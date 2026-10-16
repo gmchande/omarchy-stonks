@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "symbols": ["AAPL", "PSIX", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T"],
+  "featured": "AAPL",
+  "order": "manual",
+  "lists": [
+    { "name": "US", "symbols": ["AAPL", "PSIX", "SPY", "^GSPC"], "order": "manual" }
+  ],
+  "changeMode": "pct",
+  "style": "smooth",
+  "refreshIntervalSec": 60
+}

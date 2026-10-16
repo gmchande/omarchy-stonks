@@ -1,0 +1,105 @@
+# The checks that run on a fresh public clone, with no display, no Omarchy
+# install, and none of the private saved answers. test/all.sh is the full
+# suite; it runs on a desktop with Omarchy.
+#
+# Left out, because they can't run here:
+# - QML lint (test/lint.sh): it lints against the installed shell's QML.
+# - Lint's self-check: it needs the qmllint of the shell's own Qt; Ubuntu's
+#   is older and words its diagnostics differently.
+# - test/saved.test.js: it reads the saved Yahoo and Robinhood answers,
+#   which are private.
+# - The Quickshell harnesses (test/qml/*.sh, data-files.sh included) and the
+#   offscreen renders: they need Quickshell and a Wayland session. The crash
+#   handling's self-check runs: its Quickshell is a stand-in.
+# - The tophat's self-check (test/tophat.sh self-check): it needs Hyprland.
+#
+# Every action and tool is pinned to an exact version: actions by commit,
+# downloads by sha256. The runner image, with its bash and python3, is
+# pinned only as far as GitHub allows, to its ubuntu-24.04 label.
+name: Checks
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Checks a fresh clone can run
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.3
+
+      # Omarchy at one commit, from its public repo: its own plugin
+      # validator, a bash and jq script that needs no Omarchy install, and
+      # its themes, which the pure rules read where Omarchy installs them.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: basecamp/omarchy
+          ref: b7e900cedd0c98e843aba4ae3ec301172044238a
+          path: omarchy
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /themes/
+            /bin/omarchy-plugin-validate
+
+      # ripgrep and jq for the boundaries, desktop-file-validate for the
+      # launcher entry; Omarchy's part moves out of the plugin's folder.
+      - name: Install ripgrep 15.2.0, jq 1.8.2, desktop-file-utils 0.27, and Omarchy's validator and themes
+        run: |
+          tools=$RUNNER_TEMP/tools
+          mkdir -p "$tools/bin"
+          sudo mkdir -p /usr/share/omarchy
+          sudo mv omarchy/themes /usr/share/omarchy/
+          mv omarchy/bin/omarchy-plugin-validate "$tools/bin/"
+          rm -rf omarchy
+          cd "$tools"
+          curl -fsSLO https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-unknown-linux-musl.tar.gz
+          curl -fsSL -o bin/jq https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-linux-amd64
+          curl -fsSLO https://archive.ubuntu.com/ubuntu/pool/main/d/desktop-file-utils/desktop-file-utils_0.27-2build1_amd64.deb
+          sha256sum -c <<'EOF'
+          33e15bcf1624b25cdd2a55813a47a2f95dbe126268203e76aa6a585d1e7b149c  ripgrep-15.2.0-x86_64-unknown-linux-musl.tar.gz
+          b1c22172dd303f3be49e935aa56aa48a8b7a46e0bc838b4997d3bb451495870f  bin/jq
+          a6b03256d0153a8d1213ee21123d15315945752308f31b63751d7b29543b8bc0  desktop-file-utils_0.27-2build1_amd64.deb
+          EOF
+          tar -xzf ripgrep-15.2.0-x86_64-unknown-linux-musl.tar.gz --strip-components=1 -C bin ripgrep-15.2.0-x86_64-unknown-linux-musl/rg
+          dpkg-deb -x desktop-file-utils_0.27-2build1_amd64.deb deb
+          cp deb/usr/bin/desktop-file-validate bin/
+          chmod +x bin/*
+          echo "$tools/bin" >> "$GITHUB_PATH"
+
+      - name: Pure rules (bun test)
+        run: bun test ./test/model.test.js
+
+      - name: Source boundaries
+        run: bash test/boundaries.sh
+
+      - name: Frame checker self-check
+        run: bun test/qml/frames.js self-check
+
+      - name: Quickshell crash handling self-check (stand-in)
+        run: bash test/qml/crash-check.sh
+
+      - name: Launcher icon is the mark
+        run: bun test/mark-svg.js check
+
+      - name: Launcher entry validates
+        run: desktop-file-validate share/stonks.desktop
+
+      - name: Manifest and calendars are valid JSON
+        run: jq -e . manifest.json calendars.json > /dev/null
+
+      - name: omarchy plugin validate
+        run: omarchy-plugin-validate .

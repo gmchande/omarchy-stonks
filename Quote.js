@@ -1,0 +1,369 @@
+.import "Format.js" as Format
+
+// Yahoo's day answer for a listing, and the day's prices read off it: the
+// session its bars describe, the headline, the change, and each print's
+// session. If the chart endpoint changes, its URL and parser move here.
+// Knows no calendar, no Robinhood, and nothing of how a figure is shown.
+
+var CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/"
+
+// Yahoo's short exchange codes to the names people use. A listing falls back
+// to Yahoo's full exchange name; a search result to Yahoo's own short code.
+var EXCHANGE_NAMES = {
+  NMS: "NASDAQ", NGM: "NASDAQ", NCM: "NASDAQ", NAS: "NASDAQ", NYQ: "NYSE", PCX: "NYSE ARCA",
+  ASE: "NYSE AMERICAN", BTS: "CBOE", TOR: "TSX", VAN: "TSXV", NEO: "NEO", CNQ: "CSE", LSE: "LSE",
+  IOB: "LSE", TYO: "TSE", JPX: "TSE", FRA: "FRA", GER: "XETRA", PAR: "PARIS", AMS: "AMSTERDAM",
+  HKG: "HKEX", ASX: "ASX", NZE: "NZX", SES: "SGX", BSE: "BSE", NSI: "NSE", CCC: "CRYPTO", CCY: "FX",
+  SNP: "S&P", DJI: "DOW", NIM: "NASDAQ", PNK: "OTC", OQB: "OTC", OQX: "OTC", OEM: "OTC", JNB: "JSE"
+}
+
+function chartUrl(symbol) {
+  return CHART_URL + encodeURIComponent(symbol) + "?range=1d&interval=5m&includePrePost=true"
+}
+
+// How far apart two prices are, as a fraction of the larger.
+function apart(a, b) {
+  var scale = Math.max(Math.abs(a), Math.abs(b))
+  return scale > 0 ? Math.abs(a - b) / scale : 0
+}
+
+// Under this, two prices are the same level; over it, they are not.
+var STRAY_GAP = 0.005
+
+// The longest run of stray buckets seen: Yahoo has sent two in a row.
+var STRAY_RUN = 3
+
+// The longest run of mixed stray prints seen inside one extended session:
+// BRK-B's four after its close on Friday 2 October.
+var MIXED_RUN = 4
+
+// Yahoo drops stray ticks into intraday buckets: a bell bucket that falls
+// back to yesterday's close, a lone after-hours print, sometimes two in a
+// row. What identifies them is not how far they reach — one of the saved
+// cases is 0.8% — but that the series carries on as if they never happened.
+function filterStrayCloses(bars, periods) {
+  var source = bars || []
+  if (source.length < 3) return { bars: source.slice(), droppedTimes: [] }
+  var kept = [bars[0]]
+  var droppedTimes = []
+  var level = 0
+  var i = 1
+  while (i < bars.length) {
+    var run = strayRun(bars, level, i) || mixedRun(bars, level, i, periods)
+    if (run > 0) {
+      for (var dropped = 0; dropped < run; dropped++) droppedTimes.push(bars[i + dropped].t)
+      i += run
+      continue
+    }
+    kept.push(bars[i])
+    level = i
+    i++
+  }
+  return { bars: kept, droppedTimes: droppedTimes }
+}
+
+// How many bars from `from` the series says never happened: their closes have
+// all left the accepted bar's price, and the bar after them opens back at that
+// price instead of continuing from the last of them. A real move is the other
+// way round — the next bar opens from where the move closed. Zero for a real
+// move, across an uneven gap so a session break is never bridged, and for a
+// run with no bar after it, so the newest bar is never judged.
+function strayRun(bars, level, from) {
+  var price = bars[level].c
+  var step = bars[level + 1].t - bars[level].t
+  for (var length = 1; length <= STRAY_RUN; length++) {
+    var end = from + length - 1
+    var back = end + 1 < bars.length ? bars[end + 1] : null
+    if (!back || back.t - bars[end].t !== step) return 0
+    if (!Format.isFiniteNumber(back.o) || apart(bars[end].c, price) <= STRAY_GAP) return 0
+    if (apart(back.o, price) <= STRAY_GAP && apart(back.o, bars[end].c) > STRAY_GAP) return length
+  }
+  return 0
+}
+
+// Yahoo also mixes stray prints into a quiet extended session: BRK-B on
+// Friday 2 October, 16:45 to 17:10, closed at 520.93, 489.66, 500.31, and
+// 489.66 between 502.80 and 502.65, 30, 5, 10, and 10 minutes apart. Inside
+// one pre- or post-market session, whatever the gaps, a run of three or four
+// bars is stray when none of them opens where the one before closed, their
+// closes land both above and below the accepted price, and the bar after
+// them opens back at that price. A thin listing's own trades take that shape
+// two bars at a time (REED's 18:25 and 18:40 on 1 October), never three in
+// the saved answers. Zero otherwise; `periods` are the answer's sessions.
+function mixedRun(bars, level, from, periods) {
+  var price = bars[level].c
+  var session = extendedSession(periods, bars[level].t)
+  if (!session) return 0
+  var above = false
+  var below = false
+  for (var end = from; end < from + MIXED_RUN && end + 1 < bars.length; end++) {
+    var bar = bars[end]
+    var back = bars[end + 1]
+    if (end > from && apart(bar.o, bars[end - 1].c) <= STRAY_GAP) return 0
+    if (extendedSession(periods, back.t) !== session) return 0
+    if (apart(bar.c, price) > STRAY_GAP) {
+      if (bar.c > price) above = true
+      else below = true
+    }
+    if (end - from >= 2 && above && below && Format.isFiniteNumber(back.o)
+        && apart(back.o, price) <= STRAY_GAP && apart(back.o, bar.c) > STRAY_GAP) return end - from + 1
+  }
+  return 0
+}
+
+// "pre" or "post" when `t` falls in that session of `periods`, else "".
+function extendedSession(periods, t) {
+  var names = ["pre", "post"]
+  for (var n = 0; periods && n < names.length; n++) {
+    var period = periods[names[n]]
+    if (period && t >= period.start && t < period.end) return names[n]
+  }
+  return ""
+}
+
+function parseChart(json) {
+  var result = json && json.chart && json.chart.result && json.chart.result[0]
+  if (!result || !result.meta) return null
+  var meta = result.meta
+  var timestamps = result.timestamp || []
+  var quote = (result.indicators && result.indicators.quote && result.indicators.quote[0]) || {}
+  var closes = quote.close || []
+  var opens = quote.open || []
+  // The session the bars describe is the answer's trading periods. Yahoo's
+  // current period moves on to the next session first (Monday's at 00:36 New
+  // York, the bars still Friday's), so it stands in only for an answer
+  // without them.
+  var periods = meta.tradingPeriods ? answerPeriods(meta.tradingPeriods) : meta.currentTradingPeriod || {}
+  var current = meta.currentTradingPeriod || {}
+  var bars = []
+  for (var i = 0; i < timestamps.length; i++) {
+    if (closes[i] !== null && closes[i] !== undefined)
+      bars.push({ t: timestamps[i], o: opens[i], c: closes[i] })
+  }
+  var filtered = filterStrayCloses(bars, periods)
+  var kept = filtered.bars
+  var regular = periodOf(periods.regular)
+  // An index is worked out only while its exchange trades. Yahoo still
+  // gives it pre- and post-market periods, and repeats its close through the
+  // evening (^GSPC's 7818.93 from 16:00 to 17:20): it has neither session,
+  // and no print outside its own.
+  var index = meta.instrumentType === "INDEX"
+  var points = []
+  for (var j = 0; j < kept.length; j++) {
+    if (!index || !regular || (kept[j].t >= regular.start && kept[j].t < regular.end))
+      points.push({ t: kept[j].t, p: kept[j].c })
+  }
+  // Yahoo moves the day's high, low, and volume on before the bars, too:
+  // London's answer before its session sends the coming day's high and low
+  // as 0, not known yet. The figures' day is then that session's, and the
+  // bars' open is not its.
+  var ahead = !knownPrice(meta.regularMarketDayHigh) && !knownPrice(meta.regularMarketDayLow) && !!current.regular
+  var figuresDay = ahead ? current.regular.start : regular ? regular.start : null
+  // The day's open: the first regular-session bar's, once there is one.
+  var firstRegular = null
+  for (var k = 0; regular && !ahead && k < kept.length && !firstRegular; k++)
+    if (kept[k].t >= regular.start && kept[k].t < regular.end) firstRegular = kept[k]
+  return {
+    symbol: meta.symbol,
+    // The long name, as search takes it: the short one arrives in capitals
+    // for some listings and is cut at 31 characters.
+    name: meta.longName || meta.shortName || meta.symbol,
+    currency: meta.currency || "USD",
+    exchange: EXCHANGE_NAMES[meta.exchangeName] || String(meta.fullExchangeName || meta.exchangeName || "").toUpperCase(),
+    timezoneName: meta.exchangeTimezoneName || "",
+    gmtoffset: meta.gmtoffset || 0,
+    // The zone's short name at that offset, as Yahoo writes it: "EDT", "JST".
+    zoneName: meta.timezone || "",
+    instrumentType: meta.instrumentType || "",
+    crypto: meta.instrumentType === "CRYPTOCURRENCY",
+    // The regular-market quote as Yahoo reports it, with its own timestamp.
+    // Kept apart from the chart samples: see headlineQuote.
+    price: Format.isFiniteNumber(meta.regularMarketPrice) ? meta.regularMarketPrice : null,
+    // The decimals every price of this listing is shown in, from its
+    // headline price and Yahoo's hint (`Format.priceDigits`).
+    priceDigits: Format.priceDigits(Format.isFiniteNumber(meta.regularMarketPrice) ? meta.regularMarketPrice
+      : (points.length ? points[points.length - 1].p : null), meta.priceHint),
+    prevClose: meta.chartPreviousClose !== undefined ? meta.chartPreviousClose : meta.previousClose,
+    marketTime: Format.isFiniteNumber(meta.regularMarketTime) && meta.regularMarketTime > 0 ? meta.regularMarketTime : null,
+    dayOpen: firstRegular ? knownPrice(firstRegular.o) : null,
+    dayHigh: knownPrice(meta.regularMarketDayHigh),
+    dayLow: knownPrice(meta.regularMarketDayLow),
+    volume: meta.regularMarketVolume,
+    fiftyTwoWeekHigh: knownPrice(meta.fiftyTwoWeekHigh),
+    fiftyTwoWeekLow: knownPrice(meta.fiftyTwoWeekLow),
+    // The start of the session the day's open, high, low, and volume are.
+    figuresDay: figuresDay,
+    session: {
+      pre: index ? null : periodOf(periods.pre),
+      regular: regular,
+      post: index ? null : periodOf(periods.post)
+    },
+    // Yahoo's current period: the next session once the bars' has ended.
+    current: {
+      pre: index ? null : periodOf(current.pre),
+      regular: periodOf(current.regular),
+      post: index ? null : periodOf(current.post)
+    },
+    points: points,
+    droppedTimes: filtered.droppedTimes
+  }
+}
+
+// Whether a quote says nothing new over the last one for the same symbol,
+// without writing out every point: every figure but the points as text,
+// then the points compared one by one, a bar Yahoo revises mid-day too.
+function sameQuote(a, b) {
+  var pa = a.points || []
+  var pb = b.points || []
+  if (pa.length !== pb.length) return false
+  for (var i = 0; i < pa.length; i++) if (pa[i].t !== pb[i].t || pa[i].p !== pb[i].p) return false
+  return JSON.stringify(figuresOf(a)) === JSON.stringify(figuresOf(b))
+}
+
+function figuresOf(quote) {
+  var figures = {}
+  for (var key in quote) if (key !== "points") figures[key] = quote[key]
+  return figures
+}
+
+function periodOf(period) {
+  return period ? { start: period.start, end: period.end } : null
+}
+
+// An answer's trading periods as its pre, regular, and post sessions: each
+// the last day it lists, from its first period's start to its last's end.
+function answerPeriods(periods) {
+  var out = {}
+  var names = ["pre", "regular", "post"]
+  for (var i = 0; i < names.length; i++) {
+    var days = periods[names[i]] || []
+    var day = days[days.length - 1] || []
+    out[names[i]] = day.length ? { start: day[0].start, end: day[day.length - 1].end } : null
+  }
+  return out
+}
+
+// A price Yahoo sends as 0 is one it does not know yet: London's day high,
+// day low, and 52-week low before its session opens. Null, like a missing one.
+function knownPrice(v) {
+  return Format.isFiniteNumber(v) && v > 0 ? v : null
+}
+
+// Chart samples inside the regular session. Buckets are stamped by their
+// start, and Yahoo's regular-only series ends with the 15:55 bucket, so a
+// bucket stamped at the bell belongs to the post-market.
+function regularPoints(quote) {
+  var reg = quote.session.regular
+  if (!reg) return quote.points
+  var out = []
+  for (var i = 0; i < quote.points.length; i++) {
+    var pt = quote.points[i]
+    if (pt.t >= reg.start && pt.t < reg.end) out.push(pt)
+  }
+  return out
+}
+
+function openPrice(quote) {
+  var pts = regularPoints(quote)
+  return pts.length ? pts[0].p : quote.prevClose
+}
+
+// The headline: the regular-market quote Yahoo reports, with its own
+// timestamp, the way Apple's Stocks shows the price. It is the latest
+// regular print while trading and the close otherwise, and it may be
+// stamped a second after the bell or belong to the previous session; that
+// is still the regular quote. Only when the metadata is unusable does the
+// last regular chart sample stand in, with its own time. Null when neither
+// exists: an unavailable price is shown as unavailable, never invented.
+function headlineQuote(quote) {
+  if (Format.isFiniteNumber(quote.price) && Format.isFiniteNumber(quote.marketTime)) {
+    return { price: quote.price, t: quote.marketTime, source: "quote" }
+  }
+  var pts = regularPoints(quote)
+  if (pts.length) return { price: pts[pts.length - 1].p, t: pts[pts.length - 1].t, source: "chart" }
+  return null
+}
+
+function regularClose(quote) {
+  var head = headlineQuote(quote)
+  return head ? head.price : null
+}
+
+// The latest print outside a regular session, the newest print of all
+// (`latest` when given, else the quote's own last): pre-market, post-market,
+// or overnight. Null while the regular session's print is the newest.
+function extendedPrint(quote, latest) {
+  var pts = quote.points
+  var last = latest || pts[pts.length - 1]
+  if (!quote.session.regular || !last) return null
+  var phase = pointSession(quote, last)
+  return phase === "reg" ? null : { t: last.t, p: last.p, phase: phase }
+}
+
+// What a moment `t` of the day reads, shaped as the headline is: the price
+// at or just before it, at `t`; before the first print, the previous close.
+// Once Yahoo's quote is the regular session's close, the session's last
+// print reads that close at the bell (`close`): the S&P 500's last bar is
+// 15:55's, never its close, and Tokyo's 15:20's. Not at the quote's own
+// stamp, which can come later: London's close on 7 October, 16:30, was
+// stamped 17:20, after its 16:30 and 16:35 after-hours buckets.
+function readingAt(quote, t) {
+  var pts = quote.points
+  if (!pts.length || t < pts[0].t) return { price: quote.prevClose, t: t, close: false }
+  var k = 0
+  while (k + 1 < pts.length && pts[k + 1].t <= t) k++
+  var head = headlineQuote(quote)
+  var reg = quote.session.regular
+  if (!quote.crypto && head && head.source === "quote" && reg && head.t >= reg.end
+      && pointSession(quote, pts[k]) === "reg" && (k + 1 === pts.length || pointSession(quote, pts[k + 1]) !== "reg"))
+    return { price: head.price, t: reg.end, close: true }
+  return { price: pts[k].p, t: t, close: false }
+}
+
+function change(quote, priceNow, mode) {
+  var base = mode === "open" ? openPrice(quote) : quote.prevClose
+  if (!Format.isFiniteNumber(priceNow) || !Format.isFiniteNumber(base)) return { abs: null, pct: null, up: true }
+  var abs = priceNow - base
+  return { abs: abs, pct: base ? (abs / base) * 100 : 0, up: abs >= 0 }
+}
+
+// A print's session: its own tag where the series carries one, else where it
+// falls against the response's regular session. Buckets are stamped by their
+// start, so the one stamped at the bell is post-market.
+function pointSession(quote, pt) {
+  if (pt.s) return pt.s
+  var reg = regularOrPrints(quote)
+  return pt.t >= reg.end ? "post" : pt.t < reg.start ? "pre" : "reg"
+}
+
+// The regular session, or the prints' own span when Yahoo sent none.
+function regularOrPrints(quote) {
+  var pts = quote.points
+  return quote.session.regular || { start: pts[0] ? pts[0].t : 0, end: pts.length ? pts[pts.length - 1].t : 1 }
+}
+
+// The last print the chart actually drew. The axis runs on past it, to the
+// bell or to midnight, but there is nothing to read past this, so the scrub
+// stops here.
+function lastPrintTime(quote) {
+  var pts = quote.points
+  return pts.length ? pts[pts.length - 1].t : null
+}
+
+// Where the response's own day starts and ends: its pre- and post-market,
+// or its regular session.
+function dayStart(quote) {
+  var s = quote.session
+  return s.pre ? s.pre.start : s.regular ? s.regular.start : 0
+}
+
+function dayEnd(quote) {
+  var s = quote.session
+  return s.post ? s.post.end : s.regular ? s.regular.end : 0
+}
+
+function bucketTimes(times) {
+  var out = []
+  for (var i = 0; times && i < times.length; i++) out.push(new Date(times[i] * 1000).toISOString())
+  return out.join(", ")
+}

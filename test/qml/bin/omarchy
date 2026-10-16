@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# A stand-in for the omarchy command, first on PATH inside the harnesses, so
+# a footer click that restarts the shell restarts nothing. It appends its
+# arguments as one line to STONKS_FAKE_STATE/omarchy.calls and refuses the
+# way `omarchy restart shell` does while the session is locked, so the
+# service is left running, as it would be then.
+echo "$*" >> "$STONKS_FAKE_STATE/omarchy.calls"
+echo "Refusing to restart Omarchy shell while the session is locked." >&2
+exit 1

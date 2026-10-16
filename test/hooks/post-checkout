@@ -1,0 +1,13 @@
+#!/bin/sh
+# Copies the main checkout's AGENTS.md into a worktree that has none, so an
+# agent in a new worktree reads the same local rules. AGENTS.md is ignored,
+# so no checkout brings it. A real file, never a link: `omarchy plugin
+# validate` refuses any symlink in the plugin folder. A worktree that already
+# has one keeps it, the main checkout's own included. Turn it on once, in the
+# main checkout: git config core.hooksPath test/hooks
+# Never fails the git command that ran it.
+common=$(git rev-parse --path-format=absolute --git-common-dir 2> /dev/null) || exit 0
+top=$(git rev-parse --show-toplevel 2> /dev/null) || exit 0
+source="${common%/.git}/AGENTS.md"
+[ -f "$source" ] && [ ! -e "$top/AGENTS.md" ] && cp "$source" "$top/AGENTS.md"
+exit 0

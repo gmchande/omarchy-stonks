@@ -1,0 +1,1095 @@
+import QtQuick
+import Quickshell
+import Quickshell.Io
+import "Chart.js" as Chart
+import "Fundamentals.js" as Fundamentals
+import "History.js" as History
+import "Market.js" as Market
+import "Overnight.js" as Overnight
+import "Settings.js" as Settings
+// The one data owner. Data settings live in grvc.stonks.json and are
+// written only here, including what you are looking at: the list, the
+// featured symbol, and the chart range the popup and the window share.
+// List membership follows Settings.js's rules; this file persists their result.
+Item {
+  id: root
+
+  property var dataSettings: Settings.fileSettings(null)
+  property bool pluginsReady: false
+  // The data file is there but can't be read: empty, not JSON, or not an
+  // object. The settings in memory stay, the defaults if it never could be
+  // read, and changes still apply to them, but nothing is written until the
+  // file reads again, so a typo in it never costs the user's lists.
+  property bool settingsUnreadable: false
+  property int now: Math.floor(Date.now() / 1000)
+  // A symbol whose fundamentals were asked for before its first quote.
+  property string pendingFundamentals: ""
+  // What the last removal took and the settings from just before it, on
+  // offer until the next change to what the lists hold, however it comes: a
+  // change here, on either surface, or in the data file.
+  property var lastRemoval: null
+  property string listsHeld: ""
+  onDataSettingsChanged: {
+    var held = Settings.listsHeld(root.dataSettings)
+    if (held === root.listsHeld) return
+    root.listsHeld = held
+    root.lastRemoval = null
+  }
+  // Symbols just added whose first answer is not in: neither a quote nor a
+  // first fetch that failed for good. They are members, saved and fetched,
+  // but no list shows them until then.
+  property var arriving: []
+  // The surfaces open now: the popup on any bar, the window. The chart's
+  // history is wanted only while one is (`surfaceShown`).
+  property var openSurfaces: []
+  // The search result a surface's hero shows unadded, the keyboard's choice
+  // while its search is open (`preview`); "" when none is. Never saved.
+  property string previewSymbol: ""
+  // The surface whose search it is: one search previews at a time, and
+  // another surface's search that starts choosing takes it.
+  property var previewSurface: null
+  // The choice has rested on it: only then are its quote, its range's
+  // history, and its cap and P/E asked for.
+  property bool previewRests: false
+  // The symbols whose quotes are kept fresh now: the featured symbol, which
+  // the pill shows; every stock, ETF, and index in All through its own
+  // regular session, so an open finds the rows fresh (`Market.staysWarm`);
+  // and all of All while a surface is open. Each is asked for on its own
+  // market's clock (`askDue`).
+  property var watched: []
+
+  readonly property string dataPath: Quickshell.env("HOME") + "/.config/omarchy/grvc.stonks.json"
+  // The last good quotes, shown at start until each one's first answer.
+  readonly property string quotesPath: (Quickshell.env("XDG_CACHE_HOME") || Quickshell.env("HOME") + "/.cache")
+    + "/grvc.stonks/quotes.json"
+
+  // All, the library: every symbol, fetched once each whatever lists hold it.
+  readonly property var library: dataSettings.symbols
+  // The current list: "" for All. Its symbols in manual order are the rows.
+  readonly property string listName: dataSettings.list
+  readonly property var lists: Settings.listChoices(dataSettings)
+  // Every member of the current list, in manual order, arriving ones too.
+  readonly property var symbols: Settings.listSymbols(dataSettings)
+  readonly property string order: Settings.listOrder(dataSettings)
+  readonly property bool reversed: Settings.listReversed(dataSettings)
+  readonly property string range: dataSettings.range
+  // The popup's first-run hint has shown.
+  readonly property bool hinted: dataSettings.hinted
+  // What the surfaces show of the settings, as one value, so a change of it
+  // is whole whatever changed: the hero, the range, the list and its key
+  // (`listKey`), which tells a rename from a switch, its order and
+  // direction, its rows (members that have answered), those rows as sorted,
+  // All, and the chart asked for once it is ready.
+  // Read straight from the settings and the feeds, not from the bindings
+  // above, which may not have caught up when this one is evaluated.
+  readonly property var view: {
+    var all = dataSettings.symbols
+    var order = Settings.listOrder(dataSettings)
+    var reversed = Settings.listReversed(dataSettings)
+    var rows = Settings.listSymbols(dataSettings).filter(function(s) { return arriving.indexOf(s) < 0 })
+    var named = String(dataSettings.featured || "").toUpperCase()
+    var featured = all.indexOf(named) >= 0 ? named : (all[0] || "")
+    var range = dataSettings.range
+    // Receipts and histories are read only when the chart needs them, so a
+    // receipt for a quoted symbol on the day recomputes nothing here.
+    var chart = Chart.viewChart(featured, range, feed.quotes,
+      feed.quotes[featured] ? ({}) : feed.entries, range === "1D" ? ({}) : historyFeed.entries,
+      overnightFeed.entries, allDayFeed.entries, calendars)
+    root.keepDay(featured, chart, overnightFeed.entries, allDayFeed.entries)
+    return {
+      featured: featured,
+      range: range,
+      list: dataSettings.list,
+      listKey: root.listKey(dataSettings.list),
+      order: order,
+      reversed: reversed,
+      rows: rows,
+      shown: Settings.sortedSymbols(rows, feed.quotes, order, reversed),
+      library: all,
+      // The chart asked for once it can be drawn (`Chart.viewChart`), null
+      // while it is on its way: each surface keeps the one it has on screen.
+      chart: chart
+    }
+  }
+  // The view with the preview as its hero, unadded: the rows and the range
+  // as they are, and its chart once it can be drawn. The view itself while
+  // there is none. A symbol in All has its chart as it does featured; a US
+  // listing outside it has Yahoo's own day: Robinhood is asked only for All.
+  readonly property var previewView: {
+    var symbol = root.previewSymbol
+    if (!symbol) return view
+    var own = !!previewFeed.quotes[symbol] || !!previewFeed.entries[symbol]
+    var quotes = own ? previewFeed.quotes : feed.quotes
+    var entries = own ? previewFeed.entries : feed.entries
+    var range = view.range
+    var nights = own ? ({}) : overnightFeed.entries
+    var allDay = own ? null : allDayFeed.entries
+    var chart = Chart.viewChart(symbol, range, quotes, quotes[symbol] ? ({}) : entries,
+      range === "1D" ? ({}) : historyFeed.entries, nights, allDay, calendars)
+    root.keepDay(symbol, chart, nights, allDay)
+    return Object.assign({}, view, { featured: symbol, chart: chart })
+  }
+  readonly property var previewEntries: previewFeed.entries
+  readonly property string featuredSymbol: view.featured
+  readonly property string changeMode: dataSettings.changeMode === "abs" || dataSettings.changeMode === "open"
+    ? dataSettings.changeMode : "pct"
+  readonly property bool retro: dataSettings.style === "retro"
+  readonly property int refreshIntervalSec: dataSettings.refreshIntervalSec
+  readonly property var quotes: feed.quotes
+  readonly property var entries: feed.entries
+  // Each symbol asked for and not yet answered, with the second it was asked.
+  readonly property var asked: feed.asked
+  readonly property var histories: historyFeed.entries
+  readonly property var fundamentals: fundamentalsFeed.entries
+  readonly property var shown: view.shown
+  // Every US stock and ETF, by its quote (`Overnight.hasOvernight`), never by
+  // what Robinhood answers: Robinhood is asked whether it trades each all day.
+  readonly property var overnightSymbols: library.filter(function(s) {
+    return !!feed.quotes[s] && Overnight.hasOvernight(feed.quotes[s], calendars)
+  })
+  // Those Robinhood trades all day, the only ones asked for its prints.
+  readonly property var allDaySymbols: overnightSymbols.filter(function(s) {
+    return !!allDayFeed.entries[s] && allDayFeed.entries[s].allDay
+  })
+  // Robinhood is asked only while a surface is open, the one place its
+  // answers show: whether it trades a listing all day, once a day each
+  // (`Overnight.allDayDue`); and the prints of those it does, for each one
+  // it has not answered for, and for all of them as a night goes
+  // (`Overnight.overnightDue`). Looked at as the clock ticks, the listings
+  // change, a surface opens, and the screens answer; never while every
+  // screen is off (`screensClear`).
+  function askOvernight() {
+    if (!root.pluginsReady || root.openSurfaces.length === 0) return
+    var tradability = root.overnightSymbols.filter(function(s) {
+      return Overnight.allDayDue(allDayFeed.entries[s], root.now)
+    })
+    var prints = []
+    if (root.allDaySymbols.length > 0) {
+      var failed = root.allDaySymbols.some(function(s) {
+        return !!overnightFeed.entries[s] && overnightFeed.entries[s].status === "failed"
+      })
+      prints = Overnight.overnightDue(overnightFeed.askedAt, root.now, root.calendars, failed)
+        ? root.allDaySymbols : root.allDaySymbols.filter(function(s) { return !overnightFeed.entries[s] })
+    }
+    if ((tradability.length === 0 && prints.length === 0) || !root.screensClear()) return
+    allDayFeed.fetch(tradability, root.now)
+    overnightFeed.fetch(prints, root.now)
+  }
+  // The clock's work, as it moves: the asks fall due at their own second
+  // (`dueAt`), and the rest by the minute, when a market's session may have
+  // begun or ended.
+  onNowChanged: {
+    askOvernight()
+    if ((root.dueAt > 0 && root.now >= root.dueAt) || Math.floor(root.now / 60) !== root.askedMinute) askDue()
+    // What a symbol gone keeps ages out by the minute, with no edit to
+    // prompt it (`forgetLeft`).
+    if (Math.floor(root.now / 60) !== root.prunedMinute) {
+      root.prunedMinute = Math.floor(root.now / 60)
+      forgetLeft()
+    }
+    // A refresh owed while every screen was off asks again as the clock
+    // moves, so it goes once one is on, quotes due or not.
+    if (root.refreshOwed && root.screensClear()) {
+      root.refreshOwed = false
+      root.refreshRest()
+    }
+    flushQuotes()
+  }
+  property int prunedMinute: -1
+  onOvernightSymbolsChanged: askOvernight()
+  onAllDaySymbolsChanged: askOvernight()
+
+  // What is watched (`watched`), and of it what is due: a symbol whose last
+  // answer, ok or failed, is as old as its own market's cadence
+  // (`Market.quoteCadence`), the hero of an open surface on the interval.
+  // First answers are the feed's own. Looked at as the clock reaches the
+  // next one due (`dueAt`) and each minute, as answers land, as a surface
+  // opens, as the featured symbol or a resting preview changes, and as the
+  // interval does: on the wall clock, which `now` trails between ticks
+  // while nothing is open. Whatever is asked goes only while a screen is on
+  // (`screensClear`).
+  property int dueAt: 0
+  property int askedMinute: -1
+  function askDue() {
+    if (!root.pluginsReady) return
+    var now = root.wallSecond()
+    root.askedMinute = Math.floor(now / 60)
+    var open = root.openSurfaces.length > 0
+    var featured = root.view.featured
+    var watched = root.library.filter(function(s) {
+      return open || s === featured || Market.staysWarm(feed.quotes[s], now, root.calendars)
+    })
+    if (watched.join(",") !== root.watched.join(",")) root.watched = watched
+    var due = []
+    var next = 0
+    watched.forEach(function(s) {
+      var entry = feed.entries[s]
+      if (!entry || entry.status === "saved" || s in feed.asked) return
+      var hero = open && (s === featured || (root.previewRests && s === root.previewSymbol))
+      var at = entry.answeredAt + Market.quoteCadence(feed.quotes[s], now, root.refreshIntervalSec, hero, root.calendars)
+      if (at <= now) due.push(s)
+      else if (next === 0 || at < next) next = at
+    })
+    root.dueAt = next
+    if (due.length > 0) feed.ask(due, now)
+  }
+  onPreviewRestsChanged: askDue()
+  onRefreshIntervalSecChanged: askDue()
+
+  // The window's host, which asks Hyprland whether every screen is off.
+  // Every request a feed starts on the schedule, a quote run (queued,
+  // retried, or after a pause), Robinhood's, and a refresh's history, asks
+  // first (`screensClear`): only an answer under a second old says go. An
+  // older one is asked again, and the answer lets what waits go
+  // (`screensAnswered`), or holds it while every screen is off.
+  property var screens: null
+  readonly property bool screensOff: !!root.screens && root.screens.screensOff
+  property real screensAnsweredMs: 0
+  function screensClear() {
+    if (!root.screens) return true
+    if (Date.now() - root.screensAnsweredMs < 1000) return !root.screensOff
+    // No screens to ask, as in a harness: nothing holds.
+    return !root.screens.askScreens()
+  }
+  Connections {
+    target: root.screens
+    function onScreensAnswered() { Qt.callLater(root.screensAnswered) }
+  }
+  function screensAnswered() {
+    root.screensAnsweredMs = Date.now()
+    if (root.screensOff) return
+    feed.pump()
+    previewFeed.pump()
+    root.askOvernight()
+    if (root.refreshOwed) {
+      root.refreshOwed = false
+      root.refreshRest()
+    }
+    root.fetchAhead()
+  }
+  // The day last built for each symbol's chart, kept while what built it is
+  // the same: its quote, and for a listing Robinhood trades all day its
+  // prints, read from the answers the chart was built from (`nights`,
+  // `allDay`, as `Chart.viewChart` took them), so an own preview's Yahoo day
+  // is never handed to the same symbol's calendar day once it is added. An
+  // answer for another symbol hands the chart the objects it has and nothing
+  // that draws it repaints. Written in place by the views, and pruned with
+  // the other caches by symbol (`forgetLeft`); it notifies nothing.
+  readonly property var builtDays: ({})
+  function keepDay(symbol, chart, nights, allDay) {
+    if (!chart || !chart.quote || chart.day === chart.quote) return
+    var tradability = allDay ? allDay[symbol] : null
+    var night = tradability && tradability.allDay ? nights[symbol] : null
+    var bars = night ? night.bars : null
+    var built = builtDays[symbol]
+    if (built && built.quote === chart.quote && built.bars === bars) {
+      chart.day = built.day
+      chart.latest = built.latest
+    } else {
+      builtDays[symbol] = { quote: chart.quote, bars: bars, day: chart.day, latest: chart.latest }
+    }
+  }
+
+  FileView {
+    id: calendarFile
+    path: Qt.resolvedUrl("calendars.json")
+    blockLoading: true
+    printErrors: false
+  }
+
+  readonly property var calendars: {
+    try { return JSON.parse(calendarFile.text()) } catch (e) { return null }
+  }
+
+  FileView {
+    id: shellFile
+    path: Quickshell.env("HOME") + "/.config/omarchy/shell.json"
+    blockLoading: true
+    printErrors: false
+  }
+
+  FileView {
+    id: dataFile
+    path: root.dataPath
+    watchChanges: true
+    atomicWrites: true
+    // Written before setText returns. Quickshell 0.3.1's async write, cancelled
+    // by the next, leaves the cancelled text as what it compares a third
+    // against, so a change back to it while the second is in flight is never
+    // written, and the watch reads the second back over it.
+    blockWrites: true
+    printErrors: false
+    onFileChanged: root.readDataFile()
+    onLoaded: root.dataReadEnded(root.takeLoadedSettings)
+    // Only a file that isn't there is missing: one there that can't be
+    // read, for its permissions or as a folder, is never written over.
+    onLoadFailed: function(error) {
+      root.dataReadEnded(error === FileViewError.FileNotFound ? root.takeMissingFile : root.takeUnreadableFile)
+    }
+    // A write drops a read in flight unheard: neither loaded nor failed.
+    onSaved: root.dataReadEnded(null)
+    onSaveFailed: function(error) {
+      console.warn("stonks: failed to write " + root.dataPath + ": " + error)
+      root.dataReadEnded(null)
+    }
+  }
+  // A read of the data file is in flight, or owed; the first starts as its
+  // path is set. Quickshell 0.3.1 ignores a reload() asked for while one is,
+  // so a change saved meanwhile would never be read: it is held instead,
+  // and read once that read ends, however it ends.
+  property bool dataReading: true
+  property bool dataChangedMeanwhile: false
+  function readDataFile() {
+    if (root.dataReading) {
+      root.dataChangedMeanwhile = true
+      return
+    }
+    root.startDataRead()
+  }
+  function startDataRead() {
+    root.dataReading = true
+    dataFile.reload()
+  }
+  // TAKE, when the read found something, takes it first. A change held
+  // during the read is read once the handler has returned: Quickshell lets
+  // go of a read only after its loaded or loadFailed handlers have run.
+  function dataReadEnded(take) {
+    var again = root.dataChangedMeanwhile
+    root.dataReading = again
+    root.dataChangedMeanwhile = false
+    if (take) take()
+    if (again) Qt.callLater(root.startDataRead)
+  }
+
+  Gate {
+    id: yahooGate
+    host: "Yahoo"
+    clock: root
+    onReopened: root.showHistory(false)
+  }
+  // Robinhood is asked for its prints and its instruments as a surface
+  // opens, as US listings are added, every 5 minutes through a night, and on
+  // r: a few a minute, more while adding, so the budget only stops a
+  // runaway.
+  Gate {
+    id: robinhoodGate
+    host: "Robinhood"
+    clock: root
+    capacity: 20
+    perMinute: 10
+  }
+  readonly property alias yahooGate: yahooGate
+
+  QuoteFeed {
+    id: feed
+    symbols: root.pluginsReady ? root.library : []
+    watched: root.watched
+    lead: root.view.featured
+    now: root.now
+    clock: root
+    clearance: function() { return root.screensClear() }
+    gate: yahooGate
+  }
+
+  // One chart's history at a time; an answer may leave another chart a
+  // refresh still owes, or one with no answer yet, which is asked for next;
+  // with none, a chart in sight is fetched ahead (`fetchAhead`).
+  HistoryFeed {
+    id: historyFeed
+    gate: yahooGate
+    inUse: root.chartsInUse
+    onEntriesChanged: {
+      var owed = root.owedHistory()
+      if (owed.length > 0) historyFeed.request(owed[0], root.view.range, true)
+      else {
+        var unanswered = root.unansweredHistory()
+        if (unanswered.length > 0) historyFeed.request(unanswered[0], root.view.range, false)
+      }
+    }
+    onIdle: root.fetchAhead()
+    onMissed: function(key) {
+      var missed = Object.assign({}, root.aheadMissed)
+      missed[key] = true
+      root.aheadMissed = missed
+    }
+  }
+  // The preview's quote, fetched once when the choice rests on a symbol
+  // outside All, and never refreshed: not on the timer, not by `r`.
+  QuoteFeed {
+    id: previewFeed
+    symbols: root.previewRests && root.previewSymbol !== "" && root.library.indexOf(root.previewSymbol) < 0
+      ? [root.previewSymbol] : []
+    now: root.now
+    clock: root
+    clearance: function() { return root.screensClear() }
+    gate: yahooGate
+    bulk: false
+    onQuotesChanged: if (root.pendingFundamentals) root.fetchFundamentals(root.pendingFundamentals)
+  }
+
+  FundamentalsFeed { id: fundamentalsFeed; gate: yahooGate }
+  AllDayFeed { id: allDayFeed; now: root.now; gate: robinhoodGate }
+  OvernightFeed { id: overnightFeed; now: root.now; gate: robinhoodGate }
+
+  // A user's refresh, from a key, the pill, or IPC: every watched quote
+  // whose last answer is more than 10 s old, and, with a surface open to
+  // show them, the overnight prints unless asked for in the last 10 s, so a
+  // second press adds nothing; and the chart's history fresh whatever the
+  // cache holds. While every screen is off the quotes wait their turn, and
+  // the rest is owed (`refreshOwed`) until a screen is on.
+  property bool refreshOwed: false
+  function refresh() {
+    if (!root.pluginsReady) return
+    var now = root.wallSecond()
+    feed.ask(root.watched.filter(function(s) {
+      var entry = feed.entries[s]
+      return !!entry && entry.status !== "saved" && now - entry.answeredAt > 10
+    }), now)
+    if (!root.screensClear()) {
+      root.refreshOwed = true
+      return
+    }
+    root.refreshRest()
+  }
+  function refreshRest() {
+    var now = root.wallSecond()
+    root.showHistory(true)
+    if (root.openSurfaces.length > 0 && now - overnightFeed.askedAt > 10)
+      overnightFeed.fetch(root.allDaySymbols, now)
+  }
+
+  // The history the open surfaces' heroes show on the shared range: the
+  // featured symbol's, on every open surface but the one previewing, and
+  // the preview's once the choice rests on it. The day needs none, and
+  // neither does the pill, which always shows the day. One request at a
+  // time: a chart a user's refresh (`force`) still owes first, fetched
+  // fresh, then one with no answer yet, else the last, the preview.
+  function showHistory(force) {
+    if (!root.pluginsReady) return
+    var charts = root.historyCharts()
+    if (charts.length === 0) {
+      root.historyOwed = ({})
+      historyFeed.clear()
+      return
+    }
+    var range = root.view.range
+    if (force) {
+      var owing = {}
+      charts.forEach(function(s) {
+        var key = historyFeed.keyFor(s, range)
+        owing[key] = historyFeed.entries[key] || null
+      })
+      root.historyOwed = owing
+    }
+    var owed = root.owedHistory()
+    if (owed.length > 0) {
+      historyFeed.request(owed[0], range, true)
+      return
+    }
+    var unanswered = root.unansweredHistory()
+    historyFeed.request(unanswered.length > 0 ? unanswered[0] : charts[charts.length - 1], range, false)
+  }
+
+  // The charts a user's refresh asked for fresh, each with the answer it had
+  // then: one is owed until a new answer, ok or failed, replaces that.
+  property var historyOwed: ({})
+  function owedHistory() {
+    var range = root.view.range
+    return root.historyCharts().filter(function(s) {
+      var key = historyFeed.keyFor(s, range)
+      return key in root.historyOwed && historyFeed.entries[key] === root.historyOwed[key]
+    })
+  }
+
+  // A preview that ends as its symbol is added, before its first answer,
+  // with its history still out: the add's, whose row lands and is featured
+  // in a moment, takes that fetch over, ahead of the hero it leaves, rather
+  // than letting it go and asking again; { symbol, surface }, the surface
+  // whose search added it. Until the next change of the chart asked for,
+  // the next preview, or that surface closing, which ends the add's landing.
+  property var handedOver: null
+
+  // The symbols whose history the open surfaces' heroes show: first the
+  // one an add from search took over (`handedOver`), then the featured
+  // symbol's and a resting preview's.
+  function historyCharts() {
+    if (root.openSurfaces.length === 0 || root.view.range === "1D") return []
+    var charts = root.handedOver ? [root.handedOver.symbol] : []
+    if (root.previewSymbol === "" || root.openSurfaces.some(function(s) { return s !== root.previewSurface }))
+      if (charts.indexOf(root.view.featured) < 0) charts.push(root.view.featured)
+    if (root.previewSymbol !== "" && root.previewRests && charts.indexOf(root.previewSymbol) < 0)
+      charts.push(root.previewSymbol)
+    return charts.filter(function(s) { return s !== "" })
+  }
+
+  // Those of them with no answer yet, ok or failed.
+  function unansweredHistory() {
+    var range = root.view.range
+    return root.historyCharts().filter(function(s) { return !historyFeed.entries[historyFeed.keyFor(s, range)] })
+  }
+
+  // The rows each open surface shows, top first, as { surface, symbols }
+  // (`rowsSeen`): on a range, their charts are fetched ahead of a click.
+  property var sights: []
+  // The charts asked for ahead on this range and not shown since, which a
+  // change of range drops; and those that got no good answer, which are
+  // not asked for ahead again on it.
+  property var aheadAsked: ({})
+  property var aheadMissed: ({})
+  function rowsSeen(surface, symbols) {
+    var others = root.sights.filter(function(s) { return s.surface !== surface })
+    var next = symbols.length ? others.concat([{ surface: surface, symbols: symbols }]) : others
+    if (next.length === 0 && root.sights.length === 0) return
+    root.sights = next
+    root.fetchAhead()
+  }
+
+  // The rows in sight on the open surfaces, top first, each surface's in
+  // the order they opened, but the heroes': only as many as the history
+  // cache keeps beside the heroes' charts.
+  function aheadRows() {
+    if (root.openSurfaces.length === 0 || root.view.range === "1D") return []
+    var heroes = root.historyCharts()
+    var rows = []
+    root.sights.forEach(function(sight) {
+      sight.symbols.forEach(function(s) { if (rows.indexOf(s) < 0 && heroes.indexOf(s) < 0) rows.push(s) })
+    })
+    return rows.slice(0, historyFeed.keep - heroes.length)
+  }
+
+  // Those of them whose chart on this range has no answer yet, nor has
+  // missed one ahead.
+  function aheadCharts() {
+    var range = root.view.range
+    return root.aheadRows().filter(function(s) {
+      var key = historyFeed.keyFor(s, range)
+      return !historyFeed.entries[key] && !root.aheadMissed[key]
+    })
+  }
+
+  // The charts the heroes show and those of the rows in sight, which the
+  // cache never lets go for another.
+  readonly property var chartsInUse: root.historyCharts().concat(root.aheadRows()).map(function(s) {
+    return historyFeed.keyFor(s, root.view.range)
+  })
+
+  // One chart in sight fetched ahead, once the heroes' charts want nothing,
+  // while Yahoo has budget to spare (`Gate.spare`) and a screen is on; the
+  // next goes as the feed is idle again, or on the clock.
+  function fetchAhead() {
+    if (!root.pluginsReady || historyFeed.busy || root.screensOff || !yahooGate.spare()) return
+    var next = root.aheadCharts()[0]
+    if (!next || !root.screensClear()) return
+    var key = historyFeed.keyFor(next, root.view.range)
+    var asked = Object.assign({}, root.aheadAsked)
+    asked[key] = true
+    root.aheadAsked = asked
+    historyFeed.request(next, root.view.range, false, true)
+  }
+
+  // A surface's search shows its choice on the hero (`previewView`), or
+  // nothing with "", which only the search previewing can say. What it
+  // needs is asked for only once the choice has rested there, so arrowing
+  // past a result asks for nothing. One that ends as its symbol is added
+  // hands its history fetch still out to the add (`handedOver`).
+  function preview(surface, symbol) {
+    var s = String(symbol || "").trim().toUpperCase()
+    if (!s && surface !== root.previewSurface) return
+    if (s === root.previewSymbol && surface === root.previewSurface) return
+    var before = root.previewSurface
+    var ending = root.previewSymbol
+    // The rest first: a choice that moves on has not rested on the next one.
+    root.previewRests = false
+    root.previewSurface = s ? surface : null
+    root.previewSymbol = s
+    if (s) {
+      root.handedOver = null
+      root.shownAsHero(s)
+      previewRest.restart()
+    } else {
+      previewRest.stop()
+      var wanted = historyFeed.wanted
+      if (root.arriving.indexOf(ending) >= 0 && !!wanted && wanted.key === historyFeed.keyFor(ending, root.view.range))
+        root.handedOver = { symbol: ending, surface: surface }
+    }
+    root.showHistory(false)
+    if (before && before !== root.previewSurface && s) root.previewTaken(before)
+  }
+
+  // Another surface's search took the preview `surface` had.
+  signal previewTaken(var surface)
+
+  Timer {
+    id: previewRest
+    interval: 250
+    onTriggered: {
+      root.previewRests = true
+      root.showHistory(false)
+      root.fetchFundamentals(root.previewSymbol)
+    }
+  }
+
+  // A surface says when it opens and closes, and as it goes. The clock
+  // catches up at once, and moves on at the pace that now holds.
+  function surfaceShown(surface, open) {
+    var others = root.openSurfaces.filter(function(s) { return s !== surface })
+    var next = open ? others.concat([surface]) : others
+    if (next.length === root.openSurfaces.length) return
+    root.openSurfaces = next
+    if (!open) {
+      root.sights = root.sights.filter(function(s) { return s.surface !== surface })
+      if (root.handedOver && root.handedOver.surface === surface) root.handedOver = null
+    }
+    root.tick()
+    root.showHistory(false)
+    root.askOvernight()
+    root.askDue()
+  }
+
+  // Asked for once per change of the chart asked for, read from the view, so
+  // a change of symbol and range together is one request, never a mixed pair.
+  // A new range drops what was fetched ahead for the last one.
+  property string chartOnShow: ""
+  onViewChanged: {
+    var chart = view.featured + "|" + view.range
+    if (chart === chartOnShow) return
+    var rangeLeft = chartOnShow !== "" && chartOnShow.split("|")[1] !== view.range
+    chartOnShow = chart
+    root.handedOver = null
+    if (rangeLeft) {
+      // A turn later: the change of the view is still being told.
+      var left = Object.keys(root.aheadAsked)
+      root.aheadAsked = ({})
+      root.aheadMissed = ({})
+      if (left.length) Qt.callLater(function() { historyFeed.drop(left) })
+    } else root.shownAsHero(view.featured)
+    showHistory(false)
+    askDue()
+  }
+
+  // A chart fetched ahead and now on a hero, featured or previewed, is a
+  // hero's: a new range keeps it.
+  function shownAsHero(symbol) {
+    var key = historyFeed.keyFor(symbol, root.view.range)
+    if (!(key in root.aheadAsked)) return
+    var asked = Object.assign({}, root.aheadAsked)
+    delete asked[key]
+    root.aheadAsked = asked
+  }
+
+  function setRange(value) {
+    if (History.historyRanges().indexOf(value) >= 0) root.persist({ range: value })
+  }
+
+  // An open surface asks for the hero's cap and P/E: the featured symbol's,
+  // or a preview's. One asked for before its quote goes when the quote
+  // lands, and only an equity's.
+  function fetchFundamentals(symbol) {
+    var normalized = String(symbol || "").toUpperCase()
+    var quote = root.quotes[normalized] || previewFeed.quotes[normalized]
+    if (!quote) {
+      root.pendingFundamentals = normalized
+      return
+    }
+    root.pendingFundamentals = ""
+    if (Fundamentals.hasFundamentals(quote)) fundamentalsFeed.fetch(normalized)
+  }
+
+  onQuotesChanged: {
+    if (pendingFundamentals) fetchFundamentals(pendingFundamentals)
+    settleArrivals()
+  }
+  // Every run's answers land in the entries, after their quotes, whether or
+  // not a quote changed: the last good quotes are saved from there. Then,
+  // once the run has left the feed's asks, the clock catches up to the
+  // answers' own second and the next ask falls due from them.
+  onEntriesChanged: {
+    settleArrivals()
+    if (Object.keys(feed.entries).some(function(s) { return feed.entries[s].status === "ok" })) saveQuotes()
+    Qt.callLater(answersLanded)
+  }
+  function answersLanded() {
+    root.tick()
+    root.askDue()
+  }
+  onLibraryChanged: {
+    settleArrivals()
+    Qt.callLater(forgetLeft)
+  }
+  onPreviewSymbolChanged: Qt.callLater(forgetLeft)
+  onLastRemovalChanged: Qt.callLater(forgetLeft)
+
+  // What is kept by symbol is kept for All, the preview, and a removal
+  // still on offer to undo: a symbol that leaves, or a preview passed by,
+  // takes its built day and its cap and P/E with it, and Robinhood's
+  // answers once they would be asked again anyway (a day for whether it
+  // trades all day, a night's five minutes for its prints, each by when
+  // that symbol was last asked), so a symbol added back meanwhile asks
+  // Robinhood nothing. Pruned as those change and each minute. The quotes
+  // go with the feeds' symbols, and histories by their own cap
+  // (`HistoryFeed.keep`).
+  function forgetLeft() {
+    var now = root.wallSecond()
+    var removed = root.lastRemoval ? root.lastRemoval.symbol : ""
+    var keep = function(s) { return root.library.indexOf(s) >= 0 || s === root.previewSymbol || s === removed }
+    for (var symbol in root.builtDays) if (!keep(symbol)) delete root.builtDays[symbol]
+    var prune = function(cache, fresh) {
+      var next = {}
+      var dropped = false
+      for (var s in cache.entries) {
+        if (keep(s) || fresh(cache.entries[s])) next[s] = cache.entries[s]
+        else dropped = true
+      }
+      if (dropped) cache.entries = next
+    }
+    prune(fundamentalsFeed, function() { return false })
+    prune(allDayFeed, function(entry) { return !Overnight.allDayDue(entry, now) })
+    prune(overnightFeed, function(entry) { return !!entry.at && now - entry.at < Overnight.OVERNIGHT_INTERVAL })
+  }
+
+  function answered(symbol) {
+    return !!feed.quotes[symbol] || !!(feed.entries[symbol] && feed.entries[symbol].status === "failed")
+  }
+
+  // An add leaves arriving once it has answered, or has left All.
+  function settleArrivals() {
+    var still = root.arriving.filter(function(s) { return root.library.indexOf(s) >= 0 && !root.answered(s) })
+    if (still.length !== root.arriving.length) root.arriving = still
+  }
+
+  function parseShell() {
+    try { return JSON.parse(shellFile.text()) } catch (e) { return null }
+  }
+
+  function parseDataText(text) {
+    try {
+      var parsed = JSON.parse(String(text || "").trim())
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null
+      return Settings.fileSettings(parsed)
+    } catch (e) {
+      return null
+    }
+  }
+
+  function adopt(settings) {
+    root.dataSettings = Settings.fileSettings(settings)
+    if (!root.pluginsReady) {
+      root.pluginsReady = true
+      feed.seed(root.parseSavedQuotes())
+      root.askDue()
+    }
+  }
+
+  FileView {
+    id: quotesFile
+    path: root.quotesPath
+    blockLoading: true
+    atomicWrites: true
+    printErrors: false
+  }
+
+  // The saved quotes, { symbol: { quote, receivedAt } }; none when the file
+  // is missing or unreadable.
+  function parseSavedQuotes() {
+    try {
+      var parsed = JSON.parse(quotesFile.text())
+      return parsed && parsed.version === 1 && parsed.quotes ? parsed.quotes : {}
+    } catch (e) {
+      return {}
+    }
+  }
+
+  // Written as answers come, at most every 10 minutes on the service's
+  // clock: at once, then, if more came meanwhile, as the wait ends.
+  property bool quotesUnsaved: false
+  property int quotesSavedAt: 0
+  function saveQuotes() {
+    root.quotesUnsaved = true
+    root.flushQuotes()
+  }
+
+  function flushQuotes() {
+    if (!root.quotesUnsaved || (root.quotesSavedAt && root.now - root.quotesSavedAt < 10 * 60)) return
+    root.quotesUnsaved = false
+    root.quotesSavedAt = root.now
+    var saved = {}
+    root.library.forEach(function(s) {
+      if (feed.quotes[s]) saved[s] = { quote: feed.quotes[s], receivedAt: (feed.entries[s] || {}).receivedAt || 0 }
+    })
+    if (typeof quotesFile.setText === "function") quotesFile.setText(JSON.stringify({ version: 1, quotes: saved }) + "\n")
+  }
+
+  function takeLoadedSettings() {
+    var parsed = root.parseDataText(dataFile.text())
+    if (!parsed) {
+      root.takeUnreadableFile()
+      return
+    }
+    root.settingsUnreadable = false
+    if (settleWrite.running) parsed = Settings.fileSettings(Object.assign({}, parsed, { featured: root.dataSettings.featured }))
+    if (root.pluginsReady && Settings.settingsEqual(parsed, root.dataSettings)) return
+    root.adopt(parsed)
+  }
+
+  // The settings in memory stay, the defaults if none were read, and
+  // nothing is written until the file reads again.
+  function takeUnreadableFile() {
+    if (!root.settingsUnreadable)
+      console.warn("stonks: " + root.dataPath + " can't be read; saving nothing until it can")
+    root.settingsUnreadable = true
+    if (!root.pluginsReady) root.adopt(root.dataSettings)
+  }
+
+  function takeMissingFile() {
+    root.settingsUnreadable = false
+    if (!root.pluginsReady) {
+      var fromBar = Settings.settingsFromBar(root.parseShell())
+      if (fromBar) {
+        root.adopt(fromBar)
+        root.writeDataFile(fromBar)
+        return
+      }
+    }
+    console.warn("stonks: settings file missing; using defaults")
+    root.adopt(Settings.fileSettings(null))
+  }
+
+  function writeDataFile(settings) {
+    var body = JSON.stringify(Settings.fileSettings(settings), null, 2) + "\n"
+    if (typeof dataFile.setText !== "function") {
+      console.warn("stonks: cannot write " + root.dataPath)
+      return
+    }
+    dataFile.setText(body)
+  }
+
+  // Saved at once, or with `settles`, once the change has rested
+  // (`settleWrite`); a change saved at once takes a waiting one with it.
+  function persist(values, settles) {
+    var next = Settings.fileSettings(root.dataSettings)
+    for (var key in values) next[key] = values[key]
+    next = Settings.fileSettings(next)
+    root.dataSettings = next
+    if (!root.pluginsReady || root.settingsUnreadable) return
+    if (settles) {
+      settleWrite.restart()
+      return
+    }
+    settleWrite.stop()
+    root.writeDataFile(next)
+  }
+
+  // The pill's wheel steps through symbols faster than the file needs to
+  // hear of each: the pill follows every notch, and the file is written
+  // once the wheel has rested. A read of the file meanwhile, of its last
+  // write or of an edit, keeps the symbol the wheel left.
+  Timer {
+    id: settleWrite
+    interval: 400
+    onTriggered: root.writeSettled()
+  }
+  function writeSettled() {
+    if (root.pluginsReady && !root.settingsUnreadable) root.writeDataFile(root.dataSettings)
+  }
+  Component.onDestruction: if (settleWrite.running) root.writeSettled()
+
+  function feature(symbol, settles) {
+    var s = String(symbol || "").toUpperCase()
+    if (root.library.indexOf(s) < 0) return
+    root.persist({ featured: s }, settles)
+  }
+
+  // The pill's wheel and IPC's next and prev: the next row of the current
+  // list, or from outside it its first or last, saved once the steps rest.
+  function featureStep(delta) {
+    var shown = root.view.shown
+    if (shown.length === 0) return
+    var at = shown.indexOf(root.view.featured)
+    root.feature(at < 0 ? shown[delta > 0 ? 0 : shown.length - 1]
+      : shown[(at + delta + shown.length) % shown.length], true)
+  }
+
+  // A summon's symbol and range, in one change.
+  function summon(symbol, range) {
+    var values = {}
+    var s = String(symbol || "").toUpperCase()
+    if (s && root.library.indexOf(s) >= 0) values.featured = s
+    if (History.historyRanges().indexOf(range) >= 0) values.range = range
+    if (Object.keys(values).length) root.persist(values)
+  }
+
+  // Every membership change is a Settings.js rule: settings in, settings out.
+  function save(next) {
+    if (Settings.settingsEqual(next, root.dataSettings)) return
+    root.persist(next)
+  }
+
+  // A symbol new to All arrives: fetched ahead of any refresh, and shown
+  // once it has answered. One already in All is a row at once. The result
+  // the hero shows as a preview joins with the answer it has: a quote, and
+  // it stays the hero, so nothing is fetched again and the chart does not
+  // change; or a first fetch that failed, and the add is done there, its
+  // row saying so.
+  function addSymbol(symbol) {
+    var s = String(symbol || "").trim().toUpperCase()
+    if (s && s === root.previewSymbol && previewFeed.entries[s])
+      feed.restore(s, previewFeed.quotes[s] || null, previewFeed.entries[s])
+    var shown = s !== "" && s === root.previewSymbol && !!feed.quotes[s]
+    if (s && root.library.indexOf(s) < 0 && root.arriving.indexOf(s) < 0 && !root.answered(s))
+      root.arriving = root.arriving.concat([s])
+    var next = Settings.withSymbolAdded(root.dataSettings, s)
+    if (shown) next.featured = s
+    root.save(next)
+  }
+
+  // A featured symbol that leaves hands the hero to its neighbour in `shown`,
+  // the rows as the surface shows them; the service's own order otherwise.
+  function removeSymbol(symbol, shown) {
+    root.remove(symbol, Settings.withMembership(root.dataSettings, symbol, root.listName, false, shown || root.shown))
+  }
+
+  // A tick or untick in a symbol's checklist; "" is All. Unticking All is a
+  // removal, and can be taken back like one.
+  function setMembership(symbol, name, member, shown) {
+    var next = Settings.withMembership(root.dataSettings, symbol, name, member, shown || root.shown)
+    if (name === "" && !member) root.remove(symbol, next)
+    else root.save(next)
+  }
+
+  // A removal remembers the settings before it, the hero it left, and the
+  // symbol's quote, so it can be taken back as it was without undoing
+  // anything chosen since. It is the one removal on offer, whichever surface
+  // made it, until the next change to the lists.
+  function remove(symbol, next) {
+    var before = root.dataSettings
+    var quote = feed.quotes[symbol] || null
+    var entry = feed.entries[symbol] || null
+    root.save(next)
+    root.lastRemoval = { symbol: symbol, before: before, left: root.dataSettings.featured, quote: quote, entry: entry }
+  }
+
+  // The last removal, put back where it was. Only once.
+  function undoRemoval(symbol) {
+    if (!root.lastRemoval || root.lastRemoval.symbol !== symbol) return
+    var removal = root.lastRemoval
+    root.lastRemoval = null
+    if (removal.quote) feed.restore(symbol, removal.quote, removal.entry)
+    root.save(Settings.withRemovalUndone(root.dataSettings, removal.before, symbol, removal.left))
+  }
+
+  // A hand-arranged order of the rows. Members still arriving keep their
+  // places, so the order saved holds every member.
+  function setManualOrder(rows) {
+    var members = root.symbols
+    var next = rows.slice()
+    for (var i = 0; i < members.length; i++)
+      if (next.indexOf(members[i]) < 0) next.splice(Math.min(i, next.length), 0, members[i])
+    root.save(Settings.withManualOrder(root.dataSettings, next))
+  }
+
+  function setOrder(order) {
+    root.save(Settings.withListOrder(root.dataSettings, order))
+  }
+
+  // The current sorted order the other way; manual stays as it is.
+  function reverseOrder() {
+    root.save(Settings.withListReversed(root.dataSettings))
+  }
+
+  function switchList(name) {
+    root.persist({ list: name })
+  }
+
+  function stepList(delta) {
+    root.switchList(Settings.steppedList(root.dataSettings, delta))
+  }
+
+  // Makes and opens an empty list. Returns why not, or "" once it exists.
+  function createList(name) {
+    var problem = Settings.listNameProblem(name, root.dataSettings.lists)
+    if (problem === "") root.save(Settings.withListCreated(root.dataSettings, name))
+    return problem
+  }
+
+  // Returns why not, or "" once renamed. The new name takes the list's key
+  // before the save, so no view shows the list under another key; the old
+  // name, now free, takes a new one after.
+  function renameList(name, newName) {
+    var problem = Settings.renameProblem(root.dataSettings, name, newName)
+    var i = Settings.listIndex(root.dataSettings.lists, name)
+    if (problem !== "" || i < 0) return problem
+    var old = root.dataSettings.lists[i].name
+    var now = Settings.listName(newName)
+    if (old !== now) root.keyList(now, root.listKey(old))
+    root.save(Settings.withListRenamed(root.dataSettings, name, newName))
+    if (old !== now) root.keyList(old, "#" + (++root.listKeyCount))
+    return problem
+  }
+
+  function moveList(name, delta) {
+    root.save(Settings.withListMoved(root.dataSettings, name, delta))
+  }
+
+  // A list made later under the deleted one's name is another list.
+  function deleteList(name) {
+    var i = Settings.listIndex(root.dataSettings.lists, name)
+    if (i < 0) return
+    var old = root.dataSettings.lists[i].name
+    root.save(Settings.withListDeleted(root.dataSettings, name))
+    root.keyList(old, "#" + (++root.listKeyCount))
+  }
+
+  // Each list's identity for the session, by name, for what is kept by list
+  // and not saved (each surface's place in it): a rename keeps it, and a name
+  // a rename or a delete freed names another list. A name with no entry is
+  // its own key. A list renamed by editing the file is another list.
+  property var listKeys: ({})
+  property int listKeyCount: 0
+  function listKey(name) { return root.listKeys[name] || "=" + name }
+  function keyList(name, key) {
+    var next = Object.assign({}, root.listKeys)
+    next[name] = key
+    root.listKeys = next
+  }
+
+  // The clock moves each second while a surface is open, for what it shows,
+  // and each minute while none is; it also wakes at the second the next
+  // quote falls due (`dueAt`) and a host's pause ends, at once for one the
+  // wall clock has passed already. The wall clock is read in one place
+  // (`wallSecond`).
+  function wallSecond() { return Math.floor(Date.now() / 1000) }
+  function tick() {
+    root.now = root.wallSecond()
+    root.armClock()
+  }
+  function armClock() {
+    if (!root.pluginsReady) return
+    var wall = root.wallSecond()
+    var next = root.openSurfaces.length > 0 ? wall + 1 : (Math.floor(wall / 60) + 1) * 60
+    ;[root.dueAt, yahooGate.pausedUntil, robinhoodGate.pausedUntil].forEach(function(at) {
+      if (at > root.now && at < next) next = at
+    })
+    // To just past that second's start.
+    clock.interval = Math.max(0, (next - wall - 1) * 1000 + 1000 - Date.now() % 1000) + 5
+    clock.restart()
+  }
+  onDueAtChanged: armClock()
+  onPluginsReadyChanged: armClock()
+  Connections {
+    target: yahooGate
+    function onPausedUntilChanged() { root.armClock() }
+  }
+  Connections {
+    target: robinhoodGate
+    function onPausedUntilChanged() { root.armClock() }
+  }
+  // Each step of the clock also tries the next chart ahead, which may have
+  // waited on Yahoo's budget.
+  Timer {
+    id: clock
+    onTriggered: {
+      root.tick()
+      root.fetchAhead()
+    }
+  }
+}

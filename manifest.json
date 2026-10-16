@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "grvc.stonks",
+  "name": "Stonks",
+  "version": "1.0.0",
+  "author": "Gaurav Chande",
+  "license": "MIT",
+  "description": "A stock watchlist plugin for the Omarchy 4 shell: today's move in your bar, and a chart you can scrub a click away.",
+  "kinds": ["service", "bar-widget"],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Plugin.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Stonks",
+    "description": "Today's move for your stocks, with a chart a click away.",
+    "category": "Info",
+    "aliases": ["stocks", "stonks", "ticker"],
+    "allowMultiple": false,
+    "defaultSection": "center",
+    "defaults": {
+      "barStyle": "sparkline"
+    },
+    "schema": [
+      { "key": "barStyle", "type": "enum", "label": "Bar pill", "options": ["sparkline", "arrow", "text", "icon"], "defaultValue": "sparkline", "description": "How the bar shows the featured symbol in the centre and left sections. Middle-click the pill to cycle." },
+      { "key": "barStyleRight", "type": "enum", "label": "Bar pill on the right", "options": ["sparkline", "arrow", "text", "icon"], "defaultValue": "icon", "description": "How the bar shows the featured symbol in the right section, among the bar's icons. Middle-click the pill there to cycle." }
+    ]
+  }
+}

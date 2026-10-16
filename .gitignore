@@ -1,0 +1,21 @@
+out/
+# Local plans, research, session notes, and their archive.
+/docs/
+# The saved Yahoo and Robinhood answers, private: their terms don't allow
+# republishing them. The tests find them with test/fixtures-dir.sh.
+test/fixtures/
+# Agent files, local to each machine: the marketplace's review treats them as
+# a listing blocker. The rules for everyone are in CONTRIBUTING.md.
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+.cursorrules
+.cursor/
+.claude/
+.github/copilot-instructions.md
+.agents/
+.codex/
+cubic.yaml
+node_modules/
+.env
+*.log

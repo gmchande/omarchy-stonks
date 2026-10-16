@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Stonks
+Comment=Watchlist and day chart
+Exec=omarchy-shell grvc.stonks openWindow {}
+Icon=grvc.stonks
+Terminal=false
+Type=Application
+Categories=Office;Finance;
+StartupNotify=true

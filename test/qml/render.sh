@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+# Renders StonksBody offscreen from fixtures. Quickshell only loads QML from
+# inside its config folder, so a temporary one is assembled from copies.
+# Usage: test/qml/render.sh [state ...]
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+out="${STONKS_VISUAL_DIR:-$plugin/out/render}"
+mkdir -p "$out"
+plugin_tree render.qml
+# The pill sheet's pills load no popup: the offscreen platform has no popup
+# window to put one in, and no render shows one.
+patch_copy plugin/BarWidget.qml '/id: panelLoader/,/source:/s/active: true/active: false/'
+
+export QT_QPA_PLATFORM=offscreen
+export STONKS_VISUAL_CALENDARS="$plugin/calendars.json"
+
+states=${*:-window-help-smooth window-help-retro popup-help-smooth popup-help-retro popup-help-sorted-smooth popup-help-sorted-retro popup-holiday-retro popup-price4-solo-smooth popup-price4-solo-retro popup-price5-stack-smooth popup-price5-stack-retro popup-nest-1d-smooth popup-nest-1d-retro popup-history-failed popup-history-loading popup-history-1w-smooth popup-history-1w-retro popup-history-1m-smooth popup-history-1m-retro popup-history-1y-smooth popup-history-1y-retro popup-history-all-smooth popup-history-all-retro loading failed aged history-scrub history-empty-loading history-sparse sprite-candidates popup-search-smooth popup-search-retro popup-search-stale-smooth popup-search-none-smooth popup-search-failed-retro popup-search-preview-smooth popup-search-preview-retro popup-search-show-smooth popup-search-show-retro min-window-smooth min-window-retro min-window-search-smooth w22-popup-smooth-aapl-1d w22-popup-retro-aapl-1d w22-window-smooth-aapl-1d w22-window-retro-aapl-1d w22-popup-smooth-aapl-5y w22-popup-retro-aapl-5y w22-window-smooth-aapl-5y w22-window-retro-aapl-5y w22-popup-smooth-spy-1d w22-popup-retro-spy-1d w22-window-smooth-spy-1d w22-window-retro-spy-1d w22-popup-smooth-shop-1d w22-popup-retro-shop-1d w22-window-smooth-shop-1d w22-window-retro-shop-1d w22-popup-smooth-shop-1y w22-popup-retro-shop-1y w22-window-smooth-shop-1y w22-window-retro-shop-1y w22-popup-smooth-mz-1d w22-popup-retro-mz-1d w22-window-smooth-mz-1d w22-window-retro-mz-1d window-1416-smooth popup-room-one-open-smooth popup-room-growth-open-retro window-room-four-five-retro popup-room-five-long-smooth popup-room-five-long-retro popup-rowstates-smooth popup-rowstates-retro popup-note-smooth popup-hint-smooth popup-hint-retro popup-notice-file-smooth popup-notice-file-retro popup-notice-update-smooth popup-notice-update-retro popup-lists-menu-retro popup-lists-named-smooth popup-lists-empty-smooth popup-lists-empty-retro popup-lists-long-retro popup-lists-manage-smooth popup-lists-manage-retro popup-lists-symbol-smooth popup-lists-symbol-retro popup-lists-rename-smooth popup-lists-confirm-retro window-lists-manage-smooth window-lists-symbol-retro popup-rowlines-smooth popup-rowlines-retro popup-52w-smooth popup-52w-retro popup-breadth-even-smooth popup-breadth-even-retro popup-order-falls-smooth popup-order-rises-smooth popup-order-falls-retro popup-order-rises-retro window-order-falls-smooth window-order-rises-smooth window-order-falls-retro window-order-rises-retro popup-overnight-night-nest-smooth popup-overnight-night-nest-retro popup-overnight-night-silk-smooth popup-overnight-night-silk-retro popup-overnight-night-reed-retro popup-overnight-day-nest-smooth popup-overnight-day-nest-retro popup-overnight-sunday-nest-smooth popup-overnight-sunday-nest-retro popup-overnight-live-ez-smooth popup-overnight-live-ez-retro popup-overnight-live-toy-smooth popup-overnight-live-toy-retro popup-overnight-live-nest-1m-smooth popup-overnight-live-nest-1m-retro popup-overnight-live-nest-1m-scrub-smooth popup-overnight-live-nest-1m-scrub-retro popup-overnight-2026-10-07-1153-nest-smooth popup-overnight-2026-10-07-1153-nest-retro popup-overnight-2026-10-06-1800-nest-smooth popup-overnight-2026-10-06-2300-nest-retro popup-overnight-2026-10-07-0005-nest-smooth popup-overnight-2026-10-07-0005-nest-retro popup-overnight-2026-10-07-0100-nest-smooth popup-overnight-2026-10-07-0100-nest-scrub-smooth popup-overnight-2026-10-07-0100-nest-scrub-retro popup-overnight-2026-10-07-0600-nest-retro popup-overnight-2026-10-03-1200-nest-smooth popup-overnight-2026-10-04-2230-nest-retro popup-fill-up-smooth popup-fill-down-smooth popup-fill-cross-smooth popup-fill-up-retro popup-fill-down-retro popup-fill-cross-retro popup-fill-up-smooth-kanagawa popup-fill-down-smooth-kanagawa popup-fill-cross-smooth-kanagawa popup-fill-up-retro-kanagawa popup-fill-down-retro-kanagawa popup-fill-cross-retro-kanagawa pill-sheet fetch-saved-smooth fetch-saved-retro fetch-overdue-smooth fetch-overdue-retro}
+# The listing sweep (CONTRIBUTING.md, Verify it): every kind of listing on 1D at
+# each of its moments, in both looks.
+if [ $# -eq 0 ]; then
+  # The list menu over the cursor's row in both looks on both surfaces: its
+  # edge shows nothing of the row under it.
+  states="$states popup-lists-menu-smooth window-lists-menu-smooth window-lists-menu-retro"
+  # The buttons that took over key hints: a new list's ⏎ MAKE, and a failed
+  # range's R RETRY, in both looks.
+  states="$states popup-lists-naming-smooth popup-lists-naming-retro popup-history-unavailable-smooth popup-history-unavailable-retro"
+  # A chart held past its quarter second, dimmed under the label naming the
+  # next, on a US stock, a non-US listing, and a cryptocurrency, in both
+  # looks on both surfaces.
+  for kind in aapl shel-l btc-usd; do
+    for look in smooth retro; do
+      states="$states popup-loading-$kind-$look window-of-loading-$kind-$look"
+    done
+  done
+  for moment in 2026-10-07-1455 2026-10-07-0100 2026-10-07-0600 2026-10-03-1200; do
+    for symbol in nest psix spy bolt gspc btc-usd shel.l 7203.t; do
+      states="$states popup-sweep-$moment-$symbol-smooth popup-sweep-$moment-$symbol-retro"
+    done
+  done
+  # The look sweep's new listings in session, 8 October 10:54: a coin under
+  # a cent, Toronto, a six-figure price, and a long symbol. `render.sh
+  # popup-sweep-<moment>-<symbol>-<look>` renders any saved moment.
+  for symbol in shib-usd ry.to brk-a brk-b; do
+    states="$states popup-sweep-2026-10-08-1054-$symbol-smooth popup-sweep-2026-10-08-1054-$symbol-retro"
+  done
+  # The header's animal: a cold start in smooth too, and the window on an up,
+  # a down, and a flat day, and a cryptocurrency, in both looks; asleep at
+  # 01:00 for PSIX, whose night doesn't trade, and on Saturday for an index
+  # (NEST awake at 01:00 and Tokyo's lunch are among the info lines' below).
+  states="$states loading-smooth failed-smooth"
+  for day in 2026-10-07-1455-psix 2026-10-07-1455-nest 2026-10-07-0100-bolt 2026-10-07-1455-btc-usd \
+    2026-10-07-0100-psix 2026-10-03-1200-gspc; do
+    states="$states window-sweep-$day-smooth window-sweep-$day-retro"
+  done
+  # The footer's notes in both looks and both surfaces: a refusal, a move
+  # refused in a sorted order, and a removal's offer from a long list name,
+  # under the first visit's hint too.
+  for look in smooth retro; do
+    states="$states popup-note-undo-$look window-note-undo-$look popup-hint-undo-$look"
+    states="$states popup-note-sorted-$look window-note-sorted-$look"
+  done
+  states="$states popup-note-retro"
+  # What search leaves out, said alone (vfiax) or under the results it shows
+  # (eurusd), in both looks.
+  for look in smooth retro; do
+    states="$states popup-search-vfiax-$look popup-search-eurusd-$look"
+  done
+  # The views over the rows in the window at its smallest: the scrollbar
+  # says more sits below.
+  for look in smooth retro; do
+    for view in lists-menu lists-manage lists-symbol search; do
+      states="$states min-window-$view-$look"
+    done
+  done
+  # A cursor of your own shows its row's remove button: on a plain row in
+  # the window, and on the featured row's fill in the popup (popup-rowstates
+  # has it on a plain row).
+  for look in smooth retro; do
+    states="$states window-rowstates-$look popup-rowstates-featured-$look"
+  done
+  # The info lines' hard cases, in both looks, in the popup and the window
+  # (window-sweep-*, and window-of-<state> for the rest): every kind of
+  # listing, a coin under a cent, a six-figure price, London before its
+  # session and at its 52-week high, Tokyo at lunch, pre-market, after
+  # hours, overnight, a Saturday, the ranges, and a 1Y range whose first day
+  # passes Yahoo's 52 weeks. AAPL with every fact is w22-*-aapl-1d.
+  for look in smooth retro; do
+    for sweep in own-shel.l own-7203.t 2026-10-08-1054-shel.l; do
+      states="$states popup-sweep-$sweep-$look"
+    done
+    for sweep in own-shel.l own-7203.t 2026-10-08-1054-shel.l 2026-10-07-1455-nest 2026-10-07-1455-psix \
+      2026-10-07-1455-spy 2026-10-07-1455-gspc 2026-10-07-1455-btc-usd 2026-10-07-1455-shel.l 2026-10-08-1054-brk-a \
+      2026-10-08-1054-shib-usd 2026-10-07-0600-nest 2026-10-07-0100-nest 2026-10-03-1200-nest; do
+      states="$states window-sweep-$sweep-$look"
+    done
+    for state in overnight-2026-10-06-1800-nest history-1y history-all 52w first-day-1d first-day-1y; do
+      states="$states popup-$state-$look window-of-$state-$look"
+    done
+  done
+  # The theme gallery: Omarchy's default, and four that take Stonks' pair:
+  # Catppuccin Latte, whose green is under 3:1 on its ground, Hackerman's two
+  # greens, Solitude's two greys, and White on a light ground. `render.sh
+  # theme-<look>-<theme>` renders any other installed theme.
+  for theme in tokyo-night catppuccin-latte hackerman solitude white; do
+    states="$states theme-smooth-$theme theme-retro-$theme"
+  done
+  # The calendars' longest closures, in the popup and the smallest window.
+  for place in popup min-window; do
+    for market in tokyo london; do
+      states="$states $place-holiday-$market-smooth $place-holiday-$market-retro"
+    done
+  done
+  # The pill at a larger text size, as `omarchy display text size 16` sets it.
+  states="$states pill-sheet-large"
+fi
+# Every render is in an installed Omarchy theme: the one the state's name
+# ends with (popup-fill-up-smooth-kanagawa, theme-retro-white), else Tokyo
+# Night, the theme a fresh Omarchy install sets. It goes where the shell
+# reads the current theme, so the shell's Color and the plugin's
+# TrendColors both read it as they do on the desktop. A state ending -large
+# has the shell's text size at 16 rather than 12.
+themes=$(ls /usr/share/omarchy/themes | awk '{ print length, $0 }' | sort -rn | cut -d' ' -f2-)
+theme_dir="$HOME/.local/state/omarchy/current"
+mkdir -p "$theme_dir"
+for state in $states; do
+  dest="$out/$state.png"
+  shot="$work/$state.png"
+  theme=tokyo-night
+  for t in $themes; do [[ $state == *-"$t" ]] && { theme=$t; break; }; done
+  ln -sfn "/usr/share/omarchy/themes/$theme" "$theme_dir/theme"
+  if [[ $state == *-large ]]; then printf '[font]\nbase-size = 16\n' > "$HOME/.config/omarchy/shell.toml"
+  else rm -f "$HOME/.config/omarchy/shell.toml"; fi
+  echo "render $state ($theme) -> $dest"
+  # render.qml ignores whether the save worked and exits 0 anyway, so only a
+  # picture this run wrote counts. It is judged in this run's own folder,
+  # where no other run's picture can stand in for it, then moved to $out.
+  rm -f "$dest"
+  STONKS_VISUAL_STATE="$state" STONKS_VISUAL_OUT="$shot" quickshell_run 15 "$work/$state.log" -p "$root"
+  code=$qs_code
+  # A state whose QML threw still writes a picture; the log is what tells,
+  # and so is a Qt warning from the plugin's files (lib.sh).
+  warnings=$(stonks_warnings "$work/$state.log")
+  if [[ $code -ne 0 || ! -s $shot || -n $warnings ]] || rg -q 'TypeError|ReferenceError|\bError:' "$work/$state.log"; then
+    echo "FAIL $state (exit $code)"
+    rg 'ERROR|error:|TypeError|ReferenceError|\bError:' "$work/$state.log" | head -30 || true
+    [[ -n $warnings ]] && echo "Qt warnings from the plugin's files:" && head -30 <<< "$warnings"
+    tail -20 "$work/$state.log"
+    exit 1
+  fi
+  echo "OK $state ($(wc -c < "$shot") bytes)"
+  mv "$shot" "$dest"
+done

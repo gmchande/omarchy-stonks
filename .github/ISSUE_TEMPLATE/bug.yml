@@ -1,0 +1,55 @@
+name: Something's wrong
+description: Stonks did something it shouldn't, or didn't do something it should.
+labels: [bug]
+body:
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+      description: What you did, and what Stonks did. A picture helps if it's about how something looks.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: input
+    id: stonks-version
+    attributes:
+      label: Stonks' version
+      description: "In a terminal: `jq -r .version ~/.config/omarchy/plugins/grvc.stonks/manifest.json`"
+      placeholder: 1.0.0
+    validations:
+      required: true
+  - type: input
+    id: omarchy-version
+    attributes:
+      label: Omarchy's version
+      description: "In a terminal: `omarchy version`"
+    validations:
+      required: true
+  - type: input
+    id: theme
+    attributes:
+      label: Theme
+      description: "In a terminal: `omarchy theme current`"
+    validations:
+      required: true
+  - type: input
+    id: pill
+    attributes:
+      label: Where the pill sits
+      description: Which edge the bar is on, and which part of the bar the pill is in.
+      placeholder: Top bar, right side. Or not on the bar, window only.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: The shell's log (optional)
+      description: |
+        In a terminal: `journalctl --user -t omarchy-shell -b --no-pager | grep -i stonks | tail -n 50`
+        Read it before you paste it: it can name the stocks you follow.
+      render: text

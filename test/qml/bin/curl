@@ -1,0 +1,325 @@
+#!/usr/bin/env bash
+# A stand-in for curl, first on PATH only inside the harnesses that fetch. It
+# answers from fixtures by symbol and fails on command, so the real feeds can
+# be driven through success, failure, retry, and recovery without the network.
+# It counts its calls per symbol in STONKS_FAKE_STATE/<SYMBOL>.calls, and a
+# symbol's history requests again in <SYMBOL>.history.calls; while
+# <SYMBOL>.history.hold exists, that symbol's history answer waits, and
+# while <SYMBOL>.quote.hold exists, its day's answer does. Every chart
+# answer names the symbol asked for, whichever saved day it carries, so a
+# quote kept under another symbol shows.
+#
+#   AAPL, MSFT, NVDA   answer test/fixtures/aapl.json
+#   FAIL         fails every time, like curl -f on an HTTP error
+#   FLAKY        fails twice, then answers like AAPL (retry and recovery)
+#   ONCE         answers the first time, then fails (failure with cached data)
+#   BLIP         answers the first time, fails twice, then answers again
+#   LATE         fails while STONKS_FAKE_STATE/LATE.down exists, else answers
+#                like AAPL (a warning that ends when an answer lands)
+#   SLOW         waits a second, then answers like AAPL (its 1W history: NEST's week)
+#   STRAY        answers the saved NEST day with one dropped bucket
+#   DOWN         answers the saved NEST day, which fell 1.56%; its history is
+#                NEST's saved week, which rose, so its day and range disagree
+#   FLAT         answers the AAPL day with its previous close at its price
+#   SHOP.TO      answers its saved Toronto day, so a search result can be in All
+#   SPY, BTC-USD answer their saved days: an ETF and a cryptocurrency
+#   HISTSTRAY    answers saved intraday MSFT data through the history path
+#   HUGE         answers AAPL's day padded past 64 KB, over the day's cap
+#   GONE         answers 404, a symbol Yahoo does not know
+#   LONG<n>      answers NEST's saved day of 7 October at 14:55, under its own
+#                name: a long list of busy US stocks
+#   TALL<n>      answers like AAPL, its history too: a long list whose every
+#                range answers
+# A symbol search answers the saved SHOP results after 0.4 s, so a search
+# can still be out when the popup closes and opens again; FAST answers them
+# at once, as Yahoo does on a normal network; ZZZ answers with
+# no matches, OOPS gets no answer, ONE answers the first SHOP result alone,
+# BTC Yahoo's five long symbols for "wrapped btc", VFIAX and EURUSD
+# Yahoo's answers for those, which hold kinds Stonks leaves out, and MIXED
+# the five SHOP results with EURUSD's currency after them. Each SHOP answer
+# given, after the pause, is counted in SEARCH.answered.calls; a search
+# stopped first is not.
+# History requests use the saved AAPL year response for AAPL, MSFT, and BOTH,
+# and NEST's saved month for NEST; PSIX, SPY, ^GSPC, BTC-USD, SHEL.L, and
+# 7203.T, one of each kind of listing, answer their own saved years.
+# Fundamentals answer from test/fixtures/fundamentals: the timeseries by
+# symbol (MSFT and NVDA take AAPL's; a symbol with none saved gets SPY's,
+# every series empty), and the daily closes around the snapshots' dates
+# likewise. Every fundamentals request is counted in FUNDAMENTALS.calls, and
+# a symbol's timeseries requests in <SYMBOL>.fundamentals.calls. While
+# STONKS_FAKE_STATE/FUNDAMENTALS.down exists both fail.
+# Robinhood's historicals are counted in OVERNIGHT.calls, the symbols of each
+# request appended to OVERNIGHT.asked, and its span to
+# OVERNIGHT.spans. While STONKS_FAKE_STATE/overnight.set names a moment's
+# folder of test/fixtures/moments (weekend, sunday, monday, night,
+# live-2026-10-05), or several, the first with the file answering, its saved
+# Robinhood answer for that span answers,
+# results in the order asked, its saved days answer for their symbols, and
+# its saved 1M histories (<symbol>-1m.json) for theirs;
+# otherwise Robinhood answers every symbol empty, as it does one it does not
+# trade. While STONKS_FAKE_STATE/OVERNIGHT.down exists, Robinhood fails,
+# counted all the same.
+# Robinhood's instruments are counted in INSTRUMENTS.calls, the symbols of
+# each request appended to INSTRUMENTS.asked. A moment's folder with its own
+# saved answer (robinhood-instruments.json, the sweep's moments) answers
+# from it, the symbols asked only; the moments saved before 7 October have
+# none, and every symbol asked answers that Robinhood trades it all day, as
+# the steps on them take the 24-hour market's rules. While
+# STONKS_FAKE_STATE/INSTRUMENTS.down exists, the instruments fail, counted
+# all the same.
+#
+# Runs: like curl, it takes several URLs in one call and answers each in
+# turn, each followed by the -w line Fetch.js asks for, with the status
+# (200, 404 for GONE, 429 while refused, 502 for a failure, 000 for no
+# answer), curl's exit code, and the URL's place. An answer over
+# --max-filesize is cut there with exit code 63. Each call is a line of
+# runs.log, its kind:name per URL, and each URL a line of requests.log,
+# "kind name status".
+#   YAHOO.refuse, ROBINHOOD.refuse   that host answers 429 to every request,
+#                                    counted in <HOST>.refused.calls
+#   YAHOO.offline, ROBINHOOD.offline that host gives no answer at all
+
+set -u
+fixtures="${STONKS_FIXTURES:?}"
+state="${STONKS_FAKE_STATE:?}"
+# in_moment FILE: FILE in the first folder overnight.set names that has it,
+# else in the first one.
+in_moment() {
+  local name first=""
+  for name in $(cat "$state/overnight.set" 2>/dev/null); do
+    [ -n "$first" ] || first="$fixtures/moments/$name/$1"
+    if [ -e "$fixtures/moments/$name/$1" ]; then
+      echo "$fixtures/moments/$name/$1"
+      return
+    fi
+  done
+  echo "$first"
+}
+# count FILE: one more call, under a lock, since a quote and a history request
+# for one symbol can run at once; prints the new count.
+count() {
+  exec 9>>"$1.lock"
+  flock 9
+  local calls=$(( $(cat "$1" 2>/dev/null || echo 0) + 1 ))
+  echo "$calls" > "$1"
+  flock -u 9
+  echo "$calls"
+}
+# What one URL is: its kind and its name in the logs.
+kind_of() {
+  case "$1" in
+    *"/v1/finance/search"*) echo search ;;
+    *"api.robinhood.com/instruments/"*) echo instruments ;;
+    *"api.robinhood.com/"*) echo overnight ;;
+    *"/fundamentals-timeseries/"*|*"interval=1d&period1="*) echo fundamentals ;;
+    *"includeAdjustedClose=true"*) echo history ;;
+    *) echo chart ;;
+  esac
+}
+name_of() {
+  case "$2" in
+    search|instruments|overnight) echo "$2" ;;
+    fundamentals) local s="${1##*/timeseries/}"; s="${s##*/chart/}"; echo "${s%%\?*}" ;;
+    *) local s="${1##*/chart/}"; echo "${s%%\?*}" ;;
+  esac
+}
+
+# serve URL: one URL's answer on stdout; its exit code says what kind:
+# 0 an answer, 22 a failure (502), 44 not found (404), 7 no answer.
+serve() {
+  local url=$1
+  if [[ "$url" == *"/v1/finance/search"* ]]; then
+    [[ "$url" == *"q=FAST&"* ]] || sleep 0.4
+    case "$url" in
+      *"q=FAST&"*) cat "$fixtures/search.json" ;;
+      *"q=ZZZ"*) echo '{"quotes":[]}' ;;
+      *"q=OOPS"*) exit 22 ;;
+      *"q=ONE&"*) jq -c '.quotes |= .[:1]' "$fixtures/search.json" ;;
+      *"q=VFIAX&"*) cat "$fixtures/search-vfiax.json" ;;
+      *"q=EURUSD&"*) cat "$fixtures/search-eurusd.json" ;;
+      *"q=MIXED&"*) jq -c --slurpfile fx "$fixtures/search-eurusd.json" '.quotes += [$fx[0].quotes[0]]' "$fixtures/search.json" ;;
+      *"q=BTC&"*) echo '{"quotes":[
+        {"symbol":"XBTC39577-USD","longname":"OKX Wrapped BTC USD","exchange":"CCC","quoteType":"CRYPTOCURRENCY"},
+        {"symbol":"CBBTC32994-USD","longname":"Coinbase Wrapped BTC USD","exchange":"CCC","quoteType":"CRYPTOCURRENCY"},
+        {"symbol":"KBTC33513-USD","longname":"Kraken Wrapped Bitcoin USD","exchange":"CCC","quoteType":"CRYPTOCURRENCY"},
+        {"symbol":"WBTC-USD","longname":"Wrapped Bitcoin USD","exchange":"CCC","quoteType":"CRYPTOCURRENCY"},
+        {"symbol":"CIRBTC-USD","longname":"Circle Wrapped Bitcoin USD","exchange":"CCC","quoteType":"CRYPTOCURRENCY"}]}' ;;
+      *) count "${STONKS_FAKE_STATE:?}/SEARCH.answered.calls" > /dev/null; cat "$fixtures/search.json" ;;
+    esac
+    exit
+  fi
+  if [[ "$url" == *"api.robinhood.com/instruments/"* ]]; then
+    count "${STONKS_FAKE_STATE:?}/INSTRUMENTS.calls" > /dev/null
+    asked="${url#*symbols=}"
+    echo "$asked" >> "$STONKS_FAKE_STATE/INSTRUMENTS.asked"
+    [ -e "$STONKS_FAKE_STATE/INSTRUMENTS.down" ] && exit 22
+    saved_answer="$(in_moment robinhood-instruments.json)"
+    if [ -f "$saved_answer" ]; then
+      jq -c --arg asked "$asked" '($asked | split(",")) as $want | .results |= map(select(.symbol as $s | $want | index($s)))' "$saved_answer"
+    else
+      jq -nc --arg asked "$asked" '{ next: null, results: [($asked | split(","))[] | { symbol: ., all_day_tradability: "tradable" }] }'
+    fi
+    exit
+  fi
+  if [[ "$url" == *"api.robinhood.com/marketdata/historicals/"* ]]; then
+    count "${STONKS_FAKE_STATE:?}/OVERNIGHT.calls" > /dev/null
+    asked="${url#*symbols=}"
+    asked="${asked%%&*}"
+    echo "$asked" >> "$STONKS_FAKE_STATE/OVERNIGHT.asked"
+    span="${url#*span=}"
+    span="${span%%&*}"
+    echo "$span" >> "$STONKS_FAKE_STATE/OVERNIGHT.spans"
+    [ -e "$STONKS_FAKE_STATE/OVERNIGHT.down" ] && exit 22
+    set_name="$(cat "$STONKS_FAKE_STATE/overnight.set" 2>/dev/null)"
+    if [ -n "$set_name" ]; then
+      jq -c --arg asked "$asked" '($asked | split(",")) as $want
+        | { results: [$want[] as $s | ([.results[] | select(.symbol == $s)][0] // { symbol: "", historicals: [] })] }' \
+        "$(in_moment "robinhood-$span.json")"
+    else
+      jq -nc --arg asked "$asked" '{ results: [($asked | split(","))[] | { symbol: "", historicals: [] }] }'
+    fi
+    exit
+  fi
+  # saved SYMBOL [SUFFIX]: the fundamentals fixture that answers for SYMBOL.
+  saved() {
+    local name
+    case "$1" in AAPL|MSFT|NVDA) name=aapl ;; *) name=$(tr 'A-Z.' 'a-z-' <<< "$1") ;; esac
+    local file="$fixtures/fundamentals/$name${2:-}.json"
+    [ -e "$file" ] || file="$fixtures/fundamentals/spy${2:-}.json"
+    echo "$file"
+  }
+  if [[ "$url" == *"/fundamentals-timeseries/"* || "$url" == *"interval=1d&period1="* ]]; then
+    count "${STONKS_FAKE_STATE:?}/FUNDAMENTALS.calls" > /dev/null
+    if [[ "$url" == *"/timeseries/"* ]]; then
+      symbol="${url##*/timeseries/}"
+      symbol="${symbol%%\?*}"
+      count "$STONKS_FAKE_STATE/$symbol.fundamentals.calls" > /dev/null
+      file="$(saved "$symbol")"
+    else
+      symbol="${url##*/chart/}"
+      file="$(saved "${symbol%%\?*}" -closes)"
+    fi
+    [ -e "$STONKS_FAKE_STATE/FUNDAMENTALS.down" ] && exit 22
+    cat "$file"
+    exit
+  fi
+  symbol="${url##*/chart/}"
+  symbol="${symbol%%\?*}"
+  calls=$(count "${STONKS_FAKE_STATE:?}/$symbol.calls")
+  if [[ "$url" != *"includeAdjustedClose=true"* ]]; then
+    while [ -e "$STONKS_FAKE_STATE/$symbol.quote.hold" ]; do sleep 0.05; done
+  fi
+  set_name="$(cat "$STONKS_FAKE_STATE/overnight.set" 2>/dev/null)"
+  saved_day="$(in_moment "$(tr 'A-Z' 'a-z' <<< "${symbol#%5E}").json")"
+  saved_month="$(in_moment "$(tr 'A-Z' 'a-z' <<< "${symbol#%5E}")-1m.json")"
+  if [ -n "$set_name" ] && [ -e "$saved_day" ] && [[ "$url" != *"includeAdjustedClose=true"* ]]; then
+    cat "$saved_day"
+    exit
+  fi
+  if [ -n "$set_name" ] && [ -e "$saved_month" ] && [[ "$url" == *"range=1mo&"*"includeAdjustedClose=true"* ]]; then
+    count "$STONKS_FAKE_STATE/$symbol.history.calls" > /dev/null
+    cat "$saved_month"
+    exit
+  fi
+  stamp() { sed "s/\"symbol\":\"[^\"]*\"/\"symbol\":\"$symbol\"/"; }
+  answer() { stamp < "$fixtures/aapl.json"; }
+  history() { stamp < "$fixtures/history/aapl-1y.json"; }
+  if [[ "$url" == *"includeAdjustedClose=true"* ]]; then
+    count "$STONKS_FAKE_STATE/$symbol.history.calls" > /dev/null
+    # A harness holds a symbol's history answer back while <SYMBOL>.history.hold exists.
+    while [ -e "$STONKS_FAKE_STATE/$symbol.history.hold" ]; do sleep 0.05; done
+    case "$symbol" in
+      AAPL|MSFT|BOTH|TALL*) history ;;
+      NEST) cat "$fixtures/history/nest-1mo.json" ;;
+      HISTSTRAY) stamp < "$fixtures/msft-2026-09-11-day-prepost.json" ;;
+      FAIL) exit 22 ;;
+      ONCE) [ "$calls" -ge 2 ] && exit 22; history ;;
+      # SLOW's week is NEST's saved week, so its 1W and 6M charts differ.
+      SLOW) sleep 1; if [[ "$url" == *"range=5d"* ]]; then cat "$fixtures/history/nest-5d.json"; else history; fi ;;
+      DOWN) cat "$fixtures/history/nest-5d.json" ;;
+      PSIX|SPY|%5EGSPC|BTC-USD|SHEL.L|7203.T) cat "$fixtures/history/$(tr 'A-Z.' 'a-z-' <<< "${symbol#%5E}")-1y.json" ;;
+      *) exit 22 ;;
+    esac
+    exit
+  fi
+  case "$symbol" in
+    AAPL|MSFT|NVDA|TALL*) answer ;;
+    FAIL) exit 22 ;;
+    FLAKY) [ "$calls" -le 2 ] && exit 22; answer ;;
+    ONCE) [ "$calls" -ge 2 ] && exit 22; answer ;;
+    BLIP) [ "$calls" -eq 2 ] || [ "$calls" -eq 3 ] && exit 22; answer ;;
+    LATE) [ -e "$state/LATE.down" ] && exit 22; answer ;;
+    SLOW) sleep 1; answer ;;
+    STRAY|DOWN) stamp < "$fixtures/nest-2026-09-11-day-prepost.json" ;;
+    FLAT) answer | sed 's/"chartPreviousClose":316.85/"chartPreviousClose":325.13/' ;;
+    SHOP.TO) cat "$fixtures/shop-to.json" ;;
+    SPY) cat "$fixtures/spy-2026-09-11-day-prepost.json" ;;
+    BTC-USD) cat "$fixtures/btc-usd-day.json" ;;
+    HUGE) answer; head -c 70000 /dev/zero | tr '\0' ' ' ;;
+    GONE) exit 44 ;;
+    LONG*) stamp < "$fixtures/moments/sweep-2026-10-07-1455/nest.json" ;;
+    *) exit 22 ;;
+  esac
+}
+
+urls=()
+format=""
+cap=0
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -w) format=$2; shift 2 ;;
+    --max-filesize) cap=$2; shift 2 ;;
+    -A|-H|--max-time|--connect-timeout|--rate) shift 2 ;;
+    http*) urls+=("$1"); shift ;;
+    *) shift ;;
+  esac
+done
+run=()
+for i in "${!urls[@]}"; do
+  url=${urls[$i]}
+  kind=$(kind_of "$url")
+  name=$(name_of "$url" "$kind")
+  host=YAHOO
+  [[ "$url" == *"robinhood.com"* ]] && host=ROBINHOOD
+  run+=("$kind:$name")
+  exit_code=0
+  if [ -e "$state/$host.offline" ]; then
+    status=000
+    exit_code=7
+    body=""
+  elif [ -e "$state/$host.refuse" ]; then
+    count "$state/$host.refused.calls" > /dev/null
+    status=429
+    body="Too Many Requests"
+  else
+    # In the background, so a curl stopped mid-answer (search's suspend, a
+    # history no longer wanted) stops its answer too, as the real one does.
+    out_file="$state/serve.$$.$i"
+    serve "$url" > "$out_file" &
+    serving=$!
+    trap 'kill "$serving" 2> /dev/null; rm -f "$out_file"; exit 143' TERM INT
+    wait "$serving"
+    served=$?
+    trap - TERM INT
+    body=$(cat "$out_file")
+    rm -f "$out_file"
+    case $served in
+      0) status=200 ;;
+      44) status=404 ;;
+      7) status=000; exit_code=7; body="" ;;
+      *) status=502 ;;
+    esac
+    if [ "$cap" -gt 0 ] && [ "${#body}" -gt "$cap" ]; then
+      body=${body:0:$cap}
+      exit_code=63
+    fi
+  fi
+  echo "$kind $name $status" >> "$state/requests.log"
+  printf '%s' "$body"
+  out=${format//'%{urlnum}'/$i}
+  out=${out//'%{http_code}'/$status}
+  out=${out//'%{exitcode}'/$exit_code}
+  out=${out//'%header{retry-after}'/}
+  printf '%b' "$out"
+done
+echo "${run[*]}" >> "$state/runs.log"
