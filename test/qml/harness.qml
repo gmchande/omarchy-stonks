@@ -5,11 +5,13 @@ import Quickshell.Io
 // Drives the real QuoteFeed through its scenarios with the fake curl that
 // test/qml/run.sh puts first on PATH: runs of several symbols, the first
 // answers' lane beside the refreshes', retries by what came back, and
-// recovery. Quickshell only loads QML from inside its config folder, so
-// run.sh assembles one from copies of the plugin's QuoteFeed.qml and the
-// rule files it imports beside this file. No gate: the service's own flows
-// (fetch.sh) drive the feed through one. Prints one line per check and
-// exits 0 when every check passed, 1 otherwise.
+// recovery. Every symbol on the chart endpoint, one answer each (`bulk`
+// false, as the preview's feed asks), so each symbol's answer is its own:
+// spark's batches are long-list.sh's. Quickshell only loads QML from inside
+// its config folder, so run.sh assembles one from copies of the plugin's
+// QuoteFeed.qml and the rule files it imports beside this file. No gate:
+// the service's own flows (fetch.sh) drive the feed through one. Prints one
+// line per check and exits 0 when every check passed, 1 otherwise.
 ShellRoot {
   id: harness
 
@@ -42,6 +44,7 @@ ShellRoot {
     id: feed
     now: harness.now
     watched: symbols
+    bulk: false
   }
 
   // Each step waits for the feed to go quiet, then checks and advances.

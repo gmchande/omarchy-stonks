@@ -28,7 +28,7 @@ Flickable {
   property int scrubShown: 0
   property string changeMode: "pct"
   property int now: 0
-  property var asked: ({})
+  property var owed: ({})
   property bool retro: false
   // The exchanges' calendars, for the breaks in a row's day line.
   property var calendars: null
@@ -250,7 +250,7 @@ Flickable {
   }
 
   function freshnessOf(symbol) {
-    return Figures.freshness(entryOf(symbol), quotes[symbol] || null, now, asked[symbol] || 0)
+    return Figures.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0)
   }
 
   function moveCursor(delta) {
@@ -807,6 +807,12 @@ Flickable {
         // comes into sight, and draws it before that frame.
         readonly property bool inSight: lifted || (y + height > root.contentY - root.rowPitch
           && y < root.contentY + root.sightHeight + root.rowPitch)
+        // A row of the list has its words and pointer built within a screen
+        // of the view, above and below, so a wheel's glide or a page's step
+        // finds them built; farther off, or outside this list, it holds its
+        // place and its day line only.
+        built: lifted || (place >= 0 && y + height > root.contentY - root.sightHeight
+          && y < root.contentY + 2 * root.sightHeight)
         property var sightQuote: null
         Binding on sightQuote {
           value: rowDelegate.place >= 0 ? root.quotes[rowDelegate.symbol] || null : null
@@ -816,7 +822,8 @@ Flickable {
         quote: place >= 0 ? sightQuote : null
         view: quote ? Figures.rowModel(quote, root.scrubShown, root.changeMode) : null
         status: root.entryOf(symbol) ? root.entryOf(symbol).status : "loading"
-        freshness: place >= 0 ? root.freshnessOf(symbol) : null
+        // Freshness reads the clock every second: only rows in sight do.
+        freshness: place >= 0 && inSight ? root.freshnessOf(symbol) : null
         featuredRow: symbol === root.featuredSymbol
         cursor: symbol === root.cursorRow
         // A cursor of your own, not the resting one nor one the wheel

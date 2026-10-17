@@ -346,12 +346,12 @@ ShellRoot {
       app.testKeyCatcher.forceActiveFocus()
       keyClick(Qt.Key_R)
       within(2000, function() { return service.testRobinhoodGate.pause === "refused" })
-      var quotesBefore = harness.record("requests.log").split("\n").filter(function(l) { return /^chart /.test(l) }).length
+      var quotesBefore = harness.record("requests.log").split("\n").filter(function(l) { return /^(chart|spark) /.test(l) }).length
       service.now += 20
       keyClick(Qt.Key_R)
       wait(500)
       var refusedCalls = Number(harness.record("ROBINHOOD.refused.calls"))
-      var quotesAfter = harness.record("requests.log").split("\n").filter(function(l) { return /^chart /.test(l) }).length
+      var quotesAfter = harness.record("requests.log").split("\n").filter(function(l) { return /^(chart|spark) /.test(l) }).length
       harness.check("a Robinhood refusal pauses Robinhood alone: one request refused, the next held, Yahoo's quotes still asked, the prints kept",
         service.testRobinhoodGate.pause === "refused" && refusedCalls === 1 && service.testYahooGate.pause === ""
           && quotesAfter > quotesBefore && harness.strip() === line,

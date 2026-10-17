@@ -246,7 +246,7 @@ ShellRoot {
     property bool reversed: false
     property string changeMode: "pct"
     property int now: 0
-    property var asked: ({})
+    property var owed: ({})
     property string range: "1D"
     property var historyEntry: null
     property var figures: null
@@ -1615,7 +1615,7 @@ ShellRoot {
           stub.retro = retro
           stub.now = shop.marketTime + age
           stub.entries = Object.assign({}, stub.entries, { "SHOP.TO": { status: "ok", receivedAt: stub.now } })
-          stub.asked = unanswered ? { "SHOP.TO": stub.now - unanswered } : {}
+          stub.owed = unanswered ? { "SHOP.TO": stub.now - unanswered } : {}
           wait(50)
           return listing.text.slice(0, 2)
         }
@@ -1624,7 +1624,7 @@ ShellRoot {
         stub.retro = false
         stub.now = liveNow
         stub.entries = Object.assign({}, stub.entries, { "SHOP.TO": { status: "ok", receivedAt: liveNow } })
-        stub.asked = {}
+        stub.owed = {}
         wait(50)
         root.check("the hero says an aged quote plainly and marks only a warning, smooth and retro",
           aged.every(function(t) { return t === "AS" }) && overdue.every(function(t) { return t === "! " }),

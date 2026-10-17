@@ -248,6 +248,55 @@ test("a run's output splits into its answers, each said by what came back", () =
   expect(M.answers('{"a":1}' + trailer(0, 200, 0) + '{"b":').length).toBe(1)
 })
 
+test("a spark day keeps the last chart's verdict, and a jump past it waits for a chart", () => {
+  const t0 = 1791386400
+  // A day of bars at 100 with a stray at the sixth: it closes at 103 and
+  // the next bar opens back at 100.
+  const closes = [100, 100.1, 100, 100.1, 100, 103, 100.1, 100, 100.1, 100, 100.1, 100]
+  const answer = (cs, withOpens) => {
+    const ts = cs.map((c, i) => t0 + i * 300)
+    const quote = { close: cs }
+    if (withOpens) quote.open = cs.map((c, i) => i === 6 ? 100 : i > 0 ? cs[i - 1] : c)
+    return { meta: { symbol: "AAA", instrumentType: "EQUITY", exchangeName: "NMS", priceHint: 2,
+      regularMarketPrice: cs[cs.length - 1], regularMarketTime: ts[ts.length - 1], chartPreviousClose: 100 },
+      timestamp: ts, indicators: { quote: [quote] } }
+  }
+  const chart = M.parseChart({ chart: { result: [answer(closes, true)] } }, [])
+  expect(chart.droppedTimes).toEqual([t0 + 5 * 300])
+  // The same day from spark, no opens: the chart's stray stays out, and
+  // with no new bar since, nothing waits.
+  const same = M.sparkQuote(answer(closes, false), chart.verdict, [])
+  expect([same.unjudged, same.quote.droppedTimes, same.quote.points.length]).toEqual([false, [t0 + 5 * 300], 11])
+  // Never judged: the jump waits for a chart.
+  expect(M.sparkQuote(answer(closes, false), null, []).unjudged).toBe(true)
+  // Five quiet bars on, the old jump is settled; a new one is not.
+  const later = closes.concat([100.1, 100, 100.1, 100, 100.1])
+  const settled = M.parseChart({ chart: { result: [answer(later, true)] } }, []).verdict
+  expect(M.sparkQuote(answer(later.concat([100, 100.1]), false), settled, []).unjudged).toBe(false)
+  expect(M.sparkQuote(answer(later.concat([104, 100.1]), false), settled, []).unjudged).toBe(true)
+  // The newest bar is never judged, so a jump there waits for nothing.
+  expect(M.sparkQuote(answer(later.concat([104]), false), settled, []).unjudged).toBe(false)
+  // A whole bar Yahoo changes waits for a chart, new bar or not: an old bar
+  // turned into a spike, the stray it dropped corrected back to the level,
+  // a smaller move than a level, and a bar of the last few, not yet
+  // settled.
+  const revised = (at, price) => later.map((c, i) => i === at ? price : c)
+  expect(M.sparkQuote(answer(revised(3, 103), false), settled, []).unjudged).toBe(true)
+  expect(M.sparkQuote(answer(revised(5, 100), false), settled, []).unjudged).toBe(true)
+  expect(M.sparkQuote(answer(revised(4, 100.3), false), settled, []).unjudged).toBe(true)
+  expect(M.sparkQuote(answer(revised(14, 100.4), false), settled, []).unjudged).toBe(true)
+  // Spark's own rounding of a close is no change.
+  expect(M.sparkQuote(answer(revised(3, 100.1004), false), settled, []).unjudged).toBe(false)
+  // A bar the chart had none for, filled in since, waits for a chart too.
+  const gap = answer(later, true)
+  gap.indicators.quote[0].close = later.map((c, i) => i === 9 ? null : c)
+  const holed = M.parseChart({ chart: { result: [gap] } }, []).verdict
+  expect(M.sparkQuote(answer(later, false), holed, []).unjudged).toBe(true)
+  // Yahoo leaves a symbol it doesn't know out of a spark answer.
+  const days = M.sparkResults({ spark: { result: [{ symbol: "AAA", response: [answer(closes, false)] }] } })
+  expect(Object.keys(days)).toEqual(["AAA"])
+})
+
 test("blockCells lays digits on a grid with a blank column between", () => {
   const grid = text => {
     const { columns, cells } = M.blockCells(text)

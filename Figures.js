@@ -1,3 +1,4 @@
+.pragma library
 .import "Format.js" as Format
 .import "Market.js" as Market
 .import "Overnight.js" as Overnight
@@ -34,18 +35,19 @@ function listingMeta(quote) {
 var LIVE_QUOTE_MAX_AGE = 120
 
 // Room for a run of the whole list and three tries of a bad answer before
-// a refresh asked for counts as overdue.
+// a refresh owed counts as overdue.
 var OVERDUE_AFTER = 90
 
 // entry: the feed's last answer, { status: "ok"|"failed"|"saved" }, "saved"
-// for a quote kept from an earlier session, or null before any. askedAt:
-// when a refresh was asked for and has had no answer yet, or 0. A symbol
-// nobody asked for is never late, so no cadence enters the rule.
-function freshness(entry, quote, now, askedAt) {
+// for a quote kept from an earlier session, or null before any. owedSince:
+// when a refresh began waiting on Yahoo, its request out unanswered or the
+// host paused (`QuoteFeed.owed`), or 0. A symbol nobody asked for is never
+// late, so no cadence enters the rule; nor is one Stonks' own pacing holds.
+function freshness(entry, quote, now, owedSince) {
   var head = quote ? Quote.headlineQuote(quote) : null
   var phase = quote ? Market.sessionPhase(quote, now) : "closed"
   var asOf = head ? head.t : null
-  var overdue = askedAt > 0 && now - askedAt >= OVERDUE_AFTER
+  var overdue = owedSince > 0 && now - owedSince >= OVERDUE_AFTER
   // The quote stands for another day than the clock's: the words name the day.
   var earlier = !!asOf && exchangeDay(quote, asOf) !== exchangeDay(quote, now)
   var state = entry && entry.status === "failed" ? "failed"

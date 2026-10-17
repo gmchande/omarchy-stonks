@@ -71,14 +71,18 @@ ShellRoot {
     return lines.filter(function(line) { return !/^(overnight|instruments) /.test(line) })
   }
 
-  // Quote requests per listing among `lines`.
+  // Quote requests per listing among `lines`: a chart's symbol, and each of
+  // a spark's.
   function quoteCounts(lines) {
     var counts = {}
     harness.listed.forEach(function(s) { counts[s] = 0 })
     lines.forEach(function(line) {
       var parts = line.split(" ")
-      var symbol = parts[1].replace("%5E", "^")
-      if (parts[0] === "chart" && symbol in counts) counts[symbol]++
+      if (parts[0] !== "chart" && parts[0] !== "spark") return
+      parts[1].split(",").forEach(function(name) {
+        var symbol = name.replace("%5E", "^")
+        if (symbol in counts) counts[symbol]++
+      })
     })
     return counts
   }
@@ -270,7 +274,10 @@ ShellRoot {
       return out
     }
 
+    // Tall enough that every listing's row is in sight: a row out of sight
+    // works out no freshness, so it could say nothing either way.
     function openWindow() {
+      app.testWindow.implicitHeight = 1000
       app.open("{}")
       tryVerify(function() { return app.opened && service.openSurfaces.length === 1 }, 3000)
       settle()
@@ -313,9 +320,10 @@ ShellRoot {
       harness.check("90 s asked and unanswered: the pill warns, a saved row says its update is overdue, as of Tuesday, and a row with nothing saved says No data",
         /^true \| ! Update overdue · as of Tue \d\d:\d\d \| ! No data$/.test(lateNotes), lateNotes)
       tick(9, 1)
+      // The run is two requests: the pill's chart and one spark of the rest.
       var tries = harness.requests().filter(function(l) { return / 000$/.test(l) })
       harness.check("with no network, a run, then one request alone at 2, 6, 14, 30, and 62 s: no more",
-        tries.length >= 9 && tries.length <= 15, tries.length + " requests unanswered in 100 s")
+        tries.length >= 5 && tries.length <= 9, tries.length + " requests unanswered in 100 s")
       remove("YAHOO.offline")
       var back = service.now
       var landed = 0
@@ -355,8 +363,8 @@ ShellRoot {
       wait(300)
       frames.running = false
       var openRuns = harness.runs().slice(runsBefore)
-      harness.check("an open mid-session asks only for the stale, the crypto and Tokyo, in one run",
-        openRuns.length === 1 && openRuns[0].split(" ").sort().join(" ") === "chart:7203.T chart:BTC-USD", openRuns.join(" / "))
+      harness.check("an open mid-session asks only for the stale, the crypto and Tokyo, in one run, one spark request",
+        openRuns.length === 1 && openRuns[0] === "spark:BTC-USD,7203.T", openRuns.join(" / "))
       harness.check("an open mid-session shows no warning and no As of on any frame", shownMarks.length === 0, shownMarks.join(" | "))
       closeWindow()
       tick(30)
@@ -460,11 +468,11 @@ ShellRoot {
         harness.requests().slice(offFrom).some(function(l) { return l === "chart AAPL 200" }), harness.requests().slice(offFrom).join(", "))
       service.preview(body, "")
 
-      // A list past the budget: 42 more busy stocks, 50 in all. The first
-      // add goes at once, the rest's first answers together in the next
-      // run; then the rows refresh as fast as the budget lets, the oldest
-      // ask first and the pill's symbol always, with one warning and no row
-      // starved.
+      // A longer list: 42 more busy stocks, 50 in all. The first add goes
+      // at once, the rest's first answers together in the next run, three
+      // spark requests; each day holds jumps no chart has judged, so each is
+      // asked on the chart next. Then every row refreshes every minute, the
+      // pill's symbol too, with no warning and well inside the budget.
       service.now = at(harness.wed7, 12, 0)
       settle()
       var more = []
@@ -473,29 +481,25 @@ ShellRoot {
       more.forEach(function(s) { service.addSymbol(s) })
       tryVerify(function() { return service.arriving.length === 0 && idle() }, 20000)
       var firstRuns = harness.runs().slice(runsBefore).filter(function(r) { return /LONG/.test(r) })
-      harness.check("42 symbols added at once have their first answers in two runs: the first add's, then the rest together",
-        firstRuns.length === 2 && firstRuns[0] === "chart:LONG01" && firstRuns[1].split(" ").length === 41,
-        firstRuns.map(function(r) { return r.split(" ").length }).join(" + ") + " URLs")
+      harness.check("42 symbols added at once have their first answers in two runs: the first add's, and the rest's in two spark requests and a lone chart",
+        firstRuns[0] === "chart:LONG01"
+          && firstRuns.some(function(r) { return r === "spark:" + more.slice(1, 21).join(",") + " spark:" + more.slice(21, 41).join(",") + " chart:LONG42" }),
+        firstRuns.slice(0, 2).join(" / "))
       var longFrom = harness.requests().length
       var longBang = []
-      var watchBang = function() { if (marks().some(function(m) { return /!/.test(m) })) longBang.push(service.now) }
-      tick(300, 5, watchBang)
-      // Halfway, with the budget spent on the rows, a range picked still
-      // gets its history: runs of quotes leave the reserve to it.
-      var tokensThen = Math.floor(service.testYahooGate.tokens)
-      body.selectRange("1W")
-      tryVerify(function() { return !!service.histories["NEST|1W"] && service.histories["NEST|1W"].status === "ok" }, 5000)
-      var pressed = [tokensThen, service.histories["NEST|1W"].status, body.headerText].join(" | ")
-      body.selectRange("1D")
-      harness.check("with the budget spent on a long list's rows, a range picked still gets its history",
-        tokensThen <= service.testYahooGate.reserve && service.histories["NEST|1W"].status === "ok", pressed)
-      tick(300, 5, watchBang)
-      var longCounts = {}
-      harness.requests().slice(longFrom).forEach(function(l) { var p = l.split(" "); if (p[0] === "chart") longCounts[p[1]] = (longCounts[p[1]] || 0) + 1 })
-      var starved = more.filter(function(s) { return (longCounts[s] || 0) < 5 })
-      harness.check("50 symbols: the pill's symbol every minute, every row at least every 2 minutes, no warning",
-        Math.abs((longCounts.NEST || 0) - 10) <= 1 && starved.length === 0 && longBang.length === 0,
-        "NEST " + longCounts.NEST + ", LONG01 " + longCounts.LONG01 + ", LONG42 " + longCounts.LONG42 + ", starved " + starved + ", warned " + longBang.length)
+      tick(600, 5, function() { if (marks().some(function(m) { return /!/.test(m) })) longBang.push(service.now) })
+      var longReqs = harness.requests().slice(longFrom)
+      var longCounts = { NEST: 0 }
+      more.forEach(function(s) { longCounts[s] = 0 })
+      longReqs.forEach(function(l) {
+        var p = l.split(" ")
+        if (p[0] === "chart" || p[0] === "spark") p[1].split(",").forEach(function(s) { if (s in longCounts) longCounts[s]++ })
+      })
+      var starved = more.filter(function(s) { return longCounts[s] < 9 })
+      harness.check("50 symbols: the pill's symbol and every row every minute, in a few requests, no warning",
+        Math.abs(longCounts.NEST - 10) <= 1 && starved.length === 0 && longBang.length === 0 && longReqs.length <= 60,
+        "NEST " + longCounts.NEST + ", LONG01 " + longCounts.LONG01 + ", LONG42 " + longCounts.LONG42 + ", starved " + starved
+          + ", warned " + longBang.length + ", " + longReqs.length + " requests in 10 min")
       more.forEach(function(s) { service.removeSymbol(s) })
       closeWindow()
 

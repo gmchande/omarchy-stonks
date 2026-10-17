@@ -1,3 +1,4 @@
+.pragma library
 // How the theme's colours are put to work: which colours are up and down,
 // how much quieter secondary text is, and how strongly a chart's wash lies
 // over the ground. Every colour comes in from the theme, except Stonks' own

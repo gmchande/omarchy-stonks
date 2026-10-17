@@ -1,3 +1,4 @@
+.pragma library
 .import "Settings.js" as Settings
 
 // What the key sheet shows. Knows nothing of how the keys are handled.

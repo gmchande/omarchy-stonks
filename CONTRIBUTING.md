@@ -86,9 +86,10 @@ building one that won't merge.
 
 ## Product rules
 
-- **Data.** Quotes come from Yahoo's unofficial chart and search endpoints,
-  overnight prints from Robinhood's keyless historicals, with no account or
-  key. The README says so plainly, and nothing shows Robinhood's logo.
+- **Data.** Quotes come from Yahoo's unofficial chart, spark, and search
+  endpoints, overnight prints from Robinhood's keyless historicals, with no
+  account or key. The README says so plainly, and nothing shows Robinhood's
+  logo.
 - **Only what's true.** Show what the source sent, never an adjustment,
   precision, or coverage it didn't. Leave out a figure that isn't known; never
   guess it. The headline price is Yahoo's regular-market quote, never the last
@@ -128,8 +129,9 @@ building one that won't merge.
   OutCubic.
 - Secondary text is the foreground mixed toward its ground (`Tones.dim`),
   never `Qt.darker`, which gets louder on a light theme.
-- Rule files: top-level functions only, read through `.import`, imports one
-  way with no cycles.
+- Rule files: `.pragma library` first, so QML loads each once rather than
+  once per row; top-level functions only, read through `.import`, imports
+  one way with no cycles.
 
 ## Branches and pull requests
 

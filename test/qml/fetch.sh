@@ -5,14 +5,14 @@
 # stock, a thin one, an ETF, an index, a cryptocurrency, London, Tokyo at
 # lunch, and Toronto; an offline start on saved quotes and the network's
 # return; an open that finds the rows fresh; r twice; Yahoo refusing and
-# recovering; a network back within seconds; a list past the budget; the
+# recovering; a network back within seconds; a list of 50 every minute; the
 # pill's wheel; an add, a removal and its undo; a search's preview; and, in a
 # second run, a US holiday while London and Toronto trade. HOME and curl are
 # scratch; the fake curl answers from test/fixtures/moments/fetch-2026-10-07
 # and sweep-2026-10-07-1455.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree fetch.qml
-patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property var testBody: root.body'
+patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property var testBody: root.body\n  readonly property alias testWindow: window'
 # The harness owns the clock, from Wednesday 7 October at 05:59 New York.
 patch_copy plugin/Service.qml 's/function wallSecond() { return Math.floor(Date.now() \/ 1000) }/function wallSecond() { return root.now }/'
 patch_copy plugin/Service.qml 's/property int now: Math.floor(Date.now() \/ 1000)/property int now: 1791367140/'
@@ -27,8 +27,6 @@ patch_copy plugin/WindowHost.qml 's/Hyprland\.\(toplevels\|focusedWorkspace\|dis
 # host, stand-ins that answer as they are set.
 patch_copy plugin/WindowHost.qml 's/Hyprland\.refreshMonitors()/root.monitors.forEach(function(m) { m.refresh() })/g'
 export QT_QPA_PLATFORM=offscreen
-# The long list holds the budget back once, and says so.
-export STONKS_BUDGET_EXPECTED=1
 
 # The main run starts offline, with last session's quotes saved: NEST at
 # Tuesday's close and London's Thursday.
@@ -47,7 +45,6 @@ bun -e '
   } }))
 ' "$plugin" > "$XDG_CACHE_HOME/grvc.stonks/quotes.json"
 run_qs 400
-budget_warnings=$(rg -c "Yahoo's budget held back" "$work/log" || true)
 mv "$work/log" "$work/main.log"
 
 # The holiday run: New York closed on 7 October, London and Toronto open.
@@ -62,12 +59,6 @@ STONKS_FETCH_RUN=holiday run_qs 120
 cat "$work/main.log" "$work/log" > "$work/both.log"
 mv "$work/both.log" "$work/log"
 
-if [ "${budget_warnings:-0}" -eq 1 ]; then
-  echo "PASS the long list holds Yahoo's budget back, and says so once"
-else
-  echo "FAIL Yahoo's budget said it held requests back ${budget_warnings:-0} times, not once"
-  code=1
-fi
 if ! rg -q -F "FETCH DONE" "$work/log"; then
   echo "FAIL the main run never reached FETCH DONE"
   code=1

@@ -68,16 +68,24 @@
 # STONKS_FAKE_STATE/INSTRUMENTS.down exists, the instruments fail, counted
 # all the same.
 #
+# Spark: a /v7/finance/spark request answers each of its symbols from that
+# symbol's own day as the chart route would, closes only, in Yahoo's spark
+# shape, counting each symbol's call as a chart's. A symbol the chart route
+# would fail or answer 404 is left out, as Yahoo leaves out one it has no
+# day for. HUGE pads the answer past the spark cap.
+#
 # Runs: like curl, it takes several URLs in one call and answers each in
 # turn, each followed by the -w line Fetch.js asks for, with the status
 # (200, 404 for GONE, 429 while refused, 502 for a failure, 000 for no
 # answer), curl's exit code, and the URL's place. An answer over
 # --max-filesize is cut there with exit code 63. Each call is a line of
 # runs.log, its kind:name per URL, and each URL a line of requests.log,
-# "kind name status".
+# "kind name status", a spark's name its symbols, comma-separated.
 #   YAHOO.refuse, ROBINHOOD.refuse   that host answers 429 to every request,
 #                                    counted in <HOST>.refused.calls
 #   YAHOO.offline, ROBINHOOD.offline that host gives no answer at all
+#   DELAY                            each URL answers that many seconds
+#                                    late, as on a slow network
 
 set -u
 fixtures="${STONKS_FIXTURES:?}"
@@ -113,12 +121,14 @@ kind_of() {
     *"api.robinhood.com/"*) echo overnight ;;
     *"/fundamentals-timeseries/"*|*"interval=1d&period1="*) echo fundamentals ;;
     *"includeAdjustedClose=true"*) echo history ;;
+    *"/v7/finance/spark"*) echo spark ;;
     *) echo chart ;;
   esac
 }
 name_of() {
   case "$2" in
     search|instruments|overnight) echo "$2" ;;
+    spark) local s="${1#*symbols=}"; echo "${s%%&*}" ;;
     fundamentals) local s="${1##*/timeseries/}"; s="${s##*/chart/}"; echo "${s%%\?*}" ;;
     *) local s="${1##*/chart/}"; echo "${s%%\?*}" ;;
   esac
@@ -128,6 +138,20 @@ name_of() {
 # 0 an answer, 22 a failure (502), 44 not found (404), 7 no answer.
 serve() {
   local url=$1
+  if [[ "$url" == *"/v7/finance/spark"* ]]; then
+    local list="${url#*symbols=}" sym body served days=() huge=0
+    list="${list%%&*}"
+    for sym in ${list//,/ }; do
+      body=$(serve "https://query1.finance.yahoo.com/v8/finance/chart/$sym?range=1d&interval=5m&includePrePost=true")
+      served=$?
+      [ "$served" = 0 ] && days+=("$body")
+      [ "$sym" = HUGE ] && huge=1
+    done
+    printf '%s\n' "${days[@]}" | jq -cs '{ spark: { result: map(.chart.result[0] | { symbol: .meta.symbol,
+      response: [{ meta: .meta, timestamp: .timestamp, indicators: { quote: [{ close: .indicators.quote[0].close }] } }] }) } }'
+    [ "$huge" = 1 ] && head -c 450000 /dev/zero | tr '\0' ' '
+    exit 0
+  fi
   if [[ "$url" == *"/v1/finance/search"* ]]; then
     [[ "$url" == *"q=FAST&"* ]] || sleep 0.4
     case "$url" in
@@ -277,6 +301,7 @@ done
 run=()
 for i in "${!urls[@]}"; do
   url=${urls[$i]}
+  [ -e "$state/DELAY" ] && sleep "$(cat "$state/DELAY")"
   kind=$(kind_of "$url")
   name=$(name_of "$url" "$kind")
   host=YAHOO
