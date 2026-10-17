@@ -20,6 +20,9 @@ Item {
   property color dim: Tones.dim(foreground, Color.background)
   property string fontFamily: Style.font.family
   property int rowHeight: Style.space(30)
+  // The scrollbar's gutter at the right, which the rows stop short of: the
+  // footer's words and fill line up with theirs. Its ground still spans it.
+  property int gutter: 0
   property string note: ""
   property string noteAction: ""
   property string notice: ""
@@ -71,6 +74,7 @@ Item {
     anchors.top: parent.top
     anchors.left: parent.left
     anchors.right: parent.right
+    anchors.rightMargin: root.gutter
     // A line wider than the card, at a theme's own spacing, wraps; the hint
     // takes the height it needs.
     wrapMode: Text.WordWrap
@@ -84,6 +88,7 @@ Item {
 
   PanelSeparator {
     y: root.hintHeight
+    width: root.width - root.gutter
     foreground: root.foreground
     strength: 0.08
   }
@@ -92,6 +97,7 @@ Item {
     objectName: "footerFill"
     anchors.fill: parent
     anchors.topMargin: root.hintHeight + Style.space(6)
+    anchors.rightMargin: root.gutter
     radius: root.retro ? 0 : Style.cornerRadius
     color: !root.acts ? "transparent"
       : addMouse.pressed ? Style.pressedFillFor(root.foreground, Color.accent)
@@ -102,7 +108,7 @@ Item {
 
       Text {
         objectName: "footerText"
-        width: Math.min(implicitWidth, root.width - Style.space(20) - (noteAction.visible ? noteAction.implicitWidth : 0))
+        width: Math.min(implicitWidth, root.width - root.gutter - Style.space(20) - (noteAction.visible ? noteAction.implicitWidth : 0))
         elide: Text.ElideRight
         // Cut short, it ends against its action, not a gap's width away.
         horizontalAlignment: Text.AlignRight

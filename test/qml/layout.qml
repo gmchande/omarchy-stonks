@@ -435,15 +435,15 @@ ShellRoot {
             root.check(label + ": both looks' digits share a top line and a left edge",
               Math.abs(smooth.top - retro.top) <= 2 && Math.abs(smooth.left - retro.left) <= 2,
               "smooth " + root.describe(smooth) + " retro " + root.describe(retro))
-            root.check(label + ": the change and its caption end at the hero's right edge",
+            root.check(label + ": the change and its caption end at the band's right edge, the rows' figures'",
               smooth.changeRight === smooth.captionRight
-                && smooth.changeRight === Math.round(body.width - body.margins),
-              root.describe(smooth) + " body " + body.width + " margins " + body.margins)
+                && smooth.changeRight === Math.round(body.width - body.textRight),
+              root.describe(smooth) + " body " + body.width + " right " + body.textRight)
             root.check(label + ": the change sits on the price baseline",
               smooth.change === smooth.baseline && retro.change === retro.baseline,
               "smooth " + root.describe(smooth) + " retro " + root.describe(retro))
             root.check(label + ": the footer follows the rows at one gap",
-              smooth.footerGap === body.bandGap && retro.footerGap === body.bandGap,
+              smooth.footerGap === body.groupGap && retro.footerGap === body.groupGap,
               smooth.footerGap + " / " + retro.footerGap)
             root.check(label + ": the first row sits at the top of the list",
               smooth.row === smooth.list && retro.row === retro.list,
@@ -718,13 +718,14 @@ ShellRoot {
           closures > 50 && unnamed.length === 0 && roomless.length === 0,
           closures + " closures | " + unnamed.join(" | ") + " | " + roomless.join(" | "))
 
-        // The list's header lines up with its rows and groups with them: its
-        // name starts at the rows' text and its order word ends at the
-        // figures it ranks, and it sits 16 px under the info lines and 6 px
-        // over its rows, the range row 8 px over the info lines. Found in
-        // design pass 3: the name started 4 px left of the symbols, the
-        // order word ended 12 px right of the figures, and every band was
-        // 10 px from the next.
+        // The band lines up with the rows and keeps one rhythm: the range
+        // row, the info lines, and the list's header start at the rows' text
+        // and end at their figures, the info lines' last column included;
+        // the range row, the info lines, and the header stand a band's gap
+        // apart, and the header a group's gap over its rows. Found in design
+        // pass 3: the name started 4 px left of the symbols and the order
+        // word ended 12 px right of the figures; and in the owner's look at
+        // the window on 16 October: the info lines stopped near its middle.
         var headerFaults = []
         for (var hw = 0; hw < 2; hw++) {
           surface.wide = hw === 1
@@ -732,27 +733,37 @@ ShellRoot {
             stub.retro = hl === 1
             wait(50)
             var row0 = body.watchlist.rowItem(body.watchlist.displayedSymbols[0])
+            var textLeft = xIn(row0, 0) + row0.gap
+            var textRight = xIn(row0, row0.width) - row0.gap
             var nameText = find(body, "listLabel")
             var orderWord = find(body, "orderLabel")
             var headerLine = nameText.parent
             var rangeRow = find(body, "rangeRow")
             var infoLines = find(body, "infoBlock")
+            // The info lines' last column, as wide as its widest slot.
+            var lastFact = infoLines.layout.factXs.length - 1
+            var lastSlot = 0
+            ;[body.periodLine, body.yearLine].forEach(function(line) {
+              if (line && line.facts[lastFact]) lastSlot = Math.max(lastSlot, infoLines.factWidth(line.facts[lastFact]))
+            })
             var placed = {
-              name: xIn(nameText, 0) - (xIn(row0, 0) + row0.gap),
-              order: xIn(orderWord, orderWord.width) - (xIn(row0, row0.width) - row0.gap),
+              name: xIn(nameText, 0) - textLeft,
+              order: xIn(orderWord, orderWord.width) - textRight,
+              range: [xIn(rangeRow, 0) - textLeft, xIn(rangeRow, rangeRow.width) - textRight],
+              info: [xIn(infoLines, 0) - textLeft, lastFact < 0 ? "none" : xIn(infoLines, infoLines.layout.factXs[lastFact] + lastSlot) - textRight],
               rangeToInfo: yIn(infoLines, 0) - yIn(rangeRow, rangeRow.height),
               infoToHeader: yIn(headerLine, 0) - yIn(infoLines, infoLines.height),
               headerToRows: yIn(body.watchlist, 0) - yIn(headerLine, headerLine.height)
             }
-            if (placed.name !== 0 || placed.order !== 0 || placed.rangeToInfo !== 8
-                || placed.infoToHeader !== 16 || placed.headerToRows !== 6)
+            if (placed.name !== 0 || placed.order !== 0 || placed.range.join() !== "0,0" || placed.info.join() !== "0,0"
+                || placed.rangeToInfo !== body.bandGap || placed.infoToHeader !== body.bandGap || placed.headerToRows !== body.groupGap)
               headerFaults.push((surface.wide ? "window " : "popup ") + (stub.retro ? "retro " : "smooth ") + JSON.stringify(placed))
           }
         }
         surface.wide = false
         stub.retro = false
         wait(50)
-        root.check("the list's header starts at its rows' text, ends at their figures, 16 px under the info lines and 6 px over its rows",
+        root.check("the range row, the info lines to their last column, and the list's header start at the rows' text and end at their figures, a band's gap apart, the header a group's gap over its rows",
           headerFaults.length === 0, headerFaults.join(" | "))
 
         // The rows stop short of the scrollbar's gutter, so the thumb never
@@ -789,7 +800,7 @@ ShellRoot {
         var minimum = root.measure()
         root.check("the window's smallest height shows three whole rows, its chart giving way to 136 px, and its usual height keeps the whole chart",
           body.watchlist.height === 3 * body.rowPitch - body.rowGap && body.chartItem.height === Style.space(136)
-            && usualChart === Style.space(220) && minimum.footerGap === body.bandGap && minimum.footer <= surface.height,
+            && usualChart === Style.space(220) && minimum.footerGap === body.groupGap && minimum.footer <= surface.height,
           "list " + body.watchlist.height + " of " + surface.height + ", chart " + body.chartItem.height + ", at 760 " + usualChart)
         // At the window's smallest, every scrollbar's thumb is at least 24
         // px long. Found in the walk of dev on 14 October: one row of nine
@@ -958,8 +969,8 @@ ShellRoot {
           var bottom = yIn(footer, footer.height)
           var room = surface.height - body.margins
           var ok = !footer.visible ? false : body.watchlist.interactive
-            ? bottom === room && gap >= body.bandGap && gap < body.bandGap + body.rowPitch
-            : gap === body.bandGap && bottom <= room
+            ? bottom === room && gap >= body.groupGap && gap < body.groupGap + body.rowPitch
+            : gap === body.groupGap && bottom <= room
           if (!ok) windowFaults.push(where + ": footer " + (footer.visible ? "ends " + bottom + " of " + room + ", " + gap + " under the rows"
             + (body.watchlist.interactive ? " of a list that fills it" : "") : "hidden"))
         }
@@ -998,7 +1009,7 @@ ShellRoot {
             wait(50)
             var menu = find(body, "listMenu")
             var menuFooter = find(body, "footer")
-            if (!(menu.visible && yIn(menu, menu.height) + body.bandGap <= yIn(menuFooter, 0)
+            if (!(menu.visible && yIn(menu, menu.height) + body.groupGap <= yIn(menuFooter, 0)
                 && yIn(menuFooter, menuFooter.height) <= surface.height - body.margins))
               windowFaults.push(at + "the list menu: it ends at " + yIn(menu, menu.height) + ", the footer "
                 + yIn(menuFooter, 0) + "-" + yIn(menuFooter, menuFooter.height) + " in " + surface.height)
@@ -1102,7 +1113,7 @@ ShellRoot {
           var footerTop = function() { return yIn(find(body, "footer"), 0) }
           root.check(lookName + ": an empty list keeps one row, the footer one gap under it, and moves nothing above it",
             body.watchlist.height === body.rowPitch - body.rowGap && onEmpty.list === onAll.list
-              && onEmpty.range === onAll.range && footerTop() === onEmpty.list + body.watchlist.height + body.bandGap
+              && onEmpty.range === onAll.range && footerTop() === onEmpty.list + body.watchlist.height + body.groupGap
               && find(body, "emptyList").visible,
             root.describe(onEmpty) + " footer at " + footerTop())
           // An open list menu taller than the one row makes room for itself
@@ -1127,7 +1138,7 @@ ShellRoot {
           var footerAt = find(body, "footer")
           root.check(lookName + ": an open list menu makes room for itself and the footer under it",
             menu.visible && menu.height === menu.contentHeight && surface.height > shut
-              && menuBottom + body.bandGap <= yIn(footerAt, 0) && yIn(footerAt, footerAt.height) <= surface.height
+              && menuBottom + body.groupGap <= yIn(footerAt, 0) && yIn(footerAt, footerAt.height) <= surface.height
               && body.fittedHeight(surface.height - 1) === surface.height - 1,
             "menu " + menu.height + " of " + menu.contentHeight + " ends at " + menuBottom + ", footer at " + yIn(footerAt, 0)
               + " in " + surface.height + ", shut " + shut + ", in one less " + body.fittedHeight(surface.height - 1))
@@ -1197,7 +1208,7 @@ ShellRoot {
           var rows = Math.max(1, lists[s].symbols.length)
           var shortList = root.measure()
           shortOk = shortOk && body.watchlist.height === rows * body.rowPitch - body.rowGap
-            && yIn(find(body, "footer"), 0) === shortList.list + body.watchlist.height + body.bandGap
+            && yIn(find(body, "footer"), 0) === shortList.list + body.watchlist.height + body.groupGap
         }
         root.check("a shorter list's footer sits one gap under its rows", shortOk)
 

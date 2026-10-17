@@ -729,7 +729,7 @@ ShellRoot {
       // on its last row: four rows of five tall, the cursor on the last,
       // then the smallest, three. The body is resized as the window resizes
       // it: an offscreen window takes a new size only as it opens.
-      body.height = 586 + 3 * 42
+      body.height = body.smallestHeight + 3 * 42
       wait(100)
       keys.forceActiveFocus()
       mouseMove(body, 1, 1)
@@ -740,7 +740,7 @@ ShellRoot {
       tryVerify(function() { return !watchlist.settling }, 2000)
       var keyedLast = watchlist.cursorSymbol
       var tallRows = watchlist.height
-      body.height = 586
+      body.height = body.smallestHeight
       wait(100)
       var lastIndex = watchlist.displayedSymbols.indexOf(keyedLast)
       var shrunkKeeps = [keyedLast === lastSymbol, tallRows === 4 * watchlist.rowPitch - watchlist.rowGap, watchlist.cursorSymbol === keyedLast,
@@ -757,17 +757,17 @@ ShellRoot {
       app.close()
       wait(100)
       service.feature(lastSymbol)
-      body.height = 586 + 3 * 42
+      body.height = body.smallestHeight + 3 * 42
       app.open("{}")
       wait(200)
       var openedOn = watchlist.cursorRow
-      body.height = 586 + 5 * 42
+      body.height = body.smallestHeight + 5 * 42
       // Every row fits: the next view the rows show pulls the scroll back
       // within them, to the top (Watchlist.display), as one did then.
       watchlist.display(watchlist.displayedSymbols.slice(), false)
       wait(100)
       var allFit = watchlist.contentY
-      body.height = 586 + 3 * 42
+      body.height = body.smallestHeight + 3 * 42
       wait(100)
       var settledAt = watchlist.displayedSymbols.indexOf(lastSymbol)
       var settled = [openedOn, allFit, watchlist.cursorRow, watchlist.cursorSymbol === "", watchlist.wholeInSight(settledAt, watchlist.headedY)].join(",")
@@ -1148,7 +1148,7 @@ ShellRoot {
           + (footer.y + footer.height) + " of " + body.height
       }
       var underRows = function() {
-        return watchlist.displayedSymbols.length === 1 && footer.y === watchlist.y + watchlist.height + body.bandGap
+        return watchlist.displayedSymbols.length === 1 && footer.y === watchlist.y + watchlist.height + body.groupGap
           && footer.y + footer.height < body.height - body.margins - watchlist.rowPitch
       }
       var shortList = [underRows(), place()]

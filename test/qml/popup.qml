@@ -859,7 +859,7 @@ ShellRoot {
           panel.testContentHeightChanged.disconnect(test.recordHeight)
           test.check("the short list's rows stay its own, the footer one gap under them",
             test.shortListRows === 2 * panel.testWatchlist.rowPitch - panel.testWatchlist.rowGap
-              && test.find(panel.testBody, "footer").y === panel.testWatchlist.y + test.shortListRows + panel.testBody.bandGap,
+              && test.find(panel.testBody, "footer").y === panel.testWatchlist.y + test.shortListRows + panel.testBody.groupGap,
             test.shortListRows + " footer " + test.find(panel.testBody, "footer").y)
           panel.testKeyCatcher.textKey(",")
         } else if (test.step === 20) {

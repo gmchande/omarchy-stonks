@@ -44,9 +44,14 @@ FocusScope {
   // full answer.
   readonly property int maxResults: 8
   readonly property int rowGap: Style.space(2)
+  // The scrollbar's gutter at the right, as the list's rows keep it, so the
+  // field and the answers line up with the rows they replace.
+  property int gutter: 0
   readonly property int rowPitch: rowHeight + rowGap
-  // From the field's rule to the first result.
-  readonly property int resultsGap: Style.space(6)
+  // From the field's rule to the first result: with it, the field and a
+  // full answer are as tall as a full list's six rows and footer, so search
+  // on a short list grows the popup no taller than a full one.
+  readonly property int resultsGap: Style.space(4)
   readonly property int desiredHeight: fieldBar.height + resultsGap + rowPitch * maxResults - rowGap
   // The results' room under the field, in whole rows: a row is never cut.
   readonly property int resultsHeight: {
@@ -99,7 +104,7 @@ FocusScope {
   // column for every row, as wide as the answer's widest symbol, until the
   // name is down to half the room the two share; past that a symbol ends
   // in an ellipsis. The exchange and the label keep theirs.
-  readonly property int sharedWidth: width - rowPadding * 2 - columnGap * 3 - exchangeWidth - buttonWidth
+  readonly property int sharedWidth: width - gutter - rowPadding * 2 - columnGap * 3 - exchangeWidth - buttonWidth
   readonly property int symbolWidth: {
     var font = symbolMetrics.font // read, so a look's new font measures again
     var widest = Style.space(80)
@@ -329,8 +334,8 @@ FocusScope {
     boundsBehavior: Flickable.StopAtBounds
     interactive: contentHeight > height
     // While more results sit out of sight, as in the window at its
-    // smallest, the rows' scrollbar says so, at rest too, and the results
-    // stop short of its gutter.
+    // smallest, the rows' scrollbar says so, at rest too, in the gutter the
+    // results stop short of.
     Controls.ScrollBar.vertical: Controls.ScrollBar {
       // Drawn while there is more, not only while used.
       policy: resultsScroll.interactive ? Controls.ScrollBar.AlwaysOn : Controls.ScrollBar.AlwaysOff
@@ -341,7 +346,7 @@ FocusScope {
 
     Column {
       id: resultsColumn
-      width: resultsScroll.width - (resultsScroll.interactive ? Style.space(8) : 0)
+      width: resultsScroll.width - root.gutter
       spacing: root.rowGap
 
       Repeater {
@@ -488,6 +493,7 @@ FocusScope {
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: parent.top
+    anchors.rightMargin: root.gutter
     height: root.rowHeight + Style.space(6)
 
     TextField {
@@ -511,7 +517,7 @@ FocusScope {
       objectName: "searchCancel"
       view: root
       anchors.right: parent.right
-      anchors.rightMargin: Style.space(6)
+      anchors.rightMargin: root.rowPadding
       anchors.verticalCenter: parent.verticalCenter
       text: "CANCEL"
       onActivated: root.cancel()

@@ -27,6 +27,11 @@ FocusScope {
   property int cursor: 0
 
   readonly property int itemHeight: Style.space(30)
+  // The scrollbar's gutter at the right, as the list's rows keep it, and the
+  // rows' words' inset from their fills, so this view's words line up with
+  // the rows it covers.
+  property int gutter: 0
+  readonly property int inset: Style.space(10)
   readonly property int contentHeight: itemHeight + choices.length * itemHeight
 
   signal toggled(string name, bool member)
@@ -142,7 +147,7 @@ FocusScope {
     Text {
       id: lead
       visible: root.note === ""
-      x: Style.space(6)
+      x: root.inset
       anchors.baseline: symbolText.baseline
       textFormat: Text.PlainText
       text: "LISTS WITH"
@@ -186,7 +191,7 @@ FocusScope {
     Text {
       objectName: "symbolListsNote"
       visible: root.note !== ""
-      x: Style.space(6)
+      x: root.inset
       anchors.right: done.left
       anchors.rightMargin: Style.space(16)
       anchors.verticalCenter: parent.verticalCenter
@@ -203,7 +208,7 @@ FocusScope {
       objectName: "symbolListsDone"
       view: root
       anchors.right: parent.right
-      anchors.rightMargin: Style.space(6)
+      anchors.rightMargin: root.gutter + root.inset
       anchors.verticalCenter: parent.verticalCenter
       text: "DONE"
       onActivated: root.dismissed()
@@ -231,8 +236,8 @@ FocusScope {
       root.keepCursorInSight()
     }
     // While more lists sit out of sight, as in the window at its smallest,
-    // the rows' scrollbar says so, at rest too, and the lists stop short of
-    // its gutter.
+    // the rows' scrollbar says so, at rest too, in the gutter the lists stop
+    // short of.
     Controls.ScrollBar.vertical: Controls.ScrollBar {
       id: listsBar
       // Drawn while there is more, not only while used.
@@ -244,7 +249,7 @@ FocusScope {
 
     Column {
       id: column
-      width: scroll.width - (scroll.interactive ? Style.space(8) : 0)
+      width: scroll.width - root.gutter
 
       Repeater {
         model: root.choices
@@ -276,7 +281,7 @@ FocusScope {
           Rectangle {
             id: box
             objectName: "tickBox"
-            x: Style.space(12)
+            x: root.inset
             anchors.verticalCenter: parent.verticalCenter
             width: Style.space(12)
             height: width
@@ -329,7 +334,7 @@ FocusScope {
             id: count
             objectName: "listCount"
             anchors.right: parent.right
-            anchors.rightMargin: Style.space(8)
+            anchors.rightMargin: root.inset
             anchors.verticalCenter: parent.verticalCenter
             textFormat: Text.PlainText
             text: String(entry.modelData.count)
