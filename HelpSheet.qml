@@ -20,6 +20,13 @@ Flickable {
   property color dim: Tones.dim(foreground, Color.background)
   property string fontFamily: Style.font.family
   property bool retro: false
+  // The words start at the rows' inset (`inset`), and CLOSE ends where the
+  // rows' figures do, one gutter and an inset short of the right (`edge`):
+  // the sheet clips at its edges, so CLOSE's fill reaching past its word
+  // stays whole. What each key does may run on past that edge, as wrapped
+  // words do, rather than break a line in the popup.
+  property int inset: 0
+  property int edge: 0
 
   signal closeRequested()
 
@@ -36,7 +43,17 @@ Flickable {
     }
     return groups.length
   }
-  readonly property int columnWidth: (width - columns.spacing) / 2
+  readonly property int columnWidth: (width - inset - columns.spacing) / 2
+  // The key column, as wide as the widest key or gesture, so what each
+  // does keeps the room a popup's half column has.
+  readonly property int keyWidth: {
+    var widest = 0
+    var all = groups.concat(sheet.mouse ? [sheet.mouse] : [])
+    for (var g = 0; g < all.length; g++)
+      for (var r = 0; r < all[g].rows.length; r++) widest = Math.max(widest, Math.ceil(keyMetrics.advanceWidth(all[g].rows[r].key)))
+    return widest
+  }
+  FontMetrics { id: keyMetrics; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; font.bold: true }
 
   contentWidth: width
   contentHeight: sheetColumn.y + sheetColumn.implicitHeight
@@ -69,7 +86,7 @@ Flickable {
 
         Text {
           objectName: group.keyName
-          width: Style.space(48)
+          width: root.keyWidth
           textFormat: Text.PlainText
           text: helpRow.modelData.key
           color: root.foreground
@@ -78,7 +95,7 @@ Flickable {
           font.bold: true
         }
         Text {
-          width: parent.width - Style.space(48) - parent.spacing
+          width: parent.width - root.keyWidth - parent.spacing
           textFormat: Text.PlainText
           text: helpRow.modelData.does
           color: root.dim
@@ -92,8 +109,9 @@ Flickable {
 
   Column {
     id: sheetColumn
+    x: root.inset
     y: Style.space(4)
-    width: root.width
+    width: root.width - root.inset
     spacing: Style.space(16)
 
     Row {
@@ -118,11 +136,11 @@ Flickable {
 
     Repeater {
       model: root.sheet.mouse ? [root.sheet.mouse] : []
-      delegate: Group { width: root.width; keyName: "helpGesture" }
+      delegate: Group { width: sheetColumn.width; keyName: "helpGesture" }
     }
 
     Item {
-      width: root.width
+      width: sheetColumn.width
       height: Math.max(note.implicitHeight, close.implicitHeight)
 
       Text {
@@ -146,7 +164,7 @@ Flickable {
         objectName: "helpClose"
         view: root
         anchors.right: parent.right
-        anchors.rightMargin: Style.space(6)
+        anchors.rightMargin: root.edge
         anchors.verticalCenter: parent.verticalCenter
         text: "CLOSE"
         onActivated: root.closeRequested()

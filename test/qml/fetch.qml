@@ -295,7 +295,13 @@ ShellRoot {
       var nestRow = body.watchlist.rowItem("NEST")
       var shelRow = body.watchlist.rowItem("SHEL.L")
       within(3000, function() { return body.featuredFreshness.state === "saved" })
+      // London's row into sight, wherever the window's height leaves it: a
+      // row far out of sight keeps what it last showed.
+      body.watchlist.scrollToRow(body.watchlist.displayedSymbols.indexOf("SHEL.L"))
+      within(3000, function() { return body.watchlist.sightSymbols.indexOf("SHEL.L") >= 0 && shelRow.quote !== null })
       var savedNotes = [nestRow ? nestRow.detail : "", shelRow ? shelRow.detail : "", body.featuredFreshness.state].join(" | ")
+      body.watchlist.scrollToRow(0)
+      within(3000, function() { return body.watchlist.contentY === 0 })
       // London's time names its zone for the harness's reader in New York.
       harness.check("the saved rows and hero say their day and time, plainly: Tuesday's close, London's Thursday",
         /^As of Tue \d\d:\d\d \| As of Thu \d\d:\d\d BST \| saved$/.test(savedNotes), savedNotes)

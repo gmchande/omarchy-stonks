@@ -61,6 +61,11 @@ FocusScope {
   readonly property string typedName: renaming ? nameField.text : ""
 
   readonly property int itemHeight: Style.space(30)
+  // The scrollbar's gutter at the right, as the list's rows keep it, and the
+  // rows' words' inset from their fills, so this view's words line up with
+  // the rows it covers.
+  property int gutter: 0
+  readonly property int inset: Style.space(10)
   readonly property int rowsHeight: choices.length * itemHeight + (problem !== "" ? itemHeight : 0)
   readonly property int contentHeight: itemHeight + rowsHeight
   readonly property var cursorChoice: choices[cursor] || null
@@ -254,7 +259,7 @@ FocusScope {
     height: root.itemHeight
 
     Text {
-      x: Style.space(6)
+      x: root.inset
       anchors.verticalCenter: parent.verticalCenter
       textFormat: Text.PlainText
       text: "MANAGE LISTS"
@@ -271,7 +276,7 @@ FocusScope {
       view: root
       objectName: "manageDone"
       anchors.right: parent.right
-      anchors.rightMargin: Style.space(6)
+      anchors.rightMargin: root.gutter + root.inset
       anchors.verticalCenter: parent.verticalCenter
       text: "DONE"
       onActivated: {
@@ -304,8 +309,8 @@ FocusScope {
       root.keepCursorInSight()
     }
     // While more lists sit out of sight, as in the window at its smallest,
-    // the rows' scrollbar says so, at rest too, and the lists stop short of
-    // its gutter.
+    // the rows' scrollbar says so, at rest too, in the gutter the lists stop
+    // short of.
     Controls.ScrollBar.vertical: Controls.ScrollBar {
       id: manageBar
       // Drawn while there is more, not only while used.
@@ -317,7 +322,7 @@ FocusScope {
 
     Column {
       id: column
-      width: scroll.width - (scroll.interactive ? Style.space(8) : 0)
+      width: scroll.width - root.gutter
 
       Repeater {
         model: root.choices
@@ -352,7 +357,7 @@ FocusScope {
 
           Text {
             visible: !entry.editing && !entry.asking
-            x: Style.space(12)
+            x: root.inset
             width: (entry.showsActions ? actions.x : count.x) - x - Style.space(12)
             height: root.itemHeight
             verticalAlignment: Text.AlignVCenter
@@ -425,7 +430,7 @@ FocusScope {
             objectName: "listCount"
             visible: !entry.editing && !entry.asking
             anchors.right: parent.right
-            anchors.rightMargin: Style.space(8)
+            anchors.rightMargin: root.inset
             height: root.itemHeight
             verticalAlignment: Text.AlignVCenter
             textFormat: Text.PlainText
@@ -439,7 +444,7 @@ FocusScope {
           // Delete asks here, in the row: the viewer has no dialogs.
           Text {
             visible: entry.asking
-            x: Style.space(12)
+            x: root.inset
             width: confirm.x - x - Style.space(12)
             height: root.itemHeight
             verticalAlignment: Text.AlignVCenter
@@ -458,7 +463,7 @@ FocusScope {
             id: confirm
             visible: entry.asking
             anchors.right: parent.right
-            anchors.rightMargin: Style.space(8)
+            anchors.rightMargin: root.inset
             height: root.itemHeight
             spacing: Style.space(14)
 
@@ -484,7 +489,7 @@ FocusScope {
           Text {
             visible: entry.editing && root.problem !== ""
             y: root.itemHeight
-            x: Style.space(12)
+            x: root.inset
             width: parent.width - x
             height: root.itemHeight
             verticalAlignment: Text.AlignVCenter
@@ -499,7 +504,8 @@ FocusScope {
       }
     }
 
-    // One field, laid over whichever row is being renamed, up to its choices.
+    // One field, laid over whichever row is being renamed, up to its choices:
+    // clear of the cursor's bar, its words where the name's were.
     TextField {
       id: nameField
       objectName: "renameField"
@@ -507,6 +513,7 @@ FocusScope {
       x: Style.space(6)
       y: root.cursor * root.itemHeight
       width: renameChoices.x - x - Style.space(12)
+      leftPadding: root.inset - x
       height: root.itemHeight
       verticalPadding: 0
       foreground: root.foreground
@@ -529,7 +536,7 @@ FocusScope {
       id: renameChoices
       visible: root.renaming
       anchors.right: parent.right
-      anchors.rightMargin: Style.space(8)
+      anchors.rightMargin: root.gutter + root.inset
       y: root.cursor * root.itemHeight
       height: root.itemHeight
       spacing: Style.space(14)

@@ -86,10 +86,14 @@ Item {
   // At rest as a surface opens: the rule on the list's breadth.
   function settle() { breadthRule.settle() }
 
+  // Between the band's blocks, the body's rhythm (`StonksBody.bandGap`).
+  property int bandGap: Style.space(16)
+
   implicitHeight: band.implicitHeight
   // The band's height but the chart's, summed from its other parts, so the
   // body can size the chart from it without reading the chart back.
-  readonly property int heightBesideChart: heroItem.height + infoGroup.height + listHeader.height + band.spacing * 3
+  readonly property int heightBesideChart: heroItem.height + rangeRow.height + infoBlock.height + listHeader.height
+    + band.spacing * 4
   implicitWidth: parent ? parent.width : 0
   height: implicitHeight
   width: parent ? parent.width : implicitWidth
@@ -97,7 +101,7 @@ Item {
   Column {
     id: band
     width: parent.width
-    spacing: Style.space(10)
+    spacing: root.bandGap
 
     Hero {
       id: heroItem
@@ -215,59 +219,54 @@ Item {
       }
     }
 
-    // The range row and the info lines it chooses are one group, 8 px apart;
-    // the list's header stands 16 px under them (the group's padding and the
-    // band's spacing) and 6 px over its rows (the body's `listGap`), so it
-    // groups with the rows it titles. The total is the 30 px it always was.
-    Column {
-      id: infoGroup
+    // The range row, then the info lines it chooses, then the list's header,
+    // a band's gap apart, as every block in the band is; the header stands a
+    // group's gap over its rows (the body's `listGap`), so it groups with
+    // the rows it titles.
+    RangeSelector {
+      id: rangeRow
+      objectName: "rangeRow"
       width: parent.width
-      spacing: Style.space(8)
-      bottomPadding: Style.space(6)
+      options: root.rangeOptions
+      value: root.range
+      retro: root.retro
+      foreground: root.foreground
+      dim: root.dim
+      fontFamily: root.fontFamily
+      onSelected: function(value) { root.rangeRequested(value) }
+    }
 
-      RangeSelector {
-        objectName: "rangeRow"
-        width: parent.width
-        options: root.rangeOptions
-        value: root.range
-        retro: root.retro
-        foreground: root.foreground
-        dim: root.dim
-        fontFamily: root.fontFamily
-        onSelected: function(value) { root.rangeRequested(value) }
-      }
+    // The period and the 52 weeks: two lines that are always there, so
+    // the list keeps its place for every symbol and range.
+    InfoTable {
+      id: infoBlock
+      objectName: "infoBlock"
+      width: parent.width
+      height: implicitHeight
+      lines: [root.periodLine, root.yearLine]
+      // Every title a line can hold: each range's, the day's weekday or
+      // month (`Figures.dayTitles`), and the 52 weeks'
+      // (`Fundamentals.yearLine`).
+      titles: root.rangeOptions.map(function(r) { return String(r).toUpperCase() }).concat(Figures.dayTitles(), ["52W"])
+      retro: root.retro
+      foreground: root.foreground
+      dim: root.dim
+      upColor: root.upColor
+      downColor: root.downColor
+      fontFamily: root.fontFamily
+      rowGap: Style.space(4)
 
-      // The period and the 52 weeks: two lines that are always there, so
-      // the list keeps its place for every symbol and range.
-      InfoTable {
-        objectName: "infoBlock"
-        width: parent.width
-        height: implicitHeight
-        lines: [root.periodLine, root.yearLine]
-        // Every title a line can hold: each range's, the day's weekday or
-        // month (`Figures.dayTitles`), and the 52 weeks'
-        // (`Fundamentals.yearLine`).
-        titles: root.rangeOptions.map(function(r) { return String(r).toUpperCase() }).concat(Figures.dayTitles(), ["52W"])
-        retro: root.retro
-        foreground: root.foreground
-        dim: root.dim
-        upColor: root.upColor
-        downColor: root.downColor
-        fontFamily: root.fontFamily
-        rowGap: Style.space(4)
-
-        Rectangle {
-          anchors.fill: parent
-          visible: root.dimmed > 0
-          color: root.veil
-        }
+      Rectangle {
+        anchors.fill: parent
+        visible: root.dimmed > 0
+        color: root.veil
       }
     }
 
     // The list's name, a menu, at the left of the rule, as Apple puts it at
     // the top of the list; the order control at the right. The name starts
-    // at the rows' text, and the order word ends at the figures it ranks,
-    // the rows' inset plus the scrollbar's gutter. Its height is the caption
+    // at the rows' words, and the order word ends at the figures it ranks,
+    // the band's own edges. Its height is the caption
     // line's, never a word's: a glyph drawn from another font is taller, and
     // would move the rows. A line of text rounds its ascent and its descent
     // up to whole pixels each, and so does this.
@@ -300,7 +299,6 @@ Item {
         id: listText
         objectName: "listLabel"
         anchors.left: parent.left
-        anchors.leftMargin: Style.space(10)
         anchors.verticalCenter: parent.verticalCenter
         width: Math.min(implicitWidth, parent.width - orderText.implicitWidth - todayText.implicitWidth - Style.space(80))
         textFormat: Text.PlainText
@@ -432,7 +430,6 @@ Item {
         objectName: "orderLabel"
         visible: !root.rowsCovered
         anchors.right: parent.right
-        anchors.rightMargin: Style.space(18)
         anchors.verticalCenter: parent.verticalCenter
         textFormat: Text.PlainText
         text: Settings.orderLabel(root.order, root.reversed)

@@ -36,10 +36,27 @@ Item {
   // bottom once the list fills it. Found in the edge pass of 15 October: a
   // list of one row in the window left a tall gap above the footer.
   property real edge: Math.min(height, fittedHeight(Infinity))
-  property int bandGap: Style.space(10)
-  // From the list's header to its rows, closer than the bands above it, so
-  // the header groups with the rows it titles: the shell's own spacing step.
-  readonly property int listGap: Style.spacing.md
+  // One vertical rhythm for both looks and both surfaces. A band's gap
+  // stands between the band's blocks: the hero, the chart, the range row,
+  // the info lines, and the list's header. A group's gap, half of it,
+  // stands between a thing and what it heads: the header over the hero, the
+  // list's header over its rows or a view in their place, and the rows over
+  // the footer that adds to them. The info lines' own lines are 4 apart.
+  // Every row of words in the band is its caption line, a control's fill
+  // reaching past it, so the gaps are the gaps seen.
+  readonly property int bandGap: Style.space(16)
+  readonly property int groupGap: Style.space(8)
+  // Every block's words share two edges, the rows' own: `inset` in from
+  // the rows' fills, which stop one `gutter` short of the right, where the
+  // scrollbar lives. A block with a fill (a row, a search answer, a view's
+  // row, the footer) spans the rows' width, its words inset; the band and
+  // the key sheet's words stand at the words' edges, a control's fill
+  // reaching past its word. The key sheet's descriptions may run on past
+  // the right one, as wrapped words do; the header is the surface's own row.
+  readonly property int inset: Style.space(10)
+  readonly property int gutter: Style.space(8)
+  readonly property int textLeft: margins + inset
+  readonly property int textRight: margins + gutter + inset
   property int chartHeight: Style.space(190)
   // The least the chart may be (the window's 136 px): as the window gets
   // short, the chart gives way first, so three rows still show; at its
@@ -287,11 +304,11 @@ Item {
     if (featuredQuote) return Market.marketStatus(dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars)
     return headerWhenMissing
   }
-  // Everything but the rows: margins, header, band, and footer, one gap
-  // apart, and the list's own gap from its header.
+  // Everything but the rows: margins, header, band, and footer, with the
+  // band, the rows, and the footer each one group's gap under what is above.
   readonly property int chromeHeight: chartGivesWay ? chromeBesideChart + shownChartHeight
-    : margins * 2 + header.height + heroBand.implicitHeight + footer.height + bandGap * 2 + listGap
-  readonly property int chromeBesideChart: margins * 2 + header.height + heroBand.heightBesideChart + footer.height + bandGap * 2 + listGap
+    : margins * 2 + header.height + heroBand.implicitHeight + footer.height + groupGap * 3
+  readonly property int chromeBesideChart: margins * 2 + header.height + heroBand.heightBesideChart + footer.height + groupGap * 3
   // The chart as drawn: chartHeight, less what three rows need of it, down
   // to minChartHeight. Read from the chrome beside it, never from the chart,
   // so its size never reads itself back. Only where the chart gives way:
@@ -306,12 +323,12 @@ Item {
   // at a larger text size (275 less 170 is not two 53 px rows).
   readonly property int smallestHeight: chartGivesWay ? chromeBesideChart + minChartHeight + 3 * rowPitch - rowGap
     : chromeBesideChart + chartHeight + listRowHeight
-  readonly property int helpHeight: margins * 2 + header.height + bandGap + helpSheet.contentHeight
+  readonly property int helpHeight: margins * 2 + header.height + groupGap + helpSheet.contentHeight
   // Search needs room for the field and a full set of results, never less
   // because the list it replaces is short. Its field takes the rows' place
   // as it opens, and its answers fill down under the field.
   readonly property int searchHeight: margins * 2 + header.height + heroBand.implicitHeight
-    + bandGap + listGap + search.desiredHeight
+    + groupGap * 2 + search.desiredHeight
   readonly property int wholeListHeight: wholeRowsHeight(height - chromeHeight)
   // The most height the surface gives the body, as the popup's card does
   // when it fits the rows; 0 where the body's height is its own (the
@@ -319,13 +336,13 @@ Item {
   // the card has shrunk to for the key sheet or a view.
   property int rowsRoom: 0
   readonly property int rowsSightHeight: rowsRoom > 0 ? wholeRowsHeight(rowsRoom - chromeHeight) : wholeListHeight
-  readonly property int listMenuTop: margins + header.height + bandGap + heroBand.implicitHeight + Style.space(4)
+  readonly property int listMenuTop: margins + header.height + groupGap + heroBand.implicitHeight + Style.space(4)
   // The menu ends one gap above the footer, which stays in sight under it.
-  readonly property int listMenuBottom: listMenuTop + listMenu.contentHeight + bandGap + footer.height + margins
+  readonly property int listMenuBottom: listMenuTop + listMenu.contentHeight + groupGap + footer.height + margins
   // Manage lists and a symbol's lists take the rows' and the footer's place,
   // at their own height.
   readonly property bool listViewOpen: managingLists || listsSymbol !== ""
-  readonly property int listViewHeight: margins * 2 + header.height + heroBand.implicitHeight + bandGap + listGap
+  readonly property int listViewHeight: margins * 2 + header.height + heroBand.implicitHeight + groupGap * 2
     + (managingLists ? manageLists.contentHeight : symbolLists.contentHeight)
   // The rows are what the body shows under the band, not the key sheet,
   // search, or a list view.
@@ -865,6 +882,9 @@ Item {
     }
   }
 
+  // The surface's own row, on the margins as the rows' fills are, not on
+  // the words' edges: the longest closure's status (a holiday's name, the
+  // next open, its zone) needs every pixel of the popup's width.
   HeaderStatus {
     id: header
     anchors.left: parent.left
@@ -897,9 +917,10 @@ Item {
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: header.bottom
-    anchors.leftMargin: root.margins
-    anchors.rightMargin: root.margins
-    anchors.topMargin: root.bandGap
+    anchors.leftMargin: root.textLeft
+    anchors.rightMargin: root.textRight
+    anchors.topMargin: root.groupGap
+    bandGap: root.bandGap
     visible: !root.showingHelp
     freshness: root.featuredFreshness
     retro: root.retro
@@ -960,7 +981,7 @@ Item {
     anchors.top: heroBand.bottom
     anchors.leftMargin: root.margins
     anchors.rightMargin: root.margins
-    anchors.topMargin: root.listGap
+    anchors.topMargin: root.groupGap
     height: root.wholeListHeight
     sightHeight: root.rowsSightHeight
     visible: root.rowsShown
@@ -981,6 +1002,7 @@ Item {
     fontFamily: root.fontFamily
     rowHeight: root.listRowHeight
     rowGap: root.rowGap
+    gutter: root.gutter
     surfaceOpen: root.surfaceOpen
     // A turn later: the change that arranged the rows is still being told.
     onArranged: Qt.callLater(root.land)
@@ -1009,7 +1031,7 @@ Item {
     anchors.bottom: parent.bottom
     anchors.leftMargin: root.margins
     anchors.rightMargin: root.margins
-    anchors.topMargin: root.listGap
+    anchors.topMargin: root.groupGap
     anchors.bottomMargin: root.margins
     visible: root.adding
     gate: root.service ? root.service.yahooGate : null
@@ -1019,6 +1041,7 @@ Item {
     dim: root.dim
     dimmer: root.dimmer
     fontFamily: root.fontFamily
+    gutter: root.gutter
     // What to type, and the list it adds to; short, so a list's name fits
     // the popup's field.
     placeholder: root.listName !== "" ? "Symbol or company for " + root.listName + "…" : "Search a symbol or company…"
@@ -1037,7 +1060,7 @@ Item {
     anchors.bottom: parent.bottom
     anchors.leftMargin: root.margins
     anchors.rightMargin: root.margins
-    anchors.topMargin: root.listGap
+    anchors.topMargin: root.groupGap
     anchors.bottomMargin: root.margins
     visible: root.managingLists
     active: root.managingLists && root.surfaceOpen
@@ -1046,6 +1069,7 @@ Item {
     foreground: root.foreground
     dim: root.dim
     fontFamily: root.fontFamily
+    gutter: root.gutter
     onRenameRequested: function(name, newName) { root.renameList(name, newName) }
     onMoveRequested: function(name, delta) { if (root.service) root.service.moveList(name, delta) }
     onDeleteRequested: function(name) { if (root.service) root.service.deleteList(name) }
@@ -1061,7 +1085,7 @@ Item {
     anchors.bottom: parent.bottom
     anchors.leftMargin: root.margins
     anchors.rightMargin: root.margins
-    anchors.topMargin: root.listGap
+    anchors.topMargin: root.groupGap
     anchors.bottomMargin: root.margins
     visible: root.listsSymbol !== ""
     active: root.listsSymbol !== "" && root.surfaceOpen
@@ -1073,6 +1097,7 @@ Item {
     foreground: root.foreground
     dim: root.dim
     fontFamily: root.fontFamily
+    gutter: root.gutter
     onToggled: function(name, member) { root.setMembership(name, member) }
     onDismissed: root.closeListViews()
   }
@@ -1086,7 +1111,7 @@ Item {
       && !root.showingHelp && !root.adding && !root.listViewOpen
     x: root.margins
     y: watchlist.y
-    width: root.width - root.margins * 2
+    width: root.width - root.margins * 2 - root.gutter
     height: root.listRowHeight
     horizontalAlignment: Text.AlignHCenter
     verticalAlignment: Text.AlignVCenter
@@ -1115,6 +1140,7 @@ Item {
     foreground: root.foreground
     dim: root.dim
     fontFamily: root.fontFamily
+    gutter: root.gutter
     rowHeight: root.rowHeight
     note: root.note
     noteAction: root.offered !== null ? " · click to undo" : ""
@@ -1146,8 +1172,10 @@ Item {
     anchors.bottom: parent.bottom
     anchors.leftMargin: root.margins
     anchors.rightMargin: root.margins
-    anchors.topMargin: root.bandGap
+    anchors.topMargin: root.groupGap
     anchors.bottomMargin: root.margins
+    inset: root.inset
+    edge: root.gutter + root.inset
     sheet: root.keySheet
     foreground: root.foreground
     dim: root.dim
@@ -1189,7 +1217,7 @@ Item {
     z: 10
     x: root.margins
     y: root.listMenuTop
-    maxHeight: root.height - root.listMenuTop - root.bandGap - footer.height - root.margins
+    maxHeight: root.height - root.listMenuTop - root.groupGap - footer.height - root.margins
     choices: root.lists
     current: root.listName
     retro: root.retro
