@@ -30,6 +30,18 @@ function apart(a, b) {
 // Under this, two prices are the same level; over it, they are not.
 var STRAY_GAP = 0.005
 
+// Two prices this many ticks apart are one level however small the price:
+// under $2 one cent is more than STRAY_GAP, and PLUG's one-cent bounces read
+// as stray.
+var STRAY_TICKS = 2
+
+// Whether two prices are one level: within STRAY_GAP, or within two of the
+// listing's ticks (`Format.priceTick`; null without one). The half tick over
+// absorbs Yahoo's float noise (1.9800000190734863 against 1.9700000286102295).
+function sameLevel(a, b, tick) {
+  return apart(a, b) <= STRAY_GAP || (tick > 0 && Math.abs(a - b) < (STRAY_TICKS + 0.5) * tick)
+}
+
 // The longest run of stray buckets seen: Yahoo has sent two in a row.
 var STRAY_RUN = 3
 
@@ -41,7 +53,9 @@ var MIXED_RUN = 4
 // back to yesterday's close, a lone after-hours print, sometimes two in a
 // row. What identifies them is not how far they reach — one of the saved
 // cases is 0.8% — but that the series carries on as if they never happened.
-function filterStrayCloses(bars, periods) {
+// `tick` is the listing's (`Format.priceTick`): a move of a tick or two is
+// trading, never stray.
+function filterStrayCloses(bars, periods, tick) {
   var source = bars || []
   if (source.length < 3) return { bars: source.slice(), droppedTimes: [] }
   var kept = [bars[0]]
@@ -49,7 +63,7 @@ function filterStrayCloses(bars, periods) {
   var level = 0
   var i = 1
   while (i < bars.length) {
-    var run = strayRun(bars, level, i) || mixedRun(bars, level, i, periods)
+    var run = strayRun(bars, level, i, tick, periods) || mixedRun(bars, level, i, periods, tick)
     if (run > 0) {
       for (var dropped = 0; dropped < run; dropped++) droppedTimes.push(bars[i + dropped].t)
       i += run
@@ -66,17 +80,28 @@ function filterStrayCloses(bars, periods) {
 // all left the accepted bar's price, and the bar after them opens back at that
 // price instead of continuing from the last of them. A real move is the other
 // way round — the next bar opens from where the move closed. Zero for a real
-// move, across an uneven gap so a session break is never bridged, and for a
-// run with no bar after it, so the newest bar is never judged.
-function strayRun(bars, level, from) {
+// move, and for a run with no bar after it, so the newest bar is never judged.
+// Only a bar one step after the run, the step from the accepted bar to the
+// run, judges it, so a session break is never bridged. Inside one session of
+// the answer's `periods`, a bar after an uneven gap that opens back at the
+// price yet strays again only carries the run on: JPM's 16:50 and 17:00 on
+// 16 October opened at the price (339.83, 339.52) and closed at 318.24,
+// 16:55 missing, and 17:05 opened back at 339.50. A history has no periods:
+// across a night or a weekend, prices can really move.
+function strayRun(bars, level, from, tick, periods) {
   var price = bars[level].c
   var step = bars[level + 1].t - bars[level].t
+  var session = sessionAt(periods, bars[level].t)
   for (var length = 1; length <= STRAY_RUN; length++) {
     var end = from + length - 1
     var back = end + 1 < bars.length ? bars[end + 1] : null
-    if (!back || back.t - bars[end].t !== step) return 0
-    if (!Format.isFiniteNumber(back.o) || apart(bars[end].c, price) <= STRAY_GAP) return 0
-    if (apart(back.o, price) <= STRAY_GAP && apart(back.o, bars[end].c) > STRAY_GAP) return length
+    if (!back || !Format.isFiniteNumber(back.o) || sameLevel(bars[end].c, price, tick)) return 0
+    var opensBack = sameLevel(back.o, price, tick) && !sameLevel(back.o, bars[end].c, tick)
+    if (back.t - bars[end].t !== step) {
+      if (opensBack && session && sessionAt(periods, back.t) === session) continue
+      return 0
+    }
+    if (opensBack) return length
   }
   return 0
 }
@@ -90,7 +115,7 @@ function strayRun(bars, level, from) {
 // them opens back at that price. A thin listing's own trades take that shape
 // two bars at a time (REED's 18:25 and 18:40 on 1 October), never three in
 // the saved answers. Zero otherwise; `periods` are the answer's sessions.
-function mixedRun(bars, level, from, periods) {
+function mixedRun(bars, level, from, periods, tick) {
   var price = bars[level].c
   var session = extendedSession(periods, bars[level].t)
   if (!session) return 0
@@ -99,21 +124,22 @@ function mixedRun(bars, level, from, periods) {
   for (var end = from; end < from + MIXED_RUN && end + 1 < bars.length; end++) {
     var bar = bars[end]
     var back = bars[end + 1]
-    if (end > from && apart(bar.o, bars[end - 1].c) <= STRAY_GAP) return 0
+    if (end > from && sameLevel(bar.o, bars[end - 1].c, tick)) return 0
     if (extendedSession(periods, back.t) !== session) return 0
-    if (apart(bar.c, price) > STRAY_GAP) {
+    if (!sameLevel(bar.c, price, tick)) {
       if (bar.c > price) above = true
       else below = true
     }
     if (end - from >= 2 && above && below && Format.isFiniteNumber(back.o)
-        && apart(back.o, price) <= STRAY_GAP && apart(back.o, bar.c) > STRAY_GAP) return end - from + 1
+        && sameLevel(back.o, price, tick) && !sameLevel(back.o, bar.c, tick)) return end - from + 1
   }
   return 0
 }
 
-// "pre" or "post" when `t` falls in that session of `periods`, else "".
-function extendedSession(periods, t) {
-  var names = ["pre", "post"]
+// "pre", "regular", or "post" when `t` falls in that session of `periods`,
+// else "".
+function sessionAt(periods, t) {
+  var names = ["pre", "regular", "post"]
   for (var n = 0; periods && n < names.length; n++) {
     var period = periods[names[n]]
     if (period && t >= period.start && t < period.end) return names[n]
@@ -121,7 +147,35 @@ function extendedSession(periods, t) {
   return ""
 }
 
-function parseChart(json) {
+// "pre" or "post" when `t` falls in that session of `periods`, else "".
+function extendedSession(periods, t) {
+  var session = sessionAt(periods, t)
+  return session === "regular" ? "" : session
+}
+
+// The exchange a listing trades on, by the name people use.
+function exchangeOf(meta) {
+  return EXCHANGE_NAMES[meta.exchangeName] || String(meta.fullExchangeName || meta.exchangeName || "").toUpperCase()
+}
+
+// Whether an answer's listing trades in whole cents from $1: its exchange is
+// one of `centExchanges`, the caller's to know (`Market.centExchanges`).
+function inCents(meta, centExchanges) {
+  return !!centExchanges && centExchanges.indexOf(exchangeOf(meta)) >= 0
+}
+
+// The tick of the listing an answer is for (`Format.priceTick`), from its
+// headline price, else its last bar's close.
+function answerTick(meta, bars, centExchanges) {
+  var price = Format.isFiniteNumber(meta.regularMarketPrice) ? meta.regularMarketPrice
+    : (bars.length ? bars[bars.length - 1].c : null)
+  return Format.priceTick(price, meta.priceHint, inCents(meta, centExchanges))
+}
+
+// Yahoo's day answer as a quote. `centExchanges` are the exchanges whose
+// listings trade in whole cents from $1 (`Market.centExchanges`): their
+// prices and ticks take cents there; any other listing's take Yahoo's hint.
+function parseChart(json, centExchanges) {
   var result = json && json.chart && json.chart.result && json.chart.result[0]
   if (!result || !result.meta) return null
   var meta = result.meta
@@ -140,7 +194,7 @@ function parseChart(json) {
     if (closes[i] !== null && closes[i] !== undefined)
       bars.push({ t: timestamps[i], o: opens[i], c: closes[i] })
   }
-  var filtered = filterStrayCloses(bars, periods)
+  var filtered = filterStrayCloses(bars, periods, answerTick(meta, bars, centExchanges))
   var kept = filtered.bars
   var regular = periodOf(periods.regular)
   // An index is worked out only while its exchange trades. Yahoo still
@@ -156,9 +210,14 @@ function parseChart(json) {
   // Yahoo moves the day's high, low, and volume on before the bars, too:
   // London's answer before its session sends the coming day's high and low
   // as 0, not known yet. The figures' day is then that session's, and the
-  // bars' open is not its.
+  // bars' open is not its. And they stay a listing's last trading day's:
+  // CVR, untraded on Friday 16 October, answered with Friday's session and
+  // Wednesday's figures, its regular quote stamped Wednesday 16:00. The
+  // figures' day is then the quote's.
   var ahead = !knownPrice(meta.regularMarketDayHigh) && !knownPrice(meta.regularMarketDayLow) && !!current.regular
-  var figuresDay = ahead ? current.regular.start : regular ? regular.start : null
+  var quoted = Format.isFiniteNumber(meta.regularMarketTime) && meta.regularMarketTime > 0 ? meta.regularMarketTime : null
+  var figuresDay = ahead ? current.regular.start : !regular ? null
+    : quoted !== null && quoted < regular.start ? quoted : regular.start
   // The day's open: the first regular-session bar's, once there is one.
   var firstRegular = null
   for (var k = 0; regular && !ahead && k < kept.length && !firstRegular; k++)
@@ -169,7 +228,7 @@ function parseChart(json) {
     // for some listings and is cut at 31 characters.
     name: meta.longName || meta.shortName || meta.symbol,
     currency: meta.currency || "USD",
-    exchange: EXCHANGE_NAMES[meta.exchangeName] || String(meta.fullExchangeName || meta.exchangeName || "").toUpperCase(),
+    exchange: exchangeOf(meta),
     timezoneName: meta.exchangeTimezoneName || "",
     gmtoffset: meta.gmtoffset || 0,
     // The zone's short name at that offset, as Yahoo writes it: "EDT", "JST".
@@ -180,9 +239,9 @@ function parseChart(json) {
     // Kept apart from the chart samples: see headlineQuote.
     price: Format.isFiniteNumber(meta.regularMarketPrice) ? meta.regularMarketPrice : null,
     // The decimals every price of this listing is shown in, from its
-    // headline price and Yahoo's hint (`Format.priceDigits`).
+    // headline price, Yahoo's hint, and its market (`Format.priceDigits`).
     priceDigits: Format.priceDigits(Format.isFiniteNumber(meta.regularMarketPrice) ? meta.regularMarketPrice
-      : (points.length ? points[points.length - 1].p : null), meta.priceHint),
+      : (points.length ? points[points.length - 1].p : null), meta.priceHint, inCents(meta, centExchanges)),
     prevClose: meta.chartPreviousClose !== undefined ? meta.chartPreviousClose : meta.previousClose,
     marketTime: Format.isFiniteNumber(meta.regularMarketTime) && meta.regularMarketTime > 0 ? meta.regularMarketTime : null,
     dayOpen: firstRegular ? knownPrice(firstRegular.o) : null,

@@ -22,6 +22,9 @@ Item {
 
   property var entries: ({})
   property var gate: null
+  // The exchanges whose listings trade in whole cents from $1
+  // (`History.parseHistory`); none unless handed in.
+  property var centExchanges: []
   // The gate's ticket the request out was let through on (`Gate.report`).
   property int ticket: 0
   // The chart wanted, { key, symbol, range, ahead }, until its answer is in;
@@ -173,7 +176,7 @@ Item {
     var answer = got.length ? got[0] : null
     var history = null
     if (answer && answer.kind === "ok") {
-      try { history = History.parseHistory(JSON.parse(answer.body), request.range) } catch (e) { history = null }
+      try { history = History.parseHistory(JSON.parse(answer.body), request.range, root.centExchanges) } catch (e) { history = null }
     }
     if (!history && !request.ahead && attempts < 2 && answer && (answer.kind === "bad" || answer.kind === "ok")) {
       retryTimer.restart()

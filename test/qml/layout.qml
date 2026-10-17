@@ -56,6 +56,12 @@ ShellRoot {
   FileView { id: liveFile; path: root.fixtures + "/moments/live-2026-10-05/nest.json"; blockLoading: true }
   FileView { id: liveMonthFile; path: root.fixtures + "/moments/live-2026-10-05/nest-1m.json"; blockLoading: true }
   FileView { id: liveNightFile; path: root.fixtures + "/moments/live-2026-10-05/robinhood-day.json"; blockLoading: true }
+  // The power-user walk's thin days, Friday 16 October: CKX's one bar,
+  // CVR's none; and the S&P 500 on Monday 28 September at 08:00, before its
+  // bell, with no print yet.
+  FileView { id: ckxFile; path: root.fixtures + "/moments/power-user-2026-10-16/ckx.json"; blockLoading: true }
+  FileView { id: cvrFile; path: root.fixtures + "/moments/power-user-2026-10-16/cvr.json"; blockLoading: true }
+  FileView { id: preOpenIndexFile; path: root.fixtures + "/moments/monday/gspc.json"; blockLoading: true }
   FileView { id: calendarFile; path: Quickshell.env("STONKS_CALENDARS"); blockLoading: true }
 
   // The hero chart's rendered frames, for frames.js.
@@ -1191,6 +1197,103 @@ ShellRoot {
           root.check(lookName + ": with the rows back the header says TODAY, the breadth, and the order again",
             rowsOnly.every(function(name) { return find(body, name).visible }))
         }
+        // A long list menu shows whole rows only, and "New list…" and
+        // "Manage lists…" in reach without scrolling, with 12 lists or 30,
+        // in the popup at its cap and the window at its smallest and its
+        // usual height, in both looks; a click on Manage lists opens it.
+        // Found in the power-user walk of 16 October: with 12 lists the
+        // last row was cut in half and the two sat below the fold.
+        var listsBeforeMenu = stub.lists
+        var menuFaults = []
+        var menuSeen = []
+        ;[12, 30].forEach(function(count) {
+          stub.lists = [{ name: "", label: "All", count: stub.symbols.length, symbols: stub.symbols }].concat(
+            Array.from({ length: count - 1 }, function(_, n) { return { name: "List " + (n + 1), label: "List " + (n + 1), count: 1, symbols: ["MZ"] } }))
+          ;[["popup", 0], ["window smallest", -1], ["window", 760]].forEach(function(place) {
+            surface.wide = place[0] !== "popup"
+            body.minChartHeight = surface.wide ? Style.space(136) : 0
+            surface.fixedHeight = place[1] < 0 ? body.smallestHeight : place[1]
+            ;[false, true].forEach(function(retro) {
+              stub.retro = retro
+              wait(50)
+              body.openListMenu()
+              wait(100)
+              var where = count + " lists, " + place[0] + " " + (retro ? "retro" : "smooth")
+              var menu = find(body, "listMenu")
+              var scroll = find(menu, "menuScroll")
+              var inMenu = function(item) { var at = item.mapToItem(menu, 0, 0); return at.y >= -0.5 && at.y + item.height <= menu.height + 0.5 }
+              var cutRows = function() {
+                return Array.from(scroll.contentItem.children[0].children).filter(function(row) {
+                  var at = row.mapToItem(scroll, 0, 0)
+                  return row.objectName === "listChoice" && at.y < scroll.height && at.y + row.height > 0
+                    && (at.y < -0.5 || at.y + row.height > scroll.height + 0.5)
+                }).length
+              }
+              // The scroll moves from `from`, then comes to rest.
+              var settled = function(from) {
+                for (var t = 0; t < 2000 && (scroll.contentY === from || scroll.moving || cutRows() > 0); t += 20) wait(20)
+                return scroll.contentY === from ? -1 : cutRows()
+              }
+              // As the menu opens; after a wheel notch over the lists and a
+              // drag of the scrollbar part way, in one look, the rows being
+              // alike in both; scrolled to its end. Found in review: a notch
+              // stopped at 72 px of 26 px rows.
+              var atRest = cutRows()
+              var pinnedShown = inMenu(find(menu, "newListRow")) && inMenu(find(menu, "manageListsRow"))
+              var afterWheel = 0
+              var afterDrag = 0
+              var afterKey = 0
+              if (!retro) {
+                var over = scroll.mapToItem(body, scroll.width / 3, scroll.height / 2)
+                mouseMove(body, over.x, over.y)
+                var beforeWheel = scroll.contentY
+                mouseWheel(body, over.x, over.y, 0, -120)
+                afterWheel = settled(beforeWheel)
+                var thumb = scroll.ScrollBar.vertical.contentItem
+                var grip = thumb.mapToItem(body, thumb.width / 2, thumb.height / 2)
+                var beforeDrag = scroll.contentY
+                mousePress(body, grip.x, grip.y)
+                mouseMove(body, grip.x, grip.y + 7)
+                mouseMove(body, grip.x, grip.y + scroll.height / 4 + 7)
+                mouseRelease(body, grip.x, grip.y + scroll.height / 4 + 7)
+                afterDrag = settled(beforeDrag)
+                // A key while the lists settle after a notch back up lands
+                // them on a row's edge at once.
+                var beforeKey = scroll.contentY
+                mouseWheel(body, over.x, over.y, 0, 120)
+                for (var k = 0; k < 1000 && (scroll.contentY === beforeKey || scroll.moving
+                  || scroll.contentY % menu.itemHeight === 0); k += 5) wait(5)
+                var cursorBefore = menu.cursor
+                keyClick(Qt.Key_Down)
+                wait(20)
+                afterKey = menu.cursor === cursorBefore ? -2 : cutRows()
+              }
+              scroll.contentY = Math.max(0, scroll.contentHeight - scroll.height)
+              var cuts = [atRest, afterWheel, afterDrag, afterKey, cutRows()]
+              var footerTop = yIn(find(body, "footer"), 0)
+              menuSeen.push(where + ": " + scroll.height / menu.itemHeight + " rows")
+              if (cuts.some(function(n) { return n !== 0 }) || !pinnedShown || yIn(menu, menu.height) + body.groupGap > footerTop)
+                menuFaults.push(where + ": rows cut (opened/wheel/bar/key/end, -1 unmoved, -2 key unheard) " + cuts.join("/") + " in a view " + scroll.height + " px, pinned in sight " + pinnedShown
+                  + ", menu ends " + yIn(menu, menu.height) + " footer at " + footerTop)
+              var manageRow = find(menu, "manageListsRow")
+              var manageAt = manageRow.mapToItem(body, manageRow.width / 2, manageRow.height / 2)
+              mouseClick(body, manageAt.x, manageAt.y)
+              wait(50)
+              if (!body.managingLists) menuFaults.push(where + ": a click on Manage lists… did not open it")
+              body.closeListViews()
+              body.closeListMenu()
+              wait(50)
+            })
+          })
+        })
+        stub.lists = listsBeforeMenu
+        stub.retro = false
+        surface.wide = false
+        surface.fixedHeight = 0
+        body.minChartHeight = 0
+        wait(50)
+        root.check("a long list menu shows whole rows, and New list and Manage lists without scrolling, in the popup and the window, in both looks",
+          menuFaults.length === 0, menuFaults.join(" | ") + " || " + menuSeen.join(", "))
         // A shorter list's rows are its own, and the footer sits one gap under
         // them. Found in design pass 3: the footer stayed where All's is,
         // with an empty row's room above it.
@@ -1668,6 +1771,88 @@ ShellRoot {
         wait(50)
         root.check("no word on screen names a key, Enter's button alone is marked, and every button is one whole line, in both looks in the popup and the smallest window",
           badKeys.length === 0, badKeys.join(" | "))
+
+        // A day with one bar or none says so where its chart would be, in
+        // both looks on both surfaces: CKX's one bar at 14:10, CVR's none,
+        // at 23:09 that Friday. A busy stock, an ETF, a coin, and listings
+        // in London and Tokyo say nothing, nor does an index before its
+        // bell. Found in the power-user walk of 16 October: a lone dot and
+        // an empty chart, with no words, read as broken.
+        var quotesBeforeNotes = stub.quotes
+        stub.quotes = Object.assign({}, quotesBeforeNotes, { CKX: Quote.parseChart(JSON.parse(ckxFile.text())),
+          CVR: Quote.parseChart(JSON.parse(cvrFile.text())), "^GSPC": Quote.parseChart(JSON.parse(preOpenIndexFile.text())) })
+        var noteCases = [["CKX", 1792206540, "Traded only at 14:10"], ["CVR", 1792206540, "No trades charted"],
+          ["AAPL", 1792206540, ""], ["SPY", 1792206540, ""], ["SHIB-USD", 1792206540, ""], ["SHEL.L", 1792206540, ""],
+          ["7203.T", 1792206540, ""], ["^GSPC", 1790596800, ""]]
+        var noteFaults = []
+        // The info line's title too: CKX traded that Friday, so 1D; CVR's
+        // figures are Wednesday's, so WED. It read 1D (the walk).
+        var titles = { CKX: "1D", CVR: "WED" }
+        var titleFaults = []
+        for (var nsurface = 0; nsurface < 2; nsurface++) {
+          surface.wide = nsurface === 1
+          for (var nl = 0; nl < 2; nl++) {
+            stub.retro = nl === 1
+            noteCases.forEach(function(c) {
+              stub.now = c[1]
+              stub.featuredSymbol = c[0]
+              wait(50)
+              var note = find(body, "dayNote")
+              var said = note && note.visible ? note.text : ""
+              var whole = !said || (xIn(note, 0) >= xIn(body.chartItem, 0) && xIn(note, note.width) <= xIn(body.chartItem, body.chartItem.width))
+              if (said !== c[2] || !whole)
+                noteFaults.push((surface.wide ? "window " : "popup ") + (stub.retro ? "retro " : "smooth ") + c[0] + ": \"" + said + "\""
+                  + (whole ? "" : " outside the chart"))
+              var title = body.periodLine ? body.periodLine.title : ""
+              if (titles[c[0]] && title !== titles[c[0]])
+                titleFaults.push((surface.wide ? "window " : "popup ") + (stub.retro ? "retro " : "smooth ") + c[0] + ": " + title)
+            })
+          }
+        }
+        // A row draws a one-bar day in both looks, as the hero does: smooth's
+        // line as a dot, retro's as its column. A day with no bar leaves the
+        // cell empty in both. Found in the power-user walk: CKX's row showed
+        // its bar in retro and nothing in smooth.
+        var symbolsBeforeRows = stub.symbols
+        var libraryBeforeRows = stub.library
+        stub.symbols = symbolsBeforeRows.concat(["CKX", "CVR"])
+        stub.library = stub.symbols
+        stub.now = 1792206540
+        surface.wide = false
+        var rowInk = []
+        ;[false, true].forEach(function(retro) {
+          stub.retro = retro
+          wait(50)
+          ;["CKX", "CVR"].forEach(function(s) {
+            var row = body.watchlist.rowItem(s)
+            if (!row) { rowInk.push((retro ? "retro " : "smooth ") + s + " no row"); return }
+            body.watchlist.contentY = Math.max(0, Math.min(row.y, body.watchlist.contentHeight - body.watchlist.height))
+            wait(100)
+            var inked = false
+            if (retro) inked = find(row, "rowCells").drawable
+            else {
+              var canvas = find(row, "rowLine").children[0]
+              var px = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data
+              for (var p = 3; p < px.length && !inked; p += 4) inked = px[p] > 0
+            }
+            rowInk.push((retro ? "retro " : "smooth ") + s + " " + (inked ? "drawn" : "empty"))
+          })
+        })
+        body.watchlist.contentY = 0
+        stub.symbols = symbolsBeforeRows
+        stub.library = libraryBeforeRows
+        stub.quotes = quotesBeforeNotes
+        stub.featuredSymbol = "AAPL"
+        stub.now = 0
+        surface.wide = false
+        stub.retro = false
+        wait(50)
+        root.check("a day with one bar or none says so on its chart, and no fuller day or index before its bell does, in both looks on both surfaces",
+          noteFaults.length === 0, noteFaults.join(" | "))
+        root.check("a day's info line is titled by its figures' day: CKX's Friday is 1D at 23:09 that Friday, CVR's Wednesday WED, in both looks on both surfaces",
+          titleFaults.length === 0, titleFaults.join(" | "))
+        root.check("a one-bar day's row draws its bar in both looks, and a day with none leaves the cell empty in both",
+          rowInk.join(", ") === "smooth CKX drawn, smooth CVR empty, retro CKX drawn, retro CVR empty", rowInk.join(", "))
         console.log("LAYOUT DONE")
         done.exitCode = root.failures ? 1 : 0
         done.start()

@@ -23,7 +23,8 @@ BarWidget {
   // so the clock never redraws it.
   readonly property var featured: featuredQuote
     ? Figures.rowModel(featuredQuote, 0, service.changeMode) : null
-  readonly property var lineGeometry: featuredQuote ? Chart.chartGeometry(featuredQuote, service.calendars) : null
+  // A day with no print draws nothing, as its row does.
+  readonly property var lineGeometry: featuredQuote && featuredQuote.points.length ? Chart.chartGeometry(featuredQuote, service.calendars) : null
   // In the bar's right section, among its bare icons, the pill has a form of
   // its own, `barStyleRight`: the icon until a middle-click there picks
   // another. The centre and left share `barStyle`. Both ride the entry when

@@ -86,21 +86,40 @@ function moneyDigits(abs) {
 }
 
 // The decimals a listing's prices take, decided once from its headline
-// price, so a scrub or a refresh never changes their width: Yahoo's
-// `priceHint` at least, four significant digits under 1 (SHIB's 0.000005420,
-// where its hint of 5 reads 0.00001), and none from 10,000 up, where cents
-// say nothing.
+// price, so a scrub or a refresh never changes their width: Yahoo's hint;
+// on a market that trades in whole cents from 1 up (`inCents`: the US, by
+// Reg NMS, `Market.centExchanges`), cents there, or the hint where coarser
+// (its hint of 4 under $5 read "4.6500"), while a coin (XRP-USD's 1.3065)
+// or a European listing (IAG's 4.9270 in Madrid) trades finer and keeps
+// it; under 1 the hint at least, and four significant digits (SHIB's
+// 0.000005420, where its hint of 5 reads 0.00001); none from 10,000 up,
+// where cents say nothing.
 // toFixed's own limit; no price comes near it.
 var MAX_PRICE_DIGITS = 100
 
-function priceDigits(price, hint) {
+function priceDigits(price, hint, inCents) {
   var digits = isFiniteNumber(hint) && hint >= 0 ? hint : 2
   if (isFiniteNumber(price)) {
     var abs = Math.abs(price)
     if (abs >= 10000) return 0
-    if (abs > 0 && abs < 1) digits = Math.max(digits, 3 - Math.floor(Math.log(abs) / Math.LN10))
+    if (abs >= 1 && inCents) digits = Math.min(digits, 2)
+    else if (abs > 0 && abs < 1) digits = Math.max(digits, 3 - Math.floor(Math.log(abs) / Math.LN10))
   }
   return Math.min(MAX_PRICE_DIGITS, digits)
+}
+
+// The least a listing's price moves by: one unit of Yahoo's hint; on a
+// market that trades in whole cents from 1 up (`inCents`), a cent there,
+// or the hint's unit where coarser; under 1 never coarser than the price's
+// second significant digit (SHIB's hint of 0.00001 is twice its price).
+// Null without a price.
+function priceTick(price, hint, inCents) {
+  if (!isFiniteNumber(price) || price === 0) return null
+  var abs = Math.abs(price)
+  var digits = isFiniteNumber(hint) && hint >= 0 ? hint : 2
+  if (abs >= 1 && inCents) digits = Math.min(digits, 2)
+  else if (abs < 1) digits = Math.max(digits, 1 - Math.floor(Math.log(abs) / Math.LN10))
+  return Math.pow(10, -digits)
 }
 
 // A move in money takes its listing's decimals, and at least cents under

@@ -20,6 +20,8 @@ const fixture = name => JSON.parse(readFileSync(join(fixtures, name), "utf8"))
 const calendars = JSON.parse(readFileSync(join(import.meta.dir, "..", "calendars.json"), "utf8"))
 const US = calendars.calendars.US
 const JPX = calendars.calendars.JPX
+// The exchanges that trade in whole cents from $1, as the feeds read with.
+const cents = M.centExchanges(calendars)
 const quote = M.parseChart(fixture("aapl.json"))
 const shop = M.parseChart(fixture("shop-to.json"))
 const btc = M.parseChart(fixture("btc-usd-day.json"))
@@ -63,7 +65,7 @@ test("parseChart drops a null close, even on the newest bar the stray filter nev
   expect(M.parseChart(json).points.map(p => p.t)).toEqual(quote.points.map(p => p.t).filter(t => t !== gone))
 })
 
-test("across every saved intraday response the filter drops only those nine bars", () => {
+test("across every saved intraday response the filter drops only those eleven bars", () => {
   const days = [
     ["aapl.json", []],
     ["aapl-2026-09-04-day-prepost.json", []],
@@ -76,12 +78,23 @@ test("across every saved intraday response the filter drops only those nine bars
     ["msft-2026-09-11-day-prepost.json", [1789157100, 1789162200, 1789162500]],
     // BRK-B's after hours on Friday 2 October: 520.93, 489.66, 500.31, and
     // 489.66 between 502.80 and 502.65, 30, 5, 10, and 10 minutes apart.
-    ["moments/sweep-2026-10-03-1200/brk-b.json", [1790973900, 1790974200, 1790974800, 1790975400]]
+    ["moments/sweep-2026-10-03-1200/brk-b.json", [1790973900, 1790974200, 1790974800, 1790975400]],
+    // JPM's after hours on Friday 16 October: 16:50 and 17:00 opened at
+    // 339.83 and 339.52 and closed at 318.24, 16:55 missing, and 17:05
+    // opened back at 339.50. Its sparkline ended in a spike.
+    ["moments/power-user-2026-10-16/jpm.json", [1792183800, 1792184400]],
+    // A cent or two is trading under $2, where it is more than half a
+    // percent: PLUG's 188 bars lost 23, AITX's at $0.0016 lost 5 to one
+    // tick of 0.0001, and BOLT's 1.97 between 1.98s lost 5 over two days.
+    ["moments/power-user-2026-10-16/plug.json", []],
+    ["moments/power-user-2026-10-16/aitx.json", []],
+    ["moments/sweep-2026-10-07-1455/bolt.json", []],
+    ["moments/sweep-2026-10-08-1054/bolt.json", []]
   ]
   for (const [name, expected] of days) {
     const json = fixture(name)
     const result = json.chart.result[0]
-    const parsed = M.parseChart(json)
+    const parsed = M.parseChart(json, cents)
     const kept = parsed.points.map(point => point.t)
     const dropped = result.timestamp.filter((t, i) =>
       result.indicators.quote[0].close[i] !== null && kept.indexOf(t) < 0)
@@ -101,6 +114,13 @@ test("across every saved intraday response the filter drops only those nine bars
   // stock's own trades, BRK-B's shape two bars long. A mixed run is three.
   const reed = M.parseChart(fixture("moments/night/reed.json"))
   expect(reed.points.filter(p => p.t === 1790893500 || p.t === 1790894400).map(p => p.p)).toEqual([21.63, 21.3])
+  // A real move across a gap stays: TOY rose from 325.33 at 09:10 on Monday
+  // 5 October to 327.38, 327.90, and, 09:25 missing, 328.43 at 09:30, and
+  // 09:35 opened back near 325. The bar after the gap opened from 327.90,
+  // where the move had got to, so the gap is not bridged.
+  const toy = M.parseChart(fixture("moments/live-2026-10-05/toy.json"))
+  expect(toy.points.filter(p => p.t >= 1790946900 && p.t <= 1790947800).map(p => p.t))
+    .toEqual([1790946900, 1790947200, 1790947800])
 })
 
 test("the headline is Yahoo's regular-market quote with its own time; the chart only stands in", () => {
@@ -300,16 +320,34 @@ test("a weeknight after post-market leads with closed and the next open", () => 
 })
 
 test("a listing's prices take the decimals they need, decided once from its headline price", () => {
-  // Yahoo's priceHint at least, four significant digits under 1, none from
-  // 10,000 up; the hints are the real ones (SHIB-USD 5, DOGE-USD 5, EURUSD=X
-  // 4, BRK-A 2).
-  const shown = (price, hint) => M.money(price, M.priceDigits(price, hint))
+  // On a market that trades in whole cents from $1 (the US), cents there,
+  // or Yahoo's hint where coarser; elsewhere the hint. The hint at least
+  // and four significant digits under 1; none from 10,000 up. The hints are
+  // the real ones (SHIB-USD 5, DOGE-USD 5, AITX 4, LUMN 4, BRK-A 2).
+  const shown = (price, hint, inCents) => M.money(price, M.priceDigits(price, hint, inCents))
   expect(shown(5.41e-6, 5)).toBe("0.000005410")
   // However small: found in review, a ten-decimal cap read 1.234e-11 as 0.
   expect(shown(1.234e-11, 8)).toBe("0.00000000001234")
   expect(shown(0.08711, 5)).toBe("0.08711")
   expect(shown(0.5, 2)).toBe("0.5000")
-  expect(shown(1.122, 4)).toBe("1.1220")
+  expect(shown(0.0016, 4)).toBe("0.001600")
+  // Yahoo's hint of 4 under $5 read "4.6500" on the row and the hero; after
+  // hours, PLUG's sub-penny 1.3891 reads in cents too.
+  for (const [name, price] of [["lumn", "4.65"], ["plug", "1.38"]]) {
+    const q = M.parseChart(fixture("moments/power-user-2026-10-16/" + name + ".json"), cents)
+    expect([name, M.rowModel(q, 0, "pct").priceText]).toEqual([name, price])
+  }
+  expect(shown(1.3891, 4, true)).toBe("1.39")
+  // Off the US a listing over $1 trades finer than a cent and keeps Yahoo's
+  // hint, its tick too: XRP-USD at 1.3065 and IAG at 4.927 EUR in Madrid,
+  // each with a hint of 4, read four decimals and move by 0.0001. In cents,
+  // a coin's real moves hid, and two cents of XRP were 1.5% to the stray
+  // filter. Found in review.
+  for (const [name, price] of [["xrp-usd", "1.3065"], ["iag.mc", "4.9270"]]) {
+    const json = fixture("moments/cents-2026-10-17/" + name + ".json")
+    const q = M.parseChart(json, cents)
+    expect([name, M.rowModel(q, 0, "pct").priceText, M.answerTick(json.chart.result[0].meta, [], cents)]).toEqual([name, price, 0.0001])
+  }
   expect(shown(235.62, 2)).toBe("235.62")
   expect(shown(759748.25, 2)).toBe("759,748")
   expect(shown(2900.5, undefined)).toBe("2,900.50")
@@ -451,6 +489,12 @@ test("the day line is 1D, or its figures' weekday when they are not today's: its
   // Six days on, the weekday still names one day of the week before; a
   // week on it would read as today's, so the month stands in.
   expect([dayLineAt(nest, at("2026-09-17", "12:00")).title, dayLineAt(nest, at("2026-09-18", "12:00")).title]).toEqual(["FRI", "SEP"])
+  // A listing untraded on its answer's day keeps its last trading day's
+  // figures, and says that day: CVR at 23:09 on Friday 16 October answered
+  // with Friday's session and Wednesday's figures, its quote stamped
+  // Wednesday 16:00. It read 1D. Found in the power-user walk.
+  const cvr = M.parseChart(fixture("moments/power-user-2026-10-16/cvr.json"))
+  expect(said(dayLineAt(cvr, at("2026-10-16", "23:09")))).toBe("WED · 11.28–11.87 @11.28 · OPEN _ · VOL 68")
   expect(M.dayLine(null)).toBeNull()
   // Before the session's first bar there is no open to give: its slot is
   // kept, empty, so the line keeps its shape.

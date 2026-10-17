@@ -109,6 +109,22 @@ function extendedStack(quote, latest, now, day, changeMode) {
   }
 }
 
+// What a day's chart says in words where it has almost nothing to draw:
+// no bar at all ("No trades charted": CVR on Friday 16 October, its last
+// trade Wednesday's), or one ("Traded only at 14:10": CKX's one bar, its
+// time where the listing trades, the zone named where the reader's
+// differs). A bar is five minutes of trades, so the words speak of the
+// chart, not of each trade. "" otherwise, and for an empty day before its
+// session opens at `now`: an index has no print before its bell.
+function dayNote(day, now, calendars) {
+  if (!day) return ""
+  var pts = day.points
+  if (pts.length === 1) return "Traded only at " + Market.printClock(day, pts[0].t, calendars)
+  if (pts.length > 1) return ""
+  var regular = day.session.regular
+  return regular && now < regular.start ? "" : "No trades charted"
+}
+
 // The day a moment falls on in the quote's exchange, as a day count: two
 // moments on one count are on one day there.
 function exchangeDay(quote, t) {

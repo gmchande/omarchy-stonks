@@ -31,6 +31,16 @@ if [ $# -eq 0 ]; then
       states="$states popup-loading-$kind-$look window-of-loading-$kind-$look"
     done
   done
+  # The power-user walk's odd days in both looks: CKX's one bar and CVR's
+  # none said in words on both surfaces, JPM's stray pair dropped, and LUMN
+  # in cents. And the list menu over 12 lists in the popup and 30 in the
+  # smallest window: whole rows, New list and Manage lists in sight.
+  for look in smooth retro; do
+    for symbol in ckx cvr; do
+      states="$states popup-power-$symbol-$look window-power-$symbol-$look"
+    done
+    states="$states popup-power-jpm-$look popup-power-lumn-$look popup-lists-menu12-$look min-window-of-lists-menu30-$look"
+  done
   for moment in 2026-10-07-1455 2026-10-07-0100 2026-10-07-0600 2026-10-03-1200; do
     for symbol in nest psix spy bolt gspc btc-usd shel.l 7203.t; do
       states="$states popup-sweep-$moment-$symbol-smooth popup-sweep-$moment-$symbol-retro"
