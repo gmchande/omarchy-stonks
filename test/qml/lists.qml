@@ -1432,8 +1432,11 @@ ShellRoot {
       wait(200)
       keys.forceActiveFocus()
       var menuScroll = harness.find(menu2, "menuScroll")
+      // "New list…" and "Manage lists…" are pinned under the lists, always
+      // in sight.
       var cursorShown = function() {
-        var top = menu2.cursor * menu2.itemHeight + (menu2.cursor < menu2.newIndex ? 0 : menu2.separatorHeight)
+        if (menu2.cursor >= menu2.newIndex) return true
+        var top = menu2.cursor * menu2.itemHeight
         return top >= menuScroll.contentY && top + menu2.itemHeight <= menuScroll.contentY + menuScroll.height
       }
       keyClick(Qt.Key_W)
@@ -1461,12 +1464,13 @@ ShellRoot {
         scrolls && reopenedAt.length === 2 && reopenedAt[0] === "0:0:true"
           && new RegExp(":" + lastProbe + ":true$").test(reopenedAt[1]),
         scrolls + "|" + reopenedAt.join(" "))
-      // A refused name, at the foot of a list too long for its view, is
-      // brought into view though the list holds still while it is typed.
-      // Found in the branch's review: it sat under the view's edge. And the
-      // moment its line goes, as you type again or leave the field, the
-      // view rests within its rows: in Manage lists, typing on after a
-      // refusal left a row's gap for a frame before the list sprang back.
+      // A refused name is in view though the list holds still while it is
+      // typed: in the list menu its note is pinned under the field, in Manage
+      // lists it is brought into view. Found in the branch's review: it sat
+      // under the view's edge. And the moment its line goes, as you type
+      // again or leave the field, the view rests within its rows: in Manage
+      // lists, typing on after a refusal left a row's gap for a frame before
+      // the list sprang back.
       var problemShown = function(scroll, top) {
         return top >= scroll.contentY - 0.5 && top + menu2.itemHeight <= scroll.contentY + scroll.height + 0.5
       }
@@ -1478,10 +1482,10 @@ ShellRoot {
         return at + scroll.height <= scroll.contentHeight + 0.5 ? "settled" : "gap " + Math.round(at + scroll.height - scroll.contentHeight)
       }
       // Refused, then typed on, then refused again and left by Escape.
-      var refuseTwice = function(scroll, problemTop, view) {
+      var refuseTwice = function(scroll, shown, view) {
         keyClick(Qt.Key_Return)
         wait(100)
-        var refused = [view.problem !== "", scroll.contentHeight > scroll.height, problemShown(scroll, problemTop())].join(",")
+        var refused = [view.problem !== "", scroll.contentHeight > scroll.height, shown()].join(",")
         var typing = settlesAt(scroll, function() { typeText("x") })
         keyClick(Qt.Key_Backspace)
         keyClick(Qt.Key_Return)
@@ -1494,7 +1498,11 @@ ShellRoot {
       menu2.startNaming()
       wait(50)
       typeText("Probe 1")
-      var menuRefusal = refuseTwice(menuScroll, function() { return harness.find(menu2, "newListRow").y + menu2.itemHeight }, menu2)
+      var menuRefusal = refuseTwice(menuScroll, function() {
+        var note = harness.find(menu2, "listProblem")
+        var at = note.mapToItem(menu2, 0, 0)
+        return note.visible && at.y >= 0 && at.y + note.height <= menu2.height + 0.5
+      }, menu2)
       keyClick(Qt.Key_Escape)
       wait(50)
       var manage2 = harness.find(body2, "manageLists")
@@ -1508,10 +1516,10 @@ ShellRoot {
       wait(100)
       keyClick(Qt.Key_A, Qt.ControlModifier)
       typeText("Probe 1")
-      var manageRefusal = refuseTwice(manageScroll, function() { return (manage2.cursor + 1) * manage2.itemHeight }, manage2)
+      var manageRefusal = refuseTwice(manageScroll, function() { return problemShown(manageScroll, (manage2.cursor + 1) * manage2.itemHeight) }, manage2)
       body2.closeListViews()
       wait(50)
-      harness.check("a refused name at the foot of a long list is brought into view, and once its line goes the view settles at once, in the list menu and Manage lists",
+      harness.check("a refused name at the foot of a long list is in view, and once its line goes the view settles at once, in the list menu and Manage lists",
         menuRefusal === "true,true,true,settled,settled" && manageRefusal === "true,true,true,settled,settled",
         menuRefusal + " | " + manageRefusal)
 

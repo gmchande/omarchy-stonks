@@ -759,7 +759,8 @@ ShellRoot {
       // popup-lists-<menu|naming|named|empty|long|manage|rename|confirm|symbol>-<look>,
       // window-lists-<manage|symbol>-<look>, and min-window-lists-<menu|manage|symbol>-<look>,
       // the window at its smallest: named watchlists over the 22-symbol
-      // library, the featured symbol staying put on a switch.
+      // library, the featured symbol staying put on a switch. -menu12- and
+      // -menu30-: the menu over 12 or 30 lists, the power-user walk's.
       var all = stub.symbols.slice()
       var named = root.stateName.indexOf("-named-") > 0 ? { name: "My Watchlist", symbols: all.slice(0, 8) }
         : root.stateName.indexOf("-empty-") > 0 ? { name: "Growth", symbols: [] }
@@ -776,6 +777,8 @@ ShellRoot {
         stub.symbols = named.symbols
         stub.shown = named.symbols.slice()
       }
+      var many = /-menu(\d+)-/.exec(root.stateName)
+      for (var n = stub.lists.length; many && n < Number(many[1]); n++) stub.lists = stub.lists.concat([choice("List " + n, all.slice(n % 9, n % 9 + 3))])
       var child = function(name) { return body.children.filter(function(c) { return c.objectName === name })[0] }
       var find = function(item, name) {
         if (item.objectName === name) return item
@@ -785,7 +788,7 @@ ShellRoot {
         }
         return null
       }
-      if (root.stateName.indexOf("-menu-") > 0) {
+      if (root.stateName.indexOf("-menu-") > 0 || many) {
         // The cursor's row under the menu's left edge, which must not show
         // its bar through: a turn later, once the rows show.
         Qt.callLater(function() { body.watchlist.cursorSymbol = stub.shown[2] })

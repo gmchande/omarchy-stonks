@@ -1197,6 +1197,67 @@ ShellRoot {
         stub.retro = false
         stub.listName = ""
         root.load()
+        // A long list menu shows whole rows only, and "New list…" and
+        // "Manage lists…" in reach without scrolling, with 12 lists or 30,
+        // in the popup at its cap and the window at its smallest and its
+        // usual height, in both looks; a click on Manage lists opens it.
+        // Found in the power-user walk of 16 October: with 12 lists the
+        // last row was cut in half and the two sat below the fold.
+        var listsBeforeMenu = stub.lists
+        var menuFaults = []
+        var menuSeen = []
+        ;[12, 30].forEach(function(count) {
+          stub.lists = [{ name: "", label: "All", count: stub.symbols.length, symbols: stub.symbols }].concat(
+            Array.from({ length: count - 1 }, function(_, n) { return { name: "List " + (n + 1), label: "List " + (n + 1), count: 1, symbols: ["MZ"] } }))
+          ;[["popup", 0], ["window smallest", -1], ["window", 760]].forEach(function(place) {
+            surface.wide = place[0] !== "popup"
+            body.minChartHeight = surface.wide ? Style.space(136) : 0
+            surface.fixedHeight = place[1] < 0 ? body.smallestHeight : place[1]
+            ;[false, true].forEach(function(retro) {
+              stub.retro = retro
+              wait(50)
+              body.openListMenu()
+              wait(100)
+              var where = count + " lists, " + place[0] + " " + (retro ? "retro" : "smooth")
+              var menu = find(body, "listMenu")
+              var scroll = find(menu, "menuScroll")
+              var inMenu = function(item) { var at = item.mapToItem(menu, 0, 0); return at.y >= -0.5 && at.y + item.height <= menu.height + 0.5 }
+              var cutRows = function() {
+                return Array.from(scroll.contentItem.children[0].children).filter(function(row) {
+                  var at = row.mapToItem(scroll, 0, 0)
+                  return row.objectName === "listChoice" && at.y < scroll.height && at.y + row.height > 0
+                    && (at.y < -0.5 || at.y + row.height > scroll.height + 0.5)
+                }).length
+              }
+              // As the menu opens, then scrolled to its end.
+              var atRest = cutRows()
+              var pinnedShown = inMenu(find(menu, "newListRow")) && inMenu(find(menu, "manageListsRow"))
+              scroll.contentY = Math.max(0, scroll.contentHeight - scroll.height)
+              var cut = atRest + cutRows()
+              var footerTop = yIn(find(body, "footer"), 0)
+              menuSeen.push(where + ": " + scroll.height / menu.itemHeight + " rows")
+              if (cut > 0 || !pinnedShown || yIn(menu, menu.height) + body.bandGap > footerTop)
+                menuFaults.push(where + ": " + cut + " rows cut in a view " + scroll.height + " px, pinned in sight " + pinnedShown
+                  + ", menu ends " + yIn(menu, menu.height) + " footer at " + footerTop)
+              var manageRow = find(menu, "manageListsRow")
+              var manageAt = manageRow.mapToItem(body, manageRow.width / 2, manageRow.height / 2)
+              mouseClick(body, manageAt.x, manageAt.y)
+              wait(50)
+              if (!body.managingLists) menuFaults.push(where + ": a click on Manage lists… did not open it")
+              body.closeListViews()
+              body.closeListMenu()
+              wait(50)
+            })
+          })
+        })
+        stub.lists = listsBeforeMenu
+        stub.retro = false
+        surface.wide = false
+        surface.fixedHeight = 0
+        body.minChartHeight = 0
+        wait(50)
+        root.check("a long list menu shows whole rows, and New list and Manage lists without scrolling, in the popup and the window, in both looks",
+          menuFaults.length === 0, menuFaults.join(" | ") + " || " + menuSeen.join(", "))
         stub.library = stub.symbols.slice()
         wait(250)
         var shortOk = true
