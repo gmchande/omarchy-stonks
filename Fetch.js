@@ -10,10 +10,12 @@ var USER_AGENT = "Mozilla/5.0 (Omarchy Stonks)"
 var ANSWER_MARK = "@@stonks"
 
 // Caps, each above the largest real answer even uncompressed: a day's chart
-// is about 13 KB raw (BTC-USD's 22), cap and P/E and a search a few KB, a
-// history of 500 bars about 60 KB, Robinhood's prints 56.3 KB a listing and
-// its instruments a few KB.
+// is about 13 KB raw (BTC-USD's 22), a spark answer of 20 listings about
+// 90 KB (closes only), cap and P/E and a search a few KB, a history of 500
+// bars about 60 KB, Robinhood's prints 56.3 KB a listing and its
+// instruments a few KB.
 var DAY_CAP = 64000
+var SPARK_CAP = 400000
 var FUNDAMENTALS_CAP = 64000
 var SEARCH_CAP = 64000
 var HISTORY_CAP = 256000
@@ -27,7 +29,7 @@ function instrumentsCap(count) {
 }
 
 // `urls` are fetched in turn; an answer over `maxBytes` is a bad answer.
-// `--max-time` is per URL, so a run's own limit is its feed's.
+// `--max-time` is per URL, so no URL holds a run more than 10 s.
 function curlCommand(urls, maxBytes) {
   return ["curl", "-sS", "--compressed", "--max-filesize", String(maxBytes),
     "--connect-timeout", "5", "--max-time", "10", "-A", USER_AGENT,

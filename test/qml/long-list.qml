@@ -6,15 +6,19 @@ import qs.Commons
 import qs.Ui
 import "plugin" as Stonks
 
-// A power user's list: 154 busy US stocks through the real Plugin, Service,
-// App, and a pill, on a clock this harness sets, from Wednesday 7 October
-// 2026 at 15:00 New York, with the window open. The fake curl answers every
-// LONG<n> with NEST's saved day at 14:55, counts every request in
-// requests.log and every curl call in runs.log.
+// A power user's list: 154 symbols through the real Plugin, Service, App,
+// and a pill, on a clock this harness sets, from Wednesday 7 October 2026 at
+// 15:00 New York, with the window open: a busy stock featured (TALL001, the
+// AAPL day), a day with a stray print (STRAY), two days with no jump
+// (SHOP.TO, BTC-USD), and 150 busy US stocks (LONG<n>, NEST's saved day at
+// 14:55). The fake curl counts every request in requests.log and every curl
+// call in runs.log. long-list.sh runs this twice: the main run, and the slow
+// run (STONKS_LONG_RUN=slow), on a network that takes 3 s a request.
 ShellRoot {
   id: harness
 
   property int failures: 0
+  readonly property string mode: Quickshell.env("STONKS_LONG_RUN") || "main"
   readonly property string state: Quickshell.env("STONKS_FAKE_STATE")
 
   function check(label, ok, detail) {
@@ -123,31 +127,86 @@ ShellRoot {
       return out
     }
 
+    // Quote requests among `lines` ("kind name status"), by symbol: a
+    // chart's one, and each of a spark's.
+    function perSymbol(lines, kind) {
+      var counts = {}
+      lines.forEach(function(line) {
+        var parts = line.split(" ")
+        if (kind ? parts[0] !== kind : parts[0] !== "chart" && parts[0] !== "spark") return
+        parts[1].split(",").forEach(function(s) { counts[s] = (counts[s] || 0) + 1 })
+      })
+      return counts
+    }
+
+    function test_slow() {
+      if (harness.mode !== "slow") skip("the main run")
+      // Every request takes 3 s, as on a weak hotspot: the whole list still
+      // answers in one run of a few requests, none of them cut short.
+      var began = Date.now()
+      app.open("{}")
+      tryVerify(function() { return app.opened && service.openSurfaces.length === 1 }, 3000)
+      var all = function() { return service.library.every(function(s) { return !!service.quotes[s] }) }
+      for (var t = 0; t < 600 && !all(); t++) wait(100)
+      var took = Date.now() - began
+      harness.check("on a network that takes 3 s a request, all 154 symbols answer within 40 s",
+        all() && took <= 40000, (took / 1000).toFixed(1) + " s, " + service.library.filter(function(s) { return !!service.quotes[s] }).length + " answered")
+      console.log("LONG LIST SLOW DONE")
+      done.exitCode = harness.failures ? 1 : 0
+      done.start()
+    }
+
     function test_longList() {
+      if (harness.mode !== "main") skip("the slow run")
       var start = service.now
       app.open("{}")
       tryVerify(function() { return app.opened && service.openSurfaces.length === 1 }, 3000)
 
-      // Loading: the budget lets only part of the list go at once, and the
-      // rest waits its turn. No row says "No data" for that wait.
+      // Loading: the pill's chart and eight spark requests carry the list.
+      // Each day with a jump no chart has judged is judged on the chart
+      // after, from the budget's spare half. No row says "No data" for any
+      // wait of Stonks' own.
       var loadWarned = []
       var answered = 0
-      for (var t = 0; t < 300 && !answered; t++) {
+      for (var t = 0; t < 600 && (!answered || service.testFeed.toJudge.length > 0); t++) {
         service.now += 1
         settle()
         var w = warned()
         if (w.length) loadWarned.push((service.now - start) + " s: " + w.length)
-        if (service.library.every(function(s) { return !!service.quotes[s] })) answered = service.now - start
+        if (!answered && service.library.every(function(s) { return !!service.quotes[s] })) answered = service.now - start
       }
-      harness.check("154 symbols load with no row warning while they wait on the budget",
-        answered > 0 && loadWarned.length === 0,
-        "all answered at " + (answered || "never") + " s; warned " + loadWarned.slice(0, 3).join(", ") + (loadWarned.length > 3 ? " …" : ""))
+      var loadLines = harness.lines("requests.log")
+      var firstRun = harness.lines("runs.log")[0] || ""
+      harness.check("154 symbols answer in one run, the pill's chart and eight spark requests, within 2 s",
+        answered > 0 && answered <= 2 && firstRun.split(" ").length === 9 && /^chart:TALL001( spark:\S+){8}$/.test(firstRun),
+        "all answered at " + (answered || "never") + " s; first run " + firstRun.split(" ").map(function(u) { return u.split(":")[0] }).join(" "))
+      harness.check("loading warns of nothing, and every day with a jump is judged within 5 minutes",
+        loadWarned.length === 0 && service.testFeed.toJudge.length === 0 && service.now - start <= 300,
+        loadWarned.slice(0, 3).join(", ") + (loadWarned.length > 3 ? " …" : "") + "; still to judge " + service.testFeed.toJudge.length
+          + " after " + (service.now - start) + " s")
+      var charted = perSymbol(loadLines, "chart")
+      var stray = service.quotes.STRAY
+      harness.check("a stray print in a spark day is judged on the chart and left out of the row's line; days with no jump are never charted",
+        charted.STRAY === 1 && !!stray && stray.droppedTimes.length === 1
+          && !stray.points.some(function(p) { return p.t === stray.droppedTimes[0] })
+          && !charted["SHOP.TO"] && !charted["BTC-USD"],
+        "STRAY charted " + charted.STRAY + ", dropped " + (stray ? stray.droppedTimes.length : "-") + "; SHOP.TO " + (charted["SHOP.TO"] || 0) + ", BTC-USD " + (charted["BTC-USD"] || 0))
 
-      // Ten minutes of trading: every row is due each minute, past the
-      // budget. A refresh waiting its turn is not overdue.
+      // Ten minutes of trading: every row is due each minute. The list
+      // refreshes whole each minute in a few requests, one curl a minute.
+      var reqFrom = harness.lines("requests.log").length
+      var runFrom = harness.lines("runs.log").length
       var steadyWarned = 0
       tick(600, 5, function() { if (warned().length) steadyWarned++ })
-      harness.check("ten minutes of trading on a long list: no row or pill warns while refreshes wait their turn",
+      var steady = harness.lines("requests.log").slice(reqFrom)
+      var runs = harness.lines("runs.log").slice(runFrom)
+      var counts = perSymbol(steady)
+      var behind = service.library.filter(function(s) { return (counts[encodeURIComponent(s)] || 0) < 9 })
+      harness.check("ten minutes of trading: every row refreshed every minute, in at most 15 requests and 2 curl runs a minute",
+        behind.length === 0 && steady.length <= 150 && runs.length <= 20,
+        (steady.length / 10).toFixed(1) + " requests and " + (runs.length / 10).toFixed(1) + " runs a minute; behind: " + behind.slice(0, 5).join(",")
+          + "; first run " + (runs[0] || "").split(" ").map(function(u) { return u.split(":")[0] }).join(" "))
+      harness.check("ten minutes of trading on a long list: no row or pill warns",
         steadyWarned === 0, steadyWarned + " of 120 steps warned")
 
       // Yahoo refusing: nothing more goes for the pause. Each row says its

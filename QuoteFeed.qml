@@ -9,8 +9,14 @@ import "Quote.js" as Quote
 //
 // Two lanes, one run each at a time: first answers (a symbol with no
 // answer this session) and refreshes, so an add never waits behind a
-// refresh. The pill's symbol (`lead`) goes first in a run. A run still
-// going after 20 s is stopped, and its host counts as not answering.
+// refresh. The pill's symbol (`lead`) goes first in a run, on the chart
+// endpoint: its line and the hero's open need the bars' opens. The rest go
+// in spark batches of up to 20 (`Quote.sparkUrl`), closes only, judged by
+// each listing's last chart verdict (`Quote.sparkQuote`). One whose spark
+// day holds a jump that verdict can't speak for shows all the same, and
+// waits to be judged on the chart (`toJudge`), from the budget's spare
+// half. A run has no limit of its own: curl gives up on each URL within
+// 10 s (`Fetch.curlCommand`).
 //
 // An entry is this symbol's last answer: { status, receivedAt, answeredAt },
 // on the service's clock. "ok" or "failed" for the latest answer, or
@@ -76,7 +82,7 @@ Item {
 
   readonly property bool busy: firstProc.running || refreshProc.running || landing.length > 0 || Object.keys(asked).length > 0
 
-  // Each lane's run under way, its symbols in the order of their URLs.
+  // Each lane's run under way, its symbols in the order of their requests.
   property var firstRun: []
   property var refreshRun: []
   // Bad answers so far for a symbol still asked for.
@@ -133,6 +139,7 @@ Item {
     root.quotes = kept(quotes)
     root.entries = kept(entries)
     root.tries = kept(tries)
+    root.toJudge = toJudge.filter(function(symbol) { return symbols.indexOf(symbol) >= 0 })
     var next = kept(asked)
     symbols.forEach(function(symbol) { if (firstAnswer(symbol) && !(symbol in next)) next[symbol] = root.stamp() })
     root.asked = next
@@ -173,39 +180,81 @@ Item {
   }
 
   // The next run of a lane: every symbol it owes that is not cooling or in
-  // the other lane's run, as many as the gate lets go: the lead first, then
-  // the longest asked, so one the budget held goes before those asked since.
+  // the other lane's run, as many requests as the gate lets go: the lead's
+  // chart first, then spark batches in ask order, so one the budget held
+  // goes before those asked since. Then, in the refresh lane, a chart for
+  // each symbol waiting to be judged, only from the budget's spare half
+  // (`Gate.spare`), so judging never holds a refresh back or splits a run.
+  // The preview's feed (`bulk` false) asks only the chart.
   function launch(first) {
     var proc = first ? firstProc : refreshProc
     if (proc.running || landing.some(function(job) { return job.first === first })) return
     var waiting = symbols.filter(function(symbol) {
       return symbol in asked && firstAnswer(symbol) === first && cooling.indexOf(symbol) < 0 && !inRun(symbol)
     })
-    if (waiting.length === 0 || (clearance && !clearance())) return
+    var judging = first ? [] : toJudge.filter(function(symbol) {
+      return !(symbol in asked) && cooling.indexOf(symbol) < 0 && !inRun(symbol)
+    })
+    if ((waiting.length === 0 && judging.length === 0) || (clearance && !clearance())) return
     waiting.sort(function(a, b) {
       return (b === lead) - (a === lead) || asked[a] - asked[b] || symbols.indexOf(a) - symbols.indexOf(b)
     })
-    var granted = gate ? gate.take(waiting.length, bulk) : waiting.length
-    if (granted === 0) return
-    var run = waiting.slice(0, granted)
-    owe(run)
-    if (first) root.firstRun = run
-    else root.refreshRun = run
+    var charted = function(symbol) { return !bulk || symbol === lead }
+    var slots = waiting.filter(charted).map(function(symbol) { return { symbols: [symbol], spark: false } })
+    var batched = waiting.filter(function(symbol) { return !charted(symbol) })
+    // A batch of one is a chart: one request either way, and the chart's
+    // has opens, so its day needs no judging.
+    for (var i = 0; i < batched.length; i += Quote.SPARK_BATCH) {
+      var batch = batched.slice(i, i + Quote.SPARK_BATCH)
+      slots.push({ symbols: batch, spark: batch.length > 1 })
+    }
+    var granted = slots.length > 0 && gate ? gate.take(slots.length, bulk) : slots.length
+    var run = slots.slice(0, granted)
+    var runSymbols = []
+    run.forEach(function(slot) { runSymbols = runSymbols.concat(slot.symbols) })
+    owe(runSymbols)
+    for (var j = 0; j < judging.length && (!gate || (gate.spare() && gate.take(1, bulk) === 1)); j++) {
+      run.push({ symbols: [judging[j]], spark: false })
+      runSymbols.push(judging[j])
+    }
+    if (run.length === 0) return
+    if (first) {
+      root.firstSlots = run
+      root.firstRun = runSymbols
+    } else {
+      root.refreshSlots = run
+      root.refreshRun = runSymbols
+    }
     if (first && gate) root.firstTicket = gate.ticket
     if (!first && gate) root.refreshTicket = gate.ticket
-    proc.command = Fetch.curlCommand(run.map(Quote.chartUrl), Fetch.DAY_CAP)
+    var spark = run.some(function(slot) { return slot.spark })
+    proc.command = Fetch.curlCommand(run.map(function(slot) {
+      return slot.spark ? Quote.sparkUrl(slot.symbols) : Quote.chartUrl(slot.symbols[0])
+    }), spark ? Fetch.SPARK_CAP : Fetch.DAY_CAP)
     proc.running = true
-    ;(first ? firstLimit : refreshLimit).restart()
   }
 
-  // A run's answers are read a few at a time, about 8 ms a turn
-  // (`landStep`), so a long run never holds the shell's thread for long;
-  // the run lands whole once its last answer is read (`land`), and until
-  // then its lane runs nothing new.
+  // Each lane's run under way as its requests, in the order of their URLs:
+  // { symbols, spark }, one symbol to a chart.
+  property var firstSlots: []
+  property var refreshSlots: []
+  // Symbols whose spark day holds a jump no chart verdict speaks for, each
+  // waiting for its chart from the budget's spare half.
+  property var toJudge: []
+
+  // A new lead whose quote came from spark has no opens for its line or the
+  // hero's open: its chart is asked for at once.
+  onLeadChanged: if (quotes[lead] && quotes[lead].closesOnly) ask([lead], root.stamp())
+
+  // A run's answers are read a little at a time, about 8 ms a turn
+  // (`landStep`): a chart answer, a spark answer's text, or one listing of
+  // it, so a long run never holds the shell's thread for long. The run lands
+  // whole once its last answer is read (`land`), and until then its lane
+  // runs nothing new. Each answer gets `outcomes`, by symbol: { quote,
+  // unjudged }, null for a bad answer, or "missing".
   property var landing: []
-  function receive(first, text, stopped) {
-    ;(first ? firstLimit : refreshLimit).stop()
-    root.landing = landing.concat([{ first: first, answers: Fetch.answers(text), read: 0, stopped: stopped }])
+  function receive(first, text) {
+    root.landing = landing.concat([{ first: first, slots: first ? firstSlots : refreshSlots, answers: Fetch.answers(text), read: 0 }])
     landTimer.start()
   }
 
@@ -214,10 +263,32 @@ Item {
     if (!job) return
     var until = Date.now() + 8
     while (job.read < job.answers.length && Date.now() < until) {
-      var answer = job.answers[job.read++]
-      if (answer.kind !== "ok") continue
-      try { answer.quote = Quote.parseChart(JSON.parse(answer.body), root.centExchanges) } catch (e) { answer.quote = null }
-      answer.body = null
+      var answer = job.answers[job.read]
+      var slot = job.slots[answer.index]
+      if (answer.kind !== "ok" || !slot) {
+        job.read++
+      } else if (!slot.spark) {
+        var quote = null
+        try { quote = Quote.parseChart(JSON.parse(answer.body), root.centExchanges) } catch (e) { quote = null }
+        answer.body = null
+        answer.outcomes = {}
+        answer.outcomes[slot.symbols[0]] = quote ? { quote: quote, unjudged: false } : null
+        job.read++
+      } else if (!answer.outcomes) {
+        try { answer.days = Quote.sparkResults(JSON.parse(answer.body)) } catch (e) { answer.days = null }
+        answer.body = null
+        answer.outcomes = {}
+        answer.done = 0
+      } else {
+        var symbol = slot.symbols[answer.done++]
+        var previous = quotes[symbol]
+        answer.outcomes[symbol] = !answer.days ? null : !(symbol in answer.days) ? "missing"
+          : Quote.sparkQuote(answer.days[symbol], previous && previous.verdict || null, root.centExchanges)
+        if (answer.done >= slot.symbols.length) {
+          answer.days = null
+          job.read++
+        }
+      }
     }
     if (job.read < job.answers.length) {
       landTimer.start()
@@ -236,55 +307,79 @@ Item {
 
   function land(job) {
     var first = job.first
-    var run = first ? firstRun : refreshRun
-    if (first) root.firstRun = []
-    else root.refreshRun = []
+    if (first) {
+      root.firstRun = []
+      root.firstSlots = []
+    } else {
+      root.refreshRun = []
+      root.refreshSlots = []
+    }
     var at = root.stamp()
     var got = job.answers
     var nextQuotes = null
     var nextEntries = Object.assign({}, entries)
     var nextAsked = Object.assign({}, asked)
     var nextTries = Object.assign({}, tries)
+    var nextJudge = toJudge.slice()
     var cool = []
     var kinds = []
     var retryAfter = 0
-    for (var i = 0; i < got.length; i++) {
-      var answer = got[i]
-      var symbol = run[answer.index]
-      if (!symbol) continue
-      kinds.push(answer.kind)
-      retryAfter = Math.max(retryAfter, answer.retryAfter)
-      // Removed while its run was out: the answer belongs to nobody. A
-      // refusal or no answer leaves it asked, for the gate to pace.
-      if (symbols.indexOf(symbol) < 0 || answer.kind === "refused" || answer.kind === "none") continue
-      var quote = answer.kind === "ok" ? answer.quote : null
-      var entry = nextEntries[symbol] || { receivedAt: 0 }
+    var show = function(symbol, quote) {
+      var dropped = Quote.bucketTimes(quote.droppedTimes)
+      var previous = quotes[symbol]
+      var previousDropped = Quote.bucketTimes(previous ? previous.droppedTimes : null)
+      if (dropped && dropped !== previousDropped && !quote.closesOnly)
+        console.warn("stonks: " + symbol + " dropped stray buckets " + dropped)
+      // An answer with nothing new keeps the quote already shown, so nothing
+      // is derived from it again and no line repaints; its receipt still moves.
+      if (!previous || !Quote.sameQuote(quote, previous)) {
+        if (!nextQuotes) nextQuotes = Object.assign({}, quotes)
+        nextQuotes[symbol] = quote
+      }
+      nextEntries[symbol] = { status: "ok", receivedAt: at, answeredAt: at }
+    }
+    var settle = function(answer, slot, symbol) {
+      // Removed while its run was out: the answer belongs to nobody.
+      if (symbols.indexOf(symbol) < 0) return
+      // A chart answer, whatever it says, is the judging a spark day waited
+      // on. It keeps the spark answer's second, so the symbol stays due with
+      // the rest of its run; one fetched only to judge that fails changes
+      // nothing, and the next spark day asks again.
+      var judging = !slot.spark && toJudge.indexOf(symbol) >= 0
+      if (!slot.spark) nextJudge = nextJudge.filter(function(s) { return s !== symbol })
+      var outcome = answer.kind === "ok" ? answer.outcomes[symbol] : null
+      var quote = outcome && outcome !== "missing" ? outcome.quote : null
+      if (judging && !(symbol in asked) && !quote) return
       if (quote) {
-        var dropped = Quote.bucketTimes(quote.droppedTimes)
-        var previous = quotes[symbol]
-        var previousDropped = Quote.bucketTimes(previous ? previous.droppedTimes : null)
-        if (dropped && dropped !== previousDropped)
-          console.warn("stonks: " + symbol + " dropped stray buckets " + dropped)
-        // An answer with nothing new keeps the quote already shown, so nothing
-        // is derived from it again and no line repaints; its receipt still moves.
-        if (!previous || !Quote.sameQuote(quote, previous)) {
-          if (!nextQuotes) nextQuotes = Object.assign({}, quotes)
-          nextQuotes[symbol] = quote
-        }
-        nextEntries[symbol] = { status: "ok", receivedAt: at, answeredAt: at }
-      } else if (answer.kind !== "missing" && (nextTries[symbol] || 0) < 2) {
+        // A day with a jump no chart has judged shows, and waits for one.
+        if (outcome.unjudged && nextJudge.indexOf(symbol) < 0) nextJudge.push(symbol)
+        show(symbol, quote)
+        if (judging && entries[symbol]) nextEntries[symbol].answeredAt = entries[symbol].answeredAt
+      } else if (answer.kind !== "missing" && outcome !== "missing" && (nextTries[symbol] || 0) < 2) {
         // A bad answer: a short pause, then the same symbol again.
         nextTries[symbol] = (nextTries[symbol] || 0) + 1
         cool.push(symbol)
-        continue
+        return
       } else {
+        var entry = nextEntries[symbol] || { receivedAt: 0 }
         nextEntries[symbol] = Object.assign({}, entry, { status: "failed", answeredAt: at })
       }
       delete nextAsked[symbol]
       delete nextTries[symbol]
     }
+    for (var i = 0; i < got.length; i++) {
+      var answer = got[i]
+      var slot = job.slots[answer.index]
+      if (!slot) continue
+      kinds.push(answer.kind)
+      retryAfter = Math.max(retryAfter, answer.retryAfter)
+      // A refusal or no answer leaves its symbols asked, for the gate to pace.
+      if (answer.kind === "refused" || answer.kind === "none") continue
+      for (var k = 0; k < slot.symbols.length; k++) settle(answer, slot, slot.symbols[k])
+    }
     if (nextQuotes) root.quotes = nextQuotes
     root.entries = nextEntries
+    root.toJudge = nextJudge.filter(function(s) { return symbols.indexOf(s) >= 0 })
     root.asked = nextAsked
     root.tries = nextTries
     dropUnwatched()
@@ -292,8 +387,7 @@ Item {
       root.cooling = cooling.concat(cool)
       retryTimer.restart()
     }
-    // A run stopped before its end: the host is not answering.
-    if (gate) gate.report(job.stopped ? kinds.concat(["none"]) : kinds, retryAfter, first ? firstTicket : refreshTicket)
+    if (gate) gate.report(kinds, retryAfter, first ? firstTicket : refreshTicket)
     pump()
   }
 
@@ -341,43 +435,21 @@ Item {
     }
   }
 
-  Timer {
-    id: firstLimit
-    interval: 20000
-    onTriggered: { firstProc.stopped = true; firstProc.running = false }
-  }
-
-  Timer {
-    id: refreshLimit
-    interval: 20000
-    onTriggered: { refreshProc.stopped = true; refreshProc.running = false }
-  }
-
   // A run ends with its stream, never with the process stopping: both fire
   // for one run, and a failed curl still ends the stream.
   Process {
     id: firstProc
-    property bool stopped: false
     stdout: StdioCollector {
       waitForEnd: true
-      onStreamFinished: {
-        var stopped = firstProc.stopped
-        firstProc.stopped = false
-        root.receive(true, String(text || ""), stopped)
-      }
+      onStreamFinished: root.receive(true, String(text || ""))
     }
   }
 
   Process {
     id: refreshProc
-    property bool stopped: false
     stdout: StdioCollector {
       waitForEnd: true
-      onStreamFinished: {
-        var stopped = refreshProc.stopped
-        refreshProc.stopped = false
-        root.receive(false, String(text || ""), stopped)
-      }
+      onStreamFinished: root.receive(false, String(text || ""))
     }
   }
 }

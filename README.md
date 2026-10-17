@@ -180,9 +180,10 @@ switch between smooth and retro.
   `~/.config/omarchy/grvc.stonks.json`, and the last quotes in
   `~/.cache/grvc.stonks/quotes.json`. The shell keeps the pill's form on its
   bar entry in `~/.config/omarchy/shell.json`.
-- **Limits:** every request has a time limit and a size cap. Each listing is
-  asked for only as often as its market can move, and a host that refuses
-  is left alone for a while.
+- **Limits:** every request has a time limit and a size cap. Quotes come
+  20 listings to a request, so a long list refreshes in a few requests a
+  minute. Each listing is asked for only as often as its market can move,
+  and a host that refuses is left alone for a while.
 - **Updates:** never by itself.
 
 Every request runs through the one curl command in [`Fetch.js`](Fetch.js),

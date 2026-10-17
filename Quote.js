@@ -2,10 +2,15 @@
 
 // Yahoo's day answer for a listing, and the day's prices read off it: the
 // session its bars describe, the headline, the change, and each print's
-// session. If the chart endpoint changes, its URL and parser move here.
-// Knows no calendar, no Robinhood, and nothing of how a figure is shown.
+// session. If the chart or spark endpoint changes, its URL and parser move
+// here. Knows no calendar, no Robinhood, and nothing of how a figure is
+// shown.
 
 var CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/"
+// Yahoo's spark: the chart's whole `meta` and its closes, for up to
+// SPARK_BATCH listings a request (21 gets HTTP 400). No opens.
+var SPARK_URL = "https://query1.finance.yahoo.com/v7/finance/spark"
+var SPARK_BATCH = 20
 
 // Yahoo's short exchange codes to the names people use. A listing falls back
 // to Yahoo's full exchange name; a search result to Yahoo's own short code.
@@ -19,6 +24,46 @@ var EXCHANGE_NAMES = {
 
 function chartUrl(symbol) {
   return CHART_URL + encodeURIComponent(symbol) + "?range=1d&interval=5m&includePrePost=true"
+}
+
+function sparkUrl(symbols) {
+  return SPARK_URL + "?symbols=" + symbols.map(encodeURIComponent).join(",") + "&range=1d&interval=5m&includePrePost=true"
+}
+
+// A spark answer's listings, by symbol: each one's day in the chart's own
+// shape, closes only. A symbol Yahoo doesn't know is left out of the answer.
+function sparkResults(json) {
+  var out = {}
+  var results = json && json.spark && json.spark.result
+  for (var i = 0; results && i < results.length; i++) {
+    var day = results[i].response && results[i].response[0]
+    if (day && day.meta) out[results[i].symbol] = day
+  }
+  return out
+}
+
+// One listing's spark day (`sparkResults`) as a quote. Without opens the
+// stray filter can judge nothing, so the listing's last chart answer's
+// verdict stands in (`verdict`, `parseChart`): the strays it dropped are
+// left out. `unjudged` when a jump between two closes (not `sameLevel`)
+// lies past the bars that verdict settled, and a whole bar has come since
+// it: only a chart answer, with opens, can say whether that jump is a
+// stray. The newest bar is never judged, as in the filter.
+function sparkQuote(day, verdict, centExchanges) {
+  var quote = parseChart({ chart: { result: [day] } }, centExchanges)
+  if (!quote) return null
+  var pts = quote.points
+  var tick = answerTick(day.meta, pts.map(function(p) { return { c: p.p } }), centExchanges)
+  var newBar = !verdict || (pts.length >= 2 && pts[pts.length - 2].t > verdict.newest)
+  var unjudged = false
+  for (var i = 1; newBar && !unjudged && i < pts.length - 1; i++)
+    unjudged = pts[i].t > (verdict ? verdict.settled : 0) && !sameLevel(pts[i].p, pts[i - 1].p, tick)
+  var dropped = verdict ? verdict.dropped : []
+  quote.points = pts.filter(function(p) { return dropped.indexOf(p.t) < 0 })
+  quote.droppedTimes = pts.filter(function(p) { return dropped.indexOf(p.t) >= 0 }).map(function(p) { return p.t })
+  quote.verdict = verdict
+  quote.closesOnly = true
+  return { quote: quote, unjudged: unjudged }
 }
 
 // How far apart two prices are, as a fraction of the larger.
@@ -264,7 +309,16 @@ function parseChart(json, centExchanges) {
       post: index ? null : periodOf(current.post)
     },
     points: points,
-    droppedTimes: filtered.droppedTimes
+    droppedTimes: filtered.droppedTimes,
+    // What the stray filter judged of this day, for a spark answer after it
+    // (`sparkQuote`): its last whole bar (the newest is the live moment),
+    // the last bar no later bar can change the verdict on, and the strays
+    // it dropped. Null without opens, when it could judge nothing.
+    verdict: opens.length ? {
+      newest: bars.length >= 2 ? bars[bars.length - 2].t : 0,
+      settled: bars.length > MIXED_RUN ? bars[bars.length - 1 - MIXED_RUN].t : 0,
+      dropped: filtered.droppedTimes
+    } : null
   }
 }
 
