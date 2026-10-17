@@ -315,8 +315,9 @@ ShellRoot {
         searchAlone && !panel.testBody.showingHelp, searchAlone + "|" + panel.testBody.showingHelp)
       // ↓ put the cursor off the featured row; the key sheet, shown and
       // closed by ? and ? or by Escape, and Manage lists leave it there,
-      // though the popup's card shrinks to each and the list with it, and a
-      // key pressed over them acts on it. Found in the live check of #19:
+      // though the popup's card shrinks to the sheet and the list with it,
+      // and a key pressed over them acts on it. Manage lists keeps the
+      // card's height, the list's with it. Found in the live check of #19:
       // the shrunk list let the cursor go, and it came back on the featured
       // row, so x removed that one.
       var wl = panel.testBody.watchlist
@@ -338,8 +339,8 @@ ShellRoot {
       kept.push(wl.cursorRow)
       panel.testBody.closeListViews()
       kept.push(wl.cursorRow)
-      test.check("in the popup, the key sheet and Manage lists leave the cursor where ↓ put it, though the card shrinks to them",
-        keyedRow !== service.featuredSymbol && shrunk.every(function(h) { return h < fullHeight })
+      test.check("in the popup, the key sheet and Manage lists leave the cursor where ↓ put it, though the card shrinks to the sheet",
+        keyedRow !== service.featuredSymbol && shrunk[0] < fullHeight && shrunk[1] < fullHeight && shrunk[2] === fullHeight
           && kept.every(function(s) { return s === keyedRow }),
         keyedRow + " for featured " + service.featuredSymbol + " | heights " + fullHeight + " -> " + shrunk.join(",") + " | " + kept.join(","))
       panel.testBody.showingHelp = true
@@ -451,6 +452,9 @@ ShellRoot {
   property var heights: []
   property bool drawKept: false
   property bool bodyAtOnce: false
+  // The card's height with the rows, before a view opens; the key sheet's.
+  property int rowsCard: 0
+  property int sheetCard: 0
 
   function recordHeight() { test.heights.push(panel.testContentHeight) }
   // As the card's edge eases, frame by frame: while search is open, where
@@ -563,7 +567,7 @@ ShellRoot {
     var body = panel.testBody
     var icon = test.find(body, "lookIcon")
     return [body.chartSymbol, body.chart ? body.chart.symbol : "none", body.featuredQuote ? body.featuredQuote.price : "none",
-      body.watchlist.displayedSymbols.join(","), body.motion.reveal, body.headerText, body.managingLists,
+      body.watchlist.displayedSymbols.join(","), body.motion.reveal, body.headerText, body.showingHelp,
       panel.testContentHeight, icon.cells.toFixed(4)].join("|")
   }
   function closeHolding() {
@@ -587,7 +591,8 @@ ShellRoot {
     }
     panel.testContentHeightChanged.connect(closeMid)
     service.retro = !service.retro
-    body.openManageLists()
+    // The key sheet moves the card's edge; a view over the rows keeps it.
+    body.showingHelp = true
   }
   function heldThroughFade() {
     var body = panel.testBody
@@ -602,9 +607,9 @@ ShellRoot {
     panel.open()
     test.check("the next open takes the latest, draws in, and settles the edge and the icon",
       body.chartSymbol === other && body.watchlist.displayedSymbols.indexOf(test.heldHero) < 0 && body.motion.reveal < 1
-        && !body.managingLists && panel.testContentHeight === Math.round(panel.fittedCardHeight)
+        && !body.showingHelp && panel.testContentHeight === Math.round(panel.fittedCardHeight)
         && icon.cells === (service.retro ? 0 : 1),
-      body.chartSymbol + "|" + body.watchlist.displayedSymbols + "|" + body.motion.reveal + "|" + body.managingLists
+      body.chartSymbol + "|" + body.watchlist.displayedSymbols + "|" + body.motion.reveal + "|" + body.showingHelp
         + "|" + panel.testContentHeight + " vs " + panel.fittedCardHeight + "|" + icon.cells)
     service.retro = !service.retro
     service.symbols = test.heldSymbols
@@ -782,23 +787,24 @@ ShellRoot {
           panel.testBody.featureSymbol("MZ")
           // The popup's own key route: W and m reach the list views through the
           // real catcher, which then stands aside so j, x, and esc reach the view.
+          // Each keeps the card's height: it fits the rows' room.
+          test.rowsCard = panel.testContentHeight
           panel.testKeyCatcher.textKey("W")
         } else if (test.step === 13) {
-          test.check("W opens Manage lists in the popup, which takes the keys and the view's height",
-            panel.testBody.managingLists && panel.testKeyCatcher.blocked
-              && panel.testContentHeight === panel.testBody.listViewHeight + panel.testInset)
+          test.check("W opens Manage lists in the popup, which takes the keys and keeps the card's height",
+            panel.testBody.managingLists && panel.testKeyCatcher.blocked && panel.testContentHeight === test.rowsCard,
+            panel.testContentHeight + " vs " + test.rowsCard)
           panel.close()
           test.check("closing keeps Manage lists for the fade", panel.testBody.managingLists)
           panel.open()
           test.check("the next open closes Manage lists and gives the keys back",
             !panel.testBody.managingLists && !panel.testKeyCatcher.blocked)
+          test.rowsCard = panel.testContentHeight
           panel.testKeyCatcher.textKey("m")
         } else if (test.step === 14) {
-          test.check("m opens the cursor row's lists in the popup, which takes the keys",
-            panel.testBody.listsSymbol === "MZ" && panel.testKeyCatcher.blocked
-              && panel.testContentHeight === panel.testBody.listViewHeight + panel.testInset,
-            panel.testBody.listsSymbol + "|" + panel.testKeyCatcher.blocked + "|" + panel.testContentHeight
-              + " vs " + (panel.testBody.listViewHeight + panel.testInset))
+          test.check("m opens the cursor row's lists in the popup, which takes the keys and keeps the card's height",
+            panel.testBody.listsSymbol === "MZ" && panel.testKeyCatcher.blocked && panel.testContentHeight === test.rowsCard,
+            panel.testBody.listsSymbol + "|" + panel.testKeyCatcher.blocked + "|" + panel.testContentHeight + " vs " + test.rowsCard)
           panel.testBody.closeListViews()
           // A high-resolution wheel sends a notch as small ticks: the pill
           // carries three quarters without a step, and the fourth moves the
@@ -863,24 +869,26 @@ ShellRoot {
             test.shortListRows + " footer " + test.find(panel.testBody, "footer").y)
           panel.testKeyCatcher.textKey(",")
         } else if (test.step === 20) {
-          // A view with its own height, here Manage lists, takes it with the
+          // A view with its own height, here the key sheet, takes it with the
           // card's edge easing there, 160 ms OutCubic, while the body is laid
-          // out at that height at once; closing the view eases back. The key
-          // sheet takes the same path. Found in motion pass 3: the card jumped
-          // in one frame, about 365 px for the key sheet.
+          // out at that height at once; closing it eases back. A view over the
+          // rows keeps the card's height, but takes this path where a short
+          // list's grows it. Found in motion pass 3: the card jumped in one
+          // frame, about 365 px for the key sheet.
           test.heights = [panel.testContentHeight]
           panel.testContentHeightChanged.connect(test.recordHeight)
-          panel.testKeyCatcher.textKey("W")
-          test.bodyAtOnce = panel.testBody.managingLists && panel.fittedCardHeight !== test.heights[0]
+          panel.testKeyCatcher.textKey("?")
+          test.bodyAtOnce = panel.testBody.showingHelp && panel.fittedCardHeight !== test.heights[0]
             && panel.testBody.height === panel.fittedCardHeight - panel.testInset
+          test.sheetCard = panel.fittedCardHeight
         } else if (test.step === 21) {
-          test.check("a list view eases the card to its height, with the body there at once",
-            test.bodyAtOnce && test.eased(panel.testBody.listViewHeight + panel.testInset), test.heights.join(","))
+          test.check("the key sheet eases the card to its height, with the body there at once",
+            test.bodyAtOnce && test.eased(test.sheetCard), test.heights.join(","))
           test.heights = [panel.testContentHeight]
-          panel.testBody.closeListViews()
+          panel.testKeyCatcher.textKey("?")
         } else if (test.step === 22) {
-          test.check("closing the view eases the card back to the rows",
-            !panel.testBody.managingLists && test.eased(panel.heightCap), test.heights.join(","))
+          test.check("closing the sheet eases the card back to the rows",
+            !panel.testBody.showingHelp && test.eased(panel.heightCap), test.heights.join(","))
           panel.testContentHeightChanged.disconnect(test.recordHeight)
           // Closing stops the wheel where it is: its glide and its settle,
           // 260 ms after the last notch, would move the list after the close.
