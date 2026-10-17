@@ -66,6 +66,14 @@ test("stray filtering never judges the newest bar or an uneven gap", () => {
   expect(keptBars(overnight)).toEqual(overnight)
   expect(keptBars(noOpens)).toEqual(noOpens)
   expect(keptBars(long)).toEqual(long)
+  // An hourly history across a weekend: every bar opens at 100, Friday's
+  // last and Monday's first close at 98. A history has no sessions to say a
+  // gap lies inside one, so none is bridged. Found in review.
+  const weekend = [
+    { t: 0, o: 100, c: 100 }, { t: 3600, o: 100, c: 98 }, { t: 3600 + 66 * 3600, o: 100, c: 98 },
+    { t: 3600 + 67 * 3600, o: 100, c: 100 }
+  ]
+  expect(keptBars(weekend)).toEqual(weekend)
   expect(keptBars([])).toEqual([])
 })
 

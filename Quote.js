@@ -63,7 +63,7 @@ function filterStrayCloses(bars, periods, tick) {
   var level = 0
   var i = 1
   while (i < bars.length) {
-    var run = strayRun(bars, level, i, tick) || mixedRun(bars, level, i, periods, tick)
+    var run = strayRun(bars, level, i, tick, periods) || mixedRun(bars, level, i, periods, tick)
     if (run > 0) {
       for (var dropped = 0; dropped < run; dropped++) droppedTimes.push(bars[i + dropped].t)
       i += run
@@ -82,20 +82,23 @@ function filterStrayCloses(bars, periods, tick) {
 // way round — the next bar opens from where the move closed. Zero for a real
 // move, and for a run with no bar after it, so the newest bar is never judged.
 // Only a bar one step after the run, the step from the accepted bar to the
-// run, judges it, so a session break is never bridged. A bar after an uneven
-// gap that opens back at the price yet strays again only carries the run on:
-// JPM's 16:50 and 17:00 on 16 October opened at the price (339.83, 339.52)
-// and closed at 318.24, 16:55 missing, and 17:05 opened back at 339.50.
-function strayRun(bars, level, from, tick) {
+// run, judges it, so a session break is never bridged. Inside one session of
+// the answer's `periods`, a bar after an uneven gap that opens back at the
+// price yet strays again only carries the run on: JPM's 16:50 and 17:00 on
+// 16 October opened at the price (339.83, 339.52) and closed at 318.24,
+// 16:55 missing, and 17:05 opened back at 339.50. A history has no periods:
+// across a night or a weekend, prices can really move.
+function strayRun(bars, level, from, tick, periods) {
   var price = bars[level].c
   var step = bars[level + 1].t - bars[level].t
+  var session = sessionAt(periods, bars[level].t)
   for (var length = 1; length <= STRAY_RUN; length++) {
     var end = from + length - 1
     var back = end + 1 < bars.length ? bars[end + 1] : null
     if (!back || !Format.isFiniteNumber(back.o) || sameLevel(bars[end].c, price, tick)) return 0
     var opensBack = sameLevel(back.o, price, tick) && !sameLevel(back.o, bars[end].c, tick)
     if (back.t - bars[end].t !== step) {
-      if (opensBack) continue
+      if (opensBack && session && sessionAt(periods, back.t) === session) continue
       return 0
     }
     if (opensBack) return length
@@ -133,14 +136,21 @@ function mixedRun(bars, level, from, periods, tick) {
   return 0
 }
 
-// "pre" or "post" when `t` falls in that session of `periods`, else "".
-function extendedSession(periods, t) {
-  var names = ["pre", "post"]
+// "pre", "regular", or "post" when `t` falls in that session of `periods`,
+// else "".
+function sessionAt(periods, t) {
+  var names = ["pre", "regular", "post"]
   for (var n = 0; periods && n < names.length; n++) {
     var period = periods[names[n]]
     if (period && t >= period.start && t < period.end) return names[n]
   }
   return ""
+}
+
+// "pre" or "post" when `t` falls in that session of `periods`, else "".
+function extendedSession(periods, t) {
+  var session = sessionAt(periods, t)
+  return session === "regular" ? "" : session
 }
 
 // The tick of the listing an answer is for (`Format.priceTick`), from its
