@@ -1229,15 +1229,40 @@ ShellRoot {
                     && (at.y < -0.5 || at.y + row.height > scroll.height + 0.5)
                 }).length
               }
-              // As the menu opens, then scrolled to its end.
+              // The scroll moves from `from`, then comes to rest.
+              var settled = function(from) {
+                for (var t = 0; t < 2000 && (scroll.contentY === from || scroll.moving || cutRows() > 0); t += 20) wait(20)
+                return scroll.contentY === from ? -1 : cutRows()
+              }
+              // As the menu opens; after a wheel notch over the lists and a
+              // drag of the scrollbar part way, in one look, the rows being
+              // alike in both; scrolled to its end. Found in review: a notch
+              // stopped at 72 px of 26 px rows.
               var atRest = cutRows()
               var pinnedShown = inMenu(find(menu, "newListRow")) && inMenu(find(menu, "manageListsRow"))
+              var afterWheel = 0
+              var afterDrag = 0
+              if (!retro) {
+                var over = scroll.mapToItem(body, scroll.width / 3, scroll.height / 2)
+                mouseMove(body, over.x, over.y)
+                var beforeWheel = scroll.contentY
+                mouseWheel(body, over.x, over.y, 0, -120)
+                afterWheel = settled(beforeWheel)
+                var thumb = scroll.ScrollBar.vertical.contentItem
+                var grip = thumb.mapToItem(body, thumb.width / 2, thumb.height / 2)
+                var beforeDrag = scroll.contentY
+                mousePress(body, grip.x, grip.y)
+                mouseMove(body, grip.x, grip.y + 7)
+                mouseMove(body, grip.x, grip.y + scroll.height / 4 + 7)
+                mouseRelease(body, grip.x, grip.y + scroll.height / 4 + 7)
+                afterDrag = settled(beforeDrag)
+              }
               scroll.contentY = Math.max(0, scroll.contentHeight - scroll.height)
-              var cut = atRest + cutRows()
+              var cuts = [atRest, afterWheel, afterDrag, cutRows()]
               var footerTop = yIn(find(body, "footer"), 0)
               menuSeen.push(where + ": " + scroll.height / menu.itemHeight + " rows")
-              if (cut > 0 || !pinnedShown || yIn(menu, menu.height) + body.bandGap > footerTop)
-                menuFaults.push(where + ": " + cut + " rows cut in a view " + scroll.height + " px, pinned in sight " + pinnedShown
+              if (cuts.some(function(n) { return n !== 0 }) || !pinnedShown || yIn(menu, menu.height) + body.bandGap > footerTop)
+                menuFaults.push(where + ": rows cut (opened/wheel/bar/end, -1 unmoved) " + cuts.join("/") + " in a view " + scroll.height + " px, pinned in sight " + pinnedShown
                   + ", menu ends " + yIn(menu, menu.height) + " footer at " + footerTop)
               var manageRow = find(menu, "manageListsRow")
               var manageAt = manageRow.mapToItem(body, manageRow.width / 2, manageRow.height / 2)

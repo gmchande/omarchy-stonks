@@ -76,6 +76,7 @@ FocusScope {
       nameField.focus = false
       root.focus = false
       scroll.cancelFlick()
+      settle.stop()
     }
   }
 
@@ -101,6 +102,7 @@ FocusScope {
   // "Manage lists…" are always in sight.
   function showCursor() {
     scroll.cancelFlick()
+    settle.stop()
     if (cursor >= newIndex) return
     var top = topOf(cursor)
     if (top < scroll.contentY) scroll.contentY = top
@@ -111,6 +113,29 @@ FocusScope {
   // List `index`'s top among the lists.
   function topOf(index) {
     return index * itemHeight
+  }
+
+  // A scroll by hand, the wheel's or the scrollbar's, comes to rest on a
+  // row's edge, so the lists in sight are whole rows: one notch stopped at
+  // 72 px of 26 px rows, cutting a row at each edge. A list wholly in sight
+  // before stays so, the cursor's too.
+  function settleOnRow() {
+    var end = Math.max(0, scroll.contentHeight - scroll.height)
+    var target = Math.min(end, Math.round(scroll.contentY / itemHeight) * itemHeight)
+    if (target === scroll.contentY) return
+    settle.to = target
+    settle.restart()
+  }
+
+  NumberAnimation {
+    id: settle
+    target: scroll
+    property: "contentY"
+    duration: 160
+    easing.type: Easing.OutCubic
+    // The rows moved under a still pointer: the cursor takes the one now
+    // under it, as the wheel's own scroll does.
+    onFinished: if (root.active && pointer.hovered) root.pointAt(pointer.scenePosition.x, pointer.scenePosition.y)
   }
 
   // The scrollbar or the wheel moved the lists off the cursor: it comes to
@@ -230,6 +255,7 @@ FocusScope {
       if (moving && pointer.hovered) root.pointAt(pointer.scenePosition.x, pointer.scenePosition.y)
       root.keepCursorInSight()
     }
+    onMovementEnded: root.settleOnRow()
     // While more lists sit out of sight, as in the window at its smallest,
     // the rows' scrollbar says so, at rest too, and the lists stop short of
     // its gutter.
@@ -240,6 +266,7 @@ FocusScope {
       visible: scroll.interactive
       // At least 24 px long, so a long view's thumb is there to see and grab.
       minimumSize: Math.min(1, Style.space(24) / Math.max(1, availableHeight))
+      onPressedChanged: if (!pressed) root.settleOnRow()
     }
 
     Column {
