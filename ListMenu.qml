@@ -50,6 +50,9 @@ FocusScope {
     ? Math.max(1, Math.min(choices.length, Math.floor((maxHeight - pinnedHeight - inset * 2) / itemHeight)))
     : choices.length
 
+  // The least it shows: one list row and the pinned rows, a refusal's note
+  // included.
+  readonly property int leastHeight: itemHeight + pinnedHeight + inset * 2
   signal chosen(string name)
   signal createRequested(string name)
   signal manageRequested()

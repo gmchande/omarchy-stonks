@@ -339,6 +339,8 @@ Item {
   readonly property int listMenuTop: margins + header.height + groupGap + heroBand.implicitHeight + Style.space(4)
   // The menu ends one gap above the footer, which stays in sight under it.
   readonly property int listMenuBottom: listMenuTop + listMenu.contentHeight + groupGap + footer.height + margins
+  // Where the menu's least ends, the footer one gap under it: its floor.
+  readonly property int listMenuLeastBottom: listMenuTop + listMenu.leastHeight + groupGap + footer.height + margins
   // Manage lists and a symbol's lists take the rows' and the footer's place,
   // in the surface's height; their own is what they would need
   // (`fittedHeight`).
@@ -389,12 +391,16 @@ Item {
   // under the rows' 742 and pushed the footer down. Search takes its height
   // as it opens, before any typing: the field and a full set of results, so
   // the card's edge holds still while you type. An open list menu taller
-  // than a short list makes room for itself and for the footer under it.
+  // than a short list makes room for itself and for the footer under it,
+  // and at least for its least (`listMenuLeastBottom`) where the room holds
+  // that though its whole rows don't: a refused name on a one-symbol list
+  // under the first-run hint sat 27 px over the footer (found in review).
   function fittedHeight(maxHeight) {
     if (showingHelp) return Math.min(maxHeight, helpHeight)
     var rows = chromeHeight + wholeRowsHeight(maxHeight - chromeHeight)
     var view = listViewOpen ? listViewHeight : adding ? searchHeight : listMenuOpen ? listMenuBottom : 0
-    return Math.max(rows, Math.min(chromeHeight + rowsHeight(Infinity, maxHeight - chromeHeight), view))
+    var least = listMenuOpen ? Math.min(maxHeight, listMenuLeastBottom) : 0
+    return Math.max(rows, least, Math.min(chromeHeight + rowsHeight(Infinity, maxHeight - chromeHeight), view))
   }
 
   // A hero chosen while an add is still coming wins over the add.

@@ -1352,6 +1352,42 @@ ShellRoot {
             })
           })
         })
+        // The menu's least, one list row and the pinned rows with a refused
+        // name's note, fits over the footer wherever the room holds it,
+        // though the room's whole rows don't: one symbol in All, the first-run
+        // hint, at a room from the least to 40 px over it, in both looks.
+        // Found in review: the menu sat 27 px over the footer, on its hint.
+        surface.wide = false
+        surface.fixedHeight = 0
+        stub.lists = [{ name: "", label: "All", count: 1, symbols: ["MZ"] }]
+        stub.library = ["MZ"]
+        stub.listName = ""
+        stub.symbols = ["MZ"]
+        body.showFirstRunHint()
+        var leastFaults = []
+        ;[false, true].forEach(function(retro) {
+          stub.retro = retro
+          body.openListMenu()
+          wait(50)
+          var menu = find(body, "listMenu")
+          menu.resumeNaming("All", "A list has that name already")
+          wait(50)
+          var least = body.listMenuTop + menu.itemHeight + menu.pinnedHeight + menu.inset * 2 + body.groupGap
+            + find(body, "footer").height + body.margins
+          for (var extra = 0; extra <= 40; extra += 10) {
+            surface.budget = least + extra
+            wait(50)
+            var footer = find(body, "footer")
+            var menuEnd = yIn(menu, menu.height)
+            if (menuEnd + body.groupGap > yIn(footer, 0) || yIn(footer, footer.height) > surface.height)
+              leastFaults.push((retro ? "retro" : "smooth") + " room " + (least + extra) + ": menu ends " + menuEnd + ", footer " + yIn(footer, 0)
+                + "–" + yIn(footer, footer.height) + " in " + surface.height)
+          }
+          menu.stopNaming()
+          body.closeListMenu()
+          wait(50)
+        })
+        body.hint = ""
         surface.wide = false
         surface.fixedHeight = 0
         surface.budget = 730
@@ -1363,6 +1399,8 @@ ShellRoot {
         wait(50)
         root.check("a view opening over the rows keeps the surface's height and edge: the list menu, search, Manage lists, and a row's ticks, at a room of 760, 780, and the popup's cap, in the popup and the window, in both looks",
           heldFaults.length === 0, heldFaults.join(" | ") + " || " + heldSeen.join(", "))
+        root.check("the list menu's least, a refused name's note too, fits over the footer wherever the room holds it, under the first-run hint, in both looks",
+          leastFaults.length === 0, leastFaults.join(" | "))
         // A shorter list's rows are its own, and the footer sits one gap under
         // them. Found in design pass 3: the footer stayed where All's is,
         // with an empty row's room above it.
