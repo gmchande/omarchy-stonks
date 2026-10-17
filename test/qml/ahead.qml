@@ -272,12 +272,17 @@ ShellRoot {
       // rows coming into sight are fetched as those that left go, and the
       // hero's chart, the oldest kept, stays on show throughout. The budget
       // is topped up for the run of 45 first answers and for the rows,
-      // which would otherwise wait for it to refill.
+      // which would otherwise wait for it to refill; the 45 days are judged
+      // on the chart first, from the spare budget fetching ahead also uses.
       var tall = []
       for (var n = 1; n <= 45; n++) tall.push("TALL" + (n < 10 ? "0" : "") + n)
       gate.tokens = gate.capacity
       tall.forEach(function(s) { service.addSymbol(s) })
       tryVerify(function() { return service.arriving.length === 0 }, 20000)
+      for (var top = 0; top < 30 && service.testFeed.toJudge.length > 0; top++) {
+        gate.tokens = gate.capacity
+        wait(200)
+      }
       app.testWindow.implicitHeight = 2600
       app.open("{}")
       var everyRow = harness.listed.length + tall.length

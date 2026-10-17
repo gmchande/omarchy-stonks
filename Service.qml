@@ -391,6 +391,8 @@ Item {
     symbols: root.pluginsReady ? root.library : []
     watched: root.watched
     lead: root.view.featured
+    // A member previewed shows on the hero too, from this feed.
+    heroes: [root.view.featured].concat(root.previewRests && root.library.indexOf(root.previewSymbol) >= 0 ? [root.previewSymbol] : [])
     now: root.now
     clock: root
     clearance: function() { return root.screensClear() }

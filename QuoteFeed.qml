@@ -9,14 +9,15 @@ import "Quote.js" as Quote
 //
 // Two lanes, one run each at a time: first answers (a symbol with no
 // answer this session) and refreshes, so an add never waits behind a
-// refresh. The pill's symbol (`lead`) goes first in a run, on the chart
-// endpoint: its line and the hero's open need the bars' opens. The rest go
-// in spark batches of up to 20 (`Quote.sparkUrl`), closes only, judged by
-// each listing's last chart verdict (`Quote.sparkQuote`). One whose spark
-// day holds a jump that verdict can't speak for shows all the same, and
-// waits to be judged on the chart (`toJudge`), from the budget's spare
-// half. A run has no limit of its own: curl gives up on each URL within
-// 10 s (`Fetch.curlCommand`).
+// refresh. The pill's symbol (`lead`) goes first in a run; it and any other
+// hero's (`heroes`) go on the chart endpoint, whose opens a hero's line and
+// the day's open need. The rest go in spark batches of up to 20
+// (`Quote.sparkUrl`), closes only, judged by each listing's last chart
+// verdict (`Quote.sparkQuote`). One whose spark day holds a jump that
+// verdict can't speak for shows all the same, and waits to be judged on the
+// chart (`toJudge`), a few a run from the budget's spare half. A run has no
+// limit of its own: curl gives up on each URL within 10 s
+// (`Fetch.curlCommand`).
 //
 // An entry is this symbol's last answer: { status, receivedAt, answeredAt },
 // on the service's clock. "ok" or "failed" for the latest answer, or
@@ -44,6 +45,9 @@ Item {
   // longer watched is dropped. First answers always stay.
   property var watched: []
   property string lead: ""
+  // The symbols a hero shows, the lead and a resting preview of a member:
+  // each goes on the chart, whose opens its line and the day's open need.
+  property var heroes: lead ? [lead] : []
   property int now: 0
   // The service, whose wall clock stamps each ask and answer of the feed's
   // own (`stamp`): between its ticks `now` can be a minute behind.
@@ -180,15 +184,21 @@ Item {
   }
 
   // The next run of a lane: every symbol it owes that is not cooling or in
-  // the other lane's run, as many requests as the gate lets go: the lead's
-  // chart first, then spark batches in ask order, so one the budget held
-  // goes before those asked since. Then, in the refresh lane, a chart for
-  // each symbol waiting to be judged, only from the budget's spare half
-  // (`Gate.spare`), so judging never holds a refresh back or splits a run.
-  // The preview's feed (`bulk` false) asks only the chart.
+  // the other lane's run, as many requests as the gate lets go: the heroes'
+  // charts first, the lead's leading, then spark batches in ask order, so
+  // one the budget held goes before those asked since. A run with nothing
+  // of that in the refresh lane carries instead a chart for each of up to
+  // `judgeRun` symbols waiting to be judged, only from the budget's spare
+  // half (`Gate.spare`): judging never splits a run, and a refresh falling
+  // due waits for at most one run of it. The preview's feed (`bulk` false)
+  // asks only the chart.
+  readonly property int judgeRun: 4
   function launch(first) {
     var proc = first ? firstProc : refreshProc
-    if (proc.running || landing.some(function(job) { return job.first === first })) return
+    // A lane's run is out from its launch until it lands: its process can
+    // say it stopped before its stream has ended. Nothing launches while a
+    // run's answers are applied (`applying`).
+    if (applying || (first ? firstRun : refreshRun).length > 0) return
     var waiting = symbols.filter(function(symbol) {
       return symbol in asked && firstAnswer(symbol) === first && cooling.indexOf(symbol) < 0 && !inRun(symbol)
     })
@@ -199,7 +209,7 @@ Item {
     waiting.sort(function(a, b) {
       return (b === lead) - (a === lead) || asked[a] - asked[b] || symbols.indexOf(a) - symbols.indexOf(b)
     })
-    var charted = function(symbol) { return !bulk || symbol === lead }
+    var charted = function(symbol) { return !bulk || heroes.indexOf(symbol) >= 0 }
     var slots = waiting.filter(charted).map(function(symbol) { return { symbols: [symbol], spark: false } })
     var batched = waiting.filter(function(symbol) { return !charted(symbol) })
     // A batch of one is a chart: one request either way, and the chart's
@@ -210,14 +220,12 @@ Item {
     }
     var granted = slots.length > 0 && gate ? gate.take(slots.length, bulk) : slots.length
     var run = slots.slice(0, granted)
+    for (var j = 0; slots.length === 0 && j < Math.min(judging.length, judgeRun) && (!gate || (gate.spare() && gate.take(1, bulk) === 1)); j++)
+      run.push({ symbols: [judging[j]], spark: false })
+    if (run.length === 0) return
     var runSymbols = []
     run.forEach(function(slot) { runSymbols = runSymbols.concat(slot.symbols) })
-    owe(runSymbols)
-    for (var j = 0; j < judging.length && (!gate || (gate.spare() && gate.take(1, bulk) === 1)); j++) {
-      run.push({ symbols: [judging[j]], spark: false })
-      runSymbols.push(judging[j])
-    }
-    if (run.length === 0) return
+    // The lane is taken before anything its asks set off can launch again.
     if (first) {
       root.firstSlots = run
       root.firstRun = runSymbols
@@ -227,6 +235,8 @@ Item {
     }
     if (first && gate) root.firstTicket = gate.ticket
     if (!first && gate) root.refreshTicket = gate.ticket
+    // A chart that only judges a day already shown owes no answer.
+    owe(runSymbols.filter(function(symbol) { return symbol in asked }))
     var spark = run.some(function(slot) { return slot.spark })
     proc.command = Fetch.curlCommand(run.map(function(slot) {
       return slot.spark ? Quote.sparkUrl(slot.symbols) : Quote.chartUrl(slot.symbols[0])
@@ -242,9 +252,16 @@ Item {
   // waiting for its chart from the budget's spare half.
   property var toJudge: []
 
-  // A new lead whose quote came from spark has no opens for its line or the
-  // hero's open: its chart is asked for at once.
-  onLeadChanged: if (quotes[lead] && quotes[lead].closesOnly) ask([lead], root.stamp())
+  // A hero whose quote came from spark has no opens for its line or the
+  // day's open: its chart is asked for as it becomes one, and again as a
+  // spark answer for it lands, one already out when it did. One whose chart
+  // just failed waits for its next refresh, which goes on the chart.
+  onHeroesChanged: chartHeroes()
+  function chartHeroes() {
+    ask(heroes.filter(function(symbol) {
+      return quotes[symbol] && quotes[symbol].closesOnly && !(entries[symbol] && entries[symbol].status === "failed")
+    }), root.stamp())
+  }
 
   // A run's answers are read a little at a time, about 8 ms a turn
   // (`landStep`): a chart answer, a spark answer's text, or one listing of
@@ -305,7 +322,11 @@ Item {
     onTriggered: root.landStep()
   }
 
+  // While a run's answers are applied nothing launches: what they set off
+  // (a new hero, a quote shown) would read the feed half updated.
+  property bool applying: false
   function land(job) {
+    root.applying = true
     var first = job.first
     if (first) {
       root.firstRun = []
@@ -388,7 +409,9 @@ Item {
       retryTimer.restart()
     }
     if (gate) gate.report(kinds, retryAfter, first ? firstTicket : refreshTicket)
-    pump()
+    root.applying = false
+    // Asks for what is due next, a spark hero's chart among it.
+    chartHeroes()
   }
 
   // A symbol that comes with its answer, not as a first fetch: a removal

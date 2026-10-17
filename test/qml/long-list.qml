@@ -40,6 +40,16 @@ ShellRoot {
     return record(name).split("\n").filter(function(line) { return line !== "" })
   }
 
+  function find(item, name) {
+    if (!item) return null
+    if (item.objectName === name) return item
+    for (var i = 0; i < item.children.length; i++) {
+      var found = find(item.children[i], name)
+      if (found) return found
+    }
+    return null
+  }
+
   Stonks.Plugin { id: plugin; shell: shellApi }
   readonly property var service: plugin.service
   readonly property var app: plugin.windowHost.app
@@ -158,6 +168,19 @@ ShellRoot {
       var took = Date.now() - began
       harness.check("on a network that takes 3 s a request, all 154 symbols answer within 40 s",
         all() && took <= 40000, (took / 1000).toFixed(1) + " s, " + service.library.filter(function(s) { return !!service.quotes[s] }).length + " answered")
+      // A minute on, with the days still being judged on the chart, every
+      // row falls due: judging goes a few charts a run, so the refresh waits
+      // for at most those, and the whole list refreshes within a minute.
+      var judging = service.testFeed.toJudge.length
+      service.now += 61
+      var dueAt = service.now
+      var refreshedFrom = Date.now()
+      var fresh = function() { return service.library.every(function(s) { return service.entries[s] && service.entries[s].answeredAt >= dueAt }) }
+      for (var r = 0; r < 900 && !fresh(); r++) wait(100)
+      var refreshTook = Date.now() - refreshedFrom
+      harness.check("on that network, a refresh falling due while days are judged lands for every row within 60 s",
+        judging > 0 && fresh() && refreshTook <= 60000,
+        (refreshTook / 1000).toFixed(1) + " s, with " + judging + " days to judge when it fell due")
       console.log("LONG LIST SLOW DONE")
       done.exitCode = harness.failures ? 1 : 0
       done.start()
@@ -166,6 +189,9 @@ ShellRoot {
     function test_longList() {
       if (harness.mode !== "main") skip("the slow run")
       var start = service.now
+      // A tall window, many rows in sight: the glide below builds more of
+      // them a frame.
+      app.testWindow.implicitHeight = 1400
       app.open("{}")
       tryVerify(function() { return app.opened && service.openSurfaces.length === 1 }, 3000)
 
@@ -175,18 +201,24 @@ ShellRoot {
       // wait of Stonks' own.
       var loadWarned = []
       var answered = 0
+      var wallStart = Date.now()
+      var answeredWall = 0
       for (var t = 0; t < 600 && (!answered || service.testFeed.toJudge.length > 0); t++) {
         service.now += 1
         settle()
         var w = warned()
         if (w.length) loadWarned.push((service.now - start) + " s: " + w.length)
-        if (!answered && service.library.every(function(s) { return !!service.quotes[s] })) answered = service.now - start
+        if (!answered && service.library.every(function(s) { return !!service.quotes[s] })) {
+          answered = service.now - start
+          answeredWall = Date.now() - wallStart
+        }
       }
       var loadLines = harness.lines("requests.log")
       var firstRun = harness.lines("runs.log")[0] || ""
-      harness.check("154 symbols answer in one run, the pill's chart and eight spark requests, within 2 s",
-        answered > 0 && answered <= 2 && firstRun.split(" ").length === 9 && /^chart:TALL001( spark:\S+){8}$/.test(firstRun),
-        "all answered at " + (answered || "never") + " s; first run " + firstRun.split(" ").map(function(u) { return u.split(":")[0] }).join(" "))
+      harness.check("154 symbols answer in one run, the pill's chart and eight spark requests, within 2 s of the clock and 15 s of the wall",
+        answered > 0 && answered <= 2 && answeredWall <= 15000 && firstRun.split(" ").length === 9 && /^chart:TALL001( spark:\S+){8}$/.test(firstRun),
+        "all answered at " + (answered || "never") + " s, " + (answeredWall / 1000).toFixed(1) + " s of the wall; first run "
+          + firstRun.split(" ").map(function(u) { return u.split(":")[0] }).join(" "))
       harness.check("loading warns of nothing, and every day with a jump is judged within 5 minutes",
         loadWarned.length === 0 && service.testFeed.toJudge.length === 0 && service.now - start <= 300,
         loadWarned.slice(0, 3).join(", ") + (loadWarned.length > 3 ? " …" : "") + "; still to judge " + service.testFeed.toJudge.length
@@ -197,7 +229,8 @@ ShellRoot {
         charted.STRAY === 1 && !!stray && stray.droppedTimes.length === 1
           && !stray.points.some(function(p) { return p.t === stray.droppedTimes[0] })
           && !charted["SHOP.TO"] && !charted["BTC-USD"],
-        "STRAY charted " + charted.STRAY + ", dropped " + (stray ? stray.droppedTimes.length : "-") + "; SHOP.TO " + (charted["SHOP.TO"] || 0) + ", BTC-USD " + (charted["BTC-USD"] || 0))
+        "STRAY charted " + charted.STRAY + ", dropped " + (stray ? stray.droppedTimes.length : "-") + "; SHOP.TO " + (charted["SHOP.TO"] || 0) + ", BTC-USD " + (charted["BTC-USD"] || 0)
+          + "; runs with STRAY: " + harness.lines("runs.log").filter(function(r) { return /STRAY/.test(r) }).map(function(r) { return r.split(" ").filter(function(u) { return /STRAY/.test(u) }).map(function(u) { return u.split(":")[0] }).join("+") + "/" + r.split(" ").length }).join(" "))
 
       // Ten minutes of trading: every row is due each minute. The list
       // refreshes whole each minute in a few requests, one curl a minute.
@@ -217,13 +250,20 @@ ShellRoot {
         steadyWarned === 0, steadyWarned + " of 120 steps warned")
 
       // A glide from the top to the end of the list, and the wheel back up:
-      // on every rendered frame each row in sight is drawn (frames.js
-      // `filled`, down the symbols' column), though only rows near sight
-      // are built. The longest gap between frames is said, for the cost of
-      // building rows as they come.
+      // on every rendered frame each row in sight is drawn, its symbol, its
+      // day line, and its price (frames.js `filled`, down each column),
+      // though only rows near sight are built; and no frame waits on the
+      // rows built as they come more than 100 ms after the last.
       var list = app.testBody.watchlist
       list.contentY = 0
       wait(100)
+      var top = list.rowItem(list.displayedSymbols[0])
+      // Each column where the row lays it out (WatchlistRow).
+      var columns = [
+        ["symbols", top.gap, 64],
+        ["day lines", top.width - top.gap - top.priceWidth - top.gap - top.sparkWidth, top.sparkWidth],
+        ["prices", top.width - top.gap - top.priceWidth, top.priceWidth]
+      ]
       grab.source = list
       grab.begin("glide")
       wait(100)
@@ -237,11 +277,60 @@ ShellRoot {
       grab.end()
       tryVerify(function() { return grab.waiting === 0 }, 5000)
       var gaps = grab.frames.slice(1).map(function(f, k) { return f.at - grab.frames[k].at })
-      grab.judge("filled:24:8,0,64," + Math.floor(list.height), null, [])
-      tryVerify(function() { return grab.verdict !== null }, 10000)
-      harness.check("a glide down the whole list and the wheel back up draw every row in sight on every frame",
-        grab.verdict.ok && endY > 0 && list.contentY < endY,
-        grab.verdict.detail + "; longest gap between frames " + Math.max.apply(null, gaps) + " ms; at " + Math.round(endY) + " then " + Math.round(list.contentY))
+      var longestGap = Math.max.apply(null, gaps)
+      // A row drawn empty leaves a bare run longer than a row's pitch; a
+      // drawn one's words and dashed baseline never do.
+      var verdicts = columns.map(function(c) {
+        grab.judge("filled:" + Math.round(list.rowPitch) + ":" + Math.round(c[1]) + ",0," + Math.round(c[2]) + "," + Math.floor(list.height), null, [])
+        tryVerify(function() { return grab.verdict !== null }, 10000)
+        return { name: c[0], ok: grab.verdict.ok, detail: grab.verdict.detail }
+      })
+      harness.check("a glide down the whole list and the wheel back up draw every row's symbol, day line, and price in sight on every frame, no frame over 100 ms late",
+        verdicts.every(function(v) { return v.ok }) && grab.frames.length >= 10 && longestGap <= 100 && endY > 0 && list.contentY < endY,
+        verdicts.map(function(v) { return v.name + ": " + v.detail }).join("; ") + "; longest gap between frames " + longestGap + " ms; at "
+          + Math.round(endY) + " then " + Math.round(list.contentY))
+
+      // A row featured while its spark request is out: once that lands, the
+      // hero's chart goes, so its line and the day's open have the bars'
+      // opens. A member previewed through search rests on the hero: its
+      // chart goes too.
+      touch("LONG020.quote.hold")
+      service.now += 60
+      tryVerify(function() { return service.testFeed.refreshRun.indexOf("LONG020") >= 0 }, 5000)
+      service.feature("LONG020")
+      remove("LONG020.quote.hold")
+      tryVerify(function() { return idle() && !!service.quotes.LONG020 && !service.quotes.LONG020.closesOnly }, 15000)
+      var featuredDay = service.quotes.LONG020
+      service.preview(app.testBody, "LONG030")
+      tryVerify(function() { return service.previewRests }, 3000)
+      tryVerify(function() { return idle() && !!service.quotes.LONG030 && !service.quotes.LONG030.closesOnly }, 15000)
+      var previewDay = service.quotes.LONG030
+      harness.check("a row featured while its spark request is out, and a member previewed, each get the chart, with the day's open",
+        !featuredDay.closesOnly && featuredDay.dayOpen > 0 && !previewDay.closesOnly && previewDay.dayOpen > 0,
+        "featured " + featuredDay.closesOnly + " " + featuredDay.dayOpen + ", previewed " + previewDay.closesOnly + " " + previewDay.dayOpen)
+      service.preview(app.testBody, "")
+      service.feature("TALL001")
+      settle()
+
+      // The budget nearly spent and slow to refill: every row falls due and
+      // waits its turn for minutes, on Stonks' own pacing alone. No row and
+      // not the pill warns; once the budget is back, every row refreshes.
+      var gate = service.testYahooGate
+      var refill = gate.perMinute
+      gate.perMinute = 4
+      gate.tokens = 0
+      var heldWarned = 0
+      var heldMost = 0
+      tick(240, 5, function() {
+        if (warned().length) heldWarned++
+        heldMost = Math.max(heldMost, Object.keys(service.asked).length)
+      })
+      gate.perMinute = refill
+      var heldFrom = service.now
+      tick(120, 5)
+      var caughtUp = service.library.every(function(s) { return service.entries[s].answeredAt >= heldFrom })
+      harness.check("refreshes held back by the budget alone for four minutes warn of nothing, and land once it refills",
+        heldMost >= 100 && heldWarned === 0 && caughtUp, heldMost + " waiting at most, " + heldWarned + " steps warned, caught up " + caughtUp)
 
       // Yahoo refusing: nothing more goes for the pause. Each row says its
       // update is overdue 90 s after its wait on Yahoo began: at once for

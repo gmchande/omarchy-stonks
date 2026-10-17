@@ -10,7 +10,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree ahead.qml
 patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property var testBody: root.body\n  readonly property alias testWindow: window'
-patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testHistoryFeed: historyFeed\n  readonly property alias testYahooGate: yahooGate'
+patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testHistoryFeed: historyFeed\n  readonly property alias testYahooGate: yahooGate\n  readonly property alias testFeed: feed'
 scratch_home fetch-list.json grvc.stonks.json
 echo fetch-2026-10-07 sweep-2026-10-07-1455 > "$STONKS_FAKE_STATE/overnight.set"
 export QT_QPA_PLATFORM=offscreen

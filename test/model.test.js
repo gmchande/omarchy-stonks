@@ -276,6 +276,14 @@ test("a spark day keeps the last chart's verdict, and a jump past it waits for a
   expect(M.sparkQuote(answer(later.concat([104, 100.1]), false), settled, []).unjudged).toBe(true)
   // The newest bar is never judged, so a jump there waits for nothing.
   expect(M.sparkQuote(answer(later.concat([104]), false), settled, []).unjudged).toBe(false)
+  // A settled bar Yahoo revises to another level waits for a chart, new bar
+  // or not: an old bar turned into a spike, and the stray it dropped
+  // corrected back to the level.
+  const revised = (at, price) => later.map((c, i) => i === at ? price : c)
+  expect(M.sparkQuote(answer(revised(3, 103), false), settled, []).unjudged).toBe(true)
+  expect(M.sparkQuote(answer(revised(5, 100), false), settled, []).unjudged).toBe(true)
+  // Spark's own rounding of a close is no revision.
+  expect(M.sparkQuote(answer(revised(3, 100.1004), false), settled, []).unjudged).toBe(false)
   // Yahoo leaves a symbol it doesn't know out of a spark answer.
   const days = M.sparkResults({ spark: { result: [{ symbol: "AAA", response: [answer(closes, false)] }] } })
   expect(Object.keys(days)).toEqual(["AAA"])
