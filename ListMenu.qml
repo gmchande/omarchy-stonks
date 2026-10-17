@@ -98,11 +98,16 @@ FocusScope {
   }
 
   // A key takes the list over from the wheel: its motion stops, so it
-  // cannot carry the cursor on from where the key put it. "New list…" and
+  // cannot carry the cursor on from where the key put it, and the lists
+  // land at once where they were settling, on a row's edge (a key mid-settle
+  // left them at 75 px of 26 px rows, found in review). "New list…" and
   // "Manage lists…" are always in sight.
   function showCursor() {
     scroll.cancelFlick()
+    var end = Math.max(0, scroll.contentHeight - scroll.height)
+    var landed = settle.running ? settle.to : Math.min(end, Math.round(scroll.contentY / itemHeight) * itemHeight)
     settle.stop()
+    scroll.contentY = landed
     if (cursor >= newIndex) return
     var top = topOf(cursor)
     if (top < scroll.contentY) scroll.contentY = top

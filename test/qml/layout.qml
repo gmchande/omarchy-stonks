@@ -1242,6 +1242,7 @@ ShellRoot {
               var pinnedShown = inMenu(find(menu, "newListRow")) && inMenu(find(menu, "manageListsRow"))
               var afterWheel = 0
               var afterDrag = 0
+              var afterKey = 0
               if (!retro) {
                 var over = scroll.mapToItem(body, scroll.width / 3, scroll.height / 2)
                 mouseMove(body, over.x, over.y)
@@ -1256,13 +1257,23 @@ ShellRoot {
                 mouseMove(body, grip.x, grip.y + scroll.height / 4 + 7)
                 mouseRelease(body, grip.x, grip.y + scroll.height / 4 + 7)
                 afterDrag = settled(beforeDrag)
+                // A key while the lists settle after a notch back up lands
+                // them on a row's edge at once.
+                var beforeKey = scroll.contentY
+                mouseWheel(body, over.x, over.y, 0, 120)
+                for (var k = 0; k < 1000 && (scroll.contentY === beforeKey || scroll.moving
+                  || scroll.contentY % menu.itemHeight === 0); k += 5) wait(5)
+                var cursorBefore = menu.cursor
+                keyClick(Qt.Key_Down)
+                wait(20)
+                afterKey = menu.cursor === cursorBefore ? -2 : cutRows()
               }
               scroll.contentY = Math.max(0, scroll.contentHeight - scroll.height)
-              var cuts = [atRest, afterWheel, afterDrag, cutRows()]
+              var cuts = [atRest, afterWheel, afterDrag, afterKey, cutRows()]
               var footerTop = yIn(find(body, "footer"), 0)
               menuSeen.push(where + ": " + scroll.height / menu.itemHeight + " rows")
               if (cuts.some(function(n) { return n !== 0 }) || !pinnedShown || yIn(menu, menu.height) + body.bandGap > footerTop)
-                menuFaults.push(where + ": rows cut (opened/wheel/bar/end, -1 unmoved) " + cuts.join("/") + " in a view " + scroll.height + " px, pinned in sight " + pinnedShown
+                menuFaults.push(where + ": rows cut (opened/wheel/bar/key/end, -1 unmoved, -2 key unheard) " + cuts.join("/") + " in a view " + scroll.height + " px, pinned in sight " + pinnedShown
                   + ", menu ends " + yIn(menu, menu.height) + " footer at " + footerTop)
               var manageRow = find(menu, "manageListsRow")
               var manageAt = manageRow.mapToItem(body, manageRow.width / 2, manageRow.height / 2)
