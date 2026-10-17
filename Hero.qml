@@ -137,6 +137,7 @@ Item {
     spacing: Style.space(8)
     Text {
       id: symbolText
+      objectName: "heroSymbol"
       textFormat: Text.PlainText
       text: root.symbol || "—"
       color: root.foreground

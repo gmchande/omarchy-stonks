@@ -81,12 +81,14 @@ FocusScope {
   // The list on screen's members, arriving ones too: a result already in
   // it is shown, not added, and its label says so.
   property var members: []
-  function actionFor(symbol) { return members.indexOf(symbol) >= 0 ? "Show" : "Add" }
-  // Add and Show share one slot on every row, the wider label's, so the
-  // exchange codes keep their column whichever shows.
+  function actionFor(symbol) { return members.indexOf(symbol) >= 0 ? "SHOW" : "ADD" }
+  // ADD and SHOW share one slot on every row, the wider word's, so the
+  // exchange codes keep their column whichever shows. In the caption's
+  // spaced capitals, as every other button in the views says its word.
+  readonly property font buttonFont: Qt.font({ family: fontFamily, pixelSize: Style.font.caption, bold: true, letterSpacing: 1 })
   readonly property int buttonWidth: Math.ceil(Math.max(addMetrics.advanceWidth, showMetrics.advanceWidth)) + Style.space(20)
-  TextMetrics { id: addMetrics; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; font.bold: true; text: "Add" }
-  TextMetrics { id: showMetrics; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; font.bold: true; text: "Show" }
+  TextMetrics { id: addMetrics; font: root.buttonFont; text: "ADD" }
+  TextMetrics { id: showMetrics; font: root.buttonFont; text: "SHOW" }
   // A row's columns: the symbol, the name, the exchange, and the label.
   readonly property int rowPadding: Style.space(10)
   readonly property int columnGap: Style.space(10)
@@ -434,9 +436,7 @@ FocusScope {
                 textFormat: Text.PlainText
                 text: root.actionFor(resultRow.modelData.symbol)
                 color: Style.selectedStateColor(root.foreground, Color.accent)
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.bodySmall
-                font.bold: true
+                font: root.buttonFont
               }
             }
           }

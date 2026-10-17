@@ -952,12 +952,14 @@ ShellRoot {
       wait(0)
       // Before any chart has been in, the hero is empty under "Loading",
       // naming what is coming: never the day, nor "No data". Found in the
-      // transition audit (lifecycle 6, data 7, featured 9).
+      // transition audit (lifecycle 6, data 7, featured 9). Its symbol is
+      // the one coming, not a dash: the design check of 16 October.
       var cold = summoned.testBody
+      var coldSymbol = harness.find(cold, "heroSymbol").text
       harness.check("a cold start shows an empty hero under Loading, naming what is coming",
         cold.chart === null && cold.headerText === "Loading MSFT 1Y" && cold.periodLine === null && cold.yearLine === null
-          && cold.featured === null,
-        cold.headerText + "|" + JSON.stringify(cold.periodLine) + "|" + JSON.stringify(cold.yearLine) + "|" + JSON.stringify(cold.featured))
+          && cold.featured === null && coldSymbol === "MSFT",
+        cold.headerText + "|" + coldSymbol + "|" + JSON.stringify(cold.periodLine) + "|" + JSON.stringify(cold.yearLine) + "|" + JSON.stringify(cold.featured))
       // A quarter second on, the label over the empty hero names it too.
       var coldLabel = harness.find(cold, "loadingLabel")
       harness.check("a quarter second into a cold start the empty hero names what is coming",
