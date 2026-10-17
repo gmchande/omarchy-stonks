@@ -30,6 +30,18 @@ function apart(a, b) {
 // Under this, two prices are the same level; over it, they are not.
 var STRAY_GAP = 0.005
 
+// Two prices this many ticks apart are one level however small the price:
+// under $2 one cent is more than STRAY_GAP, and PLUG's one-cent bounces read
+// as stray.
+var STRAY_TICKS = 2
+
+// Whether two prices are one level: within STRAY_GAP, or within two of the
+// listing's ticks (`Format.priceTick`; null without one). The half tick over
+// absorbs Yahoo's float noise (1.9800000190734863 against 1.9700000286102295).
+function sameLevel(a, b, tick) {
+  return apart(a, b) <= STRAY_GAP || (tick > 0 && Math.abs(a - b) < (STRAY_TICKS + 0.5) * tick)
+}
+
 // The longest run of stray buckets seen: Yahoo has sent two in a row.
 var STRAY_RUN = 3
 
@@ -41,7 +53,9 @@ var MIXED_RUN = 4
 // back to yesterday's close, a lone after-hours print, sometimes two in a
 // row. What identifies them is not how far they reach — one of the saved
 // cases is 0.8% — but that the series carries on as if they never happened.
-function filterStrayCloses(bars, periods) {
+// `tick` is the listing's (`Format.priceTick`): a move of a tick or two is
+// trading, never stray.
+function filterStrayCloses(bars, periods, tick) {
   var source = bars || []
   if (source.length < 3) return { bars: source.slice(), droppedTimes: [] }
   var kept = [bars[0]]
@@ -49,7 +63,7 @@ function filterStrayCloses(bars, periods) {
   var level = 0
   var i = 1
   while (i < bars.length) {
-    var run = strayRun(bars, level, i) || mixedRun(bars, level, i, periods)
+    var run = strayRun(bars, level, i, tick) || mixedRun(bars, level, i, periods, tick)
     if (run > 0) {
       for (var dropped = 0; dropped < run; dropped++) droppedTimes.push(bars[i + dropped].t)
       i += run
@@ -66,17 +80,25 @@ function filterStrayCloses(bars, periods) {
 // all left the accepted bar's price, and the bar after them opens back at that
 // price instead of continuing from the last of them. A real move is the other
 // way round — the next bar opens from where the move closed. Zero for a real
-// move, across an uneven gap so a session break is never bridged, and for a
-// run with no bar after it, so the newest bar is never judged.
-function strayRun(bars, level, from) {
+// move, and for a run with no bar after it, so the newest bar is never judged.
+// Only a bar one step after the run, the step from the accepted bar to the
+// run, judges it, so a session break is never bridged. A bar after an uneven
+// gap that opens back at the price yet strays again only carries the run on:
+// JPM's 16:50 and 17:00 on 16 October opened at the price (339.83, 339.52)
+// and closed at 318.24, 16:55 missing, and 17:05 opened back at 339.50.
+function strayRun(bars, level, from, tick) {
   var price = bars[level].c
   var step = bars[level + 1].t - bars[level].t
   for (var length = 1; length <= STRAY_RUN; length++) {
     var end = from + length - 1
     var back = end + 1 < bars.length ? bars[end + 1] : null
-    if (!back || back.t - bars[end].t !== step) return 0
-    if (!Format.isFiniteNumber(back.o) || apart(bars[end].c, price) <= STRAY_GAP) return 0
-    if (apart(back.o, price) <= STRAY_GAP && apart(back.o, bars[end].c) > STRAY_GAP) return length
+    if (!back || !Format.isFiniteNumber(back.o) || sameLevel(bars[end].c, price, tick)) return 0
+    var opensBack = sameLevel(back.o, price, tick) && !sameLevel(back.o, bars[end].c, tick)
+    if (back.t - bars[end].t !== step) {
+      if (opensBack) continue
+      return 0
+    }
+    if (opensBack) return length
   }
   return 0
 }
@@ -90,7 +112,7 @@ function strayRun(bars, level, from) {
 // them opens back at that price. A thin listing's own trades take that shape
 // two bars at a time (REED's 18:25 and 18:40 on 1 October), never three in
 // the saved answers. Zero otherwise; `periods` are the answer's sessions.
-function mixedRun(bars, level, from, periods) {
+function mixedRun(bars, level, from, periods, tick) {
   var price = bars[level].c
   var session = extendedSession(periods, bars[level].t)
   if (!session) return 0
@@ -99,14 +121,14 @@ function mixedRun(bars, level, from, periods) {
   for (var end = from; end < from + MIXED_RUN && end + 1 < bars.length; end++) {
     var bar = bars[end]
     var back = bars[end + 1]
-    if (end > from && apart(bar.o, bars[end - 1].c) <= STRAY_GAP) return 0
+    if (end > from && sameLevel(bar.o, bars[end - 1].c, tick)) return 0
     if (extendedSession(periods, back.t) !== session) return 0
-    if (apart(bar.c, price) > STRAY_GAP) {
+    if (!sameLevel(bar.c, price, tick)) {
       if (bar.c > price) above = true
       else below = true
     }
     if (end - from >= 2 && above && below && Format.isFiniteNumber(back.o)
-        && apart(back.o, price) <= STRAY_GAP && apart(back.o, bar.c) > STRAY_GAP) return end - from + 1
+        && sameLevel(back.o, price, tick) && !sameLevel(back.o, bar.c, tick)) return end - from + 1
   }
   return 0
 }
@@ -119,6 +141,14 @@ function extendedSession(periods, t) {
     if (period && t >= period.start && t < period.end) return names[n]
   }
   return ""
+}
+
+// The tick of the listing an answer is for (`Format.priceTick`), from its
+// headline price, else its last bar's close.
+function answerTick(meta, bars) {
+  var price = Format.isFiniteNumber(meta.regularMarketPrice) ? meta.regularMarketPrice
+    : (bars.length ? bars[bars.length - 1].c : null)
+  return Format.priceTick(price, meta.priceHint)
 }
 
 function parseChart(json) {
@@ -140,7 +170,7 @@ function parseChart(json) {
     if (closes[i] !== null && closes[i] !== undefined)
       bars.push({ t: timestamps[i], o: opens[i], c: closes[i] })
   }
-  var filtered = filterStrayCloses(bars, periods)
+  var filtered = filterStrayCloses(bars, periods, answerTick(meta, bars))
   var kept = filtered.bars
   var regular = periodOf(periods.regular)
   // An index is worked out only while its exchange trades. Yahoo still

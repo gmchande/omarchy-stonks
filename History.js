@@ -50,10 +50,11 @@ function parseHistory(json, range) {
   if (bars.length >= 2 && bars[bars.length - 1].t === bars[bars.length - 2].t) bars.splice(bars.length - 2, 1)
   var interval = meta.dataGranularity || (spec && spec.interval)
   var intervalSeconds = historyIntervalSeconds(interval)
-  // Only intraday buckets carry a stray close; a daily bar cannot.
+  // Only intraday buckets carry a stray close; a daily bar cannot. A move of
+  // a tick or two is trading (`Quote.filterStrayCloses`).
   var droppedTimes = []
   if (intervalSeconds > 0 && intervalSeconds < 24 * 60 * 60) {
-    var filtered = Quote.filterStrayCloses(bars)
+    var filtered = Quote.filterStrayCloses(bars, null, Quote.answerTick(meta, bars))
     bars = filtered.bars
     droppedTimes = filtered.droppedTimes
   }
