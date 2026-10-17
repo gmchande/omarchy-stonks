@@ -939,7 +939,9 @@ Item {
     ghost: root.ghost
     ground: root.ground
     fontFamily: root.fontFamily
-    symbol: root.chartSymbol
+    // The chart's symbol, or before any chart is in, the one coming, which
+    // the header names as it loads: never a dash in its place.
+    symbol: root.chartSymbol || root.featuredSymbol
     view: root.featured
     quote: root.featuredQuote
     day: root.featuredDay
