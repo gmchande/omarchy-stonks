@@ -339,8 +339,11 @@ Item {
   readonly property int listMenuTop: margins + header.height + groupGap + heroBand.implicitHeight + Style.space(4)
   // The menu ends one gap above the footer, which stays in sight under it.
   readonly property int listMenuBottom: listMenuTop + listMenu.contentHeight + groupGap + footer.height + margins
+  // Where the menu's least ends, the footer one gap under it: its floor.
+  readonly property int listMenuLeastBottom: listMenuTop + listMenu.leastHeight + groupGap + footer.height + margins
   // Manage lists and a symbol's lists take the rows' and the footer's place,
-  // at their own height.
+  // in the surface's height; their own is what they would need
+  // (`fittedHeight`).
   readonly property bool listViewOpen: managingLists || listsSymbol !== ""
   readonly property int listViewHeight: margins * 2 + header.height + heroBand.implicitHeight + groupGap * 2
     + (managingLists ? manageLists.contentHeight : symbolLists.contentHeight)
@@ -379,18 +382,25 @@ Item {
   }
 
   // The body's height within `maxHeight`: the key sheet's own height while it
-  // shows, a list view's own, otherwise whole rows for the list shown, the
-  // footer one gap under them. Search takes its height as it opens, before
-  // any typing: the field and a full set of results, or the rows' height
-  // when that is taller, the spare room under the results, so the card's
-  // edge holds still while you type. An open list menu taller than the rows
-  // makes room for itself and for the footer under it.
+  // shows, otherwise whole rows for the list shown, the footer one gap under
+  // them. A view over the rows (the list menu, search, Manage lists, a row's
+  // ticks) keeps that height and fits the rows' room, scrolling what it
+  // holds: it grows the surface only for a list shorter than itself, and
+  // only in whole rows the room holds, never into what the rows leave over.
+  // Found in the walk of #1: at a room of 780 px the menu took the 38 px
+  // under the rows' 742 and pushed the footer down. Search takes its height
+  // as it opens, before any typing: the field and a full set of results, so
+  // the card's edge holds still while you type. An open list menu taller
+  // than a short list makes room for itself and for the footer under it,
+  // and at least for its least (`listMenuLeastBottom`) where the room holds
+  // that though its whole rows don't: a refused name on a one-symbol list
+  // under the first-run hint sat 27 px over the footer (found in review).
   function fittedHeight(maxHeight) {
     if (showingHelp) return Math.min(maxHeight, helpHeight)
-    if (listViewOpen) return Math.min(maxHeight, listViewHeight)
     var rows = chromeHeight + wholeRowsHeight(maxHeight - chromeHeight)
-    if (adding) return Math.min(maxHeight, Math.max(rows, searchHeight))
-    return listMenuOpen ? Math.max(rows, Math.min(maxHeight, listMenuBottom)) : rows
+    var view = listViewOpen ? listViewHeight : adding ? searchHeight : listMenuOpen ? listMenuBottom : 0
+    var least = listMenuOpen ? Math.min(maxHeight, listMenuLeastBottom) : 0
+    return Math.max(rows, least, Math.min(chromeHeight + rowsHeight(Infinity, maxHeight - chromeHeight), view))
   }
 
   // A hero chosen while an add is still coming wins over the add.

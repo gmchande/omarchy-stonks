@@ -303,10 +303,14 @@ ShellRoot {
       // The window's width: the body's widest, or the window's minimum.
       property int windowWidth: 720
       property int fixedHeight: 0
+      // The room the popup's card gives the body, never past its cap of six
+      // rows (`Panel.bodyRoom`): its rows fill it in whole rows, the rest
+      // left over (`StonksBody.fittedHeight`).
+      property int budget: 730
       x: 0
       y: 0
       width: wide ? windowWidth : 448
-      height: fixedHeight > 0 ? fixedHeight : body.fittedHeight(730)
+      height: fixedHeight > 0 ? fixedHeight : body.fittedHeight(Math.min(budget, body.chromeHeight + 6 * body.rowPitch - body.rowGap))
 
       StonksBody {
         id: body
@@ -1047,7 +1051,8 @@ ShellRoot {
 
         // Search takes its height as it opens, before any typing: the field
         // and a full set of results, or the rows' height when that is taller,
-        // and keeps it as the answer comes: with All full, and nearly empty.
+        // in the whole rows the room holds, and keeps it as the answer comes:
+        // with All full, and nearly empty.
         // Found in the transition audit (search 1, lists 14): the card grew
         // only at the first answer, and the field jumped with it.
         body.minChartHeight = 0
@@ -1065,7 +1070,8 @@ ShellRoot {
           body.search.answer = ""
           body.adding = false
           wait(50)
-          return [opened === Math.min(730, Math.max(rowsHeight, body.searchHeight)), answered === opened].join(",")
+          var room = body.chromeHeight + body.rowsHeight(1000, 730 - body.chromeHeight)
+          return [opened === Math.max(rowsHeight, Math.min(room, body.searchHeight)), answered === opened].join(",")
             + " " + rowsHeight + "->" + opened + "->" + answered
         }
         var fullAll = opens()
@@ -1124,9 +1130,10 @@ ShellRoot {
             root.describe(onEmpty) + " footer at " + footerTop())
           // An open list menu taller than the one row makes room for itself
           // and for the footer one gap under it: the surface grows until the
-          // whole menu and the footer show inside it, but never past a budget
-          // too short for them. Found in design pass 3: fitting a short list,
-          // the menu covered the footer's words.
+          // menu and the footer show inside it, in the whole rows the room
+          // holds and never into what they leave over; the menu's lists
+          // scroll in what is left. Found in design pass 3: fitting a short
+          // list, the menu covered the footer's words.
           stub.lists = [
             { name: "", label: "All", count: 23, symbols: [] },
             { name: "Growth", label: "Growth", count: 0, symbols: [] },
@@ -1142,12 +1149,12 @@ ShellRoot {
           var menu = find(body, "listMenu")
           var menuBottom = yIn(menu, menu.height)
           var footerAt = find(body, "footer")
+          var menuRoom = body.chromeHeight + body.rowsHeight(1000, 730 - body.chromeHeight)
           root.check(lookName + ": an open list menu makes room for itself and the footer under it",
-            menu.visible && menu.height === menu.contentHeight && surface.height > shut
-              && menuBottom + body.groupGap <= yIn(footerAt, 0) && yIn(footerAt, footerAt.height) <= surface.height
-              && body.fittedHeight(surface.height - 1) === surface.height - 1,
+            menu.visible && surface.height > shut && surface.height === Math.min(menuRoom, body.listMenuBottom)
+              && menuBottom + body.groupGap <= yIn(footerAt, 0) && yIn(footerAt, footerAt.height) <= surface.height,
             "menu " + menu.height + " of " + menu.contentHeight + " ends at " + menuBottom + ", footer at " + yIn(footerAt, 0)
-              + " in " + surface.height + ", shut " + shut + ", in one less " + body.fittedHeight(surface.height - 1))
+              + " in " + surface.height + " of a room of " + menuRoom + ", shut " + shut)
           body.closeListMenu()
           stub.lists = Qt.binding(function() {
             return [{ name: "", label: "All", count: stub.symbols.length, symbols: stub.symbols }]
@@ -1294,6 +1301,106 @@ ShellRoot {
         wait(50)
         root.check("a long list menu shows whole rows, and New list and Manage lists without scrolling, in the popup and the window, in both looks",
           menuFaults.length === 0, menuFaults.join(" | ") + " || " + menuSeen.join(", "))
+
+        // A view opening over the rows moves nothing: the list menu, search,
+        // Manage lists, and a row's ticks keep the surface's height and its
+        // edge, in both looks, on a list of 20 rows with 13 lists. In the
+        // popup at a room 24 px and 4 px under its cap, as 760 and 780 are
+        // under the 784 px cap of the walk's popup, and at the cap; in the
+        // window at 760, 780, and that cap's height. Found in the walk of #1:
+        // at a room of 780 px the menu took the 38 px the whole rows left
+        // over, and pushed the footer down.
+        var listsBeforeViews = stub.lists
+        var libraryBeforeViews = stub.library
+        var symbolsBeforeViews = stub.symbols
+        var allSymbols = stub.symbols.slice()
+        stub.library = allSymbols
+        stub.lists = [{ name: "", label: "All", count: allSymbols.length, symbols: allSymbols },
+          { name: "Core", label: "Core", count: 20, symbols: allSymbols.slice(0, 20) }].concat(
+          Array.from({ length: 11 }, function(_, n) { return { name: "List " + (n + 1), label: "List " + (n + 1), count: 3, symbols: allSymbols.slice(n, n + 3) } }))
+        stub.listName = "Core"
+        stub.symbols = allSymbols.slice(0, 20)
+        body.minChartHeight = 0
+        var cap = body.chromeHeight + 6 * body.rowPitch - body.rowGap
+        var viewOpens = [
+          ["the list menu", function() { body.openListMenu() }, function() { body.closeListMenu() }],
+          ["search", function() { body.startAdding() }, function() { body.cancelAdding() }],
+          ["Manage lists", function() { body.openManageLists() }, function() { body.closeListViews() }],
+          ["a row's ticks", function() { body.openSymbolLists(stub.symbols[0]) }, function() { body.closeListViews() }]
+        ]
+        var heldFaults = []
+        var heldSeen = []
+        ;["popup", "window"].forEach(function(place) {
+          surface.wide = place === "window"
+          ;(surface.wide ? [760, 780, cap] : [cap - 24, cap - 4, cap]).forEach(function(room) {
+            if (surface.wide) surface.fixedHeight = room
+            else surface.budget = room
+            ;[false, true].forEach(function(retro) {
+              stub.retro = retro
+              wait(50)
+              var where = place + " " + room + " " + (retro ? "retro" : "smooth")
+              var shut = [surface.height, Math.round(body.edge)].join("/")
+              heldSeen.push(where + " " + shut)
+              viewOpens.forEach(function(v) {
+                v[1]()
+                wait(Qt.styleHints.mouseDoubleClickInterval + 50)
+                var open = [surface.height, Math.round(body.edge)].join("/")
+                if (open !== shut) heldFaults.push(where + ", " + v[0] + ": height/edge " + shut + " -> " + open)
+                v[2]()
+                wait(50)
+              })
+            })
+          })
+        })
+        // The menu's least, one list row and the pinned rows with a refused
+        // name's note, fits over the footer wherever the room holds it,
+        // though the room's whole rows don't: one symbol in All, the first-run
+        // hint, at a room from the least to 40 px over it, in both looks.
+        // Found in review: the menu sat 27 px over the footer, on its hint.
+        surface.wide = false
+        surface.fixedHeight = 0
+        stub.lists = [{ name: "", label: "All", count: 1, symbols: ["MZ"] }]
+        stub.library = ["MZ"]
+        stub.listName = ""
+        stub.symbols = ["MZ"]
+        body.showFirstRunHint()
+        var leastFaults = []
+        ;[false, true].forEach(function(retro) {
+          stub.retro = retro
+          body.openListMenu()
+          wait(50)
+          var menu = find(body, "listMenu")
+          menu.resumeNaming("All", "A list has that name already")
+          wait(50)
+          var least = body.listMenuTop + menu.itemHeight + menu.pinnedHeight + menu.inset * 2 + body.groupGap
+            + find(body, "footer").height + body.margins
+          for (var extra = 0; extra <= 40; extra += 10) {
+            surface.budget = least + extra
+            wait(50)
+            var footer = find(body, "footer")
+            var menuEnd = yIn(menu, menu.height)
+            if (menuEnd + body.groupGap > yIn(footer, 0) || yIn(footer, footer.height) > surface.height)
+              leastFaults.push((retro ? "retro" : "smooth") + " room " + (least + extra) + ": menu ends " + menuEnd + ", footer " + yIn(footer, 0)
+                + "–" + yIn(footer, footer.height) + " in " + surface.height)
+          }
+          menu.stopNaming()
+          body.closeListMenu()
+          wait(50)
+        })
+        body.hint = ""
+        surface.wide = false
+        surface.fixedHeight = 0
+        surface.budget = 730
+        stub.retro = false
+        stub.listName = ""
+        stub.symbols = symbolsBeforeViews
+        stub.library = libraryBeforeViews
+        stub.lists = listsBeforeViews
+        wait(50)
+        root.check("a view opening over the rows keeps the surface's height and edge: the list menu, search, Manage lists, and a row's ticks, at a room of 760, 780, and the popup's cap, in the popup and the window, in both looks",
+          heldFaults.length === 0, heldFaults.join(" | ") + " || " + heldSeen.join(", "))
+        root.check("the list menu's least, a refused name's note too, fits over the footer wherever the room holds it, under the first-run hint, in both looks",
+          leastFaults.length === 0, leastFaults.join(" | "))
         // A shorter list's rows are its own, and the footer sits one gap under
         // them. Found in design pass 3: the footer stayed where All's is,
         // with an empty row's room above it.
