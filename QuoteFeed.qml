@@ -253,13 +253,15 @@ Item {
   property var toJudge: []
 
   // A hero whose quote came from spark has no opens for its line or the
-  // day's open: its chart is asked for as it becomes one, and again as a
-  // spark answer for it lands, one already out when it did. One whose chart
-  // just failed waits for its next refresh, which goes on the chart.
-  onHeroesChanged: chartHeroes()
-  function chartHeroes() {
+  // day's open: its chart is asked for as it becomes one, whatever its last
+  // answer, and again as a spark answer for it lands, one already out when
+  // it became one; after a landing, not for one whose answer just failed,
+  // so a failing chart is not asked again at once: its next refresh goes
+  // on the chart.
+  onHeroesChanged: chartHeroes(false)
+  function chartHeroes(afterLanding) {
     ask(heroes.filter(function(symbol) {
-      return quotes[symbol] && quotes[symbol].closesOnly && !(entries[symbol] && entries[symbol].status === "failed")
+      return quotes[symbol] && quotes[symbol].closesOnly && !(afterLanding && entries[symbol] && entries[symbol].status === "failed")
     }), root.stamp())
   }
 
@@ -411,7 +413,7 @@ Item {
     if (gate) gate.report(kinds, retryAfter, first ? firstTicket : refreshTicket)
     root.applying = false
     // Asks for what is due next, a spark hero's chart among it.
-    chartHeroes()
+    chartHeroes(true)
   }
 
   // A symbol that comes with its answer, not as a first fetch: a removal

@@ -48,10 +48,10 @@ function sparkResults(json) {
 // verdict stands in (`verdict`, `parseChart`): the strays it dropped are
 // left out. `unjudged` when a jump between two closes (not `sameLevel`)
 // lies past the bars that verdict settled and a whole bar has come since
-// it, or when Yahoo has since revised one of those settled bars to another
-// level (a stray it dropped corrected, an old bar now a spike): only a
-// chart answer, with opens, can say whether that is a stray. The newest
-// bar is never judged, as in the filter.
+// it, or when Yahoo has since changed a whole bar the verdict saw, past
+// spark's own rounding (`sameClose`), or filled one in it had none for:
+// only a chart answer, with opens, can say whether that is a stray. The
+// newest bar is never judged, as in the filter.
 function sparkQuote(day, verdict, centExchanges) {
   var quote = parseChart({ chart: { result: [day] } }, centExchanges)
   if (!quote) return null
@@ -61,9 +61,9 @@ function sparkQuote(day, verdict, centExchanges) {
   var unjudged = false
   for (var i = 1; newBar && !unjudged && i < pts.length - 1; i++)
     unjudged = pts[i].t > (verdict ? verdict.settled : 0) && !sameLevel(pts[i].p, pts[i - 1].p, tick)
-  for (var j = 0, k = 0; verdict && !unjudged && j < pts.length && pts[j].t <= verdict.settled; j++) {
+  for (var j = 0, k = 0; verdict && !unjudged && j < pts.length && pts[j].t <= verdict.newest; j++) {
     while (k < verdict.times.length && verdict.times[k] < pts[j].t) k++
-    if (verdict.times[k] === pts[j].t) unjudged = !sameLevel(pts[j].p, verdict.closes[k], tick)
+    unjudged = verdict.times[k] !== pts[j].t || !sameClose(pts[j].p, verdict.closes[k])
   }
   var dropped = verdict ? verdict.dropped : []
   quote.points = pts.filter(function(p) { return dropped.indexOf(p.t) < 0 })
@@ -71,6 +71,13 @@ function sparkQuote(day, verdict, centExchanges) {
   quote.verdict = verdict
   quote.closesOnly = true
   return { quote: quote, unjudged: unjudged }
+}
+
+// Whether a spark close is the chart's for the same bar: spark sends a
+// price of 1 or more to three decimals (PLUG's 1.3786 as 1.379), a smaller
+// one as the chart does (AITX's 0.0014, SHIB's 0.00000505).
+function sameClose(spark, chart) {
+  return Math.abs(spark - chart) <= (Math.abs(chart) >= 1 ? 0.0005 : 0) + Math.abs(chart) * 1e-6
 }
 
 // How far apart two prices are, as a fraction of the larger.
@@ -248,8 +255,10 @@ function parseChart(json, centExchanges) {
   }
   var filtered = filterStrayCloses(bars, periods, answerTick(meta, bars, centExchanges))
   var kept = filtered.bars
-  // Bars whose verdict no later bar can change: a stray run reaches at
-  // most MIXED_RUN bars on, to the bar that opens back.
+  // The whole bars, all but the live moment; and of them those whose
+  // verdict no later bar can change: a stray run reaches at most MIXED_RUN
+  // bars on, to the bar that opens back.
+  var wholeBars = bars.slice(0, Math.max(0, bars.length - 1))
   var settledBars = bars.slice(0, Math.max(0, bars.length - MIXED_RUN))
   var regular = periodOf(periods.regular)
   // An index is worked out only while its exchange trades. Yahoo still
@@ -322,14 +331,14 @@ function parseChart(json, centExchanges) {
     droppedTimes: filtered.droppedTimes,
     // What the stray filter judged of this day, for a spark answer after it
     // (`sparkQuote`): its last whole bar (the newest is the live moment),
-    // the last bar no later bar can change the verdict on, the closes up to
-    // it as judged, and the strays it dropped. Null without opens, when it
-    // could judge nothing.
+    // the last bar no later bar can change the verdict on, the whole bars'
+    // closes as judged, and the strays it dropped. Null without opens, when
+    // it could judge nothing.
     verdict: opens.length ? {
-      newest: bars.length >= 2 ? bars[bars.length - 2].t : 0,
+      newest: wholeBars.length ? wholeBars[wholeBars.length - 1].t : 0,
       settled: settledBars.length ? settledBars[settledBars.length - 1].t : 0,
-      times: settledBars.map(function(b) { return b.t }),
-      closes: settledBars.map(function(b) { return b.c }),
+      times: wholeBars.map(function(b) { return b.t }),
+      closes: wholeBars.map(function(b) { return b.c }),
       dropped: filtered.droppedTimes
     } : null
   }
