@@ -145,7 +145,7 @@ ShellRoot {
     property bool reversed: false
     property string changeMode: "pct"
     property int now: 1789669200
-    property var asked: ({})
+    property var owed: ({})
     property string range: "1D"
     property var histories: ({})
     property var fundamentals: ({})

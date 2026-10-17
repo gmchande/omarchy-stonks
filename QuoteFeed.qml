@@ -20,11 +20,15 @@ import "Quote.js" as Quote
 // kind, which the service schedules by.
 //
 // `asked` holds each symbol asked for and not yet answered, with the second
-// it was asked: freshness calls one overdue after 90 s. What came back
-// decides (`Fetch.answerKind`): a bad answer is tried again 2.5 s later,
-// three tries in all, then failed; a missing symbol fails at once; a
-// refusal or no answer at all is the host's, not the symbol's, so it stays
-// asked and the gate pauses every feed on that host.
+// it was asked, which orders the queue. `owed` holds, of those, each one
+// whose wait is on Yahoo, with the second that began: its request went and
+// has no answer yet, or Yahoo paused while it waited. One held back only by
+// the gate's budget, Stonks' own pacing, is not owed. Freshness calls an
+// owed symbol overdue after 90 s. What came back decides
+// (`Fetch.answerKind`): a bad answer is tried again 2.5 s later, three
+// tries in all, then failed; a missing symbol fails at once; a refusal or
+// no answer at all is the host's, not the symbol's, so it stays asked and
+// owed, and the gate pauses every feed on that host.
 Item {
   id: root
 
@@ -54,6 +58,21 @@ Item {
   property var quotes: ({})
   property var entries: ({})
   property var asked: ({})
+  property var owed: ({})
+  // An answer, or leaving the queue, ends what was owed.
+  onAskedChanged: {
+    var next = null
+    for (var symbol in owed) {
+      if (symbol in asked) continue
+      if (!next) next = Object.assign({}, owed)
+      delete next[symbol]
+    }
+    if (next) root.owed = next
+  }
+  readonly property bool hostPaused: !!gate && gate.paused
+  // Only what waits becomes owed here: the gate is still setting up the
+  // pause as this fires, so nothing may be launched from it.
+  onHostPausedChanged: oweWaiting()
 
   readonly property bool busy: firstProc.running || refreshProc.running || landing.length > 0 || Object.keys(asked).length > 0
 
@@ -131,8 +150,26 @@ Item {
   }
 
   function pump() {
+    oweWaiting()
     launch(true)
     launch(false)
+  }
+
+  // While the host is paused, everything waiting waits on Yahoo.
+  function oweWaiting() {
+    if (hostPaused) owe(symbols.filter(function(symbol) { return symbol in asked }))
+  }
+
+  // Each of `list` not owed already is owed from now.
+  function owe(list) {
+    var next = null
+    var at = root.stamp()
+    list.forEach(function(symbol) {
+      if (symbol in owed) return
+      if (!next) next = Object.assign({}, owed)
+      next[symbol] = at
+    })
+    if (next) root.owed = next
   }
 
   // The next run of a lane: every symbol it owes that is not cooling or in
@@ -151,6 +188,7 @@ Item {
     var granted = gate ? gate.take(waiting.length, bulk) : waiting.length
     if (granted === 0) return
     var run = waiting.slice(0, granted)
+    owe(run)
     if (first) root.firstRun = run
     else root.refreshRun = run
     if (first && gate) root.firstTicket = gate.ticket

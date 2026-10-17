@@ -49,7 +49,7 @@ ShellRoot {
     property bool retro: false
     property int now: 1788294000
     property var calendars: null
-    property var asked: ({})
+    property var owed: ({})
     property var arriving: []
     property var lastRemoval: null
     readonly property var view: ({ featured: featuredSymbol, range: range, list: listName, listKey: "=" + listName,

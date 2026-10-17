@@ -147,8 +147,9 @@ Item {
   property var removal: null
   property string changeMode: "pct"
   property bool retro: false
-  // Each symbol asked for and not yet answered: freshness's overdue.
-  property var asked: ({})
+  // Each symbol waiting on Yahoo, with the second that began: freshness's
+  // overdue (`QuoteFeed.owed`).
+  property var owed: ({})
   property bool settingsUnreadable: false
   property string updatedTo: ""
   // The clock: a closed surface's holds still too, so nothing it would show
@@ -172,7 +173,7 @@ Item {
   Binding on removal { when: root.reading; value: root.service?.lastRemoval; restoreMode: Binding.RestoreNone }
   Binding on changeMode { when: root.reading; value: root.service?.changeMode; restoreMode: Binding.RestoreNone }
   Binding on retro { when: root.reading; value: root.service?.retro; restoreMode: Binding.RestoreNone }
-  Binding on asked { when: root.reading; value: root.service?.asked; restoreMode: Binding.RestoreNone }
+  Binding on owed { when: root.reading; value: root.service?.owed; restoreMode: Binding.RestoreNone }
   Binding on settingsUnreadable { when: root.reading; value: root.service?.settingsUnreadable; restoreMode: Binding.RestoreNone }
   Binding on updatedTo { when: root.reading; value: root.updates ? root.updates.newVersion : ""; restoreMode: Binding.RestoreNone }
   Binding on now { when: root.reading; value: root.service?.now; restoreMode: Binding.RestoreNone }
@@ -230,7 +231,7 @@ Item {
   // its baseline as `prevClose` (`Chart.viewChart`).
   readonly property var featuredDay: motion.day
   readonly property var featuredFreshness: Figures.freshness(entryOf(chartSymbol || featuredSymbol), featuredQuote, now,
-    asked[chartSymbol || featuredSymbol] || 0)
+    owed[chartSymbol || featuredSymbol] || 0)
   readonly property var featuredGeometry: motion.geometry
   readonly property real scrubX: motion.scrubX
   readonly property bool dayScrubbed: !historyActive && scrubShown !== 0
@@ -1004,7 +1005,7 @@ Item {
     scrubShown: root.watchlistScrubShown
     changeMode: root.changeMode
     now: root.now
-    asked: root.asked
+    owed: root.owed
     retro: root.retro
     upColor: root.upColor
     downColor: root.downColor

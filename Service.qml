@@ -139,6 +139,9 @@ Item {
   readonly property var entries: feed.entries
   // Each symbol asked for and not yet answered, with the second it was asked.
   readonly property var asked: feed.asked
+  // Of those, each one waiting on Yahoo, with the second that began: what
+  // freshness's overdue counts from (`QuoteFeed.owed`).
+  readonly property var owed: feed.owed
   readonly property var histories: historyFeed.entries
   readonly property var fundamentals: fundamentalsFeed.entries
   readonly property var shown: view.shown

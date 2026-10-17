@@ -255,7 +255,7 @@ ShellRoot {
     property bool reversed: false
     property string changeMode: "pct"
     property int now: root.now
-    property var asked: ({})
+    property var owed: ({})
     property string range: root.shownRange
     // The history on show, keyed to its symbol: a held chart's stays its own
     // while the next symbol's is on its way.
@@ -373,7 +373,7 @@ ShellRoot {
       // A refresh asked for 91 s ago with no answer: a refusal, or no network.
       stub.quotes = { AAPL: aapl, "SHOP.TO": shop }
       stub.entries = { AAPL: { status: "ok", receivedAt: root.now - 300 }, "SHOP.TO": { status: "ok", receivedAt: root.now - 300 } }
-      stub.asked = { AAPL: root.now - 91, "SHOP.TO": root.now - 91 }
+      stub.owed = { AAPL: root.now - 91, "SHOP.TO": root.now - 91 }
     } else {
       stub.quotes = { AAPL: aapl, "SHOP.TO": shop }
       stub.entries = { AAPL: { status: "ok", receivedAt: root.now }, "SHOP.TO": { status: "ok", receivedAt: root.now } }
@@ -960,7 +960,7 @@ ShellRoot {
                 property string changeMode: "pct"
                 property bool retro: pillRow.modelData.retro
                 property int now: root.now
-                property var asked: ({})
+                property var owed: ({})
               }
               QtObject {
                 id: pillShell

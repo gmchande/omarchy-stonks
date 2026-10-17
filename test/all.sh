@@ -160,6 +160,7 @@ start "window search harness" bash test/qml/window-search.sh
 start "window motion harness" bash test/qml/window-motion.sh
 start "named watchlists harness" bash test/qml/lists.sh
 start "fetch policy harness" bash test/qml/fetch.sh
+start "long list harness" bash test/qml/long-list.sh
 start "popup harness" bash test/qml/popup.sh
 start "window rows harness" bash test/qml/window-rows.sh
 start "overnight harness" bash test/qml/overnight.sh
