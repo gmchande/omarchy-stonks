@@ -196,9 +196,14 @@ function parseChart(json) {
   // Yahoo moves the day's high, low, and volume on before the bars, too:
   // London's answer before its session sends the coming day's high and low
   // as 0, not known yet. The figures' day is then that session's, and the
-  // bars' open is not its.
+  // bars' open is not its. And they stay a listing's last trading day's:
+  // CVR, untraded on Friday 16 October, answered with Friday's session and
+  // Wednesday's figures, its regular quote stamped Wednesday 16:00. The
+  // figures' day is then the quote's.
   var ahead = !knownPrice(meta.regularMarketDayHigh) && !knownPrice(meta.regularMarketDayLow) && !!current.regular
-  var figuresDay = ahead ? current.regular.start : regular ? regular.start : null
+  var quoted = Format.isFiniteNumber(meta.regularMarketTime) && meta.regularMarketTime > 0 ? meta.regularMarketTime : null
+  var figuresDay = ahead ? current.regular.start : !regular ? null
+    : quoted !== null && quoted < regular.start ? quoted : regular.start
   // The day's open: the first regular-session bar's, once there is one.
   var firstRegular = null
   for (var k = 0; regular && !ahead && k < kept.length && !firstRegular; k++)

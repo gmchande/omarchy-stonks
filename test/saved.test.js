@@ -476,6 +476,12 @@ test("the day line is 1D, or its figures' weekday when they are not today's: its
   // Six days on, the weekday still names one day of the week before; a
   // week on it would read as today's, so the month stands in.
   expect([dayLineAt(nest, at("2026-09-17", "12:00")).title, dayLineAt(nest, at("2026-09-18", "12:00")).title]).toEqual(["FRI", "SEP"])
+  // A listing untraded on its answer's day keeps its last trading day's
+  // figures, and says that day: CVR at 23:09 on Friday 16 October answered
+  // with Friday's session and Wednesday's figures, its quote stamped
+  // Wednesday 16:00. It read 1D. Found in the power-user walk.
+  const cvr = M.parseChart(fixture("moments/power-user-2026-10-16/cvr.json"))
+  expect(said(dayLineAt(cvr, at("2026-10-16", "23:09")))).toBe("WED · 11.28–11.87 @11.28 · OPEN _ · VOL 68")
   expect(M.dayLine(null)).toBeNull()
   // Before the session's first bar there is no open to give: its slot is
   // kept, empty, so the line keeps its shape.
