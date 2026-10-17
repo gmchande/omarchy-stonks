@@ -37,9 +37,10 @@ Item {
   readonly property font wordFont: Qt.font({ family: fontFamily, pixelSize: Style.font.caption, bold: true, letterSpacing: 1 })
   FontMetrics { id: metrics; font: root.wordFont }
   implicitHeight: Math.ceil(metrics.ascent) + Math.ceil(metrics.descent)
+  // The metrics' font carries the letter spacing, so its advance is the
+  // word as drawn.
   readonly property var wordWidths: options.map(function(o) {
-    var text = String(o).toUpperCase()
-    return Math.ceil(metrics.advanceWidth(text) + text.length * root.wordFont.letterSpacing)
+    return Math.ceil(metrics.advanceWidth(String(o).toUpperCase()))
   })
   readonly property real wordSpace: options.length > 1
     ? (width - wordWidths.reduce(function(a, b) { return a + b }, 0)) / (options.length - 1) : 0
