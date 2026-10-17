@@ -11,9 +11,9 @@ import "Tones.js" as Tones
 // columns are shared, so the two rules stand in one column. Each column is
 // as wide as the widest figure its slots can hold at the listing's digits,
 // never today's, and the title column as the widest of `titles`: a refresh
-// moves only the tick, and a range change no column. The rule takes the room the
-// columns leave, within its bounds; a trailing column that does not fit is
-// left out whole, never cut.
+// moves only the tick, and a range change no column. The rule takes the
+// room the columns leave, so the table spans the band's width at any width;
+// a trailing column that does not fit is left out whole, never cut.
 Item {
   id: root
 
@@ -32,7 +32,6 @@ Item {
   readonly property int gap: Style.space(14)
   readonly property int innerGap: Style.space(6)
   readonly property int minRule: Style.space(32)
-  readonly property int maxRule: Style.space(140)
   // Figures in the caption's bold; labels the same, spaced as the range
   // row's are.
   readonly property font valueFont: Qt.font({ family: fontFamily, pixelSize: Style.font.caption, bold: true })
@@ -73,15 +72,18 @@ Item {
     }
     var shown = facts.length
     while (shown > 0 && fixed(shown) + minRule > width) shown--
-    var rule = Math.max(minRule, Math.min(maxRule, width - fixed(shown)))
+    var rule = Math.max(minRule, width - fixed(shown))
     // Whole cells on the grain, so retro's last cell ends where smooth's
-    // rule does.
+    // rule does; what the grain leaves goes before the facts, which end at
+    // the right edge.
     rule = Math.floor((rule + 1) / Cells.RULE_PITCH) * Cells.RULE_PITCH - 1
     var lowX = titleWidth + gap
     var ruleX = lowX + price + innerGap
     var highX = ruleX + rule + innerGap
+    var factsWidth = 0
+    for (var k = 0; k < shown; k++) factsWidth += gap + facts[k]
     var xs = []
-    var x = highX + price
+    var x = Math.max(highX + price, width - factsWidth)
     for (var j = 0; j < shown; j++) {
       xs.push(x + gap)
       x += gap + facts[j]
