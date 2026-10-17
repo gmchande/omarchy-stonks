@@ -1,3 +1,4 @@
+.pragma library
 .import "Format.js" as Format
 .import "Market.js" as Market
 .import "Overnight.js" as Overnight

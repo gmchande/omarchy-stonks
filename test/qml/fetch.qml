@@ -274,7 +274,10 @@ ShellRoot {
       return out
     }
 
+    // Tall enough that every listing's row is in sight: a row out of sight
+    // works out no freshness, so it could say nothing either way.
     function openWindow() {
+      app.testWindow.implicitHeight = 1000
       app.open("{}")
       tryVerify(function() { return app.opened && service.openSurfaces.length === 1 }, 3000)
       settle()

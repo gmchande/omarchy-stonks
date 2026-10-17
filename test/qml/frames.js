@@ -46,6 +46,12 @@
 //                                      new picture in about 160 ms, or with
 //                                      :0 changes at once, never through a
 //                                      blank or faint frame
+//   bun frames.js filled:GAP[:X,Y,W,H] FRAME@T...
+//                                      every frame shows ink all the way
+//                                      down, within that rectangle if
+//                                      given: no run of more than GAP
+//                                      pixel rows bare, as a row in sight
+//                                      drawn empty would leave
 //   bun frames.js self-check          wrong pictures fail, a right one passes
 //
 // A draw-in is read against its own first and last frames: a pixel is ink
@@ -856,7 +862,58 @@ function selfCheck() {
     if (!right) failed++
     console.log((right ? "PASS " : "FAIL ") + "a press that " + name + (expected ? " passes" : " fails") + " — " + verdict.detail)
   }
+  // A column of rows 40 px apart, each with two 8 px lines of text, as a
+  // list scrolls by `scroll(t)` px; `bare(t)` names a row drawn empty.
+  const column = (scroll, bare = () => -1) => {
+    const width = 20, height = 200
+    const frames = []
+    for (let t = -48; t <= 360; t += 16) {
+      const data = Buffer.alloc(width * height * 3)
+      for (let y = 0; y < height; y++) {
+        const at = y + scroll(t)
+        const row = Math.floor(at / 40), inRow = at % 40
+        const text = row !== bare(t) && ((inRow >= 4 && inRow < 12) || (inRow >= 26 && inRow < 34))
+        for (let x = 0; x < width; x++) data.set(text && x % 3 ? [220, 220, 220] : [20, 22, 26], (y * width + x) * 3)
+      }
+      frames.push({ t, image: { width, height, data } })
+    }
+    return frames
+  }
+  const fillCases = [
+    ["scrolls with every row drawn", true, t => Math.max(0, t) * 20],
+    ["leaves a row empty for a frame", false, t => Math.max(0, t) * 20, t => t === 112 ? Math.floor((112 * 20 + 100) / 40) : -1],
+  ]
+  for (const [name, expected, scroll, bare] of fillCases) {
+    const verdict = filled(column(scroll, bare), 24)
+    const right = verdict.ok === expected
+    if (!right) failed++
+    console.log((right ? "PASS " : "FAIL ") + "a list that " + name + (expected ? " passes" : " fails") + " — " + verdict.detail)
+  }
   process.exit(failed ? 1 : 0)
+}
+
+// Every frame shows ink all the way down: no run of more than `gap` pixel
+// rows with nothing but the picture's ground on them. Rows of text keep
+// their gaps shorter than a row; a row in sight drawn empty leaves a run
+// as tall as it.
+function filled(frames, gap) {
+  if (frames.length < 2) return { ok: false, detail: frames.length + " frames grabbed" }
+  const bare = []
+  let longest = 0
+  for (const f of frames) {
+    const { width, height, data } = f.image
+    const ground = groundIn(data)
+    let run = 0, most = 0
+    for (let y = 0; y < height; y++) {
+      let ink = false
+      for (let x = 0; x < width && !ink; x++) ink = data.readUIntBE((y * width + x) * 3, 3) !== ground
+      run = ink ? 0 : run + 1
+      most = Math.max(most, run)
+    }
+    longest = Math.max(longest, most)
+    if (most > gap) bare.push(f.t + " ms: " + most + " px bare")
+  }
+  return { ok: bare.length === 0, detail: frames.length + " frames, the longest bare run " + longest + " px" + (bare.length ? "; " + bare.slice(0, 5).join(", ") : "") }
 }
 
 const [mode, ...rest] = process.argv.slice(2)
@@ -877,6 +934,7 @@ else {
     : kind === "dim" ? dim(flag === undefined ? frames : frames.map(f => ({ ...f, image: cropped(f.image, flag) })), end === undefined ? 250 : Number(end))
     : kind === "turn" ? turn(frames, end === undefined ? 160 : Number(end))
     : kind === "steps" ? steps(frames, Number(end))
+    : kind === "filled" ? filled(flag === undefined ? frames : frames.map(f => ({ ...f, image: cropped(f.image, flag) })), Number(end))
     : kind === "press" ? press(frames, rest[0].split(",").map(Number), rest[1].split(",").map(Number))
     : { ok: false, detail: "unknown mode " + mode }
   console.log(JSON.stringify(verdict))

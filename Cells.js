@@ -1,3 +1,4 @@
+.pragma library
 // The cell drawings: block digits, the bull and the bear, and the mark's
 // levels. Knows no data.
 

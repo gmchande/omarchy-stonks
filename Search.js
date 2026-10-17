@@ -1,3 +1,4 @@
+.pragma library
 .import "Quote.js" as Quote
 
 // Yahoo's symbol lookup: its URL and its answer. Knows nothing else.

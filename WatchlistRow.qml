@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons
 import "Cells.js" as Cells
@@ -27,6 +28,10 @@ Rectangle {
   property bool retro: false
   // True while the pointer carries this row; the panel positions it.
   property bool lifted: false
+  // Whether the row's words, day line, and pointer are built: the list
+  // builds only rows near sight, so a long list costs what a screenful does.
+  // Built, the row draws in the frame it is asked to.
+  property bool built: true
   // While it moves, lifted or sliding, the row carries the card's own ground
   // under its fill, so the rows it passes never show through.
   property bool moving: false
@@ -121,235 +126,251 @@ Rectangle {
     color: row.ground
   }
 
-  CursorBar {
-    visible: row.cursor
-    retro: row.retro
-    foreground: row.foreground
-  }
-
-  Text {
-    id: symbolText
-    x: row.gap
-    y: row.inset
-    textFormat: Text.PlainText
-    text: row.symbol
-    color: row.foreground
-    font.family: row.fontFamily
-    font.pixelSize: Style.font.body
-    font.bold: true
-  }
-
-  Text {
-    id: detailText
-    x: row.gap
-    anchors.bottom: parent.bottom
-    anchors.bottomMargin: row.inset
-    width: row.width - x - row.priceWidth - row.gap * 2 - row.sparkWidth - row.gap
-    textFormat: Text.PlainText
-    text: row.detail
-    color: row.warns ? row.foreground : row.dim
-    font.family: row.fontFamily
-    font.pixelSize: Style.font.bodySmall
-    font.bold: row.warns
-    elide: Text.ElideRight
-  }
-
-  // The shell's row action (PanelActionButton, as Bluetooth's Forget): dim
-  // at rest, the foreground under the pointer, never the urgent colour,
-  // which here means a falling price. It sits just after the symbol it
-  // removes, on its line, so nothing on the row moves or narrows for it,
-  // and it has no tip: the × says what it does, the ? sheet says a
-  // right-click does the same, and a tip there covered the next row. The
-  // row's own pointer handles it, so a press there and a move still lift
-  // the row, and a double-click is one removal (Watchlist.clickRow); a left
-  // click that starts and ends on it removes rather than features, and one
-  // that starts on it and ends off it does nothing.
-  Item {
-    id: removeButton
-    objectName: "rowRemove"
-    visible: row.removable
-    width: Style.space(22)
-    height: width
-    x: symbolText.x + symbolText.width + Style.space(4)
-    y: symbolText.y + (symbolText.height - height) / 2
-    readonly property bool hovered: mouse.containsMouse && mouse.onRemove(mouse.mouseX, mouse.mouseY)
-    readonly property color ink: hovered ? row.foreground : row.dim
-
-    // The shell's 22 px target; its fill 2 px inside it, so on a 40 px row
-    // it keeps clear of the row's top edge.
-    Rectangle {
-      objectName: "rowRemoveFill"
-      anchors.fill: parent
-      anchors.margins: Style.space(2)
-      radius: row.retro ? 0 : Style.cornerRadius
-      color: removeButton.hovered && mouse.pressed && mouse.pressedOnRemove && !mouse.dragged ? Style.pressedFillFor(row.foreground, Color.accent)
-        : removeButton.hovered ? Style.hoverFillFor(row.foreground, Color.accent) : "transparent"
-      Behavior on color { ColorAnimation { duration: 60 } }
-    }
-
-    // Smooth: a plain ×, the weight of the symbol beside it.
-    Text {
-      objectName: "rowRemoveGlyph"
-      visible: !row.retro
-      anchors.centerIn: parent
-      textFormat: Text.PlainText
-      text: "󰅖"
-      color: removeButton.ink
-      font.family: row.fontFamily
-      font.pixelSize: Style.font.body
-    }
-
-    // Retro: an × in the rows' own 2 px cells.
-    PixelSprite {
-      objectName: "rowRemoveCells"
-      visible: row.retro
-      anchors.centerIn: parent
-      width: Cells.REMOVE_SPRITE[0].length * 2
-      height: Cells.REMOVE_SPRITE.length * 2
-      columns: Cells.REMOVE_SPRITE[0].length
-      rows: Cells.REMOVE_SPRITE.length
-      pixels: Cells.spritePixels(Cells.REMOVE_SPRITE)
-      color: removeButton.ink
-    }
-  }
-
-  Item {
-    x: row.width - row.gap - row.priceWidth - row.gap - row.sparkWidth
-    width: row.sparkWidth
-    height: Style.space(22)
-    anchors.verticalCenter: parent.verticalCenter
-
-    // Only the shown look draws: the other rests, drawing nothing and
-    // following no scrub, until `s` shows it and it draws before that frame.
-    Sparkline {
-      objectName: "rowLine"
-      visible: !row.retro
-      anchors.fill: parent
-      geometry: row.retro ? null : row.geometry
-      // The hero's rule at row size: up above the baseline, down below it.
-      up: row.view ? row.view.dayUp : null
-      upColor: row.upColor
-      downColor: row.downColor
-      lineColor: row.dim
-      baselineColor: row.dimmer
-      cursorX: row.retro ? -1 : row.scrubX
-    }
-
-    // The hero histogram at a finer pitch, so a row and the hero are one
-    // drawing at two sizes.
-    PixelChart {
-      objectName: "rowCells"
-      visible: row.retro
-      anchors.fill: parent
-      geometry: row.retro ? row.geometry : null
-      // Unknown direction draws dim, the way the hero's chart does.
-      up: row.view ? row.view.dayUp : null
-      upColor: row.upColor
-      downColor: row.downColor
-      baselineColor: row.dimmer
-      hairlineColor: row.foreground
-      ground: Qt.tint(row.ground, row.fill)
-      pixel: 2
-      gap: 1
-      scrubX: row.retro ? row.scrubX : -1
-    }
-  }
-
-  Text {
-    x: row.width - row.gap - row.priceWidth
-    y: row.inset
-    width: row.priceWidth
-    horizontalAlignment: Text.AlignRight
-    textFormat: Text.PlainText
-    text: row.view ? row.view.priceText : ""
-    color: row.foreground
-    font.family: row.fontFamily
-    font.pixelSize: Style.font.body
-  }
-
-  Text {
-    x: row.width - row.gap - row.priceWidth
-    width: row.priceWidth
-    anchors.bottom: parent.bottom
-    anchors.bottomMargin: row.inset
-    horizontalAlignment: Text.AlignRight
-    textFormat: Text.PlainText
-    text: row.view ? Format.lookSigns(row.view.changeLine, row.retro) : ""
-    color: row.trend
-    font.family: row.fontFamily
-    font.pixelSize: Style.font.body
-    font.bold: true
-  }
-
-  // Press and move a few pixels to lift the row; a plain click features it.
-  // The list never steals the press, so the wheel is how it scrolls.
-  MouseArea {
-    id: mouse
+  Loader {
     anchors.fill: parent
-    hoverEnabled: true
-    preventStealing: true
-    acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
-    cursorShape: row.lifted ? Qt.ClosedHandCursor : Qt.PointingHandCursor
+    active: row.built
+    sourceComponent: Component {
+      Item {
+        objectName: "rowContent"
+        CursorBar {
+          visible: row.cursor
+          retro: row.retro
+          foreground: row.foreground
+        }
 
-    property real pressY: -1
-    property bool dragged: false
-    // The press began on the remove button: only its release, on the
-    // button and with no drag between, removes, whatever Qt calls the press
-    // (a double-click's second press acts at mouse-down), and a release off
-    // it does nothing, as a button's does.
-    property bool pressedOnRemove: false
+        Text {
+          id: symbolText
+          x: row.gap
+          y: row.inset
+          textFormat: Text.PlainText
+          text: row.symbol
+          color: row.foreground
+          font.family: row.fontFamily
+          font.pixelSize: Style.font.body
+          font.bold: true
+        }
 
-    function onRemove(x, y) {
-      return removeButton.visible && x >= removeButton.x && x < removeButton.x + removeButton.width
-        && y >= removeButton.y && y < removeButton.y + removeButton.height
-    }
+        Text {
+          id: detailText
+          x: row.gap
+          anchors.bottom: parent.bottom
+          anchors.bottomMargin: row.inset
+          width: row.width - x - row.priceWidth - row.gap * 2 - row.sparkWidth - row.gap
+          textFormat: Text.PlainText
+          text: row.detail
+          color: row.warns ? row.foreground : row.dim
+          font.family: row.fontFamily
+          font.pixelSize: Style.font.bodySmall
+          font.bold: row.warns
+          elide: Text.ElideRight
+        }
 
-    onPressed: function(event) {
-      pressY = event.button === Qt.LeftButton ? event.y : -1
-      dragged = false
-      pressedOnRemove = event.button === Qt.LeftButton && !(event.modifiers & Qt.ControlModifier) && onRemove(event.x, event.y)
-      if (pressedOnRemove) {
-        var at = mapToItem(null, event.x, event.y)
-        row.removePressed(at.x, at.y, false)
+        // The shell's row action (PanelActionButton, as Bluetooth's Forget): dim
+        // at rest, the foreground under the pointer, never the urgent colour,
+        // which here means a falling price. It sits just after the symbol it
+        // removes, on its line, so nothing on the row moves or narrows for it,
+        // and it has no tip: the × says what it does, the ? sheet says a
+        // right-click does the same, and a tip there covered the next row. The
+        // row's own pointer handles it, so a press there and a move still lift
+        // the row, and a double-click is one removal (Watchlist.clickRow); a left
+        // click that starts and ends on it removes rather than features, and one
+        // that starts on it and ends off it does nothing.
+        Item {
+          id: removeButton
+          objectName: "rowRemove"
+          visible: row.removable
+          width: Style.space(22)
+          height: width
+          x: symbolText.x + symbolText.width + Style.space(4)
+          y: symbolText.y + (symbolText.height - height) / 2
+          readonly property bool hovered: mouse.containsMouse && mouse.onRemove(mouse.mouseX, mouse.mouseY)
+          readonly property color ink: hovered ? row.foreground : row.dim
+
+          // The shell's 22 px target; its fill 2 px inside it, so on a 40 px row
+          // it keeps clear of the row's top edge.
+          Rectangle {
+            objectName: "rowRemoveFill"
+            anchors.fill: parent
+            anchors.margins: Style.space(2)
+            radius: row.retro ? 0 : Style.cornerRadius
+            color: removeButton.hovered && mouse.pressed && mouse.pressedOnRemove && !mouse.dragged ? Style.pressedFillFor(row.foreground, Color.accent)
+              : removeButton.hovered ? Style.hoverFillFor(row.foreground, Color.accent) : "transparent"
+            Behavior on color { ColorAnimation { duration: 60 } }
+          }
+
+          // Smooth: a plain ×, the weight of the symbol beside it.
+          Text {
+            objectName: "rowRemoveGlyph"
+            visible: !row.retro
+            anchors.centerIn: parent
+            textFormat: Text.PlainText
+            text: "󰅖"
+            color: removeButton.ink
+            font.family: row.fontFamily
+            font.pixelSize: Style.font.body
+          }
+
+          // Retro: an × in the rows' own 2 px cells, built only in that look.
+          Loader {
+            anchors.centerIn: parent
+            active: row.retro
+            sourceComponent: Component {
+              PixelSprite {
+                objectName: "rowRemoveCells"
+                width: Cells.REMOVE_SPRITE[0].length * 2
+                height: Cells.REMOVE_SPRITE.length * 2
+                columns: Cells.REMOVE_SPRITE[0].length
+                rows: Cells.REMOVE_SPRITE.length
+                pixels: Cells.spritePixels(Cells.REMOVE_SPRITE)
+                color: removeButton.ink
+              }
+            }
+          }
+        }
+
+        // Only the shown look is built: `s` builds the other, which draws
+        // before that frame.
+        Loader {
+          x: row.width - row.gap - row.priceWidth - row.gap - row.sparkWidth
+          width: row.sparkWidth
+          height: Style.space(22)
+          anchors.verticalCenter: parent.verticalCenter
+          sourceComponent: row.retro ? cellsLine : smoothLine
+        }
+
+        Component {
+          id: smoothLine
+          Sparkline {
+            objectName: "rowLine"
+            geometry: row.geometry
+            // The hero's rule at row size: up above the baseline, down below it.
+            up: row.view ? row.view.dayUp : null
+            upColor: row.upColor
+            downColor: row.downColor
+            lineColor: row.dim
+            baselineColor: row.dimmer
+            cursorX: row.scrubX
+          }
+        }
+
+        // The hero histogram at a finer pitch, so a row and the hero are one
+        // drawing at two sizes.
+        Component {
+          id: cellsLine
+          PixelChart {
+            objectName: "rowCells"
+            geometry: row.geometry
+            // Unknown direction draws dim, the way the hero's chart does.
+            up: row.view ? row.view.dayUp : null
+            upColor: row.upColor
+            downColor: row.downColor
+            baselineColor: row.dimmer
+            hairlineColor: row.foreground
+            ground: Qt.tint(row.ground, row.fill)
+            pixel: 2
+            gap: 1
+            scrubX: row.scrubX
+          }
+        }
+
+        Text {
+          x: row.width - row.gap - row.priceWidth
+          y: row.inset
+          width: row.priceWidth
+          horizontalAlignment: Text.AlignRight
+          textFormat: Text.PlainText
+          text: row.view ? row.view.priceText : ""
+          color: row.foreground
+          font.family: row.fontFamily
+          font.pixelSize: Style.font.body
+        }
+
+        Text {
+          x: row.width - row.gap - row.priceWidth
+          width: row.priceWidth
+          anchors.bottom: parent.bottom
+          anchors.bottomMargin: row.inset
+          horizontalAlignment: Text.AlignRight
+          textFormat: Text.PlainText
+          text: row.view ? Format.lookSigns(row.view.changeLine, row.retro) : ""
+          color: row.trend
+          font.family: row.fontFamily
+          font.pixelSize: Style.font.body
+          font.bold: true
+        }
+
+        // Press and move a few pixels to lift the row; a plain click features it.
+        // The list never steals the press, so the wheel is how it scrolls.
+        MouseArea {
+          id: mouse
+          anchors.fill: parent
+          hoverEnabled: true
+          preventStealing: true
+          acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+          cursorShape: row.lifted ? Qt.ClosedHandCursor : Qt.PointingHandCursor
+
+          property real pressY: -1
+          property bool dragged: false
+          // The press began on the remove button: only its release, on the
+          // button and with no drag between, removes, whatever Qt calls the press
+          // (a double-click's second press acts at mouse-down), and a release off
+          // it does nothing, as a button's does.
+          property bool pressedOnRemove: false
+
+          function onRemove(x, y) {
+            return removeButton.visible && x >= removeButton.x && x < removeButton.x + removeButton.width
+              && y >= removeButton.y && y < removeButton.y + removeButton.height
+          }
+
+          onPressed: function(event) {
+            pressY = event.button === Qt.LeftButton ? event.y : -1
+            dragged = false
+            pressedOnRemove = event.button === Qt.LeftButton && !(event.modifiers & Qt.ControlModifier) && onRemove(event.x, event.y)
+            if (pressedOnRemove) {
+              var at = mapToItem(null, event.x, event.y)
+              row.removePressed(at.x, at.y, false)
+            }
+          }
+          onPositionChanged: function(event) {
+            if (!pressed || pressY < 0) return
+            if (!dragged) {
+              if (Math.abs(event.y - pressY) < 6) return
+              dragged = true
+              row.dragStarted(row.mapToItem(row.parent, event.x, pressY).y)
+            }
+            row.dragMoved(row.mapToItem(row.parent, event.x, event.y).y)
+          }
+          onReleased: function(event) {
+            if (dragged) row.dragEnded()
+            else if (pressedOnRemove && onRemove(event.x, event.y)) {
+              var at = mapToItem(null, event.x, event.y)
+              row.removeReleased(at.x, at.y)
+            }
+          }
+          onCanceled: {
+            if (dragged) row.dragCanceled()
+          }
+          function act(event, second) {
+            if (dragged) return
+            var at = mapToItem(null, event.x, event.y)
+            if (event.button === Qt.RightButton || event.button === Qt.MiddleButton) row.removeRequested(at.x, at.y, second)
+            else if (event.modifiers & Qt.ControlModifier) row.listsRequested(at.x, at.y, second)
+            else if (pressedOnRemove) return
+            else if (event.button === Qt.LeftButton) row.featureRequested(at.x, at.y, second)
+          }
+          onClicked: function(event) { act(event, false) }
+          // A double-click is one click: its second would land on whatever took
+          // the first one's place, a row sliding up or the rows back from search.
+          // The list says whether it acts: only after the wheel or a key between.
+          onDoubleClicked: function(event) {
+            if (pressedOnRemove) {
+              var at = mapToItem(null, event.x, event.y)
+              row.removePressed(at.x, at.y, true)
+            }
+            else act(event, true)
+          }
+        }
       }
-    }
-    onPositionChanged: function(event) {
-      if (!pressed || pressY < 0) return
-      if (!dragged) {
-        if (Math.abs(event.y - pressY) < 6) return
-        dragged = true
-        row.dragStarted(row.mapToItem(row.parent, event.x, pressY).y)
-      }
-      row.dragMoved(row.mapToItem(row.parent, event.x, event.y).y)
-    }
-    onReleased: function(event) {
-      if (dragged) row.dragEnded()
-      else if (pressedOnRemove && onRemove(event.x, event.y)) {
-        var at = mapToItem(null, event.x, event.y)
-        row.removeReleased(at.x, at.y)
-      }
-    }
-    onCanceled: {
-      if (dragged) row.dragCanceled()
-    }
-    function act(event, second) {
-      if (dragged) return
-      var at = mapToItem(null, event.x, event.y)
-      if (event.button === Qt.RightButton || event.button === Qt.MiddleButton) row.removeRequested(at.x, at.y, second)
-      else if (event.modifiers & Qt.ControlModifier) row.listsRequested(at.x, at.y, second)
-      else if (pressedOnRemove) return
-      else if (event.button === Qt.LeftButton) row.featureRequested(at.x, at.y, second)
-    }
-    onClicked: function(event) { act(event, false) }
-    // A double-click is one click: its second would land on whatever took
-    // the first one's place, a row sliding up or the rows back from search.
-    // The list says whether it acts: only after the wheel or a key between.
-    onDoubleClicked: function(event) {
-      if (pressedOnRemove) {
-        var at = mapToItem(null, event.x, event.y)
-        row.removePressed(at.x, at.y, true)
-      }
-      else act(event, true)
     }
   }
 }

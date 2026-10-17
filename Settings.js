@@ -1,3 +1,4 @@
+.pragma library
 .import "History.js" as History
 .import "Quote.js" as Quote
 

@@ -5,6 +5,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "plugin" as Stonks
+import "plugin/Figures.js" as Figures
 
 // A power user's list: 154 symbols through the real Plugin, Service, App,
 // and a pill, on a clock this harness sets, from Wednesday 7 October 2026 at
@@ -88,6 +89,9 @@ ShellRoot {
 
   Process { id: fileProc }
 
+  // The window's rows' rendered frames, for frames.js.
+  FrameGrab { id: grab }
+
   TestCase {
     name: "LongList"
     when: service.pluginsReady && pillWindow.visible
@@ -116,12 +120,15 @@ ShellRoot {
       }
     }
 
-    // The rows, and the pill, that say "!" now.
+    // The rows, and the pill, that say "!" now: a row in sight by what it
+    // shows, and one out of sight, which works out nothing until it comes
+    // into sight, by what it would show there.
     function warned() {
       var body = app.testBody
       var out = service.library.filter(function(s) {
         var row = body.watchlist.rowItem(s)
-        return !!row && /^!/.test(row.detail)
+        if (row && row.inSight) return /^!/.test(row.detail)
+        return Figures.freshnessWarns(Figures.freshness(service.entries[s] || null, service.quotes[s] || null, service.now, service.owed[s] || 0))
       })
       if (pill.warns) out.push("pill")
       return out
@@ -208,6 +215,33 @@ ShellRoot {
           + "; first run " + (runs[0] || "").split(" ").map(function(u) { return u.split(":")[0] }).join(" "))
       harness.check("ten minutes of trading on a long list: no row or pill warns",
         steadyWarned === 0, steadyWarned + " of 120 steps warned")
+
+      // A glide from the top to the end of the list, and the wheel back up:
+      // on every rendered frame each row in sight is drawn (frames.js
+      // `filled`, down the symbols' column), though only rows near sight
+      // are built. The longest gap between frames is said, for the cost of
+      // building rows as they come.
+      var list = app.testBody.watchlist
+      list.contentY = 0
+      wait(100)
+      grab.source = list
+      grab.begin("glide")
+      wait(100)
+      grab.markStart()
+      list.scrollToRow(list.displayedSymbols.length - 1)
+      tryVerify(function() { return !list.settling && list.contentY >= list.contentHeight - list.height - 1 }, 5000)
+      var endY = list.contentY
+      for (var notch = 0; notch < 10; notch++) mouseWheel(list, 30, 30, 0, 120)
+      tryVerify(function() { return !list.settling }, 5000)
+      wait(100)
+      grab.end()
+      tryVerify(function() { return grab.waiting === 0 }, 5000)
+      var gaps = grab.frames.slice(1).map(function(f, k) { return f.at - grab.frames[k].at })
+      grab.judge("filled:24:8,0,64," + Math.floor(list.height), null, [])
+      tryVerify(function() { return grab.verdict !== null }, 10000)
+      harness.check("a glide down the whole list and the wheel back up draw every row in sight on every frame",
+        grab.verdict.ok && endY > 0 && list.contentY < endY,
+        grab.verdict.detail + "; longest gap between frames " + Math.max.apply(null, gaps) + " ms; at " + Math.round(endY) + " then " + Math.round(list.contentY))
 
       // Yahoo refusing: nothing more goes for the pause. Each row says its
       // update is overdue 90 s after its wait on Yahoo began: at once for

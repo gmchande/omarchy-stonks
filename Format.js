@@ -1,3 +1,4 @@
+.pragma library
 // How numbers and moments are checked and written: prices, changes and
 // their signs, durations, clock times, and the names of days and months.
 // Knows nothing of markets, quotes, or where the data comes from.

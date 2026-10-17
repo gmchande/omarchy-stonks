@@ -1,3 +1,4 @@
+.pragma library
 // The one curl every feed runs: one or several URLs in one run, over one
 // connection, compressed, each answer capped and followed by a line that
 // says what came back. Knows nothing of what it fetches.

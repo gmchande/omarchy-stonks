@@ -129,8 +129,9 @@ building one that won't merge.
   OutCubic.
 - Secondary text is the foreground mixed toward its ground (`Tones.dim`),
   never `Qt.darker`, which gets louder on a light theme.
-- Rule files: top-level functions only, read through `.import`, imports one
-  way with no cycles.
+- Rule files: `.pragma library` first, so QML loads each once rather than
+  once per row; top-level functions only, read through `.import`, imports
+  one way with no cycles.
 
 ## Branches and pull requests
 

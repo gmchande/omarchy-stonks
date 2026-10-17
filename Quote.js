@@ -1,3 +1,4 @@
+.pragma library
 .import "Format.js" as Format
 
 // Yahoo's day answer for a listing, and the day's prices read off it: the

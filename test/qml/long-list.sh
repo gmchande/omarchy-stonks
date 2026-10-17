@@ -8,6 +8,7 @@
 # HOME and curl are scratch; the fake curl answers from test/fixtures.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree long-list.qml
+frame_tools
 patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property var testBody: root.body'
 # The harness owns the clock, from Wednesday 7 October at 15:00 New York.
 patch_copy plugin/Service.qml 's/function wallSecond() { return Math.floor(Date.now() \/ 1000) }/function wallSecond() { return root.now }/'

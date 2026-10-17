@@ -198,27 +198,36 @@ ShellRoot {
       harness.check(", steps back to All", service.listName === "" && harness.same(service.symbols, ["AAPL", "MSFT", "NVDA"]))
 
       // Only the current list's rows, in the look on screen, are drawn: a
-      // row outside the list and the hidden look rest, deriving and drawing
-      // nothing, and one shown again draws before the first frame that shows
-      // it. A switch still rebuilds no row. Found in the code-quality
-      // review: every row in All, in both looks, repainted with every quote.
+      // row outside the list is not built and derives nothing, the hidden
+      // look is not built at all, and a row shown again draws before the
+      // first frame that shows it. A switch still rebuilds no row's place.
+      // Found in the code-quality review: every row in All, in both looks,
+      // repainted with every quote.
       tryVerify(function() { return service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 5000)
       var rowsBefore = service.library.map(function(s) { return watchlist.rowItem(s) })
       var sameRows = function() {
         return service.library.every(function(s, i) { return watchlist.rowItem(s) === rowsBefore[i] })
       }
-      // Paints per symbol and look, every layer of each.
+      // Paints per symbol and look, every layer of each line built.
       var paints = {}
+      var hooked = []
       var painted = function(symbol, look) { return paints[symbol + "|" + look] || 0 }
       var hookPaints = function(item, key) {
+        if (!item || hooked.indexOf(item) >= 0) return
+        hooked.push(item)
         if (typeof item.requestPaint === "function")
           item.painted.connect(function() { paints[key] = (paints[key] || 0) + 1 })
         for (var i = 0; i < item.children.length; i++) hookPaints(item.children[i], key)
       }
-      service.library.forEach(function(s) {
-        hookPaints(harness.find(watchlist.rowItem(s), "rowLine"), s + "|smooth")
-        hookPaints(harness.find(watchlist.rowItem(s), "rowCells"), s + "|retro")
-      })
+      var lineOf = function(symbol, look) { return harness.find(watchlist.rowItem(symbol), look === "retro" ? "rowCells" : "rowLine") }
+      var hookAll = function() {
+        service.library.forEach(function(s) {
+          hookPaints(lineOf(s, "smooth"), s + "|smooth")
+          hookPaints(lineOf(s, "retro"), s + "|retro")
+        })
+      }
+      var built = function() { return service.library.filter(function(s) { return !!lineOf(s, "smooth") || !!lineOf(s, "retro") }) }
+      hookAll()
       var total = function() { var n = 0; for (var k in paints) n += paints[k]; return n }
       // What the next frame shows of `item`, saved; its path.
       var shoot = function(item, name) {
@@ -274,20 +283,24 @@ ShellRoot {
       keyClick(Qt.Key_Period)
       wait(100)
       paints = {}
+      hookAll()
       turnLine("MSFT")
       feedQuote("NVDA", 180.25)
       wait(100)
-      harness.check("off the list and in the hidden look, a changed quote derives and draws nothing",
-        service.listName === "Growth" && painted("MSFT", "smooth") + painted("MSFT", "retro") === 0
+      var retroBuilt = service.library.filter(function(s) { return !!lineOf(s, "retro") })
+      harness.check("off the list a row is not built and derives nothing, and the hidden look is built nowhere",
+        service.listName === "Growth" && !lineOf("MSFT", "smooth") && !lineOf("MSFT", "retro")
           && msft.view === null && msft.geometry === null
-          && painted("NVDA", "smooth") > 0 && painted("NVDA", "retro") === 0,
-        JSON.stringify(paints) + "|" + (msft.view === null))
+          && painted("NVDA", "smooth") > 0 && retroBuilt.length === 0,
+        JSON.stringify(paints) + "|" + (msft.view === null) + "|retro built " + retroBuilt)
       paints = {}
+      var builtBefore = built()
       var switched = firstIsNew("switch", smoothOld, function() { keyClick(Qt.Key_Comma) })
-      harness.check("a list switch rebuilds no row, and the row it shows has its new line in its first frame",
-        service.listName === "" && sameRows() && switched.ok
-          && painted("AAPL", "smooth") + painted("NVDA", "smooth") === 0,
-        sameRows() + "|" + switched.detail + "|" + JSON.stringify(paints))
+      var kept = built().filter(function(s) { return builtBefore.indexOf(s) >= 0 })
+      harness.check("a list switch rebuilds no row's place, a line built on both lists repaints nothing, and the rows show their new lines in the first frame",
+        service.listName === "" && sameRows() && switched.ok && kept.length > 0
+          && kept.every(function(s) { return painted(s, "smooth") === 0 }),
+        sameRows() + "|" + switched.detail + "|kept " + kept + "|" + JSON.stringify(paints))
       var toRetro = firstIsNew("retro", retroOld, function() { keyClick(Qt.Key_S) })
       turnLine("MSFT")
       var toSmooth = firstIsNew("smooth", switched.settled, function() { keyClick(Qt.Key_S) })
@@ -306,6 +319,7 @@ ShellRoot {
         reopenHashes.map(function(h) { return String(h).slice(0, 8) }).join(" "))
       service.testFeed.quotes = quotesBefore
       wait(100)
+      hookAll()
       paints = {}
       wait(1100)
       harness.check("a clock tick redraws no line", total() === 0, JSON.stringify(paints))

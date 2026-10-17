@@ -1103,14 +1103,16 @@ ShellRoot {
         var wl = body.watchlist
         var hoverFill = Style.hoverFillFor(stub.foreground, Color.accent)
         var selectedFill = Style.selectedFillFor(stub.foreground, Color.accent)
-        // The rows whose fill or bar says something other than their state.
+        // The rows whose fill or bar says something other than their state;
+        // a row far out of sight is not built, and shows no bar.
         var misdrawn = function() {
           var wrong = []
           wl.displayedSymbols.forEach(function(symbol) {
             var item = wl.rowItem(symbol)
             var want = symbol === stub.featuredSymbol ? selectedFill : symbol === wl.cursorRow ? hoverFill : "transparent"
             if (!Qt.colorEqual(item.color, want)) wrong.push(symbol + " fill " + item.color)
-            if (root.find(item, "cursorBar").visible !== (symbol === wl.cursorRow)) wrong.push(symbol + " bar")
+            var bar = root.find(item, "cursorBar")
+            if ((!!bar && bar.visible) !== (symbol === wl.cursorRow)) wrong.push(symbol + " bar")
           })
           return wrong
         }
@@ -1540,7 +1542,7 @@ ShellRoot {
         // narrowed for a button floating between it and the day line.
         var rowPlaces = function(r) {
           var b = root.find(r, "rowRemove")
-          return r.children.filter(function(c) { return c !== b }).map(function(c) { return c.x + "," + c.y + "," + c.width }).join(" ")
+          return root.find(r, "rowContent").children.filter(function(c) { return c !== b }).map(function(c) { return c.x + "," + c.y + "," + c.width }).join(" ")
         }
         var placesBefore = rowPlaces(fit2)
         // The first place a pointer is seen at is no move (RowPointer).
@@ -1557,7 +1559,7 @@ ShellRoot {
         // its tip covering the row below.
         var removeLooks = "none"
         if (fit2Remove && fit2Remove.visible) {
-          var symbolText = fit2.children.filter(function(c) { return c.text === "FIT2" })[0]
+          var symbolText = root.find(fit2, "rowContent").children.filter(function(c) { return c.text === "FIT2" })[0]
           var onRemove = fit2Remove.mapToItem(body, fit2Remove.width / 2, fit2Remove.height / 2)
           mouseMove(body, onRemove.x, onRemove.y)
           wait(600)

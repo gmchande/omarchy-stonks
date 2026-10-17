@@ -1,3 +1,4 @@
+.pragma library
 .import "Format.js" as Format
 .import "Quote.js" as Quote
 
