@@ -28,9 +28,9 @@ Rectangle {
   property bool retro: false
   // True while the pointer carries this row; the panel positions it.
   property bool lifted: false
-  // Whether the row's words, day line, and pointer are built: the list
-  // builds only rows near sight, so a long list costs what a screenful does.
-  // Built, the row draws in the frame it is asked to.
+  // Whether the row's words, remove button, and pointer are built: the list
+  // builds them only for rows near sight, so a long list costs little more
+  // than a screenful does. Built, the row draws in the frame it is asked to.
   property bool built: true
   // While it moves, lifted or sliding, the row carries the card's own ground
   // under its fill, so the rows it passes never show through.
@@ -124,6 +124,53 @@ Rectangle {
     radius: row.radius
     visible: row.moving
     color: row.ground
+  }
+
+  // The day line, built whatever the row's distance from sight: a canvas
+  // built as its row comes into sight would draw a frame or two after the
+  // row's words. Only the shown look is built: `s` builds the other, which
+  // draws before that frame.
+  Loader {
+    x: row.width - row.gap - row.priceWidth - row.gap - row.sparkWidth
+    width: row.sparkWidth
+    height: Style.space(22)
+    anchors.verticalCenter: parent.verticalCenter
+    sourceComponent: row.retro ? cellsLine : smoothLine
+  }
+
+  Component {
+    id: smoothLine
+    Sparkline {
+      objectName: "rowLine"
+      geometry: row.geometry
+      // The hero's rule at row size: up above the baseline, down below it.
+      up: row.view ? row.view.dayUp : null
+      upColor: row.upColor
+      downColor: row.downColor
+      lineColor: row.dim
+      baselineColor: row.dimmer
+      cursorX: row.scrubX
+    }
+  }
+
+  // The hero histogram at a finer pitch, so a row and the hero are one
+  // drawing at two sizes.
+  Component {
+    id: cellsLine
+    PixelChart {
+      objectName: "rowCells"
+      geometry: row.geometry
+      // Unknown direction draws dim, the way the hero's chart does.
+      up: row.view ? row.view.dayUp : null
+      upColor: row.upColor
+      downColor: row.downColor
+      baselineColor: row.dimmer
+      hairlineColor: row.foreground
+      ground: Qt.tint(row.ground, row.fill)
+      pixel: 2
+      gap: 1
+      scrubX: row.scrubX
+    }
   }
 
   Loader {
@@ -225,51 +272,6 @@ Rectangle {
                 color: removeButton.ink
               }
             }
-          }
-        }
-
-        // Only the shown look is built: `s` builds the other, which draws
-        // before that frame.
-        Loader {
-          x: row.width - row.gap - row.priceWidth - row.gap - row.sparkWidth
-          width: row.sparkWidth
-          height: Style.space(22)
-          anchors.verticalCenter: parent.verticalCenter
-          sourceComponent: row.retro ? cellsLine : smoothLine
-        }
-
-        Component {
-          id: smoothLine
-          Sparkline {
-            objectName: "rowLine"
-            geometry: row.geometry
-            // The hero's rule at row size: up above the baseline, down below it.
-            up: row.view ? row.view.dayUp : null
-            upColor: row.upColor
-            downColor: row.downColor
-            lineColor: row.dim
-            baselineColor: row.dimmer
-            cursorX: row.scrubX
-          }
-        }
-
-        // The hero histogram at a finer pitch, so a row and the hero are one
-        // drawing at two sizes.
-        Component {
-          id: cellsLine
-          PixelChart {
-            objectName: "rowCells"
-            geometry: row.geometry
-            // Unknown direction draws dim, the way the hero's chart does.
-            up: row.view ? row.view.dayUp : null
-            upColor: row.upColor
-            downColor: row.downColor
-            baselineColor: row.dimmer
-            hairlineColor: row.foreground
-            ground: Qt.tint(row.ground, row.fill)
-            pixel: 2
-            gap: 1
-            scrubX: row.scrubX
           }
         }
 

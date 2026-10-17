@@ -226,7 +226,6 @@ ShellRoot {
           hookPaints(lineOf(s, "retro"), s + "|retro")
         })
       }
-      var built = function() { return service.library.filter(function(s) { return !!lineOf(s, "smooth") || !!lineOf(s, "retro") }) }
       hookAll()
       var total = function() { var n = 0; for (var k in paints) n += paints[k]; return n }
       // What the next frame shows of `item`, saved; its path.
@@ -288,19 +287,20 @@ ShellRoot {
       feedQuote("NVDA", 180.25)
       wait(100)
       var retroBuilt = service.library.filter(function(s) { return !!lineOf(s, "retro") })
-      harness.check("off the list a row is not built and derives nothing, and the hidden look is built nowhere",
-        service.listName === "Growth" && !lineOf("MSFT", "smooth") && !lineOf("MSFT", "retro")
+      harness.check("off the list a row builds no words and derives nothing, its line draws nothing, and the hidden look is built nowhere",
+        service.listName === "Growth" && !harness.find(msft, "rowContent") && painted("MSFT", "smooth") === 0
           && msft.view === null && msft.geometry === null
           && painted("NVDA", "smooth") > 0 && retroBuilt.length === 0,
         JSON.stringify(paints) + "|" + (msft.view === null) + "|retro built " + retroBuilt)
       paints = {}
-      var builtBefore = built()
       var switched = firstIsNew("switch", smoothOld, function() { keyClick(Qt.Key_Comma) })
-      var kept = built().filter(function(s) { return builtBefore.indexOf(s) >= 0 })
-      harness.check("a list switch rebuilds no row's place, a line built on both lists repaints nothing, and the rows show their new lines in the first frame",
-        service.listName === "" && sameRows() && switched.ok && kept.length > 0
-          && kept.every(function(s) { return painted(s, "smooth") === 0 }),
-        sameRows() + "|" + switched.detail + "|kept " + kept + "|" + JSON.stringify(paints))
+      // MSFT's day was turned while it was off the list: only its line has
+      // something new to draw.
+      var unchanged = service.library.filter(function(s) { return s !== "MSFT" && !!lineOf(s, "smooth") })
+      harness.check("a list switch rebuilds no row's place, a line whose day did not change repaints nothing, and the rows show their new lines in the first frame",
+        service.listName === "" && sameRows() && switched.ok && unchanged.length > 0
+          && unchanged.every(function(s) { return painted(s, "smooth") === 0 }),
+        sameRows() + "|" + switched.detail + "|unchanged " + unchanged + "|" + JSON.stringify(paints))
       var toRetro = firstIsNew("retro", retroOld, function() { keyClick(Qt.Key_S) })
       turnLine("MSFT")
       var toSmooth = firstIsNew("smooth", switched.settled, function() { keyClick(Qt.Key_S) })

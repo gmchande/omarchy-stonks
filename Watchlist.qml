@@ -807,9 +807,10 @@ Flickable {
         // comes into sight, and draws it before that frame.
         readonly property bool inSight: lifted || (y + height > root.contentY - root.rowPitch
           && y < root.contentY + root.sightHeight + root.rowPitch)
-        // A row of the list is built within a screen of the view, above and
-        // below, so a wheel's glide or a page's step finds its rows built;
-        // farther off, or outside this list, it holds only its place.
+        // A row of the list has its words and pointer built within a screen
+        // of the view, above and below, so a wheel's glide or a page's step
+        // finds them built; farther off, or outside this list, it holds its
+        // place and its day line only.
         built: lifted || (place >= 0 && y + height > root.contentY - root.sightHeight
           && y < root.contentY + 2 * root.sightHeight)
         property var sightQuote: null
