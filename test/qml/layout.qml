@@ -1785,6 +1785,10 @@ ShellRoot {
           ["AAPL", 1792206540, ""], ["SPY", 1792206540, ""], ["SHIB-USD", 1792206540, ""], ["SHEL.L", 1792206540, ""],
           ["7203.T", 1792206540, ""], ["^GSPC", 1790596800, ""]]
         var noteFaults = []
+        // The info line's title too: CKX traded that Friday, so 1D; CVR's
+        // figures are Wednesday's, so WED. It read 1D (the walk).
+        var titles = { CKX: "1D", CVR: "WED" }
+        var titleFaults = []
         for (var nsurface = 0; nsurface < 2; nsurface++) {
           surface.wide = nsurface === 1
           for (var nl = 0; nl < 2; nl++) {
@@ -1799,9 +1803,44 @@ ShellRoot {
               if (said !== c[2] || !whole)
                 noteFaults.push((surface.wide ? "window " : "popup ") + (stub.retro ? "retro " : "smooth ") + c[0] + ": \"" + said + "\""
                   + (whole ? "" : " outside the chart"))
+              var title = body.periodLine ? body.periodLine.title : ""
+              if (titles[c[0]] && title !== titles[c[0]])
+                titleFaults.push((surface.wide ? "window " : "popup ") + (stub.retro ? "retro " : "smooth ") + c[0] + ": " + title)
             })
           }
         }
+        // A row draws a one-bar day in both looks, as the hero does: smooth's
+        // line as a dot, retro's as its column. A day with no bar leaves the
+        // cell empty in both. Found in the power-user walk: CKX's row showed
+        // its bar in retro and nothing in smooth.
+        var symbolsBeforeRows = stub.symbols
+        var libraryBeforeRows = stub.library
+        stub.symbols = symbolsBeforeRows.concat(["CKX", "CVR"])
+        stub.library = stub.symbols
+        stub.now = 1792206540
+        surface.wide = false
+        var rowInk = []
+        ;[false, true].forEach(function(retro) {
+          stub.retro = retro
+          wait(50)
+          ;["CKX", "CVR"].forEach(function(s) {
+            var row = body.watchlist.rowItem(s)
+            if (!row) { rowInk.push((retro ? "retro " : "smooth ") + s + " no row"); return }
+            body.watchlist.contentY = Math.max(0, Math.min(row.y, body.watchlist.contentHeight - body.watchlist.height))
+            wait(100)
+            var inked = false
+            if (retro) inked = find(row, "rowCells").drawable
+            else {
+              var canvas = find(row, "rowLine").children[0]
+              var px = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data
+              for (var p = 3; p < px.length && !inked; p += 4) inked = px[p] > 0
+            }
+            rowInk.push((retro ? "retro " : "smooth ") + s + " " + (inked ? "drawn" : "empty"))
+          })
+        })
+        body.watchlist.contentY = 0
+        stub.symbols = symbolsBeforeRows
+        stub.library = libraryBeforeRows
         stub.quotes = quotesBeforeNotes
         stub.featuredSymbol = "AAPL"
         stub.now = 0
@@ -1810,6 +1849,10 @@ ShellRoot {
         wait(50)
         root.check("a day with one bar or none says so on its chart, and no fuller day or index before its bell does, in both looks on both surfaces",
           noteFaults.length === 0, noteFaults.join(" | "))
+        root.check("a day's info line is titled by its figures' day: CKX's Friday is 1D at 23:09 that Friday, CVR's Wednesday WED, in both looks on both surfaces",
+          titleFaults.length === 0, titleFaults.join(" | "))
+        root.check("a one-bar day's row draws its bar in both looks, and a day with none leaves the cell empty in both",
+          rowInk.join(", ") === "smooth CKX drawn, smooth CVR empty, retro CKX drawn, retro CVR empty", rowInk.join(", "))
         console.log("LAYOUT DONE")
         done.exitCode = root.failures ? 1 : 0
         done.start()

@@ -22,7 +22,9 @@ Item {
   // 0..1 along the session, or -1 for none. Drawn as a small dot on the line.
   property real cursorX: -1
   readonly property real pad: 1.5
-  readonly property bool drawable: !!geometry && !!geometry.points && geometry.points.length >= 2
+  // One print draws, as a dot, as the hero's does: a day with one bar is no
+  // empty cell.
+  readonly property bool drawable: !!geometry && !!geometry.points && geometry.points.length >= 1
 
   onGeometryChanged: { ink.requestPaint(); marks.requestPaint() }
   onLineColorChanged: { ink.requestPaint(); marks.requestPaint() }
@@ -84,6 +86,16 @@ Item {
         else ctx.lineTo(x, y)
       }
       ctx.stroke()
+      // A print alone on its stretch of line, a day's only one or one between
+      // two quiet hours, is a dot three line widths across.
+      for (var k = 0; k < pts.length; k++) {
+        if (!(k === 0 || pts[k].brk) || !(k === pts.length - 1 || pts[k + 1].brk)) continue
+        var dy = pad + pts[k].y * h
+        ctx.fillStyle = !root.split ? root.lineColor : dy <= by ? root.upColor : root.downColor
+        ctx.beginPath()
+        ctx.arc(pad + pts[k].x * w, dy, root.lineWidth * 1.5, 0, Math.PI * 2)
+        ctx.fill()
+      }
     }
   }
 
