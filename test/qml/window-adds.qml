@@ -270,7 +270,7 @@ ShellRoot {
       within(12000, function() { return service.featuredSymbol === "SHHI.NE" })
       wait(300)
       harness.check("Show on a member still arriving features its row once its first fetch fails",
-        arrivingShow === "true,Show" && service.featuredSymbol === "SHHI.NE" && !!service.entries["SHHI.NE"]
+        arrivingShow === "true,SHOW" && service.featuredSymbol === "SHHI.NE" && !!service.entries["SHHI.NE"]
           && service.entries["SHHI.NE"].status === "failed" && watchlist.cursorRow === "SHHI.NE",
         arrivingShow + "|" + service.featuredSymbol + "|" + JSON.stringify(service.entries["SHHI.NE"]) + "|" + watchlist.cursorRow)
 
@@ -304,7 +304,7 @@ ShellRoot {
           service.featuredSymbol, !body.adding, service.library.join(",") === library,
           watchlist.cursorRow === symbol].join("|")
       }
-      var labels = "Add/Show/Show/Add/Add|true|"
+      var labels = "ADD/SHOW/SHOW/ADD/ADD|true|"
       var answered = shows(1, "SHOP.TO")
       var failedMember = shows(2, "SHHI.NE")
       var clicked = shows(1, "SHOP.TO", true)
@@ -338,7 +338,7 @@ ShellRoot {
       tryVerify(function() { return watchlist.displayedSymbols.indexOf("FLAKY") >= 0 && !watchlist.settling }, 15000)
       wait(1000)
       harness.check("Show ends an add still waiting for its quote, and the shown symbol stays featured when it lands",
-        waiting === "FLAKY,true" && shownFirst === "Show,SHOP,false" && service.featuredSymbol === "SHOP" && body.landing === "",
+        waiting === "FLAKY,true" && shownFirst === "SHOW,SHOP,false" && service.featuredSymbol === "SHOP" && body.landing === "",
         waiting + "|" + shownFirst + "|" + service.featuredSymbol + "|" + body.landing)
       service.removeSymbol("FLAKY")
       service.removeSymbol("SHOP")

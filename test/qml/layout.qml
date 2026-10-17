@@ -1758,6 +1758,12 @@ ShellRoot {
                 if (t.lineCount !== 1 || t.truncated || t.implicitWidth > t.width + 0.5 || xIn(t, 0) < 0 || xIn(t, t.width) > body.width)
                   badKeys.push(place + ": " + words + " " + t.lineCount + " lines" + (t.truncated ? ", elided" : "")
                     + ", " + Math.ceil(t.implicitWidth) + " px in " + xIn(t, 0) + "–" + xIn(t, t.width) + " of " + body.width)
+                // Every button says its word one way: the caption, bold, in
+                // spaced capitals. Found in the design check of 16 October:
+                // search's Add and Show alone were body-sized and in lower case.
+                if (t.font.pixelSize !== Style.font.caption || !t.font.bold || t.font.letterSpacing !== 1 || t.text !== t.text.toUpperCase())
+                  badKeys.push(place + ": " + words + " is not in the buttons' caption capitals (" + t.font.pixelSize + " px"
+                    + (t.font.bold ? ", bold" : "") + ", spacing " + t.font.letterSpacing + ")")
               })
               v.close()
               wait(20)
@@ -1769,7 +1775,7 @@ ShellRoot {
         stub.retro = false
         stub.lists = listsBefore
         wait(50)
-        root.check("no word on screen names a key, Enter's button alone is marked, and every button is one whole line, in both looks in the popup and the smallest window",
+        root.check("no word on screen names a key, Enter's button alone is marked, and every button is one whole line in the caption capitals, in both looks in the popup and the smallest window",
           badKeys.length === 0, badKeys.join(" | "))
 
         // A day with one bar or none says so where its chart would be, in
