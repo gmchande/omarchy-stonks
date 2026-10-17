@@ -118,6 +118,10 @@ ShellRoot {
   // <popup|window>-sweep-own-<shel.l|7203.t>-<look>: the 7 October 14:55
   // sweep with London before its session, or Tokyo at lunch, from that
   // listing's own saved day, at a clock inside that moment.
+  // <popup|window>-power-<symbol>-<look>: the power-user walk's odd days,
+  // Friday 16 October at 23:09, with Yahoo's own day (no Robinhood answer
+  // was saved): JPM's stray pair, PLUG's and AITX's one-tick bounces, CKX's
+  // one bar, CVR's none, and LUMN's four-decimal hint.
   readonly property var overnight: {
     var match = /^popup-overnight-(day|night|sunday|live|\d{4}-\d\d-\d\d-\d{4})-(nest|silk|reed|ez|toy)(-1m|-1m-scrub|-scrub)?-(smooth|retro)$/.exec(stateName)
     if (match) return { moment: match[1], symbol: match[2].toUpperCase(), month: match[3] === "-1m" || match[3] === "-1m-scrub",
@@ -126,6 +130,9 @@ ShellRoot {
     if (match) return { moment: "2026-10-07-1455", symbol: match[1].toUpperCase(), month: false, scrub: false, dated: true, sweep: true,
       own: match[1] === "shel.l" ? { file: "shel-l-day", at: Date.UTC(2026, 9, 2, 5, 30) / 1000 }
         : { file: "7203-t-day", at: Date.UTC(2026, 9, 2, 2, 45) / 1000 } }
+    match = /^(?:popup|window)-power-(jpm|plug|aitx|ckx|cvr|lumn)-(smooth|retro)$/.exec(stateName)
+    if (match) return { moment: "2026-10-16-2309", folder: "power-user-2026-10-16", symbol: match[1].toUpperCase(), month: false,
+      scrub: false, dated: true, sweep: false, power: true }
     match = /^(?:popup|window)-sweep-(\d{4}-\d\d-\d\d-\d{4})-(nest|psix|spy|bolt|gspc|btc-usd|shel\.l|7203\.t|shib-usd|ry\.to|brk-a|brk-b)-(smooth|retro)$/.exec(stateName)
     return match ? { moment: match[1], symbol: match[2] === "gspc" ? "^GSPC" : match[2].toUpperCase(), month: false, scrub: false,
       dated: true, sweep: true } : null
@@ -400,7 +407,7 @@ ShellRoot {
 
     if (root.overnight) {
       var live = root.overnight.moment === "live"
-      var folder = live ? "live-2026-10-05" : (root.overnight.sweep ? "sweep-" : "") + root.overnight.moment
+      var folder = root.overnight.folder || (live ? "live-2026-10-05" : (root.overnight.sweep ? "sweep-" : "") + root.overnight.moment)
       var saved = function(name) {
         var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true; printErrors: false }', root)
         view.path = fixtureDir + "/moments/" + folder + "/" + name + ".json"
@@ -417,16 +424,17 @@ ShellRoot {
       var looked = root.overnight.sweep && saved(file("SHIB-USD")) !== ""
       var listed = looked ? ["NEST", "PSIX", "SPY", "BOLT", "^GSPC", "BTC-USD", "SHIB-USD", "SHEL.L", "7203.T", "RY.TO", "BRK-A", "BRK-B"]
         : root.overnight.sweep ? ["NEST", "PSIX", "SPY", "BOLT", "^GSPC", "BTC-USD", "SHEL.L", "7203.T"]
-        : live ? ["NEST", "EZ", "TOY"] : root.overnight.dated ? ["NEST"] : ["NEST", "SILK", "REED"]
-      if (looked) listed = [root.overnight.symbol].concat(listed.filter(function(s) { return s !== root.overnight.symbol }))
+        : live ? ["NEST", "EZ", "TOY"] : root.overnight.power ? ["JPM", "PLUG", "AITX", "CKX", "CVR", "LUMN"]
+        : root.overnight.dated ? ["NEST"] : ["NEST", "SILK", "REED"]
+      if (looked || root.overnight.power) listed = [root.overnight.symbol].concat(listed.filter(function(s) { return s !== root.overnight.symbol }))
       // The US listings: Robinhood's word on which it trades all day, saved
       // with the sweep's moments, and every one at the moments before them.
       var us = looked ? ["NEST", "PSIX", "SPY", "BOLT", "BRK-A", "BRK-B"]
         : root.overnight.sweep ? ["NEST", "PSIX", "SPY", "BOLT"] : listed
-      var tradable = root.overnight.sweep ? Overnight.parseAllDay(read("robinhood-instruments"), us) : null
+      var tradable = root.overnight.sweep ? Overnight.parseAllDay(read("robinhood-instruments"), us) : root.overnight.power ? {} : null
       // What a surface opening at the moment holds: Robinhood's span=day
       // answer.
-      var answer = Overnight.parseOvernight(read("robinhood-day"), us)
+      var answer = root.overnight.power ? {} : Overnight.parseOvernight(read("robinhood-day"), us)
       var quotes = {}, entries = {}, nights = {}, allDay = {}
       listed.forEach(function(s) {
         quotes[s] = Quote.parseChart(read(file(s)))

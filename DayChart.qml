@@ -49,9 +49,11 @@ Item {
   readonly property color dotColor: lastPoint && lastPoint.y > geometry.baselineY ? belowColor : aboveColor
   // One print draws: the first print after midnight is a dot on its day.
   readonly property bool drawable: !!geometry && !!geometry.points && geometry.points.length >= 1
+  // The baseline draws with no print too, as on a day nobody traded.
+  readonly property bool hasBaseline: !!geometry && typeof geometry.baselineY === "number" && isFinite(geometry.baselineY)
   // Where the ink ends, in pixels: the newest drawn print and its dot (the
   // line's width and a half, and a pixel). The draw-in sweeps to here.
-  readonly property real inkLast: drawable ? geometry.points[geometry.points.length - 1].x : 1
+  readonly property real inkLast: drawable ? geometry.points[geometry.points.length - 1].x : 0
   readonly property real inkRight: Math.min(width, pad + inkLast * (width - pad * 2) + 4)
   // The wash: the up colour's at 16%, and each side at the alpha that adds
   // the same lightness over the ground (`Tones.washAlpha`), so a down day's
@@ -98,7 +100,7 @@ Item {
     onPaint: {
       var ctx = getContext("2d")
       ctx.clearRect(0, 0, width, height)
-      if (!root.drawable) return
+      if (!root.hasBaseline) return
       var by = root.pad + root.geometry.baselineY * (height - root.pad * 2)
       ctx.strokeStyle = root.baselineColor
       ctx.lineWidth = 1

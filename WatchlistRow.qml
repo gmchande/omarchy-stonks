@@ -62,8 +62,9 @@ Rectangle {
   signal dragCanceled()
 
   // The day line is the quote's own drawing: it changes when the quote does,
-  // never with the clock, the change mode, or another symbol's quote.
-  readonly property var geometry: quote ? Chart.chartGeometry(quote, calendars) : null
+  // never with the clock, the change mode, or another symbol's quote. A day
+  // with no print leaves the cell empty: the hero alone draws its baseline.
+  readonly property var geometry: quote && quote.points.length ? Chart.chartGeometry(quote, calendars) : null
 
   readonly property color trend: !view || view.tone === "flat" ? dim : view.tone === "up" ? upColor : downColor
   // What the feed has done for this symbol, from Figures.freshness. A failed

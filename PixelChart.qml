@@ -58,10 +58,12 @@ Item {
   readonly property color belowColor: directionKnown ? downColor : baselineColor
   // One print draws: the first print after midnight is a cell on its day.
   readonly property bool drawable: !!geometry && !!geometry.points && geometry.points.length >= 1
+  // The baseline draws with no print too, as on a day nobody traded.
+  readonly property bool hasBaseline: !!geometry && typeof geometry.baselineY === "number" && isFinite(geometry.baselineY)
   // The columns the ink reaches, through the newest drawn print's. The
   // draw-in sweeps across these, a whole column at a time.
   readonly property int inkColumns: drawable
-    ? Math.min(grid.columns, Math.floor(geometry.points[geometry.points.length - 1].x * grid.columns) + 1) : grid.columns
+    ? Math.min(grid.columns, Math.floor(geometry.points[geometry.points.length - 1].x * grid.columns) + 1) : 0
   readonly property int scrubColumn: scrubX >= 0 ? Math.min(grid.columns - 1, Math.floor(scrubX * grid.columns)) : -1
   // The stems are retro's wash: the up colour's at 35%, dimmer for the
   // extended hours, and each side at the alpha that adds the same lightness
@@ -96,7 +98,7 @@ Item {
       ext: [],
       lastRegular: -1
     }
-    if (!geometry || !geometry.points || geometry.points.length < 1) return g
+    if (!hasBaseline) return g
     g.baseRow = Math.round(geometry.baselineY * (g.rows - 1))
     var pts = geometry.points
     for (var i = 0; i < pts.length; i++) {
@@ -125,7 +127,7 @@ Item {
           for (var gr = 0; gr < g.rows; gr++) ctx.fillRect(gc * g.pitch, gr * pixel, pixel, pixel - root.gap)
         }
       }
-      if (!root.drawable) return
+      if (!root.hasBaseline) return
       // The baseline: a dashed row of cells, every other column, so it lives
       // on the same grid as the bars instead of a hairline drawn across them.
       ctx.fillStyle = root.baselineColor
@@ -184,7 +186,7 @@ Item {
   // ticks draw in with its line; those ahead of the newest print, in the
   // hours still to come, are there with the baseline.
   Repeater {
-    model: root.drawable ? root.geometry.ticks.length : 0
+    model: root.hasBaseline ? root.geometry.ticks.length : 0
 
     Rectangle {
       required property int index

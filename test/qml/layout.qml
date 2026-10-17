@@ -56,6 +56,12 @@ ShellRoot {
   FileView { id: liveFile; path: root.fixtures + "/moments/live-2026-10-05/nest.json"; blockLoading: true }
   FileView { id: liveMonthFile; path: root.fixtures + "/moments/live-2026-10-05/nest-1m.json"; blockLoading: true }
   FileView { id: liveNightFile; path: root.fixtures + "/moments/live-2026-10-05/robinhood-day.json"; blockLoading: true }
+  // The power-user walk's thin days, Friday 16 October: CKX's one bar,
+  // CVR's none; and the S&P 500 on Monday 28 September at 08:00, before its
+  // bell, with no print yet.
+  FileView { id: ckxFile; path: root.fixtures + "/moments/power-user-2026-10-16/ckx.json"; blockLoading: true }
+  FileView { id: cvrFile; path: root.fixtures + "/moments/power-user-2026-10-16/cvr.json"; blockLoading: true }
+  FileView { id: preOpenIndexFile; path: root.fixtures + "/moments/monday/gspc.json"; blockLoading: true }
   FileView { id: calendarFile; path: Quickshell.env("STONKS_CALENDARS"); blockLoading: true }
 
   // The hero chart's rendered frames, for frames.js.
@@ -1191,12 +1197,6 @@ ShellRoot {
           root.check(lookName + ": with the rows back the header says TODAY, the breadth, and the order again",
             rowsOnly.every(function(name) { return find(body, name).visible }))
         }
-        // A shorter list's rows are its own, and the footer sits one gap under
-        // them. Found in design pass 3: the footer stayed where All's is,
-        // with an empty row's room above it.
-        stub.retro = false
-        stub.listName = ""
-        root.load()
         // A long list menu shows whole rows only, and "New list…" and
         // "Manage lists…" in reach without scrolling, with 12 lists or 30,
         // in the popup at its cap and the window at its smallest and its
@@ -1258,6 +1258,12 @@ ShellRoot {
         wait(50)
         root.check("a long list menu shows whole rows, and New list and Manage lists without scrolling, in the popup and the window, in both looks",
           menuFaults.length === 0, menuFaults.join(" | ") + " || " + menuSeen.join(", "))
+        // A shorter list's rows are its own, and the footer sits one gap under
+        // them. Found in design pass 3: the footer stayed where All's is,
+        // with an empty row's room above it.
+        stub.retro = false
+        stub.listName = ""
+        root.load()
         stub.library = stub.symbols.slice()
         wait(250)
         var shortOk = true
@@ -1729,6 +1735,45 @@ ShellRoot {
         wait(50)
         root.check("no word on screen names a key, Enter's button alone is marked, and every button is one whole line, in both looks in the popup and the smallest window",
           badKeys.length === 0, badKeys.join(" | "))
+
+        // A day with one bar or none says so where its chart would be, in
+        // both looks on both surfaces: CKX's one bar at 14:10, CVR's none,
+        // at 23:09 that Friday. A busy stock, an ETF, a coin, and listings
+        // in London and Tokyo say nothing, nor does an index before its
+        // bell. Found in the power-user walk of 16 October: a lone dot and
+        // an empty chart, with no words, read as broken.
+        var quotesBeforeNotes = stub.quotes
+        stub.quotes = Object.assign({}, quotesBeforeNotes, { CKX: Quote.parseChart(JSON.parse(ckxFile.text())),
+          CVR: Quote.parseChart(JSON.parse(cvrFile.text())), "^GSPC": Quote.parseChart(JSON.parse(preOpenIndexFile.text())) })
+        var noteCases = [["CKX", 1792206540, "Traded only at 14:10"], ["CVR", 1792206540, "No trades charted"],
+          ["AAPL", 1792206540, ""], ["SPY", 1792206540, ""], ["SHIB-USD", 1792206540, ""], ["SHEL.L", 1792206540, ""],
+          ["7203.T", 1792206540, ""], ["^GSPC", 1790596800, ""]]
+        var noteFaults = []
+        for (var nsurface = 0; nsurface < 2; nsurface++) {
+          surface.wide = nsurface === 1
+          for (var nl = 0; nl < 2; nl++) {
+            stub.retro = nl === 1
+            noteCases.forEach(function(c) {
+              stub.now = c[1]
+              stub.featuredSymbol = c[0]
+              wait(50)
+              var note = find(body, "dayNote")
+              var said = note && note.visible ? note.text : ""
+              var whole = !said || (xIn(note, 0) >= xIn(body.chartItem, 0) && xIn(note, note.width) <= xIn(body.chartItem, body.chartItem.width))
+              if (said !== c[2] || !whole)
+                noteFaults.push((surface.wide ? "window " : "popup ") + (stub.retro ? "retro " : "smooth ") + c[0] + ": \"" + said + "\""
+                  + (whole ? "" : " outside the chart"))
+            })
+          }
+        }
+        stub.quotes = quotesBeforeNotes
+        stub.featuredSymbol = "AAPL"
+        stub.now = 0
+        surface.wide = false
+        stub.retro = false
+        wait(50)
+        root.check("a day with one bar or none says so on its chart, and no fuller day or index before its bell does, in both looks on both surfaces",
+          noteFaults.length === 0, noteFaults.join(" | "))
         console.log("LAYOUT DONE")
         done.exitCode = root.failures ? 1 : 0
         done.start()

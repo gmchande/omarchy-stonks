@@ -206,6 +206,34 @@ Item {
         elide: Text.ElideRight
       }
 
+      // A day with one bar or none says so where its line would be, on a
+      // patch of the ground so the dashed baseline stops short of it: a lone
+      // dot or an empty chart read as broken (`Figures.dayNote`). Beside a
+      // lone print it stands in the other half, clear of its dot or column.
+      Rectangle {
+        objectName: "dayNote"
+        readonly property string text: root.geometry && root.geometry.day ? Figures.dayNote(root.day, root.now, root.calendars) : ""
+        readonly property real printX: root.geometry && root.geometry.points.length === 1 ? root.geometry.points[0].x : -1
+        x: (printX < 0 ? parent.width / 2 : printX > 0.5 ? parent.width / 4 : parent.width * 3 / 4) - width / 2
+        anchors.verticalCenter: parent.verticalCenter
+        width: Math.min(parent.width / (printX < 0 ? 1 : 2), dayNoteText.implicitWidth + Style.space(16))
+        height: dayNoteText.implicitHeight
+        visible: text !== "" && !(root.held && root.dimmed > 0)
+        color: root.ground
+
+        Text {
+          id: dayNoteText
+          anchors.centerIn: parent
+          width: Math.min(implicitWidth, parent.width)
+          textFormat: Text.PlainText
+          text: parent.text
+          color: root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.bodySmall
+          elide: Text.ElideRight
+        }
+      }
+
       MouseArea {
         anchors.fill: parent
         hoverEnabled: true
