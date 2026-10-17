@@ -20,6 +20,8 @@ const fixture = name => JSON.parse(readFileSync(join(fixtures, name), "utf8"))
 const calendars = JSON.parse(readFileSync(join(import.meta.dir, "..", "calendars.json"), "utf8"))
 const US = calendars.calendars.US
 const JPX = calendars.calendars.JPX
+// The exchanges that trade in whole cents from $1, as the feeds read with.
+const cents = M.centExchanges(calendars)
 const quote = M.parseChart(fixture("aapl.json"))
 const shop = M.parseChart(fixture("shop-to.json"))
 const btc = M.parseChart(fixture("btc-usd-day.json"))
@@ -92,7 +94,7 @@ test("across every saved intraday response the filter drops only those eleven ba
   for (const [name, expected] of days) {
     const json = fixture(name)
     const result = json.chart.result[0]
-    const parsed = M.parseChart(json)
+    const parsed = M.parseChart(json, cents)
     const kept = parsed.points.map(point => point.t)
     const dropped = result.timestamp.filter((t, i) =>
       result.indicators.quote[0].close[i] !== null && kept.indexOf(t) < 0)
@@ -318,10 +320,11 @@ test("a weeknight after post-market leads with closed and the next open", () => 
 })
 
 test("a listing's prices take the decimals they need, decided once from its headline price", () => {
-  // Cents from 1 up, or Yahoo's hint where coarser; the hint at least and
-  // four significant digits under 1; none from 10,000 up. The hints are the
-  // real ones (SHIB-USD 5, DOGE-USD 5, AITX 4, LUMN 4, BRK-A 2).
-  const shown = (price, hint) => M.money(price, M.priceDigits(price, hint))
+  // On a market that trades in whole cents from $1 (the US), cents there,
+  // or Yahoo's hint where coarser; elsewhere the hint. The hint at least
+  // and four significant digits under 1; none from 10,000 up. The hints are
+  // the real ones (SHIB-USD 5, DOGE-USD 5, AITX 4, LUMN 4, BRK-A 2).
+  const shown = (price, hint, inCents) => M.money(price, M.priceDigits(price, hint, inCents))
   expect(shown(5.41e-6, 5)).toBe("0.000005410")
   // However small: found in review, a ten-decimal cap read 1.234e-11 as 0.
   expect(shown(1.234e-11, 8)).toBe("0.00000000001234")
@@ -331,10 +334,20 @@ test("a listing's prices take the decimals they need, decided once from its head
   // Yahoo's hint of 4 under $5 read "4.6500" on the row and the hero; after
   // hours, PLUG's sub-penny 1.3891 reads in cents too.
   for (const [name, price] of [["lumn", "4.65"], ["plug", "1.38"]]) {
-    const q = M.parseChart(fixture("moments/power-user-2026-10-16/" + name + ".json"))
+    const q = M.parseChart(fixture("moments/power-user-2026-10-16/" + name + ".json"), cents)
     expect([name, M.rowModel(q, 0, "pct").priceText]).toEqual([name, price])
   }
-  expect(shown(1.3891, 4)).toBe("1.39")
+  expect(shown(1.3891, 4, true)).toBe("1.39")
+  // Off the US a listing over $1 trades finer than a cent and keeps Yahoo's
+  // hint, its tick too: XRP-USD at 1.3065 and IAG at 4.927 EUR in Madrid,
+  // each with a hint of 4, read four decimals and move by 0.0001. In cents,
+  // a coin's real moves hid, and two cents of XRP were 1.5% to the stray
+  // filter. Found in review.
+  for (const [name, price] of [["xrp-usd", "1.3065"], ["iag.mc", "4.9270"]]) {
+    const json = fixture("moments/cents-2026-10-17/" + name + ".json")
+    const q = M.parseChart(json, cents)
+    expect([name, M.rowModel(q, 0, "pct").priceText, M.answerTick(json.chart.result[0].meta, [], cents)]).toEqual([name, price, 0.0001])
+  }
   expect(shown(235.62, 2)).toBe("235.62")
   expect(shown(759748.25, 2)).toBe("759,748")
   expect(shown(2900.5, undefined)).toBe("2,900.50")

@@ -30,7 +30,9 @@ function historyRanges() {
   return ["1D"].concat(Object.keys(HISTORY_RANGES))
 }
 
-function parseHistory(json, range) {
+// Yahoo's answer for a range. `centExchanges` as `Quote.parseChart` takes
+// them, for the stray filter's tick.
+function parseHistory(json, range, centExchanges) {
   var result = json && json.chart && json.chart.result && json.chart.result[0]
   if (!result || !result.meta) return null
   var meta = result.meta
@@ -54,7 +56,7 @@ function parseHistory(json, range) {
   // a tick or two is trading (`Quote.filterStrayCloses`).
   var droppedTimes = []
   if (intervalSeconds > 0 && intervalSeconds < 24 * 60 * 60) {
-    var filtered = Quote.filterStrayCloses(bars, null, Quote.answerTick(meta, bars))
+    var filtered = Quote.filterStrayCloses(bars, null, Quote.answerTick(meta, bars, centExchanges))
     bars = filtered.bars
     droppedTimes = filtered.droppedTimes
   }

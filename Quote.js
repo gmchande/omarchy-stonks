@@ -153,15 +153,29 @@ function extendedSession(periods, t) {
   return session === "regular" ? "" : session
 }
 
-// The tick of the listing an answer is for (`Format.priceTick`), from its
-// headline price, else its last bar's close.
-function answerTick(meta, bars) {
-  var price = Format.isFiniteNumber(meta.regularMarketPrice) ? meta.regularMarketPrice
-    : (bars.length ? bars[bars.length - 1].c : null)
-  return Format.priceTick(price, meta.priceHint)
+// The exchange a listing trades on, by the name people use.
+function exchangeOf(meta) {
+  return EXCHANGE_NAMES[meta.exchangeName] || String(meta.fullExchangeName || meta.exchangeName || "").toUpperCase()
 }
 
-function parseChart(json) {
+// Whether an answer's listing trades in whole cents from $1: its exchange is
+// one of `centExchanges`, the caller's to know (`Market.centExchanges`).
+function inCents(meta, centExchanges) {
+  return !!centExchanges && centExchanges.indexOf(exchangeOf(meta)) >= 0
+}
+
+// The tick of the listing an answer is for (`Format.priceTick`), from its
+// headline price, else its last bar's close.
+function answerTick(meta, bars, centExchanges) {
+  var price = Format.isFiniteNumber(meta.regularMarketPrice) ? meta.regularMarketPrice
+    : (bars.length ? bars[bars.length - 1].c : null)
+  return Format.priceTick(price, meta.priceHint, inCents(meta, centExchanges))
+}
+
+// Yahoo's day answer as a quote. `centExchanges` are the exchanges whose
+// listings trade in whole cents from $1 (`Market.centExchanges`): their
+// prices and ticks take cents there; any other listing's take Yahoo's hint.
+function parseChart(json, centExchanges) {
   var result = json && json.chart && json.chart.result && json.chart.result[0]
   if (!result || !result.meta) return null
   var meta = result.meta
@@ -180,7 +194,7 @@ function parseChart(json) {
     if (closes[i] !== null && closes[i] !== undefined)
       bars.push({ t: timestamps[i], o: opens[i], c: closes[i] })
   }
-  var filtered = filterStrayCloses(bars, periods, answerTick(meta, bars))
+  var filtered = filterStrayCloses(bars, periods, answerTick(meta, bars, centExchanges))
   var kept = filtered.bars
   var regular = periodOf(periods.regular)
   // An index is worked out only while its exchange trades. Yahoo still
@@ -214,7 +228,7 @@ function parseChart(json) {
     // for some listings and is cut at 31 characters.
     name: meta.longName || meta.shortName || meta.symbol,
     currency: meta.currency || "USD",
-    exchange: EXCHANGE_NAMES[meta.exchangeName] || String(meta.fullExchangeName || meta.exchangeName || "").toUpperCase(),
+    exchange: exchangeOf(meta),
     timezoneName: meta.exchangeTimezoneName || "",
     gmtoffset: meta.gmtoffset || 0,
     // The zone's short name at that offset, as Yahoo writes it: "EDT", "JST".
@@ -225,9 +239,9 @@ function parseChart(json) {
     // Kept apart from the chart samples: see headlineQuote.
     price: Format.isFiniteNumber(meta.regularMarketPrice) ? meta.regularMarketPrice : null,
     // The decimals every price of this listing is shown in, from its
-    // headline price and Yahoo's hint (`Format.priceDigits`).
+    // headline price, Yahoo's hint, and its market (`Format.priceDigits`).
     priceDigits: Format.priceDigits(Format.isFiniteNumber(meta.regularMarketPrice) ? meta.regularMarketPrice
-      : (points.length ? points[points.length - 1].p : null), meta.priceHint),
+      : (points.length ? points[points.length - 1].p : null), meta.priceHint, inCents(meta, centExchanges)),
     prevClose: meta.chartPreviousClose !== undefined ? meta.chartPreviousClose : meta.previousClose,
     marketTime: Format.isFiniteNumber(meta.regularMarketTime) && meta.regularMarketTime > 0 ? meta.regularMarketTime : null,
     dayOpen: firstRegular ? knownPrice(firstRegular.o) : null,

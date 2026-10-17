@@ -47,6 +47,9 @@ Item {
   // Runs of the list leave the gate's reserve to single requests; the
   // preview's feed is one.
   property bool bulk: true
+  // The exchanges whose listings trade in whole cents from $1
+  // (`Quote.parseChart`); none unless handed in.
+  property var centExchanges: []
 
   property var quotes: ({})
   property var entries: ({})
@@ -175,7 +178,7 @@ Item {
     while (job.read < job.answers.length && Date.now() < until) {
       var answer = job.answers[job.read++]
       if (answer.kind !== "ok") continue
-      try { answer.quote = Quote.parseChart(JSON.parse(answer.body)) } catch (e) { answer.quote = null }
+      try { answer.quote = Quote.parseChart(JSON.parse(answer.body), root.centExchanges) } catch (e) { answer.quote = null }
       answer.body = null
     }
     if (job.read < job.answers.length) {

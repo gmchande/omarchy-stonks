@@ -436,8 +436,9 @@ ShellRoot {
       // answer.
       var answer = root.overnight.power ? {} : Overnight.parseOvernight(read("robinhood-day"), us)
       var quotes = {}, entries = {}, nights = {}, allDay = {}
+      // Read as the feeds read them: the US listings in cents from $1.
       listed.forEach(function(s) {
-        quotes[s] = Quote.parseChart(read(file(s)))
+        quotes[s] = Quote.parseChart(read(file(s)), Market.centExchanges(stub.calendars))
       })
       us.forEach(function(s) {
         allDay[s] = { status: "ok", allDay: tradable ? tradable[s] : true, at: 0 }

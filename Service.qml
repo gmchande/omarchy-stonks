@@ -379,6 +379,9 @@ Item {
     perMinute: 10
   }
   readonly property alias yahooGate: yahooGate
+  // The exchanges whose listings trade in whole cents from $1, which every
+  // Yahoo answer is read with (`Quote.parseChart`).
+  readonly property var centExchanges: Market.centExchanges(calendars)
 
   QuoteFeed {
     id: feed
@@ -389,6 +392,7 @@ Item {
     clock: root
     clearance: function() { return root.screensClear() }
     gate: yahooGate
+    centExchanges: root.centExchanges
   }
 
   // One chart's history at a time; an answer may leave another chart a
@@ -397,6 +401,7 @@ Item {
   HistoryFeed {
     id: historyFeed
     gate: yahooGate
+    centExchanges: root.centExchanges
     inUse: root.chartsInUse
     onEntriesChanged: {
       var owed = root.owedHistory()
@@ -423,6 +428,7 @@ Item {
     clock: root
     clearance: function() { return root.screensClear() }
     gate: yahooGate
+    centExchanges: root.centExchanges
     bulk: false
     onQuotesChanged: if (root.pendingFundamentals) root.fetchFundamentals(root.pendingFundamentals)
   }

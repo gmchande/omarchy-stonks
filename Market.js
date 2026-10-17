@@ -84,6 +84,14 @@ function calendarFor(calendars, quote) {
   return null
 }
 
+// The exchanges whose listings trade in whole cents from $1: the US
+// calendar's, by Reg NMS. A coin or a European listing trades finer
+// (`Format.priceDigits`). None without calendars.
+function centExchanges(calendars) {
+  var map = calendarMap(calendars)
+  return map && map.US && map.US.exchanges ? map.US.exchanges : []
+}
+
 function dateStringOf(local) {
   return local.y + "-" + Format.pad2(local.m) + "-" + Format.pad2(local.d)
 }
