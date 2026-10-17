@@ -1272,7 +1272,7 @@ ShellRoot {
               var cuts = [atRest, afterWheel, afterDrag, afterKey, cutRows()]
               var footerTop = yIn(find(body, "footer"), 0)
               menuSeen.push(where + ": " + scroll.height / menu.itemHeight + " rows")
-              if (cuts.some(function(n) { return n !== 0 }) || !pinnedShown || yIn(menu, menu.height) + body.bandGap > footerTop)
+              if (cuts.some(function(n) { return n !== 0 }) || !pinnedShown || yIn(menu, menu.height) + body.groupGap > footerTop)
                 menuFaults.push(where + ": rows cut (opened/wheel/bar/key/end, -1 unmoved, -2 key unheard) " + cuts.join("/") + " in a view " + scroll.height + " px, pinned in sight " + pinnedShown
                   + ", menu ends " + yIn(menu, menu.height) + " footer at " + footerTop)
               var manageRow = find(menu, "manageListsRow")
