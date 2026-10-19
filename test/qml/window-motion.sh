@@ -2,9 +2,9 @@
 # The window's chart in motion through the real App and Service with real
 # Qt keys and pointer: repaints, replays, the day and the hero, the draw-in
 # judged on rendered frames, a wrong draw-in failing that same judgement,
-# the header's animal closing its eyes at the bell and asleep at once on
-# every other change, and a closing surface holding still. HOME and curl
-# are scratch.
+# the header's animal closing and opening its eyes at the bell and changing
+# at once on every other change, and a closing surface holding still. HOME
+# and curl are scratch.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree window-motion.qml
 patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property var testBody: root.body\n  readonly property alias testKeyCatcher: keyCatcher\n  readonly property alias testWindow: window'

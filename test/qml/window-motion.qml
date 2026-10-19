@@ -636,11 +636,12 @@ ShellRoot {
       tryVerify(function() { return !body.chartLoading && body.motion.drawn === 1 }, 5000)
     }
 
-    // The header's animal falling asleep, as it is rendered with its "z",
-    // the status words hidden: when the clock closes DOWN's market, Friday
-    // 11 September at 20:00 with no night after it, its eyes close over
-    // 320 ms in smooth and in two steps in retro. Nothing else moves it:
-    // letting go of a scrub puts it back to sleep at once, a new symbol
+    // The header's animal falling asleep and waking, as it is rendered with
+    // its "z", the status words hidden: when the clock closes DOWN's market,
+    // Friday 11 September at 20:00 with no night after it, its eyes close
+    // over 320 ms in smooth and in two steps in retro, and when its night
+    // starts on Sunday at 20:00 they open the same way. Nothing else moves
+    // it: letting go of a scrub puts it back to sleep at once, a new symbol
     // changes it at once, and an open after the close shows it asleep from
     // its first frame.
     function sleepFrames(body) {
@@ -693,6 +694,19 @@ ShellRoot {
       })
       harness.check("the clock closing the market closes the animal's eyes over 320 ms, smoothly in smooth and in two steps in retro, whose clock skips the closing second — "
         + bells.join(" | "), bells.every(function(b) { return /^\w+: ok, /.test(b) }))
+      // Sunday at 20:00, DOWN's night starting: it trades all night.
+      var wake = close + 2 * 86400
+      var wakes = ["smooth", "retro"].map(function(style) {
+        look(style)
+        service.now = wake - 60
+        tryVerify(function() { return body.animal.asleep && header.closing === 1 }, 2000)
+        var opened = run("wake-bell-" + style, style === "smooth" ? "turn:320" : "steps:320", function() {
+          service.now = style === "smooth" ? wake : wake + 2
+        })
+        return style + ": " + (opened.ok && !body.animal.asleep ? "ok" : "not ok") + ", " + opened.detail
+      })
+      harness.check("the clock waking the market opens the animal's eyes over 320 ms, the \"z\" going with them, smoothly in smooth and in two steps in retro — "
+        + wakes.join(" | "), wakes.every(function(w) { return /^\w+: ok, /.test(w) }))
       look("smooth")
       // Two seconds after the close, inside the bell's few seconds, a scrub
       // on the same side of the close, so the animal reads a bear on both
