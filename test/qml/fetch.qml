@@ -114,6 +114,9 @@ ShellRoot {
     property var toplevels: ({ values: [] })
     property var focusedWorkspace: workspaceHere
     function dispatch(request) {}
+    // Hyprland's events, which ask the screens again while every one is
+    // off. None come: only a step asks them.
+    signal rawEvent(var event)
   }
   Binding { target: plugin.windowHost; property: "hyprlandStandIn"; value: hyprlandStandIn }
 
