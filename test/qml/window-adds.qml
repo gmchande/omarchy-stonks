@@ -7,8 +7,8 @@ import "plugin" as Stonks
 // Adding symbols in the window, through the real App and Service with real
 // Qt keys and pointer: an add held until its price is in, its row joining
 // at its place, the list easing to it, adds out at a close or a list
-// switch, two adds in a row, and adds from search. HOME and curl are
-// scratch fixtures.
+// switch, two adds in a row, adds from search, and a joining row's day line
+// drawn in, whole once drawn. HOME and curl are scratch fixtures.
 ShellRoot {
   id: harness
 
@@ -345,6 +345,101 @@ ShellRoot {
       service.removeSymbol("SHOP.TO")
       service.removeSymbol("SHHI.NE")
       tryVerify(function() { return service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 5000)
+      wait(100)
+    }
+
+    // A row that joins draws its day line in, and is whole once drawn:
+    // after an add lands and after an undo, in smooth and retro. A list
+    // switch and a sort show every row whole at once. Read on frames, what
+    // a frame shows: each frame's least of the joining row's line, and of
+    // every row's on a switch. No timing is judged here (window-motion
+    // judges the motion on its pictures).
+    function joiningLines(body, watchlist, keys) {
+      service.createList("Lines")
+      ;["AAPL", "NVDA", "STRAY"].forEach(function(s) { service.setMembership(s, "Lines", true) })
+      service.switchList("Lines")
+      service.setOrder("manual")
+      wait(100)
+      var lineOf = function(symbol) {
+        var row = watchlist.rowItem(symbol)
+        return row ? harness.find(row, watchlist.retro ? "rowCells" : "rowLine") : null
+      }
+      // The least reveal any frame showed of `symbols`' lines while `act`
+      // runs, until `done` holds, and whether each is whole at the end.
+      var watchLines = function(symbols, act, done) {
+        var least = 1
+        var watch = function() {
+          symbols().forEach(function(s) {
+            var line = lineOf(s)
+            if (line && watchlist.rowItem(s).visible) least = Math.min(least, line.reveal)
+          })
+        }
+        var frames = Qt.createQmlObject('import QtQuick; FrameAnimation { running: true }', harness)
+        frames.triggered.connect(watch)
+        act()
+        tryVerify(done, 5000)
+        tryVerify(function() { return symbols().every(function(s) { var l = lineOf(s); return !!l && l.reveal === 1 }) }, 3000)
+        watch()
+        frames.destroy()
+        var whole = symbols().every(function(s) { return lineOf(s).reveal === 1 })
+        var drawable = symbols().every(function(s) { return lineOf(s).drawable })
+        return { drew: least < 1, whole: whole, drawable: drawable, least: least }
+      }
+      var joined = []
+      ;["smooth", "retro"].forEach(function(look) {
+        service.persist({ style: look })
+        wait(50)
+        var slow = function() { return ["SLOW"] }
+        var shown = function() { return watchlist.displayedSymbols.indexOf("SLOW") >= 0 }
+        var added = watchLines(slow, function() { body.search.picked("SLOW") }, shown)
+        tryVerify(function() { return !watchlist.settling && watchlist.rowResting("SLOW") }, 3000)
+        keys.forceActiveFocus()
+        watchlist.cursorSymbol = "SLOW"
+        keyClick(Qt.Key_X)
+        tryVerify(function() { return !shown() }, 2000)
+        var undone = watchLines(slow, function() { keyClick(Qt.Key_U) }, shown)
+        // Closed mid draw-in, the line holds where it is; the next open
+        // shows it whole, not half drawn.
+        keys.forceActiveFocus()
+        watchlist.cursorSymbol = "SLOW"
+        keyClick(Qt.Key_X)
+        tryVerify(function() { return !shown() }, 2000)
+        keyClick(Qt.Key_U)
+        var drawing = lineOf("SLOW").reveal
+        app.close()
+        wait(100)
+        var held = lineOf("SLOW").reveal
+        app.open("{}")
+        var reopened = lineOf("SLOW").reveal
+        wait(200)
+        var closing = { drawing: drawing, held: held, reopened: reopened }
+        joined.push(look + " add " + JSON.stringify(added) + " undo " + JSON.stringify(undone) + " closed " + JSON.stringify(closing))
+        joined.push(added.drew && added.whole && added.drawable && undone.drew && undone.whole && undone.drawable
+          && drawing < 1 && held === drawing && reopened === 1 ? "ok" : "FAILED")
+        service.removeSymbol("SLOW")
+        tryVerify(function() { return !shown() }, 2000)
+      })
+      harness.check("a row that joins, by an add that lands or an undo, draws its day line in and shows it whole once drawn, smooth and retro; closed mid draw-in, it opens whole",
+        joined.every(function(r) { return r !== "FAILED" }), joined.join(" | "))
+
+      var atOnce = []
+      ;["smooth", "retro"].forEach(function(look) {
+        service.persist({ style: look })
+        wait(50)
+        var rows = function() { return watchlist.displayedSymbols }
+        var toAll = watchLines(rows, function() { service.switchList("") }, function() { return service.listName === "" })
+        var back = watchLines(rows, function() { service.switchList("Lines") }, function() { return service.listName === "Lines" })
+        var sorted = watchLines(rows, function() { service.setOrder("symbol") }, function() { return service.order === "symbol" })
+        service.setOrder("manual")
+        atOnce.push(look + " " + [toAll, back, sorted].map(function(r) { return !r.drew && r.whole ? "ok" : "FAILED " + JSON.stringify(r) }).join(","))
+      })
+      harness.check("a list switch and a sort show every row's day line whole at once, smooth and retro",
+        atOnce.every(function(r) { return r.indexOf("FAILED") < 0 }), atOnce.join(" | "))
+      service.persist({ style: "smooth" })
+      service.switchList("")
+      service.deleteList("Lines")
+      // Taken off Lines only, it is still in All.
+      service.removeSymbol("SLOW")
       wait(100)
     }
 
@@ -693,6 +788,7 @@ ShellRoot {
       sixRows(body, "MSFT", "1Y")
 
       addsFromSearch(body, watchlist, keys)
+      joiningLines(body, watchlist, keys)
       app.close()
       harness.finish()
     }

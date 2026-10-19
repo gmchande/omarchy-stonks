@@ -461,11 +461,11 @@ Flickable {
   }
 
   // Shows `next`. Rows never draw through each other: when `animate`, a
-  // symbol new to the shown rows joins, fading in at its place, and rows
-  // already shown slide (see the delegate). A list that gets shorter at its
-  // end, scrolled to it, has its scroll pulled back within its new length;
-  // the rows keep their places on screen through that, and the ones above
-  // the gap slide down to close it.
+  // symbol new to the shown rows joins, fading in at its place as its day
+  // line draws in, and rows already shown slide (see the delegate). A list
+  // that gets shorter at its end, scrolled to it, has its scroll pulled back
+  // within its new length; the rows keep their places on screen through
+  // that, and the ones above the gap slide down to close it.
   function display(next, animate) {
     var before = displayedSymbols
     var scrolled = contentY
@@ -485,8 +485,9 @@ Flickable {
     }
   }
 
-  // Closing stops each row's slide and fade where they are, so the surface
-  // fades out as it was; settleRows puts them at rest before it opens again.
+  // Closing stops each row's slide, fade, and draw-in where they are, so the
+  // surface fades out as it was; settleRows puts them at rest before it
+  // opens again.
   function pauseRows() {
     for (var i = 0; i < rowRepeater.count; i++) {
       var row = rowRepeater.itemAt(i)
@@ -494,8 +495,8 @@ Flickable {
     }
   }
 
-  // A slide or fade still running when a new arrangement lands ends where
-  // it was going, before anything is drawn.
+  // A slide, fade, or draw-in still running when a new arrangement lands
+  // ends where it was going, before anything is drawn.
   function settleRows() {
     for (var i = 0; i < rowRepeater.count; i++) {
       var row = rowRepeater.itemAt(i)
@@ -769,10 +770,14 @@ Flickable {
           travel = 0
           fadeIn.stop()
           opacity = 1
+          drawIn.stop()
+          reveal = 1
+          lineOwed = false
         }
         function pause() {
           if (slide.running) slide.pause()
           if (fadeIn.running) fadeIn.pause()
+          if (drawIn.running) drawIn.pause()
         }
         // Stays at `atY` on screen, still: the slide it would start ends here.
         function holdAt(atY) {
@@ -780,9 +785,26 @@ Flickable {
           slide.stop()
           shift = atY - place * root.rowPitch
         }
+        // Joining, the row fades in and its day line draws in from the left
+        // in the hero's 320 ms, the baseline whole from the start. A row
+        // that joins before its line is there owes the draw-in: a line that
+        // comes while the row still fades in draws in from its start, and
+        // one that comes later is there at once, the join being over.
+        property bool lineOwed: false
         function join() {
           opacity = 0
           fadeIn.restart()
+          lineOwed = !geometry
+          if (geometry) drawLineIn()
+        }
+        function drawLineIn() {
+          reveal = 0
+          drawIn.restart()
+        }
+        onGeometryChanged: {
+          if (!lineOwed || !geometry) return
+          lineOwed = false
+          if (fadeIn.running && !fadeIn.paused) drawLineIn()
         }
         // Keeps the row where it is on screen while the list's scroll moves
         // by `distance` under it, then slides it to its place.
@@ -798,6 +820,7 @@ Flickable {
           slide.restart()
         }
         NumberAnimation { id: fadeIn; target: rowDelegate; property: "opacity"; to: 1; duration: 160; easing.type: Easing.OutCubic }
+        NumberAnimation { id: drawIn; target: rowDelegate; property: "reveal"; from: 0; to: 1; duration: 320; easing.type: Easing.OutCubic }
         width: parent.width
         // A row outside this list rests: no figures derived, nothing drawn.
         // Shown again, it takes its quote and draws before that frame. A row

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # The window's chart in motion through the real App and Service with real
 # Qt keys and pointer: repaints, replays, the day and the hero, the draw-in
-# judged on rendered frames, a wrong draw-in failing that same judgement,
+# judged on rendered frames, a wrong draw-in failing that same judgement, a
+# joining row's day line drawing in and a list switch's rows drawn at once,
 # the header's animal closing and opening its eyes at the bell and changing
 # at once on every other change, and a closing surface holding still. HOME
 # and curl are scratch.
