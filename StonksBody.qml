@@ -115,7 +115,7 @@ Item {
   // is fixed: the data file can't be read, or an update waits on a shell
   // restart, which a click on it does.
   readonly property string notice: settingsUnreadable ? "Can't read grvc.stonks.json · fix or remove it to save changes"
-    : updatedTo !== "" ? "Updated to " + updatedTo + " · restart the shell" : ""
+    : updatedTo !== "" ? "Updated to " + updatedTo + " · click to restart the shell" : ""
   // The removal the footer's note offers back, the service's one removal on
   // offer as the note was said: when another surface makes a newer removal,
   // the lists change, or it is undone, the offer goes, and the note with it.

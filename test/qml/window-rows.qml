@@ -1177,7 +1177,7 @@ ShellRoot {
       app.close()
       app.open("{}")
       var updated = stillOpen.indexOf("+  Add a symbol") === 0
-        && within(1000, function() { return text() === "Updated to 9.9.9 · restart the shell" })
+        && within(1000, function() { return text() === "Updated to 9.9.9 · click to restart the shell" })
       mouseClick(footer, footer.width / 2, footer.height / 2)
       harness.check("the window's footer says an update on its next open, and a click on it restarts the shell",
         updated && within(5000, function() { return harness.readFile(harness.fakeState + "/omarchy.calls") === "restart shell\n" }),

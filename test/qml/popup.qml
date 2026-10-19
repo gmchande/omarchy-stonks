@@ -206,7 +206,7 @@ ShellRoot {
     return lines.length
   }
   readonly property string fileNotice: "Can't read grvc.stonks.json · fix or remove it to save changes"
-  readonly property string updateNotice: "Updated to 9.9.9 · restart the shell"
+  readonly property string updateNotice: "Updated to 9.9.9 · click to restart the shell"
   PluginBarApi {
     id: hintApi
     pluginId: "grvc.stonks"
@@ -1043,8 +1043,10 @@ ShellRoot {
           var closedUpdate = test.footerText(test.hintPanel)
           test.hintPanel.open()
           var updateSaid = test.footerText(test.hintPanel)
-          test.check("an update while the popup is closed is said in the footer on the next open",
-            closedUpdate.indexOf("+  Add a symbol") === 0 && updateSaid === test.updateNotice, closedUpdate + "|" + updateSaid)
+          var updateWhole = !test.find(test.find(test.hintPanel.testBody, "footer"), "footerText").truncated
+          test.check("an update while the popup is closed is said whole in the footer on the next open",
+            closedUpdate.indexOf("+  Add a symbol") === 0 && updateSaid === test.updateNotice && updateWhole,
+            [closedUpdate, updateSaid, updateWhole].join("|"))
           test.writeFile(test.dataPath, "")
         } else if (test.step === 34) {
           if (test.hold(test.hintService.settingsUnreadable)) return

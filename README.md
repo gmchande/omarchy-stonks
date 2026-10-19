@@ -201,7 +201,7 @@ omarchy restart shell
 ```
 
 Until the shell restarts, it runs the old version, and the popup says
-"Updated to … · restart the shell"; a click there restarts it.
+"Updated to … · click to restart the shell".
 
 ## Remove
 
