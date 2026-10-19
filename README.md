@@ -165,6 +165,63 @@ switch between smooth and retro.
 | `?` | Open the key sheet |
 | `Esc` | Close the sheet, then the scrub, then the popup or window |
 
+## If something's wrong
+
+A "!" on the pill means its stock's quote is late or its last refresh
+failed: point at the pill to read which. The row and the line above the
+price say the same.
+
+- **A row says "No data" or "Update overdue".** Stonks has waited 90
+  seconds on Yahoo: no answer came, or Yahoo turned it away. A row with a
+  price keeps it, with the time it's from. Check your connection; if other
+  sites load, Yahoo is down or refusing, and there's nothing to do but wait.
+  Stonks keeps asking by itself, less often the longer Yahoo stays away,
+  and `r` won't hurry it.
+- **A row says "No data for this symbol" or "Refresh failed".** Yahoo said
+  it has nothing for the symbol, or sent a broken answer three times
+  running. A row with a price keeps it, with the time it's from, and `r`
+  asks again. A symbol Yahoo has dropped, after a merger, a rename, or a
+  delisting, stays this way: search for the company to find what Yahoo
+  calls it now. If every row says it, Yahoo has changed or closed what
+  Stonks asks for, and only a newer Stonks can fix that.
+- **A London or Tokyo stock says "As of" while its market is open.** Yahoo
+  sends those exchanges' prices 20 minutes late, and Stonks gives the time
+  of any price more than two minutes old while its market trades. Yahoo
+  lists each exchange's delay [on its help page](https://help.yahoo.com/kb/SLN2310.html).
+  A thin stock can say it too: its last trade was that long ago. The
+  overnight price names its own time, usually 10 to 15 minutes back, since
+  Robinhood's prints arrive late, and dims once it's 20 minutes old.
+- **A price looks wrong.** Each price is in its listing's currency, never
+  converted, and Yahoo sends London's in pence (GBp): 3,580.00 is £35.80.
+  The large price is the regular session's; pre-market, after-hours, and
+  overnight trades are the smaller line under it, which some apps show as
+  the main price. The change is from the previous close, or on a longer
+  range from the range's start. Stonks shows Yahoo's prices as sent, but
+  for the stray prints Yahoo sometimes drops into a chart, which it leaves
+  out.
+- **The day's chart says "No trades charted" or "Traded only at" a time.**
+  The listing traded too little that day to draw a line.
+- **The header says "1W unavailable", with RETRY beside it.** Yahoo didn't
+  send that range's chart. Click RETRY, or press `r`. While Yahoo is
+  turning Stonks away, a range fails at once.
+- **Search says "Search didn't answer".** Yahoo's search didn't answer, or
+  Stonks is waiting out a refusal from Yahoo. Try again in a moment.
+- **The header says "schedule unavailable".** Stonks carries each
+  exchange's holidays through a set date, and this exchange's have run
+  out, so it can't say when the market next opens. Update Stonks for a
+  renewed calendar.
+- **The footer says "Can't read grvc.stonks.json".** The file holding your
+  lists can't be opened or isn't valid JSON, often after a hand edit.
+  Stonks keeps the lists it has and writes nothing over the file until it
+  reads again. Fix the file, and Stonks reads it as you save; or remove it
+  to start over from the starter list.
+
+To report a price or chart that looks wrong, or anything this doesn't
+answer, use the [bug form](https://github.com/gmchande/omarchy-stonks/issues/new?template=bug.yml).
+For a price, give the symbol, the range, and the time (scrub the chart to
+it), what Stonks showed, and what your broker or the exchange showed then.
+The shell's log the form asks for can name prints Stonks left out.
+
 ## What it runs
 
 - **Needs:** nothing beyond Omarchy 4. It runs `curl`, which Omarchy ships.
@@ -175,7 +232,9 @@ switch between smooth and retro.
   for overnight prices and which stocks trade overnight. Nothing else.
 - **Data:** Yahoo's endpoints are unofficial, and its terms restrict
   automated access; Robinhood's data is for personal use. Either may change
-  or stop without notice.
+  or stop without notice. Some prices come late: Yahoo's London and Tokyo
+  quotes are 20 minutes behind. Stonks isn't investment advice, and isn't
+  affiliated with Yahoo or Robinhood.
 - **Files it writes:** your lists and settings in
   `~/.config/omarchy/grvc.stonks.json`, and the last quotes in
   `~/.cache/grvc.stonks/quotes.json`. The shell keeps the pill's form on its
