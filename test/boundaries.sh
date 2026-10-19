@@ -2,8 +2,9 @@
 # Boundaries in the production source that no flow can see: who may run a
 # command, read or write a file, start a feed, or name an endpoint; that the
 # model stays pure; that colours come from the theme; that the bar entry
-# holds only barStyle; and that no file takes QtQuick's Sprite name. And one
-# in the tests: a harness ends Quickshell only through HarnessExit.qml.
+# holds only the pill's forms; and that no file takes QtQuick's Sprite name.
+# And one in the tests: a harness ends Quickshell only through
+# HarnessExit.qml.
 # Prints a FAILED line per breach and exits non-zero on any.
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -73,13 +74,13 @@ none "^(?!  \\{ up: \"#[0-9a-f]{6}\", down: \"#[0-9a-f]{6}\" \\},?$).*([\"'])#[0
 # its colours still themes: no hex literal in either quote, no numeric
 # Qt.rgba, and no literal but "transparent" as a colour's whole value.
 none "([\"'])#[0-9a-fA-F]{3,8}\\1|Qt\\.(rgba|hsla|hsva)\\(\\s*[0-9.]|(?i)(\\b\\w*color|fillstyle|strokestyle|property\\s+color\\s+\\w+)\\s*[:=]\\s*([\"'])(?!transparent\\4)[^\"'\\n]+\\4\\s*;?\\s*$" *.qml
-# The bar entry holds only the pill's forms, barStyle and, for the right
-# section, barStyleRight, which is absent until a middle-click there; the
-# service's file holds the rest.
+# The bar entry holds only the pill's forms: barStyle, and, absent until a
+# middle-click there, barStyleRight for the right section and
+# barStyleVertical for a side bar; the service's file holds the rest.
 jq -e '.barWidget.defaults | keys == ["barStyle"]' manifest.json > /dev/null \
   || fail "manifest.json: the bar entry's defaults hold more than barStyle"
-jq -e '[.barWidget.schema[].key] == ["barStyle", "barStyleRight"]' manifest.json > /dev/null \
-  || fail "manifest.json: the bar entry's schema holds more than barStyle and barStyleRight"
+jq -e '[.barWidget.schema[].key] == ["barStyle", "barStyleRight", "barStyleVertical"]' manifest.json > /dev/null \
+  || fail "manifest.json: the bar entry's schema holds more than barStyle, barStyleRight, and barStyleVertical"
 # QtQuick owns Sprite: a Sprite.qml here would resolve as QtQuick's type.
 [ -e Sprite.qml ] && fail "Sprite.qml: QtQuick owns the Sprite type"
 # Qt.exit tears Quickshell's engine down at the next deferred delete, which

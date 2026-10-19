@@ -215,6 +215,7 @@ function rowModel(quote, scrubT, changeMode) {
     asOf: read ? read.t : null,
     // Null stays null: an unavailable change must not read as unchanged.
     pct: chg.pct,
+    abs: chg.abs,
     tone: Format.changeTone(chg, changeMode, quote.priceDigits),
     dayUp: direction.pct === null ? null : direction.up,
     dayTone: Format.changeTone(direction, "pct", quote.priceDigits),

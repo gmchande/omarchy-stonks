@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import qs.Commons
 import qs.Ui
@@ -27,8 +29,12 @@ BarWidget {
   readonly property var lineGeometry: featuredQuote && featuredQuote.points.length ? Chart.chartGeometry(featuredQuote, service.calendars) : null
   // In the bar's right section, among its bare icons, the pill has a form of
   // its own, `barStyleRight`: the icon until a middle-click there picks
-  // another. The centre and left share `barStyle`. Both ride the entry when
-  // it moves, so each section brings back its own.
+  // another. The centre and left share `barStyle`. On a side bar it has
+  // `barStyleVertical`: the icon, as Omarchy's text widgets fall back to
+  // theirs there, until a middle-click picks the symbol over its change
+  // ("stacked"). Each rides the entry, as the clock keeps verticalFormat
+  // beside format, so a move between sections or between the top and a side
+  // brings back each one's own.
   readonly property bool onRight: {
     var layout = bar && bar.layoutConfig ? bar.layoutConfig : null
     var right = layout && Array.isArray(layout.right) ? layout.right : []
@@ -36,8 +42,8 @@ BarWidget {
       return (typeof entry === "string" ? entry : entry && entry.id) === root.moduleName
     })
   }
-  readonly property string styleKey: onRight ? "barStyleRight" : "barStyle"
-  readonly property string barStyle: setting(styleKey, onRight ? "icon" : "sparkline")
+  readonly property string styleKey: vertical ? "barStyleVertical" : onRight ? "barStyleRight" : "barStyle"
+  readonly property string barStyle: setting(styleKey, vertical || onRight ? "icon" : "sparkline")
   // Just Stonks' mark, a quiet icon among the bar's own.
   readonly property bool iconOnly: barStyle === "icon"
   readonly property bool retro: service ? service.retro : setting("style", "smooth") === "retro"
@@ -75,6 +81,15 @@ BarWidget {
   // most likely to be trusted at a glance.
   readonly property string changeText: featured ? (warns ? "! " : "") + Format.lookSigns(featured.changeLine, retro)
     : (warns ? "! no data" : "…")
+  // A side bar's stacked form: the symbol's lines over the move's, each at
+  // most four characters (`Format.stackedSymbol`), the move in the rows'
+  // unit, money in money and else a percent (`Format.stackedMoney`,
+  // `stackedPct`), coloured by its sign as drawn.
+  readonly property var stackedMove: !featured ? { lines: ["…"], sign: 0 }
+    : service.changeMode === "abs" ? Format.stackedMoney(featured.abs, featuredQuote.priceDigits) : Format.stackedPct(featured.pct)
+  readonly property var stackedLines: (featured ? Format.stackedSymbol(featured.symbol) : ["ST"])
+    .map(function(t) { return { text: t, move: false } })
+    .concat(stackedMove.lines.map(function(t) { return { text: t, move: true } }))
 
   // What is left of a notch between wheel events: a high-resolution wheel
   // sends a notch as several small ticks, and a notch is one symbol.
@@ -111,13 +126,11 @@ BarWidget {
       root.bar.shell.updateEntryInline(root.moduleName, entry)
   }
 
-  // A vertical bar draws the line, the arrow, and the text alike, the symbol
-  // over its change, so a middle-click there steps between that and the
-  // icon; a saved arrow or text stays saved, for a horizontal bar, until it
-  // does.
+  // A side bar has two forms, the icon and the symbol over its change, so a
+  // middle-click there steps between them.
   function cycleBarStyle() {
     var ring = ["sparkline", "arrow", "text", "icon"]
-    root.persistBarStyle(root.vertical ? (root.iconOnly ? "sparkline" : "icon")
+    root.persistBarStyle(root.vertical ? (root.iconOnly ? "stacked" : "icon")
       : ring[(ring.indexOf(barStyle) + 1) % ring.length])
   }
 
@@ -171,7 +184,7 @@ BarWidget {
     labelVisible: false
     hasVisualContent: true
     fixedWidth: root.vertical ? -1 : (root.iconOnly ? Style.bar.iconSlot : content.implicitWidth + Style.space(17))
-    fixedHeight: root.vertical ? (root.iconOnly ? Style.bar.iconSlot : Style.bar.iconSlot * 2) : -1
+    fixedHeight: root.vertical ? (root.iconOnly ? Style.bar.iconSlot : root.stackedLines.length * Style.bar.iconSlot) : -1
     // A hover only for what the pill can't say: the icon names nothing, so
     // its hover says what the other forms show, the symbol and its change;
     // on every form, what a warning's "!" means. The line, the arrow, and
@@ -286,30 +299,27 @@ BarWidget {
       }
     }
 
+    // As Omarchy's clock draws a vertical bar: one line to an icon slot, at
+    // the bar's size, 90% at four characters, never smaller.
     Column {
+      objectName: "pillStack"
       visible: root.vertical && !root.iconOnly
       anchors.centerIn: parent
 
-      OpticalGlyph {
-        objectName: "pillDaySymbol"
-        width: button.width
-        height: Style.bar.iconSlot
-        text: root.featured ? root.featured.symbol : "ST"
-        fontFamily: button.fontFamily
-        fontSize: button.fontSize * 0.85
-        color: button.foreground
-      }
-      // Coloured by the figure it shows, a percentage whatever change the
-      // rows say: by its sign, and no colour once it shows 0.0%.
-      OpticalGlyph {
-        objectName: "pillDayChange"
-        width: button.width
-        height: Style.bar.iconSlot
-        text: root.featured ? Format.lookSigns(Format.narrowPct(root.featured.pct), root.retro) : "…"
-        fontFamily: button.fontFamily
-        fontSize: button.fontSize * 0.85
-        color: !root.featured || Format.narrowPctShown(root.featured.pct).shown === 0 ? root.dimColor
-          : root.featured.pct > 0 ? root.upColor : root.downColor
+      Repeater {
+        model: root.stackedLines
+
+        OpticalGlyph {
+          required property var modelData
+          objectName: "pillStackLine"
+          width: button.width
+          height: Style.bar.iconSlot
+          text: modelData.move ? Format.lookSigns(modelData.text, root.retro) : modelData.text
+          fontFamily: button.fontFamily
+          fontSize: modelData.text.length > 3 ? button.fontSize * 0.9 : button.fontSize
+          color: !modelData.move ? button.foreground : root.stackedMove.sign > 0 ? root.upColor
+            : root.stackedMove.sign < 0 ? root.downColor : root.dimColor
+        }
       }
     }
   }

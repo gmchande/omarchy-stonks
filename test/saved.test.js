@@ -567,15 +567,16 @@ test("the 52-week line moves Yahoo's cap and P/E with the price, and leaves out 
   const at = (q, price, date, days = 0) => ({ ...q, price, marketTime: M.dateEpoch(date) + days * DAY + 20 * 3600 })
   const aapl = figures("aapl")
   const year = (q, f) => said(M.yearLine(q, f))
-  // At the snapshot's own close the figures are Yahoo's; 10% up moves both 10%.
-  expect(year(at(quote, 337.02, "2026-09-23"), aapl)).toBe("52W · 225.95–344.57 @337.02 · MKT CAP 4.92T · P/E 38.6")
-  expect(year(at(quote, 370.72, "2026-10-01"), aapl)).toBe("52W · 225.95–344.57 @370.72 · MKT CAP 5.41T · P/E 42.5")
+  // At the snapshot's own close the figures are Yahoo's; 10% up moves both
+  // 10%. Every cap names its currency: Tokyo's read "33.82T", yen that read
+  // as dollars beside a US cap.
+  expect(year(at(quote, 337.02, "2026-09-23"), aapl)).toBe("52W · 225.95–344.57 @337.02 · MKT CAP USD 4.92T · P/E 38.6")
+  expect(year(at(quote, 370.72, "2026-10-01"), aapl)).toBe("52W · 225.95–344.57 @370.72 · MKT CAP USD 5.41T · P/E 42.5")
   const nest = M.parseChart(fixture("nest-2026-09-11-day-prepost.json"))
-  expect(year(at(nest, 226.61, "2026-09-23"), figures("nest"))).toBe("52W · 73.52–299.86 @226.61 · MKT CAP 61.6B · P/E _")
-  // A cap in the price's own currency names none.
-  expect(year(at(shop, 200.46, "2026-09-23"), figures("shop-to"))).toBe("52W · 129.01–253.10 @200.46 · MKT CAP 257.6B · P/E 96.5")
+  expect(year(at(nest, 226.61, "2026-09-23"), figures("nest"))).toBe("52W · 73.52–299.86 @226.61 · MKT CAP USD 61.6B · P/E _")
+  expect(year(at(shop, 200.46, "2026-09-23"), figures("shop-to"))).toBe("52W · 129.01–253.10 @200.46 · MKT CAP CAD 257.6B · P/E 96.5")
   // Tokyo's day, a week and more after its snapshots.
-  expect(year(M.parseChart(fixture("7203-t-day.json")), figures("7203-t"))).toBe("52W · 2,686.00–4,000.00 @2,856.00 · MKT CAP 33.82T · P/E 8.1")
+  expect(year(M.parseChart(fixture("7203-t-day.json")), figures("7203-t"))).toBe("52W · 2,686.00–4,000.00 @2,856.00 · MKT CAP JPY 33.82T · P/E 8.1")
   // London before its session: the cap names its pounds against the
   // price's pence, and the zeros Yahoo sends then for the day's high and
   // low and the 52-week low are prices not known yet, left out of both lines.
@@ -588,10 +589,12 @@ test("the 52-week line moves Yahoo's cap and P/E with the price, and leaves out 
   // line names no other day.
   expect(said(dayLineAt(shell, M.epochAt(calendars.calendars.LSE, "2026-10-02", "07:30")))).toBe("1D · ?–? @3,589.00 · OPEN _ · VOL 4K")
   expect(year(shell, figures("shel-l"))).toBe("52W · ?–? @3,589.00 · MKT CAP GBP 204.8B · P/E 10.6")
-  // Before its figures come, its cap's slot already holds the pounds.
+  // Before its figures come, its cap's slot already holds a currency's
+  // room, as every listing's does.
   expect(M.yearLine(shell, null).facts.map(f => f.widest)).toEqual(["GBP 888.8B", "88.8"])
+  expect(M.yearLine(quote, null).facts.map(f => f.widest)).toEqual(["USD 888.8B", "88.8"])
   // A cap 120 days old still moves with the price; at 121 it is left out.
-  expect(year(at(quote, 337.02, "2026-09-23", 120), aapl)).toBe("52W · 225.95–344.57 @337.02 · MKT CAP 4.92T · P/E 38.6")
+  expect(year(at(quote, 337.02, "2026-09-23", 120), aapl)).toBe("52W · 225.95–344.57 @337.02 · MKT CAP USD 4.92T · P/E 38.6")
   expect(year(at(quote, 337.02, "2026-09-23", 121), aapl)).toBe("52W · 225.95–344.57 @337.02 · MKT CAP _ · P/E 38.6")
   // From 100 a P/E has no decimals.
   expect(year(at(quote, 337, "2026-09-17"), { cap: null, pe: { value: 891.6, date: "2026-09-17", close: 337 } }))

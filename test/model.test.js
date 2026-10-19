@@ -158,6 +158,25 @@ test("Toronto and London close early when their exchanges say, and London's 2028
   expect(status(easter, "2028-04-14")).toBe("Good Friday · opens Tue 08:00 BST")
 })
 
+test("a listing's overnight session is named so, a holiday's evening too, and the night before a holiday trades none", () => {
+  const nest = {
+    symbol: "NEST", exchange: "NASDAQ", crypto: false, gmtoffset: M.offsetForDate(US, "2026-11-25"),
+    session: {
+      pre: { start: at("2026-11-25", "04:00"), end: at("2026-11-25", "09:30") },
+      regular: { start: at("2026-11-25", "09:30"), end: at("2026-11-25", "16:00") },
+      post: { start: at("2026-11-25", "16:00"), end: at("2026-11-25", "20:00") }
+    },
+    points: []
+  }
+  const night = (date, allDay) => M.nightTrades(nest, allDay, at(date, "21:00"), calendars)
+  // Thanksgiving's evening trades for Friday, for a listing Robinhood trades
+  // all day; the evening before it, nothing.
+  expect([night("2026-11-26", true), night("2026-11-26", false), night("2026-11-25", true)]).toEqual([true, false, false])
+  const thursday = at("2026-11-26", "21:00")
+  expect(M.marketStatus(nest, thursday, 0, calendars, true)).toBe("Overnight · opens Fri 09:30")
+  expect(M.marketStatus(nest, thursday, 0, calendars, false)).toBe("Thanksgiving Day · opens Fri 09:30")
+})
+
 test("formatting", () => {
   expect(M.duration(4200)).toBe("1h 10m")
   expect(M.duration(300)).toBe("5m")
@@ -174,10 +193,12 @@ test("formatting", () => {
   expect(M.pct(1267.16)).toBe("+1,267%")
   expect(M.pct(71789.6)).toBe("+71,790%")
   expect(M.pct(-999.99)).toBe("\u2212999.99%")
-  // A vertical bar's pill: one decimal under 10%, none from 10% up, so it
-  // stays five characters wide; a move that shows as none has no sign.
-  expect([-1.56, 0.04, 9.94, 9.96, -12.34, 123.4].map(M.narrowPct))
-    .toEqual(["\u22121.6%", "0.0%", "+9.9%", "+10%", "\u221212%", "+123%"])
+  // A side bar's pill stacks the move in lines of four characters at most:
+  // one decimal under 10%, none from 10% up, thousands as K%; a move that
+  // shows as none has no sign.
+  const pctLines = v => M.stackedPct(v).lines.join(" ")
+  expect([-1.56, 0.04, 9.94, 9.96, -12.34, 123.4, 999.4, 1234.5, 9960, 54321].map(pctLines))
+    .toEqual(["\u22121.6 %", "0.0 %", "+9.9 %", "+10 %", "\u221212 %", "+123 %", "+999 %", "+1.2 K%", "+10 K%", "+54 K%"])
   // It rounds what the rows show, never the float behind it, so the two
   // agree whatever prices made the move: 20 to 21.99 is 9.94999…%, which
   // the rows show as +9.95% and the pill showed as +9.9% while 100 to
@@ -186,11 +207,24 @@ test("formatting", () => {
     [100, 100.05], [100, 99.95], [20, 39.99], [100, 199.95], [20, 0.01], [100, 0.05]]
     .map(([prevClose, price]) => {
       const move = M.change({ prevClose }, price, "pct").pct
-      return M.pct(move) + " " + M.narrowPct(move)
+      return M.pct(move) + " " + M.stackedPct(move).lines[0]
     })
-  expect(shown).toEqual(["+9.95% +10%", "\u22129.95% \u221210%", "+9.95% +10%", "\u22129.95% \u221210%", "+9.94% +9.9%",
-    "+0.05% +0.1%", "\u22120.05% \u22120.1%", "+0.05% +0.1%", "\u22120.05% \u22120.1%",
-    "+99.95% +100%", "+99.95% +100%", "\u221299.95% \u2212100%", "\u221299.95% \u2212100%"])
+  expect(shown).toEqual(["+9.95% +10", "\u22129.95% \u221210", "+9.95% +10", "\u22129.95% \u221210", "+9.94% +9.9",
+    "+0.05% +0.1", "\u22120.05% \u22120.1", "+0.05% +0.1", "\u22120.05% \u22120.1",
+    "+99.95% +100", "+99.95% +100", "\u221299.95% \u2212100", "\u221299.95% \u2212100"])
+  // In money, split at its point with its sign kept; a coin's long fraction
+  // broken after four characters; from a thousand in its unit, a figure that
+  // rounds to 1,000 of one being one of the next.
+  const moneyLines = ([v, digits]) => M.stackedMoney(v, digits).lines.join(" ")
+  expect([[-3.84, 2], [0.004, 2], [-0.67, 2], [999.994, 2], [999.996, 2], [8940, 2], [-12345, 0], [999600, 0], [-0.000000123, 9]]
+    .map(moneyLines))
+    .toEqual(["\u22123 .84", "0 .00", "\u22120 .67", "+999 .99", "+1.0 K", "+8.9 K", "\u221212 K", "+1.0 M", "\u22120 .000 0001 23"])
+  expect([M.stackedMoney(0.004, 2).sign, M.stackedMoney(-0.67, 2).sign, M.stackedPct(0.04).sign]).toEqual([0, -1, 0])
+  // A symbol: an index without its ^, a longer one split at its dot or
+  // dash, and what is still longer broken after its fourth character.
+  expect(["AAPL", "^GSPC", "^DJI", "SHEL.L", "BTC-USD", "SHIB-USD", "BRK-B", "GOOGL", "RELIANCE.NS", "^STOXX50E"]
+    .map(s => M.stackedSymbol(s).join(" ")))
+    .toEqual(["AAPL", "GSPC", "DJI", "SHEL .L", "BTC -USD", "SHIB -USD", "BRK -B", "GOOG L", "RELI ANCE .NS", "STOX X50E"])
   expect(M.changeText({ abs: 0.91, pct: 0.52 }, "abs")).toBe("+0.91")
   expect(M.changeText({ abs: -1234.5, pct: -2 }, "abs")).toBe("\u22121,234.50")
   expect(M.nextChangeMode("pct")).toBe("abs")

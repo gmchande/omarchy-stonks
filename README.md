@@ -3,7 +3,7 @@
 A stock watchlist plugin for the Omarchy 4 shell: today's move in your bar,
 and a chart you can scrub a click away.
 
-<img src="preview.png" alt="Stonks in the Omarchy bar: the pill shows Apple's symbol, sparkline, and change, and under it the popup shows Apple's price, the day's chart, the range buttons, and the day's and 52-week figures">
+<img src="preview.png" alt="Stonks in the Omarchy bar: the pill shows Apple's symbol, sparkline, and change, and under it the popup shows Apple's price, the day's chart, the range buttons, the day's and 52-week figures, and the first rows of the list">
 
 - Today's move in your bar; scroll over it to step through your stocks.
 - Click for the day's chart and scrub it with the pointer, or pick a range
@@ -40,7 +40,8 @@ you're ready.
 The pill shows today's move for the stock you last looked at, in one of four
 forms: a sparkline, an arrow, the price as text, or Stonks' mark, a little
 chart that climbs on an up day and falls on a down one. Middle-click it to
-change its form.
+change its form. On a bar at the side of the screen it shows the mark, and
+a middle-click there switches to the symbol over its change.
 
 Scroll over it to step through your list, left-click for the popup,
 right-click for the window, and drag it to move it along the bar.

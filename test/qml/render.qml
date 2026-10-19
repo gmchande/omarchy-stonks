@@ -845,7 +845,7 @@ ShellRoot {
       : (root.windowWidth ? root.windowWidth : (root.smallest ? 560 : (root.popup ? 480 : 720)))
     // The larger text size lands after the window has taken its height, so
     // the large sheet is given room for its seven rows.
-    implicitHeight: root.stateName === "pill-sheet-large" ? 580 : root.pillSheet ? pillColumn.implicitHeight + 40 : root.sheet ? 460
+    implicitHeight: root.stateName === "pill-sheet-large" ? 720 : root.pillSheet ? pillColumn.implicitHeight + 40 : root.sheet ? 460
       : root.themeState ? Math.max(body.fittedHeight(body.chromeHeight + 3 * body.rowPitch - body.rowGap) + content.inset * 2, pillColumn.implicitHeight + 40)
       : (root.windowWidth ? 850
         : (root.smallest ? body.smallestHeight
@@ -998,10 +998,11 @@ ShellRoot {
               }
             }
 
-            // The same pill on a strip of vertical bar.
+            // The same pill on a strip of vertical bar: the mark beside the
+            // icon form, the symbol over its change beside the others.
             Rectangle {
               width: Style.bar.sizeVertical
-              height: Style.bar.iconSlot * 2
+              height: verticalPill.implicitHeight
               anchors.verticalCenter: parent.verticalCenter
               color: root.barGround
 
@@ -1018,11 +1019,12 @@ ShellRoot {
                 layoutConfig: pillApi.layoutConfig
               }
               BarWidget {
+                id: verticalPill
                 anchors.centerIn: parent
                 width: parent.width
                 height: implicitHeight
                 bar: verticalApi
-                settings: ({ id: "grvc.stonks", barStyle: pillRow.modelData.style })
+                settings: ({ id: "grvc.stonks", barStyleVertical: pillRow.modelData.style === "icon" ? "icon" : "stacked" })
               }
             }
           }
