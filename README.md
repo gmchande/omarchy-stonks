@@ -186,9 +186,9 @@ price say the same.
   again at each refresh, and if Yahoo has changed what it answers, only a
   newer Stonks can fix that.
 - **A London or Tokyo stock says "As of" while its market is open.** Yahoo
-  sends those exchanges' prices 20 minutes late, and Stonks gives the time
-  of any price more than two minutes old while its market trades. Yahoo
-  lists each exchange's delay [on its help page](https://help.yahoo.com/kb/SLN2310.html).
+  sends those exchanges' prices up to 20 minutes late, and Stonks gives
+  the time of any price more than two minutes old while its market trades.
+  Yahoo lists each exchange's delay [on its help page](https://help.yahoo.com/kb/SLN2310.html).
   A thin stock can say it too: its last trade was that long ago. The
   overnight price names its own time, usually 10 to 15 minutes back, since
   Robinhood's prints arrive late, and dims once it's 20 minutes old.
@@ -235,7 +235,7 @@ The shell's log the form asks for can name prints Stonks left out.
 - **Data:** Yahoo's endpoints are unofficial, and its terms restrict
   automated access; Robinhood's data is for personal use. Either may change
   or stop without notice. Some prices come late: Yahoo's London and Tokyo
-  quotes are 20 minutes behind. Stonks isn't investment advice, and isn't
+  quotes by up to 20 minutes. Stonks isn't investment advice, and isn't
   affiliated with Yahoo or Robinhood.
 - **Files it writes:** your lists and settings in
   `~/.config/omarchy/grvc.stonks.json`, and the last quotes in
