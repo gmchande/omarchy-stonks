@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 # Saves the endpoints' answers for the demo watchlist (test/tophat/demo.json)
 # at this moment, into the saved answers' moments/demo-<YYYY-MM-DD-HHMM>,
-# New York time, which test/qml/readme.sh renders the README's pictures
-# from: Yahoo's 1D chart for each listing, as Stonks asks for it, and for
-# the US listings Robinhood's span=day prints and instruments. Commit the
-# new folder in the saved answers' repository. By hand: it calls the network.
+# New York time, for the README's pictures: Yahoo's 1D chart for each
+# listing, as Stonks asks for it, and for the US listings Robinhood's
+# span=day prints and instruments. Commit the new folder in the saved
+# answers' repository; test/qml/readme.sh renders from it once its `moment`
+# names it. By hand: it calls the network.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 fixtures=$(test/fixtures-dir.sh)
 moment=$(TZ=America/New_York date +%Y-%m-%d-%H%M)
 final="$fixtures/moments/demo-$moment"
 [ ! -e "$final" ] || { echo "$final exists" >&2; exit 1; }
-# Saved into a folder readme.sh never picks, and named a capture only once
-# every answer is in: a failed fetch leaves nothing behind.
+# Saved into a scratch folder, and named a capture only once every answer
+# is in: a failed fetch leaves nothing behind.
 dir=$(mktemp -d "$fixtures/moments/.capture-XXXX")
 trap 'rm -rf "$dir"' EXIT
 ua="Mozilla/5.0 (Omarchy Stonks)"
