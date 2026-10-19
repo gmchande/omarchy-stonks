@@ -71,8 +71,28 @@ BarWidget {
   // Up and down for the bar's own ground (`TrendColors`).
   readonly property color upColor: plugin && plugin.trendColors ? plugin.trendColors.upOn(barGround) : button.foreground
   readonly property color downColor: plugin && plugin.trendColors ? plugin.trendColors.downOn(barGround) : Color.urgent
-  readonly property color trendColor: featured && featured.tone === "up" ? upColor
-    : featured && featured.tone === "down" ? downColor : dimColor
+  readonly property color trendColor: toneColor(featured ? featured.tone : "")
+  // A day's colour by its tone: up, down, or the dim of a flat one.
+  function toneColor(tone) { return tone === "up" ? upColor : tone === "down" ? downColor : dimColor }
+  // The symbol and tone the mark shows. A new price that turns the same
+  // symbol's day between falling and climbing (a flat day climbs, dim)
+  // steps the mark (`StonksMark.turnTo`); a tone alone recolours it, and
+  // another symbol shows at once.
+  property string markSymbol: ""
+  property string markTone: ""
+  onFeaturedChanged: {
+    var symbol = featured ? featured.symbol : ""
+    var tone = featured ? featured.tone : ""
+    if (symbol !== "" && symbol === markSymbol)
+      mark.turnTo(tone === "down", toneColor(tone), markTone === "down", toneColor(markTone))
+    else mark.settle()
+    markSymbol = symbol
+    markTone = tone
+  }
+  Component.onCompleted: {
+    markSymbol = featured ? featured.symbol : ""
+    markTone = featured ? featured.tone : ""
+  }
   // Quieter than the bar's ink by the same rule as the popup's secondary
   // text, against the bar's own ground.
   readonly property color barGround: Qt.rgba(Color.bar.background.r, Color.bar.background.g, Color.bar.background.b, 1)
@@ -250,8 +270,10 @@ BarWidget {
 
       // The icon form, on either bar: Stonks' mark, the same in both looks,
       // climbing or falling with the day, in its colour, at the size of the
-      // bar's icons, its columns solid so it reads beside their glyphs.
+      // bar's icons, its columns solid so it reads beside their glyphs. A
+      // day that crosses its close turns it column by column (`markTone`).
       StonksMark {
+        id: mark
         objectName: "pillMark"
         visible: root.iconOnly
         anchors.verticalCenter: parent.verticalCenter

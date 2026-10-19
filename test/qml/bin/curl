@@ -21,6 +21,8 @@
 #   DOWN         answers the saved NEST day, which fell 1.56%; its history is
 #                NEST's saved week, which rose, so its day and range disagree
 #   FLAT         answers the AAPL day with its previous close at its price
+#   TURN         answers the AAPL day, up; while STONKS_FAKE_STATE/TURN.down
+#                exists, with its previous close above its price, down
 #   SHOP.TO      answers its saved Toronto day, so a search result can be in All
 #   SPY, BTC-USD answer their saved days: an ETF and a cryptocurrency
 #   HISTSTRAY    answers saved intraday MSFT data through the history path
@@ -276,6 +278,7 @@ serve() {
     SLOW) sleep 1; answer ;;
     STRAY|DOWN) stamp < "$fixtures/nest-2026-09-11-day-prepost.json" ;;
     FLAT) answer | sed 's/"chartPreviousClose":316.85/"chartPreviousClose":325.13/' ;;
+    TURN) if [ -e "$state/TURN.down" ]; then answer | sed 's/"chartPreviousClose":316.85/"chartPreviousClose":330.00/'; else answer; fi ;;
     SHOP.TO) cat "$fixtures/shop-to.json" ;;
     SPY) cat "$fixtures/spy-2026-09-11-day-prepost.json" ;;
     BTC-USD) cat "$fixtures/btc-usd-day.json" ;;

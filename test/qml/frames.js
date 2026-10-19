@@ -46,6 +46,13 @@
 //                                      new picture in about 160 ms, or with
 //                                      :0 changes at once, never through a
 //                                      blank or faint frame
+//   bun frames.js columns:LENGTH:N FRAME@T...
+//                                      the pill's mark, N columns across the
+//                                      picture, turns from the first picture
+//                                      to the last left to right, each
+//                                      column whole, over about LENGTH ms
+//                                      OutCubic, never through a blank or
+//                                      faint frame
 //   bun frames.js filled:GAP[:X,Y,W,H] FRAME@T...
 //                                      every frame shows ink all the way
 //                                      down, within that rectangle if
@@ -248,6 +255,55 @@ function steps(frames, length) {
   const ok = !bare && faint < 0 && distinct === 1 && leftAt >= length * 0.35 && leftAt <= length * 0.7
     && restAt >= length * 0.85 && restAt <= length * 1.4
   return { ok, detail: describe(ends) }
+}
+
+// The pill's mark turning column by column, `n` columns across the picture
+// with a pixel's gap between them. Every frame shows each column whole, as
+// the first picture's or the last's, the turned ones (the last's) left of
+// the rest, never fewer than the frame before. The count turned keeps to an
+// OutCubic step over about `length` ms (0.8 to 1.25 of it) starting at the
+// mark, give or take a frame: a column turns once the step passes its
+// middle, as the look icon's columns do (Math.round). At least two frames
+// show part turned, and none is blank or faint.
+function columnTurn(frames, length, n) {
+  const ends = turnEnds(frames)
+  if (ends.detail) return ends
+  const { width, height } = frames[0].image
+  const slice = (width + 1) / n
+  const column = (data, k) => {
+    const parts = []
+    for (let y = 0; y < height; y++)
+      parts.push(data.subarray((y * width + Math.round(k * slice)) * 3, (y * width + Math.round((k + 1) * slice) - 1) * 3))
+    return Buffer.concat(parts)
+  }
+  const ks = [...Array(n).keys()]
+  const before = ks.map(k => column(ends.first, k))
+  const after = ks.map(k => column(ends.last, k))
+  const still = ks.filter(k => before[k].equals(after[k]))
+  const states = frames.map(f => ks.map(k => {
+    const c = column(f.image.data, k)
+    return c.equals(after[k]) ? "n" : c.equals(before[k]) ? "o" : "x"
+  }).join(""))
+  const counts = states.map(s => (s.match(/n/g) || []).length)
+  const wrong = states.findIndex(s => !/^n*o*$/.test(s))
+  const backwards = counts.findIndex((c, i) => i > 0 && c < counts[i - 1])
+  const partial = new Set(counts.filter(c => c > 0 && c < n)).size
+  // Columns an OutCubic step of `l` ms from `s` has turned by `t`.
+  const due = (t, s, l) => ks.filter(k => t - s >= l * (1 - Math.cbrt(1 - (k + 0.5) / n))).length
+  // A frame shows the clock's last tick, up to a frame before its time.
+  const fits = (s, l) => frames.every((f, i) => counts[i] >= due(f.t - 24, s, l) && counts[i] <= due(f.t + 8, s, l))
+  const lengths = []
+  for (let l = 100; l <= 400; l += 5)
+    for (let s = -8; s <= 32; s += 2) if (fits(s, l)) { lengths.push(l); break }
+  const fitted = lengths.filter(l => l >= length * 0.8 && l <= length * 1.25)
+  const ok = !ends.bare && ends.faint < 0 && still.length === 0 && wrong < 0 && backwards < 0 && partial >= 2 && fitted.length > 0
+  return { ok, detail: "columns " + states.join(" ") + " at " + frames.map(f => f.t).join(" ") + " ms | " + partial + " partial, "
+    + (lengths.length ? "fits " + lengths[0] + " to " + lengths[lengths.length - 1] + " ms" : "fits no step of 100 to 400 ms")
+    + (ends.bare ? ", the first or last picture is the bare ground" : "")
+    + (ends.faint >= 0 && !ends.bare ? ", frame " + ends.faint + " (" + frames[ends.faint].t + " ms) is blank or faint" : "")
+    + (still.length ? ", column " + still.join(", ") + " the same in the first and last pictures" : "")
+    + (wrong >= 0 ? ", frame " + wrong + " (" + frames[wrong].t + " ms) not turned left to right, column by whole column" : "")
+    + (backwards >= 0 ? ", went back at frame " + backwards : "") }
 }
 
 function turnEnds(frames) {
@@ -889,6 +945,45 @@ function selfCheck() {
     if (!right) failed++
     console.log((right ? "PASS " : "FAIL ") + "a list that " + name + (expected ? " passes" : " fails") + " — " + verdict.detail)
   }
+  // The pill's mark, five columns of 2 px a pixel apart, each a cap and a
+  // stem down to the floor, turning from falling in red to climbing in
+  // green: `turned(t)` columns from the left, or `pick(k, t)` per column.
+  const markTurn = (turned, until = 360, uneven = null, pick = null) => {
+    const width = 14, height = 11
+    const climbs = [3, 1, 2, 1, 0], falls = [0, 1, 2, 1, 3]
+    const frames = []
+    for (let t = -48, k = 0; t <= until; t += uneven ? uneven[k++ % uneven.length] : 16) {
+      const data = Buffer.alloc(width * height * 3, 20)
+      for (let c = 0; c < 5; c++) {
+        const way = pick ? pick(c, t) : c < turned(t) ? "new" : "old"
+        if (way === "blank") continue
+        // "half": the new colour on the old shape.
+        const level = (way === "new" ? climbs[c] : falls[c]) * 3
+        const ink = way === "old" ? [247, 118, 142] : [158, 206, 106]
+        for (let y = level; y < height; y++)
+          for (let x = c * 3; x < c * 3 + 2; x++) data.set(ink, (y * width + x) * 3)
+      }
+      frames.push({ t, image: { width, height, data } })
+    }
+    return frames
+  }
+  const stepped = (length, from = 0) => t => Math.round(outCubic(t, length, from) * 5)
+  const markCases = [
+    ["turns left to right in 200 ms", true, stepped(200)],
+    ["turns in 200 ms, frames 9 to 50 ms apart", true, stepped(200), 480, busy],
+    ["turns at once", false, t => t >= 0 ? 5 : 0],
+    ["turns in 400 ms", false, stepped(400), 560],
+    ["turns in 100 ms", false, stepped(100)],
+    ["turns right to left in 200 ms", false, null, 360, null, (c, t) => 4 - c < stepped(200)(t) ? "new" : "old"],
+    ["turns through a blank frame", false, null, 360, null, (c, t) => t === 32 ? "blank" : c < stepped(200)(t) ? "new" : "old"],
+    ["takes its new colour before its new shape", false, null, 360, null, (c, t) => c < stepped(200)(t) ? "new" : t >= 0 ? "half" : "old"],
+  ]
+  for (const [name, expected, turned, until, uneven, pick] of markCases) {
+    const verdict = columnTurn(markTurn(turned, until, uneven, pick), 200, 5)
+    const right = verdict.ok === expected
+    if (!right) failed++
+    console.log((right ? "PASS " : "FAIL ") + "a mark that " + name + (expected ? " passes" : " fails") + " — " + verdict.detail.replace(/^columns [^|]*\| /, ""))
+  }
   process.exit(failed ? 1 : 0)
 }
 
@@ -934,6 +1029,7 @@ else {
     : kind === "dim" ? dim(flag === undefined ? frames : frames.map(f => ({ ...f, image: cropped(f.image, flag) })), end === undefined ? 250 : Number(end))
     : kind === "turn" ? turn(frames, end === undefined ? 160 : Number(end))
     : kind === "steps" ? steps(frames, Number(end))
+    : kind === "columns" ? columnTurn(frames, Number(end), Number(flag))
     : kind === "filled" ? filled(flag === undefined ? frames : frames.map(f => ({ ...f, image: cropped(f.image, flag) })), Number(end))
     : kind === "press" ? press(frames, rest[0].split(",").map(Number), rest[1].split(",").map(Number))
     : { ok: false, detail: "unknown mode " + mode }

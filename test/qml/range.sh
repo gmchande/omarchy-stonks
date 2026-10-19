@@ -7,7 +7,8 @@
 # the popup and another workspace, real IPC refreshing once for two pills
 # and reaching the plugin with no pill at all, a range left behind never
 # retrying, no history fetched with no surface open, the pill's first-fetch
-# states, and later Services reading back the saved range, with a window
+# states, the pill's mark turning with its day and switching on a wheel
+# step, and later Services reading back the saved range, with a window
 # summoned before each was ready, and the hero holding what it showed while
 # a range or symbol loads. HOME and curl are scratch.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"

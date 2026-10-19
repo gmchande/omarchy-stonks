@@ -92,6 +92,19 @@ ShellRoot {
     return first > last ? "climbs" : first < last ? "falls" : "flat"
   }
 
+  // The pill's mark as drawn: which way it goes, and each column's colour
+  // from the left.
+  function markDrawn(mark) {
+    var caps = []
+    var collect = function(item) {
+      if (item.objectName === "markCell") caps.push(item)
+      for (var i = 0; i < item.children.length; i++) collect(item.children[i])
+    }
+    collect(mark)
+    caps.sort(function(a, b) { return a.parent.x - b.parent.x })
+    return markWay(mark) + " in " + caps.map(function(c) { return String(c.color) }).join(" ")
+  }
+
   // A window's info line: titled by its range, with the range's high once
   // its history is in; the day's otherwise.
   function infoLine(window) {
@@ -205,6 +218,9 @@ ShellRoot {
   // LATE's quotes fail and answer again (see the fake curl).
   Process { id: lateDown; command: ["touch", Quickshell.env("STONKS_FAKE_STATE") + "/LATE.down"] }
   Process { id: lateUp; command: ["rm", "-f", Quickshell.env("STONKS_FAKE_STATE") + "/LATE.down"] }
+  // TURN's day goes down and back up (see the fake curl).
+  Process { id: turnDown; command: ["touch", Quickshell.env("STONKS_FAKE_STATE") + "/TURN.down"] }
+  Process { id: turnUp; command: ["rm", "-f", Quickshell.env("STONKS_FAKE_STATE") + "/TURN.down"] }
 
   Process {
     id: catProc
@@ -1540,6 +1556,55 @@ ShellRoot {
           + " | white #116329 #a40e26 | kanagawa #76946a #c34043 | tokyo-night #9ece6a #f7768e"
           + " | tokyo-night with kanagawa's green #76946a #f7768e | tokyo-night #9ece6a #f7768e",
         trendColours.join(" | "))
+
+      // The pill's mark turns with its own day: a new price that takes TURN
+      // below its close leaves the mark falling, every column in the down
+      // colour, and one back above it climbing, every column in the up
+      // colour. A wheel step to another symbol shows that one's mark at
+      // once, and back again. (popup-motion.sh judges the turn's frames.)
+      var settingsBeforeTurn = pill.settings
+      barApi.layoutConfig = { left: [], center: [], right: [{ id: "grvc.stonks" }] }
+      service.addSymbol("TURN")
+      tryVerify(function() { return !!service.quotes.TURN && service.arriving.length === 0 }, 10000)
+      service.feature("TURN")
+      var markOf = function(symbol) {
+        var tone = Figures.rowModel(service.quotes[symbol], 0, service.changeMode).tone
+        return (tone === "down" ? "falls" : "climbs") + " in " + [0, 1, 2, 3, 4].map(function() { return String(pill.toneColor(tone)) }).join(" ")
+      }
+      var newPrice = function(down) {
+        var proc = down ? turnDown : turnUp
+        proc.running = true
+        tryVerify(function() { return !proc.running }, 2000)
+        var entries = Object.assign({}, service.testFeed.entries)
+        entries.TURN = Object.assign({}, entries.TURN, { answeredAt: entries.TURN.answeredAt - 20 })
+        service.testFeed.entries = entries
+        service.refresh()
+        tryVerify(function() { return pill.featured.tone === (down ? "down" : "up") && !mark.turning }, 10000)
+        return harness.markDrawn(mark)
+      }
+      var turnStart = harness.markDrawn(mark)
+      var turnedDown = newPrice(true)
+      var turnedUp = newPrice(false)
+      // Wheel steps until one lands on a symbol whose mark has the other
+      // shape, each step's mark checked as it lands.
+      var wheels = []
+      for (var w = 0; w < 3; w++) {
+        var before = harness.markWay(mark)
+        mouseWheel(pill, pill.width / 2, pill.height / 2, 0, w === 0 ? -120 : 120)
+        wheels.push(service.featuredSymbol + " " + (mark.turning ? "turning " : "") + harness.markDrawn(mark)
+          + (harness.markDrawn(mark) === markOf(service.featuredSymbol) ? "" : " want " + markOf(service.featuredSymbol)))
+        if (harness.markWay(mark) !== before && service.featuredSymbol !== "TURN") break
+      }
+      var wheelsRight = wheels.every(function(line) { return !/turning| want /.test(line) })
+        && / (falls|climbs) /.test(wheels[wheels.length - 1]) && harness.markWay(mark) !== markOf("TURN").split(" ")[0]
+      harness.check("a new price that turns the pill's day ends its mark the new way in the new colour in every column, and a wheel step shows the next symbol's mark at once",
+        turnStart === markOf("TURN") && turnedDown === "falls in " + [0, 1, 2, 3, 4].map(function() { return String(pill.downColor) }).join(" ")
+          && turnedUp === "climbs in " + [0, 1, 2, 3, 4].map(function() { return String(pill.upColor) }).join(" ") && wheelsRight,
+        [turnStart, turnedDown, turnedUp].concat(wheels).join(" | "))
+      barApi.layoutConfig = ({})
+      pill.settings = settingsBeforeTurn
+      service.feature(upSymbol)
+      service.removeSymbol("TURN")
 
       service.removeSymbol("DOWN")
 
