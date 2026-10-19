@@ -160,7 +160,8 @@ Item {
           service: root.ready ? root.service : null
           updates: root.updates
           surfaceOpen: window.visible
-          headerWhenMissing: root.ready ? "No data" : "Loading"
+          // Before the service is ready the empty hero's label says Loading.
+          headerWhenMissing: root.ready ? "No data" : ""
           margins: Style.space(16)
           chartHeight: Style.space(220)
           minChartHeight: Style.space(136)

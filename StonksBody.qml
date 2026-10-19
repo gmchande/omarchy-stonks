@@ -292,11 +292,13 @@ Item {
   readonly property string unavailableText: chartRange.toUpperCase() + " unavailable"
   readonly property bool offersRetry: headerText === unavailableText
   // The chart asked for, named while it is on its way.
-  readonly property string loadingText: "Loading " + featuredSymbol + (range !== "1D" ? " " + range : "")
+  readonly property string loadingText: "Loading" + (featuredSymbol ? " " + featuredSymbol + (range !== "1D" ? " " + range : "") : "")
   readonly property string headerText: {
     if (!service) return headerWhenMissing
     // The chart asked for is on its way, named: what was on show stays.
-    if (chartLoading) return loadingText
+    // Before any chart has been in, the empty hero's label names it alone,
+    // in the one place a reader looks (`HeroBand`).
+    if (chartLoading) return chart ? loadingText : ""
     if (failClosedHeader && !featuredQuote && featuredFreshness && featuredFreshness.state === "failed")
       return "No data"
     if (historyActive && historyFailed) return unavailableText

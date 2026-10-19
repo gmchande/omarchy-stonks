@@ -945,26 +945,40 @@ ShellRoot {
       harness.check("payload waits while the service starts",
         !again.pluginsReady && again.featuredSymbol !== "MSFT" && again.range !== "1Y",
         again.pluginsReady + "|" + again.featuredSymbol + "|" + again.range)
+      // The header and the empty hero's label, each as it reads while the
+      // window waits: Loading is said once, by the label. Both said it.
+      var coldLabel = harness.find(summoned.testBody, "loadingLabel")
+      var coldWords = harness.find(summoned.testBody, "statusText")
+      var loadingSaid = []
+      var countLoading = function() {
+        var said = [coldWords.visible ? coldWords.text : "", coldLabel.visible ? coldLabel.text : ""]
+          .filter(function(t) { return /loading/i.test(t) }).length
+        if (loadingSaid.indexOf(said) < 0) loadingSaid.push(said)
+      }
+      coldWords.textChanged.connect(countLoading)
+      coldLabel.visibleChanged.connect(countLoading)
+      coldLabel.textChanged.connect(countLoading)
       tryVerify(function() { return again.pluginsReady }, 5000)
       // The window applies its summon a turn after the service is ready
       // (`App.onReadyChanged`): a ready seen at the end of a wait can come
       // before that turn.
       wait(0)
-      // Before any chart has been in, the hero is empty under "Loading",
-      // naming what is coming: never the day, nor "No data". Found in the
-      // transition audit (lifecycle 6, data 7, featured 9). Its symbol is
-      // the one coming, not a dash: the design check of 16 October.
+      // Before any chart has been in, the hero is empty, naming what is
+      // coming: never the day, nor "No data". Found in the transition audit
+      // (lifecycle 6, data 7, featured 9). Its symbol is the one coming, not
+      // a dash: the design check of 16 October.
       var cold = summoned.testBody
       var coldSymbol = harness.find(cold, "heroSymbol").text
-      harness.check("a cold start shows an empty hero under Loading, naming what is coming",
-        cold.chart === null && cold.headerText === "Loading MSFT 1Y" && cold.periodLine === null && cold.yearLine === null
+      harness.check("a cold start shows an empty hero, naming what is coming",
+        cold.chart === null && cold.periodLine === null && cold.yearLine === null
           && cold.featured === null && coldSymbol === "MSFT",
-        cold.headerText + "|" + coldSymbol + "|" + JSON.stringify(cold.periodLine) + "|" + JSON.stringify(cold.yearLine) + "|" + JSON.stringify(cold.featured))
-      // A quarter second on, the label over the empty hero names it too.
-      var coldLabel = harness.find(cold, "loadingLabel")
-      harness.check("a quarter second into a cold start the empty hero names what is coming",
-        within(2000, function() { return coldLabel.visible && cold.motion.dimmed === 1 }) && coldLabel.text === "Loading MSFT 1Y…" && cold.chart === null,
-        coldLabel.visible + "|" + coldLabel.text + "|" + cold.motion.dimmed)
+        coldSymbol + "|" + JSON.stringify(cold.periodLine) + "|" + JSON.stringify(cold.yearLine) + "|" + JSON.stringify(cold.featured))
+      // A quarter second on, the label over the empty hero says Loading,
+      // and the header doesn't: it's said once, where a reader looks.
+      harness.check("a quarter second into a cold start the empty hero's label alone says Loading, naming what is coming",
+        within(2000, function() { return coldLabel.visible && cold.motion.dimmed === 1 }) && coldLabel.text === "Loading MSFT 1Y…"
+          && cold.chart === null && coldWords.text === "",
+        coldLabel.visible + "|" + coldLabel.text + "|" + cold.motion.dimmed + "|" + coldWords.text)
       releaseMsft.running = true
       wait(50)
       harness.check("payload features its symbol",
@@ -978,6 +992,12 @@ ShellRoot {
       summoned.testBody.motion.revealChanged.disconnect(watchReveal)
       harness.check("a window summoned while its service starts draws its chart in",
         lowestReveal < 0.5 && summoned.testBody.motion.reveal === 1, lowestReveal)
+      coldWords.textChanged.disconnect(countLoading)
+      coldLabel.visibleChanged.disconnect(countLoading)
+      coldLabel.textChanged.disconnect(countLoading)
+      harness.check("from the summon until its chart lands, Loading is never said twice, and the header then names the market",
+        loadingSaid.indexOf(2) < 0 && loadingSaid.indexOf(1) >= 0 && coldWords.text !== "" && !/loading/i.test(coldWords.text),
+        "said at once " + loadingSaid.join(",") + " | header " + coldWords.text)
       // The first service reads the summon back from the file before its own
       // window writes the next range.
       tryVerify(function() { return service.featuredSymbol === "MSFT" && service.range === "1Y" }, 5000,
