@@ -2,10 +2,11 @@
 # Every check a pull request needs: what Stonks does, what it fetches, saves,
 # and says, and what a key or a click changes. The model tests, source
 # boundaries, QML lint, manifest and launcher validation, and the Quickshell
-# flow harnesses. It never judges a picture, a position, or a timing: those
-# are the maintainer's review kit (test/review.sh). The queue, the lock, and
-# the verdict are test/queue.sh's. Needs Omarchy installed and the Wayland
-# session for the harnesses.
+# flow harnesses. A picture, a position, or a timing is the maintainer's
+# review kit's (test/review.sh); a few steps inside these harnesses still
+# judge one (frames, pixels, an x, an ease), until they move there. The
+# queue, the lock, and the verdict are test/queue.sh's. Needs Omarchy
+# installed and the Wayland session for the harnesses.
 source "$(dirname "${BASH_SOURCE[0]}")/queue.sh"
 
 # validate_clone: omarchy plugin validate on what a clone of this checkout
