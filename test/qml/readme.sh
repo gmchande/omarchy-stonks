@@ -53,13 +53,14 @@ grabbed() { local grab; for grab in popup strip forms scrub lists retro window; 
 fade=$(rg -m 1 -o -r '$1' 'PREVIEW_FADE ([0-9.]+ [0-9.]+)' "$work/log")
 if [ "$code" -eq 0 ] && grabbed && [ -n "$fade" ]; then
   small() { local dest=$1; shift; magick "$@" -strip -dither None -colors 128 "PNG8:$dest"; }
-  # preview.png, the README's first picture and the marketplace card's, at
-  # 2:1: the bar across the width with the pill at its centre, and under it
-  # the popup down to its list's header, fading out below its figures
+  # preview.png, the README's first picture and the marketplace's, at 2:1:
+  # the bar across the width with the pill at its centre, and under it the
+  # popup down to its list's third row, fading out over the fourth
   # (PREVIEW_FADE, from readme.qml). The ground is the theme's darkest
   # background, standing in for a wallpaper, so the bar and the card show
-  # against it. The card crops the picture to a short box from the middle,
-  # which keeps the pill and the chart.
+  # against it. The marketplace's card scales the picture to 350 px wide
+  # and shows its top 175 (build-catalog.mjs and style.css's
+  # .plugin-preview), so at 2:1 it shows it whole: the chart and the rows.
   pw=$(magick identify -format '%w' "$raw/popup.png") ph=$(magick identify -format '%h' "$raw/popup.png")
   sh=$(magick identify -format '%h' "$raw/strip.png")
   bar=$(magick "$raw/strip.png" -format '%[pixel:p{0,0}]' info:)

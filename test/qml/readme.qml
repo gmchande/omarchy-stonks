@@ -191,15 +191,15 @@ ShellRoot {
       grab("popup", panel.testCard.card, body, robinhoodIn)
       grab("strip", heroStrip)
       grab("forms", forms)
-      // preview.png keeps the popup down to its list's header, fading out
-      // over the space between the figures and that header: each end as a
-      // share of the card's height, for readme.sh.
+      // preview.png keeps the popup down to its list's fourth row, fading
+      // out over it: each end as a share of the card's height, for
+      // readme.sh.
       var card = panel.testCard.card
-      var info = harness.find(body, "infoBlock")
-      var figuresEnd = info.mapToItem(card, 0, info.height).y
-      var headerTop = harness.find(body, "listControl").mapToItem(card, 0, 0).y
-      console.log("PREVIEW_FADE " + (figuresEnd / card.height).toFixed(4)
-        + " " + (headerTop / card.height).toFixed(4))
+      var bottom = function(row) {
+        var item = body.watchlist.rowItem(body.watchlist.displayedSymbols[row])
+        return item.mapToItem(card, 0, item.height).y / card.height
+      }
+      console.log("PREVIEW_FADE " + bottom(2).toFixed(4) + " " + bottom(3).toFixed(4))
 
       // Scrubbed back an hour and a half, as ← steps do, a print at a time:
       // a capture taken mid-session lands in the same session.
