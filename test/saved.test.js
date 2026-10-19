@@ -78,7 +78,7 @@ test("across every saved intraday response the filter drops only those eleven ba
     ["msft-2026-09-11-day-prepost.json", [1789157100, 1789162200, 1789162500]],
     // BRK-B's after hours on Friday 2 October: 520.93, 489.66, 500.31, and
     // 489.66 between 502.80 and 502.65, 30, 5, 10, and 10 minutes apart.
-    ["moments/sweep-2026-10-03-1200/brk-b.json", [1790973900, 1790974200, 1790974800, 1790975400]],
+    ["moments/listings-2026-10-03-1200/brk-b.json", [1790973900, 1790974200, 1790974800, 1790975400]],
     // JPM's after hours on Friday 16 October: 16:50 and 17:00 opened at
     // 339.83 and 339.52 and closed at 318.24, 16:55 missing, and 17:05
     // opened back at 339.50. Its sparkline ended in a spike.
@@ -88,8 +88,8 @@ test("across every saved intraday response the filter drops only those eleven ba
     // tick of 0.0001, and BOLT's 1.97 between 1.98s lost 5 over two days.
     ["moments/power-user-2026-10-16/plug.json", []],
     ["moments/power-user-2026-10-16/aitx.json", []],
-    ["moments/sweep-2026-10-07-1455/bolt.json", []],
-    ["moments/sweep-2026-10-08-1054/bolt.json", []]
+    ["moments/listings-2026-10-07-1455/bolt.json", []],
+    ["moments/listings-2026-10-08-1054/bolt.json", []]
   ]
   for (const [name, expected] of days) {
     const json = fixture(name)
@@ -161,7 +161,7 @@ test("after the close, the session's last print reads the close at the bell, and
   // London on Wednesday 7 October, fetched 14:55 New York: its last regular
   // bucket is 16:25 at 3,646.50, its close 3,648.00 stamped 17:20:32 BST,
   // after its 16:30 and 16:35 buckets.
-  const london = M.parseChart(fixture("moments/sweep-2026-10-07-1455/shel.l.json"))
+  const london = M.parseChart(fixture("moments/listings-2026-10-07-1455/shel.l.json"))
   const bell = london.session.regular.end
   expect(london.marketTime).toBeGreaterThan(bell)
   expect(M.readingAt(london, bell - 300)).toEqual({ price: 3648, t: bell, close: true })
@@ -352,7 +352,7 @@ test("a listing's prices take the decimals they need, decided once from its head
   expect(shown(759748.25, 2)).toBe("759,748")
   expect(shown(2900.5, undefined)).toBe("2,900.50")
   // A coin's day and every scrub of it are in the headline's decimals.
-  const shib = M.parseChart(fixture("moments/sweep-2026-10-08-1054/shib-usd.json"))
+  const shib = M.parseChart(fixture("moments/listings-2026-10-08-1054/shib-usd.json"))
   expect(shib.priceDigits).toBe(9)
   expect(M.rowModel(shib, 0, "pct").priceText).toBe("0.000005410")
   expect(M.rowModel(shib, shib.points[3].t, "pct").priceText).toMatch(/^0\.00000\d{4}$/)
@@ -520,7 +520,7 @@ test("the day line is 1D, or its figures' weekday when they are not today's: its
   // decimals, and VOL's as 999.9M, so a refresh never widens either.
   const today = dayLineAt(quote, at("2026-09-01", "17:30"))
   expect([today.range.widest, ...today.facts.map(f => f.widest)]).toEqual(["888.88", "888.88", "888.8M"])
-  expect(M.dayLine(M.parseChart(fixture("moments/sweep-2026-10-08-1054/brk-a.json"))).range.widest).toBe("888,888")
+  expect(M.dayLine(M.parseChart(fixture("moments/listings-2026-10-08-1054/brk-a.json"))).range.widest).toBe("888,888")
 })
 
 // Saved answers from 1 October 2026 (2 October in Tokyo and London): the
@@ -1107,11 +1107,11 @@ test("Robinhood's answer keeps only the bars that traded, by the symbols asked f
 
 test("Robinhood's instruments say which listings it trades all day, by the symbols asked for", () => {
   // Saved Wednesday 7 October: NEST and SPY trade on its 24 Hour Market,
-  // PSIX and BOLT do not. Results come in Robinhood's own order; one it does
+  // KILN and BOLT do not. Results come in Robinhood's own order; one it does
   // not list is not all-day, and a share class is asked with a dot.
-  const answer = fixture("moments/sweep-2026-10-07-1455/robinhood-instruments.json")
-  expect(M.parseAllDay(answer, ["PSIX", "NEST", "BOLT", "SPY", "ZZZZQ"]))
-    .toEqual({ PSIX: false, NEST: true, BOLT: false, SPY: true, ZZZZQ: false })
+  const answer = fixture("moments/listings-2026-10-07-1455/robinhood-instruments.json")
+  expect(M.parseAllDay(answer, ["KILN", "NEST", "BOLT", "SPY", "ZZZZQ"]))
+    .toEqual({ KILN: false, NEST: true, BOLT: false, SPY: true, ZZZZQ: false })
   expect(M.parseAllDay({ results: [{ symbol: "BRK.B", all_day_tradability: "tradable" }] }, ["BRK-B"])).toEqual({ "BRK-B": true })
   expect(M.allDayUrl(["BRK-B", "NEST"])).toContain("?symbols=BRK.B,NEST")
   expect(M.parseAllDay({ chart: {} }, ["NEST"])).toBeNull()
@@ -1296,7 +1296,7 @@ test("a quote held past its bars' session takes the phase and the bell from Yaho
 
 test("a quote held from an earlier day stays warm by its calendar; one with no calendar, on the slow clock once its periods are past", () => {
   // NEST's answer of Wednesday 7 October at 14:55, held into Thursday.
-  const nest = M.parseChart(fixture("moments/sweep-2026-10-07-1455/nest.json"))
+  const nest = M.parseChart(fixture("moments/listings-2026-10-07-1455/nest.json"))
   const thursday = at("2026-10-08", "11:00")
   expect(M.sessionPhase(nest, thursday)).toBe("closed")
   expect([M.inRegularSession(nest, thursday, calendars), M.staysWarm(nest, thursday, calendars), M.quoteCadence(nest, thursday, 60, false, calendars)])
@@ -1307,7 +1307,7 @@ test("a quote held from an earlier day stays warm by its calendar; one with no c
   // The S&P 500 is on the US calendar (S&P is one of its exchanges): kept
   // fresh through Thursday's session like any US listing, at the refresh
   // interval, and not before Wednesday's open.
-  const gspc = M.parseChart(fixture("moments/sweep-2026-10-07-1455/gspc.json"))
+  const gspc = M.parseChart(fixture("moments/listings-2026-10-07-1455/gspc.json"))
   expect([M.staysWarm(gspc, at("2026-10-07", "11:00"), calendars), M.staysWarm(gspc, at("2026-10-07", "06:00"), calendars)]).toEqual([true, false])
   expect([M.staysWarm(gspc, thursday, calendars), M.quoteCadence(gspc, thursday, 60, false, calendars)]).toEqual([true, 60])
   expect(M.staysWarm(gspc, at("2026-10-10", "12:00"), calendars)).toBe(false)
@@ -1324,25 +1324,25 @@ test("a quote held from an earlier day stays warm by its calendar; one with no c
 test("the header's animal sleeps while its market does: by phase and calendar, never by the data's age", () => {
   // The sweep's listings at each saved moment, each from its own answer at
   // that moment, and whether Robinhood trades it all day from its own.
-  const sweep = ["nest", "psix", "spy", "bolt", "gspc", "btc-usd", "shel.l", "7203.t"]
-  const tradable = M.parseAllDay(fixture("moments/sweep-2026-10-07-0100/robinhood-instruments.json"), ["NEST", "PSIX", "SPY", "BOLT"])
+  const sweep = ["nest", "kiln", "spy", "bolt", "gspc", "btc-usd", "shel.l", "7203.t"]
+  const tradable = M.parseAllDay(fixture("moments/listings-2026-10-07-0100/robinhood-instruments.json"), ["NEST", "KILN", "SPY", "BOLT"])
   const asleep = (quote, t) => M.marketAsleep(quote, !!tradable[quote.symbol], t, calendars)
   const row = (set, t) => sweep.filter(name => asleep(savedDay(set, name), t)).join(" ")
-  // Wednesday 01:00: NEST's and SPY's night trades; PSIX's and BOLT's
+  // Wednesday 01:00: NEST's and SPY's night trades; KILN's and BOLT's
   // doesn't, nor an index's or London's; Tokyo is in its afternoon.
-  expect(row("sweep-2026-10-07-0100", at("2026-10-07", "01:00"))).toBe("psix bolt gspc shel.l")
+  expect(row("listings-2026-10-07-0100", at("2026-10-07", "01:00"))).toBe("kiln bolt gspc shel.l")
   // 06:00, pre-market: every US stock and ETF is awake, the thin ones
   // too; an index has no pre-market; London trades; Tokyo has closed.
-  expect(row("sweep-2026-10-07-0600", at("2026-10-07", "06:00"))).toBe("gspc 7203.t")
+  expect(row("listings-2026-10-07-0600", at("2026-10-07", "06:00"))).toBe("gspc 7203.t")
   // 14:55, the session; London and Tokyo have closed.
-  expect(row("sweep-2026-10-07-1455", at("2026-10-07", "14:55"))).toBe("shel.l 7203.t")
+  expect(row("listings-2026-10-07-1455", at("2026-10-07", "14:55"))).toBe("shel.l 7203.t")
   // Thursday 10:54, the session, London's too.
-  expect(row("sweep-2026-10-08-1054", M.epochAt(US, "2026-10-08", "10:54") + 24)).toBe("7203.t")
+  expect(row("listings-2026-10-08-1054", M.epochAt(US, "2026-10-08", "10:54") + 24)).toBe("7203.t")
   // Saturday noon: all but the cryptocurrency, which never sleeps.
-  expect(row("sweep-2026-10-03-1200", at("2026-10-03", "12:00"))).toBe("nest psix spy bolt gspc shel.l 7203.t")
+  expect(row("listings-2026-10-03-1200", at("2026-10-03", "12:00"))).toBe("nest kiln spy bolt gspc shel.l 7203.t")
   // After hours, the 14:55 answers held to 17:00: a thin stock is awake
   // with nothing trading; an index has closed.
-  expect(row("sweep-2026-10-07-1455", at("2026-10-07", "17:00"))).toBe("gspc shel.l 7203.t")
+  expect(row("listings-2026-10-07-1455", at("2026-10-07", "17:00"))).toBe("gspc shel.l 7203.t")
   // Sunday 22:30: Monday's night trades for NEST; the index sleeps.
   const sunday = at("2026-09-27", "22:30")
   expect([asleep(savedDay("sunday", "nest"), sunday), asleep(savedDay("sunday", "gspc"), sunday)]).toEqual([false, true])
@@ -1355,20 +1355,20 @@ test("the header's animal sleeps while its market does: by phase and calendar, n
   const labor = 1788793200
   const fakeOpen = { ...sep4, session: { pre: null, post: null, regular: { start: labor - 3600, end: labor + 3600 } } }
   expect(asleep(fakeOpen, labor)).toBe(true)
-  const nest = savedDay("sweep-2026-10-07-1455", "nest")
+  const nest = savedDay("listings-2026-10-07-1455", "nest")
   expect([asleep(nest, at("2026-11-26", "12:00")), asleep(nest, at("2026-11-25", "22:00"))]).toEqual([true, true])
   // The data's age never sends it to sleep: Wednesday's answers held into
   // Thursday are awake by the calendar through its pre-market, session, and
-  // after hours, PSIX asleep in the nights around them and NEST, whose
+  // after hours, KILN asleep in the nights around them and NEST, whose
   // nights trade, awake; the index has no pre-market.
   const thursday = ["03:00", "06:00", "11:00", "17:00", "21:00"].map(clock => at("2026-10-08", clock))
-  const psix = savedDay("sweep-2026-10-07-1455", "psix")
-  expect([nest, psix].map(q => thursday.map(t => asleep(q, t))))
+  const kiln = savedDay("listings-2026-10-07-1455", "kiln")
+  expect([nest, kiln].map(q => thursday.map(t => asleep(q, t))))
     .toEqual([[false, false, false, false, false], [true, false, false, false, true]])
-  const gspc = savedDay("sweep-2026-10-07-1455", "gspc")
+  const gspc = savedDay("listings-2026-10-07-1455", "gspc")
   expect([asleep(gspc, at("2026-10-08", "06:00")), asleep(gspc, at("2026-10-08", "11:00"))]).toEqual([true, false])
   // An early close's own periods rule its day: the day after Thanksgiving,
-  // PSIX's after hours ends at 17:00, so it sleeps at 18:00, not at 20:00,
+  // KILN's after hours ends at 17:00, so it sleeps at 18:00, not at 20:00,
   // whether they are its bars' periods, only Yahoo's current ones over
   // Wednesday's bars, or none of that day's at all, Wednesday's answer held
   // there: its after hours runs as long after the early close as after a
@@ -1378,7 +1378,7 @@ test("the header's animal sleeps while its market does: by phase and calendar, n
     pre: { start: early("04:00"), end: early("09:30") },
     regular: { start: early("09:30"), end: early("13:00") },
     post: { start: early("13:00"), end: early("17:00") } }
-  for (const friday of [{ ...psix, session: periods }, { ...psix, current: periods }, psix])
+  for (const friday of [{ ...kiln, session: periods }, { ...kiln, current: periods }, kiln])
     expect(["16:00", "18:00"].map(clock => asleep(friday, early(clock)))).toEqual([false, true])
   // A listing's own extended hours, whatever day its periods describe:
   // London's Wednesday answer held into Thursday is awake in its pre-market
@@ -1388,7 +1388,7 @@ test("the header's animal sleeps while its market does: by phase and calendar, n
   const london = clock => M.epochAt(calendars.calendars.LSE, "2026-10-08", clock)
   const toronto = clock => M.epochAt(calendars.calendars.TSX, "2026-09-03", clock)
   const awakeAt = (quote, times) => times.map(t => !asleep(quote, t))
-  for (const set of ["sweep-2026-10-07-1455", "sweep-2026-10-08-1054"])
+  for (const set of ["listings-2026-10-07-1455", "listings-2026-10-08-1054"])
     expect(awakeAt(savedDay(set, "shel.l"), ["07:00", "07:20", "16:40", "17:30"].map(london))).toEqual([false, true, true, false])
   expect(awakeAt(shop, ["07:30", "08:30", "16:10", "17:30"].map(toronto))).toEqual([false, true, true, false])
 })

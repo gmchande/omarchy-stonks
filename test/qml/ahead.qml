@@ -6,7 +6,7 @@ import "plugin" as Stonks
 
 // The charts in sight fetched ahead, through the real Service and App with
 // real Qt pointer, on every kind of listing a range can meet: a busy US
-// stock (NEST, featured), a thin one (PSIX), an ETF (SPY), an index
+// stock (NEST, featured), a thin one (KILN), an ETF (SPY), an index
 // (^GSPC), a cryptocurrency (BTC-USD), London (SHEL.L), Tokyo (7203.T), each
 // answering its own saved year, and Toronto (SHOP.TO), whose history fails;
 // then a long list in a window taller than the history cache. The fake curl
@@ -16,7 +16,7 @@ ShellRoot {
 
   property int failures: 0
   readonly property string state: Quickshell.env("STONKS_FAKE_STATE")
-  readonly property var listed: ["NEST", "PSIX", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T", "SHOP.TO"]
+  readonly property var listed: ["NEST", "KILN", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T", "SHOP.TO"]
 
   function check(label, ok, detail) {
     console.log((ok ? "PASS " : "FAIL ") + label + (detail !== undefined ? " — " + detail : ""))
@@ -128,7 +128,7 @@ ShellRoot {
       // nothing; one whose fetch ahead failed asks, as the hero, and loads.
       from = harness.requestCount()
       var waited = []
-      ;["PSIX", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T"].forEach(function(s) {
+      ;["KILN", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T"].forEach(function(s) {
         clickRow(body, s)
         if (body.chartLoading || body.chartSymbol !== s || body.headerText.indexOf("Loading") === 0) waited.push(s)
         wait(100)
@@ -162,7 +162,7 @@ ShellRoot {
       // shown; the heroes' charts stay.
       body.selectRange("1W")
       wait(50)
-      var stillAhead = ["PSIX", "SPY", "^GSPC", "SHEL.L", "7203.T"].filter(function(s) { return !!service.histories[s + "|6M"] })
+      var stillAhead = ["KILN", "SPY", "^GSPC", "SHEL.L", "7203.T"].filter(function(s) { return !!service.histories[s + "|6M"] })
       var heroesGone = ["NEST|6M", "BTC-USD|6M"].concat(rows.map(function(s) { return s + "|1Y" }))
         .filter(function(k) { return !service.histories[k] })
       harness.check("a new range drops the last range's charts fetched ahead and never shown, and keeps every hero's",
@@ -254,12 +254,12 @@ ShellRoot {
 
       // Closing the window stops the chart fetched ahead, and with none
       // open nothing is fetched.
-      touch("PSIX.history.hold")
+      touch("KILN.history.hold")
       body.selectRange("10Y")
-      tryVerify(function() { return !!service.testHistoryFeed.wanted && service.testHistoryFeed.wanted.symbol === "PSIX" }, 5000)
+      tryVerify(function() { return !!service.testHistoryFeed.wanted && service.testHistoryFeed.wanted.symbol === "KILN" }, 5000)
       app.close()
       var stopped = within(1000, function() { return !service.testHistoryFeed.busy })
-      remove("PSIX.history.hold")
+      remove("KILN.history.hold")
       from = harness.requestCount()
       service.setRange("YTD")
       wait(1500)

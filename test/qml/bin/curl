@@ -40,7 +40,7 @@
 # given, after the pause, is counted in SEARCH.answered.calls; a search
 # stopped first is not.
 # History requests use the saved AAPL year response for AAPL, MSFT, and BOTH,
-# and NEST's saved month for NEST; PSIX, SPY, ^GSPC, BTC-USD, SHEL.L, and
+# and NEST's saved month for NEST; KILN, SPY, ^GSPC, BTC-USD, SHEL.L, and
 # 7203.T, one of each kind of listing, answer their own saved years.
 # Fundamentals answer from test/fixtures/fundamentals: the timeseries by
 # symbol (MSFT and NVDA take AAPL's; a symbol with none saved gets SPY's,
@@ -261,7 +261,7 @@ serve() {
       # SLOW's week is NEST's saved week, so its 1W and 6M charts differ.
       SLOW) sleep 1; if [[ "$url" == *"range=5d"* ]]; then cat "$fixtures/history/nest-5d.json"; else history; fi ;;
       DOWN) cat "$fixtures/history/nest-5d.json" ;;
-      PSIX|SPY|%5EGSPC|BTC-USD|SHEL.L|7203.T) cat "$fixtures/history/$(tr 'A-Z.' 'a-z-' <<< "${symbol#%5E}")-1y.json" ;;
+      KILN|SPY|%5EGSPC|BTC-USD|SHEL.L|7203.T) cat "$fixtures/history/$(tr 'A-Z.' 'a-z-' <<< "${symbol#%5E}")-1y.json" ;;
       *) exit 22 ;;
     esac
     exit
@@ -281,7 +281,7 @@ serve() {
     BTC-USD) cat "$fixtures/btc-usd-day.json" ;;
     HUGE) answer; head -c 70000 /dev/zero | tr '\0' ' ' ;;
     GONE) exit 44 ;;
-    LONG*) stamp < "$fixtures/moments/sweep-2026-10-07-1455/nest.json" ;;
+    LONG*) stamp < "$fixtures/moments/listings-2026-10-07-1455/nest.json" ;;
     *) exit 22 ;;
   esac
 }

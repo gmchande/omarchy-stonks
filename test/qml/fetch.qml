@@ -10,7 +10,7 @@ import "plugin" as Stonks
 // a clock this harness sets, moving forward through Wednesday 7 October
 // 2026 and Saturday the 10th, New York time. The fake curl answers every
 // listing from its saved day of 7 October (test/fixtures/moments/
-// fetch-2026-10-07, then sweep-2026-10-07-1455): a busy US stock (NEST, featured), a thin one (PSIX),
+// fetch-2026-10-07, then listings-2026-10-07-1455): a busy US stock (NEST, featured), a thin one (KILN),
 // an ETF (SPY), an index (^GSPC), a cryptocurrency (BTC-USD), London
 // (SHEL.L), Tokyo (7203.T), and Toronto (SHOP.TO). It counts every request
 // in requests.log and every curl call in runs.log. fetch.sh runs this twice:
@@ -23,7 +23,7 @@ ShellRoot {
   property int failures: 0
   readonly property string mode: Quickshell.env("STONKS_FETCH_RUN") || "main"
   readonly property string state: Quickshell.env("STONKS_FAKE_STATE")
-  readonly property var listed: ["NEST", "PSIX", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T", "SHOP.TO"]
+  readonly property var listed: ["NEST", "KILN", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T", "SHOP.TO"]
   // Midnight starting Wednesday 7 October and Saturday 10 October in New York.
   readonly property int wed7: 1791345600
   readonly property int sat10: 1791604800
@@ -412,7 +412,7 @@ ShellRoot {
       tick(78, 1, function() {
         var sent = harness.yahoo(harness.requests().slice(refusedFrom)).length
         if (sent > lone.length) lone.push(service.now - askedAt)
-        if (!warnedAt && pill.warns && /^! Update overdue/.test(body.watchlist.rowItem("PSIX").detail)) warnedAt = service.now - askedAt
+        if (!warnedAt && pill.warns && /^! Update overdue/.test(body.watchlist.rowItem("KILN").detail)) warnedAt = service.now - askedAt
       })
       harness.check("refused: nothing goes for the pause, then one request alone, between 48 and 72 s",
         askedAt > 0 && lone.length === 1 && lone[0] >= 48 && lone[0] <= 73, "refused at " + askedAt + ", alone at " + lone.join(","))
@@ -503,7 +503,7 @@ ShellRoot {
       more.forEach(function(s) { service.removeSymbol(s) })
       closeWindow()
 
-      // 16:30, after hours. The pill's wheel moves to PSIX, which nothing
+      // 16:30, after hours. The pill's wheel moves to KILN, which nothing
       // watched: it is asked for at once, and shown without a warning.
       service.now = at(harness.wed7, 16, 30)
       settle()
@@ -512,7 +512,7 @@ ShellRoot {
       settle()
       var wheeled = harness.quoteCounts(harness.requests().slice(wheelFrom))
       harness.check("the pill's wheel asks for the symbol it lands on at once",
-        service.featuredSymbol === "PSIX" && wheeled.PSIX === 1 && !pill.warns, service.featuredSymbol + " " + JSON.stringify(wheeled))
+        service.featuredSymbol === "KILN" && wheeled.KILN === 1 && !pill.warns, service.featuredSymbol + " " + JSON.stringify(wheeled))
       mouseWheel(pill, pill.width / 2, pill.height / 2, 0, 120)
       settle()
       // A spin's notches are saved once the wheel rests: three down and one
@@ -530,7 +530,7 @@ ShellRoot {
       settle()
       service.featuredSymbolChanged.disconnect(visit)
       harness.check("a spin of the pill's wheel writes the data file once, as the wheel rests",
-        visited.join(" ") === "PSIX SPY ^GSPC SPY" && duringSpin === 0 && harness.dataWrites - writesBefore === 1 && harness.savedFeatured() === "SPY",
+        visited.join(" ") === "KILN SPY ^GSPC SPY" && duringSpin === 0 && harness.dataWrites - writesBefore === 1 && harness.savedFeatured() === "SPY",
         visited.join(" ") + ": " + duringSpin + " writes during the spin, " + (harness.dataWrites - writesBefore) + " in all, saved " + harness.savedFeatured())
       mouseWheel(pill, pill.width / 2, pill.height / 2, 0, 120)
       mouseWheel(pill, pill.width / 2, pill.height / 2, 0, 120)
@@ -550,10 +550,10 @@ ShellRoot {
       tryVerify(function() { return !!service.quotes.MSFT && idle() }, 5000)
       harness.check("an add's first answer goes at once, in a run of its own", harness.runs()[runsBefore] === "chart:MSFT", harness.runs().slice(runsBefore).join(" / "))
       var undoFrom = harness.requests().length
-      service.removeSymbol("PSIX")
-      service.undoRemoval("PSIX")
+      service.removeSymbol("KILN")
+      service.undoRemoval("KILN")
       settle()
-      harness.check("a removal and its undo fetch nothing", harness.quoteCounts(harness.requests().slice(undoFrom)).PSIX === 0 && !!service.quotes.PSIX,
+      harness.check("a removal and its undo fetch nothing", harness.quoteCounts(harness.requests().slice(undoFrom)).KILN === 0 && !!service.quotes.KILN,
         harness.requests().slice(undoFrom).join(", "))
       service.removeSymbol("MSFT")
 
@@ -608,7 +608,7 @@ ShellRoot {
       var lit = harness.quoteCounts(harness.requests().slice(darkFrom))
       harness.check("every screen off, nothing is asked for, a refresh included; a screen on, the next look asks for every warm row at once",
         harness.listed.every(function(s) { return dark[s] === 0 })
-          && ["NEST", "PSIX", "SPY", "SHOP.TO"].every(function(s) { return lit[s] === 1 }) && lit["BTC-USD"] === 0,
+          && ["NEST", "KILN", "SPY", "SHOP.TO"].every(function(s) { return lit[s] === 1 }) && lit["BTC-USD"] === 0,
         "off: " + JSON.stringify(dark) + " | on: " + JSON.stringify(lit))
 
       // A run queued behind a host's pause, the screens gone off since

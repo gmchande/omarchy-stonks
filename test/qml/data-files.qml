@@ -23,10 +23,10 @@ ShellRoot {
   // by hand in the file, which every save keeps.
   readonly property var made: ({
     lists: [
-      { name: "", symbols: ["SPY", "AAPL", "7203.T", "BTC-USD", "^GSPC", "SHEL.L", "PSIX"], order: "manual", reversed: false },
-      { name: "US", symbols: ["SPY", "PSIX", "AAPL", "^GSPC"], order: "manual", reversed: false },
+      { name: "", symbols: ["SPY", "AAPL", "7203.T", "BTC-USD", "^GSPC", "SHEL.L", "JNJ"], order: "manual", reversed: false },
+      { name: "US", symbols: ["SPY", "JNJ", "AAPL", "^GSPC"], order: "manual", reversed: false },
       { name: "World", symbols: ["SHEL.L", "7203.T", "AAPL"], order: "name", reversed: false },
-      { name: "Movers", symbols: ["BTC-USD", "PSIX", "7203.T"], order: "pct", reversed: true },
+      { name: "Movers", symbols: ["BTC-USD", "JNJ", "7203.T"], order: "pct", reversed: true },
       { name: "Later", symbols: [], order: "manual", reversed: false }
     ],
     list: "World",

@@ -112,8 +112,8 @@ ShellRoot {
   // (<date>-<hhmm>, New York), NEST alone, on 1D at rest or scrubbed to its
   // last print (-scrub). Robinhood trades every one of them all day there.
   // <popup|window>-sweep-<moment>-<symbol>-<look>: the listing sweep's
-  // moments (sweep-<date>-<hhmm>), every kind of listing on 1D at rest:
-  // NEST, PSIX, SPY, BOLT, the S&P 500 (gspc), BTC-USD, SHEL.L, and 7203.T,
+  // moments (listings-<date>-<hhmm>), every kind of listing on 1D at rest:
+  // NEST, KILN, SPY, BOLT, the S&P 500 (gspc), BTC-USD, SHEL.L, and 7203.T,
   // with Robinhood's saved answers on which it trades all day.
   // <popup|window>-sweep-own-<shel.l|7203.t>-<look>: the 7 October 14:55
   // sweep with London before its session, or Tokyo at lunch, from that
@@ -133,7 +133,7 @@ ShellRoot {
     match = /^(?:popup|window)-power-(jpm|plug|aitx|ckx|cvr|lumn)-(smooth|retro)$/.exec(stateName)
     if (match) return { moment: "2026-10-16-2309", folder: "power-user-2026-10-16", symbol: match[1].toUpperCase(), month: false,
       scrub: false, dated: true, sweep: false, power: true }
-    match = /^(?:popup|window)-sweep-(\d{4}-\d\d-\d\d-\d{4})-(nest|psix|spy|bolt|gspc|btc-usd|shel\.l|7203\.t|shib-usd|ry\.to|brk-a|brk-b)-(smooth|retro)$/.exec(stateName)
+    match = /^(?:popup|window)-sweep-(\d{4}-\d\d-\d\d-\d{4})-(nest|kiln|spy|bolt|gspc|btc-usd|shel\.l|7203\.t|shib-usd|ry\.to|brk-a|brk-b)-(smooth|retro)$/.exec(stateName)
     return match ? { moment: match[1], symbol: match[2] === "gspc" ? "^GSPC" : match[2].toUpperCase(), month: false, scrub: false,
       dated: true, sweep: true } : null
   }
@@ -407,7 +407,7 @@ ShellRoot {
 
     if (root.overnight) {
       var live = root.overnight.moment === "live"
-      var folder = root.overnight.folder || (live ? "live-2026-10-05" : (root.overnight.sweep ? "sweep-" : "") + root.overnight.moment)
+      var folder = root.overnight.folder || (live ? "live-2026-10-05" : (root.overnight.sweep ? "listings-" : "") + root.overnight.moment)
       var saved = function(name) {
         var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true; printErrors: false }', root)
         view.path = fixtureDir + "/moments/" + folder + "/" + name + ".json"
@@ -422,15 +422,15 @@ ShellRoot {
       // shows.
       var file = function(s) { return s.toLowerCase().replace(/^\^/, "") }
       var looked = root.overnight.sweep && saved(file("SHIB-USD")) !== ""
-      var listed = looked ? ["NEST", "PSIX", "SPY", "BOLT", "^GSPC", "BTC-USD", "SHIB-USD", "SHEL.L", "7203.T", "RY.TO", "BRK-A", "BRK-B"]
-        : root.overnight.sweep ? ["NEST", "PSIX", "SPY", "BOLT", "^GSPC", "BTC-USD", "SHEL.L", "7203.T"]
+      var listed = looked ? ["NEST", "KILN", "SPY", "BOLT", "^GSPC", "BTC-USD", "SHIB-USD", "SHEL.L", "7203.T", "RY.TO", "BRK-A", "BRK-B"]
+        : root.overnight.sweep ? ["NEST", "KILN", "SPY", "BOLT", "^GSPC", "BTC-USD", "SHEL.L", "7203.T"]
         : live ? ["NEST", "EZ", "TOY"] : root.overnight.power ? ["JPM", "PLUG", "AITX", "CKX", "CVR", "LUMN"]
         : root.overnight.dated ? ["NEST"] : ["NEST", "SILK", "REED"]
       if (looked || root.overnight.power) listed = [root.overnight.symbol].concat(listed.filter(function(s) { return s !== root.overnight.symbol }))
       // The US listings: Robinhood's word on which it trades all day, saved
       // with the sweep's moments, and every one at the moments before them.
-      var us = looked ? ["NEST", "PSIX", "SPY", "BOLT", "BRK-A", "BRK-B"]
-        : root.overnight.sweep ? ["NEST", "PSIX", "SPY", "BOLT"] : listed
+      var us = looked ? ["NEST", "KILN", "SPY", "BOLT", "BRK-A", "BRK-B"]
+        : root.overnight.sweep ? ["NEST", "KILN", "SPY", "BOLT"] : listed
       var tradable = root.overnight.sweep ? Overnight.parseAllDay(read("robinhood-instruments"), us) : root.overnight.power ? {} : null
       // What a surface opening at the moment holds: Robinhood's span=day
       // answer.
