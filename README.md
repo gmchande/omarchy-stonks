@@ -19,8 +19,6 @@ and a chart you can scrub a click away.
 
 It doesn't track holdings, send price alerts, or convert currencies.
 
-<img src="media/light.png" width="480" alt="The popup in Catppuccin Latte, a light theme: Stonks' own green and red, for a light ground, on the theme's pale background">
-
 ## Install
 
 Needs Omarchy 4.
@@ -134,6 +132,12 @@ cp ~/.config/omarchy/plugins/grvc.stonks/share/grvc.stonks.svg ~/.local/share/ic
 Retro draws the price in block digits and the charts in pixel columns, the
 way Omarchy draws its logo. Click the small chart icon at the top right to
 switch between smooth and retro.
+
+<img src="media/light.png" width="480" alt="The popup in Catppuccin Latte, a light theme: Stonks' own green and red, for a light ground, on the theme's pale background">
+
+Both looks draw in your theme's colours, light themes too: up in its green
+and down in its red, or in Stonks' own pair where the theme's are missing,
+too alike, or too faint.
 
 ## Keys
 
