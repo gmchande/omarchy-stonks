@@ -1,6 +1,7 @@
 import QtQuick
 import QtTest
 import Quickshell
+import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "plugin" as Stonks
@@ -16,6 +17,8 @@ ShellRoot {
   readonly property string rawDir: Quickshell.env("STONKS_README_RAW")
   readonly property var demo: ["AAPL", "JNJ", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T"]
   readonly property var us: ["AAPL", "JNJ", "SPY"]
+  readonly property string themeLink: Quickshell.env("HOME") + "/.local/state/omarchy/current/theme"
+  property bool themeLinked: false
 
   function check(label, ok, detail) {
     console.log((ok ? "PASS " : "FAIL ") + label + (!ok && detail !== undefined ? " — " + detail : ""))
@@ -55,6 +58,7 @@ ShellRoot {
   }
   Stonks.Panel { id: panel; bar: api; settings: ({}) }
   Stonks.App { id: app; service: service; updates: updates; trendColors: colors }
+  Process { id: themeSwitch; onExited: harness.themeLinked = true }
 
   // The pill on strips of bar: one as wide as the popup's card, which
   // readme.sh widens into preview.png's bar; and each of its four forms.
@@ -179,6 +183,17 @@ ShellRoot {
       harness.check("grabbed " + name, saved)
     }
 
+    // preview.png keeps a popup down to its list's fourth row, fading out
+    // over it: each end as a share of the card's height, for readme.sh.
+    function previewFade(name, body) {
+      var card = panel.testCard.card
+      var bottom = function(row) {
+        var item = body.watchlist.rowItem(body.watchlist.displayedSymbols[row])
+        return item.mapToItem(card, 0, item.height).y / card.height
+      }
+      console.log("PREVIEW_FADE " + name + " " + bottom(2).toFixed(4) + " " + bottom(3).toFixed(4))
+    }
+
     function test_pictures() {
       quiet()
       harness.check("the demo watchlist, AAPL featured, on All and the day",
@@ -188,18 +203,8 @@ ShellRoot {
       panel.open()
       var body = panel.testBody
       tryVerify(function() { return body.surfaceOpen }, 3000)
-      grab("popup", panel.testCard.card, body, robinhoodIn)
-      grab("strip", heroStrip)
+      grab("strip", heroStrip, body, robinhoodIn)
       grab("forms", forms)
-      // preview.png keeps the popup down to its list's fourth row, fading
-      // out over it: each end as a share of the card's height, for
-      // readme.sh.
-      var card = panel.testCard.card
-      var bottom = function(row) {
-        var item = body.watchlist.rowItem(body.watchlist.displayedSymbols[row])
-        return item.mapToItem(card, 0, item.height).y / card.height
-      }
-      console.log("PREVIEW_FADE " + bottom(2).toFixed(4) + " " + bottom(3).toFixed(4))
 
       // Scrubbed back an hour and a half, as ← steps do, a print at a time:
       // a capture taken mid-session lands in the same session.
@@ -209,6 +214,7 @@ ShellRoot {
       harness.check("the scrub reached an hour and a half back", body.motion.scrubT > 0 && body.motion.scrubT <= back,
         body.motion.scrubT + " vs " + back)
       grab("scrub", panel.testCard.card, body, function() { return body.motion.scrubT !== 0 })
+      previewFade("scrub", body)
       body.endScrub()
       tryVerify(function() { return atRest(body) }, 3000, "the rows back on now")
 
@@ -233,6 +239,7 @@ ShellRoot {
       service.persist({ style: "retro" })
       panel.open()
       grab("retro", panel.testCard.card, body, function() { return service.retro && body.surfaceOpen })
+      previewFade("retro", body)
       panel.close()
       service.persist({ style: "smooth" })
       tryVerify(function() { return !body.surfaceOpen && !service.retro }, 3000)
@@ -240,6 +247,24 @@ ShellRoot {
       app.open("{}")
       grab("window", app.testKeyCatcher, app.testBody, function() { return app.testBody.surfaceOpen })
       app.close()
+
+      // Catppuccin Latte, as omarchy-theme-set switches it: the theme's
+      // files in place, then its palette handed to the shell. Its green and
+      // red are no real pair, so up and down are Stonks' own pair for a
+      // light ground.
+      var before = colors.green
+      themeSwitch.command = ["ln", "-sfn", "/usr/share/omarchy/themes/catppuccin-latte", harness.themeLink]
+      themeSwitch.running = true
+      tryVerify(function() { return harness.themeLinked }, 2000, "Catppuccin Latte in place")
+      var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', harness)
+      view.path = harness.themeLink + "/colors.toml"
+      Color.loadColors(view.text())
+      Color.loadShell("")
+      view.destroy()
+      tryVerify(function() { return colors.green !== before }, 2000, "Catppuccin Latte read")
+      panel.open()
+      grab("light", panel.testCard.card, body, function() { return body.surfaceOpen })
+      panel.close()
       harness.finish()
     }
   }

@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "author": "Gaurav Chande",
   "license": "MIT",
-  "description": "A stock watchlist plugin for the Omarchy 4 shell: today's move in your bar, and a chart you can scrub a click away.",
+  "description": "A stock watchlist for your bar: a bull on up days, a bear on down, and a day chart you can scrub, smooth or retro.",
   "kinds": ["service", "bar-widget"],
   "keepLoaded": true,
   "entryPoints": {
