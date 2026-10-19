@@ -6,7 +6,8 @@ import qs.Ui
 import "Tones.js" as Tones
 
 // Shortcut sheet, the same on both surfaces: the key groups in two columns,
-// the mouse's lines across both under them, and its close button last.
+// the mouse's lines across both under them, its close button, and at the
+// foot one dim credit line: the version and where prices come from.
 // One column left half the window empty and pushed the last group below the
 // fold. The two columns stack independently, groups in order, the first
 // taking groups until it holds about half the lines, so a short group never
@@ -27,6 +28,11 @@ Flickable {
   // words do, rather than break a line in the popup.
   property int inset: 0
   property int edge: 0
+  // Stonks' version, as the version watch read it from the manifest; ""
+  // leaves it off the credit line rather than show a blank.
+  property string version: ""
+  readonly property string credit: (version !== "" ? "Stonks " + version + " · " : "")
+    + "Prices from Yahoo · Overnight from Robinhood"
 
   signal closeRequested()
 
@@ -169,6 +175,17 @@ Flickable {
         text: "CLOSE"
         onActivated: root.closeRequested()
       }
+    }
+
+    Text {
+      objectName: "helpCredit"
+      width: sheetColumn.width - root.edge
+      textFormat: Text.PlainText
+      text: root.credit
+      color: root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.bodySmall
+      wrapMode: Text.WordWrap
     }
   }
 }

@@ -1193,6 +1193,7 @@ Item {
     inset: root.inset
     edge: root.gutter + root.inset
     sheet: root.keySheet
+    version: root.updates && root.updates.runningVersion || ""
     foreground: root.foreground
     dim: root.dim
     fontFamily: root.fontFamily

@@ -307,6 +307,7 @@ ShellRoot {
   QtObject {
     id: updates
     property string newVersion: ""
+    property string runningVersion: "1.0.0"
   }
 
   function load() {
