@@ -159,12 +159,19 @@ ShellRoot {
 
   // A screen as Hyprland reports it, for the window host (fetch.sh): on or
   // off, as it says when asked again, a turn later, as Hyprland's answer
-  // comes.
+  // comes. It counts the asks it has not answered yet (`screensHeard`).
   QtObject {
     id: screenStandIn
     property bool on: true
     property var lastIpcObject: ({ dpmsStatus: true })
-    function refresh() { Qt.callLater(function() { screenStandIn.lastIpcObject = { dpmsStatus: screenStandIn.on } }) }
+    property int unanswered: 0
+    function refresh() {
+      unanswered++
+      Qt.callLater(function() {
+        screenStandIn.lastIpcObject = { dpmsStatus: screenStandIn.on }
+        screenStandIn.unanswered--
+      })
+    }
   }
 
   // The service's writes of the data file, each as it is saved.
@@ -209,6 +216,16 @@ ShellRoot {
     }
     function settle() {
       if (!idle()) tryVerify(idle, 10000)
+    }
+
+    // Every ask of the screens answered. A step waits on this before it
+    // counts what went while they were off, and before it turns one on, so
+    // an answer still out, as on a loaded machine, can't report the next
+    // state for the last one. The service trusts an answer for a second of
+    // the wall clock (`screensClear`), so a step that needs it asked afresh
+    // still waits that long first.
+    function screensHeard() {
+      tryVerify(function() { return screenStandIn.unanswered === 0 }, 5000)
     }
 
     // The clock moves on by `seconds`, a step at a time, each run let land.
@@ -596,7 +613,7 @@ ShellRoot {
       tick(600)
       // A refresh asked for meanwhile, by IPC or a script, waits too.
       service.refresh()
-      wait(200)
+      screensHeard()
       var dark = harness.quoteCounts(harness.requests().slice(darkFrom))
       screenStandIn.on = true
       // The next look comes a minute on, when the screens' last answer is
@@ -626,7 +643,7 @@ ShellRoot {
       screenStandIn.on = false
       var pausedFrom = harness.runs().length
       service.now += 5
-      wait(300)
+      screensHeard()
       var whilePausedDark = harness.runs().length - pausedFrom
       remove("YAHOO.offline")
       screenStandIn.on = true
@@ -649,7 +666,7 @@ ShellRoot {
       wait(1100)
       var historyFrom = Number(harness.record("NEST.history.calls") || 0)
       service.refresh()
-      wait(300)
+      screensHeard()
       var darkHistory = Number(harness.record("NEST.history.calls") || 0) - historyFrom
       screenStandIn.on = true
       wait(1100)
