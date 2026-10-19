@@ -23,9 +23,9 @@ Item {
   // flat day, or no direction yet), and `chart`, what it reads. A turn of
   // the same chart crossfades in smooth; any other change is at once.
   // `asleep`, its market resting, and `bell`, the clock alone put it to
-  // sleep: then, on the same chart, the eyes close over 320 ms; any other
-  // change of sleep, a wake included, is at once. `scrubbed`: a scrub has
-  // it awake, so the sleep that follows its end is no bell.
+  // sleep or woke it: then, on the same chart, the eyes close or open over
+  // 320 ms; any other change of sleep is at once. `scrubbed`: a scrub has it
+  // awake, so the sleep that follows its end is no bell.
   property var animal: ({ kind: "", chart: "", asleep: false, bell: false, scrubbed: false })
   property bool scrubbing: false
   property bool live: false
@@ -47,11 +47,17 @@ Item {
   // The sleep last shown, and whether a scrub had it awake.
   property bool shownAsleep: false
   property bool shownScrubbed: false
-  // How far the eyes have closed, 0 to 1, evenly in time: smooth eases its
-  // lids along it, and retro steps them, half shut at its middle.
+  // How far the eyes have closed, 0 to 1, evenly in time, and whether they
+  // last moved open: a wake runs the close's own ease and steps from shut,
+  // so smooth eases its lids out on both, and retro steps them, half way at
+  // the middle.
   property real closing: 0
-  readonly property real lids: 1 - Math.pow(1 - closing, 3)
-  readonly property int retroLids: closing >= 1 ? 2 : closing >= 0.5 ? 1 : 0
+  property bool waking: false
+  readonly property real moved: waking ? 1 - closing : closing
+  readonly property real eased: 1 - Math.pow(1 - moved, 3)
+  readonly property real lids: waking ? 1 - eased : eased
+  readonly property int steps: moved >= 1 ? 2 : moved >= 0.5 ? 1 : 0
+  readonly property int retroLids: waking ? 2 - steps : steps
 
   signal styleRequested(string style)
   signal helpRequested()
@@ -82,9 +88,9 @@ Item {
     sleep(fade)
   }
 
-  // The eyes close over 320 ms at the bell, `fade` allowing, unless a scrub
-  // let go is what puts it to sleep; a close under way runs on through a
-  // turn. Any other change is at once.
+  // The eyes close or open over 320 ms at the bell, `fade` allowing, unless
+  // a scrub let go is what puts it to sleep; a move under way runs on
+  // through a turn. Any other change is at once.
   function sleep(fade) {
     var asleep = !!(animal && animal.asleep)
     var afterScrub = shownScrubbed
@@ -92,8 +98,12 @@ Item {
     if (fade && asleep === shownAsleep) return
     shownAsleep = asleep
     shutting.stop()
-    if (fade && asleep && animal.bell && !afterScrub) shutting.start()
-    else closing = asleep ? 1 : 0
+    if (fade && animal.bell && !afterScrub) {
+      waking = !asleep
+      shutting.from = asleep ? 0 : 1
+      shutting.to = asleep ? 1 : 0
+      shutting.start()
+    } else closing = asleep ? 1 : 0
   }
 
   Component.onCompleted: settle()
@@ -104,7 +114,7 @@ Item {
     if (shutting.running) shutting.pause()
   }
 
-  NumberAnimation { id: shutting; target: root; property: "closing"; from: 0; to: 1; duration: 320 }
+  NumberAnimation { id: shutting; target: root; property: "closing"; duration: 320 }
 
   implicitHeight: Style.space(28)
   implicitWidth: parent ? parent.width : 0

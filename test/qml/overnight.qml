@@ -728,6 +728,26 @@ ShellRoot {
       service.persist({ style: "smooth" })
       harness.check("01:00: NEST, whose night trades, is awake; KILN sleeps, a scrub wakes it, and letting go puts it back to sleep at once, in both looks",
         sleeps.every(function(s) { return / NEST awake, KILN asleep, scrubbed awake, let go asleep$/.test(s) }), sleeps.join(" | "))
+      // Its market waking while you watch, at 04:00 when KILN's pre-market
+      // starts, opens the animal's eyes and takes the "z" away, in both
+      // looks. They opened at once; now they open over the close's time, so
+      // this reads where they end.
+      var wakes = []
+      featureShown("KILN")
+      ;["smooth", "retro"].forEach(function(look) {
+        service.persist({ style: look })
+        within(2000, function() { return body.retro === (look === "retro") })
+        service.now = harness.midnight.wed7 + 4 * 3600 - 2
+        within(1000, function() { return harness.sleep() === "asleep" })
+        var before = harness.sleep()
+        service.now = harness.midnight.wed7 + 4 * 3600
+        within(2000, function() { return harness.sleep() === "awake" })
+        wakes.push(look + ": " + before + " to " + harness.sleep())
+      })
+      service.persist({ style: "smooth" })
+      service.now = 1791349200
+      harness.check("04:00: KILN's pre-market starting wakes its animal, eyes open and no \"z\", in both looks",
+        wakes.every(function(w) { return / asleep to awake$/.test(w) }), wakes.join(" | "))
       // So does the header: NEST's says Overnight, as the line under its
       // price does, and KILN's Closed, with no such line. NEST's said Closed.
       featureShown("NEST")

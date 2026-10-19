@@ -11,8 +11,10 @@ import "plugin" as Stonks
 // (CardWindow.qml) since the shell's layer-shell one does not load
 // offscreen. Each change of what the card fits eases its edge there in the
 // house 160 ms, the footer riding it whole and covering the rows it passes;
-// an open from closed shows the fitted height from its first frame. HOME and
-// curl are scratch fixtures.
+// an open from closed shows the fitted height from its first frame. Beside
+// it, a real pill's mark turns column by column as its day crosses its
+// close, and switches at once on a wheel step. HOME and curl are scratch
+// fixtures.
 ShellRoot {
   id: harness
 
@@ -55,6 +57,33 @@ ShellRoot {
   }
   Stonks.Panel { id: panel; bar: api; settings: ({}) }
   FrameGrab { id: grab }
+  // A real pill in its icon form, its own popup off (popup-motion.sh), on
+  // a plain window in the bar's ground, for its mark's frames and the wheel.
+  // Its shell hands it the plugin's up and down, as Plugin.qml does.
+  Stonks.TrendColors { id: trendColors }
+  QtObject {
+    id: pillShell
+    function serviceFor(id) { return { service: service, trendColors: trendColors } }
+  }
+  PluginBarApi {
+    id: pillApi
+    pluginId: "grvc.stonks"
+    moduleName: "grvc.stonks"
+    shell: pillShell
+  }
+  FloatingWindow {
+    visible: true
+    color: Qt.rgba(Color.bar.background.r, Color.bar.background.g, Color.bar.background.b, 1)
+    implicitWidth: 120
+    implicitHeight: 60
+    Stonks.BarWidget {
+      id: pill
+      width: implicitWidth
+      height: 32
+      bar: pillApi
+      settings: ({ id: "grvc.stonks", barStyle: "icon" })
+    }
+  }
 
   TestCase {
     name: "PopupMotion"
@@ -101,6 +130,48 @@ ShellRoot {
     function key(text) {
       panel.testKeyCatcher.forceActiveFocus()
       keyClick(text)
+    }
+
+    // The pill's mark turning with its own day, judged on the mark's own
+    // frames: a new price that takes AAPL below its close steps it from
+    // climbing to falling left to right in the look icon's 200 ms, each
+    // column taking the down colour as it turns; a wheel step to a symbol
+    // that climbs switches it at once.
+    function pillTurns() {
+      service.persist({ featured: "AAPL" })
+      var mark = find(pill, "pillMark")
+      tryVerify(function() { return mark.visible && !!pill.featured && pill.featured.symbol === "AAPL" && pill.featured.tone === "up" }, 2000)
+      var quotes = service.testFeed.quotes
+      // AAPL below its close, and the symbols either side of it in the list
+      // above theirs, so a wheel step either way lands on one that climbs.
+      var turned = Object.assign({}, quotes)
+      turned.AAPL = Object.assign({}, quotes.AAPL, { prevClose: quotes.AAPL.price + 10 })
+      var shown = service.view.shown
+      var at = shown.indexOf("AAPL")
+      ;[shown[(at + 1) % shown.length], shown[(at - 1 + shown.length) % shown.length]].forEach(function(s) {
+        turned[s] = Object.assign({}, quotes[s], { prevClose: quotes[s].price - 10 })
+      })
+      grab.source = mark
+      grab.begin("mark-turn")
+      wait(100)
+      grab.markStart()
+      service.testFeed.quotes = turned
+      wait(400)
+      var turn = verdict("columns:200:5")
+      var turnOk = turn.ok && pill.featured.tone === "down"
+      harness.check("a new price that turns the pill's day turns its mark left to right in 200 ms, each column taking its new colour as it turns"
+        + (turnOk ? " — " + turn.detail.replace(/^columns [^|]*\| /, "") : ""), turnOk, turn.detail)
+      grab.source = mark
+      grab.begin("mark-wheel")
+      wait(100)
+      grab.markStart()
+      mouseWheel(pill, pill.width / 2, pill.height / 2, 0, -120)
+      wait(400)
+      var wheel = verdict("turn:0")
+      var wheelOk = wheel.ok && service.featuredSymbol !== "AAPL" && pill.featured.tone !== "down"
+      harness.check("a wheel step to a symbol that climbs switches the pill's mark at once"
+        + (wheelOk ? " — " + wheel.detail : ""), wheelOk, wheel.detail + " | " + service.featuredSymbol)
+      service.testFeed.quotes = quotes
     }
 
     // An ease of the edge, from the frames, after `act`. Its line, pass or
@@ -203,6 +274,7 @@ ShellRoot {
       tryVerify(function() { return !panel.testBody.chartLoading && panel.testBody.motion.dimmed === 0 }, 5000)
       service.setRange("1D")
       panel.close()
+      pillTurns()
       harness.finish()
     }
   }

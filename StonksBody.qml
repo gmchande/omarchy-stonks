@@ -252,25 +252,27 @@ Item {
   readonly property string animalChart: [motion.chartKeyOf(chart), view.listKey, retro].join(" ")
   // It sleeps while its market does, by the phase and the calendar, never
   // by the data's age (`Overnight.marketAsleep`), and a scrub, which reads
-  // a moment the market traded, wakes it. `bell`: the clock put it to sleep
-  // in the last few seconds, the same quote awake `bellWindow` before, so
-  // its eyes close slowly, a late or skipped tick of the clock included;
-  // any other way into sleep is no bell: a scrub let go, ever (`scrubbed`
-  // tells the header a scrub woke it), and a quote landing, past those
-  // seconds. `animalSleep` is 0 awake, 1 asleep, 2 asleep at the bell, 3
-  // awake for a scrub, worked out in one binding, so no value of it pairs a
-  // fresh sleep with a stale bell or scrub; a number, so the animal changes
-  // only when its sleep does, not with every tick, quote, or scrub step
-  // that leaves it.
+  // a moment the market traded, wakes it. `bell`: the clock alone put it to
+  // sleep or woke it in the last few seconds, the same quote the other way
+  // `bellWindow` before, so its eyes close or open slowly, a late or skipped
+  // tick of the clock included; any other change of sleep is no bell: a
+  // scrub let go, ever (`scrubbed` tells the header a scrub woke it), and a
+  // quote landing, past those seconds. `animalSleep` is 0 awake, 1 asleep,
+  // 2 asleep at the bell, 3 awake for a scrub, 4 awake at the bell, worked
+  // out in one binding, so no value of it pairs a fresh sleep with a stale
+  // bell or scrub; a number, so the animal changes only when its sleep
+  // does, not with every tick, quote, or scrub step that leaves it.
   readonly property int bellWindow: 5
   readonly property int animalSleep: {
     if (scrubT) return 3
+    if (!featuredQuote) return 0
     var allDay = !!chart && chart.allDay
-    if (!featuredQuote || !Overnight.marketAsleep(featuredQuote, allDay, now, calendars)) return 0
-    return Overnight.marketAsleep(featuredQuote, allDay, now - bellWindow, calendars) ? 1 : 2
+    var asleep = Overnight.marketAsleep(featuredQuote, allDay, now, calendars)
+    var before = Overnight.marketAsleep(featuredQuote, allDay, now - bellWindow, calendars)
+    return asleep ? (before ? 1 : 2) : (before ? 4 : 0)
   }
   readonly property var animal: ({ kind: animalKind, chart: animalChart,
-    asleep: animalSleep === 1 || animalSleep === 2, bell: animalSleep === 2, scrubbed: animalSleep === 3 })
+    asleep: animalSleep === 1 || animalSleep === 2, bell: animalSleep === 2 || animalSleep === 4, scrubbed: animalSleep === 3 })
   // Today in the featured listing's exchange, which changes only at its
   // midnight, so the day line is not derived again every second.
   readonly property int featuredToday: featuredQuote ? Figures.exchangeDay(featuredQuote, now) : 0
@@ -290,11 +292,13 @@ Item {
   readonly property string unavailableText: chartRange.toUpperCase() + " unavailable"
   readonly property bool offersRetry: headerText === unavailableText
   // The chart asked for, named while it is on its way.
-  readonly property string loadingText: "Loading " + featuredSymbol + (range !== "1D" ? " " + range : "")
+  readonly property string loadingText: "Loading" + (featuredSymbol ? " " + featuredSymbol + (range !== "1D" ? " " + range : "") : "")
   readonly property string headerText: {
     if (!service) return headerWhenMissing
     // The chart asked for is on its way, named: what was on show stays.
-    if (chartLoading) return loadingText
+    // Before any chart has been in, the empty hero's label names it alone,
+    // in the one place a reader looks (`HeroBand`).
+    if (chartLoading) return chart ? loadingText : ""
     if (failClosedHeader && !featuredQuote && featuredFreshness && featuredFreshness.state === "failed")
       return "No data"
     if (historyActive && historyFailed) return unavailableText
@@ -1191,6 +1195,7 @@ Item {
     inset: root.inset
     edge: root.gutter + root.inset
     sheet: root.keySheet
+    version: root.updates && root.updates.runningVersion || ""
     foreground: root.foreground
     dim: root.dim
     fontFamily: root.fontFamily

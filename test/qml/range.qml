@@ -92,6 +92,19 @@ ShellRoot {
     return first > last ? "climbs" : first < last ? "falls" : "flat"
   }
 
+  // The pill's mark as drawn: which way it goes, and each column's colour
+  // from the left.
+  function markDrawn(mark) {
+    var caps = []
+    var collect = function(item) {
+      if (item.objectName === "markCell") caps.push(item)
+      for (var i = 0; i < item.children.length; i++) collect(item.children[i])
+    }
+    collect(mark)
+    caps.sort(function(a, b) { return a.parent.x - b.parent.x })
+    return markWay(mark) + " in " + caps.map(function(c) { return String(c.color) }).join(" ")
+  }
+
   // A window's info line: titled by its range, with the range's high once
   // its history is in; the day's otherwise.
   function infoLine(window) {
@@ -205,6 +218,9 @@ ShellRoot {
   // LATE's quotes fail and answer again (see the fake curl).
   Process { id: lateDown; command: ["touch", Quickshell.env("STONKS_FAKE_STATE") + "/LATE.down"] }
   Process { id: lateUp; command: ["rm", "-f", Quickshell.env("STONKS_FAKE_STATE") + "/LATE.down"] }
+  // TURN's day goes down and back up (see the fake curl).
+  Process { id: turnDown; command: ["touch", Quickshell.env("STONKS_FAKE_STATE") + "/TURN.down"] }
+  Process { id: turnUp; command: ["rm", "-f", Quickshell.env("STONKS_FAKE_STATE") + "/TURN.down"] }
 
   Process {
     id: catProc
@@ -945,26 +961,40 @@ ShellRoot {
       harness.check("payload waits while the service starts",
         !again.pluginsReady && again.featuredSymbol !== "MSFT" && again.range !== "1Y",
         again.pluginsReady + "|" + again.featuredSymbol + "|" + again.range)
+      // The header and the empty hero's label, each as it reads while the
+      // window waits: Loading is said once, by the label. Both said it.
+      var coldLabel = harness.find(summoned.testBody, "loadingLabel")
+      var coldWords = harness.find(summoned.testBody, "statusText")
+      var loadingSaid = []
+      var countLoading = function() {
+        var said = [coldWords.visible ? coldWords.text : "", coldLabel.visible ? coldLabel.text : ""]
+          .filter(function(t) { return /loading/i.test(t) }).length
+        if (loadingSaid.indexOf(said) < 0) loadingSaid.push(said)
+      }
+      coldWords.textChanged.connect(countLoading)
+      coldLabel.visibleChanged.connect(countLoading)
+      coldLabel.textChanged.connect(countLoading)
       tryVerify(function() { return again.pluginsReady }, 5000)
       // The window applies its summon a turn after the service is ready
       // (`App.onReadyChanged`): a ready seen at the end of a wait can come
       // before that turn.
       wait(0)
-      // Before any chart has been in, the hero is empty under "Loading",
-      // naming what is coming: never the day, nor "No data". Found in the
-      // transition audit (lifecycle 6, data 7, featured 9). Its symbol is
-      // the one coming, not a dash: the design check of 16 October.
+      // Before any chart has been in, the hero is empty, naming what is
+      // coming: never the day, nor "No data". Found in the transition audit
+      // (lifecycle 6, data 7, featured 9). Its symbol is the one coming, not
+      // a dash: the design check of 16 October.
       var cold = summoned.testBody
       var coldSymbol = harness.find(cold, "heroSymbol").text
-      harness.check("a cold start shows an empty hero under Loading, naming what is coming",
-        cold.chart === null && cold.headerText === "Loading MSFT 1Y" && cold.periodLine === null && cold.yearLine === null
+      harness.check("a cold start shows an empty hero, naming what is coming",
+        cold.chart === null && cold.periodLine === null && cold.yearLine === null
           && cold.featured === null && coldSymbol === "MSFT",
-        cold.headerText + "|" + coldSymbol + "|" + JSON.stringify(cold.periodLine) + "|" + JSON.stringify(cold.yearLine) + "|" + JSON.stringify(cold.featured))
-      // A quarter second on, the label over the empty hero names it too.
-      var coldLabel = harness.find(cold, "loadingLabel")
-      harness.check("a quarter second into a cold start the empty hero names what is coming",
-        within(2000, function() { return coldLabel.visible && cold.motion.dimmed === 1 }) && coldLabel.text === "Loading MSFT 1Y…" && cold.chart === null,
-        coldLabel.visible + "|" + coldLabel.text + "|" + cold.motion.dimmed)
+        coldSymbol + "|" + JSON.stringify(cold.periodLine) + "|" + JSON.stringify(cold.yearLine) + "|" + JSON.stringify(cold.featured))
+      // A quarter second on, the label over the empty hero says Loading,
+      // and the header doesn't: it's said once, where a reader looks.
+      harness.check("a quarter second into a cold start the empty hero's label alone says Loading, naming what is coming",
+        within(2000, function() { return coldLabel.visible && cold.motion.dimmed === 1 }) && coldLabel.text === "Loading MSFT 1Y…"
+          && cold.chart === null && coldWords.text === "",
+        coldLabel.visible + "|" + coldLabel.text + "|" + cold.motion.dimmed + "|" + coldWords.text)
       releaseMsft.running = true
       wait(50)
       harness.check("payload features its symbol",
@@ -978,6 +1008,12 @@ ShellRoot {
       summoned.testBody.motion.revealChanged.disconnect(watchReveal)
       harness.check("a window summoned while its service starts draws its chart in",
         lowestReveal < 0.5 && summoned.testBody.motion.reveal === 1, lowestReveal)
+      coldWords.textChanged.disconnect(countLoading)
+      coldLabel.visibleChanged.disconnect(countLoading)
+      coldLabel.textChanged.disconnect(countLoading)
+      harness.check("from the summon until its chart lands, Loading is never said twice, and the header then names the market",
+        loadingSaid.indexOf(2) < 0 && loadingSaid.indexOf(1) >= 0 && coldWords.text !== "" && !/loading/i.test(coldWords.text),
+        "said at once " + loadingSaid.join(",") + " | header " + coldWords.text)
       // The first service reads the summon back from the file before its own
       // window writes the next range.
       tryVerify(function() { return service.featuredSymbol === "MSFT" && service.range === "1Y" }, 5000,
@@ -1520,6 +1556,71 @@ ShellRoot {
           + " | white #116329 #a40e26 | kanagawa #76946a #c34043 | tokyo-night #9ece6a #f7768e"
           + " | tokyo-night with kanagawa's green #76946a #f7768e | tokyo-night #9ece6a #f7768e",
         trendColours.join(" | "))
+
+      // The pill's mark turns with its own day: a new price that takes TURN
+      // below its close leaves the mark falling, every column in the down
+      // colour, and one back above it climbing, every column in the up
+      // colour. A wheel step to another symbol shows that one's mark at
+      // once, and back again. (popup-motion.sh judges the turn's frames.)
+      var settingsBeforeTurn = pill.settings
+      barApi.layoutConfig = { left: [], center: [], right: [{ id: "grvc.stonks" }] }
+      service.addSymbol("TURN")
+      tryVerify(function() { return !!service.quotes.TURN && service.arriving.length === 0 }, 10000)
+      service.feature("TURN")
+      var markOfIn = function(symbol, mode) {
+        var tone = Figures.rowModel(service.quotes[symbol], 0, mode).tone
+        return (tone === "down" ? "falls" : "climbs") + " in " + [0, 1, 2, 3, 4].map(function() { return String(pill.toneColor(tone)) }).join(" ")
+      }
+      var markOf = function(symbol) { return markOfIn(symbol, service.changeMode) }
+      var newPrice = function(down) {
+        var proc = down ? turnDown : turnUp
+        proc.running = true
+        tryVerify(function() { return !proc.running }, 2000)
+        var entries = Object.assign({}, service.testFeed.entries)
+        entries.TURN = Object.assign({}, entries.TURN, { answeredAt: entries.TURN.answeredAt - 20 })
+        service.testFeed.entries = entries
+        service.refresh()
+        tryVerify(function() { return pill.featured.tone === (down ? "down" : "up") && !mark.turning }, 10000)
+        return harness.markDrawn(mark)
+      }
+      var turnStart = harness.markDrawn(mark)
+      var turnedDown = newPrice(true)
+      var turnedUp = newPrice(false)
+      // Wheel steps until one lands on a symbol whose mark has the other
+      // shape, each step's mark checked as it lands.
+      var wheels = []
+      for (var w = 0; w < 3; w++) {
+        var before = harness.markWay(mark)
+        mouseWheel(pill, pill.width / 2, pill.height / 2, 0, w === 0 ? -120 : 120)
+        wheels.push(service.featuredSymbol + " " + (mark.turning ? "turning " : "") + harness.markDrawn(mark)
+          + (harness.markDrawn(mark) === markOf(service.featuredSymbol) ? "" : " want " + markOf(service.featuredSymbol)))
+        if (harness.markWay(mark) !== before && service.featuredSymbol !== "TURN") break
+      }
+      var wheelsRight = wheels.every(function(line) { return !/turning| want /.test(line) })
+        && / (falls|climbs) /.test(wheels[wheels.length - 1]) && harness.markWay(mark) !== markOf("TURN").split(" ")[0]
+      harness.check("a new price that turns the pill's day ends its mark the new way in the new colour in every column, and a wheel step shows the next symbol's mark at once",
+        turnStart === markOf("TURN") && turnedDown === "falls in " + [0, 1, 2, 3, 4].map(function() { return String(pill.downColor) }).join(" ")
+          && turnedUp === "climbs in " + [0, 1, 2, 3, 4].map(function() { return String(pill.upColor) }).join(" ") && wheelsRight,
+        [turnStart, turnedDown, turnedUp].concat(wheels).join(" | "))
+      // A change of mode turns no mark: the turn says a new price crossed.
+      // Found in review: "since open", reading TURN's day the other way,
+      // stepped the mark as a crossing would.
+      service.feature("TURN")
+      tryVerify(function() { return !!pill.featured && pill.featured.symbol === "TURN" && !mark.turning }, 2000)
+      var toneIn = function(mode) { return Figures.rowModel(service.quotes.TURN, 0, mode).tone }
+      if (toneIn("open") === toneIn("pct")) newPrice(true)
+      var modeFlip = toneIn("pct") + " to " + toneIn("open")
+      service.persist({ changeMode: "open" })
+      var modeTurned = mark.turning
+      var modeMark = harness.markDrawn(mark)
+      service.persist({ changeMode: "pct" })
+      harness.check("a change of mode that reads the pill's day the other way switches its mark at once, with no turn",
+        toneIn("open") !== toneIn("pct") && !modeTurned && !mark.turning && modeMark === markOfIn("TURN", "open"),
+        modeFlip + ": " + (modeTurned ? "turning " : "") + modeMark + " want " + markOfIn("TURN", "open"))
+      barApi.layoutConfig = ({})
+      pill.settings = settingsBeforeTurn
+      service.feature(upSymbol)
+      service.removeSymbol("TURN")
 
       service.removeSymbol("DOWN")
 

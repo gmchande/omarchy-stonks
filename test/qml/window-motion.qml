@@ -6,7 +6,8 @@ import "plugin" as Stonks
 
 // The window's chart in motion, through the real App and Service with real
 // Qt keys and pointer: what a draw-in and a scrub repaint, replays, the day
-// and the hero, every change's draw-in judged on rendered frames, and a
+// and the hero, every change's draw-in judged on rendered frames, a joining
+// row's day line drawing in and a list switch's rows drawn at once, and a
 // closing surface holding still. HOME and curl are scratch fixtures.
 ShellRoot {
   id: harness
@@ -589,6 +590,101 @@ ShellRoot {
         + halves.join(" || "), halves.every(function(r) { return / ok /.test(r) }))
     }
 
+    // A row that joins draws its day line in from the left over about
+    // 320 ms, as rendered, the baseline whole from the start: the undo of a
+    // removal from a named list, in smooth and retro, ending on the whole
+    // line, never a blank or half-drawn one. And a list switch draws its
+    // rows at once: every frame from the switch on is the same picture.
+    // The row's line is grabbed alone, so the row's own 160 ms fade is not
+    // in its pictures.
+    function joinFrames(body, watchlist, keys) {
+      service.createList("Joins")
+      ;["AAPL", "MSFT", "NVDA"].forEach(function(s) { service.setMembership(s, "Joins", true) })
+      service.switchList("Joins")
+      mouseMove(body, 1, 1)
+      wait(200)
+      var joins = []
+      var switches = []
+      ;["smooth", "retro"].forEach(function(look) {
+        service.persist({ style: look })
+        tryVerify(function() { return body.retro === (look === "retro") }, 2000)
+        wait(100)
+        var row = watchlist.rowItem("MSFT")
+        var line = harness.find(row, look === "retro" ? "rowCells" : "rowLine")
+        var joined = null
+        var tries = []
+        // Filmed again, up to three times, only when too loaded to read.
+        for (var attempt = 0; attempt < 3 && (!joined || joined.unreadable); attempt++) {
+          var name = "join-" + look + "-" + attempt
+          keys.forceActiveFocus()
+          watchlist.cursorSymbol = "MSFT"
+          keyClick(Qt.Key_X)
+          tryVerify(function() { return watchlist.displayedSymbols.indexOf("MSFT") < 0 }, 2000)
+          // The grab starts as the line's reveal leaves whole, the row just
+          // shown: a hidden row has no picture to grab.
+          grab.source = line
+          var started = false
+          var marked = function() {
+            if (started || row.reveal >= 1) return
+            started = true
+            grab.begin(name)
+          }
+          row.revealChanged.connect(marked)
+          keyClick(Qt.Key_U)
+          tryVerify(function() { return started && row.reveal === 1 }, 3000)
+          var settledAt = grab.frames.length
+          tryVerify(function() { return grab.frames.length >= settledAt + 4 }, 2000)
+          grab.end()
+          row.revealChanged.disconnect(marked)
+          tryVerify(function() { return grab.waiting === 0 }, 3000)
+          // The empty plot, the baseline alone, on the grab's own ground.
+          var plot = Quickshell.env("STONKS_FRAMES") + "/" + name + "-plot.ppm"
+          var saved = false
+          row.reveal = 0
+          line.grabToImage(function(result) { result.saveToFile(plot); saved = true })
+          tryVerify(function() { return saved }, 3000)
+          row.reveal = 1
+          grab.judge("drawin:ink", null, ["plot=" + plot])
+          tryVerify(function() { return grab.verdict !== null }, 10000)
+          joined = grab.verdict
+          tries.push(joined.unreadable ? "unreadable" : joined.ok ? "ok" : "failed")
+        }
+        joins.push(look + " " + (joined.ok ? "ok" : "FAILED") + " (" + tries.join(",") + "): " + joined.detail)
+
+        // A switch to All and back, each filmed from the switch on, judged
+        // on the rows' day line column. The cursor goes back to rest first,
+        // so its fill easing off, the shell's hover ease, is not filmed.
+        watchlist.cursorSymbol = ""
+        ;["", "Joins"].forEach(function(list) {
+          grab.source = watchlist
+          grab.begin("switch-" + look + "-" + (list || "all"))
+          // Past the cursor fill's 60 ms ease before the switch.
+          var begun = grab.start
+          tryVerify(function() { var f = grab.frames; return f.length > 0 && f[f.length - 1].at - begun >= 160 }, 2000)
+          grab.markStart()
+          var from = grab.start
+          service.switchList(list)
+          tryVerify(function() { var f = grab.frames; return f.length > 0 && f[f.length - 1].at - from >= 480 }, 5000)
+          grab.end()
+          tryVerify(function() { return grab.waiting === 0 }, 3000)
+          var column = harness.find(watchlist.rowItem("MSFT"), look === "retro" ? "rowCells" : "rowLine")
+          var left = Math.floor(column.mapToItem(watchlist, 0, 0).x)
+          grab.judge("same:" + [left, 0, Math.ceil(column.width), Math.floor(watchlist.height)].join(","),
+            grab.frames.filter(function(f) { return f.at >= from }))
+          tryVerify(function() { return grab.verdict !== null }, 10000)
+          switches.push(look + " to " + (list || "All") + " " + (grab.verdict.ok && service.listName === list ? "ok" : "FAILED") + ": " + grab.verdict.detail)
+        })
+      })
+      service.persist({ style: "smooth" })
+      service.switchList("")
+      service.deleteList("Joins")
+      wait(100)
+      harness.check("a row that joins, an undo, draws its day line in from the left over about 320 ms, as rendered, ending whole, smooth and retro — "
+        + joins.join(" || "), joins.every(function(r) { return / ok /.test(r) }))
+      harness.check("a list switch draws its rows at once: the same picture on every frame from the switch on, smooth and retro — "
+        + switches.join(" || "), switches.every(function(r) { return / ok: /.test(r) }))
+    }
+
     // The header's animal as it is rendered, in smooth: a scrub across the
     // close turns the bull into the bear in a 160 ms crossfade that never
     // leaves the slot empty, and a new symbol changes it at once. Judged on
@@ -636,11 +732,12 @@ ShellRoot {
       tryVerify(function() { return !body.chartLoading && body.motion.drawn === 1 }, 5000)
     }
 
-    // The header's animal falling asleep, as it is rendered with its "z",
-    // the status words hidden: when the clock closes DOWN's market, Friday
-    // 11 September at 20:00 with no night after it, its eyes close over
-    // 320 ms in smooth and in two steps in retro. Nothing else moves it:
-    // letting go of a scrub puts it back to sleep at once, a new symbol
+    // The header's animal falling asleep and waking, as it is rendered with
+    // its "z", the status words hidden: when the clock closes DOWN's market,
+    // Friday 11 September at 20:00 with no night after it, its eyes close
+    // over 320 ms in smooth and in two steps in retro, and when its night
+    // starts on Sunday at 20:00 they open the same way. Nothing else moves
+    // it: letting go of a scrub puts it back to sleep at once, a new symbol
     // changes it at once, and an open after the close shows it asleep from
     // its first frame.
     function sleepFrames(body) {
@@ -693,6 +790,19 @@ ShellRoot {
       })
       harness.check("the clock closing the market closes the animal's eyes over 320 ms, smoothly in smooth and in two steps in retro, whose clock skips the closing second — "
         + bells.join(" | "), bells.every(function(b) { return /^\w+: ok, /.test(b) }))
+      // Sunday at 20:00, DOWN's night starting: it trades all night.
+      var wake = close + 2 * 86400
+      var wakes = ["smooth", "retro"].map(function(style) {
+        look(style)
+        service.now = wake - 60
+        tryVerify(function() { return body.animal.asleep && header.closing === 1 }, 2000)
+        var opened = run("wake-bell-" + style, style === "smooth" ? "turn:320" : "steps:320", function() {
+          service.now = style === "smooth" ? wake : wake + 2
+        })
+        return style + ": " + (opened.ok && !body.animal.asleep ? "ok" : "not ok") + ", " + opened.detail
+      })
+      harness.check("the clock waking the market opens the animal's eyes over 320 ms, the \"z\" going with them, smoothly in smooth and in two steps in retro — "
+        + wakes.join(" | "), wakes.every(function(w) { return /^\w+: ok, /.test(w) }))
       look("smooth")
       // Two seconds after the close, inside the bell's few seconds, a scrub
       // on the same side of the close, so the animal reads a bear on both
@@ -1065,6 +1175,7 @@ ShellRoot {
       dayAndHero(body, watchlist, keys)
       motionEnds(body, watchlist, keys)
       drawInFrames(body, keys)
+      joinFrames(body, watchlist, keys)
       animalFrames(body)
       sleepFrames(body)
       closingHolds(body, watchlist, keys)

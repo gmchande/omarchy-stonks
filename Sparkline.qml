@@ -6,8 +6,10 @@ import "Tones.js" as Tones
 // geometry from Chart.chartGeometry and the colors, it draws. Given a known
 // direction it takes the hero's rule: the up colour above the dashed
 // baseline and the down colour below it. Without one (the pill, a row still
-// loading) it is one colour. The scrub's dot is its own layer, so a scrub
-// never repaints the line.
+// loading) it is one colour. A row's draw-in clips the line, not the
+// baseline, as the hero's does; one canvas repaints for it, so a row costs
+// no layer more. The scrub's dot is its own layer, so a scrub never
+// repaints the line.
 Item {
   id: root
 
@@ -22,6 +24,10 @@ Item {
   // 0..1 along the session, or -1 for none. Drawn as a small dot on the line.
   property real cursorX: -1
   readonly property real pad: 1.5
+  // How much of the line has been drawn, 0..1: it shows from the left edge
+  // to the newest print's dot, and at 1 the whole line shows. The baseline
+  // is always there.
+  property real reveal: 1
   // One print draws, as a dot, as the hero's does: a day with one bar is no
   // empty cell.
   readonly property bool drawable: !!geometry && !!geometry.points && geometry.points.length >= 1
@@ -33,6 +39,7 @@ Item {
   onDownColorChanged: { ink.requestPaint(); marks.requestPaint() }
   onBaselineColorChanged: ink.requestPaint()
   onLineWidthChanged: ink.requestPaint()
+  onRevealChanged: ink.requestPaint()
   onCursorXChanged: marks.requestPaint()
 
   Canvas {
@@ -66,6 +73,15 @@ Item {
       ctx.lineWidth = root.lineWidth
       ctx.lineJoin = "round"
       ctx.lineCap = "round"
+      // Drawing in: the line and its dots only left of the sweep, which
+      // runs to the newest print's dot.
+      ctx.save()
+      if (root.reveal < 1) {
+        var inkRight = pad + pts[pts.length - 1].x * w + root.lineWidth * 1.5 + 1
+        ctx.beginPath()
+        ctx.rect(0, 0, inkRight * Math.max(0, root.reveal), height)
+        ctx.clip()
+      }
       // Split, the up colour over the baseline and the down colour under
       // it, in one stroke; two stops at one offset merge, so the second sits
       // a hair below.
@@ -96,6 +112,7 @@ Item {
         ctx.arc(pad + pts[k].x * w, dy, root.lineWidth * 1.5, 0, Math.PI * 2)
         ctx.fill()
       }
+      ctx.restore()
     }
   }
 

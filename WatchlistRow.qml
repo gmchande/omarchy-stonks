@@ -37,6 +37,10 @@ Rectangle {
   property bool moving: false
   property color ground: "transparent"
   property real scrubX: -1
+  // How much of the day line has been drawn, 0..1: a row joining the list
+  // draws its line in from the left, as the hero's chart draws in (the list
+  // runs it); at rest, and in every other change, the whole line.
+  property real reveal: 1
   // The exchanges' calendars, for the breaks in the day line.
   property var calendars: null
   property color foreground: Color.foreground
@@ -150,6 +154,7 @@ Rectangle {
       lineColor: row.dim
       baselineColor: row.dimmer
       cursorX: row.scrubX
+      reveal: row.reveal
     }
   }
 
@@ -170,6 +175,7 @@ Rectangle {
       pixel: 2
       gap: 1
       scrubX: row.scrubX
+      reveal: row.reveal
     }
   }
 

@@ -55,6 +55,7 @@ ShellRoot {
   }
 
   readonly property string readmePath: String(Qt.resolvedUrl("README.md")).replace(/^file:\/\//, "")
+  readonly property string manifestPath: String(Qt.resolvedUrl("plugin/manifest.json")).replace(/^file:\/\//, "")
   function readFile(path) {
     var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true; printErrors: false }', harness)
     view.path = path
@@ -96,7 +97,7 @@ ShellRoot {
   Stonks.Updates { id: updates }
   QtObject {
     id: shellApi
-    function serviceFor(id) { return { service: service } }
+    function serviceFor(id) { return { service: service, updates: updates } }
   }
   PluginBarApi {
     id: api
@@ -206,7 +207,8 @@ ShellRoot {
       press("?")
       wait(50)
       var sheet = harness.find(s.body, "helpSheet")
-      var drawn = { keys: harness.texts(sheet, "helpKey"), all: harness.texts(sheet), whole: !sheet.interactive }
+      var drawn = { keys: harness.texts(sheet, "helpKey"), all: harness.texts(sheet), whole: !sheet.interactive,
+        credit: harness.texts(sheet, "helpCredit").join("") }
       press("?")
       return drawn
     }
@@ -222,6 +224,10 @@ ShellRoot {
       harness.check("in the " + s.name + ", every key the sheet and the README's table list acts (" + listed.length + " keys)",
         readme !== null && dead.length === 0, readme === null ? "no key table in the README" : "dead: " + dead.join(" "))
       harness.check("in the " + s.name + ", Shift+P changes nothing", !acts(s, "Shift+P"))
+      var version = JSON.parse(harness.readFile(harness.manifestPath)).version
+      harness.check("in the " + s.name + ", the sheet's foot credits Stonks " + version + ", Yahoo, and Robinhood",
+        sheet.credit.indexOf("Stonks " + version + " ") >= 0 && sheet.credit.indexOf("Yahoo") >= 0
+          && sheet.credit.indexOf("Robinhood") >= 0, sheet.credit)
       return sheet
     }
 
