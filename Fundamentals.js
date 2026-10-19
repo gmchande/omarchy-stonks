@@ -120,12 +120,12 @@ function peText(value) {
 // a mark it reads as. A day only takes the tone while its end is the one
 // shown. The cap and the P/E move with the headline price from their own
 // date's close; a cap more than CAP_MAX_AGE_DAYS whole days older than the
-// price is left out. The cap's currency is named only when it is not the
-// price's (London prices in GBp, its caps in GBP).
+// price is left out. The cap names its currency, always, so one in yen never
+// reads as one in dollars beside it, whatever the reader's own; a London cap
+// is in GBP while its prices are in GBp.
 // Only an equity has cap and P/E slots, kept whether known or not, so the
-// line keeps its shape: the cap's as wide as 999.9B, with room for its
-// currency on a listing priced in a minor unit (GBp) before the cap comes;
-// the P/E's as wide as 99.9.
+// line keeps its shape: the cap's as wide as its currency and 999.9B before
+// the cap comes; the P/E's as wide as 99.9.
 function yearLine(quote, figures, range, stats) {
   if (!quote) return null
   var q = quote
@@ -152,13 +152,14 @@ function yearLine(quote, figures, range, stats) {
   if (hasFundamentals(q)) {
     var cap = figures ? figures.cap : null
     var pe = figures ? figures.pe : null
-    var named = function(currency) { return currency && currency !== q.currency ? currency + " " : "" }
-    var minor = /[a-z]/.test(q.currency || "") ? q.currency.toUpperCase() : ""
+    // A currency code is three letters, the listing's in capitals until the
+    // cap's own is known.
+    var code = (cap ? cap.currency : String(q.currency || "").toUpperCase()) + " "
     facts.push({
       label: "MKT CAP",
       value: head && cap && Math.floor((head.t - dateEpoch(cap.date)) / (24 * 60 * 60)) <= CAP_MAX_AGE_DAYS
-        ? named(cap.currency) + Format.compactNumber(cap.value * head.price / cap.close) : "",
-      widest: named(cap ? cap.currency : minor) + Format.widest("999.9B")
+        ? code + Format.compactNumber(cap.value * head.price / cap.close) : "",
+      widest: code + Format.widest("999.9B")
     })
     facts.push({ label: "P/E", value: head && pe ? peText(pe.value * head.price / pe.close) : "", widest: Format.widest("99.9") })
   }
