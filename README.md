@@ -3,7 +3,7 @@
 A stock watchlist plugin for the Omarchy 4 shell: today's move in your bar,
 and a chart you can scrub a click away.
 
-<img src="preview.png" alt="Stonks in the Omarchy bar: the pill shows Apple's symbol, sparkline, and change, and under it the popup shows Apple's price, the day's chart, the range buttons, the day's and 52-week figures, and the first rows of the list">
+<img src="preview.png" alt="Stonks in the Omarchy bar: the pill shows Apple's symbol, sparkline, and change, and under it two popups side by side, each showing Apple's price, the day's chart, the range buttons, the day's and 52-week figures, and the first rows of the list. On the left, smooth, scrubbed back to 10:15 when the day was up, with the bull; on the right, retro, on the latest price of a down day, with the bear">
 
 - Today's move in your bar; scroll over it to step through your stocks.
 - Click for the day's chart and scrub it with the pointer, or pick a range
@@ -18,6 +18,8 @@ and a chart you can scrub a click away.
 - No account and no API key.
 
 It doesn't track holdings, send price alerts, or convert currencies.
+
+<img src="media/light.png" width="480" alt="The popup in Catppuccin Latte, a light theme: Stonks' own green and red, for a light ground, on the theme's pale background">
 
 ## Install
 
