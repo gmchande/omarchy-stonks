@@ -182,8 +182,9 @@ price say the same.
   running. A row with a price keeps it, with the time it's from, and `r`
   asks again. A symbol Yahoo has dropped, after a merger, a rename, or a
   delisting, stays this way: search for the company to find what Yahoo
-  calls it now. If every row says it, Yahoo has changed or closed what
-  Stonks asks for, and only a newer Stonks can fix that.
+  calls it now. If every row says it, the fault is Yahoo's: Stonks asks
+  again at each refresh, and if Yahoo has changed what it answers, only a
+  newer Stonks can fix that.
 - **A London or Tokyo stock says "As of" while its market is open.** Yahoo
   sends those exchanges' prices 20 minutes late, and Stonks gives the time
   of any price more than two minutes old while its market trades. Yahoo
@@ -192,13 +193,14 @@ price say the same.
   overnight price names its own time, usually 10 to 15 minutes back, since
   Robinhood's prints arrive late, and dims once it's 20 minutes old.
 - **A price looks wrong.** Each price is in its listing's currency, never
-  converted, and Yahoo sends London's in pence (GBp): 3,580.00 is £35.80.
-  The large price is the regular session's; pre-market, after-hours, and
-  overnight trades are the smaller line under it, which some apps show as
-  the main price. The change is from the previous close, or on a longer
-  range from the range's start. Stonks shows Yahoo's prices as sent, but
-  for the stray prints Yahoo sometimes drops into a chart, which it leaves
-  out.
+  converted, and a price marked GBp is in pence, as Yahoo quotes many
+  London listings: 3,580.00 is £35.80. The large price is the regular
+  session's; pre-market, after-hours, and overnight trades are the smaller
+  line under it, which some apps show as the main price. The change is
+  from the previous close, unless you've clicked it to since the open; on
+  a longer range, it's from the range's start. Stonks shows Yahoo's prices
+  as sent, but for the stray prints Yahoo sometimes drops into a chart,
+  which it leaves out.
 - **The day's chart says "No trades charted" or "Traded only at" a time.**
   The listing traded too little that day to draw a line.
 - **The header says "1W unavailable", with RETRY beside it.** Yahoo didn't
