@@ -116,6 +116,10 @@ building one that won't merge.
   symbol changes, except the footer for a list of another length: it rides
   the popup's easing edge, and sits one gap under a short list in the
   window.
+- **Character.** Stonks has a few signs of life: the bull and the bear,
+  their sleep while the market rests, the live dot's ripples, and the day's
+  named moments, such as "Power hour". Each says something true and none
+  cheers a number. They are part of the product, so a cleanup keeps them.
 - **Fetching.** Each listing is asked for only as often as its market can
   move, nothing is fetched while every screen is off, and a host that refuses
   is left alone for a while.
