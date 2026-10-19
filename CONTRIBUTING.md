@@ -53,7 +53,8 @@ building one that won't merge.
   `bash test/qml/lists.sh`.
 - A test checks what Stonks does: what it fetches, saves, and says, and what
   a key or a click changes; never a picture, a position, or a timing. How
-  Stonks looks and moves is the maintainer's to review, on your branch.
+  Stonks looks and moves is the maintainer's to review, on your branch, with
+  `test/review.sh`.
 - Tests are few and end to end. A new behaviour gets a step in a flow harness
   under `test/qml/` that drives the real service and surfaces with real keys
   and pointer. `bun test` is only for pure data rules, such as parsers and
@@ -170,9 +171,12 @@ every release bumps it.
 2. Bump `manifest.json`'s version in a release commit on `dev`. When what
    the README's pictures show has changed, render them again with
    `test/qml/readme.sh` in that commit.
-3. Fast-forward `main` to it: `git push origin dev:main`.
-4. Tag it (`vX.Y.Z`) and publish release notes.
-5. File the Omarchy plugin marketplace's verify form with `main`'s new
+3. Run `test/review.sh` on the release commit: the renders, layout, motion,
+   the long list, and the README pictures run only there. Its last line must
+   be `ALL PASS`.
+4. Fast-forward `main` to it: `git push origin dev:main`.
+5. Tag it (`vX.Y.Z`) and publish release notes.
+6. File the Omarchy plugin marketplace's verify form with `main`'s new
    commit; until then the listing says Unverified.
 
 ## Agents
