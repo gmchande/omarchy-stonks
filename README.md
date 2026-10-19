@@ -185,13 +185,16 @@ price say the same.
   calls it now. If every row says it, the fault is Yahoo's: Stonks asks
   again at each refresh, and if Yahoo has changed what it answers, only a
   newer Stonks can fix that.
-- **A London or Tokyo stock says "As of" while its market is open.** Yahoo
-  sends those exchanges' prices up to 20 minutes late, and Stonks gives
-  the time of any price more than two minutes old while its market trades.
-  Yahoo lists each exchange's delay [on its help page](https://help.yahoo.com/kb/SLN2310.html).
-  A thin stock can say it too: its last trade was that long ago. The
-  overnight price names its own time, usually 10 to 15 minutes back, since
-  Robinhood's prints arrive late, and dims once it's 20 minutes old.
+- **A stock or index says "As of" while its market is open.** Yahoo sends
+  many exchanges' prices late, and some indexes'. When we measured,
+  London's, São Paulo's, and the Cboe's VIX came 15 minutes late and
+  Mexico's 20; Nasdaq's, NYSE's, Toronto's, and crypto came within a
+  minute. For any other exchange, Tokyo's among them, see [Yahoo's table of delays](https://help.yahoo.com/kb/SLN2310.html).
+  Stonks gives the time of any price more than two minutes old while its
+  market trades. A thin stock can say it too: its last trade was that long
+  ago. The overnight price names its own time, usually 10 to 15 minutes
+  back, since Robinhood's prints arrive late, and dims once it's 20
+  minutes old.
 - **A price looks wrong.** Each price is in its listing's currency, never
   converted, and a price marked GBp is in pence, as Yahoo quotes many
   London listings: 3,580.00 is £35.80. The large price is the regular
@@ -210,8 +213,8 @@ price say the same.
   Stonks is waiting out a refusal from Yahoo. Try again in a moment.
 - **The header says "schedule unavailable".** Stonks carries each
   exchange's holidays through a set date, and this exchange's have run
-  out, so it can't say when the market next opens. Update Stonks for a
-  renewed calendar.
+  out, so it can't say when the market next opens. Stonks doesn't update
+  itself: [update it](#update) for a renewed calendar.
 - **The footer says "Can't read grvc.stonks.json".** The file holding your
   lists can't be opened or isn't valid JSON, often after a hand edit.
   Stonks keeps the lists it has and writes nothing over the file until it
@@ -234,9 +237,11 @@ The shell's log the form asks for can name prints Stonks left out.
   for overnight prices and which stocks trade overnight. Nothing else.
 - **Data:** Yahoo's endpoints are unofficial, and its terms restrict
   automated access; Robinhood's data is for personal use. Either may change
-  or stop without notice. Some prices come late: Yahoo's London and Tokyo
-  quotes by up to 20 minutes. Stonks isn't investment advice, and isn't
-  affiliated with Yahoo or Robinhood.
+  or stop without notice. Some prices come late: Yahoo delays many
+  exchanges' quotes and some indexes', London's and Tokyo's among them, by
+  up to 30 minutes in [its table](https://help.yahoo.com/kb/SLN2310.html).
+  Stonks isn't investment advice, and isn't affiliated with Yahoo or
+  Robinhood.
 - **Files it writes:** your lists and settings in
   `~/.config/omarchy/grvc.stonks.json`, and the last quotes in
   `~/.cache/grvc.stonks/quotes.json`. The shell keeps the pill's form on its
