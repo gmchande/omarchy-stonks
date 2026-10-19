@@ -217,7 +217,7 @@ wait "$h" 2> /dev/null
 [ -s "$tmp/made/made" ] || miss "made: the TERM never came with the folder made"
 [ -e "$(cat "$tmp/made/made" 2> /dev/null)" ] && miss "made: its runtime folder $(cat "$tmp/made/made") is still there"
 
-# An interrupt of a harness: INT as a terminal sends it, TERM as test/all.sh
+# An interrupt of a harness: INT as a terminal sends it, TERM as test/queue.sh
 # does, each to the harness's group, mid-run; and TERM the moment
 # Quickshell has started, before the harness has recorded its group.
 for signal in INT TERM; do

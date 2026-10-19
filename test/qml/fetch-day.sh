@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The daily totals, by hand (test/all.sh leaves it out: it takes minutes):
+# The daily totals, by hand (neither test runner starts it: it takes minutes):
 # a weekday and a weekend of glances through the real Service and App on a
 # clock the harness sets (fetch-day.qml), with a long list's shape, 34
 # symbols. Counts every request the fake curl answered and every curl call,
