@@ -74,23 +74,29 @@ BarWidget {
   readonly property color trendColor: toneColor(featured ? featured.tone : "")
   // A day's colour by its tone: up, down, or the dim of a flat one.
   function toneColor(tone) { return tone === "up" ? upColor : tone === "down" ? downColor : dimColor }
-  // The symbol and tone the mark shows. A new price that turns the same
+  // The day and tone the mark shows. A new price that turns the same
   // symbol's day between falling and climbing (a flat day climbs, dim)
   // steps the mark (`StonksMark.turnTo`); a tone alone recolours it, and
-  // another symbol shows at once.
-  property string markSymbol: ""
+  // another symbol, another day, or another change mode shows at once: the
+  // turn says a price crossed, never that the reading changed.
+  // Read in the handler, never a binding, so it can't lag `featured`.
+  function markDay() {
+    return !featuredQuote ? "" : [featuredSymbol, service.changeMode,
+      featuredQuote.session && featuredQuote.session.regular ? featuredQuote.session.regular.start : 0].join("|")
+  }
+  property string shownDay: ""
   property string markTone: ""
   onFeaturedChanged: {
-    var symbol = featured ? featured.symbol : ""
     var tone = featured ? featured.tone : ""
-    if (symbol !== "" && symbol === markSymbol)
+    var day = markDay()
+    if (day !== "" && day === shownDay)
       mark.turnTo(tone === "down", toneColor(tone), markTone === "down", toneColor(markTone))
     else mark.settle()
-    markSymbol = symbol
+    shownDay = day
     markTone = tone
   }
   Component.onCompleted: {
-    markSymbol = featured ? featured.symbol : ""
+    shownDay = markDay()
     markTone = featured ? featured.tone : ""
   }
   // Quieter than the bar's ink by the same rule as the popup's secondary

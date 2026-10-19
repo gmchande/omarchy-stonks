@@ -1567,10 +1567,11 @@ ShellRoot {
       service.addSymbol("TURN")
       tryVerify(function() { return !!service.quotes.TURN && service.arriving.length === 0 }, 10000)
       service.feature("TURN")
-      var markOf = function(symbol) {
-        var tone = Figures.rowModel(service.quotes[symbol], 0, service.changeMode).tone
+      var markOfIn = function(symbol, mode) {
+        var tone = Figures.rowModel(service.quotes[symbol], 0, mode).tone
         return (tone === "down" ? "falls" : "climbs") + " in " + [0, 1, 2, 3, 4].map(function() { return String(pill.toneColor(tone)) }).join(" ")
       }
+      var markOf = function(symbol) { return markOfIn(symbol, service.changeMode) }
       var newPrice = function(down) {
         var proc = down ? turnDown : turnUp
         proc.running = true
@@ -1601,6 +1602,21 @@ ShellRoot {
         turnStart === markOf("TURN") && turnedDown === "falls in " + [0, 1, 2, 3, 4].map(function() { return String(pill.downColor) }).join(" ")
           && turnedUp === "climbs in " + [0, 1, 2, 3, 4].map(function() { return String(pill.upColor) }).join(" ") && wheelsRight,
         [turnStart, turnedDown, turnedUp].concat(wheels).join(" | "))
+      // A change of mode turns no mark: the turn says a new price crossed.
+      // Found in review: "since open", reading TURN's day the other way,
+      // stepped the mark as a crossing would.
+      service.feature("TURN")
+      tryVerify(function() { return !!pill.featured && pill.featured.symbol === "TURN" && !mark.turning }, 2000)
+      var toneIn = function(mode) { return Figures.rowModel(service.quotes.TURN, 0, mode).tone }
+      if (toneIn("open") === toneIn("pct")) newPrice(true)
+      var modeFlip = toneIn("pct") + " to " + toneIn("open")
+      service.persist({ changeMode: "open" })
+      var modeTurned = mark.turning
+      var modeMark = harness.markDrawn(mark)
+      service.persist({ changeMode: "pct" })
+      harness.check("a change of mode that reads the pill's day the other way switches its mark at once, with no turn",
+        toneIn("open") !== toneIn("pct") && !modeTurned && !mark.turning && modeMark === markOfIn("TURN", "open"),
+        modeFlip + ": " + (modeTurned ? "turning " : "") + modeMark + " want " + markOfIn("TURN", "open"))
       barApi.layoutConfig = ({})
       pill.settings = settingsBeforeTurn
       service.feature(upSymbol)
