@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import qs.Commons
 import qs.Ui
@@ -79,6 +81,15 @@ BarWidget {
   // most likely to be trusted at a glance.
   readonly property string changeText: featured ? (warns ? "! " : "") + Format.lookSigns(featured.changeLine, retro)
     : (warns ? "! no data" : "…")
+  // A side bar's stacked form: the symbol's lines over the move's, each at
+  // most four characters (`Format.stackedSymbol`), the move in the rows'
+  // unit, money in money and else a percent (`Format.stackedMoney`,
+  // `stackedPct`), coloured by its sign as drawn.
+  readonly property var stackedMove: !featured ? { lines: ["…"], sign: 0 }
+    : service.changeMode === "abs" ? Format.stackedMoney(featured.abs, featuredQuote.priceDigits) : Format.stackedPct(featured.pct)
+  readonly property var stackedLines: (featured ? Format.stackedSymbol(featured.symbol) : ["ST"])
+    .map(function(t) { return { text: t, move: false } })
+    .concat(stackedMove.lines.map(function(t) { return { text: t, move: true } }))
 
   // What is left of a notch between wheel events: a high-resolution wheel
   // sends a notch as several small ticks, and a notch is one symbol.
@@ -173,7 +184,7 @@ BarWidget {
     labelVisible: false
     hasVisualContent: true
     fixedWidth: root.vertical ? -1 : (root.iconOnly ? Style.bar.iconSlot : content.implicitWidth + Style.space(17))
-    fixedHeight: root.vertical ? (root.iconOnly ? Style.bar.iconSlot : Style.bar.iconSlot * 2) : -1
+    fixedHeight: root.vertical ? (root.iconOnly ? Style.bar.iconSlot : root.stackedLines.length * Style.bar.iconSlot) : -1
     // A hover only for what the pill can't say: the icon names nothing, so
     // its hover says what the other forms show, the symbol and its change;
     // on every form, what a warning's "!" means. The line, the arrow, and
@@ -288,30 +299,27 @@ BarWidget {
       }
     }
 
+    // As Omarchy's clock draws a vertical bar: one line to an icon slot, at
+    // the bar's size, 90% at four characters, never smaller.
     Column {
+      objectName: "pillStack"
       visible: root.vertical && !root.iconOnly
       anchors.centerIn: parent
 
-      OpticalGlyph {
-        objectName: "pillDaySymbol"
-        width: button.width
-        height: Style.bar.iconSlot
-        text: root.featured ? root.featured.symbol : "ST"
-        fontFamily: button.fontFamily
-        fontSize: button.fontSize * 0.85
-        color: button.foreground
-      }
-      // Coloured by the figure it shows, a percentage whatever change the
-      // rows say: by its sign, and no colour once it shows 0.0%.
-      OpticalGlyph {
-        objectName: "pillDayChange"
-        width: button.width
-        height: Style.bar.iconSlot
-        text: root.featured ? Format.lookSigns(Format.narrowPct(root.featured.pct), root.retro) : "…"
-        fontFamily: button.fontFamily
-        fontSize: button.fontSize * 0.85
-        color: !root.featured || Format.narrowPctShown(root.featured.pct).shown === 0 ? root.dimColor
-          : root.featured.pct > 0 ? root.upColor : root.downColor
+      Repeater {
+        model: root.stackedLines
+
+        OpticalGlyph {
+          required property var modelData
+          objectName: "pillStackLine"
+          width: button.width
+          height: Style.bar.iconSlot
+          text: modelData.move ? Format.lookSigns(modelData.text, root.retro) : modelData.text
+          fontFamily: button.fontFamily
+          fontSize: modelData.text.length > 3 ? button.fontSize * 0.9 : button.fontSize
+          color: !modelData.move ? button.foreground : root.stackedMove.sign > 0 ? root.upColor
+            : root.stackedMove.sign < 0 ? root.downColor : root.dimColor
+        }
       }
     }
   }

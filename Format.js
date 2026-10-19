@@ -150,11 +150,11 @@ function pct(value) {
   return isFiniteNumber(value) ? percent(value, pctDigits(Math.abs(value))) : "—"
 }
 
-// A move as a vertical bar's pill has room for, about five characters
-// across its 28 px: one decimal under 10%, none from there. It is the rows'
-// figure (`pct`) rounded half up, in whole hundredths so no float can tip
-// it, so the two never disagree: the rows' +9.95% reads +10%, their +0.05%
-// +0.1%, however the quote's prices made it. `shown` is its size.
+// A move rounded for a side bar's stack: one decimal under 10%, none from
+// there. It is the rows' figure (`pct`) rounded half up, in whole
+// hundredths so no float can tip it, so the two never disagree: the rows'
+// +9.95% reads +10, their +0.05% +0.1, however the quote's prices made it.
+// `shown` is its size.
 function narrowPctShown(value) {
   var abs = Math.abs(value)
   var hundredths = Math.round(Number(abs.toFixed(pctDigits(abs))) * 100)
@@ -162,10 +162,73 @@ function narrowPctShown(value) {
   return tenths >= 100 ? { digits: 0, shown: Math.round(hundredths / 100) } : { digits: 1, shown: tenths / 10 }
 }
 
-function narrowPct(value) {
-  if (!isFiniteNumber(value)) return "—"
+// A bar at the side of the screen stacks the pill as Omarchy's clock stacks
+// its lines, one to an icon slot, each at most STACK_WIDTH characters: as
+// many as fit its 28 px at the clock's sizes.
+var STACK_WIDTH = 4
+
+// `text` broken after every STACK_WIDTH characters.
+function stackChunks(text) {
+  var out = []
+  for (var i = 0; i < text.length; i += STACK_WIDTH) out.push(text.slice(i, i + STACK_WIDTH))
+  return out
+}
+
+// A symbol's stacked lines: an index without its ^ (GSPC), a longer one
+// split at its first dot or dash (SHEL .L, BTC -USD), and any part still
+// longer broken after its fourth character (GOOG L).
+function stackedSymbol(symbol) {
+  var s = String(symbol).replace(/^\^/, "")
+  if (s.length <= STACK_WIDTH) return [s]
+  var at = s.search(/[.\-]/)
+  var parts = at > 0 ? [s.slice(0, at), s.slice(at)] : [s]
+  return parts.reduce(function(out, part) { return out.concat(stackChunks(part)) }, [])
+}
+
+// A magnitude of a thousand or more, in its unit as compactNumber names
+// them: one decimal under 10, none from there, and a figure that rounds to
+// 1,000 of its unit is one of the next. At most three characters, so its
+// sign fits beside it.
+function stackedThousands(abs) {
+  var units = ["K", "M", "B", "T"]
+  var v = abs
+  var u = -1
+  do {
+    v /= 1000
+    u++
+  } while (Math.round(v) >= 1000 && u < units.length - 1)
+  return { figure: Math.round(v * 10) < 100 ? v.toFixed(1) : String(Math.round(v)), unit: units[u] }
+}
+
+// A move in percent stacked, its sign and figure over its %: −1.5 over %,
+// −12 over % from 10% (`narrowPctShown`), and from 1,000% in thousands,
+// 1.2 over K%. `sign` is the figure's as drawn.
+function stackedPct(value) {
+  if (!isFiniteNumber(value)) return { lines: ["—"], sign: 0 }
   var narrow = narrowPctShown(value)
-  return signText(narrow.shown === 0 ? 0 : value) + grouped(narrow.shown.toFixed(narrow.digits)) + "%"
+  var sign = narrow.shown === 0 ? 0 : value > 0 ? 1 : -1
+  if (narrow.shown >= 1000) {
+    var big = stackedThousands(narrow.shown)
+    return { lines: [signText(sign) + big.figure, big.unit + "%"], sign: sign }
+  }
+  return { lines: [signText(sign) + narrow.shown.toFixed(narrow.digits), "%"], sign: sign }
+}
+
+// A move in money stacked, as `signedMoney` writes it, split at its point
+// with its sign kept: −3 over .84, and a fraction too long for a line
+// broken after its fourth character, as a coin under a cent's is. From a
+// thousand, in its unit: 8.9 over K.
+function stackedMoney(value, digits) {
+  if (!isFiniteNumber(value)) return { lines: ["—"], sign: 0 }
+  var shown = moveDigits(Math.abs(value), digits)
+  var sign = shownSign(value, shown)
+  var fixed = Math.abs(value).toFixed(shown)
+  if (Number(fixed) >= 1000) {
+    var big = stackedThousands(Number(fixed))
+    return { lines: [signText(sign) + big.figure, big.unit], sign: sign }
+  }
+  var parts = fixed.split(".")
+  return { lines: [signText(sign) + parts[0]].concat(parts.length > 1 ? stackChunks("." + parts[1]) : []), sign: sign }
 }
 
 function percent(value, digits) {
