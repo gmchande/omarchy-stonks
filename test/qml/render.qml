@@ -998,7 +998,8 @@ ShellRoot {
               }
             }
 
-            // The same pill on a strip of vertical bar.
+            // The same pill on a strip of vertical bar: the mark beside the
+            // icon form, the symbol over its change beside the others.
             Rectangle {
               width: Style.bar.sizeVertical
               height: Style.bar.iconSlot * 2
@@ -1022,7 +1023,7 @@ ShellRoot {
                 width: parent.width
                 height: implicitHeight
                 bar: verticalApi
-                settings: ({ id: "grvc.stonks", barStyle: pillRow.modelData.style })
+                settings: ({ id: "grvc.stonks", barStyleVertical: pillRow.modelData.style === "icon" ? "icon" : "stacked" })
               }
             }
           }

@@ -40,7 +40,8 @@ you're ready.
 The pill shows today's move for the stock you last looked at, in one of four
 forms: a sparkline, an arrow, the price as text, or Stonks' mark, a little
 chart that climbs on an up day and falls on a down one. Middle-click it to
-change its form.
+change its form. On a bar at the side of the screen it shows the mark, and
+a middle-click there switches to the symbol over its change.
 
 Scroll over it to step through your list, left-click for the popup,
 right-click for the window, and drag it to move it along the bar.

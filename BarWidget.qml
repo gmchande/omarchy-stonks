@@ -27,8 +27,12 @@ BarWidget {
   readonly property var lineGeometry: featuredQuote && featuredQuote.points.length ? Chart.chartGeometry(featuredQuote, service.calendars) : null
   // In the bar's right section, among its bare icons, the pill has a form of
   // its own, `barStyleRight`: the icon until a middle-click there picks
-  // another. The centre and left share `barStyle`. Both ride the entry when
-  // it moves, so each section brings back its own.
+  // another. The centre and left share `barStyle`. On a side bar it has
+  // `barStyleVertical`: the icon, as Omarchy's text widgets fall back to
+  // theirs there, until a middle-click picks the symbol over its change
+  // ("stacked"). Each rides the entry, as the clock keeps verticalFormat
+  // beside format, so a move between sections or between the top and a side
+  // brings back each one's own.
   readonly property bool onRight: {
     var layout = bar && bar.layoutConfig ? bar.layoutConfig : null
     var right = layout && Array.isArray(layout.right) ? layout.right : []
@@ -36,8 +40,8 @@ BarWidget {
       return (typeof entry === "string" ? entry : entry && entry.id) === root.moduleName
     })
   }
-  readonly property string styleKey: onRight ? "barStyleRight" : "barStyle"
-  readonly property string barStyle: setting(styleKey, onRight ? "icon" : "sparkline")
+  readonly property string styleKey: vertical ? "barStyleVertical" : onRight ? "barStyleRight" : "barStyle"
+  readonly property string barStyle: setting(styleKey, vertical || onRight ? "icon" : "sparkline")
   // Just Stonks' mark, a quiet icon among the bar's own.
   readonly property bool iconOnly: barStyle === "icon"
   readonly property bool retro: service ? service.retro : setting("style", "smooth") === "retro"
@@ -111,13 +115,11 @@ BarWidget {
       root.bar.shell.updateEntryInline(root.moduleName, entry)
   }
 
-  // A vertical bar draws the line, the arrow, and the text alike, the symbol
-  // over its change, so a middle-click there steps between that and the
-  // icon; a saved arrow or text stays saved, for a horizontal bar, until it
-  // does.
+  // A side bar has two forms, the icon and the symbol over its change, so a
+  // middle-click there steps between them.
   function cycleBarStyle() {
     var ring = ["sparkline", "arrow", "text", "icon"]
-    root.persistBarStyle(root.vertical ? (root.iconOnly ? "sparkline" : "icon")
+    root.persistBarStyle(root.vertical ? (root.iconOnly ? "stacked" : "icon")
       : ring[(ring.indexOf(barStyle) + 1) % ring.length])
   }
 

@@ -23,8 +23,9 @@
       "barStyle": "sparkline"
     },
     "schema": [
-      { "key": "barStyle", "type": "enum", "label": "Bar pill", "options": ["sparkline", "arrow", "text", "icon"], "defaultValue": "sparkline", "description": "How the bar shows the featured symbol in the centre and left sections. Middle-click the pill to cycle." },
-      { "key": "barStyleRight", "type": "enum", "label": "Bar pill on the right", "options": ["sparkline", "arrow", "text", "icon"], "defaultValue": "icon", "description": "How the bar shows the featured symbol in the right section, among the bar's icons. Middle-click the pill there to cycle." }
+      { "key": "barStyle", "type": "enum", "label": "Bar pill", "options": ["sparkline", "arrow", "text", "icon"], "defaultValue": "sparkline", "description": "How a bar along the top or bottom shows the featured symbol in its centre and left sections. Middle-click the pill to cycle." },
+      { "key": "barStyleRight", "type": "enum", "label": "Bar pill on the right", "options": ["sparkline", "arrow", "text", "icon"], "defaultValue": "icon", "description": "How a bar along the top or bottom shows the featured symbol in its right section, among the bar's icons. Middle-click the pill there to cycle." },
+      { "key": "barStyleVertical", "type": "enum", "label": "Bar pill on a side bar", "options": ["icon", "stacked"], "defaultValue": "icon", "description": "How a bar on the left or right of the screen shows the featured symbol: Stonks' mark, or the symbol over its change. Middle-click the pill there to switch." }
     ]
   }
 }

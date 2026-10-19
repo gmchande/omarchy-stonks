@@ -1343,7 +1343,9 @@ ShellRoot {
         service.range + " " + downDay.tone + "/" + downRange.tone + " " + dayWrong.join(" | "))
 
       // A vertical bar is as wide as the shell's bar makes it (Bar.qml's
-      // barSize), and the pill takes that width.
+      // barSize), and the pill takes that width. There it is its icon, as
+      // Omarchy's text widgets fall back to theirs, until a middle-click
+      // there picks the symbol over its change.
       barApi.vertical = true
       barApi.barSize = Style.bar.sizeVertical
       var verticalWrong = []
@@ -1352,6 +1354,15 @@ ShellRoot {
         service.persist({ style: vlook === 0 ? "smooth" : "retro" })
         var daySymbol = harness.find(pill, "pillDaySymbol")
         var dayChange = harness.find(pill, "pillDayChange")
+        // The icon form, whatever the top bar's: the mark alone, falling, in
+        // one slot.
+        var verticalMark = harness.find(pill, "pillMark")
+        if (!verticalMark.visible || daySymbol.visible || !Qt.colorEqual(verticalMark.color, Color.urgent)
+            || harness.markWay(verticalMark) !== "falls" || pill.implicitHeight !== Style.bar.iconSlot)
+          verticalWrong.push((service.retro ? "retro" : "smooth") + " icon: mark " + verticalMark.visible + " in "
+            + verticalMark.color + ", " + harness.markWay(verticalMark) + ", symbol " + daySymbol.visible + ", "
+            + pill.implicitHeight + " px tall")
+        pill.settings = Object.assign({}, settingsBefore, { barStyleVertical: "stacked" })
         // Its change keeps its "%", narrowed to five characters. Their ink,
         // a minus and a "%" at its ends, is a pixel past each side of the
         // bar, as the old two-decimal figure without its "%" was.
@@ -1361,22 +1372,14 @@ ShellRoot {
           verticalWrong.push((service.retro ? "retro" : "smooth") + ": " + daySymbol.text + " " + dayChange.text
             + " in " + dayChange.color + ", " + Math.ceil(dayChange.tightWidth) + " px across a " + Style.bar.sizeVertical
             + " px bar, want DOWN " + wantChange)
-        // The icon form on a vertical bar: the mark alone, falling, in one slot.
-        pill.settings = Object.assign({}, settingsBefore, { barStyle: "icon" })
-        var verticalMark = harness.find(pill, "pillMark")
-        if (!verticalMark.visible || daySymbol.visible || !Qt.colorEqual(verticalMark.color, Color.urgent)
-            || harness.markWay(verticalMark) !== "falls" || pill.implicitHeight !== Style.bar.iconSlot)
-          verticalWrong.push((service.retro ? "retro" : "smooth") + " icon: mark " + verticalMark.visible + " in "
-            + verticalMark.color + ", " + harness.markWay(verticalMark) + ", symbol " + daySymbol.visible + ", "
-            + pill.implicitHeight + " px tall")
         pill.settings = settingsBefore
       }
-      // There the line, the arrow, and the text draw alike: a saved arrow
-      // draws as the others do, and as the arrow again once the bar is
-      // horizontal, as nothing has written over it. Every middle-click there
-      // changes what shows: the symbol over its change, then the mark, and
-      // back, which is the line; the one setting cannot also keep the
-      // arrow. Found in a render: two of four middle-clicks changed nothing.
+      // Each bar keeps its own form: a saved arrow stays the arrow on a
+      // horizontal bar while a vertical one shows the mark, and a
+      // middle-click there steps between the mark and the symbol over its
+      // change without touching the arrow. The arrow, the line, and the text
+      // used to share one setting with the vertical bar, so a middle-click
+      // there lost the arrow.
       pill.settings = Object.assign({}, settingsBefore, { barStyle: "arrow" })
       var drawn = function() {
         return pill.barStyle + " " + (harness.find(pill, "pillMark").visible ? "mark" : harness.find(pill, "pillDaySymbol").visible ? "stacked"
@@ -1395,12 +1398,13 @@ ShellRoot {
       }
       barApi.vertical = false
       barApi.barSize = 0
+      walk.push(drawn())
       pill.settings = settingsBefore
       service.persist({ style: "smooth" })
-      harness.check("a vertical bar shows the day on 6M, in its colour, its change with its % across the bar, in both looks, and the icon form as the mark alone in one slot",
+      harness.check("a vertical bar shows the mark on 6M, falling, in both looks, and once picked the day in its colour, its change with its % across the bar",
         verticalWrong.length === 0, verticalWrong.join(" | "))
-      harness.check("a saved arrow is the arrow again on a horizontal bar, and on a vertical one every middle-click changes what shows",
-        walk.join(",") === "arrow stacked,arrow arrow,icon mark,sparkline stacked,icon mark", walk.join(","))
+      harness.check("a horizontal bar's arrow and a vertical bar's form are kept apart, and on a vertical bar every middle-click changes what shows",
+        walk.join(",") === "icon mark,arrow arrow,stacked stacked,icon mark,stacked stacked,arrow arrow", walk.join(","))
 
       // In the bar's right section, among its bare icons, the pill shows its
       // icon until a middle-click there picks another form, which it keeps
