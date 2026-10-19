@@ -2,10 +2,10 @@
 # builds a tree, runs Quickshell on it, and finishes on the harness's own
 # finish line. Quickshell loads QML only from inside its config folder, so
 # each tree is assembled in a scratch folder that is removed on exit.
-# Harnesses run side by side (test/all.sh), so each keeps its own HOME, QML
+# Harnesses run side by side (test/queue.sh), so each keeps its own HOME, QML
 # cache, and fake curl state. Every harness reads the saved answers
 # (STONKS_FIXTURES, test/fixtures-dir.sh), the fake curl's too; without them
-# it says so and exits 77, which test/all.sh reports as skipped. One that
+# it says so and exits 77, which the runners report as skipped. One that
 # reads none sets saved_answers=none before sourcing this: it runs on any
 # clone, and the fake curl fails its every ask.
 set -euo pipefail

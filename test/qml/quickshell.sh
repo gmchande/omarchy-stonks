@@ -135,7 +135,7 @@ quickshell_stop() {
 }
 
 # quickshell_exit: what a script's EXIT trap runs. A second interrupt during
-# it (test/all.sh's TERM after a Ctrl-C) must not cut the stop short.
+# it (test/queue.sh's TERM after a Ctrl-C) must not cut the stop short.
 quickshell_exit() {
   trap '' INT TERM
   quickshell_stop

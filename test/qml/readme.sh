@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 # The README's pictures, rendered again in one command: the real popup,
 # window, and pill (readme.qml) on the demo watchlist (test/tophat/demo.json),
-# its quotes the newest saved capture of it (test/capture-demo.sh), the clock
+# its quotes the saved capture named below (test/capture-demo.sh), the clock
 # a minute after that capture, in Tokyo Night at twice the scale. Writes
 # preview.png at the root and media/*.png, or all of them into
-# STONKS_README_OUT (test/all.sh renders into a scratch folder, so the
+# STONKS_README_OUT (test/review.sh renders into a scratch folder, so the
 # script can't quietly break). The popup's card window is CardWindow.qml, as
 # in keys.sh. HOME and curl are scratch.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 out="${STONKS_README_OUT:-$plugin/media}"
 top="${STONKS_README_OUT:-$plugin}"
-moment=$(cd "$STONKS_FIXTURES/moments" && ls -d demo-*/ | sort | tail -n 1)
-moment=${moment%/}
-[ -n "$moment" ] || { echo "FAIL no saved capture of the demo watchlist (test/capture-demo.sh)"; exit 1; }
+# The capture the committed pictures show. Named, not the newest, so a new
+# capture changes nothing until the commit that renders from it names it.
+moment=demo-2026-10-19-1146
+[ -d "$STONKS_FIXTURES/moments/$moment" ] || { echo "FAIL no saved capture $moment (test/capture-demo.sh)"; exit 1; }
 stamp=${moment#demo-}
 at=$(( $(date -d "${stamp:0:10} ${stamp:11:2}:${stamp:13:2}" +%s) + 60 ))
 echo "the demo watchlist at $moment"

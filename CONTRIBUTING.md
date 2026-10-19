@@ -37,22 +37,32 @@ building one that won't merge.
 
 ## Verify it
 
-- `test/all.sh` runs every check. It needs a Wayland session, takes about two
-  minutes, and runs one at a time per machine. Its last line must be
-  `ALL PASS`. GitHub runs the checks a fresh clone can on every push and pull
-  request to `dev` and `main` (`.github/workflows/checks.yml`); the full suite
-  is still yours to run.
-- The saved Yahoo and Robinhood answers the harnesses replay are private,
-  since their terms don't allow republishing them. Without them those checks
-  skip, and the run ends `PASSED, N SKIPPED`.
+- `test/all.sh` runs the checks a pull request needs: the pure rules, the
+  source boundaries, QML lint against the installed shell, the manifest and
+  launcher, and the flow harnesses, which drive the real service and
+  surfaces with real keys and pointer. It needs Omarchy installed and a
+  Wayland session, and runs one at a time per machine. With the saved
+  answers it takes about 2 min 20 s, and its last line must be `ALL PASS`.
+- Most harnesses replay saved Yahoo and Robinhood answers, which are
+  private: their terms don't allow republishing them. On a clone without
+  them those harnesses skip, the run takes under 10 seconds and ends
+  `PASSED, N SKIPPED`, and the maintainer runs them on your branch.
+- GitHub runs the checks a fresh clone can on every push and pull request to
+  `dev` and `main` (`.github/workflows/fresh-clone.yml`).
+- While you work, run the harness for the area you change, such as
+  `bash test/qml/lists.sh`.
+- A test checks what Stonks does: what it fetches, saves, and says, and what
+  a key or a click changes; never a picture, a position, or a timing. How
+  Stonks looks and moves is the maintainer's to review, on your branch, with
+  `test/review.sh`.
 - Tests are few and end to end. A new behaviour gets a step in a flow harness
   under `test/qml/` that drives the real service and surfaces with real keys
-  and pointer, or an offscreen render. `bun test` is only for pure data rules,
-  such as parsers and calendars.
+  and pointer. `bun test` is only for pure data rules, such as parsers and
+  calendars.
 - Before adding a test, name what a user would see break. A bug fix's test
   fails on the code before the fix.
-- Judge motion on rendered frames (`test/qml/frames.js`), never on the
-  property behind it, and wait on events, never on fixed sleeps.
+- Wait on events or counts, never on fixed sleeps: a wait on time passes
+  alone and fails beside other harnesses.
 - A new key goes in the README's table, which `test/qml/keys.sh` presses.
 - A change to what a chart, row, or figure shows is checked on every kind of
   listing: a busy US stock, a thin one, an ETF, an index, a cryptocurrency, and
@@ -64,8 +74,6 @@ building one that won't merge.
 - Before a pull request, use your change the way a user would: open the popup
   from the pill, add a symbol through search, switch lists, remove and undo,
   feature a row, change the range and the look, and use the window.
-- Maintainers try visible changes in a nested session first
-  (`test/tophat.sh`, its usage at the top).
 
 ## Layout
 
@@ -148,7 +156,7 @@ building one that won't merge.
   every install clones every branch.
 - An AI reviewer (cubic) comments on every pull request: fix what holds up,
   and say why when a finding doesn't.
-- Leave `manifest.json`'s version alone. Keep merged branches.
+- Leave `manifest.json`'s version alone.
 - Report a security problem privately, through the repository's Security
   tab, not in an issue: Stonks runs unsandboxed inside the shell.
 
@@ -163,9 +171,12 @@ every release bumps it.
 2. Bump `manifest.json`'s version in a release commit on `dev`. When what
    the README's pictures show has changed, render them again with
    `test/qml/readme.sh` in that commit.
-3. Fast-forward `main` to it: `git push origin dev:main`.
-4. Tag it (`vX.Y.Z`) and publish release notes.
-5. File the Omarchy plugin marketplace's verify form with `main`'s new
+3. Run `test/review.sh` on the release commit: the renders, layout, motion,
+   the long list, and the README pictures run only there. Its last line must
+   be `ALL PASS`.
+4. Fast-forward `main` to it: `git push origin dev:main`.
+5. Tag it (`vX.Y.Z`) and publish release notes.
+6. File the Omarchy plugin marketplace's verify form with `main`'s new
    commit; until then the listing says Unverified.
 
 ## Agents
