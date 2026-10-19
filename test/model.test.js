@@ -158,6 +158,25 @@ test("Toronto and London close early when their exchanges say, and London's 2028
   expect(status(easter, "2028-04-14")).toBe("Good Friday · opens Tue 08:00 BST")
 })
 
+test("a listing's overnight session is named so, a holiday's evening too, and the night before a holiday trades none", () => {
+  const nest = {
+    symbol: "NEST", exchange: "NASDAQ", crypto: false, gmtoffset: M.offsetForDate(US, "2026-11-25"),
+    session: {
+      pre: { start: at("2026-11-25", "04:00"), end: at("2026-11-25", "09:30") },
+      regular: { start: at("2026-11-25", "09:30"), end: at("2026-11-25", "16:00") },
+      post: { start: at("2026-11-25", "16:00"), end: at("2026-11-25", "20:00") }
+    },
+    points: []
+  }
+  const night = (date, allDay) => M.nightTrades(nest, allDay, at(date, "21:00"), calendars)
+  // Thanksgiving's evening trades for Friday, for a listing Robinhood trades
+  // all day; the evening before it, nothing.
+  expect([night("2026-11-26", true), night("2026-11-26", false), night("2026-11-25", true)]).toEqual([true, false, false])
+  const thursday = at("2026-11-26", "21:00")
+  expect(M.marketStatus(nest, thursday, 0, calendars, true)).toBe("Overnight · opens Fri 09:30")
+  expect(M.marketStatus(nest, thursday, 0, calendars, false)).toBe("Thanksgiving Day · opens Fri 09:30")
+})
+
 test("formatting", () => {
   expect(M.duration(4200)).toBe("1h 10m")
   expect(M.duration(300)).toBe("5m")

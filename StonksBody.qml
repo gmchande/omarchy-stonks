@@ -302,7 +302,8 @@ Item {
     // keeps the chart and the market.
     if (historyShown && historyBar) return History.historyScrubText(history, historyBar, featuredQuote ? featuredQuote.priceDigits : undefined,
       featuredQuote ? Market.calendarFor(calendars, featuredQuote) : null)
-    if (featuredQuote) return Market.marketStatus(dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars)
+    if (featuredQuote) return Market.marketStatus(dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars,
+      Overnight.nightTrades(featuredQuote, !!chart && chart.allDay, now, calendars))
     return headerWhenMissing
   }
   // Everything but the rows: margins, header, band, and footer, with the

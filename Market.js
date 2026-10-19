@@ -267,10 +267,12 @@ function holidayName(name) {
 // The one time that matters: how long until the market opens or closes,
 // when the exchange has said. "Closes in" already says it is open. After
 // the bell the phase stands on its own, with the regular close named so
-// 16:00 is never mistaken for the end of after-hours trading. While
-// scrubbing, where in the day the finger is: at the close's own time, the
-// closing bell, when it reads the close (`Quote.readingAt`).
-function marketStatus(quote, now, scrubT, calendars) {
+// 16:00 is never mistaken for the end of after-hours trading. A listing
+// whose overnight session is on (`overnight`, `Overnight.nightTrades`) is in
+// it, as the line under the price says, a weekend's or a holiday's evening
+// included. While scrubbing, where in the day the finger is: at the close's
+// own time, the closing bell, when it reads the close (`Quote.readingAt`).
+function marketStatus(quote, now, scrubT, calendars, overnight) {
   if (scrubT) {
     var read = Quote.readingAt(quote, scrubT)
     return "At " + printClock(quote, read.t, calendars) + " · " + phaseLabel(read.close ? "closing" : scrubPhase(quote, scrubT))
@@ -280,18 +282,18 @@ function marketStatus(quote, now, scrubT, calendars) {
   if (brk) {
     return "Lunch break · reopens " + calendarClock(cal, brk, quote) + " · in " + Format.duration(brk - now)
   }
-  var phase = sessionPhase(quote, now)
+  var phase = overnight ? "overnight" : sessionPhase(quote, now)
   var bell = secondsToBell(quote, now)
   var kind = cal ? dayKind(cal, dateStringOf(localDate(now, cal))) : null
   // A published closure outranks a cached response that still describes a
   // session: on a holiday Yahoo may hand back a window nobody is trading.
-  var closure = kind && kind.kind === "closure"
+  var closure = !overnight && kind && kind.kind === "closure"
   // The day's named moments lead while they last, as they do in a scrub.
   if (!closure && bell && bell.bell === "close") {
     var named = phase === "opening" || phase === "lunch" || phase === "power" || phase === "closing"
     return (named ? phaseLabel(phase) + " · closes in " : "Market closes in ") + Format.duration(bell.seconds)
   }
-  if (!closure && bell && phase === "pre") return "Pre-market · opens in " + Format.duration(bell.seconds)
+  if (!closure && bell && (phase === "pre" || phase === "overnight")) return phaseLabel(phase) + " · opens in " + Format.duration(bell.seconds)
   if (!closure && bell) return "Market opens in " + Format.duration(bell.seconds)
   var reg = clockSession(quote, now).regular
   var base = closure ? holidayName(kind.name)

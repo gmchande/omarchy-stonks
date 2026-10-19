@@ -297,6 +297,10 @@ ShellRoot {
         harness.strip() === "OVERNIGHT 22:20 234.84 \u22121.05%" && body.featured.priceText === "237.33",
         harness.strip() + " | " + body.featured.priceText)
       harness.check("Sunday 22:30, its night trading, NEST's animal is awake", harness.sleep() === "awake", harness.sleep())
+      // The header names the session the line under the price names: it
+      // said "Weekend" over OVERNIGHT.
+      harness.check("Sunday 22:30, its night trading, NEST's header says Overnight, as the line under its price does",
+        body.headerText === "Overnight · opens Mon 09:30", body.headerText)
       // The chart stays on Friday (provisional: Sunday's captures settle
       // it), Thursday night's prints at its left edge, which a scrub reads,
       // never the previous close.
@@ -724,6 +728,16 @@ ShellRoot {
       service.persist({ style: "smooth" })
       harness.check("01:00: NEST, whose night trades, is awake; KILN sleeps, a scrub wakes it, and letting go puts it back to sleep at once, in both looks",
         sleeps.every(function(s) { return / NEST awake, KILN asleep, scrubbed awake, let go asleep$/.test(s) }), sleeps.join(" | "))
+      // So does the header: NEST's says Overnight, as the line under its
+      // price does, and KILN's Closed, with no such line. NEST's said Closed.
+      featureShown("NEST")
+      var nestHeader = body.headerText + " | " + harness.strip()
+      featureShown("KILN")
+      var kilnHeader = body.headerText + " | " + harness.strip()
+      featureShown("NEST")
+      harness.check("01:00: NEST's header says Overnight, as the line under its price does; KILN's says Closed",
+        nestHeader.indexOf("Overnight · opens Wed 09:30 | OVERNIGHT ") === 0 && kilnHeader === "Closed · opens Wed 09:30 | ",
+        nestHeader + " || " + kilnHeader)
       // An index trades only in its session: no pre-market before it, no
       // flat tail of its repeated close after it, and the header names its
       // next open from the US calendar. ^GSPC at 06:00 said "PRE-MARKET ·
