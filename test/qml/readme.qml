@@ -14,8 +14,8 @@ ShellRoot {
 
   property int failures: 0
   readonly property string rawDir: Quickshell.env("STONKS_README_RAW")
-  readonly property var demo: ["AAPL", "PSIX", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T"]
-  readonly property var us: ["AAPL", "PSIX", "SPY"]
+  readonly property var demo: ["AAPL", "JNJ", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T"]
+  readonly property var us: ["AAPL", "JNJ", "SPY"]
 
   function check(label, ok, detail) {
     console.log((ok ? "PASS " : "FAIL ") + label + (!ok && detail !== undefined ? " — " + detail : ""))

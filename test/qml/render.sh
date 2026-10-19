@@ -42,7 +42,7 @@ if [ $# -eq 0 ]; then
     states="$states popup-power-jpm-$look popup-power-lumn-$look popup-lists-menu12-$look min-window-of-lists-menu30-$look"
   done
   for moment in 2026-10-07-1455 2026-10-07-0100 2026-10-07-0600 2026-10-03-1200; do
-    for symbol in nest psix spy bolt gspc btc-usd shel.l 7203.t; do
+    for symbol in nest kiln spy bolt gspc btc-usd shel.l 7203.t; do
       states="$states popup-sweep-$moment-$symbol-smooth popup-sweep-$moment-$symbol-retro"
     done
   done
@@ -54,11 +54,11 @@ if [ $# -eq 0 ]; then
   done
   # The header's animal: a cold start in smooth too, and the window on an up,
   # a down, and a flat day, and a cryptocurrency, in both looks; asleep at
-  # 01:00 for PSIX, whose night doesn't trade, and on Saturday for an index
+  # 01:00 for KILN, whose night doesn't trade, and on Saturday for an index
   # (NEST awake at 01:00 and Tokyo's lunch are among the info lines' below).
   states="$states loading-smooth failed-smooth"
-  for day in 2026-10-07-1455-psix 2026-10-07-1455-nest 2026-10-07-0100-bolt 2026-10-07-1455-btc-usd \
-    2026-10-07-0100-psix 2026-10-03-1200-gspc; do
+  for day in 2026-10-07-1455-kiln 2026-10-07-1455-nest 2026-10-07-0100-bolt 2026-10-07-1455-btc-usd \
+    2026-10-07-0100-kiln 2026-10-03-1200-gspc; do
     states="$states window-sweep-$day-smooth window-sweep-$day-retro"
   done
   # The footer's notes in both looks and both surfaces: a refusal, a move
@@ -97,7 +97,7 @@ if [ $# -eq 0 ]; then
     for sweep in own-shel.l own-7203.t 2026-10-08-1054-shel.l; do
       states="$states popup-sweep-$sweep-$look"
     done
-    for sweep in own-shel.l own-7203.t 2026-10-08-1054-shel.l 2026-10-07-1455-nest 2026-10-07-1455-psix \
+    for sweep in own-shel.l own-7203.t 2026-10-08-1054-shel.l 2026-10-07-1455-nest 2026-10-07-1455-kiln \
       2026-10-07-1455-spy 2026-10-07-1455-gspc 2026-10-07-1455-btc-usd 2026-10-07-1455-shel.l 2026-10-08-1054-brk-a \
       2026-10-08-1054-shib-usd 2026-10-07-0600-nest 2026-10-07-0100-nest 2026-10-03-1200-nest; do
       states="$states window-sweep-$sweep-$look"

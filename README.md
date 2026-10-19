@@ -47,7 +47,7 @@ right-click for the window, and drag it to move it along the bar.
 
 ## Reading the day
 
-<img src="media/scrub.png" width="480" alt="The popup scrubbed back to 11:40 in the morning: the price, the change, and the rows follow the pointer">
+<img src="media/scrub.png" width="480" alt="The popup scrubbed back an hour and a half, to 10:15 in the morning: the price, the change, and the rows follow the pointer">
 
 Hover the chart to scrub back through the day: the price, the change, and
 the rows follow the pointer. Click the bull, or on a down day the bear, to

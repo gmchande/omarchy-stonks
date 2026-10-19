@@ -49,8 +49,8 @@ ShellRoot {
   FileView { id: tokyoFile; path: root.fixtures + "/7203-t-day.json"; blockLoading: true }
   FileView { id: londonFile; path: root.fixtures + "/shel-l-day.json"; blockLoading: true }
   // A coin under a cent and a six-figure price, each in its own decimals.
-  FileView { id: shibFile; path: root.fixtures + "/moments/sweep-2026-10-08-1054/shib-usd.json"; blockLoading: true }
-  FileView { id: berkshireFile; path: root.fixtures + "/moments/sweep-2026-10-08-1054/brk-a.json"; blockLoading: true }
+  FileView { id: shibFile; path: root.fixtures + "/moments/listings-2026-10-08-1054/shib-usd.json"; blockLoading: true }
+  FileView { id: berkshireFile; path: root.fixtures + "/moments/listings-2026-10-08-1054/brk-a.json"; blockLoading: true }
   // NEST on the first live night, Monday 5 October 00:36: its day, its 1M
   // history, and Robinhood's prints, so its hero carries the overnight line.
   FileView { id: liveFile; path: root.fixtures + "/moments/live-2026-10-05/nest.json"; blockLoading: true }

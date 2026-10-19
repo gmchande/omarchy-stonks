@@ -14,12 +14,12 @@ plugin_tree fetch-day.qml
 patch_copy plugin/Service.qml 's/function wallSecond() { return Math.floor(Date.now() \/ 1000) }/function wallSecond() { return root.now }/'
 patch_copy plugin/Service.qml 's/property int now: Math.floor(Date.now() \/ 1000)/property int now: 1791345540/'
 patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testFeed: feed'
-symbols='"NEST", "PSIX", "BOLT"'
+symbols='"NEST", "KILN", "BOLT"'
 for n in $(seq -w 1 29); do symbols="$symbols, \"LONG$n\""; done
 symbols="$symbols, \"SPY\", \"SHOP.TO\""
 printf '{ "version": 1, "symbols": [%s], "featured": "NEST", "order": "manual", "refreshIntervalSec": 60 }\n' "$symbols" \
   > "$HOME/.config/omarchy/grvc.stonks.json"
-echo fetch-2026-10-07 sweep-2026-10-07-1455 > "$STONKS_FAKE_STATE/overnight.set"
+echo fetch-2026-10-07 listings-2026-10-07-1455 > "$STONKS_FAKE_STATE/overnight.set"
 export QT_QPA_PLATFORM=offscreen
 run_qs 1800
 

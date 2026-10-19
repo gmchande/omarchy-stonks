@@ -16,7 +16,7 @@ import "plugin/Format.js" as Format
 // New York time; at 01:00 and 14:55 the listing sweep's saved answers too,
 // with Robinhood's word on which listings it trades all day. The library
 // holds three US stocks, an index, a cryptocurrency, and a Toronto listing;
-// PSIX, BOLT, and SPY join it there.
+// KILN, BOLT, and SPY join it there.
 ShellRoot {
   id: harness
 
@@ -676,33 +676,33 @@ ShellRoot {
         fallback.indexOf("249.78 | OVERNIGHT 00:50 248.04 ") === 0, fallback)
 
       // Two US stocks Robinhood does not trade all day, saved with the
-      // listing sweep at the same moment: PSIX traded 2 shares at 23:10 on
+      // listing sweep at the same moment: KILN traded 2 shares at 23:10 on
       // Tuesday, and BOLT six times in the night, 1 to 622 shares. Neither
       // has an overnight line or a night on its chart: each draws Yahoo's own
       // day, Tuesday, 04:00 to 20:00, its prints from the left edge.
       // Robinhood is asked once whether it trades them all day, and never for
       // their prints.
-      useSet("sweep-2026-10-07-0100")
-      service.addSymbol("PSIX")
+      useSet("listings-2026-10-07-0100")
+      service.addSymbol("KILN")
       service.addSymbol("BOLT")
-      within(8000, function() { return !!service.quotes.PSIX && !!service.quotes.BOLT && service.arriving.length === 0 })
-      var thin = ["PSIX", "BOLT"].map(function(symbol) {
+      within(8000, function() { return !!service.quotes.KILN && !!service.quotes.BOLT && service.arriving.length === 0 })
+      var thin = ["KILN", "BOLT"].map(function(symbol) {
         featureShown(symbol)
         var g = body.featuredGeometry
         return { symbol: symbol, strip: harness.strip(), start: g.start, end: g.end, first: g.points.length ? g.points[0].x : -1 }
       })
-      harness.check("01:00: PSIX and BOLT, which Robinhood does not trade all day, have no overnight line from a stray night trade, and draw Tuesday 04:00 to 20:00 from the left edge",
+      harness.check("01:00: KILN and BOLT, which Robinhood does not trade all day, have no overnight line from a stray night trade, and draw Tuesday 04:00 to 20:00 from the left edge",
         thin.every(function(t) {
           return t.strip.indexOf("OVERNIGHT") < 0 && t.start === harness.midnight.tue6 + 4 * 3600
             && t.end === harness.midnight.tue6 + 20 * 3600 && t.first === 0
         }),
         JSON.stringify(thin))
-      harness.check("Robinhood is asked whether it trades PSIX and BOLT all day, and never for their prints",
-        harness.allDayAsked("PSIX") === 1 && harness.allDayAsked("BOLT") === 1 && harness.asked().indexOf("PSIX") < 0
+      harness.check("Robinhood is asked whether it trades KILN and BOLT all day, and never for their prints",
+        harness.allDayAsked("KILN") === 1 && harness.allDayAsked("BOLT") === 1 && harness.asked().indexOf("KILN") < 0
           && harness.asked().indexOf("BOLT") < 0,
-        harness.allDayAsked("PSIX") + ", " + harness.allDayAsked("BOLT") + " | prints asked for " + harness.asked())
+        harness.allDayAsked("KILN") + ", " + harness.allDayAsked("BOLT") + " | prints asked for " + harness.asked())
       // The header's animal sleeps while its market does, by its phase and
-      // calendar: at 01:00 NEST's night trades, so it's awake; PSIX's
+      // calendar: at 01:00 NEST's night trades, so it's awake; KILN's
       // doesn't, so it sleeps, in both looks. A scrub wakes it, since it
       // reads a moment the market traded, and letting go puts it back to
       // sleep at once.
@@ -712,18 +712,18 @@ ShellRoot {
         within(2000, function() { return body.retro === (look === "retro") })
         featureShown("NEST")
         var nest = harness.sleep()
-        featureShown("PSIX")
-        var psix = harness.sleep()
+        featureShown("KILN")
+        var kiln = harness.sleep()
         scrubAt(0.5)
         within(1000, function() { return body.scrubT !== 0 })
         var scrubbed = harness.sleep()
         endScrub()
         within(1000, function() { return body.scrubT === 0 })
-        sleeps.push(look + ": NEST " + nest + ", PSIX " + psix + ", scrubbed " + scrubbed + ", let go " + harness.sleep())
+        sleeps.push(look + ": NEST " + nest + ", KILN " + kiln + ", scrubbed " + scrubbed + ", let go " + harness.sleep())
       })
       service.persist({ style: "smooth" })
-      harness.check("01:00: NEST, whose night trades, is awake; PSIX sleeps, a scrub wakes it, and letting go puts it back to sleep at once, in both looks",
-        sleeps.every(function(s) { return / NEST awake, PSIX asleep, scrubbed awake, let go asleep$/.test(s) }), sleeps.join(" | "))
+      harness.check("01:00: NEST, whose night trades, is awake; KILN sleeps, a scrub wakes it, and letting go puts it back to sleep at once, in both looks",
+        sleeps.every(function(s) { return / NEST awake, KILN asleep, scrubbed awake, let go asleep$/.test(s) }), sleeps.join(" | "))
       // An index trades only in its session: no pre-market before it, no
       // flat tail of its repeated close after it, and the header names its
       // next open from the US calendar. ^GSPC at 06:00 said "PRE-MARKET ·
@@ -767,24 +767,24 @@ ShellRoot {
         noon.start === harness.midnight.wed7 && noon.end === harness.midnight.thu8 && lastX > 0.48 && lastX < 0.5,
         noon.start + " to " + noon.end + ", last x " + lastX)
 
-      // 14:55, PSIX, a thin stock: its line starts at the left edge and runs a
+      // 14:55, KILN, a thin stock: its line starts at the left edge and runs a
       // print a step to where the clock puts its newest print, the hours to
       // come by the clock; on the calendar day its first print stood at 40%.
       // The keys step print to print: from BOLT's first print, at 04:00,
       // three steps land on its fourth, at 05:40. Robinhood is not asked
       // again whether it trades them all day: its answer holds a day.
-      useSet("sweep-2026-10-07-1455")
+      useSet("listings-2026-10-07-1455")
       service.now = 1791399300
       service.refresh()
-      within(8000, function() { return service.quotes.PSIX.session.regular.start === 1791379800 && service.quotes.BOLT.session.regular.start === 1791379800 })
-      featureShown("PSIX")
-      var psix = body.featuredGeometry
-      var last = psix.points.length - 1
-      var clockAt = (service.quotes.PSIX.points[last].t - psix.start) / (psix.end - psix.start)
-      var even = psix.points.every(function(p, k) { return Math.abs(p.x - clockAt * k / last) < 1e-9 })
-      harness.check("14:55: PSIX's line starts at the left edge and runs evenly, a print a step, to where the clock puts its newest print",
-        psix.start === harness.midnight.wed7 + 4 * 3600 && psix.points[0].x === 0 && even && clockAt > 0.67 && clockAt < 0.69,
-        psix.start + ", first x " + psix.points[0].x + ", newest at " + clockAt + ", even " + even)
+      within(8000, function() { return service.quotes.KILN.session.regular.start === 1791379800 && service.quotes.BOLT.session.regular.start === 1791379800 })
+      featureShown("KILN")
+      var kiln = body.featuredGeometry
+      var last = kiln.points.length - 1
+      var clockAt = (service.quotes.KILN.points[last].t - kiln.start) / (kiln.end - kiln.start)
+      var even = kiln.points.every(function(p, k) { return Math.abs(p.x - clockAt * k / last) < 1e-9 })
+      harness.check("14:55: KILN's line starts at the left edge and runs evenly, a print a step, to where the clock puts its newest print",
+        kiln.start === harness.midnight.wed7 + 4 * 3600 && kiln.points[0].x === 0 && even && clockAt > 0.67 && clockAt < 0.69,
+        kiln.start + ", first x " + kiln.points[0].x + ", newest at " + clockAt + ", even " + even)
       // A scrub reads the print it lands on in both looks: NEST's newest,
       // 235.32 at 14:55:42, is no five-minute mark, and retro once rounded
       // it back to 14:55:00 and read the print before, 235.31.
@@ -818,8 +818,8 @@ ShellRoot {
       harness.check("the keys step print to print: three steps from BOLT's first print land on its fourth, 05:40, an hour and forty minutes on",
         stepped === bolt[3].t && bolt[3].t - bolt[0].t > 3 * 300 && steppedRead.indexOf("At 05:40") === 0,
         steppedRead + " | " + stepped + " vs " + bolt[3].t)
-      harness.check("Robinhood's answer on all-day trading holds the day: PSIX and BOLT asked once",
-        harness.allDayAsked("PSIX") === 1 && harness.allDayAsked("BOLT") === 1, harness.allDayAsked("PSIX") + ", " + harness.allDayAsked("BOLT"))
+      harness.check("Robinhood's answer on all-day trading holds the day: KILN and BOLT asked once",
+        harness.allDayAsked("KILN") === 1 && harness.allDayAsked("BOLT") === 1, harness.allDayAsked("KILN") + ", " + harness.allDayAsked("BOLT"))
 
       // Robinhood's instruments down as SPY joins: not all-day meanwhile, so
       // its 1D lands on Yahoo's day, never waiting; five minutes on it is

@@ -7,7 +7,7 @@
     "BTC-USD",
     "^GSPC",
     "SHEL.L",
-    "PSIX"
+    "JNJ"
   ],
   "featured": "7203.T",
   "order": "manual",
@@ -20,7 +20,7 @@
       "name": "US",
       "symbols": [
         "SPY",
-        "PSIX",
+        "JNJ",
         "AAPL",
         "^GSPC"
       ],
@@ -41,7 +41,7 @@
       "name": "Movers",
       "symbols": [
         "BTC-USD",
-        "PSIX",
+        "JNJ",
         "7203.T"
       ],
       "order": "pct",

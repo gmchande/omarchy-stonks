@@ -13,7 +13,7 @@
 # scrubbed; a night held open across midnight, the chart staying on
 # Tuesday until Wednesday's first print, then measured from Tuesday's close
 # at rest and scrubbed; and two names Robinhood does not trade all day,
-# PSIX and BOLT, with no overnight line from a stray night trade, Yahoo's
+# KILN and BOLT, with no overnight line from a stray night trade, Yahoo's
 # own day laid out a print a step from the left edge, keys stepping print to
 # print, and SPY on Yahoo's day while Robinhood's instruments are down;
 # exchange times named by zone for a reader in New York; an index with

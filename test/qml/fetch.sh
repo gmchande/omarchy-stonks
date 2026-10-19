@@ -9,7 +9,7 @@
 # pill's wheel; an add, a removal and its undo; a search's preview; and, in a
 # second run, a US holiday while London and Toronto trade. HOME and curl are
 # scratch; the fake curl answers from test/fixtures/moments/fetch-2026-10-07
-# and sweep-2026-10-07-1455.
+# and listings-2026-10-07-1455.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree fetch.qml
 patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property var testBody: root.body\n  readonly property alias testWindow: window'
@@ -30,8 +30,8 @@ export QT_QPA_PLATFORM=offscreen
 
 # The main run starts offline, with last session's quotes saved: NEST at
 # Tuesday's close and London's Thursday.
-scratch_home fetch-list.json grvc.stonks.json
-echo fetch-2026-10-07 sweep-2026-10-07-1455 > "$STONKS_FAKE_STATE/overnight.set"
+scratch_home fetch-watchlist.json grvc.stonks.json
+echo fetch-2026-10-07 listings-2026-10-07-1455 > "$STONKS_FAKE_STATE/overnight.set"
 touch "$STONKS_FAKE_STATE/YAHOO.offline"
 mkdir -p "$XDG_CACHE_HOME/grvc.stonks"
 bun -e '
@@ -50,8 +50,8 @@ mv "$work/log" "$work/main.log"
 # The holiday run: New York closed on 7 October, London and Toronto open.
 rm -rf "$STONKS_FAKE_STATE" "$XDG_CACHE_HOME/grvc.stonks"
 mkdir -p "$STONKS_FAKE_STATE"
-echo fetch-2026-10-07 sweep-2026-10-07-1455 > "$STONKS_FAKE_STATE/overnight.set"
-scratch_home fetch-list.json grvc.stonks.json
+echo fetch-2026-10-07 listings-2026-10-07-1455 > "$STONKS_FAKE_STATE/overnight.set"
+scratch_home fetch-watchlist.json grvc.stonks.json
 patch_copy plugin/calendars.json 's/"2026-11-26": *"Thanksgiving Day"/"2026-10-07": "Fetch holiday", &/'
 main_code=$code
 STONKS_FETCH_RUN=holiday run_qs 120

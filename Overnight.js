@@ -17,10 +17,10 @@
 // chart of one New York calendar day, midnight to midnight, the way
 // Robinhood's screen draws it: Yahoo's day, and Robinhood's prints for the
 // hours before it and after it. Any other has Yahoo's own day, 04:00 to
-// 20:00: a thin name trades a few shares overnight now and then (PSIX two at
-// 23:10 on 6 October), and none of them is a night's price. The overnight
-// print is never the headline, nor in the day's high, low, or change: those
-// stay Yahoo's.
+// 20:00: a thin name trades a few shares overnight now and then (two at
+// 23:10 on 6 October, in the saved answers), and none of them is a night's
+// price. The overnight print is never the headline, nor in the day's high,
+// low, or change: those stay Yahoo's.
 
 var ROBINHOOD_URL = "https://api.robinhood.com/marketdata/historicals/"
 var INSTRUMENTS_URL = "https://api.robinhood.com/instruments/"
