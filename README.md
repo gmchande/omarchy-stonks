@@ -191,7 +191,7 @@ which sets its limits. [`test/boundaries.sh`](test/boundaries.sh) fails if a
 command, a file read or write, or a request turns up outside the few files
 allowed them. It runs on every push:
 
-[![Checks](https://github.com/gmchande/omarchy-stonks/actions/workflows/checks.yml/badge.svg)](https://github.com/gmchande/omarchy-stonks/actions/workflows/checks.yml)
+[![Checks](https://github.com/gmchande/omarchy-stonks/actions/workflows/fresh-clone.yml/badge.svg)](https://github.com/gmchande/omarchy-stonks/actions/workflows/fresh-clone.yml)
 
 ## Update
 

@@ -37,22 +37,31 @@ building one that won't merge.
 
 ## Verify it
 
-- `test/all.sh` runs every check. It needs a Wayland session, takes about two
-  minutes, and runs one at a time per machine. Its last line must be
-  `ALL PASS`. GitHub runs the checks a fresh clone can on every push and pull
-  request to `dev` and `main` (`.github/workflows/checks.yml`); the full suite
-  is still yours to run.
-- The saved Yahoo and Robinhood answers the harnesses replay are private,
-  since their terms don't allow republishing them. Without them those checks
-  skip, and the run ends `PASSED, N SKIPPED`.
+- `test/all.sh` runs the checks a pull request needs: the pure rules, the
+  source boundaries, QML lint against the installed shell, the manifest and
+  launcher, and the flow harnesses, which drive the real service and
+  surfaces with real keys and pointer. It needs Omarchy installed and a
+  Wayland session, and runs one at a time per machine. With the saved
+  answers it takes about 2 min 20 s, and its last line must be `ALL PASS`.
+- Most harnesses replay saved Yahoo and Robinhood answers, which are
+  private: their terms don't allow republishing them. On a clone without
+  them those harnesses skip, the run takes under 10 seconds and ends
+  `PASSED, N SKIPPED`, and the maintainer runs them on your branch.
+- GitHub runs the checks a fresh clone can on every push and pull request to
+  `dev` and `main` (`.github/workflows/fresh-clone.yml`).
+- While you work, run the harness for the area you change, such as
+  `bash test/qml/lists.sh`.
+- A test checks what Stonks does: what it fetches, saves, and says, and what
+  a key or a click changes; never a picture, a position, or a timing. How
+  Stonks looks and moves is the maintainer's to review, on your branch.
 - Tests are few and end to end. A new behaviour gets a step in a flow harness
   under `test/qml/` that drives the real service and surfaces with real keys
-  and pointer, or an offscreen render. `bun test` is only for pure data rules,
-  such as parsers and calendars.
+  and pointer. `bun test` is only for pure data rules, such as parsers and
+  calendars.
 - Before adding a test, name what a user would see break. A bug fix's test
   fails on the code before the fix.
-- Judge motion on rendered frames (`test/qml/frames.js`), never on the
-  property behind it, and wait on events, never on fixed sleeps.
+- Wait on events or counts, never on fixed sleeps: a wait on time passes
+  alone and fails beside other harnesses.
 - A new key goes in the README's table, which `test/qml/keys.sh` presses.
 - A change to what a chart, row, or figure shows is checked on every kind of
   listing: a busy US stock, a thin one, an ETF, an index, a cryptocurrency, and
@@ -64,8 +73,6 @@ building one that won't merge.
 - Before a pull request, use your change the way a user would: open the popup
   from the pill, add a symbol through search, switch lists, remove and undo,
   feature a row, change the range and the look, and use the window.
-- Maintainers try visible changes in a nested session first
-  (`test/tophat.sh`, its usage at the top).
 
 ## Layout
 
