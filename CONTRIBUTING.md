@@ -156,7 +156,7 @@ building one that won't merge.
   every install clones every branch.
 - An AI reviewer (cubic) comments on every pull request: fix what holds up,
   and say why when a finding doesn't.
-- Leave `manifest.json`'s version alone. Keep merged branches.
+- Leave `manifest.json`'s version alone.
 - Report a security problem privately, through the repository's Security
   tab, not in an issue: Stonks runs unsandboxed inside the shell.
 
