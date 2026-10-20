@@ -1,11 +1,10 @@
 .pragma library
 .import "Format.js" as Format
-.import "Market.js" as Market
 .import "Quote.js" as Quote
 
 // Ranges: Yahoo's history answer, its stats, bars, dates, and words. Knows
-// nothing of the day or overnight prints; a calendar it is handed only says
-// an intraday bar's time.
+// nothing of the day or overnight prints, nor of calendars: a bar's clock
+// is its own day's, from the answer.
 
 // 1D stays on chartUrl / parseChart. Every other range uses this table.
 var HISTORY_RANGES = {
@@ -68,6 +67,8 @@ function parseHistory(json, range, centExchanges) {
     interval: interval,
     gmtoffset: meta.gmtoffset || 0,
     zoneName: meta.timezone || "",
+    // An intraday answer's days, each with its own clock (`barOffset`).
+    clocks: Quote.answerClocks(meta.tradingPeriods),
     bars: bars,
     baseline: baseline,
     firstTradeDate: Format.isFiniteNumber(meta.firstTradeDate) ? meta.firstTradeDate : null,
@@ -195,22 +196,39 @@ function historyFraction(history, t) {
   return nearest / (bars.length - 1)
 }
 
-function historyDateParts(t, gmtoffset) {
+// The UTC offset a bar of `history` at `t` is dated by: its own day's. An
+// intraday bar's day is in Yahoo's periods (`Quote.clockAt`). A longer
+// bar's answer lists none, and Yahoo stamps a week or a month at its first
+// day's midnight by that day's offset, which is an hour either side of the
+// answer's across a change of clocks: London's summer weeks at 23:00 UTC
+// the Sunday before, its winter ones at 00:00. Any other stamp, a day's bar
+// at its open or the live moment, keeps to its day by the answer's.
+function barOffset(history, t) {
+  if (history.clocks && history.clocks.length) return Quote.clockAt(history, t).offset
+  var offset = history.gmtoffset || 0
+  var shifts = [0, -3600, 3600]
+  for (var i = 0; i < shifts.length; i++) {
+    if ((t + offset + shifts[i]) % 86400 === 0) return offset + shifts[i]
+  }
+  return offset
+}
+
+function historyDateParts(history, t) {
   if (!Format.isFiniteNumber(t)) return null
-  var d = new Date((t + (gmtoffset || 0)) * 1000)
+  var d = new Date((t + barOffset(history, t)) * 1000)
   return { day: d.getUTCDate(), month: d.getUTCMonth(), year: d.getUTCFullYear() }
 }
 
 function historySpansYears(history) {
   var bars = history && history.bars ? history.bars : []
   if (!bars.length) return false
-  var first = historyDateParts(bars[0].t, history.gmtoffset)
-  var last = historyDateParts(bars[bars.length - 1].t, history.gmtoffset)
+  var first = historyDateParts(history, bars[0].t)
+  var last = historyDateParts(history, bars[bars.length - 1].t)
   return !!(first && last && first.year !== last.year)
 }
 
-function historyDateText(t, gmtoffset, withYear, interval) {
-  var date = historyDateParts(t, gmtoffset)
+function historyDateText(history, t, withYear, interval) {
+  var date = historyDateParts(history, t)
   if (!date) return "—"
   var text = interval === "1mo" || interval === "3mo" ? Format.MONTHS[date.month] : date.day + " " + Format.MONTHS[date.month]
   return text + (withYear ? " " + date.year : "")
@@ -220,8 +238,8 @@ function historyDateText(t, gmtoffset, withYear, interval) {
 // carries its year: a five-year high inside one calendar year would
 // otherwise read "JUL". Day-level bars take the year only when the period
 // crosses one.
-function historyStatsDateText(t, gmtoffset, withYear, interval) {
-  var date = historyDateParts(t, gmtoffset)
+function historyStatsDateText(history, t, withYear, interval) {
+  var date = historyDateParts(history, t)
   if (!date) return "—"
   var coarse = interval === "1wk" || interval === "1mo" || interval === "3mo"
   var text = coarse ? Format.MONTHS[date.month] : date.day + " " + Format.MONTHS[date.month]
@@ -250,11 +268,11 @@ function rangeLine(history, stats, digits, price) {
   var years = historySpansYears(history)
   var range = Format.infoRange(stats.low ? stats.low.p : null, stats.high ? stats.high.p : null,
     Format.isFiniteNumber(price) ? price : stats.last, digits)
-  var dated = function(point) { return point ? historyStatsDateText(point.t, history.gmtoffset, years, history.interval) : "" }
+  var dated = function(point) { return point ? historyStatsDateText(history, point.t, years, history.interval) : "" }
   var widest = historyStatsDateWidest(history.interval)
   var facts = []
   if (coverage.short)
-    facts.push({ label: "SINCE", value: historyStatsDateText(history.firstTradeDate, history.gmtoffset, true, "1d"), widest: historyStatsDateWidest("1d") })
+    facts.push({ label: "SINCE", value: historyStatsDateText(history, history.firstTradeDate, true, "1d"), widest: historyStatsDateWidest("1d") })
   facts.push({ label: "LOW", value: dated(stats.low), widest: widest })
   facts.push({ label: "HIGH", value: dated(stats.high), widest: widest })
   if (coverage.short)
@@ -262,15 +280,17 @@ function rangeLine(history, stats, digits, price) {
   return { title: String(history.range || "").toUpperCase(), range: range, facts: facts }
 }
 
-// `calendar` is the listing's, so an intraday bar's time across a change of
-// clocks reads by its own date's offset.
-function historyScrubText(history, bar, digits, calendar) {
+// An intraday bar's date and time read by its own day's clock, so a time
+// across a change of clocks reads as the exchange's clock said then.
+function historyScrubText(history, bar, digits) {
   if (!history || !bar) return ""
   var years = historySpansYears(history)
-  var date = historyDateText(bar.t, history.gmtoffset, years, history.interval)
+  var date = historyDateText(history, bar.t, years, history.interval)
   if (history.interval === "1wk") date = "WEEK OF " + date
-  if (history.interval === "15m" || history.interval === "30m" || history.interval === "1h")
-    date += " " + (calendar ? Market.calendarClock(calendar, bar.t, history) : Format.zonedHhmm(bar.t, history.gmtoffset, history.zoneName))
+  if (history.interval === "15m" || history.interval === "30m" || history.interval === "1h") {
+    var clock = Quote.clockAt(history, bar.t)
+    date += " " + Format.zonedHhmm(bar.t, clock.offset, clock.zone)
+  }
   return date + " · " + Format.money(bar.c, digits)
 }
 

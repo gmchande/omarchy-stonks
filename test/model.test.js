@@ -636,6 +636,32 @@ test("each print says its own time across a change of clocks, and the day marks 
   expect(geometry.ticks.filter(x => x > afternoon).map(x => M.timeAtFraction(friday, x))).not.toContain(at("2026-11-27", "16:00"))
 })
 
+test("weeks and months either side of 25 October and 1 November keep their dates, from either side's answer, for every reader", () => {
+  // Yahoo stamps each at its first day's midnight by that day's offset (a
+  // London week in summer time at 23:00 UTC the Sunday before, one in GMT
+  // at 00:00), and sends the answer's offset as the day it is sent's.
+  const stamp = iso => Date.parse(iso) / 1000
+  const cases = [
+    ["1wk", [3600, 0], ["2026-10-18T23:00:00Z", "2026-10-26T00:00:00Z"], ["WEEK OF 19 OCT", "WEEK OF 26 OCT"]],
+    ["1wk", [-14400, -18000], ["2026-10-26T04:00:00Z", "2026-11-02T05:00:00Z"], ["WEEK OF 26 OCT", "WEEK OF 2 NOV"]],
+    ["1mo", [3600, 0], ["2026-09-30T23:00:00Z", "2026-11-01T00:00:00Z"], ["OCT", "NOV"]],
+    // Midnight of 1 November is still summer time in New York.
+    ["1mo", [-14400, -18000], ["2026-10-01T04:00:00Z", "2026-11-01T04:00:00Z", "2026-12-01T05:00:00Z"], ["OCT", "NOV", "DEC"]]
+  ]
+  for (const reader of ["America/New_York", "Europe/London", "Asia/Tokyo", "Asia/Kolkata"]) {
+    process.env.TZ = reader
+    try {
+      for (const [interval, offsets, stamps, dates] of cases) {
+        for (const gmtoffset of offsets) {
+          const history = { range: "5Y", interval, gmtoffset, bars: stamps.map(iso => ({ t: stamp(iso), c: 100 })) }
+          expect([reader, gmtoffset, history.bars.map(bar => M.historyScrubText(history, bar).split(" · ")[0])])
+            .toEqual([reader, gmtoffset, dates])
+        }
+      }
+    } finally { process.env.TZ = "America/New_York" }
+  }
+})
+
 test("a failed answer is asked again five minutes on, whatever the hour", () => {
   const asked = at("2026-10-02", "04:11")
   expect(M.overnightDue(asked, at("2026-10-02", "04:15"), calendars, true)).toBe(false)

@@ -305,8 +305,7 @@ Item {
     if (historyActive && historyFailed) return unavailableText
     // A refetch, out or failed, with the range in hand says nothing: it
     // keeps the chart and the market.
-    if (historyShown && historyBar) return History.historyScrubText(history, historyBar, featuredQuote ? featuredQuote.priceDigits : undefined,
-      featuredQuote ? Market.calendarFor(calendars, featuredQuote) : null)
+    if (historyShown && historyBar) return History.historyScrubText(history, historyBar, featuredQuote ? featuredQuote.priceDigits : undefined)
     if (featuredQuote) return Market.marketStatus(dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars,
       Overnight.nightTrades(featuredQuote, !!chart && chart.allDay, now, calendars))
     return headerWhenMissing

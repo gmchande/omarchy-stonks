@@ -248,11 +248,14 @@ function scrubPhase(quote, t) {
 
 // A time where `quote` trades: by its calendar's offset for that moment's
 // date, the series' own or the listing's in `calendars`, so a time across a
-// change of clocks reads true; else the response's offset. Its zone is named
-// where the reader's clock differs.
+// change of clocks reads true; else by the clock Yahoo's periods say its
+// day kept (`Quote.clockAt`). Its zone is named where the reader's clock
+// differs.
 function printClock(quote, t, calendars) {
   var cal = quote.calendar || calendarFor(calendars, quote)
-  return cal ? calendarClock(cal, t, quote) : Format.zonedHhmm(t, quote.gmtoffset, quote.zoneName)
+  if (cal) return calendarClock(cal, t, quote)
+  var clock = Quote.clockAt(quote, t)
+  return Format.zonedHhmm(t, clock.offset, clock.zone)
 }
 
 // A closure as the header names it: the holiday, without the calendar's

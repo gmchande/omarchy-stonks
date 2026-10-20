@@ -251,16 +251,44 @@ test("after the close the header names the day and the next open from the calend
   for (const [now, cals, expected] of rows) expect([now, M.marketStatus(sep4, now, 0, cals)]).toEqual([now, expected])
 })
 
+// The readers every exchange's clock is pinned for, and an answer as Yahoo
+// sends it once the exchange's clocks have changed: its `gmtoffset` and
+// zone are the new ones, and each period keeps its own day's.
+const READERS = ["America/New_York", "Europe/London", "Asia/Tokyo", "Asia/Kolkata"]
+const readAs = (zone, fn) => {
+  process.env.TZ = zone
+  try { return fn() } finally { process.env.TZ = "America/New_York" }
+}
+const sentAt = (json, gmtoffset, timezone) => {
+  const copy = structuredClone(json)
+  Object.assign(copy.chart.result[0].meta, { gmtoffset, timezone })
+  return copy
+}
+
+test("a long chart dates each bar by its own day, on both sides of a change of clocks, for every reader", () => {
+  // Yahoo stamps a week at its Monday's midnight, by that day's offset, and
+  // sends the answer's offset as today's. Found in QA: once New York's
+  // clocks go back, the week of 7 September reads "WEEK OF 6 SEP", a
+  // Sunday, and a week that starts on the 1st names the month before.
+  const weekly = fixture("history/aapl-5y.json")
+  const stamped = iso => Date.parse(iso) / 1000
+  for (const reader of READERS) readAs(reader, () => {
+    for (const answer of [weekly, sentAt(weekly, -18000, "EST")]) {
+      const history = M.parseHistory(answer, "5Y")
+      const bar = iso => history.bars.find(b => b.t === stamped(iso))
+      expect(M.historyScrubText(history, bar("2026-09-07T04:00:00Z"))).toBe("WEEK OF 7 SEP 2026 · 332.27")
+      expect(M.historyScrubText(history, bar("2025-12-01T05:00:00Z"))).toBe("WEEK OF 1 DEC 2025 · 278.78")
+      expect(M.historyScrubText({ ...history, interval: "1mo" }, bar("2026-06-01T04:00:00Z"))).toBe("JUN 2026 · 307.34")
+    }
+  })
+})
+
 test("an exchange's time names its zone only where the reader's clock differs", () => {
   const tokyo = M.parseChart(fixture("7203-t-day.json"))
   const evening = tokyo.session.regular.end + 3 * 3600
   const aapl = M.parseChart(fixture("aapl.json"))
   // Saturday 31 October: New York's clocks go back that night.
   const saturday = M.epochAt(US, "2026-10-31", "12:00")
-  const readAs = (zone, fn) => {
-    process.env.TZ = zone
-    try { return fn() } finally { process.env.TZ = "America/New_York" }
-  }
   const tokyoNext = () => M.marketStatus(tokyo, evening, 0, calendars)
   expect(readAs("America/New_York", tokyoNext)).toMatch(/^Closed · opens \w{3} 09:00 JST$/)
   expect(readAs("Asia/Tokyo", tokyoNext)).toMatch(/^Closed · opens \w{3} 09:00$/)
@@ -275,20 +303,41 @@ test("an exchange's time names its zone only where the reader's clock differs", 
   expect(M.freshnessText({ state: "aged", asOf: btc.marketTime }, btc)).toBe("AS OF 18:32 UTC")
 })
 
-test("an exchange's time across a change of clocks reads by its own date's offset", () => {
-  // An answer fetched after New York's clocks went back (EST) holds bars and
-  // a close from before it (EDT): found in review, 09:30 read 08:30 EST.
-  const before = at("2026-10-30", "09:30")
-  const history = { range: "1M", interval: "30m", gmtoffset: -18000, zoneName: "EST",
-    bars: [{ t: before, o: 100, h: 100, l: 100, c: 100 }] }
-  expect(M.historyScrubText(history, history.bars[0], 2, US)).toBe("30 OCT 09:30 · 100.00")
+test("an exchange's time across a change of clocks reads by its own day's clock, for every reader", () => {
+  // A listing with a calendar: an answer fetched after New York's clocks go
+  // back (EST) holds a close from before (EDT). Found in review: 09:30 read
+  // 08:30 EST.
   const aapl = { ...M.parseChart(fixture("aapl.json")), gmtoffset: -18000, zoneName: "EST" }
   const close = at("2026-10-30", "16:00")
-  expect(M.freshnessText({ state: "aged", asOf: close }, aapl, calendars)).toBe("AS OF 16:00")
-  process.env.TZ = "Europe/London"
-  try {
-    expect(M.freshnessText({ state: "aged", asOf: close }, aapl, calendars)).toBe("AS OF 16:00 EDT")
-  } finally { process.env.TZ = "America/New_York" }
+  // Sydney's clocks went forward on 4 October: today's 1M answer is sent in
+  // AEDT, and its periods keep each day's own. Found in QA: the 10:00 AEST
+  // open of 21 September read 11:00 AEDT.
+  const bhp = M.parseHistory(fixture("history/bhp-ax-1mo.json"), "1M")
+  // Ranges and closes fetched before 25 October (XETRA) and 1 November
+  // (Nasdaq, Chicago, OTC), each also as Yahoo sends it after.
+  const nest = fixture("history/nest-1mo.json")
+  const sap = fixture("history/sap-de-5d.json")
+  const vix = fixture("vix-day.json")
+  const aitx = fixture("moments/power-user-2026-10-16/aitx.json")
+  const sides = [[nest, sentAt(nest, -18000, "EST")], [sap, sentAt(sap, 3600, "CET")],
+    [vix, sentAt(vix, -21600, "CST")], [aitx, sentAt(aitx, -18000, "EST")]]
+  for (const reader of READERS) readAs(reader, () => {
+    // New York's own clock is named only to the other readers.
+    const edt = reader === "America/New_York" ? "" : " EDT"
+    expect(M.freshnessText({ state: "aged", asOf: close }, aapl, calendars)).toBe("AS OF 16:00" + edt)
+    expect(M.historyScrubText(bhp, bhp.bars[0])).toBe("21 SEP 10:00 AEST · 60.56")
+    expect(M.historyScrubText(bhp, bhp.bars[bhp.bars.length - 2])).toBe("20 OCT 16:00 AEDT · 59.50")
+    for (const [n, s, v, a] of [sides.map(side => side[0]), sides.map(side => side[1])]) {
+      const month = M.parseHistory(n, "1M")
+      const week = M.parseHistory(s, "1W")
+      const chicago = M.parseChart(v)
+      const otc = M.parseChart(a)
+      expect(M.historyScrubText(month, month.bars[0])).toBe("12 AUG 09:30" + edt + " · 233.17")
+      expect(M.historyScrubText(week, week.bars[0])).toBe("14 OCT 09:00 CEST · 196.32")
+      expect(M.freshnessText({ state: "aged", asOf: chicago.marketTime, earlier: true }, chicago, calendars)).toBe("AS OF TUE 09:35 CDT")
+      expect(M.freshnessText({ state: "aged", asOf: otc.marketTime, earlier: true }, otc, calendars)).toBe("AS OF FRI 16:00" + edt)
+    }
+  })
 })
 
 test("a weeknight after post-market leads with closed and the next open", () => {
