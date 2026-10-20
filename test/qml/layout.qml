@@ -24,10 +24,11 @@ import "plugin"
 // change's baseline and right edge, the range row, the info block, the
 // header's look control and the end of its words, the list's TODAY and its
 // rule, and the first row must not move with the look, and the first row
-// must not move with the symbol or the range. The header's words keep room
-// for its longest states at the popup's width. The footer sits one gap under
-// the rows whichever list shows, the window's too until its list fills it,
-// then at its bottom, the
+// must not move with the symbol or the range. Both looks' digits start on
+// the band's left edge. The header's words keep room for its longest states
+// at the popup's width. The footer sits one gap under the rows whichever
+// list shows, the window's too, at its bottom once its list fills it, the
+// window's chart taking what whole rows leave over, the
 // rows stop short of the scrollbar's gutter, an open list menu makes room
 // for itself, and the window's smallest permitted height still holds a whole
 // row. The price and change text are measured as displayed, at whatever size
@@ -836,10 +837,11 @@ ShellRoot {
 
         // The window's smallest permitted height shows three whole rows: the
         // chart gives way first, down to 136 px; at the usual 760 px it keeps
-        // all 220. Found in the design pass of 14 October: the smallest
-        // window showed one row of the list.
-        // The window's chart gives way: set here, where the height is the
-        // window's own, not fitted to the body as the popup's is.
+        // all 220 and takes what whole rows leave over, less than a row.
+        // Found in the design pass of 14 October: the smallest window showed
+        // one row of the list.
+        // The window's chart fits the window: set here, where the height is
+        // the window's own, not fitted to the body as the popup's is.
         surface.fixedHeight = 760
         body.minChartHeight = Style.space(136)
         wait(50)
@@ -850,9 +852,10 @@ ShellRoot {
         stub.historyEntry = null
         wait(50)
         var minimum = root.measure()
-        root.check("the window's smallest height shows three whole rows, its chart giving way to 136 px, and its usual height keeps the whole chart",
+        root.check("the window's smallest height shows three whole rows, its chart giving way to 136 px, and its usual height keeps the whole chart and less than a row more",
           body.watchlist.height === 3 * body.rowPitch - body.rowGap && body.chartItem.height === Style.space(136)
-            && usualChart === Style.space(220) && minimum.footerGap === body.groupGap && minimum.footer <= surface.height,
+            && usualChart >= Style.space(220) && usualChart < Style.space(220) + body.rowPitch
+            && minimum.footerGap === body.groupGap && minimum.footer <= surface.height,
           "list " + body.watchlist.height + " of " + surface.height + ", chart " + body.chartItem.height + ", at 760 " + usualChart)
         // At the window's smallest, every scrollbar's thumb is at least 24
         // px long. Found in the walk of dev on 14 October: one row of nine
@@ -999,56 +1002,67 @@ ShellRoot {
           smallFaults.length === 0, smallFaults.join(" | "))
 
         // The window's footer sits one gap under a short list, as the
-        // popup's does, and at the window's bottom once the list fills it;
-        // its note, hint, and notice go with it. An empty named list keeps
-        // one row over it, an open list menu taller than the rows pushes it
-        // down under the menu, and the views that take the rows' place give
-        // it back there. At the window's smallest and tall, in both looks.
-        // Found in the edge pass of 15 October: one row in the window, a
-        // tall empty space, then "+ Add a symbol".
+        // popup's does, and at the window's bottom once the list fills it,
+        // the rows then ending one gap above it, the chart taking what they
+        // leave over; its note, hint, and notice go with it. An empty named
+        // list keeps one row over it, an open list menu taller than the rows
+        // pushes it down under the menu, and the views that take the rows'
+        // place give it back there. The chart's height follows the window's
+        // alone: every list at one height draws it the same. At the window's
+        // smallest, its usual 760, 850, and tall, in both looks. Found in the
+        // edge pass of 15 October: one row in the window, a tall empty space,
+        // then "+ Add a symbol"; and in the spacing review of 1.0.0: a list
+        // that filled the window ended 0 to 41 px over the footer's gap.
         root.load()
         stub.library = stub.symbols.slice()
         var fullList = stub.symbols.slice()
         surface.wide = true
         body.minChartHeight = Style.space(136)
         var windowFaults = []
+        var chartFaults = []
         // `rows` when the rows changed: past a row's slide or fade into its
         // place.
-        var windowFooter = function(where, rows) {
+        var windowFooter = function(where, rows, chart) {
           wait(rows ? 300 : 50)
           var footer = find(body, "footer")
           var gap = yIn(footer, 0) - root.lastRowBottom()
           var bottom = yIn(footer, footer.height)
           var room = surface.height - body.margins
           var ok = !footer.visible ? false : body.watchlist.interactive
-            ? bottom === room && gap >= body.groupGap && gap < body.groupGap + body.rowPitch
+            ? bottom === room && gap === body.groupGap
             : gap === body.groupGap && bottom <= room
           if (!ok) windowFaults.push(where + ": footer " + (footer.visible ? "ends " + bottom + " of " + room + ", " + gap + " under the rows"
             + (body.watchlist.interactive ? " of a list that fills it" : "") : "hidden"))
+          if (chart !== null && body.chartItem.height !== chart)
+            chartFaults.push(where + ": chart " + body.chartItem.height + ", " + chart + " under All")
         }
         ;[false, true].forEach(function(retro) {
           stub.retro = retro
-          ;[body.smallestHeight, 1400].forEach(function(tall) {
+          ;[body.smallestHeight, 760, 850, 1400].forEach(function(tall) {
             surface.fixedHeight = tall
             var at = (retro ? "retro " : "smooth ") + tall + " px "
             stub.listName = ""
             stub.symbols = fullList.slice()
-            windowFooter(at + "All", true)
+            wait(300)
+            var chart = body.chartItem.height
+            windowFooter(at + "All", true, chart)
             stub.listName = "Tech"
             stub.symbols = ["MZ", "AAPL"]
-            windowFooter(at + "two rows", true)
+            windowFooter(at + "two rows", true, chart)
             stub.symbols = ["MZ"]
-            windowFooter(at + "one row", true)
+            windowFooter(at + "one row", true, chart)
             body.hint = "Wheel over the pill to step symbols"
             body.note = "Removed AAPL"
             stub.settingsUnreadable = true
-            windowFooter(at + "one row, its hint, note, and notice")
+            // Only the popup shows a hint (Panel.qml), so its height here
+            // judges the footer, not the chart.
+            windowFooter(at + "one row, its hint, note, and notice", false, null)
             body.hint = ""
             body.note = ""
             stub.settingsUnreadable = false
             stub.listName = "Growth"
             stub.symbols = []
-            windowFooter(at + "an empty named list")
+            windowFooter(at + "an empty named list", false, chart)
             stub.listName = "Tech"
             stub.symbols = ["MZ"]
             stub.lists = [
@@ -1066,7 +1080,7 @@ ShellRoot {
               windowFaults.push(at + "the list menu: it ends at " + yIn(menu, menu.height) + ", the footer "
                 + yIn(menuFooter, 0) + "-" + yIn(menuFooter, menuFooter.height) + " in " + surface.height)
             body.closeListMenu()
-            windowFooter(at + "the list menu closed")
+            windowFooter(at + "the list menu closed", false, chart)
             ;[
               ["Manage lists", function() { body.openManageLists() }, function() { body.closeListViews() }],
               ["a symbol's lists", function() { body.openSymbolLists("MZ") }, function() { body.closeListViews() }],
@@ -1076,15 +1090,17 @@ ShellRoot {
               v[1]()
               wait(50)
               v[2]()
-              windowFooter(at + v[0] + " closed")
+              windowFooter(at + v[0] + " closed", false, chart)
             })
             stub.lists = Qt.binding(function() {
               return [{ name: "", label: "All", count: stub.symbols.length, symbols: stub.symbols }]
             })
           })
         })
-        root.check("the window's footer sits one gap under a short list, its note and notice too, and at its bottom once the list fills it, in both looks, at its smallest and tall",
+        root.check("the window's footer sits one gap under a short list, its note and notice too, and at its bottom once the list fills it, the rows one gap above it, in both looks, at its smallest and taller",
           windowFaults.length === 0, windowFaults.join(" | "))
+        root.check("the window's chart is as tall for every list at one window height, in both looks",
+          chartFaults.length === 0, chartFaults.join(" | "))
         stub.retro = false
         stub.listName = ""
         root.load()
@@ -1099,6 +1115,9 @@ ShellRoot {
         // only at the first answer, and the field jumped with it.
         body.minChartHeight = 0
         surface.fixedHeight = 0
+        // The band's column lays the chart's new height out on its next
+        // polish: the window's chart above was taller than the popup's.
+        wait(50)
         var opens = function() {
           var rowsHeight = body.fittedHeight(730)
           body.adding = true

@@ -37,8 +37,10 @@ Item {
   // once, the footer riding it, and a row below it is out of sight. The
   // window's is the content's own height while that fits, so a short list
   // has the footer one gap under its rows, as in the popup, and its own
-  // bottom once the list fills it. Found in the edge pass of 15 October: a
-  // list of one row in the window left a tall gap above the footer.
+  // bottom once the list fills it, where the chart's share of the height
+  // (`shownChartHeight`) leaves the rows ending one gap above it. Found in
+  // the edge pass of 15 October: a list of one row in the window left a
+  // tall gap above the footer.
   property real edge: Math.min(height, fittedHeight(Infinity))
   // One vertical rhythm for both looks and both surfaces. A band's gap
   // stands between the band's blocks: the hero, the chart, the range row,
@@ -62,12 +64,13 @@ Item {
   readonly property int textLeft: margins + inset
   readonly property int textRight: margins + gutter + inset
   property int chartHeight: Style.space(190)
-  // The least the chart may be (the window's 136 px): as the window gets
-  // short, the chart gives way first, so three rows still show; at its
-  // usual sizes it keeps chartHeight. The popup's card fits its rows, so
-  // its chart never gives way. Found in the design pass of 14 October: the
-  // smallest window showed one row of the list. 0, the popup's, gives none:
-  // a constant, so no change of chartHeight can find it stale.
+  // The least the chart may be (the window's 136 px): where it is set, the
+  // chart is sized to the surface (`shownChartHeight`), giving way first as
+  // the window gets short, so three rows still show, and taking what whole
+  // rows leave over otherwise. The popup's card fits its rows, so its chart
+  // keeps chartHeight. Found in the design pass of 14 October: the smallest
+  // window showed one row of the list. 0, the popup's, gives none: a
+  // constant, so no change of chartHeight can find it stale.
   property int minChartHeight: 0
   // The host's look.
   property color foreground: Commons.Color.foreground
@@ -331,22 +334,29 @@ Item {
   }
   // Everything but the rows: margins, header, band, and footer, with the
   // band, the rows, and the footer each one group's gap under what is above.
-  readonly property int chromeHeight: chartGivesWay ? chromeBesideChart + shownChartHeight
+  readonly property int chromeHeight: chartFitsSurface ? chromeBesideChart + shownChartHeight
     : margins * 2 + header.height + heroBand.implicitHeight + footer.height + groupGap * 3
   readonly property int chromeBesideChart: margins * 2 + header.height + heroBand.heightBesideChart + footer.height + groupGap * 3
-  // The chart as drawn: chartHeight, less what three rows need of it, down
-  // to minChartHeight. Read from the chrome beside it, never from the chart,
-  // so its size never reads itself back. Only where the chart gives way:
-  // elsewhere the chart and the chrome are read as they always were, so a
-  // height fitted to the body, as the popup's is, never passes through it.
-  readonly property bool chartGivesWay: minChartHeight > 0 && minChartHeight < chartHeight
-  readonly property int shownChartHeight: chartHeight - Math.max(0, Math.min(chartHeight - minChartHeight,
-    3 * rowPitch - rowGap - (height - chromeBesideChart - chartHeight)))
+  // The chart as drawn where it fits the surface (the window's): its height
+  // follows the surface's alone, never the list's, so a switch of lists
+  // moves nothing. Where three rows would not fit beside chartHeight it
+  // gives way, down to minChartHeight; otherwise it takes what whole rows
+  // leave over, less than a row, so the rows end one gap above the footer.
+  // Found in the spacing review of 1.0.0: a window whose list didn't fit
+  // left 0 to 41 px above the footer. Read from the chrome beside it,
+  // never from the chart, so its size never reads itself back. Elsewhere
+  // the chart and the chrome are read as they always were, so a height
+  // fitted to the body, as the popup's is, never passes through it.
+  readonly property bool chartFitsSurface: minChartHeight > 0 && minChartHeight < chartHeight
+  readonly property int roomBesideChart: height - chromeBesideChart - chartHeight
+  readonly property int shownChartHeight: roomBesideChart < 3 * rowPitch - rowGap
+    ? chartHeight - Math.min(chartHeight - minChartHeight, 3 * rowPitch - rowGap - roomBesideChart)
+    : chartHeight + roomBesideChart - rowsHeight(Infinity, roomBesideChart)
   // The shortest the surface may be: its chrome and one row, or, where the
-  // chart gives way, its chrome at the least chart and three rows. Counted
-  // from the rows, not from the chart's give: each size rounds on its own
-  // at a larger text size (275 less 170 is not two 53 px rows).
-  readonly property int smallestHeight: chartGivesWay ? chromeBesideChart + minChartHeight + 3 * rowPitch - rowGap
+  // chart fits the surface, its chrome at the least chart and three rows.
+  // Counted from the rows, not from the chart's give: each size rounds on
+  // its own at a larger text size (275 less 170 is not two 53 px rows).
+  readonly property int smallestHeight: chartFitsSurface ? chromeBesideChart + minChartHeight + 3 * rowPitch - rowGap
     : chromeBesideChart + chartHeight + listRowHeight
   readonly property int helpHeight: margins * 2 + header.height + groupGap + helpSheet.contentHeight
   // Search needs room for the field and a full set of results, never less
@@ -991,7 +1001,7 @@ Item {
     scrubX: root.scrubX
     reveal: motion.reveal
     replayX: motion.replayX
-    chartHeight: root.chartGivesWay ? root.shownChartHeight : root.chartHeight
+    chartHeight: root.chartFitsSurface ? root.shownChartHeight : root.chartHeight
     order: root.order
     reversed: root.reversed
     listLabel: root.listLabel

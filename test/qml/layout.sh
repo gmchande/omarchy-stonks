@@ -6,5 +6,5 @@ plugin_tree layout.qml
 export QT_QPA_PLATFORM=offscreen
 export STONKS_CALENDARS="$plugin/calendars.json"
 frame_tools
-run_qs 140
+run_qs 180
 finish "LAYOUT DONE"
