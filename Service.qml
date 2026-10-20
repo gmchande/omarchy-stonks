@@ -276,11 +276,11 @@ Item {
 
   // The window's host, which asks Hyprland whether every screen is off.
   // Every request a feed starts on the schedule, a quote run (queued,
-  // retried, or after a pause), Robinhood's, and a refresh's history or a
-  // range's grown old, asks first (`screensClear`): only an answer under a
-  // second old says go. An older one is asked again, and the answer lets
-  // what waits go (`screensAnswered`), or holds it while every screen is
-  // off.
+  // retried, or after a pause), Robinhood's, a refresh's history or a
+  // range's grown old, and the day's look for a newer Stonks, asks first
+  // (`screensClear`): only an answer under a second old says go. An older
+  // one is asked again, and the answer lets what waits go
+  // (`screensAnswered`), or holds it while every screen is off.
   property var screens: null
   readonly property bool screensOff: !!root.screens && root.screens.screensOff
   property real screensAnsweredMs: 0
@@ -306,6 +306,7 @@ Item {
     }
     root.refreshRange()
     root.fetchAhead()
+    releaseFeed.pump()
   }
   // The day last built for each symbol's chart, kept while what built it is
   // the same: its quote, and for a listing Robinhood trades all day its
@@ -418,6 +419,12 @@ Item {
     capacity: 20
     perMinute: 10
   }
+  // GitHub is asked once a day, for the newest version (`ReleaseFeed`).
+  Gate {
+    id: githubGate
+    host: "GitHub"
+    clock: root
+  }
   readonly property alias yahooGate: yahooGate
   // The exchanges whose listings trade in whole cents from $1, which every
   // Yahoo answer is read with (`Quote.parseChart`).
@@ -482,6 +489,16 @@ Item {
   // for what is still wanted, while it still is (`askOvernight`).
   AllDayFeed { id: allDayFeed; gate: robinhoodGate; onEntriesChanged: Qt.callLater(root.askOvernight) }
   OvernightFeed { id: overnightFeed; gate: robinhoodGate; onEntriesChanged: Qt.callLater(root.askOvernight) }
+  ReleaseFeed {
+    id: releaseFeed
+    ready: root.pluginsReady
+    now: root.now
+    clock: root
+    clearance: function() { return root.screensClear() }
+    gate: githubGate
+  }
+  // The version on main, "" until GitHub has named one (`Updates`).
+  readonly property alias mainVersion: releaseFeed.version
 
   // A user's refresh, from a key, the pill, or IPC: every watched quote
   // whose last answer is more than 10 s old, and, with a surface open to

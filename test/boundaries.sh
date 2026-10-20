@@ -36,23 +36,29 @@ none() {
 }
 
 # External commands run only in the feeds, search, and the version watch's
-# shell restart; files are read and written only by the service, the
-# version watch reads the manifest, and the trend colours read the theme's
-# colours; one service owns the feeds; the quote URL is the quote feed's,
-# the fundamentals URLs the fundamentals feed's, the overnight URL the
-# overnight feed's, and the all-day URL the all-day feed's. The plugin has
-# one IPC target, and only the window's host acts on Hyprland.
-only '\bProcess\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml SymbolSearch.qml Updates.qml
+# shell restart and update; files are read and written only by the
+# service, the version watch reads the manifest, and the trend colours read
+# the theme's colours; one service owns the feeds; the quote URL is the
+# quote feed's, the fundamentals URLs the fundamentals feed's, the overnight
+# URL the overnight feed's, the all-day URL the all-day feed's, and the
+# manifest's URL the release feed's. The plugin has one IPC target, and
+# only the window's host acts on Hyprland.
+only '\bProcess\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Updates.qml
 only '\bFileView\s*\{' Service.qml Updates.qml TrendColors.qml
-only '^import Quickshell\.Io' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml SymbolSearch.qml Service.qml IpcTarget.qml Updates.qml TrendColors.qml
+only '^import Quickshell\.Io' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Service.qml IpcTarget.qml Updates.qml TrendColors.qml
 only '\bIpcHandler\s*\{' IpcTarget.qml
 only '^import Quickshell\.Hyprland' WindowHost.qml
-only '\b(QuoteFeed|HistoryFeed|FundamentalsFeed|OvernightFeed|AllDayFeed)\s*\{' Service.qml
+only '\b(QuoteFeed|HistoryFeed|FundamentalsFeed|OvernightFeed|AllDayFeed|ReleaseFeed)\s*\{' Service.qml
 only 'Quote\.chartUrl\(' QuoteFeed.qml
 only 'Fundamentals\.(fundamentalsUrl|snapshotClosesUrl)\(' FundamentalsFeed.qml
 only 'Overnight\.overnightUrl\(' OvernightFeed.qml
 only 'Overnight\.allDayUrl\(' AllDayFeed.qml
+only 'Release\.MANIFEST_URL\b' ReleaseFeed.qml
 none 'execDetached|XMLHttpRequest|https?://' *.qml
+# GitHub's address is the release rule's alone: no other file names it.
+others=()
+for file in *.js; do [ "$file" = Release.js ] || others+=("$file"); done
+none 'github(usercontent)?\.com' *.qml "${others[@]}"
 # Every request goes through Fetch.curlCommand, which compresses and caps
 # it, and through a host's gate, which only the service holds.
 while read -r hit; do
