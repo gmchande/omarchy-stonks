@@ -85,9 +85,11 @@ FocusScope {
   function actionFor(symbol) { return members.indexOf(symbol) >= 0 ? "SHOW" : "ADD" }
   // ADD and SHOW share one slot on every row, the wider word's, so the
   // exchange codes keep their column whichever shows. In the caption's
-  // spaced capitals, as every other button in the views says its word.
+  // spaced capitals, as every other button in the views says its word, and
+  // padded as they are: 6 px each side of the wider word, 2 above and below
+  // the caption line.
   readonly property font buttonFont: Qt.font({ family: fontFamily, pixelSize: Style.font.caption, bold: true, letterSpacing: 1 })
-  readonly property int buttonWidth: Math.ceil(Math.max(addMetrics.advanceWidth, showMetrics.advanceWidth)) + Style.space(20)
+  readonly property int buttonWidth: Math.ceil(Math.max(addMetrics.advanceWidth, showMetrics.advanceWidth)) + Style.space(12)
   TextMetrics { id: addMetrics; font: root.buttonFont; text: "ADD" }
   TextMetrics { id: showMetrics; font: root.buttonFont; text: "SHOW" }
   // A row's columns: the symbol, the name, the exchange, and the label.
@@ -428,7 +430,7 @@ FocusScope {
               opacity: resultRow.chosen && !root.stale ? 1 : 0
               anchors.verticalCenter: parent.verticalCenter
               width: root.buttonWidth
-              height: Style.space(20)
+              height: addLabel.implicitHeight + Style.space(4)
               radius: root.retro ? 0 : Style.cornerRadius
               color: Style.selectedFillFor(root.foreground, Commons.Color.accent)
               Text {
