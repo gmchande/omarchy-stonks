@@ -5,7 +5,6 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 import "plugin/Cells.js" as Cells
-import "plugin/Tones.js" as Tones
 import "plugin/Chart.js" as Chart
 import "plugin/Fundamentals.js" as Fundamentals
 import "plugin/History.js" as History
@@ -21,9 +20,8 @@ import "plugin"
 // w22-<surface>-<look>-<symbol>-<range> states render the 22-symbol list with
 // a real day featured, at identical state in both looks; a popup is as tall
 // as its whole rows, the way Panel sizes it. sprite-candidates draws the
-// bull and bear candidates at 1x and 4x, smooth's drawn pair beside them.
-// pill-sheet draws the real bar pill for NEST in every bar style and look,
-// on a horizontal and a vertical bar.
+// bull and bear candidates at 1x and 4x. pill-sheet draws the real bar pill
+// for NEST in every bar style and look, on a horizontal and a vertical bar.
 ShellRoot {
   id: root
 
@@ -72,11 +70,15 @@ ShellRoot {
     || stateName.indexOf("popup-breadth-even-") === 0
     || stateName.indexOf("window-lists-") === 0 || orderState
   readonly property bool sheet: stateName === "sprite-candidates"
-  // pill-sheet-large: the same at a larger text size (render.sh).
-  readonly property bool pillSheet: stateName === "pill-sheet" || stateName === "pill-sheet-large"
+  // pill-sheet-large: the same at a larger text size (render.sh);
+  // pill-sheet-<theme>: in another theme.
+  readonly property bool pillSheet: stateName.indexOf("pill-sheet") === 0
   property var pillQuote: null
-  // The same day closed up: the pill's icon form climbs where NEST's falls.
+  // The same day closed up, and closed where it opened: the icon form's
+  // bull, and its flat day.
   readonly property var pillUpQuote: pillQuote ? Object.assign({}, pillQuote, { prevClose: pillQuote.price * 0.97 }) : null
+  readonly property var pillFlatQuote: pillQuote ? Object.assign({}, pillQuote, { prevClose: pillQuote.price }) : null
+  function pillQuoteFor(day) { return day === "up" ? pillUpQuote : day === "flat" ? pillFlatQuote : day === "down" ? pillQuote : null }
   readonly property bool popup: windowOf ? false : w22 ? w22.popup : stateName.indexOf("popup") === 0 || themeState
   // <popup-help|popup-help-sorted|window-help>-<look>: the key sheet.
   readonly property var help: {
@@ -914,24 +916,25 @@ ShellRoot {
         spacing: 8
 
         Repeater {
-          // Every form in each look, the icon on a down day and an up one,
-          // then the pill in the right section with no form picked there,
-          // where it is its icon, down and up.
+          // Every form in each look, the icon on a down day, an up one, a
+          // flat one, before the first quote, and after a first fetch that
+          // failed, then the pill in the right section with no form picked
+          // there, where it is its icon, down and up.
           model: {
             if (root.themeState) {
               var retroLook = root.stateName.indexOf("theme-retro-") === 0
-              return ["sparkline", "arrow", "text", "icon"].map(function(style) { return { style: style, retro: retroLook, compact: true } })
-                .concat([{ style: "text", retro: retroLook, up: true, compact: true }, { style: "icon", retro: retroLook, up: true, compact: true }])
+              return ["sparkline", "arrow", "text", "icon"].map(function(style) { return { style: style, retro: retroLook, compact: true, day: "down" } })
+                .concat([{ style: "text", retro: retroLook, day: "up", compact: true }, { style: "icon", retro: retroLook, day: "up", compact: true }])
             }
             if (!root.pillSheet) return []
             var rows = []
             for (var look = 0; look < 2; look++) {
               var retro = look === 1
-              ;["sparkline", "arrow", "text", "icon"].forEach(function(style) { rows.push({ style: style, retro: retro }) })
-              rows.push({ style: "icon", retro: retro, up: true })
+              ;["sparkline", "arrow", "text", "icon"].forEach(function(style) { rows.push({ style: style, retro: retro, day: "down" }) })
+              ;["up", "flat", "waiting", "failed"].forEach(function(day) { rows.push({ style: "icon", retro: retro, day: day }) })
             }
-            var right = [{ style: "sparkline", retro: false, right: true }, { style: "sparkline", retro: true, right: true },
-              { style: "sparkline", retro: false, right: true, up: true }, { style: "sparkline", retro: true, right: true, up: true }]
+            var right = [{ style: "sparkline", retro: false, right: true, day: "down" }, { style: "sparkline", retro: true, right: true, day: "down" },
+              { style: "sparkline", retro: false, right: true, day: "up" }, { style: "sparkline", retro: true, right: true, day: "up" }]
             // At the larger size, the smooth look's rows fill the screen.
             return root.stateName === "pill-sheet-large" ? rows.filter(function(r) { return !r.retro })
               .concat(right.filter(function(r) { return !r.retro })) : rows.concat(right)
@@ -946,7 +949,7 @@ ShellRoot {
               width: pillRow.modelData.compact ? 80 : 170
               anchors.verticalCenter: parent.verticalCenter
               text: (pillRow.modelData.compact ? "" : (pillRow.modelData.retro ? "RETRO" : "SMOOTH") + " · ") + (pillRow.modelData.right ? "RIGHT SECTION" : pillRow.modelData.style.toUpperCase())
-                + (pillRow.modelData.up ? " · UP" : pillRow.modelData.style === "icon" || pillRow.modelData.right ? " · DOWN" : "")
+                + (pillRow.modelData.style === "icon" || pillRow.modelData.right || pillRow.modelData.day !== "down" ? " · " + pillRow.modelData.day.toUpperCase() : "")
               color: Commons.Color.muted
               font.family: Style.font.family
               font.pixelSize: 10
@@ -965,8 +968,8 @@ ShellRoot {
               QtObject {
                 id: pillService
                 property string featuredSymbol: "NEST"
-                property var quotes: ({ NEST: pillRow.modelData.up ? root.pillUpQuote : root.pillQuote })
-                property var entries: ({ NEST: { status: "ok", receivedAt: root.now } })
+                property var quotes: ({ NEST: root.pillQuoteFor(pillRow.modelData.day) })
+                property var entries: ({ NEST: { status: pillRow.modelData.day === "failed" ? "failed" : pillRow.modelData.day === "waiting" ? "pending" : "ok", receivedAt: root.now } })
                 property string changeMode: "pct"
                 property bool retro: pillRow.modelData.retro
                 property int now: root.now
@@ -997,7 +1000,7 @@ ShellRoot {
                 settings: ({ id: "grvc.stonks", barStyle: pillRow.modelData.style })
               }
               // An Omarchy bar icon beside it, Bluetooth's, as the right
-              // section draws its icons: what the mark is sized against.
+              // section draws its icons: what the animal is sized against.
               BarIconButton {
                 visible: pillRow.modelData.right === true
                 anchors.verticalCenter: parent.verticalCenter
@@ -1008,7 +1011,7 @@ ShellRoot {
               }
             }
 
-            // The same pill on a strip of vertical bar: the mark beside the
+            // The same pill on a strip of vertical bar: the animal beside the
             // icon form, the symbol over its change beside the others.
             Rectangle {
               width: Style.bar.sizeVertical
@@ -1049,10 +1052,8 @@ ShellRoot {
 
         Repeater {
           model: [
-            { title: "BULL", color: "#8fc08a", sprites: root.bullCandidates, standard: Cells.BULL_SPRITE,
-              wash: Tones.washAlpha("#8fc08a", "#8fc08a", root.groundColor, 0.16, 1) },
-            { title: "BEAR", color: "#e05a7a", sprites: root.bearCandidates, standard: Cells.BEAR_SPRITE,
-              wash: Tones.washAlpha("#e05a7a", "#8fc08a", root.groundColor, 0.16, 1) }
+            { title: "BULL", color: "#8fc08a", sprites: root.bullCandidates, standard: Cells.BULL_SPRITE },
+            { title: "BEAR", color: "#e05a7a", sprites: root.bearCandidates, standard: Cells.BEAR_SPRITE }
           ]
 
           Column {
@@ -1084,22 +1085,6 @@ ShellRoot {
                   }
                 }
               }
-              // Smooth's drawn animal, in the theme's wash as the header lays it.
-              Column {
-                spacing: 6
-                Text {
-                  text: family.modelData.title + "  SMOOTH"
-                  color: "#8a8d8d"
-                  font.family: Style.font.family
-                  font.pixelSize: 10
-                  font.bold: true
-                }
-                Row {
-                  spacing: 16
-                  DrawnAnimal { width: 40; height: 28; bull: family.modelData.title === "BULL"; color: family.modelData.color; wash: family.modelData.wash }
-                  DrawnAnimal { width: 80; height: 56; bull: family.modelData.title === "BULL"; color: family.modelData.color; wash: family.modelData.wash }
-                }
-              }
             }
 
             Row {
@@ -1113,13 +1098,6 @@ ShellRoot {
                   pixels: Cells.spritePixels(modelData)
                   color: family.modelData.color
                 }
-              }
-              DrawnAnimal {
-                width: 160
-                height: 112
-                bull: family.modelData.title === "BULL"
-                color: family.modelData.color
-                wash: family.modelData.wash
               }
             }
           }

@@ -5,10 +5,10 @@ import "Cells.js" as Cells
 import "Tones.js" as Tones
 // The animal, live status, the look, and the help mark. Surfaces own the
 // actions; this only draws and signals. The animal is the day's bull or
-// bear in both looks, retro's in cells and smooth's drawn, in one slot the
-// status words start after, drawn or not, so neither the look nor a flat
-// day moves them. While its market rests it sleeps: eyes shut and a dim
-// "z" just past the slot, above the words. The height is the slot's in
+// bear in cells (`Cells.spriteFor`), the same in both looks, in one slot
+// the status words start after, drawn or not, so neither the look nor a
+// flat day moves them. While its market rests it sleeps: eyes shut and a
+// dim "z" just past the slot, above the words. The height is the slot's in
 // both looks, and the look is one small icon in both, so toggling moves
 // nothing. None of the three has a tooltip: under the header one covered
 // the line naming the stock, and what a click does is on the ? sheet with
@@ -22,11 +22,12 @@ Item {
   property bool retro: false
   // The animal, as the body decides it: `kind` "bull", "bear", or "" (a
   // flat day, or no direction yet), and `chart`, what it reads. A turn of
-  // the same chart crossfades in smooth; any other change is at once.
-  // `asleep`, its market resting, and `bell`, the clock alone put it to
-  // sleep or woke it: then, on the same chart, the eyes close or open over
-  // 320 ms; any other change of sleep is at once. `scrubbed`: a scrub has it
-  // awake, so the sleep that follows its end is no bell.
+  // the same chart crossfades in smooth; any other change, and every one in
+  // retro, is at once. `asleep`, its market resting, and `bell`, the clock
+  // alone put it to sleep or woke it: then, on the same chart, the eyes
+  // close or open over 320 ms; any other change of sleep is at once.
+  // `scrubbed`: a scrub has it awake, so the sleep that follows its end is
+  // no bell.
   property var animal: ({ kind: "", chart: "", asleep: false, bell: false, scrubbed: false })
   property bool scrubbing: false
   property bool live: false
@@ -49,16 +50,13 @@ Item {
   property bool shownAsleep: false
   property bool shownScrubbed: false
   // How far the eyes have closed, 0 to 1, evenly in time, and whether they
-  // last moved open: a wake runs the close's own ease and steps from shut,
-  // so smooth eases its lids out on both, and retro steps them, half way at
-  // the middle.
+  // last moved open: a wake steps from shut, so the cells show the lids
+  // half way at the middle of either move (`lids`: 0 open, 1 half, 2 shut).
   property real closing: 0
   property bool waking: false
   readonly property real moved: waking ? 1 - closing : closing
-  readonly property real eased: 1 - Math.pow(1 - moved, 3)
-  readonly property real lids: waking ? 1 - eased : eased
   readonly property int steps: moved >= 1 ? 2 : moved >= 0.5 ? 1 : 0
-  readonly property int retroLids: waking ? 2 - steps : steps
+  readonly property int lids: waking ? 2 - steps : steps
 
   signal styleRequested(string style)
   signal helpRequested()
@@ -72,16 +70,16 @@ Item {
     show(false)
   }
 
-  // Smooth's layers to the animal: crossfading when it turns on the chart
-  // it showed, from wherever a turn under way has them; else at once. Its
-  // sleep as `sleep` decides.
+  // The layers to the animal: crossfading in smooth when it turns on the
+  // chart it showed, from wherever a turn under way has them; else at
+  // once. Its sleep as `sleep` decides.
   function show(fade) {
     var k = animal ? animal.kind : ""
     shownChart = animal ? animal.chart : ""
     turn.stop()
     turnBull.to = k === "bull" ? 1 : 0
     turnBear.to = k === "bear" ? 1 : 0
-    if (fade) turn.start()
+    if (fade && !retro) turn.start()
     else {
       bull.opacity = turnBull.to
       bear.opacity = turnBear.to
@@ -130,34 +128,22 @@ Item {
     anchors.left: parent.left
     anchors.verticalCenter: parent.verticalCenter
 
+    // One layer each, so smooth's turn crossfades between them.
     PixelSprite {
-      objectName: "sprite"
-      anchors.fill: parent
-      visible: root.retro && root.kind !== ""
-      pixels: Cells.spriteFor(root.kind === "bull", root.retroLids)
-      color: root.kind === "bull" ? root.upColor : root.downColor
-    }
-
-    // Smooth's pair, one layer each, so a turn crossfades between them.
-    DrawnAnimal {
       id: bull
-      objectName: "drawnBull"
+      objectName: "bullCells"
       anchors.fill: parent
-      visible: !root.retro && opacity > 0
-      bull: true
+      visible: opacity > 0
+      pixels: Cells.spriteFor(true, root.lids)
       color: root.upColor
-      lids: root.lids
-      wash: Tones.washAlpha(root.upColor, root.upColor, root.ground, 0.16, 1)
     }
-    DrawnAnimal {
+    PixelSprite {
       id: bear
-      objectName: "drawnBear"
+      objectName: "bearCells"
       anchors.fill: parent
-      visible: !root.retro && opacity > 0
-      bull: false
+      visible: opacity > 0
+      pixels: Cells.spriteFor(false, root.lids)
       color: root.downColor
-      lids: root.lids
-      wash: Tones.washAlpha(root.downColor, root.upColor, root.ground, 0.16, 1)
     }
 
     ParallelAnimation {
@@ -177,27 +163,13 @@ Item {
     }
   }
 
-  // Asleep, a small dim "z" over the animal's back, just past its slot:
-  // text in smooth, cells in retro, coming in with the eyes' close. It sits
-  // at the header's top, never above it: the popup's body starts there and
-  // clips what draws past it.
-  Text {
-    objectName: "sleepZ"
-    visible: !root.retro && root.kind !== "" && opacity > 0
-    opacity: root.lids
-    x: slot.x + slot.width + Style.space(1)
-    y: 0
-    textFormat: Text.PlainText
-    text: "z"
-    color: root.dim
-    font.family: root.fontFamily
-    font.pixelSize: Style.font.caption
-    font.bold: true
-  }
+  // Asleep, a small dim "z" in cells over the animal's back, just past its
+  // slot, coming in as the eyes shut. It sits at the header's top, never
+  // above it: the popup's body starts there and clips what draws past it.
   PixelSprite {
     objectName: "sleepCells"
     readonly property int cell: Math.floor(Math.min(slot.width / 20, slot.height / 14))
-    visible: root.retro && root.kind !== "" && root.retroLids === 2
+    visible: root.kind !== "" && root.lids === 2
     columns: 3
     rows: 5
     width: cell * 3

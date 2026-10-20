@@ -702,7 +702,7 @@ ShellRoot {
       var above = day.points.filter(function(p) { return moved(p) > 0.001 })
       var below = day.points.filter(function(p) { return moved(p) < -0.001 })
       var slot = harness.find(body, "animal")
-      var bull = harness.find(body, "drawnBull")
+      var bull = harness.find(body, "bullCells")
       var run = function(name, mode, change) {
         tryVerify(function() { return body.animal.kind === "bull" && bull.opacity === 1 }, 2000)
         grab.source = slot
@@ -735,11 +735,11 @@ ShellRoot {
     // The header's animal falling asleep and waking, as it is rendered with
     // its "z", the status words hidden: when the clock closes DOWN's market,
     // Friday 11 September at 20:00 with no night after it, its eyes close
-    // over 320 ms in smooth and in two steps in retro, and when its night
-    // starts on Sunday at 20:00 they open the same way. Nothing else moves
-    // it: letting go of a scrub puts it back to sleep at once, a new symbol
-    // changes it at once, and an open after the close shows it asleep from
-    // its first frame.
+    // over 320 ms in two steps, the same cells in both looks, and when its
+    // night starts on Sunday at 20:00 they open the same way. Nothing else
+    // moves it: letting go of a scrub puts it back to sleep at once, a new
+    // symbol changes it at once, and an open after the close shows it
+    // asleep from its first frame.
     function sleepFrames(body) {
       var featuredBefore = service.featuredSymbol
       var rangeBefore = service.range
@@ -783,12 +783,12 @@ ShellRoot {
       var bells = ["smooth", "retro"].map(function(style) {
         look(style)
         awake()
-        var bell = run("sleep-bell-" + style, style === "smooth" ? "turn:320" : "steps:320", function() {
+        var bell = run("sleep-bell-" + style, "steps:320", function() {
           service.now = style === "smooth" ? close : close + 2
         })
         return style + ": " + (bell.ok && body.animal.asleep ? "ok" : "not ok") + ", " + bell.detail
       })
-      harness.check("the clock closing the market closes the animal's eyes over 320 ms, smoothly in smooth and in two steps in retro, whose clock skips the closing second — "
+      harness.check("the clock closing the market closes the animal's eyes over 320 ms in two steps, in both looks, retro's clock skipping the closing second — "
         + bells.join(" | "), bells.every(function(b) { return /^\w+: ok, /.test(b) }))
       // Sunday at 20:00, DOWN's night starting: it trades all night.
       var wake = close + 2 * 86400
@@ -796,12 +796,12 @@ ShellRoot {
         look(style)
         service.now = wake - 60
         tryVerify(function() { return body.animal.asleep && header.closing === 1 }, 2000)
-        var opened = run("wake-bell-" + style, style === "smooth" ? "turn:320" : "steps:320", function() {
+        var opened = run("wake-bell-" + style, "steps:320", function() {
           service.now = style === "smooth" ? wake : wake + 2
         })
         return style + ": " + (opened.ok && !body.animal.asleep ? "ok" : "not ok") + ", " + opened.detail
       })
-      harness.check("the clock waking the market opens the animal's eyes over 320 ms, the \"z\" going with them, smoothly in smooth and in two steps in retro — "
+      harness.check("the clock waking the market opens the animal's eyes over 320 ms in two steps, the \"z\" going with them, in both looks — "
         + wakes.join(" | "), wakes.every(function(w) { return /^\w+: ok, /.test(w) }))
       look("smooth")
       // Two seconds after the close, inside the bell's few seconds, a scrub
