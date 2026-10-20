@@ -308,6 +308,9 @@ ShellRoot {
   QtObject {
     id: updates
     property string newVersion: ""
+    property string releasedVersion: ""
+    property bool releaseUnsaid: false
+    function sayRelease() { releaseUnsaid = false }
     property string runningVersion: "1.0.0"
   }
 
@@ -766,6 +769,11 @@ ShellRoot {
       stub.settingsUnreadable = true
     } else if (root.stateName.indexOf("popup-notice-update-") === 0) {
       updates.newVersion = "1.0.0"
+    } else if (root.stateName.indexOf("popup-update-note-") === 0) {
+      // A newer Stonks, said as the popup opens.
+      updates.releasedVersion = "1.0.10"
+      updates.releaseUnsaid = true
+      body.offerRelease()
     } else if (/^(popup|window|min-window)-lists-/.test(root.stateName)) {
       // popup-lists-<menu|naming|named|empty|long|manage|rename|confirm|symbol>-<look>,
       // window-lists-<manage|symbol>-<look>, and min-window-lists-<menu|manage|symbol>-<look>,

@@ -241,11 +241,16 @@ The shell's log the form asks for can name the prices Stonks left out.
 ## What it runs
 
 - **Needs:** nothing beyond Omarchy 4. It runs `curl`, which Omarchy ships.
-- **Commands:** `curl` for every request, and `omarchy restart shell` only
-  when you click the update notice.
+- **Commands:** `curl` for every request; `omarchy restart shell` only when
+  you click the notice that an update is on disk; and, only when you click
+  the note that a newer Stonks is out, `omarchy plugin update grvc.stonks`
+  in a terminal.
 - **Sites:** `query1.finance.yahoo.com` for quotes, charts, and the market
-  cap and P/E; `query2.finance.yahoo.com` for search; and `api.robinhood.com`
-  for overnight prices and which stocks trade overnight. Nothing else.
+  cap and P/E; `query2.finance.yahoo.com` for search; `api.robinhood.com`
+  for overnight prices and which stocks trade overnight; and
+  `raw.githubusercontent.com` for the newest version number, as the shell
+  starts and then once a day; when no answer comes, again 2 seconds later,
+  doubling to about a minute. Nothing else.
 - **Data:** Yahoo's endpoints are unofficial, and its terms restrict
   automated access; Robinhood's data is for personal use. Either may change
   or stop without notice. Some prices come late: [Yahoo's table](https://help.yahoo.com/kb/SLN2310.html)
@@ -268,7 +273,8 @@ The shell's log the form asks for can name the prices Stonks left out.
   the rest when the popup or window first opens, and for each one you add;
   and, while one is open, when you press `r` and every 5 minutes through a
   night that trades.
-- **Updates:** never by itself.
+- **Updates:** never by itself. When a newer version is out, the footer
+  says so for 5 seconds.
 
 Every request runs through the one curl command in [`Fetch.js`](Fetch.js),
 which sets its limits. [`test/boundaries.sh`](test/boundaries.sh) fails if a
@@ -284,8 +290,13 @@ omarchy plugin update grvc.stonks
 omarchy restart shell
 ```
 
-Until the shell restarts, the old version keeps running, and the popup's
-footer says "Updated to … · click to restart the shell".
+Once a day, Stonks asks GitHub for the newest version. When it's newer than
+yours, the footer says "Stonks … is out · click to update" for 5 seconds
+as the popup or the window opens, once for each day's answer. A
+click while it shows opens a terminal that runs `omarchy plugin update
+grvc.stonks`, which shows what changes and asks before it updates. Until
+the shell restarts, the old version keeps running, and the footer says
+"Updated to … · click to restart the shell".
 
 ## Remove
 

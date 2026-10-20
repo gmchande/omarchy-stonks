@@ -1171,15 +1171,10 @@ ShellRoot {
       var manifest = JSON.parse(harness.readFile(harness.manifestPath))
       manifest.version = "9.9.9"
       harness.writeFile(harness.manifestPath, JSON.stringify(manifest, null, 2) + "\n")
-      // The manifest is checked as the window opens.
-      within(5000, function() { return !writer.running })
-      var stillOpen = text()
-      app.close()
-      app.open("{}")
-      var updated = stillOpen.indexOf("+  Add a symbol") === 0
-        && within(1000, function() { return text() === "Updated to 9.9.9 · click to restart the shell" })
+      // The manifest is read again as it changes, with the window open.
+      var updated = within(5000, function() { return text() === "Updated to 9.9.9 · click to restart the shell" })
       mouseClick(footer, footer.width / 2, footer.height / 2)
-      harness.check("the window's footer says an update on its next open, and a click on it restarts the shell",
+      harness.check("the open window's footer says an update as it lands, and a click on it restarts the shell",
         updated && within(5000, function() { return harness.readFile(harness.fakeState + "/omarchy.calls") === "restart shell\n" }),
         text() + "|" + harness.readFile(harness.fakeState + "/omarchy.calls"))
     }

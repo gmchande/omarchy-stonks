@@ -214,7 +214,9 @@ ShellRoot {
         }
       }
       var loadLines = harness.lines("requests.log")
-      var firstRun = harness.lines("runs.log")[0] || ""
+      // The first quote run: GitHub's look goes in a run of its own as the
+      // service starts.
+      var firstRun = harness.lines("runs.log").filter(function(r) { return !/^manifest:/.test(r) })[0] || ""
       harness.check("154 symbols answer in one run, the pill's chart and eight spark requests, within 2 s of the clock and 15 s of the wall",
         answered > 0 && answered <= 2 && answeredWall <= 15000 && firstRun.split(" ").length === 9 && /^chart:TALL001( spark:\S+){8}$/.test(firstRun),
         "all answered at " + (answered || "never") + " s, " + (answeredWall / 1000).toFixed(1) + " s of the wall; first run "

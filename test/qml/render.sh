@@ -69,6 +69,8 @@ if [ $# -eq 0 ]; then
     states="$states popup-note-sorted-$look window-note-sorted-$look"
   done
   states="$states popup-note-retro"
+  # A newer Stonks out, said as a note: it has to fit the popup's width.
+  states="$states popup-update-note-smooth popup-update-note-retro"
   # What search leaves out, said alone (vfiax) or under the results it shows
   # (eurusd), in both looks.
   for look in smooth retro; do

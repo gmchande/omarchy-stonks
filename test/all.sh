@@ -39,6 +39,7 @@ start "window rows harness" bash test/qml/window-rows.sh
 start "keys harness" bash test/qml/keys.sh
 start "quote queue harness" bash test/qml/run.sh
 start "service harness" bash test/qml/service.sh
+start "update check harness" bash test/qml/updates.sh
 start "Quickshell crash handling (stand-in)" bash test/qml/crash-check.sh
 start "history harness" bash test/qml/history.sh
 start "1.0.0 data file harness" bash test/qml/data-files.sh

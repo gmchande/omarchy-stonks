@@ -72,6 +72,10 @@
 # all the same.
 # While STONKS_FAKE_STATE/ROBINHOOD.hold exists, every answer of Robinhood's
 # waits, each counted as it is asked: a step sees what is out at once.
+# GitHub's manifest on main, and only that address: while
+# STONKS_FAKE_STATE/MANIFEST.version exists, it answers a manifest naming
+# that version; otherwise, and while MANIFEST.down exists, it fails. Any
+# other GitHub address answers 404.
 #
 # Spark: a /v7/finance/spark request answers each of its symbols from that
 # symbol's own day as the chart route would, closes only, in Yahoo's spark
@@ -87,11 +91,12 @@
 # call is a line of runs.log, its kind:name per URL, and each URL a line of
 # requests.log, "kind name status", a spark's name its symbols,
 # comma-separated.
-#   YAHOO.refuse, ROBINHOOD.refuse   that host answers 429 to every request,
-#                                    counted in <HOST>.refused.calls
-#   YAHOO.offline, ROBINHOOD.offline that host gives no answer at all
-#   DELAY                            each URL answers that many seconds
-#                                    late, as on a slow network
+#   YAHOO.refuse, ROBINHOOD.refuse,   that host answers 429 to every request,
+#   GITHUB.refuse                     counted in <HOST>.refused.calls
+#   YAHOO.offline, ROBINHOOD.offline, that host gives no answer at all
+#   GITHUB.offline
+#   DELAY                             each URL answers that many seconds
+#                                     late, as on a slow network
 
 set -u
 fixtures="${STONKS_FIXTURES:?}"
@@ -122,6 +127,7 @@ count() {
 # What one URL is: its kind and its name in the logs.
 kind_of() {
   case "$1" in
+    *"raw.githubusercontent.com/"*) echo manifest ;;
     *"/v1/finance/search"*) echo search ;;
     *"api.robinhood.com/instruments/"*) echo instruments ;;
     *"api.robinhood.com/"*) echo overnight ;;
@@ -133,7 +139,7 @@ kind_of() {
 }
 name_of() {
   case "$2" in
-    search|instruments|overnight) echo "$2" ;;
+    search|instruments|overnight|manifest) echo "$2" ;;
     spark) local s="${1#*symbols=}"; echo "${s%%&*}" ;;
     fundamentals) local s="${1##*/timeseries/}"; s="${s##*/chart/}"; echo "${s%%\?*}" ;;
     *) local s="${1##*/chart/}"; echo "${s%%\?*}" ;;
@@ -145,6 +151,13 @@ name_of() {
 # 44 not found (404), 7 no answer.
 serve() {
   local url=$1
+  if [[ "$url" == *"raw.githubusercontent.com/"* ]]; then
+    [ "$url" = https://raw.githubusercontent.com/gmchande/omarchy-stonks/main/manifest.json ] || exit 44
+    [ -e "$STONKS_FAKE_STATE/MANIFEST.down" ] && exit 22
+    [ -e "$STONKS_FAKE_STATE/MANIFEST.version" ] || exit 22
+    jq -nc --arg version "$(cat "$STONKS_FAKE_STATE/MANIFEST.version")" '{ schemaVersion: 1, id: "grvc.stonks", version: $version }'
+    exit
+  fi
   if [[ "$url" == *"/v7/finance/spark"* ]]; then
     local list="${url#*symbols=}" sym body served days=() huge=0
     list="${list%%&*}"
@@ -323,6 +336,7 @@ for i in "${!urls[@]}"; do
   name=$(name_of "$url" "$kind")
   host=YAHOO
   [[ "$url" == *"robinhood.com"* ]] && host=ROBINHOOD
+  [[ "$url" == *"githubusercontent.com"* ]] && host=GITHUB
   run+=("$kind:$name")
   exit_code=0
   if [ -e "$state/$host.offline" ]; then
