@@ -852,7 +852,7 @@ ShellRoot {
     visible: true
     color: root.groundColor
     implicitWidth: root.pillSheet ? Math.max(520, pillColumn.implicitWidth + 48) : root.themeState ? 480 + 410 : root.sheet ? 1000
-      : (root.windowWidth ? root.windowWidth : (root.smallest ? 560 : (root.popup ? 480 : 720)))
+      : (root.windowWidth ? root.windowWidth : (root.smallest ? Style.space(560) : (root.popup ? 480 : 720)))
     // The larger text size lands after the window has taken its height, so
     // the large sheet is given room for its seven rows.
     implicitHeight: root.stateName === "pill-sheet-large" ? 720 : root.pillSheet ? pillColumn.implicitHeight + 40 : root.sheet ? 460

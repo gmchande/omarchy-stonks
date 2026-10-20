@@ -748,7 +748,7 @@ ShellRoot {
         var roomless = []
         for (var hw = 0; hw < 3; hw++) {
           surface.wide = hw > 0
-          surface.windowWidth = hw === 1 ? 560 : 720
+          surface.windowWidth = hw === 1 ? Style.space(560) : 720
           for (var hlook = 0; hlook < 2; hlook++) {
             stub.retro = hlook === 1
             for (var s = 0; s < states.length; s++) {
@@ -869,7 +869,7 @@ ShellRoot {
         // US, "New list…", and "Manage lists…" sat under it.
         var wideBefore = surface.wide
         surface.wide = true
-        surface.windowWidth = 560
+        surface.windowWidth = Style.space(560)
         stub.lists = [{ name: "", label: "All", count: stub.symbols.length, symbols: stub.symbols },
           { name: "US", label: "US", count: 3, symbols: stub.symbols.slice(0, 3) },
           { name: "Tech", label: "Tech", count: 2, symbols: ["MZ", "AAPL"] },
@@ -966,7 +966,7 @@ ShellRoot {
         body.startAdding()
         for (var nw = 0; nw < 2; nw++) {
           surface.wide = nw === 1
-          surface.windowWidth = 560
+          surface.windowWidth = Style.space(560)
           for (var nlook = 0; nlook < 2; nlook++) {
             stub.retro = nlook === 1
             answers.forEach(function(answer) {
@@ -1887,7 +1887,7 @@ ShellRoot {
             close: function() { body.cancelAdding(); stub.range = "1D"; stub.historyEntry = null } }
         ]
         var badKeys = []
-        surface.windowWidth = 560
+        surface.windowWidth = Style.space(560)
         for (var hw = 0; hw < 2; hw++) {
           surface.wide = hw === 1
           for (var hl = 0; hl < 2; hl++) {
