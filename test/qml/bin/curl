@@ -42,7 +42,8 @@
 # Yahoo's answers for those, which hold kinds Stonks leaves out, and MIXED
 # the five SHOP results with EURUSD's currency after them. Each SHOP answer
 # given, after the pause, is counted in SEARCH.answered.calls; a search
-# stopped first is not.
+# stopped first is not. While STONKS_FAKE_STATE/SEARCH.down exists, every
+# search fails, counted in SEARCH.failed.calls.
 # History requests use the saved AAPL year response for AAPL, MSFT, and BOTH,
 # and NEST's saved month for NEST; KILN, SPY, ^GSPC, BTC-USD, SHEL.L, and
 # 7203.T, one of each kind of listing, answer their own saved years.
@@ -176,6 +177,10 @@ serve() {
   fi
   if [[ "$url" == *"/v1/finance/search"* ]]; then
     [[ "$url" == *"q=FAST&"* ]] || sleep 0.4
+    if [ -e "$state/SEARCH.down" ]; then
+      count "$state/SEARCH.failed.calls" > /dev/null
+      exit 22
+    fi
     case "$url" in
       *"q=FAST&"*) cat "$fixtures/search.json" ;;
       *"q=ZZZ"*) echo '{"quotes":[]}' ;;

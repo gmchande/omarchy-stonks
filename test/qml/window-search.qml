@@ -633,9 +633,77 @@ ShellRoot {
       harness.check("a first search says it is searching a quarter second after its lookup goes out, through an edit, until its answer replaces the line; one answering sooner never says so",
         late === "- / Searching for “S”… / Searching for “SH”… / - | late"
           && none === "- / Searching for “ZZZ”… / No matches for “ZZZ” | late"
-          && failed === "- / Searching for “OOPS”… / Search didn’t answer · try again | late"
+          && failed === "- / Searching for “OOPS”… / Search didn’t answer | late"
           && fast === "- | never",
         [late, none, failed, fast].join(" ; "))
+    }
+
+    // A failed lookup is asked again, the same query through the same
+    // request and gate as typing it: by Enter, saying it is searching as a
+    // first query does, and by a click on RETRY; while Yahoo's gate pauses
+    // Stonks, a retry fails at once and asks nothing. SH fails while the
+    // fake curl's search is down, then answers. Found in the 1.0.0 review:
+    // "Search didn't answer · try again" led nowhere, Enter doing nothing
+    // and nothing to click.
+    function failedSearchRetries(body, keys) {
+      var searchDown = function(down) {
+        fileProc.command = down ? ["touch", harness.fakeState + "/SEARCH.down"] : ["rm", "-f", harness.fakeState + "/SEARCH.down"]
+        fileProc.running = true
+        tryVerify(function() { return !fileProc.running }, 2000)
+      }
+      var message = harness.find(body.search, "searchMessage")
+      // Read through guards, so a search without RETRY fails the check
+      // rather than throwing.
+      var retry = harness.find(body.search, "searchRetry")
+      var retryShown = function() { return !!retry && retry.visible }
+      var clickRetry = function() { if (retry) mouseClick(retry, retry.width / 2, retry.height / 2) }
+      var library = service.library.slice()
+      searchDown(true)
+      keys.forceActiveFocus()
+      keyClick(Qt.Key_A)
+      wait(50)
+      keyClick("S")
+      keyClick("H")
+      tryVerify(function() { return body.search.answer === "failed" && body.search.resultsQuery === "SH" }, 3000)
+      var offered = [message.text, retryShown()].join(",")
+      // Enter, Yahoo's search still down: asked once more, the line saying
+      // so, frame by frame, until it fails again.
+      var failedBefore = harness.calls("SEARCH.failed")
+      var seen = []
+      var watch = function() {
+        var said = message.visible ? message.text : "-"
+        if (seen[seen.length - 1] !== said) seen.push(said)
+      }
+      var frames = Qt.createQmlObject('import QtQuick; FrameAnimation { running: true }', harness)
+      frames.triggered.connect(watch)
+      watch()
+      keyClick(Qt.Key_Return)
+      within(3000, function() { return seen.length > 1 && body.search.answer === "failed" })
+      wait(100)
+      frames.destroy()
+      var byEnter = [seen.join(" / "), harness.calls("SEARCH.failed") - failedBefore, body.adding].join(",")
+      // RETRY, while the gate pauses Stonks: no request, the failure stays.
+      var gate = service.testYahooGate
+      gate.begin("refused", 60)
+      failedBefore = harness.calls("SEARCH.failed")
+      var answeredBefore = harness.calls("SEARCH.answered")
+      clickRetry()
+      wait(600)
+      var paused = [harness.calls("SEARCH.failed") - failedBefore, harness.calls("SEARCH.answered") - answeredBefore,
+        body.search.answer, retryShown()].join(",")
+      gate.pause = ""
+      // RETRY, Yahoo's search back: its answer lands, nothing added.
+      searchDown(false)
+      clickRetry()
+      within(3000, function() { return body.search.results.length > 0 })
+      var byClick = [body.search.resultsQuery, body.search.results.length > 0, harness.calls("SEARCH.answered") - answeredBefore,
+        retryShown(), body.adding, harness.same(service.library, library)].join(",")
+      body.resetInteraction()
+      harness.check("a failed lookup offers RETRY; Enter and a click on it ask the same query again, through Yahoo's gate, and adding nothing",
+        offered === "Search didn’t answer,true"
+          && byEnter === "Search didn’t answer / - / Searching for “SH”… / Search didn’t answer,1,true"
+          && paused === "0,0,failed,true" && byClick === "SH,true,1,false,true,true",
+        [offered, byEnter, paused, byClick].join(" ; "))
     }
 
     function test_flows() {
@@ -748,7 +816,7 @@ ShellRoot {
         whileOut === "true,true,true,true" && freshAgain, whileOut + "|" + freshAgain)
       harness.check("an empty answer and a failed lookup each say so in place, differently",
         noMatches === "true,true,No matches for “ZZZ”"
-          && failed === "true,Search didn’t answer · try again",
+          && failed === "true,Search didn’t answer",
         noMatches + " / " + failed)
       harness.check("an answer of kinds Stonks leaves out names them where \"No matches\" would be, and under the results it shows, the arrows stopping at the last result",
         fundAlone === "0,false,true,Stonks doesn’t show mutual funds,0"
@@ -769,6 +837,7 @@ ShellRoot {
         (harness.calls("SEARCH.answered") - answeredBeforeClear) + "|" + body.search.activeQuery)
       body.resetInteraction()
       firstSearchSaysSo(body, keys)
+      failedSearchRetries(body, keys)
 
       fieldInRowsPlace(body, watchlist, keys)
       longSymbols(body, keys)

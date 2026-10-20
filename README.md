@@ -220,8 +220,9 @@ price say the same.
 - **The header says "1W unavailable", with RETRY beside it.** Yahoo didn't
   send that range's chart. Click RETRY, or press `r`. While Yahoo is
   turning Stonks away, a range fails at once.
-- **Search says "Search didn't answer".** Yahoo's search didn't answer, or
-  Stonks is waiting out a refusal from Yahoo. Try again in a moment.
+- **Search says "Search didn't answer", with RETRY beside it.** Yahoo's
+  search didn't answer. Click RETRY, or press Enter. While Yahoo is turning
+  Stonks away, a search fails at once: try again in a moment.
 - **The header says "schedule unavailable".** Stonks knows each exchange's
   holidays up to a set date. This exchange's have run out, so it can't say
   when the market next opens. Stonks doesn't update itself:
