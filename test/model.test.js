@@ -660,6 +660,13 @@ test("weeks and months either side of 25 October and 1 November keep their dates
       }
     } finally { process.env.TZ = "America/New_York" }
   }
+  // The live moment Yahoo appends keeps today's date, even at a whole hour
+  // of a coin's day, where no clock changes. Found in review: Saturday 31
+  // October's 23:00 UTC read as the week of 1 November.
+  const live = stamp("2026-10-31T23:00:00Z")
+  const coin = { range: "5Y", interval: "1wk", gmtoffset: 0, liveAt: live,
+    bars: [{ t: stamp("2026-10-26T00:00:00Z"), c: 100 }, { t: live, c: 101 }] }
+  expect(coin.bars.map(bar => M.historyScrubText(coin, bar).split(" · ")[0])).toEqual(["WEEK OF 26 OCT", "WEEK OF 31 OCT"])
 })
 
 test("a failed answer is asked again five minutes on, whatever the hour", () => {

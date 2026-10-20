@@ -67,8 +67,10 @@ function parseHistory(json, range, centExchanges) {
     interval: interval,
     gmtoffset: meta.gmtoffset || 0,
     zoneName: meta.timezone || "",
-    // An intraday answer's days, each with its own clock (`barOffset`).
+    // An intraday answer's days, each with its own clock, and the live
+    // moment Yahoo appends, at the price's own second (`barOffset`).
     clocks: Quote.answerClocks(meta.tradingPeriods),
+    liveAt: Format.isFiniteNumber(meta.regularMarketTime) ? meta.regularMarketTime : null,
     bars: bars,
     baseline: baseline,
     firstTradeDate: Format.isFiniteNumber(meta.firstTradeDate) ? meta.firstTradeDate : null,
@@ -202,10 +204,12 @@ function historyFraction(history, t) {
 // day's midnight by that day's offset, which is an hour either side of the
 // answer's across a change of clocks: London's summer weeks at 23:00 UTC
 // the Sunday before, its winter ones at 00:00. Any other stamp, a day's bar
-// at its open or the live moment, keeps to its day by the answer's.
+// at its open or the live moment, keeps to its day by the answer's; the
+// live moment even at a whole hour, as a coin's at 23:00 UTC.
 function barOffset(history, t) {
   if (history.clocks && history.clocks.length) return Quote.clockAt(history, t).offset
   var offset = history.gmtoffset || 0
+  if (t === history.liveAt) return offset
   var shifts = [0, -3600, 3600]
   for (var i = 0; i < shifts.length; i++) {
     if ((t + offset + shifts[i]) % 86400 === 0) return offset + shifts[i]
