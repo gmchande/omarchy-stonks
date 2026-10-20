@@ -31,12 +31,14 @@ function clockSession(quote, t) {
 
 // The phase at time `t`, from the exchange's own periods and nothing else.
 // The chart endpoint carries no market state, and a missing series is not
-// evidence of a holiday, so a session the periods describe is trusted.
+// evidence of a holiday, so a session the periods describe is trusted. Its
+// day and hour are by the clock of `t`'s own period (`Quote.clockAt`): a
+// scrub of Friday's lunch on the Sunday the clocks went back is at noon.
 function sessionPhase(quote, t) {
   var s = clockSession(quote, t)
   if (quote.crypto) return "always"
   if (!s.regular) return "closed"
-  var local = Format.localClock(t, quote.gmtoffset)
+  var local = Format.localClock(t, Quote.clockAt(quote, t).offset)
   if (local.weekday === 0 || local.weekday === 6) return "weekend"
   if (s.pre && t >= s.pre.start && t < s.regular.start) return "pre"
   if (t >= s.regular.start && t < s.regular.end) {

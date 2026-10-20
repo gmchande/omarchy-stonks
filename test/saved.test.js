@@ -331,29 +331,35 @@ test("an exchange's time across a change of clocks reads by its own day's clock,
   // AEDT, and its periods keep each day's own. Found in QA: the 10:00 AEST
   // open of 21 September read 11:00 AEDT.
   const bhp = M.parseHistory(fixture("history/bhp-ax-1mo.json"), "1M")
-  // Ranges and closes fetched before 25 October (XETRA) and 1 November
-  // (Nasdaq, Chicago, OTC), each also as Yahoo sends it after.
+  // Ranges, a day, and closes fetched before 25 October (XETRA) and 1
+  // November (Nasdaq, Chicago, OTC), each also as Yahoo sends it after.
   const nest = fixture("history/nest-1mo.json")
   const sap = fixture("history/sap-de-5d.json")
   const vix = fixture("vix-day.json")
   const aitx = fixture("moments/power-user-2026-10-16/aitx.json")
+  const day = fixture("aapl.json")
   const sides = [[nest, sentAt(nest, -18000, "EST")], [sap, sentAt(sap, 3600, "CET")],
-    [vix, sentAt(vix, -21600, "CST")], [aitx, sentAt(aitx, -18000, "EST")]]
+    [vix, sentAt(vix, -21600, "CST")], [aitx, sentAt(aitx, -18000, "EST")], [day, sentAt(day, -18000, "EST")]]
   for (const reader of READERS) readAs(reader, () => {
     // New York's own clock is named only to the other readers.
     const edt = reader === "America/New_York" ? "" : " EDT"
     expect(M.freshnessText({ state: "aged", asOf: close }, aapl, calendars)).toBe("AS OF 16:00" + edt)
     expect(M.historyScrubText(bhp, bhp.bars[0])).toBe("21 SEP 10:00 AEST · 60.56")
     expect(M.historyScrubText(bhp, bhp.bars[bhp.bars.length - 2])).toBe("20 OCT 16:00 AEDT · 59.50")
-    for (const [n, s, v, a] of [sides.map(side => side[0]), sides.map(side => side[1])]) {
+    for (const [n, s, v, a, d] of [sides.map(side => side[0]), sides.map(side => side[1])]) {
       const month = M.parseHistory(n, "1M")
       const week = M.parseHistory(s, "1W")
       const chicago = M.parseChart(v)
       const otc = M.parseChart(a)
+      const nasdaq = M.parseChart(d)
       expect(M.historyScrubText(month, month.bars[0])).toBe("12 AUG 09:30" + edt + " · 233.17")
       expect(M.historyScrubText(week, week.bars[0])).toBe("14 OCT 09:00 CEST · 196.32")
       expect(M.freshnessText({ state: "aged", asOf: chicago.marketTime, earlier: true }, chicago, calendars)).toBe("AS OF TUE 09:35 CDT")
       expect(M.freshnessText({ state: "aged", asOf: otc.marketTime, earlier: true }, otc, calendars)).toBe("AS OF FRI 16:00" + edt)
+      // The day's lunch lull is New York's noon, whichever clock the
+      // answer was sent by.
+      const noon = nasdaq.session.regular.start + 2.5 * 3600
+      expect(M.marketStatus(nasdaq, nasdaq.session.post.end, noon, calendars)).toBe("At 12:00" + edt + " · Lunch lull")
     }
   })
 })

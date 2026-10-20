@@ -381,30 +381,30 @@ function answerPeriods(periods) {
 }
 
 // The clocks an answer's days kept: each trading period with its own UTC
-// offset and zone name, by start. `meta.gmtoffset` is only today's, so the
-// week after a change of clocks, a period before it still says its own
-// (Sydney's 10:00 AEST open of 21 September, in an answer sent in AEDT).
-// Both shapes Yahoo sends: a day answer's pre, regular, and post, each a
-// list of days, and a range's one list of days.
+// offset and zone name. `meta.gmtoffset` is the clock the answer was sent
+// by, so the week after a change of clocks a period before it still says
+// its own (Sydney's 10:00 AEST open of 21 September, in an answer sent in
+// AEDT). Both shapes Yahoo sends: a day answer's pre, regular, and post,
+// each a list of days, and a range's one list of days.
 function answerClocks(periods) {
   var lists = !periods ? [] : Array.isArray(periods) ? [periods] : [periods.pre, periods.regular, periods.post]
   var out = []
   lists.forEach(function(days) {
     (days || []).forEach(function(day) {
-      (day || []).forEach(function(p) { out.push({ start: p.start, offset: p.gmtoffset, zone: p.timezone || "" }) })
+      (day || []).forEach(function(p) { out.push({ start: p.start, end: p.end, offset: p.gmtoffset, zone: p.timezone || "" }) })
     })
   })
-  return out.sort(function(a, b) { return a.start - b.start })
+  return out
 }
 
-// The clock `answer`, a quote or a history, kept at `t`: its last period
-// begun by then, else its first; with none, the answer's own.
+// The clock `answer`, a quote or a history, kept at `t`: that of its
+// period holding `t`, its bell included; outside them, the answer's own.
 function clockAt(answer, t) {
   var clocks = answer.clocks || []
-  if (!clocks.length) return { offset: answer.gmtoffset || 0, zone: answer.zoneName || "" }
-  var clock = clocks[0]
-  for (var i = 1; i < clocks.length && clocks[i].start <= t; i++) clock = clocks[i]
-  return clock
+  for (var i = 0; i < clocks.length; i++) {
+    if (t >= clocks[i].start && t <= clocks[i].end) return clocks[i]
+  }
+  return { offset: answer.gmtoffset || 0, zone: answer.zoneName || "" }
 }
 
 // A price Yahoo sends as 0 is one it does not know yet: London's day high,
