@@ -127,6 +127,25 @@ ShellRoot {
         service.switchList(list.name)
         harness.check(harness.label(list), harness.label(harness.shown()) === harness.label(list), harness.label(harness.shown()))
       })
+      // A later version's keys, at the top and in a list, outlive this
+      // one's writes: after a downgrade, or on a machine sharing the file.
+      // Found in the 1.0.0 review: every write dropped them.
+      // The other machine's file is on US; once this one has read it, a
+      // switch back to World writes it.
+      var onFile = function() { saved.reload(); try { return JSON.parse(saved.text()) } catch (e) { return null } }
+      tryVerify(function() { var f = onFile(); return !!f && f.list === service.listName }, 5000)
+      var later = onFile()
+      later.alerts = [{ symbol: "AAPL", above: 400 }]
+      later.lists[1].pinned = true
+      later.list = "US"
+      saved.setText(JSON.stringify(later, null, 2) + "\n")
+      tryVerify(function() { return service.listName === "US" }, 3000)
+      service.switchList(made.list)
+      var kept = null
+      tryVerify(function() { kept = onFile(); return !!kept && kept.list === made.list }, 5000)
+      harness.check("a later version's keys stay through a write: one at the top, one in a list",
+        !!kept && kept.list === made.list && JSON.stringify(kept.alerts) === JSON.stringify(later.alerts) && kept.lists[1].pinned === true,
+        saved.text())
       harness.finish("DATA FILE LOADED")
     }
   }

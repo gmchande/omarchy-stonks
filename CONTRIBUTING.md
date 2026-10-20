@@ -128,7 +128,8 @@ building one that won't merge.
 - **Lists.** All holds every symbol, and named lists hold some of them. The
   data file at `~/.config/omarchy/grvc.stonks.json` keeps its version-1 keys,
   so an older build still reads All, and one that can't be read is never
-  written over.
+  written over. When Stonks writes the file, it keeps every key it doesn't
+  know, so a newer build's settings survive an older one.
 - **Mouse and keys.** Every flow works by mouse alone and by keys alone, and
   anything that looks clickable acts when clicked. A button says only what it
   does, and no word on screen names a key: the keys are on the `?` sheet.
