@@ -296,22 +296,58 @@ ShellRoot {
       harness.check("a failed answer once a newer version is known says nothing on the next open",
         failedLater === add, harness.asked() + " asks | " + failedLater)
 
-      // The update lands on disk as git writes it, the old file removed and
-      // a new one made, while the window stays open: its footer says the
-      // restart's notice at once, and a later answer naming a newer version
-      // says no note over it.
+      // A refused rename kept by a close comes back as the window opens, in
+      // Manage lists, over the rows and the footer: the next answer's note
+      // waits, unspent, for an open that shows the footer.
+      service.createList("Mine")
+      service.createList("Other")
       openWindow()
+      app.testBody.openManageLists()
+      var manage = harness.find(app.testBody, "manageLists")
+      var field = harness.find(manage, "renameField")
+      manage.startRenaming(1)
+      tryVerify(function() { return field.activeFocus }, 3000)
+      field.text = "Other"
+      closeWindow()
+      nextDay()
+      var heldNamed = answered(10)
+      openWindow()
+      var renamingBack = app.testBody.managingLists
+      app.testBody.closeListViews()
+      closeWindow()
+      var heldBack = visit()
+      service.deleteList("Mine")
+      service.deleteList("Other")
+      harness.check("a note due as Manage lists comes back over the footer waits for the next open that shows it",
+        heldNamed && renamingBack && heldBack === newer + " | ", renamingBack + " | " + heldBack)
+
+      // The update lands on disk as git writes it, the old file removed and
+      // a new one made, while the window stays open with the note held under
+      // the pointer: the restart's notice takes over at once, and a click
+      // restarts the shell. A later answer naming a newer version says no
+      // note over it.
+      nextDay()
+      var noteDay = answered(11)
+      openWindow()
+      var noteShown = footer() === newer
+      var bar = harness.find(app.testBody, "footer")
+      mouseMove(bar, bar.width / 2, bar.height / 2)
       var manifest = JSON.parse(harness.readFile(harness.manifestPath))
       manifest.version = "1.0.10"
       run(["bash", "-c", "rm -f \"$2\" && printf '%s' \"$1\" > \"$2\"", "--", JSON.stringify(manifest, null, 2) + "\n", harness.manifestPath])
       var restart = "Updated to 1.0.10 · click to restart the shell"
       var tookOver = within(3000, function() { return footer() === restart })
+      clickFooter()
+      var restarted = within(5000, function() {
+        return harness.readFile(harness.state + "/omarchy.calls") === harness.updateCall + "\nrestart shell\n"
+      })
       closeWindow()
       put("MANIFEST.version", "1.0.11")
       nextDay()
-      var afterDisk = answered(10) && visit()
-      harness.check("once the update is on disk, the open window's restart notice takes over, and no note says a newer one over it",
-        tookOver && afterDisk === restart + " | ", tookOver + " | " + afterDisk)
+      var afterDisk = answered(12) && visit()
+      harness.check("once the update is on disk, the open window's restart notice takes over a held note, a click restarts, and no note says a newer one over it",
+        noteDay && noteShown && tookOver && restarted && afterDisk === restart + " | ",
+        noteShown + " " + tookOver + " " + restarted + " | " + afterDisk + " | " + harness.readFile(harness.state + "/omarchy.calls"))
 
       harness.finish()
     }

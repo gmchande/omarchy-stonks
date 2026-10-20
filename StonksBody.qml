@@ -126,18 +126,21 @@ Item {
   // the lists change, or it is undone, the offer goes, and the note with it.
   property var offered: null
   onRemovalChanged: if (offered !== null && removal !== offered) clearNote()
-  // The note says a newer Stonks is out, said as a surface opens, once for
-  // each answer that names it (`Updates.releaseUnsaid`): a standing notice
-  // would take the add's place for days.
+  // The note says a newer Stonks is out, said as a surface opens with its
+  // footer in sight, once for each answer that names it
+  // (`Updates.releaseUnsaid`): a standing notice would take the add's place
+  // for days. An update reaching the disk meanwhile ends it: the restart's
+  // notice says what to do next.
   property bool updateOffered: false
   function offerRelease() {
-    if (!updates || !updates.releaseUnsaid) return
+    if (!updates || !updates.releaseUnsaid || showingHelp || adding || listViewOpen) return
     updates.sayRelease()
     offered = null
     updateOffered = true
     note = "Stonks " + updates.releasedVersion + " is out"
     holdNote()
   }
+  onUpdatedToChanged: if (updatedTo !== "" && updateOffered) clearNote()
 
   // What this surface shows of the service, held in one place: the surface
   // reads the service only while it is open. From a close until the next
@@ -892,8 +895,8 @@ Item {
     clearNote()
     footer.settle()
     hint = ""
-    offerRelease()
     resumeTyped()
+    offerRelease()
   }
 
   // A refusal stays a moment; an offer to undo or to update long enough to
