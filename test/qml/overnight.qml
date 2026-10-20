@@ -663,6 +663,16 @@ ShellRoot {
         body.featuredGeometry.start === harness.midnight.wed7
           && body.featured.changeText === nestRow.view.changeText && body.featured.changeText !== "+7.44%",
         body.featuredGeometry.start + " | " + body.featured.changeText + " vs " + nestRow.view.changeText)
+      // And from the open the info line shows, never from the first bar's
+      // close: found in the 1.0.0 review, the demo AAPL read "−0.26% open"
+      // beside OPEN 341.33 and a price of 342.79.
+      var openShown = harness.find(body, "periodLine").line.facts[0]
+      var openPrice = Number(openShown.value.replace(/,/g, ""))
+      var priceShown = Number(body.featured.priceText.replace(/,/g, ""))
+      var fromOpen = Format.pct((priceShown - openPrice) / openPrice * 100)
+      harness.check("since the open, the hero's change is the move from the OPEN the info line shows",
+        openShown.label === "OPEN" && openPrice > 0 && body.featured.changeText === fromOpen,
+        "OPEN " + openShown.value + ", price " + body.featured.priceText + ": " + body.featured.changeText + " vs " + fromOpen)
       keyClick(Qt.Key_C)
       within(2000, function() { return service.changeMode === "pct" })
       // An answer without its regular price and time: the hero falls back

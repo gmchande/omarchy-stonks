@@ -197,8 +197,8 @@ ShellRoot {
 
       // Loading: the pill's chart and eight spark requests carry the list.
       // Each day with a jump no chart has judged is judged on the chart
-      // after, from the budget's spare half. No row says "No data" for any
-      // wait of Stonks' own.
+      // after, from the budget's spare half, and so is each day whose open
+      // spark can't send. No row says "No data" for any wait of Stonks' own.
       var loadWarned = []
       var answered = 0
       var wallStart = Date.now()
@@ -225,10 +225,11 @@ ShellRoot {
           + " after " + (service.now - start) + " s")
       var charted = perSymbol(loadLines, "chart")
       var stray = service.quotes.STRAY
-      harness.check("a stray print in a spark day is judged on the chart and left out of the row's line; days with no jump are never charted",
+      harness.check("a stray print in a spark day is judged on the chart and left out of the row's line; a day with no jump is charted once, for its open",
         charted.STRAY === 1 && !!stray && stray.droppedTimes.length === 1
           && !stray.points.some(function(p) { return p.t === stray.droppedTimes[0] })
-          && !charted["SHOP.TO"] && !charted["BTC-USD"],
+          && charted["SHOP.TO"] === 1 && charted["BTC-USD"] === 1
+          && service.quotes["SHOP.TO"].dayOpen > 0,
         "STRAY charted " + charted.STRAY + ", dropped " + (stray ? stray.droppedTimes.length : "-") + "; SHOP.TO " + (charted["SHOP.TO"] || 0) + ", BTC-USD " + (charted["BTC-USD"] || 0)
           + "; runs with STRAY: " + harness.lines("runs.log").filter(function(r) { return /STRAY/.test(r) }).map(function(r) { return r.split(" ").filter(function(u) { return /STRAY/.test(u) }).map(function(u) { return u.split(":")[0] }).join("+") + "/" + r.split(" ").length }).join(" "))
 
@@ -248,6 +249,15 @@ ShellRoot {
           + "; first run " + (runs[0] || "").split(" ").map(function(u) { return u.split(":")[0] }).join(" "))
       harness.check("ten minutes of trading on a long list: no row or pill warns",
         steadyWarned === 0, steadyWarned + " of 120 steps warned")
+      // Spark sends no opens: each row's open, from its one chart, stays
+      // through every spark refresh since, so since the open it reads from
+      // the day's open, never from the first bar's close.
+      var opened = service.library.filter(function(s) { return service.quotes[s] && service.quotes[s].openSession !== null })
+      var openless = opened.filter(function(s) { return !(service.quotes[s].dayOpen > 0) })
+      var sparked = opened.filter(function(s) { return service.quotes[s].closesOnly })
+      harness.check("after ten minutes of spark refreshes, every opened row still has its day's open",
+        opened.length > 100 && sparked.length > 100 && openless.length === 0,
+        opened.length + " opened, " + sparked.length + " from spark, without an open: " + openless.slice(0, 5).join(","))
 
       // A glide from the top to the end of the list, and the wheel back up:
       // on every rendered frame each row in sight is drawn, its symbol, its

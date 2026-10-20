@@ -242,7 +242,7 @@ ShellRoot {
       timezoneName: "America/New_York", gmtoffset: -14400,
       instrumentType: "EQUITY", crypto: false,
       price: price, prevClose: price - 1, marketTime: service.now,
-      dayHigh: price + 1, dayLow: price - 1, volume: 100,
+      dayHigh: price + 1, dayLow: price - 1, dayOpen: price - 1, volume: 100,
       session: {
         pre: { start: service.now - 25200, end: service.now - 19800 },
         regular: { start: service.now - 19800, end: service.now - 300 },

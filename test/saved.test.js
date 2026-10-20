@@ -456,10 +456,11 @@ test("rowModel shows the regular close at rest and the print under the finger", 
   const close = { price: 325.13, priceText: "325.13", tone: "up", dayUp: true }
   expect(view(0, "pct")).toEqual({ ...close, changeText: "+2.61%" })
   expect(view(0, "abs")).toEqual({ ...close, changeText: "+8.28" })
-  expect(view(0, "open")).toEqual({ ...close, changeText: "+3.10%" })
+  // Since the open: from the OPEN the info line shows, 316.98.
+  expect(view(0, "open")).toEqual({ ...close, changeText: "+2.57%" })
   // The rows carry the mode's word inline; the hero's SINCE OPEN caption is
   // pointer.qml's. Percent and amount carry none.
-  expect(M.rowModel(quote, 0, "open")).toMatchObject({ changeLine: "+3.10% open", periodLabel: "SINCE OPEN" })
+  expect(M.rowModel(quote, 0, "open")).toMatchObject({ changeLine: "+2.57% open", periodLabel: "SINCE OPEN" })
   expect(M.rowModel(quote, 0, "abs")).toMatchObject({ changeLine: "+8.28", periodLabel: "" })
   // Scrubbing reads the print at that moment and holds it until the next;
   // the direction is the moment's too, so the bull and bear follow a scrub.
@@ -471,7 +472,7 @@ test("rowModel shows the regular close at rest and the print under the finger", 
   expect(view(quote.points[0].t - 60, "pct")).toEqual({ price: 316.85, priceText: "316.85", changeText: "0.00%", tone: "flat", dayUp: true })
   // Open mode can turn the change down while the day is still up.
   const flip = {
-    ...quote, prevClose: 100, price: 105, marketTime: reg.end - 30,
+    ...quote, prevClose: 100, price: 105, marketTime: reg.end - 30, dayOpen: 110,
     points: [{ t: reg.start + 60, p: 110 }, { t: reg.end - 60, p: 105 }]
   }
   expect(view(0, "open", flip)).toMatchObject({ price: 105, tone: "down", dayUp: true })
