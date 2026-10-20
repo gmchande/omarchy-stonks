@@ -21,17 +21,20 @@ Item {
   readonly property var toplevel: app.opened ? Hyprland.toplevels.values.find(root.isWindow) || null : null
   // Hyprland has it on a workspace other than the focused one.
   readonly property bool elsewhere: !!toplevel && !!toplevel.workspace && toplevel.workspace !== Hyprland.focusedWorkspace
-  // A screen shows it: a monitor's active workspace is the window's, or the
-  // special workspace over it is. Until Hyprland lists it, and with no
-  // screens to ask, as in a harness, it counts as shown. Out of sight it is
-  // open as it was left, and the service asks for what a closed surface
-  // asks, so a window left on another workspace costs nothing a closed one
-  // doesn't.
+  // A screen shows it: a monitor that is on (as `screensOff` reads it) has
+  // the window's workspace active, or the special workspace over it. Until
+  // Hyprland lists it, and with no screens to ask, as in a harness, it
+  // counts as shown. Out of sight it is open as it was left, and the
+  // service asks for what a closed surface asks, so a window left on
+  // another workspace, or on a screen switched off, costs nothing a closed
+  // one doesn't.
   readonly property bool onScreen: {
     var workspace = toplevel ? toplevel.workspace : null
     if (!workspace || root.monitors.length === 0) return true
     return root.monitors.some(function(m) {
-      var special = m.lastIpcObject ? m.lastIpcObject.specialWorkspace : null
+      var answer = m.lastIpcObject
+      if (answer && answer.dpmsStatus === false) return false
+      var special = answer ? answer.specialWorkspace : null
       return m.activeWorkspace === workspace || (!!special && special.id !== 0 && special.id === workspace.id)
     })
   }
@@ -70,10 +73,16 @@ Item {
   // Hyprland's screens. Every one off (DPMS) as Hyprland last answered
   // holds the service's quote runs. `askScreens` asks afresh, before each
   // run; each screen's answer says so (`screensAnswered`). With no screens
-  // to ask, it asks nothing and says so. While every screen is off, any
-  // word from Hyprland asks again, so a run waits no longer than it must.
+  // to ask, it asks nothing and says so. While every screen is off, or the
+  // window is open with one off, any word from Hyprland asks again, so a
+  // run waits no longer than it must and a screen back on shows the window
+  // at once; so does a special workspace shown or hidden, which is in the
+  // screens' answer alone.
   readonly property var monitors: Hyprland.monitors.values
   readonly property bool screensOff: monitors.length > 0 && monitors.every(function(m) {
+    return !!m.lastIpcObject && m.lastIpcObject.dpmsStatus === false
+  })
+  readonly property bool screenOff: monitors.some(function(m) {
     return !!m.lastIpcObject && m.lastIpcObject.dpmsStatus === false
   })
   signal screensAnswered()
@@ -92,14 +101,10 @@ Item {
   }
   Connections {
     target: Hyprland
-    enabled: root.screensOff
-    function onRawEvent() { Hyprland.refreshMonitors() }
-  }
-  // A special workspace shown or hidden is in the monitors' answer alone.
-  Connections {
-    target: Hyprland
-    enabled: root.opened && root.monitors.length > 0
-    function onRawEvent(event) { if (event.name === "activespecial") Hyprland.refreshMonitors() }
+    enabled: root.screensOff || (root.opened && root.monitors.length > 0)
+    function onRawEvent(event) {
+      if (root.screensOff || root.screenOff || event.name === "activespecial") Hyprland.refreshMonitors()
+    }
   }
 
   App {

@@ -187,6 +187,13 @@ ShellRoot {
       })
     }
   }
+  // A second screen, always on, showing the other workspace.
+  QtObject {
+    id: otherScreen
+    property var lastIpcObject: ({ dpmsStatus: true })
+    property var activeWorkspace: workspaceThere
+    function refresh() { Qt.callLater(function() { otherScreen.lastIpcObject = { dpmsStatus: true } }) }
+  }
 
   // The service's writes of the data file, each as it is saved.
   readonly property string dataPath: Quickshell.env("HOME") + "/.config/omarchy/grvc.stonks.json"
@@ -692,6 +699,25 @@ ShellRoot {
       })
       harness.check("back in sight, what fell due goes at once: the crypto, and Robinhood's prints", caughtUp,
         harness.requests().slice(backFrom).join(", "))
+      settle()
+
+      // 00:35, two screens: the window's switched off, the other on and
+      // showing another workspace. No screen shows the window, so it asks
+      // what a closed one asks, though not every screen is off.
+      plugin.windowHost.monitors = [screenStandIn, otherScreen]
+      var dark = countsOver("00:35, the window's screen off and the other on: the pill's symbol, Tokyo every minute, nothing else",
+        900, counts([1, 0, 0, 0, 0, 0, 15, 0]), function() {
+          screenStandIn.on = false
+          screenStandIn.refresh()
+          screensHeard()
+          startAt(at(harness.wed7 + 86400, 0, 35))()
+          answerScreens()
+        }, answerScreens)
+      harness.check("its screen off, the window asks nothing of Robinhood", dark.every(function(l) { return !/^(overnight|instruments) /.test(l) }),
+        dark.filter(function(l) { return /^(overnight|instruments) /.test(l) }).join(", "))
+      screenStandIn.on = true
+      screenStandIn.refresh()
+      screensHeard()
       settle()
       closeWindow()
       hyprlandStandIn.toplevels = { values: [] }
