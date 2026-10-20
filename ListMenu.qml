@@ -431,6 +431,8 @@ FocusScope {
         anchors.bottom: parent.bottom
         visible: root.naming
         verticalPadding: 0
+        // The typed name starts where "New list…" and the lists' names do.
+        leftPadding: Style.space(24)
         foreground: root.foreground
         font.family: root.fontFamily
         font.pixelSize: Style.font.bodySmall
