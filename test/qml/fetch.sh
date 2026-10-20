@@ -4,9 +4,11 @@
 # market's cadence, with nothing open and with the window open, for a busy
 # stock, a thin one, an ETF, an index, a cryptocurrency, London, Tokyo at
 # lunch, and Toronto; an offline start on saved quotes and the network's
-# return; an open that finds the rows fresh; r twice; Yahoo refusing and
-# recovering; a network back within seconds; a list of 50 every minute; the
-# pill's wheel; an add, a removal and its undo; a search's preview; and, in a
+# return; an open that finds the rows fresh; five rows featured and the
+# list still in one run a minute; r twice; Yahoo refusing and recovering; a
+# network back within seconds; a list of 50 every minute; a range left open
+# asked again; the pill's wheel; an add, a removal and its undo; a search's
+# preview; the window left on a workspace no screen shows; and, in a
 # second run, a US holiday while London and Toronto trade. HOME and curl are
 # scratch; the fake curl answers from test/fixtures/moments/fetch-2026-10-07
 # and listings-2026-10-07-1455.

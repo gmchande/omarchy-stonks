@@ -258,8 +258,16 @@ The shell's log the form asks for can name the prices Stonks left out.
   bar entry in `~/.config/omarchy/shell.json`.
 - **Limits:** every request has a time limit and a size cap. Quotes come
   up to 20 listings to a request, so a long list refreshes in a few
-  requests a minute. Stonks fetches each listing only as often as its
-  market can move, and leaves a site that refuses it alone for a while.
+  requests a minute, and overnight prices up to 75. Stonks fetches each
+  listing only as often as its market can move, and leaves a site that
+  refuses it alone for a while. A window no screen shows, on another
+  workspace or a screen switched off, fetches only what a closed one does.
+- **Robinhood:** Stonks asks whether your US stocks and ETFs trade
+  overnight, and for their overnight prices, both at once: for the stock on
+  the pill once each time the shell starts, as its first price comes in; for
+  the rest when the popup or window first opens, and for each one you add;
+  and, while one is open, when you press `r` and every 5 minutes through a
+  night that trades.
 - **Updates:** never by itself.
 
 Every request runs through the one curl command in [`Fetch.js`](Fetch.js),

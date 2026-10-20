@@ -123,8 +123,11 @@ building one that won't merge.
   named moments, such as "Power hour". Each says something true and none
   cheers a number. They are part of the product, so a cleanup keeps them.
 - **Fetching.** Stonks fetches each listing only as often as its market can
-  move, fetches nothing while every screen is off, and leaves a site that
-  refuses it alone for a while.
+  move, and treats a window no screen shows as closed. It asks Robinhood its
+  two questions about a stock, whether it trades all day and its overnight
+  prices, at the same time, never one after the other. It fetches nothing
+  while every screen is off, and leaves a site that refuses it alone for a
+  while.
 - **Lists.** All holds every symbol, and named lists hold some of them. The
   data file at `~/.config/omarchy/grvc.stonks.json` keeps its version-1 keys,
   so an older build still reads All, and one that can't be read is never
