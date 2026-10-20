@@ -458,14 +458,15 @@ Item {
     }
   }
   // The preview's quote, fetched once when the choice rests on a symbol
-  // outside All, and never refreshed: not on the timer, not by `r`.
+  // outside All, and never refreshed: not on the timer, not by `r`; held
+  // while its surface is out of sight (`previewShown`).
   QuoteFeed {
     id: previewFeed
     symbols: root.previewRests && root.previewSymbol !== "" && root.library.indexOf(root.previewSymbol) < 0
       ? [root.previewSymbol] : []
     now: root.now
     clock: root
-    clearance: function() { return root.screensClear() }
+    clearance: function() { return root.previewShown && root.screensClear() }
     gate: yahooGate
     centExchanges: root.centExchanges
     bulk: false
@@ -689,8 +690,13 @@ Item {
     onTriggered: {
       root.previewRests = true
       root.showHistory(false)
-      root.fetchFundamentals(root.previewSymbol)
     }
+  }
+  // A resting preview on a surface a screen shows asks for what it holds
+  // back while it is not: its quote, and its cap and P/E.
+  onPreviewShownChanged: if (previewShown) {
+    previewFeed.pump()
+    fetchFundamentals(previewSymbol)
   }
 
   // A surface says when it opens and closes, and as it goes. The clock
