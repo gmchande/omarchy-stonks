@@ -381,28 +381,33 @@ function answerPeriods(periods) {
 }
 
 // The clocks an answer's days kept: each trading period with its own UTC
-// offset and zone name. `meta.gmtoffset` is the clock the answer was sent
-// by, so the week after a change of clocks a period before it still says
-// its own (Sydney's 10:00 AEST open of 21 September, in an answer sent in
-// AEDT). Both shapes Yahoo sends: a day answer's pre, regular, and post,
+// offset and zone name, from its start to its day's midnight, so a close
+// stamped past the period's end reads its day's too (IAG.MC's at 17:35:26,
+// its periods ended at 17:30). `meta.gmtoffset` is the clock the answer was
+// sent by, so the week after a change of clocks a period before it still
+// says its own (Sydney's 10:00 AEST open of 21 September, in an answer sent
+// in AEDT). Both shapes Yahoo sends: a day answer's pre, regular, and post,
 // each a list of days, and a range's one list of days.
 function answerClocks(periods) {
   var lists = !periods ? [] : Array.isArray(periods) ? [periods] : [periods.pre, periods.regular, periods.post]
   var out = []
   lists.forEach(function(days) {
     (days || []).forEach(function(day) {
-      (day || []).forEach(function(p) { out.push({ start: p.start, end: p.end, offset: p.gmtoffset, zone: p.timezone || "" }) })
+      (day || []).forEach(function(p) {
+        var midnight = (Math.floor((p.start + p.gmtoffset) / 86400) + 1) * 86400 - p.gmtoffset
+        out.push({ start: p.start, until: midnight, offset: p.gmtoffset, zone: p.timezone || "" })
+      })
     })
   })
   return out
 }
 
 // The clock `answer`, a quote or a history, kept at `t`: that of its
-// period holding `t`, its bell included; outside them, the answer's own.
+// period's day holding `t`; outside them, the answer's own.
 function clockAt(answer, t) {
   var clocks = answer.clocks || []
   for (var i = 0; i < clocks.length; i++) {
-    if (t >= clocks[i].start && t <= clocks[i].end) return clocks[i]
+    if (t >= clocks[i].start && t < clocks[i].until) return clocks[i]
   }
   return { offset: answer.gmtoffset || 0, zone: answer.zoneName || "" }
 }
