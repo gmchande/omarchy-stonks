@@ -394,6 +394,9 @@ ShellRoot {
         900, counts([15, 15, 15, 15, 0, 15, 0, 15]), startAt(at(harness.wed7, 11, 0)))
       // F2 and F4: an open finds the rows fresh; it asks only for what is
       // stale, in one run, and shows no warning and no "As of" on any frame.
+      // It opens past the minute's run, when no row falls due for most of a
+      // minute: an ask takes with it what falls due within half a minute.
+      tick(20)
       var shownMarks = []
       var watchFrames = function() { marks().forEach(function(m) { if (shownMarks.indexOf(m) < 0) shownMarks.push(m) }) }
       frames.each = watchFrames
@@ -415,6 +418,21 @@ ShellRoot {
       // window ends: its last minute's request does not go.
       countsOver("11:15, the window open: every listing trading every minute, London until its close; Tokyo, closed, every 15",
         900, counts([15, 15, 15, 15, 15, 14, 1, 15]), startAt(service.now + 5))
+
+      // Five rows featured a few seconds apart: each new hero's chart is
+      // asked at once, at a second of its own, and the next run takes each
+      // with it, so the list goes on refreshing in one run a minute. Each
+      // used to keep its own second, five or six runs a minute.
+      ;["KILN", "SPY", "^GSPC", "SHOP.TO", "NEST"].forEach(function(s) {
+        service.feature(s)
+        tick(3, 1)
+      })
+      tick(60)
+      var featuredFrom = harness.runs().length
+      tick(300)
+      var featuredRuns = harness.runs().slice(featuredFrom)
+      harness.check("five rows featured a few seconds apart: the list still refreshes in one run a minute",
+        featuredRuns.length <= 6, featuredRuns.length + " runs in 5 minutes: " + featuredRuns.join(" / "))
 
       // F7: r twice within 5 s sends one run.
       tick(20)

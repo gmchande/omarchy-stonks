@@ -226,6 +226,10 @@ Item {
   // What is watched (`watched`), and of it what is due: a symbol whose last
   // answer, ok or failed, is as old as its own market's cadence
   // (`Market.quoteCadence`), the hero of an open surface on the interval.
+  // Whatever is asked takes with it each one due within `dueSoon`, so a
+  // symbol answered at a second of its own (featured, added, or retried)
+  // joins the run at the next one, and the list stays one run: two seconds
+  // of a minute are never more than half a minute apart one way.
   // First answers are the feed's own. Looked at as the clock reaches the
   // next one due (`dueAt`) and each minute, as answers land, as a surface
   // opens, as the featured symbol or a resting preview changes, and as the
@@ -234,6 +238,7 @@ Item {
   // (`screensClear`).
   property int dueAt: 0
   property int askedMinute: -1
+  readonly property int dueSoon: 30
   function askDue() {
     if (!root.pluginsReady) return
     var now = root.wallSecond()
@@ -244,16 +249,18 @@ Item {
       return open || s === featured || Market.staysWarm(feed.quotes[s], now, root.calendars)
     })
     if (watched.join(",") !== root.watched.join(",")) root.watched = watched
-    var due = []
-    var next = 0
+    var at = {}
     watched.forEach(function(s) {
       var entry = feed.entries[s]
       if (!entry || entry.status === "saved" || s in feed.asked) return
       var hero = open && (s === featured || (root.previewRests && s === root.previewSymbol))
-      var at = entry.answeredAt + Market.quoteCadence(feed.quotes[s], now, root.refreshIntervalSec, hero, root.calendars)
-      if (at <= now) due.push(s)
-      else if (next === 0 || at < next) next = at
+      at[s] = entry.answeredAt + Market.quoteCadence(feed.quotes[s], now, root.refreshIntervalSec, hero, root.calendars)
     })
+    var symbols = Object.keys(at)
+    var asking = symbols.some(function(s) { return at[s] <= now })
+    var due = symbols.filter(function(s) { return at[s] <= (asking ? now + root.dueSoon : now) })
+    var next = 0
+    symbols.forEach(function(s) { if (due.indexOf(s) < 0 && (next === 0 || at[s] < next)) next = at[s] })
     root.dueAt = next
     if (due.length > 0) feed.ask(due, now)
   }
