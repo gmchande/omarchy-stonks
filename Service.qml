@@ -52,6 +52,9 @@ Item {
   // The choice has rested on it: only then are its quote, its range's
   // history, and its cap and P/E asked for.
   property bool previewRests: false
+  // It rests on a surface a screen shows: only then is it a hero, its quote
+  // on the chart and on the interval, its range's history kept fresh.
+  readonly property bool previewShown: previewRests && openSurfaces.indexOf(previewSurface) >= 0
   // The symbols whose quotes are kept fresh now: the featured symbol, which
   // the pill shows; every stock, ETF, and index in All through its own
   // regular session, so an open finds the rows fresh (`Market.staysWarm`);
@@ -253,7 +256,7 @@ Item {
     watched.forEach(function(s) {
       var entry = feed.entries[s]
       if (!entry || entry.status === "saved" || s in feed.asked) return
-      var hero = open && (s === featured || (root.previewRests && s === root.previewSymbol))
+      var hero = open && (s === featured || (root.previewShown && s === root.previewSymbol))
       at[s] = entry.answeredAt + Market.quoteCadence(feed.quotes[s], now, root.refreshIntervalSec, hero, root.calendars)
     })
     var symbols = Object.keys(at)
@@ -422,7 +425,7 @@ Item {
     watched: root.watched
     lead: root.view.featured
     // A member previewed shows on the hero too, from this feed.
-    heroes: [root.view.featured].concat(root.previewRests && root.library.indexOf(root.previewSymbol) >= 0 ? [root.previewSymbol] : [])
+    heroes: [root.view.featured].concat(root.previewShown && root.library.indexOf(root.previewSymbol) >= 0 ? [root.previewSymbol] : [])
     now: root.now
     clock: root
     clearance: function() { return root.screensClear() }
@@ -578,7 +581,7 @@ Item {
     var charts = root.handedOver ? [root.handedOver.symbol] : []
     if (root.previewSymbol === "" || root.openSurfaces.some(function(s) { return s !== root.previewSurface }))
       if (charts.indexOf(root.view.featured) < 0) charts.push(root.view.featured)
-    if (root.previewSymbol !== "" && root.previewRests && charts.indexOf(root.previewSymbol) < 0)
+    if (root.previewSymbol !== "" && root.previewShown && charts.indexOf(root.previewSymbol) < 0)
       charts.push(root.previewSymbol)
     return charts.filter(function(s) { return s !== "" })
   }
