@@ -25,6 +25,8 @@
 #                exists, with its previous close above its price, down
 #   SHOP.TO      answers its saved Toronto day, so a search result can be in All
 #   SPY, BTC-USD answer their saved days: an ETF and a cryptocurrency
+#   NOCUR        answers the saved FTSE 100 day with no currency, as Yahoo
+#                answered ^STOXX50E
 #   HISTSTRAY    answers saved intraday MSFT data through the history path
 #   HUGE         answers AAPL's day padded past 64 KB, over the day's cap
 #   GONE         answers 404, a symbol Yahoo does not know
@@ -309,6 +311,7 @@ serve() {
     SHOP.TO) cat "$fixtures/shop-to.json" ;;
     SPY) cat "$fixtures/spy-2026-09-11-day-prepost.json" ;;
     BTC-USD) cat "$fixtures/btc-usd-day.json" ;;
+    NOCUR) stamp < "$fixtures/ftse-day.json" | jq -c '.chart.result[0].meta.currency = null' ;;
     HUGE) answer; head -c 70000 /dev/zero | tr '\0' ' ' ;;
     GONE) exit 44 ;;
     LONG*) stamp < "$fixtures/moments/listings-2026-10-07-1455/nest.json" ;;

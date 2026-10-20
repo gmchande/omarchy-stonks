@@ -785,6 +785,28 @@ ShellRoot {
       service.setOrder(orderBefore)
       wait(50)
 
+      // A listing Yahoo answers with no currency says its exchange alone on
+      // the hero's line, and one it names keeps its code: NOCUR answers the
+      // FTSE 100's day with none, as Yahoo answered ^STOXX50E. Found in the
+      // 1.0.0 review: ^STOXX50E read "ZURICH · USD".
+      // On the day, whose chart is in the quote, so the hero turns to it as
+      // its price lands.
+      service.setRange("1D")
+      var hero = harness.find(body, "hero")
+      var listingSaid = function(symbol) {
+        tryVerify(function() { return !!hero.quote && hero.quote.symbol === symbol }, 5000)
+        wait(50)
+        return harness.find(hero, "listingMeta").text
+      }
+      body.search.picked("NOCUR")
+      var noneNamed = listingSaid("NOCUR")
+      service.feature("AAPL")
+      var named = listingSaid("AAPL")
+      harness.check("a listing Yahoo names no currency for says its exchange alone, never USD; one it names keeps its code",
+        noneNamed === " · FTSE INDEX" && named === " · NASDAQ · USD", noneNamed + " | " + named)
+      service.removeSymbol("NOCUR")
+      wait(50)
+
       sixRows(body, "MSFT", "1Y")
 
       addsFromSearch(body, watchlist, keys)

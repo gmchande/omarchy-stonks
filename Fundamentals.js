@@ -120,9 +120,9 @@ function peText(value) {
 // a mark it reads as. A day only takes the tone while its end is the one
 // shown. The cap and the P/E move with the headline price from their own
 // date's close; a cap more than CAP_MAX_AGE_DAYS whole days older than the
-// price is left out. The cap names its currency, always, so one in yen never
-// reads as one in dollars beside it, whatever the reader's own; a London cap
-// is in GBP while its prices are in GBp.
+// price is left out. The cap names its currency wherever Yahoo does, so one
+// in yen never reads as one in dollars beside it, whatever the reader's own;
+// a London cap is in GBP while its prices are in GBp.
 // Only an equity has cap and P/E slots, kept whether known or not, so the
 // line keeps its shape: the cap's as wide as its currency and 999.9B before
 // the cap comes; the P/E's as wide as 99.9.
@@ -153,8 +153,9 @@ function yearLine(quote, figures, range, stats) {
     var cap = figures ? figures.cap : null
     var pe = figures ? figures.pe : null
     // A currency code is three letters, the listing's in capitals until the
-    // cap's own is known.
-    var code = (cap ? cap.currency : String(q.currency || "").toUpperCase()) + " "
+    // cap's own is known; with none named, the cap says none.
+    var named = cap ? cap.currency : String(q.currency || "").toUpperCase()
+    var code = named ? named + " " : ""
     facts.push({
       label: "MKT CAP",
       value: head && cap && Math.floor((head.t - dateEpoch(cap.date)) / (24 * 60 * 60)) <= CAP_MAX_AGE_DAYS
