@@ -65,8 +65,12 @@ Item {
     return freshness && freshness.state === "failed" ? "! NO DATA FOR THIS SYMBOL"
       : freshness && freshness.state === "overdue" ? "! NO DATA" : ""
   }
-  readonly property string listingFullMeta: view && quote ? " · " + Figures.listingMeta(quote) : ""
-  readonly property string listingFull: listingLead + listingFullMeta
+  // The exchange and currency stay whole; the lead, the name last, gives
+  // way to them. A name cut short no longer says the currency it ends with.
+  readonly property string listingMeta: view && quote
+    ? " · " + Figures.listingMeta(quote, listingMetrics.advanceWidth(listingLead + " · " + Figures.listingMeta(quote, false)) > listingRoom)
+    : ""
+  readonly property real listingRoom: Math.max(0, listingRow.width - symbolText.implicitWidth - Style.space(8))
   readonly property string changeCaption: view && view.periodLabel ? view.periodLabel
     : (extended !== null ? "AT CLOSE" : "")
 
@@ -135,7 +139,6 @@ Item {
   Row {
     id: listingRow
     width: parent.width
-    spacing: Style.space(8)
     Text {
       id: symbolText
       objectName: "heroSymbol"
@@ -149,16 +152,26 @@ Item {
     Text {
       id: listingText
       objectName: "listingLine"
-      width: Math.max(0, parent.width - symbolText.implicitWidth - parent.spacing)
+      leftPadding: Style.space(8)
+      width: Math.min(implicitWidth, leftPadding + Math.max(0, root.listingRoom - metaText.implicitWidth))
       anchors.baseline: symbolText.baseline
       textFormat: Text.PlainText
-      text: listingMetrics.advanceWidth(root.listingFull) <= width ? root.listingFull : root.listingLead
+      text: root.listingLead
       color: Figures.freshnessWarns(root.freshness) ? root.foreground : root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
       font.bold: true
       font.letterSpacing: 1
       elide: Text.ElideRight
+    }
+    Text {
+      id: metaText
+      objectName: "listingMeta"
+      anchors.baseline: symbolText.baseline
+      textFormat: Text.PlainText
+      text: root.listingMeta
+      color: listingText.color
+      font: listingText.font
     }
 
     FontMetrics { id: listingMetrics; font: listingText.font }

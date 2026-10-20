@@ -5,6 +5,7 @@ import Quickshell
 import qs.Commons
 import qs.Commons as Commons
 import "History.js" as History
+import "KeyText.js" as KeyText
 // Tiled app window. Owns window lifecycle, keys, and look; the body reads
 // the service and owns the list, search, scrub, and help.
 Item {
@@ -110,6 +111,8 @@ Item {
       Keys.onPressed: function(event) {
         var body = root.body
         if (body.ownsKeys) return
+        // A letter by its key and Shift: Caps Lock sends "O" for o.
+        var t = KeyText.typed(event)
         if (event.key === Qt.Key_Escape) {
           if (body.showingHelp) body.showingHelp = false
           else if (!body.endScrub()) root.close()
@@ -126,26 +129,30 @@ Item {
         } else if (event.key === Qt.Key_Backspace || event.key === Qt.Key_Delete) {
           body.removeRow(body.watchlist.cursorRow)
           event.accepted = true
-        } else if (event.text === "?") { body.toggleHelp(); event.accepted = true }
-        else if (event.text === "a" || event.text === "+") { body.startAdding(); event.accepted = true }
-        else if (event.text === "x") { body.removeRow(body.watchlist.cursorRow); event.accepted = true }
-        else if (event.text === "c") { body.cycleChangeMode(); event.accepted = true }
-        else if (event.text === "r") { root.refresh(); event.accepted = true }
-        else if (event.text === "[") { body.stepRange(-1); event.accepted = true }
-        else if (event.text === "]") { body.stepRange(1); event.accepted = true }
-        else if (event.key === Qt.Key_P && event.modifiers === Qt.NoModifier) { body.replay(); event.accepted = true }
-        else if (event.text === "s") { body.toggleStyle(); event.accepted = true }
-        else if (event.text === "o") { body.cycleOrder(); event.accepted = true }
-        else if (event.text === "O") { body.reverseOrder(); event.accepted = true }
-        else if (event.text === "w") { body.openListMenu(); event.accepted = true }
-        else if (event.text === "W") { body.openManageLists(); event.accepted = true }
-        else if (event.text === "m") { body.openSymbolLists(body.watchlist.cursorRow); event.accepted = true }
-        else if (event.text === "u") { body.undoRemoval(); event.accepted = true }
-        else if (event.text === ",") { body.stepList(-1); event.accepted = true }
-        else if (event.text === ".") { body.stepList(1); event.accepted = true }
-        else if (event.modifiers === Qt.ShiftModifier && event.key === Qt.Key_J) { body.moveSelected(1); event.accepted = true }
-        else if (event.modifiers === Qt.ShiftModifier && event.key === Qt.Key_K) { body.moveSelected(-1); event.accepted = true }
-        else if (event.text >= "1" && event.text <= "9") { body.featureAt(Number(event.text) - 1); event.accepted = true }
+        } else {
+          if (t === "?") body.toggleHelp()
+          else if (t === "a" || t === "+") body.startAdding()
+          else if (t === "x") body.removeRow(body.watchlist.cursorRow)
+          else if (t === "c") body.cycleChangeMode()
+          else if (t === "r") root.refresh()
+          else if (t === "[") body.stepRange(-1)
+          else if (t === "]") body.stepRange(1)
+          else if (t === "p") body.replay()
+          else if (t === "s") body.toggleStyle()
+          else if (t === "o") body.cycleOrder()
+          else if (t === "O") body.reverseOrder()
+          else if (t === "w") body.openListMenu()
+          else if (t === "W") body.openManageLists()
+          else if (t === "m") body.openSymbolLists(body.watchlist.cursorRow)
+          else if (t === "u") body.undoRemoval()
+          else if (t === ",") body.stepList(-1)
+          else if (t === ".") body.stepList(1)
+          else if (t === "J") body.moveSelected(1)
+          else if (t === "K") body.moveSelected(-1)
+          else if (t >= "1" && t <= "9") body.featureAt(Number(t) - 1)
+          else return
+          event.accepted = true
+        }
       }
 
       // A tiled window can be very wide; past the width the layout is drawn

@@ -168,7 +168,7 @@ ShellRoot {
         var cursor = watchlist.cursorSymbol
         var scrolled = watchlist.contentY
         keys.forceActiveFocus()
-        keyClick("W")
+        keyClick("W", Qt.ShiftModifier)
         wait(50)
         keyClick(Qt.Key_Return)
         wait(50)

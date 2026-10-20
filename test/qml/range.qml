@@ -1073,6 +1073,31 @@ ShellRoot {
         warningTips.slice(0, 3).join(" | ") === 'text "NO DATA FOR THIS SYMBOL" | sparkline "NO DATA FOR THIS SYMBOL" | arrow "NO DATA FOR THIS SYMBOL"'
           && /^icon "FAIL .* · NO DATA FOR THIS SYMBOL"$/.test(warningTips[3]),
         warningTips.join(" | "))
+      // The icon form, on the top bar and a side bar, and the side bar's
+      // stacked form show the "!" too, the stacked one naming its symbol.
+      // Found in the 1.0.0 review: they looked healthy, the stacked form
+      // saying "ST …" as if still loading.
+      var formsWarn = function() {
+        var settingsWas = pill.settings
+        var said = []
+        ;[false, true].forEach(function(vertical) {
+          barApi.vertical = vertical
+          barApi.barSize = vertical ? Style.bar.sizeVertical : 0
+          pill.settings = Object.assign({}, settingsWas, vertical ? { barStyleVertical: "icon" } : { barStyle: "icon" })
+          var markWarning = harness.find(pill, "pillMarkWarning")
+          said.push((vertical ? "side icon " : "icon ") + (!!markWarning && markWarning.visible && markWarning.text === "!"))
+        })
+        pill.settings = Object.assign({}, settingsWas, { barStyleVertical: "stacked" })
+        said.push("stacked " + harness.find(pill, "pillStack").children.filter(function(c) { return c.objectName === "pillStackLine" })
+          .map(function(l) { return l.text }).join("/"))
+        barApi.vertical = false
+        barApi.barSize = 0
+        pill.settings = settingsWas
+        return said.join(", ")
+      }
+      var failedForms = formsWarn()
+      harness.check("after a failed first fetch the icon form, on either bar, and the stacked form show the \"!\", the stacked one naming its symbol",
+        failedForms === "icon true, side icon true, stacked FAIL/!", failedForms)
       // The window says the same where it says it: the header "No data",
       // the hero's line "! NO DATA FOR THIS SYMBOL", as the row says it.
       // Found in the design pass of 14 October: "NO QUOTE", "! REFRESH

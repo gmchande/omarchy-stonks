@@ -128,6 +128,25 @@ ShellRoot {
       }).join(",")
     }
 
+    // The rows' words that show beside the open list menu on `body`: a
+    // symbol or name on the menu's band that ends past its right edge.
+    function wordsPastMenu(body) {
+      var menu = harness.find(body, "listMenu")
+      var edge = menu.mapToItem(body, menu.width, menu.height)
+      var past = []
+      body.watchlist.displayedSymbols.forEach(function(symbol) {
+        var row = body.watchlist.rowItem(symbol)
+        ;["rowSymbol", "rowDetail"].forEach(function(name) {
+          var words = row ? harness.find(row, name) : null
+          if (!words || !words.visible || words.text === "") return
+          var top = words.mapToItem(body, 0, 0)
+          var end = words.mapToItem(body, Math.min(words.width, words.contentWidth), 0)
+          if (top.y < edge.y && end.x > edge.x) past.push(symbol + " " + JSON.stringify(words.text))
+        })
+      })
+      return past
+    }
+
     function test_list_flows() {
       tryVerify(function() {
         return service.quotes.AAPL && service.quotes.MSFT && service.quotes.NVDA
@@ -147,6 +166,34 @@ ShellRoot {
       var watchlist = body.watchlist
       var keys = app.testKeyCatcher
       keys.forceActiveFocus()
+
+      // No piece of a row's words shows past the open list menu's edge,
+      // opened by key or by click. Found in the 1.0.0 review: the "t" of
+      // SPY's long name showed beside the menu, and in the window whole
+      // tails of names.
+      var plainQuotes = service.testFeed.quotes
+      var longNamed = Object.assign({}, plainQuotes)
+      longNamed.AAPL = Object.assign({}, plainQuotes.AAPL, { name: "State Street SPDR S&P 500 ETF Trust, a name as long as the window's row" })
+      service.testFeed.quotes = longNamed
+      wait(50)
+      var shutPast = wordsPastMenu(body)
+      keyClick(Qt.Key_W)
+      wait(50)
+      var keyPast = body.listMenuOpen ? wordsPastMenu(body) : ["the menu is shut"]
+      keyClick(Qt.Key_Escape)
+      wait(50)
+      var listControlAt = center(harness.find(body, "listControl"))
+      mouseClick(body, listControlAt.x, listControlAt.y)
+      wait(100)
+      var clickPast = body.listMenuOpen ? wordsPastMenu(body) : ["the menu is shut"]
+      mouseClick(body, listControlAt.x, listControlAt.y)
+      wait(100)
+      service.testFeed.quotes = plainQuotes
+      keys.forceActiveFocus()
+      wait(50)
+      harness.check("no piece of a row's long name shows past the list menu's edge, opened by key or by click",
+        shutPast.length > 0 && keyPast.length === 0 && clickPast.length === 0 && !body.listMenuOpen,
+        "shut: " + shutPast.join(", ") + " | by key: " + keyPast.join(", ") + " | by click: " + clickPast.join(", "))
 
       keyClick(Qt.Key_W)
       wait(50)
@@ -368,13 +415,13 @@ ShellRoot {
       // Shift+O and a Shift-click on the order word run a sorted order the
       // other way, kept in the list's own entry in the file; manual has no
       // direction, and o starts the next order in its own.
-      keyClick("O")
+      keyClick("O", Qt.ShiftModifier)
       wait(50)
       var manualStays = !service.reversed && label.text === "↕  MANUAL" && service.order === "manual"
       keyClick(Qt.Key_O)
       wait(50)
       var ahead = watchlist.displayedSymbols.slice()
-      keyClick("O")
+      keyClick("O", Qt.ShiftModifier)
       wait(50)
       var byKey = [service.reversed, label.text, watchlist.displayedSymbols.join(",")]
       harness.readFile()
@@ -383,7 +430,7 @@ ShellRoot {
       mouseClick(label, label.width / 2, label.height / 2, Qt.LeftButton, Qt.ShiftModifier)
       wait(50)
       var byClick = [service.reversed, label.text, watchlist.displayedSymbols.join(",")]
-      keyClick("O")
+      keyClick("O", Qt.ShiftModifier)
       keyClick(Qt.Key_O)
       wait(50)
       var nextOrder = [service.order, service.reversed, label.text]
@@ -784,7 +831,7 @@ ShellRoot {
       mouseMove(body2, manageAllAt.x, manageAllAt.y)
       wait(50)
       keys.forceActiveFocus()
-      keyClick("W")
+      keyClick("W", Qt.ShiftModifier)
       wait(100)
       mouseMove(body2, manageAllAt.x, manageAllAt.y + 1)
       wait(50)
@@ -837,7 +884,7 @@ ShellRoot {
       var names = function() { return service.dataSettings.lists.map(function(l) { return l.name }) }
       var manage = harness.find(body2, "manageLists")
       keys.forceActiveFocus()
-      keyClick("W")
+      keyClick("W", Qt.ShiftModifier)
       wait(100)
       harness.check("W opens Manage lists in the rows' place, on the first named list",
         body2.managingLists && manage.visible && manage.activeFocus && manage.cursor === 1
@@ -863,7 +910,7 @@ ShellRoot {
       wait(100)
       harness.check("a change of case alone renames",
         !manage.renaming && harness.same(names(), ["GROWTH", "Wins"]), names())
-      keyClick("J")
+      keyClick("J", Qt.ShiftModifier)
       wait(100)
       harness.check("J moves the list down, and the cursor goes with it",
         harness.same(names(), ["Wins", "GROWTH"]) && manage.cursor === 2, names() + "|" + manage.cursor)
@@ -886,7 +933,7 @@ ShellRoot {
         names() + "|" + service.listName + "|" + service.library)
       keyClick(Qt.Key_K)
       keyClick(Qt.Key_Return)
-      keyClick("J")
+      keyClick("J", Qt.ShiftModifier)
       keyClick(Qt.Key_X)
       wait(50)
       harness.check("All cannot be renamed, moved, or deleted",
@@ -987,10 +1034,51 @@ ShellRoot {
       mouseClick(body2, cancelAt.x, cancelAt.y)
       wait(50)
       harness.check("DELETE asks, and CANCEL keeps the list", !manage.confirming && harness.same(names(), ["Wins", "Power"]))
+      // A double-click on DELETE asks, and never answers its own question:
+      // the second click lands where the question's DELETE now sits. Found
+      // in the 1.0.0 review: a quick double-click on DELETE's first letters
+      // deleted the list without asking. Escape takes the question back.
+      mouseMove(body2, winsNowAt.x, winsNowAt.y)
+      wait(50)
+      var deleteAction = harness.find(winsRowNow, "deleteAction")
+      var deleteFirst = deleteAction.mapToItem(body2, 3, deleteAction.height / 2)
+      var confirmAction = harness.find(winsRowNow, "confirmDelete")
+      mouseDoubleClickSequence(body2, deleteFirst.x, deleteFirst.y)
+      wait(50)
+      var confirmUnder = false
+      try { confirmUnder = confirmAction.contains(confirmAction.mapFromItem(body2, deleteFirst.x, deleteFirst.y)) } catch (e) {}
+      var afterDouble = [confirmUnder, manage.confirming, names().join(",")].join("|")
+      keyClick(Qt.Key_Escape)
+      wait(50)
+      harness.check("a double-click on DELETE, its second click on the question's DELETE, asks and deletes nothing; Escape takes the question back",
+        afterDouble === "true|true|Wins,Power" && !manage.confirming && harness.same(names(), ["Wins", "Power"]),
+        afterDouble + " then " + manage.confirming)
+      // A second press inside the interval, held until after it ends, is
+      // still that double-click's: Qt counts a double-click from the presses,
+      // and its release answers nothing. Found in the stand-in review of #17:
+      // the guard was read on release, so this release deleted the list.
+      var interval = Application.styleHints.mouseDoubleClickInterval
+      wait(interval + 50)
+      mouseMove(body2, winsNowAt.x, winsNowAt.y)
+      wait(50)
+      mouseClick(body2, deleteFirst.x, deleteFirst.y)
+      wait(interval - 150)
+      mousePress(body2, deleteFirst.x, deleteFirst.y)
+      wait(250)
+      mouseRelease(body2, deleteFirst.x, deleteFirst.y)
+      wait(50)
+      var afterHeld = [manage.confirming, names().join(",")].join("|")
+      keyClick(Qt.Key_Escape)
+      wait(50)
+      harness.check("a second press on the question's DELETE inside the double-click interval, released after it, deletes nothing",
+        afterHeld === "true|Wins,Power" && !manage.confirming && harness.same(names(), ["Wins", "Power"]),
+        afterHeld + " then " + manage.confirming + "|" + names())
+      wait(Application.styleHints.mouseDoubleClickInterval)
       mouseMove(body2, winsNowAt.x, winsNowAt.y)
       wait(50)
       mouseClick(body2, deleteAt.x, deleteAt.y)
-      wait(50)
+      // The answer is a click of its own, after the double-click interval.
+      wait(Application.styleHints.mouseDoubleClickInterval + 50)
       var confirmAt = center(harness.find(winsRowNow, "confirmDelete"))
       mouseClick(body2, confirmAt.x, confirmAt.y)
       wait(100)
@@ -1265,7 +1353,7 @@ ShellRoot {
       // of sight. Found in design pass 3's review: hidden, it would still
       // ease, and show mid-way if the rows came back within 160 ms.
       keys.forceActiveFocus()
-      keyClick("W")
+      keyClick("W", Qt.ShiftModifier)
       wait(50)
       var coveredDown = rule.downShare
       service.setMembership("FLAT", "Losers", true)
@@ -1300,7 +1388,7 @@ ShellRoot {
       keyClick(Qt.Key_Down)
       keyClick(Qt.Key_Escape)
       wait(50)
-      keyClick("W")
+      keyClick("W", Qt.ShiftModifier)
       wait(50)
       keyClick(Qt.Key_Up)
       keyClick(Qt.Key_Escape)
@@ -1330,7 +1418,7 @@ ShellRoot {
       wait(50)
       keyClick(Qt.Key_Escape)
       wait(50)
-      keyClick("W")
+      keyClick("W", Qt.ShiftModifier)
       wait(50)
       keyClick(Qt.Key_Escape)
       wait(50)
@@ -1369,8 +1457,8 @@ ShellRoot {
       var closings = [
         keysAfter(function() { keyClick(Qt.Key_W) }),
         keysAfter(function() { keyClick(Qt.Key_W); wait(50); keyClick(Qt.Key_Up); keyClick(Qt.Key_Up); keyClick(Qt.Key_Return) }),
-        keysAfter(function() { keyClick("W") }),
-        keysAfter(function() { keyClick("W"); wait(50); keyClick(Qt.Key_Return) }),
+        keysAfter(function() { keyClick("W", Qt.ShiftModifier) }),
+        keysAfter(function() { keyClick("W", Qt.ShiftModifier); wait(50); keyClick(Qt.Key_Return) }),
         keysAfter(function() { keyClick(Qt.Key_M) }),
         keysAfter(function() { keyClick(Qt.Key_A) })
       ]

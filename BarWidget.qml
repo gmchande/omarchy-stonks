@@ -111,11 +111,14 @@ BarWidget {
   // A side bar's stacked form: the symbol's lines over the move's, each at
   // most four characters (`Format.stackedSymbol`), the move in the rows'
   // unit, money in money and else a percent (`Format.stackedMoney`,
-  // `stackedPct`), coloured by its sign as drawn.
-  readonly property var stackedMove: !featured ? { lines: ["…"], sign: 0 }
+  // `stackedPct`), coloured by its sign as drawn. A warning's "!" goes on a
+  // line of its own before the move, as the text form puts it before the
+  // change; with no quote at all it is the move.
+  readonly property var stackedMove: !featured ? { lines: warns ? [] : ["…"], sign: 0 }
     : service.changeMode === "abs" ? Format.stackedMoney(featured.abs, featuredQuote.priceDigits) : Format.stackedPct(featured.pct)
-  readonly property var stackedLines: (featured ? Format.stackedSymbol(featured.symbol) : ["ST"])
+  readonly property var stackedLines: Format.stackedSymbol(featuredSymbol || "ST")
     .map(function(t) { return { text: t, move: false } })
+    .concat(warns ? [{ text: "!", move: false }] : [])
     .concat(stackedMove.lines.map(function(t) { return { text: t, move: true } }))
 
   // What is left of a notch between wheel events: a high-resolution wheel
@@ -289,6 +292,24 @@ BarWidget {
         solid: true
         pixel: Math.max(2, Math.round(Style.bar.iconCanvas / 8))
         gap: 1
+
+        // A warning's "!", in the bar's ink as the hero's line says one,
+        // hangs in the slot's margin right of the mark, so the mark stays
+        // where it was. A badge on its corner, as the shell's Tailscale
+        // icon wears one, blurred into the columns at this size.
+        Text {
+          objectName: "pillMarkWarning"
+          visible: root.warns
+          anchors.left: parent.right
+          anchors.leftMargin: 1
+          anchors.verticalCenter: parent.verticalCenter
+          textFormat: Text.PlainText
+          text: "!"
+          color: button.foreground
+          font.family: button.fontFamily
+          font.pixelSize: button.fontSize
+          font.bold: true
+        }
       }
 
       Text {

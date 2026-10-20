@@ -46,11 +46,13 @@ function sparkResults(json) {
 // One listing's spark day (`sparkResults`) as a quote. Without opens the
 // stray filter can judge nothing, so the listing's last chart answer's
 // verdict stands in (`verdict`, `parseChart`): the strays it dropped are
-// left out. `unjudged` when a jump between two closes (not `sameLevel`)
+// left out, and its day's open is this day's when both are the same
+// session's. `unjudged` when a jump between two closes (not `sameLevel`)
 // lies past the bars that verdict settled and a whole bar has come since
 // it, or when Yahoo has since changed a whole bar the verdict saw, past
-// spark's own rounding (`sameClose`), or filled one in it had none for:
-// only a chart answer, with opens, can say whether that is a stray. The
+// spark's own rounding (`sameClose`), or filled one in it had none for, or
+// when the session has opened since the verdict's: only a chart answer,
+// with opens, can say whether that is a stray, or what the open was. The
 // newest bar is never judged, as in the filter.
 function sparkQuote(day, verdict, centExchanges) {
   var quote = parseChart({ chart: { result: [day] } }, centExchanges)
@@ -64,6 +66,10 @@ function sparkQuote(day, verdict, centExchanges) {
   for (var j = 0, k = 0; verdict && !unjudged && j < pts.length && pts[j].t <= verdict.newest; j++) {
     while (k < verdict.times.length && verdict.times[k] < pts[j].t) k++
     unjudged = verdict.times[k] !== pts[j].t || !sameClose(pts[j].p, verdict.closes[k])
+  }
+  if (quote.openSession !== null) {
+    if (verdict && verdict.openSession === quote.openSession) quote.dayOpen = verdict.open
+    else unjudged = true
   }
   var dropped = verdict ? verdict.dropped : []
   quote.points = pts.filter(function(p) { return dropped.indexOf(p.t) < 0 })
@@ -311,6 +317,9 @@ function parseChart(json, centExchanges) {
     prevClose: meta.chartPreviousClose !== undefined ? meta.chartPreviousClose : meta.previousClose,
     marketTime: Format.isFiniteNumber(meta.regularMarketTime) && meta.regularMarketTime > 0 ? meta.regularMarketTime : null,
     dayOpen: firstRegular ? knownPrice(firstRegular.o) : null,
+    // The regular session `dayOpen` is the open of, once its first bar has
+    // come; null before, and while the figures are the coming session's.
+    openSession: firstRegular ? regular.start : null,
     dayHigh: knownPrice(meta.regularMarketDayHigh),
     dayLow: knownPrice(meta.regularMarketDayLow),
     volume: meta.regularMarketVolume,
@@ -334,14 +343,16 @@ function parseChart(json, centExchanges) {
     // What the stray filter judged of this day, for a spark answer after it
     // (`sparkQuote`): its last whole bar (the newest is the live moment),
     // the last bar no later bar can change the verdict on, the whole bars'
-    // closes as judged, and the strays it dropped. Null without opens, when
-    // it could judge nothing.
+    // closes as judged, the strays it dropped, and the day's open with its
+    // session. Null without opens, when it could judge nothing.
     verdict: opens.length ? {
       newest: wholeBars.length ? wholeBars[wholeBars.length - 1].t : 0,
       settled: settledBars.length ? settledBars[settledBars.length - 1].t : 0,
       times: wholeBars.map(function(b) { return b.t }),
       closes: wholeBars.map(function(b) { return b.c }),
-      dropped: filtered.droppedTimes
+      dropped: filtered.droppedTimes,
+      open: firstRegular ? knownPrice(firstRegular.o) : null,
+      openSession: firstRegular ? regular.start : null
     } : null
   }
 }
@@ -432,11 +443,6 @@ function regularPoints(quote) {
   return out
 }
 
-function openPrice(quote) {
-  var pts = regularPoints(quote)
-  return pts.length ? pts[0].p : quote.prevClose
-}
-
 // The headline: the regular-market quote Yahoo reports, with its own
 // timestamp, the way Apple's Stocks shows the price. It is the latest
 // regular print while trading and the close otherwise, and it may be
@@ -489,8 +495,11 @@ function readingAt(quote, t) {
   return { price: pts[k].p, t: t, close: false }
 }
 
+// The move from the previous close, or "since the open" from the day's open
+// as the info line shows it (`dayOpen`): none while that isn't known, as
+// before the session's first bar.
 function change(quote, priceNow, mode) {
-  var base = mode === "open" ? openPrice(quote) : quote.prevClose
+  var base = mode === "open" ? quote.dayOpen : quote.prevClose
   if (!Format.isFiniteNumber(priceNow) || !Format.isFiniteNumber(base)) return { abs: null, pct: null, up: true }
   var abs = priceNow - base
   return { abs: abs, pct: base ? (abs / base) * 100 : 0, up: abs >= 0 }

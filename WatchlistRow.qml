@@ -33,6 +33,10 @@ Rectangle {
   // builds them only for rows near sight, so a long list costs little more
   // than a screenful does. Built, the row draws in the frame it is asked to.
   property bool built: true
+  // Whether the symbol, the name line, and the remove button show: not
+  // while the list menu lies over the row, where a long name ran on past
+  // the menu's edge in pieces ("t" of a name's last word).
+  property bool wordsShown: true
   // While it moves, lifted or sliding, the row carries the card's own ground
   // under its fill, so the rows it passes never show through.
   property bool moving: false
@@ -194,6 +198,8 @@ Rectangle {
 
         Text {
           id: symbolText
+          objectName: "rowSymbol"
+          visible: row.wordsShown
           x: row.gap
           y: row.inset
           textFormat: Text.PlainText
@@ -206,6 +212,8 @@ Rectangle {
 
         Text {
           id: detailText
+          objectName: "rowDetail"
+          visible: row.wordsShown
           x: row.gap
           anchors.bottom: parent.bottom
           anchors.bottomMargin: row.inset
@@ -232,7 +240,7 @@ Rectangle {
         Item {
           id: removeButton
           objectName: "rowRemove"
-          visible: row.removable
+          visible: row.removable && row.wordsShown
           width: Style.space(22)
           height: width
           x: symbolText.x + symbolText.width + Style.space(4)

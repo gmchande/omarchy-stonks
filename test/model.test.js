@@ -331,6 +331,32 @@ test("a spark day keeps the last chart's verdict, and a jump past it waits for a
   expect(Object.keys(days)).toEqual(["AAA"])
 })
 
+test("a spark day takes its open from the chart of the same session, and waits for a chart once its session opens", () => {
+  const day = (start, cs, withOpens) => {
+    const ts = cs.map((c, i) => start + i * 300)
+    const quote = { close: cs }
+    if (withOpens) quote.open = cs.map(c => c - 1)
+    return { meta: { symbol: "AAA", instrumentType: "EQUITY", exchangeName: "NMS", priceHint: 2,
+      regularMarketPrice: cs[cs.length - 1], regularMarketTime: ts[ts.length - 1], chartPreviousClose: 90,
+      regularMarketDayHigh: 200, regularMarketDayLow: 50,
+      currentTradingPeriod: { regular: { start: start, end: start + 23400 } } },
+      timestamp: ts, indicators: { quote: [quote] } }
+  }
+  const monday = 1791386400
+  const chart = M.parseChart({ chart: { result: [day(monday, [100, 100.1, 100.2], true)] } }, [])
+  // The chart's open is its first regular bar's, and the change since the
+  // open is measured from it, not from that bar's close.
+  expect(chart.dayOpen).toBe(99)
+  expect(M.change(chart, 110, "open").abs).toBe(11)
+  // Spark, no opens: the same session's day keeps the chart's open.
+  const same = M.sparkQuote(day(monday, [100, 100.1, 100.2, 100.1], false), chart.verdict, [])
+  expect([same.unjudged, same.quote.dayOpen]).toEqual([false, 99])
+  // The next session has opened: no open is known, so none is shown, and the
+  // day waits for a chart.
+  const tuesday = M.sparkQuote(day(monday + 86400, [104, 105], false), chart.verdict, [])
+  expect([tuesday.unjudged, tuesday.quote.dayOpen, M.change(tuesday.quote, 105, "open").pct]).toEqual([true, null, null])
+})
+
 test("blockCells lays digits on a grid with a blank column between", () => {
   const grid = text => {
     const { columns, cells } = M.blockCells(text)

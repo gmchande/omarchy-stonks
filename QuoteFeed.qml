@@ -13,8 +13,9 @@ import "Quote.js" as Quote
 // hero's (`heroes`) go on the chart endpoint, whose opens a hero's line and
 // the day's open need. The rest go in spark batches of up to 20
 // (`Quote.sparkUrl`), closes only, judged by each listing's last chart
-// verdict (`Quote.sparkQuote`). One whose spark day holds a jump that
-// verdict can't speak for shows all the same, and waits to be judged on the
+// verdict (`Quote.sparkQuote`), which also carries the day's open. One whose
+// spark day holds a jump that verdict can't speak for, or a session opened
+// since it, shows all the same, and waits to be judged on the
 // chart (`toJudge`), a few a run from the budget's spare half. A run has no
 // limit of its own: curl gives up on each URL within 10 s
 // (`Fetch.curlCommand`).

@@ -647,6 +647,39 @@ ShellRoot {
           onYear.every(function(e) { return e === wantYear }) && onDay === wantDay,
           onYear.join(" / ") + " on 1Y, " + onDay + " on 1D; want " + wantYear + " and " + wantDay)
 
+        // The exchange and currency stay whole on the hero's line; a long
+        // name gives way to them, in both looks. Found in the 1.0.0 review:
+        // the popup dropped "LSE · GBp" first, so a price in pence could
+        // read as pounds beside a cap in GBP.
+        var shelQuote = stub.quotes["SHEL.L"]
+        var longNamed = Object.assign({}, stub.quotes)
+        longNamed["SHEL.L"] = Object.assign({}, shelQuote,
+          { name: "Shell plc, with a name long enough to fill the hero's whole line in the popup, and in the window at its widest too" })
+        stub.quotes = longNamed
+        stub.featuredSymbol = "SHEL.L"
+        stub.figures = null
+        var wantMeta = " · " + shelQuote.exchange + " · " + shelQuote.currency
+        var metaLost = []
+        var wideWas = surface.wide
+        ;[false, true].forEach(function(wide) {
+          surface.wide = wide
+          ;[false, true].forEach(function(retro) {
+            stub.retro = retro
+            wait(50)
+            var name = find(body, "listingLine")
+            var meta = find(body, "listingMeta")
+            var right = meta ? meta.x + meta.implicitWidth : 0
+            if (!meta || !meta.visible || meta.text !== wantMeta || !name.truncated || right > meta.parent.width + 0.5)
+              metaLost.push((wide ? "window " : "popup ") + (retro ? "retro " : "smooth ") + JSON.stringify(name ? name.text : "") + " + "
+                + JSON.stringify(meta ? meta.text : null) + (meta ? ", ends at " + Math.ceil(right) + " of " + meta.parent.width : ""))
+          })
+        })
+        surface.wide = wideWas
+        stub.retro = false
+        stub.quotes = Object.assign({}, longNamed, { "SHEL.L": shelQuote })
+        root.check("a long name gives way on the hero's line; its exchange and currency stay whole, in the popup and the window, both looks",
+          metaLost.length === 0, metaLost.join(" | "))
+
         // Every price a listing shows is in its own decimals: a coin under a
         // cent to four significant digits, a six-figure price to none, in
         // the hero in both looks, in its row, and in a scrub of its day.

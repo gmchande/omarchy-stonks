@@ -129,13 +129,15 @@ function normalizeRefreshInterval(value) {
 // for the same reason. Named lists are subsets of All with their own
 // order and direction; `list` is the current one, "" for All. A symbol a hand-edited file
 // puts only in a named list joins All rather than being dropped. `range` is
-// the chart range the popup and the window show.
+// the chart range the popup and the window show. A key this version doesn't
+// know, at the top or in a list, stays as it is: a later version's, after a
+// downgrade or from another machine sharing the file.
 function fileSettings(src) {
   var from = src || {}
   var lists = normalizeLists(from.lists)
   var symbols = normalizeSymbols(from.symbols && from.symbols.length ? from.symbols : ["NVDA", "AAPL", "MSFT", "SPY", "TSLA"])
   for (var i = 0; i < lists.length; i++) symbols = normalizeSymbols(symbols.concat(lists[i].symbols))
-  return {
+  return Object.assign({}, from, {
     version: 1,
     symbols: symbols,
     featured: String(from.featured || ""),
@@ -149,7 +151,7 @@ function fileSettings(src) {
     range: History.historyRanges().indexOf(from.range) >= 0 ? from.range : "1D",
     // The popup's first-run hint has shown, and never shows again.
     hinted: from.hinted === true
-  }
+  })
 }
 
 // Named lists: a name, the symbols in their manual order, and the list's own
@@ -162,8 +164,8 @@ function normalizeLists(value) {
     var list = value[i] || {}
     var name = listName(list.name)
     if (listNameProblem(name, out) !== "") continue
-    out.push({ name: name, symbols: normalizeSymbols(list.symbols), order: normalizeOrder(list.order || "manual"),
-      reversed: normalizeReversed(list.order, list.reversed) })
+    out.push(Object.assign({}, list, { name: name, symbols: normalizeSymbols(list.symbols), order: normalizeOrder(list.order || "manual"),
+      reversed: normalizeReversed(list.order, list.reversed) }))
   }
   return out
 }
@@ -384,12 +386,16 @@ function listsHeld(settings) {
   return JSON.stringify([from.symbols, from.lists.map(function(list) { return [list.name, list.symbols] })])
 }
 
-// First-run copy of data settings off the bar entry. Null when that entry
-// has no symbols, so the service can fall back to defaults without writing.
+// First-run copy of data settings off the bar entry, which held them before
+// the data file: its data-file keys only, never the pill's own. Null when
+// that entry has no symbols, so the service can fall back to defaults
+// without writing.
 function settingsFromBar(config) {
   var bar = barEntryFor(config, "grvc.stonks")
   if (!bar || !bar.symbols || !bar.symbols.length) return null
-  return fileSettings(bar)
+  var from = {}
+  for (var key in fileSettings(null)) if (key in bar) from[key] = bar[key]
+  return fileSettings(from)
 }
 
 // A manual list with one symbol moved to a new slot.
