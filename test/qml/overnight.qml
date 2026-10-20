@@ -986,6 +986,30 @@ ShellRoot {
       harness.check("a symbol gone keeps Robinhood's prints five minutes and its all-day answer a day, then neither, with no edit",
         asked && keptFresh && printsGone && allDayKept && allDayGone,
         [asked, keptFresh, printsGone, allDayKept, allDayGone].join(","))
+
+      // 80 US stocks Robinhood trades all day, added with the window open:
+      // their prints come in requests of at most 75, Robinhood's limit, and
+      // every one's night is drawn. Robinhood answered 400 to all 80 in one
+      // request, and no overnight price ever showed.
+      useSet("2026-10-07-0100")
+      var longs = []
+      for (var n = 1; n <= 80; n++) longs.push("LONG" + (n < 10 ? "0" : "") + n)
+      var askedBefore = harness.record("OVERNIGHT.asked").split("\n").length
+      longs.forEach(function(s) { service.addSymbol(s) })
+      var nights = within(20000, function() {
+        return service.arriving.length === 0 && longs.every(function(s) {
+          return !!prints.entries[s] && prints.entries[s].status === "ok" && prints.entries[s].bars.length > 0
+        })
+      })
+      var requests = harness.record("OVERNIGHT.asked").split("\n").slice(askedBefore).map(function(line) { return line.split(",") })
+      var each = longs.filter(function(s) { return requests.filter(function(r) { return r.indexOf(s) >= 0 }).length === 1 })
+      featureShown("LONG80")
+      var drawn = body.featuredGeometry.start === harness.midnight.wed7
+        && body.featuredDay.points.some(function(p) { return p.t < harness.midnight.wed7 + 4 * 3600 })
+      harness.check("80 all-day listings: their prints in requests of at most 75, each asked once, and every one's night drawn",
+        nights && requests.every(function(r) { return r.length <= 75 }) && each.length === 80 && drawn,
+        "requests of " + requests.map(function(r) { return r.length }).join(", ") + "; " + each.length + " asked once; nights "
+          + nights + "; LONG80 drawn " + drawn)
       harness.finish()
     }
   }

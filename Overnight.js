@@ -62,11 +62,16 @@ function robinhoodSymbol(symbol) {
 
 // span=day is the last 288 five-minute slots Robinhood's 24/5 market traded,
 // its closed days left out (seen Sunday 4 October, 22:58 ET: Thursday 22:55
-// onward), so one answer holds every print a 1D chart can draw.
+// onward), so one answer holds every print a 1D chart can draw. At most
+// `OVERNIGHT_BATCH` symbols to a request.
 function overnightUrl(symbols) {
   return ROBINHOOD_URL + "?symbols=" + symbols.map(function(s) { return encodeURIComponent(robinhoodSymbol(s)) }).join(",")
     + "&interval=5minute&span=day&bounds=24_5"
 }
+
+// Robinhood's historicals answer 400 to more symbols than this in one
+// request: "Too many instruments requested. No more than 75 allowed."
+var OVERNIGHT_BATCH = 75
 
 // Robinhood's instruments for `symbols`, one request for all: whether it
 // trades each all day.

@@ -51,12 +51,13 @@
 # a symbol's timeseries requests in <SYMBOL>.fundamentals.calls. While
 # STONKS_FAKE_STATE/FUNDAMENTALS.down exists both fail.
 # Robinhood's historicals are counted in OVERNIGHT.calls, the symbols of each
-# request appended to OVERNIGHT.asked, and its span to
-# OVERNIGHT.spans. While STONKS_FAKE_STATE/overnight.set names a moment's
-# folder of test/fixtures/moments (weekend, sunday, monday, night,
-# live-2026-10-05), or several, the first with the file answering, its saved
-# Robinhood answer for that span answers,
-# results in the order asked, its saved days answer for their symbols, and
+# request appended to OVERNIGHT.asked, and its span to OVERNIGHT.spans. More
+# than 75 symbols in one request answer 400, as Robinhood does ("No more than
+# 75 allowed"). While STONKS_FAKE_STATE/overnight.set names a moment's folder
+# of test/fixtures/moments (weekend, sunday, monday, night, live-2026-10-05),
+# or several, the first with the file answering, its saved Robinhood answer
+# for that span answers, results in the order asked, LONG<n> with NEST's
+# prints under its own name, its saved days answer for their symbols, and
 # its saved 1M histories (<symbol>-1m.json) for theirs;
 # otherwise Robinhood answers every symbol empty, as it does one it does not
 # trade. While STONKS_FAKE_STATE/OVERNIGHT.down exists, Robinhood fails,
@@ -78,11 +79,12 @@
 #
 # Runs: like curl, it takes several URLs in one call and answers each in
 # turn, each followed by the -w line Fetch.js asks for, with the status
-# (200, 404 for GONE, 429 while refused, 502 for a failure, 000 for no
-# answer), curl's exit code, and the URL's place. An answer over
-# --max-filesize is cut there with exit code 63. Each call is a line of
-# runs.log, its kind:name per URL, and each URL a line of requests.log,
-# "kind name status", a spark's name its symbols, comma-separated.
+# (200, 400 for too many of Robinhood's, 404 for GONE, 429 while refused,
+# 502 for a failure, 000 for no answer), curl's exit code, and the URL's
+# place. An answer over --max-filesize is cut there with exit code 63. Each
+# call is a line of runs.log, its kind:name per URL, and each URL a line of
+# requests.log, "kind name status", a spark's name its symbols,
+# comma-separated.
 #   YAHOO.refuse, ROBINHOOD.refuse   that host answers 429 to every request,
 #                                    counted in <HOST>.refused.calls
 #   YAHOO.offline, ROBINHOOD.offline that host gives no answer at all
@@ -137,7 +139,8 @@ name_of() {
 }
 
 # serve URL: one URL's answer on stdout; its exit code says what kind:
-# 0 an answer, 22 a failure (502), 44 not found (404), 7 no answer.
+# 0 an answer, 22 a failure (502), 40 a request refused as asked (400),
+# 44 not found (404), 7 no answer.
 serve() {
   local url=$1
   if [[ "$url" == *"/v7/finance/spark"* ]]; then
@@ -195,11 +198,17 @@ serve() {
     span="${url#*span=}"
     span="${span%%&*}"
     echo "$span" >> "$STONKS_FAKE_STATE/OVERNIGHT.spans"
+    while [ -e "$STONKS_FAKE_STATE/ROBINHOOD.hold" ]; do sleep 0.05; done
+    if [ "$(tr ',' '\n' <<< "$asked" | wc -l)" -gt 75 ]; then
+      echo '{"non_field_errors":["Too many instruments requested. No more than 75 allowed."]}'
+      exit 40
+    fi
     [ -e "$STONKS_FAKE_STATE/OVERNIGHT.down" ] && exit 22
     set_name="$(cat "$STONKS_FAKE_STATE/overnight.set" 2>/dev/null)"
     if [ -n "$set_name" ]; then
       jq -c --arg asked "$asked" '($asked | split(",")) as $want
-        | { results: [$want[] as $s | ([.results[] | select(.symbol == $s)][0] // { symbol: "", historicals: [] })] }' \
+        | { results: [$want[] as $s | (($s | if test("^LONG[0-9]+$") then "NEST" else . end) as $from
+          | [.results[] | select(.symbol == $from)][0] | if . then .symbol = $s else { symbol: "", historicals: [] } end)] }' \
         "$(in_moment "robinhood-$span.json")"
     else
       jq -nc --arg asked "$asked" '{ results: [($asked | split(","))[] | { symbol: "", historicals: [] }] }'
@@ -333,6 +342,7 @@ for i in "${!urls[@]}"; do
     rm -f "$out_file"
     case $served in
       0) status=200 ;;
+      40) status=400 ;;
       44) status=404 ;;
       7) status=000; exit_code=7; body="" ;;
       *) status=502 ;;
