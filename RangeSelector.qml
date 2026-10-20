@@ -39,10 +39,14 @@ Item {
   FontMetrics { id: metrics; font: root.wordFont }
   implicitHeight: Math.ceil(metrics.ascent) + Math.ceil(metrics.descent)
   // The metrics' font carries the letter spacing, so its advance is the
-  // word as drawn.
-  readonly property var wordWidths: options.map(function(o) {
-    return Math.ceil(metrics.advanceWidth(String(o).toUpperCase()))
-  })
+  // word as drawn. The font is read, so a new text size measures again: a
+  // popup built before `omarchy display text size` overshot both edges.
+  readonly property var wordWidths: {
+    var font = metrics.font
+    return options.map(function(o) {
+      return Math.ceil(metrics.advanceWidth(String(o).toUpperCase()))
+    })
+  }
   readonly property real wordSpace: options.length > 1
     ? (width - wordWidths.reduce(function(a, b) { return a + b }, 0)) / (options.length - 1) : 0
   function wordX(index) {
