@@ -419,20 +419,24 @@ ShellRoot {
       countsOver("11:15, the window open: every listing trading every minute, London until its close; Tokyo, closed, every 15",
         900, counts([15, 15, 15, 15, 15, 14, 1, 15]), startAt(service.now + 5))
 
-      // Five rows featured a few seconds apart: each new hero's chart is
-      // asked at once, at a second of its own, and the next run takes each
-      // with it, so the list goes on refreshing in one run a minute. Each
-      // used to keep its own second, five or six runs a minute.
+      // Five rows featured 12 seconds apart, across a minute: each new
+      // hero's chart is asked at once, at a second of its own, and the next
+      // run takes each with it, however far from the list's second, so the
+      // list goes on refreshing in one run a minute. Each used to keep its
+      // own second, five or six runs a minute.
       ;["KILN", "SPY", "^GSPC", "SHOP.TO", "NEST"].forEach(function(s) {
         service.feature(s)
-        tick(3, 1)
+        tick(12, 1)
       })
       tick(60)
       var featuredFrom = harness.runs().length
       tick(300)
       var featuredRuns = harness.runs().slice(featuredFrom)
-      harness.check("five rows featured a few seconds apart: the list still refreshes in one run a minute",
+      harness.check("five rows featured across a minute: the list still refreshes in one run a minute",
         featuredRuns.length <= 6, featuredRuns.length + " runs in 5 minutes: " + featuredRuns.join(" / "))
+      // The next run, so r below finds every answer older than 10 s.
+      var runsNow = harness.runs().length
+      for (var w = 0; w < 61 && harness.runs().length === runsNow; w++) tick(1, 1)
 
       // F7: r twice within 5 s sends one run.
       tick(20)
