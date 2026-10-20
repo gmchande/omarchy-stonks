@@ -543,6 +543,24 @@ ShellRoot {
       more.forEach(function(s) { service.removeSymbol(s) })
       closeWindow()
 
+      // 15:00, the window left on 1W: its history is asked again every 15
+      // minutes while New York trades, and once after the close for its
+      // last bars, then not again, so its line and its low and high keep up
+      // with the price over them. It was asked once, and kept all session.
+      service.now = at(harness.wed7, 15, 0)
+      settle()
+      openWindow()
+      body.selectRange("1W")
+      tryVerify(function() { return !!service.histories["NEST|1W"] && service.histories["NEST|1W"].status === "ok" }, 5000)
+      var weekFrom = Number(harness.record("NEST.history.calls") || 0)
+      tick(80 * 60, 15)
+      var weekAsked = Number(harness.record("NEST.history.calls") || 0) - weekFrom
+      harness.check("the window left on 1W from 15:00 to 16:20: its history asked again every 15 minutes until the close, then once for its last bars",
+        weekAsked === 4, weekAsked + " asks")
+      body.selectRange("1D")
+      settle()
+      closeWindow()
+
       // 16:30, after hours. The pill's wheel moves to KILN, which nothing
       // watched: it is asked for at once, and shown without a warning.
       service.now = at(harness.wed7, 16, 30)

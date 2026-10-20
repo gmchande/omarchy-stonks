@@ -200,7 +200,7 @@ Item {
   }
   // The clock's work, as it moves: the asks fall due at their own second
   // (`dueAt`), and the rest by the minute, when a market's session may have
-  // begun or ended.
+  // begun or ended, or a range on show grown old.
   onNowChanged: {
     askOvernight()
     if ((root.dueAt > 0 && root.now >= root.dueAt) || Math.floor(root.now / 60) !== root.askedMinute) askDue()
@@ -209,6 +209,7 @@ Item {
     if (Math.floor(root.now / 60) !== root.prunedMinute) {
       root.prunedMinute = Math.floor(root.now / 60)
       forgetLeft()
+      refreshRange()
     }
     // A refresh owed while every screen was off asks again as the clock
     // moves, so it goes once one is on, quotes due or not.
@@ -261,10 +262,11 @@ Item {
 
   // The window's host, which asks Hyprland whether every screen is off.
   // Every request a feed starts on the schedule, a quote run (queued,
-  // retried, or after a pause), Robinhood's, and a refresh's history, asks
-  // first (`screensClear`): only an answer under a second old says go. An
-  // older one is asked again, and the answer lets what waits go
-  // (`screensAnswered`), or holds it while every screen is off.
+  // retried, or after a pause), Robinhood's, and a refresh's history or a
+  // range's grown old, asks first (`screensClear`): only an answer under a
+  // second old says go. An older one is asked again, and the answer lets
+  // what waits go (`screensAnswered`), or holds it while every screen is
+  // off.
   property var screens: null
   readonly property bool screensOff: !!root.screens && root.screens.screensOff
   property real screensAnsweredMs: 0
@@ -288,6 +290,7 @@ Item {
       root.refreshOwed = false
       root.refreshRest()
     }
+    root.refreshRange()
     root.fetchAhead()
   }
   // The day last built for each symbol's chart, kept while what built it is
@@ -426,6 +429,7 @@ Item {
   HistoryFeed {
     id: historyFeed
     gate: yahooGate
+    clock: root
     centExchanges: root.centExchanges
     inUse: root.chartsInUse
     onEntriesChanged: {
@@ -519,6 +523,22 @@ Item {
     }
     var unanswered = root.unansweredHistory()
     historyFeed.request(unanswered.length > 0 ? unanswered[0] : charts[charts.length - 1], range, false)
+  }
+
+  // A range left on show is asked again as its market moves it
+  // (`History.historyDue`), so its line and its low and high keep up with
+  // the price over it: a hero's at a time, when the feed has nothing on its
+  // way, and only while a screen is on. Looked at each minute.
+  function refreshRange() {
+    if (!root.pluginsReady || historyFeed.busy) return
+    var range = root.view.range
+    var now = root.wallSecond()
+    var stale = root.historyCharts().filter(function(s) {
+      var entry = historyFeed.entries[historyFeed.keyFor(s, range)]
+      var quote = feed.quotes[s] || previewFeed.quotes[s]
+      return !!entry && entry.status === "ok" && History.historyDue(range, entry.receivedAt, quote, now, root.calendars)
+    })
+    if (stale.length > 0 && root.screensClear()) historyFeed.request(stale[0], range, false)
   }
 
   // The charts a user's refresh asked for fresh, each with the answer it had

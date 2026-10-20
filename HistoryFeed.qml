@@ -22,6 +22,10 @@ Item {
 
   property var entries: ({})
   property var gate: null
+  // The service, whose wall clock stamps each answer and ages the cache
+  // (`wallSecond`); the system's without one.
+  property var clock: null
+  function stamp() { return clock ? clock.wallSecond() : Math.floor(Date.now() / 1000) }
   // The exchanges whose listings trade in whole cents from $1
   // (`History.parseHistory`); none unless handed in.
   property var centExchanges: []
@@ -89,7 +93,7 @@ Item {
       return
     }
     var cached = entries[key]
-    var now = Math.floor(Date.now() / 1000)
+    var now = root.stamp()
     if (!force && cached && cached.status === "ok" && cached.receivedAt && now - cached.receivedAt < 15 * 60) {
       if (!wanted || !wanted.ahead || wanted.range !== range) root.want(null)
       return
@@ -207,7 +211,7 @@ Item {
       root.setEntry(request.key, {
         status: "ok",
         history: history,
-        receivedAt: Math.floor(Date.now() / 1000)
+        receivedAt: root.stamp()
       })
     } else {
       root.setEntry(request.key, { status: "failed" })
