@@ -214,6 +214,15 @@ FocusScope {
     confirming = true
   }
 
+  // A double-click is one click: the question's DELETE comes up under the
+  // DELETE clicked to ask, so a click on it within the double-click
+  // interval (`justAsked`) is that double-click's second, and never answers
+  // the question it asked. Enter always answers.
+  Timer {
+    id: justAsked
+    interval: Application.styleHints.mouseDoubleClickInterval
+  }
+
   function confirmDelete() {
     if (!confirming) return
     var name = pendingName
@@ -422,7 +431,10 @@ FocusScope {
               objectName: "deleteAction"
               anchors.verticalCenter: parent.verticalCenter
               text: "DELETE"
-              onActivated: root.askDelete(entry.index)
+              onActivated: {
+                root.askDelete(entry.index)
+                justAsked.restart()
+              }
             }
           }
 
@@ -474,7 +486,7 @@ FocusScope {
               anchors.verticalCenter: parent.verticalCenter
               text: "DELETE"
               enterTakes: true
-              onActivated: root.confirmDelete()
+              onActivated: if (!justAsked.running) root.confirmDelete()
             }
             ListAction {
               view: root

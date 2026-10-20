@@ -987,10 +987,31 @@ ShellRoot {
       mouseClick(body2, cancelAt.x, cancelAt.y)
       wait(50)
       harness.check("DELETE asks, and CANCEL keeps the list", !manage.confirming && harness.same(names(), ["Wins", "Power"]))
+      // A double-click on DELETE asks, and never answers its own question:
+      // the second click lands where the question's DELETE now sits. Found
+      // in the 1.0.0 review: a quick double-click on DELETE's first letters
+      // deleted the list without asking. Escape takes the question back.
+      mouseMove(body2, winsNowAt.x, winsNowAt.y)
+      wait(50)
+      var deleteAction = harness.find(winsRowNow, "deleteAction")
+      var deleteFirst = deleteAction.mapToItem(body2, 3, deleteAction.height / 2)
+      var confirmAction = harness.find(winsRowNow, "confirmDelete")
+      mouseDoubleClickSequence(body2, deleteFirst.x, deleteFirst.y)
+      wait(50)
+      var confirmUnder = false
+      try { confirmUnder = confirmAction.contains(confirmAction.mapFromItem(body2, deleteFirst.x, deleteFirst.y)) } catch (e) {}
+      var afterDouble = [confirmUnder, manage.confirming, names().join(",")].join("|")
+      keyClick(Qt.Key_Escape)
+      wait(50)
+      harness.check("a double-click on DELETE, its second click on the question's DELETE, asks and deletes nothing; Escape takes the question back",
+        afterDouble === "true|true|Wins,Power" && !manage.confirming && harness.same(names(), ["Wins", "Power"]),
+        afterDouble + " then " + manage.confirming)
+      wait(Application.styleHints.mouseDoubleClickInterval)
       mouseMove(body2, winsNowAt.x, winsNowAt.y)
       wait(50)
       mouseClick(body2, deleteAt.x, deleteAt.y)
-      wait(50)
+      // The answer is a click of its own, after the double-click interval.
+      wait(Application.styleHints.mouseDoubleClickInterval + 50)
       var confirmAt = center(harness.find(winsRowNow, "confirmDelete"))
       mouseClick(body2, confirmAt.x, confirmAt.y)
       wait(100)
