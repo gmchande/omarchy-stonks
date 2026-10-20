@@ -117,11 +117,14 @@ function extendedStack(quote, latest, now, day, changeMode) {
 // time where the listing trades, the zone named where the reader's
 // differs). A bar is five minutes of trades, so the words speak of the
 // chart, not of each trade. "" otherwise, and for an empty day before its
-// session opens at `now`: an index has no print before its bell.
+// session opens at `now`: an index has no print before its bell. Nor for a
+// day whose one point is Yahoo's live moment, which it stamps at the
+// price's own second, apart from the bars at their five-minute starts: the
+// day is in its first bar, which has no close yet (^GSPC at 09:30:25).
 function dayNote(day, now, calendars) {
   if (!day) return ""
   var pts = day.points
-  if (pts.length === 1) return "Traded only at " + Market.printClock(day, pts[0].t, calendars)
+  if (pts.length === 1) return pts[0].t % (5 * 60) === 0 ? "Traded only at " + Market.printClock(day, pts[0].t, calendars) : ""
   if (pts.length > 1) return ""
   var regular = day.session.regular
   return regular && now < regular.start ? "" : "No trades charted"
