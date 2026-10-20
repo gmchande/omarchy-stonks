@@ -77,12 +77,15 @@ function calendarMap(calendars) {
   return calendars.calendars ? calendars.calendars : calendars
 }
 
+// The listing's calendar: the one naming its exchange, or naming the index
+// itself, where Yahoo files it under a name that holds indexes on other
+// hours too (^FTSE beside FTSE's global ones, ^RUT beside Cboe's VVIX).
 function calendarFor(calendars, quote) {
   var map = calendarMap(calendars)
   if (!map || !quote || !quote.exchange) return null
   for (var id in map) {
     var cal = map[id]
-    if (cal && cal.exchanges && cal.exchanges.indexOf(quote.exchange) >= 0) return cal
+    if (cal && ((cal.exchanges && cal.exchanges.indexOf(quote.exchange) >= 0) || (cal.indexes && cal.indexes.indexOf(quote.symbol) >= 0))) return cal
   }
   return null
 }

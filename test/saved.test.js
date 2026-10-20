@@ -294,11 +294,15 @@ test("the popular indexes Yahoo files under their own codes keep their exchange'
   expect(M.quoteCadence(n225, lunch, 60, false, calendars)).toBe(15 * 60)
   const closed = q => M.marketStatus(q, q.session.regular.end + 4 * 3600, 0, calendars)
   expect(closed(n225)).toBe("Closed · opens Thu 09:00 JST")
-  expect(closed(M.parseChart(fixture("ftse-day.json")))).toBe("Closed · opens Wed 08:00 BST")
+  const ftse = M.parseChart(fixture("ftse-day.json"))
+  expect(closed(ftse)).toBe("Closed · opens Wed 08:00 BST")
   expect(closed(M.parseChart(fixture("rut-day.json")))).toBe("Closed · opens Wed 09:30")
   expect(closed(M.parseChart(fixture("gsptse-day.json")))).toBe("Closed · opens Wed 09:30")
-  // ^VIX keeps Chicago's hours, which no calendar has.
+  // ^VIX keeps Chicago's hours, which no calendar has; FTSE's global
+  // indexes, filed under FTSE Index too, are calculated while any of their
+  // markets trade, not on London's days. Found in review.
   expect(closed(M.parseChart(fixture("vix-day.json")))).toBe("Closed")
+  expect(closed({ ...ftse, symbol: "GEISAC.FGI" })).toBe("Closed")
 })
 
 test("an exchange's time names its zone only where the reader's clock differs", () => {
