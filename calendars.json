@@ -2,7 +2,7 @@
   "generatedAt": "2026-10-16",
   "calendars": {
     "US": {
-      "exchanges": ["NASDAQ", "NYSE", "NYSE ARCA", "NYSE AMERICAN", "CBOE", "S&P", "DOW"],
+      "exchanges": ["NASDAQ", "NYSE", "NYSE ARCA", "NYSE AMERICAN", "CBOE", "S&P", "DOW", "CHICAGO OPTIONS"],
       "timezone": "America/New_York",
       "utcOffsets": [
         { "from": "2026-03-08", "to": "2026-11-01", "offset": -14400 },
@@ -52,7 +52,7 @@
       "source": "https://www.nyse.com/trade/hours-calendars"
     },
     "TSX": {
-      "exchanges": ["TSX", "TSXV"],
+      "exchanges": ["TSX", "TSXV", "TORONTO"],
       "timezone": "America/Toronto",
       "utcOffsets": [
         { "from": "2026-03-08", "to": "2026-11-01", "offset": -14400 }
@@ -78,7 +78,7 @@
       "source": "https://www.tsx.com/en/trading/calendars-and-trading-hours/calendar"
     },
     "LSE": {
-      "exchanges": ["LSE"],
+      "exchanges": ["LSE", "FTSE INDEX"],
       "timezone": "Europe/London",
       "utcOffsets": [
         { "from": "2026-03-29", "to": "2026-10-25", "offset": 3600 },
@@ -120,7 +120,7 @@
       "source": "https://www.londonstockexchange.com/equities-trading/business-days"
     },
     "JPX": {
-      "exchanges": ["TSE"],
+      "exchanges": ["TSE", "OSAKA"],
       "timezone": "Asia/Tokyo",
       "utcOffsets": [],
       "standardOffset": 32400,

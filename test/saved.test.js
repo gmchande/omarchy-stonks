@@ -283,6 +283,24 @@ test("a long chart dates each bar by its own day, on both sides of a change of c
   })
 })
 
+test("the popular indexes Yahoo files under their own codes keep their exchange's hours", () => {
+  // ^N225 under Osaka, ^FTSE under FTSE Index, ^RUT under Chicago Options,
+  // and the TSX Composite under Toronto. Found in QA: through Tokyo's lunch
+  // the Nikkei said "Market closes in 3h 30m" and was asked every minute,
+  // and after each close they said only "Closed".
+  const n225 = M.parseChart(fixture("first-day-2026-10-14/n225-day.json"))
+  const lunch = n225.session.regular.start + 2.75 * 3600
+  expect(M.marketStatus(n225, lunch, 0, calendars)).toBe("Lunch break · reopens 12:30 JST · in 45m")
+  expect(M.quoteCadence(n225, lunch, 60, false, calendars)).toBe(15 * 60)
+  const closed = q => M.marketStatus(q, q.session.regular.end + 4 * 3600, 0, calendars)
+  expect(closed(n225)).toBe("Closed · opens Thu 09:00 JST")
+  expect(closed(M.parseChart(fixture("ftse-day.json")))).toBe("Closed · opens Wed 08:00 BST")
+  expect(closed(M.parseChart(fixture("rut-day.json")))).toBe("Closed · opens Wed 09:30")
+  expect(closed(M.parseChart(fixture("gsptse-day.json")))).toBe("Closed · opens Wed 09:30")
+  // ^VIX keeps Chicago's hours, which no calendar has.
+  expect(closed(M.parseChart(fixture("vix-day.json")))).toBe("Closed")
+})
+
 test("an exchange's time names its zone only where the reader's clock differs", () => {
   const tokyo = M.parseChart(fixture("7203-t-day.json"))
   const evening = tokyo.session.regular.end + 3 * 3600
