@@ -72,9 +72,10 @@
 # all the same.
 # While STONKS_FAKE_STATE/ROBINHOOD.hold exists, every answer of Robinhood's
 # waits, each counted as it is asked: a step sees what is out at once.
-# GitHub's manifest on main: while STONKS_FAKE_STATE/MANIFEST.version
-# exists, it answers a manifest naming that version; otherwise, and while
-# MANIFEST.down exists, it fails.
+# GitHub's manifest on main, and only that address: while
+# STONKS_FAKE_STATE/MANIFEST.version exists, it answers a manifest naming
+# that version; otherwise, and while MANIFEST.down exists, it fails. Any
+# other GitHub address answers 404.
 #
 # Spark: a /v7/finance/spark request answers each of its symbols from that
 # symbol's own day as the chart route would, closes only, in Yahoo's spark
@@ -151,6 +152,7 @@ name_of() {
 serve() {
   local url=$1
   if [[ "$url" == *"raw.githubusercontent.com/"* ]]; then
+    [ "$url" = https://raw.githubusercontent.com/gmchande/omarchy-stonks/main/manifest.json ] || exit 44
     [ -e "$STONKS_FAKE_STATE/MANIFEST.down" ] && exit 22
     [ -e "$STONKS_FAKE_STATE/MANIFEST.version" ] || exit 22
     jq -nc --arg version "$(cat "$STONKS_FAKE_STATE/MANIFEST.version")" '{ schemaVersion: 1, id: "grvc.stonks", version: $version }'

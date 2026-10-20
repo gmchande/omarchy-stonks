@@ -1160,7 +1160,7 @@ Item {
     if (!root.pluginsReady) return
     var wall = root.wallSecond()
     var next = root.openSurfaces.length > 0 ? wall + 1 : (Math.floor(wall / 60) + 1) * 60
-    ;[root.dueAt, yahooGate.pausedUntil, robinhoodGate.pausedUntil].forEach(function(at) {
+    ;[root.dueAt, yahooGate.pausedUntil, robinhoodGate.pausedUntil, githubGate.pausedUntil].forEach(function(at) {
       if (at > root.now && at < next) next = at
     })
     // To just past that second's start.
@@ -1175,6 +1175,10 @@ Item {
   }
   Connections {
     target: robinhoodGate
+    function onPausedUntilChanged() { root.armClock() }
+  }
+  Connections {
+    target: githubGate
     function onPausedUntilChanged() { root.armClock() }
   }
   // Each step of the clock also tries the next chart ahead, which may have

@@ -245,15 +245,14 @@ ShellRoot {
       harness.check("a failed answer once a newer version is known leaves its notice",
         kept && footer() === "Stonks 1.0.10 is out · click to update", harness.asked() + " asks | " + footer())
 
-      // The update on disk: the next open says the restart's notice.
+      // The update lands on disk as git writes it, the old file removed and
+      // a new one made, while the window stays open: its footer says the
+      // restart's notice at once.
       var manifest = JSON.parse(harness.readFile(harness.manifestPath))
       manifest.version = "1.0.10"
-      run(["bash", "-c", "printf '%s' \"$1\" > \"$2.tmp\" && mv -f \"$2.tmp\" \"$2\"", "--", JSON.stringify(manifest, null, 2) + "\n", harness.manifestPath])
-      app.close()
-      tryVerify(function() { return service.openSurfaces.length === 0 }, 3000)
-      app.open("{}")
-      harness.check("once the update is on disk, the restart's notice takes over",
-        within(1000, function() { return footer() === "Updated to 1.0.10 · click to restart the shell" }), footer())
+      run(["bash", "-c", "rm -f \"$2\" && printf '%s' \"$1\" > \"$2\"", "--", JSON.stringify(manifest, null, 2) + "\n", harness.manifestPath])
+      harness.check("once the update is on disk, the open window's restart notice takes over",
+        within(3000, function() { return footer() === "Updated to 1.0.10 · click to restart the shell" }), footer())
 
       harness.finish()
     }
