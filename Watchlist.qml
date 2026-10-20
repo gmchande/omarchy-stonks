@@ -51,6 +51,10 @@ Flickable {
   // the key sheet or a view, and the list with it, while its rows are
   // hidden; sight is judged against the rows' view all the same.
   property real sightHeight: height
+  // Down to here in the view, the list menu lies over the rows: a row that
+  // starts above it leaves out its words (`WatchlistRow.wordsShown`). 0
+  // while the menu is shut.
+  property real menuCovers: 0
 
   property string cursorSymbol: ""
   // The row the wheel scrolled under a still pointer: it takes the cursor,
@@ -837,6 +841,7 @@ Flickable {
         // place and its day line only.
         built: lifted || (place >= 0 && y + height > root.contentY - root.sightHeight
           && y < root.contentY + 2 * root.sightHeight)
+        wordsShown: root.menuCovers <= 0 || y - root.contentY >= root.menuCovers
         property var sightQuote: null
         Binding on sightQuote {
           value: rowDelegate.place >= 0 ? root.quotes[rowDelegate.symbol] || null : null

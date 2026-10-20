@@ -1002,6 +1002,7 @@ Item {
     anchors.topMargin: root.groupGap
     height: root.wholeListHeight
     sightHeight: root.rowsSightHeight
+    menuCovers: root.listMenuOpen ? listMenu.y + listMenu.height - watchlist.y : 0
     visible: root.rowsShown
     view: root.view
     quotes: root.quotes

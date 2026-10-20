@@ -128,6 +128,25 @@ ShellRoot {
       }).join(",")
     }
 
+    // The rows' words that show beside the open list menu on `body`: a
+    // symbol or name on the menu's band that ends past its right edge.
+    function wordsPastMenu(body) {
+      var menu = harness.find(body, "listMenu")
+      var edge = menu.mapToItem(body, menu.width, menu.height)
+      var past = []
+      body.watchlist.displayedSymbols.forEach(function(symbol) {
+        var row = body.watchlist.rowItem(symbol)
+        ;["rowSymbol", "rowDetail"].forEach(function(name) {
+          var words = row ? harness.find(row, name) : null
+          if (!words || !words.visible || words.text === "") return
+          var top = words.mapToItem(body, 0, 0)
+          var end = words.mapToItem(body, Math.min(words.width, words.contentWidth), 0)
+          if (top.y < edge.y && end.x > edge.x) past.push(symbol + " " + JSON.stringify(words.text))
+        })
+      })
+      return past
+    }
+
     function test_list_flows() {
       tryVerify(function() {
         return service.quotes.AAPL && service.quotes.MSFT && service.quotes.NVDA
@@ -147,6 +166,34 @@ ShellRoot {
       var watchlist = body.watchlist
       var keys = app.testKeyCatcher
       keys.forceActiveFocus()
+
+      // No piece of a row's words shows past the open list menu's edge,
+      // opened by key or by click. Found in the 1.0.0 review: the "t" of
+      // SPY's long name showed beside the menu, and in the window whole
+      // tails of names.
+      var plainQuotes = service.testFeed.quotes
+      var longNamed = Object.assign({}, plainQuotes)
+      longNamed.AAPL = Object.assign({}, plainQuotes.AAPL, { name: "State Street SPDR S&P 500 ETF Trust, a name as long as the window's row" })
+      service.testFeed.quotes = longNamed
+      wait(50)
+      var shutPast = wordsPastMenu(body)
+      keyClick(Qt.Key_W)
+      wait(50)
+      var keyPast = body.listMenuOpen ? wordsPastMenu(body) : ["the menu is shut"]
+      keyClick(Qt.Key_Escape)
+      wait(50)
+      var listControlAt = center(harness.find(body, "listControl"))
+      mouseClick(body, listControlAt.x, listControlAt.y)
+      wait(100)
+      var clickPast = body.listMenuOpen ? wordsPastMenu(body) : ["the menu is shut"]
+      mouseClick(body, listControlAt.x, listControlAt.y)
+      wait(100)
+      service.testFeed.quotes = plainQuotes
+      keys.forceActiveFocus()
+      wait(50)
+      harness.check("no piece of a row's long name shows past the list menu's edge, opened by key or by click",
+        shutPast.length > 0 && keyPast.length === 0 && clickPast.length === 0 && !body.listMenuOpen,
+        "shut: " + shutPast.join(", ") + " | by key: " + keyPast.join(", ") + " | by click: " + clickPast.join(", "))
 
       keyClick(Qt.Key_W)
       wait(50)
