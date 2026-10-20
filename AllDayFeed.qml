@@ -4,8 +4,8 @@ import "Fetch.js" as Fetch
 import "Overnight.js" as Overnight
 // Whether Robinhood trades each US stock or ETF all day, its 24 Hour Market
 // (`all_day_tradability`), from its keyless instruments, one request for
-// every listing asked: only a listing it does is asked for its overnight
-// prints, and draws a calendar day (`Chart.viewChart`). An entry is
+// every listing asked: only a listing it does draws its overnight prints
+// and a calendar day (`Chart.viewChart`). An entry is
 // { status, allDay, at }, `at` the service's clock as it asked: "ok" with
 // Robinhood's answer, kept a day (`Overnight.allDayDue`); or "failed",
 // keeping the last good answer, and not all-day without one. `entries`

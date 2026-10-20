@@ -150,33 +150,52 @@ Item {
   readonly property var overnightSymbols: library.filter(function(s) {
     return !!feed.quotes[s] && Overnight.hasOvernight(feed.quotes[s], calendars)
   })
-  // Those Robinhood trades all day, the only ones asked for its prints.
+  // Those Robinhood trades all day, the only ones whose prints are drawn.
   readonly property var allDaySymbols: overnightSymbols.filter(function(s) {
     return !!allDayFeed.entries[s] && allDayFeed.entries[s].allDay
   })
-  // Robinhood is asked only while a surface is open, the one place its
-  // answers show: whether it trades a listing all day, once a day each
-  // (`Overnight.allDayDue`); and the prints of those it does, for each one
-  // it has not answered for, and for all of them as a night goes
-  // (`Overnight.overnightDue`). Looked at as the clock ticks, the listings
-  // change, a surface opens, and the screens answer; never while every
-  // screen is off (`screensClear`).
+  // Robinhood's two questions, whether it trades a listing all day and its
+  // prints, go side by side, so a 1D chart waits for one answer, never two
+  // in a row. While a surface is open, for every US stock and ETF: whether
+  // it trades all day, once a day each (`Overnight.allDayDue`); and the
+  // prints of each not known to trade only by day, for each one not
+  // answered for, and for all of them as a night goes
+  // (`Overnight.overnightDue`). With nothing open, once a session, for the
+  // pill's symbol alone, what Robinhood has not answered for it, as soon as
+  // Yahoo has answered it live, so the first click finds its chart in
+  // hand. Looked at as the clock ticks, answers land, the listings change,
+  // a surface opens, and the screens answer; never while every screen is
+  // off (`screensClear`).
+  property bool pillAsked: false
   function askOvernight() {
-    if (!root.pluginsReady || root.openSurfaces.length === 0) return
-    var tradability = root.overnightSymbols.filter(function(s) {
-      return Overnight.allDayDue(allDayFeed.entries[s], root.now)
+    if (!root.pluginsReady) return
+    var open = root.openSurfaces.length > 0
+    var pill = root.view.featured
+    var live = !!feed.entries[pill] && feed.entries[pill].status === "ok" && root.overnightSymbols.indexOf(pill) >= 0
+    if (!open && (root.pillAsked || !live)) return
+    var listings = open ? root.overnightSymbols : [pill]
+    var tradability = listings.filter(function(s) {
+      return open ? Overnight.allDayDue(allDayFeed.entries[s], root.now) : !allDayFeed.entries[s]
     })
-    var prints = []
-    if (root.allDaySymbols.length > 0) {
-      var failed = root.allDaySymbols.some(function(s) {
-        return !!overnightFeed.entries[s] && overnightFeed.entries[s].status === "failed"
-      })
-      prints = Overnight.overnightDue(overnightFeed.askedAt, root.now, root.calendars, failed)
-        ? root.allDaySymbols : root.allDaySymbols.filter(function(s) { return !overnightFeed.entries[s] })
-    }
+    var drawn = listings.filter(function(s) { return !allDayFeed.entries[s] || allDayFeed.entries[s].allDay })
+    var failed = drawn.some(function(s) {
+      return !!overnightFeed.entries[s] && overnightFeed.entries[s].status === "failed"
+    })
+    var prints = open && Overnight.overnightDue(overnightFeed.askedAt, root.now, root.calendars, failed)
+      ? drawn : drawn.filter(function(s) { return !overnightFeed.entries[s] })
     if ((tradability.length === 0 && prints.length === 0) || !root.screensClear()) return
-    allDayFeed.fetch(tradability, root.now)
-    overnightFeed.fetch(prints, root.now)
+    if (!open) root.pillAsked = true
+    var now = root.now
+    // The pill's symbol with no answer yet goes alone, ahead of the rest:
+    // its chart is the one a click waits on. A feed with a request out
+    // holds the next until that is answered.
+    var ask = function(robinhood, symbols) {
+      var alone = symbols.length > 1 && symbols.indexOf(pill) >= 0 && !robinhood.entries[pill]
+      if (alone) robinhood.fetch([pill], now)
+      robinhood.fetch(alone ? symbols.filter(function(s) { return s !== pill }) : symbols, now)
+    }
+    ask(allDayFeed, tradability)
+    ask(overnightFeed, prints)
   }
   // The clock's work, as it moves: the asks fall due at their own second
   // (`dueAt`), and the rest by the minute, when a market's session may have
@@ -370,10 +389,10 @@ Item {
     clock: root
     onReopened: root.showHistory(false)
   }
-  // Robinhood is asked for its prints and its instruments as a surface
-  // opens, as US listings are added, every 5 minutes through a night, and on
-  // r: a few a minute, more while adding, so the budget only stops a
-  // runaway.
+  // Robinhood is asked for its prints and its instruments once a session
+  // for the pill's symbol, as a surface opens, as US listings are added,
+  // every 5 minutes through a night, and on r: a few a minute, more while
+  // adding, so the budget only stops a runaway.
   Gate {
     id: robinhoodGate
     host: "Robinhood"
@@ -713,7 +732,8 @@ Item {
   // Every run's answers land in the entries, after their quotes, whether or
   // not a quote changed: the last good quotes are saved from there. Then,
   // once the run has left the feed's asks, the clock catches up to the
-  // answers' own second and the next ask falls due from them.
+  // answers' own second and the next ask falls due from them; and the pill's
+  // first live answer asks Robinhood for it (`askOvernight`).
   onEntriesChanged: {
     settleArrivals()
     if (Object.keys(feed.entries).some(function(s) { return feed.entries[s].status === "ok" })) saveQuotes()
@@ -722,6 +742,7 @@ Item {
   function answersLanded() {
     root.tick()
     root.askDue()
+    root.askOvernight()
   }
   onLibraryChanged: {
     settleArrivals()

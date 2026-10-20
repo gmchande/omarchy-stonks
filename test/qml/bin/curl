@@ -70,6 +70,8 @@
 # the steps on them take the 24-hour market's rules. While
 # STONKS_FAKE_STATE/INSTRUMENTS.down exists, the instruments fail, counted
 # all the same.
+# While STONKS_FAKE_STATE/ROBINHOOD.hold exists, every answer of Robinhood's
+# waits, each counted as it is asked: a step sees what is out at once.
 #
 # Spark: a /v7/finance/spark request answers each of its symbols from that
 # symbol's own day as the chart route would, closes only, in Yahoo's spark
@@ -181,6 +183,7 @@ serve() {
     count "${STONKS_FAKE_STATE:?}/INSTRUMENTS.calls" > /dev/null
     asked="${url#*symbols=}"
     echo "$asked" >> "$STONKS_FAKE_STATE/INSTRUMENTS.asked"
+    while [ -e "$STONKS_FAKE_STATE/ROBINHOOD.hold" ]; do sleep 0.05; done
     [ -e "$STONKS_FAKE_STATE/INSTRUMENTS.down" ] && exit 22
     saved_answer="$(in_moment robinhood-instruments.json)"
     if [ -f "$saved_answer" ]; then

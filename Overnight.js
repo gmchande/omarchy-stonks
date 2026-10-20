@@ -10,17 +10,17 @@
 // to Thursday nights, never the night before a market holiday. A stock or
 // an ETF on a US listing (decided from Yahoo's instrument type and the
 // listing's calendar, never from what Robinhood answers: it answers BTC with
-// a bitcoin ETF) is first asked of Robinhood's instruments whether Robinhood
+// a bitcoin ETF) is asked of Robinhood's instruments whether Robinhood
 // trades it all day, the 24 Hour Market its screen badges
-// (`all_day_tradability`). Only one it does has Robinhood's keyless
-// historicals asked for its prints, one request for all of them, and a 1D
-// chart of one New York calendar day, midnight to midnight, the way
-// Robinhood's screen draws it: Yahoo's day, and Robinhood's prints for the
-// hours before it and after it. Any other has Yahoo's own day, 04:00 to
-// 20:00: a thin name trades a few shares overnight now and then (two at
-// 23:10 on 6 October, in the saved answers), and none of them is a night's
-// price. The overnight print is never the headline, nor in the day's high,
-// low, or change: those stay Yahoo's.
+// (`all_day_tradability`), and of its keyless historicals for its prints,
+// side by side, so neither waits for the other. Only one it trades all day
+// draws its prints, on a 1D chart of one New York calendar day, midnight to
+// midnight, the way Robinhood's screen draws it: Yahoo's day, and
+// Robinhood's prints for the hours before it and after it. Any other has
+// Yahoo's own day, 04:00 to 20:00: a thin name trades a few shares
+// overnight now and then (two at 23:10 on 6 October, in the saved answers),
+// and none of them is a night's price. The overnight print is never the
+// headline, nor in the day's high, low, or change: those stay Yahoo's.
 
 var ROBINHOOD_URL = "https://api.robinhood.com/marketdata/historicals/"
 var INSTRUMENTS_URL = "https://api.robinhood.com/instruments/"
