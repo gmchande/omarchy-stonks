@@ -237,20 +237,18 @@ function historyDateText(history, t, withYear, interval) {
 // A bar coarser than a day has no day number to place it, so it always
 // carries its year: a five-year high inside one calendar year would
 // otherwise read "JUL". Day-level bars take the year only when the period
-// crosses one.
+// crosses one. The year is written whole, as the scrub writes it: "JAN 23"
+// read as the 23rd of January.
 function historyStatsDateText(history, t, withYear, interval) {
-  var date = historyDateParts(history, t)
-  if (!date) return "—"
   var coarse = interval === "1wk" || interval === "1mo" || interval === "3mo"
-  var text = coarse ? Format.MONTHS[date.month] : date.day + " " + Format.MONTHS[date.month]
-  return text + (coarse || withYear ? " " + String(date.year).slice(-2) : "")
+  return historyDateText(history, t, coarse || withYear, coarse ? "1mo" : "1d")
 }
 
 // The widest date historyStatsDateText writes for these bars: a two-digit
 // day, and always the year, which a period takes once it crosses one.
 function historyStatsDateWidest(interval) {
   var coarse = interval === "1wk" || interval === "1mo" || interval === "3mo"
-  return coarse ? "MMM 88" : "88 MMM 88"
+  return coarse ? "MMM 8888" : "88 MMM 8888"
 }
 
 // The info block's first line on a range, in the day line's shape

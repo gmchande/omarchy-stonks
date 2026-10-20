@@ -1053,19 +1053,21 @@ test("a range's line gives its low and high, their dates, and its coverage", () 
   const fab = M.parseHistory(fixture("history/fab-max.json"), "All")
   const weekly = M.parseHistory(fixture("history/aapl-5y.json"), "5Y")
   const line = (h, price) => said(M.rangeLine(h, null, undefined, price))
-  expect(line(aapl, M.regularClose(quote))).toBe("1Y · 229.02–344.57 @325.13 · LOW 12 SEP 25 · HIGH 29 JUL 26")
+  expect(line(aapl, M.regularClose(quote))).toBe("1Y · 229.02–344.57 @325.13 · LOW 12 SEP 2025 · HIGH 29 JUL 2026")
   expect(line(week)).toBe("1W · 209.40–254.74 @224.55 · LOW 4 SEP · HIGH 8 SEP")
   expect(line(month)).toBe("1M · 194.80–280.83 @224.55 · LOW 1 SEP · HIGH 17 AUG")
-  expect(line(fab)).toBe("ALL · 16.60–142.92 @23.20 · SINCE 31 JUL 25 · LOW 30 APR 26 · HIGH 1 AUG 25 · _ BARS")
-  expect(line(weekly)).toBe("5Y · 124.17–344.57 @332.27 · LOW JAN 23 · HIGH JUL 26")
+  expect(line(fab)).toBe("ALL · 16.60–142.92 @23.20 · SINCE 31 JUL 2025 · LOW 30 APR 2026 · HIGH 1 AUG 2025 · _ BARS")
+  // The year whole, as the scrub writes it: "JAN 23" read as 23 January.
+  // Found in design QA.
+  expect(line(weekly)).toBe("5Y · 124.17–344.57 @332.27 · LOW JAN 2023 · HIGH JUL 2026")
   // No bars: an empty rule and empty dates, and no word about it.
   expect(line({ ...week, bars: [] })).toBe("1W · ?–? · LOW _ · HIGH _")
   // Each date's slot holds the widest date of its kind, its year included,
   // so a new high's date, or a period that comes to cross a year, never
   // widens it.
-  expect(M.rangeLine(aapl).facts.map(f => f.widest)).toEqual(["88 MMM 88", "88 MMM 88"])
-  expect(M.rangeLine(week).facts.map(f => f.widest)).toEqual(["88 MMM 88", "88 MMM 88"])
-  expect(M.rangeLine(weekly).facts.map(f => f.widest)).toEqual(["MMM 88", "MMM 88"])
+  expect(M.rangeLine(aapl).facts.map(f => f.widest)).toEqual(["88 MMM 8888", "88 MMM 8888"])
+  expect(M.rangeLine(week).facts.map(f => f.widest)).toEqual(["88 MMM 8888", "88 MMM 8888"])
+  expect(M.rangeLine(weekly).facts.map(f => f.widest)).toEqual(["MMM 8888", "MMM 8888"])
   // A weekly bar names no day, so it carries its year even when the whole
   // period sits inside one.
   const oneYear = {
@@ -1073,7 +1075,7 @@ test("a range's line gives its low and high, their dates, and its coverage", () 
     bars: weekly.bars.filter(bar => bar.t >= 1767225600 && bar.t < 1798761600)
   }
   expect(M.historySpansYears(oneYear)).toBe(false)
-  expect(line(oneYear)).toMatch(/ · LOW [A-Z]{3} 26 · HIGH [A-Z]{3} 26$/)
+  expect(line(oneYear)).toMatch(/ · LOW [A-Z]{3} 2026 · HIGH [A-Z]{3} 2026$/)
   expect(M.historyScrubText(aapl, aapl.bars[0])).toBe("12 SEP 2025 · 234.07")
   expect(M.historyScrubText(week, week.bars[0])).toBe("4 SEP 09:30 · 213.58")
   expect(M.historyScrubText({ ...week, interval: "30m" }, week.bars[0])).toBe("4 SEP 09:30 · 213.58")
@@ -1088,7 +1090,7 @@ test("a range's line gives its low and high, their dates, and its coverage", () 
     symbol: "NEW", range: "All", interval: "1d", gmtoffset: 0, baseline: 10, firstTradeDate: 100,
     bars: [day(0), day(1)]
   }
-  expect(line(sparse)).toBe("ALL · 9.00–12.00 @11.00 · SINCE 1 JAN 70 · LOW 1 JAN · HIGH 2 JAN · 2 BARS")
+  expect(line(sparse)).toBe("ALL · 9.00–12.00 @11.00 · SINCE 1 JAN 1970 · LOW 1 JAN · HIGH 2 JAN · 2 BARS")
   const seven = { ...sparse, bars: [0, 1, 2, 3, 4, 5, 6].map(day) }
   const eight = { ...sparse, bars: [0, 1, 2, 3, 4, 5, 6, 7].map(day) }
   expect(line(seven)).toMatch(/ · 7 BARS$/)
