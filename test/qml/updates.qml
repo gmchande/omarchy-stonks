@@ -9,10 +9,11 @@ import "plugin" as Stonks
 // The look for a newer Stonks, through the real Plugin, Service, Updates,
 // App, and a pill, on a clock this harness sets (updates.sh). This build is
 // 1.0.9. The service asks GitHub for main's manifest as it starts and a day
-// after each ask, never while every screen is off. An equal, an older, a
-// failed, and a refused answer say nothing and show no "!"; a newer one says
-// so in the window's footer, whose click runs the update in a terminal; and
-// once the update is on disk, the restart notice takes over.
+// after each ask GitHub answered, within seconds after one it didn't, never
+// while every screen is off. An equal, an older, a failed, and a refused
+// answer say nothing and show no "!"; a newer one says so in the window's
+// footer, whose click runs the update in a terminal, and a later failure
+// leaves it; and once the update is on disk, the restart notice takes over.
 ShellRoot {
   id: harness
 
@@ -188,7 +189,6 @@ ShellRoot {
         harness.asked() + " asks | " + footer())
 
       // A failed answer, then a refusal, a day apart.
-      put("MANIFEST.version", "1.0.10")
       put("MANIFEST.down", "")
       nextDay()
       var failed = answered(3) && footer() === "+  Add a symbol" && marks().length === 0
@@ -200,17 +200,31 @@ ShellRoot {
       harness.check("a failed answer and a refusal say nothing and show no \"!\"",
         failed && refused, failed + " " + refused + " | " + harness.asked() + " asks | " + footer() + " | " + marks().join(", "))
 
+      // No answer at all, as straight after a wake before the network is
+      // back: it asks again once the gate's pause of a few seconds is over,
+      // not a day later.
+      put("GITHUB.offline", "")
+      nextDay()
+      var unanswered = answered(5)
+      remove("GITHUB.offline")
+      service.now += 5
+      var retried = answered(6)
+      harness.check("an ask that got no answer at all goes again within seconds, and says nothing meanwhile",
+        unanswered && retried && footer() === "+  Add a symbol" && marks().length === 0,
+        unanswered + " " + retried + " | " + harness.asked() + " asks | " + footer() + " | " + marks().join(", "))
+
       // Every screen off a day on: nothing is asked. On again, the next
       // word from Hyprland asks the screens, and the look goes.
+      put("MANIFEST.version", "1.0.10")
       screenStandIn.on = false
       screenStandIn.lastIpcObject = { dpmsStatus: false }
       plugin.windowHost.monitors = [screenStandIn]
       nextDay()
       tryVerify(function() { return screenStandIn.unanswered === 0 }, 3000)
-      var dark = harness.asked() === 4 && !harness.feed.testAsking && footer() === "+  Add a symbol"
+      var dark = harness.asked() === 6 && !harness.feed.testAsking && footer() === "+  Add a symbol"
       screenStandIn.on = true
       hyprlandStandIn.rawEvent({})
-      var lit = answered(5)
+      var lit = answered(7)
       harness.check("while every screen is off it asks nothing; with one on, it asks, and a newer version says so in the footer",
         dark && lit && within(1000, function() { return footer() === "Stonks 1.0.10 is out · click to update" }),
         dark + " " + lit + " | " + harness.asked() + " asks | " + footer())
@@ -226,7 +240,7 @@ ShellRoot {
       // A failed answer later changes nothing: the notice stays.
       put("MANIFEST.down", "")
       nextDay()
-      var kept = answered(6)
+      var kept = answered(8)
       remove("MANIFEST.down")
       harness.check("a failed answer once a newer version is known leaves its notice",
         kept && footer() === "Stonks 1.0.10 is out · click to update", harness.asked() + " asks | " + footer())

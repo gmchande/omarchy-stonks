@@ -10,7 +10,7 @@
 #                          its own functions, only while 1.0.0 is unreleased
 saved_answers=none
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-feed_tree data-files.qml Service.qml Gate.qml QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml AllDayFeed.qml OvernightFeed.qml Fetch.js Quote.js Format.js Market.js Overnight.js History.js Fundamentals.js Chart.js Settings.js calendars.json
+feed_tree data-files.qml Service.qml Gate.qml QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml AllDayFeed.qml OvernightFeed.qml ReleaseFeed.qml Fetch.js Quote.js Format.js Market.js Overnight.js History.js Fundamentals.js Chart.js Settings.js Release.js calendars.json
 file=$plugin/test/data-files/1.0.0.json
 data=$HOME/.config/omarchy/grvc.stonks.json
 if [ "${1:-}" = write ]; then

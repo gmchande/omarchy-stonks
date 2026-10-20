@@ -248,8 +248,9 @@ The shell's log the form asks for can name the prices Stonks left out.
 - **Sites:** `query1.finance.yahoo.com` for quotes, charts, and the market
   cap and P/E; `query2.finance.yahoo.com` for search; `api.robinhood.com`
   for overnight prices and which stocks trade overnight; and
-  `raw.githubusercontent.com` for the newest version number, once as the
-  shell starts and then once a day. Nothing else.
+  `raw.githubusercontent.com` for the newest version number, as the shell
+  starts and then once a day, or again within a minute when no answer came.
+  Nothing else.
 - **Data:** Yahoo's endpoints are unofficial, and its terms restrict
   automated access; Robinhood's data is for personal use. Either may change
   or stop without notice. Some prices come late: [Yahoo's table](https://help.yahoo.com/kb/SLN2310.html)
