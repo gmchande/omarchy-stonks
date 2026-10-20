@@ -185,7 +185,7 @@ function listIndex(lists, name) {
 function listNameProblem(name, lists) {
   var n = listName(name)
   if (!n) return "Name the list"
-  if (n.toUpperCase() === "ALL") return "All is the whole library"
+  if (n.toUpperCase() === "ALL") return "All already exists"
   if (listIndex(lists, n) >= 0) return n + " already exists"
   return ""
 }

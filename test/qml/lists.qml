@@ -714,7 +714,7 @@ ShellRoot {
       keyClick(Qt.Key_Return)
       wait(100)
       harness.check("All is refused as a name, and the menu says why",
-        body2.listMenuOpen && menu.problem === "All is the whole library",
+        body2.listMenuOpen && menu.problem === "All already exists",
         body2.listMenuOpen + "|" + menu.naming + "|" + menu.problem + "|" + service.listName + "|" + JSON.stringify(service.lists))
       grab("refused")
       keyClick(Qt.Key_Escape)
@@ -1727,7 +1727,7 @@ ShellRoot {
       harness.check("closing the window keeps a rename or a new list's name, a refused one comes back saying why, and only to its own list",
         renameKept === "true,true,false" && renameBack === "true,true,Probe 7,Probe 7 already exists,true"
           && replacedDropped === "false,true,true"
-          && newKept === "Fresh,false,false" && newBack === "true,true,all,All is the whole library",
+          && newKept === "Fresh,false,false" && newBack === "true,true,all,All already exists",
         [renameKept, renameBack, replacedDropped, newKept, newBack].join(" | "))
       service.switchList("")
       extra.concat(["Chips", "Fives", "Fresh"]).forEach(function(name) { service.deleteList(name) })

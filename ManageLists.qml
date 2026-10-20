@@ -390,7 +390,7 @@ FocusScope {
             height: root.itemHeight
             verticalAlignment: Text.AlignVCenter
             textFormat: Text.PlainText
-            text: "THE LIBRARY"
+            text: "EVERY SYMBOL"
             color: root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -467,7 +467,7 @@ FocusScope {
             verticalAlignment: Text.AlignVCenter
             textFormat: Text.PlainText
             text: "Delete " + entry.modelData.label + "? "
-              + (entry.modelData.count === 0 ? "It is empty."
+              + (entry.modelData.count === 0 ? "It's empty."
                 : entry.modelData.count === 1 ? "Its symbol stays in All."
                 : "Its " + entry.modelData.count + " symbols stay in All.")
             color: root.foreground

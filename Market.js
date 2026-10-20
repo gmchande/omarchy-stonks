@@ -305,7 +305,7 @@ function marketStatus(quote, now, scrubT, calendars, overnight) {
   if (!closure && bell) return "Market opens in " + Format.duration(bell.seconds)
   var reg = clockSession(quote, now).regular
   var base = closure ? holidayName(kind.name)
-    : (phase === "post" && reg && now >= reg.end ? phaseLabel(phase) + " · close " + printClock(quote, reg.end, calendars)
+    : (phase === "post" && reg && now >= reg.end ? phaseLabel(phase) + " · closed at " + printClock(quote, reg.end, calendars)
       : phaseLabel(phase))
   return base + (phase === "post" ? "" : scheduleNote(quote, now, calendars))
 }

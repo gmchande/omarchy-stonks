@@ -45,8 +45,9 @@ function sheet(order) {
     ],
     mouse: { title: "Mouse", rows: [
       // Each fits one line of the popup at the shell's usual text size, so
-      // the row's take two.
-      { key: "pill", does: "Wheel steps · middle changes form · right opens the window" },
+      // the pill's and the row's take two.
+      { key: "pill", does: "Scroll steps through your stocks · drag moves it" },
+      { key: "", does: "Middle-click changes form · right-click opens the window" },
       { key: "row", does: "Click shows its chart · right-click removes it" },
       { key: "", does: manual ? "Ctrl-click opens its lists · drag moves it" : "Ctrl-click opens its lists" },
       // The sort word beside the list's name: in manual order the arrow and

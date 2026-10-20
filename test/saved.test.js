@@ -238,7 +238,7 @@ test("after the close the header names the day and the next open from the calend
   const rows = [
     // Friday evening: the regular close is named so 16:00 is not read as the
     // end of trading, then the post-market ends.
-    [sep4.session.post.start + 1800, calendars, "After hours · close 16:00"],
+    [sep4.session.post.start + 1800, calendars, "After hours · closed at 16:00"],
     [sep4.session.post.end + 60, calendars, "Closed · opens Tue 09:30"],
     [saturday, calendars, "Weekend · opens Tue 09:30"],
     [1788793200, calendars, "Labor Day · opens Tue 09:30"],
@@ -492,7 +492,7 @@ test("marketStatus says whether the market is open, and where the finger is whil
   expect(M.marketStatus(q, reg.start + 2 * 3600, 0, calendars)).toBe("Market closes in 4h 30m")
   expect(M.marketStatus(q, reg.start - 600, 0, calendars)).toBe("Pre-market · opens in 10m")
   expect(M.marketStatus(q, q.session.pre.start - 600, 0, calendars)).toBe("Market opens in 5h 40m")
-  expect(M.marketStatus(quote, quote.session.post.start + 60, 0, calendars)).toBe("After hours · close 16:00")
+  expect(M.marketStatus(quote, quote.session.post.start + 60, 0, calendars)).toBe("After hours · closed at 16:00")
   expect(M.marketStatus(q, reg.start + 2 * 3600, reg.start + 3600)).toBe("At 10:30 · Market open")
   expect(M.marketStatus(q, reg.start + 2 * 3600, reg.start + 2.75 * 3600)).toBe("At 12:15 · Lunch lull")
   // At rest the day's named moments lead too, as they do while scrubbing.

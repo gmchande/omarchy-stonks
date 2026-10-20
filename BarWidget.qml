@@ -49,7 +49,7 @@ BarWidget {
   readonly property bool iconOnly: barStyle === "icon"
   readonly property bool retro: service ? service.retro : setting("style", "smooth") === "retro"
   // Freshness is judged with or without a quote: a first fetch that failed
-  // is what "! no data" is for.
+  // is what "! No data" is for.
   readonly property var freshness: service && featuredSymbol
     ? Figures.freshness(service.entries[featuredSymbol] || null, featuredQuote, service.now, service.owed[featuredSymbol] || 0) : null
   readonly property bool warns: Figures.freshnessWarns(freshness)
@@ -107,7 +107,7 @@ BarWidget {
   // A failed or overdue refresh marks the pill too: the bar is the surface
   // most likely to be trusted at a glance.
   readonly property string changeText: featured ? (warns ? "! " : "") + Format.lookSigns(featured.changeLine, retro)
-    : (warns ? "! no data" : "…")
+    : (warns ? "! No data" : "…")
   // A side bar's stacked form: the symbol's lines over the move's, each at
   // most four characters (`Format.stackedSymbol`), the move in the rows'
   // unit, money in money and else a percent (`Format.stackedMoney`,

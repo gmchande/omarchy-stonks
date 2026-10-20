@@ -1065,7 +1065,7 @@ ShellRoot {
       harness.check("the pill waits quietly while the first fetch is out",
         service.featuredSymbol === "FAIL" && pillChange.text === "…", service.featuredSymbol + "|" + pillChange.text)
       harness.check("the pill says no data when the first fetch failed",
-        within(10000, function() { return pillChange.text === "! no data" }), pillChange.text)
+        within(10000, function() { return pillChange.text === "! No data" }), pillChange.text)
       // The "!" names itself on hover on every form, the text's included,
       // in the popup's words; the text's says nothing else.
       var warningTips = hoverEveryForm()
