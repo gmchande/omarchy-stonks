@@ -4,14 +4,15 @@ import "Fetch.js" as Fetch
 import "Overnight.js" as Overnight
 // Whether Robinhood trades each US stock or ETF all day, its 24 Hour Market
 // (`all_day_tradability`), from its keyless instruments, one request for
-// every listing asked: only a listing it does is asked for its overnight
-// prints, and draws a calendar day (`Chart.viewChart`). An entry is
+// every listing asked: only a listing it does draws its overnight prints
+// and a calendar day (`Chart.viewChart`). An entry is
 // { status, allDay, at }, `at` the service's clock as it asked: "ok" with
 // Robinhood's answer, kept a day (`Overnight.allDayDue`); or "failed",
 // keeping the last good answer, and not all-day without one. `entries`
-// holds answers only. One curl at a time; listings asked for while one is
-// out, and not in it, are asked for once it is answered. While Robinhood's
-// gate pauses the host, a request fails at once.
+// holds answers only. One curl at a time: a request asked for while one is
+// out is not sent, and the service asks again for what it still wants once
+// that is answered. While Robinhood's gate pauses the host, a request fails
+// at once.
 Item {
   id: root
 
@@ -19,22 +20,15 @@ Item {
   property var gate: null
   // The gate's ticket the request out was let through on (`Gate.report`).
   property int ticket: 0
-  // The service's clock, which stamps a request the feed sends of its own
-  // accord: one held while another was out.
-  property int now: 0
   property int askedAt: 0
+  // The listings asked for, until they are answered.
   property var asking: []
-  property var wanted: []
+  readonly property bool busy: asking.length > 0
 
   // While the gate holds the host, the request fails a turn later, out of
   // the change that asked for it.
   function fetch(symbols, at) {
-    if (fetchProc.running || heldTimer.running) {
-      var more = symbols.filter(function(s) { return asking.indexOf(s) < 0 && wanted.indexOf(s) < 0 })
-      if (more.length) root.wanted = wanted.concat(more)
-      return
-    }
-    if (!symbols.length) return
+    if (busy || !symbols.length) return
     root.asking = symbols
     root.askedAt = at
     if (gate && gate.take(1) === 0) {
@@ -59,10 +53,8 @@ Item {
         ? { status: "ok", allDay: parsed[symbol], at: askedAt }
         : { status: "failed", allDay: had ? had.allDay : false, at: askedAt }
     }
+    root.asking = []
     root.entries = next
-    var again = wanted
-    root.wanted = []
-    fetch(again, now)
   }
 
   Timer {

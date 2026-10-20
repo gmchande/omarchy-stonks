@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Overnight prices through the real Service, feeds, and App window, on a
 # clock the harness sets: which listings Robinhood is asked for, when, and
-# for which span; the 1D chart as one New York calendar day, midnight to
+# for which span, the pill's two questions side by side with nothing open,
+# the rest's at the first open, and 80 listings' prints in requests of at
+# most 75; the 1D chart as one New York calendar day, midnight to
 # midnight, on a weekday, a weekend, and Sunday night; search's preview of a
 # symbol in All and of one not yet added; the overnight line under the price
 # and its dimming; a scrub of the night leaving the rows on now; none for a
@@ -36,6 +38,9 @@ patch_copy plugin/Service.qml 's/function wallSecond() { return Math.floor(Date.
 patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testOvernightFeed: overnightFeed\n  readonly property alias testAllDayFeed: allDayFeed\n  readonly property alias testFeed: feed\n  readonly property alias testYahooGate: yahooGate\n  readonly property alias testRobinhoodGate: robinhoodGate'
 scratch_home moments/data.json grvc.stonks.json
 echo weekend > "$STONKS_FAKE_STATE/overnight.set"
+# Robinhood's answers wait from the start, so the first step sees what the
+# pill's first live answer asks for while it is out.
+touch "$STONKS_FAKE_STATE/ROBINHOOD.hold"
 export QT_QPA_PLATFORM=offscreen
 run_qs 60
 finish "OVERNIGHT DONE"

@@ -39,7 +39,8 @@ Item {
   // first fetch that failed for good. They are members, saved and fetched,
   // but no list shows them until then.
   property var arriving: []
-  // The surfaces open now: the popup on any bar, the window. The chart's
+  // The surfaces open now where a screen shows them: the popup on any bar,
+  // the window on a workspace on view (`StonksBody.onScreen`). The chart's
   // history is wanted only while one is (`surfaceShown`).
   property var openSurfaces: []
   // The search result a surface's hero shows unadded, the keyboard's choice
@@ -51,6 +52,9 @@ Item {
   // The choice has rested on it: only then are its quote, its range's
   // history, and its cap and P/E asked for.
   property bool previewRests: false
+  // It rests on a surface a screen shows: only then is it a hero, its quote
+  // on the chart and on the interval, its range's history kept fresh.
+  readonly property bool previewShown: previewRests && openSurfaces.indexOf(previewSurface) >= 0
   // The symbols whose quotes are kept fresh now: the featured symbol, which
   // the pill shows; every stock, ETF, and index in All through its own
   // regular session, so an open finds the rows fresh (`Market.staysWarm`);
@@ -150,37 +154,60 @@ Item {
   readonly property var overnightSymbols: library.filter(function(s) {
     return !!feed.quotes[s] && Overnight.hasOvernight(feed.quotes[s], calendars)
   })
-  // Those Robinhood trades all day, the only ones asked for its prints.
+  // Those Robinhood trades all day, the only ones whose prints are drawn.
   readonly property var allDaySymbols: overnightSymbols.filter(function(s) {
     return !!allDayFeed.entries[s] && allDayFeed.entries[s].allDay
   })
-  // Robinhood is asked only while a surface is open, the one place its
-  // answers show: whether it trades a listing all day, once a day each
-  // (`Overnight.allDayDue`); and the prints of those it does, for each one
-  // it has not answered for, and for all of them as a night goes
-  // (`Overnight.overnightDue`). Looked at as the clock ticks, the listings
-  // change, a surface opens, and the screens answer; never while every
-  // screen is off (`screensClear`).
+  // Robinhood's two questions, whether it trades a listing all day and its
+  // prints, go side by side, so a 1D chart waits for one answer, never two
+  // in a row. While a surface is open, for every US stock and ETF: whether
+  // it trades all day, once a day each (`Overnight.allDayDue`); and the
+  // prints of each not known to trade only by day, each by its own last ask
+  // (`Overnight.overnightDue`): never asked, every 5 minutes as a night
+  // goes, once after it ends. Whatever is asked takes with it each one due
+  // within half that, so the list stays one request a night's 5 minutes,
+  // and one the gate held back goes as soon as it lets it. With nothing
+  // open, once a session, for the pill's symbol alone, what Robinhood has
+  // not answered for it, as soon as Yahoo has answered it live, so the
+  // first click finds its chart in hand. Looked at as the clock ticks,
+  // answers land, the listings change, a surface opens, and the screens
+  // answer; never while every screen is off (`screensClear`).
+  property bool pillAsked: false
   function askOvernight() {
-    if (!root.pluginsReady || root.openSurfaces.length === 0) return
-    var tradability = root.overnightSymbols.filter(function(s) {
-      return Overnight.allDayDue(allDayFeed.entries[s], root.now)
+    if (!root.pluginsReady) return
+    var open = root.openSurfaces.length > 0
+    var pill = root.view.featured
+    var live = !!feed.entries[pill] && feed.entries[pill].status === "ok" && root.overnightSymbols.indexOf(pill) >= 0
+    if (!open && (root.pillAsked || !live)) return
+    var listings = open ? root.overnightSymbols : [pill]
+    var tradability = listings.filter(function(s) {
+      return open ? Overnight.allDayDue(allDayFeed.entries[s], root.now) : !allDayFeed.entries[s]
     })
-    var prints = []
-    if (root.allDaySymbols.length > 0) {
-      var failed = root.allDaySymbols.some(function(s) {
-        return !!overnightFeed.entries[s] && overnightFeed.entries[s].status === "failed"
-      })
-      prints = Overnight.overnightDue(overnightFeed.askedAt, root.now, root.calendars, failed)
-        ? root.allDaySymbols : root.allDaySymbols.filter(function(s) { return !overnightFeed.entries[s] })
+    var drawn = listings.filter(function(s) { return !allDayFeed.entries[s] || allDayFeed.entries[s].allDay })
+    var printsDue = function(s, at) {
+      var entry = overnightFeed.entries[s]
+      return !entry || (open && Overnight.overnightDue(entry.at, at, root.calendars, entry.status === "failed"))
     }
+    var prints = drawn.filter(function(s) { return printsDue(s, root.now) })
+    if (prints.length > 0)
+      prints = drawn.filter(function(s) { return printsDue(s, root.now + Overnight.OVERNIGHT_INTERVAL / 2) })
     if ((tradability.length === 0 && prints.length === 0) || !root.screensClear()) return
-    allDayFeed.fetch(tradability, root.now)
-    overnightFeed.fetch(prints, root.now)
+    // The pill's own ask waits for a request already out, then goes.
+    if (!open && (allDayFeed.busy || overnightFeed.busy)) return
+    if (!open) root.pillAsked = true
+    // The pill's symbol with no answer yet goes alone, ahead of the rest:
+    // its chart is the one a click waits on. A feed with a request out
+    // sends nothing more; each answer asks again for what is still wanted.
+    var ask = function(robinhood, symbols) {
+      var alone = symbols.length > 1 && symbols.indexOf(pill) >= 0 && !robinhood.entries[pill]
+      robinhood.fetch(alone ? [pill] : symbols, root.now)
+    }
+    ask(allDayFeed, tradability)
+    ask(overnightFeed, prints)
   }
   // The clock's work, as it moves: the asks fall due at their own second
   // (`dueAt`), and the rest by the minute, when a market's session may have
-  // begun or ended.
+  // begun or ended, or a range on show grown old.
   onNowChanged: {
     askOvernight()
     if ((root.dueAt > 0 && root.now >= root.dueAt) || Math.floor(root.now / 60) !== root.askedMinute) askDue()
@@ -189,6 +216,7 @@ Item {
     if (Math.floor(root.now / 60) !== root.prunedMinute) {
       root.prunedMinute = Math.floor(root.now / 60)
       forgetLeft()
+      refreshRange()
     }
     // A refresh owed while every screen was off asks again as the clock
     // moves, so it goes once one is on, quotes due or not.
@@ -205,6 +233,10 @@ Item {
   // What is watched (`watched`), and of it what is due: a symbol whose last
   // answer, ok or failed, is as old as its own market's cadence
   // (`Market.quoteCadence`), the hero of an open surface on the interval.
+  // Whatever is asked takes with it each one due within `dueSoon`, so a
+  // symbol answered at a second of its own (featured, added, or retried)
+  // joins the run at the next one, and the list stays one run: two seconds
+  // of a minute are never more than half a minute apart one way.
   // First answers are the feed's own. Looked at as the clock reaches the
   // next one due (`dueAt`) and each minute, as answers land, as a surface
   // opens, as the featured symbol or a resting preview changes, and as the
@@ -213,6 +245,7 @@ Item {
   // (`screensClear`).
   property int dueAt: 0
   property int askedMinute: -1
+  readonly property int dueSoon: 30
   function askDue() {
     if (!root.pluginsReady) return
     var now = root.wallSecond()
@@ -223,16 +256,18 @@ Item {
       return open || s === featured || Market.staysWarm(feed.quotes[s], now, root.calendars)
     })
     if (watched.join(",") !== root.watched.join(",")) root.watched = watched
-    var due = []
-    var next = 0
+    var at = {}
     watched.forEach(function(s) {
       var entry = feed.entries[s]
       if (!entry || entry.status === "saved" || s in feed.asked) return
-      var hero = open && (s === featured || (root.previewRests && s === root.previewSymbol))
-      var at = entry.answeredAt + Market.quoteCadence(feed.quotes[s], now, root.refreshIntervalSec, hero, root.calendars)
-      if (at <= now) due.push(s)
-      else if (next === 0 || at < next) next = at
+      var hero = open && (s === featured || (root.previewShown && s === root.previewSymbol))
+      at[s] = entry.answeredAt + Market.quoteCadence(feed.quotes[s], now, root.refreshIntervalSec, hero, root.calendars)
     })
+    var symbols = Object.keys(at)
+    var asking = symbols.some(function(s) { return at[s] <= now })
+    var due = symbols.filter(function(s) { return at[s] <= (asking ? now + root.dueSoon : now) })
+    var next = 0
+    symbols.forEach(function(s) { if (due.indexOf(s) < 0 && (next === 0 || at[s] < next)) next = at[s] })
     root.dueAt = next
     if (due.length > 0) feed.ask(due, now)
   }
@@ -241,10 +276,11 @@ Item {
 
   // The window's host, which asks Hyprland whether every screen is off.
   // Every request a feed starts on the schedule, a quote run (queued,
-  // retried, or after a pause), Robinhood's, and a refresh's history, asks
-  // first (`screensClear`): only an answer under a second old says go. An
-  // older one is asked again, and the answer lets what waits go
-  // (`screensAnswered`), or holds it while every screen is off.
+  // retried, or after a pause), Robinhood's, and a refresh's history or a
+  // range's grown old, asks first (`screensClear`): only an answer under a
+  // second old says go. An older one is asked again, and the answer lets
+  // what waits go (`screensAnswered`), or holds it while every screen is
+  // off.
   property var screens: null
   readonly property bool screensOff: !!root.screens && root.screens.screensOff
   property real screensAnsweredMs: 0
@@ -268,6 +304,7 @@ Item {
       root.refreshOwed = false
       root.refreshRest()
     }
+    root.refreshRange()
     root.fetchAhead()
   }
   // The day last built for each symbol's chart, kept while what built it is
@@ -370,10 +407,10 @@ Item {
     clock: root
     onReopened: root.showHistory(false)
   }
-  // Robinhood is asked for its prints and its instruments as a surface
-  // opens, as US listings are added, every 5 minutes through a night, and on
-  // r: a few a minute, more while adding, so the budget only stops a
-  // runaway.
+  // Robinhood is asked for its prints and its instruments once a session
+  // for the pill's symbol, as a surface opens, as US listings are added,
+  // every 5 minutes through a night, and on r: a few a minute, more while
+  // adding, so the budget only stops a runaway.
   Gate {
     id: robinhoodGate
     host: "Robinhood"
@@ -392,7 +429,7 @@ Item {
     watched: root.watched
     lead: root.view.featured
     // A member previewed shows on the hero too, from this feed.
-    heroes: [root.view.featured].concat(root.previewRests && root.library.indexOf(root.previewSymbol) >= 0 ? [root.previewSymbol] : [])
+    heroes: [root.view.featured].concat(root.previewShown && root.library.indexOf(root.previewSymbol) >= 0 ? [root.previewSymbol] : [])
     now: root.now
     clock: root
     clearance: function() { return root.screensClear() }
@@ -406,6 +443,7 @@ Item {
   HistoryFeed {
     id: historyFeed
     gate: yahooGate
+    clock: root
     centExchanges: root.centExchanges
     inUse: root.chartsInUse
     onEntriesChanged: {
@@ -424,14 +462,15 @@ Item {
     }
   }
   // The preview's quote, fetched once when the choice rests on a symbol
-  // outside All, and never refreshed: not on the timer, not by `r`.
+  // outside All, and never refreshed: not on the timer, not by `r`; held
+  // while its surface is out of sight (`previewShown`).
   QuoteFeed {
     id: previewFeed
     symbols: root.previewRests && root.previewSymbol !== "" && root.library.indexOf(root.previewSymbol) < 0
       ? [root.previewSymbol] : []
     now: root.now
     clock: root
-    clearance: function() { return root.screensClear() }
+    clearance: function() { return root.previewShown && root.screensClear() }
     gate: yahooGate
     centExchanges: root.centExchanges
     bulk: false
@@ -439,8 +478,10 @@ Item {
   }
 
   FundamentalsFeed { id: fundamentalsFeed; gate: yahooGate }
-  AllDayFeed { id: allDayFeed; now: root.now; gate: robinhoodGate }
-  OvernightFeed { id: overnightFeed; now: root.now; gate: robinhoodGate }
+  // Robinhood's feeds send one request at a time; each answer asks again
+  // for what is still wanted, while it still is (`askOvernight`).
+  AllDayFeed { id: allDayFeed; gate: robinhoodGate; onEntriesChanged: Qt.callLater(root.askOvernight) }
+  OvernightFeed { id: overnightFeed; gate: robinhoodGate; onEntriesChanged: Qt.callLater(root.askOvernight) }
 
   // A user's refresh, from a key, the pill, or IPC: every watched quote
   // whose last answer is more than 10 s old, and, with a surface open to
@@ -501,6 +542,24 @@ Item {
     historyFeed.request(unanswered.length > 0 ? unanswered[0] : charts[charts.length - 1], range, false)
   }
 
+  // A range left on show with its history in hand is asked again as its
+  // market moves it (`History.historyDue`), a failed refresh too, so its
+  // line and its low and high keep up with the price over it: a hero's at a
+  // time, when the feed has nothing on its way, and only while a screen is
+  // on. Looked at each minute.
+  function refreshRange() {
+    if (!root.pluginsReady || historyFeed.busy) return
+    var range = root.view.range
+    var now = root.wallSecond()
+    var stale = root.historyCharts().filter(function(s) {
+      var entry = historyFeed.entries[historyFeed.keyFor(s, range)]
+      var quote = feed.quotes[s] || previewFeed.quotes[s]
+      var trading = !!quote && (quote.crypto || Market.inRegularSession(quote, now, root.calendars))
+      return !!entry && !!entry.history && History.historyDue(range, entry, quote, now, trading)
+    })
+    if (stale.length > 0 && root.screensClear()) historyFeed.request(stale[0], range, false)
+  }
+
   // The charts a user's refresh asked for fresh, each with the answer it had
   // then: one is owed until a new answer, ok or failed, replaces that.
   property var historyOwed: ({})
@@ -528,7 +587,7 @@ Item {
     var charts = root.handedOver ? [root.handedOver.symbol] : []
     if (root.previewSymbol === "" || root.openSurfaces.some(function(s) { return s !== root.previewSurface }))
       if (charts.indexOf(root.view.featured) < 0) charts.push(root.view.featured)
-    if (root.previewSymbol !== "" && root.previewRests && charts.indexOf(root.previewSymbol) < 0)
+    if (root.previewSymbol !== "" && root.previewShown && charts.indexOf(root.previewSymbol) < 0)
       charts.push(root.previewSymbol)
     return charts.filter(function(s) { return s !== "" })
   }
@@ -636,8 +695,13 @@ Item {
     onTriggered: {
       root.previewRests = true
       root.showHistory(false)
-      root.fetchFundamentals(root.previewSymbol)
     }
+  }
+  // A resting preview on a surface a screen shows asks for what it holds
+  // back while it is not: its quote, and its cap and P/E.
+  onPreviewShownChanged: if (previewShown) {
+    previewFeed.pump()
+    fetchFundamentals(previewSymbol)
   }
 
   // A surface says when it opens and closes, and as it goes. The clock
@@ -713,7 +777,8 @@ Item {
   // Every run's answers land in the entries, after their quotes, whether or
   // not a quote changed: the last good quotes are saved from there. Then,
   // once the run has left the feed's asks, the clock catches up to the
-  // answers' own second and the next ask falls due from them.
+  // answers' own second and the next ask falls due from them; and the pill's
+  // first live answer asks Robinhood for it (`askOvernight`).
   onEntriesChanged: {
     settleArrivals()
     if (Object.keys(feed.entries).some(function(s) { return feed.entries[s].status === "ok" })) saveQuotes()
@@ -722,6 +787,7 @@ Item {
   function answersLanded() {
     root.tick()
     root.askDue()
+    root.askOvernight()
   }
   onLibraryChanged: {
     settleArrivals()

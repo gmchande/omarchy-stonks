@@ -15,13 +15,19 @@ import "Quote.js" as Quote
 // clicked never says it is unavailable; its miss is told (`missed`).
 // `entries` holds answers only, "ok" or "failed": what is on its way is
 // `wanted`, so asking for a chart changes nothing a reader of the answers
-// sees until one lands. With nothing wanted the feed says so (`idle`), as
+// sees until one lands. An entry keeps its last good history and when it
+// came (`receivedAt`), and when the last answer of any kind came
+// (`answeredAt`). With nothing wanted the feed says so (`idle`), as
 // the time to ask for a chart ahead.
 Item {
   id: root
 
   property var entries: ({})
   property var gate: null
+  // The service, whose wall clock stamps each answer and ages the cache
+  // (`wallSecond`); the system's without one.
+  property var clock: null
+  function stamp() { return clock ? clock.wallSecond() : Math.floor(Date.now() / 1000) }
   // The exchanges whose listings trade in whole cents from $1
   // (`History.parseHistory`); none unless handed in.
   property var centExchanges: []
@@ -89,7 +95,7 @@ Item {
       return
     }
     var cached = entries[key]
-    var now = Math.floor(Date.now() / 1000)
+    var now = root.stamp()
     if (!force && cached && cached.status === "ok" && cached.receivedAt && now - cached.receivedAt < 15 * 60) {
       if (!wanted || !wanted.ahead || wanted.range !== range) root.want(null)
       return
@@ -207,10 +213,11 @@ Item {
       root.setEntry(request.key, {
         status: "ok",
         history: history,
-        receivedAt: Math.floor(Date.now() / 1000)
+        receivedAt: root.stamp(),
+        answeredAt: root.stamp()
       })
     } else {
-      root.setEntry(request.key, { status: "failed" })
+      root.setEntry(request.key, { status: "failed", answeredAt: root.stamp() })
     }
     root.endJob()
   }

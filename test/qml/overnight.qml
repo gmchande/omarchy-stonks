@@ -63,6 +63,13 @@ ShellRoot {
     }).length
   }
 
+  // How many requests for Robinhood's prints named `symbol`.
+  function printsAsked(symbol) {
+    return harness.record("OVERNIGHT.asked").split("\n").filter(function(line) {
+      return line.split(",").indexOf(symbol) >= 0
+    }).length
+  }
+
   function find(item, name) {
     if (!item) return null
     if (item.objectName === name) return item
@@ -251,16 +258,45 @@ ShellRoot {
       service.now = harness.saturday
       var all = ["NEST", "SILK", "REED", "^GSPC", "BTC-USD", "SHOP.TO"]
       within(8000, function() { return all.every(function(s) { return !!service.quotes[s] }) })
+      // With nothing open, the pill's first live answer asks Robinhood both
+      // its questions for it, side by side: overnight.sh holds Robinhood's
+      // answers from the start, so both are out before either answers.
+      var bothOut = within(5000, function() {
+        return harness.record("INSTRUMENTS.calls") === "1" && harness.record("OVERNIGHT.calls") === "1"
+      })
+      harness.check("with nothing open, the pill's first live answer asks Robinhood whether it trades it all day and for its prints at once, for it alone",
+        bothOut && harness.record("INSTRUMENTS.asked") === "NEST" && harness.record("OVERNIGHT.asked") === "NEST",
+        harness.record("INSTRUMENTS.asked") + " | " + harness.record("OVERNIGHT.asked"))
+      runCommand(["rm", "-f", harness.state + "/ROBINHOOD.hold"])
+      within(3000, function() { return !!service.testAllDayFeed.entries.NEST && !!service.testOvernightFeed.entries.NEST })
+      service.now += 5 * 60
       wait(300)
-      harness.check("with no surface open, Robinhood is not asked", harness.record("OVERNIGHT.calls") === "",
-        harness.record("OVERNIGHT.calls"))
+      service.now += 5 * 60
+      wait(300)
+      harness.check("with nothing open, Robinhood is asked once, and never again",
+        harness.record("INSTRUMENTS.calls") === "1" && harness.record("OVERNIGHT.calls") === "1",
+        harness.record("INSTRUMENTS.calls") + ", " + harness.record("OVERNIGHT.calls"))
 
-      // Saturday noon, after Friday 25 September.
+      // Saturday noon, after Friday 25 September. The first open finds the
+      // pill's chart in hand, and asks for the rest of the list's two
+      // answers side by side.
+      service.now = harness.saturday
+      runCommand(["touch", harness.state + "/ROBINHOOD.hold"])
       app.open("{}")
       var body = app.testBody
+      var firstFrame = body.chartSymbol + (body.chartLoading ? " loading" : "")
+      var restOut = within(5000, function() {
+        return harness.record("INSTRUMENTS.calls") === "2" && harness.record("OVERNIGHT.calls") === "2"
+      })
+      runCommand(["rm", "-f", harness.state + "/ROBINHOOD.hold"])
+      harness.check("a window opened after them shows the pill's 1D chart at once", firstFrame === "NEST", firstFrame)
+      harness.check("the first open asks for the rest's instruments and prints together: both out before either answers",
+        restOut && harness.record("INSTRUMENTS.asked").split("\n")[1] === "SILK,REED"
+          && harness.record("OVERNIGHT.asked").split("\n")[1] === "SILK,REED",
+        harness.record("INSTRUMENTS.asked") + " | " + harness.record("OVERNIGHT.asked"))
       harness.check("the window's 1D chart lands once Robinhood has answered", featureShown("NEST"))
-      harness.check("Robinhood is asked once, for a day, for the stocks on US exchanges only: never the index, the cryptocurrency, or the Toronto listing",
-        harness.record("OVERNIGHT.calls") === "1" && harness.asked() === "NEST,REED,SILK" && lastSpan() === "day",
+      harness.check("Robinhood is asked for a day, for the stocks on US exchanges only: never the index, the cryptocurrency, or the Toronto listing",
+        harness.record("OVERNIGHT.calls") === "2" && harness.asked() === "NEST,REED,SILK" && lastSpan() === "day",
         harness.record("OVERNIGHT.calls") + " calls for " + harness.asked() + ", " + lastSpan())
       within(3000, function() { return harness.strip().indexOf("AFTER HOURS") === 0 })
       harness.check("Saturday noon: no session Friday night, so Friday's after-hours is the line",
@@ -378,7 +414,7 @@ ShellRoot {
       // the last prints, and a scrub reads Yahoo's morning, not the night.
       within(5000, function() {
         return body.featuredQuote && body.featuredQuote.session.regular.start === 1790602200 && !body.chartLoading
-          && service.testOvernightFeed.askedAt === harness.monday && service.testOvernightFeed.asking.length === 0
+          && service.testOvernightFeed.askedAt === harness.monday && !service.testOvernightFeed.busy
       })
       var mondayChart = body.featuredGeometry
       scrubAt(0.1)
@@ -694,8 +730,8 @@ ShellRoot {
       // Tuesday, and BOLT six times in the night, 1 to 622 shares. Neither
       // has an overnight line or a night on its chart: each draws Yahoo's own
       // day, Tuesday, 04:00 to 20:00, its prints from the left edge.
-      // Robinhood is asked once whether it trades them all day, and never for
-      // their prints.
+      // Robinhood is asked once whether it trades them all day, and for
+      // their prints beside that, never again.
       useSet("listings-2026-10-07-0100")
       service.addSymbol("KILN")
       service.addSymbol("BOLT")
@@ -711,10 +747,10 @@ ShellRoot {
             && t.end === harness.midnight.tue6 + 20 * 3600 && t.first === 0
         }),
         JSON.stringify(thin))
-      harness.check("Robinhood is asked whether it trades KILN and BOLT all day, and never for their prints",
-        harness.allDayAsked("KILN") === 1 && harness.allDayAsked("BOLT") === 1 && harness.asked().indexOf("KILN") < 0
-          && harness.asked().indexOf("BOLT") < 0,
-        harness.allDayAsked("KILN") + ", " + harness.allDayAsked("BOLT") + " | prints asked for " + harness.asked())
+      harness.check("Robinhood is asked whether it trades KILN and BOLT all day, and their prints beside that, once",
+        harness.allDayAsked("KILN") === 1 && harness.allDayAsked("BOLT") === 1 && harness.printsAsked("KILN") === 1
+          && harness.printsAsked("BOLT") === 1,
+        harness.allDayAsked("KILN") + ", " + harness.allDayAsked("BOLT") + " | prints " + harness.printsAsked("KILN") + ", " + harness.printsAsked("BOLT"))
       // The header's animal sleeps while its market does, by its phase and
       // calendar: at 01:00 NEST's night trades, so it's awake; KILN's
       // doesn't, so it sleeps, in both looks. A scrub wakes it, since it
@@ -862,8 +898,10 @@ ShellRoot {
       harness.check("the keys step print to print: three steps from BOLT's first print land on its fourth, 05:40, an hour and forty minutes on",
         stepped === bolt[3].t && bolt[3].t - bolt[0].t > 3 * 300 && steppedRead.indexOf("At 05:40") === 0,
         steppedRead + " | " + stepped + " vs " + bolt[3].t)
-      harness.check("Robinhood's answer on all-day trading holds the day: KILN and BOLT asked once",
-        harness.allDayAsked("KILN") === 1 && harness.allDayAsked("BOLT") === 1, harness.allDayAsked("KILN") + ", " + harness.allDayAsked("BOLT"))
+      harness.check("Robinhood's answer on all-day trading holds the day: KILN and BOLT asked once, their prints never again",
+        harness.allDayAsked("KILN") === 1 && harness.allDayAsked("BOLT") === 1 && harness.printsAsked("KILN") === 1
+          && harness.printsAsked("BOLT") === 1,
+        harness.allDayAsked("KILN") + ", " + harness.allDayAsked("BOLT") + " | prints " + harness.printsAsked("KILN") + ", " + harness.printsAsked("BOLT"))
 
       // Robinhood's instruments down as SPY joins: not all-day meanwhile, so
       // its 1D lands on Yahoo's day, never waiting; five minutes on it is
@@ -986,6 +1024,51 @@ ShellRoot {
       harness.check("a symbol gone keeps Robinhood's prints five minutes and its all-day answer a day, then neither, with no edit",
         asked && keptFresh && printsGone && allDayKept && allDayGone,
         [asked, keptFresh, printsGone, allDayKept, allDayGone].join(","))
+
+      // 80 US stocks Robinhood trades all day, added with the window open:
+      // their prints come in requests of at most 75, Robinhood's limit, and
+      // every one's night is drawn. Robinhood answered 400 to all 80 in one
+      // request, and no overnight price ever showed.
+      useSet("2026-10-07-0100")
+      var longs = []
+      for (var n = 1; n <= 80; n++) longs.push("LONG" + (n < 10 ? "0" : "") + n)
+      var askedBefore = harness.record("OVERNIGHT.asked").split("\n").length
+      longs.forEach(function(s) { service.addSymbol(s) })
+      var nights = within(20000, function() {
+        return service.arriving.length === 0 && longs.every(function(s) {
+          return !!prints.entries[s] && prints.entries[s].status === "ok" && prints.entries[s].bars.length > 0
+        })
+      })
+      var requests = harness.record("OVERNIGHT.asked").split("\n").slice(askedBefore).map(function(line) { return line.split(",") })
+      var each = longs.filter(function(s) { return requests.filter(function(r) { return r.indexOf(s) >= 0 }).length === 1 })
+      featureShown("LONG80")
+      var drawn = body.featuredGeometry.start === harness.midnight.wed7
+        && body.featuredDay.points.some(function(p) { return p.t < harness.midnight.wed7 + 4 * 3600 })
+      harness.check("80 all-day listings: their prints in requests of at most 75, each asked once, and every one's night drawn",
+        nights && requests.every(function(r) { return r.length <= 75 }) && each.length === 80 && drawn,
+        "requests of " + requests.map(function(r) { return r.length }).join(", ") + "; " + each.length + " asked once; nights "
+          + nights + "; LONG80 drawn " + drawn)
+
+      // Thursday 23:00, a trading night, Robinhood refusing: the night's
+      // refresh of the list's prints, two requests now, meets a 429 and
+      // pauses Robinhood. Five minutes on, the pause's first probe lets one
+      // request of the two go; its answer reopens Robinhood, and the rest of
+      // the list goes at once. One ask stood for the whole list, so the rest
+      // used to wait another five minutes.
+      var thursdayNight = harness.midnight.thu8 + 23 * 3600
+      runCommand(["touch", harness.state + "/ROBINHOOD.refuse"])
+      service.now = thursdayNight
+      var refused = within(3000, function() { return service.testRobinhoodGate.pause === "refused" && !prints.busy })
+      runCommand(["rm", "-f", harness.state + "/ROBINHOOD.refuse"])
+      var probedFrom = harness.record("OVERNIGHT.asked").split("\n").length
+      service.now = thursdayNight + 5 * 60 + 5
+      var caughtUp = within(5000, function() {
+        return longs.every(function(s) { return prints.entries[s].status === "ok" && prints.entries[s].at > thursdayNight })
+      })
+      var afterProbe = harness.record("OVERNIGHT.asked").split("\n").slice(probedFrom).map(function(line) { return line.split(",").length })
+      harness.check("a trading night, Robinhood back after a refusal: its first probe lets one request of two go, and the rest goes once that reopens it",
+        refused && caughtUp && afterProbe.length === 2 && afterProbe[0] === 75,
+        "refused " + refused + "; requests after the pause of " + afterProbe.join(", ") + "; every night refreshed " + caughtUp)
       harness.finish()
     }
   }

@@ -109,6 +109,15 @@ ShellRoot {
   readonly property var app: plugin.windowHost.app
 
   QtObject { id: workspaceHere }
+  QtObject { id: workspaceThere }
+  // The window as Hyprland lists it, on the workspace a step puts it.
+  QtObject {
+    id: stonksToplevel
+    property string title: "Stonks"
+    property var wayland: ({ appId: "org.quickshell" })
+    property string address: "5ab1e"
+    property var workspace: workspaceHere
+  }
   QtObject {
     id: hyprlandStandIn
     property var toplevels: ({ values: [] })
@@ -162,11 +171,13 @@ ShellRoot {
 
   // A screen as Hyprland reports it, for the window host (fetch.sh): on or
   // off, as it says when asked again, a turn later, as Hyprland's answer
-  // comes. It counts the asks it has not answered yet (`screensHeard`).
+  // comes, showing this workspace. It counts the asks it has not answered
+  // yet (`screensHeard`).
   QtObject {
     id: screenStandIn
     property bool on: true
     property var lastIpcObject: ({ dpmsStatus: true })
+    property var activeWorkspace: workspaceHere
     property int unanswered: 0
     function refresh() {
       unanswered++
@@ -175,6 +186,13 @@ ShellRoot {
         screenStandIn.unanswered--
       })
     }
+  }
+  // A second screen, always on, showing the other workspace.
+  QtObject {
+    id: otherScreen
+    property var lastIpcObject: ({ dpmsStatus: true })
+    property var activeWorkspace: workspaceThere
+    function refresh() { Qt.callLater(function() { otherScreen.lastIpcObject = { dpmsStatus: true } }) }
   }
 
   // The service's writes of the data file, each as it is saved.
@@ -230,6 +248,14 @@ ShellRoot {
     function screensHeard() {
       tryVerify(function() { return screenStandIn.unanswered === 0 }, 5000)
     }
+    // A run waiting on the stand-in screen's answer goes once it comes, a
+    // turn or two later: let it come, and the run land.
+    function answerScreens() {
+      if (screenStandIn.unanswered === 0) return
+      screensHeard()
+      wait(20)
+      settle()
+    }
 
     // The clock moves on by `seconds`, a step at a time, each run let land.
     // `each` is called after every step.
@@ -263,10 +289,11 @@ ShellRoot {
     // its start in and its end out, against `want`. A symbol asked for on a
     // period may land a tick either side of the window's edge, so a count
     // may be one off; one expected never to be asked must not be at all.
-    function countsOver(label, seconds, want, begin) {
+    // `each` is called after every step of the clock (`tick`).
+    function countsOver(label, seconds, want, begin, each) {
       var from = harness.requests().length
       begin()
-      tick(seconds - 5)
+      tick(seconds - 5, 5, each)
       var got = harness.quoteCounts(harness.requests().slice(from))
       var off = harness.listed.filter(function(s) { return want[s] === 0 ? got[s] !== 0 : Math.abs(got[s] - want[s]) > 1 })
       harness.check(label, off.length === 0, harness.listed.map(function(s) { return s + " " + got[s] + "/" + want[s] }).join(", "))
@@ -374,6 +401,9 @@ ShellRoot {
         900, counts([15, 15, 15, 15, 0, 15, 0, 15]), startAt(at(harness.wed7, 11, 0)))
       // F2 and F4: an open finds the rows fresh; it asks only for what is
       // stale, in one run, and shows no warning and no "As of" on any frame.
+      // It opens past the minute's run, when no row falls due for most of a
+      // minute: an ask takes with it what falls due within half a minute.
+      tick(20)
       var shownMarks = []
       var watchFrames = function() { marks().forEach(function(m) { if (shownMarks.indexOf(m) < 0) shownMarks.push(m) }) }
       frames.each = watchFrames
@@ -395,6 +425,25 @@ ShellRoot {
       // window ends: its last minute's request does not go.
       countsOver("11:15, the window open: every listing trading every minute, London until its close; Tokyo, closed, every 15",
         900, counts([15, 15, 15, 15, 15, 14, 1, 15]), startAt(service.now + 5))
+
+      // Five rows featured 12 seconds apart, across a minute: each new
+      // hero's chart is asked at once, at a second of its own, and the next
+      // run takes each with it, however far from the list's second, so the
+      // list goes on refreshing in one run a minute. Each used to keep its
+      // own second, five or six runs a minute.
+      ;["KILN", "SPY", "^GSPC", "SHOP.TO", "NEST"].forEach(function(s) {
+        service.feature(s)
+        tick(12, 1)
+      })
+      tick(60)
+      var featuredFrom = harness.runs().length
+      tick(300)
+      var featuredRuns = harness.runs().slice(featuredFrom)
+      harness.check("five rows featured across a minute: the list still refreshes in one run a minute",
+        featuredRuns.length <= 6, featuredRuns.length + " runs in 5 minutes: " + featuredRuns.join(" / "))
+      // The next run, so r below finds every answer older than 10 s.
+      var runsNow = harness.runs().length
+      for (var w = 0; w < 61 && harness.runs().length === runsNow; w++) tick(1, 1)
 
       // F7: r twice within 5 s sends one run.
       tick(20)
@@ -523,6 +572,30 @@ ShellRoot {
       more.forEach(function(s) { service.removeSymbol(s) })
       closeWindow()
 
+      // 15:00, the window left on 1W: its history is asked again every 15
+      // minutes while New York trades, and once after the close for its
+      // last bars, then not again, so its line and its low and high keep up
+      // with the price over them. A refresh that fails, tried twice, is
+      // asked again 15 minutes on. It was asked once, and kept all session.
+      service.now = at(harness.wed7, 15, 0)
+      settle()
+      openWindow()
+      body.selectRange("1W")
+      tryVerify(function() { return !!service.histories["NEST|1W"] && service.histories["NEST|1W"].status === "ok" }, 5000)
+      var weekFrom = Number(harness.record("NEST.history.calls") || 0)
+      tick(20 * 60, 15)
+      touch("NEST.history.down")
+      tick(15 * 60, 15)
+      tryVerify(function() { return service.histories["NEST|1W"].status === "failed" }, 8000)
+      remove("NEST.history.down")
+      tick(45 * 60, 15)
+      var weekAsked = Number(harness.record("NEST.history.calls") || 0) - weekFrom
+      harness.check("the window left on 1W from 15:00 to 16:20: its history asked again every 15 minutes until the close, a failed refresh twice and again 15 minutes on, then once for its last bars",
+        weekAsked === 5, weekAsked + " asks")
+      body.selectRange("1D")
+      settle()
+      closeWindow()
+
       // 16:30, after hours. The pill's wheel moves to KILN, which nothing
       // watched: it is asked for at once, and shown without a warning.
       service.now = at(harness.wed7, 16, 30)
@@ -599,6 +672,56 @@ ShellRoot {
       var prints = night.filter(function(l) { return /^overnight /.test(l) }).length
       harness.check("23:30, the window open: Robinhood's prints every 5 minutes through the night", Math.abs(prints - 3) <= 1, prints + " requests")
       closeWindow()
+
+      // Midnight, the window left open on a workspace no screen shows: it
+      // asks what a closed one asks, the pill's symbol every 15 minutes and
+      // Tokyo, trading, every minute, and nothing of Robinhood, whose prints
+      // a window in sight asks every 5 minutes through the night. Back in
+      // sight, what fell due goes at once.
+      hyprlandStandIn.toplevels = { values: [stonksToplevel] }
+      plugin.windowHost.monitors = [screenStandIn]
+      stonksToplevel.workspace = workspaceThere
+      var away = countsOver("00:00, the window open on a workspace no screen shows: the pill's symbol every 15 minutes, Tokyo, trading, every minute, nothing else",
+        1800, counts([2, 0, 0, 0, 0, 0, 30, 0]), function() {
+          startAt(at(harness.wed7 + 86400, 0, 0))()
+          answerScreens()
+          app.open("{}")
+          tryVerify(function() { return app.opened }, 3000)
+          answerScreens()
+        }, answerScreens)
+      harness.check("out of sight, the window asks nothing of Robinhood", away.every(function(l) { return !/^(overnight|instruments) /.test(l) }),
+        away.filter(function(l) { return /^(overnight|instruments) /.test(l) }).join(", "))
+      var backFrom = harness.requests().length
+      stonksToplevel.workspace = workspaceHere
+      var caughtUp = within(3000, function() {
+        var back = harness.requests().slice(backFrom)
+        return harness.quoteCounts(back)["BTC-USD"] === 1 && back.some(function(l) { return /^overnight /.test(l) })
+      })
+      harness.check("back in sight, what fell due goes at once: the crypto, and Robinhood's prints", caughtUp,
+        harness.requests().slice(backFrom).join(", "))
+      settle()
+
+      // 00:35, two screens: the window's switched off, the other on and
+      // showing another workspace. No screen shows the window, so it asks
+      // what a closed one asks, though not every screen is off.
+      plugin.windowHost.monitors = [screenStandIn, otherScreen]
+      var dark = countsOver("00:35, the window's screen off and the other on: the pill's symbol, Tokyo every minute, nothing else",
+        900, counts([1, 0, 0, 0, 0, 0, 15, 0]), function() {
+          screenStandIn.on = false
+          screenStandIn.refresh()
+          screensHeard()
+          startAt(at(harness.wed7 + 86400, 0, 35))()
+          answerScreens()
+        }, answerScreens)
+      harness.check("its screen off, the window asks nothing of Robinhood", dark.every(function(l) { return !/^(overnight|instruments) /.test(l) }),
+        dark.filter(function(l) { return /^(overnight|instruments) /.test(l) }).join(", "))
+      screenStandIn.on = true
+      screenStandIn.refresh()
+      screensHeard()
+      settle()
+      closeWindow()
+      hyprlandStandIn.toplevels = { values: [] }
+      plugin.windowHost.monitors = []
 
       // Thursday 11:00, nothing open, every quote still Wednesday's: the
       // calendars say New York, London, and Toronto trade, so their rows

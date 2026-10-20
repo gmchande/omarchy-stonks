@@ -10,17 +10,17 @@
 // to Thursday nights, never the night before a market holiday. A stock or
 // an ETF on a US listing (decided from Yahoo's instrument type and the
 // listing's calendar, never from what Robinhood answers: it answers BTC with
-// a bitcoin ETF) is first asked of Robinhood's instruments whether Robinhood
+// a bitcoin ETF) is asked of Robinhood's instruments whether Robinhood
 // trades it all day, the 24 Hour Market its screen badges
-// (`all_day_tradability`). Only one it does has Robinhood's keyless
-// historicals asked for its prints, one request for all of them, and a 1D
-// chart of one New York calendar day, midnight to midnight, the way
-// Robinhood's screen draws it: Yahoo's day, and Robinhood's prints for the
-// hours before it and after it. Any other has Yahoo's own day, 04:00 to
-// 20:00: a thin name trades a few shares overnight now and then (two at
-// 23:10 on 6 October, in the saved answers), and none of them is a night's
-// price. The overnight print is never the headline, nor in the day's high,
-// low, or change: those stay Yahoo's.
+// (`all_day_tradability`), and of its keyless historicals for its prints,
+// side by side, so neither waits for the other. Only one it trades all day
+// draws its prints, on a 1D chart of one New York calendar day, midnight to
+// midnight, the way Robinhood's screen draws it: Yahoo's day, and
+// Robinhood's prints for the hours before it and after it. Any other has
+// Yahoo's own day, 04:00 to 20:00: a thin name trades a few shares
+// overnight now and then (two at 23:10 on 6 October, in the saved answers),
+// and none of them is a night's price. The overnight print is never the
+// headline, nor in the day's high, low, or change: those stay Yahoo's.
 
 var ROBINHOOD_URL = "https://api.robinhood.com/marketdata/historicals/"
 var INSTRUMENTS_URL = "https://api.robinhood.com/instruments/"
@@ -62,11 +62,16 @@ function robinhoodSymbol(symbol) {
 
 // span=day is the last 288 five-minute slots Robinhood's 24/5 market traded,
 // its closed days left out (seen Sunday 4 October, 22:58 ET: Thursday 22:55
-// onward), so one answer holds every print a 1D chart can draw.
+// onward), so one answer holds every print a 1D chart can draw. At most
+// `OVERNIGHT_BATCH` symbols to a request.
 function overnightUrl(symbols) {
   return ROBINHOOD_URL + "?symbols=" + symbols.map(function(s) { return encodeURIComponent(robinhoodSymbol(s)) }).join(",")
     + "&interval=5minute&span=day&bounds=24_5"
 }
+
+// Robinhood's historicals answer 400 to more symbols than this in one
+// request: "Too many instruments requested. No more than 75 allowed."
+var OVERNIGHT_BATCH = 75
 
 // Robinhood's instruments for `symbols`, one request for all: whether it
 // trades each all day.
@@ -278,10 +283,10 @@ function sessionDay(quote) {
   })
 }
 
-// Whether an open surface should ask Robinhood again: never asked; every
-// few minutes while a night trades; and once after a night ends, for its
-// last bars. Between a night's last bars and the next night, nothing new
-// can come.
+// Whether an open surface should ask Robinhood again for a listing's
+// prints, last asked at `askedAt`: never asked; every few minutes while a
+// night trades; and once after a night ends, for its last bars. Between a
+// night's last bars and the next night, nothing new can come.
 function overnightDue(askedAt, now, calendars, failed) {
   var cal = overnightMarket(calendars)
   if (!cal) return false
