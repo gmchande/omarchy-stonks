@@ -1088,7 +1088,7 @@ Item {
     gutter: root.gutter
     // What to type, and the list it adds to; short, so a list's name fits
     // the popup's field.
-    placeholder: root.listName !== "" ? "Symbol or company for " + root.listName + "…" : "Search a symbol or company…"
+    placeholder: root.listName !== "" ? "Symbol or company for " + root.listName + "…" : "Symbol or company…"
     members: root.members
     onPicked: function(symbol) { root.acceptSymbol(symbol) }
     onChose: function(symbol) { root.previewTo(symbol) }
