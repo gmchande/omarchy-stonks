@@ -34,19 +34,15 @@ var BLOCK_GLYPHS = {
 }
 
 // Stonks' mark: a small chart that climbs, as points left to right, 0 at the
-// top. The look icon's curve, and, in cells, the pill's icon form, the look
-// icon's retro cells, and the launcher icon (test/mark-svg.js).
+// top. The look icon draws it as a curve and in cells.
 function markPoints() {
   return [{ x: 0, y: 0.9 }, { x: 0.25, y: 0.45 }, { x: 0.5, y: 0.75 }, { x: 0.75, y: 0.25 }, { x: 1, y: 0.05 }]
 }
 
 // The mark in cells, the way the retro chart draws: each column's cap row,
-// of `rows`, 0 at the top, its stem running down to the floor. Falling is the
-// same chart mirrored, so its shape alone says which way the day went.
-function markLevels(rows, falling) {
-  var points = markPoints()
-  var levels = points.map(function(p) { return Math.round(p.y * (rows - 1)) })
-  return falling ? levels.reverse() : levels
+// of `rows`, 0 at the top, its stem running down to the floor.
+function markLevels(rows) {
+  return markPoints().map(function(p) { return Math.round(p.y * (rows - 1)) })
 }
 
 // The price as cells on a five-row grid: every digit's full 3x5 slot, the
@@ -71,13 +67,15 @@ function blockCells(text) {
   return { columns: Math.max(0, x - 1), cells: cells }
 }
 
-// Pixel sprites for the header: a bull for an up day, a bear for a down day.
-// 20 wide, 14 tall; "#" is a lit pixel. Two faces, front on. The bull reads
-// by its long horns and its nostrils. The bear reads by round ears that stand
-// out from its head, with a notch under each, and cheeks wider than its
-// ears: earlier faces whose outline ran straight up into the ears read as
-// cats. test/qml/render.qml draws the other candidates beside these, and
-// marks whichever pair is here as the default.
+// The bull for an up day, the bear for a down day: the header's animal in
+// both looks, the pill's icon form, and the launcher icon
+// (test/launcher-icon.js). 20 wide, 14 tall; "#" is a lit pixel. Two faces,
+// front on. The bull reads by its long horns and its nostrils. The bear
+// reads by round ears that stand out from its head, with a notch under
+// each, and cheeks wider than its ears: earlier faces whose outline ran
+// straight up into the ears read as cats. test/qml/render.qml draws the
+// other candidates beside these, and marks whichever pair is here as the
+// default.
 var BULL_SPRITE = [
   "....................",
   "#..................#",
@@ -122,11 +120,12 @@ var REMOVE_SPRITE = [
   "#...#"
 ]
 
-// Each animal's eyes closing, as retro steps them: the lid half down, then
-// shut (`HeaderStatus`). The bull's two-cell eyes shut to slits lowered a
-// row. The bear's one-cell eyes have no half: the lid covers them, then
-// each opens as a two-cell slit at eye level, widened outward: widened
-// inward they crowd the nose, and lowered a row they meet it in a frown.
+// Each animal's eyes closing, as the header steps them: the lid half down,
+// then shut (`HeaderStatus`). The bull's two-cell eyes shut to slits
+// lowered a row. The bear's one-cell eyes have no half: the lid covers
+// them, then each opens as a two-cell slit at eye level, widened outward:
+// widened inward they crowd the nose, and lowered a row they meet it in a
+// frown.
 var BULL_HALF = BULL_SPRITE.slice()
 BULL_HALF[6] = "...##############..."
 var BULL_SHUT = BULL_HALF.slice()

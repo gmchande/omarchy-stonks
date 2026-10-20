@@ -231,3 +231,10 @@ function rowModel(quote, scrubT, changeMode) {
     periodLabel: Format.changeCaption(changeMode)
   }
 }
+
+// The day's animal for a row (`rowModel`): "bull" up, "bear" down, by
+// `dayTone`, and "" on a flat day or with no row. The header's and the
+// pill's read this one rule, so the two never disagree on the same moment.
+function animalKind(row) {
+  return !row || row.dayTone === "flat" ? "" : row.dayTone === "up" ? "bull" : "bear"
+}

@@ -4,7 +4,7 @@
 # sheet closing, a removal and its undo, an add that lands, a membership
 # change from elsewhere, the list menu, and search opening and closing each
 # ease the edge in 160 ms, the footer riding it whole where it shows; an
-# open from closed holds its fitted height. The pill's mark turns column by
+# open from closed holds its fitted height. The pill's animal turns column by
 # column in 200 ms as its day crosses its close, and a wheel step switches
 # it at once.
 # The shell's layer-shell card window does not load offscreen, so the copy

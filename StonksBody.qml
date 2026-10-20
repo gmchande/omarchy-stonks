@@ -288,10 +288,8 @@ Item {
   readonly property bool heroLive: (!historyActive || historyFailed)
     && !scrubT && featuredFreshness.live
   // The header's animal, in both looks: the direction of the moment shown
-  // against the baseline, a bull up and a bear down, and none on a flat day
-  // (`dayTone`) or before a direction is known.
-  readonly property string animalKind: !featured || featured.dayTone === "flat" ? ""
-    : featured.dayTone === "up" ? "bull" : "bear"
+  // against the baseline (`Figures.animalKind`), as the pill's reads the day.
+  readonly property string animalKind: Figures.animalKind(featured)
   // What it reads, the chart as the motion tells charts apart (a failed
   // range's stand-in day is another chart than its history), the list, and
   // the look: a change of it is no turn, so the animal changes at once.

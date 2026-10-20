@@ -5,6 +5,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "plugin/Cells.js" as Cells
 import "plugin/Chart.js" as Chart
 import "plugin/Figures.js" as Figures
 import "plugin/Format.js" as Format
@@ -78,32 +79,31 @@ ShellRoot {
     return change ? change.text : ""
   }
 
-  // Which way the pill's mark goes, as drawn: its cells' caps from the left.
-  function markWay(mark) {
-    var caps = []
+  // What the pill's icon form draws: its animal's cells read back as the
+  // bull or the bear in their colour, mid-turn each part from the left with
+  // its columns; a flat day's level line; the "…" before a first quote; and
+  // a warning's "!" after any of them.
+  function iconDrawn() {
+    var icon = find(pill, "pillIcon")
+    var parts = []
     var collect = function(item) {
-      if (item.objectName === "markCell") caps.push(item)
+      if (item.objectName === "animalCells" && item.parent.visible && item.parent.width > 0) parts.push(item)
       for (var i = 0; i < item.children.length; i++) collect(item.children[i])
     }
-    collect(mark)
-    caps.sort(function(a, b) { return a.parent.x - b.parent.x })
-    if (caps.length < 2) return "no cells"
-    var first = caps[0].y
-    var last = caps[caps.length - 1].y
-    return first > last ? "climbs" : first < last ? "falls" : "flat"
-  }
-
-  // The pill's mark as drawn: which way it goes, and each column's colour
-  // from the left.
-  function markDrawn(mark) {
-    var caps = []
-    var collect = function(item) {
-      if (item.objectName === "markCell") caps.push(item)
-      for (var i = 0; i < item.children.length; i++) collect(item.children[i])
-    }
-    collect(mark)
-    caps.sort(function(a, b) { return a.parent.x - b.parent.x })
-    return markWay(mark) + " in " + caps.map(function(c) { return String(c.color) }).join(" ")
+    collect(icon)
+    var animal = find(pill, "pillAnimal")
+    parts.sort(function(a, b) { return a.parent.x - b.parent.x })
+    var drawn = parts.map(function(p) {
+      var pixels = JSON.stringify(p.pixels)
+      var kind = pixels === JSON.stringify(Cells.spriteFor(true, 0)) ? "bull"
+        : pixels === JSON.stringify(Cells.spriteFor(false, 0)) ? "bear" : "other cells"
+      var columns = Math.round(p.parent.width / animal.cell)
+      return kind + " in " + p.color + (columns === animal.columns ? "" : " " + columns + " columns")
+    })
+    if (find(pill, "pillLevel").visible) drawn.push("level")
+    if (find(pill, "pillWaiting").visible) drawn.push("…")
+    if (find(pill, "pillWarning").visible) drawn.push("!")
+    return drawn.join(", ") || "nothing"
   }
 
   // A window's info line: titled by its range, with the range's high once
@@ -277,10 +277,9 @@ ShellRoot {
 
     // The pill in every bar style, cycled by middle-clicks until it comes
     // round, in both looks: what it says and the change's colour against
-    // `expected(retro)` and `tone`, and for the icon form the mark alone,
-    // falling, in `tone`. Each middle-click hands the shell the entry's
-    // other keys with the next style, and writes no data file. Returns what
-    // was wrong.
+    // `expected(retro)` and `tone`, and for the icon form the bear alone in
+    // `tone`. Each middle-click hands the shell the entry's other keys with
+    // the next style, and writes no data file. Returns what was wrong.
     function pillInEveryStyle(expected, tone) {
       var wrong = []
       var startLook = service.retro
@@ -296,15 +295,13 @@ ShellRoot {
           seen.push(pill.barStyle)
           var change = harness.find(pill, "pillChange")
           var arrow = harness.find(pill, "pillArrow")
-          var mark = harness.find(pill, "pillMark")
           var symbolShown = harness.find(pill, "pillSymbol").visible
           var want = expected(service.retro)
           var where = pill.barStyle + " " + (service.retro ? "retro" : "smooth")
           if (pill.barStyle === "icon") {
-            if (!mark.visible || arrow.visible || change.visible || symbolShown || !Qt.colorEqual(mark.color, tone)
-                || harness.markWay(mark) !== "falls")
-              wrong.push(where + ": mark " + mark.visible + " in " + mark.color + ", " + harness.markWay(mark) + ", arrow "
-                + arrow.visible + ", symbol " + symbolShown + ", change " + change.visible + "; want the mark alone, falling, in " + tone)
+            if (harness.iconDrawn() !== "bear in " + tone || arrow.visible || change.visible || symbolShown)
+              wrong.push(where + ": " + harness.iconDrawn() + ", arrow " + arrow.visible + ", symbol " + symbolShown
+                + ", change " + change.visible + "; want the bear alone in " + tone)
           } else if (harness.pillText() !== want || !Qt.colorEqual(change.color, tone) || !symbolShown || !change.visible) {
             wrong.push(where + ": " + harness.pillText() + " in " + change.color + ", want " + want + " in " + tone)
           }
@@ -1048,7 +1045,7 @@ ShellRoot {
 
       // A hover only where the pill can't say it: the text, the line, and
       // the arrow show their symbol and change, so theirs is quiet; the
-      // icon's says the symbol and its change, which the mark can't show.
+      // icon's says the symbol and its change, which the animal can't show.
       // The owner's rule of 15 October: tooltips sparingly.
       var quietSymbol = service.featuredSymbol
       var quietTips = hoverEveryForm()
@@ -1062,8 +1059,14 @@ ShellRoot {
       service.addSymbol("FAIL")
       service.feature("FAIL")
       var pillChange = harness.find(pill, "pillChange")
-      harness.check("the pill waits quietly while the first fetch is out",
-        service.featuredSymbol === "FAIL" && pillChange.text === "…", service.featuredSymbol + "|" + pillChange.text)
+      // The icon form has no animal to show yet: it says "…" as the text does.
+      var waitingSettings = pill.settings
+      pill.settings = Object.assign({}, waitingSettings, { barStyle: "icon" })
+      var waitingIcon = harness.iconDrawn()
+      pill.settings = waitingSettings
+      harness.check("the pill waits quietly while the first fetch is out, the icon form with no animal",
+        service.featuredSymbol === "FAIL" && pillChange.text === "…" && waitingIcon === "…",
+        service.featuredSymbol + "|" + pillChange.text + "|" + waitingIcon)
       harness.check("the pill says no data when the first fetch failed",
         within(10000, function() { return pillChange.text === "! No data" }), pillChange.text)
       // The "!" names itself on hover on every form, the text's included,
@@ -1074,7 +1077,8 @@ ShellRoot {
           && /^icon "FAIL .* · NO DATA FOR THIS SYMBOL"$/.test(warningTips[3]),
         warningTips.join(" | "))
       // The icon form, on the top bar and a side bar, and the side bar's
-      // stacked form show the "!" too, the stacked one naming its symbol.
+      // stacked form show the "!" too, the stacked one naming its symbol;
+      // the icon form's stands alone, with no animal to stand beside.
       // Found in the 1.0.0 review: they looked healthy, the stacked form
       // saying "ST …" as if still loading.
       var formsWarn = function() {
@@ -1084,8 +1088,7 @@ ShellRoot {
           barApi.vertical = vertical
           barApi.barSize = vertical ? Style.bar.sizeVertical : 0
           pill.settings = Object.assign({}, settingsWas, vertical ? { barStyleVertical: "icon" } : { barStyle: "icon" })
-          var markWarning = harness.find(pill, "pillMarkWarning")
-          said.push((vertical ? "side icon " : "icon ") + (!!markWarning && markWarning.visible && markWarning.text === "!"))
+          said.push((vertical ? "side icon " : "icon ") + harness.iconDrawn())
         })
         pill.settings = Object.assign({}, settingsWas, { barStyleVertical: "stacked" })
         said.push("stacked " + harness.find(pill, "pillStack").children.filter(function(c) { return c.objectName === "pillStackLine" })
@@ -1096,8 +1099,8 @@ ShellRoot {
         return said.join(", ")
       }
       var failedForms = formsWarn()
-      harness.check("after a failed first fetch the icon form, on either bar, and the stacked form show the \"!\", the stacked one naming its symbol",
-        failedForms === "icon true, side icon true, stacked FAIL/!", failedForms)
+      harness.check("after a failed first fetch the icon form, on either bar, shows the \"!\" alone, and the stacked form shows it naming its symbol",
+        failedForms === "icon !, side icon !, stacked FAIL/!", failedForms)
       // The window says the same where it says it: the header "No data",
       // the hero's line "! NO DATA FOR THIS SYMBOL", as the row says it.
       // Found in the design pass of 14 October: "NO QUOTE", "! REFRESH
@@ -1419,13 +1422,11 @@ ShellRoot {
       for (var vlook = 0; vlook < 2; vlook++) {
         service.persist({ style: vlook === 0 ? "smooth" : "retro" })
         var stack = harness.find(pill, "pillStack")
-        // The icon form, whatever the top bar's: the mark alone, falling, in
-        // one slot.
-        var verticalMark = harness.find(pill, "pillMark")
-        if (!verticalMark.visible || stack.visible || !Qt.colorEqual(verticalMark.color, Commons.Color.urgent)
-            || harness.markWay(verticalMark) !== "falls" || pill.implicitHeight !== Style.bar.iconSlot)
-          verticalWrong.push((service.retro ? "retro" : "smooth") + " icon: mark " + verticalMark.visible + " in "
-            + verticalMark.color + ", " + harness.markWay(verticalMark) + ", stack " + stack.visible + ", "
+        // The icon form, whatever the top bar's: the bear alone, in one
+        // slot.
+        var verticalIcon = harness.iconDrawn()
+        if (verticalIcon !== "bear in " + Commons.Color.urgent || stack.visible || pill.implicitHeight !== Style.bar.iconSlot)
+          verticalWrong.push((service.retro ? "retro" : "smooth") + " icon: " + verticalIcon + ", stack " + stack.visible + ", "
             + pill.implicitHeight + " px tall")
         // Stacked, as Omarchy's clock stacks a vertical bar's lines: DOWN
         // over its move, a percent over its %, or in money split at its
@@ -1456,14 +1457,14 @@ ShellRoot {
         pill.settings = settingsBefore
       }
       // Each bar keeps its own form: a saved arrow stays the arrow on a
-      // horizontal bar while a vertical one shows the mark, and a
-      // middle-click there steps between the mark and the symbol over its
+      // horizontal bar while a vertical one shows the icon, and a
+      // middle-click there steps between the icon and the symbol over its
       // change without touching the arrow. The arrow, the line, and the text
       // used to share one setting with the vertical bar, so a middle-click
       // there lost the arrow.
       pill.settings = Object.assign({}, settingsBefore, { barStyle: "arrow" })
       var drawn = function() {
-        return pill.barStyle + " " + (harness.find(pill, "pillMark").visible ? "mark" : harness.find(pill, "pillStack").visible ? "stacked"
+        return pill.barStyle + " " + (harness.find(pill, "pillIcon").visible ? "icon" : harness.find(pill, "pillStack").visible ? "stacked"
           : harness.find(pill, "pillArrow").visible ? "arrow" : "nothing")
       }
       var walk = [drawn()]
@@ -1482,10 +1483,10 @@ ShellRoot {
       walk.push(drawn())
       pill.settings = settingsBefore
       service.persist({ style: "smooth" })
-      harness.check("a vertical bar shows the mark on 6M, falling, in both looks, and once picked the day stacked inside the bar in its colour, in % and in money",
+      harness.check("a vertical bar shows the day's bear on 6M in both looks, and once picked the day stacked inside the bar in its colour, in % and in money",
         verticalWrong.length === 0, verticalWrong.join(" | "))
       harness.check("a horizontal bar's arrow and a vertical bar's form are kept apart, and on a vertical bar every middle-click changes what shows",
-        walk.join(",") === "icon mark,arrow arrow,stacked stacked,icon mark,stacked stacked,arrow arrow", walk.join(","))
+        walk.join(",") === "icon icon,arrow arrow,stacked stacked,icon icon,stacked stacked,arrow arrow", walk.join(","))
 
       // In the bar's right section, among its bare icons, the pill shows its
       // icon until a middle-click there picks another form, which it keeps
@@ -1497,7 +1498,7 @@ ShellRoot {
         var layout = { left: [], center: [], right: [] }
         layout[section] = [{ id: "grvc.stonks" }]
         barApi.layoutConfig = layout
-        var alone = harness.find(pill, "pillMark").visible && !harness.find(pill, "pillSymbol").visible
+        var alone = harness.find(pill, "pillIcon").visible && !harness.find(pill, "pillSymbol").visible
         return pill.barStyle + (alone ? " alone" : "")
       }
       var middleClick = function() {
@@ -1506,16 +1507,22 @@ ShellRoot {
       }
       var centreForm = formIn("center")
       var movedRight = formIn("right")
-      // The mark climbs on an up day and falls on a down one, in the day's
-      // colour: the shape says the direction without the colour.
-      var mark = harness.find(pill, "pillMark")
+      // The icon form is the day's animal, as the header's: the bull on an
+      // up day and the bear on a down one, each in its colour, and on a flat
+      // day neither, a level line in the dim.
       var upSymbol = service.library.filter(function(s) {
-        return !!service.quotes[s] && Figures.rowModel(service.quotes[s], 0, service.changeMode).tone === "up"
+        return !!service.quotes[s] && Figures.animalKind(Figures.rowModel(service.quotes[s], 0, service.changeMode)) === "bull"
       })[0] || ""
       service.feature(upSymbol)
-      var onUpDay = upSymbol + " " + harness.markWay(mark) + (Qt.colorEqual(mark.color, "#9ece6a") ? " up colour" : " " + mark.color)
+      var onUpDay = upSymbol + " " + harness.iconDrawn()
       service.feature("DOWN")
-      var onDownDay = "DOWN " + harness.markWay(mark) + (Qt.colorEqual(mark.color, Commons.Color.urgent) ? " down colour" : " " + mark.color)
+      var onDownDay = "DOWN " + harness.iconDrawn()
+      var quotesBeforeFlat = service.testFeed.quotes
+      var flat = Object.assign({}, quotesBeforeFlat)
+      flat.DOWN = Object.assign({}, quotesBeforeFlat.DOWN, { prevClose: quotesBeforeFlat.DOWN.price })
+      service.testFeed.quotes = flat
+      var onFlatDay = "DOWN " + harness.iconDrawn()
+      service.testFeed.quotes = quotesBeforeFlat
       middleClick()
       middleClick()
       var pickedRight = pill.barStyle
@@ -1526,12 +1533,13 @@ ShellRoot {
       var backOnRight = formIn("right")
       barApi.layoutConfig = ({})
       pill.settings = settingsBeforeMove
-      harness.check("on the right the pill is its mark, climbing on an up day and falling on a down one, until a middle-click there picks a form, kept for the right; the centre and left keep theirs",
+      harness.check("on the right the pill is its icon, the bull on an up day, the bear on a down one, and a level line on a flat one, until a middle-click there picks a form, kept for the right; the centre and left keep theirs",
         centreForm === "sparkline" && movedRight === "icon alone" && pickedRight === "arrow"
-          && onUpDay === upSymbol + " climbs up colour" && upSymbol !== "" && onDownDay === "DOWN falls down colour"
+          && onUpDay === upSymbol + " bull in #9ece6a" && upSymbol !== "" && onDownDay === "DOWN bear in " + Commons.Color.urgent
+          && onFlatDay === "DOWN level"
           && wrote.barStyleRight === "arrow" && wrote.barStyle === "sparkline"
           && backInCentre === "sparkline" && onLeft === "sparkline" && backOnRight === "arrow",
-        [centreForm, movedRight, onUpDay, onDownDay, pickedRight, JSON.stringify(wrote), backInCentre, onLeft, backOnRight].join(" | "))
+        [centreForm, movedRight, onUpDay, onDownDay, onFlatDay, pickedRight, JSON.stringify(wrote), backInCentre, onLeft, backOnRight].join(" | "))
 
       // Only a middle-click writes the bar entry: every look, range, and
       // list this flow changed is the data file's.
@@ -1583,21 +1591,22 @@ ShellRoot {
           + " | tokyo-night with kanagawa's green #76946a #f7768e | tokyo-night #9ece6a #f7768e",
         trendColours.join(" | "))
 
-      // The pill's mark turns with its own day: a new price that takes TURN
-      // below its close leaves the mark falling, every column in the down
-      // colour, and one back above it climbing, every column in the up
-      // colour. A wheel step to another symbol shows that one's mark at
+      // The pill's animal turns with its own day: a new price that takes
+      // TURN below its close leaves the bear, every column in the down
+      // colour, and one back above it the bull, every column in the up
+      // colour. A wheel step to another symbol shows that one's animal at
       // once, and back again. (popup-motion.sh judges the turn's frames.)
       var settingsBeforeTurn = pill.settings
       barApi.layoutConfig = { left: [], center: [], right: [{ id: "grvc.stonks" }] }
       service.addSymbol("TURN")
       tryVerify(function() { return !!service.quotes.TURN && service.arriving.length === 0 }, 10000)
       service.feature("TURN")
-      var markOfIn = function(symbol, mode) {
-        var tone = Figures.rowModel(service.quotes[symbol], 0, mode).tone
-        return (tone === "down" ? "falls" : "climbs") + " in " + [0, 1, 2, 3, 4].map(function() { return String(pill.toneColor(tone)) }).join(" ")
+      var animal = harness.find(pill, "pillAnimal")
+      var kindOf = function(symbol, mode) { return Figures.animalKind(Figures.rowModel(service.quotes[symbol], 0, mode || service.changeMode)) }
+      var animalOf = function(symbol) {
+        var kind = kindOf(symbol)
+        return kind === "" ? "level" : kind + " in " + (kind === "bull" ? pill.upColor : pill.downColor)
       }
-      var markOf = function(symbol) { return markOfIn(symbol, service.changeMode) }
       var newPrice = function(down) {
         var proc = down ? turnDown : turnUp
         proc.running = true
@@ -1606,43 +1615,44 @@ ShellRoot {
         entries.TURN = Object.assign({}, entries.TURN, { answeredAt: entries.TURN.answeredAt - 20 })
         service.testFeed.entries = entries
         service.refresh()
-        tryVerify(function() { return pill.featured.tone === (down ? "down" : "up") && !mark.turning }, 10000)
-        return harness.markDrawn(mark)
+        tryVerify(function() { return kindOf("TURN") === (down ? "bear" : "bull") && !animal.turning }, 10000)
+        return harness.iconDrawn()
       }
-      var turnStart = harness.markDrawn(mark)
+      var turnStart = harness.iconDrawn()
       var turnedDown = newPrice(true)
       var turnedUp = newPrice(false)
-      // Wheel steps until one lands on a symbol whose mark has the other
-      // shape, each step's mark checked as it lands.
+      // Wheel steps until one lands on a symbol with the other animal, each
+      // step's animal checked as it lands.
       var wheels = []
       for (var w = 0; w < 3; w++) {
-        var before = harness.markWay(mark)
+        var before = harness.iconDrawn()
         mouseWheel(pill, pill.width / 2, pill.height / 2, 0, w === 0 ? -120 : 120)
-        wheels.push(service.featuredSymbol + " " + (mark.turning ? "turning " : "") + harness.markDrawn(mark)
-          + (harness.markDrawn(mark) === markOf(service.featuredSymbol) ? "" : " want " + markOf(service.featuredSymbol)))
-        if (harness.markWay(mark) !== before && service.featuredSymbol !== "TURN") break
+        wheels.push(service.featuredSymbol + " " + (animal.turning ? "turning " : "") + harness.iconDrawn()
+          + (harness.iconDrawn() === animalOf(service.featuredSymbol) ? "" : " want " + animalOf(service.featuredSymbol)))
+        if (harness.iconDrawn() !== before && service.featuredSymbol !== "TURN") break
       }
       var wheelsRight = wheels.every(function(line) { return !/turning| want /.test(line) })
-        && / (falls|climbs) /.test(wheels[wheels.length - 1]) && harness.markWay(mark) !== markOf("TURN").split(" ")[0]
-      harness.check("a new price that turns the pill's day ends its mark the new way in the new colour in every column, and a wheel step shows the next symbol's mark at once",
-        turnStart === markOf("TURN") && turnedDown === "falls in " + [0, 1, 2, 3, 4].map(function() { return String(pill.downColor) }).join(" ")
-          && turnedUp === "climbs in " + [0, 1, 2, 3, 4].map(function() { return String(pill.upColor) }).join(" ") && wheelsRight,
+        && harness.iconDrawn() !== animalOf("TURN")
+      harness.check("a new price that turns the pill's day ends on the other animal in its colour in every column, and a wheel step shows the next symbol's animal at once",
+        turnStart === animalOf("TURN") && turnedDown === "bear in " + pill.downColor
+          && turnedUp === "bull in " + pill.upColor && wheelsRight,
         [turnStart, turnedDown, turnedUp].concat(wheels).join(" | "))
-      // A change of mode turns no mark: the turn says a new price crossed.
-      // Found in review: "since open", reading TURN's day the other way,
-      // stepped the mark as a crossing would.
+      // The animal is the day against its close in every change mode, as
+      // the header's is: "since open", reading TURN's day the other way,
+      // neither changes nor turns it.
       service.feature("TURN")
-      tryVerify(function() { return !!pill.featured && pill.featured.symbol === "TURN" && !mark.turning }, 2000)
+      tryVerify(function() { return !!pill.featured && pill.featured.symbol === "TURN" && !animal.turning }, 2000)
       var toneIn = function(mode) { return Figures.rowModel(service.quotes.TURN, 0, mode).tone }
       if (toneIn("open") === toneIn("pct")) newPrice(true)
       var modeFlip = toneIn("pct") + " to " + toneIn("open")
+      var pctAnimal = harness.iconDrawn()
       service.persist({ changeMode: "open" })
-      var modeTurned = mark.turning
-      var modeMark = harness.markDrawn(mark)
+      var modeTurned = animal.turning
+      var modeAnimal = harness.iconDrawn()
       service.persist({ changeMode: "pct" })
-      harness.check("a change of mode that reads the pill's day the other way switches its mark at once, with no turn",
-        toneIn("open") !== toneIn("pct") && !modeTurned && !mark.turning && modeMark === markOfIn("TURN", "open"),
-        modeFlip + ": " + (modeTurned ? "turning " : "") + modeMark + " want " + markOfIn("TURN", "open"))
+      harness.check("a change of mode that reads the pill's day the other way leaves its animal, the day against its close, with no turn",
+        toneIn("open") !== toneIn("pct") && !modeTurned && !animal.turning && modeAnimal === pctAnimal && pctAnimal === animalOf("TURN"),
+        modeFlip + ": " + (modeTurned ? "turning " : "") + modeAnimal + ", " + pctAnimal + " in pct")
       barApi.layoutConfig = ({})
       pill.settings = settingsBeforeTurn
       service.feature(upSymbol)
