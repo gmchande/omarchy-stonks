@@ -19,11 +19,12 @@ function arrowAngle(pctChange) {
 }
 
 // The listing line's exchange and currency, the code said once: left out
-// where the name already ends with it, as Yahoo names a pair ("Bitcoin USD").
-function listingMeta(quote) {
+// where the name, shown whole (not `nameCut`), already ends with it, as
+// Yahoo names a pair ("Bitcoin USD").
+function listingMeta(quote, nameCut) {
   var tail = " " + quote.currency
   var name = String(quote.name || "")
-  return quote.exchange + (name.slice(-tail.length) === tail ? "" : " · " + quote.currency)
+  return quote.exchange + (!nameCut && name.slice(-tail.length) === tail ? "" : " · " + quote.currency)
 }
 
 // Freshness is three separate facts, kept separate: the time the headline
