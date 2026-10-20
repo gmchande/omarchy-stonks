@@ -113,16 +113,18 @@ ShellRoot {
   Stonks.App { id: app; service: service; updates: updates }
 
   // Each surface's body is built as it first opens: read it as it is now.
+  // Its keys go where the surface puts them: the popup's to the item that
+  // reads letters before the shell's catcher.
   readonly property var popup: ({
     name: "popup",
     get body() { return panel.testBody },
-    keys: panel.testKeyCatcher,
+    focusKeys: function() { panel.refocusKeys() },
     open: function() { panel.open() }
   })
   readonly property var window: ({
     name: "window",
     get body() { return app.testBody },
-    keys: app.testKeyCatcher,
+    focusKeys: function() { app.testKeyCatcher.forceActiveFocus() },
     open: function() { app.open("{}") }
   })
 
@@ -166,7 +168,8 @@ ShellRoot {
       b.watchlist.contentY = 0
       b.watchlist.cursorSymbol = rows[1]
       wait(50)
-      s.keys.forceActiveFocus()
+      s.focusKeys()
+      wait(50)
     }
 
     // What a key needs to have something to do, past the base.
@@ -232,6 +235,44 @@ ShellRoot {
       return sheet
     }
 
+    // With Caps Lock on, a letter acts as itself: j does what j does (in
+    // the popup it moves the selection) and never moves a row, o changes
+    // the order and never reverses it, w opens the list menu and never
+    // Manage lists, and in Manage lists J moves no list. Caps Lock sends
+    // "J" with no Shift. Found in the 1.0.0 review: Caps Lock's J and K
+    // saved a reorder.
+    function capsLock(s) {
+      var wrong = []
+      ;["j", "k", "o", "w"].forEach(function(letter) {
+        var caps = letter.toUpperCase()
+        var setup = function() { base(s); if (letter === "o") service.setOrder("pct"); wait(50) }
+        setup()
+        keyClick(letter)
+        wait(100)
+        var plain = shown(s)
+        setup()
+        keyClick(caps)
+        wait(100)
+        var locked = shown(s)
+        if (locked !== plain) wrong.push(caps + " with Caps Lock: " + locked + " vs " + letter + ": " + plain)
+      })
+      base(s)
+      service.createList("Caps")
+      service.switchList("Walk")
+      s.body.openManageLists()
+      wait(100)
+      var lists = function() { return service.lists.map(function(l) { return l.name }).join(",") }
+      var listsBefore = lists()
+      keyClick("J")
+      wait(100)
+      if (lists() !== listsBefore) wrong.push("J with Caps Lock in Manage lists moved the list: " + listsBefore + " -> " + lists())
+      s.body.closeListViews()
+      service.deleteList("Caps")
+      wait(50)
+      harness.check("in the " + s.name + ", with Caps Lock on, j k o w act as themselves, and J in Manage lists moves no list",
+        wrong.length === 0, wrong.join(" | "))
+    }
+
     function test_keys() {
       // Ten rows, so 9 has a row, and a second list for , and .
       for (var n = 1; n <= 7; n++) service.addSymbol("LONG" + n)
@@ -243,6 +284,7 @@ ShellRoot {
 
       // The popup first: the window, shown, would take the keys.
       var popupSheet = walk(harness.popup)
+      capsLock(harness.popup)
       // Whole in both looks: the popup's height takes the sheet's, under its cap.
       var looks = [false, true].map(function(retro) {
         service.persist({ style: retro ? "retro" : "smooth" })
@@ -254,6 +296,7 @@ ShellRoot {
       wait(300)
 
       var windowSheet = walk(harness.window)
+      capsLock(harness.window)
       harness.check("the window's sheet is the popup's", popupSheet.all.join("|") === windowSheet.all.join("|"),
         popupSheet.all.join("|") + " vs " + windowSheet.all.join("|"))
       app.close()

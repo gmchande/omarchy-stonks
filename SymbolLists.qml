@@ -5,6 +5,7 @@ import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Commons as Commons
 import "Tones.js" as Tones
+import "KeyText.js" as KeyText
 
 // A symbol's lists, in the rows' place: one tick box per list, All first.
 // Value-in, signals out; the body applies the membership rules. It owns its
@@ -127,11 +128,13 @@ FocusScope {
 
   Keys.onPressed: function(event) {
     event.accepted = true
-    if (event.key === Qt.Key_Escape || event.text === "m") root.dismissed()
+    // A letter by its key and Shift: Caps Lock sends "J" for j.
+    var t = KeyText.typed(event)
+    if (event.key === Qt.Key_Escape || t === "m") root.dismissed()
     else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) root.toggle(root.cursor)
-    else if (event.key === Qt.Key_Down || event.text === "j") root.moveCursor(1)
-    else if (event.key === Qt.Key_Up || event.text === "k") root.moveCursor(-1)
-    else if (event.text >= "1" && event.text <= "9") root.toggle(Number(event.text) - 1)
+    else if (event.key === Qt.Key_Down || t === "j") root.moveCursor(1)
+    else if (event.key === Qt.Key_Up || t === "k") root.moveCursor(-1)
+    else if (t >= "1" && t <= "9") root.toggle(Number(t) - 1)
   }
 
   RowPointer {

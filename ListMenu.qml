@@ -6,6 +6,7 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 import "Tones.js" as Tones
+import "KeyText.js" as KeyText
 
 // The list menu: All and each named list with its count, a check on the
 // current one, then "New list…", which turns into a name field in place, and
@@ -212,12 +213,14 @@ FocusScope {
   Keys.onPressed: function(event) {
     // While naming, the field has the keys; what it lets past goes nowhere.
     if (root.naming) { event.accepted = true; return }
+    // A letter by its key and Shift: Caps Lock sends "J" for j.
+    var t = KeyText.typed(event)
     if (event.key === Qt.Key_Escape) { root.dismissed(); event.accepted = true }
-    else if (event.key === Qt.Key_Down || event.text === "j") { root.moveCursor(1); event.accepted = true }
-    else if (event.key === Qt.Key_Up || event.text === "k") { root.moveCursor(-1); event.accepted = true }
+    else if (event.key === Qt.Key_Down || t === "j") { root.moveCursor(1); event.accepted = true }
+    else if (event.key === Qt.Key_Up || t === "k") { root.moveCursor(-1); event.accepted = true }
     else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { root.take(root.cursor); event.accepted = true }
-    else if (event.text >= "1" && event.text <= "9") { root.take(Number(event.text) - 1); event.accepted = true }
-    else if (event.text === "w") { root.dismissed(); event.accepted = true }
+    else if (t >= "1" && t <= "9") { root.take(Number(t) - 1); event.accepted = true }
+    else if (t === "w") { root.dismissed(); event.accepted = true }
     // Every other key stays with the menu, so nothing behind it acts.
     else event.accepted = true
   }

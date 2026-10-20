@@ -4,6 +4,7 @@ import QtQuick
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "KeyText.js" as KeyText
 
 // The watchlist popup. Owns popup lifecycle, keys, and look; the body reads
 // the service and owns the list, search, scrub, help, and the motion when
@@ -135,7 +136,7 @@ Panel {
     requestFundamentals()
   }
 
-  function refocusKeys() { Qt.callLater(function() { if (keyCatcher) keyCatcher.forceActiveFocus() }) }
+  function refocusKeys() { Qt.callLater(function() { if (letterKeys) letterKeys.forceActiveFocus() }) }
 
   onFeaturedSymbolChanged: requestFundamentals()
 
@@ -145,7 +146,7 @@ Panel {
     owner: root.barIdentity
     bar: root.bar
     open: root.opened
-    focusTarget: keyCatcher
+    focusTarget: letterKeys
     contentWidth: panel.fittedContentWidth(root.panelWidth)
     contentHeight: Math.round(root.cardHeight)
 
@@ -172,6 +173,11 @@ Panel {
       onTextKey: function(t) {
         var body = root.body
         if (t === "?") body.toggleHelp()
+        else if (t === "j") body.moveCursor(1)
+        else if (t === "k") body.moveCursor(-1)
+        else if (t === "h") body.nudgeScrub(-1)
+        else if (t === "l") body.nudgeScrub(1)
+        else if (t === "x" || t === "X") body.removeRow(body.watchlist.cursorRow)
         else if (t === "a" || t === "+") body.startAdding()
         else if (t === "c") body.cycleChangeMode()
         else if (t === "r") root.refresh()
@@ -190,6 +196,21 @@ Panel {
         else if (t === "J") body.moveSelected(1)
         else if (t === "K") body.moveSelected(-1)
         else if (t >= "1" && t <= "9") body.featureAt(Number(t) - 1)
+      }
+
+      // The popup's keys land here first. The catcher reads a key's text,
+      // and Caps Lock sends "J" for j, which would move a row: a letter
+      // goes on as the text its key and Shift mean (`KeyText.typed`), and
+      // every other key on to the catcher.
+      Item {
+        id: letterKeys
+        Keys.onPressed: function(event) {
+          if (event.key < Qt.Key_A || event.key > Qt.Key_Z || keyCatcher.blocked) return
+          var t = KeyText.typed(event)
+          if (t === "") return
+          keyCatcher.textKey(t)
+          event.accepted = true
+        }
       }
 
       Loader {

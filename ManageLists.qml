@@ -6,6 +6,7 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 import "Tones.js" as Tones
+import "KeyText.js" as KeyText
 
 // Manage lists, in the rows' place: rename, reorder, and delete the named
 // lists. All is listed first and cannot be changed. Value-in, signals out;
@@ -235,17 +236,19 @@ FocusScope {
     // While renaming, the field has the keys; what it lets past goes nowhere.
     event.accepted = true
     if (root.renaming) return
+    // A letter by its key and Shift: Caps Lock sends "J" for j.
+    var t = KeyText.typed(event)
     if (event.key === Qt.Key_Escape) { if (root.confirming) root.confirming = false; else root.dismissed() }
     else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
       if (root.confirming) root.confirmDelete()
       else root.startRenaming(root.cursor)
     }
-    else if (event.key === Qt.Key_Down || event.text === "j") root.moveCursor(1)
-    else if (event.key === Qt.Key_Up || event.text === "k") root.moveCursor(-1)
-    else if (event.text === "J") root.move(root.cursor, 1)
-    else if (event.text === "K") root.move(root.cursor, -1)
-    else if (event.text === "x" || event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) root.askDelete(root.cursor)
-    else if (event.text === "W") root.dismissed()
+    else if (event.key === Qt.Key_Down || t === "j") root.moveCursor(1)
+    else if (event.key === Qt.Key_Up || t === "k") root.moveCursor(-1)
+    else if (t === "J") root.move(root.cursor, 1)
+    else if (t === "K") root.move(root.cursor, -1)
+    else if (t === "x" || event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) root.askDelete(root.cursor)
+    else if (t === "W") root.dismissed()
   }
 
   // Under everything else in the view: while a name is typed, a click that

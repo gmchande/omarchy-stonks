@@ -368,13 +368,13 @@ ShellRoot {
       // Shift+O and a Shift-click on the order word run a sorted order the
       // other way, kept in the list's own entry in the file; manual has no
       // direction, and o starts the next order in its own.
-      keyClick("O")
+      keyClick("O", Qt.ShiftModifier)
       wait(50)
       var manualStays = !service.reversed && label.text === "↕  MANUAL" && service.order === "manual"
       keyClick(Qt.Key_O)
       wait(50)
       var ahead = watchlist.displayedSymbols.slice()
-      keyClick("O")
+      keyClick("O", Qt.ShiftModifier)
       wait(50)
       var byKey = [service.reversed, label.text, watchlist.displayedSymbols.join(",")]
       harness.readFile()
@@ -383,7 +383,7 @@ ShellRoot {
       mouseClick(label, label.width / 2, label.height / 2, Qt.LeftButton, Qt.ShiftModifier)
       wait(50)
       var byClick = [service.reversed, label.text, watchlist.displayedSymbols.join(",")]
-      keyClick("O")
+      keyClick("O", Qt.ShiftModifier)
       keyClick(Qt.Key_O)
       wait(50)
       var nextOrder = [service.order, service.reversed, label.text]
@@ -784,7 +784,7 @@ ShellRoot {
       mouseMove(body2, manageAllAt.x, manageAllAt.y)
       wait(50)
       keys.forceActiveFocus()
-      keyClick("W")
+      keyClick("W", Qt.ShiftModifier)
       wait(100)
       mouseMove(body2, manageAllAt.x, manageAllAt.y + 1)
       wait(50)
@@ -837,7 +837,7 @@ ShellRoot {
       var names = function() { return service.dataSettings.lists.map(function(l) { return l.name }) }
       var manage = harness.find(body2, "manageLists")
       keys.forceActiveFocus()
-      keyClick("W")
+      keyClick("W", Qt.ShiftModifier)
       wait(100)
       harness.check("W opens Manage lists in the rows' place, on the first named list",
         body2.managingLists && manage.visible && manage.activeFocus && manage.cursor === 1
@@ -863,7 +863,7 @@ ShellRoot {
       wait(100)
       harness.check("a change of case alone renames",
         !manage.renaming && harness.same(names(), ["GROWTH", "Wins"]), names())
-      keyClick("J")
+      keyClick("J", Qt.ShiftModifier)
       wait(100)
       harness.check("J moves the list down, and the cursor goes with it",
         harness.same(names(), ["Wins", "GROWTH"]) && manage.cursor === 2, names() + "|" + manage.cursor)
@@ -886,7 +886,7 @@ ShellRoot {
         names() + "|" + service.listName + "|" + service.library)
       keyClick(Qt.Key_K)
       keyClick(Qt.Key_Return)
-      keyClick("J")
+      keyClick("J", Qt.ShiftModifier)
       keyClick(Qt.Key_X)
       wait(50)
       harness.check("All cannot be renamed, moved, or deleted",
@@ -1286,7 +1286,7 @@ ShellRoot {
       // of sight. Found in design pass 3's review: hidden, it would still
       // ease, and show mid-way if the rows came back within 160 ms.
       keys.forceActiveFocus()
-      keyClick("W")
+      keyClick("W", Qt.ShiftModifier)
       wait(50)
       var coveredDown = rule.downShare
       service.setMembership("FLAT", "Losers", true)
@@ -1321,7 +1321,7 @@ ShellRoot {
       keyClick(Qt.Key_Down)
       keyClick(Qt.Key_Escape)
       wait(50)
-      keyClick("W")
+      keyClick("W", Qt.ShiftModifier)
       wait(50)
       keyClick(Qt.Key_Up)
       keyClick(Qt.Key_Escape)
@@ -1351,7 +1351,7 @@ ShellRoot {
       wait(50)
       keyClick(Qt.Key_Escape)
       wait(50)
-      keyClick("W")
+      keyClick("W", Qt.ShiftModifier)
       wait(50)
       keyClick(Qt.Key_Escape)
       wait(50)
@@ -1390,8 +1390,8 @@ ShellRoot {
       var closings = [
         keysAfter(function() { keyClick(Qt.Key_W) }),
         keysAfter(function() { keyClick(Qt.Key_W); wait(50); keyClick(Qt.Key_Up); keyClick(Qt.Key_Up); keyClick(Qt.Key_Return) }),
-        keysAfter(function() { keyClick("W") }),
-        keysAfter(function() { keyClick("W"); wait(50); keyClick(Qt.Key_Return) }),
+        keysAfter(function() { keyClick("W", Qt.ShiftModifier) }),
+        keysAfter(function() { keyClick("W", Qt.ShiftModifier); wait(50); keyClick(Qt.Key_Return) }),
         keysAfter(function() { keyClick(Qt.Key_M) }),
         keysAfter(function() { keyClick(Qt.Key_A) })
       ]
