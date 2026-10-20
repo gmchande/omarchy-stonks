@@ -162,14 +162,16 @@ Item {
   // prints, go side by side, so a 1D chart waits for one answer, never two
   // in a row. While a surface is open, for every US stock and ETF: whether
   // it trades all day, once a day each (`Overnight.allDayDue`); and the
-  // prints of each not known to trade only by day, for each one not
-  // answered for, and for all of them as a night goes
-  // (`Overnight.overnightDue`). With nothing open, once a session, for the
-  // pill's symbol alone, what Robinhood has not answered for it, as soon as
-  // Yahoo has answered it live, so the first click finds its chart in
-  // hand. Looked at as the clock ticks, answers land, the listings change,
-  // a surface opens, and the screens answer; never while every screen is
-  // off (`screensClear`).
+  // prints of each not known to trade only by day, each by its own last ask
+  // (`Overnight.overnightDue`): never asked, every 5 minutes as a night
+  // goes, once after it ends. Whatever is asked takes with it each one due
+  // within half that, so the list stays one request a night's 5 minutes,
+  // and one the gate held back goes as soon as it lets it. With nothing
+  // open, once a session, for the pill's symbol alone, what Robinhood has
+  // not answered for it, as soon as Yahoo has answered it live, so the
+  // first click finds its chart in hand. Looked at as the clock ticks,
+  // answers land, the listings change, a surface opens, and the screens
+  // answer; never while every screen is off (`screensClear`).
   property bool pillAsked: false
   function askOvernight() {
     if (!root.pluginsReady) return
@@ -182,11 +184,13 @@ Item {
       return open ? Overnight.allDayDue(allDayFeed.entries[s], root.now) : !allDayFeed.entries[s]
     })
     var drawn = listings.filter(function(s) { return !allDayFeed.entries[s] || allDayFeed.entries[s].allDay })
-    var failed = drawn.some(function(s) {
-      return !!overnightFeed.entries[s] && overnightFeed.entries[s].status === "failed"
-    })
-    var prints = open && Overnight.overnightDue(overnightFeed.askedAt, root.now, root.calendars, failed)
-      ? drawn : drawn.filter(function(s) { return !overnightFeed.entries[s] })
+    var printsDue = function(s, at) {
+      var entry = overnightFeed.entries[s]
+      return !entry || (open && Overnight.overnightDue(entry.at, at, root.calendars, entry.status === "failed"))
+    }
+    var prints = drawn.filter(function(s) { return printsDue(s, root.now) })
+    if (prints.length > 0)
+      prints = drawn.filter(function(s) { return printsDue(s, root.now + Overnight.OVERNIGHT_INTERVAL / 2) })
     if ((tradability.length === 0 && prints.length === 0) || !root.screensClear()) return
     // The pill's own ask waits for a request already out, then goes.
     if (!open && (allDayFeed.busy || overnightFeed.busy)) return

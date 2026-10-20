@@ -1048,6 +1048,27 @@ ShellRoot {
         nights && requests.every(function(r) { return r.length <= 75 }) && each.length === 80 && drawn,
         "requests of " + requests.map(function(r) { return r.length }).join(", ") + "; " + each.length + " asked once; nights "
           + nights + "; LONG80 drawn " + drawn)
+
+      // Thursday 23:00, a trading night, Robinhood refusing: the night's
+      // refresh of the list's prints, two requests now, meets a 429 and
+      // pauses Robinhood. Five minutes on, the pause's first probe lets one
+      // request of the two go; its answer reopens Robinhood, and the rest of
+      // the list goes at once. One ask stood for the whole list, so the rest
+      // used to wait another five minutes.
+      var thursdayNight = harness.midnight.thu8 + 23 * 3600
+      runCommand(["touch", harness.state + "/ROBINHOOD.refuse"])
+      service.now = thursdayNight
+      var refused = within(3000, function() { return service.testRobinhoodGate.pause === "refused" && !prints.busy })
+      runCommand(["rm", "-f", harness.state + "/ROBINHOOD.refuse"])
+      var probedFrom = harness.record("OVERNIGHT.asked").split("\n").length
+      service.now = thursdayNight + 5 * 60 + 5
+      var caughtUp = within(5000, function() {
+        return longs.every(function(s) { return prints.entries[s].status === "ok" && prints.entries[s].at > thursdayNight })
+      })
+      var afterProbe = harness.record("OVERNIGHT.asked").split("\n").slice(probedFrom).map(function(line) { return line.split(",").length })
+      harness.check("a trading night, Robinhood back after a refusal: its first probe lets one request of two go, and the rest goes once that reopens it",
+        refused && caughtUp && afterProbe.length === 2 && afterProbe[0] === 75,
+        "refused " + refused + "; requests after the pause of " + afterProbe.join(", ") + "; every night refreshed " + caughtUp)
       harness.finish()
     }
   }

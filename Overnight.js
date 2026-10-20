@@ -283,10 +283,10 @@ function sessionDay(quote) {
   })
 }
 
-// Whether an open surface should ask Robinhood again: never asked; every
-// few minutes while a night trades; and once after a night ends, for its
-// last bars. Between a night's last bars and the next night, nothing new
-// can come.
+// Whether an open surface should ask Robinhood again for a listing's
+// prints, last asked at `askedAt`: never asked; every few minutes while a
+// night trades; and once after a night ends, for its last bars. Between a
+// night's last bars and the next night, nothing new can come.
 function overnightDue(askedAt, now, calendars, failed) {
   var cal = overnightMarket(calendars)
   if (!cal) return false

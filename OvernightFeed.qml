@@ -22,8 +22,9 @@ Item {
   property var gate: null
   // The gate's ticket the request out was let through on (`Gate.report`).
   property int ticket: 0
-  // When the last request went out, answered or not: the service asks again
-  // by it (`Overnight.overnightDue`).
+  // When the last request went out, answered or not, which each of its
+  // listings' entries keeps (`at`): the service asks again by those
+  // (`Overnight.overnightDue`), and a user's refresh waits 10 s by this.
   property int askedAt: 0
   // The run out, as its requests' symbols, in the order of their URLs,
   // until it is answered.
