@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 
 // A caption-sized word that acts, in the list views and wherever a view
 // needs a button: DONE, RENAME, SAVE, the moves. It says only what it does;
@@ -18,7 +19,7 @@ Text {
   signal activated()
 
   textFormat: Text.PlainText
-  color: enterTakes ? Style.selectedStateColor(view.foreground, Color.accent)
+  color: enterTakes ? Style.selectedStateColor(view.foreground, Commons.Color.accent)
     : mouse.containsMouse ? view.foreground : view.dim
   font.family: view.fontFamily
   font.pixelSize: Style.font.caption
@@ -32,9 +33,9 @@ Text {
     width: parent.implicitWidth + Style.space(12)
     height: parent.implicitHeight + Style.space(4)
     radius: root.view.retro ? 0 : Style.cornerRadius
-    color: mouse.pressed ? Style.pressedFillFor(root.view.foreground, Color.accent)
-      : mouse.containsMouse ? Style.hoverFillFor(root.view.foreground, Color.accent)
-      : root.enterTakes ? Style.selectedFillFor(root.view.foreground, Color.accent) : "transparent"
+    color: mouse.pressed ? Style.pressedFillFor(root.view.foreground, Commons.Color.accent)
+      : mouse.containsMouse ? Style.hoverFillFor(root.view.foreground, Commons.Color.accent)
+      : root.enterTakes ? Style.selectedFillFor(root.view.foreground, Commons.Color.accent) : "transparent"
   }
 
   MouseArea {

@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 
 // The watchlist popup. Owns popup lifecycle, keys, and look; the body reads
@@ -209,12 +210,12 @@ Panel {
           surfaceOpen: root.opened
           failClosedHeader: true
           chartHeight: Style.space(190)
-          foreground: root.bar ? root.bar.foreground : Color.foreground
+          foreground: root.bar ? root.bar.foreground : Commons.Color.foreground
           fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
           // The card's colour, opaque whatever the theme's popup alpha.
-          ground: Qt.rgba(Color.popups.background.r, Color.popups.background.g, Color.popups.background.b, 1)
-          upColor: root.trendColors ? root.trendColors.upOn(ground) : Color.foreground
-          downColor: root.trendColors ? root.trendColors.downOn(ground) : Color.urgent
+          ground: Qt.rgba(Commons.Color.popups.background.r, Commons.Color.popups.background.g, Commons.Color.popups.background.b, 1)
+          upColor: root.trendColors ? root.trendColors.upOn(ground) : Commons.Color.foreground
+          downColor: root.trendColors ? root.trendColors.downOn(ground) : Commons.Color.urgent
           onKeysReleased: root.refocusKeys()
           onRefreshRequested: root.refresh()
         }

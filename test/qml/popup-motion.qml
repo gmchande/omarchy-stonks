@@ -3,6 +3,7 @@ import QtTest
 import Quickshell
 import Quickshell.Io
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "plugin" as Stonks
 
@@ -52,7 +53,7 @@ ShellRoot {
     pluginId: "grvc.stonks"
     moduleName: "grvc.stonks"
     shell: shellApi
-    foreground: Color.foreground
+    foreground: Commons.Color.foreground
     fontFamily: Style.font.family
   }
   Stonks.Panel { id: panel; bar: api; settings: ({}) }
@@ -73,7 +74,7 @@ ShellRoot {
   }
   FloatingWindow {
     visible: true
-    color: Qt.rgba(Color.bar.background.r, Color.bar.background.g, Color.bar.background.b, 1)
+    color: Qt.rgba(Commons.Color.bar.background.r, Commons.Color.bar.background.g, Commons.Color.bar.background.b, 1)
     implicitWidth: 120
     implicitHeight: 60
     Stonks.BarWidget {

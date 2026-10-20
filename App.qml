@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import qs.Commons
+import qs.Commons as Commons
 import "History.js" as History
 // Tiled app window. Owns window lifecycle, keys, and look; the body reads
 // the service and owns the list, search, scrub, and help.
@@ -90,7 +91,7 @@ Item {
   FloatingWindow {
     id: window
     title: "Stonks"
-    color: Color.background
+    color: Commons.Color.background
     implicitWidth: 720
     implicitHeight: 760
     // The fixed content at its whole chart plus one row: below this the
@@ -165,8 +166,8 @@ Item {
           margins: Style.space(16)
           chartHeight: Style.space(220)
           minChartHeight: Style.space(136)
-          upColor: root.trendColors ? root.trendColors.upOn(ground) : Color.foreground
-          downColor: root.trendColors ? root.trendColors.downOn(ground) : Color.urgent
+          upColor: root.trendColors ? root.trendColors.upOn(ground) : Commons.Color.foreground
+          downColor: root.trendColors ? root.trendColors.downOn(ground) : Commons.Color.urgent
           onKeysReleased: root.refocusKeys()
           onRefreshRequested: root.refresh()
         }

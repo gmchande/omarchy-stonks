@@ -3,6 +3,7 @@ import QtTest
 import Quickshell
 import Quickshell.Io
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "plugin/Chart.js" as Chart
 import "plugin/Figures.js" as Figures
@@ -1373,7 +1374,7 @@ ShellRoot {
       app.close()
       var downDay = Figures.rowModel(service.quotes.DOWN, 0, service.changeMode)
       var downRange = History.historyRowModel(service.histories["DOWN|6M"].history, service.quotes.DOWN, 0)
-      var dayWrong = pillInEveryStyle(function(retro) { return Format.lookSigns(downDay.changeLine, retro) }, Color.urgent)
+      var dayWrong = pillInEveryStyle(function(retro) { return Format.lookSigns(downDay.changeLine, retro) }, Commons.Color.urgent)
       harness.check("on 6M every bar style in both looks shows the day in its colour, and a middle-click keeps the entry's other keys",
         service.range === "6M" && downDay.tone === "down" && downRange.tone === "up" && dayWrong.length === 0,
         service.range + " " + downDay.tone + "/" + downRange.tone + " " + dayWrong.join(" | "))
@@ -1396,7 +1397,7 @@ ShellRoot {
         // The icon form, whatever the top bar's: the mark alone, falling, in
         // one slot.
         var verticalMark = harness.find(pill, "pillMark")
-        if (!verticalMark.visible || stack.visible || !Qt.colorEqual(verticalMark.color, Color.urgent)
+        if (!verticalMark.visible || stack.visible || !Qt.colorEqual(verticalMark.color, Commons.Color.urgent)
             || harness.markWay(verticalMark) !== "falls" || pill.implicitHeight !== Style.bar.iconSlot)
           verticalWrong.push((service.retro ? "retro" : "smooth") + " icon: mark " + verticalMark.visible + " in "
             + verticalMark.color + ", " + harness.markWay(verticalMark) + ", stack " + stack.visible + ", "
@@ -1420,7 +1421,7 @@ ShellRoot {
             || lines.some(function(l, i) {
               return l.text !== want[i] || l.tightWidth > Style.bar.sizeVertical
                 || l.renderedFontSize !== Math.round(l.text.length > 3 ? Style.font.body * 0.9 : Style.font.body)
-                || !Qt.colorEqual(l.color, i === 0 ? barApi.barForeground : Color.urgent)
+                || !Qt.colorEqual(l.color, i === 0 ? barApi.barForeground : Commons.Color.urgent)
             })
           if (wrong)
             verticalWrong.push((service.retro ? "retro " : "smooth ") + mode + ": " + drawn.join(" / ") + ", " + pill.implicitHeight
@@ -1489,7 +1490,7 @@ ShellRoot {
       service.feature(upSymbol)
       var onUpDay = upSymbol + " " + harness.markWay(mark) + (Qt.colorEqual(mark.color, "#9ece6a") ? " up colour" : " " + mark.color)
       service.feature("DOWN")
-      var onDownDay = "DOWN " + harness.markWay(mark) + (Qt.colorEqual(mark.color, Color.urgent) ? " down colour" : " " + mark.color)
+      var onDownDay = "DOWN " + harness.markWay(mark) + (Qt.colorEqual(mark.color, Commons.Color.urgent) ? " down colour" : " " + mark.color)
       middleClick()
       middleClick()
       var pickedRight = pill.barStyle
@@ -1541,8 +1542,8 @@ ShellRoot {
         tryVerify(function() { return harness.themeCopied }, 2000)
         var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', harness)
         view.path = harness.themeDir + "/colors.toml"
-        Color.loadColors(view.text())
-        Color.loadShell("")
+        Commons.Color.loadColors(view.text())
+        Commons.Color.loadShell("")
         view.destroy()
         within(2000, function() { return plugin.trendColors.green !== before })
         return dayColours(theme)

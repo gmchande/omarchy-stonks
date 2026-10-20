@@ -4,6 +4,7 @@ import QtTest
 import Quickshell
 import Quickshell.Io
 import qs.Commons
+import qs.Commons as Commons
 import "plugin/Cells.js" as Cells
 import "plugin/Chart.js" as Chart
 import "plugin/Quote.js" as Quote
@@ -295,8 +296,8 @@ ShellRoot {
           return null
         }
         root.check("a range token under the pointer takes the hover fill",
-          Qt.colorEqual(tokens[1].color, Style.hoverFillFor(stub.foreground, Color.accent))
-            && Qt.colorEqual(tokens[0].color, Style.selectedFillFor(stub.foreground, Color.accent)))
+          Qt.colorEqual(tokens[1].color, Style.hoverFillFor(stub.foreground, Commons.Color.accent))
+            && Qt.colorEqual(tokens[0].color, Style.selectedFillFor(stub.foreground, Commons.Color.accent)))
         // Only the chosen range is bright: the hovered one keeps its dim
         // label, so a hover never reads as a second choice. Found in the
         // mouse audit: 5Y under the pointer looked as chosen as 1D.
@@ -1101,8 +1102,8 @@ ShellRoot {
         // went to the featured row, and after the wheel to the first row in
         // sight, wherever the pointer was; a hovered row only tinted, at 4%.
         var wl = body.watchlist
-        var hoverFill = Style.hoverFillFor(stub.foreground, Color.accent)
-        var selectedFill = Style.selectedFillFor(stub.foreground, Color.accent)
+        var hoverFill = Style.hoverFillFor(stub.foreground, Commons.Color.accent)
+        var selectedFill = Style.selectedFillFor(stub.foreground, Commons.Color.accent)
         // The rows whose fill or bar says something other than their state;
         // a row far out of sight is not built, and shows no bar.
         var misdrawn = function() {
@@ -1393,7 +1394,7 @@ ShellRoot {
         var orderRow = root.find(body, "orderControl")
         var arrowFill = root.find(body, "orderArrowFill")
         var orderWord = root.find(body, "orderLabel")
-        var hoverFill = Style.hoverFillFor(stub.foreground, Color.accent)
+        var hoverFill = Style.hoverFillFor(stub.foreground, Commons.Color.accent)
         var lit = function(fill) { return Qt.colorEqual(fill.color, hoverFill) }
         var hoverAt = function(x) {
           var at = orderWord.mapToItem(body, x, orderWord.height / 2)
@@ -1871,7 +1872,7 @@ ShellRoot {
         grab.source = body
         var status = root.find(body, "statusText")
         var away = status.mapToItem(body, status.width / 2, status.height / 2)
-        var pressed = Style.pressedFillFor(stub.foreground, Color.accent)
+        var pressed = Style.pressedFillFor(stub.foreground, Commons.Color.accent)
         var fillArg = [pressed.r, pressed.g, pressed.b, pressed.a].join(",")
         var boxOf = function(item) {
           var at = item.mapToItem(body, 0, 0)

@@ -3,6 +3,7 @@ import QtTest
 import Quickshell
 import Quickshell.Io
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "plugin" as Stonks
 
@@ -53,7 +54,7 @@ ShellRoot {
     pluginId: "grvc.stonks"
     moduleName: "grvc.stonks"
     shell: shellApi
-    foreground: Color.foreground
+    foreground: Commons.Color.foreground
     fontFamily: Style.font.family
   }
   Stonks.Panel { id: panel; bar: api; settings: ({}) }
@@ -75,7 +76,7 @@ ShellRoot {
         id: heroStrip
         width: panel.testCard.card.width
         height: Style.bar.sizeHorizontal
-        color: Qt.rgba(Color.bar.background.r, Color.bar.background.g, Color.bar.background.b, 1)
+        color: Qt.rgba(Commons.Color.bar.background.r, Commons.Color.bar.background.g, Commons.Color.bar.background.b, 1)
 
         Stonks.BarWidget {
           anchors.centerIn: parent
@@ -116,8 +117,8 @@ ShellRoot {
     pluginId: "grvc.stonks"
     moduleName: "grvc.stonks"
     shell: shellApi
-    foreground: Color.bar.text
-    barForeground: Color.bar.text
+    foreground: Commons.Color.bar.text
+    barForeground: Commons.Color.bar.text
     fontFamily: Style.font.family
     barSize: Style.bar.sizeHorizontal
   }
@@ -258,8 +259,8 @@ ShellRoot {
       tryVerify(function() { return harness.themeLinked }, 2000, "Catppuccin Latte in place")
       var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', harness)
       view.path = harness.themeLink + "/colors.toml"
-      Color.loadColors(view.text())
-      Color.loadShell("")
+      Commons.Color.loadColors(view.text())
+      Commons.Color.loadShell("")
       view.destroy()
       tryVerify(function() { return colors.green !== before }, 2000, "Catppuccin Latte read")
       panel.open()

@@ -1,5 +1,5 @@
 import QtQuick
-import qs.Commons
+import qs.Commons as Commons
 // The bull or the bear in smooth's own hand, drawn the way the hero chart
 // draws: one 1.5 px round line in the day's colour and the wash inside it.
 // The same subjects as retro's cells (`Cells.js`): two faces, front on, the
@@ -9,7 +9,7 @@ Item {
   id: root
 
   property bool bull: true
-  property color color: Color.foreground
+  property color color: Commons.Color.foreground
   // The wash's alpha, as the hero's (`Tones.washAlpha`), so the bear's red
   // weighs the same as the bull's green.
   property real wash: 0.16

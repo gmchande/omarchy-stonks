@@ -21,11 +21,11 @@ declare -A listed=(
 
 # The house baseline, what qmllint cannot see in the installed shell: these
 # members of its QtObject-typed Style.font, Style.spacing, Style.bar,
-# Color.popups, and Color.bar, and of the `bar` that Panel and BarWidget
-# inherit.
+# Commons.Color.popups, and Commons.Color.bar, and of the `bar` that Panel
+# and BarWidget inherit.
 shell_members=" Style.font.family Style.font.title Style.font.body Style.font.bodySmall
   Style.font.caption Style.font.display Style.font.displayLarge Style.font.icon Style.spacing.md
-  Style.bar.iconSlot Style.bar.iconCanvas Color.popups.background Color.bar.background BarWidget.qml:bar.shell BarWidget.qml:bar.layoutConfig
+  Style.bar.iconSlot Style.bar.iconCanvas Commons.Color.popups.background Commons.Color.bar.background BarWidget.qml:bar.shell BarWidget.qml:bar.layoutConfig
   Panel.qml:bar.shell Panel.qml:bar.foreground Panel.qml:bar.fontFamily
   Panel.qml:bar.switchPanelFrom Panel.qml:bar.setCenterHoverRevealSuppressed "
 shell_members=${shell_members//$'\n'/ }

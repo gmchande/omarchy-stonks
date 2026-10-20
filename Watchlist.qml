@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import qs.Commons
+import qs.Commons as Commons
 import "Chart.js" as Chart
 import "Figures.js" as Figures
 import "Settings.js" as Settings
@@ -32,11 +33,11 @@ Flickable {
   property bool retro: false
   // The exchanges' calendars, for the breaks in a row's day line.
   property var calendars: null
-  property color upColor: Color.foreground
-  property color downColor: Color.urgent
-  property color foreground: Color.foreground
-  property color dim: Tones.dim(foreground, Color.background)
-  property color dimmer: Tones.dimmer(foreground, Color.background)
+  property color upColor: Commons.Color.foreground
+  property color downColor: Commons.Color.urgent
+  property color foreground: Commons.Color.foreground
+  property color dim: Tones.dim(foreground, Commons.Color.background)
+  property color dimmer: Tones.dimmer(foreground, Commons.Color.background)
   property string fontFamily: Style.font.family
   property int rowHeight: Style.space(40)
   property int rowGap: Style.space(2)

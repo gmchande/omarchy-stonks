@@ -1,7 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import qs.Commons
+import qs.Commons as Commons
 import "Cells.js" as Cells
 
 // A range drawn as a thin rule, its low at the left and its high at the
@@ -16,7 +16,7 @@ Item {
   property var high: null
   property var price: null
   property bool retro: false
-  property color foreground: Color.foreground
+  property color foreground: Commons.Color.foreground
 
   readonly property int thickness: Cells.RULE_THICKNESS
   readonly property int pitch: Cells.RULE_PITCH

@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import "Figures.js" as Figures
 import "Settings.js" as Settings
 import "Tones.js" as Tones
@@ -31,14 +32,14 @@ Item {
   // retro's cap.
   readonly property string newestPrice: root.day && root.day.points && root.day.points.length
     ? String(root.day.points[root.day.points.length - 1].p) : ""
-  property color foreground: Color.foreground
-  property color dim: Tones.dim(foreground, Color.background)
-  property color dimmer: Tones.dimmer(foreground, Color.background)
-  property color upColor: Color.foreground
-  property color downColor: Color.urgent
+  property color foreground: Commons.Color.foreground
+  property color dim: Tones.dim(foreground, Commons.Color.background)
+  property color dimmer: Tones.dimmer(foreground, Commons.Color.background)
+  property color upColor: Commons.Color.foreground
+  property color downColor: Commons.Color.urgent
   property color ghost: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.05)
   // The surface under the chart, which the wash is seen against.
-  property color ground: Color.background
+  property color ground: Commons.Color.background
   property string fontFamily: Style.font.family
   property string symbol: ""
   property var view: null
@@ -317,9 +318,9 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         height: parent.height + Style.space(4)
         radius: root.retro ? 0 : Style.cornerRadius
-        color: listMouse.pressed ? Style.pressedFillFor(root.foreground, Color.accent)
-          : root.listMenuOpen ? Style.selectedFillFor(root.foreground, Color.accent)
-          : listMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
+        color: listMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
+          : root.listMenuOpen ? Style.selectedFillFor(root.foreground, Commons.Color.accent)
+          : listMouse.containsMouse ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
         Behavior on color { ColorAnimation { duration: 160; easing.type: Easing.OutCubic } }
       }
 
@@ -420,8 +421,8 @@ Item {
         radius: root.retro ? 0 : Style.cornerRadius
         readonly property bool hovered: wordMouse.containsMouse || !orderText.sorted && arrowMouse.containsMouse
         readonly property bool pressed: wordMouse.pressed || !orderText.sorted && arrowMouse.pressed
-        color: pressed ? Style.pressedFillFor(root.foreground, Color.accent)
-          : hovered ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
+        color: pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
+          : hovered ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
         Behavior on color { ColorAnimation { duration: 160; easing.type: Easing.OutCubic } }
       }
 
@@ -435,8 +436,8 @@ Item {
         anchors.verticalCenter: orderText.verticalCenter
         height: parent.height + Style.space(4)
         radius: root.retro ? 0 : Style.cornerRadius
-        color: arrowMouse.pressed ? Style.pressedFillFor(root.foreground, Color.accent)
-          : arrowMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
+        color: arrowMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
+          : arrowMouse.containsMouse ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
         Behavior on color { ColorAnimation { duration: 160; easing.type: Easing.OutCubic } }
       }
 

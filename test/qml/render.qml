@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "plugin/Cells.js" as Cells
 import "plugin/Tones.js" as Tones
@@ -153,9 +154,9 @@ ShellRoot {
   property TrendColors trendColors: TrendColors {}
   // The surface's ground: the popup's card, opaque, or the window's.
   readonly property color groundColor: popup
-    ? Qt.rgba(Color.popups.background.r, Color.popups.background.g, Color.popups.background.b, 1) : Color.background
+    ? Qt.rgba(Commons.Color.popups.background.r, Commons.Color.popups.background.g, Commons.Color.popups.background.b, 1) : Commons.Color.background
   // The bar's own ground and ink, opaque, for the pills.
-  readonly property color barGround: Qt.rgba(Color.bar.background.r, Color.bar.background.g, Color.bar.background.b, 1)
+  readonly property color barGround: Qt.rgba(Commons.Color.bar.background.r, Commons.Color.bar.background.g, Commons.Color.bar.background.b, 1)
   property int now: holidayState ? 1813334400 : (nestState || nestDayState ? 1789156800 : 1788294000)
   property string shownRange: historyState ? "1Y" : "1D"
   property var shownHistoryEntry: null
@@ -285,7 +286,7 @@ ShellRoot {
     }
     property bool retro: root.stateName !== "smooth" && root.stateName.indexOf("-smooth") < 0
       && root.stateName !== "popup-history-failed" && root.stateName !== "popup-history-loading"
-    property color foreground: Color.popups.text
+    property color foreground: Commons.Color.popups.text
     property color upColor: root.trendColors.upOn(root.groundColor)
     property color downColor: root.trendColors.downOn(root.groundColor)
     // The shell's own family, so renders measure what the owner sees.
@@ -866,7 +867,7 @@ ShellRoot {
       Item {
         id: content
         readonly property int inset: root.popup ? Style.spacing.popupPadding
-          + Border.left(Border.surfaceSpec("popups", "border", Color.popups.border, Math.max(1, Style.space(2)))) : 0
+          + Border.left(Border.surfaceSpec("popups", "border", Commons.Color.popups.border, Math.max(1, Style.space(2)))) : 0
         clip: root.popup
         visible: !root.sheet && !root.pillSheet
         x: inset
@@ -938,7 +939,7 @@ ShellRoot {
               anchors.verticalCenter: parent.verticalCenter
               text: (pillRow.modelData.compact ? "" : (pillRow.modelData.retro ? "RETRO" : "SMOOTH") + " · ") + (pillRow.modelData.right ? "RIGHT SECTION" : pillRow.modelData.style.toUpperCase())
                 + (pillRow.modelData.up ? " · UP" : pillRow.modelData.style === "icon" || pillRow.modelData.right ? " · DOWN" : "")
-              color: Color.muted
+              color: Commons.Color.muted
               font.family: Style.font.family
               font.pixelSize: 10
               font.bold: true
@@ -973,8 +974,8 @@ ShellRoot {
                 moduleName: "grvc.stonks"
                 shell: pillShell
                 // The bar mirrors these onto the facade; the render sets them.
-                foreground: Color.bar.text
-                barForeground: Color.bar.text
+                foreground: Commons.Color.bar.text
+                barForeground: Commons.Color.bar.text
                 fontFamily: Style.font.family
                 barSize: Style.bar.sizeHorizontal
                 layoutConfig: pillRow.modelData.right ? { left: [], center: [], right: [{ id: "grvc.stonks" }] } : ({})
@@ -1013,8 +1014,8 @@ ShellRoot {
                 moduleName: "grvc.stonks"
                 shell: pillShell
                 vertical: true
-                foreground: Color.bar.text
-                barForeground: Color.bar.text
+                foreground: Commons.Color.bar.text
+                barForeground: Commons.Color.bar.text
                 fontFamily: Style.font.family
                 barSize: Style.bar.sizeVertical
                 layoutConfig: pillApi.layoutConfig

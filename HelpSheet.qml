@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "Tones.js" as Tones
 
@@ -17,8 +18,8 @@ Flickable {
 
   // KeySheet.sheet: { groups, mouse, note }.
   property var sheet: ({ groups: [], mouse: null, note: "" })
-  property color foreground: Color.foreground
-  property color dim: Tones.dim(foreground, Color.background)
+  property color foreground: Commons.Color.foreground
+  property color dim: Tones.dim(foreground, Commons.Color.background)
   property string fontFamily: Style.font.family
   property bool retro: false
   // The words start at the rows' inset (`inset`), and CLOSE ends where the

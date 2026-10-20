@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "Chart.js" as Chart
 import "Figures.js" as Figures
@@ -70,7 +71,7 @@ BarWidget {
   onOpenedChanged: Qt.callLater(reshowTooltip)
   // Up and down for the bar's own ground (`TrendColors`).
   readonly property color upColor: plugin && plugin.trendColors ? plugin.trendColors.upOn(barGround) : button.foreground
-  readonly property color downColor: plugin && plugin.trendColors ? plugin.trendColors.downOn(barGround) : Color.urgent
+  readonly property color downColor: plugin && plugin.trendColors ? plugin.trendColors.downOn(barGround) : Commons.Color.urgent
   readonly property color trendColor: toneColor(featured ? featured.tone : "")
   // A day's colour by its tone: up, down, or the dim of a flat one.
   function toneColor(tone) { return tone === "up" ? upColor : tone === "down" ? downColor : dimColor }
@@ -101,7 +102,7 @@ BarWidget {
   }
   // Quieter than the bar's ink by the same rule as the popup's secondary
   // text, against the bar's own ground.
-  readonly property color barGround: Qt.rgba(Color.bar.background.r, Color.bar.background.g, Color.bar.background.b, 1)
+  readonly property color barGround: Qt.rgba(Commons.Color.bar.background.r, Commons.Color.bar.background.g, Commons.Color.bar.background.b, 1)
   readonly property color dimColor: Tones.dim(button.foreground, barGround)
   // A failed or overdue refresh marks the pill too: the bar is the surface
   // most likely to be trusted at a glance.

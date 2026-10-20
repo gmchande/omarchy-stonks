@@ -1,7 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import qs.Commons
+import qs.Commons as Commons
 import "Cells.js" as Cells
 // The look a click switches to, as a small line chart, the way a button
 // shows what pressing it does, since the chart already shows the current
@@ -16,7 +16,7 @@ Item {
   // The current look; the icon shows the other one.
   property bool retro: false
   property bool still: false
-  property color color: Color.foreground
+  property color color: Commons.Color.foreground
 
   // The mark's shape, left to right, 0 at the top: a line that climbs.
   readonly property var points: Cells.markPoints()

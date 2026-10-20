@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "Tones.js" as Tones
 
@@ -16,8 +17,8 @@ Item {
   id: root
 
   property bool retro: false
-  property color foreground: Color.foreground
-  property color dim: Tones.dim(foreground, Color.background)
+  property color foreground: Commons.Color.foreground
+  property color dim: Tones.dim(foreground, Commons.Color.background)
   property string fontFamily: Style.font.family
   property int rowHeight: Style.space(30)
   // The scrollbar's gutter at the right, which the rows stop short of: the
@@ -100,8 +101,8 @@ Item {
     anchors.rightMargin: root.gutter
     radius: root.retro ? 0 : Style.cornerRadius
     color: !root.acts ? "transparent"
-      : addMouse.pressed ? Style.pressedFillFor(root.foreground, Color.accent)
-      : addMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
+      : addMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
+      : addMouse.containsMouse ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
 
     Row {
       anchors.centerIn: parent

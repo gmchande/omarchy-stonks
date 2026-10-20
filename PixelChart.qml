@@ -1,7 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import qs.Commons
+import qs.Commons as Commons
 import "Tones.js" as Tones
 // The retro chart, one rule for the day and every range: pixel columns fill
 // from the baseline row, the previous close or the period's starting price,
@@ -15,9 +15,9 @@ Item {
   id: root
 
   property var geometry: null
-  property color upColor: Color.foreground
-  property color downColor: Color.urgent
-  property color baselineColor: Tones.dimmer(Color.foreground, Color.background)
+  property color upColor: Commons.Color.foreground
+  property color downColor: Commons.Color.urgent
+  property color baselineColor: Tones.dimmer(Commons.Color.foreground, Commons.Color.background)
   property var up: true
   // Light the last regular print's cap white. Off for small copies, and a
   // range has none: its last bar need not be the headline print.
@@ -32,7 +32,7 @@ Item {
   // A closing surface: the live mark stops where it is, as the rest of the
   // surface does; it blinks again as the surface opens.
   property bool still: false
-  property color hairlineColor: Color.foreground
+  property color hairlineColor: Commons.Color.foreground
   // The unlit cells of the display, the way an LCD shows every segment
   // faintly. Transparent draws none.
   property color ghostColor: "transparent"
@@ -48,7 +48,7 @@ Item {
   // fill in behind it, whole columns of the plot.
   property real replayX: -1
   // The surface under the chart, which the stems are seen against.
-  property color ground: Color.background
+  property color ground: Commons.Color.background
 
   // The grid the day is drawn on, shared by the paint and the cap overlay.
   readonly property var grid: layout()
