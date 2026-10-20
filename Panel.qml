@@ -224,6 +224,8 @@ Panel {
           // The rows' room, so the list judges its sight by the rows' view
           // while the card has shrunk to the key sheet or a view.
           rowsRoom: root.bodyRoom
+          // The screen's room, so the first-run hint gives way to the rows.
+          screenRoom: panel.availableCardHeight > 0 ? panel.availableCardHeight - panel.verticalContentInset : 0
           // The card's edge as it eases: the footer and the field ride it.
           edge: Math.round(root.cardHeight) - panel.verticalContentInset
           service: root.service

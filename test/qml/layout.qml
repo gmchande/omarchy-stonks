@@ -2081,6 +2081,36 @@ ShellRoot {
           titleFaults.length === 0, titleFaults.join(" | "))
         root.check("a one-bar day's row draws its bar in both looks, and a day with none leaves the cell empty in both",
           rowInk.join(", ") === "smooth CKX drawn, smooth CVR empty, retro CKX drawn, retro CVR empty", rowInk.join(", "))
+        // The popup shows a row on a short screen at a large text size: the
+        // first-run hint gives way where it and a row don't both fit under
+        // the rest. At text size 16, on screens from just room for the rest
+        // and a row to just short of room for the hint too, in both looks.
+        // Found in the spacing walk: at 16 on an 850 px screen the popup
+        // showed its chrome and the hint, and not one row.
+        Style.fontBaseSize = 16
+        wait(100)
+        var bareChrome = body.chromeHeight
+        body.showFirstRunHint()
+        wait(50)
+        var hintRoom = Math.ceil(find(find(body, "footer"), "footerHint").implicitHeight) + Style.space(6)
+        var rowless = []
+        ;[false, true].forEach(function(retro) {
+          stub.retro = retro
+          for (var room = bareChrome + body.listRowHeight; room < bareChrome + body.listRowHeight + hintRoom; room += 8) {
+            body.screenRoom = room
+            surface.budget = room
+            wait(50)
+            if (root.lastRowBottom() <= yIn(body.watchlist, 0)) rowless.push((retro ? "retro " : "smooth ") + room + " px")
+          }
+        })
+        body.hint = ""
+        body.screenRoom = 0
+        surface.budget = 730
+        stub.retro = false
+        Style.fontBaseSize = 12
+        wait(100)
+        root.check("at text size 16, on a screen too short for the first-run hint and a row, the popup shows a row, in both looks",
+          rowless.length === 0, rowless.join(", "))
         console.log("LAYOUT DONE")
         done.exitCode = root.failures ? 1 : 0
         done.start()

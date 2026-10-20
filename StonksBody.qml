@@ -119,6 +119,15 @@ Item {
   function showFirstRunHint() {
     hint = "Drag the pill to move it along the bar\nMiddle-click changes its form · right-click opens the window"
   }
+  // The most height the screen leaves the body, whatever the card fits; 0
+  // where the body's height is its own (the window).
+  property int screenRoom: 0
+  // The hint gives way where it would leave no row in sight: read from the
+  // screen's room, never the card's, which fits what the footer takes.
+  // Found in the spacing walk: at text size 16 on an 850 px screen the
+  // popup showed its chrome and hint and not one row.
+  readonly property bool hintShown: hint !== "" && (screenRoom <= 0
+    || margins * 2 + header.height + heroBand.implicitHeight + groupGap * 3 + footer.barHeight + footer.hintRoom + listRowHeight <= screenRoom)
   // A standing word in the footer's place, under a note, until what it says
   // is fixed: the data file can't be read, or an update waits on a shell
   // restart, which a click on it does.
@@ -1208,6 +1217,7 @@ Item {
     noteOpacity: root.noteShown
     notice: root.notice
     hint: root.hint
+    showsHint: root.hintShown
     ground: root.ground
     label: root.listName !== "" ? "+  Add a symbol to " + root.listName : "+  Add a symbol"
     acts: root.offered !== null || root.updateOffered || !root.settingsUnreadable
