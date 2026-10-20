@@ -8,7 +8,10 @@
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 export LC_ALL=C.UTF-8
+# Qt 6.12's qmllint warns of every `var` declared in a block, a style the
+# code keeps throughout.
 qmllint=${QMLLINT:-/usr/lib/qt6/bin/qmllint}
+lint_flags=(--block-scope-var-declaration disable)
 
 # Warnings outside the house baseline, each file, category, and token with
 # its exact count. Fix one and lower its count here.
@@ -17,6 +20,16 @@ declare -A listed=(
   # declares, which qmllint cannot see through Repeater.itemAt.
   ["Watchlist.qml missing-property pause"]=1
   ["Watchlist.qml missing-property settle"]=1
+  # BarWidget.qml: injectPanel sets each property the loaded panel has,
+  # checked with `in`; Qt 6.12 types Loader.item as a bare QObject.
+  ["BarWidget.qml missing-property target"]=4
+  # An alias that exposes an inner object by its own id, which Qt 6.12
+  # counts as shadowing: the alias and the id's line each.
+  ["StonksBody.qml id-shadows-member motion"]=2
+  ["StonksBody.qml id-shadows-member watchlist"]=2
+  ["StonksBody.qml id-shadows-member search"]=2
+  ["WindowHost.qml id-shadows-member app"]=2
+  ["Service.qml id-shadows-member yahooGate"]=2
 )
 
 # The house baseline, what qmllint cannot see in the installed shell: these
@@ -38,7 +51,7 @@ lint() { # file...
   local tmp out code failed=0 shown=0 houses=0
   tmp=$(mktemp -d)
   ln -s /usr/share/omarchy/shell "$tmp/qs"
-  out=$("$qmllint" -I "$tmp" --json "$tmp/lint.json" "$@" 2>&1)
+  out=$("$qmllint" "${lint_flags[@]}" -I "$tmp" --json "$tmp/lint.json" "$@" 2>&1)
   code=$?
   if [ "$code" -ne 0 ] || [ -n "$out" ]; then
     echo "qmllint exited $code${out:+ and printed:}"
