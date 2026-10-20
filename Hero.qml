@@ -91,7 +91,8 @@ Item {
     Math.floor(priceRoom / Math.max(1, cells))))
   readonly property int digitHeight: fittedCell * 5
   readonly property int fittedSize: Math.max(1, Math.round(priceSize * digitHeight / naturalInk))
-  // Where the smooth digits' ink starts; the retro cells start there too.
+  // Where the smooth digits' ink starts in their box: they are pulled left
+  // by it, so their ink, like the retro cells, starts on the band's edge.
   readonly property real inkLeft: priceInk.tightBoundingRect.x * fittedSize / priceSize
   readonly property int baselineY: listingRow.height + Style.space(14) + boxHeight
   // The strip under the price starts below the retro comma's tail, one cell
@@ -181,6 +182,7 @@ Item {
     id: smoothPrice
     objectName: "smoothPrice"
     visible: !root.retro
+    x: -Math.round(root.inkLeft)
     y: root.baselineY - baselineOffset
     textFormat: Text.PlainText
     text: root.priceText
@@ -195,7 +197,6 @@ Item {
     id: blockDigits
     objectName: "blockPrice"
     visible: root.retro
-    x: Math.max(0, Math.round(root.inkLeft))
     y: root.baselineY - baselineOffset
     // Hidden, it rests: a scrub in smooth repainted it every step.
     text: root.retro ? root.priceText : ""

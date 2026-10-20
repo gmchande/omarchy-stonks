@@ -450,9 +450,10 @@ ShellRoot {
             var moved = fixed.filter(function(key) { return smooth[key] !== retro[key] })
             root.check(label + ": the look moves nothing outside the digits", moved.length === 0,
               moved.join(", ") + " smooth " + root.describe(smooth) + " retro " + root.describe(retro))
-            root.check(label + ": both looks' digits share a top line and a left edge",
-              Math.abs(smooth.top - retro.top) <= 2 && Math.abs(smooth.left - retro.left) <= 2,
-              "smooth " + root.describe(smooth) + " retro " + root.describe(retro))
+            root.check(label + ": both looks' digits share a top line, and their ink starts on the band's left edge",
+              Math.abs(smooth.top - retro.top) <= 2 && Math.abs(smooth.left - Math.round(body.textLeft)) <= 1
+                && retro.left === Math.round(body.textLeft),
+              "smooth " + root.describe(smooth) + " retro " + root.describe(retro) + " edge " + body.textLeft)
             root.check(label + ": the change and its caption end at the band's right edge, the rows' figures'",
               smooth.changeRight === smooth.captionRight
                 && smooth.changeRight === Math.round(body.width - body.textRight),
