@@ -185,15 +185,15 @@ Item {
     var prints = open && Overnight.overnightDue(overnightFeed.askedAt, root.now, root.calendars, failed)
       ? drawn : drawn.filter(function(s) { return !overnightFeed.entries[s] })
     if ((tradability.length === 0 && prints.length === 0) || !root.screensClear()) return
+    // The pill's own ask waits for a request already out, then goes.
+    if (!open && (allDayFeed.busy || overnightFeed.busy)) return
     if (!open) root.pillAsked = true
-    var now = root.now
     // The pill's symbol with no answer yet goes alone, ahead of the rest:
     // its chart is the one a click waits on. A feed with a request out
-    // holds the next until that is answered.
+    // sends nothing more; each answer asks again for what is still wanted.
     var ask = function(robinhood, symbols) {
       var alone = symbols.length > 1 && symbols.indexOf(pill) >= 0 && !robinhood.entries[pill]
-      if (alone) robinhood.fetch([pill], now)
-      robinhood.fetch(alone ? symbols.filter(function(s) { return s !== pill }) : symbols, now)
+      robinhood.fetch(alone ? [pill] : symbols, root.now)
     }
     ask(allDayFeed, tradability)
     ask(overnightFeed, prints)
@@ -470,8 +470,10 @@ Item {
   }
 
   FundamentalsFeed { id: fundamentalsFeed; gate: yahooGate }
-  AllDayFeed { id: allDayFeed; now: root.now; gate: robinhoodGate }
-  OvernightFeed { id: overnightFeed; now: root.now; gate: robinhoodGate }
+  // Robinhood's feeds send one request at a time; each answer asks again
+  // for what is still wanted, while it still is (`askOvernight`).
+  AllDayFeed { id: allDayFeed; gate: robinhoodGate; onEntriesChanged: Qt.callLater(root.askOvernight) }
+  OvernightFeed { id: overnightFeed; gate: robinhoodGate; onEntriesChanged: Qt.callLater(root.askOvernight) }
 
   // A user's refresh, from a key, the pill, or IPC: every watched quote
   // whose last answer is more than 10 s old, and, with a surface open to

@@ -10,10 +10,11 @@ import "Overnight.js" as Overnight
 // so it replaces the prints kept. An entry is { status, bars }: "ok" with
 // the prints Robinhood has, none for a listing it does not trade; or
 // "failed", keeping the last good prints. `entries` holds answers only. One
-// curl at a time; symbols asked for while one is out, and not in it, are
-// asked for once it is answered. While Robinhood's gate pauses the host, a
-// request fails at once, keeping the last good prints; one the gate's
-// budget holds back waits for the next run.
+// run at a time: a request asked for while one is out is not sent, and the
+// service asks again for what it still wants once that is answered, so
+// nothing goes once nothing wants it. While Robinhood's gate pauses the
+// host, a request fails at once, keeping the last good prints; the gate's
+// budget may let only some of a run's requests go.
 Item {
   id: root
 
@@ -21,43 +22,30 @@ Item {
   property var gate: null
   // The gate's ticket the request out was let through on (`Gate.report`).
   property int ticket: 0
-  // The service's clock, which stamps a request the feed sends of its own
-  // accord: one held while another was out.
-  property int now: 0
   // When the last request went out, answered or not: the service asks again
   // by it (`Overnight.overnightDue`).
   property int askedAt: 0
-  property var asking: []
-  // The run out, as its requests' symbols, in the order of their URLs.
+  // The run out, as its requests' symbols, in the order of their URLs,
+  // until it is answered.
   property var batches: []
-  property var wanted: []
+  readonly property bool busy: batches.length > 0
 
   // `at` is the service's clock as it asks: the clock's own handlers may run
   // before this binding to it has caught up. While the gate holds the host,
   // the request fails a turn later, out of the change that asked for it.
   function fetch(symbols, at) {
-    if (fetchProc.running || heldTimer.running) {
-      var more = symbols.filter(function(s) { return asking.indexOf(s) < 0 && wanted.indexOf(s) < 0 })
-      if (more.length) root.wanted = wanted.concat(more)
-      return
-    }
-    if (!symbols.length) return
+    if (busy || !symbols.length) return
     var batches = []
     for (var i = 0; i < symbols.length; i += Overnight.OVERNIGHT_BATCH) batches.push(symbols.slice(i, i + Overnight.OVERNIGHT_BATCH))
     var granted = gate ? gate.take(batches.length) : batches.length
-    if (granted > 0 && granted < batches.length) {
-      batches.slice(granted).forEach(function(batch) { root.wanted = root.wanted.concat(batch) })
-      batches = batches.slice(0, granted)
-    }
-    root.batches = batches
-    root.asking = [].concat.apply([], batches)
+    root.batches = granted > 0 ? batches.slice(0, granted) : batches
     root.askedAt = at
     if (granted === 0) {
       heldTimer.restart()
       return
     }
     if (gate) root.ticket = gate.ticket
-    fetchProc.command = Fetch.curlCommand(batches.map(Overnight.overnightUrl), Fetch.overnightCap(batches[0].length))
+    fetchProc.command = Fetch.curlCommand(root.batches.map(Overnight.overnightUrl), Fetch.overnightCap(root.batches[0].length))
     fetchProc.running = true
   }
 
@@ -87,10 +75,8 @@ Item {
         next[symbol] = { status: "ok", bars: bars, at: askedAt }
       })
     })
+    root.batches = []
     root.entries = next
-    var again = wanted
-    root.wanted = []
-    fetch(again, now)
   }
 
   Timer {

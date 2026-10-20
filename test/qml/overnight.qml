@@ -414,7 +414,7 @@ ShellRoot {
       // the last prints, and a scrub reads Yahoo's morning, not the night.
       within(5000, function() {
         return body.featuredQuote && body.featuredQuote.session.regular.start === 1790602200 && !body.chartLoading
-          && service.testOvernightFeed.askedAt === harness.monday && service.testOvernightFeed.asking.length === 0
+          && service.testOvernightFeed.askedAt === harness.monday && !service.testOvernightFeed.busy
       })
       var mondayChart = body.featuredGeometry
       scrubAt(0.1)
