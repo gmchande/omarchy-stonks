@@ -47,6 +47,7 @@ ShellRoot {
   FileView { id: shopFile; path: root.fixtures + "/shop-to.json"; blockLoading: true }
   FileView { id: aaplWeeklyFile; path: root.fixtures + "/history/aapl-5y.json"; blockLoading: true }
   FileView { id: shopYearFile; path: root.fixtures + "/history/shop-to-1y.json"; blockLoading: true }
+  FileView { id: youngFile; path: root.fixtures + "/history/fab-max.json"; blockLoading: true }
   FileView { id: tokyoFile; path: root.fixtures + "/7203-t-day.json"; blockLoading: true }
   FileView { id: londonFile; path: root.fixtures + "/shel-l-day.json"; blockLoading: true }
   // A coin under a cent and a six-figure price, each in its own decimals.
@@ -338,11 +339,16 @@ ShellRoot {
         wait(400)
         var weekly = History.parseHistory(JSON.parse(aaplWeeklyFile.text()), "5Y")
         var year = History.parseHistory(JSON.parse(shopYearFile.text()), "1Y")
+        var young = History.parseHistory(JSON.parse(youngFile.text()), "All")
         var month = History.parseHistory(JSON.parse(liveMonthFile.text()), "1M")
         var aapl = root.figures("aapl")
         var cases = [
           { symbol: "AAPL", range: "1D", history: null, figures: aapl },
           { symbol: "AAPL", range: "5Y", history: weekly, figures: aapl },
+          // The widest range line: a listing younger than All, its start
+          // beside its low and high, each with its four-digit year, and the
+          // slot for how few bars it has.
+          { symbol: "AAPL", range: "All", history: young, figures: aapl },
           { symbol: "SPY", range: "1D", history: null, figures: null },
           { symbol: "SHOP.TO", range: "1D", history: null, figures: root.figures("shop-to") },
           { symbol: "SHOP.TO", range: "1Y", history: year, figures: root.figures("shop-to") },
