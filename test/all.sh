@@ -51,7 +51,7 @@ run "bun test (pure rules)" bun test ./test/model.test.js
 run "source boundaries" bash test/boundaries.sh
 run "qmllint (only the baseline in test/lint.sh)" bash test/lint.sh
 run "qmllint gate self-check" bash test/lint.sh self-check
-run "launcher icon is the mark" bun test/mark-svg.js check
+run "launcher icon is the logo" bun test/launcher-icon.js check
 run "omarchy plugin validate (what a clone holds)" validate_clone
 run "launcher entry validates" desktop-file-validate share/stonks.desktop
 verdict
