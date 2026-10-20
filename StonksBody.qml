@@ -26,6 +26,9 @@ Item {
   // The plugin's version on disk against the one running (`Updates`).
   property var updates: null
   property bool surfaceOpen: false
+  // A screen shows the open surface: the window on a workspace no screen
+  // shows is open, as it was left, and asks for nothing an open one would.
+  property bool onScreen: true
   property string headerWhenMissing: "No data"
   property bool failClosedHeader: false
   property int margins: 0
@@ -415,17 +418,18 @@ Item {
   // The service wants the chart's history only while a surface shows it,
   // and a preview only while its search is open on an open surface.
   onSurfaceOpenChanged: {
-    if (service) service.surfaceShown(root, surfaceOpen)
+    if (service) service.surfaceShown(root, surfaceOpen && onScreen)
     if (!surfaceOpen) previewTo("")
   }
-  onServiceChanged: if (service && surfaceOpen) service.surfaceShown(root, true)
+  onOnScreenChanged: if (service) service.surfaceShown(root, surfaceOpen && onScreen)
+  onServiceChanged: if (service && surfaceOpen && onScreen) service.surfaceShown(root, true)
   Component.onDestruction: if (service) {
     service.surfaceShown(root, false)
     service.preview(root, "")
   }
   // The rows in sight while they show, whose charts the service fetches
   // ahead on a range.
-  readonly property var rowsInSight: surfaceOpen && rowsShown ? watchlist.sightSymbols : []
+  readonly property var rowsInSight: surfaceOpen && onScreen && rowsShown ? watchlist.sightSymbols : []
   onRowsInSightChanged: if (service) service.rowsSeen(root, rowsInSight)
   // One search previews at a time: another surface's search that starts
   // choosing takes the preview, and this search closes, so its hero never

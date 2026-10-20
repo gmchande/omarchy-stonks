@@ -39,7 +39,8 @@ Item {
   // first fetch that failed for good. They are members, saved and fetched,
   // but no list shows them until then.
   property var arriving: []
-  // The surfaces open now: the popup on any bar, the window. The chart's
+  // The surfaces open now where a screen shows them: the popup on any bar,
+  // the window on a workspace on view (`StonksBody.onScreen`). The chart's
   // history is wanted only while one is (`surfaceShown`).
   property var openSurfaces: []
   // The search result a surface's hero shows unadded, the keyboard's choice

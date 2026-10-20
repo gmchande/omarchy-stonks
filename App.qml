@@ -18,6 +18,8 @@ Item {
   property bool closingFromHost: false
   property string requestedSymbol: ""
   property string requestedRange: ""
+  // A screen shows the window's workspace (`WindowHost.onScreen`).
+  property bool onScreen: true
 
   readonly property bool ready: !!(service && service.pluginsReady)
   readonly property bool opened: window.visible
@@ -168,6 +170,7 @@ Item {
           service: root.ready ? root.service : null
           updates: root.updates
           surfaceOpen: window.visible
+          onScreen: root.onScreen
           // Before the service is ready the empty hero's label says Loading.
           headerWhenMissing: root.ready ? "No data" : ""
           margins: Style.space(16)

@@ -109,6 +109,15 @@ ShellRoot {
   readonly property var app: plugin.windowHost.app
 
   QtObject { id: workspaceHere }
+  QtObject { id: workspaceThere }
+  // The window as Hyprland lists it, on the workspace a step puts it.
+  QtObject {
+    id: stonksToplevel
+    property string title: "Stonks"
+    property var wayland: ({ appId: "org.quickshell" })
+    property string address: "5ab1e"
+    property var workspace: workspaceHere
+  }
   QtObject {
     id: hyprlandStandIn
     property var toplevels: ({ values: [] })
@@ -162,11 +171,13 @@ ShellRoot {
 
   // A screen as Hyprland reports it, for the window host (fetch.sh): on or
   // off, as it says when asked again, a turn later, as Hyprland's answer
-  // comes. It counts the asks it has not answered yet (`screensHeard`).
+  // comes, showing this workspace. It counts the asks it has not answered
+  // yet (`screensHeard`).
   QtObject {
     id: screenStandIn
     property bool on: true
     property var lastIpcObject: ({ dpmsStatus: true })
+    property var activeWorkspace: workspaceHere
     property int unanswered: 0
     function refresh() {
       unanswered++
@@ -230,6 +241,14 @@ ShellRoot {
     function screensHeard() {
       tryVerify(function() { return screenStandIn.unanswered === 0 }, 5000)
     }
+    // A run waiting on the stand-in screen's answer goes once it comes, a
+    // turn or two later: let it come, and the run land.
+    function answerScreens() {
+      if (screenStandIn.unanswered === 0) return
+      screensHeard()
+      wait(20)
+      settle()
+    }
 
     // The clock moves on by `seconds`, a step at a time, each run let land.
     // `each` is called after every step.
@@ -263,10 +282,11 @@ ShellRoot {
     // its start in and its end out, against `want`. A symbol asked for on a
     // period may land a tick either side of the window's edge, so a count
     // may be one off; one expected never to be asked must not be at all.
-    function countsOver(label, seconds, want, begin) {
+    // `each` is called after every step of the clock (`tick`).
+    function countsOver(label, seconds, want, begin, each) {
       var from = harness.requests().length
       begin()
-      tick(seconds - 5)
+      tick(seconds - 5, 5, each)
       var got = harness.quoteCounts(harness.requests().slice(from))
       var off = harness.listed.filter(function(s) { return want[s] === 0 ? got[s] !== 0 : Math.abs(got[s] - want[s]) > 1 })
       harness.check(label, off.length === 0, harness.listed.map(function(s) { return s + " " + got[s] + "/" + want[s] }).join(", "))
@@ -599,6 +619,37 @@ ShellRoot {
       var prints = night.filter(function(l) { return /^overnight /.test(l) }).length
       harness.check("23:30, the window open: Robinhood's prints every 5 minutes through the night", Math.abs(prints - 3) <= 1, prints + " requests")
       closeWindow()
+
+      // Midnight, the window left open on a workspace no screen shows: it
+      // asks what a closed one asks, the pill's symbol every 15 minutes and
+      // Tokyo, trading, every minute, and nothing of Robinhood, whose prints
+      // a window in sight asks every 5 minutes through the night. Back in
+      // sight, what fell due goes at once.
+      hyprlandStandIn.toplevels = { values: [stonksToplevel] }
+      plugin.windowHost.monitors = [screenStandIn]
+      stonksToplevel.workspace = workspaceThere
+      var away = countsOver("00:00, the window open on a workspace no screen shows: the pill's symbol every 15 minutes, Tokyo, trading, every minute, nothing else",
+        1800, counts([2, 0, 0, 0, 0, 0, 30, 0]), function() {
+          startAt(at(harness.wed7 + 86400, 0, 0))()
+          answerScreens()
+          app.open("{}")
+          tryVerify(function() { return app.opened }, 3000)
+          answerScreens()
+        }, answerScreens)
+      harness.check("out of sight, the window asks nothing of Robinhood", away.every(function(l) { return !/^(overnight|instruments) /.test(l) }),
+        away.filter(function(l) { return /^(overnight|instruments) /.test(l) }).join(", "))
+      var backFrom = harness.requests().length
+      stonksToplevel.workspace = workspaceHere
+      var caughtUp = within(3000, function() {
+        var back = harness.requests().slice(backFrom)
+        return harness.quoteCounts(back)["BTC-USD"] === 1 && back.some(function(l) { return /^overnight /.test(l) })
+      })
+      harness.check("back in sight, what fell due goes at once: the crypto, and Robinhood's prints", caughtUp,
+        harness.requests().slice(backFrom).join(", "))
+      settle()
+      closeWindow()
+      hyprlandStandIn.toplevels = { values: [] }
+      plugin.windowHost.monitors = []
 
       // Thursday 11:00, nothing open, every quote still Wednesday's: the
       // calendars say New York, London, and Toronto trade, so their rows

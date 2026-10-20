@@ -4,8 +4,9 @@ import QtQuick
 import Quickshell.Hyprland
 
 // Hosts the window, whatever is on the bar, and decides what a request for
-// it does with the popup and Hyprland's workspaces. The window itself is
-// App's. It also asks Hyprland, for the service, whether every screen is off.
+// it does with the popup and Hyprland's workspaces, and whether a screen
+// shows it. The window itself is App's. It also asks Hyprland, for the
+// service, whether every screen is off.
 Item {
   id: root
 
@@ -20,6 +21,20 @@ Item {
   readonly property var toplevel: app.opened ? Hyprland.toplevels.values.find(root.isWindow) || null : null
   // Hyprland has it on a workspace other than the focused one.
   readonly property bool elsewhere: !!toplevel && !!toplevel.workspace && toplevel.workspace !== Hyprland.focusedWorkspace
+  // A screen shows it: a monitor's active workspace is the window's, or the
+  // special workspace over it is. Until Hyprland lists it, and with no
+  // screens to ask, as in a harness, it counts as shown. Out of sight it is
+  // open as it was left, and the service asks for what a closed surface
+  // asks, so a window left on another workspace costs nothing a closed one
+  // doesn't.
+  readonly property bool onScreen: {
+    var workspace = toplevel ? toplevel.workspace : null
+    if (!workspace || root.monitors.length === 0) return true
+    return root.monitors.some(function(m) {
+      var special = m.lastIpcObject ? m.lastIpcObject.specialWorkspace : null
+      return m.activeWorkspace === workspace || (!!special && special.id !== 0 && special.id === workspace.id)
+    })
+  }
 
   function isWindow(t) {
     return t.title === "Stonks" && !!t.wayland && t.wayland.appId === "org.quickshell"
@@ -80,11 +95,18 @@ Item {
     enabled: root.screensOff
     function onRawEvent() { Hyprland.refreshMonitors() }
   }
+  // A special workspace shown or hidden is in the monitors' answer alone.
+  Connections {
+    target: Hyprland
+    enabled: root.opened && root.monitors.length > 0
+    function onRawEvent(event) { if (event.name === "activespecial") Hyprland.refreshMonitors() }
+  }
 
   App {
     id: app
     service: root.service
     updates: root.updates
     trendColors: root.trendColors
+    onScreen: root.onScreen
   }
 }
