@@ -105,8 +105,9 @@ Item {
   // The symbol whose lists the checklist shows; "" while it is closed.
   property string listsSymbol: ""
   // A short word in the footer's place, for a moment, held while the pointer
-  // is on it: why a key did nothing, or what a removal took, which a click
-  // on it puts back (`offered`).
+  // is on it: why a key did nothing, what a removal took, which a click on
+  // it puts back (`offered`), or that a newer Stonks is out, which a click
+  // on it updates (`updateOffered`).
   property string note: ""
   // A quiet line above the footer for this visit: the popup's first-run
   // hint (`showFirstRunHint`), how the pill is moved and changed. The next
@@ -116,17 +117,27 @@ Item {
     hint = "Drag the pill to move it along the bar\nMiddle-click changes its form · right-click opens the window"
   }
   // A standing word in the footer's place, under a note, until what it says
-  // is fixed: the data file can't be read, an update waits on a shell
-  // restart, or a newer Stonks is out; a click on either of the last two
-  // does what it says.
+  // is fixed: the data file can't be read, or an update waits on a shell
+  // restart, which a click on it does.
   readonly property string notice: settingsUnreadable ? "Can't read grvc.stonks.json · fix or remove it to save changes"
-    : updatedTo !== "" ? "Updated to " + updatedTo + " · click to restart the shell"
-    : releasedVersion !== "" ? "Stonks " + releasedVersion + " is out · click to update" : ""
+    : updatedTo !== "" ? "Updated to " + updatedTo + " · click to restart the shell" : ""
   // The removal the footer's note offers back, the service's one removal on
   // offer as the note was said: when another surface makes a newer removal,
   // the lists change, or it is undone, the offer goes, and the note with it.
   property var offered: null
   onRemovalChanged: if (offered !== null && removal !== offered) clearNote()
+  // The note says a newer Stonks is out, said as a surface opens, once for
+  // each answer that names it (`Updates.releaseUnsaid`): a standing notice
+  // would take the add's place for days.
+  property bool updateOffered: false
+  function offerRelease() {
+    if (!updates || !updates.releaseUnsaid) return
+    updates.sayRelease()
+    offered = null
+    updateOffered = true
+    note = "Stonks " + updates.releasedVersion + " is out"
+    holdNote()
+  }
 
   // What this surface shows of the service, held in one place: the surface
   // reads the service only while it is open. From a close until the next
@@ -158,7 +169,6 @@ Item {
   property var owed: ({})
   property bool settingsUnreadable: false
   property string updatedTo: ""
-  property string releasedVersion: ""
   // The clock: a closed surface's holds still too, so nothing it would show
   // is derived again every second.
   property int now: 0
@@ -183,7 +193,6 @@ Item {
   Binding on owed { when: root.reading; value: root.service?.owed; restoreMode: Binding.RestoreNone }
   Binding on settingsUnreadable { when: root.reading; value: root.service?.settingsUnreadable; restoreMode: Binding.RestoreNone }
   Binding on updatedTo { when: root.reading; value: root.updates ? root.updates.newVersion : ""; restoreMode: Binding.RestoreNone }
-  Binding on releasedVersion { when: root.reading; value: root.updates ? root.updates.releasedVersion : ""; restoreMode: Binding.RestoreNone }
   Binding on now { when: root.reading; value: root.service?.now; restoreMode: Binding.RestoreNone }
 
   readonly property var symbols: view.rows
@@ -526,6 +535,7 @@ Item {
 
   function say(text) {
     offered = null
+    updateOffered = false
     note = text
     holdNote()
   }
@@ -535,6 +545,7 @@ Item {
   // until the next change to the lists, long after the note has gone.
   function offerUndo(symbol, from) {
     offered = removal
+    updateOffered = false
     note = "Removed " + symbol + (from !== "" ? " from " + from : "")
     holdNote()
   }
@@ -576,6 +587,7 @@ Item {
     noteShown = 1
     note = ""
     offered = null
+    updateOffered = false
   }
 
   function selectRange(value) {
@@ -865,7 +877,8 @@ Item {
   // At rest before the first frame: the rows in their places and the list on
   // a row, wherever a close stopped the wheel, and the look icon and the
   // breadth rule on what the surface now reads. A name a close kept, refused,
-  // is open again where it was typed.
+  // is open again where it was typed, and a newer Stonks not yet said is
+  // said.
   function resetInteraction() {
     closeViews()
     showingHelp = false
@@ -879,18 +892,19 @@ Item {
     clearNote()
     footer.settle()
     hint = ""
+    offerRelease()
     resumeTyped()
   }
 
-  // A refusal stays a moment; an offer to undo long enough to act on it.
-  // Its last 600 ms it fades, still taking a click while any of it shows,
-  // and what it covered fades in after it, so the change under a click is
-  // seen coming. Found in the walk of dev on 14 October: a click meant as
-  // an undo, just after the note went, opened search.
+  // A refusal stays a moment; an offer to undo or to update long enough to
+  // act on it. Its last 600 ms it fades, still taking a click while any of
+  // it shows, and what it covered fades in after it, so the change under a
+  // click is seen coming. Found in the walk of dev on 14 October: a click
+  // meant as an undo, just after the note went, opened search.
   property real noteShown: 1
   Timer {
     id: noteTimer
-    interval: (root.offered !== null ? 5000 : 2500) - noteFade.duration
+    interval: (root.offered !== null || root.updateOffered ? 5000 : 2500) - noteFade.duration
     onTriggered: noteFade.start()
   }
   NumberAnimation {
@@ -1170,23 +1184,26 @@ Item {
     gutter: root.gutter
     rowHeight: root.rowHeight
     note: root.note
-    noteAction: root.offered !== null ? " · click to undo" : ""
+    noteAction: root.offered !== null ? " · click to undo" : root.updateOffered ? " · click to update" : ""
     noteOpacity: root.noteShown
     notice: root.notice
     hint: root.hint
     ground: root.ground
     label: root.listName !== "" ? "+  Add a symbol to " + root.listName : "+  Add a symbol"
-    acts: root.offered !== null || !root.settingsUnreadable
+    acts: root.offered !== null || root.updateOffered || !root.settingsUnreadable
     onHoveredChanged: root.holdNote()
-    // The click acts on what the footer shows: an undo offer undoes, the
-    // update's notice restarts the shell, a newer version's runs the
-    // update, and the file's does nothing, nor does a refusal over it; a
+    // The click acts on what the footer shows: an undo offer undoes, a newer
+    // version's note runs the update, the update's notice restarts the
+    // shell, and the file's does nothing, nor does a refusal over it; a
     // refusal otherwise, or the label, adds.
     onClicked: {
       if (root.offered !== null) root.undoRemoval()
+      else if (root.updateOffered) {
+        root.clearNote()
+        root.updates.update()
+      }
       else if (root.settingsUnreadable) return
       else if (root.note === "" && root.updatedTo !== "") root.updates.restart()
-      else if (root.note === "" && root.releasedVersion !== "") root.updates.update()
       else root.startAdding()
     }
   }

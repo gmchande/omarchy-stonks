@@ -11,9 +11,10 @@ import "plugin" as Stonks
 // 1.0.9. The service asks GitHub for main's manifest as it starts and a day
 // after each ask GitHub answered, within seconds after one it didn't, never
 // while every screen is off. An equal, an older, a failed, and a refused
-// answer say nothing and show no "!"; a newer one says so in the window's
-// footer, whose click runs the update in a terminal, and a later failure
-// leaves it; and once the update is on disk, the restart notice takes over.
+// answer say nothing and show no "!". A newer one is said as a note on the
+// window's next open, once for each answer that names it: a click while it
+// shows runs the update in a terminal, and once it has gone the footer is
+// the add again. Once the update is on disk, the restart notice takes over.
 ShellRoot {
   id: harness
 
@@ -152,8 +153,15 @@ ShellRoot {
       service.now = harness.feed.askedAt + 24 * 60 * 60
     }
 
+    // What the footer says, its note's action included.
     function footer() {
-      return String(harness.find(harness.find(app.testBody, "footer"), "footerText").text)
+      var bar = harness.find(app.testBody, "footer")
+      var action = harness.find(bar, "footerAction")
+      return String(harness.find(bar, "footerText").text) + (action.visible ? String(action.text) : "")
+    }
+    function clickFooter() {
+      var bar = harness.find(app.testBody, "footer")
+      mouseClick(bar, bar.width / 2, bar.height / 2)
     }
 
     // Every "!" on show: the pill's, and each row's.
@@ -167,38 +175,56 @@ ShellRoot {
       return out
     }
 
-    function test_updates() {
+    // The window opened with the pointer off its footer, which would hold
+    // a note.
+    function openWindow() {
       app.open("{}")
       tryVerify(function() { return app.opened && service.openSurfaces.length === 1 }, 3000)
+      mouseMove(app.testBody, 1, 1)
+    }
+    function closeWindow() {
+      app.close()
+      tryVerify(function() { return service.openSurfaces.length === 0 }, 3000)
+    }
+    // What the footer and the marks say as the window opens; then closed.
+    function visit() {
+      openWindow()
+      var said = footer() + " | " + marks().join(", ")
+      closeWindow()
+      return said
+    }
+
+    function test_updates() {
       var quoted = within(5000, function() { return ["AAPL", "MSFT", "NVDA"].every(function(s) { return !!service.quotes[s] }) })
+      var add = "+  Add a symbol | "
+      var newer = "Stonks 1.0.10 is out · click to update"
 
       // As the service starts, main names this build's version.
       var started = answered(1)
+      var first = visit()
       harness.check("as the service starts, it asks GitHub once for main's version, and the same version says nothing",
-        quoted && started && footer() === "+  Add a symbol" && marks().length === 0,
-        harness.asked() + " asks | " + footer() + " | " + marks().join(", "))
+        quoted && started && first === add, harness.asked() + " asks | " + first)
 
       // A second short of a day: nothing. A day on: asked again, older.
       put("MANIFEST.version", "1.0.8")
       service.now = harness.feed.askedAt + 24 * 60 * 60 - 1
       var early = harness.feed.testAsking || harness.asked() !== 1
       nextDay()
-      var older = answered(2)
+      var older = answered(2) && visit()
       harness.check("a day after the last ask, not a second sooner, it asks again, and an older version says nothing",
-        !early && older && footer() === "+  Add a symbol",
-        harness.asked() + " asks | " + footer())
+        !early && older === add, harness.asked() + " asks | " + older)
 
       // A failed answer, then a refusal, a day apart.
       put("MANIFEST.down", "")
       nextDay()
-      var failed = answered(3) && footer() === "+  Add a symbol" && marks().length === 0
+      var failed = answered(3) && visit()
       remove("MANIFEST.down")
       put("GITHUB.refuse", "")
       nextDay()
-      var refused = answered(4) && footer() === "+  Add a symbol" && marks().length === 0
+      var refused = answered(4) && visit()
       remove("GITHUB.refuse")
       harness.check("a failed answer and a refusal say nothing and show no \"!\"",
-        failed && refused, failed + " " + refused + " | " + harness.asked() + " asks | " + footer() + " | " + marks().join(", "))
+        failed === add && refused === add, harness.asked() + " asks | " + failed + " / " + refused)
 
       // No answer at all, as straight after a wake before the network is
       // back: it asks again once the gate's pause of a few seconds is over,
@@ -208,10 +234,9 @@ ShellRoot {
       var unanswered = answered(5)
       remove("GITHUB.offline")
       service.now += 5
-      var retried = answered(6)
+      var retried = answered(6) && visit()
       harness.check("an ask that got no answer at all goes again within seconds, and says nothing meanwhile",
-        unanswered && retried && footer() === "+  Add a symbol" && marks().length === 0,
-        unanswered + " " + retried + " | " + harness.asked() + " asks | " + footer() + " | " + marks().join(", "))
+        unanswered && retried === add, unanswered + " | " + harness.asked() + " asks | " + retried)
 
       // Every screen off a day on: nothing is asked. On again, the next
       // word from Hyprland asks the screens, and the look goes.
@@ -221,38 +246,72 @@ ShellRoot {
       plugin.windowHost.monitors = [screenStandIn]
       nextDay()
       tryVerify(function() { return screenStandIn.unanswered === 0 }, 3000)
-      var dark = harness.asked() === 6 && !harness.feed.testAsking && footer() === "+  Add a symbol"
+      var dark = harness.asked() === 6 && !harness.feed.testAsking
       screenStandIn.on = true
       hyprlandStandIn.rawEvent({})
       var lit = answered(7)
-      harness.check("while every screen is off it asks nothing; with one on, it asks, and a newer version says so in the footer",
-        dark && lit && within(1000, function() { return footer() === "Stonks 1.0.10 is out · click to update" }),
-        dark + " " + lit + " | " + harness.asked() + " asks | " + footer())
       plugin.windowHost.monitors = []
+      openWindow()
+      var said = footer() + " | " + marks().join(", ")
+      harness.check("while every screen is off it asks nothing; with one on, it asks, and the next open says the newer version in a note",
+        dark && lit && said === newer + " | ", dark + " " + lit + " | " + harness.asked() + " asks | " + said)
 
-      // The click runs the update in a terminal, and adds nothing.
-      var notice = harness.find(app.testBody, "footer")
-      mouseClick(notice, notice.width / 2, notice.height / 2)
+      // A click while the note shows runs the update in a terminal.
+      clickFooter()
       var ran = within(5000, function() { return harness.readFile(harness.state + "/omarchy.calls") === harness.updateCall + "\n" })
-      harness.check("a click on the notice runs omarchy plugin update grvc.stonks in a terminal, and adds nothing",
+      harness.check("a click on the note runs omarchy plugin update grvc.stonks in a terminal, and adds nothing",
         ran && !app.testBody.adding, harness.readFile(harness.state + "/omarchy.calls") + " | " + app.testBody.adding)
+      closeWindow()
 
-      // A failed answer later changes nothing: the notice stays.
+      // Opened again before the next answer: the add, which a click starts.
+      openWindow()
+      var again = footer()
+      clickFooter()
+      var adding = within(1000, function() { return app.testBody.adding })
+      app.testBody.cancelAdding()
+      closeWindow()
+      harness.check("opened again before the next answer, the footer is the add, and a click on it starts adding",
+        again === "+  Add a symbol" && adding, again + " | adding " + adding)
+
+      // A day on, main names it again: the note once more. Left alone, it
+      // goes, and the footer is the add, which a click starts.
+      nextDay()
+      var named = answered(8)
+      openWindow()
+      var back = footer()
+      var gone = within(8000, function() { return footer() === "+  Add a symbol" })
+      clickFooter()
+      adding = within(1000, function() { return app.testBody.adding })
+      app.testBody.cancelAdding()
+      closeWindow()
+      harness.check("the next day's answer says the note again; once it has gone, a click on the footer starts adding, not the update",
+        named && back === newer && gone && adding && harness.readFile(harness.state + "/omarchy.calls") === harness.updateCall + "\n",
+        back + " | gone " + gone + " | adding " + adding + " | " + harness.readFile(harness.state + "/omarchy.calls"))
+
+      // A failed answer names nothing: no note on the next open.
       put("MANIFEST.down", "")
       nextDay()
-      var kept = answered(8)
+      var failedLater = answered(9) && visit()
       remove("MANIFEST.down")
-      harness.check("a failed answer once a newer version is known leaves its notice",
-        kept && footer() === "Stonks 1.0.10 is out · click to update", harness.asked() + " asks | " + footer())
+      harness.check("a failed answer once a newer version is known says nothing on the next open",
+        failedLater === add, harness.asked() + " asks | " + failedLater)
 
       // The update lands on disk as git writes it, the old file removed and
       // a new one made, while the window stays open: its footer says the
-      // restart's notice at once.
+      // restart's notice at once, and a later answer naming a newer version
+      // says no note over it.
+      openWindow()
       var manifest = JSON.parse(harness.readFile(harness.manifestPath))
       manifest.version = "1.0.10"
       run(["bash", "-c", "rm -f \"$2\" && printf '%s' \"$1\" > \"$2\"", "--", JSON.stringify(manifest, null, 2) + "\n", harness.manifestPath])
-      harness.check("once the update is on disk, the open window's restart notice takes over",
-        within(3000, function() { return footer() === "Updated to 1.0.10 · click to restart the shell" }), footer())
+      var restart = "Updated to 1.0.10 · click to restart the shell"
+      var tookOver = within(3000, function() { return footer() === restart })
+      closeWindow()
+      put("MANIFEST.version", "1.0.11")
+      nextDay()
+      var afterDisk = answered(10) && visit()
+      harness.check("once the update is on disk, the open window's restart notice takes over, and no note says a newer one over it",
+        tookOver && afterDisk === restart + " | ", tookOver + " | " + afterDisk)
 
       harness.finish()
     }

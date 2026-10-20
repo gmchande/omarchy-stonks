@@ -10,7 +10,8 @@ import "Release.js" as Release
 // other than the running one, a downgrade too, `newVersion` names it, and
 // `restart()` restarts the shell. While main names a newer one than the
 // running one (`mainVersion`, the service's, from GitHub),
-// `releasedVersion` names it, and `update()` runs the update in a
+// `releasedVersion` names it; a surface opening says so once for each
+// answer that names it (`sayRelease`), and `update()` runs the update in a
 // terminal, where Omarchy shows what changes and asks.
 Item {
   id: root
@@ -20,10 +21,20 @@ Item {
   property string runningVersion: ""
   // The manifest's version when it is not the running one; "" otherwise.
   property string newVersion: ""
-  // The version on main, "" until GitHub has named one.
+  // The version on main, "" until GitHub has named one, and the service's
+  // wall second of the ask whose answer last named it.
   property string mainVersion: ""
+  property int mainNamedAt: 0
   // Main's version when it is newer than the running one; "" otherwise.
   readonly property string releasedVersion: Release.isNewer(mainVersion, runningVersion) ? mainVersion : ""
+  // The answer the last surface to open said the newer version for: each
+  // one is said once, on whichever surface opens first after it, unless an
+  // update is already on disk, which the restart's notice says.
+  property int releaseSaidFor: 0
+  readonly property bool releaseUnsaid: releasedVersion !== "" && newVersion === "" && mainNamedAt > releaseSaidFor
+  function sayRelease() {
+    root.releaseSaidFor = root.mainNamedAt
+  }
 
   function check() {
     manifest.reload()

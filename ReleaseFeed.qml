@@ -13,8 +13,11 @@ import "Release.js" as Release
 Item {
   id: root
 
-  // The version main names, "" until an answer has named one.
+  // The version main names, "" until an answer has named one, and the wall
+  // second of the ask whose answer last named it, so a surface can say each
+  // day's answer once (`Updates.releaseUnsaid`).
   property string version: ""
+  property int namedAt: 0
   property bool ready: false
   // The service's clock: `now` moves the feed to look, and the wall clock
   // (`wallSecond`) is what it reads.
@@ -51,7 +54,9 @@ Item {
     if (gate) gate.report(got.map(function(a) { return a.kind }), got.length ? got[0].retryAfter : 0, root.ticket)
     if (got.length > 0 && got.every(function(a) { return a.kind === "none" })) root.askedAt = 0
     var named = got.length && got[0].kind === "ok" ? Release.manifestVersion(got[0].body) : ""
-    if (named !== "") root.version = named
+    if (named === "") return
+    root.version = named
+    root.namedAt = root.askedAt
   }
 
   Process {
