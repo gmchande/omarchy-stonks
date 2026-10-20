@@ -65,9 +65,11 @@ Item {
   property bool rowsCovered: false
   property var rangeOptions: []
   property string range: "1D"
-  // The info block's two lines: the day's or the range's, over the 52 weeks.
+  // The info block's two lines: the day's or the range's, over the 52 weeks;
+  // and every list of facts the first can hold on any range.
   property var periodLine: null
   property var yearLine: null
+  property var factLists: []
   property string baselineText: ""
   // The clock, by which the hero's overnight print is old.
   property int now: 0
@@ -277,6 +279,7 @@ Item {
       // month (`Figures.dayTitles`), and the 52 weeks'
       // (`Fundamentals.yearLine`).
       titles: root.rangeOptions.map(function(r) { return String(r).toUpperCase() }).concat(Figures.dayTitles(), ["52W"])
+      factLists: root.factLists
       retro: root.retro
       foreground: root.foreground
       dim: root.dim

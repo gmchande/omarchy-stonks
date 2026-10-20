@@ -489,6 +489,47 @@ ShellRoot {
           cut.length === 0, cut.join(" | "))
         root.check("each info line's title is its range's, the day's, or 52W, and the lows one gap past 52W on every range",
           mistitled.length === 0, mistitled.join(" | "))
+        // Nothing on the two lines moves with the range: AAPL on the day and
+        // on 1M, 1Y, 5Y, and All, a listing younger than All with all four
+        // of its facts, keeps its columns, both rules, and the 52 weeks'
+        // words where they were, in both looks, in the popup and the window.
+        // Found in the spacing review of 1.0.0: from 1D to 1Y both rules
+        // shrank 27 px and every fact after them moved left.
+        var infoPlace = function() {
+          var block = find(body, "infoBlock")
+          var rules = ["periodRule", "yearRule"].map(function(name) {
+            var rule = find(body, name)
+            return xIn(rule, 0) + "+" + rule.width
+          })
+          var words = root.drawnSpans(find(body, "yearLine")).filter(function(s) { return String(s.color) === String(body.dim) })
+          return "rules " + rules.join(" ") + " low " + block.layout.lowX + " high " + block.layout.highX
+            + " facts " + block.layout.factXs.join(",") + " 52W words " + words.map(function(s) { return s.what + "@" + s.left }).join(" ")
+        }
+        var shifted = []
+        stub.featuredSymbol = "AAPL"
+        stub.figures = aapl
+        for (var rangeSurface = 0; rangeSurface < 2; rangeSurface++) {
+          surface.wide = rangeSurface === 1
+          ;[false, true].forEach(function(retro) {
+            stub.retro = retro
+            var where = (surface.wide ? "window " : "popup ") + (retro ? "retro" : "smooth")
+            var onDay = null
+            ;[["1D", null], ["1M", month], ["1Y", year], ["5Y", weekly], ["All", young]].forEach(function(r) {
+              stub.range = r[0]
+              stub.historyEntry = r[1] ? { status: "ok", history: r[1], receivedAt: stub.now } : null
+              wait(50)
+              var at = infoPlace()
+              if (!!r[1] !== body.historyShown) shifted.push(where + " " + r[0] + " shows " + (body.historyShown ? "a range" : "the day"))
+              else if (onDay === null) onDay = at
+              else if (at !== onDay) shifted.push(where + " " + r[0] + ": " + at + ", on 1D " + onDay)
+            })
+          })
+        }
+        stub.retro = false
+        stub.range = "1D"
+        stub.historyEntry = null
+        root.check("nothing on the info lines moves from 1D to 1M, 1Y, 5Y, or All, a young listing's four facts included, in both looks, in the popup and the window",
+          shifted.length === 0, shifted.join(" | "))
         // AAPL's figures are Tuesday 1 September's: the day line is 1D that
         // Tuesday to its last second, TUE from Wednesday's first, on the
         // Saturday after, and on Labor Day, Monday 7 September, and SEP a
@@ -793,12 +834,14 @@ ShellRoot {
             var headerLine = nameText.parent
             var rangeRow = find(body, "rangeRow")
             var infoLines = find(body, "infoBlock")
-            // The info lines' last column, as wide as its widest slot.
+            // The info lines' last column, as wide as the widest slot any
+            // line puts there on any range.
             var lastFact = infoLines.layout.factXs.length - 1
             var lastSlot = 0
-            ;[body.periodLine, body.yearLine].forEach(function(line) {
-              if (line && line.facts[lastFact]) lastSlot = Math.max(lastSlot, infoLines.factWidth(line.facts[lastFact]))
-            })
+            ;[body.periodLine, body.yearLine].map(function(line) { return line ? line.facts : [] }).concat(body.infoFactLists)
+              .forEach(function(facts) {
+                if (facts[lastFact]) lastSlot = Math.max(lastSlot, infoLines.factWidth(facts[lastFact]))
+              })
             var placed = {
               name: xIn(nameText, 0) - textLeft,
               order: xIn(orderWord, orderWord.width) - textRight,

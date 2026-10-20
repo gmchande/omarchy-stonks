@@ -11,10 +11,12 @@ import "Tones.js" as Tones
 // (`Figures.dayLine`, `History.rangeLine`, `Fundamentals.yearLine`). The
 // columns are shared, so the two rules stand in one column. Each column is
 // as wide as the widest figure its slots can hold at the listing's digits,
-// never today's, and the title column as the widest of `titles`: a refresh
-// moves only the tick, and a range change no column. The rule takes the
-// room the columns leave, so the table spans the band's width at any width;
-// a trailing column that does not fit is left out whole, never cut.
+// never today's: each fact's as the widest any line puts there on any
+// range (`factLists`), and the title column as the widest of `titles`. So
+// a refresh moves only the tick, and a range change nothing; the cost is a
+// rule as short on the day as on the widest range. The rule takes the room
+// the columns leave, so the table spans the band's width at any width; a
+// trailing column that does not fit is left out whole, never cut.
 Item {
   id: root
 
@@ -22,6 +24,9 @@ Item {
   property var lines: [null, null]
   // Every title a line can hold.
   property var titles: []
+  // Every list of facts the first line can hold, on any range; the second's
+  // are its own.
+  property var factLists: []
   property bool retro: false
   property color foreground: Commons.Color.foreground
   property color dim: Tones.dim(foreground, Commons.Color.background)
@@ -60,12 +65,16 @@ Item {
   readonly property var layout: {
     var price = 0
     var facts = []
+    var widen = function(list) {
+      for (var f = 0; f < list.length; f++) facts[f] = Math.max(facts[f] || 0, factWidth(list[f]))
+    }
     for (var i = 0; i < 2; i++) {
       var line = lines ? lines[i] : null
       if (!line) continue
       price = Math.max(price, valueWidth(line.range.widest), valueWidth(line.range.lowText), valueWidth(line.range.highText))
-      for (var f = 0; f < line.facts.length; f++) facts[f] = Math.max(facts[f] || 0, factWidth(line.facts[f]))
+      widen(line.facts)
     }
+    for (var l = 0; l < factLists.length; l++) widen(factLists[l])
     var fixed = function(n) {
       var t = titleWidth + gap + price * 2 + innerGap * 2
       for (var k = 0; k < n; k++) t += gap + facts[k]
