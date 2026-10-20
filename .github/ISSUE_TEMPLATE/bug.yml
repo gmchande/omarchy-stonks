@@ -6,7 +6,7 @@ body:
     id: happened
     attributes:
       label: What happened
-      description: What you did, and what Stonks did. A picture helps if it's about how something looks.
+      description: What you did, and what Stonks did. A picture helps if it's about how something looks. For a wrong price, give the symbol, the range, the time, and what your broker or the exchange showed then.
     validations:
       required: true
   - type: textarea
