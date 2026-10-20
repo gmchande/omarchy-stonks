@@ -116,10 +116,12 @@ Item {
     hint = "Drag the pill to move it along the bar\nMiddle-click changes its form · right-click opens the window"
   }
   // A standing word in the footer's place, under a note, until what it says
-  // is fixed: the data file can't be read, or an update waits on a shell
-  // restart, which a click on it does.
+  // is fixed: the data file can't be read, an update waits on a shell
+  // restart, or a newer Stonks is out; a click on either of the last two
+  // does what it says.
   readonly property string notice: settingsUnreadable ? "Can't read grvc.stonks.json · fix or remove it to save changes"
-    : updatedTo !== "" ? "Updated to " + updatedTo + " · click to restart the shell" : ""
+    : updatedTo !== "" ? "Updated to " + updatedTo + " · click to restart the shell"
+    : releasedVersion !== "" ? "Stonks " + releasedVersion + " is out · click to update" : ""
   // The removal the footer's note offers back, the service's one removal on
   // offer as the note was said: when another surface makes a newer removal,
   // the lists change, or it is undone, the offer goes, and the note with it.
@@ -156,6 +158,7 @@ Item {
   property var owed: ({})
   property bool settingsUnreadable: false
   property string updatedTo: ""
+  property string releasedVersion: ""
   // The clock: a closed surface's holds still too, so nothing it would show
   // is derived again every second.
   property int now: 0
@@ -180,6 +183,7 @@ Item {
   Binding on owed { when: root.reading; value: root.service?.owed; restoreMode: Binding.RestoreNone }
   Binding on settingsUnreadable { when: root.reading; value: root.service?.settingsUnreadable; restoreMode: Binding.RestoreNone }
   Binding on updatedTo { when: root.reading; value: root.updates ? root.updates.newVersion : ""; restoreMode: Binding.RestoreNone }
+  Binding on releasedVersion { when: root.reading; value: root.updates ? root.updates.releasedVersion : ""; restoreMode: Binding.RestoreNone }
   Binding on now { when: root.reading; value: root.service?.now; restoreMode: Binding.RestoreNone }
 
   readonly property var symbols: view.rows
@@ -1175,12 +1179,14 @@ Item {
     acts: root.offered !== null || !root.settingsUnreadable
     onHoveredChanged: root.holdNote()
     // The click acts on what the footer shows: an undo offer undoes, the
-    // update's notice restarts the shell, and the file's does nothing,
-    // nor does a refusal over it; a refusal otherwise, or the label, adds.
+    // update's notice restarts the shell, a newer version's runs the
+    // update, and the file's does nothing, nor does a refusal over it; a
+    // refusal otherwise, or the label, adds.
     onClicked: {
       if (root.offered !== null) root.undoRemoval()
       else if (root.settingsUnreadable) return
       else if (root.note === "" && root.updatedTo !== "") root.updates.restart()
+      else if (root.note === "" && root.releasedVersion !== "") root.updates.update()
       else root.startAdding()
     }
   }

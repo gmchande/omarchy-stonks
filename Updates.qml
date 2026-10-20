@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell.Io
+import "Release.js" as Release
 
 // The plugin's own version. `omarchy plugin update` moves the plugin's files
 // under a service the shell keeps loaded, which runs the code it started with
@@ -7,7 +8,9 @@ import Quickshell.Io
 // again as a surface opens (`check`), where the notice shows, so no missed
 // file event can hide it. While it names a version other than the running
 // one, a downgrade too, `newVersion` names it, and `restart()` restarts the
-// shell.
+// shell. While main names a newer one than the running one (`mainVersion`,
+// the service's, from GitHub), `releasedVersion` names it, and `update()`
+// runs the update in a terminal, where Omarchy shows what changes and asks.
 Item {
   id: root
 
@@ -16,6 +19,10 @@ Item {
   property string runningVersion: ""
   // The manifest's version when it is not the running one; "" otherwise.
   property string newVersion: ""
+  // The version on main, "" until GitHub has named one.
+  property string mainVersion: ""
+  // Main's version when it is newer than the running one; "" otherwise.
+  readonly property string releasedVersion: Release.isNewer(mainVersion, runningVersion) ? mainVersion : ""
 
   function check() {
     manifest.reload()
@@ -38,6 +45,11 @@ Item {
     restartShell.startDetached()
   }
 
+  // Detached, so the terminal stays whatever the shell does meanwhile.
+  function update() {
+    updatePlugin.startDetached()
+  }
+
   Component.onCompleted: takeManifest(manifest.text())
 
   // Read when asked, and whole: `text()` waits for the read.
@@ -51,5 +63,10 @@ Item {
   Process {
     id: restartShell
     command: ["omarchy", "restart", "shell"]
+  }
+
+  Process {
+    id: updatePlugin
+    command: ["omarchy", "launch", "floating", "terminal", "with", "presentation", "omarchy", "plugin", "update", "grvc.stonks"]
   }
 }
