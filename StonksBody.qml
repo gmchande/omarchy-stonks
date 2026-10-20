@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import "Figures.js" as Figures
 import "Format.js" as Format
 import "Fundamentals.js" as Fundamentals
@@ -66,10 +67,10 @@ Item {
   // a constant, so no change of chartHeight can find it stale.
   property int minChartHeight: 0
   // The host's look.
-  property color foreground: Color.foreground
+  property color foreground: Commons.Color.foreground
   property string fontFamily: Style.font.family
-  property color upColor: Color.foreground
-  property color downColor: Color.urgent
+  property color upColor: Commons.Color.foreground
+  property color downColor: Commons.Color.urgent
   // The added symbol the chart will change to once its answer is in, its row
   // in view, and the list at rest; "" when none is. The latest add is the
   // one, and a hero chosen meanwhile drops it.
@@ -81,7 +82,7 @@ Item {
   // featured once its first answer is in, a failed one too.
   property bool landingShows: false
   // The surface's own colour, which a moving row carries.
-  property color ground: Color.background
+  property color ground: Commons.Color.background
   property var rangeOptions: History.historyRanges()
 
   // A view that had the keys has let them go: the surface takes them back.

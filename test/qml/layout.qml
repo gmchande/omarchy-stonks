@@ -4,6 +4,7 @@ import QtTest
 import Quickshell
 import Quickshell.Io
 import qs.Commons
+import qs.Commons as Commons
 import "plugin/Chart.js" as Chart
 import "plugin/Format.js" as Format
 import "plugin/Fundamentals.js" as Fundamentals
@@ -1772,8 +1773,8 @@ ShellRoot {
         // default mark, its selected fill under its word in the selected
         // colour. Read off what is drawn, not off the flag that asks for it.
         var paintedMarked = function(button, fill, foreground) {
-          return Qt.colorEqual(fill.color, Style.selectedFillFor(foreground, Color.accent))
-            && Qt.colorEqual(button.color, Style.selectedStateColor(foreground, Color.accent))
+          return Qt.colorEqual(fill.color, Style.selectedFillFor(foreground, Commons.Color.accent))
+            && Qt.colorEqual(button.color, Style.selectedStateColor(foreground, Commons.Color.accent))
         }
         // The view's shown texts that name a key, its shown buttons, and the
         // ones painted as Enter's: a marked button, or search's chosen

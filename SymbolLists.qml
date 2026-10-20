@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls as Controls
 import qs.Commons
+import qs.Commons as Commons
 import "Tones.js" as Tones
 
 // A symbol's lists, in the rows' place: one tick box per list, All first.
@@ -18,8 +19,8 @@ FocusScope {
   property string symbol: ""
   property string symbolName: ""
   property bool retro: false
-  property color foreground: Color.foreground
-  property color dim: Tones.dim(foreground, Color.background)
+  property color foreground: Commons.Color.foreground
+  property color dim: Tones.dim(foreground, Commons.Color.background)
   property string fontFamily: Style.font.family
   // A short word in the title's place, for a moment: why a tick did nothing.
   property string note: ""
@@ -267,8 +268,8 @@ FocusScope {
             objectName: "rowFill"
             anchors.fill: parent
             radius: root.retro ? 0 : Style.cornerRadius
-            color: rowMouse.pressed ? Style.pressedFillFor(root.foreground, Color.accent)
-              : entry.index === root.cursor ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
+            color: rowMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
+              : entry.index === root.cursor ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
             Behavior on color { ColorAnimation { duration: 60 } }
           }
 

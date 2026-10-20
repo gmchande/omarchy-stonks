@@ -1,7 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import qs.Commons
+import qs.Commons as Commons
 import "Cells.js" as Cells
 // Stonks' mark in cells (`Cells.markLevels`): each column's cap lit and its
 // stem faint, down to the floor. It climbs, or falls on a down day, so the
@@ -17,7 +17,7 @@ Item {
   id: root
   property bool falling: false
   property bool solid: false
-  property color color: Color.foreground
+  property color color: Commons.Color.foreground
   property int pixel: 2
   property int gap: 1
   readonly property int rows: 4

@@ -2,6 +2,7 @@ import QtQuick
 import QtTest
 import Quickshell
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "plugin" as Stonks
 
@@ -104,7 +105,7 @@ ShellRoot {
     pluginId: "grvc.stonks"
     moduleName: "grvc.stonks"
     shell: shellApi
-    foreground: Color.foreground
+    foreground: Commons.Color.foreground
     fontFamily: Style.font.family
     _switchPanelFrom: function(owner, direction) { harness.tabs++; return true }
   }

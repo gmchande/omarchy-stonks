@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import "Tones.js" as Tones
 
 // The shared history range control. The words share the row with equal
@@ -21,8 +22,8 @@ Item {
   property var options: []
   property string value: "1D"
   property bool retro: false
-  property color foreground: Color.foreground
-  property color dim: Tones.dim(foreground, Color.background)
+  property color foreground: Commons.Color.foreground
+  property color dim: Tones.dim(foreground, Commons.Color.background)
   property string fontFamily: Style.font.family
   // What is left of a notch between wheel events.
   property real wheelRemainder: 0
@@ -82,9 +83,9 @@ Item {
         width: token.implicitWidth + Style.space(12)
         height: parent.height + Style.space(4)
         radius: root.retro ? 0 : Style.cornerRadius
-        color: tokenMouse.pressed ? Style.pressedFillFor(root.foreground, Color.accent)
-          : parent.chosen ? Style.selectedFillFor(root.foreground, Color.accent)
-          : (tokenMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent")
+        color: tokenMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
+          : parent.chosen ? Style.selectedFillFor(root.foreground, Commons.Color.accent)
+          : (tokenMouse.containsMouse ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent")
         Behavior on color { ColorAnimation { duration: 160; easing.type: Easing.OutCubic } }
       }
 

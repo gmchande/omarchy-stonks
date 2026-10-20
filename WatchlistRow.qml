@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import "Cells.js" as Cells
 import "Chart.js" as Chart
 import "Figures.js" as Figures
@@ -43,11 +44,11 @@ Rectangle {
   property real reveal: 1
   // The exchanges' calendars, for the breaks in the day line.
   property var calendars: null
-  property color foreground: Color.foreground
-  property color dim: Tones.dim(foreground, Color.background)
-  property color dimmer: Tones.dimmer(foreground, Color.background)
-  property color upColor: Color.foreground
-  property color downColor: Color.urgent
+  property color foreground: Commons.Color.foreground
+  property color dim: Tones.dim(foreground, Commons.Color.background)
+  property color dimmer: Tones.dimmer(foreground, Commons.Color.background)
+  property color upColor: Commons.Color.foreground
+  property color downColor: Commons.Color.urgent
   property string fontFamily: Style.font.family
 
   // Each click says where it was, in the scene, and whether Qt took it for
@@ -109,12 +110,12 @@ Rectangle {
   // The fill the row's state asks for; the row eases to it, and the
   // retro stems are weighed against it over the ground, so a featured or
   // cursor row's two colours still read alike.
-  readonly property color fill: lifted ? Style.pressedFillFor(foreground, Color.accent)
-    : featuredRow ? Style.selectedFillFor(foreground, Color.accent)
-    : cursor ? Style.hoverFillFor(foreground, Color.accent) : "transparent"
+  readonly property color fill: lifted ? Style.pressedFillFor(foreground, Commons.Color.accent)
+    : featuredRow ? Style.selectedFillFor(foreground, Commons.Color.accent)
+    : cursor ? Style.hoverFillFor(foreground, Commons.Color.accent) : "transparent"
   color: fill
   border.width: lifted ? 1 : 0
-  border.color: Style.normalBorderFor(foreground, Color.accent)
+  border.color: Style.normalBorderFor(foreground, Commons.Color.accent)
 
   // The shell's own speed (CursorSurface), so the fill keeps up with the
   // pointer.
@@ -246,8 +247,8 @@ Rectangle {
             anchors.fill: parent
             anchors.margins: Style.space(2)
             radius: row.retro ? 0 : Style.cornerRadius
-            color: removeButton.hovered && mouse.pressed && mouse.pressedOnRemove && !mouse.dragged ? Style.pressedFillFor(row.foreground, Color.accent)
-              : removeButton.hovered ? Style.hoverFillFor(row.foreground, Color.accent) : "transparent"
+            color: removeButton.hovered && mouse.pressed && mouse.pressedOnRemove && !mouse.dragged ? Style.pressedFillFor(row.foreground, Commons.Color.accent)
+              : removeButton.hovered ? Style.hoverFillFor(row.foreground, Commons.Color.accent) : "transparent"
             Behavior on color { ColorAnimation { duration: 60 } }
           }
 

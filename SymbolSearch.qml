@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Controls as Controls
 import Quickshell.Io
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "Fetch.js" as Fetch
 import "Search.js" as Search
@@ -35,9 +36,9 @@ FocusScope {
   id: root
 
   property bool retro: false
-  property color foreground: Color.foreground
-  property color dim: Tones.dim(foreground, Color.background)
-  property color dimmer: Tones.dimmer(foreground, Color.background)
+  property color foreground: Commons.Color.foreground
+  property color dim: Tones.dim(foreground, Commons.Color.background)
+  property color dimmer: Tones.dimmer(foreground, Commons.Color.background)
   property string fontFamily: Style.font.family
   property int rowHeight: Style.space(30)
   // What the search endpoint returns at most, so the room is the shape of a
@@ -362,9 +363,9 @@ FocusScope {
           width: parent.width
           height: root.rowHeight
           radius: root.retro ? 0 : Style.cornerRadius
-          color: rowMouse.pressed ? Style.pressedFillFor(root.foreground, Color.accent)
-            : chosen ? Style.hoverFillFor(root.foreground, Color.accent)
-            : rowMouse.containsMouse ? Style.normalFillFor(root.foreground, Color.accent) : "transparent"
+          color: rowMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
+            : chosen ? Style.hoverFillFor(root.foreground, Commons.Color.accent)
+            : rowMouse.containsMouse ? Style.normalFillFor(root.foreground, Commons.Color.accent) : "transparent"
 
           MouseArea {
             id: rowMouse
@@ -429,13 +430,13 @@ FocusScope {
               width: root.buttonWidth
               height: Style.space(20)
               radius: root.retro ? 0 : Style.cornerRadius
-              color: Style.selectedFillFor(root.foreground, Color.accent)
+              color: Style.selectedFillFor(root.foreground, Commons.Color.accent)
               Text {
                 id: addLabel
                 anchors.centerIn: parent
                 textFormat: Text.PlainText
                 text: root.actionFor(resultRow.modelData.symbol)
-                color: Style.selectedStateColor(root.foreground, Color.accent)
+                color: Style.selectedStateColor(root.foreground, Commons.Color.accent)
                 font: root.buttonFont
               }
             }

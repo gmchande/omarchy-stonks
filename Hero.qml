@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import "Cells.js" as Cells
 import "Figures.js" as Figures
 import "Format.js" as Format
@@ -33,10 +34,10 @@ Item {
   property bool scrubbing: false
   // The clock, by which an overnight print is old.
   property int now: 0
-  property color foreground: Color.foreground
-  property color dim: Tones.dim(foreground, Color.background)
-  property color upColor: Color.foreground
-  property color downColor: Color.urgent
+  property color foreground: Commons.Color.foreground
+  property color dim: Tones.dim(foreground, Commons.Color.background)
+  property color upColor: Commons.Color.foreground
+  property color downColor: Commons.Color.urgent
   property color ghost: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.05)
   property string fontFamily: Style.font.family
   property string symbol: ""

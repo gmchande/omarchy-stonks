@@ -1,5 +1,5 @@
 import QtQuick
-import qs.Commons
+import qs.Commons as Commons
 import "Cells.js" as Cells
 // The retro price: Cells.blockCells drawn as square cells, every digit's slot
 // faintly and the glyph lit, the way an LCD shows its unlit segments. Each
@@ -13,7 +13,7 @@ Canvas {
 
   property string text: ""
   property int cell: 8
-  property color color: Color.foreground
+  property color color: Commons.Color.foreground
   property color ghostColor: "transparent"
 
   readonly property var grid: Cells.blockCells(text)

@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls as Controls
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "Tones.js" as Tones
 
@@ -22,12 +23,12 @@ FocusScope {
   property var choices: []
   property string current: ""
   property bool retro: false
-  property color foreground: Color.foreground
-  property color dim: Tones.dim(foreground, Color.background)
+  property color foreground: Commons.Color.foreground
+  property color dim: Tones.dim(foreground, Commons.Color.background)
   property string fontFamily: Style.font.family
   property int maxHeight: 0
   // Opaque whatever the theme's popup alpha, so the rows never show through.
-  property color background: Qt.rgba(Color.popups.background.r, Color.popups.background.g, Color.popups.background.b, 1)
+  property color background: Qt.rgba(Commons.Color.popups.background.r, Commons.Color.popups.background.g, Commons.Color.popups.background.b, 1)
   // Why the typed name was refused, said under the field: while a name is
   // typed the menu holds still.
   property string problem: ""
@@ -296,7 +297,7 @@ FocusScope {
           Rectangle {
             anchors.fill: parent
             radius: root.retro ? 0 : Style.cornerRadius
-            color: entry.isCursor ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
+            color: entry.isCursor ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
             Behavior on color { ColorAnimation { duration: 60 } }
           }
 
@@ -388,7 +389,7 @@ FocusScope {
         anchors.fill: parent
         visible: !root.naming
         radius: root.retro ? 0 : Style.cornerRadius
-        color: root.cursor === root.newIndex ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
+        color: root.cursor === root.newIndex ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
         Behavior on color { ColorAnimation { duration: 60 } }
       }
 
@@ -478,7 +479,7 @@ FocusScope {
       Rectangle {
         anchors.fill: parent
         radius: root.retro ? 0 : Style.cornerRadius
-        color: manageRow.isCursor ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
+        color: manageRow.isCursor ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
         Behavior on color { ColorAnimation { duration: 60 } }
       }
 

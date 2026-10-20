@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls as Controls
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "Tones.js" as Tones
 
@@ -20,8 +21,8 @@ FocusScope {
 
   property var choices: []
   property bool retro: false
-  property color foreground: Color.foreground
-  property color dim: Tones.dim(foreground, Color.background)
+  property color foreground: Commons.Color.foreground
+  property color dim: Tones.dim(foreground, Commons.Color.background)
   property string fontFamily: Style.font.family
   // Why the typed name was refused, said under the field, and brought into
   // view: while a name is typed the list holds still. Its line gone, as you
@@ -344,7 +345,7 @@ FocusScope {
             width: parent.width
             height: root.itemHeight
             radius: root.retro ? 0 : Style.cornerRadius
-            color: entry.isCursor ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
+            color: entry.isCursor ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
             Behavior on color { ColorAnimation { duration: 60 } }
           }
 

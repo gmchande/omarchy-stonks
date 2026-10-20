@@ -1,5 +1,5 @@
 import QtQuick
-import qs.Commons
+import qs.Commons as Commons
 import "Chart.js" as Chart
 import "Tones.js" as Tones
 // A small day line for a watchlist row. Value-in: hand it the normalized
@@ -14,12 +14,12 @@ Item {
   id: root
 
   property var geometry: null
-  property color lineColor: Tones.dim(Color.foreground, Color.background)
+  property color lineColor: Tones.dim(Commons.Color.foreground, Commons.Color.background)
   property var up: null
-  property color upColor: Color.foreground
-  property color downColor: Color.urgent
+  property color upColor: Commons.Color.foreground
+  property color downColor: Commons.Color.urgent
   readonly property bool split: typeof up === "boolean"
-  property color baselineColor: Tones.dimmer(Color.foreground, Color.background)
+  property color baselineColor: Tones.dimmer(Commons.Color.foreground, Commons.Color.background)
   property real lineWidth: 1.25
   // 0..1 along the session, or -1 for none. Drawn as a small dot on the line.
   property real cursorX: -1

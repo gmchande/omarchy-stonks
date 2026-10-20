@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import "Cells.js" as Cells
 import "Tones.js" as Tones
 // The animal, live status, the look, and the help mark. Surfaces own the
@@ -34,11 +35,11 @@ Item {
   property bool still: false
   // The key sheet shows, so a click on ? hides it.
   property bool helpShown: false
-  property color foreground: Color.foreground
-  property color dim: Tones.dim(foreground, Color.background)
-  property color upColor: Color.foreground
-  property color downColor: Color.urgent
-  property color ground: Color.background
+  property color foreground: Commons.Color.foreground
+  property color dim: Tones.dim(foreground, Commons.Color.background)
+  property color upColor: Commons.Color.foreground
+  property color downColor: Commons.Color.urgent
+  property color ground: Commons.Color.background
   property string fontFamily: Style.font.family
 
   readonly property string kind: animal ? animal.kind : ""
@@ -262,7 +263,7 @@ Item {
       width: parent.width + Style.space(12)
       height: parent.height + Style.space(6)
       radius: root.retro ? 0 : Style.cornerRadius
-      color: lookMouse.pressed ? Style.pressedFillFor(root.foreground, Color.accent) : "transparent"
+      color: lookMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent) : "transparent"
     }
 
     MouseArea {
@@ -300,7 +301,7 @@ Item {
       width: parent.implicitWidth + Style.space(12)
       height: parent.implicitHeight + Style.space(4)
       radius: root.retro ? 0 : Style.cornerRadius
-      color: helpMouse.pressed ? Style.pressedFillFor(root.foreground, Color.accent) : "transparent"
+      color: helpMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent) : "transparent"
     }
     MouseArea {
       id: helpMouse

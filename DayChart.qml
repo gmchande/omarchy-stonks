@@ -1,5 +1,5 @@
 import QtQuick
-import qs.Commons
+import qs.Commons as Commons
 import "Chart.js" as Chart
 import "Tones.js" as Tones
 // The hero chart, one rule for the day and every range: a dashed baseline at
@@ -14,10 +14,10 @@ Item {
   id: root
 
   property var geometry: null
-  property color upColor: Color.foreground
-  property color downColor: Color.urgent
-  property color baselineColor: Tones.dimmer(Color.foreground, Color.background)
-  property color hairlineColor: Color.foreground
+  property color upColor: Commons.Color.foreground
+  property color downColor: Commons.Color.urgent
+  property color baselineColor: Tones.dimmer(Commons.Color.foreground, Commons.Color.background)
+  property color hairlineColor: Commons.Color.foreground
   property var up: true
   // 0..1 along the axis, or -1 when not scrubbing.
   property real scrubX: -1
@@ -38,7 +38,7 @@ Item {
   // surface does; it ripples again as the surface opens.
   property bool still: false
   // The surface under the chart, which the wash is seen against.
-  property color ground: Color.background
+  property color ground: Commons.Color.background
 
   readonly property bool directionKnown: typeof up === "boolean"
   readonly property color aboveColor: directionKnown ? upColor : baselineColor

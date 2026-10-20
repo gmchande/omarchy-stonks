@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import "Cells.js" as Cells
 import "Tones.js" as Tones
 
@@ -16,10 +17,10 @@ Item {
   // The list's breadth, and the list it is for.
   property var breadth: ({ list: "", up: 0, flat: 0, down: 0, none: 0 })
   property bool retro: false
-  property color foreground: Color.foreground
-  property color dim: Tones.dim(foreground, Color.background)
-  property color upColor: Color.foreground
-  property color downColor: Color.urgent
+  property color foreground: Commons.Color.foreground
+  property color dim: Tones.dim(foreground, Commons.Color.background)
+  property color upColor: Commons.Color.foreground
+  property color downColor: Commons.Color.urgent
   property string fontFamily: Style.font.family
 
   readonly property int total: breadth.up + breadth.flat + breadth.down + breadth.none

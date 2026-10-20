@@ -141,6 +141,8 @@ building one that won't merge.
   OutCubic.
 - Secondary text is the foreground mixed toward its ground (`Tones.dim`),
   never `Qt.darker`, which gets louder on a light theme.
+- Omarchy's palette is `Commons.Color`, through `import qs.Commons as
+  Commons`: Qt 6.12's own `Color` type hides a plain `Color`.
 - Rule files: `.pragma library` first, so QML loads each once rather than
   once per row; top-level functions only, read through `.import`, imports
   one way with no cycles.

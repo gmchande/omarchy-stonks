@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import "Cells.js" as Cells
 import "Tones.js" as Tones
 
@@ -22,10 +23,10 @@ Item {
   // Every title a line can hold.
   property var titles: []
   property bool retro: false
-  property color foreground: Color.foreground
-  property color dim: Tones.dim(foreground, Color.background)
-  property color upColor: Color.foreground
-  property color downColor: Color.urgent
+  property color foreground: Commons.Color.foreground
+  property color dim: Tones.dim(foreground, Commons.Color.background)
+  property color upColor: Commons.Color.foreground
+  property color downColor: Commons.Color.urgent
   property string fontFamily: Style.font.family
   property int rowGap: Style.space(4)
 

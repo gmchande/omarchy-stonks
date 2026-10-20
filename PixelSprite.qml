@@ -1,5 +1,5 @@
 import QtQuick
-import qs.Commons
+import qs.Commons as Commons
 
 // A pixel sprite (named to dodge QtQuick.Sprite) drawn from Cells.spritePixels: [{x, y}, ...] on a grid.
 Canvas {
@@ -8,7 +8,7 @@ Canvas {
   property var pixels: []
   property int columns: 20
   property int rows: 14
-  property color color: Color.foreground
+  property color color: Commons.Color.foreground
 
   implicitWidth: width
   implicitHeight: height
