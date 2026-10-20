@@ -31,20 +31,21 @@ function historyRanges() {
 }
 
 // Whether the range on show, its last answer `entry` (HistoryFeed's), is
-// asked again at `now`: while its listing's market trades (a
-// cryptocurrency's always; a history holds regular hours only), every 15
-// minutes for a range of bars within the day (1W, 1M), whose line moves
-// with the hour, and every hour for one of daily bars or longer, whose last
-// bar moves through the session; and once after a session its last good
-// history came in has closed, for its last bars. Each wait counts from the
-// last answer, a failed one too, so a failed refresh is tried again at the
-// same pace; never sooner than the cache's 15 minutes.
-function historyDue(range, entry, quote, now, calendars) {
+// asked again at `now`: while its listing's market trades (`trading`, the
+// caller's word, by the listing's calendar; a history holds regular hours
+// only), every 15 minutes for a range of bars within the day (1W, 1M),
+// whose line moves with the hour, and every hour for one of daily bars or
+// longer, whose last bar moves through the session; and once after the
+// session in its quote (`quote`) has closed, if its last good history came
+// in before that, for its last bars. Each wait counts from the last answer,
+// a failed one too, so a failed refresh is tried again at the same pace;
+// never sooner than the cache's 15 minutes.
+function historyDue(range, entry, quote, now, trading) {
   var spec = HISTORY_RANGES[range]
   if (!spec || !entry || !quote) return false
   var intraday = historyIntervalSeconds(spec.interval) < 24 * 60 * 60
   if (now - entry.answeredAt < (intraday ? 15 : 60) * 60) return false
-  if (quote.crypto || Market.inRegularSession(quote, now, calendars)) return true
+  if (trading) return true
   var regular = quote.session && quote.session.regular
   return !!regular && regular.end <= now && entry.receivedAt < regular.end
 }

@@ -554,7 +554,8 @@ Item {
     var stale = root.historyCharts().filter(function(s) {
       var entry = historyFeed.entries[historyFeed.keyFor(s, range)]
       var quote = feed.quotes[s] || previewFeed.quotes[s]
-      return !!entry && !!entry.history && History.historyDue(range, entry, quote, now, root.calendars)
+      var trading = !!quote && (quote.crypto || Market.inRegularSession(quote, now, root.calendars))
+      return !!entry && !!entry.history && History.historyDue(range, entry, quote, now, trading)
     })
     if (stale.length > 0 && root.screensClear()) historyFeed.request(stale[0], range, false)
   }
