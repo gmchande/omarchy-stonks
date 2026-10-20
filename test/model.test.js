@@ -669,6 +669,17 @@ test("weeks and months either side of 25 October and 1 November keep their dates
   expect(coin.bars.map(bar => M.historyScrubText(coin, bar).split(" · ")[0])).toEqual(["WEEK OF 26 OCT", "WEEK OF 31 OCT"])
 })
 
+test("a session's one bar says nothing until its five minutes are past", () => {
+  // An index's opening bar with its close already in, three minutes into
+  // the session: it read "Traded only at 09:30" (found in review).
+  const bell = at("2026-10-20", "09:30")
+  const day = { symbol: "^GSPC", exchange: "S&P", instrumentType: "INDEX", gmtoffset: -14400,
+    session: { pre: null, regular: { start: bell, end: at("2026-10-20", "16:00") }, post: null },
+    points: [{ t: bell, p: 100 }] }
+  expect(M.dayNote(day, bell + 180, calendars)).toBe("")
+  expect(M.dayNote(day, bell + 300, calendars)).toBe("Traded only at 09:30")
+})
+
 test("a failed answer is asked again five minutes on, whatever the hour", () => {
   const asked = at("2026-10-02", "04:11")
   expect(M.overnightDue(asked, at("2026-10-02", "04:15"), calendars, true)).toBe(false)
