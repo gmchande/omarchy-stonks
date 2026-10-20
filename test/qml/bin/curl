@@ -264,8 +264,10 @@ serve() {
   history() { stamp < "$fixtures/history/aapl-1y.json"; }
   if [[ "$url" == *"includeAdjustedClose=true"* ]]; then
     count "$STONKS_FAKE_STATE/$symbol.history.calls" > /dev/null
-    # A harness holds a symbol's history answer back while <SYMBOL>.history.hold exists.
+    # A harness holds a symbol's history answer back while <SYMBOL>.history.hold exists,
+    # and fails it while <SYMBOL>.history.down does.
     while [ -e "$STONKS_FAKE_STATE/$symbol.history.hold" ]; do sleep 0.05; done
+    [ -e "$STONKS_FAKE_STATE/$symbol.history.down" ] && exit 22
     case "$symbol" in
       AAPL|MSFT|BOTH|TALL*) history ;;
       NEST) cat "$fixtures/history/nest-1mo.json" ;;

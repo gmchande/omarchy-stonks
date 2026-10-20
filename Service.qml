@@ -532,10 +532,11 @@ Item {
     historyFeed.request(unanswered.length > 0 ? unanswered[0] : charts[charts.length - 1], range, false)
   }
 
-  // A range left on show is asked again as its market moves it
-  // (`History.historyDue`), so its line and its low and high keep up with
-  // the price over it: a hero's at a time, when the feed has nothing on its
-  // way, and only while a screen is on. Looked at each minute.
+  // A range left on show with its history in hand is asked again as its
+  // market moves it (`History.historyDue`), a failed refresh too, so its
+  // line and its low and high keep up with the price over it: a hero's at a
+  // time, when the feed has nothing on its way, and only while a screen is
+  // on. Looked at each minute.
   function refreshRange() {
     if (!root.pluginsReady || historyFeed.busy) return
     var range = root.view.range
@@ -543,7 +544,7 @@ Item {
     var stale = root.historyCharts().filter(function(s) {
       var entry = historyFeed.entries[historyFeed.keyFor(s, range)]
       var quote = feed.quotes[s] || previewFeed.quotes[s]
-      return !!entry && entry.status === "ok" && History.historyDue(range, entry.receivedAt, quote, now, root.calendars)
+      return !!entry && !!entry.history && History.historyDue(range, entry, quote, now, root.calendars)
     })
     if (stale.length > 0 && root.screensClear()) historyFeed.request(stale[0], range, false)
   }

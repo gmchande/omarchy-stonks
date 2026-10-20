@@ -564,17 +564,23 @@ ShellRoot {
       // 15:00, the window left on 1W: its history is asked again every 15
       // minutes while New York trades, and once after the close for its
       // last bars, then not again, so its line and its low and high keep up
-      // with the price over them. It was asked once, and kept all session.
+      // with the price over them. A refresh that fails, tried twice, is
+      // asked again 15 minutes on. It was asked once, and kept all session.
       service.now = at(harness.wed7, 15, 0)
       settle()
       openWindow()
       body.selectRange("1W")
       tryVerify(function() { return !!service.histories["NEST|1W"] && service.histories["NEST|1W"].status === "ok" }, 5000)
       var weekFrom = Number(harness.record("NEST.history.calls") || 0)
-      tick(80 * 60, 15)
+      tick(20 * 60, 15)
+      touch("NEST.history.down")
+      tick(15 * 60, 15)
+      tryVerify(function() { return service.histories["NEST|1W"].status === "failed" }, 8000)
+      remove("NEST.history.down")
+      tick(45 * 60, 15)
       var weekAsked = Number(harness.record("NEST.history.calls") || 0) - weekFrom
-      harness.check("the window left on 1W from 15:00 to 16:20: its history asked again every 15 minutes until the close, then once for its last bars",
-        weekAsked === 4, weekAsked + " asks")
+      harness.check("the window left on 1W from 15:00 to 16:20: its history asked again every 15 minutes until the close, a failed refresh twice and again 15 minutes on, then once for its last bars",
+        weekAsked === 5, weekAsked + " asks")
       body.selectRange("1D")
       settle()
       closeWindow()

@@ -15,7 +15,9 @@ import "Quote.js" as Quote
 // clicked never says it is unavailable; its miss is told (`missed`).
 // `entries` holds answers only, "ok" or "failed": what is on its way is
 // `wanted`, so asking for a chart changes nothing a reader of the answers
-// sees until one lands. With nothing wanted the feed says so (`idle`), as
+// sees until one lands. An entry keeps its last good history and when it
+// came (`receivedAt`), and when the last answer of any kind came
+// (`answeredAt`). With nothing wanted the feed says so (`idle`), as
 // the time to ask for a chart ahead.
 Item {
   id: root
@@ -211,10 +213,11 @@ Item {
       root.setEntry(request.key, {
         status: "ok",
         history: history,
-        receivedAt: root.stamp()
+        receivedAt: root.stamp(),
+        answeredAt: root.stamp()
       })
     } else {
-      root.setEntry(request.key, { status: "failed" })
+      root.setEntry(request.key, { status: "failed", answeredAt: root.stamp() })
     }
     root.endJob()
   }
