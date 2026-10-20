@@ -216,9 +216,10 @@ FocusScope {
   }
 
   // A double-click is one click: the question's DELETE comes up under the
-  // DELETE clicked to ask, so a click on it within the double-click
-  // interval (`justAsked`) is that double-click's second, and never answers
-  // the question it asked. Enter always answers.
+  // DELETE clicked to ask, so within the double-click interval (`justAsked`)
+  // it takes no press at all. Qt counts a double-click from its presses, so
+  // a second press held past the interval is still that double-click's, and
+  // its release must answer nothing. Enter always answers.
   Timer {
     id: justAsked
     interval: Application.styleHints.mouseDoubleClickInterval
@@ -489,7 +490,8 @@ FocusScope {
               anchors.verticalCenter: parent.verticalCenter
               text: "DELETE"
               enterTakes: true
-              onActivated: if (!justAsked.running) root.confirmDelete()
+              enabled: !justAsked.running
+              onActivated: root.confirmDelete()
             }
             ListAction {
               view: root

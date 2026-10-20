@@ -1053,6 +1053,26 @@ ShellRoot {
       harness.check("a double-click on DELETE, its second click on the question's DELETE, asks and deletes nothing; Escape takes the question back",
         afterDouble === "true|true|Wins,Power" && !manage.confirming && harness.same(names(), ["Wins", "Power"]),
         afterDouble + " then " + manage.confirming)
+      // A second press inside the interval, held until after it ends, is
+      // still that double-click's: Qt counts a double-click from the presses,
+      // and its release answers nothing. Found in the stand-in review of #17:
+      // the guard was read on release, so this release deleted the list.
+      var interval = Application.styleHints.mouseDoubleClickInterval
+      wait(interval + 50)
+      mouseMove(body2, winsNowAt.x, winsNowAt.y)
+      wait(50)
+      mouseClick(body2, deleteFirst.x, deleteFirst.y)
+      wait(interval - 150)
+      mousePress(body2, deleteFirst.x, deleteFirst.y)
+      wait(250)
+      mouseRelease(body2, deleteFirst.x, deleteFirst.y)
+      wait(50)
+      var afterHeld = [manage.confirming, names().join(",")].join("|")
+      keyClick(Qt.Key_Escape)
+      wait(50)
+      harness.check("a second press on the question's DELETE inside the double-click interval, released after it, deletes nothing",
+        afterHeld === "true|Wins,Power" && !manage.confirming && harness.same(names(), ["Wins", "Power"]),
+        afterHeld + " then " + manage.confirming + "|" + names())
       wait(Application.styleHints.mouseDoubleClickInterval)
       mouseMove(body2, winsNowAt.x, winsNowAt.y)
       wait(50)
