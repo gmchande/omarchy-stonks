@@ -47,6 +47,7 @@ ShellRoot {
   FileView { id: shopFile; path: root.fixtures + "/shop-to.json"; blockLoading: true }
   FileView { id: aaplWeeklyFile; path: root.fixtures + "/history/aapl-5y.json"; blockLoading: true }
   FileView { id: shopYearFile; path: root.fixtures + "/history/shop-to-1y.json"; blockLoading: true }
+  FileView { id: youngFile; path: root.fixtures + "/history/fab-max.json"; blockLoading: true }
   FileView { id: tokyoFile; path: root.fixtures + "/7203-t-day.json"; blockLoading: true }
   FileView { id: londonFile; path: root.fixtures + "/shel-l-day.json"; blockLoading: true }
   // A coin under a cent and a six-figure price, each in its own decimals.
@@ -63,6 +64,7 @@ ShellRoot {
   FileView { id: ckxFile; path: root.fixtures + "/moments/power-user-2026-10-16/ckx.json"; blockLoading: true }
   FileView { id: cvrFile; path: root.fixtures + "/moments/power-user-2026-10-16/cvr.json"; blockLoading: true }
   FileView { id: preOpenIndexFile; path: root.fixtures + "/moments/monday/gspc.json"; blockLoading: true }
+  FileView { id: indexDayFile; path: root.fixtures + "/first-day-2026-10-14/n225-day.json"; blockLoading: true }
   FileView { id: calendarFile; path: Quickshell.env("STONKS_CALENDARS"); blockLoading: true }
 
   // The hero chart's rendered frames, for frames.js.
@@ -337,11 +339,16 @@ ShellRoot {
         wait(400)
         var weekly = History.parseHistory(JSON.parse(aaplWeeklyFile.text()), "5Y")
         var year = History.parseHistory(JSON.parse(shopYearFile.text()), "1Y")
+        var young = History.parseHistory(JSON.parse(youngFile.text()), "All")
         var month = History.parseHistory(JSON.parse(liveMonthFile.text()), "1M")
         var aapl = root.figures("aapl")
         var cases = [
           { symbol: "AAPL", range: "1D", history: null, figures: aapl },
           { symbol: "AAPL", range: "5Y", history: weekly, figures: aapl },
+          // The widest range line: a listing younger than All, its start
+          // beside its low and high, each with its four-digit year, and the
+          // slot for how few bars it has.
+          { symbol: "AAPL", range: "All", history: young, figures: aapl },
           { symbol: "SPY", range: "1D", history: null, figures: null },
           { symbol: "SHOP.TO", range: "1D", history: null, figures: root.figures("shop-to") },
           { symbol: "SHOP.TO", range: "1Y", history: year, figures: root.figures("shop-to") },
@@ -1890,14 +1897,25 @@ ShellRoot {
         // both looks on both surfaces: CKX's one bar at 14:10, CVR's none,
         // at 23:09 that Friday. A busy stock, an ETF, a coin, and listings
         // in London and Tokyo say nothing, nor does an index before its
-        // bell. Found in the power-user walk of 16 October: a lone dot and
-        // an empty chart, with no words, read as broken.
+        // bell, nor one 25 s past it. Found in the power-user walk of 16
+        // October: a lone dot and an empty chart, with no words, read as
+        // broken.
         var quotesBeforeNotes = stub.quotes
+        // ^N225 as Yahoo answers 25 s into its session: its first bar with
+        // no close yet, and the live moment. Found in QA: "Traded only at
+        // 09:00 JST" about the whole market.
+        var opening = JSON.parse(indexDayFile.text())
+        var openingDay = opening.chart.result[0]
+        var bell = openingDay.meta.tradingPeriods.regular[0][0].start
+        var bars = openingDay.indicators.quote[0]
+        Object.keys(bars).forEach(function(key) { bars[key] = [null, bars[key][0]] })
+        openingDay.timestamp = [bell, bell + 25]
         stub.quotes = Object.assign({}, quotesBeforeNotes, { CKX: Quote.parseChart(JSON.parse(ckxFile.text())),
-          CVR: Quote.parseChart(JSON.parse(cvrFile.text())), "^GSPC": Quote.parseChart(JSON.parse(preOpenIndexFile.text())) })
+          CVR: Quote.parseChart(JSON.parse(cvrFile.text())), "^GSPC": Quote.parseChart(JSON.parse(preOpenIndexFile.text())),
+          "^N225": Quote.parseChart(opening) })
         var noteCases = [["CKX", 1792206540, "Traded only at 14:10"], ["CVR", 1792206540, "No trades charted"],
           ["AAPL", 1792206540, ""], ["SPY", 1792206540, ""], ["SHIB-USD", 1792206540, ""], ["SHEL.L", 1792206540, ""],
-          ["7203.T", 1792206540, ""], ["^GSPC", 1790596800, ""]]
+          ["7203.T", 1792206540, ""], ["^GSPC", 1790596800, ""], ["^N225", bell + 25, ""]]
         var noteFaults = []
         // The info line's title too: CKX traded that Friday, so 1D; CVR's
         // figures are Wednesday's, so WED. It read 1D (the walk).

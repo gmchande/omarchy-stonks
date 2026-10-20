@@ -31,12 +31,14 @@ function clockSession(quote, t) {
 
 // The phase at time `t`, from the exchange's own periods and nothing else.
 // The chart endpoint carries no market state, and a missing series is not
-// evidence of a holiday, so a session the periods describe is trusted.
+// evidence of a holiday, so a session the periods describe is trusted. Its
+// day and hour are by the clock of `t`'s own period (`Quote.clockAt`): a
+// scrub of Friday's lunch on the Sunday the clocks went back is at noon.
 function sessionPhase(quote, t) {
   var s = clockSession(quote, t)
   if (quote.crypto) return "always"
   if (!s.regular) return "closed"
-  var local = Format.localClock(t, quote.gmtoffset)
+  var local = Format.localClock(t, Quote.clockAt(quote, t).offset)
   if (local.weekday === 0 || local.weekday === 6) return "weekend"
   if (s.pre && t >= s.pre.start && t < s.regular.start) return "pre"
   if (t >= s.regular.start && t < s.regular.end) {
@@ -75,12 +77,15 @@ function calendarMap(calendars) {
   return calendars.calendars ? calendars.calendars : calendars
 }
 
+// The listing's calendar: the one naming its exchange, or naming the index
+// itself, where Yahoo files it under a name that holds indexes on other
+// hours too (^FTSE beside FTSE's global ones, ^RUT beside Cboe's VVIX).
 function calendarFor(calendars, quote) {
   var map = calendarMap(calendars)
   if (!map || !quote || !quote.exchange) return null
   for (var id in map) {
     var cal = map[id]
-    if (cal && cal.exchanges && cal.exchanges.indexOf(quote.exchange) >= 0) return cal
+    if (cal && ((cal.exchanges && cal.exchanges.indexOf(quote.exchange) >= 0) || (cal.indexes && cal.indexes.indexOf(quote.symbol) >= 0))) return cal
   }
   return null
 }
@@ -248,11 +253,14 @@ function scrubPhase(quote, t) {
 
 // A time where `quote` trades: by its calendar's offset for that moment's
 // date, the series' own or the listing's in `calendars`, so a time across a
-// change of clocks reads true; else the response's offset. Its zone is named
-// where the reader's clock differs.
+// change of clocks reads true; else by the clock Yahoo's periods say its
+// day kept (`Quote.clockAt`). Its zone is named where the reader's clock
+// differs.
 function printClock(quote, t, calendars) {
   var cal = quote.calendar || calendarFor(calendars, quote)
-  return cal ? calendarClock(cal, t, quote) : Format.zonedHhmm(t, quote.gmtoffset, quote.zoneName)
+  if (cal) return calendarClock(cal, t, quote)
+  var clock = Quote.clockAt(quote, t)
+  return Format.zonedHhmm(t, clock.offset, clock.zone)
 }
 
 // A closure as the header names it: the holiday, without the calendar's

@@ -297,6 +297,8 @@ function parseChart(json, centExchanges) {
     gmtoffset: meta.gmtoffset || 0,
     // The zone's short name at that offset, as Yahoo writes it: "EDT", "JST".
     zoneName: meta.timezone || "",
+    // Each period's own (`answerClocks`), for a print's clock on its day.
+    clocks: answerClocks(meta.tradingPeriods),
     instrumentType: meta.instrumentType || "",
     crypto: meta.instrumentType === "CRYPTOCURRENCY",
     // The regular-market quote as Yahoo reports it, with its own timestamp.
@@ -376,6 +378,38 @@ function answerPeriods(periods) {
     out[names[i]] = day.length ? { start: day[0].start, end: day[day.length - 1].end } : null
   }
   return out
+}
+
+// The clocks an answer's days kept: each trading period with its own UTC
+// offset and zone name, from its start to its day's midnight, so a close
+// stamped past the period's end reads its day's too (IAG.MC's at 17:35:26,
+// its periods ended at 17:30). `meta.gmtoffset` is the clock the answer was
+// sent by, so the week after a change of clocks a period before it still
+// says its own (Sydney's 10:00 AEST open of 21 September, in an answer sent
+// in AEDT). Both shapes Yahoo sends: a day answer's pre, regular, and post,
+// each a list of days, and a range's one list of days.
+function answerClocks(periods) {
+  var lists = !periods ? [] : Array.isArray(periods) ? [periods] : [periods.pre, periods.regular, periods.post]
+  var out = []
+  lists.forEach(function(days) {
+    (days || []).forEach(function(day) {
+      (day || []).forEach(function(p) {
+        var midnight = (Math.floor((p.start + p.gmtoffset) / 86400) + 1) * 86400 - p.gmtoffset
+        out.push({ start: p.start, until: midnight, offset: p.gmtoffset, zone: p.timezone || "" })
+      })
+    })
+  })
+  return out
+}
+
+// The clock `answer`, a quote or a history, kept at `t`: that of its
+// period's day holding `t`; outside them, the answer's own.
+function clockAt(answer, t) {
+  var clocks = answer.clocks || []
+  for (var i = 0; i < clocks.length; i++) {
+    if (t >= clocks[i].start && t < clocks[i].until) return clocks[i]
+  }
+  return { offset: answer.gmtoffset || 0, zone: answer.zoneName || "" }
 }
 
 // A price Yahoo sends as 0 is one it does not know yet: London's day high,

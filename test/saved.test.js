@@ -251,16 +251,66 @@ test("after the close the header names the day and the next open from the calend
   for (const [now, cals, expected] of rows) expect([now, M.marketStatus(sep4, now, 0, cals)]).toEqual([now, expected])
 })
 
+// The readers every exchange's clock is pinned for, and an answer as Yahoo
+// sends it once the exchange's clocks have changed: its `gmtoffset` and
+// zone are the new ones, and each period keeps its own day's.
+const READERS = ["America/New_York", "Europe/London", "Asia/Tokyo", "Asia/Kolkata"]
+const readAs = (zone, fn) => {
+  process.env.TZ = zone
+  try { return fn() } finally { process.env.TZ = "America/New_York" }
+}
+const sentAt = (json, gmtoffset, timezone) => {
+  const copy = structuredClone(json)
+  Object.assign(copy.chart.result[0].meta, { gmtoffset, timezone })
+  return copy
+}
+
+test("a long chart dates each bar by its own day, on both sides of a change of clocks, for every reader", () => {
+  // Yahoo stamps a week at its Monday's midnight, by that day's offset, and
+  // sends the answer's offset as today's. Found in QA: once New York's
+  // clocks go back, the week of 7 September reads "WEEK OF 6 SEP", a
+  // Sunday, and a week that starts on the 1st names the month before.
+  const weekly = fixture("history/aapl-5y.json")
+  const stamped = iso => Date.parse(iso) / 1000
+  for (const reader of READERS) readAs(reader, () => {
+    for (const answer of [weekly, sentAt(weekly, -18000, "EST")]) {
+      const history = M.parseHistory(answer, "5Y")
+      const bar = iso => history.bars.find(b => b.t === stamped(iso))
+      expect(M.historyScrubText(history, bar("2026-09-07T04:00:00Z"))).toBe("WEEK OF 7 SEP 2026 · 332.27")
+      expect(M.historyScrubText(history, bar("2025-12-01T05:00:00Z"))).toBe("WEEK OF 1 DEC 2025 · 278.78")
+      expect(M.historyScrubText({ ...history, interval: "1mo" }, bar("2026-06-01T04:00:00Z"))).toBe("JUN 2026 · 307.34")
+    }
+  })
+})
+
+test("the popular indexes Yahoo files under their own codes keep their exchange's hours", () => {
+  // ^N225 under Osaka, ^FTSE under FTSE Index, ^RUT under Chicago Options,
+  // and the TSX Composite under Toronto. Found in QA: through Tokyo's lunch
+  // the Nikkei said "Market closes in 3h 30m" and was asked every minute,
+  // and after each close they said only "Closed".
+  const n225 = M.parseChart(fixture("first-day-2026-10-14/n225-day.json"))
+  const lunch = n225.session.regular.start + 2.75 * 3600
+  expect(M.marketStatus(n225, lunch, 0, calendars)).toBe("Lunch break · reopens 12:30 JST · in 45m")
+  expect(M.quoteCadence(n225, lunch, 60, false, calendars)).toBe(15 * 60)
+  const closed = q => M.marketStatus(q, q.session.regular.end + 4 * 3600, 0, calendars)
+  expect(closed(n225)).toBe("Closed · opens Thu 09:00 JST")
+  const ftse = M.parseChart(fixture("ftse-day.json"))
+  expect(closed(ftse)).toBe("Closed · opens Wed 08:00 BST")
+  expect(closed(M.parseChart(fixture("rut-day.json")))).toBe("Closed · opens Wed 09:30")
+  expect(closed(M.parseChart(fixture("gsptse-day.json")))).toBe("Closed · opens Wed 09:30")
+  // ^VIX keeps Chicago's hours, which no calendar has; FTSE's global
+  // indexes, filed under FTSE Index too, are calculated while any of their
+  // markets trade, not on London's days. Found in review.
+  expect(closed(M.parseChart(fixture("vix-day.json")))).toBe("Closed")
+  expect(closed({ ...ftse, symbol: "GEISAC.FGI" })).toBe("Closed")
+})
+
 test("an exchange's time names its zone only where the reader's clock differs", () => {
   const tokyo = M.parseChart(fixture("7203-t-day.json"))
   const evening = tokyo.session.regular.end + 3 * 3600
   const aapl = M.parseChart(fixture("aapl.json"))
   // Saturday 31 October: New York's clocks go back that night.
   const saturday = M.epochAt(US, "2026-10-31", "12:00")
-  const readAs = (zone, fn) => {
-    process.env.TZ = zone
-    try { return fn() } finally { process.env.TZ = "America/New_York" }
-  }
   const tokyoNext = () => M.marketStatus(tokyo, evening, 0, calendars)
   expect(readAs("America/New_York", tokyoNext)).toMatch(/^Closed · opens \w{3} 09:00 JST$/)
   expect(readAs("Asia/Tokyo", tokyoNext)).toMatch(/^Closed · opens \w{3} 09:00$/)
@@ -275,20 +325,52 @@ test("an exchange's time names its zone only where the reader's clock differs", 
   expect(M.freshnessText({ state: "aged", asOf: btc.marketTime }, btc)).toBe("AS OF 18:32 UTC")
 })
 
-test("an exchange's time across a change of clocks reads by its own date's offset", () => {
-  // An answer fetched after New York's clocks went back (EST) holds bars and
-  // a close from before it (EDT): found in review, 09:30 read 08:30 EST.
-  const before = at("2026-10-30", "09:30")
-  const history = { range: "1M", interval: "30m", gmtoffset: -18000, zoneName: "EST",
-    bars: [{ t: before, o: 100, h: 100, l: 100, c: 100 }] }
-  expect(M.historyScrubText(history, history.bars[0], 2, US)).toBe("30 OCT 09:30 · 100.00")
+test("an exchange's time across a change of clocks reads by its own day's clock, for every reader", () => {
+  // A listing with a calendar: an answer fetched after New York's clocks go
+  // back (EST) holds a close from before (EDT). Found in review: 09:30 read
+  // 08:30 EST.
   const aapl = { ...M.parseChart(fixture("aapl.json")), gmtoffset: -18000, zoneName: "EST" }
   const close = at("2026-10-30", "16:00")
-  expect(M.freshnessText({ state: "aged", asOf: close }, aapl, calendars)).toBe("AS OF 16:00")
-  process.env.TZ = "Europe/London"
-  try {
-    expect(M.freshnessText({ state: "aged", asOf: close }, aapl, calendars)).toBe("AS OF 16:00 EDT")
-  } finally { process.env.TZ = "America/New_York" }
+  // Sydney's clocks went forward on 4 October: today's 1M answer is sent in
+  // AEDT, and its periods keep each day's own. Found in QA: the 10:00 AEST
+  // open of 21 September read 11:00 AEDT.
+  const bhp = M.parseHistory(fixture("history/bhp-ax-1mo.json"), "1M")
+  // Ranges, a day, and closes fetched before 25 October (XETRA, Madrid) and
+  // 1 November (Nasdaq, Chicago, OTC), each also as Yahoo sends it after.
+  // Madrid's close is stamped 17:35:26, past its periods' end at 17:30.
+  const nest = fixture("history/nest-1mo.json")
+  const sap = fixture("history/sap-de-5d.json")
+  const vix = fixture("vix-day.json")
+  const aitx = fixture("moments/power-user-2026-10-16/aitx.json")
+  const day = fixture("aapl.json")
+  const iag = fixture("moments/cents-2026-10-17/iag.mc.json")
+  const sides = [[nest, sentAt(nest, -18000, "EST")], [sap, sentAt(sap, 3600, "CET")],
+    [vix, sentAt(vix, -21600, "CST")], [aitx, sentAt(aitx, -18000, "EST")], [day, sentAt(day, -18000, "EST")],
+    [iag, sentAt(iag, 3600, "CET")]]
+  for (const reader of READERS) readAs(reader, () => {
+    // New York's own clock is named only to the other readers.
+    const edt = reader === "America/New_York" ? "" : " EDT"
+    expect(M.freshnessText({ state: "aged", asOf: close }, aapl, calendars)).toBe("AS OF 16:00" + edt)
+    expect(M.historyScrubText(bhp, bhp.bars[0])).toBe("21 SEP 10:00 AEST · 60.56")
+    expect(M.historyScrubText(bhp, bhp.bars[bhp.bars.length - 2])).toBe("20 OCT 16:00 AEDT · 59.50")
+    for (const [n, s, v, a, d, m] of [sides.map(side => side[0]), sides.map(side => side[1])]) {
+      const month = M.parseHistory(n, "1M")
+      const week = M.parseHistory(s, "1W")
+      const chicago = M.parseChart(v)
+      const otc = M.parseChart(a)
+      const nasdaq = M.parseChart(d)
+      expect(M.historyScrubText(month, month.bars[0])).toBe("12 AUG 09:30" + edt + " · 233.17")
+      expect(M.historyScrubText(week, week.bars[0])).toBe("14 OCT 09:00 CEST · 196.32")
+      expect(M.freshnessText({ state: "aged", asOf: chicago.marketTime, earlier: true }, chicago, calendars)).toBe("AS OF TUE 09:35 CDT")
+      expect(M.freshnessText({ state: "aged", asOf: otc.marketTime, earlier: true }, otc, calendars)).toBe("AS OF FRI 16:00" + edt)
+      const madrid = M.parseChart(m)
+      expect(M.freshnessText({ state: "aged", asOf: madrid.marketTime, earlier: true }, madrid, calendars)).toBe("AS OF FRI 17:35 CEST")
+      // The day's lunch lull is New York's noon, whichever clock the
+      // answer was sent by.
+      const noon = nasdaq.session.regular.start + 2.5 * 3600
+      expect(M.marketStatus(nasdaq, nasdaq.session.post.end, noon, calendars)).toBe("At 12:00" + edt + " · Lunch lull")
+    }
+  })
 })
 
 test("a weeknight after post-market leads with closed and the next open", () => {
@@ -1004,19 +1086,21 @@ test("a range's line gives its low and high, their dates, and its coverage", () 
   const fab = M.parseHistory(fixture("history/fab-max.json"), "All")
   const weekly = M.parseHistory(fixture("history/aapl-5y.json"), "5Y")
   const line = (h, price) => said(M.rangeLine(h, null, undefined, price))
-  expect(line(aapl, M.regularClose(quote))).toBe("1Y · 229.02–344.57 @325.13 · LOW 12 SEP 25 · HIGH 29 JUL 26")
+  expect(line(aapl, M.regularClose(quote))).toBe("1Y · 229.02–344.57 @325.13 · LOW 12 SEP 2025 · HIGH 29 JUL 2026")
   expect(line(week)).toBe("1W · 209.40–254.74 @224.55 · LOW 4 SEP · HIGH 8 SEP")
   expect(line(month)).toBe("1M · 194.80–280.83 @224.55 · LOW 1 SEP · HIGH 17 AUG")
-  expect(line(fab)).toBe("ALL · 16.60–142.92 @23.20 · SINCE 31 JUL 25 · LOW 30 APR 26 · HIGH 1 AUG 25 · _ BARS")
-  expect(line(weekly)).toBe("5Y · 124.17–344.57 @332.27 · LOW JAN 23 · HIGH JUL 26")
+  expect(line(fab)).toBe("ALL · 16.60–142.92 @23.20 · SINCE 31 JUL 2025 · LOW 30 APR 2026 · HIGH 1 AUG 2025 · _ BARS")
+  // The year whole, as the scrub writes it: "JAN 23" read as 23 January.
+  // Found in design QA.
+  expect(line(weekly)).toBe("5Y · 124.17–344.57 @332.27 · LOW JAN 2023 · HIGH JUL 2026")
   // No bars: an empty rule and empty dates, and no word about it.
   expect(line({ ...week, bars: [] })).toBe("1W · ?–? · LOW _ · HIGH _")
   // Each date's slot holds the widest date of its kind, its year included,
   // so a new high's date, or a period that comes to cross a year, never
   // widens it.
-  expect(M.rangeLine(aapl).facts.map(f => f.widest)).toEqual(["88 MMM 88", "88 MMM 88"])
-  expect(M.rangeLine(week).facts.map(f => f.widest)).toEqual(["88 MMM 88", "88 MMM 88"])
-  expect(M.rangeLine(weekly).facts.map(f => f.widest)).toEqual(["MMM 88", "MMM 88"])
+  expect(M.rangeLine(aapl).facts.map(f => f.widest)).toEqual(["88 MMM 8888", "88 MMM 8888"])
+  expect(M.rangeLine(week).facts.map(f => f.widest)).toEqual(["88 MMM 8888", "88 MMM 8888"])
+  expect(M.rangeLine(weekly).facts.map(f => f.widest)).toEqual(["MMM 8888", "MMM 8888"])
   // A weekly bar names no day, so it carries its year even when the whole
   // period sits inside one.
   const oneYear = {
@@ -1024,7 +1108,7 @@ test("a range's line gives its low and high, their dates, and its coverage", () 
     bars: weekly.bars.filter(bar => bar.t >= 1767225600 && bar.t < 1798761600)
   }
   expect(M.historySpansYears(oneYear)).toBe(false)
-  expect(line(oneYear)).toMatch(/ · LOW [A-Z]{3} 26 · HIGH [A-Z]{3} 26$/)
+  expect(line(oneYear)).toMatch(/ · LOW [A-Z]{3} 2026 · HIGH [A-Z]{3} 2026$/)
   expect(M.historyScrubText(aapl, aapl.bars[0])).toBe("12 SEP 2025 · 234.07")
   expect(M.historyScrubText(week, week.bars[0])).toBe("4 SEP 09:30 · 213.58")
   expect(M.historyScrubText({ ...week, interval: "30m" }, week.bars[0])).toBe("4 SEP 09:30 · 213.58")
@@ -1039,7 +1123,7 @@ test("a range's line gives its low and high, their dates, and its coverage", () 
     symbol: "NEW", range: "All", interval: "1d", gmtoffset: 0, baseline: 10, firstTradeDate: 100,
     bars: [day(0), day(1)]
   }
-  expect(line(sparse)).toBe("ALL · 9.00–12.00 @11.00 · SINCE 1 JAN 70 · LOW 1 JAN · HIGH 2 JAN · 2 BARS")
+  expect(line(sparse)).toBe("ALL · 9.00–12.00 @11.00 · SINCE 1 JAN 1970 · LOW 1 JAN · HIGH 2 JAN · 2 BARS")
   const seven = { ...sparse, bars: [0, 1, 2, 3, 4, 5, 6].map(day) }
   const eight = { ...sparse, bars: [0, 1, 2, 3, 4, 5, 6, 7].map(day) }
   expect(line(seven)).toMatch(/ · 7 BARS$/)
