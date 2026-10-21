@@ -203,12 +203,7 @@ function sessionBreaks(cal, t) {
 }
 
 function breakUntil(cal, t) {
-  if (!cal) return null
-  var segs = segmentsOn(cal, dateStringOf(localDate(t, cal)))
-  for (var i = 0; i < segs.length - 1; i++) {
-    if (t >= segs[i].end && t < segs[i + 1].start) return segs[i + 1].start
-  }
-  return null
+  return calendarNow(cal, t).breakEnd
 }
 
 function formatNextOpen(cal, nxt) {
@@ -217,11 +212,27 @@ function formatNextOpen(cal, nxt) {
 }
 
 function calendarQuiet(calendars, quote, now) {
-  if (!quote || quote.crypto) return false
-  var cal = calendarFor(calendars, quote)
-  if (!cal) return false
-  var kind = dayKind(cal, dateStringOf(localDate(now, cal)))
-  return kind.kind === "weekend" || kind.kind === "closure"
+  return !!quote && !quote.crypto && calendarNow(calendarFor(calendars, quote), now).quiet
+}
+
+// What a market's calendar says at `now`, the same for every listing on
+// it, so a walk over a list reads each calendar once (`Service.askDue`):
+// whether its day is a weekend or a published closure (`quiet`), the end of
+// the break between segments it is in (`breakEnd`, Tokyo's lunch), and
+// whether one of its segments trades (`segment`). A listing with no
+// calendar (`cal` null) has none of these.
+function calendarNow(cal, now) {
+  var date = cal ? dateStringOf(localDate(now, cal)) : ""
+  var kind = cal ? dayKind(cal, date).kind : ""
+  var segs = cal ? segmentsOn(cal, date) : []
+  var breakEnd = null
+  for (var i = 0; i < segs.length - 1; i++) if (now >= segs[i].end && now < segs[i + 1].start) breakEnd = segs[i + 1].start
+  return {
+    cal: cal,
+    quiet: kind === "weekend" || kind === "closure",
+    breakEnd: breakEnd,
+    segment: segs.some(function(seg) { return now >= seg.start && now < seg.end })
+  }
 }
 
 function scheduleNote(quote, now, calendars) {
@@ -315,12 +326,13 @@ function marketStatus(quote, now, scrubT, calendars, overnight) {
 // the periods cannot know; less a published closure and a break between
 // segments (Tokyo's lunch). Never a cryptocurrency, which has none.
 function inRegularSession(quote, now, calendars) {
-  if (!quote || quote.crypto || calendarQuiet(calendars, quote, now)) return false
-  var cal = calendarFor(calendars, quote)
-  if (cal && breakUntil(cal, now)) return false
-  if (isTrading(sessionPhase(quote, now))) return true
-  var segs = cal ? segmentsOn(cal, dateStringOf(localDate(now, cal))) : []
-  return segs.some(function(seg) { return now >= seg.start && now < seg.end })
+  return regularNow(quote, now, calendarNow(calendarFor(calendars, quote), now))
+}
+
+// `inRegularSession` by its calendar's reading at `now` (`calendarNow`).
+function regularNow(quote, now, calNow) {
+  if (!quote || quote.crypto || calNow.quiet || calNow.breakEnd) return false
+  return isTrading(sessionPhase(quote, now)) || calNow.segment
 }
 
 // Whether a quote's own market is in its pre-market or after hours now:
@@ -352,11 +364,12 @@ function inExtendedHours(quote, now, calendars) {
 // Whether a stock, ETF, or index is kept fresh with nothing open: through
 // its regular session; and a listing with no calendar to say when that is
 // (an index's), on the slow clock once every period its quote knows is
-// past, so it learns of its next session.
-function staysWarm(quote, now, calendars) {
+// past, so it learns of its next session. By its calendar's reading at
+// `now` (`calendarNow`).
+function staysWarm(quote, now, calNow) {
   if (!quote || quote.crypto) return false
-  if (inRegularSession(quote, now, calendars)) return true
-  if (calendarFor(calendars, quote)) return false
+  if (regularNow(quote, now, calNow)) return true
+  if (calNow.cal) return false
   var latest = quote.current && quote.current.regular ? quote.current : quote.session
   var last = latest.post || latest.regular
   return !!last && now >= last.end
@@ -368,12 +381,12 @@ function staysWarm(quote, now, calendars) {
 // when only the dim tail of its day can move, every 5 minutes unless it is
 // the hero of an open surface; and every 15 minutes while its market is
 // closed, for a night, a weekend, a holiday, or a break. A symbol with no
-// quote is asked again on the slow clock too.
-function quoteCadence(quote, now, interval, hero, calendars) {
+// quote is asked again on the slow clock too. By its calendar's reading at
+// `now` (`calendarNow`).
+function quoteCadence(quote, now, interval, hero, calNow) {
   if (!quote) return 15 * 60
-  if (quote.crypto || inRegularSession(quote, now, calendars)) return interval
-  var cal = calendarFor(calendars, quote)
-  if (calendarQuiet(calendars, quote, now) || (cal && breakUntil(cal, now))) return 15 * 60
+  if (quote.crypto || regularNow(quote, now, calNow)) return interval
+  if (calNow.quiet || calNow.breakEnd) return 15 * 60
   var phase = sessionPhase(quote, now)
   if (phase === "pre" || phase === "post") return hero ? interval : Math.max(5 * 60, interval)
   return 15 * 60

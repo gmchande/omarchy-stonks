@@ -20,6 +20,8 @@ const JPX = calendars.calendars.JPX
 const DAY = 24 * 3600
 const keptBars = bars => M.filterStrayCloses(bars).bars
 const at = (date, clock) => M.epochAt(US, date, clock)
+// A listing's cadence, by its calendar's reading, as askDue reads it.
+const quoteCadence = (q, now, interval, hero) => M.quoteCadence(q, now, interval, hero, M.calendarNow(M.calendarFor(calendars, q), now))
 
 test("a stray run is the one the series carries on past", () => {
   // The bar after opens back at the level, not from the stray close.
@@ -145,7 +147,7 @@ test("Toronto and London close early when their exchanges say, and London's 2028
   const TSX = calendars.calendars.TSX
   const LSE = calendars.calendars.LSE
   const shop = held("SHOP.TO", "TSX", TSX, "2026-12-23", "09:30", "16:00")
-  const cadence = (quote, cal, day, clock) => M.quoteCadence(quote, M.epochAt(cal, day, clock), 60, false, calendars)
+  const cadence = (quote, cal, day, clock) => quoteCadence(quote, M.epochAt(cal, day, clock), 60, false)
   expect([cadence(shop, TSX, "2026-12-24", "12:00"), cadence(shop, TSX, "2026-12-24", "14:00")]).toEqual([60, 900])
   const shel = held("SHEL.L", "LSE", LSE, "2027-12-23", "08:00", "16:30")
   expect([cadence(shel, LSE, "2027-12-24", "12:00"), cadence(shel, LSE, "2027-12-24", "13:00")]).toEqual([60, 900])

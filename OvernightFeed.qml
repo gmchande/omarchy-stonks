@@ -50,34 +50,79 @@ Item {
     fetchProc.running = true
   }
 
-  // Each request's answer is read with its own symbols. An answer with
-  // nothing new for a symbol keeps the prints it had, so its chart is not
-  // built again. Each symbol's entry says when it was asked (`at`), so a
-  // symbol no longer asked for ages on its own.
+  // Each request's answer is read with its own symbols, a little at a time,
+  // about 8 ms a turn (`landStep`), as the quote feed reads its runs: an
+  // answer's text, or one listing of it, so a long list's prints never hold
+  // the shell's thread for long. The run lands whole once its last listing
+  // is read (`land`), and is out (`busy`) until then. An answer with nothing
+  // new for a symbol keeps the prints it had, so its chart is not built
+  // again. Each symbol's entry says when it was asked (`at`), so a symbol no
+  // longer asked for ages on its own.
+  property var landing: null
   function receive(text) {
     var got = Fetch.answers(text)
     if (gate && got.length) {
       gate.report(got.map(function(a) { return a.kind }),
         Math.max.apply(null, got.map(function(a) { return a.retryAfter })), root.ticket)
     }
+    // `results` is the batch's answer once read, null before and for a bad
+    // one; `bars` holds each symbol read, by symbol.
+    root.landing = {
+      answers: batches.map(function(batch, b) { return got.filter(function(a) { return a.index === b })[0] || null }),
+      batch: 0, results: null, read: 0, bars: {}
+    }
+    landTimer.start()
+  }
+
+  function landStep() {
+    var job = landing
+    var until = Date.now() + 8
+    while (job.batch < batches.length && Date.now() < until) {
+      var batch = batches[job.batch]
+      if (!job.results) {
+        var answer = job.answers[job.batch]
+        try { job.results = answer && answer.kind === "ok" ? Overnight.overnightResults(JSON.parse(answer.body)) : null } catch (e) { job.results = null }
+        job.answers[job.batch] = null
+        job.read = 0
+        // A bad answer reads nothing: its symbols fail.
+        if (!job.results) job.batch++
+      } else {
+        var symbol = batch[job.read]
+        var bars = null
+        try { bars = Overnight.overnightBars(job.results[job.read], symbol) } catch (e) { bars = null }
+        var had = entries[symbol]
+        if (bars) job.bars[symbol] = had && Overnight.sameBars(had.bars, bars) ? had.bars : bars
+        // An answer with a listing that can't be read is a bad answer too:
+        // none of its symbols is read.
+        else batch.forEach(function(s) { delete job.bars[s] })
+        if (!bars || ++job.read >= batch.length) {
+          job.results = null
+          job.batch++
+        }
+      }
+    }
+    if (job.batch < batches.length) landTimer.start()
+    else land(job)
+  }
+
+  function land(job) {
     var next = Object.assign({}, entries)
-    batches.forEach(function(batch, b) {
-      var answer = got.filter(function(a) { return a.index === b })[0]
-      var parsed = null
-      try { parsed = answer && answer.kind === "ok" ? Overnight.parseOvernight(JSON.parse(answer.body), batch) : null } catch (e) { parsed = null }
+    batches.forEach(function(batch) {
       batch.forEach(function(symbol) {
         var had = entries[symbol]
-        if (!parsed) {
-          next[symbol] = { status: "failed", bars: had ? had.bars : [], at: askedAt }
-          return
-        }
-        var bars = parsed[symbol]
-        if (had && JSON.stringify(had.bars) === JSON.stringify(bars)) bars = had.bars
-        next[symbol] = { status: "ok", bars: bars, at: askedAt }
+        next[symbol] = symbol in job.bars ? { status: "ok", bars: job.bars[symbol], at: askedAt }
+          : { status: "failed", bars: had ? had.bars : [], at: askedAt }
       })
     })
+    root.landing = null
     root.batches = []
     root.entries = next
+  }
+
+  Timer {
+    id: landTimer
+    interval: 0
+    onTriggered: root.landStep()
   }
 
   Timer {
