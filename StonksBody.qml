@@ -90,9 +90,9 @@ Item {
   // The landing is a Show of a member still arriving, not an add: it is
   // featured once its first answer is in, a failed one too.
   property bool landingShows: false
-  // An add not yet heard: it is as its row joins this surface's list, its
-  // answer in, whatever is featured meanwhile; "" when none is.
-  property string unheardAdd: ""
+  // Adds not yet heard: each is as its row joins this surface's list, its
+  // answer in, whatever is featured or added meanwhile.
+  property var unheardAdds: []
   // The surface's own colour, which a moving row carries.
   property color ground: Commons.Color.background
   property var rangeOptions: History.historyRanges()
@@ -750,12 +750,15 @@ Item {
     }
     var member = members.indexOf(s) >= 0
     adding = false
+    // An add takes the hero while it arrives (`Service.addSymbol`); a Show
+    // of a member still arriving chooses it, kept whatever its answer.
     if (!member) service.addSymbol(s)
+    else service.feature(s)
     previewTo("")
     // After the preview has gone, whose hero was a choice, not a landing.
     landing = s
     landingShows = member
-    unheardAdd = member ? "" : s
+    if (!member) unheardAdds = unheardAdds.filter(function(a) { return a !== s }).concat([s])
     landingJoined = false
     land()
   }
@@ -776,10 +779,13 @@ Item {
   // Called once the rows show the service's latest view.
   function land() {
     // A row that says its first fetch failed joins too, and is heard; an add
-    // that has left the list on show goes unheard.
-    if (unheardAdd !== "" && service && service.arriving.indexOf(unheardAdd) < 0) {
-      if (view.rows.indexOf(unheardAdd) >= 0) sound("add")
-      if (view.rows.indexOf(unheardAdd) >= 0 || members.indexOf(unheardAdd) < 0) unheardAdd = ""
+    // that has left the list on show goes unheard. Rows joining together
+    // are heard once.
+    if (unheardAdds.length && service) {
+      var joined = unheardAdds.filter(function(a) { return service.arriving.indexOf(a) < 0 && view.rows.indexOf(a) >= 0 })
+      if (joined.length) sound("add")
+      var still = unheardAdds.filter(function(a) { return joined.indexOf(a) < 0 && members.indexOf(a) >= 0 })
+      if (still.length !== unheardAdds.length) unheardAdds = still
     }
     if (landing === "" || !service || service.arriving.indexOf(landing) >= 0) return
     // A first fetch that failed has nothing to show: the hero is the one
@@ -906,7 +912,7 @@ Item {
   function freeze() {
     keepTyped()
     landing = ""
-    unheardAdd = ""
+    unheardAdds = []
     noteTimer.stop()
     noteFade.stop()
     footer.freeze()
