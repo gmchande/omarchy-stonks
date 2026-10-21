@@ -359,10 +359,16 @@ Item {
     // A refetch, out or failed, with the range in hand says nothing: it
     // keeps the chart and the market.
     if (historyShown && historyBar) return History.historyScrubText(history, historyBar, featuredQuote ? featuredQuote.priceDigits : undefined)
-    if (featuredQuote) return Market.marketStatus(dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars,
-      Overnight.nightTrades(featuredQuote, !!chart && chart.allDay, now, calendars))
+    if (featuredQuote) return marketText
     return headerWhenMissing
   }
+  // The market as the header says it, and, where it names a holiday, the
+  // same without the name for a header with no room for it
+  // (`Market.shortMarketStatus`); "" while the header says anything else.
+  readonly property var marketSays: featuredQuote ? [dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars,
+    Overnight.nightTrades(featuredQuote, !!chart && chart.allDay, now, calendars)] : null
+  readonly property string marketText: marketSays ? Market.marketStatus.apply(null, marketSays) : ""
+  readonly property string headerShortText: marketSays && headerText === marketText ? Market.shortMarketStatus.apply(null, marketSays) : ""
   // Everything but the rows: margins, header, band, and footer, with the
   // band, the rows, and the footer each one group's gap under what is above.
   readonly property int chromeHeight: chartFitsSurface ? chromeBesideChart + shownChartHeight
@@ -996,6 +1002,7 @@ Item {
     anchors.top: parent.top
     anchors.margins: root.margins
     statusText: root.headerText
+    shortText: root.headerShortText
     offersRetry: root.offersRetry
     retro: root.retro
     soundsOn: root.soundsOn

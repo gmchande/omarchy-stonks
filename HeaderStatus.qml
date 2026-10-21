@@ -17,6 +17,9 @@ Item {
   id: root
 
   property string statusText: ""
+  // The same words shorter, for where they don't fit: a closure's notice
+  // without its holiday's name. "" when they have no shorter form.
+  property string shortText: ""
   // The words say a range failed, and its button asks again, as r does.
   property bool offersRetry: false
   property bool retro: false
@@ -188,17 +191,28 @@ Item {
   // came and went, with every range change and every scrub. A failed
   // range's retry follows them. They start twice as far from the sleeping
   // z as the bull is, so it reads as the animal's and not as a mark on the
-  // first word, and stop as much sooner, so their room is the same.
+  // first word, and stop as much sooner, so their room is the same. Where
+  // the words don't fit their room, their short form shows, where they have
+  // one; otherwise they are cut with an ellipsis.
+  readonly property real wordsRoom: Math.max(0, soundIcon.x - Style.space(8) - statusWords.x
+    - (root.offersRetry ? retry.implicitWidth + Style.space(16) : 0))
+  Text {
+    id: fullWords
+    objectName: "statusFullWords"
+    visible: false
+    textFormat: Text.PlainText
+    text: root.statusText.toUpperCase()
+    font: statusWords.font
+  }
   Text {
     id: statusWords
     objectName: "statusText"
     anchors.left: slot.right
     anchors.leftMargin: Style.space(14)
-    width: Math.max(0, Math.min(implicitWidth, soundIcon.x - Style.space(8) - x
-      - (root.offersRetry ? retry.implicitWidth + Style.space(16) : 0)))
+    width: Math.min(implicitWidth, root.wordsRoom)
     anchors.verticalCenter: parent.verticalCenter
     textFormat: Text.PlainText
-    text: root.statusText.toUpperCase()
+    text: (root.shortText !== "" && fullWords.implicitWidth > root.wordsRoom ? root.shortText : root.statusText).toUpperCase()
     color: root.scrubbing || root.live ? root.foreground : root.dim
     font.family: root.fontFamily
     font.pixelSize: Style.font.caption

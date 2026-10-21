@@ -756,63 +756,6 @@ ShellRoot {
         root.check("a coin under a cent and a six-figure price each show their own decimals in the hero, both looks, the row, and a scrub",
           decimals.length === 0, decimals.join(" | "))
 
-        // The header's words keep room for its longest real states and for
-        // every closure in calendars.json, as Market names it, for a reader
-        // whose clock differs from the exchange's (its zone named): in both
-        // looks, in the popup and the window at its widest and its minimum
-        // width (App.qml), beside the look icon and the help mark. Found in
-        // the polish board: Tokyo's "Constitution Memorial Day observed"
-        // and London's "(substitute)" closures were cut in the popup.
-        var header = find(body, "statusText").parent
-        var calendars = JSON.parse(calendarFile.text())
-        var states = ["CLOSED · OPENS MON 09:30", "POWER HOUR · CLOSES IN 40M", "LUNCH BREAK · REOPENS 12:30 JST · IN 59M",
-          "OPENING BELL · CLOSES IN 6H 20M"]
-        var closures = 0
-        var unnamed = []
-        for (var calId in calendars.calendars) {
-          var cal = calendars.calendars[calId]
-          var listing = stub.quotes[["AAPL", "SHOP.TO", "7203.T", "SHEL.L"].filter(function(s) {
-            return Market.calendarFor(calendars, stub.quotes[s]) === cal
-          })[0]]
-          for (var day in cal.closures) {
-            var noon = Market.epochAt(cal, day, "12:00")
-            var said = Market.marketStatus(listing, noon, 0, calendars)
-            // Past the calendar's last day the header says the schedule is
-            // unavailable, with no time to name a zone for.
-            var next = Market.nextOpen(cal, noon)
-            var zone = next ? Market.zoneName(cal, Market.localDate(next.t, cal).offset) : ""
-            if (zone !== "" && said.slice(-zone.length) !== zone) said += " " + zone
-            if (said.indexOf(cal.closures[day].split(" ")[0] + " ") !== 0 || said.indexOf(" · ") < 0)
-              unnamed.push(calId + " " + day + " " + said)
-            states.push(said)
-            closures++
-          }
-        }
-        var roomless = []
-        for (var hw = 0; hw < 3; hw++) {
-          surface.wide = hw > 0
-          surface.windowWidth = hw === 1 ? Style.space(560) : 720
-          for (var hlook = 0; hlook < 2; hlook++) {
-            stub.retro = hlook === 1
-            for (var s = 0; s < states.length; s++) {
-              header.statusText = states[s]
-              wait(1)
-              var words = find(body, "statusText")
-              if (words.truncated || words.implicitWidth > words.width)
-                roomless.push((surface.wide ? "window " + surface.width + " " : "popup ") + (stub.retro ? "retro " : "smooth ")
-                  + words.text + " (" + Math.ceil(words.implicitWidth) + " px in " + words.width + ")")
-            }
-          }
-        }
-        header.statusText = Qt.binding(function() { return body.headerText })
-        surface.wide = false
-        surface.windowWidth = 720
-        stub.retro = false
-        wait(20)
-        root.check("the header's longest real states and every closure in calendars.json fit, a zone named, in both looks, in the popup and the window at its widest and narrowest",
-          closures > 50 && unnamed.length === 0 && roomless.length === 0,
-          closures + " closures | " + unnamed.join(" | ") + " | " + roomless.join(" | "))
-
         // The band lines up with the rows and keeps one rhythm: the range
         // row, the info lines, and the list's header start at the rows' text
         // and end at their figures, the info lines' last column included;
@@ -2112,6 +2055,84 @@ ShellRoot {
         wait(100)
         root.check("at text size 16, on a screen too short for the first-run hint and a row, the popup shows a row, in both looks",
           rowless.length === 0, rowless.join(", "))
+
+        // The header's words keep room for its longest real states, and say
+        // every closure in calendars.json, as Market names it, for a reader
+        // whose clock differs from the exchange's (its zone named): in full
+        // wherever that fits, and otherwise in its short form, without the
+        // holiday's name, as a weekend's is worded. In both looks, in the
+        // popup and the window at its widest and its minimum width
+        // (App.qml), beside the speaker, the look icon, and the help mark,
+        // at every text size Omarchy offers (9 to 20). Found in the polish
+        // board: Tokyo's "Constitution Memorial Day observed" and London's
+        // "(substitute)" closures were cut in the popup; and in the sound
+        // build: beside the speaker, Martin Luther King, Jr. Day's was.
+        var header = find(body, "statusText").parent
+        var fullWords = find(body, "statusFullWords")
+        var calendars = JSON.parse(calendarFile.text())
+        var states = [["CLOSED · OPENS MON 09:30", ""], ["POWER HOUR · CLOSES IN 40M", ""], ["LUNCH BREAK · REOPENS 12:30 JST · IN 59M", ""],
+          ["OPENING BELL · CLOSES IN 6H 20M", ""]]
+        var closures = 0
+        var unnamed = []
+        for (var calId in calendars.calendars) {
+          var cal = calendars.calendars[calId]
+          var listing = stub.quotes[["AAPL", "SHOP.TO", "7203.T", "SHEL.L"].filter(function(s) {
+            return Market.calendarFor(calendars, stub.quotes[s]) === cal
+          })[0]]
+          for (var day in cal.closures) {
+            var noon = Market.epochAt(cal, day, "12:00")
+            var said = Market.marketStatus(listing, noon, 0, calendars)
+            var short = Market.shortMarketStatus(listing, noon, 0, calendars)
+            // Past the calendar's last day the header says the schedule is
+            // unavailable, with no time to name a zone for.
+            var next = Market.nextOpen(cal, noon)
+            var zone = next ? Market.zoneName(cal, Market.localDate(next.t, cal).offset) : ""
+            if (zone !== "" && said.slice(-zone.length) !== zone) said += " " + zone
+            if (zone !== "" && short.slice(-zone.length) !== zone) short += " " + zone
+            if (said.indexOf(cal.closures[day].split(" ")[0] + " ") !== 0 || said.indexOf(" · ") < 0
+              || short !== "Closed" + said.slice(said.indexOf(" · ")))
+              unnamed.push(calId + " " + day + " " + said + " / " + short)
+            states.push([said, short])
+            closures++
+          }
+        }
+        var roomless = []
+        var shortened = {}
+        for (var hsize = 9; hsize <= 20; hsize++) {
+          Style.fontBaseSize = hsize
+          for (var hw = 0; hw < 3; hw++) {
+            surface.wide = hw > 0
+            surface.windowWidth = hw === 1 ? Style.space(560) : 720
+            for (var hlook = 0; hlook < 2; hlook++) {
+              stub.retro = hlook === 1
+              wait(20)
+              var where = "size " + hsize + " " + (surface.wide ? "window " + surface.width + " " : "popup ") + (stub.retro ? "retro " : "smooth ")
+              for (var s = 0; s < states.length; s++) {
+                header.statusText = states[s][0]
+                header.shortText = states[s][1]
+                wait(1)
+                var words = find(body, "statusText")
+                var shownShort = states[s][1] !== "" && words.text === states[s][1].toUpperCase()
+                if (words.truncated || words.implicitWidth > words.width)
+                  roomless.push(where + words.text + " (" + Math.ceil(words.implicitWidth) + " px in " + words.width + ")")
+                else if (shownShort && fullWords.implicitWidth <= header.wordsRoom)
+                  roomless.push(where + "short though the full fits: " + states[s][0])
+                if (shownShort) shortened[where.trim()] = (shortened[where.trim()] || 0) + 1
+              }
+            }
+          }
+        }
+        header.statusText = Qt.binding(function() { return body.headerText })
+        header.shortText = Qt.binding(function() { return body.headerShortText })
+        Style.fontBaseSize = 12
+        surface.wide = false
+        surface.windowWidth = 720
+        stub.retro = false
+        wait(20)
+        console.log("closures said short: " + Object.keys(shortened).map(function(k) { return k + " " + shortened[k] }).join(", "))
+        root.check("the header's longest real states fit, and every closure in calendars.json is said in full where it fits and else without its holiday's name, a zone named, in both looks, in the popup and the window at its widest and narrowest, at every text size from 9 to 20",
+          closures > 50 && unnamed.length === 0 && roomless.length === 0,
+          closures + " closures | " + unnamed.join(" | ") + " | " + roomless.slice(0, 12).join(" | ") + (roomless.length > 12 ? " | … " + roomless.length : ""))
 
         // The popup shows a row on a 768 px screen at every text size Omarchy
         // offers (`omarchy display text size`, 9 to 20), in both looks: where
