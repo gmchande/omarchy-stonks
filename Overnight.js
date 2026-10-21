@@ -102,30 +102,44 @@ function allDayDue(entry, now) {
   return now - entry.at >= (entry.status === "ok" ? ALL_DAY_INTERVAL : OVERNIGHT_INTERVAL)
 }
 
-// Robinhood's answer, by the Yahoo symbols asked for: each one's prints,
-// { t, p, s } with s its session ("pre", "reg", "post", "overnight"), only
-// the bars that traded: bounds=24_5 still fills a quiet name's gaps with
-// flat `interpolated` bars. Results come in the order asked; an unknown
-// symbol comes back empty, and one that names another symbol is no answer
-// for it. Null for a response that is not Robinhood's.
+// Robinhood's answer, by the Yahoo symbols asked for: each one's prints
+// (`overnightBars`). Null for a response that is not Robinhood's.
 function parseOvernight(json, symbols) {
-  var results = json && json.results
-  if (!Array.isArray(results)) return null
+  var results = overnightResults(json)
+  if (!results) return null
   var out = {}
-  for (var i = 0; i < symbols.length; i++) {
-    var result = results[i]
-    var bars = []
-    if (result && result.symbol === robinhoodSymbol(symbols[i]) && Array.isArray(result.historicals)) {
-      for (var j = 0; j < result.historicals.length; j++) {
-        var bar = result.historicals[j]
-        var t = Date.parse(bar.begins_at) / 1000
-        var p = Number(bar.close_price)
-        if (!bar.interpolated && Format.isFiniteNumber(t) && Format.isFiniteNumber(p) && p > 0) bars.push({ t: t, p: p, s: bar.session })
-      }
-    }
-    out[symbols[i]] = bars
-  }
+  for (var i = 0; i < symbols.length; i++) out[symbols[i]] = overnightBars(results[i], symbols[i])
   return out
+}
+
+// Robinhood's results, in the order asked, or null for a response that is
+// not Robinhood's.
+function overnightResults(json) {
+  return json && Array.isArray(json.results) ? json.results : null
+}
+
+// One result of Robinhood's answer, for the Yahoo symbol asked for in its
+// place: its prints, { t, p, s } with s its session ("pre", "reg", "post",
+// "overnight"), only the bars that traded: bounds=24_5 still fills a quiet
+// name's gaps with flat `interpolated` bars. An unknown symbol comes back
+// empty, and one that names another symbol is no answer for it.
+function overnightBars(result, symbol) {
+  var bars = []
+  if (!result || result.symbol !== robinhoodSymbol(symbol) || !Array.isArray(result.historicals)) return bars
+  for (var j = 0; j < result.historicals.length; j++) {
+    var bar = result.historicals[j]
+    var t = Date.parse(bar.begins_at) / 1000
+    var p = Number(bar.close_price)
+    if (!bar.interpolated && Format.isFiniteNumber(t) && Format.isFiniteNumber(p) && p > 0) bars.push({ t: t, p: p, s: bar.session })
+  }
+  return bars
+}
+
+// Whether two answers' prints for a listing are the same, bar by bar.
+function sameBars(a, b) {
+  if (a.length !== b.length) return false
+  for (var i = 0; i < a.length; i++) if (a[i].t !== b[i].t || a[i].p !== b[i].p || a[i].s !== b[i].s) return false
+  return true
 }
 
 // The 24-hour market's day `dateString`: from the overnight open the evening
