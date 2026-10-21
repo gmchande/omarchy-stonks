@@ -173,8 +173,9 @@ ShellRoot {
     //   dark columns), nothing sounds;
     // - ticks: each crossing of the baseline by the drawn line is heard
     //   within 25 ms, and no tick is heard anywhere else: smooth's a burst
-    //   at 1760 Hz, retro's noise above 8 kHz, where its band-limited pulse
-    //   has nothing. Crossings closer than the tick is long are one.
+    //   at 1760 Hz, retro's noise, flat where its pulse is a few lines.
+    //   Crossings closer than a tick and the window that hears it are one:
+    //   35 ms in smooth, 60 ms in retro, read over 11 ms.
     function heardAgainst(index, chart, retro) {
       var bytes = new DataView(harness.readBytes(harness.fakeState + "/pw-play." + harness.starts()[index - 1].n + ".wav"))
       var rate = bytes.getUint32(24, true)
@@ -264,46 +265,67 @@ ShellRoot {
         }
         if (side && last && side !== last && (retro || c - lastAt > 0.08)) {
           every.push(c)
-          if (!crossings.length || c - crossings[crossings.length - 1] > 0.035) crossings.push(c)
+          if (!crossings.length || c - crossings[crossings.length - 1] > (retro ? 0.06 : 0.035)) crossings.push(c)
           lastAt = c
         }
         if (side) last = side
       }
-      // The ticks heard, every 4 ms, where a band's energy jumps: retro's
-      // above 8 kHz, where its band-limited pulse has little, past four
-      // times its median for 12 ms, as its 30 ms of noise does and a note's
-      // 1 ms onset doesn't, and twice and a half what it was 8 ms before;
-      // smooth's at 1760 Hz, past a fifth of the tone's own level there,
-      // which the tone's third harmonic (0.06 of it, at 587 Hz) never
-      // reaches and the tick (0.55) always does, and four times what it was.
-      var win = Math.round(0.004 * rate), energy = [], levels = []
-      var w8 = 2 * Math.PI * 8000 / rate, c8 = Math.cos(w8), a8 = Math.sin(w8) / 1.414, n8 = 1 + a8
-      var x1 = 0, x2 = 0, y1 = 0, y2 = 0, goertzel = 2 * Math.cos(2 * Math.PI * 1760 / rate)
-      for (var st = 0; st + win < samples; st += win) {
-        var en = 0, q1 = 0, q2 = 0
-        for (var m = st; m < st + win; m++) {
-          if (retro) {
-            var y = ((1 + c8) / 2 * s[m] - (1 + c8) * x1 + (1 + c8) / 2 * x2 + 2 * c8 * y1 - (1 - a8) * y2) / n8
-            x2 = x1; x1 = s[m]; y2 = y1; y1 = y
-            en += y * y
-          } else {
+      // The ticks heard, every 4 ms. Smooth's where the band at 1760 Hz
+      // jumps past a fifth of the tone's own level there, which the tone's
+      // third harmonic (0.06 of it, at 587 Hz) never reaches and the tick
+      // (0.55) always does, and four times what it was. Retro's by the
+      // shape of the spectrum between 1 and 6 kHz over 11 ms: its pulse is
+      // a few lines, its noise flat. A tick where that band's flatness
+      // (the mean of its powers' logs against the log of their mean) passes
+      // 0.15 for 12 ms, as 30 ms of noise does and a note's 1 ms onset
+      // doesn't, from under half that 8 ms before, where the note sounds.
+      var win = Math.round(0.004 * rate), energy = [], levels = [], ticks = []
+      if (retro) {
+        var fft = 256, lowBin = Math.ceil(1000 * fft / rate), highBin = Math.floor(6000 * fft / rate)
+        var flatness = function(at) {
+          var logs = 0, sum = 0
+          for (var b = lowBin; b <= highBin; b++) {
+            var re = 0, im = 0
+            for (var k = 0; k < fft; k++) {
+              var v = s[at + k] * (0.5 - 0.5 * Math.cos(2 * Math.PI * k / fft)), phase = 2 * Math.PI * ((b * k) % fft) / fft
+              re += v * Math.cos(phase)
+              im -= v * Math.sin(phase)
+            }
+            var power = re * re + im * im + 1e-12
+            logs += Math.log(power)
+            sum += power
+          }
+          var n = highBin - lowBin + 1
+          return Math.exp(logs / n) / (sum / n)
+        }
+        for (var at = 0; at + fft < samples; at += win) {
+          energy.push(flatness(at))
+          levels.push(rms(at, fft))
+        }
+        var sounding = levels.slice().sort(function(a, b) { return a - b })[Math.floor(levels.length * 0.75)]
+        for (var f = 2; f < energy.length - 2; f++) {
+          var heardAt = (f * win + fft / 2) / rate
+          if (energy[f] > 0.15 && energy[f + 1] > 0.15 && energy[f + 2] > 0.15 && energy[f - 2] < 0.075 && levels[f] > 0.1 * sounding
+            && (!ticks.length || heardAt - ticks[ticks.length - 1] > 0.035)) ticks.push(heardAt)
+        }
+      } else {
+        var goertzel = 2 * Math.cos(2 * Math.PI * 1760 / rate)
+        for (var st = 0; st + win < samples; st += win) {
+          var q1 = 0, q2 = 0
+          for (var m = st; m < st + win; m++) {
             var q0 = goertzel * q1 - q2 + s[m]
             q2 = q1; q1 = q0
           }
+          energy.push(q1 * q1 + q2 * q2 - goertzel * q1 * q2)
+          levels.push(rms(st, win))
         }
-        energy.push(retro ? en : q1 * q1 + q2 * q2 - goertzel * q1 * q2)
-        levels.push(rms(st, win))
-      }
-      var sorted = energy.slice().sort(function(a, b) { return a - b })
-      var median = sorted[Math.floor(sorted.length / 2)]
-      // The tone's amplitude: its louder windows' RMS over a sine-like
-      // wave's 0.72.
-      var tone = levels.slice().sort(function(a, b) { return a - b })[Math.floor(levels.length * 0.75)] / 0.72
-      var floor = retro ? 4 * median : Math.pow(win / 2 * 0.2 * tone, 2)
-      var ticks = []
-      for (var w = 2; w < energy.length - 2; w++) {
-        var held = !retro || (energy[w + 1] > floor && energy[w + 2] > floor)
-        if (energy[w] > floor && held && energy[w] > (retro ? 2.5 : 4) * energy[w - 2] && (!ticks.length || w * win / rate - ticks[ticks.length - 1] > 0.035)) ticks.push(w * win / rate)
+        // The tone's amplitude: its louder windows' RMS over a sine-like
+        // wave's 0.72.
+        var tone = levels.slice().sort(function(a, b) { return a - b })[Math.floor(levels.length * 0.75)] / 0.72
+        var floor = Math.pow(win / 2 * 0.2 * tone, 2)
+        for (var w = 2; w < energy.length - 2; w++) {
+          if (energy[w] > floor && energy[w] > 4 * energy[w - 2] && (!ticks.length || w * win / rate - ticks[ticks.length - 1] > 0.035)) ticks.push(w * win / rate)
+        }
       }
       var near = function(list, t) { return list.some(function(u) { return Math.abs(u - t) < 0.025 }) }
       var unheard = crossings.filter(function(t) { return !near(ticks, t) })

@@ -51,15 +51,17 @@ function biquad(type, f, q) {
   return { b0: b0, b1: (type === "lp" ? 1 - c : -(1 + c)) / a0, b2: b0, a1: -2 * c / a0, a2: (1 - a) / a0 }
 }
 
-// A high-pass then a low-pass, in place, in one pass.
+// A high-pass then a low-pass, in place, in one pass: the high-pass's output
+// is the low-pass's input, so the low-pass reads its last two outputs
+// (`hy1`, `hy2`) before they move on.
 function band(x, low, high) {
   var h = biquad("hp", low, 0.707), l = biquad("lp", high, 0.707)
   var hx1 = 0, hx2 = 0, hy1 = 0, hy2 = 0, ly1 = 0, ly2 = 0
   for (var i = 0; i < x.length; i++) {
     var hy = h.b0 * x[i] + h.b1 * hx1 + h.b2 * hx2 - h.a1 * hy1 - h.a2 * hy2
-    hx2 = hx1; hx1 = x[i]; hy2 = hy1
+    hx2 = hx1; hx1 = x[i]
     var ly = l.b0 * hy + l.b1 * hy1 + l.b2 * hy2 - l.a1 * ly1 - l.a2 * ly2
-    hy1 = hy; ly2 = ly1; ly1 = ly
+    hy2 = hy1; hy1 = hy; ly2 = ly1; ly1 = ly
     x[i] = ly
   }
   return x
