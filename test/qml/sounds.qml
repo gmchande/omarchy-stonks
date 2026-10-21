@@ -307,9 +307,11 @@ ShellRoot {
         }
         var sounding = levels.slice().sort(function(a, b) { return a - b })[Math.floor(levels.length * 0.75)] * fft * fft
         var noisy = function(f) { return energy[f] / sounding > 0.004 }
-        for (var f = 1; f < energy.length - 2; f++) {
+        // Before the file is silence, so a tick from its first sample is
+        // heard too.
+        for (var f = 0; f < energy.length - 2; f++) {
           var heardAt = (f * win + fft / 2) / rate
-          if (noisy(f) && noisy(f + 1) && noisy(f + 2) && !noisy(f - 1)
+          if (noisy(f) && noisy(f + 1) && noisy(f + 2) && (f === 0 || !noisy(f - 1))
             && (!ticks.length || heardAt - ticks[ticks.length - 1] > 0.035)) ticks.push(heardAt)
         }
       } else {
