@@ -13,6 +13,7 @@ Item {
   property var shell: null
   property var service: null
   property var updates: null
+  property var sounds: null
   property var trendColors: null
 
   readonly property alias app: app
@@ -111,6 +112,7 @@ Item {
     id: app
     service: root.service
     updates: root.updates
+    sounds: root.sounds
     trendColors: root.trendColors
     onScreen: root.onScreen
   }

@@ -76,6 +76,9 @@ Item {
   // Whether the hero's change is the day's, which a click cycles.
   property bool changeCycles: true
   readonly property alias chartItem: heroChart
+  // The retro chart's grid as drawn (`PixelChart.grid`), which a replay's
+  // sound steps through in retro, a note a column.
+  readonly property var pixelGrid: pixelChart.grid
 
   signal changeClicked()
   signal orderClicked()
@@ -167,6 +170,7 @@ Item {
       }
 
       PixelChart {
+        id: pixelChart
         visible: root.retro
         anchors.fill: parent
         geometry: root.retro ? root.geometry : null
