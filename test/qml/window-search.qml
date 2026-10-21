@@ -383,9 +383,16 @@ ShellRoot {
         wait(300)
       }
 
+      // The add is the hero at once: its row has joined once its day is in
+      // and it has left arriving, which is when a second ask would come.
+      var joined = function() {
+        return !!service.quotes["SHOP.TO"] && service.arriving.indexOf("SHOP.TO") < 0
+          && body.watchlist.displayedSymbols.indexOf("SHOP.TO") >= 0
+      }
+
       var first = addHeld(true)
       hold("rm", "SHOP.TO.quote.hold")
-      tryVerify(function() { return service.featuredSymbol === "SHOP.TO" }, 8000)
+      tryVerify(joined, 8000)
       wait(300)
       var taken = [first.arriving, body.chartLoading, harness.calls("SHOP.TO.history") - first.from].join(",")
       done()
@@ -436,7 +443,7 @@ ShellRoot {
       beside.surfaceOpen = false
       wait(50)
       hold("rm", "SHOP.TO.quote.hold")
-      tryVerify(function() { return service.featuredSymbol === "SHOP.TO" }, 8000)
+      tryVerify(joined, 8000)
       wait(300)
       var besideAsked = harness.calls("SHOP.TO.history") - besideAdd.from
       beside.destroy()
