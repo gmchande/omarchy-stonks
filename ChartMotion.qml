@@ -103,6 +103,15 @@ Item {
   // Where a replay has reached, 0..1 along the chart.
   property real replayPosition: 0
   readonly property bool replayRunning: replayAnim.running
+  // A replay's length: what plays alongside it keeps to it, and to its
+  // InOutSine.
+  readonly property int replayDuration: 2000
+  // A replay starts, from `from` to `to` along the chart: said before its
+  // first frame, so what plays alongside starts with it.
+  signal replayStarted(real from, real to)
+  // A replay cut short: stopped, or held by a closing surface. One that runs
+  // to its end says nothing.
+  signal replayCut()
   // Where a replay's scrub has reached along the plot, 0..1, or -1 with no
   // replay running: the painters draw it in behind that, in the plot's own
   // terms, retro's whole columns included, apart from the draw-in's sweep.
@@ -213,18 +222,24 @@ Item {
     replayAnim.to = historyActive ? 1 : Chart.fractionAtTime(day, scrubEnd)
     // On its first moment at once, before the animation's first step.
     scrubTo(replayAnim.from)
+    replayStarted(replayAnim.from, replayAnim.to)
     replayAnim.start()
   }
 
   function stopReplay() {
+    if (!replayAnim.running) return
     replayAnim.stop()
+    replayCut()
   }
 
   // A closing surface stops what moves where it is: a replay keeps what it
   // had drawn, a draw-in what it had revealed, and the dim where it was.
   // Only what runs can pause.
   function freeze() {
-    if (replayAnim.running) replayAnim.pause()
+    if (replayAnim.running) {
+      replayAnim.pause()
+      replayCut()
+    }
     drawInAnim.stop()
     slowTimer.stop()
     dimAnim.stop()
@@ -252,7 +267,7 @@ Item {
     id: replayAnim
     target: root
     property: "replayPosition"
-    duration: 2000
+    duration: root.replayDuration
     easing.type: Easing.InOutSine
     onFinished: root.scrubT = 0
   }

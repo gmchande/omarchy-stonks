@@ -25,6 +25,8 @@ Item {
   property var service: null
   // The plugin's version on disk against the one running (`Updates`).
   property var updates: null
+  // The sounds for what you do here (`Sounds`), or null for none.
+  property var sounds: null
   property bool surfaceOpen: false
   // A screen shows the open surface: the window on a workspace no screen
   // shows is open, as it was left, and asks for nothing an open one would.
@@ -193,6 +195,7 @@ Item {
   property var removal: null
   property string changeMode: "pct"
   property bool retro: false
+  property bool soundsOn: true
   // Each symbol waiting on Yahoo, with the second that began: freshness's
   // overdue (`QuoteFeed.owed`).
   property var owed: ({})
@@ -219,6 +222,7 @@ Item {
   Binding on removal { when: root.reading; value: root.service?.lastRemoval; restoreMode: Binding.RestoreNone }
   Binding on changeMode { when: root.reading; value: root.service?.changeMode; restoreMode: Binding.RestoreNone }
   Binding on retro { when: root.reading; value: root.service?.retro; restoreMode: Binding.RestoreNone }
+  Binding on soundsOn { when: root.reading; value: root.service?.soundsOn; restoreMode: Binding.RestoreNone }
   Binding on owed { when: root.reading; value: root.service?.owed; restoreMode: Binding.RestoreNone }
   Binding on settingsUnreadable { when: root.reading; value: root.service?.settingsUnreadable; restoreMode: Binding.RestoreNone }
   Binding on updatedTo { when: root.reading; value: root.updates ? root.updates.newVersion : ""; restoreMode: Binding.RestoreNone }
@@ -355,10 +359,16 @@ Item {
     // A refetch, out or failed, with the range in hand says nothing: it
     // keeps the chart and the market.
     if (historyShown && historyBar) return History.historyScrubText(history, historyBar, featuredQuote ? featuredQuote.priceDigits : undefined)
-    if (featuredQuote) return Market.marketStatus(dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars,
-      Overnight.nightTrades(featuredQuote, !!chart && chart.allDay, now, calendars))
+    if (featuredQuote) return marketText
     return headerWhenMissing
   }
+  // The market as the header says it, and, where it names a holiday, the
+  // same without the name for a header with no room for it
+  // (`Market.shortMarketStatus`); "" while the header says anything else.
+  readonly property var marketSays: featuredQuote ? [dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars,
+    Overnight.nightTrades(featuredQuote, !!chart && chart.allDay, now, calendars)] : null
+  readonly property string marketText: marketSays ? Market.marketStatus.apply(null, marketSays) : ""
+  readonly property string headerShortText: marketSays && headerText === marketText ? Market.shortMarketStatus.apply(null, marketSays) : ""
   // Everything but the rows: margins, header, band, and footer, with the
   // band, the rows, and the footer each one group's gap under what is above.
   readonly property int chromeHeight: chartFitsSurface ? chromeBesideChart + shownChartHeight
@@ -476,9 +486,14 @@ Item {
   }
   onOnScreenChanged: if (service) service.surfaceShown(root, surfaceOpen && onScreen)
   onServiceChanged: if (service && surfaceOpen && onScreen) service.surfaceShown(root, true)
-  Component.onDestruction: if (service) {
-    service.surfaceShown(root, false)
-    service.preview(root, "")
+  // A surface taken down mid-replay, as a rebuilt bar or a removed screen
+  // takes its popup, stops its replay's sound with it.
+  Component.onDestruction: {
+    if (sounds) sounds.stopReplay(root)
+    if (service) {
+      service.surfaceShown(root, false)
+      service.preview(root, "")
+    }
   }
   // The rows in sight while they show, whose charts the service fetches
   // ahead on a range.
@@ -505,6 +520,18 @@ Item {
     if (service) service.persist({ style: style })
   }
   function toggleStyle() { setStyle(retro ? "smooth" : "retro") }
+  // Sounds on or off; turned on, the add sound plays once, so you hear how
+  // loud they are.
+  function toggleSounds() {
+    showingHelp = false
+    if (!service) return
+    var on = !service.soundsOn
+    service.persist({ sounds: on })
+    if (on) sound("add")
+  }
+  function sound(name) {
+    if (sounds) sounds.play(name)
+  }
   function cycleOrder() {
     showingHelp = false
     if (service) service.setOrder(Settings.nextOrder(order))
@@ -569,6 +596,7 @@ Item {
     var at = rows.indexOf(symbol)
     var successor = symbol === watchlist.cursorRow && at >= 0 ? (rows[at + 1] || rows[at - 1] || "") : ""
     service.removeSymbol(symbol, rows)
+    sound("remove")
     if (successor !== "") watchlist.handTo(successor)
     offerUndo(symbol, listName)
   }
@@ -603,6 +631,7 @@ Item {
     var symbol = removal.symbol
     clearNote()
     service.undoRemoval(symbol)
+    sound("undo")
     watchlist.select(symbol)
   }
 
@@ -717,7 +746,10 @@ Item {
     }
     var member = members.indexOf(s) >= 0
     adding = false
-    if (!member) service.addSymbol(s)
+    if (!member) {
+      service.addSymbol(s)
+      sound("add")
+    }
     previewTo("")
     // After the preview has gone, whose hero was a choice, not a landing.
     landing = s
@@ -970,8 +1002,10 @@ Item {
     anchors.top: parent.top
     anchors.margins: root.margins
     statusText: root.headerText
+    shortText: root.headerShortText
     offersRetry: root.offersRetry
     retro: root.retro
+    soundsOn: root.soundsOn
     animal: root.animal
     ground: root.ground
     scrubbing: root.scrubT !== 0
@@ -984,6 +1018,7 @@ Item {
     downColor: root.downColor
     fontFamily: root.fontFamily
     onStyleRequested: function(v) { root.setStyle(v) }
+    onSoundsRequested: root.toggleSounds()
     onHelpRequested: root.toggleHelp()
     onReplayRequested: root.replay()
     onRetryRequested: root.refreshRequested()
@@ -1329,5 +1364,12 @@ Item {
     surfaceOpen: root.surfaceOpen
     retro: root.retro
     calendars: root.calendars
+    // The replay heard starts with the replay, made from the chart as drawn
+    // in the look on screen, and stops when the replay is cut short.
+    onReplayStarted: function(from, to) {
+      if (root.sounds) root.sounds.playReplay(root, { geometry: motion.geometry, grid: heroBand.pixelGrid,
+        from: from, to: to, seconds: motion.replayDuration / 1000 })
+    }
+    onReplayCut: if (root.sounds) root.sounds.stopReplay(root)
   }
 }

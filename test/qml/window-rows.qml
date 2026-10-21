@@ -882,7 +882,7 @@ ShellRoot {
       // popup: never the bar's Tab or a double such as O, and the move keys
       // only on manual, where they act.
       var rows = ["↑ ↓", "⏎", "1–9", "a", "x", "u"]
-      var rest = ["← →", "[ ]", "p", "w", "o", ", .", "s", "c", "r"]
+      var rest = ["← →", "[ ]", "p", "w", "o", ", .", "s", "S", "c", "r"]
       var sortedHelp = helpKeys(keys, body)
       service.persist({ order: "manual" })
       wait(50)

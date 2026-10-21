@@ -292,6 +292,19 @@ function holidayName(name) {
 // included. While scrubbing, where in the day the finger is: at the close's
 // own time, the closing bell, when it reads the close (`Quote.readingAt`).
 function marketStatus(quote, now, scrubT, calendars, overnight) {
+  return statusSaying(quote, now, scrubT, calendars, overnight, holidayName)
+}
+
+// A closure's notice without the holiday's name, worded as a weekend's is
+// ("Closed · opens Tue 09:30"), for a header with no room for the name; ""
+// for any other status, which has no shorter form.
+function shortMarketStatus(quote, now, scrubT, calendars, overnight) {
+  var short = statusSaying(quote, now, scrubT, calendars, overnight, function() { return phaseLabel("closed") })
+  return short !== marketStatus(quote, now, scrubT, calendars, overnight) ? short : ""
+}
+
+// The status, a published closure said as `closureWords(name)` says it.
+function statusSaying(quote, now, scrubT, calendars, overnight, closureWords) {
   if (scrubT) {
     var read = Quote.readingAt(quote, scrubT)
     return "At " + printClock(quote, read.t, calendars) + " · " + phaseLabel(read.close ? "closing" : scrubPhase(quote, scrubT))
@@ -315,7 +328,7 @@ function marketStatus(quote, now, scrubT, calendars, overnight) {
   if (!closure && bell && (phase === "pre" || phase === "overnight")) return phaseLabel(phase) + " · opens in " + Format.duration(bell.seconds)
   if (!closure && bell) return "Market opens in " + Format.duration(bell.seconds)
   var reg = clockSession(quote, now).regular
-  var base = closure ? holidayName(kind.name)
+  var base = closure ? closureWords(kind.name)
     : (phase === "post" && reg && now >= reg.end ? phaseLabel(phase) + " · closed at " + printClock(quote, reg.end, calendars)
       : phaseLabel(phase))
   return base + (phase === "post" ? "" : scheduleNote(quote, now, calendars))

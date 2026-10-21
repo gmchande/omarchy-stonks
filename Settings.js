@@ -150,7 +150,9 @@ function fileSettings(src) {
     list: listIndex(lists, from.list) >= 0 ? lists[listIndex(lists, from.list)].name : "",
     range: History.historyRanges().indexOf(from.range) >= 0 ? from.range : "1D",
     // The popup's first-run hint has shown, and never shows again.
-    hinted: from.hinted === true
+    hinted: from.hinted === true,
+    // The sounds for what you do, on until you turn them off.
+    sounds: from.sounds !== false
   })
 }
 

@@ -138,6 +138,7 @@ Item {
   readonly property string changeMode: dataSettings.changeMode === "abs" || dataSettings.changeMode === "open"
     ? dataSettings.changeMode : "pct"
   readonly property bool retro: dataSettings.style === "retro"
+  readonly property bool soundsOn: dataSettings.sounds
   readonly property int refreshIntervalSec: dataSettings.refreshIntervalSec
   readonly property var quotes: feed.quotes
   readonly property var entries: feed.entries
