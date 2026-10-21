@@ -23,13 +23,18 @@ ShellRoot {
     visible: false
     implicitWidth: 1000
     implicitHeight: 32
-    Stonks.BarWidget {
-      id: pill
-      x: 16
-      width: 150
+    Item {
+      id: sectionRow
+      width: parent.width
       height: 32
-      bar: api
-      settings: ({id: "grvc.stonks", barStyle: "text"})
+      Stonks.BarWidget {
+        id: pill
+        x: 16
+        width: 150
+        height: 32
+        bar: api
+        settings: ({id: "grvc.stonks", barStyle: "text"})
+      }
     }
   }
   HarnessExit { id: done }
@@ -45,6 +50,7 @@ ShellRoot {
       card.anchorWindow = barWindow
       var poses = {}
       ;["left", "center", "right"].forEach(function(section) {
+        sectionRow.x = 0
         pill.width = 150
         pill.x = section === "left" ? 16 : section === "center" ? 425 : 834
         var openedMiddle = pill.x + pill.width / 2
@@ -54,13 +60,15 @@ ShellRoot {
         ;["open", "held", "next"].forEach(function(moment) {
           if (moment === "held") {
             pill.width = 220
-            if (section === "right") pill.x = 1000 - pill.width - 16
+            // A bar section can move when one of its pills widens. The
+            // held card must survive that movement until its next open.
+            sectionRow.x = section === "center" ? -20 : section === "right" ? -70 : 0
           }
           if (moment === "next") { pill.close(); pill.open() }
           wait(20)
           var at = card.cardOrigin
-          poses[section + "-" + moment] = {x: at.x, y: at.y, pillX: pill.x, pillWidth: pill.width}
-          var middle = moment === "next" ? pill.x + pill.width / 2 : openedMiddle
+          poses[section + "-" + moment] = {x: at.x, y: at.y, pillX: sectionRow.x + pill.x, pillWidth: pill.width}
+          var middle = moment === "next" ? sectionRow.x + pill.x + pill.width / 2 : openedMiddle
           harness.check("card contains the pill centre it opened from: " + section + " " + moment, at.x <= middle && middle <= at.x + card.contentWidth)
           if (section === "center") harness.check("the card centres under the pill it opened from: " + moment,
             Math.abs(at.x + card.contentWidth / 2 - middle) < 0.5)
