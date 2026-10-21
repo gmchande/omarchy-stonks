@@ -23,14 +23,22 @@ ShellRoot {
     visible: false
     implicitWidth: 1000
     implicitHeight: 32
-    Item { id: pill; x: 16; width: 150; height: 32 }
+    Stonks.BarWidget {
+      id: pill
+      x: 16
+      width: 150
+      height: 32
+      bar: api
+      settings: ({id: "grvc.stonks", barStyle: "text"})
+    }
   }
-  Stonks.Panel { id: panel; bar: api; anchorItem: pill }
   HarnessExit { id: done }
   TestCase {
     name: "PopupAnchor"
-    when: true
+    when: !!pill.panel
     function test_origins() {
+      var panel = pill.panel
+      wait(20)
       var card = panel.testCard
       var held = panel.testHeldAnchor
       held.barWindow = barWindow
@@ -40,7 +48,7 @@ ShellRoot {
         pill.width = 150
         pill.x = section === "left" ? 16 : section === "center" ? 425 : 834
         var openedMiddle = pill.x + pill.width / 2
-        panel.open()
+        pill.open()
         wait(20)
         var first = card.cardOrigin.x
         ;["open", "held", "next"].forEach(function(moment) {
@@ -48,7 +56,7 @@ ShellRoot {
             pill.width = 220
             if (section === "right") pill.x = 1000 - pill.width - 16
           }
-          if (moment === "next") { panel.close(); panel.open() }
+          if (moment === "next") { pill.close(); pill.open() }
           wait(20)
           var at = card.cardOrigin
           poses[section + "-" + moment] = {x: at.x, y: at.y, pillX: pill.x, pillWidth: pill.width}
@@ -61,7 +69,7 @@ ShellRoot {
             harness.check("the open card stays where it opened", at.x === first)
           }
         })
-        panel.close()
+        pill.close()
       })
       console.log("ANCHOR POSES " + JSON.stringify(poses))
       console.log("ANCHOR DONE")
