@@ -43,7 +43,7 @@ building one that won't merge.
   launcher, and the flow harnesses, which drive the real service and
   surfaces with real keys and pointer. It needs Omarchy installed and a
   Wayland session. A second run on the same machine waits for the first to
-  end. With the saved answers it takes about 2 min 20 s, and its last line
+  end. With the saved answers it takes about 1 min 50 s, and its last line
   must be `ALL PASS`.
 - Most harnesses replay saved Yahoo and Robinhood answers, which are
   private: their terms don't allow republishing them. On a clone without
