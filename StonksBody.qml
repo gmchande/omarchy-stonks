@@ -11,6 +11,7 @@ import "Market.js" as Market
 import "Overnight.js" as Overnight
 import "Quote.js" as Quote
 import "Settings.js" as Settings
+import "Share.js" as Share
 import "Tones.js" as Tones
 // Shared body for the window and the popup: header, hero band, list,
 // search, footer, help, and the chart's motion (ChartMotion). It reads the
@@ -28,6 +29,8 @@ Item {
   property var updates: null
   // The sounds for what you do here (`Sounds`), or null for none.
   property var sounds: null
+  // The screenshot's hand-off (`Camera`), or null for none.
+  property var camera: null
   property bool surfaceOpen: false
   // A screen shows the open surface: the window on a workspace no screen
   // shows is open, as it was left, and asks for nothing an open one would.
@@ -119,6 +122,9 @@ Item {
   // it puts back (`offered`), or that a newer Stonks is out, which a click
   // on it updates (`updateOffered`).
   property string note: ""
+  // A screenshot was taken on this visit: the header's camera stays lit
+  // until the surface closes, and the next open puts it out.
+  property bool cameraLit: false
   // A quiet line above the footer for this visit: the popup's first-run
   // hint (`showFirstRunHint`), how the pill is moved and changed. The next
   // open clears it.
@@ -709,6 +715,52 @@ Item {
     motion.replay()
   }
 
+  // A screenshot of the chart on show, as the camera or y takes it: laid
+  // out for sharing (`ShareCard`) where no screen shows it, as the hero and
+  // the chart show it at that moment, grabbed once its canvases have
+  // painted, and handed to the camera, which saves, copies, and announces
+  // it. The footer says what it shows. One at a time; with no chart on
+  // show, the footer says why nothing was taken.
+  function takeScreenshot() {
+    showingHelp = false
+    if (!camera || camera.busy || String(shareLoader.source) !== "") return
+    if (!featuredQuote || !featuredDay || !featured) {
+      say("No chart to take a screenshot of")
+      return
+    }
+    shareLoader.setSource("ShareCard.qml", {
+      objectName: "shareCard",
+      symbol: chartSymbol || featuredSymbol,
+      quote: featuredQuote,
+      day: featuredDay,
+      history: historyShown ? history : null,
+      latest: motion.latest,
+      view: featured,
+      scrubT: scrubShown,
+      changeMode: changeMode,
+      range: historyShown ? chartRange : "1D",
+      now: now,
+      calendars: calendars,
+      retro: retro,
+      animalKind: animalKind,
+      asleep: animal.asleep,
+      foreground: foreground,
+      ground: ground,
+      upColor: upColor,
+      downColor: downColor,
+      fontFamily: fontFamily
+    })
+  }
+  function shootCard(card) {
+    var shown = Share.subject(card.symbol, card.range, card.words ? card.words.said : "")
+    camera.shoot(card, Share.fileSymbol(card.symbol), Share.toastBody(card.quote, shown), function(code) {
+      shareLoader.source = ""
+      if (code === 1) return say("Screenshot not saved · the screenshots folder can't be written")
+      cameraLit = true
+      say(code === 0 ? "Copied a screenshot of " + shown : "Saved a screenshot of " + shown + " · copying it failed")
+    })
+  }
+
   // Back from a scrub or a replay to now; false when there was none.
   function endScrub() {
     if (!motion.replayRunning && !motion.scrubT) return false
@@ -1002,6 +1054,7 @@ Item {
     header.settle()
     heroBand.settle()
     clearNote()
+    cameraLit = false
     footer.settle()
     hint = ""
     resumeTyped()
@@ -1046,6 +1099,7 @@ Item {
     offersRetry: root.offersRetry
     retro: root.retro
     soundsOn: root.soundsOn
+    cameraLit: root.cameraLit
     animal: root.animal
     ground: root.ground
     scrubbing: root.scrubT !== 0
@@ -1059,6 +1113,7 @@ Item {
     fontFamily: root.fontFamily
     onStyleRequested: function(v) { root.setStyle(v) }
     onSoundsRequested: root.toggleSounds()
+    onScreenshotRequested: root.takeScreenshot()
     onHelpRequested: root.toggleHelp()
     onReplayRequested: root.replay()
     onRetryRequested: root.refreshRequested()
@@ -1325,6 +1380,29 @@ Item {
       else if (root.settingsUnreadable) return
       else if (root.note === "" && root.updatedTo !== "") root.updates.restart()
       else root.startAdding()
+    }
+  }
+
+  // The screenshot, laid out where no screen shows it, for a shot alone:
+  // built as one is asked for, with what the surface shows at that moment,
+  // and gone once it is handed on. Clipped to nothing rather than hidden:
+  // a hidden item's parts read themselves as hidden, and the retro chart's
+  // lit cap fell to its top row. A canvas paints on the frame after it is
+  // asked to, so the grab waits two drawn frames: grabbed at once, the
+  // chart came out empty in the probe of 21 October.
+  Item {
+    width: 0
+    height: 0
+    clip: true
+    Loader {
+      id: shareLoader
+      objectName: "shareLoader"
+    }
+    FrameAnimation {
+      property int frames: 0
+      running: shareLoader.status === Loader.Ready
+      onRunningChanged: frames = 0
+      onTriggered: if (++frames === 2) root.shootCard(shareLoader.item)
     }
   }
 

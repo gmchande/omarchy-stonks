@@ -38,6 +38,7 @@ start "charts fetched ahead harness" bash test/qml/ahead.sh
 start "window rows harness" bash test/qml/window-rows.sh
 start "keys harness" bash test/qml/keys.sh
 start "sounds harness" bash test/qml/sounds.sh
+start "camera harness" bash test/qml/camera.sh
 start "quote queue harness" bash test/qml/run.sh
 start "service harness" bash test/qml/service.sh
 start "update check harness" bash test/qml/updates.sh

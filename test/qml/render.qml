@@ -29,7 +29,20 @@ ShellRoot {
   // the 52-week high, an overnight moment), the same data. The sweep has
   // its own window-sweep-*. min-window-of-<state>: the same in the smallest
   // window.
-  readonly property string requested: Quickshell.env("STONKS_VISUAL_STATE") || "retro"
+  // share-of-<state>: the screenshot the camera takes of popup-<state>, at
+  // its full size, in place of the surface; share-scrub-of-<state>: the
+  // same scrubbed to the day's middle print. lit-<state>: the surface after
+  // a screenshot, its camera lit. <state>-large: at text size 16
+  // (render.sh), the state as named without it.
+  readonly property string asked: Quickshell.env("STONKS_VISUAL_STATE") || "retro"
+  readonly property bool lit: asked.indexOf("lit-") === 0
+  readonly property bool shareScrub: asked.indexOf("share-scrub-of-") === 0
+  readonly property bool shareOf: shareScrub || asked.indexOf("share-of-") === 0
+  readonly property string requested: {
+    var state = asked.replace(/^lit-/, "")
+    if (shareOf) state = "popup-" + state.slice(state.indexOf("-of-") + 4)
+    return state.indexOf("pill-sheet") === 0 ? state : state.replace(/-large$/, "")
+  }
   readonly property bool minWindowOf: requested.indexOf("min-window-of-") === 0
   readonly property bool windowOf: minWindowOf || requested.indexOf("window-of-") === 0
   readonly property string stateName: windowOf ? "popup-" + requested.slice((minWindowOf ? "min-window-of-" : "window-of-").length) : requested
@@ -865,6 +878,27 @@ ShellRoot {
       var day = body.featuredDay.points
       body.motion.scrubT = day[day.length - 1].t
     }
+    if (root.shareScrub) {
+      var shown = body.historyShown ? body.history.bars : body.featuredDay.points
+      body.motion.scrubT = shown[Math.floor(shown.length / 2)].t
+    }
+    body.cameraLit = root.lit
+  }
+
+  // The camera, for share-of-*: the screenshot saved as the render, its
+  // words in the log, nothing handed on.
+  QtObject {
+    id: shareCamera
+    property bool busy: false
+    function shoot(item, symbol, said, done) {
+      console.log("SHARE " + symbol + " | " + said)
+      return item.grabToImage(function(result) {
+        result.saveToFile(root.outPath)
+        done(0)
+        console.log("SHARE footer | " + body.note)
+        exitTimer.start()
+      }, Qt.size(item.width, item.height))
+    }
   }
 
   FloatingWindow {
@@ -1132,10 +1166,17 @@ ShellRoot {
     Timer {
       interval: 300
       running: true
-      onTriggered: frame.grabToImage(function(result) {
-        result.saveToFile(root.outPath)
-        exitTimer.start()
-      })
+      onTriggered: {
+        if (root.shareOf) {
+          body.camera = shareCamera
+          body.takeScreenshot()
+          return
+        }
+        frame.grabToImage(function(result) {
+          result.saveToFile(root.outPath)
+          exitTimer.start()
+        })
+      }
     }
   }
 

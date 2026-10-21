@@ -119,6 +119,18 @@ var REMOVE_SPRITE = [
   "#...#"
 ]
 
+// The header's camera in retro, as its look icon is drawn in cells: a body
+// with its viewfinder's hump and the lens's ring.
+var CAMERA_SPRITE = [
+  "...###.....",
+  "###########",
+  "#....###..#",
+  "#...#...#.#",
+  "#...#...#.#",
+  "#....###..#",
+  "###########"
+]
+
 // Each animal's eyes closing, as the header steps them: the lid half down,
 // then shut (`HeaderStatus`). The bull's two-cell eyes shut to slits
 // lowered a row. The bear's one-cell eyes have no half: the lid covers

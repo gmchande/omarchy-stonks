@@ -160,6 +160,17 @@ sounds by itself: no refresh or price. Click the speaker at the top right,
 or press `Shift+S`, to turn sounds off; Stonks remembers. Your system volume
 sets how loud they are.
 
+## Screenshots
+
+Click the camera at the top right, or press `y`, for a picture of the chart
+you're looking at, laid out to share: the price and its move large, the
+day's bull or bear, the exchange, the currency, the time of the price with
+its zone, the date, and the price the move is measured from. Scrubbed, it
+shows the moment you scrubbed to. Your list is never in it. It lands as
+Omarchy's own screenshots do: a file in your screenshots folder, the
+picture on the clipboard, and Omarchy's notification, which opens your
+screenshot editor when you click it.
+
 ## Keys
 
 `?` opens a sheet of the everyday keys. Every key is in this table:
@@ -174,6 +185,7 @@ sets how loud they are.
 | `h` `l` | Scrub one chart step (popup) |
 | `[` `]` | Change the chart range |
 | `p` | Replay the chart |
+| `y` | Take a screenshot of the chart |
 | `a` or `+` | Search and add a symbol |
 | `x` | Remove the selected row |
 | `u` | Undo the last removal, until a list next changes |
@@ -261,7 +273,8 @@ The shell's log the form asks for can name the prices Stonks left out.
 
 - **Needs:** nothing beyond Omarchy 4. It runs `curl`, PipeWire's
   `pw-play`, `pw-cat`, and `pw-dump`, and `sh`, `bash`, `timeout`, and
-  `head`, which Omarchy ships.
+  `head`, which Omarchy ships, and, for a screenshot, `wl-copy` and
+  `omarchy-notification-send`.
 - **Commands:** `curl` for every request; while sounds are on, `pw-play` to
   play a sound, only when you add, remove, or undo a row, turn sounds on,
   replay a chart, or move along it, or the bell is due, and one `sh` that
@@ -272,10 +285,17 @@ The shell's log the form asks for can name the prices Stonks left out.
   `bash` under `timeout` for 3 seconds and through `head` for 4 MB, to see
   whether an app is recording from a microphone, reading only which streams
   run; an answer that runs out of time, fails, or goes over 4 MB counts as
-  recording, so the bell stays quiet; `omarchy restart shell` only when you
-  click the notice that an update is on disk; and, only when you click the
-  note that a newer Stonks is out, `omarchy plugin update grvc.stonks` in a
-  terminal.
+  recording, so the bell stays quiet; only when you take a screenshot, one
+  `sh` that names the picture's file in your screenshots folder, making the
+  folder if it isn't there; another that hands `wl-copy` the picture on its
+  input, to put it on the clipboard; and `omarchy-notification-send` with
+  Omarchy's own words, as Omarchy's own screenshots do; each under
+  `timeout`, which stops it after 5 seconds; only when you click that
+  notification, Omarchy runs your screenshot editor
+  (`OMARCHY_SCREENSHOT_EDITOR`, else Tensaku) on the file; `omarchy restart
+  shell` only when you click the notice that an update is on disk; and, only
+  when you click the note that a newer Stonks is out, `omarchy plugin update
+  grvc.stonks` in a terminal.
 - **Silence's cost:** while `pw-cat` plays silence, your speakers'
   amplifier stays powered and your headphones stay connected to this
   computer, as when any sound plays, and it takes about a tenth of a
@@ -297,7 +317,12 @@ The shell's log the form asks for can name the prices Stonks left out.
   `~/.config/omarchy/grvc.stonks.json`, the last quotes in
   `~/.cache/grvc.stonks/quotes.json`, and, while sounds are on, a replay's
   sound in `~/.cache/grvc.stonks/replay.wav`, written over at each replay,
-  and the chimes' notes beside it, `chime-*.wav`, written each run.
+  and the chimes' notes beside it, `chime-*.wav`, written each run; and
+  for each screenshot you take, one picture,
+  `stonks-<symbol>-<date>_<time>.png`, in the folder Omarchy's own
+  screenshots use (`OMARCHY_SCREENSHOT_DIR`, else your Pictures folder),
+  and a working copy in `~/.cache/grvc.stonks/screenshot.png`, written
+  over at each one.
   The shell keeps the pill's form on its bar entry in
   `~/.config/omarchy/shell.json`.
 - **Limits:** every request has a time limit and a size cap. Quotes come

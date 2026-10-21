@@ -23,6 +23,7 @@ Panel {
   readonly property var service: plugin ? plugin.service : null
   readonly property var updates: plugin ? plugin.updates : null
   readonly property var sounds: plugin ? plugin.sounds : null
+  readonly property var camera: plugin ? plugin.camera : null
   readonly property var trendColors: plugin ? plugin.trendColors : null
   readonly property string featuredSymbol: service ? service.featuredSymbol : ""
   readonly property string range: service ? service.range : "1D"
@@ -185,6 +186,7 @@ Panel {
         else if (t === "[") body.stepRange(-1)
         else if (t === "]") body.stepRange(1)
         else if (t === "p") body.replay()
+        else if (t === "y") body.takeScreenshot()
         else if (t === "s") body.toggleStyle()
         else if (t === "S") body.toggleSounds()
         else if (t === "o") body.cycleOrder()
@@ -233,6 +235,7 @@ Panel {
           service: root.service
           updates: root.updates
           sounds: root.sounds
+          camera: root.camera
           surfaceOpen: root.opened
           failClosedHeader: true
           chartHeight: Style.space(190)

@@ -17,6 +17,8 @@
 #   drag X1 Y1 X2 Y2               hold the left button through the motion
 #   scroll X Y NOTCHES [--mod M]…  whole wheel notches; positive scrolls down
 #   shot FILE                      screenshot the nested output
+#   paste FILE                     the nested clipboard: its types printed,
+#                                  its PNG, if it holds one, saved to FILE
 #   record start FILE | record stop
 #   shell CMD…                     omarchy-shell inside the session
 #   log                            the nested shell's log
@@ -935,11 +937,13 @@ case ${1:-} in
   drag) [ $# -eq 5 ] || die "usage: drag X1 Y1 X2 Y2"; drive_prelude; pointer "$4" "$5" drag "$2" "$3" "$4" "$5" ;;
   scroll) shift; cmd_scroll "$@" ;;
   shot) [ $# -eq 2 ] || die "usage: shot FILE"; drive_prelude; nested grim "$2" || die "grim failed" ;;
+  paste) [ $# -eq 2 ] || die "usage: paste FILE"; drive_prelude; nested wl-paste --list-types || die "the clipboard is empty"
+    nested wl-paste --no-newline --type image/png > "$2" || rm -f "$2" ;;
   record) shift; cmd_record "$@" ;;
   _record-watch) shift; record_watch "$@" ;;
   shell) shift; (( $# )) || die "usage: shell CMD…"; drive_prelude; nested omarchy-shell "$@" ;;
   log) load_run; cat "$run/shell.log" ;;
   sounds) load_run; cat "$run/sounds.log" 2> /dev/null ;;
   self-check) self_check ;;
-  *) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *) sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

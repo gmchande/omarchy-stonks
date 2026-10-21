@@ -138,6 +138,21 @@ every_state() (
   # The pill at a larger and a smaller text size, as `omarchy display text
   # size 16` and `10` set it: a side bar is then 37 and 23 pixels wide.
   states="$states pill-sheet-large pill-sheet-small"
+  # The screenshot the camera takes, in both looks, of every kind of
+  # listing: a thin stock, an ETF, an index, Bitcoin, London after its
+  # close, Tokyo at lunch, a stock after hours, scrubbed, and a range at
+  # rest and scrubbed. And the header with the camera at text size 16, at
+  # rest and lit after a shot, in the popup and the window.
+  for look in smooth retro; do
+    for state in gaps-1d sweep-2026-10-07-1455-spy sweep-2026-10-07-1455-gspc sweep-2026-10-07-1455-btc-usd \
+      sweep-2026-10-07-1455-shel.l sweep-own-7203.t overnight-2026-10-06-1800-nest history-1y; do
+      states="$states share-of-$state-$look"
+    done
+    states="$states share-scrub-of-sweep-2026-10-07-1455-nest-$look share-scrub-of-history-1y-$look"
+    for surface in popup window; do
+      states="$states $surface-sweep-2026-10-07-1455-spy-$look-large lit-$surface-sweep-2026-10-07-1455-spy-$look-large"
+    done
+  done
   echo $states
 )
 all=$(every_state)

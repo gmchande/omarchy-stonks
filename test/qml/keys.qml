@@ -96,9 +96,11 @@ ShellRoot {
 
   Stonks.Service { id: service }
   Stonks.Updates { id: updates }
+  // The camera hands its shots to the stand-ins on PATH (bin/).
+  Stonks.Camera { id: camera }
   QtObject {
     id: shellApi
-    function serviceFor(id) { return { service: service, updates: updates } }
+    function serviceFor(id) { return { service: service, updates: updates, camera: camera } }
   }
   PluginBarApi {
     id: api
@@ -110,7 +112,7 @@ ShellRoot {
     _switchPanelFrom: function(owner, direction) { harness.tabs++; return true }
   }
   Stonks.Panel { id: panel; bar: api; settings: ({}) }
-  Stonks.App { id: app; service: service; updates: updates }
+  Stonks.App { id: app; service: service; updates: updates; camera: camera }
 
   // Each surface's body is built as it first opens: read it as it is now.
   // Its keys go where the surface puts them: the popup's to the item that
@@ -142,7 +144,7 @@ ShellRoot {
       return JSON.stringify([b.surfaceOpen, b.watchlist.cursorRow, service.featuredSymbol, b.scrubT, b.motion.replayRunning,
         service.range, b.adding, b.listMenuOpen, b.managingLists, b.listsSymbol, service.order, service.reversed,
         service.listName, service.symbols.join(","), service.retro, service.soundsOn, service.changeMode, b.showingHelp,
-        service.testRefreshes, harness.tabs])
+        service.testRefreshes, harness.tabs, b.cameraLit])
     }
 
     // Every key starts from here: the surface open on All, manual order, the
@@ -156,6 +158,8 @@ ShellRoot {
       b.closeListMenu()
       b.closeListViews()
       b.showingHelp = false
+      // As a surface opens: the camera out, so y lights it again.
+      b.cameraLit = false
       b.endScrub()
       if (service.listName !== "") service.switchList("")
       if (service.order !== "manual") service.setOrder("manual")
@@ -196,6 +200,8 @@ ShellRoot {
       return true
     }
 
+    // A key acts once what it changes shows: the camera's shot lands a
+    // moment after the key, once its picture is saved.
     function acts(s, token) {
       base(s)
       if (setups[token]) setups[token](s)
@@ -203,6 +209,7 @@ ShellRoot {
       var before = shown(s)
       if (!press(token)) return false
       wait(100)
+      for (var waited = 0; waited < 2000 && shown(s) === before; waited += 50) wait(50)
       return shown(s) !== before
     }
 

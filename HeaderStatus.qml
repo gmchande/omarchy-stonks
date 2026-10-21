@@ -3,7 +3,8 @@ import qs.Commons
 import qs.Commons as Commons
 import "Cells.js" as Cells
 import "Tones.js" as Tones
-// The animal, live status, the sounds, the look, and the help mark.
+// The animal, live status, the sounds, the camera, the look, and the help
+// mark.
 // Surfaces own the actions; this only draws and signals. The animal is the
 // day's bull or bear in cells (`Cells.spriteFor`), the same in both looks,
 // in one slot the status words start after, drawn or not, so neither the
@@ -41,6 +42,9 @@ Item {
   property bool still: false
   // The key sheet shows, so a click on ? hides it.
   property bool helpShown: false
+  // A screenshot was taken on this visit: the camera stays lit until the
+  // surface closes.
+  property bool cameraLit: false
   property color foreground: Commons.Color.foreground
   property color dim: Tones.dim(foreground, Commons.Color.background)
   property color upColor: Commons.Color.foreground
@@ -65,6 +69,7 @@ Item {
 
   signal styleRequested(string style)
   signal soundsRequested()
+  signal screenshotRequested()
   signal helpRequested()
   signal replayRequested()
   signal retryRequested()
@@ -240,7 +245,7 @@ Item {
   Text {
     id: soundIcon
     objectName: "soundIcon"
-    anchors.right: lookIcon.left
+    anchors.right: camera.left
     anchors.rightMargin: Style.space(14)
     anchors.verticalCenter: parent.verticalCenter
     textFormat: Text.PlainText
@@ -275,6 +280,70 @@ Item {
       hoverEnabled: true
       cursorShape: Qt.PointingHandCursor
       onClicked: root.soundsRequested()
+    }
+  }
+
+  // The camera, which takes a screenshot of the chart on show, as y does:
+  // Omarchy's capture glyph in smooth (nf-fa-camera, as its Capture menu
+  // shows it), a camera in cells in retro, as the look icon is drawn. One
+  // width in both looks, so the look moves nothing. It hovers and presses
+  // as the look icon does, its target the header's full height, and is lit
+  // once it has taken one.
+  Item {
+    id: camera
+    objectName: "camera"
+    readonly property color ink: root.cameraLit || cameraMouse.containsMouse ? root.foreground : root.dim
+    anchors.right: lookIcon.left
+    anchors.rightMargin: Style.space(14)
+    anchors.verticalCenter: parent.verticalCenter
+    width: Math.max(Math.ceil(cameraGlyph.advanceWidth), cameraCells.width)
+    height: Math.max(cameraText.implicitHeight, cameraCells.height)
+
+    TextMetrics { id: cameraGlyph; font: cameraText.font; text: "\uF030" }
+    Text {
+      id: cameraText
+      objectName: "cameraGlyph"
+      visible: !root.retro
+      anchors.centerIn: parent
+      textFormat: Text.PlainText
+      text: cameraGlyph.text
+      color: camera.ink
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.body
+    }
+    PixelSprite {
+      id: cameraCells
+      objectName: "cameraCells"
+      visible: root.retro
+      anchors.centerIn: parent
+      columns: 11
+      rows: 7
+      width: columns * 2
+      height: rows * 2
+      pixels: Cells.spritePixels(Cells.CAMERA_SPRITE)
+      color: camera.ink
+    }
+
+    Rectangle {
+      objectName: "cameraFill"
+      z: -1
+      anchors.centerIn: parent
+      width: parent.width + Style.space(12)
+      height: parent.height + Style.space(6)
+      radius: root.retro ? 0 : Style.cornerRadius
+      color: cameraMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent) : "transparent"
+    }
+
+    MouseArea {
+      id: cameraMouse
+      objectName: "cameraButton"
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.verticalCenter: parent.verticalCenter
+      width: parent.width + Style.space(12)
+      height: root.height
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onClicked: root.screenshotRequested()
     }
   }
 

@@ -14,6 +14,7 @@ Item {
   property var service: null
   property var updates: null
   property var sounds: null
+  property var camera: null
   property var trendColors: null
 
   readonly property alias app: app
@@ -113,6 +114,7 @@ Item {
     service: root.service
     updates: root.updates
     sounds: root.sounds
+    camera: root.camera
     trendColors: root.trendColors
     onScreen: root.onScreen
   }

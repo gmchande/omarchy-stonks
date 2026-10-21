@@ -15,6 +15,8 @@ Item {
   property var updates: null
   // The sounds (`Sounds`), or null for none.
   property var sounds: null
+  // The screenshot's hand-off (`Camera`), or null for none.
+  property var camera: null
   // The theme's up and down (`TrendColors`).
   property var trendColors: null
   property bool closingFromHost: false
@@ -144,6 +146,7 @@ Item {
           else if (t === "[") body.stepRange(-1)
           else if (t === "]") body.stepRange(1)
           else if (t === "p") body.replay()
+          else if (t === "y") body.takeScreenshot()
           else if (t === "s") body.toggleStyle()
           else if (t === "S") body.toggleSounds()
           else if (t === "o") body.cycleOrder()
@@ -175,6 +178,7 @@ Item {
           service: root.ready ? root.service : null
           updates: root.updates
           sounds: root.sounds
+          camera: root.camera
           surfaceOpen: window.visible
           onScreen: root.onScreen
           // Before the service is ready the empty hero's label says Loading.
