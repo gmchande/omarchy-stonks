@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
 # A stand-in for pw-dump, first on PATH inside the harnesses: PipeWire's
 # nodes as STONKS_FAKE_STATE/pw-dump.json holds them, or none, so a harness
-# says whether an app is recording from a microphone.
+# says whether an app is recording from a microphone. With
+# STONKS_FAKE_STATE/pw-dump.stall present it answers nothing and waits, as a
+# stalled PipeWire would, until it is stopped. Each run logs "start" and
+# then "answered" or "stopped" to STONKS_FAKE_STATE/pw-dump.log.
+log="$STONKS_FAKE_STATE/pw-dump.log"
+trap 'echo stopped >> "$log"; exit 0' TERM INT
+echo start >> "$log"
+if [ -e "$STONKS_FAKE_STATE/pw-dump.stall" ]; then
+  while :; do sleep 0.2; done
+fi
 cat "$STONKS_FAKE_STATE/pw-dump.json" 2> /dev/null || echo "[]"
+echo answered >> "$log"

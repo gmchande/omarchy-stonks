@@ -165,9 +165,16 @@ Item {
   }
 
   // The market's bell, unless an app is recording from a microphone, as a
-  // call does: `pw-dump` lists PipeWire's nodes once, as the bell is due.
+  // call does: `pw-dump` lists PipeWire's nodes once, as the bell is due,
+  // for at most 3 s and 4 MB (the list runs to about half a megabyte), so
+  // no answer can hold the bell or fill the shell. An answer cut short, or
+  // later than that, counts as recording: the bell stays quiet. One still
+  // out ends within 4 s, before the next bell.
+  property real askedAt: 0
   function ring() {
-    if (turnedOn && !listening.running) listening.running = true
+    if (!turnedOn || listening.running) return
+    askedAt = Date.now()
+    listening.running = true
   }
 
   // Whether PipeWire's nodes (`pw-dump`'s answer) hold a microphone being
@@ -186,9 +193,9 @@ Item {
 
   Process {
     id: listening
-    command: ["pw-dump"]
+    command: ["sh", "-c", "timeout -k 1 3 pw-dump | head -c 4000000"]
     stdout: StdioCollector {
-      onStreamFinished: if (root.turnedOn && !root.recording(text)) root.play("bell")
+      onStreamFinished: if (root.turnedOn && Date.now() - root.askedAt <= 3000 && !root.recording(text)) root.play("bell")
     }
   }
 
@@ -196,14 +203,15 @@ Item {
   // chime's name a line, and starting a pw-play for each in the background,
   // so the chimes overlap and the shell's own thread starts no process per
   // chime. It plays nothing but a chime's file: any other line it skips.
-  // When Stonks goes its input closes and it ends; a chime ringing then
-  // rings out, half a second at most.
+  // Each pw-play has 2 s, four times a chime's length, so a PipeWire that
+  // stalls can't pile them up. When Stonks goes its input closes and it
+  // ends; a chime ringing then rings out, half a second at most.
   Process {
     id: chimer
     running: root.turnedOn
     stdinEnabled: true
     command: ["sh", "-c", "while read -r name; do case $name in smooth-[0-9]|smooth-10|retro-[0-9]|retro-10) "
-      + "pw-play --media-role Notification --latency 20ms \"$1/chime-$name.wav\" & ;; esac; done", "sh", root.folder]
+      + "timeout -k 1 2 pw-play --media-role Notification --latency 20ms \"$1/chime-$name.wav\" & ;; esac; done", "sh", root.folder]
   }
 
   FileView {

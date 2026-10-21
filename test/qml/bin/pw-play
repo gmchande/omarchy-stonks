@@ -20,10 +20,13 @@ trap '[ -n "$sleeper" ] && kill "$sleeper" 2> /dev/null; echo "stopped $(ms) $n"
 file="${!#}"
 cp "$file" "$STONKS_FAKE_STATE/pw-play.$n.wav" 2> /dev/null
 # The length a real player takes: the 16-bit mono data after the 44-byte
-# header, at the rate the header names.
+# header, at the rate the header names; or, with STONKS_FAKE_STATE/pw-play.stall
+# present, 30 s, as a player a stalled PipeWire holds.
 size=$(stat -c %s "$file" 2> /dev/null || echo 44)
 rate=$(od -An -t u4 -j 24 -N 4 "$file" 2> /dev/null | tr -d ' ')
-sleep "$(awk -v s="$size" -v r="${rate:-48000}" 'BEGIN { printf "%.3f", (s - 44) / 2 / (r > 0 ? r : 48000) }')" &
+length=$(awk -v s="$size" -v r="${rate:-48000}" 'BEGIN { printf "%.3f", (s - 44) / 2 / (r > 0 ? r : 48000) }')
+[ -e "$STONKS_FAKE_STATE/pw-play.stall" ] && length=30
+sleep "$length" &
 sleeper=$!
 wait "$sleeper"
 echo "ended $(ms) $n" >> "$log"

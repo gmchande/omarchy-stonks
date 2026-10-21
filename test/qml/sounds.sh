@@ -18,6 +18,7 @@ patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  
 scratch_home v1-data.json grvc.stonks.json
 : > "$STONKS_FAKE_STATE/pw-play.log"
 : > "$STONKS_FAKE_STATE/pw-cat.log"
+: > "$STONKS_FAKE_STATE/pw-dump.log"
 export QT_QPA_PLATFORM=offscreen
 run_qs 120
 finish "SOUNDS DONE"

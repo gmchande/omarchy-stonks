@@ -558,6 +558,27 @@ ShellRoot {
       harness.check("a bar waiting out the gap as the pointer moves into lunch is dropped, and only the bar before it sounds",
         heardThen.join(",") === "smooth-" + barOfPrint(lunchPts[otherPrint]),
         heardThen.join(",") + " for smooth-" + barOfPrint(lunchPts[otherPrint]))
+      // A chime's pw-play that a stalled PipeWire holds is stopped within
+      // its 2 s, so none pile up (the stand-in holds while pw-play.stall is
+      // there).
+      harness.writeText(harness.fakeState + "/pw-play.stall", "held")
+      wait(300)
+      var heldFrom = harness.chimes().length
+      hero.scrubRequested(lunchPts[otherPrint].x)
+      tryVerify(function() { return harness.chimes().length > heldFrom }, 2000)
+      var held = harness.chimes()[heldFrom].n
+      var heldEnd = function() {
+        var ends = harness.record().filter(function(e) { return e.what !== "start" && e.n === held })
+        return ends.length ? ends[0].what : ""
+      }
+      var stillHeld = heldEnd()
+      tryVerify(function() { return heldEnd() !== "" }, 6000)
+      fileProc.command = ["rm", "-f", harness.fakeState + "/pw-play.stall"]
+      fileProc.running = true
+      tryVerify(function() { return !fileProc.running }, 2000)
+      body.endScrub()
+      harness.check("a chime's player held by a stalled PipeWire is stopped within its time limit",
+        stillHeld === "" && heldEnd() === "stopped", stillHeld + "|" + heldEnd())
       service.removeSymbol("7203.T")
       service.feature("MSFT")
       quiet()
@@ -870,8 +891,9 @@ ShellRoot {
       // Stonks started a moment before it included; never late, after a
       // long step of the clock; never twice, with the clock set back across
       // it; never while an app records from a microphone (the stand-in
-      // pw-dump's nodes); never with sounds off. Each pass is a Stonks
-      // started at its first moment.
+      // pw-dump's nodes), or when the answer runs past its 4 MB or its 3 s,
+      // and a stalled answer stopped holds no later bell; never with sounds
+      // off. Each pass is a Stonks started at its first moment.
       app.close()
       service.feature("AAPL")
       tryVerify(function() { return !!service.quotes.AAPL && service.featuredSymbol === "AAPL" }, 5000)
@@ -904,11 +926,24 @@ ShellRoot {
       rang.push(pass([reg.end - 30, reg.end + 30], 0))
       harness.writeText(harness.fakeState + "/pw-dump.json", meterOn)
       rang.push(pass([reg.end - 30, reg.end + 30], 1))
+      // Valid nodes and no microphone, but 4.1 MB of them: cut at 4 MB.
+      harness.writeText(harness.fakeState + "/pw-dump.json", JSON.stringify([{ type: "PipeWire:Interface:Core", padding: new Array(4100001).join("x") }]))
+      rang.push(pass([reg.end - 30, reg.end + 30], 0))
+      harness.writeText(harness.fakeState + "/pw-dump.json", "[]")
+      var dumpLog = function() { return harness.readFile(harness.fakeState + "/pw-dump.log").split("\n").filter(function(l) { return l !== "" }) }
+      harness.writeText(harness.fakeState + "/pw-dump.stall", "held")
+      rang.push(pass([reg.end - 30, reg.end + 30], 0))
+      tryVerify(function() { var l = dumpLog(); return l[l.length - 1] === "stopped" }, 6000)
+      fileProc.command = ["rm", "-f", harness.fakeState + "/pw-dump.stall"]
+      fileProc.running = true
+      tryVerify(function() { return !fileProc.running }, 2000)
+      var stallStopped = dumpLog()[dumpLog().length - 1] === "stopped"
+      rang.push(pass([reg.start - 30, reg.start + 30], 1))
       service.persist({ sounds: false })
       rang.push(pass([reg.start - 30, reg.start + 30], 0))
       service.now = Math.floor(Date.now() / 1000)
-      harness.check("the bell rings at the open in retro's voice, a moment after Stonks starts too, not late, not twice with the clock set back, not while a microphone records though a level meter may run, and not with sounds off",
-        rang.join(",") === "1,0,1,0,1,0", rang.join(","))
+      harness.check("the bell rings at the open in retro's voice, a moment after Stonks starts too, not late, not twice with the clock set back, not while a microphone records though a level meter may run, not past its answer's 4 MB or 3 s, again after a stalled answer is stopped, and not with sounds off",
+        rang.join(",") === "1,0,1,0,1,0,0,1,0" && stallStopped, rang.join(",") + " | stalled answer stopped " + stallStopped)
 
       console.log("SOUNDS DONE")
       done.exitCode = harness.failures ? 1 : 0
