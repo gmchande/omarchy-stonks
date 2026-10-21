@@ -63,11 +63,13 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
 // out by print (`printFraction`). `ticks` mark the bell, and the night's
 // edges.
 // Prints outside a regular session are flagged `ext`; `brk` starts the line
-// again after a quiet hour across a night, and across a break in the
-// exchange's day (Tokyo's lunch, from its calendar in `calendars`: Yahoo
-// sends 09:00 to 15:30 as one session), so no line crosses hours nobody
-// traded. The vertical range holds every drawn print and the previous close,
-// with headroom, so the baseline is always in view.
+// again across a break in the exchange's day (Tokyo's lunch, from its
+// calendar in `calendars`: Yahoo sends 09:00 to 15:30 as one session), so no
+// line crosses hours the market was shut. A quiet hour of a US night is no
+// break: that day is laid out by print, where a quiet hour takes no room, so
+// a gap there would read as missing prices. The vertical range holds every
+// drawn print and the previous close, with headroom, so the baseline is
+// always in view.
 function chartGeometry(quote, calendars) {
   var pts = quote.points
   var axis = chartSpan(quote)
@@ -91,8 +93,7 @@ function chartGeometry(quote, calendars) {
       x: printFraction(quote, axis, k),
       y: 1 - (pts[k].p - lo) / (hi - lo),
       ext: session !== "reg",
-      brk: !!prev && ((pts[k].t - prev.t > 60 * 60
-        && (session === "overnight" || Quote.pointSession(quote, prev) === "overnight")) || acrossBreak(prev.t, pts[k].t))
+      brk: !!prev && acrossBreak(prev.t, pts[k].t)
     })
   }
   var ticks = []

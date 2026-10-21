@@ -241,7 +241,7 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         // The pointer reads the chart where it is drawn, so its right edge
-        // reaches the last print, alone after a quiet hour too.
+        // reaches the last print, alone as a dot too.
         onPositionChanged: function(mouse) {
           if (!root.replayRunning) root.scrubRequested(root.retro ? mouse.x / width : dayChart.fractionAt(mouse.x))
         }

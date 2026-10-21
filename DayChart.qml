@@ -7,7 +7,8 @@ import "Tones.js" as Tones
 // it and the baseline in the up colour above and the down colour below, the
 // way the retro columns fall. The day adds its own furniture: the dimmer
 // extended hours, the ticks at the bell and the night's edges, a line that
-// starts again after a quiet night, and the dot on the last regular print.
+// starts again after a break in the exchange's day, and the dot on the last
+// regular print.
 // Three layers, so each paints only when what it draws changes: the
 // baseline, the data's ink under a clip the draw-in widens, and the scrub.
 Item {
@@ -175,7 +176,7 @@ Item {
       }
 
       // The stretches the line joins: a point that `keep` refuses, or one
-      // that starts again after a quiet night (`brk`), ends a stretch.
+      // that starts again after a break (`brk`, Tokyo's lunch), ends a stretch.
       function runs(pts, keep) {
         var out = []
         var run = []
@@ -203,9 +204,10 @@ Item {
         return g
       }
 
-      // A stretch of one print, alone after a quiet hour, is a dot three
-      // times the line's width, in its session's tone, so it reads at a
-      // glance. It never breathes: that is the live dot's alone.
+      // A stretch of one print, a day's only one or one alone beside a
+      // break, is a dot three times the line's width, in its session's tone,
+      // so it reads at a glance. It never breathes: that is the live dot's
+      // alone.
       function strokeRuns(ctx, lines, pad, w, h) {
         for (var r = 0; r < lines.length; r++) {
           var line = lines[r]

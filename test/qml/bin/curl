@@ -62,7 +62,7 @@
 # or several, the first with the file answering, its saved Robinhood answer
 # for that span answers, results in the order asked, LONG<n> with NEST's
 # prints under its own name, its saved days answer for their symbols, and
-# its saved 1M histories (<symbol>-1m.json) for theirs;
+# its saved 1M and 3M histories (<symbol>-1m.json, <symbol>-3m.json) for theirs;
 # otherwise Robinhood answers every symbol empty, as it does one it does not
 # trade. While STONKS_FAKE_STATE/OVERNIGHT.down exists, Robinhood fails,
 # counted all the same.
@@ -269,6 +269,7 @@ serve() {
   set_name="$(cat "$STONKS_FAKE_STATE/overnight.set" 2>/dev/null)"
   saved_day="$(in_moment "$(tr 'A-Z' 'a-z' <<< "${symbol#%5E}").json")"
   saved_month="$(in_moment "$(tr 'A-Z' 'a-z' <<< "${symbol#%5E}")-1m.json")"
+  saved_quarter="$(in_moment "$(tr 'A-Z' 'a-z' <<< "${symbol#%5E}")-3m.json")"
   if [ -n "$set_name" ] && [ -e "$saved_day" ] && [[ "$url" != *"includeAdjustedClose=true"* ]]; then
     cat "$saved_day"
     exit
@@ -276,6 +277,11 @@ serve() {
   if [ -n "$set_name" ] && [ -e "$saved_month" ] && [[ "$url" == *"range=1mo&"*"includeAdjustedClose=true"* ]]; then
     count "$STONKS_FAKE_STATE/$symbol.history.calls" > /dev/null
     cat "$saved_month"
+    exit
+  fi
+  if [ -n "$set_name" ] && [ -e "$saved_quarter" ] && [[ "$url" == *"range=3mo&"*"includeAdjustedClose=true"* ]]; then
+    count "$STONKS_FAKE_STATE/$symbol.history.calls" > /dev/null
+    cat "$saved_quarter"
     exit
   fi
   stamp() { sed "s/\"symbol\":\"[^\"]*\"/\"symbol\":\"$symbol\"/"; }

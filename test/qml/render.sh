@@ -52,6 +52,13 @@ if [ $# -eq 0 ]; then
   for symbol in shib-usd ry.to brk-a brk-b; do
     states="$states popup-sweep-2026-10-08-1054-$symbol-smooth popup-sweep-2026-10-08-1054-$symbol-retro"
   done
+  # A thin stock's day, fewer prints than the chart's columns, and its 3M,
+  # in both looks on both surfaces: retro lights every column the line joins.
+  for look in smooth retro; do
+    for range in 1d 3m; do
+      states="$states popup-gaps-$range-$look window-gaps-$range-$look"
+    done
+  done
   # The header's animal: a cold start in smooth too, and the window on an up,
   # a down, and a flat day, and a cryptocurrency, in both looks; asleep at
   # 01:00 for KILN, whose night doesn't trade, and on Saturday for an index
