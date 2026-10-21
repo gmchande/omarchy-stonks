@@ -179,14 +179,16 @@ ShellRoot {
     // Smooth's replay, read against the chart it was made from: the scrub's
     // bars, struck as the replay passes them.
     // - strikes: where a bar's fundamental rises (its amplitude over 40 ms,
-    //   every 4 ms, up a twelfth of the loudest's against 40 ms before),
-    //   the bar that rose most; strikes 35 ms apart or less are one;
+    //   every 4 ms, up a twelfth of the loudest's against 40 ms before, and
+    //   before the file silence), each bar's own, so bars struck together
+    //   are each heard;
     // - pitch: nine strikes in ten are a bar the line had in the 80 ms
     //   before or the 20 ms after, as the strikes' 45 ms spacing and the
-    //   window allow; and every bar the line holds 100 ms or more is struck
-    //   from 150 ms before it, as it may still ring, to 70 ms after;
-    // - silence: no strike where the line had nothing in those 100 ms,
-    //   across a break, though a bar struck before it rings on into it.
+    //   window allow; and nine of ten moves onto a bar the line then holds
+    //   45 ms or more are heard as that bar's strike, so no stretch of the
+    //   line goes unheard;
+    // - silence: no strike starts across a break, though a bar struck before
+    //   it rings on into it.
     function smoothStrikes(index, chart) {
       var sound = replaySound(index, chart), s = sound.s, rate = sound.rate
       var pts = chart.geometry.points
@@ -218,26 +220,34 @@ ShellRoot {
           if (a > top) top = a
         }
       }
-      var strikes = []
-      for (var w = 10; w < amp[0].length; w++) {
-        var best = -1, rise = 0
+      // Each bar's rises, so bars struck together are each heard; a rise
+      // under half the window's greatest is another bar's partial or
+      // neighbour heard through it, and a rise goes on for the window's
+      // 40 ms after its strike, so one bar's rises within 40 ms of its
+      // strike are that strike.
+      var strikes = [], lastOf = []
+      for (var w = 0; w < amp[0].length; w++) {
+        var rises = [], most = 0
         for (var c = 0; c < penta.length; c++) {
-          var r = (amp[c][w] - amp[c][w - 10]) / top
-          if (r > 0.08 && r > rise) { rise = r; best = c }
+          rises.push((amp[c][w] - (w >= 10 ? amp[c][w - 10] : 0)) / top)
+          if (rises[c] > most) most = rises[c]
         }
-        if (best < 0) continue
-        var t = (w * hop + span / 2) / rate, prev = strikes[strikes.length - 1]
-        if (prev && t - prev.t <= 0.035) {
-          if (rise > prev.rise) { prev.bar = best; prev.rise = rise }
-          continue
+        var t = (w * hop + span / 2) / rate
+        for (c = 0; c < penta.length; c++) {
+          if (rises[c] <= 0.08 || rises[c] < most / 2) continue
+          if (lastOf[c] !== undefined && t - lastOf[c] <= 0.04) continue
+          lastOf[c] = t
+          strikes.push({ t: t, bar: c })
         }
-        strikes.push({ t: t, bar: best, rise: rise })
       }
+      strikes.sort(function(a, b) { return a.t - b.t })
       var wrong = [], inBreak = []
       strikes.forEach(function(st) {
-        var around = []
+        var around = [], at = []
         for (var u = st.t - 0.08; u <= st.t + 0.02; u += 0.002) around.push(barAt(u))
-        if (around.every(function(b) { return b === -1 })) inBreak.push(st.t.toFixed(3))
+        // Where it starts, give or take the window's half.
+        for (var o = st.t - 0.025; o <= st.t + 0.02; o += 0.002) at.push(barAt(o))
+        if (at.every(function(b) { return b === -1 })) inBreak.push(st.t.toFixed(3))
         else if (around.indexOf(st.bar) < 0) wrong.push(st.t.toFixed(3) + "s bar " + st.bar)
       })
       var runs = [], run = null
@@ -246,13 +256,17 @@ ShellRoot {
         if (!run || run.bar !== held) { run = { bar: held, from: v, to: v }; runs.push(run) }
         else run.to = v
       }
-      var unheard = runs.filter(function(r) {
-        return r.bar >= 0 && r.to - r.from >= 0.1
-          && !strikes.some(function(st) { return st.bar === r.bar && st.t >= r.from - 0.15 && st.t <= r.to + 0.07 })
+      // A move onto a bar the line holds 45 ms or more is that bar's strike,
+      // at once or at the end of the gap, so no later move can take its
+      // place: heard from 20 ms before it to 65 ms after, the window's give.
+      var moves = runs.filter(function(r) { return r.bar >= 0 && r.to - r.from >= 0.045 })
+      var unstruck = moves.filter(function(r) {
+        return !strikes.some(function(st) { return st.bar === r.bar && st.t >= r.from - 0.02 && st.t <= r.from + 0.065 })
       }).map(function(r) { return r.from.toFixed(3) + "s bar " + r.bar })
       return {
-        pitch: { ok: strikes.length >= 5 && wrong.length <= strikes.length * 0.1 && unheard.length === 0,
-          detail: strikes.length + " strikes; wrong " + wrong.slice(0, 5).join(", ") + "; held bars unheard " + unheard.slice(0, 5).join(", ") },
+        pitch: { ok: strikes.length >= 5 && wrong.length <= strikes.length * 0.1 && unstruck.length <= moves.length * 0.1,
+          detail: strikes.length + " strikes; wrong " + wrong.slice(0, 5).join(", ") + "; "
+            + unstruck.length + " of " + moves.length + " held moves unstruck: " + unstruck.slice(0, 5).join(", ") },
         silence: { ok: inBreak.length === 0, breakMs: runs.filter(function(r) { return r.bar === -1 }).reduce(function(sum, r) { return sum + (r.to - r.from) * 1000 }, 0),
           detail: "struck in a break at " + inBreak.join(" ") }
       }
@@ -525,6 +539,25 @@ ShellRoot {
       service.persist({ style: "smooth" })
       harness.check("the scrub over Tokyo's lunch strikes nothing, and the afternoon's line strikes again, smooth and retro",
         lunchChimes[0].ok && lunchChimes[1].ok, lunchChimes[0].detail + " || " + lunchChimes[1].detail)
+      // A bar still waiting out the 45 ms gap as the pointer moves on into
+      // lunch is dropped: nothing starts where the line lifts. Two prints
+      // before lunch on different bars, struck back to back, then lunch.
+      wait(300)
+      var lunchPts = body.motion.geometry.points, lastMorning = -1
+      for (var q = 1; q < lunchPts.length && lastMorning < 0; q++) if (lunchPts[q].brk) lastMorning = q - 1
+      var barOfPrint = function(pt) { return Math.round((1 - Math.max(0, Math.min(1, pt.y))) * 10) }
+      var otherPrint = lastMorning - 1
+      while (otherPrint > 0 && barOfPrint(lunchPts[otherPrint]) === barOfPrint(lunchPts[lastMorning])) otherPrint--
+      var chimedBefore = harness.chimes().length
+      hero.scrubRequested(lunchPts[otherPrint].x)
+      hero.scrubRequested(lunchPts[lastMorning].x)
+      hero.scrubRequested((lunchPts[lastMorning].x + lunchPts[lastMorning + 1].x) / 2)
+      wait(300)
+      var heardThen = harness.chimes().slice(chimedBefore).map(harness.bar)
+      body.endScrub()
+      harness.check("a bar waiting out the gap as the pointer moves into lunch is dropped, and only the bar before it sounds",
+        heardThen.join(",") === "smooth-" + barOfPrint(lunchPts[otherPrint]),
+        heardThen.join(",") + " for smooth-" + barOfPrint(lunchPts[otherPrint]))
       service.removeSymbol("7203.T")
       service.feature("MSFT")
       quiet()

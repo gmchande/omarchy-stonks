@@ -70,9 +70,15 @@ Item {
   }
 
   // A chime: bar `bar` (0..10, `ChartSound.barAt`) struck in the look's
-  // voice; -1, a place with no bar, strikes nothing.
+  // voice; -1, a place with no bar, strikes nothing, and drops a bar
+  // waiting, so nothing starts where the line lifts.
   function chime(bar) {
-    if (!turnedOn || bar < 0) return
+    if (!turnedOn) return
+    if (bar < 0) {
+      chimeWait.stop()
+      waiting = -1
+      return
+    }
     var wait = lastChime + chimeGap - Date.now()
     if (wait <= 0) return strike(bar)
     waiting = bar

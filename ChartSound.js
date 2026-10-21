@@ -107,8 +107,10 @@ function smooth(geometry, from, to, seconds) {
     waiting = -1
   }
   for (var i = 0; i < end; i += STEP) {
-    if (waiting >= 0 && i >= last + gap) strike(waiting, last + gap)
     var bar = bars(placeAt(i / RATE, from, to, seconds))
+    // Where the line lifts, a bar waiting is dropped: nothing starts there.
+    if (bar < 0) waiting = -1
+    if (waiting >= 0 && i >= last + gap) strike(waiting, last + gap)
     if (bar === heard) continue
     heard = bar
     if (bar < 0) continue
