@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "grvc.stonks",
   "name": "Stonks",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "author": "Gaurav Chande",
   "license": "MIT",
   "description": "A stock ticker and watchlist for your bar: a bull on up days, a bear on down, and a day chart you can scrub, smooth or retro. It follows stocks on markets around the world, and US ones through pre-market, after-hours, and overnight trading. Prices come from Yahoo Finance and Robinhood.",
