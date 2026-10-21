@@ -2,13 +2,17 @@
 # Tophat Stonks in a sandboxed nested Hyprland on the laptop screen, while
 # the owner keeps working on the other screen.
 #
-#   start [--fresh] [--zone ZONE] [--slow SECONDS] REF
+#   start [--fresh] [--zone ZONE] [--slow SECONDS] [--take-laptop] REF
 #                                  sandbox the committed REF and start the session;
 #                                  --fresh: as a new user's machine, Stonks not
 #                                  installed, a terminal open with REF's clone at ~/stonks;
 #                                  --zone: the session's clocks in ZONE (Asia/Kolkata);
 #                                  --slow: every curl in the session answers SECONDS
-#                                  late (3), as on a weak hotspot
+#                                  late (3), as on a weak hotspot;
+#                                  --take-laptop: the laptop is the only screen and the
+#                                  owner has said go: show workspace 10 on it and focus a
+#                                  virtual screen; however the run ends, or once the
+#                                  owner is back, both are put back with the pointer
 #   stop                           end it and report the isolation evidence
 #   key KEY...                     keysym names; shift+j, ctrl+a, or J hold a modifier
 #   type TEXT                      type text
@@ -25,9 +29,9 @@
 # Two identities, never mixed. The nested one (socket, instance, runtime
 # folder), saved at start, is the only one input, grim, shell, and the nested
 # shutdown use; a missing or dead session fails the command. The host one is
-# used only for the preflight, the launch, the parent window's rectangle, and
-# the recorder. Never ydotool: it writes to the kernel, which is the owner's
-# seat.
+# used only for the preflight, the launch, the parent window's rectangle, the
+# recorder, and a --take-laptop run's switch, watch, and undo. Never ydotool:
+# it writes to the kernel, which is the owner's seat.
 set -uo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 checkout=$(cd "$here/.." && pwd)
@@ -37,6 +41,8 @@ base=${TOPHAT_BASE:-$HOME/Work/temporary/tophat}
 runtime=${TOPHAT_RUNTIME:-$host_runtime/tophat}
 lock=${TOPHAT_LOCK:-$host_runtime/tophat.lock}
 laptop=eDP-1
+# A --take-laptop run's screen: it holds the focus the owner's would.
+virtual=STONKS-TEST
 # System Python, standard library only: a version manager's shim on PATH
 # reads config from the sandbox home and refuses to run.
 python=${TOPHAT_PYTHON:-/usr/bin/python3}
@@ -290,12 +296,13 @@ build_sandbox() {
 # holds. It switches nothing: the workspace setter releases host buttons and
 # can move focus.
 host_preflight() {
-  local locked mons ws
-  omarchy-hyprland-session-locked; locked=$?
-  (( locked == 1 )) || { echo "tophat: the session is locked, or its state is unknown ($locked)" >&2; return 1; }
+  local mons ws
+  unlocked || return 1
   mons=$(hyprctl -j monitors all) || { echo "tophat: cannot read the host's monitors" >&2; return 1; }
   jq -e --arg m "$laptop" 'any(.[]; .name == $m and (.disabled | not) and .dpmsStatus)' <<< "$mons" > /dev/null \
     || { echo "tophat: the laptop screen ($laptop) is not on" >&2; return 1; }
+  jq -e 'length > 1' <<< "$mons" > /dev/null \
+    || { echo "tophat: the laptop is the only screen: once the owner has said go, start --take-laptop" >&2; return 1; }
   jq -e --arg m "$laptop" 'any(.[]; .focused and .name != $m)' <<< "$mons" > /dev/null \
     || { echo "tophat: the owner's focus is not on the other screen" >&2; return 1; }
   jq -e --arg m "$laptop" 'any(.[]; .name == $m and .specialWorkspace.id == 0)' <<< "$mons" > /dev/null \
@@ -333,6 +340,159 @@ host_facts() {
   echo "power profile: $(powerprofilesctl get 2>/dev/null)"
 }
 
+# unlocked: the session is unlocked, and known to be.
+unlocked() {
+  omarchy-hyprland-session-locked
+  local locked=$?
+  (( locked == 1 )) || { echo "tophat: the session is locked, or its state is unknown ($locked)" >&2; return 1; }
+}
+
+# ---- the laptop alone -------------------------------------------------------
+# With the owner's go, --take-laptop does by hand what a second screen does:
+# workspace 10 on the laptop, the focus elsewhere. The switch and the run are
+# one: it happens right before the launch, and every ending puts it back.
+
+host_dispatch() { [ "$(hyprctl dispatch "$1" 2>&1)" = ok ] || { echo "tophat: the host refused $1" >&2; return 1; }; }
+host_pointer() { hyprctl -j cursorpos | jq -r '"\(.x | round) \(.y | round)"'; }
+pointer_at() { near "$(host_pointer)" "$1"; }
+laptop_ws() { hyprctl -j monitors | jq -r --arg m "$laptop" '.[] | select(.name == $m) | .activeWorkspace.id'; }
+laptop_shows() { [ "$(laptop_ws)" = "$1" ]; }
+screen_on() { hyprctl -j monitors all | jq -e --arg m "$1" 'any(.[]; .name == $m)' > /dev/null; }
+screen_gone() { hyprctl -j monitors all | jq -e --arg m "$1" 'all(.[]; .name != $m)' > /dev/null; }
+focused_on() { hyprctl -j monitors | jq -e --arg m "$1" 'any(.[]; .name == $m and .focused)' > /dev/null; }
+
+# laptop_alone_preflight: prints the laptop's workspace when --take-laptop may
+# switch it: the laptop is the only screen, on, unlocked, and shows a numbered
+# workspace other than 9, which is private and never touched; workspace 10 is
+# empty. It switches nothing.
+laptop_alone_preflight() {
+  local mons ws
+  unlocked || return 1
+  mons=$(hyprctl -j monitors all) || { echo "tophat: cannot read the host's monitors" >&2; return 1; }
+  jq -e --arg m "$laptop" 'length == 1 and .[0].name == $m' <<< "$mons" > /dev/null \
+    || { echo "tophat: --take-laptop is for the laptop alone, and the host has: $(jq -r 'map(.name) | join(", ")' <<< "$mons")" >&2; return 1; }
+  jq -e '.[0] | (.disabled | not) and .dpmsStatus' <<< "$mons" > /dev/null \
+    || { echo "tophat: the laptop screen ($laptop) is not on" >&2; return 1; }
+  jq -e '.[0].specialWorkspace.id == 0' <<< "$mons" > /dev/null \
+    || { echo "tophat: the laptop screen shows a special workspace" >&2; return 1; }
+  ws=$(jq -r '.[0].activeWorkspace.id' <<< "$mons")
+  [[ $ws =~ ^[1-8]$|^[1-9][0-9]+$ ]] \
+    || { echo "tophat: the laptop shows workspace $ws: --take-laptop switches only from a numbered one, never 9" >&2; return 1; }
+  hyprctl -j workspaces | jq -e 'all(.[]; .id != 10 or .windows == 0)' > /dev/null \
+    || { echo "tophat: workspace 10 is not empty" >&2; return 1; }
+  echo "$ws"
+}
+
+# take_laptop WS: note the laptop's workspace WS and the pointer, show
+# workspace 10 on the laptop, add the virtual screen and focus it, then save
+# the scene the watcher compares. restore_screens undoes any part of it.
+take_laptop() {
+  local pointer
+  pointer=$(host_pointer) && [ -n "$pointer" ] || { echo "tophat: cannot read the host's pointer" >&2; return 1; }
+  printf 'LAPTOP_WS=%q\nPOINTER=%q\n' "$1" "$pointer" > "$run/screens"
+  echo "noted: the laptop shows workspace $1, the pointer is at $pointer"
+  { laptop_shows 10 || host_dispatch 'hl.dsp.focus({ workspace = "10" })'; } && within 5 laptop_shows 10 \
+    || { echo "tophat: the laptop does not show workspace 10" >&2; return 1; }
+  hyprctl output create headless "$virtual" > /dev/null 2>&1
+  within 5 screen_on "$virtual" || { echo "tophat: the virtual screen $virtual did not appear" >&2; return 1; }
+  host_dispatch "hl.dsp.focus({ monitor = \"$virtual\" })" && within 5 focused_on "$virtual" \
+    || { echo "tophat: the focus did not move to $virtual" >&2; return 1; }
+  scene > "$run/scene" || { echo "tophat: cannot read the host's screens" >&2; return 1; }
+  echo "switched: the laptop shows workspace 10, the focus is on $virtual"
+}
+
+# restore_screens: undo whatever part of take_laptop happened, in the order
+# that keeps the owner's workspace off the virtual screen, and check it.
+restore_screens() {
+  [ -f "$run/screens" ] || return 0
+  local LAPTOP_WS POINTER ok=0
+  source "$run/screens"
+  if screen_on "$virtual"; then
+    hyprctl output remove "$virtual" > /dev/null 2>&1
+    within 5 screen_gone "$virtual" || { echo "FAILED the virtual screen $virtual is still there" >&2; ok=1; }
+  fi
+  if ! laptop_shows "$LAPTOP_WS"; then
+    host_dispatch "hl.dsp.focus({ workspace = \"$LAPTOP_WS\" })"
+    within 5 laptop_shows "$LAPTOP_WS" || { echo "FAILED the laptop shows workspace $(laptop_ws), not the owner's $LAPTOP_WS" >&2; ok=1; }
+  fi
+  # Last: the workspace change warps the pointer.
+  if ! pointer_at "$POINTER"; then
+    host_dispatch "hl.dsp.cursor.move({ x = ${POINTER% *}, y = ${POINTER#* } })"
+    within 5 pointer_at "$POINTER" || { echo "FAILED the pointer is at $(host_pointer), not $POINTER where it was" >&2; ok=1; }
+  fi
+  (( ok )) && return 1
+  rm -f "$run/screens"
+  echo "put back: the laptop shows workspace $LAPTOP_WS, $virtual is gone, the pointer is at $POINTER"
+}
+
+# scene: what a hand on the machine changes, a fact a line. The pointer moves
+# at a touch; a key that does anything moves the focus, a workspace, or opens
+# a window; the screen set changes on a plug. A key that changes none of these
+# lands nowhere: the virtual screen's workspace holds no window. Workspace 9's
+# windows are never counted.
+scene() {
+  local mons pos wss
+  mons=$(hyprctl -j monitors all) && pos=$(hyprctl -j cursorpos) && wss=$(hyprctl -j workspaces) || return 1
+  jq -r '"pointer \(.x | round) \(.y | round)"' <<< "$pos"
+  jq -r '.[] | "\(.name) shows \(.activeWorkspace.id), special \(.specialWorkspace.id), "
+    + (if .disabled then "disabled" elif .dpmsStatus then "on" else "off" end)
+    + (if .focused then ", focused" else "" end)' <<< "$mons"
+  jq -r --arg v "$virtual" '"windows on \($v): \([.[] | select(.monitor == $v and .id != 9) | .windows] | add // 0)"' <<< "$wss"
+}
+
+# start_watch: the watcher, in its own session; a subshell, so the start's
+# shell is never its parent, and a gone watcher is reaped.
+start_watch() {
+  ( setsid "$here/tophat.sh" _watch "$run" > "$run/watch.log" 2>&1 < /dev/null & )
+  within 5 test -s "$run/watcher"
+}
+
+# stop_watch: the watcher leaves; one ending the run finishes that first.
+stop_watch() {
+  local pid start
+  [ -s "$run/watcher" ] || return 0
+  read -r pid start < "$run/watcher"
+  [ "$(start_of "$pid")" = "$start" ] || return 0
+  kill -TERM "$pid" 2> /dev/null
+  within 60 bash -c "! kill -0 $pid 2>/dev/null" || echo "tophat: the watcher did not stop" >&2
+}
+
+# _watch RUN: from the switch until the run ends, it ends the run, which puts
+# the screens back, once the session locks (a lid close locks it: Omarchy
+# counts only plugged-in screens, so the virtual one doesn't dock the laptop),
+# the scene changes (the owner is back, or the idle screensaver opened), the
+# session's launcher has gone, or a start in progress was killed.
+watch_run() {
+  run=$1
+  source "$run/identity"
+  echo "$$ $(start_of $$)" > "$run/watcher"
+  trap 'exit 0' TERM
+  local why now pid start
+  while sleep 0.5; do
+    [ -f "$run/stop.status" ] && exit 0
+    if ! unlocked 2> /dev/null; then
+      why="the session locked"
+    elif ! now=$(scene); then
+      why="the host's screens could not be read"
+    elif [ "$now" != "$(cat "$run/scene")" ]; then
+      why="the desktop changed: $(diff "$run/scene" - <<< "$now" | sed -n 's/^< /was /p; s/^> /now /p' | paste -sd ';' - | sed 's/;/; /g')"
+    elif [ -s "$run/leader" ] && read -r pid start < "$run/leader" && ! leader_is "$pid" "$start"; then
+      why="the session's launcher has gone"
+    elif [ -s "$run/starter" ] && read -r pid start < "$run/starter" && [ "$(start_of "$pid")" != "$start" ]; then
+      why="the start was killed"
+    else
+      continue
+    fi
+    trap '' TERM
+    end_run "$why" > /dev/null
+    # A start still waiting on the session learns it has ended.
+    if [ -s "$run/starter" ] && read -r pid start < "$run/starter" && [ "$(start_of "$pid")" = "$start" ]; then
+      kill -TERM "$pid" 2> /dev/null
+    fi
+    exit 0
+  done
+}
+
 # ---- the run ----------------------------------------------------------------
 
 # load_run: the current run's saved identity, or fail.
@@ -358,6 +518,7 @@ session_alive() {
 
 drive_prelude() {
   load_run
+  [ -f "$run/stop.status" ] && die "the run has ended ($(head -n 1 "$run/stop.log")): nothing was sent; stop reports the rest"
   session_alive || die "no live nested session: nothing was sent"
 }
 
@@ -434,16 +595,17 @@ cmd_scroll() {
 # ---- start ------------------------------------------------------------------
 
 cmd_start() {
-  fresh=0 zone="" slow=""
+  fresh=0 zone="" slow="" take=0
   while :; do
     case ${1:-} in
       --fresh) fresh=1; shift ;;
       --zone) zone=${2:-}; zone_ok "$zone" || exit 1; shift 2 ;;
       --slow) slow=${2:-}; slow_ok "$slow" || exit 1; shift 2 ;;
+      --take-laptop) take=1; shift ;;
       *) break ;;
     esac
   done
-  local ref=${1:?usage: start [--fresh] [--zone ZONE] [--slow SECONDS] REF} commit ws id answer tool curl=""
+  local ref=${1:?usage: start [--fresh] [--zone ZONE] [--slow SECONDS] [--take-laptop] REF} commit ws owner_ws id answer tool curl=""
   commit=$(git -C "$checkout" rev-parse --verify --quiet "$ref^{commit}") || die "no such commit: $ref"
   for tool in Hyprland quickshell dbus-run-session python3 wtype grim gpu-screen-recorder setsid flock jq foot; do
     command -v "$tool" > /dev/null || die "$tool is not installed"
@@ -457,7 +619,7 @@ cmd_start() {
   slot_free && socket_paths_fit "$runtime" && bus_ok || exit 1
   # The slot is free, so whatever current names has ended.
   rm -f "$base/current"
-  ws=$(host_preflight) || exit 1
+  if (( take )); then owner_ws=$(laptop_alone_preflight) || exit 1; else ws=$(host_preflight) || exit 1; fi
 
   id=$(date +%Y%m%d-%H%M%S)-${commit:0:7}
   run=$base/$id
@@ -470,6 +632,13 @@ cmd_start() {
   host_facts > "$run/host-before"
   { printf 'RUN_ID=%q\nCHECKOUT=%q\nCOMMIT=%q\nSTART_EPOCH=%q\nRUNTIME=%q\nZONE=%q\nSLOW=%q\n' "$id" "$checkout" "$commit" "$(date +%s)" "$runtime" "$zone" "$slow"; } > "$run/identity"
   trap 'start_failed "interrupted"' INT TERM
+  if (( take )); then
+    # The last moment before the launch: the switch starts the run.
+    echo "$$ $(start_of $$)" > "$run/starter"
+    take_laptop "$owner_ws" || start_failed "the laptop was not switched"
+    start_watch || start_failed "the watcher never started"
+    ws=$(host_preflight) || start_failed "the switched host does not pass the preflight"
+  fi
 
   # One launch-scoped rule: the host places this launch's window on the
   # laptop's shown workspace and never focuses it. It matches the token the
@@ -499,9 +668,11 @@ cmd_start() {
   read -r WIDTH HEIGHT < <(nested hyprctl -j monitors | jq -r '.[0] | "\(.width) \(.height)"')
   printf 'WIDTH=%q\nHEIGHT=%q\n' "$WIDTH" "$HEIGHT" >> "$run/identity"
   note_pids
+  rm -f "$run/starter"
   trap - INT TERM
   echo "commit: $commit"
   echo "nested output: ${WIDTH}x$HEIGHT on $laptop, workspace $ws"
+  if (( take )); then echo "taken: the laptop and the focus, until stop, a lock, or the owner's hand on the machine"; fi
   if (( fresh )); then echo "fresh: Stonks not installed; in the terminal, its clone is ~/stonks"; fi
   if [ -n "$zone" ]; then echo "zone: $zone, $(TZ=$zone date +'%H:%M %Z') there"; fi
   if [ -n "$slow" ]; then echo "slow: every curl in the session answers $slow s late"; fi
@@ -549,12 +720,9 @@ services_off() {
 start_failed() {
   trap - INT TERM
   echo "tophat: $*; stopping" >&2
-  touch "$run/cancel"
-  # A launcher checks for cancel only once it holds the slot. If the slot is
-  # held, ours may be past that check: wait for it to report.
-  flock -n "$lock" true 2> /dev/null || within 15 test -s "$run/launch.status"
-  source "$run/identity"
-  stop_run
+  stop_watch
+  end_run
+  forget_run
   exit 1
 }
 
@@ -589,6 +757,8 @@ stop_run() {
   # A start that failed early recorded its group only in the leader file.
   if [ -z "${LEADER:-}" ] && [ -s "$run/leader" ]; then read -r LEADER LEADER_START < "$run/leader"; fi
   [ -f "$run/recorder" ] && { record_stop || status=1; }
+  # Before the session ends: the owner may be back, and waiting.
+  restore_screens || status=1
   end_session || { echo "FAILED the session's group did not end" >&2; status=1; }
   sleep 0.5
   # Processes that carry the run's mark but left its group: reported, never
@@ -617,14 +787,39 @@ stop_run() {
       status=1
     fi
   fi
-  [ "$(readlink -f "$base/current")" = "$run" ] && rm -f "$base/current"
   echo "artifacts: $run"
   return "$status"
 }
 
+# end_run [WHY]: stop_run once, whoever asks first (stop, a failed start, the
+# watcher, which says WHY); a later caller gets the same findings and status.
+end_run() {
+  local code
+  exec 7>> "$run/stop.lock"
+  flock 7
+  if [ ! -f "$run/stop.status" ]; then
+    touch "$run/cancel"
+    # A launcher checks for cancel only once it holds the slot. If the slot is
+    # held, ours may be past that check: wait for it to report.
+    flock -n "$lock" true 2> /dev/null || within 15 test -s "$run/launch.status"
+    source "$run/identity"
+    { [ -z "${1:-}" ] || echo "ended early: $1"; stop_run; } > "$run/stop.log" 2>&1
+    code=$?
+    [ -n "${1:-}" ] && code=1
+    echo "$code" > "$run/stop.status"
+  fi
+  exec 7>&-
+  cat "$run/stop.log"
+  return "$(cat "$run/stop.status")"
+}
+
+# forget_run: the ended run is no longer the current one.
+forget_run() { if [ "$(readlink -f "$base/current")" = "$run" ]; then rm -f "$base/current"; fi; }
+
 cmd_stop() {
   load_run
-  stop_run && echo "stopped clean" || { echo "stopped, with the findings above" >&2; exit 1; }
+  stop_watch
+  end_run && forget_run && echo "stopped clean" || { forget_run; echo "stopped, with the findings above" >&2; exit 1; }
 }
 
 # ---- capture ----------------------------------------------------------------
@@ -700,14 +895,17 @@ self_check() {
   local failed=0 out
   check_tmp=$(mktemp -d /tmp/tophat-check.XXXXXX) || exit 1
   local tmp=$check_tmp
-  # Whatever a failed step left: the stand-in session's group and its escapee.
+  # Whatever a failed step left: the stand-in session's group, its escapee,
+  # and a watcher.
   trap '[ -f "$check_tmp/base/fake/leader" ] && kill -KILL -- "-$(cut -d" " -f1 "$check_tmp/base/fake/leader")" 2>/dev/null
-    [ -f "$check_tmp/escapee" ] && kill "$(cat "$check_tmp/escapee")" 2>/dev/null; rm -rf "$check_tmp"' EXIT
+    [ -f "$check_tmp/escapee" ] && kill "$(cat "$check_tmp/escapee")" 2>/dev/null
+    for w in "$check_tmp"/base/*/watcher; do [ -f "$w" ] && kill "$(cut -d" " -f1 "$w")" 2>/dev/null; done
+    rm -rf "$check_tmp"' EXIT
   miss() { echo "FAILED $*"; failed=1; }
   export TOPHAT_BASE=$tmp/base TOPHAT_RUNTIME=$tmp/rt TOPHAT_LOCK=$tmp/lock TOPHAT_PYTHON=$tmp/tools/python3
   base=$TOPHAT_BASE runtime=$TOPHAT_RUNTIME lock=$TOPHAT_LOCK
   # The guards run on these; a missing one is named, not buried in a miss.
-  for t in Hyprland dbus-run-session flock setsid pgrep jq; do
+  for t in Hyprland dbus-run-session flock setsid pgrep jq omarchy-hyprland-session-locked; do
     command -v "$t" > /dev/null || { echo "FAILED $t is not installed: the guards cannot run"; return 1; }
   done
   mkdir -p "$tmp/base" "$tmp/tools"
@@ -879,6 +1077,127 @@ self_check() {
     miss "the plain stand-in session never started"
   fi
 
+  # The laptop alone: --take-laptop on a stand-in host compositor whose state
+  # is a file. Its pointer warps on a workspace or screen change, as the
+  # host's does; omarchy-hyprland-session-locked is the real one, reading it.
+  unset LEADER LEADER_START
+  mkdir -p "$tmp/host"
+  cat > "$tmp/host/hyprctl" << 'EOF'
+#!/bin/bash
+s=$FAKE_HOST
+echo "$*" >> "$s.calls"
+[ "$1" = -j ] && shift
+put() { jq "$@" "$s" > "$s.new" && mv "$s.new" "$s"; }
+case $1 in
+  monitors) jq .monitors "$s" ;;
+  cursorpos) jq .cursor "$s" ;;
+  workspaces) jq .workspaces "$s" ;;
+  output)
+    case $2 in
+      create) put --arg n "$4" '.monitors += [{name: $n, x: 21440, y: 0, width: 1920, height: 1080, scale: 2,
+        disabled: false, dpmsStatus: true, focused: false, activeWorkspace: {id: 11}, specialWorkspace: {id: 0},
+        solitaryBlockedBy: []}] | .workspaces += [{id: 11, monitor: $n, windows: 0}]' ;;
+      remove) put --arg n "$3" '.monitors |= map(select(.name != $n)) | .workspaces |= map(select(.monitor != $n))
+        | if any(.monitors[]; .focused) then . else .monitors[0].focused = true | .cursor = {x: 20720, y: 450} end' ;;
+    esac
+    echo ok ;;
+  dispatch)
+    if [[ $2 =~ workspace\ =\ \"([0-9]+)\" ]]; then
+      put --argjson w "${BASH_REMATCH[1]}" '(.monitors | map(.focused) | index(true)) as $i
+        | .monitors[$i].activeWorkspace.id = $w | .cursor = {x: (.monitors[$i].x + 100), y: 100}
+        | if any(.workspaces[]; .id == $w) then . else .workspaces += [{id: $w, monitor: .monitors[$i].name, windows: 0}] end'
+    elif [[ $2 =~ monitor\ =\ \"([A-Za-z0-9-]+)\" ]]; then
+      put --arg m "${BASH_REMATCH[1]}" '.monitors |= map(.focused = (.name == $m))
+        | .cursor = (.monitors[] | select(.name == $m) | {x: (.x + 480), y: 270})'
+    elif [[ $2 =~ x\ =\ ([0-9]+),\ y\ =\ ([0-9]+) ]]; then
+      put --argjson x "${BASH_REMATCH[1]}" --argjson y "${BASH_REMATCH[2]}" '.cursor = {x: $x, y: $y}'
+    else
+      echo "error: $2"; exit 7
+    fi
+    echo ok ;;
+  *) echo "the stand-in host has no '$*'" >&2; exit 1 ;;
+esac
+EOF
+  chmod +x "$tmp/host/hyprctl"
+  # A real hyprctl that slips past the stand-in finds no compositor.
+  export PATH="$tmp/host:$PATH" FAKE_HOST=$tmp/host.json HYPRLAND_INSTANCE_SIGNATURE=tophat-self-check
+  local alone='{"monitors": [{"name": "eDP-1", "x": 20000, "y": 0, "width": 2880, "height": 1800, "scale": 2,
+    "disabled": false, "dpmsStatus": true, "focused": true, "activeWorkspace": {"id": 2}, "specialWorkspace": {"id": 0},
+    "solitaryBlockedBy": []}], "cursor": {"x": 20194, "y": 508},
+    "workspaces": [{"id": 2, "monitor": "eDP-1", "windows": 1}, {"id": 9, "monitor": "eDP-1", "windows": 2}]}'
+  host_is() { jq "${1:-.}" <<< "$alone" > "$FAKE_HOST"; }
+  host_change() { jq "$1" "$FAKE_HOST" > "$FAKE_HOST.new" && mv "$FAKE_HOST.new" "$FAKE_HOST"; }
+  seen() { jq -c '[.monitors[] | {name, ws: .activeWorkspace.id, focused}], .cursor' "$FAKE_HOST" | paste -sd ' '; }
+  host_is; local as_left; as_left=$(seen)
+  host_back() { [ "$(seen)" = "$as_left" ]; }
+  # solo_run NAME: a run folder as start leaves it once it has switched.
+  solo_run() {
+    run=$tmp/base/$1
+    mkdir -p "$run"
+    printf 'RUN_ID=%q\nCHECKOUT=%q\nSTART_EPOCH=%q\nRUNTIME=%q\n' "$1" "$checkout" "$(date +%s)" "$tmp/rt" > "$run/identity"
+    host_is
+    take_laptop 2 > /dev/null 2>&1 || miss "$1: the switch failed"
+  }
+  watcher_gone() { local pid; read -r pid _ < "$run/watcher"; within 5 bash -c "! kill -0 $pid 2>/dev/null"; }
+  polled() { (( $(grep -c cursorpos "$FAKE_HOST.calls") >= $1 )); }
+
+  # Only the laptop alone, unlocked and on, on a numbered workspace but 9,
+  # with workspace 10 empty, and never without the flag.
+  [ "$(laptop_alone_preflight 2> /dev/null)" = 2 ] || miss "--take-laptop should take the laptop alone on workspace 2"
+  host_preflight > /dev/null 2>&1 && miss "the laptop alone should be refused without --take-laptop"
+  for bad in '.monitors += [.monitors[0] | .name = "DP-1" | .focused = false]' '.monitors[0].activeWorkspace.id = 9' \
+    '.workspaces += [{id: 10, monitor: "eDP-1", windows: 1}]' '.monitors[].solitaryBlockedBy = ["LOCK"]' \
+    '.monitors[0].specialWorkspace.id = -98' '.monitors[0].dpmsStatus = false'; do
+    host_is "$bad"
+    laptop_alone_preflight > /dev/null 2>&1 && miss "--take-laptop should refuse a host where $bad"
+  done
+
+  # The switch passes the two-screen guards; the undo puts it all back.
+  solo_run switch
+  jq -e '[.monitors[] | {name, ws: .activeWorkspace.id, focused}]
+    == [{name: "eDP-1", ws: 10, focused: false}, {name: "STONKS-TEST", ws: 11, focused: true}]' "$FAKE_HOST" > /dev/null \
+    || miss "the switch should show workspace 10 on the laptop and focus the virtual screen, got: $(seen)"
+  host_preflight > /dev/null 2>&1 || miss "the switched host should pass the two-screen preflight"
+  restore_screens > /dev/null 2>&1 && host_back || miss "the undo should put the host back, got: $(seen)"
+  # A start that failed partway through the switch undoes the part it did.
+  solo_run partway
+  host_is '.monitors[0].activeWorkspace.id = 10 | .cursor = {x: 20100, y: 100}'
+  ( start_failed "a test failure" ) > /dev/null 2>&1
+  host_back || miss "a start that failed partway through the switch should undo it, got: $(seen)"
+
+  # The watcher ends the run, putting it all back, on whatever ends the
+  # owner's absence or the run.
+  local dead; sleep 0 & dead=$!; wait "$dead"
+  leader_gone() { echo "$dead 1" > "$run/leader"; }
+  start_killed() { echo "$dead 1" > "$run/starter"; }
+  watched() {  # NAME CHANGE…
+    local name=$1; shift
+    solo_run "$name"
+    start_watch || { miss "$name: the watcher never started"; return; }
+    "$@"
+    within 5 test -f "$run/stop.status" || { miss "$name: the watcher did not end the run"; return; }
+    host_back || miss "$name: the host was not put back, got: $(seen)"
+    watcher_gone || miss "$name: the watcher outlived the run"
+  }
+  watched "a touch of the pointer" host_change '.cursor.x += 3'
+  # Stop then reports the walk cut short.
+  ln -sfn "$run" "$base/current"
+  bash "$here/tophat.sh" stop > /dev/null 2>&1 && miss "stop should fail a run the watcher ended early"
+  watched "a workspace key" host_change '.monitors[1].activeWorkspace.id = 3'
+  watched "a window opened" host_change '.workspaces |= map(if .id == 11 then .windows = 1 else . end)'
+  watched "the lid closed, which locks" host_change '.monitors[].solitaryBlockedBy = ["LOCK"]'
+  watched "the session's launcher gone" leader_gone
+  watched "the start killed" start_killed
+  # Nothing changed: the watcher looks and lets the run be, and stop ends it.
+  solo_run stop
+  start_watch || miss "stop: the watcher never started"
+  ln -sfn "$run" "$base/current"
+  within 5 polled $(( $(grep -c cursorpos "$FAKE_HOST.calls") + 3 )) || miss "the watcher should keep looking"
+  [ -f "$run/stop.status" ] && miss "the watcher ended a run nothing had changed: $(head -n 1 "$run/stop.log")"
+  out=$(bash "$here/tophat.sh" stop 2>&1) || miss "stop should end a watched run clean, got: $out"
+  host_back || miss "stop should put the host back, got: $(seen)"
+  watcher_gone || miss "the watcher outlived stop"
+
   (( failed )) && echo "tophat self-check FAILED" || echo "tophat self-check ok"
   return "$failed"
 }
@@ -895,8 +1214,9 @@ case ${1:-} in
   shot) [ $# -eq 2 ] || die "usage: shot FILE"; drive_prelude; nested grim "$2" || die "grim failed" ;;
   record) shift; cmd_record "$@" ;;
   _record-watch) shift; record_watch "$@" ;;
+  _watch) shift; watch_run "$@" ;;
   shell) shift; (( $# )) || die "usage: shell CMD…"; drive_prelude; nested omarchy-shell "$@" ;;
   log) load_run; cat "$run/shell.log" ;;
   self-check) self_check ;;
-  *) sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *) sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
