@@ -125,6 +125,10 @@ ShellRoot {
   // Friday 16 October at 23:09, with Yahoo's own day (no Robinhood answer
   // was saved): JPM's stray pair, PLUG's and AITX's one-tick bounces, CKX's
   // one bar, CVR's none, and LUMN's four-decimal hint.
+  // <popup|window>-gaps-<1d|3m>-<look>: VANE, a thin NYSE stock, on
+  // Wednesday 21 October at 10:06, with Robinhood's prints: 26 since
+  // midnight, its night quiet for over an hour twice, and nine pre-market
+  // prints hours apart; or its 3M, 66 days.
   readonly property var overnight: {
     var match = /^popup-overnight-(day|night|sunday|live|\d{4}-\d\d-\d\d-\d{4})-(nest|silk|reed|ez|toy)(-1m|-1m-scrub|-scrub)?-(smooth|retro)$/.exec(stateName)
     if (match) return { moment: match[1], symbol: match[2].toUpperCase(), month: match[3] === "-1m" || match[3] === "-1m-scrub",
@@ -137,8 +141,11 @@ ShellRoot {
     if (match) return { moment: "2026-10-16-2309", folder: "power-user-2026-10-16", symbol: match[1].toUpperCase(), month: false,
       scrub: false, dated: true, sweep: false, power: true }
     match = /^(?:popup|window)-sweep-(\d{4}-\d\d-\d\d-\d{4})-(nest|kiln|spy|bolt|gspc|btc-usd|shel\.l|7203\.t|shib-usd|ry\.to|brk-a|brk-b)-(smooth|retro)$/.exec(stateName)
-    return match ? { moment: match[1], symbol: match[2] === "gspc" ? "^GSPC" : match[2].toUpperCase(), month: false, scrub: false,
-      dated: true, sweep: true } : null
+    if (match) return { moment: match[1], symbol: match[2] === "gspc" ? "^GSPC" : match[2].toUpperCase(), month: false, scrub: false,
+      dated: true, sweep: true }
+    match = /^(?:popup|window)-gaps-(1d|3m)-(smooth|retro)$/.exec(stateName)
+    return match ? { moment: "2026-10-21-1006", folder: "gaps-2026-10-21-1006", symbol: "VANE", listed: ["VANE"], month: false,
+      quarter: match[1] === "3m", scrub: false, dated: true, sweep: false } : null
   }
   // popup-fill-<day>-<look>[-<theme>]: the 1D wash on an up day (SPY 11
   // Sep), a down day (AAPL 4 Sep), and a day across its baseline (NEST 11
@@ -429,7 +436,8 @@ ShellRoot {
       // shows.
       var file = function(s) { return s.toLowerCase().replace(/^\^/, "") }
       var looked = root.overnight.sweep && saved(file("SHIB-USD")) !== ""
-      var listed = looked ? ["NEST", "KILN", "SPY", "BOLT", "^GSPC", "BTC-USD", "SHIB-USD", "SHEL.L", "7203.T", "RY.TO", "BRK-A", "BRK-B"]
+      var listed = root.overnight.listed ? root.overnight.listed
+        : looked ? ["NEST", "KILN", "SPY", "BOLT", "^GSPC", "BTC-USD", "SHIB-USD", "SHEL.L", "7203.T", "RY.TO", "BRK-A", "BRK-B"]
         : root.overnight.sweep ? ["NEST", "KILN", "SPY", "BOLT", "^GSPC", "BTC-USD", "SHEL.L", "7203.T"]
         : live ? ["NEST", "EZ", "TOY"] : root.overnight.power ? ["JPM", "PLUG", "AITX", "CKX", "CVR", "LUMN"]
         : root.overnight.dated ? ["NEST"] : ["NEST", "SILK", "REED"]
@@ -465,9 +473,10 @@ ShellRoot {
         root.now = root.overnight.own.at
       }
       listed.forEach(function(s) { entries[s] = { status: "ok", receivedAt: root.now } })
-      if (root.overnight.month) {
-        root.shownRange = "1M"
-        root.shownHistoryEntry = { status: "ok", history: History.parseHistory(read(root.overnight.symbol.toLowerCase() + "-1m"), "1M"), receivedAt: root.now }
+      if (root.overnight.month || root.overnight.quarter) {
+        var range = root.overnight.month ? "1M" : "3M"
+        root.shownRange = range
+        root.shownHistoryEntry = { status: "ok", history: History.parseHistory(read(root.overnight.symbol.toLowerCase() + "-" + range.toLowerCase()), range), receivedAt: root.now }
       }
       stub.symbols = listed
       stub.shown = listed.slice()
