@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 # Renders StonksBody offscreen from fixtures. Quickshell only loads QML from
 # inside its config folder, so a temporary one is assembled from copies.
-# Usage: test/qml/render.sh [state ...]
+# Usage: test/qml/render.sh [state or pattern ...]
+#        test/qml/render.sh --part I/N
+# With no state named, every state below. A name with *, ?, or [ is a
+# pattern over them ('popup-lists-*'); any other name is rendered as given,
+# such as a saved moment the list leaves out. --part I/N renders every Nth
+# state from the Ith, so N runs side by side render every state once
+# (test/review.sh).
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 out="${STONKS_VISUAL_DIR:-$plugin/out/render}"
 mkdir -p "$out"
@@ -13,10 +19,11 @@ patch_copy plugin/BarWidget.qml '/id: panelLoader/,/source:/s/active: true/activ
 export QT_QPA_PLATFORM=offscreen
 export STONKS_VISUAL_CALENDARS="$plugin/calendars.json"
 
-states=${*:-window-help-smooth window-help-retro popup-help-smooth popup-help-retro popup-help-sorted-smooth popup-help-sorted-retro popup-holiday-retro popup-price4-solo-smooth popup-price4-solo-retro popup-price5-stack-smooth popup-price5-stack-retro popup-nest-1d-smooth popup-nest-1d-retro popup-history-failed popup-history-loading popup-history-1w-smooth popup-history-1w-retro popup-history-1m-smooth popup-history-1m-retro popup-history-1y-smooth popup-history-1y-retro popup-history-all-smooth popup-history-all-retro loading failed aged history-scrub history-empty-loading history-sparse sprite-candidates popup-search-smooth popup-search-retro popup-search-stale-smooth popup-search-none-smooth popup-search-failed-retro popup-search-preview-smooth popup-search-preview-retro popup-search-show-smooth popup-search-show-retro min-window-smooth min-window-retro min-window-search-smooth w22-popup-smooth-aapl-1d w22-popup-retro-aapl-1d w22-window-smooth-aapl-1d w22-window-retro-aapl-1d w22-popup-smooth-aapl-5y w22-popup-retro-aapl-5y w22-window-smooth-aapl-5y w22-window-retro-aapl-5y w22-popup-smooth-spy-1d w22-popup-retro-spy-1d w22-window-smooth-spy-1d w22-window-retro-spy-1d w22-popup-smooth-shop-1d w22-popup-retro-shop-1d w22-window-smooth-shop-1d w22-window-retro-shop-1d w22-popup-smooth-shop-1y w22-popup-retro-shop-1y w22-window-smooth-shop-1y w22-window-retro-shop-1y w22-popup-smooth-mz-1d w22-popup-retro-mz-1d w22-window-smooth-mz-1d w22-window-retro-mz-1d window-1416-smooth popup-room-one-open-smooth popup-room-growth-open-retro window-room-four-five-retro popup-room-five-long-smooth popup-room-five-long-retro popup-rowstates-smooth popup-rowstates-retro popup-note-smooth popup-hint-smooth popup-hint-retro popup-notice-file-smooth popup-notice-file-retro popup-notice-update-smooth popup-notice-update-retro popup-lists-menu-retro popup-lists-named-smooth popup-lists-empty-smooth popup-lists-empty-retro popup-lists-long-retro popup-lists-manage-smooth popup-lists-manage-retro popup-lists-symbol-smooth popup-lists-symbol-retro popup-lists-rename-smooth popup-lists-confirm-retro window-lists-manage-smooth window-lists-symbol-retro popup-rowlines-smooth popup-rowlines-retro popup-52w-smooth popup-52w-retro popup-breadth-even-smooth popup-breadth-even-retro popup-order-falls-smooth popup-order-rises-smooth popup-order-falls-retro popup-order-rises-retro window-order-falls-smooth window-order-rises-smooth window-order-falls-retro window-order-rises-retro popup-overnight-night-nest-smooth popup-overnight-night-nest-retro popup-overnight-night-silk-smooth popup-overnight-night-silk-retro popup-overnight-night-reed-retro popup-overnight-day-nest-smooth popup-overnight-day-nest-retro popup-overnight-sunday-nest-smooth popup-overnight-sunday-nest-retro popup-overnight-live-ez-smooth popup-overnight-live-ez-retro popup-overnight-live-toy-smooth popup-overnight-live-toy-retro popup-overnight-live-nest-1m-smooth popup-overnight-live-nest-1m-retro popup-overnight-live-nest-1m-scrub-smooth popup-overnight-live-nest-1m-scrub-retro popup-overnight-2026-10-07-1153-nest-smooth popup-overnight-2026-10-07-1153-nest-retro popup-overnight-2026-10-06-1800-nest-smooth popup-overnight-2026-10-06-2300-nest-retro popup-overnight-2026-10-07-0005-nest-smooth popup-overnight-2026-10-07-0005-nest-retro popup-overnight-2026-10-07-0100-nest-smooth popup-overnight-2026-10-07-0100-nest-scrub-smooth popup-overnight-2026-10-07-0100-nest-scrub-retro popup-overnight-2026-10-07-0600-nest-retro popup-overnight-2026-10-03-1200-nest-smooth popup-overnight-2026-10-04-2230-nest-retro popup-fill-up-smooth popup-fill-down-smooth popup-fill-cross-smooth popup-fill-up-retro popup-fill-down-retro popup-fill-cross-retro popup-fill-up-smooth-kanagawa popup-fill-down-smooth-kanagawa popup-fill-cross-smooth-kanagawa popup-fill-up-retro-kanagawa popup-fill-down-retro-kanagawa popup-fill-cross-retro-kanagawa pill-sheet fetch-saved-smooth fetch-saved-retro fetch-overdue-smooth fetch-overdue-retro}
-# The listing sweep (CONTRIBUTING.md, Verify it): every kind of listing on 1D at
-# each of its moments, in both looks.
-if [ $# -eq 0 ]; then
+# every_state: every state the kit renders, in order.
+every_state() (
+  states="window-help-smooth window-help-retro popup-help-smooth popup-help-retro popup-help-sorted-smooth popup-help-sorted-retro popup-holiday-retro popup-price4-solo-smooth popup-price4-solo-retro popup-price5-stack-smooth popup-price5-stack-retro popup-nest-1d-smooth popup-nest-1d-retro popup-history-failed popup-history-loading popup-history-1w-smooth popup-history-1w-retro popup-history-1m-smooth popup-history-1m-retro popup-history-1y-smooth popup-history-1y-retro popup-history-all-smooth popup-history-all-retro loading failed aged history-scrub history-empty-loading history-sparse sprite-candidates popup-search-smooth popup-search-retro popup-search-stale-smooth popup-search-none-smooth popup-search-failed-retro popup-search-preview-smooth popup-search-preview-retro popup-search-show-smooth popup-search-show-retro min-window-smooth min-window-retro min-window-search-smooth w22-popup-smooth-aapl-1d w22-popup-retro-aapl-1d w22-window-smooth-aapl-1d w22-window-retro-aapl-1d w22-popup-smooth-aapl-5y w22-popup-retro-aapl-5y w22-window-smooth-aapl-5y w22-window-retro-aapl-5y w22-popup-smooth-spy-1d w22-popup-retro-spy-1d w22-window-smooth-spy-1d w22-window-retro-spy-1d w22-popup-smooth-shop-1d w22-popup-retro-shop-1d w22-window-smooth-shop-1d w22-window-retro-shop-1d w22-popup-smooth-shop-1y w22-popup-retro-shop-1y w22-window-smooth-shop-1y w22-window-retro-shop-1y w22-popup-smooth-mz-1d w22-popup-retro-mz-1d w22-window-smooth-mz-1d w22-window-retro-mz-1d window-1416-smooth popup-room-one-open-smooth popup-room-growth-open-retro window-room-four-five-retro popup-room-five-long-smooth popup-room-five-long-retro popup-rowstates-smooth popup-rowstates-retro popup-note-smooth popup-hint-smooth popup-hint-retro popup-notice-file-smooth popup-notice-file-retro popup-notice-update-smooth popup-notice-update-retro popup-lists-menu-retro popup-lists-named-smooth popup-lists-empty-smooth popup-lists-empty-retro popup-lists-long-retro popup-lists-manage-smooth popup-lists-manage-retro popup-lists-symbol-smooth popup-lists-symbol-retro popup-lists-rename-smooth popup-lists-confirm-retro window-lists-manage-smooth window-lists-symbol-retro popup-rowlines-smooth popup-rowlines-retro popup-52w-smooth popup-52w-retro popup-breadth-even-smooth popup-breadth-even-retro popup-order-falls-smooth popup-order-rises-smooth popup-order-falls-retro popup-order-rises-retro window-order-falls-smooth window-order-rises-smooth window-order-falls-retro window-order-rises-retro popup-overnight-night-nest-smooth popup-overnight-night-nest-retro popup-overnight-night-silk-smooth popup-overnight-night-silk-retro popup-overnight-night-reed-retro popup-overnight-day-nest-smooth popup-overnight-day-nest-retro popup-overnight-sunday-nest-smooth popup-overnight-sunday-nest-retro popup-overnight-live-ez-smooth popup-overnight-live-ez-retro popup-overnight-live-toy-smooth popup-overnight-live-toy-retro popup-overnight-live-nest-1m-smooth popup-overnight-live-nest-1m-retro popup-overnight-live-nest-1m-scrub-smooth popup-overnight-live-nest-1m-scrub-retro popup-overnight-2026-10-07-1153-nest-smooth popup-overnight-2026-10-07-1153-nest-retro popup-overnight-2026-10-06-1800-nest-smooth popup-overnight-2026-10-06-2300-nest-retro popup-overnight-2026-10-07-0005-nest-smooth popup-overnight-2026-10-07-0005-nest-retro popup-overnight-2026-10-07-0100-nest-smooth popup-overnight-2026-10-07-0100-nest-scrub-smooth popup-overnight-2026-10-07-0100-nest-scrub-retro popup-overnight-2026-10-07-0600-nest-retro popup-overnight-2026-10-03-1200-nest-smooth popup-overnight-2026-10-04-2230-nest-retro popup-fill-up-smooth popup-fill-down-smooth popup-fill-cross-smooth popup-fill-up-retro popup-fill-down-retro popup-fill-cross-retro popup-fill-up-smooth-kanagawa popup-fill-down-smooth-kanagawa popup-fill-cross-smooth-kanagawa popup-fill-up-retro-kanagawa popup-fill-down-retro-kanagawa popup-fill-cross-retro-kanagawa pill-sheet fetch-saved-smooth fetch-saved-retro fetch-overdue-smooth fetch-overdue-retro"
+  # The listing sweep (CONTRIBUTING.md, Verify it): every kind of listing on
+  # 1D at each of its moments, in both looks.
   # The list menu over the cursor's row in both looks on both surfaces: its
   # edge shows nothing of the row under it.
   states="$states popup-lists-menu-smooth window-lists-menu-smooth window-lists-menu-retro"
@@ -131,6 +138,25 @@ if [ $# -eq 0 ]; then
   # The pill at a larger and a smaller text size, as `omarchy display text
   # size 16` and `10` set it: a side bar is then 37 and 23 pixels wide.
   states="$states pill-sheet-large pill-sheet-small"
+  echo $states
+)
+all=$(every_state)
+if [ "${1:-}" = --part ]; then
+  part=${2%/*} parts=${2#*/} i=0 states=""
+  for state in $all; do
+    (( i++ % parts == part - 1 )) && states="$states $state"
+  done
+elif [ $# -eq 0 ]; then
+  states=$all
+else
+  states=""
+  for name in "$@"; do
+    if [[ $name != *[*?[]* ]]; then states="$states $name"; continue; fi
+    matched=""
+    for state in $all; do [[ $state == $name ]] && matched="$matched $state"; done
+    [ -n "$matched" ] || { echo "FAIL no state matches $name"; exit 1; }
+    states="$states$matched"
+  done
 fi
 # Every render is in an installed Omarchy theme: the one the state's name
 # ends with (popup-fill-up-smooth-kanagawa, theme-retro-white), else Tokyo
