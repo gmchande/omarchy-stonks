@@ -69,6 +69,12 @@ ShellRoot {
     view.destroy()
     return bytes
   }
+  function writeText(path, text) {
+    var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockWrites: true; preload: false; printErrors: false }', harness)
+    view.path = path
+    view.setText(text)
+    view.destroy()
+  }
 
   // The stand-in's record, a line each: "start" with the file it was asked
   // to play and its other arguments, "stopped", or "ended".
@@ -135,64 +141,158 @@ ShellRoot {
       return ""
     }
 
-    // Whether the replay's sound, as the stand-in kept it, is the chart's
-    // line: its pitch every 25 ms, read from the samples, is the one the
-    // chart puts there, within a semitone, nine times in ten. Smooth's runs
-    // from E4 at the chart's floor to E5 at its ceiling along the line;
-    // retro's steps a pentatonic note per column of its grid, judged where
-    // one note holds through the window read.
-    function followsChart(index, chart, retro) {
+    // The replay's sound, as the stand-in kept it, read against the chart
+    // it was made from, by what the samples hold and what the chart draws:
+    // - pitch: every 25 ms where the chart draws, the pitch read from the
+    //   samples is the chart's, within a semitone, nine times in ten:
+    //   smooth's from E4 at the chart's floor to E5 at its ceiling along the
+    //   line, retro's a pentatonic note per column of its grid, read where
+    //   one note holds through the window;
+    // - silence: where the chart draws nothing (smooth's breaks, retro's
+    //   dark columns), nothing sounds;
+    // - ticks: each crossing of the baseline by the drawn line is heard
+    //   within 25 ms, and no tick is heard anywhere else: smooth's a burst
+    //   at 1760 Hz, retro's noise above 8 kHz, where its band-limited pulse
+    //   has nothing. Crossings closer than the tick is long are one.
+    function heardAgainst(index, chart, retro) {
       var bytes = new DataView(harness.readBytes(harness.fakeState + "/pw-play." + index + ".wav"))
       var rate = bytes.getUint32(24, true)
       var samples = (bytes.byteLength - 44) / 2
-      var at = function(i) { return bytes.getInt16(44 + i * 2, true) }
+      var s = new Float32Array(samples)
+      for (var i = 0; i < samples; i++) s[i] = bytes.getInt16(44 + i * 2, true) / 32768
       var ease = function(u) { return -(Math.cos(Math.PI * u) - 1) / 2 }
       var place = function(t) { return chart.from + (chart.to - chart.from) * ease(Math.min(1, t / 2)) }
       var penta = [440, 493.88, 554.37, 659.25, 739.99, 880, 987.77, 1108.73, 1318.51, 1479.98, 1760]
-      var pts = chart.geometry.points
+      var pts = chart.geometry.points, grid = chart.grid
+      // The drawn line at `x`: its height, or null across a break, where the
+      // chart draws none.
       var lineY = function(x) {
         if (x <= pts[0].x) return pts[0].y
-        for (var k = 0; k < pts.length - 1; k++)
-          if (pts[k + 1].x >= x) return pts[k].y + (pts[k + 1].y - pts[k].y) * (x - pts[k].x) / Math.max(1e-9, pts[k + 1].x - pts[k].x)
+        for (var k = 0; k < pts.length - 1; k++) {
+          if (pts[k + 1].x < x) continue
+          if (pts[k + 1].brk && x > pts[k].x) return null
+          return pts[k].y + (pts[k + 1].y - pts[k].y) * (x - pts[k].x) / Math.max(1e-9, pts[k + 1].x - pts[k].x)
+        }
         return pts[pts.length - 1].y
       }
-      var noteAt = function(x) {
-        var grid = chart.grid
-        var col = Math.max(0, Math.min(grid.columns - 1, Math.floor(x * grid.columns)))
-        for (var c = col; c >= 0; c--) {
-          if (grid.levels[c] !== undefined)
-            return penta[Math.round((grid.rows - 1 - grid.levels[c]) / Math.max(1, grid.rows - 1) * (penta.length - 1))]
+      var column = function(x) { return Math.max(0, Math.min(grid.columns - 1, Math.floor(x * grid.columns))) }
+      // What the chart puts at `t` seconds in: a pitch, or 0 where it draws
+      // nothing.
+      var expected = function(t) {
+        if (retro) {
+          var row = grid.levels[column(place(t))]
+          return row === undefined ? 0 : penta[Math.round((grid.rows - 1 - row) / Math.max(1, grid.rows - 1) * (penta.length - 1))]
         }
-        return 0
+        var y = lineY(place(t))
+        return y === null ? 0 : 329.63 * Math.pow(2, 1 - y)
       }
-      var expected = function(t) { return retro ? noteAt(place(t)) : 329.63 * Math.pow(2, 1 - lineY(place(t))) }
+      var span = Math.round(0.012 * rate)
       // The period, by autocorrelation over 12 ms: the shortest lag within
       // a tenth of the best, so an octave down never wins.
-      var span = Math.round(0.012 * rate)
       var pitch = function(start) {
-        var n = span, scores = [], best = 0
+        var scores = [], best = 0
         for (var lag = Math.floor(rate / 2000); lag <= Math.ceil(rate / 250); lag++) {
-          var s = 0, e = 0
-          for (var i = 0; i < n; i++) { s += at(start + i) * at(start + i + lag); e += at(start + i) * at(start + i) }
-          scores.push({ lag: lag, score: e > 0 ? s / e : 0 })
-          if (s / e > best) best = s / e
+          var a = 0, e = 0
+          for (var i = 0; i < span; i++) { a += s[start + i] * s[start + i + lag]; e += s[start + i] * s[start + i] }
+          scores.push(e > 0 ? a / e : 0)
+          if (e > 0 && a / e > best) best = a / e
         }
-        for (var j = 1; j < scores.length - 1; j++) {
-          var sc = scores[j]
-          if (sc.score >= best * 0.9 && sc.score >= scores[j - 1].score && sc.score >= scores[j + 1].score) return rate / sc.lag
-        }
+        for (var j = 1; j < scores.length - 1; j++)
+          if (scores[j] >= best * 0.9 && scores[j] >= scores[j - 1] && scores[j] >= scores[j + 1]) return rate / (j + Math.floor(rate / 2000))
         return 0
       }
-      var hits = 0, total = 0, misses = []
+      var rms = function(start, n) { var e = 0; for (var i = start; i < start + n; i++) e += s[i] * s[i]; return Math.sqrt(e / n) }
+      var whole = rms(0, samples)
+      var hits = 0, total = 0, misses = [], quiet = 0, still = 0, loud = []
       for (var t = 0.15; t < 1.9; t += 0.025) {
+        // Where the window and 10 ms either side hold one thing: one note,
+        // or for smooth, the line or no line.
         var want = expected(t + span / rate / 2)
-        if (retro && (expected(t) !== want || expected(t + span / rate) !== want)) continue
+        var same = function(other) { return retro ? other === want : (other === 0) === (want === 0) }
+        if (!same(expected(t - 0.01)) || !same(expected(t + span / rate + 0.01))) continue
+        if (want === 0) {
+          still++
+          if (rms(Math.round(t * rate), span) < whole * 0.01) quiet++
+          else loud.push(t.toFixed(3) + "s")
+          continue
+        }
         var heard = pitch(Math.round(t * rate))
         total++
-        if (heard > 0 && want > 0 && Math.abs(12 * Math.log(heard / want) / Math.LN2) < 1) hits++
+        if (heard > 0 && Math.abs(12 * Math.log(heard / want) / Math.LN2) < 1) hits++
         else misses.push(t.toFixed(3) + "s " + Math.round(heard) + " for " + Math.round(want))
       }
-      return { ok: samples > 2 * rate && total >= 20 && hits >= total * 0.9, detail: hits + "/" + total + " windows; " + misses.slice(0, 5).join(", ") }
+      // The crossings of the drawn line, from the chart: smooth's no closer
+      // than 80 ms, as its tick and the rule allow; retro's at each lit
+      // column on the other side from the last.
+      // `every` keeps each one, which a heard tick may be at; `crossings`
+      // only those after a gap as long as a tick, which must each be heard.
+      var crossings = [], every = [], last = 0, lastCol = -1, lastAt = -1
+      for (var c = 0; c <= 2; c += 0.0005) {
+        var side = 0
+        if (retro) {
+          var col = column(place(c))
+          if (col === lastCol) continue
+          lastCol = col
+          if (grid.levels[col] === undefined) continue
+          side = Math.sign(grid.baseRow - grid.levels[col])
+        } else {
+          var ly = lineY(place(c))
+          if (ly === null) continue
+          side = Math.sign(chart.geometry.baselineY - ly)
+        }
+        if (side && last && side !== last && (retro || c - lastAt > 0.08)) {
+          every.push(c)
+          if (!crossings.length || c - crossings[crossings.length - 1] > 0.035) crossings.push(c)
+          lastAt = c
+        }
+        if (side) last = side
+      }
+      // The ticks heard, every 4 ms, where a band's energy jumps: retro's
+      // above 8 kHz, where its band-limited pulse has little, past four
+      // times its median for 12 ms, as its 30 ms of noise does and a note's
+      // 1 ms onset doesn't, and twice and a half what it was 8 ms before;
+      // smooth's at 1760 Hz, past a fifth of the tone's own level there,
+      // which the tone's third harmonic (0.06 of it, at 587 Hz) never
+      // reaches and the tick (0.55) always does, and four times what it was.
+      var win = Math.round(0.004 * rate), energy = [], levels = []
+      var w8 = 2 * Math.PI * 8000 / rate, c8 = Math.cos(w8), a8 = Math.sin(w8) / 1.414, n8 = 1 + a8
+      var x1 = 0, x2 = 0, y1 = 0, y2 = 0, goertzel = 2 * Math.cos(2 * Math.PI * 1760 / rate)
+      for (var st = 0; st + win < samples; st += win) {
+        var en = 0, q1 = 0, q2 = 0
+        for (var m = st; m < st + win; m++) {
+          if (retro) {
+            var y = ((1 + c8) / 2 * s[m] - (1 + c8) * x1 + (1 + c8) / 2 * x2 + 2 * c8 * y1 - (1 - a8) * y2) / n8
+            x2 = x1; x1 = s[m]; y2 = y1; y1 = y
+            en += y * y
+          } else {
+            var q0 = goertzel * q1 - q2 + s[m]
+            q2 = q1; q1 = q0
+          }
+        }
+        energy.push(retro ? en : q1 * q1 + q2 * q2 - goertzel * q1 * q2)
+        levels.push(rms(st, win))
+      }
+      var sorted = energy.slice().sort(function(a, b) { return a - b })
+      var median = sorted[Math.floor(sorted.length / 2)]
+      // The tone's amplitude: its louder windows' RMS over a sine-like
+      // wave's 0.72.
+      var tone = levels.slice().sort(function(a, b) { return a - b })[Math.floor(levels.length * 0.75)] / 0.72
+      var floor = retro ? 4 * median : Math.pow(win / 2 * 0.2 * tone, 2)
+      var ticks = []
+      for (var w = 2; w < energy.length - 2; w++) {
+        var held = !retro || (energy[w + 1] > floor && energy[w + 2] > floor)
+        if (energy[w] > floor && held && energy[w] > (retro ? 2.5 : 4) * energy[w - 2] && (!ticks.length || w * win / rate - ticks[ticks.length - 1] > 0.035)) ticks.push(w * win / rate)
+      }
+      var near = function(list, t) { return list.some(function(u) { return Math.abs(u - t) < 0.025 }) }
+      var unheard = crossings.filter(function(t) { return !near(ticks, t) })
+      var stray = ticks.filter(function(t) { return !near(every, t) })
+      return {
+        pitch: { ok: samples > 2 * rate && total >= 20 && hits >= total * 0.9, detail: hits + "/" + total + " windows; " + misses.slice(0, 5).join(", ") },
+        silence: { ok: loud.length === 0, detail: quiet + "/" + still + " windows quiet; loud at " + loud.slice(0, 5).join(", ") },
+        ticks: { ok: unheard.length === 0 && stray.length === 0, count: crossings.length,
+          detail: crossings.length + " crossings, " + ticks.length + " ticks; unheard " + unheard.map(function(t) { return t.toFixed(3) }).join(" ")
+            + "; stray " + stray.map(function(t) { return t.toFixed(3) }).join(" ") }
+      }
     }
 
     // The chart a replay starts on, as the motion hands it to the sounds.
@@ -258,7 +358,6 @@ ShellRoot {
 
       // p: a replay heard, made from the chart as it starts; left to run,
       // it plays to its end.
-      var featured = service.featuredSymbol
       tryVerify(function() { return !body.chartLoading }, 5000)
       var watch = capture(body)
       keyClick(Qt.Key_P)
@@ -266,10 +365,42 @@ ShellRoot {
       watch.done()
       tryVerify(function() { return !body.motion.replayRunning }, 4000)
       tryVerify(function() { return endOf(4) !== "" }, 3000)
-      var smoothHeard = followsChart(4, watch.seen.chart, false)
+      var smoothHeard = heardAgainst(4, watch.seen.chart, false)
       harness.check("p plays the replay's sound, written whole before it plays, and a replay left to run plays to its end",
         replayed[3].file === sounds.replayPath && endOf(4) === "ended", replayed[3].file + "|" + endOf(4))
-      harness.check("smooth's replay is the chart's line: its pitch follows the line's height as the replay moves along it", smoothHeard.ok, smoothHeard.detail)
+      harness.check("smooth's replay is the chart's line: its pitch follows the line's height as the replay moves along it, a tick at each crossing of the close",
+        smoothHeard.pitch.ok && smoothHeard.ticks.ok && smoothHeard.ticks.count > 0, smoothHeard.pitch.detail + " | " + smoothHeard.ticks.detail)
+
+      // Tokyo's day, whose line stops for lunch, in both looks: the replay
+      // is silent across the break, where smooth draws no line and retro
+      // dark columns, and ticks only where what is drawn crosses.
+      harness.writeText(harness.fakeState + "/overnight.set", "listings-2026-10-07-1455\n")
+      service.addSymbol("7203.T")
+      quiet()
+      harness.writeText(harness.fakeState + "/overnight.set", "")
+      service.feature("7203.T")
+      tryVerify(function() { return body.featuredSymbol === "7203.T" && !body.chartLoading }, 5000)
+      var lunch = [false, true].map(function(retro) {
+        service.persist({ style: retro ? "retro" : "smooth" })
+        wait(400)
+        var tokyo = capture(body)
+        var at = harness.starts().length
+        keyClick(Qt.Key_P)
+        startsBy(at + 1)
+        tokyo.done()
+        tryVerify(function() { return endOf(at + 1) !== "" }, 4000)
+        var heard = heardAgainst(at + 1, tokyo.seen.chart, retro)
+        return { ok: heard.pitch.ok && heard.silence.ok && /^[1-9]/.test(heard.silence.detail) && heard.ticks.ok,
+          detail: (retro ? "retro: " : "smooth: ") + heard.pitch.detail + " | " + heard.silence.detail + " | " + heard.ticks.detail }
+      })
+      service.persist({ style: "smooth" })
+      harness.check("a replay of Tokyo's day is silent across lunch, where the chart draws nothing, and ticks only where what is drawn crosses, smooth and retro",
+        lunch[0].ok && lunch[1].ok, lunch[0].detail + " || " + lunch[1].detail)
+      service.removeSymbol("7203.T")
+      service.feature("MSFT")
+      quiet()
+      tryVerify(function() { return body.featuredSymbol === "MSFT" && !body.chartLoading }, 5000)
+      wait(400)
 
       // A replay's sound stops with the replay: Esc, a row's chart, the
       // popup closing. And one sound at a time: x mid-replay cuts it.
@@ -411,12 +542,16 @@ ShellRoot {
       quiet()
       harness.check("in the window, a right-click on a row, a click on the footer's undo, and a click on a result's ADD play retro's removal, undo, and add",
         mouseSounds.join(", ") === "sounds/retro/remove.wav, sounds/retro/undo.wav, sounds/retro/add.wav", mouseSounds.join(", "))
-      // The add lands: its chart, a Toronto listing's day, is the one to replay.
+      // The add lands; then a click on MSFT's row shows its chart, a busy
+      // US day, every column lit, to replay.
       tryVerify(function() { return win.featuredSymbol === "SHOP.TO" && !win.chartLoading }, 8000)
+      var msft = win.watchlist.rowItem("MSFT")
+      mouseClick(msft, msft.width / 2, msft.height / 2)
+      tryVerify(function() { return win.featuredSymbol === "MSFT" && !win.chartLoading && win.animal.kind !== "" }, 5000)
+      wait(400)
 
       // A click on the animal: retro's replay, its notes the chart's
       // columns; a click on another row cuts it.
-      tryVerify(function() { return !win.chartLoading && win.animal.kind !== "" }, 5000)
       before = harness.starts().length
       var animal = harness.find(win, "animalToggle")
       watch = capture(win)
@@ -424,20 +559,32 @@ ShellRoot {
       startsBy(before + 1)
       watch.done()
       tryVerify(function() { return endOf(before + 1) !== "" }, 4000)
-      var retroHeard = followsChart(before + 1, watch.seen.chart, true)
-      harness.check("retro's replay is the chart's columns: a note per column, its pitch the column's height", retroHeard.ok, retroHeard.detail)
+      var retroHeard = heardAgainst(before + 1, watch.seen.chart, true)
+      harness.check("retro's replay is the chart's columns: a note per lit column, its pitch the column's height, silent over dark ones, a tick at each crossing",
+        retroHeard.pitch.ok && retroHeard.silence.ok && retroHeard.ticks.ok,
+        retroHeard.pitch.detail + " | " + retroHeard.silence.detail + " | " + retroHeard.ticks.detail)
+
+      // Two surfaces, one player: the popup opening and closing while the
+      // window's replay plays leaves it playing to its end.
       mouseClick(animal, animal.width / 2, animal.height / 2)
       startsBy(before + 2)
-      var running = win.motion.replayRunning
+      panel.open()
+      wait(150)
+      panel.close()
+      wait(150)
+      var playing = endOf(before + 2) === "" && win.motion.replayRunning
+      tryVerify(function() { return endOf(before + 2) !== "" }, 4000)
+      harness.check("the popup opening and closing during the window's replay leaves its sound playing to its end",
+        playing && endOf(before + 2) === "ended", playing + "|" + endOf(before + 2))
+
+      app.testKeyCatcher.forceActiveFocus()
+      mouseClick(animal, animal.width / 2, animal.height / 2)
+      startsBy(before + 3)
       rows = win.watchlist.displayedSymbols
-      var target = rows[0] === service.featuredSymbol ? rows[1] : rows[0]
-      var other = win.watchlist.rowItem(target)
+      var other = win.watchlist.rowItem(rows[0] === service.featuredSymbol ? rows[1] : rows[0])
       mouseClick(other, other.width / 2, other.height / 2)
-      wait(100)
-      var featuredNow = service.featuredSymbol
-      tryVerify(function() { return endOf(before + 2) !== "" }, 3000)
-      harness.check("a click on another row stops the replay's sound with the replay", endOf(before + 2) === "stopped",
-        endOf(before + 2) + "|" + running + "|" + target + "|" + featuredNow + "|" + rows.join(","))
+      tryVerify(function() { return endOf(before + 3) !== "" }, 3000)
+      harness.check("a click on another row stops the replay's sound with the replay", endOf(before + 3) === "stopped", endOf(before + 3))
 
       app.close()
       console.log("SOUNDS DONE")
