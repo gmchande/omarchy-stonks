@@ -858,7 +858,8 @@ ShellRoot {
       // The output kept awake (the stand-in pw-cat): a stream of silence
       // while a surface is open with sounds on, held as the last closes,
       // ended a while after; none while every surface has been closed that
-      // long, and none with sounds off.
+      // long, and none with sounds off. One that ends on its own while a
+      // surface is open starts again.
       var silence = function() {
         var lines = harness.readFile(harness.fakeState + "/pw-cat.log").split("\n").filter(function(l) { return l !== "" })
         return { running: lines.length > 0 && /^start /.test(lines[lines.length - 1]),
@@ -877,14 +878,21 @@ ShellRoot {
       panel.open()
       tryVerify(function() { return silence().running }, 3000)
       var wokeOnOpen = silence().starts === startsBefore + 1
+      harness.writeText(harness.fakeState + "/pw-cat.exit", "now")
+      tryVerify(function() { return /^exited /.test(silence().last) }, 3000)
+      fileProc.command = ["rm", "-f", harness.fakeState + "/pw-cat.exit"]
+      fileProc.running = true
+      tryVerify(function() { return !fileProc.running }, 2000)
+      tryVerify(function() { return silence().running }, 5000)
+      var backAfterExit = silence().running && silence().starts === startsBefore + 2
       service.persist({ sounds: false })
       tryVerify(function() { return !silence().running }, 3000)
       var offRests = !silence().running
       service.persist({ sounds: true })
       panel.close()
-      harness.check("a stream of silence holds the output while a surface is open with sounds on, still as it closes, and rests a while after, or at once with sounds off",
-        awakeWhileOpen && heldAtClose && restsWhenClosed && wokeOnOpen && offRests,
-        [awakeWhileOpen, heldAtClose, restsWhenClosed, wokeOnOpen, offRests].join(","))
+      harness.check("a stream of silence holds the output while a surface is open with sounds on, still as it closes, and rests a while after, or at once with sounds off; one that ends while a surface is open starts again",
+        awakeWhileOpen && heldAtClose && restsWhenClosed && wokeOnOpen && backAfterExit && offRests,
+        [awakeWhileOpen, heldAtClose, restsWhenClosed, wokeOnOpen, backAfterExit, offRests].join(","))
 
       // The market's bell, in retro's voice: as the clock passes the open
       // or the close of the market of the stock last looked at, once, a

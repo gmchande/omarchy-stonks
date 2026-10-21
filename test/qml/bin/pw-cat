@@ -2,10 +2,18 @@
 # A stand-in for pw-cat, first on PATH inside the harnesses, so no harness
 # ever holds an output open: it records each stream of silence as lines in
 # STONKS_FAKE_STATE/pw-cat.log, "start MS ARGS" and then "stopped MS" when
-# Stonks stops it, and plays nothing meanwhile. It waits in short sleeps, so
-# a kill that skips its trap leaves nothing behind for long.
+# Stonks stops it, and plays nothing meanwhile. With
+# STONKS_FAKE_STATE/pw-cat.exit present it ends on its own, logging
+# "exited MS", as one does when PipeWire restarts. It waits in short sleeps,
+# so a kill that skips its trap leaves nothing behind for long.
 log="$STONKS_FAKE_STATE/pw-cat.log"
 ms() { echo $(( $(date +%s%N) / 1000000 )); }
 trap 'echo "stopped $(ms)" >> "$log"; exit 0' TERM INT
 echo "start $(ms) $*" >> "$log"
-while :; do sleep 0.2; done
+while :; do
+  if [ -e "$STONKS_FAKE_STATE/pw-cat.exit" ]; then
+    echo "exited $(ms)" >> "$log"
+    exit 1
+  fi
+  sleep 0.2
+done

@@ -120,7 +120,10 @@ Item {
     ahead.restart()
   }
   onVoiceChanged: ahead.restart()
-  Component.onCompleted: ahead.restart()
+  Component.onCompleted: {
+    ahead.restart()
+    silence.running = keepingAwake
+  }
   Timer {
     id: ahead
     interval: 1
@@ -154,14 +157,21 @@ Item {
   // The output kept awake (`keepingAwake`): a stream of silence, PipeWire's
   // pw-cat reading zeros, which holds the speakers or headphones open as a
   // sound playing does, and nothing while sounds are off or every surface
-  // has been closed 10 s.
+  // has been closed 10 s. A pw-cat that ends while it's wanted, as when
+  // PipeWire restarts, starts again 2 s later.
   onSurfacesOpenChanged: if (!surfacesOpen) afterClose.restart()
   Timer { id: afterClose; interval: 10000 }
+  onKeepingAwakeChanged: silence.running = keepingAwake
   Process {
     id: silence
-    running: root.keepingAwake
     command: ["pw-cat", "--playback", "--raw", "--rate", "24000", "--channels", "1", "--format", "s16",
       "--media-role", "Notification", "/dev/zero"]
+    onExited: if (root.keepingAwake) silenceAgain.restart()
+  }
+  Timer {
+    id: silenceAgain
+    interval: 2000
+    onTriggered: if (root.keepingAwake && !silence.running) silence.running = true
   }
 
   // The market's bell, unless an app is recording from a microphone, as a
