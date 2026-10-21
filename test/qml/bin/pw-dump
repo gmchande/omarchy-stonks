@@ -3,13 +3,18 @@
 # nodes as STONKS_FAKE_STATE/pw-dump.json holds them, or none, so a harness
 # says whether an app is recording from a microphone. With
 # STONKS_FAKE_STATE/pw-dump.stall present it answers nothing and waits, as a
-# stalled PipeWire would, until it is stopped. Each run logs "start" and
-# then "answered" or "stopped" to STONKS_FAKE_STATE/pw-dump.log.
+# stalled PipeWire would, until it is stopped; with pw-dump.slow present it
+# ignores being asked to stop and answers after 3.2 s. Each run logs "start"
+# and then "answered" or "stopped" to STONKS_FAKE_STATE/pw-dump.log.
 log="$STONKS_FAKE_STATE/pw-dump.log"
 trap 'echo stopped >> "$log"; exit 0' TERM INT
 echo start >> "$log"
 if [ -e "$STONKS_FAKE_STATE/pw-dump.stall" ]; then
   while :; do sleep 0.2; done
+fi
+if [ -e "$STONKS_FAKE_STATE/pw-dump.slow" ]; then
+  trap '' TERM
+  sleep 3.2
 fi
 cat "$STONKS_FAKE_STATE/pw-dump.json" 2> /dev/null || echo "[]"
 echo answered >> "$log"

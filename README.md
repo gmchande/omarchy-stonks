@@ -260,21 +260,21 @@ The shell's log the form asks for can name the prices Stonks left out.
 ## What it runs
 
 - **Needs:** nothing beyond Omarchy 4. It runs `curl`, PipeWire's
-  `pw-play`, `pw-cat`, and `pw-dump`, and `sh`, `timeout`, and `head`, which
-  Omarchy ships.
+  `pw-play`, `pw-cat`, and `pw-dump`, and `sh`, `bash`, `timeout`, and
+  `head`, which Omarchy ships.
 - **Commands:** `curl` for every request; while sounds are on, `pw-play` to
   play a sound, only when you add, remove, or undo a row, turn sounds on,
   replay a chart, or move along it, or the bell is due, and one `sh` that
   starts a `pw-play` for each chime, with 2 seconds each under `timeout`,
   and plays nothing else; while sounds are on and the popup or the window
   is open, and for 10 seconds after, `pw-cat` playing silence, so the first
-  sound plays at once; `pw-dump` once as each bell is due, under `timeout`
-  for 3 seconds and through `head` for 4 MB, to see whether an app is
-  recording from a microphone, reading only which streams run, an answer
-  cut short counting as recording, so the bell stays quiet; `omarchy
-  restart shell` only when you click the notice that an update is on disk;
-  and, only when you click the note that a newer Stonks is out, `omarchy
-  plugin update grvc.stonks` in a terminal.
+  sound plays at once; `pw-dump` once as each bell is due, in `bash` under
+  `timeout` for 3 seconds and through `head` for 4 MB, to see whether an app
+  is recording from a microphone, reading only which streams run; an
+  answer that runs out of time, fails, or reaches 4 MB counts as recording,
+  so the bell stays quiet; `omarchy restart shell` only when you click the
+  notice that an update is on disk; and, only when you click the note that
+  a newer Stonks is out, `omarchy plugin update grvc.stonks` in a terminal.
 - **Silence's cost:** while `pw-cat` plays silence, your speakers'
   amplifier stays powered and your headphones stay connected to this
   computer, as when any sound plays, and it takes about a tenth of a

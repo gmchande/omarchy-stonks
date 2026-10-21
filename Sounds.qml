@@ -167,14 +167,12 @@ Item {
   // The market's bell, unless an app is recording from a microphone, as a
   // call does: `pw-dump` lists PipeWire's nodes once, as the bell is due,
   // for at most 3 s and 4 MB (the list runs to about half a megabyte), so
-  // no answer can hold the bell or fill the shell. An answer cut short, or
-  // later than that, counts as recording: the bell stays quiet. One still
-  // out ends within 4 s, before the next bell.
-  property real askedAt: 0
+  // no answer can hold the bell or fill the shell. An answer that ran out
+  // of time, failed, or reached the cap counts as recording, by the
+  // pipeline's own exit and the bytes it gave, never by the clock: the bell
+  // stays quiet. One still out is stopped within 4 s, before the next bell.
   function ring() {
-    if (!turnedOn || listening.running) return
-    askedAt = Date.now()
-    listening.running = true
+    if (turnedOn && !listening.running) listening.running = true
   }
 
   // Whether PipeWire's nodes (`pw-dump`'s answer) hold a microphone being
@@ -191,11 +189,13 @@ Item {
     })
   }
 
+  // A byte past 4 MB is read, so an answer that reaches the cap shows it.
   Process {
     id: listening
-    command: ["sh", "-c", "timeout -k 1 3 pw-dump | head -c 4000000"]
-    stdout: StdioCollector {
-      onStreamFinished: if (root.turnedOn && Date.now() - root.askedAt <= 3000 && !root.recording(text)) root.play("bell")
+    command: ["bash", "-c", "set -o pipefail; timeout -k 1 3 pw-dump | head -c 4000001"]
+    stdout: StdioCollector { id: answer }
+    onExited: function(code) {
+      if (root.turnedOn && code === 0 && answer.data.byteLength <= 4000000 && !root.recording(answer.text)) root.play("bell")
     }
   }
 
