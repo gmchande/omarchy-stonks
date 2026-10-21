@@ -198,8 +198,11 @@ FocusScope {
   // The failed lookup's query asked again, through the same request and
   // gate as typing it: the failure goes, so the line says what a first
   // query's does until the answer lands (at once, while the gate pauses).
+  // A lookup of it still waiting on the typing pause goes now instead, so
+  // it is asked once.
   function retry() {
     if (stale || answer !== "failed") return
+    searchDebounce.stop()
     answer = ""
     runSearch()
   }

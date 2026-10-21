@@ -644,7 +644,8 @@ ShellRoot {
     // Stonks, a retry fails at once and asks nothing. SH fails while the
     // fake curl's search is down, then answers. Found in the 1.0.0 review:
     // "Search didn't answer · try again" led nowhere, Enter doing nothing
-    // and nothing to click.
+    // and nothing to click. Enter straight after an edit back to the failed
+    // query asks it once: found in review, the edit's own lookup went too.
     function failedSearchRetries(body, keys) {
       var searchDown = function(down) {
         fileProc.command = down ? ["touch", harness.fakeState + "/SEARCH.down"] : ["rm", "-f", harness.fakeState + "/SEARCH.down"]
@@ -666,8 +667,11 @@ ShellRoot {
       keyClick("H")
       tryVerify(function() { return body.search.answer === "failed" && body.search.resultsQuery === "SH" }, 3000)
       var offered = [message.text, retryShown()].join(",")
-      // Enter, Yahoo's search still down: asked once more, the line saying
-      // so, frame by frame, until it fails again.
+      // An edit and its undo, then Enter before the typing pause ends,
+      // Yahoo's search still down: asked once more, the line saying so,
+      // frame by frame, until it fails again, and not asked again after.
+      keyClick("X")
+      keyClick(Qt.Key_Backspace)
       var failedBefore = harness.calls("SEARCH.failed")
       var seen = []
       var watch = function() {
@@ -679,7 +683,7 @@ ShellRoot {
       watch()
       keyClick(Qt.Key_Return)
       within(3000, function() { return seen.length > 1 && body.search.answer === "failed" })
-      wait(100)
+      wait(1000)
       frames.destroy()
       var byEnter = [seen.join(" / "), harness.calls("SEARCH.failed") - failedBefore, body.adding].join(",")
       // RETRY, while the gate pauses Stonks: no request, the failure stays.
