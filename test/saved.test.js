@@ -22,6 +22,11 @@ const US = calendars.calendars.US
 const JPX = calendars.calendars.JPX
 // The exchanges that trade in whole cents from $1, as the feeds read with.
 const cents = M.centExchanges(calendars)
+// A listing's cadence and warmth, by its calendar's reading, as askDue
+// reads them.
+const calNow = (q, now) => M.calendarNow(M.calendarFor(calendars, q), now)
+const staysWarm = (q, now) => M.staysWarm(q, now, calNow(q, now))
+const quoteCadence = (q, now, interval, hero) => M.quoteCadence(q, now, interval, hero, calNow(q, now))
 const quote = M.parseChart(fixture("aapl.json"))
 const shop = M.parseChart(fixture("shop-to.json"))
 const btc = M.parseChart(fixture("btc-usd-day.json"))
@@ -291,7 +296,7 @@ test("the popular indexes Yahoo files under their own codes keep their exchange'
   const n225 = M.parseChart(fixture("first-day-2026-10-14/n225-day.json"))
   const lunch = n225.session.regular.start + 2.75 * 3600
   expect(M.marketStatus(n225, lunch, 0, calendars)).toBe("Lunch break · reopens 12:30 JST · in 45m")
-  expect(M.quoteCadence(n225, lunch, 60, false, calendars)).toBe(15 * 60)
+  expect(quoteCadence(n225, lunch, 60, false)).toBe(15 * 60)
   const closed = q => M.marketStatus(q, q.session.regular.end + 4 * 3600, 0, calendars)
   expect(closed(n225)).toBe("Closed · opens Thu 09:00 JST")
   const ftse = M.parseChart(fixture("ftse-day.json"))
@@ -738,7 +743,7 @@ test("on 1Y the 52-week line takes in the range's low and high, and no other ran
 test("each symbol is asked for on its own market's clock", () => {
   const q = duringSession(quote)
   const s = q.session
-  const cadence = (quote, now, hero = false, interval = 60) => M.quoteCadence(quote, now, interval, hero, calendars)
+  const cadence = (quote, now, hero = false, interval = 60) => quoteCadence(quote, now, interval, hero)
   // Its regular session: the refresh interval, whatever the setting says.
   expect(cadence(q, reg.start + 3600)).toBe(60)
   expect(cadence(q, reg.start + 3600, false, 45)).toBe(45)
@@ -765,8 +770,8 @@ test("a published closure or a break between segments is closed, whatever Yahoo'
     ...sep4,
     session: { pre: null, post: null, regular: { start: labor - 3600, end: labor + 3600 } }
   }
-  expect(M.quoteCadence(fakeOpen, labor, 60, false, null)).toBe(60)
-  expect(M.quoteCadence(fakeOpen, labor, 60, false, calendars)).toBe(900)
+  expect(M.quoteCadence(fakeOpen, labor, 60, false, M.calendarNow(null, labor))).toBe(60)
+  expect(quoteCadence(fakeOpen, labor, 60, false)).toBe(900)
   expect(M.inRegularSession(fakeOpen, labor, calendars)).toBe(false)
   // The header agrees: the published closure outranks a response that still
   // describes a session.
@@ -778,8 +783,8 @@ test("a published closure or a break between segments is closed, whatever Yahoo'
     session: { pre: null, post: null, regular: { start: M.epochAt(JPX, "2026-09-08", "09:00"), end: M.epochAt(JPX, "2026-09-08", "15:30") } },
     points: []
   }
-  expect(M.quoteCadence(jpx, 1788832800, 60, true, calendars)).toBe(60)
-  expect(M.quoteCadence(jpx, 1788836400, 60, true, calendars)).toBe(900)
+  expect(quoteCadence(jpx, 1788832800, 60, true)).toBe(60)
+  expect(quoteCadence(jpx, 1788836400, 60, true)).toBe(900)
   expect(M.inRegularSession(jpx, 1788836400, calendars)).toBe(false)
 })
 
@@ -1370,7 +1375,7 @@ test("a quote held past its bars' session takes the phase and the bell from Yaho
   const nest = M.parseChart(fixture("moments/live-2026-10-05/nest.json"))
   const dawn = at("2026-10-05", "04:30")
   expect(M.marketStatus(nest, dawn, 0, calendars)).toBe("Pre-market · opens in 5h")
-  expect([M.quoteCadence(nest, dawn, 60, true, calendars), M.quoteCadence(nest, dawn, 60, false, calendars)]).toEqual([60, 300])
+  expect([quoteCadence(nest, dawn, 60, true), quoteCadence(nest, dawn, 60, false)]).toEqual([60, 300])
   // The chart, the open, and the info line stay the bars' Friday.
   expect(said(dayLineAt(nest, dawn))).toBe("FRI · 235.34–248.34 @242.81 · OPEN 235.81 · VOL 12.3M")
   expect(M.extendedStack(nest, null, dawn).label).toBe("AFTER HOURS")
@@ -1379,7 +1384,7 @@ test("a quote held past its bars' session takes the phase and the bell from Yaho
   const london = M.parseChart(fixture("shel-l-day.json"))
   const morning = M.epochAt(calendars.calendars.LSE, "2026-10-02", "08:30")
   expect(M.marketStatus(london, morning, 0, calendars)).toBe("Market closes in 8h")
-  expect([M.inRegularSession(london, morning, calendars), M.quoteCadence(london, morning, 60, false, calendars)]).toEqual([true, 60])
+  expect([M.inRegularSession(london, morning, calendars), quoteCadence(london, morning, 60, false)]).toEqual([true, 60])
 })
 
 test("a quote held from an earlier day stays warm by its calendar; one with no calendar, on the slow clock once its periods are past", () => {
@@ -1387,26 +1392,26 @@ test("a quote held from an earlier day stays warm by its calendar; one with no c
   const nest = M.parseChart(fixture("moments/listings-2026-10-07-1455/nest.json"))
   const thursday = at("2026-10-08", "11:00")
   expect(M.sessionPhase(nest, thursday)).toBe("closed")
-  expect([M.inRegularSession(nest, thursday, calendars), M.staysWarm(nest, thursday, calendars), M.quoteCadence(nest, thursday, 60, false, calendars)])
+  expect([M.inRegularSession(nest, thursday, calendars), staysWarm(nest, thursday), quoteCadence(nest, thursday, 60, false)])
     .toEqual([true, true, 60])
   // Before Thursday's open, and on Saturday: closed.
-  expect(M.staysWarm(nest, at("2026-10-08", "08:00"), calendars)).toBe(false)
-  expect(M.staysWarm(nest, at("2026-10-10", "12:00"), calendars)).toBe(false)
+  expect(staysWarm(nest, at("2026-10-08", "08:00"))).toBe(false)
+  expect(staysWarm(nest, at("2026-10-10", "12:00"))).toBe(false)
   // The S&P 500 is on the US calendar (S&P is one of its exchanges): kept
   // fresh through Thursday's session like any US listing, at the refresh
   // interval, and not before Wednesday's open.
   const gspc = M.parseChart(fixture("moments/listings-2026-10-07-1455/gspc.json"))
-  expect([M.staysWarm(gspc, at("2026-10-07", "11:00"), calendars), M.staysWarm(gspc, at("2026-10-07", "06:00"), calendars)]).toEqual([true, false])
-  expect([M.staysWarm(gspc, thursday, calendars), M.quoteCadence(gspc, thursday, 60, false, calendars)]).toEqual([true, 60])
-  expect(M.staysWarm(gspc, at("2026-10-10", "12:00"), calendars)).toBe(false)
+  expect([staysWarm(gspc, at("2026-10-07", "11:00")), staysWarm(gspc, at("2026-10-07", "06:00"))]).toEqual([true, false])
+  expect([staysWarm(gspc, thursday), quoteCadence(gspc, thursday, 60, false)]).toEqual([true, 60])
+  expect(staysWarm(gspc, at("2026-10-10", "12:00"))).toBe(false)
   // An index whose exchange has no calendar (Russell's, Yahoo's WCB): in its
   // periods it is warm; once they are past, it is asked on the slow clock to
   // learn of the next.
   const russell = { ...gspc, exchange: "WCB" }
-  expect([M.staysWarm(russell, at("2026-10-07", "11:00"), calendars), M.staysWarm(russell, at("2026-10-07", "06:00"), calendars)]).toEqual([true, false])
-  expect([M.staysWarm(russell, thursday, calendars), M.quoteCadence(russell, thursday, 60, false, calendars)]).toEqual([true, 900])
+  expect([staysWarm(russell, at("2026-10-07", "11:00")), staysWarm(russell, at("2026-10-07", "06:00"))]).toEqual([true, false])
+  expect([staysWarm(russell, thursday), quoteCadence(russell, thursday, 60, false)]).toEqual([true, 900])
   // A cryptocurrency never stays warm with nothing open.
-  expect(M.staysWarm(btc, btc.session.regular.start + 3600, calendars)).toBe(false)
+  expect(staysWarm(btc, btc.session.regular.start + 3600)).toBe(false)
 })
 
 test("the header's animal sleeps while its market does: by phase and calendar, never by the data's age", () => {

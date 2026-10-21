@@ -184,9 +184,16 @@ Item {
       return open ? Overnight.allDayDue(allDayFeed.entries[s], root.now) : !allDayFeed.entries[s]
     })
     var drawn = listings.filter(function(s) { return !allDayFeed.entries[s] || allDayFeed.entries[s].allDay })
+    // The listings of one ask share its second (`entry.at`), so each ask is
+    // judged once, not once a listing.
+    var judged = {}
     var printsDue = function(s, at) {
       var entry = overnightFeed.entries[s]
-      return !entry || (open && Overnight.overnightDue(entry.at, at, root.calendars, entry.status === "failed"))
+      if (!entry) return true
+      if (!open) return false
+      var key = at + " " + entry.at + " " + entry.status
+      if (!(key in judged)) judged[key] = Overnight.overnightDue(entry.at, at, root.calendars, entry.status === "failed")
+      return judged[key]
     }
     var prints = drawn.filter(function(s) { return printsDue(s, root.now) })
     if (prints.length > 0)
@@ -252,8 +259,16 @@ Item {
     root.askedMinute = Math.floor(now / 60)
     var open = root.openSurfaces.length > 0
     var featured = root.view.featured
+    // Each market's calendar is read once a walk, not once a listing.
+    var calendars = root.calendars
+    var calendarsNow = new Map()
+    var calNow = function(quote) {
+      var cal = Market.calendarFor(calendars, quote)
+      if (!calendarsNow.has(cal)) calendarsNow.set(cal, Market.calendarNow(cal, now))
+      return calendarsNow.get(cal)
+    }
     var watched = root.library.filter(function(s) {
-      return open || s === featured || Market.staysWarm(feed.quotes[s], now, root.calendars)
+      return open || s === featured || Market.staysWarm(feed.quotes[s], now, calNow(feed.quotes[s]))
     })
     if (watched.join(",") !== root.watched.join(",")) root.watched = watched
     var at = {}
@@ -261,7 +276,7 @@ Item {
       var entry = feed.entries[s]
       if (!entry || entry.status === "saved" || s in feed.asked) return
       var hero = open && (s === featured || (root.previewShown && s === root.previewSymbol))
-      at[s] = entry.answeredAt + Market.quoteCadence(feed.quotes[s], now, root.refreshIntervalSec, hero, root.calendars)
+      at[s] = entry.answeredAt + Market.quoteCadence(feed.quotes[s], now, root.refreshIntervalSec, hero, calNow(feed.quotes[s]))
     })
     var symbols = Object.keys(at)
     var asking = symbols.some(function(s) { return at[s] <= now })
