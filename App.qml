@@ -99,8 +99,10 @@ Item {
     implicitHeight: 760
     // The fixed content at its whole chart plus one row: below this the
     // list would have no room at all. The chart gives way first, so here
-    // three rows show (StonksBody.minChartHeight).
-    minimumSize: Qt.size(560, root.body ? root.body.smallestHeight : 0)
+    // three rows show (StonksBody.minChartHeight). The width scales with
+    // the text size, as the popup's does: a fixed 560 at size 16 cut
+    // Tokyo's holiday header and left VOL and P/E off the info lines.
+    minimumSize: Qt.size(Style.space(560), root.body ? root.body.smallestHeight : 0)
     visible: false
 
     // A close by the compositor freezes the body as one of ours does.

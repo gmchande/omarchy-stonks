@@ -11,8 +11,9 @@ import "Tones.js" as Tones
 // it (`hovered`). Until what it says is fixed, a notice, in the foreground
 // too, under any note, whose click is the surface's (`acts`). A hint for the
 // visit is a quiet line of its own above the bar, which it never replaces,
-// and takes no click. It is painted in its surface's ground, so riding a
-// growing edge it covers the rows it passes.
+// and takes no click; the surface can have it give way (`showsHint`). It is
+// painted in its surface's ground, so riding a growing edge it covers the
+// rows it passes.
 Item {
   id: root
 
@@ -28,6 +29,9 @@ Item {
   property string noteAction: ""
   property string notice: ""
   property string hint: ""
+  // Whether the hint shows. Its room (`hintRoom`) is measured either way,
+  // so the surface can judge whether it fits without reading it back.
+  property bool showsHint: true
   // A click does something: the add, an undo, or the notice's own action.
   property bool acts: true
   property string label: "+  Add a symbol"
@@ -57,10 +61,14 @@ Item {
 
   signal clicked()
 
-  // The hint's lines and the gap under them, above the bar; none without one.
-  readonly property int hintHeight: hint !== "" ? hintText.implicitHeight + Style.space(6) : 0
+  // The hint's lines and the gap under them, above the bar, whether or not
+  // they show; and what they take, none without a hint showing.
+  readonly property int hintRoom: hint !== "" ? hintText.implicitHeight + Style.space(6) : 0
+  readonly property int hintHeight: showsHint ? hintRoom : 0
+  // The bar and the gap over it, under the hint.
+  readonly property int barHeight: rowHeight + Style.space(6)
 
-  implicitHeight: hintHeight + rowHeight + Style.space(6)
+  implicitHeight: hintHeight + barHeight
   height: implicitHeight
 
   Rectangle {
@@ -71,7 +79,7 @@ Item {
   Text {
     id: hintText
     objectName: "footerHint"
-    visible: root.hint !== ""
+    visible: root.hint !== "" && root.showsHint
     anchors.top: parent.top
     anchors.left: parent.left
     anchors.right: parent.right

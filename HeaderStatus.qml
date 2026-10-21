@@ -211,13 +211,15 @@ Item {
   // Live is said by the chart's breathing dot and by these words in the
   // foreground; a mark in front of them would push them over each time it
   // came and went, with every range change and every scrub. A failed
-  // range's retry follows them.
+  // range's retry follows them. They start twice as far from the sleeping
+  // z as the bull is, so it reads as the animal's and not as a mark on the
+  // first word, and stop as much sooner, so their room is the same.
   Text {
     id: statusWords
     objectName: "statusText"
     anchors.left: slot.right
-    anchors.leftMargin: Style.space(10)
-    width: Math.max(0, Math.min(implicitWidth, lookIcon.x - Style.space(12) - x
+    anchors.leftMargin: Style.space(14)
+    width: Math.max(0, Math.min(implicitWidth, lookIcon.x - Style.space(8) - x
       - (root.offersRetry ? retry.implicitWidth + Style.space(16) : 0)))
     anchors.verticalCenter: parent.verticalCenter
     textFormat: Text.PlainText

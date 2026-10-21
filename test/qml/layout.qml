@@ -24,10 +24,11 @@ import "plugin"
 // change's baseline and right edge, the range row, the info block, the
 // header's look control and the end of its words, the list's TODAY and its
 // rule, and the first row must not move with the look, and the first row
-// must not move with the symbol or the range. The header's words keep room
-// for its longest states at the popup's width. The footer sits one gap under
-// the rows whichever list shows, the window's too until its list fills it,
-// then at its bottom, the
+// must not move with the symbol or the range. Both looks' digits start on
+// the band's left edge. The header's words keep room for its longest states
+// at the popup's width. The footer sits one gap under the rows whichever
+// list shows, the window's too, at its bottom once its list fills it, the
+// window's chart taking what whole rows leave over, the
 // rows stop short of the scrollbar's gutter, an open list menu makes room
 // for itself, and the window's smallest permitted height still holds a whole
 // row. The price and change text are measured as displayed, at whatever size
@@ -299,7 +300,8 @@ ShellRoot {
     implicitWidth: 760
     implicitHeight: 900
 
-    // The surface under test: the popup's content box, or the window's.
+    // The surface under test: the popup's content box (Panel's
+    // Style.space(480) card less its padding and border), or the window's.
     Item {
       id: surface
       property bool wide: false
@@ -312,7 +314,7 @@ ShellRoot {
       property int budget: 730
       x: 0
       y: 0
-      width: wide ? windowWidth : 448
+      width: wide ? windowWidth : Style.space(448)
       height: fixedHeight > 0 ? fixedHeight : body.fittedHeight(Math.min(budget, body.chromeHeight + 6 * body.rowPitch - body.rowGap))
 
       StonksBody {
@@ -450,9 +452,10 @@ ShellRoot {
             var moved = fixed.filter(function(key) { return smooth[key] !== retro[key] })
             root.check(label + ": the look moves nothing outside the digits", moved.length === 0,
               moved.join(", ") + " smooth " + root.describe(smooth) + " retro " + root.describe(retro))
-            root.check(label + ": both looks' digits share a top line and a left edge",
-              Math.abs(smooth.top - retro.top) <= 2 && Math.abs(smooth.left - retro.left) <= 2,
-              "smooth " + root.describe(smooth) + " retro " + root.describe(retro))
+            root.check(label + ": both looks' digits share a top line, and their ink starts on the band's left edge",
+              Math.abs(smooth.top - retro.top) <= 2 && Math.abs(smooth.left - Math.round(body.textLeft)) <= 1
+                && retro.left === Math.round(body.textLeft),
+              "smooth " + root.describe(smooth) + " retro " + root.describe(retro) + " edge " + body.textLeft)
             root.check(label + ": the change and its caption end at the band's right edge, the rows' figures'",
               smooth.changeRight === smooth.captionRight
                 && smooth.changeRight === Math.round(body.width - body.textRight),
@@ -487,6 +490,47 @@ ShellRoot {
           cut.length === 0, cut.join(" | "))
         root.check("each info line's title is its range's, the day's, or 52W, and the lows one gap past 52W on every range",
           mistitled.length === 0, mistitled.join(" | "))
+        // Nothing on the two lines moves with the range: AAPL on the day and
+        // on 1M, 1Y, 5Y, and All, a listing younger than All with all four
+        // of its facts, keeps its columns, both rules, and the 52 weeks'
+        // words where they were, in both looks, in the popup and the window.
+        // Found in the spacing review of 1.0.0: from 1D to 1Y both rules
+        // shrank 27 px and every fact after them moved left.
+        var infoPlace = function() {
+          var block = find(body, "infoBlock")
+          var rules = ["periodRule", "yearRule"].map(function(name) {
+            var rule = find(body, name)
+            return xIn(rule, 0) + "+" + rule.width
+          })
+          var words = root.drawnSpans(find(body, "yearLine")).filter(function(s) { return String(s.color) === String(body.dim) })
+          return "rules " + rules.join(" ") + " low " + block.layout.lowX + " high " + block.layout.highX
+            + " facts " + block.layout.factXs.join(",") + " 52W words " + words.map(function(s) { return s.what + "@" + s.left }).join(" ")
+        }
+        var shifted = []
+        stub.featuredSymbol = "AAPL"
+        stub.figures = aapl
+        for (var rangeSurface = 0; rangeSurface < 2; rangeSurface++) {
+          surface.wide = rangeSurface === 1
+          ;[false, true].forEach(function(retro) {
+            stub.retro = retro
+            var where = (surface.wide ? "window " : "popup ") + (retro ? "retro" : "smooth")
+            var onDay = null
+            ;[["1D", null], ["1M", month], ["1Y", year], ["5Y", weekly], ["All", young]].forEach(function(r) {
+              stub.range = r[0]
+              stub.historyEntry = r[1] ? { status: "ok", history: r[1], receivedAt: stub.now } : null
+              wait(50)
+              var at = infoPlace()
+              if (!!r[1] !== body.historyShown) shifted.push(where + " " + r[0] + " shows " + (body.historyShown ? "a range" : "the day"))
+              else if (onDay === null) onDay = at
+              else if (at !== onDay) shifted.push(where + " " + r[0] + ": " + at + ", on 1D " + onDay)
+            })
+          })
+        }
+        stub.retro = false
+        stub.range = "1D"
+        stub.historyEntry = null
+        root.check("nothing on the info lines moves from 1D to 1M, 1Y, 5Y, or All, a young listing's four facts included, in both looks, in the popup and the window",
+          shifted.length === 0, shifted.join(" | "))
         // AAPL's figures are Tuesday 1 September's: the day line is 1D that
         // Tuesday to its last second, TUE from Wednesday's first, on the
         // Saturday after, and on Labor Day, Monday 7 September, and SEP a
@@ -747,7 +791,7 @@ ShellRoot {
         var roomless = []
         for (var hw = 0; hw < 3; hw++) {
           surface.wide = hw > 0
-          surface.windowWidth = hw === 1 ? 560 : 720
+          surface.windowWidth = hw === 1 ? Style.space(560) : 720
           for (var hlook = 0; hlook < 2; hlook++) {
             stub.retro = hlook === 1
             for (var s = 0; s < states.length; s++) {
@@ -791,12 +835,14 @@ ShellRoot {
             var headerLine = nameText.parent
             var rangeRow = find(body, "rangeRow")
             var infoLines = find(body, "infoBlock")
-            // The info lines' last column, as wide as its widest slot.
+            // The info lines' last column, as wide as the widest slot any
+            // line puts there on any range.
             var lastFact = infoLines.layout.factXs.length - 1
             var lastSlot = 0
-            ;[body.periodLine, body.yearLine].forEach(function(line) {
-              if (line && line.facts[lastFact]) lastSlot = Math.max(lastSlot, infoLines.factWidth(line.facts[lastFact]))
-            })
+            ;[body.periodLine, body.yearLine].map(function(line) { return line ? line.facts : [] }).concat(body.infoFactLists)
+              .forEach(function(facts) {
+                if (facts[lastFact]) lastSlot = Math.max(lastSlot, infoLines.factWidth(facts[lastFact]))
+              })
             var placed = {
               name: xIn(nameText, 0) - textLeft,
               order: xIn(orderWord, orderWord.width) - textRight,
@@ -835,10 +881,11 @@ ShellRoot {
 
         // The window's smallest permitted height shows three whole rows: the
         // chart gives way first, down to 136 px; at the usual 760 px it keeps
-        // all 220. Found in the design pass of 14 October: the smallest
-        // window showed one row of the list.
-        // The window's chart gives way: set here, where the height is the
-        // window's own, not fitted to the body as the popup's is.
+        // all 220 and takes what whole rows leave over, less than a row.
+        // Found in the design pass of 14 October: the smallest window showed
+        // one row of the list.
+        // The window's chart fits the window: set here, where the height is
+        // the window's own, not fitted to the body as the popup's is.
         surface.fixedHeight = 760
         body.minChartHeight = Style.space(136)
         wait(50)
@@ -849,9 +896,10 @@ ShellRoot {
         stub.historyEntry = null
         wait(50)
         var minimum = root.measure()
-        root.check("the window's smallest height shows three whole rows, its chart giving way to 136 px, and its usual height keeps the whole chart",
+        root.check("the window's smallest height shows three whole rows, its chart giving way to 136 px, and its usual height keeps the whole chart and less than a row more",
           body.watchlist.height === 3 * body.rowPitch - body.rowGap && body.chartItem.height === Style.space(136)
-            && usualChart === Style.space(220) && minimum.footerGap === body.groupGap && minimum.footer <= surface.height,
+            && usualChart >= Style.space(220) && usualChart < Style.space(220) + body.rowPitch
+            && minimum.footerGap === body.groupGap && minimum.footer <= surface.height,
           "list " + body.watchlist.height + " of " + surface.height + ", chart " + body.chartItem.height + ", at 760 " + usualChart)
         // At the window's smallest, every scrollbar's thumb is at least 24
         // px long. Found in the walk of dev on 14 October: one row of nine
@@ -868,7 +916,7 @@ ShellRoot {
         // US, "New list…", and "Manage lists…" sat under it.
         var wideBefore = surface.wide
         surface.wide = true
-        surface.windowWidth = 560
+        surface.windowWidth = Style.space(560)
         stub.lists = [{ name: "", label: "All", count: stub.symbols.length, symbols: stub.symbols },
           { name: "US", label: "US", count: 3, symbols: stub.symbols.slice(0, 3) },
           { name: "Tech", label: "Tech", count: 2, symbols: ["MZ", "AAPL"] },
@@ -965,7 +1013,7 @@ ShellRoot {
         body.startAdding()
         for (var nw = 0; nw < 2; nw++) {
           surface.wide = nw === 1
-          surface.windowWidth = 560
+          surface.windowWidth = Style.space(560)
           for (var nlook = 0; nlook < 2; nlook++) {
             stub.retro = nlook === 1
             answers.forEach(function(answer) {
@@ -998,56 +1046,67 @@ ShellRoot {
           smallFaults.length === 0, smallFaults.join(" | "))
 
         // The window's footer sits one gap under a short list, as the
-        // popup's does, and at the window's bottom once the list fills it;
-        // its note, hint, and notice go with it. An empty named list keeps
-        // one row over it, an open list menu taller than the rows pushes it
-        // down under the menu, and the views that take the rows' place give
-        // it back there. At the window's smallest and tall, in both looks.
-        // Found in the edge pass of 15 October: one row in the window, a
-        // tall empty space, then "+ Add a symbol".
+        // popup's does, and at the window's bottom once the list fills it,
+        // the rows then ending one gap above it, the chart taking what they
+        // leave over; its note, hint, and notice go with it. An empty named
+        // list keeps one row over it, an open list menu taller than the rows
+        // pushes it down under the menu, and the views that take the rows'
+        // place give it back there. The chart's height follows the window's
+        // alone: every list at one height draws it the same. At the window's
+        // smallest, its usual 760, 850, and tall, in both looks. Found in the
+        // edge pass of 15 October: one row in the window, a tall empty space,
+        // then "+ Add a symbol"; and in the spacing review of 1.0.0: a list
+        // that filled the window ended 0 to 41 px over the footer's gap.
         root.load()
         stub.library = stub.symbols.slice()
         var fullList = stub.symbols.slice()
         surface.wide = true
         body.minChartHeight = Style.space(136)
         var windowFaults = []
+        var chartFaults = []
         // `rows` when the rows changed: past a row's slide or fade into its
         // place.
-        var windowFooter = function(where, rows) {
+        var windowFooter = function(where, rows, chart) {
           wait(rows ? 300 : 50)
           var footer = find(body, "footer")
           var gap = yIn(footer, 0) - root.lastRowBottom()
           var bottom = yIn(footer, footer.height)
           var room = surface.height - body.margins
           var ok = !footer.visible ? false : body.watchlist.interactive
-            ? bottom === room && gap >= body.groupGap && gap < body.groupGap + body.rowPitch
+            ? bottom === room && gap === body.groupGap
             : gap === body.groupGap && bottom <= room
           if (!ok) windowFaults.push(where + ": footer " + (footer.visible ? "ends " + bottom + " of " + room + ", " + gap + " under the rows"
             + (body.watchlist.interactive ? " of a list that fills it" : "") : "hidden"))
+          if (chart !== null && body.chartItem.height !== chart)
+            chartFaults.push(where + ": chart " + body.chartItem.height + ", " + chart + " under All")
         }
         ;[false, true].forEach(function(retro) {
           stub.retro = retro
-          ;[body.smallestHeight, 1400].forEach(function(tall) {
+          ;[body.smallestHeight, 760, 850, 1400].forEach(function(tall) {
             surface.fixedHeight = tall
             var at = (retro ? "retro " : "smooth ") + tall + " px "
             stub.listName = ""
             stub.symbols = fullList.slice()
-            windowFooter(at + "All", true)
+            wait(300)
+            var chart = body.chartItem.height
+            windowFooter(at + "All", true, chart)
             stub.listName = "Tech"
             stub.symbols = ["MZ", "AAPL"]
-            windowFooter(at + "two rows", true)
+            windowFooter(at + "two rows", true, chart)
             stub.symbols = ["MZ"]
-            windowFooter(at + "one row", true)
+            windowFooter(at + "one row", true, chart)
             body.hint = "Wheel over the pill to step symbols"
             body.note = "Removed AAPL"
             stub.settingsUnreadable = true
-            windowFooter(at + "one row, its hint, note, and notice")
+            // Only the popup shows a hint (Panel.qml), so its height here
+            // judges the footer, not the chart.
+            windowFooter(at + "one row, its hint, note, and notice", false, null)
             body.hint = ""
             body.note = ""
             stub.settingsUnreadable = false
             stub.listName = "Growth"
             stub.symbols = []
-            windowFooter(at + "an empty named list")
+            windowFooter(at + "an empty named list", false, chart)
             stub.listName = "Tech"
             stub.symbols = ["MZ"]
             stub.lists = [
@@ -1065,7 +1124,7 @@ ShellRoot {
               windowFaults.push(at + "the list menu: it ends at " + yIn(menu, menu.height) + ", the footer "
                 + yIn(menuFooter, 0) + "-" + yIn(menuFooter, menuFooter.height) + " in " + surface.height)
             body.closeListMenu()
-            windowFooter(at + "the list menu closed")
+            windowFooter(at + "the list menu closed", false, chart)
             ;[
               ["Manage lists", function() { body.openManageLists() }, function() { body.closeListViews() }],
               ["a symbol's lists", function() { body.openSymbolLists("MZ") }, function() { body.closeListViews() }],
@@ -1075,15 +1134,17 @@ ShellRoot {
               v[1]()
               wait(50)
               v[2]()
-              windowFooter(at + v[0] + " closed")
+              windowFooter(at + v[0] + " closed", false, chart)
             })
             stub.lists = Qt.binding(function() {
               return [{ name: "", label: "All", count: stub.symbols.length, symbols: stub.symbols }]
             })
           })
         })
-        root.check("the window's footer sits one gap under a short list, its note and notice too, and at its bottom once the list fills it, in both looks, at its smallest and tall",
+        root.check("the window's footer sits one gap under a short list, its note and notice too, and at its bottom once the list fills it, the rows one gap above it, in both looks, at its smallest and taller",
           windowFaults.length === 0, windowFaults.join(" | "))
+        root.check("the window's chart is as tall for every list at one window height, in both looks",
+          chartFaults.length === 0, chartFaults.join(" | "))
         stub.retro = false
         stub.listName = ""
         root.load()
@@ -1098,6 +1159,9 @@ ShellRoot {
         // only at the first answer, and the field jumped with it.
         body.minChartHeight = 0
         surface.fixedHeight = 0
+        // The band's column lays the chart's new height out on its next
+        // polish: the window's chart above was taller than the popup's.
+        wait(50)
         var opens = function() {
           var rowsHeight = body.fittedHeight(730)
           body.adding = true
@@ -1886,7 +1950,7 @@ ShellRoot {
             close: function() { body.cancelAdding(); stub.range = "1D"; stub.historyEntry = null } }
         ]
         var badKeys = []
-        surface.windowWidth = 560
+        surface.windowWidth = Style.space(560)
         for (var hw = 0; hw < 2; hw++) {
           surface.wide = hw === 1
           for (var hl = 0; hl < 2; hl++) {
@@ -2018,6 +2082,80 @@ ShellRoot {
           titleFaults.length === 0, titleFaults.join(" | "))
         root.check("a one-bar day's row draws its bar in both looks, and a day with none leaves the cell empty in both",
           rowInk.join(", ") === "smooth CKX drawn, smooth CVR empty, retro CKX drawn, retro CVR empty", rowInk.join(", "))
+        // The popup shows a row on a short screen at a large text size: the
+        // first-run hint gives way where it and a row don't both fit under
+        // the rest. At text size 16, on screens from just room for the rest
+        // and a row to just short of room for the hint too, in both looks.
+        // Found in the spacing walk: at 16 on an 850 px screen the popup
+        // showed its chrome and the hint, and not one row.
+        Style.fontBaseSize = 16
+        wait(100)
+        var bareChrome = body.chromeHeight
+        body.showFirstRunHint()
+        wait(50)
+        var hintRoom = Math.ceil(find(find(body, "footer"), "footerHint").implicitHeight) + Style.space(6)
+        var rowless = []
+        ;[false, true].forEach(function(retro) {
+          stub.retro = retro
+          for (var room = bareChrome + body.listRowHeight; room < bareChrome + body.listRowHeight + hintRoom; room += 8) {
+            body.screenRoom = room
+            surface.budget = room
+            wait(50)
+            if (root.lastRowBottom() <= yIn(body.watchlist, 0)) rowless.push((retro ? "retro " : "smooth ") + room + " px")
+          }
+        })
+        body.hint = ""
+        body.screenRoom = 0
+        surface.budget = 730
+        stub.retro = false
+        Style.fontBaseSize = 12
+        wait(100)
+        root.check("at text size 16, on a screen too short for the first-run hint and a row, the popup shows a row, in both looks",
+          rowless.length === 0, rowless.join(", "))
+
+        // The popup shows a row on a 768 px screen at every text size Omarchy
+        // offers (`omarchy display text size`, 9 to 20), in both looks: where
+        // the screen would hold no row beside the chart, the chart gives way
+        // to one; where it holds one, the chart keeps its height. The body's
+        // room is what the shell's card leaves it (Ui/PopupCard.qml): the
+        // screen less the bar, the card's margins, padding, and border.
+        // Found in the 1.0.2 leftovers review (O1): from text size 18 on a
+        // short screen the popup showed no row at all.
+        var shortFaults = []
+        var shortSeen = []
+        for (var size = 9; size <= 20; size++) {
+          Style.fontBaseSize = size
+          body.screenRoom = 0
+          surface.budget = 4000
+          wait(100)
+          var room = 768 - Style.bar.sizeHorizontal - 2 * Style.gapsOut - 2 * Style.spacing.popupPadding - 2 * Math.max(1, Style.space(2))
+          var fullChart = body.chartItem.height
+          var rowFitsWhole = body.chromeHeight + body.listRowHeight <= room
+          ;[false, true].forEach(function(retro) {
+            stub.retro = retro
+            body.screenRoom = room
+            surface.budget = room
+            wait(100)
+            var where = "size " + size + (retro ? " retro" : " smooth")
+            var chart = body.chartItem.height
+            if (retro === false) shortSeen.push(size + ": " + chart + (chart === fullChart ? "" : " of " + fullChart) + " in " + room)
+            // The card stops at the screen's room, the footer riding its
+            // edge: a row is in view when the list holds one and it ends one
+            // gap above the footer there.
+            var footerTop = Math.min(surface.height, room) - find(body, "footer").height
+            if (!(body.watchlist.height >= body.listRowHeight && yIn(body.watchlist, body.listRowHeight) + body.groupGap <= footerTop))
+              shortFaults.push(where + ": no row in " + room + " px, chart " + chart + ", list " + body.watchlist.height)
+            if (rowFitsWhole && chart !== fullChart) shortFaults.push(where + ": the chart gave way to " + chart + " though " + fullChart + " leaves a row")
+          })
+        }
+        body.screenRoom = 0
+        surface.budget = 730
+        stub.retro = false
+        Style.fontBaseSize = 12
+        wait(100)
+        console.log("popup charts on a 768 px screen: " + shortSeen.join(", "))
+        root.check("on a 768 px screen at every text size from 9 to 20 the popup shows a row, its chart giving way only where it must, in both looks",
+          shortFaults.length === 0, shortFaults.join(" | "))
         console.log("LAYOUT DONE")
         done.exitCode = root.failures ? 1 : 0
         done.start()
