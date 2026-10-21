@@ -76,7 +76,10 @@ Item {
     }
   }
 
+  // A bar struck now: one waiting is behind it, and never plays after it.
   function strike(bar) {
+    chimeWait.stop()
+    waiting = -1
     lastChime = Date.now()
     chimer.write(written(voice, bar) + "\n")
   }

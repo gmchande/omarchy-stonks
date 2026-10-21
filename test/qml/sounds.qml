@@ -115,7 +115,7 @@ ShellRoot {
   Stonks.Service { id: service }
   Stonks.Updates { id: updates }
   Stonks.Sounds { id: sounds; turnedOn: service.soundsOn; retro: service.retro }
-  Stonks.Bell { service: service; sounds: sounds }
+  Component { id: bellMaker; Stonks.Bell {} }
   QtObject {
     id: shellApi
     function serviceFor(id) { return { service: service, updates: updates, sounds: sounds } }
@@ -424,6 +424,33 @@ ShellRoot {
       service.persist({ style: "smooth" })
       harness.check("a replay of Tokyo's day is silent across lunch, where the chart draws nothing, and ticks only where what is drawn crosses, smooth and retro",
         lunch[0].ok && lunch[1].ok, lunch[0].detail + " || " + lunch[1].detail)
+      // The chimes over Tokyo's lunch, in both looks: the scrub moved into
+      // the break, where the chart draws nothing, strikes nothing; moved on
+      // to the afternoon's line, it strikes once.
+      var hero = harness.findWith(body, "pixelGrid")
+      var lunchChimes = [false, true].map(function(retro) {
+        service.persist({ style: retro ? "retro" : "smooth" })
+        wait(300)
+        var pts = body.motion.geometry.points
+        var gap = null
+        for (var p = 1; p < pts.length && !gap; p++) if (pts[p].brk) gap = [pts[p - 1].x, pts[p].x]
+        hero.scrubRequested(gap[0] - 0.02)
+        wait(100)
+        var struck = harness.chimes().length
+        for (var k = 2; k <= 4; k++) {
+          hero.scrubRequested(gap[0] + (gap[1] - gap[0]) * k / 6)
+          wait(80)
+        }
+        var inBreak = harness.chimes().length - struck
+        hero.scrubRequested(gap[1] + 0.02)
+        wait(150)
+        var afterBreak = harness.chimes().length - struck - inBreak
+        body.endScrub()
+        return { ok: inBreak === 0 && afterBreak === 1, detail: (retro ? "retro: " : "smooth: ") + inBreak + " in the break, " + afterBreak + " after" }
+      })
+      service.persist({ style: "smooth" })
+      harness.check("the scrub over Tokyo's lunch strikes nothing, and the afternoon's line strikes again, smooth and retro",
+        lunchChimes[0].ok && lunchChimes[1].ok, lunchChimes[0].detail + " || " + lunchChimes[1].detail)
       service.removeSymbol("7203.T")
       service.feature("MSFT")
       quiet()
@@ -701,36 +728,41 @@ ShellRoot {
       harness.check("a click on another row stops the replay's sound with the replay", endOf(before + 3) === "stopped", endOf(before + 3))
 
       // The market's bell, in retro's voice: as the clock passes the open
-      // or the close of the market of the stock last looked at, once; never
-      // late, after a long step of the clock; never while an app records
-      // from a microphone (the stand-in pw-dump's nodes); never with sounds
-      // off.
+      // or the close of the market of the stock last looked at, once, a
+      // Stonks started a moment before it included; never late, after a
+      // long step of the clock; never twice, with the clock set back across
+      // it; never while an app records from a microphone (the stand-in
+      // pw-dump's nodes); never with sounds off. Each pass is a Stonks
+      // started at its first moment.
       app.close()
       service.feature("AAPL")
       tryVerify(function() { return !!service.quotes.AAPL && service.featuredSymbol === "AAPL" }, 5000)
       var reg = service.quotes.AAPL.session.regular
       var bells = function() { return harness.starts().filter(function(s) { return played(s) === "sounds/retro/bell.wav" }).length }
-      var pass = function(from, to) {
+      var pass = function(moments) {
         var rung = bells()
-        service.now = from
-        service.now = to
+        service.now = moments[0]
+        var bell = bellMaker.createObject(harness, { service: service, sounds: sounds })
+        moments.slice(1).forEach(function(t) { service.now = t })
         wait(600)
+        bell.destroy()
         return bells() - rung
       }
       var micOn = JSON.stringify([{ type: "PipeWire:Interface:Node", info: { state: "running",
         props: { "media.class": "Stream/Input/Audio", "application.name": "a call" } } }])
       var meterOn = JSON.stringify([{ type: "PipeWire:Interface:Node", info: { state: "running",
         props: { "media.class": "Stream/Input/Audio", "stream.capture.sink": true } } }])
-      var rang = [pass(reg.start - 30, reg.start + 30), pass(reg.start - 3600, reg.start + 60)]
+      var rang = [pass([reg.start - 30, reg.start + 30]), pass([reg.start - 3600, reg.start + 60]),
+        pass([reg.start - 2, reg.start - 1, reg.start, reg.start - 1, reg.start, reg.start + 1])]
       harness.writeText(harness.fakeState + "/pw-dump.json", micOn)
-      rang.push(pass(reg.end - 30, reg.end + 30))
+      rang.push(pass([reg.end - 30, reg.end + 30]))
       harness.writeText(harness.fakeState + "/pw-dump.json", meterOn)
-      rang.push(pass(reg.end - 30, reg.end + 30))
+      rang.push(pass([reg.end - 30, reg.end + 30]))
       service.persist({ sounds: false })
-      rang.push(pass(reg.start - 30, reg.start + 30))
+      rang.push(pass([reg.start - 30, reg.start + 30]))
       service.now = Math.floor(Date.now() / 1000)
-      harness.check("the bell rings at the open in retro's voice, not late, not while a microphone records though a level meter may run, and not with sounds off",
-        rang.join(",") === "1,0,0,1,0", rang.join(","))
+      harness.check("the bell rings at the open in retro's voice, a moment after Stonks starts too, not late, not twice with the clock set back, not while a microphone records though a level meter may run, and not with sounds off",
+        rang.join(",") === "1,0,1,0,1,0", rang.join(","))
 
       console.log("SOUNDS DONE")
       done.exitCode = harness.failures ? 1 : 0

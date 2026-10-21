@@ -257,7 +257,8 @@ function rowBar(grid, row) {
 
 // The bar the chart sounds at `x` (0..1 along it), or -1 where it draws
 // nothing: in smooth the line's height there (`chart.geometry`), as the
-// scrub's dot sits; in retro the lit row of the column there (`chart.grid`,
+// scrub's dot sits, silent across a break (`brk`, Tokyo's lunch), where the
+// line lifts; in retro the lit row of the column there (`chart.grid`,
 // PixelChart's), dark columns silent.
 function barAt(chart, x) {
   if (x < 0) return -1
@@ -267,7 +268,11 @@ function barAt(chart, x) {
     var row = grid.levels[Math.max(0, Math.min(grid.columns - 1, Math.floor(x * grid.columns)))]
     return row === undefined ? -1 : rowBar(grid, row)
   }
-  var y = chart.geometry ? Chart.yAt(chart.geometry.points, x) : null
+  var pts = chart.geometry ? chart.geometry.points : []
+  var next = 1
+  while (next < pts.length && pts[next].x < x) next++
+  if (next < pts.length && pts[next].brk && x > pts[next - 1].x) return -1
+  var y = Chart.yAt(pts, x)
   return y === null ? -1 : barOf(1 - y)
 }
 

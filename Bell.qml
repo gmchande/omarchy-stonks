@@ -12,15 +12,19 @@ Item {
 
   property var service: null
   property var sounds: null
-  // The clock's second last heard, 0 before the first.
+  // The latest second of the clock heard: where Stonks started, then each
+  // step on. A clock set back is not heard until it passes this again, so
+  // no bell rings twice.
   property int heardAt: 0
+  Component.onCompleted: if (service) heardAt = service.now
 
   Connections {
     target: root.service
     function onNowChanged() {
       var before = root.heardAt
+      if (root.service.now <= before) return
       root.heardAt = root.service.now
-      if (!before || !root.sounds || !root.sounds.turnedOn || root.service.screensOff) return
+      if (!root.sounds || !root.sounds.turnedOn || root.service.screensOff) return
       var quote = root.service.quotes[root.service.featuredSymbol]
       if (Market.bellBetween(quote, before, root.service.now, root.service.calendars) !== "") root.sounds.ring()
     }
