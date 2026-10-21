@@ -175,8 +175,8 @@ ShellRoot {
       var count = root.calls("AAPL.history")
       history.request("AAPL", "1Y", true)
       history.request("AAPL", "2Y", true)
-      wait(300)
-      root.check("dark pending history sends nothing and retains only the current range", root.calls("AAPL.history") === count)
+      var pendingHeld = within(5000, function() { return history.waitingForScreen || root.calls("AAPL.history") > count })
+      root.check("dark pending history sends nothing and retains only the current range", pendingHeld && root.calls("AAPL.history") === count)
       wake()
       awaitState(function() { return !history.busy }, 5000)
       root.check("wake sends the current held range once", root.calls("AAPL.history") === count + 1 && history.entries["AAPL|2Y"].status === "ok" && !history.entries["AAPL|1Y"])
@@ -186,8 +186,8 @@ ShellRoot {
       service.screensAnsweredMs = 0
       count = root.calls("MSFT.history")
       history.request("MSFT", "1Y", true)
-      wait(100)
-      root.check("history waits for a current screen answer", root.calls("MSFT.history") === count)
+      var screenHeld = within(5000, function() { return history.waitingForScreen || root.calls("MSFT.history") > count })
+      root.check("history waits for a current screen answer", screenHeld && root.calls("MSFT.history") === count)
       wake()
       awaitState(function() { return !history.busy }, 5000)
       root.check("a fresh on-screen answer releases the held hero", root.calls("MSFT.history") === count + 1 && history.entries["MSFT|1Y"].status === "ok")
@@ -197,8 +197,8 @@ ShellRoot {
       awaitState(function() { return root.calls("FAIL.history") >= 1 }, 3000)
       screens.screensOff = true
       count = root.calls("FAIL.history")
-      wait(2800)
-      root.check("a pending history retry starts no request in darkness", root.calls("FAIL.history") === count)
+      var retryHeld = within(5000, function() { return history.waitingForScreen || root.calls("FAIL.history") > count })
+      root.check("a pending history retry starts no request in darkness", retryHeld && root.calls("FAIL.history") === count)
       wake()
       awaitState(function() { return !history.busy }, 5000)
       root.check("the pending retry runs once after wake", root.calls("FAIL.history") === count + 1 && history.entries["FAIL|1Y"].status === "failed")
@@ -213,8 +213,8 @@ ShellRoot {
       root.chainHistory = true
       flag("AAPL.history.hold", false)
       awaitState(function() { return !root.chainHistory }, 3000)
-      wait(200)
-      root.check("an answer landing in darkness starts no next chart", root.calls("MSFT.history") === count)
+      var chainHeld = within(5000, function() { return history.waitingForScreen || root.calls("MSFT.history") > count })
+      root.check("an answer landing in darkness starts no next chart", chainHeld && root.calls("MSFT.history") === count)
       wake()
       awaitState(function() { return !history.busy }, 4000)
       root.check("the chained chart resumes once after wake", root.calls("MSFT.history") === count + 1 && history.entries["MSFT|5Y"].status === "ok")
@@ -225,8 +225,10 @@ ShellRoot {
       service.setRange("10Y")
       service.testGate.pause = "none"
       service.testGate.report(["ok"], 0, service.testGate.ticket)
-      wait(200)
-      root.check("a shared range change and host reopening in darkness start no history", root.calls("BTC-USD.history") === count)
+      var rangeHeld = within(5000, function() { return history.waitingForScreen || root.calls("BTC-USD.history") > count })
+      root.check("a shared range change and host reopening in darkness start no history",
+        rangeHeld && history.waitingForScreen && history.job && history.job.symbol === "BTC-USD" && history.job.range === "10Y"
+          && root.calls("BTC-USD.history") === count)
       wake()
       awaitState(function() { return !history.busy }, 4000)
       root.check("wake fetches the shared range's current hero", root.calls("BTC-USD.history") === count + 1 && history.entries["BTC-USD|10Y"].status === "ok")
@@ -253,9 +255,12 @@ ShellRoot {
       awaitState(function() { return body.search.active }, 3000)
       var searches = root.calls("SEARCH.asked")
       keyClick("Z"); keyClick("Z"); keyClick("Z")
-      wait(400)
+      var searchHeld = within(5000, function() {
+        return (service.testFundamentals.pendingUrl !== "" && body.search.requestedQuery === "ZZZ")
+          || root.calls("SEARCH.asked") > searches || root.calls("FUNDAMENTALS") > before
+      })
       root.check("dark fundamentals and a first search start no HTTP request",
-        root.calls("FUNDAMENTALS") === before && root.calls("SEARCH.asked") === searches)
+        searchHeld && root.calls("FUNDAMENTALS") === before && root.calls("SEARCH.asked") === searches)
       wake()
       awaitState(function() { return body.search.resultsQuery === "ZZZ" && !service.testFundamentals.busy }, 6000)
       root.check("wake resumes both pending search and fundamentals", root.calls("SEARCH.asked") === searches + 1
@@ -269,8 +274,8 @@ ShellRoot {
       awaitState(function() { return root.calls("FUNDAMENTALS") === before + 1 }, 3000)
       screens.screensOff = true
       flag("FUNDAMENTALS.hold", false)
-      wait(300)
-      root.check("a fundamentals snapshot landing in darkness starts no closes request", root.calls("FUNDAMENTALS") === before + 1)
+      var closesHeld = within(5000, function() { return service.testFundamentals.pendingUrl !== "" || root.calls("FUNDAMENTALS") > before + 1 })
+      root.check("a fundamentals snapshot landing in darkness starts no closes request", closesHeld && root.calls("FUNDAMENTALS") === before + 1)
       wake()
       awaitState(function() { return !service.testFundamentals.busy }, 4000)
       root.check("wake sends the held fundamentals closes once", root.calls("FUNDAMENTALS") === before + 2 && service.fundamentals.MSFT.status === "ok")
