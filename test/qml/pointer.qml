@@ -1524,6 +1524,8 @@ ShellRoot {
         body.showingHelp = false
         stub.range = "1D"
         stub.order = "pct"
+        stub.lists = [{name: "", label: "All", count: stub.symbols.length, symbols: stub.symbols.slice()},
+          {name: "Watching", label: "Watching", count: 0, symbols: []}]
         var status = root.find(body, "statusText")
         var away = status.mapToItem(body, status.width / 2, status.height / 2)
         var settings = function() {
@@ -1576,7 +1578,7 @@ ShellRoot {
           // the opening's double-click moment, and a search result.
           body.openSymbolLists(stub.symbols[0])
           wait(Application.styleHints.mouseDoubleClickInterval + 100)
-          var listRow = root.findAll(body, "symbolListRow")[0]
+          var listRow = root.findAll(body, "symbolListRow")[1]
           var listFault = pressOn((look + "symbol list row").replace(/ /g, "-"), root.find(listRow, "rowFill"), listRow)
           if (listFault !== "") pressFaults.push(listFault)
           body.closeListViews()
