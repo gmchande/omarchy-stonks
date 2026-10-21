@@ -70,11 +70,13 @@ function freshnessText(fresh, quote, calendars) {
   // With nothing ever answered there was nothing to refresh: "Refresh
   // failed" is for a symbol that had data and lost it.
   if (!fresh.asOf) return fresh.state === "failed" ? "NO DATA FOR THIS SYMBOL" : fresh.state === "unavailable" || fresh.state === "overdue" ? "NO DATA" : ""
-  var asOf = "AS OF " + (fresh.earlier ? Format.WEEKDAYS[Format.localClock(fresh.asOf, quote.gmtoffset).weekday].toUpperCase() + " " : "")
+  var head = Quote.headlineQuote(quote)
+  var chartTrade = head && head.source === "chart"
+  var asOf = (chartTrade ? "LAST TRADE " : "AS OF ") + (fresh.earlier ? Format.WEEKDAYS[Format.localClock(fresh.asOf, quote.gmtoffset).weekday].toUpperCase() + " " : "")
     + Market.printClock(quote, fresh.asOf, calendars)
   if (fresh.state === "failed") return "REFRESH FAILED · " + asOf
   if (fresh.state === "overdue") return "UPDATE OVERDUE · " + asOf
-  if (fresh.state === "aged" || fresh.state === "saved") return asOf
+  if (chartTrade || fresh.state === "aged" || fresh.state === "saved") return asOf
   return ""
 }
 

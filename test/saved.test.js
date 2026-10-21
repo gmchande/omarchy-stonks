@@ -134,7 +134,7 @@ test("across every saved intraday response the filter drops only those eleven ba
     .toEqual([1790946900, 1790947200, 1790947800])
 })
 
-test("the headline is Yahoo's regular-market quote with its own time; the chart only stands in", () => {
+test("the headline uses the regular quote or labels the last chart trade with its time", () => {
   expect(M.headlineQuote(quote)).toEqual({ price: quote.price, t: quote.marketTime, source: "quote" })
   expect(M.regularClose(quote)).toBe(quote.price)
   const regular = M.regularPoints(quote)
@@ -145,6 +145,20 @@ test("the headline is Yahoo's regular-market quote with its own time; the chart 
   const nothing = { ...quote, price: null, points: [] }
   expect(M.headlineQuote(nothing)).toBeNull()
   expect(M.regularClose(nothing)).toBeNull()
+  // A constructed omission, not a claim that this capture lacked metadata.
+  const night = M.parseChart(fixture("moments/listings-2026-10-07-0100/nest.json"))
+  const now = Date.UTC(2026, 9, 7, 5) / 1000
+  for (const omitted of [{ price: null }, { marketTime: null }]) {
+    const fallback = { ...night, ...omitted }
+    const fresh = M.freshness({ status: "ok" }, fallback, now, 0)
+    expect(M.headlineQuote(fallback)).toEqual({ price: 249.77999877929688, t: 1791316500, source: "chart" })
+    expect(M.freshnessText(fresh, fallback, calendars)).toBe("LAST TRADE TUE 15:55")
+    expect(M.freshnessWarns(fresh)).toBe(false)
+    expect(M.freshnessText({ ...fresh, earlier: false }, fallback, calendars)).toBe("LAST TRADE 15:55")
+    expect(M.freshnessText({ ...fresh, state: "failed" }, fallback, calendars)).toBe("REFRESH FAILED · LAST TRADE TUE 15:55")
+    expect(M.freshnessText({ ...fresh, state: "overdue" }, fallback, calendars)).toBe("UPDATE OVERDUE · LAST TRADE TUE 15:55")
+  }
+  expect(M.freshnessText(M.freshness({ status: "ok" }, night, now, 0), night, calendars)).toBe("")
 })
 
 const sep4 = M.parseChart(fixture("aapl-2026-09-04-day-prepost.json"))

@@ -153,6 +153,10 @@ ShellRoot {
   // midnight, its night quiet for over an hour twice, and nine pre-market
   // prints hours apart; or its 3M, 66 days.
   readonly property var overnight: {
+    // A constructed metadata omission: the saved answer itself had a quote.
+    if (/^popup-last-trade-(smooth|retro)$/.test(stateName)) return {
+      moment: "2026-10-07-0100", folder: "listings-2026-10-07-0100", symbol: "NEST", listed: ["NEST"],
+      month: false, scrub: false, dated: true, sweep: false, lastTrade: true }
     var match = /^popup-overnight-(day|night|sunday|live|\d{4}-\d\d-\d\d-\d{4})-(nest|silk|reed|ez|toy)(-1m|-1m-scrub|-scrub)?-(smooth|retro)$/.exec(stateName)
     if (match) return { moment: match[1], symbol: match[2].toUpperCase(), month: match[3] === "-1m" || match[3] === "-1m-scrub",
       scrub: !!match[3] && match[3] !== "-1m", dated: /^\d/.test(match[1]), sweep: false }
@@ -476,6 +480,7 @@ ShellRoot {
       // Read as the feeds read them: the US listings in cents from $1.
       listed.forEach(function(s) {
         quotes[s] = Quote.parseChart(read(file(s)), Market.centExchanges(stub.calendars))
+        if (root.overnight.lastTrade) quotes[s] = Object.assign({}, quotes[s], { price: null, marketTime: null })
       })
       us.forEach(function(s) {
         allDay[s] = { status: "ok", allDay: tradable ? tradable[s] : true, at: 0 }
