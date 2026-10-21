@@ -35,20 +35,17 @@ none() {
   while read -r hit; do fail "$hit: '$pattern' is not allowed here"; done <<< "$hits"
 }
 
-# External commands run only in the feeds, search, the version watch's
-# shell restart and update, and the sounds' pw-play; files are read and
-# written only by the service, the version watch reads the manifest, the
-# trend colours read the theme's colours, and the sounds write the replay's;
-# one service owns the feeds; the quote URL is the
+# External commands run only in the feeds, search, and the version watch's
+# shell restart and update; files are read and written only by the
+# service, the version watch reads the manifest, and the trend colours read
+# the theme's colours; one service owns the feeds; the quote URL is the
 # quote feed's, the fundamentals URLs the fundamentals feed's, the overnight
 # URL the overnight feed's, the all-day URL the all-day feed's, and the
 # manifest's URL the release feed's. The plugin has one IPC target, and
 # only the window's host acts on Hyprland.
-only '\bProcess\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Updates.qml Sounds.qml
-only '\bFileView\s*\{' Service.qml Updates.qml TrendColors.qml Sounds.qml
-only '^import Quickshell\.Io' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Service.qml IpcTarget.qml Updates.qml TrendColors.qml Sounds.qml
-# A command started by exec is a sound's: pw-play, and only there.
-only '\.exec\(|pw-play' Sounds.qml
+only '\bProcess\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Updates.qml
+only '\bFileView\s*\{' Service.qml Updates.qml TrendColors.qml
+only '^import Quickshell\.Io' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Service.qml IpcTarget.qml Updates.qml TrendColors.qml
 only '\bIpcHandler\s*\{' IpcTarget.qml
 only '^import Quickshell\.Hyprland' WindowHost.qml
 only '\b(QuoteFeed|HistoryFeed|FundamentalsFeed|OvernightFeed|AllDayFeed|ReleaseFeed)\s*\{' Service.qml

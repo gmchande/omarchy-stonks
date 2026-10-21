@@ -56,7 +56,6 @@ plugin_tree() {
   root="$work"
   mkdir -p "$root/plugin"
   cp "$plugin"/*.qml "$plugin"/*.js "$plugin/calendars.json" "$plugin/manifest.json" "$root/plugin/"
-  cp -r "$plugin/sounds" "$root/plugin/"
   ln -s /usr/share/omarchy/shell/Ui /usr/share/omarchy/shell/Commons "$root/"
   cp "$here/$1" "$root/shell.qml"
   cp "$here/HarnessExit.qml" "$root/"

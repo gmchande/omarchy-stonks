@@ -37,13 +37,12 @@ start "popup harness" bash test/qml/popup.sh
 start "charts fetched ahead harness" bash test/qml/ahead.sh
 start "window rows harness" bash test/qml/window-rows.sh
 start "keys harness" bash test/qml/keys.sh
-start "sounds harness" bash test/qml/sounds.sh
 start "quote queue harness" bash test/qml/run.sh
 start "service harness" bash test/qml/service.sh
 start "update check harness" bash test/qml/updates.sh
 start "Quickshell crash handling (stand-in)" bash test/qml/crash-check.sh
 start "history harness" bash test/qml/history.sh
-start "data files harness" bash test/qml/data-files.sh
+start "1.0.0 data file harness" bash test/qml/data-files.sh
 fill
 
 # A bun test file is named with ./: bare, bun takes it as a substring filter

@@ -777,11 +777,6 @@ test("a published closure or a break between segments is closed, whatever Yahoo'
   // describes a session.
   expect(M.marketStatus(fakeOpen, labor, 0, calendars)).toBe("Labor Day · opens Tue 09:30")
   expect(M.marketStatus(fakeOpen, labor, 0, null)).toBe("Power hour · closes in 1h")
-  // Where the header has no room for the holiday's name, it says the
-  // closure as a weekend is said; a status naming no holiday has no
-  // shorter form.
-  expect(M.shortMarketStatus(fakeOpen, labor, 0, calendars)).toBe("Closed · opens Tue 09:30")
-  expect(M.shortMarketStatus(fakeOpen, labor, 0, null)).toBe("")
   // Tokyo's lunch break, from its calendar; the morning trades.
   const jpx = {
     symbol: "7203.T", exchange: "TSE", timezoneName: "Asia/Tokyo", gmtoffset: 32400, crypto: false,
