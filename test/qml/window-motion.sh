@@ -6,6 +6,11 @@
 # the header's animal closing and opening its eyes at the bell and changing
 # at once on every other change, and a closing surface holding still. HOME
 # and curl are scratch.
+if [ "$#" -eq 0 ]; then
+  for chapter in charts rows; do bash "$0" "$chapter" || exit "$?"; done
+  exit 0
+fi
+export STONKS_MOTION_FLOW="$1"
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree window-motion.qml
 patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property var testBody: root.body\n  readonly property alias testKeyCatcher: keyCatcher\n  readonly property alias testWindow: window'

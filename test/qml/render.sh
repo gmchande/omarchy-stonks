@@ -8,6 +8,25 @@
 # such as a saved moment the list leaves out. --part I/N renders every Nth
 # state from the Ith, so N runs side by side render every state once
 # (test/review.sh).
+if [ "${1:-}" = --anchors ]; then
+  saved_answers=none
+  source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+  plugin_tree popup-anchor.qml
+  patch_copy plugin/Panel.qml 's/open: root.opened/open: false/'
+  patch_copy plugin/Panel.qml '/readonly property int panelWidth:/a\  readonly property alias testCard: panel\n  readonly property alias testHeldAnchor: heldAnchor'
+  # A fixed screen for the unmapped placement specimen; the installed
+  # KeyboardPanel still computes its actual anchor, origin and clamping.
+  rm "$root/Ui"
+  cp -r /usr/share/omarchy/shell/Ui "$root/Ui"
+  patch_copy Ui/KeyboardPanel.qml 's/readonly property real screenW: screen ? screen.width : 0/readonly property real screenW: 1000/; s/readonly property real screenH: screen ? screen.height : 0/readonly property real screenH: 900/'
+  patch_copy Ui/KeyboardPanel.qml 's/readonly property var anchorWindow: /property var anchorWindow: /'
+  patch_copy plugin/HeldAnchor.qml 's/readonly property var barWindow: /property var barWindow: /'
+  export QT_QPA_PLATFORM=wayland
+  run_qs 15
+  sed -n 's/^.*qml: ANCHOR POSES //p' "$work/log" > "$2"
+  [ -s "$2" ] || { echo "FAIL no anchor poses"; code=1; }
+  finish "ANCHOR DONE"
+fi
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 out="${STONKS_VISUAL_DIR:-$plugin/out/render}"
 mkdir -p "$out"
@@ -207,6 +226,10 @@ else
     [ -n "$matched" ] || { echo "FAIL no state matches $name"; exit 1; }
     states="$states$matched"
   done
+fi
+if [[ $states == *popup-anchor-* ]]; then
+  export STONKS_ANCHOR_POSES="$work/anchors.json"
+  bash "$0" --anchors "$STONKS_ANCHOR_POSES"
 fi
 # Every render is in an installed Omarchy theme: the one the state's name
 # ends with (popup-fill-up-smooth-kanagawa, theme-retro-white), else Tokyo

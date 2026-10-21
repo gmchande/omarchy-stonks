@@ -1301,13 +1301,14 @@ ShellRoot {
       tryVerify(function() { return !body.chartLoading }, 5000)
       dropEntry("SLOW|1M")
       dropEntry("SLOW|3M")
-      service.setRange("1M")
       var selectedRanges = []
       var latestRange = function() {
         var said = body.chartSymbol + "|" + body.chartRange
         if (selectedRanges[selectedRanges.length - 1] !== said) selectedRanges.push(said)
       }
       body.chartChanged.connect(latestRange)
+      latestRange()
+      service.setRange("1M")
       service.setRange("3M")
       tryVerify(function() { return harness.answered("SLOW|3M") && !service.testHistoryFeed.busy }, 5000)
       waitForRendering(body)

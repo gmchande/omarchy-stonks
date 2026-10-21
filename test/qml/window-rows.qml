@@ -431,6 +431,7 @@ ShellRoot {
         mouseWheel(body, at.x, at.y, 0, notch, Qt.LeftButton)
         tryVerify(function() { return !watchlist.settling }, 2000)
         var kept = watchlist.dragSymbol === symbol
+        var wheeled = Math.abs(watchlist.contentY - scrollBefore + notch / 120 * watchlist.rowPitch) < 1
         var drop = watchlist.displayedSymbols.slice()
         var from = drop.indexOf(symbol)
         var to = Math.round(from + (by + watchlist.contentY - scrollBefore) / watchlist.rowPitch)
@@ -438,7 +439,7 @@ ShellRoot {
         drop.splice(Math.max(0, Math.min(drop.length, to)), 0, symbol)
         mouseRelease(body, at.x, at.y)
         within(2000, ready)
-        return (kept && service.symbols.join() === drop.join()) + " dragged " + symbol + " -> " + service.symbols.join() + " wanted " + drop.join()
+        return (kept && wheeled && service.symbols.join() === drop.join()) + " dragged " + symbol + " -> " + service.symbols.join() + " wanted " + drop.join()
       }
       reset("", "smooth")
       var wheelDown = underPointer("AAPL", 8, -120)

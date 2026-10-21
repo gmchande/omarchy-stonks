@@ -65,6 +65,7 @@ ShellRoot {
   // AAPL's day cut at noon, and back (see the fake curl's overnight.set).
   Process { id: noonAapl; command: ["sh", "-c", "echo aapl-noon > \"$0/overnight.set\"", Quickshell.env("STONKS_FAKE_STATE")] }
   Process { id: wholeAapl; command: ["rm", "-f", Quickshell.env("STONKS_FAKE_STATE") + "/overnight.set"] }
+  Process { id: quoteFile }
   // LATE's quote failing, and answering again (see the fake curl).
   Process { id: lateDown; command: ["touch", Quickshell.env("STONKS_FAKE_STATE") + "/LATE.down"] }
   Process { id: lateUp; command: ["rm", "-f", Quickshell.env("STONKS_FAKE_STATE") + "/LATE.down"] }
@@ -1030,11 +1031,111 @@ ShellRoot {
       rest()
     }
 
+    // Position clauses moved from the behavior flows. These observe real
+    // joins, a pointer hold ending, and the scroll pulled back at a removal;
+    // the renderer's paused poses show their ink, not these transitions.
+    function holdQuote(symbol, held) {
+      var path = Quickshell.env("STONKS_FAKE_STATE") + "/" + symbol + ".quote.hold"
+      quoteFile.command = held ? ["touch", path] : ["rm", "-f", path]
+      quoteFile.running = true
+      tryVerify(function() { return !quoteFile.running }, 2000)
+    }
+
+    function pickSymbol(body, keys, symbol) {
+      keys.forceActiveFocus()
+      keyClick(Qt.Key_A)
+      tryVerify(function() { return body.adding && body.search.active }, 2000)
+      var field = harness.find(body.search, "searchField")
+      field.forceActiveFocus()
+      keyClick(Qt.Key_A, Qt.ControlModifier)
+      for (var c = 0; c < symbol.length; c++) keyClick(symbol.charAt(c))
+      tryVerify(function() { return body.search.resultsQuery === symbol && body.search.results.length === 1 }, 3000)
+      keyClick(Qt.Key_Return)
+      tryVerify(function() { return !body.adding }, 2000)
+    }
+
+    function rowPlaces(body, watchlist, keys) {
+      sixRows(body, "NVDA", "1D")
+      service.setOrder("pct")
+      wait(400)
+      var join = function(two, held) {
+        service.removeSymbol("SLOW")
+        service.removeSymbol("FLAT")
+        wait(200)
+        holdQuote("SLOW", true)
+        pickSymbol(body, keys, "SLOW")
+        if (two) pickSymbol(body, keys, "FLAT")
+        if (held) {
+          mouseMove(watchlist, 20, watchlist.rowPitch + 10)
+          tryVerify(function() { return watchlist.sortHeld }, 2000)
+        }
+        else mouseMove(body, 1, 1)
+        tryVerify(function() { return !!watchlist.rowItem("SLOW") }, 2000)
+        var row = watchlist.rowItem("SLOW")
+        var positions = []
+        var frames = Qt.createQmlObject('import QtQuick; FrameAnimation { running: true }', harness)
+        frames.triggered.connect(function() {
+          if (row.visible && row.opacity > 0 && watchlist.displayedSymbols.indexOf("SLOW") >= 0)
+            positions.push(row.y - watchlist.contentY)
+        })
+        var stillWaiting = !service.quotes.SLOW
+        holdQuote("SLOW", false)
+        tryVerify(function() { return !!service.quotes.SLOW && (!two || !!service.quotes.FLAT) }, 5000)
+        tryVerify(function() { return row.resting && !watchlist.settling }, 3000)
+        var place = watchlist.displayedSymbols.indexOf("SLOW")
+        mouseMove(body, 1, 1)
+        wait(400)
+        frames.destroy()
+        var at = place * watchlist.rowPitch - watchlist.contentY
+        return stillWaiting && positions.length > 1 && positions.every(function(y) { return Math.abs(y - at) < 0.5 })
+          && place >= 0 && watchlist.displayedSymbols.indexOf("SLOW") === place
+      }
+      var single = join(false, false)
+      var second = join(true, false)
+      var pointer = join(false, true)
+      harness.check("an arriving row fades at its own place without sliding across the rows, alone or before a second add", single && second,
+        "single=" + single + " two=" + second)
+      harness.check("a pointer-held arrival stays at its place when the pointer leaves", pointer)
+
+      service.removeSymbol("SLOW")
+      sixRows(body, "NVDA", "1D")
+      app.close()
+      app.testWindow.implicitHeight = body.chromeHeight + 3 * body.rowPitch
+      app.open("{}")
+      wait(400)
+      watchlist.contentY = watchlist.contentHeight - watchlist.height
+      wait(100)
+      var screenY = function(s) { return Math.round(watchlist.rowItem(s).y - watchlist.contentY) }
+      var below = watchlist.displayedSymbols[5]
+      var above = watchlist.displayedSymbols[3]
+      var belowAt = [screenY(below)]
+      var aboveAt = [screenY(above)]
+      var frames = Qt.createQmlObject('import QtQuick; FrameAnimation { running: true }', harness)
+      frames.triggered.connect(function() { belowAt.push(screenY(below)); aboveAt.push(screenY(above)) })
+      body.removeRow(watchlist.displayedSymbols[4])
+      tryVerify(function() { return !watchlist.settling && watchlist.displayedSymbols.every(function(s) { return watchlist.rowItem(s).resting }) }, 3000)
+      frames.destroy()
+      var end = aboveAt[aboveAt.length - 1]
+      harness.check("an end removal keeps the row below still while the rows above close the gap",
+        belowAt.every(function(y) { return y === belowAt[0] }) && end === aboveAt[0] + watchlist.rowPitch
+          && aboveAt.some(function(y) { return y > aboveAt[0] && y < end })
+          && aboveAt.every(function(y, i) { return i === 0 || y >= aboveAt[i - 1] }),
+        belowAt.join(",") + " / " + aboveAt.join(","))
+    }
+
     function test_flows() {
       tryVerify(function() {
         return service.quotes.AAPL && service.quotes.MSFT && service.quotes.NVDA
           && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0
       }, 10000)
+      if (Quickshell.env("STONKS_MOTION_FLOW") === "rows") {
+        app.open("{}")
+        tryVerify(function() { return !!app.testBody }, 3000)
+        rowPlaces(app.testBody, app.testBody.watchlist, app.testKeyCatcher)
+        app.close()
+        harness.finish()
+        return
+      }
 
       // The window's first open in this process draws its chart in over
       // about 320 ms, as rendered: a draw-in spent before the window's first

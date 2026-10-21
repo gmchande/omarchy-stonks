@@ -1527,17 +1527,23 @@ ShellRoot {
         var status = root.find(body, "statusText")
         var away = status.mapToItem(body, status.width / 2, status.height / 2)
         var settings = function() {
-          return [stub.range, stub.order, body.showingHelp, body.listMenuOpen, JSON.stringify(stub.lastSettings), body.adding, body.managingLists].join(",")
+          return [stub.range, stub.order, body.showingHelp, body.listMenuOpen, JSON.stringify(stub.lastSettings), body.adding, body.managingLists,
+            JSON.stringify(stub.memberships), stub.symbols.join("|")].join(",")
+        }
+        var pressedIn = function(item) {
+          if (item.pressed === true) return true
+          return item.children.some(function(child) { return pressedIn(child) })
         }
         var pressOn = function(name, fill, target) {
           var at = target.mapToItem(body, target.width / 2, target.height / 2)
           mouseMove(body, away.x, away.y)
           var before = settings()
           mousePress(body, at.x, at.y)
+          var reached = pressedIn(fill.parent)
           mouseMove(body, away.x, away.y)
           mouseRelease(body, away.x, away.y)
           var after = settings()
-          return after === before ? "" : name + ": " + before + " -> " + after
+          return reached && after === before ? "" : name + ": pressed=" + reached + " " + before + " -> " + after
         }
         var pressFaults = []
         ;[false, true].forEach(function(retro) {

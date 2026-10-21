@@ -58,6 +58,8 @@ ShellRoot {
   // join the ordinary render diff; no behavior test prescribes their ink.
   readonly property var controlState: /^(popup|window)-controls-([a-z]+)-(hover|press)-(smooth|retro)$/.exec(stateName)
   readonly property var anchorState: /^popup-anchor-(left|center|right)-(open|held|next)-(smooth|retro)$/.exec(stateName)
+  FileView { id: anchorPoses; path: Quickshell.env("STONKS_ANCHOR_POSES"); blockLoading: true }
+  readonly property var anchorPose: anchorState ? JSON.parse(anchorPoses.text())[anchorState[1] + "-" + anchorState[2]] : null
   readonly property var motionPose: /^popup-motion-(join|crossing|dragwheel|scroll|endremove|notefade|breadth|look|neutral)-(smooth|retro)$/.exec(stateName)
   readonly property var refusedList: /^min-window-lists-refused-(menu|manage)-(smooth|retro)$/.exec(stateName)
   readonly property bool interactivePicture: !!controlState || !!anchorState || !!motionPose || !!refusedList
@@ -973,10 +975,8 @@ ShellRoot {
       anchors.fill: parent
       color: root.groundColor
 
-      // A top bar and its real pill, with HeldAnchor's saved position. The
-      // card origin is KeyboardPanel.qml's top-bar placement and clamping,
-      // on this scene's screen. The pictures expose a detached/wrong anchor
-      // or a held anchor that follows a widening pill.
+      // The origins came from the real Panel/HeldAnchor/KeyboardPanel in
+      // popup-anchor.qml, unmapped on Wayland. This scene paints them.
       Rectangle {
         visible: !!root.anchorState
         width: parent.width
@@ -990,15 +990,14 @@ ShellRoot {
         BarWidget {
           id: anchorPill
           visible: !!root.anchorState
-          x: !root.anchorState ? 0 : root.anchorState[1] === "left" ? 16
-            : root.anchorState[1] === "right" ? parent.width - width - 16 : parent.width / 2 - 75
-          width: 150
+          x: root.anchorPose ? root.anchorPose.pillX : 0
+          width: root.anchorPose ? root.anchorPose.pillWidth : 150
           height: parent.height
           bar: anchorApi
           settings: ({id: "grvc.stonks", barStyle: "text"})
         }
       }
-      HeldAnchor { id: sceneAnchor; pill: anchorPill }
+      HeldAnchor { id: anchorProbe; pill: anchorPill }
       BorderSurface {
         visible: !!root.anchorState
         x: content.x - content.inset
@@ -1021,8 +1020,8 @@ ShellRoot {
           + Border.left(Border.surfaceSpec("popups", "border", Commons.Color.popups.border, Math.max(1, Style.space(2)))) : 0
         clip: root.popup
         visible: !root.sheet && !root.pillSheet
-        x: root.anchorState ? Math.round(Math.max(Style.gapsOut, Math.min(sceneAnchor.x + sceneAnchor.width / 2 - 240, parent.width - 480 - Style.gapsOut))) + inset : inset
-        y: root.anchorState ? 32 + Style.gapsOut + inset : inset
+        x: root.anchorPose ? root.anchorPose.x + inset : inset
+        y: root.anchorPose ? root.anchorPose.y + inset : inset
         width: (root.anchorState || root.themeState ? 480 : parent.width) - inset * 2
         height: root.anchorState ? parent.height - y - inset : root.themeState ? body.fittedHeight(body.chromeHeight + 3 * body.rowPitch - body.rowGap) : parent.height - inset * 2
 
@@ -1346,13 +1345,11 @@ ShellRoot {
         return
       }
       if (root.anchorState) {
-        waitForRendering(body)
-        sceneAnchor.hold()
-        if (root.anchorState[2] !== "open") {
-          anchorPill.width = 220
-          waitForRendering(body)
-          if (root.anchorState[2] === "next") sceneAnchor.hold()
-        }
+        verify(!!root.anchorPose, "the real placement produced this review pose")
+        anchorProbe.hold()
+        verify(anchorProbe.QsWindow.window === renderWindow && anchorProbe.parent === renderWindow.contentItem,
+          "the default held anchor finds its real pill's window")
+        compare(anchorProbe.x, anchorPill.x, "the real pill's held position")
         savePicture()
         return
       }
