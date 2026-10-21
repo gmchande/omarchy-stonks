@@ -1156,6 +1156,12 @@ ShellRoot {
       watchlist.contentY = 0
       var shown = watchlist.displayedSymbols.slice()
       var far = shown.filter(function(s) { return watchlist.rowItem(s).y >= watchlist.height + watchlist.rowPitch })
+      // Visit the distant rows before their next answer. Returning to them
+      // must refresh an already shown price, not only build a new row.
+      watchlist.contentY = watchlist.contentHeight - watchlist.height
+      waitForRendering(watchlist)
+      watchlist.contentY = 0
+      waitForRendering(watchlist)
       var feed = service.testFeed
       var before = feed.quotes
       var moved = Object.assign({}, before)
