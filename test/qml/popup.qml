@@ -372,13 +372,22 @@ ShellRoot {
   }
 
   // Search words and actions stay in this harness; placement is reviewed.
+  function resultCount(search) {
+    var rows = []
+    var walk = function(item) {
+      if (item.objectName === "searchResult" && rows.indexOf(item) < 0) rows.push(item)
+      for (var i = 0; i < item.children.length; i++) walk(item.children[i])
+    }
+    walk(search)
+    return rows.length
+  }
   function answerSearch(query, results) {
     var search = panel.testBody.search
     test.find(search, "searchField").text = query
     search.results = results
     search.resultsQuery = query
     search.answer = results.length ? "results" : "none"
-    return [query, search.results.length, search.resultIndex, test.find(search, "searchMessage").text].join("|")
+    return [test.find(search, "searchField").text, test.resultCount(search), search.resultIndex, test.find(search, "searchMessage").text].join("|")
   }
   function typeSearch() {
     var body = panel.testBody

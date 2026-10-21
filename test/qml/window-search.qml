@@ -482,10 +482,10 @@ ShellRoot {
       keys.forceActiveFocus()
       keyClick(Qt.Key_A)
       tryVerify(function() { return body.adding }, 2000)
-      seen.push(body.search.results.length === 0)
+      seen.push(resultRows(body).length === 0)
       ;["ONE", "SH", "ZZZ", "OOPS"].forEach(function(query) {
         answer(body, query)
-        seen.push([body.search.results.length, message.visible, message.text])
+        seen.push([resultRows(body).length, message.visible, message.text])
       })
       keyClick(Qt.Key_Escape)
       harness.check("search opens empty, shows one or five results, and names empty and failed answers",
@@ -687,7 +687,8 @@ ShellRoot {
       // replace the field with NVDA, and act before NVDA's answer (the fake
       // curl answers 0.4 s after the 250 ms debounce): neither Enter nor a
       // click where SHOP was adds anything. Once NVDA's answer is in, Enter
-      // adds its top result. Found in the garden review: both added SHOP.
+      // shows that existing member and adds nothing. Found in the garden
+      // review: both early actions added SHOP.
       var beforeSearch = service.dataSettings
       var beforeFeatured = service.featuredSymbol
       var searchFor = function(first, then) {
@@ -712,8 +713,8 @@ ShellRoot {
       tryVerify(function() { return body.search.resultsQuery === "NVDA" && body.search.results.length > 0 }, 3000)
       keyClick(Qt.Key_Return)
       wait(50)
-      harness.check("Enter once the new query's results are in adds its top result",
-        service.library.indexOf("SHOP") >= 0 && !body.adding,
+      harness.check("Enter once NVDA's answer is in shows that member and adds nothing",
+        harness.same(service.library, beforeSearch.symbols) && service.featuredSymbol === "NVDA" && !body.adding,
         service.library + "|" + service.featuredSymbol + "|" + body.adding)
       service.persist(beforeSearch)
       wait(50)
