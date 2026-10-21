@@ -173,9 +173,9 @@ ShellRoot {
     //   dark columns), nothing sounds;
     // - ticks: each crossing of the baseline by the drawn line is heard
     //   within 25 ms, and no tick is heard anywhere else: smooth's a burst
-    //   at 1760 Hz, retro's noise, flat where its pulse is a few lines.
-    //   Crossings closer than a tick and the window that hears it are one:
-    //   35 ms in smooth, 60 ms in retro, read over 11 ms.
+    //   at 1760 Hz, retro's noise between its note's harmonics. Crossings
+    //   closer than a tick and the window that hears it are one: 35 ms in
+    //   smooth, 41 ms in retro (30 ms of noise, read over 11 ms).
     function heardAgainst(index, chart, retro) {
       var bytes = new DataView(harness.readBytes(harness.fakeState + "/pw-play." + harness.starts()[index - 1].n + ".wav"))
       var rate = bytes.getUint32(24, true)
@@ -265,7 +265,7 @@ ShellRoot {
         }
         if (side && last && side !== last && (retro || c - lastAt > 0.08)) {
           every.push(c)
-          if (!crossings.length || c - crossings[crossings.length - 1] > (retro ? 0.06 : 0.035)) crossings.push(c)
+          if (!crossings.length || c - crossings[crossings.length - 1] > (retro ? 0.041 : 0.035)) crossings.push(c)
           lastAt = c
         }
         if (side) last = side
@@ -273,39 +273,43 @@ ShellRoot {
       // The ticks heard, every 4 ms. Smooth's where the band at 1760 Hz
       // jumps past a fifth of the tone's own level there, which the tone's
       // third harmonic (0.06 of it, at 587 Hz) never reaches and the tick
-      // (0.55) always does, and four times what it was. Retro's by the
-      // shape of the spectrum between 1 and 6 kHz over 11 ms: its pulse is
-      // a few lines, its noise flat. A tick where that band's flatness
-      // (the mean of its powers' logs against the log of their mean) passes
-      // 0.15 for 12 ms, as 30 ms of noise does and a note's 1 ms onset
-      // doesn't, from under half that 8 ms before, where the note sounds.
+      // (0.55) always does, and four times what it was. Retro's where noise
+      // fills the spectrum between the note's harmonics: over 256 samples
+      // (11 ms, Hann), the power between 1 and 6 kHz more than a bin and a
+      // half from every harmonic of the notes the chart puts in the window,
+      // where its band-limited pulse leaves nothing, against the replay's
+      // sounding level. A tick where that passes 0.004 for 12 ms, as 30 ms
+      // of noise does and a note's 1 ms onset doesn't, from under it 4 ms
+      // before: over a held note, a change of note, or silence alike.
       var win = Math.round(0.004 * rate), energy = [], levels = [], ticks = []
       if (retro) {
-        var fft = 256, lowBin = Math.ceil(1000 * fft / rate), highBin = Math.floor(6000 * fft / rate)
-        var flatness = function(at) {
-          var logs = 0, sum = 0
+        var fft = 256, binHz = rate / fft, lowBin = Math.ceil(1000 / binHz), highBin = Math.floor(6000 / binHz)
+        var between = function(at) {
+          var notes = [expected(at / rate), expected((at + fft / 2) / rate), expected((at + fft) / rate)].filter(function(f0) { return f0 > 0 })
+          var power = 0
           for (var b = lowBin; b <= highBin; b++) {
+            var hz = b * binHz
+            if (notes.some(function(f0) { return Math.abs(hz - Math.round(hz / f0) * f0) <= 1.5 * binHz })) continue
             var re = 0, im = 0
             for (var k = 0; k < fft; k++) {
               var v = s[at + k] * (0.5 - 0.5 * Math.cos(2 * Math.PI * k / fft)), phase = 2 * Math.PI * ((b * k) % fft) / fft
               re += v * Math.cos(phase)
               im -= v * Math.sin(phase)
             }
-            var power = re * re + im * im + 1e-12
-            logs += Math.log(power)
-            sum += power
+            power += re * re + im * im
           }
-          var n = highBin - lowBin + 1
-          return Math.exp(logs / n) / (sum / n)
+          return power
         }
         for (var at = 0; at + fft < samples; at += win) {
-          energy.push(flatness(at))
-          levels.push(rms(at, fft))
+          energy.push(between(at))
+          var e = rms(at, fft)
+          levels.push(e * e)
         }
-        var sounding = levels.slice().sort(function(a, b) { return a - b })[Math.floor(levels.length * 0.75)]
-        for (var f = 2; f < energy.length - 2; f++) {
+        var sounding = levels.slice().sort(function(a, b) { return a - b })[Math.floor(levels.length * 0.75)] * fft * fft
+        var noisy = function(f) { return energy[f] / sounding > 0.004 }
+        for (var f = 1; f < energy.length - 2; f++) {
           var heardAt = (f * win + fft / 2) / rate
-          if (energy[f] > 0.15 && energy[f + 1] > 0.15 && energy[f + 2] > 0.15 && energy[f - 2] < 0.075 && levels[f] > 0.1 * sounding
+          if (noisy(f) && noisy(f + 1) && noisy(f + 2) && !noisy(f - 1)
             && (!ticks.length || heardAt - ticks[ticks.length - 1] > 0.035)) ticks.push(heardAt)
         }
       } else {
@@ -768,7 +772,9 @@ ShellRoot {
       tryVerify(function() { return !!service.quotes.AAPL && service.featuredSymbol === "AAPL" }, 5000)
       var reg = service.quotes.AAPL.session.regular
       var bells = function() { return harness.starts().filter(function(s) { return played(s) === "sounds/retro/bell.wav" }).length }
-      var pass = function(moments) {
+      // A pass rings `rings` bells: waited for, then 300 ms more for any
+      // other.
+      var pass = function(moments, rings) {
         var rung = bells()
         service.now = moments[0]
         var bell = bellMaker.createObject(harness, { service: service, sounds: sounds })
@@ -778,6 +784,8 @@ ShellRoot {
           service.now = t
           wait(300)
         })
+        if (rings) tryVerify(function() { return bells() - rung >= rings }, 5000)
+        wait(300)
         bell.destroy()
         return bells() - rung
       }
@@ -785,14 +793,14 @@ ShellRoot {
         props: { "media.class": "Stream/Input/Audio", "application.name": "a call" } } }])
       var meterOn = JSON.stringify([{ type: "PipeWire:Interface:Node", info: { state: "running",
         props: { "media.class": "Stream/Input/Audio", "stream.capture.sink": true } } }])
-      var rang = [pass([reg.start - 30, reg.start + 30]), pass([reg.start - 3600, reg.start + 60]),
-        pass([reg.start - 2, reg.start - 1, reg.start, reg.start - 1, reg.start, reg.start + 1])]
+      var rang = [pass([reg.start - 30, reg.start + 30], 1), pass([reg.start - 3600, reg.start + 60], 0),
+        pass([reg.start - 2, reg.start - 1, reg.start, reg.start - 1, reg.start, reg.start + 1], 1)]
       harness.writeText(harness.fakeState + "/pw-dump.json", micOn)
-      rang.push(pass([reg.end - 30, reg.end + 30]))
+      rang.push(pass([reg.end - 30, reg.end + 30], 0))
       harness.writeText(harness.fakeState + "/pw-dump.json", meterOn)
-      rang.push(pass([reg.end - 30, reg.end + 30]))
+      rang.push(pass([reg.end - 30, reg.end + 30], 1))
       service.persist({ sounds: false })
-      rang.push(pass([reg.start - 30, reg.start + 30]))
+      rang.push(pass([reg.start - 30, reg.start + 30], 0))
       service.now = Math.floor(Date.now() / 1000)
       harness.check("the bell rings at the open in retro's voice, a moment after Stonks starts too, not late, not twice with the clock set back, not while a microphone records though a level meter may run, and not with sounds off",
         rang.join(",") === "1,0,1,0,1,0", rang.join(","))
