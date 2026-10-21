@@ -149,6 +149,9 @@ every_state() (
       states="$states share-of-$state-$look"
     done
     states="$states share-scrub-of-sweep-2026-10-07-1455-nest-$look share-scrub-of-history-1y-$look"
+    # After midnight, the change measured from the close before the chart's;
+    # and an intraday bar of a range scrubbed, its time's zone named.
+    states="$states share-of-sweep-2026-10-07-0100-nest-$look share-scrub-of-history-1w-$look"
     for surface in popup window; do
       states="$states $surface-sweep-2026-10-07-1455-spy-$look-large lit-$surface-sweep-2026-10-07-1455-spy-$look-large"
     done

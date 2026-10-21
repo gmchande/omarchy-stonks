@@ -65,11 +65,17 @@ function moment(o) {
 }
 
 // A range's bar as its scrub names it (`History.historyScrubText`): its
-// date, a week's "WEEK OF", an intraday bar's time, without the price,
-// which the picture shows large.
+// date, a week's "WEEK OF", and an intraday bar's time, here always with
+// its zone, without the price, which the picture shows large.
 function barDate(history, bar) {
-  var text = History.historyScrubText(history, bar)
-  return text.slice(0, text.lastIndexOf(" · "))
+  var intraday = history.interval === "15m" || history.interval === "30m" || history.interval === "1h"
+  var date = History.historyDateText(history, bar.t, History.historySpansYears(history), history.interval)
+  if (history.interval === "1wk") date = "WEEK OF " + date
+  if (intraday) {
+    var clock = Quote.clockAt(history, bar.t)
+    date += " " + Format.hhmm(bar.t, clock.offset) + " " + (clock.zone || Format.offsetName(clock.offset))
+  }
+  return date
 }
 
 // The picture's words, from what the surface shows: `quote` (Yahoo's),
@@ -102,8 +108,12 @@ function words(o) {
       out.end = History.historyDateText(o.history, bars[bars.length - 1].t, true, o.history.interval)
     }
   } else {
-    out.from = o.changeMode === "open" ? "OPEN " + Format.money(quote.dayOpen, digits)
-      : "PREV CLOSE " + Format.money(o.day.prevClose, o.day.priceDigits)
+    // What the change on show is measured from: the quote's at rest, the
+    // day's while scrubbed (`Figures.rowModel`), as after midnight, where
+    // the day's chart starts from the close the quote's change ends on.
+    var base = o.scrubT ? o.day : quote
+    out.from = o.changeMode === "open" ? "OPEN " + Format.money(base.dayOpen, base.priceDigits)
+      : "PREV CLOSE " + Format.money(base.prevClose, base.priceDigits)
     var pts = o.day.points
     if (pts.length) {
       var axis = Chart.chartSpan(pictureDay(o.day))
