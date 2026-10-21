@@ -23,7 +23,7 @@ ShellRoot {
   // one empty; the current list a named one, a featured symbol off the top,
   // and every view setting off its default. The refresh interval is set only
   // by hand in the file, which every save keeps. 1.0.0 knew no sounds, so
-  // its file reads as on, their default; from 1.0.3 the file has them off.
+  // its file reads as on, their default; from 1.0.4 the file has them off.
   readonly property var made: ({
     lists: [
       { name: "", symbols: ["SPY", "AAPL", "7203.T", "BTC-USD", "^GSPC", "SHEL.L", "JNJ"], order: "manual", reversed: false },
