@@ -112,14 +112,28 @@ BarWidget {
   // most four characters (`Format.stackedSymbol`), the move in the rows'
   // unit, money in money and else a percent (`Format.stackedMoney`,
   // `stackedPct`), coloured by its sign as drawn. A warning's "!" goes on a
-  // line of its own before the move, as the text form puts it before the
-  // change; with no quote at all it is the move.
+  // short line of its own before the move, as the text form puts it before
+  // the change, kept whether the "!" shows or not, as the icon form keeps
+  // its room: the pill never changes height for a warning. With no quote at
+  // all the "!" is the move, in the place of the waiting "…".
   readonly property var stackedMove: !featured ? { lines: warns ? [] : ["…"], sign: 0 }
     : service.changeMode === "abs" ? Format.stackedMoney(featured.abs, featuredQuote.priceDigits) : Format.stackedPct(featured.pct)
   readonly property var stackedLines: Format.stackedSymbol(featuredSymbol || "ST")
-    .map(function(t) { return { text: t, move: false } })
-    .concat(warns ? [{ text: "!", move: false }] : [])
-    .concat(stackedMove.lines.map(function(t) { return { text: t, move: true } }))
+    .map(function(t) { return { text: t, move: false, warning: false } })
+    .concat(featured ? [{ text: warns ? "!" : "", move: false, warning: true }]
+      : warns ? [{ text: "!", move: false, warning: false }] : [])
+    .concat(stackedMove.lines.map(function(t) { return { text: t, move: true, warning: false } }))
+  // The warning's line: the "!"'s ink and a gap each side, as the icon form
+  // keeps under its animal.
+  readonly property int stackedWarningHeight: Math.ceil(stackedWarningMetrics.tightBoundingRect("!").height) + 2 * 2
+  readonly property int stackedHeight: stackedLines.reduce(function(sum, line) {
+    return sum + (line.warning ? stackedWarningHeight : Style.bar.iconSlot)
+  }, 0)
+  FontMetrics {
+    id: stackedWarningMetrics
+    font.family: button.fontFamily
+    font.pixelSize: Math.max(1, Math.round(button.fontSize))
+  }
 
   // What is left of a notch between wheel events: a high-resolution wheel
   // sends a notch as several small ticks, and a notch is one symbol.
@@ -218,7 +232,7 @@ BarWidget {
     // warning's "!", with a pixel to spare each end: an icon slot, or more
     // where the text is small enough that the two outgrow it.
     fixedHeight: root.vertical ? (root.iconOnly ? Math.max(Style.bar.iconSlot, Math.ceil(iconForm.implicitHeight) + 2)
-      : root.stackedLines.length * Style.bar.iconSlot) : -1
+      : root.stackedHeight) : -1
     // A hover only for what the pill can't say: the icon names nothing, so
     // its hover says what the other forms show, the symbol and its change;
     // on every form, what a warning's "!" means. The line, the arrow, and
@@ -394,7 +408,8 @@ BarWidget {
     }
 
     // As Omarchy's clock draws a vertical bar: one line to an icon slot, at
-    // the bar's size, 90% at four characters, never smaller.
+    // the bar's size, 90% at four characters, never smaller; the warning's
+    // line is shorter (`stackedWarningHeight`).
     Column {
       objectName: "pillStack"
       visible: root.vertical && !root.iconOnly
@@ -407,7 +422,7 @@ BarWidget {
           required property var modelData
           objectName: "pillStackLine"
           width: button.width
-          height: Style.bar.iconSlot
+          height: modelData.warning ? root.stackedWarningHeight : Style.bar.iconSlot
           text: modelData.move ? Format.lookSigns(modelData.text, root.retro) : modelData.text
           fontFamily: button.fontFamily
           fontSize: modelData.text.length > 3 ? button.fontSize * 0.9 : button.fontSize

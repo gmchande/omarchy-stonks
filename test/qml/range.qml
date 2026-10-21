@@ -1414,6 +1414,7 @@ ShellRoot {
       barApi.vertical = true
       barApi.barSize = Style.bar.sizeVertical
       var verticalWrong = []
+      var stackWarned = []
       var settingsBefore = pill.settings
       // The stacked form's lines as drawn: text, ink width, size, colour.
       var stackLines = function() {
@@ -1432,28 +1433,47 @@ ShellRoot {
         // over its move, a percent over its %, or in money split at its
         // point, one line to an icon slot, each inside the bar at the bar's
         // size or 90% of it, never smaller. Its five-character change ran a
-        // pixel past each side.
+        // pixel past each side. Between them, the warning's short line, empty.
         pill.settings = Object.assign({}, settingsBefore, { barStyleVertical: "stacked" })
         ;["pct", "abs"].forEach(function(mode) {
           service.persist({ changeMode: mode })
           var day = Figures.rowModel(service.quotes.DOWN, 0, service.changeMode)
           var move = mode === "abs" ? Format.stackedMoney(day.abs, service.quotes.DOWN.priceDigits) : Format.stackedPct(day.pct)
-          var want = ["DOWN"].concat(move.lines.map(function(t) { return Format.lookSigns(t, service.retro) }))
+          var want = [["DOWN", barApi.barForeground], ["", barApi.barForeground]].concat(move.lines.map(function(t) {
+            return [Format.lookSigns(t, service.retro), Commons.Color.urgent]
+          }))
           var lines = stackLines()
           var drawn = lines.map(function(l) {
             return l.text + " " + Math.ceil(l.tightWidth) + "px at " + l.renderedFontSize
           })
-          var wrong = lines.length !== want.length || pill.implicitHeight !== want.length * Style.bar.iconSlot
+          var wrong = lines.length !== want.length || pill.implicitHeight !== pill.stackedWarningHeight + (want.length - 1) * Style.bar.iconSlot
             || lines.some(function(l, i) {
-              return l.text !== want[i] || l.tightWidth > Style.bar.sizeVertical
+              return l.text !== want[i][0] || l.tightWidth > Style.bar.sizeVertical
                 || l.renderedFontSize !== Math.round(l.text.length > 3 ? Style.font.body * 0.9 : Style.font.body)
-                || !Qt.colorEqual(l.color, i === 0 ? barApi.barForeground : Commons.Color.urgent)
+                || !Qt.colorEqual(l.color, want[i][1])
             })
           if (wrong)
             verticalWrong.push((service.retro ? "retro " : "smooth ") + mode + ": " + drawn.join(" / ") + ", " + pill.implicitHeight
-              + " px tall on a " + Style.bar.sizeVertical + " px bar, want " + want.join(" / "))
+              + " px tall on a " + Style.bar.sizeVertical + " px bar, want " + want.map(function(w) { return w[0] }).join(" / "))
         })
         service.persist({ changeMode: "pct" })
+        // A failed refresh puts its "!" on the warning's line, and the pill
+        // keeps its height and its move where they were. Found in the 1.0.2
+        // visual review: the "!" took a line of its own, 81 px to 108.
+        var stackPlace = function() {
+          harness.find(pill, "pillStack").forceLayout()
+          var lines = stackLines()
+          var move = lines[lines.length - 1]
+          return pill.implicitHeight + " px, move at " + move.mapToItem(pill, 0, move.baselineY).y + ", "
+            + lines.map(function(l) { return JSON.stringify(l.text) }).join("/")
+        }
+        var freshStack = stackPlace()
+        var freshEntries = service.testFeed.entries
+        service.testFeed.entries = Object.assign({}, freshEntries, { DOWN: Object.assign({}, freshEntries.DOWN, { status: "failed" }) })
+        var lateStack = stackPlace()
+        service.testFeed.entries = freshEntries
+        if (lateStack.indexOf("\"!\"") < 0 || lateStack.replace("\"!\"", "\"\"") !== freshStack)
+          stackWarned.push((service.retro ? "retro" : "smooth") + " stacked fresh " + freshStack + ", after a failed refresh " + lateStack)
         pill.settings = settingsBefore
       }
       // A refresh that fails with a quote shown puts a "!" on a side bar's
@@ -1531,6 +1551,8 @@ ShellRoot {
       service.persist({ style: "smooth" })
       harness.check("a vertical bar shows the day's bear on 6M in both looks, and once picked the day stacked inside the bar in its colour, in % and in money",
         verticalWrong.length === 0, verticalWrong.join(" | "))
+      harness.check("a failed refresh's \"!\" on a side bar's stacked form changes neither its height nor where its move sits, in both looks",
+        stackWarned.length === 0, stackWarned.join(" | "))
       harness.check("a horizontal bar's arrow and a vertical bar's form are kept apart, and on a vertical bar every middle-click changes what shows",
         walk.join(",") === "icon icon,arrow arrow,stacked stacked,icon icon,stacked stacked,arrow arrow", walk.join(","))
 

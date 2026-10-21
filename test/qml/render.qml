@@ -932,11 +932,15 @@ ShellRoot {
               var retro = look === 1
               ;["sparkline", "arrow", "text", "icon"].forEach(function(style) { rows.push({ style: style, retro: retro, day: "down" }) })
               ;["up", "flat", "waiting", "failed", "refresh failed"].forEach(function(day) { rows.push({ style: "icon", retro: retro, day: day }) })
+              // The text form's row puts the stacked form on the side bar:
+              // after a failed refresh, as tall as the fresh one above.
+              rows.push({ style: "text", retro: retro, day: "refresh failed" })
             }
             var right = [{ style: "sparkline", retro: false, right: true, day: "down" }, { style: "sparkline", retro: true, right: true, day: "down" },
               { style: "sparkline", retro: false, right: true, day: "up" }, { style: "sparkline", retro: true, right: true, day: "up" }]
-            // At the larger size, the smooth look's rows fill the screen.
-            return root.stateName === "pill-sheet-large" ? rows.filter(function(r) { return !r.retro })
+            // At the larger size, the smooth look's rows fill the screen, the
+            // failed refresh's stacked row left out.
+            return root.stateName === "pill-sheet-large" ? rows.filter(function(r) { return !r.retro && !(r.style === "text" && r.day !== "down") })
               .concat(right.filter(function(r) { return !r.retro })) : rows.concat(right)
           }
 
