@@ -141,22 +141,29 @@ test("the headline uses the regular quote or labels the last chart trade with it
   const noMeta = { ...quote, price: null }
   expect(M.headlineQuote(noMeta)).toEqual({ price: regular[regular.length - 1].p, t: regular[regular.length - 1].t, source: "chart" })
   const noTime = { ...quote, marketTime: null }
-  expect(M.headlineQuote(noTime).source).toBe("chart")
+  expect(M.headlineQuote(noTime)).toEqual({ price: quote.price, t: null, source: "quote" })
+  const untimed = M.freshness({ status: "ok" }, noTime, quote.marketTime, 0)
+  expect(untimed.asOf).toBeNull()
+  expect(untimed.live).toBe(false)
+  expect(M.freshnessText(untimed, noTime, calendars)).toBe("TIME NOT SENT")
+  expect(M.freshnessText({ ...untimed, state: "saved" }, noTime, calendars)).toBe("SAVED · TIME NOT SENT")
+  expect(M.freshnessText({ ...untimed, state: "failed" }, noTime, calendars)).toBe("REFRESH FAILED · TIME NOT SENT")
+  expect(M.freshnessText({ ...untimed, state: "overdue" }, noTime, calendars)).toBe("UPDATE OVERDUE · TIME NOT SENT")
   const nothing = { ...quote, price: null, points: [] }
   expect(M.headlineQuote(nothing)).toBeNull()
   expect(M.regularClose(nothing)).toBeNull()
   // A constructed omission, not a claim that this capture lacked metadata.
   const night = M.parseChart(fixture("moments/listings-2026-10-07-0100/nest.json"))
   const now = Date.UTC(2026, 9, 7, 5) / 1000
-  for (const omitted of [{ price: null }, { marketTime: null }]) {
+  for (const omitted of [{ price: null }, { price: null, marketTime: null }]) {
     const fallback = { ...night, ...omitted }
     const fresh = M.freshness({ status: "ok" }, fallback, now, 0)
     expect(M.headlineQuote(fallback)).toEqual({ price: 249.77999877929688, t: 1791316500, source: "chart" })
-    expect(M.freshnessText(fresh, fallback, calendars)).toBe("LAST TRADE TUE 15:55")
+    expect(M.freshnessText(fresh, fallback, calendars)).toBe("LAST TRADE · BAR TUE 15:55")
     expect(M.freshnessWarns(fresh)).toBe(false)
-    expect(M.freshnessText({ ...fresh, earlier: false }, fallback, calendars)).toBe("LAST TRADE 15:55")
-    expect(M.freshnessText({ ...fresh, state: "failed" }, fallback, calendars)).toBe("REFRESH FAILED · LAST TRADE TUE 15:55")
-    expect(M.freshnessText({ ...fresh, state: "overdue" }, fallback, calendars)).toBe("UPDATE OVERDUE · LAST TRADE TUE 15:55")
+    expect(M.freshnessText({ ...fresh, earlier: false }, fallback, calendars)).toBe("LAST TRADE · BAR 15:55")
+    expect(M.freshnessText({ ...fresh, state: "failed" }, fallback, calendars)).toBe("REFRESH FAILED · LAST TRADE · BAR TUE 15:55")
+    expect(M.freshnessText({ ...fresh, state: "overdue" }, fallback, calendars)).toBe("UPDATE OVERDUE · LAST TRADE · BAR TUE 15:55")
   }
   expect(M.freshnessText(M.freshness({ status: "ok" }, night, now, 0), night, calendars)).toBe("")
 })
@@ -842,9 +849,9 @@ test("freshness keeps quote age, an unanswered ask, and the refresh outcome apar
   // No quote at all: unavailable, failed when the first fetch failed, and a
   // warning once its ask has gone 90 s unanswered.
   expect(M.freshness(null, null, trading, 0)).toMatchObject({ state: "unavailable", live: false })
-  expect(M.freshnessText(M.freshness({ status: "failed", receivedAt: 0 }, null, trading, 0), q)).toBe("NO DATA FOR THIS SYMBOL")
+  expect(M.freshnessText(M.freshness({ status: "failed", receivedAt: 0 }, null, trading, 0), null)).toBe("NO DATA FOR THIS SYMBOL")
   const nothing = M.freshness(null, null, trading, trading - 90)
-  expect([nothing.state, M.freshnessText(nothing, q), M.freshnessWarns(nothing)]).toEqual(["overdue", "NO DATA", true])
+  expect([nothing.state, M.freshnessText(nothing, null), M.freshnessWarns(nothing)]).toEqual(["overdue", "NO DATA", true])
 })
 
 test("a quote kept from an earlier session says when it is from, and warns only once asked for and unanswered", () => {
