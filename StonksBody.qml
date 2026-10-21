@@ -753,7 +753,7 @@ Item {
   }
   function shootCard(card) {
     var shown = Share.subject(card.symbol, card.range, card.words ? card.words.said : "")
-    camera.shoot(card, Share.fileSymbol(card.symbol), Share.toastBody(card.quote, shown), function(code) {
+    camera.shoot(card, Share.fileSymbol(card.symbol), function(code) {
       shareLoader.source = ""
       if (code === 1) return say("Screenshot not saved · the screenshots folder can't be written")
       cameraLit = true

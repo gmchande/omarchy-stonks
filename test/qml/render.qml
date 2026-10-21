@@ -890,8 +890,8 @@ ShellRoot {
   QtObject {
     id: shareCamera
     property bool busy: false
-    function shoot(item, symbol, said, done) {
-      console.log("SHARE " + symbol + " | " + said)
+    function shoot(item, symbol, done) {
+      console.log("SHARE " + symbol)
       return item.grabToImage(function(result) {
         result.saveToFile(root.outPath)
         done(0)

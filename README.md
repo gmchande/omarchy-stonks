@@ -321,8 +321,7 @@ The shell's log the form asks for can name the prices Stonks left out.
   for each screenshot you take, one picture,
   `stonks-<symbol>-<date>_<time>.png`, in the folder Omarchy's own
   screenshots use (`OMARCHY_SCREENSHOT_DIR`, else your Pictures folder),
-  and a working copy in `~/.cache/grvc.stonks/screenshot.png`, written
-  over at each one.
+  saved straight there, with no copy anywhere else.
   The shell keeps the pill's form on its bar entry in
   `~/.config/omarchy/shell.json`.
 - **Limits:** every request has a time limit and a size cap. Quotes come

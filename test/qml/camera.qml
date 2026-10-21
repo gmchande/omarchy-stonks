@@ -84,9 +84,11 @@ ShellRoot {
     return into
   }
 
+  readonly property string cacheDir: Quickshell.env("XDG_CACHE_HOME") + "/grvc.stonks"
+  property string listedDir: shotsDir
   Process {
     id: lister
-    command: ["sh", "-c", "ls -1 \"$1\" 2> /dev/null", "sh", harness.shotsDir]
+    command: ["sh", "-c", "ls -1 \"$1\" 2> /dev/null", "sh", harness.listedDir]
     stdout: StdioCollector { id: listed }
   }
 
@@ -116,8 +118,9 @@ ShellRoot {
       tryVerify(function() { return service.arriving.length === 0 && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 8000)
     }
 
-    // The pictures in the folder, by name.
-    function shots() {
+    // The files in `folder` (the pictures folder unless named), by name.
+    function shots(folder) {
+      harness.listedDir = folder || harness.shotsDir
       lister.running = true
       tryVerify(function() { return !lister.running }, 3000)
       return listed.text.split("\n").filter(function(name) { return name !== "" })
@@ -150,6 +153,7 @@ ShellRoot {
       return {
         card: seen || {},
         added: shots().length - files,
+        cached: shots(harness.cacheDir).filter(function(name) { return /\.png$/.test(name) }),
         note: note,
         file: file,
         name: file.slice(file.lastIndexOf("/") + 1),
@@ -164,23 +168,25 @@ ShellRoot {
     }
 
     // A shot that landed as Omarchy's own screenshots do: one picture,
-    // named for `symbol`, in the reader's pictures folder; that picture on
-    // the clipboard as a PNG; the notification with its headline, `words`
-    // ahead of the click to edit, the picture as its thumbnail, and a click
-    // that opens Tensaku on it; the footer saying what it shows; and the
-    // card gone. A second shot in the same second keeps the first: its name
-    // ends "-2".
-    function landed(shot, symbol, words) {
+    // named for `symbol`, in the reader's pictures folder, and no copy of it
+    // in Stonks' cache; that picture on the clipboard as a PNG; Omarchy's
+    // notification in Omarchy's own words, the picture as its thumbnail and
+    // a click that opens Tensaku on it; the footer saying what it shows,
+    // `said` matching what follows "Copied a screenshot of "; and the card
+    // gone. A second shot in the same second keeps the first: its name ends
+    // "-2".
+    function landed(shot, symbol, said) {
       var named = new RegExp("^stonks-" + symbol + "-\\d{4}-\\d\\d-\\d\\d_\\d\\d-\\d\\d-\\d\\d(-\\d+)?\\.png$")
-      var expected = ["Screenshot saved to clipboard and file", words, "--image", shot.file, "--exec", "tensaku-edit", shot.file]
-      var subject = words.replace(/(, [A-Z ]+)?\. Click to edit\.$/, "")
+      var expected = ["Screenshot saved to clipboard and file", "Edit with Super + Alt + , (or click this)",
+        "--image", shot.file, "--exec", "tensaku-edit", shot.file]
       var problems = []
       if (shot.added !== 1) problems.push(shot.added + " pictures saved")
       if (!named.test(shot.name) || shot.folder !== harness.shotsDir) problems.push("saved as " + shot.file)
+      if (shot.cached.length) problems.push("pictures in the cache: " + shot.cached.join(", "))
       if (JSON.stringify(shot.note) !== JSON.stringify(expected)) problems.push("notified " + JSON.stringify(shot.note))
       if (shot.copied !== "--type image/png" || !harness.sameBytes(shot.clipboard, shot.picture)) problems.push("copied " + shot.copied + " " + (shot.clipboard ? shot.clipboard.byteLength : 0) + " bytes")
       if (shot.size !== "2400x1350") problems.push("picture " + shot.size)
-      if (shot.footer !== "Copied a screenshot of " + subject) problems.push("footer " + shot.footer)
+      if (!said.test(shot.footer.replace(/^Copied a screenshot of /, "")) || shot.footer.indexOf("Copied a screenshot of ") !== 0) problems.push("footer " + shot.footer)
       if (shot.loaded !== "") problems.push("card still loaded")
       return problems
     }
@@ -211,23 +217,22 @@ ShellRoot {
       var still = shots().length
       var unlit = !body.cameraLit
       var rest = shoot(body, function() { keyClick(Qt.Key_Y) })
-      var problems = landed(rest, "aapl", rest.note[1] || "").concat(ofChart(rest, "AAPL", "1D", rows))
+      var problems = landed(rest, "aapl", /^AAPL at .+$/).concat(ofChart(rest, "AAPL", "1D", rows))
       harness.check("y in the popup saves one picture of AAPL's day in the pictures folder, copies it as a PNG, and sends Omarchy's notification with it",
-        problems.length === 0 && still === 0 && /^AAPL at .+, NASDAQ\. Click to edit\.$/.test(rest.note[1] || "") && rest.card.scrubX === -1 && !rest.card.retro,
-        problems.join("; ") + " | " + JSON.stringify(rest.note))
+        problems.length === 0 && still === 0 && rest.card.scrubX === -1 && !rest.card.retro, problems.join("; "))
       harness.check("the camera lights after its first shot, and not before", unlit && body.cameraLit)
 
       // Scrubbed back two steps: the picture shows the scrub and says its
-      // time, and the footer and the notification name it.
+      // time, and the footer names it.
       keyClick(Qt.Key_H)
       keyClick(Qt.Key_H)
       tryVerify(function() { return body.scrubT !== 0 }, 2000)
       var scrubbed = shoot(body, function() { keyClick(Qt.Key_Y) })
-      problems = landed(scrubbed, "aapl", scrubbed.note[1] || "").concat(ofChart(scrubbed, "AAPL", "1D", rows))
-      harness.check("scrubbed, y takes the scrub: the picture shows it and says its time, and the footer and the notification say it too",
+      problems = landed(scrubbed, "aapl", /^AAPL at \d\d:\d\d$/).concat(ofChart(scrubbed, "AAPL", "1D", rows))
+      harness.check("scrubbed, y takes the scrub: the picture shows it and says its time, and the footer says it too",
         problems.length === 0 && scrubbed.card.scrubT === body.scrubShown && scrubbed.card.scrubX >= 0 && /^AT \d\d:\d\d [A-Z]+ · /.test(scrubbed.card.when)
-          && /^AAPL at \d\d:\d\d, NASDAQ\. Click to edit\.$/.test(scrubbed.note[1] || "") && scrubbed.name !== rest.name,
-        problems.join("; ") + " | " + scrubbed.card.when + " | " + JSON.stringify(scrubbed.note))
+          && scrubbed.name !== rest.name,
+        problems.join("; ") + " | " + scrubbed.card.when + " | " + scrubbed.footer)
 
       // Lit through the close's fade, and out when the popup opens again.
       panel.close()
@@ -250,10 +255,9 @@ ShellRoot {
       wait(200)
       var button = harness.find(win, "cameraButton")
       var year = shoot(win, function() { if (button) mouseClick(button, button.width / 2, button.height / 2) })
-      problems = landed(year, "aapl", year.note[1] || "").concat(ofChart(year, "AAPL", "1Y", rows))
+      problems = landed(year, "aapl", /^AAPL 1Y at .+$/).concat(ofChart(year, "AAPL", "1Y", rows))
       harness.check("a click on the window's camera, in retro, takes AAPL's 1Y as it is shown",
-        problems.length === 0 && year.card.retro && /^AAPL 1Y at .+, NASDAQ\. Click to edit\.$/.test(year.note[1] || "") && win.cameraLit,
-        problems.join("; ") + " | " + JSON.stringify(year.note))
+        problems.length === 0 && year.card.retro && win.cameraLit, problems.join("; "))
 
       // The pointer on the chart scrubs it, and y takes that moment: the
       // way a mouse hand takes a scrubbed picture, since leaving the chart
@@ -263,13 +267,13 @@ ShellRoot {
       mouseMove(chart, chart.width * 0.4, chart.height / 2)
       tryVerify(function() { return win.scrubT !== 0 }, 2000)
       var hovered = shoot(win, function() { keyClick(Qt.Key_Y) })
-      problems = landed(hovered, "aapl", hovered.note[1] || "").concat(ofChart(hovered, "AAPL", "1Y", rows))
+      problems = landed(hovered, "aapl", /^AAPL 1Y on .+$/).concat(ofChart(hovered, "AAPL", "1Y", rows))
       harness.check("y with the pointer on the window's chart takes the bar the pointer reads",
-        problems.length === 0 && hovered.card.scrubT === win.scrubShown && hovered.card.scrubX >= 0 && /^AAPL 1Y on /.test(hovered.note[1] || ""),
-        problems.join("; ") + " | " + hovered.card.scrubT + " vs " + win.scrubShown + " | " + JSON.stringify(hovered.note))
+        problems.length === 0 && hovered.card.scrubT === win.scrubShown && hovered.card.scrubX >= 0,
+        problems.join("; ") + " | " + hovered.card.scrubT + " vs " + win.scrubShown)
       mouseMove(win, 1, 1)
 
-      // Bitcoin's notification names no exchange: "CRYPTO" is none.
+      // Bitcoin, its file named for its symbol, its dash kept.
       service.setRange("1D")
       service.addSymbol("BTC-USD")
       quiet()
@@ -277,10 +281,8 @@ ShellRoot {
       tryVerify(function() { return win.featuredSymbol === "BTC-USD" && !win.chartLoading && !win.historyActive }, 8000)
       app.testKeyCatcher.forceActiveFocus()
       var coin = shoot(win, function() { keyClick(Qt.Key_Y) })
-      problems = landed(coin, "btc-usd", coin.note[1] || "").concat(ofChart(coin, "BTC-USD", "1D", rows))
-      harness.check("y in the window takes Bitcoin's day, its notification naming no exchange",
-        problems.length === 0 && /^BTC-USD at \d\d:\d\d(?: [A-Z]+)?\. Click to edit\.$/.test(coin.note[1] || ""),
-        problems.join("; ") + " | " + JSON.stringify(coin.note))
+      problems = landed(coin, "btc-usd", /^BTC-USD at \d\d:\d\d(?: [A-Z]+)?$/).concat(ofChart(coin, "BTC-USD", "1D", rows))
+      harness.check("y in the window takes Bitcoin's day", problems.length === 0, problems.join("; "))
       app.close()
 
       console.log("CAMERA DONE")

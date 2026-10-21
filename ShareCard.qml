@@ -313,7 +313,9 @@ Rectangle {
     color: root.ghost
   }
 
-  // The range at the foot, and Stonks' mark and name.
+  // The range at the foot, and Stonks' logo, the pixel bull, whatever the
+  // day's animal is, and its name. The bull is in the name's ink, not the
+  // up colour: on a down day a green bull would read as the day's.
   Caption {
     objectName: "shareRange"
     x: root.margin
@@ -341,11 +343,14 @@ Rectangle {
     font.pixelSize: 20 * root.u
     font.bold: true
   }
-  StonksMark {
-    x: stonksText.x - implicitWidth - 8 * root.u
-    y: 650 * root.u - implicitHeight
-    pixel: 3 * root.u
-    gap: root.u
+  PixelSprite {
+    objectName: "shareLogo"
+    readonly property int cell: Math.round(1.5 * root.u)
+    x: stonksText.x - width - 10 * root.u
+    y: 650 * root.u - height
+    width: columns * cell
+    height: rows * cell
+    pixels: Cells.spriteFor(true, 0)
     color: root.foreground
   }
 }

@@ -7,7 +7,7 @@
 .import "Quote.js" as Quote
 
 // What the screenshot says: the picture's line of facts, what its change is
-// measured from, its axis's ends, the footer's and the toast's words, and
+// measured from, its axis's ends, the footer's words, and
 // the file's name. Every figure is one Stonks already shows or knows, in
 // its own words. The picture leaves the reader's clock behind, so its
 // times always name their zone. Knows nothing of drawing or of files.
@@ -86,7 +86,7 @@ function barDate(history, bar) {
 //   from: what the change is measured from, as the chart's dashed line;
 //   extended: the line under the price the popup shows, with its time;
 //   start, end: the axis's two ends;
-//   said: the moment in the footer's and the toast's words.
+//   said: the moment in the footer's words.
 function words(o) {
   var quote = o.quote
   var digits = quote.priceDigits
@@ -133,21 +133,17 @@ function words(o) {
   return out
 }
 
-// What the screenshot is of, as the footer and the toast name it: the
-// symbol, the range off the day, and the moment ("AAPL at the close",
-// "AAPL 1Y on 3 Aug 2026").
+// What the screenshot is of, as the footer names it: the symbol, the range
+// off the day, and the moment ("AAPL at the close", "AAPL 1Y on 3 AUG
+// 2026").
 function subject(symbol, range, said) {
   return symbol + (range && range !== "1D" ? " " + range : "") + (said ? " " + said : "")
 }
 
-// The toast's words under its headline: the exchange as Stonks names it,
-// left out for a cryptocurrency, whose "CRYPTO" is no exchange.
-function toastBody(quote, subjectText) {
-  var exchange = quote.crypto || !quote.exchange ? "" : ", " + quote.exchange
-  return subjectText + exchange + ". Click to edit."
-}
-
-// The symbol as the file's name carries it: "aapl", "^GSPC" as "gspc".
+// The symbol as the file's name carries it: lower case, letters, digits,
+// dots, and dashes only, so no symbol can name another folder or carry a
+// character a shell or a file manager reads; 32 at most. "^GSPC" is
+// "gspc", "BRK-B" "brk-b".
 function fileSymbol(symbol) {
-  return String(symbol).toLowerCase().replace(/[^a-z0-9.-]/g, "") || "chart"
+  return String(symbol).toLowerCase().replace(/[^a-z0-9.-]/g, "").slice(0, 32) || "chart"
 }
