@@ -19,10 +19,6 @@ ShellRoot {
   property int step: 0
   property int now: 1791000000
 
-  function quoteData(q) {
-    return q ? JSON.stringify([q.price, q.marketTime, q.prevClose, q.points.map(function(p) { return [p.t, p.p] })]) : ""
-  }
-
   function check(name, ok, detail) {
     console.log((ok ? "PASS " : "FAIL ") + name + (detail !== undefined ? " — " + detail : ""))
     if (!ok) harness.failures++
@@ -85,7 +81,7 @@ ShellRoot {
       check("FLAKY recovered after retries", status("FLAKY") === "ok", status("FLAKY"))
       check("ONCE ok on first answer", status("ONCE") === "ok", status("ONCE"))
       harness.onceReceipt = receipt("ONCE")
-      harness.aaplQuote = quoteData(feed.quotes["AAPL"])
+      harness.aaplQuote = JSON.stringify(feed.quotes["AAPL"])
       harness.runsBefore = harness.runs().length
       // A refresh of everything: ONCE now fails, AAPL succeeds again, FAIL
       // fails; the lead goes first.
@@ -101,7 +97,7 @@ ShellRoot {
         status("AAPL") === "ok" && status("FAIL") === "failed" && !feed.quotes["FAIL"])
       // The same answer preserves its data and still counts as received.
       check("an unchanged answer keeps the quote already shown, and its receipt moves",
-        quoteData(feed.quotes["AAPL"]) === harness.aaplQuote && receipt("AAPL") === harness.now,
+        JSON.stringify(feed.quotes["AAPL"]) === harness.aaplQuote && receipt("AAPL") === harness.now,
         receipt("AAPL") + " vs " + harness.now)
       feed.lead = ""
       // A symbol that leaves takes its quote, entry, and ask with it.

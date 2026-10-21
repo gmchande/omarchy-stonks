@@ -76,7 +76,7 @@ function freshnessText(fresh, quote, calendars) {
     return fresh.state === "failed" ? "NO DATA FOR THIS SYMBOL" : fresh.state === "unavailable" || fresh.state === "overdue" ? "NO DATA" : ""
   }
   var chartTrade = head && head.source === "chart"
-  var asOf = (chartTrade ? "LAST TRADE · BAR " : "AS OF ") + (fresh.earlier ? Format.WEEKDAYS[Format.localClock(fresh.asOf, quote.gmtoffset).weekday].toUpperCase() + " " : "")
+  var asOf = (chartTrade ? "LAST TRADE · " : "AS OF ") + (fresh.earlier ? Format.WEEKDAYS[Format.localClock(fresh.asOf, quote.gmtoffset).weekday].toUpperCase() + " " : "")
     + Market.printClock(quote, fresh.asOf, calendars)
   if (fresh.state === "failed") return "REFRESH FAILED · " + asOf
   if (fresh.state === "overdue") return "UPDATE OVERDUE · " + asOf

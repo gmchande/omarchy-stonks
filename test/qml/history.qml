@@ -13,10 +13,6 @@ ShellRoot {
   property int onceReceipt: 0
   property int failCalls: 0
 
-  function historyData(h) {
-    return h ? JSON.stringify([h.symbol, h.range, h.baseline, h.bars.map(function(b) { return [b.t, b.o, b.h, b.l, b.c] })]) : ""
-  }
-
   function check(name, ok, detail) {
     console.log((ok ? "PASS " : "FAIL ") + name + (detail !== undefined ? " — " + detail : ""))
     if (!ok) harness.failures++
@@ -101,14 +97,14 @@ ShellRoot {
     } else if (step === 3) {
       var once = entry("ONCE", "1Y")
       check("last-good fixture loaded", once && once.status === "ok")
-      harness.onceHistory = once ? historyData(once.history) : null
+      harness.onceHistory = once ? JSON.stringify(once.history) : null
       harness.onceReceipt = once ? once.receivedAt : 0
       feed.request("ONCE", "1Y", true)
       waitFor(4)
     } else if (step === 4) {
       var failedRefresh = entry("ONCE", "1Y")
       check("failed refresh is visible", failedRefresh && failedRefresh.status === "failed")
-      check("failed refresh keeps history", failedRefresh && historyData(failedRefresh.history) === onceHistory)
+      check("failed refresh keeps history", failedRefresh && JSON.stringify(failedRefresh.history) === onceHistory)
       check("failed refresh keeps receipt", failedRefresh && failedRefresh.receivedAt === onceReceipt)
       check("one retry only", calls("ONCE") === 3, String(calls("ONCE")))
       feed.request("FAIL", "1Y")

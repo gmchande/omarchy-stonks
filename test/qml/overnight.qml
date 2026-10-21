@@ -737,9 +737,9 @@ ShellRoot {
       service.testFeed.quotes = whole
       within(2000, function() { return body.featured.priceText === "249.87" })
       harness.check("with no regular price, the hero labels its last chart trade with Tuesday's time and keeps the overnight line",
-        fallback.indexOf("249.78 | LAST TRADE · BAR TUE 15:55 · ") === 0
+        fallback.indexOf("249.78 | LAST TRADE · TUE 15:55 · ") === 0
           && fallback.indexOf(" | OVERNIGHT 00:50 248.04 ") > 0
-          && rowFallback === "Last trade · bar Tue 15:55", fallback + " | row: " + rowFallback)
+          && rowFallback === "Last trade · Tue 15:55", fallback + " | row: " + rowFallback)
 
       // Two US stocks Robinhood does not trade all day, saved with the
       // listing sweep at the same moment: KILN traded 2 shares at 23:10 on

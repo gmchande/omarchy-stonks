@@ -331,8 +331,9 @@ ShellRoot {
     }
 
     // The sheet as drawn on `s`, opened with ? and closed again.
-    function drawnSheet(s) {
+    function drawnSheet(s, order) {
       base(s)
+      if (order) service.setOrder(order)
       press("?")
       wait(50)
       var sheet = harness.find(s.body, "helpSheet")
@@ -344,6 +345,17 @@ ShellRoot {
 
     function walk(s) {
       var sheet = drawnSheet(s)
+      var sortedSheet = drawnSheet(s, "symbol")
+      var everyday = harness.tokens("↑ ↓ ⏎ 1 2 3 4 5 6 7 8 9 a x u ← → [ ] p w o , . s c r")
+      var missing = []
+      ;[sheet, sortedSheet].forEach(function(drawn, i) {
+        var keys = []
+        drawn.keys.map(harness.tokens).forEach(function(group) { keys = keys.concat(group) })
+        var required = everyday.concat(i === 0 ? ["Shift+J", "Shift+K"] : [])
+        required.forEach(function(key) { if (keys.indexOf(key) < 0) missing.push((i === 0 ? "manual " : "sorted ") + key) })
+      })
+      harness.check("in the " + s.name + ", the sheet lists the everyday keys in manual and sorted order",
+        missing.length === 0, missing.join(" "))
       var readme = harness.readmeKeys(s.name)
       var sheetKeys = []
       sheet.keys.map(harness.tokens).forEach(function(group) { sheetKeys = sheetKeys.concat(group) })

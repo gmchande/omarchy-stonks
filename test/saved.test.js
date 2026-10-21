@@ -159,11 +159,11 @@ test("the headline uses the regular quote or labels the last chart trade with it
     const fallback = { ...night, ...omitted }
     const fresh = M.freshness({ status: "ok" }, fallback, now, 0)
     expect(M.headlineQuote(fallback)).toEqual({ price: 249.77999877929688, t: 1791316500, source: "chart" })
-    expect(M.freshnessText(fresh, fallback, calendars)).toBe("LAST TRADE · BAR TUE 15:55")
+    expect(M.freshnessText(fresh, fallback, calendars)).toBe("LAST TRADE · TUE 15:55")
     expect(M.freshnessWarns(fresh)).toBe(false)
-    expect(M.freshnessText({ ...fresh, earlier: false }, fallback, calendars)).toBe("LAST TRADE · BAR 15:55")
-    expect(M.freshnessText({ ...fresh, state: "failed" }, fallback, calendars)).toBe("REFRESH FAILED · LAST TRADE · BAR TUE 15:55")
-    expect(M.freshnessText({ ...fresh, state: "overdue" }, fallback, calendars)).toBe("UPDATE OVERDUE · LAST TRADE · BAR TUE 15:55")
+    expect(M.freshnessText({ ...fresh, earlier: false }, fallback, calendars)).toBe("LAST TRADE · 15:55")
+    expect(M.freshnessText({ ...fresh, state: "failed" }, fallback, calendars)).toBe("REFRESH FAILED · LAST TRADE · TUE 15:55")
+    expect(M.freshnessText({ ...fresh, state: "overdue" }, fallback, calendars)).toBe("UPDATE OVERDUE · LAST TRADE · TUE 15:55")
   }
   expect(M.freshnessText(M.freshness({ status: "ok" }, night, now, 0), night, calendars)).toBe("")
 })

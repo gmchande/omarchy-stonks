@@ -111,9 +111,8 @@ building one that won't merge.
 - **Only what's true.** Show what the source sent, never an adjustment,
   precision, or coverage it didn't. Leave out a figure that isn't known; never
   guess it. The headline price is Yahoo's regular-market quote. If that price
-  is missing, keep the last regular chart bar's trade, labelled "Last trade"
-  with the bar's time identified as such, never an exact trade time Yahoo
-  didn't send. Only a failed or overdue refresh shows a "!".
+  is missing, keep the last regular chart trade, labelled "Last trade"
+  with its time. Only a failed or overdue refresh shows a "!".
 - **Money.** No currency conversion: each listing in its own currency, with
   its code beside the exchange, as Apple's Stocks does.
 - **Time.** An exchange's times are its own, with its zone named when it

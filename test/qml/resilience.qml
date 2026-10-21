@@ -8,6 +8,7 @@ ShellRoot {
   id: root
   property int failures: 0
   property int saveFailures: 0
+  property int snapshotEnd: 0
   property bool chainHistory: false
   readonly property string state: Quickshell.env("STONKS_FAKE_STATE")
   function check(label, ok, detail) {
@@ -37,6 +38,15 @@ ShellRoot {
   Connections {
     target: service.testDataFile
     function onSaveFailed(error) { root.saveFailures++ }
+  }
+  Connections {
+    target: service.testFundamentals
+    function onTestCommandChanged() {
+      var feed = service.testFundamentals
+      if (!feed.job || feed.job.figures) return
+      var end = /period2=(\d+)/.exec(feed.testCommand.join(" "))
+      if (end) root.snapshotEnd = Number(end[1])
+    }
   }
   Connections {
     target: service.testHistory
@@ -71,6 +81,7 @@ ShellRoot {
       screens.answering = false
       service.screens = null
       service.clockOffset = 0
+      service.testFundamentals.clockOffset = 0
       service.tick()
       service.surfaceShown(root, false)
       service.setRange("1D")
@@ -117,8 +128,9 @@ ShellRoot {
       try {
         run(["chmod", "u-w", dir])
         service.createList("Keep")
+        awaitState(function() { return root.saveFailures === failed + 1 }, 3000)
         service.setMembership("BTC-USD", "Keep", true)
-        awaitState(function() { return root.saveFailures > failed }, 3000)
+        awaitState(function() { return root.saveFailures === failed + 2 }, 3000)
         root.check("failed atomic save keeps the last readable bytes and the edits in memory",
           root.read(service.dataPath) === before && service.lists.some(function(l) { return l.name === "Keep" && l.symbols.indexOf("BTC-USD") >= 0 }),
           "save failures " + (root.saveFailures - failed))
@@ -261,10 +273,15 @@ ShellRoot {
       })
       root.check("dark fundamentals and a first search start no HTTP request",
         searchHeld && root.calls("FUNDAMENTALS") === before && root.calls("SEARCH.asked") === searches)
+      var queuedEnd = Number(/period2=(\d+)/.exec(service.testFundamentals.pendingUrl)[1])
+      service.testFundamentals.clockOffset = 24 * 60 * 60
       wake()
       awaitState(function() { return body.search.resultsQuery === "ZZZ" && !service.testFundamentals.busy }, 6000)
       root.check("wake resumes both pending search and fundamentals", root.calls("SEARCH.asked") === searches + 1
         && root.calls("FUNDAMENTALS") === before + 2 && service.fundamentals.AAPL.status === "ok")
+      root.check("a fundamentals snapshot held overnight ends at wake, not at the earlier ask",
+        root.snapshotEnd >= queuedEnd + 24 * 60 * 60, queuedEnd + " queued, " + root.snapshotEnd + " sent")
+      service.testFundamentals.clockOffset = 0
       body.cancelAdding()
       // Hold the snapshot answer, turn the screens off, then let it land.
       // Its closes are a separate command and must not start in darkness.

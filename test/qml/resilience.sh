@@ -5,6 +5,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree resilience.qml
 patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testGate: yahooGate\n  readonly property alias testFeed: feed\n  readonly property alias testHistory: historyFeed\n  readonly property alias testFundamentals: fundamentalsFeed\n  readonly property alias testDataFile: dataFile'
 patch_copy plugin/Service.qml 's/function wallSecond() { return Math.floor(Date.now() \/ 1000) }/property int clockOffset: 0\n  function wallSecond() { return Math.floor(Date.now() \/ 1000) + root.clockOffset }/'
+patch_copy plugin/FundamentalsFeed.qml '/id: root/a\  property int clockOffset: 0\n  readonly property var testCommand: fetchProc.command'
+patch_copy plugin/FundamentalsFeed.qml 's/Date.now()/(Date.now() + root.clockOffset * 1000)/g'
 patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property var testBody: root.body\n  readonly property alias testKeys: keyCatcher'
 printf '%s\n' '{"version":1,"symbols":["BTC-USD"],"featured":"BTC-USD","order":"manual","style":"smooth","range":"1D"}' > "$HOME/.config/omarchy/grvc.stonks.json"
 # Even a failed test must restore the one scratch directory before cleanup.
@@ -12,6 +14,13 @@ trap 'chmod u+w "$HOME/.config/omarchy"; quickshell_exit; rm -rf "$work"' EXIT
 export QT_QPA_PLATFORM=offscreen
 run_qs 90
 if rg -q 'PASS failed atomic save keeps' "$work/log"; then
-  sed -i '\|WARN scene: QML FileView at @plugin/Service.qml.*Write of .*grvc.stonks.json failed: Unknown error when opening file\.|d' "$work/log"
+  expected='WARN scene: QML FileView at @plugin/Service.qml.*Write of .*grvc.stonks.json failed: Unknown error when opening file\.'
+  count=$(rg -c "$expected" "$work/log" || true)
+  if [ "$count" != 2 ]; then
+    cat "$work/log"
+    echo "FAIL expected two deliberate save-failure warnings, got ${count:-0}"
+    exit 1
+  fi
+  sed -i "\\|$expected|d" "$work/log"
 fi
 finish "RESILIENCE DONE"
