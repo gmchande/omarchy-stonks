@@ -669,7 +669,9 @@ cmd_start() {
   socket_paths_fit "$runtime" "$SIG" || start_failed "the nested sockets do not fit"
   printf 'HYPR_PID=%q\nSIG=%q\nWAYLAND=%q\n' "$HYPR_PID" "$SIG" "$WAYLAND" >> "$run/identity"
   source "$run/identity"
-  within 15 parent_window > /dev/null || start_failed "the session's window is not alone, unfocused, and shown on $laptop's workspace $ws"
+  within 15 parent_window > /dev/null || start_failed "the session's window is not alone, unfocused, and shown on $laptop's workspace $ws: $(hyprctl -j clients \
+    | jq -c --argjson pid "$HYPR_PID" --argjson ws "$ws" '{mine: [.[] | select(.pid == $pid) | {ws: .workspace.id, monitor, mapped, hidden, focusHistoryID}],
+      windows_on_ws: [.[] | select(.workspace.id == $ws)] | length}')"
   within 60 shell_up || start_failed "the nested shell never answered"
   services_off || start_failed "a service that must be off is running"
   if (( fresh )); then
