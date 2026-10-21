@@ -480,9 +480,14 @@ Item {
   }
   onOnScreenChanged: if (service) service.surfaceShown(root, surfaceOpen && onScreen)
   onServiceChanged: if (service && surfaceOpen && onScreen) service.surfaceShown(root, true)
-  Component.onDestruction: if (service) {
-    service.surfaceShown(root, false)
-    service.preview(root, "")
+  // A surface taken down mid-replay, as a rebuilt bar or a removed screen
+  // takes its popup, stops its replay's sound with it.
+  Component.onDestruction: {
+    if (sounds) sounds.stopReplay(root)
+    if (service) {
+      service.surfaceShown(root, false)
+      service.preview(root, "")
+    }
   }
   // The rows in sight while they show, whose charts the service fetches
   // ahead on a range.
