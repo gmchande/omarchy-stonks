@@ -259,16 +259,23 @@ The shell's log the form asks for can name the prices Stonks left out.
 ## What it runs
 
 - **Needs:** nothing beyond Omarchy 4. It runs `curl` and PipeWire's
-  `pw-play` and `pw-dump`, which Omarchy ships.
+  `pw-play`, `pw-cat`, and `pw-dump`, which Omarchy ships.
 - **Commands:** `curl` for every request; while sounds are on, `pw-play` to
   play a sound, only when you add, remove, or undo a row, turn sounds on,
   replay a chart, or move along it, or the bell is due, and one `sh` that
-  starts a `pw-play` for each chime and plays nothing else; `pw-dump` once
-  as each bell is due, to see whether an app is recording from a
+  starts a `pw-play` for each chime and plays nothing else; while sounds
+  are on and the popup or the window is open, and for 10 seconds after,
+  `pw-cat` playing silence, so the first sound plays at once; `pw-dump`
+  once as each bell is due, to see whether an app is recording from a
   microphone, reading only which streams run; `omarchy restart shell` only
   when you click the notice that an update is on disk; and, only when you
   click the note that a newer Stonks is out, `omarchy plugin update
   grvc.stonks` in a terminal.
+- **Silence's cost:** while `pw-cat` plays silence, your speakers'
+  amplifier stays powered and your headphones stay connected to this
+  computer, as when any sound plays, and it takes about a tenth of a
+  percent of one processor core. Once the popup and the window have been
+  closed 10 seconds, or with sounds off, it doesn't run.
 - **Sites:** `query1.finance.yahoo.com` for quotes, charts, and the market
   cap and P/E; `query2.finance.yahoo.com` for search; `api.robinhood.com`
   for overnight prices and which stocks trade overnight; and

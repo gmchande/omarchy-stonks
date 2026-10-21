@@ -25,7 +25,12 @@ Item {
 
   TrendColors { id: colors }
 
-  Sounds { id: speaker; turnedOn: dataService.soundsOn; retro: dataService.retro }
+  Sounds {
+    id: speaker
+    turnedOn: dataService.soundsOn
+    retro: dataService.retro
+    surfacesOpen: dataService.openSurfaces.length > 0
+  }
 
   Bell { service: dataService; sounds: speaker }
 

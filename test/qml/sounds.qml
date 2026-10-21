@@ -114,7 +114,7 @@ ShellRoot {
 
   Stonks.Service { id: service }
   Stonks.Updates { id: updates }
-  Stonks.Sounds { id: sounds; turnedOn: service.soundsOn; retro: service.retro }
+  Stonks.Sounds { id: sounds; turnedOn: service.soundsOn; retro: service.retro; surfacesOpen: service.openSurfaces.length > 0 }
   Component { id: bellMaker; Stonks.Bell {} }
   QtObject {
     id: shellApi
@@ -761,6 +761,37 @@ ShellRoot {
       mouseClick(other, other.width / 2, other.height / 2)
       tryVerify(function() { return endOf(before + 3) !== "" }, 3000)
       harness.check("a click on another row stops the replay's sound with the replay", endOf(before + 3) === "stopped", endOf(before + 3))
+
+      // The output kept awake (the stand-in pw-cat): a stream of silence
+      // while a surface is open with sounds on, held as the last closes,
+      // ended a while after; none while every surface has been closed that
+      // long, and none with sounds off.
+      var silence = function() {
+        var lines = harness.readFile(harness.fakeState + "/pw-cat.log").split("\n").filter(function(l) { return l !== "" })
+        return { running: lines.length > 0 && /^start /.test(lines[lines.length - 1]),
+          starts: lines.filter(function(l) { return /^start /.test(l) }).length, last: lines[lines.length - 1] || "" }
+      }
+      panel.open()
+      tryVerify(function() { return silence().running }, 3000)
+      var awakeWhileOpen = silence().running
+      app.close()
+      panel.close()
+      wait(200)
+      var heldAtClose = silence().running
+      tryVerify(function() { return !silence().running }, 15000)
+      var restsWhenClosed = !silence().running
+      var startsBefore = silence().starts
+      panel.open()
+      tryVerify(function() { return silence().running }, 3000)
+      var wokeOnOpen = silence().starts === startsBefore + 1
+      service.persist({ sounds: false })
+      tryVerify(function() { return !silence().running }, 3000)
+      var offRests = !silence().running
+      service.persist({ sounds: true })
+      panel.close()
+      harness.check("a stream of silence holds the output while a surface is open with sounds on, still as it closes, and rests a while after, or at once with sounds off",
+        awakeWhileOpen && heldAtClose && restsWhenClosed && wokeOnOpen && offRests,
+        [awakeWhileOpen, heldAtClose, restsWhenClosed, wokeOnOpen, offRests].join(","))
 
       // The market's bell, in retro's voice: as the clock passes the open
       // or the close of the market of the stock last looked at, once, a

@@ -17,6 +17,12 @@ Item {
 
   property bool turnedOn: true
   property bool retro: false
+  // A popup or window is open where a screen shows it.
+  property bool surfacesOpen: false
+  // The output is kept awake while sounds are on and a surface is open, and
+  // for 10 s after the last closes, so the first sound plays at once: an
+  // output asleep wakes as a sound starts, and cuts or delays its start.
+  readonly property bool keepingAwake: turnedOn && (surfacesOpen || afterClose.running)
   // The surface whose replay is playing, so that replay's end stops only
   // its own sound; null for any other sound.
   property var replayOwner: null
@@ -138,6 +144,19 @@ Item {
   }
 
   Process { id: player }
+
+  // The output kept awake (`keepingAwake`): a stream of silence, PipeWire's
+  // pw-cat reading zeros, which holds the speakers or headphones open as a
+  // sound playing does, and nothing while sounds are off or every surface
+  // has been closed 10 s.
+  onSurfacesOpenChanged: if (!surfacesOpen) afterClose.restart()
+  Timer { id: afterClose; interval: 10000 }
+  Process {
+    id: silence
+    running: root.keepingAwake
+    command: ["pw-cat", "--playback", "--raw", "--rate", "24000", "--channels", "1", "--format", "s16",
+      "--media-role", "Notification", "/dev/zero"]
+  }
 
   // The market's bell, unless an app is recording from a microphone, as a
   // call does: `pw-dump` lists PipeWire's nodes once, as the bell is due.

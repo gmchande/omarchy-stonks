@@ -200,7 +200,9 @@ EOF
 # MS N", N counting the starts, since chimes overlap; keeps a copy of the
 # file as RUN/sound.N.wav; and stays for the sound's length, or until
 # stopped, as a real player does. And pw-dump's, an empty list of nodes, so
-# no microphone keeps the market's bell quiet.
+# no microphone keeps the market's bell quiet; and pw-cat's, which logs each
+# stream of silence that keeps the output awake to RUN/silence.log, "start
+# MS ARGS" and "stopped MS", and holds no output.
 write_standins() {
   local run=$1 name
   mkdir -p "$run/stubs"
@@ -232,6 +234,15 @@ EOF
   chmod +x "$run/stubs/pw-play"
   printf '#!/bin/sh\necho "[]"\n' > "$run/stubs/pw-dump"
   chmod +x "$run/stubs/pw-dump"
+  cat > "$run/stubs/pw-cat" << EOF
+#!/usr/bin/env bash
+log=$(printf %q "$run/silence.log")
+ms() { echo \$(( \$(date +%s%N) / 1000000 )); }
+trap 'echo "stopped \$(ms)" >> "\$log"; exit 0' TERM INT
+echo "start \$(ms) \$*" >> "\$log"
+while :; do sleep 0.2; done
+EOF
+  chmod +x "$run/stubs/pw-cat"
 }
 
 # write_slow_curl RUN SECONDS CURL: the session's curl, ahead of the real one
