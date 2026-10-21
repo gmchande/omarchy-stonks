@@ -1349,8 +1349,11 @@ ShellRoot {
       if (root.anchorState) {
         verify(!!root.anchorPose, "the real placement produced this review pose")
         anchorProbe.hold()
-        verify(anchorProbe.QsWindow.window === renderWindow && anchorProbe.parent === renderWindow.contentItem,
-          "the default held anchor finds its real pill's window")
+        if (!anchorProbe.QsWindow || anchorProbe.QsWindow.window !== renderWindow || anchorProbe.parent !== renderWindow.contentItem) {
+          console.error("FAIL the default held anchor finds its real pill's window")
+          exitTimer.exitCode = 1
+          return
+        }
         compare(anchorProbe.x, anchorPill.x, "the real pill's held position")
         savePicture()
         return
