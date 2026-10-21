@@ -39,6 +39,11 @@ Item {
   // first fetch that failed for good. They are members, saved and fetched,
   // but no list shows them until then.
   property var arriving: []
+  // The hero an add from search took while its symbol was still on its way,
+  // and the one it left: { symbol, before }. A first fetch that fails for
+  // good hands the hero back, as an add whose preview had already failed
+  // leaves it; another hero chosen meanwhile ends it.
+  property var heroTaken: null
   // The surfaces open now where a screen shows them: the popup on any bar,
   // the window on a workspace on view (`StonksBody.onScreen`). The chart's
   // history is wanted only while one is (`surfaceShown`).
@@ -606,22 +611,15 @@ Item {
     })
   }
 
-  // A preview that ends as its symbol is added, before its first answer,
-  // with its history still out: the add's, whose row lands and is featured
-  // in a moment, takes that fetch over, ahead of the hero it leaves, rather
-  // than letting it go and asking again; { symbol, surface }, the surface
-  // whose search added it. Until the next change of the chart asked for,
-  // the next preview, or that surface closing, which ends the add's landing.
-  property var handedOver: null
-
-  // The symbols whose history the open surfaces' heroes show: first the
-  // one an add from search took over (`handedOver`), then the featured
-  // symbol's and a resting preview's.
+  // The symbols whose history the open surfaces' heroes show: the featured
+  // symbol's, which an add from search still on its way already is
+  // (`addSymbol`), so the fetch its preview has out goes on as the hero's;
+  // and a resting preview's.
   function historyCharts() {
     if (root.openSurfaces.length === 0 || root.view.range === "1D") return []
-    var charts = root.handedOver ? [root.handedOver.symbol] : []
+    var charts = []
     if (root.previewSymbol === "" || root.openSurfaces.some(function(s) { return s !== root.previewSurface }))
-      if (charts.indexOf(root.view.featured) < 0) charts.push(root.view.featured)
+      charts.push(root.view.featured)
     if (root.previewSymbol !== "" && root.previewShown && charts.indexOf(root.previewSymbol) < 0)
       charts.push(root.previewSymbol)
     return charts.filter(function(s) { return s !== "" })
@@ -695,28 +693,20 @@ Item {
   // A surface's search shows its choice on the hero (`previewView`), or
   // nothing with "", which only the search previewing can say. What it
   // needs is asked for only once the choice has rested there, so arrowing
-  // past a result asks for nothing. One that ends as its symbol is added
-  // hands its history fetch still out to the add (`handedOver`).
+  // past a result asks for nothing.
   function preview(surface, symbol) {
     var s = String(symbol || "").trim().toUpperCase()
     if (!s && surface !== root.previewSurface) return
     if (s === root.previewSymbol && surface === root.previewSurface) return
     var before = root.previewSurface
-    var ending = root.previewSymbol
     // The rest first: a choice that moves on has not rested on the next one.
     root.previewRests = false
     root.previewSurface = s ? surface : null
     root.previewSymbol = s
     if (s) {
-      root.handedOver = null
       root.shownAsHero(s)
       previewRest.restart()
-    } else {
-      previewRest.stop()
-      var wanted = historyFeed.wanted
-      if (root.arriving.indexOf(ending) >= 0 && !!wanted && wanted.key === historyFeed.keyFor(ending, root.view.range))
-        root.handedOver = { symbol: ending, surface: surface }
-    }
+    } else previewRest.stop()
     root.showHistory(false)
     if (before && before !== root.previewSurface && s) root.previewTaken(before)
   }
@@ -746,10 +736,7 @@ Item {
     var next = open ? others.concat([surface]) : others
     if (next.length === root.openSurfaces.length) return
     root.openSurfaces = next
-    if (!open) {
-      root.sights = root.sights.filter(function(s) { return s.surface !== surface })
-      if (root.handedOver && root.handedOver.surface === surface) root.handedOver = null
-    }
+    if (!open) root.sights = root.sights.filter(function(s) { return s.surface !== surface })
     root.tick()
     root.showHistory(false)
     root.askOvernight()
@@ -765,7 +752,7 @@ Item {
     if (chart === chartOnShow) return
     var rangeLeft = chartOnShow !== "" && chartOnShow.split("|")[1] !== view.range
     chartOnShow = chart
-    root.handedOver = null
+    if (root.heroTaken && view.featured !== root.heroTaken.symbol) root.heroTaken = null
     if (rangeLeft) {
       // A turn later: the change of the view is still being told.
       var left = Object.keys(root.aheadAsked)
@@ -863,10 +850,15 @@ Item {
     return !!feed.quotes[symbol] || !!(feed.entries[symbol] && feed.entries[symbol].status === "failed")
   }
 
-  // An add leaves arriving once it has answered, or has left All.
+  // An add leaves arriving once it has answered, or has left All. One that
+  // took the hero and failed hands it back (`heroTaken`).
   function settleArrivals() {
     var still = root.arriving.filter(function(s) { return root.library.indexOf(s) >= 0 && !root.answered(s) })
     if (still.length !== root.arriving.length) root.arriving = still
+    var taken = root.heroTaken
+    if (!taken || still.indexOf(taken.symbol) >= 0) return
+    root.heroTaken = null
+    if (root.view.featured === taken.symbol && !feed.quotes[taken.symbol]) root.feature(taken.before)
   }
 
   function parseShell() {
@@ -1005,9 +997,12 @@ Item {
   }
   Component.onDestruction: if (settleWrite.running) root.writeSettled()
 
+  // A hero chosen, by a click, a Show, a key, or the wheel, is kept: an
+  // add's hold on the hero ends (`heroTaken`).
   function feature(symbol, settles) {
     var s = String(symbol || "").toUpperCase()
     if (root.library.indexOf(s) < 0) return
+    root.heroTaken = null
     root.persist({ featured: s }, settles)
   }
 
@@ -1025,7 +1020,11 @@ Item {
   function summon(symbol, range) {
     var values = {}
     var s = String(symbol || "").toUpperCase()
-    if (s && root.library.indexOf(s) >= 0) values.featured = s
+    if (s && root.library.indexOf(s) >= 0) {
+      values.featured = s
+      // Asked for by name, it is a hero chosen (`feature`).
+      root.heroTaken = null
+    }
     if (History.historyRanges().indexOf(range) >= 0) values.range = range
     if (Object.keys(values).length) root.persist(values)
   }
@@ -1038,19 +1037,30 @@ Item {
 
   // A symbol new to All arrives: fetched ahead of any refresh, and shown
   // once it has answered. One already in All is a row at once. The result
-  // the hero shows as a preview joins with the answer it has: a quote, and
-  // it stays the hero, so nothing is fetched again and the chart does not
-  // change; or a first fetch that failed, and the add is done there, its
-  // row saying so.
+  // the hero shows as a preview stays the hero: with a quote, it joins with
+  // it, so nothing is fetched again and the chart does not change; with
+  // none yet, it is the chart asked for, which each surface names while it
+  // is on its way (`ChartMotion.loading`), as the preview did, until its
+  // answer lands and its row joins. Found in the slow walk of 1.0.2: the
+  // hero went back to the stock before the add, as if the add were done.
+  // A first fetch the preview saw fail joins with that, the add done there,
+  // its row saying so; one that fails later hands the hero back
+  // (`heroTaken`).
   function addSymbol(symbol) {
     var s = String(symbol || "").trim().toUpperCase()
     if (s && s === root.previewSymbol && previewFeed.entries[s])
       feed.restore(s, previewFeed.quotes[s] || null, previewFeed.entries[s])
-    var shown = s !== "" && s === root.previewSymbol && !!feed.quotes[s]
     if (s && root.library.indexOf(s) < 0 && root.arriving.indexOf(s) < 0 && !root.answered(s))
       root.arriving = root.arriving.concat([s])
+    var previewed = s !== "" && s === root.previewSymbol
+    var coming = previewed && root.arriving.indexOf(s) >= 0
     var next = Settings.withSymbolAdded(root.dataSettings, s)
-    if (shown) next.featured = s
+    // Taken from an add still on its way, the hero to hand back is the one
+    // before that add.
+    var taken = root.heroTaken
+    var before = taken && taken.symbol === root.view.featured && !feed.quotes[taken.symbol] ? taken.before : root.view.featured
+    if (coming) root.heroTaken = { symbol: s, before: before }
+    if (coming || (previewed && !!feed.quotes[s])) next.featured = s
     root.save(next)
   }
 

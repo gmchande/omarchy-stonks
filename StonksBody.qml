@@ -90,6 +90,9 @@ Item {
   // The landing is a Show of a member still arriving, not an add: it is
   // featured once its first answer is in, a failed one too.
   property bool landingShows: false
+  // Adds not yet heard: each is as its row joins this surface's list, its
+  // answer in, whatever is featured or added meanwhile.
+  property var unheardAdds: []
   // The surface's own colour, which a moving row carries.
   property color ground: Commons.Color.background
   property var rangeOptions: History.historyRanges()
@@ -722,18 +725,19 @@ Item {
   }
 
   // A symbol you add has nothing to show until its first answer, so the
-  // service keeps it out of the rows until then and the view stays on what
-  // you were looking at. Then its row joins at its place, the list eases it
-  // into view once, and when the list and the row are at rest it is featured
-  // the way a click on that row features it, unless you chose another hero
-  // meanwhile or switched to a list without it. The latest add is the one;
-  // closing drops it (freeze). A result the hero already shows as a preview
-  // has its answer: it joins at once and stays the hero.
+  // service keeps it out of the rows until then. Then its row joins at its
+  // place, the list eases it into view once, and when the list and the row
+  // are at rest it is featured the way a click on that row features it,
+  // unless you chose another hero meanwhile or switched to a list without
+  // it. The latest add is the one; closing drops it (freeze). The add is
+  // heard as its row joins, not before.
   // Search closes first, the preview staying on the hero: the rows show
   // again as they were, and the add then joins them the way any new row
-  // does, faded in at its place with the rows below it sliding. The preview
-  // ends once the add has made it the featured symbol, so the chart on
-  // show never changes for it.
+  // does, faded in at its place with the rows below it sliding. The service
+  // makes the preview's symbol the featured one as it adds it, so the
+  // preview ends with the hero unchanged: a result that has answered stays
+  // drawn, and one still on its way stays named as the chart on its way
+  // (`loadingText`) until it lands.
   // A result already in the list on screen is shown, not added
   // (`showSymbol`); one still arriving lands as an add does, and, shown,
   // is featured even when its first fetch fails.
@@ -746,14 +750,15 @@ Item {
     }
     var member = members.indexOf(s) >= 0
     adding = false
-    if (!member) {
-      service.addSymbol(s)
-      sound("add")
-    }
+    // An add takes the hero while it arrives (`Service.addSymbol`); a Show
+    // of a member still arriving chooses it, kept whatever its answer.
+    if (!member) service.addSymbol(s)
+    else service.feature(s)
     previewTo("")
     // After the preview has gone, whose hero was a choice, not a landing.
     landing = s
     landingShows = member
+    if (!member) unheardAdds = unheardAdds.filter(function(a) { return a !== s }).concat([s])
     landingJoined = false
     land()
   }
@@ -773,11 +778,21 @@ Item {
 
   // Called once the rows show the service's latest view.
   function land() {
+    // A row that says its first fetch failed joins too, and is heard; an add
+    // that has left the list on show goes unheard. Rows joining together
+    // are heard once.
+    if (unheardAdds.length && service) {
+      var joined = unheardAdds.filter(function(a) { return service.arriving.indexOf(a) < 0 && view.rows.indexOf(a) >= 0 })
+      if (joined.length) sound("add")
+      var still = unheardAdds.filter(function(a) { return joined.indexOf(a) < 0 && members.indexOf(a) >= 0 })
+      if (still.length !== unheardAdds.length) unheardAdds = still
+    }
     if (landing === "" || !service || service.arriving.indexOf(landing) >= 0) return
-    // A first fetch that failed has nothing to show: the view stays, the add
-    // is done, and its row says it failed; a Show features that row all the
-    // same. One the list on show lacks is done too. One already in All
-    // whose first quote is still out waits for it.
+    // A first fetch that failed has nothing to show: the hero is the one
+    // before the add (`Service.heroTaken`), the add is done, and its row
+    // says it failed; a Show features that row all the same. One the list
+    // on show lacks is done too. One already in All whose first quote is
+    // still out waits for it.
     var failed = !quotes[landing] && !!entries[landing] && entries[landing].status === "failed"
     if (view.rows.indexOf(landing) < 0 || (failed && !landingShows)) {
       landing = ""
@@ -897,6 +912,7 @@ Item {
   function freeze() {
     keepTyped()
     landing = ""
+    unheardAdds = []
     noteTimer.stop()
     noteFade.stop()
     footer.freeze()

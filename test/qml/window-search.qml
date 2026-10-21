@@ -331,15 +331,15 @@ ShellRoot {
 
     // An add from search on a range, before the result's first answer,
     // takes over the history fetch its preview has out instead of asking
-    // again: SHOP.TO's day and year held back, Enter on it, then its day let
-    // through, and its row lands and is featured while the year is still
-    // out, asked for once. The hero it leaves has lost its own year
-    // meanwhile, which waits behind it. And the fetch it takes over is
-    // still the add's own: let through before the row lands, it fails,
-    // is tried again as any is, and keeps its failure. Found in the slow
-    // walk of #45: the year was asked for twice, and on a slow network the
-    // new row's chart took twice as long; the hero's missing year and the
-    // failure in the review of the fix.
+    // again: SHOP.TO's day and year held back, Enter on it, the add the
+    // hero at once, then its day let through, and its row lands while the
+    // year is still out, asked for once, though the hero before it has lost
+    // its own year meanwhile. And the fetch it takes over is still the
+    // add's own: let through before the row lands, it fails, is tried again
+    // as any is, and keeps its failure. Found in the slow walk of #45: the
+    // year was asked for twice, and on a slow network the new row's chart
+    // took twice as long; the hero's missing year and the failure in the
+    // review of the fix.
     function addTakesOverHistory(body, keys) {
       var hold = function(command, name) {
         fileProc.command = [command].concat(command === "rm" ? ["-f"] : []).concat([harness.fakeState + "/" + name])
@@ -383,9 +383,16 @@ ShellRoot {
         wait(300)
       }
 
+      // The add is the hero at once: its row has joined once its day is in
+      // and it has left arriving, which is when a second ask would come.
+      var joined = function() {
+        return !!service.quotes["SHOP.TO"] && service.arriving.indexOf("SHOP.TO") < 0
+          && body.watchlist.displayedSymbols.indexOf("SHOP.TO") >= 0
+      }
+
       var first = addHeld(true)
       hold("rm", "SHOP.TO.quote.hold")
-      tryVerify(function() { return service.featuredSymbol === "SHOP.TO" }, 8000)
+      tryVerify(joined, 8000)
       wait(300)
       var taken = [first.arriving, body.chartLoading, harness.calls("SHOP.TO.history") - first.from].join(",")
       done()
@@ -403,11 +410,9 @@ ShellRoot {
       harness.check("the fetch an add takes over is still its own: failing before the row lands, it is tried again and keeps its failure",
         kept === "true,true,2", kept)
 
-      // The hand-over is the add's only while its landing lasts: another
-      // preview has its own year asked for, and a close ends it, so the
-      // reopened window asks nothing for the add as a hero's. Under half of
-      // Yahoo's budget there, so nothing is fetched ahead either. Found in
-      // the second review of the fix: it held on, ahead of both.
+      // An add on its way leaves the next preview its own year: asked for
+      // while the add's is still out. Found in the second review of the
+      // fix: the add held on, ahead of it.
       var release = function() {
         hold("rm", "SHOP.TO.quote.hold")
         hold("rm", "SHOP.TO.history.hold")
@@ -425,21 +430,12 @@ ShellRoot {
       var othersOwn = within(3000, function() { return harness.calls("307.F.history") > otherYear })
       keyClick(Qt.Key_Escape)
       release()
-      var shut = addHeld(false)
-      app.close()
-      hold("rm", "SHOP.TO.quote.hold")
-      tryVerify(function() { return service.arriving.length === 0 }, 8000)
-      service.testYahooGate.tokens = 30
-      app.open("{}")
-      wait(1500)
-      var reopenedAsked = harness.calls("SHOP.TO.history") - shut.from
-      release()
-      harness.check("the next preview, or a close, ends an add's hold on its preview's fetch",
-        othersOwn && reopenedAsked === 1, othersOwn + "," + reopenedAsked)
+      harness.check("an add on its way leaves the next preview its own year, asked for while the add's is out",
+        othersOwn, othersOwn)
 
-      // Only its own surface's close ends it: another surface open beside
-      // the window, as the popup is, closes while the add is out, and the
-      // added row's year is still asked for once. Found in the third review.
+      // Another surface open beside the window, as the popup is, closes
+      // while the add is out, and the added row's year is still asked for
+      // once. Found in the third review.
       var beside = otherSurface.createObject(null, { service: service, width: 480, height: 760 })
       beside.surfaceOpen = true
       wait(100)
@@ -447,13 +443,39 @@ ShellRoot {
       beside.surfaceOpen = false
       wait(50)
       hold("rm", "SHOP.TO.quote.hold")
-      tryVerify(function() { return service.featuredSymbol === "SHOP.TO" }, 8000)
+      tryVerify(joined, 8000)
       wait(300)
       var besideAsked = harness.calls("SHOP.TO.history") - besideAdd.from
       beside.destroy()
       release()
       harness.check("another surface closing leaves the add its preview's fetch: asked for once",
         besideAdd.arriving && besideAsked === 1, besideAdd.arriving + "," + besideAsked)
+
+      // Two adds on their way, SHOP and then SHHI.NE, both failing for good:
+      // the hero goes back to the one before both, not to the first add,
+      // which has nothing to show. Found in the review of the slow-add fix:
+      // the second add's fallback was the first.
+      service.feature("MSFT")
+      tryVerify(function() { return body.chartSymbol === "MSFT" && !body.chartLoading }, 8000)
+      searchShop(body, keys)
+      tryVerify(function() { return body.previewSymbol === "SHOP" }, 2000)
+      keyClick(Qt.Key_Return)
+      tryVerify(function() { return service.featuredSymbol === "SHOP" && !body.adding }, 2000)
+      searchShop(body, keys)
+      keyClick(Qt.Key_Down)
+      keyClick(Qt.Key_Down)
+      tryVerify(function() { return body.previewSymbol === "SHHI.NE" }, 2000)
+      keyClick(Qt.Key_Return)
+      var tookBoth = within(2000, function() { return service.featuredSymbol === "SHHI.NE" })
+      var settled = within(20000, function() { return service.arriving.length === 0 })
+      wait(100)
+      var handedBack = service.featuredSymbol
+      service.removeSymbol("SHOP")
+      service.removeSymbol("SHHI.NE")
+      service.feature("MSFT")
+      wait(300)
+      harness.check("two adds on their way, both failing, hand the hero back to the one before both",
+        tookBoth && settled && handedBack === "MSFT", [tookBoth, settled, handedBack].join(","))
       service.setRange("1D")
       wait(300)
     }

@@ -197,7 +197,8 @@ ShellRoot {
 
       // A double-click on a result is one pick: its second click does not
       // feature the row that takes the result's place, for a symbol new to
-      // All and for one already in it, the keyboard's choice on another
+      // All, which is the hero at once as it arrives (SHOP, whose answer
+      // fails), and for one already in it, the keyboard's choice on another
       // result. On the footer's undo note it is one undo, not an undo and
       // then a search. Found in the transition audit (search 4): the row
       // under the pointer took the hero.
@@ -218,7 +219,6 @@ ShellRoot {
         mouseMove(body, 1, 1)
         return hero + ":" + heroes.filter(function(h, i) { return i === 0 || h !== heroes[i - 1] }).join(">")
       }
-      var heroBefore = watchlist.displayedSymbols[3]
       var newPick = doublePick(0, "SHOP")
       service.removeSymbol("SHOP")
       service.removeSymbol("SHOP.TO")
@@ -232,7 +232,7 @@ ShellRoot {
       wait(100)
       var knownPick = doublePick(1, "SHOP.TO")
       harness.check("a double-click on a result adds it once and features no row under it, new to All and already in it",
-        newPick === heroBefore + ":" + heroBefore && knownPick === "SHOP.TO:SHOP.TO",
+        newPick === "SHOP:SHOP" && knownPick === "SHOP.TO:SHOP.TO",
         newPick + " | " + knownPick)
       service.switchList("")
       service.deleteList("Mid3")
@@ -253,10 +253,10 @@ ShellRoot {
       harness.check("a double-click on the undo note undoes once and opens no search",
         undone && !searching, undone + "|" + searching)
 
-      // A member still arriving says Show too, and Enter on it features its
-      // row once its first answer is in, a failed one included. Found in the
-      // branch's review: accepted before its first fetch failed, it featured
-      // nothing.
+      // A member still arriving says Show too, and Enter on it features it at
+      // once, named as on its way, and its row once its first answer is in,
+      // a failed one included. Found in the branch's review: accepted before
+      // its first fetch failed, it featured nothing.
       service.feature("AAPL")
       wait(300)
       service.addSymbol("SHHI.NE")
@@ -267,7 +267,9 @@ ShellRoot {
       var arrivingShow = [service.arriving.indexOf("SHHI.NE") >= 0,
         harness.find(findAll(body.search, "searchResult")[2], "searchAdd").children[0].text].join(",")
       keyClick(Qt.Key_Return)
-      within(12000, function() { return service.featuredSymbol === "SHHI.NE" })
+      within(12000, function() {
+        return !!service.entries["SHHI.NE"] && service.entries["SHHI.NE"].status === "failed" && watchlist.cursorRow === "SHHI.NE"
+      })
       wait(300)
       harness.check("Show on a member still arriving features its row once its first fetch fails",
         arrivingShow === "true,SHOW" && service.featuredSymbol === "SHHI.NE" && !!service.entries["SHHI.NE"]
