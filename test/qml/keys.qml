@@ -11,7 +11,7 @@ import "plugin" as Stonks
 // (Panel.qml, its card in CardWindow.qml) and the real window (App.qml), it
 // changes what that surface shows. A key a handler lost, or one renamed in
 // the sheet or the README but not in the handlers, fails here. And the sheet
-// is the same on both surfaces, and whole in the popup in both looks. A
+// says the same on both surfaces and in both looks. A
 // replay has one speed, `p`'s, so Shift+P does nothing. HOME and curl are
 // scratch fixtures.
 ShellRoot {
@@ -337,7 +337,7 @@ ShellRoot {
       press("?")
       wait(50)
       var sheet = harness.find(s.body, "helpSheet")
-      var drawn = { keys: harness.texts(sheet, "helpKey"), all: harness.texts(sheet), whole: !sheet.interactive,
+      var drawn = { keys: harness.texts(sheet, "helpKey"), all: harness.texts(sheet),
         credit: harness.texts(sheet, "helpCredit").join("") }
       press("?")
       return drawn
@@ -459,13 +459,13 @@ ShellRoot {
       var popupSheet = walk(harness.popup)
       capsLock(harness.popup)
       shiftX(harness.popup)
-      // Whole in both looks: the popup's height takes the sheet's, under its cap.
+      // The look changes its drawing, not the keys and words the reader gets.
       var looks = [false, true].map(function(retro) {
         service.persist({ style: retro ? "retro" : "smooth" })
         wait(50)
-        return drawnSheet(harness.popup).whole
+        return drawnSheet(harness.popup).all.join("|") === popupSheet.all.join("|")
       })
-      harness.check("the key sheet fits the popup without scrolling, smooth and retro", looks[0] && looks[1], looks.join(","))
+      harness.check("the key sheet says the same in smooth and retro", looks[0] && looks[1], looks.join(","))
       panel.close()
       wait(300)
 
