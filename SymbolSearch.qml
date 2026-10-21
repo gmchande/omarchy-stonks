@@ -16,7 +16,8 @@ import "Tones.js" as Tones
 // answers come and go. The last answer stays on screen while a new query is
 // out, dimmed and not takeable, so nothing can add a symbol found for an
 // earlier query; only an empty field clears it. An empty answer says there
-// are no matches, and a lookup that failed says so. A first query, with no
+// are no matches, and a lookup that failed says so with RETRY beside it,
+// which Enter does too (`retry`). A first query, with no
 // answer on screen, whose lookup has been out a quarter of a second says
 // it is being searched for, so a slow network never leaves the space under
 // the field blank. What an answer held that Stonks doesn't follow, a mutual
@@ -186,9 +187,29 @@ FocusScope {
   }
 
   // Every way of taking a result comes through here, and only a result for
-  // the query in the field is taken.
+  // the query in the field is taken. On a failed lookup there is none to
+  // take: Enter asks again.
   function accept(index) {
-    if (!stale && index >= 0 && index < results.length) picked(results[index].symbol)
+    if (stale) return
+    if (answer === "failed") retry()
+    else if (index >= 0 && index < results.length) picked(results[index].symbol)
+  }
+
+  // The failed lookup's query asked again, through the same request and
+  // gate as typing it: the failure goes, so the line says what a first
+  // query's does until the answer lands (at once, while the gate pauses).
+  // It is asked once: a lookup of it still waiting on the typing pause
+  // goes now instead, and one already out is the retry's.
+  function retry() {
+    if (stale || answer !== "failed") return
+    searchDebounce.stop()
+    answer = ""
+    if (searchProc.running && activeQuery === searchText.trim()) {
+      requestedQuery = ""
+      slowSearch.restart()
+    } else {
+      runSearch()
+    }
   }
 
   // A click on a result is Enter on it: chosen, so the hero is on it as an
@@ -467,26 +488,41 @@ FocusScope {
   }
 
   // No matches, no answer at all, or a slow first lookup, said where the
-  // results would be.
+  // results would be; a failed lookup offers RETRY after its words.
   Text {
+    id: searchMessage
     objectName: "searchMessage"
     visible: root.answer === "none" || root.answer === "failed" || (root.answer === "" && root.slow)
     opacity: root.stale ? 0.4 : 1
     anchors.left: parent.left
-    anchors.right: parent.right
     anchors.top: fieldBar.bottom
     anchors.topMargin: root.resultsGap
+    width: Math.min(implicitWidth, parent.width - (retrySearch.visible ? retrySearch.implicitWidth + Style.space(16) + root.rowPadding : 0))
     height: root.rowHeight
     leftPadding: root.rowPadding
     verticalAlignment: Text.AlignVCenter
     textFormat: Text.PlainText
     text: root.answer === "none" ? "No matches for “" + root.resultsQuery + "”"
-      : root.answer === "failed" ? "Search didn’t answer · try again"
+      : root.answer === "failed" ? "Search didn’t answer"
       : "Searching for “" + root.searchText.trim() + "”…"
     color: root.dim
     font.family: root.fontFamily
     font.pixelSize: Style.font.bodySmall
     elide: Text.ElideRight
+  }
+
+  ListAction {
+    id: retrySearch
+    objectName: "searchRetry"
+    view: root
+    visible: root.answer === "failed"
+    enabled: !root.stale
+    opacity: searchMessage.opacity
+    anchors.left: searchMessage.right
+    anchors.leftMargin: Style.space(16)
+    anchors.verticalCenter: searchMessage.verticalCenter
+    text: "RETRY"
+    onActivated: root.retry()
   }
 
   // The field, at the top, where the list's rows were. Its own border is

@@ -25,6 +25,8 @@
 #                exists, with its previous close above its price, down
 #   SHOP.TO      answers its saved Toronto day, so a search result can be in All
 #   SPY, BTC-USD answer their saved days: an ETF and a cryptocurrency
+#   NOCUR        answers the saved FTSE 100 day with no currency, as Yahoo
+#                answered ^STOXX50E
 #   HISTSTRAY    answers saved intraday MSFT data through the history path
 #   HUGE         answers AAPL's day padded past 64 KB, over the day's cap
 #   GONE         answers 404, a symbol Yahoo does not know
@@ -40,7 +42,9 @@
 # Yahoo's answers for those, which hold kinds Stonks leaves out, and MIXED
 # the five SHOP results with EURUSD's currency after them. Each SHOP answer
 # given, after the pause, is counted in SEARCH.answered.calls; a search
-# stopped first is not.
+# stopped first is not. Every search is counted in SEARCH.asked.calls as it
+# comes, before the pause. While STONKS_FAKE_STATE/SEARCH.down exists, every
+# search fails.
 # History requests use the saved AAPL year response for AAPL, MSFT, and BOTH,
 # and NEST's saved month for NEST; KILN, SPY, ^GSPC, BTC-USD, SHEL.L, and
 # 7203.T, one of each kind of listing, answer their own saved years.
@@ -173,7 +177,9 @@ serve() {
     exit 0
   fi
   if [[ "$url" == *"/v1/finance/search"* ]]; then
+    count "$state/SEARCH.asked.calls" > /dev/null
     [[ "$url" == *"q=FAST&"* ]] || sleep 0.4
+    [ -e "$state/SEARCH.down" ] && exit 22
     case "$url" in
       *"q=FAST&"*) cat "$fixtures/search.json" ;;
       *"q=ZZZ"*) echo '{"quotes":[]}' ;;
@@ -309,6 +315,7 @@ serve() {
     SHOP.TO) cat "$fixtures/shop-to.json" ;;
     SPY) cat "$fixtures/spy-2026-09-11-day-prepost.json" ;;
     BTC-USD) cat "$fixtures/btc-usd-day.json" ;;
+    NOCUR) stamp < "$fixtures/ftse-day.json" | jq -c '.chart.result[0].meta.currency = null' ;;
     HUGE) answer; head -c 70000 /dev/zero | tr '\0' ' ' ;;
     GONE) exit 44 ;;
     LONG*) stamp < "$fixtures/moments/listings-2026-10-07-1455/nest.json" ;;

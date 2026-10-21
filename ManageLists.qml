@@ -406,11 +406,14 @@ FocusScope {
             height: root.itemHeight
             spacing: Style.space(14)
 
+            // An arrow with nowhere to move its list can't act: faded, with
+            // no hover or hand (`ListAction`).
             ListAction {
               view: root
               objectName: "moveUp"
               anchors.verticalCenter: parent.verticalCenter
               text: "↑"
+              enabled: entry.index > 1
               opacity: entry.index > 1 ? 1 : 0.4
               onActivated: root.move(entry.index, -1)
             }
@@ -419,6 +422,7 @@ FocusScope {
               objectName: "moveDown"
               anchors.verticalCenter: parent.verticalCenter
               text: "↓"
+              enabled: entry.index < root.choices.length - 1
               opacity: entry.index < root.choices.length - 1 ? 1 : 0.4
               onActivated: root.move(entry.index, 1)
             }

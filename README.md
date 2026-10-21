@@ -207,7 +207,8 @@ price say the same.
   minutes back, since Robinhood reports those trades late, and dims once
   it's 20 minutes old.
 - **A price looks wrong.** Each price is in its listing's currency, never
-  converted. A price marked GBp is in pence, as Yahoo quotes many London
+  converted, and shows no code where Yahoo names none, as for some
+  indexes. A price marked GBp is in pence, as Yahoo quotes many London
   listings: 3,580.00 is £35.80. The large price is the regular session's.
   Pre-market, after-hours, and overnight trades show on the smaller line
   under it, which some apps show as the main price. The change is from the
@@ -220,8 +221,9 @@ price say the same.
 - **The header says "1W unavailable", with RETRY beside it.** Yahoo didn't
   send that range's chart. Click RETRY, or press `r`. While Yahoo is
   turning Stonks away, a range fails at once.
-- **Search says "Search didn't answer".** Yahoo's search didn't answer, or
-  Stonks is waiting out a refusal from Yahoo. Try again in a moment.
+- **Search says "Search didn't answer", with RETRY beside it.** Yahoo's
+  search didn't answer. Click RETRY, or press Enter. While Yahoo is turning
+  Stonks away, a search fails at once: try again in a moment.
 - **The header says "schedule unavailable".** Stonks knows each exchange's
   holidays up to a set date. This exchange's have run out, so it can't say
   when the market next opens. Stonks doesn't update itself:

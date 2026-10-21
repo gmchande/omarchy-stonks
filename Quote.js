@@ -297,7 +297,9 @@ function parseChart(json, centExchanges) {
     // The long name, as search takes it: the short one arrives in capitals
     // for some listings and is cut at 31 characters.
     name: meta.longName || meta.shortName || meta.symbol,
-    currency: meta.currency || "USD",
+    // Only the currency Yahoo names, or "": an answer can name none, as
+    // ^STOXX50E's did, and a price is never called dollars Yahoo didn't say.
+    currency: meta.currency || "",
     exchange: exchangeOf(meta),
     timezoneName: meta.exchangeTimezoneName || "",
     gmtoffset: meta.gmtoffset || 0,

@@ -1,10 +1,12 @@
 [Desktop Entry]
 Version=1.0
 Name=Stonks
+GenericName=Stock Watchlist
 Comment=Watchlist and day chart
 Exec=omarchy-shell grvc.stonks openWindow {}
 Icon=grvc.stonks
 Terminal=false
 Type=Application
 Categories=Office;Finance;
+Keywords=stocks;stock;ticker;watchlist;finance;market;
 StartupNotify=true
