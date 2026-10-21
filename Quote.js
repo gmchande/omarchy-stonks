@@ -359,21 +359,39 @@ function parseChart(json, centExchanges) {
   }
 }
 
-// Whether a quote says nothing new over the last one for the same symbol,
-// without writing out every point: every figure but the points as text,
-// then the points compared one by one, a bar Yahoo revises mid-day too.
+// Whether a quote says nothing new over the last one for the same symbol:
+// the points compared one by one, a bar Yahoo revises mid-day too, then
+// every other figure as a value (`sameRecord`), never written out as text,
+// which for a long list's landing took longer than the rest of it.
 function sameQuote(a, b) {
   var pa = a.points || []
   var pb = b.points || []
   if (pa.length !== pb.length) return false
   for (var i = 0; i < pa.length; i++) if (pa[i].t !== pb[i].t || pa[i].p !== pb[i].p) return false
-  return JSON.stringify(figuresOf(a)) === JSON.stringify(figuresOf(b))
+  return sameRecord(a, b, "points")
 }
 
-function figuresOf(quote) {
-  var figures = {}
-  for (var key in quote) if (key !== "points") figures[key] = quote[key]
-  return figures
+// Whether two figures hold the same: a number, text, or flag; or a list
+// or record of them, item by item.
+function sameValue(a, b) {
+  if (a === b) return true
+  if (!a || !b || typeof a !== "object" || typeof b !== "object") return false
+  var list = Array.isArray(a)
+  if (list !== Array.isArray(b)) return false
+  if (!list) return sameRecord(a, b, "")
+  if (a.length !== b.length) return false
+  for (var i = 0; i < a.length; i++) if (a[i] !== b[i] && !sameValue(a[i], b[i])) return false
+  return true
+}
+
+// Two records' figures, all but `skip`'s. One left unset is the same as one
+// a record lacks, as a saved quote, written out and read back, lacks it.
+function sameRecord(a, b, skip) {
+  var keys = Object.keys(a)
+  for (var i = 0; i < keys.length; i++) if (keys[i] !== skip && !sameValue(a[keys[i]], b[keys[i]])) return false
+  keys = Object.keys(b)
+  for (var j = 0; j < keys.length; j++) if (keys[j] !== skip && b[keys[j]] !== undefined && !(keys[j] in a)) return false
+  return true
 }
 
 function periodOf(period) {
