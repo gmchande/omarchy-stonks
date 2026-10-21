@@ -1,11 +1,12 @@
 import QtQuick
 
 // The manifest's service entry: the data service, the theme's up and down,
-// the plugin's version watch, the sounds, the window's host, and the IPC
-// target, side by side, each on its own. The pills and the popup reach them
-// through `serviceFor("grvc.stonks")`: the data as `service`, the colours as
-// `trendColors`, the version watch as `updates`, the sounds as `sounds`, the
-// window as `windowHost`, and the IPC target as `ipc`.
+// the plugin's version watch, the sounds and the market's bell, the
+// window's host, and the IPC target, side by side, each on its own. The
+// pills and the popup reach them through `serviceFor("grvc.stonks")`: the
+// data as `service`, the colours as `trendColors`, the version watch as
+// `updates`, the sounds as `sounds`, the window as `windowHost`, and the IPC
+// target as `ipc`.
 Item {
   id: root
 
@@ -25,6 +26,8 @@ Item {
   TrendColors { id: colors }
 
   Sounds { id: speaker; turnedOn: dataService.soundsOn; retro: dataService.retro }
+
+  Bell { service: dataService; sounds: speaker }
 
   WindowHost {
     id: host

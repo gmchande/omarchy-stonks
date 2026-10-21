@@ -793,6 +793,33 @@ test("a published closure or a break between segments is closed, whatever Yahoo'
   expect(M.inRegularSession(jpx, 1788836400, calendars)).toBe(false)
 })
 
+test("the bell rings once at a market's open and once at its close, never late, at lunch, on a holiday, or for a coin", () => {
+  const q = duringSession(quote)
+  const bell = (quote, before, now) => M.bellBetween(quote, before, now, calendars)
+  // The minute's tick over the open and the close, and a step just over.
+  expect([bell(q, reg.start - 60, reg.start), bell(q, reg.start - 1, reg.start + 5), bell(q, reg.end - 30, reg.end + 30)])
+    .toEqual(["open", "open", "close"])
+  // Nothing between them, and nothing late: Stonks started, or the machine
+  // woke, after the bell.
+  expect([bell(q, reg.start + 60, reg.start + 120), bell(q, reg.start - 3600, reg.start + 60), bell(q, reg.end - 60, reg.end + 600)])
+    .toEqual(["", "", ""])
+  // Tokyo rings at 09:00 and 15:30, not around its lunch.
+  const jpx = {
+    symbol: "7203.T", exchange: "TSE", timezoneName: "Asia/Tokyo", gmtoffset: 32400, crypto: false,
+    session: { pre: null, post: null, regular: { start: M.epochAt(JPX, "2026-09-08", "09:00"), end: M.epochAt(JPX, "2026-09-08", "15:30") } },
+    points: []
+  }
+  const tokyo = hm => M.epochAt(JPX, "2026-09-08", hm)
+  expect(["09:00", "11:30", "12:30", "15:30"].map(hm => bell(jpx, tokyo(hm) - 60, tokyo(hm) + 1)))
+    .toEqual(["open", "", "", "close"])
+  // Labor Day, whatever Yahoo's periods say, and a coin's day, ring nothing.
+  const labor = 1788793200
+  const fakeOpen = { ...sep4, session: { pre: null, post: null, regular: { start: labor - 3600, end: labor + 3600 } } }
+  expect([bell(fakeOpen, labor - 3630, labor - 3570), bell(fakeOpen, labor + 3570, labor + 3630)]).toEqual(["", ""])
+  const day = btc.session.regular
+  expect([bell(btc, day.start - 30, day.start + 30), bell(btc, day.end - 30, day.end + 30)]).toEqual(["", ""])
+})
+
 test("freshness keeps quote age, an unanswered ask, and the refresh outcome apart", () => {
   const q = duringSession(quote)
   const trading = reg.start + 3600

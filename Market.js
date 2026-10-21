@@ -348,6 +348,24 @@ function regularNow(quote, now, calNow) {
   return isTrading(sessionPhase(quote, now)) || calNow.segment
 }
 
+// The bell a quote's market rings as the clock moves on from `before` to
+// `now`: "open" where its regular session begins between them, "close"
+// where it ends, else "". A break between segments (Tokyo's lunch) rings
+// neither, so each rings once a day; a closure, a weekend, and a
+// cryptocurrency never enter a session, so ring nothing. A step of the
+// clock longer than 90 seconds, Stonks starting after the bell or the
+// machine waking from sleep, rings nothing: a bell is never late.
+function bellBetween(quote, before, now, calendars) {
+  if (!quote || now <= before || now - before > 90) return ""
+  var cal = calendarFor(calendars, quote)
+  var then = calendarNow(cal, before)
+  var at = calendarNow(cal, now)
+  if (then.breakEnd || at.breakEnd) return ""
+  var was = regularNow(quote, before, then)
+  var is = regularNow(quote, now, at)
+  return was === is ? "" : is ? "open" : "close"
+}
+
 // Whether a quote's own market is in its pre-market or after hours now:
 // Yahoo's periods; or, for a quote held from an earlier day, whose periods,
 // its bars' and its current ones, don't describe today, the listing's own

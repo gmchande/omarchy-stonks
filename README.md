@@ -147,11 +147,16 @@ too alike, or too faint.
 ## Sounds
 
 Stonks makes a short sound when you add a symbol, remove a row, or undo the
-removal, which plays the removal backwards. A replay plays the chart's line
-as a tone, with a tick where it crosses the previous close. Each look has its
-own voice. Nothing that happens by itself makes a sound: no refresh, price,
-or bell. Click the speaker at the top right, or press `Shift+S`, to turn
-sounds off; Stonks remembers. Your system volume sets how loud they are.
+removal, which plays the removal backwards. Run the pointer along the chart
+and it plays like a row of chimes: each bar you cross rings its note, higher
+where the line is higher, and each step of `←` `→` rings too. A replay plays
+the chart's line as a tone, with a tick where it crosses the previous close.
+Each look has its own voice. A soft bell rings as the market of the stock
+you last looked at opens and as it closes, on time or not at all, and never
+while every screen is off or an app records from your microphone. Nothing
+else sounds by itself: no refresh or price. Click the speaker at the top
+right, or press `Shift+S`, to turn sounds off; Stonks remembers. Your system
+volume sets how loud they are.
 
 ## Keys
 
@@ -253,12 +258,16 @@ The shell's log the form asks for can name the prices Stonks left out.
 ## What it runs
 
 - **Needs:** nothing beyond Omarchy 4. It runs `curl` and PipeWire's
-  `pw-play`, which Omarchy ships.
-- **Commands:** `curl` for every request; `pw-play` to play a sound, while
-  sounds are on, only when you add, remove, or undo a row, turn sounds on,
-  or replay a chart; `omarchy restart shell` only when you click the notice
-  that an update is on disk; and, only when you click the note that a newer
-  Stonks is out, `omarchy plugin update grvc.stonks` in a terminal.
+  `pw-play` and `pw-dump`, which Omarchy ships.
+- **Commands:** `curl` for every request; while sounds are on, `pw-play` to
+  play a sound, only when you add, remove, or undo a row, turn sounds on,
+  replay a chart, or move along it, or the bell is due, and one `sh` that
+  starts a `pw-play` for each chime and plays nothing else; `pw-dump` once
+  as each bell is due, to see whether an app is recording from a
+  microphone, reading only which streams run; `omarchy restart shell` only
+  when you click the notice that an update is on disk; and, only when you
+  click the note that a newer Stonks is out, `omarchy plugin update
+  grvc.stonks` in a terminal.
 - **Sites:** `query1.finance.yahoo.com` for quotes, charts, and the market
   cap and P/E; `query2.finance.yahoo.com` for search; `api.robinhood.com`
   for overnight prices and which stocks trade overnight; and
@@ -274,7 +283,8 @@ The shell's log the form asks for can name the prices Stonks left out.
 - **Files it writes:** your lists and settings in
   `~/.config/omarchy/grvc.stonks.json`, the last quotes in
   `~/.cache/grvc.stonks/quotes.json`, and, while sounds are on, a replay's
-  sound in `~/.cache/grvc.stonks/replay.wav`, written over at each replay.
+  sound in `~/.cache/grvc.stonks/replay.wav`, written over at each replay,
+  and the chimes' notes beside it, `chime-*.wav`, written each run.
   The shell keeps the pill's form on its bar entry in
   `~/.config/omarchy/shell.json`.
 - **Limits:** every request has a time limit and a size cap. Quotes come

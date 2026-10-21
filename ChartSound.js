@@ -1,16 +1,21 @@
 .pragma library
+.import "Chart.js" as Chart
 
-// The replay heard: the chart's line as sound, made from the chart on screen
-// as a replay starts, in each look's voice. Its time is the replay's own: its
-// place along the chart goes from `from` to `to` (0..1, the chart's x) over
-// `seconds`, on Qt's InOutSine, as ChartMotion's replay scrubs. Pitch is the
-// line's height on the chart, from its floor to its ceiling, so it reads the
-// day the way the chart does, and where the line crosses its baseline,
-// yesterday's close or the range's start, there is a tick. Smooth glides
-// one octave on a sine with a little breath, and ticks on wood; retro steps
-// one note per pixel column, on a two-octave pentatonic, so no note is sad
-// and a down day sounds as kind as an up one, and ticks in noise. Each is
-// levelled by its loudest 50 ms, under the fixed sounds.
+// The chart heard, in each look's voice: the replay, and the chimes.
+// The replay is the chart's line as sound, made from the chart on screen
+// as a replay starts. Its time is the replay's own: its place along the
+// chart goes from `from` to `to` (0..1, the chart's x) over `seconds`, on
+// Qt's InOutSine, as ChartMotion's replay scrubs. Pitch is the line's height
+// on the chart, from its floor to its ceiling, so it reads the day the way
+// the chart does, and where the line crosses its baseline, yesterday's close
+// or the range's start, there is a tick. Smooth glides one octave on a sine
+// with a little breath, and ticks on wood; retro steps one note per pixel
+// column, on a two-octave pentatonic, so no note is sad and a down day
+// sounds as kind as an up one, and ticks in noise.
+// The chimes are the chart as a row of bars you run a hand along: the
+// pentatonic's eleven notes, low at the chart's floor and high at its
+// ceiling, a bar each (`barAt`, `chime`).
+// Each sound is levelled by its loudest 50 ms, under the fixed sounds.
 // Ported from the sound study's make.js, which measured them. The shell's
 // engine interprets a loop that runs once, so the work per sample is a
 // table read and a few sums: the place, the pitch, and the envelope move
@@ -184,7 +189,6 @@ function nesVolume(t, start, stepMs, floor) {
 // it, the noise channel ticks, 30 ms; across dark columns nothing crosses.
 function retro(grid, from, to, seconds) {
   var x = new Float32Array(Math.round((seconds + 0.1) * RATE))
-  var rows = Math.max(1, grid.rows - 1)
   var tables = []
   var slewK = 1 - Math.exp(-1 / (0.0012 * RATE)), slew = 0
   var ph = 0, note = -1, since = 0, lastCol = -1, lastSide = 0, step = 0, wave = null, lit = false
@@ -199,7 +203,7 @@ function retro(grid, from, to, seconds) {
       lit = row !== undefined
       if (!lit) lastSide = 0
       if (lit) {
-        var next = Math.round((grid.rows - 1 - row) / rows * (PENTATONIC.length - 1))
+        var next = rowBar(grid, row)
         if (next !== note || !wasLit) since = t
         if (next !== note) {
           note = next
@@ -239,6 +243,80 @@ function retro(grid, from, to, seconds) {
     for (var m = 0; m < noise.length && ticks[n] + m < x.length; m++) x[ticks[n] + m] += 0.5 * nesVolume(m / RATE, 10, 4, 0) * noise[m]
   }
   return levelled(fadeEdges(band(x, 90, 6500), 1, 4), -22)
+}
+
+// The bar a height on the chart (0 its floor, 1 its ceiling) sounds.
+function barOf(height) {
+  return Math.round(Math.max(0, Math.min(1, height)) * (PENTATONIC.length - 1))
+}
+
+// The bar a row of the retro chart's grid (0 at the top) sounds.
+function rowBar(grid, row) {
+  return barOf((grid.rows - 1 - row) / Math.max(1, grid.rows - 1))
+}
+
+// The bar the chart sounds at `x` (0..1 along it), or -1 where it draws
+// nothing: in smooth the line's height there (`chart.geometry`), as the
+// scrub's dot sits; in retro the lit row of the column there (`chart.grid`,
+// PixelChart's), dark columns silent.
+function barAt(chart, x) {
+  if (x < 0) return -1
+  if (chart.retro) {
+    var grid = chart.grid
+    if (!grid || !grid.levels) return -1
+    var row = grid.levels[Math.max(0, Math.min(grid.columns - 1, Math.floor(x * grid.columns)))]
+    return row === undefined ? -1 : rowBar(grid, row)
+  }
+  var y = chart.geometry ? Chart.yAt(chart.geometry.points, x) : null
+  return y === null ? -1 : barOf(1 - y)
+}
+
+// A chime: bar `bar` (0..10) struck, in the look's voice. Smooth's is a soft
+// metal bar struck with felt, ringing about half a second: a free bar's
+// modes (1, 2.756, 5.404), the upper ones dying first, and higher bars
+// ringing shorter, as real ones do. Retro's is a pulse blip that falls in
+// the console's volume steps, a tenth of a second. Each sits 5 dB under the
+// add sound, so a sweep's overlapping bars come to about its level.
+function chime(retro, bar) {
+  return retro ? retroBar(PENTATONIC[bar]) : smoothBar(PENTATONIC[bar])
+}
+
+function smoothBar(f) {
+  var ring = 0.55
+  var x = new Float32Array(Math.round(ring * RATE))
+  var tau = ring / 4.6 * 1.2 * Math.sqrt(440 / f)
+  var modes = [[1, 1, 1], [2.756, 0.28, 0.35], [5.404, 0.08, 0.15]]
+  for (var m = 0; m < modes.length; m++) {
+    // A decaying sine by its recurrence, two products a sample.
+    var w = 2 * Math.PI * f * modes[m][0] / RATE
+    var r = Math.exp(-1 / (tau * modes[m][2] * RATE))
+    var c = 2 * r * Math.cos(w), rr = r * r
+    var before = 0, last = modes[m][1] * r * Math.sin(w)
+    x[1] += last
+    for (var i = 2; i < x.length; i++) {
+      var next = c * last - rr * before
+      x[i] += next
+      before = last
+      last = next
+    }
+  }
+  // The felt: a 3 ms rise; and the tail faded to nothing.
+  return levelled(fadeEdges(x, 3, 50), -22)
+}
+
+function retroBar(f) {
+  f = nesPitch(f)
+  var x = new Float32Array(Math.round(0.113 * RATE))
+  var wave = pulseTable(f), step = f / RATE * TABLE
+  var slewK = 1 - Math.exp(-1 / (0.0012 * RATE)), slew = 0, ph = 0
+  for (var i = 0; i < x.length; i++) {
+    slew += (nesVolume(i / RATE, 9, 12, 0) - slew) * slewK
+    ph += step
+    if (ph >= TABLE) ph -= TABLE
+    var a = ph | 0
+    x[i] = slew * (wave[a] + (wave[a + 1] - wave[a]) * (ph - a))
+  }
+  return levelled(fadeEdges(band(x, 90, 6500), 0.5, 3), -23)
 }
 
 // A levelled sound as a 16-bit mono WAV, its bytes, with a one-bit TPDF

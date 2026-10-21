@@ -1,15 +1,17 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import "ReplaySound.js" as ReplaySound
-// The sounds for what you just did, while they are on (`turnedOn`, the data
-// file's `sounds`): adding a symbol, removing a row, undoing the removal,
-// which plays the removal backwards, and a replay, which plays the chart
-// (`ReplaySound`). Each in the look's voice, and one at a time: a new sound
-// stops the one playing. Nothing else sounds: no refresh, price, or bell,
-// and nothing you do to look around. `pw-play`, which PipeWire ships, plays
-// them at the system's volume; there is no volume of Stonks' own. The
-// surfaces say when; this knows only how.
+import "ChartSound.js" as ChartSound
+// The sounds, while they are on (`turnedOn`, the data file's `sounds`):
+// for what you just did, adding a symbol, removing a row, undoing the
+// removal, which plays the removal backwards, a replay, which plays the
+// chart, and the chimes, the chart's bars as the scrub crosses them
+// (`ChartSound`); and the market's bell (`Bell`). Each in the look's voice.
+// The fixed sounds, the bell, and the replay play one at a time: a new one
+// stops the one playing. The chimes overlap and ring out. Nothing else
+// sounds: no refresh or price. `pw-play`, which PipeWire ships, plays them
+// at the system's volume; there is no volume of Stonks' own. The surfaces
+// and the bell say when; this knows only how.
 Item {
   id: root
 
@@ -18,14 +20,25 @@ Item {
   // The surface whose replay is playing, so that replay's end stops only
   // its own sound; null for any other sound.
   property var replayOwner: null
-  readonly property string replayPath: (Quickshell.env("XDG_CACHE_HOME") || Quickshell.env("HOME") + "/.cache")
-    + "/grvc.stonks/replay.wav"
+  readonly property string folder: (Quickshell.env("XDG_CACHE_HOME") || Quickshell.env("HOME") + "/.cache") + "/grvc.stonks"
+  readonly property string replayPath: folder + "/replay.wav"
+  readonly property string voice: retro ? "retro" : "smooth"
+  // The chimes' files written this run, by name ("retro-3"): each look's
+  // eleven, written ahead as sounds turn on or the look changes, and again
+  // on the next run.
+  property var chimesWritten: ({})
+  // At most one chime every 45 ms, 22 a second: a bar struck sooner waits
+  // out the gap, and the latest waiting wins (`waiting`, or -1), so a sweep
+  // ends on the bar under the pointer.
+  readonly property int chimeGap: 45
+  property real lastChime: 0
+  property int waiting: -1
 
   // One of the fixed sounds: "add", "remove", or "undo".
   function play(name) {
     if (!turnedOn) return
     replayOwner = null
-    start(String(Qt.resolvedUrl("sounds/" + (retro ? "retro" : "smooth") + "/" + name + ".wav")).replace(/^file:\/\//, ""))
+    start(String(Qt.resolvedUrl("sounds/" + voice + "/" + name + ".wav")).replace(/^file:\/\//, ""))
   }
 
   // A replay's sound, made from the chart as it starts: `chart` holds the
@@ -35,9 +48,10 @@ Item {
   // still reading the last one keeps it.
   function playReplay(owner, chart) {
     if (!turnedOn) return
-    var sound = retro ? ReplaySound.retro(chart.grid, chart.from, chart.to, chart.seconds)
-      : ReplaySound.smooth(chart.geometry, chart.from, chart.to, chart.seconds)
-    replayFile.setData(ReplaySound.wav(sound))
+    var sound = retro ? ChartSound.retro(chart.grid, chart.from, chart.to, chart.seconds)
+      : ChartSound.smooth(chart.geometry, chart.from, chart.to, chart.seconds)
+    soundFile.path = replayPath
+    soundFile.setData(ChartSound.wav(sound))
     replayOwner = owner
     start(replayPath)
   }
@@ -49,10 +63,69 @@ Item {
     player.running = false
   }
 
-  // Turned off, the sound playing stops.
-  onTurnedOnChanged: if (!turnedOn) {
-    replayOwner = null
-    player.running = false
+  // A chime: bar `bar` (0..10, `ChartSound.barAt`) struck in the look's
+  // voice; -1, a place with no bar, strikes nothing.
+  function chime(bar) {
+    if (!turnedOn || bar < 0) return
+    var wait = lastChime + chimeGap - Date.now()
+    if (wait <= 0) return strike(bar)
+    waiting = bar
+    if (!chimeWait.running) {
+      chimeWait.interval = Math.ceil(wait)
+      chimeWait.start()
+    }
+  }
+
+  function strike(bar) {
+    lastChime = Date.now()
+    chimer.write(written(voice, bar) + "\n")
+  }
+
+  // A chime's name ("retro-3"), its file written unless this run has.
+  function written(look, bar) {
+    var name = look + "-" + bar
+    if (!chimesWritten[name]) {
+      soundFile.path = folder + "/chime-" + name + ".wav"
+      soundFile.setData(ChartSound.wav(ChartSound.chime(look === "retro", bar)))
+      chimesWritten[name] = true
+    }
+    return name
+  }
+
+  // Turned off, the sound playing stops, and a chime waiting with it. The
+  // look's chimes are written ahead, one a turn of the event loop, so the
+  // first pass over the chart writes nothing.
+  onTurnedOnChanged: {
+    if (!turnedOn) {
+      replayOwner = null
+      player.running = false
+      chimeWait.stop()
+      waiting = -1
+    }
+    ahead.restart()
+  }
+  onVoiceChanged: ahead.restart()
+  Component.onCompleted: ahead.restart()
+  Timer {
+    id: ahead
+    interval: 1
+    repeat: true
+    onTriggered: {
+      if (!root.turnedOn) return stop()
+      for (var bar = 0; bar < 11; bar++) {
+        if (!root.chimesWritten[root.voice + "-" + bar]) return root.written(root.voice, bar)
+      }
+      stop()
+    }
+  }
+
+  Timer {
+    id: chimeWait
+    onTriggered: {
+      var bar = root.waiting
+      root.waiting = -1
+      if (bar >= 0) root.strike(bar)
+    }
   }
 
   // A sound still playing ends first: the next waits for it to go.
@@ -62,9 +135,50 @@ Item {
 
   Process { id: player }
 
+  // The market's bell, unless an app is recording from a microphone, as a
+  // call does: `pw-dump` lists PipeWire's nodes once, as the bell is due.
+  function ring() {
+    if (turnedOn && !listening.running) listening.running = true
+  }
+
+  // Whether PipeWire's nodes (`pw-dump`'s answer) hold a microphone being
+  // recorded: an app's capture stream running, not one reading a speaker's
+  // monitor, as a level meter does. An answer that can't be read keeps the
+  // bell quiet too.
+  function recording(dump) {
+    var nodes
+    try { nodes = JSON.parse(dump) } catch (e) { return true }
+    return !Array.isArray(nodes) || nodes.some(function(node) {
+      var props = node.info && node.info.props || {}
+      return node.type === "PipeWire:Interface:Node" && props["media.class"] === "Stream/Input/Audio"
+        && node.info.state === "running" && String(props["stream.capture.sink"]) !== "true"
+    })
+  }
+
+  Process {
+    id: listening
+    command: ["pw-dump"]
+    stdout: StdioCollector {
+      onStreamFinished: if (root.turnedOn && !root.recording(text)) root.play("bell")
+    }
+  }
+
+  // The chimes' player: one shell for as long as sounds are on, reading a
+  // chime's name a line, and starting a pw-play for each in the background,
+  // so the chimes overlap and the shell's own thread starts no process per
+  // chime. It plays nothing but a chime's file: any other line it skips.
+  // When Stonks goes its input closes and it ends; a chime ringing then
+  // rings out, half a second at most.
+  Process {
+    id: chimer
+    running: root.turnedOn
+    stdinEnabled: true
+    command: ["sh", "-c", "while read -r name; do case $name in smooth-[0-9]|smooth-10|retro-[0-9]|retro-10) "
+      + "pw-play --media-role Notification --latency 20ms \"$1/chime-$name.wav\" & ;; esac; done", "sh", root.folder]
+  }
+
   FileView {
-    id: replayFile
-    path: root.replayPath
+    id: soundFile
     preload: false
     blockWrites: true
     atomicWrites: true

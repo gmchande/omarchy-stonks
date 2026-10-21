@@ -36,9 +36,10 @@ none() {
 }
 
 # External commands run only in the feeds, search, the version watch's
-# shell restart and update, and the sounds' pw-play; files are read and
-# written only by the service, the version watch reads the manifest, the
-# trend colours read the theme's colours, and the sounds write the replay's;
+# shell restart and update, and the sounds' pw-play, its chimes' sh, and
+# the bell's pw-dump; files are read and written only by the service, the
+# version watch reads the manifest, the trend colours read the theme's
+# colours, and the sounds write the replay's and the chimes';
 # one service owns the feeds; the quote URL is the
 # quote feed's, the fundamentals URLs the fundamentals feed's, the overnight
 # URL the overnight feed's, the all-day URL the all-day feed's, and the
@@ -47,8 +48,9 @@ none() {
 only '\bProcess\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Updates.qml Sounds.qml
 only '\bFileView\s*\{' Service.qml Updates.qml TrendColors.qml Sounds.qml
 only '^import Quickshell\.Io' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Service.qml IpcTarget.qml Updates.qml TrendColors.qml Sounds.qml
-# A command started by exec is a sound's: pw-play, and only there.
-only '\.exec\(|pw-play' Sounds.qml
+# A command started by exec is a sound's: pw-play, and only there; and only
+# the sounds ask PipeWire anything.
+only '\.exec\(|pw-play|pw-dump' Sounds.qml
 only '\bIpcHandler\s*\{' IpcTarget.qml
 only '^import Quickshell\.Hyprland' WindowHost.qml
 only '\b(QuoteFeed|HistoryFeed|FundamentalsFeed|OvernightFeed|AllDayFeed|ReleaseFeed)\s*\{' Service.qml

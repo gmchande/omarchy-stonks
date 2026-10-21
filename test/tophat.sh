@@ -196,8 +196,11 @@ EOF
 
 # write_standins RUN: each logs its name and arguments and succeeds. And
 # pw-play's, so the session plays no sound: it logs what it was asked to
-# play to RUN/sounds.log, keeps a copy of the file as RUN/sound.N.wav, and
-# stays for the sound's length, or until stopped, as a real player does.
+# play to RUN/sounds.log, "start MS N ARGS", then "ended MS N" or "stopped
+# MS N", N counting the starts, since chimes overlap; keeps a copy of the
+# file as RUN/sound.N.wav; and stays for the sound's length, or until
+# stopped, as a real player does. And pw-dump's, an empty list of nodes, so
+# no microphone keeps the market's bell quiet.
 write_standins() {
   local run=$1 name
   mkdir -p "$run/stubs"
@@ -209,19 +212,26 @@ write_standins() {
 #!/usr/bin/env bash
 log=$(printf %q "$run/sounds.log")
 ms() { echo \$(( \$(date +%s%N) / 1000000 )); }
+exec 9>> "\$log.lock"
+flock 9
+n=\$(( \$(grep -c '^start ' "\$log" 2> /dev/null) + 1 ))
+echo "start \$(ms) \$n \$*" >> "\$log"
+flock -u 9
+exec 9>&-
 sleeper=""
-trap '[ -n "\$sleeper" ] && kill "\$sleeper" 2> /dev/null; echo "stopped \$(ms)" >> "\$log"; exit 0' TERM INT
-echo "start \$(ms) \$*" >> "\$log"
+trap '[ -n "\$sleeper" ] && kill "\$sleeper" 2> /dev/null; echo "stopped \$(ms) \$n" >> "\$log"; exit 0' TERM INT
 file="\${!#}"
-cp "\$file" $(printf %q "$run")/sound.\$(grep -c '^start ' "\$log").wav 2> /dev/null
+cp "\$file" $(printf %q "$run")/sound.\$n.wav 2> /dev/null
 size=\$(stat -c %s "\$file" 2> /dev/null || echo 44)
 rate=\$(od -An -t u4 -j 24 -N 4 "\$file" 2> /dev/null | tr -d ' ')
 sleep "\$(awk -v s="\$size" -v r="\${rate:-48000}" 'BEGIN { printf "%.3f", (s - 44) / 2 / (r > 0 ? r : 48000) }')" &
 sleeper=\$!
 wait "\$sleeper"
-echo "ended \$(ms)" >> "\$log"
+echo "ended \$(ms) \$n" >> "\$log"
 EOF
   chmod +x "$run/stubs/pw-play"
+  printf '#!/bin/sh\necho "[]"\n' > "$run/stubs/pw-dump"
+  chmod +x "$run/stubs/pw-dump"
 }
 
 # write_slow_curl RUN SECONDS CURL: the session's curl, ahead of the real one

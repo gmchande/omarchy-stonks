@@ -1,6 +1,7 @@
 import QtQuick
 import qs.Commons
 import qs.Commons as Commons
+import "ChartSound.js" as ChartSound
 import "Figures.js" as Figures
 import "Format.js" as Format
 import "Fundamentals.js" as Fundamentals
@@ -199,6 +200,9 @@ Item {
   property string changeMode: "pct"
   property bool retro: false
   property bool soundsOn: true
+  // The bar the scrub last struck on this pass over the chart, so moving
+  // within a bar strikes nothing more; -1 between passes.
+  property int chimed: -1
   // Each symbol waiting on Yahoo, with the second that began: freshness's
   // overdue (`QuoteFeed.owed`).
   property var owed: ({})
@@ -682,7 +686,21 @@ Item {
 
   function nudgeScrub(steps) {
     showingHelp = false
+    var before = motion.scrubT
     motion.nudgeScrub(steps)
+    if (motion.scrubT !== before) chime(true)
+  }
+
+  // The chimes: the scrub you move, by the pointer or the keys, strikes the
+  // chart's bar where it lands (`ChartSound.barAt`), as a hand run along a
+  // row of bar chimes does. The pointer strikes a bar as it moves onto it;
+  // each key step strikes, `again`, the same bar too. A replay has its own
+  // sound, and strikes nothing.
+  function chime(again) {
+    if (!sounds || motion.replayRunning) return
+    var bar = ChartSound.barAt({ retro: retro, geometry: motion.geometry, grid: heroBand.pixelGrid }, motion.scrubX)
+    if (bar !== chimed || again) sounds.chime(bar)
+    chimed = bar
   }
 
   // A replay plays the shown chart; the motion runs it.
@@ -1105,7 +1123,10 @@ Item {
     onOrderClicked: root.cycleOrder()
     onOrderReverseClicked: root.reverseOrder()
     onListClicked: root.listMenuOpen ? root.closeListMenu() : root.openListMenu()
-    onScrubRequested: function(fraction) { motion.scrubTo(fraction) }
+    onScrubRequested: function(fraction) {
+      motion.scrubTo(fraction)
+      root.chime(false)
+    }
     onScrubCleared: if (root.surfaceOpen) motion.clearScrub()
     onSnapToNow: motion.clearScrub()
     onRangeRequested: function(value) { root.selectRange(value) }
@@ -1393,5 +1414,7 @@ Item {
         from: from, to: to, seconds: motion.replayDuration / 1000 })
     }
     onReplayCut: if (root.sounds) root.sounds.stopReplay(root)
+    // The scrub let go ends the chimes' pass: the next starts afresh.
+    onScrubTChanged: if (!scrubT) root.chimed = -1
   }
 }

@@ -12,9 +12,10 @@ import "plugin" as Stonks
 // a stand-in pw-play first on PATH (bin/pw-play) that plays nothing and
 // records what it was asked to play: on by default, the add, remove, and
 // undo sounds in each look's voice, the add as its row joins, a replay's
-// sound made from its chart and stopped with it, one sound at a time,
-// nothing while off, and nothing for what happens on its own or for looking
-// around. HOME and curl are scratch.
+// sound made from its chart and stopped with it, one sound at a time, the
+// scrub's chimes by keys and by the pointer, nothing while off, and nothing
+// for what happens on its own or for the rest of looking around. HOME and
+// curl are scratch.
 ShellRoot {
   id: harness
 
@@ -84,16 +85,28 @@ ShellRoot {
     fileProc.running = true
   }
 
-  // The stand-in's record, a line each: "start" with the file it was asked
-  // to play and its other arguments, "stopped", or "ended".
+  // The stand-in's record, a line each: "start" with its count `n`, the
+  // file it was asked to play, and its other arguments, then "stopped" or
+  // "ended" with the same `n`.
   function record() {
     return readFile(fakeState + "/pw-play.log").split("\n").filter(function(line) { return line !== "" }).map(function(line) {
       var words = line.split(" ")
-      return { what: words[0], ms: Number(words[1]), args: words.slice(2, -1).join(" "), file: words[words.length - 1] }
+      return { what: words[0], ms: Number(words[1]), n: Number(words[2]), args: words.slice(3, -1).join(" "), file: words[words.length - 1] }
     })
   }
+  // A chime is any start of a chime's file; every other start is a sound.
+  function isChime(e) {
+    return /\/chime-(smooth|retro)-\d+\.wav$/.test(e.file)
+  }
   function starts() {
-    return record().filter(function(e) { return e.what === "start" })
+    return record().filter(function(e) { return e.what === "start" && !isChime(e) })
+  }
+  function chimes() {
+    return record().filter(function(e) { return e.what === "start" && isChime(e) })
+  }
+  // A chime's voice and bar, as "retro-3".
+  function bar(chime) {
+    return chime.file.replace(/^.*\/chime-/, "").replace(/\.wav$/, "")
   }
 
   readonly property string onGlyph: "\uDB81\uDD7E"
@@ -102,6 +115,7 @@ ShellRoot {
   Stonks.Service { id: service }
   Stonks.Updates { id: updates }
   Stonks.Sounds { id: sounds; turnedOn: service.soundsOn; retro: service.retro }
+  Stonks.Bell { service: service; sounds: sounds }
   QtObject {
     id: shellApi
     function serviceFor(id) { return { service: service, updates: updates, sounds: sounds } }
@@ -137,14 +151,13 @@ ShellRoot {
       return start.file.replace(/^.*\/plugin\//, "")
     }
 
-    // What follows the replay started at `index` (1-based, the stand-in's
-    // count): "stopped" or "ended", or "" while it plays.
+    // What follows the sound started at `index` (1-based, among sounds, not
+    // chimes): "stopped" or "ended", or "" while it plays.
     function endOf(index) {
-      var seen = 0
+      var n = harness.starts()[index - 1].n
       var events = harness.record()
       for (var i = 0; i < events.length; i++) {
-        if (events[i].what === "start") seen++
-        else if (seen === index) return events[i].what
+        if (events[i].what !== "start" && events[i].n === n) return events[i].what
       }
       return ""
     }
@@ -163,7 +176,7 @@ ShellRoot {
     //   at 1760 Hz, retro's noise above 8 kHz, where its band-limited pulse
     //   has nothing. Crossings closer than the tick is long are one.
     function heardAgainst(index, chart, retro) {
-      var bytes = new DataView(harness.readBytes(harness.fakeState + "/pw-play." + index + ".wav"))
+      var bytes = new DataView(harness.readBytes(harness.fakeState + "/pw-play." + harness.starts()[index - 1].n + ".wav"))
       var rate = bytes.getUint32(24, true)
       var samples = (bytes.byteLength - 44) / 2
       var s = new Float32Array(samples)
@@ -331,17 +344,20 @@ ShellRoot {
       // The popup by keys, in smooth.
       panel.refocusKeys()
       wait(100)
-      // Nothing that happens by itself, and nothing done to look around:
-      // a refresh and its answers, the scrub, a range and back, the look and
-      // back, the change, the selection, the key sheet, a row's chart.
+      // Nothing that happens by itself, and nothing done to look around
+      // but the scrub: a refresh and its answers, a range and back, the
+      // look and back, the change, the selection, the key sheet, a row's
+      // chart. The scrub's key steps each strike a chime.
       var quietKeys = [Qt.Key_R, Qt.Key_Left, Qt.Key_Left, Qt.Key_Right, Qt.Key_Escape, Qt.Key_BracketRight, Qt.Key_BracketLeft,
         Qt.Key_S, Qt.Key_S, Qt.Key_C, Qt.Key_C, Qt.Key_C, Qt.Key_Down, Qt.Key_Up, Qt.Key_Question, Qt.Key_Question, Qt.Key_2, Qt.Key_1]
       quietKeys.forEach(function(key) { keyClick(key); wait(60) })
       service.refresh()
       quiet()
       wait(500)
-      harness.check("with sounds on, a refresh, its answers, a scrub, a range, the look, the change, the selection, the sheet, and a row's chart play nothing",
-        harness.starts().length === 0, JSON.stringify(harness.record()))
+      var stepChimes = harness.chimes().map(harness.bar)
+      harness.check("with sounds on, a refresh, its answers, a range, the look, the change, the selection, the sheet, and a row's chart play nothing, and the scrub's three key steps strike three of smooth's chimes",
+        harness.starts().length === 0 && stepChimes.length === 3 && stepChimes.every(function(b) { return /^smooth-([0-9]|10)$/.test(b) }),
+        JSON.stringify(harness.record()))
 
       // x, u, and an add through search: each its own sound, in smooth's
       // voice, as a notification, at a short latency.
@@ -546,8 +562,49 @@ ShellRoot {
       var second = win.watchlist.rowItem(rows[1])
       mouseClick(second, second.width / 2, second.height / 2)
       wait(300)
-      harness.check("in the window, a click on the look, a scrub by the pointer, a range and back, and a row's chart play nothing",
+      harness.check("in the window, a click on the look, a scrub by the pointer, a range and back, and a row's chart play no sound but the scrub's chimes",
         scrubbed && harness.starts().length === before, scrubbed + "|" + JSON.stringify(harness.starts().slice(before)))
+
+      // The chimes by the pointer, in retro: a sweep across the chart and
+      // back strikes the bars it crosses, the lit row's height each one's
+      // pitch, and ends on the bar under the pointer; never more strikes
+      // than bars it moved onto. A hand resting on one column strikes
+      // nothing more.
+      var pixels = harness.findWith(win, "scrubColumn")
+      var barHere = function() {
+        var g = pixels.grid, row = g.levels[pixels.scrubColumn]
+        return row === undefined ? -1 : Math.round((g.rows - 1 - row) / Math.max(1, g.rows - 1) * 10)
+      }
+      var sweep = function(from, to, seen) {
+        var step = from < to ? 2 : -2
+        for (var px = from; step > 0 ? px <= to : px >= to; px += step) {
+          mouseMove(chart, px, chart.height / 2)
+          var b = barHere()
+          if (b >= 0 && b !== seen.last) {
+            seen.changes++
+            if (seen.crossed.indexOf(b) < 0) seen.crossed.push(b)
+          }
+          seen.last = b
+        }
+        return seen
+      }
+      mouseMove(win, 1, 1)
+      wait(100)
+      var chimesBefore = harness.chimes().length
+      var seen = sweep(chart.width * 0.05, chart.width * 0.9, { last: -1, changes: 0, crossed: [] })
+      sweep(chart.width * 0.9, chart.width * 0.3, seen)
+      var endBar = "retro-" + barHere()
+      tryVerify(function() { var c = harness.chimes(); return c.length > chimesBefore && harness.bar(c[c.length - 1]) === endBar }, 2000)
+      wait(200)
+      var swept = harness.chimes().slice(chimesBefore).map(harness.bar)
+      mouseMove(chart, chart.width * 0.3, chart.height / 3)
+      wait(300)
+      var rested = harness.chimes().length - chimesBefore - swept.length
+      harness.check("a sweep of the pointer over the chart and back strikes retro's bars it crosses, ends on the bar under the pointer, and a hand resting strikes nothing more",
+        swept.length > 1 && swept.length <= seen.changes && swept[swept.length - 1] === endBar && rested === 0
+          && swept.every(function(b) { return /^retro-/.test(b) && seen.crossed.indexOf(Number(b.slice(6))) >= 0 }),
+        swept.length + " struck of " + seen.changes + " moved onto; ends " + swept[swept.length - 1] + " under " + endBar + "; rested " + rested + "; " + swept.join(" "))
+      mouseMove(win, 1, 1)
 
       // The speaker: a click turns sounds off, silently, and on, with the
       // add sound once, now in retro's voice.
@@ -556,7 +613,11 @@ ShellRoot {
       mouseClick(speaker, speaker.width / 2, speaker.height / 2)
       tryVerify(function() { return !service.soundsOn }, 2000)
       wait(300)
-      var offSilent = harness.starts().length === before && winIcon.text === harness.offGlyph
+      var chimesOff = harness.chimes().length
+      sweep(chart.width * 0.05, chart.width * 0.9, { last: -1, changes: 0, crossed: [] })
+      mouseMove(win, 1, 1)
+      wait(300)
+      var offSilent = harness.starts().length === before && harness.chimes().length === chimesOff && winIcon.text === harness.offGlyph
       mouseClick(speaker, speaker.width / 2, speaker.height / 2)
       var clicked = startsBy(before + 1)
       harness.check("a click on the speaker turns sounds off, silently, and on again, with the add sound once in retro's voice",
@@ -639,7 +700,38 @@ ShellRoot {
       tryVerify(function() { return endOf(before + 3) !== "" }, 3000)
       harness.check("a click on another row stops the replay's sound with the replay", endOf(before + 3) === "stopped", endOf(before + 3))
 
+      // The market's bell, in retro's voice: as the clock passes the open
+      // or the close of the market of the stock last looked at, once; never
+      // late, after a long step of the clock; never while an app records
+      // from a microphone (the stand-in pw-dump's nodes); never with sounds
+      // off.
       app.close()
+      service.feature("AAPL")
+      tryVerify(function() { return !!service.quotes.AAPL && service.featuredSymbol === "AAPL" }, 5000)
+      var reg = service.quotes.AAPL.session.regular
+      var bells = function() { return harness.starts().filter(function(s) { return played(s) === "sounds/retro/bell.wav" }).length }
+      var pass = function(from, to) {
+        var rung = bells()
+        service.now = from
+        service.now = to
+        wait(600)
+        return bells() - rung
+      }
+      var micOn = JSON.stringify([{ type: "PipeWire:Interface:Node", info: { state: "running",
+        props: { "media.class": "Stream/Input/Audio", "application.name": "a call" } } }])
+      var meterOn = JSON.stringify([{ type: "PipeWire:Interface:Node", info: { state: "running",
+        props: { "media.class": "Stream/Input/Audio", "stream.capture.sink": true } } }])
+      var rang = [pass(reg.start - 30, reg.start + 30), pass(reg.start - 3600, reg.start + 60)]
+      harness.writeText(harness.fakeState + "/pw-dump.json", micOn)
+      rang.push(pass(reg.end - 30, reg.end + 30))
+      harness.writeText(harness.fakeState + "/pw-dump.json", meterOn)
+      rang.push(pass(reg.end - 30, reg.end + 30))
+      service.persist({ sounds: false })
+      rang.push(pass(reg.start - 30, reg.start + 30))
+      service.now = Math.floor(Date.now() / 1000)
+      harness.check("the bell rings at the open in retro's voice, not late, not while a microphone records though a level meter may run, and not with sounds off",
+        rang.join(",") === "1,0,0,1,0", rang.join(","))
+
       console.log("SOUNDS DONE")
       done.exitCode = harness.failures ? 1 : 0
       done.start()

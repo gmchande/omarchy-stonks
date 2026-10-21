@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# A stand-in for pw-dump, first on PATH inside the harnesses: PipeWire's
+# nodes as STONKS_FAKE_STATE/pw-dump.json holds them, or none, so a harness
+# says whether an app is recording from a microphone.
+cat "$STONKS_FAKE_STATE/pw-dump.json" 2> /dev/null || echo "[]"
