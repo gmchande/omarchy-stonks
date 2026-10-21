@@ -4,23 +4,26 @@ import Quickshell
 import Quickshell.Io
 import "Settings.js" as Settings
 
-// The data file 1.0.0 wrote, through the real Service (data-files.sh). What
-// the user made is written out here, not read from the file, so a loader
-// that loses something can't lose it from what the check expects too. With
-// STONKS_DATA_FILE=write, the Service starts with no file and makes all of it
-// through its own functions, as the surfaces call them; the script keeps the
-// file it saved. Every quote and history ask fails: no saved answers.
+// A data file a release wrote, through the real Service (data-files.sh).
+// What the user made is written out here, not read from the file, so a
+// loader that loses something can't lose it from what the check expects
+// too. With STONKS_DATA_FILE=write, the Service starts with no file and
+// makes all of it through its own functions, as the surfaces call them; the
+// script keeps the file it saved. Every quote and history ask fails: no
+// saved answers. STONKS_DATA_VERSION names the release.
 ShellRoot {
   id: harness
 
   property int failures: 0
   readonly property bool writing: Quickshell.env("STONKS_DATA_FILE") === "write"
+  readonly property string version: Quickshell.env("STONKS_DATA_VERSION")
 
   // The demo watchlist's symbols: All in an order made by hand, a list in
   // manual order arranged by hand, one sorted, one sorted the other way, and
   // one empty; the current list a named one, a featured symbol off the top,
   // and every view setting off its default. The refresh interval is set only
-  // by hand in the file, which every save keeps.
+  // by hand in the file, which every save keeps. 1.0.0 knew no sounds, so
+  // its file reads as on, their default; from 1.0.3 the file has them off.
   readonly property var made: ({
     lists: [
       { name: "", symbols: ["SPY", "AAPL", "7203.T", "BTC-USD", "^GSPC", "SHEL.L", "JNJ"], order: "manual", reversed: false },
@@ -35,7 +38,8 @@ ShellRoot {
     style: "retro",
     changeMode: "abs",
     refreshIntervalSec: 300,
-    hinted: true
+    hinted: true,
+    sounds: version === "1.0.0"
   })
 
   function check(label, ok, detail) {
@@ -97,6 +101,7 @@ ShellRoot {
       service.persist({ changeMode: Settings.nextChangeMode(service.changeMode) })
       service.persist({ refreshIntervalSec: harness.made.refreshIntervalSec })
       service.persist({ hinted: harness.made.hinted })
+      if (harness.version !== "1.0.0") service.persist({ sounds: harness.made.sounds })
       wait(100)
       saved.reload()
       var file = null
@@ -122,6 +127,7 @@ ShellRoot {
       harness.check("the change as " + made.changeMode, service.changeMode === made.changeMode, service.changeMode)
       harness.check("refreshed every " + made.refreshIntervalSec + " s", service.refreshIntervalSec === made.refreshIntervalSec, service.refreshIntervalSec)
       harness.check("the first-run hint not shown again", service.hinted === made.hinted, service.hinted)
+      harness.check("sounds " + (made.sounds ? "on" : "off"), service.soundsOn === made.sounds, service.soundsOn)
       // Each list as a switch to it shows it.
       made.lists.forEach(function(list) {
         service.switchList(list.name)
