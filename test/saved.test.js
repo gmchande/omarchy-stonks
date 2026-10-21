@@ -1095,7 +1095,8 @@ test("a range's line gives its low and high, their dates, and its coverage", () 
   expect(line(aapl, M.regularClose(quote))).toBe("1Y · 229.02–344.57 @325.13 · LOW 12 SEP 2025 · HIGH 29 JUL 2026")
   expect(line(week)).toBe("1W · 209.40–254.74 @224.55 · LOW 4 SEP · HIGH 8 SEP")
   expect(line(month)).toBe("1M · 194.80–280.83 @224.55 · LOW 1 SEP · HIGH 17 AUG")
-  expect(line(fab)).toBe("ALL · 16.60–142.92 @23.20 · SINCE 31 JUL 2025 · LOW 30 APR 2026 · HIGH 1 AUG 2025 · _ BARS")
+  // All starts where the listing does: it never says SINCE.
+  expect(line(fab)).toBe("ALL · 16.60–142.92 @23.20 · LOW 30 APR 2026 · HIGH 1 AUG 2025")
   // The year whole, as the scrub writes it: "JAN 23" read as 23 January.
   // Found in design QA.
   expect(line(weekly)).toBe("5Y · 124.17–344.57 @332.27 · LOW JAN 2023 · HIGH JUL 2026")
@@ -1126,16 +1127,35 @@ test("a range's line gives its low and high, their dates, and its coverage", () 
   // eighth bar empties that slot and keeps every slot in place.
   const day = t => ({ t: 100 + t * DAY, h: 11 + t, l: 9 + t, c: 10 + t })
   const sparse = {
-    symbol: "NEW", range: "All", interval: "1d", gmtoffset: 0, baseline: 10, firstTradeDate: 100,
+    symbol: "NEW", range: "1Y", interval: "1d", gmtoffset: 0, baseline: 10, firstTradeDate: 100,
     bars: [day(0), day(1)]
   }
-  expect(line(sparse)).toBe("ALL · 9.00–12.00 @11.00 · SINCE 1 JAN 1970 · LOW 1 JAN · HIGH 2 JAN · 2 BARS")
+  expect(line(sparse)).toBe("1Y · 9.00–12.00 @11.00 · SINCE 1 JAN 1970 · LOW 1 JAN · HIGH 2 JAN · 2 BARS")
   const seven = { ...sparse, bars: [0, 1, 2, 3, 4, 5, 6].map(day) }
   const eight = { ...sparse, bars: [0, 1, 2, 3, 4, 5, 6, 7].map(day) }
   expect(line(seven)).toMatch(/ · 7 BARS$/)
   expect(line(eight)).toMatch(/ · _ BARS$/)
   const slots = h => M.rangeLine(h).facts.map(f => [f.label, f.widest, f.after].join("|"))
   expect(slots(eight)).toEqual(slots(seven))
+})
+
+// Room on the info lines is held only for what a listing can show: SINCE
+// on the ranges short of All it is younger than, and how few bars it has
+// only while it can have fewer than eight on one of them. Found in the
+// visual review of 1.0.2: every listing held room for a young one's, and
+// the window's lines stopped 211 px short of the edge.
+test("a listing's range lines hold room for SINCE and BARS only where it can show them", () => {
+  const years = n => n * 365 * DAY
+  const room = listedAgo => M.youngRoom({ ...quote, firstTradeDate: quote.marketTime - listedAgo })
+  expect(M.youngRoom(quote)).toEqual({ since: [], bars: false })
+  expect(room(years(3))).toEqual({ since: ["5Y", "10Y"], bars: false })
+  expect(room(40 * DAY)).toEqual({ since: ["3M", "6M", "YTD", "1Y", "2Y", "5Y", "10Y"], bars: true })
+  expect(room(years(11)).since).toEqual([])
+  expect(M.youngRoom({ ...quote, firstTradeDate: null })).toEqual({
+    since: ["1W", "1M", "3M", "6M", "YTD", "1Y", "2Y", "5Y", "10Y"], bars: true
+  })
+  // An old listing's columns are its low and high alone, on every range.
+  expect(M.rangeFactLists(M.youngRoom(quote)).every(list => list.map(f => f.label).join(",") === "LOW,HIGH")).toBe(true)
 })
 
 test("historyRowModel uses the quote until a historical bar is scrubbed", () => {
