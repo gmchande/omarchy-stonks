@@ -733,6 +733,8 @@ services_off() {
 # case this is killed meanwhile.
 start_failed() {
   trap - INT TERM
+  # Ending now: nothing should signal this start any more.
+  rm -f "$run/starter"
   echo "tophat: $*; stopping" >&2
   end_run
   stop_watch
