@@ -514,7 +514,10 @@ const library = (extra = {}) => M.fileSettings({
 test("the data file reads as written and repairs hand edits", () => {
   const v1 = { version: 1, symbols: ["NEST", "SILK"], featured: "SILK", order: "pct", changeMode: "pct", style: "retro", refreshIntervalSec: 60 }
   const read = M.fileSettings(v1)
-  expect(read).toEqual({ ...v1, reversed: false, lists: [], list: "", range: "1D", hinted: false })
+  // A file from before sounds has them on, their default; only a saved
+  // false turns them off.
+  expect(read).toEqual({ ...v1, reversed: false, lists: [], list: "", range: "1D", hinted: false, sounds: true })
+  expect([false, "no", 0].map(v => M.fileSettings({ sounds: v }).sounds)).toEqual([false, true, true])
   expect(M.listSymbols(read)).toEqual(["NEST", "SILK"])
   expect(M.listOrder(read)).toBe("pct")
   // The version-1 keys keep their meaning, so an older build reads the same All.
