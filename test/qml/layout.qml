@@ -1258,7 +1258,9 @@ ShellRoot {
             wait(50)
             var menu = find(body, "listMenu")
             var menuFooter = find(body, "footer")
-            if (!(menu.visible && yIn(menu, menu.height) + body.groupGap <= yIn(menuFooter, 0)
+            // The menu runs down over the footer, inside the window's margin;
+            // the footer stays at its place under the rows.
+            if (!(menu.visible && yIn(menu, menu.height) <= surface.height - body.margins
                 && yIn(menuFooter, menuFooter.height) <= surface.height - body.margins))
               windowFaults.push(at + "the list menu: it ends at " + yIn(menu, menu.height) + ", the footer "
                 + yIn(menuFooter, 0) + "-" + yIn(menuFooter, menuFooter.height) + " in " + surface.height)
@@ -1521,11 +1523,13 @@ ShellRoot {
               }
               scroll.contentY = Math.max(0, scroll.contentHeight - scroll.height)
               var cuts = [atRest, afterWheel, afterDrag, afterKey, cutRows()]
-              var footerTop = yIn(find(body, "footer"), 0)
+              // The popup's menu ends a gap above the footer; the window's
+              // may run over it, to the body's margin.
+              var menuFloor = surface.wide ? surface.height - body.margins : yIn(find(body, "footer"), 0) - body.groupGap
               menuSeen.push(where + ": " + scroll.height / menu.itemHeight + " rows")
-              if (cuts.some(function(n) { return n !== 0 }) || !pinnedShown || yIn(menu, menu.height) + body.groupGap > footerTop)
+              if (cuts.some(function(n) { return n !== 0 }) || !pinnedShown || yIn(menu, menu.height) > menuFloor)
                 menuFaults.push(where + ": rows cut (opened/wheel/bar/key/end, -1 unmoved, -2 key unheard) " + cuts.join("/") + " in a view " + scroll.height + " px, pinned in sight " + pinnedShown
-                  + ", menu ends " + yIn(menu, menu.height) + " footer at " + footerTop)
+                  + ", menu ends " + yIn(menu, menu.height) + " floor at " + menuFloor)
               var manageRow = find(menu, "manageListsRow")
               var manageAt = manageRow.mapToItem(body, manageRow.width / 2, manageRow.height / 2)
               mouseClick(body, manageAt.x, manageAt.y)
@@ -1537,6 +1541,30 @@ ShellRoot {
             })
           })
         })
+        // The window at its usual 720 × 760 shows five lists of the demo's
+        // six in the menu, which runs down over the footer, in both looks.
+        // Found in the 1.0.2 visual review: the taller chart left the menu
+        // room for three above the footer.
+        stub.lists = [{ name: "", label: "All", count: stub.symbols.length, symbols: stub.symbols }].concat(
+          ["My Watchlist", "Watching", "Growth", "Wins", "Losses"].map(function(name) { return { name: name, label: name, count: 1, symbols: ["MZ"] } }))
+        surface.wide = true
+        surface.windowWidth = 720
+        body.minChartHeight = Style.space(136)
+        surface.fixedHeight = 760
+        var fiveSeen = []
+        ;[false, true].forEach(function(retro) {
+          stub.retro = retro
+          wait(50)
+          body.openListMenu()
+          wait(100)
+          var menu = find(body, "listMenu")
+          var scroll = find(menu, "menuScroll")
+          fiveSeen.push((retro ? "retro " : "smooth ") + Math.round(scroll.height / menu.itemHeight * 10) / 10 + " lists, menu ends "
+            + yIn(menu, menu.height) + " of " + surface.height)
+          if (scroll.height < 5 * menu.itemHeight || yIn(menu, menu.height) > surface.height - body.margins) fiveSeen.push("FAULT")
+          body.closeListMenu()
+          wait(50)
+        })
         stub.lists = listsBeforeMenu
         stub.retro = false
         surface.wide = false
@@ -1545,6 +1573,8 @@ ShellRoot {
         wait(50)
         root.check("a long list menu shows whole rows, and New list and Manage lists without scrolling, in the popup and the window, in both looks",
           menuFaults.length === 0, menuFaults.join(" | ") + " || " + menuSeen.join(", "))
+        root.check("the window's list menu at its usual 720 × 760 shows five of six lists, over the footer and inside the window, in both looks",
+          fiveSeen.indexOf("FAULT") < 0, fiveSeen.join(", "))
 
         // A view opening over the rows moves nothing: the list menu, search,
         // Manage lists, and a row's ticks keep the surface's height and its
