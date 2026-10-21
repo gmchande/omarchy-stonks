@@ -141,7 +141,7 @@ ShellRoot {
       var b = s.body
       return JSON.stringify([b.surfaceOpen, b.watchlist.cursorRow, service.featuredSymbol, b.scrubT, b.motion.replayRunning,
         service.range, b.adding, b.listMenuOpen, b.managingLists, b.listsSymbol, service.order, service.reversed,
-        service.listName, service.symbols.join(","), service.retro, service.soundsOn, service.changeMode, b.showingHelp,
+        service.listName, service.symbols.join(","), service.retro, service.changeMode, b.showingHelp,
         service.testRefreshes, harness.tabs])
     }
 
@@ -160,7 +160,6 @@ ShellRoot {
       if (service.listName !== "") service.switchList("")
       if (service.order !== "manual") service.setOrder("manual")
       if (service.range !== "1D") service.setRange("1D")
-      if (!service.soundsOn) service.persist({ sounds: true })
       var rows = b.watchlist.displayedSymbols
       service.feature(rows[rows.length - 1])
       // The second row in sight: an open brings the featured last row into

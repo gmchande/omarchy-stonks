@@ -3,28 +3,23 @@ import qs.Commons
 import qs.Commons as Commons
 import "Cells.js" as Cells
 import "Tones.js" as Tones
-// The animal, live status, the sounds, the look, and the help mark.
-// Surfaces own the actions; this only draws and signals. The animal is the
-// day's bull or bear in cells (`Cells.spriteFor`), the same in both looks,
-// in one slot the status words start after, drawn or not, so neither the
-// look nor a flat day moves them. While its market rests it sleeps: eyes
-// shut and a dim "z" just past the slot, above the words. The height is the
-// slot's in both looks, and the look is one small icon in both, so toggling
-// moves nothing. None of them has a tooltip: under the header one covered
+// The animal, live status, the look, and the help mark. Surfaces own the
+// actions; this only draws and signals. The animal is the day's bull or
+// bear in cells (`Cells.spriteFor`), the same in both looks, in one slot
+// the status words start after, drawn or not, so neither the look nor a
+// flat day moves them. While its market rests it sleeps: eyes shut and a
+// dim "z" just past the slot, above the words. The height is the slot's in
+// both looks, and the look is one small icon in both, so toggling moves
+// nothing. None of the three has a tooltip: under the header one covered
 // the line naming the stock, and what a click does is on the ? sheet with
 // the keys.
 Item {
   id: root
 
   property string statusText: ""
-  // The same words shorter, for where they don't fit: a closure's notice
-  // without its holiday's name. "" when they have no shorter form.
-  property string shortText: ""
   // The words say a range failed, and its button asks again, as r does.
   property bool offersRetry: false
   property bool retro: false
-  // The sounds are on: the speaker shows its waves, or, off, a cross.
-  property bool soundsOn: true
   // The animal, as the body decides it: `kind` "bull", "bear", or "" (a
   // flat day, or no direction yet), and `chart`, what it reads. A turn of
   // the same chart crossfades in smooth; any other change, and every one in
@@ -64,7 +59,6 @@ Item {
   readonly property int lids: waking ? 2 - steps : steps
 
   signal styleRequested(string style)
-  signal soundsRequested()
   signal helpRequested()
   signal replayRequested()
   signal retryRequested()
@@ -191,28 +185,17 @@ Item {
   // came and went, with every range change and every scrub. A failed
   // range's retry follows them. They start twice as far from the sleeping
   // z as the bull is, so it reads as the animal's and not as a mark on the
-  // first word, and stop as much sooner, so their room is the same. Where
-  // the words don't fit their room, their short form shows, where they have
-  // one; otherwise they are cut with an ellipsis.
-  readonly property real wordsRoom: Math.max(0, soundIcon.x - Style.space(8) - statusWords.x
-    - (root.offersRetry ? retry.implicitWidth + Style.space(16) : 0))
-  Text {
-    id: fullWords
-    objectName: "statusFullWords"
-    visible: false
-    textFormat: Text.PlainText
-    text: root.statusText.toUpperCase()
-    font: statusWords.font
-  }
+  // first word, and stop as much sooner, so their room is the same.
   Text {
     id: statusWords
     objectName: "statusText"
     anchors.left: slot.right
     anchors.leftMargin: Style.space(14)
-    width: Math.min(implicitWidth, root.wordsRoom)
+    width: Math.max(0, Math.min(implicitWidth, lookIcon.x - Style.space(8) - x
+      - (root.offersRetry ? retry.implicitWidth + Style.space(16) : 0)))
     anchors.verticalCenter: parent.verticalCenter
     textFormat: Text.PlainText
-    text: (root.shortText !== "" && fullWords.implicitWidth > root.wordsRoom ? root.shortText : root.statusText).toUpperCase()
+    text: root.statusText.toUpperCase()
     color: root.scrubbing || root.live ? root.foreground : root.dim
     font.family: root.fontFamily
     font.pixelSize: Style.font.caption
@@ -231,51 +214,6 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     text: "RETRY"
     onActivated: root.retryRequested()
-  }
-
-  // The sounds as they are, a speaker with its waves or muted, as the
-  // shell's audio panel shows a stream; a click turns them off or on, as
-  // Shift+S does. It hovers and presses as the look icon does, and its
-  // target is the header's full height too.
-  Text {
-    id: soundIcon
-    objectName: "soundIcon"
-    anchors.right: lookIcon.left
-    anchors.rightMargin: Style.space(14)
-    anchors.verticalCenter: parent.verticalCenter
-    textFormat: Text.PlainText
-    // Nerd Font's volume-high and volume-mute, in one width, so turning
-    // sounds off or on moves nothing.
-    text: root.soundsOn ? soundOn.text : soundOff.text
-    width: Math.ceil(Math.max(soundOn.advanceWidth, soundOff.advanceWidth))
-    horizontalAlignment: Text.AlignHCenter
-    color: soundMouse.containsMouse ? root.foreground : root.dim
-    font.family: root.fontFamily
-    TextMetrics { id: soundOn; font: soundIcon.font; text: "\uDB81\uDD7E" }
-    TextMetrics { id: soundOff; font: soundIcon.font; text: "\uDB81\uDF5F" }
-    font.pixelSize: Style.font.body
-
-    Rectangle {
-      objectName: "soundFill"
-      z: -1
-      anchors.centerIn: parent
-      width: parent.width + Style.space(12)
-      height: parent.height + Style.space(6)
-      radius: root.retro ? 0 : Style.cornerRadius
-      color: soundMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent) : "transparent"
-    }
-
-    MouseArea {
-      id: soundMouse
-      objectName: "soundToggle"
-      anchors.horizontalCenter: parent.horizontalCenter
-      anchors.verticalCenter: parent.verticalCenter
-      width: parent.width + Style.space(12)
-      height: root.height
-      hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
-      onClicked: root.soundsRequested()
-    }
   }
 
   // The look a click switches to, as s does, about a word tall: the chart

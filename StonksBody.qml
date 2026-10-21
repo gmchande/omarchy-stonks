@@ -25,8 +25,6 @@ Item {
   property var service: null
   // The plugin's version on disk against the one running (`Updates`).
   property var updates: null
-  // The sounds for what you do here (`Sounds`), or null for none.
-  property var sounds: null
   property bool surfaceOpen: false
   // A screen shows the open surface: the window on a workspace no screen
   // shows is open, as it was left, and asks for nothing an open one would.
@@ -90,9 +88,6 @@ Item {
   // The landing is a Show of a member still arriving, not an add: it is
   // featured once its first answer is in, a failed one too.
   property bool landingShows: false
-  // Adds not yet heard: each is as its row joins this surface's list, its
-  // answer in, whatever is featured or added meanwhile.
-  property var unheardAdds: []
   // The surface's own colour, which a moving row carries.
   property color ground: Commons.Color.background
   property var rangeOptions: History.historyRanges()
@@ -198,7 +193,6 @@ Item {
   property var removal: null
   property string changeMode: "pct"
   property bool retro: false
-  property bool soundsOn: true
   // Each symbol waiting on Yahoo, with the second that began: freshness's
   // overdue (`QuoteFeed.owed`).
   property var owed: ({})
@@ -225,7 +219,6 @@ Item {
   Binding on removal { when: root.reading; value: root.service?.lastRemoval; restoreMode: Binding.RestoreNone }
   Binding on changeMode { when: root.reading; value: root.service?.changeMode; restoreMode: Binding.RestoreNone }
   Binding on retro { when: root.reading; value: root.service?.retro; restoreMode: Binding.RestoreNone }
-  Binding on soundsOn { when: root.reading; value: root.service?.soundsOn; restoreMode: Binding.RestoreNone }
   Binding on owed { when: root.reading; value: root.service?.owed; restoreMode: Binding.RestoreNone }
   Binding on settingsUnreadable { when: root.reading; value: root.service?.settingsUnreadable; restoreMode: Binding.RestoreNone }
   Binding on updatedTo { when: root.reading; value: root.updates ? root.updates.newVersion : ""; restoreMode: Binding.RestoreNone }
@@ -362,16 +355,10 @@ Item {
     // A refetch, out or failed, with the range in hand says nothing: it
     // keeps the chart and the market.
     if (historyShown && historyBar) return History.historyScrubText(history, historyBar, featuredQuote ? featuredQuote.priceDigits : undefined)
-    if (featuredQuote) return marketText
+    if (featuredQuote) return Market.marketStatus(dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars,
+      Overnight.nightTrades(featuredQuote, !!chart && chart.allDay, now, calendars))
     return headerWhenMissing
   }
-  // The market as the header says it, and, where it names a holiday, the
-  // same without the name for a header with no room for it
-  // (`Market.shortMarketStatus`); "" while the header says anything else.
-  readonly property var marketSays: featuredQuote ? [dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars,
-    Overnight.nightTrades(featuredQuote, !!chart && chart.allDay, now, calendars)] : null
-  readonly property string marketText: marketSays ? Market.marketStatus.apply(null, marketSays) : ""
-  readonly property string headerShortText: marketSays && headerText === marketText ? Market.shortMarketStatus.apply(null, marketSays) : ""
   // Everything but the rows: margins, header, band, and footer, with the
   // band, the rows, and the footer each one group's gap under what is above.
   readonly property int chromeHeight: chartFitsSurface ? chromeBesideChart + shownChartHeight
@@ -489,14 +476,9 @@ Item {
   }
   onOnScreenChanged: if (service) service.surfaceShown(root, surfaceOpen && onScreen)
   onServiceChanged: if (service && surfaceOpen && onScreen) service.surfaceShown(root, true)
-  // A surface taken down mid-replay, as a rebuilt bar or a removed screen
-  // takes its popup, stops its replay's sound with it.
-  Component.onDestruction: {
-    if (sounds) sounds.stopReplay(root)
-    if (service) {
-      service.surfaceShown(root, false)
-      service.preview(root, "")
-    }
+  Component.onDestruction: if (service) {
+    service.surfaceShown(root, false)
+    service.preview(root, "")
   }
   // The rows in sight while they show, whose charts the service fetches
   // ahead on a range.
@@ -523,18 +505,6 @@ Item {
     if (service) service.persist({ style: style })
   }
   function toggleStyle() { setStyle(retro ? "smooth" : "retro") }
-  // Sounds on or off; turned on, the add sound plays once, so you hear how
-  // loud they are.
-  function toggleSounds() {
-    showingHelp = false
-    if (!service) return
-    var on = !service.soundsOn
-    service.persist({ sounds: on })
-    if (on) sound("add")
-  }
-  function sound(name) {
-    if (sounds) sounds.play(name)
-  }
   function cycleOrder() {
     showingHelp = false
     if (service) service.setOrder(Settings.nextOrder(order))
@@ -599,7 +569,6 @@ Item {
     var at = rows.indexOf(symbol)
     var successor = symbol === watchlist.cursorRow && at >= 0 ? (rows[at + 1] || rows[at - 1] || "") : ""
     service.removeSymbol(symbol, rows)
-    sound("remove")
     if (successor !== "") watchlist.handTo(successor)
     offerUndo(symbol, listName)
   }
@@ -634,7 +603,6 @@ Item {
     var symbol = removal.symbol
     clearNote()
     service.undoRemoval(symbol)
-    sound("undo")
     watchlist.select(symbol)
   }
 
@@ -729,8 +697,7 @@ Item {
   // place, the list eases it into view once, and when the list and the row
   // are at rest it is featured the way a click on that row features it,
   // unless you chose another hero meanwhile or switched to a list without
-  // it. The latest add is the one; closing drops it (freeze). The add is
-  // heard as its row joins, not before.
+  // it. The latest add is the one; closing drops it (freeze).
   // Search closes first, the preview staying on the hero: the rows show
   // again as they were, and the add then joins them the way any new row
   // does, faded in at its place with the rows below it sliding. The service
@@ -758,7 +725,6 @@ Item {
     // After the preview has gone, whose hero was a choice, not a landing.
     landing = s
     landingShows = member
-    if (!member) unheardAdds = unheardAdds.filter(function(a) { return a !== s }).concat([s])
     landingJoined = false
     land()
   }
@@ -778,15 +744,6 @@ Item {
 
   // Called once the rows show the service's latest view.
   function land() {
-    // A row that says its first fetch failed joins too, and is heard; an add
-    // that has left the list on show goes unheard. Rows joining together
-    // are heard once.
-    if (unheardAdds.length && service) {
-      var joined = unheardAdds.filter(function(a) { return service.arriving.indexOf(a) < 0 && view.rows.indexOf(a) >= 0 })
-      if (joined.length) sound("add")
-      var still = unheardAdds.filter(function(a) { return joined.indexOf(a) < 0 && members.indexOf(a) >= 0 })
-      if (still.length !== unheardAdds.length) unheardAdds = still
-    }
     if (landing === "" || !service || service.arriving.indexOf(landing) >= 0) return
     // A first fetch that failed has nothing to show: the hero is the one
     // before the add (`Service.heroTaken`), the add is done, and its row
@@ -912,7 +869,6 @@ Item {
   function freeze() {
     keepTyped()
     landing = ""
-    unheardAdds = []
     noteTimer.stop()
     noteFade.stop()
     footer.freeze()
@@ -1018,10 +974,8 @@ Item {
     anchors.top: parent.top
     anchors.margins: root.margins
     statusText: root.headerText
-    shortText: root.headerShortText
     offersRetry: root.offersRetry
     retro: root.retro
-    soundsOn: root.soundsOn
     animal: root.animal
     ground: root.ground
     scrubbing: root.scrubT !== 0
@@ -1034,7 +988,6 @@ Item {
     downColor: root.downColor
     fontFamily: root.fontFamily
     onStyleRequested: function(v) { root.setStyle(v) }
-    onSoundsRequested: root.toggleSounds()
     onHelpRequested: root.toggleHelp()
     onReplayRequested: root.replay()
     onRetryRequested: root.refreshRequested()
@@ -1380,12 +1333,5 @@ Item {
     surfaceOpen: root.surfaceOpen
     retro: root.retro
     calendars: root.calendars
-    // The replay heard starts with the replay, made from the chart as drawn
-    // in the look on screen, and stops when the replay is cut short.
-    onReplayStarted: function(from, to) {
-      if (root.sounds) root.sounds.playReplay(root, { geometry: motion.geometry, grid: heroBand.pixelGrid,
-        from: from, to: to, seconds: motion.replayDuration / 1000 })
-    }
-    onReplayCut: if (root.sounds) root.sounds.stopReplay(root)
   }
 }

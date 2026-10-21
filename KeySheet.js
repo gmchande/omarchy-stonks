@@ -37,7 +37,6 @@ function sheet(order) {
       ]},
       { title: "Look", rows: [
         { key: "s", does: "Switch smooth and retro" },
-        { key: "S", does: "Turn sounds off or on" },
         // The change mode is the day's: on a range the hero shows the period,
         // so c changes the rows and, on the day, the hero.
         { key: "c", does: "Cycle the day's change" },

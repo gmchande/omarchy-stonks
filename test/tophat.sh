@@ -20,7 +20,6 @@
 #   record start FILE | record stop
 #   shell CMD…                     omarchy-shell inside the session
 #   log                            the nested shell's log
-#   sounds                         what the stand-in pw-play was asked to play
 #   self-check                     the guards, without a screen
 #
 # Two identities, never mixed. The nested one (socket, instance, runtime
@@ -194,10 +193,7 @@ end)
 EOF
 }
 
-# write_standins RUN: each logs its name and arguments and succeeds. And
-# pw-play's, so the session plays no sound: it logs what it was asked to
-# play to RUN/sounds.log, keeps a copy of the file as RUN/sound.N.wav, and
-# stays for the sound's length, or until stopped, as a real player does.
+# write_standins RUN: each logs its name and arguments and succeeds.
 write_standins() {
   local run=$1 name
   mkdir -p "$run/stubs"
@@ -205,23 +201,6 @@ write_standins() {
     printf '#!/bin/sh\nprintf "%%s\\n" "%s $*" >> %q\nexit 0\n' "$name" "$run/stubs.log" > "$run/stubs/$name"
     chmod +x "$run/stubs/$name"
   done
-  cat > "$run/stubs/pw-play" << EOF
-#!/usr/bin/env bash
-log=$(printf %q "$run/sounds.log")
-ms() { echo \$(( \$(date +%s%N) / 1000000 )); }
-sleeper=""
-trap '[ -n "\$sleeper" ] && kill "\$sleeper" 2> /dev/null; echo "stopped \$(ms)" >> "\$log"; exit 0' TERM INT
-echo "start \$(ms) \$*" >> "\$log"
-file="\${!#}"
-cp "\$file" $(printf %q "$run")/sound.\$(grep -c '^start ' "\$log").wav 2> /dev/null
-size=\$(stat -c %s "\$file" 2> /dev/null || echo 44)
-rate=\$(od -An -t u4 -j 24 -N 4 "\$file" 2> /dev/null | tr -d ' ')
-sleep "\$(awk -v s="\$size" -v r="\${rate:-48000}" 'BEGIN { printf "%.3f", (s - 44) / 2 / (r > 0 ? r : 48000) }')" &
-sleeper=\$!
-wait "\$sleeper"
-echo "ended \$(ms)" >> "\$log"
-EOF
-  chmod +x "$run/stubs/pw-play"
 }
 
 # write_slow_curl RUN SECONDS CURL: the session's curl, ahead of the real one
@@ -918,7 +897,6 @@ case ${1:-} in
   _record-watch) shift; record_watch "$@" ;;
   shell) shift; (( $# )) || die "usage: shell CMD…"; drive_prelude; nested omarchy-shell "$@" ;;
   log) load_run; cat "$run/shell.log" ;;
-  sounds) load_run; cat "$run/sounds.log" 2> /dev/null ;;
   self-check) self_check ;;
-  *) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *) sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

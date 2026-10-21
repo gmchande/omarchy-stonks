@@ -144,15 +144,6 @@ Both looks draw in your theme's colours, light themes too: up in its green
 and down in its red, or in Stonks' own pair where the theme's are missing,
 too alike, or too faint.
 
-## Sounds
-
-Stonks makes a quiet sound when you add a symbol, remove a row, or undo the
-removal, which plays the removal backwards. A replay plays the chart's line
-as a tone, with a tick where it crosses the previous close. Each look has its
-own voice. Nothing that happens by itself makes a sound: no refresh, price,
-or bell. Click the speaker at the top right, or press `Shift+S`, to turn
-sounds off; Stonks remembers. Your system volume sets how loud they are.
-
 ## Keys
 
 `?` opens a sheet of the everyday keys. Every key is in this table:
@@ -180,7 +171,6 @@ sounds off; Stonks remembers. Your system volume sets how loud they are.
 | `,` `.` | Previous or next list |
 | `c` | Show the day's change as a percent, an amount, or since the open |
 | `s` | Switch between smooth and retro |
-| `Shift+S` | Turn sounds off or on |
 | `r` | Refresh |
 | `1` to `9` | Show that row's chart |
 | Tab or `Shift+Tab` | Next or previous panel on the bar (popup) |
@@ -252,13 +242,11 @@ The shell's log the form asks for can name the prices Stonks left out.
 
 ## What it runs
 
-- **Needs:** nothing beyond Omarchy 4. It runs `curl` and PipeWire's
-  `pw-play`, which Omarchy ships.
-- **Commands:** `curl` for every request; `pw-play` to play a sound, while
-  sounds are on, only when you add, remove, or undo a row, turn sounds on,
-  or replay a chart; `omarchy restart shell` only when you click the notice
-  that an update is on disk; and, only when you click the note that a newer
-  Stonks is out, `omarchy plugin update grvc.stonks` in a terminal.
+- **Needs:** nothing beyond Omarchy 4. It runs `curl`, which Omarchy ships.
+- **Commands:** `curl` for every request; `omarchy restart shell` only when
+  you click the notice that an update is on disk; and, only when you click
+  the note that a newer Stonks is out, `omarchy plugin update grvc.stonks`
+  in a terminal.
 - **Sites:** `query1.finance.yahoo.com` for quotes, charts, and the market
   cap and P/E; `query2.finance.yahoo.com` for search; `api.robinhood.com`
   for overnight prices and which stocks trade overnight; and
@@ -272,11 +260,9 @@ The shell's log the form asks for can name the prices Stonks left out.
   London's and Tokyo's among them. Stonks isn't investment advice, and isn't
   affiliated with Yahoo or Robinhood.
 - **Files it writes:** your lists and settings in
-  `~/.config/omarchy/grvc.stonks.json`, the last quotes in
-  `~/.cache/grvc.stonks/quotes.json`, and, while sounds are on, a replay's
-  sound in `~/.cache/grvc.stonks/replay.wav`, written over at each replay.
-  The shell keeps the pill's form on its bar entry in
-  `~/.config/omarchy/shell.json`.
+  `~/.config/omarchy/grvc.stonks.json`, and the last quotes in
+  `~/.cache/grvc.stonks/quotes.json`. The shell keeps the pill's form on its
+  bar entry in `~/.config/omarchy/shell.json`.
 - **Limits:** every request has a time limit and a size cap. Quotes come
   up to 20 listings to a request, so a long list refreshes in a few
   requests a minute, and overnight prices up to 75. Stonks fetches each
