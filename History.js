@@ -53,20 +53,26 @@ function historyDue(range, entry, quote, now, trading) {
 }
 
 // Yahoo's answer for a range. `centExchanges` as `Quote.parseChart` takes
-// them, for the stray filter's tick.
+// them, for the stray filter's tick. Null, as there, for an answer that is
+// not a chart, whose bars or periods are not lists within Quote's budgets,
+// or whose bar times are not moments.
 function parseHistory(json, range, centExchanges) {
   var result = json && json.chart && json.chart.result && json.chart.result[0]
   if (!result || !result.meta) return null
   var meta = result.meta
   var spec = HISTORY_RANGES[range]
   var quote = (result.indicators && result.indicators.quote && result.indicators.quote[0]) || {}
-  var timestamps = result.timestamp || []
-  var opens = quote.open || []
-  var highs = quote.high || []
-  var lows = quote.low || []
-  var closes = quote.close || []
+  var list = function(value) { return Format.fetchedList(value || [], Quote.MOST_BARS) }
+  var timestamps = list(result.timestamp)
+  var opens = list(quote.open)
+  var highs = list(quote.high)
+  var lows = list(quote.low)
+  var closes = list(quote.close)
+  var clocks = Quote.answerClocks(meta.tradingPeriods)
+  if (!timestamps || !opens || !highs || !lows || !closes || !clocks) return null
   var bars = []
   for (var i = 0; i < timestamps.length; i++) {
+    if (!Format.isMoment(timestamps[i])) return null
     if (closes[i] === null || closes[i] === undefined) continue
     bars.push({ t: timestamps[i], o: opens[i], h: highs[i], l: lows[i], c: closes[i] })
   }
@@ -91,7 +97,7 @@ function parseHistory(json, range, centExchanges) {
     zoneName: meta.timezone || "",
     // An intraday answer's days, each with its own clock, and the live
     // moment Yahoo appends, at the price's own second (`barOffset`).
-    clocks: Quote.answerClocks(meta.tradingPeriods),
+    clocks: clocks,
     liveAt: Format.isFiniteNumber(meta.regularMarketTime) ? meta.regularMarketTime : null,
     bars: bars,
     baseline: baseline,

@@ -811,3 +811,142 @@ test("community themes that one hue, a faint colour, or a tinted light ground wo
   // A light bar under a dark popup takes the other pair: White's on black.
   expect(M.trend("#3a3a3a", M.hexColor("#2a2a2a"), M.hexColor("#000000"))).toEqual(own.dark)
 })
+
+// Each parser fed hostile answers, in a child process with a time limit: a
+// loop without end in a parser holds the shell's one thread, and with it
+// the bar, the launcher, and every other plugin, and the test's own timeout
+// can't stop a synchronous one. At each place a parser reads a list, an
+// object posing as one with a length of 1e300, and a list one past its
+// budget; and bar times no Date can hold. Each must come back at once with
+// nothing read from it. An answer goes as text, read with JSON.parse, as
+// curl's is. `call` is run on it as `json`; its value comes back as JSON,
+// "threw" and the error's name, or "no answer in 10 s".
+async function hostile(cases) {
+  const rules = ["Format", "Quote", "History", "Fundamentals", "Search", "Overnight"]
+  return Promise.all(cases.map(async c => {
+    const child = Bun.spawn([process.execPath, "-e", `
+      import { load } from ${JSON.stringify(join(import.meta.dir, "load.js"))}
+      const M = Object.assign({}, ...${JSON.stringify(rules)}.map(name => load(name + ".js")))
+      const json = JSON.parse(await Bun.stdin.text())
+      let out
+      try { out = ${c.call} } catch (e) { out = "threw " + e.name }
+      console.log(JSON.stringify(out))`],
+      { stdin: new Blob([JSON.stringify(c.answer)]), stdout: "pipe", stderr: "pipe", timeout: 10000 })
+    const [text, error, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+    return [c.name, child.signalCode ? "no answer in 10 s" : code === 0 ? JSON.parse(text) : "exited " + code + ": " + error.trim()]
+  }))
+}
+const POSING = { length: 1e300 }
+// `n` bar times five minutes apart, or `n` of anything else.
+const T0 = 1791386400
+const times = n => Array.from({ length: n }, (_, i) => T0 + 300 * i)
+const period = (start, end) => ({ start, end, gmtoffset: -14400, timezone: "EDT" })
+// A day answer whose three bars read, and a range's, its periods one list
+// of days; `edit` changes the result, or the answer, before it is sent.
+const chartAnswer = (edit, periods) => {
+  const answer = { chart: { result: [{
+    meta: { symbol: "X", regularMarketPrice: 10, regularMarketTime: T0 + 600, gmtoffset: -14400, tradingPeriods: periods ||
+      { pre: [[period(T0 - 3600, T0)]], regular: [[period(T0, T0 + 3600)]], post: [[period(T0 + 3600, T0 + 7200)]] } },
+    timestamp: times(3),
+    indicators: { quote: [{ open: [10, 10, 10], high: [10, 10, 10], low: [10, 10, 10], close: [10, 10, 10] }] }
+  }] } }
+  if (edit) edit(answer.chart.result[0], answer)
+  return answer
+}
+const rangeAnswer = edit => chartAnswer(edit, [[period(T0, T0 + 3600)]])
+const bars = r => r.indicators.quote[0]
+
+test("a hostile chart or spark answer reads as no answer, at once", async () => {
+  const read = "M.parseChart(json, []) && 'read'"
+  const spark = "M.sparkResults(json) && 'read'"
+  const cases = [
+    { name: "a day answer, as sent", call: read, answer: chartAnswer(), want: "read" },
+    { name: "bar times posing", call: read, answer: chartAnswer(r => { r.timestamp = POSING }) },
+    { name: "closes posing", call: read, answer: chartAnswer(r => { bars(r).close = POSING }) },
+    { name: "opens posing", call: read, answer: chartAnswer(r => { bars(r).open = POSING }) },
+    { name: "a session's days posing", call: read, answer: chartAnswer(r => { r.meta.tradingPeriods.regular = POSING }) },
+    { name: "a day's periods posing", call: read, answer: chartAnswer(r => { r.meta.tradingPeriods.regular = [POSING] }) },
+    { name: "bar times over budget", call: read, answer: chartAnswer(r => { r.timestamp = times(M.MOST_BARS + 1) }) },
+    { name: "closes over budget", call: read, answer: chartAnswer(r => { bars(r).close = times(M.MOST_BARS + 1).map(() => 10) }) },
+    { name: "a session's days over budget", call: read,
+      answer: chartAnswer(r => { r.meta.tradingPeriods.pre = times(M.MOST_DAYS + 1).map(() => [period(T0 - 3600, T0)]) }) },
+    { name: "a day's periods over budget", call: read,
+      answer: chartAnswer(r => { r.meta.tradingPeriods.pre = [times(M.MOST_PERIODS + 1).map(() => period(T0 - 3600, T0))] }) },
+    { name: "bar times no Date holds", call: read, answer: chartAnswer(r => { r.timestamp = [0, 1e300, 2e300] }) },
+    { name: "a spark day with its bar times posing", call: "M.sparkQuote(json, null, [])",
+      answer: chartAnswer(r => { r.timestamp = POSING }).chart.result[0] },
+    { name: "a spark answer, as sent", call: spark, answer: { spark: { result: [{ symbol: "X", response: [chartAnswer().chart.result[0]] }] } }, want: "read" },
+    { name: "spark listings posing", call: spark, answer: { spark: { result: POSING } } },
+    { name: "spark listings over budget", call: spark,
+      answer: { spark: { result: times(M.MOST_SPARKS + 1).map(t => ({ symbol: "S" + t, response: [chartAnswer().chart.result[0]] })) } } }
+  ]
+  expect(await hostile(cases)).toEqual(cases.map(c => [c.name, c.want === undefined ? null : c.want]))
+}, 60000)
+
+test("a hostile range answer reads as no answer, at once", async () => {
+  const read = "M.parseHistory(json, '1M', []) && 'read'"
+  const cases = [
+    { name: "a range answer, as sent", call: read, answer: rangeAnswer(), want: "read" },
+    { name: "bar times posing", call: read, answer: rangeAnswer(r => { r.timestamp = POSING }) },
+    ...["open", "high", "low", "close"].map(list =>
+      ({ name: list + "s posing", call: read, answer: rangeAnswer(r => { bars(r)[list] = POSING }) })),
+    { name: "a day's periods posing", call: read, answer: rangeAnswer(r => { r.meta.tradingPeriods = [POSING] }) },
+    { name: "bar times over budget", call: read, answer: rangeAnswer(r => { r.timestamp = times(M.MOST_BARS + 1) }) },
+    { name: "days over budget", call: read,
+      answer: rangeAnswer(r => { r.meta.tradingPeriods = times(M.MOST_DAYS + 1).map(() => [period(T0, T0 + 3600)]) }) },
+    { name: "bar times no Date holds", call: read, answer: rangeAnswer(r => { r.timestamp = [0, 1e300, 2e300] }) }
+  ]
+  expect(await hostile(cases)).toEqual(cases.map(c => [c.name, c.want === undefined ? null : c.want]))
+}, 60000)
+
+test("a hostile cap and P/E answer leaves the figures it would have fed unknown, at once", async () => {
+  const series = (type, value) => ({ meta: { type: [type] }, [type]: [{ asOfDate: "2026-09-30", currencyCode: "USD", reportedValue: { raw: value } }] })
+  const timeseries = edit => {
+    const answer = { timeseries: { result: [series("trailingMarketCap", 4e12), series("trailingPeRatio", 30), series("trailingDilutedEPS", 7)] } }
+    if (edit) edit(answer.timeseries.result)
+    return answer
+  }
+  const read = "M.parseFundamentals(json)"
+  const figures = { cap: { value: 4e12, date: "2026-09-30", currency: "USD" }, pe: { value: 30, date: "2026-09-30" } }
+  const closes = `M.withSnapshotCloses(${JSON.stringify(figures)}, json)`
+  const both = { cap: { ...figures.cap, close: 250 }, pe: { ...figures.pe, close: 250 } }
+  const day = Date.UTC(2026, 8, 30) / 1000 + 14 * 3600
+  const cases = [
+    { name: "an answer, as sent", call: read, answer: timeseries(), want: figures },
+    // The marketplace's review of 1.0.2 found this one.
+    { name: "the cap's series posing", call: read, answer: timeseries(r => { r[0].trailingMarketCap = POSING }), want: { cap: null, pe: figures.pe } },
+    { name: "the EPS series posing", call: read, answer: timeseries(r => { r[2].trailingDilutedEPS = POSING }), want: { cap: figures.cap, pe: null } },
+    { name: "the series posing", call: "M.latestSnapshot(json, 'trailingMarketCap')", answer: POSING },
+    { name: "the series over budget", call: read, answer: timeseries(r => r.push(...times(M.MOST_SERIES - 2).map(() => series("trailingPeRatio", 30)))) },
+    { name: "the cap's snapshots over budget", call: read,
+      answer: timeseries(r => { r[0].trailingMarketCap = times(M.MOST_SNAPSHOTS + 1).map(() => r[0].trailingMarketCap[0]) }), want: { cap: null, pe: figures.pe } },
+    { name: "the closes, as sent", call: closes, answer: chartAnswer(r => { r.timestamp = [day]; bars(r).close = [250] }), want: both },
+    { name: "the closes' times posing", call: closes, answer: chartAnswer(r => { r.timestamp = POSING }) },
+    { name: "the closes posing", call: closes, answer: chartAnswer(r => { r.timestamp = [day]; bars(r).close = POSING }) },
+    { name: "the closes over budget", call: closes,
+      answer: chartAnswer(r => { r.timestamp = times(M.MOST_BARS + 1).map(t => t - T0 - 300 * M.MOST_BARS + day); bars(r).close = r.timestamp.map(() => 250) }) },
+    { name: "the closes' times no Date holds", call: closes, answer: chartAnswer(r => { r.timestamp = [1e300]; bars(r).close = [250] }) }
+  ]
+  expect(await hostile(cases)).toEqual(cases.map(c => [c.name, c.want === undefined ? null : c.want]))
+}, 60000)
+
+test("a hostile search or Robinhood answer reads as no answer, at once", async () => {
+  const quote = { symbol: "SHOP", quoteType: "EQUITY", exchange: "NMS", longname: "Shopify Inc." }
+  const result = historicals => ({ symbol: "NEST", historicals })
+  const print = { begins_at: "2026-10-07T00:00:00Z", close_price: "10.00", session: "overnight", interpolated: false }
+  const nest = "M.overnightBars(json.results[0], 'NEST').length"
+  const cases = [
+    { name: "a search, as sent", call: "M.parseSearch(json).results.length", answer: { quotes: [quote] }, want: 1 },
+    { name: "search quotes posing", call: "M.parseSearch(json)", answer: { quotes: POSING } },
+    { name: "search quotes over budget", call: "M.parseSearch(json) && 'read'", answer: { quotes: times(M.MOST_QUOTES + 1).map(() => quote) } },
+    { name: "prints, as sent", call: nest, answer: { results: [result([print])] }, want: 1 },
+    { name: "Robinhood's results posing", call: "M.parseOvernight(json, ['NEST'])", answer: { results: POSING } },
+    { name: "Robinhood's results over budget", call: "M.overnightResults(json) && 'read'", answer: { results: times(M.MOST_RESULTS + 1).map(() => result([])) } },
+    { name: "a listing's prints posing", call: nest, answer: { results: [result(POSING)] }, want: 0 },
+    { name: "a listing's prints over budget", call: nest, answer: { results: [result(times(M.MOST_PRINTS + 1).map(() => print))] }, want: 0 },
+    { name: "instruments, as sent", call: "M.parseAllDay(json, ['NEST'])", answer: { results: [{ symbol: "NEST", all_day_tradability: "tradable" }] }, want: { NEST: true } },
+    { name: "instruments posing", call: "M.parseAllDay(json, ['NEST'])", answer: { results: POSING } },
+    { name: "instruments over budget", call: "M.parseAllDay(json, ['NEST'])", answer: { results: times(3).map(() => ({ symbol: "NEST", all_day_tradability: "tradable" })) } }
+  ]
+  expect(await hostile(cases)).toEqual(cases.map(c => [c.name, c.want === undefined ? null : c.want]))
+}, 60000)

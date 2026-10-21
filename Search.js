@@ -1,4 +1,5 @@
 .pragma library
+.import "Format.js" as Format
 .import "Quote.js" as Quote
 
 // Yahoo's symbol lookup: its URL and its answer. Knows nothing else.
@@ -9,15 +10,21 @@ function searchUrl(query) {
   return SEARCH_URL + "?q=" + encodeURIComponent(query) + "&quotesCount=8&newsCount=0"
 }
 
+// Yahoo sends at most the 8 quotes `searchUrl` asks for, 7 in the saved
+// answers; an answer with more than this is a bad one (`Format.fetchedList`).
+var MOST_QUOTES = 40
+
 // Yahoo's answer as search shows it: the results Stonks can follow, and a
-// note naming what else the answer held, or "" when it held nothing else.
+// note naming what else the answer held, or "" when it held nothing else;
+// null when its quotes are not a list within MOST_QUOTES.
 // Stonks follows stocks, ETFs, indexes, and cryptocurrencies; Yahoo also
 // finds mutual funds, currencies, futures, and more, and a search that
 // hid them without a word read "No matches" for a fund Yahoo has.
 var FOLLOWED = ["EQUITY", "ETF", "INDEX", "CRYPTOCURRENCY"]
 
 function parseSearch(json) {
-  var quotes = (json && json.quotes) || []
+  var quotes = Format.fetchedList((json && json.quotes) || [], MOST_QUOTES)
+  if (!quotes) return null
   var results = []
   var left = []
   for (var i = 0; i < quotes.length; i++) {

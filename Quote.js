@@ -13,6 +13,19 @@ var CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/"
 var SPARK_URL = "https://query1.finance.yahoo.com/v7/finance/spark"
 var SPARK_BATCH = 20
 
+// The most entries a list in a chart or spark answer may hold, past which
+// the answer is a bad one (`Format.fetchedList`), each well over a real
+// answer's. Bars: 501 in the saved answers (NVDA's 2Y of days); ^GSPC's All,
+// a month a bar since 1927, comes to about 1,190, and a coin's 1M, an hour
+// a bar, to 744.
+var MOST_BARS = 5000
+// Trading periods: a list of days, 23 in the saved answers (a month of
+// hours), 31 for a coin's month; one period a day in every saved answer.
+var MOST_DAYS = 100
+var MOST_PERIODS = 10
+// A spark answer's listings: one for each symbol asked, SPARK_BATCH at most.
+var MOST_SPARKS = 2 * SPARK_BATCH
+
 // Yahoo's short exchange codes to the names people use. A listing falls back
 // to Yahoo's full exchange name; a search result to Yahoo's own short code.
 var EXCHANGE_NAMES = {
@@ -33,10 +46,13 @@ function sparkUrl(symbols) {
 
 // A spark answer's listings, by symbol: each one's day in the chart's own
 // shape, closes only. A symbol Yahoo doesn't know is left out of the answer.
+// Null for an answer whose listings are not a list of at most MOST_SPARKS.
 function sparkResults(json) {
   var out = {}
-  var results = json && json.spark && json.spark.result
-  for (var i = 0; results && i < results.length; i++) {
+  var sent = json && json.spark && json.spark.result
+  var results = sent ? Format.fetchedList(sent, MOST_SPARKS) : []
+  if (!results) return null
+  for (var i = 0; i < results.length; i++) {
     var day = results[i].response && results[i].response[0]
     if (day && day.meta) out[results[i].symbol] = day
   }
@@ -240,14 +256,19 @@ function answerTick(meta, bars, centExchanges) {
 // Yahoo's day answer as a quote. `centExchanges` are the exchanges whose
 // listings trade in whole cents from $1 (`Market.centExchanges`): their
 // prices and ticks take cents there; any other listing's take Yahoo's hint.
+// Null for an answer that is not a chart, whose bars or periods are not
+// lists within MOST_BARS, MOST_DAYS, and MOST_PERIODS, or whose bar times
+// are not moments (`Format.isMoment`).
 function parseChart(json, centExchanges) {
   var result = json && json.chart && json.chart.result && json.chart.result[0]
   if (!result || !result.meta) return null
   var meta = result.meta
-  var timestamps = result.timestamp || []
+  var timestamps = Format.fetchedList(result.timestamp || [], MOST_BARS)
   var quote = (result.indicators && result.indicators.quote && result.indicators.quote[0]) || {}
-  var closes = quote.close || []
-  var opens = quote.open || []
+  var closes = Format.fetchedList(quote.close || [], MOST_BARS)
+  var opens = Format.fetchedList(quote.open || [], MOST_BARS)
+  var clocks = answerClocks(meta.tradingPeriods)
+  if (!timestamps || !closes || !opens || !clocks) return null
   // The session the bars describe is the answer's trading periods. Yahoo's
   // current period moves on to the next session first (Monday's at 00:36 New
   // York, the bars still Friday's), so it stands in only for an answer
@@ -256,6 +277,7 @@ function parseChart(json, centExchanges) {
   var current = meta.currentTradingPeriod || {}
   var bars = []
   for (var i = 0; i < timestamps.length; i++) {
+    if (!Format.isMoment(timestamps[i])) return null
     if (closes[i] !== null && closes[i] !== undefined)
       bars.push({ t: timestamps[i], o: opens[i], c: closes[i] })
   }
@@ -306,7 +328,7 @@ function parseChart(json, centExchanges) {
     // The zone's short name at that offset, as Yahoo writes it: "EDT", "JST".
     zoneName: meta.timezone || "",
     // Each period's own (`answerClocks`), for a print's clock on its day.
-    clocks: answerClocks(meta.tradingPeriods),
+    clocks: clocks,
     instrumentType: meta.instrumentType || "",
     crypto: meta.instrumentType === "CRYPTOCURRENCY",
     // The regular-market quote as Yahoo reports it, with its own timestamp.
@@ -421,18 +443,24 @@ function answerPeriods(periods) {
 // sent by, so the week after a change of clocks a period before it still
 // says its own (Sydney's 10:00 AEST open of 21 September, in an answer sent
 // in AEDT). Both shapes Yahoo sends: a day answer's pre, regular, and post,
-// each a list of days, and a range's one list of days.
+// each a list of days, and a range's one list of days. Null when a list of
+// days or of a day's periods is not a list within MOST_DAYS or MOST_PERIODS.
 function answerClocks(periods) {
   var lists = !periods ? [] : Array.isArray(periods) ? [periods] : [periods.pre, periods.regular, periods.post]
   var out = []
-  lists.forEach(function(days) {
-    (days || []).forEach(function(day) {
-      (day || []).forEach(function(p) {
+  for (var i = 0; i < lists.length; i++) {
+    var days = Format.fetchedList(lists[i] || [], MOST_DAYS)
+    if (!days) return null
+    for (var j = 0; j < days.length; j++) {
+      var day = Format.fetchedList(days[j] || [], MOST_PERIODS)
+      if (!day) return null
+      for (var k = 0; k < day.length; k++) {
+        var p = day[k]
         var midnight = (Math.floor((p.start + p.gmtoffset) / 86400) + 1) * 86400 - p.gmtoffset
         out.push({ start: p.start, until: midnight, offset: p.gmtoffset, zone: p.timezone || "" })
-      })
-    })
-  })
+      }
+    }
+  }
   return out
 }
 

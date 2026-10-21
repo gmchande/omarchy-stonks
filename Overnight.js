@@ -73,6 +73,14 @@ function overnightUrl(symbols) {
 // request: "Too many instruments requested. No more than 75 allowed."
 var OVERNIGHT_BATCH = 75
 
+// The most entries a list in Robinhood's answers may hold, past which the
+// answer is a bad one (`Format.fetchedList`): a result for each symbol
+// asked, one each in the saved answers, so twice the most asked at once; a
+// listing's prints, span=day's 288 five-minute slots, 288 in the saved
+// answers.
+var MOST_RESULTS = 2 * OVERNIGHT_BATCH
+var MOST_PRINTS = 1000
+
 // Robinhood's instruments for `symbols`, one request for all: whether it
 // trades each all day.
 function allDayUrl(symbols) {
@@ -82,10 +90,11 @@ function allDayUrl(symbols) {
 // Robinhood's instruments answer, by the Yahoo symbols asked for: true for a
 // listing it trades all day (`all_day_tradability` "tradable"), false for any
 // other, and for one it does not know. Results come in its own order. Null
-// for a response that is not Robinhood's.
+// for a response that is not Robinhood's, or whose results are not a list
+// of at most two for each symbol asked.
 function parseAllDay(json, symbols) {
-  var results = json && json.results
-  if (!Array.isArray(results)) return null
+  var results = Format.fetchedList(json && json.results, 2 * symbols.length)
+  if (!results) return null
   var out = {}
   for (var i = 0; i < symbols.length; i++) {
     var wanted = robinhoodSymbol(symbols[i])
@@ -113,21 +122,23 @@ function parseOvernight(json, symbols) {
 }
 
 // Robinhood's results, in the order asked, or null for a response that is
-// not Robinhood's.
+// not Robinhood's, or whose results are not a list within MOST_RESULTS.
 function overnightResults(json) {
-  return json && Array.isArray(json.results) ? json.results : null
+  return Format.fetchedList(json && json.results, MOST_RESULTS)
 }
 
 // One result of Robinhood's answer, for the Yahoo symbol asked for in its
 // place: its prints, { t, p, s } with s its session ("pre", "reg", "post",
 // "overnight"), only the bars that traded: bounds=24_5 still fills a quiet
 // name's gaps with flat `interpolated` bars. An unknown symbol comes back
-// empty, and one that names another symbol is no answer for it.
+// empty, and one that names another symbol, or whose prints are not a list
+// within MOST_PRINTS, is no answer for it.
 function overnightBars(result, symbol) {
   var bars = []
-  if (!result || result.symbol !== robinhoodSymbol(symbol) || !Array.isArray(result.historicals)) return bars
-  for (var j = 0; j < result.historicals.length; j++) {
-    var bar = result.historicals[j]
+  var historicals = result && result.symbol === robinhoodSymbol(symbol) ? Format.fetchedList(result.historicals, MOST_PRINTS) : null
+  if (!historicals) return bars
+  for (var j = 0; j < historicals.length; j++) {
+    var bar = historicals[j]
     var t = Date.parse(bar.begins_at) / 1000
     var p = Number(bar.close_price)
     if (!bar.interpolated && Format.isFiniteNumber(t) && Format.isFiniteNumber(p) && p > 0) bars.push({ t: t, p: p, s: bar.session })

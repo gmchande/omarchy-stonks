@@ -14,6 +14,13 @@ var FUNDAMENTALS_DAYS = 400
 // A cap snapshot older than this, against the price, is too stale to move.
 var CAP_MAX_AGE_DAYS = 120
 
+// The most entries a list in a cap and P/E answer may hold
+// (`Format.fetchedList`): a series for each of the three types asked, three
+// in the saved answers; and a series' snapshots, four in the saved answers,
+// at most one a day over the FUNDAMENTALS_DAYS asked, both ends counted.
+var MOST_SERIES = 12
+var MOST_SNAPSHOTS = FUNDAMENTALS_DAYS + 1
+
 // Only an equity has a cap or a P/E: Yahoo sends an ETF, an index, or a
 // cryptocurrency none.
 function hasFundamentals(quote) {
@@ -25,13 +32,15 @@ function fundamentalsUrl(symbol, now) {
     + "&period1=" + (now - FUNDAMENTALS_DAYS * 24 * 60 * 60) + "&period2=" + now
 }
 
-// The latest dated value of one series: { value, date, currency }, or null.
+// The latest dated value of one series: { value, date, currency }, or null,
+// also when `results`, or the series, is not a list within its budget.
 function latestSnapshot(results, type) {
   var latest = null
-  for (var i = 0; i < results.length; i++) {
-    var meta = results[i] && results[i].meta
+  var all = Format.fetchedList(results, MOST_SERIES) || []
+  for (var i = 0; i < all.length; i++) {
+    var meta = all[i] && all[i].meta
     if (!meta || !meta.type || meta.type[0] !== type) continue
-    var series = results[i][type] || []
+    var series = Format.fetchedList(all[i][type] || [], MOST_SNAPSHOTS) || []
     for (var j = 0; j < series.length; j++) {
       var point = series[j]
       var value = point && point.reportedValue ? point.reportedValue.raw : null
@@ -44,12 +53,13 @@ function latestSnapshot(results, type) {
 }
 
 // Yahoo's latest cap and P/E, each with its own date; null when the answer
-// is not a timeseries. The P/E stands only while the latest trailing diluted
-// EPS is above zero: after a loss Yahoo publishes no new P/E, and its last
-// one describes earnings that are gone.
+// is not a timeseries, or its series are not a list within MOST_SERIES. The
+// P/E stands only while the latest trailing diluted EPS is above zero: after
+// a loss Yahoo publishes no new P/E, and its last one describes earnings
+// that are gone.
 function parseFundamentals(json) {
-  var results = json && json.timeseries && json.timeseries.result
-  if (!Array.isArray(results)) return null
+  var results = Format.fetchedList(json && json.timeseries && json.timeseries.result, MOST_SERIES)
+  if (!results) return null
   var cap = latestSnapshot(results, "trailingMarketCap")
   var pe = latestSnapshot(results, "trailingPeRatio")
   var eps = latestSnapshot(results, "trailingDilutedEPS")
@@ -80,19 +90,23 @@ function snapshotClosesUrl(symbol, figures) {
 }
 
 // The figures with each snapshot's close: the last session's on or before
-// its date, in the exchange's calendar. Null when the answer is not a chart
-// or lacks a snapshot's close: no answer, so the feed keeps what it had.
+// its date, in the exchange's calendar. Null when the answer is not a chart,
+// its bars are not lists within `Quote.MOST_BARS` stamped at moments
+// (`Format.isMoment`), or it lacks a snapshot's close: no answer, so the
+// feed keeps what it had.
 function withSnapshotCloses(figures, json) {
   var result = json && json.chart && json.chart.result && json.chart.result[0]
   if (!result || !result.meta) return null
-  var times = result.timestamp || []
+  var times = Format.fetchedList(result.timestamp || [], Quote.MOST_BARS)
   var bars = result.indicators && result.indicators.quote && result.indicators.quote[0]
-  var closes = bars && bars.close ? bars.close : []
+  var closes = Format.fetchedList(bars && bars.close ? bars.close : [], Quote.MOST_BARS)
+  if (!times || !closes) return null
   var offset = result.meta.gmtoffset || 0
   var withClose = function(snapshot) {
     if (!snapshot) return null
     var close = null
     for (var i = 0; i < times.length; i++) {
+      if (!Format.isMoment(times[i] + offset)) return null
       var day = new Date((times[i] + offset) * 1000).toISOString().slice(0, 10)
       if (day <= snapshot.date && Quote.knownPrice(closes[i]) !== null) close = closes[i]
     }
