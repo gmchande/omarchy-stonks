@@ -165,17 +165,22 @@ Item {
       font.letterSpacing: 1
       elide: Text.ElideRight
     }
-    Text {
-      id: metaText
-      objectName: "listingMeta"
-      anchors.baseline: symbolText.baseline
-      textFormat: Text.PlainText
-      text: root.listingMeta
-      color: listingText.color
-      font: listingText.font
-    }
 
     FontMetrics { id: listingMetrics; font: listingText.font }
+  }
+
+  // The exchange and currency start where the name's drawn text ends, not
+  // where its box does: a name cut short draws narrower than its box, and
+  // the gap read as a double space before the dot.
+  Text {
+    id: metaText
+    objectName: "listingMeta"
+    x: listingText.x + listingText.leftPadding + listingText.contentWidth
+    y: symbolText.baselineOffset - baselineOffset
+    textFormat: Text.PlainText
+    text: root.listingMeta
+    color: listingText.color
+    font: listingText.font
   }
 
   Text {

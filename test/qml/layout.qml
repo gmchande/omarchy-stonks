@@ -331,6 +331,21 @@ ShellRoot {
       }
     }
 
+    // Reads a grabbed picture's pixels, for ink measured as drawn.
+    Canvas {
+      id: inkCanvas
+      y: window.implicitHeight
+      width: window.implicitWidth
+      height: 120
+      renderTarget: Canvas.Image
+      renderStrategy: Canvas.Immediate
+    }
+    Text {
+      id: inkProbe
+      y: window.implicitHeight + 130
+      textFormat: Text.PlainText
+    }
+
     TestCase {
       name: "NothingJumps"
       when: window.visible
@@ -720,9 +735,78 @@ ShellRoot {
         })
         surface.wide = wideWas
         stub.retro = false
-        stub.quotes = Object.assign({}, longNamed, { "SHEL.L": shelQuote })
         root.check("a long name gives way on the hero's line; its exchange and currency stay whole, in the popup and the window, both looks",
           metaLost.length === 0, metaLost.join(" | "))
+
+        // One space before the dot after the name, whatever the name's
+        // length: the ink gap from the name's last character to the dot is
+        // the font's own, within a pixel, for the cut name in the popup and
+        // the window at five widths, and for a whole name. Found in the 1.0.2
+        // visual review: "TOYOTA MOTOR CORPORA…  · TSE", the name's box wider
+        // than its cut text.
+        var inkRuns = function(item) {
+          var grabbed = null
+          item.grabToImage(function(result) { grabbed = result })
+          tryVerify(function() { return grabbed !== null }, 3000, "grab " + item.objectName)
+          inkCanvas.loadImage(grabbed.url)
+          tryVerify(function() { return inkCanvas.isImageLoaded(grabbed.url) }, 3000, "load " + item.objectName)
+          var ctx = inkCanvas.getContext("2d")
+          ctx.clearRect(0, 0, inkCanvas.width, inkCanvas.height)
+          ctx.drawImage(grabbed.url, 0, 0)
+          var w = Math.min(inkCanvas.width, Math.ceil(item.width))
+          var h = Math.min(inkCanvas.height, Math.ceil(item.height))
+          var data = ctx.getImageData(0, 0, w, h).data
+          inkCanvas.unloadImage(grabbed.url)
+          var runs = []
+          for (var x = 0; x < w; x++) {
+            var inked = false
+            for (var y = 0; y < h && !inked; y++) inked = data[(y * w + x) * 4 + 3] > 24
+            if (inked && runs.length && runs[runs.length - 1].right === x) runs[runs.length - 1].right = x + 1
+            else if (inked) runs.push({ left: x, right: x + 1 })
+          }
+          return runs
+        }
+        // The gap from the name's last ink to the dot, against the same last
+        // character and words drawn as one line: one space each side as the
+        // font sets it, whatever the glyphs' bearings.
+        var dotGaps = []
+        var dotGap = function(label) {
+          var name = find(body, "listingLine")
+          var meta = find(body, "listingMeta")
+          var nameInk = inkRuns(name)
+          var metaInk = inkRuns(meta)
+          var drawn = meta.mapToItem(body, metaInk[0].left, 0).x - name.mapToItem(body, nameInk[nameInk.length - 1].right, 0).x
+          var last = name.truncated ? "…" : name.text.charAt(name.text.length - 1)
+          inkProbe.font = name.font
+          inkProbe.text = last
+          var lastInk = inkRuns(inkProbe)
+          var lastRight = lastInk[lastInk.length - 1].right
+          inkProbe.text = last + meta.text
+          var probeDot = inkRuns(inkProbe).filter(function(r) { return r.left >= lastRight })[0]
+          var set = probeDot.left - lastRight
+          if (Math.abs(drawn - set) > 1)
+            dotGaps.push(label + " " + JSON.stringify(name.text) + ": " + drawn.toFixed(1) + " px before the dot, " + set + " as one line")
+        }
+        ;[[false, 0], [true, 560], [true, 600], [true, 640], [true, 680], [true, 720]].forEach(function(place) {
+          surface.wide = place[0]
+          if (place[0]) surface.windowWidth = place[1]
+          ;[false, true].forEach(function(retro) {
+            stub.retro = retro
+            stub.featuredSymbol = "SHEL.L"
+            wait(50)
+            var where = (place[0] ? "window " + place[1] : "popup") + (retro ? " retro" : " smooth")
+            dotGap(where + " cut")
+            stub.featuredSymbol = "AAPL"
+            wait(50)
+            dotGap(where + " whole")
+          })
+        })
+        surface.wide = wideWas
+        surface.windowWidth = 720
+        stub.retro = false
+        stub.quotes = Object.assign({}, longNamed, { "SHEL.L": shelQuote })
+        root.check("the hero's line keeps one space between the name, cut or whole, and the dot after it, in the popup and the window at five widths, both looks",
+          dotGaps.length === 0, dotGaps.join(" | "))
 
         // Every price a listing shows is in its own decimals: a coin under a
         // cent to four significant digits, a six-figure price to none, in
