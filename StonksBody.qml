@@ -68,9 +68,10 @@ Item {
   // chart is sized to the surface (`shownChartHeight`), giving way first as
   // the window gets short, so three rows still show, and taking what whole
   // rows leave over otherwise. The popup's card fits its rows, so its chart
-  // keeps chartHeight. Found in the design pass of 14 October: the smallest
-  // window showed one row of the list. 0, the popup's, gives none: a
-  // constant, so no change of chartHeight can find it stale.
+  // follows the screen's room instead (`screenChartHeight`). Found in the
+  // design pass of 14 October: the smallest window showed one row of the
+  // list. 0, the popup's, gives none: a constant, so no change of
+  // chartHeight can find it stale.
   property int minChartHeight: 0
   // The host's look.
   property color foreground: Commons.Color.foreground
@@ -122,12 +123,25 @@ Item {
   // The most height the screen leaves the body, whatever the card fits; 0
   // where the body's height is its own (the window).
   property int screenRoom: 0
-  // The hint gives way where it would leave no row in sight: read from the
-  // screen's room, never the card's, which fits what the footer takes.
-  // Found in the spacing walk: at text size 16 on an 850 px screen the
-  // popup showed its chrome and hint and not one row.
+  // Everything in the popup but its chart, its rows, and the hint: what the
+  // chart and a row share the screen's room with.
+  readonly property int chromeBesideScreenChart: margins * 2 + header.height + heroBand.heightBesideChart + footer.barHeight + groupGap * 3
+  // The popup's chart: chartHeight wherever the screen holds a row beside
+  // it; where it wouldn't (large text on a short screen), it gives way to
+  // one row, down to a fifth of itself, which still shows the day's shape:
+  // a row in view matters more than a tall chart. Read from the screen's
+  // room, never the card's, which fits the chart. Found in the 1.0.2
+  // leftovers review (O1): from text size 18 on a short screen the popup
+  // showed no row at all.
+  readonly property int leastScreenChart: Math.round(chartHeight / 5)
+  readonly property int screenChartHeight: screenRoom <= 0 ? chartHeight
+    : Math.max(leastScreenChart, Math.min(chartHeight, screenRoom - chromeBesideScreenChart - listRowHeight))
+  // The hint gives way where it would leave no row in sight, after the
+  // chart has: read from the screen's room, never the card's, which fits
+  // what the footer takes. Found in the spacing walk: at text size 16 on
+  // an 850 px screen the popup showed its chrome and hint and not one row.
   readonly property bool hintShown: hint !== "" && (screenRoom <= 0
-    || margins * 2 + header.height + heroBand.implicitHeight + groupGap * 3 + footer.barHeight + footer.hintRoom + listRowHeight <= screenRoom)
+    || chromeBesideScreenChart + screenChartHeight + footer.hintRoom + listRowHeight <= screenRoom)
   // A standing word in the footer's place, under a note, until what it says
   // is fixed: the data file can't be read, or an update waits on a shell
   // restart, which a click on it does.
@@ -1016,7 +1030,7 @@ Item {
     scrubX: root.scrubX
     reveal: motion.reveal
     replayX: motion.replayX
-    chartHeight: root.chartFitsSurface ? root.shownChartHeight : root.chartHeight
+    chartHeight: root.chartFitsSurface ? root.shownChartHeight : root.screenChartHeight
     order: root.order
     reversed: root.reversed
     listLabel: root.listLabel

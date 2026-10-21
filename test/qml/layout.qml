@@ -300,7 +300,8 @@ ShellRoot {
     implicitWidth: 760
     implicitHeight: 900
 
-    // The surface under test: the popup's content box, or the window's.
+    // The surface under test: the popup's content box (Panel's
+    // Style.space(480) card less its padding and border), or the window's.
     Item {
       id: surface
       property bool wide: false
@@ -313,7 +314,7 @@ ShellRoot {
       property int budget: 730
       x: 0
       y: 0
-      width: wide ? windowWidth : 448
+      width: wide ? windowWidth : Style.space(448)
       height: fixedHeight > 0 ? fixedHeight : body.fittedHeight(Math.min(budget, body.chromeHeight + 6 * body.rowPitch - body.rowGap))
 
       StonksBody {
@@ -2111,6 +2112,50 @@ ShellRoot {
         wait(100)
         root.check("at text size 16, on a screen too short for the first-run hint and a row, the popup shows a row, in both looks",
           rowless.length === 0, rowless.join(", "))
+
+        // The popup shows a row on a 768 px screen at every text size Omarchy
+        // offers (`omarchy display text size`, 9 to 20), in both looks: where
+        // the screen would hold no row beside the chart, the chart gives way
+        // to one; where it holds one, the chart keeps its height. The body's
+        // room is what the shell's card leaves it (Ui/PopupCard.qml): the
+        // screen less the bar, the card's margins, padding, and border.
+        // Found in the 1.0.2 leftovers review (O1): from text size 18 on a
+        // short screen the popup showed no row at all.
+        var shortFaults = []
+        var shortSeen = []
+        for (var size = 9; size <= 20; size++) {
+          Style.fontBaseSize = size
+          body.screenRoom = 0
+          surface.budget = 4000
+          wait(100)
+          var room = 768 - Style.bar.sizeHorizontal - 2 * Style.gapsOut - 2 * Style.spacing.popupPadding - 2 * Math.max(1, Style.space(2))
+          var fullChart = body.chartItem.height
+          var rowFitsWhole = body.chromeHeight + body.listRowHeight <= room
+          ;[false, true].forEach(function(retro) {
+            stub.retro = retro
+            body.screenRoom = room
+            surface.budget = room
+            wait(100)
+            var where = "size " + size + (retro ? " retro" : " smooth")
+            var chart = body.chartItem.height
+            if (retro === false) shortSeen.push(size + ": " + chart + (chart === fullChart ? "" : " of " + fullChart) + " in " + room)
+            // The card stops at the screen's room, the footer riding its
+            // edge: a row is in view when the list holds one and it ends one
+            // gap above the footer there.
+            var footerTop = Math.min(surface.height, room) - find(body, "footer").height
+            if (!(body.watchlist.height >= body.listRowHeight && yIn(body.watchlist, body.listRowHeight) + body.groupGap <= footerTop))
+              shortFaults.push(where + ": no row in " + room + " px, chart " + chart + ", list " + body.watchlist.height)
+            if (rowFitsWhole && chart !== fullChart) shortFaults.push(where + ": the chart gave way to " + chart + " though " + fullChart + " leaves a row")
+          })
+        }
+        body.screenRoom = 0
+        surface.budget = 730
+        stub.retro = false
+        Style.fontBaseSize = 12
+        wait(100)
+        console.log("popup charts on a 768 px screen: " + shortSeen.join(", "))
+        root.check("on a 768 px screen at every text size from 9 to 20 the popup shows a row, its chart giving way only where it must, in both looks",
+          shortFaults.length === 0, shortFaults.join(" | "))
         console.log("LAYOUT DONE")
         done.exitCode = root.failures ? 1 : 0
         done.start()
