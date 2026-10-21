@@ -271,7 +271,7 @@ function barAt(chart, x) {
   var pts = chart.geometry ? chart.geometry.points : []
   var next = 1
   while (next < pts.length && pts[next].x < x) next++
-  if (next < pts.length && pts[next].brk && x > pts[next - 1].x) return -1
+  if (next < pts.length && pts[next].brk && x > pts[next - 1].x && x < pts[next].x) return -1
   var y = Chart.yAt(pts, x)
   return y === null ? -1 : barOf(1 - y)
 }

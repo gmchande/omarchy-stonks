@@ -442,11 +442,18 @@ ShellRoot {
           wait(80)
         }
         var inBreak = harness.chimes().length - struck
-        hero.scrubRequested(gap[1] + 0.02)
+        // Steps on, as → takes them, through the rest of lunch, silent, to
+        // the afternoon's first print, which strikes.
+        for (var step = 0; step < 30 && body.motion.scrubX < gap[1]; step++) {
+          body.nudgeScrub(1)
+          wait(60)
+        }
+        var landed = body.motion.scrubX === gap[1]
         wait(150)
         var afterBreak = harness.chimes().length - struck - inBreak
         body.endScrub()
-        return { ok: inBreak === 0 && afterBreak === 1, detail: (retro ? "retro: " : "smooth: ") + inBreak + " in the break, " + afterBreak + " after" }
+        return { ok: inBreak === 0 && afterBreak === 1 && landed,
+          detail: (retro ? "retro: " : "smooth: ") + inBreak + " in the break, " + afterBreak + " after, landed on the first print " + landed }
       })
       service.persist({ style: "smooth" })
       harness.check("the scrub over Tokyo's lunch strikes nothing, and the afternoon's line strikes again, smooth and retro",
@@ -743,8 +750,12 @@ ShellRoot {
         var rung = bells()
         service.now = moments[0]
         var bell = bellMaker.createObject(harness, { service: service, sounds: sounds })
-        moments.slice(1).forEach(function(t) { service.now = t })
-        wait(600)
+        // Each moment its own minute's tick: a bell rung has played before
+        // the next, so a second ring isn't lost to the first's check.
+        moments.slice(1).forEach(function(t) {
+          service.now = t
+          wait(300)
+        })
         bell.destroy()
         return bells() - rung
       }
