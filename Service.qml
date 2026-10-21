@@ -1020,7 +1020,11 @@ Item {
   function summon(symbol, range) {
     var values = {}
     var s = String(symbol || "").toUpperCase()
-    if (s && root.library.indexOf(s) >= 0) values.featured = s
+    if (s && root.library.indexOf(s) >= 0) {
+      values.featured = s
+      // Asked for by name, it is a hero chosen (`feature`).
+      root.heroTaken = null
+    }
     if (History.historyRanges().indexOf(range) >= 0) values.range = range
     if (Object.keys(values).length) root.persist(values)
   }

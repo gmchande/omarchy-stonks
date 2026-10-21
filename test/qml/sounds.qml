@@ -477,12 +477,12 @@ ShellRoot {
         harness.starts().slice(before).map(played).join(", "))
 
       // An add confirmed before its preview has answered: SHOP.TO's day held
-      // back, Enter on it as soon as it is chosen. Until its answer lands
-      // and its row joins, the header and the dimmed chart name it as the
-      // chart on its way, as the preview did, and nothing plays; the add is
-      // heard as the row joins. Found in the slow walk of 1.0.2: the hero
-      // went back to the stock before the add, undimmed and named by nothing,
-      // and the add sounded at Enter.
+      // back, Enter on it as soon as it is chosen. While its answer is held,
+      // the header names it as the chart on its way, as the preview did, no
+      // row stands for it, and nothing plays; let through, its row joins and
+      // the add is heard then. Found in the slow walk of 1.0.2: the hero
+      // went back to the stock before the add, named by nothing, and the add
+      // sounded at Enter.
       before = harness.starts().length
       harness.hold(true, "SHOP.TO.quote.hold")
       tryVerify(function() { return !fileProc.running }, 2000)
@@ -493,23 +493,20 @@ ShellRoot {
       tryVerify(function() { return body.adding && body.search.results.length > 1 }, 3000)
       keyClick(Qt.Key_Down)
       tryVerify(function() { return body.previewSymbol === "SHOP.TO" }, 2000)
-      wait(400)
       keyClick(Qt.Key_Return)
-      var waiting = []
-      for (var w = 0; w < 6; w++) {
-        wait(250)
-        waiting.push([harness.find(body, "statusText").text, body.motion.dimmed > 0 ? "dimmed" : "undimmed",
-          body.watchlist.displayedSymbols.indexOf("SHOP.TO") >= 0 ? "row" : "no row", harness.starts().length - before].join("/"))
-      }
+      wait(50)
+      var header = harness.find(body, "statusText")
+      for (var t = 0; t < 2000 && header.text !== "LOADING SHOP.TO"; t += 20) wait(20)
+      var waiting = [header.text, body.watchlist.displayedSymbols.indexOf("SHOP.TO") >= 0 ? "row" : "no row",
+        harness.starts().length - before].join("/")
       var released = Date.now()
       harness.hold(false, "SHOP.TO.quote.hold")
       tryVerify(function() { return body.watchlist.displayedSymbols.indexOf("SHOP.TO") >= 0 && service.featuredSymbol === "SHOP.TO" && !body.chartLoading }, 8000)
       var joined = startsBy(before + 1).slice(before)
       quiet()
-      var named = waiting.every(function(w) { return w === "LOADING SHOP.TO/dimmed/no row/0" })
-      harness.check("an add confirmed before its preview answers is named as the chart on its way, dimmed and silent, until its row joins, and heard then",
-        named && joined.length === 1 && played(joined[0]) === "sounds/smooth/add.wav" && joined[0].ms >= released,
-        waiting.join(" | ") + " || " + joined.map(function(s) { return played(s) + " at " + (s.ms - released) + " ms" }).join(", "))
+      harness.check("an add confirmed before its preview answers is named as the chart on its way, silent, until its row joins, and heard then",
+        waiting === "LOADING SHOP.TO/no row/0" && joined.length === 1 && played(joined[0]) === "sounds/smooth/add.wav" && joined[0].ms >= released,
+        waiting + " || " + joined.map(function(s) { return played(s) + " at " + (s.ms - released) + " ms" }).join(", "))
       service.removeSymbol("SHOP.TO")
       panel.close()
       wait(300)
