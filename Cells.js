@@ -68,14 +68,13 @@ function blockCells(text) {
 }
 
 // The bull for an up day, the bear for a down day: the header's animal in
-// both looks, the pill's icon form, and the launcher icon
-// (test/launcher-icon.js). 20 wide, 14 tall; "#" is a lit pixel. Two faces,
-// front on. The bull reads by its long horns and its nostrils. The bear
-// reads by round ears that stand out from its head, with a notch under
-// each, and cheeks wider than its ears: earlier faces whose outline ran
-// straight up into the ears read as cats. test/qml/render.qml draws the
-// other candidates beside these, and marks whichever pair is here as the
-// default.
+// both looks, and the pill's icon form. 20 wide, 14 tall; "#" is a lit
+// pixel. Two faces, front on. The bull reads by its long horns and its
+// nostrils. The bear reads by round ears that stand out from its head,
+// with a notch under each, and cheeks wider than its ears: earlier faces
+// whose outline ran straight up into the ears read as cats.
+// test/qml/render.qml draws the other candidates beside these, and marks
+// whichever pair is here as the default.
 var BULL_SPRITE = [
   "....................",
   "#..................#",
