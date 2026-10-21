@@ -162,51 +162,119 @@ ShellRoot {
       return ""
     }
 
-    // The replay's sound, as the stand-in kept it, read against the chart
-    // it was made from, by what the samples hold and what the chart draws:
-    // - pitch: every 25 ms where the chart draws, the pitch read from the
-    //   samples is the chart's, within a semitone, nine times in ten:
-    //   smooth's from E4 at the chart's floor to E5 at its ceiling along the
-    //   line, retro's a pentatonic note per column of its grid, read where
-    //   one note holds through the window;
-    // - silence: where the chart draws nothing (smooth's breaks, retro's
-    //   dark columns), nothing sounds;
-    // - ticks: each crossing of the baseline by the drawn line is heard
-    //   within 25 ms, and no tick is heard anywhere else: smooth's a burst
-    //   at 1760 Hz, retro's noise between its note's harmonics. Crossings
-    //   closer than a tick and the window that hears it are one: 35 ms in
-    //   smooth, 41 ms in retro (30 ms of noise, read over 11 ms).
-    function heardAgainst(index, chart, retro) {
+    // The sound a start played, as the stand-in kept it: its samples and
+    // rate, and the replay's place along the chart `t` seconds in.
+    function replaySound(index, chart) {
       var bytes = new DataView(harness.readBytes(harness.fakeState + "/pw-play." + harness.starts()[index - 1].n + ".wav"))
       var rate = bytes.getUint32(24, true)
       var samples = (bytes.byteLength - 44) / 2
       var s = new Float32Array(samples)
       for (var i = 0; i < samples; i++) s[i] = bytes.getInt16(44 + i * 2, true) / 32768
       var ease = function(u) { return -(Math.cos(Math.PI * u) - 1) / 2 }
-      var place = function(t) { return chart.from + (chart.to - chart.from) * ease(Math.min(1, t / 2)) }
-      var penta = [440, 493.88, 554.37, 659.25, 739.99, 880, 987.77, 1108.73, 1318.51, 1479.98, 1760]
-      var pts = chart.geometry.points, grid = chart.grid
-      // The drawn line at `x`: its height, or null across a break, where the
-      // chart draws none.
+      return { s: s, rate: rate, samples: samples,
+        place: function(t) { return chart.from + (chart.to - chart.from) * ease(Math.min(1, t / 2)) } }
+    }
+    readonly property var penta: [440, 493.88, 554.37, 659.25, 739.99, 880, 987.77, 1108.73, 1318.51, 1479.98, 1760]
+
+    // Smooth's replay, read against the chart it was made from: the scrub's
+    // bars, struck as the replay passes them.
+    // - strikes: where a bar's fundamental rises (its amplitude over 40 ms,
+    //   every 4 ms, up a twelfth of the loudest's against 40 ms before),
+    //   the bar that rose most; strikes 35 ms apart or less are one;
+    // - pitch: nine strikes in ten are a bar the line had in the 80 ms
+    //   before or the 20 ms after, as the strikes' 45 ms spacing and the
+    //   window allow; and every bar the line holds 100 ms or more is struck
+    //   from 150 ms before it, as it may still ring, to 70 ms after;
+    // - silence: no strike where the line had nothing in those 100 ms,
+    //   across a break, though a bar struck before it rings on into it.
+    function smoothStrikes(index, chart) {
+      var sound = replaySound(index, chart), s = sound.s, rate = sound.rate
+      var pts = chart.geometry.points
       var lineY = function(x) {
         if (x <= pts[0].x) return pts[0].y
         for (var k = 0; k < pts.length - 1; k++) {
           if (pts[k + 1].x < x) continue
-          if (pts[k + 1].brk && x > pts[k].x) return null
+          if (pts[k + 1].brk && x > pts[k].x && x < pts[k + 1].x) return null
           return pts[k].y + (pts[k + 1].y - pts[k].y) * (x - pts[k].x) / Math.max(1e-9, pts[k + 1].x - pts[k].x)
         }
         return pts[pts.length - 1].y
       }
-      var column = function(x) { return Math.max(0, Math.min(grid.columns - 1, Math.floor(x * grid.columns))) }
-      // What the chart puts at `t` seconds in: a pitch, or 0 where it draws
-      // nothing.
-      var expected = function(t) {
-        if (retro) {
-          var row = grid.levels[column(place(t))]
-          return row === undefined ? 0 : penta[Math.round((grid.rows - 1 - row) / Math.max(1, grid.rows - 1) * (penta.length - 1))]
+      var barAt = function(t) {
+        if (t > 2) return -2
+        var y = lineY(sound.place(t))
+        return y === null ? -1 : Math.round((1 - Math.max(0, Math.min(1, y))) * (penta.length - 1))
+      }
+      var span = 960, hop = 96, amp = penta.map(function() { return [] }), top = 0
+      var coef = penta.map(function(f) { return 2 * Math.cos(2 * Math.PI * f / rate) })
+      for (var at = 0; at + span < sound.samples; at += hop) {
+        for (var b = 0; b < penta.length; b++) {
+          var q1 = 0, q2 = 0
+          for (var k = 0; k < span; k++) {
+            var q0 = coef[b] * q1 - q2 + s[at + k] * (0.5 - 0.5 * Math.cos(2 * Math.PI * k / span))
+            q2 = q1; q1 = q0
+          }
+          var a = Math.sqrt(Math.max(0, q1 * q1 + q2 * q2 - coef[b] * q1 * q2))
+          amp[b].push(a)
+          if (a > top) top = a
         }
-        var y = lineY(place(t))
-        return y === null ? 0 : 329.63 * Math.pow(2, 1 - y)
+      }
+      var strikes = []
+      for (var w = 10; w < amp[0].length; w++) {
+        var best = -1, rise = 0
+        for (var c = 0; c < penta.length; c++) {
+          var r = (amp[c][w] - amp[c][w - 10]) / top
+          if (r > 0.08 && r > rise) { rise = r; best = c }
+        }
+        if (best < 0) continue
+        var t = (w * hop + span / 2) / rate, prev = strikes[strikes.length - 1]
+        if (prev && t - prev.t <= 0.035) {
+          if (rise > prev.rise) { prev.bar = best; prev.rise = rise }
+          continue
+        }
+        strikes.push({ t: t, bar: best, rise: rise })
+      }
+      var wrong = [], inBreak = []
+      strikes.forEach(function(st) {
+        var around = []
+        for (var u = st.t - 0.08; u <= st.t + 0.02; u += 0.002) around.push(barAt(u))
+        if (around.every(function(b) { return b === -1 })) inBreak.push(st.t.toFixed(3))
+        else if (around.indexOf(st.bar) < 0) wrong.push(st.t.toFixed(3) + "s bar " + st.bar)
+      })
+      var runs = [], run = null
+      for (var v = 0; v <= 2; v += 0.002) {
+        var held = barAt(v)
+        if (!run || run.bar !== held) { run = { bar: held, from: v, to: v }; runs.push(run) }
+        else run.to = v
+      }
+      var unheard = runs.filter(function(r) {
+        return r.bar >= 0 && r.to - r.from >= 0.1
+          && !strikes.some(function(st) { return st.bar === r.bar && st.t >= r.from - 0.15 && st.t <= r.to + 0.07 })
+      }).map(function(r) { return r.from.toFixed(3) + "s bar " + r.bar })
+      return {
+        pitch: { ok: strikes.length >= 5 && wrong.length <= strikes.length * 0.1 && unheard.length === 0,
+          detail: strikes.length + " strikes; wrong " + wrong.slice(0, 5).join(", ") + "; held bars unheard " + unheard.slice(0, 5).join(", ") },
+        silence: { ok: inBreak.length === 0, breakMs: runs.filter(function(r) { return r.bar === -1 }).reduce(function(sum, r) { return sum + (r.to - r.from) * 1000 }, 0),
+          detail: "struck in a break at " + inBreak.join(" ") }
+      }
+    }
+
+    // Retro's replay, read against the chart it was made from, by what the
+    // samples hold and what the chart draws:
+    // - pitch: every 25 ms where one note holds through the window, the
+    //   pitch read from the samples is the column's pentatonic note, within
+    //   a semitone, nine times in ten;
+    // - silence: over dark columns, nothing sounds;
+    // - ticks: each crossing of the baseline by the lit columns is heard
+    //   within 25 ms, and no tick is heard anywhere else. Crossings closer
+    //   than 41 ms (30 ms of noise, read over 11 ms) are one.
+    function retroHeard(index, chart) {
+      var sound = replaySound(index, chart), s = sound.s, rate = sound.rate, samples = sound.samples
+      var grid = chart.grid
+      var column = function(x) { return Math.max(0, Math.min(grid.columns - 1, Math.floor(x * grid.columns))) }
+      // The column's note at `t` seconds in, or 0 over a dark one.
+      var expected = function(t) {
+        var row = grid.levels[column(sound.place(t))]
+        return row === undefined ? 0 : penta[Math.round((grid.rows - 1 - row) / Math.max(1, grid.rows - 1) * (penta.length - 1))]
       }
       var span = Math.round(0.012 * rate)
       // The period, by autocorrelation over 12 ms: the shortest lag within
@@ -227,11 +295,9 @@ ShellRoot {
       var whole = rms(0, samples)
       var hits = 0, total = 0, misses = [], quiet = 0, still = 0, loud = []
       for (var t = 0.15; t < 1.9; t += 0.025) {
-        // Where the window and 10 ms either side hold one thing: one note,
-        // or for smooth, the line or no line.
+        // Where the window and 10 ms either side hold one note.
         var want = expected(t + span / rate / 2)
-        var same = function(other) { return retro ? other === want : (other === 0) === (want === 0) }
-        if (!same(expected(t - 0.01)) || !same(expected(t + span / rate + 0.01))) continue
+        if (expected(t - 0.01) !== want || expected(t + span / rate + 0.01) !== want) continue
         if (want === 0) {
           still++
           if (rms(Math.round(t * rate), span) < whole * 0.01) quiet++
@@ -243,95 +309,62 @@ ShellRoot {
         if (heard > 0 && Math.abs(12 * Math.log(heard / want) / Math.LN2) < 1) hits++
         else misses.push(t.toFixed(3) + "s " + Math.round(heard) + " for " + Math.round(want))
       }
-      // The crossings of the drawn line, from the chart: smooth's no closer
-      // than 80 ms, as its tick and the rule allow; retro's at each lit
-      // column on the other side from the lit one before it. Nothing
-      // crosses where nothing is drawn: a break, a dark column.
-      // `every` keeps each one, which a heard tick may be at; `crossings`
-      // only those after a gap as long as a tick, which must each be heard.
-      var crossings = [], every = [], last = 0, lastCol = -1, lastAt = -1
+      // The crossings, from the chart: at each lit column on the other side
+      // from the lit one before it; nothing crosses a dark column. `every`
+      // keeps each one, which a heard tick may be at; `crossings` only those
+      // after a gap as long as a tick, which must each be heard.
+      var crossings = [], every = [], last = 0, lastCol = -1
       for (var c = 0; c <= 2; c += 0.0005) {
-        var side = 0
-        if (retro) {
-          var col = column(place(c))
-          if (col === lastCol) continue
-          lastCol = col
-          if (grid.levels[col] === undefined) { last = 0; continue }
-          side = Math.sign(grid.baseRow - grid.levels[col])
-        } else {
-          var ly = lineY(place(c))
-          if (ly === null) { last = 0; continue }
-          side = Math.sign(chart.geometry.baselineY - ly)
-        }
-        if (side && last && side !== last && (retro || c - lastAt > 0.08)) {
+        var col = column(sound.place(c))
+        if (col === lastCol) continue
+        lastCol = col
+        if (grid.levels[col] === undefined) { last = 0; continue }
+        var side = Math.sign(grid.baseRow - grid.levels[col])
+        if (side && last && side !== last) {
           every.push(c)
-          if (!crossings.length || c - crossings[crossings.length - 1] > (retro ? 0.041 : 0.035)) crossings.push(c)
-          lastAt = c
+          if (!crossings.length || c - crossings[crossings.length - 1] > 0.041) crossings.push(c)
         }
         if (side) last = side
       }
-      // The ticks heard, every 4 ms. Smooth's where the band at 1760 Hz
-      // jumps past a fifth of the tone's own level there, which the tone's
-      // third harmonic (0.06 of it, at 587 Hz) never reaches and the tick
-      // (0.55) always does, and four times what it was. Retro's where noise
-      // fills the spectrum between the note's harmonics: over 256 samples
-      // (11 ms, Hann), the power between 1 and 6 kHz more than a bin and a
-      // half from every harmonic of the notes the chart puts in the window,
-      // where its band-limited pulse leaves nothing, against the replay's
-      // sounding level. A tick where that passes 0.004 for 12 ms, as 30 ms
-      // of noise does and a note's 1 ms onset doesn't, from under it 4 ms
-      // before: over a held note, a change of note, or silence alike.
+      // The ticks heard, every 4 ms, where noise fills the spectrum between
+      // the note's harmonics: over 256 samples (11 ms, Hann), the power
+      // between 1 and 6 kHz more than a bin and a half from every harmonic
+      // of the notes the chart puts in the window, where the band-limited
+      // pulse leaves nothing, against the replay's sounding level. A tick
+      // where that passes 0.004 for 12 ms, as 30 ms of noise does and a
+      // note's 1 ms onset doesn't, from under it 4 ms before: over a held
+      // note, a change of note, or silence alike.
       var win = Math.round(0.004 * rate), energy = [], levels = [], ticks = []
-      if (retro) {
-        var fft = 256, binHz = rate / fft, lowBin = Math.ceil(1000 / binHz), highBin = Math.floor(6000 / binHz)
-        var between = function(at) {
-          var notes = [expected(at / rate), expected((at + fft / 2) / rate), expected((at + fft) / rate)].filter(function(f0) { return f0 > 0 })
-          var power = 0
-          for (var b = lowBin; b <= highBin; b++) {
-            var hz = b * binHz
-            if (notes.some(function(f0) { return Math.abs(hz - Math.round(hz / f0) * f0) <= 1.5 * binHz })) continue
-            var re = 0, im = 0
-            for (var k = 0; k < fft; k++) {
-              var v = s[at + k] * (0.5 - 0.5 * Math.cos(2 * Math.PI * k / fft)), phase = 2 * Math.PI * ((b * k) % fft) / fft
-              re += v * Math.cos(phase)
-              im -= v * Math.sin(phase)
-            }
-            power += re * re + im * im
+      var fft = 256, binHz = rate / fft, lowBin = Math.ceil(1000 / binHz), highBin = Math.floor(6000 / binHz)
+      var between = function(at) {
+        var notes = [expected(at / rate), expected((at + fft / 2) / rate), expected((at + fft) / rate)].filter(function(f0) { return f0 > 0 })
+        var power = 0
+        for (var b = lowBin; b <= highBin; b++) {
+          var hz = b * binHz
+          if (notes.some(function(f0) { return Math.abs(hz - Math.round(hz / f0) * f0) <= 1.5 * binHz })) continue
+          var re = 0, im = 0
+          for (var k = 0; k < fft; k++) {
+            var v = s[at + k] * (0.5 - 0.5 * Math.cos(2 * Math.PI * k / fft)), phase = 2 * Math.PI * ((b * k) % fft) / fft
+            re += v * Math.cos(phase)
+            im -= v * Math.sin(phase)
           }
-          return power
+          power += re * re + im * im
         }
-        for (var at = 0; at + fft < samples; at += win) {
-          energy.push(between(at))
-          var e = rms(at, fft)
-          levels.push(e * e)
-        }
-        var sounding = levels.slice().sort(function(a, b) { return a - b })[Math.floor(levels.length * 0.75)] * fft * fft
-        var noisy = function(f) { return energy[f] / sounding > 0.004 }
-        // Before the file is silence, so a tick from its first sample is
-        // heard too.
-        for (var f = 0; f < energy.length - 2; f++) {
-          var heardAt = (f * win + fft / 2) / rate
-          if (noisy(f) && noisy(f + 1) && noisy(f + 2) && (f === 0 || !noisy(f - 1))
-            && (!ticks.length || heardAt - ticks[ticks.length - 1] > 0.035)) ticks.push(heardAt)
-        }
-      } else {
-        var goertzel = 2 * Math.cos(2 * Math.PI * 1760 / rate)
-        for (var st = 0; st + win < samples; st += win) {
-          var q1 = 0, q2 = 0
-          for (var m = st; m < st + win; m++) {
-            var q0 = goertzel * q1 - q2 + s[m]
-            q2 = q1; q1 = q0
-          }
-          energy.push(q1 * q1 + q2 * q2 - goertzel * q1 * q2)
-          levels.push(rms(st, win))
-        }
-        // The tone's amplitude: its louder windows' RMS over a sine-like
-        // wave's 0.72.
-        var tone = levels.slice().sort(function(a, b) { return a - b })[Math.floor(levels.length * 0.75)] / 0.72
-        var floor = Math.pow(win / 2 * 0.2 * tone, 2)
-        for (var w = 2; w < energy.length - 2; w++) {
-          if (energy[w] > floor && energy[w] > 4 * energy[w - 2] && (!ticks.length || w * win / rate - ticks[ticks.length - 1] > 0.035)) ticks.push(w * win / rate)
-        }
+        return power
+      }
+      for (var at = 0; at + fft < samples; at += win) {
+        energy.push(between(at))
+        var e = rms(at, fft)
+        levels.push(e * e)
+      }
+      var sounding = levels.slice().sort(function(a, b) { return a - b })[Math.floor(levels.length * 0.75)] * fft * fft
+      var noisy = function(f) { return energy[f] / sounding > 0.004 }
+      // Before the file is silence, so a tick from its first sample is
+      // heard too.
+      for (var f = 0; f < energy.length - 2; f++) {
+        var heardAt = (f * win + fft / 2) / rate
+        if (noisy(f) && noisy(f + 1) && noisy(f + 2) && (f === 0 || !noisy(f - 1))
+          && (!ticks.length || heardAt - ticks[ticks.length - 1] > 0.035)) ticks.push(heardAt)
       }
       var near = function(list, t) { return list.some(function(u) { return Math.abs(u - t) < 0.025 }) }
       var unheard = crossings.filter(function(t) { return !near(ticks, t) })
@@ -420,16 +453,17 @@ ShellRoot {
       watch.done()
       tryVerify(function() { return !body.motion.replayRunning }, 4000)
       tryVerify(function() { return endOf(4) !== "" }, 3000)
-      var smoothHeard = heardAgainst(4, watch.seen.chart, false)
+      var smoothHeard = smoothStrikes(4, watch.seen.chart)
       harness.check("p plays the replay's sound, written whole before it plays, and a replay left to run plays to its end",
         replayed[3].file === sounds.replayPath && endOf(4) === "ended", replayed[3].file + "|" + endOf(4))
-      harness.check("smooth's replay is the chart's line: its pitch follows the line's height as the replay moves along it, a tick at each crossing of the close",
-        smoothHeard.pitch.ok && smoothHeard.ticks.ok && smoothHeard.ticks.count > 0, smoothHeard.pitch.detail + " | " + smoothHeard.ticks.detail)
+      harness.check("smooth's replay strikes the scrub's chimes: the bar under the line as the replay moves along it",
+        smoothHeard.pitch.ok, smoothHeard.pitch.detail)
 
       // Tokyo's day of 19 October, whose line stops for lunch below the
-      // close and starts again above it, in both looks: the replay is silent
-      // across the break, where smooth draws no line and retro dark columns,
-      // and ticks only where what is drawn crosses, not at lunch's end.
+      // close and starts again above it, in both looks: smooth strikes no bar
+      // across the break, where it draws no line; retro is silent over its
+      // dark columns, and ticks only where what is drawn crosses, not at
+      // lunch's end.
       harness.writeText(harness.fakeState + "/overnight.set", "demo-2026-10-19-1146\n")
       service.addSymbol("7203.T")
       quiet()
@@ -445,12 +479,17 @@ ShellRoot {
         startsBy(at + 1)
         tokyo.done()
         tryVerify(function() { return endOf(at + 1) !== "" }, 4000)
-        var heard = heardAgainst(at + 1, tokyo.seen.chart, retro)
+        if (!retro) {
+          var struck = smoothStrikes(at + 1, tokyo.seen.chart)
+          return { ok: struck.pitch.ok && struck.silence.ok && struck.silence.breakMs > 100,
+            detail: "smooth: " + struck.pitch.detail + " | " + struck.silence.detail }
+        }
+        var heard = retroHeard(at + 1, tokyo.seen.chart)
         return { ok: heard.pitch.ok && heard.silence.ok && /^[1-9]/.test(heard.silence.detail) && heard.ticks.ok,
-          detail: (retro ? "retro: " : "smooth: ") + heard.pitch.detail + " | " + heard.silence.detail + " | " + heard.ticks.detail }
+          detail: "retro: " + heard.pitch.detail + " | " + heard.silence.detail + " | " + heard.ticks.detail }
       })
       service.persist({ style: "smooth" })
-      harness.check("a replay of Tokyo's day is silent across lunch, where the chart draws nothing, and ticks only where what is drawn crosses, smooth and retro",
+      harness.check("a replay of Tokyo's day sounds nothing new across lunch, where the chart draws nothing, and retro ticks only where what is drawn crosses",
         lunch[0].ok && lunch[1].ok, lunch[0].detail + " || " + lunch[1].detail)
       // The chimes over Tokyo's lunch, in both looks: the scrub moved into
       // the break, where the chart draws nothing, strikes nothing; moved on
@@ -727,10 +766,10 @@ ShellRoot {
       startsBy(before + 1)
       watch.done()
       tryVerify(function() { return endOf(before + 1) !== "" }, 4000)
-      var retroHeard = heardAgainst(before + 1, watch.seen.chart, true)
+      var retroReplay = retroHeard(before + 1, watch.seen.chart)
       harness.check("retro's replay is the chart's columns: a note per lit column, its pitch the column's height, silent over dark ones, a tick at each crossing",
-        retroHeard.pitch.ok && retroHeard.silence.ok && retroHeard.ticks.ok,
-        retroHeard.pitch.detail + " | " + retroHeard.silence.detail + " | " + retroHeard.ticks.detail)
+        retroReplay.pitch.ok && retroReplay.silence.ok && retroReplay.ticks.ok,
+        retroReplay.pitch.detail + " | " + retroReplay.silence.detail + " | " + retroReplay.ticks.detail)
 
       // Two surfaces, one player: the popup's replay, cut by the window's,
       // whose sound then plays to its end through the popup's close, which

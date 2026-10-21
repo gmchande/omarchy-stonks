@@ -1,20 +1,18 @@
 .pragma library
 .import "Chart.js" as Chart
 
-// The chart heard, in each look's voice: the replay, and the chimes.
-// The replay is the chart's line as sound, made from the chart on screen
-// as a replay starts. Its time is the replay's own: its place along the
-// chart goes from `from` to `to` (0..1, the chart's x) over `seconds`, on
-// Qt's InOutSine, as ChartMotion's replay scrubs. Pitch is the line's height
-// on the chart, from its floor to its ceiling, so it reads the day the way
-// the chart does, and where the line crosses its baseline, yesterday's close
-// or the range's start, there is a tick. Smooth glides one octave on a sine
-// with a little breath, and ticks on wood; retro steps one note per pixel
-// column, on a two-octave pentatonic, so no note is sad and a down day
-// sounds as kind as an up one, and ticks in noise.
+// The chart heard, in each look's voice: the chimes, and the replay.
 // The chimes are the chart as a row of bars you run a hand along: the
 // pentatonic's eleven notes, low at the chart's floor and high at its
-// ceiling, a bar each (`barAt`, `chime`).
+// ceiling, a bar each (`barAt`, `chime`), so no note is sad and a down day
+// sounds as kind as an up one.
+// The replay is made from the chart on screen as a replay starts. Its time
+// is the replay's own: its place along the chart goes from `from` to `to`
+// (0..1, the chart's x) over `seconds`, on Qt's InOutSine, as ChartMotion's
+// replay scrubs. Smooth strikes the scrub's chimes as the place moves onto
+// each bar; retro steps one note per pixel column, on the same bars, and
+// where the line crosses its baseline, yesterday's close or the range's
+// start, ticks in noise.
 // Each sound is levelled by its loudest 50 ms, under the fixed sounds.
 // Ported from the sound study's make.js, which measured them. The shell's
 // engine interprets a loop that runs once, so the work per sample is a
@@ -87,73 +85,50 @@ function levelled(x, db) {
   return { samples: x, gain: best > 0 ? Math.pow(10, db / 20) / Math.sqrt(best / win) : 0 }
 }
 
-// Smooth: `geometry` is the chart's, its points' x and y in 0..1 (y down)
-// and its baseline's y. The line's height at each moment, interpolated
-// between the points the replay passes, is the pitch: E4 at the floor, E5 at
-// the ceiling, glided over 22 ms, on a sine with its second and third
-// harmonics and a breath of low noise. Where the chart draws no line, across
-// a break in the exchange's day (`brk`: Tokyo's lunch), it is silent,
-// fading out and in over 5 ms, and the line's next print starts its pitch
-// afresh. Where the drawn line crosses the baseline, the add sound's wooden
-// bar an octave and a fifth up, 40 ms; a line that ends on one side and
-// starts again on the other after a break crosses nothing.
+// Smooth: the scrub's chimes, struck as the replay's place moves onto each
+// bar of the line (`barAt` on `geometry`, the chart's), as a pointer swept
+// along it strikes them: at most one every 45 ms, a bar struck sooner
+// waiting out the gap with the latest waiting winning, none where the chart
+// draws no line (a break: Tokyo's lunch), and each ringing out its half
+// second over what follows. No tick where the line crosses its baseline:
+// it was a short tone at A6, the top bar's own pitch, and among the bars it
+// read as one more. Each bar sits as a chime does, so a replay sounds as a
+// sweep does.
 function smooth(geometry, from, to, seconds) {
-  var pts = geometry.points
-  var n = pts.length
-  var x = new Float32Array(Math.round((seconds + 0.15) * RATE))
-  var wave = cycle(function(p) { return Math.sin(2 * Math.PI * p) + 0.18 * Math.sin(4 * Math.PI * p) + 0.06 * Math.sin(6 * Math.PI * p) })
-  var glideK = 1 - Math.exp(-STEP / (0.022 * RATE))
-  var gateStep = STEP / (0.005 * RATE)
-  // The breath: seeded noise through a one-pole low-pass at 1.4 kHz.
-  var breathK = 1 - Math.exp(-2 * Math.PI * 1400 / RATE), seed = 9, breath = 0
-  var ph = 0, glide = -1, k = 0, lastSide = 0, lastTick = -1, gate = 1, level = 0, wasBreak = false
-  var ticks = []
-  for (var i = 0; i < x.length; i += STEP) {
-    var t = i / RATE
-    var at = placeAt(t, from, to, seconds)
-    // The place only moves on, so the segment it is on only moves on.
-    while (k < n - 1 && pts[k + 1].x <= at) k++
-    var inBreak = k < n - 1 && !!pts[k + 1].brk && at > pts[k].x
-    var y = inBreak || n === 1 || at <= pts[0].x ? pts[k].y : k >= n - 1 ? pts[n - 1].y
-      : pts[k].y + (pts[k + 1].y - pts[k].y) * (at - pts[k].x) / Math.max(1e-9, pts[k + 1].x - pts[k].x)
-    var target = 329.63 * Math.pow(2, 1 - y)
-    glide = glide < 0 || (wasBreak && !inBreak) ? target : glide + (target - glide) * glideK
-    wasBreak = inBreak
-    gate = inBreak ? Math.max(0, gate - gateStep) : Math.min(1, gate + gateStep)
-    var fin = Math.min(1, t / 0.08)
-    var fout = Math.max(0, Math.min(1, (seconds + 0.05 - t) / 0.2))
-    var envelope = gate * (0.5 - 0.5 * Math.cos(Math.PI * fin)) * (0.5 - 0.5 * Math.cos(Math.PI * fout))
-    // The envelope moves across the millisecond, not at its start.
-    var rise = (envelope - level) / STEP
-    var step = glide / RATE * TABLE
-    var end = Math.min(x.length, i + STEP)
-    for (var j = i; j < end; j++) {
-      level += rise
-      ph += step
-      if (ph >= TABLE) ph -= TABLE
-      var a = ph | 0
-      seed = (seed * 1664525 + 1013904223) >>> 0
-      breath += (seed / 2147483648 - 1 - breath) * breathK
-      x[j] = level * (wave[a] + (wave[a + 1] - wave[a]) * (ph - a) + 0.05 * breath)
-    }
-    if (inBreak) {
-      lastSide = 0
-      continue
-    }
-    var side = Math.sign(geometry.baselineY - y)
-    if (side && lastSide && side !== lastSide && t - lastTick > 0.08) {
-      ticks.push(i)
-      lastTick = t
-    }
-    if (side) lastSide = side
+  var chart = { retro: false, geometry: geometry }
+  var x = new Float32Array(Math.round((seconds + 0.6) * RATE))
+  var gap = Math.round(0.045 * RATE), end = Math.round(seconds * RATE)
+  var heard = -1, last = -gap, waiting = -1
+  var strike = function(bar, at) {
+    var note = smoothBarSamples(bar)
+    for (var j = 0; j < note.length && at + j < x.length; j++) x[at + j] += note[j]
+    last = at
+    waiting = -1
   }
-  for (var m = 0; m < ticks.length; m++) {
-    for (var d = 0; d < 0.04 * RATE && ticks[m] + d < x.length; d++) {
-      var tt = d / RATE
-      x[ticks[m] + d] += 0.55 * Math.exp(-tt / 0.012) * Math.sin(2 * Math.PI * 1760 * tt) * Math.min(1, tt / 0.0015)
-    }
+  for (var i = 0; i < end; i += STEP) {
+    if (waiting >= 0 && i >= last + gap) strike(waiting, last + gap)
+    var bar = barAt(chart, placeAt(i / RATE, from, to, seconds))
+    if (bar === heard) continue
+    heard = bar
+    if (bar < 0) continue
+    if (i >= last + gap) strike(bar, i)
+    else waiting = bar
   }
-  return levelled(fadeEdges(x, 1, 4), -21)
+  if (waiting >= 0) strike(waiting, last + gap)
+  return { samples: x, gain: 1 }
+}
+
+// Smooth's bar `bar` as a chime plays it, levelled, made once and kept: a
+// replay strikes dozens.
+var smoothBars = []
+function smoothBarSamples(bar) {
+  if (!smoothBars[bar]) {
+    var sound = chime(false, bar)
+    var note = new Float32Array(sound.samples.length)
+    for (var i = 0; i < note.length; i++) note[i] = sound.samples[i] * sound.gain
+    smoothBars[bar] = note
+  }
+  return smoothBars[bar]
 }
 
 // A, B, C♯, E, F♯ over two octaves, from A4.
