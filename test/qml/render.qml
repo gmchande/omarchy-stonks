@@ -1273,6 +1273,8 @@ ShellRoot {
   TestCase {
     name: "ReviewPictures"
     when: root.interactivePicture && renderWindow.visible
+    // Failed QtTest assertions still leave through the quiescent exit.
+    function cleanupTestCase() { exitTimer.start() }
 
     function findAll(item, name) {
       var out = []

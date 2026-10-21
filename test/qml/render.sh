@@ -261,9 +261,9 @@ for state in $states; do
   # A state whose QML threw still writes a picture; the log is what tells,
   # and so is a Qt warning from the plugin's files (lib.sh).
   warnings=$(stonks_warnings "$work/$state.log")
-  if [[ $code -ne 0 || ! -s $shot || -n $warnings ]] || rg -q 'TypeError|ReferenceError|\bError:' "$work/$state.log"; then
+  if [[ $code -ne 0 || ! -s $shot || -n $warnings ]] || rg -q 'FAIL[ !]|TypeError|ReferenceError|\bError:' "$work/$state.log"; then
     echo "FAIL $state (exit $code)"
-    rg 'ERROR|error:|TypeError|ReferenceError|\bError:' "$work/$state.log" | head -30 || true
+    rg 'FAIL[ !]|ERROR|error:|TypeError|ReferenceError|\bError:' "$work/$state.log" | head -30 || true
     [[ -n $warnings ]] && echo "Qt warnings from the plugin's files:" && head -30 <<< "$warnings"
     tail -20 "$work/$state.log"
     exit 1
