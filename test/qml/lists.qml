@@ -969,6 +969,31 @@ ShellRoot {
       mouseClick(body2, upAt.x, upAt.y)
       wait(100)
       harness.check("↑ on a hovered row moves that list up", harness.same(names(), ["Wins", "GROWTH"]), names())
+      // An arrow with nowhere to move its list offers nothing under the
+      // pointer, no hover fill and the arrow cursor, and a click on it moves
+      // nothing; one that can move keeps both. Found in the 1.0.0 review
+      // (O31 of the 1.0.2 leftovers): the unavailable arrows only faded,
+      // still hovering under the hand.
+      var winsFirst = harness.findAll(body2, "manageRow")[1]
+      var pointedAt = function(action) {
+        var at = center(action)
+        mouseMove(body2, at.x, at.y)
+        wait(50)
+        var area = action.children.filter(function(c) { return c.cursorShape !== undefined })[0]
+        var filled = !Qt.colorEqual(harness.find(action, "actionFill").color, "transparent")
+        return (filled ? "fill" : "none") + "+" + (area.cursorShape === Qt.PointingHandCursor ? "hand"
+          : area.cursorShape === Qt.ArrowCursor ? "arrow" : String(area.cursorShape))
+      }
+      var deadUp = harness.find(winsFirst, "moveUp")
+      var deadLooks = pointedAt(deadUp)
+      var deadAt = center(deadUp)
+      mouseClick(body2, deadAt.x, deadAt.y)
+      wait(100)
+      var afterDead = names()
+      var liveLooks = pointedAt(harness.find(winsFirst, "moveDown"))
+      harness.check("an arrow with nowhere to move shows no hover and the arrow cursor, and moves nothing; one that can move hovers under the hand",
+        deadLooks === "none+arrow" && harness.same(afterDead, ["Wins", "GROWTH"]) && liveLooks === "fill+hand",
+        [deadLooks, afterDead, liveLooks].join(" | "))
       var growthRow = harness.findAll(body2, "manageRow")[2]
       var growthAt = center(growthRow)
       mouseMove(body2, growthAt.x, growthAt.y)
