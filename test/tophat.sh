@@ -393,7 +393,7 @@ take_laptop() {
   echo "noted: the laptop shows workspace $1, the pointer is at $pointer"
   { laptop_shows 10 || host_dispatch 'hl.dsp.focus({ workspace = "10" })'; } && within 5 laptop_shows 10 \
     || { echo "tophat: the laptop does not show workspace 10" >&2; return 1; }
-  hyprctl output create headless "$virtual" > /dev/null 2>&1
+  echo "output create: $(hyprctl output create headless "$virtual" 2>&1)" >> "$run/outputs.log"
   within 5 screen_on "$virtual" || { echo "tophat: the virtual screen $virtual did not appear" >&2; return 1; }
   host_dispatch "hl.dsp.focus({ monitor = \"$virtual\" })" && within 5 focused_on "$virtual" \
     || { echo "tophat: the focus did not move to $virtual" >&2; return 1; }
@@ -408,7 +408,7 @@ restore_screens() {
   local LAPTOP_WS POINTER ok=0
   source "$run/screens"
   if screen_on "$virtual"; then
-    hyprctl output remove "$virtual" > /dev/null 2>&1
+    echo "output remove: $(hyprctl output remove "$virtual" 2>&1)" >> "$run/outputs.log"
     within 5 screen_gone "$virtual" || { echo "FAILED the virtual screen $virtual is still there" >&2; ok=1; }
   fi
   if ! laptop_shows "$LAPTOP_WS"; then
