@@ -1,4 +1,5 @@
 .pragma library
+.import "Format.js" as Format
 .import "Quote.js" as Quote
 
 // Yahoo's symbol lookup: its URL and its answer. Knows nothing else.
@@ -9,15 +10,21 @@ function searchUrl(query) {
   return SEARCH_URL + "?q=" + encodeURIComponent(query) + "&quotesCount=8&newsCount=0"
 }
 
+// Yahoo sends at most the 8 quotes `searchUrl` asks for, 7 in the saved
+// answers; an answer with more than this is a bad one (`Format.fetchedList`).
+var MOST_QUOTES = 40
+
 // Yahoo's answer as search shows it: the results Stonks can follow, and a
-// note naming what else the answer held, or "" when it held nothing else.
+// note naming what else the answer held, or "" when it held nothing else;
+// null when its quotes are not a list within MOST_QUOTES.
 // Stonks follows stocks, ETFs, indexes, and cryptocurrencies; Yahoo also
 // finds mutual funds, currencies, futures, and more, and a search that
 // hid them without a word read "No matches" for a fund Yahoo has.
 var FOLLOWED = ["EQUITY", "ETF", "INDEX", "CRYPTOCURRENCY"]
 
 function parseSearch(json) {
-  var quotes = (json && json.quotes) || []
+  var quotes = Format.fetchedList((json && json.quotes) || [], MOST_QUOTES)
+  if (!quotes) return null
   var results = []
   var left = []
   for (var i = 0; i < quotes.length; i++) {
@@ -63,9 +70,16 @@ function leftOutNote(left) {
 // German listing's pads a share-class letter onto the end ("…UCITS ETF    R",
 // R for registered shares). The long name is the whole name, so the row's
 // own ellipsis is the only cut; the short name, without that letter, is the
-// fallback.
+// fallback. The letter is read from the end, a character at a time: a regex
+// for "two spaces, a capital, the end" retries from every space, and a
+// fetched name of 63,000 spaces held the shell's thread for over two
+// seconds. (Qt's JavaScript has no trimEnd.)
 function searchName(q) {
   if (q.longname) return q.longname
-  if (q.shortname) return String(q.shortname).replace(/\s{2,}[A-Z]$/, "").trim()
-  return q.symbol
+  if (!q.shortname) return q.symbol
+  var name = String(q.shortname)
+  var spaces = 0
+  while (spaces < name.length - 1 && /\s/.test(name.charAt(name.length - 2 - spaces))) spaces++
+  var lettered = spaces >= 2 && /[A-Z]/.test(name.charAt(name.length - 1))
+  return (lettered ? name.slice(0, -1) : name).trim()
 }

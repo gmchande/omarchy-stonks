@@ -105,10 +105,11 @@ Item {
     g.baseRow = Math.round(geometry.baselineY * (g.rows - 1))
     var pts = geometry.points
     // The cap sits on the last column whose own last print is regular,
-    // never on one held after it.
+    // never on one held after it. A column stays on the grid at both ends,
+    // so the fill between two prints never runs past it.
     var last = -1
     for (var i = 0; i < pts.length; i++) {
-      var col = Math.min(g.columns - 1, Math.floor(pts[i].x * g.columns))
+      var col = Math.max(0, Math.min(g.columns - 1, Math.floor(pts[i].x * g.columns)))
       if (col !== last && last >= 0 && !g.ext[last]) g.lastRegular = last
       for (var held = last + 1; i > 0 && !pts[i].brk && held < col; held++) {
         g.levels[held] = g.levels[last]

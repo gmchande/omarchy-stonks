@@ -7,6 +7,20 @@ function isFiniteNumber(v) {
   return typeof v === "number" && isFinite(v)
 }
 
+// A list from a fetched answer: `value` when it is an array of at most
+// `most` entries, else null. A loop over a fetched list reads only one this
+// returned: an object posing as a list, `{"length": 1e300}`, would hold the
+// shell's one thread for good.
+function fetchedList(value, most) {
+  return Array.isArray(value) && value.length <= most ? value : null
+}
+
+// Whether `t`, in epoch seconds, is a moment a Date can hold (±8.64e12 s),
+// so no reading of it throws: a fetched 1e300 would.
+function isMoment(t) {
+  return isFiniteNumber(t) && Math.abs(t) <= 8.64e12
+}
+
 var MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
 
 function localClock(t, gmtoffset) {
