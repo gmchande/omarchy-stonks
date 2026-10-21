@@ -633,7 +633,7 @@ ShellRoot {
       var sixth = watchlist.displayedSymbols[5]
       keys.forceActiveFocus()
       keyClick(Qt.Key_6)
-      tryVerify(function() { return sight(sixth) }, 2000)
+      within(2000, function() { return sight(sixth) })
       var numbered = [service.featuredSymbol === sixth, sight(sixth)].join(",")
       var numberRemoves = removesInSight()
       harness.check("a number key reaches its row with the cursor, and x takes it",
