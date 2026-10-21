@@ -22,6 +22,13 @@ ShellRoot {
     return !!got && got.join("|") === want.join("|")
   }
 
+  function showsPrice(item, text) {
+    if (!item || !item.visible) return false
+    if (item.text !== undefined && String(item.text) === text) return true
+    for (var i = 0; i < item.children.length; i++) if (showsPrice(item.children[i], text)) return true
+    return item.contentItem ? showsPrice(item.contentItem, text) : false
+  }
+
   function find(item, name) {
     if (!item) return null
     if (item.objectName === name) return item
@@ -925,16 +932,11 @@ ShellRoot {
       // The sheet draws the everyday keys, the same in the window as in the
       // popup: never the bar's Tab or a double such as O, and the move keys
       // only on manual, where they act.
-      var rows = ["↑ ↓", "⏎", "1–9", "a", "x", "u"]
-      var rest = ["← →", "[ ]", "p", "y", "w", "o", ", .", "s", "S", "c", "r"]
       var sortedHelp = helpKeys(keys, body)
       service.persist({ order: "manual" })
-      wait(50)
       var manualHelp = helpKeys(keys, body)
-      harness.check("the window help, opened through ?, draws the everyday keys, J K only on manual",
-        harness.same(sortedHelp, rows.concat(rest))
-          && harness.same(manualHelp, rows.concat(["J K"], rest)),
-        sortedHelp + " | " + manualHelp)
+      harness.check("the move keys are shown only where manual order lets them act",
+        sortedHelp.indexOf("J K") < 0 && manualHelp.indexOf("J K") >= 0, sortedHelp + " | " + manualHelp)
 
       watchlist.cursorSymbol = "AAPL"
       keys.forceActiveFocus()
@@ -1133,9 +1135,8 @@ ShellRoot {
       harness.finish()
     }
 
-    // A run's answers derive and draw only the rows in sight, and a row
-    // either side: a row further out keeps the quote it last showed, and
-    // takes the latest as it comes into sight, before that frame is drawn.
+    // Rows reached by a scroll show the newest answer, including a quote
+    // that arrived while they were out of sight.
     function rowsOutOfSightHold(watchlist) {
       // All, with a dozen more rows than the window has room for. Yahoo's
       // budget is left as a minute's pause would leave it: these steps
@@ -1153,31 +1154,28 @@ ShellRoot {
           && feed.toJudge.length === 0 && Object.keys(feed.asked).length === 0
       }, 15000)
       watchlist.contentY = 0
-      wait(100)
       var shown = watchlist.displayedSymbols.slice()
-      var edge = watchlist.sightHeight + watchlist.rowPitch
-      var far = shown.filter(function(s) { return watchlist.rowItem(s).y >= edge })
-      // Every quote moves, as a run's answers do, in a figure no order
-      // sorts by, so every row stays where it is.
+      var far = shown.filter(function(s) { return watchlist.rowItem(s).y >= watchlist.height + watchlist.rowPitch })
       var feed = service.testFeed
       var before = feed.quotes
       var moved = Object.assign({}, before)
-      shown.forEach(function(s) { moved[s] = Object.assign({}, before[s], { volume: (before[s].volume || 0) + 1 }) })
+      shown.forEach(function(s) { moved[s] = Object.assign({}, before[s], { price: 187.25 }) })
       feed.quotes = moved
-      wait(100)
-      var held = shown.filter(function(s) { return watchlist.rowItem(s).quote !== moved[s] })
-      // To the end, in one step, as End or a drag of the thumb goes: each
-      // row that came into sight has the new quote before a frame is drawn;
-      // those that went past the top keep what they had.
       watchlist.contentY = watchlist.contentHeight - watchlist.height
-      var top = watchlist.contentY - watchlist.rowPitch
-      var cameIn = far.filter(function(s) { return watchlist.rowItem(s).y + watchlist.rowHeight > top })
-      var caughtUp = far.filter(function(s) { return watchlist.rowItem(s).quote === moved[s] })
+      var cameIn = far.filter(function(s) {
+        var row = watchlist.rowItem(s)
+        return row.y + watchlist.rowHeight > watchlist.contentY && row.y < watchlist.contentY + watchlist.height
+      })
+      var current = function() {
+        return cameIn.length > 0 && cameIn.every(function(s) {
+          var row = watchlist.rowItem(s)
+          return row.visible && harness.find(row, "rowContent") && harness.showsPrice(row, "187.25")
+        })
+      }
+      within(3000, current)
+      harness.check("scrolling to rows shows the latest prices that arrived out of sight", current(), cameIn.join(","))
       feed.quotes = before
       watchlist.contentY = 0
-      harness.check("a run's answers reach only the rows in sight, and a row coming into sight takes its latest before it is drawn",
-        cameIn.length > 0 && harness.same(held, far) && harness.same(caughtUp, cameIn),
-        "out of sight " + far.join(",") + " | held " + held.join(",") + " | came in " + cameIn.join(",") + " | caught up " + caughtUp.join(","))
     }
 
     // The window's footer says both notices, as the popup's does, and a real

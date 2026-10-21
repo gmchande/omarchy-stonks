@@ -145,6 +145,11 @@ stonks_warnings() {
 # harness's finish line: a step that throws ends a Quickshell harness
 # without a FAIL line.
 finish() {
+  if [[ -s "$STONKS_FAKE_STATE/unexpected.requests" ]]; then
+    echo "FAIL unexpected HTTP request"
+    cat "$STONKS_FAKE_STATE/unexpected.requests"
+    code=1
+  fi
   rg -N 'PASS |FAIL[ !]|ALL PASS|[0-9]+ FAILED|ERROR|TypeError|ReferenceError|\bError:' "$work/log" \
     | sed -E 's/^ *[A-Z]+ qml: //' || true
   if rg -q '(^\s*|qml: )FAIL[ !]' "$work/log"; then code=1; fi

@@ -52,10 +52,12 @@ ShellRoot {
     id: screens
     property bool screensOff: false
     signal screensAnswered()
-    function askScreens() { return false }
+    function askScreens() { screenAnswer.restart(); return true }
   }
 
   Process { id: fileProc }
+
+  Timer { id: screenAnswer; interval: 0; onTriggered: screens.screensAnswered() }
 
   TestCase {
     name: "Ahead"
@@ -222,8 +224,8 @@ ShellRoot {
       var lit = within(3000, function() { return harness.histories(from).length > 1 })
       quiet()
       service.screens = null
-      harness.check("while every screen is off only the hero's chart goes; the rows' go once one is on",
-        dark === "BTC-USD" && lit, dark + " | then " + harness.histories(from).join(","))
+      harness.check("while every screen is off no history goes; the requested hero goes first once one is on",
+        dark === "" && lit && harness.histories(from)[0] === "BTC-USD", dark + " | then " + harness.histories(from).join(","))
 
       // A chart fetched ahead and shown through search's preview is a
       // hero's: the next range keeps it. Found in the review of this

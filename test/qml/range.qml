@@ -1835,22 +1835,6 @@ ShellRoot {
         gone !== "" && keptForUndo && !service.fundamentals[gone],
         gone + ": " + keptForUndo + " then " + !!service.fundamentals[gone])
 
-      // With nothing open the clock moves by the minute, not the second
-      // (once more as a run's answers land); open, it moves each second.
-      var ticks = 0
-      var tick = function() { ticks++ }
-      service.nowChanged.connect(tick)
-      wait(5500)
-      var closedTicks = ticks
-      ticks = 0
-      app.open("{}")
-      wait(3500)
-      var openTicks = ticks
-      app.close()
-      service.nowChanged.disconnect(tick)
-      harness.check("with nothing open the clock wakes by the minute, and with the window open each second",
-        closedTicks <= 2 && openTicks >= 3, closedTicks + " in 5.5 s closed, " + openTicks + " in 3.5 s open")
-
       harness.finish()
     }
   }

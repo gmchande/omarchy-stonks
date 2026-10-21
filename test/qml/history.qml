@@ -11,10 +11,11 @@ ShellRoot {
   property int step: 0
   property var onceHistory: null
   property int onceReceipt: 0
-  // When the chart that superseded SLOW was asked for, and when it landed.
-  property double latestAskedAt: 0
-  property double latestLandedAt: 0
   property int failCalls: 0
+
+  function historyData(h) {
+    return h ? JSON.stringify([h.symbol, h.range, h.baseline, h.bars.map(function(b) { return [b.t, b.o, b.h, b.l, b.c] })]) : ""
+  }
 
   function check(name, ok, detail) {
     console.log((ok ? "PASS " : "FAIL ") + name + (detail !== undefined ? " — " + detail : ""))
@@ -50,13 +51,17 @@ ShellRoot {
 
   HistoryFeed { id: feed }
 
-  Connections {
-    target: feed
-    function onEntriesChanged() {
-      var latest = harness.entry("MSFT", "2Y")
-      if (harness.latestAskedAt && !harness.latestLandedAt && latest && latest.status === "ok")
-        harness.latestLandedAt = Date.now()
-    }
+  FileView {
+    id: holdSlow
+    path: Quickshell.env("STONKS_FAKE_STATE") + "/SLOW.history.hold"
+    blockWrites: true
+  }
+  function record(name) {
+    var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true; printErrors: false }', harness)
+    view.path = Quickshell.env("STONKS_FAKE_STATE") + "/" + name
+    var text = String(view.text() || "")
+    view.destroy()
+    return text
   }
 
   Component.onCompleted: {
@@ -88,23 +93,22 @@ ShellRoot {
       check("latest symbol and range win", latest && latest.status === "ok" && latest.history.range === "2Y")
       check("slow request ran once", calls("SLOW") === 1, String(calls("SLOW")))
       check("latest request ran once", calls("MSFT") === 1, String(calls("MSFT")))
-      // SLOW answers after a second. Waited out, it held the new chart back
-      // until then; stopped, the new chart goes at once.
-      check("a stale download is stopped, not waited out",
-        latestLandedAt - latestAskedAt < 600, (latestLandedAt - latestAskedAt) + " ms")
+      check("a held stale download is cancelled before the replacement answers",
+        record("cancelled.log").indexOf("history SLOW cancelled") >= 0 && calls("SLOW.history") === 1,
+        record("cancelled.log"))
       feed.request("ONCE", "1Y")
       waitFor(3)
     } else if (step === 3) {
       var once = entry("ONCE", "1Y")
       check("last-good fixture loaded", once && once.status === "ok")
-      harness.onceHistory = once ? once.history : null
+      harness.onceHistory = once ? historyData(once.history) : null
       harness.onceReceipt = once ? once.receivedAt : 0
       feed.request("ONCE", "1Y", true)
       waitFor(4)
     } else if (step === 4) {
       var failedRefresh = entry("ONCE", "1Y")
       check("failed refresh is visible", failedRefresh && failedRefresh.status === "failed")
-      check("failed refresh keeps history", failedRefresh && failedRefresh.history === onceHistory)
+      check("failed refresh keeps history", failedRefresh && historyData(failedRefresh.history) === onceHistory)
       check("failed refresh keeps receipt", failedRefresh && failedRefresh.receivedAt === onceReceipt)
       check("one retry only", calls("ONCE") === 3, String(calls("ONCE")))
       feed.request("FAIL", "1Y")
@@ -151,6 +155,7 @@ ShellRoot {
     interval: 200
     onTriggered: {
       check("fresh cache returns without curl", !feed.busy && calls("AAPL") === 1, String(calls("AAPL")))
+      holdSlow.setText("held")
       feed.request("SLOW", "1Y")
       switchAway.start()
     }
@@ -159,12 +164,26 @@ ShellRoot {
   // A range stepped past and the next, both while SLOW is out.
   Timer {
     id: switchAway
-    interval: 100
+    interval: 20
+    repeat: true
     onTriggered: {
+      if (calls("SLOW.history") === 0) return
+      switchAway.stop()
       feed.request("AAPL", "1M")
-      harness.latestAskedAt = Date.now()
       feed.request("MSFT", "2Y")
       waitFor(2)
+      supersessionDeadline.start()
+    }
+  }
+
+  // A held answer never finishes by itself. If cancellation is broken,
+  // report that contract here instead of timing out the whole harness.
+  Timer {
+    id: supersessionDeadline
+    interval: 4000
+    onTriggered: if (harness.step === 2 && feed.busy) {
+      harness.check("a held stale download is cancelled before the replacement answers", false, "replacement still blocked by the held answer")
+      harness.finish()
     }
   }
 

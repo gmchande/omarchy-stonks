@@ -286,7 +286,8 @@ Item {
       var entry = feed.entries[s]
       if (!entry || entry.status === "saved" || s in feed.asked) return
       var hero = open && (s === featured || (root.previewShown && s === root.previewSymbol))
-      at[s] = entry.answeredAt + Market.quoteCadence(feed.quotes[s], now, root.refreshIntervalSec, hero, calNow(feed.quotes[s]))
+      at[s] = entry.answeredAt > now ? now
+        : entry.answeredAt + Market.quoteCadence(feed.quotes[s], now, root.refreshIntervalSec, hero, calNow(feed.quotes[s]))
     })
     var symbols = Object.keys(at)
     var asking = symbols.some(function(s) { return at[s] <= now })
@@ -312,7 +313,6 @@ Item {
   function screensClear() {
     if (!root.screens) return true
     if (Date.now() - root.screensAnsweredMs < 1000) return !root.screensOff
-    // No screens to ask, as in a harness: nothing holds.
     return !root.screens.askScreens()
   }
   Connections {
@@ -324,6 +324,9 @@ Item {
     if (root.screensOff) return
     feed.pump()
     previewFeed.pump()
+    historyFeed.pump()
+    fundamentalsFeed.pump()
+    root.screensReady()
     root.askOvernight()
     if (root.refreshOwed) {
       root.refreshOwed = false
@@ -333,6 +336,7 @@ Item {
     root.fetchAhead()
     releaseFeed.pump()
   }
+  signal screensReady()
   // The day last built for each symbol's chart, kept while what built it is
   // the same: its quote, and for a listing Robinhood trades all day its
   // prints, read from the answers the chart was built from (`nights`,
@@ -483,6 +487,7 @@ Item {
   HistoryFeed {
     id: historyFeed
     gate: yahooGate
+    clearance: function() { return root.screensClear() }
     clock: root
     centExchanges: root.centExchanges
     inUse: root.chartsInUse
@@ -517,7 +522,11 @@ Item {
     onQuotesChanged: if (root.pendingFundamentals) root.fetchFundamentals(root.pendingFundamentals)
   }
 
-  FundamentalsFeed { id: fundamentalsFeed; gate: yahooGate }
+  FundamentalsFeed {
+    id: fundamentalsFeed
+    gate: yahooGate
+    clearance: function() { return root.screensClear() }
+  }
   // Robinhood's feeds send one request at a time; each answer asks again
   // for what is still wanted, while it still is (`askOvernight`).
   AllDayFeed { id: allDayFeed; gate: robinhoodGate; onEntriesChanged: Qt.callLater(root.askOvernight) }

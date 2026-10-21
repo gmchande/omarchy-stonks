@@ -279,6 +279,7 @@ ShellRoot {
     property string fontFamily: Style.font.family
     function persist(values) {}
     function setRange(value) {}
+    function screensClear() { return true }
     function surfaceShown(surface, open) {}
     function rowsSeen(surface, symbols) {}
     // A search's choice shown on the hero; this stub's hero never changes.

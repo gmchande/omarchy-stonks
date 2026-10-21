@@ -24,6 +24,8 @@ Item {
 
   property var entries: ({})
   property var gate: null
+  // A screen answer lets pending work go; darkness spends no request or retry.
+  property var clearance: null
   // The service, whose wall clock stamps each answer and ages the cache
   // (`wallSecond`); the system's without one.
   property var clock: null
@@ -42,6 +44,7 @@ Item {
   property int attempts: 0
   // The job's curl was stopped; its answer, whatever it says, is dropped.
   property bool stopped: false
+  property bool waitingForScreen: false
 
   readonly property bool busy: job !== null || wanted !== null
 
@@ -118,7 +121,7 @@ Item {
   function want(next) {
     root.wanted = next
     if (job && (!next || next.key !== job.key)) {
-      if (retryTimer.running || heldTimer.running) {
+      if (waitingForScreen || retryTimer.running || heldTimer.running) {
         retryTimer.stop()
         heldTimer.stop()
         root.endJob()
@@ -147,6 +150,8 @@ Item {
   // change that asked for it is still being told. A chart asked for ahead
   // that the gate has no spare budget for is let go, nothing kept.
   function run() {
+    if (clearance && !clearance()) { root.waitingForScreen = true; return }
+    root.waitingForScreen = false
     if (gate && (job.ahead && !gate.spare() || gate.take(1) === 0)) {
       if (!job.ahead) {
         heldTimer.restart()
@@ -162,8 +167,13 @@ Item {
     fetchProc.running = true
   }
 
+  function pump() {
+    if (job && waitingForScreen) root.run()
+  }
+
   // The job is over; then the chart wanted now, if any, goes.
   function endJob() {
+    root.waitingForScreen = false
     root.job = null
     root.attempts = 0
     root.stopped = false

@@ -323,6 +323,7 @@ ShellRoot {
     property string fontFamily: Style.font.family
     function persist(values) {}
     function setRange(value) { root.shownRange = value }
+    function screensClear() { return true }
     function surfaceShown(surface, open) {}
     function rowsSeen(surface, symbols) {}
     function feature(symbol) { featuredSymbol = symbol }

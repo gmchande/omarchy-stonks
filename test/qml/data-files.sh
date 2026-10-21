@@ -19,6 +19,10 @@ if [ $# -eq 0 ]; then
   done
   exit 0
 fi
+if [[ $1 == write && ${2:-} == 1.0.0 ]]; then
+  echo "1.0.0 is immutable; data-files.sh only reads it" >&2
+  exit 2
+fi
 saved_answers=none
 source "$here/lib.sh"
 feed_tree data-files.qml Service.qml OwnerOnly.qml Gate.qml QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml AllDayFeed.qml OvernightFeed.qml ReleaseFeed.qml Fetch.js Quote.js Format.js Market.js Overnight.js History.js Fundamentals.js Chart.js Settings.js Release.js calendars.json

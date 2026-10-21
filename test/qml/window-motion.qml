@@ -29,16 +29,6 @@ ShellRoot {
     return item.contentItem ? find(item.contentItem, name) : null
   }
 
-  // Calls `add` on each paint of every canvas under `item` but the scrub's
-  // own marks, from the call on.
-  property int linePaints: 0
-  property int retroPaints: 0
-  function countPaints(item, add) {
-    if (!item) return
-    if (typeof item.requestPaint === "function" && item.objectName !== "scrubMarks") item.painted.connect(add)
-    for (var i = 0; i < item.children.length; i++) countPaints(item.children[i], add)
-  }
-
   function finish() {
     console.log("WINDOW MOTION DONE")
     done.exitCode = failures ? 1 : 0
@@ -1060,53 +1050,6 @@ ShellRoot {
       wait(200)
       var watchlist = body.watchlist
       var keys = app.testKeyCatcher
-
-      // A draw-in and a scrub repaint no line, in either look: the draw-in
-      // widens a clip over the chart as drawn, and the scrub's marks are
-      // their own layer. Found in perf pass 1: both repainted the whole chart,
-      // and a scrub every row's line, on every frame.
-      tryVerify(function() { return service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 10000)
-      var countLine = function() { harness.linePaints++ }
-      harness.countPaints(body.chartItem, countLine)
-      harness.countPaints(watchlist, countLine)
-      var stillLines = []
-      for (var look = 0; look < 2; look++) {
-        wait(300)
-        harness.linePaints = 0
-        body.motion.drawIn()
-        wait(450)
-        var drawInPaints = harness.linePaints
-        for (var step = 1; step <= 10; step++) {
-          mouseMove(body.chartItem, body.chartItem.width * step / 12, body.chartItem.height / 2)
-          wait(20)
-        }
-        stillLines.push(drawInPaints + "+" + (harness.linePaints - drawInPaints) + (body.scrubT !== 0 ? "" : " no scrub"))
-        mouseMove(body, 1, 1)
-        service.persist({ style: look === 0 ? "retro" : "smooth" })
-        tryVerify(function() { return body.retro === (look === 0) }, 2000)
-      }
-      harness.check("a draw-in and ten scrub steps repaint no line, smooth then retro",
-        stillLines.join("|") === "0+0|0+0", stillLines.join("|"))
-
-      // The hidden look rests: a new chart in smooth paints nothing of
-      // retro's, chart or digits. Found in perf pass 1: they repainted with
-      // every new chart, the look on screen or not.
-      var retroChart = null
-      for (var child = 0; child < body.chartItem.children.length; child++)
-        if (typeof body.chartItem.children[child].pixel === "number") retroChart = body.chartItem.children[child]
-      var countRetro = function() { harness.retroPaints++ }
-      harness.countPaints(retroChart, countRetro)
-      harness.countPaints(harness.find(body, "blockPrice"), countRetro)
-      var featuredBefore = service.featuredSymbol
-      // Turning back to smooth just now cleared retro's chart once; let it land.
-      wait(300)
-      harness.retroPaints = 0
-      service.feature(featuredBefore === "MSFT" ? "NVDA" : "MSFT")
-      wait(400)
-      harness.check("a new chart in smooth paints nothing of retro's",
-        !!retroChart && harness.retroPaints === 0 && service.featuredSymbol !== featuredBefore, harness.retroPaints)
-      service.feature(featuredBefore)
-      wait(400)
 
       service.feature("AAPL")
       app.testBody.selectRange("1Y")

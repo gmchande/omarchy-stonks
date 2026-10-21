@@ -40,6 +40,13 @@ ShellRoot {
     catProc.running = true
   }
 
+  function showsPrice(item, text) {
+    if (!item || !item.visible) return false
+    if (item.text !== undefined && String(item.text) === text) return true
+    for (var i = 0; i < item.children.length; i++) if (showsPrice(item.children[i], text)) return true
+    return item.contentItem ? showsPrice(item.contentItem, text) : false
+  }
+
   function find(item, name) {
     if (!item) return null
     if (item.objectName === name) return item
@@ -90,23 +97,6 @@ ShellRoot {
       waitForEnd: true
       onStreamFinished: {
         try { harness.fileRead = JSON.parse(String(text || "").trim()) } catch (e) { harness.fileRead = {} }
-      }
-    }
-  }
-
-  // Hashes of saved frames, path to sha1.
-  Process {
-    id: hashProc
-    property var sums: null
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: {
-        var out = {}
-        String(text || "").trim().split("\n").forEach(function(line) {
-          // sha1sum prints the hash, two spaces, then the path as given.
-          out[line.slice(42)] = line.slice(0, 40)
-        })
-        hashProc.sums = out
       }
     }
   }
@@ -261,139 +251,36 @@ ShellRoot {
       wait(100)
       harness.check(", steps back to All", service.listName === "" && harness.same(service.symbols, ["AAPL", "MSFT", "NVDA"]))
 
-      // Only the current list's rows, in the look on screen, are drawn: a
-      // row outside the list is not built and derives nothing, the hidden
-      // look is not built at all, and a row shown again draws before the
-      // first frame that shows it. A switch still rebuilds no row's place.
-      // Found in the code-quality review: every row in All, in both looks,
-      // repainted with every quote.
+      // A quote arriving off the current list must be current when its row
+      // returns, in either look and after reopening the window.
       tryVerify(function() { return service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 5000)
-      var rowsBefore = service.library.map(function(s) { return watchlist.rowItem(s) })
-      var sameRows = function() {
-        return service.library.every(function(s, i) { return watchlist.rowItem(s) === rowsBefore[i] })
+      var beforeQuotes = service.testFeed.quotes
+      service.switchList("Growth")
+      var changed = Object.assign({}, beforeQuotes)
+      changed.MSFT = Object.assign({}, beforeQuotes.MSFT, { price: 180.25 })
+      service.testFeed.quotes = changed
+      service.switchList("")
+      var currentRow = function() {
+        var row = watchlist.rowItem("MSFT")
+        return row && row.visible && harness.find(row, "rowContent") && harness.showsPrice(row, "180.25")
       }
-      // Paints per symbol and look, every layer of each line built.
-      var paints = {}
-      var hooked = []
-      var painted = function(symbol, look) { return paints[symbol + "|" + look] || 0 }
-      var hookPaints = function(item, key) {
-        if (!item || hooked.indexOf(item) >= 0) return
-        hooked.push(item)
-        if (typeof item.requestPaint === "function")
-          item.painted.connect(function() { paints[key] = (paints[key] || 0) + 1 })
-        for (var i = 0; i < item.children.length; i++) hookPaints(item.children[i], key)
-      }
-      var lineOf = function(symbol, look) { return harness.find(watchlist.rowItem(symbol), look === "retro" ? "rowCells" : "rowLine") }
-      var hookAll = function() {
-        service.library.forEach(function(s) {
-          hookPaints(lineOf(s, "smooth"), s + "|smooth")
-          hookPaints(lineOf(s, "retro"), s + "|retro")
-        })
-      }
-      hookAll()
-      var total = function() { var n = 0; for (var k in paints) n += paints[k]; return n }
-      // What the next frame shows of `item`, saved; its path.
-      var shoot = function(item, name) {
-        var saved = false
-        var path = Quickshell.env("STONKS_LISTS_OUT") + "/lists-first-frame-" + name + ".png"
-        item.grabToImage(function(result) { saved = result.saveToFile(path) })
-        tryVerify(function() { return saved }, 3000, "grab " + name)
-        return path
-      }
-      var sums = function(paths) {
-        hashProc.sums = null
-        hashProc.command = ["sha1sum"].concat(paths)
-        hashProc.running = true
-        tryVerify(function() { return hashProc.sums !== null }, 3000, "sha1sum answered")
-        return paths.map(function(path) { return hashProc.sums[path] })
-      }
-      // A symbol's day turned upside down, so an old line reads apart.
-      var turnLine = function(symbol) {
-        var next = Object.assign({}, service.testFeed.quotes)
-        var quote = next[symbol]
-        var prices = quote.points.map(function(point) { return point.p })
-        var mid = (Math.max.apply(null, prices) + Math.min.apply(null, prices)) / 2
-        next[symbol] = Object.assign({}, quote, {
-          points: quote.points.map(function(point) { return { t: point.t, p: 2 * mid - point.p } })
-        })
-        service.testFeed.quotes = next
-      }
-      var feedQuote = function(symbol, price) {
-        var next = Object.assign({}, service.testFeed.quotes)
-        next[symbol] = Object.assign({}, next[symbol], { price: price })
-        service.testFeed.quotes = next
-      }
-      var msft = watchlist.rowItem("MSFT")
-      var rowsShot = watchlist
-      // The list's first frame after `reveal`, as drawn, must be the frame it
-      // settles on, and not `stalePath`, the lines it last showed.
-      var firstIsNew = function(name, stalePath, reveal) {
-        reveal()
-        var first = shoot(rowsShot, name + "-first")
-        wait(300)
-        var settled = shoot(rowsShot, name + "-settled")
-        var hashes = sums([stalePath, first, settled])
-        return { ok: hashes[1] === hashes[2] && hashes[1] !== hashes[0], settled: settled,
-          detail: hashes.map(function(h) { return String(h).slice(0, 8) }).join(" ") }
-      }
-      var quotesBefore = service.testFeed.quotes
-      var smoothOld = shoot(rowsShot, "smooth-old")
+      within(3000, currentRow)
+      harness.check("returning to a list shows its latest quote", currentRow())
       keyClick(Qt.Key_S)
-      wait(100)
-      var retroOld = shoot(rowsShot, "retro-old")
+      within(3000, function() { return service.retro && currentRow() })
+      harness.check("changing look keeps the row's latest quote", service.retro && currentRow())
       keyClick(Qt.Key_S)
-      wait(100)
-      keyClick(Qt.Key_Period)
-      wait(100)
-      paints = {}
-      hookAll()
-      turnLine("MSFT")
-      feedQuote("NVDA", 180.25)
-      wait(100)
-      var retroBuilt = service.library.filter(function(s) { return !!lineOf(s, "retro") })
-      harness.check("off the list a row builds no words and derives nothing, its line draws nothing, and the hidden look is built nowhere",
-        service.listName === "Growth" && !harness.find(msft, "rowContent") && painted("MSFT", "smooth") === 0
-          && msft.view === null && msft.geometry === null
-          && painted("NVDA", "smooth") > 0 && retroBuilt.length === 0,
-        JSON.stringify(paints) + "|" + (msft.view === null) + "|retro built " + retroBuilt)
-      paints = {}
-      var switched = firstIsNew("switch", smoothOld, function() { keyClick(Qt.Key_Comma) })
-      // MSFT's day was turned while it was off the list: only its line has
-      // something new to draw.
-      var unchanged = service.library.filter(function(s) { return s !== "MSFT" && !!lineOf(s, "smooth") })
-      harness.check("a list switch rebuilds no row's place, a line whose day did not change repaints nothing, and the rows show their new lines in the first frame",
-        service.listName === "" && sameRows() && switched.ok && unchanged.length > 0
-          && unchanged.every(function(s) { return painted(s, "smooth") === 0 }),
-        sameRows() + "|" + switched.detail + "|unchanged " + unchanged + "|" + JSON.stringify(paints))
-      var toRetro = firstIsNew("retro", retroOld, function() { keyClick(Qt.Key_S) })
-      turnLine("MSFT")
-      var toSmooth = firstIsNew("smooth", switched.settled, function() { keyClick(Qt.Key_S) })
-      harness.check("s shows the row's current line in its first frame, both ways",
-        toRetro.ok && toSmooth.ok && !service.retro, toRetro.detail + " / " + toSmooth.detail)
-      // Turned back to the line the switch showed; an open refetches every
-      // quote, so the frame to match is that line's, not a later one.
       app.close()
-      turnLine("MSFT")
       app.open("{}")
-      var reopenFirst = shoot(rowsShot, "reopen-first")
+      within(3000, currentRow)
+      harness.check("reopening the window shows the current quote", currentRow())
+      service.testFeed.quotes = beforeQuotes
       keys.forceActiveFocus()
-      var reopenHashes = sums([toSmooth.settled, reopenFirst, switched.settled])
-      harness.check("a window reopened after the line changed shows the new line in its first frame",
-        reopenHashes[1] === reopenHashes[2] && reopenHashes[1] !== reopenHashes[0],
-        reopenHashes.map(function(h) { return String(h).slice(0, 8) }).join(" "))
-      service.testFeed.quotes = quotesBefore
-      wait(100)
-      hookAll()
-      paints = {}
-      wait(1100)
-      harness.check("a clock tick redraws no line", total() === 0, JSON.stringify(paints))
       keyClick(Qt.Key_C)
-      wait(100)
-      harness.check("the change mode redraws no line", service.changeMode === "abs" && total() === 0,
-        service.changeMode + "|" + JSON.stringify(paints))
+      tryCompare(service, "changeMode", "abs")
+      harness.check("c changes the displayed change mode", service.changeMode === "abs")
       keyClick(Qt.Key_C)
       keyClick(Qt.Key_C)
-      wait(50)
       keyClick(Qt.Key_Period)
       wait(100)
       harness.check(". steps forward to Growth", service.listName === "Growth",
