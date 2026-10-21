@@ -1440,7 +1440,13 @@ ShellRoot {
           console.error("FAIL pressed feedback " + control + " — " + pressFilm.verdict.detail)
           exitTimer.exitCode = 1
         }
-      } else mouseMove(body, point.x, point.y)
+      } else {
+        // RowPointer treats its first sighting as a resting pointer.
+        // Enter the row, then move within it as a hand would.
+        if (control === "symbol" || control === "search")
+          mouseMove(body, point.x - target.width / 4, point.y)
+        mouseMove(body, point.x, point.y)
+      }
       savePicture()
     }
 
