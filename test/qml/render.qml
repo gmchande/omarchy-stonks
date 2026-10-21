@@ -677,6 +677,12 @@ ShellRoot {
       stub.historySymbol = stub.featuredSymbol
       stub.featuredSymbol = root.loadingNext
       body.motion.dimmed = 1
+    } else if (body.motion.loading) {
+      // A chart still on its way dims a quarter second in, over 160 ms, and
+      // the grab at 300 ms caught it partway, further in one run than the
+      // next: it shows at rest, dimmed, so two renders of one tree match
+      // (test/render-diff.sh).
+      body.motion.dimmed = 1
     }
     if (root.searchState) {
       body.adding = true
