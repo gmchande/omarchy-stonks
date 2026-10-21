@@ -88,10 +88,14 @@ Item {
         if (!job.results) job.batch++
       } else {
         var symbol = batch[job.read]
-        var bars = Overnight.overnightBars(job.results[job.read], symbol)
+        var bars = null
+        try { bars = Overnight.overnightBars(job.results[job.read], symbol) } catch (e) { bars = null }
         var had = entries[symbol]
-        job.bars[symbol] = had && Overnight.sameBars(had.bars, bars) ? had.bars : bars
-        if (++job.read >= batch.length) {
+        if (bars) job.bars[symbol] = had && Overnight.sameBars(had.bars, bars) ? had.bars : bars
+        // An answer with a listing that can't be read is a bad answer too:
+        // none of its symbols is read.
+        else batch.forEach(function(s) { delete job.bars[s] })
+        if (!bars || ++job.read >= batch.length) {
           job.results = null
           job.batch++
         }
