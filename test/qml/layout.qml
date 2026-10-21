@@ -354,6 +354,61 @@ ShellRoot {
         // The rows animate into their slots on the first layout; measure once
         // everything has settled.
         wait(400)
+        // Under the open list menu each line of a row's words shows unless
+        // it starts under the menu: the symbol, with its remove button, and
+        // the name, each on its own, with one list to six, in both looks.
+        // Found in the 1.0.2 visual review: a row 11 px under the menu lost
+        // its symbol and its name, and showed its price and chart alone.
+        var coverFaults = []
+        var straddled = 0
+        var coverSeen = []
+        ;[1, 2, 3, 4, 5, 6].forEach(function(count) {
+          stub.lists = [{ name: "", label: "All", count: stub.symbols.length, symbols: stub.symbols }].concat(
+            Array.from({ length: count - 1 }, function(_, n) { return { name: "List " + (n + 1), label: "List " + (n + 1), count: 1, symbols: ["MZ"] } }))
+          ;[false, true].forEach(function(retro) {
+            stub.retro = retro
+            wait(50)
+            body.openListMenu()
+            wait(100)
+            var menu = find(body, "listMenu")
+            var menuEnd = menu.mapToItem(body, 0, menu.height).y
+            var listEnd = yIn(body.watchlist, body.watchlist.height)
+            var seen = []
+            // Every built row's words, as drawn.
+            var contents = []
+            var walk = function(it) {
+              if (it.objectName === "rowContent") contents.push(it)
+              else for (var c = 0; c < it.children.length; c++) walk(it.children[c])
+            }
+            walk(body.watchlist)
+            contents.forEach(function(content) {
+              if (!content.visible || yIn(content, 0) >= listEnd || yIn(content, content.height) <= yIn(body.watchlist, 0)) return
+              var symbol = find(content, "rowSymbol").text
+              var lines = ["rowSymbol", "rowDetail"].map(function(name) {
+                var words = find(content, name)
+                var top = words.mapToItem(body, 0, 0).y
+                if (words.visible !== (top >= menuEnd))
+                  coverFaults.push(count + " lists " + (retro ? "retro " : "smooth ") + symbol + " " + name + " at " + top
+                    + (words.visible ? " shows" : " hidden") + ", the menu ends at " + menuEnd)
+                seen.push(symbol + " " + name + "@" + Math.round(top) + (words.visible ? "" : " hidden"))
+                return words.visible
+              })
+              if (!lines[0] && lines[1]) straddled++
+            })
+            coverSeen.push(count + (retro ? " retro" : " smooth") + ", menu ends " + Math.round(menuEnd) + ", list " + yIn(body.watchlist, 0) + "–" + listEnd
+              + " of " + body.watchlist.displayedSymbols.length + ": " + seen.join(", "))
+            body.closeListMenu()
+            wait(50)
+          })
+        })
+        stub.lists = Qt.binding(function() {
+          return [{ name: "", label: "All", count: stub.symbols.length, symbols: stub.symbols }]
+        })
+        stub.retro = false
+        wait(50)
+        root.check("under the open list menu a row's symbol and its name each show unless they start under it, with one list to six in both looks, a row half under it keeping its name",
+          coverFaults.length === 0 && straddled > 0, coverFaults.join(" | ") + " (" + straddled + " rows kept their name alone) || " + coverSeen.join(" | "))
+
         var weekly = History.parseHistory(JSON.parse(aaplWeeklyFile.text()), "5Y")
         var year = History.parseHistory(JSON.parse(shopYearFile.text()), "1Y")
         var young = History.parseHistory(JSON.parse(youngFile.text()), "All")

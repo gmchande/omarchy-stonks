@@ -841,7 +841,7 @@ Flickable {
         // place and its day line only.
         built: lifted || (place >= 0 && y + height > root.contentY - root.sightHeight
           && y < root.contentY + 2 * root.sightHeight)
-        wordsShown: root.menuCovers <= 0 || y - root.contentY >= root.menuCovers
+        menuCovers: root.menuCovers > 0 ? root.menuCovers - (y - root.contentY) : 0
         property var sightQuote: null
         Binding on sightQuote {
           value: rowDelegate.place >= 0 ? root.quotes[rowDelegate.symbol] || null : null

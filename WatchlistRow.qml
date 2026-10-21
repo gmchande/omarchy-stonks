@@ -33,10 +33,12 @@ Rectangle {
   // builds them only for rows near sight, so a long list costs little more
   // than a screenful does. Built, the row draws in the frame it is asked to.
   property bool built: true
-  // Whether the symbol, the name line, and the remove button show: not
-  // while the list menu lies over the row, where a long name ran on past
-  // the menu's edge in pieces ("t" of a name's last word).
-  property bool wordsShown: true
+  // Down to here in the row, the list menu lies over it: a line of words
+  // that starts above this leaves out, the symbol with its remove button,
+  // and the name, each on its own, so a row mostly below the menu keeps its
+  // name. A long name ran on past the menu's edge in pieces ("t" of a
+  // name's last word). 0 while the menu is shut.
+  property real menuCovers: 0
   // While it moves, lifted or sliding, the row carries the card's own ground
   // under its fill, so the rows it passes never show through.
   property bool moving: false
@@ -199,7 +201,7 @@ Rectangle {
         Text {
           id: symbolText
           objectName: "rowSymbol"
-          visible: row.wordsShown
+          visible: y >= row.menuCovers
           x: row.gap
           y: row.inset
           textFormat: Text.PlainText
@@ -213,7 +215,7 @@ Rectangle {
         Text {
           id: detailText
           objectName: "rowDetail"
-          visible: row.wordsShown
+          visible: y >= row.menuCovers
           x: row.gap
           anchors.bottom: parent.bottom
           anchors.bottomMargin: row.inset
@@ -240,7 +242,7 @@ Rectangle {
         Item {
           id: removeButton
           objectName: "rowRemove"
-          visible: row.removable && row.wordsShown
+          visible: row.removable && symbolText.visible
           width: Style.space(22)
           height: width
           x: symbolText.x + symbolText.width + Style.space(4)
