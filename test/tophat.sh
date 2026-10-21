@@ -397,19 +397,20 @@ take_laptop() {
   within 5 screen_on "$virtual" || { echo "tophat: the virtual screen $virtual did not appear" >&2; return 1; }
   host_dispatch "hl.dsp.focus({ monitor = \"$virtual\" })" && within 5 focused_on "$virtual" \
     || { echo "tophat: the focus did not move to $virtual" >&2; return 1; }
-  scene > "$run/scene" || { echo "tophat: cannot read the host's screens" >&2; return 1; }
+  scene > "$run/scene.new" && mv "$run/scene.new" "$run/scene" || { echo "tophat: cannot read the host's screens" >&2; return 1; }
   echo "switched: the laptop shows workspace 10, the focus is on $virtual"
 }
 
-# restore_screens: undo whatever part of take_laptop happened, in the order
-# that keeps the owner's workspace off the virtual screen, and check it.
+# restore_screens: undo whatever part of take_laptop happened, and check it.
+# The virtual screen goes first: a workspace shown while it holds the focus
+# would open there, so while it stays, the rest waits for a retry.
 restore_screens() {
   [ -f "$run/screens" ] || return 0
   local LAPTOP_WS POINTER ok=0
   source "$run/screens"
   if screen_on "$virtual"; then
     echo "output remove: $(hyprctl output remove "$virtual" 2>&1)" >> "$run/outputs.log"
-    within 5 screen_gone "$virtual" || { echo "FAILED the virtual screen $virtual is still there" >&2; ok=1; }
+    within 5 screen_gone "$virtual" || { echo "FAILED the virtual screen $virtual is still there" >&2; return 1; }
   fi
   if ! laptop_shows "$LAPTOP_WS"; then
     host_dispatch "hl.dsp.focus({ workspace = \"$LAPTOP_WS\" })"
@@ -457,11 +458,18 @@ stop_watch() {
   within 60 bash -c "! kill -0 $pid 2>/dev/null" || echo "tophat: the watcher did not stop" >&2
 }
 
-# _watch RUN: from the switch until the run ends, it ends the run, which puts
-# the screens back, once the session locks (a lid close locks it: Omarchy
-# counts only plugged-in screens, so the virtual one doesn't dock the laptop),
-# the scene changes (the owner is back, or the idle screensaver opened), the
-# session's launcher has gone, or a start in progress was killed.
+# gone FILE: FILE names a process ("PID START") that has since ended.
+gone() {
+  local pid start
+  [ -s "$1" ] && read -r pid start < "$1" && [ "$(start_of "$pid")" != "$start" ]
+}
+
+# _watch RUN: from before the switch until the run ends, it ends the run,
+# which puts the screens back, once the session locks (a lid close locks it:
+# Omarchy counts only plugged-in screens, so the virtual one doesn't dock the
+# laptop), the scene the switch saved changes (the owner is back, or the idle
+# screensaver opened), the session's launcher has gone, or the start or a
+# stop in progress was killed, since neither can then finish the undo.
 watch_run() {
   run=$1
   source "$run/identity"
@@ -472,14 +480,16 @@ watch_run() {
     [ -f "$run/stop.status" ] && exit 0
     if ! unlocked 2> /dev/null; then
       why="the session locked"
-    elif ! now=$(scene); then
+    elif [ -f "$run/scene" ] && ! now=$(scene); then
       why="the host's screens could not be read"
-    elif [ "$now" != "$(cat "$run/scene")" ]; then
+    elif [ -f "$run/scene" ] && [ "$now" != "$(cat "$run/scene")" ]; then
       why="the desktop changed: $(diff "$run/scene" - <<< "$now" | sed -n 's/^< /was /p; s/^> /now /p' | paste -sd ';' - | sed 's/;/; /g')"
     elif [ -s "$run/leader" ] && read -r pid start < "$run/leader" && ! leader_is "$pid" "$start"; then
       why="the session's launcher has gone"
-    elif [ -s "$run/starter" ] && read -r pid start < "$run/starter" && [ "$(start_of "$pid")" != "$start" ]; then
+    elif gone "$run/starter"; then
       why="the start was killed"
+    elif gone "$run/stopper"; then
+      why="a stop was killed before it finished"
     else
       continue
     fi
@@ -633,10 +643,12 @@ cmd_start() {
   { printf 'RUN_ID=%q\nCHECKOUT=%q\nCOMMIT=%q\nSTART_EPOCH=%q\nRUNTIME=%q\nZONE=%q\nSLOW=%q\n' "$id" "$checkout" "$commit" "$(date +%s)" "$runtime" "$zone" "$slow"; } > "$run/identity"
   trap 'start_failed "interrupted"' INT TERM
   if (( take )); then
-    # The last moment before the launch: the switch starts the run.
+    # The last moment before the launch: the switch starts the run. The
+    # watcher comes first, so a killed start is undone too.
     echo "$$ $(start_of $$)" > "$run/starter"
-    take_laptop "$owner_ws" || start_failed "the laptop was not switched"
+    owner_ws=$(laptop_alone_preflight) || start_failed "the host changed while the sandbox was built"
     start_watch || start_failed "the watcher never started"
+    take_laptop "$owner_ws" || start_failed "the laptop was not switched"
     ws=$(host_preflight) || start_failed "the switched host does not pass the preflight"
   fi
 
@@ -717,11 +729,13 @@ services_off() {
   return "$ok"
 }
 
+# start_failed WHY: undo the start; the watcher stays until that is done, in
+# case this is killed meanwhile.
 start_failed() {
   trap - INT TERM
   echo "tophat: $*; stopping" >&2
-  stop_watch
   end_run
+  stop_watch
   forget_run
   exit 1
 }
@@ -792,12 +806,14 @@ stop_run() {
 }
 
 # end_run [WHY]: stop_run once, whoever asks first (stop, a failed start, the
-# watcher, which says WHY); a later caller gets the same findings and status.
+# watcher, which says WHY); a later caller gets the same findings and status,
+# and retries the screens if they were not all put back.
 end_run() {
   local code
   exec 7>> "$run/stop.lock"
   flock 7
   if [ ! -f "$run/stop.status" ]; then
+    echo "$BASHPID $(start_of "$BASHPID")" > "$run/stopper"
     touch "$run/cancel"
     # A launcher checks for cancel only once it holds the slot. If the slot is
     # held, ours may be past that check: wait for it to report.
@@ -807,19 +823,34 @@ end_run() {
     code=$?
     [ -n "${1:-}" ] && code=1
     echo "$code" > "$run/stop.status"
+  elif [ -f "$run/screens" ]; then
+    { echo "again, the screens:"; restore_screens; } >> "$run/stop.log" 2>&1
   fi
   exec 7>&-
   cat "$run/stop.log"
   return "$(cat "$run/stop.status")"
 }
 
-# forget_run: the ended run is no longer the current one.
-forget_run() { if [ "$(readlink -f "$base/current")" = "$run" ]; then rm -f "$base/current"; fi; }
+# forget_run: the ended run is no longer the current one, unless its screens
+# are not all back: then it stays current, so stop can try them again.
+forget_run() {
+  if [ -f "$run/screens" ]; then
+    ln -sfn "$run" "$base/current"
+    echo "tophat: the screens are not all back; stop tries them again" >&2
+  elif [ "$(readlink -f "$base/current")" = "$run" ]; then
+    rm -f "$base/current"
+  fi
+}
 
+# cmd_stop: the watcher stays until the run has ended, in case this is
+# killed meanwhile.
 cmd_stop() {
   load_run
-  stop_watch
-  end_run && forget_run && echo "stopped clean" || { forget_run; echo "stopped, with the findings above" >&2; exit 1; }
+  if end_run; then
+    stop_watch; forget_run; echo "stopped clean"
+  else
+    stop_watch; forget_run; echo "stopped, with the findings above" >&2; exit 1
+  fi
 }
 
 # ---- capture ----------------------------------------------------------------
@@ -1097,7 +1128,8 @@ case $1 in
       create) put --arg n "$4" '.monitors += [{name: $n, x: 21440, y: 0, width: 1920, height: 1080, scale: 2,
         disabled: false, dpmsStatus: true, focused: false, activeWorkspace: {id: 11}, specialWorkspace: {id: 0},
         solitaryBlockedBy: []}] | .workspaces += [{id: 11, monitor: $n, windows: 0}]' ;;
-      remove) put --arg n "$3" '.monitors |= map(select(.name != $n)) | .workspaces |= map(select(.monitor != $n))
+      remove) [ -e "$s.refuse" ] && { echo "error: refused"; exit 1; }
+        put --arg n "$3" '.monitors |= map(select(.name != $n)) | .workspaces |= map(select(.monitor != $n))
         | if any(.monitors[]; .focused) then . else .monitors[0].focused = true | .cursor = {x: 20720, y: 450} end' ;;
     esac
     echo ok ;;
@@ -1139,7 +1171,8 @@ EOF
     take_laptop 2 > /dev/null 2>&1 || miss "$1: the switch failed"
   }
   watcher_gone() { local pid; read -r pid _ < "$run/watcher"; within 5 bash -c "! kill -0 $pid 2>/dev/null"; }
-  polled() { (( $(grep -c cursorpos "$FAKE_HOST.calls") >= $1 )); }
+  # polled CALL N: the stand-in host has answered CALL N times.
+  polled() { (( $(grep -c -- "$1" "$FAKE_HOST.calls") >= $2 )); }
 
   # Only the laptop alone, unlocked and on, on a numbered workspace but 9,
   # with workspace 10 empty, and never without the flag.
@@ -1169,7 +1202,7 @@ EOF
   # owner's absence or the run.
   local dead; sleep 0 & dead=$!; wait "$dead"
   leader_gone() { echo "$dead 1" > "$run/leader"; }
-  start_killed() { echo "$dead 1" > "$run/starter"; }
+  stop_killed() { echo "$dead 1" > "$run/stopper"; }
   watched() {  # NAME CHANGE…
     local name=$1; shift
     solo_run "$name"
@@ -1187,12 +1220,41 @@ EOF
   watched "a window opened" host_change '.workspaces |= map(if .id == 11 then .windows = 1 else . end)'
   watched "the lid closed, which locks" host_change '.monitors[].solitaryBlockedBy = ["LOCK"]'
   watched "the session's launcher gone" leader_gone
-  watched "the start killed" start_killed
+  watched "a stop killed before it finished" stop_killed
+  # A start killed in the middle of the switch: its watcher, started first,
+  # undoes what it did.
+  run=$tmp/base/killed-start
+  mkdir -p "$run"
+  printf 'RUN_ID=killed-start\nCHECKOUT=%q\nSTART_EPOCH=%q\n' "$checkout" "$(date +%s)" > "$run/identity"
+  host_is
+  sleep 300 & local starter=$!
+  echo "$starter $(start_of "$starter")" > "$run/starter"
+  start_watch || miss "killed start: the watcher never started"
+  host_dispatch 'hl.dsp.focus({ workspace = "10" })' > /dev/null
+  printf 'LAPTOP_WS=2\nPOINTER=%q\n' "20194 508" > "$run/screens"
+  hyprctl output create headless "$virtual" > /dev/null
+  kill "$starter"; wait "$starter" 2> /dev/null
+  within 5 test -f "$run/stop.status" && host_back || miss "a start killed mid-switch should be undone, got: $(seen)"
+  # Not sooner, on the half-done switch: the start's own death ended it.
+  grep -q '^ended early: the start was killed' "$run/stop.log" \
+    || miss "a start killed mid-switch should end on its death, got: $(head -n 1 "$run/stop.log")"
+  watcher_gone || miss "killed start: the watcher outlived the run"
+  # Screens that could not all be put back: stop keeps the run current and
+  # tries them again.
+  solo_run retry
+  ln -sfn "$run" "$base/current"
+  : > "$FAKE_HOST.refuse"
+  bash "$here/tophat.sh" stop > /dev/null 2>&1 && miss "stop should fail when the virtual screen stays"
+  rm -f "$FAKE_HOST.refuse"
+  [ "$(readlink -f "$base/current")" = "$run" ] || miss "a run whose screens are not back should stay current"
+  bash "$here/tophat.sh" stop > /dev/null 2>&1
+  host_back || miss "a second stop should put the screens back, got: $(seen)"
+  [ -e "$base/current" ] && miss "a run whose screens are back should no longer be current"
   # Nothing changed: the watcher looks and lets the run be, and stop ends it.
   solo_run stop
   start_watch || miss "stop: the watcher never started"
   ln -sfn "$run" "$base/current"
-  within 5 polled $(( $(grep -c cursorpos "$FAKE_HOST.calls") + 3 )) || miss "the watcher should keep looking"
+  within 5 polled cursorpos $(( $(grep -c cursorpos "$FAKE_HOST.calls") + 3 )) || miss "the watcher should keep looking"
   [ -f "$run/stop.status" ] && miss "the watcher ended a run nothing had changed: $(head -n 1 "$run/stop.log")"
   out=$(bash "$here/tophat.sh" stop 2>&1) || miss "stop should end a watched run clean, got: $out"
   host_back || miss "stop should put the host back, got: $(seen)"
