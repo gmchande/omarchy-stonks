@@ -1,5 +1,4 @@
 .pragma library
-.import "Chart.js" as Chart
 
 // The chart heard, in each look's voice: the chimes, and the replay.
 // The chimes are the chart as a row of bars you run a hand along: the
@@ -86,8 +85,8 @@ function levelled(x, db) {
 }
 
 // Smooth: the scrub's chimes, struck as the replay's place moves onto each
-// bar of the line (`barAt` on `geometry`, the chart's), as a pointer swept
-// along it strikes them: at most one every 45 ms, a bar struck sooner
+// bar of the line (`lineBars` on `geometry`, the chart's), as a pointer
+// swept along it strikes them: at most one every 45 ms, a bar struck sooner
 // waiting out the gap with the latest waiting winning, none where the chart
 // draws no line (a break: Tokyo's lunch), and each ringing out its half
 // second over what follows. No tick where the line crosses its baseline:
@@ -95,19 +94,21 @@ function levelled(x, db) {
 // read as one more. Each bar sits as a chime does, so a replay sounds as a
 // sweep does.
 function smooth(geometry, from, to, seconds) {
-  var chart = { retro: false, geometry: geometry }
+  var bars = lineBars(geometry)
   var x = new Float32Array(Math.round((seconds + 0.6) * RATE))
   var gap = Math.round(0.045 * RATE), end = Math.round(seconds * RATE)
   var heard = -1, last = -gap, waiting = -1
   var strike = function(bar, at) {
-    var note = smoothBarSamples(bar)
-    for (var j = 0; j < note.length && at + j < x.length; j++) x[at + j] += note[j]
+    var note = smoothBarSamples(bar), n = Math.min(note.length, x.length - at)
+    // An index the engine keeps as a whole number: indexed by the sum of
+    // the loop's steps, read as a fraction, the mix took eight times as long.
+    for (var j = 0, k = at | 0; j < n; j++, k++) x[k] += note[j]
     last = at
     waiting = -1
   }
   for (var i = 0; i < end; i += STEP) {
     if (waiting >= 0 && i >= last + gap) strike(waiting, last + gap)
-    var bar = barAt(chart, placeAt(i / RATE, from, to, seconds))
+    var bar = bars(placeAt(i / RATE, from, to, seconds))
     if (bar === heard) continue
     heard = bar
     if (bar < 0) continue
@@ -119,11 +120,11 @@ function smooth(geometry, from, to, seconds) {
 }
 
 // Smooth's bar `bar` as a chime plays it, levelled, made once and kept: a
-// replay strikes dozens.
+// replay strikes dozens, and the scrub's chimes are written from it too.
 var smoothBars = []
 function smoothBarSamples(bar) {
   if (!smoothBars[bar]) {
-    var sound = chime(false, bar)
+    var sound = smoothBar(PENTATONIC[bar])
     var note = new Float32Array(sound.samples.length)
     for (var i = 0; i < note.length; i++) note[i] = sound.samples[i] * sound.gain
     smoothBars[bar] = note
@@ -233,9 +234,8 @@ function rowBar(grid, row) {
 }
 
 // The bar the chart sounds at `x` (0..1 along it), or -1 where it draws
-// nothing: in smooth the line's height there (`chart.geometry`), as the
-// scrub's dot sits, silent across a break (`brk`, Tokyo's lunch), where the
-// line lifts; in retro the lit row of the column there (`chart.grid`,
+// nothing: in smooth the line's height there (`lineBars`), as the scrub's
+// dot sits; in retro the lit row of the column there (`chart.grid`,
 // PixelChart's), dark columns silent.
 function barAt(chart, x) {
   if (x < 0) return -1
@@ -245,12 +245,25 @@ function barAt(chart, x) {
     var row = grid.levels[Math.max(0, Math.min(grid.columns - 1, Math.floor(x * grid.columns)))]
     return row === undefined ? -1 : rowBar(grid, row)
   }
-  var pts = chart.geometry ? chart.geometry.points : []
-  var next = 1
-  while (next < pts.length && pts[next].x < x) next++
-  if (next < pts.length && pts[next].brk && x > pts[next - 1].x && x < pts[next].x) return -1
-  var y = Chart.yAt(pts, x)
-  return y === null ? -1 : barOf(1 - y)
+  return lineBars(chart.geometry)(x)
+}
+
+// The bar under smooth's line at each place along it, as `Chart.yAt` reads
+// the line: -1 before its first print, past its last, and across a break
+// (`brk`, Tokyo's lunch), where the line lifts. It walks on from where it
+// was last asked, so a replay, whose place only moves on, reads the line
+// once.
+function lineBars(geometry) {
+  var pts = geometry ? geometry.points : [], k = 0
+  return function(x) {
+    if (!pts.length || x < pts[0].x || x > pts[pts.length - 1].x) return -1
+    if (pts.length === 1) return barOf(1 - pts[0].y)
+    if (x < pts[k].x) k = 0
+    while (k < pts.length - 2 && pts[k + 1].x < x) k++
+    var a = pts[k], b = pts[k + 1]
+    if (b.brk && x > a.x && x < b.x) return -1
+    return barOf(1 - (a.y + (b.y - a.y) * (b.x === a.x ? 0 : (x - a.x) / (b.x - a.x))))
+  }
 }
 
 // A chime: bar `bar` (0..10) struck, in the look's voice. Smooth's is a soft
@@ -260,7 +273,7 @@ function barAt(chart, x) {
 // the console's volume steps, a tenth of a second. Each sits 5 dB under the
 // add sound, so a sweep's overlapping bars come to about its level.
 function chime(retro, bar) {
-  return retro ? retroBar(PENTATONIC[bar]) : smoothBar(PENTATONIC[bar])
+  return retro ? retroBar(PENTATONIC[bar]) : { samples: smoothBarSamples(bar), gain: 1 }
 }
 
 function smoothBar(f) {
