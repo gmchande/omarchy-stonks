@@ -40,6 +40,15 @@ centiseconds() {
 # The run's own time, from the lock taken to its verdict.
 began=$(centiseconds)
 
+# The run's record (test/ran.sh): the tree it ran on, so the next one to
+# merge it checks the record instead of running it again. Only a run that
+# begins and ends on a clean tree (no edit, no untracked file) is recorded:
+# any other ran on something no commit holds. It goes in the git folder
+# every worktree shares, which no one edits by hand.
+clean_tree() { [ -z "$(git status --porcelain 2> /dev/null)" ] && git rev-parse -q --verify 'HEAD^{tree}' 2> /dev/null; }
+tree=$(clean_tree)
+commit=$(git rev-parse -q --verify HEAD 2> /dev/null)
+
 # Before anything runs: every harness script sources lib.sh, ends on finish
 # and its finish line, and is started by one of the runners. A script that
 # misses one can pass without its checks having run. The daily totals
@@ -76,8 +85,10 @@ trap 'rm -rf "$logs"' EXIT
 
 # At most this many checks started below run at once. Measured on 14
 # October, with every check in one run: all nineteen at once peaked at
-# 1.9 GB, four at once at 0.8 GB, and both took about four minutes.
-slots=4
+# 1.9 GB, four at once at 0.8 GB. On 21 October, test/all.sh at four at once
+# averaged 1.5 of 16 cores and peaked at 0.7 GB: its harnesses wait on their
+# own steps, not the machine, so six at once end it sooner.
+slots=6
 queue=()
 
 # start LABEL COMMAND...: queues COMMAND to run in the background, in order,
@@ -131,11 +142,22 @@ run() {
   fill
 }
 
+# drain: once every queued check has ended, filling slots meanwhile, for a
+# check that reads what they made (test/review.sh's render diff). Their
+# output still prints at the verdict.
+drain() {
+  local pid
+  while [ "${#queue[@]}" -gt 0 ]; do sleep 0.2; fill; done
+  for pid in "${pids[@]}"; do
+    while kill -0 "$pid" 2> /dev/null; do sleep 0.2; done
+  done
+}
+
 # verdict: once the queue has run dry, each queued check's output and
-# verdict in order, the run's own time, and the last line. Exits non-zero
-# on any failure.
+# verdict in order, the run's own time, and the last line, which a run on a
+# clean tree also records against it. Exits non-zero on any failure.
 verdict() {
-  local i code took
+  local i code took last
   while [ "${#queue[@]}" -gt 0 ]; do sleep 0.2; fill; done
   for i in "${!pids[@]}"; do
     wait "${pids[$i]}"
@@ -146,8 +168,13 @@ verdict() {
   done
   took=$(( ($(centiseconds) - began + 50) / 100 ))
   echo "$runner took $((took / 60)) min $((took % 60)) s"
-  if [ "$status" -ne 0 ]; then echo "SOME FAILED"
-  elif [ "$skipped" -gt 0 ]; then echo "PASSED, $skipped SKIPPED (no saved answers)"
-  else echo "ALL PASS"; fi
+  if [ "$status" -ne 0 ]; then last="SOME FAILED"
+  elif [ "$skipped" -gt 0 ]; then last="PASSED, $skipped SKIPPED (no saved answers)"
+  else last="ALL PASS"; fi
+  if [ -n "$tree" ] && [ "$(clean_tree)" = "$tree" ]; then
+    echo "$tree $commit $runner $(date -Iseconds) ${took}s $last" \
+      >> "$(git rev-parse --path-format=absolute --git-common-dir)/stonks-runs"
+  fi
+  echo "$last"
   exit "$status"
 }

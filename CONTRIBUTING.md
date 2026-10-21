@@ -43,7 +43,7 @@ building one that won't merge.
   launcher, and the flow harnesses, which drive the real service and
   surfaces with real keys and pointer. It needs Omarchy installed and a
   Wayland session. A second run on the same machine waits for the first to
-  end. With the saved answers it takes about 2 min 20 s, and its last line
+  end. With the saved answers it takes about 1 min 50 s, and its last line
   must be `ALL PASS`.
 - Most harnesses replay saved Yahoo and Robinhood answers, which are
   private: their terms don't allow republishing them. On a clone without
@@ -52,11 +52,13 @@ building one that won't merge.
 - GitHub runs the checks a fresh clone can on every push and pull request to
   `dev` and `main` (`.github/workflows/fresh-clone.yml`).
 - While you work, run the harness for the area you change, such as
-  `bash test/qml/lists.sh`.
+  `bash test/qml/lists.sh`, and render the states you change, such as
+  `test/qml/render.sh 'popup-lists-*'`.
 - A test checks what Stonks does: what it fetches, saves, and says, and what
   a key or a click changes. It never checks a picture, a position, or a
   timing. How Stonks looks and moves is the maintainer's to review, on your
-  branch, with `test/review.sh`.
+  branch, with `test/review.sh`, which lists every picture your change
+  moved.
 - Tests are few and end to end. A new behaviour gets a step in a flow harness
   under `test/qml/` that drives the real service and surfaces with real keys
   and pointer. `bun test` is only for pure data rules, such as parsers and
@@ -64,7 +66,8 @@ building one that won't merge.
 - Before adding a test, name what a user would see break. A bug fix's test
   fails on the code before the fix.
 - Wait on events or counts, never on fixed sleeps: a wait on time passes
-  alone and fails beside other harnesses.
+  alone and fails beside other harnesses. A step that fails without a cause
+  is fixed or deleted the day it's seen, never rerun past.
 - A new key goes in the README's table, which `test/qml/keys.sh` presses.
 - Check a change to what a chart, row, or figure shows on every kind of
   listing: a busy US stock, a thin one, an ETF, an index, a cryptocurrency,
@@ -204,15 +207,19 @@ seconds to give it.
 A maintainer releases from `dev`. The update notice watches the version, so
 every release bumps it.
 
-1. Walk the build in a nested session on a slow network
-   (`test/tophat.sh start --slow 3`): every wait says what's coming, and
-   nothing looks frozen.
+1. Audit the build one lens at a time: by mouse alone, by keys alone, a
+   first run, a slow network (`test/tophat.sh start --slow 3`: every wait
+   says what's coming, and nothing looks frozen), text size 16 on a short
+   screen, 150 symbols in 12 lists, every kind of listing at its odd hours,
+   and every render against the last release's. Fix or file what each
+   finds.
 2. Bump `manifest.json`'s version in a release commit on `dev`. When what
    the README's pictures show has changed, render them again with
    `test/qml/readme.sh` in that commit.
-3. Run `test/review.sh` on the release commit: the renders, layout, motion,
-   the long list, and the README pictures run only there. Its last line must
-   be `ALL PASS`.
+3. Run `test/review.sh` on the release commit, with `STONKS_RENDER_BASE`
+   set to the last release's tag so its render diff shows every picture
+   the release moved: the renders, layout, motion, the long list, and the
+   README pictures run only there. Its last line must be `ALL PASS`.
 4. Fast-forward `main` to it: `git push origin dev:main`.
 5. Tag it (`vX.Y.Z`) and publish release notes, written as Words says.
 6. File the Omarchy plugin marketplace's verify form with `main`'s new
