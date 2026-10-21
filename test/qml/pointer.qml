@@ -1230,17 +1230,27 @@ ShellRoot {
         var orderWord = root.find(body, "orderLabel")
         var orderWas = stub.order
         var edgeFaults = []
+        var arrowGlyph = Qt.createQmlObject('import QtQuick; TextMetrics {}', root)
+        arrowGlyph.font = orderWord.font
+        arrowGlyph.text = orderWord.text.charAt(0)
         ;[false, true].forEach(function(retro) {
           stub.retro = retro
           stub.order = "pct"
           wait(20)
-          ;[1, orderWord.wordStart - 1].forEach(function(x) {
+          ;[arrowGlyph.boundingRect.x + 1, arrowGlyph.boundingRect.x + arrowGlyph.boundingRect.width - 1].forEach(function(x) {
             stub.lastSettings = null
             var at = orderWord.mapToItem(body, x, orderWord.height / 2)
             mouseClick(body, at.x, at.y)
             if (!stub.lastSettings || stub.lastSettings.reversed === undefined) edgeFaults.push(retro + " at " + x)
           })
         })
+        arrowGlyph.destroy()
+        var breadth = root.find(body, "breadthRule")
+        var breadthEnd = breadth.mapToItem(body, breadth.width - 2, breadth.height / 2)
+        mouseMove(body, breadthEnd.x, breadthEnd.y)
+        within(2000, function() { return breadth.revealed })
+        var breadthWords = root.find(body, "breadthCounts")
+        root.check("the order arrow leaves the breadth rule's end available for its counts", breadth.revealed && breadthWords.visible && breadthWords.text !== "")
         stub.retro = false
         stub.order = orderWas
         root.check("both visible edges of a sorted order's arrow act in both looks", edgeFaults.length === 0, edgeFaults.join(" | "))
@@ -1508,6 +1518,79 @@ ShellRoot {
         root.check("the ? sheet says a right-click on a row offers to remove it",
           gestures.some(function(g) { return /^row: .*right-click offers to remove it/.test(g) }), gestures.join(" | "))
 
+
+        // Sliding off cancels a press. Only the pressed ink moved to review.
+        body.closeListViews()
+        body.showingHelp = false
+        stub.range = "1D"
+        stub.order = "pct"
+        var status = root.find(body, "statusText")
+        var away = status.mapToItem(body, status.width / 2, status.height / 2)
+        var settings = function() {
+          return [stub.range, stub.order, body.showingHelp, body.listMenuOpen, JSON.stringify(stub.lastSettings), body.adding, body.managingLists].join(",")
+        }
+        var pressOn = function(name, fill, target) {
+          var at = target.mapToItem(body, target.width / 2, target.height / 2)
+          mouseMove(body, away.x, away.y)
+          var before = settings()
+          mousePress(body, at.x, at.y)
+          mouseMove(body, away.x, away.y)
+          mouseRelease(body, away.x, away.y)
+          var after = settings()
+          return after === before ? "" : name + ": " + before + " -> " + after
+        }
+        var pressFaults = []
+        ;[false, true].forEach(function(retro) {
+          stub.retro = retro
+          stub.lastSettings = null
+          waitForRendering(body)
+          var look = retro ? "retro " : "smooth "
+          var token = root.findAll(root.find(body, "rangeRow"), "rangeToken")[1]
+          var controls = [
+            ["range token", token, token],
+            ["list name", root.find(body, "listControl"), root.find(body, "listLabel")],
+            ["order word", root.find(body, "orderControl"), root.find(body, "orderLabel")],
+            ["order arrow", root.find(body, "orderArrowFill"), root.find(body, "orderArrow")],
+            ["look icon", root.find(body, "lookFill"), root.find(body, "lookIcon")],
+            ["help mark", root.find(body, "helpFill"), root.find(body, "helpMark")],
+            ["footer", root.find(body, "footerFill"), root.find(body, "footerText")]
+          ]
+          controls.forEach(function(c) {
+            var fault = pressOn((look + c[0]).replace(/ /g, "-"), c[1], c[2])
+            if (fault !== "") pressFaults.push(fault)
+          })
+          body.openManageLists()
+          wait(100)
+          var doneAction = root.find(body, "manageDone")
+          var actionFault = pressOn((look + "list view action").replace(/ /g, "-"), root.find(doneAction, "actionFill"), doneAction)
+          if (actionFault !== "") pressFaults.push(actionFault)
+          body.closeListViews()
+          wait(100)
+          // The rows that name a key are buttons too: a symbol's list, past
+          // the opening's double-click moment, and a search result.
+          body.openSymbolLists(stub.symbols[0])
+          wait(Application.styleHints.mouseDoubleClickInterval + 100)
+          var listRow = root.findAll(body, "symbolListRow")[0]
+          var listFault = pressOn((look + "symbol list row").replace(/ /g, "-"), root.find(listRow, "rowFill"), listRow)
+          if (listFault !== "") pressFaults.push(listFault)
+          body.closeListViews()
+          wait(100)
+          body.startAdding()
+          body.search.results = [
+            { symbol: "TOPR", name: "Top Result Inc.", exchange: "NASDAQ" },
+            { symbol: "SECR", name: "Second Result Inc.", exchange: "NYSE" }
+          ]
+          body.search.answer = "results"
+          wait(100)
+          var resultRow = root.findAll(body.search, "searchResult")[1]
+          var resultFault = pressOn((look + "search result").replace(/ /g, "-"), resultRow, resultRow)
+          if (resultFault !== "") pressFaults.push(resultFault)
+          body.cancelAdding()
+          wait(100)
+        })
+        stub.retro = false
+        root.check("releasing a press off a control cancels it, for every control in both looks",
+          pressFaults.length === 0, pressFaults.join(" | "))
 
         // The list views follow the wheel as the rows do: scrolled under a
         // still pointer, the cursor goes to the row then under it, so Enter

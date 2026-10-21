@@ -332,7 +332,8 @@ ShellRoot {
         var before = service.symbols.indexOf(symbol)
         move()
         var after = service.symbols.indexOf(symbol)
-        return (after !== before && watchlist.cursorRow === symbol) + " " + symbol + " at " + after
+        within(2000, function() { return watchlist.wholeInSight(watchlist.displayedSymbols.indexOf(symbol), watchlist.contentY) })
+        return (after !== before && watchlist.cursorRow === symbol && watchlist.wholeInSight(watchlist.displayedSymbols.indexOf(symbol), watchlist.contentY)) + " " + symbol + " at " + after
       }
       reset("", "smooth")
       watchlist.cursorSymbol = "NVDA"
@@ -370,8 +371,9 @@ ShellRoot {
       keyClick(Qt.Key_Down)
       var downTarget = watchlist.displayedSymbols[3]
       tryVerify(function() { return watchlist.cursorRow === downTarget }, 2000)
+      within(2000, function() { return watchlist.wholeInSight(3, watchlist.contentY) })
       harness.check("J and K move their selected row, and Down selects the next row",
-        /^true /.test(jAtBottom) && /^true /.test(kAtTop) && watchlist.cursorRow === downTarget,
+        /^true /.test(jAtBottom) && /^true /.test(kAtTop) && watchlist.cursorRow === downTarget && watchlist.wholeInSight(3, watchlist.contentY),
         [jAtBottom, kAtTop, watchlist.cursorRow].join(" | "))
       app.close()
       app.testWindow.implicitHeight = heightBefore
@@ -395,7 +397,7 @@ ShellRoot {
       app.testWindow.implicitHeight = body.chromeHeight + 3 * body.rowPitch
       app.open("{}")
       wait(200)
-      var ready = function() { return !watchlist.settling && watchlist.displayedSymbols.every(function(symbol) { return !!watchlist.rowItem(symbol) }) }
+      var ready = function() { return watchlist.dragSymbol === "" && !watchlist.settling && watchlist.displayedSymbols.every(function(symbol) { return !!watchlist.rowItem(symbol) }) }
       var reset = function(list, look) {
         service.persist({ style: look })
         service.switchList(list)
@@ -417,7 +419,7 @@ ShellRoot {
         wait(50)
         return Qt.point(at.x, at.y + by)
       }
-      var canAct = function() { return watchlist.cursorRow !== "" && watchlist.displayedSymbols.indexOf(watchlist.cursorRow) >= 0 }
+      var canAct = function() { return watchlist.cursorRow !== "" && watchlist.wholeInSight(watchlist.displayedSymbols.indexOf(watchlist.cursorRow), watchlist.contentY) }
 
       // Found in the transition audit (lists 3): the wheel scrolled the
       // lifted row away from the pointer, and it snapped back on the next
@@ -425,12 +427,18 @@ ShellRoot {
       var underPointer = function(symbol, by, notch) {
         var at = lift(symbol, by)
         var row = watchlist.rowItem(symbol)
+        var scrollBefore = watchlist.contentY
         mouseWheel(body, at.x, at.y, 0, notch, Qt.LeftButton)
         tryVerify(function() { return !watchlist.settling }, 2000)
         var kept = watchlist.dragSymbol === symbol
+        var drop = watchlist.displayedSymbols.slice()
+        var from = drop.indexOf(symbol)
+        var to = Math.round(from + (by + watchlist.contentY - scrollBefore) / watchlist.rowPitch)
+        drop.splice(from, 1)
+        drop.splice(Math.max(0, Math.min(drop.length, to)), 0, symbol)
         mouseRelease(body, at.x, at.y)
         within(2000, ready)
-        return kept + " dragged " + symbol + " remains in All " + (service.library.indexOf(symbol) >= 0)
+        return (kept && service.symbols.join() === drop.join()) + " dragged " + symbol + " -> " + service.symbols.join() + " wanted " + drop.join()
       }
       reset("", "smooth")
       var wheelDown = underPointer("AAPL", 8, -120)
@@ -768,12 +776,13 @@ ShellRoot {
       // within them, to the top (Watchlist.display), as one did then.
       watchlist.display(watchlist.displayedSymbols.slice(), false)
       wait(100)
+      var allReachable = watchlist.displayedSymbols.every(function(symbol, index) { return watchlist.wholeInSight(index, watchlist.contentY) })
       body.height = body.smallestHeight + 3 * 42
       wait(100)
       var settledAt = watchlist.displayedSymbols.indexOf(lastSymbol)
       var settled = [openedOn, watchlist.cursorRow, watchlist.cursorSymbol === "", watchlist.wholeInSight(settledAt, watchlist.headedY)].join(",")
       harness.check("a window settling through sizes as it opens keeps the featured row in sight, the cursor resting on it",
-        settled === [lastSymbol, lastSymbol, true, true].join(","), lastSymbol + " -> " + settled)
+        allReachable && settled === [lastSymbol, lastSymbol, true, true].join(","), lastSymbol + " -> " + settled)
       app.close()
       app.testWindow.implicitHeight = heightAtStart
       ;["FLAT", "DOWN"].forEach(function(s) { service.removeSymbol(s) })

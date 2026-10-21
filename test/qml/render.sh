@@ -12,6 +12,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 out="${STONKS_VISUAL_DIR:-$plugin/out/render}"
 mkdir -p "$out"
 plugin_tree render.qml
+frame_tools
 # The pill sheet's pills load no popup: the offscreen platform has no popup
 # window to put one in, and no render shows one.
 patch_copy plugin/BarWidget.qml '/id: panelLoader/,/source:/s/active: true/active: false/'
@@ -24,6 +25,23 @@ every_state() (
   states="window-help-smooth window-help-retro popup-help-smooth popup-help-retro popup-help-sorted-smooth popup-help-sorted-retro popup-holiday-retro popup-price4-solo-smooth popup-price4-solo-retro popup-price5-stack-smooth popup-price5-stack-retro popup-nest-1d-smooth popup-nest-1d-retro popup-history-failed popup-history-loading popup-history-1w-smooth popup-history-1w-retro popup-history-1m-smooth popup-history-1m-retro popup-history-1y-smooth popup-history-1y-retro popup-history-all-smooth popup-history-all-retro loading failed aged history-scrub history-empty-loading history-sparse sprite-candidates popup-search-smooth popup-search-retro popup-search-stale-smooth popup-search-none-smooth popup-search-failed-retro popup-search-preview-smooth popup-search-preview-retro popup-search-show-smooth popup-search-show-retro min-window-smooth min-window-retro min-window-search-smooth w22-popup-smooth-aapl-1d w22-popup-retro-aapl-1d w22-window-smooth-aapl-1d w22-window-retro-aapl-1d w22-popup-smooth-aapl-5y w22-popup-retro-aapl-5y w22-window-smooth-aapl-5y w22-window-retro-aapl-5y w22-popup-smooth-spy-1d w22-popup-retro-spy-1d w22-window-smooth-spy-1d w22-window-retro-spy-1d w22-popup-smooth-shop-1d w22-popup-retro-shop-1d w22-window-smooth-shop-1d w22-window-retro-shop-1d w22-popup-smooth-shop-1y w22-popup-retro-shop-1y w22-window-smooth-shop-1y w22-window-retro-shop-1y w22-popup-smooth-mz-1d w22-popup-retro-mz-1d w22-window-smooth-mz-1d w22-window-retro-mz-1d window-1416-smooth popup-room-one-open-smooth popup-room-growth-open-retro window-room-four-five-retro popup-room-five-long-smooth popup-room-five-long-retro popup-rowstates-smooth popup-rowstates-retro popup-note-smooth popup-hint-smooth popup-hint-retro popup-notice-file-smooth popup-notice-file-retro popup-notice-update-smooth popup-notice-update-retro popup-lists-menu-retro popup-lists-named-smooth popup-lists-empty-smooth popup-lists-empty-retro popup-lists-long-retro popup-lists-manage-smooth popup-lists-manage-retro popup-lists-symbol-smooth popup-lists-symbol-retro popup-lists-rename-smooth popup-lists-confirm-retro window-lists-manage-smooth window-lists-symbol-retro popup-rowlines-smooth popup-rowlines-retro popup-52w-smooth popup-52w-retro popup-breadth-even-smooth popup-breadth-even-retro popup-order-falls-smooth popup-order-rises-smooth popup-order-falls-retro popup-order-rises-retro window-order-falls-smooth window-order-rises-smooth window-order-falls-retro window-order-rises-retro popup-overnight-night-nest-smooth popup-overnight-night-nest-retro popup-overnight-night-silk-smooth popup-overnight-night-silk-retro popup-overnight-night-reed-retro popup-overnight-day-nest-smooth popup-overnight-day-nest-retro popup-overnight-sunday-nest-smooth popup-overnight-sunday-nest-retro popup-overnight-live-ez-smooth popup-overnight-live-ez-retro popup-overnight-live-toy-smooth popup-overnight-live-toy-retro popup-overnight-live-nest-1m-smooth popup-overnight-live-nest-1m-retro popup-overnight-live-nest-1m-scrub-smooth popup-overnight-live-nest-1m-scrub-retro popup-overnight-2026-10-07-1153-nest-smooth popup-overnight-2026-10-07-1153-nest-retro popup-overnight-2026-10-06-1800-nest-smooth popup-overnight-2026-10-06-2300-nest-retro popup-overnight-2026-10-07-0005-nest-smooth popup-overnight-2026-10-07-0005-nest-retro popup-overnight-2026-10-07-0100-nest-smooth popup-overnight-2026-10-07-0100-nest-scrub-smooth popup-overnight-2026-10-07-0100-nest-scrub-retro popup-overnight-2026-10-07-0600-nest-retro popup-overnight-2026-10-03-1200-nest-smooth popup-overnight-2026-10-04-2230-nest-retro popup-fill-up-smooth popup-fill-down-smooth popup-fill-cross-smooth popup-fill-up-retro popup-fill-down-retro popup-fill-cross-retro popup-fill-up-smooth-kanagawa popup-fill-down-smooth-kanagawa popup-fill-cross-smooth-kanagawa popup-fill-up-retro-kanagawa popup-fill-down-retro-kanagawa popup-fill-cross-retro-kanagawa pill-sheet fetch-saved-smooth fetch-saved-retro fetch-overdue-smooth fetch-overdue-retro"
   # A missing regular price: the last chart trade labelled with its time.
   states="$states popup-last-trade-smooth popup-last-trade-retro"
+  # Hover and held presses formerly judged inside the behavior flows.
+  # Each uses real pointer input on the displayed control in both looks.
+  for look in smooth retro; do
+    for pose in join crossing dragwheel scroll endremove notefade breadth look neutral; do
+      states="$states popup-motion-$pose-$look"
+    done
+    states="$states min-window-lists-refused-menu-$look min-window-lists-refused-manage-$look"
+    for section in left center right; do
+      for moment in open held next; do
+        states="$states popup-anchor-$section-$moment-$look"
+      done
+    done
+    for control in range list orderword orderarrow manualorder look help footer done symbol search remove; do
+      states="$states popup-controls-$control-hover-$look popup-controls-$control-press-$look"
+    done
+    states="$states popup-controls-deadmove-hover-$look popup-controls-livemove-hover-$look popup-controls-breadth-hover-$look"
+  done
   # The listing sweep (CONTRIBUTING.md, Verify it): every kind of listing on
   # 1D at each of its moments, in both looks.
   # The list menu over the cursor's row in both looks on both surfaces: its

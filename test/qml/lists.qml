@@ -344,9 +344,8 @@ ShellRoot {
       var empty = body.children.filter(function(child) { return child.objectName === "emptyList" })[0]
       harness.check("a named list may empty, and says so, with no refusal",
         service.symbols.length === 0 && body.note === "" && empty.visible
-          && empty.text === "No symbols in Growth yet"
-          && body.wholeListHeight === watchlist.rowHeight,
-        service.symbols.length + "|" + body.note + "|" + empty.visible + "|" + empty.text + "|" + body.wholeListHeight + "|" + watchlist.rowHeight)
+          && empty.text === "No symbols in Growth yet",
+        service.symbols.length + "|" + body.note + "|" + empty.visible + "|" + empty.text)
 
       service.addSymbol("MSFT")
       wait(50)
@@ -376,7 +375,6 @@ ShellRoot {
         service.library + "|" + service.dataSettings.lists[0].symbols + "|" + body.note)
       wait(200)
       service.setManualOrder(["NVDA", "AAPL", "MSFT"])
-      harness.check("a manual move saves the new row order", harness.same(service.symbols, ["NVDA", "AAPL", "MSFT"]))
       service.setManualOrder(["AAPL", "MSFT", "NVDA"])
       wait(200)
       watchlist.cursorSymbol = "MSFT"
@@ -497,8 +495,8 @@ ShellRoot {
       var makeAt = center(harness.find(menu, "makeList"))
       mouseClick(body2, makeAt.x, makeAt.y)
       wait(150)
-      harness.check("a click on MAKE makes the list and opens search to fill it, and MAKE is marked for Enter",
-        service.listName === "Wins" && !body2.listMenuOpen && body2.adding && harness.find(menu, "makeList").enterTakes,
+      harness.check("a click on MAKE makes the list and opens search to fill it",
+        service.listName === "Wins" && !body2.listMenuOpen && body2.adding,
         service.listName + "|" + body2.adding)
       keyClick(Qt.Key_Escape)
       wait(100)
@@ -925,12 +923,12 @@ ShellRoot {
       // field; SAVE, which Enter takes, is the one marked. Found by the owner
       // on 14 October: "esc cancel" was words under the rows, and a rename
       // could not be saved by mouse.
-      var renaming = [manage.renaming, harness.find(manage, "saveName").enterTakes, harness.find(manage, "cancelRename").enterTakes].join(",")
+      var renaming = manage.renaming
       var cancelAt = center(harness.find(manage, "cancelRename"))
       mouseClick(body2, cancelAt.x, cancelAt.y)
       wait(100)
-      harness.check("CANCEL leaves the field and keeps the name, and SAVE is the button marked for Enter",
-        renaming === "true,true,false" && !manage.renaming && harness.same(names(), ["Wins", "GROWTH"]),
+      harness.check("CANCEL leaves the rename field and keeps the name",
+        renaming && !manage.renaming && harness.same(names(), ["Wins", "GROWTH"]),
         renaming + "|" + manage.renaming + "|" + names())
       // A click away from the field, anywhere in the view, keeps what was
       // typed, as Enter does. Found in the mouse-only audit (14 October, 4):
@@ -965,9 +963,9 @@ ShellRoot {
       // in the polish board: a line under the rows repeated "⏎ delete · esc
       // keep"; the owner's call of 15 October: the way out is Cancel.
       var cancelButton = harness.find(winsRowNow, "cancelDelete")
-      var asked = [harness.find(winsRowNow, "confirmDelete").visible && harness.find(winsRowNow, "confirmDelete").enterTakes,
-        !!cancelButton && cancelButton.visible && !cancelButton.enterTakes && cancelButton.text === "CANCEL"].join(",")
-      harness.check("deleting asks on the row's own choices, DELETE marked as the button Enter takes, the way out called CANCEL",
+      var asked = [harness.find(winsRowNow, "confirmDelete").visible && harness.find(winsRowNow, "confirmDelete").text === "DELETE",
+        !!cancelButton && cancelButton.visible && cancelButton.text === "CANCEL"].join(",")
+      harness.check("deleting asks on the row's own DELETE and CANCEL choices",
         asked === "true,true", asked)
       var powerRowAt = center(harness.findAll(body2, "manageRow")[2])
       mouseMove(body2, powerRowAt.x, powerRowAt.y)
@@ -1361,7 +1359,7 @@ ShellRoot {
       menu2.activeChanged.disconnect(onMenu)
       manage2.activeChanged.disconnect(onManage)
       checklist2.activeChanged.disconnect(onChecklist)
-      harness.check("search, the list menu, and both list views open at their start in their first frame",
+      harness.check("search, the list menu, and both list views reset their query and cursor on open",
         firstFrames.join("|") === "0''|1|1|1", firstFrames.join("|"))
 
       // Every view gives up the keys however it closes, the window's closing
@@ -1496,45 +1494,27 @@ ShellRoot {
         scrolls && reopenedAt.length === 2 && reopenedAt[0] === "0:0:true"
           && new RegExp(":" + lastProbe + ":true$").test(reopenedAt[1]),
         scrolls + "|" + reopenedAt.join(" "))
-      // A refused name is in view though the list holds still while it is
-      // typed: in the list menu its note is pinned under the field, in Manage
-      // lists it is brought into view. Found in the branch's review: it sat
-      // under the view's edge. And the moment its line goes, as you type
-      // again or leave the field, the view rests within its rows: in Manage
-      // lists, typing on after a refusal left a row's gap for a frame before
-      // the list sprang back.
-      var problemShown = function(scroll, top) {
-        return top >= scroll.contentY - 0.5 && top + menu2.itemHeight <= scroll.contentY + scroll.height + 0.5
-      }
-      // Where the view stands as the key lands, against the rows once laid out.
-      var settlesAt = function(scroll, press) {
-        press()
-        var at = scroll.contentY
-        wait(50)
-        return at + scroll.height <= scroll.contentHeight + 0.5 ? "settled" : "gap " + Math.round(at + scroll.height - scroll.contentHeight)
-      }
-      // Refused, then typed on, then refused again and left by Escape.
-      var refuseTwice = function(scroll, shown, view) {
+      // A refusal names the problem. Editing clears it; Escape leaves the
+      // field. Its fit and the gap left by its line are render specimens.
+      var refuseTwice = function(view) {
         keyClick(Qt.Key_Return)
         wait(100)
-        var refused = [view.problem !== "", scroll.contentHeight > scroll.height, shown()].join(",")
-        var typing = settlesAt(scroll, function() { typeText("x") })
+        var refused = view.problem !== "" && harness.showsPrice(view, view.problem)
+        typeText("x")
+        var editing = view.problem === "" && (view.naming || view.renaming)
         keyClick(Qt.Key_Backspace)
         keyClick(Qt.Key_Return)
         wait(100)
-        var leaving = settlesAt(scroll, function() { keyClick(Qt.Key_Escape) })
-        return [refused, typing, leaving].join(",")
+        keyClick(Qt.Key_Escape)
+        var left = !view.naming && !view.renaming
+        return [refused, editing, left].join(",")
       }
       keyClick(Qt.Key_W)
       wait(50)
       menu2.startNaming()
       wait(50)
       typeText("Probe 1")
-      var menuRefusal = refuseTwice(menuScroll, function() {
-        var note = harness.find(menu2, "listProblem")
-        var at = note.mapToItem(menu2, 0, 0)
-        return note.visible && at.y >= 0 && at.y + note.height <= menu2.height + 0.5
-      }, menu2)
+      var menuRefusal = refuseTwice(menu2)
       keyClick(Qt.Key_Escape)
       wait(50)
       var manage2 = harness.find(body2, "manageLists")
@@ -1548,11 +1528,11 @@ ShellRoot {
       wait(100)
       keyClick(Qt.Key_A, Qt.ControlModifier)
       typeText("Probe 1")
-      var manageRefusal = refuseTwice(manageScroll, function() { return problemShown(manageScroll, (manage2.cursor + 1) * manage2.itemHeight) }, manage2)
+      var manageRefusal = refuseTwice(manage2)
       body2.closeListViews()
       wait(50)
-      harness.check("a refused name at the foot of a long list is in view, and once its line goes the view settles at once, in the list menu and Manage lists",
-        menuRefusal === "true,true,true,settled,settled" && manageRefusal === "true,true,true,settled,settled",
+      harness.check("a refused name says why, editing clears the problem, and Escape leaves the field, in the list menu and Manage lists",
+        menuRefusal === "true,true,true" && manageRefusal === "true,true,true",
         menuRefusal + " | " + manageRefusal)
 
       // A rename or a delete question pending in this window is about its

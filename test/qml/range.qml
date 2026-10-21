@@ -82,7 +82,13 @@ ShellRoot {
   function iconDrawn() {
     var words = []
     var animal = find(pill, "pillAnimal")
-    if (animal.visible && animal.kind) words.push(animal.kind + " in " + (animal.kind === "bull" ? pill.upColor : pill.downColor))
+    if (animal.visible && animal.kind) {
+      // During a reversed turn the current kind is the right-hand layer;
+      // read that layer's actual colour, without judging the turn's ink.
+      var layer = animal.children.filter(function(item) { return item.shows === animal.kind })[0]
+        || animal.children.filter(function(item) { return item.shows === undefined })[0]
+      words.push(animal.kind + " in " + find(layer, "animalCells").color)
+    }
     if (find(pill, "pillLevel").visible) words.push("level")
     if (find(pill, "pillWaiting").visible) words.push("…")
     if (find(pill, "pillWarning").visible) words.push("!")
@@ -756,6 +762,12 @@ ShellRoot {
 
       // r fetches every quote again, and the range on show, which the cache
       // would otherwise have kept: AAPL's quote and its history.
+      // These answers are older than refresh's ten-second floor. The
+      // preceding inputs may now finish before that much wall time passes.
+      var refreshable = {}
+      for (var symbol in service.testFeed.entries)
+        refreshable[symbol] = Object.assign({}, service.testFeed.entries[symbol], { answeredAt: service.testFeed.entries[symbol].answeredAt - 20 })
+      service.testFeed.entries = refreshable
       var aapl = harness.calls("AAPL")
       var aaplHistory = harness.calls("AAPL.history")
       var msft = harness.calls("MSFT")
@@ -1004,7 +1016,15 @@ ShellRoot {
       app.open("{}")
       wait(100)
       var heroBeforeFail = service.featuredSymbol
-      body.search.picked("NOPE")
+      app.testKeyCatcher.forceActiveFocus()
+      keyClick(Qt.Key_A)
+      tryVerify(function() { return body.adding && body.search.active }, 2000)
+      var failField = harness.find(body.search, "searchField")
+      failField.forceActiveFocus()
+      keyClick(Qt.Key_A, Qt.ControlModifier)
+      for (var letter = 0; letter < 4; letter++) keyClick("NOPE".charAt(letter))
+      tryVerify(function() { return body.search.resultsQuery === "NOPE" && body.search.results.length === 1 }, 3000)
+      keyClick(Qt.Key_Return)
       var failedOut = within(10000, function() { return !!service.entries.NOPE && service.entries.NOPE.status === "failed" })
       wait(200)
       harness.check("an add whose first fetch fails leaves the hero where it was",
@@ -1282,9 +1302,20 @@ ShellRoot {
       dropEntry("SLOW|1M")
       dropEntry("SLOW|3M")
       service.setRange("1M")
+      var selectedRanges = []
+      var latestRange = function() {
+        var said = body.chartSymbol + "|" + body.chartRange
+        if (selectedRanges[selectedRanges.length - 1] !== said) selectedRanges.push(said)
+      }
+      body.chartChanged.connect(latestRange)
       service.setRange("3M")
-      tryVerify(function() { return harness.answered("SLOW|3M") }, 5000)
-      harness.check("a second range requested while another is out shows only the latest answer", body.chartRange === "3M" && body.chartSymbol === "SLOW")
+      tryVerify(function() { return harness.answered("SLOW|3M") && !service.testHistoryFeed.busy }, 5000)
+      waitForRendering(body)
+      latestRange()
+      body.chartChanged.disconnect(latestRange)
+      harness.check("a second range requested while another is out shows only the latest answer",
+        selectedRanges.every(function(range) { return range === "SLOW|1W" || range === "SLOW|3M" }) && body.chartRange === "3M" && body.chartSymbol === "SLOW",
+        selectedRanges.join(" -> "))
       service.setRange("1D")
 
       // On the day, a symbol whose first fetch failed is an answer too: the
@@ -1343,6 +1374,8 @@ ShellRoot {
       for (var vlook = 0; vlook < 2; vlook++) {
         service.persist({ style: vlook === 0 ? "smooth" : "retro" })
         var stack = harness.find(pill, "pillStack")
+        pill.settings = Object.assign({}, settingsBefore, {barStyleVertical: "icon"})
+        if (harness.iconDrawn() !== "bear in " + Commons.Color.urgent) verticalWrong.push("icon " + harness.iconDrawn())
         // The icon form, whatever the top bar's: the bear alone, in one
         // slot.
         // Stacked, as Omarchy's clock stacks a vertical bar's lines: DOWN
@@ -1359,7 +1392,7 @@ ShellRoot {
             return [Format.lookSigns(t, service.retro), Commons.Color.urgent]
           }))
           var lines = stackLines()
-          if (lines.length !== want.length || lines.some(function(line, i) { return line.text !== want[i][0] }))
+          if (lines.length !== want.length || lines.some(function(line, i) { return line.text !== want[i][0] || !Qt.colorEqual(line.color, want[i][1]) }))
             verticalWrong.push(mode + ": " + lines.map(function(line) { return line.text }).join("/"))
         })
         service.persist({ changeMode: "pct" })
@@ -1561,7 +1594,7 @@ ShellRoot {
       }
       var wheelsRight = wheels.every(function(line) { return !/turning| want /.test(line) })
         && harness.iconDrawn() !== animalOf("TURN")
-      harness.check("a new price that turns the pill's day ends on the other animal in its colour in every column, and a wheel step shows the next symbol's animal at once",
+      harness.check("a new price and a wheel step give the pill the current day's animal and its colour",
         turnStart === animalOf("TURN") && turnedDown === "bear in " + pill.downColor
           && turnedUp === "bull in " + pill.upColor && wheelsRight,
         [turnStart, turnedDown, turnedUp].concat(wheels).join(" | "))

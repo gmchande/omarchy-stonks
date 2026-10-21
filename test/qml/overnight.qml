@@ -80,6 +80,8 @@ ShellRoot {
     return null
   }
 
+  function sleep() { return app.testBody.animal.asleep ? "asleep" : "awake" }
+
   // The displayed extended-session words and figures; their ink is review.
   function strip() {
     var row = find(app.testBody, "extendedLine")
@@ -249,8 +251,12 @@ ShellRoot {
         friday.start + " to " + friday.end + ", last " + body.motion.scrubEnd)
       // Saturday noon, the header's animal sleeps; the cryptocurrency's
       // never does.
+      var saturdayNest = harness.sleep()
       featureShown("BTC-USD")
+      var saturdayBtc = harness.sleep()
       featureShown("NEST")
+      harness.check("Saturday noon: NEST's animal sleeps, BTC-USD's never does",
+        saturdayNest === "asleep" && saturdayBtc === "awake", saturdayNest + ", " + saturdayBtc)
       service.now = 1790388000
       harness.check("Friday 22:00 reads the same", harness.strip() === "AFTER HOURS 238.22 +0.38%", harness.strip())
       var calls = harness.record("OVERNIGHT.calls")
@@ -284,6 +290,7 @@ ShellRoot {
       harness.check("Sunday night trades, measured from Friday's close",
         harness.strip() === "OVERNIGHT 22:20 234.84 \u22121.05%" && body.featured.priceText === "237.33",
         harness.strip() + " | " + body.featured.priceText)
+      harness.check("Sunday 22:30, its night trading, NEST's animal is awake", harness.sleep() === "awake", harness.sleep())
       // The header names the session the line under the price names: it
       // said "Weekend" over OVERNIGHT.
       harness.check("Sunday 22:30, its night trading, NEST's header says Overnight, as the line under its price does",
@@ -417,7 +424,7 @@ ShellRoot {
       service.now = harness.night
 
       featureShown("SILK")
-      harness.check("SILK's last print, at 22:20, is forty minutes old and", harness.strip() === "OVERNIGHT 22:20 342.13 +0.04%",
+      harness.check("SILK's last print, at 22:20, is forty minutes old", harness.strip() === "OVERNIGHT 22:20 342.13 +0.04%",
         harness.strip())
       // SILK traded in 13 of the night's 35 five-minute slots so far: its 1D
       // is Thursday's day from 04:00, then the night to Friday 04:00, each of
@@ -743,6 +750,49 @@ ShellRoot {
         harness.allDayAsked("KILN") === 1 && harness.allDayAsked("BOLT") === 1 && harness.printsAsked("KILN") === 1
           && harness.printsAsked("BOLT") === 1,
         harness.allDayAsked("KILN") + ", " + harness.allDayAsked("BOLT") + " | prints " + harness.printsAsked("KILN") + ", " + harness.printsAsked("BOLT"))
+      // The header's animal sleeps while its market does, by its phase and
+      // calendar: at 01:00 NEST's night trades, so it's awake; KILN's
+      // doesn't, so it sleeps, in both looks. A scrub wakes it, since it
+      // reads a moment the market traded, and letting go puts it back to
+      // sleep at once.
+      var sleeps = []
+      ;["smooth", "retro"].forEach(function(look) {
+        service.persist({ style: look })
+        within(2000, function() { return body.retro === (look === "retro") })
+        featureShown("NEST")
+        var nest = harness.sleep()
+        featureShown("KILN")
+        var kiln = harness.sleep()
+        scrubAt(0.5)
+        within(1000, function() { return body.scrubT !== 0 })
+        var scrubbed = harness.sleep()
+        endScrub()
+        within(1000, function() { return body.scrubT === 0 })
+        sleeps.push(look + ": NEST " + nest + ", KILN " + kiln + ", scrubbed " + scrubbed + ", let go " + harness.sleep())
+      })
+      service.persist({ style: "smooth" })
+      harness.check("01:00: NEST, whose night trades, is awake; KILN sleeps, a scrub wakes it, and letting go puts it back to sleep at once, in both looks",
+        sleeps.every(function(s) { return / NEST awake, KILN asleep, scrubbed awake, let go asleep$/.test(s) }), sleeps.join(" | "))
+      // Its market waking while you watch, at 04:00 when KILN's pre-market
+      // starts, opens the animal's eyes and takes the "z" away, in both
+      // looks. They opened at once; now they open over the close's time, so
+      // this reads where they end.
+      var wakes = []
+      featureShown("KILN")
+      ;["smooth", "retro"].forEach(function(look) {
+        service.persist({ style: look })
+        within(2000, function() { return body.retro === (look === "retro") })
+        service.now = harness.midnight.wed7 + 4 * 3600 - 2
+        within(1000, function() { return harness.sleep() === "asleep" })
+        var before = harness.sleep()
+        service.now = harness.midnight.wed7 + 4 * 3600
+        within(2000, function() { return harness.sleep() === "awake" })
+        wakes.push(look + ": " + before + " to " + harness.sleep())
+      })
+      service.persist({ style: "smooth" })
+      service.now = 1791349200
+      harness.check("04:00: KILN's pre-market starting wakes its animal, eyes open and no \"z\", in both looks",
+        wakes.every(function(w) { return / asleep to awake$/.test(w) }), wakes.join(" | "))
       // So does the header: NEST's says Overnight, as the line under its
       // price does, and KILN's Closed, with no such line. NEST's said Closed.
       featureShown("NEST")
@@ -893,18 +943,16 @@ ShellRoot {
       within(8000, function() { return !!service.quotes["7203.T"] && service.arriving.length === 0 })
       featureShown("7203.T")
       var tokyoHeader = body.headerText
-      // The saved day has no invented trades during Tokyo's lunch. The
-      // painted break in both surfaces and looks is in render review.
-      var tokyoDay = service.quotes["7203.T"]
-      var duringLunch = body.featuredDay.points.filter(function(point) {
-        var clock = Format.hhmm(point.t, tokyoDay.gmtoffset)
-        return clock > "11:30" && clock < "12:30"
-      })
+      // The empty lunch buckets sent no trades. A real scrub in their
+      // middle keeps the last trade (11:30, 2915), never an interpolated one.
+      scrubAt(Chart.fractionAtTime(body.featuredDay, 1791342000))
+      var lunchPrice = body.featured.priceText
+      endScrub()
       featureShown("NEST")
       scrubAt(0.5)
       var nasdaqScrub = body.headerText
       endScrub()
-      harness.check("Tokyo's day invents no lunch trades", duringLunch.length === 0, JSON.stringify(duringLunch))
+      harness.check("a scrub during Tokyo lunch keeps the last sent trade, never an interpolated price", lunchPrice === "2,915.00", lunchPrice)
       // Bring the row into sight before reading its data.
       var tokyoAt = body.watchlist.rowItem("7203.T").y
       body.watchlist.contentY = Math.max(0, Math.min(tokyoAt, body.watchlist.contentHeight - body.watchlist.height))

@@ -2,7 +2,7 @@
 # Adding symbols in the window through the real App and Service with real
 # Qt keys and pointer: an add held until its price is in, its row joining
 # at its place, adds out at a close or a list switch, two adds in a row,
-# adds from search, a joining row's day line drawn in, whole once drawn, and
+# adds from search, an undone row keeping its quote through a reopen, and
 # a stock put back, by u and by PUT BACK, asking for its quote at once.
 # HOME and curl are scratch.
 # Each independent chapter starts a fresh service. Driving all three at

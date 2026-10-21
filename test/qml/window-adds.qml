@@ -4,12 +4,10 @@ import Quickshell
 import Quickshell.Io
 import "plugin" as Stonks
 
-// Adding symbols in the window, through the real App and Service with real
-// Qt keys and pointer: an add held until its price is in, its row joining
-// at its place, the list easing to it, adds out at a close or a list
-// switch, two adds in a row, adds from search, a joining row's day line
-// drawn in, whole once drawn, and a stock put back asking for its quote at
-// once. HOME and curl are scratch fixtures.
+// Adds through the real App and Service: accepted previews, arriving rows,
+// chosen charts, list membership, removal and undo, including the immediate
+// refresh when put back. The review kit keeps their ink and motion.
+// HOME and curl are scratch fixtures.
 ShellRoot {
   id: harness
 
@@ -60,6 +58,7 @@ ShellRoot {
 
   Stonks.Service { id: service }
   Stonks.App { id: app; service: service }
+  Process { id: quoteFile }
 
   TestCase {
     name: "WindowAdds"
@@ -170,6 +169,13 @@ ShellRoot {
       tryVerify(function() { return !body.adding }, 2000)
     }
 
+    function holdQuote(symbol, held) {
+      var path = Quickshell.env("STONKS_FAKE_STATE") + "/" + symbol + ".quote.hold"
+      quoteFile.command = held ? ["touch", path] : ["rm", "-f", path]
+      quoteFile.running = true
+      tryVerify(function() { return !quoteFile.running }, 2000)
+    }
+
     // The six symbols these flows start from, in manual order, `featured`
     // on `range`, the window tall enough for every row.
     function sixRows(body, featured, range) {
@@ -193,11 +199,8 @@ ShellRoot {
       tryVerify(function() { return !!service.quotes["SHOP.TO"] && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 5000)
       service.feature("AAPL")
 
-      // A result already in All joins a list that lacks it the way a new
-      // symbol does: faded in at its place, the rows below sliding, in smooth
-      // on one list and retro on another. Found in the transition audit
-      // (search 3): it was already in place at full opacity, the rows below
-      // already moved, because it joined while the results hid the rows.
+      // A result already in All joins a list that lacks it once, and becomes
+      // its selected symbol, in both looks. Review keeps the joining poses.
       var joins = function(name, members, look) {
         service.persist({ style: look })
         service.createList(name)
@@ -221,13 +224,8 @@ ShellRoot {
       harness.check("a result already in All joins the named list once and is selected, smooth and retro",
         smoothJoin === "smooth:true" && retroJoin === "retro:true", smoothJoin + " | " + retroJoin)
 
-      // A named list whose only member is still arriving is not empty: it
-      // never says so, and the popup's height counts only answered rows,
-      // so it holds the empty list's one row while the add is out and the
-      // row joins in that row's place. From New list… in the menu and from
-      // a list emptied by x. Found in the transition audit (lists 8, lists
-      // 15): "No symbols in Wins yet" stood until the quote landed, and the
-      // popup kept an empty row's gap above its footer.
+      // A list with an accepted member never says it is empty while waiting
+      // for that member's quote, from New list… and from a list emptied by x.
       var emptyLine = harness.find(body, "emptyList")
       var arrive = function(open) {
         open()
@@ -479,6 +477,7 @@ ShellRoot {
         service.persist({ style: look })
         pickSymbol(body, keys, "SLOW")
         tryVerify(function() { return watchlist.displayedSymbols.indexOf("SLOW") >= 0 }, 5000)
+        var addedQuote = JSON.stringify(service.quotes.SLOW)
         keys.forceActiveFocus()
         watchlist.cursorSymbol = "SLOW"
         keyClick(Qt.Key_X)
@@ -488,7 +487,7 @@ ShellRoot {
         app.close()
         app.open("{}")
         harness.check(look + ": an added and undone row keeps its quote and membership after reopen",
-          service.symbols.indexOf("SLOW") >= 0 && !!service.quotes.SLOW && watchlist.displayedSymbols.indexOf("SLOW") >= 0)
+          service.symbols.indexOf("SLOW") >= 0 && JSON.stringify(service.quotes.SLOW) === addedQuote && watchlist.displayedSymbols.indexOf("SLOW") >= 0)
         service.switchList("")
         var all = watchlist.displayedSymbols.slice()
         service.switchList("Lines")
@@ -552,12 +551,8 @@ ShellRoot {
           && existingRow.y >= watchlist.contentY
           && existingRow.y + existingRow.height <= watchlist.contentY + watchlist.height)
 
-      // An add keeps the hero on what you were looking at until the new
-      // symbol's price is in (the fake curl answers SLOW after a second, as
-      // AAPL, up 2.61%), then features it, and its row joins at its sorted
-      // place, above DOWN's fall. Found in motion pass 3: the hero emptied
-      // ("No data") for as long as the fetch took, and the row slid up from
-      // the end of the list over the others.
+      // Accepting a pending preview names it at once. Its row is not a
+      // number-key target until it has an answer; a later choice wins.
       mouseMove(body, 1, 1)
       var rangeBefore = service.range
       // The add steps below sort by % change; the order goes back after them.
@@ -567,49 +562,61 @@ ShellRoot {
       service.addSymbol("DOWN")
       tryVerify(function() { return !!service.quotes.DOWN }, 3000)
       wait(50)
-      var heroBefore = service.featuredSymbol
+      holdQuote("SLOW", true)
       pickSymbol(body, keys, "SLOW")
       wait(20)
       var pendingNamed = service.featuredSymbol === "SLOW" && body.headerText === "Loading SLOW"
-      var acceptedHero = service.featuredSymbol
       var heldWhileOut = watchlist.displayedSymbols.indexOf("SLOW") < 0
       // A number key counts only the rows you can see. It used to count the
       // add still out, sorted last, and feature a symbol with no price.
       keys.forceActiveFocus()
+      keyClick(Qt.Key_1)
+      var chosenHero = service.featuredSymbol
       keyClick(String(watchlist.displayedSymbols.length + 1))
-      var keyedPending = service.featuredSymbol !== acceptedHero
+      var keyedPending = service.featuredSymbol !== chosenHero
+      holdQuote("SLOW", false)
       tryVerify(function() { return !!service.quotes.SLOW && service.arriving.indexOf("SLOW") < 0 }, 5000)
       wait(200)
-      harness.check("accepting before the preview fetch names the incoming hero, then joins its row at the sorted place",
-        pendingNamed && heldWhileOut && !keyedPending && !!body.featuredQuote && watchlist.cursorSymbol === "SLOW"
+      harness.check("an accepted pending add is named, an out-of-range row key cannot reclaim it, and its price joins at the sorted place",
+        pendingNamed && heldWhileOut && chosenHero !== "SLOW" && !keyedPending && !!body.featuredQuote && service.featuredSymbol === chosenHero
           && watchlist.displayedSymbols.indexOf("SLOW") === 3,
         [pendingNamed, heldWhileOut, keyedPending, !!body.featuredQuote, watchlist.cursorSymbol,
           watchlist.displayedSymbols.join(",")].join("|"))
-      // Its place is out of view (the window is one row tall), so the list
-      // eases there over several frames, and the chart draws in once the
-      // list is at rest, from the row where it ended up; a wheel already
-      // gliding when the price lands, or turned during the ease, only moves
-      // where that rest is. Found in motion pass 3: the list jumped to the
-      // new row in one frame, and then (review) a stopped or restarted wheel
-      // glide featured the row from the old or a passing position.
+      // A wheel around the arrival keeps its chosen view even when an
+      // unrelated quote changes. Without an override the new row is in reach.
+      var firstWholeSymbol = function() {
+        return watchlist.displayedSymbols.filter(function(symbol, index) { return watchlist.wholeInSight(index, watchlist.contentY) })[0]
+      }
       var landWith = function(wheel) {
         removeForGood("SLOW")
         wait(50)
         watchlist.contentY = wheel === "before" ? watchlist.rowPitch : 0
+        var wheeled = false
+        var destination = "SLOW"
+        var beforeArrival = function() {
+          if (wheel !== "before" || wheeled || !service.quotes.SLOW) return
+          wheeled = true
+          watchlist.wheelBy(-1)
+        }
+        service.quotesChanged.connect(beforeArrival)
         pickSymbol(body, keys, "SLOW")
-        if (wheel === "before") watchlist.wheelBy(-1)
         tryVerify(function() { return !!service.quotes.SLOW && service.arriving.indexOf("SLOW") < 0 }, 5000)
         if (wheel === "during") {
+          wheeled = body.landing === "SLOW" && body.landingJoined
           watchlist.wheelBy(1)
+          destination = watchlist.displayedSymbols[Math.round(watchlist.wheelTarget() / watchlist.rowPitch)]
           var next = Object.assign({}, service.testFeed.quotes)
           next.DOWN = Object.assign({}, next.DOWN, { price: next.DOWN.price + 0.01 })
           service.testFeed.quotes = next
         }
-        tryVerify(function() { return !watchlist.settling }, 2000)
-        return service.featuredSymbol === "SLOW" && watchlist.displayedSymbols.indexOf("SLOW") === 3 ? "true" : service.featuredSymbol + " " + watchlist.displayedSymbols.join(",")
+        within(3000, function() { return !watchlist.settling && body.landing === "" })
+        service.quotesChanged.disconnect(beforeArrival)
+        var kept = service.featuredSymbol === "SLOW" && watchlist.displayedSymbols.indexOf("SLOW") === 3
+          && (wheel === "" || wheeled) && firstWholeSymbol() === destination
+        return kept ? "true" : [service.featuredSymbol, wheeled, firstWholeSymbol(), destination].join("/")
       }
       var landings = [landWith(""), landWith("before"), landWith("during")]
-      harness.check("wheel input around an arrival keeps the accepted symbol and its sorted place",
+      harness.check("an arrival respects the wheel's chosen row after another quote, and its own row is reachable without a wheel override",
         landings.join(",") === "true,true,true", landings.join(","))
       service.removeSymbol("SLOW")
       service.removeSymbol("DOWN")
@@ -650,24 +657,29 @@ ShellRoot {
         whileClosed === "true,true,true" && afterReopen === "true,true,true", whileClosed + " / " + afterReopen)
 
       // An add still out when you switch to a list without it is done
-      // there: its answer lands without featuring it or moving the list you
-      // switched to. Found in the review of the untangle: the new list's
+      // there. The charted stock is global; choosing a row in the new
+      // list must win over the old list's pending add. Found in the review of the untangle: the new list's
       // hero jumped to the old list's add.
       var heroBeforeSwitch = service.featuredSymbol
+      holdQuote("SLOW", true)
       pickSymbol(body, keys, "SLOW")
       wait(20)
       service.createList("Elsewhere")
       service.addSymbol(heroBeforeSwitch)
+      var switchedHero = service.featuredSymbol
+      var switchedHeader = body.headerText
       keys.forceActiveFocus()
       keyClick(Qt.Key_1)
+      holdQuote("SLOW", false)
       wait(50)
       watchlist.contentY = 0
       tryVerify(function() { return !!service.quotes.SLOW }, 5000)
       wait(300)
-      harness.check("an add out when the list switches to one without it features nothing there",
-        service.listName === "Elsewhere" && service.featuredSymbol === heroBeforeSwitch
+      harness.check("a list switch keeps the global hero, and a row chosen there wins over the pending add",
+        switchedHero === "SLOW" && switchedHeader === "Loading SLOW" + (rangeBefore === "1D" ? "" : " " + rangeBefore)
+          && service.listName === "Elsewhere" && service.featuredSymbol === heroBeforeSwitch
           && watchlist.contentY === 0 && body.landing === "",
-        service.listName + "|" + service.featuredSymbol + "|" + watchlist.contentY + "|" + body.landing)
+        switchedHero + "|" + switchedHeader + "|" + service.listName + "|" + service.featuredSymbol + "|" + watchlist.contentY + "|" + body.landing)
       service.deleteList("Elsewhere")
       removeForGood("SLOW")
       wait(50)
@@ -714,23 +726,29 @@ ShellRoot {
         watchlist.contentY = 0
         var target = watchlist.displayedSymbols.filter(function(s) { return s !== service.featuredSymbol })[0]
         var chosen = false
+        holdQuote("SLOW", true)
         pickSymbol(body, keys, "SLOW")
         if (when === "before") {
           chosen = true
-          app.testBody.featureSymbol(target)
+          keys.forceActiveFocus()
+          keyClick(String(watchlist.displayedSymbols.indexOf(target) + 1))
         }
+        holdQuote("SLOW", false)
         tryVerify(function() { return !!service.quotes.SLOW }, 5000)
-        wait(100)
+        if (when === "joining") {
+          chosen = body.landing === "SLOW" && body.landingJoined
+          keys.forceActiveFocus()
+          keyClick(String(watchlist.displayedSymbols.indexOf(target) + 1))
+        }
         tryVerify(function() { return !watchlist.settling }, 2000)
         wait(400)
-        if (when === "glide") { chosen = true; app.testBody.featureSymbol(target) }
         var kept = [chosen, service.featuredSymbol === target, watchlist.displayedSymbols.indexOf("SLOW") === 3].join(",")
         removeForGood("SLOW")
         wait(50)
         return kept
       }
       var chosenBefore = chooseDuring("before")
-      var chosenInGlide = chooseDuring("glide")
+      var chosenInGlide = chooseDuring("joining")
       harness.check("a hero chosen while an add is still coming keeps the chart; the new row still joins at its place",
         chosenBefore === "true,true,true" && chosenInGlide === "true,true,true", chosenBefore + " / " + chosenInGlide)
 
@@ -745,10 +763,12 @@ ShellRoot {
       tryVerify(function() { return !!service.quotes.DOWN }, 3000)
       wait(50)
       watchlist.contentY = 0
+      holdQuote("SLOW", true)
       pickSymbol(body, keys, "SLOW")
       wait(20)
       var waitedAt = watchlist.displayedSymbols.indexOf("SLOW")
       pickSymbol(body, keys, "FLAT")
+      holdQuote("SLOW", false)
       tryVerify(function() { return !!service.quotes.SLOW && !!service.quotes.FLAT }, 5000)
       wait(100)
       tryVerify(function() { return !watchlist.settling }, 2000)
@@ -767,6 +787,7 @@ ShellRoot {
       // keeps its place in the list, out of sight until its price lands.
       service.setOrder("manual")
       wait(50)
+      holdQuote("SLOW", true)
       pickSymbol(body, keys, "SLOW")
       wait(20)
       keys.forceActiveFocus()
@@ -783,6 +804,7 @@ ShellRoot {
           && membersAfter.length === membersBefore.length && membersAfter.indexOf("SLOW") >= 0
           && membersAfter.indexOf(movedSymbol) === membersBefore.indexOf(movedSymbol) + 1,
         membersBefore + " -> " + membersAfter)
+      holdQuote("SLOW", false)
       tryVerify(function() { return !!service.quotes.SLOW }, 5000)
       wait(400)
       service.removeSymbol("SLOW")

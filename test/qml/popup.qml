@@ -9,8 +9,8 @@ import "plugin/Settings.js" as Settings
 import "plugin" as Stonks
 
 // The real Panel and a real pill on a stub service, under the Wayland session
-// without mapping: lifecycle, the draw-in, closing's hold, the height, the list
-// views, and the pill wheel; and on the real Service and version watch, the
+// without mapping: lifecycle, list views, safe input and the pill wheel;
+// and on the real Service and version watch, the
 // first-run hint and the footer's notices.
 ShellRoot {
   id: test
@@ -527,7 +527,7 @@ ShellRoot {
           panel.testBody.selectRange("1D")
           panel.testBody.featureAt(1)
           panel.testBody.selectRange("1M")
-          var onItsWay = panel.testBody.chartLoading && panel.testBody.chartSymbol === "MSFT"
+          var onItsWay = panel.testBody.chartLoading && !!panel.testBody.chart && panel.testBody.chartSymbol === "MSFT" && panel.testBody.chartRange === "1D"
           test.check("a cached range selects its data, an uncached range keeps the previous data while loading", inHand && onItsWay)
           panel.testBody.selectRange("1D")
           panel.testBody.replay()
