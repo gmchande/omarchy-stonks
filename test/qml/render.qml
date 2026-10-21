@@ -931,7 +931,7 @@ ShellRoot {
             for (var look = 0; look < 2; look++) {
               var retro = look === 1
               ;["sparkline", "arrow", "text", "icon"].forEach(function(style) { rows.push({ style: style, retro: retro, day: "down" }) })
-              ;["up", "flat", "waiting", "failed"].forEach(function(day) { rows.push({ style: "icon", retro: retro, day: day }) })
+              ;["up", "flat", "waiting", "failed", "refresh failed"].forEach(function(day) { rows.push({ style: "icon", retro: retro, day: day }) })
             }
             var right = [{ style: "sparkline", retro: false, right: true, day: "down" }, { style: "sparkline", retro: true, right: true, day: "down" },
               { style: "sparkline", retro: false, right: true, day: "up" }, { style: "sparkline", retro: true, right: true, day: "up" }]
@@ -968,8 +968,9 @@ ShellRoot {
               QtObject {
                 id: pillService
                 property string featuredSymbol: "NEST"
-                property var quotes: ({ NEST: root.pillQuoteFor(pillRow.modelData.day) })
-                property var entries: ({ NEST: { status: pillRow.modelData.day === "failed" ? "failed" : pillRow.modelData.day === "waiting" ? "pending" : "ok", receivedAt: root.now } })
+                property var quotes: ({ NEST: root.pillQuoteFor(pillRow.modelData.day === "refresh failed" ? "down" : pillRow.modelData.day) })
+                property var entries: ({ NEST: { status: pillRow.modelData.day === "failed" || pillRow.modelData.day === "refresh failed" ? "failed"
+                  : pillRow.modelData.day === "waiting" ? "pending" : "ok", receivedAt: root.now } })
                 property string changeMode: "pct"
                 property bool retro: pillRow.modelData.retro
                 property int now: root.now
@@ -1012,12 +1013,14 @@ ShellRoot {
             }
 
             // The same pill on a strip of vertical bar: the animal beside the
-            // icon form, the symbol over its change beside the others.
+            // icon form, the symbol over its change beside the others. The
+            // strip clips to the bar's width, as the shell's bar surface does.
             Rectangle {
               width: Style.bar.sizeVertical
               height: verticalPill.implicitHeight
               anchors.verticalCenter: parent.verticalCenter
               color: root.barGround
+              clip: true
 
               PluginBarApi {
                 id: verticalApi

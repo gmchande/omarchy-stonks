@@ -1456,6 +1456,52 @@ ShellRoot {
         service.persist({ changeMode: "pct" })
         pill.settings = settingsBefore
       }
+      // A refresh that fails with a quote shown puts a "!" on a side bar's
+      // icon too, its ink inside the bar's width and the pill's slot, on a
+      // left and a right side bar, at the default text size and at 10, and
+      // the animal stays where it was. Found in review: right of the
+      // 20-pixel animal the "!" ran past the 28-pixel bar, and at size 10,
+      // a 23-pixel bar, wholly past it, the shell clipping it away.
+      var entriesBeforeFail = service.testFeed.entries
+      var failedEntries = Object.assign({}, entriesBeforeFail)
+      failedEntries.DOWN = Object.assign({}, entriesBeforeFail.DOWN, { status: "failed" })
+      var inkMetrics = Qt.createQmlObject("import QtQuick; FontMetrics {}", harness)
+      var sideWarnings = []
+      var sideWrong = false
+      ;[12, 10].forEach(function(size) {
+        Commons.Color.loadUserShell(size === 12 ? "" : "[font]\nbase-size = " + size + "\n")
+        ;["left", "right"].forEach(function(side) {
+          barApi.position = side
+          barApi.barSize = Style.bar.sizeVertical
+          // The pill's row places the icon as it lays out, before a frame:
+          // the reading waits for neither.
+          var laidOut = function() { harness.find(pill, "pillIcon").parent.forceLayout() }
+          var animalAt = function() { laidOut(); var p = harness.find(pill, "pillAnimal").mapToItem(pill, 0, 0); return p.x + "," + p.y }
+          var calm = animalAt()
+          service.testFeed.entries = failedEntries
+          laidOut()
+          var warning = harness.find(pill, "pillWarning")
+          inkMetrics.font = warning.font
+          var ink = inkMetrics.tightBoundingRect("!")
+          var at = warning.mapToItem(pill, ink.x, warning.baselineOffset + ink.y)
+          // The slot as the bar lays it, centred in the harness's pill.
+          var slotTop = (pill.height - pill.implicitHeight) / 2
+          var inside = warning.visible && at.x >= 0 && at.x + ink.width <= Style.bar.sizeVertical
+            && at.y >= slotTop && at.y + ink.height <= slotTop + pill.implicitHeight
+          var still = animalAt() === calm
+          sideWrong = sideWrong || !inside || !still || !pill.warns
+          sideWarnings.push("size " + size + " " + side + ": ink " + at.x.toFixed(1) + " to " + (at.x + ink.width).toFixed(1)
+            + " of a " + Style.bar.sizeVertical + " px bar, " + (at.y - slotTop).toFixed(1) + " to " + (at.y - slotTop + ink.height).toFixed(1)
+            + " of a " + pill.implicitHeight + " px slot" + (warning.visible ? "" : ", hidden") + (still ? "" : ", the animal moved from " + calm + " to " + animalAt()))
+          service.testFeed.entries = entriesBeforeFail
+        })
+      })
+      Commons.Color.loadUserShell("")
+      barApi.position = "top"
+      barApi.barSize = Style.bar.sizeVertical
+      inkMetrics.destroy()
+      harness.check("a failed refresh's \"!\" on a side bar's icon lies inside the bar and the pill's slot, left and right, at text sizes 12 and 10, the animal staying put — "
+        + sideWarnings.join(" | "), !sideWrong, sideWarnings.join(" | "))
       // Each bar keeps its own form: a saved arrow stays the arrow on a
       // horizontal bar while a vertical one shows the icon, and a
       // middle-click there steps between the icon and the symbol over its

@@ -214,7 +214,11 @@ BarWidget {
     labelVisible: false
     hasVisualContent: true
     fixedWidth: root.vertical ? -1 : (root.iconOnly ? Style.bar.iconSlot : content.implicitWidth + Style.space(17))
-    fixedHeight: root.vertical ? (root.iconOnly ? Style.bar.iconSlot : root.stackedLines.length * Style.bar.iconSlot) : -1
+    // A side bar's icon slot holds the animal and the room under it for a
+    // warning's "!", with a pixel to spare each end: an icon slot, or more
+    // where the text is small enough that the two outgrow it.
+    fixedHeight: root.vertical ? (root.iconOnly ? Math.max(Style.bar.iconSlot, Math.ceil(iconForm.implicitHeight) + 2)
+      : root.stackedLines.length * Style.bar.iconSlot) : -1
     // A hover only for what the pill can't say: the icon names nothing, so
     // its hover says what the other forms show, the symbol and its change;
     // on every form, what a warning's "!" means. The line, the arrow, and
@@ -286,11 +290,17 @@ BarWidget {
       // as the line form's flat day does, and before the first quote the
       // dim "…" of the text form.
       Item {
+        id: iconForm
         objectName: "pillIcon"
         visible: root.iconOnly
         anchors.verticalCenter: parent.verticalCenter
+        // A side bar is barely wider than the animal, so a warning's "!" goes
+        // under it there, in room the slot keeps whether the "!" shows or
+        // not: the animal never moves for a warning.
+        readonly property int warningGap: 2
+        readonly property rect warningInk: warningMetrics.tightBoundingRect("!")
         implicitWidth: animal.implicitWidth
-        implicitHeight: animal.implicitHeight
+        implicitHeight: animal.implicitHeight + (root.vertical ? warningGap + warningInk.height : 0)
 
         BarAnimal {
           id: animal
@@ -304,8 +314,8 @@ BarWidget {
         Rectangle {
           objectName: "pillLevel"
           visible: !!root.featured && animal.kind === ""
-          anchors.verticalCenter: parent.verticalCenter
-          width: parent.width
+          y: Math.round((animal.height - height) / 2)
+          width: animal.width
           height: Cells.RULE_THICKNESS
           color: root.dimColor
         }
@@ -313,7 +323,7 @@ BarWidget {
         Text {
           objectName: "pillWaiting"
           visible: !root.featured && !root.warns
-          anchors.centerIn: parent
+          anchors.centerIn: animal
           textFormat: Text.PlainText
           text: "…"
           color: root.dimColor
@@ -321,16 +331,21 @@ BarWidget {
           font.pixelSize: button.fontSize
         }
 
-        // A warning's "!", in the bar's ink as the hero's line says one,
-        // hangs in the slot's margin right of the animal, so the animal
-        // stays where it was; a badge on its corner, as the shell's
-        // Tailscale icon wears one, blurs into the cells at this size. With
-        // nothing shown, a first fetch that failed, it stands alone.
+        // A warning's "!", in the bar's ink as the hero's line says one. On a
+        // top or bottom bar it hangs in the slot's margin right of the
+        // animal; on a side bar it sits under it, its ink centred across the
+        // bar. A badge on its corner, as the shell's Tailscale icon wears
+        // one, blurs into the cells at this size. With nothing shown, a first
+        // fetch that failed, it stands alone where the animal would be.
         Text {
+          id: warning
           objectName: "pillWarning"
+          readonly property bool under: root.vertical && !!root.featured
           visible: root.warns
-          x: root.featured ? parent.width + 1 : (parent.width - width) / 2
-          anchors.verticalCenter: parent.verticalCenter
+          x: Math.round(under ? (animal.width - iconForm.warningInk.width) / 2 - iconForm.warningInk.x
+            : root.featured ? animal.width + 1 : (animal.width - width) / 2)
+          y: Math.round(under ? animal.height + iconForm.warningGap - baselineOffset - iconForm.warningInk.y
+            : (animal.height - height) / 2)
           textFormat: Text.PlainText
           text: "!"
           color: button.foreground
@@ -338,6 +353,7 @@ BarWidget {
           font.pixelSize: button.fontSize
           font.bold: true
         }
+        FontMetrics { id: warningMetrics; font: warning.font }
       }
 
       Text {
