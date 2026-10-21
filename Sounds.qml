@@ -35,9 +35,9 @@ Item {
   // still reading the last one keeps it.
   function playReplay(owner, chart) {
     if (!turnedOn) return
-    var samples = retro ? ReplaySound.retro(chart.grid, chart.from, chart.to, chart.seconds)
+    var sound = retro ? ReplaySound.retro(chart.grid, chart.from, chart.to, chart.seconds)
       : ReplaySound.smooth(chart.geometry, chart.from, chart.to, chart.seconds)
-    replayFile.setData(ReplaySound.wav(samples))
+    replayFile.setData(ReplaySound.wav(sound))
     replayOwner = owner
     start(replayPath)
   }

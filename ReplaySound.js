@@ -11,9 +11,14 @@
 // one note per pixel column, on a two-octave pentatonic, so no note is sad
 // and a down day sounds as kind as an up one, and ticks in noise. Each is
 // levelled by its loudest 50 ms, under the fixed sounds.
-// Ported from the sound study's make.js, which measured them.
+// Ported from the sound study's make.js, which measured them. The shell's
+// engine interprets a loop that runs once, so the work per sample is a
+// table read and a few sums: the place, the pitch, and the envelope move
+// once a millisecond (`STEP`), and each voice reads one cycle from a table.
 
 var RATE = 24000
+var STEP = 24
+var TABLE = 1024
 
 // Qt's Easing.InOutSine.
 function inOutSine(u) {
@@ -25,33 +30,32 @@ function placeAt(t, from, to, seconds) {
   return from + (to - from) * inOutSine(Math.min(1, t / seconds))
 }
 
-// A seeded generator, the study's, so a chart makes the same bytes each time.
-function random(seed) {
-  var a = seed >>> 0
-  return function() {
-    a |= 0; a = a + 0x6D2B79F5 | 0
-    var t = Math.imul(a ^ a >>> 15, 1 | a)
-    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t
-    return ((t ^ t >>> 14) >>> 0) / 4294967296
-  }
+// One cycle of `shape(phase)`, phase 0..1, with a guard point for reading
+// between entries.
+function cycle(shape) {
+  var table = new Float32Array(TABLE + 1)
+  for (var i = 0; i <= TABLE; i++) table[i] = shape(i / TABLE)
+  return table
 }
 
-function fromDb(db) {
-  return Math.pow(10, db / 20)
-}
-
-// RBJ low- and high-pass biquads, run in place.
-function filter(x, type, f, q) {
+// An RBJ low- or high-pass biquad's coefficients.
+function biquad(type, f, q) {
   var w = 2 * Math.PI * f / RATE, c = Math.cos(w), s = Math.sin(w), a = s / (2 * q)
-  var b0 = type === "lp" ? (1 - c) / 2 : (1 + c) / 2
-  var b1 = type === "lp" ? 1 - c : -(1 + c)
-  var a0 = 1 + a, a1 = -2 * c, a2 = 1 - a
-  b0 /= a0; b1 /= a0; a1 /= a0; a2 /= a0
-  var x1 = 0, x2 = 0, y1 = 0, y2 = 0
+  var a0 = 1 + a
+  var b0 = (type === "lp" ? (1 - c) / 2 : (1 + c) / 2) / a0
+  return { b0: b0, b1: (type === "lp" ? 1 - c : -(1 + c)) / a0, b2: b0, a1: -2 * c / a0, a2: (1 - a) / a0 }
+}
+
+// A high-pass then a low-pass, in place, in one pass.
+function band(x, low, high) {
+  var h = biquad("hp", low, 0.707), l = biquad("lp", high, 0.707)
+  var hx1 = 0, hx2 = 0, hy1 = 0, hy2 = 0, ly1 = 0, ly2 = 0
   for (var i = 0; i < x.length; i++) {
-    var y = b0 * x[i] + b1 * x1 + b0 * x2 - a1 * y1 - a2 * y2
-    x2 = x1; x1 = x[i]; y2 = y1; y1 = y
-    x[i] = y
+    var hy = h.b0 * x[i] + h.b1 * hx1 + h.b2 * hx2 - h.a1 * hy1 - h.a2 * hy2
+    hx2 = hx1; hx1 = x[i]; hy2 = hy1
+    var ly = l.b0 * hy + l.b1 * hy1 + l.b2 * hy2 - l.a1 * ly1 - l.a2 * ly2
+    hy1 = hy; ly2 = ly1; ly1 = ly
+    x[i] = ly
   }
   return x
 }
@@ -64,36 +68,35 @@ function fadeEdges(x, inMs, outMs) {
   return x
 }
 
-// Scaled so its loudest 50 ms of RMS is `db` dBFS.
-function level(x, db) {
+// The sound, and the gain that puts its loudest 50 ms of RMS at `db` dBFS,
+// which `wav` applies as it writes.
+function levelled(x, db) {
   var win = Math.round(0.05 * RATE), best = 0, acc = 0
   for (var i = 0; i < x.length; i++) {
     acc += x[i] * x[i]
     if (i >= win) acc -= x[i - win] * x[i - win]
-    if (acc / win > best) best = acc / win
+    if (acc > best) best = acc
   }
-  var gain = best > 0 ? fromDb(db) / Math.sqrt(best) : 0
-  for (var k = 0; k < x.length; k++) x[k] *= gain
-  return x
+  return { samples: x, gain: best > 0 ? Math.pow(10, db / 20) / Math.sqrt(best / win) : 0 }
 }
 
 // Smooth: `geometry` is the chart's, its points' x and y in 0..1 (y down)
 // and its baseline's y. The line's height at each moment, interpolated
 // between the points the replay passes, is the pitch: E4 at the floor, E5 at
-// the ceiling, glided over 22 ms. Where the line crosses the baseline, the
-// add sound's wooden bar an octave and a fifth up, 40 ms.
+// the ceiling, glided over 22 ms, on a sine with its second and third
+// harmonics and a breath of low noise. Where the line crosses the baseline,
+// the add sound's wooden bar an octave and a fifth up, 40 ms.
 function smooth(geometry, from, to, seconds) {
   var pts = geometry.points
   var n = pts.length
   var x = new Float32Array(Math.round((seconds + 0.15) * RATE))
-  var r = random(9)
-  var breath = new Float32Array(x.length)
-  for (var b = 0; b < breath.length; b++) breath[b] = r() * 2 - 1
-  filter(breath, "lp", 1400, 0.7)
-  var glideK = 1 - Math.exp(-1 / (0.022 * RATE))
+  var wave = cycle(function(p) { return Math.sin(2 * Math.PI * p) + 0.18 * Math.sin(4 * Math.PI * p) + 0.06 * Math.sin(6 * Math.PI * p) })
+  var glideK = 1 - Math.exp(-STEP / (0.022 * RATE))
+  // The breath: seeded noise through a one-pole low-pass at 1.4 kHz.
+  var breathK = 1 - Math.exp(-2 * Math.PI * 1400 / RATE), seed = 9, breath = 0
   var ph = 0, glide = -1, k = 0, lastSide = 0, lastTick = -1
   var ticks = []
-  for (var i = 0; i < x.length; i++) {
+  for (var i = 0; i < x.length; i += STEP) {
     var t = i / RATE
     var at = placeAt(t, from, to, seconds)
     // The place only moves on, so the segment it is on only moves on.
@@ -102,11 +105,19 @@ function smooth(geometry, from, to, seconds) {
       : pts[k].y + (pts[k + 1].y - pts[k].y) * (at - pts[k].x) / Math.max(1e-9, pts[k + 1].x - pts[k].x)
     var target = 329.63 * Math.pow(2, 1 - y)
     glide = glide < 0 ? target : glide + (target - glide) * glideK
-    ph += glide / RATE
-    var s = Math.sin(2 * Math.PI * ph) + 0.18 * Math.sin(4 * Math.PI * ph) + 0.06 * Math.sin(6 * Math.PI * ph)
     var fin = Math.min(1, t / 0.08)
     var fout = Math.max(0, Math.min(1, (seconds + 0.05 - t) / 0.2))
-    x[i] = (0.5 - 0.5 * Math.cos(Math.PI * fin)) * (0.5 - 0.5 * Math.cos(Math.PI * fout)) * (s + 0.05 * breath[i])
+    var envelope = (0.5 - 0.5 * Math.cos(Math.PI * fin)) * (0.5 - 0.5 * Math.cos(Math.PI * fout))
+    var step = glide / RATE * TABLE
+    var end = Math.min(x.length, i + STEP)
+    for (var j = i; j < end; j++) {
+      ph += step
+      if (ph >= TABLE) ph -= TABLE
+      var a = ph | 0
+      seed = (seed * 1664525 + 1013904223) >>> 0
+      breath += (seed / 2147483648 - 1 - breath) * breathK
+      x[j] = envelope * (wave[a] + (wave[a + 1] - wave[a]) * (ph - a) + 0.05 * breath)
+    }
     var side = Math.sign(geometry.baselineY - y)
     if (side && lastSide && side !== lastSide && t - lastTick > 0.08) {
       ticks.push(i)
@@ -114,13 +125,13 @@ function smooth(geometry, from, to, seconds) {
     }
     if (side) lastSide = side
   }
-  for (var j = 0; j < ticks.length; j++) {
-    for (var m = 0; m < 0.04 * RATE && ticks[j] + m < x.length; m++) {
-      var tt = m / RATE
-      x[ticks[j] + m] += 0.55 * Math.exp(-tt / 0.012) * Math.sin(2 * Math.PI * 1760 * tt) * Math.min(1, tt / 0.0015)
+  for (var m = 0; m < ticks.length; m++) {
+    for (var d = 0; d < 0.04 * RATE && ticks[m] + d < x.length; d++) {
+      var tt = d / RATE
+      x[ticks[m] + d] += 0.55 * Math.exp(-tt / 0.012) * Math.sin(2 * Math.PI * 1760 * tt) * Math.min(1, tt / 0.0015)
     }
   }
-  return level(fadeEdges(x, 1, 4), -36)
+  return levelled(fadeEdges(x, 1, 4), -36)
 }
 
 // A, B, C♯, E, F♯ over two octaves, from A4.
@@ -133,18 +144,14 @@ function nesPitch(f) {
 }
 
 // One cycle of a 25% pulse at `f`, band-limited to 7 kHz, so nothing folds
-// back: one table per note, read with the phase, rather than summing the
-// harmonics at every sample.
-var TABLE = 512
+// back.
 function pulseTable(f) {
   var duty = 0.25, top = Math.max(1, Math.floor(7000 / f))
-  var table = new Float32Array(TABLE + 1)
-  for (var i = 0; i <= TABLE; i++) {
-    var phase = i / TABLE, v = 0
+  return cycle(function(phase) {
+    var v = 0
     for (var k = 1; k <= top; k++) v += (2 / (k * Math.PI)) * Math.sin(k * Math.PI * duty) * Math.cos(2 * Math.PI * k * (phase - duty / 2))
-    table[i] = v
-  }
-  return table
+    return v
+  })
 }
 
 // Volume in the console's 16 steps, falling one step every `stepMs`.
@@ -156,16 +163,17 @@ function nesVolume(t, start, stepMs, floor) {
 // rows, each column's lit row (0 at the top), and the baseline's row. Each
 // column the replay reaches plays its lit row as a note, low at the floor,
 // high at the ceiling; a column with no print holds the note before, and a
-// repeated note is held, not struck again. Where a column lands on the
-// other side of the baseline from the last, the noise channel ticks, 30 ms.
+// repeated note is held, not struck again, its volume falling in the
+// console's steps. Where a column lands on the other side of the baseline
+// from the last, the noise channel ticks, 30 ms.
 function retro(grid, from, to, seconds) {
   var x = new Float32Array(Math.round((seconds + 0.1) * RATE))
   var rows = Math.max(1, grid.rows - 1)
   var tables = []
   var slewK = 1 - Math.exp(-1 / (0.0012 * RATE)), slew = 0
-  var ph = 0, note = -1, since = 0, lastCol = -1, lastSide = 0
+  var ph = 0, note = -1, since = 0, lastCol = -1, lastSide = 0, step = 0, wave = null
   var ticks = []
-  for (var i = 0; i < x.length; i++) {
+  for (var i = 0; i < x.length; i += STEP) {
     var t = i / RATE
     var col = Math.max(0, Math.min(grid.columns - 1, Math.floor(placeAt(t, from, to, seconds) * grid.columns)))
     if (col !== lastCol) {
@@ -176,6 +184,10 @@ function retro(grid, from, to, seconds) {
         if (next !== note) {
           note = next
           since = t
+          var f = nesPitch(PENTATONIC[note])
+          if (!tables[note]) tables[note] = pulseTable(f)
+          wave = tables[note]
+          step = f / RATE * TABLE
         }
         var side = Math.sign(grid.baseRow - row)
         if (side && lastSide && side !== lastSide) ticks.push(i)
@@ -183,35 +195,38 @@ function retro(grid, from, to, seconds) {
       }
     }
     var volume = note < 0 || t > seconds ? 0 : nesVolume(t - since, 11, 25, 6)
-    slew += (volume - slew) * slewK
-    if (note < 0) continue
-    var f = nesPitch(PENTATONIC[note])
-    if (!tables[note]) tables[note] = pulseTable(f)
-    ph = (ph + f / RATE) % 1
-    var at = ph * TABLE, a = Math.floor(at)
-    x[i] = slew * (tables[note][a] + (tables[note][a + 1] - tables[note][a]) * (at - a))
+    var end = Math.min(x.length, i + STEP)
+    if (!wave) continue
+    for (var j = i; j < end; j++) {
+      slew += (volume - slew) * slewK
+      ph += step
+      if (ph >= TABLE) ph -= TABLE
+      var a = ph | 0
+      x[j] = slew * (wave[a] + (wave[a + 1] - wave[a]) * (ph - a))
+    }
   }
   // The noise channel: a 15-bit shift register clocked at 9 kHz.
   var noise = new Float32Array(Math.round(0.03 * RATE))
   var reg = 7, clock = 0
-  for (var j = 0; j < noise.length; j++) {
+  for (var c = 0; c < noise.length; c++) {
     clock += 9000 / RATE
     while (clock >= 1) {
       clock -= 1
-      reg = (reg >> 1) | ((((reg & 1) ^ ((reg >> 1) & 1))) << 14)
+      reg = (reg >> 1) | (((reg & 1) ^ ((reg >> 1) & 1)) << 14)
     }
-    noise[j] = (reg & 1) ? -1 : 1
+    noise[c] = (reg & 1) ? -1 : 1
   }
   for (var n = 0; n < ticks.length; n++) {
     for (var m = 0; m < noise.length && ticks[n] + m < x.length; m++) x[ticks[n] + m] += 0.5 * nesVolume(m / RATE, 10, 4, 0) * noise[m]
   }
-  filter(x, "hp", 90, 0.707)
-  filter(x, "lp", 6500, 0.707)
-  return level(fadeEdges(x, 1, 4), -37)
+  return levelled(fadeEdges(band(x, 90, 6500), 1, 4), -37)
 }
 
-// The samples as a 16-bit mono WAV, its bytes, with a one-bit TPDF dither.
-function wav(samples) {
+// A levelled sound as a 16-bit mono WAV, its bytes, with a one-bit TPDF
+// dither. The samples go in in the machine's byte order, which on every
+// machine Omarchy runs on is the WAV's own, little-endian.
+function wav(sound) {
+  var samples = sound.samples, gain = sound.gain * 32767
   var bytes = new ArrayBuffer(44 + samples.length * 2)
   var d = new DataView(bytes)
   var text = function(at, s) { for (var c = 0; c < s.length; c++) d.setUint8(at + c, s.charCodeAt(c)) }
@@ -219,8 +234,14 @@ function wav(samples) {
   text(12, "fmt "); d.setUint32(16, 16, true); d.setUint16(20, 1, true); d.setUint16(22, 1, true)
   d.setUint32(24, RATE, true); d.setUint32(28, RATE * 2, true); d.setUint16(32, 2, true); d.setUint16(34, 16, true)
   text(36, "data"); d.setUint32(40, samples.length * 2, true)
-  var r = random(77)
-  for (var i = 0; i < samples.length; i++)
-    d.setInt16(44 + i * 2, Math.max(-32768, Math.min(32767, Math.round(samples[i] * 32767 + r() - r()))), true)
+  var out = new Int16Array(bytes, 44)
+  var seed = 77
+  for (var i = 0; i < samples.length; i++) {
+    seed = (seed * 1664525 + 1013904223) >>> 0
+    var dither = seed / 4294967296
+    seed = (seed * 1664525 + 1013904223) >>> 0
+    var v = Math.round(samples[i] * gain + dither - seed / 4294967296)
+    out[i] = v > 32767 ? 32767 : v < -32768 ? -32768 : v
+  }
   return bytes
 }
