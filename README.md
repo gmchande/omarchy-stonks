@@ -148,15 +148,16 @@ too alike, or too faint.
 
 Stonks makes a short sound when you add a symbol, remove a row, or undo the
 removal, which plays the removal backwards. Run the pointer along the chart
-and it plays like a row of chimes: each bar you cross rings its note, higher
-where the line is higher, and each step of `←` `→` rings too. A replay plays
-the chart's line as a tone, with a tick where it crosses the previous close.
-Each look has its own voice. A soft bell rings as the market of the stock
-you last looked at opens and as it closes, on time or not at all, and never
-while every screen is off or an app records from your microphone. Nothing
-else sounds by itself: no refresh or price. Click the speaker at the top
-right, or press `Shift+S`, to turn sounds off; Stonks remembers. Your system
-volume sets how loud they are.
+and it plays like a row of chimes, higher where the line is higher: the bars
+you cross ring, up to 22 a second, ending on the one under the pointer, and
+each step of `←` `→` rings too. A replay plays the chart's line as a tone,
+with a tick where it crosses the chart's baseline: the previous close on 1D,
+the range's first price on the others. Each look has its own voice. A soft
+bell rings as the market of the stock you last looked at opens and as it
+closes, on time or not at all, and never while every screen is off or an app
+records from your microphone. Nothing else sounds by itself: no refresh or
+price. Click the speaker at the top right, or press `Shift+S`, to turn sounds
+off; Stonks remembers. Your system volume sets how loud they are.
 
 ## Keys
 

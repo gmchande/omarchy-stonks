@@ -48,9 +48,10 @@ none() {
 only '\bProcess\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Updates.qml Sounds.qml
 only '\bFileView\s*\{' Service.qml Updates.qml TrendColors.qml Sounds.qml
 only '^import Quickshell\.Io' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Service.qml IpcTarget.qml Updates.qml TrendColors.qml Sounds.qml
-# A command started by exec is a sound's: pw-play, and only there; and only
-# the sounds ask PipeWire anything.
+# A command started by exec is a sound's, and only there; it is pw-play,
+# and nothing else. Only the sounds ask PipeWire anything.
 only '\.exec\(|pw-play|pw-dump' Sounds.qml
+none '\.exec\((?!\["pw-play",)' Sounds.qml
 only '\bIpcHandler\s*\{' IpcTarget.qml
 only '^import Quickshell\.Hyprland' WindowHost.qml
 only '\b(QuoteFeed|HistoryFeed|FundamentalsFeed|OvernightFeed|AllDayFeed|ReleaseFeed)\s*\{' Service.qml

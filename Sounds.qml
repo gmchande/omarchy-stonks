@@ -131,7 +131,8 @@ Item {
     }
   }
 
-  // A sound still playing ends first: the next waits for it to go.
+  // One at a time: exec stops a sound still playing, and starts this one
+  // once it has gone.
   function start(file) {
     player.exec(["pw-play", "--media-role", "Notification", "--latency", "20ms", file])
   }

@@ -75,7 +75,8 @@ building one that won't merge.
 - Each `test/data-files/VERSION.json` is a data file as that release saved
   it. Every version must keep loading each with nothing lost
   (`test/qml/data-files.sh`). A new shape of the file adds its release's own
-  file beside them (`data-files.sh write VERSION`), and never edits one.
+  file beside them (`test/qml/data-files.sh write VERSION`), and never edits
+  one.
 - Before a pull request, use your change the way a user would: open the popup
   from the pill, add a symbol through search, switch lists, remove and undo,
   show a row's chart, change the range and the look, and use the window.
