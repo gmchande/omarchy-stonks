@@ -92,8 +92,8 @@ Item {
         g.addColorStop(Math.min(1, stop + 0.0001), root.downColor)
         ctx.strokeStyle = g
       } else ctx.strokeStyle = root.lineColor
-      // A point that starts again (`brk`: Tokyo's lunch, a quiet night)
-      // lifts the pen, as the hero's line does.
+      // A point that starts again (`brk`: Tokyo's lunch) lifts the pen, as
+      // the hero's line does.
       ctx.beginPath()
       for (var i = 0; i < pts.length; i++) {
         var x = pad + pts[i].x * w
@@ -103,7 +103,7 @@ Item {
       }
       ctx.stroke()
       // A print alone on its stretch of line, a day's only one or one between
-      // two quiet hours, is a dot three line widths across.
+      // two breaks, is a dot three line widths across.
       for (var k = 0; k < pts.length; k++) {
         if (!(k === 0 || pts[k].brk) || !(k === pts.length - 1 || pts[k + 1].brk)) continue
         var dy = pad + pts[k].y * h

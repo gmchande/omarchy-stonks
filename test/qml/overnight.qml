@@ -556,8 +556,8 @@ ShellRoot {
       // Monday 5 October, 00:36: the first live night, saved as it was. EZ
       // last traded at 22:40 on Sunday, so its chart stays on Friday, never
       // blank, and the line under the price names the night. TOY traded at
-      // 00:20, a print alone after a quiet hour on Monday's chart: it draws,
-      // in its session's dim tone, in both looks, and the scrub lands on it.
+      // 00:20, the only print on Monday's chart so far: it draws, in its
+      // session's dim tone, in both looks, and the scrub lands on it.
       useSet("live-2026-10-05")
       service.now = harness.live
       app.testKeyCatcher.forceActiveFocus()
@@ -1087,17 +1087,37 @@ ShellRoot {
         "refused " + refused + "; requests after the pause of " + afterProbe.join(", ") + "; every night refreshed " + caughtUp)
 
       // Wednesday 21 October, 10:06: VANE, a thin NYSE stock, printed 26
-      // times since midnight, fewer than the hero's columns, and nine times
-      // in the pre-market, hours apart. Retro left a column dark wherever no
-      // print fell in it, so the day looked torn where smooth's line runs
-      // on: in the hero laid out by print, in its row laid out by the
-      // clock, and on 3M, 66 days across the hero's columns.
+      // times since midnight, fewer than the hero's columns, its night quiet
+      // for over an hour twice, and nine times in the pre-market, hours
+      // apart. Laid out by print, a quiet hour takes no room, so smooth's
+      // line runs on across it: a break there read as missing prices.
+      // Retro left a column dark wherever no print fell in it, so the day
+      // looked torn where smooth's line runs on: in the hero laid out by
+      // print, in its row laid out by the clock, and on 3M, 66 days across
+      // the hero's columns.
       useSet("gaps-2026-10-21-1006")
       service.now = 1792591591
       service.addSymbol("VANE")
       within(8000, function() { return !!service.quotes.VANE && service.arriving.length === 0 })
       featureShown("VANE")
       within(3000, function() { return body.featuredGeometry.start === 1792555200 && !body.chartLoading })
+      if (service.retro) {
+        app.testKeyCatcher.forceActiveFocus()
+        keyClick(Qt.Key_S)
+        within(2000, function() { return !service.retro })
+      }
+      var vaneDay = body.featuredDay.points
+      var vaneLine = body.featuredGeometry.points
+      var quietInk = []
+      for (var q = 1; q < vaneDay.length; q++) {
+        if (vaneDay[q].t - vaneDay[q - 1].t <= 3600) continue
+        var mid = (vaneLine[q - 1].x + vaneLine[q].x) / 2
+        within(2000, function() { return harness.inkAt(mid).alpha > 0 })
+        var offset = service.quotes.VANE.gmtoffset
+        quietInk.push(Format.hhmm(vaneDay[q - 1].t, offset) + "–" + Format.hhmm(vaneDay[q].t, offset) + " " + harness.inkAt(mid).alpha)
+      }
+      harness.check("smooth: VANE's line runs on across every quiet hour of its day, laid out by print: two in its night, one before the open",
+        quietInk.length === 3 && quietInk.every(function(s) { return !/ 0$/.test(s) }), quietInk.join(", "))
       if (!service.retro) {
         app.testKeyCatcher.forceActiveFocus()
         keyClick(Qt.Key_S)
