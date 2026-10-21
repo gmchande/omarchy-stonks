@@ -39,6 +39,11 @@ Item {
   // first fetch that failed for good. They are members, saved and fetched,
   // but no list shows them until then.
   property var arriving: []
+  // The hero an add from search took while its symbol was still on its way,
+  // and the one it left: { symbol, before }. A first fetch that fails for
+  // good hands the hero back, as an add whose preview had already failed
+  // leaves it; another hero chosen meanwhile ends it.
+  property var heroTaken: null
   // The surfaces open now where a screen shows them: the popup on any bar,
   // the window on a workspace on view (`StonksBody.onScreen`). The chart's
   // history is wanted only while one is (`surfaceShown`).
@@ -766,6 +771,7 @@ Item {
     var rangeLeft = chartOnShow !== "" && chartOnShow.split("|")[1] !== view.range
     chartOnShow = chart
     root.handedOver = null
+    if (root.heroTaken && view.featured !== root.heroTaken.symbol) root.heroTaken = null
     if (rangeLeft) {
       // A turn later: the change of the view is still being told.
       var left = Object.keys(root.aheadAsked)
@@ -863,10 +869,15 @@ Item {
     return !!feed.quotes[symbol] || !!(feed.entries[symbol] && feed.entries[symbol].status === "failed")
   }
 
-  // An add leaves arriving once it has answered, or has left All.
+  // An add leaves arriving once it has answered, or has left All. One that
+  // took the hero and failed hands it back (`heroTaken`).
   function settleArrivals() {
     var still = root.arriving.filter(function(s) { return root.library.indexOf(s) >= 0 && !root.answered(s) })
     if (still.length !== root.arriving.length) root.arriving = still
+    var taken = root.heroTaken
+    if (!taken || still.indexOf(taken.symbol) >= 0) return
+    root.heroTaken = null
+    if (root.view.featured === taken.symbol && !feed.quotes[taken.symbol]) root.feature(taken.before)
   }
 
   function parseShell() {
@@ -1038,19 +1049,26 @@ Item {
 
   // A symbol new to All arrives: fetched ahead of any refresh, and shown
   // once it has answered. One already in All is a row at once. The result
-  // the hero shows as a preview joins with the answer it has: a quote, and
-  // it stays the hero, so nothing is fetched again and the chart does not
-  // change; or a first fetch that failed, and the add is done there, its
-  // row saying so.
+  // the hero shows as a preview stays the hero: with a quote, it joins with
+  // it, so nothing is fetched again and the chart does not change; with
+  // none yet, it is the chart asked for, which each surface names while it
+  // is on its way (`ChartMotion.loading`), as the preview did, until its
+  // answer lands and its row joins. Found in the slow walk of 1.0.2: the
+  // hero went back to the stock before the add, as if the add were done.
+  // A first fetch the preview saw fail joins with that, the add done there,
+  // its row saying so; one that fails later hands the hero back
+  // (`heroTaken`).
   function addSymbol(symbol) {
     var s = String(symbol || "").trim().toUpperCase()
     if (s && s === root.previewSymbol && previewFeed.entries[s])
       feed.restore(s, previewFeed.quotes[s] || null, previewFeed.entries[s])
-    var shown = s !== "" && s === root.previewSymbol && !!feed.quotes[s]
     if (s && root.library.indexOf(s) < 0 && root.arriving.indexOf(s) < 0 && !root.answered(s))
       root.arriving = root.arriving.concat([s])
+    var previewed = s !== "" && s === root.previewSymbol
+    var coming = previewed && root.arriving.indexOf(s) >= 0
     var next = Settings.withSymbolAdded(root.dataSettings, s)
-    if (shown) next.featured = s
+    if (coming) root.heroTaken = { symbol: s, before: root.view.featured }
+    if (coming || (previewed && !!feed.quotes[s])) next.featured = s
     root.save(next)
   }
 

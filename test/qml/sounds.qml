@@ -11,9 +11,10 @@ import "plugin" as Stonks
 // CardWindow.qml) by keys and the real window (App.qml) by the pointer, with
 // a stand-in pw-play first on PATH (bin/pw-play) that plays nothing and
 // records what it was asked to play: on by default, the add, remove, and
-// undo sounds in each look's voice, a replay's sound made from its chart and
-// stopped with it, one sound at a time, nothing while off, and nothing for
-// what happens on its own or for looking around. HOME and curl are scratch.
+// undo sounds in each look's voice, the add as its row joins, a replay's
+// sound made from its chart and stopped with it, one sound at a time,
+// nothing while off, and nothing for what happens on its own or for looking
+// around. HOME and curl are scratch.
 ShellRoot {
   id: harness
 
@@ -74,6 +75,13 @@ ShellRoot {
     view.path = path
     view.setText(text)
     view.destroy()
+  }
+  // Holds a symbol's answer back while the fake curl finds NAME in its
+  // state, or lets it through (bin/curl).
+  Process { id: fileProc }
+  function hold(on, name) {
+    fileProc.command = on ? ["touch", fakeState + "/" + name] : ["rm", "-f", fakeState + "/" + name]
+    fileProc.running = true
   }
 
   // The stand-in's record, a line each: "start" with the file it was asked
@@ -348,8 +356,10 @@ ShellRoot {
       tryVerify(function() { return body.adding && body.search.results.length > 1 }, 3000)
       var library = service.library.length
       keyClick(Qt.Key_Return)
-      var added = startsBy(3)
+      // SHOP's first fetch fails for good: its row joins saying so, and the
+      // add is heard then.
       quiet()
+      var added = startsBy(3)
       harness.check("in the popup, x plays the removal, u its undo, and an add from search the add, each in smooth's voice",
         played(removed[0]) === "sounds/smooth/remove.wav" && played(undone[1]) === "sounds/smooth/undo.wav"
           && played(added[2]) === "sounds/smooth/add.wav" && service.library.length === library + 1,
@@ -465,6 +475,42 @@ ShellRoot {
       harness.check("Shift+S turns sounds back on, saved, and plays the add sound once",
         service.soundsOn && icon.text === harness.onGlyph && onAgain.length === before + 1 && played(onAgain[before]) === "sounds/smooth/add.wav",
         harness.starts().slice(before).map(played).join(", "))
+
+      // An add confirmed before its preview has answered: SHOP.TO's day held
+      // back, Enter on it as soon as it is chosen. Until its answer lands
+      // and its row joins, the header and the dimmed chart name it as the
+      // chart on its way, as the preview did, and nothing plays; the add is
+      // heard as the row joins. Found in the slow walk of 1.0.2: the hero
+      // went back to the stock before the add, undimmed and named by nothing,
+      // and the add sounded at Enter.
+      before = harness.starts().length
+      harness.hold(true, "SHOP.TO.quote.hold")
+      tryVerify(function() { return !fileProc.running }, 2000)
+      keyClick(Qt.Key_A)
+      wait(50)
+      keyClick(Qt.Key_S)
+      keyClick(Qt.Key_H)
+      tryVerify(function() { return body.adding && body.search.results.length > 1 }, 3000)
+      keyClick(Qt.Key_Down)
+      tryVerify(function() { return body.previewSymbol === "SHOP.TO" }, 2000)
+      wait(400)
+      keyClick(Qt.Key_Return)
+      var waiting = []
+      for (var w = 0; w < 6; w++) {
+        wait(250)
+        waiting.push([harness.find(body, "statusText").text, body.motion.dimmed > 0 ? "dimmed" : "undimmed",
+          body.watchlist.displayedSymbols.indexOf("SHOP.TO") >= 0 ? "row" : "no row", harness.starts().length - before].join("/"))
+      }
+      var released = Date.now()
+      harness.hold(false, "SHOP.TO.quote.hold")
+      tryVerify(function() { return body.watchlist.displayedSymbols.indexOf("SHOP.TO") >= 0 && service.featuredSymbol === "SHOP.TO" && !body.chartLoading }, 8000)
+      var joined = startsBy(before + 1).slice(before)
+      quiet()
+      var named = waiting.every(function(w) { return w === "LOADING SHOP.TO/dimmed/no row/0" })
+      harness.check("an add confirmed before its preview answers is named as the chart on its way, dimmed and silent, until its row joins, and heard then",
+        named && joined.length === 1 && played(joined[0]) === "sounds/smooth/add.wav" && joined[0].ms >= released,
+        waiting.join(" | ") + " || " + joined.map(function(s) { return played(s) + " at " + (s.ms - released) + " ms" }).join(", "))
+      service.removeSymbol("SHOP.TO")
       panel.close()
       wait(300)
 
