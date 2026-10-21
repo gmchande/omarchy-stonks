@@ -87,15 +87,16 @@ function levelled(x, db) {
 // harmonics and a breath of low noise. Where the chart draws no line, across
 // a break (`brk`: a quiet hour of the night, Tokyo's lunch), it is silent,
 // fading out and in over 5 ms, and the line's next print starts its pitch
-// afresh. Where the line crosses the baseline, the add sound's wooden bar
-// an octave and a fifth up, 40 ms.
+// afresh. Where the drawn line crosses the baseline, the add sound's wooden
+// bar an octave and a fifth up, 40 ms; a line that ends on one side and
+// starts again on the other after a break crosses nothing.
 function smooth(geometry, from, to, seconds) {
   var pts = geometry.points
   var n = pts.length
   var x = new Float32Array(Math.round((seconds + 0.15) * RATE))
   var wave = cycle(function(p) { return Math.sin(2 * Math.PI * p) + 0.18 * Math.sin(4 * Math.PI * p) + 0.06 * Math.sin(6 * Math.PI * p) })
   var glideK = 1 - Math.exp(-STEP / (0.022 * RATE))
-  var gateK = 1 - Math.exp(-STEP / (0.005 * RATE))
+  var gateStep = STEP / (0.005 * RATE)
   // The breath: seeded noise through a one-pole low-pass at 1.4 kHz.
   var breathK = 1 - Math.exp(-2 * Math.PI * 1400 / RATE), seed = 9, breath = 0
   var ph = 0, glide = -1, k = 0, lastSide = 0, lastTick = -1, gate = 1, level = 0, wasBreak = false
@@ -111,7 +112,7 @@ function smooth(geometry, from, to, seconds) {
     var target = 329.63 * Math.pow(2, 1 - y)
     glide = glide < 0 || (wasBreak && !inBreak) ? target : glide + (target - glide) * glideK
     wasBreak = inBreak
-    gate += ((inBreak ? 0 : 1) - gate) * gateK
+    gate = inBreak ? Math.max(0, gate - gateStep) : Math.min(1, gate + gateStep)
     var fin = Math.min(1, t / 0.08)
     var fout = Math.max(0, Math.min(1, (seconds + 0.05 - t) / 0.2))
     var envelope = gate * (0.5 - 0.5 * Math.cos(Math.PI * fin)) * (0.5 - 0.5 * Math.cos(Math.PI * fout))
@@ -128,7 +129,10 @@ function smooth(geometry, from, to, seconds) {
       breath += (seed / 2147483648 - 1 - breath) * breathK
       x[j] = level * (wave[a] + (wave[a + 1] - wave[a]) * (ph - a) + 0.05 * breath)
     }
-    if (inBreak) continue
+    if (inBreak) {
+      lastSide = 0
+      continue
+    }
     var side = Math.sign(geometry.baselineY - y)
     if (side && lastSide && side !== lastSide && t - lastTick > 0.08) {
       ticks.push(i)
@@ -175,9 +179,9 @@ function nesVolume(t, start, stepMs, floor) {
 // column the replay reaches plays its lit row as a note, low at the floor,
 // high at the ceiling; a column with no print, which the chart leaves dark,
 // is silent. A repeated note is held, not struck again, its volume falling
-// in the console's steps; after silence it is struck again. Where a column
-// lands on the other side of the baseline from the last lit one, the noise
-// channel ticks, 30 ms.
+// in the console's steps; after silence it is struck again. Where a lit
+// column lands on the other side of the baseline from the lit one before
+// it, the noise channel ticks, 30 ms; across dark columns nothing crosses.
 function retro(grid, from, to, seconds) {
   var x = new Float32Array(Math.round((seconds + 0.1) * RATE))
   var rows = Math.max(1, grid.rows - 1)
@@ -193,6 +197,7 @@ function retro(grid, from, to, seconds) {
       var row = grid.levels[col]
       var wasLit = lit
       lit = row !== undefined
+      if (!lit) lastSide = 0
       if (lit) {
         var next = Math.round((grid.rows - 1 - row) / rows * (PENTATONIC.length - 1))
         if (next !== note || !wasLit) since = t
