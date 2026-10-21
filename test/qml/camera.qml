@@ -255,6 +255,20 @@ ShellRoot {
         problems.length === 0 && year.card.retro && /^AAPL 1Y at .+, NASDAQ\. Click to edit\.$/.test(year.note[1] || "") && win.cameraLit,
         problems.join("; ") + " | " + JSON.stringify(year.note))
 
+      // The pointer on the chart scrubs it, and y takes that moment: the
+      // way a mouse hand takes a scrubbed picture, since leaving the chart
+      // for the camera ends the scrub.
+      app.testKeyCatcher.forceActiveFocus()
+      var chart = win.chartItem
+      mouseMove(chart, chart.width * 0.4, chart.height / 2)
+      tryVerify(function() { return win.scrubT !== 0 }, 2000)
+      var hovered = shoot(win, function() { keyClick(Qt.Key_Y) })
+      problems = landed(hovered, "aapl", hovered.note[1] || "").concat(ofChart(hovered, "AAPL", "1Y", rows))
+      harness.check("y with the pointer on the window's chart takes the bar the pointer reads",
+        problems.length === 0 && hovered.card.scrubT === win.scrubShown && hovered.card.scrubX >= 0 && /^AAPL 1Y on /.test(hovered.note[1] || ""),
+        problems.join("; ") + " | " + hovered.card.scrubT + " vs " + win.scrubShown + " | " + JSON.stringify(hovered.note))
+      mouseMove(win, 1, 1)
+
       // Bitcoin's notification names no exchange: "CRYPTO" is none.
       service.setRange("1D")
       service.addSymbol("BTC-USD")
