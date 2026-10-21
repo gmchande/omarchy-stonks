@@ -644,8 +644,9 @@ ShellRoot {
     // Stonks, a retry fails at once and asks nothing. SH fails while the
     // fake curl's search is down, then answers. Found in the 1.0.0 review:
     // "Search didn't answer · try again" led nowhere, Enter doing nothing
-    // and nothing to click. Enter straight after an edit back to the failed
-    // query asks it once: found in review, the edit's own lookup went too.
+    // and nothing to click. After an edit back to the failed query, a retry
+    // still asks it once, before the typing pause ends and once the edit's
+    // own lookup is out: found in review, both went.
     function failedSearchRetries(body, keys) {
       var searchDown = function(down) {
         fileProc.command = down ? ["touch", harness.fakeState + "/SEARCH.down"] : ["rm", "-f", harness.fakeState + "/SEARCH.down"]
@@ -672,7 +673,7 @@ ShellRoot {
       // frame by frame, until it fails again, and not asked again after.
       keyClick("X")
       keyClick(Qt.Key_Backspace)
-      var failedBefore = harness.calls("SEARCH.failed")
+      var askedBefore = harness.calls("SEARCH.asked")
       var seen = []
       var watch = function() {
         var said = message.visible ? message.text : "-"
@@ -685,15 +686,25 @@ ShellRoot {
       within(3000, function() { return seen.length > 1 && body.search.answer === "failed" })
       wait(1000)
       frames.destroy()
-      var byEnter = [seen.join(" / "), harness.calls("SEARCH.failed") - failedBefore, body.adding].join(",")
+      var byEnter = [seen.join(" / "), harness.calls("SEARCH.asked") - askedBefore, body.adding].join(",")
+      // The same edit, then RETRY once the edit's own lookup is out: that
+      // lookup is the retry.
+      keyClick("X")
+      keyClick(Qt.Key_Backspace)
+      askedBefore = harness.calls("SEARCH.asked")
+      var editOut = within(2000, function() { return harness.calls("SEARCH.asked") > askedBefore })
+      clickRetry()
+      within(3000, function() { return body.search.answer === "failed" })
+      wait(1000)
+      var joined = [editOut, harness.calls("SEARCH.asked") - askedBefore, body.search.answer].join(",")
       // RETRY, while the gate pauses Stonks: no request, the failure stays.
       var gate = service.testYahooGate
       gate.begin("refused", 60)
-      failedBefore = harness.calls("SEARCH.failed")
+      askedBefore = harness.calls("SEARCH.asked")
       var answeredBefore = harness.calls("SEARCH.answered")
       clickRetry()
       wait(600)
-      var paused = [harness.calls("SEARCH.failed") - failedBefore, harness.calls("SEARCH.answered") - answeredBefore,
+      var paused = [harness.calls("SEARCH.asked") - askedBefore, harness.calls("SEARCH.answered") - answeredBefore,
         body.search.answer, retryShown()].join(",")
       gate.pause = ""
       // RETRY, Yahoo's search back: its answer lands, nothing added.
@@ -703,11 +714,11 @@ ShellRoot {
       var byClick = [body.search.resultsQuery, body.search.results.length > 0, harness.calls("SEARCH.answered") - answeredBefore,
         retryShown(), body.adding, harness.same(service.library, library)].join(",")
       body.resetInteraction()
-      harness.check("a failed lookup offers RETRY; Enter and a click on it ask the same query again, through Yahoo's gate, and adding nothing",
+      harness.check("a failed lookup offers RETRY; Enter and a click on it ask the same query again, once, through Yahoo's gate, and adding nothing",
         offered === "Search didn’t answer,true"
           && byEnter === "Search didn’t answer / - / Searching for “SH”… / Search didn’t answer,1,true"
-          && paused === "0,0,failed,true" && byClick === "SH,true,1,false,true,true",
-        [offered, byEnter, paused, byClick].join(" ; "))
+          && joined === "true,1,failed" && paused === "0,0,failed,true" && byClick === "SH,true,1,false,true,true",
+        [offered, byEnter, joined, paused, byClick].join(" ; "))
     }
 
     function test_flows() {

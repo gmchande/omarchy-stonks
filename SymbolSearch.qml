@@ -198,13 +198,18 @@ FocusScope {
   // The failed lookup's query asked again, through the same request and
   // gate as typing it: the failure goes, so the line says what a first
   // query's does until the answer lands (at once, while the gate pauses).
-  // A lookup of it still waiting on the typing pause goes now instead, so
-  // it is asked once.
+  // It is asked once: a lookup of it still waiting on the typing pause
+  // goes now instead, and one already out is the retry's.
   function retry() {
     if (stale || answer !== "failed") return
     searchDebounce.stop()
     answer = ""
-    runSearch()
+    if (searchProc.running && activeQuery === searchText.trim()) {
+      requestedQuery = ""
+      slowSearch.restart()
+    } else {
+      runSearch()
+    }
   }
 
   // A click on a result is Enter on it: chosen, so the hero is on it as an
