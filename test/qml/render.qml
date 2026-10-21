@@ -1390,6 +1390,10 @@ ShellRoot {
       } else if (control === "symbol") {
         body.openSymbolLists(stub.shown[0])
         waitForRendering(body)
+        // The click that opened this view is shielded for a double-click.
+        // Begin the row's film only once that row can receive the press.
+        var shield = findAll(one("symbolLists"), "openingShield")[0]
+        tryVerify(function() { return !shield.visible }, 2000)
         target = findAll(body, "symbolListRow")[0]
       } else if (control === "search") {
         body.adding = true
