@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Nothing jumps: positions across looks, symbols, and ranges, offscreen.
 # No surface is added to the running shell.
-bun "$(dirname "${BASH_SOURCE[0]}")/../themes.js" || true
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree layout.qml
 export QT_QPA_PLATFORM=offscreen
