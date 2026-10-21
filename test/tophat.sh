@@ -475,15 +475,17 @@ watch_run() {
   source "$run/identity"
   echo "$$ $(start_of $$)" > "$run/watcher"
   trap 'exit 0' TERM
-  local why now pid start
+  local why now saved pid start
   while sleep 0.5; do
     [ -f "$run/stop.status" ] && exit 0
+    # Read once: the switch may save it between two reads.
+    saved=$(cat "$run/scene" 2> /dev/null)
     if ! unlocked 2> /dev/null; then
       why="the session locked"
-    elif [ -f "$run/scene" ] && ! now=$(scene); then
+    elif [ -n "$saved" ] && ! now=$(scene); then
       why="the host's screens could not be read"
-    elif [ -f "$run/scene" ] && [ "$now" != "$(cat "$run/scene")" ]; then
-      why="the desktop changed: $(diff "$run/scene" - <<< "$now" | sed -n 's/^< /was /p; s/^> /now /p' | paste -sd ';' - | sed 's/;/; /g')"
+    elif [ -n "$saved" ] && [ "$now" != "$saved" ]; then
+      why="the desktop changed: $(diff <(echo "$saved") - <<< "$now" | sed -n 's/^< /was /p; s/^> /now /p' | paste -sd ';' - | sed 's/;/; /g')"
     elif [ -s "$run/leader" ] && read -r pid start < "$run/leader" && ! leader_is "$pid" "$start"; then
       why="the session's launcher has gone"
     elif gone "$run/starter"; then
@@ -494,14 +496,22 @@ watch_run() {
       continue
     fi
     trap '' TERM
-    end_run "$why" > /dev/null
-    # A start still waiting on the session learns it has ended.
-    if [ -s "$run/starter" ] && read -r pid start < "$run/starter" && [ "$(start_of "$pid")" = "$start" ]; then
+    echo "$why" > "$run/why"
+    # A start still running would switch on after the undo: stop it first,
+    # and its own undo runs. If it hangs, the undo here runs anyway.
+    if start_live; then
+      read -r pid start < "$run/starter"
       kill -TERM "$pid" 2> /dev/null
+      within 30 start_over
     fi
+    end_run "$why" > /dev/null
     exit 0
   done
 }
+
+# start_live: a start is still running; start_failed drops the file first.
+start_live() { [ -s "$run/starter" ] && ! gone "$run/starter"; }
+start_over() { ! start_live; }
 
 # ---- the run ----------------------------------------------------------------
 
@@ -738,7 +748,7 @@ start_failed() {
   # Ending now: nothing should signal this start any more.
   rm -f "$run/starter"
   echo "tophat: $*; stopping" >&2
-  end_run
+  end_run "$(cat "$run/why" 2> /dev/null)"
   stop_watch
   forget_run
   exit 1
@@ -1243,6 +1253,25 @@ EOF
   grep -q '^ended early: the start was killed' "$run/stop.log" \
     || miss "a start killed mid-switch should end on its death, got: $(head -n 1 "$run/stop.log")"
   watcher_gone || miss "killed start: the watcher outlived the run"
+  # A lock while a start is still switching: the watcher stops the start
+  # before its own undo, so nothing switches on after it. The stand-in start
+  # finishes its switch on TERM; a subshell, so it is reaped once it exits.
+  run=$tmp/base/locked-start
+  mkdir -p "$run"
+  printf 'RUN_ID=locked-start\nCHECKOUT=%q\nSTART_EPOCH=%q\n' "$checkout" "$(date +%s)" > "$run/identity"
+  host_is
+  cat > "$tmp/switching" << 'EOF'
+trap 'hyprctl output create headless STONKS-TEST > /dev/null
+  hyprctl dispatch "hl.dsp.focus({ monitor = \"STONKS-TEST\" })" > /dev/null; exit 0' TERM
+while :; do sleep 0.1; done
+EOF
+  ( bash "$tmp/switching" & echo "$! $(sleep 0.1; start_of $!)" > "$run/starter" )
+  start_watch || miss "locked start: the watcher never started"
+  printf 'LAPTOP_WS=2\nPOINTER=%q\n' "20194 508" > "$run/screens"
+  host_dispatch 'hl.dsp.focus({ workspace = "10" })' > /dev/null
+  host_change '.monitors[].solitaryBlockedBy = ["LOCK"]'
+  within 5 test -f "$run/stop.status" && host_back || miss "a lock while a start was switching should leave the host as it was, got: $(seen)"
+  watcher_gone || miss "locked start: the watcher outlived the run"
   # Screens that could not all be put back: stop keeps the run current and
   # tries them again.
   solo_run retry
