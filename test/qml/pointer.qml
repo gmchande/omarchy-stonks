@@ -47,18 +47,17 @@ ShellRoot {
     if (!ok) failures++
   }
 
-  // What the header's animal slot draws, in the look shown: retro's cells,
-  // or smooth's drawn layer alone at full ink; "" for nothing at all.
+  // What the header's animal slot draws, the same cells in both looks: one
+  // layer alone at full ink, in its colour; "" for nothing at all.
   function animalShows(kind) {
-    var sprite = find(body, "sprite")
-    var bull = find(body, "drawnBull")
-    var bear = find(body, "drawnBear")
-    if (stub.retro) return !bull.visible && !bear.visible && (kind === "" ? !sprite.visible
-      : sprite.visible && JSON.stringify(sprite.pixels) === JSON.stringify(Cells.spriteFor(kind === "bull"))
-        && Qt.colorEqual(sprite.color, kind === "bull" ? stub.upColor : stub.downColor))
-    return !sprite.visible && (kind === "bull" ? bull.visible && bull.opacity === 1 && !bear.visible
-      : kind === "bear" ? bear.visible && bear.opacity === 1 && !bull.visible
-      : !bull.visible && !bear.visible)
+    var bull = find(body, "bullCells")
+    var bear = find(body, "bearCells")
+    var shown = kind === "bull" ? bull : kind === "bear" ? bear : null
+    var other = kind === "bull" ? bear : bull
+    if (!shown) return !bull.visible && !bear.visible
+    return shown.visible && shown.opacity === 1 && !other.visible
+      && JSON.stringify(shown.pixels) === JSON.stringify(Cells.spriteFor(kind === "bull", 0))
+      && Qt.colorEqual(shown.color, kind === "bull" ? stub.upColor : stub.downColor)
   }
 
   function quote(symbol, price, previous) {
@@ -460,7 +459,7 @@ ShellRoot {
           { t: stub.now, c: 110, h: 111, l: 109, o: 110, v: 100 }
         ] } } }
         root.check("a failed range's retry that lands down draws the bear at once, no crossfade",
-          !body.chart.failed && root.animalShows("bear"), body.animal.kind + " " + root.find(body, "drawnBear").opacity)
+          !body.chart.failed && root.animalShows("bear"), body.animal.kind + " " + root.find(body, "bearCells").opacity)
         stub.range = "1D"
         stub.histories = {}
         stub.featuredSymbol = restFeatured

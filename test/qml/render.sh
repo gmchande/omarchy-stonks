@@ -121,15 +121,16 @@ if [ $# -eq 0 ]; then
       states="$states $place-holiday-$market-smooth $place-holiday-$market-retro"
     done
   done
-  # The pill at a larger text size, as `omarchy display text size 16` sets it.
-  states="$states pill-sheet-large"
+  # The pill at a larger and a smaller text size, as `omarchy display text
+  # size 16` and `10` set it: a side bar is then 37 and 23 pixels wide.
+  states="$states pill-sheet-large pill-sheet-small"
 fi
 # Every render is in an installed Omarchy theme: the one the state's name
 # ends with (popup-fill-up-smooth-kanagawa, theme-retro-white), else Tokyo
 # Night, the theme a fresh Omarchy install sets. It goes where the shell
 # reads the current theme, so the shell's Color and the plugin's
 # TrendColors both read it as they do on the desktop. A state ending -large
-# has the shell's text size at 16 rather than 12.
+# has the shell's text size at 16 rather than 12, and one ending -small at 10.
 themes=$(ls /usr/share/omarchy/themes | awk '{ print length, $0 }' | sort -rn | cut -d' ' -f2-)
 theme_dir="$HOME/.local/state/omarchy/current"
 mkdir -p "$theme_dir"
@@ -140,6 +141,7 @@ for state in $states; do
   for t in $themes; do [[ $state == *-"$t" ]] && { theme=$t; break; }; done
   ln -sfn "/usr/share/omarchy/themes/$theme" "$theme_dir/theme"
   if [[ $state == *-large ]]; then printf '[font]\nbase-size = 16\n' > "$HOME/.config/omarchy/shell.toml"
+  elif [[ $state == *-small ]]; then printf '[font]\nbase-size = 10\n' > "$HOME/.config/omarchy/shell.toml"
   else rm -f "$HOME/.config/omarchy/shell.toml"; fi
   echo "render $state ($theme) -> $dest"
   # render.qml ignores whether the save worked and exits 0 anyway, so only a

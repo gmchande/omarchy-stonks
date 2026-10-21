@@ -4,6 +4,7 @@ import QtQuick
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "Cells.js" as Cells
 import "Chart.js" as Chart
 import "Figures.js" as Figures
 import "Format.js" as Format
@@ -45,7 +46,7 @@ BarWidget {
   }
   readonly property string styleKey: vertical ? "barStyleVertical" : onRight ? "barStyleRight" : "barStyle"
   readonly property string barStyle: setting(styleKey, vertical || onRight ? "icon" : "sparkline")
-  // Just Stonks' mark, a quiet icon among the bar's own.
+  // Just the day's animal, a quiet icon among the bar's own.
   readonly property bool iconOnly: barStyle === "icon"
   readonly property bool retro: service ? service.retro : setting("style", "smooth") === "retro"
   // Freshness is judged with or without a quote: a first fetch that failed
@@ -75,30 +76,29 @@ BarWidget {
   readonly property color trendColor: toneColor(featured ? featured.tone : "")
   // A day's colour by its tone: up, down, or the dim of a flat one.
   function toneColor(tone) { return tone === "up" ? upColor : tone === "down" ? downColor : dimColor }
-  // The day and tone the mark shows. A new price that turns the same
-  // symbol's day between falling and climbing (a flat day climbs, dim)
-  // steps the mark (`StonksMark.turnTo`); a tone alone recolours it, and
-  // another symbol, another day, or another change mode shows at once: the
+  // The day and animal the icon form shows (`Figures.animalKind`, the
+  // header's rule). A new price that turns the same symbol's day between
+  // the bull and the bear steps the animal (`BarAnimal.turnTo`); another
+  // symbol or another day shows at once, and no change mode moves it: the
   // turn says a price crossed, never that the reading changed.
   // Read in the handler, never a binding, so it can't lag `featured`.
-  function markDay() {
-    return !featuredQuote ? "" : [featuredSymbol, service.changeMode,
+  function animalDay() {
+    return !featuredQuote ? "" : [featuredSymbol,
       featuredQuote.session && featuredQuote.session.regular ? featuredQuote.session.regular.start : 0].join("|")
   }
   property string shownDay: ""
-  property string markTone: ""
+  property string shownKind: ""
   onFeaturedChanged: {
-    var tone = featured ? featured.tone : ""
-    var day = markDay()
-    if (day !== "" && day === shownDay)
-      mark.turnTo(tone === "down", toneColor(tone), markTone === "down", toneColor(markTone))
-    else mark.settle()
+    var kind = Figures.animalKind(featured)
+    var day = animalDay()
+    if (day !== "" && day === shownDay) animal.turnTo(kind, shownKind)
+    else animal.settle()
     shownDay = day
-    markTone = tone
+    shownKind = kind
   }
   Component.onCompleted: {
-    shownDay = markDay()
-    markTone = featured ? featured.tone : ""
+    shownDay = animalDay()
+    shownKind = Figures.animalKind(featured)
   }
   // Quieter than the bar's ink by the same rule as the popup's secondary
   // text, against the bar's own ground.
@@ -214,7 +214,11 @@ BarWidget {
     labelVisible: false
     hasVisualContent: true
     fixedWidth: root.vertical ? -1 : (root.iconOnly ? Style.bar.iconSlot : content.implicitWidth + Style.space(17))
-    fixedHeight: root.vertical ? (root.iconOnly ? Style.bar.iconSlot : root.stackedLines.length * Style.bar.iconSlot) : -1
+    // A side bar's icon slot holds the animal and the room under it for a
+    // warning's "!", with a pixel to spare each end: an icon slot, or more
+    // where the text is small enough that the two outgrow it.
+    fixedHeight: root.vertical ? (root.iconOnly ? Math.max(Style.bar.iconSlot, Math.ceil(iconForm.implicitHeight) + 2)
+      : root.stackedLines.length * Style.bar.iconSlot) : -1
     // A hover only for what the pill can't say: the icon names nothing, so
     // its hover says what the other forms show, the symbol and its change;
     // on every form, what a warning's "!" means. The line, the arrow, and
@@ -278,31 +282,70 @@ BarWidget {
         Behavior on rotation { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
       }
 
-      // The icon form, on either bar: Stonks' mark, the same in both looks,
-      // climbing or falling with the day, in its colour, at the size of the
-      // bar's icons, its columns solid so it reads beside their glyphs. A
-      // day that crosses its close turns it column by column (`markTone`).
-      StonksMark {
-        id: mark
-        objectName: "pillMark"
+      // The icon form, on either bar: the day's animal, the same in both
+      // looks, the header's bull or bear (`BarAnimal`) one cell a pixel, as
+      // tall as the bar's icons allow. A day that crosses its close turns it
+      // column by column (`shownKind`). With no animal it says what the
+      // other forms say: a flat day lies level in the dim of a flat change,
+      // as the line form's flat day does, and before the first quote the
+      // dim "…" of the text form.
+      Item {
+        id: iconForm
+        objectName: "pillIcon"
         visible: root.iconOnly
         anchors.verticalCenter: parent.verticalCenter
-        falling: !!root.featured && root.featured.tone === "down"
-        color: root.trendColor
-        solid: true
-        pixel: Math.max(2, Math.round(Style.bar.iconCanvas / 8))
-        gap: 1
+        // A side bar is barely wider than the animal, so a warning's "!" goes
+        // under it there, in room the slot keeps whether the "!" shows or
+        // not: the animal never moves for a warning.
+        readonly property int warningGap: 2
+        readonly property rect warningInk: warningMetrics.tightBoundingRect("!")
+        implicitWidth: animal.implicitWidth
+        implicitHeight: animal.implicitHeight + (root.vertical ? warningGap + warningInk.height : 0)
 
-        // A warning's "!", in the bar's ink as the hero's line says one,
-        // hangs in the slot's margin right of the mark, so the mark stays
-        // where it was. A badge on its corner, as the shell's Tailscale
-        // icon wears one, blurred into the columns at this size.
+        BarAnimal {
+          id: animal
+          objectName: "pillAnimal"
+          kind: Figures.animalKind(root.featured)
+          upColor: root.upColor
+          downColor: root.downColor
+          cell: Math.max(1, Math.floor(Style.bar.iconCanvas / rows))
+        }
+
+        Rectangle {
+          objectName: "pillLevel"
+          visible: !!root.featured && animal.kind === ""
+          y: Math.round((animal.height - height) / 2)
+          width: animal.width
+          height: Cells.RULE_THICKNESS
+          color: root.dimColor
+        }
+
         Text {
-          objectName: "pillMarkWarning"
+          objectName: "pillWaiting"
+          visible: !root.featured && !root.warns
+          anchors.centerIn: animal
+          textFormat: Text.PlainText
+          text: "…"
+          color: root.dimColor
+          font.family: button.fontFamily
+          font.pixelSize: button.fontSize
+        }
+
+        // A warning's "!", in the bar's ink as the hero's line says one. On a
+        // top or bottom bar it hangs in the slot's margin right of the
+        // animal; on a side bar it sits under it, its ink centred across the
+        // bar. A badge on its corner, as the shell's Tailscale icon wears
+        // one, blurs into the cells at this size. With nothing shown, a first
+        // fetch that failed, it stands alone where the animal would be.
+        Text {
+          id: warning
+          objectName: "pillWarning"
+          readonly property bool under: root.vertical && !!root.featured
           visible: root.warns
-          anchors.left: parent.right
-          anchors.leftMargin: 1
-          anchors.verticalCenter: parent.verticalCenter
+          x: Math.round(under ? (animal.width - iconForm.warningInk.width) / 2 - iconForm.warningInk.x
+            : root.featured ? animal.width + 1 : (animal.width - width) / 2)
+          y: Math.round(under ? animal.height + iconForm.warningGap - baselineOffset - iconForm.warningInk.y
+            : (animal.height - height) / 2)
           textFormat: Text.PlainText
           text: "!"
           color: button.foreground
@@ -310,6 +353,7 @@ BarWidget {
           font.pixelSize: button.fontSize
           font.bold: true
         }
+        FontMetrics { id: warningMetrics; font: warning.font }
       }
 
       Text {

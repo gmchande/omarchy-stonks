@@ -40,10 +40,10 @@ AAPL, MSFT, SPY, and TSLA. Add your own and remove any you don't follow.
 <img src="media/pill.png" width="200" alt="The pill's four forms: a sparkline, an arrow, the price as text, and Stonks' mark">
 
 The pill shows today's move for the stock you last looked at, in one of four
-forms: a sparkline, an arrow, the price as text, or Stonks' mark, a little
-chart that climbs on an up day and falls on a down one. Middle-click it to
-change its form. On a bar at the side of the screen it shows the mark, and
-a middle-click there switches to the symbol over its change.
+forms: a sparkline, an arrow, the price as text, or the day's animal, the
+bull on an up day and the bear on a down one. Middle-click it to change its
+form. On a bar at the side of the screen it shows the animal, and a
+middle-click there switches to the symbol over its change.
 
 Scroll over it to step through your list, left-click for the popup,
 right-click for the window, and drag it to move it along the bar.

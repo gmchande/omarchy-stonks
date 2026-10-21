@@ -93,9 +93,6 @@ jobs:
       - name: Quickshell crash handling self-check (stand-in)
         run: bash test/qml/crash-check.sh
 
-      - name: Launcher icon is the mark
-        run: bun test/mark-svg.js check
-
       - name: Launcher entry validates
         run: desktop-file-validate share/stonks.desktop
 

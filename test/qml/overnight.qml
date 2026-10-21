@@ -80,24 +80,20 @@ ShellRoot {
     return null
   }
 
-  // How the header's animal is drawn, in the look shown: "asleep", its eyes
-  // shut and the "z" shown, "awake", eyes open and no "z", else how far its
-  // lids are down and whether the "z" shows. A "z" reaching past the
-  // header's box is cut off: the popup's body starts at the header's top
-  // and clips what draws above it.
+  // How the header's animal is drawn, the same cells in both looks:
+  // "asleep", its eyes shut and the "z" shown, "awake", eyes open and no
+  // "z", else how far its lids are down and whether the "z" shows. A "z"
+  // reaching past the header's box is cut off: the popup's body starts at
+  // the header's top and clips what draws above it.
   function sleep() {
     var body = app.testBody
     var header = find(body, "animal").parent
-    var mark = find(header, body.retro ? "sleepCells" : "sleepZ")
+    var mark = find(header, "sleepCells")
     var z = mark.visible
     var whole = mark.y >= 0 && mark.y + mark.height <= header.height
-    var lids
-    if (body.retro) {
-      var drawn = JSON.stringify(find(header, "sprite").pixels)
-      lids = [0, 1, 2].filter(function(l) { return drawn === JSON.stringify(Cells.spriteFor(body.animal.kind === "bull", l)) })[0] / 2
-    } else {
-      lids = [find(header, "drawnBull"), find(header, "drawnBear")].filter(function(a) { return a.visible })[0].lids
-    }
+    var bull = body.animal.kind === "bull"
+    var drawn = JSON.stringify(find(header, bull ? "bullCells" : "bearCells").pixels)
+    var lids = [0, 1, 2].filter(function(l) { return drawn === JSON.stringify(Cells.spriteFor(bull, l)) })[0] / 2
     return lids === 1 && z && whole ? "asleep" : lids === 0 && !z ? "awake"
       : "lids " + lids + ", z " + z + (whole ? "" : " at " + mark.y + " to " + (mark.y + mark.height) + " of the header's " + header.height)
   }
