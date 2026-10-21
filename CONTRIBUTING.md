@@ -69,10 +69,10 @@ building one that won't merge.
 - Check a change to what a chart, row, or figure shows on every kind of
   listing: a busy US stock, a thin one, an ETF, an index, a cryptocurrency,
   and a non-US listing.
-- `test/data-files/1.0.0.json` is a data file as 1.0.0 saved it. Every version
-  must keep loading it with nothing lost (`test/qml/data-files.sh`). A new
-  shape of the file adds its release's own file beside it, and never edits
-  this one.
+- Each `test/data-files/VERSION.json` is a data file as that release saved
+  it. Every version must keep loading each with nothing lost
+  (`test/qml/data-files.sh`). A new shape of the file adds its release's own
+  file beside them (`data-files.sh write VERSION`), and never edits one.
 - Before a pull request, use your change the way a user would: open the popup
   from the pill, add a symbol through search, switch lists, remove and undo,
   show a row's chart, change the range and the look, and use the window.
