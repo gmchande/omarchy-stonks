@@ -4,7 +4,7 @@ Stonks puts a stock watchlist in your Omarchy 4 bar. A small pill shows how
 a stock is doing today. Click it for that stock's chart and your lists, and
 move the pointer across the chart to see the price at any moment on it.
 
-<img src="preview.png" alt="Stonks in the Omarchy bar: the pill shows Apple's symbol, sparkline, and change, and under it two popups side by side, each showing Apple's price, the day's chart, the range buttons, the day's and 52-week figures, and the first rows of the list. On the left, smooth, scrubbed back to 10:15 when the day was up, with the bull; on the right, retro, on the latest price of a down day, with the bear">
+<img src="preview.png" alt="Stonks in the Omarchy bar: its pill shows SPY's sparkline and change. Below the bar, the pixel bull, the STONKS wordmark, 'Stocks in your Omarchy bar.' and 'Free · No account · No API key', beside the retro popup: SPY at 769.94, up 0.88%, with the bull, over the day's chart in pixel columns">
 
 - Charts from one day to all time.
 - Pre-market, after-hours, and overnight prices, and when the market opens
@@ -37,7 +37,7 @@ AAPL, MSFT, SPY, and TSLA. Add your own and remove any you don't follow.
 
 ## The pill
 
-<img src="media/pill.png" width="200" alt="The pill's four forms: a sparkline, an arrow, the price as text, and Stonks' mark">
+<img src="media/pill.png" width="200" alt="The pill's four forms: a sparkline, an arrow, the price as text, and the day's bear">
 
 The pill shows today's move for the stock you last looked at, in one of four
 forms: a sparkline, an arrow, the price as text, or the day's animal, the
