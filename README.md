@@ -146,7 +146,7 @@ too alike, or too faint.
 
 ## Sounds
 
-Stonks makes a quiet sound when you add a symbol, remove a row, or undo the
+Stonks makes a short sound when you add a symbol, remove a row, or undo the
 removal, which plays the removal backwards. A replay plays the chart's line
 as a tone, with a tick where it crosses the previous close. Each look has its
 own voice. Nothing that happens by itself makes a sound: no refresh, price,

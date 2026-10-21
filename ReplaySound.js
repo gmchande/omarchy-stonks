@@ -146,7 +146,7 @@ function smooth(geometry, from, to, seconds) {
       x[ticks[m] + d] += 0.55 * Math.exp(-tt / 0.012) * Math.sin(2 * Math.PI * 1760 * tt) * Math.min(1, tt / 0.0015)
     }
   }
-  return levelled(fadeEdges(x, 1, 4), -36)
+  return levelled(fadeEdges(x, 1, 4), -21)
 }
 
 // A, B, C♯, E, F♯ over two octaves, from A4.
@@ -238,7 +238,7 @@ function retro(grid, from, to, seconds) {
   for (var n = 0; n < ticks.length; n++) {
     for (var m = 0; m < noise.length && ticks[n] + m < x.length; m++) x[ticks[n] + m] += 0.5 * nesVolume(m / RATE, 10, 4, 0) * noise[m]
   }
-  return levelled(fadeEdges(band(x, 90, 6500), 1, 4), -37)
+  return levelled(fadeEdges(band(x, 90, 6500), 1, 4), -22)
 }
 
 // A levelled sound as a 16-bit mono WAV, its bytes, with a one-bit TPDF
