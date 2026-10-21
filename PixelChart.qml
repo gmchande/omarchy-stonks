@@ -86,7 +86,10 @@ Item {
   onBelowStemDimChanged: ink.requestPaint()
 
   // Bucket the points by column; the last point in a bucket wins, which is
-  // the price at the end of that five minutes.
+  // the price at the end of that stretch of the axis. A column no print
+  // falls in, between two prints the line joins, holds the last print
+  // before it: the price then. Only a break (`brk`) leaves columns dark, as
+  // it lifts the smooth look's pen.
   function layout() {
     var pitch = pixel + gap
     var g = {
@@ -101,10 +104,16 @@ Item {
     if (!hasBaseline) return g
     g.baseRow = Math.round(geometry.baselineY * (g.rows - 1))
     var pts = geometry.points
+    var last = -1
     for (var i = 0; i < pts.length; i++) {
       var col = Math.min(g.columns - 1, Math.floor(pts[i].x * g.columns))
+      for (var held = last + 1; i > 0 && !pts[i].brk && held < col; held++) {
+        g.levels[held] = g.levels[last]
+        g.ext[held] = g.ext[last]
+      }
       g.levels[col] = Math.round(pts[i].y * (g.rows - 1))
       g.ext[col] = pts[i].ext
+      last = col
     }
     for (var c = 0; c < g.columns; c++) {
       if (g.levels[c] !== undefined && !g.ext[c]) g.lastRegular = c

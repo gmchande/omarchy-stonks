@@ -14,9 +14,10 @@ import "plugin/Format.js" as Format
 // 5 October at 00:36, and a night held open across midnight: Tuesday
 // 6 October at 23:00, Wednesday at 00:05, 01:00, 06:00, 11:53, and 14:55,
 // New York time; at 01:00 and 14:55 the listing sweep's saved answers too,
-// with Robinhood's word on which listings it trades all day. The library
-// holds three US stocks, an index, a cryptocurrency, and a Toronto listing;
-// KILN, BOLT, and SPY join it there.
+// with Robinhood's word on which listings it trades all day; and a thin
+// stock's day on Wednesday 21 October at 10:06. The library holds three US
+// stocks, an index, a cryptocurrency, and a Toronto listing; KILN, BOLT,
+// SPY, and VANE join it there.
 ShellRoot {
   id: harness
 
@@ -152,6 +153,25 @@ ShellRoot {
     var width = 0
     for (var j = 3; j < row.length; j += 4) if (row[j] > 0) width++
     return { alpha: most, width: width, cell: chart.grid ? chart.pixel : 0 }
+  }
+
+  // The hero's retro chart, shown.
+  function retroChart() {
+    return findAll(app.testBody, "curtain", []).filter(function(c) { return c.parent.visible })[0].parent
+  }
+
+  // The columns a retro chart leaves dark between two prints its line joins,
+  // as smooth's does: every point but one that starts again (`brk`).
+  function darkJoins(chart) {
+    var g = chart.grid
+    var pts = chart.geometry.points
+    var column = function(p) { return Math.min(g.columns - 1, Math.floor(p.x * g.columns)) }
+    var dark = []
+    for (var k = 1; k < pts.length; k++) {
+      if (pts[k].brk) continue
+      for (var c = column(pts[k - 1]); c <= column(pts[k]); c++) if (g.levels[c] === undefined && dark.indexOf(c) < 0) dark.push(c)
+    }
+    return dark
   }
 
   function finish() {
@@ -1065,6 +1085,39 @@ ShellRoot {
       harness.check("a trading night, Robinhood back after a refusal: its first probe lets one request of two go, and the rest goes once that reopens it",
         refused && caughtUp && afterProbe.length === 2 && afterProbe[0] === 75,
         "refused " + refused + "; requests after the pause of " + afterProbe.join(", ") + "; every night refreshed " + caughtUp)
+
+      // Wednesday 21 October, 10:06: VANE, a thin NYSE stock, printed 26
+      // times since midnight, fewer than the hero's columns, and nine times
+      // in the pre-market, hours apart. Retro left a column dark wherever no
+      // print fell in it, so the day looked torn where smooth's line runs
+      // on: in the hero laid out by print, in its row laid out by the
+      // clock, and on 3M, 66 days across the hero's columns.
+      useSet("gaps-2026-10-21-1006")
+      service.now = 1792591591
+      service.addSymbol("VANE")
+      within(8000, function() { return !!service.quotes.VANE && service.arriving.length === 0 })
+      featureShown("VANE")
+      within(3000, function() { return body.featuredGeometry.start === 1792555200 && !body.chartLoading })
+      if (!service.retro) {
+        app.testKeyCatcher.forceActiveFocus()
+        keyClick(Qt.Key_S)
+        within(2000, function() { return service.retro })
+      }
+      var vaneAt = body.watchlist.rowItem("VANE").y
+      body.watchlist.contentY = Math.max(0, Math.min(vaneAt, body.watchlist.contentHeight - body.watchlist.height))
+      within(2000, function() { return !!harness.find(body.watchlist.rowItem("VANE"), "rowCells") })
+      var heroDark = harness.darkJoins(harness.retroChart())
+      var rowDark = harness.darkJoins(harness.find(body.watchlist.rowItem("VANE"), "rowCells"))
+      app.testKeyCatcher.forceActiveFocus()
+      keyClick(Qt.Key_BracketRight)
+      keyClick(Qt.Key_BracketRight)
+      keyClick(Qt.Key_BracketRight)
+      within(5000, function() { return body.chartRange === "3M" && body.historyShown && !body.historyFailed && !body.chartLoading })
+      var quarter = harness.retroChart()
+      var quarterDark = body.chartRange === "3M" && quarter.geometry.points.length === 66 ? harness.darkJoins(quarter) : ["no 3M"]
+      harness.check("retro: VANE's day in the hero and its row, and its 3M, light every column between two prints the line joins",
+        heroDark.length === 0 && rowDark.length === 0 && quarterDark.length === 0,
+        "dark columns: hero " + heroDark.join(",") + " | row " + rowDark.join(",") + " | 3M " + quarterDark.join(","))
       harness.finish()
     }
   }
