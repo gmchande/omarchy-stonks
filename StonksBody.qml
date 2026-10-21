@@ -1306,7 +1306,11 @@ Item {
     z: 10
     x: root.margins
     y: root.listMenuTop
-    maxHeight: root.height - root.listMenuTop - root.groupGap - footer.height - root.margins
+    // Where the chart takes the spare height (the window's), down over the
+    // footer, as it lies over the rows: stopped above the footer it showed
+    // three lists of six at 720 × 760. Elsewhere one gap above the footer,
+    // which the popup's card makes room for under it (`listMenuBottom`).
+    maxHeight: root.height - root.listMenuTop - root.margins - (root.chartFitsSurface ? 0 : root.groupGap + footer.height)
     choices: root.lists
     current: root.listName
     retro: root.retro

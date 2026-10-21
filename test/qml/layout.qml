@@ -331,6 +331,21 @@ ShellRoot {
       }
     }
 
+    // Reads a grabbed picture's pixels, for ink measured as drawn.
+    Canvas {
+      id: inkCanvas
+      y: window.implicitHeight
+      width: window.implicitWidth
+      height: 120
+      renderTarget: Canvas.Image
+      renderStrategy: Canvas.Immediate
+    }
+    Text {
+      id: inkProbe
+      y: window.implicitHeight + 130
+      textFormat: Text.PlainText
+    }
+
     TestCase {
       name: "NothingJumps"
       when: window.visible
@@ -339,6 +354,61 @@ ShellRoot {
         // The rows animate into their slots on the first layout; measure once
         // everything has settled.
         wait(400)
+        // Under the open list menu each line of a row's words shows unless
+        // it starts under the menu: the symbol, with its remove button, and
+        // the name, each on its own, with one list to six, in both looks.
+        // Found in the 1.0.2 visual review: a row 11 px under the menu lost
+        // its symbol and its name, and showed its price and chart alone.
+        var coverFaults = []
+        var straddled = 0
+        var coverSeen = []
+        ;[1, 2, 3, 4, 5, 6].forEach(function(count) {
+          stub.lists = [{ name: "", label: "All", count: stub.symbols.length, symbols: stub.symbols }].concat(
+            Array.from({ length: count - 1 }, function(_, n) { return { name: "List " + (n + 1), label: "List " + (n + 1), count: 1, symbols: ["MZ"] } }))
+          ;[false, true].forEach(function(retro) {
+            stub.retro = retro
+            wait(50)
+            body.openListMenu()
+            wait(100)
+            var menu = find(body, "listMenu")
+            var menuEnd = menu.mapToItem(body, 0, menu.height).y
+            var listEnd = yIn(body.watchlist, body.watchlist.height)
+            var seen = []
+            // Every built row's words, as drawn.
+            var contents = []
+            var walk = function(it) {
+              if (it.objectName === "rowContent") contents.push(it)
+              else for (var c = 0; c < it.children.length; c++) walk(it.children[c])
+            }
+            walk(body.watchlist)
+            contents.forEach(function(content) {
+              if (!content.visible || yIn(content, 0) >= listEnd || yIn(content, content.height) <= yIn(body.watchlist, 0)) return
+              var symbol = find(content, "rowSymbol").text
+              var lines = ["rowSymbol", "rowDetail"].map(function(name) {
+                var words = find(content, name)
+                var top = words.mapToItem(body, 0, 0).y
+                if (words.visible !== (top >= menuEnd))
+                  coverFaults.push(count + " lists " + (retro ? "retro " : "smooth ") + symbol + " " + name + " at " + top
+                    + (words.visible ? " shows" : " hidden") + ", the menu ends at " + menuEnd)
+                seen.push(symbol + " " + name + "@" + Math.round(top) + (words.visible ? "" : " hidden"))
+                return words.visible
+              })
+              if (!lines[0] && lines[1]) straddled++
+            })
+            coverSeen.push(count + (retro ? " retro" : " smooth") + ", menu ends " + Math.round(menuEnd) + ", list " + yIn(body.watchlist, 0) + "–" + listEnd
+              + " of " + body.watchlist.displayedSymbols.length + ": " + seen.join(", "))
+            body.closeListMenu()
+            wait(50)
+          })
+        })
+        stub.lists = Qt.binding(function() {
+          return [{ name: "", label: "All", count: stub.symbols.length, symbols: stub.symbols }]
+        })
+        stub.retro = false
+        wait(50)
+        root.check("under the open list menu a row's symbol and its name each show unless they start under it, with one list to six in both looks, a row half under it keeping its name",
+          coverFaults.length === 0 && straddled > 0, coverFaults.join(" | ") + " (" + straddled + " rows kept their name alone) || " + coverSeen.join(" | "))
+
         var weekly = History.parseHistory(JSON.parse(aaplWeeklyFile.text()), "5Y")
         var year = History.parseHistory(JSON.parse(shopYearFile.text()), "1Y")
         var young = History.parseHistory(JSON.parse(youngFile.text()), "All")
@@ -720,9 +790,78 @@ ShellRoot {
         })
         surface.wide = wideWas
         stub.retro = false
-        stub.quotes = Object.assign({}, longNamed, { "SHEL.L": shelQuote })
         root.check("a long name gives way on the hero's line; its exchange and currency stay whole, in the popup and the window, both looks",
           metaLost.length === 0, metaLost.join(" | "))
+
+        // One space before the dot after the name, whatever the name's
+        // length: the ink gap from the name's last character to the dot is
+        // the font's own, within a pixel, for the cut name in the popup and
+        // the window at five widths, and for a whole name. Found in the 1.0.2
+        // visual review: "TOYOTA MOTOR CORPORA…  · TSE", the name's box wider
+        // than its cut text.
+        var inkRuns = function(item) {
+          var grabbed = null
+          item.grabToImage(function(result) { grabbed = result })
+          tryVerify(function() { return grabbed !== null }, 3000, "grab " + item.objectName)
+          inkCanvas.loadImage(grabbed.url)
+          tryVerify(function() { return inkCanvas.isImageLoaded(grabbed.url) }, 3000, "load " + item.objectName)
+          var ctx = inkCanvas.getContext("2d")
+          ctx.clearRect(0, 0, inkCanvas.width, inkCanvas.height)
+          ctx.drawImage(grabbed.url, 0, 0)
+          var w = Math.min(inkCanvas.width, Math.ceil(item.width))
+          var h = Math.min(inkCanvas.height, Math.ceil(item.height))
+          var data = ctx.getImageData(0, 0, w, h).data
+          inkCanvas.unloadImage(grabbed.url)
+          var runs = []
+          for (var x = 0; x < w; x++) {
+            var inked = false
+            for (var y = 0; y < h && !inked; y++) inked = data[(y * w + x) * 4 + 3] > 24
+            if (inked && runs.length && runs[runs.length - 1].right === x) runs[runs.length - 1].right = x + 1
+            else if (inked) runs.push({ left: x, right: x + 1 })
+          }
+          return runs
+        }
+        // The gap from the name's last ink to the dot, against the same last
+        // character and words drawn as one line: one space each side as the
+        // font sets it, whatever the glyphs' bearings.
+        var dotGaps = []
+        var dotGap = function(label) {
+          var name = find(body, "listingLine")
+          var meta = find(body, "listingMeta")
+          var nameInk = inkRuns(name)
+          var metaInk = inkRuns(meta)
+          var drawn = meta.mapToItem(body, metaInk[0].left, 0).x - name.mapToItem(body, nameInk[nameInk.length - 1].right, 0).x
+          var last = name.truncated ? "…" : name.text.charAt(name.text.length - 1)
+          inkProbe.font = name.font
+          inkProbe.text = last
+          var lastInk = inkRuns(inkProbe)
+          var lastRight = lastInk[lastInk.length - 1].right
+          inkProbe.text = last + meta.text
+          var probeDot = inkRuns(inkProbe).filter(function(r) { return r.left >= lastRight })[0]
+          var set = probeDot.left - lastRight
+          if (Math.abs(drawn - set) > 1)
+            dotGaps.push(label + " " + JSON.stringify(name.text) + ": " + drawn.toFixed(1) + " px before the dot, " + set + " as one line")
+        }
+        ;[[false, 0], [true, 560], [true, 600], [true, 640], [true, 680], [true, 720]].forEach(function(place) {
+          surface.wide = place[0]
+          if (place[0]) surface.windowWidth = place[1]
+          ;[false, true].forEach(function(retro) {
+            stub.retro = retro
+            stub.featuredSymbol = "SHEL.L"
+            wait(50)
+            var where = (place[0] ? "window " + place[1] : "popup") + (retro ? " retro" : " smooth")
+            dotGap(where + " cut")
+            stub.featuredSymbol = "AAPL"
+            wait(50)
+            dotGap(where + " whole")
+          })
+        })
+        surface.wide = wideWas
+        surface.windowWidth = 720
+        stub.retro = false
+        stub.quotes = Object.assign({}, longNamed, { "SHEL.L": shelQuote })
+        root.check("the hero's line keeps one space between the name, cut or whole, and the dot after it, in the popup and the window at five widths, both looks",
+          dotGaps.length === 0, dotGaps.join(" | "))
 
         // Every price a listing shows is in its own decimals: a coin under a
         // cent to four significant digits, a six-figure price to none, in
@@ -1119,7 +1258,9 @@ ShellRoot {
             wait(50)
             var menu = find(body, "listMenu")
             var menuFooter = find(body, "footer")
-            if (!(menu.visible && yIn(menu, menu.height) + body.groupGap <= yIn(menuFooter, 0)
+            // The menu runs down over the footer, inside the window's margin;
+            // the footer stays at its place under the rows.
+            if (!(menu.visible && yIn(menu, menu.height) <= surface.height - body.margins
                 && yIn(menuFooter, menuFooter.height) <= surface.height - body.margins))
               windowFaults.push(at + "the list menu: it ends at " + yIn(menu, menu.height) + ", the footer "
                 + yIn(menuFooter, 0) + "-" + yIn(menuFooter, menuFooter.height) + " in " + surface.height)
@@ -1382,11 +1523,13 @@ ShellRoot {
               }
               scroll.contentY = Math.max(0, scroll.contentHeight - scroll.height)
               var cuts = [atRest, afterWheel, afterDrag, afterKey, cutRows()]
-              var footerTop = yIn(find(body, "footer"), 0)
+              // The popup's menu ends a gap above the footer; the window's
+              // may run over it, to the body's margin.
+              var menuFloor = surface.wide ? surface.height - body.margins : yIn(find(body, "footer"), 0) - body.groupGap
               menuSeen.push(where + ": " + scroll.height / menu.itemHeight + " rows")
-              if (cuts.some(function(n) { return n !== 0 }) || !pinnedShown || yIn(menu, menu.height) + body.groupGap > footerTop)
+              if (cuts.some(function(n) { return n !== 0 }) || !pinnedShown || yIn(menu, menu.height) > menuFloor)
                 menuFaults.push(where + ": rows cut (opened/wheel/bar/key/end, -1 unmoved, -2 key unheard) " + cuts.join("/") + " in a view " + scroll.height + " px, pinned in sight " + pinnedShown
-                  + ", menu ends " + yIn(menu, menu.height) + " footer at " + footerTop)
+                  + ", menu ends " + yIn(menu, menu.height) + " floor at " + menuFloor)
               var manageRow = find(menu, "manageListsRow")
               var manageAt = manageRow.mapToItem(body, manageRow.width / 2, manageRow.height / 2)
               mouseClick(body, manageAt.x, manageAt.y)
@@ -1398,6 +1541,30 @@ ShellRoot {
             })
           })
         })
+        // The window at its usual 720 × 760 shows five lists of the demo's
+        // six in the menu, which runs down over the footer, in both looks.
+        // Found in the 1.0.2 visual review: the taller chart left the menu
+        // room for three above the footer.
+        stub.lists = [{ name: "", label: "All", count: stub.symbols.length, symbols: stub.symbols }].concat(
+          ["My Watchlist", "Watching", "Growth", "Wins", "Losses"].map(function(name) { return { name: name, label: name, count: 1, symbols: ["MZ"] } }))
+        surface.wide = true
+        surface.windowWidth = 720
+        body.minChartHeight = Style.space(136)
+        surface.fixedHeight = 760
+        var fiveSeen = []
+        ;[false, true].forEach(function(retro) {
+          stub.retro = retro
+          wait(50)
+          body.openListMenu()
+          wait(100)
+          var menu = find(body, "listMenu")
+          var scroll = find(menu, "menuScroll")
+          fiveSeen.push((retro ? "retro " : "smooth ") + Math.round(scroll.height / menu.itemHeight * 10) / 10 + " lists, menu ends "
+            + yIn(menu, menu.height) + " of " + surface.height)
+          if (scroll.height < 5 * menu.itemHeight || yIn(menu, menu.height) > surface.height - body.margins) fiveSeen.push("FAULT")
+          body.closeListMenu()
+          wait(50)
+        })
         stub.lists = listsBeforeMenu
         stub.retro = false
         surface.wide = false
@@ -1406,6 +1573,8 @@ ShellRoot {
         wait(50)
         root.check("a long list menu shows whole rows, and New list and Manage lists without scrolling, in the popup and the window, in both looks",
           menuFaults.length === 0, menuFaults.join(" | ") + " || " + menuSeen.join(", "))
+        root.check("the window's list menu at its usual 720 × 760 shows five of six lists, over the footer and inside the window, in both looks",
+          fiveSeen.indexOf("FAULT") < 0, fiveSeen.join(", "))
 
         // A view opening over the rows moves nothing: the list menu, search,
         // Manage lists, and a row's ticks keep the surface's height and its
