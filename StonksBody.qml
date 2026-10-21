@@ -751,14 +751,17 @@ Item {
       fontFamily: fontFamily
     })
   }
+  // The other surface's shot may have taken the camera in the frames this
+  // one waited: then this card goes, and the next y or click is free.
   function shootCard(card) {
     var shown = Share.subject(card.symbol, card.range, card.words ? card.words.said : "")
-    camera.shoot(card, Share.fileSymbol(card.symbol), function(code) {
+    var taken = camera.shoot(card, Share.fileSymbol(card.symbol), function(code) {
       shareLoader.source = ""
       if (code === 1) return say("Screenshot not saved · the screenshots folder can't be written")
       cameraLit = true
       say(code === 0 ? "Copied a screenshot of " + shown : "Saved a screenshot of " + shown + " · copying it failed")
     })
+    if (!taken) shareLoader.source = ""
   }
 
   // Back from a scrub or a replay to now; false when there was none.

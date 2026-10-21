@@ -938,7 +938,7 @@ case ${1:-} in
   scroll) shift; cmd_scroll "$@" ;;
   shot) [ $# -eq 2 ] || die "usage: shot FILE"; drive_prelude; nested grim "$2" || die "grim failed" ;;
   paste) [ $# -eq 2 ] || die "usage: paste FILE"; drive_prelude; nested wl-paste --list-types || die "the clipboard is empty"
-    nested wl-paste --no-newline --type image/png > "$2" || rm -f "$2" ;;
+    nested wl-paste --no-newline --type image/png > "$2" || { rm -f "$2"; die "the clipboard holds no PNG"; } ;;
   record) shift; cmd_record "$@" ;;
   _record-watch) shift; record_watch "$@" ;;
   shell) shift; (( $# )) || die "usage: shell CMD…"; drive_prelude; nested omarchy-shell "$@" ;;

@@ -205,7 +205,9 @@ ShellRoot {
 
     function test_camera() {
       quiet()
-      var rows = service.library.concat(["All"])
+      // Every row's symbol and every list's name, the one on show too: none
+      // is the chart's, so none may be on the picture.
+      var rows = service.library.concat(service.lists.map(function(l) { return l.label }), ["All"])
 
       // The popup by keys, in smooth, on AAPL's day at rest.
       service.feature("AAPL")

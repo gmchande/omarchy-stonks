@@ -49,7 +49,8 @@ function headlineIsClose(quote) {
 }
 
 // The moment the picture's price stands for: `t`, whether it is the close,
-// and, for a range's bar, the bar.
+// and, for a range's bar, the bar: the scrubbed one, or, with no headline,
+// the last, whose close the range then shows (`History.historyRowModel`).
 function moment(o) {
   if (o.history && o.scrubT) {
     var bar = History.historyBarAt(o.history, History.historyFraction(o.history, o.scrubT))
@@ -60,6 +61,10 @@ function moment(o) {
     return { t: read.t, close: read.close, bar: null }
   }
   var head = Quote.headlineQuote(o.quote)
+  if (!head && o.history) {
+    var last = History.historyBarAt(o.history, 1)
+    if (last) return { t: last.t, close: false, bar: last }
+  }
   var close = headlineIsClose(o.quote)
   return { t: close ? o.quote.session.regular.end : head ? head.t : 0, close: close, bar: null }
 }
