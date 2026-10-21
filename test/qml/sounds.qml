@@ -223,7 +223,8 @@ ShellRoot {
       }
       // The crossings of the drawn line, from the chart: smooth's no closer
       // than 80 ms, as its tick and the rule allow; retro's at each lit
-      // column on the other side from the last.
+      // column on the other side from the lit one before it. Nothing
+      // crosses where nothing is drawn: a break, a dark column.
       // `every` keeps each one, which a heard tick may be at; `crossings`
       // only those after a gap as long as a tick, which must each be heard.
       var crossings = [], every = [], last = 0, lastCol = -1, lastAt = -1
@@ -233,11 +234,11 @@ ShellRoot {
           var col = column(place(c))
           if (col === lastCol) continue
           lastCol = col
-          if (grid.levels[col] === undefined) continue
+          if (grid.levels[col] === undefined) { last = 0; continue }
           side = Math.sign(grid.baseRow - grid.levels[col])
         } else {
           var ly = lineY(place(c))
-          if (ly === null) continue
+          if (ly === null) { last = 0; continue }
           side = Math.sign(chart.geometry.baselineY - ly)
         }
         if (side && last && side !== last && (retro || c - lastAt > 0.08)) {
@@ -371,10 +372,11 @@ ShellRoot {
       harness.check("smooth's replay is the chart's line: its pitch follows the line's height as the replay moves along it, a tick at each crossing of the close",
         smoothHeard.pitch.ok && smoothHeard.ticks.ok && smoothHeard.ticks.count > 0, smoothHeard.pitch.detail + " | " + smoothHeard.ticks.detail)
 
-      // Tokyo's day, whose line stops for lunch, in both looks: the replay
-      // is silent across the break, where smooth draws no line and retro
-      // dark columns, and ticks only where what is drawn crosses.
-      harness.writeText(harness.fakeState + "/overnight.set", "listings-2026-10-07-1455\n")
+      // Tokyo's day of 19 October, whose line stops for lunch below the
+      // close and starts again above it, in both looks: the replay is silent
+      // across the break, where smooth draws no line and retro dark columns,
+      // and ticks only where what is drawn crosses, not at lunch's end.
+      harness.writeText(harness.fakeState + "/overnight.set", "demo-2026-10-19-1146\n")
       service.addSymbol("7203.T")
       quiet()
       harness.writeText(harness.fakeState + "/overnight.set", "")
@@ -564,18 +566,26 @@ ShellRoot {
         retroHeard.pitch.ok && retroHeard.silence.ok && retroHeard.ticks.ok,
         retroHeard.pitch.detail + " | " + retroHeard.silence.detail + " | " + retroHeard.ticks.detail)
 
-      // Two surfaces, one player: the popup opening and closing while the
-      // window's replay plays leaves it playing to its end.
-      mouseClick(animal, animal.width / 2, animal.height / 2)
-      startsBy(before + 2)
+      // Two surfaces, one player: the popup's replay, cut by the window's,
+      // whose sound then plays to its end through the popup's close, which
+      // stops the popup's replay and with it only the popup's own sound.
       panel.open()
-      wait(150)
+      tryVerify(function() { return body.surfaceOpen && !body.chartLoading }, 5000)
+      wait(300)
+      body.replay()
+      startsBy(before + 2)
+      mouseClick(animal, animal.width / 2, animal.height / 2)
+      startsBy(before + 3)
+      var popupCut = endOf(before + 2)
+      var popupReplaying = body.motion.replayRunning
       panel.close()
       wait(150)
-      var playing = endOf(before + 2) === "" && win.motion.replayRunning
-      tryVerify(function() { return endOf(before + 2) !== "" }, 4000)
-      harness.check("the popup opening and closing during the window's replay leaves its sound playing to its end",
-        playing && endOf(before + 2) === "ended", playing + "|" + endOf(before + 2))
+      var playing = endOf(before + 3) === "" && win.motion.replayRunning
+      tryVerify(function() { return endOf(before + 3) !== "" }, 4000)
+      harness.check("the window's replay cuts the popup's sound, and the popup closing mid-replay leaves the window's playing to its end",
+        popupCut === "stopped" && popupReplaying && playing && endOf(before + 3) === "ended",
+        popupCut + "|" + popupReplaying + "|" + playing + "|" + endOf(before + 3))
+      before++
 
       app.testKeyCatcher.forceActiveFocus()
       mouseClick(animal, animal.width / 2, animal.height / 2)
