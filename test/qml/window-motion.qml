@@ -1062,6 +1062,14 @@ ShellRoot {
         service.removeSymbol("SLOW")
         service.removeSymbol("FLAT")
         wait(200)
+        var positions = []
+        var frames = Qt.createQmlObject('import QtQuick; FrameAnimation { running: true }', harness)
+        frames.triggered.connect(function() {
+          var seen = watchlist.rowItem("SLOW")
+          if (!seen || !seen.visible || seen.opacity <= 0) return
+          var top = seen.y - watchlist.contentY
+          if (top + seen.height > 0 && top < watchlist.height) positions.push(top)
+        })
         holdQuote("SLOW", true)
         pickSymbol(body, keys, "SLOW")
         if (two) pickSymbol(body, keys, "FLAT")
@@ -1072,13 +1080,8 @@ ShellRoot {
         else mouseMove(body, 1, 1)
         tryVerify(function() { return !!watchlist.rowItem("SLOW") }, 2000)
         var row = watchlist.rowItem("SLOW")
-        var positions = []
-        var frames = Qt.createQmlObject('import QtQuick; FrameAnimation { running: true }', harness)
-        frames.triggered.connect(function() {
-          if (row.visible && row.opacity > 0 && watchlist.displayedSymbols.indexOf("SLOW") >= 0)
-            positions.push(row.y - watchlist.contentY)
-        })
         var stillWaiting = !service.quotes.SLOW
+        waitForRendering(watchlist)
         holdQuote("SLOW", false)
         tryVerify(function() { return !!service.quotes.SLOW && (!two || !!service.quotes.FLAT) }, 5000)
         tryVerify(function() { return row.resting && !watchlist.settling }, 3000)
