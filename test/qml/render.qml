@@ -253,6 +253,8 @@ ShellRoot {
     id: stub
     property var symbols: ["AAPL", "SHOP.TO"]
     property bool settingsUnreadable: false
+    // Sounds on, their default, so the header's speaker shows its waves.
+    property bool soundsOn: true
     property var shown: ["AAPL", "SHOP.TO"]
     property var library: symbols
     property string listName: ""
