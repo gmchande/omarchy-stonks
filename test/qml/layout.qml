@@ -959,18 +959,20 @@ ShellRoot {
         // every closure in calendars.json, as Market names it, for a reader
         // whose clock differs from the exchange's (its zone named): in full
         // wherever that fits, and otherwise in its short form, without the
-        // holiday's name, as a weekend's is worded. In both looks, in the
-        // popup and the window at its widest and its minimum width
-        // (App.qml), beside the speaker, the look icon, and the help mark,
-        // at every text size Omarchy offers (9 to 20). Found in the polish
-        // board: Tokyo's "Constitution Memorial Day observed" and London's
-        // "(substitute)" closures were cut in the popup; and in the sound
-        // build: beside the speaker, Martin Luther King, Jr. Day's was.
+        // holiday's name, as a weekend's is worded; Tokyo's lunch break the
+        // same, without its countdown. In both looks, in the popup and the
+        // window at its widest and its minimum width (App.qml), beside the
+        // speaker, the camera, the look icon, and the help mark, at every
+        // text size Omarchy offers (9 to 20). Found in the polish board:
+        // Tokyo's "Constitution Memorial Day observed" and London's
+        // "(substitute)" closures were cut in the popup; in the sound build:
+        // beside the speaker, Martin Luther King, Jr. Day's was; and in the
+        // camera build: beside the camera, Tokyo's lunch break was.
         var header = find(body, "statusText").parent
         var fullWords = find(body, "statusFullWords")
         var calendars = JSON.parse(calendarFile.text())
-        var states = [["CLOSED · OPENS MON 09:30", ""], ["POWER HOUR · CLOSES IN 40M", ""], ["LUNCH BREAK · REOPENS 12:30 JST · IN 59M", ""],
-          ["OPENING BELL · CLOSES IN 6H 20M", ""]]
+        var states = [["CLOSED · OPENS MON 09:30", ""], ["POWER HOUR · CLOSES IN 40M", ""],
+          ["LUNCH BREAK · REOPENS 12:30 JST · IN 59M", "LUNCH BREAK · REOPENS 12:30 JST"], ["OPENING BELL · CLOSES IN 6H 20M", ""]]
         var closures = 0
         var unnamed = []
         for (var calId in calendars.calendars) {
@@ -1053,7 +1055,7 @@ ShellRoot {
             back, before.layout + " vs " + settled())
         }
         console.log("closures said short: " + Object.keys(shortened).map(function(k) { return k + " " + shortened[k] }).join(", "))
-        root.check("the header's longest real states fit, and every closure in calendars.json is said in full where it fits and else without its holiday's name, a zone named, in both looks, in the popup and the window at its widest and narrowest, at every text size from 9 to 20",
+        root.check("the header's longest real states fit, and every closure in calendars.json is said in full where it fits and else without its holiday's name, a zone named, and Tokyo's lunch without its countdown, in both looks, in the popup and the window at its widest and narrowest, at every text size from 9 to 20",
           closures > 50 && unnamed.length === 0 && roomless.length === 0,
           closures + " closures | " + unnamed.join(" | ") + " | " + roomless.slice(0, 12).join(" | ") + (roomless.length > 12 ? " | … " + roomless.length : ""))
 

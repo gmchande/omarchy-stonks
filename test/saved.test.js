@@ -779,7 +779,7 @@ test("a published closure or a break between segments is closed, whatever Yahoo'
   expect(M.marketStatus(fakeOpen, labor, 0, null)).toBe("Power hour · closes in 1h")
   // Where the header has no room for the holiday's name, it says the
   // closure as a weekend is said; a status naming no holiday has no
-  // shorter form.
+  // shorter form, but for a lunch break, without its countdown.
   expect(M.shortMarketStatus(fakeOpen, labor, 0, calendars)).toBe("Closed · opens Tue 09:30")
   expect(M.shortMarketStatus(fakeOpen, labor, 0, null)).toBe("")
   // Tokyo's lunch break, from its calendar; the morning trades.
@@ -791,6 +791,9 @@ test("a published closure or a break between segments is closed, whatever Yahoo'
   expect(quoteCadence(jpx, 1788832800, 60, true)).toBe(60)
   expect(quoteCadence(jpx, 1788836400, 60, true)).toBe(900)
   expect(M.inRegularSession(jpx, 1788836400, calendars)).toBe(false)
+  const lunch = M.marketStatus(jpx, 1788836400, 0, calendars)
+  expect(lunch).toMatch(/^Lunch break · reopens 12:30( JST)? · in \d+m$/)
+  expect(M.shortMarketStatus(jpx, 1788836400, 0, calendars)).toBe(lunch.replace(/ · in \d+m$/, ""))
 })
 
 test("the bell rings once at a market's open and once at its close, never late, at lunch, on a holiday, or for a coin", () => {
