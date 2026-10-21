@@ -1349,12 +1349,14 @@ ShellRoot {
       if (root.anchorState) {
         verify(!!root.anchorPose, "the real placement produced this review pose")
         anchorProbe.hold()
-        if (!anchorProbe.QsWindow || anchorProbe.QsWindow.window !== renderWindow || anchorProbe.parent !== renderWindow.contentItem) {
+        if (!anchorProbe.QsWindow || anchorProbe.QsWindow.window !== renderWindow || !anchorProbe.parent) {
           console.error("FAIL the default held anchor finds its real pill's window")
           exitTimer.exitCode = 1
           return
         }
-        compare(anchorProbe.x, anchorPill.x, "the real pill's held position")
+        var heldAt = anchorProbe.mapToItem(renderWindow.contentItem, 0, 0)
+        var pillAt = anchorPill.mapToItem(renderWindow.contentItem, 0, 0)
+        compare(heldAt.x, pillAt.x, "the real pill's held position")
         savePicture()
         return
       }

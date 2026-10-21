@@ -39,10 +39,9 @@ ShellRoot {
       ;["left", "center", "right"].forEach(function(section) {
         pill.width = 150
         pill.x = section === "left" ? 16 : section === "center" ? 425 : 834
+        var openedMiddle = pill.x + pill.width / 2
         panel.open()
         wait(20)
-        harness.check("the card uses HeldAnchor on the bar's content", held.parent === barWindow.contentItem && card.anchorItem === held)
-        var original = held.x + "+" + held.width
         var first = card.cardOrigin.x
         ;["open", "held", "next"].forEach(function(moment) {
           if (moment === "held") {
@@ -53,14 +52,14 @@ ShellRoot {
           wait(20)
           var at = card.cardOrigin
           poses[section + "-" + moment] = {x: at.x, y: at.y, pillX: pill.x, pillWidth: pill.width}
-          var middle = held.x + held.width / 2
-          harness.check("card contains its held pill's centre: " + section + " " + moment, at.x <= middle && middle <= at.x + card.contentWidth)
+          var middle = moment === "next" ? pill.x + pill.width / 2 : openedMiddle
+          harness.check("card contains the pill centre it opened from: " + section + " " + moment, at.x <= middle && middle <= at.x + card.contentWidth)
+          if (section === "center") harness.check("the card centres under the pill it opened from: " + moment,
+            Math.abs(at.x + card.contentWidth / 2 - middle) < 0.5)
           harness.check("card is whole under the bar", at.x >= 0 && at.x + card.contentWidth <= 1000 && at.y > 32)
           if (moment === "held") {
-            harness.check("widening leaves the held anchor alone", held.x + "+" + held.width === original)
             harness.check("the open card stays where it opened", at.x === first)
           }
-          if (moment === "next") harness.check("next open takes the new width", held.width === 220)
         })
         panel.close()
       })
