@@ -417,9 +417,8 @@ ShellRoot {
         var cases = [
           { symbol: "AAPL", range: "1D", history: null, figures: aapl },
           { symbol: "AAPL", range: "5Y", history: weekly, figures: aapl },
-          // The widest range line: a listing younger than All, its start
-          // beside its low and high, each with its four-digit year, and the
-          // slot for how few bars it has.
+          // All whose answer starts at the first trade, as most listings'
+          // does: its low and high, each with its four-digit year, no SINCE.
           { symbol: "AAPL", range: "All", history: young, figures: aapl },
           { symbol: "SPY", range: "1D", history: null, figures: null },
           { symbol: "SHOP.TO", range: "1D", history: null, figures: root.figures("shop-to") },
@@ -561,11 +560,13 @@ ShellRoot {
         root.check("each info line's title is its range's, the day's, or 52W, and the lows one gap past 52W on every range",
           mistitled.length === 0, mistitled.join(" | "))
         // Nothing on the two lines moves with the range: AAPL on the day and
-        // on 1M, 1Y, 5Y, and All, a listing younger than All with all four
-        // of its facts, keeps its columns, both rules, and the 52 weeks'
-        // words where they were, in both looks, in the popup and the window.
-        // Found in the spacing review of 1.0.0: from 1D to 1Y both rules
-        // shrank 27 px and every fact after them moved left.
+        // on 1M, 1Y, 5Y, and All, its All answer starting at its first trade
+        // as most listings' do; and NEST as a listing a month old, on the
+        // day and on 1M with all four of its facts. Each keeps its columns,
+        // both rules, and the 52 weeks' words where they were, in both
+        // looks, in the popup and the window. Found in the spacing review of
+        // 1.0.0: from 1D to 1Y both rules shrank 27 px and every fact after
+        // them moved left.
         var infoPlace = function() {
           var block = find(body, "infoBlock")
           var rules = ["periodRule", "yearRule"].map(function(name) {
@@ -576,31 +577,87 @@ ShellRoot {
           return "rules " + rules.join(" ") + " low " + block.layout.lowX + " high " + block.layout.highX
             + " facts " + block.layout.factXs.join(",") + " 52W words " + words.map(function(s) { return s.what + "@" + s.left }).join(" ")
         }
+        // NEST as a listing that began trading with its month's first bar.
+        var nestQuote = stub.quotes.NEST
+        var withNest = function(quote) {
+          var next = Object.assign({}, stub.quotes)
+          next.NEST = quote
+          stub.quotes = next
+        }
+        var youngNest = Object.assign({}, nestQuote, { firstTradeDate: month.bars[0].t })
+        var youngMonth = Object.assign({}, month, { firstTradeDate: month.bars[0].t, bars: month.bars.slice(0, 7) })
         var shifted = []
+        var youngFacts = []
+        ;[{ symbol: "AAPL", figures: aapl, ranges: [["1D", null], ["1M", month], ["1Y", year], ["5Y", weekly], ["All", young]] },
+          { symbol: "NEST", figures: null, ranges: [["1D", null], ["1M", youngMonth]] }].forEach(function(listing) {
+          stub.featuredSymbol = listing.symbol
+          stub.figures = listing.figures
+          withNest(listing.symbol === "NEST" ? youngNest : nestQuote)
+          for (var rangeSurface = 0; rangeSurface < 2; rangeSurface++) {
+            surface.wide = rangeSurface === 1
+            ;[false, true].forEach(function(retro) {
+              stub.retro = retro
+              var where = (surface.wide ? "window " : "popup ") + (retro ? "retro " : "smooth ") + listing.symbol
+              var onDay = null
+              listing.ranges.forEach(function(r) {
+                stub.range = r[0]
+                stub.historyEntry = r[1] ? { status: "ok", history: r[1], receivedAt: stub.now } : null
+                wait(50)
+                var at = infoPlace()
+                if (!!r[1] !== body.historyShown) shifted.push(where + " " + r[0] + " shows " + (body.historyShown ? "a range" : "the day"))
+                else if (onDay === null) onDay = at
+                else if (at !== onDay) shifted.push(where + " " + r[0] + ": " + at + ", on 1D " + onDay)
+                if (r[1] === youngMonth && surface.wide)
+                  youngFacts.push(root.drawnSpans(find(body, "periodLine")).map(function(s) { return s.what }).filter(function(w) {
+                    return ["SINCE", "LOW", "HIGH", "BARS"].indexOf(w) >= 0 }).join(","))
+              })
+            })
+          }
+        })
+        withNest(nestQuote)
         stub.featuredSymbol = "AAPL"
         stub.figures = aapl
-        for (var rangeSurface = 0; rangeSurface < 2; rangeSurface++) {
-          surface.wide = rangeSurface === 1
-          ;[false, true].forEach(function(retro) {
-            stub.retro = retro
-            var where = (surface.wide ? "window " : "popup ") + (retro ? "retro" : "smooth")
-            var onDay = null
-            ;[["1D", null], ["1M", month], ["1Y", year], ["5Y", weekly], ["All", young]].forEach(function(r) {
-              stub.range = r[0]
-              stub.historyEntry = r[1] ? { status: "ok", history: r[1], receivedAt: stub.now } : null
-              wait(50)
-              var at = infoPlace()
-              if (!!r[1] !== body.historyShown) shifted.push(where + " " + r[0] + " shows " + (body.historyShown ? "a range" : "the day"))
-              else if (onDay === null) onDay = at
-              else if (at !== onDay) shifted.push(where + " " + r[0] + ": " + at + ", on 1D " + onDay)
-            })
-          })
-        }
         stub.retro = false
         stub.range = "1D"
         stub.historyEntry = null
+        // The popup has room for two of them; the window shows all four.
+        var fourFacts = youngFacts.length === 2 && youngFacts.every(function(f) { return f === "SINCE,LOW,HIGH,BARS" })
         root.check("nothing on the info lines moves from 1D to 1M, 1Y, 5Y, or All, a young listing's four facts included, in both looks, in the popup and the window",
-          shifted.length === 0, shifted.join(" | "))
+          shifted.length === 0 && fourFacts, shifted.join(" | ") + " || young 1M: " + youngFacts.join(" / "))
+        // An old listing holds room for its low and high alone, so in the
+        // window its lines on the day run nearly to the edge, short of it by
+        // less than 64 px, in both looks; and All, whose answer starts at the
+        // first trade for most listings, says LOW and HIGH, never SINCE, in
+        // the popup too. Found in the visual review of 1.0.2: room held for a
+        // young listing's SINCE and BARS left AAPL's lines 211 px short in
+        // the window, and the popup's All line dropped HIGH.
+        var reach = []
+        ;[false, true].forEach(function(retro) {
+          stub.retro = retro
+          surface.wide = true
+          stub.range = "1D"
+          stub.historyEntry = null
+          wait(50)
+          var edge = Math.round(body.width - body.textRight)
+          var ends = ["periodLine", "yearLine"].map(function(name) {
+            return root.drawnSpans(find(body, name)).reduce(function(most, s) { return Math.max(most, s.right) }, 0)
+          })
+          var short = edge - Math.max(ends[0], ends[1])
+          if (short >= 64) reach.push((retro ? "retro" : "smooth") + " window 1D ends " + short + " px short of " + edge)
+          surface.wide = false
+          stub.range = "All"
+          stub.historyEntry = { status: "ok", history: young, receivedAt: stub.now }
+          wait(50)
+          var said = root.drawnSpans(find(body, "periodLine")).map(function(s) { return s.what }).filter(function(w) {
+            return ["SINCE", "LOW", "HIGH"].indexOf(w) >= 0 }).join(",")
+          if (said !== "LOW,HIGH") reach.push((retro ? "retro" : "smooth") + " popup All says " + said)
+        })
+        stub.retro = false
+        stub.range = "1D"
+        stub.historyEntry = null
+        wait(50)
+        root.check("an old listing's lines run nearly to the window's edge on the day, and All says LOW and HIGH, in the popup too, both looks",
+          reach.length === 0, reach.join(" | "))
         // AAPL's figures are Tuesday 1 September's: the day line is 1D that
         // Tuesday to its last second, TUE from Wednesday's first, on the
         // Saturday after, and on Labor Day, Monday 7 September, and SEP a
@@ -692,7 +749,9 @@ ShellRoot {
               if (ends() !== before) restless.push(where + " at VOL " + volume + ": " + before + " became " + ends())
             })
             if (tickEnd("periodRule") === tickBefore) restless.push(where + ": the tick stayed at " + tickBefore + " as the price rose")
-            // A listing younger than its range: its eighth bar lands.
+            // A listing younger than its range, a month old: its eighth bar
+            // lands, and empties the slot its room holds.
+            withNest(youngNest)
             stub.featuredSymbol = "NEST"
             stub.range = "1M"
             stub.figures = null
@@ -705,6 +764,7 @@ ShellRoot {
             var sparse = ends()
             young(8)
             if (ends() !== sparse) restless.push(where + " at a young listing's eighth bar: " + sparse + " became " + ends())
+            withNest(nestQuote)
             stub.featuredSymbol = "AAPL"
             stub.range = "1D"
             stub.historyEntry = null

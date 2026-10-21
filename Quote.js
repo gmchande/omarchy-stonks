@@ -318,6 +318,9 @@ function parseChart(json, centExchanges) {
       : (points.length ? points[points.length - 1].p : null), meta.priceHint, inCents(meta, centExchanges)),
     prevClose: meta.chartPreviousClose !== undefined ? meta.chartPreviousClose : meta.previousClose,
     marketTime: Format.isFiniteNumber(meta.regularMarketTime) && meta.regularMarketTime > 0 ? meta.regularMarketTime : null,
+    // When the listing began trading, as Yahoo has it: how young it is
+    // decides what its range lines can say (`History.youngRoom`).
+    firstTradeDate: Format.isFiniteNumber(meta.firstTradeDate) ? meta.firstTradeDate : null,
     dayOpen: firstRegular ? knownPrice(firstRegular.o) : null,
     // The regular session `dayOpen` is the open of, once its first bar has
     // come; null before, and while the figures are the coming session's.

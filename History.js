@@ -7,16 +7,18 @@
 // is its own day's, from the answer.
 
 // 1D stays on chartUrl / parseChart. Every other range uses this table.
+// `reach`: how many days back its first bar can be, at most, the range's
+// own length with a holiday's slack (`youngRoom`); All reaches the start.
 var HISTORY_RANGES = {
-  "1W": { range: "5d", interval: "15m" },
-  "1M": { range: "1mo", interval: "1h" },
-  "3M": { range: "3mo", interval: "1d" },
-  "6M": { range: "6mo", interval: "1d" },
-  "YTD": { range: "ytd", interval: "1d" },
-  "1Y": { range: "1y", interval: "1d" },
-  "2Y": { range: "2y", interval: "1d" },
-  "5Y": { range: "5y", interval: "1wk", scale: "log" },
-  "10Y": { range: "10y", interval: "1wk", scale: "log" },
+  "1W": { range: "5d", interval: "15m", reach: 10 },
+  "1M": { range: "1mo", interval: "1h", reach: 32 },
+  "3M": { range: "3mo", interval: "1d", reach: 93 },
+  "6M": { range: "6mo", interval: "1d", reach: 185 },
+  "YTD": { range: "ytd", interval: "1d", reach: 367 },
+  "1Y": { range: "1y", interval: "1d", reach: 367 },
+  "2Y": { range: "2y", interval: "1d", reach: 732 },
+  "5Y": { range: "5y", interval: "1wk", reach: 1828, scale: "log" },
+  "10Y": { range: "10y", interval: "1wk", reach: 3654, scale: "log" },
   "All": { range: "max", interval: "1mo", scale: "log" }
 }
 
@@ -276,49 +278,75 @@ function historyStatsDateWidest(interval) {
 }
 
 // A range line's facts for bars of `interval`, as `rangeLine` gives them:
-// when the listing is younger than the range (`short`), its start before
-// the low and high and the slot for how few bars it has after them.
-// `values` holds what each says, "" when not known.
-function rangeFacts(interval, short, values) {
+// when the listing is younger than a range short of All (`since`), its
+// start before the low and high, and, where it can have fewer than eight
+// bars (`bars`), the slot for how few after them. `values` holds what each
+// says, "" when not known.
+function rangeFacts(interval, since, bars, values) {
   var widest = historyStatsDateWidest(interval)
   var facts = []
-  if (short) facts.push({ label: "SINCE", value: values.since || "", widest: historyStatsDateWidest("1d") })
+  if (since) facts.push({ label: "SINCE", value: values.since || "", widest: historyStatsDateWidest("1d") })
   facts.push({ label: "LOW", value: values.low || "", widest: widest })
   facts.push({ label: "HIGH", value: values.high || "", widest: widest })
-  if (short) facts.push({ label: "", value: values.bars || "", after: "BARS", widest: "8" })
+  if (since && bars) facts.push({ label: "", value: values.bars || "", after: "BARS", widest: "8" })
   return facts
 }
 
-// Every list of facts a range line can hold, on any range, young or not:
-// what the info table sizes its columns for (`InfoTable.factLists`), so a
-// range change moves none of them.
-function rangeFactLists() {
+// The longest a listing can have traded and still have fewer than eight
+// bars on a range short of All: eight of the coarsest, a week, and one more.
+var FEW_BARS_AGE = 9 * 7 * 24 * 60 * 60
+
+// What a listing's range lines can say beyond their low and high, from
+// when it began trading (`firstTradeDate`, in its day's answer) to its
+// quote's time: SINCE on each range short of All it is younger than
+// (`since`, their names), and how few bars it has where it is young enough
+// to have fewer than eight (`bars`). Not knowing when it began, all of it.
+// All starts where the listing does, so it never says SINCE.
+function youngRoom(quote) {
+  var listed = quote ? quote.firstTradeDate : null
+  var asOf = quote ? quote.marketTime : null
+  var known = Format.isFiniteNumber(listed) && Format.isFiniteNumber(asOf)
+  var age = known ? asOf - listed : 0
+  var since = Object.keys(HISTORY_RANGES).filter(function(r) {
+    var spec = HISTORY_RANGES[r]
+    return !!spec.reach && (!known || age <= spec.reach * 24 * 60 * 60 + historyIntervalSeconds(spec.interval))
+  })
+  return { since: since, bars: !known || age <= FEW_BARS_AGE }
+}
+
+// Every list of facts a listing's range line can hold, on any range: what
+// the info table sizes its columns for (`InfoTable.factLists`), so a range
+// change moves none of them. `room` is the listing's (`youngRoom`): an old
+// listing holds room for its low and high alone, and its rules run long.
+function rangeFactLists(room) {
   var lists = []
   for (var r in HISTORY_RANGES) {
-    lists.push(rangeFacts(HISTORY_RANGES[r].interval, false, {}))
-    lists.push(rangeFacts(HISTORY_RANGES[r].interval, true, {}))
+    lists.push(rangeFacts(HISTORY_RANGES[r].interval, false, false, {}))
+    if (room.since.indexOf(r) >= 0) lists.push(rangeFacts(HISTORY_RANGES[r].interval, true, room.bars, {}))
   }
   return lists
 }
 
 // The info block's first line on a range, in the day line's shape
 // (`Figures.dayLine`): the range, its low and high with the price's place
-// between them, then what only it says: when a listing younger than its
-// range began, the dates of its low and high, and how few bars a young
-// listing's sparse answer has. The bars' slot is kept while the listing is
-// younger than its range, so the eighth bar empties it and moves nothing.
-// `digits` is the listing's price decimals (`Quote.priceDigits`); `price`
-// the headline, else the last bar's close.
-function rangeLine(history, stats, digits, price) {
+// between them, then what only it says: when a listing younger than a range
+// short of All began, the dates of its low and high, and how few bars a
+// young listing's sparse answer has. The bars' slot is kept while the
+// listing is younger than its range, where the listing can have so few
+// (`room.bars`, `youngRoom`), so the eighth bar empties it and moves
+// nothing. `digits` is the listing's price decimals (`Quote.priceDigits`);
+// `price` the headline, else the last bar's close.
+function rangeLine(history, stats, digits, price, room) {
   stats = stats || periodStats(history)
   if (!history || !stats || !stats.coverage) return null
   var coverage = stats.coverage
+  var since = coverage.short && history.range !== "All"
   var years = historySpansYears(history)
   var range = Format.infoRange(stats.low ? stats.low.p : null, stats.high ? stats.high.p : null,
     Format.isFiniteNumber(price) ? price : stats.last, digits)
   var dated = function(point) { return point ? historyStatsDateText(history, point.t, years, history.interval) : "" }
-  var facts = rangeFacts(history.interval, coverage.short, {
-    since: coverage.short ? historyStatsDateText(history, history.firstTradeDate, true, "1d") : "",
+  var facts = rangeFacts(history.interval, since, !room || room.bars, {
+    since: since ? historyStatsDateText(history, history.firstTradeDate, true, "1d") : "",
     low: dated(stats.low),
     high: dated(stats.high),
     bars: coverage.bars && coverage.bars < 8 ? String(coverage.bars) : ""
