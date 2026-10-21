@@ -70,9 +70,16 @@ function leftOutNote(left) {
 // German listing's pads a share-class letter onto the end ("…UCITS ETF    R",
 // R for registered shares). The long name is the whole name, so the row's
 // own ellipsis is the only cut; the short name, without that letter, is the
-// fallback.
+// fallback. The letter is read from the end, a character at a time: a regex
+// for "two spaces, a capital, the end" retries from every space, and a
+// fetched name of 63,000 spaces held the shell's thread for over two
+// seconds. (Qt's JavaScript has no trimEnd.)
 function searchName(q) {
   if (q.longname) return q.longname
-  if (q.shortname) return String(q.shortname).replace(/\s{2,}[A-Z]$/, "").trim()
-  return q.symbol
+  if (!q.shortname) return q.symbol
+  var name = String(q.shortname)
+  var spaces = 0
+  while (spaces < name.length - 1 && /\s/.test(name.charAt(name.length - 2 - spaces))) spaces++
+  var lettered = spaces >= 2 && /[A-Z]/.test(name.charAt(name.length - 1))
+  return (lettered ? name.slice(0, -1) : name).trim()
 }

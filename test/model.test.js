@@ -870,6 +870,9 @@ test("a hostile chart or spark answer reads as no answer, at once", async () => 
     { name: "closes over budget", call: read, answer: chartAnswer(r => { bars(r).close = times(M.MOST_BARS + 1).map(() => 10) }) },
     { name: "a session's days over budget", call: read,
       answer: chartAnswer(r => { r.meta.tradingPeriods.pre = times(M.MOST_DAYS + 1).map(() => [period(T0 - 3600, T0)]) }) },
+    // A 322-byte answer the review of this fix found: the retro chart filled
+    // 222 billion columns from its middle print back to its last.
+    { name: "bar times out of order", call: read, answer: chartAnswer(r => { r.timestamp = [T0, -8e12, T0 + 600] }) },
     { name: "a day's periods over budget", call: read,
       answer: chartAnswer(r => { r.meta.tradingPeriods.pre = [times(M.MOST_PERIODS + 1).map(() => period(T0 - 3600, T0))] }) },
     { name: "bar times no Date holds", call: read, answer: chartAnswer(r => { r.timestamp = [0, 1e300, 2e300] }) },

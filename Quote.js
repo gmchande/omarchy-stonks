@@ -258,7 +258,9 @@ function answerTick(meta, bars, centExchanges) {
 // prices and ticks take cents there; any other listing's take Yahoo's hint.
 // Null for an answer that is not a chart, whose bars or periods are not
 // lists within MOST_BARS, MOST_DAYS, and MOST_PERIODS, or whose bar times
-// are not moments (`Format.isMoment`).
+// are not moments (`Format.isMoment`) each after the one before, as every
+// saved answer's are: the chart lays its prints out from the first to the
+// last, and one out of order would land off its grid.
 function parseChart(json, centExchanges) {
   var result = json && json.chart && json.chart.result && json.chart.result[0]
   if (!result || !result.meta) return null
@@ -277,7 +279,7 @@ function parseChart(json, centExchanges) {
   var current = meta.currentTradingPeriod || {}
   var bars = []
   for (var i = 0; i < timestamps.length; i++) {
-    if (!Format.isMoment(timestamps[i])) return null
+    if (!Format.isMoment(timestamps[i]) || (i > 0 && !(timestamps[i] > timestamps[i - 1]))) return null
     if (closes[i] !== null && closes[i] !== undefined)
       bars.push({ t: timestamps[i], o: opens[i], c: closes[i] })
   }
@@ -424,13 +426,15 @@ function periodOf(period) {
 }
 
 // An answer's trading periods as its pre, regular, and post sessions: each
-// the last day it lists, from its first period's start to its last's end.
+// the last day it lists, from its first period's start to its last's end;
+// none from a list past MOST_DAYS or MOST_PERIODS, an answer `parseChart`
+// has already refused (`answerClocks`).
 function answerPeriods(periods) {
   var out = {}
   var names = ["pre", "regular", "post"]
   for (var i = 0; i < names.length; i++) {
-    var days = periods[names[i]] || []
-    var day = days[days.length - 1] || []
+    var days = Format.fetchedList(periods[names[i]] || [], MOST_DAYS) || []
+    var day = Format.fetchedList(days[days.length - 1] || [], MOST_PERIODS) || []
     out[names[i]] = day.length ? { start: day[0].start, end: day[day.length - 1].end } : null
   }
   return out
