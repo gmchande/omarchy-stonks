@@ -166,6 +166,17 @@ Item {
         }
       }
 
+      // Past the body's width, on the window's margins, a click off the
+      // row's menu closes it too, as one on the body does.
+      MouseArea {
+        objectName: "marginCatcher"
+        anchors.fill: parent
+        visible: !!root.body && root.body.rowMenu !== null
+        acceptedButtons: Qt.AllButtons
+        onClicked: root.body.rowMenu = null
+        onWheel: function(wheel) { wheel.accepted = true }
+      }
+
       // A tiled window can be very wide; past the width the layout is drawn
       // for, the body keeps that width and centres, so a row never splits
       // into two islands. Narrower, it fills.

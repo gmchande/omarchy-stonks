@@ -881,6 +881,28 @@ ShellRoot {
       tryVerify(function() { return service.quotes.NVDA && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 10000)
       wait(50)
 
+      // In a window wider than the body, a click on its margin, past the
+      // rows, closes the row's menu too, removing nothing. Found in the walk
+      // of 22 October: there it stayed open.
+      var widthBefore = app.testWindow.implicitWidth
+      app.close()
+      app.testWindow.implicitWidth = 1200
+      app.open("{}")
+      wait(200)
+      keys.forceActiveFocus()
+      keyClick("X", Qt.ShiftModifier)
+      wait(100)
+      var openWide = body.rowMenu !== null && app.testWindow.width > body.width + 200
+      mouseClick(app.testWindow.contentItem, app.testWindow.width - 40, 200)
+      wait(100)
+      harness.check("in a wide window, a click on the margin closes the row's menu and removes nothing",
+        openWide && body.rowMenu === null && service.symbols.join(",") === before,
+        [openWide, body.rowMenu === null, service.symbols].join("|"))
+      app.close()
+      app.testWindow.implicitWidth = widthBefore
+      app.open("{}")
+      wait(200)
+
       watchlist.cursorSymbol = "AAPL"
       keys.forceActiveFocus()
       keyClick(Qt.Key_J, Qt.ShiftModifier)
