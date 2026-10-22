@@ -939,16 +939,16 @@ ShellRoot {
       service.persist({ style: "smooth" })
       rest()
 
-      // At rest, a removal's note on show: the frames before the close are
-      // the picture every frame after it keeps, through an answer that
-      // lands (AAPL's next quote, its line turned and its price new), a hero
-      // chosen on another surface, the hero leaving All, and past the note's
-      // five seconds. The next open takes the latest and draws in.
+      // At rest, a note on show, u's refusal with nothing to undo: the
+      // frames before the close are the picture every frame after it keeps,
+      // through an answer that lands (AAPL's next quote, its line turned and
+      // its price new), a hero chosen on another surface, the hero leaving
+      // All, and past the note's moment. The next open takes the latest and
+      // draws in.
       var quotesBefore = service.testFeed.quotes
-      watchlist.cursorSymbol = "NVDA"
-      keyClick(Qt.Key_X)
+      keyClick(Qt.Key_U)
       rest()
-      var noted = body.note.indexOf("NVDA") >= 0
+      var noted = body.note === "Nothing to undo"
       grab.begin("closing-at-rest")
       frames(3)
       grab.end()
@@ -969,7 +969,7 @@ ShellRoot {
       service.removeSymbol("AAPL")
       frames(3)
       grab.end()
-      wait(5200)
+      wait(2700)
       grab.resume()
       frames(3)
       grab.end()
@@ -981,7 +981,6 @@ ShellRoot {
         + stepping + " " + inFlight.detail + " | at rest " + noted + " " + atRest.detail + " | open " + adopted,
         stepping && inFlight.ok && noted && atRest.ok && adopted === "true,true,true,true")
       service.undoRemoval("AAPL")
-      service.addSymbol("NVDA")
       service.testFeed.quotes = quotesBefore
       tryVerify(function() { return service.arriving.length === 0 && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 5000)
       service.feature("AAPL")

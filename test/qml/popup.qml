@@ -1056,9 +1056,8 @@ ShellRoot {
         } else if (test.step === 35) {
           if (test.hold(!test.hintService.settingsUnreadable)) return
           // A refusal over the update adds, as the footer does under a
-          // refusal, and restarts nothing. A removal's offer takes the footer
-          // for its moment, and its click undoes; then the update is said
-          // again, and a click restarts.
+          // refusal, and restarts nothing. A removal says nothing over it:
+          // the update is said still, and a click restarts.
           var body = test.hintPanel.testBody
           var updateFooter = test.find(body, "footer")
           test.restartsBefore = test.restartsAsked()
@@ -1067,16 +1066,16 @@ ShellRoot {
           updateFooter.clicked()
           var refusalAdds = body.adding
           body.cancelAdding()
+          // The refusal's moment over.
+          body.clearNote()
           var gone = test.hintService.library[0]
           body.removeRow(gone)
-          var offer = test.footerText(test.hintPanel)
-          updateFooter.clicked()
-          var undone = test.hintService.library.indexOf(gone) >= 0
+          var removed = test.hintService.library.indexOf(gone) < 0
           var after = test.footerText(test.hintPanel)
           updateFooter.clicked()
-          test.check("a refusal over the update opens search, and a removal's offer over it undoes",
-            refusal === "Keep at least one symbol" && refusalAdds && offer.indexOf("Removed " + gone) === 0 && undone
-              && after === test.updateNotice, [refusal, refusalAdds, offer, undone, after].join("|"))
+          test.check("a refusal over the update opens search, and a removal leaves the update said",
+            refusal === "Keep at least one symbol" && refusalAdds && removed && after === test.updateNotice,
+            [refusal, refusalAdds, removed, after].join("|"))
         } else if (test.step === 36) {
           var asked = test.restartsAsked() - test.restartsBefore
           if (test.hold(asked === 1)) return
@@ -1168,22 +1167,20 @@ ShellRoot {
               && afterOpenMode === openedAt && afterFeature === openedAt && reopenedAt === expected && reopenedAt !== openedAt,
             [mode, "AAPL " + before + " → " + widened + ", MZ " + narrowed,
               "card x " + openedAt + " → " + afterOpenMode + " → " + afterFeature, "reopened " + reopenedAt + " (expected " + expected + ")"].join(", "))
-          // A removal's undo outlives its note: u long after it, with the
-          // footer back on the add, still takes it back.
+          // A removal leaves the footer on the add, and u takes it back
+          // later, after other looking around.
           test.hintPanel.open()
           test.removedEarlier = test.hintService.library[0]
           test.hintPanel.testBody.removeRow(test.removedEarlier)
           test.noteSaid = test.footerText(test.hintPanel)
         } else if (test.step === 44) {
-          var labelBack = test.footerText(test.hintPanel).indexOf("+  Add a symbol") === 0
-          if (test.hold(labelBack)) return
           var gone = test.removedEarlier
           var goneMeanwhile = test.hintService.library.indexOf(gone) < 0
           test.hintPanel.testKeyCatcher.textKey("u")
           var back = test.hintService.library.indexOf(gone) >= 0
-          test.check("u after the note has gone, the footer back on the add, still takes the removal back",
-            test.noteSaid === "Removed " + gone && labelBack && goneMeanwhile && back,
-            [test.noteSaid, labelBack, goneMeanwhile, back].join("|"))
+          test.check("after a removal the footer is the add, and u later takes the removal back",
+            test.noteSaid.indexOf("+  Add a symbol") === 0 && goneMeanwhile && back,
+            [test.noteSaid, goneMeanwhile, back].join("|"))
           // Until the next change to the lists: a new list ends the offer,
           // and u says there is nothing to undo.
           test.hintPanel.testBody.removeRow(gone)

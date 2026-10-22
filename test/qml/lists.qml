@@ -485,7 +485,7 @@ ShellRoot {
       wait(100)
       var empty = body.children.filter(function(child) { return child.objectName === "emptyList" })[0]
       harness.check("a named list may empty, and says so, with no refusal",
-        service.symbols.length === 0 && body.note === "Removed NVDA from Growth" && empty.visible
+        service.symbols.length === 0 && body.note === "" && empty.visible
           && empty.text === "No symbols in Growth yet"
           && body.wholeListHeight === watchlist.rowHeight,
         service.symbols.length + "|" + body.note + "|" + empty.visible + "|" + empty.text + "|" + body.wholeListHeight + "|" + watchlist.rowHeight)
@@ -497,13 +497,18 @@ ShellRoot {
       watchlist.cursorSymbol = "MSFT"
       keyClick(Qt.Key_X)
       wait(100)
+      var asked = body.rowMenu ? body.rowMenu.lines.map(function(l) { return l.label }).join("/") + ":" + harness.find(body, "rowMenu").cursor : "shut"
+      var keptAsking = service.library.indexOf("MSFT") >= 0
+      keyClick(Qt.Key_Return)
+      wait(100)
       var growth = service.dataSettings.lists[0]
-      harness.check("x on All removes the symbol from every list",
-        harness.same(service.library, ["AAPL", "NVDA"]) && harness.same(growth.symbols, []))
-      // A removal is instant and needs no confirm, so it can be taken back:
-      // the footer names what went, and u puts it back where it was.
-      harness.check("the footer names the removed symbol and offers undo by click",
-        body.note === "Removed MSFT" && harness.find(body, "footerAction").text === " · click to undo",
+      harness.check("x on All, for a symbol a named list holds too, asks first on \"Remove from all 2 lists\", and Enter removes it from every list",
+        asked === "Remove from all 2 lists:0" && keptAsking && body.rowMenu === null
+          && harness.same(service.library, ["AAPL", "NVDA"]) && harness.same(growth.symbols, []),
+        asked + "|" + keptAsking + "|" + service.library + "|" + growth.symbols)
+      // A removal says nothing in the footer, which stays the add, and u
+      // puts it back where it was.
+      harness.check("after a removal the footer is the add", body.note === "" && harness.find(body, "footerAction").text === "",
         body.note + "|" + harness.find(body, "footerAction").text)
       keyClick(Qt.Key_U)
       // It used to slide down from above the list, over every row between.
@@ -552,7 +557,10 @@ ShellRoot {
       service.setManualOrder(["AAPL", "MSFT", "NVDA"])
       wait(200)
       watchlist.cursorSymbol = "MSFT"
+      // Growth holds MSFT too, so x asks, and Enter takes it from both.
       keyClick(Qt.Key_X)
+      wait(100)
+      keyClick(Qt.Key_Return)
       wait(100)
 
       keyClick(Qt.Key_W)
@@ -875,10 +883,125 @@ ShellRoot {
 
       wait(Application.styleHints.mouseDoubleClickInterval)
       var aaplRow = wl.rowItem("AAPL")
-      mouseClick(aaplRow, aaplRow.width / 2, aaplRow.height / 2, Qt.RightButton)
+      // A right-click opens the row's menu at the pointer, on no line, and
+      // removes nothing: Escape closes it, and so does a click anywhere
+      // else, which acts on nothing under it. Its first line takes the row
+      // out of this list only.
+      var held = function(symbol) { return service.lists.filter(function(l) { return l.symbols.indexOf(symbol) >= 0 }).length }
+      var menuShown = function() {
+        var menu = harness.find(body2, "rowMenu")
+        return body2.rowMenu ? body2.rowMenu.symbol + " " + menu.lines.join("/") + " " + menu.cursor : "shut"
+      }
+      var both = harness.same(service.symbols, ["AAPL", "NVDA"])
+      var aaplLists = held("AAPL")
+      // Near the row's left, where the menu has room to open at the pointer.
+      var aaplAt = aaplRow.mapToItem(body2, 40, aaplRow.height / 2)
+      mouseMove(body2, aaplAt.x, aaplAt.y - 6)
+      mouseMove(body2, aaplAt.x, aaplAt.y)
+      mouseClick(body2, aaplAt.x, aaplAt.y, Qt.RightButton)
+      wait(100)
+      var menuItem = harness.find(body2, "rowMenu")
+      var opened = [menuShown(), harness.same(service.symbols, ["AAPL", "NVDA"]),
+        Math.abs(menuItem.mapToItem(body2, 0, 0).x - aaplAt.x) <= 1 && Math.abs(menuItem.mapToItem(body2, 0, 0).y - aaplAt.y) <= 1].join(",")
+      keyClick(Qt.Key_Escape)
+      wait(100)
+      var escaped = menuShown() + "," + harness.same(service.symbols, ["AAPL", "NVDA"])
+      wait(Application.styleHints.mouseDoubleClickInterval)
+      mouseClick(body2, aaplAt.x, aaplAt.y, Qt.RightButton)
+      wait(100)
+      var lookWas = service.retro
+      var lookAt = center(harness.find(body2, "lookIcon"))
+      mouseClick(body2, lookAt.x, lookAt.y)
+      wait(100)
+      var clickedOff = [menuShown(), service.retro === lookWas, harness.same(service.symbols, ["AAPL", "NVDA"])].join(",")
+      wait(Application.styleHints.mouseDoubleClickInterval)
+      mouseClick(body2, aaplAt.x, aaplAt.y, Qt.RightButton)
+      wait(100)
+      var fromWins = harness.findAll(body2, "rowMenuLine")[0]
+      mouseClick(fromWins, fromWins.width / 2, fromWins.height / 2)
       wait(150)
-      harness.check("right-clicking a row on a named list takes it out of that list only",
-        harness.same(service.symbols, ["NVDA"]) && service.library.indexOf("AAPL") >= 0)
+      harness.check("a right-click on a row of a named list opens its menu at the pointer, removing nothing; Escape or a click elsewhere closes it, acting on nothing; and \"Remove from Wins\" takes it out of that list only",
+        both && opened === "AAPL Remove from Wins/Remove from all " + aaplLists + " lists -1,true,true" && escaped === "shut,true"
+          && clickedOff === "shut,true,true" && harness.same(service.symbols, ["NVDA"]) && service.library.indexOf("AAPL") >= 0,
+        [both, opened, escaped, clickedOff, service.symbols].join(" | "))
+
+      // Shift+X opens the selected row's menu on its first line; ↓ and
+      // Enter take "Remove from all N lists", which takes it out of every
+      // list; u puts it back in each, at its place.
+      keys.forceActiveFocus()
+      wl.cursorSymbol = "NVDA"
+      var nvdaLists = held("NVDA")
+      var listsBefore = JSON.stringify(service.lists)
+      keyClick("X", Qt.ShiftModifier)
+      wait(100)
+      var keyed = menuShown()
+      keyClick(Qt.Key_Down)
+      wait(50)
+      keyed += " | " + harness.find(body2, "rowMenu").cursor
+      keyClick(Qt.Key_Return)
+      wait(150)
+      var everywhere = menuShown() + "," + (held("NVDA") === 0)
+      keyClick(Qt.Key_U)
+      wait(150)
+      harness.check("Shift+X opens the selected row's menu on its first line, ↓ Enter removes it from all its lists, and u puts it back in each at its place",
+        keyed === "NVDA Remove from Wins/Remove from all " + nvdaLists + " lists 0 | 1" && everywhere === "shut,true"
+          && JSON.stringify(service.lists) === listsBefore,
+        [nvdaLists, keyed, everywhere, JSON.stringify(service.lists)].join(" | "))
+
+      // Another surface switching the list closes a menu opened on Wins, so
+      // "Remove from Wins" never acts in All. Found in review: it took the
+      // symbol from every list.
+      keys.forceActiveFocus()
+      wl.cursorSymbol = "NVDA"
+      keyClick("X", Qt.ShiftModifier)
+      wait(100)
+      var openOnWins = menuShown()
+      service.switchList("")
+      wait(100)
+      var afterSwitch = menuShown()
+      keyClick(Qt.Key_Return)
+      wait(100)
+      harness.check("a list switched on another surface closes the row's menu, and Enter then removes nothing",
+        openOnWins.indexOf("NVDA Remove from Wins/") === 0 && afterSwitch === "shut" && JSON.stringify(service.lists) === listsBefore,
+        [openOnWins, afterSwitch, JSON.stringify(service.lists)].join(" | "))
+      service.switchList("Wins")
+      wait(100)
+
+      // In All, the × asks first for a symbol a list of yours holds too:
+      // the menu opens on its one line, "Remove from all N lists", and a
+      // click on it takes it from every list. Then a opens search on it,
+      // chosen, PUT BACK, and Enter puts it back in each at its place.
+      service.switchList("")
+      wait(100)
+      var crossed = wl.rowItem("NVDA")
+      var crossedAt = crossed.mapToItem(body2, 40, crossed.height / 2)
+      mouseMove(body2, crossedAt.x, crossedAt.y - 6)
+      mouseMove(body2, crossedAt.x, crossedAt.y)
+      wait(100)
+      var cross = harness.find(crossed, "rowRemove")
+      var crossShown = cross.visible
+      wait(Application.styleHints.mouseDoubleClickInterval)
+      mouseClick(cross, cross.width / 2, cross.height / 2)
+      wait(100)
+      var askedBy = menuShown() + "," + (service.library.indexOf("NVDA") >= 0)
+      var allLine = harness.findAll(body2, "rowMenuLine")[0]
+      mouseClick(allLine, allLine.width / 2, allLine.height / 2)
+      wait(150)
+      var takenAll = menuShown() + "," + (held("NVDA") === 0)
+      keys.forceActiveFocus()
+      keyClick(Qt.Key_A)
+      tryVerify(function() { return body2.adding }, 2000)
+      wait(100)
+      var offeredBack = body2.search.results.map(function(r) { return r.symbol + " " + body2.search.actionFor(r.symbol) }).join(",")
+        + " " + body2.search.resultIndex
+      keyClick(Qt.Key_Return)
+      wait(150)
+      harness.check("in All the × asks on \"Remove from all N lists\", whose click takes it from every list, and a then Enter puts it back in each at its place",
+        crossShown && askedBy === "NVDA Remove from all " + nvdaLists + " lists 0,true" && takenAll === "shut,true"
+          && offeredBack === "NVDA PUT BACK 0" && !body2.adding && JSON.stringify(service.lists) === listsBefore,
+        [crossShown, askedBy, takenAll, offeredBack, body2.adding, JSON.stringify(service.lists)].join(" | "))
+      service.switchList("Wins")
+      wait(100)
 
       // Manage lists by keyboard: Growth and Wins, Wins current.
       var names = function() { return service.dataSettings.lists.map(function(l) { return l.name }) }
@@ -1213,15 +1336,13 @@ ShellRoot {
       harness.check("unticking All removes the symbol everywhere and closes the checklist",
         harness.same(service.library, ["NVDA"]) && harness.same(power(), ["NVDA"]) && body2.listsSymbol === "",
         service.library + "|" + power() + "|" + body2.listsSymbol)
-      harness.check("unticking All names the symbol in the footer, like any removal",
-        body2.note === "Removed AAPL", body2.note)
-      var noteAt = center(harness.find(body2, "footer"))
-      mouseClick(body2, noteAt.x, noteAt.y)
+      harness.check("unticking All leaves the footer the add, like any removal", body2.note === "", body2.note)
+      keys.forceActiveFocus()
+      keyClick(Qt.Key_U)
       wait(100)
-      harness.check("a click on the note undoes it, and does not open search",
-        harness.same(service.library, ["AAPL", "NVDA"]) && harness.same(power(), ["NVDA", "AAPL"])
-          && !body2.adding && body2.note === "",
-        service.library + "|" + power() + "|" + body2.adding + "|" + body2.note)
+      harness.check("u puts it back in All and its lists",
+        harness.same(service.library, ["AAPL", "NVDA"]) && harness.same(power(), ["NVDA", "AAPL"]),
+        service.library + "|" + power())
       service.removeSymbol("AAPL")
       wait(100)
 
@@ -1242,17 +1363,14 @@ ShellRoot {
         harness.same(power(), ["NVDA", "AAPL"]) && service.featuredSymbol === "NVDA",
         power() + "|" + service.featuredSymbol)
 
-      // An offer stands only while it is the service's last removal: one made
-      // on another surface replaces it, and this footer lets it go. u then
-      // takes back that newer one, the service's last removal, wherever it
-      // was made: AAPL returns to All, and stays out of Power, which the
-      // first removal took it from.
+      // u takes back the service's last removal, wherever it was made: one
+      // made on another surface replaces this one's, so AAPL returns to All,
+      // and stays out of Power, which the first removal took it from.
       wl.cursorSymbol = "AAPL"
       keyClick(Qt.Key_X)
       wait(100)
       service.setMembership("AAPL", "", false)
       wait(100)
-      harness.check("a removal made elsewhere drops this surface's offer", body2.note === "", body2.note)
       keyClick(Qt.Key_U)
       wait(100)
       harness.check("and u then takes back that removal, made on the other surface",

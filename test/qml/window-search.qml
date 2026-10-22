@@ -361,6 +361,9 @@ ShellRoot {
         // over, after every flow before: no user's minute. The budget is
         // topped up so none of it is held back.
         service.testYahooGate.tokens = service.testYahooGate.capacity
+        // No removal on offer, as after the next change to the lists: search
+        // opens with no result to put back, and Enter adds.
+        service.lastRemoval = null
         hold("touch", "SHOP.TO.quote.hold")
         hold("touch", "SHOP.TO.history.hold")
         // An earlier step's failed year for it goes: this add is its first.

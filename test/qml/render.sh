@@ -75,12 +75,16 @@ every_state() (
     2026-10-07-0100-kiln 2026-10-03-1200-gspc; do
     states="$states window-sweep-$day-smooth window-sweep-$day-retro"
   done
-  # The footer's notes in both looks and both surfaces: a refusal, a move
-  # refused in a sorted order, and a removal's offer from a long list name,
-  # under the first visit's hint too.
+  # The footer's notes in both looks and both surfaces: a refusal, and a
+  # move refused in a sorted order.
   for look in smooth retro; do
-    states="$states popup-note-undo-$look window-note-undo-$look popup-hint-undo-$look"
     states="$states popup-note-sorted-$look window-note-sorted-$look"
+  done
+  # A row's menu: right-clicked in a list, its two lines, on both surfaces;
+  # by Shift+X in All, its one line chosen; and after a removal, search's
+  # one result putting it back. In both looks.
+  for look in smooth retro; do
+    states="$states popup-lists-rowmenu-$look window-lists-rowmenu-$look popup-lists-rowmenuall-$look popup-search-putback-$look"
   done
   states="$states popup-note-retro"
   # A newer Stonks out, said as a note: it has to fit the popup's width.

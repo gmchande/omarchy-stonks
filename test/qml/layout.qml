@@ -1384,7 +1384,7 @@ ShellRoot {
             stub.symbols = ["MZ"]
             windowFooter(at + "one row", true, chart)
             body.hint = "Wheel over the pill to step symbols"
-            body.note = "Removed AAPL"
+            body.note = "Keep at least one symbol"
             stub.settingsUnreadable = true
             // Only the popup shows a hint (Panel.qml), so its height here
             // judges the footer, not the chart.
@@ -2259,7 +2259,7 @@ ShellRoot {
           { name: "deleting a list", scope: manage, enter: "confirmDelete", open: function() { body.openManageLists(); manage.askDelete(2) }, close: function() { body.closeListViews() } },
           { name: "naming a list", scope: listMenu, enter: "makeList", open: function() { body.openListMenu(); listMenu.startNaming() }, close: function() { body.closeListMenu() } },
           { name: "the key sheet", scope: find(body, "helpSheet"), enter: "", open: function() { body.showingHelp = true }, close: function() { body.showingHelp = false } },
-          { name: "a removal's note", scope: footerItem, enter: "", open: function() { stub.lastRemoval = { symbol: "MZ" }; body.offerUndo("MZ", "") }, close: function() { body.clearNote() } },
+          { name: "a row's menu", scope: find(body, "rowMenu"), enter: "", open: function() { body.openRowMenu("MZ", null) }, close: function() { body.rowMenu = null } },
           { name: "a failed range", scope: headerItem, enter: "",
             open: function() { stub.range = "1W"; stub.historyEntry = { status: "failed", history: null, receivedAt: stub.now } },
             close: function() { stub.range = "1D"; stub.historyEntry = null } },
@@ -2280,7 +2280,7 @@ ShellRoot {
               var seen = survey(v.scope)
               seen.keys.forEach(function(t) { badKeys.push(place + ": \"" + t.text + "\" names a key") })
               if (seen.marked.join(",") !== v.enter) badKeys.push(place + ": marked for Enter [" + seen.marked.join(",") + "], want [" + v.enter + "]")
-              if (!seen.buttons.length && v.name !== "a removal's note") badKeys.push(place + ": no button")
+              if (!seen.buttons.length && v.name !== "a row's menu") badKeys.push(place + ": no button")
               seen.buttons.forEach(function(t) {
                 var words = "\"" + t.text + "\""
                 // The whole text, not only its box: one that cannot fit fails

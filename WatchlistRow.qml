@@ -61,7 +61,8 @@ Rectangle {
   // a double-click's second press, so the list decides whether it acts,
   // whichever row it lands on (Watchlist.clickRow).
   signal featureRequested(real x, real y, bool second)
-  signal removeRequested(real x, real y, bool second)
+  // A right-click: this row's menu, at the pointer.
+  signal menuRequested(real x, real y, bool second)
   // The remove button's press, the list asked there whether its click counts
   // (Watchlist.clickCounts), a double-click's second press asking again;
   // and its release on the button, with no drag between, which acts on that
@@ -233,12 +234,12 @@ Rectangle {
         // at rest, the foreground under the pointer, never the urgent colour,
         // which here means a falling price. It sits just after the symbol it
         // removes, on its line, so nothing on the row moves or narrows for it,
-        // and it has no tip: the × says what it does, the ? sheet says a
-        // right-click does the same, and a tip there covered the next row. The
-        // row's own pointer handles it, so a press there and a move still lift
-        // the row, and a double-click is one removal (Watchlist.clickRow); a left
-        // click that starts and ends on it removes rather than features, and one
-        // that starts on it and ends off it does nothing.
+        // and it has no tip: the × says what it does, and a tip there covered
+        // the next row. The row's own pointer handles it, so a press there and
+        // a move still lift the row, and a double-click is one removal
+        // (Watchlist.clickRow); a left click that starts and ends on it removes
+        // rather than features, and one that starts on it and ends off it does
+        // nothing.
         Item {
           id: removeButton
           objectName: "rowRemove"
@@ -325,7 +326,7 @@ Rectangle {
           anchors.fill: parent
           hoverEnabled: true
           preventStealing: true
-          acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+          acceptedButtons: Qt.LeftButton | Qt.RightButton
           cursorShape: row.lifted ? Qt.ClosedHandCursor : Qt.PointingHandCursor
 
           property real pressY: -1
@@ -372,7 +373,7 @@ Rectangle {
           function act(event, second) {
             if (dragged) return
             var at = mapToItem(null, event.x, event.y)
-            if (event.button === Qt.RightButton || event.button === Qt.MiddleButton) row.removeRequested(at.x, at.y, second)
+            if (event.button === Qt.RightButton) row.menuRequested(at.x, at.y, second)
             else if (event.modifiers & Qt.ControlModifier) row.listsRequested(at.x, at.y, second)
             else if (pressedOnRemove) return
             else if (event.button === Qt.LeftButton) row.featureRequested(at.x, at.y, second)

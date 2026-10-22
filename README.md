@@ -90,9 +90,15 @@ Click "+ Add a symbol" and type a name or a symbol. The top result shows in
 the chart, and Enter or a click adds it. Search finds stocks, ETFs,
 indexes, and crypto.
 
-To remove a row, right-click it, or point at it and click the × beside its
-symbol. The footer then says what you removed, such as "Removed AAPL · click
-to undo." Click it to bring the row back.
+To remove a row, point at it and click the × beside its symbol, or press
+`x`: it goes from the list you're looking at. Right-click a row to choose
+where it goes from, such as "Remove from Growth" or "Remove from all 3
+lists". In All, where removing takes a symbol out of every list, the × and
+`x` ask first when one of your own lists holds it too.
+
+To bring back what you removed, press `u`, or click "+ Add a symbol": the
+symbol is the first result, with PUT BACK, which puts it back in its lists
+at its old place.
 
 The line beside the list's name shows how many rows are up, in green, and
 down, in red. Click the order word to sort by symbol, name, or change, and
@@ -190,6 +196,7 @@ screenshot editor when you click it.
 | `y` | Screenshot the chart |
 | `a` or `+` | Search and add a symbol |
 | `x` | Remove the selected row |
+| `Shift+X` | Choose where to remove the selected row from |
 | `u` | Undo the last removal, until a list next changes |
 | Delete or Backspace | Remove the selected row (window) |
 | `Shift+J` `Shift+K` | Move the selected row up or down, in manual order |

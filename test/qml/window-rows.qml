@@ -259,16 +259,23 @@ ShellRoot {
         wait(100)
         return (got === next) + " " + next + "->" + got
       }
+      // Pair holds MSFT too, so in All the menu's one line, and x's, reach
+      // both lists.
       var byClick = handOff(function() {
         var row = watchlist.rowItem("MSFT")
-        mouseClick(row, row.width / 2, row.height / 2, Qt.MiddleButton)
+        mouseClick(row, row.width / 2, row.height / 2, Qt.RightButton)
+        wait(50)
+        var line = harness.find(body, "rowMenuLine")
+        mouseClick(line, line.width / 2, line.height / 2)
       })
       var byKey = handOff(function() {
         watchlist.cursorSymbol = "MSFT"
         keys.forceActiveFocus()
         keyClick(Qt.Key_X)
+        wait(50)
+        keyClick(Qt.Key_Return)
       })
-      harness.check("removing the held hero hands it to its neighbour on screen, by middle-click and by x",
+      harness.check("removing the held hero hands it to its neighbour on screen, by a right-click's menu and by x",
         /^true /.test(byClick) && /^true /.test(byKey), byClick + " | " + byKey)
       service.testFeed.quotes = quotesBefore
       service.deleteList("Pair")
@@ -557,11 +564,14 @@ ShellRoot {
         return y >= 0 && y >= watchlist.contentY - 0.5 && y + watchlist.rowHeight <= watchlist.contentY + watchlist.height + 0.5
       }
       // What x takes, and where the cursor went, from the cursor as it is.
+      // Tall holds every row, so in All x asks, and Enter takes it.
       var removesInSight = function() {
         var cursor = watchlist.cursorRow
         var shown = sight(cursor)
         keys.forceActiveFocus()
         keyClick(Qt.Key_X)
+        wait(50)
+        if (body.rowMenu !== null) keyClick(Qt.Key_Return)
         wait(50)
         var took = service.lastRemoval ? service.lastRemoval.symbol : ""
         keyClick(Qt.Key_U)
@@ -836,28 +846,62 @@ ShellRoot {
       harness.check("the key sheet closing under a resting pointer leaves the cursor where the keys put it, by ? and by Escape",
         /^true /.test(byQuestion) && /^true /.test(byEscape), byQuestion + " | " + byEscape)
 
+      // A middle-click removes nothing. A right-click opens the row's menu,
+      // and its line removes the row, handing the hero on to the next shown
+      // row; a row not the hero goes without featuring another.
       var removedRow = watchlist.rowItem("MSFT")
+      var heroWas = service.featuredSymbol
       mouseClick(removedRow, removedRow.width / 2, removedRow.height / 2, Qt.MiddleButton)
       wait(100)
-      harness.check("middle-click removal features the next shown row",
-        harness.sameSymbols(["AAPL", "NVDA"]) && service.featuredSymbol === "NVDA")
+      var middleKept = harness.sameSymbols(["AAPL", "MSFT", "NVDA"]) && service.featuredSymbol === heroWas && body.rowMenu === null
+      // Past the double-click interval of the middle-click at this place.
+      wait(Application.styleHints.mouseDoubleClickInterval)
+      var takeLine = function(row) {
+        mouseClick(row, row.width / 2, row.height / 2, Qt.RightButton)
+        wait(100)
+        var line = harness.find(body, "rowMenuLine")
+        mouseClick(line, line.width / 2, line.height / 2)
+        wait(100)
+      }
+      takeLine(removedRow)
+      harness.check("a middle-click removes nothing, and a right-click's menu removes the row, featuring the next shown row",
+        middleKept && heroWas === "MSFT" && harness.sameSymbols(["AAPL", "NVDA"]) && service.featuredSymbol === "NVDA",
+        [middleKept, heroWas, service.symbols, service.featuredSymbol].join("|"))
 
       service.addSymbol("MSFT")
       service.feature("AAPL")
       service.persist({ order: "pct" })
       wait(100)
       var before = service.symbols.join(",")
-      // Past the double-click interval of the middle-click at this place:
-      // another click there within it would be the same click.
       wait(Application.styleHints.mouseDoubleClickInterval)
-      var rightRow = watchlist.rowItem("NVDA")
-      mouseClick(rightRow, rightRow.width / 2, rightRow.height / 2, Qt.RightButton)
-      wait(100)
-      harness.check("right-clicking a row removes it without featuring it",
-        harness.sameSymbols(["AAPL", "MSFT"]) && service.featuredSymbol === "AAPL")
+      takeLine(watchlist.rowItem("NVDA"))
+      harness.check("a right-click's menu removes a row without featuring it",
+        harness.sameSymbols(["AAPL", "MSFT"]) && service.featuredSymbol === "AAPL", service.symbols + "|" + service.featuredSymbol)
       service.persist({ symbols: before.split(","), featured: "AAPL" })
       tryVerify(function() { return service.quotes.NVDA && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 10000)
       wait(50)
+
+      // In a window wider than the body, a click on its margin, past the
+      // rows, closes the row's menu too, removing nothing. Found in the walk
+      // of 22 October: there it stayed open.
+      var widthBefore = app.testWindow.implicitWidth
+      app.close()
+      app.testWindow.implicitWidth = 1200
+      app.open("{}")
+      wait(200)
+      keys.forceActiveFocus()
+      keyClick("X", Qt.ShiftModifier)
+      wait(100)
+      var openWide = body.rowMenu !== null && app.testWindow.width > body.width + 200
+      mouseClick(app.testWindow.contentItem, app.testWindow.width - 40, 200)
+      wait(100)
+      harness.check("in a wide window, a click on the margin closes the row's menu and removes nothing",
+        openWide && body.rowMenu === null && service.symbols.join(",") === before,
+        [openWide, body.rowMenu === null, service.symbols].join("|"))
+      app.close()
+      app.testWindow.implicitWidth = widthBefore
+      app.open("{}")
+      wait(200)
 
       watchlist.cursorSymbol = "AAPL"
       keys.forceActiveFocus()

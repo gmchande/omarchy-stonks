@@ -141,6 +141,7 @@ Item {
           if (t === "?") body.toggleHelp()
           else if (t === "a" || t === "+") body.startAdding()
           else if (t === "x") body.removeRow(body.watchlist.cursorRow)
+          else if (t === "X") body.openRowMenu(body.watchlist.cursorRow, null)
           else if (t === "c") body.cycleChangeMode()
           else if (t === "r") root.refresh()
           else if (t === "[") body.stepRange(-1)
@@ -163,6 +164,17 @@ Item {
           else return
           event.accepted = true
         }
+      }
+
+      // Past the body's width, on the window's margins, a click off the
+      // row's menu closes it too, as one on the body does.
+      MouseArea {
+        objectName: "marginCatcher"
+        anchors.fill: parent
+        visible: !!root.body && root.body.rowMenu !== null
+        acceptedButtons: Qt.AllButtons
+        onClicked: root.body.rowMenu = null
+        onWheel: function(wheel) { wheel.accepted = true }
       }
 
       // A tiled window can be very wide; past the width the layout is drawn
