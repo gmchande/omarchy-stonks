@@ -785,10 +785,12 @@ Item {
     return true
   }
 
-  // Every view that takes the keys, closed. Each gives up its own keys; the
-  // surface takes them back once none has them (keysReleased).
+  // Every view over the rows closed, the key sheet too. Each that takes the
+  // keys gives up its own; the surface takes them back once none has them
+  // (keysReleased).
   function closeViews() {
     cancelAdding()
+    showingHelp = false
     listMenuOpen = false
     managingLists = false
     listsSymbol = ""
@@ -804,8 +806,9 @@ Item {
 
   function toggleHelp() {
     if (!keepRename()) return
+    var shown = showingHelp
     closeViews()
-    showingHelp = !showingHelp
+    showingHelp = !shown
     if (showingHelp) helpSheet.contentY = 0
   }
 
@@ -813,7 +816,6 @@ Item {
   function startAdding() {
     if (!keepRename()) return
     closeViews()
-    showingHelp = false
     adding = true
   }
 
@@ -929,7 +931,6 @@ Item {
   function openListMenu() {
     if (!keepRename()) return
     closeViews()
-    showingHelp = false
     watchlist.forgetClicks()
     listMenuOpen = true
   }
@@ -953,14 +954,12 @@ Item {
 
   function openManageLists() {
     closeViews()
-    showingHelp = false
     managingLists = true
   }
 
   function openSymbolLists(symbol) {
     if (!symbol) return
     closeViews()
-    showingHelp = false
     listsSymbol = symbol
   }
 
@@ -1060,7 +1059,6 @@ Item {
   // said.
   function resetInteraction() {
     closeViews()
-    showingHelp = false
     freeze()
     motion.reset()
     // The rows in the service's order, at rest, whatever a close held.
@@ -1337,8 +1335,7 @@ Item {
   // show, so a closing surface, which keeps its rows, says nothing.
   Text {
     objectName: "emptyList"
-    visible: root.members.length === 0 && watchlist.displayedSymbols.length === 0
-      && !root.showingHelp && !root.adding && !root.listViewOpen
+    visible: root.members.length === 0 && watchlist.displayedSymbols.length === 0 && root.rowsShown
     x: root.margins
     y: watchlist.y
     width: root.width - root.margins * 2 - root.gutter
@@ -1365,7 +1362,7 @@ Item {
     anchors.leftMargin: root.margins
     anchors.rightMargin: root.margins
     y: root.edge - root.margins - height
-    visible: !root.showingHelp && !root.adding && !root.listViewOpen
+    visible: root.rowsShown
     retro: root.retro
     foreground: root.foreground
     dim: root.dim
