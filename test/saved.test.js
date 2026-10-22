@@ -886,9 +886,17 @@ test("sorting ranks the rows as a view over the manual list", () => {
   expect(M.sortedSymbols(["FL2", "FL"], tie, "pct")).toEqual(["FL2", "FL"])
   expect(M.sortedSymbols(["FL2", "FL"], tie, "pct", true)).toEqual(["FL2", "FL"])
   // Lumen is up 10%, NVIDIA 2%: by percent Lumen leads, though NVIDIA's
-  // amount is larger.
+  // amount is larger, and it still leads with amounts showing: they can't
+  // be ranked across currencies.
   const pair = { LUMA: q("LUMA", "Lumen", 10, 11), NVDA: q("NVDA", "NVIDIA", 180, 183.6) }
   expect(M.sortedSymbols(["LUMA", "NVDA"], pair, "pct")).toEqual(["LUMA", "NVDA"])
+  expect(M.sortedSymbols(["LUMA", "NVDA"], pair, "pct", false, "abs")).toEqual(["LUMA", "NVDA"])
+  // Showing since the open, the rows rank by the move from the open they
+  // show: UP is up 10% on the close but 0.9% on the open, DN down 5% on the
+  // close but up 5.6% on the open.
+  const opened = { UP: { ...quotes.UP, dayOpen: 109 }, DN: { ...quotes.DN, dayOpen: 90 } }
+  expect(M.sortedSymbols(["UP", "DN"], opened, "pct", false, "pct")).toEqual(["UP", "DN"])
+  expect(M.sortedSymbols(["UP", "DN"], opened, "pct", false, "open")).toEqual(["DN", "UP"])
 })
 
 test("parseSearch keeps tradable results with names and readable exchanges", () => {

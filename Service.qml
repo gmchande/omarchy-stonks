@@ -91,8 +91,8 @@ Item {
   // What the surfaces show of the settings, as one value, so a change of it
   // is whole whatever changed: the hero, the range, the list and its key
   // (`listKey`), which tells a rename from a switch, its order and
-  // direction, its rows (members that have answered), those rows as sorted,
-  // All, and the chart asked for once it is ready.
+  // direction, its rows (members that have answered), those rows as sorted
+  // (by the unit they show), All, and the chart asked for once it is ready.
   // Read straight from the settings and the feeds, not from the bindings
   // above, which may not have caught up when this one is evaluated.
   readonly property var view: {
@@ -117,7 +117,7 @@ Item {
       order: order,
       reversed: reversed,
       rows: rows,
-      shown: Settings.sortedSymbols(rows, feed.quotes, order, reversed),
+      shown: Settings.sortedSymbols(rows, feed.quotes, order, reversed, dataSettings.changeMode),
       library: all,
       // The chart asked for once it can be drawn (`Chart.viewChart`), null
       // while it is on its way: each surface keeps the one it has on screen.

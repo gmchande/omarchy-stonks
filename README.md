@@ -62,10 +62,11 @@ the rows follow the pointer. Click the bull, or on a down day the bear, to
 replay the chart.
 
 Pick a range under the chart, from 1D to All. Every stock then shows that
-range, even after a restart. The rows stay on the day's move. On 1D, click
-the change beside the price to see it as a percent, an amount, or since the
-open. A range marks its high and low on the chart, with their dates, and a
-stock younger than the range says when it began: "SINCE 31 JUL 2025".
+range, even after a restart. The rows stay on the day's move. To see it as
+a percent, an amount, or since the open, click the sign at the end of the
+list's header, or on 1D the change beside the price. A range marks its
+high and low on the chart, with their dates, and a stock younger than the
+range says when it began: "SINCE 31 JUL 2025".
 
 Under the ranges, two lines place the price between its low and high: for
 the day, beside its open and volume, and for the past 52 weeks, beside the
@@ -108,6 +109,13 @@ at its old place.
 The line beside the list's name shows how many rows are up, in green, and
 down, in red. Click the order word to sort by symbol, name, or change, and
 click its arrow to reverse the sort.
+
+The sign at the end of the line says what the rows' figures are: % for a
+percent, ± for an amount, and a bell for since the open. Click it to step
+every row to the next. Sorted by change, the rows rank by the percent they
+show, from the open when they show since the open. Amounts can't be ranked
+across currencies, so while the rows show amounts they stay in percent
+order.
 
 ## The window
 

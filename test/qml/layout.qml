@@ -264,7 +264,7 @@ ShellRoot {
     property var lastRemoval: null
     property bool settingsUnreadable: false
     readonly property var view: ({ featured: featuredSymbol, range: range, list: listName, listKey: "=" + listName,
-      order: order, reversed: reversed, rows: symbols, shown: Settings.sortedSymbols(symbols, quotes, order, reversed),
+      order: order, reversed: reversed, rows: symbols, shown: Settings.sortedSymbols(symbols, quotes, order, reversed, changeMode),
       library: library, chart: Chart.viewChart(featuredSymbol, range, quotes, entries, histories, nights,
         { NEST: { status: "ok", allDay: true, at: 0 } }, featuredSymbol === "NEST" ? nightCalendars : null) })
     // NEST's prints, and the calendars its chart's day reads; only NEST has
@@ -1106,10 +1106,13 @@ ShellRoot {
         // row, the info lines, and the list's header start at the rows' text
         // and end at their figures, the info lines' last column included;
         // the range row, the info lines, and the header stand a band's gap
-        // apart, and the header a group's gap over its rows. Found in design
-        // pass 3: the name started 4 px left of the symbols and the order
-        // word ended 12 px right of the figures; and in the owner's look at
-        // the window on 16 October: the info lines stopped near its middle.
+        // apart, and the header a group's gap over its rows. The header ends
+        // in the rows' unit, which ends there in every unit, and stepping it
+        // moves neither the sign, the order word, nor the rule. Found in
+        // design pass 3: the name started 4 px left of the symbols and the
+        // order word ended 12 px right of the figures; and in the owner's
+        // look at the window on 16 October: the info lines stopped near its
+        // middle.
         var headerFaults = []
         for (var hw = 0; hw < 2; hw++) {
           surface.wide = hw === 1
@@ -1121,6 +1124,8 @@ ShellRoot {
             var textRight = xIn(row0, row0.width) - row0.gap
             var nameText = find(body, "listLabel")
             var orderWord = find(body, "orderLabel")
+            var unitSign = find(body, "unitSign")
+            var rule = find(body, "breadthRule")
             var headerLine = nameText.parent
             var rangeRow = find(body, "rangeRow")
             var infoLines = find(body, "infoBlock")
@@ -1131,16 +1136,23 @@ ShellRoot {
             ;[body.dayLine, body.yearLine].forEach(function(line) {
               if (line && line.facts[lastFact]) lastSlot = Math.max(lastSlot, infoLines.factWidth(line.facts[lastFact]))
             })
+            var units = ["pct", "abs", "open"].map(function(mode) {
+              stub.changeMode = mode
+              wait(20)
+              return [xIn(unitSign, 0), xIn(unitSign, unitSign.width) - textRight, xIn(orderWord, orderWord.width), xIn(rule, rule.width)].join(",")
+            })
+            stub.changeMode = "pct"
             var placed = {
               name: xIn(nameText, 0) - textLeft,
-              order: xIn(orderWord, orderWord.width) - textRight,
+              unit: units,
               range: [xIn(rangeRow, 0) - textLeft, xIn(rangeRow, rangeRow.width) - textRight],
               info: [xIn(infoLines, 0) - textLeft, lastFact < 0 ? "none" : xIn(infoLines, infoLines.layout.factXs[lastFact] + lastSlot) - textRight],
               rangeToInfo: yIn(infoLines, 0) - yIn(rangeRow, rangeRow.height),
               infoToHeader: yIn(headerLine, 0) - yIn(infoLines, infoLines.height),
               headerToRows: yIn(body.watchlist, 0) - yIn(headerLine, headerLine.height)
             }
-            if (placed.name !== 0 || placed.order !== 0 || placed.range.join() !== "0,0" || placed.info.join() !== "0,0"
+            if (placed.name !== 0 || units[0].split(",")[1] !== "0" || units[1] !== units[0] || units[2] !== units[0]
+                || placed.range.join() !== "0,0" || placed.info.join() !== "0,0"
                 || placed.rangeToInfo !== body.bandGap || placed.infoToHeader !== body.bandGap || placed.headerToRows !== body.groupGap)
               headerFaults.push((surface.wide ? "window " : "popup ") + (stub.retro ? "retro " : "smooth ") + JSON.stringify(placed))
           }
@@ -1148,7 +1160,7 @@ ShellRoot {
         surface.wide = false
         stub.retro = false
         wait(50)
-        root.check("the range row, the info lines to their last column, and the list's header start at the rows' text and end at their figures, a band's gap apart, the header a group's gap over its rows",
+        root.check("the range row, the info lines to their last column, and the list's header start at the rows' text and end at their figures, a band's gap apart, the header a group's gap over its rows; the unit's sign ends there in every unit and a step moves nothing beside it",
           headerFaults.length === 0, headerFaults.join(" | "))
 
         // The rows stop short of the scrollbar's gutter, so the thumb never
@@ -1567,7 +1579,7 @@ ShellRoot {
           // they did not describe.
           var header = find(body, "listLabel").parent
           var headerHeight = header.height
-          var rowsOnly = ["todayLabel", "breadthRule", "orderLabel", "orderControl"]
+          var rowsOnly = ["todayLabel", "breadthRule", "orderLabel", "orderControl", "unitSign", "unitFill", "unitTarget"]
           var namesOnly = function() {
             var shown = rowsOnly.filter(function(name) { return find(body, name).visible })
             return find(body, "listLabel").visible && shown.length === 0 && header.height === headerHeight

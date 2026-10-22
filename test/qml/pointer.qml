@@ -1841,6 +1841,7 @@ ShellRoot {
             ["list name", root.find(body, "listControl"), root.find(body, "listLabel")],
             ["order word", root.find(body, "orderControl"), root.find(body, "orderLabel")],
             ["order arrow", root.find(body, "orderArrowFill"), root.find(body, "orderArrow")],
+            ["unit sign", root.find(body, "unitFill"), root.find(body, "unitTarget")],
             ["look icon", root.find(body, "lookFill"), root.find(body, "lookIcon")],
             ["help mark", root.find(body, "helpFill"), root.find(body, "helpMark")],
             ["footer", root.find(body, "footerFill"), root.find(body, "footerText")]
@@ -1879,7 +1880,7 @@ ShellRoot {
           wait(100)
         })
         stub.retro = false
-        root.check("the range tokens, the list name, the order word and its arrow, the look icon, the ?, the footer, a list view's action, a symbol's list, and a search result take the pressed fill on mouse-down, in both looks",
+        root.check("the range tokens, the list name, the order word and its arrow, the unit's sign, the look icon, the ?, the footer, a list view's action, a symbol's list, and a search result take the pressed fill on mouse-down, in both looks",
           pressFaults.length === 0, pressFaults.join(" | "))
 
         // The list views follow the wheel as the rows do: scrolled under a

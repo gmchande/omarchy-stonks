@@ -625,7 +625,7 @@ ShellRoot {
       if (root.orderState) {
         stub.order = "pct"
         stub.reversed = root.stateName.indexOf("-rises-") > 0
-        stub.shown = Settings.sortedSymbols(stub.symbols, stub.quotes, stub.order, stub.reversed)
+        stub.shown = Settings.sortedSymbols(stub.symbols, stub.quotes, stub.order, stub.reversed, stub.changeMode)
       }
       if (root.w22 && root.w22.range === "5y") {
         root.shownRange = "5Y"

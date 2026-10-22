@@ -2,6 +2,10 @@ import QtQuick
 import QtTest
 import Quickshell
 import Quickshell.Io
+import qs.Commons
+import qs.Commons as Commons
+import qs.Ui
+import "plugin/Cells.js" as Cells
 import "plugin" as Stonks
 
 // Named watchlists through the real Service and App with real keys. The data
@@ -62,6 +66,19 @@ ShellRoot {
 
   Stonks.Service { id: service }
   Stonks.App { id: app; service: service }
+  QtObject {
+    id: shellApi
+    function serviceFor(id) { return { service: service } }
+  }
+  PluginBarApi {
+    id: api
+    pluginId: "grvc.stonks"
+    moduleName: "grvc.stonks"
+    shell: shellApi
+    foreground: Commons.Color.foreground
+    fontFamily: Style.font.family
+  }
+  Stonks.Panel { id: panel; bar: api; settings: ({}) }
 
   Component { id: serviceAgain; Stonks.Service {} }
 
@@ -2043,7 +2060,67 @@ ShellRoot {
       if (!hadFlat) service.removeSymbol("FLAT")
       wait(50)
 
+      // The sign at the end of the list's header says the rows' unit, and a
+      // click on it steps every row to the next, as c does, in the window
+      // and the popup. Sorted by % change, the rows rank by the percent they
+      // show, from the open since the open; amounts can't be ranked across
+      // currencies, so with amounts showing the rows stay in percent order.
+      // Of three rows, the first leads from the close, the second by the
+      // amount, and the third from the open.
+      var plain = service.testFeed.quotes
+      var moved = Object.assign({}, plain)
+      var three = service.library.slice(0, 3)
+      ;[[100, 110, 109], [1000, 1050, 1000], [100, 102, 95]].forEach(function(m, i) {
+        moved[three[i]] = Object.assign({}, plain[three[i]], { prevClose: m[0], price: m[1], dayOpen: m[2] })
+      })
+      service.testFeed.quotes = moved
+      var orderWas = service.order
+      service.setOrder("pct")
+      tryVerify(function() { return service.order === "pct" && !service.reversed }, 2000)
+      // What each unit's figures look like, and the three's order by it.
+      var fromClose = three.join(",")
+      var wants = {
+        abs: { says: function(l) { return l.indexOf("%") < 0 }, order: fromClose },
+        open: { says: function(l) { return /% open$/.test(l) }, order: three.slice().reverse().join(",") },
+        pct: { says: function(l) { return /%$/.test(l) }, order: fromClose }
+      }
+      var unitSteps = function(b) {
+        var sign = harness.find(b, "unitSign")
+        var target = harness.find(b, "unitTarget")
+        var faults = []
+        ;["abs", "open", "pct"].forEach(function(mode) {
+          mouseClick(target, target.width / 2, target.height / 2)
+          within(2000, function() { return service.changeMode === mode })
+          wait(50)
+          var shown = b.watchlist.displayedSymbols
+          var rows = shown.map(function(s) { return b.watchlist.rowItem(s).view })
+          var lines = three.map(function(s) { return b.watchlist.rowItem(s).view.changeLine })
+          // Each row's percent, as it shows it, no greater than the one above.
+          var ranked = rows.every(function(v, i) {
+            return i === 0 || v.pct === null || rows[i - 1].pct !== null && rows[i - 1].pct >= v.pct
+          })
+          var threeShown = shown.filter(function(s) { return three.indexOf(s) >= 0 }).join(",")
+          var signed = JSON.stringify(sign.shape) === JSON.stringify(Cells.UNIT_SIGNS[mode])
+          if (service.changeMode !== mode || !lines.every(wants[mode].says) || !signed || !ranked || threeShown !== wants[mode].order)
+            faults.push(service.changeMode + " for " + mode + ": " + lines.join(" ") + " | " + shown.join(",")
+              + (signed ? "" : " | the sign is another's"))
+        })
+        return faults
+      }
+      mouseMove(body2, 1, 1)
+      var windowSteps = unitSteps(body2)
       app.close()
+      panel.open()
+      tryVerify(function() { return !!panel.testBody && panel.testBody.surfaceOpen }, 3000)
+      wait(200)
+      var popupSteps = unitSteps(panel.testBody)
+      panel.close()
+      harness.check("a click on the list header's sign steps every row through percent, amount, and since the open, sorted by the percent each shows, in the window and the popup",
+        windowSteps.length === 0 && popupSteps.length === 0, "window: " + windowSteps.join("; ") + " / popup: " + popupSteps.join("; "))
+      service.setOrder(orderWas)
+      service.testFeed.quotes = plain
+      wait(50)
+
       harness.finish()
     }
   }

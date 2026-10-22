@@ -2,12 +2,12 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.Commons as Commons
-// One of the header's own icons, the speaker or the camera (`Cells`), in
-// both looks: its path in the look icon's pen, over the look icon's grid of
-// `columns` × `rows` cells, `cell` px apart, each a pixel short of the next.
-// The path is drawn on cells 3 px apart and scaled with the cell, the pen
-// with it: 1.5 px, then 2, then 2.5. It paints only when its shape, ink, or
-// size does.
+// One of the header's own icons, the speaker, the camera, or the rows' unit
+// (`Cells`), in both looks: its path in the look icon's pen, over the look
+// icon's grid of `columns` × `rows` cells, `cell` px apart, each a pixel
+// short of the next. The path is drawn on cells 3 px apart and scaled with
+// the cell, the pen with it: 1.5 px, then 2, then 2.5. It paints only when
+// its shape, ink, or size does.
 Item {
   id: root
 
