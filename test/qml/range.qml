@@ -115,6 +115,36 @@ ShellRoot {
     var body = window.testBody
     return body.chartRange === range && body.historyShown && !!body.rangeMarks
   }
+  // A window's first info line as drawn, word by word from the left.
+  function firstLineDrawn(window) {
+    var row = find(window.testBody, "periodLine")
+    var words = []
+    var collect = function(item) {
+      if (!item.visible) return
+      if (typeof item.text === "string" && item.text !== "") words.push({ x: item.mapToItem(row, 0, 0).x, text: item.text })
+      for (var i = 0; i < item.children.length; i++) collect(item.children[i])
+    }
+    if (row) collect(row)
+    return words.sort(function(a, b) { return a.x - b.x }).map(function(w) { return w.text }).join(" ")
+  }
+  // What the first line starts with on `range`: its name, then the low
+  // and high its chart's marks have.
+  function rangeLineWanted(symbol, range) {
+    var history = service.histories[symbol + "|" + range].history
+    var quote = service.quotes[symbol]
+    var ends = History.rangeEnds(history, null, quote)
+    return [range.toUpperCase(), Format.money(ends.low.p, quote.priceDigits), Format.money(ends.high.p, quote.priceDigits)].join(" ")
+  }
+  // A window's range button for `range`: its word, under its mouse area.
+  function rangeToken(window, range) {
+    var found = null
+    var walk = function(item) {
+      if (item.text === range.toUpperCase()) found = item
+      for (var i = 0; !found && i < item.children.length; i++) walk(item.children[i])
+    }
+    walk(find(window.testBody, "rangeRow"))
+    return found
+  }
 
   function finish() {
     console.log("RANGE DONE")
@@ -344,7 +374,7 @@ ShellRoot {
         tryVerify(function() { return harness.answered(key) && !body.chartLoading && body.motion.drawn === 1 }, 5000)
       }
       var hero = function() {
-        return body.chartSymbol + " " + (body.featured ? body.featured.priceText : "") + " " + JSON.stringify(body.dayLine)
+        return body.chartSymbol + " " + (body.featured ? body.featured.priceText : "") + " " + JSON.stringify(body.periodLine)
           + " " + JSON.stringify(body.rangeMarks)
       }
       app.open("{}")
@@ -648,6 +678,31 @@ ShellRoot {
           && JSON.stringify(harness.find(pill, "pillLine").geometry) === JSON.stringify(Chart.chartGeometry(service.quotes.MSFT)),
         harness.pillText() + " vs day " + msftDay.changeLine + " / week " + week.changeLine)
 
+      // The first info line follows the range, by keys and by mouse, in
+      // both looks: ] to 1W, a click on 1M in retro, and [ back to 1W, each
+      // drawing that range's name and its low and high, as its marks have
+      // them. Until 22 October it stayed the day's on every range.
+      var followed = []
+      var follows = function(how, range) {
+        tryVerify(function() { return harness.answered("MSFT|" + range) && body.chartRange === range && body.historyShown }, 5000)
+        wait(50)
+        var drawn = harness.firstLineDrawn(app)
+        var want = harness.rangeLineWanted("MSFT", range)
+        if (drawn.indexOf(want + " START ") !== 0) followed.push(how + ": " + drawn + ", want " + want + " START …")
+      }
+      follows("] in smooth", "1W")
+      service.persist({ style: "retro" })
+      wait(50)
+      var month = harness.rangeToken(app, "1M")
+      mouseClick(month, month.width / 2, month.height / 2)
+      follows("a click on 1M in retro", "1M")
+      keyClick(Qt.Key_BracketLeft)
+      follows("[ in retro", "1W")
+      service.persist({ style: "smooth" })
+      wait(50)
+      harness.check("the first info line says the range's name, low, and high as the range changes by keys and by mouse, in both looks",
+        followed.length === 0, followed.join(" | "))
+
       // r with the week in hand says "Refreshing" in the header while what it
       // asked for is out, MSFT's week held back here, and the market again
       // once it lands; the service asking again by itself for the week grown
@@ -742,15 +797,15 @@ ShellRoot {
         var entry = service.histories["AAPL|1M"]
         if (service.range !== "1M" || (entry && entry.history)) return
         if (!body.featuredGeometry || body.motion.drawn < 1) blanked.push("chart")
-        if (!body.dayLine || body.dayLine.range.highText === "") blanked.push("info")
+        if (!body.periodLine || body.periodLine.range.highText === "") blanked.push("info")
       }
       body.featuredGeometryChanged.connect(watchLoad)
-      body.dayLineChanged.connect(watchLoad)
+      body.periodLineChanged.connect(watchLoad)
       keyClick(Qt.Key_BracketRight)
       watchLoad()
       tryVerify(function() { return harness.answered("AAPL|1M") }, 5000)
       body.featuredGeometryChanged.disconnect(watchLoad)
-      body.dayLineChanged.disconnect(watchLoad)
+      body.periodLineChanged.disconnect(watchLoad)
       tryVerify(function() { return body.motion.drawn === 1 }, 2000)
       harness.check("a range's first fetch keeps the day's chart and info lines until it lands",
         blanked.length === 0 && !!body.featuredGeometry && body.motion.drawn === 1, blanked.join(","))
@@ -1263,7 +1318,7 @@ ShellRoot {
       tryVerify(function() { return harness.answered("SLOW|1W") && body.motion.drawn === 1 }, 5000)
       var sig = function() {
         return JSON.stringify([body.featuredGeometry, body.featured ? body.featured.priceText + " " + body.featured.changeLine : "",
-          JSON.stringify(body.dayLine), JSON.stringify(body.rangeMarks), body.chartSymbol])
+          JSON.stringify(body.periodLine), JSON.stringify(body.rangeMarks), body.chartSymbol])
       }
       var dropEntry = function(key) {
         var next = Object.assign({}, service.testHistoryFeed.entries)
@@ -1313,7 +1368,7 @@ ShellRoot {
         var later = function() { Qt.callLater(record) }
         body.featuredGeometryChanged.connect(later)
         body.featuredChanged.connect(later)
-        body.dayLineChanged.connect(later)
+        body.periodLineChanged.connect(later)
         body.rangeMarksChanged.connect(later)
         body.motion.drawnChanged.connect(watchDraw)
         body.motion.dimmedChanged.connect(watchDim)
@@ -1327,7 +1382,7 @@ ShellRoot {
         record()
         body.featuredGeometryChanged.disconnect(later)
         body.featuredChanged.disconnect(later)
-        body.dayLineChanged.disconnect(later)
+        body.periodLineChanged.disconnect(later)
         body.rangeMarksChanged.disconnect(later)
         body.motion.drawnChanged.disconnect(watchDraw)
         body.motion.dimmedChanged.disconnect(watchDim)

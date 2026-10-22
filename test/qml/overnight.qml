@@ -729,7 +729,7 @@ ShellRoot {
       // And from the open the info line shows, never from the first bar's
       // close: found in the 1.0.0 review, the demo AAPL read "−0.26% open"
       // beside OPEN 341.33 and a price of 342.79.
-      var openShown = harness.find(body, "dayLine").line.facts[0]
+      var openShown = harness.find(body, "periodLine").line.facts[0]
       var openPrice = Number(openShown.value.replace(/,/g, ""))
       var priceShown = Number(body.featured.priceText.replace(/,/g, ""))
       var fromOpen = Format.pct((priceShown - openPrice) / openPrice * 100)

@@ -1114,6 +1114,10 @@ test("history scrub lookup snaps to a bar and maps its timestamp back", () => {
   expect(M.historyFraction(history, history.bars[history.bars.length - 1].t + 1)).toBe(-1)
 })
 
+// A range's high and low, each with its bar's place and its date, as its
+// chart's marks show them (`rangeEnds`, `rangeMarks`).
+const marksOf = (h, q) => M.rangeMarks(h, M.rangeEnds(h, null, q), q)
+
 // A range marks its own high and low on its chart, each over the bar that
 // made it, dated at the bars' granularity.
 test("a range marks its high and low on its chart, over their bars, with their dates", () => {
@@ -1123,7 +1127,7 @@ test("a range marks its high and low on its chart, over their bars, with their d
   const fab = M.parseHistory(fixture("history/fab-max.json"), "All")
   const weekly = M.parseHistory(fixture("history/aapl-5y.json"), "5Y")
   const marks = h => {
-    const m = M.rangeMarks(h)
+    const m = marksOf(h)
     return `HIGH ${m.high.price} ${m.high.date} · LOW ${m.low.price} ${m.low.date}`
   }
   expect(marks(aapl)).toBe("HIGH 344.57 29 JUL 2026 · LOW 229.02 12 SEP 2025")
@@ -1135,14 +1139,14 @@ test("a range marks its high and low on its chart, over their bars, with their d
   expect(marks(weekly)).toBe("HIGH 344.57 JUL 2026 · LOW 124.17 JAN 2023")
   // Each stands where the chart draws the bar that made it.
   for (const h of [aapl, week, month, fab, weekly]) {
-    const m = M.rangeMarks(h)
+    const m = marksOf(h)
     const highs = h.bars.map(b => b.h).filter(Number.isFinite)
     const lows = h.bars.map(b => b.l).filter(Number.isFinite)
     expect(M.historyBarAt(h, m.high.x).h).toBe(Math.max(...highs))
     expect(M.historyBarAt(h, m.low.x).l).toBe(Math.min(...lows))
   }
   // No bars, no marks.
-  expect(M.rangeMarks({ ...week, bars: [] })).toBeNull()
+  expect(marksOf({ ...week, bars: [] })).toBeNull()
   // A weekly bar names no day, so it carries its year even when the whole
   // period sits inside one.
   const oneYear = {
@@ -1162,20 +1166,21 @@ test("a range marks its high and low on its chart, over their bars, with their d
 
 // A range is fetched each hour and the quote each minute, so a range's last
 // bar can trail the day: while that bar holds the quote's session, the
-// quote's day high and low count as its own, and the marks keep up with the
-// day's line and the 52 weeks'. RGTI made its 52-week low of 11.77 on 14
-// October 2026; its 1Y answer from before that low still had the day at
-// 12.05.
-test("a range's marks take in the quote's day while its last bar is that day's", () => {
+// quote's day high and low count as its own, and the range's line and marks
+// keep up with the day's line and the 52 weeks'. RGTI made its 52-week low
+// of 11.77 on 14 October 2026; its 1Y answer from before that low still had
+// the day at 12.05.
+test("a range's line and marks take in the quote's day while its last bar is that day's", () => {
   const saved = name => ({
     q: M.parseChart(fixture(`first-day-2026-10-14/${name}-day.json`)),
     h: M.parseHistory(fixture(`first-day-2026-10-14/${name}-1y.json`), "1Y")
   })
   const rgti = saved("rgti")
   const earlier = { ...rgti.h, bars: rgti.h.bars.map((b, i, all) => (i === all.length - 1 ? { ...b, l: 12.05 } : b)) }
-  const low = M.rangeMarks(earlier, null, rgti.q).low
+  const low = marksOf(earlier, rgti.q).low
   expect(`${low.price} ${low.date}`).toBe("11.77 14 OCT 2026")
   expect(M.historyBarAt(earlier, low.x)).toBe(earlier.bars[earlier.bars.length - 1])
+  expect(M.rangeLine(earlier, M.rangeEnds(earlier, null, rgti.q), rgti.q).range.lowText).toBe("11.77")
   // A week's bar holds each day of its week. Yahoo's weekly answer ends
   // with the week of Monday 7 September and the live moment, Friday the
   // 11th, as a bar of its own: Thursday is that week's, and the Monday after
@@ -1184,16 +1189,38 @@ test("a range's marks take in the quote's day while its last bar is that day's",
   const weekOf = weekly.bars[weekly.bars.length - 2]
   expect(weekly.bars[weekly.bars.length - 1].t).toBe(weekly.liveAt)
   const thursday = { figuresDay: weekOf.t + 3 * DAY, dayHigh: 400, dayLow: 300, priceDigits: 2 }
-  expect(M.rangeMarks(weekly, null, thursday).high.price).toBe("400.00")
-  expect(M.rangeMarks(weekly, null, { ...thursday, figuresDay: weekOf.t + 7 * DAY }).high.price).toBe("344.57")
+  expect(marksOf(weekly, thursday).high.price).toBe("400.00")
+  expect(marksOf(weekly, { ...thursday, figuresDay: weekOf.t + 7 * DAY }).high.price).toBe("344.57")
   // A chart with no bar for the quote's day yet leaves it out: the Nikkei's
   // 1Y answer ended on 13 October.
   const n225 = saved("n225")
-  expect(M.rangeMarks(n225.h, null, { ...n225.q, dayHigh: 80000 }).high.price).toBe("72,832")
+  expect(marksOf(n225.h, { ...n225.q, dayHigh: 80000 }).high.price).toBe("72,832")
   // An intraday bar holds only part of a day, so a day's high is not its.
   const week = M.parseHistory(fixture("history/nest-5d.json"), "1W")
   const lastBar = week.bars[week.bars.length - 1]
-  expect(M.rangeMarks(week, null, { figuresDay: lastBar.t, dayHigh: 999, dayLow: 1, priceDigits: 2 }).high.price).toBe("254.74")
+  expect(marksOf(week, { figuresDay: lastBar.t, dayHigh: 999, dayLow: 1, priceDigits: 2 }).high.price).toBe("254.74")
+})
+
+// On a range, the first info line is the range's: its low and high, the
+// same as its marks, with the price's place between them, then START, the
+// price its change is measured from, and VOL, what traded over it, in the
+// places the day's OPEN and VOL take.
+test("a range's line gives its low and high, START, and the volume traded over it", () => {
+  const nest = M.parseChart(fixture("nest-2026-09-11-day-prepost.json"))
+  const rangeLine = (h, q) => said(M.rangeLine(h, M.rangeEnds(h, null, q), q))
+  const week = M.parseHistory(fixture("history/nest-5d.json"), "1W")
+  expect(rangeLine(week, nest)).toBe("1W · 209.40–254.74 @224.55 · START 210.63 · VOL 69.5M")
+  // Yahoo's weekly answer ends with the live moment as a bar of its own,
+  // whose volume the week's bar before it already counts: 80.5B with it.
+  expect(rangeLine(M.parseHistory(fixture("history/aapl-5y.json"), "5Y"), quote))
+    .toBe("5Y · 124.17–344.57 @325.13 · START 148.97 · VOL 80.4B")
+  // An index has its volume; with no quote the tick is the last close.
+  expect(rangeLine(M.parseHistory(fixture("history/gspc-1y.json"), "1Y"), null))
+    .toBe("1Y · 6,316.91–7,844.52 @7,735.81 · START 6,629.07 · VOL 1.34T")
+  // A bar whose volume isn't known leaves VOL out rather than undercount
+  // it, and so does an answer with no volume above zero.
+  expect(rangeLine({ ...week, bars: week.bars.map((b, i) => (i === 3 ? { ...b, v: null } : b)) }, nest).endsWith("VOL _")).toBe(true)
+  expect(rangeLine({ ...week, bars: week.bars.map(b => ({ ...b, v: 0 })) }, nest).endsWith("VOL _")).toBe(true)
 })
 
 // A listing younger than its range says so under its change, with the day

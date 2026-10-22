@@ -8,13 +8,15 @@ import "Tones.js" as Tones
 
 // The info block's two lines as one table: each line its title, its range
 // as low, a rule with the price's tick, and high, then its facts
-// (`Figures.dayLine`, `Fundamentals.yearLine`). The columns are shared, so
-// the two rules stand in one column. Each column is as wide as the widest
-// figure its slots can hold at the listing's digits, never today's, and the
-// title column as the widest of `titles`. So a refresh moves only the tick.
-// The rule takes the room the columns leave, so the table spans the band's
-// width at any width; a trailing column that does not fit is left out
-// whole, never cut.
+// (`Figures.dayLine` or `History.rangeLine`, and `Fundamentals.yearLine`).
+// The columns are shared, so the two rules stand in one column. Each column
+// is as wide as the widest figure its slots can hold at the listing's
+// digits, never today's: each fact's as the widest any line puts there on
+// any range (`factLists`), and the title column as the widest of `titles`.
+// So a refresh moves only the tick, and a range change nothing. The rule
+// takes the room the columns leave, so the table spans the band's width at
+// any width; a trailing column that does not fit is left out whole, never
+// cut.
 Item {
   id: root
 
@@ -22,6 +24,9 @@ Item {
   property var lines: [null, null]
   // Every title a line can hold.
   property var titles: []
+  // Every list of facts the first line can hold, on any range; the second's
+  // are its own.
+  property var factLists: []
   property bool retro: false
   property color foreground: Commons.Color.foreground
   property color dim: Tones.dim(foreground, Commons.Color.background)
@@ -69,6 +74,7 @@ Item {
       price = Math.max(price, valueWidth(line.range.widest), valueWidth(line.range.lowText), valueWidth(line.range.highText))
       widen(line.facts)
     }
+    for (var l = 0; l < factLists.length; l++) widen(factLists[l])
     var fixed = function(n) {
       var t = titleWidth + gap + price * 2 + innerGap * 2
       for (var k = 0; k < n; k++) t += gap + facts[k]
@@ -104,7 +110,7 @@ Item {
       id: row
       required property int index
       readonly property var line: root.lines ? root.lines[index] || null : null
-      objectName: index === 0 ? "dayLine" : "yearLine"
+      objectName: index === 0 ? "periodLine" : "yearLine"
       y: index * (root.lineHeight + root.rowGap)
       width: root.width
       height: root.lineHeight
@@ -127,7 +133,7 @@ Item {
       }
 
       InfoRule {
-        objectName: row.index === 0 ? "dayRule" : "yearRule"
+        objectName: row.index === 0 ? "periodRule" : "yearRule"
         visible: !!row.line
         x: root.layout.ruleX
         width: root.layout.rule

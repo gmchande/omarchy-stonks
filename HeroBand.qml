@@ -66,10 +66,12 @@ Item {
   property bool rowsCovered: false
   property var rangeOptions: []
   property string range: "1D"
-  // The info block's two lines, the day's over the 52 weeks, and a range's
-  // own high and low, marked on its chart (`History.rangeMarks`).
-  property var dayLine: null
+  // The info block's two lines, the day's or the range's over the 52 weeks;
+  // every list of facts the first can hold on any range; and a range's own
+  // high and low, marked on its chart (`History.rangeMarks`).
+  property var periodLine: null
   property var yearLine: null
+  property var factLists: []
   property var rangeMarks: null
   property string baselineText: ""
   // The clock, by which the hero's overnight print is old.
@@ -286,17 +288,19 @@ Item {
       onSelected: function(value) { root.rangeRequested(value) }
     }
 
-    // The day and the 52 weeks: two lines that are always there, so the
-    // list keeps its place for every symbol and range.
+    // The day's or the range's, and the 52 weeks: two lines that are always
+    // there, so the list keeps its place for every symbol and range.
     InfoTable {
       id: infoBlock
       objectName: "infoBlock"
       width: parent.width
       height: implicitHeight
-      lines: [root.dayLine, root.yearLine]
-      // Every title a line can hold: the day's 1D, weekday, or month
-      // (`Figures.dayTitles`), and the 52 weeks' (`Fundamentals.yearLine`).
-      titles: Figures.dayTitles().concat(["52W"])
+      lines: [root.periodLine, root.yearLine]
+      // Every title a line can hold: each range's, the day's 1D, weekday, or
+      // month (`Figures.dayTitles`), and the 52 weeks'
+      // (`Fundamentals.yearLine`).
+      titles: root.rangeOptions.map(function(r) { return String(r).toUpperCase() }).concat(Figures.dayTitles(), ["52W"])
+      factLists: root.factLists
       retro: root.retro
       foreground: root.foreground
       dim: root.dim

@@ -66,13 +66,14 @@ function parseHistory(json, range, centExchanges) {
   var highs = list(quote.high)
   var lows = list(quote.low)
   var closes = list(quote.close)
+  var volumes = quote.volume ? list(quote.volume) : null
   var clocks = Quote.answerClocks(meta.tradingPeriods)
   if (!timestamps || !opens || !highs || !lows || !closes || !clocks) return null
   var bars = []
   for (var i = 0; i < timestamps.length; i++) {
     if (!Format.isMoment(timestamps[i])) return null
     if (closes[i] === null || closes[i] === undefined) continue
-    bars.push({ t: timestamps[i], o: opens[i], h: highs[i], l: lows[i], c: closes[i] })
+    bars.push({ t: timestamps[i], o: opens[i], h: highs[i], l: lows[i], c: closes[i], v: volumes ? volumes[i] : null })
   }
   bars.sort(function (a, b) { return a.t - b.t })
   if (bars.length >= 2 && bars[bars.length - 1].t === bars[bars.length - 2].t) bars.splice(bars.length - 2, 1)
@@ -274,19 +275,27 @@ function historyStatsDateText(history, t, withYear, interval) {
   return historyDateText(history, t, coarse || withYear, coarse ? "1mo" : "1d")
 }
 
+// Whether the last bar is the live moment (`liveAt`) Yahoo appends to a
+// week's, a month's, or a quarter's bars as a bar of its own: the bucket
+// before it already holds the live moment's day, its volume included.
+function liveBarAppended(history) {
+  var bars = history && history.bars ? history.bars : []
+  var coarse = history && (history.interval === "1wk" || history.interval === "1mo" || history.interval === "3mo")
+  return !!coarse && bars.length > 1 && bars[bars.length - 1].t === history.liveAt
+}
+
 // Whether the last bar of a range of bars a day long or longer holds the
 // session that starts at `t` (`Quote.figuresDay`), by the exchange's
 // calendar: a day's bar is that day's, a week's bar the seven days from its
-// first, a month's its month. Yahoo appends the live moment (`liveAt`) to a
-// week's or a month's bars as a bar of its own, so their bucket starts at
-// the bar before it. An intraday bar holds only part of a day.
+// first, a month's its month. An appended live moment (`liveBarAppended`)
+// belongs to the bucket before it. An intraday bar holds only part of a day.
 function lastBarHolds(history, t) {
   var bars = history && history.bars ? history.bars : []
   var spans = { "1d": "day", "1wk": "week", "1mo": "month", "3mo": "quarter" }
   var span = spans[history ? history.interval : ""]
   if (!bars.length || !span || !Format.isFiniteNumber(t)) return false
   var last = bars.length - 1
-  var start = span !== "day" && last > 0 && bars[last].t === history.liveAt ? bars[last - 1].t : bars[last].t
+  var start = liveBarAppended(history) ? bars[last - 1].t : bars[last].t
   var day = historyDateParts(history, t)
   var first = historyDateParts(history, start)
   var days = (Date.UTC(day.year, day.month, day.day) - Date.UTC(first.year, first.month, first.day)) / 86400000
@@ -296,15 +305,13 @@ function lastBarHolds(history, t) {
   return months >= 0 && months < (span === "month" ? 1 : 3)
 }
 
-// A range's high and low, marked on its chart (`RangeMarks`): each where
-// its bar sits along the chart, 0..1, as the scrub places a bar
-// (`historyFraction`), its price at the listing's decimals, and its date.
-// When the last bar holds the session of the listing's `quote`, the quote's
-// day high and low count as that bar's: the range is fetched each hour, the
-// quote each minute, so on a day that passes the range's high the mark
-// keeps up with the day's line and the 52 weeks' (`Figures.dayLine`,
-// `Fundamentals.yearLine`). Null with no bars.
-function rangeMarks(history, stats, quote) {
+// A range's high and low, each a bar's `{ p, t }`. When the last bar holds
+// the session of the listing's `quote`, the quote's day high and low count
+// as that bar's: the range is fetched each hour, the quote each minute, so
+// on a day that passes the range's high, the range keeps up with the day's
+// line and the 52 weeks' (`Figures.dayLine`, `Fundamentals.yearLine`).
+// Null with no bars.
+function rangeEnds(history, stats, quote) {
   stats = stats || periodStats(history)
   if (!stats.high || !stats.low) return null
   var high = stats.high
@@ -314,6 +321,60 @@ function rangeMarks(history, stats, quote) {
     if (Format.isFiniteNumber(quote.dayHigh) && quote.dayHigh > high.p) high = { p: quote.dayHigh, t: today }
     if (Format.isFiniteNumber(quote.dayLow) && quote.dayLow < low.p) low = { p: quote.dayLow, t: today }
   }
+  return { high: high, low: low }
+}
+
+// What traded over a range: its bars' volumes added, as the day's VOL reads
+// (`Format.compactNumber`). An appended live moment is left out, since the
+// bucket before it counts its day. "" when a bar's volume isn't known, or
+// when none is above zero, as for an index Yahoo has no volume for.
+function rangeVolume(history) {
+  var bars = history && history.bars ? history.bars : []
+  var end = liveBarAppended(history) ? bars.length - 1 : bars.length
+  var sum = 0
+  for (var i = 0; i < end; i++) {
+    if (!Format.isFiniteNumber(bars[i].v)) return ""
+    sum += bars[i].v
+  }
+  return sum > 0 ? Format.compactNumber(sum) : ""
+}
+
+// A range line's facts, in the day line's places (`Figures.dayLine`): START,
+// the price the range's change is measured from, which the scrub's dashed
+// line names too, and VOL, what traded over it (`rangeVolume`). `widest` is
+// the widest price of the listing's at its decimals; each value is "" when
+// not known, as in the room the info table holds for them.
+function rangeFacts(widest, start, volume) {
+  return [
+    { label: "START", value: start || "", widest: widest },
+    { label: "VOL", value: volume || "", widest: Format.widest("999.9M") }
+  ]
+}
+
+// The info block's first line on a range, in the day line's shape: the
+// range's name, its low and high (`rangeEnds`) with the headline price's
+// place between them, else the last bar's close's, then its facts
+// (`rangeFacts`). The dates of the low and high are on the chart's marks
+// (`rangeMarks`). Null with no bars.
+function rangeLine(history, ends, quote) {
+  if (!ends) return null
+  var digits = quote ? quote.priceDigits : undefined
+  var head = quote ? Quote.headlineQuote(quote) : null
+  var last = history.bars[history.bars.length - 1]
+  var range = Format.infoRange(ends.low.p, ends.high.p, head ? head.price : last.c, digits)
+  var start = Format.isFiniteNumber(history.baseline) ? Format.money(history.baseline, digits) : ""
+  return {
+    title: String(history.range || "").toUpperCase(),
+    range: range,
+    facts: rangeFacts(range.widest, start, rangeVolume(history))
+  }
+}
+
+// A range's high and low (`rangeEnds`), marked on its chart (`RangeMarks`):
+// each where its bar sits along the chart, 0..1, as the scrub places a bar
+// (`historyFraction`), its price at the listing's decimals, and its date.
+function rangeMarks(history, ends, quote) {
+  if (!ends) return null
   var digits = quote ? quote.priceDigits : undefined
   var years = historySpansYears(history)
   var mark = function(point) {
@@ -323,7 +384,7 @@ function rangeMarks(history, stats, quote) {
       date: historyStatsDateText(history, point.t, years, history.interval)
     }
   }
-  return { high: mark(high), low: mark(low) }
+  return { high: mark(ends.high), low: mark(ends.low) }
 }
 
 // An intraday bar's date and time read by its own day's clock, so a time
