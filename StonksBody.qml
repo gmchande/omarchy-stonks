@@ -362,14 +362,19 @@ Item {
   // Today in the featured listing's exchange, which changes only at its
   // midnight, so the day line is not derived again every second.
   readonly property int featuredToday: featuredQuote ? Figures.exchangeDay(featuredQuote, now) : 0
-  // The info block describes the stock, the same on every range: the day's
-  // line over the 52 weeks. Before any chart, nothing. A range marks its own
-  // high and low on its chart (`rangeMarks`). Until 21 October the first
-  // line was the day's or the range's, and holding room for both left the
-  // day's rule short of the edge.
+  // The info block's first line describes what the chart shows: the day's
+  // on 1D, a range's low and high with START and VOL on a longer one, over
+  // the 52 weeks. Before any chart, nothing. A range marks its high and low
+  // on its chart too, with their dates (`rangeMarks`). The info table holds
+  // room for both first lines' facts on every range (`infoFactLists`), so a
+  // range change moves nothing. Until 21 October the range's line held
+  // room for its dates too, which left the day's rule short of the edge.
   readonly property var dayLine: chart ? Figures.dayLine(featuredQuote, featuredToday) : null
+  readonly property var rangeEnds: historyShown ? History.rangeEnds(history, historyStats, featuredQuote) : null
+  readonly property var periodLine: !chart ? null : historyShown ? History.rangeLine(history, rangeEnds, featuredQuote) : dayLine
+  readonly property var infoFactLists: dayLine ? [dayLine.facts, History.rangeFacts(dayLine.range.widest)] : []
   readonly property var yearLine: chart ? Fundamentals.yearLine(featuredQuote, fundamentals ? fundamentals.figures : null) : null
-  readonly property var rangeMarks: historyShown ? History.rangeMarks(history, historyStats, featuredQuote) : null
+  readonly property var rangeMarks: historyShown ? History.rangeMarks(history, rangeEnds, featuredQuote) : null
   // What the dashed line is, said while a scrub reads against it.
   readonly property string baselineText: historyShown ? chartRange.toUpperCase() + " START " + Format.money(history.baseline, featuredQuote ? featuredQuote.priceDigits : undefined)
     : (!historyActive && featuredDay ? "PREV CLOSE " + Format.money(featuredDay.prevClose, featuredDay.priceDigits) : "")
@@ -1238,7 +1243,8 @@ Item {
     replayRunning: motion.replayRunning
     rangeOptions: root.rangeOptions
     range: root.range
-    dayLine: root.dayLine
+    periodLine: root.periodLine
+    factLists: root.infoFactLists
     rangeMarks: root.rangeMarks
     baselineText: root.baselineText
     yearLine: root.yearLine

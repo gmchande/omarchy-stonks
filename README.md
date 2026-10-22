@@ -68,10 +68,12 @@ list's header, or on 1D the change beside the price. A range marks its
 high and low on the chart, with their dates, and a stock younger than the
 range says when it began: "SINCE 31 JUL 2025".
 
-Under the ranges, two lines place the price between its low and high: for
-the day, beside its open and volume, and for the past 52 weeks, beside the
-market cap and P/E. They say the same on every range. The market cap is an
-estimate: Yahoo's last reported figure, moved with the price since.
+Under the ranges, two lines place the price between its low and high. The
+first is the range's: on 1D the day's, beside its open and volume, and on a
+longer range that range's, beside START, the price its change is measured
+from, and the volume traded over it. The second is the past 52 weeks', beside
+the market cap and P/E. The market cap is an estimate: Yahoo's last reported
+figure, moved with the price since.
 
 The top line says where the market is, in its own time: counting down to
 the open or the close, after hours, or closed. A smaller line under the
