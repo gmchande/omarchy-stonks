@@ -27,6 +27,8 @@
 #   SPY, BTC-USD answer their saved days: an ETF and a cryptocurrency
 #   NOCUR        answers the saved FTSE 100 day with no currency, as Yahoo
 #                answered ^STOXX50E
+#   MANGLED      answers AAPL's day with its pre-market period null, a
+#                malformed answer, in its chart and in a spark run alike
 #   HISTSTRAY    answers saved intraday MSFT data through the history path
 #   HUGE         answers AAPL's day padded past 64 KB, over the day's cap
 #   GONE         answers 404, a symbol Yahoo does not know
@@ -96,7 +98,9 @@
 # requests.log, "kind name status", a spark's name its symbols,
 # comma-separated.
 #   YAHOO.refuse, ROBINHOOD.refuse,   that host answers 429 to every request,
-#   GITHUB.refuse                     counted in <HOST>.refused.calls
+#   GITHUB.refuse                     counted in <HOST>.refused.calls; while
+#                                     <HOST>.retry-after holds a number, the
+#                                     refusal's Retry-After says it
 #   YAHOO.offline, ROBINHOOD.offline, that host gives no answer at all
 #   GITHUB.offline
 #   DELAY                             each URL answers that many seconds
@@ -322,6 +326,7 @@ serve() {
     SPY) cat "$fixtures/spy-2026-09-11-day-prepost.json" ;;
     BTC-USD) cat "$fixtures/btc-usd-day.json" ;;
     NOCUR) stamp < "$fixtures/ftse-day.json" | jq -c '.chart.result[0].meta.currency = null' ;;
+    MANGLED) answer | jq -c '.chart.result[0].meta.tradingPeriods.pre[0][0] = null' ;;
     HUGE) answer; head -c 70000 /dev/zero | tr '\0' ' ' ;;
     GONE) exit 44 ;;
     LONG*) stamp < "$fixtures/moments/listings-2026-10-07-1455/nest.json" ;;
@@ -352,6 +357,7 @@ for i in "${!urls[@]}"; do
   [[ "$url" == *"githubusercontent.com"* ]] && host=GITHUB
   run+=("$kind:$name")
   exit_code=0
+  retry_after=""
   if [ -e "$state/$host.offline" ]; then
     status=000
     exit_code=7
@@ -360,6 +366,7 @@ for i in "${!urls[@]}"; do
     count "$state/$host.refused.calls" > /dev/null
     status=429
     body="Too Many Requests"
+    retry_after=$(cat "$state/$host.retry-after" 2> /dev/null)
   else
     # In the background, so a curl stopped mid-answer (search's suspend, a
     # history no longer wanted) stops its answer too, as the real one does.
@@ -389,7 +396,7 @@ for i in "${!urls[@]}"; do
   out=${format//'%{urlnum}'/$i}
   out=${out//'%{http_code}'/$status}
   out=${out//'%{exitcode}'/$exit_code}
-  out=${out//'%header{retry-after}'/}
+  out=${out//'%header{retry-after}'/$retry_after}
   printf '%b' "$out"
 done
 echo "${run[*]}" >> "$state/runs.log"

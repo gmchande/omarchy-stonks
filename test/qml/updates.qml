@@ -366,6 +366,28 @@ ShellRoot {
         noteDay && noteShown && tookOver && restarted && afterDisk === restart + " | ",
         noteShown + " " + tookOver + " " + restarted + " | " + afterDisk + " | " + harness.readFile(harness.state + "/omarchy.calls"))
 
+      // "updateCheck": false in the data file, as the README says: a day on,
+      // and a day after that, GitHub is asked nothing. Taken out again, the
+      // check goes at once.
+      var dataFile = Quickshell.env("HOME") + "/.config/omarchy/grvc.stonks.json"
+      var edit = function(filter) {
+        run(["bash", "-c", "jq \"$1\" \"$2\" > \"$2.tmp\" && mv -f \"$2.tmp\" \"$2\"", "--", filter, dataFile])
+      }
+      edit(".updateCheck = false")
+      var off = within(3000, function() { return service.dataSettings.updateCheck === false })
+      // An ask starts as the clock moves (`ReleaseFeed.pump`): none went if
+      // none is out at once.
+      nextDay()
+      var quiet = !harness.feed.testAsking
+      service.now += 24 * 60 * 60
+      quiet = quiet && !harness.feed.testAsking
+      var askedOff = harness.asked()
+      edit("del(.updateCheck)")
+      var backOn = within(3000, function() { return service.dataSettings.updateCheck === true })
+      var askedOn = answered(13)
+      harness.check("with \"updateCheck\": false in the data file, GitHub is asked nothing for two days; without it, at once",
+        off && quiet && askedOff === 12 && backOn && askedOn, [off, quiet, askedOff + " asks while off", backOn, harness.asked() + " asks"].join(" | "))
+
       harness.finish()
     }
   }

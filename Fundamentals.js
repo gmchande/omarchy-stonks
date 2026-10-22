@@ -44,9 +44,10 @@ function latestSnapshot(results, type) {
     for (var j = 0; j < series.length; j++) {
       var point = series[j]
       var value = point && point.reportedValue ? point.reportedValue.raw : null
-      if (!Format.isFiniteNumber(value) || typeof point.asOfDate !== "string") continue
-      if (!latest || point.asOfDate > latest.date)
-        latest = { value: value, date: point.asOfDate, currency: point.currencyCode || "" }
+      var date = point ? Format.fetchedText(point.asOfDate, Format.MOST_CODE) : ""
+      if (!Format.isFiniteNumber(value) || !date) continue
+      if (!latest || date > latest.date)
+        latest = { value: value, date: date, currency: Format.fetchedText(point.currencyCode, Format.MOST_CODE) }
     }
   }
   return latest

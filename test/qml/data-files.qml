@@ -23,7 +23,8 @@ ShellRoot {
   // one empty; the current list a named one, a featured symbol off the top,
   // and every view setting off its default. The refresh interval is set only
   // by hand in the file, which every save keeps. 1.0.0 knew no sounds, so
-  // its file reads as on, their default; from 1.0.4 the file has them off.
+  // its file reads as on, their default; from 1.0.4 the file has them off,
+  // and the daily version check off too.
   readonly property var made: ({
     lists: [
       { name: "", symbols: ["SPY", "AAPL", "7203.T", "BTC-USD", "^GSPC", "SHEL.L", "JNJ"], order: "manual", reversed: false },
@@ -39,7 +40,8 @@ ShellRoot {
     changeMode: "abs",
     refreshIntervalSec: 300,
     hinted: true,
-    sounds: version === "1.0.0"
+    sounds: version === "1.0.0",
+    updateCheck: version === "1.0.0"
   })
 
   function check(label, ok, detail) {
@@ -101,7 +103,7 @@ ShellRoot {
       service.persist({ changeMode: Settings.nextChangeMode(service.changeMode) })
       service.persist({ refreshIntervalSec: harness.made.refreshIntervalSec })
       service.persist({ hinted: harness.made.hinted })
-      if (harness.version !== "1.0.0") service.persist({ sounds: harness.made.sounds })
+      if (harness.version !== "1.0.0") service.persist({ sounds: harness.made.sounds, updateCheck: harness.made.updateCheck })
       wait(100)
       saved.reload()
       var file = null
@@ -128,6 +130,8 @@ ShellRoot {
       harness.check("refreshed every " + made.refreshIntervalSec + " s", service.refreshIntervalSec === made.refreshIntervalSec, service.refreshIntervalSec)
       harness.check("the first-run hint not shown again", service.hinted === made.hinted, service.hinted)
       harness.check("sounds " + (made.sounds ? "on" : "off"), service.soundsOn === made.sounds, service.soundsOn)
+      harness.check("the version check " + (made.updateCheck ? "on" : "off"), service.dataSettings.updateCheck === made.updateCheck,
+        service.dataSettings.updateCheck)
       // Each list as a switch to it shows it.
       made.lists.forEach(function(list) {
         service.switchList(list.name)

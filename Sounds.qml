@@ -238,10 +238,14 @@ Item {
       + "( timeout -k 1 2 pw-play --media-role Notification --latency 20ms \"$1/chime-$name.wav\" & ) ;; esac; done", "sh", root.folder]
   }
 
+  // Each sound's file, written in the cache, is its owner's alone, and so
+  // is the cache's folder (`OwnerOnly`).
   FileView {
     id: soundFile
     preload: false
     blockWrites: true
     atomicWrites: true
+    onSaved: ownerOnly.keep([root.folder, soundFile.path])
   }
+  OwnerOnly { id: ownerOnly }
 }

@@ -531,10 +531,11 @@ const library = (extra = {}) => M.fileSettings({
 test("the data file reads as written and repairs hand edits", () => {
   const v1 = { version: 1, symbols: ["NEST", "SILK"], featured: "SILK", order: "pct", changeMode: "pct", style: "retro", refreshIntervalSec: 60 }
   const read = M.fileSettings(v1)
-  // A file from before sounds has them on, their default; only a saved
-  // false turns them off.
-  expect(read).toEqual({ ...v1, reversed: false, lists: [], list: "", range: "1D", hinted: false, sounds: true })
+  // A file from before sounds has them on, their default, and the version
+  // check too; only a saved false turns either off.
+  expect(read).toEqual({ ...v1, reversed: false, lists: [], list: "", range: "1D", hinted: false, sounds: true, updateCheck: true })
   expect([false, "no", 0].map(v => M.fileSettings({ sounds: v }).sounds)).toEqual([false, true, true])
+  expect([false, "no", 0].map(v => M.fileSettings({ updateCheck: v }).updateCheck)).toEqual([false, true, true])
   expect(M.listSymbols(read)).toEqual(["NEST", "SILK"])
   expect(M.listOrder(read)).toBe("pct")
   // The version-1 keys keep their meaning, so an older build reads the same All.
@@ -886,6 +887,11 @@ test("a hostile chart or spark answer reads as no answer, at once", async () => 
     { name: "opens posing", call: read, answer: chartAnswer(r => { bars(r).open = POSING }) },
     { name: "a session's days posing", call: read, answer: chartAnswer(r => { r.meta.tradingPeriods.regular = POSING }) },
     { name: "a day's periods posing", call: read, answer: chartAnswer(r => { r.meta.tradingPeriods.regular = [POSING] }) },
+    // A spark day with this threw as it was read, and its feed asked nothing
+    // more until Stonks restarted.
+    { name: "a day's period null", call: read, answer: chartAnswer(r => { r.meta.tradingPeriods.pre = [[null]] }) },
+    { name: "a spark day with a period null", call: "M.sparkQuote(json, null, [])",
+      answer: chartAnswer(r => { r.meta.tradingPeriods.pre = [[null]] }).chart.result[0] },
     { name: "bar times over budget", call: read, answer: chartAnswer(r => { r.timestamp = times(M.MOST_BARS + 1) }) },
     { name: "closes over budget", call: read, answer: chartAnswer(r => { bars(r).close = times(M.MOST_BARS + 1).map(() => 10) }) },
     { name: "a session's days over budget", call: read,
@@ -973,3 +979,34 @@ test("a hostile search or Robinhood answer reads as no answer, at once", async (
   ]
   expect(await hostile(cases)).toEqual(cases.map(c => [c.name, c.want === undefined ? null : c.want]))
 }, 60000)
+
+test("a fetched name or code past its length reads as not sent", () => {
+  const long = n => "N".repeat(n)
+  const day = edit => M.parseChart(chartAnswer(r => edit(r.meta)), [])
+  // A name past MOST_NAME gives way to the next one Yahoo sent, then the
+  // symbol; one at the limit is kept whole.
+  expect(day(m => { m.longName = long(M.MOST_NAME + 1); m.shortName = "Short" }).name).toBe("Short")
+  expect(day(m => { m.longName = long(M.MOST_NAME) }).name).toBe(long(M.MOST_NAME))
+  expect(day(m => { m.longName = long(1e6); m.shortName = long(1e6) }).name).toBe("X")
+  // A code past MOST_CODE is no code, and the exchange's full name past
+  // MOST_NAME no name: no currency named, no zone, no exchange.
+  const codes = day(m => {
+    m.currency = m.exchangeTimezoneName = m.timezone = m.exchangeName = m.instrumentType = long(M.MOST_CODE + 1)
+    m.fullExchangeName = long(M.MOST_NAME + 1)
+  })
+  expect([codes.currency, codes.timezoneName, codes.zoneName, codes.exchange, codes.instrumentType]).toEqual(["", "", "", "", ""])
+  expect(day(m => { m.symbol = long(1e5) }).symbol).toBe("")
+  const range = M.parseHistory(rangeAnswer(r => { r.meta.symbol = r.meta.timezone = long(1e5) }), "1M", [])
+  expect([range.symbol, range.zoneName]).toEqual(["", ""])
+  // Search leaves out a result with no symbol it can keep, and names a kind
+  // it leaves out by its own code when Yahoo's word for it runs on.
+  const found = M.parseSearch({ quotes: [
+    { symbol: long(1e5), quoteType: "EQUITY", longname: "Lost" },
+    { symbol: "SHOP", quoteType: "EQUITY", exchange: long(1e5), longname: long(1e5), shortname: "Shopify" },
+    { symbol: "VFIAX", quoteType: "MUTUALFUND", typeDisp: long(1e5) },
+    { symbol: "OTHER", quoteType: "WARRANT", typeDisp: long(1e5) }
+  ] })
+  expect(found).toEqual({ results: [{ symbol: "SHOP", name: "Shopify", exchange: "" }], note: "Stonks doesn’t show mutual funds or warrants" })
+  const cap = { meta: { type: ["trailingMarketCap"] }, trailingMarketCap: [{ asOfDate: "2026-09-30", currencyCode: long(1e5), reportedValue: { raw: 4e12 } }] }
+  expect(M.parseFundamentals({ timeseries: { result: [cap] } }).cap.currency).toBe("")
+})

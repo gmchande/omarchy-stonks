@@ -286,11 +286,13 @@ The shell's log the form asks for can name the prices Stonks left out.
 ## What it runs
 
 - **Needs:** nothing beyond Omarchy 4. It runs `curl`, PipeWire's
-  `pw-play`, `pw-cat`, and `pw-dump`, and `sh`, `bash`, `timeout`, and
-  `head`, which Omarchy ships, and, for a screenshot, `wl-copy` and
-  `omarchy-notification-send`.
-- **Commands:** `curl` for every request; while sounds are on, `pw-play` to
-  play a sound, only when you add, remove, or undo a row, take a
+  `pw-play`, `pw-cat`, and `pw-dump`, and `sh`, `bash`, `timeout`,
+  `head`, and `chmod`, which Omarchy ships, and, for a screenshot,
+  `wl-copy` and `omarchy-notification-send`.
+- **Commands:** `curl` for every request; `chmod` as each file Stonks
+  writes is first written each run, to make it and its cache folder yours
+  alone; while sounds are on, `pw-play` to play a sound, only when you add,
+  remove, or undo a row, take a
   screenshot, turn sounds on, replay a chart, or move along it, or the bell
   is due, and one `sh` that
   starts a `pw-play` for each chime, with 2 seconds each under `timeout`,
@@ -321,7 +323,8 @@ The shell's log the form asks for can name the prices Stonks left out.
   for overnight prices and which stocks trade overnight; and
   `raw.githubusercontent.com` for the newest version number, as the shell
   starts and then once a day; when no answer comes, again once Yahoo
-  answers again, or a day later. Nothing else.
+  answers again, or a day later; never with `"updateCheck": false` in
+  `~/.config/omarchy/grvc.stonks.json`. Nothing else.
 - **Data:** Yahoo's endpoints are unofficial, and its terms restrict
   automated access; Robinhood's data is for personal use. Either may change
   or stop without notice. Some prices come late: [Yahoo's table](https://help.yahoo.com/kb/SLN2310.html)
@@ -337,15 +340,18 @@ The shell's log the form asks for can name the prices Stonks left out.
   for each screenshot you take, one picture,
   `stonks-<symbol>-<date>_<time>.png`, in the folder Omarchy's own
   screenshots use (`OMARCHY_SCREENSHOT_DIR`, else your Pictures folder),
-  saved straight there, with no copy anywhere else.
+  saved straight there, with no copy anywhere else. The data file and
+  everything in `~/.cache/grvc.stonks` are readable by you alone (0600, the
+  folder 0700); a file an older Stonks wrote becomes so on its next write.
   The shell keeps the pill's form on its bar entry in
   `~/.config/omarchy/shell.json`.
 - **Limits:** every request has a time limit and a size cap. Quotes come
   up to 20 listings to a request, so a long list refreshes in a few
   requests a minute, and overnight prices up to 25. Stonks fetches each
   listing only as often as its market can move, and leaves a site that
-  refuses it alone for a while. A window no screen shows, on another
-  workspace or a screen switched off, fetches only what a closed one does.
+  refuses it alone for a while, as long as it asks up to half an hour. A
+  window no screen shows, on another workspace or a screen switched off,
+  fetches only what a closed one does.
 - **Robinhood:** Stonks asks whether your US stocks and ETFs trade
   overnight, and for their overnight prices, both at once: for the stock on
   the pill once each time the shell starts, as its first price comes in; for
@@ -376,6 +382,10 @@ click while it shows opens a terminal that runs `omarchy plugin update
 grvc.stonks`, which shows what changes and asks before it updates. Until
 the shell restarts, the old version keeps running, and the footer says
 "Updated to … · click to restart the shell".
+
+To stop the daily look, add `"updateCheck": false` to
+`~/.config/omarchy/grvc.stonks.json`; Stonks then asks GitHub nothing, and
+you update by the commands above. Take it out to look again.
 
 ## Remove
 

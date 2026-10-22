@@ -21,7 +21,7 @@ if [ $# -eq 0 ]; then
 fi
 saved_answers=none
 source "$here/lib.sh"
-feed_tree data-files.qml Service.qml Gate.qml QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml AllDayFeed.qml OvernightFeed.qml ReleaseFeed.qml Fetch.js Quote.js Format.js Market.js Overnight.js History.js Fundamentals.js Chart.js Settings.js Release.js calendars.json
+feed_tree data-files.qml Service.qml OwnerOnly.qml Gate.qml QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml AllDayFeed.qml OvernightFeed.qml ReleaseFeed.qml Fetch.js Quote.js Format.js Market.js Overnight.js History.js Fundamentals.js Chart.js Settings.js Release.js calendars.json
 data=$HOME/.config/omarchy/grvc.stonks.json
 if [ "$1" = write ]; then
   export STONKS_DATA_VERSION=${2:?usage: data-files.sh write VERSION}

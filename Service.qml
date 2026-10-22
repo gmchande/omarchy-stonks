@@ -73,9 +73,9 @@ Item {
   property var watched: []
 
   readonly property string dataPath: Quickshell.env("HOME") + "/.config/omarchy/grvc.stonks.json"
+  readonly property string cacheFolder: (Quickshell.env("XDG_CACHE_HOME") || Quickshell.env("HOME") + "/.cache") + "/grvc.stonks"
   // The last good quotes, shown at start until each one's first answer.
-  readonly property string quotesPath: (Quickshell.env("XDG_CACHE_HOME") || Quickshell.env("HOME") + "/.cache")
-    + "/grvc.stonks/quotes.json"
+  readonly property string quotesPath: cacheFolder + "/quotes.json"
 
   // All, the library: every symbol, fetched once each whatever lists hold it.
   readonly property var library: dataSettings.symbols
@@ -393,7 +393,11 @@ Item {
       root.dataReadEnded(error === FileViewError.FileNotFound ? root.takeMissingFile : root.takeUnreadableFile)
     }
     // A write drops a read in flight unheard: neither loaded nor failed.
-    onSaved: root.dataReadEnded(null)
+    // Written, the file is its owner's alone (`OwnerOnly`).
+    onSaved: {
+      ownerOnly.keep([root.dataPath])
+      root.dataReadEnded(null)
+    }
     onSaveFailed: function(error) {
       console.warn("stonks: failed to write " + root.dataPath + ": " + error)
       root.dataReadEnded(null)
@@ -518,9 +522,10 @@ Item {
   // for what is still wanted, while it still is (`askOvernight`).
   AllDayFeed { id: allDayFeed; gate: robinhoodGate; onEntriesChanged: Qt.callLater(root.askOvernight) }
   OvernightFeed { id: overnightFeed; gate: robinhoodGate; onEntriesChanged: Qt.callLater(root.askOvernight) }
+  // Off by the data file's `updateCheck`, it asks GitHub nothing.
   ReleaseFeed {
     id: releaseFeed
-    ready: root.pluginsReady
+    ready: root.pluginsReady && root.dataSettings.updateCheck
     now: root.now
     clock: root
     clearance: function() { return root.screensClear() }
@@ -914,7 +919,9 @@ Item {
     blockLoading: true
     atomicWrites: true
     printErrors: false
+    onSaved: ownerOnly.keep([root.cacheFolder, root.quotesPath])
   }
+  OwnerOnly { id: ownerOnly }
 
   // The saved quotes, { symbol: { quote, receivedAt } }; none when the file
   // is missing or unreadable.

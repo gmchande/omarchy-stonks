@@ -15,6 +15,20 @@ function fetchedList(value, most) {
   return Array.isArray(value) && value.length <= most ? value : null
 }
 
+// A name or code from a fetched answer: `value` when it is a string of at
+// most `most` characters, else "", as if the site had sent none. Every
+// name and code a parser keeps comes through here, so nothing downstream
+// measures, matches, or draws an unbounded string.
+function fetchedText(value, most) {
+  return typeof value === "string" && value.length <= most ? value : ""
+}
+
+// The longest name and code kept, set well above what the saved answers
+// hold: names reach 74 characters (a short name of Yahoo's), codes 27 (an
+// exchange's display name).
+var MOST_NAME = 200
+var MOST_CODE = 64
+
 // Whether `t`, in epoch seconds, is a moment a Date can hold (±8.64e12 s),
 // so no reading of it throws: a fetched 1e300 would.
 function isMoment(t) {

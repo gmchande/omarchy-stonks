@@ -9,12 +9,13 @@ import QtQuick
 // a history, a search, cap and P/E, so a long list never starves them. A
 // pause comes from what came back (`report`): no answer at all waits 2 s,
 // doubling to 60, since nothing reached the server; a refusal (429, 503)
-// waits for Retry-After, else 1 minute, doubling to 30. Each wait varies by
-// ±20%, so installs don't all come back at the same second. Once a pause
-// has run out, one request goes alone, and only its answer reopens the
-// host: each request carries the `ticket` it was let through on, and an
-// answer to one let through before the latest pause began says nothing of
-// the host now.
+// waits for Retry-After, else 1 minute, doubling, either for 30 minutes at
+// most, so a huge or hostile Retry-After can't silence Stonks for days.
+// Each wait varies by ±20%, so installs don't all come back at the same
+// second. Once a pause has run out, one request goes alone, and only its
+// answer reopens the host: each request carries the `ticket` it was let
+// through on, and an answer to one let through before the latest pause
+// began says nothing of the host now.
 Item {
   id: root
 
@@ -94,7 +95,7 @@ Item {
       // The rest of the run that began this pause adds no strike.
       if (!current && pause === "refused") return
       root.strikes = pause === "refused" ? strikes + 1 : 1
-      begin("refused", retryAfter > 0 ? retryAfter : Math.min(60 * Math.pow(2, strikes - 1), 30 * 60))
+      begin("refused", Math.min(retryAfter > 0 ? retryAfter : 60 * Math.pow(2, strikes - 1), 30 * 60))
     } else if (!current) {
       return
     } else if (kinds.some(function(k) { return k !== "none" })) {

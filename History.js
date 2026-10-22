@@ -76,7 +76,7 @@ function parseHistory(json, range, centExchanges) {
   }
   bars.sort(function (a, b) { return a.t - b.t })
   if (bars.length >= 2 && bars[bars.length - 1].t === bars[bars.length - 2].t) bars.splice(bars.length - 2, 1)
-  var interval = meta.dataGranularity || (spec && spec.interval)
+  var interval = Format.fetchedText(meta.dataGranularity, Format.MOST_CODE) || (spec && spec.interval)
   var intervalSeconds = historyIntervalSeconds(interval)
   // Only intraday buckets carry a stray close; a daily bar cannot. A move of
   // a tick or two is trading (`Quote.filterStrayCloses`).
@@ -88,11 +88,11 @@ function parseHistory(json, range, centExchanges) {
   }
   var baseline = Format.isFiniteNumber(meta.chartPreviousClose) ? meta.chartPreviousClose : (bars.length ? bars[0].c : null)
   return {
-    symbol: meta.symbol,
+    symbol: Format.fetchedText(meta.symbol, Format.MOST_CODE),
     range: range,
     interval: interval,
     gmtoffset: meta.gmtoffset || 0,
-    zoneName: meta.timezone || "",
+    zoneName: Format.fetchedText(meta.timezone, Format.MOST_CODE),
     // An intraday answer's days, each with its own clock, and the live
     // moment Yahoo appends, at the price's own second (`barOffset`).
     clocks: clocks,

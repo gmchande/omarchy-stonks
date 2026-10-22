@@ -28,13 +28,21 @@ function parseSearch(json) {
   var results = []
   var left = []
   for (var i = 0; i < quotes.length; i++) {
-    var q = quotes[i]
+    // Each name and code as Yahoo sent it, or "" (`Format.fetchedText`).
+    var q = {
+      symbol: Format.fetchedText(quotes[i].symbol, Format.MOST_CODE),
+      quoteType: Format.fetchedText(quotes[i].quoteType, Format.MOST_CODE),
+      typeDisp: Format.fetchedText(quotes[i].typeDisp, Format.MOST_NAME),
+      exchange: Format.fetchedText(quotes[i].exchange, Format.MOST_CODE),
+      longname: Format.fetchedText(quotes[i].longname, Format.MOST_NAME),
+      shortname: Format.fetchedText(quotes[i].shortname, Format.MOST_NAME)
+    }
     if (!q.symbol) continue
     if (q.quoteType && FOLLOWED.indexOf(q.quoteType) < 0) {
       left.push(q)
       continue
     }
-    results.push({ symbol: q.symbol, name: searchName(q), exchange: Quote.EXCHANGE_NAMES[q.exchange] || String(q.exchange || "").toUpperCase() })
+    results.push({ symbol: q.symbol, name: searchName(q), exchange: Quote.EXCHANGE_NAMES[q.exchange] || q.exchange.toUpperCase() })
   }
   return { results: results, note: leftOutNote(left) }
 }
@@ -77,7 +85,7 @@ function leftOutNote(left) {
 function searchName(q) {
   if (q.longname) return q.longname
   if (!q.shortname) return q.symbol
-  var name = String(q.shortname)
+  var name = q.shortname
   var spaces = 0
   while (spaces < name.length - 1 && /\s/.test(name.charAt(name.length - 2 - spaces))) spaces++
   var lettered = spaces >= 2 && /[A-Z]/.test(name.charAt(name.length - 1))

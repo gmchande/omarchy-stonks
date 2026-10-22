@@ -168,6 +168,11 @@ ShellRoot {
   }
 
   Process { id: fileProc }
+  // Each path's mode, as `stat` gives it ("600").
+  Process {
+    id: statProc
+    stdout: StdioCollector { id: statOut; waitForEnd: true }
+  }
 
   // A screen as Hyprland reports it, for the window host (fetch.sh): on or
   // off, as it says when asked again, a turn later, as Hyprland's answer
@@ -227,6 +232,12 @@ ShellRoot {
     }
     function touch(name) { runCommand(["touch", harness.state + "/" + name]) }
     function remove(name) { runCommand(["rm", "-f", harness.state + "/" + name]) }
+    function modes(paths) {
+      statProc.command = ["stat", "-c", "%a"].concat(paths)
+      statProc.running = true
+      tryVerify(function() { return !statProc.running }, 2000)
+      return String(statOut.text).trim().split("\n").join(",")
+    }
 
     // No quote run is out, the preview's included: the clock moves on only
     // once each run has landed, as it would in the seconds a run takes.
@@ -826,6 +837,67 @@ ShellRoot {
         1800, counts([2, 2, 2, 2, 30, 2, 2, 2]), openAfter)
       closeWindow()
 
+      // A malformed answer, a day whose pre-market period is null, in a
+      // spark run with the rest of the list: that listing fails, as a bad
+      // answer does, and the rest of the run lands, so the next refresh goes
+      // as ever. The day threw as it was read, and the feed asked nothing
+      // more until Stonks restarted.
+      openWindow()
+      service.addSymbol("MANGLED")
+      within(15000, function() { return !!service.entries.MANGLED && service.entries.MANGLED.status === "failed" && idle() })
+      // A refresh's spark run carries MANGLED with the rest of the list, once
+      // they are all due again.
+      var sparkFrom = harness.requests().length
+      var carried = false
+      for (var round = 0; round < 4 && !carried; round++) {
+        tick(15, 1)
+        service.refresh()
+        carried = within(5000, function() {
+          return harness.requests().slice(sparkFrom).some(function(l) { return /^spark \S*\bMANGLED\b/.test(l) })
+        })
+      }
+      var landed = carried && within(15000, function() { return service.testFeed.refreshRun.length === 0 && idle() })
+      tick(15, 1)
+      var againFrom = harness.requests().length
+      service.refresh()
+      var nextLanded = within(15000, function() {
+        return harness.requests().slice(againFrom).some(function(l) { return /^(spark|chart) /.test(l) })
+          && service.testFeed.refreshRun.length === 0 && idle()
+      })
+      harness.check("a malformed day in a spark run fails its own listing and stops nothing: the run lands, and the next refresh goes too",
+        carried && landed && nextLanded && service.entries.MANGLED.status === "failed",
+        [carried, landed, nextLanded, service.entries.MANGLED.status, JSON.stringify(service.testFeed.refreshRun)].join(" | "))
+      closeWindow()
+
+      // A refusal asking for a year's rest (Retry-After 31536000): Stonks
+      // rests half an hour at most, give or take a fifth, then asks again.
+      // It rested as long as it was told.
+      openWindow()
+      runCommand(["bash", "-c", "printf 31536000 > \"$1\"", "--", harness.state + "/YAHOO.retry-after"])
+      touch("YAHOO.refuse")
+      var longFrom = harness.requests().length
+      var restFrom = 0
+      tick(120, 1, function() { if (!restFrom && service.testYahooGate.pause === "refused") restFrom = service.now })
+      remove("YAHOO.refuse")
+      remove("YAHOO.retry-after")
+      var askedAgain = 0
+      tick(40 * 60, 30, function() {
+        if (!askedAgain && harness.yahoo(harness.requests().slice(longFrom)).some(function(l) { return / 200$/.test(l) })) askedAgain = service.now
+      })
+      harness.check("a refusal asking for a year's rest holds Yahoo for half an hour at most, then Stonks asks again",
+        restFrom > 0 && askedAgain > 0 && askedAgain - restFrom <= 36 * 60,
+        restFrom ? (askedAgain ? (askedAgain - restFrom) + " s at rest" : "never asked again in 40 minutes") : "never refused")
+      closeWindow()
+
+      // The data file and the saved quotes, each there before Stonks started
+      // and readable by every account (0644), and the cache folder (0755),
+      // are owner-only once Stonks has written them: 0600 and 0700.
+      var cacheDir = Quickshell.env("XDG_CACHE_HOME") + "/grvc.stonks"
+      var owned = ""
+      within(3000, function() { owned = modes([harness.dataPath, cacheDir + "/quotes.json", cacheDir]); return owned === "600,600,700" })
+      harness.check("the data file and the saved quotes are the owner's alone once written, and so is their folder in the cache",
+        owned === "600,600,700", owned)
+
       harness.finish()
     }
 
@@ -840,6 +912,12 @@ ShellRoot {
       countsOver("a US holiday, the window open: New York every 15 minutes, London, Toronto, and the crypto every minute",
         900, counts([1, 1, 1, 1, 15, 15, 1, 15]), openAfter)
       closeWindow()
+      // This run's cache began empty: the folder and the saved quotes are
+      // new, and the owner's alone from their first write.
+      var newDir = Quickshell.env("XDG_CACHE_HOME") + "/grvc.stonks"
+      var newModes = ""
+      within(3000, function() { newModes = modes([newDir + "/quotes.json", newDir]); return newModes === "600,700" })
+      harness.check("a new cache folder and its saved quotes are the owner's alone", newModes === "600,700", newModes)
       harness.finish()
     }
   }
