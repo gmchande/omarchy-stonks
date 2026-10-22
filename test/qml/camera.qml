@@ -193,15 +193,15 @@ ShellRoot {
     }
 
     // The card shows the chart on show and never the list: no other row's
-    // symbol and no list's name. Its price's currency stands beside the
-    // price, and its foot says when: the day's date, or the range's length.
-    function ofChart(shot, symbol, range, rows) {
+    // symbol and no list's name. Its price's currency, USD for every shot
+    // here, stands beside the price, and its foot says when: `span`, the
+    // saved day's date of the price on show, or the range's length.
+    function ofChart(shot, symbol, range, span, rows) {
       var problems = []
       if (!shot.card.texts) return ["no card laid out"]
       if (shot.card.symbol !== symbol || shot.card.range !== range) problems.push("card of " + shot.card.symbol + " " + shot.card.range)
-      var span = range === "1D" ? /^(MON|TUE|WED|THU|FRI|SAT|SUN) \d{1,2} [A-Z]{3} \d{4}$/ : { "1Y": /^1 YEAR$/ }[range]
-      if (shot.card.texts.indexOf(symbol) < 0 || shot.card.texts.indexOf(shot.card.span) < 0 || !span.test(shot.card.span)
-        || shot.card.currency === "" || shot.card.texts.indexOf(shot.card.currency) < 0)
+      if (shot.card.texts.indexOf(symbol) < 0 || shot.card.span !== span || shot.card.texts.indexOf(span) < 0
+        || shot.card.currency !== "USD" || shot.card.texts.indexOf("USD") < 0)
         problems.push("words " + shot.card.texts.join(" | "))
       var listed = shot.card.texts.filter(function(text) { return rows.indexOf(text) >= 0 && text !== symbol })
       if (listed.length) problems.push("shows the list's " + listed.join(", "))
@@ -224,7 +224,7 @@ ShellRoot {
       var still = shots().length
       var unlit = !body.cameraLit
       var rest = shoot(body, function() { keyClick(Qt.Key_Y) })
-      var problems = landed(rest, "aapl", /^AAPL at .+$/).concat(ofChart(rest, "AAPL", "1D", rows))
+      var problems = landed(rest, "aapl", /^AAPL at .+$/).concat(ofChart(rest, "AAPL", "1D", "TUE 1 SEP 2026", rows))
       harness.check("y in the popup saves one picture of AAPL's day in the pictures folder, copies it as a PNG, and sends Omarchy's notification with it",
         problems.length === 0 && still === 0 && rest.card.scrubX === -1 && !rest.card.retro, problems.join("; "))
       harness.check("the camera lights after its first shot, and not before", unlit && body.cameraLit)
@@ -235,7 +235,7 @@ ShellRoot {
       keyClick(Qt.Key_H)
       tryVerify(function() { return body.scrubT !== 0 }, 2000)
       var scrubbed = shoot(body, function() { keyClick(Qt.Key_Y) })
-      problems = landed(scrubbed, "aapl", /^AAPL at \d\d:\d\d$/).concat(ofChart(scrubbed, "AAPL", "1D", rows))
+      problems = landed(scrubbed, "aapl", /^AAPL at \d\d:\d\d$/).concat(ofChart(scrubbed, "AAPL", "1D", "TUE 1 SEP 2026", rows))
       harness.check("scrubbed, y takes the scrub: the picture shows it and says its time, its date only at the foot, and the footer says it too",
         problems.length === 0 && scrubbed.card.scrubT === body.scrubShown && scrubbed.card.scrubX >= 0 && /^AT \d\d:\d\d [A-Z]+$/.test(scrubbed.card.when)
           && scrubbed.name !== rest.name,
@@ -262,7 +262,7 @@ ShellRoot {
       wait(200)
       var button = harness.find(win, "cameraButton")
       var year = shoot(win, function() { if (button) mouseClick(button, button.width / 2, button.height / 2) })
-      problems = landed(year, "aapl", /^AAPL 1Y at .+$/).concat(ofChart(year, "AAPL", "1Y", rows))
+      problems = landed(year, "aapl", /^AAPL 1Y at .+$/).concat(ofChart(year, "AAPL", "1Y", "1 YEAR", rows))
       harness.check("a click on the window's camera, in retro, takes AAPL's 1Y as it is shown",
         problems.length === 0 && year.card.retro && win.cameraLit, problems.join("; "))
 
@@ -274,7 +274,7 @@ ShellRoot {
       mouseMove(chart, chart.width * 0.4, chart.height / 2)
       tryVerify(function() { return win.scrubT !== 0 }, 2000)
       var hovered = shoot(win, function() { keyClick(Qt.Key_Y) })
-      problems = landed(hovered, "aapl", /^AAPL 1Y on .+$/).concat(ofChart(hovered, "AAPL", "1Y", rows))
+      problems = landed(hovered, "aapl", /^AAPL 1Y on .+$/).concat(ofChart(hovered, "AAPL", "1Y", "1 YEAR", rows))
       harness.check("y with the pointer on the window's chart takes the bar the pointer reads",
         problems.length === 0 && hovered.card.scrubT === win.scrubShown && hovered.card.scrubX >= 0,
         problems.join("; ") + " | " + hovered.card.scrubT + " vs " + win.scrubShown)
@@ -288,7 +288,7 @@ ShellRoot {
       tryVerify(function() { return win.featuredSymbol === "BTC-USD" && !win.chartLoading && !win.historyActive }, 8000)
       app.testKeyCatcher.forceActiveFocus()
       var coin = shoot(win, function() { keyClick(Qt.Key_Y) })
-      problems = landed(coin, "btc-usd", /^BTC-USD at \d\d:\d\d(?: [A-Z]+)?$/).concat(ofChart(coin, "BTC-USD", "1D", rows))
+      problems = landed(coin, "btc-usd", /^BTC-USD at \d\d:\d\d(?: [A-Z]+)?$/).concat(ofChart(coin, "BTC-USD", "1D", "SAT 12 SEP 2026", rows))
       harness.check("y in the window takes Bitcoin's day", problems.length === 0, problems.join("; "))
       app.close()
 

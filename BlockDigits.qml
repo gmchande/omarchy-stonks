@@ -27,6 +27,7 @@ Canvas {
 
   onGridChanged: requestPaint()
   onCellChanged: requestPaint()
+  onGapChanged: requestPaint()
   onColorChanged: requestPaint()
   onGhostColorChanged: requestPaint()
 
