@@ -17,6 +17,11 @@ move the pointer across the chart to see the price at any moment on it.
 
 It doesn't track holdings, send price alerts, or convert currencies.
 
+Website: [getstonks.app](https://getstonks.app)
+
+[![Omarchy marketplace](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fgmchande%2Fstonks-site%2Fmarketplace-status%2Fmarketplace.json)](https://plugins.omarchy.org/plugin.html?id=grvc.stonks)
+[![Last verified on the Omarchy marketplace](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fgmchande%2Fstonks-site%2Fmarketplace-status%2Fverified.json)](https://plugins.omarchy.org/plugin.html?id=grvc.stonks)
+
 ## Install
 
 Needs Omarchy 4.
