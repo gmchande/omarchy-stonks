@@ -727,6 +727,12 @@ ShellRoot {
       // An answer without its regular price and time: the hero falls back
       // to Tuesday's last regular print, and the line under the price still
       // names the night, against that same close.
+      // Robinhood can answer the clock step before the regular quote does.
+      // Let that refresh land before replacing its quote with this case.
+      var quoteAnswered = within(8000, function() {
+        var entry = service.entries.NEST
+        return entry && entry.status === "ok" && entry.answeredAt === service.now && !service.owed.NEST
+      })
       var whole = service.testFeed.quotes
       var bare = Object.assign({}, whole)
       bare.NEST = Object.assign({}, whole.NEST, { price: null, marketTime: null })
@@ -737,9 +743,9 @@ ShellRoot {
       service.testFeed.quotes = whole
       within(2000, function() { return body.featured.priceText === "249.87" })
       harness.check("with no regular price, the hero labels its last chart trade with Tuesday's time and keeps the overnight line",
-        fallback.indexOf("249.78 | LAST TRADE · TUE 15:55 · ") === 0
+        quoteAnswered && fallback.indexOf("249.78 | LAST TRADE · TUE 15:55 · ") === 0
           && fallback.indexOf(" | OVERNIGHT 00:50 248.04 ") > 0
-          && rowFallback === "Last trade · Tue 15:55", fallback + " | row: " + rowFallback)
+          && rowFallback === "Last trade · Tue 15:55", "quote answered: " + quoteAnswered + " | " + fallback + " | row: " + rowFallback)
 
       // Two US stocks Robinhood does not trade all day, saved with the
       // listing sweep at the same moment: KILN traded 2 shares at 23:10 on
