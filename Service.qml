@@ -1140,12 +1140,15 @@ Item {
   // The last removal, put back where it was. Only once. Its quote is asked
   // for at once, as an add's is, not at its next refresh on the schedule:
   // the quote it had shows until the new one lands. The owner, 22 October.
+  // It is watched again first (`askDue`), so a run landing before the
+  // restore's own look at the schedule can't drop the ask as unwatched.
   function undoRemoval(symbol) {
     if (!root.lastRemoval || root.lastRemoval.symbol !== symbol) return
     var removal = root.lastRemoval
     root.lastRemoval = null
     if (removal.quote) feed.restore(symbol, removal.quote, removal.entry)
     root.save(Settings.withRemovalUndone(root.dataSettings, removal.before, symbol, removal.left))
+    root.askDue()
     feed.ask([symbol], root.wallSecond())
   }
 
