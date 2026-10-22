@@ -8,7 +8,7 @@
 # and none failed.
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-mapfile -t files < <(git ls-files --cached --others --exclude-standard '*.test.js')
+mapfile -d '' -t files < <(git ls-files -z --cached --others --exclude-standard '*.test.js')
 [ "${#files[@]}" -gt 0 ] || { echo "FAILED no *.test.js found"; exit 1; }
 status=0
 for file in "${files[@]}"; do
