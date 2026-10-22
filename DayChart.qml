@@ -95,20 +95,28 @@ Item {
 
   // How high and low the ink reaches between `x0` and `x1`, in pixels: the
   // prints there and the nearest either side, which the line joins to
-  // them, the baseline, which runs the whole width, and the line's half
-  // width. What is laid over the chart keeps clear of it (`RangeMarks`).
+  // them, each with the line's half width, or a lone print's dot
+  // (`strokeRuns`); and the baseline, which runs the whole width. What is
+  // laid over the chart keeps clear of it (`RangeMarks`).
   function inkExtentIn(x0, x1) {
     var g = geometry
-    var ys = g && typeof g.baselineY === "number" && isFinite(g.baselineY) ? [g.baselineY] : []
+    var h = height - pad * 2
+    var top = height
+    var bottom = 0
+    var reach = function(y, r) {
+      top = Math.min(top, pad + y * h - r)
+      bottom = Math.max(bottom, pad + y * h + r)
+    }
+    if (g && typeof g.baselineY === "number" && isFinite(g.baselineY)) reach(g.baselineY, weight)
     var pts = g && g.points ? g.points : []
     for (var i = 0; i < pts.length; i++) {
-      var before = xAt(pts[Math.max(0, i - 1)].x)
-      var after = xAt(pts[Math.min(pts.length - 1, i + 1)].x)
-      if (after >= x0 && before <= x1) ys.push(pts[i].y)
+      var lone = (i === 0 || pts[i].brk) && (i === pts.length - 1 || pts[i + 1].brk)
+      var r = lone ? 3 * weight : weight
+      var before = xAt(pts[Math.max(0, i - 1)].x) - r
+      var after = xAt(pts[Math.min(pts.length - 1, i + 1)].x) + r
+      if (after >= x0 && before <= x1) reach(pts[i].y, r)
     }
-    if (!ys.length) return { top: height, bottom: 0 }
-    var h = height - pad * 2
-    return { top: pad + Math.min.apply(null, ys) * h - weight, bottom: pad + Math.max.apply(null, ys) * h + weight }
+    return { top: top, bottom: bottom }
   }
 
   // The ticks: a mark on the baseline at the bell, and at the night's

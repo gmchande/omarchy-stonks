@@ -2446,25 +2446,33 @@ ShellRoot {
         stub.quotes = Object.assign({}, quotesBeforeCoin, { "BTC-USD": Quote.parseChart(JSON.parse(btcFile.text())) })
         stub.featuredSymbol = "BTC-USD"
         stub.range = "1Y"
-        stub.historyEntry = { status: "ok", history: History.parseHistory(JSON.parse(btcYearFile.text()), "1Y"), receivedAt: stub.now }
+        var coinYear = { status: "ok", history: History.parseHistory(JSON.parse(btcYearFile.text()), "1Y"), receivedAt: stub.now }
+        // The coin on its first day: one bar over a baseline below it, its
+        // lone print a dot.
+        var firstBar = coinYear.history.bars[coinYear.history.bars.length - 1]
+        var coinDay = { status: "ok", receivedAt: stub.now, history: Object.assign({}, coinYear.history,
+          { bars: [firstBar], baseline: firstBar.c * 0.9, firstTradeDate: firstBar.t }) }
+        stub.historyEntry = coinYear
         // Where the ink reaches under a mark, between `x0` and `x1` on the
         // chart, as each look draws it: smooth's line through the closes
-        // there and the nearest either side, a pixel either side of it,
-        // inside its 3 px pad; retro's columns, 6 px apart, each at its last
-        // close's row of 5 px; and the baseline across the whole width.
+        // there and the nearest either side, a pixel either side of it, or
+        // a lone close's dot of 3 px, inside its 3 px pad; retro's columns,
+        // 6 px apart, each at its last close's row of 5 px; and the
+        // baseline across the whole width.
         var inkReach = function(x0, x1) {
           var g = body.featuredGeometry
           var w = body.chartItem.width
           var h = body.chartItem.height
           var ys = [g.baselineY]
           if (!stub.retro) {
+            var r = g.points.length === 1 ? 3 : 1
             var px = function(p) { return 3 + p.x * (w - 6) }
-            g.points.forEach(function(p, i) {
-              var before = px(g.points[Math.max(0, i - 1)])
-              var after = px(g.points[Math.min(g.points.length - 1, i + 1)])
-              if (after >= x0 && before <= x1) ys.push(p.y)
-            })
-            return [3 + Math.min.apply(null, ys) * (h - 6) - 1, 3 + Math.max.apply(null, ys) * (h - 6) + 1]
+            var near = g.points.filter(function(p, i) {
+              return px(g.points[Math.min(g.points.length - 1, i + 1)]) + r >= x0 && px(g.points[Math.max(0, i - 1)]) - r <= x1
+            }).map(function(p) { return p.y })
+            var at = function(y) { return 3 + y * (h - 6) }
+            return [Math.min(at(g.baselineY) - 1, at(Math.min.apply(null, near.concat([1]))) - r),
+              Math.max(at(g.baselineY) + 1, at(Math.max.apply(null, near.concat([0]))) + r)]
           }
           var rows = Math.floor(h / 5)
           var columns = Math.floor(w / 6)
@@ -2514,14 +2522,18 @@ ShellRoot {
             if (!(body.watchlist.height >= body.listRowHeight && yIn(body.watchlist, body.listRowHeight) + body.groupGap <= footerTop))
               shortFaults.push(where + ": no row in " + room + " px, chart " + chart + ", list " + body.watchlist.height)
             if (rowFitsWhole && chart !== fullChart) shortFaults.push(where + ": the chart gave way to " + chart + " though " + fullChart + " leaves a row")
-            ;[find(body, "highMark"), find(body, "lowMark")].forEach(function(mark, i) {
-              var name = i === 0 ? "high" : "low"
-              if (!mark || !mark.visible) {
-                if (chart === fullChart) touched.push(where + ": no " + name + " mark on a " + chart + " px chart")
-                return
-              }
-              var onInk = touching(mark, i === 0)
-              if (onInk) touched.push(where + ": the " + name + " mark's " + onInk + ", chart " + chart)
+            ;[[coinYear, "1Y"], [coinDay, "first day"]].forEach(function(entry) {
+              stub.historyEntry = entry[0]
+              wait(50)
+              ;[find(body, "highMark"), find(body, "lowMark")].forEach(function(mark, i) {
+                var name = entry[1] + " " + (i === 0 ? "high" : "low")
+                if (!mark || !mark.visible) {
+                  if (chart === fullChart) touched.push(where + ": no " + name + " mark on a " + chart + " px chart")
+                  return
+                }
+                var onInk = touching(mark, i === 0)
+                if (onInk) touched.push(where + ": the " + name + " mark's " + onInk + ", chart " + chart)
+              })
             })
           })
         }
