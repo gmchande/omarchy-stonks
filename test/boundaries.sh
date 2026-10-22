@@ -35,17 +35,28 @@ none() {
   while read -r hit; do fail "$hit: '$pattern' is not allowed here"; done <<< "$hits"
 }
 
-# External commands run only in the feeds, search, and the version watch's
-# shell restart and update; files are read and written only by the
-# service, the version watch reads the manifest, and the trend colours read
-# the theme's colours; one service owns the feeds; the quote URL is the
+# External commands run only in the feeds, search, the version watch's
+# shell restart and update, the sounds' pw-play, its chimes' sh, the
+# bell's pw-dump, and the silence's pw-cat, and the camera's screenshot
+# hand-off; files are read and written only by the service, the version
+# watch reads the manifest, the trend colours read the theme's colours,
+# the sounds write the replay's and the chimes', and the camera its
+# screenshot; one service owns the feeds; the quote URL is the
 # quote feed's, the fundamentals URLs the fundamentals feed's, the overnight
 # URL the overnight feed's, the all-day URL the all-day feed's, and the
 # manifest's URL the release feed's. The plugin has one IPC target, and
 # only the window's host acts on Hyprland.
-only '\bProcess\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Updates.qml
-only '\bFileView\s*\{' Service.qml Updates.qml TrendColors.qml
-only '^import Quickshell\.Io' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Service.qml IpcTarget.qml Updates.qml TrendColors.qml
+only '\bProcess\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Updates.qml Sounds.qml Camera.qml
+only '\bFileView\s*\{' Service.qml Updates.qml TrendColors.qml Sounds.qml
+only '^import Quickshell\.Io' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Service.qml IpcTarget.qml Updates.qml TrendColors.qml Sounds.qml Camera.qml
+# Only the camera grabs and saves a picture, puts it on the clipboard, and
+# sends a notification.
+only 'grabToImage|saveToFile|wl-copy|wl-paste|omarchy-notification-send|notify-send' Camera.qml
+# A command started by exec is a sound's, and only there; it is pw-play,
+# and nothing else. Only the sounds ask PipeWire anything, or hold its
+# output awake.
+only '\.exec\(|pw-play|pw-dump|pw-cat' Sounds.qml
+none '\.exec\((?!\["pw-play",)' Sounds.qml
 only '\bIpcHandler\s*\{' IpcTarget.qml
 only '^import Quickshell\.Hyprland' WindowHost.qml
 only '\b(QuoteFeed|HistoryFeed|FundamentalsFeed|OvernightFeed|AllDayFeed|ReleaseFeed)\s*\{' Service.qml

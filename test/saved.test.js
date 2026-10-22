@@ -783,6 +783,11 @@ test("a published closure or a break between segments is closed, whatever Yahoo'
   // describes a session.
   expect(M.marketStatus(fakeOpen, labor, 0, calendars)).toBe("Labor Day · opens Tue 09:30")
   expect(M.marketStatus(fakeOpen, labor, 0, null)).toBe("Power hour · closes in 1h")
+  // Where the header has no room for the holiday's name, it says the
+  // closure as a weekend is said; a status naming no holiday has no
+  // shorter form, but for a lunch break, without its countdown.
+  expect(M.shortMarketStatus(fakeOpen, labor, 0, calendars)).toBe("Closed · opens Tue 09:30")
+  expect(M.shortMarketStatus(fakeOpen, labor, 0, null)).toBe("")
   // Tokyo's lunch break, from its calendar; the morning trades.
   const jpx = {
     symbol: "7203.T", exchange: "TSE", timezoneName: "Asia/Tokyo", gmtoffset: 32400, crypto: false,
@@ -792,6 +797,36 @@ test("a published closure or a break between segments is closed, whatever Yahoo'
   expect(quoteCadence(jpx, 1788832800, 60, true)).toBe(60)
   expect(quoteCadence(jpx, 1788836400, 60, true)).toBe(900)
   expect(M.inRegularSession(jpx, 1788836400, calendars)).toBe(false)
+  const lunch = M.marketStatus(jpx, 1788836400, 0, calendars)
+  expect(lunch).toMatch(/^Lunch break · reopens 12:30( JST)? · in \d+m$/)
+  expect(M.shortMarketStatus(jpx, 1788836400, 0, calendars)).toBe(lunch.replace(/ · in \d+m$/, ""))
+})
+
+test("the bell rings once at a market's open and once at its close, never late, at lunch, on a holiday, or for a coin", () => {
+  const q = duringSession(quote)
+  const bell = (quote, before, now) => M.bellBetween(quote, before, now, calendars)
+  // The minute's tick over the open and the close, and a step just over.
+  expect([bell(q, reg.start - 60, reg.start), bell(q, reg.start - 1, reg.start + 5), bell(q, reg.end - 30, reg.end + 30)])
+    .toEqual(["open", "open", "close"])
+  // Nothing between them, and nothing late: Stonks started, or the machine
+  // woke, after the bell.
+  expect([bell(q, reg.start + 60, reg.start + 120), bell(q, reg.start - 3600, reg.start + 60), bell(q, reg.end - 60, reg.end + 600)])
+    .toEqual(["", "", ""])
+  // Tokyo rings at 09:00 and 15:30, not around its lunch.
+  const jpx = {
+    symbol: "7203.T", exchange: "TSE", timezoneName: "Asia/Tokyo", gmtoffset: 32400, crypto: false,
+    session: { pre: null, post: null, regular: { start: M.epochAt(JPX, "2026-09-08", "09:00"), end: M.epochAt(JPX, "2026-09-08", "15:30") } },
+    points: []
+  }
+  const tokyo = hm => M.epochAt(JPX, "2026-09-08", hm)
+  expect(["09:00", "11:30", "12:30", "15:30"].map(hm => bell(jpx, tokyo(hm) - 60, tokyo(hm) + 1)))
+    .toEqual(["open", "", "", "close"])
+  // Labor Day, whatever Yahoo's periods say, and a coin's day, ring nothing.
+  const labor = 1788793200
+  const fakeOpen = { ...sep4, session: { pre: null, post: null, regular: { start: labor - 3600, end: labor + 3600 } } }
+  expect([bell(fakeOpen, labor - 3630, labor - 3570), bell(fakeOpen, labor + 3570, labor + 3630)]).toEqual(["", ""])
+  const day = btc.session.regular
+  expect([bell(btc, day.start - 30, day.start + 30), bell(btc, day.end - 30, day.end + 30)]).toEqual(["", ""])
 })
 
 test("freshness keeps quote age, an unanswered ask, and the refresh outcome apart", () => {

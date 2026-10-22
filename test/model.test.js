@@ -12,7 +12,7 @@ const root = join(import.meta.dir, "..")
 process.env.TZ = "America/New_York"
 // Every rule file's names, under one name: each is defined once.
 const M = Object.assign({}, ...["Format", "Fetch", "Quote", "Market", "Overnight", "History", "Fundamentals", "Figures",
-  "Chart", "Tones", "Settings", "KeySheet", "Search", "Cells"].map(name => load(name + ".js")))
+  "Chart", "Tones", "Settings", "KeySheet", "Search", "Cells", "Share"].map(name => load(name + ".js")))
 
 const calendars = JSON.parse(readFileSync(join(root, "calendars.json"), "utf8"))
 const US = calendars.calendars.US
@@ -359,6 +359,23 @@ test("a spark day takes its open from the chart of the same session, and waits f
   expect([tuesday.unjudged, tuesday.quote.dayOpen, M.change(tuesday.quote, 105, "open").pct]).toEqual([true, null, null])
 })
 
+test("a screenshot's file name carries only its symbol's letters, digits, dots, and dashes, so no symbol names another folder", () => {
+  expect(M.fileSymbol("AAPL")).toBe("aapl")
+  expect(M.fileSymbol("^GSPC")).toBe("gspc")
+  expect(M.fileSymbol("BRK-B")).toBe("brk-b")
+  expect(M.fileSymbol("7203.T")).toBe("7203.t")
+  // A symbol a hostile answer could send: no slash survives, so "..", left
+  // between "stonks-" and the date, is no step out of the folder.
+  for (const symbol of ["../../.ssh/id_rsa", "a/../../b", "/etc/passwd", "..", "$(rm -rf ~)", "x\ny", "AAPL;ls *"]) {
+    const name = "stonks-" + M.fileSymbol(symbol) + "-2026-10-21_15-11-03.png"
+    expect([symbol, /^[a-z0-9.-]+$/.test(M.fileSymbol(symbol)), name.includes("/")]).toEqual([symbol, true, false])
+  }
+  expect(M.fileSymbol("../../.ssh/id_rsa")).toBe(".....sshidrsa")
+  // Nothing left, and no symbol runs long.
+  expect(M.fileSymbol("^/")).toBe("chart")
+  expect(M.fileSymbol("A".repeat(500)).length).toBe(32)
+})
+
 test("blockCells lays digits on a grid with a blank column between", () => {
   const grid = text => {
     const { columns, cells } = M.blockCells(text)
@@ -514,7 +531,10 @@ const library = (extra = {}) => M.fileSettings({
 test("the data file reads as written and repairs hand edits", () => {
   const v1 = { version: 1, symbols: ["NEST", "SILK"], featured: "SILK", order: "pct", changeMode: "pct", style: "retro", refreshIntervalSec: 60 }
   const read = M.fileSettings(v1)
-  expect(read).toEqual({ ...v1, reversed: false, lists: [], list: "", range: "1D", hinted: false })
+  // A file from before sounds has them on, their default; only a saved
+  // false turns them off.
+  expect(read).toEqual({ ...v1, reversed: false, lists: [], list: "", range: "1D", hinted: false, sounds: true })
+  expect([false, "no", 0].map(v => M.fileSettings({ sounds: v }).sounds)).toEqual([false, true, true])
   expect(M.listSymbols(read)).toEqual(["NEST", "SILK"])
   expect(M.listOrder(read)).toBe("pct")
   // The version-1 keys keep their meaning, so an older build reads the same All.

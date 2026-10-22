@@ -1,6 +1,7 @@
 import QtQuick
 import qs.Commons
 import qs.Commons as Commons
+import "ChartSound.js" as ChartSound
 import "Figures.js" as Figures
 import "Format.js" as Format
 import "Fundamentals.js" as Fundamentals
@@ -10,6 +11,7 @@ import "Market.js" as Market
 import "Overnight.js" as Overnight
 import "Quote.js" as Quote
 import "Settings.js" as Settings
+import "Share.js" as Share
 import "Tones.js" as Tones
 // Shared body for the window and the popup: header, hero band, list,
 // search, footer, help, and the chart's motion (ChartMotion). It reads the
@@ -25,6 +27,10 @@ Item {
   property var service: null
   // The plugin's version on disk against the one running (`Updates`).
   property var updates: null
+  // The sounds for what you do here (`Sounds`), or null for none.
+  property var sounds: null
+  // The screenshot's hand-off (`Camera`), or null for none.
+  property var camera: null
   property bool surfaceOpen: false
   // A screen shows the open surface: the window on a workspace no screen
   // shows is open, as it was left, and asks for nothing an open one would.
@@ -88,6 +94,9 @@ Item {
   // The landing is a Show of a member still arriving, not an add: it is
   // featured once its first answer is in, a failed one too.
   property bool landingShows: false
+  // Adds not yet heard: each is as its row joins this surface's list, its
+  // answer in, whatever is featured or added meanwhile.
+  property var unheardAdds: []
   // The surface's own colour, which a moving row carries.
   property color ground: Commons.Color.background
   property var rangeOptions: History.historyRanges()
@@ -113,6 +122,9 @@ Item {
   // it puts back (`offered`), or that a newer Stonks is out, which a click
   // on it updates (`updateOffered`).
   property string note: ""
+  // A screenshot was taken on this visit: the header's camera stays lit
+  // until the surface closes, and the next open puts it out.
+  property bool cameraLit: false
   // A quiet line above the footer for this visit: the popup's first-run
   // hint (`showFirstRunHint`), how the pill is moved and changed. The next
   // open clears it.
@@ -193,6 +205,10 @@ Item {
   property var removal: null
   property string changeMode: "pct"
   property bool retro: false
+  property bool soundsOn: true
+  // The bar the scrub last struck on this pass over the chart, so moving
+  // within a bar strikes nothing more; -1 between passes.
+  property int chimed: -1
   // Each symbol waiting on Yahoo, with the second that began: freshness's
   // overdue (`QuoteFeed.owed`).
   property var owed: ({})
@@ -219,6 +235,7 @@ Item {
   Binding on removal { when: root.reading; value: root.service?.lastRemoval; restoreMode: Binding.RestoreNone }
   Binding on changeMode { when: root.reading; value: root.service?.changeMode; restoreMode: Binding.RestoreNone }
   Binding on retro { when: root.reading; value: root.service?.retro; restoreMode: Binding.RestoreNone }
+  Binding on soundsOn { when: root.reading; value: root.service?.soundsOn; restoreMode: Binding.RestoreNone }
   Binding on owed { when: root.reading; value: root.service?.owed; restoreMode: Binding.RestoreNone }
   Binding on settingsUnreadable { when: root.reading; value: root.service?.settingsUnreadable; restoreMode: Binding.RestoreNone }
   Binding on updatedTo { when: root.reading; value: root.updates ? root.updates.newVersion : ""; restoreMode: Binding.RestoreNone }
@@ -361,10 +378,16 @@ Item {
     // A refetch, out or failed, with the range in hand says nothing: it
     // keeps the chart and the market.
     if (historyShown && historyBar) return History.historyScrubText(history, historyBar, featuredQuote ? featuredQuote.priceDigits : undefined)
-    if (featuredQuote) return Market.marketStatus(dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars,
-      Overnight.nightTrades(featuredQuote, !!chart && chart.allDay, now, calendars))
+    if (featuredQuote) return marketText
     return headerWhenMissing
   }
+  // The market as the header says it, and, where it names a holiday, the
+  // same without the name for a header with no room for it
+  // (`Market.shortMarketStatus`); "" while the header says anything else.
+  readonly property var marketSays: featuredQuote ? [dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars,
+    Overnight.nightTrades(featuredQuote, !!chart && chart.allDay, now, calendars)] : null
+  readonly property string marketText: marketSays ? Market.marketStatus.apply(null, marketSays) : ""
+  readonly property string headerShortText: marketSays && headerText === marketText ? Market.shortMarketStatus.apply(null, marketSays) : ""
   // Everything but the rows: margins, header, band, and footer, with the
   // band, the rows, and the footer each one group's gap under what is above.
   readonly property int chromeHeight: chartFitsSurface ? chromeBesideChart + shownChartHeight
@@ -482,9 +505,14 @@ Item {
   }
   onOnScreenChanged: if (service) service.surfaceShown(root, surfaceOpen && onScreen)
   onServiceChanged: if (service && surfaceOpen && onScreen) service.surfaceShown(root, true)
-  Component.onDestruction: if (service) {
-    service.surfaceShown(root, false)
-    service.preview(root, "")
+  // A surface taken down mid-replay, as a rebuilt bar or a removed screen
+  // takes its popup, stops its replay's sound with it.
+  Component.onDestruction: {
+    if (sounds) sounds.stopReplay(root)
+    if (service) {
+      service.surfaceShown(root, false)
+      service.preview(root, "")
+    }
   }
   // The rows in sight while they show, whose charts the service fetches
   // ahead on a range.
@@ -511,6 +539,18 @@ Item {
     if (service) service.persist({ style: style })
   }
   function toggleStyle() { setStyle(retro ? "smooth" : "retro") }
+  // Sounds on or off; turned on, the add sound plays once, so you hear how
+  // loud they are.
+  function toggleSounds() {
+    showingHelp = false
+    if (!service) return
+    var on = !service.soundsOn
+    service.persist({ sounds: on })
+    if (on) sound("add")
+  }
+  function sound(name) {
+    if (sounds) sounds.play(name)
+  }
   function cycleOrder() {
     showingHelp = false
     if (service) service.setOrder(Settings.nextOrder(order))
@@ -575,6 +615,7 @@ Item {
     var at = rows.indexOf(symbol)
     var successor = symbol === watchlist.cursorRow && at >= 0 ? (rows[at + 1] || rows[at - 1] || "") : ""
     service.removeSymbol(symbol, rows)
+    sound("remove")
     if (successor !== "") watchlist.handTo(successor)
     offerUndo(symbol, listName)
   }
@@ -609,6 +650,7 @@ Item {
     var symbol = removal.symbol
     clearNote()
     service.undoRemoval(symbol)
+    sound("undo")
     watchlist.select(symbol)
   }
 
@@ -650,13 +692,81 @@ Item {
 
   function nudgeScrub(steps) {
     showingHelp = false
+    var before = motion.scrubT
     motion.nudgeScrub(steps)
+    if (motion.scrubT !== before) chime(true)
+  }
+
+  // The chimes: the scrub you move, by the pointer or the keys, strikes the
+  // chart's bar where it lands (`ChartSound.barAt`), as a hand run along a
+  // row of bar chimes does. The pointer strikes a bar as it moves onto it;
+  // each key step strikes, `again`, the same bar too. A replay has its own
+  // sound, and strikes nothing.
+  function chime(again) {
+    if (!sounds || motion.replayRunning) return
+    var bar = ChartSound.barAt({ retro: retro, geometry: motion.geometry, grid: heroBand.pixelGrid }, motion.scrubX)
+    if (bar !== chimed || again) sounds.chime(bar)
+    chimed = bar
   }
 
   // A replay plays the shown chart; the motion runs it.
   function replay() {
     showingHelp = false
     motion.replay()
+  }
+
+  // A screenshot of the chart on show, as the camera or y takes it: laid
+  // out for sharing (`ShareCard`) where no screen shows it, as the hero and
+  // the chart show it at that moment, grabbed once its canvases have
+  // painted, and handed to the camera, which saves, copies, and announces
+  // it. The footer says what it shows. One at a time; with no chart on
+  // show, the footer says why nothing was taken.
+  function takeScreenshot() {
+    showingHelp = false
+    if (!camera || camera.busy || String(shareLoader.source) !== "") return
+    if (!featuredQuote || !featuredDay || !featured) {
+      say("No chart to take a screenshot of")
+      return
+    }
+    shareLoader.setSource("ShareCard.qml", {
+      objectName: "shareCard",
+      symbol: chartSymbol || featuredSymbol,
+      quote: featuredQuote,
+      day: featuredDay,
+      history: historyShown ? history : null,
+      latest: motion.latest,
+      view: featured,
+      scrubT: scrubShown,
+      changeMode: changeMode,
+      range: historyShown ? chartRange : "1D",
+      now: now,
+      calendars: calendars,
+      retro: retro,
+      animalKind: animalKind,
+      asleep: animal.asleep,
+      foreground: foreground,
+      ground: ground,
+      upColor: upColor,
+      downColor: downColor,
+      fontFamily: fontFamily
+    })
+  }
+  // The other surface's shot may have taken the camera in the frames this
+  // one waited: then this card goes, and the next y or click is free. The
+  // shutter sounds as the picture is taken, and the card goes then; the
+  // footer says how the save, the copy, and the notification went after.
+  function shootCard(card) {
+    var shown = Share.subject(card.symbol, card.range, card.words ? card.words.said : "")
+    var taken = camera.shoot(card, Share.fileSymbol(card.symbol), function() {
+      shareLoader.source = ""
+      sound("shutter")
+    }, function(code) {
+      shareLoader.source = ""
+      if (code === 1) return say("Screenshot not saved · the screenshots folder can't be written")
+      cameraLit = true
+      say(code === 0 ? "Copied a screenshot of " + shown : "Saved a screenshot of " + shown + " · copying it failed")
+    })
+    if (!taken) shareLoader.source = ""
   }
 
   // Back from a scrub or a replay to now; false when there was none.
@@ -703,7 +813,8 @@ Item {
   // place, the list eases it into view once, and when the list and the row
   // are at rest it is featured the way a click on that row features it,
   // unless you chose another hero meanwhile or switched to a list without
-  // it. The latest add is the one; closing drops it (freeze).
+  // it. The latest add is the one; closing drops it (freeze). The add is
+  // heard as its row joins, not before.
   // Search closes first, the preview staying on the hero: the rows show
   // again as they were, and the add then joins them the way any new row
   // does, faded in at its place with the rows below it sliding. The service
@@ -731,6 +842,7 @@ Item {
     // After the preview has gone, whose hero was a choice, not a landing.
     landing = s
     landingShows = member
+    if (!member) unheardAdds = unheardAdds.filter(function(a) { return a !== s }).concat([s])
     landingJoined = false
     land()
   }
@@ -750,6 +862,15 @@ Item {
 
   // Called once the rows show the service's latest view.
   function land() {
+    // A row that says its first fetch failed joins too, and is heard; an add
+    // that has left the list on show goes unheard. Rows joining together
+    // are heard once.
+    if (unheardAdds.length && service) {
+      var joined = unheardAdds.filter(function(a) { return service.arriving.indexOf(a) < 0 && view.rows.indexOf(a) >= 0 })
+      if (joined.length) sound("add")
+      var still = unheardAdds.filter(function(a) { return joined.indexOf(a) < 0 && members.indexOf(a) >= 0 })
+      if (still.length !== unheardAdds.length) unheardAdds = still
+    }
     if (landing === "" || !service || service.arriving.indexOf(landing) >= 0) return
     // A first fetch that failed has nothing to show: the hero is the one
     // before the add (`Service.heroTaken`), the add is done, and its row
@@ -875,6 +996,7 @@ Item {
   function freeze() {
     keepTyped()
     landing = ""
+    unheardAdds = []
     noteTimer.stop()
     noteFade.stop()
     footer.freeze()
@@ -940,6 +1062,7 @@ Item {
     header.settle()
     heroBand.settle()
     clearNote()
+    cameraLit = false
     footer.settle()
     hint = ""
     resumeTyped()
@@ -980,8 +1103,11 @@ Item {
     anchors.top: parent.top
     anchors.margins: root.margins
     statusText: root.headerText
+    shortText: root.headerShortText
     offersRetry: root.offersRetry
     retro: root.retro
+    soundsOn: root.soundsOn
+    cameraLit: root.cameraLit
     animal: root.animal
     ground: root.ground
     scrubbing: root.scrubT !== 0
@@ -994,6 +1120,8 @@ Item {
     downColor: root.downColor
     fontFamily: root.fontFamily
     onStyleRequested: function(v) { root.setStyle(v) }
+    onSoundsRequested: root.toggleSounds()
+    onScreenshotRequested: root.takeScreenshot()
     onHelpRequested: root.toggleHelp()
     onReplayRequested: root.replay()
     onRetryRequested: root.refreshRequested()
@@ -1058,7 +1186,10 @@ Item {
     onOrderClicked: root.cycleOrder()
     onOrderReverseClicked: root.reverseOrder()
     onListClicked: root.listMenuOpen ? root.closeListMenu() : root.openListMenu()
-    onScrubRequested: function(fraction) { motion.scrubTo(fraction) }
+    onScrubRequested: function(fraction) {
+      motion.scrubTo(fraction)
+      root.chime(false)
+    }
     onScrubCleared: if (root.surfaceOpen) motion.clearScrub()
     onSnapToNow: motion.clearScrub()
     onRangeRequested: function(value) { root.selectRange(value) }
@@ -1260,6 +1391,29 @@ Item {
     }
   }
 
+  // The screenshot, laid out where no screen shows it, for a shot alone:
+  // built as one is asked for, with what the surface shows at that moment,
+  // and gone once it is handed on. Clipped to nothing rather than hidden:
+  // a hidden item's parts read themselves as hidden, and the retro chart's
+  // lit cap fell to its top row. A canvas paints on the frame after it is
+  // asked to, so the grab waits two drawn frames: grabbed at once, the
+  // chart came out empty in the probe of 21 October.
+  Item {
+    width: 0
+    height: 0
+    clip: true
+    Loader {
+      id: shareLoader
+      objectName: "shareLoader"
+    }
+    FrameAnimation {
+      property int frames: 0
+      running: shareLoader.status === Loader.Ready
+      onRunningChanged: frames = 0
+      onTriggered: if (++frames === 2) root.shootCard(shareLoader.item)
+    }
+  }
+
   HelpSheet {
     id: helpSheet
     objectName: "helpSheet"
@@ -1339,5 +1493,14 @@ Item {
     surfaceOpen: root.surfaceOpen
     retro: root.retro
     calendars: root.calendars
+    // The replay heard starts with the replay, made from the chart as drawn
+    // in the look on screen, and stops when the replay is cut short.
+    onReplayStarted: function(from, to) {
+      if (root.sounds) root.sounds.playReplay(root, { geometry: motion.geometry, grid: heroBand.pixelGrid,
+        from: from, to: to, seconds: motion.replayDuration / 1000 })
+    }
+    onReplayCut: if (root.sounds) root.sounds.stopReplay(root)
+    // The scrub let go ends the chimes' pass: the next starts afresh.
+    onScrubTChanged: if (!scrubT) root.chimed = -1
   }
 }

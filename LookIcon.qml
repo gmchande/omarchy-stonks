@@ -20,7 +20,9 @@ Item {
 
   // The mark's shape, left to right, 0 at the top: a line that climbs.
   readonly property var points: Cells.markPoints()
-  readonly property int pixel: 2
+  // The cell, a pixel short of the header's grid (`HeaderStatus.cell`), so
+  // the icon grows with the text beside the speaker and the camera.
+  property int pixel: 2
   readonly property int gap: 1
   // How far the cells have stepped in: 0 is the curve, 1 the cells.
   property real cells: 0
@@ -70,7 +72,8 @@ Item {
         var h = height
         var at = function(p) { return { x: 1 + p.x * (w - 2), y: 1 + p.y * (h - 2) } }
         ctx.strokeStyle = root.color
-        ctx.lineWidth = 1.5
+        // The header's pen: 1.5 px on its smallest grid, thickening with it.
+        ctx.lineWidth = Math.max(1.5, (root.pixel + root.gap) / 2)
         ctx.lineCap = "round"
         ctx.lineJoin = "round"
         ctx.beginPath()

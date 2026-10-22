@@ -144,6 +144,35 @@ Both looks draw in your theme's colours, light themes too: up in its green
 and down in its red, or in Stonks' own pair where the theme's are missing,
 too alike, or too faint.
 
+## Sounds
+
+Stonks makes a short sound when you add a symbol, remove a row, or undo the
+removal, which plays the removal backwards, and a shutter when you take a
+screenshot. Run the pointer along the chart
+and it plays like a row of chimes, higher where the line is higher: the bars
+you cross ring, up to 22 a second, ending on the one under the pointer, and
+each step of `←` `→` rings too. A replay sweeps the same bars along the
+line; in retro it also ticks where the line crosses the chart's baseline:
+the previous close on 1D, the range's first price on the others. Each look
+has its own voice. A soft bell rings as the market of the stock you last
+looked at opens and as it closes, on time or not at all, and never while
+every screen is off or an app records from your microphone. Nothing else
+sounds by itself: no refresh or price. Click the speaker at the top right,
+or press `Shift+S`, to turn sounds off; Stonks remembers. Your system volume
+sets how loud they are.
+
+## Screenshots
+
+Click the camera at the top right, or press `y`, for a picture of the chart
+you're looking at, laid out to share: the price large with its currency
+beside it, its move, the day's bull or bear, the exchange, the time of the
+price with its zone, the price the move is measured from, and at the foot
+the day's date or the range's length. Scrubbed, it shows the moment you
+scrubbed to. Your list is never in it. It lands as
+Omarchy's own screenshots do: a file in your screenshots folder, the
+picture on the clipboard, and Omarchy's notification, which opens your
+screenshot editor when you click it.
+
 ## Keys
 
 `?` opens a sheet of the everyday keys. Every key is in this table:
@@ -158,6 +187,7 @@ too alike, or too faint.
 | `h` `l` | Scrub one chart step (popup) |
 | `[` `]` | Change the chart range |
 | `p` | Replay the chart |
+| `y` | Screenshot the chart |
 | `a` or `+` | Search and add a symbol |
 | `x` | Remove the selected row |
 | `u` | Undo the last removal, until a list next changes |
@@ -171,6 +201,7 @@ too alike, or too faint.
 | `,` `.` | Previous or next list |
 | `c` | Show the day's change as a percent, an amount, or since the open |
 | `s` | Switch between smooth and retro |
+| `Shift+S` | Turn sounds off or on |
 | `r` | Refresh |
 | `1` to `9` | Show that row's chart |
 | Tab or `Shift+Tab` | Next or previous panel on the bar (popup) |
@@ -242,11 +273,37 @@ The shell's log the form asks for can name the prices Stonks left out.
 
 ## What it runs
 
-- **Needs:** nothing beyond Omarchy 4. It runs `curl`, which Omarchy ships.
-- **Commands:** `curl` for every request; `omarchy restart shell` only when
-  you click the notice that an update is on disk; and, only when you click
-  the note that a newer Stonks is out, `omarchy plugin update grvc.stonks`
-  in a terminal.
+- **Needs:** nothing beyond Omarchy 4. It runs `curl`, PipeWire's
+  `pw-play`, `pw-cat`, and `pw-dump`, and `sh`, `bash`, `timeout`, and
+  `head`, which Omarchy ships, and, for a screenshot, `wl-copy` and
+  `omarchy-notification-send`.
+- **Commands:** `curl` for every request; while sounds are on, `pw-play` to
+  play a sound, only when you add, remove, or undo a row, take a
+  screenshot, turn sounds on, replay a chart, or move along it, or the bell
+  is due, and one `sh` that
+  starts a `pw-play` for each chime, with 2 seconds each under `timeout`,
+  and plays nothing else; while sounds are on and the popup or the window
+  is open on a screen, and for 10 seconds after, `pw-cat` playing silence,
+  so the first sound plays at once; `pw-dump` once as each bell is due, in
+  `bash` under `timeout` for 3 seconds and through `head` for 4 MB, to see
+  whether an app is recording from a microphone, reading only which streams
+  run; an answer that runs out of time, fails, or goes over 4 MB counts as
+  recording, so the bell stays quiet; only when you take a screenshot, one
+  `sh` that names the picture's file in your screenshots folder, making the
+  folder if it isn't there; another that hands `wl-copy` the picture on its
+  input, to put it on the clipboard; and `omarchy-notification-send` with
+  Omarchy's own words, as Omarchy's own screenshots do; each under
+  `timeout`, which stops it after 5 seconds; only when you click that
+  notification, Omarchy runs your screenshot editor
+  (`OMARCHY_SCREENSHOT_EDITOR`, else Tensaku) on the file; `omarchy restart
+  shell` only when you click the notice that an update is on disk; and, only
+  when you click the note that a newer Stonks is out, `omarchy plugin update
+  grvc.stonks` in a terminal.
+- **Silence's cost:** while `pw-cat` plays silence, your speakers'
+  amplifier stays powered and your headphones stay connected to this
+  computer, as when any sound plays, and it takes about a tenth of a
+  percent of one processor core. Once no screen has shown the popup or the
+  window for 10 seconds, or with sounds off, it doesn't run.
 - **Sites:** `query1.finance.yahoo.com` for quotes, charts, and the market
   cap and P/E; `query2.finance.yahoo.com` for search; `api.robinhood.com`
   for overnight prices and which stocks trade overnight; and
@@ -260,9 +317,16 @@ The shell's log the form asks for can name the prices Stonks left out.
   London's and Tokyo's among them. Stonks isn't investment advice, and isn't
   affiliated with Yahoo or Robinhood.
 - **Files it writes:** your lists and settings in
-  `~/.config/omarchy/grvc.stonks.json`, and the last quotes in
-  `~/.cache/grvc.stonks/quotes.json`. The shell keeps the pill's form on its
-  bar entry in `~/.config/omarchy/shell.json`.
+  `~/.config/omarchy/grvc.stonks.json`, the last quotes in
+  `~/.cache/grvc.stonks/quotes.json`, and, while sounds are on, a replay's
+  sound in `~/.cache/grvc.stonks/replay.wav`, written over at each replay,
+  and the chimes' notes beside it, `chime-*.wav`, written each run; and
+  for each screenshot you take, one picture,
+  `stonks-<symbol>-<date>_<time>.png`, in the folder Omarchy's own
+  screenshots use (`OMARCHY_SCREENSHOT_DIR`, else your Pictures folder),
+  saved straight there, with no copy anywhere else.
+  The shell keeps the pill's form on its bar entry in
+  `~/.config/omarchy/shell.json`.
 - **Limits:** every request has a time limit and a size cap. Quotes come
   up to 20 listings to a request, so a long list refreshes in a few
   requests a minute, and overnight prices up to 75. Stonks fetches each
@@ -324,4 +388,5 @@ If you added them, also delete the `{ "id": "grvc.stonks" }` entry in
 How Stonks is built, how to run your checkout, the checks, and how to send a
 change are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
-License: MIT, see [LICENSE](LICENSE).
+License: MIT, see [LICENSE](LICENSE). The sounds in `sounds/` and the ones
+Stonks makes as it runs were made for Stonks, from code, and are MIT too.

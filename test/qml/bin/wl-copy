@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# A stand-in for wl-copy, first on PATH inside the harnesses, so no harness
+# ever reaches the clipboard. It appends its arguments as one line to
+# STONKS_FAKE_STATE/wl-copy.calls, and keeps what it was given to copy as
+# wl-copy.N, N counting the calls from 1. It stays in the foreground: the
+# real one leaves a server behind to hand the picture out.
+calls="$STONKS_FAKE_STATE/wl-copy.calls"
+echo "$*" >> "$calls"
+cat > "$STONKS_FAKE_STATE/wl-copy.$(wc -l < "$calls")"

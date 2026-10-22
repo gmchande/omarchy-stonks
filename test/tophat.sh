@@ -17,9 +17,12 @@
 #   drag X1 Y1 X2 Y2               hold the left button through the motion
 #   scroll X Y NOTCHES [--mod M]…  whole wheel notches; positive scrolls down
 #   shot FILE                      screenshot the nested output
+#   paste FILE                     the nested clipboard: its types printed,
+#                                  its PNG, if it holds one, saved to FILE
 #   record start FILE | record stop
 #   shell CMD…                     omarchy-shell inside the session
 #   log                            the nested shell's log
+#   sounds                         what the stand-in pw-play was asked to play
 #   self-check                     the guards, without a screen
 #
 # Two identities, never mixed. The nested one (socket, instance, runtime
@@ -193,7 +196,15 @@ end)
 EOF
 }
 
-# write_standins RUN: each logs its name and arguments and succeeds.
+# write_standins RUN: each logs its name and arguments and succeeds. And
+# pw-play's, so the session plays no sound: it logs what it was asked to
+# play to RUN/sounds.log, "start MS N ARGS", then "ended MS N" or "stopped
+# MS N", N counting the starts, since chimes overlap; keeps a copy of the
+# file as RUN/sound.N.wav; and stays for the sound's length, or until
+# stopped, as a real player does. And pw-dump's, an empty list of nodes, so
+# no microphone keeps the market's bell quiet; and pw-cat's, which logs each
+# stream of silence that keeps the output awake to RUN/silence.log, "start
+# MS ARGS" and "stopped MS", and holds no output.
 write_standins() {
   local run=$1 name
   mkdir -p "$run/stubs"
@@ -201,6 +212,39 @@ write_standins() {
     printf '#!/bin/sh\nprintf "%%s\\n" "%s $*" >> %q\nexit 0\n' "$name" "$run/stubs.log" > "$run/stubs/$name"
     chmod +x "$run/stubs/$name"
   done
+  cat > "$run/stubs/pw-play" << EOF
+#!/usr/bin/env bash
+log=$(printf %q "$run/sounds.log")
+ms() { echo \$(( \$(date +%s%N) / 1000000 )); }
+exec 9>> "\$log.lock"
+flock 9
+n=\$(( \$(grep -c '^start ' "\$log" 2> /dev/null) + 1 ))
+echo "start \$(ms) \$n \$*" >> "\$log"
+flock -u 9
+exec 9>&-
+sleeper=""
+trap '[ -n "\$sleeper" ] && kill "\$sleeper" 2> /dev/null; echo "stopped \$(ms) \$n" >> "\$log"; exit 0' TERM INT
+file="\${!#}"
+cp "\$file" $(printf %q "$run")/sound.\$n.wav 2> /dev/null
+size=\$(stat -c %s "\$file" 2> /dev/null || echo 44)
+rate=\$(od -An -t u4 -j 24 -N 4 "\$file" 2> /dev/null | tr -d ' ')
+sleep "\$(awk -v s="\$size" -v r="\${rate:-48000}" 'BEGIN { printf "%.3f", (s - 44) / 2 / (r > 0 ? r : 48000) }')" &
+sleeper=\$!
+wait "\$sleeper"
+echo "ended \$(ms) \$n" >> "\$log"
+EOF
+  chmod +x "$run/stubs/pw-play"
+  printf '#!/bin/sh\necho "[]"\n' > "$run/stubs/pw-dump"
+  chmod +x "$run/stubs/pw-dump"
+  cat > "$run/stubs/pw-cat" << EOF
+#!/usr/bin/env bash
+log=$(printf %q "$run/silence.log")
+ms() { echo \$(( \$(date +%s%N) / 1000000 )); }
+trap 'echo "stopped \$(ms)" >> "\$log"; exit 0' TERM INT
+echo "start \$(ms) \$*" >> "\$log"
+while :; do sleep 0.2; done
+EOF
+  chmod +x "$run/stubs/pw-cat"
 }
 
 # write_slow_curl RUN SECONDS CURL: the session's curl, ahead of the real one
@@ -893,10 +937,13 @@ case ${1:-} in
   drag) [ $# -eq 5 ] || die "usage: drag X1 Y1 X2 Y2"; drive_prelude; pointer "$4" "$5" drag "$2" "$3" "$4" "$5" ;;
   scroll) shift; cmd_scroll "$@" ;;
   shot) [ $# -eq 2 ] || die "usage: shot FILE"; drive_prelude; nested grim "$2" || die "grim failed" ;;
+  paste) [ $# -eq 2 ] || die "usage: paste FILE"; drive_prelude; nested wl-paste --list-types || die "the clipboard is empty"
+    nested wl-paste --no-newline --type image/png > "$2" || { rm -f "$2"; die "the clipboard holds no PNG"; } ;;
   record) shift; cmd_record "$@" ;;
   _record-watch) shift; record_watch "$@" ;;
   shell) shift; (( $# )) || die "usage: shell CMD…"; drive_prelude; nested omarchy-shell "$@" ;;
   log) load_run; cat "$run/shell.log" ;;
+  sounds) load_run; cat "$run/sounds.log" 2> /dev/null ;;
   self-check) self_check ;;
-  *) sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *) sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

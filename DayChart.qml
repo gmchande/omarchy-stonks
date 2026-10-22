@@ -40,11 +40,19 @@ Item {
   property bool still: false
   // The surface under the chart, which the wash is seen against.
   property color ground: Commons.Color.background
+  // The size of every stroke, the dot, and the pad, as a multiple of the
+  // screen's: the screenshot lays its chart out at the picture's pixels,
+  // 2 to its unit (`ShareCard`).
+  property real weight: 1
+  // The baseline's dashes, which Canvas also multiplies by the line's
+  // width: the weight, or the picture's 2 on a screen of any scale, so the
+  // screenshot's dashes are the same length on each (`ShareCard`).
+  property real dashUnit: weight
 
   readonly property bool directionKnown: typeof up === "boolean"
   readonly property color aboveColor: directionKnown ? upColor : baselineColor
   readonly property color belowColor: directionKnown ? downColor : baselineColor
-  readonly property int pad: 3
+  readonly property int pad: Math.round(3 * weight)
   readonly property var lastPoint: Chart.lastRegularPoint(geometry)
   readonly property bool day: !!geometry && geometry.day === true
   readonly property color dotColor: lastPoint && lastPoint.y > geometry.baselineY ? belowColor : aboveColor
@@ -82,13 +90,13 @@ Item {
   function strokeTicks(ctx, by, ahead) {
     var w = width - pad * 2
     ctx.strokeStyle = baselineColor
-    ctx.lineWidth = 1
+    ctx.lineWidth = weight
     for (var k = 0; k < geometry.ticks.length; k++) {
       if ((geometry.ticks[k] > inkLast) !== ahead) continue
       var cx = pad + geometry.ticks[k] * w
       ctx.beginPath()
-      ctx.moveTo(cx, by - 4)
-      ctx.lineTo(cx, by + 4)
+      ctx.moveTo(cx, by - 4 * weight)
+      ctx.lineTo(cx, by + 4 * weight)
       ctx.stroke()
     }
   }
@@ -104,9 +112,9 @@ Item {
       if (!root.hasBaseline) return
       var by = root.pad + root.geometry.baselineY * (height - root.pad * 2)
       ctx.strokeStyle = root.baselineColor
-      ctx.lineWidth = 1
+      ctx.lineWidth = root.weight
       ctx.lineCap = "round"
-      ctx.setLineDash([3, 4])
+      ctx.setLineDash([3 * root.dashUnit, 4 * root.dashUnit])
       ctx.beginPath()
       ctx.moveTo(root.pad, by)
       ctx.lineTo(width - root.pad, by)
@@ -162,7 +170,7 @@ Item {
 
         ctx.lineJoin = "round"
         ctx.lineCap = "round"
-        ctx.lineWidth = 2
+        ctx.lineWidth = 2 * root.weight
         // The whole series in dim ink, then each regular session over it in
         // full ink, so the extended hours on either side read as the quieter
         // part of one continuous line.
@@ -246,7 +254,7 @@ Item {
       var h = height - pad * 2
       var sx = pad + root.scrubX * w
       ctx.strokeStyle = root.hairlineColor
-      ctx.lineWidth = 1
+      ctx.lineWidth = root.weight
       ctx.beginPath()
       ctx.moveTo(sx, 0)
       ctx.lineTo(sx, height)
@@ -255,7 +263,7 @@ Item {
       if (sy !== null) {
         ctx.fillStyle = root.hairlineColor
         ctx.beginPath()
-        ctx.arc(sx, pad + sy * h, 5, 0, Math.PI * 2)
+        ctx.arc(sx, pad + sy * h, 5 * root.weight, 0, Math.PI * 2)
         ctx.fill()
       }
     }
@@ -288,18 +296,18 @@ Item {
       id: halo
       objectName: "liveHalo"
       anchors.centerIn: parent
-      width: 14
-      height: 14
-      radius: 7
+      width: 14 * root.weight
+      height: 14 * root.weight
+      radius: 7 * root.weight
       color: root.dotColor
       opacity: 0.25
     }
 
     Rectangle {
       anchors.centerIn: parent
-      width: 6
-      height: 6
-      radius: 3
+      width: 6 * root.weight
+      height: 6 * root.weight
+      radius: 3 * root.weight
       color: root.dotColor
     }
 

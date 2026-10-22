@@ -28,7 +28,8 @@ function sheet(order) {
       { title: "Chart", rows: [
         { key: "← →", does: "Scrub one chart step" },
         { key: "[ ]", does: "Change the chart range" },
-        { key: "p", does: "Replay the chart" }
+        { key: "p", does: "Replay the chart" },
+        { key: "y", does: "Screenshot the chart" }
       ]},
       { title: "Lists", rows: [
         { key: "w", does: "Open the list menu" },
@@ -37,6 +38,7 @@ function sheet(order) {
       ]},
       { title: "Look", rows: [
         { key: "s", does: "Switch smooth and retro" },
+        { key: "S", does: "Turn sounds off or on" },
         // The change mode is the day's: on a range the hero shows the period,
         // so c changes the rows and, on the day, the hero.
         { key: "c", does: "Cycle the day's change" },

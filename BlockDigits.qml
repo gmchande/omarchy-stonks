@@ -12,7 +12,10 @@ Canvas {
   id: root
 
   property string text: ""
-  property int cell: 8
+  property real cell: 8
+  // The seam between lit cells: a pixel of the screen it draws on, or of
+  // the picture it is grabbed into (`ShareCard`).
+  property real gap: 1
   property color color: Commons.Color.foreground
   property color ghostColor: "transparent"
 
@@ -24,6 +27,7 @@ Canvas {
 
   onGridChanged: requestPaint()
   onCellChanged: requestPaint()
+  onGapChanged: requestPaint()
   onColorChanged: requestPaint()
   onGhostColorChanged: requestPaint()
 
@@ -38,7 +42,7 @@ Canvas {
     ctx.fillStyle = color
     for (var j = 0; j < cells.length; j++) {
       if (!cells[j].lit) continue
-      ctx.fillRect(cells[j].x * cell, cells[j].y * cell, Math.max(1, cell - 1), Math.max(1, cell - 1))
+      ctx.fillRect(cells[j].x * cell, cells[j].y * cell, Math.max(gap, cell - gap), Math.max(gap, cell - gap))
     }
   }
 }

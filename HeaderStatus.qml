@@ -3,23 +3,29 @@ import qs.Commons
 import qs.Commons as Commons
 import "Cells.js" as Cells
 import "Tones.js" as Tones
-// The animal, live status, the look, and the help mark. Surfaces own the
-// actions; this only draws and signals. The animal is the day's bull or
-// bear in cells (`Cells.spriteFor`), the same in both looks, in one slot
-// the status words start after, drawn or not, so neither the look nor a
-// flat day moves them. While its market rests it sleeps: eyes shut and a
-// dim "z" just past the slot, above the words. The height is the slot's in
-// both looks, and the look is one small icon in both, so toggling moves
-// nothing. None of the three has a tooltip: under the header one covered
+// The animal, live status, the sounds, the camera, the look, and the help
+// mark.
+// Surfaces own the actions; this only draws and signals. The animal is the
+// day's bull or bear in cells (`Cells.spriteFor`), the same in both looks,
+// in one slot the status words start after, drawn or not, so neither the
+// look nor a flat day moves them. While its market rests it sleeps: eyes
+// shut and a dim "z" just past the slot, above the words. The height is the
+// slot's in both looks, and the look is one small icon in both, so toggling
+// moves nothing. None of them has a tooltip: under the header one covered
 // the line naming the stock, and what a click does is on the ? sheet with
 // the keys.
 Item {
   id: root
 
   property string statusText: ""
+  // The same words shorter, for where they don't fit: a closure's notice
+  // without its holiday's name. "" when they have no shorter form.
+  property string shortText: ""
   // The words say a range failed, and its button asks again, as r does.
   property bool offersRetry: false
   property bool retro: false
+  // The sounds are on: the speaker shows its waves, or, off, a cross.
+  property bool soundsOn: true
   // The animal, as the body decides it: `kind` "bull", "bear", or "" (a
   // flat day, or no direction yet), and `chart`, what it reads. A turn of
   // the same chart crossfades in smooth; any other change, and every one in
@@ -36,6 +42,9 @@ Item {
   property bool still: false
   // The key sheet shows, so a click on ? hides it.
   property bool helpShown: false
+  // A screenshot was taken on this visit: the camera stays lit until the
+  // surface closes.
+  property bool cameraLit: false
   property color foreground: Commons.Color.foreground
   property color dim: Tones.dim(foreground, Commons.Color.background)
   property color upColor: Commons.Color.foreground
@@ -59,6 +68,8 @@ Item {
   readonly property int lids: waking ? 2 - steps : steps
 
   signal styleRequested(string style)
+  signal soundsRequested()
+  signal screenshotRequested()
   signal helpRequested()
   signal replayRequested()
   signal retryRequested()
@@ -185,17 +196,28 @@ Item {
   // came and went, with every range change and every scrub. A failed
   // range's retry follows them. They start twice as far from the sleeping
   // z as the bull is, so it reads as the animal's and not as a mark on the
-  // first word, and stop as much sooner, so their room is the same.
+  // first word, and stop as much sooner, so their room is the same. Where
+  // the words don't fit their room, their short form shows, where they have
+  // one; otherwise they are cut with an ellipsis.
+  readonly property real wordsRoom: Math.max(0, soundIcon.x - Style.space(8) - statusWords.x
+    - (root.offersRetry ? retry.implicitWidth + Style.space(16) : 0))
+  Text {
+    id: fullWords
+    objectName: "statusFullWords"
+    visible: false
+    textFormat: Text.PlainText
+    text: root.statusText.toUpperCase()
+    font: statusWords.font
+  }
   Text {
     id: statusWords
     objectName: "statusText"
     anchors.left: slot.right
     anchors.leftMargin: Style.space(14)
-    width: Math.max(0, Math.min(implicitWidth, lookIcon.x - Style.space(8) - x
-      - (root.offersRetry ? retry.implicitWidth + Style.space(16) : 0)))
+    width: Math.min(implicitWidth, root.wordsRoom)
     anchors.verticalCenter: parent.verticalCenter
     textFormat: Text.PlainText
-    text: root.statusText.toUpperCase()
+    text: (root.shortText !== "" && fullWords.implicitWidth > root.wordsRoom ? root.shortText : root.statusText).toUpperCase()
     color: root.scrubbing || root.live ? root.foreground : root.dim
     font.family: root.fontFamily
     font.pixelSize: Style.font.caption
@@ -216,6 +238,90 @@ Item {
     onActivated: root.retryRequested()
   }
 
+  // Stonks' own speaker and camera, solid and the same in both looks
+  // (`Cells.SOUND_ON` and the rest), and the look icon, on one grid whose
+  // cell grows with the text (`Cells.iconCell`), so the header's four keep
+  // their weight beside the words at every size; the ? is a word and grows
+  // with them already.
+  readonly property int cell: Cells.iconCell(Style.fontScale)
+
+  // The sounds as they are, the speaker with its waves, or off with a
+  // cross; a click turns them off or on, as Shift+S does. One width on or
+  // off, so the toggle moves nothing. It hovers and presses as the look
+  // icon does, and its target is the header's full height too.
+  GridIcon {
+    id: soundIcon
+    objectName: "soundIcon"
+    readonly property bool on: root.soundsOn
+    anchors.right: camera.left
+    anchors.rightMargin: Style.space(14)
+    anchors.verticalCenter: parent.verticalCenter
+    cell: root.cell
+    shape: on ? Cells.SOUND_ON : Cells.SOUND_OFF
+    color: soundMouse.containsMouse ? root.foreground : root.dim
+
+    Rectangle {
+      objectName: "soundFill"
+      z: -1
+      anchors.centerIn: parent
+      width: parent.width + Style.space(12)
+      height: parent.height + Style.space(6)
+      radius: root.retro ? 0 : Style.cornerRadius
+      color: soundMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent) : "transparent"
+    }
+
+    MouseArea {
+      id: soundMouse
+      objectName: "soundToggle"
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.verticalCenter: parent.verticalCenter
+      width: parent.width + Style.space(12)
+      height: root.height
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onClicked: root.soundsRequested()
+    }
+  }
+
+  // The camera, which takes a screenshot of the chart on show, as y does:
+  // solid, its lens a hole at rest; once it has taken one, lit in the full
+  // ink with the shot's dot in its lens until the surface closes. It hovers
+  // and presses as the look icon does, its target the header's full
+  // height.
+  GridIcon {
+    id: camera
+    objectName: "camera"
+    readonly property bool lit: root.cameraLit
+    anchors.right: lookIcon.left
+    anchors.rightMargin: Style.space(14)
+    anchors.verticalCenter: parent.verticalCenter
+    cell: root.cell
+    shape: lit ? Cells.CAMERA_LIT : Cells.CAMERA
+    color: lit || cameraMouse.containsMouse ? root.foreground : root.dim
+
+    Rectangle {
+      objectName: "cameraFill"
+      z: -1
+      anchors.centerIn: parent
+      width: parent.width + Style.space(12)
+      height: parent.height + Style.space(6)
+      radius: root.retro ? 0 : Style.cornerRadius
+      color: cameraMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent) : "transparent"
+    }
+
+    MouseArea {
+      id: cameraMouse
+      objectName: "cameraButton"
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.verticalCenter: parent.verticalCenter
+      width: parent.width + Style.space(12)
+      height: root.height
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onClicked: root.screenshotRequested()
+    }
+  }
+
   // The look a click switches to, as s does, about a word tall: the chart
   // already shows the current one. The target is the header's full height,
   // so a click above or below the icon still lands. Like the `?`, it hovers
@@ -228,6 +334,7 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     retro: root.retro
     still: root.still
+    pixel: root.cell - 1
     color: lookMouse.containsMouse ? root.foreground : root.dim
 
     Rectangle {

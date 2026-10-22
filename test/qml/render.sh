@@ -138,6 +138,29 @@ every_state() (
   # The pill at a larger and a smaller text size, as `omarchy display text
   # size 16` and `10` set it: a side bar is then 37 and 23 pixels wide.
   states="$states pill-sheet-large pill-sheet-small"
+  # The screenshot the camera takes, in both looks, of every kind of
+  # listing: a thin stock, an ETF, an index, Bitcoin, London after its
+  # close, Tokyo at lunch, a stock after hours, scrubbed, and a range at
+  # rest and scrubbed. And the header's icons at text sizes 9, 16, and 20,
+  # at rest, and with sounds off and the camera lit after a shot, in the
+  # popup and the window at its widest and narrowest; and the smallest
+  # window's longest closures at size 20, where the header is tightest.
+  for look in smooth retro; do
+    for state in gaps-1d sweep-2026-10-07-1455-spy sweep-2026-10-07-1455-gspc sweep-2026-10-07-1455-btc-usd \
+      sweep-2026-10-07-1455-shel.l sweep-own-7203.t overnight-2026-10-06-1800-nest history-1y; do
+      states="$states share-of-$state-$look"
+    done
+    states="$states share-scrub-of-sweep-2026-10-07-1455-nest-$look share-scrub-of-history-1y-$look"
+    # After midnight, the change measured from the close before the chart's;
+    # and an intraday bar of a range scrubbed, its time's zone named.
+    states="$states share-of-sweep-2026-10-07-0100-nest-$look share-scrub-of-history-1w-$look"
+    for size in 9 16 20; do
+      for surface in popup-sweep window-sweep min-window-of-sweep; do
+        states="$states $surface-2026-10-07-1455-spy-$look-size-$size quiet-lit-$surface-2026-10-07-1455-spy-$look-size-$size"
+      done
+    done
+    states="$states min-window-holiday-tokyo-$look-size-20 min-window-holiday-london-$look-size-20"
+  done
   echo $states
 )
 all=$(every_state)
@@ -163,7 +186,8 @@ fi
 # Night, the theme a fresh Omarchy install sets. It goes where the shell
 # reads the current theme, so the shell's Color and the plugin's
 # TrendColors both read it as they do on the desktop. A state ending -large
-# has the shell's text size at 16 rather than 12, and one ending -small at 10.
+# has the shell's text size at 16 rather than 12, one ending -small at 10,
+# and one ending -size-N at N.
 themes=$(ls /usr/share/omarchy/themes | awk '{ print length, $0 }' | sort -rn | cut -d' ' -f2-)
 theme_dir="$HOME/.local/state/omarchy/current"
 mkdir -p "$theme_dir"
@@ -175,6 +199,7 @@ for state in $states; do
   ln -sfn "/usr/share/omarchy/themes/$theme" "$theme_dir/theme"
   if [[ $state == *-large ]]; then printf '[font]\nbase-size = 16\n' > "$HOME/.config/omarchy/shell.toml"
   elif [[ $state == *-small ]]; then printf '[font]\nbase-size = 10\n' > "$HOME/.config/omarchy/shell.toml"
+  elif [[ $state =~ -size-([0-9]+)$ ]]; then printf '[font]\nbase-size = %s\n' "${BASH_REMATCH[1]}" > "$HOME/.config/omarchy/shell.toml"
   else rm -f "$HOME/.config/omarchy/shell.toml"; fi
   echo "render $state ($theme) -> $dest"
   # render.qml ignores whether the save worked and exits 0 anyway, so only a
