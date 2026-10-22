@@ -41,9 +41,13 @@ Item {
   // The surface under the chart, which the wash is seen against.
   property color ground: Commons.Color.background
   // The size of every stroke, the dot, and the pad, as a multiple of the
-  // screen's: the screenshot lays its chart out at twice its size, so its
-  // canvases paint sharp, and draws at 2 (`ShareCard`).
+  // screen's: the screenshot lays its chart out at the picture's pixels,
+  // 2 to its unit (`ShareCard`).
   property real weight: 1
+  // The baseline's dashes, which Canvas also multiplies by the line's
+  // width: the weight, or the picture's 2 on a screen of any scale, so the
+  // screenshot's dashes are the same length on each (`ShareCard`).
+  property real dashUnit: weight
 
   readonly property bool directionKnown: typeof up === "boolean"
   readonly property color aboveColor: directionKnown ? upColor : baselineColor
@@ -110,7 +114,7 @@ Item {
       ctx.strokeStyle = root.baselineColor
       ctx.lineWidth = root.weight
       ctx.lineCap = "round"
-      ctx.setLineDash([3 * root.weight, 4 * root.weight])
+      ctx.setLineDash([3 * root.dashUnit, 4 * root.dashUnit])
       ctx.beginPath()
       ctx.moveTo(root.pad, by)
       ctx.lineTo(width - root.pad, by)

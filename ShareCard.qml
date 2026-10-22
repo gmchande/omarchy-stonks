@@ -11,17 +11,19 @@ import "History.js" as History
 import "Share.js" as Share
 import "Tones.js" as Tones
 // The screenshot: the chart on show laid out again for sharing, 1200 × 675
-// (16:9, which X shows whole), drawn at twice that so its canvases paint
-// sharp on any screen: every measure is in the layout's units, `u` pixels
-// each. What the popup shows above its ranges, at share size, with the
-// facts it leaves out (`Share.words`): the symbol, its name and exchange;
-// the day's animal, as the header draws it; the price, with its currency
-// beside it as a unit, and its move, large; what the price is, its time
-// and zone, a range's date, and what the move is measured from; the line
-// under the price the popup shows; the chart, its axis ending at the
-// newest price, with the scrub; and at the foot when, the day's date or
-// the range's length, and Stonks' mark. Never the list. In the surface's look
-// and colours. Built for a shot and gone after it (`StonksBody`).
+// (16:9, which X shows whole), drawn at twice that, 2400 × 1350 of the
+// screen's own pixels on a screen of any scale, so its canvases paint
+// sharp and no larger than the picture: every measure is in the layout's
+// units, `u` window units each. What the popup shows above its ranges, at
+// share size, with the facts it leaves out (`Share.words`): the symbol,
+// its name and exchange; the day's animal, as the header draws it; the
+// price, with its currency beside it as a unit, and its move, large; what
+// the price is, its time and zone, a range's date, and what the move is
+// measured from; the line under the price the popup shows; the chart, its
+// axis ending at the newest price, with the scrub; and at the foot when,
+// the day's date or the range's length, and Stonks' mark. Never the list.
+// In the surface's look and colours. Built for a shot and gone after it
+// (`StonksBody`).
 Rectangle {
   id: root
 
@@ -50,8 +52,14 @@ Rectangle {
   property color downColor: Commons.Color.urgent
   property string fontFamily: Style.font.family
 
-  readonly property int u: 2
-  readonly property int margin: 64 * u
+  // A layout unit is a pixel of the 2400 × 1350 picture: 2 to the picture's
+  // 1200 × 675, so on a screen of any scale the card draws at the size it
+  // is saved at, its canvases no larger. `px` is one of the picture's
+  // pixels in the window's units: half a unit on a scale-2 screen.
+  readonly property real dpr: Screen.devicePixelRatio > 0 ? Screen.devicePixelRatio : 1
+  readonly property real u: 2 / dpr
+  readonly property real px: 1 / dpr
+  readonly property real margin: 64 * u
   readonly property color dim: Tones.dim(foreground, ground)
   readonly property color dimmer: Tones.dimmer(foreground, ground)
   readonly property color ghost: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.05)
@@ -142,13 +150,15 @@ Rectangle {
   // The price gives up the currency's width when room is short.
   readonly property real priceRoom: width - margin * 2 - changeText.implicitWidth - 48 * u
     - currencyText.implicitWidth - currencyGap
-  readonly property int currencyGap: 16 * u
+  readonly property real currencyGap: 16 * u
+  // Measured in the picture's pixels, at the size the price is drawn at on
+  // a scale-1 screen, so the sizes it gives are the same on every screen.
   TextMetrics {
     id: priceInk
     font.family: root.fontFamily
-    font.pixelSize: 120 * root.u
+    font.pixelSize: 240
     font.bold: true
-    font.letterSpacing: -1 * root.u
+    font.letterSpacing: -2
     text: root.priceText
   }
   TextMetrics {
@@ -156,21 +166,21 @@ Rectangle {
     font: priceInk.font
     text: "0123456789"
   }
-  readonly property real priceScale: Math.min(1, priceRoom / Math.max(1, priceInk.advanceWidth))
-  readonly property int cell: Math.max(1, Math.floor(Math.min(-digitInk.tightBoundingRect.y * priceScale / 5,
-    priceRoom / Math.max(1, Cells.blockCells(priceText).columns))))
-  readonly property int priceBaseline: 222 * u
+  readonly property real priceScale: Math.min(1, priceRoom * dpr / Math.max(1, priceInk.advanceWidth))
+  readonly property real cell: Math.max(1, Math.floor(Math.min(-digitInk.tightBoundingRect.y * priceScale / 5,
+    priceRoom * dpr / Math.max(1, Cells.blockCells(priceText).columns)))) * px
+  readonly property real priceBaseline: 222 * u
   Text {
     id: priceSmooth
     objectName: "sharePrice"
     visible: !root.retro
-    x: root.margin - Math.round(priceInk.tightBoundingRect.x * root.priceScale)
+    x: root.margin - Math.round(priceInk.tightBoundingRect.x * root.priceScale) * root.px
     y: root.priceBaseline - baselineOffset
     textFormat: Text.PlainText
     text: root.priceText
     color: root.foreground
     font.family: root.fontFamily
-    font.pixelSize: Math.round(120 * root.u * root.priceScale)
+    font.pixelSize: Math.round(240 * root.priceScale) * root.px
     font.bold: true
     font.letterSpacing: -1 * root.u
   }
@@ -181,6 +191,7 @@ Rectangle {
     y: root.priceBaseline - baselineOffset
     text: root.retro ? root.priceText : ""
     cell: root.cell
+    gap: root.px
     color: root.foreground
     ghostColor: root.ghost
   }
@@ -259,6 +270,7 @@ Rectangle {
       visible: !root.retro
       anchors.fill: parent
       weight: root.u
+      dashUnit: 2
       geometry: root.retro ? null : root.geometry
       up: root.view ? root.view.dayUp : true
       upColor: root.upColor
@@ -366,7 +378,7 @@ Rectangle {
   }
   PixelSprite {
     objectName: "shareLogo"
-    readonly property int cell: 2 * root.u
+    readonly property real cell: 2 * root.u
     x: stonksText.x - width - 14 * root.u
     y: 654 * root.u - height
     width: columns * cell

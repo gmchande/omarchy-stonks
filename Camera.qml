@@ -18,23 +18,27 @@ Item {
   id: root
 
   readonly property string editor: Quickshell.env("OMARCHY_SCREENSHOT_EDITOR") || "tensaku-edit"
-  // The shot under way: its symbol, its item, the file it is saved as, and
-  // what to call with how it ended (`shoot`); no callback, no shot.
+  // The shot under way: its symbol, its item, the file it is saved as, what
+  // to call once the picture is taken, and what to call with how it ended
+  // (`shoot`); no callback, no shot.
   property string shotSymbol: ""
   property var shotItem: null
   property string shotFile: ""
+  property var shotTaken: null
   property var shotDone: null
   readonly property bool busy: shotDone !== null
 
   // Saves `item` as a picture named for `symbol` (`Share.fileSymbol`), copies
-  // it, and announces it; `done(code)` hears how it ended: 0 saved, copied,
-  // and announced; 1 not saved; 2 saved but not copied. False while another
-  // shot is under way.
-  function shoot(item, symbol, done) {
+  // it, and announces it. `taken()` hears the picture taken, before it is
+  // saved; then `item` may go. `done(code)` hears how it ended: 0 saved,
+  // copied, and announced; 1 not saved; 2 saved but not copied. False while
+  // another shot is under way.
+  function shoot(item, symbol, taken, done) {
     if (busy) return false
     shotSymbol = symbol
     shotItem = item
     shotFile = ""
+    shotTaken = taken
     shotDone = done
     naming.running = true
     return true
@@ -43,6 +47,7 @@ Item {
   function finish(code) {
     var done = shotDone
     shotDone = null
+    shotTaken = null
     shotItem = null
     if (done) done(code)
   }
@@ -73,7 +78,14 @@ Item {
         if (!root.shotItem || file.charAt(0) !== "/" || file.indexOf("\n") >= 0) return root.finish(1)
         root.shotFile = file
         var item = root.shotItem
+        // Grabbed at the item's size, which on the window's screen is the
+        // picture's in pixels (`ShareCard`). The PNG is encoded here, on
+        // this thread, once the picture is taken.
         if (!item.grabToImage(function(result) {
+          var taken = root.shotTaken
+          root.shotTaken = null
+          root.shotItem = null
+          if (taken) taken()
           if (result.saveToFile(root.shotFile)) copying.running = true
           else root.finish(1)
         }, Qt.size(item.width, item.height))) root.finish(1)

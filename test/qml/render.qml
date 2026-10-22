@@ -898,9 +898,10 @@ ShellRoot {
   QtObject {
     id: shareCamera
     property bool busy: false
-    function shoot(item, symbol, done) {
+    function shoot(item, symbol, taken, done) {
       console.log("SHARE " + symbol)
       return item.grabToImage(function(result) {
+        taken()
         result.saveToFile(root.outPath)
         done(0)
         console.log("SHARE footer | " + body.note)
