@@ -7,9 +7,10 @@ import "Overnight.js" as Overnight
 // the overnight session's, and the hours outside Yahoo's day that the 1D
 // chart draws (`Overnight.dayChart`). Each answer is a day, the last 288
 // slots the 24/5 market traded, which reaches every hour a chart can draw,
-// so it replaces the prints kept. An entry is { status, bars }: "ok" with
-// the prints Robinhood has, none for a listing it does not trade; or
-// "failed", keeping the last good prints. `entries` holds answers only. One
+// so it replaces the prints kept. An entry is { status, bars, through }:
+// "ok" with the prints Robinhood has, none for a listing it does not trade,
+// and how far its answer reached (`Overnight.overnightAnswer`); or
+// "failed", keeping the last good ones. `entries` holds answers only. One
 // run at a time: a request asked for while one is out is not sent, and the
 // service asks again for what it still wants once that is answered, so
 // nothing goes once nothing wants it. While Robinhood's gate pauses the
@@ -66,10 +67,10 @@ Item {
         Math.max.apply(null, got.map(function(a) { return a.retryAfter })), root.ticket)
     }
     // `results` is the batch's answer once read, null before and for a bad
-    // one; `bars` holds each symbol read, by symbol.
+    // one; `listings` holds each symbol's answer read, by symbol.
     root.landing = {
       answers: batches.map(function(batch, b) { return got.filter(function(a) { return a.index === b })[0] || null }),
-      batch: 0, results: null, read: 0, bars: {}
+      batch: 0, results: null, read: 0, listings: {}
     }
     landTimer.start()
   }
@@ -88,14 +89,14 @@ Item {
         if (!job.results) job.batch++
       } else {
         var symbol = batch[job.read]
-        var bars = null
-        try { bars = Overnight.overnightBars(job.results[job.read], symbol) } catch (e) { bars = null }
+        var answer = null
+        try { answer = Overnight.overnightAnswer(job.results[job.read], symbol) } catch (e) { answer = null }
         var had = entries[symbol]
-        if (bars) job.bars[symbol] = had && Overnight.sameBars(had.bars, bars) ? had.bars : bars
+        if (answer) job.listings[symbol] = { bars: had && Overnight.sameBars(had.bars, answer.bars) ? had.bars : answer.bars, through: answer.through }
         // An answer with a listing that can't be read is a bad answer too:
         // none of its symbols is read.
-        else batch.forEach(function(s) { delete job.bars[s] })
-        if (!bars || ++job.read >= batch.length) {
+        else batch.forEach(function(s) { delete job.listings[s] })
+        if (!answer || ++job.read >= batch.length) {
           job.results = null
           job.batch++
         }
@@ -110,8 +111,9 @@ Item {
     batches.forEach(function(batch) {
       batch.forEach(function(symbol) {
         var had = entries[symbol]
-        next[symbol] = symbol in job.bars ? { status: "ok", bars: job.bars[symbol], at: askedAt }
-          : { status: "failed", bars: had ? had.bars : [], at: askedAt }
+        var got = job.listings[symbol]
+        next[symbol] = got ? { status: "ok", bars: got.bars, through: got.through, at: askedAt }
+          : { status: "failed", bars: had ? had.bars : [], through: had ? had.through : null, at: askedAt }
       })
     })
     root.landing = null

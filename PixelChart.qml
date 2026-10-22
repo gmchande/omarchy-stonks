@@ -6,8 +6,8 @@ import "Tones.js" as Tones
 // The retro chart, one rule for the day and every range: pixel columns fill
 // from the baseline row, the previous close or the period's starting price,
 // in the up colour above it and the down colour below. The day adds the
-// dimmer extended hours, the bell and the night's edges, and the lit last
-// print.
+// dimmer extended hours, the bell and the night's edges, the lit last
+// print, and a thin night's trades, each a lone cell with no column under it.
 // The grid and the lit columns are painted when the data changes; the
 // draw-in widens a clip over the columns a whole column at a time, and the
 // bell and the scrub are cells laid over them.
@@ -105,6 +105,7 @@ Item {
       baseRow: 0,
       levels: [],
       ext: [],
+      dot: [],
       lastRegular: -1
     }
     if (!hasBaseline) return g
@@ -123,6 +124,7 @@ Item {
       }
       g.levels[col] = Math.round(pts[i].y * (g.rows - 1))
       g.ext[col] = pts[i].ext
+      g.dot[col] = !!pts[i].dot
       last = col
     }
     if (last >= 0 && !g.ext[last]) g.lastRegular = last
@@ -204,8 +206,9 @@ Item {
           var x = c * g.pitch
           var top = Math.min(y, baseY)
           var h = Math.abs(y - baseY)
-          // The stem from each cap down to the baseline.
-          if (h > 0) {
+          // The stem from each cap down to the baseline; a thin night's
+          // trade stands alone, as smooth's dot does.
+          if (h > 0 && !g.dot[c]) {
             var stem = g.ext[c] ? (above ? root.aboveStemDim : root.belowStemDim) : (above ? root.aboveStem : root.belowStem)
             ctx.fillStyle = Qt.rgba(color.r, color.g, color.b, stem)
             ctx.fillRect(x, top, pixel, h)

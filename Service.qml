@@ -339,24 +339,26 @@ Item {
   signal screensReady()
   // The day last built for each symbol's chart, kept while what built it is
   // the same: its quote, and for a listing Robinhood trades all day its
-  // prints, read from the answers the chart was built from (`nights`,
-  // `allDay`, as `Chart.viewChart` took them), so an own preview's Yahoo day
-  // is never handed to the same symbol's calendar day once it is added. An
-  // answer for another symbol hands the chart the objects it has and nothing
-  // that draws it repaints. Written in place by the views, and pruned with
-  // the other caches by symbol (`forgetLeft`); it notifies nothing.
+  // prints and how far its answer reached, read from the answers the chart
+  // was built from (`nights`, `allDay`, as `Chart.viewChart` took them), so
+  // an own preview's Yahoo day is never handed to the same symbol's
+  // calendar day once it is added. An answer for another symbol hands the
+  // chart the objects it has and nothing that draws it repaints. Written in
+  // place by the views, and pruned with the other caches by symbol
+  // (`forgetLeft`); it notifies nothing.
   readonly property var builtDays: ({})
   function keepDay(symbol, chart, nights, allDay) {
     if (!chart || !chart.quote || chart.day === chart.quote) return
     var tradability = allDay ? allDay[symbol] : null
     var night = tradability && tradability.allDay ? nights[symbol] : null
     var bars = night ? night.bars : null
+    var through = night ? night.through : null
     var built = builtDays[symbol]
-    if (built && built.quote === chart.quote && built.bars === bars) {
+    if (built && built.quote === chart.quote && built.bars === bars && built.through === through) {
       chart.day = built.day
       chart.latest = built.latest
     } else {
-      builtDays[symbol] = { quote: chart.quote, bars: bars, day: chart.day, latest: chart.latest }
+      builtDays[symbol] = { quote: chart.quote, bars: bars, through: through, day: chart.day, latest: chart.latest }
     }
   }
 

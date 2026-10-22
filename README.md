@@ -78,7 +78,9 @@ figure, moved with the price since.
 The top line says where the market is, in its own time: counting down to
 the open or the close, after hours, or closed. A smaller line under the
 price shows the pre-market, after-hours, or overnight price. The overnight
-price is for the US stocks and ETFs Robinhood trades overnight.
+price is for the US stocks and ETFs Robinhood trades overnight. At night, a
+stock that trades only now and then keeps its day on the 1D chart, with the
+night's trades as dots after it.
 
 An old price says "As of" and its time, on its row and above the price.
 Old means more than two minutes behind while its market trades, or saved
