@@ -598,26 +598,35 @@ Item {
     if (service) service.stepList(delta)
   }
 
-  // Every removal comes through here, from a key or a right-click, so All's
-  // last row's refusal is said once, in the footer. A named list may empty.
-  // Removing the row the keyboard cursor is on hands the cursor to the row
-  // that takes its place, as Mail and Finder do: the next row, or the one
-  // before when it was the last.
+  // A removal from the rows, by a key or a right-click. A named list may
+  // empty. Removing the row the keyboard cursor is on hands the cursor to
+  // the row that takes its place, as Mail and Finder do: the next row, or
+  // the one before when it was the last.
   function removeRow(symbol) {
     showingHelp = false
     cancelAdding()
-    if (!service || !symbol) return
-    if (listName === "" && !Settings.canRemove(symbols)) {
-      say("Keep at least one symbol")
-      return
-    }
+    if (!service || !symbol || refusesLast(listName)) return
     var rows = watchlist.displayedSymbols
     var at = rows.indexOf(symbol)
     var successor = symbol === watchlist.cursorRow && at >= 0 ? (rows[at + 1] || rows[at - 1] || "") : ""
     service.removeSymbol(symbol, rows)
-    sound("remove")
     if (successor !== "") watchlist.handTo(successor)
-    offerUndo(symbol, listName)
+    removed(symbol, listName)
+  }
+
+  // All keeps one symbol: a removal from All, "", that would empty it is
+  // refused, said once in the footer, whichever way it was asked.
+  function refusesLast(from) {
+    if (from !== "" || Settings.canRemove(lists[0].symbols)) return false
+    say("Keep at least one symbol")
+    return true
+  }
+
+  // Every removal ends here, from the rows or from a row's lists: the
+  // remove sound, and the footer's offer to put it back.
+  function removed(symbol, from) {
+    sound("remove")
+    offerUndo(symbol, from)
   }
 
   function say(text) {
@@ -975,15 +984,13 @@ Item {
   // symbol it takes away has no lists left to show.
   function setMembership(name, member) {
     if (!service) return
-    if (name === "" && !member && !Settings.canRemove(lists[0].symbols)) {
-      say("Keep at least one symbol")
-      return
-    }
+    var removing = name === "" && !member
+    if (removing && refusesLast(name)) return
     var symbol = listsSymbol
     service.setMembership(symbol, name, member, watchlist.displayedSymbols)
-    if (name === "" && !member) {
+    if (removing) {
       closeListViews()
-      offerUndo(symbol, "")
+      removed(symbol, "")
     }
   }
 

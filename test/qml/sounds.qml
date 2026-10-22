@@ -823,6 +823,27 @@ ShellRoot {
       tryVerify(function() { return win.featuredSymbol === "MSFT" && !win.chartLoading && win.animal.kind !== "" }, 5000)
       wait(400)
 
+      // Unticking All in a row's lists removes it everywhere, heard as any
+      // removal is, and u takes it back.
+      before = harness.starts().length
+      var unticked = win.watchlist.displayedSymbols.filter(function(s) { return s !== "MSFT" })[0]
+      var untickRow = win.watchlist.rowItem(unticked)
+      mouseClick(untickRow, untickRow.width / 2, untickRow.height / 2, Qt.LeftButton, Qt.ControlModifier)
+      tryVerify(function() { return win.listsSymbol === unticked }, 2000)
+      var allTick = harness.findAll(win, "symbolListRow")[0]
+      wait(Application.styleHints.mouseDoubleClickInterval + 50)
+      mouseClick(allTick, allTick.width / 2, allTick.height / 2)
+      tryVerify(function() { return service.library.indexOf(unticked) < 0 }, 2000)
+      app.refocusKeys()
+      wait(100)
+      keyClick(Qt.Key_U)
+      // The undo's sound is the last to start: the removal's, if any, began
+      // at the untick.
+      var untickSounds = startsBy(before + 1).slice(before).map(played)
+      harness.check("unticking All in a row's lists plays retro's removal, and u its undo",
+        untickSounds.join(", ") === "sounds/retro/remove.wav, sounds/retro/undo.wav" && service.library.indexOf(unticked) >= 0,
+        untickSounds.join(", "))
+
       // A click on the window's camera: the shutter once, in retro's voice.
       before = harness.starts().length
       var lens = harness.find(win, "cameraButton")
