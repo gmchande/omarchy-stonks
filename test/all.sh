@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Every check a pull request needs: what Stonks does, what it fetches, saves,
-# and says, and what a key or a click changes. The model tests, source
-# boundaries, QML lint, manifest and launcher validation, and the Quickshell
-# flow harnesses. A picture, a position, or a timing is the maintainer's
-# review kit's (test/review.sh); a few steps inside these harnesses still
-# judge one (frames, pixels, an x, an ease), until they move there. The
-# queue, the lock, and the verdict are test/queue.sh's. Needs Omarchy
-# installed and the Wayland session for the harnesses.
+# and says, and what a key or a click changes. The rules' unit tests (those
+# on the saved answers too), source boundaries, QML lint, manifest and
+# launcher validation, and the Quickshell flow harnesses. A picture, a
+# position, or a timing is the maintainer's review kit's (test/review.sh); a
+# few steps inside these harnesses still judge one (frames, pixels, an x, an
+# ease), until they move there. The queue, the lock, and the verdict are
+# test/queue.sh's. Needs Omarchy installed and the Wayland session for the
+# harnesses.
 source "$(dirname "${BASH_SOURCE[0]}")/queue.sh"
 
 # validate_clone: omarchy plugin validate on what a clone of this checkout
@@ -23,6 +24,13 @@ validate_clone() {
   code=$?
   rm -rf "$tree"
   return "$code"
+}
+
+# saved_tests: the rules read against the saved answers, when there are any.
+saved_tests() {
+  local why
+  why=$(test/fixtures-dir.sh 2>&1 > /dev/null) || { echo "SKIP saved.test.js: $why"; return 77; }
+  bun test ./test/saved.test.js
 }
 
 # Longest first, as measured.

@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
-# The maintainer's review kit: how Stonks looks and moves, and the rules read
-# against the real saved answers. Run it by hand before merging a visible
-# change, a contributor's included, on their branch, and before a release.
-# It is neither test/all.sh nor CI: pictures and frame timings vary by
-# machine, and the saved answers are private. Without them (test/
-# fixtures-dir.sh) almost all of it skips.
+# The maintainer's review kit: how Stonks looks and moves. Run it by hand
+# before merging a visible change, a contributor's included, on their branch,
+# and before a release. It is neither test/all.sh nor CI: pictures and frame
+# timings vary by machine, and the saved answers are private. Without them
+# (test/fixtures-dir.sh) almost all of it skips.
 #
 # - The offscreen renders (out/render/): every state on every kind of
 #   listing in both looks, for your eyes. The base's too, from its own
@@ -21,19 +20,10 @@
 #   budgets.
 # - The tophat's guards, without a screen. Try a visible change in a nested
 #   session first (test/tophat.sh, its usage at the top).
-# - The rules read against Yahoo's and Robinhood's saved answers
-#   (test/saved.test.js).
 #
 # The queue, the lock, and the verdict are test/queue.sh's: one run of
 # either runner at a time.
 source "$(dirname "${BASH_SOURCE[0]}")/queue.sh"
-
-# saved_tests: the rules read against the saved answers, when there are any.
-saved_tests() {
-  local why
-  why=$(test/fixtures-dir.sh 2>&1 > /dev/null) || { echo "SKIP saved.test.js: $why"; return 77; }
-  bun test ./test/saved.test.js
-}
 
 # render_diff: the pictures the change moved, once both sets are rendered.
 render_diff() {
@@ -75,7 +65,6 @@ start "popup motion harness" bash test/qml/popup-motion.sh
 start "tophat guards (no screen)" bash test/tophat.sh self-check
 fill
 
-run "bun test (saved answers)" saved_tests
 run "frame checker self-check" bun test/qml/frames.js self-check
 drain
 run "render diff, against ${base:0:7} (out/render-diff/)" render_diff

@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { load } from "./load.js"
 
 // The rules read against Yahoo's and Robinhood's saved answers, which are
-// private (test/fixtures; test/fixtures-dir.sh finds them). test/review.sh
+// private (test/fixtures; test/fixtures-dir.sh finds them). test/all.sh
 // skips this file where there are none. The pure rules are model.test.js.
 const found = Bun.spawnSync([join(import.meta.dir, "fixtures-dir.sh")])
 if (!found.success) throw new Error(found.stderr.toString().trim())
