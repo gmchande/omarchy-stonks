@@ -350,7 +350,11 @@ unlocked() {
 # ---- the laptop alone -------------------------------------------------------
 # With the owner's go, --take-laptop does by hand what a second screen does:
 # workspace 10 on the laptop, the focus elsewhere. The switch and the run are
-# one: it happens right before the launch, and every ending puts it back.
+# one: it happens around the launch, and every ending puts it back. The
+# virtual screen comes last, once the nested Hyprland has asked the host for
+# its window: aquamarine 0.15.1 sends that request only when the host next
+# sends it something (fixed upstream, hyprwm/aquamarine#415), and on a quiet
+# laptop the new screen is that something.
 
 host_dispatch() { [ "$(hyprctl dispatch "$1" 2>&1)" = ok ] || { echo "tophat: the host refused $1" >&2; return 1; }; }
 host_pointer() { hyprctl -j cursorpos | jq -r '"\(.x | round) \(.y | round)"'; }
@@ -383,9 +387,9 @@ laptop_alone_preflight() {
   echo "$ws"
 }
 
-# take_laptop WS: note the laptop's workspace WS and the pointer, show
-# workspace 10 on the laptop, add the virtual screen and focus it, then save
-# the scene the watcher compares. restore_screens undoes any part of it.
+# take_laptop WS: note the laptop's workspace WS and the pointer, and show
+# workspace 10 on the laptop. add_virtual finishes the switch once the
+# session is launched. restore_screens undoes any part of either.
 take_laptop() {
   local pointer
   pointer=$(host_pointer) && [ -n "$pointer" ] || { echo "tophat: cannot read the host's pointer" >&2; return 1; }
@@ -393,6 +397,11 @@ take_laptop() {
   echo "noted: the laptop shows workspace $1, the pointer is at $pointer"
   { laptop_shows 10 || host_dispatch 'hl.dsp.focus({ workspace = "10" })'; } && within 5 laptop_shows 10 \
     || { echo "tophat: the laptop does not show workspace 10" >&2; return 1; }
+}
+
+# add_virtual: add the virtual screen and focus it, then save the scene the
+# watcher compares.
+add_virtual() {
   echo "output create: $(hyprctl output create headless "$virtual" 2>&1)" >> "$run/outputs.log"
   within 5 screen_on "$virtual" || { echo "tophat: the virtual screen $virtual did not appear" >&2; return 1; }
   host_dispatch "hl.dsp.focus({ monitor = \"$virtual\" })" && within 5 focused_on "$virtual" \
@@ -401,7 +410,7 @@ take_laptop() {
   echo "switched: the laptop shows workspace 10, the focus is on $virtual"
 }
 
-# restore_screens: undo whatever part of take_laptop happened, and check it.
+# restore_screens: undo whatever part of the switch happened, and check it.
 # The virtual screen goes first: a workspace shown while it holds the focus
 # would open there, so while it stays, the rest waits for a retry.
 restore_screens() {
@@ -464,12 +473,18 @@ gone() {
   [ -s "$1" ] && read -r pid start < "$1" && [ "$(start_of "$pid")" != "$start" ]
 }
 
+# record_why WHY: why the run ended, in its folder, for a caller who cut the
+# output. The first reason stays: the start the watcher stops fails too.
+record_why() { ( set -C; echo "$1" > "$run/why" ) 2> /dev/null; }
+
 # _watch RUN: from before the switch until the run ends, it ends the run,
 # which puts the screens back, once the session locks (a lid close locks it:
 # Omarchy counts only plugged-in screens, so the virtual one doesn't dock the
 # laptop), the scene the switch saved changes (the owner is back, or the idle
 # screensaver opened), the session's launcher has gone, or the start or a
-# stop in progress was killed, since neither can then finish the undo.
+# stop in progress was killed, since neither can then finish the undo. Once
+# the run is ending (a stop, or a failed start), the scene and the launcher
+# change by its own undo: then only the ending's death counts.
 watch_run() {
   run=$1
   source "$run/identity"
@@ -490,13 +505,18 @@ watch_run() {
       why="the session's launcher has gone"
     elif gone "$run/starter"; then
       why="the start was killed"
-    elif gone "$run/stopper"; then
-      why="a stop was killed before it finished"
     else
-      continue
+      why=""
     fi
+    # After the reads above: an undo they saw began after the stopper was
+    # noted. One that finished wrote its status before it exited.
+    if [ -s "$run/stopper" ]; then
+      gone "$run/stopper" && [ ! -f "$run/stop.status" ] || continue
+      why="a stop was killed before it finished"
+    fi
+    [ -n "$why" ] || continue
     trap '' TERM
-    echo "$why" > "$run/why"
+    record_why "$why"
     # A start still running would switch on after the undo: stop it first,
     # and its own undo runs. One that hangs is killed with what it is
     # running (its children: this tool's), so nothing it began lands after.
@@ -508,7 +528,7 @@ watch_run() {
         within 5 start_over
       fi
     fi
-    end_run "$why" > /dev/null
+    end_run "$(cat "$run/why")" > /dev/null
     exit 0
   done
 }
@@ -629,7 +649,7 @@ cmd_start() {
       *) break ;;
     esac
   done
-  local ref=${1:?usage: start [--fresh] [--zone ZONE] [--slow SECONDS] [--take-laptop] REF} commit ws owner_ws id answer tool curl=""
+  local ref=${1:?usage: start [--fresh] [--zone ZONE] [--slow SECONDS] [--take-laptop] REF} commit ws owner_ws id answer tool curl="" built
   commit=$(git -C "$checkout" rev-parse --verify --quiet "$ref^{commit}") || die "no such commit: $ref"
   for tool in Hyprland quickshell dbus-run-session python3 wtype grim gpu-screen-recorder setsid flock jq foot; do
     command -v "$tool" > /dev/null || die "$tool is not installed"
@@ -650,9 +670,9 @@ cmd_start() {
   [[ $run =~ ^[A-Za-z0-9/._-]+$ ]] || die "the run folder $run needs a plain path"
   mkdir -p "$run" || die "cannot make $run"
   echo "run folder: $run"
-  build_sandbox "$run" "$commit" && { [ -z "$slow" ] || write_slow_curl "$run" "$slow" "$curl"; } \
-    && write_nested_lua "$run" && nested_lua_ok "$run/nested.lua" \
-    && write_launcher "$run" "$id" || die "the sandbox is not ready; nothing was launched"
+  built=$({ build_sandbox "$run" "$commit" && { [ -z "$slow" ] || write_slow_curl "$run" "$slow" "$curl"; } \
+    && write_nested_lua "$run" && nested_lua_ok "$run/nested.lua" && write_launcher "$run" "$id"; } 2>&1) \
+    || { record_why "the start failed: the sandbox is not ready; nothing was launched: $built"; die "$(cat "$run/why")"; }
   host_facts > "$run/host-before"
   { printf 'RUN_ID=%q\nCHECKOUT=%q\nCOMMIT=%q\nSTART_EPOCH=%q\nRUNTIME=%q\nZONE=%q\nSLOW=%q\n' "$id" "$checkout" "$commit" "$(date +%s)" "$runtime" "$zone" "$slow"; } > "$run/identity"
   trap 'start_failed "interrupted"' INT TERM
@@ -663,7 +683,7 @@ cmd_start() {
     owner_ws=$(laptop_alone_preflight) || start_failed "the host changed while the sandbox was built"
     start_watch || start_failed "the watcher never started"
     take_laptop "$owner_ws" || start_failed "the laptop was not switched"
-    ws=$(host_preflight) || start_failed "the switched host does not pass the preflight"
+    ws=10
   fi
 
   # One launch-scoped rule: the host places this launch's window on the
@@ -683,6 +703,9 @@ cmd_start() {
   socket_paths_fit "$runtime" "$SIG" || start_failed "the nested sockets do not fit"
   printf 'HYPR_PID=%q\nSIG=%q\nWAYLAND=%q\n' "$HYPR_PID" "$SIG" "$WAYLAND" >> "$run/identity"
   source "$run/identity"
+  # Hyprland writes the lock file find_instance reads only once its backend
+  # has started, so by now it has asked the host for its window.
+  if (( take )); then add_virtual || start_failed "the virtual screen was not added and focused"; fi
   within 15 parent_window > /dev/null || start_failed "the session's window is not alone, unfocused, and shown on $laptop's workspace $ws: $(hyprctl -j clients \
     | jq -c --argjson pid "$HYPR_PID" --argjson ws "$ws" '{mine: [.[] | select(.pid == $pid) | {ws: .workspace.id, monitor, mapped, hidden, focusHistoryID}],
       windows_on_ws: [.[] | select(.workspace.id == $ws)] | length}')"
@@ -745,14 +768,16 @@ services_off() {
   return "$ok"
 }
 
-# start_failed WHY: undo the start; the watcher stays until that is done, in
-# case this is killed meanwhile.
+# start_failed WHY: undo the start, ending the run with WHY, unless the
+# watcher ended it first for its own reason; the watcher stays until that is
+# done, in case this is killed meanwhile.
 start_failed() {
   trap - INT TERM
   # Ending now: nothing should signal this start any more.
   rm -f "$run/starter"
   echo "tophat: $*; stopping" >&2
-  end_run "$(cat "$run/why" 2> /dev/null)"
+  record_why "the start failed: $*"
+  end_run "$(cat "$run/why")"
   stop_watch
   forget_run
   exit 1
@@ -827,11 +852,12 @@ stop_run() {
 # watcher, which says WHY); a later caller gets the same findings and status,
 # and retries the screens if they were not all put back.
 end_run() {
-  local code
+  local code me=$BASHPID
   exec 7>> "$run/stop.lock"
   flock 7
   if [ ! -f "$run/stop.status" ]; then
-    echo "$BASHPID $(start_of "$BASHPID")" > "$run/stopper"
+    # Not $BASHPID inside $(…): that is the substitution's own process.
+    echo "$me $(start_of "$me")" > "$run/stopper"
     touch "$run/cancel"
     # A launcher checks for cancel only once it holds the slot. If the slot is
     # held, ours may be past that check: wait for it to report.
@@ -1186,7 +1212,7 @@ EOF
     mkdir -p "$run"
     printf 'RUN_ID=%q\nCHECKOUT=%q\nSTART_EPOCH=%q\nRUNTIME=%q\n' "$1" "$checkout" "$(date +%s)" "$tmp/rt" > "$run/identity"
     host_is
-    take_laptop 2 > /dev/null 2>&1 || miss "$1: the switch failed"
+    { take_laptop 2 && add_virtual; } > /dev/null 2>&1 || miss "$1: the switch failed"
   }
   watcher_gone() { local pid; read -r pid _ < "$run/watcher"; within 5 bash -c "! kill -0 $pid 2>/dev/null"; }
   # polled CALL N: the stand-in host has answered CALL N times.
@@ -1215,6 +1241,28 @@ EOF
   host_is '.monitors[0].activeWorkspace.id = 10 | .cursor = {x: 20100, y: 100}'
   ( start_failed "a test failure" ) > /dev/null 2>&1
   host_back || miss "a start that failed partway through the switch should undo it, got: $(seen)"
+  # A start that fails after the switch ends the run with its own reason, in
+  # the run folder for a caller who cut the output, and the watcher does not
+  # take its undo for the owner's hand.
+  solo_run failed-start
+  start_watch || miss "failed start: the watcher never started"
+  ( start_failed "the window did not show" ) > /dev/null 2>&1
+  [ "$(cat "$run/why" 2> /dev/null)" = "the start failed: the window did not show" ] \
+    || miss "a failed start should end the run with its own reason, got: $(cat "$run/why" 2> /dev/null)"
+  [ "$(head -n 1 "$run/stop.log")" = "ended early: the start failed: the window did not show" ] \
+    || miss "a failed start's stop log should open with its reason, got: $(head -n 1 "$run/stop.log")"
+  host_back || miss "a failed start should put the host back, got: $(seen)"
+  watcher_gone || miss "failed start: the watcher outlived the run"
+  # One that fails before the launch says why in its run folder too: the
+  # stand-in host has no gaps to read. Its runtime path only has to fit.
+  host_is
+  local runs_before; runs_before=$(ls "$base")
+  out=$(TOPHAT_RUNTIME=/tmp/tophat-check-rt WAYLAND_DISPLAY=wayland-1 bash "$here/tophat.sh" start --take-laptop HEAD 2>&1) \
+    && miss "a start on a host without gaps succeeded"
+  local made; made=$(comm -13 <(echo "$runs_before") <(ls "$base"))
+  grep -q "cannot read the host's gaps" "$base/${made:-none}/why" 2> /dev/null \
+    || miss "a start that failed before the launch should say why in its run folder, got: $(cat "$base/${made:-none}/why" 2> /dev/null), said: $out"
+  host_back || miss "a start that failed before the launch should leave the host as it was, got: $(seen)"
 
   # The watcher ends the run, putting it all back, on whatever ends the
   # owner's absence or the run.
@@ -1287,7 +1335,8 @@ EOF
   bash "$here/tophat.sh" stop > /dev/null 2>&1
   host_back || miss "a second stop should put the screens back, got: $(seen)"
   [ -e "$base/current" ] && miss "a run whose screens are back should no longer be current"
-  # Nothing changed: the watcher looks and lets the run be, and stop ends it.
+  # Nothing changed: the watcher looks and lets the run be, and stop ends it,
+  # its undo taken for no one's hand.
   solo_run stop
   start_watch || miss "stop: the watcher never started"
   ln -sfn "$run" "$base/current"
@@ -1296,6 +1345,7 @@ EOF
   out=$(bash "$here/tophat.sh" stop 2>&1) || miss "stop should end a watched run clean, got: $out"
   host_back || miss "stop should put the host back, got: $(seen)"
   watcher_gone || miss "the watcher outlived stop"
+  [ -e "$run/why" ] && miss "stop's own undo should not be a reason the run ended, got: $(cat "$run/why")"
 
   (( failed )) && echo "tophat self-check FAILED" || echo "tophat self-check ok"
   return "$failed"
