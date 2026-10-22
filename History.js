@@ -274,13 +274,43 @@ function historyStatsDateText(history, t, withYear, interval) {
   return historyDateText(history, t, coarse || withYear, coarse ? "1mo" : "1d")
 }
 
+// Whether the last bar of a range of bars a day long or longer holds the
+// session that starts at `t` (`Quote.figuresDay`), by the exchange's
+// calendar: a day's bar is that day's, a week's bar the seven days from its
+// first, a month's its month. An intraday bar holds only part of a day.
+function lastBarHolds(history, t) {
+  var bars = history && history.bars ? history.bars : []
+  var spans = { "1d": "day", "1wk": "week", "1mo": "month", "3mo": "quarter" }
+  var span = spans[history ? history.interval : ""]
+  if (!bars.length || !span || !Format.isFiniteNumber(t)) return false
+  var day = historyDateParts(history, t)
+  var first = historyDateParts(history, bars[bars.length - 1].t)
+  var days = (Date.UTC(day.year, day.month, day.day) - Date.UTC(first.year, first.month, first.day)) / 86400000
+  var months = (day.year - first.year) * 12 + day.month - first.month
+  if (span === "day") return days === 0
+  if (span === "week") return days >= 0 && days < 7
+  return months >= 0 && months < (span === "month" ? 1 : 3)
+}
+
 // A range's high and low, marked on its chart (`RangeMarks`): each where
 // its bar sits along the chart, 0..1, as the scrub places a bar
-// (`historyFraction`), its price at the listing's decimals (`digits`), and
-// its date. Null with no bars.
-function rangeMarks(history, stats, digits) {
+// (`historyFraction`), its price at the listing's decimals, and its date.
+// When the last bar holds the session of the listing's `quote`, the quote's
+// day high and low count as that bar's: the range is fetched each hour, the
+// quote each minute, so on a day that passes the range's high the mark
+// keeps up with the day's line and the 52 weeks' (`Figures.dayLine`,
+// `Fundamentals.yearLine`). Null with no bars.
+function rangeMarks(history, stats, quote) {
   stats = stats || periodStats(history)
   if (!stats.high || !stats.low) return null
+  var high = stats.high
+  var low = stats.low
+  if (quote && lastBarHolds(history, quote.figuresDay)) {
+    var today = history.bars[history.bars.length - 1].t
+    if (Format.isFiniteNumber(quote.dayHigh) && quote.dayHigh > high.p) high = { p: quote.dayHigh, t: today }
+    if (Format.isFiniteNumber(quote.dayLow) && quote.dayLow < low.p) low = { p: quote.dayLow, t: today }
+  }
+  var digits = quote ? quote.priceDigits : undefined
   var years = historySpansYears(history)
   var mark = function(point) {
     return {
@@ -289,7 +319,7 @@ function rangeMarks(history, stats, digits) {
       date: historyStatsDateText(history, point.t, years, history.interval)
     }
   }
-  return { high: mark(stats.high), low: mark(stats.low) }
+  return { high: mark(high), low: mark(low) }
 }
 
 // An intraday bar's date and time read by its own day's clock, so a time

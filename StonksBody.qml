@@ -344,8 +344,7 @@ Item {
   // day's rule short of the edge.
   readonly property var dayLine: chart ? Figures.dayLine(featuredQuote, featuredToday) : null
   readonly property var yearLine: chart ? Fundamentals.yearLine(featuredQuote, fundamentals ? fundamentals.figures : null) : null
-  readonly property var rangeMarks: historyShown
-    ? History.rangeMarks(history, historyStats, featuredQuote ? featuredQuote.priceDigits : undefined) : null
+  readonly property var rangeMarks: historyShown ? History.rangeMarks(history, historyStats, featuredQuote) : null
   // What the dashed line is, said while a scrub reads against it.
   readonly property string baselineText: historyShown ? chartRange.toUpperCase() + " START " + Format.money(history.baseline, featuredQuote ? featuredQuote.priceDigits : undefined)
     : (!historyActive && featuredDay ? "PREV CLOSE " + Format.money(featuredDay.prevClose, featuredDay.priceDigits) : "")

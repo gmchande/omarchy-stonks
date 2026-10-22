@@ -1129,6 +1129,38 @@ test("a range marks its high and low on its chart, over their bars, with their d
   expect(M.historyScrubText({ ...aapl, interval: "3mo" }, aapl.bars[0])).toBe("SEP 2025 · 234.07")
 })
 
+// A range is fetched each hour and the quote each minute, so a range's last
+// bar can trail the day: while that bar holds the quote's session, the
+// quote's day high and low count as its own, and the marks keep up with the
+// day's line and the 52 weeks'. RGTI made its 52-week low of 11.77 on 14
+// October 2026; its 1Y answer from before that low still had the day at
+// 12.05.
+test("a range's marks take in the quote's day while its last bar is that day's", () => {
+  const saved = name => ({
+    q: M.parseChart(fixture(`first-day-2026-10-14/${name}-day.json`)),
+    h: M.parseHistory(fixture(`first-day-2026-10-14/${name}-1y.json`), "1Y")
+  })
+  const rgti = saved("rgti")
+  const earlier = { ...rgti.h, bars: rgti.h.bars.map((b, i, all) => (i === all.length - 1 ? { ...b, l: 12.05 } : b)) }
+  const low = M.rangeMarks(earlier, null, rgti.q).low
+  expect(`${low.price} ${low.date}`).toBe("11.77 14 OCT 2026")
+  expect(M.historyBarAt(earlier, low.x)).toBe(earlier.bars[earlier.bars.length - 1])
+  // A week's bar holds each day of its week.
+  const weekly = M.parseHistory(fixture("history/aapl-5y.json"), "5Y")
+  const lastWeek = weekly.bars[weekly.bars.length - 1]
+  const inWeek = { figuresDay: lastWeek.t + 3 * DAY, dayHigh: 400, dayLow: 300, priceDigits: 2 }
+  expect(M.rangeMarks(weekly, null, inWeek).high.price).toBe("400.00")
+  expect(M.rangeMarks(weekly, null, { ...inWeek, figuresDay: lastWeek.t + 8 * DAY }).high.price).toBe("344.57")
+  // A chart with no bar for the quote's day yet leaves it out: the Nikkei's
+  // 1Y answer ended on 13 October.
+  const n225 = saved("n225")
+  expect(M.rangeMarks(n225.h, null, { ...n225.q, dayHigh: 80000 }).high.price).toBe("72,832")
+  // An intraday bar holds only part of a day, so a day's high is not its.
+  const week = M.parseHistory(fixture("history/nest-5d.json"), "1W")
+  const lastBar = week.bars[week.bars.length - 1]
+  expect(M.rangeMarks(week, null, { figuresDay: lastBar.t, dayHigh: 999, dayLow: 1, priceDigits: 2 }).high.price).toBe("254.74")
+})
+
 // A listing younger than its range says so under its change, with the day
 // it began, in place of the range's name. All starts where the listing
 // does, so it never says SINCE; nor does a listing whose start Yahoo
