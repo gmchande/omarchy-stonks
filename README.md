@@ -147,7 +147,8 @@ too alike, or too faint.
 ## Sounds
 
 Stonks makes a short sound when you add a symbol, remove a row, or undo the
-removal, which plays the removal backwards. Run the pointer along the chart
+removal, which plays the removal backwards, and a shutter when you take a
+screenshot. Run the pointer along the chart
 and it plays like a row of chimes, higher where the line is higher: the bars
 you cross ring, up to 22 a second, ending on the one under the pointer, and
 each step of `←` `→` rings too. A replay sweeps the same bars along the
@@ -276,8 +277,9 @@ The shell's log the form asks for can name the prices Stonks left out.
   `head`, which Omarchy ships, and, for a screenshot, `wl-copy` and
   `omarchy-notification-send`.
 - **Commands:** `curl` for every request; while sounds are on, `pw-play` to
-  play a sound, only when you add, remove, or undo a row, turn sounds on,
-  replay a chart, or move along it, or the bell is due, and one `sh` that
+  play a sound, only when you add, remove, or undo a row, take a
+  screenshot, turn sounds on, replay a chart, or move along it, or the bell
+  is due, and one `sh` that
   starts a `pw-play` for each chime, with 2 seconds each under `timeout`,
   and plays nothing else; while sounds are on and the popup or the window
   is open on a screen, and for 10 seconds after, `pw-cat` playing silence,

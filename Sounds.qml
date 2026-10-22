@@ -4,9 +4,10 @@ import Quickshell.Io
 import "ChartSound.js" as ChartSound
 // The sounds, while they are on (`turnedOn`, the data file's `sounds`):
 // for what you just did, adding a symbol, removing a row, undoing the
-// removal, which plays the removal backwards, a replay, which plays the
-// chart, and the chimes, the chart's bars as the scrub crosses them
-// (`ChartSound`); and the market's bell (`Bell`). Each in the look's voice.
+// removal, which plays the removal backwards, taking a screenshot, the
+// shutter, a replay, which plays the chart, and the chimes, the chart's
+// bars as the scrub crosses them (`ChartSound`); and the market's bell
+// (`Bell`). Each in the look's voice.
 // The fixed sounds, the bell, and the replay play one at a time: a new one
 // stops the one playing. The chimes overlap and ring out. Nothing else
 // sounds: no refresh or price. `pw-play`, which PipeWire ships, plays them
@@ -40,7 +41,7 @@ Item {
   property real lastChime: 0
   property int waiting: -1
 
-  // One of the fixed sounds: "add", "remove", or "undo".
+  // One of the fixed sounds: "add", "remove", "undo", or "shutter".
   function play(name) {
     if (!turnedOn) return
     replayOwner = null

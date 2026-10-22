@@ -112,10 +112,12 @@ ShellRoot {
   Stonks.Service { id: service }
   Stonks.Updates { id: updates }
   Stonks.Sounds { id: sounds; turnedOn: service.soundsOn; retro: service.retro; surfacesOpen: service.openSurfaces.length > 0 }
+  // The screenshot's camera, its commands the stand-ins on PATH (bin/).
+  Stonks.Camera { id: camera }
   Component { id: bellMaker; Stonks.Bell {} }
   QtObject {
     id: shellApi
-    function serviceFor(id) { return { service: service, updates: updates, sounds: sounds } }
+    function serviceFor(id) { return { service: service, updates: updates, sounds: sounds, camera: camera } }
   }
   PluginBarApi {
     id: api
@@ -126,7 +128,7 @@ ShellRoot {
     fontFamily: Style.font.family
   }
   Stonks.Panel { id: panel; bar: api; settings: ({}) }
-  Stonks.App { id: app; service: service; updates: updates; sounds: sounds }
+  Stonks.App { id: app; service: service; updates: updates; sounds: sounds; camera: camera }
 
   TestCase {
     name: "Sounds"
@@ -613,8 +615,18 @@ ShellRoot {
       startsBy(before + 3)
       quiet()
 
+      // y: the screenshot, and with it the shutter once, in smooth's voice.
+      before = harness.starts().length
+      keyClick(Qt.Key_Y)
+      var shutter = startsBy(before + 1)
+      tryVerify(function() { return body.cameraLit && !camera.busy }, 5000)
+      wait(300)
+      harness.check("y sounds the shutter once as the screenshot is taken, in smooth's voice",
+        harness.starts().length === before + 1 && played(shutter[before]) === "sounds/smooth/shutter.wav",
+        harness.starts().slice(before).map(played).join(", "))
+
       // Shift+S: off, saved, the speaker muted, and nothing plays; a replay
-      // playing stops. Then x, u, an add, and p play nothing.
+      // playing stops. Then x, u, an add, p, and a screenshot play nothing.
       before = harness.starts().length
       keyClick(Qt.Key_P)
       startsBy(before + 1)
@@ -633,7 +645,10 @@ ShellRoot {
       quiet()
       keyClick(Qt.Key_P)
       wait(2500)
-      harness.check("with sounds off, x, u, an add, and p play nothing", harness.starts().length === before, JSON.stringify(harness.starts().slice(before)))
+      keyClick(Qt.Key_Y)
+      tryVerify(function() { return !camera.busy && body.note.indexOf("screenshot of SPY") >= 0 }, 5000)
+      wait(100)
+      harness.check("with sounds off, x, u, an add, p, and a screenshot play nothing", harness.starts().length === before, JSON.stringify(harness.starts().slice(before)))
       service.removeSymbol("SPY")
 
       // Shift+S again: on, saved, and the add sound once, so you hear the level.
@@ -807,6 +822,18 @@ ShellRoot {
       mouseClick(msft, msft.width / 2, msft.height / 2)
       tryVerify(function() { return win.featuredSymbol === "MSFT" && !win.chartLoading && win.animal.kind !== "" }, 5000)
       wait(400)
+
+      // A click on the window's camera: the shutter once, in retro's voice.
+      before = harness.starts().length
+      var lens = harness.find(win, "cameraButton")
+      mouseMove(lens, lens.width / 2, lens.height / 2)
+      mouseClick(lens, lens.width / 2, lens.height / 2)
+      var clickShutter = startsBy(before + 1)
+      tryVerify(function() { return !camera.busy }, 5000)
+      wait(300)
+      harness.check("a click on the window's camera sounds the shutter once, in retro's voice",
+        harness.starts().length === before + 1 && played(clickShutter[before]) === "sounds/retro/shutter.wav",
+        harness.starts().slice(before).map(played).join(", "))
 
       // A click on the animal: retro's replay, its notes the chart's
       // columns; a click on another row cuts it.

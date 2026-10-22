@@ -759,6 +759,7 @@ Item {
       shareLoader.source = ""
       if (code === 1) return say("Screenshot not saved · the screenshots folder can't be written")
       cameraLit = true
+      sound("shutter")
       say(code === 0 ? "Copied a screenshot of " + shown : "Saved a screenshot of " + shown + " · copying it failed")
     })
     if (!taken) shareLoader.source = ""
