@@ -7,8 +7,9 @@ import "plugin" as Stonks
 // Adding symbols in the window, through the real App and Service with real
 // Qt keys and pointer: an add held until its price is in, its row joining
 // at its place, the list easing to it, adds out at a close or a list
-// switch, two adds in a row, adds from search, and a joining row's day line
-// drawn in, whole once drawn. HOME and curl are scratch fixtures.
+// switch, two adds in a row, adds from search, a joining row's day line
+// drawn in, whole once drawn, and a stock put back asking for its quote at
+// once. HOME and curl are scratch fixtures.
 ShellRoot {
   id: harness
 
@@ -39,6 +40,24 @@ ShellRoot {
     done.start()
   }
 
+  // The fake curl's calls for a symbol, read through a fresh view: a
+  // FileView that has loaded once returns its old text straight after
+  // reload().
+  function calls(name) {
+    var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true; printErrors: false }', harness)
+    view.path = Quickshell.env("STONKS_FAKE_STATE") + "/" + name + ".calls"
+    var n = Number(String(view.text()).trim() || "0")
+    view.destroy()
+    return n
+  }
+  // Hold a symbol's quote answer back, and let it go (see the fake curl).
+  Process { id: holdQuote }
+  function hold(symbol, held) {
+    var path = Quickshell.env("STONKS_FAKE_STATE") + "/" + symbol + ".quote.hold"
+    holdQuote.command = held ? ["touch", path] : ["rm", "-f", path]
+    holdQuote.running = true
+  }
+
   Stonks.Service { id: service }
   Stonks.App { id: app; service: service }
 
@@ -62,6 +81,59 @@ ShellRoot {
       service.removeSymbol(symbol)
       service.lastRemoval = null
       service.yahooGate.tokens = service.yahooGate.capacity
+    }
+
+    // A stock put back asks for its quote at once, as an add does, not at
+    // its next refresh on the schedule, and shows the quote it had until
+    // the new one lands; the header says nothing of it: by u, and by
+    // search's PUT BACK, clicked. MSFT is answered just before each
+    // removal, so its put-back comes well before its next scheduled
+    // refresh, and its answer is held back while out. The owner (22
+    // October): a stock put back refreshes at once; it kept the price it
+    // had until that refresh.
+    function putsBack(body, watchlist, keys) {
+      service.setRange("1D")
+      service.feature("AAPL")
+      var quiet = function() { return service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 && !("MSFT" in service.testFeed.asked) }
+      tryVerify(quiet, 5000)
+      var putBack = function(how) {
+        var answered = service.entries.MSFT
+        service.testFeed.ask(["MSFT"], service.wallSecond())
+        tryVerify(function() { return quiet() && service.entries.MSFT !== answered }, 5000)
+        watchlist.cursorSymbol = "MSFT"
+        keys.forceActiveFocus()
+        keyClick(Qt.Key_X)
+        wait(100)
+        var kept = service.lastRemoval ? service.lastRemoval.quote : null
+        harness.hold("MSFT", true)
+        tryVerify(function() { return !holdQuote.running }, 2000)
+        var before = harness.calls("MSFT")
+        var said = [body.headerText]
+        var heard = function() { if (said[said.length - 1] !== body.headerText) said.push(body.headerText) }
+        body.headerTextChanged.connect(heard)
+        how()
+        var asked = within(2000, function() { return harness.calls("MSFT") > before })
+        var row = watchlist.rowItem("MSFT")
+        var meanwhile = service.library.indexOf("MSFT") >= 0 && !!kept && service.quotes.MSFT === kept && !!row
+        harness.hold("MSFT", false)
+        tryVerify(function() { return !holdQuote.running }, 2000)
+        tryVerify(function() { return service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 5000)
+        wait(50)
+        body.headerTextChanged.disconnect(heard)
+        return [asked, meanwhile, harness.calls("MSFT") - before, said.indexOf("Refreshing") < 0].join(",")
+      }
+      var byU = putBack(function() { keyClick(Qt.Key_U) })
+      var byClick = putBack(function() {
+        keyClick(Qt.Key_A)
+        tryVerify(function() { return body.adding }, 2000)
+        wait(100)
+        var button = harness.find(findAll(body.search, "searchResult")[0], "searchAdd")
+        if (body.search.actionFor(body.search.results[0].symbol) === "PUT BACK")
+          mouseClick(button, button.width / 2, button.height / 2)
+      })
+      harness.check("a stock put back by u, and by PUT BACK clicked, asks for its quote at once, once, showing the quote it had until the new one lands, and the header says nothing of it",
+        byU === "true,true,1,true" && byClick === "true,true,1,true" && !body.adding,
+        "u " + byU + " | PUT BACK " + byClick + " | adding " + body.adding)
     }
 
     function findAll(item, name, into) {
@@ -860,6 +932,7 @@ ShellRoot {
 
       addsFromSearch(body, watchlist, keys)
       joiningLines(body, watchlist, keys)
+      putsBack(body, watchlist, keys)
       app.close()
       harness.finish()
     }
