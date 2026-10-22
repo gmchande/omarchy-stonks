@@ -948,6 +948,25 @@ ShellRoot {
           && JSON.stringify(service.lists) === listsBefore,
         [nvdaLists, keyed, everywhere, JSON.stringify(service.lists)].join(" | "))
 
+      // Another surface switching the list closes a menu opened on Wins, so
+      // "Remove from Wins" never acts in All. Found in review: it took the
+      // symbol from every list.
+      keys.forceActiveFocus()
+      wl.cursorSymbol = "NVDA"
+      keyClick("X", Qt.ShiftModifier)
+      wait(100)
+      var openOnWins = menuShown()
+      service.switchList("")
+      wait(100)
+      var afterSwitch = menuShown()
+      keyClick(Qt.Key_Return)
+      wait(100)
+      harness.check("a list switched on another surface closes the row's menu, and Enter then removes nothing",
+        openOnWins.indexOf("NVDA Remove from Wins/") === 0 && afterSwitch === "shut" && JSON.stringify(service.lists) === listsBefore,
+        [openOnWins, afterSwitch, JSON.stringify(service.lists)].join(" | "))
+      service.switchList("Wins")
+      wait(100)
+
       // In All, the × asks first for a symbol a list of yours holds too:
       // the menu opens on its one line, "Remove from all N lists", and a
       // click on it takes it from every list. Then a opens search on it,

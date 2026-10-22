@@ -277,6 +277,28 @@ ShellRoot {
           && service.featuredSymbol === "AAPL" && service.lastRemoval === null,
         [gone, offered, body.adding, JSON.stringify(service.lists), service.featuredSymbol, JSON.stringify(service.lastRemoval)].join(" | "))
       mouseMove(body, 1, 1)
+      // The offer is the empty field's answer: a query typed over it leaves
+      // it dimmed, and Enter before that query's answer puts nothing back.
+      // Found in review: Enter there put the removal back and closed search.
+      watchlist.cursorSymbol = "NVDA"
+      keys.forceActiveFocus()
+      keyClick(Qt.Key_X)
+      wait(50)
+      keyClick(Qt.Key_A)
+      tryVerify(function() { return body.adding }, 2000)
+      wait(100)
+      keyClick(Qt.Key_S)
+      keyClick(Qt.Key_H)
+      keyClick(Qt.Key_Return)
+      wait(50)
+      var early = [body.adding, body.search.stale, service.library.indexOf("NVDA") < 0].join(",")
+      keyClick(Qt.Key_Escape)
+      wait(50)
+      keys.forceActiveFocus()
+      keyClick(Qt.Key_U)
+      wait(100)
+      harness.check("Enter on a query typed over the offer, before its answer, puts nothing back",
+        early === "true,true,true" && service.library.indexOf("NVDA") >= 0, early)
 
       // A member still arriving says Show too, and Enter on it features it at
       // once, named as on its way, and its row once its first answer is in,

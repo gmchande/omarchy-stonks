@@ -127,6 +127,18 @@ Item {
   // as a tiled window does, closes it, as a desktop's menus close.
   onWidthChanged: rowMenu = null
   onHeightChanged: rowMenu = null
+  // And it says what it was opened on: a change from another surface or
+  // the file that takes its row away, or would have it say otherwise,
+  // another list on show or its symbol in other lists, closes it, so a
+  // line never acts on a list it doesn't name. Found in review: opened on
+  // Growth, then All on the popup, "Remove from Growth" took it from every
+  // list.
+  function keepRowMenu() {
+    if (rowMenu && (view.rows.indexOf(rowMenu.symbol) < 0
+        || JSON.stringify(rowMenuLines(rowMenu.symbol)) !== JSON.stringify(rowMenu.lines))) rowMenu = null
+  }
+  onViewChanged: keepRowMenu()
+  onListsChanged: keepRowMenu()
   // A short word in the footer's place, for a moment, held while the pointer
   // is on it: why a key did nothing, or that a newer Stonks is out, which a
   // click on it updates (`updateOffered`).

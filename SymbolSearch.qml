@@ -83,20 +83,23 @@ FocusScope {
   // The list on screen's members, arriving ones too: a result already in
   // it is shown, not added, and its label says so.
   property var members: []
-  // The removal on offer, { symbol, name, exchange }, or null: while the
-  // field is empty it is the one result, chosen, and wherever it shows its
-  // label says it goes back (`StonksBody.putBack`).
+  // The removal on offer, { symbol, name, exchange }, or null: it is the
+  // empty field's answer, its one result, chosen, and wherever it shows its
+  // label says it goes back (`StonksBody.putBack`). Like any answer, it
+  // stays dimmed and untaken while a query typed since is out.
   property var putBack: null
   function actionFor(symbol) {
     if (putBack && symbol === putBack.symbol) return "PUT BACK"
     return members.indexOf(symbol) >= 0 ? "SHOW" : "ADD"
   }
-  // An empty field's results: the removal on offer, or none.
-  readonly property var emptyResults: putBack ? [putBack] : []
-  onPutBackChanged: if (searchText.trim() === "" && active) {
-    results = emptyResults
+  function showEmpty() {
+    results = putBack ? [putBack] : []
+    note = ""
+    answer = putBack ? "results" : ""
+    resultsQuery = ""
     choose(0)
   }
+  onPutBackChanged: if (searchText.trim() === "" && active) showEmpty()
   // Every label shares one slot on every row, the widest word's, so the
   // exchange codes keep their column whichever shows. In the caption's
   // spaced capitals, as every other button in the views says its word, and
@@ -164,10 +167,6 @@ FocusScope {
   // A new search's start, so its first frame is empty rather than the last
   // search's field and results.
   function reset() {
-    results = emptyResults
-    note = ""
-    answer = ""
-    resultsQuery = ""
     slow = false
     resultsScroll.contentY = 0
     activeQuery = ""
@@ -175,7 +174,7 @@ FocusScope {
     searchText = ""
     searchDebounce.stop()
     searchField.text = ""
-    choose(0)
+    showEmpty()
   }
 
   // Escape, or its button.
@@ -242,13 +241,9 @@ FocusScope {
     if (text.trim() === "") {
       // No query is asked any more: a search still out is dropped.
       suspend()
-      results = emptyResults
-      note = ""
-      answer = ""
-      resultsQuery = ""
       slow = false
       resultsScroll.contentY = 0
-      choose(0)
+      showEmpty()
       return
     }
     searchDebounce.restart()

@@ -738,10 +738,7 @@ ShellRoot {
         root.now = stub.quotes["SHOP.TO"].marketTime + 120
         stub.entries = Object.assign({}, stub.entries, { "SHOP.TO": { status: "ok", receivedAt: root.now } })
         body.search.searchText = ""
-        body.search.resultsQuery = ""
-        body.search.answer = ""
-        body.search.results = body.search.emptyResults
-        body.search.choose(0)
+        body.search.showEmpty()
       }
       if (root.stateName.indexOf("-none-") > 0 || root.stateName.indexOf("-failed-") > 0) {
         body.search.results = []
