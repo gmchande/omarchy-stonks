@@ -25,6 +25,9 @@ trap 'quickshell_exit; rm -rf "$work"' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 export HOME="$work/home"
+# The reader's screenshot settings never reach a run, so no harness's
+# picture lands in the reader's screenshots folder.
+unset OMARCHY_SCREENSHOT_DIR OMARCHY_SCREENSHOT_EDITOR OMASNAP_SCREENSHOT_DIR
 # The reader is in New York: an exchange's time names its
 # zone only where it differs from the reader's clock.
 export TZ=America/New_York

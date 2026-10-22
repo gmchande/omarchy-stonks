@@ -18,8 +18,6 @@ patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property 
 # The flows wait for the quote feed to go quiet: nothing in flight or queued.
 patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testFeed: feed'
 scratch_home v1-data.json grvc.stonks.json
-# The reader's own settings never reach the run.
-unset OMARCHY_SCREENSHOT_DIR OMARCHY_SCREENSHOT_EDITOR
 : > "$STONKS_FAKE_STATE/pw-play.log"
 : > "$STONKS_FAKE_STATE/pw-cat.log"
 : > "$STONKS_FAKE_STATE/pw-dump.log"

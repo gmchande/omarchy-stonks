@@ -179,10 +179,11 @@ you're looking at, laid out to share: the price large with its currency
 beside it, its move, the day's bull or bear, the exchange, the time of the
 price with its zone, the price the move is measured from, and at the foot
 the day's date or the range's length. Scrubbed, it shows the moment you
-scrubbed to. Your list is never in it. It lands as
-Omarchy's own screenshots do: a file in your screenshots folder, the
-picture on the clipboard, and Omarchy's notification, which opens your
-screenshot editor when you click it.
+scrubbed to. Your list is never in it. It lands where Omarchy's own
+screenshots do, on Omarchy 4.0 and on 4.5: a file in your screenshots
+folder, the picture on the clipboard, and Omarchy's notification, which
+opens it in your screenshot editor when you click it: Omasnap on 4.5,
+Tensaku on 4.0.
 
 ## Keys
 
@@ -304,13 +305,14 @@ The shell's log the form asks for can name the prices Stonks left out.
   whether an app is recording from a microphone, reading only which streams
   run; an answer that runs out of time, fails, or goes over 4 MB counts as
   recording, so the bell stays quiet; only when you take a screenshot, one
-  `sh` that names the picture's file in your screenshots folder, making the
-  folder if it isn't there; another that hands `wl-copy` the picture on its
-  input, to put it on the clipboard; and `omarchy-notification-send` with
-  Omarchy's own words, as Omarchy's own screenshots do; each under
-  `timeout`, which stops it after 5 seconds; only when you click that
-  notification, Omarchy runs your screenshot editor
-  (`OMARCHY_SCREENSHOT_EDITOR`, else Tensaku) on the file; `omarchy restart
+  `sh` that looks for `omasnap`, Omarchy 4.5's screenshot tool, and names
+  the picture's file in your screenshots folder, making the folder if it
+  isn't there; another that hands `wl-copy` the picture on its input, to
+  put it on the clipboard; and `omarchy-notification-send` with Omarchy's
+  own words, as Omarchy 4.0's own screenshots do; each under `timeout`,
+  which stops it after 5 seconds; only when you click that notification,
+  Omarchy runs your screenshot editor on the file: `omasnap` where it's
+  installed, else `OMARCHY_SCREENSHOT_EDITOR`, else Tensaku; `omarchy restart
   shell` only when you click the notice that an update is on disk; and, only
   when you click the note that a newer Stonks is out, `omarchy plugin update
   grvc.stonks` in a terminal.
@@ -340,7 +342,10 @@ The shell's log the form asks for can name the prices Stonks left out.
   and the chimes' notes beside it, `chime-*.wav`, written each run; and
   for each screenshot you take, one picture,
   `stonks-<symbol>-<date>_<time>.png`, in the folder Omarchy's own
-  screenshots use (`OMARCHY_SCREENSHOT_DIR`, else your Pictures folder),
+  screenshots use: where Omasnap is installed, `OMASNAP_SCREENSHOT_DIR`,
+  else `OMARCHY_SCREENSHOT_DIR`, else the `directory` in Omasnap's
+  `[output]` settings, else `Screenshots` in your Pictures folder; without
+  it, `OMARCHY_SCREENSHOT_DIR`, else your Pictures folder;
   saved straight there, with no copy anywhere else. Everything in
   `~/.cache/grvc.stonks` is readable by you alone (0600, the folder 0700),
   and so is the data file once Stonks writes it, also after an older
