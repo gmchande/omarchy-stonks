@@ -30,6 +30,9 @@ every_state() (
   # The buttons that took over key hints: a new list's ⏎ MAKE, and a failed
   # range's R RETRY, in both looks.
   states="$states popup-lists-naming-smooth popup-lists-naming-retro popup-history-unavailable-smooth popup-history-unavailable-retro"
+  # A refresh the reader asked for, out: the header says so, in both looks
+  # on both surfaces.
+  states="$states popup-refreshing-smooth popup-refreshing-retro window-of-refreshing-smooth window-of-refreshing-retro"
   # A chart held past its quarter second, dimmed under the label naming the
   # next, on a US stock, a non-US listing, and a cryptocurrency, in both
   # looks on both surfaces.

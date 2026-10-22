@@ -235,6 +235,8 @@ Item {
   // overdue (`QuoteFeed.owed`).
   property var owed: ({})
   property bool settingsUnreadable: false
+  // A refresh the reader asked for has a request out (`Service.refreshing`).
+  property bool refreshing: false
   property string updatedTo: ""
   // The clock: a closed surface's holds still too, so nothing it would show
   // is derived again every second.
@@ -260,6 +262,7 @@ Item {
   Binding on soundsOn { when: root.reading; value: root.service?.soundsOn; restoreMode: Binding.RestoreNone }
   Binding on owed { when: root.reading; value: root.service?.owed; restoreMode: Binding.RestoreNone }
   Binding on settingsUnreadable { when: root.reading; value: root.service?.settingsUnreadable; restoreMode: Binding.RestoreNone }
+  Binding on refreshing { when: root.reading; value: root.service?.refreshing; restoreMode: Binding.RestoreNone }
   Binding on updatedTo { when: root.reading; value: root.updates ? root.updates.newVersion : ""; restoreMode: Binding.RestoreNone }
   Binding on now { when: root.reading; value: root.service?.now; restoreMode: Binding.RestoreNone }
 
@@ -381,11 +384,14 @@ Item {
     // Before any chart has been in, the empty hero's label names it alone,
     // in the one place a reader looks (`HeroBand`).
     if (chartLoading) return chart ? loadingText : ""
+    // A refresh the reader asked for, while what it sent is out, unless a
+    // scrub reads a moment: then the header names that.
+    if (refreshing && !scrubShown) return "Refreshing"
     if (failClosedHeader && !featuredQuote && featuredFreshness && featuredFreshness.state === "failed")
       return "No data"
     if (historyActive && historyFailed) return unavailableText
-    // A refetch, out or failed, with the range in hand says nothing: it
-    // keeps the chart and the market.
+    // A refetch the service asks for itself, out or failed, with the range
+    // in hand says nothing: it keeps the chart and the market.
     if (historyShown && historyBar) return History.historyScrubText(history, historyBar, featuredQuote ? featuredQuote.priceDigits : undefined)
     if (featuredQuote) return marketText
     return headerWhenMissing
