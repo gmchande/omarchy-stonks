@@ -26,8 +26,11 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 export HOME="$work/home"
 # The reader's screenshot settings never reach a run, so no harness's
-# picture lands in the reader's screenshots folder.
-unset OMARCHY_SCREENSHOT_DIR OMARCHY_SCREENSHOT_EDITOR OMASNAP_SCREENSHOT_DIR
+# picture lands in the reader's screenshots folder: on Omarchy 4.5, where
+# Omasnap would read the reader's own omasnap.conf (XDG_CONFIG_HOME), the
+# folder is the scratch HOME's.
+unset OMARCHY_SCREENSHOT_DIR OMARCHY_SCREENSHOT_EDITOR
+export OMASNAP_SCREENSHOT_DIR="$HOME/Pictures/Screenshots"
 # The reader is in New York: an exchange's time names its
 # zone only where it differs from the reader's clock.
 export TZ=America/New_York

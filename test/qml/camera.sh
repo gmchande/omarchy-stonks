@@ -47,7 +47,8 @@ export PATH="$path"
 printf 'XDG_DESKTOP_DIR="$HOME/Desktop"\nXDG_PICTURES_DIR="$HOME/Shots"\n' > "$HOME/.config/user-dirs.dirs"
 # Omasnap reads its settings and the pictures folder from XDG_CONFIG_HOME,
 # and Omarchy 4.0 from ~/.config: here they differ, so each step shows
-# which it read.
+# which it read. The steps set OMASNAP_SCREENSHOT_DIR themselves.
+unset OMASNAP_SCREENSHOT_DIR
 export XDG_CONFIG_HOME="$HOME/.xdg-config"
 mkdir -p "$XDG_CONFIG_HOME" "$HOME/.config/omasnap"
 printf 'XDG_PICTURES_DIR="$HOME/Photos"\n' > "$XDG_CONFIG_HOME/user-dirs.dirs"
