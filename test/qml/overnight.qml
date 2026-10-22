@@ -809,10 +809,14 @@ ShellRoot {
       // OPENS IN 3H 30M"; at 01:00, Tuesday's line ran flat to 17:20 and
       // the header named no open.
       var indexRead = function() {
-        featureShown("^GSPC")
+        var shown = featureShown("^GSPC")
+        // A manual refresh names the request until its answer lands. Read
+        // the market's words after that, without waiting for an animation.
+        var settled = within(8000, function() { return !service.refreshing })
         var quote = service.quotes["^GSPC"]
         var last = quote.points[quote.points.length - 1]
-        return body.headerText + " | last print " + (last.t < quote.session.regular.end ? "in session" : "after the close")
+        return { ready: shown && settled,
+          text: body.headerText + " | last print " + (last.t < quote.session.regular.end ? "in session" : "after the close") }
       }
       service.refresh()
       within(8000, function() { return !!service.quotes["^GSPC"] && service.quotes["^GSPC"].session.regular.start === 1791293400 })
@@ -831,9 +835,10 @@ ShellRoot {
       var indexMorning = indexRead()
       featureShown("NEST")
       harness.check("an index has no pre-market and no tail after its close, and its header names the next open",
-        indexNight === "Closed · opens Wed 09:30 | last print in session"
-          && indexMorning === "Closed · opens Wed 09:30 | last print in session",
-        indexNight + " || " + indexMorning)
+        indexNight.ready && indexMorning.ready
+          && indexNight.text === "Closed · opens Wed 09:30 | last print in session"
+          && indexMorning.text === "Closed · opens Wed 09:30 | last print in session",
+        JSON.stringify({ night: indexNight, morning: indexMorning }))
       // 11:53, mid-session: midnight to midnight, the line ending at
       // now, about halfway, the rest of the day empty.
       useSet("2026-10-07-1153")
