@@ -154,6 +154,15 @@ function pulseTable(f) {
   })
 }
 
+// Retro's bar `bar` as a pulse cycle at the console's pitch, made once and
+// kept, as smooth's bars are: made afresh on every replay, the tables were
+// most of a retro replay's synthesis.
+var pulseBars = []
+function pulseBar(bar) {
+  if (!pulseBars[bar]) pulseBars[bar] = pulseTable(nesPitch(PENTATONIC[bar]))
+  return pulseBars[bar]
+}
+
 // Volume in the console's 16 steps, falling one step every `stepMs`.
 function nesVolume(t, start, stepMs, floor) {
   return Math.max(floor, start - Math.floor(t * 1000 / stepMs)) / 15
@@ -169,7 +178,6 @@ function nesVolume(t, start, stepMs, floor) {
 // it, the noise channel ticks, 30 ms; across dark columns nothing crosses.
 function retro(grid, from, to, seconds) {
   var x = new Float32Array(Math.round((seconds + 0.1) * RATE))
-  var tables = []
   var slewK = 1 - Math.exp(-1 / (0.0012 * RATE)), slew = 0
   var ph = 0, note = -1, since = 0, lastCol = -1, lastSide = 0, step = 0, wave = null, lit = false
   var ticks = []
@@ -188,8 +196,7 @@ function retro(grid, from, to, seconds) {
         if (next !== note) {
           note = next
           var f = nesPitch(PENTATONIC[note])
-          if (!tables[note]) tables[note] = pulseTable(f)
-          wave = tables[note]
+          wave = pulseBar(note)
           step = f / RATE * TABLE
         }
         var side = Math.sign(grid.baseRow - row)
@@ -275,7 +282,7 @@ function lineBars(geometry) {
 // the console's volume steps, a tenth of a second. Each sits 5 dB under the
 // add sound, so a sweep's overlapping bars come to about its level.
 function chime(retro, bar) {
-  return retro ? retroBar(PENTATONIC[bar]) : { samples: smoothBarSamples(bar), gain: 1 }
+  return retro ? retroBar(bar) : { samples: smoothBarSamples(bar), gain: 1 }
 }
 
 function smoothBar(f) {
@@ -301,10 +308,10 @@ function smoothBar(f) {
   return levelled(fadeEdges(x, 3, 50), -22)
 }
 
-function retroBar(f) {
-  f = nesPitch(f)
+function retroBar(bar) {
+  var f = nesPitch(PENTATONIC[bar])
   var x = new Float32Array(Math.round(0.113 * RATE))
-  var wave = pulseTable(f), step = f / RATE * TABLE
+  var wave = pulseBar(bar), step = f / RATE * TABLE
   var slewK = 1 - Math.exp(-1 / (0.0012 * RATE)), slew = 0, ph = 0
   for (var i = 0; i < x.length; i++) {
     slew += (nesVolume(i / RATE, 9, 12, 0) - slew) * slewK
