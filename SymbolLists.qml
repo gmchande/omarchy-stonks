@@ -256,14 +256,16 @@ FocusScope {
       width: scroll.width - root.gutter
 
       Repeater {
-        model: root.choices
+        // A row for each list, by count: a change to the lists rebinds the
+        // rows rather than building them all again, shut view or open.
+        model: root.choices.length
 
         Item {
           id: entry
           objectName: "symbolListRow"
-          required property var modelData
           required property int index
-          readonly property bool ticked: modelData.symbols.indexOf(root.symbol) >= 0
+          readonly property var choice: root.choices[index]
+          readonly property bool ticked: choice.symbols.indexOf(root.symbol) >= 0
           width: column.width
           height: root.itemHeight
 
@@ -308,11 +310,11 @@ FocusScope {
           Text {
             anchors.left: box.right
             anchors.leftMargin: Style.space(10)
-            anchors.right: (entry.modelData.name === "" ? hint : count).left
+            anchors.right: (entry.choice.name === "" ? hint : count).left
             anchors.rightMargin: Style.space(16)
             anchors.verticalCenter: parent.verticalCenter
             textFormat: Text.PlainText
-            text: entry.modelData.label
+            text: entry.choice.label
             color: root.foreground
             font.family: root.fontFamily
             font.pixelSize: Style.font.bodySmall
@@ -321,7 +323,7 @@ FocusScope {
 
           Text {
             id: hint
-            visible: entry.modelData.name === ""
+            visible: entry.choice.name === ""
             anchors.right: count.left
             anchors.rightMargin: Style.space(16)
             anchors.verticalCenter: parent.verticalCenter
@@ -341,7 +343,7 @@ FocusScope {
             anchors.rightMargin: root.inset
             anchors.verticalCenter: parent.verticalCenter
             textFormat: Text.PlainText
-            text: String(entry.modelData.count)
+            text: String(entry.choice.count)
             color: root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
