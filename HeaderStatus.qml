@@ -238,17 +238,17 @@ Item {
     onActivated: root.retryRequested()
   }
 
-  // Stonks' own speaker and camera, solid (`Cells.SOUND_ON` and the rest),
-  // and the look icon, on one grid whose cell grows with the text
-  // (`Cells.iconCell`), so the header's four keep their weight beside the
-  // words at every size; the ? is a word and grows with them already.
+  // Stonks' own speaker and camera, solid and the same in both looks
+  // (`Cells.SOUND_ON` and the rest), and the look icon, on one grid whose
+  // cell grows with the text (`Cells.iconCell`), so the header's four keep
+  // their weight beside the words at every size; the ? is a word and grows
+  // with them already.
   readonly property int cell: Cells.iconCell(Style.fontScale)
 
   // The sounds as they are, the speaker with its waves, or off with a
-  // cross, its waves faint in retro; a click turns them off or on, as
-  // Shift+S does. One width on or off, so the toggle moves nothing. It
-  // hovers and presses as the look icon does, and its target is the
-  // header's full height too.
+  // cross; a click turns them off or on, as Shift+S does. One width on or
+  // off, so the toggle moves nothing. It hovers and presses as the look
+  // icon does, and its target is the header's full height too.
   GridIcon {
     id: soundIcon
     objectName: "soundIcon"
@@ -256,7 +256,6 @@ Item {
     anchors.right: camera.left
     anchors.rightMargin: Style.space(14)
     anchors.verticalCenter: parent.verticalCenter
-    retro: root.retro
     cell: root.cell
     shape: on ? Cells.SOUND_ON : Cells.SOUND_OFF
     color: soundMouse.containsMouse ? root.foreground : root.dim
@@ -296,7 +295,6 @@ Item {
     anchors.right: lookIcon.left
     anchors.rightMargin: Style.space(14)
     anchors.verticalCenter: parent.verticalCenter
-    retro: root.retro
     cell: root.cell
     shape: lit ? Cells.CAMERA_LIT : Cells.CAMERA
     color: lit || cameraMouse.containsMouse ? root.foreground : root.dim
