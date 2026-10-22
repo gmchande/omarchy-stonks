@@ -56,6 +56,7 @@ fill
 # A bun test file is named with ./: bare, bun takes it as a substring filter
 # and also runs every copy of that file, such as those under the ignored out/.
 run "bun test (pure rules)" bun test ./test/model.test.js
+run "bun test (saved answers)" saved_tests
 run "source boundaries" bash test/boundaries.sh
 run "qmllint (only the baseline in test/lint.sh)" bash test/lint.sh
 run "qmllint gate self-check" bash test/lint.sh self-check
