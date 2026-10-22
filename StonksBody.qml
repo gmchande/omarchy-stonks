@@ -366,13 +366,17 @@ Item {
   // on 1D, a range's low and high with START and VOL on a longer one, over
   // the 52 weeks. Before any chart, nothing. A range marks its high and low
   // on its chart too, with their dates (`rangeMarks`). The info table holds
-  // room for both first lines' facts on every range (`infoFactLists`), so a
-  // range change moves nothing. Until 21 October the range's line held
-  // room for its dates too, which left the day's rule short of the edge.
+  // room for both first lines' facts on every range (`infoFactLists`),
+  // START as wide as the day's prices or the 52 weeks', which hold a range
+  // up to a year's, so a range change moves nothing; a longer range whose
+  // prices take another digit widens the price columns. Until 21 October
+  // the range's line held room for its dates too, which left the day's rule
+  // short of the edge.
   readonly property var dayLine: chart ? Figures.dayLine(featuredQuote, featuredToday) : null
   readonly property var rangeEnds: historyShown ? History.rangeEnds(history, historyStats, featuredQuote) : null
   readonly property var periodLine: !chart ? null : historyShown ? History.rangeLine(history, rangeEnds, featuredQuote) : dayLine
-  readonly property var infoFactLists: dayLine ? [dayLine.facts, History.rangeFacts(dayLine.range.widest)] : []
+  readonly property var infoFactLists: !dayLine ? [] : [dayLine.facts, History.rangeFacts(dayLine.range.widest)]
+    .concat(yearLine ? [History.rangeFacts(yearLine.range.widest)] : [])
   readonly property var yearLine: chart ? Fundamentals.yearLine(featuredQuote, fundamentals ? fundamentals.figures : null) : null
   readonly property var rangeMarks: historyShown ? History.rangeMarks(history, rangeEnds, featuredQuote) : null
   // What the dashed line is, said while a scrub reads against it.

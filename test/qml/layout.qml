@@ -670,9 +670,14 @@ ShellRoot {
         var unfollowed = []
         var places = [["popup", false, 0], ["narrowest window", true, Style.space(560)], ["widest window", true, 1416]]
         // Each range is set once and drawn in once; the look and the surface
-        // change under it, which draws nothing in again.
+        // change under it, which draws nothing in again. Bitcoin, with no cap
+        // to widen the first column, holds START's room: its 1Y started at
+        // 108,186, a digit wider than its day. Found in review.
+        var quotesBeforeRanges = stub.quotes
+        stub.quotes = Object.assign({}, quotesBeforeRanges, { "BTC-USD": Quote.parseChart(JSON.parse(btcFile.text())) })
         ;[{ symbol: "AAPL", figures: aapl, ranges: [["1D", null], ["1M", month], ["1Y", aaplYear], ["5Y", weekly], ["All", young]] },
-          { symbol: "NEST", figures: null, ranges: [["1D", null], ["1M", youngMonth]] }].forEach(function(listing) {
+          { symbol: "NEST", figures: null, ranges: [["1D", null], ["1M", youngMonth]] },
+          { symbol: "BTC-USD", figures: null, ranges: [["1D", null], ["1Y", History.parseHistory(JSON.parse(btcYearFile.text()), "1Y")]] }].forEach(function(listing) {
           stub.featuredSymbol = listing.symbol
           stub.figures = listing.figures
           var onDay = {}
@@ -711,6 +716,7 @@ ShellRoot {
             })
           })
         })
+        stub.quotes = quotesBeforeRanges
         surface.windowWidth = 720
         stub.featuredSymbol = "AAPL"
         stub.figures = aapl
