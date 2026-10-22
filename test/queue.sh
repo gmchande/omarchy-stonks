@@ -7,9 +7,54 @@
 # order, with its time. A check that exits 77 had no saved answers to run on
 # (test/fixtures-dir.sh): it says why, and the last line counts the skips,
 # ALL PASS only when nothing skipped.
+#
+#   test/all.sh [--again]     test/review.sh [--again] [--fresh]
+#
+# A tree that already passed, since the last system update, isn't run again:
+# its record covers it. --again runs it anyway, as when chasing a flaky test.
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 runner=test/${0##*/}
+again=""
+for arg; do
+  case $arg in
+    --again) again=1 ;;
+    *) echo "$runner: unknown option $arg"; exit 2 ;;
+  esac
+done
+
+# The run's record (test/ran.sh): the tree it ran on, so the next one to
+# merge it checks the record instead of running it again. Only a run that
+# begins and ends on a clean tree (no edit, no untracked file) is recorded:
+# any other ran on something no commit holds. It goes in the git folder
+# every worktree shares, which no one edits by hand.
+clean_tree() { [ -z "$(git status --porcelain 2> /dev/null)" ] && git rev-parse -q --verify 'HEAD^{tree}' 2> /dev/null; }
+records="$(git rev-parse --path-format=absolute --git-common-dir)/stonks-runs"
+# checkout: what the run runs on: its clean tree, if it is clean, and HEAD.
+checkout() {
+  tree=$(clean_tree)
+  commit=$(git rev-parse -q --verify HEAD 2> /dev/null)
+  [ -n "$tree" ] || echo "$runner: this run won't be recorded: the tree has uncommitted edits or untracked files (git status)"
+}
+# refuse_passed: ends the run when this tree already passed this runner and
+# no package has changed since, unless --again. The newest pass counts:
+# pacman's database of what is installed changes with every install,
+# upgrade, and removal, an omarchy update's included.
+refuse_passed() {
+  local passed passed_commit passed_at updated
+  [ -n "$tree" ] && [ -z "$again" ] || return 0
+  passed=$(grep "^$tree [^ ]* $runner .* ALL PASS$" "$records" 2> /dev/null | tail -n 1)
+  [ -n "$passed" ] || return 0
+  updated=$(stat -c %Y /var/lib/pacman/local 2> /dev/null || echo 0)
+  read -r _ passed_commit _ passed_at _ <<< "$passed"
+  [ "$(date -d "$passed_at" +%s)" -gt "$updated" ] || return 0
+  echo "$runner already passed on this tree at $(date -d "$passed_at" '+%H:%M on %-d %B') (commit ${passed_commit:0:7}),"
+  echo "and no package has changed since; its record covers it (test/ran.sh). To run it"
+  echo "again on purpose, as when chasing a flaky test: $runner --again"
+  exit 0
+}
+checkout
+refuse_passed
 
 # One run at a time on this machine, of either runner, from any checkout:
 # runs that overlapped filled its memory. A second run says what it waits
@@ -28,6 +73,9 @@ exec 9>> "$lock" || exit 1
 if ! flock -n 9; then
   echo "$runner: waiting for the run already going ($(cat "$lock"))"
   flock 9 || exit 1
+  # The checkout may have moved meanwhile, and that run may have passed it.
+  checkout
+  refuse_passed
 fi
 echo "$runner, pid $$ in $PWD" > "$lock"
 
@@ -39,15 +87,6 @@ centiseconds() {
 }
 # The run's own time, from the lock taken to its verdict.
 began=$(centiseconds)
-
-# The run's record (test/ran.sh): the tree it ran on, so the next one to
-# merge it checks the record instead of running it again. Only a run that
-# begins and ends on a clean tree (no edit, no untracked file) is recorded:
-# any other ran on something no commit holds. It goes in the git folder
-# every worktree shares, which no one edits by hand.
-clean_tree() { [ -z "$(git status --porcelain 2> /dev/null)" ] && git rev-parse -q --verify 'HEAD^{tree}' 2> /dev/null; }
-tree=$(clean_tree)
-commit=$(git rev-parse -q --verify HEAD 2> /dev/null)
 
 # Before anything runs: every harness script sources lib.sh, ends on finish
 # and its finish line, and is started by one of the runners. A script that
@@ -116,6 +155,7 @@ fill() {
       eval "$command" > "$log" 2>&1 9>&-
       code=$?
       echo $(( $(centiseconds) - begin )) > "$log.cs"
+      echo "$code" > "$log.code"
       exit "$code"
     ) &
     set +m
@@ -153,6 +193,14 @@ drain() {
   done
 }
 
+# passed NUMBER...: whether each queued check with NUMBER passed, after
+# drain. A check's number is how many were queued before it, so a runner
+# notes ${#labels[@]} just before its start.
+passed() {
+  local i
+  for i; do [ "$(cat "$logs/$i.code" 2> /dev/null)" = 0 ] || return 1; done
+}
+
 # verdict: once the queue has run dry, each queued check's output and
 # verdict in order, the run's own time, and the last line, which a run on a
 # clean tree also records against it. Exits non-zero on any failure.
@@ -172,8 +220,7 @@ verdict() {
   elif [ "$skipped" -gt 0 ]; then last="PASSED, $skipped SKIPPED (no saved answers)"
   else last="ALL PASS"; fi
   if [ -n "$tree" ] && [ "$(clean_tree)" = "$tree" ]; then
-    echo "$tree $commit $runner $(date -Iseconds) ${took}s $last" \
-      >> "$(git rev-parse --path-format=absolute --git-common-dir)/stonks-runs"
+    echo "$tree $commit $runner $(date -Iseconds) ${took}s $last" >> "$records"
   fi
   echo "$last"
   exit "$status"
