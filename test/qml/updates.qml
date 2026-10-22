@@ -227,16 +227,28 @@ ShellRoot {
         failed === add && refused === add, harness.asked() + " asks | " + failed + " / " + refused)
 
       // No answer at all, as straight after a wake before the network is
-      // back: it asks again once the gate's pause of a few seconds is over,
-      // not a day later.
+      // back: while Yahoo gets none either, GitHub is not asked again,
+      // minutes on; once Yahoo answers again, it is asked at once, not a day
+      // later. It was asked again each time GitHub's pause ended, about once
+      // a minute for as long as the network was down.
       put("GITHUB.offline", "")
+      put("YAHOO.offline", "")
       nextDay()
       var unanswered = answered(5)
+      openWindow()
+      for (var m = 0; m < 5; m++) {
+        service.now += 60
+        wait(200)
+      }
+      var held = harness.asked() === 5 && service.yahooGate.paused
       remove("GITHUB.offline")
-      service.now += 5
-      var retried = answered(6) && visit()
-      harness.check("an ask that got no answer at all goes again within seconds, and says nothing meanwhile",
-        unanswered && retried === add, unanswered + " | " + harness.asked() + " asks | " + retried)
+      remove("YAHOO.offline")
+      service.now += 120
+      var retried = answered(6)
+      closeWindow()
+      var said = visit()
+      harness.check("an ask that got no answer at all waits while Yahoo gets none either, and goes again once Yahoo answers, saying nothing meanwhile",
+        unanswered && held && retried && said === add, [unanswered, held, retried, harness.asked() + " asks", said].join(" | "))
 
       // Every screen off a day on: nothing is asked. On again, the next
       // word from Hyprland asks the screens, and the look goes.

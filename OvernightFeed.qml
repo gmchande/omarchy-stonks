@@ -3,7 +3,7 @@ import Quickshell.Io
 import "Fetch.js" as Fetch
 import "Overnight.js" as Overnight
 // Robinhood's prints for every listing asked, in one run of requests of at
-// most 75 listings each (`Overnight.OVERNIGHT_BATCH`), Robinhood's limit:
+// most 25 listings each (`Overnight.OVERNIGHT_BATCH`), a third of its limit:
 // the overnight session's, and the hours outside Yahoo's day that the 1D
 // chart draws (`Overnight.dayChart`). Each answer is a day, the last 288
 // slots the 24/5 market traded, which reaches every hour a chart can draw,

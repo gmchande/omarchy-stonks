@@ -69,9 +69,11 @@ function overnightUrl(symbols) {
     + "&interval=5minute&span=day&bounds=24_5"
 }
 
-// Robinhood's historicals answer 400 to more symbols than this in one
-// request: "Too many instruments requested. No more than 75 allowed."
-var OVERNIGHT_BATCH = 75
+// The listings to a request: a third of the 75 Robinhood's historicals
+// take ("Too many instruments requested. No more than 75 allowed."), so
+// each answer, read in one JSON.parse that can't be sliced, is a third as
+// long: 75 listings came to about 4 MB.
+var OVERNIGHT_BATCH = 25
 
 // The most entries a list in Robinhood's answers may hold, past which the
 // answer is a bad one (`Format.fetchedList`): a result for each symbol

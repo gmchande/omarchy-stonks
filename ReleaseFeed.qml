@@ -4,12 +4,14 @@ import "Fetch.js" as Fetch
 import "Release.js" as Release
 // The newest Stonks, from main's manifest on GitHub (`Release`): what
 // `omarchy plugin update` would bring. Asked as the service is ready, then a
-// day after each ask GitHub answered, whatever it said, and only while a
-// screen is on (`clearance`) and GitHub's gate lets it. An ask that got no
-// answer at all, as straight after a wake before the network is back, is
-// due again at once, and the gate's short pause spaces the tries. Only a
-// whole answer naming a version changes `version`: a failure or a refusal
-// leaves it as it was and says nothing, since it is not a quote.
+// day after each ask, whatever GitHub said, and only while a screen is on
+// (`clearance`) and GitHub's gate lets it. An ask that got no answer at
+// all, as straight after a wake before the network is back, goes again once
+// Yahoo answers again after its own pause (`askAgain`), or a day on: asked
+// again each time GitHub's short pause ended, it went about once a minute
+// for as long as the network was down. Only a whole answer naming a version
+// changes `version`: a failure or a refusal leaves it as it was and says
+// nothing, since it is not a quote.
 Item {
   id: root
 
@@ -27,9 +29,10 @@ Item {
   property var gate: null
   // The gate's ticket the request out was let through on (`Gate.report`).
   property int ticket: 0
-  // The wall second of the last ask; 0 before the first, and after one that
-  // got no answer at all.
+  // The wall second of the last ask; 0 before the first.
   property int askedAt: 0
+  // The last ask got no answer at all.
+  property bool unanswered: false
 
   readonly property int interval: 24 * 60 * 60
 
@@ -49,10 +52,17 @@ Item {
   onNowChanged: pump()
   onReadyChanged: pump()
 
+  // The network is back: an ask that got no answer goes now.
+  function askAgain() {
+    if (!unanswered) return
+    root.askedAt = 0
+    pump()
+  }
+
   function receive(text) {
     var got = Fetch.answers(text)
     if (gate) gate.report(got.map(function(a) { return a.kind }), got.length ? got[0].retryAfter : 0, root.ticket)
-    if (got.length > 0 && got.every(function(a) { return a.kind === "none" })) root.askedAt = 0
+    root.unanswered = got.length > 0 && got.every(function(a) { return a.kind === "none" })
     var named = got.length && got[0].kind === "ok" ? Release.manifestVersion(got[0].body) : ""
     if (named === "") return
     root.version = named
