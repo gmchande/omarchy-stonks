@@ -38,7 +38,7 @@ none() {
 # External commands run only in the feeds, search, the version watch's
 # shell restart and update, the sounds' pw-play, its chimes' sh, the
 # bell's pw-dump, and the silence's pw-cat, the camera's screenshot
-# hand-off, and the chmod that keeps Stonks' files its owner's
+# hand-off, and the sh and chmod that keep Stonks' files its owner's
 # (OwnerOnly); files are read and written only by the service, the version
 # watch reads the manifest, the trend colours read the theme's colours,
 # the sounds write the replay's and the chimes', and the camera its

@@ -54,7 +54,8 @@ function sparkResults(json) {
   if (!results) return null
   for (var i = 0; i < results.length; i++) {
     var day = results[i].response && results[i].response[0]
-    if (day && day.meta) out[results[i].symbol] = day
+    var symbol = Format.fetchedText(results[i].symbol, Format.MOST_CODE)
+    if (day && day.meta && symbol) out[symbol] = day
   }
   return out
 }

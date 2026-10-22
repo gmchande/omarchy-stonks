@@ -141,6 +141,8 @@ Item {
     repeat: true
     onTriggered: {
       if (!root.turnedOn) return stop()
+      // Nothing is written in the cache before its folder is private.
+      if (!ownerOnly.made) return
       for (var bar = 0; bar < 11; bar++) {
         if (!root.chimesWritten[root.voice + "-" + bar]) return root.written(root.voice, bar)
       }
@@ -245,7 +247,7 @@ Item {
     preload: false
     blockWrites: true
     atomicWrites: true
-    onSaved: ownerOnly.keep([root.folder, soundFile.path])
+    onSaved: ownerOnly.keep([soundFile.path])
   }
-  OwnerOnly { id: ownerOnly }
+  OwnerOnly { id: ownerOnly; folder: root.folder }
 }

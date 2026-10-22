@@ -287,11 +287,12 @@ The shell's log the form asks for can name the prices Stonks left out.
 
 - **Needs:** nothing beyond Omarchy 4. It runs `curl`, PipeWire's
   `pw-play`, `pw-cat`, and `pw-dump`, and `sh`, `bash`, `timeout`,
-  `head`, and `chmod`, which Omarchy ships, and, for a screenshot,
-  `wl-copy` and `omarchy-notification-send`.
-- **Commands:** `curl` for every request; `chmod` as each file Stonks
-  writes is first written each run, to make it and its cache folder yours
-  alone; while sounds are on, `pw-play` to play a sound, only when you add,
+  `head`, `mkdir`, and `chmod`, which Omarchy ships, and, for a
+  screenshot, `wl-copy` and `omarchy-notification-send`.
+- **Commands:** `curl` for every request; as Stonks starts, one `sh` that
+  makes its cache folder, `mkdir` and `chmod`, yours alone, and `chmod` as
+  it writes each of its files, to make it yours alone too; while sounds
+  are on, `pw-play` to play a sound, only when you add,
   remove, or undo a row, take a
   screenshot, turn sounds on, replay a chart, or move along it, or the bell
   is due, and one `sh` that
@@ -340,9 +341,10 @@ The shell's log the form asks for can name the prices Stonks left out.
   for each screenshot you take, one picture,
   `stonks-<symbol>-<date>_<time>.png`, in the folder Omarchy's own
   screenshots use (`OMARCHY_SCREENSHOT_DIR`, else your Pictures folder),
-  saved straight there, with no copy anywhere else. The data file and
-  everything in `~/.cache/grvc.stonks` are readable by you alone (0600, the
-  folder 0700); a file an older Stonks wrote becomes so on its next write.
+  saved straight there, with no copy anywhere else. Everything in
+  `~/.cache/grvc.stonks` is readable by you alone (0600, the folder 0700),
+  and so is the data file once Stonks writes it, also after an older
+  Stonks or an editor left it readable to others.
   The shell keeps the pill's form on its bar entry in
   `~/.config/omarchy/shell.json`.
 - **Limits:** every request has a time limit and a size cap. Quotes come

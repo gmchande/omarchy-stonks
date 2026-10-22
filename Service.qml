@@ -919,9 +919,9 @@ Item {
     blockLoading: true
     atomicWrites: true
     printErrors: false
-    onSaved: ownerOnly.keep([root.cacheFolder, root.quotesPath])
+    onSaved: ownerOnly.keep([root.quotesPath])
   }
-  OwnerOnly { id: ownerOnly }
+  OwnerOnly { id: ownerOnly; folder: root.cacheFolder }
 
   // The saved quotes, { symbol: { quote, receivedAt } }; none when the file
   // is missing or unreadable.

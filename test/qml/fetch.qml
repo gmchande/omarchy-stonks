@@ -897,6 +897,15 @@ ShellRoot {
       within(3000, function() { owned = modes([harness.dataPath, cacheDir + "/quotes.json", cacheDir]); return owned === "600,600,700" })
       harness.check("the data file and the saved quotes are the owner's alone once written, and so is their folder in the cache",
         owned === "600,600,700", owned)
+      // A hand edit saved by an editor that writes a new file, 0644, and
+      // moves it over: Stonks' next write makes it the owner's again.
+      runCommand(["bash", "-c", "cp \"$1\" \"$1.tmp\" && chmod 644 \"$1.tmp\" && mv -f \"$1.tmp\" \"$1\"", "--", harness.dataPath])
+      var edited = modes([harness.dataPath])
+      service.persist({ changeMode: service.changeMode === "pct" ? "abs" : "pct" })
+      var rewritten = ""
+      within(3000, function() { rewritten = modes([harness.dataPath]); return rewritten === "600" })
+      harness.check("a data file a hand edit left open to every account is the owner's again on Stonks' next write",
+        edited === "644" && rewritten === "600", edited + " then " + rewritten)
 
       harness.finish()
     }
