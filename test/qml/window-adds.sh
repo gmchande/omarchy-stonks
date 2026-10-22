@@ -5,10 +5,10 @@
 # adds from search, an undone row keeping its quote through a reopen, and
 # a stock put back, by u and by PUT BACK, asking for its quote at once.
 # HOME and curl are scratch.
-# Each independent chapter starts a fresh service. Driving all three at
+# Each independent chapter starts a fresh service. Driving all four at
 # machine speed would spend a host's minute budget on unrelated scenarios.
 if [ "$#" -eq 0 ]; then
-  for chapter in pending search restored; do
+  for chapter in pending search restored putback; do
     bash "$0" "$chapter" || exit "$?"
   done
   exit 0

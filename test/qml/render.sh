@@ -56,7 +56,7 @@ every_state() (
         states="$states popup-anchor-$section-$moment-$look"
       done
     done
-    for control in range list orderword orderarrow manualorder look help footer done symbol search remove; do
+    for control in range list orderword orderarrow unit manualorder look help footer done symbol search remove; do
       states="$states popup-controls-$control-hover-$look popup-controls-$control-press-$look"
     done
     states="$states popup-controls-deadmove-hover-$look popup-controls-livemove-hover-$look popup-controls-breadth-hover-$look"

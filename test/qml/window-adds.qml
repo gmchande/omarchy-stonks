@@ -48,14 +48,6 @@ ShellRoot {
     view.destroy()
     return n
   }
-  // Hold a symbol's quote answer back, and let it go (see the fake curl).
-  Process { id: holdQuote }
-  function hold(symbol, held) {
-    var path = Quickshell.env("STONKS_FAKE_STATE") + "/" + symbol + ".quote.hold"
-    holdQuote.command = held ? ["touch", path] : ["rm", "-f", path]
-    holdQuote.running = true
-  }
-
   Stonks.Service { id: service }
   Stonks.App { id: app; service: service }
   Process { id: quoteFile }
@@ -104,8 +96,7 @@ ShellRoot {
         keyClick(Qt.Key_X)
         wait(100)
         var kept = service.lastRemoval ? service.lastRemoval.quote : null
-        harness.hold("MSFT", true)
-        tryVerify(function() { return !holdQuote.running }, 2000)
+        holdQuote("MSFT", true)
         var before = harness.calls("MSFT")
         var said = [body.headerText]
         var heard = function() { if (said[said.length - 1] !== body.headerText) said.push(body.headerText) }
@@ -114,8 +105,7 @@ ShellRoot {
         var asked = within(2000, function() { return harness.calls("MSFT") > before })
         var row = watchlist.rowItem("MSFT")
         var meanwhile = service.library.indexOf("MSFT") >= 0 && !!kept && service.quotes.MSFT === kept && !!row
-        harness.hold("MSFT", false)
-        tryVerify(function() { return !holdQuote.running }, 2000)
+        holdQuote("MSFT", false)
         tryVerify(function() { return service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 5000)
         wait(50)
         body.headerTextChanged.disconnect(heard)
@@ -515,10 +505,11 @@ ShellRoot {
       var keys = app.testKeyCatcher
 
       var chapter = Quickshell.env("STONKS_ADD_FLOW")
-      if (chapter === "search" || chapter === "restored") {
+      if (chapter === "search" || chapter === "restored" || chapter === "putback") {
         sixRows(body, "MSFT", "1Y")
         if (chapter === "search") addsFromSearch(body, watchlist, keys)
-        else joiningLines(body, watchlist, keys)
+        else if (chapter === "restored") joiningLines(body, watchlist, keys)
+        else putsBack(body, watchlist, keys)
         app.close()
         harness.finish()
         return
@@ -833,7 +824,6 @@ ShellRoot {
       service.removeSymbol("NOCUR")
       wait(50)
 
-      putsBack(body, watchlist, keys)
       app.close()
       harness.finish()
     }

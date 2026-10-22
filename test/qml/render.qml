@@ -1380,6 +1380,7 @@ ShellRoot {
       else if (control === "list") target = one("listLabel")
       else if (control === "orderword") target = one("orderLabel")
       else if (control === "orderarrow") target = one("orderArrow")
+      else if (control === "unit") target = one("unitTarget")
       else if (control === "manualorder") { stub.order = "manual"; target = one("orderLabel") }
       else if (control === "look") target = one("lookIcon")
       else if (control === "help") target = one("helpMark")
@@ -1422,6 +1423,7 @@ ShellRoot {
         var fill = control === "list" ? one("listControl")
           : control === "orderword" || control === "manualorder" ? one("orderControl")
           : control === "orderarrow" ? one("orderArrowFill")
+          : control === "unit" ? one("unitFill")
           : control === "look" ? one("lookFill")
           : control === "help" ? one("helpFill")
           : control === "footer" ? one("footerFill")
