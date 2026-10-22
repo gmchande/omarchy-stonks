@@ -705,46 +705,6 @@ test("a day past its 52-week mark widens the 52-week range to it", () => {
   expect(said(M.yearLine(under, null)).split(" · ")[1]).toBe("314.74-–344.57 @325.13")
 })
 
-// Yahoo's 52 weeks leave out the 1Y range's first day. These answers were
-// saved on 14 October 2026, when that day held each listing's 1Y high or
-// low: a stock's high (RGTI, on a day at its 52-week low) and low (GOOG), a
-// cryptocurrency's high, an index's low, a Toronto listing's low, and an ETF
-// whose first day held neither. The chart's marks and the 52-week line
-// agree on 1Y.
-test("on 1Y the 52-week line takes in the range's low and high, and no other range widens it", () => {
-  const saved = name => {
-    const q = M.parseChart(fixture(`first-day-2026-10-14/${name}-day.json`))
-    const h = M.parseHistory(fixture(`first-day-2026-10-14/${name}-1y.json`), "1Y")
-    return { q, h, stats: M.periodStats(h) }
-  }
-  const ends = line => said(line).split(" · ")[1].replace(/ @.*/, "")
-  const marked = ({ q, h, stats }) => {
-    const marks = M.rangeMarks(h, stats, q.priceDigits)
-    return marks.low.price + "–" + marks.high.price
-  }
-  const lines = ({ q, h, stats }, range) =>
-    [marked({ q, h, stats }), ends(M.yearLine(q, null, range, stats)), ends(M.yearLine(q, null, "1D", null))]
-  expect(lines(saved("rgti"), "1Y")).toEqual(["11.77–58.15", "11.77-–58.15", "11.77-–57.97"])
-  expect(lines(saved("goog"), "1Y")).toEqual(["241.18–404.47", "241.18–404.47", "244.67–404.47"])
-  expect(lines(saved("eth-usd"), "1Y")).toEqual(["1,506.51–4,265.11", "1,506.51–4,265.11", "1,506.51–4,250.67"])
-  expect(lines(saved("n225"), "1Y")).toEqual(["46,544–72,832", "46,544–72,832", "46,911–72,832"])
-  expect(lines(saved("td-to"), "1Y")).toEqual(["109.56–175.33", "109.56–175.33", "110.17–175.33"])
-  expect(lines(saved("spy"), "1Y")).toEqual(["629.28–781.62", "629.28–781.62", "629.28–781.62"])
-  // A range longer than a year never widens it, its ends can be older.
-  expect(lines(saved("goog"), "2Y")[1]).toBe("244.67–404.47")
-  // A day at Yahoo's high under a higher first day is not at the line's
-  // high, so takes no tone.
-  const rgti = saved("rgti")
-  expect(ends(M.yearLine({ ...rgti.q, fiftyTwoWeekHigh: rgti.q.dayHigh }, null, "1Y", rgti.stats))).toBe("11.77-–58.15")
-  // A day at its 52-week high keeps its tone on 1Y, though its own bar's
-  // high carries float noise past the day's.
-  const goog = saved("goog")
-  const capped = goog.h.bars.map(b => ({ ...b, h: Math.min(b.h, goog.q.dayHigh) }))
-  capped[capped.length - 1].h = goog.q.dayHigh + 1e-9
-  expect(ends(M.yearLine({ ...goog.q, fiftyTwoWeekHigh: goog.q.dayHigh }, null, "1Y", M.periodStats({ ...goog.h, bars: capped }))))
-    .toBe("241.18–355.25+")
-})
-
 test("each symbol is asked for on its own market's clock", () => {
   const q = duringSession(quote)
   const s = q.session

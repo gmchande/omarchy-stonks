@@ -822,9 +822,10 @@ ShellRoot {
         root.check("at a 52-week high both highs read the day's high in the up colour, both ticks at the rule's right end",
           peaks.length === 0, peaks.join(" | "))
 
-        // On 1Y the 52-week line takes in the range's low and high: SHOP.TO
-        // with Yahoo's 52-week marks a dollar inside its 1Y range reads the
-        // range's there, as the chart's marks do, and Yahoo's own on 1D.
+        // Where Yahoo's 52 weeks leave out the 1Y range's first day, the
+        // 52-week line still says Yahoo's, word for word and place for place
+        // as on 1D, and the chart's marks carry the range's own low and high:
+        // SHOP.TO with Yahoo's 52-week marks a dollar inside its 1Y range.
         var yearStats = History.periodStats(year)
         var shopQuote = stub.quotes["SHOP.TO"]
         var narrowed = Object.assign({}, stub.quotes)
@@ -833,30 +834,35 @@ ShellRoot {
         stub.quotes = narrowed
         stub.featuredSymbol = "SHOP.TO"
         stub.figures = root.figures("shop-to")
-        var endsOf = function(line) { return line ? line.range.lowText + "–" + line.range.highText : "none" }
-        var drawnEnds = function() {
-          var year = root.drawnSpans(find(body, "yearLine")).filter(function(s) { return /^[\d,]+\.?\d*$/.test(s.what) })
-          var marks = [find(body, "lowMark"), find(body, "highMark")].map(function(mark) {
+        var yearSaid = function() {
+          return root.drawnSpans(find(body, "yearLine")).sort(byLeft).map(function(s) { return s.what + "@" + s.left }).join(" ")
+        }
+        var marksSaid = function() {
+          return [find(body, "lowMark"), find(body, "highMark")].map(function(mark) {
             return mark && mark.visible ? root.drawnSpans(mark).sort(byLeft)[0].what : "none"
-          })
-          return [year.slice(0, 2).map(function(s) { return s.what }).join("–"), marks.join("–")]
+          }).join("–")
         }
         stub.retro = false
+        stub.range = "1D"
+        stub.historyEntry = null
+        wait(50)
+        var onDay = yearSaid()
         stub.range = "1Y"
         stub.historyEntry = { status: "ok", history: year, receivedAt: stub.now }
         wait(50)
         tryVerify(function() { return body.motion.drawn === 1 }, 2000)
-        var onYear = [endsOf(body.yearLine)].concat(drawnEnds())
+        var onYear = yearSaid()
+        var marked = marksSaid()
         stub.range = "1D"
         stub.historyEntry = null
-        wait(50)
-        var onDay = endsOf(body.yearLine)
         stub.quotes = Object.assign({}, narrowed, { "SHOP.TO": shopQuote })
-        var wantYear = Format.money(yearStats.low.p, shopQuote.priceDigits) + "–" + Format.money(yearStats.high.p, shopQuote.priceDigits)
-        var wantDay = Format.money(yearStats.low.p + 1, shopQuote.priceDigits) + "–" + Format.money(yearStats.high.p - 1, shopQuote.priceDigits)
-        root.check("on 1Y the 52-week line reads the range's low and high, as the chart's marks do; on 1D Yahoo's",
-          onYear.every(function(e) { return e === wantYear }) && onDay === wantDay,
-          onYear.join(" / ") + " on 1Y, " + onDay + " on 1D; want " + wantYear + " and " + wantDay)
+        wait(50)
+        var wantMarks = Format.money(yearStats.low.p, shopQuote.priceDigits) + "–" + Format.money(yearStats.high.p, shopQuote.priceDigits)
+        var wantYear = Format.money(yearStats.low.p + 1, shopQuote.priceDigits) + " " + Format.money(yearStats.high.p - 1, shopQuote.priceDigits)
+        var yahoos = onDay.replace(/@\d+/g, "").indexOf(wantYear) >= 0
+        root.check("where Yahoo's 52 weeks leave out the 1Y range's ends, the 52-week line on 1Y says Yahoo's as on 1D, and the chart's marks say the range's",
+          onYear === onDay && yahoos && marked === wantMarks,
+          "1Y: " + onYear + " / 1D: " + onDay + " / marks " + marked + ", want " + wantMarks + " and Yahoo's " + wantYear)
 
         // The exchange and currency stay whole on the hero's line; a long
         // name gives way to them, in both looks. Found in the 1.0.0 review:

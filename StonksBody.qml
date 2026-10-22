@@ -343,8 +343,7 @@ Item {
   // line was the day's or the range's, and holding room for both left the
   // day's rule short of the edge.
   readonly property var dayLine: chart ? Figures.dayLine(featuredQuote, featuredToday) : null
-  readonly property var yearLine: chart ? Fundamentals.yearLine(featuredQuote, fundamentals ? fundamentals.figures : null,
-    historyShown ? history.range : "", historyStats) : null
+  readonly property var yearLine: chart ? Fundamentals.yearLine(featuredQuote, fundamentals ? fundamentals.figures : null) : null
   readonly property var rangeMarks: historyShown
     ? History.rangeMarks(history, historyStats, featuredQuote ? featuredQuote.priceDigits : undefined) : null
   // What the dashed line is, said while a scrub reads against it.
