@@ -25,54 +25,64 @@ Item {
   property string fontFamily: Style.font.family
   readonly property real lift: Style.space(4)
 
-  Repeater {
-    model: root.marks && root.chart ? [root.marks.high, root.marks.low] : []
+  // The marks draw in with the line: the chart's draw-in uncovers them as
+  // it uncovers its ink, the room a mark lifts into included.
+  Item {
+    y: -root.lift
+    width: root.chart ? Math.min(root.width, root.chart.inkDrawn) : 0
+    height: root.height + root.lift * 2
+    clip: true
 
-    Row {
-      id: mark
-      required property var modelData
-      required property int index
-      readonly property real at: root.chart.xAt(mark.modelData.x)
-      // How far its words' ink, as drawn, would reach into the chart's ink
-      // under each of them, with the mark on its edge: down into it for the
-      // high, up into it for the low. A price's thousands commas reach
-      // below the baseline.
-      readonly property real overlap: Math.max(mark.overlapOf(priceText, priceInk), mark.overlapOf(dateText, dateInk), 0)
-      objectName: index === 0 ? "highMark" : "lowMark"
-      visible: mark.overlap <= root.lift && mark.at <= root.chart.inkDrawn
-      spacing: Style.space(6)
-      x: Math.max(0, Math.min(root.width - mark.width,
-        mark.modelData.x < 0.5 ? mark.at - Style.space(2) : mark.at - mark.width + Style.space(2)))
-      y: mark.index === 0 ? -Math.min(mark.overlap, root.lift) : root.height - mark.height + Math.min(mark.overlap, root.lift)
+    Repeater {
+      model: root.marks && root.chart ? [root.marks.high, root.marks.low] : []
 
-      function overlapOf(word, ink) {
-        var under = root.chart.inkExtentIn(mark.x + word.x, mark.x + word.x + word.width)
-        var top = word.baselineOffset + ink.tightBoundingRect.y
-        return mark.index === 0 ? top + ink.tightBoundingRect.height - under.top
-          : under.bottom - (root.height - mark.height + top)
-      }
+      Row {
+        id: mark
+        required property var modelData
+        required property int index
+        readonly property real at: root.chart.xAt(mark.modelData.x)
+        // How far its words' ink, as drawn, would reach into the chart's ink
+        // under each of them, with the mark on its edge: down into it for the
+        // high, up into it for the low. A price's thousands commas reach
+        // below the baseline.
+        readonly property real overlap: Math.max(mark.overlapOf(priceText, priceInk), mark.overlapOf(dateText, dateInk), 0)
+        objectName: index === 0 ? "highMark" : "lowMark"
+        visible: mark.overlap <= root.lift
+        spacing: Style.space(6)
+        x: Math.max(0, Math.min(root.width - mark.width,
+          mark.modelData.x < 0.5 ? mark.at - Style.space(2) : mark.at - mark.width + Style.space(2)))
+        y: root.lift + (mark.index === 0 ? -Math.min(mark.overlap, root.lift)
+          : root.height - mark.height + Math.min(mark.overlap, root.lift))
 
-      TextMetrics { id: priceInk; font: priceText.font; text: priceText.text }
-      TextMetrics { id: dateInk; font: dateText.font; text: dateText.text }
+        function overlapOf(word, ink) {
+          var under = root.chart.inkExtentIn(mark.x + word.x, mark.x + word.x + word.width)
+          var top = word.baselineOffset + ink.tightBoundingRect.y
+          return mark.index === 0 ? top + ink.tightBoundingRect.height - under.top
+            : under.bottom - (root.height - mark.height + top)
+        }
 
-      Text {
-        id: priceText
-        textFormat: Text.PlainText
-        text: mark.modelData.price
-        color: root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
-        font.bold: true
-      }
-      Text {
-        id: dateText
-        textFormat: Text.PlainText
-        text: mark.modelData.date
-        color: root.dim
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
-        font.bold: true
-        font.letterSpacing: 1
+        TextMetrics { id: priceInk; font: priceText.font; text: priceText.text }
+        TextMetrics { id: dateInk; font: dateText.font; text: dateText.text }
+
+        Text {
+          id: priceText
+          textFormat: Text.PlainText
+          text: mark.modelData.price
+          color: root.foreground
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          font.bold: true
+        }
+        Text {
+          id: dateText
+          textFormat: Text.PlainText
+          text: mark.modelData.date
+          color: root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          font.bold: true
+          font.letterSpacing: 1
+        }
       }
     }
   }

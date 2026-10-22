@@ -67,9 +67,10 @@ Item {
   readonly property int inkColumns: drawable
     ? Math.min(grid.columns, Math.floor(geometry.points[geometry.points.length - 1].x * grid.columns) + 1) : 0
   readonly property int scrubColumn: scrubX >= 0 ? Math.min(grid.columns - 1, Math.floor(scrubX * grid.columns)) : -1
-  // How far the lit columns have drawn in, in pixels: what is laid over the
-  // ink draws in with it (`RangeMarks`).
-  readonly property real inkDrawn: curtain.width
+  // How far the lit columns have drawn in, in pixels, and the whole width
+  // once they have: what is laid over the ink draws in with it
+  // (`RangeMarks`).
+  readonly property real inkDrawn: replayX < 0 && reveal >= 1 ? width : curtain.width
   // The stems are retro's wash: the up colour's at 35%, dimmer for the
   // extended hours, and each side at the alpha that adds the same lightness
   // over the ground (`Tones.washAlpha`), never more than half the ink of the
