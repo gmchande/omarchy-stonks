@@ -1,32 +1,49 @@
 import QtQuick
-import Quickshell
+import QtCore
 import Quickshell.Io
 // The screenshot's hand-off, as Omarchy's own screenshot does it after its
-// grab (`omarchy-capture-screenshot`). A `sh` names the file in the folder
-// Omarchy's screenshots use (OMARCHY_SCREENSHOT_DIR, else XDG_PICTURES_DIR
-// read from ~/.config/user-dirs.dirs as text, $HOME expanded, never run,
-// else ~/Pictures), made if it isn't there, as
+// grab, on the Omarchy installed. With Omasnap installed, as on Omarchy 4.5,
+// the folder is Omasnap's: OMASNAP_SCREENSHOT_DIR, else
+// OMARCHY_SCREENSHOT_DIR, which `omarchy-capture-screenshot` hands on as
+// it, else the directory in omasnap.conf's [output], ~ expanded, else
+// Screenshots in the pictures folder; the settings and the pictures folder
+// read through Qt as Omasnap reads them (QSettings, QStandardPaths), so
+// from XDG_CONFIG_HOME, and never written. The editor is `omasnap`.
+// Without Omasnap, as on Omarchy 4.0, the folder is OMARCHY_SCREENSHOT_DIR,
+// else XDG_PICTURES_DIR read from ~/.config/user-dirs.dirs as text, $HOME
+// expanded, never run, else ~/Pictures; the editor is
+// OMARCHY_SCREENSHOT_EDITOR, else Tensaku. A `sh` picks the folder and the
+// editor, makes the folder if it isn't there, and names the file in it as
 // stonks-<symbol>-<YYYY-MM-DD_HH-MM-SS>.png, "-2" and on after a name taken
 // that second; the picture (`ShareCard`) is grabbed at its size and saved
 // there, with no copy anywhere else; `wl-copy` reads it on its input onto
-// the clipboard; and `omarchy-notification-send` says so in Omarchy's own
-// words, its thumbnail the picture and a click on it the reader's screenshot
-// editor (OMARCHY_SCREENSHOT_EDITOR, else Tensaku) on the file, the editor
-// and the file as separate words. Each command has 5 seconds. One shot at a
-// time. The surfaces say what is shot; this knows only how.
+// the clipboard; and `omarchy-notification-send` says so in Omarchy 4.0's
+// words, its thumbnail the picture and a click on it the editor on the
+// file, the editor and the file as separate words. Each command has 5
+// seconds. One shot at a time. The surfaces say what is shot; this knows
+// only how.
 Item {
   id: root
 
-  readonly property string editor: Quickshell.env("OMARCHY_SCREENSHOT_EDITOR") || "tensaku-edit"
-  // The shot under way: its symbol, its item, the file it is saved as, what
-  // to call once the picture is taken, and what to call with how it ended
-  // (`shoot`); no callback, no shot.
+  // The shot under way: its symbol, its item, the folder omasnap.conf names
+  // and the pictures folder as Omasnap reads them, the file it is saved as
+  // and the editor a click opens it in, what to call once the picture is
+  // taken, and what to call with how it ended (`shoot`); no callback, no
+  // shot.
   property string shotSymbol: ""
   property var shotItem: null
+  property string shotOmasnapFolder: ""
+  property string shotPictures: ""
   property string shotFile: ""
+  property string shotEditor: ""
   property var shotTaken: null
   property var shotDone: null
   readonly property bool busy: shotDone !== null
+
+  Settings {
+    id: omasnapSettings
+    location: StandardPaths.writableLocation(StandardPaths.ConfigLocation) + "/omasnap/omasnap.conf"
+  }
 
   // Saves `item` as a picture named for `symbol` (`Share.fileSymbol`), copies
   // it, and announces it. `taken()` hears the picture taken, before it is
@@ -37,7 +54,13 @@ Item {
     if (busy) return false
     shotSymbol = symbol
     shotItem = item
+    // As Omasnap reads it: a list (a value with a comma) is no folder.
+    omasnapSettings.sync()
+    var configured = omasnapSettings.value("output/directory", "")
+    shotOmasnapFolder = typeof configured === "string" ? configured.trim() : ""
+    shotPictures = decodeURIComponent(String(StandardPaths.writableLocation(StandardPaths.PicturesLocation)).replace(/^file:\/\//, ""))
     shotFile = ""
+    shotEditor = ""
     shotTaken = taken
     shotDone = done
     naming.running = true
@@ -52,30 +75,42 @@ Item {
     if (done) done(code)
   }
 
-  // The file's name: printed only once its folder is there to take it.
+  // The editor on its first line, then the file's name: printed only once
+  // its folder is there to take it.
   Process {
     id: naming
-    command: ["timeout", "5", "sh", "-c", "dir=${OMARCHY_SCREENSHOT_DIR:-}\n"
-      + "dirs=$HOME/.config/user-dirs.dirs\n"
-      + "if [ -z \"$dir\" ] && [ -f \"$dirs\" ]; then\n"
-      + "  dir=$(sed -n 's/^XDG_PICTURES_DIR=\"\\(.*\\)\"[[:space:]]*$/\\1/p' \"$dirs\" | tail -n 1)\n"
-      + "  case $dir in\n"
-      + "    '$HOME'*) dir=$HOME${dir#'$HOME'} ;;\n"
-      + "    '${HOME}'*) dir=$HOME${dir#'${HOME}'} ;;\n"
-      + "  esac\n"
+    command: ["timeout", "5", "sh", "-c", "if command -v omasnap > /dev/null; then\n"
+      + "  editor=omasnap\n"
+      + "  conf=$2\n"
+      + "  case $conf in '~') conf=$HOME ;; '~/'*) conf=$HOME${conf#'~'} ;; esac\n"
+      + "  dir=${OMASNAP_SCREENSHOT_DIR:-${OMARCHY_SCREENSHOT_DIR:-${conf:-$3/Screenshots}}}\n"
+      + "else\n"
+      + "  editor=${OMARCHY_SCREENSHOT_EDITOR:-tensaku-edit}\n"
+      + "  dir=${OMARCHY_SCREENSHOT_DIR:-}\n"
+      + "  dirs=$HOME/.config/user-dirs.dirs\n"
+      + "  if [ -z \"$dir\" ] && [ -f \"$dirs\" ]; then\n"
+      + "    dir=$(sed -n 's/^XDG_PICTURES_DIR=\"\\(.*\\)\"[[:space:]]*$/\\1/p' \"$dirs\" | tail -n 1)\n"
+      + "    case $dir in\n"
+      + "      '$HOME'*) dir=$HOME${dir#'$HOME'} ;;\n"
+      + "      '${HOME}'*) dir=$HOME${dir#'${HOME}'} ;;\n"
+      + "    esac\n"
+      + "  fi\n"
+      + "  dir=${dir:-$HOME/Pictures}\n"
       + "fi\n"
-      + "dir=${dir:-$HOME/Pictures}\n"
       + "mkdir -p \"$dir\" && [ -w \"$dir\" ] || exit 1\n"
       + "stamp=$(date +%Y-%m-%d_%H-%M-%S)\n"
       + "file=$dir/stonks-$1-$stamp.png\n"
       + "n=1\n"
       + "while [ -e \"$file\" ]; do n=$((n + 1)); file=$dir/stonks-$1-$stamp-$n.png; done\n"
-      + "printf '%s\\n' \"$file\"\n",
-      "sh", root.shotSymbol]
+      + "printf '%s\\n%s\\n' \"$editor\" \"$file\"\n",
+      "sh", root.shotSymbol, root.shotOmasnapFolder, root.shotPictures]
     stdout: StdioCollector {
       onStreamFinished: {
-        var file = text.replace(/\n$/, "")
-        if (!root.shotItem || file.charAt(0) !== "/" || file.indexOf("\n") >= 0) return root.finish(1)
+        var printed = text.replace(/\n$/, "")
+        var cut = printed.indexOf("\n")
+        var file = printed.slice(cut + 1)
+        if (!root.shotItem || cut < 1 || file.charAt(0) !== "/" || file.indexOf("\n") >= 0) return root.finish(1)
+        root.shotEditor = printed.slice(0, cut)
         root.shotFile = file
         var item = root.shotItem
         // Grabbed at the item's size, which on the window's screen is the
@@ -104,11 +139,12 @@ Item {
     }
   }
 
-  // Best effort, as Omarchy's is: the picture is saved and copied by then.
+  // Best effort, as Omarchy 4.0's is: the picture is saved and copied by
+  // then.
   Process {
     id: announcing
     command: ["timeout", "5", "omarchy-notification-send", "Screenshot saved to clipboard and file",
-      "Edit with Super + Alt + , (or click this)", "--image", root.shotFile, "--exec", root.editor, root.shotFile]
+      "Edit with Super + Alt + , (or click this)", "--image", root.shotFile, "--exec", root.shotEditor, root.shotFile]
     onExited: root.finish(0)
   }
 }

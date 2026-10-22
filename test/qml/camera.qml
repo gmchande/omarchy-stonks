@@ -15,7 +15,9 @@ import "plugin" as Stonks
 // reader's user-dirs.dirs names for pictures, put that picture on the
 // clipboard as a PNG, and send Omarchy's notification with that file, its
 // thumbnail and a click to edit it; the picture is of the chart on show,
-// its symbol, range, and scrub, never the list. HOME and curl are scratch.
+// its symbol, range, and scrub, never the list. Then, with Omasnap absent
+// and present (camera.sh), the folder and editor each version of Omarchy
+// uses, under each version's settings. HOME and curl are scratch.
 ShellRoot {
   id: harness
 
@@ -91,6 +93,7 @@ ShellRoot {
     command: ["sh", "-c", "ls -1 \"$1\" 2> /dev/null", "sh", harness.listedDir]
     stdout: StdioCollector { id: listed }
   }
+  Process { id: runner }
 
   Stonks.Service { id: service }
   Stonks.Updates { id: updates }
@@ -126,12 +129,20 @@ ShellRoot {
       return listed.text.split("\n").filter(function(name) { return name !== "" })
     }
 
+    // Runs `script` in sh with `args`, and waits for it to end.
+    function run(script, args) {
+      runner.command = ["sh", "-c", script, "sh"].concat(args)
+      runner.running = true
+      tryVerify(function() { return !runner.running }, 3000)
+    }
+
     // One shot, `act` taking it on `body`: what the camera laid out, the
-    // pictures it left, the notification and the clipboard's call it made,
-    // and what the footer said. A shot that never lands is reported by the
-    // checks, not stopped at the wait.
-    function shoot(body, act) {
-      var files = shots().length
+    // pictures it left in `folder` (the pictures folder unless named), the
+    // notification and the clipboard's call it made, and what the footer
+    // said. A shot that never lands is reported by the checks, not stopped
+    // at the wait.
+    function shoot(body, act, folder) {
+      var files = shots(folder).length
       var sent = notifications().length
       var copies = lines("wl-copy.calls").length
       var loader = harness.find(body, "shareLoader")
@@ -153,7 +164,7 @@ ShellRoot {
       var file = note[3] || ""
       return {
         card: seen || {},
-        added: shots().length - files,
+        added: shots(folder).length - files,
         cached: shots(harness.cacheDir).filter(function(name) { return /\.png$/.test(name) }),
         note: note,
         file: file,
@@ -169,20 +180,20 @@ ShellRoot {
     }
 
     // A shot that landed as Omarchy's own screenshots do: one picture,
-    // named for `symbol`, in the reader's pictures folder, and no copy of it
-    // in Stonks' cache; that picture on the clipboard as a PNG; Omarchy's
-    // notification in Omarchy's own words, the picture as its thumbnail and
-    // a click that opens Tensaku on it; the footer saying what it shows,
-    // `said` matching what follows "Copied a screenshot of "; and the card
-    // gone. A second shot in the same second keeps the first: its name ends
-    // "-2".
-    function landed(shot, symbol, said) {
+    // named for `symbol`, in `folder` (the reader's pictures folder unless
+    // named), and no copy of it in Stonks' cache; that picture on the
+    // clipboard as a PNG; Omarchy's notification in Omarchy's own words, the
+    // picture as its thumbnail and a click that opens `editor` (Tensaku
+    // unless named) on it; the footer saying what it shows, `said` matching
+    // what follows "Copied a screenshot of "; and the card gone. A second
+    // shot in the same second keeps the first: its name ends "-2".
+    function landed(shot, symbol, said, folder, editor) {
       var named = new RegExp("^stonks-" + symbol + "-\\d{4}-\\d\\d-\\d\\d_\\d\\d-\\d\\d-\\d\\d(-\\d+)?\\.png$")
       var expected = ["Screenshot saved to clipboard and file", "Edit with Super + Alt + , (or click this)",
-        "--image", shot.file, "--exec", "tensaku-edit", shot.file]
+        "--image", shot.file, "--exec", editor || "tensaku-edit", shot.file]
       var problems = []
       if (shot.added !== 1) problems.push(shot.added + " pictures saved")
-      if (!named.test(shot.name) || shot.folder !== harness.shotsDir) problems.push("saved as " + shot.file)
+      if (!named.test(shot.name) || shot.folder !== (folder || harness.shotsDir)) problems.push("saved as " + shot.file)
       if (shot.cached.length) problems.push("pictures in the cache: " + shot.cached.join(", "))
       if (JSON.stringify(shot.note) !== JSON.stringify(expected)) problems.push("notified " + JSON.stringify(shot.note))
       if (shot.copied !== "--type image/png" || !harness.sameBytes(shot.clipboard, shot.picture)) problems.push("copied " + shot.copied + " " + (shot.clipboard ? shot.clipboard.byteLength : 0) + " bytes")
@@ -290,6 +301,45 @@ ShellRoot {
       var coin = shoot(win, function() { keyClick(Qt.Key_Y) })
       problems = landed(coin, "btc-usd", /^BTC-USD at \d\d:\d\d(?: [A-Z]+)?$/).concat(ofChart(coin, "BTC-USD", "1D", "SAT 12 SEP 2026", rows))
       harness.check("y in the window takes Bitcoin's day", problems.length === 0, problems.join("; "))
+
+      // Omarchy 4.5 hands its screenshots to Omasnap, which keeps them in a
+      // folder of its own; 4.0 to Tensaku, in the pictures folder. Each shot
+      // follows the Omarchy installed, which Omasnap's presence tells, and
+      // that version's settings win, the other's counting for nothing.
+      // Omasnap reads XDG_CONFIG_HOME, whose user-dirs.dirs names Photos
+      // (camera.sh), never ~/.config, whose omasnap.conf names Wrong.
+      var home = Quickshell.env("HOME")
+      var conf = Quickshell.env("XDG_CONFIG_HOME") + "/omasnap/omasnap.conf"
+      var cases = [
+        { label: "without Omasnap, OMARCHY_SCREENSHOT_DIR and OMARCHY_SCREENSHOT_EDITOR win, and Omasnap's settings count for nothing",
+          omasnap: false, conf: true, folder: home + "/Legacy", editor: "my-editor",
+          env: { OMARCHY_SCREENSHOT_DIR: home + "/Legacy", OMARCHY_SCREENSHOT_EDITOR: "my-editor", OMASNAP_SCREENSHOT_DIR: home + "/Snaps" } },
+        { label: "with Omasnap, the picture lands in Screenshots in the pictures folder XDG_CONFIG_HOME names, and a click opens it in Omasnap",
+          omasnap: true, conf: false, folder: home + "/Photos/Screenshots", editor: "omasnap", env: {} },
+        { label: "with Omasnap, the directory in omasnap.conf's [output] comes before that, read as Omasnap reads it",
+          omasnap: true, conf: true, folder: home + "/Captures", editor: "omasnap", env: {} },
+        { label: "with Omasnap, OMARCHY_SCREENSHOT_DIR comes before omasnap.conf, as Omarchy hands it on, and OMARCHY_SCREENSHOT_EDITOR counts for nothing",
+          omasnap: true, conf: true, folder: home + "/Legacy", editor: "omasnap",
+          env: { OMARCHY_SCREENSHOT_DIR: home + "/Legacy", OMARCHY_SCREENSHOT_EDITOR: "my-editor" } },
+        { label: "with Omasnap, OMASNAP_SCREENSHOT_DIR comes before OMARCHY_SCREENSHOT_DIR",
+          omasnap: true, conf: true, folder: home + "/Snaps", editor: "omasnap",
+          env: { OMARCHY_SCREENSHOT_DIR: home + "/Legacy", OMASNAP_SCREENSHOT_DIR: home + "/Snaps" } }
+      ]
+      for (var i = 0; i < cases.length; i++) {
+        var step = cases[i]
+        // Only [output]'s directory counts, under an indented header, its
+        // comment dropped and its ~ expanded, as Omasnap reads it.
+        if (step.conf) run("mkdir -p \"${1%/*}\" && printf '%s' \"$2\" > \"$1\"", [conf,
+          "[colors]\ndirectory = /colors\n\n  [output]\n# Where saved screenshots go.\ndirectory = ~/Captures ; a folder of their own\n\n[later]\ndirectory = /later\n"])
+        else run("rm -f \"$1\"", [conf])
+        var env = step.env
+        if (step.omasnap) env.PATH = Quickshell.env("STONKS_OMASNAP") + ":" + Quickshell.env("PATH")
+        camera.testEnvironment = env
+        app.testKeyCatcher.forceActiveFocus()
+        var shot = shoot(win, function() { keyClick(Qt.Key_Y) }, step.folder)
+        problems = landed(shot, "btc-usd", /^BTC-USD at \d\d:\d\d(?: [A-Z]+)?$/, step.folder, step.editor)
+        harness.check(step.label, problems.length === 0, problems.join("; "))
+      }
       app.close()
 
       console.log("CAMERA DONE")
