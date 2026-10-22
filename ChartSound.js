@@ -73,9 +73,11 @@ function fadeEdges(x, inMs, outMs) {
 }
 
 // The sound, and the gain that puts its loudest 50 ms of RMS at `db` dBFS,
-// which `wav` applies as it writes.
+// which `wav` applies as it writes. The window is a whole number the engine
+// keeps as one (`| 0`): indexed by Math.round's result, read as a fraction,
+// a retro replay's levelling took 16 ms instead of 2.
 function levelled(x, db) {
-  var win = Math.round(0.05 * RATE), best = 0, acc = 0
+  var win = Math.round(0.05 * RATE) | 0, best = 0, acc = 0
   for (var i = 0; i < x.length; i++) {
     acc += x[i] * x[i]
     if (i >= win) acc -= x[i - win] * x[i - win]
