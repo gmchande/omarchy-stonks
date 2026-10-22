@@ -44,7 +44,10 @@ building one that won't merge.
   drive the real service and surfaces with real keys and pointer. It needs
   Omarchy installed and a Wayland session. A second run on the same machine
   waits for the first to end. With the saved answers it takes about 1 min
-  50 s, and its last line must be `ALL PASS`.
+  50 s, and its last line must be `ALL PASS`. A run on a clean tree is
+  recorded against it (`test/ran.sh`), and neither suite runs a tree that
+  already passed, until a package changes; `--again` runs it anyway, as
+  when chasing a flaky test.
 - Most harnesses replay saved Yahoo and Robinhood answers, and the rules'
   tests in `test/saved.test.js` read them. They are private: their terms
   don't allow republishing them. On a clone without them, those checks skip,
@@ -218,10 +221,13 @@ every release bumps it.
 2. Bump `manifest.json`'s version in a release commit on `dev`. When what
    the README's pictures show has changed, render them again with
    `test/qml/readme.sh` in that commit.
-3. Run `test/review.sh` on the release commit, with `STONKS_RENDER_BASE`
-   set to the last release's tag so its render diff shows every picture
-   the release moved: the renders, layout, popup motion, the long list, and
-   the README pictures run only there. Its last line must be `ALL PASS`.
+3. Run `test/review.sh --fresh` on the release commit, with
+   `STONKS_RENDER_BASE` set to the last release's tag so its render diff
+   shows every picture the release moved: the renders, layout, popup
+   motion, the long list, and the README pictures run only there.
+   `--fresh` draws every picture rather than reuse a set an earlier run
+   kept, since this run has to catch a change from outside the repo. Its
+   last line must be `ALL PASS`.
 4. Fast-forward `main` to it: `git push origin dev:main`.
 5. Tag it (`vX.Y.Z`) and publish release notes, written as Words says.
 6. File the Omarchy plugin marketplace's verify form with `main`'s new
