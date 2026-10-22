@@ -53,6 +53,17 @@ ShellRoot {
       return fn()
     }
 
+    // Takes `symbol` out of All for good: its offer ends, as the next change
+    // to the lists would end it, so picking it again adds it afresh rather
+    // than puts it back. That add fetches again what the offer kept, its cap
+    // and P/E among them, so Yahoo's budget is left as a minute's pause
+    // would leave it: these adds come faster than anyone makes them.
+    function removeForGood(symbol) {
+      service.removeSymbol(symbol)
+      service.lastRemoval = null
+      service.yahooGate.tokens = service.yahooGate.capacity
+    }
+
     function findAll(item, name, into) {
       var out = into || []
       if (!item) return out
@@ -199,9 +210,8 @@ ShellRoot {
       // feature the row that takes the result's place, for a symbol new to
       // All, which is the hero at once as it arrives (SHOP, whose answer
       // fails), and for one already in it, the keyboard's choice on another
-      // result. On the footer's undo note it is one undo, not an undo and
-      // then a search. Found in the transition audit (search 4): the row
-      // under the pointer took the hero.
+      // result. Found in the transition audit (search 4): the row under the
+      // pointer took the hero.
       var doublePick = function(index, symbol) {
         service.feature(watchlist.displayedSymbols[3])
         wait(400)
@@ -238,20 +248,35 @@ ShellRoot {
       service.deleteList("Mid3")
       service.removeSymbol("SHOP.TO")
       wait(100)
+      // After a removal the footer is the add. A click on it opens search,
+      // whose one result before any typing is what went, chosen, with PUT
+      // BACK, the hero showing it; a double-click on it puts it back once,
+      // in its lists at its place, the hero back as it was, its second
+      // click featuring no row under it.
+      service.feature("AAPL")
+      wait(100)
+      var listsBefore = JSON.stringify(service.lists)
       watchlist.cursorSymbol = "NVDA"
       keys.forceActiveFocus()
       keyClick(Qt.Key_X)
       wait(50)
+      var gone = service.library.indexOf("NVDA") < 0
       var footer = harness.find(body, "footer")
       var footerAt = footer.mapToItem(body, footer.width / 2, footer.height / 2)
-      mouseDoubleClickSequence(body, footerAt.x, footerAt.y)
+      mouseClick(body, footerAt.x, footerAt.y)
+      tryVerify(function() { return body.adding }, 2000)
       wait(100)
-      var undone = service.library.indexOf("NVDA") >= 0
-      var searching = body.adding
-      if (searching) keyClick(Qt.Key_Escape)
-      wait(50)
-      harness.check("a double-click on the undo note undoes once and opens no search",
-        undone && !searching, undone + "|" + searching)
+      var offers = findAll(body.search, "searchResult")
+      var offered = body.search.results.map(function(r) { return r.symbol + " " + body.search.actionFor(r.symbol) }).join(",")
+        + " chosen " + offers[0].chosen + " hero " + body.previewSymbol
+      var putAt = offers[0].mapToItem(body, offers[0].width / 4, offers[0].height / 2)
+      mouseDoubleClickSequence(body, putAt.x, putAt.y)
+      wait(300)
+      harness.check("after a removal, the footer's search offers it back first, chosen, with PUT BACK, and a double-click puts it back once in its lists at its place, the hero as it was",
+        gone && offered === "NVDA PUT BACK chosen true hero NVDA" && !body.adding && JSON.stringify(service.lists) === listsBefore
+          && service.featuredSymbol === "AAPL" && service.lastRemoval === null,
+        [gone, offered, body.adding, JSON.stringify(service.lists), service.featuredSymbol, JSON.stringify(service.lastRemoval)].join(" | "))
+      mouseMove(body, 1, 1)
 
       // A member still arriving says Show too, and Enter on it features it at
       // once, named as on its way, and its row once its first answer is in,
@@ -532,7 +557,7 @@ ShellRoot {
       // new row in one frame, and then (review) a stopped or restarted wheel
       // glide featured the row from the old or a passing position.
       var landWith = function(wheel) {
-        service.removeSymbol("SLOW")
+        removeForGood("SLOW")
         wait(50)
         watchlist.contentY = wheel === "before" ? watchlist.rowPitch : 0
         var scrolls = []
@@ -622,7 +647,7 @@ ShellRoot {
         var kept = [service.featuredSymbol === hero, watchlist.contentY === 0, watchlist.cursorSymbol === ""]
         if (!reopenFirst) app.open("{}")
         wait(50)
-        service.removeSymbol("SLOW")
+        removeForGood("SLOW")
         wait(50)
         return kept.join(",")
       }
@@ -649,7 +674,7 @@ ShellRoot {
           && watchlist.contentY === 0 && body.landing === "",
         service.listName + "|" + service.featuredSymbol + "|" + watchlist.contentY + "|" + body.landing)
       service.deleteList("Elsewhere")
-      service.removeSymbol("SLOW")
+      removeForGood("SLOW")
       wait(50)
 
       // A symbol that leaves All before its first answer leaves arriving: it
@@ -681,7 +706,7 @@ ShellRoot {
       var featuredOnAnswer = within(2000, function() { return service.featuredSymbol === "SLOW" })
       harness.check("picking a symbol in All whose first quote is out features it once the quote lands",
         slowWasOut && featuredOnAnswer, slowWasOut + "|" + service.featuredSymbol)
-      service.removeSymbol("SLOW")
+      removeForGood("SLOW")
       wait(50)
 
       // A hero chosen while an add is still coming keeps the chart: chosen
@@ -718,7 +743,7 @@ ShellRoot {
           body.landingChanged.disconnect(chooseInGlide)
         }
         var kept = [chosen, service.featuredSymbol === target, watchlist.displayedSymbols.indexOf("SLOW") === 3].join(",")
-        service.removeSymbol("SLOW")
+        removeForGood("SLOW")
         wait(50)
         return kept
       }

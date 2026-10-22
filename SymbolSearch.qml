@@ -83,16 +83,31 @@ FocusScope {
   // The list on screen's members, arriving ones too: a result already in
   // it is shown, not added, and its label says so.
   property var members: []
-  function actionFor(symbol) { return members.indexOf(symbol) >= 0 ? "SHOW" : "ADD" }
-  // ADD and SHOW share one slot on every row, the wider word's, so the
+  // The removal on offer, { symbol, name, exchange }, or null: while the
+  // field is empty it is the one result, chosen, and wherever it shows its
+  // label says it goes back (`StonksBody.putBack`).
+  property var putBack: null
+  function actionFor(symbol) {
+    if (putBack && symbol === putBack.symbol) return "PUT BACK"
+    return members.indexOf(symbol) >= 0 ? "SHOW" : "ADD"
+  }
+  // An empty field's results: the removal on offer, or none.
+  readonly property var emptyResults: putBack ? [putBack] : []
+  onPutBackChanged: if (searchText.trim() === "" && active) {
+    results = emptyResults
+    choose(0)
+  }
+  // Every label shares one slot on every row, the widest word's, so the
   // exchange codes keep their column whichever shows. In the caption's
   // spaced capitals, as every other button in the views says its word, and
-  // padded as they are: 6 px each side of the wider word, 2 above and below
-  // the caption line.
+  // padded as they are: 6 px each side of the widest word, 2 above and
+  // below the caption line.
   readonly property font buttonFont: Qt.font({ family: fontFamily, pixelSize: Style.font.caption, bold: true, letterSpacing: 1 })
-  readonly property int buttonWidth: Math.ceil(Math.max(addMetrics.advanceWidth, showMetrics.advanceWidth)) + Style.space(12)
+  readonly property int buttonWidth: Math.ceil(Math.max(addMetrics.advanceWidth, showMetrics.advanceWidth,
+    putBack ? putBackMetrics.advanceWidth : 0)) + Style.space(12)
   TextMetrics { id: addMetrics; font: root.buttonFont; text: "ADD" }
   TextMetrics { id: showMetrics; font: root.buttonFont; text: "SHOW" }
+  TextMetrics { id: putBackMetrics; font: root.buttonFont; text: "PUT BACK" }
   // A row's columns: the symbol, the name, the exchange, and the label.
   readonly property int rowPadding: Style.space(10)
   readonly property int columnGap: Style.space(10)
@@ -149,7 +164,7 @@ FocusScope {
   // A new search's start, so its first frame is empty rather than the last
   // search's field and results.
   function reset() {
-    results = []
+    results = emptyResults
     note = ""
     answer = ""
     resultsQuery = ""
@@ -227,7 +242,7 @@ FocusScope {
     if (text.trim() === "") {
       // No query is asked any more: a search still out is dropped.
       suspend()
-      results = []
+      results = emptyResults
       note = ""
       answer = ""
       resultsQuery = ""

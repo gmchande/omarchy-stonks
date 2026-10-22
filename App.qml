@@ -141,6 +141,7 @@ Item {
           if (t === "?") body.toggleHelp()
           else if (t === "a" || t === "+") body.startAdding()
           else if (t === "x") body.removeRow(body.watchlist.cursorRow)
+          else if (t === "X") body.openRowMenu(body.watchlist.cursorRow, null)
           else if (t === "c") body.cycleChangeMode()
           else if (t === "r") root.refresh()
           else if (t === "[") body.stepRange(-1)

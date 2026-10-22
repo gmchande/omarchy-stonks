@@ -117,10 +117,19 @@ Item {
   property bool managingLists: false
   // The symbol whose lists the checklist shows; "" while it is closed.
   property string listsSymbol: ""
+  // A row's menu while it is open, null while shut: { symbol, lines, each
+  // { label, everywhere }, startLine, the line its cursor starts on, -1 for
+  // none, and where it opens in the body: its top-left at (x, below), or,
+  // where the body has no room under that, its bottom-left at (x, above) }
+  // (`openRowMenu`).
+  property var rowMenu: null
+  // It stands where it opened, so a surface that changes size under it,
+  // as a tiled window does, closes it, as a desktop's menus close.
+  onWidthChanged: rowMenu = null
+  onHeightChanged: rowMenu = null
   // A short word in the footer's place, for a moment, held while the pointer
-  // is on it: why a key did nothing, what a removal took, which a click on
-  // it puts back (`offered`), or that a newer Stonks is out, which a click
-  // on it updates (`updateOffered`).
+  // is on it: why a key did nothing, or that a newer Stonks is out, which a
+  // click on it updates (`updateOffered`).
   property string note: ""
   // A screenshot was taken on this visit: the header's camera stays lit
   // until the surface closes, and the next open puts it out.
@@ -159,11 +168,6 @@ Item {
   // restart, which a click on it does.
   readonly property string notice: settingsUnreadable ? "Can't read grvc.stonks.json · fix or remove it to save changes"
     : updatedTo !== "" ? "Updated to " + updatedTo + " · click to restart the shell" : ""
-  // The removal the footer's note offers back, the service's one removal on
-  // offer as the note was said: when another surface makes a newer removal,
-  // the lists change, or it is undone, the offer goes, and the note with it.
-  property var offered: null
-  onRemovalChanged: if (offered !== null && removal !== offered) clearNote()
   // The note says a newer Stonks is out, said as a surface opens with its
   // footer in sight, once for each answer that names it
   // (`Updates.releaseUnsaid`): a standing notice would take the add's place
@@ -173,7 +177,6 @@ Item {
   function offerRelease() {
     if (!updates || !updates.releaseUnsaid || showingHelp || adding || listViewOpen) return
     updates.sayRelease()
-    offered = null
     updateOffered = true
     note = "Stonks " + updates.releasedVersion + " is out"
     holdNote()
@@ -442,7 +445,17 @@ Item {
   // search, or a list view.
   readonly property bool rowsShown: !showingHelp && !adding && !listViewOpen
   // While any of these is open it has the keys, not the surface.
-  readonly property bool ownsKeys: adding || listMenuOpen || listViewOpen
+  readonly property bool ownsKeys: adding || listMenuOpen || listViewOpen || rowMenu !== null
+  // The last removal, which search offers back first, PUT BACK, in the
+  // list it left: the list on show held the stock before it, and lacks it
+  // now. Null when there is none.
+  readonly property var putBack: {
+    if (!removal || members.indexOf(removal.symbol) >= 0) return null
+    var was = Settings.listChoices(removal.before).filter(function(list) { return list.name === listName })[0]
+    if (!was || was.symbols.indexOf(removal.symbol) < 0) return null
+    var quote = removal.quote
+    return { symbol: removal.symbol, name: quote ? quote.name : removal.symbol, exchange: quote ? quote.exchange : "" }
+  }
   readonly property var keySheet: KeySheet.sheet(order)
   // The rows' mood, for the rule under the list name; it follows the scrub
   // as the rows do, and names its list, so the rule tells a switch from a
@@ -598,51 +611,83 @@ Item {
     if (service) service.stepList(delta)
   }
 
-  // A removal from the rows, by a key or a right-click. A named list may
-  // empty. Removing the row the keyboard cursor is on hands the cursor to
-  // the row that takes its place, as Mail and Finder do: the next row, or
-  // the one before when it was the last.
+  // The × beside a row's symbol, x, and Delete or Backspace: the row goes
+  // from the list on show at once. Where that would reach lists not on
+  // show, in All for a stock a named list holds too, they ask first, with
+  // the row's menu on its one line.
   function removeRow(symbol) {
+    if (!service || !symbol) return
+    if (listName === "" && listsHolding(symbol) > 1) openRowMenu(symbol, null)
+    else removeFrom(symbol, listName === "")
+  }
+
+  // How many lists hold `symbol`, All among them.
+  function listsHolding(symbol) {
+    return lists.filter(function(list) { return list.symbols.indexOf(symbol) >= 0 }).length
+  }
+
+  // Every removal comes through here: from the list on show, or, with
+  // `everywhere`, from All and so from every list. All's last symbol stays,
+  // said once in the footer, or in the lists checklist that asked, which
+  // stays open; otherwise what covers the rows closes, so the removal
+  // shows. A named list may empty. Removing the row the keyboard cursor is
+  // on hands the cursor to the row that takes its place, as Mail and Finder
+  // do: the next row, or the one before when it was the last.
+  function removeFrom(symbol, everywhere) {
+    if (!service) return
     showingHelp = false
-    cancelAdding()
-    if (!service || !symbol || refusesLast(listName)) return
+    if (everywhere && !Settings.canRemove(lists[0].symbols)) {
+      say("Keep at least one symbol")
+      return
+    }
+    // Read and removed as the rows are shown, held under the pointer or
+    // the row's menu, and only then is what covers them closed.
     var rows = watchlist.displayedSymbols
     var at = rows.indexOf(symbol)
     var successor = symbol === watchlist.cursorRow && at >= 0 ? (rows[at + 1] || rows[at - 1] || "") : ""
-    service.removeSymbol(symbol, rows)
-    if (successor !== "") watchlist.handTo(successor)
-    removed(symbol, listName)
-  }
-
-  // All keeps one symbol: a removal from All, "", that would empty it is
-  // refused, said once in the footer, whichever way it was asked.
-  function refusesLast(from) {
-    if (from !== "" || Settings.canRemove(lists[0].symbols)) return false
-    say("Keep at least one symbol")
-    return true
-  }
-
-  // Every removal ends here, from the rows or from a row's lists: the
-  // remove sound, and the footer's offer to put it back.
-  function removed(symbol, from) {
+    if (everywhere && listName !== "") service.setMembership(symbol, "", false, rows)
+    else service.removeSymbol(symbol, rows)
+    closeViews()
     sound("remove")
-    offerUndo(symbol, from)
+    if (successor !== "") watchlist.handTo(successor)
+  }
+
+  // A row's menu says where each way to remove it reaches. In a named
+  // list, that list by its name, and every list by count: the stock is in
+  // All too, so there are always two. In All, a removal reaches every list
+  // that holds it, so the menu is the one line that says so.
+  function rowMenuLines(symbol) {
+    var held = listsHolding(symbol)
+    var everywhere = { label: held > 1 ? "Remove from all " + held + " lists" : "Remove from All", everywhere: true }
+    return listName !== "" ? [{ label: "Remove from " + listName, everywhere: false }, everywhere] : [everywhere]
+  }
+
+  // The row's menu for `symbol`, its row taking the cursor: at `point`, the
+  // pointer's place in the scene, on no line until the pointer or a key
+  // moves; with no point, as a key opens it, under the row's symbol, on its
+  // first line. Where the body has no room under, it opens upward, over
+  // the pointer or the row.
+  function openRowMenu(symbol, point) {
+    var row = watchlist.rowItem(symbol)
+    if (!service || !row || watchlist.displayedSymbols.indexOf(symbol) < 0) return
+    closeViews()
+    watchlist.cursorSymbol = symbol
+    var top = row.mapToItem(root, Style.space(28), 0)
+    var at = point ? root.mapFromItem(null, point.x, point.y) : top
+    rowMenu = { symbol: symbol, lines: rowMenuLines(symbol), startLine: point ? -1 : 0, x: at.x,
+      below: point ? at.y : top.y + row.height, above: at.y }
+  }
+
+  // A line taken closes the menu, after its removal, made or refused.
+  function takeRowMenu(index) {
+    var menu = rowMenu
+    if (menu && index >= 0 && index < menu.lines.length) removeFrom(menu.symbol, menu.lines[index].everywhere)
+    rowMenu = null
   }
 
   function say(text) {
-    offered = null
     updateOffered = false
     note = text
-    holdNote()
-  }
-
-  // A removal is instant and needs no confirm, and the row may be off screen,
-  // so the footer names what went and offers it back. `u` takes it back
-  // until the next change to the lists, long after the note has gone.
-  function offerUndo(symbol, from) {
-    offered = removal
-    updateOffered = false
-    note = "Removed " + symbol + (from !== "" ? " from " + from : "")
     holdNote()
   }
 
@@ -657,7 +702,6 @@ Item {
       return
     }
     var symbol = removal.symbol
-    clearNote()
     service.undoRemoval(symbol)
     sound("undo")
     watchlist.select(symbol)
@@ -683,7 +727,6 @@ Item {
     noteFade.stop()
     noteShown = 1
     note = ""
-    offered = null
     updateOffered = false
   }
 
@@ -794,6 +837,7 @@ Item {
     listMenuOpen = false
     managingLists = false
     listsSymbol = ""
+    rowMenu = null
   }
 
   // A rename being typed in Manage lists is kept, as Enter keeps it, before
@@ -835,12 +879,19 @@ Item {
   // (`loadingText`) until it lands.
   // A result already in the list on screen is shown, not added
   // (`showSymbol`); one still arriving lands as an add does, and, shown,
-  // is featured even when its first fetch fails.
+  // is featured even when its first fetch fails. The removal on offer
+  // (`putBack`), taken as the first result or by name, is put back as u
+  // puts it: in its lists at its place, the hero as it was.
   function acceptSymbol(symbol) {
     if (!service) return
     var s = String(symbol || "").trim().toUpperCase()
     if (view.rows.indexOf(s) >= 0) {
       showSymbol(s)
+      return
+    }
+    if (putBack && s === putBack.symbol) {
+      cancelAdding()
+      undoRemoval()
       return
     }
     var member = members.indexOf(s) >= 0
@@ -979,18 +1030,12 @@ Item {
     else manageLists.stopEditing()
   }
 
-  // Unticking All is a removal from All: its last symbol stays, and the
-  // symbol it takes away has no lists left to show.
+  // Unticking All is a removal from All, and so from every list: the
+  // checklist closes, since the symbol it shows has no lists left.
   function setMembership(name, member) {
     if (!service) return
-    var removing = name === "" && !member
-    if (removing && refusesLast(name)) return
-    var symbol = listsSymbol
-    service.setMembership(symbol, name, member, watchlist.displayedSymbols)
-    if (removing) {
-      closeListViews()
-      removed(symbol, "")
-    }
+    if (name === "" && !member) removeFrom(listsSymbol, true)
+    else service.setMembership(listsSymbol, name, member, watchlist.displayedSymbols)
   }
 
   // Closing stops what moves and keeps what is shown, so the surface fades
@@ -1074,15 +1119,15 @@ Item {
     offerRelease()
   }
 
-  // A refusal stays a moment; an offer to undo or to update long enough to
-  // act on it. Its last 600 ms it fades, still taking a click while any of
-  // it shows, and what it covered fades in after it, so the change under a
+  // A refusal stays a moment; an offer to update long enough to act on
+  // it. Its last 600 ms it fades, still taking a click while any of it
+  // shows, and what it covered fades in after it, so the change under a
   // click is seen coming. Found in the walk of dev on 14 October: a click
-  // meant as an undo, just after the note went, opened search.
+  // meant for the note, just after it went, opened search.
   property real noteShown: 1
   Timer {
     id: noteTimer
-    interval: (root.offered !== null || root.updateOffered ? 5000 : 2500) - noteFade.duration
+    interval: (root.updateOffered ? 5000 : 2500) - noteFade.duration
     onTriggered: noteFade.start()
   }
   NumberAnimation {
@@ -1212,6 +1257,7 @@ Item {
     height: root.wholeListHeight
     sightHeight: root.rowsSightHeight
     menuCovers: root.listMenuOpen ? listMenu.y + listMenu.height - watchlist.y : 0
+    held: root.rowMenu !== null
     visible: root.rowsShown
     view: root.view
     quotes: root.quotes
@@ -1239,6 +1285,7 @@ Item {
     ground: root.ground
     onFeatureRequested: function(symbol) { root.featureSymbol(symbol) }
     onRemoveRequested: function(symbol) { root.removeRow(symbol) }
+    onMenuRequested: function(symbol, x, y) { root.openRowMenu(symbol, Qt.point(x, y)) }
     onManualOrderRequested: function(symbols) {
       root.cancelAdding()
       if (root.service) root.service.setManualOrder(symbols)
@@ -1274,6 +1321,7 @@ Item {
     // the popup's field.
     placeholder: root.listName !== "" ? "Symbol or company for " + root.listName + "…" : "Symbol or company…"
     members: root.members
+    putBack: root.putBack
     onPicked: function(symbol) { root.acceptSymbol(symbol) }
     onChose: function(symbol) { root.previewTo(symbol) }
     onCancelled: root.cancelAdding()
@@ -1370,22 +1418,21 @@ Item {
     gutter: root.gutter
     rowHeight: root.rowHeight
     note: root.note
-    noteAction: root.offered !== null ? " · click to undo" : root.updateOffered ? " · click to update" : ""
+    noteAction: root.updateOffered ? " · click to update" : ""
     noteOpacity: root.noteShown
     notice: root.notice
     hint: root.hint
     showsHint: root.hintShown
     ground: root.ground
     label: root.listName !== "" ? "+  Add a symbol to " + root.listName : "+  Add a symbol"
-    acts: root.offered !== null || root.updateOffered || !root.settingsUnreadable
+    acts: root.updateOffered || !root.settingsUnreadable
     onHoveredChanged: root.holdNote()
-    // The click acts on what the footer shows: an undo offer undoes, a newer
-    // version's note runs the update, the update's notice restarts the
-    // shell, and the file's does nothing, nor does a refusal over it; a
-    // refusal otherwise, or the label, adds.
+    // The click acts on what the footer shows: a newer version's note runs
+    // the update, the update's notice restarts the shell, and the file's
+    // does nothing, nor does a refusal over it; a refusal otherwise, or the
+    // label, adds.
     onClicked: {
-      if (root.offered !== null) root.undoRemoval()
-      else if (root.updateOffered) {
+      if (root.updateOffered) {
         root.clearNote()
         root.updates.update()
       }
@@ -1464,6 +1511,43 @@ Item {
     z: 9
     onClicked: listMenu.typedName.trim() !== "" ? root.createList(listMenu.typedName) : root.closeListMenu()
     onWheel: function(wheel) { wheel.accepted = true }
+  }
+
+  // A click anywhere off a row's menu closes it, with any button, and
+  // nothing under it acts, as off the list menu. A double-click is one
+  // click, as on the rows (`Watchlist.clickCounts`): the second press of
+  // the right double-click that opened the menu leaves it open.
+  MouseArea {
+    anchors.fill: parent
+    visible: root.rowMenu !== null
+    hoverEnabled: true
+    acceptedButtons: Qt.AllButtons
+    z: 9
+    onClicked: function(mouse) {
+      var at = mapToItem(null, mouse.x, mouse.y)
+      if (watchlist.clickCounts(at.x, at.y, false)) root.rowMenu = null
+    }
+    onWheel: function(wheel) { wheel.accepted = true }
+  }
+
+  // At its place (`openRowMenu`), kept inside the body's margins, over the
+  // rows and the footer.
+  RowMenu {
+    objectName: "rowMenu"
+    visible: root.rowMenu !== null
+    active: root.rowMenu !== null && root.surfaceOpen
+    z: 10
+    maxWidth: root.width - root.margins * 2
+    x: root.rowMenu ? Math.max(root.margins, Math.min(root.rowMenu.x, root.width - root.margins - width)) : 0
+    y: !root.rowMenu ? 0 : root.rowMenu.below + height <= root.edge - root.margins ? root.rowMenu.below
+      : Math.max(root.margins, root.rowMenu.above - height)
+    lines: root.rowMenu ? root.rowMenu.lines.map(function(line) { return line.label }) : []
+    startLine: root.rowMenu ? root.rowMenu.startLine : -1
+    retro: root.retro
+    foreground: root.foreground
+    fontFamily: root.fontFamily
+    onTaken: function(index) { root.takeRowMenu(index) }
+    onDismissed: root.rowMenu = null
   }
 
   ListMenu {

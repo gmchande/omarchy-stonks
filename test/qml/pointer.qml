@@ -172,16 +172,12 @@ ShellRoot {
     function preview(surface, symbol) {}
     function feature(symbol) { featuredSymbol = symbol }
     function removeSymbol(symbol) {
+      var before = { symbols: symbols, lists: [] }
       var next = symbols.filter(function(value) { return value !== symbol })
       symbols = next
       shown = Settings.sortedSymbols(next, quotes, order)
       if (featuredSymbol === symbol) featuredSymbol = next[0] || ""
-      lastRemoval = { symbol: symbol }
-    }
-    property string undone: ""
-    function undoRemoval(symbol) {
-      undone = symbol
-      lastRemoval = null
+      lastRemoval = { symbol: symbol, before: before }
     }
     function setManualOrder(next) { symbols = next.slice(); shown = next.slice(); order = "manual" }
     function addSymbol(symbol) {
@@ -247,6 +243,12 @@ ShellRoot {
       function within(ms, fn) {
         for (var t = 0; t < ms && !fn(); t += 20) wait(20)
         return fn()
+      }
+
+      // A click on the open row menu's line `index`, where its words are.
+      function takeMenuLine(index) {
+        var line = root.findAll(body, "rowMenuLine")[index]
+        if (line) mouseClick(line, Style.space(20), line.height / 2)
       }
 
       function test_owner_flows() {
@@ -553,17 +555,26 @@ ShellRoot {
         mouseMove(body.watchlist, 12, body.watchlist.rowPitch + 12)
         wait(50)
         var removed = body.watchlist.displayedSymbols[1]
+        // A middle-click removes nothing; a right-click opens the row's menu,
+        // removing nothing, and its line removes the row.
         mouseClick(body.watchlist, 12, body.watchlist.rowPitch + 12, Qt.MiddleButton)
+        wait(50)
+        var middleKept = body.watchlist.displayedSymbols.indexOf(removed) >= 0 && body.rowMenu === null
+        mouseClick(body.watchlist, 12, body.watchlist.rowPitch + 12, Qt.RightButton)
+        wait(50)
+        var menuKept = body.rowMenu !== null && body.rowMenu.symbol === removed && body.watchlist.displayedSymbols.indexOf(removed) >= 0
+        takeMenuLine(0)
         wait(200)
         var contiguous = true
         for (i = 0; i < body.watchlist.displayedSymbols.length; i++) {
           var row = body.watchlist.rowItem(body.watchlist.displayedSymbols[i])
           if (!row || Math.abs(row.y - i * body.watchlist.rowPitch) > 0.5) contiguous = false
         }
-        root.check("pointer-held removal updates membership without a hole",
-          body.watchlist.sortHeld && body.watchlist.displayedSymbols.indexOf(removed) < 0
+        root.check("a middle-click removes nothing, a right-click opens the row's menu, and its line removes the row under a held sort without a hole",
+          middleKept && menuKept && body.rowMenu === null && body.watchlist.sortHeld && body.watchlist.displayedSymbols.indexOf(removed) < 0
             && body.watchlist.rowItem(removed) === null && contiguous
-            && body.watchlist.displayedSymbols.length === 14)
+            && body.watchlist.displayedSymbols.length === 14,
+          [middleKept, menuKept, body.rowMenu === null, body.watchlist.sortHeld, body.watchlist.displayedSymbols.length].join("|"))
 
         // Before its first answer the new symbol is not in the list at all:
         // not drawn, not counted in the scroll, and not a key's target.
@@ -706,10 +717,11 @@ ShellRoot {
         root.setFixtureWatchlist()
         wait(100)
 
-        // A right-click that removes a row mid-glide hands the cursor to the
-        // row that takes its place, as x does. From the rows review: the
-        // cursor read the glide's destination, skipped that row, and the
-        // next removal key acted on the one after it.
+        // A right-click mid-glide opens the menu of the row under the
+        // pointer, and its removal hands the cursor to the row that takes its
+        // place, as x does. From the rows review: the cursor read the glide's
+        // destination, skipped that row, and the next removal key acted on
+        // the one after it.
         body.watchlist.contentY = 0
         wait(50)
         var clicked = body.watchlist.displayedSymbols[0]
@@ -718,10 +730,12 @@ ShellRoot {
         mouseMove(body.watchlist, 12, 12)
         mouseWheel(body.watchlist, 12, 12, 0, -120, Qt.NoModifier)
         mouseClick(body.watchlist, 12, 12, Qt.RightButton)
+        var menuFor = body.rowMenu ? body.rowMenu.symbol : ""
+        takeMenuLine(0)
         wait(600)
-        root.check("a right-click removing a row mid-glide hands the cursor to the row that takes its place",
-          body.watchlist.displayedSymbols.indexOf(clicked) < 0 && body.watchlist.cursorRow === takesPlace,
-          clicked + " -> " + body.watchlist.cursorRow + " for " + takesPlace)
+        root.check("a right-click mid-glide opens the menu of the row under the pointer, and its removal hands the cursor to the row that takes its place",
+          menuFor === clicked && body.watchlist.displayedSymbols.indexOf(clicked) < 0 && body.watchlist.cursorRow === takesPlace,
+          menuFor + " menu; " + clicked + " -> " + body.watchlist.cursorRow + " for " + takesPlace)
         root.setFixtureWatchlist()
         wait(100)
 
@@ -784,8 +798,9 @@ ShellRoot {
         wait(100)
         body.watchlist.contentY = 0
         wait(50)
-        // Off a row boundary too: the removal hands the cursor on and the
-        // list stays where the click stopped it.
+        // Off a row boundary too: a right double-click opens the row's menu
+        // once, its second press no click off it, and the removal it takes
+        // hands the cursor on, the list staying where the click stopped it.
         body.watchlist.followBy(17)
         var shownBefore = body.watchlist.displayedSymbols.slice()
         var thirdY = 2 * pitch + 20 - 17
@@ -794,15 +809,18 @@ ShellRoot {
         mouseClick(body.watchlist, 12, thirdY, Qt.RightButton)
         wait(200)
         mouseClick(body.watchlist, 12, thirdY, Qt.RightButton)
+        wait(100)
+        var menuStayed = body.rowMenu !== null && body.rowMenu.symbol === shownBefore[2]
+        takeMenuLine(0)
         wait(400)
         var shownAfter = body.watchlist.displayedSymbols
         var removedOnce = shownAfter.length === shownBefore.length - 1
           && shownAfter.indexOf(shownBefore[2]) < 0 && shownAfter.indexOf(shownBefore[3]) >= 0
           && body.watchlist.cursorRow === shownBefore[3]
         var stayedRemoved = body.watchlist.contentY === 17
-        root.check("a double-click on a part-scrolled row features only that row, and a right double-click removes one row, the list staying where the click stopped it",
-          featuredOnce && removedOnce && stayedFeatured && stayedRemoved,
-          featuredSeen.join(",") + " for " + partRow + " | " + shownBefore.length + " -> " + shownAfter.length
+        root.check("a double-click on a part-scrolled row features only that row, and a right double-click opens its menu once, which removes one row, the list staying where the click stopped it",
+          featuredOnce && menuStayed && removedOnce && stayedFeatured && stayedRemoved,
+          featuredSeen.join(",") + " for " + partRow + " | menu " + menuStayed + " | " + shownBefore.length + " -> " + shownAfter.length
             + " cursor " + body.watchlist.cursorRow + " | stayed " + stayedFeatured + "," + stayedRemoved)
         root.setFixtureWatchlist()
         wait(100)
@@ -1372,7 +1390,7 @@ ShellRoot {
           wait(300)
           var still = [stub.featuredSymbol === hero, body.watchlist.displayedSymbols.join() === rows.join(),
             body.watchlist.contentY === scrolled, !body.adding, stub.lastSettings === settings,
-            body.scrubT === 0, body.watchlist.cursorRow === cursor].join(",")
+            body.scrubT === 0, body.watchlist.cursorRow === cursor, body.rowMenu === null].join(",")
           body.surfaceOpen = true
           mouseMove(body, 1, 1)
           wait(50)
@@ -1385,7 +1403,7 @@ ShellRoot {
         stub.retro = false
         wait(50)
         root.check("a closing surface takes no click, right-click, wheel, or scrub, smooth and retro",
-          smoothInert === "true,true,true,true,true,true,true" && retroInert === smoothInert, smoothInert + " | " + retroInert)
+          smoothInert === "true,true,true,true,true,true,true,true" && retroInert === smoothInert, smoothInert + " | " + retroInert)
 
         // The order control hovers like a range token. In a sorted order the
         // arrow is a control of its own, so it lights alone and the word
@@ -1477,16 +1495,18 @@ ShellRoot {
         root.check("the scrollbar is absent when every row fits",
           !body.watchlist.ScrollBar.vertical.visible)
 
-        // Right-click removes a row; the last one stays, and the footer says
-        // why for a moment.
+        // The row's menu removes a row from All; the last one stays, and the
+        // footer says why for a moment.
         var fit2 = body.watchlist.rowItem("FIT2")
         mouseClick(fit2, fit2.width / 2, fit2.height / 2, Qt.RightButton)
+        takeMenuLine(0)
         wait(200)
         var fit1 = body.watchlist.rowItem("FIT1")
         mouseClick(fit1, fit1.width / 2, fit1.height / 2, Qt.RightButton)
+        takeMenuLine(0)
         wait(50)
         root.check("the last row stays and the footer says why",
-          stub.symbols.join(",") === "FIT1" && body.note === "Keep at least one symbol")
+          stub.symbols.join(",") === "FIT1" && body.note === "Keep at least one symbol", stub.symbols + "|" + body.note)
         wait(2700)
         root.check("the note clears on its own", body.note === "")
 
@@ -1522,8 +1542,9 @@ ShellRoot {
         // button, as the shell's Bluetooth panel shows Forget; the cursor
         // resting on the featured row shows none. A click on it removes that
         // row, a double-click one row only, and nothing else on the row
-        // moves. The ? sheet says a right-click removes a row too. Found in
-        // the mouse audit: nothing on screen said a row could be removed.
+        // moves. The ? sheet says a right-click offers to remove a row.
+        // Found in the mouse audit: nothing on screen said a row could be
+        // removed.
         root.setQuotes(["FIT1", "FIT2", "FIT3", "FIT4"], [101, 102, 103, 104])
         mouseMove(body, body.width / 2, body.height - 4)
         body.watchlist.cursorSymbol = ""
@@ -1598,7 +1619,7 @@ ShellRoot {
         fit2Remove = removeOf("FIT2")
         if (fit2Remove && fit2Remove.visible) mouseClick(fit2Remove, fit2Remove.width / 2, fit2Remove.height / 2)
         wait(200)
-        removeSteps.push("click " + stub.symbols.join(",") + " " + JSON.stringify(body.note.split(" ·")[0]))
+        removeSteps.push("click " + stub.symbols.join(","))
         wait(Application.styleHints.mouseDoubleClickInterval + 50)
         var nextRemove = removeOf("FIT3")
         if (nextRemove && nextRemove.visible) mouseDoubleClickSequence(nextRemove, nextRemove.width / 2, nextRemove.height / 2)
@@ -1625,7 +1646,7 @@ ShellRoot {
         }
         removeSteps.push("lift " + stub.symbols.join(","))
         root.check("a cursor you put on a row shows its remove button, the resting one none; a click on it removes that row, a slip nothing, a double-click one, a press and move lifts the row, and nothing else moves",
-          keyed !== "" && removeSteps.join(" | ") === "rest none | pointer FIT2 | still | slips FIT1,FIT2,FIT3,FIT4 | click FIT1,FIT3,FIT4 \"Removed FIT2\" | double FIT1,FIT4 | key "
+          keyed !== "" && removeSteps.join(" | ") === "rest none | pointer FIT2 | still | slips FIT1,FIT2,FIT3,FIT4 | click FIT1,FIT3,FIT4 | double FIT1,FIT4 | key "
             + keyed + " | lift FIT4,FIT1",
           removeSteps.join(" | "))
 
@@ -1745,101 +1766,8 @@ ShellRoot {
         var gestures = root.findAll(body, "helpGesture").map(function(k) { return k.text + ": " + k.parent.children[1].text })
         body.showingHelp = false
         wait(100)
-        root.check("the ? sheet says a right-click on a row removes it",
-          gestures.some(function(g) { return /^row: .*right-click removes it/.test(g) }), gestures.join(" | "))
-
-        // A removal's note stays while the pointer rests on it, past its five
-        // seconds, and a click then takes the removal back: it never turns
-        // into the add under the pointer. Once the pointer leaves, it has its
-        // moment again. Found in the first-run review: a slow click on the
-        // note opened search.
-        root.setQuotes(["FIT1", "FIT2"], [101, 102])
-        wait(200)
-        var footer = root.find(body, "footer")
-        // On the note's words, where the footer is now: under a short list,
-        // a removal moves it up a row.
-        var noteAt = function() { return footer.mapToItem(body, footer.width / 2, footer.height / 2 + Style.space(3)) }
-        body.removeRow("FIT2")
-        var onNote = noteAt()
-        mouseMove(body, onNote.x, onNote.y)
-        wait(5600)
-        var action = root.find(footer, "footerAction")
-        var held = body.note + "|" + (action ? action.text : "no action") + "|" + footer.hovered
-        mouseClick(body, onNote.x, onNote.y)
-        wait(50)
-        root.check("a removal's note stays under the pointer past its moment, and a click on it then undoes",
-          held === "Removed FIT2| · click to undo|true" && stub.undone === "FIT2" && !body.adding,
-          held + "|" + stub.undone + "|" + body.adding)
-        root.setQuotes(["FIT1", "FIT2"], [101, 102])
-        wait(200)
-        body.removeRow("FIT2")
-        onNote = noteAt()
-        mouseMove(body, onNote.x, onNote.y)
-        wait(5600)
-        var stillHeld = body.note
-        mouseMove(body, body.width / 2, 20)
-        wait(1000)
-        var leftAMoment = body.note
-        tryVerify(function() { return body.note === "" }, 6000)
-        root.check("once the pointer leaves, the note has its moment again, then goes",
-          stillHeld === "Removed FIT2" && leftAMoment === "Removed FIT2" && body.note === "",
-          stillHeld + "|" + leftAMoment + "|" + body.note)
-
-        // The note's last 600 ms fade it out, still taking a click, and what
-        // it covered fades in after it; a pointer that comes during the fade
-        // brings it back whole and holds it, and a click then undoes. Read on
-        // the note's frames. Found in the walk of dev on 14 October: a click
-        // meant as an undo, just after the note went, opened search.
-        var footerText = root.find(footer, "footerText")
-        var faded = []
-        var noteFrames = function() { faded.push((body.note !== "" ? "n" : "l") + Math.round(footerText.opacity * 100)) }
-        footerText.opacityChanged.connect(noteFrames)
-        root.setQuotes(["FIT1", "FIT2"], [101, 102])
-        wait(200)
-        stub.undone = ""
-        body.removeRow("FIT2")
-        var fadeBegan = within(6000, function() { return body.note !== "" && footerText.opacity < 0.9 })
-        mouseMove(body, onNote.x, onNote.y)
-        wait(50)
-        var broughtBack = body.note !== "" && footerText.opacity === 1
-        wait(1200)
-        var heldWhole = body.note !== "" && footerText.opacity === 1
-        mouseClick(body, onNote.x, onNote.y)
-        wait(50)
-        var arrived = [fadeBegan, broughtBack, heldWhole, stub.undone, body.adding].join(",")
-        // Closed mid-fade, the note holds as it was, a pointer passing over
-        // the closing card too. Found in review: hover brought it back whole.
-        mouseMove(body, body.width / 2, 20)
-        root.setQuotes(["FIT1", "FIT2"], [101, 102])
-        wait(200)
-        body.removeRow("FIT2")
-        within(6000, function() { return body.note !== "" && footerText.opacity < 0.9 })
-        body.freeze()
-        body.surfaceOpen = false
-        var frozeAt = footerText.opacity
-        mouseMove(body, onNote.x, onNote.y)
-        wait(100)
-        var closedHeld = frozeAt < 0.9 && frozeAt > 0 && footerText.opacity === frozeAt
-        mouseMove(body, body.width / 2, 20)
-        body.surfaceOpen = true
-        body.resetInteraction()
-        wait(100)
-        arrived += "," + closedHeld
-        mouseMove(body, body.width / 2, 20)
-        root.setQuotes(["FIT1", "FIT2"], [101, 102])
-        wait(200)
-        faded = []
-        body.removeRow("FIT2")
-        within(6000, function() { return body.note === "" })
-        within(500, function() { return footerText.opacity === 1 })
-        // Fading notes, then the label coming in from nothing to whole.
-        var fadingNote = faded.filter(function(f) { return /^n/.test(f) && f !== "n100" && f !== "n0" })
-        var comingLabel = faded.filter(function(f) { return /^l/.test(f) })
-        footerText.opacityChanged.disconnect(noteFrames)
-        var gone = [fadingNote.length > 2, comingLabel.length > 1 && comingLabel[comingLabel.length - 1] === "l100"
-          && Number(comingLabel[0].slice(1)) < 50].join(",")
-        root.check("the note fades its last 600 ms, a pointer then brings it back whole and holds it, a click undoes, a close holds it as it was, and the add fades in after it",
-          arrived === "true,true,true,FIT2,false,true" && gone === "true,true", arrived + " | " + gone + " | " + faded.join(" "))
+        root.check("the ? sheet says a right-click on a row offers to remove it",
+          gestures.some(function(g) { return /^row: .*right-click offers to remove it/.test(g) }), gestures.join(" | "))
 
         // The popup card's held anchor finds the pill's bar window through
         // the pill and sits on its content, where the shell measures an

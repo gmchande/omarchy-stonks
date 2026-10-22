@@ -791,14 +791,21 @@ ShellRoot {
         offSilent && service.soundsOn && winIcon.on === true && clicked.length === before + 1 && played(clicked[before]) === "sounds/retro/add.wav",
         offSilent + "|" + harness.starts().slice(before).map(played).join(", "))
 
-      // A right-click removes a row, a click on the footer's note takes it
-      // back, and an add through search's ADD: retro's sounds.
+      // A right-click and its menu's line remove a row, search's PUT BACK
+      // takes it back, and an add through search's ADD: retro's sounds.
       rows = win.watchlist.displayedSymbols
       var row = win.watchlist.rowItem(rows[rows.length - 1])
       mouseClick(row, row.width / 2, row.height / 2, Qt.RightButton)
+      tryVerify(function() { return win.rowMenu !== null }, 2000)
+      var line = harness.findAll(win, "rowMenuLine")[0]
+      mouseClick(line, line.width / 2, line.height / 2)
       startsBy(before + 2)
       var footer = harness.find(win, "footer")
       mouseClick(footer, footer.width / 2, footer.height / 2)
+      tryVerify(function() { return win.adding && win.search.results.length === 1 }, 2000)
+      wait(100)
+      var putBack = harness.find(harness.findAll(win.search, "searchResult")[0], "searchAdd")
+      mouseClick(putBack, putBack.width / 2, putBack.height / 2)
       startsBy(before + 3)
       quiet()
       mouseClick(footer, footer.width / 2, footer.height / 2)
@@ -813,7 +820,7 @@ ShellRoot {
       mouseClick(add, add.width / 2, add.height / 2)
       var mouseSounds = startsBy(before + 4).slice(before + 1).map(played)
       quiet()
-      harness.check("in the window, a right-click on a row, a click on the footer's undo, and a click on a result's ADD play retro's removal, undo, and add",
+      harness.check("in the window, a right-click's menu line, search's PUT BACK, and a result's ADD play retro's removal, undo, and add",
         mouseSounds.join(", ") === "sounds/retro/remove.wav, sounds/retro/undo.wav, sounds/retro/add.wav", mouseSounds.join(", "))
       // The add lands; then a click on MSFT's row shows its chart, a busy
       // US day, every column lit, to replay.

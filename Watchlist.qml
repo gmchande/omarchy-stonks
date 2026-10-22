@@ -140,11 +140,16 @@ Flickable {
     lastSight = sightHeight
     letGoUnseen()
   }
-  readonly property bool sortHeld: listHover.hovered || dragSymbol !== ""
+  // The rows hold their order under the pointer, a drag, or the row's
+  // menu, which takes the pointer's hover from the list while it is open.
+  property bool held: false
+  readonly property bool sortHeld: listHover.hovered || dragSymbol !== "" || held
   readonly property bool manualOrder: view.order === "manual"
 
   signal featureRequested(string symbol)
   signal removeRequested(string symbol)
+  // A right-click on a row, at (x, y) in the scene.
+  signal menuRequested(string symbol, real x, real y)
   signal listsRequested(string symbol)
   signal manualOrderRequested(var symbols)
   // A drag, or J or K, asked to move a row while a sorted order shows,
@@ -871,7 +876,7 @@ Flickable {
         // A double-click's second press does nothing (clickRow), and a
         // click stops the list where it is and puts the cursor on its row.
         onFeatureRequested: function(x, y, second) { if (root.clickRow(symbol, x, y, second)) root.featureRequested(symbol) }
-        onRemoveRequested: function(x, y, second) { if (root.clickRow(symbol, x, y, second)) root.removeRequested(symbol) }
+        onMenuRequested: function(x, y, second) { if (root.clickRow(symbol, x, y, second)) root.menuRequested(symbol, x, y) }
         onRemovePressed: function(x, y, second) { root.removeArmed = root.clickCounts(x, y, second) ? symbol : "" }
         onRemoveReleased: function(x, y) {
           var armed = root.removeArmed === symbol

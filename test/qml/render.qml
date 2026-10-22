@@ -56,6 +56,9 @@ ShellRoot {
   readonly property string outPath: Quickshell.env("STONKS_VISUAL_OUT")
   readonly property string fixtureDir: Quickshell.env("STONKS_FIXTURES")
   readonly property string calendarPath: Quickshell.env("STONKS_VISUAL_CALENDARS")
+  // What a state does as its picture is taken, after everything has
+  // landed; null for none.
+  property var beforeGrab: null
   readonly property var w22: {
     var match = /^w22-(popup|window|min-window)-(smooth|retro)-([a-z]+)-(1d|1y|5y)$/.exec(stateName)
     return match ? { popup: match[1] === "popup", min: match[1] === "min-window", symbol: match[3], range: match[4] } : null
@@ -243,13 +246,6 @@ ShellRoot {
 
   function isDefaultSprite(rows, standard) {
     return rows.join("|") === standard.join("|")
-  }
-
-  // A removal's offer from a list whose long name the footer cuts, so its
-  // action is still said whole.
-  function offerUndo() {
-    body.offered = { symbol: "SHEL.L" }
-    body.note = "Removed SHEL.L from Long-term dividend growth picks"
   }
 
   FileView { id: aaplFile; path: fixtureDir + "/aapl.json"; blockLoading: true }
@@ -732,6 +728,21 @@ ShellRoot {
         stub.entries = Object.assign({}, stub.entries, { "SHOP.TO": { status: "ok", receivedAt: root.now } })
         body.search.showResult(1)
       }
+      // popup-search-putback-*: SHOP.TO just removed, and search opened on
+      // an empty field: its one result is the removal, chosen, PUT BACK, the
+      // hero showing it.
+      if (root.stateName.indexOf("-putback-") > 0) {
+        stub.lastRemoval = { symbol: "SHOP.TO", before: { symbols: stub.symbols, lists: [] }, quote: stub.quotes["SHOP.TO"] }
+        stub.symbols = stub.symbols.filter(function(s) { return s !== "SHOP.TO" })
+        stub.shown = stub.symbols.slice()
+        root.now = stub.quotes["SHOP.TO"].marketTime + 120
+        stub.entries = Object.assign({}, stub.entries, { "SHOP.TO": { status: "ok", receivedAt: root.now } })
+        body.search.searchText = ""
+        body.search.resultsQuery = ""
+        body.search.answer = ""
+        body.search.results = body.search.emptyResults
+        body.search.choose(0)
+      }
       if (root.stateName.indexOf("-none-") > 0 || root.stateName.indexOf("-failed-") > 0) {
         body.search.results = []
         body.search.resultsQuery = "ZZZ"
@@ -786,11 +797,9 @@ ShellRoot {
       quotes["SHOP.TO"] = Object.assign({}, still, { prevClose: Quote.regularClose(still) })
       stub.quotes = quotes
     } else if (/^(popup|window)-note-/.test(root.stateName)) {
-      // popup-note-<look>: a refusal. <popup|window>-note-undo-<look>: a
-      // removal's offer from a long list name, whose action is said whole.
-      // <popup|window>-note-sorted-<look>: J refused in a sorted order.
-      if (root.stateName.indexOf("-undo-") > 0) root.offerUndo()
-      else if (root.stateName.indexOf("-sorted-") > 0) {
+      // popup-note-<look>: a refusal. <popup|window>-note-sorted-<look>: J
+      // refused in a sorted order.
+      if (root.stateName.indexOf("-sorted-") > 0) {
         stub.order = "pct"
         Qt.callLater(function() {
           body.watchlist.cursorSymbol = stub.shown[2]
@@ -800,10 +809,8 @@ ShellRoot {
       else body.note = "Keep at least one symbol"
     } else if (root.stateName.indexOf("popup-hint-") === 0) {
       // The first open's footer: the hint's lines have to fit the popup's
-      // width, above "+ Add a symbol". popup-hint-undo-<look>: a removal's
-      // note under them.
+      // width, above "+ Add a symbol".
       body.showFirstRunHint()
-      if (root.stateName.indexOf("-undo-") > 0) root.offerUndo()
     } else if (root.stateName.indexOf("popup-notice-file-") === 0) {
       // The footer's notices have to fit the popup's width.
       stub.settingsUnreadable = true
@@ -821,7 +828,7 @@ ShellRoot {
       // library, the featured symbol staying put on a switch. -menu12- and
       // -menu30-: the menu over 12 or 30 lists, the power-user walk's.
       var all = stub.symbols.slice()
-      var named = root.stateName.indexOf("-named-") > 0 ? { name: "My Watchlist", symbols: all.slice(0, 8) }
+      var named = /-(named|rowmenu)-/.test(root.stateName) ? { name: "My Watchlist", symbols: all.slice(0, 8) }
         : root.stateName.indexOf("-empty-") > 0 ? { name: "Growth", symbols: [] }
         : root.stateName.indexOf("-long-") > 0 ? { name: "Semiconductors & AI infrastructure", symbols: all.slice(3, 8) }
         : null
@@ -862,6 +869,24 @@ ShellRoot {
         })
       } else if (root.stateName.indexOf("-symbol-") > 0) {
         body.openSymbolLists(body.watchlist.cursorRow)
+      } else if (/-rowmenu(all)?-/.test(root.stateName)) {
+        // <popup|window>-lists-rowmenu-<look>: My Watchlist's second row,
+        // in sight at every text size, right-clicked, which Wins holds too:
+        // this list by its name, or all 3. popup-lists-rowmenuall-<look>:
+        // that symbol's menu in All by Shift+X, its one line chosen. Opened
+        // as the picture is taken, once the rows and a -size-N text size
+        // have landed: the menu stands where it opens, and a later size
+        // closes it.
+        var held = all[1]
+        stub.lists = stub.lists.map(function(list) { return list.name === "Wins" ? choice("Wins", list.symbols.concat([held])) : list })
+        if (!named) {
+          stub.order = "manual"
+          stub.shown = all.slice()
+        }
+        root.beforeGrab = function() {
+          var row = body.watchlist.rowItem(held)
+          body.openRowMenu(held, named ? row.mapToItem(null, Style.space(60), row.height / 2) : null)
+        }
       } else if (/-(manage|rename|confirm)-/.test(root.stateName)) {
         body.openManageLists()
         // After the view opens on its first named list.
@@ -1185,6 +1210,7 @@ ShellRoot {
           body.takeScreenshot()
           return
         }
+        if (root.beforeGrab) root.beforeGrab()
         frame.grabToImage(function(result) {
           result.saveToFile(root.outPath)
           exitTimer.start()

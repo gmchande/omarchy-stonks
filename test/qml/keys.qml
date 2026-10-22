@@ -144,7 +144,7 @@ ShellRoot {
       return JSON.stringify([b.surfaceOpen, b.watchlist.cursorRow, service.featuredSymbol, b.scrubT, b.motion.replayRunning,
         service.range, b.adding, b.listMenuOpen, b.managingLists, b.listsSymbol, service.order, service.reversed,
         service.listName, service.symbols.join(","), service.retro, service.soundsOn, service.changeMode, b.showingHelp,
-        service.testRefreshes, harness.tabs, b.cameraLit])
+        service.testRefreshes, harness.tabs, b.cameraLit, b.rowMenu ? b.rowMenu.symbol : ""])
     }
 
     // Every key starts from here: the surface open on All, manual order, the
@@ -154,10 +154,7 @@ ShellRoot {
       if (!s.body || !s.body.surfaceOpen) s.open()
       var b = s.body
       b.undoRemoval()
-      b.cancelAdding()
-      b.closeListMenu()
-      b.closeListViews()
-      b.showingHelp = false
+      b.closeViews()
       // As a surface opens: the camera out, so y lights it again.
       b.cameraLit = false
       b.endScrub()
@@ -181,7 +178,7 @@ ShellRoot {
     readonly property var setups: ({
       "→": function(s) { s.body.nudgeScrub(-2) },
       "l": function(s) { s.body.nudgeScrub(-2) },
-      "u": function(s) { s.body.removeRow(s.body.watchlist.cursorRow) },
+      "u": function(s) { s.body.removeFrom(s.body.watchlist.cursorRow, true) },
       "Shift+O": function(s) { service.setOrder("pct") },
       // The day is the first range.
       "[": function(s) { service.setRange("1W") }
@@ -246,14 +243,20 @@ ShellRoot {
     // With Caps Lock on, a letter acts as itself: j does what j does (in
     // the popup it moves the selection) and never moves a row, o changes
     // the order and never reverses it, w opens the list menu and never
-    // Manage lists, and in Manage lists J moves no list. Caps Lock sends
-    // "J" with no Shift. Found in the 1.0.0 review: Caps Lock's J and K
-    // saved a reorder.
+    // Manage lists, x removes and never opens the row's menu, and in Manage
+    // lists J moves no list. Caps Lock sends "J" with no Shift. Found in the
+    // 1.0.0 review: Caps Lock's J and K saved a reorder.
     function capsLock(s) {
       var wrong = []
-      ;["j", "k", "o", "w"].forEach(function(letter) {
+      ;["j", "k", "o", "w", "x"].forEach(function(letter) {
         var caps = letter.toUpperCase()
-        var setup = function() { base(s); if (letter === "o") service.setOrder("pct"); wait(50) }
+        // x on a row Walk lacks, which it removes at once.
+        var setup = function() {
+          base(s)
+          if (letter === "o") service.setOrder("pct")
+          if (letter === "x") s.body.watchlist.cursorSymbol = s.body.watchlist.displayedSymbols[2]
+          wait(50)
+        }
         setup()
         keyClick(letter)
         wait(100)
@@ -277,8 +280,33 @@ ShellRoot {
       s.body.closeListViews()
       service.deleteList("Caps")
       wait(50)
-      harness.check("in the " + s.name + ", with Caps Lock on, j k o w act as themselves, and J in Manage lists moves no list",
+      harness.check("in the " + s.name + ", with Caps Lock on, j k o w x act as themselves, and J in Manage lists moves no list",
         wrong.length === 0, wrong.join(" | "))
+    }
+
+    // Shift+X opens the selected row's menu, on its first line, in both
+    // surfaces alike, and Escape closes it, removing nothing. In All, for
+    // AAPL, which Walk holds too, the menu is the one line that reaches
+    // both lists; in Walk, that list by its name, then both.
+    function shiftX(s) {
+      var seen = []
+      ;["", "Walk"].forEach(function(list) {
+        base(s)
+        if (list !== "") service.switchList(list)
+        s.body.watchlist.cursorSymbol = "AAPL"
+        wait(50)
+        press("Shift+X")
+        wait(100)
+        var menu = s.body.rowMenu
+        var drawn = harness.find(s.body, "rowMenu")
+        seen.push(menu ? menu.symbol + ":" + drawn.cursor + ":" + menu.lines.map(function(l) { return l.label }).join("/") : "shut")
+        press("Esc")
+        wait(100)
+        seen.push((s.body.rowMenu === null) + ":" + (service.library.indexOf("AAPL") >= 0))
+      })
+      harness.check("in the " + s.name + ", Shift+X opens the selected row's menu on its first line, and Escape closes it removing nothing",
+        seen.join(" | ") === "AAPL:0:Remove from all 2 lists | true:true | AAPL:0:Remove from Walk/Remove from all 2 lists | true:true",
+        seen.join(" | "))
     }
 
     function test_keys() {
@@ -293,6 +321,7 @@ ShellRoot {
       // The popup first: the window, shown, would take the keys.
       var popupSheet = walk(harness.popup)
       capsLock(harness.popup)
+      shiftX(harness.popup)
       // Whole in both looks: the popup's height takes the sheet's, under its cap.
       var looks = [false, true].map(function(retro) {
         service.persist({ style: retro ? "retro" : "smooth" })
@@ -305,6 +334,7 @@ ShellRoot {
 
       var windowSheet = walk(harness.window)
       capsLock(harness.window)
+      shiftX(harness.window)
       harness.check("the window's sheet is the popup's", popupSheet.all.join("|") === windowSheet.all.join("|"),
         popupSheet.all.join("|") + " vs " + windowSheet.all.join("|"))
       app.close()

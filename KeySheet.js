@@ -50,7 +50,7 @@ function sheet(order) {
       // the pill's and the row's take two.
       { key: "pill", does: "Scroll steps through your stocks · drag moves it" },
       { key: "", does: "Middle-click changes form · right-click opens the window" },
-      { key: "row", does: "Click shows its chart · right-click removes it" },
+      { key: "row", does: "Click shows its chart · right-click offers to remove it" },
       { key: "", does: manual ? "Ctrl-click opens its lists · drag moves it" : "Ctrl-click opens its lists" },
       // The sort word beside the list's name: in manual order the arrow and
       // the word are one control that steps.
