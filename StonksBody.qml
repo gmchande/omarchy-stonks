@@ -118,27 +118,34 @@ Item {
   // The symbol whose lists the checklist shows; "" while it is closed.
   property string listsSymbol: ""
   // A row's menu while it is open, null while shut: { symbol, lines, each
-  // { label, everywhere }, startLine, the line its cursor starts on, -1 for
-  // none, and where it opens in the body: its top-left at (x, below), or,
-  // where the body has no room under that, its bottom-left at (x, above) }
-  // (`openRowMenu`).
+  // { label, everywhere }, ground, what it was opened on (`rowMenuGround`),
+  // startLine, the line its cursor starts on, -1 for none, and where it
+  // opens in the body: its top-left at (x, below), or, where the body has
+  // no room under that, its bottom-left at (x, above) } (`openRowMenu`).
   property var rowMenu: null
   // It stands where it opened, so a surface that changes size under it,
   // as a tiled window does, closes it, as a desktop's menus close.
   onWidthChanged: rowMenu = null
   onHeightChanged: rowMenu = null
-  // And it says what it was opened on: a change from another surface or
-  // the file that takes its row away, or would have it say otherwise,
-  // another list on show or its symbol in other lists, closes it, so a
-  // line never acts on a list it doesn't name. Found in review: opened on
-  // Growth, then All on the popup, "Remove from Growth" took it from every
-  // list.
-  function keepRowMenu() {
-    if (rowMenu && (view.rows.indexOf(rowMenu.symbol) < 0
-        || JSON.stringify(rowMenuLines(rowMenu.symbol)) !== JSON.stringify(rowMenu.lines))) rowMenu = null
+  // And it says what it was opened on: the list on show, and the lists
+  // its symbol is in. A change from another surface or the file to either,
+  // or one that takes its row away, closes it, so a line never acts on a
+  // list it doesn't name. Read from the view and the lists themselves, as
+  // a binding, so it hears the change however it comes: a handler of the
+  // view's change could read the list's name before it had moved, and the
+  // lists may keep their array when only the list on show changes. Found in
+  // review: opened on Growth, then All on the popup, "Remove from Growth"
+  // took it from every list.
+  function rowMenuGround(symbol) {
+    if (view.rows.indexOf(symbol) < 0) return ""
+    return JSON.stringify([view.list, lists.filter(function(list) { return list.symbols.indexOf(symbol) >= 0 }).map(function(list) { return list.name })])
   }
-  onViewChanged: keepRowMenu()
-  onListsChanged: keepRowMenu()
+  readonly property string rowMenuGroundNow: rowMenu ? rowMenuGround(rowMenu.symbol) : ""
+  // Closed a turn later: closing in the binding's own change would have it
+  // read itself again.
+  onRowMenuGroundNowChanged: if (rowMenu && rowMenuGroundNow !== rowMenu.ground) Qt.callLater(function() {
+    if (root.rowMenu && root.rowMenuGround(root.rowMenu.symbol) !== root.rowMenu.ground) root.rowMenu = null
+  })
   // A short word in the footer's place, for a moment, held while the pointer
   // is on it: why a key did nothing, or that a newer Stonks is out, which a
   // click on it updates (`updateOffered`).
@@ -686,7 +693,7 @@ Item {
     watchlist.cursorSymbol = symbol
     var top = row.mapToItem(root, Style.space(28), 0)
     var at = point ? root.mapFromItem(null, point.x, point.y) : top
-    rowMenu = { symbol: symbol, lines: rowMenuLines(symbol), startLine: point ? -1 : 0, x: at.x,
+    rowMenu = { symbol: symbol, lines: rowMenuLines(symbol), ground: rowMenuGround(symbol), startLine: point ? -1 : 0, x: at.x,
       below: point ? at.y : top.y + row.height, above: at.y }
   }
 
