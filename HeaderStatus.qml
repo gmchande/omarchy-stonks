@@ -238,27 +238,28 @@ Item {
     onActivated: root.retryRequested()
   }
 
-  // The sounds as they are, a speaker with its waves or muted, as the
-  // shell's audio panel shows a stream; a click turns them off or on, as
-  // Shift+S does. It hovers and presses as the look icon does, and its
-  // target is the header's full height too.
-  Text {
+  // Stonks' own speaker and camera, solid (`Cells.SOUND_ON` and the rest),
+  // and the look icon, on one grid whose cell grows with the text
+  // (`Cells.iconCell`), so the header's four keep their weight beside the
+  // words at every size; the ? is a word and grows with them already.
+  readonly property int cell: Cells.iconCell(Style.fontScale)
+
+  // The sounds as they are, the speaker with its waves, or off with a
+  // cross, its waves faint in retro; a click turns them off or on, as
+  // Shift+S does. One width on or off, so the toggle moves nothing. It
+  // hovers and presses as the look icon does, and its target is the
+  // header's full height too.
+  GridIcon {
     id: soundIcon
     objectName: "soundIcon"
+    readonly property bool on: root.soundsOn
     anchors.right: camera.left
     anchors.rightMargin: Style.space(14)
     anchors.verticalCenter: parent.verticalCenter
-    textFormat: Text.PlainText
-    // Nerd Font's volume-high and volume-mute, in one width, so turning
-    // sounds off or on moves nothing.
-    text: root.soundsOn ? soundOn.text : soundOff.text
-    width: Math.ceil(Math.max(soundOn.advanceWidth, soundOff.advanceWidth))
-    horizontalAlignment: Text.AlignHCenter
+    retro: root.retro
+    cell: root.cell
+    shape: on ? Cells.SOUND_ON : Cells.SOUND_OFF
     color: soundMouse.containsMouse ? root.foreground : root.dim
-    font.family: root.fontFamily
-    TextMetrics { id: soundOn; font: soundIcon.font; text: "\uDB81\uDD7E" }
-    TextMetrics { id: soundOff; font: soundIcon.font; text: "\uDB81\uDF5F" }
-    font.pixelSize: Style.font.body
 
     Rectangle {
       objectName: "soundFill"
@@ -284,45 +285,21 @@ Item {
   }
 
   // The camera, which takes a screenshot of the chart on show, as y does:
-  // Omarchy's capture glyph in smooth (nf-fa-camera, as its Capture menu
-  // shows it), a camera in cells in retro, as the look icon is drawn. One
-  // width in both looks, so the look moves nothing. It hovers and presses
-  // as the look icon does, its target the header's full height, and is lit
-  // once it has taken one.
-  Item {
+  // solid, its lens a hole at rest; once it has taken one, lit in the full
+  // ink with the shot's dot in its lens until the surface closes. It hovers
+  // and presses as the look icon does, its target the header's full
+  // height.
+  GridIcon {
     id: camera
     objectName: "camera"
-    readonly property color ink: root.cameraLit || cameraMouse.containsMouse ? root.foreground : root.dim
+    readonly property bool lit: root.cameraLit
     anchors.right: lookIcon.left
     anchors.rightMargin: Style.space(14)
     anchors.verticalCenter: parent.verticalCenter
-    width: Math.max(Math.ceil(cameraGlyph.advanceWidth), cameraCells.width)
-    height: Math.max(cameraText.implicitHeight, cameraCells.height)
-
-    TextMetrics { id: cameraGlyph; font: cameraText.font; text: "\uF030" }
-    Text {
-      id: cameraText
-      objectName: "cameraGlyph"
-      visible: !root.retro
-      anchors.centerIn: parent
-      textFormat: Text.PlainText
-      text: cameraGlyph.text
-      color: camera.ink
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.body
-    }
-    PixelSprite {
-      id: cameraCells
-      objectName: "cameraCells"
-      visible: root.retro
-      anchors.centerIn: parent
-      columns: 11
-      rows: 7
-      width: columns * 2
-      height: rows * 2
-      pixels: Cells.spritePixels(Cells.CAMERA_SPRITE)
-      color: camera.ink
-    }
+    retro: root.retro
+    cell: root.cell
+    shape: lit ? Cells.CAMERA_LIT : Cells.CAMERA
+    color: lit || cameraMouse.containsMouse ? root.foreground : root.dim
 
     Rectangle {
       objectName: "cameraFill"
@@ -359,6 +336,7 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     retro: root.retro
     still: root.still
+    pixel: root.cell - 1
     color: lookMouse.containsMouse ? root.foreground : root.dim
 
     Rectangle {

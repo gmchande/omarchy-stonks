@@ -32,16 +32,23 @@ ShellRoot {
   // share-of-<state>: the screenshot the camera takes of popup-<state>, at
   // its full size, in place of the surface; share-scrub-of-<state>: the
   // same scrubbed to the day's middle print. lit-<state>: the surface after
-  // a screenshot, its camera lit. <state>-large: at text size 16
+  // a screenshot, its camera lit; quiet-<state>: with sounds off; both may
+  // lead, quiet- first. <state>-large: at text size 16, <state>-size-N at N
   // (render.sh), the state as named without it.
   readonly property string asked: Quickshell.env("STONKS_VISUAL_STATE") || "retro"
-  readonly property bool lit: asked.indexOf("lit-") === 0
+  readonly property bool quiet: /^quiet-/.test(asked)
+  readonly property bool lit: /^(quiet-)?lit-/.test(asked)
   readonly property bool shareScrub: asked.indexOf("share-scrub-of-") === 0
   readonly property bool shareOf: shareScrub || asked.indexOf("share-of-") === 0
   readonly property string requested: {
-    var state = asked.replace(/^lit-/, "")
+    var state = asked.replace(/^(quiet-)?(lit-)?/, "")
     if (shareOf) state = "popup-" + state.slice(state.indexOf("-of-") + 4)
-    return state.indexOf("pill-sheet") === 0 ? state : state.replace(/-large$/, "")
+    return state.indexOf("pill-sheet") === 0 ? state : state.replace(/-(large|size-\d+)$/, "")
+  }
+  // A -size-N state's text scale, as Style.fontScale has it; 1 for the rest.
+  readonly property real sizeScale: {
+    var m = /-size-(\d+)$/.exec(asked)
+    return m ? Math.max(1 / 12, Number(m[1]) / 12) : 1
   }
   readonly property bool minWindowOf: requested.indexOf("min-window-of-") === 0
   readonly property bool windowOf: minWindowOf || requested.indexOf("window-of-") === 0
@@ -266,8 +273,9 @@ ShellRoot {
     id: stub
     property var symbols: ["AAPL", "SHOP.TO"]
     property bool settingsUnreadable: false
-    // Sounds on, their default, so the header's speaker shows its waves.
-    property bool soundsOn: true
+    // Sounds on, their default, so the header's speaker shows its waves;
+    // off for quiet-.
+    property bool soundsOn: !root.quiet
     property var shown: ["AAPL", "SHOP.TO"]
     property var library: symbols
     property string listName: ""
@@ -904,10 +912,14 @@ ShellRoot {
   FloatingWindow {
     visible: true
     color: root.groundColor
+    // The larger text size lands after the window has taken its size, so
+    // the large sheet is given room for its seven rows, and a -size-N state
+    // is given the widths Style.space gives the surfaces at size N: the
+    // popup's 480 and the smallest window's 560 grow with the text, and the
+    // window is 720 or its smallest, whichever is wider.
     implicitWidth: root.pillSheet ? Math.max(520, pillColumn.implicitWidth + 48) : root.themeState ? 480 + 410 : root.sheet ? 1000
-      : (root.windowWidth ? root.windowWidth : (root.smallest ? Style.space(560) : (root.popup ? 480 : 720)))
-    // The larger text size lands after the window has taken its height, so
-    // the large sheet is given room for its seven rows.
+      : (root.windowWidth ? root.windowWidth : (root.smallest ? Math.round(560 * root.sizeScale)
+        : (root.popup ? Math.round(480 * root.sizeScale) : Math.max(720, Math.round(560 * root.sizeScale)))))
     implicitHeight: root.stateName === "pill-sheet-large" ? 720 : root.pillSheet ? pillColumn.implicitHeight + 40 : root.sheet ? 460
       : root.themeState ? Math.max(body.fittedHeight(body.chromeHeight + 3 * body.rowPitch - body.rowGap) + content.inset * 2, pillColumn.implicitHeight + 40)
       : (root.windowWidth ? 850

@@ -119,17 +119,37 @@ var REMOVE_SPRITE = [
   "#...#"
 ]
 
-// The header's camera in retro, as its look icon is drawn in cells: a body
-// with its viewfinder's hump and the lens's ring.
-var CAMERA_SPRITE = [
-  "...###.....",
-  "###########",
-  "#....###..#",
-  "#...#...#.#",
-  "#...#...#.#",
-  "#....###..#",
-  "###########"
-]
+// The header's speaker and camera, solid, on the look icon's grid: 4 rows,
+// 6 columns. Each has its cells for retro, "#" lit and "+" faint, as the
+// mark's stems are, and its path for smooth, drawn on cells 3 px apart and
+// scaled with them (`GridIcon`): "M" "L" "A" (centre, radius, from and to
+// degrees) "Z" build it, "fill", "stroke", and "hollow" (even-odd, so the
+// lens is a hole) paint it, and "dot" fills a circle. The speaker is on
+// with its waves, off with a cross, its waves faint in retro; the camera
+// is at rest with its lens a hole, lit with the shot's dot in it, faint
+// cells in retro.
+var SOUND_CONE = [["M", 0.5, 3.5], ["L", 3.5, 3.5], ["L", 7.5, 0.5], ["L", 7.5, 10.5], ["L", 3.5, 7.5], ["L", 0.5, 7.5], ["Z"], ["fill"]]
+var SOUND_ON = { columns: 6, rows: 4,
+  cells: ["..#.#.", "###..#", "###..#", "..#.#."],
+  path: SOUND_CONE.concat([["A", 7, 5.5, 3.8, -50, 50], ["stroke"], ["A", 7, 5.5, 7.4, -50, 50], ["stroke"]]) }
+var SOUND_OFF = { columns: 6, rows: 4,
+  cells: ["..#.+.", "###..+", "###..+", "..#.+."],
+  path: SOUND_CONE.concat([["M", 10.5, 3.5], ["L", 14.5, 7.5], ["stroke"], ["M", 14.5, 3.5], ["L", 10.5, 7.5], ["stroke"]]) }
+var CAMERA_BODY = [["M", 0.5, 3], ["L", 4.8, 3], ["L", 6.3, 0.5], ["L", 10.7, 0.5], ["L", 12.2, 3], ["L", 16.5, 3], ["L", 16.5, 10.5], ["L", 0.5, 10.5], ["Z"],
+  ["M", 11.3, 6.6], ["A", 8.5, 6.6, 2.8, 0, 359.9], ["Z"], ["hollow"]]
+var CAMERA = { columns: 6, rows: 4,
+  cells: ["..##..", "######", "##..##", "######"],
+  path: CAMERA_BODY }
+var CAMERA_LIT = { columns: 6, rows: 4,
+  cells: ["..##..", "######", "##++##", "######"],
+  path: CAMERA_BODY.concat([["dot", 8.5, 6.6, 1.6]]) }
+
+// The header's icons' cell, their grid's pitch, from the shell's text
+// scale: 3 px to text size 13, 4 px from 14 to 17, 5 px from 18, so the
+// icons keep their weight beside the words.
+function iconCell(fontScale) {
+  return Math.max(3, Math.round(3 * fontScale))
+}
 
 // Each animal's eyes closing, as the header steps them: the lid half down,
 // then shut (`HeaderStatus`). The bull's two-cell eyes shut to slits

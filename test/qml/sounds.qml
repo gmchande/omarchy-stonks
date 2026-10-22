@@ -109,9 +109,6 @@ ShellRoot {
     return chime.file.replace(/^.*\/chime-/, "").replace(/\.wav$/, "")
   }
 
-  readonly property string onGlyph: "\uDB81\uDD7E"
-  readonly property string offGlyph: "\uDB81\uDF5F"
-
   Stonks.Service { id: service }
   Stonks.Updates { id: updates }
   Stonks.Sounds { id: sounds; turnedOn: service.soundsOn; retro: service.retro; surfacesOpen: service.openSurfaces.length > 0 }
@@ -414,7 +411,7 @@ ShellRoot {
       tryVerify(function() { return body && body.surfaceOpen && !body.chartLoading }, 5000)
       var icon = harness.find(body, "soundIcon")
       harness.check("sounds are on by default, the header's speaker showing it, and nothing has played",
-        service.soundsOn && icon.text === harness.onGlyph && harness.starts().length === 0, service.soundsOn + "|" + harness.starts().length)
+        service.soundsOn && icon.on === true && harness.starts().length === 0, service.soundsOn + "|" + harness.starts().length)
 
       // The popup by keys, in smooth.
       panel.refocusKeys()
@@ -625,7 +622,7 @@ ShellRoot {
       tryVerify(function() { return endOf(before + 1) !== "" }, 3000)
       tryVerify(function() { var f = file(); return !!f && f.sounds === false }, 3000)
       harness.check("Shift+S turns sounds off: saved, the speaker muted, the replay playing stopped",
-        !service.soundsOn && icon.text === harness.offGlyph && endOf(before + 1) === "stopped", service.soundsOn + "|" + endOf(before + 1))
+        !service.soundsOn && icon.on === false && endOf(before + 1) === "stopped", service.soundsOn + "|" + endOf(before + 1))
       before = harness.starts().length
       keyClick(Qt.Key_Escape)
       keyClick(Qt.Key_X)
@@ -644,7 +641,7 @@ ShellRoot {
       var onAgain = startsBy(before + 1)
       tryVerify(function() { var f = file(); return !!f && f.sounds === true }, 3000)
       harness.check("Shift+S turns sounds back on, saved, and plays the add sound once",
-        service.soundsOn && icon.text === harness.onGlyph && onAgain.length === before + 1 && played(onAgain[before]) === "sounds/smooth/add.wav",
+        service.soundsOn && icon.on === true && onAgain.length === before + 1 && played(onAgain[before]) === "sounds/smooth/add.wav",
         harness.starts().slice(before).map(played).join(", "))
 
       // An add confirmed before its preview has answered: SHOP.TO's day held
@@ -772,11 +769,11 @@ ShellRoot {
       sweep(chart.width * 0.05, chart.width * 0.9, { last: -1, changes: 0, crossed: [] })
       mouseMove(win, 1, 1)
       wait(300)
-      var offSilent = harness.starts().length === before && harness.chimes().length === chimesOff && winIcon.text === harness.offGlyph
+      var offSilent = harness.starts().length === before && harness.chimes().length === chimesOff && winIcon.on === false
       mouseClick(speaker, speaker.width / 2, speaker.height / 2)
       var clicked = startsBy(before + 1)
       harness.check("a click on the speaker turns sounds off, silently, and on again, with the add sound once in retro's voice",
-        offSilent && service.soundsOn && winIcon.text === harness.onGlyph && clicked.length === before + 1 && played(clicked[before]) === "sounds/retro/add.wav",
+        offSilent && service.soundsOn && winIcon.on === true && clicked.length === before + 1 && played(clicked[before]) === "sounds/retro/add.wav",
         offSilent + "|" + harness.starts().slice(before).map(played).join(", "))
 
       // A right-click removes a row, a click on the footer's note takes it
