@@ -160,7 +160,10 @@ function fileSettings(src) {
     // The popup's first-run hint has shown, and never shows again.
     hinted: from.hinted === true,
     // The sounds for what you do, on until you turn them off.
-    sounds: from.sounds !== false
+    sounds: from.sounds !== false,
+    // The daily look on GitHub for a newer Stonks, on unless the file says
+    // false: off, Stonks asks GitHub nothing.
+    updateCheck: from.updateCheck !== false
   })
 }
 

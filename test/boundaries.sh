@@ -37,18 +37,20 @@ none() {
 
 # External commands run only in the feeds, search, the version watch's
 # shell restart and update, the sounds' pw-play, its chimes' sh, the
-# bell's pw-dump, and the silence's pw-cat, and the camera's screenshot
-# hand-off; files are read and written only by the service, the version
+# bell's pw-dump, and the silence's pw-cat, the camera's screenshot
+# hand-off, and the sh and chmod that keep Stonks' files its owner's
+# (OwnerOnly); files are read and written only by the service, the version
 # watch reads the manifest, the trend colours read the theme's colours,
-# the sounds write the replay's and the chimes', and the camera its
+# the cache's files, the saved quotes and the sounds' replay and chimes,
+# are written only through OwnerOnly, and the camera writes its
 # screenshot; one service owns the feeds; the quote URL is the
 # quote feed's, the fundamentals URLs the fundamentals feed's, the overnight
 # URL the overnight feed's, the all-day URL the all-day feed's, and the
 # manifest's URL the release feed's. The plugin has one IPC target, and
 # only the window's host acts on Hyprland.
-only '\bProcess\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Updates.qml Sounds.qml Camera.qml
-only '\bFileView\s*\{' Service.qml Updates.qml TrendColors.qml Sounds.qml
-only '^import Quickshell\.Io' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Service.qml IpcTarget.qml Updates.qml TrendColors.qml Sounds.qml Camera.qml
+only '\bProcess\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Updates.qml Sounds.qml Camera.qml OwnerOnly.qml
+only '\bFileView\s*\{' Service.qml Updates.qml TrendColors.qml OwnerOnly.qml
+only '^import Quickshell\.Io' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Service.qml IpcTarget.qml Updates.qml TrendColors.qml Sounds.qml Camera.qml OwnerOnly.qml
 # Only the camera grabs and saves a picture, puts it on the clipboard, and
 # sends a notification.
 only 'grabToImage|saveToFile|wl-copy|wl-paste|omarchy-notification-send|notify-send' Camera.qml

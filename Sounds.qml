@@ -1,5 +1,4 @@
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import "ChartSound.js" as ChartSound
 // The sounds, while they are on (`turnedOn`, the data file's `sounds`):
@@ -27,7 +26,10 @@ Item {
   // The surface whose replay is playing, so that replay's end stops only
   // its own sound; null for any other sound.
   property var replayOwner: null
-  readonly property string folder: (Quickshell.env("XDG_CACHE_HOME") || Quickshell.env("HOME") + "/.cache") + "/grvc.stonks"
+  // Stonks' files (`Service.files`, `OwnerOnly`): the replay's and the
+  // chimes' are written in its cache folder, through it.
+  property var files: null
+  readonly property string folder: files ? files.folder : ""
   readonly property string replayPath: folder + "/replay.wav"
   readonly property string voice: retro ? "retro" : "smooth"
   // The chimes' files written this run, by name ("retro-3"): each look's
@@ -54,7 +56,8 @@ Item {
   // `pw-play` starts: the write blocks, and lands by a rename, so a player
   // still reading the last one keeps it. A replay of what the last one
   // played, the same look, chart, and run, plays its file again: making it
-  // held a retro start about 10 ms more than a smooth one.
+  // held a retro start about 10 ms more than a smooth one. None plays while
+  // its file can't be written yet (`OwnerOnly.write`).
   property var replayMade: null
   function playReplay(owner, chart) {
     if (!turnedOn) return
@@ -64,8 +67,7 @@ Item {
         || last.to !== made.to || last.seconds !== made.seconds) {
       var sound = retro ? ChartSound.retro(chart.grid, chart.from, chart.to, chart.seconds)
         : ChartSound.smooth(chart.geometry, chart.from, chart.to, chart.seconds)
-      soundFile.path = replayPath
-      soundFile.setData(ChartSound.wav(sound))
+      if (!files.write(replayPath, ChartSound.wav(sound))) return
       replayMade = made
     }
     replayOwner = owner
@@ -106,12 +108,13 @@ Item {
     chimer.write(written(voice, bar) + "\n")
   }
 
-  // A chime's name ("retro-3"), its file written unless this run has.
+  // A chime's name ("retro-3"), its file written unless this run has: now,
+  // or once the cache's folder is private (`OwnerOnly.write`), a chime
+  // until then playing the file an earlier run left, if any.
   function written(look, bar) {
     var name = look + "-" + bar
     if (!chimesWritten[name]) {
-      soundFile.path = folder + "/chime-" + name + ".wav"
-      soundFile.setData(ChartSound.wav(ChartSound.chime(look === "retro", bar)))
+      files.write(folder + "/chime-" + name + ".wav", ChartSound.wav(ChartSound.chime(look === "retro", bar)))
       chimesWritten[name] = true
     }
     return name
@@ -236,12 +239,5 @@ Item {
     stdinEnabled: true
     command: ["sh", "-c", "while read -r name; do case $name in smooth-[0-9]|smooth-10|retro-[0-9]|retro-10) "
       + "( timeout -k 1 2 pw-play --media-role Notification --latency 20ms \"$1/chime-$name.wav\" & ) ;; esac; done", "sh", root.folder]
-  }
-
-  FileView {
-    id: soundFile
-    preload: false
-    blockWrites: true
-    atomicWrites: true
   }
 }

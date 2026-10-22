@@ -271,7 +271,10 @@ Item {
   // it, so a long run never holds the shell's thread for long. The run lands
   // whole once its last answer is read (`land`), and until then its lane
   // runs nothing new. Each answer gets `outcomes`, by symbol: { quote,
-  // unjudged }, null for a bad answer, or "missing".
+  // unjudged }, null for a bad answer, or "missing". A listing whose reading
+  // throws is a bad answer too, so the run still lands and the lane goes on:
+  // one spark day that threw left its run out for good, and the lane asked
+  // nothing more until Stonks restarted.
   property var landing: []
   function receive(first, text) {
     root.landing = landing.concat([{ first: first, slots: first ? firstSlots : refreshSlots, answers: Fetch.answers(text), read: 0 }])
@@ -302,8 +305,12 @@ Item {
       } else {
         var symbol = slot.symbols[answer.done++]
         var previous = quotes[symbol]
-        answer.outcomes[symbol] = !answer.days ? null : !(symbol in answer.days) ? "missing"
-          : Quote.sparkQuote(answer.days[symbol], previous && previous.verdict || null, root.centExchanges)
+        var outcome = null
+        try {
+          outcome = !answer.days ? null : !(symbol in answer.days) ? "missing"
+            : Quote.sparkQuote(answer.days[symbol], previous && previous.verdict || null, root.centExchanges)
+        } catch (e) { outcome = null }
+        answer.outcomes[symbol] = outcome
         if (answer.done >= slot.symbols.length) {
           answer.days = null
           job.read++

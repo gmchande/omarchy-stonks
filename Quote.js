@@ -54,7 +54,8 @@ function sparkResults(json) {
   if (!results) return null
   for (var i = 0; i < results.length; i++) {
     var day = results[i].response && results[i].response[0]
-    if (day && day.meta) out[results[i].symbol] = day
+    var symbol = Format.fetchedText(results[i].symbol, Format.MOST_CODE)
+    if (day && day.meta && symbol) out[symbol] = day
   }
   return out
 }
@@ -236,7 +237,8 @@ function extendedSession(periods, t) {
 
 // The exchange a listing trades on, by the name people use.
 function exchangeOf(meta) {
-  return EXCHANGE_NAMES[meta.exchangeName] || String(meta.fullExchangeName || meta.exchangeName || "").toUpperCase()
+  var code = Format.fetchedText(meta.exchangeName, Format.MOST_CODE)
+  return EXCHANGE_NAMES[code] || (Format.fetchedText(meta.fullExchangeName, Format.MOST_NAME) || code).toUpperCase()
 }
 
 // Whether an answer's listing trades in whole cents from $1: its exchange is
@@ -316,23 +318,25 @@ function parseChart(json, centExchanges) {
   var firstRegular = null
   for (var k = 0; regular && !ahead && k < kept.length && !firstRegular; k++)
     if (kept[k].t >= regular.start && kept[k].t < regular.end) firstRegular = kept[k]
+  var symbol = Format.fetchedText(meta.symbol, Format.MOST_CODE)
+  var instrumentType = Format.fetchedText(meta.instrumentType, Format.MOST_CODE)
   return {
-    symbol: meta.symbol,
+    symbol: symbol,
     // The long name, as search takes it: the short one arrives in capitals
     // for some listings and is cut at 31 characters.
-    name: meta.longName || meta.shortName || meta.symbol,
+    name: Format.fetchedText(meta.longName, Format.MOST_NAME) || Format.fetchedText(meta.shortName, Format.MOST_NAME) || symbol,
     // Only the currency Yahoo names, or "": an answer can name none, as
     // ^STOXX50E's did, and a price is never called dollars Yahoo didn't say.
-    currency: meta.currency || "",
+    currency: Format.fetchedText(meta.currency, Format.MOST_CODE),
     exchange: exchangeOf(meta),
-    timezoneName: meta.exchangeTimezoneName || "",
+    timezoneName: Format.fetchedText(meta.exchangeTimezoneName, Format.MOST_CODE),
     gmtoffset: meta.gmtoffset || 0,
     // The zone's short name at that offset, as Yahoo writes it: "EDT", "JST".
-    zoneName: meta.timezone || "",
+    zoneName: Format.fetchedText(meta.timezone, Format.MOST_CODE),
     // Each period's own (`answerClocks`), for a print's clock on its day.
     clocks: clocks,
-    instrumentType: meta.instrumentType || "",
-    crypto: meta.instrumentType === "CRYPTOCURRENCY",
+    instrumentType: instrumentType,
+    crypto: instrumentType === "CRYPTOCURRENCY",
     // The regular-market quote as Yahoo reports it, with its own timestamp.
     // Kept apart from the chart samples: see headlineQuote.
     price: Format.isFiniteNumber(meta.regularMarketPrice) ? meta.regularMarketPrice : null,
@@ -445,7 +449,9 @@ function answerPeriods(periods) {
 // says its own (Sydney's 10:00 AEST open of 21 September, in an answer sent
 // in AEDT). Both shapes Yahoo sends: a day answer's pre, regular, and post,
 // each a list of days, and a range's one list of days. Null when a list of
-// days or of a day's periods is not a list within MOST_DAYS or MOST_PERIODS.
+// days or of a day's periods is not a list within MOST_DAYS or MOST_PERIODS,
+// or a period is not an object: a spark day with a null period threw here,
+// and its feed stopped until Stonks restarted.
 function answerClocks(periods) {
   var lists = !periods ? [] : Array.isArray(periods) ? [periods] : [periods.pre, periods.regular, periods.post]
   var out = []
@@ -457,8 +463,9 @@ function answerClocks(periods) {
       if (!day) return null
       for (var k = 0; k < day.length; k++) {
         var p = day[k]
+        if (!p || typeof p !== "object") return null
         var midnight = (Math.floor((p.start + p.gmtoffset) / 86400) + 1) * 86400 - p.gmtoffset
-        out.push({ start: p.start, until: midnight, offset: p.gmtoffset, zone: p.timezone || "" })
+        out.push({ start: p.start, until: midnight, offset: p.gmtoffset, zone: Format.fetchedText(p.timezone, Format.MOST_CODE) })
       }
     }
   }

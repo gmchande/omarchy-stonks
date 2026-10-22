@@ -5,7 +5,7 @@
 # that can't be read, never written over; a save from elsewhere during a read
 # of the file; and the version watch on the tree's copy of the manifest.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-feed_tree service.qml Service.qml Gate.qml Updates.qml QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml AllDayFeed.qml OvernightFeed.qml ReleaseFeed.qml Fetch.js Quote.js Format.js Market.js Overnight.js History.js Fundamentals.js Chart.js Settings.js Release.js calendars.json manifest.json
+feed_tree service.qml Service.qml OwnerOnly.qml Gate.qml Updates.qml QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml AllDayFeed.qml OvernightFeed.qml ReleaseFeed.qml Fetch.js Quote.js Format.js Market.js Overnight.js History.js Fundamentals.js Chart.js Settings.js Release.js calendars.json manifest.json
 # The harness ages a fundamentals entry by a day, and counts the data file's
 # reads, so a check waits on its read-back.
 patch_copy Service.qml '/readonly property var fundamentals:/a\  readonly property alias testFundamentalsFeed: fundamentalsFeed\n  readonly property alias testDataFile: dataFile'
