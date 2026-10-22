@@ -52,13 +52,22 @@ Item {
   // chart's geometry, the retro chart's grid, where the replay runs from and
   // to along it, and its length in seconds. The file is written whole before
   // `pw-play` starts: the write blocks, and lands by a rename, so a player
-  // still reading the last one keeps it.
+  // still reading the last one keeps it. A replay of what the last one
+  // played, the same look, chart, and run, plays its file again: making it
+  // held a retro start about 10 ms more than a smooth one.
+  property var replayMade: null
   function playReplay(owner, chart) {
     if (!turnedOn) return
-    var sound = retro ? ChartSound.retro(chart.grid, chart.from, chart.to, chart.seconds)
-      : ChartSound.smooth(chart.geometry, chart.from, chart.to, chart.seconds)
-    soundFile.path = replayPath
-    soundFile.setData(ChartSound.wav(sound))
+    var made = { retro: retro, chart: retro ? chart.grid : chart.geometry, from: chart.from, to: chart.to, seconds: chart.seconds }
+    var last = replayMade
+    if (!last || last.retro !== made.retro || last.chart !== made.chart || last.from !== made.from
+        || last.to !== made.to || last.seconds !== made.seconds) {
+      var sound = retro ? ChartSound.retro(chart.grid, chart.from, chart.to, chart.seconds)
+        : ChartSound.smooth(chart.geometry, chart.from, chart.to, chart.seconds)
+      soundFile.path = replayPath
+      soundFile.setData(ChartSound.wav(sound))
+      replayMade = made
+    }
     replayOwner = owner
     start(replayPath)
   }
@@ -109,8 +118,9 @@ Item {
   }
 
   // Turned off, the sound playing stops, and a chime waiting with it. The
-  // look's chimes are written ahead, one a turn of the event loop, so the
-  // first pass over the chart writes nothing.
+  // look's chimes are written ahead, one every 100 ms, so the first pass
+  // over the chart writes nothing: written back to back, smooth's eleven
+  // held the shell's thread for about 80 ms.
   onTurnedOnChanged: {
     if (!turnedOn) {
       replayOwner = null
@@ -127,7 +137,7 @@ Item {
   }
   Timer {
     id: ahead
-    interval: 1
+    interval: 100
     repeat: true
     onTriggered: {
       if (!root.turnedOn) return stop()
@@ -215,14 +225,17 @@ Item {
   // so the chimes overlap and the shell's own thread starts no process per
   // chime. It plays nothing but a chime's file: any other line it skips.
   // Each pw-play has 2 s, four times a chime's length, so a PipeWire that
-  // stalls can't pile them up. When Stonks goes its input closes and it
-  // ends; a chime ringing then rings out, half a second at most.
+  // stalls can't pile them up. Each starts from a subshell that ends at
+  // once, so this shell keeps no record of it: started from the shell
+  // itself, each chime grew it by about a third of a kilobyte, 10 MB over
+  // 20,000 chimes. When Stonks goes its input closes and it ends; a chime
+  // ringing then rings out, half a second at most.
   Process {
     id: chimer
     running: root.turnedOn
     stdinEnabled: true
     command: ["sh", "-c", "while read -r name; do case $name in smooth-[0-9]|smooth-10|retro-[0-9]|retro-10) "
-      + "timeout -k 1 2 pw-play --media-role Notification --latency 20ms \"$1/chime-$name.wav\" & ;; esac; done", "sh", root.folder]
+      + "( timeout -k 1 2 pw-play --media-role Notification --latency 20ms \"$1/chime-$name.wav\" & ) ;; esac; done", "sh", root.folder]
   }
 
   FileView {

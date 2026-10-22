@@ -331,7 +331,8 @@ The shell's log the form asks for can name the prices Stonks left out.
 - **Files it writes:** your lists and settings in
   `~/.config/omarchy/grvc.stonks.json`, the last quotes in
   `~/.cache/grvc.stonks/quotes.json`, and, while sounds are on, a replay's
-  sound in `~/.cache/grvc.stonks/replay.wav`, written over at each replay,
+  sound in `~/.cache/grvc.stonks/replay.wav`, written over at each replay of
+  another chart,
   and the chimes' notes beside it, `chime-*.wav`, written each run; and
   for each screenshot you take, one picture,
   `stonks-<symbol>-<date>_<time>.png`, in the folder Omarchy's own
