@@ -2,7 +2,8 @@
 # The one shared chart range through the real Service, App, and BarWidget: a
 # range picked in the window, the pill showing the day on every range in
 # every style, the window's hold while a range's history is out or failed,
-# expired history arriving while it refetches, r (and its day-old cap and P/E),
+# expired history arriving while it refetches, r (its "Refreshing" while out,
+# and its day-old cap and P/E),
 # the window opened and closed by the pill's right-click and by IPC, against
 # the popup and another workspace, real IPC refreshing once for two pills
 # and reaching the plugin with no pill at all, a range left behind never

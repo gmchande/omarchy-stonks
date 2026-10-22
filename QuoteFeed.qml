@@ -70,20 +70,49 @@ Item {
   property var entries: ({})
   property var asked: ({})
   property var owed: ({})
-  // An answer, or leaving the queue, ends what was owed.
+  // The symbols a reader's refresh asked for (`ask` with `user`), each until
+  // a run with it comes back, whatever its answer says, or it leaves the
+  // queue. Yahoo pausing Stonks ends the wait: what the pause holds goes
+  // later, as the gate lets it, unannounced. `userOut`: one of them is on a
+  // request now.
+  property var userAsked: ({})
+  readonly property bool userOut: refreshRun.some(function(symbol) { return symbol in userAsked })
+  // An answer, or leaving the queue, ends what was owed and what a reader
+  // waits on.
   onAskedChanged: {
+    var owing = queued(owed)
+    if (owing !== owed) root.owed = owing
+    var waiting = queued(userAsked)
+    if (waiting !== userAsked) root.userAsked = waiting
+  }
+  // `map` less each symbol no longer asked for: `map` itself when that is
+  // none.
+  function queued(map) {
     var next = null
-    for (var symbol in owed) {
+    for (var symbol in map) {
       if (symbol in asked) continue
-      if (!next) next = Object.assign({}, owed)
+      if (!next) next = Object.assign({}, map)
       delete next[symbol]
     }
-    if (next) root.owed = next
+    return next || map
+  }
+  // `map` less `list`: `map` itself when it holds none of them.
+  function without(map, list) {
+    var next = null
+    list.forEach(function(symbol) {
+      if (!(symbol in map)) return
+      if (!next) next = Object.assign({}, map)
+      delete next[symbol]
+    })
+    return next || map
   }
   readonly property bool hostPaused: !!gate && gate.paused
   // Only what waits becomes owed here: the gate is still setting up the
   // pause as this fires, so nothing may be launched from it.
-  onHostPausedChanged: oweWaiting()
+  onHostPausedChanged: {
+    oweWaiting()
+    if (hostPaused) root.userAsked = ({})
+  }
 
   readonly property bool busy: firstProc.running || refreshProc.running || landing.length > 0 || Object.keys(asked).length > 0
 
@@ -105,8 +134,10 @@ Item {
 
   // Asks for each of `list` it does not already owe, as of `at`, the
   // service's clock as it asks: the clock's own handlers may run before this
-  // feed's binding to it has caught up.
-  function ask(list, at) {
+  // feed's binding to it has caught up. A reader's refresh (`user`) waits on
+  // each of `list` now asked for, those already asked included, unless
+  // Yahoo is pausing Stonks.
+  function ask(list, at, user) {
     var next = null
     list.forEach(function(symbol) {
       if (symbols.indexOf(symbol) < 0 || symbol in asked) return
@@ -114,6 +145,15 @@ Item {
       next[symbol] = at
     })
     if (next) root.asked = next
+    if (user && !hostPaused) {
+      var waiting = null
+      list.forEach(function(symbol) {
+        if (!(symbol in asked) || symbol in userAsked) return
+        if (!waiting) waiting = Object.assign({}, userAsked)
+        waiting[symbol] = true
+      })
+      if (waiting) root.userAsked = waiting
+    }
     pump()
   }
 
@@ -342,6 +382,7 @@ Item {
       root.firstRun = []
       root.firstSlots = []
     } else {
+      root.userAsked = without(userAsked, refreshRun)
       root.refreshRun = []
       root.refreshSlots = []
     }

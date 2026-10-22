@@ -433,13 +433,16 @@ ShellRoot {
       service.refresh()
       settle("AAPL|1W")
 
-      // A retry of a range whose first fetch failed keeps the day and says it
-      // is unavailable until an answer lands: by r in the window, by the
-      // header's RETRY, and by an open. NVDA's history always fails. Found
-      // in the transition audit (ranges 7, lifecycle 4, ranges 4, data 4):
-      // "Loading" and no AT CLOSE for the length of every retry, or an empty
-      // chart on the popup's open. The RETRY was plain words, "· R to
-      // retry", until the owner clicked one hint like it (14 October).
+      // A retry of a range whose first fetch failed keeps the day, and the
+      // header says it is unavailable until an answer lands: by an open,
+      // and by r in the window, the header's RETRY, and RETRY under search,
+      // which the reader asked for, saying "Refreshing" while it is out.
+      // NVDA's history always fails. Found in the transition audit (ranges
+      // 7, lifecycle 4, ranges 4, data 4): "Loading" and no AT CLOSE for the
+      // length of every retry, or an empty chart on the popup's open. The
+      // RETRY was plain words, "· R to retry", until the owner clicked one
+      // hint like it (14 October); the owner asked for "Refreshing" on r (21
+      // October).
       // A first fetch that takes its time dims what is on show, and the
       // dim lifts as it fails; a retry dims nothing. Whatever an earlier
       // step left of NVDA's week goes first.
@@ -458,22 +461,27 @@ ShellRoot {
       var failedLifted = nvdaHeld + "," + nvdaDimmed + "," + (body.motion.dimmed === 0)
       var retryButton = harness.find(body, "retryRange")
       var offered = !!retryButton && retryButton.visible
+      // The header's words are read on its own change, each as it happens,
+      // not on frames: under load no frame may be drawn between an answer
+      // landing and the step reading what was said. The dim is a picture,
+      // read on frames.
       var retry = function(start) {
         var said = []
         var dimmed = 0
-        var watch = function() {
-          if (said.indexOf(body.headerText) < 0) said.push(body.headerText)
-          dimmed = Math.max(dimmed, body.motion.dimmed)
-        }
+        var heard = function() { if (said[said.length - 1] !== body.headerText) said.push(body.headerText) }
+        var watch = function() { dimmed = Math.max(dimmed, body.motion.dimmed) }
         var frames = Qt.createQmlObject('import QtQuick; FrameAnimation { running: true }', harness)
         frames.triggered.connect(watch)
+        body.headerTextChanged.connect(heard)
+        heard()
         start()
         watch()
         var retried = within(3000, function() { return service.testHistoryFeed.busy })
-        tryVerify(function() { return !service.testHistoryFeed.busy }, 10000)
+        tryVerify(function() { return !service.testHistoryFeed.busy && !service.refreshing }, 10000)
         wait(50)
+        body.headerTextChanged.disconnect(heard)
         frames.destroy()
-        return [retried, said.join("/") === "1W unavailable", body.motion.drawn === 1, dimmed === 0].join(",") + " " + said.join("/")
+        return [retried, body.motion.drawn === 1, dimmed === 0].join(",") + " " + said.join("/")
       }
       app.testKeyCatcher.forceActiveFocus()
       var byR = retry(function() { keyClick(Qt.Key_R) })
@@ -489,9 +497,10 @@ ShellRoot {
       var searchWord = [body.adding, retryButton.text].join(",")
       keyClick(Qt.Key_Escape)
       wait(50)
-      harness.check("a first fetch that fails dims what is on show while out, then lifts with the day and its unavailable header; a retry of it keeps them, undimmed, until an answer lands, by r, by RETRY, by an open, and by RETRY under search",
-        failedLifted === "true,true,true" && offered && /^true,true,true,true /.test(byR) && /^true,true,true,true /.test(byClick) && /^true,true,true,true /.test(byOpen)
-          && /^true,true,true,true /.test(inSearch) && searchWord === "true,RETRY",
+      var asked = "true,true,true 1W unavailable/Refreshing/1W unavailable"
+      harness.check("a first fetch that fails dims what is on show while out, then lifts with the day and its unavailable header; a retry of it keeps them, undimmed, the header saying Refreshing while one the reader asked for is out, by r, by RETRY, and by RETRY under search, and unavailable through one by an open",
+        failedLifted === "true,true,true" && offered && byR === asked && byClick === asked
+          && byOpen === "true,true,true 1W unavailable" && inSearch === asked && searchWord === "true,RETRY",
         [failedLifted, offered, byR, byClick, byOpen, inSearch, searchWord].join(" | "))
       service.summon("AAPL", "1D")
       wait(100)
@@ -639,25 +648,49 @@ ShellRoot {
           && JSON.stringify(harness.find(pill, "pillLine").geometry) === JSON.stringify(Chart.chartGeometry(service.quotes.MSFT)),
         harness.pillText() + " vs day " + msftDay.changeLine + " / week " + week.changeLine)
 
-      // A refetch with the week in hand holds still: the header stays on the
-      // market. It said "LOADING 1W" every fifteen minutes, when the service
-      // refetched the pill's range, and on every r.
-      // The fetch can land within the key press, so the header is read as the
-      // refetch starts, from the service's own change.
-      var header = body.headerText
-      var whileLoading = null
-      var watch = function() {
-        var out = service.testHistoryFeed.wanted
-        if (whileLoading === null && out && out.key === "MSFT|1W" && service.histories["MSFT|1W"].history)
-          whileLoading = body.headerText
+      // r with the week in hand says "Refreshing" in the header while what it
+      // asked for is out, MSFT's week held back here, and the market again
+      // once it lands; the service asking again by itself for the week grown
+      // old keeps the market. The header said "LOADING 1W" every fifteen
+      // minutes, when the service refetched the pill's range, and on every r;
+      // the owner asked for "Refreshing" on r alone (21 October).
+      // Read on the header's own change, as the retries above are.
+      var said = []
+      var watch = function() { if (said[said.length - 1] !== body.headerText) said.push(body.headerText) }
+      body.headerTextChanged.connect(watch)
+      // Only the market, its minute free to turn meanwhile.
+      var market = function(texts) {
+        return texts.length > 0 && texts.every(function(t) { return t !== "Refreshing" && t.indexOf("Loading") !== 0 })
       }
-      service.testHistoryFeed.wantedChanged.connect(watch)
+      holdMsft.running = true
+      tryVerify(function() { return !holdMsft.running }, 2000)
+      watch()
       keyClick(Qt.Key_R)
-      tryVerify(function() { return whileLoading !== null && harness.answered("MSFT|1W") }, 5000)
-      service.testHistoryFeed.wantedChanged.disconnect(watch)
-      harness.check("a refetch with the range in hand keeps the header",
-        whileLoading === header && header.indexOf("Loading") !== 0 && body.headerText === header,
-        header + " -> " + whileLoading + " -> " + body.headerText)
+      within(3000, function() { return body.headerText === "Refreshing" })
+      wait(300)
+      releaseMsft.running = true
+      tryVerify(function() { return harness.answered("MSFT|1W") && !service.refreshing }, 5000)
+      wait(50)
+      var at = said.indexOf("Refreshing")
+      var byR = said.slice()
+      said = []
+      watch()
+      var aged = Object.assign({}, service.testHistoryFeed.entries)
+      aged["MSFT|1W"] = Object.assign({}, aged["MSFT|1W"], { receivedAt: aged["MSFT|1W"].receivedAt - 16 * 60 })
+      service.testHistoryFeed.entries = aged
+      holdMsft.running = true
+      tryVerify(function() { return !holdMsft.running }, 2000)
+      service.showHistory(false)
+      var out = within(3000, function() { var w = service.testHistoryFeed.wanted; return !!w && w.key === "MSFT|1W" })
+      wait(300)
+      releaseMsft.running = true
+      tryVerify(function() { return harness.answered("MSFT|1W") }, 5000)
+      wait(50)
+      body.headerTextChanged.disconnect(watch)
+      harness.check("r with the week in hand says Refreshing while it is out, then the market once it lands; the service asking again for the week by itself keeps the market",
+        at > 0 && market(byR.slice(0, at)) && market(byR.slice(at + 1)) && byR.lastIndexOf("Refreshing") === at
+          && out && market(said),
+        byR.join("/") + " | " + out + " " + said.join("/"))
 
       // Replay unfolds: on a range too it is a scrub that drives itself, bar
       // by bar, with the chart drawing in behind it. It used to be a slow

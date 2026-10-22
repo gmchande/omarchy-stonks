@@ -549,7 +549,7 @@ Item {
     feed.ask(root.watched.filter(function(s) {
       var entry = feed.entries[s]
       return !!entry && entry.status !== "saved" && now - entry.answeredAt > 10
-    }), now)
+    }), now, true)
     if (!root.screensClear()) {
       root.refreshOwed = true
       return
@@ -564,6 +564,17 @@ Item {
     root.showHistory(true)
     var charts = root.chartsOnShow().filter(function(s) { return root.allDaySymbols.indexOf(s) >= 0 })
     if (charts.length > 0 && now - overnightFeed.askedAt > 10) overnightFeed.fetch(charts, now)
+  }
+
+  // A user's refresh has a request to Yahoo out, and the header says
+  // "Refreshing": a quote it asked for (`QuoteFeed.userOut`), or the chart
+  // it owes (`historyOwed`), each until its answer comes back, whatever it
+  // says. One Yahoo's pause holds, or every screen off, is not out.
+  // Automatic refreshes say nothing.
+  readonly property bool refreshing: {
+    var job = historyFeed.job
+    return feed.userOut || (!!job && historyFeed.attempts > 0 && job.key in root.historyOwed
+      && historyFeed.entries[job.key] === root.historyOwed[job.key])
   }
 
   // The history the open surfaces' heroes show on the shared range: the

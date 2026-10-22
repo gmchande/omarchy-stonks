@@ -250,6 +250,21 @@ ShellRoot {
       if (!idle()) tryVerify(idle, 10000)
     }
 
+    // What the window's header says from now, each change as it happens:
+    // the function returned stops listening and gives them. Read on the
+    // header's own change, not on frames: under load no frame may be drawn
+    // between an answer landing and the step reading what was said.
+    function listen() {
+      var body = app.testBody
+      var said = [body.headerText]
+      var heard = function() { if (said[said.length - 1] !== body.headerText) said.push(body.headerText) }
+      body.headerTextChanged.connect(heard)
+      return function() {
+        body.headerTextChanged.disconnect(heard)
+        return said
+      }
+    }
+
     // Every ask of the screens answered. A step waits on this before it
     // counts what went while they were off, and before it turns one on, so
     // an answer still out, as on a loaded machine, can't report the next
@@ -514,8 +529,18 @@ ShellRoot {
       body.selectRange("1W")
       var rangeHeader = ""
       within(1000, function() { rangeHeader = body.headerText; return rangeHeader === "1W unavailable" })
+      // r while Yahoo refuses sends nothing, and says nothing: the header
+      // stays on the range's failure, its retry failing at once.
+      var failedWeek = service.histories["NEST|1W"]
+      var heard = listen()
+      app.refresh()
+      var retried = within(1000, function() { return service.histories["NEST|1W"] !== failedWeek })
+      wait(50)
+      var pausedSaid = heard()
       body.selectRange("1D")
       harness.check("a range picked while Yahoo refuses says it is unavailable at once, not Loading", rangeHeader === "1W unavailable", rangeHeader)
+      harness.check("r while Yahoo refuses sends nothing and says nothing: the header stays on the range's failure",
+        retried && pausedSaid.join(" / ") === "1W unavailable", retried + " " + pausedSaid.join(" / "))
       closeWindow()
       harness.check("closing drops the asks nobody watches: the crypto and Tokyo are no longer owed",
         !("BTC-USD" in service.asked) && !("7203.T" in service.asked) && "NEST" in service.asked, JSON.stringify(service.asked))
@@ -808,6 +833,7 @@ ShellRoot {
       // A refresh with the window on a range while every screen is off,
       // its quotes too fresh to ask again, owes the range's history: it is
       // asked fresh once a screen is on, with no quote due to prompt it.
+      // Until then nothing is out, and the header says nothing of it.
       openWindow()
       app.testBody.selectRange("1W")
       tryVerify(function() { return !!service.histories["NEST|1W"] && service.histories["NEST|1W"].status === "ok" }, 5000)
@@ -815,8 +841,11 @@ ShellRoot {
       screenStandIn.on = false
       wait(1100)
       var historyFrom = Number(harness.record("NEST.history.calls") || 0)
+      heard = listen()
       service.refresh()
       screensHeard()
+      wait(50)
+      var darkSaid = heard()
       var darkHistory = Number(harness.record("NEST.history.calls") || 0) - historyFrom
       screenStandIn.on = true
       wait(1100)
@@ -827,8 +856,42 @@ ShellRoot {
       settle()
       closeWindow()
       plugin.windowHost.monitors = []
-      harness.check("a refresh while every screen is off asks the range's history once a screen is on, not before",
-        darkHistory === 0 && litHistory === 1, darkHistory + " while off, " + litHistory + " after")
+      harness.check("a refresh while every screen is off asks the range's history once a screen is on, not before, and says nothing meanwhile",
+        darkHistory === 0 && litHistory === 1 && darkSaid.length === 1 && darkSaid[0] !== "Refreshing",
+        darkHistory + " while off, " + litHistory + " after | " + darkSaid.join(" / "))
+
+      // Thursday, the window open on the day: r says "Refreshing" in the
+      // header while the quotes it asked for are out, NEST's held back
+      // here, and the market again once they land; the next run on the
+      // schedule, held back the same, says nothing. The owner asked for
+      // "Refreshing" on r alone (21 October). The rows are answered over
+      // 10 s ago first, so r asks for them.
+      openWindow()
+      tick(20)
+      touch("NEST.quote.hold")
+      heard = listen()
+      app.refresh()
+      within(3000, function() { return app.testBody.headerText === "Refreshing" })
+      remove("NEST.quote.hold")
+      settle()
+      tryVerify(function() { return !service.refreshing }, 3000)
+      var byR = heard()
+      touch("NEST.quote.hold")
+      heard = listen()
+      var scheduled = false
+      for (var due = 0; due < 61 && !scheduled; due++) {
+        service.now += 1
+        scheduled = within(100, function() { return service.testFeed.refreshRun.indexOf("NEST") >= 0 })
+      }
+      wait(300)
+      remove("NEST.quote.hold")
+      settle()
+      var bySchedule = heard()
+      harness.check("r says Refreshing while its quotes are out, then the market once they land; a run on the schedule says nothing",
+        byR.length === 3 && byR[1] === "Refreshing" && byR[0] === byR[2] && scheduled
+          && bySchedule.every(function(t) { return t !== "Refreshing" }),
+        byR.join(" / ") + " | " + scheduled + " " + bySchedule.join(" / "))
+      closeWindow()
 
       // Saturday noon, half an hour each.
       countsOver("Saturday noon, nothing open: the pill's symbol every 15 minutes, nothing else",

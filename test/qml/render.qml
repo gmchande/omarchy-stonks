@@ -269,6 +269,8 @@ ShellRoot {
     id: stub
     property var symbols: ["AAPL", "SHOP.TO"]
     property bool settingsUnreadable: false
+    // A refresh the reader asked for, out (popup-refreshing-*).
+    readonly property bool refreshing: root.stateName.indexOf("popup-refreshing-") === 0
     // Sounds on, their default, so the header's speaker shows its waves;
     // off for quiet-.
     property bool soundsOn: !root.quiet
