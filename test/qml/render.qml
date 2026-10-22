@@ -1309,7 +1309,10 @@ ShellRoot {
           stub.shown = stub.shown.filter(function(symbol) { return symbol !== removed })
           wait(200)
         } else if (pose === "notefade") {
-          root.offerUndo()
+          // Removal no longer makes a notice. A refusal still fades here.
+          stub.order = "pct"
+          rows.cursorSymbol = member
+          body.moveSelected(1)
           body.noteShown = 0.5
         } else if (pose === "breadth") {
           one("breadthRule").still = true
