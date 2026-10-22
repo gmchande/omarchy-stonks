@@ -52,13 +52,22 @@ Item {
   // chart's geometry, the retro chart's grid, where the replay runs from and
   // to along it, and its length in seconds. The file is written whole before
   // `pw-play` starts: the write blocks, and lands by a rename, so a player
-  // still reading the last one keeps it.
+  // still reading the last one keeps it. A replay of what the last one
+  // played, the same look, chart, and run, plays its file again: making it
+  // held a retro start about 10 ms more than a smooth one.
+  property var replayMade: null
   function playReplay(owner, chart) {
     if (!turnedOn) return
-    var sound = retro ? ChartSound.retro(chart.grid, chart.from, chart.to, chart.seconds)
-      : ChartSound.smooth(chart.geometry, chart.from, chart.to, chart.seconds)
-    soundFile.path = replayPath
-    soundFile.setData(ChartSound.wav(sound))
+    var made = { retro: retro, chart: retro ? chart.grid : chart.geometry, from: chart.from, to: chart.to, seconds: chart.seconds }
+    var last = replayMade
+    if (!last || last.retro !== made.retro || last.chart !== made.chart || last.from !== made.from
+        || last.to !== made.to || last.seconds !== made.seconds) {
+      var sound = retro ? ChartSound.retro(chart.grid, chart.from, chart.to, chart.seconds)
+        : ChartSound.smooth(chart.geometry, chart.from, chart.to, chart.seconds)
+      soundFile.path = replayPath
+      soundFile.setData(ChartSound.wav(sound))
+      replayMade = made
+    }
     replayOwner = owner
     start(replayPath)
   }
