@@ -11,8 +11,9 @@ import "Tones.js" as Tones
 // and is turned toward the chart's middle, so it stays on the chart.
 // `chart` is the look on show: where it draws a bar (`xAt`, retro's on its
 // bar's column), how far its ink has drawn in (`inkDrawn`), so a mark draws
-// in with the line, and where the ink reaches (`inkExtent`). A mark whose
-// words would touch the ink, on a chart squeezed short, is left out whole.
+// in with the line, and how high and low its ink reaches under a mark
+// (`inkExtentIn`). A mark whose words would touch that ink, as on a chart
+// squeezed short, is left out whole.
 Item {
   id: root
 
@@ -22,13 +23,6 @@ Item {
   property color dim: Tones.dim(foreground, Commons.Color.background)
   property string fontFamily: Style.font.family
 
-  FontMetrics {
-    id: metrics
-    font.family: root.fontFamily
-    font.pixelSize: Style.font.caption
-    font.bold: true
-  }
-
   Repeater {
     model: root.marks && root.chart ? [root.marks.high, root.marks.low] : []
 
@@ -37,17 +31,25 @@ Item {
       required property var modelData
       required property int index
       readonly property real at: root.chart.xAt(mark.modelData.x)
-      // Its words' ink, from the capitals' top to the baseline: digits and
-      // capitals have nothing below it.
-      readonly property bool clear: mark.index === 0
-        ? mark.y + priceText.baselineOffset <= root.chart.inkExtent.top
-        : mark.y + priceText.baselineOffset - metrics.capitalHeight >= root.chart.inkExtent.bottom
+      // Each word's ink as drawn keeps clear of the chart's ink under it:
+      // above it for the high, below it for the low. A price's thousands
+      // commas reach below the baseline.
+      readonly property bool clear: mark.clears(priceText, priceInk) && mark.clears(dateText, dateInk)
       objectName: index === 0 ? "highMark" : "lowMark"
       visible: mark.clear && mark.at <= root.chart.inkDrawn
       spacing: Style.space(6)
       x: Math.max(0, Math.min(root.width - mark.width,
         mark.modelData.x < 0.5 ? mark.at - Style.space(2) : mark.at - mark.width + Style.space(2)))
       y: mark.index === 0 ? 0 : root.height - mark.height
+
+      function clears(word, ink) {
+        var under = root.chart.inkExtentIn(mark.x + word.x, mark.x + word.x + word.width)
+        var top = mark.y + word.baselineOffset + ink.tightBoundingRect.y
+        return mark.index === 0 ? top + ink.tightBoundingRect.height <= under.top : top >= under.bottom
+      }
+
+      TextMetrics { id: priceInk; font: priceText.font; text: priceText.text }
+      TextMetrics { id: dateInk; font: dateText.font; text: dateText.text }
 
       Text {
         id: priceText
@@ -59,6 +61,7 @@ Item {
         font.bold: true
       }
       Text {
+        id: dateText
         textFormat: Text.PlainText
         text: mark.modelData.date
         color: root.dim

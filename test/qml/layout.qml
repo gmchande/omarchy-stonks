@@ -49,6 +49,7 @@ ShellRoot {
   FileView { id: shopFile; path: root.fixtures + "/shop-to.json"; blockLoading: true }
   FileView { id: aaplWeeklyFile; path: root.fixtures + "/history/aapl-5y.json"; blockLoading: true }
   FileView { id: aaplYearFile; path: root.fixtures + "/history/aapl-1y.json"; blockLoading: true }
+  FileView { id: shelYearFile; path: root.fixtures + "/history/shel-l-1y.json"; blockLoading: true }
   FileView { id: shopYearFile; path: root.fixtures + "/history/shop-to-1y.json"; blockLoading: true }
   FileView { id: youngFile; path: root.fixtures + "/history/fab-max.json"; blockLoading: true }
   FileView { id: tokyoFile; path: root.fixtures + "/7203-t-day.json"; blockLoading: true }
@@ -650,27 +651,30 @@ ShellRoot {
         var unmarked = []
         var captions = []
         var places = [["popup", false, 0], ["narrowest window", true, Style.space(560)], ["widest window", true, 1416]]
+        // Each range is set once and drawn in once; the look and the surface
+        // change under it, which draws nothing in again.
         ;[{ symbol: "AAPL", figures: aapl, ranges: [["1D", null], ["1M", month], ["1Y", aaplYear], ["5Y", weekly], ["All", young]] },
           { symbol: "NEST", figures: null, ranges: [["1D", null], ["1M", youngMonth]] }].forEach(function(listing) {
           stub.featuredSymbol = listing.symbol
           stub.figures = listing.figures
-          places.forEach(function(place) {
-            surface.wide = place[1]
-            if (place[1]) surface.windowWidth = place[2]
-            ;[false, true].forEach(function(retro) {
-              stub.retro = retro
-              var where = place[0] + (retro ? " retro " : " smooth ") + listing.symbol
-              var onDay = null
-              listing.ranges.forEach(function(r) {
-                stub.range = r[0]
-                stub.historyEntry = r[1] ? { status: "ok", history: r[1], receivedAt: stub.now } : null
+          var onDay = {}
+          listing.ranges.forEach(function(r) {
+            stub.range = r[0]
+            stub.historyEntry = r[1] ? { status: "ok", history: r[1], receivedAt: stub.now } : null
+            wait(50)
+            // The marks draw in with the line: read them once it has.
+            if (r[1]) tryVerify(function() { return body.motion.drawn === 1 }, 2000)
+            places.forEach(function(place) {
+              surface.wide = place[1]
+              if (place[1]) surface.windowWidth = place[2]
+              ;[false, true].forEach(function(retro) {
+                stub.retro = retro
                 wait(50)
-                // The marks draw in with the line: read them once it has.
-                if (r[1]) tryVerify(function() { return body.motion.drawn === 1 }, 2000)
+                var where = place[0] + (retro ? " retro " : " smooth ") + listing.symbol
                 var said = infoSaid()
                 if (!!r[1] !== body.historyShown) shifted.push(where + " " + r[0] + " shows " + (body.historyShown ? "a range" : "the day"))
-                else if (onDay === null) onDay = said
-                else if (said !== onDay) shifted.push(where + " " + r[0] + ": " + said + ", on 1D " + onDay)
+                else if (onDay[where] === undefined) onDay[where] = said
+                else if (said !== onDay[where]) shifted.push(where + " " + r[0] + ": " + said + ", on 1D " + onDay[where])
                 var short = shortOfEdge()
                 if (short) unreached.push(where + " " + r[0] + ": " + short)
                 var marked = marksFault(r[1])
@@ -2426,42 +2430,60 @@ ShellRoot {
         // screen less the bar, the card's margins, padding, and border.
         // Found in the 1.0.2 leftovers review (O1): from text size 18 on a
         // short screen the popup showed no row at all.
-        // On AAPL's 1Y, a mark's words never touch the ink, the line's
-        // highest and lowest close or the baseline past them, and a chart
-        // at its full height shows both marks. Found in review on 21
-        // October: at 20 the squeezed chart ran through both.
+        // On Shell's 1Y, whose prices carry commas below the baseline, a
+        // mark's words never touch the ink, the line's highest and lowest
+        // close or the baseline past them, and a chart at its full height
+        // shows both marks. Found in review on 21 October: at 20 the squeezed
+        // chart ran through both, and a comma reached the ink.
         var shortFaults = []
         var shortSeen = []
         var touched = []
+        var exact = function(item, y) { return item.mapToItem(body, 0, y).y }
+        stub.featuredSymbol = "SHEL.L"
         stub.range = "1Y"
-        stub.historyEntry = { status: "ok", history: aaplYear, receivedAt: stub.now }
-        // Where the ink reaches, as each look draws it: smooth's line, a
-        // pixel either side, inside its 3 px pad; retro's columns, 6 px
-        // apart, each at its last close's row of 5 px, over the baseline's.
-        var inkReach = function() {
+        stub.historyEntry = { status: "ok", history: History.parseHistory(JSON.parse(shelYearFile.text()), "1Y"), receivedAt: stub.now }
+        // Where the ink reaches under a mark, between `x0` and `x1` on the
+        // chart, as each look draws it: smooth's line through the closes
+        // there and the nearest either side, a pixel either side of it,
+        // inside its 3 px pad; retro's columns, 6 px apart, each at its last
+        // close's row of 5 px; and the baseline across the whole width.
+        var inkReach = function(x0, x1) {
           var g = body.featuredGeometry
+          var w = body.chartItem.width
           var h = body.chartItem.height
+          var ys = [g.baselineY]
           if (!stub.retro) {
-            var ys = g.points.map(function(p) { return p.y }).concat([g.baselineY])
+            var px = function(p) { return 3 + p.x * (w - 6) }
+            g.points.forEach(function(p, i) {
+              var before = px(g.points[Math.max(0, i - 1)])
+              var after = px(g.points[Math.min(g.points.length - 1, i + 1)])
+              if (after >= x0 && before <= x1) ys.push(p.y)
+            })
             return [3 + Math.min.apply(null, ys) * (h - 6) - 1, 3 + Math.max.apply(null, ys) * (h - 6) + 1]
           }
           var rows = Math.floor(h / 5)
-          var columns = Math.floor(body.chartItem.width / 6)
+          var columns = Math.floor(w / 6)
           var last = {}
           g.points.forEach(function(p) { last[Math.min(columns - 1, Math.floor(p.x * columns))] = p.y })
-          var levels = Object.keys(last).map(function(c) { return last[c] }).concat([g.baselineY])
-            .map(function(y) { return Math.round(y * (rows - 1)) })
+          Object.keys(last).forEach(function(c) { if (c >= Math.floor(x0 / 6) && c <= Math.floor(x1 / 6)) ys.push(last[c]) })
+          var levels = ys.map(function(y) { return Math.round(y * (rows - 1)) })
           return [Math.min.apply(null, levels) * 5, (Math.max.apply(null, levels) + 1) * 5]
         }
-        var markInk = function(mark) {
-          var spans = []
+        // Each word of a mark that touches the ink under it: its ink's top
+        // and bottom, and the ink's reach there.
+        var touching = function(mark, high) {
+          var out = []
           for (var k = 0; k < mark.children.length; k++) {
             var t = mark.children[k]
             if (String(t).indexOf("QQuickText(") !== 0) continue
             var ink = root.inkOf(t)
-            spans.push([yIn(t, t.baselineOffset + ink.y), yIn(t, t.baselineOffset + ink.y + ink.height)])
+            var words = [exact(t, t.baselineOffset + ink.y), exact(t, t.baselineOffset + ink.y + ink.height)]
+            var left = t.mapToItem(body.chartItem, 0, 0).x
+            var reach = inkReach(left, left + t.width).map(function(y) { return exact(body.chartItem, y) })
+            if (high ? words[1] > reach[0] : words[0] < reach[1])
+              out.push("\"" + t.text + "\" at " + words.join("–") + " on ink at " + reach.join("–"))
           }
-          return [Math.min.apply(null, spans.map(function(s) { return s[0] })), Math.max.apply(null, spans.map(function(s) { return s[1] }))]
+          return out.join(", ")
         }
         for (var size = 9; size <= 20; size++) {
           Style.fontBaseSize = size
@@ -2487,22 +2509,21 @@ ShellRoot {
             if (!(body.watchlist.height >= body.listRowHeight && yIn(body.watchlist, body.listRowHeight) + body.groupGap <= footerTop))
               shortFaults.push(where + ": no row in " + room + " px, chart " + chart + ", list " + body.watchlist.height)
             if (rowFitsWhole && chart !== fullChart) shortFaults.push(where + ": the chart gave way to " + chart + " though " + fullChart + " leaves a row")
-            var reach = inkReach().map(function(y) { return yIn(body.chartItem, y) })
             ;[find(body, "highMark"), find(body, "lowMark")].forEach(function(mark, i) {
               var name = i === 0 ? "high" : "low"
               if (!mark || !mark.visible) {
                 if (chart === fullChart) touched.push(where + ": no " + name + " mark on a " + chart + " px chart")
                 return
               }
-              var words = markInk(mark)
-              if (i === 0 ? words[1] > reach[0] : words[0] < reach[1])
-                touched.push(where + ": the " + name + " mark's words at " + words.join("–") + " on ink at " + reach.join("–") + ", chart " + chart)
+              var onInk = touching(mark, i === 0)
+              if (onInk) touched.push(where + ": the " + name + " mark's " + onInk + ", chart " + chart)
             })
           })
         }
         body.screenRoom = 0
         surface.budget = 730
         stub.retro = false
+        stub.featuredSymbol = "AAPL"
         stub.range = "1D"
         stub.historyEntry = null
         Style.fontBaseSize = 12

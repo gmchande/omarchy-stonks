@@ -67,17 +67,6 @@ Item {
   // How far the ink has drawn in, in pixels: what is laid over the ink
   // draws in with it (`RangeMarks`).
   readonly property real inkDrawn: curtain.width
-  // The ink's top and bottom, in pixels: its highest and lowest print, or
-  // the baseline past them, and the line's half width. What is laid over
-  // the chart keeps clear of them (`RangeMarks`).
-  readonly property var inkExtent: {
-    var g = geometry
-    var ys = g && g.points ? g.points.map(function(p) { return p.y }) : []
-    if (g && typeof g.baselineY === "number" && isFinite(g.baselineY)) ys.push(g.baselineY)
-    if (!ys.length) return { top: height, bottom: 0 }
-    var h = height - pad * 2
-    return { top: pad + Math.min.apply(null, ys) * h - weight, bottom: pad + Math.max.apply(null, ys) * h + weight }
-  }
   // The wash: the up colour's at 16%, and each side at the alpha that adds
   // the same lightness over the ground (`Tones.washAlpha`), so a down day's
   // reads as strongly as an up day's; never more than half the line's ink.
@@ -102,6 +91,24 @@ Item {
   // inverse.
   function xAt(fraction) {
     return pad + fraction * (width - pad * 2)
+  }
+
+  // How high and low the ink reaches between `x0` and `x1`, in pixels: the
+  // prints there and the nearest either side, which the line joins to
+  // them, the baseline, which runs the whole width, and the line's half
+  // width. What is laid over the chart keeps clear of it (`RangeMarks`).
+  function inkExtentIn(x0, x1) {
+    var g = geometry
+    var ys = g && typeof g.baselineY === "number" && isFinite(g.baselineY) ? [g.baselineY] : []
+    var pts = g && g.points ? g.points : []
+    for (var i = 0; i < pts.length; i++) {
+      var before = xAt(pts[Math.max(0, i - 1)].x)
+      var after = xAt(pts[Math.min(pts.length - 1, i + 1)].x)
+      if (after >= x0 && before <= x1) ys.push(pts[i].y)
+    }
+    if (!ys.length) return { top: height, bottom: 0 }
+    var h = height - pad * 2
+    return { top: pad + Math.min.apply(null, ys) * h - weight, bottom: pad + Math.max.apply(null, ys) * h + weight }
   }
 
   // The ticks: a mark on the baseline at the bell, and at the night's
