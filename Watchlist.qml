@@ -863,7 +863,11 @@ Flickable {
           restoreMode: Binding.RestoreNone
         }
         quote: place >= 0 ? sightQuote : null
-        view: quote ? Figures.rowModel(quote, root.scrubShown, root.changeMode) : null
+        // The scrub reaches only the rows in sight, as answers do: each
+        // step and each replay frame derived and repainted every row ever
+        // scrolled past. A row coming into sight takes it before that frame.
+        readonly property int sightScrub: inSight ? root.scrubShown : 0
+        view: quote ? Figures.rowModel(quote, sightScrub, root.changeMode) : null
         status: root.entryOf(symbol) ? root.entryOf(symbol).status : "loading"
         // Freshness reads the clock every second: only rows in sight do.
         freshness: place >= 0 && inSight ? root.freshnessOf(symbol) : null
@@ -875,7 +879,7 @@ Flickable {
           && root.dragSymbol === ""
         lifted: symbol === root.dragSymbol
         retro: root.retro
-        scrubX: quote && root.scrubShown ? Chart.fractionAtTime(quote, root.scrubShown) : -1
+        scrubX: quote && sightScrub ? Chart.fractionAtTime(quote, sightScrub) : -1
         foreground: root.foreground
         dim: root.dim
         dimmer: root.dimmer
