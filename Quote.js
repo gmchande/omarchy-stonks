@@ -506,12 +506,13 @@ function regularPoints(quote) {
 // timestamp, the way Apple's Stocks shows the price. It is the latest
 // regular print while trading and the close otherwise, and it may be
 // stamped a second after the bell or belong to the previous session; that
-// is still the regular quote. Only when the metadata is unusable does the
-// last regular chart sample stand in, with its own time. Null when neither
+// is still the regular quote. A missing time never discards a known price.
+// Only when the price is missing does the last regular chart sample stand
+// in, labelled with its bar's time. Null when neither
 // exists: an unavailable price is shown as unavailable, never invented.
 function headlineQuote(quote) {
-  if (Format.isFiniteNumber(quote.price) && Format.isFiniteNumber(quote.marketTime)) {
-    return { price: quote.price, t: quote.marketTime, source: "quote" }
+  if (Format.isFiniteNumber(quote.price)) {
+    return { price: quote.price, t: Format.isFiniteNumber(quote.marketTime) ? quote.marketTime : null, source: "quote" }
   }
   var pts = regularPoints(quote)
   if (pts.length) return { price: pts[pts.length - 1].p, t: pts[pts.length - 1].t, source: "chart" }

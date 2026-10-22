@@ -40,6 +40,7 @@ start "overnight harness" bash test/qml/overnight.sh
 start "popup harness" bash test/qml/popup.sh
 start "charts fetched ahead harness" bash test/qml/ahead.sh
 start "window rows harness" bash test/qml/window-rows.sh
+start "save, clock and pending work harness" bash test/qml/resilience.sh
 start "keys harness" bash test/qml/keys.sh
 start "sounds harness" bash test/qml/sounds.sh
 start "camera harness" bash test/qml/camera.sh
@@ -56,6 +57,7 @@ fill
 
 run "unit tests (every *.test.js)" bash test/unit.sh
 run "frame checker self-check" bun test/qml/frames.js self-check
+run "required font glyphs" bun test/font.js
 run "source boundaries" bash test/boundaries.sh
 run "qmllint (only the baseline in test/lint.sh)" bash test/lint.sh
 run "qmllint gate self-check" bash test/lint.sh self-check

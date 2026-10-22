@@ -110,8 +110,9 @@ building one that won't merge.
   Robinhood's logo.
 - **Only what's true.** Show what the source sent, never an adjustment,
   precision, or coverage it didn't. Leave out a figure that isn't known; never
-  guess it. The headline price is Yahoo's regular-market quote, never the last
-  chart bar. Only a failed or overdue refresh shows a "!".
+  guess it. The headline price is Yahoo's regular-market quote. If that price
+  is missing, keep the last regular chart trade, labelled "Last trade"
+  with its time. Only a failed or overdue refresh shows a "!".
 - **Money.** No currency conversion: each listing in its own currency, with
   its code beside the exchange, as Apple's Stocks does.
 - **Time.** An exchange's times are its own, with its zone named when it

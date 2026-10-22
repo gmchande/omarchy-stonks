@@ -559,6 +559,7 @@ Item {
     target: root.service
     ignoreUnknownSignals: true
     function onPreviewTaken(surface) { if (surface === root) root.cancelAdding() }
+    function onScreensReady() { search.pump() }
   }
 
   // Every action on the rows and the chart shows what it acts on: the key
@@ -1332,6 +1333,7 @@ Item {
     anchors.bottomMargin: root.margins
     visible: root.adding
     gate: root.service ? root.service.yahooGate : null
+    clearance: root.service ? function() { return root.service.screensClear() } : null
     active: root.adding && root.surfaceOpen
     retro: root.retro
     foreground: root.foreground

@@ -20,6 +20,7 @@ ShellRoot {
   property int failures: 0
   // Tab's requests to the bar for its next panel.
   property int tabs: 0
+  property int tabDirection: 0
 
   function check(label, ok, detail) {
     console.log((ok ? "PASS " : "FAIL ") + label + (!ok && detail !== undefined ? " — " + detail : ""))
@@ -109,7 +110,7 @@ ShellRoot {
     shell: shellApi
     foreground: Commons.Color.foreground
     fontFamily: Style.font.family
-    _switchPanelFrom: function(owner, direction) { harness.tabs++; return true }
+    _switchPanelFrom: function(owner, direction) { harness.tabs++; harness.tabDirection = direction; return true }
   }
   Stonks.Panel { id: panel; bar: api; settings: ({}) }
   Stonks.App { id: app; service: service; updates: updates; camera: camera }
@@ -179,6 +180,11 @@ ShellRoot {
       "→": function(s) { s.body.nudgeScrub(-2) },
       "l": function(s) { s.body.nudgeScrub(-2) },
       "u": function(s) { s.body.removeFrom(s.body.watchlist.cursorRow, true) },
+      // These keys remove directly on a row held only by All. Shift+X below
+      // covers the menu for a row held by another list too.
+      "x": function(s) { s.body.watchlist.cursorSymbol = "LONG1" },
+      "Delete": function(s) { s.body.watchlist.cursorSymbol = "LONG1" },
+      "Backspace": function(s) { s.body.watchlist.cursorSymbol = "LONG1" },
       "Shift+O": function(s) { service.setOrder("pct") },
       // The day is the first range.
       "[": function(s) { service.setRange("1W") }
@@ -197,22 +203,137 @@ ShellRoot {
       return true
     }
 
-    // A key acts once what it changes shows: the camera's shot lands a
-    // moment after the key, once its picture is saved.
+    // Expected effects are independent of the handlers and of README prose.
+    // A documented key without a case fails; changing some unrelated state
+    // cannot satisfy the expected target or excuse another settings change.
     function acts(s, token) {
       base(s)
       if (setups[token]) setups[token](s)
-      wait(50)
-      var before = shown(s)
+      var b = s.body
+      var rows = b.watchlist.displayedSymbols.slice()
+      var selected = b.watchlist.cursorRow
+      var before = { featured: service.featuredSymbol, range: service.range,
+        order: service.order, reversed: service.reversed, list: service.listName,
+        symbols: service.symbols.join(","), retro: service.retro, mode: service.changeMode,
+        cursor: b.watchlist.cursorRow, scrub: b.scrubT, replay: b.motion.replayRunning,
+        adding: b.adding, menu: b.listMenuOpen, managing: b.managingLists, listsSymbol: b.listsSymbol,
+        help: b.showingHelp, open: b.surfaceOpen, refreshes: service.testRefreshes, tabs: harness.tabs, direction: harness.tabDirection,
+        sounds: service.soundsOn, camera: b.cameraLit, rowMenu: b.rowMenu ? b.rowMenu.symbol : "" }
+      var refreshes = service.testRefreshes, tabs = harness.tabs
+      var changed = [], effect = null
+      var target = selected
+      if (/^[1-9]$/.test(token)) target = rows[Number(token) - 1]
+      if (/^[1-9]$/.test(token) || token === "⏎" || token === "Space") {
+        changed = ["featured", "cursor"]
+        effect = function() { return service.featuredSymbol === target && b.watchlist.cursorRow === target }
+      } else if (["↑", "k", "↓", "j"].indexOf(token) >= 0) {
+        changed = ["cursor"]
+        var cursor = rows[rows.indexOf(selected) + (["↑", "k"].indexOf(token) >= 0 ? -1 : 1)]
+        effect = function() { return b.watchlist.cursorRow === cursor }
+      } else if (["←", "h", "→", "l"].indexOf(token) >= 0) {
+        changed = ["scrub"]
+        var points = b.featuredDay.points
+        var right = token === "→" || token === "l"
+        var nextTime = b.featuredDay.axis && b.featuredDay.axis.byPrint
+          ? points[points.length - 2].t
+          : (b.scrubT || b.motion.scrubEnd) + (right ? 300 : -300)
+        effect = function() { return b.scrubT === nextTime }
+      } else if (token === "[" || token === "]") {
+        changed = ["range"]
+        effect = function() { return service.range === (token === "[" ? "1D" : "1W") }
+      } else if (token === "p") { changed = ["scrub", "replay"]; effect = function() { return b.motion.replayRunning } }
+      else if (token === "a" || token === "+") { changed = ["adding"]; effect = function() { return b.adding && b.search.active } }
+      else if (["x", "Delete", "Backspace"].indexOf(token) >= 0) {
+        changed = ["symbols", "cursor"]
+        effect = function() { return service.symbols.join(",") === rows.filter(function(r) { return r !== selected }).join(",") }
+      } else if (token === "u") {
+        changed = ["symbols", "cursor"]
+        var removed = b.removal.symbol
+        effect = function() { return service.symbols.indexOf(removed) >= 0 && service.symbols.length === rows.length + 1 }
+      } else if (token === "Shift+J" || token === "Shift+K") {
+        changed = ["symbols"]
+        var reordered = rows.slice(), at = rows.indexOf(selected), to = at + (token === "Shift+J" ? 1 : -1)
+        reordered.splice(at, 1); reordered.splice(to, 0, selected)
+        effect = function() { return service.symbols.join(",") === reordered.join(",") && b.watchlist.cursorRow === selected }
+      } else if (token === "o") {
+        changed = ["order", "cursor"]
+        effect = function() { return service.order === "symbol" }
+      } else if (token === "Shift+O") {
+        changed = ["reversed", "cursor"]
+        effect = function() { return service.reversed === !before.reversed }
+      } else if (token === "w") { changed = ["menu"]; effect = function() { return b.listMenuOpen } }
+      else if (token === "Shift+W") { changed = ["managing"]; effect = function() { return b.managingLists } }
+      else if (token === "m") { changed = ["listsSymbol"]; effect = function() { return b.listsSymbol === selected } }
+      else if (token === "," || token === ".") {
+        changed = ["list", "symbols", "featured", "order", "reversed", "cursor"]
+        effect = function() { return service.listName === (token === "," ? "Back" : "Walk") && service.symbols.join(",") === (token === "," ? "MSFT" : "AAPL") }
+      } else if (token === "c") {
+        changed = ["mode"]
+        var mode = {pct:"abs", abs:"open", open:"pct"}[before.mode]
+        effect = function() { return service.changeMode === mode }
+      } else if (token === "s") {
+        changed = ["retro"]
+        effect = function() { return service.retro === !before.retro }
+      } else if (token === "Shift+S") {
+        changed = ["sounds"]
+        effect = function() { return service.soundsOn === !before.sounds }
+      } else if (token === "y") {
+        changed = ["camera"]
+        effect = function() { return b.cameraLit }
+      } else if (token === "Shift+X") {
+        changed = ["rowMenu"]
+        effect = function() { return !!b.rowMenu && b.rowMenu.symbol === selected
+          && b.rowMenu.lines.length === 1 && b.rowMenu.lines[0].label === "Remove from all 2 lists" }
+      } else if (token === "r") { changed = ["refreshes"]; effect = function() { return service.testRefreshes === refreshes + 1 } }
+      else if (token === "Tab" || token === "Shift+Tab") {
+        changed = ["tabs", "direction"]
+        effect = function() { return harness.tabs === tabs + 1 && harness.tabDirection === (token === "Tab" ? 1 : -1) }
+      } else if (token === "?") { changed = ["help"]; effect = function() { return b.showingHelp } }
+      else if (token === "Esc") { changed = ["open"]; effect = function() { return !b.surfaceOpen } }
+      if (!effect) {
+        if (token !== "Shift+P") return false
+        var unchanged = shown(s)
+        press(token)
+        return shown(s) !== unchanged
+      }
       if (!press(token)) return false
-      wait(100)
-      for (var waited = 0; waited < 2000 && shown(s) === before; waited += 50) wait(50)
-      return shown(s) !== before
+      var acted = function() {
+        var after = { featured: service.featuredSymbol, range: service.range,
+          order: service.order, reversed: service.reversed, list: service.listName,
+          symbols: service.symbols.join(","), retro: service.retro, mode: service.changeMode,
+        cursor: b.watchlist.cursorRow, scrub: b.scrubT, replay: b.motion.replayRunning,
+        adding: b.adding, menu: b.listMenuOpen, managing: b.managingLists, listsSymbol: b.listsSymbol,
+        help: b.showingHelp, open: b.surfaceOpen, refreshes: service.testRefreshes, tabs: harness.tabs, direction: harness.tabDirection,
+        sounds: service.soundsOn, camera: b.cameraLit, rowMenu: b.rowMenu ? b.rowMenu.symbol : "" }
+        return effect() && Object.keys(before).every(function(k) { return changed.indexOf(k) >= 0 || before[k] === after[k] })
+      }
+      var ok = within(token === "y" ? 3000 : 1500, acted)
+      if (!ok) console.log("KEY EFFECT " + s.name + " " + token + " " + shown(s))
+      return ok
+    }
+
+    function within(ms, predicate) {
+      for (var t = 0; t < ms && !predicate(); t += 20) wait(20)
+      return predicate()
+    }
+
+    function escapeOrder(s) {
+      base(s)
+      s.body.nudgeScrub(-2)
+      var scrub = s.body.scrubT
+      press("?")
+      press("Esc")
+      harness.check(s.name + " Esc closes the sheet before the scrub", !s.body.showingHelp && s.body.scrubT === scrub && s.body.surfaceOpen)
+      press("Esc")
+      harness.check(s.name + " Esc ends the scrub before the surface", !s.body.scrubT && s.body.surfaceOpen)
+      press("Esc")
+      harness.check(s.name + " Esc then closes the surface", !s.body.surfaceOpen)
     }
 
     // The sheet as drawn on `s`, opened with ? and closed again.
-    function drawnSheet(s) {
+    function drawnSheet(s, order) {
       base(s)
+      if (order) service.setOrder(order)
       press("?")
       wait(50)
       var sheet = harness.find(s.body, "helpSheet")
@@ -224,14 +345,28 @@ ShellRoot {
 
     function walk(s) {
       var sheet = drawnSheet(s)
-      var readme = harness.readmeKeys(s.name)
-      var listed = []
-      sheet.keys.map(harness.tokens).concat(readme ? [readme] : []).forEach(function(group) {
-        group.forEach(function(t) { if (listed.indexOf(t) < 0) listed.push(t) })
+      var sortedSheet = drawnSheet(s, "symbol")
+      var everyday = harness.tokens("↑ ↓ ⏎ 1 2 3 4 5 6 7 8 9 a x u ← → [ ] p y w o , . s S c r")
+      var missing = []
+      ;[sheet, sortedSheet].forEach(function(drawn, i) {
+        var keys = []
+        drawn.keys.map(harness.tokens).forEach(function(group) { keys = keys.concat(group) })
+        var required = everyday.concat(i === 0 ? ["Shift+J", "Shift+K"] : [])
+        required.forEach(function(key) { if (keys.indexOf(key) < 0) missing.push((i === 0 ? "manual " : "sorted ") + key) })
       })
+      harness.check("in the " + s.name + ", the sheet lists the everyday keys in manual and sorted order",
+        missing.length === 0, missing.join(" "))
+      var readme = harness.readmeKeys(s.name)
+      var sheetKeys = []
+      sheet.keys.map(harness.tokens).forEach(function(group) { sheetKeys = sheetKeys.concat(group) })
+      var absent = sheetKeys.filter(function(t) { return !readme || readme.indexOf(t) < 0 })
+      harness.check("in the " + s.name + ", every everyday sheet key is documented in the complete README",
+        !!readme && absent.length === 0, absent.join(" "))
+      var listed = readme || []
       var dead = listed.filter(function(t) { return !acts(s, t) })
-      harness.check("in the " + s.name + ", every key the sheet and the README's table list acts (" + listed.length + " keys)",
-        readme !== null && dead.length === 0, readme === null ? "no key table in the README" : "dead: " + dead.join(" "))
+      harness.check("in the " + s.name + ", every README key does its documented action (" + listed.length + " keys)",
+        readme !== null && dead.length === 0, readme === null ? "no key table in the README" : "wrong: " + dead.join(" "))
+      escapeOrder(s)
       harness.check("in the " + s.name + ", Shift+P changes nothing", !acts(s, "Shift+P"))
       var version = JSON.parse(harness.readFile(harness.manifestPath)).version
       harness.check("in the " + s.name + ", the sheet's foot credits Stonks " + version + ", Yahoo, and Robinhood",
@@ -254,7 +389,7 @@ ShellRoot {
         var setup = function() {
           base(s)
           if (letter === "o") service.setOrder("pct")
-          if (letter === "x") s.body.watchlist.cursorSymbol = s.body.watchlist.displayedSymbols[2]
+          if (letter === "x") s.body.watchlist.cursorSymbol = "LONG1"
           wait(50)
         }
         setup()
@@ -315,6 +450,8 @@ ShellRoot {
       quiet()
       service.createList("Walk")
       service.setMembership("AAPL", "Walk", true)
+      service.createList("Back")
+      service.setMembership("MSFT", "Back", true)
       service.switchList("")
       wait(100)
 

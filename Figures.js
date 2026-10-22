@@ -56,9 +56,9 @@ function freshness(entry, quote, now, owedSince) {
     : overdue ? "overdue"
     : !quote || !head ? "unavailable"
     : entry && entry.status === "saved" ? "saved"
-    : Market.isTrading(phase) && now - head.t > LIVE_QUOTE_MAX_AGE ? "aged"
+    : asOf !== null && Market.isTrading(phase) && now - asOf > LIVE_QUOTE_MAX_AGE ? "aged"
     : "fresh"
-  return { state: state, asOf: asOf, earlier: earlier, live: state === "fresh" && Market.isTrading(phase), phase: phase }
+  return { state: state, asOf: asOf, earlier: earlier, live: asOf !== null && state === "fresh" && Market.isTrading(phase), phase: phase }
 }
 
 // The words for a freshness state, or "" when nothing needs saying. A quote
@@ -69,12 +69,18 @@ function freshnessText(fresh, quote, calendars) {
   if (!fresh) return ""
   // With nothing ever answered there was nothing to refresh: "Refresh
   // failed" is for a symbol that had data and lost it.
-  if (!fresh.asOf) return fresh.state === "failed" ? "NO DATA FOR THIS SYMBOL" : fresh.state === "unavailable" || fresh.state === "overdue" ? "NO DATA" : ""
-  var asOf = "AS OF " + (fresh.earlier ? Format.WEEKDAYS[Format.localClock(fresh.asOf, quote.gmtoffset).weekday].toUpperCase() + " " : "")
+  var head = quote ? Quote.headlineQuote(quote) : null
+  if (!fresh.asOf) {
+    if (head) return (fresh.state === "failed" ? "REFRESH FAILED · "
+      : fresh.state === "overdue" ? "UPDATE OVERDUE · " : fresh.state === "saved" ? "SAVED · " : "") + "TIME NOT SENT"
+    return fresh.state === "failed" ? "NO DATA FOR THIS SYMBOL" : fresh.state === "unavailable" || fresh.state === "overdue" ? "NO DATA" : ""
+  }
+  var chartTrade = head && head.source === "chart"
+  var asOf = (chartTrade ? "LAST TRADE · " : "AS OF ") + (fresh.earlier ? Format.WEEKDAYS[Format.localClock(fresh.asOf, quote.gmtoffset).weekday].toUpperCase() + " " : "")
     + Market.printClock(quote, fresh.asOf, calendars)
   if (fresh.state === "failed") return "REFRESH FAILED · " + asOf
   if (fresh.state === "overdue") return "UPDATE OVERDUE · " + asOf
-  if (fresh.state === "aged" || fresh.state === "saved") return asOf
+  if (chartTrade || fresh.state === "aged" || fresh.state === "saved") return asOf
   return ""
 }
 

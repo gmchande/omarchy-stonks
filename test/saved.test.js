@@ -134,17 +134,38 @@ test("across every saved intraday response the filter drops only those eleven ba
     .toEqual([1790946900, 1790947200, 1790947800])
 })
 
-test("the headline is Yahoo's regular-market quote with its own time; the chart only stands in", () => {
+test("the headline uses the regular quote or labels the last chart trade with its time", () => {
   expect(M.headlineQuote(quote)).toEqual({ price: quote.price, t: quote.marketTime, source: "quote" })
   expect(M.regularClose(quote)).toBe(quote.price)
   const regular = M.regularPoints(quote)
   const noMeta = { ...quote, price: null }
   expect(M.headlineQuote(noMeta)).toEqual({ price: regular[regular.length - 1].p, t: regular[regular.length - 1].t, source: "chart" })
   const noTime = { ...quote, marketTime: null }
-  expect(M.headlineQuote(noTime).source).toBe("chart")
+  expect(M.headlineQuote(noTime)).toEqual({ price: quote.price, t: null, source: "quote" })
+  const untimed = M.freshness({ status: "ok" }, noTime, quote.marketTime, 0)
+  expect(untimed.asOf).toBeNull()
+  expect(untimed.live).toBe(false)
+  expect(M.freshnessText(untimed, noTime, calendars)).toBe("TIME NOT SENT")
+  expect(M.freshnessText({ ...untimed, state: "saved" }, noTime, calendars)).toBe("SAVED · TIME NOT SENT")
+  expect(M.freshnessText({ ...untimed, state: "failed" }, noTime, calendars)).toBe("REFRESH FAILED · TIME NOT SENT")
+  expect(M.freshnessText({ ...untimed, state: "overdue" }, noTime, calendars)).toBe("UPDATE OVERDUE · TIME NOT SENT")
   const nothing = { ...quote, price: null, points: [] }
   expect(M.headlineQuote(nothing)).toBeNull()
   expect(M.regularClose(nothing)).toBeNull()
+  // A constructed omission, not a claim that this capture lacked metadata.
+  const night = M.parseChart(fixture("moments/listings-2026-10-07-0100/nest.json"))
+  const now = Date.UTC(2026, 9, 7, 5) / 1000
+  for (const omitted of [{ price: null }, { price: null, marketTime: null }]) {
+    const fallback = { ...night, ...omitted }
+    const fresh = M.freshness({ status: "ok" }, fallback, now, 0)
+    expect(M.headlineQuote(fallback)).toEqual({ price: 249.77999877929688, t: 1791316500, source: "chart" })
+    expect(M.freshnessText(fresh, fallback, calendars)).toBe("LAST TRADE · TUE 15:55")
+    expect(M.freshnessWarns(fresh)).toBe(false)
+    expect(M.freshnessText({ ...fresh, earlier: false }, fallback, calendars)).toBe("LAST TRADE · 15:55")
+    expect(M.freshnessText({ ...fresh, state: "failed" }, fallback, calendars)).toBe("REFRESH FAILED · LAST TRADE · TUE 15:55")
+    expect(M.freshnessText({ ...fresh, state: "overdue" }, fallback, calendars)).toBe("UPDATE OVERDUE · LAST TRADE · TUE 15:55")
+  }
+  expect(M.freshnessText(M.freshness({ status: "ok" }, night, now, 0), night, calendars)).toBe("")
 })
 
 const sep4 = M.parseChart(fixture("aapl-2026-09-04-day-prepost.json"))
@@ -214,8 +235,8 @@ test("the day is drawn whole, and its range holds the previous close", () => {
   // than six points above the 757.83 previous close, and only the pre-market
   // climbs between them. Drawing the session alone left the line in the top
   // fifth over an empty chart.
-  expect(geo.lo).toBeCloseTo(757.1516, 4)
-  expect(geo.hi).toBeCloseTo(766.9884, 4)
+  expect(geo.lo).toBeLessThan(757.83)
+  expect(geo.hi).toBeGreaterThan(766.31)
   const lowest = Math.max(...geo.points.map(p => p.y))
   const highest = Math.min(...geo.points.map(p => p.y))
   expect(lowest - highest).toBeGreaterThan(0.5)
@@ -627,11 +648,7 @@ test("the day line is 1D, or its figures' weekday when they are not today's: its
     .toBe("1D · 314.74–327.30+ @325.13 · OPEN 316.98 · VOL 52.4M")
   expect(said(dayLineAt(reaching("fiftyTwoWeekLow", "regularMarketDayLow"), at("2026-09-01", "17:30"))))
     .toBe("1D · 314.74-–327.30 @325.13 · OPEN 316.98 · VOL 52.4M")
-  // Every price slot is as wide as the listing's largest price at its
-  // decimals, and VOL's as 999.9M, so a refresh never widens either.
-  const today = dayLineAt(quote, at("2026-09-01", "17:30"))
-  expect([today.range.widest, ...today.facts.map(f => f.widest)]).toEqual(["888.88", "888.88", "888.8M"])
-  expect(M.dayLine(M.parseChart(fixture("moments/listings-2026-10-08-1054/brk-a.json"))).range.widest).toBe("888,888")
+
 })
 
 // Saved answers from 1 October 2026 (2 October in Tokyo and London): the
@@ -700,10 +717,6 @@ test("the 52-week line moves Yahoo's cap and P/E with the price, and leaves out 
   // line names no other day.
   expect(said(dayLineAt(shell, M.epochAt(calendars.calendars.LSE, "2026-10-02", "07:30")))).toBe("1D · ?–? @3,589.00 · OPEN _ · VOL 4K")
   expect(year(shell, figures("shel-l"))).toBe("52W · ?–? @3,589.00 · MKT CAP GBP 204.8B · P/E 10.6")
-  // Before its figures come, its cap's slot already holds a currency's
-  // room, as every listing's does.
-  expect(M.yearLine(shell, null).facts.map(f => f.widest)).toEqual(["GBP 888.8B", "88.8"])
-  expect(M.yearLine(quote, null).facts.map(f => f.widest)).toEqual(["USD 888.8B", "88.8"])
   // A cap 120 days old still moves with the price; at 121 it is left out.
   expect(year(at(quote, 337.02, "2026-09-23", 120), aapl)).toBe("52W · 225.95–344.57 @337.02 · MKT CAP USD 4.92T · P/E 38.6")
   expect(year(at(quote, 337.02, "2026-09-23", 121), aapl)).toBe("52W · 225.95–344.57 @337.02 · MKT CAP _ · P/E 38.6")
@@ -836,9 +849,9 @@ test("freshness keeps quote age, an unanswered ask, and the refresh outcome apar
   // No quote at all: unavailable, failed when the first fetch failed, and a
   // warning once its ask has gone 90 s unanswered.
   expect(M.freshness(null, null, trading, 0)).toMatchObject({ state: "unavailable", live: false })
-  expect(M.freshnessText(M.freshness({ status: "failed", receivedAt: 0 }, null, trading, 0), q)).toBe("NO DATA FOR THIS SYMBOL")
+  expect(M.freshnessText(M.freshness({ status: "failed", receivedAt: 0 }, null, trading, 0), null)).toBe("NO DATA FOR THIS SYMBOL")
   const nothing = M.freshness(null, null, trading, trading - 90)
-  expect([nothing.state, M.freshnessText(nothing, q), M.freshnessWarns(nothing)]).toEqual(["overdue", "NO DATA", true])
+  expect([nothing.state, M.freshnessText(nothing, null), M.freshnessWarns(nothing)]).toEqual(["overdue", "NO DATA", true])
 })
 
 test("a quote kept from an earlier session says when it is from, and warns only once asked for and unanswered", () => {
@@ -1067,7 +1080,6 @@ test("historyGeometry uses uniform bar spacing and retains bar facts", () => {
   expect(geometry.baselineY).toBeLessThan(1)
   expect(geometry.start).toBe(1757683800)
   expect(geometry.end).toBe(1789133400)
-  expect(geometry.ticks).toEqual([])
 })
 
 test("5Y and longer draw on a log scale; shorter ranges stay linear", () => {

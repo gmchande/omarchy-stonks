@@ -66,6 +66,7 @@ ShellRoot {
     function persist(values) { if (values.changeMode !== undefined) changeMode = values.changeMode }
     function feature(symbol) { featuredSymbol = symbol }
     function setRange(value) { range = value }
+    function screensClear() { return true }
     function surfaceShown(surface, open) { if (open) test.opensTold++ }
     function rowsSeen(surface, symbols) {}
     // A search's choice shown on the hero; this stub's hero never changes.

@@ -13,6 +13,8 @@ Item {
 
   property var entries: ({})
   property var gate: null
+  property var clearance: null
+  property string pendingUrl: ""
   // The gate's ticket the request out was let through on (`Gate.report`).
   property int ticket: 0
   // The symbol to fetch once the one under way is done.
@@ -40,12 +42,22 @@ Item {
   }
 
   function run(url) {
+    root.pendingUrl = url
+    root.pump()
+  }
+
+  function pump() {
+    if (!pendingUrl || (clearance && !clearance())) return
     if (gate && gate.take(1) === 0) {
       root.settle(job.symbol, null)
       return
     }
     if (gate) root.ticket = gate.ticket
+    // A snapshot held while the screens are off ends at wake, not at the
+    // earlier ask. Closes refer to fixed snapshot dates and keep their URL.
+    var url = job.figures ? pendingUrl : Fundamentals.fundamentalsUrl(job.symbol, Math.floor(Date.now() / 1000))
     fetchProc.command = Fetch.curlCommand([url], Fetch.FUNDAMENTALS_CAP)
+    root.pendingUrl = ""
     fetchProc.running = true
   }
 
@@ -70,6 +82,7 @@ Item {
   }
 
   function settle(symbol, figures) {
+    root.pendingUrl = ""
     var next = Object.assign({}, entries)
     next[symbol] = figures
       ? { status: "ok", figures: figures, checkedAt: Math.floor(Date.now() / 1000) }

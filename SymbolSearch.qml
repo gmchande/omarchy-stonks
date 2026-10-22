@@ -273,6 +273,7 @@ FocusScope {
   // host, a lookup fails at once rather than waiting. A body with no
   // service has none.
   property var gate: null
+  property var clearance: null
   // The gate's ticket the request out was let through on (`Gate.report`).
   property int ticket: 0
 
@@ -280,6 +281,8 @@ FocusScope {
     var q = searchText.trim()
     if (q.length < 1) return
     if (searchProc.running) { requestedQuery = q; return }
+    if (clearance && !clearance()) { requestedQuery = q; return }
+    requestedQuery = ""
     activeQuery = q
     if (gate && gate.take(1) === 0) {
       land("")
@@ -289,6 +292,10 @@ FocusScope {
     searchProc.command = Fetch.curlCommand([Search.searchUrl(q)], Fetch.SEARCH_CAP)
     searchProc.running = true
     if (answer === "" && !slow) slowSearch.restart()
+  }
+
+  function pump() {
+    if (active && requestedQuery !== "" && !searchProc.running) root.runSearch()
   }
 
   // An answer counts only for the query still being asked: a search dropped

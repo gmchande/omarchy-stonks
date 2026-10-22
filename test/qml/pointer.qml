@@ -159,10 +159,11 @@ ShellRoot {
     property color foreground: "#cacccc"
     property color upColor: "#7aa2f7"
     property color downColor: "#a55555"
-    property string fontFamily: "CaskaydiaMono Nerd Font"
+    property string fontFamily: Style.font.family
     property var lastSettings: null
     function persist(values) { lastSettings = values }
     function setRange(value) { range = value }
+    function screensClear() { return true }
     function surfaceShown(surface, open) {}
     function rowsSeen(surface, symbols) {}
     // A search's choice shown on the hero; this stub's hero never changes.

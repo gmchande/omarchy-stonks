@@ -160,20 +160,6 @@ ShellRoot {
     return findAll(app.testBody, "curtain", []).filter(function(c) { return c.parent.visible })[0].parent
   }
 
-  // The columns a retro chart leaves dark between two prints its line joins,
-  // as smooth's does: every point but one that starts again (`brk`).
-  function darkJoins(chart) {
-    var g = chart.grid
-    var pts = chart.geometry.points
-    var column = function(p) { return Math.min(g.columns - 1, Math.floor(p.x * g.columns)) }
-    var dark = []
-    for (var k = 1; k < pts.length; k++) {
-      if (pts[k].brk) continue
-      for (var c = column(pts[k - 1]); c <= column(pts[k]); c++) if (g.levels[c] === undefined && dark.indexOf(c) < 0) dark.push(c)
-    }
-    return dark
-  }
-
   function finish() {
     console.log("OVERNIGHT DONE")
     done.exitCode = failures ? 1 : 0
@@ -741,16 +727,25 @@ ShellRoot {
       // An answer without its regular price and time: the hero falls back
       // to Tuesday's last regular print, and the line under the price still
       // names the night, against that same close.
+      // Robinhood can answer the clock step before the regular quote does.
+      // Let that refresh land before replacing its quote with this case.
+      var quoteAnswered = within(8000, function() {
+        var entry = service.entries.NEST
+        return entry && entry.status === "ok" && entry.answeredAt === service.now && !service.owed.NEST
+      })
       var whole = service.testFeed.quotes
       var bare = Object.assign({}, whole)
       bare.NEST = Object.assign({}, whole.NEST, { price: null, marketTime: null })
       service.testFeed.quotes = bare
       within(2000, function() { return body.featured.priceText !== "249.87" })
-      var fallback = body.featured.priceText + " | " + harness.strip()
+      var fallback = body.featured.priceText + " | " + harness.find(body, "listingLine").text + " | " + harness.strip()
+      var rowFallback = harness.find(nestRow, "rowDetail").text
       service.testFeed.quotes = whole
       within(2000, function() { return body.featured.priceText === "249.87" })
-      harness.check("with no regular price in Yahoo's answer, the hero reads Tuesday's last regular print and the line still names the night against it",
-        fallback.indexOf("249.78 | OVERNIGHT 00:50 248.04 ") === 0, fallback)
+      harness.check("with no regular price, the hero labels its last chart trade with Tuesday's time and keeps the overnight line",
+        quoteAnswered && fallback.indexOf("249.78 | LAST TRADE · TUE 15:55 · ") === 0
+          && fallback.indexOf(" | OVERNIGHT 00:50 248.04 ") > 0
+          && rowFallback === "Last trade · Tue 15:55", "quote answered: " + quoteAnswered + " | " + fallback + " | row: " + rowFallback)
 
       // Two US stocks Robinhood does not trade all day, saved with the
       // listing sweep at the same moment: KILN traded 2 shares at 23:10 on
@@ -1097,58 +1092,30 @@ ShellRoot {
         refused && caughtUp && afterProbe.length > 2 && afterProbe[0] === 25,
         "refused " + refused + "; requests after the pause of " + afterProbe.join(", ") + "; every night refreshed " + caughtUp)
 
-      // Wednesday 21 October, 10:06: VANE, a thin NYSE stock, printed 26
-      // times since midnight, fewer than the hero's columns, its night quiet
-      // for over an hour twice, and nine times in the pre-market, hours
-      // apart. Laid out by print, a quiet hour takes no room, so smooth's
-      // line runs on across it: a break there read as missing prices.
-      // Retro left a column dark wherever no print fell in it, so the day
-      // looked torn where smooth's line runs on: in the hero laid out by
-      // print, in its row laid out by the clock, and on 3M, 66 days across
-      // the hero's columns.
+      // A real thin US day: the three long quiet spans are known from
+      // the saved answer, not from the geometry's break decisions. One key
+      // step must reach the next actual print, however long the silence.
       useSet("gaps-2026-10-21-1006")
       service.now = 1792591591
       service.addSymbol("VANE")
       within(8000, function() { return !!service.quotes.VANE && service.arriving.length === 0 })
       featureShown("VANE")
-      within(3000, function() { return body.featuredGeometry.start === 1792555200 && !body.chartLoading })
-      if (service.retro) {
+      within(3000, function() { return body.chartSymbol === "VANE" && !body.chartLoading })
+      var spans = [[1792555800,1792561200], [1792565400,1792569600], [1792571400,1792580700]]
+      var joined = spans.map(function(span) {
+        var points = body.featuredDay.points
+        var a = points.map(function(p) { return p.t }).indexOf(span[0])
+        var b = points.map(function(p) { return p.t }).indexOf(span[1])
+        body.motion.scrubT = span[0]
         app.testKeyCatcher.forceActiveFocus()
-        keyClick(Qt.Key_S)
-        within(2000, function() { return !service.retro })
-      }
-      var vaneDay = body.featuredDay.points
-      var vaneLine = body.featuredGeometry.points
-      var quietInk = []
-      for (var q = 1; q < vaneDay.length; q++) {
-        if (vaneDay[q].t - vaneDay[q - 1].t <= 3600) continue
-        var mid = (vaneLine[q - 1].x + vaneLine[q].x) / 2
-        within(2000, function() { return harness.inkAt(mid).alpha > 0 })
-        var offset = service.quotes.VANE.gmtoffset
-        quietInk.push(Format.hhmm(vaneDay[q - 1].t, offset) + "–" + Format.hhmm(vaneDay[q].t, offset) + " " + harness.inkAt(mid).alpha)
-      }
-      harness.check("smooth: VANE's line runs on across every quiet hour of its day, laid out by print: two in its night, one before the open",
-        quietInk.length === 3 && quietInk.every(function(s) { return !/ 0$/.test(s) }), quietInk.join(", "))
-      if (!service.retro) {
-        app.testKeyCatcher.forceActiveFocus()
-        keyClick(Qt.Key_S)
-        within(2000, function() { return service.retro })
-      }
-      var vaneAt = body.watchlist.rowItem("VANE").y
-      body.watchlist.contentY = Math.max(0, Math.min(vaneAt, body.watchlist.contentHeight - body.watchlist.height))
-      within(2000, function() { return !!harness.find(body.watchlist.rowItem("VANE"), "rowCells") })
-      var heroDark = harness.darkJoins(harness.retroChart())
-      var rowDark = harness.darkJoins(harness.find(body.watchlist.rowItem("VANE"), "rowCells"))
-      app.testKeyCatcher.forceActiveFocus()
-      keyClick(Qt.Key_BracketRight)
-      keyClick(Qt.Key_BracketRight)
-      keyClick(Qt.Key_BracketRight)
-      within(5000, function() { return body.chartRange === "3M" && body.historyShown && !body.historyFailed && !body.chartLoading })
-      var quarter = harness.retroChart()
-      var quarterDark = body.chartRange === "3M" && quarter.geometry.points.length === 66 ? harness.darkJoins(quarter) : ["no 3M"]
-      harness.check("retro: VANE's day in the hero and its row, and its 3M, light every column between two prints the line joins",
-        heroDark.length === 0 && rowDark.length === 0 && quarterDark.length === 0,
-        "dark columns: hero " + heroDark.join(",") + " | row " + rowDark.join(",") + " | 3M " + quarterDark.join(","))
+        keyClick(Qt.Key_Right)
+        return a >= 0 && b === a + 1 && body.featuredGeometry.points[b].brk === false && body.scrubT === span[1]
+      })
+      harness.check("a thin US day's three quiet spans keep adjacent prints joined and each is one scrub step",
+        joined.every(function(ok) { return ok }), joined.join(","))
+      body.endScrub()
+      // Painted sparse day/3M, one-print and Tokyo lunch states are already
+      // in render.qml; no model value can stand in for their rendered ink.
       harness.finish()
     }
   }

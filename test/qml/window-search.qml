@@ -609,58 +609,48 @@ ShellRoot {
         "body, results' room, whole, cut: " + at + " (minimum " + app.testWindow.minimumSize.height + ") | chosen, results, note seen: " + noteSeen)
     }
 
-    // A first search says it is searching once its lookup has been out a
-    // quarter of a second, under the field where its answer will go, and
-    // the answer replaces the line: results, no matches, or no answer. One
-    // that answers sooner never shows it, and an edit while it shows keeps
-    // it up, naming the field's query. Found in the slow walk of 16
-    // October: under the field stayed empty for over four seconds.
+    // A held answer makes the waiting state observable without prescribing
+    // its presentation delay. Editing names the current query; an old result
+    // cannot be accepted for that query.
     function firstSearchSaysSo(body, keys) {
       var message = harness.find(body.search, "searchMessage")
-      // Every line under the field, frame by frame ("-" for none), from an
-      // empty field until the answer for `query` + `then` lands, and how
-      // long after its first lookup went out the line first showed.
-      // `then` is typed once a frame has drawn the line.
-      var search = function(query, then) {
-        keyClick(Qt.Key_A, Qt.ControlModifier)
-        keyClick(Qt.Key_Backspace)
-        var seen = []
-        var outAt = 0
-        var shownAfter = -1
-        var out = function() { if (body.search.activeQuery !== "" && !outAt) outAt = Date.now() }
-        var watch = function() {
-          var said = message.visible ? message.text : "-"
-          if (said !== "-" && shownAfter < 0) shownAfter = Date.now() - outAt
-          if (seen[seen.length - 1] !== said) seen.push(said)
-        }
-        body.search.activeQueryChanged.connect(out)
-        var frames = Qt.createQmlObject('import QtQuick; FrameAnimation { running: true }', harness)
-        frames.triggered.connect(watch)
-        for (var c = 0; c < query.length; c++) keyClick(query[c])
-        if (then) {
-          within(2000, function() { return seen.length > 1 })
-          for (c = 0; c < then.length; c++) keyClick(then[c])
-        }
-        tryVerify(function() { return body.search.resultsQuery === query + (then || "") }, 3000)
-        wait(100)
-        frames.destroy()
-        body.search.activeQueryChanged.disconnect(out)
-        return seen.join(" / ") + " | " + (shownAfter < 0 ? "never" : shownAfter >= 250 ? "late" : shownAfter + " ms")
+      var hold = function(on) {
+        fileProc.command = on ? ["touch", harness.fakeState + "/SEARCH.hold"] : ["rm", "-f", harness.fakeState + "/SEARCH.hold"]
+        fileProc.running = true
+        tryVerify(function() { return !fileProc.running }, 2000)
       }
       keys.forceActiveFocus()
       keyClick(Qt.Key_A)
-      wait(50)
-      var late = search("S", "H")
-      var none = search("ZZZ")
-      var failed = search("OOPS")
-      var fast = search("FAST")
+      tryVerify(function() { return body.adding && body.search.active }, 2000)
+      hold(true)
+      keyClick("S")
+      var firstNamed = within(3000, function() { return message.visible && message.text === "Searching for “S”…" })
+      harness.check("waiting names the first query", firstNamed, message.text)
+      keyClick("H")
+      var editedNamed = within(3000, function() { return message.visible && message.text === "Searching for “SH”…" })
+      harness.check("waiting names the edited query", editedNamed, message.text)
+      hold(false)
+      tryVerify(function() { return body.search.resultsQuery === "SH" && body.search.results.length > 0 }, 4000)
+      // A later query retains real results, so a broken stale-result guard
+      // would have an actual unadded symbol to accept.
+      hold(true)
+      var askedBefore = harness.calls("SEARCH.asked")
+      keyClick("X")
+      var previousResults = body.search.results.length > 0 && body.search.resultsQuery === "SH"
+        && service.library.indexOf(body.search.results[0].symbol) < 0
+      var lookupOut = within(3000, function() { return body.search.activeQuery === "SHX" && harness.calls("SEARCH.asked") === askedBefore + 1 })
+      harness.check("the edited query's lookup is actually held with previous results present", lookupOut && previousResults)
+      if (!lookupOut) { hold(false); body.resetInteraction(); return }
+      var members = service.library.join(",")
+      keyClick(Qt.Key_Return)
+      var stayed = body.adding && body.search.stale && service.library.join(",") === members
+      harness.check("Enter cannot add a previous query's real result while the current lookup is held", previousResults && stayed)
+      hold(false)
+      if (!stayed) { body.resetInteraction(); return }
+      tryVerify(function() { return body.search.resultsQuery === "SHX" && body.search.answer === "results" }, 4000)
+      harness.check("the current query's answer replaces the earlier results",
+        body.search.resultsQuery === "SHX" && !message.visible && body.search.results.length > 0)
       body.resetInteraction()
-      harness.check("a first search says it is searching a quarter second after its lookup goes out, through an edit, until its answer replaces the line; one answering sooner never says so",
-        late === "- / Searching for “S”… / Searching for “SH”… / - | late"
-          && none === "- / Searching for “ZZZ”… / No matches for “ZZZ” | late"
-          && failed === "- / Searching for “OOPS”… / Search didn’t answer | late"
-          && fast === "- | never",
-        [late, none, failed, fast].join(" ; "))
     }
 
     // A failed lookup is asked again, the same query through the same

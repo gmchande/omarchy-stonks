@@ -161,6 +161,7 @@ start "popup motion harness" bash test/qml/popup-motion.sh
 start "tophat guards (no screen)" bash test/tophat.sh self-check
 fill
 
+run "installed theme diagnostic" bun test/themes.js
 drain
 run "render diff, against ${base:0:7} (out/render-diff/)" render_diff
 run "keep the renders this run drew" keep_sets

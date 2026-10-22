@@ -182,9 +182,12 @@ serve() {
   fi
   if [[ "$url" == *"/v1/finance/search"* ]]; then
     count "$state/SEARCH.asked.calls" > /dev/null
+    while [ -e "$state/SEARCH.hold" ]; do sleep 0.05; done
     [[ "$url" == *"q=FAST&"* ]] || sleep 0.4
     [ -e "$state/SEARCH.down" ] && exit 22
     case "$url" in
+      *"q=HELD&"*) echo '{"quotes":[{"symbol":"SLOW","longname":"Held answer","exchange":"NMS","quoteType":"EQUITY"}]}' ;;
+      *"q=HELDFAIL&"*) echo '{"quotes":[{"symbol":"LATE","longname":"Failed held answer","exchange":"NMS","quoteType":"EQUITY"}]}' ;;
       *"q=FAST&"*) cat "$fixtures/search.json" ;;
       *"q=ZZZ"*) echo '{"quotes":[]}' ;;
       *"q=OOPS"*) exit 22 ;;
@@ -230,6 +233,10 @@ serve() {
       exit 40
     fi
     [ -e "$STONKS_FAKE_STATE/OVERNIGHT.down" ] && exit 22
+    if [ -e "$STONKS_FAKE_STATE/OVERNIGHT.malformed" ]; then
+      echo '{"results":[{"symbol":"NEST","historicals":[{"begins_at":"2026-10-21T04:00:00Z","close_price":"3","open_price":"2"}]},{"symbol":"KILN","historicals":[null]}]}'
+      exit
+    fi
     set_name="$(cat "$STONKS_FAKE_STATE/overnight.set" 2>/dev/null)"
     if [ -n "$set_name" ]; then
       jq -c --arg asked "$asked" '($asked | split(",")) as $want
@@ -256,6 +263,7 @@ serve() {
       symbol="${symbol%%\?*}"
       count "$STONKS_FAKE_STATE/$symbol.fundamentals.calls" > /dev/null
       file="$(saved "$symbol")"
+      while [ -e "$STONKS_FAKE_STATE/FUNDAMENTALS.hold" ]; do sleep 0.05; done
     else
       symbol="${url##*/chart/}"
       file="$(saved "${symbol%%\?*}" -closes)"
@@ -346,6 +354,15 @@ while [ "$#" -gt 0 ]; do
     *) shift ;;
   esac
 done
+# Reject before serving anything, and leave a record finish() cannot mistake
+# for a simulated outage. One parser invocation for the whole curl batch.
+if ! validated=$(bun "$(dirname "${BASH_SOURCE[0]}")/../../request-url.js" "${urls[@]}"); then
+  if [ ! -s "$state/unexpected.requests" ]; then
+    printf 'validator failed: %s\n' "${urls[*]}" >> "$state/unexpected.requests"
+  fi
+  exit 2
+fi
+mapfile -t urls <<< "$validated"
 run=()
 for i in "${!urls[@]}"; do
   url=${urls[$i]}
@@ -371,9 +388,10 @@ for i in "${!urls[@]}"; do
     # In the background, so a curl stopped mid-answer (search's suspend, a
     # history no longer wanted) stops its answer too, as the real one does.
     out_file="$state/serve.$$.$i"
+    serving=""
+    trap 'echo "$kind $name cancelled" >> "$state/cancelled.log"; serving=${serving:-${!:-}}; if [ -n "$serving" ]; then kill "$serving" 2> /dev/null; fi; rm -f "$out_file"; exit 143' TERM INT
     serve "$url" > "$out_file" &
     serving=$!
-    trap 'kill "$serving" 2> /dev/null; rm -f "$out_file"; exit 143' TERM INT
     wait "$serving"
     served=$?
     trap - TERM INT

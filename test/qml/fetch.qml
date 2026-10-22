@@ -302,9 +302,15 @@ ShellRoot {
       if (otherPill.warns) out.push("other pill !")
       if (app.opened) {
         var body = app.testBody
+        var hero = harness.find(body, "hero")
+        if (!hero || !hero.visible) out.push("! missing hero")
+        else if (/^!/.test(hero.listingLead) || hero.freshnessText !== "") out.push("hero: " + hero.listingLead)
         harness.listed.forEach(function(s) {
           var row = body.watchlist.rowItem(s)
-          if (row && (/^!/.test(row.detail) || /^As of/.test(row.detail))) out.push(s + ": " + row.detail)
+          if (!row || !row.visible || !harness.find(row, "rowContent")
+              || row.y + row.height <= body.watchlist.contentY || row.y >= body.watchlist.contentY + body.watchlist.height)
+            out.push("! missing visible row " + s)
+          else if (/^!/.test(row.detail) || /^As of/.test(row.detail)) out.push(s + ": " + row.detail)
         })
       }
       return out

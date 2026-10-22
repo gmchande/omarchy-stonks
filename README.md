@@ -82,7 +82,11 @@ price is for the US stocks and ETFs Robinhood trades overnight.
 
 An old price says "As of" and its time, on its row and above the price.
 Old means more than two minutes behind while its market trades, or saved
-from the last session. A refresh that fails, or gets no answer in 90
+from the last session. If Yahoo sends no regular price, Stonks keeps the
+last regular chart trade, labelled "Last trade" with its time.
+If Yahoo sends a price without its time, it says "Time not sent", and
+"Saved" too if kept from the last session.
+A refresh that fails, or gets no answer in 90
 seconds, says so in the same places and puts a "!" on the pill.
 
 ## Your lists

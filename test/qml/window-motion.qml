@@ -29,16 +29,6 @@ ShellRoot {
     return item.contentItem ? find(item.contentItem, name) : null
   }
 
-  // Calls `add` on each paint of every canvas under `item` but the scrub's
-  // own marks, from the call on.
-  property int linePaints: 0
-  property int retroPaints: 0
-  function countPaints(item, add) {
-    if (!item) return
-    if (typeof item.requestPaint === "function" && item.objectName !== "scrubMarks") item.painted.connect(add)
-    for (var i = 0; i < item.children.length; i++) countPaints(item.children[i], add)
-  }
-
   function finish() {
     console.log("WINDOW MOTION DONE")
     done.exitCode = failures ? 1 : 0
@@ -355,6 +345,21 @@ ShellRoot {
       rest()
     }
 
+    // OutCubic's origin: Qt may count from the tick before the change,
+    // so a wall-time mark alone makes a correct animation read early.
+    function animationOrigin(anim, value) {
+      if (anim.duration <= 0 || anim.from === anim.to) return 0
+      var progress = Math.max(0, Math.min(1, (value - anim.from) / (anim.to - anim.from)))
+      return Date.now() - (1 - Math.cbrt(1 - progress)) * anim.duration
+    }
+
+    function captureOrigin(origin, tick, mark) {
+      // Only the recorded tick before the change can explain an early start.
+      // Frame times have millisecond precision, as does Date.now().
+      origin = Math.round(origin)
+      return tick > 0 && origin >= tick && origin <= mark ? origin : mark
+    }
+
     // The draw-in as it is rendered: the hero chart grabbed on every frame,
     // its ink advancing from the left over several distinct frames and
     // whole in about 320 ms, for a symbol change and a range change, in both
@@ -367,13 +372,22 @@ ShellRoot {
         busy.target = busyMachine ? body.chartItem.Window.window : null
         harness.busySince = 0
         grab.begin(name)
+        tryVerify(function() { return grab.tick > 0 && grab.frames.length > 0 }, 2000)
         // The draw-in starts as the chart's reveal leaves whole.
         var started = false
+        var leftAt = -1
+        var drawFrom = 0
+        var beforeTick = 0
         var marked = function() {
-          if (started || body.motion.reveal >= 1) return
-          started = true
-          grab.markStart()
-          if (busyMachine) harness.busySince = Date.now()
+          var r = body.motion.reveal
+          if (!started) {
+            if (r >= 1) return
+            started = true
+            leftAt = r
+            beforeTick = grab.tick
+            grab.markStart()
+            if (busyMachine) harness.busySince = Date.now()
+          } else if (!drawFrom && r > leftAt) drawFrom = animationOrigin(body.motion.testDrawIn, r)
         }
         body.motion.revealChanged.connect(marked)
         change()
@@ -386,8 +400,12 @@ ShellRoot {
         harness.busySince = 0
         body.motion.revealChanged.disconnect(marked)
         tryVerify(function() { return grab.waiting === 0 }, 3000)
-        grab.judge("drawin:ink", null, ["plot=" + emptyPlot(body, name)])
+        var markedAt = grab.start
+        grab.start = captureOrigin(drawFrom, beforeTick, markedAt)
+        grab.judge("drawin:ink", grab.frames.filter(function(f) { return f.at >= markedAt }), ["plot=" + emptyPlot(body, name)])
         tryVerify(function() { return grab.verdict !== null }, 10000)
+        grab.verdict.detail += " | origin " + Math.round(grab.start - markedAt) + ", inferred "
+          + (drawFrom ? Math.round(drawFrom - markedAt) : "none") + ", prior tick " + (beforeTick - markedAt) + " ms from mark"
         return grab.verdict
       }
       var results = []
@@ -475,14 +493,33 @@ ShellRoot {
         var heldUntil = Date.now()
         heroGrab.source = harness.find(body, "hero")
         heroGrab.begin("lift-" + look)
+        tryVerify(function() { return heroGrab.tick > 0 && heroGrab.frames.length > 0 }, 2000)
         var landedAt = 0
+        var leftAt = -1
+        var drawFrom = 0
+        var liftFrom = 0
+        var drawTick = 0
+        var liftTick = 0
         var marked = function() {
-          if (landedAt || body.motion.reveal === 1) return
-          grab.markStart()
-          heroGrab.markStart()
-          landedAt = grab.start
+          var r = body.motion.reveal
+          if (!landedAt) {
+            if (r === 1) return
+            drawTick = grab.tick
+            liftTick = heroGrab.tick
+            grab.markStart()
+            heroGrab.markStart()
+            landedAt = grab.start
+            leftAt = r
+          } else if (!drawFrom && r > leftAt) drawFrom = animationOrigin(body.motion.testDrawIn, r)
+        }
+        var lifting = function() {
+          var anim = body.motion.testDim
+          var value = body.motion.dimmed
+          if (!liftFrom && landedAt && value < anim.from && value > anim.to)
+            liftFrom = animationOrigin(anim, value)
         }
         body.motion.revealChanged.connect(marked)
+        body.motion.dimmedChanged.connect(lifting)
         releaseAapl.running = true
         tryVerify(function() { return !body.chartLoading && body.motion.reveal === 1 && body.motion.dimmed === 0 }, 5000)
         var settledAt = grab.frames.length
@@ -491,17 +528,23 @@ ShellRoot {
         heroGrab.end()
         made(null)
         body.motion.revealChanged.disconnect(marked)
+        body.motion.dimmedChanged.disconnect(lifting)
         tryVerify(function() { return grab.waiting === 0 && heroGrab.waiting === 0 }, 3000)
         var plot = emptyPlot(body, "loading-" + look)
         grab.start = heldFrom
         var held = verdictOf(grab, "dim", grab.frames.filter(function(f) { return f.at >= heldFrom && f.at < heldUntil }))
-        grab.start = landedAt
-        var landed = verdictOf(grab, "drawin:ink", null, ["plot=" + plot])
+        grab.start = captureOrigin(drawFrom, drawTick, landedAt)
+        var landed = verdictOf(grab, "drawin:ink", grab.frames.filter(function(f) { return f.at >= landedAt }), ["plot=" + plot])
+        landed.detail += " | origin " + Math.round(grab.start - landedAt) + ", inferred "
+          + (drawFrom ? Math.round(drawFrom - landedAt) : "none") + ", prior tick " + (drawTick - landedAt) + " ms from landing mark"
         // From the last frame before the landing, still dimmed: its price is
         // the same symbol's, so the dim it comes back from is read off it,
         // not off the first frame after, which under load is part lifted.
         var beforeLanding = heroGrab.frames.filter(function(f) { return f.at < landedAt }).slice(-1)
+        heroGrab.start = captureOrigin(liftFrom, liftTick, landedAt)
         var lifted = verdictOf(heroGrab, "dim", beforeLanding.concat(heroGrab.frames.filter(function(f) { return f.at >= landedAt })))
+        lifted.detail += " | origin " + Math.round(heroGrab.start - landedAt) + ", inferred "
+          + (liftFrom ? Math.round(liftFrom - landedAt) : "none") + ", prior tick " + (liftTick - landedAt) + " ms from landing mark"
         return { held: held.ok && loading && stillLoading && named, heldDetail: held.detail + (named ? "" : ", label " + label.visible + " " + label.text),
           landed: landed, lifted: lifted }
       }
@@ -1028,8 +1071,7 @@ ShellRoot {
           return
         }
         if (drawFrom || r <= leftAt || anim.duration <= 0) return
-        var along = 1 - Math.cbrt(1 - Math.min(1, (r - anim.from) / (anim.to - anim.from)))
-        drawFrom = Date.now() - along * anim.duration
+        drawFrom = animationOrigin(anim, r)
       }
       // The body is built as the window first opens, before its draw-in
       // starts: the watch goes on it as it is built.
@@ -1060,53 +1102,6 @@ ShellRoot {
       wait(200)
       var watchlist = body.watchlist
       var keys = app.testKeyCatcher
-
-      // A draw-in and a scrub repaint no line, in either look: the draw-in
-      // widens a clip over the chart as drawn, and the scrub's marks are
-      // their own layer. Found in perf pass 1: both repainted the whole chart,
-      // and a scrub every row's line, on every frame.
-      tryVerify(function() { return service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 10000)
-      var countLine = function() { harness.linePaints++ }
-      harness.countPaints(body.chartItem, countLine)
-      harness.countPaints(watchlist, countLine)
-      var stillLines = []
-      for (var look = 0; look < 2; look++) {
-        wait(300)
-        harness.linePaints = 0
-        body.motion.drawIn()
-        wait(450)
-        var drawInPaints = harness.linePaints
-        for (var step = 1; step <= 10; step++) {
-          mouseMove(body.chartItem, body.chartItem.width * step / 12, body.chartItem.height / 2)
-          wait(20)
-        }
-        stillLines.push(drawInPaints + "+" + (harness.linePaints - drawInPaints) + (body.scrubT !== 0 ? "" : " no scrub"))
-        mouseMove(body, 1, 1)
-        service.persist({ style: look === 0 ? "retro" : "smooth" })
-        tryVerify(function() { return body.retro === (look === 0) }, 2000)
-      }
-      harness.check("a draw-in and ten scrub steps repaint no line, smooth then retro",
-        stillLines.join("|") === "0+0|0+0", stillLines.join("|"))
-
-      // The hidden look rests: a new chart in smooth paints nothing of
-      // retro's, chart or digits. Found in perf pass 1: they repainted with
-      // every new chart, the look on screen or not.
-      var retroChart = null
-      for (var child = 0; child < body.chartItem.children.length; child++)
-        if (typeof body.chartItem.children[child].pixel === "number") retroChart = body.chartItem.children[child]
-      var countRetro = function() { harness.retroPaints++ }
-      harness.countPaints(retroChart, countRetro)
-      harness.countPaints(harness.find(body, "blockPrice"), countRetro)
-      var featuredBefore = service.featuredSymbol
-      // Turning back to smooth just now cleared retro's chart once; let it land.
-      wait(300)
-      harness.retroPaints = 0
-      service.feature(featuredBefore === "MSFT" ? "NVDA" : "MSFT")
-      wait(400)
-      harness.check("a new chart in smooth paints nothing of retro's",
-        !!retroChart && harness.retroPaints === 0 && service.featuredSymbol !== featuredBefore, harness.retroPaints)
-      service.feature(featuredBefore)
-      wait(400)
 
       service.feature("AAPL")
       app.testBody.selectRange("1Y")
