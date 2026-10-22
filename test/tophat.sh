@@ -498,11 +498,15 @@ watch_run() {
     trap '' TERM
     echo "$why" > "$run/why"
     # A start still running would switch on after the undo: stop it first,
-    # and its own undo runs. If it hangs, the undo here runs anyway.
+    # and its own undo runs. One that hangs is killed with what it is
+    # running (its children: this tool's), so nothing it began lands after.
     if start_live; then
       read -r pid start < "$run/starter"
       kill -TERM "$pid" 2> /dev/null
-      within 30 start_over
+      if ! within 30 start_over; then
+        pkill -KILL -P "$pid"; kill -KILL "$pid" 2> /dev/null
+        within 5 start_over
+      fi
     fi
     end_run "$why" > /dev/null
     exit 0
