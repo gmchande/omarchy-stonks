@@ -339,14 +339,16 @@ FocusScope {
       width: scroll.width - root.gutter
 
       Repeater {
-        model: root.choices
+        // A row for each list, by count: a change to the lists rebinds the
+        // rows rather than building them all again, shut view or open.
+        model: root.choices.length
 
         Item {
           id: entry
           objectName: "manageRow"
-          required property var modelData
           required property int index
-          readonly property bool named: modelData.name !== ""
+          readonly property var choice: root.choices[index]
+          readonly property bool named: choice.name !== ""
           readonly property bool isCursor: index === root.cursor
           readonly property bool editing: isCursor && root.renaming
           readonly property bool asking: isCursor && root.confirming
@@ -376,7 +378,7 @@ FocusScope {
             height: root.itemHeight
             verticalAlignment: Text.AlignVCenter
             textFormat: Text.PlainText
-            text: entry.modelData.label
+            text: entry.choice.label
             color: entry.named ? root.foreground : root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.bodySmall
@@ -455,7 +457,7 @@ FocusScope {
             height: root.itemHeight
             verticalAlignment: Text.AlignVCenter
             textFormat: Text.PlainText
-            text: String(entry.modelData.count)
+            text: String(entry.choice.count)
             color: root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -470,10 +472,10 @@ FocusScope {
             height: root.itemHeight
             verticalAlignment: Text.AlignVCenter
             textFormat: Text.PlainText
-            text: "Delete " + entry.modelData.label + "? "
-              + (entry.modelData.count === 0 ? "It's empty."
-                : entry.modelData.count === 1 ? "Its symbol stays in All."
-                : "Its " + entry.modelData.count + " symbols stay in All.")
+            text: "Delete " + entry.choice.label + "? "
+              + (entry.choice.count === 0 ? "It's empty."
+                : entry.choice.count === 1 ? "Its symbol stays in All."
+                : "Its " + entry.choice.count + " symbols stay in All.")
             color: root.foreground
             font.family: root.fontFamily
             font.pixelSize: Style.font.bodySmall

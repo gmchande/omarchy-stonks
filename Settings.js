@@ -4,6 +4,9 @@
 
 // The data file's settings and lists, and every rule that changes them:
 // settings in, settings out. Knows nothing of quotes, except to rank them.
+// Each rule takes settings as `fileSettings` returns them, changes none it
+// is given, and normalises what it returns once: a save at 150 symbols in
+// 12 lists normalised every list four to nine times.
 
 function nextChangeMode(mode) {
   return mode === "pct" ? "abs" : mode === "abs" ? "open" : "pct"
@@ -14,9 +17,13 @@ function normalizeSymbols(value) {
   if (typeof value === "string") list = value.split(/[\s,]+/)
   else if (value && typeof value.length === "number") list = value
   var out = []
+  var seen = {}
   for (var i = 0; i < list.length; i++) {
     var s = String(list[i] || "").trim().toUpperCase()
-    if (s && out.indexOf(s) < 0) out.push(s)
+    if (s && seen[s] !== true) {
+      seen[s] = true
+      out.push(s)
+    }
   }
   return out
 }
@@ -136,7 +143,8 @@ function fileSettings(src) {
   var from = src || {}
   var lists = normalizeLists(from.lists)
   var symbols = normalizeSymbols(from.symbols && from.symbols.length ? from.symbols : ["NVDA", "AAPL", "MSFT", "SPY", "TSLA"])
-  for (var i = 0; i < lists.length; i++) symbols = normalizeSymbols(symbols.concat(lists[i].symbols))
+  for (var i = 0; i < lists.length; i++) symbols = symbols.concat(lists[i].symbols)
+  symbols = normalizeSymbols(symbols)
   return Object.assign({}, from, {
     version: 1,
     symbols: symbols,
@@ -234,30 +242,24 @@ function steppedList(settings, delta) {
 
 // The settings with one named list changed, or All when name is "".
 function withList(settings, name, change) {
-  var next = fileSettings(settings)
-  var i = listIndex(next.lists, name)
+  var i = listIndex(settings.lists, name)
   if (i < 0) {
-    var all = change({ symbols: next.symbols, order: next.order, reversed: next.reversed })
-    next.symbols = all.symbols
-    next.order = all.order
-    next.reversed = all.reversed
-  } else {
-    next.lists[i] = change(next.lists[i])
+    var all = change({ symbols: settings.symbols, order: settings.order, reversed: settings.reversed })
+    return fileSettings(Object.assign({}, settings, { symbols: all.symbols, order: all.order, reversed: all.reversed }))
   }
-  return fileSettings(next)
+  var lists = settings.lists.slice()
+  lists[i] = change(lists[i])
+  return fileSettings(Object.assign({}, settings, { lists: lists }))
 }
 
 // Adding on a named list puts the symbol in it and in All; on All, in All
 // only. The surface features it once its first answer is in.
 function withSymbolAdded(settings, symbol) {
   var s = String(symbol || "").trim().toUpperCase()
-  if (!s) return fileSettings(settings)
-  var next = fileSettings(settings)
-  next.symbols = normalizeSymbols(next.symbols.concat([s]))
-  next = withList(next, next.list, function(list) {
-    return Object.assign({}, list, { symbols: normalizeSymbols(list.symbols.concat([s])) })
+  if (!s) return settings
+  return withList(settings, settings.list, function(list) {
+    return Object.assign({}, list, { symbols: list.symbols.concat([s]) })
   })
-  return next
 }
 
 // One symbol's membership of one list, "" for All. Adding to a named list
@@ -265,24 +267,22 @@ function withSymbolAdded(settings, symbol) {
 // membership only; out of All, out of every list, and All keeps one symbol.
 // A featured symbol that leaves All hands the hero to its neighbour in `shown`.
 function withMembership(settings, symbol, name, member, shown) {
-  var next = fileSettings(settings)
   var without = function(list) { return list.filter(function(s) { return s !== symbol }) }
-  if (listIndex(next.lists, name) >= 0) {
-    return withList(next, name, function(list) {
-      var symbols = member ? normalizeSymbols(list.symbols.concat([symbol])) : without(list.symbols)
-      return Object.assign({}, list, { symbols: symbols })
+  if (listIndex(settings.lists, name) >= 0) {
+    return withList(settings, name, function(list) {
+      return Object.assign({}, list, { symbols: member ? list.symbols.concat([symbol]) : without(list.symbols) })
     })
   }
   // A symbol in the checklist is always in All; there is nothing to tick.
-  if (member) return next
-  if (!canRemove(next.symbols) || next.symbols.indexOf(symbol) < 0) return next
-  next.symbols = without(next.symbols)
-  for (var i = 0; i < next.lists.length; i++) next.lists[i].symbols = without(next.lists[i].symbols)
-  if (String(next.featured).toUpperCase() === symbol) {
+  if (member || !canRemove(settings.symbols) || settings.symbols.indexOf(symbol) < 0) return settings
+  var symbols = without(settings.symbols)
+  var featured = settings.featured
+  if (String(featured).toUpperCase() === symbol) {
     var at = (shown || []).indexOf(symbol)
-    next.featured = at < 0 ? next.symbols[0] : shown[at === shown.length - 1 ? at - 1 : at + 1]
+    featured = at < 0 ? symbols[0] : shown[at === shown.length - 1 ? at - 1 : at + 1]
   }
-  return fileSettings(next)
+  return fileSettings(Object.assign({}, settings, { symbols: symbols, featured: featured,
+    lists: settings.lists.map(function(list) { return Object.assign({}, list, { symbols: without(list.symbols) }) }) }))
 }
 
 // A removal taken back: the symbol returns to the place it had in All and in
@@ -290,8 +290,6 @@ function withMembership(settings, symbol, name, member, shown) {
 // the removal moved it off and the hero is still the one it `left`. Anything
 // else changed since stays as it is now.
 function withRemovalUndone(settings, before, symbol, left) {
-  var next = fileSettings(settings)
-  var then = fileSettings(before)
   var restore = function(now, was) {
     var at = was.indexOf(symbol)
     if (at < 0 || now.indexOf(symbol) >= 0) return now
@@ -299,15 +297,14 @@ function withRemovalUndone(settings, before, symbol, left) {
     out.splice(Math.min(at, out.length), 0, symbol)
     return out
   }
-  next.symbols = restore(next.symbols, then.symbols)
-  for (var i = 0; i < next.lists.length; i++) {
-    var j = listIndex(then.lists, next.lists[i].name)
-    if (j >= 0) next.lists[i].symbols = restore(next.lists[i].symbols, then.lists[j].symbols)
-  }
+  var lists = settings.lists.map(function(list) {
+    var j = listIndex(before.lists, list.name)
+    return j < 0 ? list : Object.assign({}, list, { symbols: restore(list.symbols, before.lists[j].symbols) })
+  })
   var hero = function(value) { return String(value || "").toUpperCase() }
-  if (hero(then.featured) === symbol && hero(left) !== symbol && hero(next.featured) === hero(left))
-    next.featured = symbol
-  return fileSettings(next)
+  var back = hero(before.featured) === symbol && hero(left) !== symbol && hero(settings.featured) === hero(left)
+  return fileSettings(Object.assign({}, settings, { symbols: restore(settings.symbols, before.symbols), lists: lists,
+    featured: back ? symbol : settings.featured }))
 }
 
 // Another order starts in its own direction.
@@ -336,11 +333,9 @@ function withManualOrder(settings, symbols) {
 
 // A new, empty list, made current. Unchanged when the name is refused.
 function withListCreated(settings, name) {
-  var next = fileSettings(settings)
-  if (listNameProblem(name, next.lists) !== "") return next
-  next.lists.push({ name: listName(name), symbols: [], order: "manual", reversed: false })
-  next.list = listName(name)
-  return fileSettings(next)
+  if (listNameProblem(name, settings.lists) !== "") return settings
+  var list = { name: listName(name), symbols: [], order: "manual", reversed: false }
+  return fileSettings(Object.assign({}, settings, { lists: settings.lists.concat([list]), list: list.name }))
 }
 
 // Why a list cannot take a new name, or "" when it can: the new-list rules
@@ -351,41 +346,41 @@ function renameProblem(settings, name, newName) {
 
 // The current list follows its new name. Unchanged when the name is refused.
 function withListRenamed(settings, name, newName) {
-  var next = fileSettings(settings)
-  var i = listIndex(next.lists, name)
-  if (i < 0 || renameProblem(next, next.lists[i].name, newName) !== "") return next
-  if (next.list === next.lists[i].name) next.list = listName(newName)
-  next.lists[i].name = listName(newName)
-  return fileSettings(next)
+  var i = listIndex(settings.lists, name)
+  if (i < 0 || renameProblem(settings, settings.lists[i].name, newName) !== "") return settings
+  var lists = settings.lists.slice()
+  lists[i] = Object.assign({}, lists[i], { name: listName(newName) })
+  var current = settings.list === settings.lists[i].name ? lists[i].name : settings.list
+  return fileSettings(Object.assign({}, settings, { lists: lists, list: current }))
 }
 
 // A named list one place up or down among the named lists; All stays first.
 function withListMoved(settings, name, delta) {
-  var next = fileSettings(settings)
-  var from = listIndex(next.lists, name)
-  if (from >= 0) next.lists = movedSymbols(next.lists, from, from + delta)
-  return next
+  var from = listIndex(settings.lists, name)
+  if (from < 0) return settings
+  return fileSettings(Object.assign({}, settings, { lists: movedSymbols(settings.lists, from, from + delta) }))
 }
 
 // Deleting a list leaves All and every other list as they were; deleting the
 // current one goes back to All.
 function withListDeleted(settings, name) {
-  var next = fileSettings(settings)
-  var i = listIndex(next.lists, name)
-  if (i >= 0) next.lists.splice(i, 1)
-  return fileSettings(next)
+  var i = listIndex(settings.lists, name)
+  if (i < 0) return settings
+  var lists = settings.lists.slice()
+  lists.splice(i, 1)
+  return fileSettings(Object.assign({}, settings, { lists: lists }))
 }
 
+// Whether two settings, as `fileSettings` returns them, say the same.
 function settingsEqual(left, right) {
-  return JSON.stringify(fileSettings(left)) === JSON.stringify(fileSettings(right))
+  return left === right || JSON.stringify(left) === JSON.stringify(right)
 }
 
 // What the lists hold, as one value two settings hold equally or not: All's
 // symbols and each named list's name and symbols, in their saved order. A
 // list's sort order and direction are views over it.
 function listsHeld(settings) {
-  var from = fileSettings(settings)
-  return JSON.stringify([from.symbols, from.lists.map(function(list) { return [list.name, list.symbols] })])
+  return JSON.stringify([settings.symbols, settings.lists.map(function(list) { return [list.name, list.symbols] })])
 }
 
 // First-run copy of data settings off the bar entry, which held them before

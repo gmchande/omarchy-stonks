@@ -483,15 +483,14 @@ Flickable {
     contentY = clampY(contentY)
     if (glide.running && glide.to > clampY(glide.to)) glideTo(glide.to)
     if (!animate || !visible) return
+    var rows = rowItems()
     for (var i = 0; i < next.length; i++) {
-      var row = before.indexOf(next[i]) < 0 ? rowItem(next[i]) : null
-      if (row) row.join()
+      if (before.indexOf(next[i]) < 0 && rows[next[i]]) rows[next[i]].join()
     }
     var pulled = scrolled - contentY
     if (pulled <= 0) return
     for (var j = 0; j < next.length; j++) {
-      var shownRow = rowItem(next[j])
-      if (shownRow) shownRow.carry(pulled)
+      if (rows[next[j]]) rows[next[j]].carry(pulled)
     }
   }
 
@@ -562,6 +561,17 @@ Flickable {
       if (item && item.symbol === symbol) return item
     }
     return null
+  }
+
+  // Every row by its symbol, in one pass: a lookup a row at a time scanned
+  // every row for each, 22,500 looks at 150 symbols.
+  function rowItems() {
+    var rows = {}
+    for (var i = 0; i < rowRepeater.count; i++) {
+      var item = rowRepeater.itemAt(i) as WatchlistRow
+      if (item) rows[item.symbol] = item
+    }
+    return rows
   }
 
   // Whether the row shown for `symbol` is still: not sliding, fading, or held.
@@ -709,15 +719,19 @@ Flickable {
     display(view.shown.slice(), false)
   }
 
+  // A row for each symbol in All, in one pass each way.
   function syncRows() {
     var library = view.library
+    var wanted = {}
+    for (var j = 0; j < library.length; j++) wanted[library[j]] = true
+    var have = {}
     for (var i = rowsModel.count - 1; i >= 0; i--) {
-      if (library.indexOf(rowsModel.get(i).symbol) < 0) rowsModel.remove(i)
+      var symbol = rowsModel.get(i).symbol
+      if (wanted[symbol] === true) have[symbol] = true
+      else rowsModel.remove(i)
     }
-    for (var j = 0; j < library.length; j++) {
-      var found = false
-      for (var k = 0; k < rowsModel.count; k++) if (rowsModel.get(k).symbol === library[j]) found = true
-      if (!found) rowsModel.append({ symbol: library[j] })
+    for (j = 0; j < library.length; j++) {
+      if (have[library[j]] !== true) rowsModel.append({ symbol: library[j] })
     }
   }
 
@@ -854,7 +868,11 @@ Flickable {
           restoreMode: Binding.RestoreNone
         }
         quote: place >= 0 ? sightQuote : null
-        view: quote ? Figures.rowModel(quote, root.scrubShown, root.changeMode) : null
+        // The scrub reaches only the rows in sight, as answers do: each
+        // step and each replay frame derived and repainted every row ever
+        // scrolled past. A row coming into sight takes it before that frame.
+        readonly property int sightScrub: inSight ? root.scrubShown : 0
+        view: quote ? Figures.rowModel(quote, sightScrub, root.changeMode) : null
         status: root.entryOf(symbol) ? root.entryOf(symbol).status : "loading"
         // Freshness reads the clock every second: only rows in sight do.
         freshness: place >= 0 && inSight ? root.freshnessOf(symbol) : null
@@ -866,7 +884,7 @@ Flickable {
           && root.dragSymbol === ""
         lifted: symbol === root.dragSymbol
         retro: root.retro
-        scrubX: quote && root.scrubShown ? Chart.fractionAtTime(quote, root.scrubShown) : -1
+        scrubX: quote && sightScrub ? Chart.fractionAtTime(quote, sightScrub) : -1
         foreground: root.foreground
         dim: root.dim
         dimmer: root.dimmer

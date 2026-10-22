@@ -537,8 +537,16 @@ function extendedPrint(quote, latest) {
 function readingAt(quote, t) {
   var pts = quote.points
   if (!pts.length || t < pts[0].t) return { price: quote.prevClose, t: t, close: false }
+  // The last print at or before `t`, halving the prints, which run in time
+  // order: a walk from the first cost every row a step for each print of
+  // the day on every scrub step.
   var k = 0
-  while (k + 1 < pts.length && pts[k + 1].t <= t) k++
+  var top = pts.length - 1
+  while (k < top) {
+    var mid = (k + top + 1) >> 1
+    if (pts[mid].t <= t) k = mid
+    else top = mid - 1
+  }
   var head = headlineQuote(quote)
   var reg = quote.session.regular
   if (!quote.crypto && head && head.source === "quote" && reg && head.t >= reg.end

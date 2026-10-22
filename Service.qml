@@ -29,10 +29,15 @@ Item {
   // change here, on either surface, or in the data file.
   property var lastRemoval: null
   property string listsHeld: ""
+  // All first, then the named lists (`Settings.listChoices`): the same array
+  // until what the lists hold changes, so a save that changes no list, such
+  // as a range or a hero, leaves each surface's list views as they are.
+  property var lists: Settings.listChoices(Settings.fileSettings(null))
   onDataSettingsChanged: {
     var held = Settings.listsHeld(root.dataSettings)
     if (held === root.listsHeld) return
     root.listsHeld = held
+    root.lists = Settings.listChoices(root.dataSettings)
     root.lastRemoval = null
   }
   // Symbols just added whose first answer is not in: neither a quote nor a
@@ -76,7 +81,6 @@ Item {
   readonly property var library: dataSettings.symbols
   // The current list: "" for All. Its symbols in manual order are the rows.
   readonly property string listName: dataSettings.list
-  readonly property var lists: Settings.listChoices(dataSettings)
   // Every member of the current list, in manual order, arriving ones too.
   readonly property var symbols: Settings.listSymbols(dataSettings)
   readonly property string order: Settings.listOrder(dataSettings)
@@ -958,8 +962,9 @@ Item {
     root.adopt(Settings.fileSettings(null))
   }
 
+  // `settings` as `Settings.fileSettings` returns them.
   function writeDataFile(settings) {
-    var body = JSON.stringify(Settings.fileSettings(settings), null, 2) + "\n"
+    var body = JSON.stringify(settings, null, 2) + "\n"
     if (typeof dataFile.setText !== "function") {
       console.warn("stonks: cannot write " + root.dataPath)
       return
@@ -970,9 +975,11 @@ Item {
   // Saved at once, or with `settles`, once the change has rested
   // (`settleWrite`); a change saved at once takes a waiting one with it.
   function persist(values, settles) {
-    var next = Settings.fileSettings(root.dataSettings)
-    for (var key in values) next[key] = values[key]
-    next = Settings.fileSettings(next)
+    root.store(Settings.fileSettings(Object.assign({}, root.dataSettings, values)), settles)
+  }
+
+  // `next`, as `Settings.fileSettings` returns it, in memory and the file.
+  function store(next, settles) {
     root.dataSettings = next
     if (!root.pluginsReady || root.settingsUnreadable) return
     if (settles) {
@@ -1031,8 +1038,7 @@ Item {
 
   // Every membership change is a Settings.js rule: settings in, settings out.
   function save(next) {
-    if (Settings.settingsEqual(next, root.dataSettings)) return
-    root.persist(next)
+    if (!Settings.settingsEqual(next, root.dataSettings)) root.store(next)
   }
 
   // A symbol new to All arrives: fetched ahead of any refresh, and shown

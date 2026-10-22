@@ -180,6 +180,23 @@ test("after the close, the session's last print reads the close at the bell, and
   expect(M.readingAt(london, bell)).toEqual({ price: 3657, t: bell, close: false })
 })
 
+test("a scrub reads the print at or before it, from the day's first print through Tokyo's lunch to its last", () => {
+  // Toyota on Wednesday 7 October, its whole day: 30 morning prints, the
+  // last 11:30's at 2,915, then none until 12:30's at 2,917, and the day
+  // closing at 2,900.50 at 15:30, after its last print, 15:20's.
+  const toyota = M.parseChart(fixture("overnight/sweep-2026-10-07-1455/7203.t.json"))
+  const pts = toyota.points
+  const read = t => M.readingAt(toyota, t)
+  const reopen = pts.findIndex((p, i) => i > 0 && p.t - pts[i - 1].t > 1800)
+  expect([pts.length, reopen, pts[reopen - 1].p, pts[reopen].p]).toEqual([65, 30, 2915, 2917])
+  expect(read(pts[0].t - 60)).toEqual({ price: 2930.5, t: pts[0].t - 60, close: false })
+  expect(read(pts[0].t)).toEqual({ price: 2939.5, t: pts[0].t, close: false })
+  expect(read(pts[3].t + 30)).toEqual({ price: 2927.5, t: pts[3].t + 30, close: false })
+  expect(read(pts[reopen].t - 1800).price).toBe(2915)
+  expect(read(pts[reopen].t).price).toBe(2917)
+  expect(read(pts[pts.length - 1].t)).toEqual({ price: 2900.5, t: toyota.session.regular.end, close: true })
+})
+
 test("the day is drawn whole, and its range holds the previous close", () => {
   const spy = M.parseChart(fixture("spy-2026-09-11-day-prepost.json"))
   const spyReg = spy.session.regular

@@ -68,14 +68,19 @@ Item {
   }
 
   // While still, nothing moves: a change waits for the open's `settle`.
+  // Shares the ends already rest on or ease to leave them be: each scrub
+  // step and replay frame brings a new breadth, mostly the same.
   function showBreadth() {
     if (still) return
     var all = breadth.up + breadth.flat + breadth.down + breadth.none
     var up = all ? breadth.up / all : 0
     var down = all ? breadth.down / all : 0
+    var same = sharesList === breadth.list
+    sharesList = breadth.list
+    if (same && up === (upEase.running ? upEase.to : upShare) && down === (downEase.running ? downEase.to : downShare)) return
     upEase.stop()
     downEase.stop()
-    if (sharesList === breadth.list) {
+    if (same) {
       upEase.to = up
       downEase.to = down
       upEase.start()
@@ -84,7 +89,6 @@ Item {
       upShare = up
       downShare = down
     }
-    sharesList = breadth.list
   }
 
   // At rest on the breadth, as a surface opens.
