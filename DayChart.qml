@@ -64,6 +64,9 @@ Item {
   // line's width and a half, and a pixel). The draw-in sweeps to here.
   readonly property real inkLast: drawable ? geometry.points[geometry.points.length - 1].x : 0
   readonly property real inkRight: Math.min(width, pad + inkLast * (width - pad * 2) + 4)
+  // How far the ink has drawn in, in pixels: what is laid over the ink
+  // draws in with it (`RangeMarks`).
+  readonly property real inkDrawn: curtain.width
   // The wash: the up colour's at 16%, and each side at the alpha that adds
   // the same lightness over the ground (`Tones.washAlpha`), so a down day's
   // reads as strongly as an up day's; never more than half the line's ink.
@@ -82,6 +85,12 @@ Item {
   // Where along the axis `x` is, inside the pad the line is drawn within.
   function fractionAt(x) {
     return (x - pad) / (width - pad * 2)
+  }
+
+  // Where a point `fraction` along the axis is drawn: `fractionAt`'s
+  // inverse.
+  function xAt(fraction) {
+    return pad + fraction * (width - pad * 2)
   }
 
   // The ticks: a mark on the baseline at the bell, and at the night's

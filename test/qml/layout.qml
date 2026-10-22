@@ -6,6 +6,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Commons as Commons
 import "plugin/Chart.js" as Chart
+import "plugin/Cells.js" as Cells
 import "plugin/Format.js" as Format
 import "plugin/Fundamentals.js" as Fundamentals
 import "plugin/History.js" as History
@@ -47,6 +48,7 @@ ShellRoot {
   FileView { id: spyFile; path: root.fixtures + "/spy-2026-09-11-day-prepost.json"; blockLoading: true }
   FileView { id: shopFile; path: root.fixtures + "/shop-to.json"; blockLoading: true }
   FileView { id: aaplWeeklyFile; path: root.fixtures + "/history/aapl-5y.json"; blockLoading: true }
+  FileView { id: aaplYearFile; path: root.fixtures + "/history/aapl-1y.json"; blockLoading: true }
   FileView { id: shopYearFile; path: root.fixtures + "/history/shop-to-1y.json"; blockLoading: true }
   FileView { id: youngFile; path: root.fixtures + "/history/fab-max.json"; blockLoading: true }
   FileView { id: tokyoFile; path: root.fixtures + "/7203-t-day.json"; blockLoading: true }
@@ -443,12 +445,12 @@ ShellRoot {
         // there when the case expects it.
         var whole = function(label, expected) {
           var block = find(body, "infoBlock")
-          var rules = [find(body, "periodRule"), find(body, "yearRule")]
+          var rules = [find(body, "dayRule"), find(body, "yearRule")]
           if (!rules[0] || !rules[1]) cut.push(label + " has no rules")
           else if (rules[0].visible && rules[1].visible
             && (xIn(rules[0], 0) !== xIn(rules[1], 0) || rules[0].width !== rules[1].width))
             cut.push(label + " rules at " + xIn(rules[0], 0) + "+" + rules[0].width + " and " + xIn(rules[1], 0) + "+" + rules[1].width)
-          ;["periodLine", "yearLine"].forEach(function(name, i) {
+          ;["dayLine", "yearLine"].forEach(function(name, i) {
             var line = find(body, name)
             if (!line) {
               cut.push(label + " has no " + name)
@@ -471,19 +473,18 @@ ShellRoot {
           var shown = strip.visible ? strip.children[0].text : ""
           if (expected && shown !== expected) cut.push(label + " shows \"" + shown + "\" under the price, not " + expected)
         }
-        // Each line's title: the shown chart's range (the day's while a
-        // range waits on its history), the day's 1D, weekday, or month, or
-        // 52W; and the lows' column one gap past 52W, as wide as any of
+        // Each line's title: the day's 1D, weekday, or month, on every range,
+        // and 52W; and the lows' column one gap past 52W, as wide as any of
         // them, on every range.
         var dayTitles = ["1D"].concat(Format.WEEKDAYS.map(function(w) { return w.toUpperCase() }), Format.MONTHS)
         var mistitled = []
         var byLeft = function(a, b) { return a.left - b.left }
         var titled = function(label) {
           var block = find(body, "infoBlock")
-          var period = root.drawnSpans(find(body, "periodLine")).sort(byLeft)
+          var period = root.drawnSpans(find(body, "dayLine")).sort(byLeft)
           var year = root.drawnSpans(find(body, "yearLine")).sort(byLeft)
           var gap = xIn(block, block.layout.lowX) - year[0].right
-          var titleOk = body.historyShown ? period[0].what === stub.range.toUpperCase() : dayTitles.indexOf(period[0].what) >= 0
+          var titleOk = dayTitles.indexOf(period[0].what) >= 0
           if (!titleOk || year[0].what !== "52W" || gap !== block.gap)
             mistitled.push(label + " titles " + period[0].what + " and " + year[0].what + ", lows " + gap + " px past 52W")
         }
@@ -557,107 +558,150 @@ ShellRoot {
           misfits.length === 0, misfits.join(", "))
         root.check("both info lines are whole for every symbol, cell by cell, their rules in one column, and the line under the price is whole where it shows",
           cut.length === 0, cut.join(" | "))
-        root.check("each info line's title is its range's, the day's, or 52W, and the lows one gap past 52W on every range",
+        root.check("each info line's title is the day's or 52W, and the lows one gap past 52W on every range",
           mistitled.length === 0, mistitled.join(" | "))
-        // Nothing on the two lines moves with the range: AAPL on the day and
-        // on 1M, 1Y, 5Y, and All, its All answer starting at its first trade
-        // as most listings' do; and NEST as a listing a month old, on the
-        // day and on 1M with all four of its facts. Each keeps its columns,
-        // both rules, and the 52 weeks' words where they were, in both
-        // looks, in the popup and the window. Found in the spacing review of
-        // 1.0.0: from 1D to 1Y both rules shrank 27 px and every fact after
-        // them moved left.
-        var infoPlace = function() {
-          var block = find(body, "infoBlock")
-          var rules = ["periodRule", "yearRule"].map(function(name) {
+        // The two lines describe the stock, the same on every range: AAPL on
+        // the day and on 1M, 1Y, 5Y, and All, and NEST as a listing a month
+        // old, on the day and on 1M. Each line says the same words in the
+        // same places, and both rules stay put. Both lines reach the band's
+        // right edge: every column shows, the last one's slot ends at the
+        // edge, and the rule leaves the facts only their gap, short of a cell
+        // of its grain. In both looks, in the popup and the window at its
+        // narrowest and its widest. Found in the spacing review of 1.0.0: from
+        // 1D to 1Y both rules shrank 27 px and every fact after them moved
+        // left; and on 21 October: room held for a range's facts left the
+        // popup's day rule 56 px long, 43 px short of the edge.
+        var infoSaid = function() {
+          var cells = ["dayLine", "yearLine"].map(function(name) {
+            return root.drawnSpans(find(body, name)).sort(byLeft).map(function(s) { return s.what + "@" + s.left }).join(" ")
+          })
+          var rules = ["dayRule", "yearRule"].map(function(name) {
             var rule = find(body, name)
             return xIn(rule, 0) + "+" + rule.width
           })
-          var words = root.drawnSpans(find(body, "yearLine")).filter(function(s) { return String(s.color) === String(body.dim) })
-          return "rules " + rules.join(" ") + " low " + block.layout.lowX + " high " + block.layout.highX
-            + " facts " + block.layout.factXs.join(",") + " 52W words " + words.map(function(s) { return s.what + "@" + s.left }).join(" ")
+          return cells.concat(rules).join(" | ")
         }
-        // NEST as a listing that began trading with its month's first bar.
-        var nestQuote = stub.quotes.NEST
-        var withNest = function(quote) {
-          var next = Object.assign({}, stub.quotes)
-          next.NEST = quote
-          stub.quotes = next
+        var shortOfEdge = function() {
+          var block = find(body, "infoBlock")
+          var at = block.layout
+          var lines = [body.dayLine, body.yearLine]
+          var columns = Math.max(lines[0].facts.length, lines[1].facts.length)
+          var last = at.factXs.length - 1
+          var slot = 0
+          lines.forEach(function(line) {
+            if (line.facts[last]) slot = Math.max(slot, block.factWidth(line.facts[last]))
+          })
+          var end = last < 0 ? -1 : xIn(block, at.factXs[last] + slot)
+          var edge = Math.round(body.width - body.textRight)
+          var slack = last < 0 ? -1 : at.factXs[0] - block.gap - (at.highX + at.price)
+          return at.factXs.length === columns && end === edge && slack >= 0 && slack < Cells.RULE_PITCH ? ""
+            : at.factXs.length + " of " + columns + " columns, the last ending at " + end + " of " + edge + ", "
+              + slack + " px spare before the facts"
         }
-        var youngNest = Object.assign({}, nestQuote, { firstTradeDate: month.bars[0].t })
+        // Under the change, a range's name, or SINCE the young listing's
+        // first day, short of the line under the price. On a range, its high
+        // and low marked whole on the chart, the high on its top edge and the
+        // low on its bottom, each starting with its price and reaching over
+        // where the chart draws the bar that made it, from the side away
+        // from the chart's middle; none on the day.
+        var chartLook = function() {
+          var kids = body.chartItem.children
+          for (var k = 0; k < kids.length; k++) if (kids[k].visible && typeof kids[k].xAt === "function") return kids[k]
+          return null
+        }
+        var marksFault = function(h) {
+          var marks = [find(body, "highMark"), find(body, "lowMark")]
+          if (!h) return marks.some(function(m) { return m && m.visible }) ? "marks on the day" : ""
+          var chart = body.chartItem
+          var look = chartLook()
+          var faults = []
+          ;[["h", function(a, b) { return a > b }], ["l", function(a, b) { return a < b }]].forEach(function(k, i) {
+            var mark = marks[i]
+            var at = -1
+            for (var j = 0; j < h.bars.length; j++) {
+              var v = h.bars[j][k[0]]
+              if (isFinite(v) && v !== null && (at < 0 || k[1](v, h.bars[at][k[0]]))) at = j
+            }
+            var name = i === 0 ? "high" : "low"
+            if (!mark || !mark.visible) {
+              faults.push("no " + name + " mark")
+              return
+            }
+            var spans = root.drawnSpans(mark).sort(byLeft)
+            var left = xIn(mark, 0)
+            var right = xIn(mark, mark.width)
+            var barX = xIn(chart, look.xAt(at / Math.max(1, h.bars.length - 1)))
+            var reach = Style.space(4)
+            var onEdge = i === 0 ? yIn(mark, 0) === yIn(chart, 0) : yIn(mark, mark.height) === yIn(chart, chart.height)
+            var bySide = at / Math.max(1, h.bars.length - 1) < 0.5 ? Math.abs(left - barX) <= reach : Math.abs(right - barX) <= reach
+            var price = Format.money(h.bars[at][k[0]], body.featuredQuote.priceDigits)
+            if (spans.length !== 2 || spans[0].what !== price || !spans.every(function(s) { return s.whole }) || !onEdge || !bySide
+                || left < xIn(chart, 0) || right > xIn(chart, chart.width))
+              faults.push(name + " \"" + spans.map(function(s) { return s.what }).join(" ") + "\" at " + left + "–" + right + ", "
+                + yIn(mark, 0) + "–" + yIn(mark, mark.height) + " on a chart at " + xIn(chart, 0) + "–" + xIn(chart, chart.width) + ", "
+                + yIn(chart, 0) + "–" + yIn(chart, chart.height) + ", its bar at " + barX + ", want " + price)
+          })
+          return faults.join(", ")
+        }
+        var aaplYear = History.parseHistory(JSON.parse(aaplYearFile.text()), "1Y")
         var youngMonth = Object.assign({}, month, { firstTradeDate: month.bars[0].t, bars: month.bars.slice(0, 7) })
         var shifted = []
-        var youngFacts = []
-        ;[{ symbol: "AAPL", figures: aapl, ranges: [["1D", null], ["1M", month], ["1Y", year], ["5Y", weekly], ["All", young]] },
+        var unreached = []
+        var unmarked = []
+        var captions = []
+        var places = [["popup", false, 0], ["narrowest window", true, Style.space(560)], ["widest window", true, 1416]]
+        ;[{ symbol: "AAPL", figures: aapl, ranges: [["1D", null], ["1M", month], ["1Y", aaplYear], ["5Y", weekly], ["All", young]] },
           { symbol: "NEST", figures: null, ranges: [["1D", null], ["1M", youngMonth]] }].forEach(function(listing) {
           stub.featuredSymbol = listing.symbol
           stub.figures = listing.figures
-          withNest(listing.symbol === "NEST" ? youngNest : nestQuote)
-          for (var rangeSurface = 0; rangeSurface < 2; rangeSurface++) {
-            surface.wide = rangeSurface === 1
+          places.forEach(function(place) {
+            surface.wide = place[1]
+            if (place[1]) surface.windowWidth = place[2]
             ;[false, true].forEach(function(retro) {
               stub.retro = retro
-              var where = (surface.wide ? "window " : "popup ") + (retro ? "retro " : "smooth ") + listing.symbol
+              var where = place[0] + (retro ? " retro " : " smooth ") + listing.symbol
               var onDay = null
               listing.ranges.forEach(function(r) {
                 stub.range = r[0]
                 stub.historyEntry = r[1] ? { status: "ok", history: r[1], receivedAt: stub.now } : null
                 wait(50)
-                var at = infoPlace()
+                // The marks draw in with the line: read them once it has.
+                if (r[1]) tryVerify(function() { return body.motion.drawn === 1 }, 2000)
+                var said = infoSaid()
                 if (!!r[1] !== body.historyShown) shifted.push(where + " " + r[0] + " shows " + (body.historyShown ? "a range" : "the day"))
-                else if (onDay === null) onDay = at
-                else if (at !== onDay) shifted.push(where + " " + r[0] + ": " + at + ", on 1D " + onDay)
-                if (r[1] === youngMonth && surface.wide)
-                  youngFacts.push(root.drawnSpans(find(body, "periodLine")).map(function(s) { return s.what }).filter(function(w) {
-                    return ["SINCE", "LOW", "HIGH", "BARS"].indexOf(w) >= 0 }).join(","))
+                else if (onDay === null) onDay = said
+                else if (said !== onDay) shifted.push(where + " " + r[0] + ": " + said + ", on 1D " + onDay)
+                var short = shortOfEdge()
+                if (short) unreached.push(where + " " + r[0] + ": " + short)
+                var marked = marksFault(r[1])
+                if (marked) unmarked.push(where + " " + r[0] + ": " + marked)
+                if (r[1]) {
+                  var caption = find(body, "changeCaption")
+                  var strip = find(body, "extendedLine")
+                  var want = r[1] === youngMonth ? /^SINCE \d{1,2} [A-Z]{3} \d{4}$/ : new RegExp("^" + r[0].toUpperCase() + "$")
+                  if (!want.test(caption.text) || (strip.visible && xIn(strip, strip.width) >= xIn(caption, 0)))
+                    captions.push(where + " " + r[0] + " says \"" + caption.text + "\" from " + xIn(caption, 0)
+                      + (strip.visible ? ", the line under the price ending at " + xIn(strip, strip.width) : ""))
+                }
               })
             })
-          }
+          })
         })
-        withNest(nestQuote)
+        surface.windowWidth = 720
         stub.featuredSymbol = "AAPL"
         stub.figures = aapl
         stub.retro = false
         stub.range = "1D"
         stub.historyEntry = null
-        // The popup has room for two of them; the window shows all four.
-        var fourFacts = youngFacts.length === 2 && youngFacts.every(function(f) { return f === "SINCE,LOW,HIGH,BARS" })
-        root.check("nothing on the info lines moves from 1D to 1M, 1Y, 5Y, or All, a young listing's four facts included, in both looks, in the popup and the window",
-          shifted.length === 0 && fourFacts, shifted.join(" | ") + " || young 1M: " + youngFacts.join(" / "))
-        // An old listing holds room for its low and high alone, so in the
-        // window its lines on the day run nearly to the edge, short of it by
-        // less than 64 px, in both looks; and All, whose answer starts at the
-        // first trade for most listings, says LOW and HIGH, never SINCE, in
-        // the popup too. Found in the visual review of 1.0.2: room held for a
-        // young listing's SINCE and BARS left AAPL's lines 211 px short in
-        // the window, and the popup's All line dropped HIGH.
-        var reach = []
-        ;[false, true].forEach(function(retro) {
-          stub.retro = retro
-          surface.wide = true
-          stub.range = "1D"
-          stub.historyEntry = null
-          wait(50)
-          var edge = Math.round(body.width - body.textRight)
-          var ends = ["periodLine", "yearLine"].map(function(name) {
-            return root.drawnSpans(find(body, name)).reduce(function(most, s) { return Math.max(most, s.right) }, 0)
-          })
-          var short = edge - Math.max(ends[0], ends[1])
-          if (short >= 64) reach.push((retro ? "retro" : "smooth") + " window 1D ends " + short + " px short of " + edge)
-          surface.wide = false
-          stub.range = "All"
-          stub.historyEntry = { status: "ok", history: young, receivedAt: stub.now }
-          wait(50)
-          var said = root.drawnSpans(find(body, "periodLine")).map(function(s) { return s.what }).filter(function(w) {
-            return ["SINCE", "LOW", "HIGH"].indexOf(w) >= 0 }).join(",")
-          if (said !== "LOW,HIGH") reach.push((retro ? "retro" : "smooth") + " popup All says " + said)
-        })
-        stub.retro = false
-        stub.range = "1D"
-        stub.historyEntry = null
         wait(50)
-        root.check("an old listing's lines run nearly to the window's edge on the day, and All says LOW and HIGH, in the popup too, both looks",
-          reach.length === 0, reach.join(" | "))
+        root.check("both info lines say the same in the same places on 1D, 1M, 1Y, 5Y, and All, a young listing's too, in both looks, in the popup and the window at its narrowest and widest",
+          shifted.length === 0, shifted.join(" | "))
+        root.check("both info lines reach the band's right edge on every range, in both looks, in the popup and the window at its narrowest and widest",
+          unreached.length === 0, unreached.join(" | "))
+        root.check("a range marks its high and low whole on the chart's top and bottom edges, by the bars that made them, and the day marks none",
+          unmarked.length === 0, unmarked.join(" | "))
+        root.check("under the change a range says its name, and a listing younger than it SINCE its first day, clear of the line under the price",
+          captions.length === 0, captions.join(" | "))
         // AAPL's figures are Tuesday 1 September's: the day line is 1D that
         // Tuesday to its last second, TUE from Wednesday's first, on the
         // Saturday after, and on Labor Day, Monday 7 September, and SEP a
@@ -674,9 +718,9 @@ ShellRoot {
           ["Labor Day", Date.UTC(2026, 8, 7, 16) / 1000, "TUE"], ["a week on", Date.UTC(2026, 8, 8, 16) / 1000, "SEP"]]
         // Every cell of both lines but the day's title, and both rules.
         var rest = function() {
-          var cells = root.drawnSpans(find(body, "periodLine")).sort(byLeft).slice(1)
+          var cells = root.drawnSpans(find(body, "dayLine")).sort(byLeft).slice(1)
             .concat(root.drawnSpans(find(body, "yearLine")).sort(byLeft))
-          return cells.map(function(s) { return s.what + "@" + s.left }).concat(["periodRule", "yearRule"].map(function(name) {
+          return cells.map(function(s) { return s.what + "@" + s.left }).concat(["dayRule", "yearRule"].map(function(name) {
             var rule = find(body, name)
             return xIn(rule, 0) + "+" + rule.width
           })).join(" ")
@@ -691,7 +735,7 @@ ShellRoot {
             moments.forEach(function(moment) {
               stub.now = moment[1]
               wait(50)
-              var title = root.drawnSpans(find(body, "periodLine")).sort(byLeft)[0].what
+              var title = root.drawnSpans(find(body, "dayLine")).sort(byLeft)[0].what
               if (title !== moment[2]) dated.push(where + " " + moment[0] + " titled " + title + ", not " + moment[2])
               if (still === null) still = rest()
               else if (rest() !== still) dated.push(where + " " + moment[0] + " moved: " + still + " became " + rest())
@@ -705,17 +749,16 @@ ShellRoot {
 
         // A refresh moves the tick and nothing else: AAPL's volume from
         // 52.4M to 999.9M, across its rounding into 1.0B, and to 7, with its
-        // price a dollar up, and a listing younger than its range getting
-        // its eighth bar, leave both rules' ends where they were; the tick
-        // follows the price. At a 52-week high, with Yahoo's 52-week high a
-        // dollar behind the day's, both lines' highs read the day's high in
-        // the up colour, and both ticks sit at their rule's right end. Both
-        // looks, both surfaces.
+        // price a dollar up, leaves both rules' ends where they were; the
+        // tick follows the price. At a 52-week high, with Yahoo's 52-week
+        // high a dollar behind the day's, both lines' highs read the day's
+        // high in the up colour, and both ticks sit at their rule's right
+        // end. Both looks, both surfaces.
         var aaplQuote = stub.quotes.AAPL
         var restless = []
         var peaks = []
         var ends = function() {
-          return ["periodRule", "yearRule"].map(function(name) {
+          return ["dayRule", "yearRule"].map(function(name) {
             var rule = find(body, name)
             return rule ? xIn(rule, 0) + "+" + rule.width : "none"
           }).join(" ")
@@ -743,54 +786,38 @@ ShellRoot {
             withQuote({})
             var where = (surface.wide ? "window " : "popup ") + (retro ? "retro" : "smooth")
             var before = ends()
-            var tickBefore = tickEnd("periodRule")
+            var tickBefore = tickEnd("dayRule")
             ;[999.9e6, 999.96e6, 1e9, 7].forEach(function(volume) {
               withQuote({ volume: volume, price: aaplQuote.price + 1 })
               if (ends() !== before) restless.push(where + " at VOL " + volume + ": " + before + " became " + ends())
             })
-            if (tickEnd("periodRule") === tickBefore) restless.push(where + ": the tick stayed at " + tickBefore + " as the price rose")
-            // A listing younger than its range, a month old: its eighth bar
-            // lands, and empties the slot its room holds.
-            withNest(youngNest)
-            stub.featuredSymbol = "NEST"
-            stub.range = "1M"
-            stub.figures = null
-            var young = function(count) {
-              stub.historyEntry = { status: "ok", receivedAt: stub.now, history: Object.assign({}, month,
-                { firstTradeDate: month.bars[0].t, bars: month.bars.slice(0, count) }) }
-              wait(50)
-            }
-            young(7)
-            var sparse = ends()
-            young(8)
-            if (ends() !== sparse) restless.push(where + " at a young listing's eighth bar: " + sparse + " became " + ends())
-            withNest(nestQuote)
+            if (tickEnd("dayRule") === tickBefore) restless.push(where + ": the tick stayed at " + tickBefore + " as the price rose")
             stub.featuredSymbol = "AAPL"
             stub.range = "1D"
             stub.historyEntry = null
             stub.figures = aapl
             withQuote({ price: aaplQuote.dayHigh, fiftyTwoWeekHigh: aaplQuote.dayHigh - 1 })
-            var rules = [find(body, "periodRule"), find(body, "yearRule")]
-            var highs = [body.periodLine, body.yearLine].map(function(line) { return line ? line.range.highText : "" })
-            var drawn = ["periodLine", "yearLine"].map(function(name) {
+            var rules = [find(body, "dayRule"), find(body, "yearRule")]
+            var highs = [body.dayLine, body.yearLine].map(function(line) { return line ? line.range.highText : "" })
+            var drawn = ["dayLine", "yearLine"].map(function(name) {
               return find(body, name) ? root.drawnSpans(find(body, name)).filter(function(s) { return s.what === highs[0] }) : []
             })
             var toned = drawn.every(function(spans) { return spans.length === 1 && Qt.colorEqual(spans[0].color, stub.upColor) })
-            if (!rules[0] || !rules[1] || tickEnd("periodRule") !== rules[0].width || tickEnd("yearRule") !== rules[1].width
+            if (!rules[0] || !rules[1] || tickEnd("dayRule") !== rules[0].width || tickEnd("yearRule") !== rules[1].width
                 || highs[0] !== highs[1] || !toned)
               peaks.push(where + ": highs " + highs.join(" / ") + (toned ? "" : " not both in the up colour") + ", ticks end at "
-                + tickEnd("periodRule") + " / " + tickEnd("yearRule") + " of " + (rules[0] ? rules[0].width : "-") + " / " + (rules[1] ? rules[1].width : "-"))
+                + tickEnd("dayRule") + " / " + tickEnd("yearRule") + " of " + (rules[0] ? rules[0].width : "-") + " / " + (rules[1] ? rules[1].width : "-"))
           })
         }
         withQuote({})
-        root.check("a refresh moves neither end of either rule: VOL across its units, a young listing's eighth bar; the tick follows the price",
+        root.check("a refresh moves neither end of either rule as VOL crosses its units; the tick follows the price",
           restless.length === 0, restless.join(" | "))
         root.check("at a 52-week high both highs read the day's high in the up colour, both ticks at the rule's right end",
           peaks.length === 0, peaks.join(" | "))
 
         // On 1Y the 52-week line takes in the range's low and high: SHOP.TO
         // with Yahoo's 52-week marks a dollar inside its 1Y range reads the
-        // range's on both lines there, and Yahoo's own on 1D.
+        // range's there, as the chart's marks do, and Yahoo's own on 1D.
         var yearStats = History.periodStats(year)
         var shopQuote = stub.quotes["SHOP.TO"]
         var narrowed = Object.assign({}, stub.quotes)
@@ -801,15 +828,18 @@ ShellRoot {
         stub.figures = root.figures("shop-to")
         var endsOf = function(line) { return line ? line.range.lowText + "–" + line.range.highText : "none" }
         var drawnEnds = function() {
-          return [find(body, "periodLine"), find(body, "yearLine")].map(function(line) {
-            return line ? root.drawnSpans(line).filter(function(s) { return /^[\d,]+\.?\d*$/.test(s.what) }).slice(0, 2).map(function(s) { return s.what }).join("–") : "none"
+          var year = root.drawnSpans(find(body, "yearLine")).filter(function(s) { return /^[\d,]+\.?\d*$/.test(s.what) })
+          var marks = [find(body, "lowMark"), find(body, "highMark")].map(function(mark) {
+            return mark && mark.visible ? root.drawnSpans(mark).sort(byLeft)[0].what : "none"
           })
+          return [year.slice(0, 2).map(function(s) { return s.what }).join("–"), marks.join("–")]
         }
         stub.retro = false
         stub.range = "1Y"
         stub.historyEntry = { status: "ok", history: year, receivedAt: stub.now }
         wait(50)
-        var onYear = [endsOf(body.periodLine), endsOf(body.yearLine)].concat(drawnEnds())
+        tryVerify(function() { return body.motion.drawn === 1 }, 2000)
+        var onYear = [endsOf(body.yearLine)].concat(drawnEnds())
         stub.range = "1D"
         stub.historyEntry = null
         wait(50)
@@ -817,7 +847,7 @@ ShellRoot {
         stub.quotes = Object.assign({}, narrowed, { "SHOP.TO": shopQuote })
         var wantYear = Format.money(yearStats.low.p, shopQuote.priceDigits) + "–" + Format.money(yearStats.high.p, shopQuote.priceDigits)
         var wantDay = Format.money(yearStats.low.p + 1, shopQuote.priceDigits) + "–" + Format.money(yearStats.high.p - 1, shopQuote.priceDigits)
-        root.check("on 1Y the 52-week line reads the range's low and high, drawn alike on both lines; on 1D Yahoo's",
+        root.check("on 1Y the 52-week line reads the range's low and high, as the chart's marks do; on 1D Yahoo's",
           onYear.every(function(e) { return e === wantYear }) && onDay === wantDay,
           onYear.join(" / ") + " on 1Y, " + onDay + " on 1D; want " + wantYear + " and " + wantDay)
 
@@ -1081,14 +1111,13 @@ ShellRoot {
             var headerLine = nameText.parent
             var rangeRow = find(body, "rangeRow")
             var infoLines = find(body, "infoBlock")
-            // The info lines' last column, as wide as the widest slot any
-            // line puts there on any range.
+            // The info lines' last column, as wide as the widest slot either
+            // line puts there.
             var lastFact = infoLines.layout.factXs.length - 1
             var lastSlot = 0
-            ;[body.periodLine, body.yearLine].map(function(line) { return line ? line.facts : [] }).concat(body.infoFactLists)
-              .forEach(function(facts) {
-                if (facts[lastFact]) lastSlot = Math.max(lastSlot, infoLines.factWidth(facts[lastFact]))
-              })
+            ;[body.dayLine, body.yearLine].forEach(function(line) {
+              if (line && line.facts[lastFact]) lastSlot = Math.max(lastSlot, infoLines.factWidth(line.facts[lastFact]))
+            })
             var placed = {
               name: xIn(nameText, 0) - textLeft,
               order: xIn(orderWord, orderWord.width) - textRight,
@@ -2308,7 +2337,7 @@ ShellRoot {
               if (said !== c[2] || !whole)
                 noteFaults.push((surface.wide ? "window " : "popup ") + (stub.retro ? "retro " : "smooth ") + c[0] + ": \"" + said + "\""
                   + (whole ? "" : " outside the chart"))
-              var title = body.periodLine ? body.periodLine.title : ""
+              var title = body.dayLine ? body.dayLine.title : ""
               if (titles[c[0]] && title !== titles[c[0]])
                 titleFaults.push((surface.wide ? "window " : "popup ") + (stub.retro ? "retro " : "smooth ") + c[0] + ": " + title)
             })

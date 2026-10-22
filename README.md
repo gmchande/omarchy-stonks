@@ -59,13 +59,13 @@ replay the chart.
 Pick a range under the chart, from 1D to All. Every stock then shows that
 range, even after a restart. The rows stay on the day's move. On 1D, click
 the change beside the price to see it as a percent, an amount, or since the
-open.
+open. A range marks its high and low on the chart, with their dates, and a
+stock younger than the range says when it began: "SINCE 31 JUL 2025".
 
 Under the ranges, two lines place the price between its low and high: for
-the day or the range, and for the past 52 weeks. Beside them are the open
-and volume, or a range's low and high dates, then the market cap and P/E.
-The market cap is an estimate: Yahoo's last reported figure, moved with the
-price since.
+the day, beside its open and volume, and for the past 52 weeks, beside the
+market cap and P/E. The market cap is an estimate: Yahoo's last reported
+figure, moved with the price since.
 
 The top line says where the market is, in its own time: counting down to
 the open or the close, after hours, or closed. A smaller line under the

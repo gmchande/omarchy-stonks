@@ -67,6 +67,9 @@ Item {
   readonly property int inkColumns: drawable
     ? Math.min(grid.columns, Math.floor(geometry.points[geometry.points.length - 1].x * grid.columns) + 1) : 0
   readonly property int scrubColumn: scrubX >= 0 ? Math.min(grid.columns - 1, Math.floor(scrubX * grid.columns)) : -1
+  // How far the lit columns have drawn in, in pixels: what is laid over the
+  // ink draws in with it (`RangeMarks`).
+  readonly property real inkDrawn: curtain.width
   // The stems are retro's wash: the up colour's at 35%, dimmer for the
   // extended hours, and each side at the alpha that adds the same lightness
   // over the ground (`Tones.washAlpha`), never more than half the ink of the
@@ -123,6 +126,13 @@ Item {
     }
     if (last >= 0 && !g.ext[last]) g.lastRegular = last
     return g
+  }
+
+  // Where a point `fraction` along the axis is drawn: the centre of its
+  // column, as `layout` buckets it.
+  function xAt(fraction) {
+    var col = Math.max(0, Math.min(grid.columns - 1, Math.floor(fraction * grid.columns)))
+    return col * grid.pitch + pixel / 2
   }
 
   // The unlit grid and the dashed baseline row: always all there.
