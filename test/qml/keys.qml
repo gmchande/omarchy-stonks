@@ -182,9 +182,9 @@ ShellRoot {
       "u": function(s) { s.body.removeFrom(s.body.watchlist.cursorRow, true) },
       // These keys remove directly on a row held only by All. Shift+X below
       // covers the menu for a row held by another list too.
-      "x": function(s) { s.body.watchlist.cursorSymbol = s.body.watchlist.displayedSymbols[2] },
-      "Delete": function(s) { s.body.watchlist.cursorSymbol = s.body.watchlist.displayedSymbols[2] },
-      "Backspace": function(s) { s.body.watchlist.cursorSymbol = s.body.watchlist.displayedSymbols[2] },
+      "x": function(s) { s.body.watchlist.cursorSymbol = "LONG1" },
+      "Delete": function(s) { s.body.watchlist.cursorSymbol = "LONG1" },
+      "Backspace": function(s) { s.body.watchlist.cursorSymbol = "LONG1" },
       "Shift+O": function(s) { service.setOrder("pct") },
       // The day is the first range.
       "[": function(s) { service.setRange("1W") }
@@ -248,7 +248,7 @@ ShellRoot {
         effect = function() { return service.symbols.join(",") === rows.filter(function(r) { return r !== selected }).join(",") }
       } else if (token === "u") {
         changed = ["symbols", "cursor"]
-        var removed = b.offered.symbol
+        var removed = b.removal.symbol
         effect = function() { return service.symbols.indexOf(removed) >= 0 && service.symbols.length === rows.length + 1 }
       } else if (token === "Shift+J" || token === "Shift+K") {
         changed = ["symbols"]
@@ -346,7 +346,7 @@ ShellRoot {
     function walk(s) {
       var sheet = drawnSheet(s)
       var sortedSheet = drawnSheet(s, "symbol")
-      var everyday = harness.tokens("↑ ↓ ⏎ 1 2 3 4 5 6 7 8 9 a x u ← → [ ] p w o , . s c r")
+      var everyday = harness.tokens("↑ ↓ ⏎ 1 2 3 4 5 6 7 8 9 a x u ← → [ ] p y w o , . s S c r")
       var missing = []
       ;[sheet, sortedSheet].forEach(function(drawn, i) {
         var keys = []
@@ -389,7 +389,7 @@ ShellRoot {
         var setup = function() {
           base(s)
           if (letter === "o") service.setOrder("pct")
-          if (letter === "x") s.body.watchlist.cursorSymbol = s.body.watchlist.displayedSymbols[2]
+          if (letter === "x") s.body.watchlist.cursorSymbol = "LONG1"
           wait(50)
         }
         setup()
