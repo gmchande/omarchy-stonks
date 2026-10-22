@@ -91,15 +91,18 @@ function levelled(x, db) {
 // swept along it strikes them: at most one every 45 ms, a bar struck sooner
 // waiting out the gap with the latest waiting winning, none where the chart
 // draws no line (a break: Tokyo's lunch), and each ringing out its half
-// second over what follows. No tick where the line crosses its baseline:
-// it was a short tone at A6, the top bar's own pitch, and among the bars it
-// read as one more. Each bar sits as a chime does, so a replay sounds as a
-// sweep does.
+// second over what follows. A print that stands alone, a thin night's trade,
+// is struck as the place passes it, as the replay's scrub lands on it,
+// though the place steps over its one point. No tick where the line crosses
+// its baseline: it was a short tone at A6, the top bar's own pitch, and
+// among the bars it read as one more. Each bar sits as a chime does, so a
+// replay sounds as a sweep does.
 function smooth(geometry, from, to, seconds) {
   var bars = lineBars(geometry)
+  var passed = lonePrints(geometry)
   var x = new Float32Array(Math.round((seconds + 0.6) * RATE))
   var gap = Math.round(0.045 * RATE), end = Math.round(seconds * RATE)
-  var heard = -1, last = -gap, waiting = -1
+  var heard = -1, last = -gap, waiting = -1, waitingAlone = false, before = from
   var strike = function(bar, at) {
     var note = smoothBarSamples(bar), n = Math.min(note.length, x.length - at)
     // An index the engine keeps as a whole number: indexed by the sum of
@@ -107,20 +110,50 @@ function smooth(geometry, from, to, seconds) {
     for (var j = 0, k = at | 0; j < n; j++, k++) x[k] += note[j]
     last = at
     waiting = -1
+    waitingAlone = false
   }
-  for (var i = 0; i < end; i += STEP) {
-    var bar = bars(placeAt(i / RATE, from, to, seconds))
+  // The last step lands on the replay's end, where its scrub ends: a lone
+  // print there is passed too.
+  for (var i = 0; i < end + STEP; i += STEP) {
+    var place = placeAt(i / RATE, from, to, seconds)
+    var bar = bars(place)
+    var alone = false
+    if (bar < 0) {
+      bar = passed(before, place)
+      alone = bar >= 0
+    }
+    before = place
     // Where the line lifts, a bar waiting is dropped: nothing starts there.
-    if (bar < 0) waiting = -1
+    // A lone print passed waits on: the gap after it is its own.
+    if (bar < 0 && !waitingAlone) waiting = -1
     if (waiting >= 0 && i >= last + gap) strike(waiting, last + gap)
     if (bar === heard) continue
     heard = bar
     if (bar < 0) continue
     if (i >= last + gap) strike(bar, i)
-    else waiting = bar
+    else {
+      waiting = bar
+      waitingAlone = alone
+    }
   }
   if (waiting >= 0) strike(waiting, last + gap)
   return { samples: x, gain: 1 }
+}
+
+// The bar of a print standing alone (`brk` on both sides of it: a thin
+// night's trade, or a day's only print) passed between two places along the
+// chart, after `a` and up to `b`, or -1 for none. It walks on from where it
+// was last asked, as a replay's place only moves on.
+function lonePrints(geometry) {
+  var pts = geometry ? geometry.points : [], lone = []
+  for (var i = 0; i < pts.length; i++) {
+    if ((i === 0 || pts[i].brk) && (i === pts.length - 1 || pts[i + 1].brk)) lone.push(pts[i])
+  }
+  var k = 0
+  return function(a, b) {
+    while (k < lone.length && lone[k].x <= a) k++
+    return k < lone.length && lone[k].x <= b ? barOf(1 - lone[k].y) : -1
+  }
 }
 
 // Smooth's bar `bar` as a chime plays it, levelled, made once and kept: a
