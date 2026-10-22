@@ -49,7 +49,8 @@ ShellRoot {
   FileView { id: shopFile; path: root.fixtures + "/shop-to.json"; blockLoading: true }
   FileView { id: aaplWeeklyFile; path: root.fixtures + "/history/aapl-5y.json"; blockLoading: true }
   FileView { id: aaplYearFile; path: root.fixtures + "/history/aapl-1y.json"; blockLoading: true }
-  FileView { id: shelYearFile; path: root.fixtures + "/history/shel-l-1y.json"; blockLoading: true }
+  FileView { id: btcFile; path: root.fixtures + "/moments/listings-2026-10-07-1455/btc-usd.json"; blockLoading: true }
+  FileView { id: btcYearFile; path: root.fixtures + "/history/btc-usd-1y.json"; blockLoading: true }
   FileView { id: shopYearFile; path: root.fixtures + "/history/shop-to-1y.json"; blockLoading: true }
   FileView { id: youngFile; path: root.fixtures + "/history/fab-max.json"; blockLoading: true }
   FileView { id: tokyoFile; path: root.fixtures + "/7203-t-day.json"; blockLoading: true }
@@ -633,7 +634,9 @@ ShellRoot {
             var right = xIn(mark, mark.width)
             var barX = xIn(chart, look.xAt(at / Math.max(1, h.bars.length - 1)))
             var reach = Style.space(4)
-            var onEdge = i === 0 ? yIn(mark, 0) === yIn(chart, 0) : yIn(mark, mark.height) === yIn(chart, chart.height)
+            // On its edge, or off it by no more than a mark lifts to clear the ink.
+            var off = i === 0 ? yIn(chart, 0) - yIn(mark, 0) : yIn(mark, mark.height) - yIn(chart, chart.height)
+            var onEdge = off >= 0 && off <= Style.space(4)
             var bySide = at / Math.max(1, h.bars.length - 1) < 0.5 ? Math.abs(left - barX) <= reach : Math.abs(right - barX) <= reach
             var price = Format.money(h.bars[at][k[0]], body.featuredQuote.priceDigits)
             if (spans.length !== 2 || spans[0].what !== price || !spans.every(function(s) { return s.whole }) || !onEdge || !bySide
@@ -2430,7 +2433,7 @@ ShellRoot {
         // screen less the bar, the card's margins, padding, and border.
         // Found in the 1.0.2 leftovers review (O1): from text size 18 on a
         // short screen the popup showed no row at all.
-        // On Shell's 1Y, whose prices carry commas below the baseline, a
+        // On Bitcoin's 1Y, whose prices carry commas below the baseline, a
         // mark's words never touch the ink, the line's highest and lowest
         // close or the baseline past them, and a chart at its full height
         // shows both marks. Found in review on 21 October: at 20 the squeezed
@@ -2439,9 +2442,11 @@ ShellRoot {
         var shortSeen = []
         var touched = []
         var exact = function(item, y) { return item.mapToItem(body, 0, y).y }
-        stub.featuredSymbol = "SHEL.L"
+        var quotesBeforeCoin = stub.quotes
+        stub.quotes = Object.assign({}, quotesBeforeCoin, { "BTC-USD": Quote.parseChart(JSON.parse(btcFile.text())) })
+        stub.featuredSymbol = "BTC-USD"
         stub.range = "1Y"
-        stub.historyEntry = { status: "ok", history: History.parseHistory(JSON.parse(shelYearFile.text()), "1Y"), receivedAt: stub.now }
+        stub.historyEntry = { status: "ok", history: History.parseHistory(JSON.parse(btcYearFile.text()), "1Y"), receivedAt: stub.now }
         // Where the ink reaches under a mark, between `x0` and `x1` on the
         // chart, as each look draws it: smooth's line through the closes
         // there and the nearest either side, a pixel either side of it,
@@ -2524,6 +2529,7 @@ ShellRoot {
         surface.budget = 730
         stub.retro = false
         stub.featuredSymbol = "AAPL"
+        stub.quotes = quotesBeforeCoin
         stub.range = "1D"
         stub.historyEntry = null
         Style.fontBaseSize = 12

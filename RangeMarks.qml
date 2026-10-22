@@ -12,8 +12,9 @@ import "Tones.js" as Tones
 // `chart` is the look on show: where it draws a bar (`xAt`, retro's on its
 // bar's column), how far its ink has drawn in (`inkDrawn`), so a mark draws
 // in with the line, and how high and low its ink reaches under a mark
-// (`inkExtentIn`). A mark whose words would touch that ink, as on a chart
-// squeezed short, is left out whole.
+// (`inkExtentIn`). A mark whose words would touch that ink moves off its
+// edge, into the band's gap, by as much as `lift`; one that would need
+// more, as on a chart squeezed short, is left out whole.
 Item {
   id: root
 
@@ -22,6 +23,7 @@ Item {
   property color foreground: Commons.Color.foreground
   property color dim: Tones.dim(foreground, Commons.Color.background)
   property string fontFamily: Style.font.family
+  readonly property real lift: Style.space(4)
 
   Repeater {
     model: root.marks && root.chart ? [root.marks.high, root.marks.low] : []
@@ -31,21 +33,23 @@ Item {
       required property var modelData
       required property int index
       readonly property real at: root.chart.xAt(mark.modelData.x)
-      // Each word's ink as drawn keeps clear of the chart's ink under it:
-      // above it for the high, below it for the low. A price's thousands
-      // commas reach below the baseline.
-      readonly property bool clear: mark.clears(priceText, priceInk) && mark.clears(dateText, dateInk)
+      // How far its words' ink, as drawn, would reach into the chart's ink
+      // under each of them, with the mark on its edge: down into it for the
+      // high, up into it for the low. A price's thousands commas reach
+      // below the baseline.
+      readonly property real overlap: Math.max(mark.overlapOf(priceText, priceInk), mark.overlapOf(dateText, dateInk), 0)
       objectName: index === 0 ? "highMark" : "lowMark"
-      visible: mark.clear && mark.at <= root.chart.inkDrawn
+      visible: mark.overlap <= root.lift && mark.at <= root.chart.inkDrawn
       spacing: Style.space(6)
       x: Math.max(0, Math.min(root.width - mark.width,
         mark.modelData.x < 0.5 ? mark.at - Style.space(2) : mark.at - mark.width + Style.space(2)))
-      y: mark.index === 0 ? 0 : root.height - mark.height
+      y: mark.index === 0 ? -Math.min(mark.overlap, root.lift) : root.height - mark.height + Math.min(mark.overlap, root.lift)
 
-      function clears(word, ink) {
+      function overlapOf(word, ink) {
         var under = root.chart.inkExtentIn(mark.x + word.x, mark.x + word.x + word.width)
-        var top = mark.y + word.baselineOffset + ink.tightBoundingRect.y
-        return mark.index === 0 ? top + ink.tightBoundingRect.height <= under.top : top >= under.bottom
+        var top = word.baselineOffset + ink.tightBoundingRect.y
+        return mark.index === 0 ? top + ink.tightBoundingRect.height - under.top
+          : under.bottom - (root.height - mark.height + top)
       }
 
       TextMetrics { id: priceInk; font: priceText.font; text: priceText.text }

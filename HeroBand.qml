@@ -192,6 +192,7 @@ Item {
       }
 
       RangeMarks {
+        id: rangeMarks
         anchors.fill: parent
         marks: root.rangeMarks
         chart: root.retro ? pixelChart : dayChart
@@ -201,8 +202,11 @@ Item {
       }
 
       // The held chart's veil; the chart that lands draws in at full ink.
+      // It reaches as far past the chart as a mark can lift off it.
       Rectangle {
         anchors.fill: parent
+        anchors.topMargin: -rangeMarks.lift
+        anchors.bottomMargin: -rangeMarks.lift
         visible: root.held && root.dimmed > 0
         color: root.veil
       }
