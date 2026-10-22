@@ -4,10 +4,16 @@ import { join } from "node:path"
 import { load } from "./load.js"
 
 // The rules read against Yahoo's and Robinhood's saved answers, which are
-// private (test/fixtures; test/fixtures-dir.sh finds them). test/review.sh
-// skips this file where there are none. The pure rules are model.test.js.
+// private (test/fixtures; test/fixtures-dir.sh finds them). Without them it
+// says why and exits 77, which test/unit.sh counts as a skip. The pure rules
+// are model.test.js.
 const found = Bun.spawnSync([join(import.meta.dir, "fixtures-dir.sh")])
-if (!found.success) throw new Error(found.stderr.toString().trim())
+// fixtures-dir.sh exits 1 for no saved answers; anything else is a failure.
+if (found.exitCode === 1) {
+  console.log(`SKIP saved.test.js: ${found.stderr.toString().trim()}`)
+  process.exit(77)
+}
+if (!found.success) throw new Error(`fixtures-dir.sh failed (${found.exitCode}): ${found.stderr.toString().trim()}`)
 const fixtures = found.stdout.toString().trim()
 // The reader is in New York: an exchange's time is named
 // with its zone only where that clock differs from the reader's.

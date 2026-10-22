@@ -38,17 +38,18 @@ building one that won't merge.
 
 ## Verify it
 
-- `test/all.sh` runs the checks a pull request needs: the pure rules, the
-  source boundaries, QML lint against the installed shell, the manifest and
-  launcher, and the flow harnesses, which drive the real service and
-  surfaces with real keys and pointer. It needs Omarchy installed and a
-  Wayland session. A second run on the same machine waits for the first to
-  end. With the saved answers it takes about 1 min 50 s, and its last line
-  must be `ALL PASS`.
-- Most harnesses replay saved Yahoo and Robinhood answers, which are
-  private: their terms don't allow republishing them. On a clone without
-  them, those harnesses skip, and the run takes under 10 seconds and ends
-  `PASSED, N SKIPPED`. The maintainer runs them on your branch.
+- `test/all.sh` runs the checks a pull request needs: every `*.test.js`
+  (`test/unit.sh` finds them), the source boundaries, QML lint against the
+  installed shell, the manifest and launcher, and the flow harnesses, which
+  drive the real service and surfaces with real keys and pointer. It needs
+  Omarchy installed and a Wayland session. A second run on the same machine
+  waits for the first to end. With the saved answers it takes about 1 min
+  50 s, and its last line must be `ALL PASS`.
+- Most harnesses replay saved Yahoo and Robinhood answers, and the rules'
+  tests in `test/saved.test.js` read them. They are private: their terms
+  don't allow republishing them. On a clone without them, those checks skip,
+  and the run takes under 10 seconds and ends `PASSED, N SKIPPED`. The
+  maintainer runs them on your branch.
 - GitHub runs the checks a fresh clone can on every push and pull request to
   `dev` and `main` (`.github/workflows/fresh-clone.yml`).
 - While you work, run the harness for the area you change, such as
@@ -218,8 +219,8 @@ every release bumps it.
    `test/qml/readme.sh` in that commit.
 3. Run `test/review.sh` on the release commit, with `STONKS_RENDER_BASE`
    set to the last release's tag so its render diff shows every picture
-   the release moved: the renders, layout, motion, the long list, and the
-   README pictures run only there. Its last line must be `ALL PASS`.
+   the release moved: the renders, layout, popup motion, the long list, and
+   the README pictures run only there. Its last line must be `ALL PASS`.
 4. Fast-forward `main` to it: `git push origin dev:main`.
 5. Tag it (`vX.Y.Z`) and publish release notes, written as Words says.
 6. File the Omarchy plugin marketplace's verify form with `main`'s new
