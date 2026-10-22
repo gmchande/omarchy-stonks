@@ -1137,12 +1137,21 @@ ShellRoot {
     // either side: a row further out keeps the quote it last showed, and
     // takes the latest as it comes into sight, before that frame is drawn.
     function rowsOutOfSightHold(watchlist) {
-      // All, with a dozen more rows than the window has room for.
+      // All, with a dozen more rows than the window has room for. Yahoo's
+      // budget is left as a minute's pause would leave it: these steps
+      // come faster than anyone makes them, and a spark day waits for the
+      // budget's spare half to be judged on its chart. Then nothing is out,
+      // queued, or waiting to be judged: a chart judging a day replaces
+      // that row's quote as it lands, and one landing between the moves
+      // below failed this step under load.
       service.switchList("")
+      service.yahooGate.tokens = service.yahooGate.capacity
       for (var n = 1; n <= 12; n++) service.addSymbol("LONG" + n)
       tryVerify(function() {
-        return service.arriving.length === 0 && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0
-      }, 8000)
+        var feed = service.testFeed
+        return service.arriving.length === 0 && feed.firstRun.length + feed.refreshRun.length === 0
+          && feed.toJudge.length === 0 && Object.keys(feed.asked).length === 0
+      }, 15000)
       watchlist.contentY = 0
       wait(100)
       var shown = watchlist.displayedSymbols.slice()

@@ -115,6 +115,20 @@ ShellRoot {
   // The screenshot's camera, its commands the stand-ins on PATH (bin/).
   Stonks.Camera { id: camera }
   Component { id: bellMaker; Stonks.Bell {} }
+  // The clock the bell's passes hear: the service's quote, featured symbol,
+  // calendars, and screens, at the moments a pass sets, which the service's
+  // own clock can't move. That clock goes to the wall's second at each
+  // step, each minute, as a quote falls due, and as answers land, and one
+  // step inside a pass took the bell's clock days past the open, so the
+  // open's bell never rang and the run ended mid-pass.
+  QtObject {
+    id: bellClock
+    property int now: 0
+    readonly property var quotes: service.quotes
+    readonly property string featuredSymbol: service.featuredSymbol
+    readonly property var calendars: service.calendars
+    readonly property bool screensOff: service.screensOff
+  }
   QtObject {
     id: shellApi
     function serviceFor(id) { return { service: service, updates: updates, sounds: sounds, camera: camera } }
@@ -963,12 +977,12 @@ ShellRoot {
       // other.
       var pass = function(moments, rings) {
         var rung = bells()
-        service.now = moments[0]
-        var bell = bellMaker.createObject(harness, { service: service, sounds: sounds })
+        bellClock.now = moments[0]
+        var bell = bellMaker.createObject(harness, { service: bellClock, sounds: sounds })
         // Each moment its own minute's tick: a bell rung has played before
         // the next, so a second ring isn't lost to the first's check.
         moments.slice(1).forEach(function(t) {
-          service.now = t
+          bellClock.now = t
           wait(300)
         })
         if (rings) tryVerify(function() { return bells() - rung >= rings }, 5000)
@@ -1014,7 +1028,6 @@ ShellRoot {
       rang.push(pass([reg.start - 30, reg.start + 30], 1))
       service.persist({ sounds: false })
       rang.push(pass([reg.start - 30, reg.start + 30], 0))
-      service.now = Math.floor(Date.now() / 1000)
       harness.check("the bell rings at the open in retro's voice, a moment after Stonks starts too, not late, not twice with the clock set back, not while a microphone records though a level meter may run, not when its answer reaches 4 MB or comes after 3 s, again after a stalled answer is stopped, and not with sounds off",
         rang.join(",") === "1,0,1,0,1,0,0,0,1,0" && stallStopped,
         rang.join(",") + " | stalled answer stopped " + stallStopped)
