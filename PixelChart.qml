@@ -36,8 +36,10 @@ Item {
   // The unlit cells of the display, the way an LCD shows every segment
   // faintly. Transparent draws none.
   property color ghostColor: "transparent"
-  property int pixel: 5
-  property int gap: 1
+  // A cell and the seam after it, in window units: whole pixels of the
+  // screen, or of the picture on a screen of any scale (`ShareCard`).
+  property real pixel: 5
+  property real gap: 1
   // 0..1 along the axis, or -1 when not scrubbing.
   property real scrubX: -1
   // How much of the ink has been drawn, 0..1. The grid and baseline are
@@ -201,7 +203,7 @@ Item {
 
     Rectangle {
       required property int index
-      readonly property int cellTop: Math.max(0, (root.grid.baseRow - 1) * root.pixel)
+      readonly property real cellTop: Math.max(0, (root.grid.baseRow - 1) * root.pixel)
       readonly property int column: Math.min(root.grid.columns - 1, Math.floor(root.geometry.ticks[index] * root.grid.columns))
       objectName: "retroBell"
       visible: column >= root.inkColumns || column * root.grid.pitch < curtain.width

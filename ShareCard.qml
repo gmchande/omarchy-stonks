@@ -129,6 +129,7 @@ Rectangle {
     width: 80 * root.u
     height: 56 * root.u
     pixels: Cells.spriteFor(root.animalKind === "bull", root.asleep ? 2 : 0)
+    pixelRatio: root.dpr
     color: root.animalKind === "bull" ? root.upColor : root.downColor
   }
   // Asleep, the header's dim "z" over its back.
@@ -141,6 +142,7 @@ Rectangle {
     width: 12 * root.u
     height: 20 * root.u
     pixels: Cells.spritePixels(Cells.SLEEP_Z)
+    pixelRatio: root.dpr
     color: root.dim
   }
 
@@ -384,6 +386,7 @@ Rectangle {
     width: columns * cell
     height: rows * cell
     pixels: Cells.spriteFor(true, 0)
+    pixelRatio: root.dpr
     color: root.foreground
   }
 }
