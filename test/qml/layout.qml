@@ -2426,8 +2426,43 @@ ShellRoot {
         // screen less the bar, the card's margins, padding, and border.
         // Found in the 1.0.2 leftovers review (O1): from text size 18 on a
         // short screen the popup showed no row at all.
+        // On AAPL's 1Y, a mark's words never touch the ink, the line's
+        // highest and lowest close or the baseline past them, and a chart
+        // at its full height shows both marks. Found in review on 21
+        // October: at 20 the squeezed chart ran through both.
         var shortFaults = []
         var shortSeen = []
+        var touched = []
+        stub.range = "1Y"
+        stub.historyEntry = { status: "ok", history: aaplYear, receivedAt: stub.now }
+        // Where the ink reaches, as each look draws it: smooth's line, a
+        // pixel either side, inside its 3 px pad; retro's columns, 6 px
+        // apart, each at its last close's row of 5 px, over the baseline's.
+        var inkReach = function() {
+          var g = body.featuredGeometry
+          var h = body.chartItem.height
+          if (!stub.retro) {
+            var ys = g.points.map(function(p) { return p.y }).concat([g.baselineY])
+            return [3 + Math.min.apply(null, ys) * (h - 6) - 1, 3 + Math.max.apply(null, ys) * (h - 6) + 1]
+          }
+          var rows = Math.floor(h / 5)
+          var columns = Math.floor(body.chartItem.width / 6)
+          var last = {}
+          g.points.forEach(function(p) { last[Math.min(columns - 1, Math.floor(p.x * columns))] = p.y })
+          var levels = Object.keys(last).map(function(c) { return last[c] }).concat([g.baselineY])
+            .map(function(y) { return Math.round(y * (rows - 1)) })
+          return [Math.min.apply(null, levels) * 5, (Math.max.apply(null, levels) + 1) * 5]
+        }
+        var markInk = function(mark) {
+          var spans = []
+          for (var k = 0; k < mark.children.length; k++) {
+            var t = mark.children[k]
+            if (String(t).indexOf("QQuickText(") !== 0) continue
+            var ink = root.inkOf(t)
+            spans.push([yIn(t, t.baselineOffset + ink.y), yIn(t, t.baselineOffset + ink.y + ink.height)])
+          }
+          return [Math.min.apply(null, spans.map(function(s) { return s[0] })), Math.max.apply(null, spans.map(function(s) { return s[1] }))]
+        }
         for (var size = 9; size <= 20; size++) {
           Style.fontBaseSize = size
           body.screenRoom = 0
@@ -2441,6 +2476,7 @@ ShellRoot {
             body.screenRoom = room
             surface.budget = room
             wait(100)
+            tryVerify(function() { return body.motion.drawn === 1 }, 2000)
             var where = "size " + size + (retro ? " retro" : " smooth")
             var chart = body.chartItem.height
             if (retro === false) shortSeen.push(size + ": " + chart + (chart === fullChart ? "" : " of " + fullChart) + " in " + room)
@@ -2451,16 +2487,31 @@ ShellRoot {
             if (!(body.watchlist.height >= body.listRowHeight && yIn(body.watchlist, body.listRowHeight) + body.groupGap <= footerTop))
               shortFaults.push(where + ": no row in " + room + " px, chart " + chart + ", list " + body.watchlist.height)
             if (rowFitsWhole && chart !== fullChart) shortFaults.push(where + ": the chart gave way to " + chart + " though " + fullChart + " leaves a row")
+            var reach = inkReach().map(function(y) { return yIn(body.chartItem, y) })
+            ;[find(body, "highMark"), find(body, "lowMark")].forEach(function(mark, i) {
+              var name = i === 0 ? "high" : "low"
+              if (!mark || !mark.visible) {
+                if (chart === fullChart) touched.push(where + ": no " + name + " mark on a " + chart + " px chart")
+                return
+              }
+              var words = markInk(mark)
+              if (i === 0 ? words[1] > reach[0] : words[0] < reach[1])
+                touched.push(where + ": the " + name + " mark's words at " + words.join("–") + " on ink at " + reach.join("–") + ", chart " + chart)
+            })
           })
         }
         body.screenRoom = 0
         surface.budget = 730
         stub.retro = false
+        stub.range = "1D"
+        stub.historyEntry = null
         Style.fontBaseSize = 12
         wait(100)
         console.log("popup charts on a 768 px screen: " + shortSeen.join(", "))
         root.check("on a 768 px screen at every text size from 9 to 20 the popup shows a row, its chart giving way only where it must, in both looks",
           shortFaults.length === 0, shortFaults.join(" | "))
+        root.check("on a 768 px screen at every text size from 9 to 20 a range's marks never touch the ink, and a chart at full height shows both, in both looks",
+          touched.length === 0, touched.join(" | "))
         console.log("LAYOUT DONE")
         done.exitCode = root.failures ? 1 : 0
         done.start()

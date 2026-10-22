@@ -70,6 +70,20 @@ Item {
   // How far the lit columns have drawn in, in pixels: what is laid over the
   // ink draws in with it (`RangeMarks`).
   readonly property real inkDrawn: curtain.width
+  // The ink's top and bottom, in pixels: its highest and lowest lit row, or
+  // the baseline's past them. What is laid over the chart keeps clear of
+  // them (`RangeMarks`).
+  readonly property var inkExtent: {
+    var g = grid
+    var top = hasBaseline ? g.baseRow : g.rows
+    var bottom = hasBaseline ? g.baseRow : -1
+    for (var c = 0; c < g.columns; c++) {
+      if (g.levels[c] === undefined) continue
+      top = Math.min(top, g.levels[c])
+      bottom = Math.max(bottom, g.levels[c])
+    }
+    return { top: top * pixel, bottom: (bottom + 1) * pixel }
+  }
   // The stems are retro's wash: the up colour's at 35%, dimmer for the
   // extended hours, and each side at the alpha that adds the same lightness
   // over the ground (`Tones.washAlpha`), never more than half the ink of the

@@ -67,6 +67,17 @@ Item {
   // How far the ink has drawn in, in pixels: what is laid over the ink
   // draws in with it (`RangeMarks`).
   readonly property real inkDrawn: curtain.width
+  // The ink's top and bottom, in pixels: its highest and lowest print, or
+  // the baseline past them, and the line's half width. What is laid over
+  // the chart keeps clear of them (`RangeMarks`).
+  readonly property var inkExtent: {
+    var g = geometry
+    var ys = g && g.points ? g.points.map(function(p) { return p.y }) : []
+    if (g && typeof g.baselineY === "number" && isFinite(g.baselineY)) ys.push(g.baselineY)
+    if (!ys.length) return { top: height, bottom: 0 }
+    var h = height - pad * 2
+    return { top: pad + Math.min.apply(null, ys) * h - weight, bottom: pad + Math.max.apply(null, ys) * h + weight }
+  }
   // The wash: the up colour's at 16%, and each side at the alpha that adds
   // the same lightness over the ground (`Tones.washAlpha`), so a down day's
   // reads as strongly as an up day's; never more than half the line's ink.
