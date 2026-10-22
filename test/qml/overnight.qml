@@ -342,6 +342,7 @@ ShellRoot {
 
       // r asks Robinhood again for the chart on show alone: no row draws
       // its prints. It asked for every listing Robinhood trades all day.
+      service.now = harness.saturday + 40 * 60
       app.testKeyCatcher.forceActiveFocus()
       keyClick(Qt.Key_R)
       var rAsked = within(2000, function() { return Number(harness.record("OVERNIGHT.calls")) === Number(calls) + 1 })

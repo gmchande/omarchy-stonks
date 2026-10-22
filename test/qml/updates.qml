@@ -245,6 +245,11 @@ ShellRoot {
       remove("YAHOO.offline")
       service.now += 120
       var retried = answered(6)
+      // The quotes the outage held catch up before the window closes.
+      for (var s = 0; s < 20 && Object.keys(service.owed).length > 0; s++) {
+        service.now += 5
+        wait(100)
+      }
       closeWindow()
       var said = visit()
       harness.check("an ask that got no answer at all waits while Yahoo gets none either, and goes again once Yahoo answers, saying nothing meanwhile",
