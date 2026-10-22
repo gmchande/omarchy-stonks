@@ -239,15 +239,17 @@ ShellRoot {
       if (!idle()) tryVerify(idle, 10000)
     }
 
-    // What the window's header says from now, frame by frame, each change
-    // once: the function returned stops listening and gives them.
+    // What the window's header says from now, each change as it happens:
+    // the function returned stops listening and gives them. Read on the
+    // header's own change, not on frames: under load no frame may be drawn
+    // between an answer landing and the step reading what was said.
     function listen() {
-      var said = [app.testBody.headerText]
-      frames.each = function() { if (said[said.length - 1] !== app.testBody.headerText) said.push(app.testBody.headerText) }
-      frames.running = true
+      var body = app.testBody
+      var said = [body.headerText]
+      var heard = function() { if (said[said.length - 1] !== body.headerText) said.push(body.headerText) }
+      body.headerTextChanged.connect(heard)
       return function() {
-        frames.running = false
-        frames.each = null
+        body.headerTextChanged.disconnect(heard)
         return said
       }
     }

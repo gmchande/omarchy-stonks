@@ -461,21 +461,25 @@ ShellRoot {
       var failedLifted = nvdaHeld + "," + nvdaDimmed + "," + (body.motion.dimmed === 0)
       var retryButton = harness.find(body, "retryRange")
       var offered = !!retryButton && retryButton.visible
+      // The header's words are read on its own change, each as it happens,
+      // not on frames: under load no frame may be drawn between an answer
+      // landing and the step reading what was said. The dim is a picture,
+      // read on frames.
       var retry = function(start) {
         var said = []
         var dimmed = 0
-        var watch = function() {
-          if (said[said.length - 1] !== body.headerText) said.push(body.headerText)
-          dimmed = Math.max(dimmed, body.motion.dimmed)
-        }
+        var heard = function() { if (said[said.length - 1] !== body.headerText) said.push(body.headerText) }
+        var watch = function() { dimmed = Math.max(dimmed, body.motion.dimmed) }
         var frames = Qt.createQmlObject('import QtQuick; FrameAnimation { running: true }', harness)
         frames.triggered.connect(watch)
-        watch()
+        body.headerTextChanged.connect(heard)
+        heard()
         start()
         watch()
         var retried = within(3000, function() { return service.testHistoryFeed.busy })
         tryVerify(function() { return !service.testHistoryFeed.busy && !service.refreshing }, 10000)
         wait(50)
+        body.headerTextChanged.disconnect(heard)
         frames.destroy()
         return [retried, body.motion.drawn === 1, dimmed === 0].join(",") + " " + said.join("/")
       }
@@ -650,10 +654,10 @@ ShellRoot {
       // old keeps the market. The header said "LOADING 1W" every fifteen
       // minutes, when the service refetched the pill's range, and on every r;
       // the owner asked for "Refreshing" on r alone (21 October).
+      // Read on the header's own change, as the retries above are.
       var said = []
       var watch = function() { if (said[said.length - 1] !== body.headerText) said.push(body.headerText) }
-      var frames = Qt.createQmlObject('import QtQuick; FrameAnimation { running: true }', harness)
-      frames.triggered.connect(watch)
+      body.headerTextChanged.connect(watch)
       // Only the market, its minute free to turn meanwhile.
       var market = function(texts) {
         return texts.length > 0 && texts.every(function(t) { return t !== "Refreshing" && t.indexOf("Loading") !== 0 })
@@ -682,7 +686,7 @@ ShellRoot {
       releaseMsft.running = true
       tryVerify(function() { return harness.answered("MSFT|1W") }, 5000)
       wait(50)
-      frames.destroy()
+      body.headerTextChanged.disconnect(watch)
       harness.check("r with the week in hand says Refreshing while it is out, then the market once it lands; the service asking again for the week by itself keeps the market",
         at > 0 && market(byR.slice(0, at)) && market(byR.slice(at + 1)) && byR.lastIndexOf("Refreshing") === at
           && out && market(said),
