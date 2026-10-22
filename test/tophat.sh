@@ -409,7 +409,7 @@ add_virtual() {
   within 5 screen_on "$virtual" || { echo "tophat: the virtual screen $virtual did not appear" >&2; return 1; }
   host_dispatch "hl.dsp.focus({ monitor = \"$virtual\" })" && within 5 focused_on "$virtual" \
     || { echo "tophat: the focus did not move to $virtual" >&2; return 1; }
-  save_scene
+  save_scene || return 1
   echo "switched: the laptop shows workspace 10, the focus is on $virtual"
 }
 
