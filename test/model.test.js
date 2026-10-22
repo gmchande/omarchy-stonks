@@ -459,8 +459,8 @@ test("parseHistory drops a duplicate of the last bar", () => {
     }
   }), "1Y")
   expect(hist.bars).toEqual([
-    { t: 100, o: 1, h: 1.1, l: 0.9, c: 1 },
-    { t: 200, o: 2, h: 2.2, l: 1.8, c: 2.05 }
+    { t: 100, o: 1, h: 1.1, l: 0.9, c: 1, v: 10 },
+    { t: 200, o: 2, h: 2.2, l: 1.8, c: 2.05, v: 21 }
   ])
 })
 
