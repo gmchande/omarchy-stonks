@@ -54,10 +54,12 @@ Item {
   // `pw-play` starts: the write blocks, and lands by a rename, so a player
   // still reading the last one keeps it. A replay of what the last one
   // played, the same look, chart, and run, plays its file again: making it
-  // held a retro start about 10 ms more than a smooth one.
+  // held a retro start about 10 ms more than a smooth one. None plays before
+  // the cache's folder is private (`OwnerOnly.made`), as none can be written
+  // there.
   property var replayMade: null
   function playReplay(owner, chart) {
-    if (!turnedOn) return
+    if (!turnedOn || !ownerOnly.made) return
     var made = { retro: retro, chart: retro ? chart.grid : chart.geometry, from: chart.from, to: chart.to, seconds: chart.seconds }
     var last = replayMade
     if (!last || last.retro !== made.retro || last.chart !== made.chart || last.from !== made.from
@@ -106,10 +108,12 @@ Item {
     chimer.write(written(voice, bar) + "\n")
   }
 
-  // A chime's name ("retro-3"), its file written unless this run has.
+  // A chime's name ("retro-3"), its file written unless this run has, or
+  // the cache's folder isn't private yet: a chime then plays the file an
+  // earlier run left, if any, and the next one writes it.
   function written(look, bar) {
     var name = look + "-" + bar
-    if (!chimesWritten[name]) {
+    if (!chimesWritten[name] && ownerOnly.made) {
       soundFile.path = folder + "/chime-" + name + ".wav"
       soundFile.setData(ChartSound.wav(ChartSound.chime(look === "retro", bar)))
       chimesWritten[name] = true

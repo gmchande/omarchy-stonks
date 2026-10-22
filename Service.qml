@@ -946,6 +946,9 @@ Item {
   function flushQuotes() {
     if (!root.quotesUnsaved || (root.quotesSavedAt && root.now - root.quotesSavedAt < 10 * 60)) return
     if (!Object.keys(feed.entries).some(function(s) { return feed.entries[s].status === "ok" })) return
+    // Nothing is written in the cache until its folder is private: the
+    // quotes stay unsaved, for the next try.
+    if (!ownerOnly.made) return
     root.quotesUnsaved = false
     root.quotesSavedAt = root.now
     var saved = {}
