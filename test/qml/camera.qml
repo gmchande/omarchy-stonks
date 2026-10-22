@@ -306,15 +306,17 @@ ShellRoot {
       // folder of its own; 4.0 to Tensaku, in the pictures folder. Each shot
       // follows the Omarchy installed, which Omasnap's presence tells, and
       // that version's settings win, the other's counting for nothing.
+      // Omasnap reads XDG_CONFIG_HOME, whose user-dirs.dirs names Photos
+      // (camera.sh), never ~/.config, whose omasnap.conf names Wrong.
       var home = Quickshell.env("HOME")
-      var conf = home + "/.config/omasnap/omasnap.conf"
+      var conf = Quickshell.env("XDG_CONFIG_HOME") + "/omasnap/omasnap.conf"
       var cases = [
         { label: "without Omasnap, OMARCHY_SCREENSHOT_DIR and OMARCHY_SCREENSHOT_EDITOR win, and Omasnap's settings count for nothing",
           omasnap: false, conf: true, folder: home + "/Legacy", editor: "my-editor",
           env: { OMARCHY_SCREENSHOT_DIR: home + "/Legacy", OMARCHY_SCREENSHOT_EDITOR: "my-editor", OMASNAP_SCREENSHOT_DIR: home + "/Snaps" } },
-        { label: "with Omasnap, the picture lands in Screenshots in the pictures folder, and a click opens it in Omasnap",
-          omasnap: true, conf: false, folder: harness.shotsDir + "/Screenshots", editor: "omasnap", env: {} },
-        { label: "with Omasnap, the directory in omasnap.conf's [output] comes before that, its ~ expanded",
+        { label: "with Omasnap, the picture lands in Screenshots in the pictures folder XDG_CONFIG_HOME names, and a click opens it in Omasnap",
+          omasnap: true, conf: false, folder: home + "/Photos/Screenshots", editor: "omasnap", env: {} },
+        { label: "with Omasnap, the directory in omasnap.conf's [output] comes before that, read as Omasnap reads it",
           omasnap: true, conf: true, folder: home + "/Captures", editor: "omasnap", env: {} },
         { label: "with Omasnap, OMARCHY_SCREENSHOT_DIR comes before omasnap.conf, as Omarchy hands it on, and OMARCHY_SCREENSHOT_EDITOR counts for nothing",
           omasnap: true, conf: true, folder: home + "/Legacy", editor: "omasnap",
@@ -325,10 +327,10 @@ ShellRoot {
       ]
       for (var i = 0; i < cases.length; i++) {
         var step = cases[i]
-        // Only [output]'s directory counts, its quotes and spaces as
-        // Omasnap's settings reader drops them.
+        // Only [output]'s directory counts, under an indented header, its
+        // comment dropped and its ~ expanded, as Omasnap reads it.
         if (step.conf) run("mkdir -p \"${1%/*}\" && printf '%s' \"$2\" > \"$1\"", [conf,
-          "[colors]\ndirectory = /colors\n\n[output]\n# Where saved screenshots go.\ndirectory = \"~/Captures\" \n\n[later]\ndirectory = /later\n"])
+          "[colors]\ndirectory = /colors\n\n  [output]\n# Where saved screenshots go.\ndirectory = ~/Captures ; a folder of their own\n\n[later]\ndirectory = /later\n"])
         else run("rm -f \"$1\"", [conf])
         var env = step.env
         if (step.omasnap) env.PATH = Quickshell.env("STONKS_OMASNAP") + ":" + Quickshell.env("PATH")
