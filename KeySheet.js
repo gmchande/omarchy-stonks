@@ -29,7 +29,7 @@ function sheet(order) {
         { key: "← →", does: "Scrub one chart step" },
         { key: "[ ]", does: "Change the chart range" },
         { key: "p", does: "Replay the chart" },
-        { key: "y", does: "Take a screenshot of the chart" }
+        { key: "y", does: "Screenshot the chart" }
       ]},
       { title: "Lists", rows: [
         { key: "w", does: "Open the list menu" },

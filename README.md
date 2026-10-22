@@ -186,7 +186,7 @@ screenshot editor when you click it.
 | `h` `l` | Scrub one chart step (popup) |
 | `[` `]` | Change the chart range |
 | `p` | Replay the chart |
-| `y` | Take a screenshot of the chart |
+| `y` | Screenshot the chart |
 | `a` or `+` | Search and add a symbol |
 | `x` | Remove the selected row |
 | `u` | Undo the last removal, until a list next changes |
