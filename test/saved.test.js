@@ -1145,12 +1145,16 @@ test("a range's marks take in the quote's day while its last bar is that day's",
   const low = M.rangeMarks(earlier, null, rgti.q).low
   expect(`${low.price} ${low.date}`).toBe("11.77 14 OCT 2026")
   expect(M.historyBarAt(earlier, low.x)).toBe(earlier.bars[earlier.bars.length - 1])
-  // A week's bar holds each day of its week.
+  // A week's bar holds each day of its week. Yahoo's weekly answer ends
+  // with the week of Monday 7 September and the live moment, Friday the
+  // 11th, as a bar of its own: Thursday is that week's, and the Monday after
+  // the live moment is not. Found in review.
   const weekly = M.parseHistory(fixture("history/aapl-5y.json"), "5Y")
-  const lastWeek = weekly.bars[weekly.bars.length - 1]
-  const inWeek = { figuresDay: lastWeek.t + 3 * DAY, dayHigh: 400, dayLow: 300, priceDigits: 2 }
-  expect(M.rangeMarks(weekly, null, inWeek).high.price).toBe("400.00")
-  expect(M.rangeMarks(weekly, null, { ...inWeek, figuresDay: lastWeek.t + 8 * DAY }).high.price).toBe("344.57")
+  const weekOf = weekly.bars[weekly.bars.length - 2]
+  expect(weekly.bars[weekly.bars.length - 1].t).toBe(weekly.liveAt)
+  const thursday = { figuresDay: weekOf.t + 3 * DAY, dayHigh: 400, dayLow: 300, priceDigits: 2 }
+  expect(M.rangeMarks(weekly, null, thursday).high.price).toBe("400.00")
+  expect(M.rangeMarks(weekly, null, { ...thursday, figuresDay: weekOf.t + 7 * DAY }).high.price).toBe("344.57")
   // A chart with no bar for the quote's day yet leaves it out: the Nikkei's
   // 1Y answer ended on 13 October.
   const n225 = saved("n225")

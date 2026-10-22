@@ -277,14 +277,18 @@ function historyStatsDateText(history, t, withYear, interval) {
 // Whether the last bar of a range of bars a day long or longer holds the
 // session that starts at `t` (`Quote.figuresDay`), by the exchange's
 // calendar: a day's bar is that day's, a week's bar the seven days from its
-// first, a month's its month. An intraday bar holds only part of a day.
+// first, a month's its month. Yahoo appends the live moment (`liveAt`) to a
+// week's or a month's bars as a bar of its own, so their bucket starts at
+// the bar before it. An intraday bar holds only part of a day.
 function lastBarHolds(history, t) {
   var bars = history && history.bars ? history.bars : []
   var spans = { "1d": "day", "1wk": "week", "1mo": "month", "3mo": "quarter" }
   var span = spans[history ? history.interval : ""]
   if (!bars.length || !span || !Format.isFiniteNumber(t)) return false
+  var last = bars.length - 1
+  var start = span !== "day" && last > 0 && bars[last].t === history.liveAt ? bars[last - 1].t : bars[last].t
   var day = historyDateParts(history, t)
-  var first = historyDateParts(history, bars[bars.length - 1].t)
+  var first = historyDateParts(history, start)
   var days = (Date.UTC(day.year, day.month, day.day) - Date.UTC(first.year, first.month, first.day)) / 86400000
   var months = (day.year - first.year) * 12 + day.month - first.month
   if (span === "day") return days === 0
