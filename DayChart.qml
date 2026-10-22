@@ -64,6 +64,9 @@ Item {
   // line's width and a half, and a pixel). The draw-in sweeps to here.
   readonly property real inkLast: drawable ? geometry.points[geometry.points.length - 1].x : 0
   readonly property real inkRight: Math.min(width, pad + inkLast * (width - pad * 2) + 4)
+  // How far the ink has drawn in, in pixels: what is laid over the ink
+  // draws in with it (`RangeMarks`).
+  readonly property real inkDrawn: curtain.width
   // The wash: the up colour's at 16%, and each side at the alpha that adds
   // the same lightness over the ground (`Tones.washAlpha`), so a down day's
   // reads as strongly as an up day's; never more than half the line's ink.
@@ -82,6 +85,38 @@ Item {
   // Where along the axis `x` is, inside the pad the line is drawn within.
   function fractionAt(x) {
     return (x - pad) / (width - pad * 2)
+  }
+
+  // Where a point `fraction` along the axis is drawn: `fractionAt`'s
+  // inverse.
+  function xAt(fraction) {
+    return pad + fraction * (width - pad * 2)
+  }
+
+  // How high and low the ink reaches between `x0` and `x1`, in pixels: the
+  // prints there and the nearest either side, which the line joins to
+  // them, each with the line's half width, or a lone print's dot
+  // (`strokeRuns`); and the baseline, which runs the whole width. What is
+  // laid over the chart keeps clear of it (`RangeMarks`).
+  function inkExtentIn(x0, x1) {
+    var g = geometry
+    var h = height - pad * 2
+    var top = height
+    var bottom = 0
+    var reach = function(y, r) {
+      top = Math.min(top, pad + y * h - r)
+      bottom = Math.max(bottom, pad + y * h + r)
+    }
+    if (g && typeof g.baselineY === "number" && isFinite(g.baselineY)) reach(g.baselineY, weight)
+    var pts = g && g.points ? g.points : []
+    for (var i = 0; i < pts.length; i++) {
+      var lone = (i === 0 || pts[i].brk) && (i === pts.length - 1 || pts[i + 1].brk)
+      var r = lone ? 3 * weight : weight
+      var before = xAt(pts[Math.max(0, i - 1)].x) - r
+      var after = xAt(pts[Math.min(pts.length - 1, i + 1)].x) + r
+      if (after >= x0 && before <= x1) reach(pts[i].y, r)
+    }
+    return { top: top, bottom: bottom }
   }
 
   // The ticks: a mark on the baseline at the bell, and at the night's

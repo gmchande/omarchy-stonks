@@ -460,7 +460,7 @@ ShellRoot {
         geometry.start + " to " + geometry.end + ", " + geometry.ticks.length + " ticks, " + lastSpan())
       harness.check("the overnight print is its own line under the price, with its time, measured from the close",
         harness.strip() === "OVERNIGHT 22:50 234.27 +0.86%", harness.strip())
-      var info = body.periodLine
+      var info = body.dayLine
       harness.check("it is never the headline, nor in the day's high: the night's 243.20 leaves Thursday's 239.63",
         body.featured.priceText === "232.28" && !!info && info.range.highText === "239.63", body.featured.priceText + " | " + JSON.stringify(info))
 
@@ -718,7 +718,7 @@ ShellRoot {
       // And from the open the info line shows, never from the first bar's
       // close: found in the 1.0.0 review, the demo AAPL read "−0.26% open"
       // beside OPEN 341.33 and a price of 342.79.
-      var openShown = harness.find(body, "periodLine").line.facts[0]
+      var openShown = harness.find(body, "dayLine").line.facts[0]
       var openPrice = Number(openShown.value.replace(/,/g, ""))
       var priceShown = Number(body.featured.priceText.replace(/,/g, ""))
       var fromOpen = Format.pct((priceShown - openPrice) / openPrice * 100)

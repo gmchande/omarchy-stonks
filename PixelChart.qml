@@ -67,6 +67,10 @@ Item {
   readonly property int inkColumns: drawable
     ? Math.min(grid.columns, Math.floor(geometry.points[geometry.points.length - 1].x * grid.columns) + 1) : 0
   readonly property int scrubColumn: scrubX >= 0 ? Math.min(grid.columns - 1, Math.floor(scrubX * grid.columns)) : -1
+  // How far the lit columns have drawn in, in pixels, and the whole width
+  // once they have: what is laid over the ink draws in with it
+  // (`RangeMarks`).
+  readonly property real inkDrawn: replayX < 0 && reveal >= 1 ? width : curtain.width
   // The stems are retro's wash: the up colour's at 35%, dimmer for the
   // extended hours, and each side at the alpha that adds the same lightness
   // over the ground (`Tones.washAlpha`), never more than half the ink of the
@@ -123,6 +127,27 @@ Item {
     }
     if (last >= 0 && !g.ext[last]) g.lastRegular = last
     return g
+  }
+
+  // Where a point `fraction` along the axis is drawn: the centre of its
+  // column, as `layout` buckets it.
+  function xAt(fraction) {
+    var col = Math.max(0, Math.min(grid.columns - 1, Math.floor(fraction * grid.columns)))
+    return col * grid.pitch + pixel / 2
+  }
+
+  // How high and low the ink reaches between `x0` and `x1`, in pixels: the
+  // lit rows of the columns there, and the baseline's, which runs the whole
+  // width. What is laid over the chart keeps clear of it (`RangeMarks`).
+  function inkExtentIn(x0, x1) {
+    var g = grid
+    var rows = hasBaseline ? [g.baseRow] : []
+    var last = Math.min(g.columns - 1, Math.floor(x1 / g.pitch))
+    for (var c = Math.max(0, Math.floor(x0 / g.pitch)); c <= last; c++) {
+      if (g.levels[c] !== undefined) rows.push(g.levels[c])
+    }
+    if (!rows.length) return { top: height, bottom: 0 }
+    return { top: Math.min.apply(null, rows) * pixel, bottom: (Math.max.apply(null, rows) + 1) * pixel }
   }
 
   // The unlit grid and the dashed baseline row: always all there.

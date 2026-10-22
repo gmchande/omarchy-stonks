@@ -711,41 +711,6 @@ test("a day past its 52-week mark widens the 52-week range to it", () => {
   expect(said(M.yearLine(under, null)).split(" · ")[1]).toBe("314.74-–344.57 @325.13")
 })
 
-// Yahoo's 52 weeks leave out the 1Y range's first day. These answers were
-// saved on 14 October 2026, when that day held each listing's 1Y high or
-// low: a stock's high (RGTI, on a day at its 52-week low) and low (GOOG), a
-// cryptocurrency's high, an index's low, a Toronto listing's low, and an ETF
-// whose first day held neither.
-test("on 1Y the 52-week line takes in the range's low and high, and no other range widens it", () => {
-  const saved = name => {
-    const q = M.parseChart(fixture(`first-day-2026-10-14/${name}-day.json`))
-    const h = M.parseHistory(fixture(`first-day-2026-10-14/${name}-1y.json`), "1Y")
-    return { q, h, stats: M.periodStats(h) }
-  }
-  const ends = line => said(line).split(" · ")[1].replace(/ @.*/, "")
-  const lines = ({ q, h, stats }, range) =>
-    [ends(M.rangeLine(h, stats, q.priceDigits, M.regularClose(q))), ends(M.yearLine(q, null, range, stats)), ends(M.yearLine(q, null, "1D", null))]
-  expect(lines(saved("rgti"), "1Y")).toEqual(["11.77–58.15", "11.77-–58.15", "11.77-–57.97"])
-  expect(lines(saved("goog"), "1Y")).toEqual(["241.18–404.47", "241.18–404.47", "244.67–404.47"])
-  expect(lines(saved("eth-usd"), "1Y")).toEqual(["1,506.51–4,265.11", "1,506.51–4,265.11", "1,506.51–4,250.67"])
-  expect(lines(saved("n225"), "1Y")).toEqual(["46,544–72,832", "46,544–72,832", "46,911–72,832"])
-  expect(lines(saved("td-to"), "1Y")).toEqual(["109.56–175.33", "109.56–175.33", "110.17–175.33"])
-  expect(lines(saved("spy"), "1Y")).toEqual(["629.28–781.62", "629.28–781.62", "629.28–781.62"])
-  // A range longer than a year never widens it, its ends can be older.
-  expect(lines(saved("goog"), "2Y")[1]).toBe("244.67–404.47")
-  // A day at Yahoo's high under a higher first day is not at the line's
-  // high, so takes no tone.
-  const rgti = saved("rgti")
-  expect(ends(M.yearLine({ ...rgti.q, fiftyTwoWeekHigh: rgti.q.dayHigh }, null, "1Y", rgti.stats))).toBe("11.77-–58.15")
-  // A day at its 52-week high keeps its tone on 1Y, though its own bar's
-  // high carries float noise past the day's.
-  const goog = saved("goog")
-  const capped = goog.h.bars.map(b => ({ ...b, h: Math.min(b.h, goog.q.dayHigh) }))
-  capped[capped.length - 1].h = goog.q.dayHigh + 1e-9
-  expect(ends(M.yearLine({ ...goog.q, fiftyTwoWeekHigh: goog.q.dayHigh }, null, "1Y", M.periodStats({ ...goog.h, bars: capped }))))
-    .toBe("241.18–355.25+")
-})
-
 test("each symbol is asked for on its own market's clock", () => {
   const q = duringSession(quote)
   const s = q.session
@@ -1124,31 +1089,35 @@ test("history scrub lookup snaps to a bar and maps its timestamp back", () => {
   expect(M.historyFraction(history, history.bars[history.bars.length - 1].t + 1)).toBe(-1)
 })
 
-// A range's line is titled by the range, so it keeps the day line's shape,
-// and says the dates of its low and high, with the bars' granularity.
-test("a range's line gives its low and high, their dates, and its coverage", () => {
+// A range marks its own high and low on its chart, each over the bar that
+// made it, dated at the bars' granularity.
+test("a range marks its high and low on its chart, over their bars, with their dates", () => {
   const aapl = M.parseHistory(fixture("history/aapl-1y.json"), "1Y")
   const week = M.parseHistory(fixture("history/nest-5d.json"), "1W")
   const month = M.parseHistory(fixture("history/nest-1mo.json"), "1M")
   const fab = M.parseHistory(fixture("history/fab-max.json"), "All")
   const weekly = M.parseHistory(fixture("history/aapl-5y.json"), "5Y")
-  const line = (h, price) => said(M.rangeLine(h, null, undefined, price))
-  expect(line(aapl, M.regularClose(quote))).toBe("1Y · 229.02–344.57 @325.13 · LOW 12 SEP 2025 · HIGH 29 JUL 2026")
-  expect(line(week)).toBe("1W · 209.40–254.74 @224.55 · LOW 4 SEP · HIGH 8 SEP")
-  expect(line(month)).toBe("1M · 194.80–280.83 @224.55 · LOW 1 SEP · HIGH 17 AUG")
-  // All starts where the listing does: it never says SINCE.
-  expect(line(fab)).toBe("ALL · 16.60–142.92 @23.20 · LOW 30 APR 2026 · HIGH 1 AUG 2025")
+  const marks = h => {
+    const m = M.rangeMarks(h)
+    return `HIGH ${m.high.price} ${m.high.date} · LOW ${m.low.price} ${m.low.date}`
+  }
+  expect(marks(aapl)).toBe("HIGH 344.57 29 JUL 2026 · LOW 229.02 12 SEP 2025")
+  expect(marks(week)).toBe("HIGH 254.74 8 SEP · LOW 209.40 4 SEP")
+  expect(marks(month)).toBe("HIGH 280.83 17 AUG · LOW 194.80 1 SEP")
+  expect(marks(fab)).toBe("HIGH 142.92 1 AUG 2025 · LOW 16.60 30 APR 2026")
   // The year whole, as the scrub writes it: "JAN 23" read as 23 January.
   // Found in design QA.
-  expect(line(weekly)).toBe("5Y · 124.17–344.57 @332.27 · LOW JAN 2023 · HIGH JUL 2026")
-  // No bars: an empty rule and empty dates, and no word about it.
-  expect(line({ ...week, bars: [] })).toBe("1W · ?–? · LOW _ · HIGH _")
-  // Each date's slot holds the widest date of its kind, its year included,
-  // so a new high's date, or a period that comes to cross a year, never
-  // widens it.
-  expect(M.rangeLine(aapl).facts.map(f => f.widest)).toEqual(["88 MMM 8888", "88 MMM 8888"])
-  expect(M.rangeLine(week).facts.map(f => f.widest)).toEqual(["88 MMM 8888", "88 MMM 8888"])
-  expect(M.rangeLine(weekly).facts.map(f => f.widest)).toEqual(["MMM 8888", "MMM 8888"])
+  expect(marks(weekly)).toBe("HIGH 344.57 JUL 2026 · LOW 124.17 JAN 2023")
+  // Each stands where the chart draws the bar that made it.
+  for (const h of [aapl, week, month, fab, weekly]) {
+    const m = M.rangeMarks(h)
+    const highs = h.bars.map(b => b.h).filter(Number.isFinite)
+    const lows = h.bars.map(b => b.l).filter(Number.isFinite)
+    expect(M.historyBarAt(h, m.high.x).h).toBe(Math.max(...highs))
+    expect(M.historyBarAt(h, m.low.x).l).toBe(Math.min(...lows))
+  }
+  // No bars, no marks.
+  expect(M.rangeMarks({ ...week, bars: [] })).toBeNull()
   // A weekly bar names no day, so it carries its year even when the whole
   // period sits inside one.
   const oneYear = {
@@ -1156,7 +1125,7 @@ test("a range's line gives its low and high, their dates, and its coverage", () 
     bars: weekly.bars.filter(bar => bar.t >= 1767225600 && bar.t < 1798761600)
   }
   expect(M.historySpansYears(oneYear)).toBe(false)
-  expect(line(oneYear)).toMatch(/ · LOW [A-Z]{3} 2026 · HIGH [A-Z]{3} 2026$/)
+  expect(marks(oneYear)).toMatch(/^HIGH [\d.]+ [A-Z]{3} 2026 · LOW [\d.]+ [A-Z]{3} 2026$/)
   expect(M.historyScrubText(aapl, aapl.bars[0])).toBe("12 SEP 2025 · 234.07")
   expect(M.historyScrubText(week, week.bars[0])).toBe("4 SEP 09:30 · 213.58")
   expect(M.historyScrubText({ ...week, interval: "30m" }, week.bars[0])).toBe("4 SEP 09:30 · 213.58")
@@ -1164,39 +1133,55 @@ test("a range's line gives its low and high, their dates, and its coverage", () 
   expect(M.historyScrubText({ ...week, interval: "1wk" }, week.bars[0])).toBe("WEEK OF 4 SEP · 213.58")
   expect(M.historyScrubText({ ...aapl, interval: "1mo" }, aapl.bars[0])).toBe("SEP 2025 · 234.07")
   expect(M.historyScrubText({ ...aapl, interval: "3mo" }, aapl.bars[0])).toBe("SEP 2025 · 234.07")
-  // A young listing's sparse answer says how many bars actually exist; its
-  // eighth bar empties that slot and keeps every slot in place.
-  const day = t => ({ t: 100 + t * DAY, h: 11 + t, l: 9 + t, c: 10 + t })
-  const sparse = {
-    symbol: "NEW", range: "1Y", interval: "1d", gmtoffset: 0, baseline: 10, firstTradeDate: 100,
-    bars: [day(0), day(1)]
-  }
-  expect(line(sparse)).toBe("1Y · 9.00–12.00 @11.00 · SINCE 1 JAN 1970 · LOW 1 JAN · HIGH 2 JAN · 2 BARS")
-  const seven = { ...sparse, bars: [0, 1, 2, 3, 4, 5, 6].map(day) }
-  const eight = { ...sparse, bars: [0, 1, 2, 3, 4, 5, 6, 7].map(day) }
-  expect(line(seven)).toMatch(/ · 7 BARS$/)
-  expect(line(eight)).toMatch(/ · _ BARS$/)
-  const slots = h => M.rangeLine(h).facts.map(f => [f.label, f.widest, f.after].join("|"))
-  expect(slots(eight)).toEqual(slots(seven))
 })
 
-// Room on the info lines is held only for what a listing can show: SINCE
-// on the ranges short of All it is younger than, and how few bars it has
-// only while it can have fewer than eight on one of them. Found in the
-// visual review of 1.0.2: every listing held room for a young one's, and
-// the window's lines stopped 211 px short of the edge.
-test("a listing's range lines hold room for SINCE and BARS only where it can show them", () => {
-  const years = n => n * 365 * DAY
-  const room = listedAgo => M.youngRoom({ ...quote, firstTradeDate: quote.marketTime - listedAgo })
-  expect(M.youngRoom(quote)).toEqual({ since: [], bars: false })
-  expect(room(years(3))).toEqual({ since: ["5Y", "10Y"], bars: false })
-  expect(room(40 * DAY)).toEqual({ since: ["3M", "6M", "YTD", "1Y", "2Y", "5Y", "10Y"], bars: true })
-  expect(room(years(11)).since).toEqual([])
-  expect(M.youngRoom({ ...quote, firstTradeDate: null })).toEqual({
-    since: ["1W", "1M", "3M", "6M", "YTD", "1Y", "2Y", "5Y", "10Y"], bars: true
+// A range is fetched each hour and the quote each minute, so a range's last
+// bar can trail the day: while that bar holds the quote's session, the
+// quote's day high and low count as its own, and the marks keep up with the
+// day's line and the 52 weeks'. RGTI made its 52-week low of 11.77 on 14
+// October 2026; its 1Y answer from before that low still had the day at
+// 12.05.
+test("a range's marks take in the quote's day while its last bar is that day's", () => {
+  const saved = name => ({
+    q: M.parseChart(fixture(`first-day-2026-10-14/${name}-day.json`)),
+    h: M.parseHistory(fixture(`first-day-2026-10-14/${name}-1y.json`), "1Y")
   })
-  // An old listing's columns are its low and high alone, on every range.
-  expect(M.rangeFactLists(M.youngRoom(quote)).every(list => list.map(f => f.label).join(",") === "LOW,HIGH")).toBe(true)
+  const rgti = saved("rgti")
+  const earlier = { ...rgti.h, bars: rgti.h.bars.map((b, i, all) => (i === all.length - 1 ? { ...b, l: 12.05 } : b)) }
+  const low = M.rangeMarks(earlier, null, rgti.q).low
+  expect(`${low.price} ${low.date}`).toBe("11.77 14 OCT 2026")
+  expect(M.historyBarAt(earlier, low.x)).toBe(earlier.bars[earlier.bars.length - 1])
+  // A week's bar holds each day of its week. Yahoo's weekly answer ends
+  // with the week of Monday 7 September and the live moment, Friday the
+  // 11th, as a bar of its own: Thursday is that week's, and the Monday after
+  // the live moment is not. Found in review.
+  const weekly = M.parseHistory(fixture("history/aapl-5y.json"), "5Y")
+  const weekOf = weekly.bars[weekly.bars.length - 2]
+  expect(weekly.bars[weekly.bars.length - 1].t).toBe(weekly.liveAt)
+  const thursday = { figuresDay: weekOf.t + 3 * DAY, dayHigh: 400, dayLow: 300, priceDigits: 2 }
+  expect(M.rangeMarks(weekly, null, thursday).high.price).toBe("400.00")
+  expect(M.rangeMarks(weekly, null, { ...thursday, figuresDay: weekOf.t + 7 * DAY }).high.price).toBe("344.57")
+  // A chart with no bar for the quote's day yet leaves it out: the Nikkei's
+  // 1Y answer ended on 13 October.
+  const n225 = saved("n225")
+  expect(M.rangeMarks(n225.h, null, { ...n225.q, dayHigh: 80000 }).high.price).toBe("72,832")
+  // An intraday bar holds only part of a day, so a day's high is not its.
+  const week = M.parseHistory(fixture("history/nest-5d.json"), "1W")
+  const lastBar = week.bars[week.bars.length - 1]
+  expect(M.rangeMarks(week, null, { figuresDay: lastBar.t, dayHigh: 999, dayLow: 1, priceDigits: 2 }).high.price).toBe("254.74")
+})
+
+// A listing younger than its range says so under its change, with the day
+// it began, in place of the range's name. All starts where the listing
+// does, so it never says SINCE; nor does a listing whose start Yahoo
+// doesn't give.
+test("a listing younger than its range says SINCE its first day under the change", () => {
+  const fig = fixture("history/fig-max.json")
+  const label = (range, h) => M.historyRowModel(h || M.parseHistory(fig, range), quote, 0).periodLabel
+  expect(label("2Y")).toBe("SINCE 31 JUL 2025")
+  expect(label("All")).toBe("ALL")
+  expect(label("2Y", { ...M.parseHistory(fig, "2Y"), firstTradeDate: null })).toBe("2Y")
+  expect(label("1Y", M.parseHistory(fixture("history/aapl-1y.json"), "1Y"))).toBe("1Y")
 })
 
 test("historyRowModel uses the quote until a historical bar is scrubbed", () => {

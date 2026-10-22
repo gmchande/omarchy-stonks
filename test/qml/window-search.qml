@@ -146,8 +146,8 @@ ShellRoot {
       harness.check("only the result the choice rests on is fetched", fetched === "1,0,0", fetched)
       var stats = within(3000, function() { return !!body.yearLine && body.yearLine.facts.length > 0 && body.yearLine.facts[0].value !== "" })
       harness.check("the preview's info lines are its own: its day and its cap",
-        stats && !!body.periodLine && body.periodLine.range.lowText + "–" + body.periodLine.range.highText === "192.88–196.46",
-        JSON.stringify(body.periodLine) + " / " + JSON.stringify(body.yearLine))
+        stats && !!body.dayLine && body.dayLine.range.lowText + "–" + body.dayLine.range.highText === "192.88–196.46",
+        JSON.stringify(body.dayLine) + " / " + JSON.stringify(body.yearLine))
       // An hour on the schedule's clock, and a user's refresh.
       service.now += 3600
       service.askDue()

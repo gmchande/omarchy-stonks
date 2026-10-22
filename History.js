@@ -7,18 +7,16 @@
 // is its own day's, from the answer.
 
 // 1D stays on chartUrl / parseChart. Every other range uses this table.
-// `reach`: how many days back its first bar can be, at most, the range's
-// own length with a holiday's slack (`youngRoom`); All reaches the start.
 var HISTORY_RANGES = {
-  "1W": { range: "5d", interval: "15m", reach: 10 },
-  "1M": { range: "1mo", interval: "1h", reach: 32 },
-  "3M": { range: "3mo", interval: "1d", reach: 93 },
-  "6M": { range: "6mo", interval: "1d", reach: 185 },
-  "YTD": { range: "ytd", interval: "1d", reach: 367 },
-  "1Y": { range: "1y", interval: "1d", reach: 367 },
-  "2Y": { range: "2y", interval: "1d", reach: 732 },
-  "5Y": { range: "5y", interval: "1wk", reach: 1828, scale: "log" },
-  "10Y": { range: "10y", interval: "1wk", reach: 3654, scale: "log" },
+  "1W": { range: "5d", interval: "15m" },
+  "1M": { range: "1mo", interval: "1h" },
+  "3M": { range: "3mo", interval: "1d" },
+  "6M": { range: "6mo", interval: "1d" },
+  "YTD": { range: "ytd", interval: "1d" },
+  "1Y": { range: "1y", interval: "1d" },
+  "2Y": { range: "2y", interval: "1d" },
+  "5Y": { range: "5y", interval: "1wk", scale: "log" },
+  "10Y": { range: "10y", interval: "1wk", scale: "log" },
   "All": { range: "max", interval: "1mo", scale: "log" }
 }
 
@@ -276,88 +274,56 @@ function historyStatsDateText(history, t, withYear, interval) {
   return historyDateText(history, t, coarse || withYear, coarse ? "1mo" : "1d")
 }
 
-// The widest date historyStatsDateText writes for these bars: a two-digit
-// day, and always the year, which a period takes once it crosses one.
-function historyStatsDateWidest(interval) {
-  var coarse = interval === "1wk" || interval === "1mo" || interval === "3mo"
-  return coarse ? "MMM 8888" : "88 MMM 8888"
+// Whether the last bar of a range of bars a day long or longer holds the
+// session that starts at `t` (`Quote.figuresDay`), by the exchange's
+// calendar: a day's bar is that day's, a week's bar the seven days from its
+// first, a month's its month. Yahoo appends the live moment (`liveAt`) to a
+// week's or a month's bars as a bar of its own, so their bucket starts at
+// the bar before it. An intraday bar holds only part of a day.
+function lastBarHolds(history, t) {
+  var bars = history && history.bars ? history.bars : []
+  var spans = { "1d": "day", "1wk": "week", "1mo": "month", "3mo": "quarter" }
+  var span = spans[history ? history.interval : ""]
+  if (!bars.length || !span || !Format.isFiniteNumber(t)) return false
+  var last = bars.length - 1
+  var start = span !== "day" && last > 0 && bars[last].t === history.liveAt ? bars[last - 1].t : bars[last].t
+  var day = historyDateParts(history, t)
+  var first = historyDateParts(history, start)
+  var days = (Date.UTC(day.year, day.month, day.day) - Date.UTC(first.year, first.month, first.day)) / 86400000
+  var months = (day.year - first.year) * 12 + day.month - first.month
+  if (span === "day") return days === 0
+  if (span === "week") return days >= 0 && days < 7
+  return months >= 0 && months < (span === "month" ? 1 : 3)
 }
 
-// A range line's facts for bars of `interval`, as `rangeLine` gives them:
-// when the listing is younger than a range short of All (`since`), its
-// start before the low and high, and, where it can have fewer than eight
-// bars (`bars`), the slot for how few after them. `values` holds what each
-// says, "" when not known.
-function rangeFacts(interval, since, bars, values) {
-  var widest = historyStatsDateWidest(interval)
-  var facts = []
-  if (since) facts.push({ label: "SINCE", value: values.since || "", widest: historyStatsDateWidest("1d") })
-  facts.push({ label: "LOW", value: values.low || "", widest: widest })
-  facts.push({ label: "HIGH", value: values.high || "", widest: widest })
-  if (since && bars) facts.push({ label: "", value: values.bars || "", after: "BARS", widest: "8" })
-  return facts
-}
-
-// The longest a listing can have traded and still have fewer than eight
-// bars on a range short of All: eight of the coarsest, a week, and one more.
-var FEW_BARS_AGE = 9 * 7 * 24 * 60 * 60
-
-// What a listing's range lines can say beyond their low and high, from
-// when it began trading (`firstTradeDate`, in its day's answer) to its
-// quote's time: SINCE on each range short of All it is younger than
-// (`since`, their names), and how few bars it has where it is young enough
-// to have fewer than eight (`bars`). Not knowing when it began, all of it.
-// All starts where the listing does, so it never says SINCE.
-function youngRoom(quote) {
-  var listed = quote ? quote.firstTradeDate : null
-  var asOf = quote ? quote.marketTime : null
-  var known = Format.isFiniteNumber(listed) && Format.isFiniteNumber(asOf)
-  var age = known ? asOf - listed : 0
-  var since = Object.keys(HISTORY_RANGES).filter(function(r) {
-    var spec = HISTORY_RANGES[r]
-    return !!spec.reach && (!known || age <= spec.reach * 24 * 60 * 60 + historyIntervalSeconds(spec.interval))
-  })
-  return { since: since, bars: !known || age <= FEW_BARS_AGE }
-}
-
-// Every list of facts a listing's range line can hold, on any range: what
-// the info table sizes its columns for (`InfoTable.factLists`), so a range
-// change moves none of them. `room` is the listing's (`youngRoom`): an old
-// listing holds room for its low and high alone, and its rules run long.
-function rangeFactLists(room) {
-  var lists = []
-  for (var r in HISTORY_RANGES) {
-    lists.push(rangeFacts(HISTORY_RANGES[r].interval, false, false, {}))
-    if (room.since.indexOf(r) >= 0) lists.push(rangeFacts(HISTORY_RANGES[r].interval, true, room.bars, {}))
-  }
-  return lists
-}
-
-// The info block's first line on a range, in the day line's shape
-// (`Figures.dayLine`): the range, its low and high with the price's place
-// between them, then what only it says: when a listing younger than a range
-// short of All began, the dates of its low and high, and how few bars a
-// young listing's sparse answer has. The bars' slot is kept while the
-// listing is younger than its range, where the listing can have so few
-// (`room.bars`, `youngRoom`), so the eighth bar empties it and moves
-// nothing. `digits` is the listing's price decimals (`Quote.priceDigits`);
-// `price` the headline, else the last bar's close.
-function rangeLine(history, stats, digits, price, room) {
+// A range's high and low, marked on its chart (`RangeMarks`): each where
+// its bar sits along the chart, 0..1, as the scrub places a bar
+// (`historyFraction`), its price at the listing's decimals, and its date.
+// When the last bar holds the session of the listing's `quote`, the quote's
+// day high and low count as that bar's: the range is fetched each hour, the
+// quote each minute, so on a day that passes the range's high the mark
+// keeps up with the day's line and the 52 weeks' (`Figures.dayLine`,
+// `Fundamentals.yearLine`). Null with no bars.
+function rangeMarks(history, stats, quote) {
   stats = stats || periodStats(history)
-  if (!history || !stats || !stats.coverage) return null
-  var coverage = stats.coverage
-  var since = coverage.short && history.range !== "All"
+  if (!stats.high || !stats.low) return null
+  var high = stats.high
+  var low = stats.low
+  if (quote && lastBarHolds(history, quote.figuresDay)) {
+    var today = history.bars[history.bars.length - 1].t
+    if (Format.isFiniteNumber(quote.dayHigh) && quote.dayHigh > high.p) high = { p: quote.dayHigh, t: today }
+    if (Format.isFiniteNumber(quote.dayLow) && quote.dayLow < low.p) low = { p: quote.dayLow, t: today }
+  }
+  var digits = quote ? quote.priceDigits : undefined
   var years = historySpansYears(history)
-  var range = Format.infoRange(stats.low ? stats.low.p : null, stats.high ? stats.high.p : null,
-    Format.isFiniteNumber(price) ? price : stats.last, digits)
-  var dated = function(point) { return point ? historyStatsDateText(history, point.t, years, history.interval) : "" }
-  var facts = rangeFacts(history.interval, since, !room || room.bars, {
-    since: since ? historyStatsDateText(history, history.firstTradeDate, true, "1d") : "",
-    low: dated(stats.low),
-    high: dated(stats.high),
-    bars: coverage.bars && coverage.bars < 8 ? String(coverage.bars) : ""
-  })
-  return { title: String(history.range || "").toUpperCase(), range: range, facts: facts }
+  var mark = function(point) {
+    return {
+      x: historyFraction(history, point.t),
+      price: Format.money(point.p, digits),
+      date: historyStatsDateText(history, point.t, years, history.interval)
+    }
+  }
+  return { high: mark(high), low: mark(low) }
 }
 
 // An intraday bar's date and time read by its own day's clock, so a time
@@ -394,7 +360,11 @@ function historyRowModel(history, quote, scrubT) {
     dayTone: Format.changeTone(chg, "pct"),
     changeText: Format.pct(chg.pct),
     changeLine: Format.pct(chg.pct),
-    // What the change is measured over, said under it the way AT CLOSE is.
-    periodLabel: String(history.range || "").toUpperCase()
+    // What the change is measured over, said under it the way AT CLOSE is:
+    // the range, or, for a listing younger than a range short of All, the
+    // day it began trading.
+    periodLabel: stats.coverage.short && history.range !== "All"
+      ? "SINCE " + historyStatsDateText(history, history.firstTradeDate, true, "1d")
+      : String(history.range || "").toUpperCase()
   }
 }

@@ -106,14 +106,14 @@ ShellRoot {
     return drawn.join(", ") || "nothing"
   }
 
-  // A window's info line: titled by its range, with the range's high once
-  // its history is in; the day's otherwise.
-  function infoLine(window) {
-    return JSON.stringify(window.testBody.periodLine)
+  // A window's chart: its range, with the range's high and low marked once
+  // its history is in.
+  function chartShown(window) {
+    return window.testBody.chartRange + " " + JSON.stringify(window.testBody.rangeMarks)
   }
   function showsRange(window, range) {
-    var line = window.testBody.periodLine
-    return window.testBody.chartRange === range && !!line && line.title === range.toUpperCase() && line.range.highText !== ""
+    var body = window.testBody
+    return body.chartRange === range && body.historyShown && !!body.rangeMarks
   }
 
   function finish() {
@@ -343,7 +343,10 @@ ShellRoot {
       var settle = function(key) {
         tryVerify(function() { return harness.answered(key) && !body.chartLoading && body.motion.drawn === 1 }, 5000)
       }
-      var hero = function() { return body.chartSymbol + " " + (body.featured ? body.featured.priceText : "") + " " + JSON.stringify(body.periodLine) }
+      var hero = function() {
+        return body.chartSymbol + " " + (body.featured ? body.featured.priceText : "") + " " + JSON.stringify(body.dayLine)
+          + " " + JSON.stringify(body.rangeMarks)
+      }
       app.open("{}")
       service.summon("AAPL", "1W")
       settle("AAPL|1W")
@@ -694,7 +697,7 @@ ShellRoot {
       harness.check("a symbol change in the window brings that symbol's range",
         service.featuredSymbol === "AAPL"
           && within(5000, function() { return harness.showsRange(app, "1W") }),
-        service.featuredSymbol + "|" + harness.infoLine(app))
+        service.featuredSymbol + "|" + harness.chartShown(app))
 
       // A range's first fetch keeps the day's chart and info lines, as the
       // hero keeps the day's figures, until the range's response lands.
@@ -706,15 +709,15 @@ ShellRoot {
         var entry = service.histories["AAPL|1M"]
         if (service.range !== "1M" || (entry && entry.history)) return
         if (!body.featuredGeometry || body.motion.drawn < 1) blanked.push("chart")
-        if (!body.periodLine || body.periodLine.range.highText === "") blanked.push("info")
+        if (!body.dayLine || body.dayLine.range.highText === "") blanked.push("info")
       }
       body.featuredGeometryChanged.connect(watchLoad)
-      body.periodLineChanged.connect(watchLoad)
+      body.dayLineChanged.connect(watchLoad)
       keyClick(Qt.Key_BracketRight)
       watchLoad()
       tryVerify(function() { return harness.answered("AAPL|1M") }, 5000)
       body.featuredGeometryChanged.disconnect(watchLoad)
-      body.periodLineChanged.disconnect(watchLoad)
+      body.dayLineChanged.disconnect(watchLoad)
       tryVerify(function() { return body.motion.drawn === 1 }, 2000)
       harness.check("a range's first fetch keeps the day's chart and info lines until it lands",
         blanked.length === 0 && !!body.featuredGeometry && body.motion.drawn === 1, blanked.join(","))
@@ -984,9 +987,9 @@ ShellRoot {
       var cold = summoned.testBody
       var coldSymbol = harness.find(cold, "heroSymbol").text
       harness.check("a cold start shows an empty hero, naming what is coming",
-        cold.chart === null && cold.periodLine === null && cold.yearLine === null
+        cold.chart === null && cold.dayLine === null && cold.yearLine === null
           && cold.featured === null && coldSymbol === "MSFT",
-        coldSymbol + "|" + JSON.stringify(cold.periodLine) + "|" + JSON.stringify(cold.yearLine) + "|" + JSON.stringify(cold.featured))
+        coldSymbol + "|" + JSON.stringify(cold.dayLine) + "|" + JSON.stringify(cold.yearLine) + "|" + JSON.stringify(cold.featured))
       // A quarter second on, the label over the empty hero says Loading,
       // and the header doesn't: it's said once, where a reader looks.
       harness.check("a quarter second into a cold start the empty hero's label alone says Loading, naming what is coming",
@@ -1001,7 +1004,7 @@ ShellRoot {
         again.range === "1Y" && summoned.range === "1Y", again.range + "|" + summoned.range)
       harness.check("the summoned window draws the range it asked for",
         within(5000, function() { return harness.showsRange(summoned, "1Y") }),
-        harness.infoLine(summoned))
+        harness.chartShown(summoned))
       wait(450)
       summoned.testBody.motion.revealChanged.disconnect(watchReveal)
       harness.check("a window summoned while its service starts draws its chart in",
@@ -1227,7 +1230,7 @@ ShellRoot {
       tryVerify(function() { return harness.answered("SLOW|1W") && body.motion.drawn === 1 }, 5000)
       var sig = function() {
         return JSON.stringify([body.featuredGeometry, body.featured ? body.featured.priceText + " " + body.featured.changeLine : "",
-          JSON.stringify(body.periodLine), body.chartSymbol])
+          JSON.stringify(body.dayLine), JSON.stringify(body.rangeMarks), body.chartSymbol])
       }
       var dropEntry = function(key) {
         var next = Object.assign({}, service.testHistoryFeed.entries)
@@ -1277,7 +1280,8 @@ ShellRoot {
         var later = function() { Qt.callLater(record) }
         body.featuredGeometryChanged.connect(later)
         body.featuredChanged.connect(later)
-        body.periodLineChanged.connect(later)
+        body.dayLineChanged.connect(later)
+        body.rangeMarksChanged.connect(later)
         body.motion.drawnChanged.connect(watchDraw)
         body.motion.dimmedChanged.connect(watchDim)
         changedAt = Date.now()
@@ -1290,7 +1294,8 @@ ShellRoot {
         record()
         body.featuredGeometryChanged.disconnect(later)
         body.featuredChanged.disconnect(later)
-        body.periodLineChanged.disconnect(later)
+        body.dayLineChanged.disconnect(later)
+        body.rangeMarksChanged.disconnect(later)
         body.motion.drawnChanged.disconnect(watchDraw)
         body.motion.dimmedChanged.disconnect(watchDim)
         dim.after = body.motion.dimmed

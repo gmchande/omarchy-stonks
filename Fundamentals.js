@@ -122,25 +122,22 @@ function peText(value) {
   return value < 100 ? value.toFixed(1) : Format.grouped(String(Math.round(value)))
 }
 
-// The info block's second line, on every range: the 52-week range with the
-// price's place in it, then the cap and the P/E, each only when known. A
-// day past Yahoo's 52-week mark widens the range to it, so the day's high
-// and the year's read the same, both in the up tone (the low in the down
-// tone). On 1Y the range's own low and high widen it too, so the two lines
-// never disagree: Yahoo's 52 weeks leave out the 1Y range's first day. A
-// longer range never does, its ends can be older than a year. `range` is
-// the range on show and `stats` its `History.periodStats`. Its bars are
-// compared at the listing's decimals, so a bar's float noise never passes
-// a mark it reads as. A day only takes the tone while its end is the one
-// shown. The cap and the P/E move with the headline price from their own
-// date's close; a cap more than CAP_MAX_AGE_DAYS whole days older than the
-// price is left out. The cap names its currency wherever Yahoo does, so one
-// in yen never reads as one in dollars beside it, whatever the reader's own;
-// a London cap is in GBP while its prices are in GBp.
+// The info block's second line, the same on every range: the 52-week range
+// with the price's place in it, then the cap and the P/E, each only when
+// known. A day past Yahoo's 52-week mark widens the range to it, so the
+// day's high and the year's read the same, both in the up tone (the low in
+// the down tone). A range's own low and high are its chart's marks
+// (`History.rangeMarks`), never this line's, though Yahoo's 52 weeks leave
+// out the 1Y range's first day. The cap and the P/E move with the headline
+// price from their own date's close; a cap more than CAP_MAX_AGE_DAYS whole
+// days older than the price is left out. The cap names its currency
+// wherever Yahoo does, so one in yen never reads as one in dollars beside
+// it, whatever the reader's own; a London cap is in GBP while its prices
+// are in GBp.
 // Only an equity has cap and P/E slots, kept whether known or not, so the
 // line keeps its shape: the cap's as wide as its currency and 999.9B before
 // the cap comes; the P/E's as wide as 99.9.
-function yearLine(quote, figures, range, stats) {
+function yearLine(quote, figures) {
   if (!quote) return null
   var q = quote
   var head = Quote.headlineQuote(q)
@@ -149,16 +146,6 @@ function yearLine(quote, figures, range, stats) {
   var atLow = both && Format.isFiniteNumber(q.dayLow) && q.dayLow <= q.fiftyTwoWeekLow
   var low = both ? (atLow ? q.dayLow : q.fiftyTwoWeekLow) : null
   var high = both ? (atHigh ? q.dayHigh : q.fiftyTwoWeekHigh) : null
-  var reads = function(v) { return Number(v.toFixed(Format.isFiniteNumber(q.priceDigits) ? q.priceDigits : Format.moneyDigits(Math.abs(v)))) }
-  var year = both && range === "1Y" && stats ? stats : null
-  if (year && year.low && reads(year.low.p) < reads(low)) {
-    low = year.low.p
-    atLow = false
-  }
-  if (year && year.high && reads(year.high.p) > reads(high)) {
-    high = year.high.p
-    atHigh = false
-  }
   var line = Format.infoRange(low, high, head ? head.price : null, q.priceDigits)
   if (atHigh) line.highTone = "up"
   if (atLow) line.lowTone = "down"
