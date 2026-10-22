@@ -308,8 +308,8 @@ The shell's log the form asks for can name the prices Stonks left out.
   cap and P/E; `query2.finance.yahoo.com` for search; `api.robinhood.com`
   for overnight prices and which stocks trade overnight; and
   `raw.githubusercontent.com` for the newest version number, as the shell
-  starts and then once a day; when no answer comes, again 2 seconds later,
-  doubling to about a minute. Nothing else.
+  starts and then once a day; when no answer comes, again once Yahoo
+  answers again, or a day later. Nothing else.
 - **Data:** Yahoo's endpoints are unofficial, and its terms restrict
   automated access; Robinhood's data is for personal use. Either may change
   or stop without notice. Some prices come late: [Yahoo's table](https://help.yahoo.com/kb/SLN2310.html)
@@ -329,7 +329,7 @@ The shell's log the form asks for can name the prices Stonks left out.
   `~/.config/omarchy/shell.json`.
 - **Limits:** every request has a time limit and a size cap. Quotes come
   up to 20 listings to a request, so a long list refreshes in a few
-  requests a minute, and overnight prices up to 75. Stonks fetches each
+  requests a minute, and overnight prices up to 25. Stonks fetches each
   listing only as often as its market can move, and leaves a site that
   refuses it alone for a while. A window no screen shows, on another
   workspace or a screen switched off, fetches only what a closed one does.
@@ -337,8 +337,8 @@ The shell's log the form asks for can name the prices Stonks left out.
   overnight, and for their overnight prices, both at once: for the stock on
   the pill once each time the shell starts, as its first price comes in; for
   the rest when the popup or window first opens, and for each one you add;
-  and, while one is open, when you press `r` and every 5 minutes through a
-  night that trades.
+  and, while one is open, every 5 minutes through a night that trades;
+  and when you press `r`, for the stock on the chart.
 - **Updates:** never by itself. When a newer version is out, the footer
   says so for 5 seconds.
 

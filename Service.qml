@@ -805,12 +805,14 @@ Item {
   }
 
   // A quote that changed, by an answer, a restore, or a symbol leaving,
-  // leaves the saved quotes behind (`flushQuotes`).
+  // leaves the saved quotes behind (`flushQuotes`), written once the turn
+  // is over: an undo restores the quote before All takes the symbol back,
+  // and a write between the two left it out of the file.
   onQuotesChanged: {
     if (pendingFundamentals) fetchFundamentals(pendingFundamentals)
     settleArrivals()
     root.quotesUnsaved = true
-    flushQuotes()
+    Qt.callLater(flushQuotes)
   }
   // Every run's answers land in the entries, after their quotes, whether or
   // not a quote changed. Then, once the run has left the feed's asks, the
@@ -819,7 +821,7 @@ Item {
   // (`askOvernight`).
   onEntriesChanged: {
     settleArrivals()
-    flushQuotes()
+    Qt.callLater(flushQuotes)
     Qt.callLater(answersLanded)
   }
   function answersLanded() {
