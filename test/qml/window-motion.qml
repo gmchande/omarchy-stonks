@@ -353,6 +353,13 @@ ShellRoot {
       return Date.now() - (1 - Math.cbrt(1 - progress)) * anim.duration
     }
 
+    function captureOrigin(origin, tick, mark) {
+      // Only the recorded tick before the change can explain an early start.
+      // Frame times have millisecond precision, as does Date.now().
+      origin = Math.round(origin)
+      return tick > 0 && origin >= tick && origin <= mark ? origin : mark
+    }
+
     // The draw-in as it is rendered: the hero chart grabbed on every frame,
     // its ink advancing from the left over several distinct frames and
     // whole in about 320 ms, for a symbol change and a range change, in both
@@ -365,16 +372,19 @@ ShellRoot {
         busy.target = busyMachine ? body.chartItem.Window.window : null
         harness.busySince = 0
         grab.begin(name)
+        tryVerify(function() { return grab.tick > 0 && grab.frames.length > 0 }, 2000)
         // The draw-in starts as the chart's reveal leaves whole.
         var started = false
         var leftAt = -1
         var drawFrom = 0
+        var beforeTick = 0
         var marked = function() {
           var r = body.motion.reveal
           if (!started) {
             if (r >= 1) return
             started = true
             leftAt = r
+            beforeTick = grab.tick
             grab.markStart()
             if (busyMachine) harness.busySince = Date.now()
           } else if (!drawFrom && r > leftAt) drawFrom = animationOrigin(body.motion.testDrawIn, r)
@@ -391,10 +401,11 @@ ShellRoot {
         body.motion.revealChanged.disconnect(marked)
         tryVerify(function() { return grab.waiting === 0 }, 3000)
         var markedAt = grab.start
-        grab.start = drawFrom || markedAt
+        grab.start = captureOrigin(drawFrom, beforeTick, markedAt)
         grab.judge("drawin:ink", grab.frames.filter(function(f) { return f.at >= markedAt }), ["plot=" + emptyPlot(body, name)])
         tryVerify(function() { return grab.verdict !== null }, 10000)
-        grab.verdict.detail += " | animation origin " + Math.round(grab.start - markedAt) + " ms from mark"
+        grab.verdict.detail += " | origin " + Math.round(grab.start - markedAt) + ", inferred "
+          + (drawFrom ? Math.round(drawFrom - markedAt) : "none") + ", prior tick " + (beforeTick - markedAt) + " ms from mark"
         return grab.verdict
       }
       var results = []
@@ -482,14 +493,19 @@ ShellRoot {
         var heldUntil = Date.now()
         heroGrab.source = harness.find(body, "hero")
         heroGrab.begin("lift-" + look)
+        tryVerify(function() { return heroGrab.tick > 0 && heroGrab.frames.length > 0 }, 2000)
         var landedAt = 0
         var leftAt = -1
         var drawFrom = 0
         var liftFrom = 0
+        var drawTick = 0
+        var liftTick = 0
         var marked = function() {
           var r = body.motion.reveal
           if (!landedAt) {
             if (r === 1) return
+            drawTick = grab.tick
+            liftTick = heroGrab.tick
             grab.markStart()
             heroGrab.markStart()
             landedAt = grab.start
@@ -517,16 +533,18 @@ ShellRoot {
         var plot = emptyPlot(body, "loading-" + look)
         grab.start = heldFrom
         var held = verdictOf(grab, "dim", grab.frames.filter(function(f) { return f.at >= heldFrom && f.at < heldUntil }))
-        grab.start = drawFrom || landedAt
+        grab.start = captureOrigin(drawFrom, drawTick, landedAt)
         var landed = verdictOf(grab, "drawin:ink", grab.frames.filter(function(f) { return f.at >= landedAt }), ["plot=" + plot])
-        landed.detail += " | animation origin " + Math.round(grab.start - landedAt) + " ms from landing mark"
+        landed.detail += " | origin " + Math.round(grab.start - landedAt) + ", inferred "
+          + (drawFrom ? Math.round(drawFrom - landedAt) : "none") + ", prior tick " + (drawTick - landedAt) + " ms from landing mark"
         // From the last frame before the landing, still dimmed: its price is
         // the same symbol's, so the dim it comes back from is read off it,
         // not off the first frame after, which under load is part lifted.
         var beforeLanding = heroGrab.frames.filter(function(f) { return f.at < landedAt }).slice(-1)
-        heroGrab.start = liftFrom || landedAt
+        heroGrab.start = captureOrigin(liftFrom, liftTick, landedAt)
         var lifted = verdictOf(heroGrab, "dim", beforeLanding.concat(heroGrab.frames.filter(function(f) { return f.at >= landedAt })))
-        lifted.detail += " | animation origin " + Math.round(heroGrab.start - landedAt) + " ms from landing mark"
+        lifted.detail += " | origin " + Math.round(heroGrab.start - landedAt) + ", inferred "
+          + (liftFrom ? Math.round(liftFrom - landedAt) : "none") + ", prior tick " + (liftTick - landedAt) + " ms from landing mark"
         return { held: held.ok && loading && stillLoading && named, heldDetail: held.detail + (named ? "" : ", label " + label.visible + " " + label.text),
           landed: landed, lifted: lifted }
       }
