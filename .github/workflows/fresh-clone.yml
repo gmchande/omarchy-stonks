@@ -9,11 +9,9 @@
 # - The Quickshell harnesses (test/qml/*.sh, data-files.sh included): they
 #   need Quickshell and a Wayland session. The crash handling's self-check
 #   runs: its Quickshell is a stand-in.
-# - The rules read against the saved answers (test/saved.test.js): the saved
-#   Yahoo and Robinhood answers are private.
 #
-# And the maintainer's review kit (test/review.sh) with the frame checker's
-# self-check: pictures and frame timings vary by machine.
+# And the maintainer's review kit (test/review.sh): pictures and frame
+# timings vary by machine.
 #
 # Every action and tool is pinned to an exact version: actions by commit,
 # downloads by sha256. The runner image, with its bash and python3, is
@@ -85,8 +83,13 @@ jobs:
           chmod +x bin/*
           echo "$tools/bin" >> "$GITHUB_PATH"
 
-      - name: Pure rules (bun test)
-        run: bun test ./test/model.test.js
+      # Every unit-test file; those reading the saved answers skip (77).
+      - name: Unit tests (bun test)
+        run: bash test/unit.sh || [ $? -eq 77 ]
+
+      # On made-up frames, so no machine's timing enters it.
+      - name: Frame checker self-check
+        run: bun test/qml/frames.js self-check
 
       - name: Source boundaries
         run: bash test/boundaries.sh
