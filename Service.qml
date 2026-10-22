@@ -73,9 +73,9 @@ Item {
   property var watched: []
 
   readonly property string dataPath: Quickshell.env("HOME") + "/.config/omarchy/grvc.stonks.json"
-  readonly property string cacheFolder: (Quickshell.env("XDG_CACHE_HOME") || Quickshell.env("HOME") + "/.cache") + "/grvc.stonks"
-  // The last good quotes, shown at start until each one's first answer.
-  readonly property string quotesPath: cacheFolder + "/quotes.json"
+  // The last good quotes, shown at start until each one's first answer, in
+  // the cache (`files`).
+  readonly property string quotesPath: ownerOnly.folder + "/quotes.json"
 
   // All, the library: every symbol, fetched once each whatever lists hold it.
   readonly property var library: dataSettings.symbols
@@ -393,7 +393,7 @@ Item {
       root.dataReadEnded(error === FileViewError.FileNotFound ? root.takeMissingFile : root.takeUnreadableFile)
     }
     // A write drops a read in flight unheard: neither loaded nor failed.
-    // Written, the file is its owner's alone (`OwnerOnly`).
+    // Written, the file is its owner's alone (`files`).
     onSaved: {
       ownerOnly.keep([root.dataPath])
       root.dataReadEnded(null)
@@ -913,15 +913,17 @@ Item {
     }
   }
 
+  // Read once, as Stonks starts; written through `files`.
   FileView {
     id: quotesFile
     path: root.quotesPath
     blockLoading: true
-    atomicWrites: true
     printErrors: false
-    onSaved: ownerOnly.keep([root.quotesPath])
   }
-  OwnerOnly { id: ownerOnly; folder: root.cacheFolder }
+  // Stonks' files, its owner's alone (`OwnerOnly`): the one keeper of the
+  // cache, which the sounds write through too.
+  OwnerOnly { id: ownerOnly }
+  readonly property alias files: ownerOnly
 
   // The saved quotes, { symbol: { quote, receivedAt } }; none when the file
   // is missing or unreadable.
@@ -946,16 +948,13 @@ Item {
   function flushQuotes() {
     if (!root.quotesUnsaved || (root.quotesSavedAt && root.now - root.quotesSavedAt < 10 * 60)) return
     if (!Object.keys(feed.entries).some(function(s) { return feed.entries[s].status === "ok" })) return
-    // Nothing is written in the cache until its folder is private: the
-    // quotes stay unsaved, for the next try.
-    if (!ownerOnly.made) return
     root.quotesUnsaved = false
     root.quotesSavedAt = root.now
     var saved = {}
     root.library.forEach(function(s) {
       if (feed.quotes[s]) saved[s] = { quote: feed.quotes[s], receivedAt: (feed.entries[s] || {}).receivedAt || 0 }
     })
-    if (typeof quotesFile.setText === "function") quotesFile.setText(JSON.stringify({ version: 1, quotes: saved }) + "\n")
+    ownerOnly.write(root.quotesPath, JSON.stringify({ version: 1, quotes: saved }) + "\n")
   }
 
   function takeLoadedSettings() {

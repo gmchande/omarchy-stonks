@@ -111,7 +111,7 @@ ShellRoot {
 
   Stonks.Service { id: service }
   Stonks.Updates { id: updates }
-  Stonks.Sounds { id: sounds; turnedOn: service.soundsOn; retro: service.retro; surfacesOpen: service.openSurfaces.length > 0 }
+  Stonks.Sounds { id: sounds; turnedOn: service.soundsOn; retro: service.retro; surfacesOpen: service.openSurfaces.length > 0; files: service.files }
   // The screenshot's camera, its commands the stand-ins on PATH (bin/).
   Stonks.Camera { id: camera }
   Component { id: bellMaker; Stonks.Bell {} }

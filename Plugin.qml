@@ -32,6 +32,7 @@ Item {
     turnedOn: dataService.soundsOn
     retro: dataService.retro
     surfacesOpen: dataService.openSurfaces.length > 0
+    files: dataService.files
   }
 
   Bell { service: dataService; sounds: speaker }
