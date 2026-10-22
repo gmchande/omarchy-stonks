@@ -617,11 +617,18 @@ ShellRoot {
             && ink.alpha > 0 && ink.alpha < 200 && ink.under === 0 && (retro ? ink.width >= ink.cell : ink.width >= 3 && ink.width <= 6),
           trades.length + " trades | alpha " + ink.alpha + ", " + ink.width + " px wide, " + ink.under + " under it")
         // Four minutes into its bar, a pixel or two at this width: the scrub
-        // lands on the dot and says its time.
+        // lands on the dot and says its time, and its move from Friday's
+        // close, the line under the price's; the legend names both closes.
+        // It read the move from Thursday's close, the dashed line's.
+        var restLine = harness.strip().split(" ")
         scrubAt(Chart.fractionAtTime(toy, 1791174000 + 240))
-        var scrubbed = body.headerText + " | " + body.featured.priceText
+        var legend = harness.find(body, "baselineLegend")
+        var scrubbed = [body.headerText, body.featured.priceText, body.featured.changeText, legend.visible ? legend.text : ""].join(" | ")
         endScrub()
-        harness.check(look + ": a scrub at TOY's 00:20 dot lands on it and says its time", scrubbed === "At 00:20 · Overnight | 322.00", scrubbed)
+        harness.check(look + ": a scrub at TOY's 00:20 dot lands on it, says its time, reads its move from Friday's close as the line under the price does, and the legend says which close each part reads from",
+          scrubbed === ["At 00:20 · Overnight", "322.00", "+0.38%", "┄ PREV CLOSE 323.09 · NIGHT FROM CLOSE 320.77"].join(" | ")
+            && restLine.slice(0, 4).join(" ") === "OVERNIGHT 00:20 322.00 " + Format.lookSigns("+0.38%", retro),
+          scrubbed + " | at rest " + restLine.join(" "))
         // The left edge and a replay's first moment read Friday's first print,
         // and the replay reads each of the night's trades on its way.
         scrubAt(0)

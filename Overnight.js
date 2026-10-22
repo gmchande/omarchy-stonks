@@ -341,9 +341,10 @@ function dayChart(quote, answer, calendars) {
 
 // A thin night's 1D: Yahoo's day as `sessionDay` lays it out, measured from
 // its previous close, then the night after it (`axis.night`) to its close,
-// its trades by the clock, each on its own (`Chart.chartGeometry`). The
-// hours between the day's end and the night's start, a weekend's, take no
-// room (`axis.dayEnd`). Ticks at the close and the night's start.
+// its trades by the clock, each on its own (`Chart.chartGeometry`), each
+// measured from the day's own close (`nightClose`). The hours between the
+// day's end and the night's start, a weekend's, take no room
+// (`axis.dayEnd`). Ticks at the close and the night's start.
 function dayAndNight(quote, bars, night, cal) {
   return Object.assign({}, quote, {
     points: quote.points.concat(bars.filter(function(b) { return b.t >= night.start && b.t < night.end })),
@@ -351,6 +352,15 @@ function dayAndNight(quote, bars, night, cal) {
       dayEnd: Quote.dayEnd(quote), night: night },
     calendar: cal
   })
+}
+
+// The close a moment `t` of a 1D `day` is measured from when it falls in a
+// thin night after the day (`dayAndNight`): the day's own close, the one the
+// overnight line under the price measures from (`Figures.extendedStack`).
+// Null for any other moment, which the day's `prevClose` measures, as it
+// does the dashed line.
+function nightClose(day, t) {
+  return day.axis && day.axis.night && t >= day.axis.night.start ? Quote.regularClose(day) : null
 }
 
 // The 1D chart of a US listing Robinhood does not trade all day: Yahoo's own

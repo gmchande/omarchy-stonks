@@ -1460,6 +1460,19 @@ test("a night that trades thinly shows Yahoo's day, then the night's trades by t
   expect(geometry.ticks.map(x => M.timeAtFraction(day, x))).toContain(at("2026-10-01", "20:00"))
   expect(built.latest).toEqual(day.points.at(-1))
   expect(stripAt(built, at("2026-10-01", "23:00"))).toMatchObject({ label: "OVERNIGHT", time: "22:20" })
+  // A scrubbed trade of the night reads its move from Thursday's close, the
+  // close the line under the price measures from, in every change mode;
+  // the day's part reads from its previous close, as the quote does. The
+  // legend says both.
+  const line = stripAt(built, at("2026-10-01", "23:00"))
+  for (const mode of ["pct", "abs", "open"]) {
+    expect(M.rowModel(day, built.latest.t, mode).changeText).toBe(M.extendedStack(quote, built.latest, at("2026-10-01", "23:00"), day, mode).changeText)
+  }
+  expect(M.rowModel(day, built.latest.t, "pct")).toMatchObject({ changeText: line.changeText, periodLabel: "" })
+  const noon = quote.points.find(p => p.t >= at("2026-10-01", "12:00")).t
+  expect(M.rowModel(day, noon, "pct").changeText).toBe(M.rowModel(quote, noon, "pct").changeText)
+  expect(M.dayBaselineText(day)).toBe(`PREV CLOSE ${M.money(quote.prevClose)} · NIGHT FROM CLOSE ${M.money(M.regularClose(quote))}`)
+  expect(M.dayBaselineText(dayAt("night", "nest").day)).toBe(`PREV CLOSE ${M.money(savedDay("night", "nest").prevClose)}`)
 
   // Sunday 22:30: Friday's day, then Sunday night's trades after it, the
   // weekend between them taking no room.
