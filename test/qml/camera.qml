@@ -139,7 +139,8 @@ ShellRoot {
       var take = function() {
         var card = loader.item
         seen = { symbol: card.symbol, range: card.range, retro: card.retro, scrubX: card.scrubX, scrubT: card.scrubT,
-          when: card.words ? card.words.when : "", texts: harness.texts(card) }
+          when: card.words ? card.words.when : "", span: card.words ? card.words.span : "",
+          currency: card.quote ? String(card.quote.currency || "") : "", texts: harness.texts(card) }
       }
       if (loader) loader.loaded.connect(take)
       act()
@@ -192,12 +193,16 @@ ShellRoot {
     }
 
     // The card shows the chart on show and never the list: no other row's
-    // symbol and no list's name.
+    // symbol and no list's name. Its price's currency stands beside the
+    // price, and its foot says when: the day's date, or the range's length.
     function ofChart(shot, symbol, range, rows) {
       var problems = []
       if (!shot.card.texts) return ["no card laid out"]
       if (shot.card.symbol !== symbol || shot.card.range !== range) problems.push("card of " + shot.card.symbol + " " + shot.card.range)
-      if (shot.card.texts.indexOf(symbol) < 0 || shot.card.texts.indexOf(range) < 0) problems.push("words " + shot.card.texts.join(" | "))
+      var span = range === "1D" ? /^(MON|TUE|WED|THU|FRI|SAT|SUN) \d{1,2} [A-Z]{3} \d{4}$/ : { "1Y": /^1 YEAR$/ }[range]
+      if (shot.card.texts.indexOf(symbol) < 0 || shot.card.texts.indexOf(shot.card.span) < 0 || !span.test(shot.card.span)
+        || shot.card.currency === "" || shot.card.texts.indexOf(shot.card.currency) < 0)
+        problems.push("words " + shot.card.texts.join(" | "))
       var listed = shot.card.texts.filter(function(text) { return rows.indexOf(text) >= 0 && text !== symbol })
       if (listed.length) problems.push("shows the list's " + listed.join(", "))
       return problems
@@ -231,8 +236,8 @@ ShellRoot {
       tryVerify(function() { return body.scrubT !== 0 }, 2000)
       var scrubbed = shoot(body, function() { keyClick(Qt.Key_Y) })
       problems = landed(scrubbed, "aapl", /^AAPL at \d\d:\d\d$/).concat(ofChart(scrubbed, "AAPL", "1D", rows))
-      harness.check("scrubbed, y takes the scrub: the picture shows it and says its time, and the footer says it too",
-        problems.length === 0 && scrubbed.card.scrubT === body.scrubShown && scrubbed.card.scrubX >= 0 && /^AT \d\d:\d\d [A-Z]+ · /.test(scrubbed.card.when)
+      harness.check("scrubbed, y takes the scrub: the picture shows it and says its time, its date only at the foot, and the footer says it too",
+        problems.length === 0 && scrubbed.card.scrubT === body.scrubShown && scrubbed.card.scrubX >= 0 && /^AT \d\d:\d\d [A-Z]+$/.test(scrubbed.card.when)
           && scrubbed.name !== rest.name,
         problems.join("; ") + " | " + scrubbed.card.when + " | " + scrubbed.footer)
 

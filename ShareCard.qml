@@ -14,12 +14,13 @@ import "Tones.js" as Tones
 // (16:9, which X shows whole), drawn at twice that so its canvases paint
 // sharp on any screen: every measure is in the layout's units, `u` pixels
 // each. What the popup shows above its ranges, at share size, with the
-// facts it leaves out (`Share.words`): the symbol, its name, exchange, and
-// currency; the day's animal, as the header draws it; the price and its
-// move, large; what the price is, its time and zone, and its date, and what
-// the move is measured from; the line under the price the popup shows; the
-// chart, its axis ending at the newest price, with the scrub; and at the
-// foot the range and Stonks' mark. Never the list. In the surface's look
+// facts it leaves out (`Share.words`): the symbol, its name and exchange;
+// the day's animal, as the header draws it; the price, with its currency
+// beside it as a unit, and its move, large; what the price is, its time
+// and zone, a range's date, and what the move is measured from; the line
+// under the price the popup shows; the chart, its axis ending at the
+// newest price, with the scrub; and at the foot when, the day's date or
+// the range's length, and Stonks' mark. Never the list. In the surface's look
 // and colours. Built for a shot and gone after it (`StonksBody`).
 Rectangle {
   id: root
@@ -69,8 +70,8 @@ Rectangle {
   height: 675 * u
   color: ground
 
-  // The symbol, its name, exchange, and currency: the name gives way to
-  // the exchange and currency, which stay whole, as the hero's line does.
+  // The symbol, its name, and exchange: the name gives way to the
+  // exchange, which stays whole. The currency is the price's (below).
   Text {
     id: symbolText
     objectName: "shareSymbol"
@@ -105,7 +106,7 @@ Rectangle {
     x: nameText.x + nameText.width
     anchors.baseline: symbolText.baseline
     textFormat: Text.PlainText
-    text: root.quote ? " · " + Figures.listingMeta(root.quote, nameText.truncated) : ""
+    text: root.quote ? " · " + root.quote.exchange : ""
     color: root.dim
     font: nameText.font
   }
@@ -138,7 +139,10 @@ Rectangle {
   // The price, as large as the room the move leaves it, in the look's
   // digits, and the move pinned to the right edge on the same baseline.
   readonly property string priceText: view ? view.priceText : "—"
+  // The price gives up the currency's width when room is short.
   readonly property real priceRoom: width - margin * 2 - changeText.implicitWidth - 48 * u
+    - currencyText.implicitWidth - currencyGap
+  readonly property int currencyGap: 16 * u
   TextMetrics {
     id: priceInk
     font.family: root.fontFamily
@@ -157,6 +161,7 @@ Rectangle {
     priceRoom / Math.max(1, Cells.blockCells(priceText).columns))))
   readonly property int priceBaseline: 222 * u
   Text {
+    id: priceSmooth
     objectName: "sharePrice"
     visible: !root.retro
     x: root.margin - Math.round(priceInk.tightBoundingRect.x * root.priceScale)
@@ -170,6 +175,7 @@ Rectangle {
     font.letterSpacing: -1 * root.u
   }
   BlockDigits {
+    id: priceRetro
     visible: root.retro
     x: root.margin
     y: root.priceBaseline - baselineOffset
@@ -177,6 +183,18 @@ Rectangle {
     cell: root.cell
     color: root.foreground
     ghostColor: root.ghost
+  }
+  // The currency beside the price, set like a unit, on its baseline, dim
+  // and at the ticker's size: a price in pence says "GBp".
+  Text {
+    id: currencyText
+    objectName: "shareCurrency"
+    x: (root.retro ? priceRetro.x + priceRetro.width : priceSmooth.x + priceSmooth.implicitWidth) + root.currencyGap
+    y: root.priceBaseline - baselineOffset
+    textFormat: Text.PlainText
+    text: root.quote ? String(root.quote.currency || "") : ""
+    color: root.dim
+    font: symbolText.font
   }
   Text {
     id: changeText
@@ -192,8 +210,9 @@ Rectangle {
     font.bold: true
   }
 
-  // What the price is, its time and zone, and its date; and what the move
-  // is measured from, the chart's dashed line.
+  // What the price is, its time and zone, and on a range its date (on the
+  // day the foot says it); and what the move is measured from, the chart's
+  // dashed line.
   component Caption: Text {
     textFormat: Text.PlainText
     color: root.dim
@@ -313,41 +332,43 @@ Rectangle {
     color: root.ghost
   }
 
-  // The range at the foot, and Stonks' logo, the pixel bull, whatever the
-  // day's animal is, and its name. The bull is in the name's ink, not the
-  // up colour: on a down day a green bull would read as the day's.
+  // When, at the foot, at the mark's size: the day's date or the range's
+  // length. And Stonks' logo, the pixel bull, whatever the day's animal
+  // is, and its name. The bull is in the name's ink, not the up colour: on
+  // a down day a green bull would read as the day's.
   Caption {
-    objectName: "shareRange"
+    objectName: "shareSpan"
     x: root.margin
-    y: 650 * root.u - baselineOffset
-    text: root.range
+    y: 654 * root.u - baselineOffset
+    font.pixelSize: 28 * root.u
+    text: root.words ? root.words.span : ""
   }
   Text {
     id: forOmarchy
     x: root.width - root.margin - implicitWidth
-    y: 650 * root.u - baselineOffset
+    y: 654 * root.u - baselineOffset
     textFormat: Text.PlainText
     text: "for Omarchy"
     color: root.dim
     font.family: root.fontFamily
-    font.pixelSize: 20 * root.u
+    font.pixelSize: 28 * root.u
   }
   Text {
     id: stonksText
     x: forOmarchy.x - implicitWidth - 12 * root.u
-    y: 650 * root.u - baselineOffset
+    y: 654 * root.u - baselineOffset
     textFormat: Text.PlainText
     text: "Stonks"
     color: root.foreground
     font.family: root.fontFamily
-    font.pixelSize: 20 * root.u
+    font.pixelSize: 28 * root.u
     font.bold: true
   }
   PixelSprite {
     objectName: "shareLogo"
-    readonly property int cell: Math.round(1.5 * root.u)
-    x: stonksText.x - width - 10 * root.u
-    y: 650 * root.u - height
+    readonly property int cell: 2 * root.u
+    x: stonksText.x - width - 14 * root.u
+    y: 654 * root.u - height
     width: columns * cell
     height: rows * cell
     pixels: Cells.spriteFor(true, 0)

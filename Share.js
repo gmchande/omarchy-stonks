@@ -34,11 +34,21 @@ function local(quote, t, calendars) {
     clock: Format.hhmm(t, at.offset), zone: at.zone || Format.offsetName(at.offset) }
 }
 
-// "16:00 EDT · TUE 20 OCT 2026".
-function clockAndDate(quote, t, calendars) {
+// "16:00 EDT".
+function clockOf(quote, t, calendars) {
   var l = local(quote, t, calendars)
-  return l.clock + " " + l.zone + " · " + Format.WEEKDAYS[l.weekday].toUpperCase() + " " + l.d + " " + Format.MONTHS[l.m - 1] + " " + l.y
+  return l.clock + " " + l.zone
 }
+
+// "TUE 20 OCT 2026".
+function dateOf(quote, t, calendars) {
+  var l = local(quote, t, calendars)
+  return Format.WEEKDAYS[l.weekday].toUpperCase() + " " + l.d + " " + Format.MONTHS[l.m - 1] + " " + l.y
+}
+
+// A range's length in words, for the picture's foot.
+var SPANS = { "1W": "1 WEEK", "1M": "1 MONTH", "3M": "3 MONTHS", "6M": "6 MONTHS", "YTD": "YEAR TO DATE",
+  "1Y": "1 YEAR", "2Y": "2 YEARS", "5Y": "5 YEARS", "10Y": "10 YEARS", "All": "ALL" }
 
 // The headline is the regular session's close, as a scrub at the bell reads
 // it (`Quote.readingAt`): never a cryptocurrency's, which has none.
@@ -87,25 +97,32 @@ function barDate(history, bar) {
 // `day` (the 1D chart's), `history` (a range's, or null on the day),
 // `latest`, `scrubT` (0 at rest), `changeMode`, `range`, `now`, and
 // `calendars`.
-//   when: what the price is, its time and zone, and its date;
+//   when: what the price is, and its time and zone; on a range, its date
+//   too, which on the day the foot says;
 //   from: what the change is measured from, as the chart's dashed line;
 //   extended: the line under the price the popup shows, with its time;
 //   start, end: the axis's two ends;
+//   span: when, at the foot: on the day, the date of the price on show,
+//   the day its move belongs to (after midnight, the close before the
+//   chart's day); on a range, the range's length;
 //   said: the moment in the footer's words.
 function words(o) {
   var quote = o.quote
   var digits = quote.priceDigits
   var at = moment(o)
-  var out = { when: "", from: "", extended: "", extendedTone: "flat", start: "", end: "", said: "" }
+  var out = { when: "", from: "", extended: "", extendedTone: "flat", start: "", end: "", span: "", said: "" }
   if (at.bar) {
     out.when = barDate(o.history, at.bar)
     out.said = "on " + out.when
   } else if (at.t) {
-    out.when = (at.close ? quote.exchange + " CLOSE · " : "AT ") + clockAndDate(quote, at.t, o.calendars)
+    out.when = (at.close ? quote.exchange + " CLOSE · " : "AT ") + clockOf(quote, at.t, o.calendars)
+      + (o.history ? " · " + dateOf(quote, at.t, o.calendars) : "")
+    if (!o.history) out.span = dateOf(quote, at.t, o.calendars)
     out.said = at.close ? "at the close" : "at " + Market.printClock(quote, at.t, o.calendars)
   }
   if (o.history) {
     out.from = String(o.range).toUpperCase() + " START " + Format.money(o.history.baseline, digits)
+    out.span = SPANS[o.range] || String(o.range).toUpperCase()
     // Each end with its year: the picture is read later, elsewhere.
     var bars = o.history.bars
     if (bars.length) {

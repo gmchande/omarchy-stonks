@@ -164,10 +164,11 @@ sets how loud they are.
 ## Screenshots
 
 Click the camera at the top right, or press `y`, for a picture of the chart
-you're looking at, laid out to share: the price and its move large, the
-day's bull or bear, the exchange, the currency, the time of the price with
-its zone, the date, and the price the move is measured from. Scrubbed, it
-shows the moment you scrubbed to. Your list is never in it. It lands as
+you're looking at, laid out to share: the price large with its currency
+beside it, its move, the day's bull or bear, the exchange, the time of the
+price with its zone, the price the move is measured from, and at the foot
+the day's date or the range's length. Scrubbed, it shows the moment you
+scrubbed to. Your list is never in it. It lands as
 Omarchy's own screenshots do: a file in your screenshots folder, the
 picture on the clipboard, and Omarchy's notification, which opens your
 screenshot editor when you click it.
