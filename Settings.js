@@ -38,9 +38,10 @@ function canRemove(symbols) {
 // A list's order; each list has its own. Manual is the symbols array as
 // saved; the rest are views over it, so sorting never rewrites what you
 // arranged by hand. The order and the change mode are separate settings:
-// sorting by % change ranks the rows without changing what their change
-// figures say. There is no order by the amount: Stonks converts no
-// currency, so yen, dollars, and index points would rank as one number.
+// sorting by % change ranks the rows by the percent they show, from the
+// open when they show since the open. There is no order by the amount:
+// Stonks converts no currency, so yen, dollars, and index points would rank
+// as one number; showing amounts, the rows stay in percent order.
 var ORDERS = ["manual", "symbol", "name", "pct"]
 
 var ORDER_LABELS = { manual: "MANUAL", symbol: "SYMBOL", name: "NAME", pct: "% CHANGE" }
@@ -81,13 +82,14 @@ function orderLabel(order, reversed) {
 // arrived at the bottom, in their manual order, and the sort is stable so
 // ties keep their manual order too, whichever way it runs. Text sorts run
 // A to Z and change sorts biggest gain first; reversed, the other way.
-function sortedSymbols(symbols, quotes, order, reversed) {
+// `changeMode` is the rows' unit, which % change ranks by.
+function sortedSymbols(symbols, quotes, order, reversed, changeMode) {
   order = normalizeOrder(order)
   if (order === "manual") return symbols.slice()
   var keyed = []
   for (var i = 0; i < symbols.length; i++) {
     var q = quotes[symbols[i]]
-    keyed.push({ symbol: symbols[i], index: i, key: q ? sortKey(q, order) : null })
+    keyed.push({ symbol: symbols[i], index: i, key: q ? sortKey(q, order, changeMode) : null })
   }
   var first = sortsAscending(order, reversed) ? -1 : 1
   keyed.sort(function(a, b) {
@@ -103,10 +105,10 @@ function sortedSymbols(symbols, quotes, order, reversed) {
   return out
 }
 
-function sortKey(quote, order) {
+function sortKey(quote, order, changeMode) {
   if (order === "symbol") return quote.symbol.toUpperCase()
   if (order === "name") return String(quote.name || quote.symbol).toUpperCase()
-  return Quote.change(quote, Quote.regularClose(quote), "pct").pct
+  return Quote.change(quote, Quote.regularClose(quote), changeMode === "open" ? "open" : "pct").pct
 }
 
 function barEntryFor(config, id) {

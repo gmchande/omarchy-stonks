@@ -136,6 +136,21 @@ var CAMERA_BODY = [["M", 0.5, 3], ["L", 4.8, 3], ["L", 6.3, 0.5], ["L", 10.7, 0.
 var CAMERA = { columns: 6, rows: 4, path: CAMERA_BODY }
 var CAMERA_LIT = { columns: 6, rows: 4, path: CAMERA_BODY.concat([["dot", 8.5, 6.6, 1.6]]) }
 
+// The rows' unit, over their figures, in the same pen on a grid four
+// columns wide, each sign as wide as the others: the percent's two dots and
+// stroke, an amount's plus over a minus, and the market's bell for since the
+// open. Keyed by the change mode.
+var UNIT_SIGNS = {
+  pct: { columns: 4, rows: 4,
+    path: [["dot", 3, 3, 2.1], ["dot", 9.5, 8.5, 2.1], ["M", 10.5, 0.8], ["L", 2, 10.7], ["stroke"]] },
+  abs: { columns: 4, rows: 4,
+    path: [["M", 6.25, 0.8], ["L", 6.25, 7.2], ["stroke"], ["M", 2.6, 4], ["L", 9.9, 4], ["stroke"],
+      ["M", 2.6, 10.4], ["L", 9.9, 10.4], ["stroke"]] },
+  open: { columns: 4, rows: 4,
+    path: [["A", 6.25, 4.6, 3.3, 180, 360], ["L", 9.55, 7.4], ["L", 11.4, 9.1], ["L", 1.1, 9.1], ["L", 2.95, 7.4], ["Z"], ["fill"],
+      ["dot", 6.25, 10.3, 1.3], ["dot", 6.25, 1.1, 0.9]] }
+}
+
 // The header's icons' cell, their grid's pitch, from the shell's text
 // scale: 3 px to text size 13, 4 px from 14 to 17, 5 px from 18, so the
 // icons keep their weight beside the words.

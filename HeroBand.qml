@@ -1,6 +1,7 @@
 import QtQuick
 import qs.Commons
 import qs.Commons as Commons
+import "Cells.js" as Cells
 import "Figures.js" as Figures
 import "Settings.js" as Settings
 import "Tones.js" as Tones
@@ -80,6 +81,7 @@ Item {
   // sound steps through in retro, a note a column.
   readonly property var pixelGrid: pixelChart.grid
 
+  // The hero's change or the rows' unit sign, clicked: the unit steps.
   signal changeClicked()
   signal orderClicked()
   signal orderReverseClicked()
@@ -311,9 +313,9 @@ Item {
     }
 
     // The list's name, a menu, at the left of the rule, as Apple puts it at
-    // the top of the list; the order control at the right. The name starts
-    // at the rows' words, and the order word ends at the figures it ranks,
-    // the band's own edges. Its height is the caption
+    // the top of the list; the order control at the right, then the rows'
+    // unit. The name starts at the rows' words, and the unit ends at the
+    // figures it names, the band's own edges. Its height is the caption
     // line's, never a word's: a glyph drawn from another font is taller, and
     // would move the rows. A line of text rounds its ascent and its descent
     // up to whole pixels each, and so does this.
@@ -347,7 +349,8 @@ Item {
         objectName: "listLabel"
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
-        width: Math.min(implicitWidth, parent.width - orderText.implicitWidth - todayText.implicitWidth - Style.space(80))
+        width: Math.min(implicitWidth, parent.width - orderText.implicitWidth - todayText.implicitWidth
+          - unitSign.width - orderText.anchors.rightMargin - Style.space(80))
         textFormat: Text.PlainText
         text: root.listLabel.toUpperCase()
         color: root.foreground
@@ -476,7 +479,8 @@ Item {
         id: orderText
         objectName: "orderLabel"
         visible: !root.rowsCovered
-        anchors.right: parent.right
+        anchors.right: unitSign.left
+        anchors.rightMargin: Style.space(10)
         anchors.verticalCenter: parent.verticalCenter
         textFormat: Text.PlainText
         text: Settings.orderLabel(root.order, root.reversed)
@@ -511,11 +515,13 @@ Item {
           onClicked: orderText.sorted ? root.orderReverseClicked() : root.orderClicked()
         }
 
+        // Its target reaches halfway into the gap before the unit, whose
+        // target takes the other half.
         MouseArea {
           id: wordMouse
           x: orderText.wordStart
           y: -Style.space(6)
-          width: parent.width - orderText.wordStart + Style.space(6)
+          width: parent.width - orderText.wordStart + orderText.anchors.rightMargin / 2
           height: parent.height + Style.space(12)
           hoverEnabled: true
           cursorShape: Qt.PointingHandCursor
@@ -524,6 +530,51 @@ Item {
             else root.orderClicked()
           }
         }
+      }
+
+      // The rows' unit at the figures' edge, where a table puts a column's
+      // unit: % for a percent, ± for an amount, and the market's bell for
+      // since the open (`Cells.UNIT_SIGNS`), in the header icons' pen,
+      // bright as a sorted order word. The signs are one width, so a step
+      // moves nothing. A click steps the unit for every row, as c does; it
+      // hovers and presses as the order word does.
+      Rectangle {
+        objectName: "unitFill"
+        visible: !root.rowsCovered
+        anchors.horizontalCenter: unitSign.horizontalCenter
+        anchors.verticalCenter: parent.verticalCenter
+        width: unitSign.width + Style.space(12)
+        height: parent.height + Style.space(4)
+        radius: root.retro ? 0 : Style.cornerRadius
+        color: unitMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
+          : unitMouse.containsMouse ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
+        Behavior on color { ColorAnimation { duration: 160; easing.type: Easing.OutCubic } }
+      }
+
+      GridIcon {
+        id: unitSign
+        objectName: "unitSign"
+        visible: !root.rowsCovered
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        cell: Cells.iconCell(Style.fontScale)
+        shape: Cells.UNIT_SIGNS[root.changeMode]
+        color: root.foreground
+      }
+
+      MouseArea {
+        id: unitMouse
+        objectName: "unitTarget"
+        visible: !root.rowsCovered
+        anchors.left: unitSign.left
+        anchors.leftMargin: -orderText.anchors.rightMargin / 2
+        anchors.right: unitSign.right
+        anchors.rightMargin: -Style.space(6)
+        anchors.verticalCenter: parent.verticalCenter
+        height: parent.height + Style.space(12)
+        hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
+        onClicked: root.changeClicked()
       }
     }
   }
