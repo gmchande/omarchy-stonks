@@ -495,7 +495,7 @@ ShellRoot {
         harness.check(look + ": switching and sorting retain each list's members",
           all.indexOf("SLOW") >= 0 && watchlist.displayedSymbols.slice().sort().join(",") === "AAPL,NVDA,SLOW,STRAY")
         service.setOrder("manual")
-        service.removeSymbol("SLOW")
+        removeForGood("SLOW")
       })
       service.persist({ style: "smooth" })
       service.switchList("")

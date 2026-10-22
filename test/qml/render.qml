@@ -1313,6 +1313,10 @@ ShellRoot {
           stub.order = "pct"
           rows.cursorSymbol = member
           body.moveSelected(1)
+          if (body.note !== "Switch to manual order to move rows") {
+            console.error("FAIL fading refusal state contains the move refusal")
+            exitTimer.exitCode = 1
+          }
           body.noteShown = 0.5
         } else if (pose === "breadth") {
           one("breadthRule").still = true
