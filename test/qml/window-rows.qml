@@ -397,7 +397,8 @@ ShellRoot {
       app.testWindow.implicitHeight = body.chromeHeight + 3 * body.rowPitch
       app.open("{}")
       wait(200)
-      var ready = function() { return watchlist.dragSymbol === "" && !watchlist.settling && watchlist.displayedSymbols.every(function(symbol) { return !!watchlist.rowItem(symbol) }) }
+      // Coordinates for the next gesture belong to rows that have landed.
+      var ready = function() { return watchlist.dragSymbol === "" && !watchlist.settling && watchlist.displayedSymbols.every(function(symbol) { return watchlist.rowResting(symbol) }) }
       var reset = function(list, look) {
         service.persist({ style: look })
         service.switchList(list)

@@ -93,7 +93,7 @@ ShellRoot {
     stub.symbols = symbols.slice()
     stub.quotes = nextQuotes
     stub.entries = nextEntries
-    stub.shown = Settings.sortedSymbols(stub.symbols, stub.quotes, stub.order)
+    stub.shown = Settings.sortedSymbols(stub.symbols, stub.quotes, stub.order, stub.reversed)
     stub.featuredSymbol = symbols[0]
   }
 
@@ -112,6 +112,7 @@ ShellRoot {
     }
     stub.now = fixture.now
     stub.order = "manual"
+    stub.reversed = false
     stub.symbols = nextSymbols
     stub.quotes = nextQuotes
     stub.entries = nextEntries
@@ -165,7 +166,7 @@ ShellRoot {
       var before = { symbols: symbols, lists: [] }
       var next = symbols.filter(function(value) { return value !== symbol })
       symbols = next
-      shown = Settings.sortedSymbols(next, quotes, order)
+      shown = Settings.sortedSymbols(next, quotes, order, reversed)
       if (featuredSymbol === symbol) featuredSymbol = next[0] || ""
       lastRemoval = { symbol: symbol, before: before }
     }
@@ -178,10 +179,18 @@ ShellRoot {
         arriving = arriving.concat([upper])
       }
       symbols = next
-      shown = Settings.sortedSymbols(next, quotes, order)
+      shown = Settings.sortedSymbols(next, quotes, order, reversed)
     }
-    function setOrder(value) { order = value; lastSettings = { order: value } }
-    function reverseOrder() { reversed = !reversed; lastSettings = { reversed: reversed } }
+    function setOrder(value) {
+      order = value
+      shown = Settings.sortedSymbols(symbols, quotes, order, reversed)
+      lastSettings = { order: value }
+    }
+    function reverseOrder() {
+      reversed = !reversed
+      shown = Settings.sortedSymbols(symbols, quotes, order, reversed)
+      lastSettings = { reversed: reversed }
+    }
     property var memberships: []
     function setMembership(symbol, name, member) { memberships = memberships.concat([symbol + "|" + name + "|" + member]) }
     function switchList(name) {}
@@ -241,6 +250,31 @@ ShellRoot {
             body.featured.dayUp === null && body.animal.kind === "")
         })
         // The featured symbol is up while the list is net down.
+        root.setQuotes(["UP", "DOWN", "DEEP"], [110, 95, 90])
+
+        // The arrow changes the rows the reader sees, and an arriving quote
+        // keeps that direction. Three unequal gains make the order explicit.
+        var reversedRows = []
+        ;[false, true].forEach(function(retro) {
+          stub.retro = retro
+          stub.reversed = false
+          stub.setOrder("pct")
+          root.setQuotes(["UP", "DOWN", "DEEP"], [110, 95, 90])
+          mouseMove(body, 1, 1)
+          tryVerify(function() { return body.watchlist.displayedSymbols.join() === "UP,DOWN,DEEP" }, 2000)
+          var arrow = root.find(body, "orderArrow")
+          var at = arrow.mapToItem(body, arrow.width / 2, arrow.height / 2)
+          mouseClick(body, at.x, at.y)
+          mouseMove(body, 1, 1)
+          var reversed = within(2000, function() { return body.watchlist.displayedSymbols.join() === "DEEP,DOWN,UP" })
+          root.setQuotes(["UP", "DOWN", "DEEP"], [80, 95, 90])
+          var refreshed = within(2000, function() { return body.watchlist.displayedSymbols.join() === "UP,DEEP,DOWN" })
+          reversedRows.push(retro + ":" + reversed + "," + refreshed)
+        })
+        root.check("the order arrow reverses the visible rows and a quote refresh keeps that direction in both looks",
+          reversedRows.join("|") === "false:true,true|true:true,true", reversedRows.join("|"))
+        stub.reversed = false
+        stub.setOrder("pct")
         root.setQuotes(["UP", "DOWN", "DEEP"], [110, 95, 90])
 
         // The header's animal, in both looks: the featured day's, whatever
@@ -473,7 +507,7 @@ ShellRoot {
         var saysEmpty = emptyList.visible && body.watchlist.displayedSymbols.length === 0
         stub.listName = ""
         stub.symbols = allRows
-        stub.shown = Settings.sortedSymbols(allRows, stub.quotes, stub.order)
+        stub.shown = Settings.sortedSymbols(allRows, stub.quotes, stub.order, stub.reversed)
         wait(100)
         root.check("a list chosen elsewhere as the surface closes changes no row until the next open, which starts it from the top; an empty one says so only then",
           keptRows && otherList && quiet && saysEmpty,
@@ -542,7 +576,7 @@ ShellRoot {
         var addedRow = body.watchlist.rowItem("NEW")
         stub.quotes = Object.assign({}, stub.quotes, { NEW: root.quote("NEW", 200, 100) })
         stub.entries = Object.assign({}, stub.entries, { NEW: { status: "ok", receivedAt: stub.now } })
-        stub.shown = Settings.sortedSymbols(stub.symbols, stub.quotes, stub.order)
+        stub.shown = Settings.sortedSymbols(stub.symbols, stub.quotes, stub.order, stub.reversed)
         stub.arriving = []
         wait(100)
         var landedAt = body.watchlist.displayedSymbols.indexOf("NEW")
@@ -557,7 +591,7 @@ ShellRoot {
         body.watchlist.contentY = addedRow.y
         var userScroll = body.watchlist.contentY
         stub.quotes = Object.assign({}, stub.quotes)
-        stub.shown = Settings.sortedSymbols(stub.symbols, stub.quotes, stub.order)
+        stub.shown = Settings.sortedSymbols(stub.symbols, stub.quotes, stub.order, stub.reversed)
         wait(100)
         root.check("a quote refresh does not repeat add selection or scrolling",
           body.watchlist.cursorSymbol === "NEW"

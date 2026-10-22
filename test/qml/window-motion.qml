@@ -4,11 +4,10 @@ import Quickshell
 import Quickshell.Io
 import "plugin" as Stonks
 
-// The window's chart in motion, through the real App and Service with real
-// Qt keys and pointer: what a draw-in and a scrub repaint, replays, the day
-// and the hero, every change's draw-in judged on rendered frames, a joining
-// row's day line drawing in and a list switch's rows drawn at once, and a
-// closing surface holding still. HOME and curl are scratch fixtures.
+// The real App and Service with real keys and pointer. The actions chapter
+// keeps replay, selection and market-state outcomes in all.sh; charts and
+// rows judge rendered motion and positions in the maintainer's review kit.
+// HOME and curl are scratch.
 ShellRoot {
   id: harness
 
@@ -141,9 +140,8 @@ ShellRoot {
       wait(200)
     }
 
-    // The day's scrub and a new session, the hero's change as a target, and
-    // retro's bell in a draw-in.
-    function dayAndHero(body, watchlist, keys) {
+    // The day's scrub and a new session, and the hero's change as a target.
+    function dayActions(body, watchlist, keys) {
       var quotesBefore = service.testFeed.quotes
       service.setRange("1D")
       service.feature("AAPL")
@@ -223,7 +221,12 @@ ShellRoot {
       var targets = [clickChange("1W", "smooth"), clickChange("1M", "retro"), clickChange("1D", "smooth")].join(",")
       harness.check("the hero's change cycles the mode only on the day: not on 1W or 1M",
         targets === "false,false,true", targets)
+    }
 
+    // Retro's bell appears with the columns, judged only in the review kit.
+    function bellDrawIn(body) {
+      service.feature("AAPL")
+      service.setRange("1D")
       // Retro's bell draws in with the columns, never ahead of them: as the
       // window opens, and as the range comes back to the day. Found in the
       // transition audit (data 3): it stood from the draw-in's first frame.
@@ -1126,15 +1129,214 @@ ShellRoot {
         belowAt.join(",") + " / " + aboveAt.join(","))
     }
 
+    // The wheel moves the list below a held row, never the row away from
+    // its pointer. Observe every animation frame, including the glide's
+    // middle: the final drop order alone cannot catch a drifting picture.
+    function wheelKeepsLift(body, watchlist) {
+      var results = []
+      ;["smooth", "retro"].forEach(function(look) {
+        sixRows(body, "NVDA", "1D")
+        service.persist({ style: look })
+        app.close()
+        app.testWindow.implicitHeight = body.chromeHeight + 3 * body.rowPitch
+        app.open("{}")
+        waitForRendering(body)
+        tryVerify(function() { return !watchlist.settling && watchlist.displayedSymbols.every(function(s) { return watchlist.rowResting(s) }) }, 3000)
+        var up = look === "retro"
+        watchlist.contentY = up ? watchlist.contentHeight - watchlist.height : 0
+        var symbol = watchlist.displayedSymbols[up ? watchlist.displayedSymbols.length - 1 : 0]
+        var row = watchlist.rowItem(symbol)
+        var at = row.mapToItem(body, row.width / 2, row.height / 2)
+        var by = up ? -8 : 8
+        mousePress(body, at.x, at.y)
+        mouseMove(body, at.x, at.y + by / 2, -1, Qt.LeftButton)
+        mouseMove(body, at.x, at.y + by, -1, Qt.LeftButton)
+        tryVerify(function() { return watchlist.dragSymbol === symbol }, 2000)
+        var top = row.mapToItem(body, 0, 0).y
+        var scrollBefore = watchlist.contentY
+        var offsets = [0]
+        var scrolls = [scrollBefore]
+        var sample = function() {
+          offsets.push(row.mapToItem(body, 0, 0).y - top)
+          scrolls.push(watchlist.contentY)
+        }
+        var frames = Qt.createQmlObject('import QtQuick; FrameAnimation { running: true }', harness)
+        frames.triggered.connect(sample)
+        mouseWheel(body, at.x, at.y + by, 0, up ? 120 : -120, Qt.LeftButton)
+        tryVerify(function() { return !watchlist.settling }, 3000)
+        waitForRendering(watchlist)
+        sample()
+        frames.destroy()
+        var scrollAfter = watchlist.contentY
+        var inBetween = scrolls.some(function(y) { return y > Math.min(scrollBefore, scrollAfter) && y < Math.max(scrollBefore, scrollAfter) })
+        var kept = Math.abs(Math.abs(scrollAfter - scrollBefore) - watchlist.rowPitch) < 1
+          && inBetween && offsets.every(function(y) { return Math.abs(y) < 0.5 })
+        results.push(look + ":" + kept + " offsets=" + offsets.join(","))
+        mouseRelease(body, at.x, at.y + by)
+        tryVerify(function() { return watchlist.dragSymbol === "" && watchlist.rowResting(symbol) }, 3000)
+      })
+      harness.check("a lifted row stays under the pointer throughout a wheel glide, down in smooth and up in retro",
+        results.every(function(r) { return /:true offsets=/.test(r) }), results.join(" | "))
+    }
+
+    // The window's replay keys and clicks, with their displayed moments:
+    // these run in all.sh even when nobody runs the motion review kit.
+    function replayActions(body, keys) {
+      service.feature("AAPL")
+      app.testBody.selectRange("1Y")
+      tryVerify(function() {
+        return !service.testHistoryFeed.busy && service.histories["AAPL|1Y"]
+          && service.histories["AAPL|1Y"].status === "ok" && body.historyShown && !body.chartLoading
+      }, 10000)
+
+      keys.forceActiveFocus()
+      keyClick(Qt.Key_P, Qt.ControlModifier)
+      harness.check("Ctrl+P does not replay", !body.motion.replayRunning && body.scrubT === 0)
+
+      keys.forceActiveFocus()
+      keyClick(Qt.Key_P, Qt.AltModifier)
+      harness.check("Alt+P does not replay", !body.motion.replayRunning && body.scrubT === 0)
+
+      // A click on the header's animal replays the chart shown, in both looks.
+      ;["smooth", "retro"].forEach(function(look) {
+        service.persist({ style: look })
+        tryVerify(function() { return body.retro === (look === "retro") && body.animal.kind !== "" }, 2000)
+        mouseClick(body, 20, body.margins + 14, Qt.LeftButton)
+        // A replay owns a real historical moment, whatever the render rate.
+        harness.check(look + "'s animal click replays a historical range",
+          within(2000, function() { return body.motion.replayRunning && body.scrubT !== 0 }),
+          body.motion.replayRunning + "|" + body.scrubT)
+        body.resetInteraction()
+      })
+      service.persist({ style: "smooth" })
+      tryVerify(function() { return !body.retro }, 2000)
+
+      // A Shift-click on the chart does what a click does: back to now, with
+      // no replay.
+      var middle = [body.chartItem.width / 2, body.chartItem.height / 2]
+      mouseMove(body.chartItem, middle[0], middle[1])
+      wait(20)
+      var scrubbed = body.scrubT !== 0
+      mouseClick(body.chartItem, middle[0], middle[1], Qt.LeftButton, Qt.ShiftModifier)
+      wait(50)
+      harness.check("a Shift-click on the chart goes back to now, as a click does, and replays nothing",
+        scrubbed && body.scrubT === 0 && !body.motion.replayRunning,
+        scrubbed + "|" + body.scrubT + "|" + body.motion.replayRunning)
+      body.resetInteraction()
+
+      keys.forceActiveFocus()
+      keyClick(Qt.Key_P)
+      harness.check("P replays a historical range",
+        within(2000, function() { return body.motion.replayRunning && body.scrubT !== 0 }),
+        body.motion.replayRunning + "|" + body.scrubT)
+      // Hold the real replay at its moment, so this judges who owns the
+      // scrub, independent of how much time a pointer command takes.
+      body.motion.testReplay.pause()
+      var replayT = body.scrubT
+      mouseMove(body.chartItem, body.chartItem.width * 3 / 4, body.chartItem.height / 2)
+      harness.check("range replay suppresses hover scrubbing",
+        body.motion.replayRunning && body.scrubT === replayT, replayT + " -> " + body.scrubT)
+      keys.forceActiveFocus()
+      keyClick(Qt.Key_Escape)
+      wait(20)
+      harness.check("Escape stops range replay before closing the window",
+        app.testWindow.visible && !body.motion.replayRunning && body.scrubT === 0)
+
+      app.open("{}")
+      keys.forceActiveFocus()
+      keyClick(Qt.Key_P)
+      var started = within(2000, function() { return body.motion.replayRunning && body.scrubT !== 0 })
+      var other = body.watchlist.displayedSymbols.findIndex(function(s) { return s !== service.featuredSymbol })
+      var target = body.watchlist.displayedSymbols[other]
+      keyClick(Qt.Key_1 + other)
+      var ended = !body.motion.replayRunning && body.scrubT === 0
+      harness.check("featuring a row during a replay ends that replay and its scrub",
+        started && ended && service.featuredSymbol === target && within(5000, function() { return body.chartSymbol === target && !body.chartLoading }))
+    }
+
+    // The sleep state is part of what the animal says. Its eye-close and
+    // first-frame appearance are separate judgments in sleepFrames.
+    function sleepStates(body) {
+      service.setRange("1D")
+      service.feature("DOWN")
+      tryVerify(function() { return body.chartSymbol === "DOWN" && !body.chartLoading }, 5000)
+      var close = service.quotes.DOWN.session.post.end
+      var wake = close + 2 * 86400
+      service.testClockHeld = true
+      var bells = []
+      ;["smooth", "retro"].forEach(function(look) {
+        service.persist({ style: look })
+        service.now = close - 60
+        var awake = within(2000, function() { return !body.animal.asleep })
+        service.now = close + 2
+        var closed = within(2000, function() { return body.animal.asleep })
+        service.now = wake - 60
+        var asleep = within(2000, function() { return body.animal.asleep })
+        service.now = wake + 2
+        var opened = within(2000, function() { return !body.animal.asleep })
+        bells.push(look + ":" + [awake, closed, asleep, opened].join(","))
+      })
+      harness.check("the clock closes and wakes the animal with its market in both looks",
+        bells.join("|") === "smooth:true,true,true,true|retro:true,true,true,true", bells.join("|"))
+      service.persist({ style: "smooth" })
+      service.now = close + 2
+      var below = body.featuredDay.points.filter(function(p) { return p.p < body.featuredDay.prevClose })
+      body.motion.scrubT = below[below.length - 1].t
+      var scrubAwake = within(2000, function() { return !body.animal.asleep && body.animal.kind === "bear" })
+      body.motion.clearScrub()
+      harness.check("letting go of a scrub after the close puts the animal back to sleep",
+        scrubAwake && within(2000, function() { return body.animal.asleep }))
+
+      service.now = close
+      lateDown.running = true
+      tryVerify(function() { return !lateDown.running }, 2000)
+      service.addSymbol("LATE")
+      tryVerify(function() { return service.arriving.indexOf("LATE") < 0 }, 15000)
+      service.feature("LATE")
+      tryVerify(function() { return body.chartSymbol === "LATE" && !body.featuredQuote && body.animal.kind === "" }, 5000)
+      lateUp.running = true
+      tryVerify(function() { return !lateUp.running }, 2000)
+      service.now = close + 15
+      service.refresh()
+      tryVerify(function() { return !!body.featuredQuote }, 8000)
+      harness.check("a first quote landing on a retry after the close shows its animal asleep",
+        body.animal.kind !== "" && body.animal.asleep)
+
+      service.feature("DOWN")
+      tryVerify(function() { return body.chartSymbol === "DOWN" && !body.chartLoading }, 5000)
+      service.now = close - 60
+      tryVerify(function() { return !body.animal.asleep }, 2000)
+      app.close()
+      service.now = close
+      app.open("{}")
+      harness.check("opening after the market closed shows its animal asleep",
+        within(2000, function() { return body.animal.asleep }))
+      service.testClockHeld = false
+    }
+
     function test_flows() {
       tryVerify(function() {
         return service.quotes.AAPL && service.quotes.MSFT && service.quotes.NVDA
           && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0
       }, 10000)
+      if (Quickshell.env("STONKS_MOTION_FLOW") === "actions") {
+        app.open("{}")
+        tryVerify(function() { return !!app.testBody }, 3000)
+        var body = app.testBody
+        var keys = app.testKeyCatcher
+        replayActions(body, keys)
+        sixRows(body, "MSFT", "1D")
+        dayActions(body, body.watchlist, keys)
+        sleepStates(body)
+        app.close()
+        harness.finish()
+        return
+      }
       if (Quickshell.env("STONKS_MOTION_FLOW") === "rows") {
         app.open("{}")
         tryVerify(function() { return !!app.testBody }, 3000)
         rowPlaces(app.testBody, app.testBody.watchlist, app.testKeyCatcher)
+        wheelKeepsLift(app.testBody, app.testBody.watchlist)
         app.close()
         harness.finish()
         return
@@ -1207,70 +1409,9 @@ ShellRoot {
       var watchlist = body.watchlist
       var keys = app.testKeyCatcher
 
-      service.feature("AAPL")
-      app.testBody.selectRange("1Y")
-      tryVerify(function() {
-        return !service.testHistoryFeed.busy && service.histories["AAPL|1Y"]
-          && service.histories["AAPL|1Y"].status === "ok" && body.historyShown && body.motion.reveal === 1
-      }, 10000)
-
-      keys.forceActiveFocus()
-      keyClick(Qt.Key_P, Qt.ControlModifier)
-      wait(20)
-      harness.check("Ctrl+P does not replay", !body.motion.replayRunning && body.motion.reveal === 1)
-
-      keys.forceActiveFocus()
-      keyClick(Qt.Key_P, Qt.AltModifier)
-      wait(20)
-      harness.check("Alt+P does not replay", !body.motion.replayRunning && body.motion.reveal === 1)
-
-      // A click on the header's animal replays the chart shown, in both looks.
-      ;["smooth", "retro"].forEach(function(look) {
-        service.persist({ style: look })
-        tryVerify(function() { return body.retro === (look === "retro") && body.animal.kind !== "" }, 2000)
-        mouseClick(body, 20, body.margins + 14, Qt.LeftButton)
-        // Drawn part way once the replay's first frame lands, however late.
-        harness.check(look + "'s animal click replays a historical range",
-          within(2000, function() { return body.motion.replayRunning && body.motion.drawn < 1 }),
-          body.motion.replayRunning + "|" + body.motion.drawn)
-        body.resetInteraction()
-      })
-      service.persist({ style: "smooth" })
-      tryVerify(function() { return !body.retro }, 2000)
-
-      // A Shift-click on the chart does what a click does: back to now, with
-      // no replay.
-      var middle = [body.chartItem.width / 2, body.chartItem.height / 2]
-      mouseMove(body.chartItem, middle[0], middle[1])
-      wait(20)
-      var scrubbed = body.scrubT !== 0
-      mouseClick(body.chartItem, middle[0], middle[1], Qt.LeftButton, Qt.ShiftModifier)
-      wait(50)
-      harness.check("a Shift-click on the chart goes back to now, as a click does, and replays nothing",
-        scrubbed && body.scrubT === 0 && !body.motion.replayRunning,
-        scrubbed + "|" + body.scrubT + "|" + body.motion.replayRunning)
-      body.resetInteraction()
-
-      keys.forceActiveFocus()
-      keyClick(Qt.Key_P)
-      harness.check("P replays a historical range",
-        within(2000, function() { return body.motion.replayRunning && body.motion.drawn < 1 }),
-        body.motion.replayRunning + "|" + body.motion.drawn)
-      mouseMove(body.chartItem, body.chartItem.width / 4, body.chartItem.height / 2)
-      wait(20)
-      // The replay drives the scrub itself, near its start here; the pointer
-      // a quarter of the way in must not take it.
-      harness.check("range replay suppresses hover scrubbing",
-        body.motion.replayRunning && body.scrubX >= 0 && body.scrubX < 0.2, body.scrubX)
-      keys.forceActiveFocus()
-      keyClick(Qt.Key_Escape)
-      wait(20)
-      harness.check("Escape stops range replay before closing the window",
-        app.testWindow.visible && !body.motion.replayRunning && body.scrubT === 0 && body.motion.drawn === 1)
-
       sixRows(body, "MSFT", "1D")
 
-      dayAndHero(body, watchlist, keys)
+      bellDrawIn(body)
       motionEnds(body, watchlist, keys)
       drawInFrames(body, keys)
       joinFrames(body, watchlist, keys)

@@ -576,7 +576,7 @@ ShellRoot {
       var rangeSelected = body.chartSymbol === "AAPL" && body.chartRange === "1Y"
       app.open(JSON.stringify({ symbol: "MSFT", range: "1D" }))
       harness.check("a summon selects its symbol and shared range in either direction",
-        rangeSelected && body.chartSymbol === "MSFT" && service.range === "1D")
+        rangeSelected && body.chartSymbol === "MSFT" && body.chartRange === "1D" && service.range === "1D")
       service.setRange("1D")
       service.feature("MSFT")
 

@@ -224,8 +224,8 @@ every release bumps it.
    `test/qml/readme.sh` in that commit.
 3. Run `test/review.sh --fresh` on the release commit, with
    `STONKS_RENDER_BASE` set to the last release's tag so its render diff
-   shows every picture the release moved: the renders, layout, popup
-   motion, the long list, and the README pictures run only there.
+   shows every picture the release moved: the renders, layout, motion,
+   the long list, and the README pictures run only there.
    `--fresh` draws every picture rather than reuse a set an earlier run
    kept, since this run has to catch a change from outside the repo. Its
    last line must be `ALL PASS`.

@@ -14,8 +14,8 @@
 # - The README's pictures, into a scratch folder, so test/qml/readme.sh
 #   still works when a release renders them for real.
 # - Nothing jumps: positions across looks, symbols, and ranges.
-# - Popup motion, judged on rendered frames (test/qml/frames.js), never on
-#   the property behind it.
+# - Window and popup motion, judged on rendered frames (test/qml/frames.js),
+#   never on the property behind it.
 # - The long list: a power user's day on a slow network, on wall-clock
 #   budgets.
 # - The tophat's guards, without a screen. Try a visible change in a nested
@@ -156,6 +156,7 @@ if [ -n "$draw_base" ]; then
   fi
 fi
 start "long list harness" bash test/qml/long-list.sh
+start "window motion harness" bash test/qml/window-motion.sh
 start "README pictures, into a scratch folder" env STONKS_README_OUT="$logs/readme" bash test/qml/readme.sh
 start "popup motion harness" bash test/qml/popup-motion.sh
 start "tophat guards (no screen)" bash test/tophat.sh self-check

@@ -30,7 +30,7 @@ validate_clone() {
 start "pointer harness" bash test/qml/pointer.sh
 start "shared range harness" bash test/qml/range.sh
 start "window search harness" bash test/qml/window-search.sh
-start "window motion harness" bash test/qml/window-motion.sh
+start "window replay and change actions harness" env STONKS_MOTION_FLOW=actions bash test/qml/window-motion.sh
 start "window adds harness" bash test/qml/window-adds.sh
 start "named watchlists harness" bash test/qml/lists.sh
 start "fetch policy harness" bash test/qml/fetch.sh
