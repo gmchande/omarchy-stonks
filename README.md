@@ -103,7 +103,8 @@ lists". In All, where removing takes a symbol out of every list, the × and
 
 To bring back what you removed, press `u`, or click "+ Add a symbol": the
 symbol is the first result, with PUT BACK, which puts it back in its lists
-at its old place.
+at its old place. It comes back with the price it had, and Stonks asks for
+a new one at once.
 
 The line beside the list's name shows how many rows are up, in green, and
 down, in red. Click the order word to sort by symbol, name, or change, and

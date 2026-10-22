@@ -1423,14 +1423,13 @@ ShellRoot {
       wait(50)
 
       // A removal that moves the hero draws its chart in, as any change of
-      // the chart does, and undo brings the symbol back as it was, quote and
-      // all: no fetch, and the hero on its chart at once, drawing in. Found
+      // the chart does, and undo brings the symbol back as it was, its quote
+      // shown at once, and the hero on its chart at once, drawing in. Found
       // in motion pass 3: the hero swapped in one frame, and undo showed "No
       // quote" until a refetch landed.
       tryVerify(function() { return !!service.quotes.AAPL && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 3000)
       service.feature("AAPL")
       wait(500)
-      var aaplCalls = harness.calls("AAPL")
       keys.forceActiveFocus()
       wl.cursorSymbol = "AAPL"
       keyClick(Qt.Key_X)
@@ -1439,10 +1438,9 @@ ShellRoot {
       keyClick(Qt.Key_U)
       var undone = [service.featuredSymbol, !!body2.featuredQuote, body2.motion.reveal < 1]
       wait(400)
-      harness.check("a removal that moves the hero draws it in, and undo draws it back with its quote and no fetch",
-        removal.join("|") === "NVDA|true" && undone.join("|") === "AAPL|true|true"
-          && harness.calls("AAPL") === aaplCalls,
-        removal.join("|") + " / " + undone.join("|") + " / calls " + aaplCalls + " -> " + harness.calls("AAPL"))
+      harness.check("a removal that moves the hero draws it in, and undo draws it back with its quote at once",
+        removal.join("|") === "NVDA|true" && undone.join("|") === "AAPL|true|true",
+        removal.join("|") + " / " + undone.join("|"))
 
       // The rule under the list name is the list's breadth: the rows' own
       // ups, flats, and downs, counted. DOWN answers a day that fell, FLAT

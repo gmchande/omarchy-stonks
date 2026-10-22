@@ -1137,13 +1137,16 @@ Item {
     root.lastRemoval = { symbol: symbol, before: before, left: root.dataSettings.featured, quote: quote, entry: entry }
   }
 
-  // The last removal, put back where it was. Only once.
+  // The last removal, put back where it was. Only once. Its quote is asked
+  // for at once, as an add's is, not at its next refresh on the schedule:
+  // the quote it had shows until the new one lands. The owner, 22 October.
   function undoRemoval(symbol) {
     if (!root.lastRemoval || root.lastRemoval.symbol !== symbol) return
     var removal = root.lastRemoval
     root.lastRemoval = null
     if (removal.quote) feed.restore(symbol, removal.quote, removal.entry)
     root.save(Settings.withRemovalUndone(root.dataSettings, removal.before, symbol, removal.left))
+    feed.ask([symbol], root.wallSecond())
   }
 
   // A hand-arranged order of the rows. Members still arriving keep their

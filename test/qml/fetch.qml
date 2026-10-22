@@ -686,17 +686,11 @@ ShellRoot {
         900, counts([15, 3, 3, 1, 15, 1, 1, 2]), openAfter)
 
       // An add's first answer goes in a run of its own, ahead of any
-      // refresh; a removal and its undo fetch nothing.
+      // refresh.
       runsBefore = harness.runs().length
       service.addSymbol("MSFT")
       tryVerify(function() { return !!service.quotes.MSFT && idle() }, 5000)
       harness.check("an add's first answer goes at once, in a run of its own", harness.runs()[runsBefore] === "chart:MSFT", harness.runs().slice(runsBefore).join(" / "))
-      var undoFrom = harness.requests().length
-      service.removeSymbol("KILN")
-      service.undoRemoval("KILN")
-      settle()
-      harness.check("a removal and its undo fetch nothing", harness.quoteCounts(harness.requests().slice(undoFrom)).KILN === 0 && !!service.quotes.KILN,
-        harness.requests().slice(undoFrom).join(", "))
       service.removeSymbol("MSFT")
 
       // A search's preview outside All: its quote once, as the choice rests,
