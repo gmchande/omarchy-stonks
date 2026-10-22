@@ -396,6 +396,19 @@ ShellRoot {
         harness.listed.every(function(s) { return cache[s] && cache[s].quote.marketTime === service.quotes[s].marketTime }),
         Object.keys(cache).join(","))
 
+      // A removal taken back with the next write due: the file holds the
+      // symbol again. Written as its quote came back, before All took it
+      // back, the file left it out, and an unchanged price never put it in.
+      service.removeSymbol("KILN")
+      tick(21 * 60, 60)
+      var since = service.now - service.quotesSavedAt
+      service.undoRemoval("KILN")
+      for (var w = 0; w < 50 && !harness.cached().KILN; w++) wait(20)
+      cache = harness.cached()
+      harness.check("a removal taken back with a write due is saved again for the next start",
+        service.library.indexOf("KILN") >= 0 && !!cache.KILN,
+        since + " s since the last write | " + Object.keys(cache).join(","))
+
       // 11:00, the regular session: the rows stay warm with nothing open.
       countsOver("11:00, nothing open: every stock, ETF, and index in its session every minute; the crypto and Tokyo not at all",
         900, counts([15, 15, 15, 15, 0, 15, 0, 15]), startAt(at(harness.wed7, 11, 0)))

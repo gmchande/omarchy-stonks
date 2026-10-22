@@ -340,6 +340,17 @@ ShellRoot {
       harness.check("with the surface open on Friday night and Saturday, Robinhood is not asked again",
         harness.record("OVERNIGHT.calls") === calls, calls + " then " + harness.record("OVERNIGHT.calls"))
 
+      // r asks Robinhood again for the chart on show alone: no row draws
+      // its prints. It asked for every listing Robinhood trades all day.
+      service.now = harness.saturday + 40 * 60
+      app.testKeyCatcher.forceActiveFocus()
+      keyClick(Qt.Key_R)
+      var rAsked = within(2000, function() { return Number(harness.record("OVERNIGHT.calls")) === Number(calls) + 1 })
+      var rListings = harness.record("OVERNIGHT.asked").split("\n").filter(function(l) { return l !== "" }).pop()
+      harness.check("r asks Robinhood for the chart on show alone, never the rows",
+        rAsked && body.chartSymbol === "NEST" && rListings === "NEST", harness.record("OVERNIGHT.calls") + " calls, the last for " + rListings)
+      calls = harness.record("OVERNIGHT.calls")
+
       // Sunday 22:30, the week's first night, Yahoo's day still Friday's:
       // the open surface asks again by itself, and five minutes on, again.
       useSet("sunday")
@@ -1042,9 +1053,9 @@ ShellRoot {
         [asked, keptFresh, printsGone, allDayKept, allDayGone].join(","))
 
       // 80 US stocks Robinhood trades all day, added with the window open:
-      // their prints come in requests of at most 75, Robinhood's limit, and
-      // every one's night is drawn. Robinhood answered 400 to all 80 in one
-      // request, and no overnight price ever showed.
+      // their prints come in requests of at most 25, a third of Robinhood's
+      // limit, and every one's night is drawn. Robinhood answered 400 to all
+      // 80 in one request, and no overnight price ever showed.
       useSet("2026-10-07-0100")
       var longs = []
       for (var n = 1; n <= 80; n++) longs.push("LONG" + (n < 10 ? "0" : "") + n)
@@ -1060,17 +1071,17 @@ ShellRoot {
       featureShown("LONG80")
       var drawn = body.featuredGeometry.start === harness.midnight.wed7
         && body.featuredDay.points.some(function(p) { return p.t < harness.midnight.wed7 + 4 * 3600 })
-      harness.check("80 all-day listings: their prints in requests of at most 75, each asked once, and every one's night drawn",
-        nights && requests.every(function(r) { return r.length <= 75 }) && each.length === 80 && drawn,
+      harness.check("80 all-day listings: their prints in requests of at most 25, each asked once, and every one's night drawn",
+        nights && requests.every(function(r) { return r.length <= 25 }) && each.length === 80 && drawn,
         "requests of " + requests.map(function(r) { return r.length }).join(", ") + "; " + each.length + " asked once; nights "
           + nights + "; LONG80 drawn " + drawn)
 
       // Thursday 23:00, a trading night, Robinhood refusing: the night's
-      // refresh of the list's prints, two requests now, meets a 429 and
+      // refresh of the list's prints, four requests now, meets a 429 and
       // pauses Robinhood. Five minutes on, the pause's first probe lets one
-      // request of the two go; its answer reopens Robinhood, and the rest of
-      // the list goes at once. One ask stood for the whole list, so the rest
-      // used to wait another five minutes.
+      // request go alone; its answer reopens Robinhood, and the rest of the
+      // list goes at once. One ask stood for the whole list, so the rest used
+      // to wait another five minutes.
       var thursdayNight = harness.midnight.thu8 + 23 * 3600
       runCommand(["touch", harness.state + "/ROBINHOOD.refuse"])
       service.now = thursdayNight
@@ -1082,8 +1093,8 @@ ShellRoot {
         return longs.every(function(s) { return prints.entries[s].status === "ok" && prints.entries[s].at > thursdayNight })
       })
       var afterProbe = harness.record("OVERNIGHT.asked").split("\n").slice(probedFrom).map(function(line) { return line.split(",").length })
-      harness.check("a trading night, Robinhood back after a refusal: its first probe lets one request of two go, and the rest goes once that reopens it",
-        refused && caughtUp && afterProbe.length === 2 && afterProbe[0] === 75,
+      harness.check("a trading night, Robinhood back after a refusal: its first probe lets one request go alone, and the rest goes once that reopens it",
+        refused && caughtUp && afterProbe.length > 2 && afterProbe[0] === 25,
         "refused " + refused + "; requests after the pause of " + afterProbe.join(", ") + "; every night refreshed " + caughtUp)
 
       // Wednesday 21 October, 10:06: VANE, a thin NYSE stock, printed 26

@@ -431,7 +431,11 @@ Item {
     id: yahooGate
     host: "Yahoo"
     clock: root
-    onReopened: root.showHistory(false)
+    // Yahoo answering again says the network is back.
+    onReopened: {
+      root.showHistory(false)
+      releaseFeed.askAgain()
+    }
   }
   // Robinhood is asked for its prints and its instruments once a session
   // for the pill's symbol, as a surface opens, as US listings are added,
@@ -528,11 +532,11 @@ Item {
   readonly property alias mainNamedAt: releaseFeed.namedAt
 
   // A user's refresh, from a key, the pill, or IPC: every watched quote
-  // whose last answer is more than 10 s old, and, with a surface open to
-  // show them, the overnight prints unless asked for in the last 10 s, so a
-  // second press adds nothing; and the chart's history fresh whatever the
-  // cache holds. While every screen is off the quotes wait their turn, and
-  // the rest is owed (`refreshOwed`) until a screen is on.
+  // whose last answer is more than 10 s old, and the overnight prints of
+  // the charts on show, unless asked for in the last 10 s, so a second
+  // press adds nothing; and the chart's history fresh whatever the cache
+  // holds. While every screen is off the quotes wait their turn, and the
+  // rest is owed (`refreshOwed`) until a screen is on.
   property bool refreshOwed: false
   function refresh() {
     if (!root.pluginsReady) return
@@ -547,11 +551,14 @@ Item {
     }
     root.refreshRest()
   }
+  // Rows never draw Robinhood's prints, only a chart does: asked for every
+  // row Robinhood trades all day, `r` sent 150 listings, two answers of
+  // 4 MB each, at any hour.
   function refreshRest() {
     var now = root.wallSecond()
     root.showHistory(true)
-    if (root.openSurfaces.length > 0 && now - overnightFeed.askedAt > 10)
-      overnightFeed.fetch(root.allDaySymbols, now)
+    var charts = root.chartsOnShow().filter(function(s) { return root.allDaySymbols.indexOf(s) >= 0 })
+    if (charts.length > 0 && now - overnightFeed.askedAt > 10) overnightFeed.fetch(charts, now)
   }
 
   // The history the open surfaces' heroes show on the shared range: the
@@ -615,18 +622,23 @@ Item {
     })
   }
 
-  // The symbols whose history the open surfaces' heroes show: the featured
-  // symbol's, which an add from search still on its way already is
-  // (`addSymbol`), so the fetch its preview has out goes on as the hero's;
-  // and a resting preview's.
-  function historyCharts() {
-    if (root.openSurfaces.length === 0 || root.view.range === "1D") return []
+  // The symbols the open surfaces' heroes chart: the featured symbol, which
+  // an add from search still on its way already is (`addSymbol`), so the
+  // fetch its preview has out goes on as the hero's; and a resting
+  // preview.
+  function chartsOnShow() {
+    if (root.openSurfaces.length === 0) return []
     var charts = []
     if (root.previewSymbol === "" || root.openSurfaces.some(function(s) { return s !== root.previewSurface }))
       charts.push(root.view.featured)
     if (root.previewSymbol !== "" && root.previewShown && charts.indexOf(root.previewSymbol) < 0)
       charts.push(root.previewSymbol)
     return charts.filter(function(s) { return s !== "" })
+  }
+
+  // Those whose history they show: none on the day.
+  function historyCharts() {
+    return root.view.range === "1D" ? [] : root.chartsOnShow()
   }
 
   // Those of them with no answer yet, ok or failed.
@@ -796,18 +808,24 @@ Item {
     if (Fundamentals.hasFundamentals(quote)) fundamentalsFeed.fetch(normalized)
   }
 
+  // A quote that changed, by an answer, a restore, or a symbol leaving,
+  // leaves the saved quotes behind (`flushQuotes`), written once the turn
+  // is over: an undo restores the quote before All takes the symbol back,
+  // and a write between the two left it out of the file.
   onQuotesChanged: {
     if (pendingFundamentals) fetchFundamentals(pendingFundamentals)
     settleArrivals()
+    root.quotesUnsaved = true
+    Qt.callLater(flushQuotes)
   }
   // Every run's answers land in the entries, after their quotes, whether or
-  // not a quote changed: the last good quotes are saved from there. Then,
-  // once the run has left the feed's asks, the clock catches up to the
-  // answers' own second and the next ask falls due from them; and the pill's
-  // first live answer asks Robinhood for it (`askOvernight`).
+  // not a quote changed. Then, once the run has left the feed's asks, the
+  // clock catches up to the answers' own second and the next ask falls due
+  // from them; and the pill's first live answer asks Robinhood for it
+  // (`askOvernight`).
   onEntriesChanged: {
     settleArrivals()
-    if (Object.keys(feed.entries).some(function(s) { return feed.entries[s].status === "ok" })) saveQuotes()
+    Qt.callLater(flushQuotes)
     Qt.callLater(answersLanded)
   }
   function answersLanded() {
@@ -884,6 +902,8 @@ Item {
     if (!root.pluginsReady) {
       root.pluginsReady = true
       feed.seed(root.parseSavedQuotes())
+      // What the seed put in is what the file holds.
+      root.quotesUnsaved = false
       root.askDue()
     }
   }
@@ -907,17 +927,18 @@ Item {
     }
   }
 
-  // Written as answers come, at most every 10 minutes on the service's
-  // clock: at once, then, if more came meanwhile, as the wait ends.
+  // Written once a quote has changed, at most every 10 minutes on the
+  // service's clock: at once, then, if more changed meanwhile, as the wait
+  // ends; and only once an answer has come, so quotes kept from an earlier
+  // session are never written back as they are. Marked by every answer, it
+  // was rewritten whole every 10 minutes around the clock, a weekend's
+  // unmoving prices too.
   property bool quotesUnsaved: false
   property int quotesSavedAt: 0
-  function saveQuotes() {
-    root.quotesUnsaved = true
-    root.flushQuotes()
-  }
 
   function flushQuotes() {
     if (!root.quotesUnsaved || (root.quotesSavedAt && root.now - root.quotesSavedAt < 10 * 60)) return
+    if (!Object.keys(feed.entries).some(function(s) { return feed.entries[s].status === "ok" })) return
     root.quotesUnsaved = false
     root.quotesSavedAt = root.now
     var saved = {}
