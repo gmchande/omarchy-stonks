@@ -808,22 +808,28 @@ ShellRoot {
       // next open from the US calendar. ^GSPC at 06:00 said "PRE-MARKET ·
       // OPENS IN 3H 30M"; at 01:00, Tuesday's line ran flat to 17:20 and
       // the header named no open.
+      // Both saved index answers carry Tuesday's bars. Their receipt,
+      // rather than their identical session, pins which moment landed.
       var indexRead = function() {
         var shown = featureShown("^GSPC")
         // A manual refresh names the request until its answer lands. Read
         // the market's words after that, without waiting for an animation.
-        var settled = within(8000, function() { return !service.refreshing })
+        var settled = within(8000, function() {
+          var quote = service.quotes["^GSPC"]
+          var entry = service.entries["^GSPC"]
+          return !service.refreshing && quote && quote.session.regular.start === 1791293400
+            && entry && entry.status === "ok" && entry.answeredAt === service.now && !service.owed["^GSPC"]
+        })
         var quote = service.quotes["^GSPC"]
         var last = quote.points[quote.points.length - 1]
         return { ready: shown && settled,
           text: body.headerText + " | last print " + (last.t < quote.session.regular.end ? "in session" : "after the close") }
       }
       service.refresh()
-      within(8000, function() { return !!service.quotes["^GSPC"] && service.quotes["^GSPC"].session.regular.start === 1791293400 })
       var indexNight = indexRead()
       featureShown("NEST")
       // 06:00, pre-market: Yahoo's day is Wednesday's, the same close.
-      useSet("2026-10-07-0600")
+      useSet("2026-10-07-0600 listings-2026-10-07-0600")
       service.now = 1791367200
       service.refresh()
       within(8000, function() { return body.featuredQuote.session.regular.start === 1791379800 && !body.chartLoading })
