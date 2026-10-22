@@ -387,9 +387,10 @@ laptop_alone_preflight() {
   echo "$ws"
 }
 
-# take_laptop WS: note the laptop's workspace WS and the pointer, and show
-# workspace 10 on the laptop. add_virtual finishes the switch once the
-# session is launched. restore_screens undoes any part of either.
+# take_laptop WS: note the laptop's workspace WS and the pointer, show
+# workspace 10 on the laptop, and save the scene the watcher compares while
+# the session launches. add_virtual finishes the switch then.
+# restore_screens undoes any part of either.
 take_laptop() {
   local pointer
   pointer=$(host_pointer) && [ -n "$pointer" ] || { echo "tophat: cannot read the host's pointer" >&2; return 1; }
@@ -397,17 +398,23 @@ take_laptop() {
   echo "noted: the laptop shows workspace $1, the pointer is at $pointer"
   { laptop_shows 10 || host_dispatch 'hl.dsp.focus({ workspace = "10" })'; } && within 5 laptop_shows 10 \
     || { echo "tophat: the laptop does not show workspace 10" >&2; return 1; }
+  save_scene
 }
 
-# add_virtual: add the virtual screen and focus it, then save the scene the
-# watcher compares.
+# add_virtual: add the virtual screen and focus it, then save the scene
+# again. The watcher compares none while this changes it.
 add_virtual() {
+  rm -f "$run/scene"
   echo "output create: $(hyprctl output create headless "$virtual" 2>&1)" >> "$run/outputs.log"
   within 5 screen_on "$virtual" || { echo "tophat: the virtual screen $virtual did not appear" >&2; return 1; }
   host_dispatch "hl.dsp.focus({ monitor = \"$virtual\" })" && within 5 focused_on "$virtual" \
     || { echo "tophat: the focus did not move to $virtual" >&2; return 1; }
-  scene > "$run/scene.new" && mv "$run/scene.new" "$run/scene" || { echo "tophat: cannot read the host's screens" >&2; return 1; }
+  save_scene
   echo "switched: the laptop shows workspace 10, the focus is on $virtual"
+}
+
+save_scene() {
+  scene > "$run/scene.new" && mv "$run/scene.new" "$run/scene" || { echo "tophat: cannot read the host's screens" >&2; return 1; }
 }
 
 # restore_screens: undo whatever part of the switch happened, and check it.
@@ -474,8 +481,13 @@ gone() {
 }
 
 # record_why WHY: why the run ended, in its folder, for a caller who cut the
-# output. The first reason stays: the start the watcher stops fails too.
-record_why() { ( set -C; echo "$1" > "$run/why" ) 2> /dev/null; }
+# output. The first reason stays: the start the watcher stops fails too. A
+# link, so the file appears whole or not at all.
+record_why() {
+  local mine=$run/why.$BASHPID
+  echo "$1" > "$mine" && ln "$mine" "$run/why" 2> /dev/null
+  rm -f "$mine"
+}
 
 # _watch RUN: from before the switch until the run ends, it ends the run,
 # which puts the screens back, once the session locks (a lid close locks it:
@@ -493,13 +505,14 @@ watch_run() {
   local why now saved pid start
   while sleep 0.5; do
     [ -f "$run/stop.status" ] && exit 0
-    # Read once: the switch may save it between two reads.
+    # Read once: the switch may save it between two reads. A change seen
+    # while the switch replaces it is the switch's own: the file differs then.
     saved=$(cat "$run/scene" 2> /dev/null)
     if ! unlocked 2> /dev/null; then
       why="the session locked"
     elif [ -n "$saved" ] && ! now=$(scene); then
       why="the host's screens could not be read"
-    elif [ -n "$saved" ] && [ "$now" != "$saved" ]; then
+    elif [ -n "$saved" ] && [ "$now" != "$saved" ] && [ "$(cat "$run/scene" 2> /dev/null)" = "$saved" ]; then
       why="the desktop changed: $(diff <(echo "$saved") - <<< "$now" | sed -n 's/^< /was /p; s/^> /now /p' | paste -sd ';' - | sed 's/;/; /g')"
     elif [ -s "$run/leader" ] && read -r pid start < "$run/leader" && ! leader_is "$pid" "$start"; then
       why="the session's launcher has gone"
@@ -704,8 +717,12 @@ cmd_start() {
   printf 'HYPR_PID=%q\nSIG=%q\nWAYLAND=%q\n' "$HYPR_PID" "$SIG" "$WAYLAND" >> "$run/identity"
   source "$run/identity"
   # Hyprland writes the lock file find_instance reads only once its backend
-  # has started, so by now it has asked the host for its window.
-  if (( take )); then add_virtual || start_failed "the virtual screen was not added and focused"; fi
+  # has started, so by now it has asked the host for its window. A hand on
+  # the machine since the watcher last looked ends the run here.
+  if (( take )); then
+    [ "$(scene)" = "$(cat "$run/scene")" ] || start_failed "the desktop changed while the session launched"
+    add_virtual || start_failed "the virtual screen was not added and focused"
+  fi
   within 15 parent_window > /dev/null || start_failed "the session's window is not alone, unfocused, and shown on $laptop's workspace $ws: $(hyprctl -j clients \
     | jq -c --argjson pid "$HYPR_PID" --argjson ws "$ws" '{mine: [.[] | select(.pid == $pid) | {ws: .workspace.id, monitor, mapped, hidden, focusHistoryID}],
       windows_on_ws: [.[] | select(.workspace.id == $ws)] | length}')"
@@ -1287,6 +1304,18 @@ EOF
   watched "the lid closed, which locks" host_change '.monitors[].solitaryBlockedBy = ["LOCK"]'
   watched "the session's launcher gone" leader_gone
   watched "a stop killed before it finished" stop_killed
+  # A touch while the session launches, before the virtual screen: the half
+  # switch is watched too.
+  run=$tmp/base/launching
+  mkdir -p "$run"
+  printf 'RUN_ID=launching\nCHECKOUT=%q\nSTART_EPOCH=%q\n' "$checkout" "$(date +%s)" > "$run/identity"
+  host_is
+  take_laptop 2 > /dev/null 2>&1 || miss "launching: the switch failed"
+  start_watch || miss "launching: the watcher never started"
+  host_change '.cursor.x += 3'
+  within 5 test -f "$run/stop.status" || miss "a touch while the session launched should end the run"
+  host_back || miss "a touch while the session launched: the host was not put back, got: $(seen)"
+  watcher_gone || miss "launching: the watcher outlived the run"
   # A start killed in the middle of the switch: its watcher, started first,
   # undoes what it did.
   run=$tmp/base/killed-start
