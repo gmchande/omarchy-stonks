@@ -319,9 +319,12 @@ Item {
   readonly property int scrubShown: motion.scrubShown
   // The rows show the day: they follow a scrub of it, and stay on now while
   // one reads a range, or the 1D chart's hours outside Yahoo's day, before
-  // it or the night after it.
+  // it or the night after it. The quote and the day change one after the
+  // other, so this can be read between them, the day still null: then the
+  // scrub stands until the day comes in. Found in the design panel's walk
+  // of 23 October: a TypeError here, the day null under a quote.
   readonly property int watchlistScrubShown: historyActive || !featuredQuote || scrubShown < Quote.dayStart(featuredQuote)
-    || (!!featuredDay.axis && scrubShown >= Quote.dayEnd(featuredQuote)) ? 0 : scrubShown
+    || (!!featuredDay && !!featuredDay.axis && scrubShown >= Quote.dayEnd(featuredQuote)) ? 0 : scrubShown
   // Yahoo's quote: the headline and the day's figures, at rest.
   readonly property var featuredQuote: motion.quote
   // The day the 1D chart draws, which a scrub of it reads: its prints, and
