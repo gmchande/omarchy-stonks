@@ -832,6 +832,15 @@ test("a hostile chart or spark answer reads as no answer, at once", async () => 
     { name: "a day's period null", call: read, answer: chartAnswer(r => { r.meta.tradingPeriods.pre = [[null]] }) },
     { name: "a spark day with a period null", call: "M.sparkQuote(json, null, [])",
       answer: chartAnswer(r => { r.meta.tradingPeriods.pre = [[null]] }).chart.result[0] },
+    // The 1.0.4 security review's: a day's one period ending at an object,
+    // which threw where a bar was compared with it. One no bar was compared
+    // with was kept in the quote, and every look for what was due threw.
+    { name: "a spark day whose period ends at an object", call: "M.sparkQuote(json, null, [])",
+      answer: chartAnswer(null, [[period(T0, { toString: null })]]).chart.result[0] },
+    { name: "a current period ending at an object", call: read,
+      answer: chartAnswer(r => { r.meta.currentTradingPeriod = { regular: period(T0, { toString: null }) } }) },
+    { name: "a period's start as text", call: read, answer: chartAnswer(r => { r.meta.tradingPeriods.regular[0][0].start = String(T0) }) },
+    { name: "a period's offset an object", call: read, answer: chartAnswer(r => { r.meta.tradingPeriods.post[0][0].gmtoffset = { toString: null } }) },
     { name: "bar times over budget", call: read, answer: chartAnswer(r => { r.timestamp = times(M.MOST_BARS + 1) }) },
     { name: "closes over budget", call: read, answer: chartAnswer(r => { bars(r).close = times(M.MOST_BARS + 1).map(() => 10) }) },
     { name: "a session's days over budget", call: read,
@@ -936,6 +945,17 @@ test("a close that isn't a finite number is a missing bar, in the day and in a r
     const sent = close => r => { bars(r).close[at] = close }
     expect(M.parseChart(chartAnswer(sent(bad)), [])).toEqual(M.parseChart(chartAnswer(sent(null)), []))
     expect(M.parseHistory(rangeAnswer(sent(bad)), "1M", [])).toEqual(M.parseHistory(rangeAnswer(sent(null)), "1M", []))
+  }
+})
+
+// An answer's offset is the clock a print outside its periods is read by:
+// an object there threw wherever a time was worked out, every look for
+// what was due among them. One that isn't an offset is none.
+test("an answer's offset that isn't one is none, in the day and in a range", () => {
+  for (const bad of [{ toString: null }, "-14400", 1e13]) {
+    const sent = offset => r => { r.meta.gmtoffset = offset }
+    expect(M.parseChart(chartAnswer(sent(bad)), []).gmtoffset).toBe(0)
+    expect(M.parseHistory(rangeAnswer(sent(bad)), "1M", []).gmtoffset).toBe(0)
   }
 })
 

@@ -29,6 +29,8 @@
 #                answered ^STOXX50E
 #   MANGLED      answers AAPL's day with its pre-market period null, a
 #                malformed answer, in its chart and in a spark run alike
+#   HOSTILE      answers AAPL's day with its current after-hours period's end
+#                {"toString": null}, which no comparison can read
 #   HISTSTRAY    answers saved intraday MSFT data through the history path
 #   HUGE         answers AAPL's day padded past 64 KB, over the day's cap
 #   GONE         answers 404, a symbol Yahoo does not know
@@ -342,6 +344,7 @@ serve() {
     BTC-USD) cat "$fixtures/btc-usd-day.json" ;;
     NOCUR) stamp < "$fixtures/ftse-day.json" | jq -c '.chart.result[0].meta.currency = null' ;;
     MANGLED) answer | jq -c '.chart.result[0].meta.tradingPeriods.pre[0][0] = null' ;;
+    HOSTILE) answer | jq -c '.chart.result[0].meta.currentTradingPeriod.post.end = {"toString": null}' ;;
     HUGE) answer; head -c 70000 /dev/zero | tr '\0' ' ' ;;
     GONE) exit 44 ;;
     LONG*) stamp < "$fixtures/moments/listings-2026-10-07-1455/nest.json" ;;
