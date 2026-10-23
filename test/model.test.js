@@ -920,6 +920,25 @@ test("a hostile search or Robinhood answer reads as no answer, at once", async (
   expect(await hostile(cases)).toEqual(cases.map(c => [c.name, c.want === undefined ? null : c.want]))
 }, 60000)
 
+// Half a UTF-16 pair can't go in a URL: the quote feed took its first-answer
+// slot, then encodeURIComponent threw before any request started, and no
+// new symbol's quote came until the shell restarted.
+test("search leaves out a symbol no request can carry", () => {
+  const found = M.parseSearch(JSON.parse('{"quotes":[{"symbol":"\\ud800","quoteType":"EQUITY"},{"symbol":"AAPL","quoteType":"EQUITY"}]}'))
+  expect(found.results.map(r => M.chartUrl(r.symbol))).toEqual([M.chartUrl("AAPL")])
+})
+
+// An object in a close cell threw where its price was drawn or written, and
+// an overflowing number read Infinity. Each is a gap in the chart, as a
+// missing close is.
+test("a close that isn't a finite number is a missing bar, in the day and in a range", () => {
+  for (const bad of [{ toString: null }, JSON.parse("1e309"), "10"]) for (const at of [1, 2]) {
+    const sent = close => r => { bars(r).close[at] = close }
+    expect(M.parseChart(chartAnswer(sent(bad)), [])).toEqual(M.parseChart(chartAnswer(sent(null)), []))
+    expect(M.parseHistory(rangeAnswer(sent(bad)), "1M", [])).toEqual(M.parseHistory(rangeAnswer(sent(null)), "1M", []))
+  }
+})
+
 test("a fetched name or code past its length reads as not sent", () => {
   const long = n => "N".repeat(n)
   const day = edit => M.parseChart(chartAnswer(r => edit(r.meta)), [])
