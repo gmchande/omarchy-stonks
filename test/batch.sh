@@ -58,7 +58,7 @@ suites() {
   commit=$(git -C "$1" rev-parse HEAD)
   log=$PWD/out/batch/${commit:0:7}.log
   if test/ran.sh --passed test/all.sh "$commit" 2> /dev/null && test/ran.sh --passed test/review.sh "$commit" 2> /dev/null; then
-    say "both suites already passed on $(git log -1 --format='%h %s' "$commit")'s tree (test/ran.sh): not running them again"
+    say "both suites already passed on the tree of $(git log -1 --format='%h %s' "$commit") (test/ran.sh): not running them again"
     return 0
   fi
   say "running the suites on $(git log -1 --format='%h %s' "$commit")"
@@ -78,7 +78,8 @@ suites() {
 
 if suites .; then
   test/live.sh dev 8>&- && exit
-  say "the suites passed on $(git rev-parse --short dev), but test/live.sh didn't put it live (above): test/batch.sh again puts it live without running them again"
+  if [ "$(git -C "$live" rev-parse HEAD)" = "$(git rev-parse dev)" ]; then say "dev is checked out in the live plugin, but test/live.sh failed (above)"
+  else say "the suites passed on $(git rev-parse --short dev), but test/live.sh didn't put it live (above): test/batch.sh again puts it live without running them again"; fi
   exit 1
 fi
 
@@ -113,7 +114,7 @@ else
   else say "reverted $what on dev, but the push was refused (dev moved on origin?): dev holds the revert, unpushed"; fi
 fi
 if [ "$last" = "$was" ]; then say "the last version that passed, ${last:0:7}, is already live"
-elif ! test/live.sh "$last" 8>&-; then say "test/live.sh didn't put ${last:0:7}, the last version that passed, live (above)"; fi
+elif ! test/live.sh "$last" 8>&-; then say "test/live.sh failed on ${last:0:7}, the last version that passed (above)"; fi
 say "$what broke dev: $why"
 if [ -n "$revert" ]; then
   say "to bring it back: merging the fixed branch alone brings back only its new commits, since dev"

@@ -110,8 +110,10 @@ socket_paths_fit() {
 # atomically, and a launcher that loses the race starts nothing.
 slot_free() {
   flock -n "$slot" true 2>/dev/null || { echo "tophat: this checkout's session is running ($slot); test/tophat.sh stop ends it" >&2; return 1; }
-  flock -s -n "$gate" true 2>/dev/null || { echo "tophat: test/live.sh is waiting for the running sessions to end so it can restart the shell ($gate). New sessions wait meanwhile, so it can't wait forever: start again once it has put its commit live" >&2; return 1; }
-  flock -s -n "$lock" true 2>/dev/null || { echo "tophat: test/live.sh is restarting the shell ($lock): start again once it has put its commit live" >&2; return 1; }
+  { flock -s -n "$gate" true && flock -s -n "$lock" true; } 2>/dev/null || { restart_busy; return 1; }
+}
+restart_busy() {
+  echo "tophat: test/live.sh is restarting the shell, or waiting for the sessions running to end so it can ($gate). New sessions wait until it's done, so it can't wait forever: start again once it has put its commit live" >&2
 }
 
 # zone_ok ZONE: the system's time zone data knows ZONE. The C library runs
@@ -533,7 +535,7 @@ cmd_start() {
   slot_free && socket_paths_fit "$runtime" && bus_ok || exit 1
   # A share of the tophat lock until the launcher holds its own, so no
   # restart lands between host-before and the session.
-  exec 7>> "$lock" && flock -s -n 7 || die "test/live.sh is restarting the shell ($lock): start again once it has put its commit live"
+  exec 7>> "$lock" && flock -s -n 7 || { restart_busy; exit 1; }
   # The slot is free, so whatever current names has ended.
   rm -f "$current"
 
