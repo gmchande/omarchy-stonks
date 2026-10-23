@@ -97,6 +97,27 @@ function overnightSpan(entry, now) {
   return !!entry && entry.through !== null && entry.through !== undefined && now - entry.through <= HOUR_REACH ? "hour" : "day"
 }
 
+// The requests for the prints of `symbols` at `now`, by their entries
+// (`overnightSpan`), each { span, symbols }: the days first, then the
+// hours. Never more requests than a day for all would take: where the hours
+// would add one, they fill the last day's spare places instead. Found in
+// the review of this change: a small list's first open, its pill's stock
+// already in hand, went in two requests, one more than before.
+function overnightBatches(symbols, entries, now) {
+  var day = symbols.filter(function(s) { return overnightSpan(entries[s], now) === "day" })
+  var hour = symbols.filter(function(s) { return overnightSpan(entries[s], now) === "hour" })
+  var dayRequests = Math.ceil(day.length / OVERNIGHT_BATCH)
+  if (dayRequests + Math.ceil(hour.length / HOUR_BATCH) > Math.ceil(symbols.length / OVERNIGHT_BATCH)) {
+    var room = dayRequests * OVERNIGHT_BATCH - day.length
+    day = day.concat(hour.slice(0, room))
+    hour = hour.slice(room)
+  }
+  var batches = []
+  for (var i = 0; i < day.length; i += OVERNIGHT_BATCH) batches.push({ span: "day", symbols: day.slice(i, i + OVERNIGHT_BATCH) })
+  for (var j = 0; j < hour.length; j += HOUR_BATCH) batches.push({ span: "hour", symbols: hour.slice(j, j + HOUR_BATCH) })
+  return batches
+}
+
 // The most entries a list in Robinhood's answers may hold, past which the
 // answer is a bad one (`Format.fetchedList`): a result for each symbol
 // asked, one each in the saved answers, so twice the most asked at once; a

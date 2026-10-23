@@ -40,14 +40,7 @@ Item {
   // the request fails a turn later, out of the change that asked for it.
   function fetch(symbols, at) {
     if (busy || !symbols.length) return
-    var spans = { day: [], hour: [] }
-    symbols.forEach(function(s) { spans[Overnight.overnightSpan(entries[s], at)].push(s) })
-    var batches = []
-    var split = function(span, size) {
-      for (var i = 0; i < spans[span].length; i += size) batches.push({ span: span, symbols: spans[span].slice(i, i + size) })
-    }
-    split("day", Overnight.OVERNIGHT_BATCH)
-    split("hour", Overnight.HOUR_BATCH)
+    var batches = Overnight.overnightBatches(symbols, entries, at)
     var granted = gate ? gate.take(batches.length) : batches.length
     root.batches = granted > 0 ? batches.slice(0, granted) : batches
     root.askedAt = at
@@ -122,12 +115,18 @@ Item {
     else land(job)
   }
 
+  // A listing asked for an hour whose prints in hand went meanwhile
+  // (`Service.forgetLeft`) is left with no entry, answered or not, so the
+  // next ask is for its day, at once. Found in the review of this change:
+  // stamped as failed with nothing in it, a preview left and come back to
+  // showed no overnight price for five minutes.
   function land(job) {
     var next = Object.assign({}, entries)
     batches.forEach(function(batch) {
       batch.symbols.forEach(function(symbol) {
         var had = entries[symbol]
         var got = job.listings[symbol]
+        if (!got && !had && batch.span === "hour") return
         next[symbol] = got ? { status: "ok", bars: got.bars, through: got.through, at: askedAt }
           : { status: "failed", bars: had ? had.bars : [], through: had ? had.through : null, at: askedAt }
       })

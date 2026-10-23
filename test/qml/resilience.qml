@@ -359,6 +359,18 @@ ShellRoot {
       awaitState(function() { return !nights.busy }, 3000)
       root.check("the next valid overnight answer succeeds after a malformed listing",
         nights.entries.NEST.status === "ok" && nights.entries.KILN.status === "ok" && nights.entries.NEST.at === 3)
+      // An hour asked for prints in hand that the service forgets while it
+      // is out (a preview left five minutes on) leaves the listing with no
+      // entry, so its next ask is its day, at once: stamped failed with
+      // nothing in it, a preview come back to showed no overnight price for
+      // five minutes.
+      nights.entries = { NEST: { status: "ok", bars: [{ t: 1000, p: 3, s: "overnight" }], through: 1000, at: 1000 } }
+      nights.fetch(["NEST"], 1300)
+      var askedHour = nights.batches.length === 1 && nights.batches[0].span === "hour"
+      nights.entries = ({})
+      awaitState(function() { return !nights.busy }, 3000)
+      root.check("an hour's answer for prints the service forgot meanwhile leaves the listing unanswered",
+        askedHour && !("NEST" in nights.entries), askedHour + " " + JSON.stringify(nights.entries))
     }
 
     function test_6_pendingDayAdds() { guarded("test_6_pendingDayAdds", checks_test_6_pendingDayAdds) }

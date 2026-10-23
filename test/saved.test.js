@@ -1453,6 +1453,25 @@ test("a refresh within half an hour asks Robinhood for the last hour, which brin
   expect(M.overnightSpan({ through: null }, earlier.through)).toBe("day")
 })
 
+test("a run of Robinhood's prints never takes more requests than a day for all would", () => {
+  const now = 1791000000
+  const warm = { through: now - 10 * 60 }
+  const names = n => Array.from({ length: n }, (_, i) => "S" + i)
+  const spans = batches => batches.map(b => b.span + " " + b.symbols.length).join(", ")
+  // A small list's first open at night, the pill's stock already in hand:
+  // one day for all three, as before, not a day and an hour.
+  expect(M.overnightBatches(["AAPL", "MSFT", "SPY"], { AAPL: warm }, now))
+    .toEqual([{ span: "day", symbols: ["MSFT", "SPY", "AAPL"] }])
+  // A long list's first open: the pill's stock fills the last day's room.
+  const long = names(115)
+  expect(spans(M.overnightBatches(long, { S0: warm }, now))).toBe("day 25, day 25, day 25, day 25, day 15")
+  // Its refreshes through the night: the last hour, two requests, not five.
+  const inHand = Object.fromEntries(long.map(s => [s, warm]))
+  expect(spans(M.overnightBatches(long, inHand, now))).toBe("hour 75, hour 40")
+  // Three added to it meanwhile: their days, and the rest's hour.
+  expect(spans(M.overnightBatches(long.concat(["N1", "N2", "N3"]), inHand, now))).toBe("day 3, hour 75, hour 40")
+})
+
 test("Robinhood's instruments say which listings it trades all day, by the symbols asked for", () => {
   // Saved Wednesday 7 October: NEST and SPY trade on its 24 Hour Market,
   // KILN and BOLT do not. Results come in Robinhood's own order; one it does
