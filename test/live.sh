@@ -53,7 +53,7 @@ done
 # Fd 8 holds the tophat lock; nothing started here keeps it.
 exec 8>> "$lock"
 if ! flock -n 8; then
-  echo "live: another restart holds the tophat lock ($lock); waiting up to 5 minutes"
+  echo "live: the tophat lock ($lock) is held, by another restart or by a session an older test/tophat.sh started; waiting up to 5 minutes"
   flock -w 300 8 || refuse "the tophat lock was held for 5 minutes, so ${commit:0:7} isn't live; nothing changed"
 fi
 git -C "$live" checkout --quiet --detach "$commit" 8>&-
