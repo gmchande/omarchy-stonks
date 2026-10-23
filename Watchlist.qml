@@ -382,17 +382,18 @@ Flickable {
 
   // The cursor handed to `symbol`, as a removal hands it on: where its row
   // is in sight already, the list stays where it is, stopped by the click,
-  // perhaps between rows; else the row is carried into view. With the
-  // pointer resting on the list, the row that took the removed one's place
-  // is under it now, so its remove button waits for the pointer to move,
-  // as one the wheel scrolls under it does: found by the design panel of
-  // 23 October, where a click on Toyota's × put Tesla's under the still
-  // pointer, and one more click removed Tesla.
+  // perhaps between rows; else the row is carried into view. The row that
+  // took the removed one's place may be under a pointer at rest, the list's
+  // own or one on the view that just closed over it (a symbol's lists), so
+  // its remove button waits for the pointer to move, or a key to move the
+  // cursor, as one the wheel scrolls under it does: found by the design
+  // panel of 23 October, where a click on Toyota's × put Tesla's under the
+  // still pointer, and one more click removed Tesla.
   function handTo(symbol) {
     var index = displayedSymbols.indexOf(symbol)
     if (index >= 0 && partInSight(index, headedY)) cursorSymbol = symbol
     else select(symbol)
-    if (listHover.hovered) scrolledUnder = symbol
+    scrolledUnder = symbol
   }
 
   // A click on a row, at (x, y) in the scene. It stops the list where it

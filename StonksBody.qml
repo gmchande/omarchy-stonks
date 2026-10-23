@@ -433,8 +433,9 @@ Item {
   readonly property string headerText: {
     if (!service) return headerWhenMissing
     // Yahoo is sending nothing for any listing, said once, unless a scrub
-    // reads a moment or a refresh you asked for is out.
-    if (yahooDown && !scrubShown && !refreshing) return yahooDownText
+    // reads a moment, a refresh you asked for is out, or a range failed,
+    // whose header offers its retry.
+    if (yahooDown && !scrubShown && !refreshing && !(historyActive && historyFailed)) return yahooDownText
     // The chart asked for is on its way, named: what was on show stays.
     // Before any chart has been in, the empty hero's label names it alone,
     // in the one place a reader looks (`HeroBand`).
@@ -1332,7 +1333,8 @@ Item {
     anchors.topMargin: root.groupGap
     bandGap: root.bandGap
     visible: !root.showingHelp
-    freshness: root.yahooDown ? Figures.quietFreshness(root.featuredFreshness) : root.featuredFreshness
+    freshness: root.featuredFreshness
+    sourceDown: root.yahooDown
     retro: root.retro
     changeMode: root.changeMode
     scrubbing: root.scrubT !== 0

@@ -12,6 +12,8 @@ Item {
   id: root
 
   property var freshness: null
+  // Yahoo is sending nothing for any listing (`Hero.sourceDown`).
+  property bool sourceDown: false
   property bool retro: false
   property string changeMode: "pct"
   property bool scrubbing: false
@@ -124,6 +126,7 @@ Item {
       day: root.day
       latest: root.latest
       freshness: root.freshness
+      sourceDown: root.sourceDown
       retro: root.retro
       changeMode: root.changeMode
       scrubbing: root.scrubbing

@@ -1272,6 +1272,23 @@ ShellRoot {
         offered === "true,true,Undo AAPL" && addOpened && stillOffered && harness.same(service.library, ["NVDA", "AAPL"]) && !footerUndo.visible,
         [offered, addOpened, stillOffered, service.library, footerUndo.visible].join(" | "))
 
+      // A removal from a symbol's lists hands the cursor on as the × does:
+      // the row that comes back as the checklist closes shows no × until
+      // the pointer moves. From the review of this change: the pointer rested
+      // on the checklist, which the rows never saw, so the × showed under it.
+      wl.cursorSymbol = "NVDA"
+      keys.forceActiveFocus()
+      keyClick(Qt.Key_M)
+      wait(Application.styleHints.mouseDoubleClickInterval)
+      var allTickAt = center(harness.findAll(body2, "symbolListRow")[0])
+      mouseClick(body2, allTickAt.x, allTickAt.y)
+      wait(100)
+      var handedOn = [harness.same(service.library, ["AAPL"]), wl.cursorRow, harness.find(wl.rowItem("AAPL"), "rowRemove").visible].join(",")
+      keyClick(Qt.Key_U)
+      wait(100)
+      harness.check("a removal from a symbol's lists hands the cursor on, its row showing no × under the still pointer",
+        handedOn === "true,AAPL,false" && harness.same(service.library, ["NVDA", "AAPL"]), handedOn + " | " + service.library)
+
       // The rule under the list name is the list's breadth: the rows' own
       // ups, flats, and downs, counted. DOWN answers a day that fell, FLAT
       // one that closed at its previous close, so a rule that swapped or
