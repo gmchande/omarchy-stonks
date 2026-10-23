@@ -106,7 +106,7 @@ socket_paths_fit() {
 # lock. Advisory: the launcher takes both atomically, and a launcher that
 # loses the race starts nothing.
 slot_free() {
-  flock -n "$slot" true 2>/dev/null || { echo "tophat: this checkout's session is running ($slot)" >&2; return 1; }
+  flock -n "$slot" true 2>/dev/null || { echo "tophat: this checkout's session is running ($slot); test/tophat.sh stop ends it" >&2; return 1; }
   flock -s -n "$lock" true 2>/dev/null || { echo "tophat: a batch holds the tophat lock ($lock)" >&2; return 1; }
 }
 
@@ -211,7 +211,7 @@ hl.config({
   decoration = { rounding = $rounding },
 })
 hl.on("hyprland.start", function()
-  hl.exec_cmd("hyprctl output create headless $output > $run/output.log 2>&1; quickshell -n -p /usr/share/omarchy/shell > $run/shell.log 2>&1")
+  hl.exec_cmd("hyprctl output create headless $output > $run/output.log 2>&1; quickshell -n -p /usr/share/omarchy/shell > $run/shell.log 2>&1; echo \$? > $run/shell.exit")
   $terminal
 end)
 EOF
@@ -279,13 +279,15 @@ write_slow_curl() {
 
 # write_launcher RUN RUN_ID: start runs it as `setsid launch.sh`, so it leads
 # this run's own session and process group. It takes this checkout's slot
-# and a share of the tophat lock atomically, and holds both until the
-# session ends. A core limit of one byte, which everything it starts
-# inherits and none can raise, makes the kernel skip a crash's dump and its
-# helper (fs/coredump.c), so a crash notifies no one; the kernel logs it,
-# which is how stop finds it. The compositor it starts gets a clean
-# environment with the start's zone and, on a slow start, the slow curl
-# ahead on its PATH.
+# and a share of the tophat lock atomically, and holds both until the rest
+# of its group has gone: what the compositor leaves behind (the bus's
+# services, a child that outlives it) still belongs to the session, and
+# stop's TERM, which reaches the launcher too, ends only them. A core limit
+# of one byte, which everything it starts inherits and none can raise, makes
+# the kernel skip a crash's dump and its helper (fs/coredump.c), so a crash
+# notifies no one. The compositor it starts gets a clean environment with
+# the start's zone and, on a slow start, the slow curl ahead on its PATH;
+# its exit, a crash's signal among them, goes to launch.status.
 write_launcher() {
   local run=$1 id=$2 tz="" slow_path=""
   [ -n "${zone:-}" ] && tz="TZ=$(printf %q "$zone") "
@@ -306,6 +308,8 @@ echo "\$\$ \${f[19]}" > "\$run/leader"
 prlimit --pid \$\$ --core=1:1 || { echo "no core limit" > "\$run/launch.status"; exit 1; }
 rm -rf $(printf %q "$runtime") && mkdir -m 700 $(printf %q "$runtime") || { echo "no runtime folder" > "\$run/launch.status"; exit 1; }
 echo started > "\$run/launch.status"
+# A handler, not an ignore: the children start with TERM's default.
+trap : TERM
 env -i HOME="\$run/home" XDG_CONFIG_HOME="\$run/home/.config" XDG_DATA_HOME="\$run/home/.local/share" \\
   XDG_STATE_HOME="\$run/home/.local/state" XDG_CACHE_HOME="\$run/home/.cache" \\
   XDG_RUNTIME_DIR=$(printf %q "$runtime") PATH="${slow_path}\$run/stubs:"$(printf %q "$PATH") \\
@@ -313,8 +317,26 @@ env -i HOME="\$run/home" XDG_CONFIG_HOME="\$run/home/.config" XDG_DATA_HOME="\$r
   TOPHAT_RUN=$(printf %q "$id") \\
   dbus-run-session -- env WAYLAND_DISPLAY=$(printf %q "$host_socket") \\
   Hyprland --config "\$run/nested.lua" > "\$run/hyprland.log" 2>&1 8>&- 9>&- &
-wait \$!
-echo "exited \$?" >> "\$run/launch.status"
+EOF
+  cat >> "$run/launch.sh" << 'EOF'
+hypr=$!
+# A trapped TERM ends a wait early; the compositor's own exit is the one kept.
+until wait "$hypr"; code=$?; ! kill -0 "$hypr" 2> /dev/null; do :; done
+echo "exited $code" >> "$run/launch.status"
+# others: another process is in this group. Builtins only, so the check
+# itself adds no member.
+others() {
+  local f s
+  for f in /proc/[0-9]*/stat; do
+    [ "$f" = "/proc/$$/stat" ] && continue
+    read -r s < "$f" 2> /dev/null || continue
+    s=${s##*) }
+    set -- $s
+    [ "$3" = $$ ] && return 0
+  done
+  return 1
+}
+while others; do sleep 0.5; done
 EOF
   chmod +x "$run/launch.sh"
 }
@@ -630,6 +652,13 @@ end_session() {
   ours || return 0
   note_pids
   if session_alive 2> /dev/null; then
+    # Hyprland 0.56.2 crashes on exit within half a second of wf-recorder
+    # leaving (4 of 4 runs stopped at once; none of 7 stopped 0.5 s later):
+    # a second passes after the last recording first.
+    if [ -s "$run/record.ended" ]; then
+      local wait_ms=$(( $(cat "$run/record.ended") + 1000 - $(date +%s%3N) ))
+      (( wait_ms > 0 )) && sleep "$(awk -v ms="$wait_ms" 'BEGIN { printf "%.3f", ms / 1000 }')"
+    fi
     nested hyprctl eval 'hl.dispatch(hl.dsp.exit())' > /dev/null 2>&1
     within 10 bash -c "! kill -0 $HYPR_PID 2>/dev/null"
     within 2 group_gone && return 0
@@ -640,13 +669,24 @@ end_session() {
   within 5 group_gone
 }
 
-# crashes: each process of this run that the kernel says crashed, as "PID
-# (COMM)"; fails when the kernel log can't be read. Under the launcher's
-# one-byte core limit the kernel writes no dump and logs "coredump:
-# PID(COMM): RLIMIT_CORE is set to 1, aborting core" instead. A run's
-# processes are the ones note_pids saw.
+# dumps_core STATUS: STATUS is a shell's exit for a death by a signal that
+# dumps core (QUIT ILL TRAP ABRT BUS FPE SEGV XCPU XFSZ SYS).
+dumps_core() { case $1 in 131|132|133|134|135|136|139|152|153|159) return 0 ;; esac; return 1; }
+
+# crashes: each process of this run that crashed, one per line; fails when
+# the kernel log can't be read. The compositor's and the shell's exits say
+# so for them, whenever they die. For the rest, the kernel's log: under the
+# launcher's one-byte core limit it writes no dump and logs "coredump:
+# PID(COMM): RLIMIT_CORE is set to 1, aborting core" instead, for the
+# processes note_pids saw. That message is rate-limited across the machine
+# (ten in five seconds) and a process too short-lived to be seen goes
+# unnamed, which is why the two that matter are read from their exits.
 crashes() {
-  local log pids pid rest
+  local log pids pid rest code
+  code=$(sed -n 's/^exited //p' "$run/launch.status" 2> /dev/null)
+  dumps_core "$code" && echo "Hyprland (exit $code)"
+  code=$(cat "$run/shell.exit" 2> /dev/null)
+  dumps_core "$code" && echo "Quickshell (exit $code)"
   [ -n "$(journalctl -k -q -n 1 --no-pager -o cat 2> /dev/null)" ] || return 1
   log=$(journalctl -k -q --no-pager -o cat --since="@${START_EPOCH:-0}") || return 1
   pids=" $(sort -un "$run/pids" 2> /dev/null | tr '\n' ' ')"
@@ -684,11 +724,8 @@ stop_run() {
   [ -n "$errors" ] && { echo "FAILED runtime errors in the nested shell's log:" >&2; echo "$errors" >&2; status=1; }
   line=$(grep -in polkit "$run/shell.log" 2> /dev/null)
   [ -n "$line" ] && { echo "FAILED the nested shell's log names polkit:" >&2; echo "$line" >&2; status=1; }
-  if ! line=$(crashes); then
-    echo "FAILED the kernel log could not be read (journalctl -k), so a crash would go unseen" >&2; status=1
-  elif [ -n "$line" ]; then
-    echo "FAILED a process crashed: $line. No core was written (the run's core limit is one byte). Find the cause before relaunching (the diagnose-crash skill)." >&2; status=1
-  fi
+  line=$(crashes) || { echo "FAILED the kernel log could not be read (journalctl -k), so a crash would go unseen" >&2; status=1; }
+  [ -n "$line" ] && { echo "FAILED a process crashed: $(paste -sd, <<< "$line" | sed 's/,/, /g'). No core was written (the run's core limit is one byte). Find the cause before relaunching (the diagnose-crash skill)." >&2; status=1; }
   if [ -f "$run/host-before" ]; then
     host_facts > "$run/host-after"
     if ! diff -q "$run/host-before" "$run/host-after" > /dev/null; then
@@ -747,6 +784,8 @@ record_watch() {
   # child; INT is what makes wf-recorder finish its file.
   kill -INT $(pgrep -P "$rec" -x wf-recorder) 2> /dev/null
   wait "$rec"
+  # When wf-recorder left the session, for end_session.
+  date +%s%3N > "$run/record.ended"
   (( stopping )) && echo saved > "$run/record.status"
 }
 lost() { echo "interrupted: $1" > "$run/record.status"; }
@@ -942,7 +981,9 @@ EOF
   fi
   rm -f "$run/launch.status"
   local START_EPOCH; START_EPOCH=$(date +%s)
-  setsid bash "$run/launch.sh" < /dev/null > /dev/null 2>&1 &
+  # Not a job of this shell: teardown ends this launcher with KILL, which
+  # the shell would report.
+  ( setsid bash "$run/launch.sh" < /dev/null > /dev/null 2>&1 & )
   within 5 test -s "$tmp/escapee" && within 5 test -s "$run/leader" \
     || { miss "the stand-in session never started"; echo "tophat self-check FAILED"; return 1; }
   read -r LEADER LEADER_START < "$run/leader"
@@ -984,6 +1025,10 @@ EOF
   (( members >= 3 )) || miss "the stand-in group should hold the launcher and its children, has $members"
   signal_group TERM "$LEADER" 1 "$(mark)" && miss "a leader whose start time differs should not be signalled"
   kill -0 "$LEADER" 2> /dev/null || miss "the group was signalled despite a changed start time"
+  # TERM leaves the member that shrugs it off: the locks stay taken.
+  signal_group TERM "$LEADER" "$LEADER_START" "$(mark)"
+  sleep 0.5
+  slot_free 2> /dev/null && miss "the slot should stay taken while teardown's TERM leaves a member"
   end_session
   pgrep -g "$LEADER" > /dev/null && miss "the run's group outlived teardown"
   kill -0 "$bystander" 2> /dev/null || miss "teardown reached a process outside the run's group"
@@ -1015,6 +1060,35 @@ EOF
   else
     miss "the plain stand-in session never started"
   fi
+
+  # A compositor that crashes and leaves a child in the group: its crash is
+  # named from its exit, and the slot and the tophat lock stay taken until
+  # the child has gone. It crashes only once its core dump is off.
+  local left=$tmp/left
+  mkdir -p "$left"
+  printf '#!/bin/sh\nshift; exec "$@"\n' > "$left/dbus-run-session"
+  printf '#!/bin/sh\nsleep 300 &\necho $! > %q\n[ "$(prlimit --pid $$ --core --raw --noheadings -o SOFT,HARD)" = "1 1" ] && kill -SEGV $$\nexit 0\n' \
+    "$tmp/leftover" > "$left/Hyprland"
+  chmod +x "$left"/*
+  rm -f "$run/launch.status" "$run/leader"
+  PATH="$left:$PATH" host_socket=$tmp/no-display zone="" slow="" write_launcher "$run" fake
+  setsid bash "$run/launch.sh" < /dev/null > /dev/null 2>&1 &
+  if within 5 grep -qs '^exited' "$run/launch.status" && within 5 test -s "$tmp/leftover"; then
+    read -r LEADER LEADER_START < "$run/leader"
+    crashes 2> /dev/null | grep -qx 'Hyprland (exit 139)' || miss "a compositor's crash should be named from its exit, got: $(crashes 2> /dev/null)"
+    slot_free 2> /dev/null && miss "the slot should stay taken while the session's group lives on"
+    flock -n "$lock" true 2> /dev/null && miss "a batch should wait while the session's group lives on"
+    kill "$(cat "$tmp/leftover")"
+    within 3 slot_free 2> /dev/null || miss "the slot should come free once the session's group has gone"
+    flock -n "$lock" true 2> /dev/null || miss "a batch should start once the session's group has gone"
+  else
+    miss "the crashing stand-in compositor never exited"
+  fi
+  # The shell's exit: a crash's signal is named, a TERM's isn't.
+  echo 134 > "$run/shell.exit"
+  crashes 2> /dev/null | grep -qx 'Quickshell (exit 134)' || miss "a shell's crash should be named from its exit"
+  echo 143 > "$run/shell.exit"
+  crashes 2> /dev/null | grep -q '^Quickshell' && miss "a shell ended by TERM should not read as a crash"
 
   (( failed )) && echo "tophat self-check FAILED" || echo "tophat self-check ok"
   return "$failed"
