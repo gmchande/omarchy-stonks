@@ -862,10 +862,11 @@ ShellRoot {
           peaks.length === 0, peaks.join(" | "))
 
         // Where Yahoo's 52 weeks leave out the 1Y range's first day, the
-        // 52-week line still says Yahoo's, word for word and place for place
-        // as on 1D, and the first line and the chart's marks carry the range's
-        // own low and high: SHOP.TO with Yahoo's 52-week marks a dollar inside
-        // its 1Y range.
+        // 52-week line on 1Y takes in the range's own low and high, as the
+        // first line and the chart's marks say them, so the two lines never
+        // disagree; on 1D it says Yahoo's. SHOP.TO with Yahoo's 52-week marks
+        // a dollar inside its 1Y range. Found in the 1.1.0 audit: RGTI's 1Y
+        // line said 58.15 over a 52-week high of 57.97.
         var yearStats = History.periodStats(year)
         var shopQuote = stub.quotes["SHOP.TO"]
         var narrowed = Object.assign({}, stub.quotes)
@@ -901,8 +902,9 @@ ShellRoot {
         var wantMarks = Format.money(yearStats.low.p, shopQuote.priceDigits) + "–" + Format.money(yearStats.high.p, shopQuote.priceDigits)
         var wantYear = Format.money(yearStats.low.p + 1, shopQuote.priceDigits) + " " + Format.money(yearStats.high.p - 1, shopQuote.priceDigits)
         var yahoos = onDay.replace(/@\d+/g, "").indexOf(wantYear) >= 0
-        root.check("where Yahoo's 52 weeks leave out the 1Y range's ends, the 52-week line on 1Y says Yahoo's as on 1D, and the first line and the chart's marks say the range's",
-          onYear === onDay && yahoos && marked === wantMarks && periodRange === wantMarks,
+        var widened = onYear.replace(/@\d+/g, "").indexOf(wantMarks.replace("–", " ")) >= 0
+        root.check("where Yahoo's 52 weeks leave out the 1Y range's ends, the 52-week line on 1Y says the range's, as the first line and the chart's marks do, and Yahoo's on 1D",
+          widened && yahoos && marked === wantMarks && periodRange === wantMarks,
           "1Y: " + onYear + " / 1D: " + onDay + " / marks " + marked + ", first line " + periodRange + ", want " + wantMarks + " and Yahoo's " + wantYear)
 
         // The exchange and currency stay whole on the hero's line; a long
@@ -1042,18 +1044,21 @@ ShellRoot {
         // The header's words keep room for its longest real states, and say
         // every closure in calendars.json, as Market names it, for a reader
         // whose clock differs from the exchange's (its zone named): in full
-        // wherever that fits, and otherwise in its short form, without the
-        // holiday's name, as a weekend's is worded; Tokyo's lunch break the
-        // same, without its countdown. In both looks, in the popup and the
-        // window at its widest and its minimum width (App.qml), beside the
-        // speaker, the camera, the look icon, and the help mark, at every
-        // text size Omarchy offers (9 to 20). Found in the polish board:
-        // Tokyo's "Constitution Memorial Day observed" and London's
-        // "(substitute)" closures were cut in the popup; in the sound build:
-        // beside the speaker, Martin Luther King, Jr. Day's was; and in the
-        // camera build: beside the camera, Tokyo's lunch break was.
+        // wherever that fits, its letters closed up where only that fits,
+        // and otherwise in its short form, without the holiday's name, as a
+        // weekend's is worded; Tokyo's lunch break the same, without its
+        // countdown. In both looks, in the popup and the window at its
+        // widest and its minimum width (App.qml), beside the speaker, the
+        // camera, the look icon, and the help mark, at every text size
+        // Omarchy offers (9 to 20). Found in the polish board: Tokyo's
+        // "Constitution Memorial Day observed" and London's "(substitute)"
+        // closures were cut in the popup; in the sound build: beside the
+        // speaker, Martin Luther King, Jr. Day's was; in the camera build:
+        // beside the camera, Tokyo's lunch break was; and in the 1.1.0
+        // audit: in the popup at the everyday size 12, Constitution Memorial
+        // Day went short, though 1.0.3 named it.
         var header = find(body, "statusText").parent
-        var fullWords = find(body, "statusFullWords")
+        var tightWords = find(body, "statusTightWords")
         var calendars = JSON.parse(calendarFile.text())
         var states = [["CLOSED · OPENS MON 09:30", ""], ["POWER HOUR · CLOSES IN 40M", ""],
           ["LUNCH BREAK · REOPENS 12:30 JST · IN 59M", "LUNCH BREAK · REOPENS 12:30 JST"], ["OPENING BELL · CLOSES IN 6H 20M", ""]]
@@ -1112,8 +1117,10 @@ ShellRoot {
                   var shownShort = states[s][1] !== "" && words.text === states[s][1].toUpperCase()
                   if (words.truncated || words.implicitWidth > words.width)
                     roomless.push(where + words.text + " (" + Math.ceil(words.implicitWidth) + " px in " + words.width + ")")
-                  else if (shownShort && fullWords.implicitWidth <= header.wordsRoom)
-                    roomless.push(where + "short though the full fits: " + states[s][0])
+                  else if (shownShort && (!tightWords || tightWords.implicitWidth <= header.wordsRoom))
+                    roomless.push(where + "short though the full fits closed up: " + states[s][0])
+                  else if (shownShort && hsize === 12 && !surface.wide && states[s][0].indexOf("Constitution Memorial Day ·") === 0)
+                    roomless.push(where + "short at the everyday size: " + states[s][0])
                   if (shownShort) shortened[where.trim()] = (shortened[where.trim()] || 0) + 1
                 }
               }
@@ -1142,6 +1149,38 @@ ShellRoot {
         root.check("the header's longest real states fit, and every closure in calendars.json is said in full where it fits and else without its holiday's name, a zone named, and Tokyo's lunch without its countdown, in both looks, in the popup and the window at its widest and narrowest, at every text size from 9 to 20",
           closures > 50 && unnamed.length === 0 && roomless.length === 0,
           closures + " closures | " + unnamed.join(" | ") + " | " + roomless.slice(0, 12).join(" | ") + (roomless.length > 12 ? " | … " + roomless.length : ""))
+
+        // In a window of ordinary height, 720 × 520, the key sheet shows its
+        // credit whole without a scroll, the version included. Found in the
+        // 1.1.0 audit: at the sheet's foot, the y and S rows pushed it out of
+        // sight, and nothing said the sheet scrolls.
+        var sheet = find(body, "helpSheet")
+        var sheetBefore = { wide: surface.wide, windowWidth: surface.windowWidth, fixedHeight: surface.fixedHeight }
+        surface.wide = true
+        surface.windowWidth = 720
+        surface.fixedHeight = 520
+        sheet.version = "1.1.0"
+        body.showingHelp = true
+        wait(50)
+        var credits = []
+        var gather = function(node) {
+          if (!node || node.visible === false) return
+          if (node.objectName === "helpCredit") credits.push(node)
+          for (var c = 0; c < node.children.length; c++) gather(node.children[c])
+        }
+        gather(sheet)
+        var creditEnd = credits.length === 1 ? yIn(credits[0], credits[0].height) - yIn(sheet, 0) : -1
+        var creditSaid = credits.length === 1 ? credits[0].text.replace(/\n/g, " / ") : credits.length + " credits"
+        var sheetHeight = sheet.height
+        var creditWhole = credits.length === 1 && !credits[0].truncated && creditEnd > 0 && creditEnd <= sheetHeight && sheet.contentY === 0
+        body.showingHelp = false
+        sheet.version = Qt.binding(function() { return body.updates && body.updates.runningVersion || "" })
+        surface.wide = sheetBefore.wide
+        surface.windowWidth = sheetBefore.windowWidth
+        surface.fixedHeight = sheetBefore.fixedHeight
+        wait(50)
+        root.check("in a 720 × 520 window the key sheet shows its credit whole without a scroll",
+          creditWhole, creditSaid + " ends at " + creditEnd + " of the sheet's " + sheetHeight)
 
         // The band lines up with the rows and keeps one rhythm: the range
         // row, the info lines, and the list's header start at the rows' text

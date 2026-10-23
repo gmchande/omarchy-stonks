@@ -386,7 +386,10 @@ Item {
   readonly property var periodLine: !chart ? null : historyShown ? History.rangeLine(history, rangeEnds, featuredQuote) : dayLine
   readonly property var infoFactLists: !dayLine ? [] : [dayLine.facts, History.rangeFacts(dayLine.range.widest)]
     .concat(yearLine ? [History.rangeFacts(yearLine.range.widest)] : [])
-  readonly property var yearLine: chart ? Fundamentals.yearLine(featuredQuote, fundamentals ? fundamentals.figures : null) : null
+  // On 1Y the 52 weeks take in the range's own ends, so the two lines never
+  // disagree (`Fundamentals.yearLine`).
+  readonly property var yearLine: chart ? Fundamentals.yearLine(featuredQuote, fundamentals ? fundamentals.figures : null,
+    historyShown && history.range === "1Y" ? rangeEnds : null) : null
   readonly property var rangeMarks: historyShown ? History.rangeMarks(history, rangeEnds, featuredQuote) : null
   // What the dashed line is, said while a scrub reads against it, and on a
   // thin night's day the close the night's trades read from too.

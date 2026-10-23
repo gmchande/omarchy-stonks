@@ -369,8 +369,8 @@ ShellRoot {
       escapeOrder(s)
       harness.check("in the " + s.name + ", Shift+P changes nothing", !acts(s, "Shift+P"))
       var version = JSON.parse(harness.readFile(harness.manifestPath)).version
-      harness.check("in the " + s.name + ", the sheet's foot credits Stonks " + version + ", Yahoo, and Robinhood",
-        sheet.credit.indexOf("Stonks " + version + " ") >= 0 && sheet.credit.indexOf("Yahoo") >= 0
+      harness.check("in the " + s.name + ", the sheet credits Stonks " + version + ", Yahoo, and Robinhood",
+        sheet.credit.split("\n").indexOf("Stonks " + version) >= 0 && sheet.credit.indexOf("Yahoo") >= 0
           && sheet.credit.indexOf("Robinhood") >= 0, sheet.credit)
       return sheet
     }

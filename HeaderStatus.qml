@@ -197,17 +197,35 @@ Item {
   // range's retry follows them. They start twice as far from the sleeping
   // z as the bull is, so it reads as the animal's and not as a mark on the
   // first word, and stop as much sooner, so their room is the same. Where
-  // the words don't fit their room, their short form shows, where they have
-  // one; otherwise they are cut with an ellipsis.
+  // the words don't fit their room but would with their letters closed up,
+  // they close up; otherwise their short form shows, where they have one,
+  // or they are cut with an ellipsis, spaced. Found in the 1.1.0 audit:
+  // beside the speaker and the camera, Tokyo's Constitution Memorial Day
+  // lost its name in the popup at the everyday text size.
   readonly property real wordsRoom: Math.max(0, soundIcon.x - Style.space(8) - statusWords.x
     - (root.offersRetry ? retry.implicitWidth + Style.space(16) : 0))
+  readonly property bool closedUp: fullWords.implicitWidth > wordsRoom && tightWords.implicitWidth <= wordsRoom
+  readonly property bool shortened: shortText !== "" && tightWords.implicitWidth > wordsRoom
   Text {
     id: fullWords
     objectName: "statusFullWords"
     visible: false
     textFormat: Text.PlainText
     text: root.statusText.toUpperCase()
-    font: statusWords.font
+    font.family: root.fontFamily
+    font.pixelSize: Style.font.caption
+    font.bold: true
+    font.letterSpacing: 1
+  }
+  Text {
+    id: tightWords
+    objectName: "statusTightWords"
+    visible: false
+    textFormat: Text.PlainText
+    text: fullWords.text
+    font.family: root.fontFamily
+    font.pixelSize: Style.font.caption
+    font.bold: true
   }
   Text {
     id: statusWords
@@ -217,12 +235,12 @@ Item {
     width: Math.min(implicitWidth, root.wordsRoom)
     anchors.verticalCenter: parent.verticalCenter
     textFormat: Text.PlainText
-    text: (root.shortText !== "" && fullWords.implicitWidth > root.wordsRoom ? root.shortText : root.statusText).toUpperCase()
+    text: (root.shortened ? root.shortText : root.statusText).toUpperCase()
     color: root.scrubbing || root.live ? root.foreground : root.dim
     font.family: root.fontFamily
     font.pixelSize: Style.font.caption
     font.bold: true
-    font.letterSpacing: 1
+    font.letterSpacing: root.closedUp ? 0 : 1
     elide: Text.ElideRight
   }
 
