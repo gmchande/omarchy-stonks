@@ -134,8 +134,11 @@ Item {
   }
   // The view with the preview as its hero, unadded: the rows and the range
   // as they are, and its chart once it can be drawn. The view itself while
-  // there is none. A symbol in All has its chart as it does featured; a US
-  // listing outside it has Yahoo's own day: Robinhood is asked only for All.
+  // there is none. A US stock or ETF outside All waits on Robinhood's
+  // answers as one in All does (`askOvernight`), so the preview says what
+  // the stock added would. Found in the overnight QA of 23 October: NVDA's
+  // preview said CLOSED and drew Thursday, then OVERNIGHT with tonight's
+  // chart a second after ADD.
   readonly property var previewView: {
     var symbol = root.previewSymbol
     if (!symbol) return view
@@ -143,11 +146,9 @@ Item {
     var quotes = own ? previewFeed.quotes : feed.quotes
     var entries = own ? previewFeed.entries : feed.entries
     var range = view.range
-    var nights = own ? ({}) : overnightFeed.entries
-    var allDay = own ? null : allDayFeed.entries
     var chart = Chart.viewChart(symbol, range, quotes, quotes[symbol] ? ({}) : entries,
-      range === "1D" ? ({}) : historyFeed.entries, nights, allDay, calendars)
-    root.keepDay(symbol, chart, nights, allDay)
+      range === "1D" ? ({}) : historyFeed.entries, overnightFeed.entries, allDayFeed.entries, calendars)
+    root.keepDay(symbol, chart, overnightFeed.entries, allDayFeed.entries)
     return Object.assign({}, view, { featured: symbol, chart: chart })
   }
   readonly property var previewEntries: previewFeed.entries
@@ -182,14 +183,17 @@ Item {
   // it trades all day, once a day each (`Overnight.allDayDue`); and the
   // prints of each not known to trade only by day, each by its own last ask
   // (`Overnight.overnightDue`): never asked, every 5 minutes as a night
-  // goes, once after it ends. Whatever is asked takes with it each one due
-  // within half that, so the list stays one request a night's 5 minutes,
-  // and one the gate held back goes as soon as it lets it. With nothing
-  // open, once a session, for the pill's symbol alone, what Robinhood has
-  // not answered for it, as soon as Yahoo has answered it live, so the
-  // first click finds its chart in hand. Looked at as the clock ticks,
-  // answers land, the listings change, a surface opens, and the screens
-  // answer; never while every screen is off (`screensClear`).
+  // goes, once after it ends. A resting preview of one outside All, on a
+  // surface a screen shows, is asked with them, and goes alone ahead of
+  // them while it has no answer: its chart is the one waited on. Whatever
+  // is asked takes with it each one due within half that, so the list
+  // stays one request a night's 5 minutes, and one the gate held back goes
+  // as soon as it lets it. With nothing open, once a session, for the
+  // pill's symbol alone, what Robinhood has not answered for it, as soon as
+  // Yahoo has answered it live, so the first click finds its chart in hand.
+  // Looked at as the clock ticks, answers land, the listings change, a
+  // surface opens, and the screens answer; never while every screen is off
+  // (`screensClear`).
   property bool pillAsked: false
   function askOvernight() {
     if (!root.pluginsReady) return
@@ -197,7 +201,12 @@ Item {
     var pill = root.view.featured
     var live = !!feed.entries[pill] && feed.entries[pill].status === "ok" && root.overnightSymbols.indexOf(pill) >= 0
     if (!open && (root.pillAsked || !live)) return
-    var listings = open ? root.overnightSymbols : [pill]
+    var previewed = root.previewSymbol
+    var previewQuote = previewFeed.quotes[previewed] || feed.quotes[previewed] || null
+    var previewing = open && root.previewRests && root.previewShown && !!previewQuote
+      && root.library.indexOf(previewed) < 0 && Overnight.hasOvernight(previewQuote, root.calendars)
+    var waited = previewing ? previewed : pill
+    var listings = open ? root.overnightSymbols.concat(previewing ? [previewed] : []) : [pill]
     var tradability = listings.filter(function(s) {
       return open ? Overnight.allDayDue(allDayFeed.entries[s], root.now) : !allDayFeed.entries[s]
     })
@@ -220,12 +229,12 @@ Item {
     // The pill's own ask waits for a request already out, then goes.
     if (!open && (allDayFeed.busy || overnightFeed.busy)) return
     if (!open) root.pillAsked = true
-    // The pill's symbol with no answer yet goes alone, ahead of the rest:
-    // its chart is the one a click waits on. A feed with a request out
-    // sends nothing more; each answer asks again for what is still wanted.
+    // The chart waited on with no answer yet goes alone, ahead of the rest.
+    // A feed with a request out sends nothing more; each answer asks again
+    // for what is still wanted.
     var ask = function(robinhood, symbols) {
-      var alone = symbols.length > 1 && symbols.indexOf(pill) >= 0 && !robinhood.entries[pill]
-      robinhood.fetch(alone ? [pill] : symbols, root.now)
+      var alone = symbols.length > 1 && symbols.indexOf(waited) >= 0 && !robinhood.entries[waited]
+      robinhood.fetch(alone ? [waited] : symbols, root.now)
     }
     ask(allDayFeed, tradability)
     ask(overnightFeed, prints)
@@ -554,7 +563,10 @@ Item {
     gate: yahooGate
     centExchanges: root.centExchanges
     bulk: false
-    onQuotesChanged: if (root.pendingFundamentals) root.fetchFundamentals(root.pendingFundamentals)
+    onQuotesChanged: {
+      if (root.pendingFundamentals) root.fetchFundamentals(root.pendingFundamentals)
+      root.askOvernight()
+    }
   }
 
   FundamentalsFeed {

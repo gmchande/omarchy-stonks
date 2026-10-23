@@ -36,8 +36,8 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
   if (!quote && !quoteFailed) return null
   var chart = { symbol: symbol, range: range, quote: quote, day: quote, latest: null, history: null, failed: false, allDay: false }
   if (quote && Overnight.hasOvernight(quote, calendars)) {
-    // A listing never asked of Robinhood (`allDay` null, a preview outside
-    // All) has Yahoo's own day.
+    // A listing never asked of Robinhood (`allDay` not given, as in a
+    // harness that stubs the service) has Yahoo's own day.
     var tradability = allDay ? allDay[symbol] : { allDay: false }
     chart.allDay = !!tradability && tradability.allDay
     var night = nights[symbol]

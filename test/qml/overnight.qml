@@ -452,8 +452,10 @@ ShellRoot {
         harness.strip() + " | " + reed.start + " to " + reed.end)
 
       // Search's choice on the hero: a symbol in All shows its chart as it
-      // does featured, SILK's thin night; one not yet added keeps its
-      // session day, and Robinhood is never asked for it.
+      // does featured, SILK's thin night; a US stock not yet added is asked
+      // of Robinhood as one in All is, so its preview trades all night as
+      // it will once added. Found in the overnight QA of 23 October: NVDA's
+      // preview said CLOSED, then OVERNIGHT a second after ADD.
       app.testKeyCatcher.forceActiveFocus()
       keyClick(Qt.Key_A)
       within(2000, function() { return body.adding })
@@ -462,23 +464,22 @@ ShellRoot {
       var listed = body.featuredGeometry
       body.previewTo("AAPL")
       within(4000, function() { return body.chartSymbol === "AAPL" && !body.chartLoading })
-      var unadded = body.featuredGeometry
-      harness.check("search's preview of a symbol in All shows its chart as featured; one not yet added, a US stock, draws Yahoo's own day, 04:00 to 20:00, a print a step, never asked of Robinhood",
-        body.adding && listed.start === silkNight.start && listed.end === silkNight.end && listed.points.length === silkNight.points.length && body.chartSymbol === "AAPL"
-          && unadded.end - unadded.start === 16 * 3600 && harness.asked() === "NEST,REED,SILK"
-          && harness.allDayAsked("AAPL") === 0,
-        body.chartSymbol + " | " + (listed.end - listed.start) + " s, " + (unadded.end - unadded.start) + " s"
-          + " | asked " + harness.asked() + ", all-day asked " + harness.allDayAsked("AAPL"))
+      var unadded = service.previewView.chart
+      var previewSaid = [body.chartSymbol, body.adding, listed.start === silkNight.start && listed.end === silkNight.end,
+        listed.points.length + "/" + silkNight.points.length, harness.allDayAsked("AAPL"), harness.printsAsked("AAPL"), !!unadded && unadded.allDay]
+      harness.check("search's preview of a symbol in All shows its chart as featured; one not yet added, a US stock, is asked of Robinhood and trades all night, as it will added",
+        previewSaid.join(" ") === "AAPL true true " + silkNight.points.length + "/" + silkNight.points.length + " 1 1 true",
+        "symbol, adding, SILK's span, its points, AAPL's all-day and prints asks, all day: " + previewSaid.join(" "))
       body.cancelAdding()
       within(3000, function() { return !body.adding && body.chartSymbol === "REED" && !body.chartLoading })
       featureShown("^GSPC")
       var index = body.featuredGeometry
       harness.check("an index has no overnight: never asked for, no line, and its 1D is its session",
-        harness.strip() === "" && index.end - index.start < 8 * 3600 && harness.asked() === "NEST,REED,SILK",
+        harness.strip() === "" && index.end - index.start < 8 * 3600 && harness.asked().split(",").indexOf("^GSPC") < 0,
         harness.strip() + " | " + (index.end - index.start) + " s | asked " + harness.asked())
       featureShown("BTC-USD")
       harness.check("a cryptocurrency has no overnight: never asked for, and no line",
-        harness.strip().indexOf("OVERNIGHT") < 0 && harness.asked() === "NEST,REED,SILK", harness.strip() + " | asked " + harness.asked())
+        harness.strip().indexOf("OVERNIGHT") < 0 && harness.asked().split(",").indexOf("BTC-USD") < 0, harness.strip() + " | asked " + harness.asked())
 
       // After the close, a scrub to the day's end reads the close the hero
       // shows at rest, at its time; the after-hours reads its own prints.
@@ -925,25 +926,25 @@ ShellRoot {
           && harness.allDayAsked("SPY") === 2,
         down + " then " + body.featuredGeometry.start + ", asked " + harness.allDayAsked("SPY"))
 
-      // A preview's day is its own: NEST, taken out of All and previewed
-      // from search, draws Yahoo's day, never asked of Robinhood; added back,
-      // with the preview's quote, it draws its calendar day again. Found in
-      // review: the kept day of the preview stood in for it.
+      // A preview's day is what the stock added draws: NEST, taken out of
+      // All and previewed from search, draws its calendar day from
+      // midnight, and so does it added back. Found in the overnight QA of
+      // 23 October: a preview drew Yahoo's day under CLOSED.
       service.removeSymbol("NEST")
       within(2000, function() { return service.library.indexOf("NEST") < 0 })
       app.testKeyCatcher.forceActiveFocus()
       keyClick(Qt.Key_A)
       within(2000, function() { return body.adding })
       body.previewTo("NEST")
-      within(5000, function() { return body.chartSymbol === "NEST" && !body.chartLoading && body.featuredGeometry.start !== harness.midnight.wed7 })
+      within(5000, function() { return body.chartSymbol === "NEST" && !body.chartLoading })
       var previewed = body.featuredGeometry.start
       service.addSymbol("NEST")
       within(5000, function() { return service.arriving.length === 0 && service.library.indexOf("NEST") >= 0 })
       body.cancelAdding()
       within(3000, function() { return !body.adding })
       featureShown("NEST")
-      harness.check("NEST previewed outside All draws Yahoo's day from 04:00; added back, its calendar day from midnight",
-        previewed === harness.midnight.wed7 + 4 * 3600 && body.featuredGeometry.start === harness.midnight.wed7,
+      harness.check("NEST previewed outside All draws its calendar day from midnight, as it does added back",
+        previewed === harness.midnight.wed7 && body.featuredGeometry.start === harness.midnight.wed7,
         previewed + " then " + body.featuredGeometry.start)
 
       // An exchange's time says its zone only where it is not the reader's
