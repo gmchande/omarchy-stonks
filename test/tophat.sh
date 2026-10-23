@@ -791,7 +791,8 @@ record_headless() {
   echo recording > "$run/record.status"
   while kill -0 "$rec" 2> /dev/null && (( ! stopping )); do sleep 0.5; done
   (( stopping )) || lost "wf-recorder exited"
-  kill -INT "$rec" 2> /dev/null
+  # nested is a function, so the job is a subshell with wf-recorder its child.
+  kill -INT $(pgrep -P "$rec" -x wf-recorder) 2> /dev/null
   wait "$rec"
   (( stopping )) && echo saved > "$run/record.status"
 }
