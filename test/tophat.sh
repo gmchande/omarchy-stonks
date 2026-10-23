@@ -902,7 +902,8 @@ self_check() {
   local tmp=$check_tmp
   # Whatever a failed step left: the stand-in session's group and its escapee.
   trap '[ -f "$check_tmp/base/fake/leader" ] && kill -KILL -- "-$(cut -d" " -f1 "$check_tmp/base/fake/leader")" 2>/dev/null
-    [ -f "$check_tmp/escapee" ] && kill "$(cat "$check_tmp/escapee")" 2>/dev/null; rm -rf "$check_tmp"' EXIT
+    [ -f "$check_tmp/escapee" ] && kill "$(cat "$check_tmp/escapee")" 2>/dev/null
+    [ -f "$check_tmp/standins" ] && kill -KILL $(cat "$check_tmp/standins") 2>/dev/null; rm -rf "$check_tmp"' EXIT
   miss() { echo "FAILED $*"; failed=1; }
   export TOPHAT_BASE=$tmp/base TOPHAT_RUNTIME=$tmp/rt TOPHAT_SLOT=$tmp/slot TOPHAT_LOCK=$tmp/lock TOPHAT_PYTHON=$tmp/tools/python3
   base=$TOPHAT_BASE runtime=$TOPHAT_RUNTIME slot=$TOPHAT_SLOT lock=$TOPHAT_LOCK restarts=${TOPHAT_LOCK%.lock}.restarts current=$TOPHAT_BASE/current-$key
@@ -1172,6 +1173,46 @@ EOF
     explained "$t1" "$t2" && miss "a restart at $began, outside the session (1000 to 9000), should explain nothing"
   done
   rm -rf "$restarts"
+
+  # The owner's clipboard watchers, on stand-ins named wl-paste (bash under
+  # that name, with --watch on its command line, as the real ones have). Each
+  # clipboard change forks a child from a real watcher that keeps its name
+  # and command line until it runs the capture script: a stand-in forks a
+  # subshell on USR1, which stays in the fork's state. That child, coming
+  # and going, is not the owner changing their watchers; a watcher gone,
+  # added or replaced is. The owner's own watchers are left out of the
+  # comparison: only the stand-ins' lines are read.
+  mkdir -p "$tmp/watch"; ln -s "$(command -v bash)" "$tmp/watch/wl-paste"; mkfifo "$tmp/watch/fifo"
+  : > "$tmp/standins"
+  watcher() {  # sets WATCHER to the pid of a new stand-in
+    FIFO=$tmp/watch/fifo "$tmp/watch/wl-paste" -c 'trap "( read -t 120 x <> \"\$FIFO\" ) &" USR1; while :; do read -t 120 x <> "$FIFO"; done' --watch &
+    WATCHER=$!; echo "$WATCHER" >> "$tmp/standins"
+  }
+  standins_seen() {  # the stand-ins among the clipboard watchers' pids, as the facts name them
+    "$here/host-facts.sh" 6>&- | grep '^clipboard watchers:' | tr ' ' '\n' | grep -xFf "$tmp/standins" | paste -sd' '
+  }
+  seen_is() { [ "$(standins_seen)" = "$1" ]; }
+  watcher; local first=$WATCHER
+  within 5 seen_is "$first" || miss "a clipboard watcher should be named by its pid in the facts, got '$(standins_seen)'"
+  local before; before=$(standins_seen)
+  has_child() { ps -o stat= --ppid "$1" | grep -qv Z; }  # a zombie is gone, but for its parent's wait
+  kill -USR1 "$first"
+  within 5 has_child "$first" || miss "the stand-in watcher never forked its child"
+  local child; child=$(pgrep -P "$first" | head -n 1); echo "$child" >> "$tmp/standins"
+  seen_is "$before" || miss "a watcher's forked child should not count as a watcher, got '$(standins_seen)' for $first and its child $child"
+  kill -KILL "$child"; within 5 eval '! has_child '"$first" || miss "the stand-in's child never ended"
+  seen_is "$before" || miss "a watcher's forked child ending should change no fact, got '$(standins_seen)'"
+  watcher; local second=$WATCHER
+  seen_is "$first $second" || miss "a second watcher should be named as well, got '$(standins_seen)'"
+  facts_same <(echo "clipboard watchers: $before") <(echo "clipboard watchers: $(standins_seen)") "in the self-check" 2> /dev/null \
+    && miss "a clipboard watcher started during a session should fail its stop"
+  kill -KILL "$first"; wait "$first" 2> /dev/null
+  facts_same <(echo "clipboard watchers: $before") <(echo "clipboard watchers: $(standins_seen)") "in the self-check" 2> /dev/null \
+    && miss "a clipboard watcher replaced during a session should fail its stop"
+  kill -KILL "$second"; wait "$second" 2> /dev/null
+  [ -z "$(standins_seen)" ] || miss "watchers that ended should leave the facts, got '$(standins_seen)'"
+  facts_same <(echo "clipboard watchers: $before") <(echo "clipboard watchers: $(standins_seen)") "in the self-check" 2> /dev/null \
+    && miss "a clipboard watcher ended during a session should fail its stop"
 
   # The slot, and the launcher's group, on harmless processes: a stand-in
   # compositor that starts a child in the group, one that shrugs off TERM,
