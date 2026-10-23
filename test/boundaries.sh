@@ -41,9 +41,10 @@ none() {
 # hand-off, and the sh and chmod that keep Stonks' files its owner's and
 # the sh that makes the data file so (OwnerOnly); files are read and
 # written only by the service, the version watch reads the manifest, the
-# trend colours read the theme's colours,
-# the cache's files, the saved quotes and the sounds' replay and chimes,
-# are written only through OwnerOnly, and the camera writes its
+# trend colours read the theme's colours, the sounds read their own
+# bundled sounds,
+# the cache's files, the saved quotes and the sounds' replay, chimes, and
+# lead-ins, are written only through OwnerOnly, and the camera writes its
 # screenshot and reads Omasnap's settings; one service owns the feeds; the
 # quote URL is the quote feed's, the fundamentals URLs the fundamentals
 # feed's, the overnight URL the overnight feed's, the all-day URL the
@@ -51,7 +52,7 @@ none() {
 # one IPC target, and a second, the locator, only in the tophat's nested
 # session; only the window's host acts on Hyprland.
 only '\bProcess\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Updates.qml Sounds.qml Camera.qml OwnerOnly.qml
-only '\bFileView\s*\{' Service.qml Updates.qml TrendColors.qml OwnerOnly.qml
+only '\bFileView\s*\{' Service.qml Updates.qml TrendColors.qml OwnerOnly.qml Sounds.qml
 only '\bSettings\s*\{|^import QtCore' Camera.qml
 only '^import Quickshell\.Io' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Service.qml IpcTarget.qml Locator.qml Updates.qml TrendColors.qml Sounds.qml Camera.qml OwnerOnly.qml
 # Only the camera grabs and saves a picture, puts it on the clipboard, and

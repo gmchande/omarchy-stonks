@@ -289,7 +289,8 @@ EOF
 # stopped, as a real player does. And pw-dump's, an empty list of nodes, so
 # no microphone keeps the market's bell quiet; and pw-cat's, which logs each
 # stream of silence that keeps the output awake to RUN/silence.log, "start
-# MS ARGS" and "stopped MS", and holds no output.
+# MS ARGS", "streaming MS" 100 ms on, when it says what pw-cat -v says as
+# its stream reaches a waking output, and "stopped MS", and holds no output.
 write_standins() {
   local run=$1 name
   mkdir -p "$run/stubs"
@@ -327,6 +328,9 @@ log=$(printf %q "$run/silence.log")
 ms() { echo \$(( \$(date +%s%N) / 1000000 )); }
 trap 'echo "stopped \$(ms)" >> "\$log"; exit 0' TERM INT
 echo "start \$(ms) \$*" >> "\$log"
+sleep 0.1
+echo "streaming \$(ms)" >> "\$log"
+echo "stream state changed paused -> streaming" >&2
 while :; do sleep 0.2; done
 EOF
   chmod +x "$run/stubs/pw-cat"

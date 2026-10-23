@@ -572,10 +572,20 @@ Item {
   }
   onOnScreenChanged: if (service) service.surfaceShown(root, surfaceOpen && onScreen)
   onServiceChanged: if (service && surfaceOpen && onScreen) service.surfaceShown(root, true)
+  // The chart scrubbed, by the pointer on it or by keys, where a screen
+  // shows it, and not while every screen is off, which the popup's own
+  // `onScreen` doesn't follow: the sounds keep the output awake meanwhile,
+  // for its chimes.
+  readonly property bool scrubbing: surfaceOpen && onScreen && !(service && service.screensOff) && motion.scrubT !== 0
+  onScrubbingChanged: if (sounds) sounds.scrubbing(root, scrubbing)
   // A surface taken down mid-replay, as a rebuilt bar or a removed screen
-  // takes its popup, stops its replay's sound with it.
+  // takes its popup, stops its replay's sound with it, and its scrub's
+  // hold on the output.
   Component.onDestruction: {
-    if (sounds) sounds.stopReplay(root)
+    if (sounds) {
+      sounds.stopReplay(root)
+      sounds.scrubbing(root, false)
+    }
     if (service) {
       service.surfaceShown(root, false)
       service.preview(root, "")
@@ -837,10 +847,13 @@ Item {
     chimed = bar
   }
 
-  // A replay plays the shown chart; the motion runs it.
+  // A replay plays the shown chart; the motion runs it. After a quiet
+  // spell it starts once the output is awake (`Sounds.whenAwake`), so its
+  // sound keeps in step with its sweep from the first bar.
   function replay() {
     showingHelp = false
-    motion.replay()
+    if (!sounds) return motion.replay()
+    sounds.whenAwake(root, function() { if (root.surfaceOpen) motion.replay() })
   }
 
   // A screenshot of the chart on show, as the camera or y takes it: laid

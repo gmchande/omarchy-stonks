@@ -36,7 +36,6 @@ Item {
     id: speaker
     turnedOn: dataService.soundsOn
     retro: dataService.retro
-    surfacesOpen: dataService.openSurfaces.length > 0
     files: dataService.files
   }
 

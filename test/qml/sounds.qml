@@ -13,9 +13,10 @@ import "plugin" as Stonks
 // records what it was asked to play: on by default, the add, remove, and
 // undo sounds in each look's voice, the add as its row joins, a replay's
 // sound made from its chart and stopped with it, one sound at a time, the
-// scrub's chimes by keys and by the pointer, nothing while off, and nothing
-// for what happens on its own or for the rest of looking around. HOME and
-// curl are scratch.
+// scrub's chimes by keys and by the pointer, the stream of silence only
+// while a chart is scrubbed, the lead-in of silence on a sound after a quiet
+// spell, nothing while off, and nothing for what happens on its own or for
+// the rest of looking around. HOME and curl are scratch.
 ShellRoot {
   id: harness
 
@@ -94,9 +95,10 @@ ShellRoot {
       return { what: words[0], ms: Number(words[1]), n: Number(words[2]), args: words.slice(3, -1).join(" "), file: words[words.length - 1] }
     })
   }
-  // A chime is any start of a chime's file; every other start is a sound.
+  // A chime is any start of a chime's file, with a lead-in or not; every
+  // other start is a sound.
   function isChime(e) {
-    return /\/chime-(smooth|retro)-\d+\.wav$/.test(e.file)
+    return /\/chime-(lead\d+-)?(smooth|retro)-\d+\.wav$/.test(e.file)
   }
   function starts() {
     return record().filter(function(e) { return e.what === "start" && !isChime(e) })
@@ -104,14 +106,20 @@ ShellRoot {
   function chimes() {
     return record().filter(function(e) { return e.what === "start" && isChime(e) })
   }
-  // A chime's voice and bar, as "retro-3".
+  // A chime's voice and bar, as "retro-3", with a lead-in or not.
   function bar(chime) {
-    return chime.file.replace(/^.*\/chime-/, "").replace(/\.wav$/, "")
+    return chime.file.replace(/^.*\/chime-(lead\d+-)?/, "").replace(/\.wav$/, "")
+  }
+  // The lead-in of silence a start's file opens with, in ms: a chime's by
+  // its name, a fixed sound's 150.
+  function lead(e) {
+    var chime = /\/chime-lead(\d+)-[^\/]*\.wav$/.exec(e.file)
+    return chime ? Number(chime[1]) : /\/lead-[^\/]*\.wav$/.test(e.file) ? 150 : 0
   }
 
   Stonks.Service { id: service }
   Stonks.Updates { id: updates }
-  Stonks.Sounds { id: sounds; turnedOn: service.soundsOn; retro: service.retro; surfacesOpen: service.openSurfaces.length > 0; files: service.files }
+  Stonks.Sounds { id: sounds; turnedOn: service.soundsOn; retro: service.retro; files: service.files }
   // The screenshot's camera, its commands the stand-ins on PATH (bin/).
   Stonks.Camera { id: camera }
   Component { id: bellMaker; Stonks.Bell {} }
@@ -159,9 +167,11 @@ ShellRoot {
       return harness.starts()
     }
 
-    // The sound file a start played, as the plugin names it.
+    // The sound file a start played, as the plugin names it: a fixed
+    // sound's lead-in as the sound it leads.
     function played(start) {
-      return start.file.replace(/^.*\/plugin\//, "")
+      var lead = /\/lead-(smooth|retro)-(\w+)\.wav$/.exec(start.file)
+      return lead ? "sounds/" + lead[1] + "/" + lead[2] + ".wav" : start.file.replace(/^.*\/plugin\//, "")
     }
 
     // What follows the sound started at `index` (1-based, among sounds, not
@@ -969,28 +979,60 @@ ShellRoot {
       harness.check("a click on another row stops the replay's sound with the replay", endOf(before + 3) === "stopped", endOf(before + 3))
 
       // The output kept awake (the stand-in pw-cat): a stream of silence
-      // while a surface is open with sounds on, held as the last closes,
-      // ended a while after; none while every surface has been closed that
-      // long, and none with sounds off. One that ends on its own while a
-      // surface is open starts again.
+      // only while a chart is scrubbed with sounds on, by the pointer on it
+      // or by keys, and a second after; none while the popup and the window
+      // are open and nothing is scrubbed, and none with sounds off. One that
+      // ends on its own while it's wanted starts again.
       var silence = function() {
         var lines = harness.readFile(harness.fakeState + "/pw-cat.log").split("\n").filter(function(l) { return l !== "" })
-        return { running: lines.length > 0 && /^start /.test(lines[lines.length - 1]),
-          starts: lines.filter(function(l) { return /^start /.test(l) }).length, last: lines[lines.length - 1] || "" }
+        var stops = lines.filter(function(l) { return /^stopped /.test(l) })
+        return { running: lines.length > 0 && /^(start|streaming) /.test(lines[lines.length - 1]),
+          starts: lines.filter(function(l) { return /^start /.test(l) }).length, last: lines[lines.length - 1] || "",
+          stoppedAt: stops.length ? Number(stops[stops.length - 1].split(" ")[1]) : 0 }
       }
-      panel.open()
-      tryVerify(function() { return silence().running }, 3000)
-      var awakeWhileOpen = silence().running
+      // The window opened again takes the keys back from the popup's card,
+      // which the replay above opened last; it starts no silence.
+      tryVerify(function() { return !silence().running }, 3000)
       app.close()
-      panel.close()
-      wait(200)
-      var heldAtClose = silence().running
-      tryVerify(function() { return !silence().running }, 15000)
-      var restsWhenClosed = !silence().running
+      app.open("{}")
+      tryVerify(function() { return app.opened && win.surfaceOpen && !win.chartLoading }, 5000)
+      app.testKeyCatcher.forceActiveFocus()
+      mouseMove(win, 1, 1)
+      var startsOpen = silence().starts
+      wait(300)
+      var restsOpen = !silence().running && silence().starts === startsOpen
+      // A quiet spell: Stonks counts the output asleep 4 s after its last
+      // sound or its silence's end. Then a burst of key steps, one about
+      // every 50 ms for 1.6 s, each striking a chime, across the output's
+      // waking.
+      wait(4500)
       var startsBefore = silence().starts
-      panel.open()
+      var chimesBefore = harness.chimes().length
+      var burstFrom = Date.now()
+      while (Date.now() - burstFrom < 1600) {
+        keyClick(Qt.Key_Left)
+        wait(40)
+      }
+      wait(200)
+      var byKeys = silence().running && silence().starts === startsBefore + 1
+      var struck = harness.chimes().slice(chimesBefore)
+      var awake = struck[struck.length - 1]
+      keyClick(Qt.Key_Escape)
+      tryVerify(function() { return !silence().running }, 3000)
+      startsBefore = silence().starts
+      for (var sx = 0.1; sx < 0.6; sx += 0.05) {
+        mouseMove(chart, chart.width * sx, chart.height / 2)
+        wait(20)
+      }
       tryVerify(function() { return silence().running }, 3000)
-      var wokeOnOpen = silence().starts === startsBefore + 1
+      var byPointer = silence().starts === startsBefore + 1
+      var leftAt = Date.now()
+      mouseMove(win, 1, 1)
+      tryVerify(function() { return !silence().running }, 3000)
+      var heldAfter = !silence().running && silence().stoppedAt - leftAt >= 900
+      startsBefore = silence().starts
+      keyClick(Qt.Key_Left)
+      tryVerify(function() { return silence().running }, 3000)
       harness.writeText(harness.fakeState + "/pw-cat.exit", "now")
       tryVerify(function() { return /^exited /.test(silence().last) }, 3000)
       fileProc.command = ["rm", "-f", harness.fakeState + "/pw-cat.exit"]
@@ -998,14 +1040,75 @@ ShellRoot {
       tryVerify(function() { return !fileProc.running }, 2000)
       tryVerify(function() { return silence().running }, 5000)
       var backAfterExit = silence().running && silence().starts === startsBefore + 2
+      // The output may have gone with the stream: the chime struck as it
+      // comes back opens with the lead-in.
+      var backAt = Number(silence().last.split(" ")[1])
+      var chimesNow = harness.chimes().length
+      keyClick(Qt.Key_Left)
+      tryVerify(function() { return harness.chimes().length > chimesNow }, 2000)
+      var afterExit = harness.chimes()[harness.chimes().length - 1]
       service.persist({ sounds: false })
       tryVerify(function() { return !silence().running }, 3000)
       var offRests = !silence().running
       service.persist({ sounds: true })
-      panel.close()
-      harness.check("a stream of silence holds the output while a surface is open with sounds on, still as it closes, and rests a while after, or at once with sounds off; one that ends while a surface is open starts again",
-        awakeWhileOpen && heldAtClose && restsWhenClosed && wokeOnOpen && backAfterExit && offRests,
-        [awakeWhileOpen, heldAtClose, restsWhenClosed, wokeOnOpen, backAfterExit, offRests].join(","))
+      tryVerify(function() { return silence().running }, 3000)
+      keyClick(Qt.Key_Escape)
+      tryVerify(function() { return !silence().running }, 3000)
+      var escRests = !silence().running && win.surfaceOpen && win.motion.scrubT === 0
+      harness.check("a stream of silence holds the output only while a chart is scrubbed with sounds on, by the pointer or by keys, until a second after the pointer leaves or Esc: not while the window is merely open, and not with sounds off; one that ends while it's wanted starts again",
+        restsOpen && byPointer && heldAfter && byKeys && backAfterExit && escRests && offRests,
+        [restsOpen, byPointer, heldAfter, byKeys, backAfterExit, escRests, offRests].join(","))
+
+      // A sound that may wake the output opens with silence, then the
+      // sound whole: a scrub's chimes as it wakes the output after a quiet
+      // spell, 150 ms at first, shrinking once the output is reached, never
+      // so fast that a chime rings before one struck ahead of it (each
+      // start plus its lead-in, give or take 10 ms for starting the
+      // stand-in); a chime as the stream comes back from ending on its own;
+      // and a sound after a quiet spell, the shutter here. A chime once the
+      // output is awake plays at once.
+      var leadsInto = function(start, plain) {
+        var a = new Uint8Array(harness.readBytes(harness.fakeState + "/pw-play." + start.n + ".wav"))
+        var b = new Uint8Array(harness.readBytes(plain))
+        var zeros = Math.round(new DataView(b.buffer).getUint32(24, true) * harness.lead(start) / 1000) * 2
+        if (b.length <= 44 || a.length !== b.length + zeros) return false
+        for (var i = 44; i < 44 + zeros; i++) if (a[i] !== 0) return false
+        for (var j = 44; j < b.length; j++) if (a[j + zeros] !== b[j]) return false
+        return true
+      }
+      wait(4500)
+      before = harness.starts().length
+      mouseClick(lens, lens.width / 2, lens.height / 2)
+      var quietShutter = startsBy(before + 1)[before]
+      tryVerify(function() { return !camera.busy }, 5000)
+      var leads = struck.map(harness.lead)
+      var chimesLed = leads[0] === 150 && struck.every(function(c) {
+        return !harness.lead(c) || leadsInto(c, sounds.folder + "/chime-" + harness.bar(c) + ".wav")
+      })
+      var inOrder = struck.every(function(c, i) { return i === 0 || c.ms + leads[i] >= struck[i - 1].ms + leads[i - 1] - 10 })
+      var shutterLed = harness.lead(quietShutter) === 150 && played(quietShutter) === "sounds/" + sounds.voice + "/shutter.wav"
+        && leadsInto(quietShutter, sounds.bundled(sounds.voice, "shutter"))
+      harness.check("after a quiet spell, a scrub's first chime and the shutter open with 150 ms of silence, then the sound whole, the scrub's lead-ins shrinking so no chime rings before one struck ahead of it, and a chime as the stream comes back from ending on its own opens with one too; a chime once the output is awake plays at once",
+        chimesLed && inOrder && shutterLed && harness.lead(afterExit) > 0 && harness.lead(awake) === 0,
+        [chimesLed, inOrder, shutterLed, harness.lead(afterExit) + " ms " + (afterExit.ms - backAt) + " ms after the stream came back",
+          "heard at " + struck.map(function(c, i) { return (c.ms - struck[0].ms) + "+" + leads[i] }).join(" "), quietShutter.file].join(" | "))
+
+      // A replay after a quiet spell waits for the output instead: its sound
+      // has no lead-in, so it keeps in step with its sweep, and it starts,
+      // picture and sound, once the stream of silence has reached the output
+      // and played 150 ms.
+      wait(4500)
+      before = harness.starts().length
+      var silenceLines = harness.readFile(harness.fakeState + "/pw-cat.log").split("\n").length
+      keyClick(Qt.Key_P)
+      var waited = startsBy(before + 1)[before]
+      var replayedAt = win.motion.replayRunning
+      var reached = harness.readFile(harness.fakeState + "/pw-cat.log").split("\n").slice(silenceLines - 1)
+        .filter(function(l) { return /^streaming /.test(l) }).map(function(l) { return Number(l.split(" ")[1]) })[0]
+      tryVerify(function() { return !win.motion.replayRunning }, 4000)
+      harness.check("after a quiet spell, p starts the replay once the silence has reached the output and played 150 ms, its sound with no lead-in, in step with its sweep",
+        waited.file === sounds.replayPath && replayedAt && reached > 0 && waited.ms >= reached + 150,
+        waited.file + " | replaying " + replayedAt + " | sound " + (waited.ms - reached) + " ms after the silence reached the output")
 
       // The market's bell, in retro's voice: as the clock passes the open
       // or the close of the market of the stock last looked at, once, a
