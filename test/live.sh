@@ -14,9 +14,10 @@
 # owner's session changed. It waits up to 20 minutes for the sessions
 # running to end, holding the gate meanwhile so no new one starts, and
 # refuses after that, changing nothing. It lets go once the restarted
-# shell's services are back: each fact test/host-facts.sh prints names as
-# many things as before the restart. When they aren't back within a minute,
-# it says which aren't and exits 1, the commit live.
+# shell's services are back, even when the restart failed: each fact
+# test/host-facts.sh prints names as many things as before the restart.
+# When they aren't back within a minute, it says which aren't and exits 1,
+# the commit checked out.
 #
 #   test/live.sh BRANCH-OR-COMMIT
 set -euo pipefail
@@ -52,7 +53,10 @@ if ! { flock -n 7 && flock -n 8; }; then
 fi
 before=$("$here/host-facts.sh" 7>&- 8>&-)
 git -C "$live" checkout --quiet --detach "$commit" 7>&- 8>&-
-omarchy restart shell 7>&- 8>&-
+# A restart that fails may have started the new shell all the same, so its
+# services are waited for either way, and its failure is the exit.
+restarted=0
+omarchy restart shell 7>&- 8>&- || restarted=$?
 # counts: how many words each fact has, its name's included.
 counts() { awk '{ print NF }'; }
 end=$((SECONDS + 60))
@@ -66,3 +70,4 @@ until [ "$("$here/host-facts.sh" 7>&- 8>&- | counts)" = "$(counts <<< "$before")
   sleep 0.5
 done
 echo "live: $(git -C "$live" log -1 --oneline)"
+exit "$restarted"

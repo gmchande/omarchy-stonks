@@ -534,8 +534,10 @@ cmd_start() {
   esac
   slot_free && socket_paths_fit "$runtime" && bus_ok || exit 1
   # A share of the tophat lock until the launcher holds its own, so no
-  # restart lands between host-before and the session.
-  exec 7>> "$lock" && flock -s -n 7 || { restart_busy; exit 1; }
+  # restart lands between host-before and the session. It's taken under a
+  # share of the gate, so it can't slip in once a restart waits.
+  exec 5>> "$gate" 7>> "$lock" && flock -s -n 5 && flock -s -n 7 || { restart_busy; exit 1; }
+  exec 5>&-
   # The slot is free, so whatever current names has ended.
   rm -f "$current"
 
