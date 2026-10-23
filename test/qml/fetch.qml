@@ -961,6 +961,26 @@ ShellRoot {
         byR.join(" / ") + " | " + scheduled + " " + bySchedule.join(" / "))
       closeWindow()
 
+      // Thursday, trading: a day whose current after-hours period ends at
+      // {"toString": null} fails its own listing, as a bad answer does, and
+      // the rest of the list is still asked for on its schedule. The day read
+      // as a quote, and every look for what was due threw on it, so no row
+      // was asked for again (the 1.0.4 security review's finding).
+      openWindow()
+      service.addSymbol("HOSTILE")
+      var hostileFailed = within(15000, function() {
+        return !!service.entries.HOSTILE && service.entries.HOSTILE.status === "failed" && idle()
+      })
+      var hostileFrom = harness.requests().length
+      tick(120, 5)
+      var afterHostile = harness.quoteCounts(harness.requests().slice(hostileFrom))
+      var trading = ["NEST", "KILN", "SPY", "BTC-USD"]
+      harness.check("a day whose period ends at an object fails its own listing, and the list's next runs go on the schedule",
+        hostileFailed && trading.every(function(s) { return afterHostile[s] > 0 }),
+        (service.entries.HOSTILE ? service.entries.HOSTILE.status : "no answer") + " | "
+          + trading.map(function(s) { return s + " " + afterHostile[s] }).join(", "))
+      closeWindow()
+
       // Saturday noon, half an hour each.
       countsOver("Saturday noon, nothing open: the pill's symbol every 15 minutes, nothing else",
         1800, counts([2, 0, 0, 0, 0, 0, 0, 0]), startAt(at(harness.sat10, 12, 0)))

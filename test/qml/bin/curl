@@ -29,6 +29,8 @@
 #                answered ^STOXX50E
 #   MANGLED      answers AAPL's day with its pre-market period null, a
 #                malformed answer, in its chart and in a spark run alike
+#   HOSTILE      answers AAPL's day with its current after-hours period's end
+#                {"toString": null}, which no comparison can read
 #   HISTSTRAY    answers saved intraday MSFT data through the history path
 #   HUGE         answers AAPL's day padded past 64 KB, over the day's cap
 #   GONE         answers 404, a symbol Yahoo does not know
@@ -51,9 +53,10 @@
 # and NEST's saved month for NEST; KILN, SPY, ^GSPC, BTC-USD, SHEL.L, and
 # 7203.T, one of each kind of listing, answer their own saved years.
 # Fundamentals answer from test/fixtures/fundamentals: the timeseries by
-# symbol (MSFT and NVDA take AAPL's; a symbol with none saved gets SPY's,
-# every series empty), and the daily closes around the snapshots' dates
-# likewise. Every fundamentals request is counted in FUNDAMENTALS.calls, and
+# symbol (MSFT, NVDA, and SKEWED take AAPL's; a symbol with none saved gets
+# SPY's, every series empty), and the daily closes around the snapshots'
+# dates likewise, SKEWED's with their offset {"toString": null}.
+# Every fundamentals request is counted in FUNDAMENTALS.calls, and
 # a symbol's timeseries requests in <SYMBOL>.fundamentals.calls. While
 # STONKS_FAKE_STATE/FUNDAMENTALS.down exists both fail.
 # Robinhood's historicals are counted in OVERNIGHT.calls, the symbols of each
@@ -258,7 +261,7 @@ serve() {
   # saved SYMBOL [SUFFIX]: the fundamentals fixture that answers for SYMBOL.
   saved() {
     local name
-    case "$1" in AAPL|MSFT|NVDA) name=aapl ;; *) name=$(tr 'A-Z.' 'a-z-' <<< "$1") ;; esac
+    case "$1" in AAPL|MSFT|NVDA|SKEWED) name=aapl ;; *) name=$(tr 'A-Z.' 'a-z-' <<< "$1") ;; esac
     local file="$fixtures/fundamentals/$name${2:-}.json"
     [ -e "$file" ] || file="$fixtures/fundamentals/spy${2:-}.json"
     echo "$file"
@@ -273,9 +276,14 @@ serve() {
       while [ -e "$STONKS_FAKE_STATE/FUNDAMENTALS.hold" ]; do sleep 0.05; done
     else
       symbol="${url##*/chart/}"
-      file="$(saved "${symbol%%\?*}" -closes)"
+      symbol="${symbol%%\?*}"
+      file="$(saved "$symbol" -closes)"
     fi
     [ -e "$STONKS_FAKE_STATE/FUNDAMENTALS.down" ] && exit 22
+    if [[ "$url" != *"/timeseries/"* && "$symbol" == SKEWED ]]; then
+      jq -c '.chart.result[0].meta.gmtoffset = {"toString": null}' "$file"
+      exit
+    fi
     cat "$file"
     exit
   fi
@@ -342,6 +350,7 @@ serve() {
     BTC-USD) cat "$fixtures/btc-usd-day.json" ;;
     NOCUR) stamp < "$fixtures/ftse-day.json" | jq -c '.chart.result[0].meta.currency = null' ;;
     MANGLED) answer | jq -c '.chart.result[0].meta.tradingPeriods.pre[0][0] = null' ;;
+    HOSTILE) answer | jq -c '.chart.result[0].meta.currentTradingPeriod.post.end = {"toString": null}' ;;
     HUGE) answer; head -c 70000 /dev/zero | tr '\0' ' ' ;;
     GONE) exit 44 ;;
     LONG*) stamp < "$fixtures/moments/listings-2026-10-07-1455/nest.json" ;;

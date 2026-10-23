@@ -53,11 +53,12 @@ function historyDue(range, entry, quote, now, trading) {
 // Yahoo's answer for a range. `centExchanges` as `Quote.parseChart` takes
 // them, for the stray filter's tick. Null, as there, for an answer that is
 // not a chart, whose bars or periods are not lists within Quote's budgets,
-// or whose bar times are not moments. A price at or under zero is none, as
-// in the day's answer (`Quote.knownPrice`): a bar without a close is left
-// out, and its START is its first close when its previous close isn't
-// known. Found in the strain QA: "START 0.00", and a cliff at the chart's
-// left from a negative first close.
+// whose periods are not periods (`Quote.answerClocks`), or whose bar times
+// are not moments; an offset that is not one is none. A price at or under
+// zero is none, as in the day's answer (`Quote.knownPrice`): a bar without a
+// close is left out, and its START is its first close when its previous
+// close isn't known. Found in the strain QA: "START 0.00", and a cliff at
+// the chart's left from a negative first close.
 function parseHistory(json, range, centExchanges) {
   var result = json && json.chart && json.chart.result && json.chart.result[0]
   if (!result || !result.meta) return null
@@ -104,7 +105,7 @@ function parseHistory(json, range, centExchanges) {
     symbol: Format.fetchedText(meta.symbol, Format.MOST_CODE),
     range: range,
     interval: interval,
-    gmtoffset: meta.gmtoffset || 0,
+    gmtoffset: Quote.isOffset(meta.gmtoffset) ? meta.gmtoffset : 0,
     zoneName: Format.fetchedText(meta.timezone, Format.MOST_CODE),
     // An intraday answer's days, each with its own clock, and the live
     // moment Yahoo appends, at the price's own second (`barOffset`).

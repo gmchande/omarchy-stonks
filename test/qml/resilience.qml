@@ -343,6 +343,18 @@ ShellRoot {
       root.check("wake sends the held fundamentals closes once", root.calls("FUNDAMENTALS") === before + 2 && service.fundamentals.MSFT.status === "ok")
       app.close()
       service.screens = null
+      // Closes whose offset is {"toString": null} throw as they are read:
+      // that symbol's cap and P/E fails, and the next symbol's still comes.
+      // The throw left the fetch under way, and no other was asked for.
+      var feed = service.testFundamentals
+      before = root.calls("FUNDAMENTALS")
+      feed.fetch("SKEWED")
+      awaitState(function() { return root.calls("FUNDAMENTALS") === before + 2 }, 3000)
+      feed.fetch("NVDA")
+      var nextCame = within(5000, function() { return !feed.busy && !!feed.entries.NVDA && feed.entries.NVDA.status === "ok" })
+      root.check("closes that throw as they are read fail their own cap and P/E, and the next symbol's still comes",
+        nextCame && !!feed.entries.SKEWED && feed.entries.SKEWED.status === "failed",
+        JSON.stringify({ skewed: feed.entries.SKEWED, nvda: feed.entries.NVDA && feed.entries.NVDA.status, busy: feed.busy }))
     }
 
     function test_5_malformedOvernightRecovers() { guarded("test_5_malformedOvernightRecovers", checks_test_5_malformedOvernightRecovers) }

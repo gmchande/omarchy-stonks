@@ -269,11 +269,13 @@ function answerTick(meta, bars, centExchanges) {
 // listings trade in whole cents from $1 (`Market.centExchanges`): their
 // prices and ticks take cents there; any other listing's take Yahoo's hint.
 // Null for an answer that is not a chart, whose bars or periods are not
-// lists within MOST_BARS, MOST_DAYS, and MOST_PERIODS, or whose bar times
+// lists within MOST_BARS, MOST_DAYS, and MOST_PERIODS, whose bar times
 // are not moments (`Format.isMoment`) each after the one before, as every
 // saved answer's are: the chart lays its prints out from the first to the
-// last, and one out of order would land off its grid. `receivedAt`, when
-// given, is when the answer came (`nextDayBegun`).
+// last, and one out of order would land off its grid; or whose trading
+// periods or current ones are not periods (`answerClocks`,
+// `currentPeriods`). An offset that is not one (`isOffset`) is none.
+// `receivedAt`, when given, is when the answer came (`nextDayBegun`).
 function parseChart(json, centExchanges, receivedAt) {
   var result = json && json.chart && json.chart.result && json.chart.result[0]
   if (!result || !result.meta) return null
@@ -286,13 +288,13 @@ function parseChart(json, centExchanges, receivedAt) {
   // an answer without them, as spark's.
   var volumes = quote.volume ? Format.fetchedList(quote.volume, MOST_BARS) : null
   var clocks = answerClocks(meta.tradingPeriods)
-  if (!timestamps || !closes || !opens || !clocks) return null
+  var current = meta.currentTradingPeriod || {}
+  if (!timestamps || !closes || !opens || !clocks || !currentPeriods(current)) return null
   // The session the bars describe is the answer's trading periods. Yahoo's
   // current period moves on to the next session first (Monday's at 00:36 New
   // York, the bars still Friday's), so it stands in only for an answer
   // without them.
-  var periods = meta.tradingPeriods ? answerPeriods(meta.tradingPeriods) : meta.currentTradingPeriod || {}
-  var current = meta.currentTradingPeriod || {}
+  var periods = meta.tradingPeriods ? answerPeriods(meta.tradingPeriods) : current
   var bars = []
   for (var i = 0; i < timestamps.length; i++) {
     if (!Format.isMoment(timestamps[i]) || (i > 0 && !(timestamps[i] > timestamps[i - 1]))) return null
@@ -352,7 +354,7 @@ function parseChart(json, centExchanges, receivedAt) {
     currency: Format.fetchedText(meta.currency, Format.MOST_CODE),
     exchange: exchangeOf(meta),
     timezoneName: Format.fetchedText(meta.exchangeTimezoneName, Format.MOST_CODE),
-    gmtoffset: meta.gmtoffset || 0,
+    gmtoffset: isOffset(meta.gmtoffset) ? meta.gmtoffset : 0,
     // The zone's short name at that offset, as Yahoo writes it: "EDT", "JST".
     zoneName: Format.fetchedText(meta.timezone, Format.MOST_CODE),
     // Each period's own (`answerClocks`), for a print's clock on its day.
@@ -483,8 +485,9 @@ function answerPeriods(periods) {
 // days, and one list of days, a range's and now some day answers' too
 // (`answerPeriods`). Null when a list of
 // days or of a day's periods is not a list within MOST_DAYS or MOST_PERIODS,
-// or a period is not an object: a spark day with a null period threw here,
-// and its feed stopped until Stonks restarted.
+// or a period is not one (`isPeriod`) with an offset (`isOffset`): a spark
+// day with a null period threw here, and its feed stopped until Stonks
+// restarted.
 function answerClocks(periods) {
   var lists = !periods ? [] : Array.isArray(periods) ? [periods] : [periods.pre, periods.regular, periods.post]
   var out = []
@@ -496,13 +499,37 @@ function answerClocks(periods) {
       if (!day) return null
       for (var k = 0; k < day.length; k++) {
         var p = day[k]
-        if (!p || typeof p !== "object") return null
+        if (!isPeriod(p) || !isOffset(p.gmtoffset)) return null
         var midnight = (Math.floor((p.start + p.gmtoffset) / 86400) + 1) * 86400 - p.gmtoffset
         out.push({ start: p.start, until: midnight, offset: p.gmtoffset, zone: Format.fetchedText(p.timezone, Format.MOST_CODE) })
       }
     }
   }
   return out
+}
+
+// Whether `p` is a period every reading of it can take: an object whose
+// start and end are moments (`Format.isMoment`). Found in the 1.0.4
+// security review: a period's end of {"toString": null} threw where a bar
+// was compared with it, and one the parser never compared was kept in the
+// quote, where every look for what was due threw on it, and no row was
+// asked for again until Stonks restarted.
+function isPeriod(p) {
+  return !!p && typeof p === "object" && Format.isMoment(p.start) && Format.isMoment(p.end)
+}
+
+// Whether each current period Yahoo sends, pre, regular, and post, is a
+// period (`isPeriod`). Their offsets are never read.
+function currentPeriods(current) {
+  var names = ["pre", "regular", "post"]
+  for (var i = 0; i < names.length; i++) if (current[names[i]] && !isPeriod(current[names[i]])) return false
+  return true
+}
+
+// Whether `v` is a UTC offset in seconds a clock can keep: a number under a
+// day either way.
+function isOffset(v) {
+  return Format.isFiniteNumber(v) && Math.abs(v) < 86400
 }
 
 // The clock `answer`, a quote or a history, kept at `t`: that of its
