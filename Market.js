@@ -329,8 +329,13 @@ function statusSaying(quote, now, scrubT, calendars, overnight, short) {
   if (brk) {
     return "Lunch break · reopens " + calendarClock(cal, brk, quote) + (short ? "" : " · in " + Format.duration(brk - now))
   }
+  // The stand-in reads the hour by the calendar's clock today, not the
+  // held answer's, which may be from before a change of clocks. Found in
+  // review: a New York quote held from EDT into EST said "Lunch lull" at
+  // 11:00.
   var held = !overnight && !isTrading(sessionPhase(quote, now)) ? calendarRegular(cal, now) : null
-  var q = held ? Object.assign({}, quote, { session: { pre: null, regular: held, post: null }, current: null }) : quote
+  var q = held ? Object.assign({}, quote, { session: { pre: null, regular: held, post: null }, current: null,
+    clocks: [], gmtoffset: localDate(now, cal).offset }) : quote
   var phase = overnight ? "overnight" : sessionPhase(q, now)
   var bell = secondsToBell(q, now)
   var kind = cal ? dayKind(cal, dateStringOf(localDate(now, cal))) : null

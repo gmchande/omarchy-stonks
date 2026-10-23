@@ -838,6 +838,11 @@ test("a quote held from an earlier session says the calendar's session while it 
   const tokyo = hm => M.marketStatus(toyota, M.epochAt(JPX, "2026-10-26", hm), 0, calendars)
   expect([tokyo("09:00"), tokyo("11:45"), tokyo("13:00")])
     .toEqual(["Opening bell · closes in 6h 30m", "Lunch break · reopens 12:30 JST · in 45m", "Market closes in 2h 30m"])
+  // The hour is the calendar's on the day, not the held answer's: AAPL's
+  // answer of Tuesday 1 September, in EDT, held to Monday 2 November, in
+  // EST. Found in review: it said "Lunch lull" at 11:00.
+  const aapl = hm => M.marketStatus(quote, M.epochAt(US, "2026-11-02", hm), 0, calendars)
+  expect([aapl("11:00"), aapl("12:10")]).toEqual(["Market closes in 5h", "Lunch lull · closes in 3h 50m"])
 })
 
 test("a published closure or a break between segments is closed, whatever Yahoo's periods say", () => {
@@ -1198,6 +1203,13 @@ test("a price at or under zero in an answer is left out", () => {
   const q = M.parseChart(day)
   expect([q.price, q.prevClose]).toEqual([null, null])
   expect(q.points.some(p => p.t === firstTime || p.p <= 0)).toBe(false)
+  // With no previous close the day's prints set its scale alone, and it
+  // draws no dashed line: a null close drew one at zero, the day squeezed
+  // flat against the top. Found in review.
+  const day1 = M.chartGeometry(q, calendars)
+  const ys = day1.points.map(p => p.y)
+  expect(day1.baselineY).toBeNull()
+  expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(0.8)
   const year = fixture("history/aapl-5y.json")
   year.chart.result[0].meta.chartPreviousClose = 0
   year.chart.result[0].indicators.quote[0].close[0] = -1

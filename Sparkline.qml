@@ -31,6 +31,9 @@ Item {
   // One print draws, as a dot, as the hero's does: a day with one bar is no
   // empty cell.
   readonly property bool drawable: !!geometry && !!geometry.points && geometry.points.length >= 1
+  // The previous close the dashed line draws, unknown for a quote without
+  // one (`Chart.chartGeometry`): then no line, and no direction to split by.
+  readonly property bool hasBaseline: !!geometry && typeof geometry.baselineY === "number" && isFinite(geometry.baselineY)
 
   onGeometryChanged: { ink.requestPaint(); marks.requestPaint() }
   onLineColorChanged: { ink.requestPaint(); marks.requestPaint() }
@@ -57,18 +60,20 @@ Item {
       var w = width - pad * 2
       var h = height - pad * 2
 
-      ctx.strokeStyle = root.baselineColor
-      ctx.lineWidth = 1
-      // Round ends on every paint: the context keeps the last paint's cap,
-      // so without this a first paint drew square dashes and repaints round.
-      ctx.lineCap = "round"
-      ctx.setLineDash([2, 3])
-      ctx.beginPath()
-      var by = pad + root.geometry.baselineY * h
-      ctx.moveTo(pad, by)
-      ctx.lineTo(pad + w, by)
-      ctx.stroke()
-      ctx.setLineDash([])
+      var by = pad + (root.hasBaseline ? root.geometry.baselineY : 1) * h
+      if (root.hasBaseline) {
+        ctx.strokeStyle = root.baselineColor
+        ctx.lineWidth = 1
+        // Round ends on every paint: the context keeps the last paint's cap,
+        // so without this a first paint drew square dashes and repaints round.
+        ctx.lineCap = "round"
+        ctx.setLineDash([2, 3])
+        ctx.beginPath()
+        ctx.moveTo(pad, by)
+        ctx.lineTo(pad + w, by)
+        ctx.stroke()
+        ctx.setLineDash([])
+      }
 
       ctx.lineWidth = root.lineWidth
       ctx.lineJoin = "round"
