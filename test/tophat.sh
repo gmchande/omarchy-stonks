@@ -125,7 +125,7 @@ read_facts() {
     echo "tophat: test/live.sh is restarting the shell for a deploy; waiting for its services to come back"
     flock -s -w 300 6 || { exec 6>&-; echo "tophat: the shell's restart held the tophat lock ($lock) for 5 minutes" >&2; return 1; }
   fi
-  "$here/host-facts.sh" 6>&- > "$1"
+  "$here/host-facts.sh" 6>&- > "$1" || { exec 6>&-; return 1; }
   read_at=$(date +%s%N)
   exec 6>&-
 }
@@ -1174,26 +1174,55 @@ EOF
   done
   rm -rf "$restarts"
 
-  # The owner's clipboard watchers, on stand-ins named wl-paste (bash under
-  # that name, with --watch on its command line, as the real ones have). Each
+  # Clipboard watchers, on stand-ins: bash under the name wl-paste, with
+  # --watch on its command line, as the real ones have, started by a parent
+  # bash under another name. The owner's watchers have the owner's Quickshell
+  # as their parent (a stand-in named quickshell, with the shell's folder on
+  # its command line and no TOPHAT_RUN); another program's, Herdr's, have any
+  # other parent, and a tophat run's own Quickshell has TOPHAT_RUN. Each
   # clipboard change forks a child from a real watcher that keeps its name
   # and command line until it runs the capture script: a stand-in forks a
   # subshell on USR1, which stays in the fork's state. That child, coming
-  # and going, is not the owner changing their watchers; a watcher gone,
-  # added or replaced is. The owner's own watchers are left out of the
-  # comparison: only the stand-ins' lines are read.
-  mkdir -p "$tmp/watch"; ln -s "$(command -v bash)" "$tmp/watch/wl-paste"; mkfifo "$tmp/watch/fifo"
+  # and going, is not the owner changing their watchers; an owner's watcher
+  # gone, added or replaced is, and another program's is not. The owner's
+  # real watchers are left out of the comparison: only the stand-ins' lines
+  # are read.
+  mkdir -p "$tmp/watch"; mkfifo "$tmp/watch/fifo"
+  local name; for name in wl-paste quickshell herdr; do ln -s "$(command -v bash)" "$tmp/watch/$name"; done
+  mkdir "$tmp/watch/sealed"; ln -s "$python" "$tmp/watch/sealed/quickshell"
   : > "$tmp/standins"
-  watcher() {  # sets WATCHER to the pid of a new stand-in
-    FIFO=$tmp/watch/fifo "$tmp/watch/wl-paste" -c 'trap "( read -t 120 x <> \"\$FIFO\" ) &" USR1; while :; do read -t 120 x <> "$FIFO"; done' --watch &
-    WATCHER=$!; echo "$WATCHER" >> "$tmp/standins"
+  watcher() {  # KIND: owner, run, other or sealed; sets WATCHER and PARENT to the pids of a new stand-in and its parent
+    local parent=quickshell shell_args=(-n -p /usr/share/omarchy/shell) in_run=() pidfile; pidfile=$(mktemp -p "$tmp/watch")
+    local exe=$tmp/watch/quickshell script='"$WPASTE" -c "$WSCRIPT" --watch & echo $! > "$PIDFILE"; wait'
+    [ "$1" != other ] || { parent=herdr; exe=$tmp/watch/herdr; shell_args=(); }
+    [ "$1" != run ] || in_run=(TOPHAT_RUN=check)
+    # A shell whose environment the owner's user can't read, as a process
+    # that set PR_SET_DUMPABLE 0 is: a Python stand-in does that on its own.
+    [ "$1" != sealed ] || { exe=$tmp/watch/sealed/quickshell; script='import ctypes, os, subprocess
+ctypes.CDLL(None).prctl(4, 0, 0, 0, 0)
+p = subprocess.Popen([os.environ["WPASTE"], "-c", os.environ["WSCRIPT"], "--watch"])
+open(os.environ["PIDFILE"], "w").write(str(p.pid))
+p.wait()'; }
+    env -u TOPHAT_RUN "${in_run[@]}" FIFO="$tmp/watch/fifo" PIDFILE="$pidfile" WPASTE="$tmp/watch/wl-paste" \
+      WSCRIPT='trap "( read -t 120 x <> \"\$FIFO\" ) &" USR1; while :; do read -t 120 x <> "$FIFO"; done' \
+      "$exe" -c "$script" "${shell_args[@]}" &
+    PARENT=$!; echo "$PARENT" >> "$tmp/standins"
+    within 5 test -s "$pidfile" || miss "the stand-in parent never started its watcher"
+    WATCHER=$(< "$pidfile"); echo "$WATCHER" >> "$tmp/standins"
+    # Counted only once both have taken their names: ps would show bash before.
+    within 5 eval '[ "$(ps -o comm= -p '"$WATCHER"')" = wl-paste ] && [ "$(ps -o comm= -p '"$PARENT"')" = '"$parent"' ]' \
+      || miss "the stand-ins never took their names"
   }
+  unwatch() { kill -KILL "$@"; wait "$@" 2> /dev/null; }
   standins_seen() {  # the stand-ins among the clipboard watchers' pids, as the facts name them
     "$here/host-facts.sh" 6>&- | grep '^clipboard watchers:' | tr ' ' '\n' | grep -xFf "$tmp/standins" | paste -sd' '
   }
   seen_is() { [ "$(standins_seen)" = "$1" ]; }
-  watcher; local first=$WATCHER
-  within 5 seen_is "$first" || miss "a clipboard watcher should be named by its pid in the facts, got '$(standins_seen)'"
+  unchanged() {  # WAS: the clipboard watchers fact now is as WAS, which standins_seen gave
+    facts_same <(echo "clipboard watchers: $1") <(echo "clipboard watchers: $(standins_seen)") "in the self-check" 2> /dev/null
+  }
+  watcher owner; local first=$WATCHER first_parent=$PARENT
+  within 5 seen_is "$first" || miss "an owner's clipboard watcher should be named by its pid in the facts, got '$(standins_seen)'"
   local before; before=$(standins_seen)
   # ps cuts its arguments at an exported COLUMNS unless told not to (-ww), and
   # a watcher without its --watch is no watcher.
@@ -1205,17 +1234,43 @@ EOF
   seen_is "$before" || miss "a watcher's forked child should not count as a watcher, got '$(standins_seen)' for $first and its child $child"
   kill -KILL "$child"; within 5 eval '! has_child '"$first" || miss "the stand-in's child never ended"
   seen_is "$before" || miss "a watcher's forked child ending should change no fact, got '$(standins_seen)'"
-  watcher; local second=$WATCHER
-  seen_is "$first $second" || miss "a second watcher should be named as well, got '$(standins_seen)'"
-  facts_same <(echo "clipboard watchers: $before") <(echo "clipboard watchers: $(standins_seen)") "in the self-check" 2> /dev/null \
-    && miss "a clipboard watcher started during a session should fail its stop"
-  kill -KILL "$first"; wait "$first" 2> /dev/null
-  facts_same <(echo "clipboard watchers: $before") <(echo "clipboard watchers: $(standins_seen)") "in the self-check" 2> /dev/null \
-    && miss "a clipboard watcher replaced during a session should fail its stop"
-  kill -KILL "$second"; wait "$second" 2> /dev/null
+  watcher owner; local second=$WATCHER second_parent=$PARENT
+  seen_is "$first $second" || miss "a second owner's watcher should be named as well, got '$(standins_seen)'"
+  unchanged "$before" && miss "an owner's clipboard watcher started during a session should fail its stop"
+  unwatch "$first" "$first_parent"
+  unchanged "$before" && miss "an owner's clipboard watcher replaced during a session should fail its stop"
+
+  # Another program's watcher, and a tophat run's own shell's, come and go
+  # with no fact changed.
+  local mid; mid=$(standins_seen)
+  [ "$mid" = "$second" ] || miss "the owner's watchers should be the second alone, got '$mid'"
+  watcher other; local other=$WATCHER other_parent=$PARENT
+  watcher run; local run_watcher=$WATCHER run_parent=$PARENT
+  seen_is "$mid" || miss "another program's, and a tophat run's own, clipboard watchers should not be named, got '$(standins_seen)' for $other and $run_watcher"
+  unchanged "$mid" || miss "another program's clipboard watcher started during a session should change no fact"
+  unwatch "$other" "$other_parent" "$run_watcher" "$run_parent"
+  unchanged "$mid" || miss "another program's clipboard watcher ended during a session should change no fact"
+
+  # An owner's shell whose environment can't be read, running: the facts
+  # fail, rather than leave its watchers out and a change to them unseen.
+  watcher sealed; local sealed=$WATCHER sealed_parent=$PARENT
+  [ ! -r "/proc/$sealed_parent/environ" ] || miss "the sealed stand-in's environment should be unreadable"
+  "$here/host-facts.sh" 6>&- > /dev/null 2>&1 && miss "the facts should fail while a running shell's environment can't be read"
+  unwatch "$sealed" "$sealed_parent"
+  "$here/host-facts.sh" 6>&- > /dev/null 2>&1 || miss "the facts should read again once that shell is gone"
+
+  # The owner's shell restarted for a deploy: its new watchers have the new
+  # shell as their parent, and count; the restart's record explains the change.
+  unwatch "$second" "$second_parent"; watcher owner; local third=$WATCHER
+  seen_is "$third" || miss "the owner's watchers after a shell restart should be named, got '$(standins_seen)'"
+  unchanged "$mid" && miss "an owner's clipboard watcher replaced by a shell restart should fail with no record of it"
+  restarted 2000 "clipboard watchers: $mid" "clipboard watchers: $third"
+  explained "clipboard watchers: $mid" "clipboard watchers: $third" \
+    || miss "an owner's watchers replaced by a recorded shell restart should pass: $(cat "$run/explained")"
+  rm -rf "$restarts"
+  unwatch "$third" "$PARENT"
   [ -z "$(standins_seen)" ] || miss "watchers that ended should leave the facts, got '$(standins_seen)'"
-  facts_same <(echo "clipboard watchers: $before") <(echo "clipboard watchers: $(standins_seen)") "in the self-check" 2> /dev/null \
-    && miss "a clipboard watcher ended during a session should fail its stop"
+  unchanged "$third" && miss "an owner's clipboard watcher ended during a session should fail its stop"
 
   # The slot, and the launcher's group, on harmless processes: a stand-in
   # compositor that starts a child in the group, one that shrugs off TERM,
