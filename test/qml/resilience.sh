@@ -8,19 +8,34 @@ patch_copy plugin/Service.qml 's/function wallSecond() { return Math.floor(Date.
 patch_copy plugin/FundamentalsFeed.qml '/id: root/a\  property int clockOffset: 0\n  readonly property var testCommand: fetchProc.command'
 patch_copy plugin/FundamentalsFeed.qml 's/Date.now()/(Date.now() + root.clockOffset * 1000)/g'
 patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property var testBody: root.body\n  readonly property alias testKeys: keyCatcher'
-printf '%s\n' '{"version":1,"symbols":["BTC-USD"],"featured":"BTC-USD","order":"manual","style":"smooth","range":"1D"}' > "$HOME/.config/omarchy/grvc.stonks.json"
-# Even a failed test must restore the one scratch directory before cleanup.
-trap 'chmod u+w "$HOME/.config/omarchy"; quickshell_exit; rm -rf "$work"' EXIT
+printf '%s\n' '{"version":1,"symbols":["BTC-USD"],"featured":"BTC-USD","order":"manual","style":"smooth","range":"1D"}' > "$work/data.json"
+# A full disk without root: Quickshell starts in a user and mount namespace
+# of its own, whose ~/.config/omarchy is a 64 KB tmpfs holding the data
+# file, then as the user again in one inside it, so a folder made
+# read-only refuses its writes, as it would not refuse root's. Each step
+# execs, so Quickshell keeps the pid the run started, and its group and
+# mark (quickshell.sh). The tmpfs goes with the namespace.
+mkdir -p "$work/bin"
+cat > "$work/bin/quickshell" << EOF
+#!/usr/bin/env bash
+exec unshare --map-root-user --mount -- bash -c '
+  set -e
+  mount -t tmpfs -o size=64k,mode=700 tmpfs "\$HOME/.config/omarchy"
+  cp "$work/data.json" "\$HOME/.config/omarchy/grvc.stonks.json"
+  exec unshare --map-user=$(id -u) --map-group=$(id -g) -- "$(command -v quickshell)" "\$@"' _ "\$@"
+EOF
+chmod +x "$work/bin/quickshell"
 export QT_QPA_PLATFORM=offscreen
-run_qs 90
-if rg -q 'PASS failed atomic save keeps' "$work/log"; then
-  expected='WARN scene: QML FileView at @plugin/Service.qml.*Write of .*grvc.stonks.json failed: Unknown error when opening file\.'
-  count=$(rg -c "$expected" "$work/log" || true)
-  if [ "$count" != 2 ]; then
-    cat "$work/log"
-    echo "FAIL expected two deliberate save-failure warnings, got ${count:-0}"
-    exit 1
+PATH="$work/bin:$PATH" run_qs 90
+# The test's lost saves warn as Quickshell does for any: three refused by
+# the read-only folder, two on the full disk.
+for expected in "Unknown error when opening file\\.:3" "Atomic commit failed\\.:2"; do
+  pattern="WARN scene: QML FileView at @plugin/Service.qml.*Write of .*grvc.stonks.json failed: ${expected%:*}"
+  count=$(rg -c "$pattern" "$work/log" || true)
+  if [ "${count:-0}" != "${expected##*:}" ]; then
+    echo "FAIL expected ${expected##*:} warnings of a lost save matching '${expected%:*}', got ${count:-0}"
+    code=1
   fi
-  sed -i "\\|$expected|d" "$work/log"
-fi
+  sed -i "\\|$pattern|d" "$work/log"
+done
 finish "RESILIENCE DONE"

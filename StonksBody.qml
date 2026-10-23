@@ -183,10 +183,15 @@ Item {
   readonly property bool hintShown: hint !== "" && (screenRoom <= 0
     || chromeBesideScreenChart + screenChartHeight + footer.hintRoom + listRowHeight <= screenRoom)
   // A standing word in the footer's place, under a note, until what it says
-  // is fixed: the data file can't be read, or an update waits on a shell
-  // restart, which a click on it does.
-  readonly property string notice: settingsUnreadable ? "Can't read grvc.stonks.json · fix or remove it to save changes"
+  // is fixed: the data file can't be read; a save didn't land, which a
+  // click tries again, ahead of the update, since a restart now would lose
+  // the changes; or an update waits on a shell restart, which a click does.
+  // The save's try again is said whole (`noticeAction`), so a narrow footer
+  // cuts the words before it.
+  readonly property string notice: settingsUnreadable ? "Couldn't load your lists"
+    : saveFailed ? "Your changes aren't saved"
     : updatedTo !== "" ? "Updated to " + updatedTo + " · click to restart the shell" : ""
+  readonly property string noticeAction: !settingsUnreadable && saveFailed ? " · click to try again" : ""
   // The note says a newer Stonks is out, said as a surface opens with its
   // footer in sight, once for each answer that names it
   // (`Updates.releaseUnsaid`): a standing notice would take the add's place
@@ -235,6 +240,7 @@ Item {
   // overdue (`QuoteFeed.owed`).
   property var owed: ({})
   property bool settingsUnreadable: false
+  property bool saveFailed: false
   // A refresh the reader asked for has a request out (`Service.refreshing`).
   property bool refreshing: false
   property string updatedTo: ""
@@ -262,6 +268,7 @@ Item {
   Binding on soundsOn { when: root.reading; value: root.service?.soundsOn; restoreMode: Binding.RestoreNone }
   Binding on owed { when: root.reading; value: root.service?.owed; restoreMode: Binding.RestoreNone }
   Binding on settingsUnreadable { when: root.reading; value: root.service?.settingsUnreadable; restoreMode: Binding.RestoreNone }
+  Binding on saveFailed { when: root.reading; value: root.service?.saveFailed; restoreMode: Binding.RestoreNone }
   Binding on refreshing { when: root.reading; value: root.service?.refreshing; restoreMode: Binding.RestoreNone }
   Binding on updatedTo { when: root.reading; value: root.updates ? root.updates.newVersion : ""; restoreMode: Binding.RestoreNone }
   Binding on now { when: root.reading; value: root.service?.now; restoreMode: Binding.RestoreNone }
@@ -713,6 +720,27 @@ Item {
     note = text
     holdNote()
   }
+
+  // The footer's try again, while a save hasn't landed. Its read-back
+  // (`Service.saveChecked`) says when it still didn't, on this surface,
+  // and a save that lands meanwhile, a change's, takes that back at once.
+  readonly property string stillUnsaved: "Still not saved · your disk may be full"
+  property bool savingAgain: false
+  function saveAgain() {
+    clearNote()
+    savingAgain = true
+    service.saveAgain()
+  }
+  Connections {
+    target: root.service
+    ignoreUnknownSignals: true
+    function onSaveChecked(saved) {
+      if (!root.savingAgain) return
+      root.savingAgain = false
+      if (!saved) root.say(root.stillUnsaved)
+    }
+  }
+  onSaveFailedChanged: if (!saveFailed && note === stillUnsaved) clearNote()
 
   // Puts the service's last removal back, whichever surface made it, or
   // says there is none: the next change to the lists ended the offer. The
@@ -1446,6 +1474,7 @@ Item {
     noteAction: root.updateOffered ? " · click to update" : ""
     noteOpacity: root.noteShown
     notice: root.notice
+    noticeAction: root.noticeAction
     hint: root.hint
     showsHint: root.hintShown
     ground: root.ground
@@ -1454,14 +1483,15 @@ Item {
     onHoveredChanged: root.holdNote()
     // The click acts on what the footer shows: a newer version's note runs
     // the update, the update's notice restarts the shell, and the file's
-    // does nothing, nor does a refusal over it; a refusal otherwise, or the
-    // label, adds.
+    // does nothing, nor does a refusal over it; while a save hasn't landed,
+    // any click tries again; a refusal otherwise, or the label, adds.
     onClicked: {
       if (root.updateOffered) {
         root.clearNote()
         root.updates.update()
       }
       else if (root.settingsUnreadable) return
+      else if (root.saveFailed) root.saveAgain()
       else if (root.note === "" && root.updatedTo !== "") root.updates.restart()
       else root.startAdding()
     }

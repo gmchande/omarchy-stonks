@@ -9,11 +9,12 @@ import "Tones.js" as Tones
 // removal took, with what a click does about it (`noteAction`), said whole
 // so a long list name is what gets cut. It stays while the pointer is on
 // it (`hovered`). Until what it says is fixed, a notice, in the foreground
-// too, under any note, whose click is the surface's (`acts`). A hint for the
-// visit is a quiet line of its own above the bar, which it never replaces,
-// and takes no click; the surface can have it give way (`showsHint`). It is
-// painted in its surface's ground, so riding a growing edge it covers the
-// rows it passes.
+// too, under any note, whose click is the surface's (`acts`), its action
+// said whole as a note's is (`noticeAction`). A hint for the visit is a
+// quiet line of its own above the bar, which it never replaces, and takes
+// no click; the surface can have it give way (`showsHint`). It is painted in
+// its surface's ground, so riding a growing edge it covers the rows it
+// passes.
 Item {
   id: root
 
@@ -28,6 +29,7 @@ Item {
   property string note: ""
   property string noteAction: ""
   property string notice: ""
+  property string noticeAction: ""
   property string hint: ""
   // Whether the hint shows. Its room (`hintRoom`) is measured either way,
   // so the surface can judge whether it fits without reading it back.
@@ -132,11 +134,11 @@ Item {
       Text {
         id: noteAction
         objectName: "footerAction"
-        visible: root.note !== "" && root.noteAction !== ""
+        visible: text !== ""
         textFormat: Text.PlainText
-        text: root.noteAction
+        text: root.note !== "" ? root.noteAction : root.notice !== "" ? root.noticeAction : ""
         color: root.foreground
-        opacity: root.noteOpacity
+        opacity: root.note !== "" ? root.noteOpacity : root.coveredOpacity
         font.family: root.fontFamily
         font.pixelSize: Style.font.bodySmall
       }

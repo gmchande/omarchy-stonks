@@ -61,7 +61,8 @@ Panel {
   // once: the service saves that it has. A popup opened while the service
   // still reads its file says it as soon as the service is ready. A visit
   // whose footer has a notice ahead of the hint (the data file can't be
-  // read, an update waits) neither shows nor records it: a later one does.
+  // read, a save didn't land, an update waits) neither shows nor records
+  // it: a later one does.
   function offerHint() {
     if (!root.opened || !root.body || !service || !service.pluginsReady || service.hinted || root.body.notice !== "") return
     root.body.showFirstRunHint()

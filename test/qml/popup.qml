@@ -183,7 +183,7 @@ ShellRoot {
     view.destroy()
     return lines.length
   }
-  readonly property string fileNotice: "Can't read grvc.stonks.json · fix or remove it to save changes"
+  readonly property string fileNotice: "Couldn't load your lists"
   readonly property string updateNotice: "Updated to 9.9.9 · click to restart the shell"
   PluginBarApi {
     id: hintApi
@@ -735,10 +735,8 @@ ShellRoot {
           test.hintPanel.open()
           var said = test.footerText(test.hintPanel)
           var footer = test.find(test.hintPanel.testBody, "footer")
-          // Said whole in the popup's width, the fix included. Found in the
-          // design pass of 14 October: it named the problem and not the fix.
           footer.clicked()
-          test.check("a data file that can't be read is said in the footer on the next open, with its fix, and a click on it does nothing",
+          test.check("a data file that can't be read is said in the footer on the next open, and a click on it does nothing",
             heldClosed === test.closedFooter && said === test.fileNotice && !footer.acts && !test.hintPanel.testBody.adding,
             [heldClosed, said, footer.acts, test.hintPanel.testBody.adding].join("|"))
           test.writeFile(test.dataPath, test.goodData)

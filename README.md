@@ -290,11 +290,18 @@ price say the same.
   holidays up to a set date. This exchange's have run out, so it can't say
   when the market next opens. Stonks doesn't update itself:
   [update it](#update) for a renewed calendar.
-- **The footer says "Can't read grvc.stonks.json".** The file holding your
-  lists can't be opened or isn't valid JSON, often after a hand edit.
-  Stonks keeps the lists it has and writes nothing over the file until it
-  can read it again. Fix the file and Stonks reads it as you save, or
-  remove it to start over with the five starter symbols.
+- **The footer says "Couldn't load your lists".** The file holding your
+  lists, `~/.config/omarchy/grvc.stonks.json`, can't be opened or isn't
+  valid JSON, often after a hand edit. Stonks keeps the lists it has and
+  writes nothing over the file until it can read it again. Fix the file and
+  Stonks reads it as you save, or remove it to start over with the five
+  starter symbols.
+- **The footer says "Your changes aren't saved".** Stonks couldn't write
+  the file holding your lists: the disk is full, or the file or its
+  folder, `~/.config/omarchy`, is read-only. Your lists stay as they look
+  until the shell restarts, and a restart loses every change since the
+  last save. Free some space or fix the permissions, then click the
+  footer. Any change you make tries again too.
 
 To report a price or chart that looks wrong, or anything this doesn't
 answer, use the [bug form](https://github.com/gmchande/omarchy-stonks/issues/new?template=bug.yml).

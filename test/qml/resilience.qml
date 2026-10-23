@@ -118,34 +118,74 @@ ShellRoot {
       screens.screensAnswered()
     }
 
+    // A save that doesn't land is said in the window's footer until one
+    // does; a real click tries again, and so does any change. Both ways a
+    // save is lost: a folder Stonks can't write in, which Quickshell
+    // reports, and a full disk, which it reports as saved, so only reading
+    // the file back catches it (the folder is a 64 KB tmpfs, resilience.sh).
     function test_1_saveFailure() { guarded("test_1_saveFailure", checks_test_1_saveFailure) }
     function checks_test_1_saveFailure() {
       quiet()
       service.persist({ changeMode: "pct" })
+      app.open("{}")
+      awaitState(function() { return !!app.testBody }, 3000)
+      var body = app.testBody
+      var footer = root.find(body, "footer")
+      waitForRendering(footer)
+      var said = function() { return String(root.find(footer, "footerText").text) + String(root.find(footer, "footerAction").text) }
+      var click = function() { mouseClick(footer, footer.width / 2, footer.height / 2) }
+      var unsaved = "Your changes aren't saved · click to try again"
+      var still = "Still not saved · your disk may be full"
+      var holds = function(name, symbol) {
+        var list = function(lists) { return (lists || []).filter(function(l) { return l.name === name })[0] }
+        var file = null
+        try { file = JSON.parse(root.read(service.dataPath)) } catch (e) {}
+        return { memory: !!list(service.lists) && list(service.lists).symbols.indexOf(symbol) >= 0,
+          file: !!file && !!list(file.lists) && list(file.lists).symbols.indexOf(symbol) >= 0 }
+      }
+
       var before = root.read(service.dataPath)
       var failed = root.saveFailures
       var dir = service.dataPath.slice(0, service.dataPath.lastIndexOf("/"))
       try {
         run(["chmod", "u-w", dir])
         service.createList("Keep")
-        awaitState(function() { return root.saveFailures === failed + 1 }, 3000)
         service.setMembership("BTC-USD", "Keep", true)
-        awaitState(function() { return root.saveFailures === failed + 2 }, 3000)
-        root.check("failed atomic save keeps the last readable bytes and the edits in memory",
-          root.read(service.dataPath) === before && service.lists.some(function(l) { return l.name === "Keep" && l.symbols.indexOf("BTC-USD") >= 0 }),
-          "save failures " + (root.saveFailures - failed))
+        awaitState(function() { return root.saveFailures === failed + 2 && said() === unsaved }, 3000)
+        click()
+        awaitState(function() { return root.saveFailures === failed + 3 }, 3000)
+        var stillSaid = within(3000, function() { return said() === still })
+        root.check("a save into a folder Stonks can't write in is said in the footer, a click that still can't says so, and the change stays in memory, the file as it was",
+          stillSaid && root.read(service.dataPath) === before && holds("Keep", "BTC-USD").memory,
+          said() + " | save failures " + (root.saveFailures - failed))
       } finally { run(["chmod", "u+w", dir]) }
-      // There is no promised visible save-error message or automatic retry.
-      // A next change must save all the earlier edits as well as itself.
-      service.persist({ changeMode: "abs" })
-      var saved = function() {
-        try {
-          var file = JSON.parse(root.read(service.dataPath))
-          return file.changeMode === "abs" && file.lists.some(function(l) { return l.name === "Keep" && l.symbols.indexOf("BTC-USD") >= 0 })
-        } catch (e) { return false }
-      }
-      awaitState(saved, 3000)
-      root.check("the next successful save includes edits made during the failed save", saved())
+      click()
+      var landed = within(3000, function() { return holds("Keep", "BTC-USD").file && said().indexOf("+  Add a symbol") === 0 })
+      root.check("once the folder can be written, a click saves every change, and the footer is the add again", landed, said())
+      // All, so the row stays as the next change takes it from Keep.
+      service.switchList("")
+
+      var fill = dir + "/fill"
+      run(["sh", "-c", "cat /dev/zero > \"$1\" 2> /dev/null; test -s \"$1\"", "_", fill])
+      before = root.read(service.dataPath)
+      failed = root.saveFailures
+      service.setMembership("BTC-USD", "Keep", false)
+      var caught = within(3000, function() { return said() === unsaved })
+      click()
+      var stillFull = within(3000, function() { return said() === still })
+      root.check("a full disk, which Quickshell reports as saved, is caught by reading the file back and said, and a click says it still isn't saved",
+        caught && stillFull && root.saveFailures === failed && root.read(service.dataPath) === before && !holds("Keep", "BTC-USD").memory,
+        said() + " | reported failures " + (root.saveFailures - failed))
+      run(["rm", "-f", fill])
+      app.testKeys.forceActiveFocus()
+      awaitState(function() { return app.testKeys.activeFocus }, 2000)
+      keyClick("c")
+      var keyed = within(3000, function() {
+        var file = null
+        try { file = JSON.parse(root.read(service.dataPath)) } catch (e) {}
+        return !!file && file.changeMode === service.changeMode && !holds("Keep", "BTC-USD").file && said().indexOf("+  Add a symbol") === 0
+      })
+      root.check("with room again, a change by key saves it and every change before it, and the footer is the add again", keyed, said())
       service.switchList("")
     }
 
