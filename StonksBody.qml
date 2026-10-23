@@ -1122,7 +1122,9 @@ Item {
   // what it showed (a new list becomes the current one, with no search
   // opened for it). A name refused, a taken one or All, is kept as it was
   // left (`draft`) and comes back, saying why, as this surface next opens.
-  // An empty field keeps nothing.
+  // A search being typed is kept the same way, and opens again with its
+  // words as this surface next opens. Found in the overnight QA of 23
+  // October: a click away lost "nvidia". An empty field keeps nothing.
   property var draft: null
   function keepTyped() {
     if (!service) return
@@ -1135,18 +1137,23 @@ Item {
       typed = listMenu.typedName
       problem = service.createList(typed)
       if (problem !== "") draft = { list: "", text: typed, problem: problem }
+    } else if (adding && search.searchText.trim() !== "") {
+      draft = { search: search.searchText }
     }
   }
 
-  // The name a close kept, refused, open again where it was typed. A rename
-  // comes back only to its own list: one deleted, or renamed, or replaced
-  // by a new list under its name meanwhile has another key, and the rename
-  // has nothing left to act on.
+  // What a close kept, open again where it was typed. A rename comes back
+  // only to its own list: one deleted, or renamed, or replaced by a new
+  // list under its name meanwhile has another key, and the rename has
+  // nothing left to act on.
   function resumeTyped() {
     var kept = draft
     draft = null
     if (!kept || !service) return
-    if (kept.list !== "") {
+    if (kept.search !== undefined) {
+      search.resumed = kept.search
+      startAdding()
+    } else if (kept.list !== "") {
       if (service.listKey(kept.list) !== kept.key) return
       openManageLists()
       manageLists.resumeRename(kept.list, kept.text, kept.problem)
