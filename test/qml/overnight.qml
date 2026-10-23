@@ -3,7 +3,6 @@ import QtTest
 import Quickshell
 import Quickshell.Io
 import "plugin" as Stonks
-import "plugin/Cells.js" as Cells
 import "plugin/Chart.js" as Chart
 import "plugin/Format.js" as Format
 // Overnight prices through the real Service, its feeds, and the App window,
@@ -81,41 +80,18 @@ ShellRoot {
     return null
   }
 
-  // How the header's animal is drawn, the same cells in both looks:
-  // "asleep", its eyes shut and the "z" shown, "awake", eyes open and no
-  // "z", else how far its lids are down and whether the "z" shows. A "z"
-  // reaching past the header's box is cut off: the popup's body starts at
-  // the header's top and clips what draws above it.
-  function sleep() {
-    var body = app.testBody
-    var header = find(body, "animal").parent
-    var mark = find(header, "sleepCells")
-    var z = mark.visible
-    var whole = mark.y >= 0 && mark.y + mark.height <= header.height
-    var bull = body.animal.kind === "bull"
-    var drawn = JSON.stringify(find(header, bull ? "bullCells" : "bearCells").pixels)
-    var lids = [0, 1, 2].filter(function(l) { return drawn === JSON.stringify(Cells.spriteFor(bull, l)) })[0] / 2
-    return lids === 1 && z && whole ? "asleep" : lids === 0 && !z ? "awake"
-      : "lids " + lids + ", z " + z + (whole ? "" : " at " + mark.y + " to " + (mark.y + mark.height) + " of the header's " + header.height)
-  }
+  function sleep() { return app.testBody.animal.asleep ? "asleep" : "awake" }
 
-  // The line under the price as drawn: its words, "dim" when every one of
-  // them, price and change too, is drawn in the dim colour, and "faded"
-  // when the line is drawn at less than full ink, which an old print never
-  // is: faded, its words fell to 2.1:1 (design pass 3).
+  // The displayed extended-session words and figures; their ink is review.
   function strip() {
     var row = find(app.testBody, "extendedLine")
     if (!row || !row.visible) return ""
-    var dim = String(app.testBody.dim)
     var words = []
-    var allDim = true
     for (var i = 0; i < row.children.length; i++) {
       var child = row.children[i]
-      if (!child.visible || !child.text) continue
-      words.push(child.text)
-      if (String(child.color) !== dim) allDim = false
+      if (child.visible && child.text) words.push(child.text)
     }
-    return words.join(" ") + (allDim ? " dim" : "") + (row.opacity < 1 ? " faded" : "")
+    return words.join(" ")
   }
 
   function findAll(item, name, out) {
@@ -157,11 +133,6 @@ ShellRoot {
     return { alpha: most, width: width, cell: chart.grid ? chart.pixel : 0, under: under }
   }
 
-  // The hero's retro chart, shown.
-  function retroChart() {
-    return findAll(app.testBody, "curtain", []).filter(function(c) { return c.parent.visible })[0].parent
-  }
-
   function finish() {
     console.log("OVERNIGHT DONE")
     done.exitCode = failures ? 1 : 0
@@ -186,7 +157,7 @@ ShellRoot {
       service.feature(symbol)
       return within(3000, function() {
         var body = app.testBody
-        return body.chartSymbol === symbol && !body.chartLoading && body.motion.reveal === 1
+        return body.chartSymbol === symbol && !body.chartLoading
       })
     }
 
@@ -213,38 +184,6 @@ ShellRoot {
     function endScrub() {
       mouseMove(app.testBody.chartItem, -20, -20)
       app.testBody.motion.clearScrub()
-    }
-
-    // The retro hero's clip at every moment of a replay of the chart on
-    // show: the replay draws the chart in behind its scrub, in the plot's
-    // own whole columns, so the clip reaches the scrub's column, its edge at
-    // least, and shows no column of ink right of it. `ahead` and `behind`
-    // name the moments that miss.
-    function replayClip() {
-      var body = app.testBody
-      var pixelChart = harness.findAll(body, "curtain", []).filter(function(c) { return c.parent.visible })[0].parent
-      var curtain = harness.find(pixelChart, "curtain")
-      var seen = { moments: 0, ahead: [], behind: [] }
-      var watch = function() {
-        if (!body.motion.replayRunning || pixelChart.scrubColumn < 0) return
-        seen.moments++
-        var shown = Math.round(curtain.width / pixelChart.grid.pitch)
-        var at = body.headerText.replace("At ", "") + ": " + shown + " columns shown, scrub's " + pixelChart.scrubColumn
-        if (shown < pixelChart.scrubColumn) seen.behind.push(at)
-        for (var c = pixelChart.scrubColumn + 1; c < shown; c++) {
-          if (pixelChart.grid.levels[c] !== undefined) {
-            seen.ahead.push(at)
-            break
-          }
-        }
-      }
-      curtain.widthChanged.connect(watch)
-      pixelChart.scrubColumnChanged.connect(watch)
-      body.replay()
-      within(4000, function() { return !body.motion.replayRunning })
-      curtain.widthChanged.disconnect(watch)
-      pixelChart.scrubColumnChanged.disconnect(watch)
-      return seen
     }
 
     // The latest span Robinhood was asked for.
@@ -457,10 +396,10 @@ ShellRoot {
       })
       within(3000, function() { return harness.strip().indexOf("OVERNIGHT") === 0 })
       var geometry = body.featuredGeometry
-      harness.check("NEST's 1D is Thursday, midnight to midnight, with ticks at the night's end, the close, and tonight's start",
-        geometry.start === harness.midnight.thu1 && geometry.end === harness.midnight.fri2 && geometry.ticks.length === 3
+      harness.check("NEST's 1D is Thursday, midnight to midnight, with the requested calendar day",
+        geometry.start === harness.midnight.thu1 && geometry.end === harness.midnight.fri2
           && lastSpan() === "day",
-        geometry.start + " to " + geometry.end + ", " + geometry.ticks.length + " ticks, " + lastSpan())
+        geometry.start + " to " + geometry.end + ", " + lastSpan())
       harness.check("the overnight print is its own line under the price, with its time, measured from the close",
         harness.strip() === "OVERNIGHT 22:50 234.27 +0.86%", harness.strip())
       var info = body.dayLine
@@ -480,12 +419,12 @@ ShellRoot {
         nightScrub.indexOf("At 21:") === 0 && heroMoved && rowsStill, nightScrub + " vs " + breadth)
 
       service.now = harness.night + 11 * 60
-      harness.check("twenty minutes on with nothing newer, the print dims", harness.strip() === "OVERNIGHT 22:50 234.27 +0.86% dim",
+      harness.check("twenty minutes on with nothing newer, the line keeps the last print and its time", harness.strip() === "OVERNIGHT 22:50 234.27 +0.86%",
         harness.strip())
       service.now = harness.night
 
       featureShown("SILK")
-      harness.check("SILK's last print, at 22:20, is forty minutes old and dim", harness.strip() === "OVERNIGHT 22:20 342.13 +0.04% dim",
+      harness.check("SILK's last print, at 22:20, is forty minutes old", harness.strip() === "OVERNIGHT 22:20 342.13 +0.04%",
         harness.strip())
       // SILK traded in 13 of the night's 35 five-minute slots so far: its 1D
       // is Thursday's day from 04:00, then the night to Friday 04:00, each of
@@ -519,18 +458,16 @@ ShellRoot {
       keyClick(Qt.Key_A)
       within(2000, function() { return body.adding })
       body.previewTo("SILK")
-      within(3000, function() { return body.chartSymbol === "SILK" && !body.chartLoading && body.motion.reveal === 1 })
+      within(3000, function() { return body.chartSymbol === "SILK" && !body.chartLoading })
       var listed = body.featuredGeometry
       body.previewTo("AAPL")
-      within(4000, function() { return body.chartSymbol === "AAPL" && !body.chartLoading && body.motion.reveal === 1 })
+      within(4000, function() { return body.chartSymbol === "AAPL" && !body.chartLoading })
       var unadded = body.featuredGeometry
-      var unaddedLast = unadded.points.length - 1
-      var unaddedEven = unadded.points.every(function(p, k) { return Math.abs(p.x - unadded.points[unaddedLast].x * k / unaddedLast) < 1e-9 })
       harness.check("search's preview of a symbol in All shows its chart as featured; one not yet added, a US stock, draws Yahoo's own day, 04:00 to 20:00, a print a step, never asked of Robinhood",
         body.adding && listed.start === silkNight.start && listed.end === silkNight.end && listed.points.length === silkNight.points.length && body.chartSymbol === "AAPL"
-          && unadded.end - unadded.start === 16 * 3600 && unaddedEven && harness.asked() === "NEST,REED,SILK"
+          && unadded.end - unadded.start === 16 * 3600 && harness.asked() === "NEST,REED,SILK"
           && harness.allDayAsked("AAPL") === 0,
-        body.chartSymbol + " | " + (listed.end - listed.start) + " s, " + (unadded.end - unadded.start) + " s, even " + unaddedEven
+        body.chartSymbol + " | " + (listed.end - listed.start) + " s, " + (unadded.end - unadded.start) + " s"
           + " | asked " + harness.asked() + ", all-day asked " + harness.allDayAsked("AAPL"))
       body.cancelAdding()
       within(3000, function() { return !body.adding && body.chartSymbol === "REED" && !body.chartLoading })
@@ -595,7 +532,7 @@ ShellRoot {
       var ezDots = ezChart.points.filter(function(p) { return p.dot })
       harness.check("EZ, one trade since Sunday 20:00: Monday 00:36 shows Friday's day from 04:00 and that trade a dot after it, and the line names the night",
         ezChart.start === harness.midnight.fri2 + 4 * 3600 && ezChart.points.length > 1 && ezDots.length === 1
-          && harness.strip() === "OVERNIGHT 22:40 19.71 \u22123.71% dim",
+          && harness.strip() === "OVERNIGHT 22:40 19.71 \u22123.71%",
         ezChart.start + ", " + ezChart.points.length + " points, " + ezDots.length + " dots | " + harness.strip())
       var looks = [false, true]
       looks.forEach(function(retro) {
@@ -652,15 +589,13 @@ ShellRoot {
           edge + " ; " + replayed + " ; missed " + missed.join(", "))
       })
 
-      // Still in retro, NEST's Monday from midnight to 00:30, its last print
-      // early in its column: a replay draws in up to its scrub's column and
-      // no further, never 00:30's column while the scrub reads 00:25, never
-      // a column short of the scrub's.
+      // Replay still returns to the latest data. Its clipping is reviewed
+      // from rendered frames in the existing motion harness.
       featureShown("NEST")
-      var monday = replayClip()
-      harness.check("retro: every moment of a replay of Monday's night reaches its scrub's column and shows no column of ink right of it",
-        monday.moments >= 3 && monday.ahead.length === 0 && monday.behind.length === 0,
-        monday.moments + " moments | ahead: " + monday.ahead.join(" ; ") + " | behind: " + monday.behind.join(" ; "))
+      body.replay()
+      var replayEnded = within(4000, function() { return !body.motion.replayRunning })
+      harness.check("a night replay returns to now and its latest price",
+        replayEnded && body.scrubT === 0 && body.featured.priceText === "242.81", body.headerText + " | " + body.featured.priceText)
 
       // On 1M, with its history in: the overnight
       // line shows at rest, rests while the history is scrubbed, where the
@@ -803,12 +738,12 @@ ShellRoot {
       var thin = ["KILN", "BOLT"].map(function(symbol) {
         featureShown(symbol)
         var g = body.featuredGeometry
-        return { symbol: symbol, strip: harness.strip(), start: g.start, end: g.end, first: g.points.length ? g.points[0].x : -1 }
+        return { symbol: symbol, strip: harness.strip(), start: g.start, end: g.end }
       })
       harness.check("01:00: KILN and BOLT, which Robinhood does not trade all day, have no overnight line from a stray night trade, and draw Tuesday 04:00 to 20:00 from the left edge",
         thin.every(function(t) {
           return t.strip.indexOf("OVERNIGHT") < 0 && t.start === harness.midnight.tue6 + 4 * 3600
-            && t.end === harness.midnight.tue6 + 20 * 3600 && t.first === 0
+            && t.end === harness.midnight.tue6 + 20 * 3600
         }),
         JSON.stringify(thin))
       harness.check("Robinhood is asked whether it trades KILN and BOLT all day, and their prints beside that, once",
@@ -873,18 +808,28 @@ ShellRoot {
       // next open from the US calendar. ^GSPC at 06:00 said "PRE-MARKET ·
       // OPENS IN 3H 30M"; at 01:00, Tuesday's line ran flat to 17:20 and
       // the header named no open.
+      // Both saved index answers carry Tuesday's bars. Their receipt,
+      // rather than their identical session, pins which moment landed.
       var indexRead = function() {
-        featureShown("^GSPC")
+        var shown = featureShown("^GSPC")
+        // A manual refresh names the request until its answer lands. Read
+        // the market's words after that, without waiting for an animation.
+        var settled = within(8000, function() {
+          var quote = service.quotes["^GSPC"]
+          var entry = service.entries["^GSPC"]
+          return !service.refreshing && quote && quote.session.regular.start === 1791293400
+            && entry && entry.status === "ok" && entry.answeredAt === service.now && !service.owed["^GSPC"]
+        })
         var quote = service.quotes["^GSPC"]
         var last = quote.points[quote.points.length - 1]
-        return body.headerText + " | last print " + (last.t < quote.session.regular.end ? "in session" : "after the close")
+        return { ready: shown && settled,
+          text: body.headerText + " | last print " + (last.t < quote.session.regular.end ? "in session" : "after the close") }
       }
       service.refresh()
-      within(8000, function() { return !!service.quotes["^GSPC"] && service.quotes["^GSPC"].session.regular.start === 1791293400 })
       var indexNight = indexRead()
       featureShown("NEST")
       // 06:00, pre-market: Yahoo's day is Wednesday's, the same close.
-      useSet("2026-10-07-0600")
+      useSet("2026-10-07-0600 listings-2026-10-07-0600")
       service.now = 1791367200
       service.refresh()
       within(8000, function() { return body.featuredQuote.session.regular.start === 1791379800 && !body.chartLoading })
@@ -896,9 +841,10 @@ ShellRoot {
       var indexMorning = indexRead()
       featureShown("NEST")
       harness.check("an index has no pre-market and no tail after its close, and its header names the next open",
-        indexNight === "Closed · opens Wed 09:30 | last print in session"
-          && indexMorning === "Closed · opens Wed 09:30 | last print in session",
-        indexNight + " || " + indexMorning)
+        indexNight.ready && indexMorning.ready
+          && indexNight.text === "Closed · opens Wed 09:30 | last print in session"
+          && indexMorning.text === "Closed · opens Wed 09:30 | last print in session",
+        JSON.stringify({ night: indexNight, morning: indexMorning }))
       // 11:53, mid-session: midnight to midnight, the line ending at
       // now, about halfway, the rest of the day empty.
       useSet("2026-10-07-1153")
@@ -906,10 +852,9 @@ ShellRoot {
       service.refresh()
       within(8000, function() { return body.featured.priceText === "236.19" && !body.chartLoading })
       var noon = body.featuredGeometry
-      var lastX = noon.points[noon.points.length - 1].x
-      harness.check("Wednesday 11:53: the day from midnight, its line ending about halfway, at now",
-        noon.start === harness.midnight.wed7 && noon.end === harness.midnight.thu8 && lastX > 0.48 && lastX < 0.5,
-        noon.start + " to " + noon.end + ", last x " + lastX)
+      harness.check("Wednesday 11:53: the chart keeps Wednesday from midnight to midnight",
+        noon.start === harness.midnight.wed7 && noon.end === harness.midnight.thu8,
+        noon.start + " to " + noon.end)
 
       // 14:55, KILN, a thin stock: its line starts at the left edge and runs a
       // print a step to where the clock puts its newest print, the hours to
@@ -923,12 +868,9 @@ ShellRoot {
       within(8000, function() { return service.quotes.KILN.session.regular.start === 1791379800 && service.quotes.BOLT.session.regular.start === 1791379800 })
       featureShown("KILN")
       var kiln = body.featuredGeometry
-      var last = kiln.points.length - 1
-      var clockAt = (service.quotes.KILN.points[last].t - kiln.start) / (kiln.end - kiln.start)
-      var even = kiln.points.every(function(p, k) { return Math.abs(p.x - clockAt * k / last) < 1e-9 })
-      harness.check("14:55: KILN's line starts at the left edge and runs evenly, a print a step, to where the clock puts its newest print",
-        kiln.start === harness.midnight.wed7 + 4 * 3600 && kiln.points[0].x === 0 && even && clockAt > 0.67 && clockAt < 0.69,
-        kiln.start + ", first x " + kiln.points[0].x + ", newest at " + clockAt + ", even " + even)
+      harness.check("14:55: KILN keeps Yahoo's day from 04:00, with its actual prints",
+        kiln.start === harness.midnight.wed7 + 4 * 3600 && body.featuredDay.points.length === service.quotes.KILN.points.length,
+        kiln.start + ", " + body.featuredDay.points.length + " prints")
       // A scrub reads the print it lands on in both looks: NEST's newest,
       // 235.32 at 14:55:42, is no five-minute mark, and retro once rounded
       // it back to 14:55:00 and read the print before, 235.31.
@@ -940,7 +882,7 @@ ShellRoot {
           within(2000, function() { return service.retro === retro })
         }
         scrubAt(1)
-        var read = body.featured.priceText + " | " + body.motion.scrubX.toFixed(4)
+        var read = body.featured.priceText
         endScrub()
         return read
       })
@@ -948,7 +890,7 @@ ShellRoot {
       keyClick(Qt.Key_S)
       within(2000, function() { return !service.retro })
       harness.check("a scrub at NEST's newest print, 14:55:42, reads 235.32 there in both looks",
-        edgeRead[0] === edgeRead[1] && edgeRead[0].indexOf("235.32 | ") === 0, edgeRead.join(" vs "))
+        edgeRead[0] === edgeRead[1] && edgeRead[0] === "235.32", edgeRead.join(" vs "))
       featureShown("BOLT")
       var bolt = body.featuredDay.points
       scrubAt(0)
@@ -1012,36 +954,19 @@ ShellRoot {
       within(8000, function() { return !!service.quotes["7203.T"] && service.arriving.length === 0 })
       featureShown("7203.T")
       var tokyoHeader = body.headerText
-      // Tokyo's lunch, 11:30 to 12:30, breaks the line, as retro's columns
-      // do; Yahoo sends the day as one session. Smooth drew straight across.
-      var tokyoDay = service.quotes["7203.T"]
-      var tokyoBreaks = body.featuredGeometry.points.map(function(p, k) { return p.brk ? Format.hhmm(tokyoDay.points[k].t, tokyoDay.gmtoffset) : "" })
-        .filter(function(clock) { return clock !== "" })
+      // The empty lunch buckets sent no trades. A real scrub in their
+      // middle keeps the last trade (11:30, 2915), never an interpolated one.
+      scrubAt(Chart.fractionAtTime(body.featuredDay, 1791342000))
+      var lunchPrice = body.featured.priceText
+      endScrub()
       featureShown("NEST")
       scrubAt(0.5)
       var nasdaqScrub = body.headerText
       endScrub()
-      harness.check("Tokyo's line starts again after its lunch break, and nowhere else",
-        tokyoBreaks.join(",") === "12:30", tokyoBreaks.join(","))
-      // And its row draws the gap: no ink in the line's canvas half way
-      // through the lunch, but the baseline's dashes. Found in review: the
-      // rows' and the pill's painter ignored the break. Its row is brought
-      // into sight: a row out of sight keeps the quote it last showed.
+      harness.check("a scrub during Tokyo lunch keeps the last sent trade, never an interpolated price", lunchPrice === "2,915.00", lunchPrice)
+      // Bring the row into sight before reading its data.
       var tokyoAt = body.watchlist.rowItem("7203.T").y
       body.watchlist.contentY = Math.max(0, Math.min(tokyoAt, body.watchlist.contentHeight - body.watchlist.height))
-      var rowLine = harness.find(body.watchlist.rowItem("7203.T"), "rowLine")
-      var rowInk = rowLine.children[0]
-      var rowPoints = rowLine.geometry.points
-      var resumed = rowPoints.findIndex(function(p) { return p.brk })
-      var lunchX = Math.round(rowLine.pad + (rowPoints[resumed - 1].x + rowPoints[resumed].x) / 2 * (rowLine.width - 2 * rowLine.pad))
-      var baseY = rowLine.pad + rowLine.geometry.baselineY * (rowLine.height - 2 * rowLine.pad)
-      wait(50)
-      var column = rowInk.getContext("2d").getImageData(lunchX, 0, 1, Math.floor(rowInk.height)).data
-      var inked = []
-      for (var py = 0; py < column.length / 4; py++)
-        if (column[py * 4 + 3] > 0 && Math.abs(py - baseY) > 1.5) inked.push(py)
-      harness.check("Tokyo's row leaves its lunch break empty",
-        resumed > 0 && inked.length === 0, "x " + lunchX + ", inked rows " + inked.join(","))
       harness.check("for a reader in New York, Tokyo's next open names JST and a Nasdaq scrub names no zone",
         tokyoHeader === "Closed · opens Thu 09:00 JST" && /^At \d\d:\d\d · /.test(nasdaqScrub) && nasdaqScrub.indexOf("EDT") < 0,
         tokyoHeader + " | " + nasdaqScrub)
@@ -1151,9 +1076,9 @@ ShellRoot {
         body.motion.scrubT = span[0]
         app.testKeyCatcher.forceActiveFocus()
         keyClick(Qt.Key_Right)
-        return a >= 0 && b === a + 1 && body.featuredGeometry.points[b].brk === false && body.scrubT === span[1]
+        return a >= 0 && b === a + 1 && body.scrubT === span[1]
       })
-      harness.check("a thin US day's three quiet spans keep adjacent prints joined and each is one scrub step",
+      harness.check("a thin US day's three quiet spans each take one scrub step to the next actual print",
         joined.every(function(ok) { return ok }), joined.join(","))
       body.endScrub()
       // Painted sparse day/3M, one-print and Tokyo lunch states are already

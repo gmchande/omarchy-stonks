@@ -3,11 +3,9 @@
 # and says, and what a key or a click changes. Every unit-test file
 # (test/unit.sh), source boundaries, QML lint, manifest and launcher
 # validation, the Quickshell flow harnesses, and the frame checker's
-# self-check. A picture, a position, or a timing is the maintainer's review
-# kit's (test/review.sh); some steps inside these harnesses still judge one
-# (frames, pixels, an x, an ease), until they move there: window motion's
-# most of all, which runs here for the keys and clicks only it checks, and
-# whose frame-judged steps, as pointer's, rely on the frame checker. The
+# self-check on made-up frames. Pictures, positions and motion belong to
+# test/review.sh. Input readiness and a target's reachability stay with the
+# action they protect. The
 # queue, the lock, and the verdict are test/queue.sh's. Needs Omarchy
 # installed and the Wayland session for the harnesses.
 source "$(dirname "${BASH_SOURCE[0]}")/queue.sh"
@@ -32,7 +30,7 @@ validate_clone() {
 start "pointer harness" bash test/qml/pointer.sh
 start "shared range harness" bash test/qml/range.sh
 start "window search harness" bash test/qml/window-search.sh
-start "window motion harness" bash test/qml/window-motion.sh
+start "window replay and change actions harness" env STONKS_MOTION_FLOW=actions bash test/qml/window-motion.sh
 start "window adds harness" bash test/qml/window-adds.sh
 start "named watchlists harness" bash test/qml/lists.sh
 start "fetch policy harness" bash test/qml/fetch.sh

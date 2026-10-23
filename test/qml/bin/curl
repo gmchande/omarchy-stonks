@@ -186,6 +186,9 @@ serve() {
     [[ "$url" == *"q=FAST&"* ]] || sleep 0.4
     [ -e "$state/SEARCH.down" ] && exit 22
     case "$url" in
+      *"q=SLOW&"*|*"q=FLAKY&"*|*"q=MSFT&"*|*"q=FLAT&"*|*"q=NOCUR&"*|*"q=NVDA&"*|*"q=AAPL&"*|*"q=NOPE&"*)
+        symbol="${url#*q=}"; symbol="${symbol%%&*}"
+        printf '{"quotes":[{"symbol":"%s","shortname":"Test result","exchange":"NMS","quoteType":"EQUITY"}]}\n' "$symbol" ;;
       *"q=HELD&"*) echo '{"quotes":[{"symbol":"SLOW","longname":"Held answer","exchange":"NMS","quoteType":"EQUITY"}]}' ;;
       *"q=HELDFAIL&"*) echo '{"quotes":[{"symbol":"LATE","longname":"Failed held answer","exchange":"NMS","quoteType":"EQUITY"}]}' ;;
       *"q=FAST&"*) cat "$fixtures/search.json" ;;

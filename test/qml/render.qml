@@ -1,4 +1,5 @@
 import QtQuick
+import QtTest
 import Quickshell
 import Quickshell.Io
 import qs.Commons
@@ -53,6 +54,15 @@ ShellRoot {
   readonly property bool minWindowOf: requested.indexOf("min-window-of-") === 0
   readonly property bool windowOf: minWindowOf || requested.indexOf("window-of-") === 0
   readonly property string stateName: windowOf ? "popup-" + requested.slice((minWindowOf ? "min-window-of-" : "window-of-").length) : requested
+  // Real pointer states retired from the behavior flows. These pictures
+  // join the ordinary render diff; no behavior test prescribes their ink.
+  readonly property var controlState: /^(popup|window)-controls-([a-z]+)-(hover|press)-(smooth|retro)$/.exec(stateName)
+  readonly property var anchorState: /^popup-anchor-(left|center|right)-(open|held|next)-(smooth|retro)$/.exec(stateName)
+  FileView { id: anchorPoses; path: Quickshell.env("STONKS_ANCHOR_POSES"); blockLoading: true }
+  readonly property var anchorPose: anchorState ? JSON.parse(anchorPoses.text())[anchorState[1] + "-" + anchorState[2]] : null
+  readonly property var motionPose: /^popup-motion-(join|crossing|dragwheel|scroll|endremove|notefade|breadth|look|neutral)-(smooth|retro)$/.exec(stateName)
+  readonly property var refusedList: /^min-window-lists-refused-(menu|manage)-(smooth|retro)$/.exec(stateName)
+  readonly property bool interactivePicture: !!controlState || !!anchorState || !!motionPose || !!refusedList
   readonly property string outPath: Quickshell.env("STONKS_VISUAL_OUT")
   readonly property string fixtureDir: Quickshell.env("STONKS_FIXTURES")
   readonly property string calendarPath: Quickshell.env("STONKS_VISUAL_CALENDARS")
@@ -86,7 +96,7 @@ ShellRoot {
   }
   // <popup|window>-order-<falls|rises>-<look>: the order word both ways.
   readonly property bool orderState: /^(popup|window)-order-(falls|rises)-/.test(stateName)
-  readonly property bool bigList: !!w22 || !!room || minWindow || windowWidth > 0 || stateName.indexOf("popup-search-") === 0
+  readonly property bool bigList: !!controlState || !!motionPose || !!w22 || !!room || minWindow || windowWidth > 0 || stateName.indexOf("popup-search-") === 0
     || stateName.indexOf("popup-price") === 0 || /^(popup|window)-rowstates-/.test(stateName)
     || stateName.indexOf("popup-note-") === 0 || stateName.indexOf("window-note-") === 0 || stateName.indexOf("popup-lists-") === 0
     || stateName.indexOf("popup-rowlines-") === 0 || stateName.indexOf("popup-52w-") === 0
@@ -941,6 +951,7 @@ ShellRoot {
   }
 
   FloatingWindow {
+    id: renderWindow
     visible: true
     color: root.groundColor
     // The larger text size lands after the window has taken its size, so
@@ -948,10 +959,11 @@ ShellRoot {
     // is given the widths Style.space gives the surfaces at size N: the
     // popup's 480 and the smallest window's 560 grow with the text, and the
     // window is 720 or its smallest, whichever is wider.
-    implicitWidth: root.pillSheet ? Math.max(520, pillColumn.implicitWidth + 48) : root.themeState ? 480 + 410 : root.sheet ? 1000
+    implicitWidth: root.anchorState ? 1000 : root.pillSheet ? Math.max(520, pillColumn.implicitWidth + 48) : root.themeState ? 480 + 410 : root.sheet ? 1000
       : (root.windowWidth ? root.windowWidth : (root.smallest ? Math.round(560 * root.sizeScale)
         : (root.popup ? Math.round(480 * root.sizeScale) : Math.max(720, Math.round(560 * root.sizeScale)))))
-    implicitHeight: root.stateName === "pill-sheet-large" ? 720 : root.pillSheet ? pillColumn.implicitHeight + 40 : root.sheet ? 460
+    implicitHeight: root.anchorState ? body.fittedHeight(body.chromeHeight + 6 * body.rowPitch - body.rowGap) + content.inset * 2 + 56
+      : root.stateName === "pill-sheet-large" ? 720 : root.pillSheet ? pillColumn.implicitHeight + 40 : root.sheet ? 460
       : root.themeState ? Math.max(body.fittedHeight(body.chromeHeight + 3 * body.rowPitch - body.rowGap) + content.inset * 2, pillColumn.implicitHeight + 40)
       : (root.windowWidth ? 850
         : (root.smallest ? body.smallestHeight
@@ -962,6 +974,40 @@ ShellRoot {
       id: frame
       anchors.fill: parent
       color: root.groundColor
+
+      // The origins came from the real Panel/HeldAnchor/KeyboardPanel in
+      // popup-anchor.qml, unmapped on Wayland. This scene paints them.
+      Rectangle {
+        visible: !!root.anchorState
+        width: parent.width
+        height: 32
+        color: root.barGround
+        QtObject {
+          id: anchorShell
+          function serviceFor() { return {service: stub, trendColors: root.trendColors} }
+        }
+        PluginBarApi { id: anchorApi; pluginId: "grvc.stonks"; moduleName: "grvc.stonks"; shell: anchorShell }
+        BarWidget {
+          id: anchorPill
+          visible: !!root.anchorState
+          x: root.anchorPose ? root.anchorPose.pillX : 0
+          width: root.anchorPose ? root.anchorPose.pillWidth : 150
+          height: parent.height
+          bar: anchorApi
+          settings: ({id: "grvc.stonks", barStyle: "text"})
+        }
+      }
+      HeldAnchor { id: anchorProbe; pill: anchorPill }
+      BorderSurface {
+        visible: !!root.anchorState
+        x: content.x - content.inset
+        y: content.y - content.inset
+        width: content.width + 2 * content.inset
+        height: content.height + 2 * content.inset
+        color: root.groundColor
+        borderSpec: Border.surfaceSpec("popups", "border", Commons.Color.popups.border, Math.max(1, Style.space(2)))
+        radius: Style.cornerRadius
+      }
 
       // The popup's body as the card holds it: inset by the card's border and
       // padding (`KeyboardPanel`'s), its own margins none, in a box that
@@ -974,10 +1020,10 @@ ShellRoot {
           + Border.left(Border.surfaceSpec("popups", "border", Commons.Color.popups.border, Math.max(1, Style.space(2)))) : 0
         clip: root.popup
         visible: !root.sheet && !root.pillSheet
-        x: inset
-        y: inset
-        width: (root.themeState ? 480 : parent.width) - inset * 2
-        height: root.themeState ? body.fittedHeight(body.chromeHeight + 3 * body.rowPitch - body.rowGap) : parent.height - inset * 2
+        x: root.anchorPose ? root.anchorPose.x + inset : inset
+        y: root.anchorPose ? root.anchorPose.y + inset : inset
+        width: (root.anchorState || root.themeState ? 480 : parent.width) - inset * 2
+        height: root.anchorState ? parent.height - y - inset : root.themeState ? body.fittedHeight(body.chromeHeight + 3 * body.rowPitch - body.rowGap) : parent.height - inset * 2
 
         StonksBody {
           id: body
@@ -1208,7 +1254,7 @@ ShellRoot {
 
     Timer {
       interval: 300
-      running: true
+      running: !root.interactivePicture
       onTriggered: {
         if (root.shareOf) {
           body.camera = shareCamera
@@ -1224,5 +1270,204 @@ ShellRoot {
     }
   }
 
+  TestCase {
+    name: "ReviewPictures"
+    when: root.interactivePicture && renderWindow.visible
+    // Failed QtTest assertions still leave through the quiescent exit.
+    function cleanupTestCase() { exitTimer.start() }
+
+    function findAll(item, name) {
+      var out = []
+      if (item.objectName === name) out.push(item)
+      for (var i = 0; i < item.children.length; i++) out = out.concat(findAll(item.children[i], name))
+      return out
+    }
+    function one(name) { return findAll(body, name)[0] }
+
+    function test_picture() {
+      if (root.motionPose) {
+        waitForRendering(body)
+        var pose = root.motionPose[1]
+        var rows = body.watchlist
+        var member = rows.displayedSymbols[2]
+        var row = rows.rowItem(member)
+        // Fixed, paused poses make the render diff repeatable. The existing
+        // motion harness judges the transitions; these show their ink.
+        if (pose === "join") { row.join(); row.pause(); row.opacity = 0.5; row.reveal = 0.5 }
+        else if (pose === "crossing") { row.carry(rows.rowPitch * 1.5); row.pause(); row.shift = -rows.rowPitch * 1.5 }
+        else if (pose === "dragwheel") {
+          stub.order = "manual"
+          rows.beginDrag(member, 2 * rows.rowPitch + 10)
+          rows.contentY = rows.rowPitch
+        } else if (pose === "scroll") {
+          rows.takeOver()
+          rows.contentY = rows.rowPitch / 2
+        } else if (pose === "endremove") {
+          rows.contentY = rows.contentHeight - rows.height
+          var removed = stub.shown[stub.shown.length - 2]
+          stub.symbols = stub.symbols.filter(function(symbol) { return symbol !== removed })
+          stub.shown = stub.shown.filter(function(symbol) { return symbol !== removed })
+          wait(200)
+        } else if (pose === "notefade") {
+          // Removal no longer makes a notice. A refusal still fades here.
+          stub.order = "pct"
+          rows.cursorSymbol = member
+          body.moveSelected(1)
+          if (body.note !== "Switch to manual order to move rows") {
+            console.error("FAIL fading refusal state contains the move refusal")
+            exitTimer.exitCode = 1
+          }
+          body.noteShown = 0.5
+        } else if (pose === "breadth") {
+          one("breadthRule").still = true
+          one("breadthRule").upShare = 0.5
+          one("breadthRule").downShare = 0.25
+        } else if (pose === "look") {
+          one("lookIcon").still = true
+          one("lookIcon").cells = 0.5
+        } else if (pose === "neutral") {
+          var unknown = Object.assign({}, stub.quotes[stub.featuredSymbol], {prevClose: null})
+          stub.quotes = Object.assign({}, stub.quotes, {[stub.featuredSymbol]: unknown})
+        }
+        savePicture()
+        return
+      }
+      if (root.refusedList) {
+        var choices = [{name: "", label: "All", symbols: stub.symbols, count: stub.symbols.length}]
+        for (var n = 1; n <= 30; n++) choices.push({name: "List " + n, label: "List " + n, symbols: stub.symbols, count: stub.symbols.length})
+        stub.lists = choices
+        if (root.refusedList[1] === "menu") {
+          body.openListMenu()
+          waitForRendering(body)
+          one("listMenu").startNaming()
+          one("listNameField").text = "List 1"
+          one("listMenu").problem = "List 1 already exists"
+        } else {
+          body.openManageLists()
+          waitForRendering(body)
+          var manage = one("manageLists")
+          manage.startRenaming(30)
+          one("renameField").text = "List 1"
+          manage.problem = "List 1 already exists"
+        }
+        savePicture()
+        return
+      }
+      if (root.anchorState) {
+        verify(!!root.anchorPose, "the real placement produced this review pose")
+        anchorProbe.hold()
+        if (!anchorProbe.QsWindow || anchorProbe.QsWindow.window !== renderWindow || !anchorProbe.parent) {
+          console.error("FAIL the default held anchor finds its real pill's window")
+          exitTimer.exitCode = 1
+          return
+        }
+        var heldAt = anchorProbe.mapToItem(renderWindow.contentItem, 0, 0)
+        var pillAt = anchorPill.mapToItem(renderWindow.contentItem, 0, 0)
+        compare(heldAt.x, pillAt.x, "the real pill's held position")
+        savePicture()
+        return
+      }
+      var control = root.controlState[2]
+      var mode = root.controlState[3]
+      var all = stub.symbols.slice()
+      stub.lists = [{name: "", label: "All", count: all.length, symbols: all},
+        {name: "Watching", label: "Watching", count: 2, symbols: all.slice(0, 2)},
+        {name: "Growth", label: "Growth", count: 1, symbols: all.slice(2, 3)}]
+      stub.order = "pct"
+      waitForRendering(body)
+      var target = null
+      if (control === "range") target = findAll(one("rangeRow"), "rangeToken")[1]
+      else if (control === "list") target = one("listLabel")
+      else if (control === "orderword") target = one("orderLabel")
+      else if (control === "orderarrow") target = one("orderArrow")
+      else if (control === "unit") target = one("unitTarget")
+      else if (control === "manualorder") { stub.order = "manual"; target = one("orderLabel") }
+      else if (control === "look") target = one("lookIcon")
+      else if (control === "help") target = one("helpMark")
+      else if (control === "footer") target = one("footerText")
+      else if (control === "breadth") target = one("breadthRule")
+      else if (control === "remove") {
+        body.watchlist.cursorSymbol = stub.shown[1]
+        waitForRendering(body)
+        target = findAll(body.watchlist.rowItem(stub.shown[1]), "rowRemove")[0]
+      } else if (control === "done" || control === "deadmove" || control === "livemove") {
+        body.openManageLists()
+        waitForRendering(body)
+        target = control === "done" ? one("manageDone")
+          : findAll(findAll(body, "manageRow")[1], control === "deadmove" ? "moveUp" : "moveDown")[0]
+      } else if (control === "symbol") {
+        body.openSymbolLists(stub.shown[0])
+        waitForRendering(body)
+        // The click that opened this view is shielded for a double-click.
+        // Begin the row's film only once that row can receive the press.
+        var shield = findAll(one("symbolLists"), "openingShield")[0]
+        tryVerify(function() { return !shield.visible }, 2000)
+        target = findAll(body, "symbolListRow")[0]
+      } else if (control === "search") {
+        body.adding = true
+        body.search.results = Search.parseSearch(JSON.parse(searchFile.text())).results
+        body.search.searchText = "SHOP"
+        body.search.resultsQuery = "SHOP"
+        body.search.answer = "results"
+        root.searchField(body.search).text = "SHOP"
+        body.search.suspend()
+        waitForRendering(body)
+        target = findAll(body.search, "searchResult")[1]
+      }
+      verify(!!target, "review control exists: " + control)
+      waitForRendering(body)
+      var point = target.mapToItem(body, target.width / 2, target.height / 2)
+      // The word's right end is its own control; its left is the arrow.
+      if (control === "orderword") point = target.mapToItem(body, target.width - 2, target.height / 2)
+      if (mode === "press") {
+        var fill = control === "list" ? one("listControl")
+          : control === "orderword" || control === "manualorder" ? one("orderControl")
+          : control === "orderarrow" ? one("orderArrowFill")
+          : control === "unit" ? one("unitFill")
+          : control === "look" ? one("lookFill")
+          : control === "help" ? one("helpFill")
+          : control === "footer" ? one("footerFill")
+          : control === "done" ? findAll(target, "actionFill")[0]
+          : control === "symbol" ? findAll(target, "rowFill")[0]
+          : control === "remove" ? findAll(target, "rowRemoveFill")[0] : target
+        var corner = fill.mapToItem(body, 0, 0)
+        var box = [Math.ceil(corner.x) + 1, Math.ceil(corner.y) + 1, Math.floor(fill.width) - 3, Math.floor(fill.height) - 3]
+        mouseMove(body, body.width / 2, 10)
+        wait(200)
+        pressFilm.source = body
+        pressFilm.begin(root.stateName)
+        tryVerify(function() { return pressFilm.frames.length >= 4 }, 2000)
+        pressFilm.markStart()
+        mousePress(body, point.x, point.y)
+        tryVerify(function() { var frames = pressFilm.frames; return frames.length > 0 && frames[frames.length - 1].at - pressFilm.start >= 320 }, 3000)
+        pressFilm.end()
+        tryVerify(function() { return pressFilm.waiting === 0 }, 3000)
+        var ink = Style.pressedFillFor(stub.foreground, Commons.Color.accent)
+        pressFilm.judge("press", null, [[ink.r, ink.g, ink.b, ink.a].join(","), box.join(",")])
+        tryVerify(function() { return pressFilm.verdict !== null }, 10000)
+        if (!pressFilm.verdict.ok) {
+          console.error("FAIL pressed feedback " + control + " — " + pressFilm.verdict.detail)
+          exitTimer.exitCode = 1
+        }
+      } else {
+        // RowPointer treats its first sighting as a resting pointer.
+        // Enter the row, then move within it as a hand would.
+        if (control === "symbol" || control === "search")
+          mouseMove(body, point.x - target.width / 4, point.y)
+        mouseMove(body, point.x, point.y)
+      }
+      savePicture()
+    }
+
+    function savePicture() {
+      wait(320)
+      var saved = false
+      frame.grabToImage(function(result) { saved = result.saveToFile(root.outPath) })
+      tryVerify(function() { return saved }, 3000)
+      exitTimer.start()
+    }
+  }
+
+  FrameGrab { id: pressFilm }
   HarnessExit { id: exitTimer }
 }

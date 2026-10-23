@@ -117,31 +117,25 @@ ShellRoot {
       wait(400)
       var hero = service.featuredSymbol
       var library = service.library.slice()
-      var field = harness.find(body.search, "searchField")
-      var draws = 0
-      var onReveal = function() { if (body.motion.reveal === 0) draws++ }
-      body.motion.revealChanged.connect(onReveal)
       // Fetches from here on: earlier flows fetched these too.
       var calls = function(symbol, from) { return harness.calls(symbol) - (from || 0) }
       var before = { to: harness.calls("SHOP.TO"), shop: harness.calls("SHOP"), shhi: harness.calls("SHHI.NE") }
 
       searchShop(body, keys)
-      var fieldAt = field.mapToItem(body, 0, 0).y
-      var topHeld = [body.headerText, body.chartSymbol, body.motion.drawn].join(",")
-      harness.check("the top result shows on the hero as it loads: named, the chart on show held whole",
-        topHeld === "Loading SHOP," + hero + ",1", topHeld)
+      var topHeld = [body.headerText, body.chartSymbol].join(",")
+      harness.check("the top result names what is loading while keeping the previous chart's data",
+        topHeld === "Loading SHOP," + hero, topHeld)
 
       // Past SHOP and SHHI.NE before the choice rests: neither is fetched.
       keyClick(Qt.Key_Down)
       keyClick(Qt.Key_Down)
       keyClick(Qt.Key_Up)
-      draws = 0
       var previewed = within(3000, function() { return body.chartSymbol === "SHOP.TO" && !body.chartLoading })
       wait(100)
       var shown = [previewed, body.featured.priceText, body.search.resultIndex, service.featuredSymbol === hero,
-        service.library.indexOf("SHOP.TO") < 0, draws].join(",")
-      harness.check("↓ shows the chosen result on the hero, unadded, drawn in once, the featured symbol kept",
-        shown === "true,194.60,1,true,true,1", shown)
+        service.library.indexOf("SHOP.TO") < 0].join(",")
+      harness.check("↓ shows the chosen result's price on the hero, unadded, the featured symbol kept",
+        shown === "true,194.60,1,true,true", shown)
       var fetched = [calls("SHOP.TO", before.to), calls("SHOP", before.shop), calls("SHHI.NE", before.shhi)].join(",")
       harness.check("only the result the choice rests on is fetched", fetched === "1,0,0", fetched)
       var stats = within(3000, function() { return !!body.yearLine && body.yearLine.facts.length > 0 && body.yearLine.facts[0].value !== "" })
@@ -154,8 +148,6 @@ ShellRoot {
       service.refresh()
       wait(600)
       harness.check("neither the schedule nor r refreshes a preview", calls("SHOP.TO", before.to) === 1, calls("SHOP.TO", before.to))
-      harness.check("the field stays put as the hero follows the choice",
-        field.mapToItem(body, 0, 0).y === fieldAt, fieldAt + " -> " + field.mapToItem(body, 0, 0).y)
       // From a choice that has rested, arrowing on past results asks for
       // none of them either: each new choice waits its own rest. Found in
       // lookup-review's review: the next result was fetched at once.
@@ -168,42 +160,28 @@ ShellRoot {
       var passed = [calls("SHHI.NE", further.shhi), calls("307.F", further.f), body.chartSymbol].join(",")
       harness.check("from a rested choice, results arrowed past are not fetched", passed === "0,0,SHOP.TO", passed)
 
-      // Enter adds what the hero shows: its row joins faded in, it is the
-      // featured symbol, and the chart on show neither changes nor redraws.
-      var faded = false
-      draws = 0
+      // Enter adds what the hero shows, with the quote already fetched.
       // The result returned to above is asked for again once it rests.
       tryVerify(function() { return calls("SHOP.TO", before.to) === 2 && !!service.previewView.chart }, 3000)
       var beforeEnter = harness.calls("SHOP.TO")
       keyClick(Qt.Key_Return)
-      // The row is made as it joins, and fades in on the frames after.
-      var row = watchlist.rowItem("SHOP.TO")
-      var onFade = function() { if (row.visible && row.opacity < 1) faded = true }
-      if (row) {
-        onFade()
-        row.opacityChanged.connect(onFade)
-      }
-      tryVerify(function() { return !!row && watchlist.displayedSymbols.indexOf("SHOP.TO") >= 0 && row.resting }, 2000)
-      wait(100)
-      var added = [service.featuredSymbol, body.adding, body.chartSymbol, draws, calls("SHOP.TO", beforeEnter)].join(",")
+      tryVerify(function() { return watchlist.displayedSymbols.indexOf("SHOP.TO") >= 0 }, 2000)
+      var added = [service.featuredSymbol, body.adding, body.chartSymbol, calls("SHOP.TO", beforeEnter)].join(",")
       harness.check("Enter adds the result on the hero with its quote: featured, the chart kept, nothing fetched again",
-        added === "SHOP.TO,false,SHOP.TO,0,0", added)
-      harness.check("its row fades in at its place", faded, faded)
-      row.opacityChanged.disconnect(onFade)
+        added === "SHOP.TO,false,SHOP.TO,0", added)
       service.removeSymbol("SHOP.TO")
       service.feature(hero)
       wait(400)
 
-      // Escape puts the featured symbol back, drawn in, and adds nothing.
+      // Escape puts the featured symbol back and adds nothing.
       searchShop(body, keys)
       keyClick(Qt.Key_Down)
-      tryVerify(function() { return body.chartSymbol === "SHOP.TO" && !body.chartLoading && body.motion.reveal === 1 }, 3000)
-      draws = 0
+      tryVerify(function() { return body.chartSymbol === "SHOP.TO" && !body.chartLoading }, 3000)
       keyClick(Qt.Key_Escape)
       wait(100)
-      var back = [body.adding, body.chartSymbol, draws, service.library.indexOf("SHOP.TO") < 0].join(",")
-      harness.check("Escape puts the featured symbol back on the hero, drawn in, and adds nothing",
-        back === "false," + hero + ",1,true", back)
+      var back = [body.adding, body.chartSymbol, service.library.indexOf("SHOP.TO") < 0].join(",")
+      harness.check("Escape puts the featured symbol back on the hero and adds nothing",
+        back === "false," + hero + ",true", back)
 
       // A lookup that fails says so on the hero; Enter adds it anyway, and
       // the hero goes back to what it showed. Its failed fetch was the add's
@@ -252,7 +230,6 @@ ShellRoot {
       var cancelled = [body.adding, body.chartSymbol, service.library.indexOf("SHOP") < 0].join(",")
       harness.check("CANCEL closes search as Escape does, the hero back and nothing added",
         cancelled === "false," + hero + ",true", cancelled)
-      body.motion.revealChanged.disconnect(onReveal)
       tryVerify(function() { return service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 5000)
       wait(400)
       harness.check("the lookup flow leaves All as it found it", harness.same(service.library, library),
@@ -497,116 +474,67 @@ ShellRoot {
       wait(50)
     }
 
-    // Search's field opens where the list's first row was, under its
-    // header, and stays there from its open through one answer, five, none,
-    // and a lookup with no answer; each answer starts the same gap under
-    // it, and Enter is offered, on the chosen result, only while there is a
-    // result to take.
-    // Found in the first-run review: the field opened at the bottom, and
-    // "No matches" sat about 260 px above it, the hint still offering add.
-    function fieldInRowsPlace(body, watchlist, keys) {
-      var bar = harness.find(body.search, "searchField").parent
-      // Whether a result's label offers Enter: the chosen one's, shown.
-      var offersEnter = function() {
-        return resultRows(body).some(function(row) {
-          var add = harness.find(row, "searchAdd")
-          return row.visible && add.opacity === 1
-        })
-      }
+    // The field and its answers keep their actions and words at every
+    // result count. Their placement and fit are in the existing review kit.
+    function searchAnswers(body, watchlist, keys) {
       var message = harness.find(body.search, "searchMessage")
-      var rowsAt = Math.round(watchlist.mapToItem(body, 0, 0).y)
       var seen = []
-      // Where the field's bar stands, how far under it the answer starts,
-      // and whether Enter is offered.
-      var look = function(label) {
-        var first = body.search.results.length ? resultRows(body)[0] : message.visible ? message : null
-        var under = first ? Math.round(first.mapToItem(body, 0, 0).y - bar.mapToItem(body, 0, bar.height).y) : "-"
-        seen.push([label, Math.round(bar.mapToItem(body, 0, 0).y), under, offersEnter()].join(" "))
-      }
       keys.forceActiveFocus()
       keyClick(Qt.Key_A)
-      wait(50)
-      look("open")
+      tryVerify(function() { return body.adding }, 2000)
+      seen.push(resultRows(body).length === 0)
       ;["ONE", "SH", "ZZZ", "OOPS"].forEach(function(query) {
         answer(body, query)
-        look(query + "/" + body.search.results.length)
+        seen.push([resultRows(body).length, message.visible, message.text])
       })
       keyClick(Qt.Key_Escape)
-      wait(50)
-      var gap = body.search.resultsGap
-      var want = ["open " + rowsAt + " - false", "ONE/1 " + rowsAt + " " + gap + " true", "SH/5 " + rowsAt + " " + gap + " true",
-        "ZZZ/0 " + rowsAt + " " + gap + " false", "OOPS/0 " + rowsAt + " " + gap + " false"]
-      harness.check("search's field opens where the first row was and stays there, each answer starting under it, Enter offered only with results",
-        harness.same(seen, want), seen.join(" | ") + " — want " + want.join(" | "))
+      harness.check("search opens empty, shows one or five results, and names empty and failed answers",
+        seen[0] && seen[1][0] === 1 && seen[2][0] === 5
+          && seen[3][0] === 0 && seen[3][1] && seen[3][2] === "No matches for “ZZZ”"
+          && seen[4][0] === 0 && seen[4][1] && seen[4][2] === "Search didn’t answer"
+          && !body.adding, JSON.stringify(seen))
     }
 
-    // A long symbol shows whole, the name giving way to it, and the
-    // exchange codes keep one column. Found in the first-run review:
-    // "XBTC39577-…" was cut while its name kept its room.
     function longSymbols(body, keys) {
       keys.forceActiveFocus()
       keyClick(Qt.Key_A)
-      wait(50)
+      tryVerify(function() { return body.adding }, 2000)
       answer(body, "BTC")
       var rows = resultRows(body)
-      // The row's symbol: the Text that says it.
-      var symbolText = function(item, symbol) {
-        if (item.text === symbol && item.implicitWidth !== undefined) return item
-        for (var i = 0; i < item.children.length; i++) {
-          var found = symbolText(item.children[i], symbol)
-          if (found) return found
-        }
-        return null
+      var wanted = ["XBTC39577-USD", "CBBTC32994-USD", "KBTC33513-USD", "WBTC-USD", "CIRBTC-USD"]
+      var texts = function(item) {
+        var out = item.text !== undefined ? [String(item.text)] : []
+        for (var i = 0; i < item.children.length; i++) out = out.concat(texts(item.children[i]))
+        return out
       }
-      var symbols = rows.map(function(row) { return symbolText(row, row.modelData.symbol) }).filter(function(s) { return !!s })
-      var cut = symbols.filter(function(s) { return s.implicitWidth > s.width }).map(function(s) { return s.text })
-      var edges = rows.map(function(row) {
-        var code = harness.find(row, "searchExchange")
-        return Math.round(code.mapToItem(body, code.width, 0).x)
-      })
+      var shown = rows.map(function(row) { return texts(row) })
       keyClick(Qt.Key_Escape)
-      wait(50)
-      harness.check("long symbols show whole in search, the exchange codes in one column",
-        symbols.length === 5 && cut.length === 0 && edges.length === 5 && edges.every(function(x) { return x === edges[0] }),
-        symbols.length + " symbols, cut: " + cut.join(",") + " | codes " + edges.join(","))
+      harness.check("search names all five long cryptocurrency symbols",
+        rows.length === 5 && wanted.every(function(symbol, i) { return shown[i].indexOf(symbol) >= 0 }), JSON.stringify(shown))
     }
 
-    // The window at its smallest shows search's field and only whole
-    // results, one at least. Found in the first-run review: the field cut
-    // the second result in half.
     function smallestWindow(body, keys) {
       var height = app.testWindow.implicitHeight
       app.close()
       app.testWindow.implicitHeight = app.testWindow.minimumSize.height
       app.open("{}")
-      wait(200)
+      tryVerify(function() { return app.opened }, 2000)
       keys.forceActiveFocus()
       keyClick(Qt.Key_A)
-      wait(50)
+      tryVerify(function() { return body.adding }, 2000)
       answer(body, "SH")
-      var view = harness.find(body.search, "searchResults")
-      var tops = resultRows(body).map(function(row) { return Math.round(row.y - view.contentY) })
-      var rowHeight = body.search.rowHeight
-      var whole = tops.filter(function(top) { return top >= 0 && top + rowHeight <= view.height }).length
-      var cut = tops.filter(function(top) { return top + rowHeight > 0 && top < view.height && (top < 0 || top + rowHeight > view.height) }).length
-      var atMinimum = Math.round(body.height) === app.testWindow.minimumSize.height
-      var at = [Math.round(body.height), Math.round(view.height), whole, cut].join(",")
-      // The keys reach the note under the results: the last one brings it
-      // into view. Found in review: in the window at its smallest, ↓ stopped
-      // on the fifth result and the note stayed clipped under it.
+      var answered = body.search.results.map(function(result) { return result.symbol })
       answer(body, "MIXED")
       for (var d = 0; d < 5; d++) keyClick(Qt.Key_Down)
       var note = harness.find(body.search, "searchNote")
-      var noteTop = Math.round(note.y - view.contentY)
-      var noteSeen = [body.search.resultIndex, body.search.results.length, noteTop >= 0 && noteTop + note.height <= view.height + 0.5].join(",")
+      var last = body.search.resultIndex === 4 && body.search.results.length === 5
+      var said = note.visible && note.text === "Stonks doesn’t show currencies"
       keyClick(Qt.Key_Escape)
       app.close()
       app.testWindow.implicitHeight = height
       app.open("{}")
-      wait(200)
-      harness.check("the smallest window shows search's results whole, one at least, none cut, and ↓ to the last brings the note under them into view",
-        atMinimum && whole >= 1 && cut === 0 && noteSeen === "4,5,true",
-        "body, results' room, whole, cut: " + at + " (minimum " + app.testWindow.minimumSize.height + ") | chosen, results, note seen: " + noteSeen)
+      harness.check("the smallest window keeps all search results reachable by keys and names the excluded kind",
+        answered.length === 5 && last && said, answered.join(",") + " | last " + last + " | note " + note.text)
     }
 
     // A held answer makes the waiting state observable without prescribing
@@ -759,7 +687,8 @@ ShellRoot {
       // replace the field with NVDA, and act before NVDA's answer (the fake
       // curl answers 0.4 s after the 250 ms debounce): neither Enter nor a
       // click where SHOP was adds anything. Once NVDA's answer is in, Enter
-      // adds its top result. Found in the garden review: both added SHOP.
+      // shows that existing member and adds nothing. Found in the garden
+      // review: both early actions added SHOP.
       var beforeSearch = service.dataSettings
       var beforeFeatured = service.featuredSymbol
       var searchFor = function(first, then) {
@@ -784,8 +713,8 @@ ShellRoot {
       tryVerify(function() { return body.search.resultsQuery === "NVDA" && body.search.results.length > 0 }, 3000)
       keyClick(Qt.Key_Return)
       wait(50)
-      harness.check("Enter once the new query's results are in adds its top result",
-        service.library.indexOf("SHOP") >= 0 && !body.adding,
+      harness.check("Enter once NVDA's answer is in shows that member and adds nothing",
+        harness.same(service.library, beforeSearch.symbols) && service.featuredSymbol === "NVDA" && !body.adding,
         service.library + "|" + service.featuredSymbol + "|" + body.adding)
       service.persist(beforeSearch)
       wait(50)
@@ -804,11 +733,9 @@ ShellRoot {
       // staying away while search is open. Found in the code-quality
       // review: every edit brought the watchlist back for up to a second.
       searchFor("SH", "SHO")
-      var resultsView = harness.find(body.search, "searchResults")
-      var whileOut = [body.search.results.length > 0, body.search.stale, resultsView.opacity < 1,
-        !watchlist.visible].join(",")
+      var whileOut = [body.search.results.length > 0, body.search.stale, !watchlist.visible].join(",")
       tryVerify(function() { return body.search.resultsQuery === "SHO" }, 3000)
-      var freshAgain = !body.search.stale && resultsView.opacity === 1
+      var freshAgain = !body.search.stale
       keyClick(Qt.Key_A, Qt.ControlModifier)
       ;["Z", "Z", "Z"].forEach(function(k) { keyClick(k) })
       tryVerify(function() { return body.search.resultsQuery === "ZZZ" }, 3000)
@@ -827,34 +754,29 @@ ShellRoot {
       keyClick(Qt.Key_A, Qt.ControlModifier)
       ;["V", "F", "I", "A", "X"].forEach(function(k) { keyClick(k) })
       tryVerify(function() { return body.search.resultsQuery === "VFIAX" }, 3000)
-      // The rows' column lays out on its next polish: positions read before
-      // it are the last answer's.
+      // Let the new results finish laying out before reading the note.
       waitForPolish(note.parent)
-      var fundAlone = [body.search.results.length, message.visible, note.visible, note.text,
-        Math.round(note.mapToItem(resultsView, 0, 0).y)].join(",")
+      var fundAlone = [body.search.results.length, message.visible, note.visible, note.text].join(",")
       keyClick(Qt.Key_A, Qt.ControlModifier)
       ;["E", "U", "R", "U", "S", "D"].forEach(function(k) { keyClick(k) })
       tryVerify(function() { return body.search.resultsQuery === "EURUSD" }, 3000)
       waitForPolish(note.parent)
-      var shownRows = findAll(body.search, "searchResult").filter(function(r) { return r.visible })
-      var lastRow = shownRows[shownRows.length - 1]
-      var under = Math.round(note.mapToItem(lastRow, 0, 0).y - lastRow.height)
       keyClick(Qt.Key_Down)
       keyClick(Qt.Key_Down)
       var beside = [body.search.results.map(function(r) { return r.symbol }).join(" "), message.visible, note.visible,
-        note.text, under === body.search.rowGap, body.search.resultIndex].join(",")
+        note.text, body.search.resultIndex].join(",")
       keyClick(Qt.Key_A, Qt.ControlModifier)
       keyClick(Qt.Key_Backspace)
       var cleared = [body.search.results.length === 0, body.adding, watchlist.visible].join(",")
-      harness.check("a query out keeps the last results dimmed and the rows away",
-        whileOut === "true,true,true,true" && freshAgain, whileOut + "|" + freshAgain)
+      harness.check("a query out keeps the last results stale and the rows away",
+        whileOut === "true,true,true" && freshAgain, whileOut + "|" + freshAgain)
       harness.check("an empty answer and a failed lookup each say so in place, differently",
         noMatches === "true,true,No matches for “ZZZ”"
           && failed === "true,Search didn’t answer",
         noMatches + " / " + failed)
       harness.check("an answer of kinds Stonks leaves out names them where \"No matches\" would be, and under the results it shows, the arrows stopping at the last result",
-        fundAlone === "0,false,true,Stonks doesn’t show mutual funds,0"
-          && beside === "18QQ.Z Q0SF.Z,false,true,Stonks doesn’t show currencies or futures,true,1",
+        fundAlone === "0,false,true,Stonks doesn’t show mutual funds"
+          && beside === "18QQ.Z Q0SF.Z,false,true,Stonks doesn’t show currencies or futures,1",
         fundAlone + " / " + beside)
       harness.check("an empty field clears the results, the rows still away while search is open",
         cleared === "true,true,false", cleared)
@@ -873,7 +795,7 @@ ShellRoot {
       firstSearchSaysSo(body, keys)
       failedSearchRetries(body, keys)
 
-      fieldInRowsPlace(body, watchlist, keys)
+      searchAnswers(body, watchlist, keys)
       longSymbols(body, keys)
       smallestWindow(body, keys)
 

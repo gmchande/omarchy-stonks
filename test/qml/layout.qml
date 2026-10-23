@@ -355,10 +355,23 @@ ShellRoot {
       name: "NothingJumps"
       when: window.visible
 
+      // Each chapter starts in a fresh process with its own fixture setup.
       function test_nothing_jumps() {
         // The rows animate into their slots on the first layout; measure once
         // everything has settled.
         wait(400)
+        var chapter = Quickshell.env("STONKS_LAYOUT_FLOW")
+        console.log("LAYOUT CHAPTER " + chapter)
+        if (chapter === "surfaces") surfaceLayout()
+        else if (chapter === "live") liveLayout()
+        else if (chapter === "sizes") textSizes()
+        else throw new Error("unknown layout chapter: " + chapter)
+        console.log("LAYOUT DONE")
+        done.exitCode = root.failures ? 1 : 0
+        done.start()
+      }
+
+      function surfaceLayout() {
         // Under the open list menu each line of a row's words shows unless
         // it starts under the menu: the symbol, with its remove button, and
         // the name, each on its own, with one list to six, in both looks.
@@ -1918,6 +1931,10 @@ ShellRoot {
         root.check("search's field opens where the rows were and stays while you type, on any list and either surface", fieldPlaces.length === 0,
           fieldPlaces.join(", "))
 
+      }
+
+      function liveLayout() {
+        var year = History.parseHistory(JSON.parse(shopYearFile.text()), "1Y")
         // A live day and a range say the same words in the same place: nothing
         // is put in front of them while the market trades, so a range change
         // or a scrub moves nothing in the header. The chart's breathing dot
@@ -2471,6 +2488,10 @@ ShellRoot {
         root.check("at text size 16, on a screen too short for the first-run hint and a row, the popup shows a row, in both looks",
           rowless.length === 0, rowless.join(", "))
 
+      }
+
+      function textSizes() {
+        stub.now = 0
         // The popup shows a row on a 768 px screen at every text size Omarchy
         // offers (`omarchy display text size`, 9 to 20), in both looks: where
         // the screen would hold no row beside the chart, the chart gives way
@@ -2597,9 +2618,6 @@ ShellRoot {
           shortFaults.length === 0, shortFaults.join(" | "))
         root.check("on a 768 px screen at every text size from 9 to 20 a range's marks never touch the ink, and a chart at full height shows both, in both looks",
           touched.length === 0, touched.join(" | "))
-        console.log("LAYOUT DONE")
-        done.exitCode = root.failures ? 1 : 0
-        done.start()
       }
     }
   }

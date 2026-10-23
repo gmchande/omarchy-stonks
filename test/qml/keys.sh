@@ -2,7 +2,7 @@
 # Every key the key sheet draws and the README's table lists, pressed with
 # real Qt keys in the real popup (Panel.qml) and the real window (App.qml):
 # each changes what the surface shows. And the sheet itself: the same on both
-# surfaces, whole in the popup in both looks, and its foot crediting the
+# surfaces and in both looks, and its foot crediting the
 # manifest's version, Yahoo, and Robinhood. The shell's layer-shell card
 # window does not load offscreen, so the copy of Panel.qml puts the card in
 # CardWindow.qml, as popup-motion.sh does. HOME and curl are scratch.

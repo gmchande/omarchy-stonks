@@ -29,7 +29,7 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 fixtures=$(test/fixtures-dir.sh)
 dir=$(cd "${1:-.}" && pwd)
-tools="test/qml/render.sh test/qml/render.qml test/qml/lib.sh test/qml/quickshell.sh test/qml/HarnessExit.qml test/procs.sh test/fixtures-dir.sh"
+tools="test/qml/render.sh test/qml/render.qml test/qml/popup-anchor.qml test/qml/FrameGrab.qml test/qml/frames.js test/qml/lib.sh test/qml/quickshell.sh test/qml/HarnessExit.qml test/procs.sh test/fixtures-dir.sh"
 
 # files: DIR's files, as paths under it.
 files() {
