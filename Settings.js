@@ -154,7 +154,9 @@ function fileSettings(src) {
     order: normalizeOrder(from.order || "manual"),
     reversed: normalizeReversed(from.order, from.reversed),
     changeMode: from.changeMode === "abs" || from.changeMode === "open" ? from.changeMode : "pct",
-    style: from.style === "retro" ? "retro" : "smooth",
+    // A new install opens in retro, the look every picture of Stonks shows;
+    // smooth is a key or a click away.
+    style: from.style === "smooth" ? "smooth" : "retro",
     refreshIntervalSec: normalizeRefreshInterval(from.refreshIntervalSec),
     lists: lists,
     list: listIndex(lists, from.list) >= 0 ? lists[listIndex(lists, from.list)].name : "",

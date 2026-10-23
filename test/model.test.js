@@ -531,9 +531,11 @@ test("the data file reads as written and repairs hand edits", () => {
   const withLists = library({ list: "Growth" })
   expect(withLists.symbols).toEqual(["NEST", "BO", "IRIS", "SPY"])
   expect(withLists.order).toBe("pct")
-  // No file: the default library and cadence.
+  // No file: the default library and cadence, in retro, the look every
+  // picture of Stonks shows; a file that chose smooth keeps it.
   expect(M.fileSettings(null).symbols).toEqual(["NVDA", "AAPL", "MSFT", "SPY", "TSLA"])
   expect(M.fileSettings(null).refreshIntervalSec).toBe(60)
+  expect([M.fileSettings(null).style, M.fileSettings({ style: "smooth" }).style]).toEqual(["retro", "smooth"])
   // Symbols are upper-cased, trimmed, and kept once, from a string or a list.
   expect(M.fileSettings({ symbols: "nvda, aapl AAPL" }).symbols).toEqual(["NVDA", "AAPL"])
   expect(M.fileSettings({ symbols: ["spy", " tsla ", "SPY"] }).symbols).toEqual(["SPY", "TSLA"])

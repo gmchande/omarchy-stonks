@@ -168,9 +168,9 @@ cp ~/.config/omarchy/plugins/grvc.stonks/share/grvc.stonks.svg ~/.local/share/ic
 
 <img src="media/retro.png" width="480" alt="The popup in retro: block digits and a chart of pixel columns">
 
-Retro draws the price in block digits and the charts in pixel columns, the
-way Omarchy draws its logo. Click the small chart icon at the top right to
-switch between smooth and retro.
+Stonks opens in retro: the price in block digits and the charts in pixel
+columns, the way Omarchy draws its logo. Click the small chart icon at the
+top right to switch between smooth and retro.
 
 <img src="media/light.png" width="480" alt="The popup in Catppuccin Latte, a light theme: Stonks' own green and red, for a light ground, on the theme's pale background">
 
@@ -250,6 +250,12 @@ A "!" on the pill means its stock's quote is late or its last refresh
 failed: point at the pill to read which. The row and the line above the
 price say the same.
 
+- **The header says "No prices from Yahoo".** Every symbol you follow is
+  waiting on Yahoo, or Yahoo turned every one away, so Stonks says it once
+  rather than on every row. Rows with a price keep it, with the time it's
+  from, and the rest show their symbol alone. What to do is as for "No
+  data" below. If Yahoo has changed what it sends, only a newer Stonks can
+  fix that.
 - **A row says "No data" or "Update overdue".** Stonks has waited 90
   seconds on Yahoo: no answer came, or Yahoo turned it away. A row with a
   price keeps it, with the time it's from. Check your connection. If other
@@ -261,9 +267,7 @@ price say the same.
   running. A row with a price keeps it, with the time it's from, and `r`
   tries again. A symbol Yahoo has dropped, after a merger, a rename, or a
   delisting, stays this way: search for the company to find what Yahoo
-  calls it now. If every row says it, the fault is Yahoo's. Stonks tries
-  again at each refresh, but if Yahoo has changed what it sends, only a
-  newer Stonks can fix that.
+  calls it now.
 - **A stock or index says "As of" while its market is open.** Yahoo sends
   many exchanges' prices late, and some indexes'. When we measured,
   London's, São Paulo's, and the Cboe's VIX came 15 minutes late and

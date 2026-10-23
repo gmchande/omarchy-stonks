@@ -54,6 +54,9 @@ every_state() (
   # A removal offered back beside the add, in both looks on both surfaces,
   # and at 16 beside a named list's longer add.
   states="$states popup-undo-smooth popup-undo-retro window-undo-retro popup-undo-retro-large popup-undo-named-smooth-large"
+  # Every listing failed, said once in the header, in the popup in both
+  # looks and at 16, where the words say less rather than be cut.
+  states="$states popup-failed popup-failed-smooth popup-failed-large"
   # Hover and held presses formerly judged inside the behavior flows.
   # Each uses real pointer input on the displayed control in both looks.
   for look in smooth retro; do
@@ -189,6 +192,8 @@ every_state() (
   for theme in tokyo-night catppuccin-latte hackerman solitude white; do
     states="$states theme-smooth-$theme theme-retro-$theme"
   done
+  # Retro, the look a new install opens in, on the two light themes at 16.
+  states="$states theme-retro-catppuccin-latte-large theme-retro-white-large"
   # The calendars' longest closures, in the popup and the smallest window.
   for place in popup min-window; do
     for market in tokyo london; do
@@ -246,7 +251,8 @@ if [[ $states == *popup-anchor-* ]]; then
   bash "$0" --anchors "$STONKS_ANCHOR_POSES"
 fi
 # Every render is in an installed Omarchy theme: the one the state's name
-# ends with (popup-fill-up-smooth-kanagawa, theme-retro-white), else Tokyo
+# ends with, before any -large (popup-fill-up-smooth-kanagawa,
+# theme-retro-white-large), else Tokyo
 # Night, the theme a fresh Omarchy install sets. It goes where the shell
 # reads the current theme, so the shell's Color and the plugin's
 # TrendColors both read it as they do on the desktop. A state ending -large
@@ -259,7 +265,7 @@ for state in $states; do
   dest="$out/$state.png"
   shot="$work/$state.png"
   theme=tokyo-night
-  for t in $themes; do [[ $state == *-"$t" ]] && { theme=$t; break; }; done
+  for t in $themes; do [[ ${state%-large} == *-"$t" ]] && { theme=$t; break; }; done
   ln -sfn "/usr/share/omarchy/themes/$theme" "$theme_dir/theme"
   if [[ $state == *-large ]]; then printf '[font]\nbase-size = 16\n' > "$HOME/.config/omarchy/shell.toml"
   elif [[ $state == *-small ]]; then printf '[font]\nbase-size = 10\n' > "$HOME/.config/omarchy/shell.toml"
