@@ -24,6 +24,10 @@ key a
 typed MSFT
 if (( locator )); then
   soon "search found MSFT" 15 shown searchResult --word MSFT
+else
+  # Nothing tells the answer's arrival without the locator: give it the
+  # search's debounce, the session's delay, and a few seconds more.
+  sleep $((4 + ${SLOW:-0}))
 fi
 settle
 shot search-MSFT

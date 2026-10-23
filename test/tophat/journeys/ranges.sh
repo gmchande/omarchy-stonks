@@ -16,17 +16,24 @@ shot 1D
 lines
 check "the range starts on 1D" [ "$(saved_range)" = 1D ]
 
-# Each ] steps to the next range, whatever ranges this commit has, until
-# the last, where ] does nothing.
+# Each ] steps to the next range, until ] changes nothing. That must be on
+# All, the last range on every commit, having visited every range the row
+# offers.
+offered=$(words rangeOption | grep -c .)
+visited=1
 last=$(saved_range)
 for _ in $(seq 1 20); do
   key bracketright
   now=$(saved_range)
   if [ "$now" = "$last" ]; then
     step "] on the last range, $last"
-    pass "] stays on $last"
+    check "] stops only on All" [ "$last" = All ]
+    if (( locator )); then
+      check "] visited every range the row offers ($visited of $offered)" [ "$visited" = "$offered" ]
+    fi
     break
   fi
+  visited=$((visited + 1))
   step "] to $now"
   pass "] moved the range from $last to $now, and it was saved"
   loaded

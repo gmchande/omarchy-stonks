@@ -35,13 +35,13 @@ say() { echo "$*" | tee -a "$out/steps.log"; }
 pass() { say "PASS $*"; }
 fail() { say "FAIL $*"; failures=$((failures + 1)); }
 # check WHAT CMD…: CMD's success is WHAT holding.
-check() { local what=$1; shift; if "$@"; then pass "$what"; else fail "$what"; fi; }
+check() { local what=$1; shift; if "$@"; then pass "$what"; else fail "$what"; return 1; fi; }
 # need WHAT CMD…: as check, but the journey can't go on without it.
 need() { local what=$1; shift; "$@" && { pass "$what"; return 0; }; fail "$what"; say "the journey can't go on"; exit 1; }
 # within SECONDS CMD…: retry CMD until it succeeds or time runs out.
 within() { local end=$((SECONDS + $1)); shift; until "$@"; do (( SECONDS < end )) || return 1; sleep 0.2; done; }
 # soon WHAT SECONDS CMD…: as check, CMD given SECONDS to come true.
-soon() { local what=$1 secs=$2; shift 2; if within "$secs" "$@"; then pass "$what"; else fail "$what"; fi; }
+soon() { local what=$1 secs=$2; shift 2; if within "$secs" "$@"; then pass "$what"; else fail "$what"; return 1; fi; }
 
 # step TEXT: a new step; its sounds and shots are numbered by it.
 step() {
@@ -228,17 +228,34 @@ reachable() {
 # open_popup: the user's click on the pill, or, on a commit without the
 # locator, the popup's IPC open, which a key binding sends.
 open_popup() {
+  local name="" before
   if (( locator )); then
-    click_on pillSymbol || click_on pillChange || return 1
-    within 5 shown heroChart || { fail "the popup opened"; return 1; }
+    # Whichever form the pill has: the owner's form rides into the session.
+    for name in pillSymbol pillIcon pillStack ""; do [ -n "$name" ] && shown "$name" && break; done
+    [ -n "$name" ] || { fail "the pill is on the bar"; return 1; }
+    click_on "$name" || return 1
+    soon "the pill's click opened the popup" 5 shown heroChart || return 1
   else
-    say "opening by IPC (omarchy-shell grvc.stonks open): no locator to find the pill"
-    "$tophat" shell grvc.stonks open > /dev/null || { fail "the popup opened"; return 1; }
+    reachable "the pill's click"
+    say "opening by IPC instead (omarchy-shell grvc.stonks open), which a key binding sends"
+    before=$(columns_sum)
+    "$tophat" shell grvc.stonks open > /dev/null || { fail "the IPC open"; return 1; }
+    soon "the IPC open showed the popup (its columns changed)" 5 columns_changed "$before" || return 1
   fi
   # The popup takes the keyboard 75 ms after it maps (KeyboardPanel.qml).
   sleep 0.6
-  pass "the popup opened"
 }
+
+# columns_sum: a checksum of the popup's columns now; columns_changed SUM:
+# they differ from SUM.
+columns_sum() {
+  local tmp sum
+  tmp=$(mktemp -d)
+  "$tophat" shot "$tmp/c.png" > /dev/null 2>&1 && sum=$(magick "$tmp/c.png" -crop "$(popup_rect)" +repage rgba:- | md5sum)
+  rm -rf "$tmp"
+  echo "${sum:-none}"
+}
+columns_changed() { [ "$(columns_sum)" != "$1" ]; }
 
 # ---- evidence ----------------------------------------------------------------
 
@@ -260,7 +277,7 @@ shot() {
   local file
   file=$(printf '%s/%02d-%s.png' "$out" "$step_no" "$1")
   "$tophat" shot "$file" > /dev/null || { fail "shot $1"; return 1; }
-  magick "$file" -crop "$(popup_rect)" +repage "${file%.png}.popup.png" 2> /dev/null
+  magick "$file" -crop "$(popup_rect)" +repage "${file%.png}.popup.png" || { fail "crop $1 to the popup"; return 1; }
   say "  shot $(basename "$file")"
 }
 

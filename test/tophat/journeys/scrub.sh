@@ -9,6 +9,28 @@ chimes() { step_sound_lines | grep -c 'chime-'; }
 follows() { readout statusText smoothPrice changeText baselineLegend; }
 scrubbed() { shown statusText --has "AT "; }
 unscrubbed() { ! scrubbed; }
+# press KEY…: each key alone, as a hand presses them, since chimes struck
+# closer than 45 ms apart keep only the latest (Sounds.qml). moved counts the
+# keys that moved the scrub: a chart with few prints runs out of steps.
+press() {
+  local k was
+  moved=0
+  for k; do
+    was=$(words statusText)
+    key "$k"
+    [ "$(words statusText)" != "$was" ] && moved=$((moved + 1))
+  done
+}
+# chimed N: each of the N steps that moved asked for a chime; without the
+# locator, which tells a step that moved, at least one did.
+chimed() {
+  if (( locator )); then
+    check "the keys moved the scrub ($1 of $2 did)" [ "$1" -ge 1 ]
+    check "each step that moved asked for a chime ($(chimes) for $1)" [ "$(chimes)" -ge "$1" ]
+  else
+    check "the steps asked for chimes" [ "$(chimes)" -ge 1 ]
+  fi
+}
 
 step "Open the popup from the pill, on 1D"
 open_popup
@@ -17,23 +39,21 @@ shot now
 follows
 
 step "h scrubs back one step at a time, a chime each"
-# One key at a time, as a hand presses them: chimes struck closer than 45 ms
-# apart keep only the latest (Sounds.qml).
-for _ in 1 2 3 4; do key h; done
+press h h h h
 sleep 0.3
 shot h4
 follows
 sounds_here
-check "four h steps asked for four chimes" [ "$(chimes)" -ge 4 ]
+chimed "$moved" 4
 (( locator )) && check "the header says the moment scrubbed to (AT …)" scrubbed
 
 step "l and the arrow keys step it too"
-key l; key Left; key Right
+press l Left Right
 sleep 0.3
 shot keys
 follows
 sounds_here
-check "three more steps asked for three chimes" [ "$(chimes)" -ge 3 ]
+chimed "$moved" 3
 
 step "Esc ends the scrub and leaves the popup open"
 key Escape
@@ -73,6 +93,7 @@ if reachable "leaving the chart"; then
   shot left
   follows
   check "the header is back on now" unscrubbed
+  check "the popup is still open" shown heroChart
 fi
 
 step "A click on the chart snaps back to now"
@@ -86,4 +107,5 @@ if reachable "clicking the chart"; then
   shot clicked
   follows
   check "the click put the header back on now" unscrubbed
+  check "the popup is still open" shown heroChart
 fi
