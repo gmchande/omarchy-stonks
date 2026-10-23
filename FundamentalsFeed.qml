@@ -61,18 +61,24 @@ Item {
     fetchProc.running = true
   }
 
+  // An answer whose reading throws is a failed one. Found in the check of
+  // the 1.0.4 security review: closes whose offset was {"toString": null}
+  // threw out of here with the fetch still under way, so no symbol's cap
+  // and P/E would be asked for again until Stonks restarted.
   function receive(text) {
     var got = Fetch.answers(text)
     if (gate) gate.report(got.map(function(a) { return a.kind }), got.length ? got[0].retryAfter : 0, root.ticket)
-    var json = null
-    try { json = got.length && got[0].kind === "ok" ? JSON.parse(got[0].body) : null } catch (e) { json = null }
     var symbol = job.symbol
-    if (job.figures) {
-      root.settle(symbol, Fundamentals.withSnapshotCloses(job.figures, json))
-      return
+    var figures = null
+    var closesUrl = null
+    try {
+      var json = got.length && got[0].kind === "ok" ? JSON.parse(got[0].body) : null
+      figures = job.figures ? Fundamentals.withSnapshotCloses(job.figures, json) : Fundamentals.parseFundamentals(json)
+      closesUrl = !job.figures && figures ? Fundamentals.snapshotClosesUrl(symbol, figures) : null
+    } catch (e) {
+      figures = null
+      closesUrl = null
     }
-    var figures = Fundamentals.parseFundamentals(json)
-    var closesUrl = figures ? Fundamentals.snapshotClosesUrl(symbol, figures) : null
     if (!closesUrl) {
       root.settle(symbol, figures)
       return
