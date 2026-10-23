@@ -914,6 +914,15 @@ test("freshness keeps quote age, an unanswered ask, and the refresh outcome apar
   const aged = { ...q, price: 100, marketTime: trading - 121 }
   expect(M.freshness(ok, aged, trading, 0)).toMatchObject({ state: "aged", live: false, asOf: trading - 121 })
   expect(M.freshnessText(M.freshness(ok, aged, trading, 0), q)).toBe("AS OF 10:27")
+  // An old quote in its refresh's grace (`Service.asking`) says nothing of
+  // its age, and claims no live price, where its last answer is old too (a
+  // coin nothing kept fresh, as a surface opens); one answered a minute ago
+  // is late at its source, and says "As of" through each refresh.
+  const unrefreshed = { status: "ok", answeredAt: trading - 3600 }
+  expect(M.freshness(unrefreshed, aged, trading, 0, true)).toMatchObject({ state: "asking", live: false })
+  expect(M.freshnessText(M.freshness(unrefreshed, aged, trading, 0, true), q)).toBe("")
+  expect(M.freshness(unrefreshed, aged, trading, 0, false).state).toBe("aged")
+  expect(M.freshness({ status: "ok", answeredAt: trading - 60 }, aged, trading, 0, true).state).toBe("aged")
   // A refresh asked for and unanswered for 90 s is overdue, however old the
   // last answer; one nobody asked for never is.
   expect(M.freshness(ok, live, trading, trading - 89).state).toBe("fresh")
@@ -1409,7 +1418,7 @@ test("Robinhood's answer keeps only the bars that traded, by the symbols asked f
   expect(bars.SILK.bars.length).toBe(288 - raw[1].historicals.filter(b => b.interpolated).length)
   expect(bars.NEST.bars.filter(b => b.s === "overnight").length).toBe(96)
   expect(bars.REED.bars.filter(b => b.s === "overnight")).toEqual([])
-  expect(bars["GRIT.TO"]).toEqual({ bars: [], through: null })
+  expect(bars["GRIT.TO"]).toEqual({ bars: [], from: null, through: null })
   // It reaches its newest slot, traded or not: REED traded in none of
   // them, and still reaches as far as SILK and NEST.
   expect(bars.REED.through).toBe(Date.parse(raw[2].historicals.at(-1).begins_at) / 1000)
@@ -1417,8 +1426,50 @@ test("Robinhood's answer keeps only the bars that traded, by the symbols asked f
   // Asked out of the order it answers in, an answer names another symbol
   // and is no answer for the one asked.
   expect(M.parseOvernight(fixture("moments/day/robinhood-day.json"), ["SILK", "NEST"]))
-    .toEqual({ SILK: { bars: [], through: null }, NEST: { bars: [], through: null } })
+    .toEqual({ SILK: { bars: [], from: null, through: null }, NEST: { bars: [], from: null, through: null } })
   expect(M.parseOvernight({ chart: {} }, ["NEST"])).toBeNull()
+})
+
+test("a refresh within half an hour asks Robinhood for the last hour, which brings the day in hand up to what a day asked then holds", () => {
+  // Saved Wednesday 7 October at 00:05 and 01:00 New York, 55 minutes
+  // apart, as a night's refreshes come with the popup closed between.
+  const earlier = traded("2026-10-07-0005", ["NEST"]).NEST
+  const later = fixture("moments/2026-10-07-0100/robinhood-day.json")
+  const hour = { results: later.results.map(r => ({ ...r, span: "hour", historicals: r.historicals.slice(-12) })) }
+  const joined = M.joinHour(earlier, M.parseOvernight(hour, ["NEST"]).NEST)
+  const day = M.parseOvernight(later, ["NEST"]).NEST
+  expect(joined.through).toBe(day.through)
+  expect(joined.bars.filter(b => b.t >= day.from)).toEqual(day.bars)
+  // The older prints stay: a chart of the day before still has them.
+  expect(joined.bars[0]).toEqual(earlier.bars[0])
+  // An hour that answers nothing keeps the prints in hand.
+  expect(M.joinHour(earlier, { bars: [], from: null, through: null })).toEqual({ bars: earlier.bars, through: earlier.through })
+  // Ten minutes after the newest slot in hand, the hour reaches back past
+  // it; an hour after, it would leave slots out, so the day is asked again,
+  // as it is for a listing never answered.
+  expect(M.overnightSpan({ through: earlier.through }, earlier.through + 10 * 60)).toBe("hour")
+  expect(M.overnightSpan({ through: earlier.through }, earlier.through + 60 * 60)).toBe("day")
+  expect(M.overnightSpan(undefined, earlier.through)).toBe("day")
+  expect(M.overnightSpan({ through: null }, earlier.through)).toBe("day")
+})
+
+test("a run of Robinhood's prints never takes more requests than a day for all would", () => {
+  const now = 1791000000
+  const warm = { through: now - 10 * 60 }
+  const names = n => Array.from({ length: n }, (_, i) => "S" + i)
+  const spans = batches => batches.map(b => b.span + " " + b.symbols.length).join(", ")
+  // A small list's first open at night, the pill's stock already in hand:
+  // one day for all three, as before, not a day and an hour.
+  expect(M.overnightBatches(["AAPL", "MSFT", "SPY"], { AAPL: warm }, now))
+    .toEqual([{ span: "day", symbols: ["MSFT", "SPY", "AAPL"] }])
+  // A long list's first open: the pill's stock fills the last day's room.
+  const long = names(115)
+  expect(spans(M.overnightBatches(long, { S0: warm }, now))).toBe("day 25, day 25, day 25, day 25, day 15")
+  // Its refreshes through the night: the last hour, two requests, not five.
+  const inHand = Object.fromEntries(long.map(s => [s, warm]))
+  expect(spans(M.overnightBatches(long, inHand, now))).toBe("hour 75, hour 40")
+  // Three added to it meanwhile: their days, and the rest's hour.
+  expect(spans(M.overnightBatches(long.concat(["N1", "N2", "N3"]), inHand, now))).toBe("day 3, hour 75, hour 40")
 })
 
 test("Robinhood's instruments say which listings it trades all day, by the symbols asked for", () => {
@@ -1448,8 +1499,9 @@ test("which listings have an overnight market comes from Yahoo, never from Robin
   expect(M.hasOvernight(M.parseChart(fixture("7203-t-day.json")), calendars)).toBe(false)
   expect(M.hasOvernight(M.parseChart(fixture("shel-l-day.json")), calendars)).toBe(false)
   // One request for the list, a share class in Robinhood's spelling.
-  expect(M.overnightUrl(["NEST", "BRK-B"]))
+  expect(M.overnightUrl(["NEST", "BRK-B"], "day"))
     .toBe("https://api.robinhood.com/marketdata/historicals/?symbols=NEST,BRK.B&interval=5minute&span=day&bounds=24_5")
+  expect(M.overnightUrl(["NEST"], "hour")).toContain("&span=hour&")
 })
 
 // The 1D chart of a saved moment, with the quote it was built from.

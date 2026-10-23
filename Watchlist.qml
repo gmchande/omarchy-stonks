@@ -30,6 +30,9 @@ Flickable {
   property string changeMode: "pct"
   property int now: 0
   property var owed: ({})
+  // Each symbol whose refresh was asked under 2 s ago (`Service.asking`):
+  // freshness's grace for a row opened old.
+  property var asking: ({})
   property bool retro: false
   // The exchanges' calendars, for the breaks in a row's day line.
   property var calendars: null
@@ -260,7 +263,7 @@ Flickable {
   }
 
   function freshnessOf(symbol) {
-    return Figures.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0)
+    return Figures.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0, !!asking[symbol])
   }
 
   function moveCursor(delta) {

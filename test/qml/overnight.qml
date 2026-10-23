@@ -310,10 +310,12 @@ ShellRoot {
       var sundayCalls = Number(harness.record("OVERNIGHT.calls"))
       service.now = harness.sunday + 5 * 60
       within(2000, function() { return Number(harness.record("OVERNIGHT.calls")) > sundayCalls })
-      harness.check("while a night trades, the open surface asks every five minutes, for a day",
-        Number(calls) + 1 === sundayCalls && Number(harness.record("OVERNIGHT.calls")) === sundayCalls + 1 && lastSpan() === "day"
-          && body.featuredGeometry.start === harness.midnight.fri25,
-        calls + ", " + sundayCalls + ", " + harness.record("OVERNIGHT.calls") + " " + lastSpan())
+      // Each refresh after the first asks only for the last hour, which
+      // joins on to the day in hand: the chart stays whole.
+      harness.check("while a night trades, the open surface asks every five minutes, for the last hour only",
+        Number(calls) + 1 === sundayCalls && Number(harness.record("OVERNIGHT.calls")) === sundayCalls + 1 && lastSpan() === "hour"
+          && within(2000, function() { return body.featuredGeometry.start === harness.midnight.fri25 && harness.strip() === "OVERNIGHT 22:20 234.84 \u22121.05%" }),
+        calls + ", " + sundayCalls + ", " + harness.record("OVERNIGHT.calls") + " " + lastSpan() + " | " + harness.strip())
 
       // Monday 04:11, the night's last bars due, and Robinhood down: the
       // last good prints stay, and once it is back, the open surface asks
@@ -455,21 +457,31 @@ ShellRoot {
       // does featured, SILK's thin night; a US stock not yet added is asked
       // of Robinhood as one in All is, so its preview trades all night as
       // it will once added. Found in the overnight QA of 23 October: NVDA's
-      // preview said CLOSED, then OVERNIGHT a second after ADD.
+      // preview said CLOSED, then OVERNIGHT a second after ADD. Robinhood
+      // is asked by search's result, beside Yahoo's quote, never after it:
+      // AAPL's quote is held out until both of Robinhood's asks are out.
+      // Found in the night's check of 23 October: one after the other, a
+      // preview took 3 s longer on a slow network.
       app.testKeyCatcher.forceActiveFocus()
       keyClick(Qt.Key_A)
       within(2000, function() { return body.adding })
       body.previewTo("SILK")
       within(3000, function() { return body.chartSymbol === "SILK" && !body.chartLoading })
       var listed = body.featuredGeometry
-      body.previewTo("AAPL")
+      runCommand(["touch", harness.state + "/AAPL.quote.hold"])
+      body.search.results = [{ symbol: "AAPL", name: "Apple Inc.", exchange: "NASDAQ", instrumentType: "EQUITY" }]
+      body.search.answer = "results"
+      body.search.choose(0)
+      var beside = within(3000, function() { return harness.allDayAsked("AAPL") === 1 && harness.printsAsked("AAPL") === 1 })
+        && !service.previewEntries.AAPL
+      runCommand(["rm", "-f", harness.state + "/AAPL.quote.hold"])
       within(4000, function() { return body.chartSymbol === "AAPL" && !body.chartLoading })
       var unadded = service.previewView.chart
       var previewSaid = [body.chartSymbol, body.adding, listed.start === silkNight.start && listed.end === silkNight.end,
-        listed.points.length + "/" + silkNight.points.length, harness.allDayAsked("AAPL"), harness.printsAsked("AAPL"), !!unadded && unadded.allDay]
-      harness.check("search's preview of a symbol in All shows its chart as featured; one not yet added, a US stock, is asked of Robinhood and trades all night, as it will added",
-        previewSaid.join(" ") === "AAPL true true " + silkNight.points.length + "/" + silkNight.points.length + " 1 1 true",
-        "symbol, adding, SILK's span, its points, AAPL's all-day and prints asks, all day: " + previewSaid.join(" "))
+        listed.points.length + "/" + silkNight.points.length, beside, harness.allDayAsked("AAPL"), harness.printsAsked("AAPL"), !!unadded && unadded.allDay]
+      harness.check("search's preview of a symbol in All shows its chart as featured; one not yet added, a US stock, is asked of Robinhood while its quote is out, and trades all night, as it will added",
+        previewSaid.join(" ") === "AAPL true true " + silkNight.points.length + "/" + silkNight.points.length + " true 1 1 true",
+        "symbol, adding, SILK's span, its points, Robinhood asked while the quote was out, AAPL's all-day and prints asks, all day: " + previewSaid.join(" "))
       body.cancelAdding()
       within(3000, function() { return !body.adding && body.chartSymbol === "REED" && !body.chartLoading })
       featureShown("^GSPC")

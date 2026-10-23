@@ -22,7 +22,7 @@ export function requestUrl(raw) {
     if (u.pathname !== '/gmchande/omarchy-stonks/main/manifest.json' || u.search) throw new Error('wrong manifest')
   } else if (u.hostname === 'api.robinhood.com') {
     if (u.pathname === '/instruments/') parameters({}, {symbols})
-    else if (u.pathname === '/marketdata/historicals/') parameters({interval:'5minute', span:'day', bounds:'24_5'}, {symbols})
+    else if (u.pathname === '/marketdata/historicals/') parameters({interval:'5minute', bounds:'24_5'}, {symbols, span:s=>s === 'day' || s === 'hour'})
     else throw new Error('unknown Robinhood route')
   } else if (u.hostname === 'query2.finance.yahoo.com' && u.pathname === '/v1/finance/search') {
     parameters({newsCount:'0'}, {q:s=>s.trim().length > 0,quotesCount:epoch})

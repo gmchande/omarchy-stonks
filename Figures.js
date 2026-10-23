@@ -40,23 +40,41 @@ var LIVE_QUOTE_MAX_AGE = 120
 // a refresh owed counts as overdue.
 var OVERDUE_AFTER = 90
 
-// entry: the feed's last answer, { status: "ok"|"failed"|"saved" }, "saved"
-// for a quote kept from an earlier session, or null before any. owedSince:
-// when a refresh began waiting on Yahoo, its request out unanswered or the
-// host paused (`QuoteFeed.owed`), or 0. A symbol nobody asked for is never
-// late, so no cadence enters the rule; nor is one Stonks' own pacing holds.
-function freshness(entry, quote, now, owedSince) {
+// How long, in seconds, a quote Stonks let go old, its last answer older
+// than a live one (LIVE_QUOTE_MAX_AGE), says nothing of its age once its
+// refresh is asked: about the time a normal answer takes, so a surface
+// opening on a row nothing kept fresh (a cryptocurrency, with nothing open)
+// shows no "As of" for the moment before the fresh price lands; on a slow
+// network it says "As of" from then until the answer. Found in the speed QA
+// of 23 October: BTC-USD's row flashed "As of 06:46 UTC" for 150 ms on each
+// open. Timed to the millisecond by the service (`Service.asking`): counted
+// in whole seconds of the clock it ended anywhere from 1 to 2 s on.
+var ASKED_GRACE = 2
+
+// entry: the feed's last answer, { status: "ok"|"failed"|"saved",
+// answeredAt }, "saved" for a quote kept from an earlier session, or null
+// before any. owedSince: when a refresh began waiting on Yahoo, its request
+// out unanswered or the host paused (`QuoteFeed.owed`), or 0. inGrace: its
+// refresh was asked for under ASKED_GRACE ago (`Service.asking`). A symbol
+// nobody asked for is never late, so no cadence enters the rule; nor is one
+// Stonks' own pacing holds. A quote old by its market's clock is "aged";
+// "asking" in its grace while its last answer is older than a live quote,
+// so its age goes unsaid only where Stonks, not the source, let it go old:
+// a source sending late (London, 15 minutes) is answered every minute and
+// says "As of" throughout.
+function freshness(entry, quote, now, owedSince, inGrace) {
   var head = quote ? Quote.headlineQuote(quote) : null
   var phase = quote ? Market.sessionPhase(quote, now) : "closed"
   var asOf = head ? head.t : null
   var overdue = owedSince > 0 && now - owedSince >= OVERDUE_AFTER
   // The quote stands for another day than the clock's: the words name the day.
   var earlier = !!asOf && exchangeDay(quote, asOf) !== exchangeDay(quote, now)
+  var asking = !!inGrace && !!entry && now - entry.answeredAt > LIVE_QUOTE_MAX_AGE
   var state = entry && entry.status === "failed" ? "failed"
     : overdue ? "overdue"
     : !quote || !head ? "unavailable"
     : entry && entry.status === "saved" ? "saved"
-    : asOf !== null && Market.isTrading(phase) && now - asOf > LIVE_QUOTE_MAX_AGE ? "aged"
+    : asOf !== null && Market.isTrading(phase) && now - asOf > LIVE_QUOTE_MAX_AGE ? (asking ? "asking" : "aged")
     : "fresh"
   return { state: state, asOf: asOf, earlier: earlier, live: asOf !== null && state === "fresh" && Market.isTrading(phase), phase: phase }
 }

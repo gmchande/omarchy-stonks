@@ -13,8 +13,9 @@ var ANSWER_MARK = "@@stonks"
 // Caps, each above the largest real answer even uncompressed: a day's chart
 // is about 13 KB raw (BTC-USD's 22), a spark answer of 20 listings about
 // 90 KB (closes only), cap and P/E and a search a few KB, a history of 500
-// bars about 60 KB, Robinhood's prints 56.3 KB a listing and its
-// instruments a few KB, and Stonks' own manifest under 2 KB.
+// bars about 60 KB, Robinhood's prints 56.3 KB a listing for a day and
+// 2.6 KB for an hour, and its instruments a few KB, and Stonks' own
+// manifest under 2 KB.
 var DAY_CAP = 64000
 var SPARK_CAP = 400000
 var FUNDAMENTALS_CAP = 64000
@@ -22,8 +23,9 @@ var SEARCH_CAP = 64000
 var HISTORY_CAP = 256000
 var MANIFEST_CAP = 16000
 
-function overnightCap(count) {
-  return 16000 + 80000 * count
+// Robinhood's prints for `count` listings over `span`, "day" or "hour".
+function overnightCap(count, span) {
+  return 16000 + (span === "hour" ? 8000 : 80000) * count
 }
 
 function instrumentsCap(count) {

@@ -58,8 +58,8 @@ ShellRoot {
   function answered(key, from) {
     var source = from || service
     var entry = source.histories[key]
-    var wanted = source.testHistoryFeed.wanted
-    return !!entry && entry.status === "ok" && !(wanted && wanted.key === key)
+    var feed = source.testHistoryFeed
+    return !!entry && entry.status === "ok" && !feed.holds(feed.wanted, key)
   }
 
   function find(item, name) {
@@ -664,7 +664,7 @@ ShellRoot {
       holdMsft.running = true
       tryVerify(function() { return !holdMsft.running }, 2000)
       service.showHistory(false)
-      var out = within(3000, function() { var w = service.testHistoryFeed.wanted; return !!w && w.key === "MSFT|1W" })
+      var out = within(3000, function() { return service.testHistoryFeed.holds(service.testHistoryFeed.wanted, "MSFT|1W") })
       wait(300)
       releaseMsft.running = true
       tryVerify(function() { return harness.answered("MSFT|1W") }, 5000)
@@ -750,11 +750,11 @@ ShellRoot {
       tryVerify(function() { return !holdMsft.running }, 2000)
       keyClick(Qt.Key_2)
       var stale = service.histories["MSFT|1M"]
-      var out = service.testHistoryFeed.wanted
+      var out = service.testHistoryFeed.holds(service.testHistoryFeed.wanted, "MSFT|1M")
       var loadingAtOnce = body.chartLoading
       harness.check("expired history stays usable while its refetch is out",
-        !!out && out.key === "MSFT|1M" && !!stale.history && !loadingAtOnce && body.chartSymbol === "MSFT",
-        (out ? out.key : "none") + "|" + loadingAtOnce)
+        out && !!stale.history && !loadingAtOnce && body.chartSymbol === "MSFT",
+        out + "|" + loadingAtOnce)
       releaseMsft.running = true
       tryVerify(function() { return !releaseMsft.running && harness.answered("MSFT|1M") && !service.testHistoryFeed.busy }, 5000)
       keyClick(Qt.Key_1)
@@ -865,7 +865,7 @@ ShellRoot {
       var leftKey = "NVDA|" + service.range
       tryVerify(function() { return service.testHistoryFeed.testRetrying }, 5000)
       var wantedSince = []
-      var noteWant = function() { var w = service.testHistoryFeed.wanted; if (w) wantedSince.push(w.key) }
+      var noteWant = function() { var w = service.testHistoryFeed.wanted; if (w) wantedSince.push(w.charts.map(function(c) { return c.key }).join("+")) }
       service.testHistoryFeed.wantedChanged.connect(noteWant)
       service.setRange("1D")
       service.feature("AAPL")

@@ -64,25 +64,66 @@ function robinhoodSymbol(symbol) {
 
 // span=day is the last 288 five-minute slots Robinhood's 24/5 market traded,
 // its closed days left out (seen Sunday 4 October, 22:58 ET: Thursday 22:55
-// onward), so one answer holds every print a 1D chart can draw. At most
-// `OVERNIGHT_BATCH` symbols to a request.
-function overnightUrl(symbols) {
+// onward), so one answer holds every print a 1D chart can draw; span=hour is
+// the last 12 slots by the clock (seen Friday 23 October, 09:45 UTC: 08:45
+// to 09:40), a twenty-fourth of the bytes, which brings prints already in
+// hand up to date (`overnightSpan`). At most `OVERNIGHT_BATCH` symbols to a
+// day's request, `HOUR_BATCH` to an hour's.
+function overnightUrl(symbols, span) {
   return ROBINHOOD_URL + "?symbols=" + symbols.map(function(s) { return encodeURIComponent(robinhoodSymbol(s)) }).join(",")
-    + "&interval=5minute&span=day&bounds=24_5"
+    + "&interval=5minute&span=" + span + "&bounds=24_5"
 }
 
-// The listings to a request: a third of the 75 Robinhood's historicals
-// take ("Too many instruments requested. No more than 75 allowed."), so
-// each answer, read in one JSON.parse that can't be sliced, is a third as
-// long: 75 listings came to about 4 MB.
+// The listings to a day's request: a third of the 75 Robinhood's
+// historicals take ("Too many instruments requested. No more than 75
+// allowed."), so each answer, read in one JSON.parse that can't be sliced,
+// is a third as long: 75 listings came to about 4 MB.
 var OVERNIGHT_BATCH = 25
+
+// The listings to an hour's request: all 75 Robinhood takes, whose answer is
+// about 200 KB.
+var HOUR_BATCH = 75
+
+// How old the newest slot of the prints in hand may be for an hour's answer
+// to reach back past it: half the hour, room for a newest bar that comes
+// ten minutes late (`OVERNIGHT_LAG`).
+var HOUR_REACH = 30 * 60
+
+// What to ask Robinhood for a listing's prints at `now`, by its entry
+// (`OvernightFeed.entries`): "hour" while its newest slot in hand is within
+// HOUR_REACH, so the answer joins on to it with no slot missed between;
+// "day" for one never answered, or answered longer ago.
+function overnightSpan(entry, now) {
+  return !!entry && entry.through !== null && entry.through !== undefined && now - entry.through <= HOUR_REACH ? "hour" : "day"
+}
+
+// The requests for the prints of `symbols` at `now`, by their entries
+// (`overnightSpan`), each { span, symbols }: the days first, then the
+// hours. Never more requests than a day for all would take: where the hours
+// would add one, they fill the last day's spare places instead. Found in
+// the review of this change: a small list's first open, its pill's stock
+// already in hand, went in two requests, one more than before.
+function overnightBatches(symbols, entries, now) {
+  var day = symbols.filter(function(s) { return overnightSpan(entries[s], now) === "day" })
+  var hour = symbols.filter(function(s) { return overnightSpan(entries[s], now) === "hour" })
+  var dayRequests = Math.ceil(day.length / OVERNIGHT_BATCH)
+  if (dayRequests + Math.ceil(hour.length / HOUR_BATCH) > Math.ceil(symbols.length / OVERNIGHT_BATCH)) {
+    var room = dayRequests * OVERNIGHT_BATCH - day.length
+    day = day.concat(hour.slice(0, room))
+    hour = hour.slice(room)
+  }
+  var batches = []
+  for (var i = 0; i < day.length; i += OVERNIGHT_BATCH) batches.push({ span: "day", symbols: day.slice(i, i + OVERNIGHT_BATCH) })
+  for (var j = 0; j < hour.length; j += HOUR_BATCH) batches.push({ span: "hour", symbols: hour.slice(j, j + HOUR_BATCH) })
+  return batches
+}
 
 // The most entries a list in Robinhood's answers may hold, past which the
 // answer is a bad one (`Format.fetchedList`): a result for each symbol
 // asked, one each in the saved answers, so twice the most asked at once; a
 // listing's prints, span=day's 288 five-minute slots, 288 in the saved
 // answers.
-var MOST_RESULTS = 2 * OVERNIGHT_BATCH
+var MOST_RESULTS = 2 * HOUR_BATCH
 var MOST_PRINTS = 1000
 
 // Robinhood's instruments for `symbols`: whether it trades each all day. At
@@ -138,26 +179,40 @@ function overnightResults(json) {
 }
 
 // One result of Robinhood's answer, for the Yahoo symbol asked for in its
-// place: { bars, through }. `bars` are its prints, { t, p, s } with s its
-// session ("pre", "reg", "post", "overnight"), only the bars that traded:
-// bounds=24_5 still fills a quiet name's gaps with flat `interpolated`
-// bars. `through` is the start of the newest five-minute slot the answer
-// holds, traded or not, null with none: how far Robinhood's day reaches, so
-// a night's quiet slots can be counted (`thinNight`). An unknown symbol
-// comes back empty, and one that names another symbol, or whose prints are
-// not a list within MOST_PRINTS, is no answer for it.
+// place: { bars, from, through }. `bars` are its prints, { t, p, s } with s
+// its session ("pre", "reg", "post", "overnight"), only the bars that
+// traded: bounds=24_5 still fills a quiet name's gaps with flat
+// `interpolated` bars. `from` and `through` are the starts of the oldest and
+// the newest five-minute slots the answer holds, traded or not, null with
+// none: what the answer covers (`joinHour`), and how far Robinhood's day
+// reaches, so a night's quiet slots can be counted (`thinNight`). An unknown
+// symbol comes back empty, and one that names another symbol, or whose
+// prints are not a list within MOST_PRINTS, is no answer for it.
 function overnightAnswer(result, symbol) {
-  var out = { bars: [], through: null }
+  var out = { bars: [], from: null, through: null }
   var historicals = result && result.symbol === robinhoodSymbol(symbol) ? Format.fetchedList(result.historicals, MOST_PRINTS) : null
   if (!historicals) return out
   for (var j = 0; j < historicals.length; j++) {
     var bar = historicals[j]
     var t = Date.parse(bar.begins_at) / 1000
     var p = Number(bar.close_price)
+    if (Format.isFiniteNumber(t) && (out.from === null || t < out.from)) out.from = t
     if (Format.isFiniteNumber(t) && (out.through === null || t > out.through)) out.through = t
     if (!bar.interpolated && Format.isFiniteNumber(t) && Format.isFiniteNumber(p) && p > 0) out.bars.push({ t: t, p: p, s: bar.session })
   }
   return out
+}
+
+// The prints in hand (`had`, { bars, through }) brought up to date by an
+// hour's answer (`hour`, `overnightAnswer`'s): the hour's slots replace
+// what was kept from its first slot on, a bar still forming among them, and
+// the older ones stay. An hour with nothing in it changes nothing.
+function joinHour(had, hour) {
+  if (hour.from === null) return { bars: had.bars, through: had.through }
+  return {
+    bars: had.bars.filter(function(b) { return b.t < hour.from }).concat(hour.bars),
+    through: had.through === null || hour.through > had.through ? hour.through : had.through
+  }
 }
 
 // Whether two answers' prints for a listing are the same, bar by bar.

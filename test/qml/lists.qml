@@ -893,8 +893,14 @@ ShellRoot {
       var manageRows = harness.findAll(body2, "manageRow")
       var winsRow = manageRows[2]
       var winsAt = center(winsRow)
+      // The view opens resting the pointer where it is (RowPointer): its
+      // first report there is no move, and a loaded machine may send it
+      // only with the next move, which it then swallows. So the pointer is
+      // seen where it rests first, then moves. Seen once in a full run on
+      // 23 October: the cursor stayed on the first list.
+      mouseMove(body2, manageAt.x, manageAt.y)
       mouseMove(body2, winsAt.x, winsAt.y)
-      wait(100)
+      within(1000, function() { return manage.cursor === 2 })
       harness.check("in Manage lists the pointer puts the one cursor, on the list under it",
         manage.cursor === 2, manage.cursor)
       // The pointer travels to the control it clicks, as a hand's does.

@@ -731,6 +731,38 @@ ShellRoot {
       service.preview(body, "")
       closeWindow()
 
+      // 17:20, the crypto's saved quote two hours old and nothing kept it
+      // fresh for five minutes: an open asks for it, its answer held out,
+      // as on a real network. Its row shows its last price with no "As of"
+      // for the 2 s an answer takes (`Figures.ASKED_GRACE`), says "As of"
+      // from then on, and goes on saying it once its answer, as old, lands:
+      // the source is late, not Stonks. Found in the speed QA of 23
+      // October: "As of 06:46 UTC" flashed on each open. The service's
+      // clock runs as a real one does, its next second 100 ms after the
+      // open, so the ask goes 0.9 s into its second: counted in whole
+      // seconds, the grace ended 1.1 s on. Found in the check of #69.
+      tick(300)
+      var start = service.now
+      touch("BTC-USD.quote.hold")
+      app.testWindow.implicitHeight = 1000
+      app.open("{}")
+      var opened = Date.now()
+      var heldOut = false
+      var asOfAt = 0
+      for (var t = 0; t < 4000 && !asOfAt; t = Date.now() - opened) {
+        service.now = start + Math.floor((t + 900) / 1000)
+        heldOut = heldOut || ("BTC-USD" in service.asked && !idle())
+        var btcRow = app.opened ? app.testBody.watchlist.rowItem("BTC-USD") : null
+        if (btcRow && /^As of /.test(btcRow.detail)) asOfAt = t
+        wait(20)
+      }
+      remove("BTC-USD.quote.hold")
+      settle()
+      harness.check("an open on a crypto nothing kept fresh shows no As of on its row for the first 2 s of its answer's wait, then As of while it stays out, and after its old answer",
+        heldOut && asOfAt >= 1900 && asOfAt <= 2600 && /^As of /.test(app.testBody.watchlist.rowItem("BTC-USD").detail),
+        heldOut + " | As of at " + asOfAt + " ms | " + app.testBody.watchlist.rowItem("BTC-USD").detail)
+      closeWindow()
+
       // 23:00, Tokyo's lunch break until 23:30; New York's night, with
       // Robinhood for the window's hero. Half an hour each, so a pill's
       // symbol never asked cannot pass for one asked every 15 minutes.

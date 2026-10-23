@@ -139,8 +139,9 @@ FocusScope {
   FontMetrics { id: symbolMetrics; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
 
   signal picked(string symbol)
-  // The choice is now this result, or none ("").
-  signal chose(string symbol)
+  // The choice is now this result, or none ("", null): its symbol, and the
+  // result itself (`Search.parseSearch`).
+  signal chose(string symbol, var result)
   signal cancelled()
 
   // True while search is open on an open surface. Turned on, it starts
@@ -261,7 +262,8 @@ FocusScope {
   // The choice, told: a result, or none when there are no results.
   function choose(index) {
     resultIndex = index
-    chose(index >= 0 && index < results.length ? results[index].symbol : "")
+    var result = index >= 0 && index < results.length ? results[index] : null
+    chose(result ? result.symbol : "", result)
   }
 
   // Choose a result and bring it into view: the last brings the note under
