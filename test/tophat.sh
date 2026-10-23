@@ -2,13 +2,15 @@
 # Tophat Stonks in a sandboxed nested Hyprland on the laptop screen, while
 # the owner keeps working on the other screen.
 #
-#   start [--fresh] [--zone ZONE] [--slow SECONDS] REF
+#   start [--fresh] [--zone ZONE] [--slow SECONDS] [--headless] REF
 #                                  sandbox the committed REF and start the session;
 #                                  --fresh: as a new user's machine, Stonks not
 #                                  installed, a terminal open with REF's clone at ~/stonks;
 #                                  --zone: the session's clocks in ZONE (Asia/Kolkata);
 #                                  --slow: every curl in the session answers SECONDS
-#                                  late (3), as on a weak hotspot
+#                                  late (3), as on a weak hotspot;
+#                                  --headless (TRIAL): no window on the host,
+#                                  Stonks on a headless output inside the session
 #   stop                           end it and report the isolation evidence
 #   key KEY...                     keysym names; shift+j, ctrl+a, or J hold a modifier
 #   type TEXT                      type text
@@ -168,15 +170,25 @@ css_table() {
 # values the shell reads, taken from the host. A fresh start opens a
 # terminal (foot, Omarchy's default config, bash) in the sandbox's home.
 write_nested_lua() {
-  local run=$1 gaps_in gaps_out border rounding layout terminal=""
+  local run=$1 gaps_in gaps_out border rounding layout terminal="" monitors create="" debug=""
   [ "${fresh:-0}" = 1 ] && terminal="hl.exec_cmd(\"foot --working-directory=$run/home bash\")"
   gaps_in=$(css_table general:gaps_in) && gaps_out=$(css_table general:gaps_out) \
     && border=$(hyprctl -j getoption general:border_size | jq -er .int) \
     && rounding=$(hyprctl -j getoption decoration:rounding | jq -er .int) \
     && layout=$(hyprctl -j getoption general:layout | jq -er .str) \
     || { echo "tophat: cannot read the host's gaps, border, rounding, and layout" >&2; return 1; }
+  monitors='hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 1 })'
+  if [ "${headless:-0}" = 1 ]; then
+    # TRIAL: the Wayland backend's output, the window on the host, never
+    # takes a buffer, so it never maps; Stonks runs on a headless output
+    # that renders through that backend's GPU.
+    monitors="hl.monitor({ output = \"WAYLAND-1\", disabled = true })
+hl.monitor({ output = \"$headless_name\", mode = \"${headless_size}@60\", position = \"0x0\", scale = 1 })"
+    create="hyprctl output create headless $headless_name > $run/output.log 2>&1; "
+    debug="debug = { disable_logs = false },"
+  fi
   cat > "$run/nested.lua" << EOF
-hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 1 })
+$monitors
 hl.env("QT_QPA_PLATFORM", "wayland")
 hl.env("XDG_CURRENT_DESKTOP", "Hyprland")
 hl.env("XDG_SESSION_TYPE", "wayland")
@@ -188,9 +200,10 @@ hl.config({
   cursor = { no_warps = true },
   general = { gaps_in = $gaps_in, gaps_out = $gaps_out, border_size = $border, layout = "$layout" },
   decoration = { rounding = $rounding },
+  $debug
 })
 hl.on("hyprland.start", function()
-  hl.exec_cmd("quickshell -n -p /usr/share/omarchy/shell > $run/shell.log 2>&1")
+  hl.exec_cmd("${create}quickshell -n -p /usr/share/omarchy/shell > $run/shell.log 2>&1")
   $terminal
 end)
 EOF
@@ -263,9 +276,12 @@ write_slow_curl() {
 # which is how the host places this launch's window, the start's zone, and,
 # on a slow start, the slow curl ahead on its PATH.
 write_launcher() {
-  local run=$1 id=$2 tz="" slow_path=""
+  local run=$1 id=$2 tz="" slow_path="" nocore=""
   [ -n "${zone:-}" ] && tz="TZ=$(printf %q "$zone") "
   [ -n "${slow:-}" ] && slow_path='$run/slow:'
+  # TRIAL: a core limit of one byte makes the kernel skip the dump and its
+  # helper (fs/coredump.c), so a crash notifies no one.
+  [ "${headless:-0}" = 1 ] && nocore='prlimit --pid $$ --core=1:1 || exit 1'
   cat > "$run/launch.sh" << EOF
 #!/usr/bin/env bash
 run=$(printf %q "$run")
@@ -279,6 +295,7 @@ read -r -a f <<< "\$s"
 echo "\$\$ \${f[19]}" > "\$run/leader"
 rm -rf $(printf %q "$runtime") && mkdir -m 700 $(printf %q "$runtime") || { echo "no runtime folder" > "\$run/launch.status"; exit 1; }
 echo started > "\$run/launch.status"
+$nocore
 env -i HOME="\$run/home" XDG_CONFIG_HOME="\$run/home/.config" XDG_DATA_HOME="\$run/home/.local/share" \\
   XDG_STATE_HOME="\$run/home/.local/state" XDG_CACHE_HOME="\$run/home/.cache" \\
   XDG_RUNTIME_DIR=$(printf %q "$runtime") PATH="${slow_path}\$run/stubs:"$(printf %q "$PATH") \\
@@ -364,6 +381,22 @@ parent_window() {
         and .focusHistoryID != 0)
     | select(([$clients[] | select(.workspace.id == $lap.activeWorkspace.id)] | length) == 1)
     | "\(.at[0]) \(.at[1]) \(.size[0]) \(.size[1])"' <<< "$clients"
+}
+
+# host_clients_of PID: the host's clients PID owns, mapped or not, one per
+# line. hyprctl's command line can't ask for unmapped ones; its socket's
+# "a" flag can.
+host_clients_of() {
+  printf 'ja/clients' | socat - "UNIX-CONNECT:$host_runtime/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket.sock" \
+    | jq -r --argjson pid "$1" '.[] | select(.workspace.id != 9 and .pid == $pid)
+      | "mapped=\(.mapped) hidden=\(.hidden) workspace=\(.workspace.id) class=\(.class) title=\(.title) size=\(.size)"'
+}
+
+# no_host_window: the nested Hyprland maps no window on the host.
+no_host_window() {
+  local mine
+  mine=$(host_clients_of "$HYPR_PID") || return 1
+  ! grep -q '^mapped=true' <<< "$mine"
 }
 
 # host_facts: the owner-session facts stop compares.
@@ -478,18 +511,19 @@ cmd_scroll() {
 # ---- start ------------------------------------------------------------------
 
 cmd_start() {
-  fresh=0 zone="" slow=""
+  fresh=0 zone="" slow="" headless=0 headless_name=TOPHAT-1 headless_size=1416x850
   while :; do
     case ${1:-} in
       --fresh) fresh=1; shift ;;
       --zone) zone=${2:-}; zone_ok "$zone" || exit 1; shift 2 ;;
       --slow) slow=${2:-}; slow_ok "$slow" || exit 1; shift 2 ;;
+      --headless) headless=1; shift ;;
       *) break ;;
     esac
   done
   local ref=${1:?usage: start [--fresh] [--zone ZONE] [--slow SECONDS] REF} commit ws id answer tool curl=""
   commit=$(git -C "$checkout" rev-parse --verify --quiet "$ref^{commit}") || die "no such commit: $ref"
-  for tool in Hyprland quickshell dbus-run-session python3 wtype grim gpu-screen-recorder setsid flock jq foot; do
+  for tool in Hyprland quickshell dbus-run-session python3 wtype grim gpu-screen-recorder setsid flock jq foot socat wf-recorder; do
     command -v "$tool" > /dev/null || die "$tool is not installed"
   done
   if [ -n "$slow" ]; then curl=$(command -v curl) || die "curl is not installed"; fi
@@ -512,7 +546,7 @@ cmd_start() {
     && write_nested_lua "$run" && nested_lua_ok "$run/nested.lua" \
     && write_launcher "$run" "$id" || die "the sandbox is not ready; nothing was launched"
   host_facts > "$run/host-before"
-  { printf 'RUN_ID=%q\nCHECKOUT=%q\nCOMMIT=%q\nSTART_EPOCH=%q\nRUNTIME=%q\nZONE=%q\nSLOW=%q\n' "$id" "$checkout" "$commit" "$(date +%s)" "$runtime" "$zone" "$slow"; } > "$run/identity"
+  { printf 'RUN_ID=%q\nCHECKOUT=%q\nCOMMIT=%q\nSTART_EPOCH=%q\nRUNTIME=%q\nZONE=%q\nSLOW=%q\nHEADLESS=%q\n' "$id" "$checkout" "$commit" "$(date +%s)" "$runtime" "$zone" "$slow" "$headless"; } > "$run/identity"
   trap 'start_failed "interrupted"' INT TERM
 
   # One launch-scoped rule: the host places this launch's window on the
@@ -532,7 +566,11 @@ cmd_start() {
   socket_paths_fit "$runtime" "$SIG" || start_failed "the nested sockets do not fit"
   printf 'HYPR_PID=%q\nSIG=%q\nWAYLAND=%q\n' "$HYPR_PID" "$SIG" "$WAYLAND" >> "$run/identity"
   source "$run/identity"
-  within 15 parent_window > /dev/null || start_failed "the session's window is not alone, unfocused, and shown on $laptop's workspace $ws"
+  if (( headless )); then
+    no_host_window || start_failed "the nested Hyprland mapped a window on the host: $(host_clients_of "$HYPR_PID")"
+  else
+    within 15 parent_window > /dev/null || start_failed "the session's window is not alone, unfocused, and shown on $laptop's workspace $ws"
+  fi
   within 60 shell_up || start_failed "the nested shell never answered"
   services_off || start_failed "a service that must be off is running"
   if (( fresh )); then
@@ -541,11 +579,18 @@ cmd_start() {
     within 30 nested omarchy-shell grvc.stonks close > /dev/null 2>&1 || start_failed "the Stonks pill never loaded"
   fi
   read -r WIDTH HEIGHT < <(nested hyprctl -j monitors | jq -r '.[0] | "\(.width) \(.height)"')
+  (( headless )) && nested hyprctl -j monitors all > "$run/nested-monitors.json"
   printf 'WIDTH=%q\nHEIGHT=%q\n' "$WIDTH" "$HEIGHT" >> "$run/identity"
   note_pids
   trap - INT TERM
   echo "commit: $commit"
-  echo "nested output: ${WIDTH}x$HEIGHT on $laptop, workspace $ws"
+  if (( headless )); then
+    no_host_window || start_failed "the nested Hyprland mapped a window on the host: $(host_clients_of "$HYPR_PID")"
+    host_clients_of "$HYPR_PID" > "$run/host-clients-up"
+    echo "nested output: ${WIDTH}x$HEIGHT, headless; on the host: $(cat "$run/host-clients-up")"
+  else
+    echo "nested output: ${WIDTH}x$HEIGHT on $laptop, workspace $ws"
+  fi
   if (( fresh )); then echo "fresh: Stonks not installed; in the terminal, its clone is ~/stonks"; fi
   if [ -n "$zone" ]; then echo "zone: $zone, $(TZ=$zone date +'%H:%M %Z') there"; fi
   if [ -n "$slow" ]; then echo "slow: every curl in the session answers $slow s late"; fi
@@ -633,6 +678,10 @@ stop_run() {
   # A start that failed early recorded its group only in the leader file.
   if [ -z "${LEADER:-}" ] && [ -s "$run/leader" ]; then read -r LEADER LEADER_START < "$run/leader"; fi
   [ -f "$run/recorder" ] && { record_stop || status=1; }
+  if [ "${HEADLESS:-0}" = 1 ] && [ -n "${HYPR_PID:-}" ]; then
+    host_clients_of "$HYPR_PID" > "$run/host-clients-stop"
+    no_host_window || { echo "FAILED the nested Hyprland mapped a window on the host: $(cat "$run/host-clients-stop")" >&2; status=1; }
+  fi
   end_session || { echo "FAILED the session's group did not end" >&2; status=1; }
   sleep 0.5
   # Processes that carry the run's mark but left its group: reported, never
@@ -685,6 +734,15 @@ record_start() {
   local file rect
   drive_prelude
   [ -f "$run/recorder" ] && die "already recording"
+  if [ "${HEADLESS:-0}" = 1 ]; then
+    file=$(realpath -m "$1")
+    rm -f "$run/record.status"
+    echo "$file" > "$run/record.file"
+    setsid "$here/tophat.sh" _record-headless "$file" > "$run/record.log" 2>&1 < /dev/null &
+    within 10 test -s "$run/record.status" || die "the recorder did not start: $(cat "$run/record.log")"
+    echo "recording the headless output to $file"
+    return
+  fi
   rect=$(parent_window) || die "the session's window is not alone, unfocused, and shown on $laptop"
   file=$(realpath -m "$1")
   rm -f "$run/record.status"
@@ -720,6 +778,23 @@ record_watch() {
   (( stopping )) && echo saved > "$run/record.status"
 }
 lost() { echo "interrupted: $1" > "$run/record.status"; }
+
+# _record-headless FILE: TRIAL. wf-recorder through the nested session's
+# screencopy, in its own group, until record stop.
+record_headless() {
+  local file=$1 rec stopping=0
+  load_run
+  echo "$$ $(start_of $$)" > "$run/recorder"
+  nested wf-recorder -y -o "$(nested hyprctl -j monitors | jq -r '.[0].name')" -f "$file" &
+  rec=$!
+  trap 'stopping=1' TERM
+  echo recording > "$run/record.status"
+  while kill -0 "$rec" 2> /dev/null && (( ! stopping )); do sleep 0.5; done
+  (( stopping )) || lost "wf-recorder exited"
+  kill -INT "$rec" 2> /dev/null
+  wait "$rec"
+  (( stopping )) && echo saved > "$run/record.status"
+}
 
 record_stop() {
   local leader start file
@@ -941,9 +1016,10 @@ case ${1:-} in
     nested wl-paste --no-newline --type image/png > "$2" || { rm -f "$2"; die "the clipboard holds no PNG"; } ;;
   record) shift; cmd_record "$@" ;;
   _record-watch) shift; record_watch "$@" ;;
+  _record-headless) shift; record_headless "$@" ;;
   shell) shift; (( $# )) || die "usage: shell CMD…"; drive_prelude; nested omarchy-shell "$@" ;;
   log) load_run; cat "$run/shell.log" ;;
   sounds) load_run; cat "$run/sounds.log" 2> /dev/null ;;
   self-check) self_check ;;
-  *) sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *) sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
