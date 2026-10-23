@@ -42,22 +42,20 @@ refuse() { echo "batch: refusing: $*" >&2; exit 1; }
 
 # Fd 8 holds the batch's lock; every command below runs without it (8>&-),
 # so nothing it starts holds it past the batch. test/merge.sh takes the same
-# lock around a merge, and each holder writes into the file what it is. A
-# batch that finds a merge holding it waits up to 2 minutes (BATCH_MERGE_WAIT,
-# in seconds), since a merge holds it for seconds and the lead starts a batch
-# right after one; it refuses at once when another batch holds it.
-lockfile=$(git rev-parse --path-format=absolute --git-common-dir)/stonks-batch.lock
-exec 8>> "$lockfile" || exit 1
+# lock around a merge, and a share of the merge lock beside it, first. A
+# batch that finds the batch lock taken while a merge holds that share waits
+# up to 2 minutes for it (BATCH_MERGE_WAIT, in seconds), since a merge holds
+# it for seconds and the lead starts a batch right after one. It refuses at
+# once when no merge is there: another batch is running.
+lockdir=$(git rev-parse --path-format=absolute --git-common-dir)
+exec 8>> "$lockdir/stonks-batch.lock" || exit 1
 if ! flock -n 8; then
-  holder=$(cat "$lockfile" 2> /dev/null)
-  case $holder in
-    "merge "*) ;;
-    *) refuse "another batch is running in this repository" ;;
-  esac
-  say "waiting up to ${BATCH_MERGE_WAIT:-120}s for the $holder to end"
-  flock -w "${BATCH_MERGE_WAIT:-120}" 8 || refuse "the $holder still holds the lock after ${BATCH_MERGE_WAIT:-120}s"
+  exec 7>> "$lockdir/stonks-merge.lock" || exit 1
+  flock -n -x 7 && refuse "another batch is running in this repository"
+  exec 7>&-
+  say "waiting up to ${BATCH_MERGE_WAIT:-120}s for a merge to end"
+  flock -w "${BATCH_MERGE_WAIT:-120}" 8 || refuse "a merge still holds the lock after ${BATCH_MERGE_WAIT:-120}s"
 fi
-echo "batch, pid $$ in $PWD" > "$lockfile"
 
 [ "$(git symbolic-ref --quiet --short HEAD)" = dev ] || refuse "this checkout isn't on dev"
 [ -z "$(git status --porcelain)" ] || refuse "this checkout has uncommitted edits or untracked files"

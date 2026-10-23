@@ -72,23 +72,27 @@ if [ -z "$want" ]; then
   want=$head
 fi
 
-# Fd 8 holds the batch's lock (test/batch.sh) until this script ends; the
-# commands below that can start a background process (git's gc) run without
-# it (8>&-), so nothing outlives the merge holding it.
-lockfile=$(git rev-parse --path-format=absolute --git-common-dir)/stonks-batch.lock
-exec 8>> "$lockfile" || exit 1
+# Fd 8 holds the batch's lock (test/batch.sh) until this script ends. Fd 7
+# holds a share of the merge lock beside it, which tells a batch that finds
+# the batch lock taken that a merge holds it (merges never block each other
+# on it; the batch lock serializes them). It is taken first, so a merge that
+# holds the batch lock always holds its share. The commands below that can
+# start a background process (git's gc) run without either (8>&- 7>&-), so
+# nothing outlives the merge holding them.
+lockdir=$(git rev-parse --path-format=absolute --git-common-dir)
+exec 7>> "$lockdir/stonks-merge.lock" 8>> "$lockdir/stonks-batch.lock" || exit 1
+flock -s 7 || exit 1
 if ! flock -n 8; then
-  say "waiting up to ${batch_patience}s for $(cat "$lockfile" 2> /dev/null || echo 'the batch') to end: a merge would change the checkout its suites run in"
-  flock -w "$batch_patience" 8 || refuse "$(cat "$lockfile" 2> /dev/null) still holds the lock after ${batch_patience}s: nothing merged"
-  say "the lock is free"
+  say "waiting up to ${batch_patience}s for the batch running in this repository to end: a merge would change the checkout its suites run in"
+  flock -w "$batch_patience" 8 || refuse "a batch still holds the lock after ${batch_patience}s: nothing merged"
+  say "the batch has ended"
 fi
-echo "merge of #$pr, pid $$" > "$lockfile"
 
 # The checkout that has dev checked out, which gets the fast-forward.
 main=$(git worktree list --porcelain | awk '/^worktree / { dir = substr($0, 10) } $0 == "branch refs/heads/dev" { print dir; exit }')
 [ -n "$main" ] || refuse "no checkout has dev checked out"
 [ -z "$(git -C "$main" status --porcelain)" ] || refuse "$main has uncommitted edits or untracked files"
-git fetch --quiet origin 8>&- || refuse "can't fetch origin"
+git fetch --quiet origin 7>&- 8>&- || refuse "can't fetch origin"
 git merge-base --is-ancestor dev origin/dev || refuse "dev has commits origin/dev doesn't: dev and origin/dev have diverged"
 
 end=$((SECONDS + patience))
@@ -109,7 +113,7 @@ while :; do
   sleep "$poll"
 done
 
-gh pr merge "$pr" --merge --match-head-commit "$want" --author-email "$email" 8>&- > /dev/null \
+gh pr merge "$pr" --merge --match-head-commit "$want" --author-email "$email" 7>&- 8>&- > /dev/null \
   || refuse "gh couldn't merge #$pr at ${want:0:7}: nothing merged"
 
 # From here on the pull request is merged: a failure says so.
@@ -119,12 +123,12 @@ until read_pr && [ "$state" = MERGED ] && [ -n "$merged" ]; do
   [ "$SECONDS" -lt "$end" ] || broke "GitHub doesn't read it as merged after ${patience}s: look at it before going on"
   sleep "$poll"
 done
-git fetch --quiet origin 8>&- || broke "can't fetch origin: dev is not updated"
+git fetch --quiet origin 7>&- 8>&- || broke "can't fetch origin: dev is not updated"
 git merge-base --is-ancestor "$merged" origin/dev || broke "merge commit ${merged:0:7} isn't on origin/dev"
 [ "$(git rev-parse --quiet --verify "$merged^2")" = "$want" ] || broke "merge commit ${merged:0:7} doesn't have ${want:0:7} as its second parent"
 [ "$(git log -1 --format=%ae "$merged")" = "$email" ] || broke "merge commit ${merged:0:7} has the author $(git log -1 --format=%ae "$merged"), not $email"
 [ "$(git -C "$main" symbolic-ref --quiet --short HEAD)" = dev ] || broke "$main is no longer on dev: nothing fast-forwarded"
-git -C "$main" merge --ff-only --quiet origin/dev 8>&- || broke "dev in $main didn't fast-forward to origin/dev"
+git -C "$main" merge --ff-only --quiet origin/dev 7>&- 8>&- || broke "dev in $main didn't fast-forward to origin/dev"
 say "merged #$pr: $(git log -1 --format='%h %s' "$merged"); dev in $main is at $(git -C "$main" rev-parse --short HEAD)"
 if [ "$(git rev-parse "$merged^{tree}")" = "$(git rev-parse "$want^{tree}")" ]; then
   say "its tree is the head's (${want:0:7}): the suites' passes for it cover dev (test/ran.sh)"
