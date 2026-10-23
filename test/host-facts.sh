@@ -5,7 +5,17 @@
 # shell's services (tophat.sh's shell_facts names them).
 #
 #   test/host-facts.sh
-echo "clipboard watchers: $(pgrep -f 'wl-paste .*--watch' | sort -n | tr '\n' ' ')"
+# A watcher is the wl-paste process itself. Each clipboard change forks a
+# child from it that carries its name and command line until it runs the
+# capture script, so the child is no watcher: counted, it came and went as
+# the owner copied, and failed a session's stop (the check of #74, 23
+# October). Only a wl-paste whose parent is no watcher counts.
+watchers() {
+  ps -ww -eo pid=,ppid=,comm=,args= | awk '
+    $3 == "wl-paste" && index($0, "--watch") { watcher[$1] = $2 }
+    END { for (pid in watcher) if (!(watcher[pid] in watcher)) print pid }'
+}
+echo "clipboard watchers: $(watchers | sort -n | tr '\n' ' ')"
 echo "notifications owner: $(busctl --user status org.freedesktop.Notifications 2>/dev/null | grep -E '^(PID|Comm)=' | tr '\n' ' ')"
 echo "tray owner: $(busctl --user status org.kde.StatusNotifierWatcher 2>/dev/null | grep -E '^(PID|Comm)=' | tr '\n' ' ')"
 systemctl --user show-environment | grep -E '^(DISPLAY|WAYLAND_DISPLAY|HYPRLAND_INSTANCE_SIGNATURE|XDG_RUNTIME_DIR|PATH)=' | sed 's/^/systemd /'
