@@ -14,6 +14,12 @@
 # record (test/ran.sh --passed), as when checks skip, proves nothing either
 # way, so the batch stops there, having reverted nothing.
 #
+# Once dev holds the revert, merging the fixed branch again brings back only
+# its new commits: git counts the reverted ones as merged, so their changes
+# stay out of dev. To bring the change back, the branch takes dev, then
+# reverts the revert, then adds its fix. The batch's last lines say so,
+# naming the revert's commit.
+#
 # It pushes only dev, and never with force. It refuses while a tophat
 # session holds the slot (test/tophat.sh), and holds the slot itself until
 # it ends, so no walk starts that the shell's restart would fail. It refuses
@@ -90,15 +96,21 @@ pr=$(sed -nE 's/^Merge pull request (#[0-9]+) from (.+)$/\1 (\2)/p' <<< "$subjec
 if [ -n "$pr" ]; then what="pull request ${pr%)}, merge ${culprit:0:7})"; else what="commit ${culprit:0:7} ($subject)"; fi
 mainline=()
 git rev-parse --quiet --verify "$culprit^2" > /dev/null && mainline=(-m 1)
+revert=""
 if ! git revert --no-edit "${mainline[@]}" "$culprit" > /dev/null 8>&-; then
   git revert --abort 8>&-
   say "can't revert $what: it conflicts with a later commit; revert it by hand"
-elif ! git push --quiet origin dev 8>&-; then
-  say "reverted $what on dev, but the push was refused (dev moved on origin?): dev holds the revert, unpushed"
 else
-  say "reverted $what on dev and pushed $(git log -1 --format='%h' dev)"
+  revert=$(git rev-parse dev)
+  if git push --quiet origin dev 8>&-; then say "reverted $what on dev and pushed ${revert:0:7}"
+  else say "reverted $what on dev, but the push was refused (dev moved on origin?): dev holds the revert, unpushed"; fi
 fi
 if [ "$last" = "$was" ]; then say "the last version that passed, ${last:0:7}, is already live"
 else test/live.sh "$last" 8>&-; fi
 say "$what broke dev: $why"
+if [ -n "$revert" ]; then
+  say "to bring it back: merging the fixed branch alone brings back only its new commits, since dev"
+  say "counts the reverted ones as merged. The branch takes dev, then reverts the revert, then adds its fix:"
+  say "  git merge origin/dev && git revert --no-edit ${revert:0:7}"
+fi
 exit 1
