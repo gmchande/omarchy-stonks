@@ -1654,6 +1654,8 @@ test("before the open an index counts to the bell and has no open yet, as the st
   expect(M.marketStatus(gspc, now, 0, calendars)).toBe("Market opens in 3h 10m")
   expect(M.marketStatus(aapl, now, 0, calendars)).toBe("Pre-market · opens in 3h 10m")
   for (const q of [gspc, aapl]) expect([q.symbol, M.rowModel(q, 0, "open").changeLine]).toEqual([q.symbol, "—"])
+  // A scrub of the index's Thursday still reads from Thursday's open.
+  expect(M.rowModel(gspc, at("2026-10-22", "10:30"), "open").changeLine).toBe("\u22120.58% open")
   // Its headline is still Thursday's close and move, as theirs are.
   expect(M.rowModel(gspc, 0, "pct").changeText).toBe("\u22121.21%")
   // Before the pre-market it names the open's day, as a stock does.

@@ -327,16 +327,9 @@ function parseChart(json, centExchanges) {
   var quoted = Format.isFiniteNumber(meta.regularMarketTime) && meta.regularMarketTime > 0 ? meta.regularMarketTime : null
   var figuresDay = ahead ? current.regular.start : !regular ? null
     : quoted !== null && quoted < regular.start ? quoted : regular.start
-  // The day's open: the first regular-session bar's, once there is one. An
-  // index's bars stay the last session's until the next opens, while a
-  // stock's turn to the coming day with its pre-market and so have no open
-  // yet: once Yahoo's current period has moved on to a later session than
-  // an index's bars (after midnight), its open is not the coming session's
-  // either. Found in the daytime QA: before Friday's open the S&P 500 said
-  // "−0.41% open" since the open, Thursday's, every stock beside it "—".
-  var movedOn = index && !!regular && !!current.regular && current.regular.start > regular.start
+  // The day's open: the first regular-session bar's, once there is one.
   var firstRegular = null
-  for (var k = 0; regular && !ahead && !movedOn && k < kept.length && !firstRegular; k++)
+  for (var k = 0; regular && !ahead && k < kept.length && !firstRegular; k++)
     if (kept[k].t >= regular.start && kept[k].t < regular.end) firstRegular = kept[k]
   var symbol = Format.fetchedText(meta.symbol, Format.MOST_CODE)
   var instrumentType = Format.fetchedText(meta.instrumentType, Format.MOST_CODE)
@@ -561,11 +554,26 @@ function regularClose(quote) {
 // QA: at 06:22 on Friday 23 October AAPL's answer held Friday's pre-market,
 // its quote Thursday's 348.22 and its previous close Wednesday's 343.99, and
 // the pre-market read +0.56% where the line under the price said −0.41%.
-// The headline's change stays the quote's own, from Yahoo's previous close.
+// The headline's change stays the quote's own (`headlineBase`).
 function dayBase(quote) {
   var reg = quote.session.regular
   var head = headlineQuote(quote)
   return reg && head && head.source === "quote" && head.t !== null && head.t < reg.start ? head.price : quote.prevClose
+}
+
+// What the headline's change is measured from, shaped as `change` reads
+// it: Yahoo's previous close, and the day's open, but none for an index
+// once Yahoo's current period has moved on past its bars (after midnight).
+// An index's bars stay the last session's until the next opens, while a
+// stock's turn to the coming day with its pre-market and have no open yet;
+// a scrub of the index's bars still reads from their open. Found in the
+// daytime QA: before Friday's open the S&P 500 said "−0.41% open",
+// Thursday's, every stock beside it "—".
+function headlineBase(quote) {
+  var reg = quote.session.regular
+  var next = quote.current && quote.current.regular
+  var movedOn = quote.instrumentType === "INDEX" && !!reg && !!next && next.start > reg.start
+  return { prevClose: quote.prevClose, dayOpen: movedOn ? null : quote.dayOpen }
 }
 
 // The latest print outside a regular session, the newest print of all

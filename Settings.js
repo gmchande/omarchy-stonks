@@ -108,7 +108,7 @@ function sortedSymbols(symbols, quotes, order, reversed, changeMode) {
 function sortKey(quote, order, changeMode) {
   if (order === "symbol") return quote.symbol.toUpperCase()
   if (order === "name") return String(quote.name || quote.symbol).toUpperCase()
-  return Quote.change(quote, Quote.regularClose(quote), changeMode === "open" ? "open" : "pct").pct
+  return Quote.change(Quote.headlineBase(quote), Quote.regularClose(quote), changeMode === "open" ? "open" : "pct").pct
 }
 
 function barEntryFor(config, id) {

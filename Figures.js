@@ -224,7 +224,7 @@ function listBreadth(symbols, quotes, scrubT, mode) {
     var quote = quotes[symbols[i]]
     var read = quote ? (scrubT ? Quote.readingAt(quote, scrubT) : Quote.headlineQuote(quote)) : null
     var price = read ? read.price : null
-    var chg = quote ? Quote.change(scrubT ? scrubbedBase(quote) : quote, price, mode) : null
+    var chg = quote ? Quote.change(scrubT ? scrubbedBase(quote) : Quote.headlineBase(quote), price, mode) : null
     if (!chg || chg.pct === null) out.none++
     else out[Format.changeTone(chg, mode, quote.priceDigits)]++
   }
@@ -232,7 +232,8 @@ function listBreadth(symbols, quotes, scrubT, mode) {
 }
 
 // The one projection every price on screen comes from. The headline is
-// the regular-market quote, its change from Yahoo's previous close; a
+// the regular-market quote, its change from Yahoo's previous close or the
+// day's open (`Quote.headlineBase`); a
 // non-zero scrubT reads that moment of the day (`Quote.readingAt`), its
 // change from the close the day is measured from (`Quote.dayBase`), as the
 // dashed line is: before the open, the last session's close. dayUp is
@@ -251,7 +252,7 @@ function rowModel(quote, scrubT, changeMode) {
   var read = scrubT ? Quote.readingAt(quote, scrubT) : Quote.headlineQuote(quote)
   var price = read ? read.price : null
   var close = scrubT ? Overnight.nightClose(quote, scrubT) : null
-  var measured = close !== null ? { prevClose: close } : scrubT ? scrubbedBase(quote) : quote
+  var measured = close !== null ? { prevClose: close } : scrubT ? scrubbedBase(quote) : Quote.headlineBase(quote)
   var mode = close !== null && changeMode === "open" ? "pct" : changeMode
   var chg = Quote.change(measured, price, mode)
   var direction = Quote.change(measured, price, "pct")
