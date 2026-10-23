@@ -596,11 +596,14 @@ Item {
   // whose last answer is more than 10 s old, and the overnight prints of
   // the charts on show, unless asked for in the last 10 s, so a second
   // press adds nothing; and the chart's history fresh whatever the cache
-  // holds. While every screen is off the quotes wait their turn, and the
-  // rest is owed (`refreshOwed`) until a screen is on.
+  // holds. A host paused for no answer is tried at once (`Gate.hurry`).
+  // While every screen is off the quotes wait their turn, and the rest is
+  // owed (`refreshOwed`) until a screen is on.
   property bool refreshOwed: false
   function refresh() {
     if (!root.pluginsReady) return
+    yahooGate.hurry()
+    robinhoodGate.hurry()
     var now = root.wallSecond()
     feed.ask(root.watched.filter(function(s) {
       var entry = feed.entries[s]

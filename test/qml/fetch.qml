@@ -592,6 +592,27 @@ ShellRoot {
         harness.requests().slice(offFrom).some(function(l) { return l === "chart AAPL 200" }), harness.requests().slice(offFrom).join(", "))
       service.preview(body, "")
 
+      // Back after two minutes off, as on a train: the pause between tries
+      // has grown to about a minute, and r tries at once instead of waiting
+      // it out. It went 53 s after r, the header on "Update overdue" all
+      // the while. A refusal's pause still holds (above).
+      touch("YAHOO.offline")
+      var gate = service.testYahooGate
+      var pausedLong = false
+      for (var offFor = 0; offFor < 240 && !pausedLong; offFor++) {
+        tick(1, 1)
+        pausedLong = gate.pause === "none" && !gate.probing && gate.pausedUntil - service.now >= 30
+      }
+      remove("YAHOO.offline")
+      var rFrom = harness.requests().length
+      var pressedAt = service.now
+      app.refresh()
+      var tried = within(2000, function() { return harness.yahoo(harness.requests().slice(rFrom)).length > 0 })
+      settle()
+      harness.check("the network back after two minutes off: r asks Yahoo at once, not when the minute's pause runs out, and its answer reopens Yahoo",
+        pausedLong && tried && service.now === pressedAt && gate.pause === "",
+        pausedLong + " " + tried + " " + (service.now - pressedAt) + " s, pause " + gate.pause + ": " + harness.requests().slice(rFrom).join(", "))
+
       // A longer list: 42 more busy stocks, 50 in all. The first add goes
       // at once, the rest's first answers together in the next run, three
       // spark requests; each day holds jumps no chart has judged, so each is
