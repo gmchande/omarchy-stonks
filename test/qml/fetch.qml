@@ -731,6 +731,34 @@ ShellRoot {
       service.preview(body, "")
       closeWindow()
 
+      // 17:20, the crypto's saved quote two hours old and nothing kept it
+      // fresh for five minutes: an open asks for it, its answer held out,
+      // as on a real network. Its row shows its last price with no "As of"
+      // for the 2 s an answer takes (`Figures.ASKED_GRACE`), says "As of"
+      // from then on, and goes on saying it once its answer, as old, lands:
+      // the source is late, not Stonks. Found in the speed QA of 23
+      // October: "As of 06:46 UTC" flashed on each open.
+      tick(300)
+      var btcMarks = function() { return marks().filter(function(m) { return /^BTC-USD: /.test(m) }) }
+      var openMarks = []
+      frames.each = function() { btcMarks().forEach(function(m) { if (openMarks.indexOf(m) < 0) openMarks.push(m) }) }
+      touch("BTC-USD.quote.hold")
+      frames.running = true
+      app.testWindow.implicitHeight = 1000
+      app.open("{}")
+      tryVerify(function() { return app.opened && service.openSurfaces.length === 1 }, 3000)
+      var heldOut = within(3000, function() { return "BTC-USD" in service.asked && !idle() })
+      wait(300)
+      frames.running = false
+      service.now += 2
+      var lateNote = within(2000, function() { return /^As of /.test(app.testBody.watchlist.rowItem("BTC-USD").detail) })
+      remove("BTC-USD.quote.hold")
+      settle()
+      harness.check("an open on a crypto nothing kept fresh shows no As of on its row while its answer is under 2 s out, then As of while it stays out, and after its old answer",
+        heldOut && openMarks.length === 0 && lateNote && /^As of /.test(app.testBody.watchlist.rowItem("BTC-USD").detail),
+        heldOut + " | " + openMarks.join(" | ") + " | " + lateNote + " | " + app.testBody.watchlist.rowItem("BTC-USD").detail)
+      closeWindow()
+
       // 23:00, Tokyo's lunch break until 23:30; New York's night, with
       // Robinhood for the window's hero. Half an hour each, so a pill's
       // symbol never asked cannot pass for one asked every 15 minutes.

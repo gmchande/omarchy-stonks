@@ -914,6 +914,15 @@ test("freshness keeps quote age, an unanswered ask, and the refresh outcome apar
   const aged = { ...q, price: 100, marketTime: trading - 121 }
   expect(M.freshness(ok, aged, trading, 0)).toMatchObject({ state: "aged", live: false, asOf: trading - 121 })
   expect(M.freshnessText(M.freshness(ok, aged, trading, 0), q)).toBe("AS OF 10:27")
+  // An old quote whose refresh was asked under 2 s ago says nothing of its
+  // age, and claims no live price, where its last answer is old too (a
+  // coin nothing kept fresh, as a surface opens); one answered a minute ago
+  // is late at its source, and says "As of" through each refresh.
+  const unrefreshed = { status: "ok", answeredAt: trading - 3600 }
+  expect(M.freshness(unrefreshed, aged, trading, 0, trading - 1)).toMatchObject({ state: "asking", live: false })
+  expect(M.freshnessText(M.freshness(unrefreshed, aged, trading, 0, trading - 1), q)).toBe("")
+  expect(M.freshness(unrefreshed, aged, trading, 0, trading - 2).state).toBe("aged")
+  expect(M.freshness({ status: "ok", answeredAt: trading - 60 }, aged, trading, 0, trading).state).toBe("aged")
   // A refresh asked for and unanswered for 90 s is overdue, however old the
   // last answer; one nobody asked for never is.
   expect(M.freshness(ok, live, trading, trading - 89).state).toBe("fresh")

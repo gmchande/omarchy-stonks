@@ -14,9 +14,11 @@ function searchUrl(query) {
 // answers; an answer with more than this is a bad one (`Format.fetchedList`).
 var MOST_QUOTES = 40
 
-// Yahoo's answer as search shows it: the results Stonks can follow, and a
-// note naming what else the answer held, or "" when it held nothing else;
-// null when its quotes are not a list within MOST_QUOTES.
+// Yahoo's answer as search shows it: the results Stonks can follow, each
+// { symbol, name, exchange, instrumentType }, the exchange and the kind as a
+// quote names them (`Quote.parseChart`), and a note naming what else the
+// answer held, or "" when it held nothing else; null when its quotes are
+// not a list within MOST_QUOTES.
 // Stonks follows stocks, ETFs, indexes, and cryptocurrencies; Yahoo also
 // finds mutual funds, currencies, futures, and more, and a search that
 // hid them without a word read "No matches" for a fund Yahoo has.
@@ -44,7 +46,8 @@ function parseSearch(json) {
       left.push(q)
       continue
     }
-    results.push({ symbol: q.symbol, name: searchName(q), exchange: Quote.EXCHANGE_NAMES[q.exchange] || q.exchange.toUpperCase() })
+    results.push({ symbol: q.symbol, name: searchName(q), exchange: Quote.EXCHANGE_NAMES[q.exchange] || q.exchange.toUpperCase(),
+      instrumentType: q.quoteType })
   }
   return { results: results, note: leftOutNote(left) }
 }

@@ -279,7 +279,7 @@ ShellRoot {
       service.testGate.report(["ok"], 0, service.testGate.ticket)
       var rangeHeld = within(5000, function() { return history.waitingForScreen || root.calls("BTC-USD.history") > count })
       root.check("a shared range change and host reopening in darkness start no history",
-        rangeHeld && history.waitingForScreen && history.job && history.job.symbol === "BTC-USD" && history.job.range === "10Y"
+        rangeHeld && history.waitingForScreen && history.holds(history.job, "BTC-USD|10Y") && !history.job.ahead
           && root.calls("BTC-USD.history") === count)
       wake()
       awaitState(function() { return !history.busy }, 4000)

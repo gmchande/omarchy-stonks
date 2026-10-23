@@ -965,7 +965,7 @@ test("a fetched name or code past its length reads as not sent", () => {
     { symbol: "VFIAX", quoteType: "MUTUALFUND", typeDisp: long(1e5) },
     { symbol: "OTHER", quoteType: "WARRANT", typeDisp: long(1e5) }
   ] })
-  expect(found).toEqual({ results: [{ symbol: "SHOP", name: "Shopify", exchange: "" }], note: "Stonks doesn’t show mutual funds or warrants" })
+  expect(found).toEqual({ results: [{ symbol: "SHOP", name: "Shopify", exchange: "", instrumentType: "EQUITY" }], note: "Stonks doesn’t show mutual funds or warrants" })
   const cap = { meta: { type: ["trailingMarketCap"] }, trailingMarketCap: [{ asOfDate: "2026-09-30", currencyCode: long(1e5), reportedValue: { raw: 4e12 } }] }
   expect(M.parseFundamentals({ timeseries: { result: [cap] } }).cap.currency).toBe("")
   // A spark listing under a symbol past its length is one Yahoo didn't send.

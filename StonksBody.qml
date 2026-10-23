@@ -249,6 +249,9 @@ Item {
   // Each symbol waiting on Yahoo, with the second that began: freshness's
   // overdue (`QuoteFeed.owed`).
   property var owed: ({})
+  // Each symbol asked for and not yet answered, with the second it was
+  // asked (`QuoteFeed.asked`): freshness's grace for a quote opened old.
+  property var asked: ({})
   property bool settingsUnreadable: false
   property bool saveFailed: false
   property bool editsUnsaved: false
@@ -278,6 +281,7 @@ Item {
   Binding on retro { when: root.reading; value: root.service?.retro; restoreMode: Binding.RestoreNone }
   Binding on soundsOn { when: root.reading; value: root.service?.soundsOn; restoreMode: Binding.RestoreNone }
   Binding on owed { when: root.reading; value: root.service?.owed; restoreMode: Binding.RestoreNone }
+  Binding on asked { when: root.reading; value: root.service?.asked || ({}); restoreMode: Binding.RestoreNone }
   Binding on settingsUnreadable { when: root.reading; value: root.service?.settingsUnreadable; restoreMode: Binding.RestoreNone }
   Binding on saveFailed { when: root.reading; value: root.service?.saveFailed; restoreMode: Binding.RestoreNone }
   Binding on editsUnsaved { when: root.reading; value: root.service?.editsUnsaved; restoreMode: Binding.RestoreNone }
@@ -344,7 +348,7 @@ Item {
   // its baseline as `prevClose` (`Chart.viewChart`).
   readonly property var featuredDay: motion.day
   readonly property var featuredFreshness: Figures.freshness(entryOf(chartSymbol || featuredSymbol), featuredQuote, now,
-    owed[chartSymbol || featuredSymbol] || 0)
+    owed[chartSymbol || featuredSymbol] || 0, asked[chartSymbol || featuredSymbol] || 0)
   readonly property var featuredGeometry: motion.geometry
   readonly property real scrubX: motion.scrubX
   readonly property bool dayScrubbed: !historyActive && scrubShown !== 0
@@ -1040,12 +1044,13 @@ Item {
   }
 
   // The hero shows search's choice, unadded, while search is open on an
-  // open surface; "" puts the featured symbol back.
-  function previewTo(symbol) {
+  // open surface; "" puts the featured symbol back. `result` is search's
+  // result for it, when it came from one.
+  function previewTo(symbol, result) {
     var s = adding && surfaceOpen ? String(symbol || "") : ""
     if (s === previewSymbol) return
     // The service's first: until it is, this preview would read as taken.
-    if (service) service.preview(root, s)
+    if (service) service.preview(root, s, s ? result : null)
     previewSymbol = s
   }
 
@@ -1347,6 +1352,7 @@ Item {
     changeMode: root.changeMode
     now: root.now
     owed: root.owed
+    asked: root.asked
     retro: root.retro
     upColor: root.upColor
     downColor: root.downColor
@@ -1404,7 +1410,7 @@ Item {
     members: root.members
     putBack: root.putBack
     onPicked: function(symbol) { root.acceptSymbol(symbol) }
-    onChose: function(symbol) { root.previewTo(symbol) }
+    onChose: function(symbol, result) { root.previewTo(symbol, result) }
     onCancelled: root.cancelAdding()
   }
 

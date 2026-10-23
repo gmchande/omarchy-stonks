@@ -189,16 +189,17 @@ Item {
   // prints of each not known to trade only by day, each by its own last ask
   // (`Overnight.overnightDue`): never asked, every 5 minutes as a night
   // goes, once after it ends. A resting preview of one outside All, on a
-  // surface a screen shows, is asked with them, and goes alone ahead of
-  // them while it has no answer: its chart is the one waited on. Whatever
-  // is asked takes with it each one due within half that, so the list
-  // stays one request a night's 5 minutes, and one the gate held back goes
-  // as soon as it lets it. With nothing open, once a session, for the
+  // surface a screen shows, known by search's result as soon as it rests,
+  // so Robinhood is asked as Yahoo is, is asked with them, and goes alone
+  // ahead of them while it has no answer: its chart is the one waited on.
+  // Whatever is asked takes with it each one due within half that, so the
+  // list stays one request a night's 5 minutes, and one the gate held back
+  // goes as soon as it lets it. With nothing open, once a session, for the
   // pill's symbol alone, what Robinhood has not answered for it, as soon as
   // Yahoo has answered it live, so the first click finds its chart in hand.
   // Looked at as the clock ticks, answers land, the listings change, a
-  // surface opens, and the screens answer; never while every screen is off
-  // (`screensClear`).
+  // surface opens, a preview rests, and the screens answer; never while
+  // every screen is off (`screensClear`).
   property bool pillAsked: false
   function askOvernight() {
     if (!root.pluginsReady) return
@@ -207,7 +208,8 @@ Item {
     var live = !!feed.entries[pill] && feed.entries[pill].status === "ok" && root.overnightSymbols.indexOf(pill) >= 0
     if (!open && (root.pillAsked || !live)) return
     var previewed = root.previewSymbol
-    var previewQuote = previewFeed.quotes[previewed] || feed.quotes[previewed] || null
+    // The preview's kind by its quote, or before that by search's result.
+    var previewQuote = previewFeed.quotes[previewed] || feed.quotes[previewed] || root.previewResult
     var previewing = open && root.previewRests && root.previewShown && !!previewQuote
       && root.library.indexOf(previewed) < 0 && Overnight.hasOvernight(previewQuote, root.calendars)
     var waited = previewing ? previewed : pill
@@ -530,9 +532,10 @@ Item {
     centExchanges: root.centExchanges
   }
 
-  // One chart's history at a time; an answer may leave another chart a
-  // refresh still owes, or one with no answer yet, which is asked for next;
-  // with none, a chart in sight is fetched ahead (`fetchAhead`).
+  // One request at a time: a chart's history, or a run of the rows in sight;
+  // an answer may leave another chart a refresh still owes, or one with no
+  // answer yet, which is asked for next; with none, the rows in sight are
+  // fetched ahead (`fetchAhead`).
   HistoryFeed {
     id: historyFeed
     gate: yahooGate
@@ -637,8 +640,8 @@ Item {
   // Automatic refreshes say nothing.
   readonly property bool refreshing: {
     var job = historyFeed.job
-    return feed.userOut || (!!job && historyFeed.attempts > 0 && job.key in root.historyOwed
-      && historyFeed.entries[job.key] === root.historyOwed[job.key])
+    return feed.userOut || (!!job && !job.ahead && historyFeed.attempts > 0 && job.charts[0].key in root.historyOwed
+      && historyFeed.entries[job.charts[0].key] === root.historyOwed[job.charts[0].key])
   }
 
   // The history the open surfaces' heroes show on the shared range: the
@@ -772,25 +775,26 @@ Item {
     return historyFeed.keyFor(s, root.view.range)
   })
 
-  // One chart in sight fetched ahead, once the heroes' charts want nothing,
-  // while Yahoo has budget to spare (`Gate.spare`) and a screen is on; the
-  // next goes as the feed is idle again, or on the clock.
+  // The charts in sight with no answer yet fetched ahead in one run, once
+  // the heroes' charts want nothing, while Yahoo has budget to spare
+  // (`Gate.spare`) and a screen is on; what the run leaves goes as the feed
+  // is idle again, or on the clock.
   function fetchAhead() {
     if (!root.pluginsReady || historyFeed.busy || root.screensOff || !yahooGate.spare()) return
-    var next = root.aheadCharts()[0]
-    if (!next || !root.screensClear()) return
-    var key = historyFeed.keyFor(next, root.view.range)
+    var charts = root.aheadCharts()
+    if (charts.length === 0 || !root.screensClear()) return
     var asked = Object.assign({}, root.aheadAsked)
-    asked[key] = true
+    charts.forEach(function(s) { asked[historyFeed.keyFor(s, root.view.range)] = true })
     root.aheadAsked = asked
-    historyFeed.request(next, root.view.range, false, true)
+    historyFeed.requestAhead(charts, root.view.range)
   }
 
   // A surface's search shows its choice on the hero (`previewView`), or
   // nothing with "", which only the search previewing can say. What it
   // needs is asked for only once the choice has rested there, so arrowing
-  // past a result asks for nothing.
-  function preview(surface, symbol) {
+  // past a result asks for nothing. `result`, search's result for it, says
+  // what kind of listing it is before its quote does (`previewResult`).
+  function preview(surface, symbol, result) {
     var s = String(symbol || "").trim().toUpperCase()
     if (!s && surface !== root.previewSurface) return
     if (s === root.previewSymbol && surface === root.previewSurface) return
@@ -799,6 +803,7 @@ Item {
     root.previewRests = false
     root.previewSurface = s ? surface : null
     root.previewSymbol = s
+    root.previewResult = s && result && String(result.symbol || "").toUpperCase() === s ? result : null
     if (s) {
       root.shownAsHero(s)
       previewRest.restart()
@@ -806,6 +811,12 @@ Item {
     root.showHistory(false)
     if (before && before !== root.previewSurface && s) root.previewTaken(before)
   }
+  // Search's result for the preview, { symbol, exchange, instrumentType },
+  // or null: a US stock or ETF by it is asked of Robinhood as its quote is
+  // asked of Yahoo, side by side (`askOvernight`). Found in the night's
+  // check of 23 October: waiting for the quote first made NVDA's preview
+  // 3 s later on a slow network.
+  property var previewResult: null
 
   // Another surface's search took the preview `surface` had.
   signal previewTaken(var surface)
@@ -819,10 +830,12 @@ Item {
     }
   }
   // A resting preview on a surface a screen shows asks for what it holds
-  // back while it is not: its quote, and its cap and P/E.
+  // back while it is not: its quote, its cap and P/E, and Robinhood's two
+  // answers for a US stock or ETF.
   onPreviewShownChanged: if (previewShown) {
     previewFeed.pump()
     fetchFundamentals(previewSymbol)
+    askOvernight()
   }
 
   // A surface says when it opens and closes, and as it goes. The clock
