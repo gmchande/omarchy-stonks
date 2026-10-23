@@ -134,17 +134,17 @@ if reachable "the row's menu"; then
   keep_data menu-undone
 fi
 
-step "The ×'s removal of SHEL.L, which All alone holds, taken back with the footer's Undo"
+step "The × removes BTC-USD again; the footer's Undo takes it back"
 if reachable "the footer's Undo"; then
-  london=$(place SHEL.L)
-  hover_on rowSymbol --text SHEL.L
-  click_on rowRemove --symbol SHEL.L
-  soon "the × removed SHEL.L" 5 not_in_all SHEL.L
-  soon "the footer offers Undo SHEL.L" 3 shown footerUndoText --text "Undo SHEL.L"
+  btc=$(place BTC-USD)
+  hover_on rowSymbol --text BTC-USD
+  click_on rowRemove --symbol BTC-USD
+  soon "the × removed BTC-USD" 5 not_in_all BTC-USD
+  soon "the footer offers Undo BTC-USD" 3 shown footerUndoText --text "Undo BTC-USD"
   shot undo-offer
   click_on footerUndoText
-  soon "Undo put SHEL.L back" 5 in_all SHEL.L
-  check "SHEL.L is back at its place ($london)" [ "$(place SHEL.L)" = "$london" ]
+  soon "Undo put BTC-USD back" 5 in_all BTC-USD
+  check "BTC-USD is back at its place ($btc)" [ "$(place BTC-USD)" = "$btc" ]
   soon "the undo sound played" 5 heard undo.wav
   check "the offer went with the undo" hidden footerUndoText
   sounds_here

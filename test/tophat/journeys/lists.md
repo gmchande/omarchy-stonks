@@ -38,7 +38,7 @@ SHEL.L, 7203.T; US: the first four), Yahoo's search reachable.
 - **×.** Hover BTC-USD's row, click its `rowRemove`. Gone at once (no other list holds it); `remove.wav`. No `rowRemove` shows under the still pointer, and `footerUndoText` says "Undo BTC-USD". Shot `06-removed-BTC`.
 - **PUT BACK.** Click "+ Add a symbol": the first result is BTC-USD, its `searchAdd` says PUT BACK; a click puts it back at its old place; `undo.wav`. Shots `07-put-back-offer`, `07-put-back`.
 - **Row menu.** Right-click SPY's symbol: the menu (`rowMenuLine`) says where it goes from; a click on it removes SPY; `u` brings it back. Shots `08-row-menu`, `08-menu-undone`.
-- **Footer's Undo.** Hover SHEL.L, click its `rowRemove`; `footerUndoText` says "Undo SHEL.L"; a click on it puts SHEL.L back at its place, `undo.wav`, and the offer goes. Shots `09-undo-offer`, `09-undo-clicked`.
+- **Footer's Undo.** Hover BTC-USD again, click its `rowRemove`; `footerUndoText` says "Undo BTC-USD"; a click on it puts BTC-USD back at its place, `undo.wav`, and the offer goes. Shots `09-undo-offer`, `09-undo-clicked`.
 
 ## Gotchas
 
