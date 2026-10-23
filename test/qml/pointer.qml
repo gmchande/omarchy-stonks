@@ -1593,6 +1593,7 @@ ShellRoot {
             ["list name", root.find(body, "listControl"), root.find(body, "listLabel")],
             ["order word", root.find(body, "orderControl"), root.find(body, "orderLabel")],
             ["order arrow", root.find(body, "orderArrowFill"), root.find(body, "orderArrow")],
+            ["unit sign", root.find(body, "unitFill"), root.find(body, "unitTarget")],
             ["look icon", root.find(body, "lookFill"), root.find(body, "lookIcon")],
             ["help mark", root.find(body, "helpFill"), root.find(body, "helpMark")],
             ["footer", root.find(body, "footerFill"), root.find(body, "footerText")]
