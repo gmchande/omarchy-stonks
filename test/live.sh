@@ -65,7 +65,7 @@ for old in "$restarts"/*/; do
   [[ $old =~ ^[0-9]+$ ]] && (( old < began - 86400000000000 )) && rm -rf -- "${restarts:?}/$old"
 done
 echo "$commit" > "$record/commit"
-"$here/host-facts.sh" 8>&- > "$record/before"
+"$here/host-facts.sh" 8>&- > "$record/before" || { rm -rf -- "$record"; echo "live: the owner's facts can't be read, so the shell was not restarted" >&2; exit 1; }
 # A restart that fails may have started the new shell all the same, so its
 # services are waited for either way, and its failure is the exit.
 restarted=0

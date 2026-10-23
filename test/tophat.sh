@@ -125,7 +125,7 @@ read_facts() {
     echo "tophat: test/live.sh is restarting the shell for a deploy; waiting for its services to come back"
     flock -s -w 300 6 || { exec 6>&-; echo "tophat: the shell's restart held the tophat lock ($lock) for 5 minutes" >&2; return 1; }
   fi
-  "$here/host-facts.sh" 6>&- > "$1"
+  "$here/host-facts.sh" 6>&- > "$1" || { exec 6>&-; return 1; }
   read_at=$(date +%s%N)
   exec 6>&-
 }
@@ -1189,14 +1189,23 @@ EOF
   # are read.
   mkdir -p "$tmp/watch"; mkfifo "$tmp/watch/fifo"
   local name; for name in wl-paste quickshell herdr; do ln -s "$(command -v bash)" "$tmp/watch/$name"; done
+  mkdir "$tmp/watch/sealed"; ln -s "$python" "$tmp/watch/sealed/quickshell"
   : > "$tmp/standins"
-  watcher() {  # KIND: owner, run or other; sets WATCHER and PARENT to the pids of a new stand-in and its parent
+  watcher() {  # KIND: owner, run, other or sealed; sets WATCHER and PARENT to the pids of a new stand-in and its parent
     local parent=quickshell shell_args=(-n -p /usr/share/omarchy/shell) in_run=() pidfile; pidfile=$(mktemp -p "$tmp/watch")
-    [ "$1" != other ] || { parent=herdr; shell_args=(); }
+    local exe=$tmp/watch/quickshell script='"$WPASTE" -c "$WSCRIPT" --watch & echo $! > "$PIDFILE"; wait'
+    [ "$1" != other ] || { parent=herdr; exe=$tmp/watch/herdr; shell_args=(); }
     [ "$1" != run ] || in_run=(TOPHAT_RUN=check)
+    # A shell whose environment the owner's user can't read, as a process
+    # that set PR_SET_DUMPABLE 0 is: a Python stand-in does that on its own.
+    [ "$1" != sealed ] || { exe=$tmp/watch/sealed/quickshell; script='import ctypes, os, subprocess
+ctypes.CDLL(None).prctl(4, 0, 0, 0, 0)
+p = subprocess.Popen([os.environ["WPASTE"], "-c", os.environ["WSCRIPT"], "--watch"])
+open(os.environ["PIDFILE"], "w").write(str(p.pid))
+p.wait()'; }
     env -u TOPHAT_RUN "${in_run[@]}" FIFO="$tmp/watch/fifo" PIDFILE="$pidfile" WPASTE="$tmp/watch/wl-paste" \
       WSCRIPT='trap "( read -t 120 x <> \"\$FIFO\" ) &" USR1; while :; do read -t 120 x <> "$FIFO"; done' \
-      "$tmp/watch/$parent" -c '"$WPASTE" -c "$WSCRIPT" --watch & echo $! > "$PIDFILE"; wait' "${shell_args[@]}" &
+      "$exe" -c "$script" "${shell_args[@]}" &
     PARENT=$!; echo "$PARENT" >> "$tmp/standins"
     within 5 test -s "$pidfile" || miss "the stand-in parent never started its watcher"
     WATCHER=$(< "$pidfile"); echo "$WATCHER" >> "$tmp/standins"
@@ -1241,6 +1250,14 @@ EOF
   unchanged "$mid" || miss "another program's clipboard watcher started during a session should change no fact"
   unwatch "$other" "$other_parent" "$run_watcher" "$run_parent"
   unchanged "$mid" || miss "another program's clipboard watcher ended during a session should change no fact"
+
+  # An owner's shell whose environment can't be read, running: the facts
+  # fail, rather than leave its watchers out and a change to them unseen.
+  watcher sealed; local sealed=$WATCHER sealed_parent=$PARENT
+  [ ! -r "/proc/$sealed_parent/environ" ] || miss "the sealed stand-in's environment should be unreadable"
+  "$here/host-facts.sh" 6>&- > /dev/null 2>&1 && miss "the facts should fail while a running shell's environment can't be read"
+  unwatch "$sealed" "$sealed_parent"
+  "$here/host-facts.sh" 6>&- > /dev/null 2>&1 || miss "the facts should read again once that shell is gone"
 
   # The owner's shell restarted for a deploy: its new watchers have the new
   # shell as their parent, and count; the restart's record explains the change.
