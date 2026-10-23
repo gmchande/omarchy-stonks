@@ -191,8 +191,10 @@ Item {
         for (var n = 0; n < pts.length; n++) if (!pts[n].ext) lastRegular = n
         var filled = runs(pts.slice(0, lastRegular + 1), function() { return true })
 
+        // The wash runs from the line to the baseline: with no previous
+        // close known there is none, and only the line draws.
         ctx.fillStyle = sides(ctx, by, root.aboveWash, root.belowWash)
-        for (var r = 0; r < filled.length; r++) {
+        for (var r = 0; root.hasBaseline && r < filled.length; r++) {
           var run = filled[r]
           if (run.length < 2) continue
           ctx.beginPath()
@@ -214,8 +216,8 @@ Item {
         ctx.strokeStyle = sides(ctx, by, 1, 1)
         strokeRuns(ctx, runs(pts, function(p) { return !p.ext }), pad, w, h)
 
-        // The ticks the line has reached draw in with it.
-        root.strokeTicks(ctx, by, false)
+        // The ticks the line has reached draw in with it, on the baseline.
+        if (root.hasBaseline) root.strokeTicks(ctx, by, false)
       }
 
       // The stretches the line joins: a point that `keep` refuses, or one

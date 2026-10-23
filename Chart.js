@@ -71,8 +71,8 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
 // a gap there would read as missing prices. A thin night's trades
 // (`axis.night`) are each a `dot`, on its own, joined to nothing: laid out
 // by the clock, the hours between them are there to see. The vertical range
-// holds every drawn print and the previous close, with headroom, so the
-// baseline is always in view.
+// holds every drawn print and the previous close where it is known, with
+// headroom, so the baseline is always in view.
 function chartGeometry(quote, calendars) {
   var pts = quote.points
   var axis = chartSpan(quote)
@@ -81,7 +81,12 @@ function chartGeometry(quote, calendars) {
   var acrossBreak = function(a, b) {
     return breaks.some(function(gap) { return a <= gap.start && b >= gap.end })
   }
-  var lo = quote.prevClose, hi = quote.prevClose
+  // An unknown previous close (`Quote.knownPrice`) has no place on the
+  // scale and no dashed line: the prints alone set it. Found in review: a
+  // null close drew a baseline at zero, the day flattened on top of it.
+  var known = Format.isFiniteNumber(quote.prevClose)
+  var lo = known ? quote.prevClose : (pts.length ? pts[0].p : 0)
+  var hi = lo
   for (var j = 0; j < pts.length; j++) {
     if (pts[j].p < lo) lo = pts[j].p
     if (pts[j].p > hi) hi = pts[j].p
@@ -109,7 +114,7 @@ function chartGeometry(quote, calendars) {
   }
   return {
     points: out,
-    baselineY: 1 - (quote.prevClose - lo) / (hi - lo),
+    baselineY: known ? 1 - (quote.prevClose - lo) / (hi - lo) : null,
     ticks: ticks,
     lo: lo, hi: hi, start: axis.start, end: axis.end,
     day: true

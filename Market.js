@@ -235,6 +235,15 @@ function calendarNow(cal, now) {
   }
 }
 
+// The calendar's regular session on the day of `now`, from its first
+// segment's open to its last's close, while one of them trades at `now`;
+// else null, as on a weekend, a closure, or with no calendar.
+function calendarRegular(cal, now) {
+  var segs = cal ? segmentsOn(cal, dateStringOf(localDate(now, cal))) : []
+  if (!segs.some(function(seg) { return now >= seg.start && now < seg.end })) return null
+  return { start: segs[0].start, end: segs[segs.length - 1].end }
+}
+
 function scheduleNote(quote, now, calendars) {
   var cal = calendarFor(calendars, quote)
   if (!cal) return calendarMap(calendars) ? "" : " · schedule unavailable"
@@ -286,11 +295,15 @@ function holidayName(name) {
 // The one time that matters: how long until the market opens or closes,
 // when the exchange has said. "Closes in" already says it is open. After
 // the bell the phase stands on its own, with the regular close named so
-// 16:00 is never mistaken for the end of after-hours trading. A listing
-// whose overnight session is on (`overnight`, `Overnight.nightTrades`) is in
-// it, as the line under the price says, a weekend's or a holiday's evening
-// included. While scrubbing, where in the day the finger is: at the close's
-// own time, the closing bell, when it reads the close (`Quote.readingAt`).
+// 16:00 is never mistaken for the end of after-hours trading. A quote held
+// from an earlier session, before the new day's answer lands, has the
+// calendar's session stand in while one of its segments trades
+// (`calendarRegular`), so the open says "Opening bell", not the next day's
+// open. A listing whose overnight session is on (`overnight`,
+// `Overnight.nightTrades`) is in it, as the line under the price says, a
+// weekend's or a holiday's evening included. While scrubbing, where in the
+// day the finger is: at the close's own time, the closing bell, when it
+// reads the close (`Quote.readingAt`).
 function marketStatus(quote, now, scrubT, calendars, overnight) {
   return statusSaying(quote, now, scrubT, calendars, overnight, false)
 }
@@ -316,8 +329,15 @@ function statusSaying(quote, now, scrubT, calendars, overnight, short) {
   if (brk) {
     return "Lunch break · reopens " + calendarClock(cal, brk, quote) + (short ? "" : " · in " + Format.duration(brk - now))
   }
-  var phase = overnight ? "overnight" : sessionPhase(quote, now)
-  var bell = secondsToBell(quote, now)
+  // The stand-in reads the hour by the calendar's clock today, not the
+  // held answer's, which may be from before a change of clocks. Found in
+  // review: a New York quote held from EDT into EST said "Lunch lull" at
+  // 11:00.
+  var held = !overnight && !isTrading(sessionPhase(quote, now)) ? calendarRegular(cal, now) : null
+  var q = held ? Object.assign({}, quote, { session: { pre: null, regular: held, post: null }, current: null,
+    clocks: [], gmtoffset: localDate(now, cal).offset }) : quote
+  var phase = overnight ? "overnight" : sessionPhase(q, now)
+  var bell = secondsToBell(q, now)
   var kind = cal ? dayKind(cal, dateStringOf(localDate(now, cal))) : null
   // A published closure outranks a cached response that still describes a
   // session: on a holiday Yahoo may hand back a window nobody is trading.
@@ -329,7 +349,7 @@ function statusSaying(quote, now, scrubT, calendars, overnight, short) {
   }
   if (!closure && bell && (phase === "pre" || phase === "overnight")) return phaseLabel(phase) + " · opens in " + Format.duration(bell.seconds)
   if (!closure && bell) return "Market opens in " + Format.duration(bell.seconds)
-  var reg = clockSession(quote, now).regular
+  var reg = clockSession(q, now).regular
   var base = closure ? (short ? phaseLabel("closed") : holidayName(kind.name))
     : (phase === "post" && reg && now >= reg.end ? phaseLabel(phase) + " · closed at " + printClock(quote, reg.end, calendars)
       : phaseLabel(phase))

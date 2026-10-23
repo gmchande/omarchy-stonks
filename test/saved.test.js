@@ -819,6 +819,32 @@ test("each symbol is asked for on its own market's clock", () => {
   expect(cadence(null, reg.start + 3600)).toBe(900)
 })
 
+// A quote held from an earlier session describes that session until the
+// new day's answer lands, so at the open it said the market closed and
+// named the next day's open. While the calendar has a segment trading, its
+// session stands in. SHEL.L's answer of Friday 23 October, held to Monday:
+// at 08:00:10 it said "Closed · opens Tue 08:00 GMT". Toyota's the same,
+// its lunch still a break. Found in the strain QA.
+test("a quote held from an earlier session says the calendar's session while it trades", () => {
+  const shel = M.parseChart(fixture("shel-l-2026-10-23-trading.json"))
+  const london = calendars.calendars.LSE
+  const monday = hm => M.marketStatus(shel, M.epochAt(london, "2026-10-26", hm), 0, calendars)
+  expect(monday("07:59")).toBe("Closed · opens Mon 08:00 GMT")
+  expect(monday("08:00")).toBe("Opening bell · closes in 8h 30m")
+  expect(monday("12:00")).toBe("Market closes in 4h 30m")
+  expect(monday("16:40")).toBe("Closed · opens Tue 08:00 GMT")
+  expect(M.marketStatus(shel, M.epochAt(london, "2026-10-24", "10:00"), 0, calendars)).toBe("Weekend · opens Mon 08:00 GMT")
+  const toyota = M.parseChart(fixture("7203-t-2026-10-23-day.json"))
+  const tokyo = hm => M.marketStatus(toyota, M.epochAt(JPX, "2026-10-26", hm), 0, calendars)
+  expect([tokyo("09:00"), tokyo("11:45"), tokyo("13:00")])
+    .toEqual(["Opening bell · closes in 6h 30m", "Lunch break · reopens 12:30 JST · in 45m", "Market closes in 2h 30m"])
+  // The hour is the calendar's on the day, not the held answer's: AAPL's
+  // answer of Tuesday 1 September, in EDT, held to Monday 2 November, in
+  // EST. Found in review: it said "Lunch lull" at 11:00.
+  const aapl = hm => M.marketStatus(quote, M.epochAt(US, "2026-11-02", hm), 0, calendars)
+  expect([aapl("11:00"), aapl("12:10")]).toEqual(["Market closes in 5h", "Lunch lull · closes in 3h 50m"])
+})
+
 test("a published closure or a break between segments is closed, whatever Yahoo's periods say", () => {
   const labor = 1788793200
   const fakeOpen = {
@@ -1158,15 +1184,43 @@ test("5Y and longer draw on a log scale; shorter ranges stay linear", () => {
   const linear = M.historyGeometry({ ...weekly, range: "2Y" })
   const linearY = p => 1 - (p - linear.lo) / (linear.hi - linear.lo)
   for (const point of linear.points) expect(point.y).toBeCloseTo(linearY(point.p), 12)
-  // A log has no place for zero: a long range with a zero baseline or a
-  // zero close draws linear, every point finite.
-  for (const odd of [{ ...weekly, baseline: 0 }, { ...weekly, bars: weekly.bars.map((bar, i) => (i === 3 ? { ...bar, c: 0 } : bar)) }]) {
-    const flat = M.historyGeometry(odd)
-    for (const point of flat.points) expect(Number.isFinite(point.y)).toBe(true)
-    expect(Number.isFinite(flat.baselineY)).toBe(true)
-    const oddY = p => 1 - (p - flat.lo) / (flat.hi - flat.lo)
-    for (const point of flat.points) expect(point.y).toBeCloseTo(oddY(point.p), 12)
-  }
+})
+
+// Nonsense in a well-formed answer is left out, as a zero high or low is: a
+// price at or under zero is none. A day's negative price, zero previous
+// close, and negative first close; a range's zero previous close and
+// negative first close, its START then its first good close, and its long
+// range still on a log scale. Found in the strain QA: "-5.00" on every coin,
+// "0.00%", "START 0.00", and a cliff at the chart's left.
+test("a price at or under zero in an answer is left out", () => {
+  const day = fixture("aapl.json")
+  const meta = day.chart.result[0].meta
+  const closes = day.chart.result[0].indicators.quote[0].close
+  const firstTime = day.chart.result[0].timestamp[0]
+  meta.regularMarketPrice = -5
+  meta.chartPreviousClose = 0
+  closes[0] = -1
+  const q = M.parseChart(day)
+  expect([q.price, q.prevClose]).toEqual([null, null])
+  expect(q.points.some(p => p.t === firstTime || p.p <= 0)).toBe(false)
+  // With no previous close the day's prints set its scale alone, and it
+  // draws no dashed line: a null close drew one at zero, the day squeezed
+  // flat against the top. Found in review.
+  const day1 = M.chartGeometry(q, calendars)
+  const ys = day1.points.map(p => p.y)
+  expect(day1.baselineY).toBeNull()
+  expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(0.8)
+  const year = fixture("history/aapl-5y.json")
+  year.chart.result[0].meta.chartPreviousClose = 0
+  year.chart.result[0].indicators.quote[0].close[0] = -1
+  year.chart.result[0].indicators.quote[0].low[1] = 0
+  const h = M.parseHistory(year, "5Y")
+  const secondClose = year.chart.result[0].indicators.quote[0].close[1]
+  expect(h.bars[0].t).toBe(year.chart.result[0].timestamp[1])
+  expect([h.baseline, h.bars[0].l]).toEqual([secondClose, null])
+  const geometry = M.historyGeometry(h)
+  const logY = p => 1 - (Math.log(p) - Math.log(geometry.lo)) / (Math.log(geometry.hi) - Math.log(geometry.lo))
+  for (const point of geometry.points) expect(point.y).toBeCloseTo(logY(point.p), 12)
 })
 
 test("history scrub lookup snaps to a bar and maps its timestamp back", () => {

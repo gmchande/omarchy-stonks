@@ -108,8 +108,9 @@ Item {
       dot: [],
       lastRegular: -1
     }
-    if (!hasBaseline) return g
-    g.baseRow = Math.round(geometry.baselineY * (g.rows - 1))
+    if (!geometry || !geometry.points) return g
+    // With no previous close known, the columns stand on the chart's floor.
+    g.baseRow = hasBaseline ? Math.round(geometry.baselineY * (g.rows - 1)) : g.rows - 1
     var pts = geometry.points
     // The cap sits on the last column whose own last print is regular,
     // never on one held after it. A column stays on the grid at both ends,

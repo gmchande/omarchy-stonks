@@ -53,7 +53,11 @@ function historyDue(range, entry, quote, now, trading) {
 // Yahoo's answer for a range. `centExchanges` as `Quote.parseChart` takes
 // them, for the stray filter's tick. Null, as there, for an answer that is
 // not a chart, whose bars or periods are not lists within Quote's budgets,
-// or whose bar times are not moments.
+// or whose bar times are not moments. A price at or under zero is none, as
+// in the day's answer (`Quote.knownPrice`): a bar without a close is left
+// out, and its START is its first close when its previous close isn't
+// known. Found in the strain QA: "START 0.00", and a cliff at the chart's
+// left from a negative first close.
 function parseHistory(json, range, centExchanges) {
   var result = json && json.chart && json.chart.result && json.chart.result[0]
   if (!result || !result.meta) return null
@@ -72,8 +76,9 @@ function parseHistory(json, range, centExchanges) {
   var bars = []
   for (var i = 0; i < timestamps.length; i++) {
     if (!Format.isMoment(timestamps[i])) return null
-    if (!Format.isFiniteNumber(closes[i])) continue
-    bars.push({ t: timestamps[i], o: opens[i], h: highs[i], l: lows[i], c: closes[i], v: volumes ? volumes[i] : null })
+    if (Quote.knownPrice(closes[i]) === null) continue
+    bars.push({ t: timestamps[i], o: Quote.knownPrice(opens[i]), h: Quote.knownPrice(highs[i]), l: Quote.knownPrice(lows[i]),
+      c: closes[i], v: volumes ? volumes[i] : null })
   }
   bars.sort(function (a, b) { return a.t - b.t })
   if (bars.length >= 2 && bars[bars.length - 1].t === bars[bars.length - 2].t) bars.splice(bars.length - 2, 1)
@@ -87,7 +92,7 @@ function parseHistory(json, range, centExchanges) {
     bars = filtered.bars
     droppedTimes = filtered.droppedTimes
   }
-  var baseline = Format.isFiniteNumber(meta.chartPreviousClose) ? meta.chartPreviousClose : (bars.length ? bars[0].c : null)
+  var baseline = Quote.knownPrice(meta.chartPreviousClose) || (bars.length ? bars[0].c : null)
   return {
     symbol: Format.fetchedText(meta.symbol, Format.MOST_CODE),
     range: range,
@@ -152,8 +157,8 @@ function periodStats(history) {
 // Normalized x/y for a range: bars evenly spaced, and a vertical range that
 // holds every close and the period's starting price the change is measured
 // from, with headroom. From 5Y up the scale is logarithmic, so a decade of
-// growth reads as a slope instead of a flat line and a wall. A log has no
-// place for zero or a negative price, so a history holding one stays linear.
+// growth reads as a slope instead of a flat line and a wall: every price
+// is above zero (`parseHistory`).
 function historyGeometry(history) {
   var bars = history && history.bars ? history.bars : []
   var usable = []
@@ -165,8 +170,7 @@ function historyGeometry(history) {
   }
   var spec = HISTORY_RANGES[history.range]
   var baseline = Format.isFiniteNumber(history.baseline) ? history.baseline : usable[0].c
-  var log = !!spec && spec.scale === "log" && baseline > 0
-    && usable.every(function(bar) { return bar.c > 0 })
+  var log = !!spec && spec.scale === "log"
   var scale = log ? Math.log : function(p) { return p }
   var lo = scale(baseline)
   var hi = lo
