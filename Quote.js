@@ -301,11 +301,14 @@ function parseChart(json, centExchanges, receivedAt) {
   // session, the last of its days whose regular session the quote is from
   // or after, else its first: the bars of the days before it are left out,
   // and the bars of the day after it (`next`), the coming day's pre-market,
-  // stay as its tail, each with its session. A one-day answer is its day.
+  // stay as its tail, each with its session. Without the quote's time, the
+  // last day with a regular-session bar, so before the open the session is
+  // still the last one. A one-day answer is its day.
   var quoted = Format.isFiniteNumber(meta.regularMarketTime) && meta.regularMarketTime > 0 ? meta.regularMarketTime : null
   var days = meta.tradingPeriods ? answerDays(meta.tradingPeriods) : [current]
-  var chosen = quoted === null ? days.length - 1 : 0
-  for (var d = 1; quoted !== null && d < days.length; d++) if (days[d].regular && days[d].regular.start <= quoted) chosen = d
+  var since = function(d) { return quoted !== null ? quoted : barIn(timestamps, closes, days[d].regular) }
+  var chosen = 0
+  for (var d = 1; d < days.length; d++) if (days[d].regular && since(d) !== null && days[d].regular.start <= since(d)) chosen = d
   var periods = days[chosen]
   var next = chosen + 1 < days.length ? days[chosen + 1] : null
   var from = chosen > 0 ? periodsStart(periods) : null
@@ -350,14 +353,15 @@ function parseChart(json, centExchanges, receivedAt) {
   var firstRegular = null
   for (var k = 0; regular && !ahead && k < kept.length && !firstRegular; k++)
     if (kept[k].t >= regular.start && kept[k].t < regular.end) firstRegular = kept[k]
-  // Whether an index's answer came once its next day had begun, its bars
-  // still an earlier session's: Yahoo's current period is a later session
-  // than the bars', and the answer came after that period's pre-market
-  // began, else its open. A stock's answer turns to the coming day then,
-  // and has no open until its session's first bar; an index's stays the
-  // last session's until its open (`headlineBase`).
+  // Whether the answer came once its next day had begun, its bars still an
+  // earlier session's: a stock's two-day answer holding the coming day
+  // (`next`), which Yahoo sends from its pre-market on; an index's, whose
+  // bars stay the last session's until its open, once Yahoo's current
+  // period is a later session than its bars' and the answer came after that
+  // period's pre-market began, else its open. Its open is then not the
+  // coming session's (`headlineBase`).
   var nextDay = !!regular && !!current.regular && current.regular.start > regular.start ? (current.pre || current.regular) : null
-  var nextDayBegun = index && !!nextDay && Format.isFiniteNumber(receivedAt) && receivedAt >= nextDay.start
+  var nextDayBegun = index ? !!nextDay && Format.isFiniteNumber(receivedAt) && receivedAt >= nextDay.start : !!next
   var symbol = Format.fetchedText(meta.symbol, Format.MOST_CODE)
   var instrumentType = Format.fetchedText(meta.instrumentType, Format.MOST_CODE)
   return {
@@ -485,6 +489,13 @@ var POINT_SESSIONS = { pre: "pre", regular: "reg", post: "post" }
 // regular session; null with neither.
 function periodsStart(periods) {
   return periods.pre ? periods.pre.start : periods.regular ? periods.regular.start : null
+}
+
+// The time of an answer's first bar with a close inside `period`, or null.
+function barIn(timestamps, closes, period) {
+  for (var i = 0; period && i < timestamps.length; i++)
+    if (timestamps[i] >= period.start && timestamps[i] < period.end && knownPrice(closes[i]) !== null) return timestamps[i]
+  return null
 }
 
 // An answer's trading periods, a day at a time, each day's pre, regular, and
@@ -643,12 +654,12 @@ function dayBase(quote) {
 }
 
 // What the headline's change is measured from, shaped as `change` reads
-// it: Yahoo's previous close, and the day's open, but none for an index
-// whose answer came once its next day had begun (`nextDayBegun`), as a
-// stock's has none then; a scrub of the index's bars still reads from their
-// open. Found in the daytime QA: before Friday's open the S&P 500 said
-// "−0.41% open", Thursday's, every stock beside it "—"; and in its check,
-// the index said "—" from midnight, the stocks Tuesday's until 04:00.
+// it: Yahoo's previous close, and the day's open, but none once the
+// listing's next day has begun (`nextDayBegun`), for a stock and an index
+// alike; a scrub of the last session still reads from its open. Found in
+// the daytime QA: before Friday's open the S&P 500 said "−0.41% open",
+// Thursday's, every stock beside it "—"; and in its check, the index said
+// "—" from midnight, the stocks Tuesday's until 04:00.
 function headlineBase(quote) {
   return { prevClose: quote.prevClose, dayOpen: quote.nextDayBegun ? null : quote.dayOpen }
 }

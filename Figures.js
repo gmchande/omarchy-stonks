@@ -238,11 +238,19 @@ function listBreadth(symbols, quotes, scrubT, mode) {
     var quote = quotes[symbols[i]]
     var read = quote ? (scrubT ? Quote.readingAt(quote, scrubT) : Quote.headlineQuote(quote)) : null
     var price = read ? read.price : null
-    var chg = quote ? Quote.change(scrubT ? scrubbedBase(quote) : Quote.headlineBase(quote), price, mode) : null
+    var close = quote && scrubT ? Overnight.nightClose(quote, scrubT) : null
+    var unit = close !== null && mode === "open" ? "pct" : mode
+    var chg = quote ? Quote.change(measuredAt(quote, scrubT, close), price, unit) : null
     if (!chg || chg.pct === null) out.none++
-    else out[Format.changeTone(chg, mode, quote.priceDigits)]++
+    else out[Format.changeTone(chg, unit, quote.priceDigits)]++
   }
   return out
+}
+
+// What a moment of a quote's day is measured from (`rowModel`), shaped as
+// `Quote.change` reads it, `close` its `Overnight.nightClose`.
+function measuredAt(quote, scrubT, close) {
+  return close !== null ? { prevClose: close } : scrubT ? scrubbedBase(quote) : Quote.headlineBase(quote)
 }
 
 // The one projection every price on screen comes from. The headline is
@@ -255,8 +263,8 @@ function listBreadth(symbols, quotes, scrubT, mode) {
 // mode does, and it is the direction at the moment shown, as a range's is.
 // dayTone is that change's tone, flat when it rounds to nothing, so the
 // bull and bear follow a scrub and a replay, and a flat day has neither. A
-// trade in a thin night after the day is measured from the day's own close
-// instead, as the overnight line under the price is
+// print after the day, in its night or the coming day's pre-market, is
+// measured from the day's own close instead, as the line under the price is
 // (`Overnight.nightClose`): since the open, as the percent from that close.
 // It carries no drawing: a line is drawn from its quote, so it redraws when
 // the quote does, not with the clock or the change mode. Nor does it read
@@ -266,7 +274,7 @@ function rowModel(quote, scrubT, changeMode) {
   var read = scrubT ? Quote.readingAt(quote, scrubT) : Quote.headlineQuote(quote)
   var price = read ? read.price : null
   var close = scrubT ? Overnight.nightClose(quote, scrubT) : null
-  var measured = close !== null ? { prevClose: close } : scrubT ? scrubbedBase(quote) : Quote.headlineBase(quote)
+  var measured = measuredAt(quote, scrubT, close)
   var mode = close !== null && changeMode === "open" ? "pct" : changeMode
   var chg = Quote.change(measured, price, mode)
   var direction = Quote.change(measured, price, "pct")

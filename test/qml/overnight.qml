@@ -1143,12 +1143,20 @@ ShellRoot {
       scrubAt(1.003)
       var nvdaLegend = harness.find(body, "baselineLegend")
       var nvdaNight = [body.featured.changeText, nvdaLegend.visible ? nvdaLegend.text : ""].join(" | ")
+      // The rows follow a scrub into the pre-market, which NVDA's quote
+      // holds, its row reading it as the hero does. Found in review: they
+      // stayed on Thursday's close.
+      var rowsAt = body.watchlistScrubShown
+      var rowView = Figures.rowModel(service.quotes.NVDA, rowsAt, service.changeMode)
+      var rowFollows = rowsAt === body.scrubShown && rowsAt >= 1792742400
+        && rowView.priceText === body.featured.priceText && rowView.changeText === body.featured.changeText
+      var rowRead = rowsAt + " vs " + body.scrubShown + ": " + rowView.priceText + " " + rowView.changeText + " vs " + body.featured.priceText + " " + body.featured.changeText
       endScrub()
-      harness.check("Friday 06:00: NVDA's chart is Thursday, then its night and pre-market, its scrub reading each from its own close",
+      harness.check("Friday 06:00: NVDA's chart is Thursday, then its night and pre-market, its scrub reading each from its own close, its row following into the pre-market",
         body.featuredGeometry.start === thursdayMidnight && body.featured.changeText === "\u22124.40%"
           && /^At 1\d:\d\d · /.test(nvdaDay) && nvdaDay.split(" | ")[1] === thursdayRead
-          && nvdaNight === nvdaLine[nvdaLine.length - 1] + " | ┄ PREV CLOSE 221.97 · NIGHT FROM CLOSE 212.21",
-        nvdaChart + " || " + nvdaDay + " vs " + thursdayRead + " || " + nvdaNight)
+          && nvdaNight === nvdaLine[nvdaLine.length - 1] + " | ┄ PREV CLOSE 221.97 · NIGHT FROM CLOSE 212.21" && rowFollows,
+        nvdaChart + " || " + nvdaDay + " vs " + thursdayRead + " || " + nvdaNight + " || row " + rowRead)
       // Painted sparse day/3M, one-print and Tokyo lunch states are already
       // in render.qml; no model value can stand in for their rendered ink.
       harness.finish()

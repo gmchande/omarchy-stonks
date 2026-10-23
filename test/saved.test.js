@@ -1866,6 +1866,18 @@ test("a two-day answer is read as the headline's session, with the coming day's 
   const row = M.chartGeometry(aapl, calendars)
   const first = aapl.points.indexOf(tail[0])
   expect([row.points[first].brk, row.points[first].x - row.points[first - 1].x < 0.02]).toEqual([true, true])
+  // Since the open at rest is "—", as the S&P 500's is: the coming session
+  // has no open yet. A scrub of Thursday still reads from Thursday's open.
+  // Found in review: the two-day answer brought back Thursday's open.
+  expect(M.rowModel(aapl, 0, "open").changeLine).toBe("—")
+  expect(M.rowModel(aapl, at("2026-10-22", "12:00"), "open").changeLine).toMatch(/^[+\u2212]\d+\.\d\d% open$/)
+  // Without the quote's time, the session is still Thursday's, the last
+  // with regular bars, not Friday's unopened one. Found in review: the
+  // chart was the night alone again, its scrub from Wednesday's close.
+  const untimed = fixture("moments/night-2026-10-23-0600/aapl.json")
+  delete untimed.chart.result[0].meta.regularMarketTime
+  const timeless = M.parseChart(untimed, cents)
+  expect([sessionDate(timeless), timeless.points.length, timeless.prevClose]).toEqual(["2026-10-22", aapl.points.length, 343.99])
   // Mid-session, a listing's first answer is asked for two days too: the
   // day is Friday's, from Thursday's close, and Thursday is left out.
   const noon = savedDay("twodays-2026-10-23-1208", "aapl")
