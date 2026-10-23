@@ -1342,7 +1342,8 @@ Item {
     still: !root.surfaceOpen
     held: root.chartLoading
     dimmed: motion.dimmed
-    loadingText: root.loadingText
+    // Nothing is said to be on its way while the header says no prices come.
+    loadingText: root.yahooDown ? "" : root.loadingText
     foreground: root.foreground
     dim: root.dim
     dimmer: root.dimmer

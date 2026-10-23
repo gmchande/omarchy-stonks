@@ -220,12 +220,13 @@ Item {
         color: root.veil
       }
 
-      // What is coming, named over the dimmed chart; gone as it lands.
+      // What is coming, named over the dimmed chart; gone as it lands. With
+      // no name, as while Yahoo sends nothing, it says nothing.
       Text {
         objectName: "loadingLabel"
         anchors.centerIn: parent
         width: Math.min(implicitWidth, parent.width)
-        visible: root.held && root.dimmed > 0
+        visible: root.held && root.dimmed > 0 && root.loadingText !== ""
         opacity: root.dimmed
         textFormat: Text.PlainText
         text: root.loadingText + "…"

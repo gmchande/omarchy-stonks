@@ -435,14 +435,16 @@ ShellRoot {
         ] } } }
         root.check("a failed range's retry that lands down names the bear",
           !body.chart.failed && root.animalShows("bear"), body.animal.kind)
-        // A scrub whose line crosses a mark's date keeps the mark: the date
-        // stands clear of the line, and the price where it was, and both are
-        // back at rest once the pointer leaves. Both looks, both marks, on a
-        // year with a sharp high early, whose date has no room before its
-        // price, and a sharp low late, whose date has. Found in the
-        // overnight QA of 23 October: AAPL's 1Y scrub ran through "20│JAN
-        // 2026"; and in the check of that night's fixes, the whole mark went
-        // instead, the year's high with it.
+        // A scrub whose line runs through a mark keeps the mark, all of it
+        // clear of the line: over its own bar, its price, its date, and
+        // either end; and the pointer leaving puts it back where it rests.
+        // Both looks, both marks, on a year with a sharp high early, which
+        // has no room before it, and a sharp low late, which has. Found in
+        // the overnight QA of 23 October: AAPL's 1Y scrub ran through
+        // "20│JAN 2026"; in the check of that night's fixes the whole mark
+        // went instead; and in check-77, with only the date moved, the line
+        // ran through "351│.73", and onto the low's own bar through its
+        // first digit.
         var sharp = []
         for (var sb = 0; sb < 40; sb++) {
           var sc = sb === 6 ? 130 : sb === 33 ? 70 : 100 + (sb % 3)
@@ -459,29 +461,30 @@ ShellRoot {
             var marks = mark.parent.parent
             var price = root.find(mark, "markPrice")
             var date = root.find(mark, "markDate")
-            var place = function() { return [mark.visible, mark.x + price.x, mark.x + date.x].join(",") }
+            var place = function() { return [mark.visible, mark.x].join(",") }
             var atRest = place()
-            var restDate = [mark.x + date.x, mark.x + date.x + date.width]
-            var over = date.mapToItem(body.chartItem, date.width / 2, 0)
-            mouseMove(body.chartItem, over.x, body.chartItem.height / 2)
-            wait(50)
-            var line = marks.scrubAt
-            var onRest = line >= restDate[0] && line <= restDate[1]
-            var dateNow = [mark.x + date.x, mark.x + date.x + date.width]
-            var clear = line < dateNow[0] - 1 || line > dateNow[1] + 1
-            var scrubbed = [mark.visible, mark.x + price.x === Number(atRest.split(",")[1]), clear, dateNow[0] >= 0 && dateNow[1] <= marks.width].join(",")
-            mouseMove(body.chartItem, over.x, -Style.space(40))
+            var rest = mark.x
+            var spots = { bar: marks.chart.xAt(mark.modelData.x), left: rest + 2, price: rest + price.x + price.width / 2,
+              date: rest + date.x + date.width / 2, right: rest + mark.width - 2 }
+            var faults = []
+            for (var spot in spots) {
+              var over = marks.mapToItem(body.chartItem, spots[spot], 0)
+              mouseMove(body.chartItem, over.x, body.chartItem.height / 2)
+              wait(50)
+              var line = marks.scrubAt
+              var clear = line < mark.x - 1 || line > mark.x + mark.width + 1
+              if (!mark.visible || !clear || mark.x < 0 || mark.x + mark.width > marks.width)
+                faults.push(spot + ": line " + Math.round(line) + ", mark " + mark.visible + " at " + Math.round(mark.x) + "–" + Math.round(mark.x + mark.width))
+            }
+            mouseMove(body.chartItem, 1, -Style.space(40))
             wait(50)
             var after = place()
-            if (!atRest.startsWith("true") || !onRest || scrubbed !== "true,true,true,true" || after !== atRest)
-              crossed.push((retro ? "retro " : "smooth ") + name + ": at rest " + atRest + ", line " + line + " on the date " + onRest
-                + ", scrubbed (shown, price kept, date clear, on the chart) " + scrubbed + ", after " + after)
+            if (!atRest.startsWith("true") || faults.length || after !== atRest)
+              crossed.push((retro ? "retro " : "smooth ") + name + ": at rest " + atRest + "; " + faults.join(", ") + "; after " + after)
           })
-          mouseMove(body.chartItem, 1, -Style.space(40))
-          wait(50)
         })
         stub.retro = false
-        root.check("a scrub over a range's mark's date keeps the mark, its price in place and its date clear of the line, and the pointer leaving puts it back, both marks, both looks",
+        root.check("a scrub through a range's mark, its own bar included, keeps all of it clear of the line, and the pointer leaving puts it back, both marks, both looks",
           crossed.length === 0, crossed.join(" | "))
         stub.range = "1D"
         stub.histories = {}

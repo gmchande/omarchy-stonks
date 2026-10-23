@@ -933,7 +933,7 @@ ShellRoot {
       body.motion.scrubT = root.shownHistoryEntry.history.bars[125].t
     } else if (/^popup-history-1y-crossed(low)?-/.test(root.stateName)) {
       // A scrub whose line runs through where the high's date rests, or
-      // the low's (-crossedlow-): the date stands clear of it.
+      // the low's (-crossedlow-): the whole mark stands clear of it.
       var low = root.stateName.indexOf("-crossedlow-") > 0
       var marked = root.shownHistoryEntry.history.bars
       body.motion.scrubT = marked[Math.round(body.rangeMarks[low ? "low" : "high"].x * (marked.length - 1)) + (low ? 55 : -4)].t
