@@ -186,12 +186,14 @@ Item {
   // is fixed: the data file can't be read; a save didn't land, which a
   // click tries again, ahead of the update, since a restart now would lose
   // the changes; or an update waits on a shell restart, which a click does.
-  // The save's try again is said whole (`noticeAction`), so a narrow footer
-  // cuts the words before it.
+  // The save's try again is said whole (`noticeAction`), and where its
+  // words don't fit beside it, as at text size 16 in the popup, they say
+  // less, whole (`noticeShort`), never cut.
   readonly property string notice: settingsUnreadable ? "Couldn't load your lists"
     : saveFailed ? "Your changes aren't saved"
     : updatedTo !== "" ? "Updated to " + updatedTo + " · click to restart the shell" : ""
   readonly property string noticeAction: !settingsUnreadable && saveFailed ? " · click to try again" : ""
+  readonly property string noticeShort: !settingsUnreadable && saveFailed ? "Not saved" : ""
   // The note says a newer Stonks is out, said as a surface opens with its
   // footer in sight, once for each answer that names it
   // (`Updates.releaseUnsaid`): a standing notice would take the add's place
@@ -1475,6 +1477,7 @@ Item {
     noteOpacity: root.noteShown
     notice: root.notice
     noticeAction: root.noticeAction
+    noticeShort: root.noticeShort
     hint: root.hint
     showsHint: root.hintShown
     ground: root.ground

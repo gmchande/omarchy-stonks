@@ -45,8 +45,8 @@ every_state() (
   # A missing regular price: the last chart trade labelled with its time.
   states="$states popup-last-trade-smooth popup-last-trade-retro"
   # A save that didn't land, and a click on it that still didn't, in both
-  # looks; and at text size 16, where the footer cuts the save's words,
-  # never its try again, and the file's notice.
+  # looks; and at text size 16, where the save's words say less rather than
+  # be cut, and the file's notice.
   states="$states popup-notice-save-smooth popup-notice-save-retro popup-notice-save-again-smooth popup-notice-save-again-retro"
   states="$states popup-notice-save-smooth-large popup-notice-save-again-smooth-large popup-notice-file-smooth-large"
   # Hover and held presses formerly judged inside the behavior flows.
