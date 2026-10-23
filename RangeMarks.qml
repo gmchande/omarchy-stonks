@@ -14,10 +14,18 @@ import "Tones.js" as Tones
 // in with the line, and how high and low its ink reaches under a mark
 // (`inkExtentIn`). A mark whose words would touch that ink moves off its
 // edge, into the band's gap, by as much as `lift`; one that would need
-// more, as on a chart squeezed short, is left out whole. A mark the scrub's
-// line crosses (`scrubX`, the scrub's place along the chart, 0..1, or -1)
-// gives way while it does, so the line never cuts its date in two. Found in
-// the overnight QA of 23 October: AAPL's 1Y scrub ran through "20│JAN 2026".
+// more, as on a chart squeezed short, is left out whole. While the scrub's
+// line (`scrubX`, the scrub's place along the chart, 0..1, or -1) runs
+// through a mark, or within `clear` of it, the whole mark, price and date,
+// steps to the side of where it rests, one mark's width and twice `clear`
+// along: before it, or, with no room there, after it, wherever that
+// touches no more ink than at rest. So the line never cuts its words, its
+// own bar included, and it steps back when the line moves off. With room
+// on neither side, as on a chart narrower than two marks, it gives way
+// while crossed. Found in the overnight QA of 23 October: AAPL's 1Y scrub
+// ran through "20│JAN 2026"; hiding the mark instead hid the year's high
+// while you scrubbed toward it (check-night), and moving only the date left
+// the line through "351│.73" (check-77).
 Item {
   id: root
 
@@ -42,30 +50,51 @@ Item {
     Repeater {
       model: root.marks && root.chart ? [root.marks.high, root.marks.low] : []
 
-      Row {
+      Item {
         id: mark
         required property var modelData
         required property int index
         readonly property real at: root.chart.xAt(mark.modelData.x)
-        // How far its words' ink, as drawn, would reach into the chart's ink
-        // under each of them, with the mark on its edge: down into it for the
-        // high, up into it for the low. A price's thousands commas reach
-        // below the baseline.
-        readonly property real overlap: Math.max(mark.overlapOf(priceText, priceInk), mark.overlapOf(dateText, dateInk), 0)
-        objectName: index === 0 ? "highMark" : "lowMark"
-        visible: mark.overlap <= root.lift
-          && !(root.scrubAt >= 0 && root.scrubAt >= mark.x - Style.space(4) && root.scrubAt <= mark.x + mark.width + Style.space(4))
-        spacing: Style.space(6)
-        x: Math.max(0, Math.min(root.width - mark.width,
+        readonly property real gap: Style.space(6)
+        // How far the line keeps from the mark's words: past the scrub's dot.
+        readonly property real clear: Style.space(6)
+        // Over its bar, turned toward the chart's middle, on the chart.
+        readonly property real restX: Math.max(0, Math.min(root.width - mark.width,
           mark.modelData.x < 0.5 ? mark.at - Style.space(2) : mark.at - mark.width + Style.space(2)))
+        // How far its words' ink, as drawn at rest, would reach into the
+        // chart's ink under each of them, with the mark on its edge: down
+        // into it for the high, up into it for the low. A price's thousands
+        // commas reach below the baseline.
+        readonly property real overlap: mark.overlapAt(mark.restX)
+        readonly property bool crossed: root.scrubAt >= 0 && root.scrubAt >= mark.restX - mark.clear
+          && root.scrubAt <= mark.restX + mark.width + mark.clear
+        readonly property real beforeX: mark.restX - mark.width - mark.clear * 2
+        readonly property real afterX: mark.restX + mark.width + mark.clear * 2
+        readonly property bool beforeFits: mark.fitsAt(mark.beforeX)
+        readonly property bool afterFits: mark.fitsAt(mark.afterX)
+        objectName: index === 0 ? "highMark" : "lowMark"
+        visible: mark.overlap <= root.lift && (!mark.crossed || mark.beforeFits || mark.afterFits)
+        width: priceText.implicitWidth + mark.gap + dateText.implicitWidth
+        height: Math.max(priceText.implicitHeight, dateText.implicitHeight)
+        x: !mark.crossed ? mark.restX : mark.beforeFits ? mark.beforeX : mark.afterFits ? mark.afterX : mark.restX
         y: root.lift + (mark.index === 0 ? -Math.min(mark.overlap, root.lift)
           : root.height - mark.height + Math.min(mark.overlap, root.lift))
 
-        function overlapOf(word, ink) {
-          var under = root.chart.inkExtentIn(mark.x + word.x, mark.x + word.x + word.width)
+        // With the mark at `left`: how far its words' ink reaches into the
+        // chart's, the most of the two.
+        function overlapAt(left) {
+          return Math.max(mark.overlapOf(left, priceText, priceInk), mark.overlapOf(left + dateText.x, dateText, dateInk), 0)
+        }
+        function overlapOf(left, word, ink) {
+          var under = root.chart.inkExtentIn(left, left + word.implicitWidth)
           var top = word.baselineOffset + ink.tightBoundingRect.y
           return mark.index === 0 ? top + ink.tightBoundingRect.height - under.top
             : under.bottom - (root.height - mark.height + top)
+        }
+        // The mark can stand at `left`: on the chart, and on no more of its
+        // ink than at rest.
+        function fitsAt(left) {
+          return left >= 0 && left + mark.width <= root.width && mark.overlapAt(left) <= mark.overlap
         }
 
         TextMetrics { id: priceInk; font: priceText.font; text: priceText.text }
@@ -73,6 +102,7 @@ Item {
 
         Text {
           id: priceText
+          objectName: "markPrice"
           textFormat: Text.PlainText
           text: mark.modelData.price
           color: root.foreground
@@ -82,6 +112,8 @@ Item {
         }
         Text {
           id: dateText
+          objectName: "markDate"
+          x: priceText.implicitWidth + mark.gap
           textFormat: Text.PlainText
           text: mark.modelData.date
           color: root.dim

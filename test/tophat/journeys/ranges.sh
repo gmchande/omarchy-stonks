@@ -66,6 +66,29 @@ if reachable "clicking a range"; then
   lines
 fi
 
+step "On 1Y, the scrub's line through each mark, at its price and at its date, keeps all of the mark clear of it"
+if reachable "a scrub over a mark"; then
+  read -r _ cy <<< "$(at heroChart)"
+  for mark in highMark lowMark; do
+    rest=$(matches "$mark" | head -n 1)
+    [ -n "$rest" ] || { fail "the $mark is on the 1Y chart"; continue; }
+    for word in markPrice markDate; do
+      # The word's middle where the mark rests, the high's the upper.
+      nth=$([ "$mark" = highMark ] && echo 0 || echo 1)
+      x=$(matches "$word" | jq -s -r "sort_by(.y)[$nth] | (.x + .width / 2) | floor")
+      move_to "$((x - 3))" "$cy"
+      move_to "$x" "$cy"
+      sleep 0.3
+      shot "scrub-$mark-$word"
+      readout "$mark"
+      check "the $mark stays while the scrub's line crosses its ${word#mark}" shown "$mark"
+      check "all of the $mark stands clear of the line at x $x" jq -e --argjson x "$x" '.x > $x + 2 or .x + .width < $x - 2' <<< "$(matches "$mark" | head -n 1)"
+      park
+      sleep 0.3
+    done
+  done
+fi
+
 step "A wheel notch up over the range row is the shorter range"
 if reachable "the wheel on the range row"; then
   before=$(saved_range)

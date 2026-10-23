@@ -349,6 +349,16 @@ Item {
   readonly property var featuredDay: motion.day
   readonly property var featuredFreshness: Figures.freshness(entryOf(chartSymbol || featuredSymbol), featuredQuote, now,
     owed[chartSymbol || featuredSymbol] || 0, !!asking[chartSymbol || featuredSymbol])
+  // Yahoo is sending nothing for any listing: every symbol in All has a
+  // failed or overdue refresh. The header says so once, naming Yahoo, and
+  // the hero and the rows say what they have, with no warning each
+  // (`Figures.quietFreshness`). Found by the design panel of 23 October:
+  // with Yahoo failing, every row said "No data for this symbol", as if
+  // each stock had stopped existing.
+  readonly property bool yahooDown: lists.length > 0 && lists[0].symbols.length > 0 && lists[0].symbols.every(function(symbol) {
+    return Figures.freshnessWarns(Figures.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0, !!asking[symbol]))
+  })
+  readonly property string yahooDownText: "No prices from Yahoo · Stonks keeps trying"
   readonly property var featuredGeometry: motion.geometry
   readonly property real scrubX: motion.scrubX
   readonly property bool dayScrubbed: !historyActive && scrubShown !== 0
@@ -422,6 +432,10 @@ Item {
   readonly property string loadingText: "Loading" + (featuredSymbol ? " " + featuredSymbol + (range !== "1D" ? " " + range : "") : "")
   readonly property string headerText: {
     if (!service) return headerWhenMissing
+    // Yahoo is sending nothing for any listing, said once, unless a scrub
+    // reads a moment, a refresh you asked for is out, or a range failed,
+    // whose header offers its retry.
+    if (yahooDown && !scrubShown && !refreshing && !(historyActive && historyFailed)) return yahooDownText
     // The chart asked for is on its way, named: what was on show stays.
     // Before any chart has been in, the empty hero's label names it alone,
     // in the one place a reader looks (`HeroBand`).
@@ -444,7 +458,8 @@ Item {
   readonly property var marketSays: featuredQuote ? [dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars,
     Overnight.nightTrades(featuredQuote, !!chart && chart.allDay, now, calendars)] : null
   readonly property string marketText: marketSays ? Market.marketStatus.apply(null, marketSays) : ""
-  readonly property string headerShortText: marketSays && headerText === marketText ? Market.shortMarketStatus.apply(null, marketSays) : ""
+  readonly property string headerShortText: headerText === yahooDownText ? "No prices from Yahoo"
+    : marketSays && headerText === marketText ? Market.shortMarketStatus.apply(null, marketSays) : ""
   // Everything but the rows: margins, header, band, and footer, with the
   // band, the rows, and the footer each one group's gap under what is above.
   readonly property int chromeHeight: chartFitsSurface ? chromeBesideChart + shownChartHeight
@@ -714,6 +729,7 @@ Item {
     else service.removeSymbol(symbol, rows)
     closeViews()
     sound("remove")
+    if (removal && removal.symbol === symbol) offerUndo()
     if (successor !== "") watchlist.handTo(successor)
   }
 
@@ -791,6 +807,48 @@ Item {
     service.undoRemoval(symbol)
     sound("undo")
     watchlist.select(symbol)
+  }
+
+  // The footer offers a removal made here back beside the add for a few
+  // seconds, "Undo NVDA", so a removal by the mouse says what it took and
+  // can be taken back by the mouse; u takes it back long after. The add
+  // stays where it is, and acts at once: in the review of 22 October the
+  // owner took out a note that held the footer, since adding the next stock
+  // meant waiting for it. The offer ends with the removal (undone, a newer
+  // one, or the lists changed), a close, or its time, which waits while the
+  // pointer is on it and fades its last 600 ms, as a note does.
+  property var undoOffered: null
+  property real undoShown: 1
+  onRemovalChanged: if (undoOffered !== null && removal !== undoOffered) endUndo()
+  function offerUndo() {
+    undoOffered = removal
+    holdUndo()
+  }
+  function holdUndo() {
+    undoFade.stop()
+    undoShown = 1
+    if (undoOffered !== null && surfaceOpen && !footer.undoHovered) undoTimer.restart()
+    else undoTimer.stop()
+  }
+  function endUndo() {
+    undoTimer.stop()
+    undoFade.stop()
+    undoShown = 1
+    undoOffered = null
+  }
+  Timer {
+    id: undoTimer
+    interval: 5000 - undoFade.duration
+    onTriggered: undoFade.start()
+  }
+  NumberAnimation {
+    id: undoFade
+    target: root
+    property: "undoShown"
+    from: 1
+    to: 0
+    duration: 600
+    onFinished: root.endUndo()
   }
 
   // The note's moment starts again, and waits while the pointer is on it,
@@ -1140,6 +1198,8 @@ Item {
     unheardAdds = []
     noteTimer.stop()
     noteFade.stop()
+    undoTimer.stop()
+    undoFade.stop()
     footer.freeze()
     watchlist.takeOver()
     motion.freeze()
@@ -1209,6 +1269,7 @@ Item {
     header.settle()
     heroBand.settle()
     clearNote()
+    endUndo()
     cameraLit = false
     footer.settle()
     hint = ""
@@ -1286,6 +1347,7 @@ Item {
     bandGap: root.bandGap
     visible: !root.showingHelp
     freshness: root.featuredFreshness
+    sourceDown: root.yahooDown
     retro: root.retro
     changeMode: root.changeMode
     scrubbing: root.scrubT !== 0
@@ -1293,7 +1355,8 @@ Item {
     still: !root.surfaceOpen
     held: root.chartLoading
     dimmed: motion.dimmed
-    loadingText: root.loadingText
+    // Nothing is said to be on its way while the header says no prices come.
+    loadingText: root.yahooDown ? "" : root.loadingText
     foreground: root.foreground
     dim: root.dim
     dimmer: root.dimmer
@@ -1377,6 +1440,7 @@ Item {
     rowGap: root.rowGap
     gutter: root.gutter
     surfaceOpen: root.surfaceOpen
+    sourceDown: root.yahooDown
     // A turn later: the change that arranged the rows is still being told.
     onArranged: Qt.callLater(root.land)
     onSettlingChanged: Qt.callLater(root.featureLanding)
@@ -1529,6 +1593,10 @@ Item {
     label: root.listName !== "" ? "+  Add a symbol to " + root.listName : "+  Add a symbol"
     acts: root.updateOffered || !root.settingsUnreadable
     onHoveredChanged: root.holdNote()
+    undoLabel: root.undoOffered ? "Undo " + root.undoOffered.symbol : ""
+    undoOpacity: root.undoShown
+    onUndoHoveredChanged: root.holdUndo()
+    onUndoClicked: root.undoRemoval()
     // The click acts on what the footer shows: a newer version's note runs
     // the update, the update's notice restarts the shell, and the file's
     // does nothing, nor does a refusal over it; while a save hasn't landed,
