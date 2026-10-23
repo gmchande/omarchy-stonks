@@ -25,6 +25,15 @@
 #   isn't, dev holds something the head didn't, and test/batch.sh runs the
 #   suites on it; when it is, the passes recorded for the head's tree cover
 #   dev (test/ran.sh).
+# - It takes test/batch.sh's lock before it checks or merges anything, and
+#   holds it until the fast-forward is done. A batch runs the suites in the
+#   main checkout, and a fast-forward under a running suite makes it end on
+#   a tree that changed under it, which no record covers (23 October). So a
+#   merge started during a batch says so and waits, up to 30 minutes
+#   (MERGE_BATCH_WAIT, in seconds; a batch takes about 6, more when it
+#   bisects), then refuses with nothing merged. The head it merges is the
+#   one GitHub reports when the script starts, not after the wait. The
+#   checks below run after the wait, since a batch may have moved dev.
 #
 # It never merges into main, never forces a push, and never deletes a
 # branch. Any failure exits non-zero and does nothing more; a failure after
@@ -36,6 +45,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 email=code@gauravchande.com
 patience=${MERGE_WAIT:-120}
 poll=${MERGE_POLL:-3}
+batch_patience=${MERGE_BATCH_WAIT:-1800}
 say() { echo "merge: $*"; }
 refuse() { echo "merge: refusing: $*" >&2; exit 1; }
 
@@ -50,13 +60,6 @@ if [ -z "${GH_REPO:-}" ]; then
   export GH_REPO
 fi
 
-# The checkout that has dev checked out, which gets the fast-forward.
-main=$(git worktree list --porcelain | awk '/^worktree / { dir = substr($0, 10) } $0 == "branch refs/heads/dev" { print dir; exit }')
-[ -n "$main" ] || refuse "no checkout has dev checked out"
-[ -z "$(git -C "$main" status --porcelain)" ] || refuse "$main has uncommitted edits or untracked files"
-git fetch --quiet origin || refuse "can't fetch origin"
-git merge-base --is-ancestor dev origin/dev || refuse "dev has commits origin/dev doesn't: dev and origin/dev have diverged"
-
 # read_pr: sets state, mergeable, base, head, merged from GitHub's answer.
 read_pr() {
   local line
@@ -64,6 +67,29 @@ read_pr() {
     --jq '[.state, .mergeable, .baseRefName, .headRefOid, (.mergeCommit.oid // "")] | join("|")') || return 1
   IFS='|' read -r state mergeable base head merged <<< "$line"
 }
+if [ -z "$want" ]; then
+  read_pr || refuse "can't read pull request #$pr from GitHub"
+  want=$head
+fi
+
+# Fd 8 holds the batch's lock (test/batch.sh) until this script ends; the
+# commands below that can start a background process (git's gc) run without
+# it (8>&-), so nothing outlives the merge holding it.
+lockfile=$(git rev-parse --path-format=absolute --git-common-dir)/stonks-batch.lock
+exec 8>> "$lockfile" || exit 1
+if ! flock -n 8; then
+  say "waiting up to ${batch_patience}s for $(cat "$lockfile" 2> /dev/null || echo 'the batch') to end: a merge would change the checkout its suites run in"
+  flock -w "$batch_patience" 8 || refuse "$(cat "$lockfile" 2> /dev/null) still holds the lock after ${batch_patience}s: nothing merged"
+  say "the lock is free"
+fi
+echo "merge of #$pr, pid $$" > "$lockfile"
+
+# The checkout that has dev checked out, which gets the fast-forward.
+main=$(git worktree list --porcelain | awk '/^worktree / { dir = substr($0, 10) } $0 == "branch refs/heads/dev" { print dir; exit }')
+[ -n "$main" ] || refuse "no checkout has dev checked out"
+[ -z "$(git -C "$main" status --porcelain)" ] || refuse "$main has uncommitted edits or untracked files"
+git fetch --quiet origin 8>&- || refuse "can't fetch origin"
+git merge-base --is-ancestor dev origin/dev || refuse "dev has commits origin/dev doesn't: dev and origin/dev have diverged"
 
 end=$((SECONDS + patience))
 while :; do
@@ -83,7 +109,7 @@ while :; do
   sleep "$poll"
 done
 
-gh pr merge "$pr" --merge --match-head-commit "$want" --author-email "$email" > /dev/null \
+gh pr merge "$pr" --merge --match-head-commit "$want" --author-email "$email" 8>&- > /dev/null \
   || refuse "gh couldn't merge #$pr at ${want:0:7}: nothing merged"
 
 # From here on the pull request is merged: a failure says so.
@@ -93,12 +119,12 @@ until read_pr && [ "$state" = MERGED ] && [ -n "$merged" ]; do
   [ "$SECONDS" -lt "$end" ] || broke "GitHub doesn't read it as merged after ${patience}s: look at it before going on"
   sleep "$poll"
 done
-git fetch --quiet origin || broke "can't fetch origin: dev is not updated"
+git fetch --quiet origin 8>&- || broke "can't fetch origin: dev is not updated"
 git merge-base --is-ancestor "$merged" origin/dev || broke "merge commit ${merged:0:7} isn't on origin/dev"
 [ "$(git rev-parse --quiet --verify "$merged^2")" = "$want" ] || broke "merge commit ${merged:0:7} doesn't have ${want:0:7} as its second parent"
 [ "$(git log -1 --format=%ae "$merged")" = "$email" ] || broke "merge commit ${merged:0:7} has the author $(git log -1 --format=%ae "$merged"), not $email"
 [ "$(git -C "$main" symbolic-ref --quiet --short HEAD)" = dev ] || broke "$main is no longer on dev: nothing fast-forwarded"
-git -C "$main" merge --ff-only --quiet origin/dev || broke "dev in $main didn't fast-forward to origin/dev"
+git -C "$main" merge --ff-only --quiet origin/dev 8>&- || broke "dev in $main didn't fast-forward to origin/dev"
 say "merged #$pr: $(git log -1 --format='%h %s' "$merged"); dev in $main is at $(git -C "$main" rev-parse --short HEAD)"
 if [ "$(git rev-parse "$merged^{tree}")" = "$(git rev-parse "$want^{tree}")" ]; then
   say "its tree is the head's (${want:0:7}): the suites' passes for it cover dev (test/ran.sh)"
