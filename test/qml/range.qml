@@ -686,9 +686,13 @@ ShellRoot {
         body.motion.replayRunning && body.headerText !== marketHeader && body.featured.priceText !== headline,
         body.headerText + "|" + body.featured.priceText + " vs " + headline)
       tryVerify(function() { return !body.motion.replayRunning }, 3000)
+      // The market's header counts down by the minute, and the minute can turn
+      // during the replay (it failed so on 23 October): it must be the market
+      // as of now, not as it was before the key. A scrub's date or a held
+      // "Loading" is still not the market.
       harness.check("the replay ends back on the market",
-        body.headerText === marketHeader && body.featured.priceText === headline,
-        body.headerText + "|" + body.featured.priceText)
+        body.marketText !== "" && body.headerText === body.marketText && body.featured.priceText === headline,
+        body.headerText + " vs " + body.marketText + "|" + body.featured.priceText)
 
       // NVDA's history never comes. Read straight after the key, before any
       // answer can land: the window names what is coming, and once the
