@@ -7,8 +7,9 @@ import qs.Ui
 import "Tones.js" as Tones
 
 // Shortcut sheet, the same on both surfaces: the key groups in two columns,
-// the mouse's lines across both under them, its close button, and at the
-// foot one dim credit line: the version and where prices come from.
+// a dim credit line (the version and where prices come from) closing the
+// second, then the mouse's lines across both under them, and its close
+// button.
 // One column left half the window empty and pushed the last group below the
 // fold. The two columns stack independently, groups in order, the first
 // taking groups until it holds about half the lines, so a short group never
@@ -30,10 +31,11 @@ Flickable {
   property int inset: 0
   property int edge: 0
   // Stonks' version, as the version watch read it from the manifest; ""
-  // leaves it off the credit line rather than show a blank.
+  // leaves it off the credit rather than show a blank.
   property string version: ""
-  readonly property string credit: (version !== "" ? "Stonks " + version + " · " : "")
-    + "Prices from Yahoo · Overnight from Robinhood"
+  // One part a line, so a half column never breaks one mid-phrase.
+  readonly property string credit: (version !== "" ? ["Stonks " + version] : [])
+    .concat(["Prices from Yahoo", "Overnight from Robinhood"]).join("\n")
 
   signal closeRequested()
 
@@ -129,13 +131,32 @@ Flickable {
         model: [root.groups.slice(0, root.split), root.groups.slice(root.split)]
 
         Column {
+          id: sheetSide
           required property var modelData
+          required property int index
           width: root.columnWidth
           spacing: Style.space(16)
 
           Repeater {
-            model: parent.modelData
+            model: sheetSide.modelData
             delegate: Group { width: root.columnWidth }
+          }
+
+          // The credit closes the second column, in the room the first's
+          // longer groups leave beside it, so a window of ordinary height
+          // shows it without a scroll. Found in the 1.1.0 audit: at the
+          // sheet's foot, the y and S rows pushed it out of a 720 × 520
+          // window's sight.
+          Text {
+            objectName: "helpCredit"
+            visible: sheetSide.index === 1
+            width: root.columnWidth - root.edge
+            textFormat: Text.PlainText
+            text: root.credit
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
+            wrapMode: Text.WordWrap
           }
         }
       }
@@ -176,17 +197,6 @@ Flickable {
         text: "CLOSE"
         onActivated: root.closeRequested()
       }
-    }
-
-    Text {
-      objectName: "helpCredit"
-      width: sheetColumn.width - root.edge
-      textFormat: Text.PlainText
-      text: root.credit
-      color: root.dim
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.bodySmall
-      wrapMode: Text.WordWrap
     }
   }
 }
