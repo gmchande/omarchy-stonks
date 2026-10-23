@@ -85,11 +85,17 @@ var OVERNIGHT_BATCH = 25
 var MOST_RESULTS = 2 * OVERNIGHT_BATCH
 var MOST_PRINTS = 1000
 
-// Robinhood's instruments for `symbols`, one request for all: whether it
-// trades each all day.
+// Robinhood's instruments for `symbols`: whether it trades each all day. At
+// most `ALL_DAY_BATCH` symbols to a request.
 function allDayUrl(symbols) {
   return INSTRUMENTS_URL + "?symbols=" + symbols.map(function(s) { return encodeURIComponent(robinhoodSymbol(s)) }).join(",")
 }
+
+// The listings to a request: Robinhood's instruments answer 100 results a
+// page and leave the rest to a `next` page, in their own order, and a
+// symbol may answer twice (`parseAllDay`), so half of that fits one page.
+// Asked for 118 at once, the 17 on page two read as not trading all day.
+var ALL_DAY_BATCH = 50
 
 // Robinhood's instruments answer, by the Yahoo symbols asked for: true for a
 // listing it trades all day (`all_day_tradability` "tradable"), false for any

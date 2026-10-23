@@ -73,9 +73,10 @@
 # saved answer (robinhood-instruments.json, the sweep's moments) answers
 # from it, the symbols asked only; the moments saved before 7 October have
 # none, and every symbol asked answers that Robinhood trades it all day, as
-# the steps on them take the 24-hour market's rules. While
-# STONKS_FAKE_STATE/INSTRUMENTS.down exists, the instruments fail, counted
-# all the same.
+# the steps on them take the 24-hour market's rules. Either way an answer
+# holds 100 results at most, the rest left to a `next` page, as Robinhood's
+# does. While STONKS_FAKE_STATE/INSTRUMENTS.down exists, the instruments
+# fail, counted all the same.
 # While STONKS_FAKE_STATE/ROBINHOOD.hold exists, every answer of Robinhood's
 # waits, each counted as it is asked: a step sees what is out at once.
 # GitHub's manifest on main, and only that address: while
@@ -219,7 +220,7 @@ serve() {
       jq -c --arg asked "$asked" '($asked | split(",")) as $want | .results |= map(select(.symbol as $s | $want | index($s)))' "$saved_answer"
     else
       jq -nc --arg asked "$asked" '{ next: null, results: [($asked | split(","))[] | { symbol: ., all_day_tradability: "tradable" }] }'
-    fi
+    fi | jq -c 'if (.results | length) > 100 then .next = "https://api.robinhood.com/instruments/?cursor=page2" | .results |= .[:100] else . end'
     exit
   fi
   if [[ "$url" == *"api.robinhood.com/marketdata/historicals/"* ]]; then
