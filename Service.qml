@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "Chart.js" as Chart
+import "Figures.js" as Figures
 import "Fundamentals.js" as Fundamentals
 import "History.js" as History
 import "Market.js" as Market
@@ -170,6 +171,38 @@ Item {
   // Of those, each one waiting on Yahoo, with the second that began: what
   // freshness's overdue counts from (`QuoteFeed.owed`).
   readonly property var owed: feed.owed
+  // Of those asked, each asked under `Figures.ASKED_GRACE` ago by the wall
+  // clock, to the millisecond, as true: freshness's grace for a quote
+  // opened old. `askedMs` holds when each was asked; a timer ends each
+  // grace as it runs out. Counted in the clock's whole seconds, the grace
+  // ended anywhere from 1 to 2 s on (the check of #69, 23 October).
+  property var asking: ({})
+  property var askedMs: ({})
+  function trackAsks() {
+    var nowMs = Date.now()
+    var since = {}
+    var inGrace = {}
+    var ends = 0
+    for (var s in feed.asked) {
+      since[s] = s in root.askedMs ? root.askedMs[s] : nowMs
+      var end = since[s] + Figures.ASKED_GRACE * 1000
+      if (end > nowMs) {
+        inGrace[s] = true
+        if (!ends || end < ends) ends = end
+      }
+    }
+    root.askedMs = since
+    if (Object.keys(inGrace).join(",") !== Object.keys(root.asking).join(",")) root.asking = inGrace
+    if (ends) {
+      graceTimer.interval = Math.max(1, ends - nowMs)
+      graceTimer.restart()
+    } else graceTimer.stop()
+  }
+  Connections {
+    target: feed
+    function onAskedChanged() { root.trackAsks() }
+  }
+  Timer { id: graceTimer; onTriggered: root.trackAsks() }
   readonly property var histories: historyFeed.entries
   readonly property var fundamentals: fundamentalsFeed.entries
   readonly property var shown: view.shown

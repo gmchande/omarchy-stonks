@@ -737,26 +737,30 @@ ShellRoot {
       // for the 2 s an answer takes (`Figures.ASKED_GRACE`), says "As of"
       // from then on, and goes on saying it once its answer, as old, lands:
       // the source is late, not Stonks. Found in the speed QA of 23
-      // October: "As of 06:46 UTC" flashed on each open.
+      // October: "As of 06:46 UTC" flashed on each open. The service's
+      // clock runs as a real one does, its next second 100 ms after the
+      // open, so the ask goes 0.9 s into its second: counted in whole
+      // seconds, the grace ended 1.1 s on. Found in the check of #69.
       tick(300)
-      var btcMarks = function() { return marks().filter(function(m) { return /^BTC-USD: /.test(m) }) }
-      var openMarks = []
-      frames.each = function() { btcMarks().forEach(function(m) { if (openMarks.indexOf(m) < 0) openMarks.push(m) }) }
+      var start = service.now
       touch("BTC-USD.quote.hold")
-      frames.running = true
       app.testWindow.implicitHeight = 1000
       app.open("{}")
-      tryVerify(function() { return app.opened && service.openSurfaces.length === 1 }, 3000)
-      var heldOut = within(3000, function() { return "BTC-USD" in service.asked && !idle() })
-      wait(300)
-      frames.running = false
-      service.now += 2
-      var lateNote = within(2000, function() { return /^As of /.test(app.testBody.watchlist.rowItem("BTC-USD").detail) })
+      var opened = Date.now()
+      var heldOut = false
+      var asOfAt = 0
+      for (var t = 0; t < 4000 && !asOfAt; t = Date.now() - opened) {
+        service.now = start + Math.floor((t + 900) / 1000)
+        heldOut = heldOut || ("BTC-USD" in service.asked && !idle())
+        var btcRow = app.opened ? app.testBody.watchlist.rowItem("BTC-USD") : null
+        if (btcRow && /^As of /.test(btcRow.detail)) asOfAt = t
+        wait(20)
+      }
       remove("BTC-USD.quote.hold")
       settle()
-      harness.check("an open on a crypto nothing kept fresh shows no As of on its row while its answer is under 2 s out, then As of while it stays out, and after its old answer",
-        heldOut && openMarks.length === 0 && lateNote && /^As of /.test(app.testBody.watchlist.rowItem("BTC-USD").detail),
-        heldOut + " | " + openMarks.join(" | ") + " | " + lateNote + " | " + app.testBody.watchlist.rowItem("BTC-USD").detail)
+      harness.check("an open on a crypto nothing kept fresh shows no As of on its row for the first 2 s of its answer's wait, then As of while it stays out, and after its old answer",
+        heldOut && asOfAt >= 1900 && asOfAt <= 2600 && /^As of /.test(app.testBody.watchlist.rowItem("BTC-USD").detail),
+        heldOut + " | As of at " + asOfAt + " ms | " + app.testBody.watchlist.rowItem("BTC-USD").detail)
       closeWindow()
 
       // 23:00, Tokyo's lunch break until 23:30; New York's night, with
