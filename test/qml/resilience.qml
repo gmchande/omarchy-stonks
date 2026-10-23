@@ -291,6 +291,12 @@ ShellRoot {
 
     function test_4_fundamentalsAndSearchDarkness() { guarded("test_4_fundamentalsAndSearchDarkness", checks_test_4_fundamentalsAndSearchDarkness) }
     function checks_test_4_fundamentalsAndSearchDarkness() {
+      // Members of All: a cap and P/E is kept only for All, the preview,
+      // and a removal on offer (`Service.forgetLeft`), pruned each minute
+      // and as the preview changes. Asked for outside All, AAPL's was pruned
+      // before the check when the search's preview moved or the minute
+      // turned in between, which a loaded run made likely.
+      service.persist({ symbols: ["BTC-USD", "AAPL", "MSFT"] })
       quiet()
       service.screens = screens
       screens.screensOff = true
