@@ -127,50 +127,57 @@ Item {
       : addMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
       : addMouse.containsMouse ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
 
-    Row {
-      // Centred on the whole bar, so an undo coming or going moves nothing,
-      // unless that would run into the undo: then just clear of it.
-      x: Math.round(Math.min((root.width - root.gutter - width) / 2, root.width - root.gutter - root.undoRoom - Style.space(10) - width))
-      anchors.verticalCenter: parent.verticalCenter
+    // The words centred on the whole bar, so an undo coming or going moves
+    // nothing, unless that would run them into the undo: then the box they
+    // centre in narrows, to end just clear of it. Centred by anchors, so
+    // they land on the pixel they always did.
+    Item {
+      width: Math.min(root.width - root.gutter, 2 * (root.width - root.gutter - root.undoRoom - Style.space(10)) - footerRow.width)
+      height: parent.height
 
-      // The notice whole, measured, never shown: where it doesn't fit beside
-      // its action, its short form shows (`noticeShort`).
-      Text {
-        id: fullNotice
-        visible: false
-        textFormat: Text.PlainText
-        text: root.notice
-        font: footerWords.font
-      }
-      Text {
-        id: footerWords
-        objectName: "footerText"
-        // Clear of the undo.
-        readonly property real room: root.width - root.gutter - root.undoRoom - Style.space(20) - (noteAction.visible ? noteAction.implicitWidth : 0)
-        width: Math.min(implicitWidth, room)
-        elide: Text.ElideRight
-        // Cut short, it ends against its action, not a gap's width away.
-        horizontalAlignment: Text.AlignRight
-        textFormat: Text.PlainText
-        text: root.note !== "" ? root.note
-          : root.notice !== "" ? (root.noticeShort !== "" && fullNotice.implicitWidth > room ? root.noticeShort : root.notice)
-          : root.label
-        color: root.note !== "" || root.notice !== "" ? root.foreground : root.dim
-        opacity: root.note !== "" ? root.noteOpacity : root.coveredOpacity
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.bodySmall
-      }
+      Row {
+        id: footerRow
+        anchors.centerIn: parent
 
-      Text {
-        id: noteAction
-        objectName: "footerAction"
-        visible: text !== ""
-        textFormat: Text.PlainText
-        text: root.note !== "" ? root.noteAction : root.notice !== "" ? root.noticeAction : ""
-        color: root.foreground
-        opacity: root.note !== "" ? root.noteOpacity : root.coveredOpacity
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.bodySmall
+        // The notice whole, measured, never shown: where it doesn't fit
+        // beside its action, its short form shows (`noticeShort`).
+        Text {
+          id: fullNotice
+          visible: false
+          textFormat: Text.PlainText
+          text: root.notice
+          font: footerWords.font
+        }
+        Text {
+          id: footerWords
+          objectName: "footerText"
+          // Clear of the undo.
+          readonly property real room: root.width - root.gutter - root.undoRoom - Style.space(20) - (noteAction.visible ? noteAction.implicitWidth : 0)
+          width: Math.min(implicitWidth, room)
+          elide: Text.ElideRight
+          // Cut short, it ends against its action, not a gap's width away.
+          horizontalAlignment: Text.AlignRight
+          textFormat: Text.PlainText
+          text: root.note !== "" ? root.note
+            : root.notice !== "" ? (root.noticeShort !== "" && fullNotice.implicitWidth > room ? root.noticeShort : root.notice)
+            : root.label
+          color: root.note !== "" || root.notice !== "" ? root.foreground : root.dim
+          opacity: root.note !== "" ? root.noteOpacity : root.coveredOpacity
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.bodySmall
+        }
+
+        Text {
+          id: noteAction
+          objectName: "footerAction"
+          visible: text !== ""
+          textFormat: Text.PlainText
+          text: root.note !== "" ? root.noteAction : root.notice !== "" ? root.noticeAction : ""
+          color: root.foreground
+          opacity: root.note !== "" ? root.noteOpacity : root.coveredOpacity
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.bodySmall
+        }
       }
     }
 

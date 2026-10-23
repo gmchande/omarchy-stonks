@@ -344,22 +344,39 @@ ShellRoot {
       harness.check("refreshes held back by the budget alone for four minutes warn of nothing, and land once it refills",
         heldMost >= 100 && heldWarned === 0 && caughtUp, heldMost + " waiting at most, " + heldWarned + " steps warned, caught up " + caughtUp)
 
-      // Yahoo refusing: nothing more goes for the pause. Each row says its
+      // Yahoo refusing: nothing more goes for the pause. Each symbol's
       // update is overdue 90 s after its wait on Yahoo began: at once for
-      // those waiting at the refusal, and as each falls due after it.
+      // those waiting at the refusal, and as each falls due after it. Once
+      // every one is, the window's header says so once, and the rows in
+      // sight warn of nothing each (found by the design panel of 23
+      // October: every row said "No data"); the pill still warns.
       touch("YAHOO.refuse")
       var refusedAt = 0
       tick(70, 1, function() { if (!refusedAt && service.testYahooGate.pause === "refused") refusedAt = service.now })
       var firstWarnAt = 0
       var allWarnAt = 0
+      var saidOnce = ""
+      var overdue = function() {
+        return service.library.filter(function(s) {
+          return Figures.freshnessWarns(Figures.freshness(service.entries[s] || null, service.quotes[s] || null, service.now, service.owed[s] || 0))
+        }).length + (pill.warns ? 1 : 0)
+      }
       tick(170, 1, function() {
-        var count = warned().length
+        var count = overdue()
         if (!firstWarnAt && count > 0) firstWarnAt = service.now - refusedAt
-        if (!allWarnAt && count === service.library.length + 1) allWarnAt = service.now - refusedAt
+        if (!allWarnAt && count === service.library.length + 1) {
+          allWarnAt = service.now - refusedAt
+          var body = app.testBody
+          var rowsWarning = service.library.filter(function(s) {
+            var row = body.watchlist.rowItem(s)
+            return row && row.inSight && /^!/.test(row.detail)
+          })
+          saidOnce = body.headerText + " | " + rowsWarning.length + " rows in sight warn"
+        }
       })
-      harness.check("Yahoo refusing: nothing warns for 85 s, then the pill and every row say their update is overdue within 90 s of falling due",
-        refusedAt > 0 && firstWarnAt >= 85 && allWarnAt > 0 && allWarnAt <= 155,
-        "refused at " + (refusedAt - start) + " s; first warning " + firstWarnAt + " s after, all " + allWarnAt + " s after; " + warned().length + " warn now")
+      harness.check("Yahoo refusing: nothing warns for 85 s, then the pill and every symbol's update is overdue within 90 s of falling due, and the header says it once instead of every row",
+        refusedAt > 0 && firstWarnAt >= 85 && allWarnAt > 0 && allWarnAt <= 155 && saidOnce === "No prices from Yahoo · Stonks keeps trying | 0 rows in sight warn",
+        "refused at " + (refusedAt - start) + " s; first warning " + firstWarnAt + " s after, all " + allWarnAt + " s after; " + overdue() + " overdue now; " + saidOnce)
       remove("YAHOO.refuse")
       // The pause has doubled twice by now: the next probe is up to five
       // minutes away, and its answer reopens Yahoo.
