@@ -426,6 +426,13 @@ ShellRoot {
       service.now = harness.night
 
       featureShown("SILK")
+      // SILK's quote came from the list's spark run, with closes only: the
+      // hero's chart is asked for as it is featured, and its stray buckets
+      // are dropped as it lands. SILK's day is read from here on once that
+      // chart is in: read before, the preview below could read the day on
+      // the other side of its landing (127 prints, then 126, in a busy run
+      // of 23 October).
+      var silkCharted = within(3000, function() { return !service.quotes.SILK.closesOnly })
       harness.check("SILK's last print, at 22:20, is forty minutes old", harness.strip() === "OVERNIGHT 22:20 342.13 +0.04%",
         harness.strip())
       // SILK traded in 13 of the night's 35 five-minute slots so far: its 1D
@@ -443,9 +450,10 @@ ShellRoot {
         return g.dot === (p.t >= harness.midnight.thu1 + 20 * 3600) && (!g.dot || (g.brk && Math.abs(g.x - (p.t - dayStart) / 86400) < 1e-9))
       })
       harness.check("SILK's thin night: Thursday's day from 04:00, then its 13 trades as dots by the clock to 04:00; NEST's night, traded through, stays midnight to midnight",
-        silkNight.start === dayStart && silkNight.end === harness.midnight.fri2 + 4 * 3600 && silkDots.length === 13 && dotsByClock
+        silkCharted && silkNight.start === dayStart && silkNight.end === harness.midnight.fri2 + 4 * 3600 && silkDots.length === 13 && dotsByClock
           && geometry.start === harness.midnight.thu1 && geometry.end === harness.midnight.fri2,
-        silkNight.start + " to " + silkNight.end + ", " + silkDots.length + " dots, by the clock " + dotsByClock + " | NEST " + geometry.start + " to " + geometry.end)
+        "charted " + silkCharted + ", " + silkNight.start + " to " + silkNight.end + ", " + silkDots.length + " dots, by the clock " + dotsByClock
+          + " | NEST " + geometry.start + " to " + geometry.end)
       featureShown("REED")
       var reed = body.featuredGeometry
       harness.check("REED has not traded tonight: no overnight line, its after-hours stays, and its chart is Thursday's day, its night empty",

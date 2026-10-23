@@ -820,8 +820,13 @@ ShellRoot {
       keys.forceActiveFocus()
       keyClick(Qt.Key_A)
       wait(50)
+      var askedFirst = harness.calls("SEARCH.asked")
       harness.find(body.search, "searchField").text = "SH"
-      var searched = within(2000, function() { return body.search.activeQuery === "SH" })
+      // Out once the fake curl has counted it, before its pause: activeQuery
+      // is set before curl starts, and a count read on it alone could miss
+      // the first search and count it as the second (on a busy machine, 23
+      // October).
+      var searched = within(2000, function() { return body.search.activeQuery === "SH" && harness.calls("SEARCH.asked") === askedFirst + 1 })
       var askedBefore = harness.calls("SEARCH.asked")
       var answeredBefore = harness.calls("SEARCH.answered")
       app.close()
