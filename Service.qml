@@ -21,6 +21,14 @@ Item {
   // read, and changes still apply to them, but nothing is written until the
   // file reads again, so a typo in it never costs the user's lists.
   property bool settingsUnreadable: false
+  // A save of the data file didn't land: Quickshell said so, or the file,
+  // read back, still held what it did before (`takesRead`). The settings in
+  // memory stay ahead of the file, and the next save, a change's or the
+  // footer's try again (`saveAgain`), writes them all.
+  property bool saveFailed: false
+  // Each read-back that judged a save, saved or not: the footer that asked
+  // to try again says when it still didn't.
+  signal saveChecked(bool saved)
   property int now: Math.floor(Date.now() / 1000)
   // A symbol whose fundamentals were asked for before its first quote.
   property string pendingFundamentals: ""
@@ -392,11 +400,12 @@ Item {
     blockWrites: true
     printErrors: false
     onFileChanged: root.readDataFile()
-    onLoaded: root.dataReadEnded(root.takeLoadedSettings)
+    onLoaded: root.dataReadEnded(root.takesRead(dataFile.text()) ? root.takeLoadedSettings : null)
     // Only a file that isn't there is missing: one there that can't be
     // read, for its permissions or as a folder, is never written over.
     onLoadFailed: function(error) {
-      root.dataReadEnded(error === FileViewError.FileNotFound ? root.takeMissingFile : root.takeUnreadableFile)
+      if (!root.takesRead(null)) root.dataReadEnded(null)
+      else root.dataReadEnded(error === FileViewError.FileNotFound ? root.takeMissingFile : root.takeUnreadableFile)
     }
     // A write drops a read in flight unheard: neither loaded nor failed.
     // Written, the file is its owner's alone (`files`).
@@ -435,6 +444,30 @@ Item {
     root.dataChangedMeanwhile = false
     if (take) take()
     if (again) Qt.callLater(root.startDataRead)
+  }
+
+  // A save awaiting its read-back: each text the file may still hold if
+  // Stonks' last write was lost, what it held before the first write not
+  // yet read back and every write since, as keys; null when none awaits.
+  // And what Stonks wrote last. Quickshell 0.3.2 reports a write done when
+  // a full disk fails its commit (fileview.cpp, FileViewWriter::write), so
+  // only a read tells.
+  property var staleTexts: null
+  property string dataWritten: ""
+  // Whether a read of the data file is taken. While a save awaits its
+  // read-back, a file holding an earlier text, or none that reads, says
+  // the last save was lost: the read is not taken, so the changes in memory
+  // stay. What Stonks wrote last ends the wait, and so does any other
+  // text, a save from elsewhere, which wins as ever.
+  function takesRead(text) {
+    if (root.staleTexts === null) return true
+    var lost = text === null || (text !== root.dataWritten && root.staleTexts[text] === true)
+    if (lost && !root.saveFailed)
+      console.warn("stonks: " + root.dataPath + " didn't take the save; keeping the changes until one lands")
+    root.saveFailed = lost
+    if (!lost) root.staleTexts = null
+    root.saveChecked(!lost)
+    return !lost
   }
 
   Gate {
@@ -1014,14 +1047,26 @@ Item {
     root.adopt(Settings.fileSettings(null))
   }
 
-  // `settings` as `Settings.fileSettings` returns them.
+  // `settings` as `Settings.fileSettings` returns them, read back once
+  // written (`takesRead`). The read also hands Quickshell the file's text,
+  // which it compares a write with: after a lost save it would skip the
+  // same text unheard. It starts once the handler that wrote has returned,
+  // as a read's own (`takeMissingFile`) may: Quickshell 0.3.2 forgets a
+  // read started inside a read's handlers (fileview.cpp, operationFinished).
   function writeDataFile(settings) {
     var body = JSON.stringify(settings, null, 2) + "\n"
     if (typeof dataFile.setText !== "function") {
       console.warn("stonks: cannot write " + root.dataPath)
       return
     }
+    var before = dataFile.text()
+    if (body === before && root.staleTexts === null) return
+    if (root.staleTexts === null) root.staleTexts = {}
+    else root.staleTexts[root.dataWritten] = true
+    root.staleTexts[before] = true
+    root.dataWritten = body
     dataFile.setText(body)
+    Qt.callLater(root.readDataFile)
   }
 
   // Saved at once, or with `settles`, once the change has rested
@@ -1053,6 +1098,11 @@ Item {
   }
   function writeSettled() {
     if (root.pluginsReady && !root.settingsUnreadable) root.writeDataFile(root.dataSettings)
+  }
+  // The footer's try again: the settings in memory, written whole.
+  function saveAgain() {
+    settleWrite.stop()
+    root.writeSettled()
   }
   Component.onDestruction: if (settleWrite.running) root.writeSettled()
 

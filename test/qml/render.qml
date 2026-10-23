@@ -283,6 +283,9 @@ ShellRoot {
     id: stub
     property var symbols: ["AAPL", "SHOP.TO"]
     property bool settingsUnreadable: false
+    // A save that didn't land (popup-notice-save-*), said again after a
+    // click that still didn't (popup-notice-save-again-*).
+    readonly property bool saveFailed: root.stateName.indexOf("popup-notice-save-") === 0
     // A refresh the reader asked for, out (popup-refreshing-*).
     readonly property bool refreshing: root.stateName.indexOf("popup-refreshing-") === 0
     // Sounds on, their default, so the header's speaker shows its waves;
@@ -831,6 +834,8 @@ ShellRoot {
       stub.settingsUnreadable = true
     } else if (root.stateName.indexOf("popup-notice-update-") === 0) {
       updates.newVersion = "1.0.0"
+    } else if (root.stateName.indexOf("popup-notice-save-again-") === 0) {
+      body.note = "Still not saved · your disk may be full"
     } else if (root.stateName.indexOf("popup-update-note-") === 0) {
       // A newer Stonks, said as the popup opens.
       updates.releasedVersion = "1.0.10"

@@ -9,11 +9,12 @@ import "Tones.js" as Tones
 // removal took, with what a click does about it (`noteAction`), said whole
 // so a long list name is what gets cut. It stays while the pointer is on
 // it (`hovered`). Until what it says is fixed, a notice, in the foreground
-// too, under any note, whose click is the surface's (`acts`). A hint for the
-// visit is a quiet line of its own above the bar, which it never replaces,
-// and takes no click; the surface can have it give way (`showsHint`). It is
-// painted in its surface's ground, so riding a growing edge it covers the
-// rows it passes.
+// too, under any note, whose click is the surface's (`acts`), its action
+// said whole as a note's is (`noticeAction`). A hint for the visit is a
+// quiet line of its own above the bar, which it never replaces, and takes
+// no click; the surface can have it give way (`showsHint`). It is painted in
+// its surface's ground, so riding a growing edge it covers the rows it
+// passes.
 Item {
   id: root
 
@@ -28,6 +29,10 @@ Item {
   property string note: ""
   property string noteAction: ""
   property string notice: ""
+  property string noticeAction: ""
+  // The notice in fewer words, shown whole where the notice won't fit:
+  // a notice cut mid-word reads as broken. "" when it has no shorter form.
+  property string noticeShort: ""
   property string hint: ""
   // Whether the hint shows. Its room (`hintRoom`) is measured either way,
   // so the surface can judge whether it fits without reading it back.
@@ -115,14 +120,27 @@ Item {
     Row {
       anchors.centerIn: parent
 
+      // The notice whole, measured, never shown: where it doesn't fit beside
+      // its action, its short form shows (`noticeShort`).
       Text {
+        id: fullNotice
+        visible: false
+        textFormat: Text.PlainText
+        text: root.notice
+        font: footerWords.font
+      }
+      Text {
+        id: footerWords
         objectName: "footerText"
-        width: Math.min(implicitWidth, root.width - root.gutter - Style.space(20) - (noteAction.visible ? noteAction.implicitWidth : 0))
+        readonly property real room: root.width - root.gutter - Style.space(20) - (noteAction.visible ? noteAction.implicitWidth : 0)
+        width: Math.min(implicitWidth, room)
         elide: Text.ElideRight
         // Cut short, it ends against its action, not a gap's width away.
         horizontalAlignment: Text.AlignRight
         textFormat: Text.PlainText
-        text: root.note !== "" ? root.note : root.notice !== "" ? root.notice : root.label
+        text: root.note !== "" ? root.note
+          : root.notice !== "" ? (root.noticeShort !== "" && fullNotice.implicitWidth > room ? root.noticeShort : root.notice)
+          : root.label
         color: root.note !== "" || root.notice !== "" ? root.foreground : root.dim
         opacity: root.note !== "" ? root.noteOpacity : root.coveredOpacity
         font.family: root.fontFamily
@@ -132,11 +150,11 @@ Item {
       Text {
         id: noteAction
         objectName: "footerAction"
-        visible: root.note !== "" && root.noteAction !== ""
+        visible: text !== ""
         textFormat: Text.PlainText
-        text: root.noteAction
+        text: root.note !== "" ? root.noteAction : root.notice !== "" ? root.noticeAction : ""
         color: root.foreground
-        opacity: root.noteOpacity
+        opacity: root.note !== "" ? root.noteOpacity : root.coveredOpacity
         font.family: root.fontFamily
         font.pixelSize: Style.font.bodySmall
       }

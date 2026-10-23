@@ -68,7 +68,7 @@ ShellRoot {
   readonly property string dataPath: Quickshell.env("HOME") + "/.config/omarchy/grvc.stonks.json"
   readonly property string manifestPath: String(Qt.resolvedUrl("plugin/manifest.json")).replace(/^file:\/\//, "")
   readonly property string fakeState: Quickshell.env("STONKS_FAKE_STATE")
-  readonly property string fileNotice: "Can't read grvc.stonks.json · fix or remove it to save changes"
+  readonly property string fileNotice: "Couldn't load your lists"
   // A fresh view per read: a FileView that has loaded once can return its
   // old text.
   function readFile(path) {
