@@ -381,7 +381,8 @@ The shell's log the form asks for can name the prices Stonks left out.
   `~/.config/omarchy/shell.json`.
 - **Limits:** every request has a time limit and a size cap. Quotes come
   up to 20 listings to a request, so a long list refreshes in a few
-  requests a minute, and overnight prices up to 25. Stonks fetches each
+  requests a minute, and overnight prices up to 25 for a whole day and 75
+  for the last hour. Stonks fetches each
   listing only as often as its market can move, and leaves a site that
   refuses it alone for a while, as long as it asks up to half an hour. A
   window no screen shows, on another workspace or a screen switched off,
@@ -391,7 +392,9 @@ The shell's log the form asks for can name the prices Stonks left out.
   the pill once each time the shell starts, as its first price comes in; for
   the rest when the popup or window first opens, and for each one you add;
   and, while one is open, every 5 minutes through a night that trades;
-  and when you press `r`, for the stock on the chart.
+  and when you press `r`, for the stock on the chart. It asks for the last
+  hour of prices when it has prices from the last half hour, and for a
+  whole day otherwise.
 - **Updates:** never by itself. When a newer version is out, the footer
   says so for 5 seconds.
 

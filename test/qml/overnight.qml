@@ -310,10 +310,12 @@ ShellRoot {
       var sundayCalls = Number(harness.record("OVERNIGHT.calls"))
       service.now = harness.sunday + 5 * 60
       within(2000, function() { return Number(harness.record("OVERNIGHT.calls")) > sundayCalls })
-      harness.check("while a night trades, the open surface asks every five minutes, for a day",
-        Number(calls) + 1 === sundayCalls && Number(harness.record("OVERNIGHT.calls")) === sundayCalls + 1 && lastSpan() === "day"
-          && body.featuredGeometry.start === harness.midnight.fri25,
-        calls + ", " + sundayCalls + ", " + harness.record("OVERNIGHT.calls") + " " + lastSpan())
+      // Each refresh after the first asks only for the last hour, which
+      // joins on to the day in hand: the chart stays whole.
+      harness.check("while a night trades, the open surface asks every five minutes, for the last hour only",
+        Number(calls) + 1 === sundayCalls && Number(harness.record("OVERNIGHT.calls")) === sundayCalls + 1 && lastSpan() === "hour"
+          && within(2000, function() { return body.featuredGeometry.start === harness.midnight.fri25 && harness.strip() === "OVERNIGHT 22:20 234.84 \u22121.05%" }),
+        calls + ", " + sundayCalls + ", " + harness.record("OVERNIGHT.calls") + " " + lastSpan() + " | " + harness.strip())
 
       // Monday 04:11, the night's last bars due, and Robinhood down: the
       // last good prints stay, and once it is back, the open surface asks

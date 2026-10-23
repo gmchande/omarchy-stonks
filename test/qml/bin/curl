@@ -61,8 +61,9 @@
 # than 75 symbols in one request answer 400, as Robinhood does ("No more than
 # 75 allowed"). While STONKS_FAKE_STATE/overnight.set names a moment's folder
 # of test/fixtures/moments (weekend, sunday, monday, night, live-2026-10-05),
-# or several, the first with the file answering, its saved Robinhood answer
-# for that span answers, results in the order asked, LONG<n> with NEST's
+# or several, the first with the file answering, its saved Robinhood day
+# answers, results in the order asked, and span=hour with each listing's
+# last 12 slots of it, LONG<n> with NEST's
 # prints under its own name, its saved days answer for their symbols, and
 # its saved 1M and 3M histories (<symbol>-1m.json, <symbol>-3m.json) for theirs;
 # otherwise Robinhood answers every symbol empty, as it does one it does not
@@ -243,10 +244,12 @@ serve() {
     fi
     set_name="$(cat "$STONKS_FAKE_STATE/overnight.set" 2>/dev/null)"
     if [ -n "$set_name" ]; then
-      jq -c --arg asked "$asked" '($asked | split(",")) as $want
+      jq -c --arg asked "$asked" --arg span "$span" '($asked | split(",")) as $want
         | { results: [$want[] as $s | (($s | if test("^LONG[0-9]+$") then "NEST" else . end) as $from
-          | [.results[] | select(.symbol == $from)][0] | if . then .symbol = $s else { symbol: "", historicals: [] } end)] }' \
-        "$(in_moment "robinhood-$span.json")"
+          | [.results[] | select(.symbol == $from)][0] | if . then .symbol = $s | .span = $span
+            | if $span == "hour" then .historicals |= .[-12:] else . end
+          else { symbol: "", historicals: [] } end)] }' \
+        "$(in_moment robinhood-day.json)"
     else
       jq -nc --arg asked "$asked" '{ results: [($asked | split(","))[] | { symbol: "", historicals: [] }] }'
     fi
