@@ -258,24 +258,26 @@ Item {
   // The output kept awake (`keepingAwake`): a stream of silence, PipeWire's
   // pw-cat reading zeros, which holds the speakers or headphones open as a
   // sound playing does, and nothing while sounds are off or no chart has
-  // been scrubbed for 1 s. Its start may wake the output, as a sound's does.
-  // A pw-cat that ends while it's wanted, as when PipeWire restarts, starts
-  // again 2 s later.
+  // been scrubbed for 1 s. Its start may wake the output, as a sound's does,
+  // and the output counts as awake only while it runs: stopped, for 4 s
+  // more; ended on its own while it's wanted, as when PipeWire restarts, not
+  // at all, since the output may have gone with it. Then it starts again
+  // 2 s later.
   Timer { id: afterScrub; interval: 1000 }
-  onKeepingAwakeChanged: {
-    if (keepingAwake) {
-      starting()
-      asleepAfter = Infinity
-    } else {
-      asleepAfter = Date.now() + 4000
-    }
-    silence.running = keepingAwake
-  }
+  onKeepingAwakeChanged: silence.running = keepingAwake
   Process {
     id: silence
     command: ["pw-cat", "--playback", "--raw", "--rate", "24000", "--channels", "1", "--format", "s16",
       "--media-role", "Notification", "/dev/zero"]
-    onExited: if (root.keepingAwake) silenceAgain.restart()
+    onRunningChanged: {
+      if (!running) return
+      root.starting()
+      root.asleepAfter = Infinity
+    }
+    onExited: {
+      root.asleepAfter = Date.now() + (root.keepingAwake ? 0 : 4000)
+      if (root.keepingAwake) silenceAgain.restart()
+    }
   }
   Timer {
     id: silenceAgain

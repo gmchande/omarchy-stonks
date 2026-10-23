@@ -573,8 +573,10 @@ Item {
   onOnScreenChanged: if (service) service.surfaceShown(root, surfaceOpen && onScreen)
   onServiceChanged: if (service && surfaceOpen && onScreen) service.surfaceShown(root, true)
   // The chart scrubbed, by the pointer on it or by keys, where a screen
-  // shows it: the sounds keep the output awake meanwhile, for its chimes.
-  readonly property bool scrubbing: surfaceOpen && onScreen && motion.scrubT !== 0
+  // shows it, and not while every screen is off, which the popup's own
+  // `onScreen` doesn't follow: the sounds keep the output awake meanwhile,
+  // for its chimes.
+  readonly property bool scrubbing: surfaceOpen && onScreen && !(service && service.screensOff) && motion.scrubT !== 0
   onScrubbingChanged: if (sounds) sounds.scrubbing(root, scrubbing)
   // A surface taken down mid-replay, as a rebuilt bar or a removed screen
   // takes its popup, stops its replay's sound with it, and its scrub's

@@ -1037,6 +1037,13 @@ ShellRoot {
       tryVerify(function() { return !fileProc.running }, 2000)
       tryVerify(function() { return silence().running }, 5000)
       var backAfterExit = silence().running && silence().starts === startsBefore + 2
+      // The output may have gone with the stream: the chime struck as it
+      // comes back opens with the lead-in.
+      var backAt = Number(silence().last.split(" ")[1])
+      chimesNow = harness.chimes().length
+      keyClick(Qt.Key_Left)
+      tryVerify(function() { return harness.chimes().length > chimesNow }, 2000)
+      var afterExit = harness.chimes()[harness.chimes().length - 1]
       service.persist({ sounds: false })
       tryVerify(function() { return !silence().running }, 3000)
       var offRests = !silence().running
@@ -1051,8 +1058,9 @@ ShellRoot {
 
       // A sound that may wake the output opens with 150 ms of silence, then
       // the sound whole: a scrub's chimes in the moment it wakes the output
-      // after a quiet spell, and a sound after one, the shutter here. A
-      // chime once the output is awake plays at once.
+      // after a quiet spell or as its stream comes back from ending on its
+      // own, and a sound after a quiet spell, the shutter here. A chime once
+      // the output is awake plays at once.
       var leadsInto = function(start, plain) {
         var a = new Uint8Array(harness.readBytes(harness.fakeState + "/pw-play." + start.n + ".wav"))
         var b = new Uint8Array(harness.readBytes(plain))
@@ -1072,9 +1080,10 @@ ShellRoot {
       })
       var shutterLed = harness.led(quietShutter) && played(quietShutter) === "sounds/" + sounds.voice + "/shutter.wav"
         && leadsInto(quietShutter, sounds.bundled(sounds.voice, "shutter"))
-      harness.check("after a quiet spell, a scrub's first chimes and the shutter open with 150 ms of silence, then the sound whole; a chime once the output is awake plays at once",
-        chimesLed && shutterLed && !harness.led(awake),
-        [chimesLed, shutterLed, !harness.led(awake), waking.map(function(c) { return c.file.replace(/^.*\//, "") }).join(" "), quietShutter.file].join(" | "))
+      harness.check("after a quiet spell, a scrub's first chimes and the shutter open with 150 ms of silence, then the sound whole, and so does a chime as the stream comes back from ending on its own; a chime once the output is awake plays at once",
+        chimesLed && shutterLed && harness.led(afterExit) && !harness.led(awake),
+        [chimesLed, shutterLed, harness.led(afterExit) + " " + (afterExit.ms - backAt) + " ms after the stream came back", !harness.led(awake),
+          waking.map(function(c) { return c.file.replace(/^.*\//, "") }).join(" "), quietShutter.file].join(" | "))
 
       // The market's bell, in retro's voice: as the clock passes the open
       // or the close of the market of the stock last looked at, once, a
