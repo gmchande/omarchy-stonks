@@ -12,7 +12,7 @@ the chart, with their dates.
 - `range-wheel`: a wheel notch over the row steps one range, up to the shorter.
 - `range-kept`: the range is saved at once and the popup opens on it again.
 - `range-lines`: the first line is the range's (on 1D the day's: low, high, OPEN, VOL; on a longer range its low, high, START, VOL); the second is the past 52 weeks' (low, high, MKT CAP, P/E).
-- `range-marks`: on a longer range, the high and the low with their dates, marked on the chart.
+- `range-marks`: on a longer range, the high and the low with their dates, marked on the chart; while the scrub's line crosses a mark's date, the date stands clear of it and the mark stays.
 - `range-caption`: the caption under the change names the range, or says "SINCE …" for a younger stock.
 
 ## How to get to it (user POV)
@@ -31,8 +31,9 @@ range (1D).
 - **Every range by key.** Press `]` until the range stops changing. After each, the data file's `range` is the new one; the shot and the words of `changeCaption`, `periodLine`, `yearLine`, `highMark`, and `lowMark` are kept for it (`02-1W` … `11-All`). `]` on the last changes nothing.
 - **Back.** `[` steps one range shorter. Shot `13-10Y`.
 - **Click.** Click `rangeOption` "1D", then "1Y". The data file follows each. Shots `14-click-1D`, `14-click-1Y`.
-- **Wheel.** One notch up over "1Y" picks a shorter range. Shot `15-wheel-…`.
-- **Kept.** Esc closes the popup; the pill opens it again on the same range, and the caption names it. Shot `16-reopened-…`.
+- **Marks under the scrub.** On 1Y, the pointer over the middle of each mark's `markDate`, the upper one the high's: `highMark` or `lowMark` stays shown, and its `markDate` now stands clear of the pointer's x. Shots `15-scrub-highMark`, `15-scrub-lowMark`.
+- **Wheel.** One notch up over "1Y" picks a shorter range. Shot `16-wheel-…`.
+- **Kept.** Esc closes the popup; the pill opens it again on the same range, and the caption names it. Shot `17-reopened-…`.
 
 ## Gotchas
 
