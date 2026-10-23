@@ -349,6 +349,16 @@ Item {
   readonly property var featuredDay: motion.day
   readonly property var featuredFreshness: Figures.freshness(entryOf(chartSymbol || featuredSymbol), featuredQuote, now,
     owed[chartSymbol || featuredSymbol] || 0, !!asking[chartSymbol || featuredSymbol])
+  // Yahoo is sending nothing for any listing: every symbol in All has a
+  // failed or overdue refresh. The header says so once, naming Yahoo, and
+  // the hero and the rows say what they have, with no warning each
+  // (`Figures.quietFreshness`). Found by the design panel of 23 October:
+  // with Yahoo failing, every row said "No data for this symbol", as if
+  // each stock had stopped existing.
+  readonly property bool yahooDown: lists.length > 0 && lists[0].symbols.length > 0 && lists[0].symbols.every(function(symbol) {
+    return Figures.freshnessWarns(Figures.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0, !!asking[symbol]))
+  })
+  readonly property string yahooDownText: "No prices from Yahoo · Stonks keeps trying"
   readonly property var featuredGeometry: motion.geometry
   readonly property real scrubX: motion.scrubX
   readonly property bool dayScrubbed: !historyActive && scrubShown !== 0
@@ -422,6 +432,9 @@ Item {
   readonly property string loadingText: "Loading" + (featuredSymbol ? " " + featuredSymbol + (range !== "1D" ? " " + range : "") : "")
   readonly property string headerText: {
     if (!service) return headerWhenMissing
+    // Yahoo is sending nothing for any listing, said once, unless a scrub
+    // reads a moment or a refresh you asked for is out.
+    if (yahooDown && !scrubShown && !refreshing) return yahooDownText
     // The chart asked for is on its way, named: what was on show stays.
     // Before any chart has been in, the empty hero's label names it alone,
     // in the one place a reader looks (`HeroBand`).
@@ -444,7 +457,8 @@ Item {
   readonly property var marketSays: featuredQuote ? [dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars,
     Overnight.nightTrades(featuredQuote, !!chart && chart.allDay, now, calendars)] : null
   readonly property string marketText: marketSays ? Market.marketStatus.apply(null, marketSays) : ""
-  readonly property string headerShortText: marketSays && headerText === marketText ? Market.shortMarketStatus.apply(null, marketSays) : ""
+  readonly property string headerShortText: headerText === yahooDownText ? "No prices from Yahoo"
+    : marketSays && headerText === marketText ? Market.shortMarketStatus.apply(null, marketSays) : ""
   // Everything but the rows: margins, header, band, and footer, with the
   // band, the rows, and the footer each one group's gap under what is above.
   readonly property int chromeHeight: chartFitsSurface ? chromeBesideChart + shownChartHeight
@@ -1318,7 +1332,7 @@ Item {
     anchors.topMargin: root.groupGap
     bandGap: root.bandGap
     visible: !root.showingHelp
-    freshness: root.featuredFreshness
+    freshness: root.yahooDown ? Figures.quietFreshness(root.featuredFreshness) : root.featuredFreshness
     retro: root.retro
     changeMode: root.changeMode
     scrubbing: root.scrubT !== 0
@@ -1410,6 +1424,7 @@ Item {
     rowGap: root.rowGap
     gutter: root.gutter
     surfaceOpen: root.surfaceOpen
+    sourceDown: root.yahooDown
     // A turn later: the change that arranged the rows is still being told.
     onArranged: Qt.callLater(root.land)
     onSettlingChanged: Qt.callLater(root.featureLanding)

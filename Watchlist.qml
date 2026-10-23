@@ -58,6 +58,9 @@ Flickable {
   // starts above it leaves out its words (`WatchlistRow.wordsShown`). 0
   // while the menu is shut.
   property real menuCovers: 0
+  // Yahoo is sending nothing for any listing, said once by the surface: the
+  // rows say what they have, with no warning each (`WatchlistRow`).
+  property bool sourceDown: false
 
   property string cursorSymbol: ""
   // The row the wheel scrolled, or a removal slid (`handTo`), under a still
@@ -911,6 +914,7 @@ Flickable {
         status: root.entryOf(symbol) ? root.entryOf(symbol).status : "loading"
         // Freshness reads the clock every second: only rows in sight do.
         freshness: place >= 0 && inSight ? root.freshnessOf(symbol) : null
+        sourceDown: root.sourceDown
         featuredRow: symbol === root.featuredSymbol
         cursor: symbol === root.cursorRow
         // A cursor of your own, not the resting one nor one the wheel

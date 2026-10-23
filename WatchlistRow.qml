@@ -87,15 +87,19 @@ Rectangle {
   // What the feed has done for this symbol, from Figures.freshness. A failed
   // or overdue refresh is said in words on the name line, so it reads
   // without hover and without color; an aged quote during trading, or one
-  // kept from an earlier session, says when it is from.
+  // kept from an earlier session, says when it is from. Where Yahoo sends
+  // nothing for any listing (`sourceDown`), the surface says so once: the
+  // row says only when its price is from, or, with none, nothing.
   property var freshness: null
-  readonly property bool warns: Figures.freshnessWarns(freshness)
-  readonly property string freshnessNote: quote ? Figures.freshnessText(freshness, quote, calendars) : ""
+  property bool sourceDown: false
+  readonly property var shownFreshness: sourceDown ? Figures.quietFreshness(freshness) : freshness
+  readonly property bool warns: Figures.freshnessWarns(shownFreshness)
+  readonly property string freshnessNote: quote ? Figures.freshnessText(shownFreshness, quote, calendars) : ""
   // An aged quote is said plainly; only a failed or overdue refresh warns.
   // The hero says the same on its listing line.
   readonly property string detail: quote
     ? (freshnessNote !== "" ? (warns ? "! " : "") + capitalize(freshnessNote) : view.name)
-    : (status === "failed" ? "! No data for this symbol" : warns ? "! No data" : "Loading…")
+    : sourceDown ? "" : (status === "failed" ? "! No data for this symbol" : warns ? "! No data" : "Loading…")
 
   // Sentence case, a day's name kept a name and a zone's its capitals:
   // "As of Fri 16:00", "As of Thu 16:39 BST".

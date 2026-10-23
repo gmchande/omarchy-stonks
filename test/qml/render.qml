@@ -76,8 +76,8 @@ ShellRoot {
   // The smallest window App.qml allows.
   readonly property bool smallest: minWindow || minWindowOf || (!!w22 && w22.min)
   // loading and failed: a cold start, the first quotes out or failed, in
-  // retro, or in smooth with -smooth.
-  readonly property string coldState: (/^(loading|failed)(?:-smooth)?$/.exec(stateName) || ["", ""])[1]
+  // retro, or in smooth with -smooth; in the popup with popup- before.
+  readonly property string coldState: (/^(?:popup-)?(loading|failed)(?:-smooth)?$/.exec(stateName) || ["", ""])[1]
   // The popup while adding, and the window at the size App.qml permits.
   readonly property bool searchState: stateName.indexOf("-search") >= 0
   readonly property bool minWindow: stateName.indexOf("min-window-") === 0

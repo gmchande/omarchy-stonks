@@ -35,6 +35,13 @@ function currencyLabel(code) {
   return code === "GBp" ? "PENCE" : code
 }
 
+// A freshness whose warning is said once for every listing, where Yahoo
+// sends nothing for any (`StonksBody.yahooDown`): a failed or overdue
+// refresh reads as an aged quote, which says only when its price is from.
+function quietFreshness(fresh) {
+  return freshnessWarns(fresh) ? Object.assign({}, fresh, { state: "aged" }) : fresh
+}
+
 // Freshness is three separate facts, kept separate: the time the headline
 // quote stands for, whether a refresh was asked for and has had no answer,
 // and whether the last one failed. The policy is presentation, not a claim
