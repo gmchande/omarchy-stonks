@@ -60,12 +60,19 @@ test("parseChart keeps the fields the panel needs", () => {
   expect(M.parseChart(fixture("nest-2026-09-11-day-prepost.json")).name).toBe("Nest Holdings Inc")
 })
 
-test("the listing line names a pair's currency once", () => {
+test("the listing line names a pair's currency once, and pence as pence", () => {
   // Yahoo names the pair with its currency: "BITCOIN USD · CRYPTO", not "· USD" again.
   expect(btc.name).toBe("Bitcoin USD")
   expect(M.listingMeta(btc)).toBe("CRYPTO")
   expect(M.listingMeta(quote)).toBe("NASDAQ · USD")
   expect(M.listingMeta(shop)).toBe("TSX · CAD")
+  // London quotes in pence, which Yahoo calls GBp: in the hero's capitals,
+  // or read fast, that is GBP, and 3,648.00 read as pounds. Found by the
+  // design panel of 23 October.
+  const london = M.parseChart(fixture("shel-l-day.json"))
+  expect(london.currency).toBe("GBp")
+  expect(M.listingMeta(london)).toBe("LSE · PENCE")
+  expect(M.currencyLabel("GBp")).toBe("PENCE")
 })
 
 test("parseChart drops a null close, even on the newest bar the stray filter never judges", () => {

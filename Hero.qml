@@ -27,6 +27,12 @@ Item {
   property var day: null
   property var latest: null
   property var freshness: null
+  // Yahoo is sending nothing for any listing, said once by the header: the
+  // listing line says only when the price is from, with no warning, as the
+  // rows do (`Figures.quietFreshness`). A failed first answer still shows
+  // "—", not the "…" of one on its way.
+  property bool sourceDown: false
+  readonly property var shownFreshness: sourceDown ? Figures.quietFreshness(freshness) : freshness
   property bool retro: false
   // The change's unit and base, "pct", "abs", or "open": the line under the
   // price takes its unit (`Figures.extendedStack`).
@@ -46,7 +52,7 @@ Item {
   property string baselineText: ""
   property int priceSize: Style.font.displayLarge * 2
 
-  readonly property string freshnessText: quote ? Figures.freshnessText(freshness, quote, calendars) : ""
+  readonly property string freshnessText: quote ? Figures.freshnessText(shownFreshness, quote, calendars) : ""
   // The extended-hours print, on every range. A scrub's price is a past one,
   // so the print rests and the baseline's legend takes its place.
   readonly property var extended: quote && !scrubbing ? Figures.extendedStack(quote, latest, now, day, changeMode) : null
@@ -57,13 +63,13 @@ Item {
       // Only a warning takes the mark; an aged quote is said plainly, as its
       // row says it.
       return (root.scrubbing || root.freshnessText === "" ? ""
-        : (Figures.freshnessWarns(root.freshness) ? "! " : "") + root.freshnessText + " · ")
+        : (Figures.freshnessWarns(root.shownFreshness) ? "! " : "") + root.freshnessText + " · ")
         + view.name.toUpperCase()
     }
     // A first fetch that failed: nothing was ever there to refresh, so it
     // says what the row says.
-    return freshness && freshness.state === "failed" ? "! NO DATA FOR THIS SYMBOL"
-      : freshness && freshness.state === "overdue" ? "! NO DATA" : ""
+    return shownFreshness && shownFreshness.state === "failed" ? "! NO DATA FOR THIS SYMBOL"
+      : shownFreshness && shownFreshness.state === "overdue" ? "! NO DATA" : ""
   }
   // The exchange and currency stay whole; the lead, the name last, gives
   // way to them. A name cut short no longer says the currency it ends with.
@@ -161,7 +167,7 @@ Item {
       anchors.baseline: symbolText.baseline
       textFormat: Text.PlainText
       text: root.listingLead
-      color: Figures.freshnessWarns(root.freshness) ? root.foreground : root.dim
+      color: Figures.freshnessWarns(root.shownFreshness) ? root.foreground : root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
       font.bold: true
