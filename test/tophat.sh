@@ -419,10 +419,11 @@ outputs_hidden() {
 
 # ---- old runs ---------------------------------------------------------------
 
-# A run folder is named DATE-TIME-COMMIT-KEY by start, or DATE-TIME-COMMIT by
-# the starts before the key. Nothing else in the base is one: the journeys'
-# evidence and the current-* links aren't.
-run_name_re='^[0-9]{8}-[0-9]{6}-[0-9a-f]{7}(-[0-9a-f]{6})?$'
+# A run folder is named DATE-TIME-COMMIT-KEY by start, which writes its
+# RUN_ID, the same name, to the folder's identity file first of all. Nothing
+# else in the base is one: the journeys' evidence and the current-* links
+# aren't, and a folder that merely has such a name isn't.
+run_name_re='^[0-9]{8}-[0-9]{6}-[0-9a-f]{7}-[0-9a-f]{6}$'
 
 # run_in_use DIR: a session still runs from DIR, or a current-* link names it.
 run_in_use() {
@@ -444,7 +445,7 @@ prune_runs() {
   for dir in "$base"/*/; do
     dir=${dir%/}
     name=${dir##*/}
-    [[ $name =~ $run_name_re ]] && [ -d "$dir" ] && [ ! -L "$dir" ] || continue
+    [[ $name =~ $run_name_re ]] && [ -d "$dir" ] && [ ! -L "$dir" ] && grep -qx "RUN_ID=$name" "$dir/identity" 2> /dev/null || continue
     [[ ${name:0:15} < $cutoff ]] || continue
     run_in_use "$dir" && continue
     rm -rf -- "$dir" && removed=$((removed + 1))
@@ -590,7 +591,7 @@ cmd_start() {
   id=$(date +%Y%m%d-%H%M%S)-${commit:0:7}-$key
   run=$base/$id
   [[ $run =~ ^[A-Za-z0-9/._-]+$ ]] || die "the run folder $run needs a plain path"
-  mkdir -p "$run" || die "cannot make $run"
+  mkdir -p "$run" && printf 'RUN_ID=%q\n' "$id" > "$run/identity" || die "cannot make $run"
   echo "run folder: $run"
   build_sandbox "$run" "$commit" && { [ -z "$slow" ] || write_slow_curl "$run" "$slow" "$curl"; } \
     && write_nested_lua "$run" && nested_lua_ok "$run/nested.lua" \
@@ -950,14 +951,23 @@ EOF
 hl.animation({ leaf = "a1", enabled = false })
 hl.config({ decoration = { rounding = 3 } })
 EOF
-  anim_loaded() {  # WANT DEFAULTS OWNER: what the loader hands over, in order, is WANT
+  # Settings it cannot filter, because they run elsewhere.
+  printf 'dofile("/dev/null")\nhl.animation({ leaf = "a2" })\n' > "$anim/owner-includes.lua"
+  anim_loaded() {  # WANT DEFAULTS OWNER: what the loader hands over, in order and in full, is WANT
     cat > "$anim/harness.lua" << EOF
 local real, seen = hl, {}
+local function show(value)
+  if type(value) ~= "table" then return tostring(value) end
+  local parts = {}
+  for key, inner in pairs(value) do parts[#parts + 1] = tostring(key) .. "=" .. show(inner) end
+  table.sort(parts)
+  return "{" .. table.concat(parts, ",") .. "}"
+end
 local function note(...) seen[#seen + 1] = table.concat({ ... }, " ") end
 _G.hl = {
-  curve = function(name) note("curve", name) end,
-  animation = function(t) note("animation", t.leaf, tostring(t.enabled)) end,
-  config = function(t) for key in pairs(t) do note("config", key) end end,
+  curve = function(name, options) note("curve", name, show(options)) end,
+  animation = function(options) note("animation", show(options)) end,
+  config = function(options) note("config", show(options)) end,
 }
 local ok = pcall(assert(loadfile("$loader")), "$2", "$3")
 _G.hl = real
@@ -967,14 +977,17 @@ if got ~= "$1" then error("got: " .. got) end
 EOF
     nested_lua_ok "$anim/harness.lua"
   }
-  anim_loaded "config animations;curve c1;animation a1 true;animation a1 false" "$anim/defaults.lua" "$anim/owner.lua" 2> /dev/null \
-    || miss "the loader should hand over the defaults' animations, then the owner's, and nothing else"
-  anim_loaded "config animations;curve c1;animation a1 true" "$anim/defaults.lua" "$anim/none.lua" 2> /dev/null \
+  local animations='config {animations={enabled=true}};curve c1 {points={1={1=0,2=0},2={1=1,2=1}},type=bezier};animation {bezier=c1,enabled=true,leaf=a1,speed=4}'
+  anim_loaded "$animations;animation {enabled=false,leaf=a1}" "$anim/defaults.lua" "$anim/owner.lua" 2> /dev/null \
+    || miss "the loader should hand over the defaults' animations, then the owner's, in full and nothing else"
+  anim_loaded "$animations" "$anim/defaults.lua" "$anim/none.lua" 2> /dev/null \
     || miss "an owner without a look'n'feel file should leave the defaults' animations"
+  anim_loaded "$animations;ERROR" "$anim/defaults.lua" "$anim/owner-includes.lua" 2> /dev/null \
+    || miss "a file that includes another should be an error, since its settings would bypass the filter"
   anim_loaded ERROR "$anim/none.lua" "$anim/owner.lua" 2> /dev/null \
     || miss "missing defaults should be an error, not the wrong motion"
-  anim_loaded "animation a1 true" "$anim/defaults.lua" "$anim/owner.lua" 2> /dev/null \
-    && miss "the loader's check should fail on a wrong expectation"
+  anim_loaded "${animations/speed=4/speed=5};animation {enabled=false,leaf=a1}" "$anim/defaults.lua" "$anim/owner.lua" 2> /dev/null \
+    && miss "the loader's check should fail on a wrong speed"
   # The installed Omarchy's own file loads, and gives animations and nothing else.
   cat > "$anim/real.lua" << EOF
 local real, kinds = hl, {}
@@ -1007,13 +1020,17 @@ EOF
   nested_lua_ok "$anim/wired.lua" || miss "the generated nested.lua should set the owner's animations"
 
   # Old runs: a run folder from before the last day goes, unless a session
-  # still uses it; nothing else in the base is touched, by name or by link.
-  local base_was=$base old=20200101-000000 fresh_name
+  # still uses it; nothing else in the base is touched, by name, by mark, or
+  # by link.
+  local base_was=$base old=20200101-000000 fresh_name n
   base=$tmp/prune
   fresh_name=$(date +%Y%m%d-%H%M%S)
-  mkdir -p "$base/$old-abcdef0-111111" "$base/$old-abcdef0-222222" "$base/$old-abcdef0-333333" \
-    "$base/$old-abcdef0-444444" "$base/$old-abcdef0-555555" "$base/$old-abcdef0-666666" \
-    "$base/$fresh_name-abcdef0-111111" "$base/journeys/$old" "$base/$old-notarun" "$base/$old-abcdef0" "$tmp/prune-victim"
+  # made NAME: a folder as start makes it.
+  made() { mkdir -p "$base/$1" && echo "RUN_ID=$1" > "$base/$1/identity"; }
+  for n in 111111 222222 333333 444444 555555; do made "$old-abcdef0-$n"; done
+  made "$fresh_name-abcdef0-111111"
+  mkdir -p "$base/journeys/$old" "$base/$old-notarun" "$base/$old-abcdef0-666666" "$base/$old-abcdef0-888888" "$tmp/prune-victim"
+  echo "RUN_ID=another" > "$base/$old-abcdef0-888888/identity"
   : > "$tmp/prune-victim/file"
   ln -s "$tmp/prune-victim" "$base/$old-abcdef0-777777"
   ln -sfn "$base/$old-abcdef0-222222" "$base/current-aaaaaa"
@@ -1026,13 +1043,13 @@ EOF
   [ -e "$base/$old-abcdef0-111111" ] && miss "an old run folder nothing uses should be removed"
   [ -e "$base/$old-abcdef0-444444" ] && miss "an old run whose session has gone should be removed"
   [ -e "$base/$old-abcdef0-555555" ] && miss "an old run whose recorded leader's process number was reused should be removed"
-  [ -e "$base/$old-abcdef0-666666" ] && miss "an old run folder with nothing in it should be removed"
-  [ -e "$base/$old-abcdef0" ] && miss "an old run folder named before runs had keys should be removed"
   [ -d "$base/$old-abcdef0-222222" ] || miss "the run a current-* link names was removed"
   [ -d "$base/$old-abcdef0-333333" ] || miss "an old run whose session still runs was removed"
   [ -d "$base/$fresh_name-abcdef0-111111" ] || miss "a run from the last day was removed"
   [ -d "$base/journeys/$old" ] || miss "the journeys' evidence was removed"
   [ -d "$base/$old-notarun" ] || miss "a folder whose name is not a run's was removed"
+  [ -d "$base/$old-abcdef0-666666" ] || miss "a folder with a run's name that start never marked was removed"
+  [ -d "$base/$old-abcdef0-888888" ] || miss "a folder marked with another run's name was removed"
   [ -L "$base/$old-abcdef0-777777" ] && [ -e "$tmp/prune-victim/file" ] || miss "pruning touched a link in the base, or what it names"
   base=$base_was
 

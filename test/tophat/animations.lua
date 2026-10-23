@@ -18,7 +18,8 @@ local only_animations = setmetatable({
     if settings.animations then hl.config({ animations = settings.animations }) end
   end,
 }, { __index = function() return function() end end })
-local env = setmetatable({ hl = only_animations }, { __index = _G })
+local function include() error("a look'n'feel file that includes another can't be filtered to its animations") end
+local env = setmetatable({ hl = only_animations, dofile = include, loadfile = include, require = include }, { __index = _G })
 
 local function run(path, required)
   local file = io.open(path, "r")
