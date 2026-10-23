@@ -12,6 +12,8 @@ Item {
   id: root
 
   property var freshness: null
+  // Yahoo is sending nothing for any listing (`Hero.sourceDown`).
+  property bool sourceDown: false
   property bool retro: false
   property string changeMode: "pct"
   property bool scrubbing: false
@@ -124,6 +126,7 @@ Item {
       day: root.day
       latest: root.latest
       freshness: root.freshness
+      sourceDown: root.sourceDown
       retro: root.retro
       changeMode: root.changeMode
       scrubbing: root.scrubbing
@@ -217,12 +220,13 @@ Item {
         color: root.veil
       }
 
-      // What is coming, named over the dimmed chart; gone as it lands.
+      // What is coming, named over the dimmed chart; gone as it lands. With
+      // no name, as while Yahoo sends nothing, it says nothing.
       Text {
         objectName: "loadingLabel"
         anchors.centerIn: parent
         width: Math.min(implicitWidth, parent.width)
-        visible: root.held && root.dimmed > 0
+        visible: root.held && root.dimmed > 0 && root.loadingText !== ""
         opacity: root.dimmed
         textFormat: Text.PlainText
         text: root.loadingText + "…"
