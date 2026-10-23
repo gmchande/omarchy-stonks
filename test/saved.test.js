@@ -563,6 +563,26 @@ const said = line => line && [
 // the listing's exchange, counted in whole days at the quote's UTC offset.
 const dayLineAt = (q, t) => M.dayLine(q, Math.floor((t + (q.gmtoffset || 0)) / 86400))
 
+// Since 23 October Yahoo sends some day answers with their trading periods
+// in a range's shape, one list of days, in place of pre, regular, and post:
+// every non-US listing's, and an index's at night. Those periods are the
+// regular session's. Found in the overnight QA: SHEL.L said "Closed · opens
+// Mon" through its session, and ^GSPC's day line said 1D over Thursday's
+// figures.
+test("a day answer whose trading periods are one list of days has them as its regular session", () => {
+  const shel = M.parseChart(fixture("shel-l-2026-10-23-trading.json"))
+  const london = calendars.calendars.LSE
+  expect(shel.session).toEqual({ pre: null, regular: { start: M.epochAt(london, "2026-10-23", "08:00"), end: M.epochAt(london, "2026-10-23", "16:30") }, post: null })
+  const opening = M.epochAt(london, "2026-10-23", "08:10")
+  expect(M.marketStatus(shel, opening, 0, calendars)).toBe("Opening bell · closes in 8h 20m")
+  const toyota = M.parseChart(fixture("7203-t-2026-10-23-day.json"))
+  expect(toyota.session.regular).toEqual({ start: M.epochAt(JPX, "2026-10-23", "09:00"), end: M.epochAt(JPX, "2026-10-23", "15:30") })
+  expect(M.marketStatus(toyota, M.epochAt(JPX, "2026-10-23", "11:00"), 0, calendars)).toMatch(/^Market closes in /)
+  const gspc = M.parseChart(fixture("gspc-2026-10-23-night.json"))
+  expect(gspc.session.regular).toEqual({ start: M.epochAt(US, "2026-10-22", "09:30"), end: M.epochAt(US, "2026-10-22", "16:00") })
+  expect(dayLineAt(gspc, at("2026-10-23", "03:03")).title).toBe("THU")
+})
+
 test("the day line is 1D, or its figures' weekday when they are not today's: its low and high, its open and volume", () => {
   // On its own day a session's line is 1D: SHOP.TO's saved day is
   // Wednesday 2 September in Toronto, AAPL's Tuesday 1 September, read
