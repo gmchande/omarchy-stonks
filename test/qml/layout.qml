@@ -2730,6 +2730,93 @@ ShellRoot {
           shortFaults.length === 0, shortFaults.join(" | "))
         root.check("on a 768 px screen at every text size from 9 to 20 a range's marks never touch the ink, and a chart at full height shows both, in both looks",
           touched.length === 0, touched.join(" | "))
+
+        // After the text size changes with the list scrolled, no row is cut
+        // at the list's top or bottom, the row at its top stays there unless
+        // the list's end comes first, and the cursor's row stays whole in
+        // sight: in the popup on an 850 px screen and the window at its
+        // usual 720 × 760, two rows down at 12, to 16 and back; at the
+        // list's end at 12, the cursor on its top row or its last, to 16;
+        // and at its end at 16, to 12. Found in the strain fixes' walk: with
+        // the popup open through a change to text size 16, the list showed
+        // rows cut at its top and bottom until the popup reopened.
+        var rowsList = body.watchlist
+        // The popup's room on an 850 px screen at the text size of the
+        // moment, as the shell's card gives it.
+        var screenTall = function() {
+          return 850 - Style.bar.sizeHorizontal - 2 * Style.gapsOut - 2 * Style.spacing.popupPadding - 2 * Math.max(1, Style.space(2))
+        }
+        // The rows any part of which shows, top to bottom, each whole or cut.
+        var rowsInSight = function() {
+          var top = rowsList.contentY
+          var bottom = top + rowsList.height
+          var out = []
+          rowsList.displayedSymbols.forEach(function(symbol) {
+            var row = rowsList.rowItem(symbol)
+            if (row && row.y + row.height > top + 0.5 && row.y < bottom - 0.5)
+              out.push({ symbol: symbol, whole: row.y >= top - 0.5 && row.y + row.height <= bottom + 0.5 })
+          })
+          return out
+        }
+        var lastSymbol = function() { return rowsList.displayedSymbols[rowsList.displayedSymbols.length - 1] }
+        var rowsCut = []
+        var rowsSeen = []
+        ;[false, true].forEach(function(wide) {
+          surface.wide = wide
+          surface.windowWidth = 720
+          // The window's height is its own, its chart giving way to three
+          // rows (App.qml); the popup's is the card's room for the body.
+          surface.fixedHeight = wide ? 760 : 0
+          if (wide) {
+            body.screenRoom = 0
+            body.minChartHeight = Qt.binding(function() { return Style.space(136) })
+          } else {
+            body.screenRoom = Qt.binding(screenTall)
+            surface.budget = Qt.binding(screenTall)
+          }
+          ;[{ from: 12, notches: 2, to: [16, 12] }, { from: 12, notches: 40, to: [16] }, { from: 12, notches: 40, last: true, to: [16] },
+            { from: 16, notches: 40, to: [12] }].forEach(function(walk) {
+            Style.fontBaseSize = walk.from
+            rowsList.contentY = 0
+            rowsList.cursorSymbol = ""
+            wait(100)
+            // Wheel notches down over the first row in sight, or the last,
+            // which takes the cursor, then the pointer off the list.
+            var pointerY = walk.last ? rowsList.height - 10 : 10
+            mouseMove(rowsList, 12, pointerY)
+            mouseWheel(rowsList, 12, pointerY, 0, -120 * walk.notches, Qt.NoModifier)
+            tryVerify(function() { return !rowsList.settling }, 2000)
+            mouseMove(body, body.width / 2, 10)
+            var topRow = (rowsInSight()[0] || { symbol: "no row" }).symbol
+            var cursor = rowsList.cursorSymbol
+            var was = walk.from
+            walk.to.forEach(function(size) {
+              Style.fontBaseSize = size
+              wait(100)
+              var shown = rowsInSight()
+              var said = (wide ? "window " : "popup ") + was + " to " + size + ": "
+                + shown.map(function(r) { return r.symbol + (r.whole ? "" : " (cut)") }).join(" ")
+              was = size
+              rowsSeen.push(said)
+              var atEnd = shown.length > 0 && shown[shown.length - 1].symbol === lastSymbol()
+              if (shown.length === 0 || shown.some(function(r) { return !r.whole }) || (!atEnd && shown[0].symbol !== topRow)
+                  || rowsList.cursorSymbol !== cursor || !shown.some(function(r) { return r.symbol === cursor }))
+                rowsCut.push(said + ", " + topRow + " was at the top, the cursor on " + cursor + " and now on " + rowsList.cursorSymbol)
+            })
+          })
+        })
+        Style.fontBaseSize = 12
+        body.screenRoom = 0
+        body.minChartHeight = 0
+        surface.budget = 730
+        surface.wide = false
+        surface.fixedHeight = 0
+        rowsList.contentY = 0
+        rowsList.cursorSymbol = ""
+        wait(100)
+        console.log("rows after a text size change: " + rowsSeen.join(" | "))
+        root.check("after the text size changes with the list scrolled, no row is cut at the list's top or bottom, the row at its top stays there unless the list's end comes first, and the cursor's row stays in sight, in the popup and the window",
+          rowsCut.length === 0, rowsCut.join(" | "))
       }
     }
   }
