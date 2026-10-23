@@ -7,7 +7,9 @@ journey_begin scrub "$@"
 
 chimes() { step_sound_lines | grep -c 'chime-'; }
 follows() { readout statusText smoothPrice changeText baselineLegend; }
-scrubbed() { shown statusText --has "AT "; }
+# scrubbed: the header starts "AT …"; at rest after the close it says
+# "CLOSED AT 16:00", which holds "AT " too.
+scrubbed() { [[ "$(words statusText)" == "AT "* ]]; }
 unscrubbed() { ! scrubbed; }
 # holding: the stream of silence that keeps the output awake for the chimes
 # (the stand-in pw-cat's silence.log) is running now.
