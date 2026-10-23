@@ -1451,10 +1451,24 @@ ShellRoot {
         })
         removeSteps.push("slips " + stub.symbols.join(","))
         fit2Remove = removeOf("FIT2")
+        var slidAt = fit2Remove ? fit2Remove.mapToItem(body, fit2Remove.width / 2, fit2Remove.height / 2) : Qt.point(-1, -1)
         if (fit2Remove && fit2Remove.visible) mouseClick(fit2Remove, fit2Remove.width / 2, fit2Remove.height / 2)
         wait(200)
         removeSteps.push("click " + stub.symbols.join(","))
+        // The row that slid into its place, under the still pointer, shows
+        // no remove button, so another click there features it; a move of
+        // the pointer shows it. Found by the design panel of 23 October: a
+        // click on Toyota's × put Tesla's under the still pointer, and one
+        // more click removed Tesla.
+        removeSteps.push("slid " + body.watchlist.cursorRow + " " + removesShown())
         wait(Application.styleHints.mouseDoubleClickInterval + 50)
+        mouseClick(body, slidAt.x, slidAt.y)
+        wait(200)
+        removeSteps.push("again " + stub.symbols.join(",") + " " + stub.featuredSymbol)
+        wait(Application.styleHints.mouseDoubleClickInterval + 50)
+        mouseMove(body, slidAt.x + 3, slidAt.y)
+        wait(100)
+        removeSteps.push("moved " + removesShown())
         var nextRemove = removeOf("FIT3")
         if (nextRemove && nextRemove.visible) mouseDoubleClickSequence(nextRemove, nextRemove.width / 2, nextRemove.height / 2)
         wait(300)
@@ -1479,21 +1493,22 @@ ShellRoot {
           wait(400)
         }
         removeSteps.push("lift " + stub.symbols.join(","))
-        root.check("a cursor you put on a row shows its remove button, the resting one none; a click on it removes that row, a slip nothing, a double-click one, a press and move lifts the row",
-          keyed !== "" && removeSteps.join(" | ") === "rest none | pointer FIT2 | slips FIT1,FIT2,FIT3,FIT4 | click FIT1,FIT3,FIT4 | double FIT1,FIT4 | key "
-            + keyed + " | lift FIT4,FIT1",
+        root.check("a cursor you put on a row shows its remove button, the resting one none; a click on it removes that row, a slip nothing, and the row sliding under the still pointer shows none until it moves; a double-click removes one, a press and move lifts the row",
+          keyed !== "" && removeSteps.join(" | ") === "rest none | pointer FIT2 | slips FIT1,FIT2,FIT3,FIT4 | click FIT1,FIT3,FIT4 | slid FIT3 none"
+            + " | again FIT1,FIT3,FIT4 FIT3 | moved FIT3 | double FIT1,FIT4 | key " + keyed + " | lift FIT4,FIT1",
           removeSteps.join(" | "))
 
         // A removal by the button is decided at its press and done at a
         // release on it, even a double-click's second press, which Qt acts
-        // on at mouse-down: a click on one row's button, a wheel notch, then
-        // a quick press on the button of the row now under the pointer. Slid
-        // off and let go, it removes nothing more; held past the double-click
-        // interval and let go on the button, it removes that row. Found in
-        // the reviews of #32: the second went at mouse-down, so a slip
-        // couldn't cancel it; then, decided at release, a held one did
-        // nothing. The events one by one, as Qt sends a double-click: press,
-        // release, press, double-click, release.
+        // on at mouse-down: a click on one row's button, a wheel notch, a
+        // pixel's move, which shows the button of the row now under the
+        // pointer, then a quick press on it. Slid off and let go, it removes
+        // nothing more; held past the double-click interval and let go on
+        // the button, it removes that row. Found in the reviews of #32: the
+        // second went at mouse-down, so a slip couldn't cancel it; then,
+        // decided at release, a held one did nothing. The events one by one,
+        // as Qt sends a double-click: press, release, press, double-click,
+        // release.
         var secondPress = function(release) {
           root.setQuotes(["FIT1", "FIT2", "FIT3"], [101, 102, 103])
           wait(200)
@@ -1516,10 +1531,12 @@ ShellRoot {
             mouseRelease(body, onButton.x, onButton.y)
             wait(120)
             mouseWheel(body, onButton.x, onButton.y, 0, -120, Qt.NoButton, Qt.NoModifier)
-            mousePress(body, onButton.x, onButton.y)
+            var moved = Qt.point(onButton.x + 1, onButton.y)
+            mouseMove(body, moved.x, moved.y)
+            mousePress(body, moved.x, moved.y)
             // TestCase has no lone double-click event in Qt 6; its sender does.
-            qtest_events.mouseDoubleClick(body, onButton.x, onButton.y, Qt.LeftButton, Qt.NoModifier, -1)
-            release(onButton)
+            qtest_events.mouseDoubleClick(body, moved.x, moved.y, Qt.LeftButton, Qt.NoModifier, -1)
+            release(moved)
           }
           wait(300)
           stub.symbolsChanged.disconnect(watchRemovals)

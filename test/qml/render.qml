@@ -827,6 +827,11 @@ ShellRoot {
         })
       }
       else body.note = "Keep at least one symbol"
+    } else if (/^(popup|window)-undo-/.test(root.stateName)) {
+      // <popup|window>-undo-<look>: a removal offered back beside the add;
+      // -named-: in a named list, the add's words the longer.
+      if (root.stateName.indexOf("-named-") > 0) stub.listName = "My Watchlist"
+      body.undoOffered = { symbol: "SHOP.TO" }
     } else if (root.stateName.indexOf("popup-hint-") === 0) {
       // The first open's footer: the hint's lines have to fit the popup's
       // width, above "+ Add a symbol".

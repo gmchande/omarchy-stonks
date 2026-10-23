@@ -60,12 +60,12 @@ Flickable {
   property real menuCovers: 0
 
   property string cursorSymbol: ""
-  // The row the wheel scrolled under a still pointer: it takes the cursor,
-  // but its remove button waits for the pointer to really move or a key to
-  // move the cursor, so a click there features it. The button sits after
-  // the symbol, wherever its length puts it, so a notch could bring it
-  // under the pointer: in the edge pass of 15 October the click meant to
-  // feature 7203.T removed it.
+  // The row the wheel scrolled, or a removal slid (`handTo`), under a still
+  // pointer: it takes the cursor, but its remove button waits for the
+  // pointer to really move or a key to move the cursor, so a click there
+  // features it. The button sits after the symbol, wherever its length puts
+  // it, so a notch could bring it under the pointer: in the edge pass of 15
+  // October the click meant to feature 7203.T removed it.
   property string scrolledUnder: ""
   property var displayedSymbols: []
   property string dragSymbol: ""
@@ -379,11 +379,17 @@ Flickable {
 
   // The cursor handed to `symbol`, as a removal hands it on: where its row
   // is in sight already, the list stays where it is, stopped by the click,
-  // perhaps between rows; else the row is carried into view.
+  // perhaps between rows; else the row is carried into view. With the
+  // pointer resting on the list, the row that took the removed one's place
+  // is under it now, so its remove button waits for the pointer to move,
+  // as one the wheel scrolls under it does: found by the design panel of
+  // 23 October, where a click on Toyota's × put Tesla's under the still
+  // pointer, and one more click removed Tesla.
   function handTo(symbol) {
     var index = displayedSymbols.indexOf(symbol)
     if (index >= 0 && partInSight(index, headedY)) cursorSymbol = symbol
     else select(symbol)
+    if (listHover.hovered) scrolledUnder = symbol
   }
 
   // A click on a row, at (x, y) in the scene. It stops the list where it

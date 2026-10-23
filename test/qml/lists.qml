@@ -1241,6 +1241,37 @@ ShellRoot {
         removal.join("|") === "NVDA|true" && undone.join("|") === "AAPL|true|true",
         removal.join("|") + " / " + undone.join("|"))
 
+      // A removal made here offers itself back beside the add for a few
+      // seconds, "Undo AAPL": the add beside it opens search at once, and
+      // the undo, clicked, puts the row back, and goes. By the mouse alone:
+      // the row's ×, the add, the undo. Asked for by the owner on 23
+      // October: removing by mouse said nothing and had no undo by mouse,
+      // and the note that once offered it held up the add.
+      wait(Application.styleHints.mouseDoubleClickInterval)
+      wl.cursorSymbol = "AAPL"
+      wait(50)
+      var aaplCross = harness.find(wl.rowItem("AAPL"), "rowRemove")
+      var crossAt = aaplCross && aaplCross.visible ? center(aaplCross) : null
+      if (crossAt) mouseClick(body2, crossAt.x, crossAt.y)
+      wait(100)
+      var footerUndo = harness.find(body2, "footerUndo")
+      var offered = [harness.same(service.library, ["NVDA"]), footerUndo.visible, harness.find(footerUndo, "footerUndoText").text].join(",")
+      wait(Application.styleHints.mouseDoubleClickInterval)
+      var addAt = center(harness.find(body2, "footerFill"))
+      mouseClick(body2, addAt.x, addAt.y)
+      wait(50)
+      var addOpened = body2.adding
+      keyClick(Qt.Key_Escape)
+      wait(100)
+      var stillOffered = footerUndo.visible
+      wait(Application.styleHints.mouseDoubleClickInterval)
+      var undoAt = center(footerUndo)
+      mouseClick(body2, undoAt.x, undoAt.y)
+      wait(100)
+      harness.check("a removal offers Undo beside the add, which opens search at once; a click on Undo puts the row back, and the offer goes",
+        offered === "true,true,Undo AAPL" && addOpened && stillOffered && harness.same(service.library, ["NVDA", "AAPL"]) && !footerUndo.visible,
+        [offered, addOpened, stillOffered, service.library, footerUndo.visible].join(" | "))
+
       // The rule under the list name is the list's breadth: the rows' own
       // ups, flats, and downs, counted. DOWN answers a day that fell, FLAT
       // one that closed at its previous close, so a rule that swapped or

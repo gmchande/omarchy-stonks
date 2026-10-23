@@ -108,15 +108,18 @@ the chart, and Enter or a click adds it. Search finds stocks, ETFs,
 indexes, and crypto.
 
 To remove a row, point at it and click the × beside its symbol, or press
-`x`: it goes from the list you're looking at. Right-click a row to choose
-where it goes from, such as "Remove from Growth" or "Remove from all 3
-lists". In All, where removing takes a symbol out of every list, the × and
-`x` ask first when one of your own lists holds it too.
+`x`: it goes from the list you're looking at. The row that slides into its
+place shows its × only once you move the pointer, so a second click can't
+remove it by mistake. Right-click a row to choose where it goes from, such
+as "Remove from Growth" or "Remove from all 3 lists". In All, where
+removing takes a symbol out of every list, the × and `x` ask first when one
+of your own lists holds it too.
 
-To bring back what you removed, press `u`, or click "+ Add a symbol": the
-symbol is the first result, with PUT BACK, which puts it back in its lists
-at its old place. It comes back with the price it had, and Stonks asks for
-a new one at once.
+For 5 seconds after a removal, "Undo NVDA" shows beside "+ Add a symbol":
+click it to bring the row back. Until a list next changes, `u` does the
+same, and so does "+ Add a symbol", where the symbol is the first result,
+with PUT BACK. Each puts it back in its lists at its old place, with the
+price it had, and Stonks asks for a new one at once.
 
 The line beside the list's name shows how many rows are up, in green, and
 down, in red. Click the order word to sort by symbol, name, or change, and

@@ -51,6 +51,9 @@ every_state() (
   states="$states popup-notice-save-smooth-large popup-notice-save-again-smooth-large popup-notice-file-smooth-large"
   # A change made while the file can't be read, in both looks and at 16.
   states="$states popup-notice-file-edited-smooth popup-notice-file-edited-retro popup-notice-file-edited-smooth-large"
+  # A removal offered back beside the add, in both looks on both surfaces,
+  # and at 16 beside a named list's longer add.
+  states="$states popup-undo-smooth popup-undo-retro window-undo-retro popup-undo-retro-large popup-undo-named-smooth-large"
   # Hover and held presses formerly judged inside the behavior flows.
   # Each uses real pointer input on the displayed control in both looks.
   for look in smooth retro; do

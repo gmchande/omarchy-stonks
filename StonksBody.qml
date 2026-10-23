@@ -704,6 +704,7 @@ Item {
     else service.removeSymbol(symbol, rows)
     closeViews()
     sound("remove")
+    if (removal && removal.symbol === symbol) offerUndo()
     if (successor !== "") watchlist.handTo(successor)
   }
 
@@ -781,6 +782,48 @@ Item {
     service.undoRemoval(symbol)
     sound("undo")
     watchlist.select(symbol)
+  }
+
+  // The footer offers a removal made here back beside the add for a few
+  // seconds, "Undo NVDA", so a removal by the mouse says what it took and
+  // can be taken back by the mouse; u takes it back long after. The add
+  // stays where it is, and acts at once: in the review of 22 October the
+  // owner took out a note that held the footer, since adding the next stock
+  // meant waiting for it. The offer ends with the removal (undone, a newer
+  // one, or the lists changed), a close, or its time, which waits while the
+  // pointer is on it and fades its last 600 ms, as a note does.
+  property var undoOffered: null
+  property real undoShown: 1
+  onRemovalChanged: if (undoOffered !== null && removal !== undoOffered) endUndo()
+  function offerUndo() {
+    undoOffered = removal
+    holdUndo()
+  }
+  function holdUndo() {
+    undoFade.stop()
+    undoShown = 1
+    if (undoOffered !== null && surfaceOpen && !footer.undoHovered) undoTimer.restart()
+    else undoTimer.stop()
+  }
+  function endUndo() {
+    undoTimer.stop()
+    undoFade.stop()
+    undoShown = 1
+    undoOffered = null
+  }
+  Timer {
+    id: undoTimer
+    interval: 5000 - undoFade.duration
+    onTriggered: undoFade.start()
+  }
+  NumberAnimation {
+    id: undoFade
+    target: root
+    property: "undoShown"
+    from: 1
+    to: 0
+    duration: 600
+    onFinished: root.endUndo()
   }
 
   // The note's moment starts again, and waits while the pointer is on it,
@@ -1127,6 +1170,8 @@ Item {
     unheardAdds = []
     noteTimer.stop()
     noteFade.stop()
+    undoTimer.stop()
+    undoFade.stop()
     footer.freeze()
     watchlist.takeOver()
     motion.freeze()
@@ -1196,6 +1241,7 @@ Item {
     header.settle()
     heroBand.settle()
     clearNote()
+    endUndo()
     cameraLit = false
     footer.settle()
     hint = ""
@@ -1516,6 +1562,10 @@ Item {
     label: root.listName !== "" ? "+  Add a symbol to " + root.listName : "+  Add a symbol"
     acts: root.updateOffered || !root.settingsUnreadable
     onHoveredChanged: root.holdNote()
+    undoLabel: root.undoOffered ? "Undo " + root.undoOffered.symbol : ""
+    undoOpacity: root.undoShown
+    onUndoHoveredChanged: root.holdUndo()
+    onUndoClicked: root.undoRemoval()
     // The click acts on what the footer shows: a newer version's note runs
     // the update, the update's notice restarts the shell, and the file's
     // does nothing, nor does a refusal over it; while a save hasn't landed,
