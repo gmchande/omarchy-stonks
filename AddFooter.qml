@@ -130,7 +130,7 @@ Item {
     Row {
       // Centred on the whole bar, so an undo coming or going moves nothing,
       // unless that would run into the undo: then just clear of it.
-      x: Math.min((root.width - root.gutter - width) / 2, root.width - root.gutter - root.undoRoom - Style.space(10) - width)
+      x: Math.round(Math.min((root.width - root.gutter - width) / 2, root.width - root.gutter - root.undoRoom - Style.space(10) - width))
       anchors.verticalCenter: parent.verticalCenter
 
       // The notice whole, measured, never shown: where it doesn't fit beside
