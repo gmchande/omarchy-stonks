@@ -20,11 +20,13 @@
 # reverts the revert, then adds its fix. The batch's last lines say so,
 # naming the revert's commit.
 #
-# It pushes only dev, and never with force. It refuses while a tophat
-# session holds the slot (test/tophat.sh), and holds the slot itself until
-# it ends, so no walk starts that the shell's restart would fail. It refuses
-# when the live commit isn't on dev: a branch build may be live for the
-# owner to try. Each run's output is in out/batch/COMMIT.log.
+# It pushes only dev, and never with force. It runs the suites while tophat
+# sessions run: only putting a commit live waits for them (test/live.sh).
+# When the suites passed but the commit didn't go live, it says so, and the
+# next batch puts it live without running them again, since their records
+# cover its tree (test/ran.sh). One batch runs at a time. It refuses when
+# the live commit isn't on dev: a branch build may be live for the owner to
+# try. Each run's output is in out/batch/COMMIT.log.
 #
 #   test/batch.sh
 set -uo pipefail
@@ -33,10 +35,10 @@ live="$HOME/.config/omarchy/plugins/grvc.stonks"
 say() { echo "batch: $*"; }
 refuse() { echo "batch: refusing: $*" >&2; exit 1; }
 
-# Fd 8 holds the slot; every command below runs without it (8>&-), so
-# nothing it starts holds the slot past the batch.
-exec 8>> "${TOPHAT_LOCK:-${XDG_RUNTIME_DIR:-/run/user/$UID}/tophat.lock}" || exit 1
-flock -n 8 || refuse "a tophat session is running (test/tophat.sh holds its slot)"
+# Fd 8 holds the batch's lock; every command below runs without it (8>&-),
+# so nothing it starts holds it past the batch.
+exec 8>> "$(git rev-parse --path-format=absolute --git-common-dir)/stonks-batch.lock" || exit 1
+flock -n 8 || refuse "another batch is running in this repository"
 
 [ "$(git symbolic-ref --quiet --short HEAD)" = dev ] || refuse "this checkout isn't on dev"
 [ -z "$(git status --porcelain)" ] || refuse "this checkout has uncommitted edits or untracked files"
@@ -55,6 +57,10 @@ suites() {
   local commit runner log
   commit=$(git -C "$1" rev-parse HEAD)
   log=$PWD/out/batch/${commit:0:7}.log
+  if test/ran.sh --passed test/all.sh "$commit" 2> /dev/null && test/ran.sh --passed test/review.sh "$commit" 2> /dev/null; then
+    say "both suites already passed on the tree of $(git log -1 --format='%h %s' "$commit") (test/ran.sh): not running them again"
+    return 0
+  fi
   say "running the suites on $(git log -1 --format='%h %s' "$commit")"
   : > "$log"
   for runner in test/all.sh test/review.sh; do
@@ -71,8 +77,10 @@ suites() {
 }
 
 if suites .; then
-  test/live.sh dev 8>&-
-  exit
+  test/live.sh dev 8>&- && exit
+  if [ "$(git -C "$live" rev-parse HEAD)" = "$(git rev-parse dev)" ]; then say "dev is checked out in the live plugin, but test/live.sh failed (above)"
+  else say "the suites passed on $(git rev-parse --short dev), but test/live.sh didn't put it live (above): test/batch.sh again puts it live without running them again"; fi
+  exit 1
 fi
 
 # The first-parent line since the live commit, oldest first: the live
@@ -106,7 +114,7 @@ else
   else say "reverted $what on dev, but the push was refused (dev moved on origin?): dev holds the revert, unpushed"; fi
 fi
 if [ "$last" = "$was" ]; then say "the last version that passed, ${last:0:7}, is already live"
-else test/live.sh "$last" 8>&-; fi
+elif ! test/live.sh "$last" 8>&-; then say "test/live.sh failed on ${last:0:7}, the last version that passed (above)"; fi
 say "$what broke dev: $why"
 if [ -n "$revert" ]; then
   say "to bring it back: merging the fixed branch alone brings back only its new commits, since dev"
