@@ -76,6 +76,24 @@ Flickable {
   property var arrangedView: null
 
   readonly property int rowPitch: rowHeight + rowGap
+  // A new text size gives the rows a new pitch: the list keeps the row at
+  // its top, where the list was headed, rather than its scroll in pixels,
+  // so it rests on whole rows, and then keeps the cursor's row whole in
+  // sight as a shorter surface does. Found in the strain fixes' walk: with
+  // the popup open through a change to text size 16, rows were cut at the
+  // list's top and bottom until the popup reopened.
+  property int lastPitch: 0
+  onRowPitchChanged: {
+    if (lastPitch > 0) {
+      var top = Math.round(headedY / lastPitch)
+      var own = cursorSymbol
+      takeOver()
+      contentY = clampY(top * rowPitch)
+      cursorSymbol = own
+      keepCursorInSight()
+    }
+    lastPitch = rowPitch
+  }
   // Where the list is headed: a glide's destination, or where it rests.
   readonly property real headedY: glide.running ? glide.to : contentY
   // The one cursor the keys and the pointer both move, as in the shell's own
@@ -163,7 +181,7 @@ Flickable {
   // A row's slide or fade has ended.
   signal rowRested(string symbol)
 
-  implicitHeight: Math.max(0, displayedSymbols.length * rowPitch - rowGap)
+  implicitHeight: rowsLength()
   contentWidth: width
   contentHeight: implicitHeight
   clip: true
@@ -274,8 +292,15 @@ Flickable {
     select(displayedSymbols[next])
   }
 
+  // The rows' length, read from the rows: the list's end is read from it,
+  // not contentHeight, which a new text size can leave a pitch behind
+  // while onRowPitchChanged runs.
+  function rowsLength() {
+    return Math.max(0, displayedSymbols.length * rowPitch - rowGap)
+  }
+
   function clampY(y) {
-    return Math.max(0, Math.min(Math.max(0, contentHeight - height), y))
+    return Math.max(0, Math.min(rowsLength() - height, y))
   }
 
   function snappedY(y) {
@@ -467,7 +492,7 @@ Flickable {
   // tophat of 15 October: the key cursor on the last row was let go.
   function restingTopFor(index, top) {
     var y = index * rowPitch
-    var bottom = Math.max(0, contentHeight - sightHeight)
+    var bottom = Math.max(0, rowsLength() - sightHeight)
     if (y < top) return Math.min(bottom, y)
     if (y + rowHeight > top + sightHeight) return Math.min(bottom, Math.ceil((y + rowHeight - sightHeight) / rowPitch) * rowPitch)
     return top
@@ -717,6 +742,7 @@ Flickable {
     }
   }
   Component.onCompleted: {
+    lastPitch = rowPitch
     arrangedView = view
     syncRows()
     display(view.shown.slice(), false)

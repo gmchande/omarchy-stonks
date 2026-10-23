@@ -317,15 +317,22 @@ The shell's log the form asks for can name the prices Stonks left out.
 
 - **Needs:** nothing beyond Omarchy 4. It runs `curl`, PipeWire's
   `pw-play`, `pw-cat`, and `pw-dump`, and `sh`, `bash`, `timeout`,
-  `head`, `mkdir`, and `chmod`, which Omarchy ships, and, for a
-  screenshot, `wl-copy` and `omarchy-notification-send`.
+  `head`, `mkdir`, `chmod`, `mktemp`, `ln`, and `rm`, which Omarchy ships,
+  and, for a screenshot, `wl-copy` and `omarchy-notification-send`.
 - **Commands:** `curl` for every request; as Stonks starts, one `sh` that
   makes its cache folder, `mkdir` and `chmod`, yours alone, and `chmod` as
-  it writes each of its files, to make it yours alone too; while sounds
-  are on, `pw-play` to play a sound, only when you add,
-  remove, or undo a row, take a
-  screenshot, turn sounds on, replay a chart, or move along it, or the bell
-  is due, and one `sh` that
+  it writes each of its files, to make it yours alone too; only when it
+  saves `~/.config/omarchy/grvc.stonks.json` and finds none there, one
+  `sh` that makes it, yours alone before it holds anything: `mktemp` makes
+  a file beside it that only you can read, the `sh` writes your settings
+  into it from its environment, never its arguments, `ln` puts it under
+  its name, never over a file there, and `rm` takes the extra name away;
+  each of these under `timeout`, which stops it after 5 seconds; a save
+  that can't be made this way says your changes aren't saved; while
+  sounds are on, `pw-play` to play a sound, only
+  when you add, remove, or undo a row, take a screenshot, turn sounds on,
+  replay a chart, or move along it, or the bell is due, with 4 seconds
+  under `timeout`, and one `sh` that
   starts a `pw-play` for each chime, with 2 seconds each under `timeout`,
   and plays nothing else; while sounds are on and the popup or the window
   is open on a screen, and for 10 seconds after, `pw-cat` playing silence,
@@ -336,7 +343,8 @@ The shell's log the form asks for can name the prices Stonks left out.
   recording, so the bell stays quiet; only when you take a screenshot, one
   `sh` that looks for `omasnap`, Omarchy 4.5's screenshot tool, and names
   the picture's file in your screenshots folder, making the folder if it
-  isn't there; another that hands `wl-copy` the picture on its input, to
+  isn't there, its answer through `head` for 8 KB; another that hands
+  `wl-copy` the picture on its input, to
   put it on the clipboard; and `omarchy-notification-send` with Omarchy's
   own words, as Omarchy 4.0's own screenshots do; each under `timeout`,
   which stops it after 5 seconds; only when you click that notification,
@@ -377,8 +385,8 @@ The shell's log the form asks for can name the prices Stonks left out.
   it, `OMARCHY_SCREENSHOT_DIR`, else your Pictures folder;
   saved straight there, with no copy anywhere else. Everything in
   `~/.cache/grvc.stonks` is readable by you alone (0600, the folder 0700),
-  and so is the data file once Stonks writes it, also after an older
-  Stonks or an editor left it readable to others.
+  and so is the data file, from the moment Stonks makes it, and again
+  after an older Stonks or an editor left it readable to others.
   The shell keeps the pill's form on its bar entry in
   `~/.config/omarchy/shell.json`.
 - **Limits:** every request has a time limit and a size cap. Quotes come

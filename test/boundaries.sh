@@ -38,9 +38,10 @@ none() {
 # External commands run only in the feeds, search, the version watch's
 # shell restart and update, the sounds' pw-play, its chimes' sh, the
 # bell's pw-dump, and the silence's pw-cat, the camera's screenshot
-# hand-off, and the sh and chmod that keep Stonks' files its owner's
-# (OwnerOnly); files are read and written only by the service, the version
-# watch reads the manifest, the trend colours read the theme's colours,
+# hand-off, and the sh and chmod that keep Stonks' files its owner's and
+# the sh that makes the data file so (OwnerOnly); files are read and
+# written only by the service, the version watch reads the manifest, the
+# trend colours read the theme's colours,
 # the cache's files, the saved quotes and the sounds' replay and chimes,
 # are written only through OwnerOnly, and the camera writes its
 # screenshot and reads Omasnap's settings; one service owns the feeds; the
@@ -56,11 +57,13 @@ only '^import Quickshell\.Io' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml
 # Only the camera grabs and saves a picture, puts it on the clipboard, and
 # sends a notification.
 only 'grabToImage|saveToFile|wl-copy|wl-paste|omarchy-notification-send|notify-send' Camera.qml
-# A command started by exec is a sound's, and only there; it is pw-play,
-# and nothing else. Only the sounds ask PipeWire anything, or hold its
-# output awake.
+# A command started by exec is a sound's, and only there; it is pw-play
+# under its time limit, and nothing else. Only the sounds ask PipeWire
+# anything, or hold its output awake.
 only '\.exec\(|pw-play|pw-dump|pw-cat' Sounds.qml
-none '\.exec\((?!\["pw-play",)' Sounds.qml
+none '\.exec\((?!\["timeout", "-k", "1", "4", "pw-play",)' Sounds.qml
+# Every command the camera and the file keeper run is under `timeout`.
+none 'command:\s*\[(?!"timeout",)' Camera.qml OwnerOnly.qml
 only '\bIpcHandler\s*\{' IpcTarget.qml Locator.qml
 only '^import Quickshell\.Hyprland' WindowHost.qml
 only '\b(QuoteFeed|HistoryFeed|FundamentalsFeed|OvernightFeed|AllDayFeed|ReleaseFeed)\s*\{' Service.qml

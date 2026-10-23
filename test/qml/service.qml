@@ -213,6 +213,23 @@ ShellRoot {
     }
   }
 
+  // The data file's mode ("600"), and the end of service.sh's hold on chmod.
+  property var afterMode: null
+  Process {
+    id: modeProc
+    command: ["stat", "-c", "%a", harness.dataPath]
+    stdout: StdioCollector { id: modeOut; waitForEnd: true }
+    onExited: {
+      var fn = harness.afterMode
+      harness.afterMode = null
+      if (fn) fn(String(modeOut.text).trim())
+    }
+  }
+  Process {
+    id: releaseChmod
+    command: ["rm", "-f", Quickshell.env("STONKS_FAKE_STATE") + "/chmod.hold"]
+  }
+
   function readThen(fn) {
     if (harness.reading) return
     harness.reading = true
@@ -248,6 +265,15 @@ ShellRoot {
     harness.writeTo(harness.dataPath, body, "rename", fn)
   }
 
+  // Runs SCRIPT in bash with the fake state's folder as $1, then FN.
+  function stateThen(script, fn) {
+    ticker.stop()
+    harness.afterWrite = fn
+    writeProc.running = false
+    writeProc.command = ["bash", "-c", script, "--", Quickshell.env("STONKS_FAKE_STATE")]
+    writeProc.running = true
+  }
+
   Timer {
     id: ticker
     interval: 50
@@ -277,10 +303,18 @@ ShellRoot {
           if (!fileOk && harness.waited < 2000) return
           harness.check("migrated from bar and wrote the file, leaving barStyle on the bar", ready && fileOk,
             JSON.stringify({ ready: ready, symbols: service.symbols, featured: service.featuredSymbol, file: obj }))
-          // The migration writes from inside the read's own handler: the
-          // file's watch must still read a save from elsewhere after it,
-          // with no change of Stonks' own in between.
-          harness.writeThen(harness.bodyFrom({ style: "smooth" }), function() { harness.go(2) })
+          // service.sh holds every chmod from the start, under umask 022, so
+          // the mode read here is the one the file was first written with.
+          harness.afterMode = function(mode) {
+            harness.check("a data file new on this machine is its owner's alone from its first write", mode === "600", mode)
+            releaseChmod.running = true
+            // The migration's file is made as the read that found none ends:
+            // the file's watch must still read a save from elsewhere after
+            // it, with no change of Stonks' own in between.
+            harness.writeThen(harness.bodyFrom({ style: "smooth" }), function() { harness.go(2) })
+          }
+          ticker.stop()
+          modeProc.running = true
         })
       } else if (harness.step === 2) {
         if (!harness.editedAfterMigration) {
@@ -550,7 +584,42 @@ ShellRoot {
           if (!kept && harness.waited < 2000) return
           harness.check("a change back to a range still being written lands, and the file's read-back keeps it", kept,
             JSON.stringify({ readBack: readBack, file: obj && obj.range, range: service.range }))
-          harness.go(25)
+          harness.go(40)
+        })
+      } else if (harness.step === 40) {
+        // The file gone again, and the disk refusing the link that puts a
+        // made file in place (bin/ln), every chmod held (bin/chmod).
+        harness.stateThen("touch \"$1/ln.fail\" \"$1/chmod.hold\"", function() {
+          harness.writeTo(harness.dataPath, "", "remove", function() { harness.go(41) })
+        })
+      } else if (harness.step === 41) {
+        if (!service.dataMissing && harness.waited < 2000) return
+        service.persist({ range: "5Y" })
+        harness.go(42)
+      } else if (harness.step === 42) {
+        if (!service.saveFailed && harness.waited < 3000) return
+        harness.readThen(function(obj, text) {
+          harness.check("a first save that can't be made its owner's alone is said unsaved, and leaves no file another account could read",
+            service.saveFailed && text === null && service.range === "5Y", service.saveFailed + "|" + text + "|" + service.range)
+          // Two changes, the second while the first is being made.
+          harness.stateThen("rm -f \"$1/ln.fail\" && touch \"$1/ln.hold\"", function() {
+            service.persist({ range: "1Y" })
+            service.persist({ range: "3M" })
+            harness.stateThen("rm -f \"$1/ln.hold\"", function() { harness.go(43) })
+          })
+        })
+      } else if (harness.step === 43) {
+        harness.readThen(function(obj) {
+          var landed = !!obj && obj.range === "3M" && !service.saveFailed && service.range === "3M"
+          if (!landed && harness.waited < 3000) return
+          harness.afterMode = function(mode) {
+            harness.check("the next change makes it, its owner's alone from its first write, and a change made meanwhile lands in it",
+              landed && mode === "600", JSON.stringify({ file: obj && obj.range, range: service.range, failed: service.saveFailed, mode: mode }))
+            releaseChmod.running = true
+            harness.go(25)
+          }
+          ticker.stop()
+          modeProc.running = true
         })
       } else if (harness.step === 25) {
         // Each manifest as a surface's open checks it.

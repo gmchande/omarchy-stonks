@@ -76,10 +76,13 @@ Item {
   }
 
   // The editor on its first line, then the file's name: printed only once
-  // its folder is there to take it.
+  // its folder is there to take it. Read through `head` up to 8 KB, twice
+  // the longest path Linux opens (PATH_MAX, 4096 bytes), a byte past it
+  // too, so an answer that reaches the cap shows it and names no file.
   Process {
     id: naming
-    command: ["timeout", "5", "sh", "-c", "if command -v omasnap > /dev/null; then\n"
+    command: ["timeout", "5", "sh", "-c", "{\n"
+      + "if command -v omasnap > /dev/null; then\n"
       + "  editor=omasnap\n"
       + "  conf=$2\n"
       + "  case $conf in '~') conf=$HOME ;; '~/'*) conf=$HOME${conf#'~'} ;; esac\n"
@@ -102,10 +105,13 @@ Item {
       + "file=$dir/stonks-$1-$stamp.png\n"
       + "n=1\n"
       + "while [ -e \"$file\" ]; do n=$((n + 1)); file=$dir/stonks-$1-$stamp-$n.png; done\n"
-      + "printf '%s\\n%s\\n' \"$editor\" \"$file\"\n",
+      + "printf '%s\\n%s\\n' \"$editor\" \"$file\"\n"
+      + "} | head -c 8193\n",
       "sh", root.shotSymbol, root.shotOmasnapFolder, root.shotPictures]
     stdout: StdioCollector {
+      id: namingOut
       onStreamFinished: {
+        if (namingOut.data.byteLength > 8192) return root.finish(1)
         var printed = text.replace(/\n$/, "")
         var cut = printed.indexOf("\n")
         var file = printed.slice(cut + 1)
