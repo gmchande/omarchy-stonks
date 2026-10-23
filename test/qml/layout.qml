@@ -220,7 +220,7 @@ ShellRoot {
     quotes["7203.T"] = Quote.parseChart(JSON.parse(tokyoFile.text()))
     quotes["SHEL.L"] = Quote.parseChart(JSON.parse(londonFile.text()))
     quotes.NEST = Quote.parseChart(JSON.parse(liveFile.text()))
-    stub.nights = { NEST: { status: "ok", bars: Overnight.parseOvernight(JSON.parse(liveNightFile.text()), ["NEST"]).NEST } }
+    stub.nights = { NEST: Object.assign({ status: "ok" }, Overnight.parseOvernight(JSON.parse(liveNightFile.text()), ["NEST"]).NEST) }
     stub.nightCalendars = JSON.parse(calendarFile.text())
     entries["7203.T"] = entries["SHEL.L"] = { status: "ok", receivedAt: quotes.AAPL.marketTime + 120 }
     // BRK-A's real answer in place of the list's stand-in.

@@ -653,7 +653,8 @@ test("each print says its own time across a change of clocks, and the day marks 
     },
     points: [{ t: at("2026-10-30", "19:55"), p: 100 }]
   }
-  const sunday = M.dayChart(quote, [{ t: at("2026-11-01", "21:00"), p: 100.5, s: "overnight" }], calendars)
+  const sundayPrint = { t: at("2026-11-01", "21:00"), p: 100.5, s: "overnight" }
+  const sunday = M.dayChart(quote, { bars: [sundayPrint], through: sundayPrint.t }, calendars)
   expect(M.extendedStack(quote, sunday.latest, at("2026-11-01", "21:05"), sunday.day)).toMatchObject({ label: "OVERNIGHT", time: "21:00" })
   // The day after Thanksgiving closes at 13:00, and its tick says so: laid
   // out by print, it stands between the 12:55 print and the 15:00 one, and
@@ -667,7 +668,8 @@ test("each print says its own time across a change of clocks, and the day marks 
     },
     points: [{ t: at("2026-11-27", "12:55"), p: 101 }, { t: at("2026-11-27", "15:00"), p: 101.5 }]
   }
-  const friday = M.dayChart(early, [{ t: at("2026-11-26", "22:00"), p: 100.2, s: "overnight" }], calendars).day
+  const thursdayPrint = { t: at("2026-11-26", "22:00"), p: 100.2, s: "overnight" }
+  const friday = M.dayChart(early, { bars: [thursdayPrint], through: thursdayPrint.t }, calendars).day
   const geometry = M.chartGeometry(friday)
   const [noon, afternoon] = geometry.points.map(p => p.x)
   expect(geometry.ticks.filter(x => x > noon && x < afternoon)).toHaveLength(1)
@@ -901,7 +903,7 @@ test("a hostile search or Robinhood answer reads as no answer, at once", async (
   const quote = { symbol: "SHOP", quoteType: "EQUITY", exchange: "NMS", longname: "Shopify Inc." }
   const result = historicals => ({ symbol: "NEST", historicals })
   const print = { begins_at: "2026-10-07T00:00:00Z", close_price: "10.00", session: "overnight", interpolated: false }
-  const nest = "M.overnightBars(json.results[0], 'NEST').length"
+  const nest = "M.overnightAnswer(json.results[0], 'NEST').bars.length"
   const cases = [
     { name: "a search, as sent", call: "M.parseSearch(json).results.length", answer: { quotes: [quote] }, want: 1 },
     { name: "search quotes posing", call: "M.parseSearch(json)", answer: { quotes: POSING } },

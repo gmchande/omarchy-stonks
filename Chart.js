@@ -12,9 +12,10 @@
 // whether it trades it all day too (`allDay`, answers only, a failed one not
 // all-day), and, for one it does, once the overnight feed has answered
 // (`nights`, answers only), when the day is the New York calendar day of its
-// newest print (`Overnight.dayChart`), and for one it does not, Yahoo's own
-// day (`Overnight.sessionDay`); a range once its history and the symbol's
-// quote are, since the headline is never the last bar. A range takes the day
+// newest print, or Yahoo's day and a thin night after it
+// (`Overnight.dayChart`), and for one it does not, Yahoo's own day
+// (`Overnight.sessionDay`); a range once its history and the symbol's quote
+// are, since the headline is never the last bar. A range takes the day
 // too once it is in, for the night's print under the price, and never waits
 // for it.
 // `quote` is Yahoo's, as it came: the headline and the day's figures. `day`
@@ -42,7 +43,7 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
     var night = nights[symbol]
     if (tradability && !tradability.allDay) chart.day = Overnight.sessionDay(quote)
     else if (tradability && night) {
-      var built = Overnight.dayChart(quote, night.bars, calendars)
+      var built = Overnight.dayChart(quote, night, calendars)
       chart.day = built.day
       chart.latest = built.latest
     } else if (range === "1D") return null
@@ -58,18 +59,20 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
 // Normalized [0..1] x/y for drawing. x runs along the day's axis
 // (`chartSpan`): the day the response describes, from the pre-market open so
 // the line arrives at the bell from where it actually came, stretching to
-// hold post-market prints; or, for a US listing, its calendar day
-// (`Overnight.dayChart`) or Yahoo's own day (`Overnight.sessionDay`), laid
-// out by print (`printFraction`). `ticks` mark the bell, and the night's
-// edges.
+// hold post-market prints; or, for a US listing, its calendar day or Yahoo's
+// day and a thin night after it (`Overnight.dayChart`), or Yahoo's own day
+// (`Overnight.sessionDay`), laid out by print (`printFraction`). `ticks`
+// mark the bell, and the night's edges.
 // Prints outside a regular session are flagged `ext`; `brk` starts the line
 // again across a break in the exchange's day (Tokyo's lunch, from its
 // calendar in `calendars`: Yahoo sends 09:00 to 15:30 as one session), so no
 // line crosses hours the market was shut. A quiet hour of a US night is no
 // break: that day is laid out by print, where a quiet hour takes no room, so
-// a gap there would read as missing prices. The vertical range holds every
-// drawn print and the previous close, with headroom, so the baseline is
-// always in view.
+// a gap there would read as missing prices. A thin night's trades
+// (`axis.night`) are each a `dot`, on its own, joined to nothing: laid out
+// by the clock, the hours between them are there to see. The vertical range
+// holds every drawn print and the previous close, with headroom, so the
+// baseline is always in view.
 function chartGeometry(quote, calendars) {
   var pts = quote.points
   var axis = chartSpan(quote)
@@ -85,15 +88,18 @@ function chartGeometry(quote, calendars) {
   }
   var pad = (hi - lo) * 0.08 || 0.5
   lo -= pad; hi += pad
+  var dots = dayPrints(quote, axis)
   var out = []
   for (var k = 0; k < pts.length; k++) {
     var session = Quote.pointSession(quote, pts[k])
     var prev = k > 0 ? pts[k - 1] : null
+    var dot = k >= dots
     out.push({
       x: printFraction(quote, axis, k),
       y: 1 - (pts[k].p - lo) / (hi - lo),
       ext: session !== "reg",
-      brk: !!prev && acrossBreak(prev.t, pts[k].t)
+      brk: dot || (!!prev && acrossBreak(prev.t, pts[k].t)),
+      dot: dot
     })
   }
   var ticks = []
@@ -124,26 +130,57 @@ function chartSpan(quote) {
 }
 
 function axisFraction(axis, t) {
-  return (t - axis.start) / Math.max(1, axis.end - axis.start)
+  return clockRoom(axis, t) / Math.max(1, clockRoom(axis, axis.end))
+}
+
+// How much of the axis the clock has run from its start to `t`: all of
+// it, but for the hours between a day's end and the night after it
+// (`axis.dayEnd`, `axis.night`), a weekend's, which take no room.
+function clockRoom(axis, t) {
+  var skipped = axis.night ? Format.clamp(t, axis.dayEnd, axis.night.start) - axis.dayEnd : 0
+  return t - axis.start - skipped
+}
+
+// `clockRoom`'s inverse: the moment `room` along the axis.
+function clockAt(axis, room) {
+  var t = axis.start + room
+  return axis.night && t > axis.dayEnd ? t + axis.night.start - axis.dayEnd : t
 }
 
 // A US listing's 1D is laid out by print (`axis.byPrint`), the way
-// Robinhood's screen draws it: the prints so far stand evenly from the left
-// edge to where the clock puts the newest, so hours nobody traded take no
-// room and a thin name's morning is never an empty stretch; the hours to
-// come run by the clock. Any other day runs by the clock throughout.
+// Robinhood's screen draws it: the day's prints so far stand evenly from the
+// left edge to where the clock puts the newest, so hours nobody traded take
+// no room and a thin name's morning is never an empty stretch; the hours to
+// come run by the clock, and so does a thin night after the day
+// (`axis.night`), where each trade stands at its own time. Any other day runs
+// by the clock throughout.
 
-// Where the clock puts the newest print, 0..1: the end of the prints' room.
-function newestFraction(quote, axis) {
+// How many prints the day holds before a night after it: all of them
+// without one. The night's come after them.
+function dayPrints(quote, axis) {
   var pts = quote.points
-  return pts.length ? Format.clamp(axisFraction(axis, pts[pts.length - 1].t), 0, 1) : 0
+  if (!axis.night) return pts.length
+  var lo = 0, hi = pts.length
+  while (lo < hi) {
+    var mid = (lo + hi) >> 1
+    if (pts[mid].t < axis.night.start) lo = mid + 1
+    else hi = mid
+  }
+  return lo
+}
+
+// Where the clock puts the day's newest print, 0..1: the end of the prints'
+// room.
+function newestFraction(quote, axis) {
+  var n = dayPrints(quote, axis)
+  return n ? Format.clamp(axisFraction(axis, quote.points[n - 1].t), 0, 1) : 0
 }
 
 // Where print `k` sits.
 function printFraction(quote, axis, k) {
-  if (!axis.byPrint) return axisFraction(axis, quote.points[k].t)
-  var last = quote.points.length - 1
-  return last > 0 ? newestFraction(quote, axis) * k / last : newestFraction(quote, axis)
+  var n = dayPrints(quote, axis)
+  if (!axis.byPrint || k >= n) return axisFraction(axis, quote.points[k].t)
+  return n > 1 ? newestFraction(quote, axis) * k / (n - 1) : newestFraction(quote, axis)
 }
 
 // The last print at or before `t`, -1 before the first.
@@ -154,27 +191,37 @@ function printIndexAt(quote, t) {
   return i
 }
 
-// Where a tick at `t` sits: by print, halfway between the prints either side
-// of it, and by the clock past the newest print; -1 before the first.
+// Where a tick at `t` sits: by print, halfway between the day's prints
+// either side of it, and by the clock past the newest; -1 before the first.
 function tickFraction(quote, axis, t) {
   var pts = quote.points
-  if (!axis.byPrint || !pts.length || t > pts[pts.length - 1].t) return axisFraction(axis, t)
+  var n = dayPrints(quote, axis)
+  if (!axis.byPrint || !n || t > pts[n - 1].t) return axisFraction(axis, t)
   var k = printIndexAt(quote, t - 1) + 1
   if (k === 0) return -1
-  return newestFraction(quote, axis) * (k - 0.5) / Math.max(1, pts.length - 1)
+  return newestFraction(quote, axis) * (k - 0.5) / Math.max(1, n - 1)
 }
 
-// The moment at `fraction` along the day: by print, the nearest print, up to
-// the newest; by the clock past it.
+// The moment at `fraction` along the day: by print, the nearest of the
+// day's prints up to its newest, and the nearest print up to the newest of
+// a night after it; by the clock past them.
 function timeAtFraction(quote, fraction) {
   var axis = chartSpan(quote)
   var pts = quote.points
   var f = Format.clamp(fraction, 0, 1)
   if (axis.byPrint && pts.length) {
+    var n = dayPrints(quote, axis)
     var newest = newestFraction(quote, axis)
-    if (f <= newest) return pts[Math.round((newest > 0 ? f / newest : 1) * (pts.length - 1))].t
+    if (n && f <= newest) return pts[Math.round((newest > 0 ? f / newest : 1) * (n - 1))].t
+    if (f <= printFraction(quote, axis, pts.length - 1)) {
+      var near = Math.max(0, n - 1)
+      for (var k = near + 1; k < pts.length; k++) {
+        if (Math.abs(printFraction(quote, axis, k) - f) < Math.abs(printFraction(quote, axis, near) - f)) near = k
+      }
+      return pts[near].t
+    }
   }
-  return Math.round(axis.start + f * (axis.end - axis.start))
+  return Math.round(clockAt(axis, f * clockRoom(axis, axis.end)))
 }
 
 // Where the moment `t` sits along the day: by print, at the print it reads,
@@ -188,8 +235,8 @@ function fractionAtTime(quote, t) {
 }
 
 // `t` moved `steps` along the day, kept on it and short of `last`, the last
-// print: by print, from one print to the next; by the clock, five minutes a
-// step.
+// print: by print, from one print to the next, a thin night's trades
+// included; by the clock, five minutes a step.
 function stepTime(quote, t, steps, last) {
   var axis = chartSpan(quote)
   var pts = quote.points

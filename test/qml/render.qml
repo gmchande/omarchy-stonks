@@ -484,7 +484,7 @@ ShellRoot {
       })
       us.forEach(function(s) {
         allDay[s] = { status: "ok", allDay: tradable ? tradable[s] : true, at: 0 }
-        if (allDay[s].allDay) nights[s] = { status: "ok", bars: answer[s] }
+        if (allDay[s].allDay) nights[s] = Object.assign({ status: "ok" }, answer[s])
       })
       // The moment each was saved at: Friday 2 October 13:42, Thursday
       // 1 October 23:00, Sunday 27 September 22:30, Monday 5 October 00:36;

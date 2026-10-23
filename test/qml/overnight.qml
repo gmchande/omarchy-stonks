@@ -127,8 +127,9 @@ ShellRoot {
 
   // The hero chart's ink at the print at `fraction` along it, in the look
   // shown: the most opaque pixel around it, smooth's line or retro's cap (0
-  // when nothing is drawn there), and how many pixels wide the ink is across
-  // the print's row, seven either side of it.
+  // when nothing is drawn there), how many pixels wide the ink is across
+  // the print's row, seven either side of it, and the ink a row of cells, or
+  // six pixels, under it.
   function inkAt(fraction) {
     var canvas = findAll(app.testBody, "ink", []).filter(function(c) { return c.visible })[0]
     var chart = canvas.parent.parent
@@ -152,7 +153,8 @@ ShellRoot {
     var row = ctx.getImageData(Math.round(x) - 7, Math.round(y), 15, 1).data
     var width = 0
     for (var j = 3; j < row.length; j += 4) if (row[j] > 0) width++
-    return { alpha: most, width: width, cell: chart.grid ? chart.pixel : 0 }
+    var under = ctx.getImageData(Math.round(x), Math.round(y + (chart.grid ? chart.pixel * 1.5 : 6)), 1, 1).data[3]
+    return { alpha: most, width: width, cell: chart.grid ? chart.pixel : 0, under: under }
   }
 
   // The hero's retro chart, shown.
@@ -481,15 +483,34 @@ ShellRoot {
       featureShown("SILK")
       harness.check("SILK's last print, at 22:20, is forty minutes old and dim", harness.strip() === "OVERNIGHT 22:20 342.13 +0.04% dim",
         harness.strip())
+      // SILK traded in 13 of the night's 35 five-minute slots so far: its 1D
+      // is Thursday's day from 04:00, then the night to Friday 04:00, each of
+      // its trades a dot where the clock puts it, joined to nothing. NEST,
+      // which traded in every one, keeps its calendar day, midnight to
+      // midnight (`geometry`, above). On dev it was Thursday midnight to
+      // midnight, its night a line run on through the quiet slots.
+      var silkNight = body.featuredGeometry
+      var silkDay = body.featuredDay
+      var dayStart = harness.midnight.thu1 + 4 * 3600
+      var silkDots = silkNight.points.filter(function(p) { return p.dot })
+      var dotsByClock = silkDay.points.every(function(p, k) {
+        var g = silkNight.points[k]
+        return g.dot === (p.t >= harness.midnight.thu1 + 20 * 3600) && (!g.dot || (g.brk && Math.abs(g.x - (p.t - dayStart) / 86400) < 1e-9))
+      })
+      harness.check("SILK's thin night: Thursday's day from 04:00, then its 13 trades as dots by the clock to 04:00; NEST's night, traded through, stays midnight to midnight",
+        silkNight.start === dayStart && silkNight.end === harness.midnight.fri2 + 4 * 3600 && silkDots.length === 13 && dotsByClock
+          && geometry.start === harness.midnight.thu1 && geometry.end === harness.midnight.fri2,
+        silkNight.start + " to " + silkNight.end + ", " + silkDots.length + " dots, by the clock " + dotsByClock + " | NEST " + geometry.start + " to " + geometry.end)
       featureShown("REED")
       var reed = body.featuredGeometry
-      harness.check("REED has not traded tonight: no overnight line, its after-hours stays, and its chart is Thursday too",
-        harness.strip() === "AFTER HOURS 21.50 +0.84%" && reed.start === harness.midnight.thu1 && reed.end === harness.midnight.fri2,
+      harness.check("REED has not traded tonight: no overnight line, its after-hours stays, and its chart is Thursday's day, its night empty",
+        harness.strip() === "AFTER HOURS 21.50 +0.84%" && reed.start === dayStart && reed.end === harness.midnight.fri2 + 4 * 3600
+          && !reed.points.some(function(p) { return p.dot }),
         harness.strip() + " | " + reed.start + " to " + reed.end)
 
-      // Search's choice on the hero: a symbol in All shows its calendar day,
-      // as it does featured; one not yet added keeps its session day, and
-      // Robinhood is never asked for it.
+      // Search's choice on the hero: a symbol in All shows its chart as it
+      // does featured, SILK's thin night; one not yet added keeps its
+      // session day, and Robinhood is never asked for it.
       app.testKeyCatcher.forceActiveFocus()
       keyClick(Qt.Key_A)
       within(2000, function() { return body.adding })
@@ -501,8 +522,8 @@ ShellRoot {
       var unadded = body.featuredGeometry
       var unaddedLast = unadded.points.length - 1
       var unaddedEven = unadded.points.every(function(p, k) { return Math.abs(p.x - unadded.points[unaddedLast].x * k / unaddedLast) < 1e-9 })
-      harness.check("search's preview of a symbol in All shows its calendar day; one not yet added, a US stock, draws Yahoo's own day, 04:00 to 20:00, a print a step, never asked of Robinhood",
-        body.adding && listed.start === harness.midnight.thu1 && listed.end === harness.midnight.fri2 && body.chartSymbol === "AAPL"
+      harness.check("search's preview of a symbol in All shows its chart as featured; one not yet added, a US stock, draws Yahoo's own day, 04:00 to 20:00, a print a step, never asked of Robinhood",
+        body.adding && listed.start === silkNight.start && listed.end === silkNight.end && listed.points.length === silkNight.points.length && body.chartSymbol === "AAPL"
           && unadded.end - unadded.start === 16 * 3600 && unaddedEven && harness.asked() === "NEST,REED,SILK"
           && harness.allDayAsked("AAPL") === 0,
         body.chartSymbol + " | " + (listed.end - listed.start) + " s, " + (unadded.end - unadded.start) + " s, even " + unaddedEven
@@ -551,10 +572,12 @@ ShellRoot {
         indexEnd + " ; " + silkClose + " ; " + silkAfter + " | at rest " + indexRest + ", " + silkRest + "; that print " + offText)
 
       // Monday 5 October, 00:36: the first live night, saved as it was. EZ
-      // last traded at 22:40 on Sunday, so its chart stays on Friday, never
-      // blank, and the line under the price names the night. TOY traded at
-      // 00:20, the only print on Monday's chart so far: it draws, in its
-      // session's dim tone, in both looks, and the scrub lands on it.
+      // traded once since Sunday 20:00, at 22:40, and TOY five times, the
+      // last at 00:20: both thin nights, so each chart is Friday's day from
+      // 04:00, never blank, then the night's trades after it as dots, the
+      // weekend between taking no room, and the line under the price names
+      // the night. On dev, EZ drew Friday midnight to midnight and TOY its
+      // one print after midnight, alone at the left edge of an empty Monday.
       useSet("live-2026-10-05")
       service.now = harness.live
       app.testKeyCatcher.forceActiveFocus()
@@ -565,10 +588,11 @@ ShellRoot {
       featureShown("EZ")
       within(3000, function() { return harness.strip().indexOf("OVERNIGHT") === 0 })
       var ezChart = body.featuredGeometry
-      harness.check("EZ, quiet since Sunday 22:40: Monday 00:36 keeps Friday's chart, and the line names the night",
-        ezChart.start === harness.midnight.fri2 && ezChart.points.length > 0 && harness.strip() === "OVERNIGHT 22:40 19.71 \u22123.71% dim",
-        ezChart.start + ", " + ezChart.points.length + " points | " + harness.strip())
-      var lone = [["TOY", 1791174000, "00:20", "322.00"]]
+      var ezDots = ezChart.points.filter(function(p) { return p.dot })
+      harness.check("EZ, one trade since Sunday 20:00: Monday 00:36 shows Friday's day from 04:00 and that trade a dot after it, and the line names the night",
+        ezChart.start === harness.midnight.fri2 + 4 * 3600 && ezChart.points.length > 1 && ezDots.length === 1
+          && harness.strip() === "OVERNIGHT 22:40 19.71 \u22123.71% dim",
+        ezChart.start + ", " + ezChart.points.length + " points, " + ezDots.length + " dots | " + harness.strip())
       var looks = [false, true]
       looks.forEach(function(retro) {
         if (service.retro !== retro) {
@@ -577,37 +601,51 @@ ShellRoot {
           within(2000, function() { return service.retro === retro })
         }
         var look = retro ? "retro" : "smooth"
-        lone.forEach(function(print) {
-          featureShown(print[0])
-          // Smooth's dot is about three times the line's width; retro's cap
-          // is a cell, as wide as every other column's. A look just switched
-          // paints on its next frame.
-          var at = Chart.fractionAtTime(body.featuredDay, print[1])
-          within(2000, function() { return harness.inkAt(at).alpha > 0 })
-          var ink = harness.inkAt(at)
-          harness.check(look + ": " + print[0] + "'s lone print at " + print[2] + " draws, dim outside the session, "
-            + (retro ? "a whole cell" : "about three times the line's width"),
-            ink.alpha > 0 && ink.alpha < 200 && (retro ? ink.width >= ink.cell : ink.width >= 5 && ink.width <= 8),
-            "alpha " + ink.alpha + ", " + ink.width + " px wide")
-          // Four minutes into its bar, a pixel or two at this width, past
-          // the chart's last print.
-          scrubAt(Chart.fractionAtTime(body.featuredDay, print[1] + 240))
-          var scrubbed = body.featured.priceText
-          endScrub()
-          harness.check(look + ": a scrub at " + print[2] + " lands on it", scrubbed === print[3], scrubbed)
-          // Before it, from midnight, there is nothing to read: the left
-          // edge, and a replay's first moment, read the print itself, never
-          // the close before the night.
-          scrubAt(0)
-          var edge = body.headerText + " | " + body.featured.priceText
-          endScrub()
-          body.replay()
-          var replayed = body.headerText + " | " + body.featured.priceText
-          body.motion.clearScrub()
-          var first = "At " + print[2] + " · Overnight | " + print[3]
-          harness.check(look + ": the left edge and a replay's first moment read the day's first print, " + print[2],
-            edge === first && replayed === first, edge + " ; " + replayed)
-        })
+        featureShown("TOY")
+        var toy = body.featuredDay
+        var offset = service.quotes.TOY.gmtoffset
+        var trades = toy.points.filter(function(p) { return p.t >= harness.midnight.fri2 + 3 * 86400 - 4 * 3600 })
+        // Smooth's dot is twice the line's width; retro's is a cell, as wide
+        // as every other column's, with no column under it. A look just
+        // switched paints on its next frame.
+        var at = Chart.fractionAtTime(toy, 1791174000)
+        within(2000, function() { return harness.inkAt(at).alpha > 0 })
+        var ink = harness.inkAt(at)
+        harness.check(look + ": TOY's five trades since Sunday 20:00 are dots after Friday's day; its 00:20 trade draws dim, "
+          + (retro ? "a whole cell" : "twice the line's width") + ", with nothing under it",
+          trades.length === 5 && body.featuredGeometry.points.filter(function(p) { return p.dot }).length === 5
+            && ink.alpha > 0 && ink.alpha < 200 && ink.under === 0 && (retro ? ink.width >= ink.cell : ink.width >= 3 && ink.width <= 6),
+          trades.length + " trades | alpha " + ink.alpha + ", " + ink.width + " px wide, " + ink.under + " under it")
+        // Four minutes into its bar, a pixel or two at this width: the scrub
+        // lands on the dot and says its time, and its move from Friday's
+        // close, the line under the price's; the legend names both closes.
+        // It read the move from Thursday's close, the dashed line's.
+        var restLine = harness.strip().split(" ")
+        scrubAt(Chart.fractionAtTime(toy, 1791174000 + 240))
+        var legend = harness.find(body, "baselineLegend")
+        var scrubbed = [body.headerText, body.featured.priceText, body.featured.changeText, legend.visible ? legend.text : ""].join(" | ")
+        endScrub()
+        harness.check(look + ": a scrub at TOY's 00:20 dot lands on it, says its time, reads its move from Friday's close as the line under the price does, and the legend says which close each part reads from",
+          scrubbed === ["At 00:20 · Overnight", "322.00", "+0.38%", "┄ PREV CLOSE 323.09 · NIGHT FROM CLOSE 320.77"].join(" | ")
+            && restLine.slice(0, 4).join(" ") === "OVERNIGHT 00:20 322.00 " + Format.lookSigns("+0.38%", retro),
+          scrubbed + " | at rest " + restLine.join(" "))
+        // The left edge and a replay's first moment read Friday's first print,
+        // and the replay reads each of the night's trades on its way.
+        scrubAt(0)
+        var edge = body.headerText
+        endScrub()
+        var replayRead = []
+        var watch = function() { if (body.motion.replayRunning) replayRead.push(body.headerText) }
+        body.headerTextChanged.connect(watch)
+        body.replay()
+        var replayed = body.headerText + " | " + body.featured.priceText
+        within(4000, function() { return !body.motion.replayRunning })
+        body.headerTextChanged.disconnect(watch)
+        var missed = trades.map(function(p) { return "At " + Format.hhmm(p.t, offset) + " · Overnight" })
+          .filter(function(said) { return replayRead.indexOf(said) < 0 })
+        harness.check(look + ": the left edge and a replay's first moment read Friday's first print, and the replay reads every one of the night's trades",
+          edge.indexOf("At 04:") === 0 && replayed === "At 04:00 · Pre-market | 328.38" && missed.length === 0,
+          edge + " ; " + replayed + " ; missed " + missed.join(", "))
       })
 
       // Still in retro, NEST's Monday from midnight to 00:30, its last print

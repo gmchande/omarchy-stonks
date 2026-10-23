@@ -277,6 +277,8 @@ ShellRoot {
         return !strikes.some(function(st) { return st.bar === r.bar && st.t >= r.from - 0.02 && st.t <= r.from + 0.065 })
       }).map(function(r) { return r.from.toFixed(3) + "s bar " + r.bar })
       return {
+        strikes: strikes,
+        place: sound.place,
         pitch: { ok: strikes.length >= 5 && wrong.length <= strikes.length * 0.1 && unstruck.length <= moves.length * 0.1,
           detail: strikes.length + " strikes; wrong " + wrong.slice(0, 5).join(", ") + "; "
             + unstruck.length + " of " + moves.length + " held moves unstruck: " + unstruck.slice(0, 5).join(", ") },
@@ -592,6 +594,38 @@ ShellRoot {
       body.endScrub()
       harness.check("a chime's player held by a stalled PipeWire is stopped within its time limit",
         stillHeld === "" && heldEnd() === "stopped", stillHeld + "|" + heldEnd())
+      // TOY's thin night, saved at 00:36 on Monday 5 October: Friday's day,
+      // then Sunday night's five trades as dots, each alone. Smooth's replay
+      // strikes each one's bar as it passes it, as the replay's scrub reads
+      // it; the replay's place stepped over their single points unheard
+      // (night-dots-review).
+      harness.writeText(harness.fakeState + "/overnight.set", "live-2026-10-05\n")
+      service.addSymbol("TOY")
+      quiet()
+      service.feature("TOY")
+      tryVerify(function() {
+        return body.featuredSymbol === "TOY" && !body.chartLoading && body.motion.geometry.points.some(function(p) { return p.dot })
+      }, 8000)
+      harness.writeText(harness.fakeState + "/overnight.set", "")
+      wait(400)
+      var thin = capture(body)
+      var thinAt = harness.starts().length
+      keyClick(Qt.Key_P)
+      startsBy(thinAt + 1)
+      thin.done()
+      tryVerify(function() { return endOf(thinAt + 1) !== "" }, 4000)
+      var thinHeard = smoothStrikes(thinAt + 1, thin.seen.chart)
+      var dots = thin.seen.chart.geometry.points.filter(function(p) { return p.dot })
+      var unheard = dots.filter(function(dot) {
+        var bar = Math.round((1 - Math.max(0, Math.min(1, dot.y))) * (penta.length - 1))
+        var passed = 0
+        while (passed < 2 && thinHeard.place(passed) < dot.x) passed += 0.002
+        return !thinHeard.strikes.some(function(st) { return st.bar === bar && st.t >= passed - 0.02 && st.t <= passed + 0.11 })
+      })
+      harness.check("smooth's replay of a thin night strikes each of its trades' dots as it passes it",
+        dots.length === 5 && unheard.length === 0 && thinHeard.pitch.ok,
+        dots.length + " dots, " + unheard.length + " unheard | " + thinHeard.pitch.detail)
+      service.removeSymbol("TOY")
       service.removeSymbol("7203.T")
       service.feature("MSFT")
       quiet()

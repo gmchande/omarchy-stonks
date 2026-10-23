@@ -211,7 +211,10 @@ function listBreadth(symbols, quotes, scrubT, mode) {
 // chart fill does not flip when the change mode does, and it is the
 // direction at the moment shown, as a range's is. dayTone is that change's
 // tone, flat when it rounds to nothing, so the bull and bear follow a scrub
-// and a replay, and a flat day has neither.
+// and a replay, and a flat day has neither. A trade in a thin night after
+// the day is measured from the day's own close instead, as the overnight
+// line under the price is (`Overnight.nightClose`): since the open, as the
+// percent from that close.
 // It carries no drawing: a line is drawn from its quote, so it redraws when
 // the quote does, not with the clock or the change mode. Nor does it read
 // the clock, so a row is not derived again every second. Pass the
@@ -219,8 +222,11 @@ function listBreadth(symbols, quotes, scrubT, mode) {
 function rowModel(quote, scrubT, changeMode) {
   var read = scrubT ? Quote.readingAt(quote, scrubT) : Quote.headlineQuote(quote)
   var price = read ? read.price : null
-  var chg = Quote.change(quote, price, changeMode)
-  var direction = Quote.change(quote, price, "pct")
+  var close = scrubT ? Overnight.nightClose(quote, scrubT) : null
+  var measured = close === null ? quote : { prevClose: close, points: [] }
+  var mode = close !== null && changeMode === "open" ? "pct" : changeMode
+  var chg = Quote.change(measured, price, mode)
+  var direction = Quote.change(measured, price, "pct")
   return {
     symbol: quote.symbol,
     name: quote.name,
@@ -230,13 +236,23 @@ function rowModel(quote, scrubT, changeMode) {
     // Null stays null: an unavailable change must not read as unchanged.
     pct: chg.pct,
     abs: chg.abs,
-    tone: Format.changeTone(chg, changeMode, quote.priceDigits),
+    tone: Format.changeTone(chg, mode, quote.priceDigits),
     dayUp: direction.pct === null ? null : direction.up,
     dayTone: Format.changeTone(direction, "pct", quote.priceDigits),
-    changeText: Format.changeText(chg, changeMode, quote.priceDigits),
-    changeLine: Format.changeText(chg, changeMode, quote.priceDigits) + (changeMode === "open" && chg.pct !== null ? " open" : ""),
-    periodLabel: Format.changeCaption(changeMode)
+    changeText: Format.changeText(chg, mode, quote.priceDigits),
+    changeLine: Format.changeText(chg, mode, quote.priceDigits) + (mode === "open" && chg.pct !== null ? " open" : ""),
+    periodLabel: Format.changeCaption(mode)
   }
+}
+
+// What a scrub of the 1D `day` reads its moves from, said beside its dashed
+// line: the line's own close, the day's previous close; on a day with a thin
+// night after it, also the close the night's trades read from
+// (`rowModel`).
+function dayBaselineText(day) {
+  var text = "PREV CLOSE " + Format.money(day.prevClose, day.priceDigits)
+  var close = day.axis && day.axis.night ? Overnight.nightClose(day, day.axis.night.start) : null
+  return close === null ? text : text + " · NIGHT FROM CLOSE " + Format.money(close, day.priceDigits)
 }
 
 // The day's animal for a row (`rowModel`): "bull" up, "bear" down, by

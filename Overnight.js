@@ -16,7 +16,9 @@
 // side by side, so neither waits for the other. Only one it trades all day
 // draws its prints, on a 1D chart of one New York calendar day, midnight to
 // midnight, the way Robinhood's screen draws it: Yahoo's day, and
-// Robinhood's prints for the hours before it and after it. Any other has
+// Robinhood's prints for the hours before it and after it; unless the night
+// after Yahoo's day trades thinly (`thinNight`), when the chart is Yahoo's
+// day and that night's few trades after it, each on its own. Any other has
 // Yahoo's own day, 04:00 to 20:00: a thin name trades a few shares
 // overnight now and then (two at 23:10 on 6 October, in the saved answers),
 // and none of them is a night's price. The overnight print is never the
@@ -113,13 +115,13 @@ function allDayDue(entry, now) {
   return now - entry.at >= (entry.status === "ok" ? ALL_DAY_INTERVAL : OVERNIGHT_INTERVAL)
 }
 
-// Robinhood's answer, by the Yahoo symbols asked for: each one's prints
-// (`overnightBars`). Null for a response that is not Robinhood's.
+// Robinhood's answer, by the Yahoo symbols asked for: each one's
+// (`overnightAnswer`). Null for a response that is not Robinhood's.
 function parseOvernight(json, symbols) {
   var results = overnightResults(json)
   if (!results) return null
   var out = {}
-  for (var i = 0; i < symbols.length; i++) out[symbols[i]] = overnightBars(results[i], symbols[i])
+  for (var i = 0; i < symbols.length; i++) out[symbols[i]] = overnightAnswer(results[i], symbols[i])
   return out
 }
 
@@ -130,22 +132,26 @@ function overnightResults(json) {
 }
 
 // One result of Robinhood's answer, for the Yahoo symbol asked for in its
-// place: its prints, { t, p, s } with s its session ("pre", "reg", "post",
-// "overnight"), only the bars that traded: bounds=24_5 still fills a quiet
-// name's gaps with flat `interpolated` bars. An unknown symbol comes back
-// empty, and one that names another symbol, or whose prints are not a list
-// within MOST_PRINTS, is no answer for it.
-function overnightBars(result, symbol) {
-  var bars = []
+// place: { bars, through }. `bars` are its prints, { t, p, s } with s its
+// session ("pre", "reg", "post", "overnight"), only the bars that traded:
+// bounds=24_5 still fills a quiet name's gaps with flat `interpolated`
+// bars. `through` is the start of the newest five-minute slot the answer
+// holds, traded or not, null with none: how far Robinhood's day reaches, so
+// a night's quiet slots can be counted (`thinNight`). An unknown symbol
+// comes back empty, and one that names another symbol, or whose prints are
+// not a list within MOST_PRINTS, is no answer for it.
+function overnightAnswer(result, symbol) {
+  var out = { bars: [], through: null }
   var historicals = result && result.symbol === robinhoodSymbol(symbol) ? Format.fetchedList(result.historicals, MOST_PRINTS) : null
-  if (!historicals) return bars
+  if (!historicals) return out
   for (var j = 0; j < historicals.length; j++) {
     var bar = historicals[j]
     var t = Date.parse(bar.begins_at) / 1000
     var p = Number(bar.close_price)
-    if (!bar.interpolated && Format.isFiniteNumber(t) && Format.isFiniteNumber(p) && p > 0) bars.push({ t: t, p: p, s: bar.session })
+    if (Format.isFiniteNumber(t) && (out.through === null || t > out.through)) out.through = t
+    if (!bar.interpolated && Format.isFiniteNumber(t) && Format.isFiniteNumber(p) && p > 0) out.bars.push({ t: t, p: p, s: bar.session })
   }
-  return bars
+  return out
 }
 
 // Whether two answers' prints for a listing are the same, bar by bar.
@@ -271,20 +277,54 @@ function dayTicks(cal, date, regular) {
   return ticks
 }
 
-// The 1D chart of a listing Robinhood trades all day, apart from its quote:
-// `day`, the New York calendar day `chartDate` names, midnight to midnight,
-// laid out by print (`Chart.chartGeometry`), with the hours to come empty,
-// shaped as a quote so the chart's measures read it as they read Yahoo's:
-// the prints inside it, its axis, and its baseline (`dayBaseline`) as its
-// `prevClose`; and `latest`, the newest print of all, which the line under
-// the price names wherever it falls. Each print keeps its session, and its
+// The night after `quote`'s day: the overnight session before the next day
+// the market trades, Sunday evening's after a Friday, from its open to its
+// close.
+function nightAfter(cal, quote) {
+  var date = Market.dateStringOf(Market.localDate(quote.session.regular.start, cal))
+  var day = marketDay(cal, Market.nextDateString(date))
+  for (var i = 0; i < 14 && !day.open; i++) day = marketDay(cal, Market.nextDateString(day.date))
+  return { start: day.start, end: Market.epochAt(cal, day.date, cal.overnight.close) }
+}
+
+// Robinhood's bars are five minutes each.
+var SLOT = 5 * 60
+
+// The share of a night's five-minute slots so far a stock trades in for its
+// night to be traded through. In the saved answers, the listings that trade
+// the night through traded in every slot, and the rest in 70% at most.
+var TRADED_THROUGH = 0.9
+
+// Whether `night` trades thinly in Robinhood's answer for a listing
+// (`answer`, { bars, through }): it has begun there, and fewer than
+// TRADED_THROUGH of its five-minute slots so far traded. A night not begun
+// is neither.
+function thinNight(night, answer) {
+  if (answer.through === null || answer.through < night.start) return false
+  var slots = Math.floor((Math.min(answer.through, night.end - SLOT) - night.start) / SLOT) + 1
+  var traded = answer.bars.filter(function(b) { return b.t >= night.start && b.t < night.end }).length
+  return traded < TRADED_THROUGH * slots
+}
+
+// The 1D chart of a listing Robinhood trades all day, apart from its quote,
+// from its answer (`answer`, { bars, through }, `overnightAnswer`'s):
+// `day`, shaped as a quote so the chart's measures read it as they read
+// Yahoo's; and `latest`, the newest print of all, which the line under the
+// price names wherever it falls. Each print keeps its session, and its
 // clock time comes from the calendar. Only the chart and a scrub of it read
 // the day: the headline and the day's figures stay the quote's.
-function dayChart(quote, bars, calendars) {
+// The day is the New York calendar day `chartDate` names, midnight to
+// midnight, laid out by print (`Chart.chartGeometry`), with the hours to
+// come empty: the prints inside it, its axis, and its baseline
+// (`dayBaseline`) as its `prevClose`. Through a night after Yahoo's day that
+// trades thinly (`thinNight`), it is `dayAndNight`.
+function dayChart(quote, answer, calendars) {
   var cal = Market.calendarFor(calendars, quote)
   if (!cal || !cal.overnight || !quote.session.regular) return { day: quote, latest: null }
-  var all = prints(quote, bars || [])
+  var all = prints(quote, answer.bars)
   var latest = all.length ? all[all.length - 1] : null
+  var night = nightAfter(cal, quote)
+  if (thinNight(night, answer)) return { day: dayAndNight(quote, answer.bars, night, cal), latest: latest }
   var date = chartDate(cal, latest ? latest.t : quote.session.regular.start)
   var start = Market.epochAt(cal, date, "00:00")
   var end = Market.epochAt(cal, Market.nextDateString(date), "00:00")
@@ -297,6 +337,30 @@ function dayChart(quote, bars, calendars) {
     }),
     latest: latest
   }
+}
+
+// A thin night's 1D: Yahoo's day as `sessionDay` lays it out, measured from
+// its previous close, then the night after it (`axis.night`) to its close,
+// its trades by the clock, each on its own (`Chart.chartGeometry`), each
+// measured from the day's own close (`nightClose`). The hours between the
+// day's end and the night's start, a weekend's, take no room
+// (`axis.dayEnd`). Ticks at the close and the night's start.
+function dayAndNight(quote, bars, night, cal) {
+  return Object.assign({}, quote, {
+    points: quote.points.concat(bars.filter(function(b) { return b.t >= night.start && b.t < night.end })),
+    axis: { start: Quote.dayStart(quote), end: night.end, ticks: [quote.session.regular.end, night.start], byPrint: true,
+      dayEnd: Quote.dayEnd(quote), night: night },
+    calendar: cal
+  })
+}
+
+// The close a moment `t` of a 1D `day` is measured from when it falls in a
+// thin night after the day (`dayAndNight`): the day's own close, the one the
+// overnight line under the price measures from (`Figures.extendedStack`).
+// Null for any other moment, which the day's `prevClose` measures, as it
+// does the dashed line.
+function nightClose(day, t) {
+  return day.axis && day.axis.night && t >= day.axis.night.start ? Quote.regularClose(day) : null
 }
 
 // The 1D chart of a US listing Robinhood does not trade all day: Yahoo's own

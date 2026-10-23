@@ -379,9 +379,10 @@ Item {
     .concat(yearLine ? [History.rangeFacts(yearLine.range.widest)] : [])
   readonly property var yearLine: chart ? Fundamentals.yearLine(featuredQuote, fundamentals ? fundamentals.figures : null) : null
   readonly property var rangeMarks: historyShown ? History.rangeMarks(history, rangeEnds, featuredQuote) : null
-  // What the dashed line is, said while a scrub reads against it.
+  // What the dashed line is, said while a scrub reads against it, and on a
+  // thin night's day the close the night's trades read from too.
   readonly property string baselineText: historyShown ? chartRange.toUpperCase() + " START " + Format.money(history.baseline, featuredQuote ? featuredQuote.priceDigits : undefined)
-    : (!historyActive && featuredDay ? "PREV CLOSE " + Format.money(featuredDay.prevClose, featuredDay.priceDigits) : "")
+    : (!historyActive && featuredDay ? Figures.dayBaselineText(featuredDay) : "")
   // A range that failed, which r, or the header's button, asks for again.
   readonly property string unavailableText: chartRange.toUpperCase() + " unavailable"
   readonly property bool offersRetry: headerText === unavailableText
