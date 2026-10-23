@@ -81,6 +81,8 @@ journey_begin() {
   step_sounds=$(sound_count)
   say "data file: $data"
   start_notice_gone || say "Hyprland's start notice was still moving after 25 s"
+  # The session starts with the pointer mid-output, over the popup's lines.
+  park
   if "$tophat" shell grvc.stonks.tophat where heroChart > /dev/null 2>&1; then
     locator=1
   else
@@ -203,6 +205,9 @@ hover_on() {
 
 # move_to X Y: one pointer move.
 move_to() { "$tophat" move "$1" "$2" > /dev/null || fail "move to $1 $2"; sleep 0.15; }
+# park: the pointer to the output's bottom-right corner, clear of the popup
+# and of everything a shot reads.
+park() { move_to "$((WIDTH - 1))" "$((HEIGHT - 1))"; }
 
 # scroll_on NAME [FILTERS] -- NOTCHES: wheel notches over the item; positive
 # scrolls down.

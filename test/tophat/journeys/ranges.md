@@ -39,3 +39,4 @@ range (1D).
 - The range's chart is fetched: wait for `loadingLabel` to go, then for the popup to settle, before the shot.
 - A restart of the shell isn't driven: the nested session has no restart that doesn't go through the owner's services.
 - On a commit before the locator, the lines are only in the shots (no words), and the click and wheel steps are SKIP. The ranges by key still run, so the shots compare.
+- The demo watchlist holds no stock younger than a range, so `range-caption`'s "SINCE …" isn't reached: add one through search to see it.

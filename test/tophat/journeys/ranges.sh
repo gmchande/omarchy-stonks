@@ -54,11 +54,13 @@ step "Click 1D, then 1Y, on the range row"
 if reachable "clicking a range"; then
   click_on rangeOption --text 1D
   check "a click on 1D chose 1D" [ "$(saved_range)" = 1D ]
+  park
   loaded
   shot click-1D
   lines
   click_on rangeOption --text 1Y
   check "a click on 1Y chose 1Y" [ "$(saved_range)" = 1Y ]
+  park
   loaded
   shot click-1Y
   lines
@@ -70,6 +72,7 @@ if reachable "the wheel on the range row"; then
   scroll_on rangeOption --text 1Y -- -1
   after=$(saved_range)
   check "a notch up moved $before to a shorter range ($after)" [ "$after" != "$before" ]
+  park
   loaded
   shot "wheel-$after"
 fi
