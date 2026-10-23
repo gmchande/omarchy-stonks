@@ -92,13 +92,21 @@ building one that won't merge.
   put a window on your desktop, crashed, or reached your session. Each
   checkout runs one session at a time, and sessions from different checkouts
   run side by side. The commands are listed at the top of the file.
+- `test/tophat/journeys/` is the feature map: what a user does with each
+  feature, and a script that drives it in that session with real keys and
+  pointer and keeps what it saw. Run the journeys of the features your
+  change touches, on the commit before it and on your branch, and compare
+  the two (its `README.md`). A change to how a feature is reached or what it
+  shows updates its entry.
 
 ## Layout
 
 - `manifest.json`: the plugin's id, kinds, and the pill's settings.
 - `Plugin.qml`: the service entry. It composes `Service.qml`, the one data
   owner, with the theme's colours, the version watch, the window's host, and
-  the IPC target.
+  the IPC target. In the tophat's nested session alone it adds
+  `Locator.qml`, which says where a named control is, for the journeys'
+  clicks.
 - `BarWidget.qml` is the pill and owns `Panel.qml`, the popup. `App.qml` is
   the window. Both surfaces show `StonksBody.qml`.
 - The feeds (`*Feed.qml`) and search's lookup are the only parts that fetch,
