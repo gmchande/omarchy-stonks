@@ -196,14 +196,12 @@ Item {
   // came and went, with every range change and every scrub. A failed
   // range's retry follows them. They start twice as far from the sleeping
   // z as the bull is, so it reads as the animal's and not as a mark on the
-  // first word, and stop as far short of the speaker as the icons stand
-  // apart, clear of its pressed fill. The first form that fits that room
-  // shows: with its letters spaced, else closed up. Found in the 1.1.0
-  // audit: beside the speaker and the camera, Tokyo's Constitution
-  // Memorial Day lost its name in the popup at the everyday text size; and
-  // in the size-16 check: after hours lost its time, and Tokyo's holiday
-  // ran up against the speaker.
-  readonly property real wordsRoom: Math.max(0, soundIcon.x - Style.space(14) - statusWords.x
+  // first word, and stop as much sooner, so their room is the same. The
+  // first form that fits that room shows: with its letters spaced, else
+  // closed up. Found in the 1.1.0 audit: beside the speaker and the camera,
+  // Tokyo's Constitution Memorial Day lost its name in the popup at the
+  // everyday text size; and in the size-16 check: after hours lost its time.
+  readonly property real wordsRoom: Math.max(0, soundIcon.x - Style.space(8) - statusWords.x
     - (root.offersRetry ? retry.implicitWidth + Style.space(16) : 0))
   readonly property var measured: [form0, form1, form2].slice(0, statusForms.length)
   // The form on show (`form`) and whether its letters close up (`tight`);

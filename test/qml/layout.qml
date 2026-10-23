@@ -1057,8 +1057,10 @@ ShellRoot {
         // Tokyo's "Constitution Memorial Day observed" and London's
         // "(substitute)" closures were cut in the popup; in the sound build:
         // beside the speaker, Martin Luther King, Jr. Day's was; in the
-        // camera build: beside the camera, Tokyo's lunch break was; and in
-        // the size-16 check: after hours lost its time.
+        // camera build: beside the camera, Tokyo's lunch break was; in the
+        // 1.1.0 audit: in the popup at the everyday size 12, Constitution
+        // Memorial Day went short, though 1.0.3 named it; and in the size-16
+        // check: after hours lost its time.
         var header = find(body, "statusText").parent
         var calendars = JSON.parse(calendarFile.text())
         var states = [["After hours · closed at 16:00 EDT", "Closed at 16:00 EDT"], ["Pre-market · opens in 3h 11m", "Opens in 3h 11m"],
@@ -1140,6 +1142,8 @@ ShellRoot {
                     roomless.push(where + words.text + " (" + Math.ceil(words.implicitWidth) + " px in " + words.width + ")")
                   else if (fitted.length > 0)
                     roomless.push(where + "said in less though \"" + fitted[0].words + "\" fits closed up")
+                  else if (shown > 0 && hsize === 12 && !surface.wide && states[s][0].indexOf("Constitution Memorial Day ·") === 0)
+                    roomless.push(where + "short at the everyday size: " + states[s][0])
                   if (shown > 0) shortened[where.trim()] = (shortened[where.trim()] || 0) + 1
                 }
                 body.undoOffered = { symbol: "SHOP.TO" }
