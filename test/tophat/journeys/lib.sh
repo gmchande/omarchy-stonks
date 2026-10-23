@@ -73,7 +73,7 @@ journey_begin() {
   trap journey_end EXIT
   "$tophat" start "${opts[@]}" "$ref" > "$out/start.log" 2>&1 || { fail "the session started: $(tail -n 1 "$out/start.log")"; exit 1; }
   started=1
-  run=$(sed -n 's/^run folder: //p' "$out/start.log")
+  run=$("$tophat" folder)
   # shellcheck source=/dev/null
   [ -f "$run/identity" ] && source "$run/identity"
   need "the session runs $ref, from this checkout" ours

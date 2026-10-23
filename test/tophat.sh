@@ -27,6 +27,9 @@
 #   shell CMD…                     omarchy-shell inside the session
 #   log                            the nested shell's log
 #   sounds                         what the stand-in pw-play was asked to play
+#   folder                         the session's run folder: identity names its COMMIT,
+#                                  CHECKOUT, WIDTH and HEIGHT; home/ is its home, with
+#                                  Stonks' data file at .config/omarchy/grvc.stonks.json
 #   self-check                     the guards, without a screen
 #
 # Two identities, never mixed. The nested one (socket, instance, runtime
@@ -1124,6 +1127,7 @@ case ${1:-} in
   shell) shift; (( $# )) || die "usage: shell CMD…"; drive_prelude; nested omarchy-shell "$@" ;;
   log) load_run; cat "$run/shell.log" ;;
   sounds) load_run; cat "$run/sounds.log" 2> /dev/null ;;
+  folder) load_run; echo "$run" ;;
   self-check) self_check ;;
-  *) sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *) sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
