@@ -52,12 +52,13 @@ key=$(printf %s "$checkout" | sha1sum | cut -c1-6)
 runtime=${TOPHAT_RUNTIME:-$host_runtime/th-$key}
 slot=${TOPHAT_SLOT:-$host_runtime/th-$key.lock}
 current=$base/current-$key
-# Every running session holds this shared, and test/live.sh takes it alone
-# to restart the shell, so a restart never lands under a session. Sessions
-# that overlap would keep it shared forever, so while test/live.sh waits for
-# it, it holds the gate, and no new session starts.
+# test/live.sh holds this alone while it restarts the shell, from the facts
+# it reads before to those it reads once the services are back, and leaves a
+# record of each restart in tophat.restarts beside it (its header). A
+# session reads the owner's facts under a share, so never mid-restart, and
+# its stop takes a change those records explain as the restart's.
 lock=${TOPHAT_LOCK:-$host_runtime/tophat.lock}
-gate=${lock%.lock}.gate
+restarts=${lock%.lock}.restarts
 # The session's output. A fixed size, so every run's shots compare.
 output=TOPHAT-1
 output_size=1416x850
@@ -109,15 +110,63 @@ socket_paths_fit() {
   done
 }
 
-# slot_free: this checkout runs no session, and no restart holds or waits
-# for the tophat lock. Advisory: the launcher takes the slot and the lock
-# atomically, and a launcher that loses the race starts nothing.
+# slot_free: this checkout runs no session. Advisory: the launcher takes the
+# slot, and a launcher that loses the race starts nothing.
 slot_free() {
   flock -n "$slot" true 2>/dev/null || { echo "tophat: this checkout's session is running ($slot); test/tophat.sh stop ends it" >&2; return 1; }
-  { flock -s -n "$gate" true && flock -s -n "$lock" true; } 2>/dev/null || { restart_busy; return 1; }
 }
-restart_busy() {
-  echo "tophat: test/live.sh is restarting the shell, or waiting for the sessions running to end so it can ($gate). New sessions wait until it's done, so it can't wait forever: start again once it has put its commit live" >&2
+
+# read_facts FILE: the owner-session facts into FILE, and read_at the time
+# they were read (date +%s%N), under a share of the tophat lock: a restart
+# that holds it is waited for, up to 5 minutes.
+read_facts() {
+  exec 6>> "$lock" || return 1
+  if ! flock -s -n 6; then
+    echo "tophat: test/live.sh is restarting the shell for a deploy; waiting for its services to come back"
+    flock -s -w 300 6 || { exec 6>&-; echo "tophat: the shell's restart held the tophat lock ($lock) for 5 minutes" >&2; return 1; }
+  fi
+  "$here/host-facts.sh" 6>&- > "$1"
+  read_at=$(date +%s%N)
+  exec 6>&-
+}
+
+# facts_explained SINCE UNTIL: the owner-session facts at stop (host-after,
+# read at UNTIL) are the start's (host-before, read at SINCE), or what the
+# restarts test/live.sh began between the two made of them: each restart
+# found them as the session last saw them and changed only its services'
+# facts (shell_facts), and the session ends with them as the last one's
+# services left them. Says each restart, and the first change none
+# explains. A restart begins while it holds the tophat lock alone, so never
+# between a read and its time.
+facts_explained() {
+  local since=$1 until=$2 was=$run/host-before after="the session's start" record began at
+  for record in "$restarts"/*/; do
+    began=$(basename "$record")
+    [[ $began =~ ^[0-9]+$ ]] && (( began > since && began < until )) || continue
+    at=$(date -d "@$((began / 1000000000))" +%H:%M:%S)
+    if [ ! -s "$record/back" ]; then
+      echo "UNEXPLAINED the shell restarted for a deploy at $at, and test/live.sh never saw its services back" >&2
+      return 1
+    fi
+    facts_same "$was" "$record/before" "between $after and the shell's restart for a deploy at $at" || return 1
+    facts_same <(grep -vE "$shell_facts" "$record/before") <(grep -vE "$shell_facts" "$record/after") \
+      "beyond the shell's services, during its restart for a deploy at $at" || return 1
+    echo "the shell restarted for a deploy of $(cut -c1-7 "$record/commit") at $at; its services were back at $(date -d "@$(($(cat "$record/back") / 1000000000))" +%H:%M:%S)"
+    was=$record/after after="that restart"
+  done
+  facts_same "$was" "$run/host-after" "between $after and the stop"
+}
+# The facts a restart changes: its services', which the new shell's own
+# processes hold (test/host-facts.sh).
+shell_facts='^(clipboard watchers|notifications owner|tray owner): '
+# facts_same A B WHEN: the facts in A and B are the same, or says how they
+# differ.
+facts_same() {
+  local changed
+  changed=$(diff "$1" "$2") && return 0
+  echo "UNEXPLAINED owner-session facts changed $3 (the owner may have changed them):" >&2
+  grep '^[<>]' <<< "$changed" >&2
+  return 1
 }
 
 # zone_ok ZONE: the system's time zone data knows ZONE. The C library runs
@@ -294,15 +343,15 @@ write_slow_curl() {
 
 # write_launcher RUN RUN_ID: start runs it as `setsid launch.sh`, so it leads
 # this run's own session and process group. It takes this checkout's slot
-# and a share of the tophat lock atomically, and holds both until the rest
-# of its group has gone: what the compositor leaves behind (the bus's
-# services, a child that outlives it) still belongs to the session, and
-# stop's TERM, which reaches the launcher too, ends only them. A core limit
-# of one byte, which everything it starts inherits and none can raise, makes
-# the kernel skip a crash's dump and its helper (fs/coredump.c), so a crash
-# notifies no one. The compositor it starts gets a clean environment with
-# the start's zone and, on a slow start, the slow curl ahead on its PATH;
-# its exit, a crash's signal among them, goes to launch.status.
+# and holds it until the rest of its group has gone: what the compositor
+# leaves behind (the bus's services, a child that outlives it) still
+# belongs to the session, and stop's TERM, which reaches the launcher too,
+# ends only them. A core limit of one byte, which everything it starts
+# inherits and none can raise, makes the kernel skip a crash's dump and its
+# helper (fs/coredump.c), so a crash notifies no one. The compositor it
+# starts gets a clean environment with the start's zone and, on a slow
+# start, the slow curl ahead on its PATH; its exit, a crash's signal among
+# them, goes to launch.status.
 write_launcher() {
   local run=$1 id=$2 tz="" slow_path=""
   [ -n "${zone:-}" ] && tz="TZ=$(printf %q "$zone") "
@@ -312,8 +361,6 @@ write_launcher() {
 run=$(printf %q "$run")
 exec 9> $(printf %q "$slot")
 flock -n 9 || { echo busy > "\$run/launch.status"; exit 0; }
-exec 8>> $(printf %q "$lock")
-flock -s -n 8 || { echo restarting > "\$run/launch.status"; exit 0; }
 # A start that gave up before this ran starts nothing.
 [ -e "\$run/cancel" ] && exit 0
 s=\$(cat /proc/\$\$/stat); s=\${s##*) }; read -r _ _ pgid sid _ <<< "\$s"
@@ -331,7 +378,7 @@ env -i HOME="\$run/home" XDG_CONFIG_HOME="\$run/home/.config" XDG_DATA_HOME="\$r
   OMARCHY_PATH=/usr/share/omarchy LANG=$(printf %q "${LANG:-C.UTF-8}") HYPRLAND_NO_SD_VARS=1 ${tz}\\
   TOPHAT_RUN=$(printf %q "$id") \\
   dbus-run-session -- env WAYLAND_DISPLAY=$(printf %q "$host_socket") \\
-  Hyprland --config "\$run/nested.lua" > "\$run/hyprland.log" 2>&1 8>&- 9>&- &
+  Hyprland --config "\$run/nested.lua" > "\$run/hyprland.log" 2>&1 9>&- &
 EOF
   cat >> "$run/launch.sh" << 'EOF'
 hypr=$!
@@ -578,11 +625,6 @@ cmd_start() {
     *) host_socket=$host_runtime/$WAYLAND_DISPLAY ;;
   esac
   slot_free && socket_paths_fit "$runtime" && bus_ok || exit 1
-  # A share of the tophat lock until the launcher holds its own, so no
-  # restart lands between host-before and the session. It's taken under a
-  # share of the gate, so it can't slip in once a restart waits.
-  exec 5>> "$gate" 7>> "$lock" && flock -s -n 5 && flock -s -n 7 || { restart_busy; exit 1; }
-  exec 5>&-
   # The slot is free, so whatever current names has ended.
   rm -f "$current"
   prune_runs
@@ -596,14 +638,13 @@ cmd_start() {
   build_sandbox "$run" "$commit" && { [ -z "$slow" ] || write_slow_curl "$run" "$slow" "$curl"; } \
     && write_nested_lua "$run" && nested_lua_ok "$run/nested.lua" \
     && write_launcher "$run" "$id" || die "the sandbox is not ready; nothing was launched"
-  "$here/host-facts.sh" > "$run/host-before"
-  { printf 'RUN_ID=%q\nCHECKOUT=%q\nCOMMIT=%q\nSTART_EPOCH=%q\nRUNTIME=%q\nZONE=%q\nSLOW=%q\n' "$id" "$checkout" "$commit" "$(date +%s)" "$runtime" "$zone" "$slow"; } > "$run/identity"
+  read_facts "$run/host-before" || die "the owner's facts could not be read; nothing was launched"
+  { printf 'RUN_ID=%q\nCHECKOUT=%q\nCOMMIT=%q\nSTART_EPOCH=%q\nFACTS_AT=%q\nRUNTIME=%q\nZONE=%q\nSLOW=%q\n' "$id" "$checkout" "$commit" "$((read_at / 1000000000))" "$read_at" "$runtime" "$zone" "$slow"; } > "$run/identity"
   trap 'start_failed "interrupted"' INT TERM
 
-  setsid "$run/launch.sh" < /dev/null > /dev/null 2>&1 7>&- &
+  setsid "$run/launch.sh" < /dev/null > /dev/null 2>&1 &
   within 15 test -s "$run/launch.status" || start_failed "the launcher never reported"
   [ "$(head -n 1 "$run/launch.status")" = started ] || start_failed "the launcher: $(head -n 1 "$run/launch.status")"
-  exec 7>&-
   # This run holds the slot: only now does it become the current one.
   ln -sfn "$run" "$current"
   read -r LEADER LEADER_START < "$run/leader"
@@ -754,10 +795,6 @@ stop_run() {
     if ! line=$(host_windows); then echo "FAILED the host's windows could not be read" >&2; status=1
     elif [ -n "$line" ]; then echo "FAILED a window of this run mapped on the host: $line" >&2; status=1; fi
   fi
-  # A share of the tophat lock until the facts are compared: once the
-  # launcher has gone, a waiting restart would land before them. It waits
-  # only while a restart runs.
-  exec 6>> "$lock" && flock -s 6
   end_session || { echo "FAILED the session's group did not end" >&2; status=1; }
   sleep 0.5
   # Processes that carry the run's mark but left its group: reported, never
@@ -778,14 +815,12 @@ stop_run() {
   line=$(crashes) || { echo "FAILED the kernel log could not be read (journalctl -k), so a crash would go unseen" >&2; status=1; }
   [ -n "$line" ] && { echo "FAILED a process crashed: $(paste -sd, <<< "$line" | sed 's/,/, /g'). No core was written (the run's core limit is one byte). Find the cause before relaunching (the diagnose-crash skill)." >&2; status=1; }
   if [ -f "$run/host-before" ]; then
-    "$here/host-facts.sh" > "$run/host-after"
-    if ! diff -q "$run/host-before" "$run/host-after" > /dev/null; then
-      echo "UNEXPLAINED owner-session facts changed during the run (the owner may have changed them):" >&2
-      diff "$run/host-before" "$run/host-after" | grep '^[<>]' >&2
+    if ! read_facts "$run/host-after"; then
+      echo "FAILED the owner's facts could not be read at stop" >&2; status=1
+    elif ! facts_explained "${FACTS_AT:-$((START_EPOCH * 1000000000))}" "$read_at"; then
       status=1
     fi
   fi
-  exec 6>&-
   [ "$(readlink -f "$current")" = "$run" ] && rm -f "$current"
   echo "artifacts: $run"
   return "$status"
@@ -870,7 +905,7 @@ self_check() {
     [ -f "$check_tmp/escapee" ] && kill "$(cat "$check_tmp/escapee")" 2>/dev/null; rm -rf "$check_tmp"' EXIT
   miss() { echo "FAILED $*"; failed=1; }
   export TOPHAT_BASE=$tmp/base TOPHAT_RUNTIME=$tmp/rt TOPHAT_SLOT=$tmp/slot TOPHAT_LOCK=$tmp/lock TOPHAT_PYTHON=$tmp/tools/python3
-  base=$TOPHAT_BASE runtime=$TOPHAT_RUNTIME slot=$TOPHAT_SLOT lock=$TOPHAT_LOCK gate=${TOPHAT_LOCK%.lock}.gate current=$TOPHAT_BASE/current-$key
+  base=$TOPHAT_BASE runtime=$TOPHAT_RUNTIME slot=$TOPHAT_SLOT lock=$TOPHAT_LOCK restarts=${TOPHAT_LOCK%.lock}.restarts current=$TOPHAT_BASE/current-$key
   # The guards run on these; a missing one is named, not buried in a miss.
   for t in Hyprland dbus-run-session flock setsid pgrep prlimit journalctl jq; do
     command -v "$t" > /dev/null || { echo "FAILED $t is not installed: the guards cannot run"; return 1; }
@@ -1105,6 +1140,39 @@ EOF
   answer '[{name: "WAYLAND-1", disabled: true}]'
   PATH="$tmp/host:$PATH" outputs_hidden && miss "no session output should fail"
 
+  # The owner's facts at stop: the start's, or what the restarts test/live.sh
+  # recorded within the session made of them. The session's facts are read
+  # at 1000 and 9000.
+  run=$tmp/base/explain; mkdir -p "$run"
+  restarted() {  # BEGAN BEFORE [AFTER]: a restart's record; without AFTER, its services never came back
+    mkdir -p "$restarts/$1" && echo 0123456789abcdef > "$restarts/$1/commit" && echo "$2" > "$restarts/$1/before"
+    [ -z "${3:-}" ] || { echo "$3" > "$restarts/$1/after"; echo $(($1 + 500)) > "$restarts/$1/back"; }
+  }
+  explained() {  # START STOP: the session's facts, explained
+    echo "$1" > "$run/host-before"; echo "$2" > "$run/host-after"
+    facts_explained 1000 9000 > "$run/explained" 2>&1
+  }
+  local t1="tray owner: PID=1" t2="tray owner: PID=2" t3="tray owner: PID=3"
+  explained "$t1" "$t1" || miss "unchanged facts should pass: $(cat "$run/explained")"
+  explained "$t1" "$t2" && miss "changed facts with no restart should fail"
+  restarted 2000 "$t1" "$t2"
+  explained "$t1" "$t2" || miss "facts as a restart within the session left them should pass: $(cat "$run/explained")"
+  grep -q '^the shell restarted for a deploy of 0123456 at ' "$run/explained" || miss "an explained stop should say the shell restarted for a deploy: $(cat "$run/explained")"
+  explained "$t1" "$t3" && miss "facts changed after a restart's services were back should fail"
+  explained "$t3" "$t2" && miss "facts changed between the start and a restart should fail"
+  restarted 3000 "$t2" "$t3"
+  explained "$t1" "$t3" || miss "two restarts in turn should explain their changes: $(cat "$run/explained")"
+  rm -rf "$restarts"; restarted 2000 "$t1"
+  explained "$t1" "$t2" && miss "a restart whose services never came back should fail"
+  rm -rf "$restarts"; restarted 2000 "$t1"$'\npower profile: performance' "$t2"$'\npower profile: power-saver'
+  explained "$t1"$'\npower profile: performance' "$t2"$'\npower profile: power-saver' \
+    && miss "a fact beyond the shell's services changed during a restart should fail"
+  for began in 500 9500; do
+    rm -rf "$restarts"; restarted "$began" "$t1" "$t2"
+    explained "$t1" "$t2" && miss "a restart at $began, outside the session (1000 to 9000), should explain nothing"
+  done
+  rm -rf "$restarts"
+
   # The slot, and the launcher's group, on harmless processes: a stand-in
   # compositor that starts a child in the group, one that shrugs off TERM,
   # one that leaves the group, and one that crashes, only once its core dump
@@ -1144,18 +1212,11 @@ EOF
     kill "$holder"; wait "$holder" 2> /dev/null
     [ ! -e "$run/leader" ]
   }
-  if ! held "$slot" -x busy "this checkout's session running" || ! held "$lock" -x restarting "a restart running"; then
+  if ! held "$slot" -x busy "this checkout's session running"; then
     miss "a launcher without the slot should start nothing"
     echo "tophat self-check FAILED"
     return 1
   fi
-  # A restart waiting for the tophat lock holds the gate: no new session
-  # starts, so the sessions running can't keep it waiting forever.
-  rm -f "$tmp/held"
-  ( exec 7>> "$gate"; flock -n 7 && { : > "$tmp/held"; exec sleep 30; } ) & local waiter=$!
-  within 5 test -e "$tmp/held" || miss "the stand-in restart never took the gate"
-  slot_free 2> /dev/null && miss "a session should not start while a restart waits"
-  kill "$waiter"; wait "$waiter" 2> /dev/null
   rm -f "$run/launch.status"
   local START_EPOCH; START_EPOCH=$(date +%s)
   # Not a job of this shell: teardown ends this launcher with KILL, which
@@ -1166,7 +1227,7 @@ EOF
   read -r LEADER LEADER_START < "$run/leader"
   RUN_ID=fake
   slot_free 2> /dev/null && miss "a running session should hold this checkout's slot"
-  flock -n "$lock" true 2> /dev/null && miss "a running session should keep a restart waiting: test/live.sh takes the tophat lock alone"
+  flock -n "$lock" true 2> /dev/null || miss "a running session should leave the tophat lock free: test/live.sh restarts the shell under it"
   slot=$tmp/slot-other slot_free 2> /dev/null || miss "another checkout's session should start beside a running one"
   setsid sleep 300 & local bystander=$!
 
@@ -1202,7 +1263,7 @@ EOF
   (( members >= 3 )) || miss "the stand-in group should hold the launcher and its children, has $members"
   signal_group TERM "$LEADER" 1 "$(mark)" && miss "a leader whose start time differs should not be signalled"
   kill -0 "$LEADER" 2> /dev/null || miss "the group was signalled despite a changed start time"
-  # TERM leaves the member that shrugs it off: the locks stay taken.
+  # TERM leaves the member that shrugs it off: the slot stays taken.
   signal_group TERM "$LEADER" "$LEADER_START" "$(mark)"
   sleep 0.5
   slot_free 2> /dev/null && miss "the slot should stay taken while teardown's TERM leaves a member"
@@ -1212,7 +1273,6 @@ EOF
   kill -0 "$(cat "$tmp/escapee")" 2> /dev/null || miss "teardown signalled a process that left the group"
   kill "$bystander" 2> /dev/null
   slot_free 2> /dev/null || miss "the slot should be free once the session ends"
-  flock -n "$lock" true 2> /dev/null || miss "a restart should go ahead once the session ends"
   [ "$(cat "$tmp/tz" 2> /dev/null)" = Asia/Kolkata ] || miss "the session should run in the zone named, got: $(cat "$tmp/tz" 2> /dev/null)"
   # The stand-in compositor's detached child carries the run's mark.
   marked "$(mark)" | grep "^$(cat "$tmp/escapee") " > /dev/null || miss "a marked process outside the group should be reported"
@@ -1239,8 +1299,8 @@ EOF
   fi
 
   # A compositor that crashes and leaves a child in the group: its crash is
-  # named from its exit, and the slot and the tophat lock stay taken until
-  # the child has gone. It crashes only once its core dump is off.
+  # named from its exit, and the slot stays taken until the child has gone.
+  # It crashes only once its core dump is off.
   local left=$tmp/left
   mkdir -p "$left"
   printf '#!/bin/sh\nshift; exec "$@"\n' > "$left/dbus-run-session"
@@ -1254,10 +1314,8 @@ EOF
     read -r LEADER LEADER_START < "$run/leader"
     crashes 2> /dev/null | grep -qx 'Hyprland (exit 139)' || miss "a compositor's crash should be named from its exit, got: $(crashes 2> /dev/null)"
     slot_free 2> /dev/null && miss "the slot should stay taken while the session's group lives on"
-    flock -n "$lock" true 2> /dev/null && miss "a restart should wait while the session's group lives on"
     kill "$(cat "$tmp/leftover")"
     within 3 slot_free 2> /dev/null || miss "the slot should come free once the session's group has gone"
-    flock -n "$lock" true 2> /dev/null || miss "a restart should go ahead once the session's group has gone"
   else
     miss "the crashing stand-in compositor never exited"
   fi
