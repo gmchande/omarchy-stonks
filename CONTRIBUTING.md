@@ -84,6 +84,14 @@ building one that won't merge.
 - Before a pull request, use your change the way a user would: open the popup
   from the pill, add a symbol through search, switch lists, remove and undo,
   show a row's chart, change the range and the look, and use the window.
+- `test/tophat.sh start REF` runs a commit in a nested Hyprland that shows
+  nothing on your desktop: Stonks runs on an invisible 1416x850 screen inside
+  it, with a demo watchlist, its own home and session bus, and the shell's
+  services that reach your session turned off. `key`, `click`, `shot`,
+  `record` and the rest drive and capture it, and `stop` fails if the run
+  put a window on your desktop, crashed, or reached your session. Each
+  checkout runs one session at a time, and sessions from different checkouts
+  run side by side. The commands are listed at the top of the file.
 
 ## Layout
 
