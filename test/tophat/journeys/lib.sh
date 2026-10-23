@@ -8,6 +8,7 @@
 #                       the popup's part of it
 #   NN-NAME.json        the data file Stonks wrote, after a step that saves
 #   sounds.log          every sound Stonks asked the stand-in pw-play for
+#   silence.log         each stream of silence the stand-in pw-cat held
 #   shell.log, stop.log the nested shell's log and the session's stop
 #   result              PASS, or FAIL and the count
 #
@@ -118,6 +119,7 @@ journey_end() {
   # A journey's own undoing, such as a folder it made read-only.
   declare -F journey_cleanup > /dev/null && journey_cleanup
   "$tophat" sounds > "$out/sounds.log" 2> /dev/null
+  cp "$("$tophat" folder 2> /dev/null)/silence.log" "$out/" 2> /dev/null
   "$tophat" log > "$out/shell.log" 2> /dev/null
   [ -f "${data:-}" ] && cp "$data" "$out/data.final.json"
   if (( started )); then

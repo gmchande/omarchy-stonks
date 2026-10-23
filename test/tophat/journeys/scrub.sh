@@ -9,6 +9,10 @@ chimes() { step_sound_lines | grep -c 'chime-'; }
 follows() { readout statusText smoothPrice changeText baselineLegend; }
 scrubbed() { shown statusText --has "AT "; }
 unscrubbed() { ! scrubbed; }
+# holding: the stream of silence that keeps the output awake for the chimes
+# (the stand-in pw-cat's silence.log) is running now.
+holding() { [ "$(tail -n 1 "$("$tophat" folder)/silence.log" 2> /dev/null | cut -d ' ' -f 1)" = start ]; }
+resting() { ! holding; }
 # press KEY…: each key alone, as a hand presses them, since chimes struck
 # closer than 45 ms apart keep only the latest (Sounds.qml). moved counts the
 # keys that moved the scrub: a chart with few prints runs out of steps.
@@ -37,6 +41,8 @@ open_popup
 loaded
 shot now
 follows
+sleep 0.5
+check "the open popup, nothing scrubbed, holds no stream of silence" resting
 
 step "h scrubs back one step at a time, a chime each"
 press h h h h
@@ -46,6 +52,7 @@ follows
 sounds_here
 chimed "$moved" 4
 (( locator )) && check "the header says the moment scrubbed to (AT …)" scrubbed
+soon "the key scrub holds a stream of silence for its chimes" 3 holding
 
 step "l and the arrow keys step it too"
 press l Left Right
@@ -64,6 +71,7 @@ if (( locator )); then
   check "the header is back on now" unscrubbed
   check "the popup is still open" shown heroChart
 fi
+soon "the silence ends soon after Esc" 3 resting
 
 step "The pointer sweeps the chart: the moment follows it, a chime as the line's height changes"
 if reachable "hovering the chart"; then
@@ -83,6 +91,7 @@ if reachable "hovering the chart"; then
   sounds_here
   check "the header followed the pointer through more than one moment" [ "$distinct" -ge 2 ]
   check "the pointer's scrub asked for chimes" [ "$(chimes)" -ge 1 ]
+  soon "the pointer's scrub holds a stream of silence" 3 holding
 fi
 
 step "The pointer leaving the chart ends the scrub"
@@ -94,6 +103,7 @@ if reachable "leaving the chart"; then
   follows
   check "the header is back on now" unscrubbed
   check "the popup is still open" shown heroChart
+  soon "the silence ends soon after the pointer leaves" 3 resting
 fi
 
 step "A click on the chart snaps back to now"

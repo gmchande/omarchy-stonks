@@ -334,9 +334,9 @@ The shell's log the form asks for can name the prices Stonks left out.
   replay a chart, or move along it, or the bell is due, with 4 seconds
   under `timeout`, and one `sh` that
   starts a `pw-play` for each chime, with 2 seconds each under `timeout`,
-  and plays nothing else; while sounds are on and the popup or the window
-  is open on a screen, and for 10 seconds after, `pw-cat` playing silence,
-  so the first sound plays at once; `pw-dump` once as each bell is due, in
+  and plays nothing else; while sounds are on and you scrub the chart, with
+  the pointer on it or by `←` `→`, and for a second after, `pw-cat` playing
+  silence, so each chime plays at once; `pw-dump` once as each bell is due, in
   `bash` under `timeout` for 3 seconds and through `head` for 4 MB, to see
   whether an app is recording from a microphone, reading only which streams
   run; an answer that runs out of time, fails, or goes over 4 MB counts as
@@ -356,8 +356,10 @@ The shell's log the form asks for can name the prices Stonks left out.
 - **Silence's cost:** while `pw-cat` plays silence, your speakers'
   amplifier stays powered and your headphones stay connected to this
   computer, as when any sound plays, and it takes about a tenth of a
-  percent of one processor core. Once no screen has shown the popup or the
-  window for 10 seconds, or with sounds off, it doesn't run.
+  percent of one processor core. It runs only while you scrub the chart,
+  never just because the popup or the window is open. A sound after
+  4 seconds of quiet from Stonks starts with 150 ms of silence of its own,
+  so a sleeping output wakes before the sound and none of it is cut.
 - **Sites:** `query1.finance.yahoo.com` for quotes, charts, and the market
   cap and P/E; `query2.finance.yahoo.com` for search; `api.robinhood.com`
   for overnight prices and which stocks trade overnight; and
@@ -374,9 +376,10 @@ The shell's log the form asks for can name the prices Stonks left out.
 - **Files it writes:** your lists and settings in
   `~/.config/omarchy/grvc.stonks.json`, the last quotes in
   `~/.cache/grvc.stonks/quotes.json`, and, while sounds are on, a replay's
-  sound in `~/.cache/grvc.stonks/replay.wav`, written over at each replay of
-  another chart,
-  and the chimes' notes beside it, `chime-*.wav`, written each run; and
+  sound in `~/.cache/grvc.stonks/replay.wav`, or `lead-replay.wav` with its
+  150 ms of silence first, written over at each replay of another chart,
+  and beside them the chimes' notes, `chime-*.wav`, and each sound with its
+  silence first, `lead-*.wav`, written each run; and
   for each screenshot you take, one picture,
   `stonks-<symbol>-<date>_<time>.png`, in the folder Omarchy's own
   screenshots use: where Omasnap is installed, `OMASNAP_SCREENSHOT_DIR`,

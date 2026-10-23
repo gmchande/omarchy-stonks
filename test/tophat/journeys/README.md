@@ -29,6 +29,8 @@ feature's file, before checking a change that touches it.
   popup's columns of it, the one to read.
 - `NN-NAME.json` and `data.final.json`: the data file as Stonks wrote it.
 - `sounds.log`: every sound asked of the stand-in `pw-play`, with its file.
+- `silence.log`: each stream of silence the stand-in `pw-cat` held, "start MS"
+  and "stopped MS".
 - `shell.log`, `stop.log`: the nested shell's log and the session's stop.
 
 ## Driving conventions
