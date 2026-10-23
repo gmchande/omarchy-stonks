@@ -133,34 +133,39 @@ read_facts() {
 # facts_explained SINCE UNTIL: the owner-session facts at stop (host-after,
 # read at UNTIL) are the start's (host-before, read at SINCE), or what the
 # restarts test/live.sh began between the two made of them: each restart
-# found them as the session last saw them, and the session ends with them
-# as the last one's services left them. Says each restart, and the first
-# change none explains. A restart begins while it holds the tophat lock
-# alone, so never between a read and its time.
+# found them as the session last saw them and changed only its services'
+# facts (shell_facts), and the session ends with them as the last one's
+# services left them. Says each restart, and the first change none
+# explains. A restart begins while it holds the tophat lock alone, so never
+# between a read and its time.
 facts_explained() {
   local since=$1 until=$2 was=$run/host-before after="the session's start" record began at
   for record in "$restarts"/*/; do
     began=$(basename "$record")
-    # No SINCE: a session started by a tophat.sh from before the records
-    # held the tophat lock throughout, so no restart began within it.
-    [[ $began =~ ^[0-9]+$ ]] && [ -n "$since" ] && (( began > since && began < until )) || continue
+    [[ $began =~ ^[0-9]+$ ]] && (( began > since && began < until )) || continue
     at=$(date -d "@$((began / 1000000000))" +%H:%M:%S)
     if [ ! -s "$record/back" ]; then
       echo "UNEXPLAINED the shell restarted for a deploy at $at, and test/live.sh never saw its services back" >&2
       return 1
     fi
     facts_same "$was" "$record/before" "between $after and the shell's restart for a deploy at $at" || return 1
+    facts_same <(grep -vE "$shell_facts" "$record/before") <(grep -vE "$shell_facts" "$record/after") \
+      "beyond the shell's services, during its restart for a deploy at $at" || return 1
     echo "the shell restarted for a deploy of $(cut -c1-7 "$record/commit") at $at; its services were back at $(date -d "@$(($(cat "$record/back") / 1000000000))" +%H:%M:%S)"
     was=$record/after after="that restart"
   done
   facts_same "$was" "$run/host-after" "between $after and the stop"
 }
+# The facts a restart changes: its services', which the new shell's own
+# processes hold (test/host-facts.sh).
+shell_facts='^(clipboard watchers|notifications owner|tray owner): '
 # facts_same A B WHEN: the facts in A and B are the same, or says how they
 # differ.
 facts_same() {
-  diff -q "$1" "$2" > /dev/null && return 0
+  local changed
+  changed=$(diff "$1" "$2") && return 0
   echo "UNEXPLAINED owner-session facts changed $3 (the owner may have changed them):" >&2
-  diff "$1" "$2" | grep '^[<>]' >&2
+  grep '^[<>]' <<< "$changed" >&2
   return 1
 }
 
@@ -812,7 +817,7 @@ stop_run() {
   if [ -f "$run/host-before" ]; then
     if ! read_facts "$run/host-after"; then
       echo "FAILED the owner's facts could not be read at stop" >&2; status=1
-    elif ! facts_explained "${FACTS_AT:-}" "$read_at"; then
+    elif ! facts_explained "${FACTS_AT:-$((START_EPOCH * 1000000000))}" "$read_at"; then
       status=1
     fi
   fi
@@ -1147,20 +1152,24 @@ EOF
     echo "$1" > "$run/host-before"; echo "$2" > "$run/host-after"
     facts_explained 1000 9000 > "$run/explained" 2>&1
   }
-  explained "tray: 1" "tray: 1" || miss "unchanged facts should pass: $(cat "$run/explained")"
-  explained "tray: 1" "tray: 2" && miss "changed facts with no restart should fail"
-  restarted 2000 "tray: 1" "tray: 2"
-  explained "tray: 1" "tray: 2" || miss "facts as a restart within the session left them should pass: $(cat "$run/explained")"
+  local t1="tray owner: PID=1" t2="tray owner: PID=2" t3="tray owner: PID=3"
+  explained "$t1" "$t1" || miss "unchanged facts should pass: $(cat "$run/explained")"
+  explained "$t1" "$t2" && miss "changed facts with no restart should fail"
+  restarted 2000 "$t1" "$t2"
+  explained "$t1" "$t2" || miss "facts as a restart within the session left them should pass: $(cat "$run/explained")"
   grep -q '^the shell restarted for a deploy of 0123456 at ' "$run/explained" || miss "an explained stop should say the shell restarted for a deploy: $(cat "$run/explained")"
-  explained "tray: 1" "tray: 3" && miss "facts changed after a restart's services were back should fail"
-  explained "tray: 0" "tray: 2" && miss "facts changed between the start and a restart should fail"
-  restarted 3000 "tray: 2" "tray: 3"
-  explained "tray: 1" "tray: 3" || miss "two restarts in turn should explain their changes: $(cat "$run/explained")"
-  rm -rf "$restarts"; restarted 2000 "tray: 1"
-  explained "tray: 1" "tray: 2" && miss "a restart whose services never came back should fail"
+  explained "$t1" "$t3" && miss "facts changed after a restart's services were back should fail"
+  explained "$t3" "$t2" && miss "facts changed between the start and a restart should fail"
+  restarted 3000 "$t2" "$t3"
+  explained "$t1" "$t3" || miss "two restarts in turn should explain their changes: $(cat "$run/explained")"
+  rm -rf "$restarts"; restarted 2000 "$t1"
+  explained "$t1" "$t2" && miss "a restart whose services never came back should fail"
+  rm -rf "$restarts"; restarted 2000 "$t1"$'\npower profile: performance' "$t2"$'\npower profile: power-saver'
+  explained "$t1"$'\npower profile: performance' "$t2"$'\npower profile: power-saver' \
+    && miss "a fact beyond the shell's services changed during a restart should fail"
   for began in 500 9500; do
-    rm -rf "$restarts"; restarted "$began" "tray: 1" "tray: 2"
-    explained "tray: 1" "tray: 2" && miss "a restart at $began, outside the session (1000 to 9000), should explain nothing"
+    rm -rf "$restarts"; restarted "$began" "$t1" "$t2"
+    explained "$t1" "$t2" && miss "a restart at $began, outside the session (1000 to 9000), should explain nothing"
   done
   rm -rf "$restarts"
 
