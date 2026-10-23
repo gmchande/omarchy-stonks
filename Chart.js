@@ -102,12 +102,14 @@ function chartGeometry(quote, calendars) {
   for (var k = 0; k < pts.length; k++) {
     var session = Quote.pointSession(quote, pts[k])
     var prev = k > 0 ? pts[k - 1] : null
-    var dot = k >= dots
+    // A thin night's own trades are dots; the pre-market after it is a line
+    // again, starting after the last of them.
+    var dot = k >= dots && pts[k].t < axis.night.end
     out.push({
       x: printFraction(quote, axis, k),
       y: 1 - (pts[k].p - lo) / (hi - lo),
       ext: session !== "reg",
-      brk: dot || (!!prev && acrossBreak(prev.t, pts[k].t)),
+      brk: dot || (k > 0 && out[k - 1].dot) || (!!prev && acrossBreak(prev.t, pts[k].t)),
       dot: dot
     })
   }
@@ -138,8 +140,7 @@ function chartSpan(quote) {
   var end = Math.max(reg.end, pts.length ? pts[pts.length - 1].t : reg.end)
   var tail = Quote.tailStart(quote)
   if (tail === null) return { start: start, end: end, ticks: [reg.end] }
-  return { start: start, end: end, ticks: [reg.end, tail], tail: tail,
-    skip: end >= tail ? { from: Quote.dayEnd(quote), to: tail } : null }
+  return { start: start, end: end, ticks: [reg.end, tail], skip: end >= tail ? { from: Quote.dayEnd(quote), to: tail } : null }
 }
 
 function axisFraction(axis, t) {

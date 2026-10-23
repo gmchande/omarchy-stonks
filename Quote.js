@@ -749,13 +749,11 @@ function dayEnd(quote) {
   return s.post ? s.post.end : s.regular ? s.regular.end : 0
 }
 
-// Where what came after a 1D day's session begins, each moment from which
-// reads from the day's own close (`Overnight.nightClose`): the chart's own
-// tail (`axis.tail`), or the coming day's pre-market a two-day answer holds
-// (`next`); null for a day with nothing after it.
-function tailStart(day) {
-  if (day.axis && day.axis.tail !== undefined) return day.axis.tail
-  return day.next ? periodsStart(day.next) : null
+// Where the coming day's pre-market a two-day answer holds after a quote's
+// day begins (`next`): its prints from here are the day's tail. Null for a
+// quote with nothing after its day.
+function tailStart(quote) {
+  return quote.next ? periodsStart(quote.next) : null
 }
 
 function bucketTimes(times) {

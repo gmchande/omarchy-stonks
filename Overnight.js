@@ -17,9 +17,8 @@
 // draws its prints, on a 1D chart of its last session until the next opens:
 // from the midnight before Yahoo's day, Robinhood's prints for the hours
 // before it, Yahoo's day, then the night after it and the coming day's
-// pre-market, each measured from the day's own close, as the line under the
-// price is; a night that trades thinly (`thinNight`) after Yahoo's day alone,
-// its few trades each on its own. Any other has Yahoo's own day, 04:00 to
+// pre-market; a night that trades thinly (`thinNight`) after Yahoo's day
+// alone, its few trades each on its own. Any other has Yahoo's own day, 04:00 to
 // 20:00, then the coming day's pre-market a two-day answer holds: a thin
 // name trades a few shares overnight now and then (two at 23:10 on 6
 // October, in the saved answers), and none of them is a night's price. The
@@ -350,17 +349,18 @@ function thinNight(night, answer) {
 // The day is the quote's session, the one the headline and its move are
 // about, until the next session opens: from the midnight before it, laid
 // out by print (`Chart.chartGeometry`), the hours to come to its own
-// midnight empty, then the night after it and the coming day's pre-market
-// (`axis.tail`), each print of which reads from the day's own close
-// (`nightClose`), as the line under the price does; past midnight the
-// chart runs to its newest print, and a weekend's or a holiday's hours,
-// when nothing trades, take no room (`axis.skip`). Through a night that
-// trades thinly (`thinNight`), it starts at Yahoo's day, and the night's
-// trades and the pre-market's are each on their own, by the clock
-// (`axis.night`). Found in the design panel of 23 October: after midnight
-// a busy stock's chart showed the night alone under the day before's move,
-// and a scrub of it turned the bear into a bull, while a quiet one beside it
-// showed the day; the owner chose the day, then the night, until the bell.
+// midnight empty, then the night after it and the coming day's pre-market;
+// past midnight the chart runs to its newest print, and a weekend's or a
+// holiday's hours, when nothing trades, take no room (`axis.skip`). A scrub
+// reads every print from the dashed line's close, the night's too
+// (`Figures.rowModel`). Through a night that trades thinly (`thinNight`),
+// it starts at Yahoo's day, and the night's own trades are each on their
+// own, by the clock (`axis.night`); the pre-market after it is a line, as
+// a busy stock's is. Found in the design panel of 23 October: after
+// midnight a busy stock's chart showed the night alone under the day
+// before's move, and a scrub of it turned the bear into a bull, while a
+// quiet one beside it showed the day; the owner chose the day, then the
+// night, until the bell.
 function dayChart(quote, answer, calendars) {
   var cal = Market.calendarFor(calendars, quote)
   if (!cal || !cal.overnight || !quote.session.regular) return { day: quote, latest: null }
@@ -380,36 +380,26 @@ function dayChart(quote, answer, calendars) {
     day: Object.assign({}, quote, {
       points: all,
       axis: { start: start, end: end, ticks: dayTicks(cal, date, quote.session.regular, night), byPrint: true,
-        skip: skip, tail: night.start, night: thin ? { start: night.start, end: end } : null },
+        skip: skip, night: thin ? night : null },
       calendar: cal
     }),
     latest: latest
   }
 }
 
-// The close a moment `t` of a 1D `day` is measured from when it falls after
-// the day's session (`Quote.tailStart`): the day's own close, the one the
-// line under the price measures from (`Figures.extendedStack`). Null for
-// any other moment, which the day's previous close measures, as it does the
-// dashed line.
-function nightClose(day, t) {
-  var tail = Quote.tailStart(day)
-  return tail !== null && t >= tail ? Quote.regularClose(day) : null
-}
-
 // The 1D chart of a US listing Robinhood does not trade all day: Yahoo's own
 // day, its pre-market open to its post-market close (04:00 to 20:00), laid
 // out by print, with a tick at the close; and once a two-day answer holds
-// the coming day's pre-market, its prints after the day (`axis.tail`), to
-// the newest of them, the night between, when it doesn't trade, taking no
-// room. No prints of Robinhood's, and no day apart from the quote's.
+// the coming day's pre-market, its prints after the day (`Quote.tailStart`),
+// to the newest of them, the night between, when it doesn't trade, taking
+// no room. No prints of Robinhood's, and no day apart from the quote's.
 function sessionDay(quote) {
   if (!quote.session.regular) return quote
   var tail = Quote.tailStart(quote)
   var pts = quote.points
   var axis = { start: Quote.dayStart(quote), end: Math.max(Quote.dayEnd(quote), pts.length ? pts[pts.length - 1].t : 0),
     ticks: [quote.session.regular.end], byPrint: true }
-  if (tail !== null) axis = Object.assign(axis, { ticks: [quote.session.regular.end, tail], tail: tail,
+  if (tail !== null) axis = Object.assign(axis, { ticks: [quote.session.regular.end, tail],
     skip: axis.end >= tail ? { from: Quote.dayEnd(quote), to: tail } : null })
   return Object.assign({}, quote, { axis: axis })
 }

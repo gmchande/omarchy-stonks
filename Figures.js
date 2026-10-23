@@ -238,44 +238,43 @@ function listBreadth(symbols, quotes, scrubT, mode) {
     var quote = quotes[symbols[i]]
     var read = quote ? (scrubT ? Quote.readingAt(quote, scrubT) : Quote.headlineQuote(quote)) : null
     var price = read ? read.price : null
-    var close = quote && scrubT ? Overnight.nightClose(quote, scrubT) : null
-    var unit = close !== null && mode === "open" ? "pct" : mode
-    var chg = quote ? Quote.change(measuredAt(quote, scrubT, close), price, unit) : null
+    var chg = quote ? Quote.change(measuredAt(quote, scrubT), price, mode) : null
     if (!chg || chg.pct === null) out.none++
-    else out[Format.changeTone(chg, unit, quote.priceDigits)]++
+    else out[Format.changeTone(chg, mode, quote.priceDigits)]++
   }
   return out
 }
 
 // What a moment of a quote's day is measured from (`rowModel`), shaped as
-// `Quote.change` reads it, `close` its `Overnight.nightClose`.
-function measuredAt(quote, scrubT, close) {
-  return close !== null ? { prevClose: close } : scrubT ? scrubbedBase(quote) : Quote.headlineBase(quote)
+// `Quote.change` reads it: at rest the headline's (`Quote.headlineBase`),
+// and a scrubbed moment the dashed line's (`scrubbedBase`).
+function measuredAt(quote, scrubT) {
+  return scrubT ? scrubbedBase(quote) : Quote.headlineBase(quote)
 }
 
 // The one projection every price on screen comes from. The headline is
 // the regular-market quote, its change from Yahoo's previous close or the
 // day's open (`Quote.headlineBase`); a
 // non-zero scrubT reads that moment of the day (`Quote.readingAt`), its
-// change from the close the day is measured from (`Quote.dayBase`), as the
-// dashed line is: before the open, the last session's close. dayUp is
-// always versus that close, so the chart fill does not flip when the change
-// mode does, and it is the direction at the moment shown, as a range's is.
-// dayTone is that change's tone, flat when it rounds to nothing, so the
-// bull and bear follow a scrub and a replay, and a flat day has neither. A
-// print after the day, in its night or the coming day's pre-market, is
-// measured from the day's own close instead, as the line under the price is
-// (`Overnight.nightClose`): since the open, as the percent from that close.
+// change from the close the dashed line is at (`Quote.dayBase`): before the
+// open, the last session's close. Every print the chart draws reads from
+// that one close, the night's and the coming day's pre-market's after the
+// day too, so wherever the pointer is the change and the animal say where
+// that price stands against the dashed line (the owner, 23 October); at
+// rest the line under the price still measures the night from the day's
+// own close (`extendedStack`). dayUp is always versus that close, so the
+// chart fill does not flip when the change mode does, and it is the
+// direction at the moment shown, as a range's is. dayTone is that change's
+// tone, flat when it rounds to nothing, so the bull and bear follow a scrub
+// and a replay, and a flat day has neither.
 // It carries no drawing: a line is drawn from its quote, so it redraws when
 // the quote does, not with the clock or the change mode. Nor does it read
 // the clock, so a row is not derived again every second. Pass the
 // already-snapped scrub time.
-function rowModel(quote, scrubT, changeMode) {
+function rowModel(quote, scrubT, mode) {
   var read = scrubT ? Quote.readingAt(quote, scrubT) : Quote.headlineQuote(quote)
   var price = read ? read.price : null
-  var close = scrubT ? Overnight.nightClose(quote, scrubT) : null
-  var measured = measuredAt(quote, scrubT, close)
-  var mode = close !== null && changeMode === "open" ? "pct" : changeMode
+  var measured = measuredAt(quote, scrubT)
   var chg = Quote.change(measured, price, mode)
   var direction = Quote.change(measured, price, "pct")
   return {
@@ -304,17 +303,9 @@ function scrubbedBase(quote) {
 
 // What a scrub of the 1D `day` reads its moves from, said beside its dashed
 // line: the line's own close, the one before the day's session
-// (`Quote.dayBase`); once a print has come after the day, also the close
-// those read from (`rowModel`), named for the first of them: the night's,
-// or the coming day's pre-market.
+// (`Quote.dayBase`), which every print of the chart reads from.
 function dayBaselineText(day) {
-  var text = "PREV CLOSE " + Format.money(Quote.dayBase(day), day.priceDigits)
-  var tail = Quote.tailStart(day)
-  var after = null
-  for (var i = day.points.length - 1; tail !== null && i >= 0 && day.points[i].t >= tail; i--) after = day.points[i]
-  if (!after) return text
-  var label = Quote.pointSession(day, after) === "overnight" ? "NIGHT" : "PRE-MARKET"
-  return text + " · " + label + " FROM CLOSE " + Format.money(Overnight.nightClose(day, after.t), day.priceDigits)
+  return "PREV CLOSE " + Format.money(Quote.dayBase(day), day.priceDigits)
 }
 
 // The day's animal for a row (`rowModel`): "bull" up, "bear" down, by

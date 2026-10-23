@@ -80,9 +80,11 @@ the open or the close, after hours, or closed. A smaller line under the
 price shows the pre-market, after-hours, or overnight price. The overnight
 price is for the US stocks and ETFs Robinhood trades overnight. Until the
 next session opens, the 1D chart shows the last session, the one the price
-and its move are about, then the night after it and the pre-market, each
-measured from the last close, as the overnight price is. A stock that trades
-only now and then shows the night's trades as dots.
+and its move are about, then the night after it and the pre-market.
+Pointing anywhere on it measures that price from the dashed line, the
+close the chart is drawn against; the smaller line measures the overnight
+price from the last close. A stock that trades only now and then shows the
+night's trades as dots.
 
 An old price says "As of" and its time, on its row and above the price.
 Old means more than two minutes behind while its market trades, or saved
