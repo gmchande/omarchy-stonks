@@ -10,9 +10,11 @@
 # Yahoo refusing and recovering; a network back within seconds; a list of
 # 50 every minute; a range left open asked again; the pill's wheel; an add,
 # a removal and its undo; a search's preview; the window left on a
-# workspace no screen shows; and, in a second run, a US holiday while
-# London and Toronto trade. HOME and curl are scratch; the fake curl answers
-# from test/fixtures/moments/fetch-2026-10-07 and listings-2026-10-07-1455.
+# workspace no screen shows; in a second run, a US holiday while London and
+# Toronto trade; and in a third, the US open on Friday 23 October. HOME and
+# curl are scratch; the fake curl answers from test/fixtures/moments/
+# fetch-2026-10-07 and listings-2026-10-07-1455, and at the open from
+# bell-2026-10-23-0929 and bell-2026-10-23-0930.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree fetch.qml
 patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property var testBody: root.body\n  readonly property alias testWindow: window'
@@ -62,12 +64,28 @@ scratch_home fetch-watchlist.json grvc.stonks.json
 patch_copy plugin/calendars.json 's/"2026-11-26": *"Thanksgiving Day"/"2026-10-07": "Fetch holiday", &/'
 main_code=$code
 STONKS_FETCH_RUN=holiday run_qs 120
-[ "$main_code" -ne 0 ] && code=$main_code
-cat "$work/main.log" "$work/log" > "$work/both.log"
-mv "$work/both.log" "$work/log"
+holiday_code=$code
+mv "$work/log" "$work/holiday.log"
 
-if ! rg -q -F "FETCH DONE" "$work/log"; then
-  echo "FAIL the main run never reached FETCH DONE"
-  code=1
-fi
-finish "FETCH HOLIDAY DONE"
+# The bell run: Friday 23 October from 09:29 New York, AAPL and the S&P 500,
+# Yahoo answering with Thursday's quotes until the harness turns it to the
+# session's first.
+rm -rf "$STONKS_FAKE_STATE" "$XDG_CACHE_HOME/grvc.stonks"
+mkdir -p "$STONKS_FAKE_STATE"
+echo bell-2026-10-23-0929 listings-2026-10-07-1455 > "$STONKS_FAKE_STATE/overnight.set"
+printf '{ "version": 1, "symbols": ["AAPL", "^GSPC"], "featured": "AAPL", "order": "manual", "refreshIntervalSec": 60 }\n' \
+  > "$HOME/.config/omarchy/grvc.stonks.json"
+patch_copy plugin/Service.qml 's/property int now: 1791367140/property int now: 1792762140/'
+STONKS_FETCH_RUN=bell run_qs 120
+[ "$main_code" -ne 0 ] && code=$main_code
+[ "$holiday_code" -ne 0 ] && code=$holiday_code
+cat "$work/main.log" "$work/holiday.log" "$work/log" > "$work/all.log"
+mv "$work/all.log" "$work/log"
+
+for done_line in "FETCH DONE" "FETCH HOLIDAY DONE"; do
+  if ! rg -q -F "$done_line" "$work/log"; then
+    echo "FAIL a run never reached $done_line"
+    code=1
+  fi
+done
+finish "FETCH BELL DONE"

@@ -332,7 +332,7 @@ Item {
         job.read++
       } else if (!slot.spark) {
         var quote = null
-        try { quote = Quote.parseChart(JSON.parse(answer.body), root.centExchanges) } catch (e) { quote = null }
+        try { quote = Quote.parseChart(JSON.parse(answer.body), root.centExchanges, root.stamp()) } catch (e) { quote = null }
         answer.body = null
         answer.outcomes = {}
         answer.outcomes[slot.symbols[0]] = quote ? { quote: quote, unjudged: false } : null
@@ -348,7 +348,7 @@ Item {
         var outcome = null
         try {
           outcome = !answer.days ? null : !(symbol in answer.days) ? "missing"
-            : Quote.sparkQuote(answer.days[symbol], previous && previous.verdict || null, root.centExchanges)
+            : Quote.sparkQuote(answer.days[symbol], previous && previous.verdict || null, root.centExchanges, root.stamp())
         } catch (e) { outcome = null }
         answer.outcomes[symbol] = outcome
         if (answer.done >= slot.symbols.length) {

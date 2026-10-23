@@ -13,17 +13,19 @@ import "plugin" as Stonks
 // fetch-2026-10-07, then listings-2026-10-07-1455): a busy US stock (NEST, featured), a thin one (KILN),
 // an ETF (SPY), an index (^GSPC), a cryptocurrency (BTC-USD), London
 // (SHEL.L), Tokyo (7203.T), and Toronto (SHOP.TO). It counts every request
-// in requests.log and every curl call in runs.log. fetch.sh runs this twice:
-// the main run, which starts offline with saved quotes, and the holiday
+// in requests.log and every curl call in runs.log. fetch.sh runs this three
+// times: the main run, which starts offline with saved quotes; the holiday
 // run (STONKS_FETCH_RUN=holiday), whose calendars close New York on 7
-// October while London and Toronto trade.
+// October while London and Toronto trade; and the bell run
+// (STONKS_FETCH_RUN=bell), AAPL and the S&P 500 across Friday 23 October's
+// open, from Yahoo's answers either side of it.
 ShellRoot {
   id: harness
 
   property int failures: 0
   readonly property string mode: Quickshell.env("STONKS_FETCH_RUN") || "main"
   readonly property string state: Quickshell.env("STONKS_FAKE_STATE")
-  readonly property var listed: ["NEST", "KILN", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T", "SHOP.TO"]
+  readonly property var listed: mode === "bell" ? ["AAPL", "^GSPC"] : ["NEST", "KILN", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T", "SHOP.TO"]
   // Midnight starting Wednesday 7 October and Saturday 10 October in New York.
   readonly property int wed7: 1791345600
   readonly property int sat10: 1791604800
@@ -98,7 +100,7 @@ ShellRoot {
   }
 
   function finish() {
-    console.log(harness.mode === "main" ? "FETCH DONE" : "FETCH HOLIDAY DONE")
+    console.log(harness.mode === "main" ? "FETCH DONE" : harness.mode === "holiday" ? "FETCH HOLIDAY DONE" : "FETCH BELL DONE")
     done.exitCode = failures ? 1 : 0
     done.start()
   }
@@ -367,7 +369,7 @@ ShellRoot {
     }
 
     function test_main() {
-      if (harness.mode !== "main") skip("the holiday run")
+      if (harness.mode !== "main") skip("another run")
       var start = service.now
 
       // 05:59, offline, with last session's quotes saved: NEST's Tuesday
@@ -1028,7 +1030,7 @@ ShellRoot {
 
     // New York closed for a holiday while London and Toronto trade.
     function test_holiday() {
-      if (harness.mode !== "holiday") skip("the main run")
+      if (harness.mode !== "holiday") skip("another run")
       tryVerify(function() { return harness.listed.every(function(s) { return !!service.quotes[s] }) && idle() }, 10000)
       // The index is on the US calendar, so the holiday closes it too,
       // whatever Yahoo's periods (a trading day's here) say.
@@ -1043,6 +1045,47 @@ ShellRoot {
       var newModes = ""
       within(3000, function() { newModes = modes([newDir + "/quotes.json", newDir]); return newModes === "600,700" })
       harness.check("a new cache folder and its saved quotes are the owner's alone", newModes === "600,700", newModes)
+      harness.finish()
+    }
+
+    // Friday 23 October's open, the window showing AAPL and the S&P 500.
+    // Yahoo answers with Thursday's quotes (bell-2026-10-23-0929) until
+    // 09:30:10, then with the session's first (bell-2026-10-23-0930), as it
+    // did that morning. Found in the daytime QA: every row said "As of Thu
+    // 16:00" from 09:30:02 until its next ask a minute after its last.
+    function test_bell() {
+      if (harness.mode !== "bell") skip("another run")
+      tryVerify(function() { return harness.listed.every(function(s) { return !!service.quotes[s] }) && idle() }, 10000)
+      var bell = 1792762200
+      openWindow()
+      // Before the bell, its pre-market begun, the index has no open since
+      // the open, as the stock beside it has none: its answer came after its
+      // next day's pre-market began, its bars still Thursday's.
+      service.persist({ changeMode: "open" })
+      var openLines = []
+      var blank = within(3000, function() {
+        openLines = harness.listed.map(function(s) { return s + " " + app.testBody.watchlist.rowItem(s).view.changeLine })
+        return openLines.join(",") === "AAPL —,^GSPC —"
+      })
+      harness.check("before the bell the index and the stock beside it have no open yet, since the open", blank, openLines.join(", "))
+      service.persist({ changeMode: "pct" })
+      tick(bell - service.now, 1)
+      var said = []
+      var landed = 0
+      var from = harness.requests().length
+      tick(45, 1, function() {
+        if (service.now === bell + 10)
+          runCommand(["bash", "-c", "echo bell-2026-10-23-0930 listings-2026-10-07-1455 > \"$1\"", "--", harness.state + "/overnight.set"])
+        marks().forEach(function(m) { said.push((service.now - bell) + " s " + m) })
+        var rows = harness.listed.map(function(s) { return app.testBody.watchlist.rowItem(s) })
+        if (!landed && rows[0].view.priceText === "349.62" && rows[1].view.priceText === "7,623.41") landed = service.now - bell
+      })
+      var asked = harness.quoteCounts(harness.requests().slice(from))
+      harness.check("at the open no row and no hero says As of while the session's first price is on its way, asked again within 15 s, and both rows have it by 09:30:30",
+        said.length === 0 && landed > 0 && landed <= 30,
+        (said.length ? said.slice(0, 4).join(" | ") : "nothing said") + "; landed " + (landed ? landed + " s on" : "never")
+          + "; asked " + harness.listed.map(function(s) { return s + " " + asked[s] }).join(", "))
+      closeWindow()
       harness.finish()
     }
   }

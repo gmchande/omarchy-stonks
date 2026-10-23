@@ -32,4 +32,4 @@ Preconditions: the demo watchlist, in percent, on 1D.
 ## Gotchas
 
 - The sign is drawn, not written: its state is in the shot and the data file, not in its words.
-- "SINCE OPEN" before the market opens shows the last session's open.
+- Since the open shows "—" once a listing's next day has begun, until its session's first bar: a stock from the pre-market its answer turns at, an index from the first answer that comes after its next day's pre-market begins (or its open, where its market has none). Before that, both show the last session's. A scrub of the last session still reads from that session's open.

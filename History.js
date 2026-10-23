@@ -82,6 +82,13 @@ function parseHistory(json, range, centExchanges) {
   }
   bars.sort(function (a, b) { return a.t - b.t })
   if (bars.length >= 2 && bars[bars.length - 1].t === bars[bars.length - 2].t) bars.splice(bars.length - 2, 1)
+  // A new listing's history opens with its offer price: a bar at
+  // the bell of its first day (`firstTradeDate`), one price and no shares,
+  // hours before its first trade. Found in the daytime QA: WREN's 1W and 1M
+  // plunged to its 18.00 offer at the left edge, its first trade 23.00 at
+  // 11:45, and named 18.00 the range's low. Every young listing tried had one.
+  var firstTrade = Format.isFiniteNumber(meta.firstTradeDate) ? meta.firstTradeDate : null
+  bars = bars.filter(function(b) { return !(b.t === firstTrade && b.v === 0 && b.o === b.c && b.h === b.c && b.l === b.c) })
   var interval = Format.fetchedText(meta.dataGranularity, Format.MOST_CODE) || (spec && spec.interval)
   var intervalSeconds = historyIntervalSeconds(interval)
   // Only intraday buckets carry a stray close; a daily bar cannot. A move of
@@ -105,7 +112,7 @@ function parseHistory(json, range, centExchanges) {
     liveAt: Format.isFiniteNumber(meta.regularMarketTime) ? meta.regularMarketTime : null,
     bars: bars,
     baseline: baseline,
-    firstTradeDate: Format.isFiniteNumber(meta.firstTradeDate) ? meta.firstTradeDate : null,
+    firstTradeDate: firstTrade,
     droppedTimes: droppedTimes
   }
 }
@@ -137,8 +144,11 @@ function periodStats(history) {
   var interval = historyIntervalSeconds(history ? history.interval : "")
   var first = bars.length ? bars[0] : null
   var firstTradeDate = history ? history.firstTradeDate : null
+  // The range starts with the listing when its first bar is on its first
+  // day of trading, or in the bar that holds it: a young listing's first
+  // trade can come hours after its first day's bell (WREN's at 11:45).
   var short = !!(first && Format.isFiniteNumber(first.t) && Format.isFiniteNumber(firstTradeDate) && interval > 0
-    && first.t <= firstTradeDate + interval && first.t + interval >= firstTradeDate)
+    && first.t <= firstTradeDate + Math.max(interval, 24 * 60 * 60) && first.t + interval >= firstTradeDate)
   return {
     last: last,
     change: chg,

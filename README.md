@@ -87,7 +87,9 @@ An old price says "As of" and its time, on its row and above the price.
 Old means more than two minutes behind while its market trades, or saved
 from the last session. A price nothing kept fresh while the popup and the
 window were closed, such as a coin's, says it only if its new price takes
-more than 2 seconds to come. If Yahoo sends no regular price, Stonks keeps
+more than 2 seconds to come. At the open, the last close says it only if
+the session's first price takes more than a minute to come; Stonks asks for
+it every 15 seconds until then. If Yahoo sends no regular price, Stonks keeps
 the last regular chart trade, labelled "Last trade" with its time.
 If Yahoo sends a price without its time, it says "Time not sent", and
 "Saved" too if kept from the last session.

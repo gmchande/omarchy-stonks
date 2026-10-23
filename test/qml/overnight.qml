@@ -826,9 +826,10 @@ ShellRoot {
         nestHeader + " || " + kilnHeader)
       // An index trades only in its session: no pre-market before it, no
       // flat tail of its repeated close after it, and the header names its
-      // next open from the US calendar. ^GSPC at 06:00 said "PRE-MARKET ·
-      // OPENS IN 3H 30M"; at 01:00, Tuesday's line ran flat to 17:20 and
-      // the header named no open.
+      // next open from the US calendar, counting to it through the
+      // pre-market as the stocks beside it do. ^GSPC at 06:00 said
+      // "PRE-MARKET · OPENS IN 3H 30M"; at 01:00, Tuesday's line ran flat to
+      // 17:20 and the header named no open.
       // Both saved index answers carry Tuesday's bars. Their receipt,
       // rather than their identical session, pins which moment landed.
       var indexRead = function() {
@@ -861,10 +862,10 @@ ShellRoot {
         body.featuredGeometry.start === harness.midnight.wed7 && dawn === "┄ PREV CLOSE 249.87", body.featuredGeometry.start + " | " + dawn)
       var indexMorning = indexRead()
       featureShown("NEST")
-      harness.check("an index has no pre-market and no tail after its close, and its header names the next open",
+      harness.check("an index has no pre-market and no tail after its close, and its header names the next open, counting to it from the pre-market",
         indexNight.ready && indexMorning.ready
           && indexNight.text === "Closed · opens Wed 09:30 | last print in session"
-          && indexMorning.text === "Closed · opens Wed 09:30 | last print in session",
+          && indexMorning.text === "Market opens in 3h 30m | last print in session",
         JSON.stringify({ night: indexNight, morning: indexMorning }))
       // 11:53, mid-session: midnight to midnight, the line ending at
       // now, about halfway, the rest of the day empty.

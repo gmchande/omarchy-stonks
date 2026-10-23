@@ -71,8 +71,8 @@ function sparkResults(json) {
 // when the session has opened since the verdict's: only a chart answer,
 // with opens, can say whether that is a stray, or what the open was. The
 // newest bar is never judged, as in the filter.
-function sparkQuote(day, verdict, centExchanges) {
-  var quote = parseChart({ chart: { result: [day] } }, centExchanges)
+function sparkQuote(day, verdict, centExchanges, receivedAt) {
+  var quote = parseChart({ chart: { result: [day] } }, centExchanges, receivedAt)
   if (!quote) return null
   var pts = quote.points
   var tick = answerTick(day.meta, pts.map(function(p) { return { c: p.p } }), centExchanges)
@@ -136,7 +136,11 @@ var MIXED_RUN = 4
 // row. What identifies them is not how far they reach — one of the saved
 // cases is 0.8% — but that the series carries on as if they never happened.
 // `tick` is the listing's (`Format.priceTick`): a move of a tick or two is
-// trading, never stray.
+// trading, never stray. So is a bar with shares traded in it (`v`): every
+// stray in the saved answers came with none, and a thin listing's own
+// trades often open back where the bar before closed. Found in the daytime
+// QA: a young listing's 1W lost 11 of its 108 bars, its week's high among
+// them, 23.875 on 257,049 shares.
 function filterStrayCloses(bars, periods, tick) {
   var source = bars || []
   if (source.length < 3) return { bars: source.slice(), droppedTimes: [] }
@@ -177,7 +181,7 @@ function strayRun(bars, level, from, tick, periods) {
   for (var length = 1; length <= STRAY_RUN; length++) {
     var end = from + length - 1
     var back = end + 1 < bars.length ? bars[end + 1] : null
-    if (!back || !Format.isFiniteNumber(back.o) || sameLevel(bars[end].c, price, tick)) return 0
+    if (!back || !Format.isFiniteNumber(back.o) || traded(bars[end]) || sameLevel(bars[end].c, price, tick)) return 0
     var opensBack = sameLevel(back.o, price, tick) && !sameLevel(back.o, bars[end].c, tick)
     if (back.t - bars[end].t !== step) {
       if (opensBack && session && sessionAt(periods, back.t) === session) continue
@@ -206,7 +210,7 @@ function mixedRun(bars, level, from, periods, tick) {
   for (var end = from; end < from + MIXED_RUN && end + 1 < bars.length; end++) {
     var bar = bars[end]
     var back = bars[end + 1]
-    if (end > from && sameLevel(bar.o, bars[end - 1].c, tick)) return 0
+    if (traded(bar) || (end > from && sameLevel(bar.o, bars[end - 1].c, tick))) return 0
     if (extendedSession(periods, back.t) !== session) return 0
     if (!sameLevel(bar.c, price, tick)) {
       if (bar.c > price) above = true
@@ -216,6 +220,12 @@ function mixedRun(bars, level, from, periods, tick) {
         && sameLevel(back.o, price, tick) && !sameLevel(back.o, bar.c, tick)) return end - from + 1
   }
   return 0
+}
+
+// Whether shares traded in a bar: Yahoo sends none for a stray, and in the
+// saved answers none for a day's pre- and post-market bars either.
+function traded(bar) {
+  return Format.isFiniteNumber(bar.v) && bar.v > 0
 }
 
 // "pre", "regular", or "post" when `t` falls in that session of `periods`,
@@ -262,8 +272,9 @@ function answerTick(meta, bars, centExchanges) {
 // lists within MOST_BARS, MOST_DAYS, and MOST_PERIODS, or whose bar times
 // are not moments (`Format.isMoment`) each after the one before, as every
 // saved answer's are: the chart lays its prints out from the first to the
-// last, and one out of order would land off its grid.
-function parseChart(json, centExchanges) {
+// last, and one out of order would land off its grid. `receivedAt`, when
+// given, is when the answer came (`nextDayBegun`).
+function parseChart(json, centExchanges, receivedAt) {
   var result = json && json.chart && json.chart.result && json.chart.result[0]
   if (!result || !result.meta) return null
   var meta = result.meta
@@ -271,6 +282,9 @@ function parseChart(json, centExchanges) {
   var quote = (result.indicators && result.indicators.quote && result.indicators.quote[0]) || {}
   var closes = Format.fetchedList(quote.close || [], MOST_BARS)
   var opens = Format.fetchedList(quote.open || [], MOST_BARS)
+  // Shares traded in each bar, which the stray filter reads; none read from
+  // an answer without them, as spark's.
+  var volumes = quote.volume ? Format.fetchedList(quote.volume, MOST_BARS) : null
   var clocks = answerClocks(meta.tradingPeriods)
   if (!timestamps || !closes || !opens || !clocks) return null
   // The session the bars describe is the answer's trading periods. Yahoo's
@@ -283,7 +297,7 @@ function parseChart(json, centExchanges) {
   for (var i = 0; i < timestamps.length; i++) {
     if (!Format.isMoment(timestamps[i]) || (i > 0 && !(timestamps[i] > timestamps[i - 1]))) return null
     if (knownPrice(closes[i]) !== null)
-      bars.push({ t: timestamps[i], o: opens[i], c: closes[i] })
+      bars.push({ t: timestamps[i], o: opens[i], c: closes[i], v: volumes ? volumes[i] : null })
   }
   var filtered = filterStrayCloses(bars, periods, answerTick(meta, bars, centExchanges))
   var kept = filtered.bars
@@ -318,6 +332,14 @@ function parseChart(json, centExchanges) {
   var firstRegular = null
   for (var k = 0; regular && !ahead && k < kept.length && !firstRegular; k++)
     if (kept[k].t >= regular.start && kept[k].t < regular.end) firstRegular = kept[k]
+  // Whether an index's answer came once its next day had begun, its bars
+  // still an earlier session's: Yahoo's current period is a later session
+  // than the bars', and the answer came after that period's pre-market
+  // began, else its open. A stock's answer turns to the coming day then,
+  // and has no open until its session's first bar; an index's stays the
+  // last session's until its open (`headlineBase`).
+  var nextDay = !!regular && !!current.regular && current.regular.start > regular.start ? (current.pre || current.regular) : null
+  var nextDayBegun = index && !!nextDay && Format.isFiniteNumber(receivedAt) && receivedAt >= nextDay.start
   var symbol = Format.fetchedText(meta.symbol, Format.MOST_CODE)
   var instrumentType = Format.fetchedText(meta.instrumentType, Format.MOST_CODE)
   return {
@@ -361,6 +383,7 @@ function parseChart(json, centExchanges) {
     fiftyTwoWeekLow: knownPrice(meta.fiftyTwoWeekLow),
     // The start of the session the day's open, high, low, and volume are.
     figuresDay: figuresDay,
+    nextDayBegun: nextDayBegun,
     session: {
       pre: index ? null : periodOf(periods.pre),
       regular: regular,
@@ -534,6 +557,31 @@ function regularClose(quote) {
   return head ? head.price : null
 }
 
+// The close the answer's own day is measured from: the one before its
+// regular session. That is Yahoo's previous close once the quote is that
+// session's; until the session opens the quote is still the last session's
+// close, and Yahoo's previous close the one before it. Found in the daytime
+// QA: at 06:22 on Friday 23 October AAPL's answer held Friday's pre-market,
+// its quote Thursday's 348.22 and its previous close Wednesday's 343.99, and
+// the pre-market read +0.56% where the line under the price said −0.41%.
+// The headline's change stays the quote's own (`headlineBase`).
+function dayBase(quote) {
+  var reg = quote.session.regular
+  var head = headlineQuote(quote)
+  return reg && head && head.source === "quote" && head.t !== null && head.t < reg.start ? head.price : quote.prevClose
+}
+
+// What the headline's change is measured from, shaped as `change` reads
+// it: Yahoo's previous close, and the day's open, but none for an index
+// whose answer came once its next day had begun (`nextDayBegun`), as a
+// stock's has none then; a scrub of the index's bars still reads from their
+// open. Found in the daytime QA: before Friday's open the S&P 500 said
+// "−0.41% open", Thursday's, every stock beside it "—"; and in its check,
+// the index said "—" from midnight, the stocks Tuesday's until 04:00.
+function headlineBase(quote) {
+  return { prevClose: quote.prevClose, dayOpen: quote.nextDayBegun ? null : quote.dayOpen }
+}
+
 // The latest print outside a regular session, the newest print of all
 // (`latest` when given, else the quote's own last): pre-market, post-market,
 // or overnight. Null while the regular session's print is the newest.
@@ -546,7 +594,8 @@ function extendedPrint(quote, latest) {
 }
 
 // What a moment `t` of the day reads, shaped as the headline is: the price
-// at or just before it, at `t`; before the first print, the previous close.
+// at or just before it, at `t`; before the first print, the close the day
+// is measured from (`dayBase`).
 // Once Yahoo's quote is the regular session's close, the session's last
 // print reads that close at the bell (`close`): the S&P 500's last bar is
 // 15:55's, never its close, and Tokyo's 15:20's. Not at the quote's own
@@ -554,7 +603,7 @@ function extendedPrint(quote, latest) {
 // stamped 17:20, after its 16:30 and 16:35 after-hours buckets.
 function readingAt(quote, t) {
   var pts = quote.points
-  if (!pts.length || t < pts[0].t) return { price: quote.prevClose, t: t, close: false }
+  if (!pts.length || t < pts[0].t) return { price: dayBase(quote), t: t, close: false }
   // The last print at or before `t`, halving the prints, which run in time
   // order: a walk from the first cost every row a step for each print of
   // the day on every scrub step.
