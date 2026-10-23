@@ -1279,7 +1279,12 @@ ShellRoot {
       wl.cursorSymbol = "NVDA"
       keys.forceActiveFocus()
       keyClick(Qt.Key_M)
-      wait(Application.styleHints.mouseDoubleClickInterval)
+      // The click comes once the checklist takes clicks: its shield over the
+      // opening's double-click interval ends on a timer, which a busy shell
+      // can run later than this run's own wait of the same interval, and then
+      // the click lands on the shield and removes nothing.
+      var openingShield = harness.find(body2, "openingShield")
+      tryVerify(function() { return !openingShield.visible }, 2000)
       var allTickAt = center(harness.findAll(body2, "symbolListRow")[0])
       mouseClick(body2, allTickAt.x, allTickAt.y)
       wait(100)
