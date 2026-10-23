@@ -9,7 +9,9 @@ import QtQuick
 // its loaded handlers have run (operationFinished); a write is skipped when
 // it equals the text in hand (setText), and drops a read in flight unheard,
 // neither loaded nor failed (saveSync's cancelAsync). Here a read sees the
-// file as it is when it starts.
+// file as it is when it starts. On a full disk (`full`), a write leaves the
+// file as it was and is reported saved all the same, its text kept in hand
+// (FileViewWriter::write's failed commit).
 QtObject {
   id: standIn
   property string path
@@ -29,6 +31,7 @@ QtObject {
   property string held: ""
   property bool reading: false
   property string readText: ""
+  property bool full: false
 
   function text() { return held }
   function reload() {
@@ -39,7 +42,7 @@ QtObject {
   function setText(next) {
     if (next === held) return
     reading = false
-    disk = next
+    if (!full) disk = next
     held = next
     saved()
   }

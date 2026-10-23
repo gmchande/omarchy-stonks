@@ -446,25 +446,26 @@ Item {
     if (again) Qt.callLater(root.startDataRead)
   }
 
-  // A save awaiting its read-back: what the file held before the first
-  // write since the file was last seen holding Stonks' own, null when none
-  // awaits; and what Stonks wrote last. Quickshell 0.3.2 reports a write
-  // done when a full disk fails its commit (fileview.cpp,
-  // FileViewWriter::write), so only a read tells.
-  property var savedOver: null
+  // A save awaiting its read-back: each text the file may still hold if
+  // Stonks' last write was lost, what it held before the first write not
+  // yet read back and every write since, as keys; null when none awaits.
+  // And what Stonks wrote last. Quickshell 0.3.2 reports a write done when
+  // a full disk fails its commit (fileview.cpp, FileViewWriter::write), so
+  // only a read tells.
+  property var staleTexts: null
   property string dataWritten: ""
   // Whether a read of the data file is taken. While a save awaits its
-  // read-back, a file still as it was, or none that reads, says the save
-  // was lost: the read is not taken, so the changes in memory stay. What
-  // Stonks wrote ends the wait, and so does anything else, a save from
-  // elsewhere, which wins as ever.
+  // read-back, a file holding an earlier text, or none that reads, says
+  // the last save was lost: the read is not taken, so the changes in memory
+  // stay. What Stonks wrote last ends the wait, and so does any other
+  // text, a save from elsewhere, which wins as ever.
   function takesRead(text) {
-    if (root.savedOver === null) return true
-    var lost = text === null || (text === root.savedOver && text !== root.dataWritten)
+    if (root.staleTexts === null) return true
+    var lost = text === null || (text !== root.dataWritten && root.staleTexts[text] === true)
     if (lost && !root.saveFailed)
       console.warn("stonks: " + root.dataPath + " didn't take the save; keeping the changes until one lands")
     root.saveFailed = lost
-    if (!lost) root.savedOver = null
+    if (!lost) root.staleTexts = null
     root.saveChecked(!lost)
     return !lost
   }
@@ -1049,7 +1050,9 @@ Item {
   // `settings` as `Settings.fileSettings` returns them, read back once
   // written (`takesRead`). The read also hands Quickshell the file's text,
   // which it compares a write with: after a lost save it would skip the
-  // same text unheard.
+  // same text unheard. It starts once the handler that wrote has returned,
+  // as a read's own (`takeMissingFile`) may: Quickshell 0.3.2 forgets a
+  // read started inside a read's handlers (fileview.cpp, operationFinished).
   function writeDataFile(settings) {
     var body = JSON.stringify(settings, null, 2) + "\n"
     if (typeof dataFile.setText !== "function") {
@@ -1057,11 +1060,13 @@ Item {
       return
     }
     var before = dataFile.text()
-    if (body === before && root.savedOver === null) return
-    if (root.savedOver === null) root.savedOver = before
+    if (body === before && root.staleTexts === null) return
+    if (root.staleTexts === null) root.staleTexts = {}
+    else root.staleTexts[root.dataWritten] = true
+    root.staleTexts[before] = true
     root.dataWritten = body
     dataFile.setText(body)
-    root.readDataFile()
+    Qt.callLater(root.readDataFile)
   }
 
   // Saved at once, or with `settles`, once the change has rested

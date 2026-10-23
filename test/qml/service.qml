@@ -40,6 +40,8 @@ ShellRoot {
   property string goodFeatured: ""
   property string goodBody: ""
   property var second: null
+  // A save from elsewhere just after the migration's write has landed.
+  property bool editedAfterMigration: false
   property bool lockedSaw: false
   property int versionAt: 0
   readonly property var versionCases: [
@@ -275,11 +277,21 @@ ShellRoot {
           if (!fileOk && harness.waited < 2000) return
           harness.check("migrated from bar and wrote the file, leaving barStyle on the bar", ready && fileOk,
             JSON.stringify({ ready: ready, symbols: service.symbols, featured: service.featuredSymbol, file: obj }))
-          service.persist({ style: "smooth" })
-          service.persist({ order: "symbol" })
-          harness.go(2)
+          // The migration writes from inside the read's own handler: the
+          // file's watch must still read a save from elsewhere after it,
+          // with no change of Stonks' own in between.
+          harness.writeThen(harness.bodyFrom({ style: "smooth" }), function() { harness.go(2) })
         })
       } else if (harness.step === 2) {
+        if (!harness.editedAfterMigration) {
+          if (service.retro && harness.waited < 2000) return
+          harness.check("a save from elsewhere just after the migration's write lands", !service.retro)
+          harness.editedAfterMigration = true
+          service.persist({ style: "smooth" })
+          service.persist({ order: "symbol" })
+          harness.waited = 0
+          return
+        }
         harness.readThen(function(obj) {
           var ok = !!(obj && obj.style === "smooth" && obj.order === "symbol")
           if (!ok && harness.waited < 2000) return
@@ -579,6 +591,27 @@ ShellRoot {
         if (harness.settling()) return
         harness.check("so does one after a write of the service's own cut a read short",
           harness.stepped.range === "1W", harness.stepped.range)
+        // A save that lands, then one a full disk loses before the first is
+        // read back: the file holds the first, which is no save from
+        // elsewhere, so the second stays in memory, said unsaved, until a
+        // save lands.
+        var disk = harness.stepped.testDataFile
+        harness.stepped.setRange("1M")
+        disk.full = true
+        harness.stepped.setRange("3M")
+        harness.go(29)
+      } else if (harness.step === 29) {
+        if (harness.settling()) return
+        harness.check("a save a full disk loses just after one that landed is said unsaved, and the change stays",
+          harness.stepped.saveFailed && harness.stepped.range === "3M", harness.stepped.saveFailed + " " + harness.stepped.range)
+        harness.stepped.testDataFile.full = false
+        harness.stepped.saveAgain()
+        harness.go(30)
+      } else if (harness.step === 30) {
+        if (harness.settling()) return
+        var saved = harness.parseFile(harness.stepped.testDataFile.disk)
+        harness.check("with room again, trying again saves it and the notice goes",
+          !harness.stepped.saveFailed && !!saved && saved.range === "3M", harness.stepped.saveFailed + " " + JSON.stringify(saved && saved.range))
         harness.stepped.destroy()
         harness.stepped = null
         harness.finish()
