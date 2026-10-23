@@ -1041,27 +1041,34 @@ ShellRoot {
         root.check("a coin under a cent and a six-figure price each show their own decimals in the hero, both looks, the row, and a scrub",
           decimals.length === 0, decimals.join(" | "))
 
-        // The header's words keep room for its longest real states, and say
-        // every closure in calendars.json, as Market names it, for a reader
-        // whose clock differs from the exchange's (its zone named): in full
-        // wherever that fits, its letters closed up where only that fits,
-        // and otherwise in its short form, without the holiday's name, as a
-        // weekend's is worded; Tokyo's lunch break the same, without its
-        // countdown. In both looks, in the popup and the window at its
-        // widest and its minimum width (App.qml), beside the speaker, the
-        // camera, the look icon, and the help mark, at every text size
-        // Omarchy offers (9 to 20). Found in the polish board: Tokyo's
-        // "Constitution Memorial Day observed" and London's "(substitute)"
-        // closures were cut in the popup; in the sound build: beside the
-        // speaker, Martin Luther King, Jr. Day's was; in the camera build:
-        // beside the camera, Tokyo's lunch break was; and in the 1.1.0
-        // audit: in the popup at the everyday size 12, Constitution Memorial
-        // Day went short, though 1.0.3 named it.
+        // The header's words keep room for its longest real states, each
+        // whole or in a shorter form that keeps its time and date, never cut,
+        // and say every closure in calendars.json, as Market names it, for a
+        // reader whose clock differs from the exchange's (its zone named): in
+        // full wherever that fits, its letters closed up where only that
+        // fits, and otherwise without the holiday's name, as a weekend's is
+        // worded, then with when it opens alone. A form shows only where the
+        // one before fits neither spaced nor closed up. In both looks, in the
+        // popup and the window at its widest and its minimum width (App.qml),
+        // beside the speaker, the camera, the look icon, and the help mark,
+        // at every text size Omarchy offers (9 to 20), and in the popup with
+        // the shell's spacing kept at size 12's as the text grows
+        // (`[spacing] scale-with-font = false`). Found in the polish board:
+        // Tokyo's "Constitution Memorial Day observed" and London's
+        // "(substitute)" closures were cut in the popup; in the sound build:
+        // beside the speaker, Martin Luther King, Jr. Day's was; in the
+        // camera build: beside the camera, Tokyo's lunch break was; and in
+        // the size-16 check: after hours lost its time.
         var header = find(body, "statusText").parent
-        var tightWords = find(body, "statusTightWords")
         var calendars = JSON.parse(calendarFile.text())
-        var states = [["CLOSED · OPENS MON 09:30", ""], ["POWER HOUR · CLOSES IN 40M", ""],
-          ["LUNCH BREAK · REOPENS 12:30 JST · IN 59M", "LUNCH BREAK · REOPENS 12:30 JST"], ["OPENING BELL · CLOSES IN 6H 20M", ""]]
+        var states = [["After hours · closed at 16:00 EDT", "Closed at 16:00 EDT"], ["Pre-market · opens in 3h 11m", "Opens in 3h 11m"],
+          ["Overnight · opens Mon 09:30 EST", "Opens Mon 09:30 EST"], ["Weekend · opens Mon 09:30 EST", "Opens Mon 09:30 EST"],
+          ["Closed · opens Thu 09:00 JST", "Opens Thu 09:00 JST"], ["Power hour · closes in 40m", "Closes in 40m"],
+          ["Opening bell · closes in 6h 20m", "Closes in 6h 20m"],
+          ["Lunch break · reopens 12:30 JST · in 59m", "Lunch break · reopens 12:30 JST", "Reopens 12:30 JST"],
+          ["At 16:30 BST · Closing bell", "At 16:30 BST"], ["At 02:25 EDT · Overnight", "At 02:25 EDT"],
+          ["WEEK OF 28 SEP 2026 · 712,345.00", "WEEK OF 28 SEP 2026"], ["21 SEP 10:00 AEST · 712,345.00", "21 SEP 10:00 AEST"],
+          ["No prices from Yahoo · Stonks keeps trying", "No prices from Yahoo"], ["Refreshing"], ["Loading SHIB-USD YTD"]]
         var closures = 0
         var unnamed = []
         for (var calId in calendars.calendars) {
@@ -1071,64 +1078,89 @@ ShellRoot {
           })[0]]
           for (var day in cal.closures) {
             var noon = Market.epochAt(cal, day, "12:00")
-            var said = Market.marketStatus(listing, noon, 0, calendars)
-            var short = Market.shortMarketStatus(listing, noon, 0, calendars)
             // Past the calendar's last day the header says the schedule is
             // unavailable, with no time to name a zone for.
             var next = Market.nextOpen(cal, noon)
             var zone = next ? Market.zoneName(cal, Market.localDate(next.t, cal).offset) : ""
-            if (zone !== "" && said.slice(-zone.length) !== zone) said += " " + zone
-            if (zone !== "" && short.slice(-zone.length) !== zone) short += " " + zone
-            if (said.indexOf(cal.closures[day].split(" ")[0] + " ") !== 0 || said.indexOf(" · ") < 0
-              || short !== "Closed" + said.slice(said.indexOf(" · ")))
-              unnamed.push(calId + " " + day + " " + said + " / " + short)
-            states.push([said, short])
+            var forms = Market.statusForms(listing, noon, 0, calendars).map(function(form) {
+              return zone !== "" && form.slice(-zone.length) !== zone ? form + " " + zone : form
+            })
+            var notice = forms[0].slice(forms[0].indexOf(" · "))
+            if (forms[0].indexOf(cal.closures[day].split(" ")[0] + " ") !== 0 || forms[0].indexOf(" · ") < 0
+              || JSON.stringify(forms.slice(1)) !== JSON.stringify(["Closed" + notice, notice.charAt(3).toUpperCase() + notice.slice(4)]))
+              unnamed.push(calId + " " + day + " " + forms.join(" / "))
+            states.push(forms)
             closures++
           }
         }
         var roomless = []
         var shortened = {}
-        // The sweep changes the text size, the surface, and the look, and
-        // with them the list's scroll, which keeps its cursor in sight; it
-        // puts each back when it ends, however it ends, and waits for the
-        // layout to come back as it was, so no later check depends on where
-        // this one runs.
+        // The sweep changes the text size, the spacing, the surface, and the
+        // look, and with them the list's scroll, which keeps its cursor in
+        // sight; it puts each back when it ends, however it ends, and waits
+        // for the layout to come back as it was, so no later check depends
+        // on where this one runs.
         var settled = function() {
           return JSON.stringify([surface.width, surface.height, body.chromeHeight, body.chartItem.height, header.height,
             body.watchlist.height, body.watchlist.contentY, body.watchlist.cursorRow, find(body, "footer").y, body.retro])
         }
         var before = { size: Style.fontBaseSize, wide: surface.wide, windowWidth: surface.windowWidth, retro: stub.retro,
-          contentY: body.watchlist.contentY, cursor: body.watchlist.cursorSymbol, layout: settled() }
+          contentY: body.watchlist.contentY, cursor: body.watchlist.cursorSymbol, listName: stub.listName, layout: settled() }
+        // On the same sweep, the footer's add on a named list, beside an
+        // undo and once it goes: where the add doesn't fit beside it, it
+        // says less, and never cuts the list's name. Found in the size-16
+        // check: "+ Add a symbol to My Watch…" beside "Undo SHOP.TO".
+        var named = "+  Add a symbol to My Watchlist"
+        var addWords = find(body, "footerText")
+        var addCut = []
+        var addShort = []
+        stub.lists = stub.lists.concat([{ name: "My Watchlist", label: "My Watchlist", count: stub.symbols.length, symbols: stub.symbols }])
+        stub.listName = "My Watchlist"
         try {
           for (var hsize = 9; hsize <= 20; hsize++) {
             Style.fontBaseSize = hsize
-            for (var hw = 0; hw < 3; hw++) {
+            // The popup with its spacing kept, then the popup and the
+            // window's two widths as the spacing grows with the text.
+            for (var hw = -1; hw < 3; hw++) {
+              Style.spacingScaleWithFont = hw >= 0
               surface.wide = hw > 0
               surface.windowWidth = hw === 1 ? Style.space(560) : 720
               for (var hlook = 0; hlook < 2; hlook++) {
                 stub.retro = hlook === 1
                 wait(20)
-                var where = "size " + hsize + " " + (surface.wide ? "window " + surface.width + " " : "popup ") + (stub.retro ? "retro " : "smooth ")
+                var where = "size " + hsize + " " + (surface.wide ? "window " + surface.width + " " : "popup " + (hw < 0 ? "spacing kept " : ""))
+                  + (stub.retro ? "retro " : "smooth ")
                 for (var s = 0; s < states.length; s++) {
-                  header.statusText = states[s][0]
-                  header.shortText = states[s][1]
+                  header.statusForms = states[s]
                   wait(1)
                   var words = find(body, "statusText")
-                  var shownShort = states[s][1] !== "" && words.text === states[s][1].toUpperCase()
-                  if (words.truncated || words.implicitWidth > words.width)
+                  var shown = states[s].map(function(form) { return form.toUpperCase() }).indexOf(words.text)
+                  var fitted = header.measured.slice(0, Math.max(0, shown)).filter(function(form) { return form.tight <= header.wordsRoom })
+                  if (shown < 0 || words.truncated || words.implicitWidth > words.width)
                     roomless.push(where + words.text + " (" + Math.ceil(words.implicitWidth) + " px in " + words.width + ")")
-                  else if (shownShort && (!tightWords || tightWords.implicitWidth <= header.wordsRoom))
-                    roomless.push(where + "short though the full fits closed up: " + states[s][0])
-                  else if (shownShort && hsize === 12 && !surface.wide && states[s][0].indexOf("Constitution Memorial Day ·") === 0)
-                    roomless.push(where + "short at the everyday size: " + states[s][0])
-                  if (shownShort) shortened[where.trim()] = (shortened[where.trim()] || 0) + 1
+                  else if (fitted.length > 0)
+                    roomless.push(where + "said in less though \"" + fitted[0].words + "\" fits closed up")
+                  if (shown > 0) shortened[where.trim()] = (shortened[where.trim()] || 0) + 1
                 }
+                body.undoOffered = { symbol: "SHOP.TO" }
+                wait(1)
+                var beside = addWords.text + (addWords.truncated ? " (cut)" : "")
+                body.undoOffered = null
+                wait(1)
+                var alone = addWords.text + (addWords.truncated ? " (cut)" : "")
+                if (alone !== named || (beside !== named && beside !== "+  Add a symbol"))
+                  addCut.push(where + beside + " / " + alone)
+                if (beside !== named) addShort.push(where.trim())
               }
             }
           }
         } finally {
-          header.statusText = Qt.binding(function() { return body.headerText })
-          header.shortText = Qt.binding(function() { return body.headerShortText })
+          header.statusForms = Qt.binding(function() { return body.headerForms })
+          Style.spacingScaleWithFont = true
+          stub.listName = before.listName
+          stub.lists = Qt.binding(function() {
+            return [{ name: "", label: "All", count: stub.symbols.length, symbols: stub.symbols }]
+          })
           Style.fontBaseSize = before.size
           surface.wide = before.wide
           surface.windowWidth = before.windowWidth
@@ -1142,13 +1174,16 @@ ShellRoot {
             wait(50)
             back = settled() === before.layout
           }
-          root.check("the header sweep puts back the text size, the surface, and the look, and the layout comes back as it was",
+          root.check("the header sweep puts back the text size, the spacing, the surface, and the look, and the layout comes back as it was",
             back, before.layout + " vs " + settled())
         }
-        console.log("closures said short: " + Object.keys(shortened).map(function(k) { return k + " " + shortened[k] }).join(", "))
-        root.check("the header's longest real states fit, and every closure in calendars.json is said in full where it fits and else without its holiday's name, a zone named, and Tokyo's lunch without its countdown, in both looks, in the popup and the window at its widest and narrowest, at every text size from 9 to 20",
+        console.log("said in less: " + Object.keys(shortened).map(function(k) { return k + " " + shortened[k] }).join(", "))
+        root.check("the header's longest real states read whole or in a shorter form that keeps their time, never cut, and every closure in calendars.json is said in full where it fits, else without its holiday's name, else with when it opens alone, a zone named, in both looks, in the popup and the window at its widest and narrowest, at every text size from 9 to 20, and in the popup with its spacing kept",
           closures > 50 && unnamed.length === 0 && roomless.length === 0,
           closures + " closures | " + unnamed.join(" | ") + " | " + roomless.slice(0, 12).join(" | ") + (roomless.length > 12 ? " | … " + roomless.length : ""))
+        console.log("the add said less beside the undo: " + addShort.join(", "))
+        root.check("on a named list the footer's add reads whole, or beside an undo it has no room beside \"+ Add a symbol\", never cut, and whole again once the undo goes, in both looks, in the popup and the window at its widest and narrowest, at every text size from 9 to 20, and in the popup with its spacing kept",
+          addCut.length === 0, addCut.slice(0, 12).join(" | "))
 
         // In a window of ordinary height, 720 × 520, the key sheet shows its
         // credit whole without a scroll, the version included. Found in the

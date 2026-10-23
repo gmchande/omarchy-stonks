@@ -17,10 +17,10 @@ import "Tones.js" as Tones
 Item {
   id: root
 
-  property string statusText: ""
-  // The same words shorter, for where they don't fit: a closure's notice
-  // without its holiday's name. "" when they have no shorter form.
-  property string shortText: ""
+  // The words, then the same said in less, each form shorter than the one
+  // before (`StonksBody.headerForms`), up to three: where one doesn't fit,
+  // the next shows.
+  property var statusForms: []
   // The words say a range failed, and its button asks again, as r does.
   property bool offersRetry: false
   property bool retro: false
@@ -196,37 +196,54 @@ Item {
   // came and went, with every range change and every scrub. A failed
   // range's retry follows them. They start twice as far from the sleeping
   // z as the bull is, so it reads as the animal's and not as a mark on the
-  // first word, and stop as much sooner, so their room is the same. Where
-  // the words don't fit their room but would with their letters closed up,
-  // they close up; otherwise their short form shows, where they have one,
-  // or they are cut with an ellipsis, spaced. Found in the 1.1.0 audit:
-  // beside the speaker and the camera, Tokyo's Constitution Memorial Day
-  // lost its name in the popup at the everyday text size.
-  readonly property real wordsRoom: Math.max(0, soundIcon.x - Style.space(8) - statusWords.x
+  // first word, and stop as far short of the speaker as the icons stand
+  // apart, clear of its pressed fill. The first form that fits that room
+  // shows: with its letters spaced, else closed up. Found in the 1.1.0
+  // audit: beside the speaker and the camera, Tokyo's Constitution
+  // Memorial Day lost its name in the popup at the everyday text size; and
+  // in the size-16 check: after hours lost its time, and Tokyo's holiday
+  // ran up against the speaker.
+  readonly property real wordsRoom: Math.max(0, soundIcon.x - Style.space(14) - statusWords.x
     - (root.offersRetry ? retry.implicitWidth + Style.space(16) : 0))
-  readonly property bool closedUp: fullWords.implicitWidth > wordsRoom && tightWords.implicitWidth <= wordsRoom
-  readonly property bool shortened: shortText !== "" && tightWords.implicitWidth > wordsRoom
-  Text {
-    id: fullWords
-    objectName: "statusFullWords"
-    visible: false
-    textFormat: Text.PlainText
-    text: root.statusText.toUpperCase()
-    font.family: root.fontFamily
-    font.pixelSize: Style.font.caption
-    font.bold: true
-    font.letterSpacing: 1
+  readonly property var measured: [form0, form1, form2].slice(0, statusForms.length)
+  // The form on show (`form`) and whether its letters close up (`tight`);
+  // where none fits, the last, closed up and cut.
+  readonly property var fit: {
+    for (var i = 0; i < measured.length; i++) {
+      if (measured[i].spaced <= wordsRoom) return { form: i, tight: false }
+      if (measured[i].tight <= wordsRoom) return { form: i, tight: true }
+    }
+    return { form: Math.max(0, measured.length - 1), tight: true }
   }
-  Text {
-    id: tightWords
-    objectName: "statusTightWords"
+  // A form's width with its letters spaced and closed up, measured, never
+  // shown.
+  component FormWidths: Item {
+    property string words: ""
+    property string family: ""
+    readonly property real spaced: spacedWords.implicitWidth
+    readonly property real tight: tightWords.implicitWidth
     visible: false
-    textFormat: Text.PlainText
-    text: fullWords.text
-    font.family: root.fontFamily
-    font.pixelSize: Style.font.caption
-    font.bold: true
+    Text {
+      id: spacedWords
+      textFormat: Text.PlainText
+      text: parent.words
+      font.family: parent.family
+      font.pixelSize: Style.font.caption
+      font.bold: true
+      font.letterSpacing: 1
+    }
+    Text {
+      id: tightWords
+      textFormat: Text.PlainText
+      text: parent.words
+      font.family: parent.family
+      font.pixelSize: Style.font.caption
+      font.bold: true
+    }
   }
+  FormWidths { id: form0; words: String(root.statusForms[0] || "").toUpperCase(); family: root.fontFamily }
+  FormWidths { id: form1; words: String(root.statusForms[1] || "").toUpperCase(); family: root.fontFamily }
+  FormWidths { id: form2; words: String(root.statusForms[2] || "").toUpperCase(); family: root.fontFamily }
   Text {
     id: statusWords
     objectName: "statusText"
@@ -235,12 +252,12 @@ Item {
     width: Math.min(implicitWidth, root.wordsRoom)
     anchors.verticalCenter: parent.verticalCenter
     textFormat: Text.PlainText
-    text: (root.shortened ? root.shortText : root.statusText).toUpperCase()
+    text: root.measured.length ? root.measured[root.fit.form].words : ""
     color: root.scrubbing || root.live ? root.foreground : root.dim
     font.family: root.fontFamily
     font.pixelSize: Style.font.caption
     font.bold: true
-    font.letterSpacing: root.closedUp ? 0 : 1
+    font.letterSpacing: root.fit.tight ? 0 : 1
     elide: Text.ElideRight
   }
 

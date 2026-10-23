@@ -42,6 +42,9 @@ Item {
   // A click does something: the add, or the notice's own action.
   property bool acts: true
   property string label: "+  Add a symbol"
+  // The add in fewer words, shown where the add won't fit, as beside an
+  // undo: a list's name is never cut. "" when it has no shorter form.
+  property string labelShort: ""
   property color ground: "transparent"
   // The undo on offer, "Undo NVDA", or "" for none; it fades out with
   // `undoOpacity`, and stays while the pointer is on it (`undoHovered`).
@@ -139,13 +142,14 @@ Item {
         id: footerRow
         anchors.centerIn: parent
 
-        // The notice whole, measured, never shown: where it doesn't fit
-        // beside its action, its short form shows (`noticeShort`).
+        // The words whole, measured, never shown: where they don't fit
+        // beside their action and clear of the undo, their short form shows
+        // (`noticeShort`, `labelShort`).
         Text {
-          id: fullNotice
+          id: fullWords
           visible: false
           textFormat: Text.PlainText
-          text: root.notice
+          text: root.note !== "" ? root.note : root.notice !== "" ? root.notice : root.label
           font: footerWords.font
         }
         Text {
@@ -158,9 +162,8 @@ Item {
           // Cut short, it ends against its action, not a gap's width away.
           horizontalAlignment: Text.AlignRight
           textFormat: Text.PlainText
-          text: root.note !== "" ? root.note
-            : root.notice !== "" ? (root.noticeShort !== "" && fullNotice.implicitWidth > room ? root.noticeShort : root.notice)
-            : root.label
+          text: root.note === "" && shortWords !== "" && fullWords.implicitWidth > room ? shortWords : fullWords.text
+          readonly property string shortWords: root.notice !== "" ? root.noticeShort : root.labelShort
           color: root.note !== "" || root.notice !== "" ? root.foreground : root.dim
           opacity: root.note !== "" ? root.noteOpacity : root.coveredOpacity
           font.family: root.fontFamily

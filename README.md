@@ -76,9 +76,11 @@ the market cap and P/E. The market cap is an estimate: Yahoo's last reported
 figure, moved with the price since.
 
 The top line says where the market is, in its own time: counting down to
-the open or the close, after hours, or closed. A smaller line under the
-price shows the pre-market, after-hours, or overnight price. The overnight
-price is for the US stocks and ETFs Robinhood trades overnight. Until the
+the open or the close, after hours, or closed. With less room, as at a
+larger text size, it says less and keeps the time: "CLOSED AT 16:00". A
+smaller line under the price shows the pre-market, after-hours, or
+overnight price. The overnight price is for the US stocks and ETFs
+Robinhood trades overnight. Until the
 next session opens, the 1D chart shows the last session, the one the price
 and its move are about, then the night after it and the pre-market.
 Pointing anywhere on it measures that price from the dashed line, the

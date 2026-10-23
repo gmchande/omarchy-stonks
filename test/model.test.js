@@ -695,7 +695,7 @@ test("weeks and months either side of 25 October and 1 November keep their dates
       for (const [interval, offsets, stamps, dates] of cases) {
         for (const gmtoffset of offsets) {
           const history = { range: "5Y", interval, gmtoffset, bars: stamps.map(iso => ({ t: stamp(iso), c: 100 })) }
-          expect([reader, gmtoffset, history.bars.map(bar => M.historyScrubText(history, bar).split(" · ")[0])])
+          expect([reader, gmtoffset, history.bars.map(bar => M.historyScrubForms(history, bar)[1])])
             .toEqual([reader, gmtoffset, dates])
         }
       }
@@ -707,7 +707,7 @@ test("weeks and months either side of 25 October and 1 November keep their dates
   const live = stamp("2026-10-31T23:00:00Z")
   const coin = { range: "5Y", interval: "1wk", gmtoffset: 0, liveAt: live,
     bars: [{ t: stamp("2026-10-26T00:00:00Z"), c: 100 }, { t: live, c: 101 }] }
-  expect(coin.bars.map(bar => M.historyScrubText(coin, bar).split(" · ")[0])).toEqual(["WEEK OF 26 OCT", "WEEK OF 31 OCT"])
+  expect(coin.bars.map(bar => M.historyScrubForms(coin, bar)[1])).toEqual(["WEEK OF 26 OCT", "WEEK OF 31 OCT"])
 })
 
 test("a session's one bar says nothing until its five minutes are past", () => {
