@@ -213,6 +213,23 @@ ShellRoot {
     }
   }
 
+  // The data file's mode ("600"), and the end of service.sh's hold on chmod.
+  property var afterMode: null
+  Process {
+    id: modeProc
+    command: ["stat", "-c", "%a", harness.dataPath]
+    stdout: StdioCollector { id: modeOut; waitForEnd: true }
+    onExited: {
+      var fn = harness.afterMode
+      harness.afterMode = null
+      if (fn) fn(String(modeOut.text).trim())
+    }
+  }
+  Process {
+    id: releaseChmod
+    command: ["rm", "-f", Quickshell.env("STONKS_FAKE_STATE") + "/chmod.hold"]
+  }
+
   function readThen(fn) {
     if (harness.reading) return
     harness.reading = true
@@ -277,10 +294,18 @@ ShellRoot {
           if (!fileOk && harness.waited < 2000) return
           harness.check("migrated from bar and wrote the file, leaving barStyle on the bar", ready && fileOk,
             JSON.stringify({ ready: ready, symbols: service.symbols, featured: service.featuredSymbol, file: obj }))
-          // The migration writes from inside the read's own handler: the
-          // file's watch must still read a save from elsewhere after it,
-          // with no change of Stonks' own in between.
-          harness.writeThen(harness.bodyFrom({ style: "smooth" }), function() { harness.go(2) })
+          // service.sh holds every chmod from the start, under umask 022, so
+          // the mode read here is the one the file was first written with.
+          harness.afterMode = function(mode) {
+            harness.check("a data file new on this machine is its owner's alone from its first write", mode === "600", mode)
+            releaseChmod.running = true
+            // The migration's file is made as the read that found none ends:
+            // the file's watch must still read a save from elsewhere after
+            // it, with no change of Stonks' own in between.
+            harness.writeThen(harness.bodyFrom({ style: "smooth" }), function() { harness.go(2) })
+          }
+          ticker.stop()
+          modeProc.running = true
         })
       } else if (harness.step === 2) {
         if (!harness.editedAfterMigration) {

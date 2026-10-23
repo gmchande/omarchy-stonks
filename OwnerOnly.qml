@@ -13,8 +13,9 @@ import Quickshell.Io
 // cache or the data file (`keep`), loses the group's and others' permissions
 // as it is written (`chmod go=`): Quickshell writes a new file as the shell's
 // umask has it, 0644, and a file an older build left 0644, or a hand edit put
-// back, keeps that mode through each atomic write. A data file new on this
-// machine is 0644 for the moment between its first write and the chmod.
+// back, keeps that mode through each atomic write. So the data file is made
+// here instead, 0600 before it holds a byte (`create`), and each write
+// after keeps that mode. Each command has 5 seconds.
 Item {
   id: root
 
@@ -25,6 +26,11 @@ Item {
   // The paths waiting for `chmod`, and those it is changing now.
   property var owed: []
   property var changing: []
+  // The file `create` is making, what it will hold, and who hears the end.
+  property string creatingPath: ""
+  property string creatingText: ""
+  property var creatingDone: null
+  property int createdCode: -1
 
   // Writes `data`, text or bytes, whole to `path` in the folder, by a
   // rename, so a reader of the last one keeps it; true once it is there,
@@ -54,6 +60,23 @@ Item {
     chmod.running = true
   }
 
+  // Makes `path`, a file that isn't there, holding `text`, then calls
+  // `done(true)`, or `done(false)` where it couldn't, a file there by then
+  // included. The text is written whole to a file beside it that `mktemp`
+  // makes 0600, which `ln` then puts under the name, never over a file
+  // there: no other account can read it from its first byte, and no reader
+  // sees it part written. The text goes on the command's input, never in
+  // its arguments. One at a time: another asked for meanwhile isn't made.
+  function create(path, text, done) {
+    if (creating.running || root.creatingDone) return done(false)
+    root.creatingPath = path
+    root.creatingText = text
+    root.creatingDone = done
+    root.createdCode = -1
+    creating.stdinEnabled = true
+    creating.running = true
+  }
+
   FileView {
     id: file
     preload: false
@@ -65,7 +88,7 @@ Item {
   Process {
     id: make
     running: true
-    command: ["sh", "-c", "umask 077 && mkdir -p -- \"$1\" && chmod go= -- \"$1\"", "sh", root.folder]
+    command: ["timeout", "5", "sh", "-c", "umask 077 && mkdir -p -- \"$1\" && chmod go= -- \"$1\"", "sh", root.folder]
     onExited: function(code) {
       root.made = code === 0
       if (!root.made) {
@@ -80,7 +103,29 @@ Item {
 
   Process {
     id: chmod
-    command: ["chmod", "go=", "--"].concat(root.changing)
+    command: ["timeout", "5", "chmod", "go=", "--"].concat(root.changing)
     onExited: root.next()
+  }
+
+  Process {
+    id: creating
+    command: ["timeout", "5", "sh", "-c", "umask 077 && tmp=$(mktemp -- \"$1.XXXXXX\") || exit 1\n"
+      + "cat > \"$tmp\" && ln -- \"$tmp\" \"$1\"\n"
+      + "code=$?\n"
+      + "rm -f -- \"$tmp\"\n"
+      + "exit $code", "sh", root.creatingPath]
+    onStarted: {
+      creating.write(root.creatingText)
+      root.creatingText = ""
+      creating.stdinEnabled = false
+    }
+    onExited: function(code) { root.createdCode = code }
+    // Heard as it ends, or as it fails to start, which says no exit.
+    onRunningChanged: {
+      if (creating.running || !root.creatingDone) return
+      var done = root.creatingDone
+      root.creatingDone = null
+      done(root.createdCode === 0)
+    }
   }
 }

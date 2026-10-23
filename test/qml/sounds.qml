@@ -594,6 +594,19 @@ ShellRoot {
       body.endScrub()
       harness.check("a chime's player held by a stalled PipeWire is stopped within its time limit",
         stillHeld === "" && heldEnd() === "stopped", stillHeld + "|" + heldEnd())
+      // So is a sound's, the add's here, within its 4 s.
+      harness.writeText(harness.fakeState + "/pw-play.stall", "held")
+      wait(300)
+      var stallAt = harness.starts().length
+      sounds.play("add")
+      startsBy(stallAt + 1)
+      var soundHeld = endOf(stallAt + 1)
+      for (var w = 0; w < 60 && endOf(stallAt + 1) === ""; w++) wait(100)
+      fileProc.command = ["rm", "-f", harness.fakeState + "/pw-play.stall"]
+      fileProc.running = true
+      tryVerify(function() { return !fileProc.running }, 2000)
+      harness.check("a sound's player held by a stalled PipeWire is stopped within its time limit",
+        soundHeld === "" && endOf(stallAt + 1) === "stopped", soundHeld + "|" + endOf(stallAt + 1))
       // TOY's thin night, saved at 00:36 on Monday 5 October: Friday's day,
       // then Sunday night's five trades as dots, each alone. Smooth's replay
       // strikes each one's bar as it passes it, as the replay's scrub reads

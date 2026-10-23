@@ -161,9 +161,10 @@ Item {
   }
 
   // One at a time: exec stops a sound still playing, and starts this one
-  // once it has gone.
+  // once it has gone. Each has 4 s, twice the longest, a replay's 2 s, so a
+  // PipeWire that stalls can't hold one.
   function start(file) {
-    player.exec(["pw-play", "--media-role", "Notification", "--latency", "20ms", file])
+    player.exec(["timeout", "-k", "1", "4", "pw-play", "--media-role", "Notification", "--latency", "20ms", file])
   }
 
   Process { id: player }

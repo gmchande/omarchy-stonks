@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# A stand-in for chmod, first on PATH inside the harnesses: the real chmod,
+# except that while STONKS_FAKE_STATE/chmod.hold is there it waits first,
+# as a slow disk would, so a harness can see the mode a file had before
+# Stonks' chmod reached it.
+while [ -n "${STONKS_FAKE_STATE:-}" ] && [ -e "$STONKS_FAKE_STATE/chmod.hold" ]; do sleep 0.05; done
+exec /usr/bin/chmod "$@"

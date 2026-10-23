@@ -1053,18 +1053,28 @@ Item {
     if (!root.pluginsReady) root.adopt(root.dataSettings)
   }
 
+  // A file that isn't there is made at once, holding the settings Stonks
+  // takes, an older build's from the bar or the defaults, its owner's alone
+  // from its first byte (`OwnerOnly.create`), and then read as any file is.
+  // Written by Quickshell, a new file is 0644 until the chmod after it,
+  // long enough for another account to read the first change's lists. As
+  // Stonks starts, nothing is written until the file is read
+  // (`pluginsReady`). Where it can't be made, the settings are taken
+  // anyway, and the bar's written as a change is.
   function takeMissingFile() {
     root.settingsUnreadable = false
-    if (!root.pluginsReady) {
-      var fromBar = Settings.settingsFromBar(root.parseShell())
-      if (fromBar) {
-        root.adopt(fromBar)
-        root.writeDataFile(fromBar)
-        return
-      }
-    }
-    console.warn("stonks: settings file missing; using defaults")
-    root.adopt(Settings.fileSettings(null))
+    var fromBar = root.pluginsReady ? null : Settings.settingsFromBar(root.parseShell())
+    if (!fromBar) console.warn("stonks: settings file missing; using defaults")
+    var settings = fromBar || Settings.fileSettings(null)
+    ownerOnly.create(root.dataPath, root.dataText(settings), function(made) {
+      if (made) return root.readDataFile()
+      root.adopt(settings)
+      if (fromBar) root.writeDataFile(settings)
+    })
+  }
+
+  function dataText(settings) {
+    return JSON.stringify(settings, null, 2) + "\n"
   }
 
   // `settings` as `Settings.fileSettings` returns them, read back once
@@ -1074,7 +1084,7 @@ Item {
   // as a read's own (`takeMissingFile`) may: Quickshell 0.3.2 forgets a
   // read started inside a read's handlers (fileview.cpp, operationFinished).
   function writeDataFile(settings) {
-    var body = JSON.stringify(settings, null, 2) + "\n"
+    var body = root.dataText(settings)
     if (typeof dataFile.setText !== "function") {
       console.warn("stonks: cannot write " + root.dataPath)
       return
