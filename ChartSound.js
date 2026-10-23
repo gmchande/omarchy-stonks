@@ -264,7 +264,7 @@ function retro(grid, from, to, seconds) {
   for (var n = 0; n < ticks.length; n++) {
     for (var m = 0; m < noise.length && ticks[n] + m < x.length; m++) x[ticks[n] + m] += 0.5 * nesVolume(m / RATE, 10, 4, 0) * noise[m]
   }
-  return levelled(fadeEdges(band(x, 90, 6500), 1, 4), -22)
+  return levelled(fadeEdges(band(x, 90, 6500), 1, 4), -28)
 }
 
 // The bar a height on the chart (0 its floor, 1 its ceiling) sounds.
@@ -314,8 +314,8 @@ function lineBars(geometry) {
 // metal bar struck with felt, ringing about half a second: a free bar's
 // modes (1, 2.756, 5.404), the upper ones dying first, and higher bars
 // ringing shorter, as real ones do. Retro's is a pulse blip that falls in
-// the console's volume steps, a tenth of a second. Each sits 5 dB under the
-// add sound, so a sweep's overlapping bars come to about its level.
+// the console's volume steps, a tenth of a second. Each sits 8 dB under the
+// add sound, so a sweep's overlapping bars come to about 3 dB under it.
 function chime(retro, bar) {
   return retro ? retroBar(bar) : { samples: smoothBarSamples(bar), gain: 1 }
 }
@@ -340,7 +340,7 @@ function smoothBar(f) {
     }
   }
   // The felt: a 3 ms rise; and the tail faded to nothing.
-  return levelled(fadeEdges(x, 3, 50), -22)
+  return levelled(fadeEdges(x, 3, 50), -28)
 }
 
 function retroBar(bar) {
@@ -355,7 +355,7 @@ function retroBar(bar) {
     var a = ph | 0
     x[i] = slew * (wave[a] + (wave[a + 1] - wave[a]) * (ph - a))
   }
-  return levelled(fadeEdges(band(x, 90, 6500), 0.5, 3), -23)
+  return levelled(fadeEdges(band(x, 90, 6500), 0.5, 3), -29)
 }
 
 // A levelled sound as a 16-bit mono WAV, its bytes, with a one-bit TPDF
