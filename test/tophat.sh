@@ -192,8 +192,9 @@ css_table() {
 }
 
 # write_nested_lua RUN: no Omarchy autostart (it imports the environment
-# into the owner's systemd), no XWayland, and the few compositor values the
-# shell reads, taken from the host. The Wayland backend's output, the window
+# into the owner's systemd), no XWayland, the few compositor values the
+# shell reads, taken from the host, and its animations, read from Omarchy's
+# look'n'feel files. The Wayland backend's output, the window
 # on the host, is off before its first frame, so it never takes a buffer and
 # never maps (aquamarine 0.15.1, CWaylandOutput::commit); the session's
 # output is a headless one at scale 1, created once Hyprland has started,
@@ -222,6 +223,8 @@ hl.config({
   general = { gaps_in = $gaps_in, gaps_out = $gaps_out, border_size = $border, layout = "$layout" },
   decoration = { rounding = $rounding },
 })
+-- The owner's animations, from Omarchy's files (test/tophat/animations.lua).
+assert(loadfile("$here/tophat/animations.lua"))("/usr/share/omarchy/default/hypr/looknfeel.lua", "$HOME/.config/hypr/looknfeel.lua")
 hl.on("hyprland.start", function()
   hl.exec_cmd("hyprctl output create headless $output > $run/output.log 2>&1; quickshell -n -p /usr/share/omarchy/shell > $run/shell.log 2>&1; echo \$? > $run/shell.exit")
   $terminal
@@ -414,6 +417,42 @@ outputs_hidden() {
     'any(.[]; .name == $o and (.disabled | not)) and all(.[]; .name == $o or .disabled)' > /dev/null
 }
 
+# ---- old runs ---------------------------------------------------------------
+
+# A run folder is named DATE-TIME-COMMIT-KEY by start, which writes its
+# RUN_ID, the same name, to the folder's identity file first of all. Nothing
+# else in the base is one: the journeys' evidence and the current-* links
+# aren't, and a folder that merely has such a name isn't.
+run_name_re='^[0-9]{8}-[0-9]{6}-[0-9a-f]{7}-[0-9a-f]{6}$'
+
+# run_in_use DIR: a session still runs from DIR, or a current-* link names it.
+run_in_use() {
+  local dir=$1 link leader start
+  for link in "$base"/current-*; do
+    [ "$(readlink -f "$link")" = "$dir" ] && return 0
+  done
+  [ -s "$dir/leader" ] && read -r leader start < "$dir/leader" \
+    && group_ours "$leader" "$start" "TOPHAT_RUN=${dir##*/}"
+}
+
+# prune_runs: remove the run folders started more than a day ago, each by its
+# exact path, unless a session still uses it. A day is what a pull request's
+# check, or a look back at a run, can still need: a run is 28 MB, and a day
+# of journeys made 116 of them.
+prune_runs() {
+  local cutoff dir name removed=0
+  cutoff=$(date -d '1 day ago' +%Y%m%d-%H%M%S)
+  for dir in "$base"/*/; do
+    dir=${dir%/}
+    name=${dir##*/}
+    [[ $name =~ $run_name_re ]] && [ -d "$dir" ] && [ ! -L "$dir" ] && grep -qx "RUN_ID=$name" "$dir/identity" 2> /dev/null || continue
+    [[ ${name:0:15} < $cutoff ]] || continue
+    run_in_use "$dir" && continue
+    rm -rf -- "$dir" && removed=$((removed + 1))
+  done
+  if (( removed )); then echo "removed $removed run folders from before $cutoff"; fi
+}
+
 # ---- the run ----------------------------------------------------------------
 
 # load_run: this checkout's current run's saved identity, or fail.
@@ -546,12 +585,13 @@ cmd_start() {
   exec 5>&-
   # The slot is free, so whatever current names has ended.
   rm -f "$current"
+  prune_runs
 
   # The key too: two checkouts may start the same commit in the same second.
   id=$(date +%Y%m%d-%H%M%S)-${commit:0:7}-$key
   run=$base/$id
   [[ $run =~ ^[A-Za-z0-9/._-]+$ ]] || die "the run folder $run needs a plain path"
-  mkdir -p "$run" || die "cannot make $run"
+  mkdir -p "$run" && printf 'RUN_ID=%q\n' "$id" > "$run/identity" || die "cannot make $run"
   echo "run folder: $run"
   build_sandbox "$run" "$commit" && { [ -z "$slow" ] || write_slow_curl "$run" "$slow" "$curl"; } \
     && write_nested_lua "$run" && nested_lua_ok "$run/nested.lua" \
@@ -894,6 +934,124 @@ self_check() {
   nested_lua_ok "$tmp/ok.lua" 2> /dev/null || miss "a valid nested.lua should pass"
   printf 'hl.config({ general = { gaps_inn = 5 } })\n' > "$tmp/bad.lua"
   nested_lua_ok "$tmp/bad.lua" 2> /dev/null && miss "an invalid nested.lua should fail"
+
+  # The session's animations: only Omarchy's curves, animations, and
+  # `animations` settings reach the compositor, its defaults first and then
+  # the owner's file. Each case runs in Hyprland's own Lua with a recording
+  # `hl` in its place.
+  local anim=$tmp/anim loader=$here/tophat/animations.lua
+  mkdir -p "$anim"
+  cat > "$anim/defaults.lua" << 'EOF'
+hl.config({ general = { gaps_in = 1 }, animations = { enabled = true } })
+hl.curve("c1", { type = "bezier", points = { { 0, 0 }, { 1, 1 } } })
+hl.animation({ leaf = "a1", enabled = true, speed = 4, bezier = "c1" })
+hl.bind("x")
+EOF
+  cat > "$anim/owner.lua" << 'EOF'
+hl.animation({ leaf = "a1", enabled = false })
+hl.config({ decoration = { rounding = 3 } })
+EOF
+  # Settings it cannot filter, because they run elsewhere.
+  printf 'dofile("/dev/null")\nhl.animation({ leaf = "a2" })\n' > "$anim/owner-includes.lua"
+  anim_loaded() {  # WANT DEFAULTS OWNER: what the loader hands over, in order and in full, is WANT
+    cat > "$anim/harness.lua" << EOF
+local real, seen = hl, {}
+local function show(value)
+  if type(value) ~= "table" then return tostring(value) end
+  local parts = {}
+  for key, inner in pairs(value) do parts[#parts + 1] = tostring(key) .. "=" .. show(inner) end
+  table.sort(parts)
+  return "{" .. table.concat(parts, ",") .. "}"
+end
+local function note(...) seen[#seen + 1] = table.concat({ ... }, " ") end
+_G.hl = {
+  curve = function(name, options) note("curve", name, show(options)) end,
+  animation = function(options) note("animation", show(options)) end,
+  config = function(options) note("config", show(options)) end,
+}
+local ok = pcall(assert(loadfile("$loader")), "$2", "$3")
+_G.hl = real
+if not ok then seen[#seen + 1] = "ERROR" end
+local got = table.concat(seen, ";")
+if got ~= "$1" then error("got: " .. got) end
+EOF
+    nested_lua_ok "$anim/harness.lua"
+  }
+  local animations='config {animations={enabled=true}};curve c1 {points={1={1=0,2=0},2={1=1,2=1}},type=bezier};animation {bezier=c1,enabled=true,leaf=a1,speed=4}'
+  anim_loaded "$animations;animation {enabled=false,leaf=a1}" "$anim/defaults.lua" "$anim/owner.lua" 2> /dev/null \
+    || miss "the loader should hand over the defaults' animations, then the owner's, in full and nothing else"
+  anim_loaded "$animations" "$anim/defaults.lua" "$anim/none.lua" 2> /dev/null \
+    || miss "an owner without a look'n'feel file should leave the defaults' animations"
+  anim_loaded "$animations;ERROR" "$anim/defaults.lua" "$anim/owner-includes.lua" 2> /dev/null \
+    || miss "a file that includes another should be an error, since its settings would bypass the filter"
+  anim_loaded ERROR "$anim/none.lua" "$anim/owner.lua" 2> /dev/null \
+    || miss "missing defaults should be an error, not the wrong motion"
+  anim_loaded "${animations/speed=4/speed=5};animation {enabled=false,leaf=a1}" "$anim/defaults.lua" "$anim/owner.lua" 2> /dev/null \
+    && miss "the loader's check should fail on a wrong speed"
+  # The installed Omarchy's own file loads, and gives animations and nothing else.
+  cat > "$anim/real.lua" << EOF
+local real, kinds = hl, {}
+_G.hl = {
+  curve = function() kinds.curve = true end,
+  animation = function() kinds.animation = true end,
+  config = function(t) for key in pairs(t) do kinds["config " .. key] = true end end,
+}
+local ok, err = pcall(assert(loadfile("$loader")), "/usr/share/omarchy/default/hypr/looknfeel.lua", "$anim/none.lua")
+_G.hl = real
+if not ok then error(err) end
+if not (kinds.curve and kinds.animation) then error("Omarchy's look'n'feel gave no animations") end
+for kind in pairs(kinds) do
+  if kind ~= "curve" and kind ~= "animation" and kind ~= "config animations" then error("let through: " .. kind) end
+end
+EOF
+  nested_lua_ok "$anim/real.lua" || miss "the installed Omarchy's look'n'feel should give animations and nothing else"
+  # And the generated nested.lua runs the loader.
+  mkdir -p "$tmp/hc"
+  printf '#!/bin/sh\necho "{\\"css\\":\\"5 5 5 5\\",\\"int\\":2,\\"str\\":\\"dwindle\\"}"\n' > "$tmp/hc/hyprctl"; chmod +x "$tmp/hc/hyprctl"
+  PATH="$tmp/hc:$PATH" fresh=0 write_nested_lua "$anim"
+  cat > "$anim/wired.lua" << EOF
+local real, seen = hl, {}
+_G.hl = setmetatable({}, { __index = function(_, name) return function() seen[name] = true end end })
+local ok, err = pcall(dofile, "$anim/nested.lua")
+_G.hl = real
+if not ok then error(err) end
+if not (seen.curve and seen.animation) then error("nested.lua set no animations") end
+EOF
+  nested_lua_ok "$anim/wired.lua" || miss "the generated nested.lua should set the owner's animations"
+
+  # Old runs: a run folder from before the last day goes, unless a session
+  # still uses it; nothing else in the base is touched, by name, by mark, or
+  # by link.
+  local base_was=$base old=20200101-000000 fresh_name n
+  base=$tmp/prune
+  fresh_name=$(date +%Y%m%d-%H%M%S)
+  # made NAME: a folder as start makes it.
+  made() { mkdir -p "$base/$1" && echo "RUN_ID=$1" > "$base/$1/identity"; }
+  for n in 111111 222222 333333 444444 555555; do made "$old-abcdef0-$n"; done
+  made "$fresh_name-abcdef0-111111"
+  mkdir -p "$base/journeys/$old" "$base/$old-notarun" "$base/$old-abcdef0-666666" "$base/$old-abcdef0-888888" "$tmp/prune-victim"
+  echo "RUN_ID=another" > "$base/$old-abcdef0-888888/identity"
+  : > "$tmp/prune-victim/file"
+  ln -s "$tmp/prune-victim" "$base/$old-abcdef0-777777"
+  ln -sfn "$base/$old-abcdef0-222222" "$base/current-aaaaaa"
+  setsid sleep 60 & local alive=$!
+  echo "$alive $(start_of "$alive")" > "$base/$old-abcdef0-333333/leader"
+  echo "$gone $gone_start" > "$base/$old-abcdef0-444444/leader"
+  echo "$alive 1" > "$base/$old-abcdef0-555555/leader"
+  prune_runs > /dev/null
+  kill "$alive" 2> /dev/null
+  [ -e "$base/$old-abcdef0-111111" ] && miss "an old run folder nothing uses should be removed"
+  [ -e "$base/$old-abcdef0-444444" ] && miss "an old run whose session has gone should be removed"
+  [ -e "$base/$old-abcdef0-555555" ] && miss "an old run whose recorded leader's process number was reused should be removed"
+  [ -d "$base/$old-abcdef0-222222" ] || miss "the run a current-* link names was removed"
+  [ -d "$base/$old-abcdef0-333333" ] || miss "an old run whose session still runs was removed"
+  [ -d "$base/$fresh_name-abcdef0-111111" ] || miss "a run from the last day was removed"
+  [ -d "$base/journeys/$old" ] || miss "the journeys' evidence was removed"
+  [ -d "$base/$old-notarun" ] || miss "a folder whose name is not a run's was removed"
+  [ -d "$base/$old-abcdef0-666666" ] || miss "a folder with a run's name that start never marked was removed"
+  [ -d "$base/$old-abcdef0-888888" ] || miss "a folder marked with another run's name was removed"
+  [ -L "$base/$old-abcdef0-777777" ] && [ -e "$tmp/prune-victim/file" ] || miss "pruning touched a link in the base, or what it names"
+  base=$base_was
 
   # The session's zone: one the system doesn't know starts nothing.
   for bad in Nowhere/City ../../etc/passwd Asia ""; do
