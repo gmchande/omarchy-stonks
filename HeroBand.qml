@@ -147,6 +147,7 @@ Item {
 
     Item {
       id: heroChart
+      objectName: "heroChart"
       width: parent.width
       height: root.chartHeight
 

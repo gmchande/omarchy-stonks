@@ -72,6 +72,7 @@ Item {
     model: root.options
 
     Item {
+      objectName: "rangeOption"
       required property var modelData
       required property int index
       // From halfway to the word before to halfway to the word after.

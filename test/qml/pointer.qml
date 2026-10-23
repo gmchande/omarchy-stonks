@@ -872,9 +872,19 @@ ShellRoot {
         // as the rows come back, and outside the list menu, which dismisses
         // it over rows that stay. From rows-review: the second press featured
         // the row under it.
+        //
+        // Each wait is on what the next move reads. A press aimed from a row
+        // still sliding into place, after the last case's rows changed, landed
+        // on the order word above the list, sorted it, and left the next case
+        // aiming at rows that weren't where it thought (2 failed runs in 20).
+        var rowsAtRest = function() {
+          var list = body.watchlist
+          return !list.settling && list.dragSymbol === ""
+            && list.displayedSymbols.every(function(s) { return list.rowResting(s) })
+        }
         var throughView = function(open, pressAt, closedSignal, wheelBetween) {
           body.watchlist.contentY = 0
-          wait(50)
+          within(3000, rowsAtRest)
           stub.featuredSymbol = body.watchlist.displayedSymbols[5]
           var row = body.watchlist.displayedSymbols[4]
           var rowY = 4 * pitch + 20
@@ -883,7 +893,12 @@ ShellRoot {
           mouseClick(body.watchlist, 12, rowY)
           if (!wheelBetween) mouseWheel(body.watchlist, 12, rowY, 0, -120, Qt.NoModifier)
           open()
-          wait(100)
+          // The view is open over rows that have stopped moving, so the
+          // press lands where pressAt reads it.
+          within(1000, function() {
+            return (body.managingLists || body.listMenuOpen)
+              && body.watchlist.displayedSymbols.every(function(s) { return body.watchlist.rowResting(s) })
+          })
           var at = pressAt()
           var once = function() {
             closedSignal.disconnect(once)
@@ -891,10 +906,13 @@ ShellRoot {
           }
           if (wheelBetween) closedSignal.connect(once)
           mouseDoubleClickSequence(body, at.x, at.y)
-          wait(300)
-          var result = (stub.featuredSymbol === row && !body.managingLists && !body.listMenuOpen) + " " + stub.featuredSymbol + " for " + row
+          within(1000, function() { return !body.managingLists && !body.listMenuOpen })
+          // Nothing under the second press acted: no row featured, and the
+          // order word above the rows kept its order.
+          var result = (stub.featuredSymbol === row && !body.managingLists && !body.listMenuOpen && stub.order === "manual")
+            + " " + stub.featuredSymbol + " for " + row + ", " + stub.order
           root.setFixtureWatchlist()
-          wait(100)
+          within(3000, rowsAtRest)
           return result
         }
         var onDone = function() {

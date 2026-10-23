@@ -221,6 +221,12 @@ BarWidget {
     }
   }
 
+  // The tophat's locator (Locator.qml) finds the pill and its popup here.
+  Connections {
+    target: root.plugin && root.plugin.locator ? root.plugin.locator : null
+    function onCollect(take) { take(root) }
+  }
+
   WidgetButton {
     id: button
     anchors.fill: parent
