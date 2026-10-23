@@ -250,7 +250,7 @@ function inCents(meta, centExchanges) {
 // The tick of the listing an answer is for (`Format.priceTick`), from its
 // headline price, else its last bar's close.
 function answerTick(meta, bars, centExchanges) {
-  var price = Format.isFiniteNumber(meta.regularMarketPrice) ? meta.regularMarketPrice
+  var price = knownPrice(meta.regularMarketPrice) !== null ? meta.regularMarketPrice
     : (bars.length ? bars[bars.length - 1].c : null)
   return Format.priceTick(price, meta.priceHint, inCents(meta, centExchanges))
 }
@@ -282,7 +282,7 @@ function parseChart(json, centExchanges) {
   var bars = []
   for (var i = 0; i < timestamps.length; i++) {
     if (!Format.isMoment(timestamps[i]) || (i > 0 && !(timestamps[i] > timestamps[i - 1]))) return null
-    if (Format.isFiniteNumber(closes[i]))
+    if (knownPrice(closes[i]) !== null)
       bars.push({ t: timestamps[i], o: opens[i], c: closes[i] })
   }
   var filtered = filterStrayCloses(bars, periods, answerTick(meta, bars, centExchanges))
@@ -338,13 +338,17 @@ function parseChart(json, centExchanges) {
     instrumentType: instrumentType,
     crypto: instrumentType === "CRYPTOCURRENCY",
     // The regular-market quote as Yahoo reports it, with its own timestamp.
-    // Kept apart from the chart samples: see headlineQuote.
-    price: Format.isFiniteNumber(meta.regularMarketPrice) ? meta.regularMarketPrice : null,
+    // Kept apart from the chart samples: see headlineQuote. A price at or
+    // under zero is none, as a close, a previous close, an open, a high, and
+    // a low are (`knownPrice`): Yahoo sends zeros for prices it doesn't
+    // have. Found in the strain QA: a negative price read "-5.00" on every
+    // coin, and a zero previous close "0.00%".
+    price: knownPrice(meta.regularMarketPrice),
     // The decimals every price of this listing is shown in, from its
     // headline price, Yahoo's hint, and its market (`Format.priceDigits`).
-    priceDigits: Format.priceDigits(Format.isFiniteNumber(meta.regularMarketPrice) ? meta.regularMarketPrice
+    priceDigits: Format.priceDigits(knownPrice(meta.regularMarketPrice) !== null ? meta.regularMarketPrice
       : (points.length ? points[points.length - 1].p : null), meta.priceHint, inCents(meta, centExchanges)),
-    prevClose: meta.chartPreviousClose !== undefined ? meta.chartPreviousClose : meta.previousClose,
+    prevClose: knownPrice(meta.chartPreviousClose !== undefined ? meta.chartPreviousClose : meta.previousClose),
     marketTime: Format.isFiniteNumber(meta.regularMarketTime) && meta.regularMarketTime > 0 ? meta.regularMarketTime : null,
     dayOpen: firstRegular ? knownPrice(firstRegular.o) : null,
     // The regular session `dayOpen` is the open of, once its first bar has

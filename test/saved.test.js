@@ -1179,15 +1179,36 @@ test("5Y and longer draw on a log scale; shorter ranges stay linear", () => {
   const linear = M.historyGeometry({ ...weekly, range: "2Y" })
   const linearY = p => 1 - (p - linear.lo) / (linear.hi - linear.lo)
   for (const point of linear.points) expect(point.y).toBeCloseTo(linearY(point.p), 12)
-  // A log has no place for zero: a long range with a zero baseline or a
-  // zero close draws linear, every point finite.
-  for (const odd of [{ ...weekly, baseline: 0 }, { ...weekly, bars: weekly.bars.map((bar, i) => (i === 3 ? { ...bar, c: 0 } : bar)) }]) {
-    const flat = M.historyGeometry(odd)
-    for (const point of flat.points) expect(Number.isFinite(point.y)).toBe(true)
-    expect(Number.isFinite(flat.baselineY)).toBe(true)
-    const oddY = p => 1 - (p - flat.lo) / (flat.hi - flat.lo)
-    for (const point of flat.points) expect(point.y).toBeCloseTo(oddY(point.p), 12)
-  }
+})
+
+// Nonsense in a well-formed answer is left out, as a zero high or low is: a
+// price at or under zero is none. A day's negative price, zero previous
+// close, and negative first close; a range's zero previous close and
+// negative first close, its START then its first good close, and its long
+// range still on a log scale. Found in the strain QA: "-5.00" on every coin,
+// "0.00%", "START 0.00", and a cliff at the chart's left.
+test("a price at or under zero in an answer is left out", () => {
+  const day = fixture("aapl.json")
+  const meta = day.chart.result[0].meta
+  const closes = day.chart.result[0].indicators.quote[0].close
+  const firstTime = day.chart.result[0].timestamp[0]
+  meta.regularMarketPrice = -5
+  meta.chartPreviousClose = 0
+  closes[0] = -1
+  const q = M.parseChart(day)
+  expect([q.price, q.prevClose]).toEqual([null, null])
+  expect(q.points.some(p => p.t === firstTime || p.p <= 0)).toBe(false)
+  const year = fixture("history/aapl-5y.json")
+  year.chart.result[0].meta.chartPreviousClose = 0
+  year.chart.result[0].indicators.quote[0].close[0] = -1
+  year.chart.result[0].indicators.quote[0].low[1] = 0
+  const h = M.parseHistory(year, "5Y")
+  const secondClose = year.chart.result[0].indicators.quote[0].close[1]
+  expect(h.bars[0].t).toBe(year.chart.result[0].timestamp[1])
+  expect([h.baseline, h.bars[0].l]).toEqual([secondClose, null])
+  const geometry = M.historyGeometry(h)
+  const logY = p => 1 - (Math.log(p) - Math.log(geometry.lo)) / (Math.log(geometry.hi) - Math.log(geometry.lo))
+  for (const point of geometry.points) expect(point.y).toBeCloseTo(logY(point.p), 12)
 })
 
 test("history scrub lookup snaps to a bar and maps its timestamp back", () => {
