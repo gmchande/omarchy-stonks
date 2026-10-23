@@ -301,7 +301,11 @@ ShellRoot {
       var gone = service.previewSymbol + "," + service.previewSurface
       harness.check("a surface closing or going while it previews ends its preview", closed === ",null" && gone === ",null",
         closed + " / " + gone)
+      // The window's search, kept through its close, opens again with it;
+      // the next flow starts with search closed.
       app.open("{}")
+      tryVerify(function() { return body.adding }, 2000)
+      body.cancelAdding()
       service.setRange("1D")
       wait(400)
     }
@@ -799,11 +803,13 @@ ShellRoot {
       longSymbols(body, keys)
       smallestWindow(body, keys)
 
-      // A search still out when the window closes brings nothing back, and is
-      // stopped, not waited out: type SH, let it go out (the fake curl
-      // answers in 0.4 s), close, open, and start a new search. Found in
-      // cubic's review of #25: the old curl ran on and could hold a new
-      // search back for its whole timeout.
+      // A search still out when the window closes is stopped, not waited
+      // out, and brings nothing back: type SH, let it go out (the fake curl
+      // answers in 0.4 s), close, and open. The words come back, as a
+      // search being typed outlives a close, and are asked again: only that
+      // new lookup answers. Found in cubic's review of #25: the old curl ran
+      // on and could hold a new search back for its whole timeout; and in
+      // the overnight QA of 23 October: a close lost the words.
       app.close()
       app.open("{}")
       wait(200)
@@ -812,18 +818,17 @@ ShellRoot {
       wait(50)
       harness.find(body.search, "searchField").text = "SH"
       var searched = within(2000, function() { return body.search.activeQuery === "SH" })
+      var askedBefore = harness.calls("SEARCH.asked")
       var answeredBefore = harness.calls("SEARCH.answered")
       app.close()
       app.open("{}")
-      wait(100)
-      keys.forceActiveFocus()
-      keyClick(Qt.Key_A)
+      var reasked = within(3000, function() { return body.search.answer !== "" && body.search.resultsQuery === "SH" })
       wait(600)
-      harness.check("a search out at a close is stopped, and a new open shows nothing of it",
-        searched && body.adding && body.search.searchText === "" && body.search.results.length === 0
-          && harness.calls("SEARCH.answered") === answeredBefore,
-        searched + "|" + body.adding + "|" + body.search.searchText + "|" + body.search.results.length
-          + "|" + (harness.calls("SEARCH.answered") - answeredBefore))
+      harness.check("a search out at a close is stopped, and the next open asks its words again",
+        searched && reasked && body.adding && body.search.searchText === "SH" && body.search.results.length > 0
+          && harness.calls("SEARCH.asked") - askedBefore === 1 && harness.calls("SEARCH.answered") - answeredBefore === 1,
+        [searched, reasked, body.adding, body.search.searchText, body.search.results.length,
+          harness.calls("SEARCH.asked") - askedBefore, harness.calls("SEARCH.answered") - answeredBefore].join("|"))
 
       keyClick(Qt.Key_Escape)
 

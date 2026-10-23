@@ -164,8 +164,12 @@ FocusScope {
   }
   Keys.onPressed: function(event) { root.handleKey(event) }
 
+  // Words a close kept, which the next start types back in; "" for none.
+  property string resumed: ""
+
   // A new search's start, so its first frame is empty rather than the last
-  // search's field and results.
+  // search's field and results, unless a close kept what was being typed
+  // (`resumed`): then it is typed back in and asked again.
   function reset() {
     slow = false
     resultsScroll.contentY = 0
@@ -175,6 +179,9 @@ FocusScope {
     searchDebounce.stop()
     searchField.text = ""
     showEmpty()
+    var kept = resumed
+    resumed = ""
+    if (kept !== "") searchField.text = kept
   }
 
   // Escape, or its button.

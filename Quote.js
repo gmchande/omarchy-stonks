@@ -429,12 +429,17 @@ function periodOf(period) {
 // An answer's trading periods as its pre, regular, and post sessions: each
 // the last day it lists, from its first period's start to its last's end;
 // none from a list past MOST_DAYS or MOST_PERIODS, an answer `parseChart`
-// has already refused (`answerClocks`).
+// has already refused (`answerClocks`). Since 23 October a day answer may
+// come in a range's shape, one list of days, as every non-US listing's and
+// an index's at night do: its periods are the regular session's, with no
+// pre or post. Found in the overnight QA: SHEL.L said "Closed · opens Mon"
+// through its session, its chart a straight line.
 function answerPeriods(periods) {
   var out = {}
   var names = ["pre", "regular", "post"]
   for (var i = 0; i < names.length; i++) {
-    var days = Format.fetchedList(periods[names[i]] || [], MOST_DAYS) || []
+    var list = Array.isArray(periods) ? (names[i] === "regular" ? periods : []) : periods[names[i]]
+    var days = Format.fetchedList(list || [], MOST_DAYS) || []
     var day = Format.fetchedList(days[days.length - 1] || [], MOST_PERIODS) || []
     out[names[i]] = day.length ? { start: day[0].start, end: day[day.length - 1].end } : null
   }
@@ -447,8 +452,9 @@ function answerPeriods(periods) {
 // its periods ended at 17:30). `meta.gmtoffset` is the clock the answer was
 // sent by, so the week after a change of clocks a period before it still
 // says its own (Sydney's 10:00 AEST open of 21 September, in an answer sent
-// in AEDT). Both shapes Yahoo sends: a day answer's pre, regular, and post,
-// each a list of days, and a range's one list of days. Null when a list of
+// in AEDT). Both shapes Yahoo sends: pre, regular, and post, each a list of
+// days, and one list of days, a range's and now some day answers' too
+// (`answerPeriods`). Null when a list of
 // days or of a day's periods is not a list within MOST_DAYS or MOST_PERIODS,
 // or a period is not an object: a spark day with a null period threw here,
 // and its feed stopped until Stonks restarted.

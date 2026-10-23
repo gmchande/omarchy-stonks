@@ -435,6 +435,39 @@ ShellRoot {
         ] } } }
         root.check("a failed range's retry that lands down names the bear",
           !body.chart.failed && root.animalShows("bear"), body.animal.kind)
+        // A scrub whose line crosses a mark makes it give way, and it comes
+        // back once the pointer moves on: the line never cuts its date in
+        // two. Both looks, on a year with a sharp high early and a sharp low
+        // late, so both marks show at rest. Found in the overnight QA of 23
+        // October: AAPL's 1Y scrub ran through "20│JAN 2026".
+        var sharp = []
+        for (var sb = 0; sb < 40; sb++) {
+          var sc = sb === 6 ? 130 : sb === 33 ? 70 : 100 + (sb % 3)
+          sharp.push({ t: stub.now - (39 - sb) * 86400, c: sc, h: sc + 0.5, l: sc - 0.5, o: sc, v: 100 })
+        }
+        stub.histories = { "UP|1Y": { history: { symbol: "UP", range: "1Y", baseline: 100, interval: "1d", gmtoffset: -14400, bars: sharp } } }
+        var crossed = []
+        ;[false, true].forEach(function(retro) {
+          stub.retro = retro
+          wait(50)
+          tryVerify(function() { return body.motion.drawn === 1 }, 2000)
+          var high = root.find(body, "highMark")
+          var low = root.find(body, "lowMark")
+          var shown = function() { return [high.visible, low.visible].join(",") }
+          var atRest = shown()
+          var over = high.mapToItem(body.chartItem, high.width / 2, 0)
+          mouseMove(body.chartItem, over.x, body.chartItem.height / 2)
+          wait(50)
+          var scrubbed = body.scrubT !== 0 ? shown() : "no scrub"
+          mouseMove(body.chartItem, over.x, -Style.space(40))
+          wait(50)
+          var after = shown()
+          if (atRest !== "true,true" || scrubbed !== "false,true" || after !== "true,true")
+            crossed.push((retro ? "retro" : "smooth") + ": at rest " + atRest + ", over the high " + scrubbed + ", after " + after)
+        })
+        stub.retro = false
+        root.check("a scrub over a range's mark makes it give way, and it comes back as the pointer leaves, both looks",
+          crossed.length === 0, crossed.join(" | "))
         stub.range = "1D"
         stub.histories = {}
         stub.featuredSymbol = restFeatured

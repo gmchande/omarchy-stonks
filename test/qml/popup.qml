@@ -919,6 +919,27 @@ ShellRoot {
           var madeOnClose = names().indexOf("Made on close") > 0 && test.hintService.listName === "Made on close"
           test.check("closing the popup keeps a rename being typed and makes a new list being named",
             renamedOnClose && madeOnClose, names().join(",") + "|" + test.hintService.listName)
+          // A search being typed outlives a close too: the next open has
+          // search open again with its words. Found in the overnight QA of
+          // 23 October: a click away lost "nvidia".
+          test.hintPanel.open()
+          body.startAdding()
+        } else if (test.step === 47) {
+          var typing = test.hintPanel.testBody
+          if (test.hold(typing.adding)) return
+          test.find(typing, "searchField").text = "nvidia"
+          test.hintPanel.close()
+        } else if (test.step === 48) {
+          test.hintPanel.open()
+        } else if (test.step === 49) {
+          var reopened = test.hintPanel.testBody
+          var kept = test.find(reopened, "searchField")
+          if (test.hold(reopened.adding && kept.text === "nvidia")) return
+          test.check("closing the popup keeps a search being typed, open again with its words",
+            reopened.adding && kept.text === "nvidia" && test.find(reopened, "symbolSearch").searchText === "nvidia",
+            reopened.adding + "|" + kept.text)
+          reopened.cancelAdding()
+          test.hintPanel.close()
           console.log("POPUP DONE")
           exitTimer.exitCode = test.failures ? 1 : 0
           exitTimer.start()
