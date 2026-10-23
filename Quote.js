@@ -280,7 +280,7 @@ function parseChart(json, centExchanges) {
   var bars = []
   for (var i = 0; i < timestamps.length; i++) {
     if (!Format.isMoment(timestamps[i]) || (i > 0 && !(timestamps[i] > timestamps[i - 1]))) return null
-    if (closes[i] !== null && closes[i] !== undefined)
+    if (Format.isFiniteNumber(closes[i]))
       bars.push({ t: timestamps[i], o: opens[i], c: closes[i] })
   }
   var filtered = filterStrayCloses(bars, periods, answerTick(meta, bars, centExchanges))

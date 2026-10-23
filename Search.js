@@ -29,7 +29,9 @@ function parseSearch(json) {
   var left = []
   for (var i = 0; i < quotes.length; i++) {
     var q = quotes[i]
-    if (!q.symbol) continue
+    // A symbol that isn't text, or holds half of a UTF-16 pair, can't go in
+    // a URL (encodeURIComponent throws), and no ticker is either.
+    if (typeof q.symbol !== "string" || !q.symbol || /[\ud800-\udfff]/.test(q.symbol)) continue
     if (q.quoteType && FOLLOWED.indexOf(q.quoteType) < 0) {
       left.push(q)
       continue
