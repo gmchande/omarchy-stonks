@@ -110,18 +110,15 @@ the chart, and Enter or a click adds it. Search finds stocks, ETFs,
 indexes, and crypto.
 
 To remove a row, point at it and click the × beside its symbol, or press
-`x`: it goes from the list you're looking at. The row that slides into its
-place shows its × only once you move the pointer, so a second click can't
-remove it by mistake. Right-click a row to choose where it goes from, such
-as "Remove from Growth" or "Remove from all 3 lists". In All, where
-removing takes a symbol out of every list, the × and `x` ask first when one
-of your own lists holds it too.
+`x`: it goes from the list you're looking at. Right-click a row to choose
+where it goes from, such as "Remove from Growth" or "Remove from all 3
+lists". In All, where removing takes a symbol out of every list, the × and
+`x` ask first when one of your own lists holds it too.
 
-For 5 seconds after a removal, "Undo NVDA" shows beside "+ Add a symbol":
-click it to bring the row back. Until a list next changes, `u` does the
-same, and so does "+ Add a symbol", where the symbol is the first result,
-with PUT BACK. Each puts it back in its lists at its old place, with the
-price it had, and Stonks asks for a new one at once.
+To bring back what you removed, press `u`, or click "+ Add a symbol": the
+symbol is the first result, with PUT BACK, which puts it back in its lists
+at its old place. It comes back with the price it had, and Stonks asks for
+a new one at once.
 
 The line beside the list's name shows how many rows are up, in green, and
 down, in red. Click the order word to sort by symbol, name, or change, and
@@ -170,9 +167,9 @@ cp ~/.config/omarchy/plugins/grvc.stonks/share/grvc.stonks.svg ~/.local/share/ic
 
 <img src="media/retro.png" width="480" alt="The popup in retro: block digits and a chart of pixel columns">
 
-Stonks opens in retro: the price in block digits and the charts in pixel
-columns, the way Omarchy draws its logo. Click the small chart icon at the
-top right to switch between smooth and retro.
+Retro draws the price in block digits and the charts in pixel columns, the
+way Omarchy draws its logo. Click the small chart icon at the top right to
+switch between smooth and retro.
 
 <img src="media/light.png" width="480" alt="The popup in Catppuccin Latte, a light theme: Stonks' own green and red, for a light ground, on the theme's pale background">
 
@@ -252,12 +249,6 @@ A "!" on the pill means its stock's quote is late or its last refresh
 failed: point at the pill to read which. The row and the line above the
 price say the same.
 
-- **The header says "No prices from Yahoo".** Every symbol you follow is
-  waiting on Yahoo, or Yahoo turned every one away, so Stonks says it once
-  rather than on every row. Rows with a price keep it, with the time it's
-  from, and the rest show their symbol alone. What to do is as for "No
-  data" below. If Yahoo has changed what it sends, only a newer Stonks can
-  fix that.
 - **A row says "No data" or "Update overdue".** Stonks has waited 90
   seconds on Yahoo: no answer came, or Yahoo turned it away. A row with a
   price keeps it, with the time it's from. Check your connection. If other
@@ -269,7 +260,9 @@ price say the same.
   running. A row with a price keeps it, with the time it's from, and `r`
   tries again. A symbol Yahoo has dropped, after a merger, a rename, or a
   delisting, stays this way: search for the company to find what Yahoo
-  calls it now.
+  calls it now. If every row says it, the fault is Yahoo's. Stonks tries
+  again at each refresh, but if Yahoo has changed what it sends, only a
+  newer Stonks can fix that.
 - **A stock or index says "As of" while its market is open.** Yahoo sends
   many exchanges' prices late, and some indexes'. When we measured,
   London's, São Paulo's, and the Cboe's VIX came 15 minutes late and
@@ -281,7 +274,7 @@ price say the same.
   it's 20 minutes old.
 - **A price looks wrong.** Each price is in its listing's currency, never
   converted, and shows no code where Yahoo names none, as for some
-  indexes. A price marked PENCE is in pence, as Yahoo quotes many London
+  indexes. A price marked GBp is in pence, as Yahoo quotes many London
   listings: 3,580.00 is £35.80. The large price is the regular session's.
   Pre-market, after-hours, and overnight trades show on the smaller line
   under it, which some apps show as the main price. The change is from the

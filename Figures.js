@@ -25,21 +25,7 @@ function listingMeta(quote, nameCut) {
   var code = quote.currency || ""
   var name = String(quote.name || "")
   var said = !nameCut && name.slice(-code.length - 1) === " " + code
-  return quote.exchange + (code === "" || said ? "" : " · " + currencyLabel(code))
-}
-
-// A currency as Stonks says it: Yahoo's code, but pence, London's "GBp",
-// as PENCE. Beside the capitals around it, GBp read as GBP, and 3,648.00
-// as pounds: found by the design panel of 23 October.
-function currencyLabel(code) {
-  return code === "GBp" ? "PENCE" : code
-}
-
-// A freshness whose warning is said once for every listing, where Yahoo
-// sends nothing for any (`StonksBody.yahooDown`): a failed or overdue
-// refresh reads as an aged quote, which says only when its price is from.
-function quietFreshness(fresh) {
-  return freshnessWarns(fresh) ? Object.assign({}, fresh, { state: "aged" }) : fresh
+  return quote.exchange + (code === "" || said ? "" : " · " + code)
 }
 
 // Freshness is three separate facts, kept separate: the time the headline

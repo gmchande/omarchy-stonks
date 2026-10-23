@@ -76,8 +76,8 @@ ShellRoot {
   // The smallest window App.qml allows.
   readonly property bool smallest: minWindow || minWindowOf || (!!w22 && w22.min)
   // loading and failed: a cold start, the first quotes out or failed, in
-  // retro, or in smooth with -smooth; in the popup with popup- before.
-  readonly property string coldState: (/^(?:popup-)?(loading|failed)(?:-smooth)?$/.exec(stateName) || ["", ""])[1]
+  // retro, or in smooth with -smooth.
+  readonly property string coldState: (/^(loading|failed)(?:-smooth)?$/.exec(stateName) || ["", ""])[1]
   // The popup while adding, and the window at the size App.qml permits.
   readonly property bool searchState: stateName.indexOf("-search") >= 0
   readonly property bool minWindow: stateName.indexOf("min-window-") === 0
@@ -827,11 +827,6 @@ ShellRoot {
         })
       }
       else body.note = "Keep at least one symbol"
-    } else if (/^(popup|window)-undo-/.test(root.stateName)) {
-      // <popup|window>-undo-<look>: a removal offered back beside the add;
-      // -named-: in a named list, the add's words the longer.
-      if (root.stateName.indexOf("-named-") > 0) stub.listName = "My Watchlist"
-      body.undoOffered = { symbol: "SHOP.TO" }
     } else if (root.stateName.indexOf("popup-hint-") === 0) {
       // The first open's footer: the hint's lines have to fit the popup's
       // width, above "+ Add a symbol".
@@ -931,12 +926,6 @@ ShellRoot {
       }
     } else if (root.stateName === "history-scrub") {
       body.motion.scrubT = root.shownHistoryEntry.history.bars[125].t
-    } else if (/^popup-history-1y-crossed(low)?-/.test(root.stateName)) {
-      // A scrub whose line runs through where the high's date rests, or
-      // the low's (-crossedlow-): the whole mark stands clear of it.
-      var low = root.stateName.indexOf("-crossedlow-") > 0
-      var marked = root.shownHistoryEntry.history.bars
-      body.motion.scrubT = marked[Math.round(body.rangeMarks[low ? "low" : "high"].x * (marked.length - 1)) + (low ? 55 : -4)].t
     } else if (root.overnight && root.overnight.scrub && root.overnight.month) {
       var bars = root.shownHistoryEntry.history.bars
       body.motion.scrubT = bars[Math.floor(bars.length / 2)].t

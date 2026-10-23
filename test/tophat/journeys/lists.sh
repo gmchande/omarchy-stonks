@@ -12,8 +12,6 @@ not_in_all() { ! in_all "$1"; }
 not_in_us() { ! in_us "$1"; }
 place() { jq -r --arg s "$1" '.symbols | index($s)' "$data"; }
 rows() { readout rowSymbol; }
-# hidden NAME [FILTERS]: no such item is on screen.
-hidden() { ! shown "$@"; }
 
 step "Open the popup from the pill"
 open_popup
@@ -86,7 +84,7 @@ shot undone-AAPL
 rows
 keep_data undone-AAPL
 
-step "The × on a hovered BTC-USD, in All alone, removes it at once; the row sliding under the still pointer shows no ×, and the footer offers Undo"
+step "The × on a hovered BTC-USD, in All alone, removes it at once"
 if reachable "the row's ×"; then
   btc=$(place BTC-USD)
   hover_on rowSymbol --text BTC-USD
@@ -95,9 +93,6 @@ if reachable "the row's ×"; then
   soon "the × removed BTC-USD" 5 not_in_all BTC-USD
   soon "the remove sound played" 5 heard remove.wav
   sounds_here
-  check "no × under the still pointer" hidden rowRemove
-  check "the footer offers Undo BTC-USD" shown footerUndoText --text "Undo BTC-USD"
-  readout footerText footerUndoText
   shot removed-BTC
   rows
 fi
@@ -132,22 +127,4 @@ if reachable "the row's menu"; then
   soon "u put SPY back" 5 in_all SPY
   shot menu-undone
   keep_data menu-undone
-fi
-
-step "The × removes BTC-USD again; the footer's Undo takes it back"
-if reachable "the footer's Undo"; then
-  btc=$(place BTC-USD)
-  hover_on rowSymbol --text BTC-USD
-  click_on rowRemove --symbol BTC-USD
-  soon "the × removed BTC-USD" 5 not_in_all BTC-USD
-  soon "the footer offers Undo BTC-USD" 3 shown footerUndoText --text "Undo BTC-USD"
-  shot undo-offer
-  click_on footerUndoText
-  soon "Undo put BTC-USD back" 5 in_all BTC-USD
-  check "BTC-USD is back at its place ($btc)" [ "$(place BTC-USD)" = "$btc" ]
-  soon "the undo sound played" 5 heard undo.wav
-  check "the offer went with the undo" hidden footerUndoText
-  sounds_here
-  shot undo-clicked
-  keep_data undo-clicked
 fi

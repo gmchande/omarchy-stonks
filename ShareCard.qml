@@ -198,14 +198,14 @@ Rectangle {
     ghostColor: root.ghost
   }
   // The currency beside the price, set like a unit, on its baseline, dim
-  // and at the ticker's size: a price in pence says "PENCE".
+  // and at the ticker's size: a price in pence says "GBp".
   Text {
     id: currencyText
     objectName: "shareCurrency"
     x: (root.retro ? priceRetro.x + priceRetro.width : priceSmooth.x + priceSmooth.implicitWidth) + root.currencyGap
     y: root.priceBaseline - baselineOffset
     textFormat: Text.PlainText
-    text: root.quote ? Figures.currencyLabel(String(root.quote.currency || "")) : ""
+    text: root.quote ? String(root.quote.currency || "") : ""
     color: root.dim
     font: symbolText.font
   }

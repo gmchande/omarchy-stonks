@@ -48,7 +48,7 @@ BarWidget {
   readonly property string barStyle: setting(styleKey, vertical || onRight ? "icon" : "sparkline")
   // Just the day's animal, a quiet icon among the bar's own.
   readonly property bool iconOnly: barStyle === "icon"
-  readonly property bool retro: service ? service.retro : setting("style", "retro") === "retro"
+  readonly property bool retro: service ? service.retro : setting("style", "smooth") === "retro"
   // Freshness is judged with or without a quote: a first fetch that failed
   // is what "! No data" is for.
   readonly property var freshness: service && featuredSymbol

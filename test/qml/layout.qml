@@ -910,7 +910,7 @@ ShellRoot {
         // The exchange and currency stay whole on the hero's line; a long
         // name gives way to them, in both looks. Found in the 1.0.0 review:
         // the popup dropped "LSE · GBp" first, so a price in pence could
-        // read as pounds beside a cap in GBP. Pence say PENCE.
+        // read as pounds beside a cap in GBP.
         var shelQuote = stub.quotes["SHEL.L"]
         var longNamed = Object.assign({}, stub.quotes)
         longNamed["SHEL.L"] = Object.assign({}, shelQuote,
@@ -918,7 +918,7 @@ ShellRoot {
         stub.quotes = longNamed
         stub.featuredSymbol = "SHEL.L"
         stub.figures = null
-        var wantMeta = " · " + shelQuote.exchange + " · PENCE"
+        var wantMeta = " · " + shelQuote.exchange + " · " + shelQuote.currency
         var metaLost = []
         var wideWas = surface.wide
         ;[false, true].forEach(function(wide) {
