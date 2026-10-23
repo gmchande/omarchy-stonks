@@ -10,7 +10,7 @@ chime sounds as the scrub moves, higher where the line is higher.
 - `scrub-pointer`: hovering the chart scrubs to the pointer, a chime each time the line's height under it changes.
 - `scrub-follows`: the header says "AT hh:mm · PHASE"; the price, the change, and the "┄ PREV CLOSE" legend show the moment; on 1D the rows follow too.
 - `scrub-end`: Esc, the pointer leaving the chart, and a click on the chart each end the scrub and put everything back on now.
-- `scrub-silence`: while a scrub shows, by the pointer or the keys, a stream of silence keeps the output awake so each chime plays at once; it ends a second after the scrub does, and an open popup with nothing scrubbed holds none. After a quiet spell the first chimes open with 150 ms of silence of their own (`chime-lead-*.wav`).
+- `scrub-silence`: while a scrub shows, by the pointer or the keys, a stream of silence keeps the output awake so each chime plays at once; it ends a second after the scrub does, and an open popup with nothing scrubbed holds none. After a quiet spell the first chimes open with up to 150 ms of silence of their own (`chime-lead*.wav`), shrinking as the output wakes so they keep their order.
 
 ## How to get to it (user POV)
 

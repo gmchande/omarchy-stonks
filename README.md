@@ -357,9 +357,11 @@ The shell's log the form asks for can name the prices Stonks left out.
   amplifier stays powered and your headphones stay connected to this
   computer, as when any sound plays, and it takes about a tenth of a
   percent of one processor core. It runs only while you scrub the chart,
-  never just because the popup or the window is open. A sound after
-  4 seconds of quiet from Stonks starts with 150 ms of silence of its own,
-  so a sleeping output wakes before the sound and none of it is cut.
+  or a replay waits for a sleeping output to wake, never just because the
+  popup or the window is open. A sound after 4 seconds of quiet from
+  Stonks starts with up to 150 ms of silence of its own, so a sleeping
+  output wakes before the sound and none of it is cut; a replay waits for
+  the output instead, so its sound keeps in step with its sweep.
 - **Sites:** `query1.finance.yahoo.com` for quotes, charts, and the market
   cap and P/E; `query2.finance.yahoo.com` for search; `api.robinhood.com`
   for overnight prices and which stocks trade overnight; and
@@ -376,10 +378,10 @@ The shell's log the form asks for can name the prices Stonks left out.
 - **Files it writes:** your lists and settings in
   `~/.config/omarchy/grvc.stonks.json`, the last quotes in
   `~/.cache/grvc.stonks/quotes.json`, and, while sounds are on, a replay's
-  sound in `~/.cache/grvc.stonks/replay.wav`, or `lead-replay.wav` with its
-  150 ms of silence first, written over at each replay of another chart,
-  and beside them the chimes' notes, `chime-*.wav`, and each sound with its
-  silence first, `lead-*.wav`, written each run; and
+  sound in `~/.cache/grvc.stonks/replay.wav`, written over at each replay of
+  another chart, and beside it the chimes' notes, `chime-*.wav`, each also
+  with its silence first, and the other sounds with theirs, `lead-*.wav`,
+  written each run; and
   for each screenshot you take, one picture,
   `stonks-<symbol>-<date>_<time>.png`, in the folder Omarchy's own
   screenshots use: where Omasnap is installed, `OMASNAP_SCREENSHOT_DIR`,

@@ -23,9 +23,10 @@ Item {
   // The output is kept awake while sounds are on and a chart is scrubbed,
   // and for 1 s after, so a chime struck after a pause plays at once: an
   // output asleep wakes as a sound starts, and cuts or delays its start.
-  // Only then: headphones go to whichever computer plays, and an open popup
-  // alone mustn't take them.
-  readonly property bool keepingAwake: turnedOn && (scrubbed.length > 0 || afterScrub.running)
+  // Only then, and while a replay waits for the output to wake
+  // (`whenAwake`): headphones go to whichever computer plays, and an open
+  // popup alone mustn't take them.
+  readonly property bool keepingAwake: turnedOn && (scrubbed.length > 0 || afterScrub.running || replaysWaiting.length > 0)
   // The surface whose replay is playing, so that replay's end stops only
   // its own sound; null for any other sound.
   property var replayOwner: null
@@ -40,6 +41,18 @@ Item {
   // changes, and again on the next run.
   property var madeThisRun: ({})
   readonly property var fixedSounds: ["add", "remove", "undo", "shutter", "bell"]
+  // A chime's lead-ins, in ms (`leadAt`).
+  readonly property var leadSteps: [30, 60, 90, 120, 150]
+  // The names the chimes' player plays, as its `case` patterns.
+  readonly property string chimeNames: {
+    var names = []
+    ;["smooth", "retro"].forEach(function(look) {
+      [""].concat(leadSteps.map(function(ms) { return "lead" + ms + "-" })).forEach(function(lead) {
+        names.push("chime-" + lead + look + "-[0-9].wav", "chime-" + lead + look + "-10.wav")
+      })
+    })
+    return names.join("|")
+  }
   // At most one chime every 45 ms, 22 a second: a bar struck sooner waits
   // out the gap, and the latest waiting wins (`waiting`, or -1), so a sweep
   // ends on the bar under the pointer.
@@ -47,31 +60,53 @@ Item {
   property real lastChime: 0
   property int waiting: -1
 
-  // A sound that may start on an output asleep opens with 150 ms of silence,
-  // its lead-in (`led`), so the output's waking eats the silence and never
-  // the sound: it comes later, whole. PipeWire puts an output to sleep after
-  // 5 s with nothing playing; Stonks hears only its own sounds, so it counts
-  // the output asleep 4 s after its last start or its silence's end
-  // (`asleepAfter`). A sound starting within 1 s of the one that woke the
-  // output opens with the lead-in too, as the output may still be waking:
-  // this laptop's speakers took 135 to 182 ms, and Bluetooth can take
-  // longer.
+  // A sound that may start on an output asleep opens with up to 150 ms of
+  // silence, its lead-in (`led`), so the output's waking eats the silence
+  // and never the sound: it comes later, whole. PipeWire puts an output to
+  // sleep after 5 s with nothing playing; Stonks hears only its own sounds,
+  // so it counts the output asleep 4 s after its last start or its
+  // silence's end (`asleepAfter`). A sound that wakes it opens with the
+  // whole lead-in, and so does every one after while it wakes: until the
+  // stream of silence says it reached the output (`awakeAt`, pw-cat's
+  // "streaming"), or without that stream, for 550 ms. On this laptop's
+  // speakers waking took 135 to 182 ms; Bluetooth can take longer. Then the
+  // lead-in shrinks a third as fast as time passes, in 30 ms steps, to none
+  // 450 ms on: chimes come at least 45 ms apart (`chimeGap`), so one never
+  // sounds before a chime struck ahead of it.
   readonly property int leadIn: 150
   property real asleepAfter: 0
   property real wokeAt: 0
+  // When the output last woke and was reached, 0 before any, or -1 while
+  // it wakes and nothing has said so yet.
+  property real awakeAt: 0
 
-  // A sound starts now: true when it opens with the lead-in.
+  // A sound starts now: the lead-in it opens with, in ms, or 0.
   function starting() {
     var now = Date.now()
-    if (now >= asleepAfter) wokeAt = now
+    if (now >= asleepAfter) {
+      wokeAt = now
+      awakeAt = -1
+    }
     asleepAfter = Math.max(asleepAfter, now + 4000)
-    return now - wokeAt < 1000
+    return leadAt(now)
+  }
+
+  function leadAt(now) {
+    var from = awakeAt >= 0 ? awakeAt : silence.running ? now : wokeAt + 550
+    return Math.min(leadIn, Math.max(0, Math.ceil((leadIn - (now - from) / 3) / 30) * 30))
+  }
+
+  // Whether the output is awake and past its waking: reached 150 ms ago, so
+  // the silence playing since has covered it.
+  function awake(now) {
+    if (now >= asleepAfter) return false
+    return awakeAt >= 0 ? now >= awakeAt + leadIn : !silence.running && now - wokeAt >= 1000
   }
 
   // `bytes`, a WAV with the plain 44-byte header the chimes' and the
-  // bundled sounds have, its lead-in of silence before the sound.
-  function led(bytes) {
-    var zeros = Math.round(new DataView(bytes).getUint32(24, true) * leadIn / 1000) * 2
+  // bundled sounds have, with `ms` of silence before the sound.
+  function led(bytes, ms) {
+    var zeros = Math.round(new DataView(bytes).getUint32(24, true) * ms / 1000) * 2
     var out = new ArrayBuffer(bytes.byteLength + zeros)
     new Uint8Array(out).set(new Uint8Array(bytes, 0, 44))
     new Uint8Array(out, 44 + zeros).set(new Uint8Array(bytes, 44))
@@ -97,46 +132,73 @@ Item {
   }
 
   // One of the fixed sounds: "add", "remove", "undo", "shutter", or "bell";
-  // with its lead-in from the cache's folder once that is private, and
-  // without where it can't be (`OwnerOnly.made`).
+  // with the whole lead-in from the cache's folder when it needs any, once
+  // that is private, and without where it can't be (`OwnerOnly.made`).
   function play(name) {
     if (!turnedOn) return
     replayOwner = null
-    var lead = starting()
-    start(lead && files.made ? written(voice, name, true) : bundled(voice, name))
+    var lead = starting() > 0
+    start(lead && files.made ? written(voice, name, leadIn) : bundled(voice, name))
+  }
+
+  // A replay's sound follows its sweep bar by bar, so it never opens with a
+  // lead-in: a replay asked for while the output may sleep waits for it
+  // instead, holding the silence until the output is awake (`awake`), or
+  // 1.5 s at most, and then starts, picture and sound together. `go`
+  // starts it; a surface asks again, or `stopReplay`, to drop its wait.
+  property var replaysWaiting: []
+  function whenAwake(owner, go) {
+    replaysWaiting = replaysWaiting.filter(function(w) { return w.owner !== owner })
+    if (!turnedOn || awake(Date.now())) return go()
+    replaysWaiting = replaysWaiting.concat([{ owner: owner, go: go, since: Date.now() }])
+    replayWait.start()
+  }
+  Timer {
+    id: replayWait
+    interval: 50
+    repeat: true
+    onTriggered: {
+      var now = Date.now()
+      var ready = !root.turnedOn || root.awake(now)
+      var due = root.replaysWaiting.filter(function(w) { return ready || now - w.since >= 1500 })
+      if (due.length === 0) return
+      due.forEach(function(w) { w.go() })
+      root.replaysWaiting = root.replaysWaiting.filter(function(w) { return due.indexOf(w) < 0 })
+      if (root.replaysWaiting.length === 0) stop()
+    }
   }
 
   // A replay's sound, made from the chart as it starts: `chart` holds the
   // chart's geometry, the retro chart's grid, where the replay runs from and
-  // to along it, and its length in seconds. The file, `replay.wav` or with
-  // its lead-in `lead-replay.wav`, is written whole before `pw-play` starts:
-  // the write blocks, and lands by a rename, so a player still reading the
-  // last one keeps it. A replay of what that file last held, the same look,
-  // chart, and run, plays it again: making it held a retro start about
-  // 10 ms more than a smooth one. None plays while its file can't be
-  // written yet (`OwnerOnly.write`).
-  property var replayHeld: ({})
+  // to along it, and its length in seconds. The file is written whole before
+  // `pw-play` starts: the write blocks, and lands by a rename, so a player
+  // still reading the last one keeps it. A replay of what the last one
+  // played, the same look, chart, and run, plays its file again: making it
+  // held a retro start about 10 ms more than a smooth one. None plays while
+  // its file can't be written yet (`OwnerOnly.write`).
+  property var replayMade: null
   function playReplay(owner, chart) {
     if (!turnedOn) return
-    var lead = starting()
-    var path = lead ? folder + "/lead-replay.wav" : replayPath
+    starting()
     var made = { retro: retro, chart: retro ? chart.grid : chart.geometry, from: chart.from, to: chart.to, seconds: chart.seconds }
-    var last = replayHeld[path]
+    var last = replayMade
     if (!last || last.retro !== made.retro || last.chart !== made.chart || last.from !== made.from
         || last.to !== made.to || last.seconds !== made.seconds) {
       var sound = retro ? ChartSound.retro(chart.grid, chart.from, chart.to, chart.seconds)
         : ChartSound.smooth(chart.geometry, chart.from, chart.to, chart.seconds)
-      var bytes = ChartSound.wav(sound)
-      if (!files.write(path, lead ? led(bytes) : bytes)) return
-      replayHeld[path] = made
+      if (!files.write(replayPath, ChartSound.wav(sound))) return
+      replayMade = made
     }
     replayOwner = owner
-    start(path)
+    start(replayPath)
   }
 
-  // A replay cut short stops its sound, and no other.
+  // A replay cut short stops its sound, and no other; one still waiting
+  // for the output stays unstarted.
   function stopReplay(owner) {
-    if (!owner || owner !== replayOwner) return
+    if (!owner) return
+    replaysWaiting = replaysWaiting.filter(function(w) { return w.owner !== owner })
+    if (owner !== replayOwner) return
     replayOwner = null
     player.running = false
   }
@@ -170,20 +232,23 @@ Item {
   }
 
   // A file's name in the cache's folder: a chime, `what` its bar,
-  // "chime-retro-3.wav", or "chime-lead-retro-3.wav" with its lead-in; or a
-  // fixed sound with its lead-in, `what` its name, "lead-smooth-add.wav".
+  // "chime-retro-3.wav", or "chime-lead90-retro-3.wav" with a 90 ms
+  // lead-in; or a fixed sound with the whole lead-in, `what` its name,
+  // "lead-smooth-add.wav".
   function fileOf(look, what, lead) {
-    return (typeof what === "number" ? "chime-" : "") + (lead ? "lead-" : "") + look + "-" + what + ".wav"
+    if (typeof what !== "number") return "lead-" + look + "-" + what + ".wav"
+    return "chime-" + (lead ? "lead" + lead + "-" : "") + look + "-" + what + ".wav"
   }
 
-  // A file's path in the cache's folder (`fileOf`), written unless this run
-  // has: now, or once the folder is private (`OwnerOnly.write`), until then
-  // playing the file an earlier run left, if any.
+  // A file's path in the cache's folder (`fileOf`), `lead` ms of silence
+  // before its sound, written unless this run has: now, or once the folder
+  // is private (`OwnerOnly.write`), until then playing the file an earlier
+  // run left, if any.
   function written(look, what, lead) {
     var file = fileOf(look, what, lead)
     if (!madeThisRun[file]) {
       var bytes = typeof what === "number" ? ChartSound.wav(ChartSound.chime(look === "retro", what)) : bundledBytes(look, what)
-      files.write(folder + "/" + file, lead ? led(bytes) : bytes)
+      files.write(folder + "/" + file, lead ? led(bytes, lead) : bytes)
       madeThisRun[file] = true
     }
     return folder + "/" + file
@@ -200,12 +265,15 @@ Item {
   // The bundled sounds, read to write their lead-ins.
   FileView { id: bundledFile; blockLoading: true }
 
-  // What a look writes ahead: its eleven chimes, each with its lead-in too,
-  // and its fixed sounds' lead-ins.
+  // What a look writes ahead: its eleven chimes, each with every lead-in
+  // too, and its fixed sounds' lead-ins.
   function aheadOf(look) {
     var list = []
-    for (var bar = 0; bar < 11; bar++) list.push([bar, false], [bar, true])
-    fixedSounds.forEach(function(name) { list.push([name, true]) })
+    for (var bar = 0; bar < 11; bar++) {
+      list.push([bar, 0])
+      leadSteps.forEach(function(ms) { list.push([bar, ms]) })
+    }
+    fixedSounds.forEach(function(name) { list.push([name, leadIn]) })
     return list
   }
 
@@ -257,18 +325,22 @@ Item {
 
   // The output kept awake (`keepingAwake`): a stream of silence, PipeWire's
   // pw-cat reading zeros, which holds the speakers or headphones open as a
-  // sound playing does, and nothing while sounds are off or no chart has
-  // been scrubbed for 1 s. Its start may wake the output, as a sound's does,
-  // and the output counts as awake only while it runs: stopped, for 4 s
-  // more; ended on its own while it's wanted, as when PipeWire restarts, not
-  // at all, since the output may have gone with it. Then it starts again
-  // 2 s later.
+  // sound playing does, and nothing while sounds are off, no chart has
+  // been scrubbed for 1 s, and no replay waits. Its start may wake the
+  // output, as a sound's does; it says, verbosely, when its stream reaches
+  // the output ("-> streaming"), which ends the waking (`awakeAt`). The
+  // output counts as awake only while it runs: stopped, for 4 s more; ended
+  // on its own while it's wanted, as when PipeWire restarts, not at all,
+  // since the output may have gone with it. Then it starts again 2 s later.
   Timer { id: afterScrub; interval: 1000 }
   onKeepingAwakeChanged: silence.running = keepingAwake
   Process {
     id: silence
-    command: ["pw-cat", "--playback", "--raw", "--rate", "24000", "--channels", "1", "--format", "s16",
+    command: ["pw-cat", "-v", "--playback", "--raw", "--rate", "24000", "--channels", "1", "--format", "s16",
       "--media-role", "Notification", "/dev/zero"]
+    stderr: SplitParser {
+      onRead: function(line) { if (root.awakeAt < 0 && line.indexOf("-> streaming") >= 0) root.awakeAt = Date.now() }
+    }
     onRunningChanged: {
       if (!running) return
       root.starting()
@@ -334,9 +406,7 @@ Item {
     id: chimer
     running: root.turnedOn
     stdinEnabled: true
-    command: ["sh", "-c", "while read -r name; do case $name in "
-      + "chime-smooth-[0-9].wav|chime-smooth-10.wav|chime-retro-[0-9].wav|chime-retro-10.wav"
-      + "|chime-lead-smooth-[0-9].wav|chime-lead-smooth-10.wav|chime-lead-retro-[0-9].wav|chime-lead-retro-10.wav) "
+    command: ["sh", "-c", "while read -r name; do case $name in " + root.chimeNames + ") "
       + "( timeout -k 1 2 pw-play --media-role Notification --latency 20ms \"$1/$name\" & ) ;; esac; done", "sh", root.folder]
   }
 }

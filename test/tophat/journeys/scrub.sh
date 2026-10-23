@@ -11,7 +11,7 @@ scrubbed() { shown statusText --has "AT "; }
 unscrubbed() { ! scrubbed; }
 # holding: the stream of silence that keeps the output awake for the chimes
 # (the stand-in pw-cat's silence.log) is running now.
-holding() { [ "$(tail -n 1 "$("$tophat" folder)/silence.log" 2> /dev/null | cut -d ' ' -f 1)" = start ]; }
+holding() { [[ "$(tail -n 1 "$("$tophat" folder)/silence.log" 2> /dev/null | cut -d ' ' -f 1)" =~ ^(start|streaming)$ ]]; }
 resting() { ! holding; }
 # press KEY…: each key alone, as a hand presses them, since chimes struck
 # closer than 45 ms apart keep only the latest (Sounds.qml). moved counts the

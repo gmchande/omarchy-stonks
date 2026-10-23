@@ -847,10 +847,13 @@ Item {
     chimed = bar
   }
 
-  // A replay plays the shown chart; the motion runs it.
+  // A replay plays the shown chart; the motion runs it. After a quiet
+  // spell it starts once the output is awake (`Sounds.whenAwake`), so its
+  // sound keeps in step with its sweep from the first bar.
   function replay() {
     showingHelp = false
-    motion.replay()
+    if (!sounds) return motion.replay()
+    sounds.whenAwake(root, function() { if (root.surfaceOpen) motion.replay() })
   }
 
   // A screenshot of the chart on show, as the camera or y takes it: laid
