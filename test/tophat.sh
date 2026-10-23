@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
-# Tophat Stonks in a sandboxed nested Hyprland on the laptop screen, while
-# the owner keeps working on the other screen.
+# Tophat Stonks in a sandboxed nested Hyprland that shows nothing on the
+# owner's desktop: its own output, the window it would open on the host, is
+# off from the start, and the session runs on a headless output inside it,
+# drawn through the host's GPU. Each checkout runs one session at a time, and
+# sessions from different checkouts run side by side.
 #
-#   start [--fresh] [--zone ZONE] [--slow SECONDS] [--headless] REF
+#   start [--fresh] [--zone ZONE] [--slow SECONDS] REF
 #                                  sandbox the committed REF and start the session;
 #                                  --fresh: as a new user's machine, Stonks not
 #                                  installed, a terminal open with REF's clone at ~/stonks;
 #                                  --zone: the session's clocks in ZONE (Asia/Kolkata);
 #                                  --slow: every curl in the session answers SECONDS
-#                                  late (3), as on a weak hotspot;
-#                                  --headless (TRIAL): no window on the host,
-#                                  Stonks on a headless output inside the session
+#                                  late (3), as on a weak hotspot
 #   stop                           end it and report the isolation evidence
 #   key KEY...                     keysym names; shift+j, ctrl+a, or J hold a modifier
 #   type TEXT                      type text
@@ -18,30 +19,41 @@
 #   click X Y [BUTTON] [--mod M]…  left, right, or middle; M is shift, ctrl, alt, super
 #   drag X1 Y1 X2 Y2               hold the left button through the motion
 #   scroll X Y NOTCHES [--mod M]…  whole wheel notches; positive scrolls down
-#   shot FILE                      screenshot the nested output
+#   shot FILE                      screenshot the session's output (1416x850)
 #   paste FILE                     the nested clipboard: its types printed,
 #                                  its PNG, if it holds one, saved to FILE
-#   record start FILE | record stop
+#   record start FILE | record stop  wf-recorder; it writes a frame only when
+#                                  the output changes, so its timing is not the screen's
 #   shell CMD…                     omarchy-shell inside the session
 #   log                            the nested shell's log
 #   sounds                         what the stand-in pw-play was asked to play
 #   self-check                     the guards, without a screen
 #
 # Two identities, never mixed. The nested one (socket, instance, runtime
-# folder), saved at start, is the only one input, grim, shell, and the nested
-# shutdown use; a missing or dead session fails the command. The host one is
-# used only for the preflight, the launch, the parent window's rectangle, and
-# the recorder. Never ydotool: it writes to the kernel, which is the owner's
+# folder), saved at start, is the only one input, grim, wf-recorder, shell,
+# and the nested shutdown use; a missing or dead session fails the command.
+# The host one is used only for the launch (the nested Hyprland's GPU comes
+# through the host's Wayland socket), the host values the shell reads, and
+# the checks that nothing maps on the host and the owner's session is
+# unchanged. Never ydotool: it writes to the kernel, which is the owner's
 # seat.
 set -uo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 checkout=$(cd "$here/.." && pwd)
 host_runtime=${XDG_RUNTIME_DIR:-/run/user/$UID}
-# The one slot, shared by every Stonks worktree: the laptop screen.
 base=${TOPHAT_BASE:-$HOME/Work/temporary/tophat}
-runtime=${TOPHAT_RUNTIME:-$host_runtime/tophat}
+# This checkout's session: its key, runtime folder, slot, and current run.
+# The key is short so the nested sockets fit a Unix socket path.
+key=$(printf %s "$checkout" | sha1sum | cut -c1-6)
+runtime=${TOPHAT_RUNTIME:-$host_runtime/th-$key}
+slot=${TOPHAT_SLOT:-$host_runtime/th-$key.lock}
+current=$base/current-$key
+# Every running session holds this shared; test/batch.sh takes it alone, so
+# a batch and a session never overlap.
 lock=${TOPHAT_LOCK:-$host_runtime/tophat.lock}
-laptop=eDP-1
+# The session's output. A fixed size, so every run's shots compare.
+output=TOPHAT-1
+output_size=1416x850
 # System Python, standard library only: a version manager's shim on PATH
 # reads config from the sandbox home and refuses to run.
 python=${TOPHAT_PYTHON:-/usr/bin/python3}
@@ -90,10 +102,12 @@ socket_paths_fit() {
   done
 }
 
-# slot_free: nobody holds the one slot. Advisory: the launcher takes it
-# atomically, and a launcher that loses the race starts nothing.
+# slot_free: this checkout runs no session, and no batch holds the tophat
+# lock. Advisory: the launcher takes both atomically, and a launcher that
+# loses the race starts nothing.
 slot_free() {
-  flock -n "$lock" true 2>/dev/null || { echo "tophat: the tophat slot is held ($lock): another session is running" >&2; return 1; }
+  flock -n "$slot" true 2>/dev/null || { echo "tophat: this checkout's session is running ($slot)" >&2; return 1; }
+  flock -s -n "$lock" true 2>/dev/null || { echo "tophat: a batch holds the tophat lock ($lock)" >&2; return 1; }
 }
 
 # zone_ok ZONE: the system's time zone data knows ZONE. The C library runs
@@ -166,29 +180,24 @@ css_table() {
 }
 
 # write_nested_lua RUN: no Omarchy autostart (it imports the environment
-# into the owner's systemd), no XWayland, scale 1, and the few compositor
-# values the shell reads, taken from the host. A fresh start opens a
-# terminal (foot, Omarchy's default config, bash) in the sandbox's home.
+# into the owner's systemd), no XWayland, and the few compositor values the
+# shell reads, taken from the host. The Wayland backend's output, the window
+# on the host, is off before its first frame, so it never takes a buffer and
+# never maps (aquamarine 0.15.1, CWaylandOutput::commit); the session's
+# output is a headless one at scale 1, created once Hyprland has started,
+# before the shell. A fresh start opens a terminal (foot, Omarchy's default
+# config, bash) in the sandbox's home.
 write_nested_lua() {
-  local run=$1 gaps_in gaps_out border rounding layout terminal="" monitors create="" debug=""
+  local run=$1 gaps_in gaps_out border rounding layout terminal=""
   [ "${fresh:-0}" = 1 ] && terminal="hl.exec_cmd(\"foot --working-directory=$run/home bash\")"
   gaps_in=$(css_table general:gaps_in) && gaps_out=$(css_table general:gaps_out) \
     && border=$(hyprctl -j getoption general:border_size | jq -er .int) \
     && rounding=$(hyprctl -j getoption decoration:rounding | jq -er .int) \
     && layout=$(hyprctl -j getoption general:layout | jq -er .str) \
     || { echo "tophat: cannot read the host's gaps, border, rounding, and layout" >&2; return 1; }
-  monitors='hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 1 })'
-  if [ "${headless:-0}" = 1 ]; then
-    # TRIAL: the Wayland backend's output, the window on the host, never
-    # takes a buffer, so it never maps; Stonks runs on a headless output
-    # that renders through that backend's GPU.
-    monitors="hl.monitor({ output = \"WAYLAND-1\", disabled = true })
-hl.monitor({ output = \"$headless_name\", mode = \"${headless_size}@60\", position = \"0x0\", scale = 1 })"
-    create="hyprctl output create headless $headless_name > $run/output.log 2>&1; "
-    debug="debug = { disable_logs = false },"
-  fi
   cat > "$run/nested.lua" << EOF
-$monitors
+hl.monitor({ output = "WAYLAND-1", disabled = true })
+hl.monitor({ output = "$output", mode = "$output_size@60", position = "0x0", scale = 1 })
 hl.env("QT_QPA_PLATFORM", "wayland")
 hl.env("XDG_CURRENT_DESKTOP", "Hyprland")
 hl.env("XDG_SESSION_TYPE", "wayland")
@@ -200,10 +209,9 @@ hl.config({
   cursor = { no_warps = true },
   general = { gaps_in = $gaps_in, gaps_out = $gaps_out, border_size = $border, layout = "$layout" },
   decoration = { rounding = $rounding },
-  $debug
 })
 hl.on("hyprland.start", function()
-  hl.exec_cmd("${create}quickshell -n -p /usr/share/omarchy/shell > $run/shell.log 2>&1")
+  hl.exec_cmd("hyprctl output create headless $output > $run/output.log 2>&1; quickshell -n -p /usr/share/omarchy/shell > $run/shell.log 2>&1")
   $terminal
 end)
 EOF
@@ -269,40 +277,42 @@ write_slow_curl() {
   printf '#!/bin/sh\nsleep %s\nexec %q "$@"\n' "$2" "$3" > "$1/slow/curl" && chmod +x "$1/slow/curl"
 }
 
-# write_launcher RUN RUN_ID: the host compositor starts it as `setsid
-# launch.sh`, so it leads this run's own session and process group. It takes
-# the slot atomically and holds it until the session ends; the compositor it
-# starts gets a clean environment, keeping only the host's exec-rule token,
-# which is how the host places this launch's window, the start's zone, and,
-# on a slow start, the slow curl ahead on its PATH.
+# write_launcher RUN RUN_ID: start runs it as `setsid launch.sh`, so it leads
+# this run's own session and process group. It takes this checkout's slot
+# and a share of the tophat lock atomically, and holds both until the
+# session ends. A core limit of one byte, which everything it starts
+# inherits and none can raise, makes the kernel skip a crash's dump and its
+# helper (fs/coredump.c), so a crash notifies no one; the kernel logs it,
+# which is how stop finds it. The compositor it starts gets a clean
+# environment with the start's zone and, on a slow start, the slow curl
+# ahead on its PATH.
 write_launcher() {
-  local run=$1 id=$2 tz="" slow_path="" nocore=""
+  local run=$1 id=$2 tz="" slow_path=""
   [ -n "${zone:-}" ] && tz="TZ=$(printf %q "$zone") "
   [ -n "${slow:-}" ] && slow_path='$run/slow:'
-  # TRIAL: a core limit of one byte makes the kernel skip the dump and its
-  # helper (fs/coredump.c), so a crash notifies no one.
-  [ "${headless:-0}" = 1 ] && nocore='prlimit --pid $$ --core=1:1 || exit 1'
   cat > "$run/launch.sh" << EOF
 #!/usr/bin/env bash
 run=$(printf %q "$run")
-exec 9> $(printf %q "$lock")
+exec 9> $(printf %q "$slot")
 flock -n 9 || { echo busy > "\$run/launch.status"; exit 0; }
+exec 8>> $(printf %q "$lock")
+flock -s -n 8 || { echo batch > "\$run/launch.status"; exit 0; }
 # A start that gave up before this ran starts nothing.
 [ -e "\$run/cancel" ] && exit 0
 s=\$(cat /proc/\$\$/stat); s=\${s##*) }; read -r _ _ pgid sid _ <<< "\$s"
 [ "\$pgid" = \$\$ ] && [ "\$sid" = \$\$ ] || { echo "not a session leader" > "\$run/launch.status"; exit 1; }
 read -r -a f <<< "\$s"
 echo "\$\$ \${f[19]}" > "\$run/leader"
+prlimit --pid \$\$ --core=1:1 || { echo "no core limit" > "\$run/launch.status"; exit 1; }
 rm -rf $(printf %q "$runtime") && mkdir -m 700 $(printf %q "$runtime") || { echo "no runtime folder" > "\$run/launch.status"; exit 1; }
 echo started > "\$run/launch.status"
-$nocore
 env -i HOME="\$run/home" XDG_CONFIG_HOME="\$run/home/.config" XDG_DATA_HOME="\$run/home/.local/share" \\
   XDG_STATE_HOME="\$run/home/.local/state" XDG_CACHE_HOME="\$run/home/.cache" \\
   XDG_RUNTIME_DIR=$(printf %q "$runtime") PATH="${slow_path}\$run/stubs:"$(printf %q "$PATH") \\
   OMARCHY_PATH=/usr/share/omarchy LANG=$(printf %q "${LANG:-C.UTF-8}") HYPRLAND_NO_SD_VARS=1 ${tz}\\
-  TOPHAT_RUN=$(printf %q "$id") HL_EXEC_RULE_TOKEN="\${HL_EXEC_RULE_TOKEN:-}" \\
+  TOPHAT_RUN=$(printf %q "$id") \\
   dbus-run-session -- env WAYLAND_DISPLAY=$(printf %q "$host_socket") \\
-  Hyprland --config "\$run/nested.lua" > "\$run/hyprland.log" 2>&1 9>&- &
+  Hyprland --config "\$run/nested.lua" > "\$run/hyprland.log" 2>&1 8>&- 9>&- &
 wait \$!
 echo "exited \$?" >> "\$run/launch.status"
 EOF
@@ -347,56 +357,27 @@ build_sandbox() {
 
 # ---- the host ---------------------------------------------------------------
 
-# host_preflight: prints the laptop's workspace when every precondition
-# holds. It switches nothing: the workspace setter releases host buttons and
-# can move focus.
-host_preflight() {
-  local locked mons ws
-  omarchy-hyprland-session-locked; locked=$?
-  (( locked == 1 )) || { echo "tophat: the session is locked, or its state is unknown ($locked)" >&2; return 1; }
-  mons=$(hyprctl -j monitors all) || { echo "tophat: cannot read the host's monitors" >&2; return 1; }
-  jq -e --arg m "$laptop" 'any(.[]; .name == $m and (.disabled | not) and .dpmsStatus)' <<< "$mons" > /dev/null \
-    || { echo "tophat: the laptop screen ($laptop) is not on" >&2; return 1; }
-  jq -e --arg m "$laptop" 'any(.[]; .focused and .name != $m)' <<< "$mons" > /dev/null \
-    || { echo "tophat: the owner's focus is not on the other screen" >&2; return 1; }
-  jq -e --arg m "$laptop" 'any(.[]; .name == $m and .specialWorkspace.id == 0)' <<< "$mons" > /dev/null \
-    || { echo "tophat: the laptop screen shows a special workspace" >&2; return 1; }
-  ws=$(jq -r --arg m "$laptop" '.[] | select(.name == $m) | .activeWorkspace.id' <<< "$mons")
-  hyprctl -j workspaces | jq -e --argjson ws "$ws" 'any(.[]; .id == $ws and .windows == 0)' > /dev/null \
-    || { echo "tophat: the laptop screen's workspace $ws is not empty" >&2; return 1; }
-  echo "$ws"
+# host_windows: the host's mapped windows that a process of this run owns,
+# workspace 9 left out, one per line; fails when the host can't be read.
+host_windows() {
+  local pids
+  pids=$(pgrep -g "$LEADER" | paste -sd,)
+  hyprctl -j clients | jq -r --argjson pids "[$pids]" '.[] | select(.workspace.id != 9)
+    | select(.pid as $p | $pids | index($p)) | "\(.class) (\(.title)), pid \(.pid), workspace \(.workspace.id)"'
 }
 
-# parent_window: the nested session's window on the host as "X Y W H", when
-# it is mapped, unfocused, alone and visible on the laptop's shown workspace.
-parent_window() {
-  local mons clients
-  mons=$(hyprctl -j monitors) && clients=$(hyprctl -j clients) || return 1
-  jq -er --argjson pid "$HYPR_PID" --arg m "$laptop" --argjson mons "$mons" --argjson clients "$clients" '
-    ($mons[] | select(.name == $m and .dpmsStatus and (.disabled | not))) as $lap
-    | [.[] | select(.pid == $pid)] as $mine
-    | select(($mine | length) == 1) | $mine[0]
-    | select(.mapped and (.hidden | not) and .monitor == $lap.id
-        and .workspace.id == $lap.activeWorkspace.id and $lap.specialWorkspace.id == 0
-        and .focusHistoryID != 0)
-    | select(([$clients[] | select(.workspace.id == $lap.activeWorkspace.id)] | length) == 1)
-    | "\(.at[0]) \(.at[1]) \(.size[0]) \(.size[1])"' <<< "$clients"
-}
-
-# host_clients_of PID: the host's clients PID owns, mapped or not, one per
-# line. hyprctl's command line can't ask for unmapped ones; its socket's
-# "a" flag can.
-host_clients_of() {
-  printf 'ja/clients' | socat - "UNIX-CONNECT:$host_runtime/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket.sock" \
-    | jq -r --argjson pid "$1" '.[] | select(.workspace.id != 9 and .pid == $pid)
-      | "mapped=\(.mapped) hidden=\(.hidden) workspace=\(.workspace.id) class=\(.class) title=\(.title) size=\(.size)"'
-}
-
-# no_host_window: the nested Hyprland maps no window on the host.
+# no_host_window: nothing this run started maps a window on the host.
 no_host_window() {
   local mine
-  mine=$(host_clients_of "$HYPR_PID") || return 1
-  ! grep -q '^mapped=true' <<< "$mine"
+  mine=$(host_windows) || { echo "tophat: cannot read the host's windows" >&2; return 1; }
+  [ -z "$mine" ] || { echo "tophat: a window of this run mapped on the host: $mine" >&2; return 1; }
+}
+
+# outputs_hidden: inside the session, the headless output is on and every
+# other output, the host window's among them, is off.
+outputs_hidden() {
+  nested hyprctl -j monitors all | jq -e --arg o "$output" \
+    'any(.[]; .name == $o and (.disabled | not)) and all(.[]; .name == $o or .disabled)' > /dev/null
 }
 
 # host_facts: the owner-session facts stop compares.
@@ -412,10 +393,10 @@ host_facts() {
 
 # ---- the run ----------------------------------------------------------------
 
-# load_run: the current run's saved identity, or fail.
+# load_run: this checkout's current run's saved identity, or fail.
 load_run() {
-  [ -f "$base/current/identity" ] || die "no nested session: none was started, or it has stopped"
-  run=$(readlink -f "$base/current")
+  [ -f "$current/identity" ] || die "no nested session: none was started from this checkout, or it has stopped"
+  run=$(readlink -f "$current")
   # shellcheck source=/dev/null
   source "$run/identity"
   [ "$CHECKOUT" = "$checkout" ] || die "the nested session belongs to $CHECKOUT"
@@ -436,6 +417,7 @@ session_alive() {
 drive_prelude() {
   load_run
   session_alive || die "no live nested session: nothing was sent"
+  note_pids
 }
 
 # nested CMD…: CMD sees only the saved nested identity.
@@ -451,7 +433,8 @@ cursor_at() { nested hyprctl -j cursorpos | jq -r '"\(.x | round) \(.y | round)"
 near() { awk -v a="$1" -v b="$2" 'BEGIN { split(a, p, " "); split(b, q, " "); d1 = p[1] - q[1]; d2 = p[2] - q[2]; exit !(d1 * d1 <= 1 && d2 * d2 <= 1) }'; }
 
 # pointer X Y CMD…: CMD moves the pointer to X Y. Before it, the pointer
-# must be where this tool left it; a hand on the parent window moves it.
+# must be where this tool left it; only something else driving the session
+# moves it.
 pointer() {
   local x=$1 y=$2 now
   shift 2
@@ -511,22 +494,22 @@ cmd_scroll() {
 # ---- start ------------------------------------------------------------------
 
 cmd_start() {
-  fresh=0 zone="" slow="" headless=0 headless_name=TOPHAT-1 headless_size=1416x850
+  fresh=0 zone="" slow=""
   while :; do
     case ${1:-} in
       --fresh) fresh=1; shift ;;
       --zone) zone=${2:-}; zone_ok "$zone" || exit 1; shift 2 ;;
       --slow) slow=${2:-}; slow_ok "$slow" || exit 1; shift 2 ;;
-      --headless) headless=1; shift ;;
       *) break ;;
     esac
   done
-  local ref=${1:?usage: start [--fresh] [--zone ZONE] [--slow SECONDS] REF} commit ws id answer tool curl=""
+  local ref=${1:?usage: start [--fresh] [--zone ZONE] [--slow SECONDS] REF} commit id tool curl=""
   commit=$(git -C "$checkout" rev-parse --verify --quiet "$ref^{commit}") || die "no such commit: $ref"
-  for tool in Hyprland quickshell dbus-run-session python3 wtype grim gpu-screen-recorder setsid flock jq foot socat wf-recorder; do
+  for tool in Hyprland quickshell dbus-run-session python3 wtype grim wf-recorder setsid flock prlimit journalctl jq foot; do
     command -v "$tool" > /dev/null || die "$tool is not installed"
   done
   if [ -n "$slow" ]; then curl=$(command -v curl) || die "curl is not installed"; fi
+  # The nested Hyprland draws through the host's GPU, over its Wayland socket.
   case ${WAYLAND_DISPLAY:-} in
     "") die "no host display: start runs from the owner's session" ;;
     /*) host_socket=$WAYLAND_DISPLAY ;;
@@ -534,10 +517,10 @@ cmd_start() {
   esac
   slot_free && socket_paths_fit "$runtime" && bus_ok || exit 1
   # The slot is free, so whatever current names has ended.
-  rm -f "$base/current"
-  ws=$(host_preflight) || exit 1
+  rm -f "$current"
 
-  id=$(date +%Y%m%d-%H%M%S)-${commit:0:7}
+  # The key too: two checkouts may start the same commit in the same second.
+  id=$(date +%Y%m%d-%H%M%S)-${commit:0:7}-$key
   run=$base/$id
   [[ $run =~ ^[A-Za-z0-9/._-]+$ ]] || die "the run folder $run needs a plain path"
   mkdir -p "$run" || die "cannot make $run"
@@ -546,31 +529,21 @@ cmd_start() {
     && write_nested_lua "$run" && nested_lua_ok "$run/nested.lua" \
     && write_launcher "$run" "$id" || die "the sandbox is not ready; nothing was launched"
   host_facts > "$run/host-before"
-  { printf 'RUN_ID=%q\nCHECKOUT=%q\nCOMMIT=%q\nSTART_EPOCH=%q\nRUNTIME=%q\nZONE=%q\nSLOW=%q\nHEADLESS=%q\n' "$id" "$checkout" "$commit" "$(date +%s)" "$runtime" "$zone" "$slow" "$headless"; } > "$run/identity"
+  { printf 'RUN_ID=%q\nCHECKOUT=%q\nCOMMIT=%q\nSTART_EPOCH=%q\nRUNTIME=%q\nZONE=%q\nSLOW=%q\n' "$id" "$checkout" "$commit" "$(date +%s)" "$runtime" "$zone" "$slow"; } > "$run/identity"
   trap 'start_failed "interrupted"' INT TERM
 
-  # One launch-scoped rule: the host places this launch's window on the
-  # laptop's shown workspace and never focuses it. It matches the token the
-  # host puts in the launch's environment, is dropped once it has placed
-  # the window, and survives a host config reload.
-  answer=$(hyprctl eval "hl.exec_cmd(\"setsid $run/launch.sh\", { workspace = \"$ws silent\", no_focus = true, no_initial_focus = true })")
-  [ "$answer" = ok ] || start_failed "the host did not take the launch: $answer"
-
+  setsid "$run/launch.sh" < /dev/null > /dev/null 2>&1 &
   within 15 test -s "$run/launch.status" || start_failed "the launcher never reported"
   [ "$(head -n 1 "$run/launch.status")" = started ] || start_failed "the launcher: $(head -n 1 "$run/launch.status")"
   # This run holds the slot: only now does it become the current one.
-  ln -sfn "$run" "$base/current"
+  ln -sfn "$run" "$current"
   read -r LEADER LEADER_START < "$run/leader"
   printf 'LEADER=%q\nLEADER_START=%q\n' "$LEADER" "$LEADER_START" >> "$run/identity"
   within 30 find_instance || start_failed "the nested Hyprland never came up"
   socket_paths_fit "$runtime" "$SIG" || start_failed "the nested sockets do not fit"
   printf 'HYPR_PID=%q\nSIG=%q\nWAYLAND=%q\n' "$HYPR_PID" "$SIG" "$WAYLAND" >> "$run/identity"
   source "$run/identity"
-  if (( headless )); then
-    no_host_window || start_failed "the nested Hyprland mapped a window on the host: $(host_clients_of "$HYPR_PID")"
-  else
-    within 15 parent_window > /dev/null || start_failed "the session's window is not alone, unfocused, and shown on $laptop's workspace $ws"
-  fi
+  within 15 outputs_hidden || start_failed "the session's output $output is not the only one on: $(nested hyprctl -j monitors all | jq -c 'map({name, disabled})')"
   within 60 shell_up || start_failed "the nested shell never answered"
   services_off || start_failed "a service that must be off is running"
   if (( fresh )); then
@@ -578,19 +551,15 @@ cmd_start() {
   else
     within 30 nested omarchy-shell grvc.stonks close > /dev/null 2>&1 || start_failed "the Stonks pill never loaded"
   fi
-  read -r WIDTH HEIGHT < <(nested hyprctl -j monitors | jq -r '.[0] | "\(.width) \(.height)"')
-  (( headless )) && nested hyprctl -j monitors all > "$run/nested-monitors.json"
+  read -r WIDTH HEIGHT < <(nested hyprctl -j monitors | jq -r --arg o "$output" '.[] | select(.name == $o) | "\(.width) \(.height)"')
   printf 'WIDTH=%q\nHEIGHT=%q\n' "$WIDTH" "$HEIGHT" >> "$run/identity"
   note_pids
+  # By now the shell has drawn its bar: had the host window taken a frame,
+  # it would show on the host.
+  no_host_window || start_failed "nothing may show on the owner's desktop"
   trap - INT TERM
   echo "commit: $commit"
-  if (( headless )); then
-    no_host_window || start_failed "the nested Hyprland mapped a window on the host: $(host_clients_of "$HYPR_PID")"
-    host_clients_of "$HYPR_PID" > "$run/host-clients-up"
-    echo "nested output: ${WIDTH}x$HEIGHT, headless; on the host: $(cat "$run/host-clients-up")"
-  else
-    echo "nested output: ${WIDTH}x$HEIGHT on $laptop, workspace $ws"
-  fi
+  echo "nested output: ${WIDTH}x$HEIGHT, headless; nothing on the host"
   if (( fresh )); then echo "fresh: Stonks not installed; in the terminal, its clone is ~/stonks"; fi
   if [ -n "$zone" ]; then echo "zone: $zone, $(TZ=$zone date +'%H:%M %Z') there"; fi
   if [ -n "$slow" ]; then echo "slow: every curl in the session answers $slow s late"; fi
@@ -641,7 +610,7 @@ start_failed() {
   touch "$run/cancel"
   # A launcher checks for cancel only once it holds the slot. If the slot is
   # held, ours may be past that check: wait for it to report.
-  flock -n "$lock" true 2> /dev/null || within 15 test -s "$run/launch.status"
+  flock -n "$slot" true 2> /dev/null || within 15 test -s "$run/launch.status"
   source "$run/identity"
   stop_run
   exit 1
@@ -671,16 +640,32 @@ end_session() {
   within 5 group_gone
 }
 
+# crashes: each process of this run that the kernel says crashed, as "PID
+# (COMM)"; fails when the kernel log can't be read. Under the launcher's
+# one-byte core limit the kernel writes no dump and logs "coredump:
+# PID(COMM): RLIMIT_CORE is set to 1, aborting core" instead. A run's
+# processes are the ones note_pids saw.
+crashes() {
+  local log pids pid rest
+  [ -n "$(journalctl -k -q -n 1 --no-pager -o cat 2> /dev/null)" ] || return 1
+  log=$(journalctl -k -q --no-pager -o cat --since="@${START_EPOCH:-0}") || return 1
+  pids=" $(sort -un "$run/pids" 2> /dev/null | tr '\n' ' ')"
+  grep -oE '[0-9]+\([^)]*\): RLIMIT_CORE' <<< "$log" | while IFS='(' read -r pid rest; do
+    [[ $pids == *" $pid "* ]] && echo "$pid (${rest%%)*})"
+  done
+  return 0
+}
+
 # stop_run: end everything this run started and report what it saw.
 # Returns non-zero on anything the run may have caused.
 stop_run() {
-  local status=0 line blocked dumps errors
+  local status=0 line blocked errors
   # A start that failed early recorded its group only in the leader file.
   if [ -z "${LEADER:-}" ] && [ -s "$run/leader" ]; then read -r LEADER LEADER_START < "$run/leader"; fi
   [ -f "$run/recorder" ] && { record_stop || status=1; }
-  if [ "${HEADLESS:-0}" = 1 ] && [ -n "${HYPR_PID:-}" ]; then
-    host_clients_of "$HYPR_PID" > "$run/host-clients-stop"
-    no_host_window || { echo "FAILED the nested Hyprland mapped a window on the host: $(cat "$run/host-clients-stop")" >&2; status=1; }
+  if ours; then
+    if ! line=$(host_windows); then echo "FAILED the host's windows could not be read" >&2; status=1
+    elif [ -n "$line" ]; then echo "FAILED a window of this run mapped on the host: $line" >&2; status=1; fi
   fi
   end_session || { echo "FAILED the session's group did not end" >&2; status=1; }
   sleep 0.5
@@ -699,9 +684,11 @@ stop_run() {
   [ -n "$errors" ] && { echo "FAILED runtime errors in the nested shell's log:" >&2; echo "$errors" >&2; status=1; }
   line=$(grep -in polkit "$run/shell.log" 2> /dev/null)
   [ -n "$line" ] && { echo "FAILED the nested shell's log names polkit:" >&2; echo "$line" >&2; status=1; }
-  dumps=$(coredumpctl --no-pager --json=short list --since="@${START_EPOCH:-0}" 2> /dev/null \
-    | jq -r --argjson pids "[$(sort -un "$run/pids" 2> /dev/null | paste -sd,)]" '.[] | select(.pid as $p | $pids | index($p)) | "\(.pid) \(.exe)"' 2> /dev/null)
-  [ -n "$dumps" ] && { echo "FAILED a process dumped core: $dumps. Use the diagnose-crash skill; do not relaunch." >&2; status=1; }
+  if ! line=$(crashes); then
+    echo "FAILED the kernel log could not be read (journalctl -k), so a crash would go unseen" >&2; status=1
+  elif [ -n "$line" ]; then
+    echo "FAILED a process crashed: $line. No core was written (the run's core limit is one byte). Find the cause before relaunching (the diagnose-crash skill)." >&2; status=1
+  fi
   if [ -f "$run/host-before" ]; then
     host_facts > "$run/host-after"
     if ! diff -q "$run/host-before" "$run/host-after" > /dev/null; then
@@ -710,7 +697,7 @@ stop_run() {
       status=1
     fi
   fi
-  [ "$(readlink -f "$base/current")" = "$run" ] && rm -f "$base/current"
+  [ "$(readlink -f "$current")" = "$run" ] && rm -f "$current"
   echo "artifacts: $run"
   return "$status"
 }
@@ -731,71 +718,38 @@ cmd_record() {
 }
 
 record_start() {
-  local file rect
+  local file
   drive_prelude
   [ -f "$run/recorder" ] && die "already recording"
-  if [ "${HEADLESS:-0}" = 1 ]; then
-    file=$(realpath -m "$1")
-    rm -f "$run/record.status"
-    echo "$file" > "$run/record.file"
-    setsid "$here/tophat.sh" _record-headless "$file" > "$run/record.log" 2>&1 < /dev/null &
-    within 10 test -s "$run/record.status" || die "the recorder did not start: $(cat "$run/record.log")"
-    echo "recording the headless output to $file"
-    return
-  fi
-  rect=$(parent_window) || die "the session's window is not alone, unfocused, and shown on $laptop"
   file=$(realpath -m "$1")
   rm -f "$run/record.status"
   echo "$file" > "$run/record.file"
-  setsid "$here/tophat.sh" _record-watch "$file" $rect > "$run/record.log" 2>&1 < /dev/null &
+  setsid "$here/tophat.sh" _record "$file" > "$run/record.log" 2>&1 < /dev/null &
   within 10 test -s "$run/record.status" || die "the recorder did not start: $(cat "$run/record.log")"
-  echo "recording $rect (host logical x y w h) to $file"
+  echo "recording $output to $file"
 }
 
-# _record-watch FILE X Y W H: leads its own group with the recorder, and
-# stops it when the capture conditions are lost. It never wakes a screen or
-# moves a window to recover.
+# _record FILE: leads its own group with wf-recorder, which captures the
+# session's output through the nested screencopy, until record stop.
 record_watch() {
-  local file=$1 x=$2 y=$3 w=$4 h=$5 fps rec stopping=0 now
+  local file=$1 rec stopping=0
   load_run
   echo "$$ $(start_of $$)" > "$run/recorder"
-  fps=$(hyprctl -j monitors | jq -r --arg m "$laptop" '.[] | select(.name == $m) | .refreshRate | round')
-  gpu-screen-recorder -w region -region "${w}x$h+$x+$y" -f "$fps" -fm cfr -k h264 -q ultra -o "$file" &
+  nested wf-recorder -y -o "$output" -f "$file" &
   rec=$!
   # TERM, not INT: a background job starts with INT ignored, and an ignored
   # signal cannot be trapped.
   trap 'stopping=1' TERM
   echo recording > "$run/record.status"
-  while kill -0 "$rec" 2> /dev/null; do
-    sleep 0.5
-    (( stopping )) && break
-    omarchy-hyprland-session-locked; [ $? -eq 1 ] || { lost "the session locked, or its state is unknown"; break; }
-    now=$(parent_window) || { lost "the window left the laptop's shown workspace, or is focused or not alone"; break; }
-    [ "$now" = "$x $y $w $h" ] || { lost "the window moved to $now"; break; }
-  done
-  kill -INT "$rec" 2> /dev/null
-  wait "$rec"
-  (( stopping )) && echo saved > "$run/record.status"
-}
-lost() { echo "interrupted: $1" > "$run/record.status"; }
-
-# _record-headless FILE: TRIAL. wf-recorder through the nested session's
-# screencopy, in its own group, until record stop.
-record_headless() {
-  local file=$1 rec stopping=0
-  load_run
-  echo "$$ $(start_of $$)" > "$run/recorder"
-  nested wf-recorder -y -o "$(nested hyprctl -j monitors | jq -r '.[0].name')" -f "$file" &
-  rec=$!
-  trap 'stopping=1' TERM
-  echo recording > "$run/record.status"
   while kill -0 "$rec" 2> /dev/null && (( ! stopping )); do sleep 0.5; done
   (( stopping )) || lost "wf-recorder exited"
-  # nested is a function, so the job is a subshell with wf-recorder its child.
+  # nested is a function, so the job is a subshell with wf-recorder its
+  # child; INT is what makes wf-recorder finish its file.
   kill -INT $(pgrep -P "$rec" -x wf-recorder) 2> /dev/null
   wait "$rec"
   (( stopping )) && echo saved > "$run/record.status"
 }
+lost() { echo "interrupted: $1" > "$run/record.status"; }
 
 record_stop() {
   local leader start file
@@ -824,16 +778,16 @@ self_check() {
   trap '[ -f "$check_tmp/base/fake/leader" ] && kill -KILL -- "-$(cut -d" " -f1 "$check_tmp/base/fake/leader")" 2>/dev/null
     [ -f "$check_tmp/escapee" ] && kill "$(cat "$check_tmp/escapee")" 2>/dev/null; rm -rf "$check_tmp"' EXIT
   miss() { echo "FAILED $*"; failed=1; }
-  export TOPHAT_BASE=$tmp/base TOPHAT_RUNTIME=$tmp/rt TOPHAT_LOCK=$tmp/lock TOPHAT_PYTHON=$tmp/tools/python3
-  base=$TOPHAT_BASE runtime=$TOPHAT_RUNTIME lock=$TOPHAT_LOCK
+  export TOPHAT_BASE=$tmp/base TOPHAT_RUNTIME=$tmp/rt TOPHAT_SLOT=$tmp/slot TOPHAT_LOCK=$tmp/lock TOPHAT_PYTHON=$tmp/tools/python3
+  base=$TOPHAT_BASE runtime=$TOPHAT_RUNTIME slot=$TOPHAT_SLOT lock=$TOPHAT_LOCK current=$TOPHAT_BASE/current-$key
   # The guards run on these; a missing one is named, not buried in a miss.
-  for t in Hyprland dbus-run-session flock setsid pgrep jq; do
+  for t in Hyprland dbus-run-session flock setsid pgrep prlimit journalctl jq; do
     command -v "$t" > /dev/null || { echo "FAILED $t is not installed: the guards cannot run"; return 1; }
   done
   mkdir -p "$tmp/base" "$tmp/tools"
   # Every tool a drive command could reach, logged: a guard that lets one
   # through shows here.
-  for t in python3 wtype grim omarchy-shell hyprctl ydotool gpu-screen-recorder; do
+  for t in python3 wtype grim omarchy-shell hyprctl ydotool wf-recorder; do
     printf '#!/bin/sh\necho "%s $*" >> %q\n' "$t" "$tmp/reached" > "$tmp/tools/$t"; chmod +x "$tmp/tools/$t"
   done
   local drives=("key j" "key shift+j" "type abc" "move 1 1" "click 1 1" "drag 1 1 2 2" "scroll 1 1 1 --mod shift" "shot $tmp/x.png" "shell shell ping" "record start $tmp/x.mp4")
@@ -857,14 +811,14 @@ self_check() {
   kill "$gone"; wait "$gone" 2> /dev/null
   printf 'RUN_ID=dead\nCHECKOUT=%q\nRUNTIME=%q\nLEADER=%s\nLEADER_START=%s\nHYPR_PID=%s\nSIG=x\nWAYLAND=wayland-1\nWIDTH=100\nHEIGHT=100\n' \
     "$checkout" "$tmp/rt" "$gone" "$gone_start" "$gone" > "$dead/identity"
-  ln -sfn "$dead" "$tmp/base/current"
+  ln -sfn "$dead" "$current"
   expect_refused "dead session"
-  rm -f "$tmp/base/current"
+  rm -f "$current"
 
   # Socket paths.
-  socket_paths_fit /run/user/1000/tophat 2> /dev/null || miss "the default runtime folder's sockets should fit"
+  socket_paths_fit "/run/user/1000/th-$key" 2> /dev/null || miss "the default runtime folder's sockets should fit"
   socket_paths_fit "/tmp/$(printf 'r%.0s' {1..40})" 2> /dev/null && miss "a 45-byte runtime folder's Hyprland sockets should not fit"
-  socket_paths_fit /run/user/1000/tophat "$(printf 's%.0s' {1..90})" 2> /dev/null && miss "a long real signature should not fit"
+  socket_paths_fit "/run/user/1000/th-$key" "$(printf 's%.0s' {1..90})" 2> /dev/null && miss "a long real signature should not fit"
 
   # The isolation config.
   write_shell_json "$tmp/shell.json" sparkline
@@ -928,42 +882,104 @@ self_check() {
   mkdir -p "$tmp/nobus"; printf '#!/bin/sh\nexit 1\n' > "$tmp/nobus/dbus-run-session"; chmod +x "$tmp/nobus/dbus-run-session"
   PATH="$tmp/nobus:$PATH" bus_ok 2> /dev/null && miss "a bus that cannot start should fail"
 
+  # The session's outputs, from stand-in answers: the host window's output
+  # on fails, as does no session output.
+  mkdir -p "$tmp/host"
+  printf '#!/bin/sh\ncat %q\n' "$tmp/host.json" > "$tmp/host/hyprctl"; chmod +x "$tmp/host/hyprctl"
+  answer() { jq -n "$@" > "$tmp/host.json"; }
+  local RUNTIME=$tmp/rt WAYLAND=wayland-1 SIG=x
+  run=$tmp/base/outputs
+  answer --arg o "$output" '[{name: "WAYLAND-1", disabled: true}, {name: $o, disabled: false}]'
+  PATH="$tmp/host:$PATH" outputs_hidden || miss "the session's output alone on should pass"
+  answer --arg o "$output" '[{name: "WAYLAND-1", disabled: false}, {name: $o, disabled: false}]'
+  PATH="$tmp/host:$PATH" outputs_hidden && miss "the host window's output on should fail"
+  answer '[{name: "WAYLAND-1", disabled: true}]'
+  PATH="$tmp/host:$PATH" outputs_hidden && miss "no session output should fail"
+
   # The slot, and the launcher's group, on harmless processes: a stand-in
-  # compositor that starts a child in the group and one that leaves it.
+  # compositor that starts a child in the group, one that shrugs off TERM,
+  # one that leaves the group, and one that crashes, only once its core dump
+  # is off.
   local fake=$tmp/fake
   mkdir -p "$fake"
   printf '#!/bin/sh\nshift; exec "$@"\n' > "$fake/dbus-run-session"
-  # A child in the group, one that shrugs off TERM, and one that leaves.
-  printf '#!/bin/sh\necho "${TZ-unset}" > %q\ncommand -v curl > %q\nsleep 300 &\nsh -c '\''trap "" TERM; exec sleep 300'\'' &\nsetsid sleep 300 & echo $! > %q\nexec sleep 300\n' \
-    "$tmp/tz" "$tmp/curl" "$tmp/escapee" > "$fake/Hyprland"
+  cat > "$fake/Hyprland" << EOF
+#!/bin/sh
+echo "\${TZ-unset}" > $(printf %q "$tmp/tz")
+command -v curl > $(printf %q "$tmp/curl")
+prlimit --pid \$\$ --core --raw --noheadings -o SOFT,HARD > $(printf %q "$tmp/core-limit")
+sh -c 'echo \$\$ > "\$1"; [ "\$(prlimit --pid \$\$ --core --raw --noheadings -o SOFT,HARD)" = "1 1" ] && kill -SEGV \$\$' crash $(printf %q "$tmp/crashed") &
+sleep 300 &
+sh -c 'trap "" TERM; exec sleep 300' &
+setsid sleep 300 & echo \$! > $(printf %q "$tmp/escapee")
+exec sleep 300
+EOF
   chmod +x "$fake"/*
   run=$tmp/base/fake; mkdir -p "$run/home"
   # The stand-in session runs in the zone a start names, with its slow curl.
   write_slow_curl "$run" 1 "$tmp/real-curl"
   PATH="$fake:$PATH" host_socket=$tmp/no-display zone=Asia/Kolkata slow=1 write_launcher "$run" fake
-  # The holder says when it holds the slot; nothing else takes the lock to
-  # find out, since a probe holding it for a moment makes the holder's
-  # flock -n give up.
-  ( exec 8> "$tmp/lock"; flock -n 8 && { : > "$tmp/held"; exec sleep 30; } ) & local holder=$!
-  within 5 test -e "$tmp/held" || miss "the stand-in slot holder never took the lock"
-  slot_free 2> /dev/null && miss "a held slot should not read free"
-  setsid bash "$run/launch.sh" < /dev/null > /dev/null 2>&1 &
-  within 5 test -s "$run/launch.status"
-  [ "$(cat "$run/launch.status" 2> /dev/null)" = busy ] || miss "a launcher without the slot should stop at busy, got: $(cat "$run/launch.status" 2> /dev/null)"
-  if [ -e "$run/leader" ]; then
+  # held FILE MODE STATUS WHAT: with FILE's lock held (-x or -s), the slot
+  # reads taken and the launcher stops at STATUS, starting nothing. The
+  # holder says when it holds the lock; nothing else takes it to find out,
+  # since a probe holding it for a moment makes the holder's flock -n give up.
+  held() {
+    local holder
+    rm -f "$tmp/held" "$run/launch.status"
+    ( exec 7>> "$1"; flock "$2" -n 7 && { : > "$tmp/held"; exec sleep 30; } ) & holder=$!
+    within 5 test -e "$tmp/held" || miss "$4: the stand-in holder never took the lock"
+    slot_free 2> /dev/null && miss "$4: the slot should not read free"
+    setsid bash "$run/launch.sh" < /dev/null > /dev/null 2>&1 &
+    within 5 test -s "$run/launch.status"
+    [ "$(cat "$run/launch.status" 2> /dev/null)" = "$3" ] || miss "$4: the launcher should stop at $3, got: $(cat "$run/launch.status" 2> /dev/null)"
+    kill "$holder"; wait "$holder" 2> /dev/null
+    [ ! -e "$run/leader" ]
+  }
+  if ! held "$slot" -x busy "this checkout's session running" || ! held "$lock" -x batch "a batch running"; then
     miss "a launcher without the slot should start nothing"
     echo "tophat self-check FAILED"
     return 1
   fi
-  kill "$holder"; wait "$holder" 2> /dev/null
   rm -f "$run/launch.status"
+  local START_EPOCH; START_EPOCH=$(date +%s)
   setsid bash "$run/launch.sh" < /dev/null > /dev/null 2>&1 &
   within 5 test -s "$tmp/escapee" && within 5 test -s "$run/leader" \
     || { miss "the stand-in session never started"; echo "tophat self-check FAILED"; return 1; }
   read -r LEADER LEADER_START < "$run/leader"
   RUN_ID=fake
-  slot_free 2> /dev/null && miss "a running launcher should hold the slot"
+  slot_free 2> /dev/null && miss "a running session should hold this checkout's slot"
+  flock -n "$lock" true 2> /dev/null && miss "a running session should make a batch refuse: test/batch.sh takes the tophat lock alone"
+  slot=$tmp/slot-other slot_free 2> /dev/null || miss "another checkout's session should start beside a running one"
   setsid sleep 300 & local bystander=$!
+
+  # Another checkout's stop finds no session of its own, and ends nothing.
+  printf 'RUN_ID=fake\nCHECKOUT=%q\nRUNTIME=%q\nSTART_EPOCH=%s\nLEADER=%s\nLEADER_START=%s\n' \
+    "$checkout" "$tmp/rt" "$START_EPOCH" "$LEADER" "$LEADER_START" > "$run/identity"
+  ln -sfn "$run" "$current"
+  mkdir -p "$tmp/other/test" && cp -r "$here/tophat.sh" "$here/procs.sh" "$here/tophat" "$tmp/other/test/"
+  bash "$tmp/other/test/tophat.sh" stop > /dev/null 2>&1 && miss "a stop from another checkout should find no session"
+  kill -0 "$LEADER" 2> /dev/null || miss "a stop from another checkout ended this checkout's session"
+  rm -f "$current"
+
+  # A window of a process in the run's group fails; another's doesn't.
+  answer --argjson pid "$LEADER" '[{pid: $pid, class: "aquamarine", title: "WAYLAND-1", workspace: {id: 1}}]'
+  PATH="$tmp/host:$PATH" no_host_window 2> /dev/null && miss "a window of the run's on the host should fail"
+  answer --argjson pid "$bystander" '[{pid: $pid, class: "foot", title: "x", workspace: {id: 1}}]'
+  PATH="$tmp/host:$PATH" no_host_window 2> /dev/null || miss "another process's window on the host should not fail the run"
+  echo 'not json' > "$tmp/host.json"
+  PATH="$tmp/host:$PATH" no_host_window 2> /dev/null && miss "a host whose windows can't be read should fail"
+
+  # The crash: no core, and the kernel's word for it names the process.
+  [ "$(cat "$tmp/core-limit" 2> /dev/null)" = "1 1" ] \
+    || miss "the session should run with a one-byte core limit, got: $(cat "$tmp/core-limit" 2> /dev/null)"
+  crash_seen() { crashes | grep -q "^$(cat "$tmp/crashed") "; }
+  if [ -s "$tmp/crashed" ] && [ "$(cat "$tmp/core-limit" 2> /dev/null)" = "1 1" ]; then
+    cat "$tmp/crashed" > "$run/pids"
+    within 5 crash_seen || miss "a crash in the run should be named, got: $(crashes)"
+    : > "$run/pids"
+    [ -z "$(crashes)" ] || miss "a crash outside the run should not be named, got: $(crashes)"
+  fi
+
   local members; members=$(pgrep -g "$LEADER" | wc -l)
   (( members >= 3 )) || miss "the stand-in group should hold the launcher and its children, has $members"
   signal_group TERM "$LEADER" 1 "$(mark)" && miss "a leader whose start time differs should not be signalled"
@@ -974,6 +990,7 @@ self_check() {
   kill -0 "$(cat "$tmp/escapee")" 2> /dev/null || miss "teardown signalled a process that left the group"
   kill "$bystander" 2> /dev/null
   slot_free 2> /dev/null || miss "the slot should be free once the session ends"
+  flock -n "$lock" true 2> /dev/null || miss "a batch should start once the session ends"
   [ "$(cat "$tmp/tz" 2> /dev/null)" = Asia/Kolkata ] || miss "the session should run in the zone named, got: $(cat "$tmp/tz" 2> /dev/null)"
   # The stand-in compositor's detached child carries the run's mark.
   marked "$(mark)" | grep "^$(cat "$tmp/escapee") " > /dev/null || miss "a marked process outside the group should be reported"
@@ -1016,11 +1033,10 @@ case ${1:-} in
   paste) [ $# -eq 2 ] || die "usage: paste FILE"; drive_prelude; nested wl-paste --list-types || die "the clipboard is empty"
     nested wl-paste --no-newline --type image/png > "$2" || { rm -f "$2"; die "the clipboard holds no PNG"; } ;;
   record) shift; cmd_record "$@" ;;
-  _record-watch) shift; record_watch "$@" ;;
-  _record-headless) shift; record_headless "$@" ;;
+  _record) shift; record_watch "$@" ;;
   shell) shift; (( $# )) || die "usage: shell CMD…"; drive_prelude; nested omarchy-shell "$@" ;;
   log) load_run; cat "$run/shell.log" ;;
   sounds) load_run; cat "$run/sounds.log" 2> /dev/null ;;
   self-check) self_check ;;
-  *) sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *) sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
