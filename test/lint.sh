@@ -7,6 +7,7 @@
 # `pragma ComponentBehavior: Bound`.
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
+source "$PWD/test/scratch.sh"
 export LC_ALL=C.UTF-8
 # Qt 6.12's qmllint warns of every `var` declared in a block, a style the
 # code keeps throughout.

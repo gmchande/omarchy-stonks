@@ -49,10 +49,11 @@ quickshell_run() {
   local - secs=$1 log=$2 fd pid sig saved
   set +e
   shift 2
-  # Under /tmp, not $TMPDIR, and short: the sockets Quickshell reaches
-  # through it must fit a Unix socket's 107 bytes, Hyprland's
-  # hypr/<signature>/.socket2.sock the longest, as they do under
-  # /run/user/<uid>. mktemp ignores INT and TERM, so an interrupt can't end
+  # Under /tmp, not the work folder ($TMPDIR, test/scratch.sh), and short: the
+  # sockets Quickshell reaches through it must fit a Unix socket's 107 bytes,
+  # Hyprland's hypr/<signature>/.socket2.sock the longest, as they do under
+  # /run/user/<uid>. It holds only links, sockets, and Quickshell's log.
+  # mktemp ignores INT and TERM, so an interrupt can't end
   # it between making the folder and handing over its name: the stop
   # always has the name of a folder this run made.
   qs_runtime=$(trap '' INT TERM; mktemp -d /tmp/qs.XXXXXX)

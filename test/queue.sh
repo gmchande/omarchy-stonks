@@ -14,6 +14,7 @@
 # its record covers it. --again runs it anyway, as when chasing a flaky test.
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
+source "$PWD/test/scratch.sh"
 runner=test/${0##*/}
 again=""
 for arg; do

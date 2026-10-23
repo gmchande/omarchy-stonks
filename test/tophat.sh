@@ -43,6 +43,7 @@
 set -uo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 checkout=$(cd "$here/.." && pwd)
+source "$here/scratch.sh"
 host_runtime=${XDG_RUNTIME_DIR:-/run/user/$UID}
 base=${TOPHAT_BASE:-$HOME/Work/temporary/tophat}
 # This checkout's session: its key, runtime folder, slot, and current run.
@@ -820,7 +821,7 @@ record_stop() {
 # compositor or reaches a display. Prints FAILED per miss.
 self_check() {
   local failed=0 out
-  check_tmp=$(mktemp -d /tmp/tophat-check.XXXXXX) || exit 1
+  check_tmp=$(mktemp -d "$TMPDIR/tophat-check.XXXXXX") || exit 1
   local tmp=$check_tmp
   # Whatever a failed step left: the stand-in session's group and its escapee.
   trap '[ -f "$check_tmp/base/fake/leader" ] && kill -KILL -- "-$(cut -d" " -f1 "$check_tmp/base/fake/leader")" 2>/dev/null

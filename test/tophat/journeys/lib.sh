@@ -22,6 +22,7 @@
 set -uo pipefail
 journeys=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 checkout=$(cd "$journeys/../../.." && pwd)
+source "$checkout/test/scratch.sh"
 tophat=$checkout/test/tophat.sh
 tophat_base=${TOPHAT_BASE:-$HOME/Work/temporary/tophat}
 
