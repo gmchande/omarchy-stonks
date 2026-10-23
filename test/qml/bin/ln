@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# A stand-in for ln, first on PATH inside the harnesses: the real ln, except
+# that while STONKS_FAKE_STATE/ln.hold is there it waits first, and while
+# STONKS_FAKE_STATE/ln.fail is there it fails, as a disk refusing the link
+# would.
+state=${STONKS_FAKE_STATE:-}
+while [ -n "$state" ] && [ -e "$state/ln.hold" ]; do sleep 0.05; done
+if [ -n "$state" ] && [ -e "$state/ln.fail" ]; then
+  echo "ln: the harness refuses the link" >&2
+  exit 1
+fi
+exec /usr/bin/ln "$@"

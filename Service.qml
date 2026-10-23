@@ -414,12 +414,16 @@ Item {
     blockWrites: true
     printErrors: false
     onFileChanged: root.readDataFile()
-    onLoaded: root.dataReadEnded(root.takesRead(dataFile.text()) ? root.takeLoadedSettings : null)
+    onLoaded: {
+      root.dataMissing = false
+      root.dataReadEnded(root.takesRead(dataFile.text()) ? root.takeLoadedSettings : null)
+    }
     // Only a file that isn't there is missing: one there that can't be
     // read, for its permissions or as a folder, is never written over.
     onLoadFailed: function(error) {
+      root.dataMissing = error === FileViewError.FileNotFound
       if (!root.takesRead(null)) root.dataReadEnded(null)
-      else root.dataReadEnded(error === FileViewError.FileNotFound ? root.takeMissingFile : root.takeUnreadableFile)
+      else root.dataReadEnded(root.dataMissing ? root.takeMissingFile : root.takeUnreadableFile)
     }
     // A write drops a read in flight unheard: neither loaded nor failed.
     // Written, the file is its owner's alone (`files`).
@@ -472,8 +476,11 @@ Item {
   // read-back, a file holding an earlier text, or none that reads, says
   // the last save was lost: the read is not taken, so the changes in memory
   // stay. What Stonks wrote last ends the wait, and so does any other
-  // text, a save from elsewhere, which wins as ever.
+  // text, a save from elsewhere, which wins as ever. A read while the file
+  // is being made (`makeDataFile`) is not taken and judges nothing: the
+  // read after it does.
   function takesRead(text) {
+    if (root.dataMaking) return false
     if (root.staleTexts === null) return true
     var lost = text === null || (text !== root.dataWritten && root.staleTexts[text] === true)
     if (lost && !root.saveFailed)
@@ -1053,28 +1060,18 @@ Item {
     if (!root.pluginsReady) root.adopt(root.dataSettings)
   }
 
-  // A file that isn't there is made at once, holding the settings Stonks
-  // takes, an older build's from the bar or the defaults, its owner's alone
-  // from its first byte (`OwnerOnly.create`), and then read as any file is.
-  // Written by Quickshell, a new file is 0644 until the chmod after it,
-  // long enough for another account to read the first change's lists. As
-  // Stonks starts, nothing is written until the file is read
-  // (`pluginsReady`). Where it can't be made, the settings are taken
-  // anyway, and the bar's written as a change is.
   function takeMissingFile() {
     root.settingsUnreadable = false
-    var fromBar = root.pluginsReady ? null : Settings.settingsFromBar(root.parseShell())
-    if (!fromBar) console.warn("stonks: settings file missing; using defaults")
-    var settings = fromBar || Settings.fileSettings(null)
-    ownerOnly.create(root.dataPath, root.dataText(settings), function(made) {
-      if (made) return root.readDataFile()
-      root.adopt(settings)
-      if (fromBar) root.writeDataFile(settings)
-    })
-  }
-
-  function dataText(settings) {
-    return JSON.stringify(settings, null, 2) + "\n"
+    if (!root.pluginsReady) {
+      var fromBar = Settings.settingsFromBar(root.parseShell())
+      if (fromBar) {
+        root.adopt(fromBar)
+        root.writeDataFile(fromBar)
+        return
+      }
+    }
+    console.warn("stonks: settings file missing; using defaults")
+    root.adopt(Settings.fileSettings(null))
   }
 
   // `settings` as `Settings.fileSettings` returns them, read back once
@@ -1084,7 +1081,7 @@ Item {
   // as a read's own (`takeMissingFile`) may: Quickshell 0.3.2 forgets a
   // read started inside a read's handlers (fileview.cpp, operationFinished).
   function writeDataFile(settings) {
-    var body = root.dataText(settings)
+    var body = JSON.stringify(settings, null, 2) + "\n"
     if (typeof dataFile.setText !== "function") {
       console.warn("stonks: cannot write " + root.dataPath)
       return
@@ -1095,8 +1092,39 @@ Item {
     else root.staleTexts[root.dataWritten] = true
     root.staleTexts[before] = true
     root.dataWritten = body
+    if (root.dataMissing) return root.makeDataFile()
     dataFile.setText(body)
     Qt.callLater(root.readDataFile)
+  }
+
+  // The data file, last read as not there, is made rather than written:
+  // Quickshell writes a new file as the shell's umask has it, 0644, and the
+  // lists in it would show to another account until the chmod after it.
+  // `OwnerOnly.create` makes it its owner's alone before it holds a byte,
+  // with what Stonks wrote last. A write asked for meanwhile is written
+  // once the file is there, into it, now 0600, or made again where it isn't
+  // there. The read after judges it as it does any save (`takesRead`): one
+  // that didn't land is said, and the next change or the footer's try
+  // again makes it again, never writing it 0644 instead. Reads while it is
+  // being made judge nothing.
+  property bool dataMissing: false
+  property bool dataMaking: false
+  property bool dataMakeOwed: false
+  function makeDataFile() {
+    if (root.dataMaking) {
+      root.dataMakeOwed = true
+      return
+    }
+    root.dataMaking = true
+    ownerOnly.create(root.dataPath, root.dataWritten, function(made) {
+      root.dataMaking = false
+      if (made) root.dataMissing = false
+      var owed = root.dataMakeOwed
+      root.dataMakeOwed = false
+      if (owed && !made) return root.makeDataFile()
+      if (owed) dataFile.setText(root.dataWritten)
+      Qt.callLater(root.readDataFile)
+    })
   }
 
   // Saved at once, or with `settles`, once the change has rested

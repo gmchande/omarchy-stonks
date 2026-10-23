@@ -315,17 +315,19 @@ The shell's log the form asks for can name the prices Stonks left out.
 
 - **Needs:** nothing beyond Omarchy 4. It runs `curl`, PipeWire's
   `pw-play`, `pw-cat`, and `pw-dump`, and `sh`, `bash`, `timeout`,
-  `head`, `mkdir`, `chmod`, `mktemp`, `cat`, `ln`, and `rm`, which Omarchy
-  ships, and, for a screenshot, `wl-copy` and `omarchy-notification-send`.
+  `head`, `mkdir`, `chmod`, `mktemp`, `ln`, and `rm`, which Omarchy ships,
+  and, for a screenshot, `wl-copy` and `omarchy-notification-send`.
 - **Commands:** `curl` for every request; as Stonks starts, one `sh` that
   makes its cache folder, `mkdir` and `chmod`, yours alone, and `chmod` as
   it writes each of its files, to make it yours alone too; only when it
-  finds no `~/.config/omarchy/grvc.stonks.json`, one `sh` that makes it,
-  yours alone before it holds anything: `mktemp` makes a file beside it
-  that only you can read, `cat` writes your settings into it from its
-  input, `ln` puts it under its name, never over a file there, and `rm`
-  takes the extra name away; each of these under `timeout`, which stops
-  it after 5 seconds; while sounds are on, `pw-play` to play a sound, only
+  saves `~/.config/omarchy/grvc.stonks.json` and finds none there, one
+  `sh` that makes it, yours alone before it holds anything: `mktemp` makes
+  a file beside it that only you can read, the `sh` writes your settings
+  into it from its environment, never its arguments, `ln` puts it under
+  its name, never over a file there, and `rm` takes the extra name away;
+  each of these under `timeout`, which stops it after 5 seconds; a save
+  that can't be made this way says your changes aren't saved; while
+  sounds are on, `pw-play` to play a sound, only
   when you add, remove, or undo a row, take a screenshot, turn sounds on,
   replay a chart, or move along it, or the bell is due, with 4 seconds
   under `timeout`, and one `sh` that
