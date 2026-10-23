@@ -101,7 +101,8 @@
 # place. An answer over --max-filesize is cut there with exit code 63. Each
 # call is a line of runs.log, its kind:name per URL, and each URL a line of
 # requests.log, "kind name status", a spark's name its symbols,
-# comma-separated.
+# comma-separated; and each day's request, a chart's or a spark's, a line of
+# days.log, "kind name range", the days it asked for.
 #   YAHOO.refuse, ROBINHOOD.refuse,   that host answers 429 to every request,
 #   GITHUB.refuse                     counted in <HOST>.refused.calls; while
 #                                     <HOST>.retry-after holds a number, the
@@ -426,6 +427,10 @@ for i in "${!urls[@]}"; do
     fi
   fi
   echo "$kind $name $status" >> "$state/requests.log"
+  if [ "$kind" = chart ] || [ "$kind" = spark ]; then
+    days="${url#*range=}"
+    echo "$kind $name ${days%%&*}" >> "$state/days.log"
+  fi
   printf '%s' "$body"
   out=${format//'%{urlnum}'/$i}
   out=${out//'%{http_code}'/$status}

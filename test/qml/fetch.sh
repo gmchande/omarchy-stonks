@@ -67,7 +67,7 @@ STONKS_FETCH_RUN=holiday run_qs 120
 holiday_code=$code
 mv "$work/log" "$work/holiday.log"
 
-# The bell run: Friday 23 October from 09:29 New York, AAPL and the S&P 500,
+# The bell run: Friday 23 October from 09:28 New York, AAPL and the S&P 500,
 # Yahoo answering with Thursday's quotes until the harness turns it to the
 # session's first.
 rm -rf "$STONKS_FAKE_STATE" "$XDG_CACHE_HOME/grvc.stonks"
@@ -75,7 +75,7 @@ mkdir -p "$STONKS_FAKE_STATE"
 echo bell-2026-10-23-0929 listings-2026-10-07-1455 > "$STONKS_FAKE_STATE/overnight.set"
 printf '{ "version": 1, "symbols": ["AAPL", "^GSPC"], "featured": "AAPL", "order": "manual", "refreshIntervalSec": 60 }\n' \
   > "$HOME/.config/omarchy/grvc.stonks.json"
-patch_copy plugin/Service.qml 's/property int now: 1791367140/property int now: 1792762140/'
+patch_copy plugin/Service.qml 's/property int now: 1791367140/property int now: 1792762080/'
 STONKS_FETCH_RUN=bell run_qs 120
 [ "$main_code" -ne 0 ] && code=$main_code
 [ "$holiday_code" -ne 0 ] && code=$holiday_code

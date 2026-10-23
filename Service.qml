@@ -570,6 +570,7 @@ Item {
     clearance: function() { return root.screensClear() }
     gate: yahooGate
     centExchanges: root.centExchanges
+    calendars: root.calendars
   }
 
   // One request at a time: a chart's history, or a run of the rows in sight;
@@ -610,6 +611,7 @@ Item {
     clearance: function() { return root.previewShown && root.screensClear() }
     gate: yahooGate
     centExchanges: root.centExchanges
+    calendars: root.calendars
     bulk: false
     onQuotesChanged: {
       if (root.pendingFundamentals) root.fetchFundamentals(root.pendingFundamentals)

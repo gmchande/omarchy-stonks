@@ -67,8 +67,8 @@ Item {
 
   // The chart on screen, measured: a range's history, or the day: Yahoo's
   // quote, the headline and the day's figures, and the day the 1D chart
-  // draws and a scrub reads, its calendar day where it has an overnight
-  // market (`Chart.viewChart`).
+  // draws and a scrub reads, its last session and the night after it where
+  // it has an overnight market (`Chart.viewChart`).
   readonly property bool historyActive: !!chart && chart.range !== "1D"
   readonly property var history: chart ? chart.history : null
   readonly property bool historyShown: historyActive && !!history

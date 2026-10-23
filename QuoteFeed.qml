@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell.Io
 import "Fetch.js" as Fetch
+import "Market.js" as Market
 import "Quote.js" as Quote
 // The quote feed: every symbol asked for goes in one run, one curl over one
 // connection, and a run's answers land together. Hand it the members, what
@@ -65,6 +66,11 @@ Item {
   // The exchanges whose listings trade in whole cents from $1
   // (`Quote.parseChart`); none unless handed in.
   property var centExchanges: []
+  // The exchange calendars, by which a listing's day is asked for two days
+  // before its session opens (`Market.twoDays`); a spark batch asks two for
+  // all when one of them wants two, so the requests stay as many.
+  property var calendars: null
+  function twoDays(symbol) { return Market.twoDays(quotes[symbol] || null, stamp(), calendars) }
 
   property var quotes: ({})
   property var entries: ({})
@@ -280,7 +286,7 @@ Item {
     owe(runSymbols.filter(function(symbol) { return symbol in asked }))
     var spark = run.some(function(slot) { return slot.spark })
     proc.command = Fetch.curlCommand(run.map(function(slot) {
-      return slot.spark ? Quote.sparkUrl(slot.symbols) : Quote.chartUrl(slot.symbols[0])
+      return slot.spark ? Quote.sparkUrl(slot.symbols, slot.symbols.some(root.twoDays)) : Quote.chartUrl(slot.symbols[0], root.twoDays(slot.symbols[0]))
     }), spark ? Fetch.SPARK_CAP : Fetch.DAY_CAP)
     proc.running = true
   }

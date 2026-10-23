@@ -296,12 +296,17 @@ function scrubbedBase(quote) {
 
 // What a scrub of the 1D `day` reads its moves from, said beside its dashed
 // line: the line's own close, the one before the day's session
-// (`Quote.dayBase`); on a day with a thin night after it, also the close the
-// night's trades read from (`rowModel`).
+// (`Quote.dayBase`); once a print has come after the day, also the close
+// those read from (`rowModel`), named for the first of them: the night's,
+// or the coming day's pre-market.
 function dayBaselineText(day) {
   var text = "PREV CLOSE " + Format.money(Quote.dayBase(day), day.priceDigits)
-  var close = day.axis && day.axis.night ? Overnight.nightClose(day, day.axis.night.start) : null
-  return close === null ? text : text + " · NIGHT FROM CLOSE " + Format.money(close, day.priceDigits)
+  var tail = Quote.tailStart(day)
+  var after = null
+  for (var i = day.points.length - 1; tail !== null && i >= 0 && day.points[i].t >= tail; i--) after = day.points[i]
+  if (!after) return text
+  var label = Quote.pointSession(day, after) === "overnight" ? "NIGHT" : "PRE-MARKET"
+  return text + " · " + label + " FROM CLOSE " + Format.money(Overnight.nightClose(day, after.t), day.priceDigits)
 }
 
 // The day's animal for a row (`rowModel`): "bull" up, "bear" down, by

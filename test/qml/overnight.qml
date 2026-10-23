@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import "plugin" as Stonks
 import "plugin/Chart.js" as Chart
+import "plugin/Figures.js" as Figures
 import "plugin/Format.js" as Format
 // Overnight prices through the real Service, its feeds, and the App window,
 // on a clock this harness sets, moving forward. The fake curl answers Yahoo
@@ -295,15 +296,16 @@ ShellRoot {
       // said "Weekend" over OVERNIGHT.
       harness.check("Sunday 22:30, its night trading, NEST's header says Overnight, as the line under its price does",
         body.headerText === "Overnight · opens Mon 09:30", body.headerText)
-      // The chart stays on Friday (provisional: Sunday's captures settle
-      // it), Thursday night's prints at its left edge, which a scrub reads,
-      // never the previous close.
+      // The chart stays on Friday, the session the headline is about, with
+      // Thursday night's prints at its left edge, which a scrub reads, never
+      // the previous close, and Sunday night's trades after it, the weekend
+      // taking no room.
       var sundayChart = body.featuredGeometry
       scrubAt(0.03)
       var sundayScrub = body.headerText + " | " + body.featured.priceText
       endScrub()
-      harness.check("on Sunday night the chart is still Friday's, and a scrub at its left edge reads Thursday night's print",
-        sundayChart.start === harness.midnight.fri25 && sundayChart.end === harness.midnight.sat26
+      harness.check("on Sunday night the chart is still Friday's, Sunday night's trades after it, and a scrub at its left edge reads Thursday night's print",
+        sundayChart.start === harness.midnight.fri25 && sundayChart.end >= harness.sunday - 150 * 60 && sundayChart.end <= harness.sunday
           && sundayScrub.indexOf("At 00:") === 0 && sundayScrub.indexOf("Overnight") > 0 && body.featured.priceText === "237.33"
           && sundayScrub.indexOf("| 243.48") < 0 && lastSpan() === "day",
         sundayScrub + " | " + sundayChart.start + " to " + sundayChart.end + ", " + lastSpan())
@@ -673,21 +675,21 @@ ShellRoot {
         held.start + " to " + held.end + ", " + held.points.length + " points | " + harness.strip() + " | " + body.featured.priceText)
       useSet("2026-10-07-0100")
       service.now = 1791349200
-      within(3000, function() { return body.featuredGeometry.start === harness.midnight.wed7 && harness.strip().indexOf("OVERNIGHT 00:") === 0 })
+      within(3000, function() { return body.featuredGeometry.end > harness.midnight.wed7 && harness.strip().indexOf("OVERNIGHT 00:") === 0 })
       var wednesday = body.featuredGeometry
-      harness.check("Wednesday 01:00: the first prints after midnight turn the chart to Wednesday; the headline stays Tuesday's close and day",
-        wednesday.start === harness.midnight.wed7 && wednesday.end === harness.midnight.thu8 && !body.chartLoading
+      harness.check("Wednesday 01:00: the chart stays Tuesday's, the session the headline is about, the night's prints after midnight at its right end",
+        wednesday.start === harness.midnight.tue6 && wednesday.end > harness.midnight.wed7 && !body.chartLoading
           && body.featured.priceText === "249.87" && body.featured.changeText === "+7.44%",
         wednesday.start + " to " + wednesday.end + " | " + body.featured.priceText + " " + body.featured.changeText)
       // A scrub of the night reads it against Tuesday's close, as the line
-      // under the price does, and names that close.
+      // under the price does, and names that close beside the day's own.
       var line = harness.strip().split(" ")
       scrubAt(1.003)
       var legend = harness.find(body, "baselineLegend")
       var nightRead = [body.headerText, body.featured.priceText, body.featured.changeText, legend.visible ? legend.text : ""].join(" | ")
       endScrub()
       harness.check("a scrub at Wednesday's last print reads its move from Tuesday's close, the line's move",
-        nightRead === ["At " + line[1] + " · Overnight", line[2], line[3], "┄ PREV CLOSE 249.87"].join(" | "),
+        nightRead === ["At " + line[1] + " · Overnight", line[2], line[3], "┄ PREV CLOSE 232.57 · NIGHT FROM CLOSE 249.87"].join(" | "),
         nightRead + " vs " + line.join(" "))
       // As an amount, the line under the price says its move as one too, of
       // the same sign; since the open, it is the percent from the close it
@@ -703,11 +705,11 @@ ShellRoot {
       harness.check("the line under the price follows c: an amount of the same sign as an amount, the percent from the close since the open",
         amountSays === "true,true,true" && harness.strip() === line.join(" "),
         line.join(" ") + " -> " + asAmount.join(" ") + " (" + amountSays + ") -> " + harness.strip())
-      // Since the open, at rest, with the chart on Wednesday, the hero says
-      // what its row says: Tuesday's open to its close.
+      // Since the open, at rest, with Tuesday's chart and its night on show,
+      // the hero says what its row says: Tuesday's open to its close.
       var nestRow = body.watchlist.rowItem("NEST")
-      harness.check("since the open, at rest, with Wednesday's chart on show, the hero's change is Tuesday's, as its row's is",
-        body.featuredGeometry.start === harness.midnight.wed7
+      harness.check("since the open, at rest, with Tuesday's chart and its night on show, the hero's change is Tuesday's, as its row's is",
+        body.featuredGeometry.start === harness.midnight.tue6
           && body.featured.changeText === nestRow.view.changeText && body.featured.changeText !== "+7.44%",
         body.featuredGeometry.start + " | " + body.featured.changeText + " vs " + nestRow.view.changeText)
       // And from the open the info line shows, never from the first bar's
@@ -1118,6 +1120,35 @@ ShellRoot {
       harness.check("a thin US day's three quiet spans each take one scrub step to the next actual print",
         joined.every(function(ok) { return ok }), joined.join(","))
       body.endScrub()
+
+      // Friday 23 October at 06:00, Yahoo's two-day answer holding Thursday
+      // and Friday's pre-market: NVDA's chart is Thursday from midnight, then
+      // the night and the pre-market after it, under Thursday's −4.40%. A
+      // scrub of Thursday reads from Wednesday's close, and one of the
+      // pre-market from Thursday's, as the line under the price does. Found
+      // in the design panel: the night alone, its scrub a bull under a bear.
+      useSet("night-2026-10-23-0600")
+      service.now = 1792749600
+      service.addSymbol("NVDA")
+      within(8000, function() { return !!service.quotes.NVDA && service.arriving.length === 0 })
+      featureShown("NVDA")
+      var thursdayMidnight = 1792641600
+      within(5000, function() { return body.chartSymbol === "NVDA" && !body.chartLoading && body.featuredGeometry.start === thursdayMidnight
+        && harness.strip().indexOf("PRE-MARKET") === 0 })
+      var nvdaLine = harness.strip().split(" ")
+      var nvdaChart = body.featuredGeometry.start + " | " + body.featured.changeText + " | " + nvdaLine.join(" ")
+      scrubAt(0.35)
+      var nvdaDay = [body.headerText, body.featured.changeText].join(" | ")
+      var thursdayRead = Figures.rowModel(service.quotes.NVDA, body.scrubT, "pct").changeText
+      scrubAt(1.003)
+      var nvdaLegend = harness.find(body, "baselineLegend")
+      var nvdaNight = [body.featured.changeText, nvdaLegend.visible ? nvdaLegend.text : ""].join(" | ")
+      endScrub()
+      harness.check("Friday 06:00: NVDA's chart is Thursday, then its night and pre-market, its scrub reading each from its own close",
+        body.featuredGeometry.start === thursdayMidnight && body.featured.changeText === "\u22124.40%"
+          && /^At 1\d:\d\d · /.test(nvdaDay) && nvdaDay.split(" | ")[1] === thursdayRead
+          && nvdaNight === nvdaLine[nvdaLine.length - 1] + " | ┄ PREV CLOSE 221.97 · NIGHT FROM CLOSE 212.21",
+        nvdaChart + " || " + nvdaDay + " vs " + thursdayRead + " || " + nvdaNight)
       // Painted sparse day/3M, one-print and Tokyo lunch states are already
       // in render.qml; no model value can stand in for their rendered ink.
       harness.finish()

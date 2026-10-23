@@ -443,6 +443,25 @@ function staysWarm(quote, now, calNow) {
   return !!last && now >= last.end
 }
 
+// Whether a listing's day answer is asked for two days (`Quote.chartUrl`):
+// one with no quote yet, whose market and hour aren't known; and, on a
+// trading day of a calendar with a pre-market, from the pre-market's open
+// until the session opens. Yahoo's day answer for a stock turns to the
+// coming day with its pre-market (AAPL's at 06:22 on Friday 23 October held
+// Friday from 04:00 and nothing of Thursday), and the 1D chart shows the
+// last session, then what came after it, until the bell. Never an index's,
+// whose answer stays the last session's until its open, nor a
+// cryptocurrency's, which has no session to wait for.
+function twoDays(quote, now, calendars) {
+  if (!quote) return true
+  if (quote.crypto || quote.instrumentType === "INDEX") return false
+  var cal = calendarFor(calendars, quote)
+  if (!cal || !cal.pre) return false
+  var date = dateStringOf(localDate(now, cal))
+  var segs = segmentsOn(cal, date)
+  return segs.length > 0 && now >= epochAt(cal, date, cal.pre.open) && now < segs[0].start
+}
+
 // How long after a session opens its first price may still be on its way,
 // and how often a quote still waiting on it is asked for meanwhile: Yahoo
 // answered with the last session's quote until 09:30:09 for the S&P 500 and

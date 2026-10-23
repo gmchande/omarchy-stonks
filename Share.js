@@ -144,8 +144,12 @@ function words(o) {
     var pts = o.day.points
     if (pts.length) {
       var axis = Chart.chartSpan(pictureDay(o.day))
-      out.start = local(o.day, axis.byPrint ? pts[0].t : axis.start, o.calendars).clock
-      out.end = local(o.day, pts[pts.length - 1].t, o.calendars).clock
+      var first = local(o.day, axis.byPrint ? pts[0].t : axis.start, o.calendars)
+      var last = local(o.day, pts[pts.length - 1].t, o.calendars)
+      out.start = first.clock
+      // A chart that runs past its day, into the night and the next
+      // morning, names the weekday it ends on.
+      out.end = (last.d !== first.d ? Format.WEEKDAYS[last.weekday].toUpperCase() + " " : "") + last.clock
     }
   }
   // The popup's line under the price, as it shows it: at rest, its tone,
