@@ -68,6 +68,7 @@ read_pr() {
 end=$((SECONDS + patience))
 while :; do
   read_pr || refuse "can't read pull request #$pr from GitHub"
+  want=${want:-$head}
   [ "$state" = OPEN ] || refuse "pull request #$pr is $state, not open"
   [ "$base" = dev ] || refuse "pull request #$pr is against $base: this merges into dev only"
   [ -z "$want" ] || [ "$want" = "$head" ] || refuse "pull request #$pr's head is ${head:0:7}, not ${want:0:7} that you last read"
@@ -81,7 +82,6 @@ while :; do
   say "GitHub hasn't yet said whether #$pr can merge; asking again"
   sleep "$poll"
 done
-want=${want:-$head}
 
 gh pr merge "$pr" --merge --match-head-commit "$want" --author-email "$email" > /dev/null \
   || refuse "gh couldn't merge #$pr at ${want:0:7}: nothing merged"
@@ -97,6 +97,7 @@ git fetch --quiet origin || broke "can't fetch origin: dev is not updated"
 git merge-base --is-ancestor "$merged" origin/dev || broke "merge commit ${merged:0:7} isn't on origin/dev"
 [ "$(git rev-parse --quiet --verify "$merged^2")" = "$want" ] || broke "merge commit ${merged:0:7} doesn't have ${want:0:7} as its second parent"
 [ "$(git log -1 --format=%ae "$merged")" = "$email" ] || broke "merge commit ${merged:0:7} has the author $(git log -1 --format=%ae "$merged"), not $email"
+[ "$(git -C "$main" symbolic-ref --quiet --short HEAD)" = dev ] || broke "$main is no longer on dev: nothing fast-forwarded"
 git -C "$main" merge --ff-only --quiet origin/dev || broke "dev in $main didn't fast-forward to origin/dev"
 say "merged #$pr: $(git log -1 --format='%h %s' "$merged"); dev in $main is at $(git -C "$main" rev-parse --short HEAD)"
 if [ "$(git rev-parse "$merged^{tree}")" = "$(git rev-parse "$want^{tree}")" ]; then
