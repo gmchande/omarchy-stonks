@@ -14,16 +14,22 @@ import "Tones.js" as Tones
 // in with the line, and how high and low its ink reaches under a mark
 // (`inkExtentIn`). A mark whose words would touch that ink moves off its
 // edge, into the band's gap, by as much as `lift`; one that would need
-// more, as on a chart squeezed short, is left out whole.
+// more, as on a chart squeezed short, is left out whole. A mark the scrub's
+// line crosses (`scrubX`, the scrub's place along the chart, 0..1, or -1)
+// gives way while it does, so the line never cuts its date in two. Found in
+// the overnight QA of 23 October: AAPL's 1Y scrub ran through "20│JAN 2026".
 Item {
   id: root
 
   property var marks: null
   property var chart: null
+  property real scrubX: -1
   property color foreground: Commons.Color.foreground
   property color dim: Tones.dim(foreground, Commons.Color.background)
   property string fontFamily: Style.font.family
   readonly property real lift: Style.space(4)
+  // Where the scrub's line stands, in this item's pixels, -1 without one.
+  readonly property real scrubAt: root.chart && root.scrubX >= 0 ? root.chart.xAt(root.scrubX) : -1
 
   // The marks draw in with the line: the chart's draw-in uncovers them as
   // it uncovers its ink, the room a mark lifts into included.
@@ -48,6 +54,7 @@ Item {
         readonly property real overlap: Math.max(mark.overlapOf(priceText, priceInk), mark.overlapOf(dateText, dateInk), 0)
         objectName: index === 0 ? "highMark" : "lowMark"
         visible: mark.overlap <= root.lift
+          && !(root.scrubAt >= 0 && root.scrubAt >= mark.x - Style.space(4) && root.scrubAt <= mark.x + mark.width + Style.space(4))
         spacing: Style.space(6)
         x: Math.max(0, Math.min(root.width - mark.width,
           mark.modelData.x < 0.5 ? mark.at - Style.space(2) : mark.at - mark.width + Style.space(2)))
