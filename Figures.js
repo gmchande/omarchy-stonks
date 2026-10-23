@@ -61,7 +61,9 @@ var ASKED_GRACE = 2
 // "asking" in its grace while its last answer is older than a live quote,
 // so its age goes unsaid only where Stonks, not the source, let it go old:
 // a source sending late (London, 15 minutes) is answered every minute and
-// says "As of" throughout.
+// says "As of" throughout. A quote still the last session's in the first
+// moments of a session is "asking" too, as Stonks asks again for its first
+// price (`Market.awaitingOpen`).
 function freshness(entry, quote, now, owedSince, inGrace) {
   var head = quote ? Quote.headlineQuote(quote) : null
   var phase = quote ? Market.sessionPhase(quote, now) : "closed"
@@ -69,7 +71,7 @@ function freshness(entry, quote, now, owedSince, inGrace) {
   var overdue = owedSince > 0 && now - owedSince >= OVERDUE_AFTER
   // The quote stands for another day than the clock's: the words name the day.
   var earlier = !!asOf && exchangeDay(quote, asOf) !== exchangeDay(quote, now)
-  var asking = !!inGrace && !!entry && now - entry.answeredAt > LIVE_QUOTE_MAX_AGE
+  var asking = (!!inGrace && !!entry && now - entry.answeredAt > LIVE_QUOTE_MAX_AGE) || Market.awaitingOpen(quote, now)
   var state = entry && entry.status === "failed" ? "failed"
     : overdue ? "overdue"
     : !quote || !head ? "unavailable"
@@ -148,7 +150,10 @@ function extendedStack(quote, latest, now, day, changeMode) {
 // live moment, which it stamps at the price's own second, apart from the
 // bars at their five-minute starts, stands alone while the first bar has
 // no close yet (^GSPC at 09:30:25; London's at 08:02, seen 15 minutes
-// late), and a bar is whole only once `now` is past its five minutes.
+// late), and a bar is whole only once `now` is past its five minutes. Nor
+// for an empty day whose quote is a trade of its session, with a price and
+// a volume beside the chart: Yahoo had sent WREN's 09:30 trade and no bar
+// at 09:37 on Friday 23 October, found in the daytime QA.
 function dayNote(day, now, calendars) {
   if (!day) return ""
   var pts = day.points
@@ -156,7 +161,10 @@ function dayNote(day, now, calendars) {
   if (pts.length === 1) return pts[0].t % bar === 0 && now >= pts[0].t + bar ? "Traded only at " + Market.printClock(day, pts[0].t, calendars) : ""
   if (pts.length > 1) return ""
   var regular = day.session.regular
-  return regular && now < regular.start ? "" : "No trades charted"
+  if (!regular) return "No trades charted"
+  var head = Quote.headlineQuote(day)
+  var tradedToday = !!head && head.t !== null && head.t >= regular.start
+  return now < regular.start || tradedToday ? "" : "No trades charted"
 }
 
 // The day a moment falls on in the quote's exchange, as a day count: two
@@ -216,7 +224,7 @@ function listBreadth(symbols, quotes, scrubT, mode) {
     var quote = quotes[symbols[i]]
     var read = quote ? (scrubT ? Quote.readingAt(quote, scrubT) : Quote.headlineQuote(quote)) : null
     var price = read ? read.price : null
-    var chg = quote ? Quote.change(quote, price, mode) : null
+    var chg = quote ? Quote.change(scrubT ? scrubbedBase(quote) : quote, price, mode) : null
     if (!chg || chg.pct === null) out.none++
     else out[Format.changeTone(chg, mode, quote.priceDigits)]++
   }
@@ -224,15 +232,17 @@ function listBreadth(symbols, quotes, scrubT, mode) {
 }
 
 // The one projection every price on screen comes from. The headline is
-// the regular-market quote; a non-zero scrubT reads that moment of the day
-// (`Quote.readingAt`). dayUp is always versus the previous close, so the
-// chart fill does not flip when the change mode does, and it is the
-// direction at the moment shown, as a range's is. dayTone is that change's
-// tone, flat when it rounds to nothing, so the bull and bear follow a scrub
-// and a replay, and a flat day has neither. A trade in a thin night after
-// the day is measured from the day's own close instead, as the overnight
-// line under the price is (`Overnight.nightClose`): since the open, as the
-// percent from that close.
+// the regular-market quote, its change from Yahoo's previous close; a
+// non-zero scrubT reads that moment of the day (`Quote.readingAt`), its
+// change from the close the day is measured from (`Quote.dayBase`), as the
+// dashed line is: before the open, the last session's close. dayUp is
+// always versus that close, so the chart fill does not flip when the change
+// mode does, and it is the direction at the moment shown, as a range's is.
+// dayTone is that change's tone, flat when it rounds to nothing, so the
+// bull and bear follow a scrub and a replay, and a flat day has neither. A
+// trade in a thin night after the day is measured from the day's own close
+// instead, as the overnight line under the price is
+// (`Overnight.nightClose`): since the open, as the percent from that close.
 // It carries no drawing: a line is drawn from its quote, so it redraws when
 // the quote does, not with the clock or the change mode. Nor does it read
 // the clock, so a row is not derived again every second. Pass the
@@ -241,7 +251,7 @@ function rowModel(quote, scrubT, changeMode) {
   var read = scrubT ? Quote.readingAt(quote, scrubT) : Quote.headlineQuote(quote)
   var price = read ? read.price : null
   var close = scrubT ? Overnight.nightClose(quote, scrubT) : null
-  var measured = close === null ? quote : { prevClose: close, points: [] }
+  var measured = close !== null ? { prevClose: close } : scrubT ? scrubbedBase(quote) : quote
   var mode = close !== null && changeMode === "open" ? "pct" : changeMode
   var chg = Quote.change(measured, price, mode)
   var direction = Quote.change(measured, price, "pct")
@@ -263,12 +273,18 @@ function rowModel(quote, scrubT, changeMode) {
   }
 }
 
+// What a scrubbed moment of a quote's day is measured from, shaped as
+// `Quote.change` reads it: the close the day is measured from, and its open.
+function scrubbedBase(quote) {
+  return { prevClose: Quote.dayBase(quote), dayOpen: quote.dayOpen }
+}
+
 // What a scrub of the 1D `day` reads its moves from, said beside its dashed
-// line: the line's own close, the day's previous close; on a day with a thin
-// night after it, also the close the night's trades read from
-// (`rowModel`).
+// line: the line's own close, the one before the day's session
+// (`Quote.dayBase`); on a day with a thin night after it, also the close the
+// night's trades read from (`rowModel`).
 function dayBaselineText(day) {
-  var text = "PREV CLOSE " + Format.money(day.prevClose, day.priceDigits)
+  var text = "PREV CLOSE " + Format.money(Quote.dayBase(day), day.priceDigits)
   var close = day.axis && day.axis.night ? Overnight.nightClose(day, day.axis.night.start) : null
   return close === null ? text : text + " · NIGHT FROM CLOSE " + Format.money(close, day.priceDigits)
 }

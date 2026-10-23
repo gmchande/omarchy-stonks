@@ -296,16 +296,16 @@ function chartDate(cal, newest) {
 }
 
 // The close the chart of `date` is measured from, the one before its regular
-// session: Yahoo's previous close once its bars are that day's, and its
-// regular close while they are still the day before, from midnight to the
-// pre-market.
+// session: the close the quote's day is measured from (`Quote.dayBase`) once
+// its bars are that day's, and its regular close while they are still the
+// day before, from midnight to the pre-market.
 // PROVISIONAL from 20:00 to midnight: the night after the close stays on the
 // day's previous close, while the line under the price measures it from the
 // day's own close. The 7 October 20:10 and 23:00 captures settle which close
 // Robinhood's chart measures it from.
 function dayBaseline(quote, cal, date) {
   var bars = Market.dateStringOf(Market.localDate(quote.session.regular.start, cal))
-  return bars < date ? Quote.regularClose(quote) : quote.prevClose
+  return bars < date ? Quote.regularClose(quote) : Quote.dayBase(quote)
 }
 
 // Robinhood's prints outside Yahoo's day and Yahoo's own, in time order, each

@@ -133,13 +133,14 @@ function words(o) {
   } else {
     // What the change on show is measured from: the quote's at rest, the
     // day's while scrubbed (`Figures.rowModel`), as after midnight, where
-    // the day's chart starts from the close the quote's change ends on; a
-    // thin night's trade, from the day's own close.
+    // the day's chart starts from the close the quote's change ends on, or
+    // before the open (`Quote.dayBase`); a thin night's trade, from the
+    // day's own close.
     var base = o.scrubT ? o.day : quote
     var close = o.scrubT ? Overnight.nightClose(o.day, o.scrubT) : null
     out.from = close !== null ? "CLOSE " + Format.money(close, base.priceDigits)
       : o.changeMode === "open" ? "OPEN " + Format.money(base.dayOpen, base.priceDigits)
-      : "PREV CLOSE " + Format.money(base.prevClose, base.priceDigits)
+      : "PREV CLOSE " + Format.money(o.scrubT ? Quote.dayBase(base) : base.prevClose, base.priceDigits)
     var pts = o.day.points
     if (pts.length) {
       var axis = Chart.chartSpan(pictureDay(o.day))

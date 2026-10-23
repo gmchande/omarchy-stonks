@@ -299,7 +299,8 @@ function holidayName(name) {
 // from an earlier session, before the new day's answer lands, has the
 // calendar's session stand in while one of its segments trades
 // (`calendarRegular`), so the open says "Opening bell", not the next day's
-// open. A listing whose overnight session is on (`overnight`,
+// open; an index counts to the open through its calendar's pre-market
+// (`indexBell`). A listing whose overnight session is on (`overnight`,
 // `Overnight.nightTrades`) is in it, as the line under the price says, a
 // weekend's or a holiday's evening included. While scrubbing, where in the
 // day the finger is: at the close's own time, the closing bell, when it
@@ -337,7 +338,7 @@ function statusSaying(quote, now, scrubT, calendars, overnight, short) {
   var q = held ? Object.assign({}, quote, { session: { pre: null, regular: held, post: null }, current: null,
     clocks: [], gmtoffset: localDate(now, cal).offset }) : quote
   var phase = overnight ? "overnight" : sessionPhase(q, now)
-  var bell = secondsToBell(q, now)
+  var bell = secondsToBell(q, now) || indexBell(quote, cal, now)
   var kind = cal ? dayKind(cal, dateStringOf(localDate(now, cal))) : null
   // A published closure outranks a cached response that still describes a
   // session: on a holiday Yahoo may hand back a window nobody is trading.
@@ -354,6 +355,20 @@ function statusSaying(quote, now, scrubT, calendars, overnight, short) {
     : (phase === "post" && reg && now >= reg.end ? phaseLabel(phase) + " · closed at " + printClock(quote, reg.end, calendars)
       : phaseLabel(phase))
   return base + (phase === "post" ? "" : scheduleNote(quote, now, calendars))
+}
+
+// An index has no pre-market of its own, and Yahoo's periods for it stay
+// the last session's until it opens (the S&P 500's until 09:30:12 on Friday
+// 23 October), so its own bell has nothing to count to: through its
+// calendar's pre-market on a trading day it counts to the open, as the
+// stocks beside it do. Found in the daytime QA: "Closed · opens Fri 09:30"
+// on the Friday, beside every stock's "Pre-market · opens in 3h 11m".
+function indexBell(quote, cal, now) {
+  if (quote.instrumentType !== "INDEX" || !cal || !cal.pre) return null
+  var date = dateStringOf(localDate(now, cal))
+  var segs = segmentsOn(cal, date)
+  if (!segs.length || now < epochAt(cal, date, cal.pre.open) || now >= segs[0].start) return null
+  return { seconds: segs[0].start - now, bell: "open" }
 }
 
 // Whether a quote's own market is in its regular session now: Yahoo's
@@ -428,17 +443,37 @@ function staysWarm(quote, now, calNow) {
   return !!last && now >= last.end
 }
 
+// How long after a session opens its first price may still be on its way,
+// and how often a quote still waiting on it is asked for meanwhile: Yahoo
+// answered with the last session's quote until 09:30:09 for the S&P 500 and
+// 09:30:12 for AAPL on Friday 23 October (the daytime QA).
+var OPENING_WAIT = 60
+var OPENING_ASK = 15
+
+// Whether `quote`'s regular session opened under OPENING_WAIT ago at `now`
+// and its headline is still from before it: the session's first price is
+// on its way. Found in the daytime QA: every US row said "As of Thu 16:00"
+// for the first 46 seconds of Friday's session, the answers asked at
+// 09:30:00 still Thursday's and the next not due for a minute.
+function awaitingOpen(quote, now) {
+  if (!quote || quote.crypto) return false
+  var reg = clockSession(quote, now).regular
+  var head = Quote.headlineQuote(quote)
+  return !!reg && !!head && head.t !== null && head.t < reg.start && now >= reg.start && now < reg.start + OPENING_WAIT
+}
+
 // How often a symbol's quote is asked for, in seconds, by its own market
 // now and never by the rest of the list: the refresh interval while it
-// trades (always, for a cryptocurrency); in pre-market and after hours,
-// when only the dim tail of its day can move, every 5 minutes unless it is
-// the hero of an open surface; and every 15 minutes while its market is
-// closed, for a night, a weekend, a holiday, or a break. A symbol with no
-// quote is asked again on the slow clock too. By its calendar's reading at
-// `now` (`calendarNow`).
+// trades (always, for a cryptocurrency), and every OPENING_ASK seconds at
+// most while its session's first price is on its way (`awaitingOpen`); in
+// pre-market and after hours, when only the dim tail of its day can move,
+// every 5 minutes unless it is the hero of an open surface; and every 15
+// minutes while its market is closed, for a night, a weekend, a holiday, or
+// a break. A symbol with no quote is asked again on the slow clock too. By
+// its calendar's reading at `now` (`calendarNow`).
 function quoteCadence(quote, now, interval, hero, calNow) {
   if (!quote) return 15 * 60
-  if (quote.crypto || regularNow(quote, now, calNow)) return interval
+  if (quote.crypto || regularNow(quote, now, calNow)) return awaitingOpen(quote, now) ? Math.min(OPENING_ASK, interval) : interval
   if (calNow.quiet || calNow.breakEnd) return 15 * 60
   var phase = sessionPhase(quote, now)
   if (phase === "pre" || phase === "post") return hero ? interval : Math.max(5 * 60, interval)

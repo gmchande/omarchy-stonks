@@ -418,7 +418,7 @@ function historyBody(overrides) {
 test("parseHistory filters intraday prints but leaves daily reversals untouched", () => {
   const common = {
     timestamp: [100, 200, 300],
-    quote: { open: [100, 100, 100], close: [100, 96, 100], high: [101, 97, 101], low: [95, 95, 99], volume: [10, 10, 10] }
+    quote: { open: [100, 100, 100], close: [100, 96, 100], high: [101, 97, 101], low: [95, 95, 99], volume: [10, 0, 10] }
   }
   const intraday = M.parseHistory(historyBody({ ...common, meta: { dataGranularity: "15m" } }), "1W")
   const daily = M.parseHistory(historyBody({ ...common, meta: { dataGranularity: "1d" } }), "1M")

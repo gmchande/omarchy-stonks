@@ -134,6 +134,46 @@ test("across every saved intraday response the filter drops only those eleven ba
     .toEqual([1790946900, 1790947200, 1790947800])
 })
 
+test("a bar with shares traded in it is a trade, never stray", () => {
+  // TOY's climb into Friday 2 October's close, 15:50 and 15:55 on 38,404 and
+  // 121,968 shares, opened back from at 16:05 by an after-hours print: the
+  // filter took the climb for strays, and the line ended the session 3.54
+  // under the last trade.
+  const toy = M.parseChart(fixture("moments/live-2026-10-05/toy.json"))
+  const close = M.epochAt(US, "2026-10-02", "15:50")
+  expect(toy.points.filter(p => p.t === close || p.t === close + 300).map(p => p.p)).toEqual([320.0400085449219, 320.8299865722656])
+})
+
+test("a young listing's ranges start at its first trade and keep its thin trades, and agree on its high and low", () => {
+  // WREN, first traded Friday 16 October: Yahoo's 1W and 1M open with its
+  // 18.00 offer at 09:30, no shares traded, its first trade 23.00 at 11:45.
+  // Found in the daytime QA: 1W said "18.00 23.00", the week's 23.875 high
+  // on 257,049 shares among 11 bars the stray filter dropped; 1M "18.00
+  // 23.88"; 3M and the 52-week line "19.75 23.88".
+  const set = "moments/premarket-2026-10-23-0622/"
+  const quote = M.parseChart(fixture(set + "wren.json"), cents)
+  expect(M.yearLine(quote).range).toMatchObject({ lowText: "19.75", highText: "23.88" })
+  for (const [file, range] of [["wren-1w", "1W"], ["wren-1m", "1M"], ["wren-3m", "3M"]]) {
+    const history = M.parseHistory(fixture(set + file + ".json"), range, cents)
+    const ends = M.rangeEnds(history, M.periodStats(history), quote)
+    expect([range, M.rangeLine(history, ends, quote).range]).toMatchObject([range, { lowText: "19.75", highText: "23.88" }])
+    expect([range, history.droppedTimes, history.bars.some(b => b.l === 18)]).toEqual([range, [], false])
+    expect([range, M.historyRowModel(history, quote, 0).periodLabel]).toEqual([range, "SINCE 16 OCT 2026"])
+  }
+})
+
+test("a day with no bar says nothing against the trade its quote holds", () => {
+  // WREN at 09:37 on Friday 23 October: Yahoo's quote is its 09:30 trade,
+  // 20.62 on 366 shares, and its day has no bar. Found in the daytime QA:
+  // "No trades charted" under "1D 20.62 20.62 VOL 366".
+  const wren = M.parseChart(fixture("moments/bell-2026-10-23-0937/wren.json"), cents)
+  expect([wren.points.length, wren.price, wren.volume]).toEqual([0, 20.62, 366])
+  expect(M.dayNote(wren, M.epochAt(US, "2026-10-23", "09:37"), calendars)).toBe("")
+  // CVR untraded on Friday 16 October, its quote Wednesday's, still says so.
+  const cvr = M.parseChart(fixture("moments/power-user-2026-10-16/cvr.json"), cents)
+  expect(M.dayNote(cvr, M.epochAt(US, "2026-10-16", "14:09"), calendars)).toBe("No trades charted")
+})
+
 test("the headline uses the regular quote or labels the last chart trade with its time", () => {
   expect(M.headlineQuote(quote)).toEqual({ price: quote.price, t: quote.marketTime, source: "quote" })
   expect(M.regularClose(quote)).toBe(quote.price)
@@ -1554,8 +1594,70 @@ test("from midnight to the pre-market the chart is the new day, measured from ye
   expect(scrubbed.changeText).toBe(M.extendedStack(quote, latest, at("2026-10-07", "01:00"), day).changeText)
   expect(scrubbed.dayUp).toBe(false)
   expect(M.rowModel(quote, 0, "pct").changeText).toBe("+7.44%")
-  // At 06:00 Yahoo's day is Wednesday's, and its previous close is the same close.
-  expect(M.money(dayAt("2026-10-07-0600", "nest").day.prevClose)).toBe("249.87")
+})
+
+test("before the open the day is measured from the last session's close, though Yahoo's previous close is the one before", () => {
+  // Friday 23 October, 06:22: Yahoo's day is Friday's, its pre-market from
+  // 04:00, while its quote is Thursday's close and its previous close
+  // Wednesday's. Found in the daytime QA: the chart and its scrub measured
+  // AAPL's pre-market from Wednesday's 343.99, green above it, while the line
+  // under the price said it was down from Thursday's.
+  const quote = savedDay("premarket-2026-10-23-0622", "aapl")
+  expect([quote.price, quote.prevClose]).toEqual([348.22, 343.99])
+  const fourFortyFive = at("2026-10-23", "04:45")
+  const days = [M.dayChart(quote, { bars: [], through: null }, calendars).day, M.sessionDay(quote)]
+  for (const day of [quote, ...days]) {
+    const line = M.chartGeometry(day)
+    expect(line.points.at(-1).y).toBeGreaterThan(line.baselineY)
+    expect(M.rowModel(day, fourFortyFive, "pct")).toMatchObject({ priceText: "345.92", changeText: "\u22120.66%", dayUp: false })
+  }
+  for (const day of days) expect(M.dayBaselineText(day)).toBe("PREV CLOSE 348.22")
+  // The headline is still Thursday's close and Thursday's move.
+  expect(M.rowModel(quote, 0, "pct").changeText).toBe("+1.23%")
+  // NVDA the other way round: down on Thursday, up since.
+  const nvda = savedDay("premarket-2026-10-23-0622", "nvda")
+  expect(M.rowModel(nvda, fourFortyFive, "pct").changeText).toBe("+1.19%")
+  expect(M.rowModel(nvda, 0, "pct").changeText).toBe("\u22124.40%")
+})
+
+test("in a session's first minute a quote still the last session's says nothing of its age, and is asked again within 15 s", () => {
+  // Friday 23 October: Yahoo's answers held Thursday's quote until 09:30:09
+  // (^GSPC) and 09:30:12 (AAPL). Found in the daytime QA: from 09:30:02
+  // every US row said "As of Thu 16:00" until 09:30:46, when the rows asked
+  // at 09:29:46 next fell due.
+  const bell = at("2026-10-23", "09:30")
+  for (const name of ["aapl", "gspc"]) {
+    const thursday = savedDay("bell-2026-10-23-0929", name)
+    const opening = M.freshness({ status: "ok", answeredAt: bell }, thursday, bell + 2, 0, false)
+    expect([name, opening.state, opening.live, M.freshnessText(opening, thursday, calendars)]).toEqual([name, "asking", false, ""])
+    expect([name, quoteCadence(thursday, bell + 2, 60, false)]).toEqual([name, 15])
+    // A minute on, a quote still Thursday's is old, and says so.
+    const later = M.freshness({ status: "ok", answeredAt: bell + 60 }, thursday, bell + 61, 0, false)
+    expect([name, M.freshnessText(later, thursday, calendars)]).toEqual([name, name === "aapl" ? "AS OF THU 16:00" : "AS OF THU 16:31"])
+    expect([name, quoteCadence(thursday, bell + 61, 60, false)]).toEqual([name, 60])
+    // The first answer with the session's price is live, asked each minute.
+    const friday = savedDay("bell-2026-10-23-0930", name)
+    expect([name, M.freshness({ status: "ok", answeredAt: bell + 12 }, friday, bell + 12, 0, false)])
+      .toMatchObject([name, { state: "fresh", live: true }])
+    expect([name, quoteCadence(friday, bell + 12, 60, false)]).toEqual([name, 60])
+  }
+})
+
+test("before the open an index counts to the bell and has no open yet, as the stocks beside it", () => {
+  // Friday 23 October, 06:22: the S&P 500's periods are still Thursday's,
+  // its current period Friday's; AAPL's day is Friday's already. Found in
+  // the daytime QA: "Closed · opens Fri 09:30" and "−0.41% open" for the
+  // index, "Pre-market · opens in 3h 11m" and "—" for every stock.
+  const gspc = savedDay("premarket-2026-10-23-0622", "gspc")
+  const aapl = savedDay("premarket-2026-10-23-0622", "aapl")
+  const now = at("2026-10-23", "06:20")
+  expect(M.marketStatus(gspc, now, 0, calendars)).toBe("Market opens in 3h 10m")
+  expect(M.marketStatus(aapl, now, 0, calendars)).toBe("Pre-market · opens in 3h 10m")
+  for (const q of [gspc, aapl]) expect([q.symbol, M.rowModel(q, 0, "open").changeLine]).toEqual([q.symbol, "—"])
+  // Its headline is still Thursday's close and move, as theirs are.
+  expect(M.rowModel(gspc, 0, "pct").changeText).toBe("\u22121.21%")
+  // Before the pre-market it names the open's day, as a stock does.
+  expect(M.marketStatus(gspc, at("2026-10-23", "03:59"), 0, calendars)).toBe("Closed · opens Fri 09:30")
 })
 
 test("the evening's night is on the day's chart, measured from the day's previous close (provisional)", () => {
