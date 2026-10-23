@@ -25,7 +25,10 @@
 # records.
 # When the suites passed but the commit didn't go live, it says so, and the
 # next batch puts it live without running them again, since their records
-# cover its tree (test/ran.sh). One batch runs at a time. It refuses when
+# cover its tree (test/ran.sh). One batch runs at a time, and no merge
+# (test/merge.sh) lands while one runs: a merge waits for the batch's lock,
+# so the checkout the suites run in never changes under them. A batch that
+# finds a merge landing waits for it. It refuses when
 # the live commit isn't on dev: a branch build may be live for the owner to
 # try. Each run's output is in out/batch/COMMIT.log.
 #
@@ -38,9 +41,21 @@ say() { echo "batch: $*"; }
 refuse() { echo "batch: refusing: $*" >&2; exit 1; }
 
 # Fd 8 holds the batch's lock; every command below runs without it (8>&-),
-# so nothing it starts holds it past the batch.
-exec 8>> "$(git rev-parse --path-format=absolute --git-common-dir)/stonks-batch.lock" || exit 1
-flock -n 8 || refuse "another batch is running in this repository"
+# so nothing it starts holds it past the batch. test/merge.sh takes the same
+# lock around a merge, and a share of the merge lock beside it, first. A
+# batch that finds the batch lock taken while a merge holds that share waits
+# up to 2 minutes for it (BATCH_MERGE_WAIT, in seconds), since a merge holds
+# it for seconds and the lead starts a batch right after one. It refuses at
+# once when no merge is there: another batch is running.
+lockdir=$(git rev-parse --path-format=absolute --git-common-dir)
+exec 8>> "$lockdir/stonks-batch.lock" || exit 1
+if ! flock -n 8; then
+  exec 7>> "$lockdir/stonks-merge.lock" || exit 1
+  flock -n -x 7 && refuse "another batch is running in this repository"
+  exec 7>&-
+  say "waiting up to ${BATCH_MERGE_WAIT:-120}s for a merge to end"
+  flock -w "${BATCH_MERGE_WAIT:-120}" 8 || refuse "a merge still holds the lock after ${BATCH_MERGE_WAIT:-120}s"
+fi
 
 [ "$(git symbolic-ref --quiet --short HEAD)" = dev ] || refuse "this checkout isn't on dev"
 [ -z "$(git status --porcelain)" ] || refuse "this checkout has uncommitted edits or untracked files"
