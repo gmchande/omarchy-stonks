@@ -37,7 +37,9 @@ function parseSearch(json) {
       longname: Format.fetchedText(quotes[i].longname, Format.MOST_NAME),
       shortname: Format.fetchedText(quotes[i].shortname, Format.MOST_NAME)
     }
-    if (!q.symbol) continue
+    // A symbol holding half of a UTF-16 pair can't go in a URL
+    // (encodeURIComponent throws), and no ticker holds either half.
+    if (!q.symbol || /[\ud800-\udfff]/.test(q.symbol)) continue
     if (q.quoteType && FOLLOWED.indexOf(q.quoteType) < 0) {
       left.push(q)
       continue

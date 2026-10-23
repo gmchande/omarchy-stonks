@@ -72,7 +72,7 @@ function parseHistory(json, range, centExchanges) {
   var bars = []
   for (var i = 0; i < timestamps.length; i++) {
     if (!Format.isMoment(timestamps[i])) return null
-    if (closes[i] === null || closes[i] === undefined) continue
+    if (!Format.isFiniteNumber(closes[i])) continue
     bars.push({ t: timestamps[i], o: opens[i], h: highs[i], l: lows[i], c: closes[i], v: volumes ? volumes[i] : null })
   }
   bars.sort(function (a, b) { return a.t - b.t })

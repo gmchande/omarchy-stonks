@@ -227,20 +227,34 @@ every release bumps it.
    screen, 150 symbols in 12 lists, every kind of listing at its odd hours,
    and every render against the last release's. Fix or file what each
    finds.
-2. Bump `manifest.json`'s version in a release commit on `dev`. When what
+2. Review it as the marketplace will. A reviewer who didn't build them
+   reads every change since the last release that runs a command, reads or
+   writes a file, fetches, or shows fetched text, taking Yahoo's, Robinhood's
+   and GitHub's answers, and other accounts on the computer, as hostile.
+   Every list read from an answer is a real array within a budget, its
+   numbers finite and its strings bounded. Every process has a time limit,
+   and every output kept in the shell a byte cap. No private text goes in a
+   process's arguments, fetched text shows as plain text, and nothing is
+   written where other accounts can read it. "What it runs" and "Files it
+   writes" match the code. Each problem comes with the answer, file or
+   command that shows it, and is fixed before the release.
+3. Bump `manifest.json`'s version in a release commit on `dev`. When what
    the README's pictures show has changed, render them again with
    `test/qml/readme.sh` in that commit.
-3. Run `test/review.sh --fresh` on the release commit, with
+4. Run `test/review.sh --fresh` on the release commit, with
    `STONKS_RENDER_BASE` set to the last release's tag so its render diff
    shows every picture the release moved: the renders, layout, motion,
    the long list, and the README pictures run only there.
    `--fresh` draws every picture rather than reuse a set an earlier run
    kept, since this run has to catch a change from outside the repo. Its
-   last line must be `ALL PASS`.
-4. Fast-forward `main` to it: `git push origin dev:main`.
-5. Tag it (`vX.Y.Z`) and publish release notes, written as Words says.
-6. File the Omarchy plugin marketplace's verify form with `main`'s new
-   commit. Until then the listing says Unverified.
+   last line must be `ALL PASS`. The marketplace's own security scan passes
+   on it with nothing to review.
+5. Fast-forward `main` to it: `git push origin dev:main`.
+6. Tag it (`vX.Y.Z`) and publish release notes, written as Words says.
+7. File the Omarchy plugin marketplace's verify form with `main`'s new
+   commit. Until then the listing says Unverified. Keep `main` still until
+   the marketplace publishes it, and answer its maintainer within seven
+   days.
 
 ## Agents
 
