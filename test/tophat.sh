@@ -157,9 +157,11 @@ shell_json_ok() {
 nested_lua_ok() {
   local tmp out
   tmp=$(mktemp -d) || return 1
+  trap 'rm -rf -- "$tmp"; exit 130' INT TERM
   out=$(env -i HOME="$tmp" XDG_RUNTIME_DIR="$tmp" PATH="$PATH" Hyprland --verify-config -c "$1" 2>&1)
   local code=$?
-  rm -rf "$tmp"
+  trap - INT TERM
+  rm -rf -- "$tmp"
   (( code == 0 )) || { echo "tophat: $1 does not parse: $(tail -n 1 <<< "$out")" >&2; return 1; }
 }
 

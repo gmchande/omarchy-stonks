@@ -8,6 +8,7 @@
 # and none failed.
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
+source "$PWD/test/scratch.sh"
 # A tracked file deleted in this checkout is left out before the count.
 files=()
 while IFS= read -r -d '' file; do

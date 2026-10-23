@@ -13,6 +13,10 @@ export LC_ALL=C.UTF-8
 # code keeps throughout.
 qmllint=${QMLLINT:-/usr/lib/qt6/bin/qmllint}
 lint_flags=(--block-scope-var-declaration disable)
+# Every scratch folder is made in this one, removed by exact path however the
+# run ends, an interrupt included.
+work=$(mktemp -d) || exit 1
+trap 'rm -rf -- "$work"' EXIT
 
 # Warnings outside the house baseline, each file, category, and token with
 # its exact count. Fix one and lower its count here.
@@ -50,7 +54,7 @@ house() { # file id message member
 
 lint() { # file...
   local tmp out code failed=0 shown=0 houses=0
-  tmp=$(mktemp -d)
+  tmp=$(mktemp -d "$work/XXXXXX")
   ln -s /usr/share/omarchy/shell "$tmp/qs"
   out=$("$qmllint" "${lint_flags[@]}" -I "$tmp" --json "$tmp/lint.json" "$@" 2>&1)
   code=$?
@@ -109,7 +113,7 @@ self_check() {
   else
     echo "a missing linter fails the gate"
   fi
-  tmp=$(mktemp -d)
+  tmp=$(mktemp -d "$work/XXXXXX")
   printf '%s\n' 'import QtQuick' '' 'Item {' '  id: root' '  width: undefinedWidth' \
     '  Repeater {' '    model: 1' '    Item { width: root.width }' '  }' '}' > "$tmp/Scratch.qml"
   if out=$(lint "$tmp/Scratch.qml" 2>&1); then

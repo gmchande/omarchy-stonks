@@ -16,7 +16,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/queue.sh"
 # links, so a tracked one still fails.
 validate_clone() {
   local tree code file
-  tree=$(mktemp -d)
+  tree=$(mktemp -d "$logs/clone.XXXXXX")
   git ls-files -z | while IFS= read -r -d '' file; do
     [[ -e $file || -L $file ]] && printf '%s\0' "$file"
   done | tar -c --null -T - | tar -x -C "$tree"
