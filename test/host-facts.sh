@@ -11,7 +11,7 @@
 # the owner copied, and failed a session's stop (the check of #74, 23
 # October). Only a wl-paste whose parent is no watcher counts.
 watchers() {
-  ps -eo pid=,ppid=,comm=,args= | awk '
+  ps -ww -eo pid=,ppid=,comm=,args= | awk '
     $3 == "wl-paste" && index($0, "--watch") { watcher[$1] = $2 }
     END { for (pid in watcher) if (!(watcher[pid] in watcher)) print pid }'
 }

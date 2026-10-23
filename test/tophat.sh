@@ -1195,6 +1195,9 @@ EOF
   watcher; local first=$WATCHER
   within 5 seen_is "$first" || miss "a clipboard watcher should be named by its pid in the facts, got '$(standins_seen)'"
   local before; before=$(standins_seen)
+  # ps cuts its arguments at an exported COLUMNS unless told not to (-ww), and
+  # a watcher without its --watch is no watcher.
+  [ "$(COLUMNS=30 standins_seen)" = "$before" ] || miss "a narrow COLUMNS should not hide a watcher's --watch, got '$(COLUMNS=30 standins_seen)'"
   has_child() { ps -o stat= --ppid "$1" | grep -qv Z; }  # a zombie is gone, but for its parent's wait
   kill -USR1 "$first"
   within 5 has_child "$first" || miss "the stand-in watcher never forked its child"
