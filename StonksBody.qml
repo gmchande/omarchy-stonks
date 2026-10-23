@@ -362,7 +362,6 @@ Item {
   readonly property bool yahooDown: lists.length > 0 && lists[0].symbols.length > 0 && lists[0].symbols.every(function(symbol) {
     return Figures.freshnessWarns(Figures.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0, !!asking[symbol]))
   })
-  readonly property string yahooDownText: "No prices from Yahoo · Stonks keeps trying"
   readonly property var featuredGeometry: motion.geometry
   readonly property real scrubX: motion.scrubX
   readonly property bool dayScrubbed: !historyActive && scrubShown !== 0
@@ -434,36 +433,39 @@ Item {
   readonly property bool offersRetry: headerText === unavailableText
   // The chart asked for, named while it is on its way.
   readonly property string loadingText: "Loading" + (featuredSymbol ? " " + featuredSymbol + (range !== "1D" ? " " + range : "") : "")
-  readonly property string headerText: {
-    if (!service) return headerWhenMissing
+  // The market as the header says it, said in less and less.
+  readonly property var marketForms: featuredQuote ? Market.statusForms(dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars,
+    Overnight.nightTrades(featuredQuote, !!chart && chart.allDay, now, calendars)) : []
+  // The header's words, then the same said in less for a header with no
+  // room for them (`HeaderStatus`), each form shorter than the one before:
+  // Yahoo's trouble without what Stonks does about it, a scrubbed bar's
+  // date without its price, and the market's (`Market.statusForms`).
+  readonly property var headerForms: {
+    if (!service) return [headerWhenMissing]
     // Yahoo is sending nothing for any listing, said once, unless a scrub
     // reads a moment, a refresh you asked for is out, or a range failed,
     // whose header offers its retry.
-    if (yahooDown && !scrubShown && !refreshing && !(historyActive && historyFailed)) return yahooDownText
+    if (yahooDown && !scrubShown && !refreshing && !(historyActive && historyFailed))
+      return ["No prices from Yahoo · Stonks keeps trying", "No prices from Yahoo"]
     // The chart asked for is on its way, named: what was on show stays.
     // Before any chart has been in, the empty hero's label names it alone,
     // in the one place a reader looks (`HeroBand`).
-    if (chartLoading) return chart ? loadingText : ""
+    if (chartLoading) return [chart ? loadingText : ""]
     // A refresh the reader asked for, while what it sent is out, unless a
     // scrub reads a moment: then the header names that.
-    if (refreshing && !scrubShown) return "Refreshing"
+    if (refreshing && !scrubShown) return ["Refreshing"]
     if (failClosedHeader && !featuredQuote && featuredFreshness && featuredFreshness.state === "failed")
-      return "No data"
-    if (historyActive && historyFailed) return unavailableText
+      return ["No data"]
+    if (historyActive && historyFailed) return [unavailableText]
     // A refetch the service asks for itself, out or failed, with the range
     // in hand says nothing: it keeps the chart and the market.
-    if (historyShown && historyBar) return History.historyScrubText(history, historyBar, featuredQuote ? featuredQuote.priceDigits : undefined)
-    if (featuredQuote) return marketText
-    return headerWhenMissing
+    if (historyShown && historyBar) return History.historyScrubForms(history, historyBar, featuredQuote ? featuredQuote.priceDigits : undefined)
+    if (featuredQuote) return marketForms
+    return [headerWhenMissing]
   }
-  // The market as the header says it, and, where it names a holiday, the
-  // same without the name for a header with no room for it
-  // (`Market.shortMarketStatus`); "" while the header says anything else.
-  readonly property var marketSays: featuredQuote ? [dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars,
-    Overnight.nightTrades(featuredQuote, !!chart && chart.allDay, now, calendars)] : null
-  readonly property string marketText: marketSays ? Market.marketStatus.apply(null, marketSays) : ""
-  readonly property string headerShortText: headerText === yahooDownText ? "No prices from Yahoo"
-    : marketSays && headerText === marketText ? Market.shortMarketStatus.apply(null, marketSays) : ""
+  // "" while the market's words, on their way in with a new quote, are not
+  // yet in, as a string property not yet bound reads.
+  readonly property string headerText: headerForms[0] || ""
   // Everything but the rows: margins, header, band, and footer, with the
   // band, the rows, and the footer each one group's gap under what is above.
   readonly property int chromeHeight: chartFitsSurface ? chromeBesideChart + shownChartHeight
@@ -1314,8 +1316,7 @@ Item {
     anchors.right: parent.right
     anchors.top: parent.top
     anchors.margins: root.margins
-    statusText: root.headerText
-    shortText: root.headerShortText
+    statusForms: root.headerForms
     offersRetry: root.offersRetry
     retro: root.retro
     soundsOn: root.soundsOn
@@ -1595,6 +1596,7 @@ Item {
     showsHint: root.hintShown
     ground: root.ground
     label: root.listName !== "" ? "+  Add a symbol to " + root.listName : "+  Add a symbol"
+    labelShort: root.listName !== "" ? "+  Add a symbol" : ""
     acts: root.updateOffered || !root.settingsUnreadable
     onHoveredChanged: root.holdNote()
     undoLabel: root.undoOffered ? "Undo " + root.undoOffered.symbol : ""

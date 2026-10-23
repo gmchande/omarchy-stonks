@@ -402,10 +402,12 @@ function rangeMarks(history, ends, quote) {
   return { high: mark(ends.high), low: mark(ends.low) }
 }
 
-// An intraday bar's date and time read by its own day's clock, so a time
-// across a change of clocks reads as the exchange's clock said then.
-function historyScrubText(history, bar, digits) {
-  if (!history || !bar) return ""
+// A scrubbed bar as the header says it, its date and its price, then its
+// date alone, for a header with no room for both: the hero shows the price
+// large. An intraday bar's date and time read by its own day's clock, so a
+// time across a change of clocks reads as the exchange's clock said then.
+function historyScrubForms(history, bar, digits) {
+  if (!history || !bar) return [""]
   var years = historySpansYears(history)
   var date = historyDateText(history, bar.t, years, history.interval)
   if (history.interval === "1wk") date = "WEEK OF " + date
@@ -413,7 +415,7 @@ function historyScrubText(history, bar, digits) {
     var clock = Quote.clockAt(history, bar.t)
     date += " " + Format.zonedHhmm(bar.t, clock.offset, clock.zone)
   }
-  return date + " · " + Format.money(bar.c, digits)
+  return [date + " · " + Format.money(bar.c, digits), date]
 }
 
 function historyRowModel(history, quote, scrubT) {

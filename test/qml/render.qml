@@ -34,8 +34,14 @@ ShellRoot {
   // its full size, in place of the surface; share-scrub-of-<state>: the
   // same scrubbed to the day's middle print. lit-<state>: the surface after
   // a screenshot, its camera lit; quiet-<state>: with sounds off; both may
-  // lead, quiet- first. <state>-large: at text size 16, <state>-size-N at N
-  // (render.sh), the state as named without it.
+  // lead, quiet- first. <state>-large: the state with the shell's text at
+  // 16 (render.sh), its gaps and icons grown with it, in the everyday frame
+  // (the popup 480 wide, the smallest window 560): narrower than the shell
+  // draws the surface at 16, so a squeeze test, not what a reader sees.
+  // <state>-size-N: the state at text size N in the frame the shell gives
+  // it there, the popup and the smallest window grown with the text, as a
+  // reader sees it. Either way, the state as named without the suffix; the
+  // pill sheet keeps its name and draws its own frame.
   readonly property string asked: Quickshell.env("STONKS_VISUAL_STATE") || "retro"
   readonly property bool quiet: /^quiet-/.test(asked)
   readonly property bool lit: /^(quiet-)?lit-/.test(asked)

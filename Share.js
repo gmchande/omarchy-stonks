@@ -79,7 +79,7 @@ function moment(o) {
   return { t: close ? o.quote.session.regular.end : head ? head.t : 0, close: close, bar: null }
 }
 
-// A range's bar as its scrub names it (`History.historyScrubText`): its
+// A range's bar as its scrub names it (`History.historyScrubForms`): its
 // date, a week's "WEEK OF", and an intraday bar's time, here always with
 // its zone, without the price, which the picture shows large.
 function barDate(history, bar) {

@@ -306,29 +306,31 @@ function holidayName(name) {
 // day the finger is: at the close's own time, the closing bell, when it
 // reads the close (`Quote.readingAt`).
 function marketStatus(quote, now, scrubT, calendars, overnight) {
-  return statusSaying(quote, now, scrubT, calendars, overnight, false)
+  return statusForms(quote, now, scrubT, calendars, overnight)[0]
 }
 
-// The status for a header with no room for the whole of it: a closure's
+// The status, then the same said in less, each form shorter than the one
+// before, for a header with no room for the one before. First a closure's
 // notice without the holiday's name, worded as a weekend's is ("Closed ·
 // opens Tue 09:30"), and a lunch break without its countdown ("Lunch break
-// · reopens 12:30 JST"), which beside the camera Tokyo's no longer fit at
-// every text size; "" for any other status, which has no shorter form.
-function shortMarketStatus(quote, now, scrubT, calendars, overnight) {
-  var short = statusSaying(quote, now, scrubT, calendars, overnight, true)
-  return short !== marketStatus(quote, now, scrubT, calendars, overnight) ? short : ""
-}
-
-// The status, or, `short`, its shorter form.
-function statusSaying(quote, now, scrubT, calendars, overnight, short) {
+// · reopens 12:30 JST"). Then the time alone, with what it is: without the
+// session's name, which the line under the price says whenever an
+// extended price shows, and the day's ("Opens Tue 09:30", "Closed at
+// 16:00"), and a scrub without its moment's name ("At 02:25"); a schedule
+// that has run out says only that. Every form keeps the time, its day, and
+// its zone. Found in the size-16 check: beside the speaker and the camera,
+// after hours lost its time.
+function statusForms(quote, now, scrubT, calendars, overnight) {
   if (scrubT) {
     var read = Quote.readingAt(quote, scrubT)
-    return "At " + printClock(quote, read.t, calendars) + " · " + phaseLabel(read.close ? "closing" : scrubPhase(quote, scrubT))
+    var at = "At " + printClock(quote, read.t, calendars)
+    return [at + " · " + phaseLabel(read.close ? "closing" : scrubPhase(quote, scrubT)), at]
   }
   var cal = calendarFor(calendars, quote)
   var brk = cal ? breakUntil(cal, now) : null
   if (brk) {
-    return "Lunch break · reopens " + calendarClock(cal, brk, quote) + (short ? "" : " · in " + Format.duration(brk - now))
+    var reopens = "reopens " + calendarClock(cal, brk, quote)
+    return ["Lunch break · " + reopens + " · in " + Format.duration(brk - now), "Lunch break · " + reopens, sentence(reopens)]
   }
   // The stand-in reads the hour by the calendar's clock today, not the
   // held answer's, which may be from before a change of clocks. Found in
@@ -346,15 +348,25 @@ function statusSaying(quote, now, scrubT, calendars, overnight, short) {
   // The day's named moments lead while they last, as they do in a scrub.
   if (!closure && bell && bell.bell === "close") {
     var named = phase === "opening" || phase === "lunch" || phase === "power" || phase === "closing"
-    return (named ? phaseLabel(phase) + " · closes in " : "Market closes in ") + Format.duration(bell.seconds)
+    var closes = "closes in " + Format.duration(bell.seconds)
+    return [(named ? phaseLabel(phase) + " · " : "Market ") + closes, sentence(closes)]
   }
-  if (!closure && bell && (phase === "pre" || phase === "overnight")) return phaseLabel(phase) + " · opens in " + Format.duration(bell.seconds)
-  if (!closure && bell) return "Market opens in " + Format.duration(bell.seconds)
+  if (!closure && bell) {
+    var opens = "opens in " + Format.duration(bell.seconds)
+    return [(phase === "pre" || phase === "overnight" ? phaseLabel(phase) + " · " : "Market ") + opens, sentence(opens)]
+  }
   var reg = clockSession(q, now).regular
-  var base = closure ? (short ? phaseLabel("closed") : holidayName(kind.name))
-    : (phase === "post" && reg && now >= reg.end ? phaseLabel(phase) + " · closed at " + printClock(quote, reg.end, calendars)
-      : phaseLabel(phase))
-  return base + (phase === "post" ? "" : scheduleNote(quote, now, calendars))
+  if (!closure && phase === "post" && reg && now >= reg.end) {
+    var closedAt = "closed at " + printClock(quote, reg.end, calendars)
+    return [phaseLabel(phase) + " · " + closedAt, sentence(closedAt)]
+  }
+  var note = phase === "post" ? "" : scheduleNote(quote, now, calendars)
+  var names = closure ? [holidayName(kind.name), phaseLabel("closed")] : [phaseLabel(phase)]
+  return names.map(function(name) { return name + note }).concat(note ? [sentence(note.slice(" · ".length))] : [])
+}
+
+function sentence(words) {
+  return words.charAt(0).toUpperCase() + words.slice(1)
 }
 
 // An index has no pre-market of its own, and Yahoo's periods for it stay

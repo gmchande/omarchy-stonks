@@ -53,7 +53,16 @@ every_state() (
   states="$states popup-notice-file-edited-smooth popup-notice-file-edited-retro popup-notice-file-edited-smooth-large"
   # A removal offered back beside the add, in both looks on both surfaces,
   # and at 16 beside a named list's longer add.
-  states="$states popup-undo-smooth popup-undo-retro window-undo-retro popup-undo-retro-large popup-undo-named-smooth-large"
+  states="$states popup-undo-smooth popup-undo-retro window-undo-retro popup-undo-retro-large popup-undo-named-smooth-large popup-undo-named-retro-large"
+  # The header beside the speaker and the camera at 16, in both looks: after
+  # hours, the pre-market, overnight, Tokyo closed for the night, a holiday
+  # abroad, and a scrub, each whole or said in less with its time kept.
+  for look in smooth retro; do
+    for state in overnight-2026-10-06-1800-nest sweep-2026-10-07-0600-nest sweep-2026-10-07-0100-nest sweep-2026-10-07-0600-7203.t \
+      holiday-tokyo holiday-london overnight-2026-10-07-0100-nest-scrub; do
+      states="$states popup-$state-$look-large"
+    done
+  done
   # Every listing failed, said once in the header, in the popup in both
   # looks and at 16, where the words say less rather than be cut.
   states="$states popup-failed popup-failed-smooth popup-failed-large"

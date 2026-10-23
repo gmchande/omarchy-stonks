@@ -691,8 +691,8 @@ ShellRoot {
       // as of now, not as it was before the key. A scrub's date or a held
       // "Loading" is still not the market.
       harness.check("the replay ends back on the market",
-        body.marketText !== "" && body.headerText === body.marketText && body.featured.priceText === headline,
-        body.headerText + " vs " + body.marketText + "|" + body.featured.priceText)
+        body.marketForms.length > 0 && body.headerText === body.marketForms[0] && body.featured.priceText === headline,
+        body.headerText + " vs " + body.marketForms[0] + "|" + body.featured.priceText)
 
       // NVDA's history never comes. Read straight after the key, before any
       // answer can land: the window names what is coming, and once the

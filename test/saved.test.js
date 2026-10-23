@@ -377,9 +377,9 @@ test("a long chart dates each bar by its own day, on both sides of a change of c
     for (const answer of [weekly, sentAt(weekly, -18000, "EST")]) {
       const history = M.parseHistory(answer, "5Y")
       const bar = iso => history.bars.find(b => b.t === stamped(iso))
-      expect(M.historyScrubText(history, bar("2026-09-07T04:00:00Z"))).toBe("WEEK OF 7 SEP 2026 · 332.27")
-      expect(M.historyScrubText(history, bar("2025-12-01T05:00:00Z"))).toBe("WEEK OF 1 DEC 2025 · 278.78")
-      expect(M.historyScrubText({ ...history, interval: "1mo" }, bar("2026-06-01T04:00:00Z"))).toBe("JUN 2026 · 307.34")
+      expect(M.historyScrubForms(history, bar("2026-09-07T04:00:00Z"))).toEqual(["WEEK OF 7 SEP 2026 · 332.27", "WEEK OF 7 SEP 2026"])
+      expect(M.historyScrubForms(history, bar("2025-12-01T05:00:00Z"))[0]).toBe("WEEK OF 1 DEC 2025 · 278.78")
+      expect(M.historyScrubForms({ ...history, interval: "1mo" }, bar("2026-06-01T04:00:00Z"))[0]).toBe("JUN 2026 · 307.34")
     }
   })
 })
@@ -452,16 +452,16 @@ test("an exchange's time across a change of clocks reads by its own day's clock,
     // New York's own clock is named only to the other readers.
     const edt = reader === "America/New_York" ? "" : " EDT"
     expect(M.freshnessText({ state: "aged", asOf: close }, aapl, calendars)).toBe("AS OF 16:00" + edt)
-    expect(M.historyScrubText(bhp, bhp.bars[0])).toBe("21 SEP 10:00 AEST · 60.56")
-    expect(M.historyScrubText(bhp, bhp.bars[bhp.bars.length - 2])).toBe("20 OCT 16:00 AEDT · 59.50")
+    expect(M.historyScrubForms(bhp, bhp.bars[0])[0]).toBe("21 SEP 10:00 AEST · 60.56")
+    expect(M.historyScrubForms(bhp, bhp.bars[bhp.bars.length - 2])[0]).toBe("20 OCT 16:00 AEDT · 59.50")
     for (const [n, s, v, a, d, m] of [sides.map(side => side[0]), sides.map(side => side[1])]) {
       const month = M.parseHistory(n, "1M")
       const week = M.parseHistory(s, "1W")
       const chicago = M.parseChart(v)
       const otc = M.parseChart(a)
       const nasdaq = M.parseChart(d)
-      expect(M.historyScrubText(month, month.bars[0])).toBe("12 AUG 09:30" + edt + " · 233.17")
-      expect(M.historyScrubText(week, week.bars[0])).toBe("14 OCT 09:00 CEST · 196.32")
+      expect(M.historyScrubForms(month, month.bars[0])[0]).toBe("12 AUG 09:30" + edt + " · 233.17")
+      expect(M.historyScrubForms(week, week.bars[0])[0]).toBe("14 OCT 09:00 CEST · 196.32")
       expect(M.freshnessText({ state: "aged", asOf: chicago.marketTime, earlier: true }, chicago, calendars)).toBe("AS OF TUE 09:35 CDT")
       expect(M.freshnessText({ state: "aged", asOf: otc.marketTime, earlier: true }, otc, calendars)).toBe("AS OF FRI 16:00" + edt)
       const madrid = M.parseChart(m)
@@ -601,6 +601,11 @@ test("marketStatus says whether the market is open, and where the finger is whil
   expect(M.marketStatus(q, reg.start + 2.75 * 3600, 0, calendars)).toBe("Lunch lull · closes in 3h 45m")
   expect(M.marketStatus(q, reg.end - 40 * 60, 0, calendars)).toBe("Power hour · closes in 40m")
   expect(M.marketStatus(q, reg.end - 3 * 60, 0, calendars)).toBe("Closing bell · closes in 3m")
+  // With less room, each says its time alone: the session is named on the
+  // line under the price, and a scrub's moment goes before its time.
+  expect(M.statusForms(quote, quote.session.post.start + 60, 0, calendars)).toEqual(["After hours · closed at 16:00", "Closed at 16:00"])
+  expect(M.statusForms(q, reg.start - 600, 0, calendars)).toEqual(["Pre-market · opens in 10m", "Opens in 10m"])
+  expect(M.statusForms(q, reg.start + 2 * 3600, reg.start + 3600)).toEqual(["At 10:30 · Market open", "At 10:30"])
 })
 
 test("extendedStack labels the print after the bell against the close", () => {
@@ -911,10 +916,10 @@ test("a published closure or a break between segments is closed, whatever Yahoo'
   expect(M.marketStatus(fakeOpen, labor, 0, calendars)).toBe("Labor Day · opens Tue 09:30")
   expect(M.marketStatus(fakeOpen, labor, 0, null)).toBe("Power hour · closes in 1h")
   // Where the header has no room for the holiday's name, it says the
-  // closure as a weekend is said; a status naming no holiday has no
-  // shorter form, but for a lunch break, without its countdown.
-  expect(M.shortMarketStatus(fakeOpen, labor, 0, calendars)).toBe("Closed · opens Tue 09:30")
-  expect(M.shortMarketStatus(fakeOpen, labor, 0, null)).toBe("")
+  // closure as a weekend is said, and with less room still, when it opens:
+  // every form keeps the time.
+  expect(M.statusForms(fakeOpen, labor, 0, calendars)).toEqual(["Labor Day · opens Tue 09:30", "Closed · opens Tue 09:30", "Opens Tue 09:30"])
+  expect(M.statusForms(fakeOpen, labor, 0, null)).toEqual(["Power hour · closes in 1h", "Closes in 1h"])
   // Tokyo's lunch break, from its calendar; the morning trades.
   const jpx = {
     symbol: "7203.T", exchange: "TSE", timezoneName: "Asia/Tokyo", gmtoffset: 32400, crypto: false,
@@ -926,7 +931,10 @@ test("a published closure or a break between segments is closed, whatever Yahoo'
   expect(M.inRegularSession(jpx, 1788836400, calendars)).toBe(false)
   const lunch = M.marketStatus(jpx, 1788836400, 0, calendars)
   expect(lunch).toMatch(/^Lunch break · reopens 12:30( JST)? · in \d+m$/)
-  expect(M.shortMarketStatus(jpx, 1788836400, 0, calendars)).toBe(lunch.replace(/ · in \d+m$/, ""))
+  // A lunch break without its countdown, then when it reopens.
+  const reopens = lunch.replace(/^Lunch break · r(.*) · in \d+m$/, "R$1")
+  expect(M.statusForms(jpx, 1788836400, 0, calendars)).toEqual([lunch, lunch.replace(/ · in \d+m$/, ""), reopens])
+  expect(reopens).toMatch(/^Reopens 12:30( JST)?$/)
 })
 
 test("the bell rings once at a market's open and once at its close, never late, at lunch, on a holiday, or for a coin", () => {
@@ -1336,13 +1344,13 @@ test("a range marks its high and low on its chart, over their bars, with their d
   }
   expect(M.historySpansYears(oneYear)).toBe(false)
   expect(marks(oneYear)).toMatch(/^HIGH [\d.]+ [A-Z]{3} 2026 · LOW [\d.]+ [A-Z]{3} 2026$/)
-  expect(M.historyScrubText(aapl, aapl.bars[0])).toBe("12 SEP 2025 · 234.07")
-  expect(M.historyScrubText(week, week.bars[0])).toBe("4 SEP 09:30 · 213.58")
-  expect(M.historyScrubText({ ...week, interval: "30m" }, week.bars[0])).toBe("4 SEP 09:30 · 213.58")
-  expect(M.historyScrubText(month, month.bars[0])).toBe("12 AUG 09:30 · 233.17")
-  expect(M.historyScrubText({ ...week, interval: "1wk" }, week.bars[0])).toBe("WEEK OF 4 SEP · 213.58")
-  expect(M.historyScrubText({ ...aapl, interval: "1mo" }, aapl.bars[0])).toBe("SEP 2025 · 234.07")
-  expect(M.historyScrubText({ ...aapl, interval: "3mo" }, aapl.bars[0])).toBe("SEP 2025 · 234.07")
+  expect(M.historyScrubForms(aapl, aapl.bars[0])[0]).toBe("12 SEP 2025 · 234.07")
+  expect(M.historyScrubForms(week, week.bars[0])[0]).toBe("4 SEP 09:30 · 213.58")
+  expect(M.historyScrubForms({ ...week, interval: "30m" }, week.bars[0])[0]).toBe("4 SEP 09:30 · 213.58")
+  expect(M.historyScrubForms(month, month.bars[0])[0]).toBe("12 AUG 09:30 · 233.17")
+  expect(M.historyScrubForms({ ...week, interval: "1wk" }, week.bars[0])[0]).toBe("WEEK OF 4 SEP · 213.58")
+  expect(M.historyScrubForms({ ...aapl, interval: "1mo" }, aapl.bars[0])[0]).toBe("SEP 2025 · 234.07")
+  expect(M.historyScrubForms({ ...aapl, interval: "3mo" }, aapl.bars[0])[0]).toBe("SEP 2025 · 234.07")
 })
 
 // A range is fetched each hour and the quote each minute, so a range's last
