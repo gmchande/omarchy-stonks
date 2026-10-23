@@ -819,6 +819,27 @@ test("each symbol is asked for on its own market's clock", () => {
   expect(cadence(null, reg.start + 3600)).toBe(900)
 })
 
+// A quote held from an earlier session describes that session until the
+// new day's answer lands, so at the open it said the market closed and
+// named the next day's open. While the calendar has a segment trading, its
+// session stands in. SHEL.L's answer of Friday 23 October, held to Monday:
+// at 08:00:10 it said "Closed · opens Tue 08:00 GMT". Toyota's the same,
+// its lunch still a break. Found in the strain QA.
+test("a quote held from an earlier session says the calendar's session while it trades", () => {
+  const shel = M.parseChart(fixture("shel-l-2026-10-23-trading.json"))
+  const london = calendars.calendars.LSE
+  const monday = hm => M.marketStatus(shel, M.epochAt(london, "2026-10-26", hm), 0, calendars)
+  expect(monday("07:59")).toBe("Closed · opens Mon 08:00 GMT")
+  expect(monday("08:00")).toBe("Opening bell · closes in 8h 30m")
+  expect(monday("12:00")).toBe("Market closes in 4h 30m")
+  expect(monday("16:40")).toBe("Closed · opens Tue 08:00 GMT")
+  expect(M.marketStatus(shel, M.epochAt(london, "2026-10-24", "10:00"), 0, calendars)).toBe("Weekend · opens Mon 08:00 GMT")
+  const toyota = M.parseChart(fixture("7203-t-2026-10-23-day.json"))
+  const tokyo = hm => M.marketStatus(toyota, M.epochAt(JPX, "2026-10-26", hm), 0, calendars)
+  expect([tokyo("09:00"), tokyo("11:45"), tokyo("13:00")])
+    .toEqual(["Opening bell · closes in 6h 30m", "Lunch break · reopens 12:30 JST · in 45m", "Market closes in 2h 30m"])
+})
+
 test("a published closure or a break between segments is closed, whatever Yahoo's periods say", () => {
   const labor = 1788793200
   const fakeOpen = {
