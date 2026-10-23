@@ -54,8 +54,11 @@ Flickable {
   }
   readonly property int columnWidth: (width - inset - columns.spacing) / 2
   // The key column, as wide as the widest key or gesture, so what each
-  // does keeps the room a popup's half column has.
+  // does keeps the room a popup's half column has. Read, so a new font
+  // measures again: a text size changed while the shell runs left "animal"
+  // running into its words.
   readonly property int keyWidth: {
+    var font = keyMetrics.font
     var widest = 0
     var all = groups.concat(sheet.mouse ? [sheet.mouse] : [])
     for (var g = 0; g < all.length; g++)

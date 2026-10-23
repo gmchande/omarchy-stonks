@@ -1182,6 +1182,29 @@ ShellRoot {
         root.check("in a 720 × 520 window the key sheet shows its credit whole without a scroll",
           creditWhole, creditSaid + " ends at " + creditEnd + " of the sheet's " + sheetHeight)
 
+        // After the text size changes while Stonks runs, every key and
+        // gesture on the key sheet still fits its column. Found in the strain
+        // audit: after `omarchy display text size 16`, "animal" ran into its
+        // words until the shell restarted.
+        var keySizeBefore = Style.fontBaseSize
+        body.showingHelp = true
+        wait(50)
+        Style.fontBaseSize = 16
+        wait(50)
+        var keysOver = []
+        var gatherKeys = function(node) {
+          if (!node || node.visible === false) return
+          if ((node.objectName === "helpKey" || node.objectName === "helpGesture") && Math.ceil(node.implicitWidth) > node.width)
+            keysOver.push(node.text + " " + Math.ceil(node.implicitWidth) + " px in " + node.width)
+          for (var c = 0; c < node.children.length; c++) gatherKeys(node.children[c])
+        }
+        gatherKeys(sheet)
+        Style.fontBaseSize = keySizeBefore
+        body.showingHelp = false
+        wait(50)
+        root.check("after the text size changes, every key and gesture on the key sheet fits its column",
+          keysOver.length === 0, keysOver.join(", "))
+
         // The band lines up with the rows and keeps one rhythm: the range
         // row, the info lines, and the list's header start at the rows' text
         // and end at their figures, the info lines' last column included;
@@ -2531,14 +2554,16 @@ ShellRoot {
 
       function textSizes() {
         stub.now = 0
-        // The popup shows a row on a 768 px screen at every text size Omarchy
-        // offers (`omarchy display text size`, 9 to 20), in both looks: where
-        // the screen would hold no row beside the chart, the chart gives way
-        // to one; where it holds one, the chart keeps its height. The body's
-        // room is what the shell's card leaves it (Ui/PopupCard.qml): the
-        // screen less the bar, the card's margins, padding, and border.
-        // Found in the 1.0.2 leftovers review (O1): from text size 18 on a
-        // short screen the popup showed no row at all.
+        // The popup shows three rows on a 768 px screen at every text size
+        // Omarchy offers (`omarchy display text size`, 9 to 20), in both
+        // looks: where the screen would hold fewer beside the chart, the
+        // chart gives way to them, down to a fifth of itself; where it holds
+        // three, the chart keeps its height. The body's room is what the
+        // shell's card leaves it (Ui/PopupCard.qml): the screen less the
+        // bar, the card's margins, padding, and border. Found in the 1.0.2
+        // leftovers review (O1): from text size 18 on a short screen the
+        // popup showed no row at all; and in the strain audit: given way to
+        // one row, the list menu and search over it showed one line.
         // On Bitcoin's 1Y, whose prices carry commas below the baseline, a
         // mark's words never touch the ink, the line's highest and lowest
         // close or the baseline past them, and a chart at its full height
@@ -2611,7 +2636,7 @@ ShellRoot {
           wait(100)
           var room = 768 - Style.bar.sizeHorizontal - 2 * Style.gapsOut - 2 * Style.spacing.popupPadding - 2 * Math.max(1, Style.space(2))
           var fullChart = body.chartItem.height
-          var rowFitsWhole = body.chromeHeight + body.listRowHeight <= room
+          var rowsFitWhole = body.chromeHeight + body.threeRowsHeight <= room
           ;[false, true].forEach(function(retro) {
             stub.retro = retro
             body.screenRoom = room
@@ -2622,12 +2647,16 @@ ShellRoot {
             var chart = body.chartItem.height
             if (retro === false) shortSeen.push(size + ": " + chart + (chart === fullChart ? "" : " of " + fullChart) + " in " + room)
             // The card stops at the screen's room, the footer riding its
-            // edge: a row is in view when the list holds one and it ends one
-            // gap above the footer there.
+            // edge: rows are in view when they end one gap above the footer
+            // there. Three, or as many as the list holds, unless the chart
+            // has given all the way it may; one at the least.
             var footerTop = Math.min(surface.height, room) - find(body, "footer").height
-            if (!(body.watchlist.height >= body.listRowHeight && yIn(body.watchlist, body.listRowHeight) + body.groupGap <= footerTop))
+            var inView = function(height) { return body.watchlist.height >= height && yIn(body.watchlist, height) + body.groupGap <= footerTop }
+            if (!inView(body.listRowHeight))
               shortFaults.push(where + ": no row in " + room + " px, chart " + chart + ", list " + body.watchlist.height)
-            if (rowFitsWhole && chart !== fullChart) shortFaults.push(where + ": the chart gave way to " + chart + " though " + fullChart + " leaves a row")
+            else if (chart > body.leastScreenChart && !inView(body.wholeRowsHeight(body.threeRowsHeight)))
+              shortFaults.push(where + ": fewer than three rows in " + room + " px, though the chart, " + chart + ", could give way")
+            if (rowsFitWhole && chart !== fullChart) shortFaults.push(where + ": the chart gave way to " + chart + " though " + fullChart + " leaves three rows")
             ;[[coinYear, "1Y"], [coinDay, "first day"]].forEach(function(entry) {
               stub.historyEntry = entry[0]
               wait(50)
@@ -2643,6 +2672,50 @@ ShellRoot {
             })
           })
         }
+        // At text sizes 16 and 20 on an 850 px screen, with 12 lists, the
+        // list menu and search show more than one line, the room of the
+        // three rows the chart gives way to, all of it inside the popup, in
+        // both looks: at 16, two lists above the menu's own two lines, and
+        // four results; at 20, one list above them, and two results. Found
+        // in the strain audit: at 16 each showed one line, scrolling in a
+        // one-line box, and at 20 the menu's "Manage lists…" ran off the
+        // popup's bottom edge.
+        var listsBefore = stub.lists
+        stub.lists = [{ name: "", label: "All", count: stub.symbols.length, symbols: stub.symbols }].concat(
+          Array.from({ length: 12 }, function(_, n) { return { name: "List " + (n + 1), label: "List " + (n + 1), count: 1, symbols: ["MZ"] } }))
+        var viewFaults = []
+        var viewSeen = []
+        ;[[16, 2, 4], [20, 1, 2]].forEach(function(least) {
+          var size = least[0]
+          Style.fontBaseSize = size
+          ;[false, true].forEach(function(retro) {
+            stub.retro = retro
+            var tall = 850 - Style.bar.sizeHorizontal - 2 * Style.gapsOut - 2 * Style.spacing.popupPadding - 2 * Math.max(1, Style.space(2))
+            body.screenRoom = tall
+            surface.budget = tall
+            wait(100)
+            var where = "size " + size + (retro ? " retro" : " smooth")
+            body.openListMenu()
+            wait(100)
+            var menu = find(body, "listMenu")
+            var menuEnd = yIn(menu, menu.height)
+            var edge = Math.min(surface.height, tall)
+            if (menu.rowsShown < least[1]) viewFaults.push(where + ": the list menu shows " + menu.rowsShown + " of 13 lists")
+            if (menuEnd > edge) viewFaults.push(where + ": the list menu ends at " + menuEnd + ", past the popup's " + edge)
+            body.closeListMenu()
+            body.startAdding()
+            wait(100)
+            var results = Math.floor((body.search.resultsHeight + body.search.rowGap) / body.search.rowPitch)
+            if (results < least[2]) viewFaults.push(where + ": search has room for " + results + " results")
+            body.cancelAdding()
+            wait(50)
+            if (!retro) viewSeen.push(size + ": menu " + menu.rowsShown + " lists, search " + results + " results")
+          })
+        })
+        stub.lists = listsBefore
+        console.log("views on an 850 px screen: " + viewSeen.join(", "))
+        root.check("at text sizes 16 and 20 on an 850 px screen, the list menu and search show more than one line, all inside the popup, in both looks",
+          viewFaults.length === 0, viewFaults.join(" | "))
         body.screenRoom = 0
         surface.budget = 730
         stub.retro = false
@@ -2653,7 +2726,7 @@ ShellRoot {
         Style.fontBaseSize = 12
         wait(100)
         console.log("popup charts on a 768 px screen: " + shortSeen.join(", "))
-        root.check("on a 768 px screen at every text size from 9 to 20 the popup shows a row, its chart giving way only where it must, in both looks",
+        root.check("on a 768 px screen at every text size from 9 to 20 the popup shows three rows, its chart giving way to them only where it must and as far as a fifth of itself, in both looks",
           shortFaults.length === 0, shortFaults.join(" | "))
         root.check("on a 768 px screen at every text size from 9 to 20 a range's marks never touch the ink, and a chart at full height shows both, in both looks",
           touched.length === 0, touched.join(" | "))

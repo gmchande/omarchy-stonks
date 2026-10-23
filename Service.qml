@@ -21,6 +21,11 @@ Item {
   // read, and changes still apply to them, but nothing is written until the
   // file reads again, so a typo in it never costs the user's lists.
   property bool settingsUnreadable: false
+  // A change made while the file can't be read: it shows, but only memory
+  // holds it, and the file read again or a restart loses it. The footer
+  // says so, as it does a save that didn't land.
+  property bool editsUnsaved: false
+  onSettingsUnreadableChanged: if (!settingsUnreadable) editsUnsaved = false
   // A save of the data file didn't land: Quickshell said so, or the file,
   // read back, still held what it did before (`takesRead`). The settings in
   // memory stay ahead of the file, and the next save, a change's or the
@@ -1092,8 +1097,13 @@ Item {
 
   // `next`, as `Settings.fileSettings` returns it, in memory and the file.
   function store(next, settles) {
+    var changed = !Settings.settingsEqual(next, root.dataSettings)
     root.dataSettings = next
-    if (!root.pluginsReady || root.settingsUnreadable) return
+    if (!root.pluginsReady) return
+    if (root.settingsUnreadable) {
+      if (changed) root.editsUnsaved = true
+      return
+    }
     if (settles) {
       settleWrite.restart()
       return

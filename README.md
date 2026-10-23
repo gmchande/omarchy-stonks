@@ -293,9 +293,11 @@ price say the same.
 - **The footer says "Couldn't load your lists".** The file holding your
   lists, `~/.config/omarchy/grvc.stonks.json`, can't be opened or isn't
   valid JSON, often after a hand edit. Stonks keeps the lists it has and
-  writes nothing over the file until it can read it again. Fix the file and
-  Stonks reads it as you save, or remove it to start over with the five
-  starter symbols.
+  writes nothing over the file until it can read it again. A change you
+  make meanwhile shows, and the footer says "Your changes aren't saved ·
+  couldn't load your lists": the file read again, or a restart, loses it.
+  Fix the file and Stonks reads it as you save, or remove it to start over
+  with the five starter symbols.
 - **The footer says "Your changes aren't saved".** Stonks couldn't write
   the file holding your lists: the disk is full, or the file or its
   folder, `~/.config/omarchy`, is read-only. Your lists stay as they look

@@ -56,13 +56,16 @@ Item {
   }
   function toneColor(tone) { return tone === "up" ? upColor : tone === "down" ? downColor : foreground }
 
+  // Each width reads the metrics' font, so a new text size measures again.
   readonly property int titleWidth: {
+    var font = metrics.font
     var widest = 0
     for (var t = 0; t < titles.length; t++) widest = Math.max(widest, labelWidth(titles[t]))
     return widest
   }
 
   readonly property var layout: {
+    var font = metrics.font
     var price = 0
     var facts = []
     var widen = function(list) {
