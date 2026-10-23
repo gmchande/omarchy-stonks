@@ -827,11 +827,15 @@ ShellRoot {
       keyClick(Qt.Key_A, Qt.ControlModifier)
       ;["V", "F", "I", "A", "X"].forEach(function(k) { keyClick(k) })
       tryVerify(function() { return body.search.resultsQuery === "VFIAX" }, 3000)
+      // The rows' column lays out on its next polish: positions read before
+      // it are the last answer's.
+      waitForPolish(note.parent)
       var fundAlone = [body.search.results.length, message.visible, note.visible, note.text,
         Math.round(note.mapToItem(resultsView, 0, 0).y)].join(",")
       keyClick(Qt.Key_A, Qt.ControlModifier)
       ;["E", "U", "R", "U", "S", "D"].forEach(function(k) { keyClick(k) })
       tryVerify(function() { return body.search.resultsQuery === "EURUSD" }, 3000)
+      waitForPolish(note.parent)
       var shownRows = findAll(body.search, "searchResult").filter(function(r) { return r.visible })
       var lastRow = shownRows[shownRows.length - 1]
       var under = Math.round(note.mapToItem(lastRow, 0, 0).y - lastRow.height)
