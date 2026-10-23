@@ -333,8 +333,12 @@ ShellRoot {
       keyClick(Qt.Key_R)
       var rAsked = within(2000, function() { return Number(harness.record("OVERNIGHT.calls")) === Number(calls) + 1 })
       var rListings = harness.record("OVERNIGHT.asked").split("\n").filter(function(l) { return l !== "" }).pop()
+      // r's own answers land before the night is read: while one is out the
+      // header says "Refreshing", not the session.
+      var rLanded = within(3000, function() { return !service.refreshing })
       harness.check("r asks Robinhood for the chart on show alone, never the rows",
-        rAsked && body.chartSymbol === "NEST" && rListings === "NEST", harness.record("OVERNIGHT.calls") + " calls, the last for " + rListings)
+        rAsked && rLanded && body.chartSymbol === "NEST" && rListings === "NEST",
+        harness.record("OVERNIGHT.calls") + " calls, the last for " + rListings + (rLanded ? "" : ", still refreshing"))
       calls = harness.record("OVERNIGHT.calls")
 
       // Sunday 22:30, the week's first night, Yahoo's day still Friday's:
