@@ -29,6 +29,7 @@ Item {
   // The file `create` is making, what it will hold, and who hears the end.
   property string creatingPath: ""
   property string creatingText: ""
+  readonly property var creatingEnvironment: ({ STONKS_TEXT: root.creatingText })
   property var creatingDone: null
   property int createdCode: -1
 
@@ -116,7 +117,7 @@ Item {
       + "code=$?\n"
       + "rm -f -- \"$tmp\"\n"
       + "exit $code", "sh", root.creatingPath]
-    environment: ({ STONKS_TEXT: root.creatingText })
+    environment: root.creatingEnvironment
     onExited: function(code) { root.createdCode = code }
     // Heard as it ends, or as it fails to start, which says no exit.
     onRunningChanged: {
