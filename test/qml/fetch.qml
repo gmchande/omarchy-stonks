@@ -1058,6 +1058,17 @@ ShellRoot {
       tryVerify(function() { return harness.listed.every(function(s) { return !!service.quotes[s] }) && idle() }, 10000)
       var bell = 1792762200
       openWindow()
+      // Before the bell, its pre-market begun, the index has no open since
+      // the open, as the stock beside it has none: its answer came after its
+      // next day's pre-market began, its bars still Thursday's.
+      service.persist({ changeMode: "open" })
+      var openLines = []
+      var blank = within(3000, function() {
+        openLines = harness.listed.map(function(s) { return s + " " + app.testBody.watchlist.rowItem(s).view.changeLine })
+        return openLines.join(",") === "AAPL —,^GSPC —"
+      })
+      harness.check("before the bell the index and the stock beside it have no open yet, since the open", blank, openLines.join(", "))
+      service.persist({ changeMode: "pct" })
       tick(bell - service.now, 1)
       var said = []
       var landed = 0

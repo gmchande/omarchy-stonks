@@ -71,8 +71,8 @@ function sparkResults(json) {
 // when the session has opened since the verdict's: only a chart answer,
 // with opens, can say whether that is a stray, or what the open was. The
 // newest bar is never judged, as in the filter.
-function sparkQuote(day, verdict, centExchanges) {
-  var quote = parseChart({ chart: { result: [day] } }, centExchanges)
+function sparkQuote(day, verdict, centExchanges, receivedAt) {
+  var quote = parseChart({ chart: { result: [day] } }, centExchanges, receivedAt)
   if (!quote) return null
   var pts = quote.points
   var tick = answerTick(day.meta, pts.map(function(p) { return { c: p.p } }), centExchanges)
@@ -272,8 +272,9 @@ function answerTick(meta, bars, centExchanges) {
 // lists within MOST_BARS, MOST_DAYS, and MOST_PERIODS, or whose bar times
 // are not moments (`Format.isMoment`) each after the one before, as every
 // saved answer's are: the chart lays its prints out from the first to the
-// last, and one out of order would land off its grid.
-function parseChart(json, centExchanges) {
+// last, and one out of order would land off its grid. `receivedAt`, when
+// given, is when the answer came (`nextDayBegun`).
+function parseChart(json, centExchanges, receivedAt) {
   var result = json && json.chart && json.chart.result && json.chart.result[0]
   if (!result || !result.meta) return null
   var meta = result.meta
@@ -331,6 +332,14 @@ function parseChart(json, centExchanges) {
   var firstRegular = null
   for (var k = 0; regular && !ahead && k < kept.length && !firstRegular; k++)
     if (kept[k].t >= regular.start && kept[k].t < regular.end) firstRegular = kept[k]
+  // Whether an index's answer came once its next day had begun, its bars
+  // still an earlier session's: Yahoo's current period is a later session
+  // than the bars', and the answer came after that period's pre-market
+  // began, else its open. A stock's answer turns to the coming day then,
+  // and has no open until its session's first bar; an index's stays the
+  // last session's until its open (`headlineBase`).
+  var nextDay = !!regular && !!current.regular && current.regular.start > regular.start ? (current.pre || current.regular) : null
+  var nextDayBegun = index && !!nextDay && Format.isFiniteNumber(receivedAt) && receivedAt >= nextDay.start
   var symbol = Format.fetchedText(meta.symbol, Format.MOST_CODE)
   var instrumentType = Format.fetchedText(meta.instrumentType, Format.MOST_CODE)
   return {
@@ -374,6 +383,7 @@ function parseChart(json, centExchanges) {
     fiftyTwoWeekLow: knownPrice(meta.fiftyTwoWeekLow),
     // The start of the session the day's open, high, low, and volume are.
     figuresDay: figuresDay,
+    nextDayBegun: nextDayBegun,
     session: {
       pre: index ? null : periodOf(periods.pre),
       regular: regular,
@@ -563,17 +573,13 @@ function dayBase(quote) {
 
 // What the headline's change is measured from, shaped as `change` reads
 // it: Yahoo's previous close, and the day's open, but none for an index
-// once Yahoo's current period has moved on past its bars (after midnight).
-// An index's bars stay the last session's until the next opens, while a
-// stock's turn to the coming day with its pre-market and have no open yet;
-// a scrub of the index's bars still reads from their open. Found in the
-// daytime QA: before Friday's open the S&P 500 said "−0.41% open",
-// Thursday's, every stock beside it "—".
+// whose answer came once its next day had begun (`nextDayBegun`), as a
+// stock's has none then; a scrub of the index's bars still reads from their
+// open. Found in the daytime QA: before Friday's open the S&P 500 said
+// "−0.41% open", Thursday's, every stock beside it "—"; and in its check,
+// the index said "—" from midnight, the stocks Tuesday's until 04:00.
 function headlineBase(quote) {
-  var reg = quote.session.regular
-  var next = quote.current && quote.current.regular
-  var movedOn = quote.instrumentType === "INDEX" && !!reg && !!next && next.start > reg.start
-  return { prevClose: quote.prevClose, dayOpen: movedOn ? null : quote.dayOpen }
+  return { prevClose: quote.prevClose, dayOpen: quote.nextDayBegun ? null : quote.dayOpen }
 }
 
 // The latest print outside a regular session, the newest print of all

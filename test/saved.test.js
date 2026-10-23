@@ -142,6 +142,11 @@ test("a bar with shares traded in it is a trade, never stray", () => {
   const toy = M.parseChart(fixture("moments/live-2026-10-05/toy.json"))
   const close = M.epochAt(US, "2026-10-02", "15:50")
   expect(toy.points.filter(p => p.t === close || p.t === close + 300).map(p => p.p)).toEqual([320.0400085449219, 320.8299865722656])
+  // From that close, 320.77 at 16:00, Yahoo's 317.05 at 16:05 and 318.57 at
+  // 16:10, no shares, the bar after each opening back at 320.77, are strays:
+  // Robinhood's tape of those minutes has no trade until 319.80 at 16:25, its
+  // price held at 320.77. The filter drew them only while it dropped the climb.
+  expect(toy.droppedTimes).toEqual([close + 900, close + 1200])
 })
 
 test("a young listing's ranges start at its first trade and keep its thin trades, and agree on its high and low", () => {
@@ -1643,17 +1648,25 @@ test("in a session's first minute a quote still the last session's says nothing 
   }
 })
 
-test("before the open an index counts to the bell and has no open yet, as the stocks beside it", () => {
+test("before the open an index counts to the bell, and its open goes when the stocks' does", () => {
   // Friday 23 October, 06:22: the S&P 500's periods are still Thursday's,
   // its current period Friday's; AAPL's day is Friday's already. Found in
   // the daytime QA: "Closed · opens Fri 09:30" and "−0.41% open" for the
   // index, "Pre-market · opens in 3h 11m" and "—" for every stock.
-  const gspc = savedDay("premarket-2026-10-23-0622", "gspc")
-  const aapl = savedDay("premarket-2026-10-23-0622", "aapl")
   const now = at("2026-10-23", "06:20")
+  const read = (set, name, received) => M.parseChart(fixture(`moments/${set}/${name}.json`), cents, received)
+  const gspc = read("premarket-2026-10-23-0622", "gspc", at("2026-10-23", "06:22"))
+  const aapl = read("premarket-2026-10-23-0622", "aapl", at("2026-10-23", "06:22"))
   expect(M.marketStatus(gspc, now, 0, calendars)).toBe("Market opens in 3h 10m")
   expect(M.marketStatus(aapl, now, 0, calendars)).toBe("Pre-market · opens in 3h 10m")
   for (const q of [gspc, aapl]) expect([q.symbol, M.rowModel(q, 0, "open").changeLine]).toEqual([q.symbol, "—"])
+  // At 01:00 the stocks' answers are still Tuesday's, and so is the
+  // index's open, though Yahoo's current period is Wednesday's. Found in
+  // the independent check: the index said "—" from midnight, its stocks
+  // Tuesday's moves since the open.
+  const one = at("2026-10-07", "01:00")
+  const night = ["gspc", "nest", "spy", "kiln"].map(name => read("listings-2026-10-07-0100", name, one))
+  expect(night.map(q => M.rowModel(q, 0, "open").changeLine)).toEqual(["+0.17% open", "+5.33% open", "+0.12% open", "+4.65% open"])
   // A scrub of the index's Thursday still reads from Thursday's open.
   expect(M.rowModel(gspc, at("2026-10-22", "10:30"), "open").changeLine).toBe("\u22120.58% open")
   // Its headline is still Thursday's close and move, as theirs are.
