@@ -48,6 +48,11 @@ building one that won't merge.
   recorded against it (`test/ran.sh`), and neither suite runs a tree that
   already passed, until a package changes; `--again` runs it anyway, as
   when chasing a flaky test.
+- A run's work folders (renders, temporary homes) are on disk, in
+  `~/.cache/stonks-test` (`STONKS_TEST_TMP` names another), never in `/tmp`,
+  which can be a tmpfs in memory. Each run removes the ones it made, however
+  it ends. Only a Quickshell's runtime folder stays in `/tmp`, because its
+  sockets need a short path; it holds links, sockets, and a log.
 - Most harnesses replay saved Yahoo and Robinhood answers, and the rules'
   tests in `test/saved.test.js` read them. They are private: their terms
   don't allow republishing them. On a clone without them, those checks skip,

@@ -18,6 +18,7 @@
 set -uo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "$here/../procs.sh"
+source "$here/../scratch.sh"
 tmp=$(mktemp -d)
 bystander=""
 runs=()

@@ -22,6 +22,7 @@
 set -uo pipefail
 journeys=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 checkout=$(cd "$journeys/../../.." && pwd)
+source "$checkout/test/scratch.sh"
 tophat=$checkout/test/tophat.sh
 tophat_base=${TOPHAT_BASE:-$HOME/Work/temporary/tophat}
 
@@ -67,6 +68,8 @@ journey_begin() {
   commit=$(git -C "$checkout" rev-parse --verify --quiet "$ref^{commit}") || { echo "journey: no such commit: $ref" >&2; exit 2; }
   out=${JOURNEY_OUT:-$tophat_base/journeys/$journey/$(date +%Y%m%d-%H%M%S)-${commit:0:7}}
   mkdir -p "$out" || exit 2
+  # Where the checksum helpers below shoot; gone when the journey ends.
+  shots=$(mktemp -d) || exit 2
   : > "$out/steps.log"
   say "journey $journey on $ref ($commit)"
   say "evidence: $out"
@@ -97,7 +100,7 @@ ours() { [ "${COMMIT:-}" = "$commit" ] && [ "${CHECKOUT:-}" = "$checkout" ]; }
 # gone: two shots of that corner a second apart are the same.
 start_notice_gone() {
   local tmp last="" now end=$((SECONDS + 25)) code=1
-  tmp=$(mktemp -d)
+  tmp=$shots
   while (( SECONDS < end )); do
     "$tophat" shot "$tmp/corner.png" > /dev/null 2>&1 || break
     now=$(magick "$tmp/corner.png" -gravity northeast -crop 600x80+0+0 +repage rgba:- 2> /dev/null | md5sum)
@@ -105,13 +108,13 @@ start_notice_gone() {
     last=$now
     sleep 1
   done
-  rm -rf "$tmp"
   return "$code"
 }
 
 journey_end() {
   local code=$?
   trap - EXIT
+  [ -z "${shots:-}" ] || rm -rf -- "$shots"
   # A journey's own undoing, such as a folder it made read-only.
   declare -F journey_cleanup > /dev/null && journey_cleanup
   "$tophat" sounds > "$out/sounds.log" 2> /dev/null
@@ -255,9 +258,8 @@ open_popup() {
 # they differ from SUM.
 columns_sum() {
   local tmp sum
-  tmp=$(mktemp -d)
+  tmp=$shots
   "$tophat" shot "$tmp/c.png" > /dev/null 2>&1 && sum=$(magick "$tmp/c.png" -crop "$(popup_rect)" +repage rgba:- | md5sum)
-  rm -rf "$tmp"
   echo "${sum:-none}"
 }
 columns_changed() { [ "$(columns_sum)" != "$1" ]; }
@@ -290,7 +292,7 @@ shot() {
 # motion done), or SECONDS (6) pass; a pulsing live dot never settles.
 settle() {
   local end=$((SECONDS + ${1:-6})) last="" now tmp rect
-  tmp=$(mktemp -d)
+  tmp=$shots
   rect=$(popup_rect)
   sleep 0.4
   while (( SECONDS < end )); do
@@ -300,7 +302,6 @@ settle() {
     last=$now
     sleep 0.4
   done
-  rm -rf "$tmp"
 }
 
 # loaded: the chart's data is in: no "Loading" over it, then settled.

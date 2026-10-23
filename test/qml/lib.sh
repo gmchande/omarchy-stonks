@@ -18,6 +18,7 @@ elif ! STONKS_FIXTURES=$("$plugin/test/fixtures-dir.sh" 2>&1); then
   exit 77
 fi
 export STONKS_FIXTURES
+source "$here/../scratch.sh"
 source "$here/quickshell.sh"
 work="$(mktemp -d)"
 # However the run ends, its Quickshell's group and marked processes go first.

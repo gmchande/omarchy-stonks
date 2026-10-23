@@ -31,6 +31,7 @@
 #   test/batch.sh
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
+source "$PWD/test/scratch.sh"
 live="$HOME/.config/omarchy/plugins/grvc.stonks"
 say() { echo "batch: $*"; }
 refuse() { echo "batch: refusing: $*" >&2; exit 1; }
