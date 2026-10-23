@@ -1128,7 +1128,10 @@ ShellRoot {
     // click acts on each as the footer says: none on the file's, a restart
     // on the update's. Over a short list it sits one gap under the rows,
     // the file's notice too, not at the window's bottom. Found in the edge
-    // pass of 15 October: one row, a tall empty space, then the footer.
+    // pass of 15 October: one row, a tall empty space, then the footer. A
+    // change while the file can't be read is said unsaved, and why: found in
+    // the strain audit, such edits looked kept, and the next restart lost
+    // them.
     function noticesInTheWindow(body) {
       app.close()
       app.testWindow.implicitHeight = 760
@@ -1147,6 +1150,16 @@ ShellRoot {
       wait(50)
       harness.check("the window's footer says the data file can't be read, and a click on it does nothing",
         said && !body.adding, text() + "|" + body.adding)
+      var modeBefore = service.changeMode
+      app.testKeyCatcher.forceActiveFocus()
+      keyClick("c")
+      var action = function() { return String(harness.find(footer, "footerAction").text) }
+      var unsaved = within(3000, function() { return text() + action() === "Your changes aren't saved · couldn't load your lists" })
+      mouseClick(footer, footer.width / 2, footer.height / 2)
+      wait(50)
+      harness.check("a change while the data file can't be read applies, the window's footer says it isn't saved and why, a click on it does nothing, and the file is as it was",
+        unsaved && service.changeMode !== modeBefore && !body.adding && harness.readFile(harness.dataPath) === "{\n",
+        text() + action() + "|" + service.changeMode + "|" + body.adding)
       harness.writeFile(harness.dataPath, good)
       harness.check("fixed, the window's footer is the add again",
         within(5000, function() { return text().indexOf("+  Add a symbol") === 0 }), text())

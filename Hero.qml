@@ -67,9 +67,12 @@ Item {
   }
   // The exchange and currency stay whole; the lead, the name last, gives
   // way to them. A name cut short no longer says the currency it ends with.
-  readonly property string listingMeta: view && quote
-    ? " · " + Figures.listingMeta(quote, listingMetrics.advanceWidth(listingLead + " · " + Figures.listingMeta(quote, false)) > listingRoom)
-    : ""
+  readonly property string listingMeta: {
+    var font = listingMetrics.font // read, so a new text size measures again
+    return view && quote
+      ? " · " + Figures.listingMeta(quote, listingMetrics.advanceWidth(listingLead + " · " + Figures.listingMeta(quote, false)) > listingRoom)
+      : ""
+  }
   readonly property real listingRoom: Math.max(0, listingRow.width - symbolText.implicitWidth - Style.space(8))
   readonly property string changeCaption: view && view.periodLabel ? view.periodLabel
     : (extended !== null ? "AT CLOSE" : "")

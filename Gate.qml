@@ -15,7 +15,8 @@ import QtQuick
 // second. Once a pause has run out, one request goes alone, and only its
 // answer reopens the host: each request carries the `ticket` it was let
 // through on, and an answer to one let through before the latest pause
-// began says nothing of the host now.
+// began says nothing of the host now. A reader asking again (`hurry`) ends
+// a pause for no answer at once, never a refusal's.
 Item {
   id: root
 
@@ -107,6 +108,14 @@ Item {
       root.strikes = pause === "none" ? strikes + 1 : 1
       begin("none", Math.min(2 * Math.pow(2, strikes - 1), 60))
     }
+  }
+
+  // A reader asked again, by r or RETRY: the network may be back, so a pause
+  // for no answer at all ends now, and its lone request goes with what was
+  // asked. It had waited up to a minute after the network came back. A
+  // refusal's pause holds: the host asked for fewer requests.
+  function hurry() {
+    if (pause === "none" && !probing && pausedUntil > now()) root.pausedUntil = now()
   }
 
   // A pause of `kind` for about `seconds`, on a new ticket: whatever was let

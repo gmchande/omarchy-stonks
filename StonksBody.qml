@@ -164,36 +164,44 @@ Item {
   // where the body's height is its own (the window).
   property int screenRoom: 0
   // Everything in the popup but its chart, its rows, and the hint: what the
-  // chart and a row share the screen's room with.
+  // chart and the rows share the screen's room with.
   readonly property int chromeBesideScreenChart: margins * 2 + header.height + heroBand.heightBesideChart + footer.barHeight + groupGap * 3
-  // The popup's chart: chartHeight wherever the screen holds a row beside
-  // it; where it wouldn't (large text on a short screen), it gives way to
-  // one row, down to a fifth of itself, which still shows the day's shape:
-  // a row in view matters more than a tall chart. Read from the screen's
-  // room, never the card's, which fits the chart. Found in the 1.0.2
-  // leftovers review (O1): from text size 18 on a short screen the popup
-  // showed no row at all.
+  // The popup's chart: chartHeight wherever the screen holds three rows
+  // beside it; where it wouldn't (large text on a short screen), it gives
+  // way to them, down to a fifth of itself, which still shows the day's
+  // shape: rows in view matter more than a tall chart, and the list menu
+  // and search, which take the rows' room, show three lines too. Read from
+  // the screen's room, never the card's, which fits the chart. Found in the
+  // 1.0.2 leftovers review (O1): from text size 18 on a short screen the
+  // popup showed no row at all; and in the strain audit: given way to one
+  // row, at 16 on an 850 px screen the list menu and search showed one line.
   readonly property int leastScreenChart: Math.round(chartHeight / 5)
   readonly property int screenChartHeight: screenRoom <= 0 ? chartHeight
-    : Math.max(leastScreenChart, Math.min(chartHeight, screenRoom - chromeBesideScreenChart - listRowHeight))
-  // The hint gives way where it would leave no row in sight, after the
-  // chart has: read from the screen's room, never the card's, which fits
-  // what the footer takes. Found in the spacing walk: at text size 16 on
-  // an 850 px screen the popup showed its chrome and hint and not one row.
+    : Math.max(leastScreenChart, Math.min(chartHeight, screenRoom - chromeBesideScreenChart - threeRowsHeight))
+  // The hint gives way where it would leave fewer than three rows in sight,
+  // after the chart has: read from the screen's room, never the card's,
+  // which fits what the footer takes. Found in the spacing walk: at text
+  // size 16 on an 850 px screen the popup showed its chrome and hint and
+  // not one row.
   readonly property bool hintShown: hint !== "" && (screenRoom <= 0
-    || chromeBesideScreenChart + screenChartHeight + footer.hintRoom + listRowHeight <= screenRoom)
+    || chromeBesideScreenChart + screenChartHeight + footer.hintRoom + threeRowsHeight <= screenRoom)
   // A standing word in the footer's place, under a note, until what it says
-  // is fixed: the data file can't be read; a save didn't land, which a
-  // click tries again, ahead of the update, since a restart now would lose
-  // the changes; or an update waits on a shell restart, which a click does.
-  // The save's try again is said whole (`noticeAction`), and where its
-  // words don't fit beside it, as at text size 16 in the popup, they say
-  // less, whole (`noticeShort`), never cut.
-  readonly property string notice: settingsUnreadable ? "Couldn't load your lists"
-    : saveFailed ? "Your changes aren't saved"
+  // is fixed: the data file can't be read, and once a change has been made
+  // meanwhile, that it isn't saved, since only memory holds it; a save
+  // didn't land, which a click tries again, ahead of the update, since a
+  // restart now would lose the changes; or an update waits on a shell
+  // restart, which a click does. Why a change isn't saved is said whole
+  // (`noticeAction`), and where its words don't fit beside that, as at text
+  // size 16 in the popup, they say less, whole (`noticeShort`), never cut.
+  // Found in the strain audit: with the file unreadable, edits looked kept
+  // and were gone at the next restart.
+  readonly property bool unsaved: settingsUnreadable ? editsUnsaved : saveFailed
+  readonly property string notice: unsaved ? "Your changes aren't saved"
+    : settingsUnreadable ? "Couldn't load your lists"
     : updatedTo !== "" ? "Updated to " + updatedTo + " · click to restart the shell" : ""
-  readonly property string noticeAction: !settingsUnreadable && saveFailed ? " · click to try again" : ""
-  readonly property string noticeShort: !settingsUnreadable && saveFailed ? "Not saved" : ""
+  readonly property string noticeAction: !unsaved ? ""
+    : settingsUnreadable ? " · couldn't load your lists" : " · click to try again"
+  readonly property string noticeShort: unsaved ? "Not saved" : ""
   // The note says a newer Stonks is out, said as a surface opens with its
   // footer in sight, once for each answer that names it
   // (`Updates.releaseUnsaid`): a standing notice would take the add's place
@@ -243,6 +251,7 @@ Item {
   property var owed: ({})
   property bool settingsUnreadable: false
   property bool saveFailed: false
+  property bool editsUnsaved: false
   // A refresh the reader asked for has a request out (`Service.refreshing`).
   property bool refreshing: false
   property string updatedTo: ""
@@ -271,6 +280,7 @@ Item {
   Binding on owed { when: root.reading; value: root.service?.owed; restoreMode: Binding.RestoreNone }
   Binding on settingsUnreadable { when: root.reading; value: root.service?.settingsUnreadable; restoreMode: Binding.RestoreNone }
   Binding on saveFailed { when: root.reading; value: root.service?.saveFailed; restoreMode: Binding.RestoreNone }
+  Binding on editsUnsaved { when: root.reading; value: root.service?.editsUnsaved; restoreMode: Binding.RestoreNone }
   Binding on refreshing { when: root.reading; value: root.service?.refreshing; restoreMode: Binding.RestoreNone }
   Binding on updatedTo { when: root.reading; value: root.updates ? root.updates.newVersion : ""; restoreMode: Binding.RestoreNone }
   Binding on now { when: root.reading; value: root.service?.now; restoreMode: Binding.RestoreNone }
@@ -303,6 +313,9 @@ Item {
   readonly property int listRowHeight: Style.space(40)
   readonly property int rowGap: Style.space(2)
   readonly property int rowPitch: listRowHeight + rowGap
+  // The least rows the list keeps in sight beside a chart that gives way,
+  // in the window (`shownChartHeight`) and the popup (`screenChartHeight`).
+  readonly property int threeRowsHeight: 3 * rowPitch - rowGap
 
   // The chart on screen as the motion measures it, and the moment it shows.
   readonly property bool historyActive: motion.historyActive
@@ -445,14 +458,14 @@ Item {
   // fitted to the body, as the popup's is, never passes through it.
   readonly property bool chartFitsSurface: minChartHeight > 0 && minChartHeight < chartHeight
   readonly property int roomBesideChart: height - chromeBesideChart - chartHeight
-  readonly property int shownChartHeight: roomBesideChart < 3 * rowPitch - rowGap
-    ? chartHeight - Math.min(chartHeight - minChartHeight, 3 * rowPitch - rowGap - roomBesideChart)
+  readonly property int shownChartHeight: roomBesideChart < threeRowsHeight
+    ? chartHeight - Math.min(chartHeight - minChartHeight, threeRowsHeight - roomBesideChart)
     : chartHeight + roomBesideChart - rowsHeight(Infinity, roomBesideChart)
   // The shortest the surface may be: its chrome and one row, or, where the
   // chart fits the surface, its chrome at the least chart and three rows.
   // Counted from the rows, not from the chart's give: each size rounds on
   // its own at a larger text size (275 less 170 is not two 53 px rows).
-  readonly property int smallestHeight: chartFitsSurface ? chromeBesideChart + minChartHeight + 3 * rowPitch - rowGap
+  readonly property int smallestHeight: chartFitsSurface ? chromeBesideChart + minChartHeight + threeRowsHeight
     : chromeBesideChart + chartHeight + listRowHeight
   readonly property int helpHeight: margins * 2 + header.height + groupGap + helpSheet.contentHeight
   // Search needs room for the field and a full set of results, never less

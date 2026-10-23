@@ -286,6 +286,8 @@ ShellRoot {
     // A save that didn't land (popup-notice-save-*), said again after a
     // click that still didn't (popup-notice-save-again-*).
     readonly property bool saveFailed: root.stateName.indexOf("popup-notice-save-") === 0
+    // A change made while the file can't be read (popup-notice-file-edited-*).
+    readonly property bool editsUnsaved: root.stateName.indexOf("popup-notice-file-edited-") === 0
     // A refresh the reader asked for, out (popup-refreshing-*).
     readonly property bool refreshing: root.stateName.indexOf("popup-refreshing-") === 0
     // Sounds on, their default, so the header's speaker shows its waves;

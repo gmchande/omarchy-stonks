@@ -21,6 +21,11 @@ Item {
   // read, and changes still apply to them, but nothing is written until the
   // file reads again, so a typo in it never costs the user's lists.
   property bool settingsUnreadable: false
+  // A change made while the file can't be read: it shows, but only memory
+  // holds it, and the file read again or a restart loses it. The footer
+  // says so, as it does a save that didn't land.
+  property bool editsUnsaved: false
+  onSettingsUnreadableChanged: if (!settingsUnreadable) editsUnsaved = false
   // A save of the data file didn't land: Quickshell said so, or the file,
   // read back, still held what it did before (`takesRead`). The settings in
   // memory stay ahead of the file, and the next save, a change's or the
@@ -596,11 +601,14 @@ Item {
   // whose last answer is more than 10 s old, and the overnight prints of
   // the charts on show, unless asked for in the last 10 s, so a second
   // press adds nothing; and the chart's history fresh whatever the cache
-  // holds. While every screen is off the quotes wait their turn, and the
-  // rest is owed (`refreshOwed`) until a screen is on.
+  // holds. A host paused for no answer is tried at once (`Gate.hurry`).
+  // While every screen is off the quotes wait their turn, and the rest is
+  // owed (`refreshOwed`) until a screen is on.
   property bool refreshOwed: false
   function refresh() {
     if (!root.pluginsReady) return
+    yahooGate.hurry()
+    robinhoodGate.hurry()
     var now = root.wallSecond()
     feed.ask(root.watched.filter(function(s) {
       var entry = feed.entries[s]
@@ -1089,8 +1097,13 @@ Item {
 
   // `next`, as `Settings.fileSettings` returns it, in memory and the file.
   function store(next, settles) {
+    var changed = !Settings.settingsEqual(next, root.dataSettings)
     root.dataSettings = next
-    if (!root.pluginsReady || root.settingsUnreadable) return
+    if (!root.pluginsReady) return
+    if (root.settingsUnreadable) {
+      if (changed) root.editsUnsaved = true
+      return
+    }
     if (settles) {
       settleWrite.restart()
       return

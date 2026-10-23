@@ -49,6 +49,8 @@ every_state() (
   # be cut, and the file's notice.
   states="$states popup-notice-save-smooth popup-notice-save-retro popup-notice-save-again-smooth popup-notice-save-again-retro"
   states="$states popup-notice-save-smooth-large popup-notice-save-again-smooth-large popup-notice-file-smooth-large"
+  # A change made while the file can't be read, in both looks and at 16.
+  states="$states popup-notice-file-edited-smooth popup-notice-file-edited-retro popup-notice-file-edited-smooth-large"
   # Hover and held presses formerly judged inside the behavior flows.
   # Each uses real pointer input on the displayed control in both looks.
   for look in smooth retro; do

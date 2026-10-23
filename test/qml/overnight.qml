@@ -1015,6 +1015,21 @@ ShellRoot {
         asked && keptFresh && printsGone && allDayKept && allDayGone,
         [asked, keptFresh, printsGone, allDayKept, allDayGone].join(","))
 
+      // 110 US stocks asked whether Robinhood trades them all day: each is
+      // answered, the last ten too. Robinhood answers 100 results a page and
+      // Stonks read only the first, so the rest said "Closed" all night.
+      useSet("2026-10-07-0100")
+      var hundred = []
+      for (var h = 1; h <= 110; h++) hundred.push("LONG" + ("00" + h).slice(-3))
+      var hundredFrom = harness.record("INSTRUMENTS.asked").split("\n").length
+      service.now += 60
+      allDay.fetch(hundred, service.now)
+      var hundredAnswered = within(5000, function() { return hundred.every(function(s) { return answeredNow(allDay, s) }) })
+      var hundredAsked = harness.record("INSTRUMENTS.asked").split("\n").slice(hundredFrom).map(function(line) { return line.split(",").length })
+      var notAllDay = hundred.filter(function(s) { return !allDay.entries[s] || !allDay.entries[s].allDay })
+      harness.check("110 US stocks asked of Robinhood's instruments, which pages at 100: every one is answered as trading all day",
+        hundredAnswered && notAllDay.length === 0, "requests of " + hundredAsked.join(", ") + "; not all day: " + notAllDay.join(","))
+
       // 80 US stocks Robinhood trades all day, added with the window open:
       // their prints come in requests of at most 25, a third of Robinhood's
       // limit, and every one's night is drawn. Robinhood answered 400 to all
