@@ -96,7 +96,10 @@ building one that won't merge.
   `record` and the rest drive and capture it, and `stop` fails if the run
   put a window on your desktop, crashed, or reached your session. Each
   checkout runs one session at a time, and sessions from different checkouts
-  run side by side. The commands are listed at the top of the file.
+  run side by side. It moves like your desktop: the session takes its
+  animations from Omarchy's look'n'feel files, yours included. Each `start`
+  removes the run folders in `~/Work/temporary/tophat/` that are more than a
+  day old and not in use. The commands are listed at the top of the file.
 - `test/tophat/journeys/` is the feature map: what a user does with each
   feature, and a script that drives it in that session with real keys and
   pointer and keeps what it saw. Run the journeys of the features your
