@@ -1102,7 +1102,15 @@ ShellRoot {
       })
       harness.check("before the bell the index and the stock beside it have no open yet, since the open", blank, openLines.join(", "))
       service.persist({ changeMode: "pct" })
-      tick(bell - service.now, 1)
+      // Before the bell a stock's day is asked for two days, so the chart has
+      // Thursday's session; from the bell, for one. An index's answer stays
+      // Thursday's until the bell, and is asked for one.
+      var dayAsks = function() { return harness.record("days.log").split("\n").filter(function(l) { return l !== "" }) }
+      var firstAsks = dayAsks().length
+      tick(bell - 1 - service.now, 1)
+      var preAsks = dayAsks().slice(firstAsks)
+      var bellAsks = dayAsks().length
+      tick(1, 1)
       var said = []
       var landed = 0
       var from = harness.requests().length
@@ -1118,6 +1126,13 @@ ShellRoot {
         said.length === 0 && landed > 0 && landed <= 30,
         (said.length ? said.slice(0, 4).join(" | ") : "nothing said") + "; landed " + (landed ? landed + " s on" : "never")
           + "; asked " + harness.listed.map(function(s) { return s + " " + asked[s] }).join(", "))
+      var postAsks = dayAsks().slice(bellAsks)
+      var aaplPre = preAsks.filter(function(l) { return / AAPL /.test(l) })
+      harness.check("before the bell AAPL's day is asked for two days, the index's for one; from the bell every day for one",
+        aaplPre.length > 0 && aaplPre.every(function(l) { return / 2d$/.test(l) })
+          && preAsks.filter(function(l) { return /%5EGSPC/.test(l) }).every(function(l) { return / 1d$/.test(l) })
+          && postAsks.length > 0 && postAsks.every(function(l) { return / 1d$/.test(l) }),
+        "before: " + preAsks.join(" / ") + "; after: " + postAsks.join(" / "))
       closeWindow()
       harness.finish()
     }

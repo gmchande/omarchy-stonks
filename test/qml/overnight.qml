@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import "plugin" as Stonks
 import "plugin/Chart.js" as Chart
+import "plugin/Figures.js" as Figures
 import "plugin/Format.js" as Format
 // Overnight prices through the real Service, its feeds, and the App window,
 // on a clock this harness sets, moving forward. The fake curl answers Yahoo
@@ -295,15 +296,16 @@ ShellRoot {
       // said "Weekend" over OVERNIGHT.
       harness.check("Sunday 22:30, its night trading, NEST's header says Overnight, as the line under its price does",
         body.headerText === "Overnight · opens Mon 09:30", body.headerText)
-      // The chart stays on Friday (provisional: Sunday's captures settle
-      // it), Thursday night's prints at its left edge, which a scrub reads,
-      // never the previous close.
+      // The chart stays on Friday, the session the headline is about, with
+      // Thursday night's prints at its left edge, which a scrub reads, never
+      // the previous close, and Sunday night's trades after it, the weekend
+      // taking no room.
       var sundayChart = body.featuredGeometry
       scrubAt(0.03)
       var sundayScrub = body.headerText + " | " + body.featured.priceText
       endScrub()
-      harness.check("on Sunday night the chart is still Friday's, and a scrub at its left edge reads Thursday night's print",
-        sundayChart.start === harness.midnight.fri25 && sundayChart.end === harness.midnight.sat26
+      harness.check("on Sunday night the chart is still Friday's, Sunday night's trades after it, and a scrub at its left edge reads Thursday night's print",
+        sundayChart.start === harness.midnight.fri25 && sundayChart.end >= harness.sunday - 150 * 60 && sundayChart.end <= harness.sunday
           && sundayScrub.indexOf("At 00:") === 0 && sundayScrub.indexOf("Overnight") > 0 && body.featured.priceText === "237.33"
           && sundayScrub.indexOf("| 243.48") < 0 && lastSpan() === "day",
         sundayScrub + " | " + sundayChart.start + " to " + sundayChart.end + ", " + lastSpan())
@@ -579,16 +581,17 @@ ShellRoot {
             && ink.alpha > 0 && ink.alpha < 200 && ink.under === 0 && (retro ? ink.width >= ink.cell : ink.width >= 3 && ink.width <= 6),
           trades.length + " trades | alpha " + ink.alpha + ", " + ink.width + " px wide, " + ink.under + " under it")
         // Four minutes into its bar, a pixel or two at this width: the scrub
-        // lands on the dot and says its time, and its move from Friday's
-        // close, the line under the price's; the legend names both closes.
-        // It read the move from Thursday's close, the dashed line's.
+        // lands on the dot and says its time, and its move from the dashed
+        // line's close, Thursday's, as a print of the day does (the owner,
+        // 23 October); at rest the line under the price measures it from
+        // Friday's close (#46).
         var restLine = harness.strip().split(" ")
         scrubAt(Chart.fractionAtTime(toy, 1791174000 + 240))
         var legend = harness.find(body, "baselineLegend")
         var scrubbed = [body.headerText, body.featured.priceText, body.featured.changeText, legend.visible ? legend.text : ""].join(" | ")
         endScrub()
-        harness.check(look + ": a scrub at TOY's 00:20 dot lands on it, says its time, reads its move from Friday's close as the line under the price does, and the legend says which close each part reads from",
-          scrubbed === ["At 00:20 · Overnight", "322.00", "+0.38%", "┄ PREV CLOSE 323.09 · NIGHT FROM CLOSE 320.77"].join(" | ")
+        harness.check(look + ": a scrub at TOY's 00:20 dot lands on it, says its time, and reads its move from the dashed line's close, which the legend names; at rest the line under the price reads it from Friday's",
+          scrubbed === ["At 00:20 · Overnight", "322.00", "\u22120.34%", "┄ PREV CLOSE 323.09"].join(" | ")
             && restLine.slice(0, 4).join(" ") === "OVERNIGHT 00:20 322.00 " + Format.lookSigns("+0.38%", retro),
           scrubbed + " | at rest " + restLine.join(" "))
         // The left edge and a replay's first moment read Friday's first print,
@@ -673,22 +676,26 @@ ShellRoot {
         held.start + " to " + held.end + ", " + held.points.length + " points | " + harness.strip() + " | " + body.featured.priceText)
       useSet("2026-10-07-0100")
       service.now = 1791349200
-      within(3000, function() { return body.featuredGeometry.start === harness.midnight.wed7 && harness.strip().indexOf("OVERNIGHT 00:") === 0 })
+      within(3000, function() { return body.featuredGeometry.end > harness.midnight.wed7 && harness.strip().indexOf("OVERNIGHT 00:") === 0 })
       var wednesday = body.featuredGeometry
-      harness.check("Wednesday 01:00: the first prints after midnight turn the chart to Wednesday; the headline stays Tuesday's close and day",
-        wednesday.start === harness.midnight.wed7 && wednesday.end === harness.midnight.thu8 && !body.chartLoading
+      harness.check("Wednesday 01:00: the chart stays Tuesday's, the session the headline is about, the night's prints after midnight at its right end",
+        wednesday.start === harness.midnight.tue6 && wednesday.end > harness.midnight.wed7 && !body.chartLoading
           && body.featured.priceText === "249.87" && body.featured.changeText === "+7.44%",
         wednesday.start + " to " + wednesday.end + " | " + body.featured.priceText + " " + body.featured.changeText)
-      // A scrub of the night reads it against Tuesday's close, as the line
-      // under the price does, and names that close.
+      // A scrub of the night reads it against the dashed line, Monday's
+      // close, as a print of the day does, and the bull of Tuesday's +7.44%
+      // stays; at rest the line under the price measures the night from
+      // Tuesday's close.
       var line = harness.strip().split(" ")
       scrubAt(1.003)
       var legend = harness.find(body, "baselineLegend")
       var nightRead = [body.headerText, body.featured.priceText, body.featured.changeText, legend.visible ? legend.text : ""].join(" | ")
+      var nightAnimal = Figures.animalKind(body.featured)
       endScrub()
-      harness.check("a scrub at Wednesday's last print reads its move from Tuesday's close, the line's move",
-        nightRead === ["At " + line[1] + " · Overnight", line[2], line[3], "┄ PREV CLOSE 249.87"].join(" | "),
-        nightRead + " vs " + line.join(" "))
+      harness.check("a scrub at Wednesday's last print reads its move from the dashed line's close, Monday's, and stays a bull; the line under the price reads it from Tuesday's",
+        nightRead === ["At " + line[1] + " · Overnight", line[2], "+6.65%", "┄ PREV CLOSE 232.57"].join(" | ") && nightAnimal === "bull"
+          && line[3] === "\u22120.73%",
+        nightRead + " " + nightAnimal + " vs " + line.join(" "))
       // As an amount, the line under the price says its move as one too, of
       // the same sign; since the open, it is the percent from the close it
       // was. Found in the edge-case pass of 15 October: the hero read
@@ -703,11 +710,11 @@ ShellRoot {
       harness.check("the line under the price follows c: an amount of the same sign as an amount, the percent from the close since the open",
         amountSays === "true,true,true" && harness.strip() === line.join(" "),
         line.join(" ") + " -> " + asAmount.join(" ") + " (" + amountSays + ") -> " + harness.strip())
-      // Since the open, at rest, with the chart on Wednesday, the hero says
-      // what its row says: Tuesday's open to its close.
+      // Since the open, at rest, with Tuesday's chart and its night on show,
+      // the hero says what its row says: Tuesday's open to its close.
       var nestRow = body.watchlist.rowItem("NEST")
-      harness.check("since the open, at rest, with Wednesday's chart on show, the hero's change is Tuesday's, as its row's is",
-        body.featuredGeometry.start === harness.midnight.wed7
+      harness.check("since the open, at rest, with Tuesday's chart and its night on show, the hero's change is Tuesday's, as its row's is",
+        body.featuredGeometry.start === harness.midnight.tue6
           && body.featured.changeText === nestRow.view.changeText && body.featured.changeText !== "+7.44%",
         body.featuredGeometry.start + " | " + body.featured.changeText + " vs " + nestRow.view.changeText)
       // And from the open the info line shows, never from the first bar's
@@ -1118,6 +1125,44 @@ ShellRoot {
       harness.check("a thin US day's three quiet spans each take one scrub step to the next actual print",
         joined.every(function(ok) { return ok }), joined.join(","))
       body.endScrub()
+
+      // Friday 23 October at 06:00, Yahoo's two-day answer holding Thursday
+      // and Friday's pre-market: NVDA's chart is Thursday from midnight, then
+      // the night and the pre-market after it, under Thursday's −4.40%. A
+      // scrub anywhere on it reads from the dashed line, Wednesday's close;
+      // at rest the line under the price measures the pre-market from
+      // Thursday's. Found in the design panel: the night alone, its scrub a
+      // bull under a bear.
+      useSet("night-2026-10-23-0600")
+      service.now = 1792749600
+      service.addSymbol("NVDA")
+      within(8000, function() { return !!service.quotes.NVDA && service.arriving.length === 0 })
+      featureShown("NVDA")
+      var thursdayMidnight = 1792641600
+      within(5000, function() { return body.chartSymbol === "NVDA" && !body.chartLoading && body.featuredGeometry.start === thursdayMidnight
+        && harness.strip().indexOf("PRE-MARKET") === 0 })
+      var nvdaLine = harness.strip().split(" ")
+      var nvdaChart = body.featuredGeometry.start + " | " + body.featured.changeText + " | " + nvdaLine.join(" ")
+      scrubAt(0.35)
+      var nvdaDay = [body.headerText, body.featured.changeText].join(" | ")
+      var thursdayRead = Figures.rowModel(service.quotes.NVDA, body.scrubT, "pct").changeText
+      scrubAt(1.003)
+      var nvdaLegend = harness.find(body, "baselineLegend")
+      var nvdaNight = [body.featured.changeText, nvdaLegend.visible ? nvdaLegend.text : ""].join(" | ")
+      // The rows follow a scrub into the pre-market, which NVDA's quote
+      // holds, its row reading it as the hero does. Found in review: they
+      // stayed on Thursday's close.
+      var rowsAt = body.watchlistScrubShown
+      var rowView = Figures.rowModel(service.quotes.NVDA, rowsAt, service.changeMode)
+      var rowFollows = rowsAt === body.scrubShown && rowsAt >= 1792742400
+        && rowView.priceText === body.featured.priceText && rowView.changeText === body.featured.changeText
+      var rowRead = rowsAt + " vs " + body.scrubShown + ": " + rowView.priceText + " " + rowView.changeText + " vs " + body.featured.priceText + " " + body.featured.changeText
+      endScrub()
+      harness.check("Friday 06:00: NVDA's chart is Thursday, then its night and pre-market, its scrub reading each from the dashed line's close, its row following into the pre-market",
+        body.featuredGeometry.start === thursdayMidnight && body.featured.changeText === "\u22124.40%"
+          && /^At 1\d:\d\d · /.test(nvdaDay) && nvdaDay.split(" | ")[1] === thursdayRead
+          && nvdaNight === "\u22123.97% | ┄ PREV CLOSE 221.97" && nvdaLine[nvdaLine.length - 1] === "+0.44%" && rowFollows,
+        nvdaChart + " || " + nvdaDay + " vs " + thursdayRead + " || " + nvdaNight + " || row " + rowRead)
       // Painted sparse day/3M, one-print and Tokyo lunch states are already
       // in render.qml; no model value can stand in for their rendered ink.
       harness.finish()

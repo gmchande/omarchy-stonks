@@ -11,9 +11,9 @@
 // the day once its quote is in; for a US stock or ETF once Robinhood has said
 // whether it trades it all day too (`allDay`, answers only, a failed one not
 // all-day), and, for one it does, once the overnight feed has answered
-// (`nights`, answers only), when the day is the New York calendar day of its
-// newest print, or Yahoo's day and a thin night after it
-// (`Overnight.dayChart`), and for one it does not, Yahoo's own day
+// (`nights`, answers only), when the day is its last session and what came
+// after it until the next open (`Overnight.dayChart`), and for one it does
+// not, Yahoo's own day and what a two-day answer holds after it
 // (`Overnight.sessionDay`); a range once its history and the symbol's quote
 // are, since the headline is never the last bar. A range takes the day
 // too once it is in, for the night's print under the price, and never waits
@@ -59,14 +59,15 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
 // Normalized [0..1] x/y for drawing. x runs along the day's axis
 // (`chartSpan`): the day the response describes, from the pre-market open so
 // the line arrives at the bell from where it actually came, stretching to
-// hold post-market prints; or, for a US listing, its calendar day or Yahoo's
-// day and a thin night after it (`Overnight.dayChart`), or Yahoo's own day
-// (`Overnight.sessionDay`), laid out by print (`printFraction`). `ticks`
+// hold post-market prints; or, for a US listing, its last session and what
+// came after it until the next open (`Overnight.dayChart`,
+// `Overnight.sessionDay`), laid out by print (`printFraction`). `ticks`
 // mark the bell, and the night's edges.
 // Prints outside a regular session are flagged `ext`; `brk` starts the line
 // again across a break in the exchange's day (Tokyo's lunch, from its
-// calendar in `calendars`: Yahoo sends 09:00 to 15:30 as one session), so no
-// line crosses hours the market was shut. A quiet hour of a US night is no
+// calendar in `calendars`: Yahoo sends 09:00 to 15:30 as one session), and
+// across the hours after a day that take no room (`axis.skip`), so no line
+// crosses hours the market was shut. A quiet hour of a US night is no
 // break: that day is laid out by print, where a quiet hour takes no room, so
 // a gap there would read as missing prices. A thin night's trades
 // (`axis.night`) are each a `dot`, on its own, joined to nothing: laid out
@@ -79,6 +80,7 @@ function chartGeometry(quote, calendars) {
   var axis = chartSpan(quote)
   var reg = quote.session.regular
   var breaks = reg ? Market.sessionBreaks(Market.calendarFor(calendars, quote), reg.start) : []
+  if (axis.skip && axis.skip.to > axis.skip.from) breaks = breaks.concat([{ start: axis.skip.from, end: axis.skip.to }])
   var acrossBreak = function(a, b) {
     return breaks.some(function(gap) { return a <= gap.start && b >= gap.end })
   }
@@ -100,12 +102,14 @@ function chartGeometry(quote, calendars) {
   for (var k = 0; k < pts.length; k++) {
     var session = Quote.pointSession(quote, pts[k])
     var prev = k > 0 ? pts[k - 1] : null
-    var dot = k >= dots
+    // A thin night's own trades are dots; the pre-market after it is a line
+    // again, starting after the last of them.
+    var dot = k >= dots && pts[k].t < axis.night.end
     out.push({
       x: printFraction(quote, axis, k),
       y: 1 - (pts[k].p - lo) / (hi - lo),
       ext: session !== "reg",
-      brk: dot || (!!prev && acrossBreak(prev.t, pts[k].t)),
+      brk: dot || (k > 0 && out[k - 1].dot) || (!!prev && acrossBreak(prev.t, pts[k].t)),
       dot: dot
     })
   }
@@ -125,15 +129,18 @@ function chartGeometry(quote, calendars) {
 
 // The day's axis, where chartGeometry's x runs from and to, without the
 // drawing: a scrub step asks it of every row. `ticks` are the times it marks.
+// A quote with the coming day's pre-market after its day (`Quote.tailStart`)
+// runs on to its newest print, the hours between its day and that
+// pre-market, which nothing trades in, taking no room (`skip`).
 function chartSpan(quote) {
   if (quote.axis) return quote.axis
   var reg = Quote.regularOrPrints(quote)
   var pts = quote.points
-  return {
-    start: Math.min(pts.length ? pts[0].t : reg.start, reg.start),
-    end: Math.max(reg.end, pts.length ? pts[pts.length - 1].t : reg.end),
-    ticks: [reg.end]
-  }
+  var start = Math.min(pts.length ? pts[0].t : reg.start, reg.start)
+  var end = Math.max(reg.end, pts.length ? pts[pts.length - 1].t : reg.end)
+  var tail = Quote.tailStart(quote)
+  if (tail === null) return { start: start, end: end, ticks: [reg.end] }
+  return { start: start, end: end, ticks: [reg.end, tail], skip: end >= tail ? { from: Quote.dayEnd(quote), to: tail } : null }
 }
 
 function axisFraction(axis, t) {
@@ -141,17 +148,17 @@ function axisFraction(axis, t) {
 }
 
 // How much of the axis the clock has run from its start to `t`: all of
-// it, but for the hours between a day's end and the night after it
-// (`axis.dayEnd`, `axis.night`), a weekend's, which take no room.
+// it, but for the hours between a day's end and what trades after it
+// (`axis.skip`), a weekend's, which take no room.
 function clockRoom(axis, t) {
-  var skipped = axis.night ? Format.clamp(t, axis.dayEnd, axis.night.start) - axis.dayEnd : 0
+  var skipped = axis.skip ? Math.max(0, Format.clamp(t, axis.skip.from, axis.skip.to) - axis.skip.from) : 0
   return t - axis.start - skipped
 }
 
 // `clockRoom`'s inverse: the moment `room` along the axis.
 function clockAt(axis, room) {
   var t = axis.start + room
-  return axis.night && t > axis.dayEnd ? t + axis.night.start - axis.dayEnd : t
+  return axis.skip && t > axis.skip.from ? t + Math.max(0, axis.skip.to - axis.skip.from) : t
 }
 
 // A US listing's 1D is laid out by print (`axis.byPrint`), the way

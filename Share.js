@@ -4,7 +4,6 @@
 .import "Format.js" as Format
 .import "History.js" as History
 .import "Market.js" as Market
-.import "Overnight.js" as Overnight
 .import "Quote.js" as Quote
 
 // What the screenshot says: the picture's line of facts, what its change is
@@ -132,20 +131,20 @@ function words(o) {
     }
   } else {
     // What the change on show is measured from: the quote's at rest
-    // (`Quote.headlineBase`), the day's while scrubbed (`Figures.rowModel`),
-    // as after midnight, where the day's chart starts from the close the
-    // quote's change ends on, or before the open (`Quote.dayBase`); a thin
-    // night's trade, from the day's own close.
+    // (`Quote.headlineBase`), and while scrubbed the close the day's dashed
+    // line is at (`Figures.rowModel`), every print of the chart alike.
     var base = o.scrubT ? Figures.scrubbedBase(o.day) : Quote.headlineBase(quote)
-    var close = o.scrubT ? Overnight.nightClose(o.day, o.scrubT) : null
-    out.from = close !== null ? "CLOSE " + Format.money(close, digits)
-      : o.changeMode === "open" ? "OPEN " + Format.money(base.dayOpen, digits)
+    out.from = o.changeMode === "open" ? "OPEN " + Format.money(base.dayOpen, digits)
       : "PREV CLOSE " + Format.money(base.prevClose, digits)
     var pts = o.day.points
     if (pts.length) {
       var axis = Chart.chartSpan(pictureDay(o.day))
-      out.start = local(o.day, axis.byPrint ? pts[0].t : axis.start, o.calendars).clock
-      out.end = local(o.day, pts[pts.length - 1].t, o.calendars).clock
+      var first = local(o.day, axis.byPrint ? pts[0].t : axis.start, o.calendars)
+      var last = local(o.day, pts[pts.length - 1].t, o.calendars)
+      out.start = first.clock
+      // A chart that runs past its day, into the night and the next
+      // morning, names the weekday it ends on.
+      out.end = (last.d !== first.d ? Format.WEEKDAYS[last.weekday].toUpperCase() + " " : "") + last.clock
     }
   }
   // The popup's line under the price, as it shows it: at rest, its tone,

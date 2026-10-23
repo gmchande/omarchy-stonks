@@ -17,6 +17,8 @@ export function requestUrl(raw) {
   const symbol = s => !!s && !/[\s/?&#%]/u.test(s)
   const symbols = s => s.split(',').every(symbol)
   const epoch = s => /^\d+$/.test(s) && Number(s) > 0
+  // A day's answer: one day, or two before a session opens.
+  const days = s => s === '1d' || s === '2d'
   const chart = /^\/v8\/finance\/chart\/([^/]+)$/.exec(u.pathname)
   if (u.hostname === 'raw.githubusercontent.com') {
     if (u.pathname !== '/gmchande/omarchy-stonks/main/manifest.json' || u.search) throw new Error('wrong manifest')
@@ -35,8 +37,8 @@ export function requestUrl(raw) {
         const intervals = {'5d':'15m','1mo':'1h','3mo':'1d','6mo':'1d',ytd:'1d','1y':'1d','2y':'1d','5y':'1wk','10y':'1wk',max:'1mo'}
         if (!(q.range in intervals)) throw new Error('unknown history range')
         parameters({range:q.range,interval:intervals[q.range],events:'div,splits',includeAdjustedClose:'true'})
-      } else parameters({range:'1d',interval:'5m',includePrePost:'true'})
-    } else if (u.pathname === '/v7/finance/spark') parameters({range:'1d',interval:'5m',includePrePost:'true'}, {symbols})
+      } else parameters({interval:'5m',includePrePost:'true'}, {range:days})
+    } else if (u.pathname === '/v7/finance/spark') parameters({interval:'5m',includePrePost:'true'}, {symbols,range:days})
     else if (/^\/ws\/fundamentals-timeseries\/v1\/finance\/timeseries\/[^/]+$/.test(u.pathname)) {
       parameters({type:'trailingMarketCap,trailingPeRatio,trailingDilutedEPS'}, {period1:epoch,period2:epoch})
       if (+q.period2 <= +q.period1) throw new Error('reversed dates')

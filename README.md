@@ -78,10 +78,13 @@ figure, moved with the price since.
 The top line says where the market is, in its own time: counting down to
 the open or the close, after hours, or closed. A smaller line under the
 price shows the pre-market, after-hours, or overnight price. The overnight
-price is for the US stocks and ETFs Robinhood trades overnight. At night, a
-stock that trades only now and then keeps its day on the 1D chart, with the
-night's trades as dots after it, each measured from the last close, as the
-overnight price is.
+price is for the US stocks and ETFs Robinhood trades overnight. Until the
+next session opens, the 1D chart shows the last session, the one the price
+and its move are about, then the night after it and the pre-market.
+Pointing anywhere on it measures that price from the dashed line, the
+close the chart is drawn against; the smaller line measures the overnight
+price from the last close. A stock that trades only now and then shows the
+night's trades as dots.
 
 An old price says "As of" and its time, on its row and above the price.
 Old means more than two minutes behind while its market trades, or saved
@@ -406,7 +409,9 @@ The shell's log the form asks for can name the prices Stonks left out.
 - **Limits:** every request has a time limit and a size cap. Quotes come
   up to 20 listings to a request, so a long list refreshes in a few
   requests a minute, and overnight prices up to 25 for a whole day and 75
-  for the last hour. Stonks fetches each
+  for the last hour. Before a US session opens, from 04:00 New York, and
+  for a listing's first price, Stonks asks for two days of prices in place
+  of one, so the chart has the last session. Stonks fetches each
   listing only as often as its market can move, and leaves a site that
   refuses it alone for a while, as long as it asks up to half an hour. A
   window no screen shows, on another workspace or a screen switched off,

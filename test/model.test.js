@@ -609,23 +609,22 @@ test("membership across several lists", () => {
   expect(M.listReversed(M.withListReversed(library({ list: "My Watchlist" })))).toBe(false)
 })
 
-test("which day the 1D chart shows: the newest print's, or on a closed date the last trading day", () => {
-  const date = newest => M.chartDate(US, newest)
-  // A weekday's first print after midnight begins its day.
-  expect(date(at("2026-10-07", "00:00"))).toBe("2026-10-07")
-  // Until then the chart stays on the day before, so it never stands
-  // empty: Wednesday 00:05, its newest print Tuesday 23:55.
-  expect(date(at("2026-10-06", "23:55"))).toBe("2026-10-06")
-  // A weekend or a holiday shows the last trading day, all day, Sunday
-  // night's session included (provisional): Saturday on Friday's last
-  // print, Sunday 22:25, Thanksgiving's evening, and the night before the
-  // half day after it.
-  expect(date(at("2026-10-09", "19:55"))).toBe("2026-10-09")
-  expect(date(at("2026-10-11", "22:25"))).toBe("2026-10-09")
-  expect(date(at("2026-11-26", "20:30"))).toBe("2026-11-25")
-  expect(date(at("2026-11-26", "23:55"))).toBe("2026-11-25")
-  // Monday's first print after midnight begins Monday.
-  expect(date(at("2026-10-12", "00:05"))).toBe("2026-10-12")
+test("a stock's day is asked for two days from its pre-market until the bell, when Yahoo's day no longer holds the last session", () => {
+  const stock = { symbol: "X", exchange: "NASDAQ", instrumentType: "EQUITY", crypto: false }
+  const two = (q, date, clock) => M.twoDays(q, at(date, clock), calendars)
+  // Friday 23 October: one day through the night, which still holds
+  // Thursday; two from the pre-market's open; one again at the bell.
+  expect(["03:59", "04:00", "06:22", "09:29", "09:30", "20:00"].map(c => two(stock, "2026-10-23", c)))
+    .toEqual([false, true, true, true, false, false])
+  // No session to wait for: a Saturday, Thanksgiving.
+  expect([two(stock, "2026-10-24", "06:00"), two(stock, "2026-11-26", "06:00")]).toEqual([false, false])
+  // An index's answer stays the last session's until its open, a coin's
+  // day never waits, and London has no pre-market to turn at.
+  expect(two({ ...stock, symbol: "^GSPC", exchange: "S&P", instrumentType: "INDEX" }, "2026-10-23", "06:00")).toBe(false)
+  expect(two({ ...stock, symbol: "BTC-USD", exchange: "CRYPTO", instrumentType: "CRYPTOCURRENCY", crypto: true }, "2026-10-23", "06:00")).toBe(false)
+  expect(two({ ...stock, symbol: "SHEL.L", exchange: "LSE" }, "2026-10-23", "06:00")).toBe(false)
+  // A listing not yet answered: its market and hour aren't known.
+  expect(two(null, "2026-10-23", "12:00")).toBe(true)
 })
 
 test("an open surface asks Robinhood again every five minutes of a night, and once after it", () => {
