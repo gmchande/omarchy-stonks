@@ -281,8 +281,8 @@ function lineBars(geometry) {
 // metal bar struck with felt, ringing about half a second: a free bar's
 // modes (1, 2.756, 5.404), the upper ones dying first, and higher bars
 // ringing shorter, as real ones do. Retro's is a pulse blip that falls in
-// the console's volume steps, a tenth of a second. Each sits 11 dB under the
-// add sound, so a sweep's overlapping bars come to about 6 dB under it.
+// the console's volume steps, a tenth of a second. Each sits 8 dB under the
+// add sound, so a sweep's overlapping bars come to about 3 dB under it.
 function chime(retro, bar) {
   return retro ? retroBar(bar) : { samples: smoothBarSamples(bar), gain: 1 }
 }
