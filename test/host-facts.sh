@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The owner-session facts, one per line: a tophat session's stop compares
-# them with its start's (test/tophat.sh), and test/live.sh waits for the
-# restarted shell's to come back.
+# them with its start's (test/tophat.sh), and test/live.sh records them on
+# each side of a restart, which explains a change between the two.
 #
 #   test/host-facts.sh
 echo "clipboard watchers: $(pgrep -f 'wl-paste .*--watch' | sort -n | tr '\n' ' ')"

@@ -20,8 +20,9 @@
 # reverts the revert, then adds its fix. The batch's last lines say so,
 # naming the revert's commit.
 #
-# It pushes only dev, and never with force. It runs the suites while tophat
-# sessions run: only putting a commit live waits for them (test/live.sh).
+# It pushes only dev, and never with force. Tophat sessions run through it,
+# its restart too: a session's stop finds the restart in test/live.sh's
+# records.
 # When the suites passed but the commit didn't go live, it says so, and the
 # next batch puts it live without running them again, since their records
 # cover its tree (test/ran.sh). One batch runs at a time. It refuses when
