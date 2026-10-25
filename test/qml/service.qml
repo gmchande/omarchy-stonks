@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "Settings.js" as Settings
+import "Fundamentals.js" as Fundamentals
 
 // Drives the real Service through migration, persist, and external edits
 // with the fake curl that test/qml/service.sh puts first on PATH, and a data
@@ -490,10 +491,12 @@ ShellRoot {
         harness.check("a failed rate counts as its pair's fetch for the day: no listing asks it again",
           harness.calls("RATE") === 2 && harness.calls("FUNDAMENTALS") === harness.fundamentalsBefore,
           (harness.calls("RATE") - 2) + " rates, " + (harness.calls("FUNDAMENTALS") - harness.fundamentalsBefore) + " fundamentals sent")
-        // The next day the rate answers, and MAPLE.TO's series are still
-        // fresh: the rate is asked alone, by the first listing that wants it.
+        // The next day the rate answers, under Yahoo's short name for the
+        // pair (CAD=X), as it does about half the time, and MAPLE.TO's
+        // series are still fresh: the rate is asked alone, by the first
+        // listing that wants it.
         harness.ageRate()
-        harness.stateThen("rm -f \"$1/RATE.down\"", function() {
+        harness.stateThen("rm -f \"$1/RATE.down\" && touch \"$1/RATE.short\"", function() {
           service.fetchFundamentals("MAPLE.TO")
           harness.go(46)
         })
@@ -504,8 +507,17 @@ ShellRoot {
           back && harness.calls("RATE") === 3 && harness.calls("MAPLE.TO.fundamentals") === 1
             && harness.calls("FUNDAMENTALS") === harness.fundamentalsBefore,
           JSON.stringify({ rates: harness.calls("RATE"), held: service.rates, maple: harness.calls("MAPLE.TO.fundamentals") }))
-        service.addSymbol("SLID")
-        harness.go(47)
+        // 194.60 CAD over 1.48 USD at 1.4004. Found in the independent check
+        // of #87: the short name read as no rate, and Shell lost its P/E.
+        var shown = ["SHOP.TO", "MAPLE.TO"].map(function(s) {
+          return Fundamentals.yearLine(service.quotes[s], service.fundamentals[s].figures, null, service.rates).facts[1].value
+        })
+        harness.check("a rate Yahoo answers under the pair's short name gives the P/E", back && shown.join() === "93.9,93.9",
+          JSON.stringify({ shown: shown, held: service.rates }))
+        harness.stateThen("rm -f \"$1/RATE.short\"", function() {
+          service.addSymbol("SLID")
+          harness.go(47)
+        })
       } else if (harness.step === 47) {
         if (!service.quotes.SLID) {
           if (harness.waited < 5000) return

@@ -809,6 +809,15 @@ test("the 52-week line moves the cap with the price, and divides the price by th
   expect(facts(shopTo.q, shopTo.f, {})).toBe("MKT CAP CAD 304.6B · P/E _")
   expect(facts(shopTo.q, shopTo.f, { USDCAD: { value: null, checkedAt: 0 } })).toBe("MKT CAP CAD 304.6B · P/E _")
   expect([rate("USDCAD"), M.parseRate(fixture("fundamentals/fx-usdgbp.json"), "USDCAD")]).toEqual([1.4004, null])
+  // Yahoo answers a pair from USD under its short name about half the time,
+  // GBP=X for USDGBP=X, at the same rate: Shell keeps its P/E. Found in the
+  // independent check of #87. The short name stands only for a pair from
+  // USD: GBP=X is no answer for EURGBP.
+  const short = pair => M.parseRate(fixture(`fundamentals/fx-${pair.toLowerCase()}-short.json`), pair)
+  expect([short("USDGBP"), short("USDCAD")]).toEqual([0.7477, 1.4004])
+  const shell = listing("shel-l")
+  expect(facts(shell.q, shell.f, { USDGBP: { value: short("USDGBP"), checkedAt: 0 } })).toBe("MKT CAP GBP 223.5B · P/E 11.9")
+  expect(M.parseRate(fixture("fundamentals/fx-usdgbp-short.json"), "EURGBP")).toBeNull()
   // A price in a small unit other than pence, cents of rand against
   // earnings in rand, asks no rate and has no P/E.
   const rand = { ...figures("shop-to-2026-10-25"), eps: { value: 1.48, date: "2026-06-30", currency: "ZAR" } }

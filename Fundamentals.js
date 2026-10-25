@@ -136,10 +136,13 @@ function rateUrl(pair) {
 
 // The rate in a pair's answer: units of the second currency to one of the
 // first. Null unless the answer names that pair and that currency, and the
-// rate is a number above zero.
+// rate is a number above zero. Yahoo answers a pair from USD under either
+// of its names, about half the time the short one: GBP=X for USDGBP=X.
 function parseRate(json, pair) {
   var meta = json && json.chart && json.chart.result && json.chart.result[0] && json.chart.result[0].meta
-  if (!meta || meta.symbol !== pair + "=X" || meta.currency !== pair.slice(3)) return null
+  var into = pair.slice(3)
+  var named = meta && (meta.symbol === pair + "=X" || (pair.slice(0, 3) === "USD" && meta.symbol === into + "=X"))
+  if (!named || meta.currency !== into) return null
   var rate = meta.regularMarketPrice
   return Format.isFiniteNumber(rate) && rate > 0 ? rate : null
 }

@@ -66,7 +66,9 @@
 # exists the closes fail.
 # A rate (USDCAD=X) answers test/fixtures/fundamentals/fx-<pair>.json, or
 # 404 for a pair with none saved, counted in RATE.calls and
-# <PAIR>.rate.calls; while STONKS_FAKE_STATE/RATE.down exists it fails.
+# <PAIR>.rate.calls; while STONKS_FAKE_STATE/RATE.down exists it fails, and
+# while RATE.short exists it answers Yahoo's saved answer under the pair's
+# short name (CAD=X), fx-<pair>-short.json.
 # Robinhood's historicals are counted in OVERNIGHT.calls, the symbols of each
 # request appended to OVERNIGHT.asked, and its span to OVERNIGHT.spans. More
 # than 75 symbols in one request answer 400, as Robinhood does ("No more than
@@ -275,7 +277,7 @@ serve() {
     count "$state/RATE.calls" > /dev/null
     count "$state/$pair.rate.calls" > /dev/null
     [ -e "$state/RATE.down" ] && exit 22
-    file="$fixtures/fundamentals/fx-$(tr 'A-Z' 'a-z' <<< "$pair").json"
+    file="$fixtures/fundamentals/fx-$(tr 'A-Z' 'a-z' <<< "$pair")$([ -e "$state/RATE.short" ] && echo -short).json"
     [ -e "$file" ] || exit 44
     cat "$file"
     exit
