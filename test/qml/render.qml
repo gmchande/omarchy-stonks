@@ -157,6 +157,13 @@ ShellRoot {
   // moments (listings-<date>-<hhmm>), every kind of listing on 1D at rest:
   // NEST, KILN, SPY, BOLT, the S&P 500 (gspc), BTC-USD, SHEL.L, and 7203.T,
   // with Robinhood's saved answers on which it trades all day.
+  // <popup|window>-sweep-<folder>-<symbol>-<look>: any saved moment whose
+  // folder is named for its minute, <word>-<date>-<hhmm> (the weekend
+  // watch's watch-2026-10-24-2238), every listing its folder saved on 1D at
+  // rest, <symbol> named as its answer's file (aapl, shel.l, gspc) and
+  // featured, at the folder's clock, with Robinhood's saved answers on which
+  // it trades all day. render.sh hands over the folder's answers
+  // (STONKS_VISUAL_SAVED), since QML can't list a folder.
   // <popup|window>-sweep-own-<shel.l|7203.t>-<look>: the 7 October 14:55
   // sweep with London before its session, or Tokyo at lunch, from that
   // listing's own saved day, at a clock inside that moment.
@@ -186,6 +193,9 @@ ShellRoot {
     match = /^(?:popup|window)-sweep-(\d{4}-\d\d-\d\d-\d{4})-(nest|kiln|spy|bolt|gspc|btc-usd|shel\.l|7203\.t|shib-usd|ry\.to|brk-a|brk-b)-(smooth|retro)$/.exec(stateName)
     if (match) return { moment: match[1], symbol: match[2] === "gspc" ? "^GSPC" : match[2].toUpperCase(), month: false, scrub: false,
       dated: true, sweep: true }
+    match = /^(?:popup|window)-sweep-([a-z]+-(\d{4}-\d\d-\d\d-\d{4}))-([a-z0-9.^-]+)-(smooth|retro)$/.exec(stateName)
+    if (match) return { moment: match[2], folder: match[1], file: match[3], month: false, scrub: false, dated: true, sweep: true,
+      saved: String(Quickshell.env("STONKS_VISUAL_SAVED") || "").split(" ").filter(function(f) { return f !== "" }) }
     match = /^(?:popup|window)-gaps-(1d|3m)-(smooth|retro)$/.exec(stateName)
     return match ? { moment: "2026-10-21-1006", folder: "gaps-2026-10-21-1006", symbol: "VANE", listed: ["VANE"], month: false,
       quarter: match[1] === "3m", scrub: false, dated: true, sweep: false } : null
@@ -483,29 +493,49 @@ ShellRoot {
       // shows.
       var file = function(s) { return s.toLowerCase().replace(/^\^/, "") }
       var looked = root.overnight.sweep && saved(file("SHIB-USD")) !== ""
-      var listed = root.overnight.listed ? root.overnight.listed
+      // A saved moment's folder names its own listings: each answer's symbol.
+      var named = root.overnight.saved
+        ? root.overnight.saved.map(function(f) { return read(f).chart.result[0].meta.symbol }) : null
+      var featured = named ? named[root.overnight.saved.indexOf(root.overnight.file)] : root.overnight.symbol
+      if (named && !featured) console.log("FAIL no saved answer " + root.overnight.file + ".json in moments/" + folder)
+      var listed = named ? named : root.overnight.listed ? root.overnight.listed
         : looked ? ["NEST", "KILN", "SPY", "BOLT", "^GSPC", "BTC-USD", "SHIB-USD", "SHEL.L", "7203.T", "RY.TO", "BRK-A", "BRK-B"]
         : root.overnight.sweep ? ["NEST", "KILN", "SPY", "BOLT", "^GSPC", "BTC-USD", "SHEL.L", "7203.T"]
         : live ? ["NEST", "EZ", "TOY"] : root.overnight.power ? ["JPM", "PLUG", "AITX", "CKX", "CVR", "LUMN"]
         : root.overnight.dated ? ["NEST"] : ["NEST", "SILK", "REED"]
-      if (looked || root.overnight.power) listed = [root.overnight.symbol].concat(listed.filter(function(s) { return s !== root.overnight.symbol }))
-      // The US listings: Robinhood's word on which it trades all day, saved
-      // with the sweep's moments, and every one at the moments before them.
-      var us = looked ? ["NEST", "KILN", "SPY", "BOLT", "BRK-A", "BRK-B"]
-        : root.overnight.sweep ? ["NEST", "KILN", "SPY", "BOLT"] : listed
-      var tradable = root.overnight.sweep ? Overnight.parseAllDay(read("robinhood-instruments"), us) : root.overnight.power ? {} : null
-      // What a surface opening at the moment holds: Robinhood's span=day
-      // answer.
-      var answer = root.overnight.power ? {} : Overnight.parseOvernight(read("robinhood-day"), us)
+      if (looked || root.overnight.power || named) listed = [featured].concat(listed.filter(function(s) { return s !== featured }))
       var quotes = {}, entries = {}, nights = {}, allDay = {}
       // Read as the feeds read them: the US listings in cents from $1.
       listed.forEach(function(s) {
         quotes[s] = Quote.parseChart(read(file(s)), Market.centExchanges(stub.calendars))
         if (root.overnight.lastTrade) quotes[s] = Object.assign({}, quotes[s], { price: null, marketTime: null })
       })
+      // The US listings: Robinhood's word on which it trades all day, saved
+      // with the sweep's moments, and every one at the moments before them;
+      // at a saved moment's folder, those Stonks asks Robinhood about, in
+      // the order its saved answer was asked in, since an answer's results
+      // pair with the symbols asked by place (Overnight.parseOvernight).
+      var day = named ? saved("robinhood-day") : null
+      var instruments = named ? saved("robinhood-instruments") : null
+      var asked = day ? JSON.parse(day).results.map(function(r) { return r.symbol }) : []
+      var place = function(s) { var i = asked.indexOf(Overnight.robinhoodSymbol(s)); return i < 0 ? asked.length : i }
+      var us = named ? listed.filter(function(s) { return Overnight.hasOvernight(quotes[s], stub.calendars) })
+          .sort(function(a, b) { return place(a) - place(b) })
+        : looked ? ["NEST", "KILN", "SPY", "BOLT", "BRK-A", "BRK-B"]
+        : root.overnight.sweep ? ["NEST", "KILN", "SPY", "BOLT"] : listed
+      // A saved moment missing either of Robinhood's answers, a fetch that
+      // failed, replays as Stonks stands without it: no word on all-day
+      // trading, or no night's prints.
+      var tradable = named ? (instruments ? Overnight.parseAllDay(JSON.parse(instruments), us) : null)
+        : root.overnight.sweep ? Overnight.parseAllDay(read("robinhood-instruments"), us) : root.overnight.power ? {} : null
+      // What a surface opening at the moment holds: Robinhood's span=day
+      // answer.
+      var answer = named ? (day ? Overnight.parseOvernight(JSON.parse(day), us) : null)
+        : root.overnight.power ? {} : Overnight.parseOvernight(read("robinhood-day"), us)
       us.forEach(function(s) {
+        if (named && !tradable) return
         allDay[s] = { status: "ok", allDay: tradable ? tradable[s] : true, at: 0 }
-        if (allDay[s].allDay) nights[s] = Object.assign({ status: "ok" }, answer[s])
+        if (allDay[s].allDay && (answer || !named)) nights[s] = Object.assign({ status: "ok" }, answer[s])
       })
       // The moment each was saved at: Friday 2 October 13:42, Thursday
       // 1 October 23:00, Sunday 27 September 22:30, Monday 5 October 00:36;
@@ -533,7 +563,7 @@ ShellRoot {
       stub.nights = nights
       stub.allDay = allDay
       stub.order = "manual"
-      stub.featuredSymbol = root.overnight.symbol
+      stub.featuredSymbol = featured
       return
     }
 
