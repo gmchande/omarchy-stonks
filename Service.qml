@@ -205,6 +205,8 @@ Item {
   Timer { id: graceTimer; onTriggered: root.trackAsks() }
   readonly property var histories: historyFeed.entries
   readonly property var fundamentals: fundamentalsFeed.entries
+  // The rates P/Es need, by currency pair (`FundamentalsFeed.rates`).
+  readonly property var rates: fundamentalsFeed.rates
   readonly property var shown: view.shown
   // Every US stock and ETF, by its quote (`Overnight.hasOvernight`), never by
   // what Robinhood answers: Robinhood is asked whether it trades each all day.
@@ -940,7 +942,7 @@ Item {
       return
     }
     root.pendingFundamentals = ""
-    if (Fundamentals.hasFundamentals(quote)) fundamentalsFeed.fetch(normalized)
+    if (Fundamentals.hasFundamentals(quote)) fundamentalsFeed.fetch(normalized, quote.currency)
   }
 
   // A quote that changed, by an answer, a restore, or a symbol leaving,

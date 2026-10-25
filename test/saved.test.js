@@ -728,83 +728,118 @@ test("the day line is 1D, or its figures' weekday when they are not today's: its
 
 })
 
-// Saved answers from 1 October 2026 (2 October in Tokyo and London): the
-// snapshots, then the daily bars around their dates.
+// Saved answers from Sunday 25 October 2026, prices Friday's: the series,
+// the daily bars around the cap's date, the day, and Yahoo's rates.
+// NEST's, SPY's, and BTC-USD's are from 1 October.
 const fundamentals = name => M.parseFundamentals(fixture(`fundamentals/${name}.json`))
-const figures = name => M.withSnapshotCloses(fundamentals(name), fixture(`fundamentals/${name}-closes.json`))
+const figures = name => {
+  const read = fundamentals(name)
+  return read.cap ? M.withCapClose(read, fixture(`fundamentals/${name}-closes.json`)) : read
+}
+const rate = pair => M.parseRate(fixture(`fundamentals/fx-${pair.toLowerCase()}.json`), pair)
+// Yahoo's saved rates as the feed keeps them, by pair.
+const rates = Object.fromEntries(["USDCAD", "USDGBP", "USDAUD"].map(pair => [pair, { value: rate(pair), checkedAt: 0 }]))
+// A listing's figures as the feed keeps them, the pair its P/E needs, and
+// its Friday day.
+const listing = name => {
+  const q = M.parseChart(fixture(`fundamentals/${name}-2026-10-25-day.json`))
+  const f = figures(`${name}-2026-10-25`)
+  return { q, f, pair: M.ratePair(f, q.currency) }
+}
 
-test("Yahoo's latest cap and P/E each come with their own date's close", () => {
+test("Yahoo's cap is the newer of its own snapshot and the quarter's end, with that date's close, beside the latest EPS", () => {
   const cap = (value, date, currency, close) => ({ value, date, currency, close })
-  // NEST's last P/E, 74.6 on 11 August, is still in the answer, but its
-  // latest trailing diluted EPS is a loss, so it has none.
-  expect(fixture("fundamentals/nest.json").timeseries.result.some(r => r.trailingPeRatio)).toBe(true)
-  expect(figures("nest")).toEqual({ cap: cap(61605110950, "2026-09-23", "USD", 226.61000061035156), pe: null })
-  // AAPL's P/E is older than its cap, and each takes its own date's close.
-  expect(figures("aapl")).toEqual({ cap: cap(4918530543600, "2026-09-23", "USD", 337.0199890136719),
-    pe: { value: 38.646789, date: "2026-09-17", close: 337 } })
-  // A Toronto and a Tokyo listing: caps in the listing's currency.
-  expect(figures("shop-to")).toEqual({ cap: cap(257625581988, "2026-09-23", "CAD", 200.4600067138672),
-    pe: { value: 96.513335, date: "2026-09-23", close: 200.4600067138672 } })
-  expect(figures("7203-t")).toEqual({ cap: cap(35821546821500, "2026-09-18", "JPY", 3025),
-    pe: { value: 8.608913, date: "2026-09-18", close: 3025 } })
-  // London's cap is in pounds; its prices are in pence.
-  expect(figures("shel-l")).toEqual({ cap: cap(204282006647, "2026-09-23", "GBP", 3580),
-    pe: { value: 10.567418, date: "2026-09-23", close: 3580 } })
-  // An ETF and a cryptocurrency: every series empty, so no closes to ask for.
+  const eps = (value, currency) => ({ value, date: "2026-06-30", currency })
+  const own = name => M.latestSnapshot(fixture(`fundamentals/${name}-2026-10-25.json`).timeseries.result, "trailingMarketCap").date
+  // AAPL's own snapshot, 17 September, is newer than the quarter's end.
+  expect(figures("aapl-2026-10-25")).toEqual({ cap: cap(4918238660000, "2026-09-17", "USD", 337), eps: eps(8.72, "USD") })
+  // PIER's own is a year old: the quarter's end, 30 June, takes its place.
+  expect(own("pier")).toBe("2025-10-02")
+  expect(figures("pier-2026-10-25")).toEqual({ cap: cap(896414500, "2026-06-30", "USD", 38.88999938964844), eps: eps(2.94, "USD") })
+  // The cap in the listing's currency, the EPS in the one it reports in:
+  // Shopify and Shell report in dollars, Shell's cap in pounds while its
+  // prices are in pence.
+  expect(own("shop-to")).toBe("2025-10-03")
+  expect(figures("shop-to-2026-10-25")).toEqual({ cap: cap(209197184573, "2026-06-30", "CAD", 162.25999450683594), eps: eps(1.48, "USD") })
+  expect(figures("shel-l-2026-10-25")).toEqual({ cap: cap(162552239092, "2026-06-30", "GBP", 2933), eps: eps(4.52, "USD") })
+  expect(figures("7203-t-2026-10-25")).toEqual({ cap: cap(36316507956160, "2026-07-31", "JPY", 3067), eps: eps(351.38, "JPY") })
+  // ORE.AX reports half-yearly: no quarter's end, its own snapshot alone.
+  expect(figures("ore-ax-2026-10-25")).toEqual({ cap: cap(306416424997, "2026-07-31", "AUD", 60.310001373291016), eps: eps(1.932, "USD") })
+  // NEST's latest trailing diluted EPS is a loss, so it has none.
+  expect(figures("nest").eps).toBeNull()
+  // An ETF and a cryptocurrency: every series empty, so no close to ask for.
   for (const name of ["spy", "btc-usd"]) {
-    expect(fundamentals(name)).toEqual({ cap: null, pe: null })
-    expect(M.snapshotClosesUrl(name.toUpperCase(), fundamentals(name))).toBeNull()
+    expect(fundamentals(name)).toEqual({ cap: null, eps: null })
+    expect(M.capCloseUrl(name.toUpperCase(), fundamentals(name))).toBeNull()
   }
   // An answer that is not a timeseries, closes that are not a chart, or a
-  // chart without a snapshot's close is no answer: the feed keeps the
-  // figures it had.
+  // chart without the cap's close is no answer: the feed keeps the figures
+  // it had.
   expect(M.parseFundamentals({ finance: { error: "Too Many Requests" } })).toBeNull()
-  expect(M.withSnapshotCloses(fundamentals("aapl"), null)).toBeNull()
-  expect(M.withSnapshotCloses(fundamentals("aapl"), { chart: { result: [{ meta: { gmtoffset: -14400 } }] } })).toBeNull()
+  expect(M.withCapClose(fundamentals("aapl-2026-10-25"), null)).toBeNull()
+  expect(M.withCapClose(fundamentals("aapl-2026-10-25"), { chart: { result: [{ meta: { gmtoffset: -14400 } }] } })).toBeNull()
   // Only an equity is asked.
   expect([quote, shop, btc].map(M.hasFundamentals)).toEqual([true, true, false])
   expect(M.hasFundamentals(M.parseChart(fixture("spy-2026-09-11-day-prepost.json")))).toBe(false)
   expect(M.hasFundamentals({ ...quote, symbol: "^GSPC", instrumentType: "INDEX" })).toBe(false)
 })
 
-test("the 52-week line moves Yahoo's cap and P/E with the price, and leaves out what is not known", () => {
-  // A quote at `price`, stamped `days` after `date`'s 20:00 UTC.
+// The research of 25 October read Yahoo's own live figures for these: each
+// cap within 3% of Yahoo's, each P/E within 4%.
+test("the 52-week line moves the cap with the price, and divides the price by the EPS in the price's currency", () => {
+  const year = (q, f, held = rates) => said(M.yearLine(q, f, null, held))
+  const facts = (q, f, held) => year(q, f, held).split(" · ").slice(2).join(" · ")
+  const read = name => facts(listing(name).q, listing(name).f)
+  expect(read("aapl")).toBe("MKT CAP USD 5.07T · P/E 39.9")
+  expect(read("pier")).toBe("MKT CAP USD 1.1B · P/E 15.5")
+  expect(read("7203-t")).toBe("MKT CAP JPY 36.77T · P/E 8.8")
+  // Earnings in dollars, at Yahoo's rate: 236.24 / (1.48 × 1.4004) is 114.0,
+  // and from 100 a P/E has no decimals.
+  expect(listing("shop-to").pair).toBe("USDCAD")
+  expect(read("shop-to")).toBe("MKT CAP CAD 304.6B · P/E 114")
+  // London's price in pence over earnings in pounds: 40.33 / (4.52 × 0.7477).
+  expect(listing("shel-l").pair).toBe("USDGBP")
+  expect(read("shel-l")).toBe("MKT CAP GBP 223.5B · P/E 11.9")
+  expect(listing("ore-ax").pair).toBe("USDAUD")
+  expect(read("ore-ax")).toBe("MKT CAP AUD 279.7B · P/E 20.1")
+  // Without its pair's rate, or after the rate failed, a P/E is left out,
+  // never shown in the wrong currency; the cap still shows. A rate answer
+  // for another pair is no rate.
+  const shopTo = listing("shop-to")
+  expect(facts(shopTo.q, shopTo.f, {})).toBe("MKT CAP CAD 304.6B · P/E _")
+  expect(facts(shopTo.q, shopTo.f, { USDCAD: { value: null, checkedAt: 0 } })).toBe("MKT CAP CAD 304.6B · P/E _")
+  expect([rate("USDCAD"), M.parseRate(fixture("fundamentals/fx-usdgbp.json"), "USDCAD")]).toEqual([1.4004, null])
+  // Yahoo answers a pair from USD under its short name about half the time,
+  // GBP=X for USDGBP=X, at the same rate: Shell keeps its P/E. Found in the
+  // independent check of #87. The short name stands only for a pair from
+  // USD: GBP=X is no answer for EURGBP.
+  const short = pair => M.parseRate(fixture(`fundamentals/fx-${pair.toLowerCase()}-short.json`), pair)
+  expect([short("USDGBP"), short("USDCAD")]).toEqual([0.7477, 1.4004])
+  const shell = listing("shel-l")
+  expect(facts(shell.q, shell.f, { USDGBP: { value: short("USDGBP"), checkedAt: 0 } })).toBe("MKT CAP GBP 223.5B · P/E 11.9")
+  expect(M.parseRate(fixture("fundamentals/fx-usdgbp-short.json"), "EURGBP")).toBeNull()
+  // A price in a small unit other than pence, cents of rand against
+  // earnings in rand, asks no rate and has no P/E.
+  const rand = { ...figures("shop-to-2026-10-25"), eps: { value: 1.48, date: "2026-06-30", currency: "ZAR" } }
+  expect(M.ratePair(rand, "ZAc")).toBe("")
+  expect(facts({ ...shopTo.q, currency: "ZAc" }, rand)).toBe("MKT CAP CAD 304.6B · P/E _")
+  // A quote at `price`, stamped `days` after `date`'s 20:00 UTC: the cap
+  // and the P/E follow the price.
   const at = (q, price, date, days = 0) => ({ ...q, price, marketTime: M.dateEpoch(date) + days * DAY + 20 * 3600 })
-  const aapl = figures("aapl")
-  const year = (q, f) => said(M.yearLine(q, f))
-  // At the snapshot's own close the figures are Yahoo's; 10% up moves both
-  // 10%. Every cap names its currency: Tokyo's read "33.82T", yen that read
-  // as dollars beside a US cap.
-  expect(year(at(quote, 337.02, "2026-09-23"), aapl)).toBe("52W · 225.95–344.57 @337.02 · MKT CAP USD 4.92T · P/E 38.6")
-  expect(year(at(quote, 370.72, "2026-10-01"), aapl)).toBe("52W · 225.95–344.57 @370.72 · MKT CAP USD 5.41T · P/E 42.5")
+  const pier = listing("pier")
+  expect(facts(at(pier.q, 38.89, "2026-06-30"), pier.f)).toBe("MKT CAP USD 896.4M · P/E 13.2")
+  expect(facts(at(pier.q, 91.26, "2026-10-23"), pier.f)).toBe("MKT CAP USD 2.1B · P/E 31.0")
+  // A cap 200 days old still moves with the price; at 201 it is left out.
+  expect(facts(at(pier.q, 38.89, "2026-06-30", 200), pier.f)).toBe("MKT CAP USD 896.4M · P/E 13.2")
+  expect(facts(at(pier.q, 38.89, "2026-06-30", 201), pier.f)).toBe("MKT CAP _ · P/E 13.2")
+  // After a loss there is no P/E.
   const nest = M.parseChart(fixture("nest-2026-09-11-day-prepost.json"))
   expect(year(at(nest, 226.61, "2026-09-23"), figures("nest"))).toBe("52W · 73.52–299.86 @226.61 · MKT CAP USD 61.6B · P/E _")
-  expect(year(at(shop, 200.46, "2026-09-23"), figures("shop-to"))).toBe("52W · 129.01–253.10 @200.46 · MKT CAP CAD 257.6B · P/E 96.5")
-  // Tokyo's day, a week and more after its snapshots.
-  expect(year(M.parseChart(fixture("7203-t-day.json")), figures("7203-t"))).toBe("52W · 2,686.00–4,000.00 @2,856.00 · MKT CAP JPY 33.82T · P/E 8.1")
-  // London before its session: the cap names its pounds against the
-  // price's pence, and the zeros Yahoo sends then for the day's high and
-  // low and the 52-week low are prices not known yet, left out of both lines.
-  const london = fixture("shel-l-day.json")
-  const meta = london.chart.result[0].meta
-  expect([meta.regularMarketDayHigh, meta.regularMarketDayLow, meta.fiftyTwoWeekLow]).toEqual([0, 0, 0])
-  const shell = M.parseChart(london)
-  expect(shell.currency).toBe("GBp")
-  // Its figures are the coming session's, Friday's, so before it opens the
-  // line names no other day.
-  expect(said(dayLineAt(shell, M.epochAt(calendars.calendars.LSE, "2026-10-02", "07:30")))).toBe("1D · ?–? @3,589.00 · OPEN _ · VOL 4K")
-  expect(year(shell, figures("shel-l"))).toBe("52W · ?–? @3,589.00 · MKT CAP GBP 204.8B · P/E 10.6")
-  // A cap 120 days old still moves with the price; at 121 it is left out.
-  expect(year(at(quote, 337.02, "2026-09-23", 120), aapl)).toBe("52W · 225.95–344.57 @337.02 · MKT CAP USD 4.92T · P/E 38.6")
-  expect(year(at(quote, 337.02, "2026-09-23", 121), aapl)).toBe("52W · 225.95–344.57 @337.02 · MKT CAP _ · P/E 38.6")
-  // From 100 a P/E has no decimals.
-  expect(year(at(quote, 337, "2026-09-17"), { cap: null, pe: { value: 891.6, date: "2026-09-17", close: 337 } }))
-    .toBe("52W · 225.95–344.57 @337.00 · MKT CAP _ · P/E 892")
   // An ETF and a cryptocurrency have their 52-week range only, and no slot
   // for a cap or a P/E they never have.
   expect(year(M.parseChart(fixture("spy-2026-09-11-day-prepost.json")), null)).toBe("52W · 629.28–779.37 @764.29")
   expect(year(btc, null)).toBe("52W · 57,748–126,198 @77,152")
-  expect(M.yearLine(null, aapl)).toBeNull()
+  expect(M.yearLine(null, pier.f)).toBeNull()
 })
 
 // Yahoo's 52-week marks can trail the day: a day past one shows the same
@@ -1113,11 +1148,13 @@ test("request URLs are the exact strings Yahoo is sent, and history never takes 
   expect(M.historyUrl("NEST", "1W")).toBe("https://query1.finance.yahoo.com/v8/finance/chart/NEST?range=5d&interval=15m&events=div%2Csplits&includeAdjustedClose=true")
   // The saved fundamentals answers are the feed's own requests.
   const saved = name => readFileSync(join(fixtures, "fundamentals", name + ".url"), "utf8").replace(/^# /, "").trim()
-  const asked = Number(saved("aapl").match(/period2=(\d+)/)[1])
-  expect(M.fundamentalsUrl("AAPL", asked)).toBe(saved("aapl"))
-  expect(asked - Number(saved("aapl").match(/period1=(\d+)/)[1])).toBe(400 * DAY)
-  for (const [name, symbol] of [["nest", "NEST"], ["aapl", "AAPL"], ["shop-to", "SHOP.TO"], ["7203-t", "7203.T"], ["shel-l", "SHEL.L"]])
-    expect(M.snapshotClosesUrl(symbol, fundamentals(name))).toBe(saved(name + "-closes"))
+  const asked = Number(saved("aapl-2026-10-25").match(/period2=(\d+)/)[1])
+  expect(M.fundamentalsUrl("AAPL", asked)).toBe(saved("aapl-2026-10-25"))
+  expect(asked - Number(saved("aapl-2026-10-25").match(/period1=(\d+)/)[1])).toBe(400 * DAY)
+  for (const [name, symbol] of [["aapl", "AAPL"], ["pier", "PIER"], ["shop-to", "SHOP.TO"], ["7203-t", "7203.T"], ["shel-l", "SHEL.L"], ["ore-ax", "ORE.AX"]])
+    expect(M.capCloseUrl(symbol, fundamentals(name + "-2026-10-25"))).toBe(saved(name + "-2026-10-25-closes"))
+  for (const pair of ["USDCAD", "USDGBP", "USDAUD"])
+    expect(M.rateUrl(pair)).toBe(saved("fx-" + pair.toLowerCase()))
   expect(M.historyUrl("NEST", "1M")).toBe("https://query1.finance.yahoo.com/v8/finance/chart/NEST?range=1mo&interval=1h&events=div%2Csplits&includeAdjustedClose=true")
   expect(M.historyUrl("AAPL", "1Y")).toBe("https://query1.finance.yahoo.com/v8/finance/chart/AAPL?range=1y&interval=1d&events=div%2Csplits&includeAdjustedClose=true")
   expect(M.historyUrl("NVDA", "2Y")).toBe("https://query1.finance.yahoo.com/v8/finance/chart/NVDA?range=2y&interval=1d&events=div%2Csplits&includeAdjustedClose=true")

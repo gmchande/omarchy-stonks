@@ -69,7 +69,7 @@ only '\bIpcHandler\s*\{' IpcTarget.qml Locator.qml
 only '^import Quickshell\.Hyprland' WindowHost.qml
 only '\b(QuoteFeed|HistoryFeed|FundamentalsFeed|OvernightFeed|AllDayFeed|ReleaseFeed)\s*\{' Service.qml
 only 'Quote\.chartUrl\(' QuoteFeed.qml
-only 'Fundamentals\.(fundamentalsUrl|snapshotClosesUrl)\(' FundamentalsFeed.qml
+only 'Fundamentals\.(fundamentalsUrl|capCloseUrl|rateUrl)\(' FundamentalsFeed.qml
 only 'Overnight\.overnightUrl\(' OvernightFeed.qml
 only 'Overnight\.allDayUrl\(' AllDayFeed.qml
 only 'Release\.MANIFEST_URL\b' ReleaseFeed.qml

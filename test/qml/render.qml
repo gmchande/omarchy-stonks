@@ -226,20 +226,27 @@ ShellRoot {
   // its own 1Y on show, dimmed, until it comes.
   readonly property var loadingKind: /^popup-loading-(aapl|shel-l|btc-usd)-/.exec(stateName)
   property string loadingNext: ""
-  // The saved cap and P/E, with their closes, by symbol: AAPL, NEST,
-  // SHOP.TO, 7203.T, and SHEL.L have them; any other symbol shows what its
-  // quote alone gives.
+  // The saved cap and EPS by symbol, the cap with its close, as the feed
+  // keeps them: AAPL, NEST, SHOP.TO, 7203.T, and SHEL.L have them; any
+  // other symbol shows what its quote alone gives. And Yahoo's saved rates
+  // by pair, which SHOP.TO's and SHEL.L's P/Es need.
   property var savedFigures: ({})
+  property var savedRates: ({})
+
+  function fundamentalsAnswer(path) {
+    var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', root)
+    view.path = fixtureDir + "/fundamentals/" + path + ".json"
+    var json = JSON.parse(view.text())
+    view.destroy()
+    return json
+  }
 
   function figures(name) {
-    var read = function(path) {
-      var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', root)
-      view.path = fixtureDir + "/fundamentals/" + path + ".json"
-      var json = JSON.parse(view.text())
-      view.destroy()
-      return json
-    }
-    return Fundamentals.withSnapshotCloses(Fundamentals.parseFundamentals(read(name)), read(name + "-closes"))
+    return Fundamentals.withCapClose(Fundamentals.parseFundamentals(fundamentalsAnswer(name)), fundamentalsAnswer(name + "-closes"))
+  }
+
+  function rate(pair) {
+    return { value: Fundamentals.parseRate(fundamentalsAnswer("fx-" + pair.toLowerCase()), pair), checkedAt: 0 }
   }
 
   readonly property var bullCandidates: [
@@ -330,6 +337,7 @@ ShellRoot {
     readonly property string hero: previewSymbol || featuredSymbol
     readonly property var fundamentals: root.savedFigures[hero]
       ? ({ [hero]: { status: "ok", figures: root.savedFigures[hero] } }) : ({})
+    readonly property var rates: root.savedRates
     property var arriving: []
     property var lastRemoval: null
     // Robinhood's prints, and its word on which listings it trades all day,
@@ -400,6 +408,7 @@ ShellRoot {
     var shortHistory = History.parseHistory(JSON.parse(shortFile.text()), "All")
     root.savedFigures = { AAPL: root.figures("aapl"), NEST: root.figures("nest"), "SHOP.TO": root.figures("shop-to"),
       "7203.T": root.figures("7203-t"), "SHEL.L": root.figures("shel-l") }
+    root.savedRates = { USDCAD: root.rate("USDCAD"), USDGBP: root.rate("USDGBP") }
     try { stub.calendars = JSON.parse(calendarFile.text()) } catch (e) { stub.calendars = null }
     if (root.pillSheet) {
       root.pillQuote = nestDay

@@ -2,17 +2,21 @@
 .import "Format.js" as Format
 .import "Quote.js" as Quote
 
-// Cap and P/E: Yahoo's dated snapshots, their closes, and the 52-week
-// line. Knows nothing of sessions or charts.
+// Cap and P/E: Yahoo's dated cap snapshots and its close, trailing
+// earnings, the rate between two currencies a P/E may need, and the
+// 52-week line. Knows nothing of sessions or charts.
 
 var FUNDAMENTALS_URL = "https://query1.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/"
 
-// Yahoo keeps a listing's cap and P/E as dated snapshots, weeks or months
-// apart (once ten months); 400 days reaches the latest.
+// Yahoo keeps a listing's cap as dated snapshots: its own, weeks or months
+// apart (once ten months), and one at each quarter's end; 400 days reaches
+// the latest of each.
 var FUNDAMENTALS_DAYS = 400
 
-// A cap snapshot older than this, against the price, is too stale to move.
-var CAP_MAX_AGE_DAYS = 120
+// A cap snapshot older than this, against the price, is too stale to move:
+// a quarter's end is in the answer about 45 days after it, and a half-yearly
+// reporter's own snapshot can be six months old.
+var CAP_MAX_AGE_DAYS = 200
 
 // The most entries a list in a cap and P/E answer may hold
 // (`Format.fetchedList`): a series for each of the three types asked, three
@@ -28,7 +32,7 @@ function hasFundamentals(quote) {
 }
 
 function fundamentalsUrl(symbol, now) {
-  return FUNDAMENTALS_URL + encodeURIComponent(symbol) + "?type=trailingMarketCap,trailingPeRatio,trailingDilutedEPS"
+  return FUNDAMENTALS_URL + encodeURIComponent(symbol) + "?type=trailingMarketCap,quarterlyMarketCap,trailingDilutedEPS"
     + "&period1=" + (now - FUNDAMENTALS_DAYS * 24 * 60 * 60) + "&period2=" + now
 }
 
@@ -53,20 +57,21 @@ function latestSnapshot(results, type) {
   return latest
 }
 
-// Yahoo's latest cap and P/E, each with its own date; null when the answer
-// is not a timeseries, or its series are not a list within MOST_SERIES. The
-// P/E stands only while the latest trailing diluted EPS is above zero: after
-// a loss Yahoo publishes no new P/E, and its last one describes earnings
-// that are gone.
+// Yahoo's latest cap and trailing diluted EPS, each with its own date and
+// currency; null when the answer is not a timeseries, or its series are not
+// a list within MOST_SERIES. The cap is the newer of Yahoo's own snapshot
+// and the last quarter's end. The EPS stands only while it is above zero:
+// after a loss there is no P/E.
 function parseFundamentals(json) {
   var results = Format.fetchedList(json && json.timeseries && json.timeseries.result, MOST_SERIES)
   if (!results) return null
-  var cap = latestSnapshot(results, "trailingMarketCap")
-  var pe = latestSnapshot(results, "trailingPeRatio")
+  var own = latestSnapshot(results, "trailingMarketCap")
+  var quarter = latestSnapshot(results, "quarterlyMarketCap")
+  var cap = !quarter || (own && own.date >= quarter.date) ? own : quarter
   var eps = latestSnapshot(results, "trailingDilutedEPS")
   return {
     cap: cap && cap.value > 0 ? cap : null,
-    pe: pe && pe.value > 0 && eps && eps.value > 0 ? { value: pe.value, date: pe.date } : null
+    eps: eps && eps.value > 0 ? eps : null
   }
 }
 
@@ -76,26 +81,21 @@ function dateEpoch(date) {
   return Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])) / 1000
 }
 
-function snapshotDates(figures) {
-  return [figures.cap, figures.pe].filter(function(s) { return !!s }).map(function(s) { return s.date }).sort()
+// The cap was taken at its date's close, so that close is what moves it
+// with the price since. The daily bars around the cap's date, with a week
+// before for holidays; null when there is no cap.
+function capCloseUrl(symbol, figures) {
+  if (!figures.cap) return null
+  return Quote.CHART_URL + encodeURIComponent(symbol) + "?interval=1d&period1=" + (dateEpoch(figures.cap.date) - 7 * 24 * 60 * 60)
+    + "&period2=" + (dateEpoch(figures.cap.date) + 2 * 24 * 60 * 60)
 }
 
-// Each snapshot was taken at its date's close, so that close is what moves
-// it with the price since. The daily bars around the snapshots' dates, with
-// a week before for holidays; null when there is no snapshot.
-function snapshotClosesUrl(symbol, figures) {
-  var dates = snapshotDates(figures)
-  if (!dates.length) return null
-  return Quote.CHART_URL + encodeURIComponent(symbol) + "?interval=1d&period1=" + (dateEpoch(dates[0]) - 7 * 24 * 60 * 60)
-    + "&period2=" + (dateEpoch(dates[dates.length - 1]) + 2 * 24 * 60 * 60)
-}
-
-// The figures with each snapshot's close: the last session's on or before
-// its date, in the exchange's calendar. Null when the answer is not a chart,
+// The figures with the cap's close: the last session's on or before its
+// date, in the exchange's calendar. Null when the answer is not a chart,
 // its bars are not lists within `Quote.MOST_BARS` stamped at moments
-// (`Format.isMoment`), or it lacks a snapshot's close: no answer, so the
-// feed keeps what it had.
-function withSnapshotCloses(figures, json) {
+// (`Format.isMoment`), or it lacks the cap's close: no answer, so the feed
+// keeps what it had.
+function withCapClose(figures, json) {
   var result = json && json.chart && json.chart.result && json.chart.result[0]
   if (!result || !result.meta) return null
   var times = Format.fetchedList(result.timestamp || [], Quote.MOST_BARS)
@@ -103,20 +103,60 @@ function withSnapshotCloses(figures, json) {
   var closes = Format.fetchedList(bars && bars.close ? bars.close : [], Quote.MOST_BARS)
   if (!times || !closes) return null
   var offset = result.meta.gmtoffset || 0
-  var withClose = function(snapshot) {
-    if (!snapshot) return null
-    var close = null
-    for (var i = 0; i < times.length; i++) {
-      if (!Format.isMoment(times[i] + offset)) return null
-      var day = new Date((times[i] + offset) * 1000).toISOString().slice(0, 10)
-      if (day <= snapshot.date && Quote.knownPrice(closes[i]) !== null) close = closes[i]
-    }
-    return close === null ? null : Object.assign({}, snapshot, { close: close })
+  var close = null
+  for (var i = 0; i < times.length; i++) {
+    if (!Format.isMoment(times[i] + offset)) return null
+    var day = new Date((times[i] + offset) * 1000).toISOString().slice(0, 10)
+    if (day <= figures.cap.date && Quote.knownPrice(closes[i]) !== null) close = closes[i]
   }
-  var cap = withClose(figures.cap)
-  var pe = withClose(figures.pe)
-  if ((figures.cap && !cap) || (figures.pe && !pe)) return null
-  return { cap: cap, pe: pe }
+  return close === null ? null : Object.assign({}, figures, { cap: Object.assign({}, figures.cap, { close: close }) })
+}
+
+// A price's currency in whole units: London quotes pence, "GBp", against
+// earnings in pounds.
+function wholeUnits(currency) {
+  return currency === "GBp" ? { currency: "GBP", per: 100 } : { currency: String(currency || ""), per: 1 }
+}
+
+// The pair whose rate turns the EPS into the price's currency, as Yahoo
+// names it ("USDCAD", from USD into CAD); "" when the two are the same or
+// either is not a plain three-letter code, as a price in another small
+// unit (ZAc) is not: then there is no P/E rather than one off by a hundred.
+function ratePair(figures, currency) {
+  var eps = figures && figures.eps
+  var into = wholeUnits(currency).currency
+  if (!eps || eps.currency === into) return ""
+  return /^[A-Z]{3}$/.test(eps.currency) && /^[A-Z]{3}$/.test(into) ? eps.currency + into : ""
+}
+
+// Yahoo's latest rate for a pair, on the chart endpoint quotes use.
+function rateUrl(pair) {
+  return Quote.CHART_URL + encodeURIComponent(pair + "=X") + "?range=1d&interval=1d"
+}
+
+// The rate in a pair's answer: units of the second currency to one of the
+// first. Null unless the answer names that pair and that currency, and the
+// rate is a number above zero. Yahoo answers a pair from USD under either
+// of its names, about half the time the short one: GBP=X for USDGBP=X.
+function parseRate(json, pair) {
+  var meta = json && json.chart && json.chart.result && json.chart.result[0] && json.chart.result[0].meta
+  var into = pair.slice(3)
+  var named = meta && (meta.symbol === pair + "=X" || (pair.slice(0, 3) === "USD" && meta.symbol === into + "=X"))
+  if (!named || meta.currency !== into) return null
+  var rate = meta.regularMarketPrice
+  return Format.isFiniteNumber(rate) && rate > 0 ? rate : null
+}
+
+// The headline price over the EPS in the price's currency, or null. The EPS
+// in another currency counts only at its pair's rate, from `rates`: by pair,
+// { value, checkedAt }, value null after a failed fetch.
+function peRatio(figures, price, currency, rates) {
+  var eps = figures ? figures.eps : null
+  if (!eps) return null
+  var units = wholeUnits(currency)
+  var held = rates ? rates[ratePair(figures, currency)] : null
+  var rate = eps.currency && eps.currency === units.currency ? 1 : held ? held.value : null
+  return rate ? price / units.per / (eps.value * rate) : null
 }
 
 function peText(value) {
@@ -133,15 +173,17 @@ function peText(value) {
 // range never does, its ends can be older than a year. They are compared
 // at the listing's decimals, so a bar's float noise never passes a mark it
 // reads as. A day only takes the tone while its end is the one shown. The
-// cap and the P/E move with the headline price from their own date's
-// close; a cap more than CAP_MAX_AGE_DAYS whole days older than the price
-// is left out. The cap names its currency wherever Yahoo does, so one in
-// yen never reads as one in dollars beside it, whatever the reader's own;
-// a London cap is in GBP while its prices are in GBp.
+// cap moves with the headline price from its own date's close; a cap more
+// than CAP_MAX_AGE_DAYS whole days older than the price is left out. The
+// P/E is the headline price over the latest EPS, at its pair's rate in
+// `rates` where it needs one (`peRatio`). The cap names its currency
+// wherever Yahoo does, so one in yen never reads as one in dollars beside
+// it, whatever the reader's own; a London cap is in GBP while its prices
+// are in GBp.
 // Only an equity has cap and P/E slots, kept whether known or not, so the
 // line keeps its shape: the cap's as wide as its currency and 999.9B before
 // the cap comes; the P/E's as wide as 99.9.
-function yearLine(quote, figures, yearEnds) {
+function yearLine(quote, figures, yearEnds, rates) {
   if (!quote) return null
   var q = quote
   var head = Quote.headlineQuote(q)
@@ -165,7 +207,7 @@ function yearLine(quote, figures, yearEnds) {
   var facts = []
   if (hasFundamentals(q)) {
     var cap = figures ? figures.cap : null
-    var pe = figures ? figures.pe : null
+    var pe = head ? peRatio(figures, head.price, q.currency, rates) : null
     // A currency code is three letters, the listing's in capitals until the
     // cap's own is known; with none named, the cap says none.
     var named = cap ? cap.currency : String(q.currency || "").toUpperCase()
@@ -176,7 +218,7 @@ function yearLine(quote, figures, yearEnds) {
         ? code + Format.compactNumber(cap.value * head.price / cap.close) : "",
       widest: code + Format.widest("999.9B")
     })
-    facts.push({ label: "P/E", value: head && pe ? peText(pe.value * head.price / pe.close) : "", widest: Format.widest("99.9") })
+    facts.push({ label: "P/E", value: pe !== null ? peText(pe) : "", widest: Format.widest("99.9") })
   }
   return { title: "52W", range: line, facts: facts }
 }

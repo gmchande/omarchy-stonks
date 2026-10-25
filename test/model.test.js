@@ -879,32 +879,41 @@ test("a hostile range answer reads as no answer, at once", async () => {
 }, 60000)
 
 test("a hostile cap and P/E answer leaves the figures it would have fed unknown, at once", async () => {
-  const series = (type, value) => ({ meta: { type: [type] }, [type]: [{ asOfDate: "2026-09-30", currencyCode: "USD", reportedValue: { raw: value } }] })
+  const series = (type, value, date = "2026-09-30") => ({ meta: { type: [type] }, [type]: [{ asOfDate: date, currencyCode: "USD", reportedValue: { raw: value } }] })
   const timeseries = edit => {
-    const answer = { timeseries: { result: [series("trailingMarketCap", 4e12), series("trailingPeRatio", 30), series("trailingDilutedEPS", 7)] } }
+    const answer = { timeseries: { result: [series("trailingMarketCap", 4e12), series("quarterlyMarketCap", 3e12, "2026-06-30"), series("trailingDilutedEPS", 7)] } }
     if (edit) edit(answer.timeseries.result)
     return answer
   }
   const read = "M.parseFundamentals(json)"
-  const figures = { cap: { value: 4e12, date: "2026-09-30", currency: "USD" }, pe: { value: 30, date: "2026-09-30" } }
-  const closes = `M.withSnapshotCloses(${JSON.stringify(figures)}, json)`
-  const both = { cap: { ...figures.cap, close: 250 }, pe: { ...figures.pe, close: 250 } }
+  const figures = { cap: { value: 4e12, date: "2026-09-30", currency: "USD" }, eps: { value: 7, date: "2026-09-30", currency: "USD" } }
+  const quarter = { value: 3e12, date: "2026-06-30", currency: "USD" }
+  const closes = `M.withCapClose(${JSON.stringify(figures)}, json)`
+  const closed = { ...figures, cap: { ...figures.cap, close: 250 } }
+  const rate = "M.parseRate(json, 'USDCAD')"
+  const rateAnswer = edit => chartAnswer(r => { r.meta.symbol = "USDCAD=X"; r.meta.currency = "CAD"; r.meta.regularMarketPrice = 1.4; if (edit) edit(r) })
   const day = Date.UTC(2026, 8, 30) / 1000 + 14 * 3600
   const cases = [
     { name: "an answer, as sent", call: read, answer: timeseries(), want: figures },
     // The marketplace's review of 1.0.2 found this one.
-    { name: "the cap's series posing", call: read, answer: timeseries(r => { r[0].trailingMarketCap = POSING }), want: { cap: null, pe: figures.pe } },
-    { name: "the EPS series posing", call: read, answer: timeseries(r => { r[2].trailingDilutedEPS = POSING }), want: { cap: figures.cap, pe: null } },
+    { name: "the cap's series posing", call: read, answer: timeseries(r => { r[0].trailingMarketCap = POSING }), want: { cap: quarter, eps: figures.eps } },
+    { name: "both caps' series posing", call: read,
+      answer: timeseries(r => { r[0].trailingMarketCap = POSING; r[1].quarterlyMarketCap = POSING }), want: { cap: null, eps: figures.eps } },
+    { name: "the EPS series posing", call: read, answer: timeseries(r => { r[2].trailingDilutedEPS = POSING }), want: { cap: figures.cap, eps: null } },
     { name: "the series posing", call: "M.latestSnapshot(json, 'trailingMarketCap')", answer: POSING },
-    { name: "the series over budget", call: read, answer: timeseries(r => r.push(...times(M.MOST_SERIES - 2).map(() => series("trailingPeRatio", 30)))) },
+    { name: "the series over budget", call: read, answer: timeseries(r => r.push(...times(M.MOST_SERIES - 2).map(() => series("trailingDilutedEPS", 7)))) },
     { name: "the cap's snapshots over budget", call: read,
-      answer: timeseries(r => { r[0].trailingMarketCap = times(M.MOST_SNAPSHOTS + 1).map(() => r[0].trailingMarketCap[0]) }), want: { cap: null, pe: figures.pe } },
-    { name: "the closes, as sent", call: closes, answer: chartAnswer(r => { r.timestamp = [day]; bars(r).close = [250] }), want: both },
+      answer: timeseries(r => { r[0].trailingMarketCap = times(M.MOST_SNAPSHOTS + 1).map(() => r[0].trailingMarketCap[0]) }), want: { cap: quarter, eps: figures.eps } },
+    { name: "the closes, as sent", call: closes, answer: chartAnswer(r => { r.timestamp = [day]; bars(r).close = [250] }), want: closed },
     { name: "the closes' times posing", call: closes, answer: chartAnswer(r => { r.timestamp = POSING }) },
     { name: "the closes posing", call: closes, answer: chartAnswer(r => { r.timestamp = [day]; bars(r).close = POSING }) },
     { name: "the closes over budget", call: closes,
       answer: chartAnswer(r => { r.timestamp = times(M.MOST_BARS + 1).map(t => t - T0 - 300 * M.MOST_BARS + day); bars(r).close = r.timestamp.map(() => 250) }) },
-    { name: "the closes' times no Date holds", call: closes, answer: chartAnswer(r => { r.timestamp = [1e300]; bars(r).close = [250] }) }
+    { name: "the closes' times no Date holds", call: closes, answer: chartAnswer(r => { r.timestamp = [1e300]; bars(r).close = [250] }) },
+    { name: "a rate, as sent", call: rate, answer: rateAnswer(), want: 1.4 },
+    { name: "a rate posing", call: rate, answer: rateAnswer(r => { r.meta.regularMarketPrice = POSING }) },
+    { name: "a rate for another pair", call: rate, answer: rateAnswer(r => { r.meta.symbol = "USDGBP=X" }) },
+    { name: "a rate in another currency", call: rate, answer: rateAnswer(r => { r.meta.currency = "GBP" }) }
   ]
   expect(await hostile(cases)).toEqual(cases.map(c => [c.name, c.want === undefined ? null : c.want]))
 }, 60000)

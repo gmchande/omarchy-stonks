@@ -29,7 +29,10 @@ export function requestUrl(raw) {
   } else if (u.hostname === 'query2.finance.yahoo.com' && u.pathname === '/v1/finance/search') {
     parameters({newsCount:'0'}, {q:s=>s.trim().length > 0,quotesCount:epoch})
   } else if (u.hostname === 'query1.finance.yahoo.com') {
-    if (chart && symbol(decodeURIComponent(chart[1]))) {
+    if (chart && /^[A-Z]{6}=X$/.test(decodeURIComponent(chart[1]))) {
+      // A currency pair's rate, its latest day.
+      parameters({range:'1d', interval:'1d'})
+    } else if (chart && symbol(decodeURIComponent(chart[1]))) {
       if ('period1' in q) {
         parameters({interval:'1d'}, {period1:epoch,period2:epoch})
         if (+q.period2 <= +q.period1) throw new Error('reversed dates')
@@ -40,7 +43,7 @@ export function requestUrl(raw) {
       } else parameters({interval:'5m',includePrePost:'true'}, {range:days})
     } else if (u.pathname === '/v7/finance/spark') parameters({interval:'5m',includePrePost:'true'}, {symbols,range:days})
     else if (/^\/ws\/fundamentals-timeseries\/v1\/finance\/timeseries\/[^/]+$/.test(u.pathname)) {
-      parameters({type:'trailingMarketCap,trailingPeRatio,trailingDilutedEPS'}, {period1:epoch,period2:epoch})
+      parameters({type:'trailingMarketCap,quarterlyMarketCap,trailingDilutedEPS'}, {period1:epoch,period2:epoch})
       if (+q.period2 <= +q.period1) throw new Error('reversed dates')
     } else throw new Error('unknown Yahoo route')
   } else throw new Error('unknown host')

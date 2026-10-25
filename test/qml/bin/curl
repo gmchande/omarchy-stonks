@@ -10,6 +10,7 @@
 # quote kept under another symbol shows.
 #
 #   AAPL, MSFT, NVDA   answer test/fixtures/aapl.json
+#   SLID         answers like AAPL; its fundamentals are NEST's, a loss
 #   FAIL         fails every time, like curl -f on an HTTP error
 #   FLAKY        fails twice, then answers like AAPL (retry and recovery)
 #   ONCE         answers the first time, then fails (failure with cached data)
@@ -24,6 +25,8 @@
 #   TURN         answers the AAPL day, up; while STONKS_FAKE_STATE/TURN.down
 #                exists, with its previous close above its price, down
 #   SHOP.TO      answers its saved Toronto day, so a search result can be in All
+#   MAPLE.TO     answers SHOP.TO's day under its own name: a second listing
+#                priced in CAD whose earnings are in USD
 #   SPY, BTC-USD answer their saved days: an ETF and a cryptocurrency
 #   NOCUR        answers the saved FTSE 100 day with no currency, as Yahoo
 #                answered ^STOXX50E
@@ -53,12 +56,19 @@
 # and NEST's saved month for NEST; KILN, SPY, ^GSPC, BTC-USD, SHEL.L, and
 # 7203.T, one of each kind of listing, answer their own saved years.
 # Fundamentals answer from test/fixtures/fundamentals: the timeseries by
-# symbol (MSFT, NVDA, and SKEWED take AAPL's; a symbol with none saved gets
-# SPY's, every series empty), and the daily closes around the snapshots'
-# dates likewise, SKEWED's with their offset {"toString": null}.
+# symbol (MSFT, NVDA, and SKEWED take AAPL's, MAPLE.TO SHOP.TO's, SLID
+# NEST's; a symbol with none saved gets SPY's, every series empty), and the
+# daily closes around the cap's date likewise, SKEWED's with their offset
+# {"toString": null}.
 # Every fundamentals request is counted in FUNDAMENTALS.calls, and
 # a symbol's timeseries requests in <SYMBOL>.fundamentals.calls. While
-# STONKS_FAKE_STATE/FUNDAMENTALS.down exists both fail.
+# STONKS_FAKE_STATE/FUNDAMENTALS.down exists both fail; while CLOSES.down
+# exists the closes fail.
+# A rate (USDCAD=X) answers test/fixtures/fundamentals/fx-<pair>.json, or
+# 404 for a pair with none saved, counted in RATE.calls and
+# <PAIR>.rate.calls; while STONKS_FAKE_STATE/RATE.down exists it fails, and
+# while RATE.short exists it answers Yahoo's saved answer under the pair's
+# short name (CAD=X), fx-<pair>-short.json.
 # Robinhood's historicals are counted in OVERNIGHT.calls, the symbols of each
 # request appended to OVERNIGHT.asked, and its span to OVERNIGHT.spans. More
 # than 75 symbols in one request answer 400, as Robinhood does ("No more than
@@ -145,6 +155,7 @@ kind_of() {
     *"/v1/finance/search"*) echo search ;;
     *"api.robinhood.com/instruments/"*) echo instruments ;;
     *"api.robinhood.com/"*) echo overnight ;;
+    *"/v8/finance/chart/"*"%3DX?"*) echo rate ;;
     *"/fundamentals-timeseries/"*|*"interval=1d&period1="*) echo fundamentals ;;
     *"includeAdjustedClose=true"*) echo history ;;
     *"/v7/finance/spark"*) echo spark ;;
@@ -156,6 +167,7 @@ name_of() {
     search|instruments|overnight|manifest) echo "$2" ;;
     spark) local s="${1#*symbols=}"; echo "${s%%&*}" ;;
     fundamentals) local s="${1##*/timeseries/}"; s="${s##*/chart/}"; echo "${s%%\?*}" ;;
+    rate) local s="${1##*/chart/}"; echo "${s%%%3DX*}" ;;
     *) local s="${1##*/chart/}"; echo "${s%%\?*}" ;;
   esac
 }
@@ -259,10 +271,21 @@ serve() {
     fi
     exit
   fi
+  if [[ "$url" == *"/v8/finance/chart/"*"%3DX?"* ]]; then
+    pair="${url##*/chart/}"
+    pair="${pair%%%3DX*}"
+    count "$state/RATE.calls" > /dev/null
+    count "$state/$pair.rate.calls" > /dev/null
+    [ -e "$state/RATE.down" ] && exit 22
+    file="$fixtures/fundamentals/fx-$(tr 'A-Z' 'a-z' <<< "$pair")$([ -e "$state/RATE.short" ] && echo -short).json"
+    [ -e "$file" ] || exit 44
+    cat "$file"
+    exit
+  fi
   # saved SYMBOL [SUFFIX]: the fundamentals fixture that answers for SYMBOL.
   saved() {
     local name
-    case "$1" in AAPL|MSFT|NVDA|SKEWED) name=aapl ;; *) name=$(tr 'A-Z.' 'a-z-' <<< "$1") ;; esac
+    case "$1" in AAPL|MSFT|NVDA|SKEWED) name=aapl ;; MAPLE.TO) name=shop-to ;; SLID) name=nest ;; *) name=$(tr 'A-Z.' 'a-z-' <<< "$1") ;; esac
     local file="$fixtures/fundamentals/$name${2:-}.json"
     [ -e "$file" ] || file="$fixtures/fundamentals/spy${2:-}.json"
     echo "$file"
@@ -279,6 +302,7 @@ serve() {
       symbol="${url##*/chart/}"
       symbol="${symbol%%\?*}"
       file="$(saved "$symbol" -closes)"
+      [ -e "$STONKS_FAKE_STATE/CLOSES.down" ] && exit 22
     fi
     [ -e "$STONKS_FAKE_STATE/FUNDAMENTALS.down" ] && exit 22
     if [[ "$url" != *"/timeseries/"* && "$symbol" == SKEWED ]]; then
@@ -336,7 +360,7 @@ serve() {
     exit
   fi
   case "$symbol" in
-    AAPL|MSFT|NVDA|TALL*) answer ;;
+    AAPL|MSFT|NVDA|TALL*|SLID) answer ;;
     FAIL) exit 22 ;;
     FLAKY) [ "$calls" -le 2 ] && exit 22; answer ;;
     ONCE) [ "$calls" -ge 2 ] && exit 22; answer ;;
@@ -347,6 +371,7 @@ serve() {
     FLAT) answer | sed 's/"chartPreviousClose":316.85/"chartPreviousClose":325.13/' ;;
     TURN) if [ -e "$state/TURN.down" ]; then answer | sed 's/"chartPreviousClose":316.85/"chartPreviousClose":330.00/'; else answer; fi ;;
     SHOP.TO) cat "$fixtures/shop-to.json" ;;
+    MAPLE.TO) stamp < "$fixtures/shop-to.json" ;;
     SPY) cat "$fixtures/spy-2026-09-11-day-prepost.json" ;;
     BTC-USD) cat "$fixtures/btc-usd-day.json" ;;
     NOCUR) stamp < "$fixtures/ftse-day.json" | jq -c '.chart.result[0].meta.currency = null' ;;
