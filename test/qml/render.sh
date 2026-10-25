@@ -123,7 +123,9 @@ every_state() (
   done
   # The look sweep's new listings in session, 8 October 10:54: a coin under
   # a cent, Toronto, a six-figure price, and a long symbol. `render.sh
-  # popup-sweep-<moment>-<symbol>-<look>` renders any saved moment.
+  # popup-sweep-<moment>-<symbol>-<look>` renders any listing sweep moment,
+  # and `render.sh popup-sweep-<folder>-<symbol>-<look>` any saved moment
+  # whose folder is named for its minute (watch-2026-10-24-2238).
   for symbol in shib-usd ry.to brk-a brk-b; do
     states="$states popup-sweep-2026-10-08-1054-$symbol-smooth popup-sweep-2026-10-08-1054-$symbol-retro"
   done
@@ -285,7 +287,16 @@ for state in $states; do
   # picture this run wrote counts. It is judged in this run's own folder,
   # where no other run's picture can stand in for it, then moved to $out.
   rm -f "$dest"
-  STONKS_VISUAL_STATE="$state" STONKS_VISUAL_OUT="$shot" quickshell_run 15 "$work/$state.log" -p "$root"
+  # A sweep of a saved moment's folder (render.qml): the answers it holds,
+  # each by its file's name, since QML can't list a folder.
+  saved=""
+  if [[ $state =~ sweep-([a-z]+-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{4})- ]]; then
+    for answer in "$STONKS_FIXTURES/moments/${BASH_REMATCH[1]}"/*.json; do
+      name=${answer##*/}
+      [[ -e $answer && $name != robinhood-* ]] && saved="$saved ${name%.json}"
+    done
+  fi
+  STONKS_VISUAL_SAVED="$saved" STONKS_VISUAL_STATE="$state" STONKS_VISUAL_OUT="$shot" quickshell_run 15 "$work/$state.log" -p "$root"
   code=$qs_code
   # A state whose QML threw still writes a picture; the log is what tells,
   # and so is a Qt warning from the plugin's files (lib.sh).
