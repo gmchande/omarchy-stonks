@@ -504,6 +504,33 @@ ShellRoot {
           back && harness.calls("RATE") === 3 && harness.calls("MAPLE.TO.fundamentals") === 1
             && harness.calls("FUNDAMENTALS") === harness.fundamentalsBefore,
           JSON.stringify({ rates: harness.calls("RATE"), held: service.rates, maple: harness.calls("MAPLE.TO.fundamentals") }))
+        service.addSymbol("SLID")
+        harness.go(47)
+      } else if (harness.step === 47) {
+        if (!service.quotes.SLID) {
+          if (harness.waited < 5000) return
+          harness.check("an added SLID gets its quote", false, "none in 5 s")
+          harness.finish()
+          return
+        }
+        // SLID had a profit and a cap yesterday; its new series reports a
+        // loss, and its close request fails.
+        var yesterday = Object.assign({}, service.testFundamentalsFeed.entries)
+        yesterday.SLID = Object.assign({}, yesterday.MSFT, { checkedAt: yesterday.MSFT.checkedAt - 25 * 60 * 60 })
+        service.testFundamentalsFeed.entries = yesterday
+        harness.stateThen("touch \"$1/CLOSES.down\"", function() {
+          service.fetchFundamentals("SLID")
+          harness.go(48)
+        })
+      } else if (harness.step === 48) {
+        var slid = service.fundamentals.SLID
+        var settledSlid = slid.status === "failed" && !service.testFundamentalsFeed.busy
+        if (!settledSlid && harness.waited < 5000) return
+        harness.check("a loss in a new series removes the P/E even when the close fails, and the cap waits for its close",
+          settledSlid && harness.calls("SLID.fundamentals") === 1 && slid.figures.eps === null && slid.figures.cap === null,
+          JSON.stringify(slid))
+        harness.stateThen("rm -f \"$1/CLOSES.down\"", function() { harness.go(49) })
+      } else if (harness.step === 49) {
         // A day later, with Yahoo's fundamentals out of reach.
         var aged = Object.assign({}, service.testFundamentalsFeed.entries)
         harness.msftBefore = aged.MSFT

@@ -7,7 +7,8 @@ import "Fundamentals.js" as Fundamentals
 // turn: the series, then the close on the cap's date, which moves it with
 // the price (`Fundamentals.yearLine`). An entry is "ok" with its figures,
 // either of which may be null when Yahoo has none, or "failed", keeping the
-// last good figures; a failed one is asked again the next time it is
+// last good figures, or once the series came but not the cap's close, their
+// EPS and no cap; a failed one is asked again the next time it is
 // wanted. Then, when the EPS is in another currency than the price and its
 // pair's rate is a day old or none was asked, the rate, once whichever
 // listing wants it first: a failed one is kept as no rate, so the pair has
@@ -135,10 +136,14 @@ Item {
     root.run(Fundamentals.rateUrl(pair))
   }
 
-  // A failed fetch keeps the last good figures.
+  // A failed fetch keeps the last good figures, unless the series came:
+  // they are the truth for the EPS, so it stands, with its rate asked, and
+  // the cap stays unknown until its close is.
   function fail(symbol) {
-    root.keep(symbol, Object.assign({ figures: null, checkedAt: 0 }, entries[symbol], { status: "failed" }))
-    root.done()
+    var series = job.figures ? { figures: { cap: null, eps: job.figures.eps } } : {}
+    root.keep(symbol, Object.assign({ figures: null, checkedAt: 0 }, entries[symbol], { status: "failed" }, series))
+    if (job.figures) root.askRate(job.figures)
+    else root.done()
   }
 
   function keep(symbol, entry) {
