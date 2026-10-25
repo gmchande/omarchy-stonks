@@ -1103,7 +1103,6 @@ ShellRoot {
           fontFamily: stub.fontFamily
           surfaceOpen: true
           headerWhenMissing: root.coldState === "loading" ? "Loading" : "No data"
-          failClosedHeader: root.coldState === "failed"
           margins: root.popup ? 0 : Style.space(16)
           chartHeight: root.popup ? Style.space(190) : Style.space(220)
           minChartHeight: root.popup ? 0 : Style.space(136)

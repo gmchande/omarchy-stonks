@@ -239,7 +239,6 @@ Panel {
           sounds: root.sounds
           camera: root.camera
           surfaceOpen: root.opened
-          failClosedHeader: true
           chartHeight: Style.space(190)
           foreground: root.bar ? root.bar.foreground : Commons.Color.foreground
           fontFamily: root.bar ? root.bar.fontFamily : Style.font.family

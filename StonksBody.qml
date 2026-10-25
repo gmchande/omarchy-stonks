@@ -36,7 +36,6 @@ Item {
   // shows is open, as it was left, and asks for nothing an open one would.
   property bool onScreen: true
   property string headerWhenMissing: "No data"
-  property bool failClosedHeader: false
   property int margins: 0
   // Where the body's content ends, the footer at its bottom: the popup's
   // card eases its edge to a new height while the body lays out at it at
@@ -457,8 +456,6 @@ Item {
     // A refresh the reader asked for, while what it sent is out, unless a
     // scrub reads a moment: then the header names that.
     if (refreshing && !scrubShown) return ["Refreshing"]
-    if (failClosedHeader && !featuredQuote && featuredFreshness && featuredFreshness.state === "failed")
-      return ["No data"]
     if (historyActive && historyFailed) return [unavailableText]
     // A refetch the service asks for itself, out or failed, with the range
     // in hand says nothing: it keeps the chart and the market.

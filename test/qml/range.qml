@@ -1105,9 +1105,21 @@ ShellRoot {
       wait(100)
       var failedWords = [body.headerText, harness.find(body, "hero").listingLead,
         body.watchlist.rowItem("FAIL") ? body.watchlist.rowItem("FAIL").detail : ""].join(" | ")
+      // A range picked for it fails too, and the header still says No data,
+      // with no range to retry, as the popup does (popup.qml): the range has
+      // no chart without a quote (`Chart.viewChart`). A range that fails
+      // with the quote in says it is unavailable on both (above, and
+      // popup.qml): the owner's call on the quality audit's finding 23.
+      var failRangeWas = service.range
+      body.selectRange("1W")
+      var rangeFailed = within(10000, function() { return !!service.histories["FAIL|1W"] && service.histories["FAIL|1W"].status === "failed" })
+      var failedRange = rangeFailed + " | " + body.headerText + " | " + body.offersRetry
+      body.selectRange(failRangeWas)
       app.close()
       harness.check("a symbol whose first fetch failed is said one way: No data, for this symbol",
         failedWords === "No data | ! NO DATA FOR THIS SYMBOL | ! No data for this symbol", failedWords)
+      harness.check("a range that failed for a symbol whose quote failed too says No data, with no retry, as the popup does",
+        failedRange === "true | No data | false", failedRange)
 
       // A warning that ends while the pointer stays on the pill leaves no
       // bubble naming it: the text pill's goes, and the icon's loses the
