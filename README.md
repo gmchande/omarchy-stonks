@@ -224,12 +224,9 @@ Omasnap on 4.5, Tensaku on 4.0.
 
 | Key | Does |
 | --- | --- |
-| `↑` `↓` | Move the selection |
-| `j` `k` | Move the selection (popup) |
-| `⏎` | Show the selected row's chart |
-| Space | Show the selected row's chart (popup) |
-| `←` `→` | Scrub one chart step |
-| `h` `l` | Scrub one chart step (popup) |
+| `↑` `↓` or `j` `k` | Move the selection |
+| `⏎` or Space | Show the selected row's chart |
+| `←` `→` or `h` `l` | Scrub one chart step |
 | `[` `]` | Change the chart range |
 | `p` | Replay the chart |
 | `y` | Screenshot the chart |
@@ -237,7 +234,7 @@ Omasnap on 4.5, Tensaku on 4.0.
 | `x` | Remove the selected row |
 | `Shift+X` | Choose where to remove the selected row from |
 | `u` | Undo the last removal, until a list next changes |
-| Delete or Backspace | Remove the selected row (window) |
+| Delete or Backspace | Remove the selected row |
 | `Shift+J` `Shift+K` | Move the selected row up or down, in manual order |
 | `o` | Change the list's order |
 | `Shift+O` | Reverse a sorted order |

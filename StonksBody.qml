@@ -661,6 +661,42 @@ Item {
     if (service) service.reverseOrder()
   }
 
+  // A key's command (KeyText.typed) as both surfaces take it, so the popup
+  // and the window answer the same keys; false for one that does nothing.
+  // The keys with no text, Esc, the arrows, Enter, Space, Delete and Tab,
+  // each surface reads itself.
+  function pressKey(t) {
+    if (t === "?") toggleHelp()
+    else if (t === "j") moveCursor(1)
+    else if (t === "k") moveCursor(-1)
+    else if (t === "h") nudgeScrub(-1)
+    else if (t === "l") nudgeScrub(1)
+    else if (t === "x") removeRow(watchlist.cursorRow)
+    else if (t === "X") openRowMenu(watchlist.cursorRow, null)
+    else if (t === "a" || t === "+") startAdding()
+    else if (t === "c") cycleChangeMode()
+    else if (t === "r") refreshRequested()
+    else if (t === "[") stepRange(-1)
+    else if (t === "]") stepRange(1)
+    else if (t === "p") replay()
+    else if (t === "y") takeScreenshot()
+    else if (t === "s") toggleStyle()
+    else if (t === "S") toggleSounds()
+    else if (t === "o") cycleOrder()
+    else if (t === "O") reverseOrder()
+    else if (t === "w") openListMenu()
+    else if (t === "W") openManageLists()
+    else if (t === "m") openSymbolLists(watchlist.cursorRow)
+    else if (t === "u") undoRemoval()
+    else if (t === ",") stepList(-1)
+    else if (t === ".") stepList(1)
+    else if (t === "J") moveSelected(1)
+    else if (t === "K") moveSelected(-1)
+    else if (t >= "1" && t <= "9") featureAt(Number(t) - 1)
+    else return false
+    return true
+  }
+
   // A row by its place in the list as it is on screen, as 1 to 9 feature
   // them: while the pointer holds the rows, that is not the service's order.
   // The cursor goes with it, gliding the row into view as the arrows do, so

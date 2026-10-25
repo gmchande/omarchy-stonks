@@ -131,39 +131,13 @@ Item {
         else if (event.key === Qt.Key_Down) { body.moveCursor(1); event.accepted = true }
         else if (event.key === Qt.Key_Left) { body.nudgeScrub(-1); event.accepted = true }
         else if (event.key === Qt.Key_Right) { body.nudgeScrub(1); event.accepted = true }
-        else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+        else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
           body.featureSymbol(body.watchlist.cursorRow)
           event.accepted = true
         } else if (event.key === Qt.Key_Backspace || event.key === Qt.Key_Delete) {
           body.removeRow(body.watchlist.cursorRow)
           event.accepted = true
-        } else {
-          if (t === "?") body.toggleHelp()
-          else if (t === "a" || t === "+") body.startAdding()
-          else if (t === "x") body.removeRow(body.watchlist.cursorRow)
-          else if (t === "X") body.openRowMenu(body.watchlist.cursorRow, null)
-          else if (t === "c") body.cycleChangeMode()
-          else if (t === "r") root.refresh()
-          else if (t === "[") body.stepRange(-1)
-          else if (t === "]") body.stepRange(1)
-          else if (t === "p") body.replay()
-          else if (t === "y") body.takeScreenshot()
-          else if (t === "s") body.toggleStyle()
-          else if (t === "S") body.toggleSounds()
-          else if (t === "o") body.cycleOrder()
-          else if (t === "O") body.reverseOrder()
-          else if (t === "w") body.openListMenu()
-          else if (t === "W") body.openManageLists()
-          else if (t === "m") body.openSymbolLists(body.watchlist.cursorRow)
-          else if (t === "u") body.undoRemoval()
-          else if (t === ",") body.stepList(-1)
-          else if (t === ".") body.stepList(1)
-          else if (t === "J") body.moveSelected(1)
-          else if (t === "K") body.moveSelected(-1)
-          else if (t >= "1" && t <= "9") body.featureAt(Number(t) - 1)
-          else return
-          event.accepted = true
-        }
+        } else if (body.pressKey(t)) event.accepted = true
       }
 
       // Past the body's width, on the window's margins, a click off the
