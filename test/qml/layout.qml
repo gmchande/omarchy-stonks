@@ -75,19 +75,22 @@ ShellRoot {
   // The hero chart's rendered frames, for frames.js.
   FrameGrab { id: grab }
 
-  // Saved fundamentals, the cap with its close and the EPS with its rate
-  // into the price's currency, as the feed keeps them.
-  function figures(name, currency) {
-    var read = function(path) {
-      var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', root)
-      view.path = root.fixtures + "/fundamentals/" + path + ".json"
-      var json = JSON.parse(view.text())
-      view.destroy()
-      return json
-    }
-    var figures = Fundamentals.withCapClose(Fundamentals.parseFundamentals(read(name)), read(name + "-closes"))
-    var pair = Fundamentals.ratePair(figures, currency)
-    return pair ? Fundamentals.withRate(figures, Fundamentals.parseRate(read("fx-" + pair.toLowerCase()), pair)) : figures
+  function fundamentalsAnswer(path) {
+    var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', root)
+    view.path = root.fixtures + "/fundamentals/" + path + ".json"
+    var json = JSON.parse(view.text())
+    view.destroy()
+    return json
+  }
+
+  // Saved fundamentals, the cap with its close, as the feed keeps them.
+  function figures(name) {
+    return Fundamentals.withCapClose(Fundamentals.parseFundamentals(fundamentalsAnswer(name)), fundamentalsAnswer(name + "-closes"))
+  }
+
+  // Yahoo's saved rate for a pair, as the feed keeps it.
+  function rate(pair) {
+    return { value: Fundamentals.parseRate(fundamentalsAnswer("fx-" + pair.toLowerCase()), pair), checkedAt: 0 }
   }
 
   function check(label, ok, detail) {
@@ -263,6 +266,7 @@ ShellRoot {
     property var figures: null
     readonly property var histories: historyEntry ? ({ [featuredSymbol + "|" + range]: historyEntry }) : ({})
     readonly property var fundamentals: figures ? ({ [featuredSymbol]: { status: "ok", figures: figures } }) : ({})
+    property var rates: ({})
     property var arriving: []
     property var lastRemoval: null
     property bool settingsUnreadable: false
@@ -434,7 +438,8 @@ ShellRoot {
         var year = History.parseHistory(JSON.parse(shopYearFile.text()), "1Y")
         var young = History.parseHistory(JSON.parse(youngFile.text()), "All")
         var month = History.parseHistory(JSON.parse(liveMonthFile.text()), "1M")
-        var aapl = root.figures("aapl", "USD")
+        var aapl = root.figures("aapl")
+        stub.rates = { USDCAD: root.rate("USDCAD"), USDGBP: root.rate("USDGBP") }
         var cases = [
           { symbol: "AAPL", range: "1D", history: null, figures: aapl },
           { symbol: "AAPL", range: "5Y", history: weekly, figures: aapl },
@@ -442,15 +447,15 @@ ShellRoot {
           // does: its low and high, each with its four-digit year, no SINCE.
           { symbol: "AAPL", range: "All", history: young, figures: aapl },
           { symbol: "SPY", range: "1D", history: null, figures: null },
-          { symbol: "SHOP.TO", range: "1D", history: null, figures: root.figures("shop-to", "CAD") },
-          { symbol: "SHOP.TO", range: "1Y", history: year, figures: root.figures("shop-to", "CAD") },
+          { symbol: "SHOP.TO", range: "1D", history: null, figures: root.figures("shop-to") },
+          { symbol: "SHOP.TO", range: "1Y", history: year, figures: root.figures("shop-to") },
           { symbol: "MZ", range: "1D", history: null, figures: null },
           { symbol: "MZ", range: "5Y", history: null, figures: null },
           { symbol: "WIDE", range: "1D", history: null, figures: null },
           // The longest real key stats line: Tokyo's, with a four-digit
           // 52-week range in yen; London's names its pounds.
-          { symbol: "7203.T", range: "1D", history: null, figures: root.figures("7203-t", "JPY") },
-          { symbol: "SHEL.L", range: "1D", history: null, figures: root.figures("shel-l", "GBp") },
+          { symbol: "7203.T", range: "1D", history: null, figures: root.figures("7203-t") },
+          { symbol: "SHEL.L", range: "1D", history: null, figures: root.figures("shel-l") },
           { symbol: "SHIB-USD", range: "1D", history: null, figures: null },
           { symbol: "BRK-A", range: "1D", history: null, figures: null },
           // 1M with an overnight print under the price.

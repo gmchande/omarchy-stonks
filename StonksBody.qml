@@ -233,8 +233,10 @@ Item {
   property var entries: ({})
   // The preview's receipt, which says whether its quote failed.
   property var previewEntries: ({})
-  // Every symbol's cap and P/E, as the service keeps them.
+  // Every symbol's cap and P/E, and the rates P/Es need by currency pair,
+  // as the service keeps them.
   property var fundamentalEntries: ({})
+  property var rates: ({})
   property var lists: []
   // The current list's members, those still arriving included.
   property var members: []
@@ -273,6 +275,7 @@ Item {
   Binding on entries { when: root.reading; value: root.service?.entries; restoreMode: Binding.RestoreNone }
   Binding on previewEntries { when: root.reading; value: root.service?.previewEntries; restoreMode: Binding.RestoreNone }
   Binding on fundamentalEntries { when: root.reading; value: root.service?.fundamentals; restoreMode: Binding.RestoreNone }
+  Binding on rates { when: root.reading; value: root.service?.rates; restoreMode: Binding.RestoreNone }
   Binding on lists { when: root.reading; value: root.service?.lists; restoreMode: Binding.RestoreNone }
   Binding on members { when: root.reading; value: root.service?.symbols; restoreMode: Binding.RestoreNone }
   Binding on arriving { when: root.reading; value: root.service?.arriving; restoreMode: Binding.RestoreNone }
@@ -422,7 +425,7 @@ Item {
   // On 1Y the 52 weeks take in the range's own ends, so the two lines never
   // disagree (`Fundamentals.yearLine`).
   readonly property var yearLine: chart ? Fundamentals.yearLine(featuredQuote, fundamentals ? fundamentals.figures : null,
-    historyShown && history.range === "1Y" ? rangeEnds : null) : null
+    historyShown && history.range === "1Y" ? rangeEnds : null, rates) : null
   readonly property var rangeMarks: historyShown ? History.rangeMarks(history, rangeEnds, featuredQuote) : null
   // What the dashed line is, said while a scrub reads against it, and on a
   // thin night's day the close the night's trades read from too.

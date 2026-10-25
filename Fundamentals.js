@@ -144,17 +144,15 @@ function parseRate(json, pair) {
   return Format.isFiniteNumber(rate) && rate > 0 ? rate : null
 }
 
-// The figures with the rate that turns their EPS into the price's currency.
-function withRate(figures, rate) {
-  return Object.assign({}, figures, { eps: Object.assign({}, figures.eps, { rate: rate }) })
-}
-
-// The headline price over the EPS in the price's currency, or null: the EPS
-// in another currency counts only with its rate.
-function peRatio(eps, price, currency) {
+// The headline price over the EPS in the price's currency, or null. The EPS
+// in another currency counts only at its pair's rate, from `rates`: by pair,
+// { value, checkedAt }, value null after a failed fetch.
+function peRatio(figures, price, currency, rates) {
+  var eps = figures ? figures.eps : null
   if (!eps) return null
   var units = wholeUnits(currency)
-  var rate = eps.currency && eps.currency === units.currency ? 1 : eps.rate
+  var held = rates ? rates[ratePair(figures, currency)] : null
+  var rate = eps.currency && eps.currency === units.currency ? 1 : held ? held.value : null
   return rate ? price / units.per / (eps.value * rate) : null
 }
 
@@ -174,14 +172,15 @@ function peText(value) {
 // reads as. A day only takes the tone while its end is the one shown. The
 // cap moves with the headline price from its own date's close; a cap more
 // than CAP_MAX_AGE_DAYS whole days older than the price is left out. The
-// P/E is the headline price over the latest EPS (`peRatio`). The cap names
-// its currency wherever Yahoo does, so one in yen never reads as one in
-// dollars beside it, whatever the reader's own; a London cap is in GBP
-// while its prices are in GBp.
+// P/E is the headline price over the latest EPS, at its pair's rate in
+// `rates` where it needs one (`peRatio`). The cap names its currency
+// wherever Yahoo does, so one in yen never reads as one in dollars beside
+// it, whatever the reader's own; a London cap is in GBP while its prices
+// are in GBp.
 // Only an equity has cap and P/E slots, kept whether known or not, so the
 // line keeps its shape: the cap's as wide as its currency and 999.9B before
 // the cap comes; the P/E's as wide as 99.9.
-function yearLine(quote, figures, yearEnds) {
+function yearLine(quote, figures, yearEnds, rates) {
   if (!quote) return null
   var q = quote
   var head = Quote.headlineQuote(q)
@@ -205,7 +204,7 @@ function yearLine(quote, figures, yearEnds) {
   var facts = []
   if (hasFundamentals(q)) {
     var cap = figures ? figures.cap : null
-    var pe = head && figures ? peRatio(figures.eps, head.price, q.currency) : null
+    var pe = head ? peRatio(figures, head.price, q.currency, rates) : null
     // A currency code is three letters, the listing's in capitals until the
     // cap's own is known; with none named, the cap says none.
     var named = cap ? cap.currency : String(q.currency || "").toUpperCase()

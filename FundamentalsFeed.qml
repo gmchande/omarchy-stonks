@@ -3,19 +3,21 @@ import Quickshell.Io
 import "Fetch.js" as Fetch
 import "Fundamentals.js" as Fundamentals
 // Yahoo's dated cap and trailing EPS, one symbol at a time, kept for the
-// day. Curls in turn: the series, then the close on the cap's date, which
-// moves it with the price (`Fundamentals.yearLine`), then, when the EPS is
-// in another currency than the price, the rate between the two, kept for
-// the day by pair, so listings that share a pair ask it once. An entry is
-// "ok" with its figures, either of which may be null when Yahoo has none,
-// or "failed", keeping the last good figures; one whose rate failed keeps
-// its new cap, with no P/E. A failed one is asked again the next time it is
-// wanted. While Yahoo's gate pauses the host, a fetch fails at once.
+// day, and the rates their P/Es need, kept for the day by pair. Curls in
+// turn: the series, then the close on the cap's date, which moves it with
+// the price (`Fundamentals.yearLine`). An entry is "ok" with its figures,
+// either of which may be null when Yahoo has none, or "failed", keeping the
+// last good figures; a failed one is asked again the next time it is
+// wanted. Then, when the EPS is in another currency than the price and its
+// pair's rate is a day old or none was asked, the rate, once whichever
+// listing wants it first: a failed one is kept as no rate, so the pair has
+// no P/E until it is asked again a day later. While Yahoo's gate pauses the
+// host, a fetch fails at once, and a rate is left unasked.
 Item {
   id: root
 
   property var entries: ({})
-  // Rates by pair ("USDCAD"): { value, checkedAt }.
+  // By pair ("USDCAD"): { value, checkedAt }, value null after a failure.
   property var rates: ({})
   property var gate: null
   property var clearance: null
@@ -26,17 +28,18 @@ Item {
   // done.
   property string wanted: ""
   property string wantedCurrency: ""
-  // The fetch under way: { symbol, currency, step, figures }, step "series",
-  // "close", or "rate", figures null until the series are in.
+  // The fetch under way: { symbol, currency, step, figures, pair }, step
+  // "series", "close", or "rate", figures null until the series are in.
   property var job: null
 
   readonly property bool busy: job !== null || wanted !== ""
+  readonly property int day: 24 * 60 * 60
 
   function fetch(symbol, currency) {
     var normalized = String(symbol || "").toUpperCase()
     if (!normalized || (job && job.symbol === normalized)) return
-    var current = entries[normalized]
-    if (current && current.status === "ok" && root.nowSecond() - current.checkedAt < 24 * 60 * 60) return
+    var current = root.fresh(normalized)
+    if (current && root.rateHeld(Fundamentals.ratePair(current.figures, currency))) return
     root.wanted = normalized
     root.wantedCurrency = String(currency || "")
     root.launch()
@@ -46,11 +49,24 @@ Item {
     return Math.floor(Date.now() / 1000)
   }
 
+  // A symbol's entry while it is good for the day, else null.
+  function fresh(symbol) {
+    var current = entries[symbol]
+    return current && current.status === "ok" && root.nowSecond() - current.checkedAt < day ? current : null
+  }
+
+  // Whether a pair needs no asking today: no pair, or one asked within a day.
+  function rateHeld(pair) {
+    return !pair || (!!rates[pair] && root.nowSecond() - rates[pair].checkedAt < day)
+  }
+
   function launch() {
     if (job || !wanted) return
-    root.job = { symbol: wanted, currency: wantedCurrency, step: "series", figures: null }
+    var current = root.fresh(wanted)
+    root.job = { symbol: wanted, currency: wantedCurrency, step: "series", figures: null, pair: "" }
     root.wanted = ""
-    root.run(Fundamentals.fundamentalsUrl(job.symbol, root.nowSecond()))
+    if (current) root.askRate(current.figures)
+    else root.run(Fundamentals.fundamentalsUrl(job.symbol, root.nowSecond()))
   }
 
   function run(url) {
@@ -61,7 +77,8 @@ Item {
   function pump() {
     if (!pendingUrl || (clearance && !clearance())) return
     if (gate && gate.take(1) === 0) {
-      root.fail(job.symbol, null)
+      if (job.step === "rate") root.done()
+      else root.fail(job.symbol)
       return
     }
     if (gate) root.ticket = gate.ticket
@@ -80,75 +97,58 @@ Item {
   function receive(text) {
     var got = Fetch.answers(text)
     if (gate) gate.report(got.map(function(a) { return a.kind }), got.length ? got[0].retryAfter : 0, root.ticket)
-    var symbol = job.symbol
     var step = job.step
-    var json = null
+    var read = null
     try {
-      json = got.length && got[0].kind === "ok" ? JSON.parse(got[0].body) : null
+      var json = got.length && got[0].kind === "ok" ? JSON.parse(got[0].body) : null
+      read = step === "series" ? Fundamentals.parseFundamentals(json)
+        : step === "close" ? Fundamentals.withCapClose(job.figures, json)
+        : Fundamentals.parseRate(json, job.pair)
     } catch (e) {
-      json = null
+      read = null
     }
     if (step === "rate") {
-      var pair = Fundamentals.ratePair(job.figures, job.currency)
-      var rate = null
-      try {
-        rate = Fundamentals.parseRate(json, pair)
-      } catch (e) {
-        rate = null
-      }
-      if (rate === null) {
-        root.fail(symbol, job.figures)
-        return
-      }
       var held = Object.assign({}, rates)
-      held[pair] = { value: rate, checkedAt: root.nowSecond() }
+      held[job.pair] = { value: read, checkedAt: root.nowSecond() }
       root.rates = held
-      root.settle(symbol, Fundamentals.withRate(job.figures, rate))
-      return
-    }
-    var figures = null
-    try {
-      figures = step === "series" ? Fundamentals.parseFundamentals(json) : Fundamentals.withCapClose(job.figures, json)
-    } catch (e) {
-      figures = null
-    }
-    if (!figures) {
-      root.fail(symbol, null)
-      return
-    }
-    root.advance(step === "series" && figures.cap ? "close" : "rate", figures)
-  }
-
-  // The figures in hand, and the step they need next: the cap's close, or
-  // the EPS's rate, unless it needs none or a rate held from today serves.
-  function advance(step, figures) {
-    var pair = Fundamentals.ratePair(figures, job.currency)
-    var held = rates[pair]
-    if (step === "rate" && !pair) {
-      root.settle(job.symbol, figures)
-    } else if (step === "rate" && held && root.nowSecond() - held.checkedAt < 24 * 60 * 60) {
-      root.settle(job.symbol, Fundamentals.withRate(figures, held.value))
+      root.done()
+    } else if (!read) {
+      root.fail(job.symbol)
+    } else if (step === "series" && read.cap) {
+      root.job = Object.assign({}, job, { step: "close", figures: read })
+      root.run(Fundamentals.capCloseUrl(job.symbol, read))
     } else {
-      root.job = Object.assign({}, job, { step: step, figures: figures })
-      root.run(step === "close" ? Fundamentals.capCloseUrl(job.symbol, figures) : Fundamentals.rateUrl(pair))
+      root.keep(job.symbol, { status: "ok", figures: read, checkedAt: root.nowSecond() })
+      root.askRate(read)
     }
   }
 
-  function settle(symbol, figures) {
-    root.finish(symbol, { status: "ok", figures: figures, checkedAt: root.nowSecond() })
+  // The rate the figures' P/E needs, unless it needs none or it was asked
+  // within a day.
+  function askRate(figures) {
+    var pair = Fundamentals.ratePair(figures, job.currency)
+    if (root.rateHeld(pair)) {
+      root.done()
+      return
+    }
+    root.job = Object.assign({}, job, { step: "rate", pair: pair })
+    root.run(Fundamentals.rateUrl(pair))
   }
 
-  // A failed fetch keeps the last good figures, unless it brings newer ones.
-  function fail(symbol, figures) {
-    root.finish(symbol, Object.assign({ figures: null, checkedAt: 0 }, entries[symbol], { status: "failed" },
-      figures ? { figures: figures } : {}))
+  // A failed fetch keeps the last good figures.
+  function fail(symbol) {
+    root.keep(symbol, Object.assign({ figures: null, checkedAt: 0 }, entries[symbol], { status: "failed" }))
+    root.done()
   }
 
-  function finish(symbol, entry) {
-    root.pendingUrl = ""
+  function keep(symbol, entry) {
     var next = Object.assign({}, entries)
     next[symbol] = entry
     root.entries = next
+  }
+
+  function done() {
+    root.pendingUrl = ""
     root.job = null
     root.launch()
   }

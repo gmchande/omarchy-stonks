@@ -737,13 +737,14 @@ const figures = name => {
   return read.cap ? M.withCapClose(read, fixture(`fundamentals/${name}-closes.json`)) : read
 }
 const rate = pair => M.parseRate(fixture(`fundamentals/fx-${pair.toLowerCase()}.json`), pair)
-// A listing's figures as the feed settles them, its EPS with its rate when
-// it needs one, and its Friday day.
+// Yahoo's saved rates as the feed keeps them, by pair.
+const rates = Object.fromEntries(["USDCAD", "USDGBP", "USDAUD"].map(pair => [pair, { value: rate(pair), checkedAt: 0 }]))
+// A listing's figures as the feed keeps them, the pair its P/E needs, and
+// its Friday day.
 const listing = name => {
   const q = M.parseChart(fixture(`fundamentals/${name}-2026-10-25-day.json`))
   const f = figures(`${name}-2026-10-25`)
-  const pair = M.ratePair(f, q.currency)
-  return { q, f: pair ? M.withRate(f, rate(pair)) : f, pair }
+  return { q, f, pair: M.ratePair(f, q.currency) }
 }
 
 test("Yahoo's cap is the newer of its own snapshot and the quarter's end, with that date's close, beside the latest EPS", () => {
@@ -786,8 +787,8 @@ test("Yahoo's cap is the newer of its own snapshot and the quarter's end, with t
 // The research of 25 October read Yahoo's own live figures for these: each
 // cap within 3% of Yahoo's, each P/E within 4%.
 test("the 52-week line moves the cap with the price, and divides the price by the EPS in the price's currency", () => {
-  const year = (q, f) => said(M.yearLine(q, f))
-  const facts = (q, f) => year(q, f).split(" · ").slice(2).join(" · ")
+  const year = (q, f, held = rates) => said(M.yearLine(q, f, null, held))
+  const facts = (q, f, held) => year(q, f, held).split(" · ").slice(2).join(" · ")
   const read = name => facts(listing(name).q, listing(name).f)
   expect(read("aapl")).toBe("MKT CAP USD 5.07T · P/E 39.9")
   expect(read("pier")).toBe("MKT CAP USD 1.1B · P/E 15.5")
@@ -801,10 +802,12 @@ test("the 52-week line moves the cap with the price, and divides the price by th
   expect(read("shel-l")).toBe("MKT CAP GBP 223.5B · P/E 11.9")
   expect(listing("ore-ax").pair).toBe("USDAUD")
   expect(read("ore-ax")).toBe("MKT CAP AUD 279.7B · P/E 20.1")
-  // Without its rate a P/E is left out, never shown in the wrong currency;
-  // the cap still shows. A rate answer for another pair is no rate.
+  // Without its pair's rate, or after the rate failed, a P/E is left out,
+  // never shown in the wrong currency; the cap still shows. A rate answer
+  // for another pair is no rate.
   const shopTo = listing("shop-to")
-  expect(facts(shopTo.q, figures("shop-to-2026-10-25"))).toBe("MKT CAP CAD 304.6B · P/E _")
+  expect(facts(shopTo.q, shopTo.f, {})).toBe("MKT CAP CAD 304.6B · P/E _")
+  expect(facts(shopTo.q, shopTo.f, { USDCAD: { value: null, checkedAt: 0 } })).toBe("MKT CAP CAD 304.6B · P/E _")
   expect([rate("USDCAD"), M.parseRate(fixture("fundamentals/fx-usdgbp.json"), "USDCAD")]).toEqual([1.4004, null])
   // A price in a small unit other than pence, cents of rand against
   // earnings in rand, asks no rate and has no P/E.

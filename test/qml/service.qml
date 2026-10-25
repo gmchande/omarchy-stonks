@@ -266,6 +266,12 @@ ShellRoot {
     harness.writeTo(harness.dataPath, body, "rename", fn)
   }
 
+  // The USDCAD rate's last fetch made a day older.
+  function ageRate() {
+    var held = service.testFundamentalsFeed.rates.USDCAD
+    service.testFundamentalsFeed.rates = { USDCAD: { value: held.value, checkedAt: held.checkedAt - 25 * 60 * 60 } }
+  }
+
   // Runs SCRIPT in bash with the fake state's folder as $1, then FN.
   function stateThen(script, fn) {
     ticker.stop()
@@ -435,11 +441,13 @@ ShellRoot {
           settled && perSymbol.join() === "0,0,1,1,1" && harness.calls("FUNDAMENTALS") - harness.fundamentalsBefore === 6
             && shop.figures.cap.currency === "CAD" && shop.figures.cap.close > 0,
           JSON.stringify({ perSymbol: perSymbol, shop: shop }))
-        // Two listings in CAD with earnings in USD ask for USDCAD once.
+        // Two listings in CAD with earnings in USD ask for USDCAD once, and
+        // a listing in USD asks none.
         harness.check("a rate is asked once a day for its pair, not for each listing",
           settled && harness.calls("RATE") === 1 && harness.calls("USDCAD.rate") === 1
-            && shop.figures.eps.rate === 1.4004 && maple.figures.eps.rate === 1.4004 && service.fundamentals["MSFT"].figures.eps.rate === undefined,
-          JSON.stringify({ rates: harness.calls("RATE"), shop: shop.figures.eps, maple: maple.figures.eps }))
+            && Object.keys(service.rates).join() === "USDCAD" && service.rates.USDCAD.value === 1.4004
+            && shop.figures.eps.currency === "USD" && maple.figures.eps.currency === "USD",
+          JSON.stringify({ rates: harness.calls("RATE"), held: service.rates }))
         // Asked again the same day, and refreshed: nothing goes. The quotes
         // were answered seconds ago, under the refresh's 10 s floor, so the
         // step gives the refresh a moment rather than waiting on a quote.
@@ -453,24 +461,49 @@ ShellRoot {
         harness.check("a cap and P/E are fetched once a day, and never by a refresh",
           harness.calls("FUNDAMENTALS") === harness.fundamentalsBefore && harness.calls("RATE") === 1,
           (harness.calls("FUNDAMENTALS") - harness.fundamentalsBefore) + " sent")
-        // A day later, with the rate out of reach.
+        // A day later, with the rate out of reach: SHOP.TO's series are a day
+        // old, and so is the rate.
         var stale = Object.assign({}, service.testFundamentalsFeed.entries)
         stale["SHOP.TO"] = Object.assign({}, stale["SHOP.TO"], { checkedAt: stale["SHOP.TO"].checkedAt - 25 * 60 * 60 })
         service.testFundamentalsFeed.entries = stale
-        service.testFundamentalsFeed.rates = { USDCAD: { value: 1.4004, checkedAt: service.testFundamentalsFeed.rates.USDCAD.checkedAt - 25 * 60 * 60 } }
+        harness.ageRate()
         harness.stateThen("touch \"$1/RATE.down\"", function() {
           service.fetchFundamentals("SHOP.TO")
           harness.go(44)
         })
       } else if (harness.step === 44) {
-        var failed = service.fundamentals["SHOP.TO"]
-        if (failed.status !== "failed" && harness.waited < 5000) return
-        harness.check("a failed rate shows the new cap and no P/E, never one in the wrong currency",
-          failed.status === "failed" && harness.calls("RATE") === 2 && harness.calls("SHOP.TO.fundamentals") === 2
-            && !!failed.figures.cap && failed.figures.cap.close > 0 && !!failed.figures.eps && failed.figures.eps.rate === undefined,
-          JSON.stringify(failed))
-        harness.stateThen("rm -f \"$1/RATE.down\"", function() { harness.go(45) })
+        var asked = harness.calls("RATE") === 2 && !service.testFundamentalsFeed.busy
+        if (!asked && harness.waited < 5000) return
+        var renewed = service.fundamentals["SHOP.TO"]
+        harness.check("a failed rate leaves the new cap and no P/E, never one in the wrong currency",
+          asked && renewed.status === "ok" && harness.calls("SHOP.TO.fundamentals") === 2 && renewed.figures.cap.close > 0
+            && service.rates.USDCAD.value === null,
+          JSON.stringify({ shop: renewed, held: service.rates }))
+        // Both listings on the pair wanted again the same day, the rate still
+        // out of reach.
+        harness.fundamentalsBefore = harness.calls("FUNDAMENTALS")
+        service.fetchFundamentals("MAPLE.TO")
+        service.fetchFundamentals("SHOP.TO")
+        harness.go(45)
       } else if (harness.step === 45) {
+        if (harness.waited < 1500) return
+        harness.check("a failed rate counts as its pair's fetch for the day: no listing asks it again",
+          harness.calls("RATE") === 2 && harness.calls("FUNDAMENTALS") === harness.fundamentalsBefore,
+          (harness.calls("RATE") - 2) + " rates, " + (harness.calls("FUNDAMENTALS") - harness.fundamentalsBefore) + " fundamentals sent")
+        // The next day the rate answers, and MAPLE.TO's series are still
+        // fresh: the rate is asked alone, by the first listing that wants it.
+        harness.ageRate()
+        harness.stateThen("rm -f \"$1/RATE.down\"", function() {
+          service.fetchFundamentals("MAPLE.TO")
+          harness.go(46)
+        })
+      } else if (harness.step === 46) {
+        var back = service.rates.USDCAD.value === 1.4004 && !service.testFundamentalsFeed.busy
+        if (!back && harness.waited < 5000) return
+        harness.check("a day-old rate is asked again on its own, and serves every listing on its pair",
+          back && harness.calls("RATE") === 3 && harness.calls("MAPLE.TO.fundamentals") === 1
+            && harness.calls("FUNDAMENTALS") === harness.fundamentalsBefore,
+          JSON.stringify({ rates: harness.calls("RATE"), held: service.rates, maple: harness.calls("MAPLE.TO.fundamentals") }))
         // A day later, with Yahoo's fundamentals out of reach.
         var aged = Object.assign({}, service.testFundamentalsFeed.entries)
         harness.msftBefore = aged.MSFT
