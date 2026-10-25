@@ -39,7 +39,7 @@ Item {
   // picture's own in the screenshot, which no text size moves (`ShareCard`).
   property real fontSize: Style.font.caption
   property real letterSpacing: 1
-  property real spacing: Style.spacing.scale
+  property real spacing: Style.effectiveSpacingScale
   readonly property real lift: root.space(4)
   // Where the scrub's line stands, in this item's pixels, -1 without one.
   readonly property real scrubAt: root.chart && root.scrubX >= 0 ? root.chart.xAt(root.scrubX) : -1
