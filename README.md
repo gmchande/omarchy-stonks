@@ -210,13 +210,13 @@ sets how loud they are.
 Click the camera at the top right, or press `y`, for a picture of the chart
 you're looking at, laid out to share: the price large with its currency
 beside it, its move, the day's bull or bear, the exchange, the time of the
-price with its zone, the price the move is measured from, and at the foot
-the day's date or the range's length. Scrubbed, it shows the moment you
-scrubbed to. Your list is never in it. It lands where Omarchy's own
-screenshots do, on Omarchy 4.0 and on 4.5: a file in your screenshots
-folder, the picture on the clipboard, and Omarchy's notification, which
-opens it in your screenshot editor when you click it: Omasnap on 4.5,
-Tensaku on 4.0.
+price with its zone, the price the move is measured from, a range's high
+and low on its chart, and at the foot the day's date or the range's length.
+Scrubbed, it shows the moment you scrubbed to. Your list is never in it. It
+lands where Omarchy's own screenshots do, on Omarchy 4.0 and on 4.5: a file
+in your screenshots folder, the picture on the clipboard, and Omarchy's
+notification, which opens it in your screenshot editor when you click it:
+Omasnap on 4.5, Tensaku on 4.0.
 
 ## Keys
 

@@ -86,6 +86,15 @@ ShellRoot {
     return into
   }
 
+  // The range's high and low marks drawn on `item`: each one's price and
+  // date, or "none".
+  function marksSaid(item) {
+    return ["highMark", "lowMark"].map(function(name) {
+      var mark = find(item, name)
+      return mark && mark.visible ? find(mark, "markPrice").text + " " + find(mark, "markDate").text : "none"
+    }).join(" / ")
+  }
+
   readonly property string cacheDir: Quickshell.env("XDG_CACHE_HOME") + "/grvc.stonks"
   property string listedDir: shotsDir
   Process {
@@ -151,7 +160,7 @@ ShellRoot {
         var card = loader.item
         seen = { symbol: card.symbol, range: card.range, retro: card.retro, scrubX: card.scrubX, scrubT: card.scrubT,
           when: card.words ? card.words.when : "", span: card.words ? card.words.span : "",
-          currency: card.quote ? String(card.quote.currency || "") : "", texts: harness.texts(card) }
+          currency: card.quote ? String(card.quote.currency || "") : "", texts: harness.texts(card), marks: harness.marksSaid(card) }
       }
       if (loader) loader.loaded.connect(take)
       act()
@@ -264,7 +273,8 @@ ShellRoot {
       wait(300)
 
       // The window by the pointer, in retro, on AAPL's 1Y: a click on the
-      // camera takes the range.
+      // camera takes the range, with the high and low marks the window
+      // draws on its chart.
       service.persist({ style: "retro" })
       service.setRange("1Y")
       app.open("{}")
@@ -274,7 +284,9 @@ ShellRoot {
       var button = harness.find(win, "cameraButton")
       var year = shoot(win, function() { if (button) mouseClick(button, button.width / 2, button.height / 2) })
       problems = landed(year, "aapl", /^AAPL 1Y at .+$/).concat(ofChart(year, "AAPL", "1Y", "1 YEAR", rows))
-      harness.check("a click on the window's camera, in retro, takes AAPL's 1Y as it is shown",
+      var marks = harness.marksSaid(win)
+      if (year.card.marks !== marks || /none/.test(marks)) problems.push("marks " + year.card.marks + " against the window's " + marks)
+      harness.check("a click on the window's camera, in retro, takes AAPL's 1Y as it is shown, its high and low marked",
         problems.length === 0 && year.card.retro && win.cameraLit, problems.join("; "))
 
       // The pointer on the chart scrubs it, and y takes that moment: the
