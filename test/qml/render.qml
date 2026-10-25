@@ -512,17 +512,30 @@ ShellRoot {
       })
       // The US listings: Robinhood's word on which it trades all day, saved
       // with the sweep's moments, and every one at the moments before them;
-      // at a saved moment's folder, those Stonks asks Robinhood about.
+      // at a saved moment's folder, those Stonks asks Robinhood about, in
+      // the order its saved answer was asked in, since an answer's results
+      // pair with the symbols asked by place (Overnight.parseOvernight).
+      var day = named ? saved("robinhood-day") : null
+      var instruments = named ? saved("robinhood-instruments") : null
+      var asked = day ? JSON.parse(day).results.map(function(r) { return r.symbol }) : []
+      var place = function(s) { var i = asked.indexOf(Overnight.robinhoodSymbol(s)); return i < 0 ? asked.length : i }
       var us = named ? listed.filter(function(s) { return Overnight.hasOvernight(quotes[s], stub.calendars) })
+          .sort(function(a, b) { return place(a) - place(b) })
         : looked ? ["NEST", "KILN", "SPY", "BOLT", "BRK-A", "BRK-B"]
         : root.overnight.sweep ? ["NEST", "KILN", "SPY", "BOLT"] : listed
-      var tradable = root.overnight.sweep ? Overnight.parseAllDay(read("robinhood-instruments"), us) : root.overnight.power ? {} : null
+      // A saved moment missing either of Robinhood's answers, a fetch that
+      // failed, replays as Stonks stands without it: no word on all-day
+      // trading, or no night's prints.
+      var tradable = named ? (instruments ? Overnight.parseAllDay(JSON.parse(instruments), us) : null)
+        : root.overnight.sweep ? Overnight.parseAllDay(read("robinhood-instruments"), us) : root.overnight.power ? {} : null
       // What a surface opening at the moment holds: Robinhood's span=day
       // answer.
-      var answer = root.overnight.power ? {} : Overnight.parseOvernight(read("robinhood-day"), us)
+      var answer = named ? (day ? Overnight.parseOvernight(JSON.parse(day), us) : null)
+        : root.overnight.power ? {} : Overnight.parseOvernight(read("robinhood-day"), us)
       us.forEach(function(s) {
+        if (named && !tradable) return
         allDay[s] = { status: "ok", allDay: tradable ? tradable[s] : true, at: 0 }
-        if (allDay[s].allDay) nights[s] = Object.assign({ status: "ok" }, answer[s])
+        if (allDay[s].allDay && (answer || !named)) nights[s] = Object.assign({ status: "ok" }, answer[s])
       })
       // The moment each was saved at: Friday 2 October 13:42, Thursday
       // 1 October 23:00, Sunday 27 September 22:30, Monday 5 October 00:36;
