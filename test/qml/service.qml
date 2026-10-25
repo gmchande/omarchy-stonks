@@ -22,8 +22,9 @@ ShellRoot {
   property bool reading: false
   // Asked for before their quotes, which the add fetches, and again once
   // they are in: an ETF and a cryptocurrency, which the service never sends
-  // to Yahoo's fundamentals, and a Toronto listing, which it does.
-  readonly property var asking: ["SPY", "BTC-USD", "SHOP.TO"]
+  // to Yahoo's fundamentals, and two Toronto listings, which it does, each
+  // priced in CAD against earnings in USD.
+  readonly property var asking: ["SPY", "BTC-USD", "SHOP.TO", "MAPLE.TO"]
   property int askingAt: 0
   property bool asked: false
   property int fundamentalsBefore: 0
@@ -390,11 +391,11 @@ ShellRoot {
           lsProc.running = true
         })
       } else if (harness.step === 7) {
-        // Asked for before any quote said AAPL is an equity, its cap and P/E
-        // still arrive where the surfaces read them, each with its close.
+        // Asked for before any quote said AAPL is an equity, its cap and EPS
+        // still arrive where the surfaces read them, the cap with its close.
         var entry = service.fundamentals["AAPL"]
-        var ready = !!(entry && entry.status === "ok" && entry.figures.cap && entry.figures.pe
-          && entry.figures.cap.value === 4918530543600 && entry.figures.pe.close === 337)
+        var ready = !!(entry && entry.status === "ok" && entry.figures.cap && entry.figures.eps
+          && entry.figures.cap.value === 4918530543600 && entry.figures.cap.close > 0 && entry.figures.eps.currency === "USD")
         if (!ready && harness.waited < 5000) return
         harness.check("a cap and P/E asked for before the quote arrive once it does", ready, JSON.stringify(entry))
         harness.fundamentalsBefore = harness.calls("FUNDAMENTALS")
@@ -423,16 +424,22 @@ ShellRoot {
         service.fetchFundamentals("MSFT")
         harness.go(9)
       } else if (harness.step === 9) {
-        var settled = ["SHOP.TO", "MSFT"].every(function(s) {
+        var settled = ["SHOP.TO", "MAPLE.TO", "MSFT"].every(function(s) {
           return service.fundamentals[s] && service.fundamentals[s].status === "ok"
         }) && !service.testFundamentalsFeed.busy
         if (!settled && harness.waited < 5000) return
-        var perSymbol = ["SPY", "BTC-USD", "SHOP.TO", "MSFT"].map(function(s) { return harness.calls(s + ".fundamentals") })
+        var perSymbol = ["SPY", "BTC-USD", "SHOP.TO", "MAPLE.TO", "MSFT"].map(function(s) { return harness.calls(s + ".fundamentals") })
         var shop = service.fundamentals["SHOP.TO"]
+        var maple = service.fundamentals["MAPLE.TO"]
         harness.check("only an equity asks for a cap and P/E, a Toronto listing too: not an ETF or a cryptocurrency",
-          settled && perSymbol.join() === "0,0,1,1" && harness.calls("FUNDAMENTALS") - harness.fundamentalsBefore === 4
+          settled && perSymbol.join() === "0,0,1,1,1" && harness.calls("FUNDAMENTALS") - harness.fundamentalsBefore === 6
             && shop.figures.cap.currency === "CAD" && shop.figures.cap.close > 0,
           JSON.stringify({ perSymbol: perSymbol, shop: shop }))
+        // Two listings in CAD with earnings in USD ask for USDCAD once.
+        harness.check("a rate is asked once a day for its pair, not for each listing",
+          settled && harness.calls("RATE") === 1 && harness.calls("USDCAD.rate") === 1
+            && shop.figures.eps.rate === 1.4004 && maple.figures.eps.rate === 1.4004 && service.fundamentals["MSFT"].figures.eps.rate === undefined,
+          JSON.stringify({ rates: harness.calls("RATE"), shop: shop.figures.eps, maple: maple.figures.eps }))
         // Asked again the same day, and refreshed: nothing goes. The quotes
         // were answered seconds ago, under the refresh's 10 s floor, so the
         // step gives the refresh a moment rather than waiting on a quote.
@@ -444,8 +451,26 @@ ShellRoot {
       } else if (harness.step === 10) {
         if (harness.waited < 1500) return
         harness.check("a cap and P/E are fetched once a day, and never by a refresh",
-          harness.calls("FUNDAMENTALS") === harness.fundamentalsBefore,
+          harness.calls("FUNDAMENTALS") === harness.fundamentalsBefore && harness.calls("RATE") === 1,
           (harness.calls("FUNDAMENTALS") - harness.fundamentalsBefore) + " sent")
+        // A day later, with the rate out of reach.
+        var stale = Object.assign({}, service.testFundamentalsFeed.entries)
+        stale["SHOP.TO"] = Object.assign({}, stale["SHOP.TO"], { checkedAt: stale["SHOP.TO"].checkedAt - 25 * 60 * 60 })
+        service.testFundamentalsFeed.entries = stale
+        service.testFundamentalsFeed.rates = { USDCAD: { value: 1.4004, checkedAt: service.testFundamentalsFeed.rates.USDCAD.checkedAt - 25 * 60 * 60 } }
+        harness.stateThen("touch \"$1/RATE.down\"", function() {
+          service.fetchFundamentals("SHOP.TO")
+          harness.go(44)
+        })
+      } else if (harness.step === 44) {
+        var failed = service.fundamentals["SHOP.TO"]
+        if (failed.status !== "failed" && harness.waited < 5000) return
+        harness.check("a failed rate shows the new cap and no P/E, never one in the wrong currency",
+          failed.status === "failed" && harness.calls("RATE") === 2 && harness.calls("SHOP.TO.fundamentals") === 2
+            && !!failed.figures.cap && failed.figures.cap.close > 0 && !!failed.figures.eps && failed.figures.eps.rate === undefined,
+          JSON.stringify(failed))
+        harness.stateThen("rm -f \"$1/RATE.down\"", function() { harness.go(45) })
+      } else if (harness.step === 45) {
         // A day later, with Yahoo's fundamentals out of reach.
         var aged = Object.assign({}, service.testFundamentalsFeed.entries)
         harness.msftBefore = aged.MSFT

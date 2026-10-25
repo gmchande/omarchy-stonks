@@ -940,7 +940,7 @@ Item {
       return
     }
     root.pendingFundamentals = ""
-    if (Fundamentals.hasFundamentals(quote)) fundamentalsFeed.fetch(normalized)
+    if (Fundamentals.hasFundamentals(quote)) fundamentalsFeed.fetch(normalized, quote.currency)
   }
 
   // A quote that changed, by an answer, a restore, or a symbol leaving,

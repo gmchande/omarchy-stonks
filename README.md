@@ -15,7 +15,7 @@ move the pointer across the chart to see the price at any moment on it.
 - Two looks, smooth and retro, in your theme's colours, light or dark.
 - No account and no API key.
 
-It doesn't track holdings, send price alerts, or convert currencies.
+It doesn't track holdings, send price alerts, or convert prices into another currency.
 
 Website: [getstonks.app](https://getstonks.app)
 
@@ -73,7 +73,10 @@ first is the range's: on 1D the day's, beside its open and volume, and on a
 longer range that range's, beside START, the price its change is measured
 from, and the volume traded over it. The second is the past 52 weeks', beside
 the market cap and P/E. The market cap is an estimate: Yahoo's last reported
-figure, moved with the price since.
+figure, moved with the price since. The P/E is the price over the last
+year's earnings per share. Where a company reports earnings in another
+currency, as Shopify does in US dollars, Stonks converts them at Yahoo's
+rate of the day, inside the P/E alone.
 
 The top line says where the market is, in its own time: counting down to
 the open or the close, after hours, or closed. With less room, as at a
@@ -377,7 +380,8 @@ The shell's log the form asks for can name the prices Stonks left out.
   output wakes before the sound and none of it is cut; a replay waits for
   the output instead, so its sound keeps in step with its sweep.
 - **Sites:** `query1.finance.yahoo.com` for quotes, charts, and the market
-  cap and P/E; `query2.finance.yahoo.com` for search; `api.robinhood.com`
+  cap and P/E, with the day's currency rate a P/E needs;
+  `query2.finance.yahoo.com` for search; `api.robinhood.com`
   for overnight prices and which stocks trade overnight; and
   `raw.githubusercontent.com` for the newest version number, as the shell
   starts and then once a day; when no answer comes, again once Yahoo

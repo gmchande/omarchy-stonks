@@ -137,8 +137,10 @@ building one that won't merge.
   guess it. The headline price is Yahoo's regular-market quote. If that price
   is missing, keep the last regular chart trade, labelled "Last trade"
   with its time. Only a failed or overdue refresh shows a "!".
-- **Money.** No currency conversion: each listing in its own currency, with
-  its code beside the exchange, as Apple's Stocks does.
+- **Money.** Each listing in its own currency, with its code beside the
+  exchange, as Apple's Stocks does: nothing shown is converted. A rate may
+  serve inside a ratio, such as a P/E whose earnings are reported in
+  another currency, from Yahoo's own quotes, never a new source.
 - **Time.** An exchange's times are its own, with its zone named when it
   differs from the reader's. Never assume New York.
 - **Colour.** Up is the theme's green and down its red (the shell's urgent),
