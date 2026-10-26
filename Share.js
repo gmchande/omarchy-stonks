@@ -21,9 +21,11 @@ function pictureDay(day) {
   return Object.assign({}, day, { axis: Object.assign({}, axis, { end: Math.max(axis.start, newest) }) })
 }
 
-// Where `t` falls in `quote`'s exchange: its date, clock, and zone's name.
+// Where `t` falls in `quote`'s exchange: its date, clock, and zone's name,
+// by the calendar that knows that day's clock (`Market.clockCalendar`),
+// else by Yahoo's.
 function local(quote, t, calendars) {
-  var cal = quote.calendar || Market.calendarFor(calendars, quote)
+  var cal = Market.clockCalendar(quote, t, calendars)
   if (cal) {
     var day = Market.localDate(t, cal)
     return { y: day.y, m: day.m, d: day.d, weekday: day.weekday, clock: Market.clockOf(day), zone: Market.zoneName(cal, day.offset, quote) }

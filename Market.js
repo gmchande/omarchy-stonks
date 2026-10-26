@@ -274,13 +274,22 @@ function scrubPhase(quote, t) {
   return session === "reg" ? "open" : session || "closed"
 }
 
-// A time where `quote` trades: by its calendar's offset for that moment's
-// date, the series' own or the listing's in `calendars`, so a time across a
-// change of clocks reads true; else by the clock Yahoo's periods say its
-// day kept (`Quote.clockAt`). Its zone is named where the reader's clock
-// differs.
-function printClock(quote, t, calendars) {
+// The calendar that knows the clock of `quote`'s exchange at `t`: the
+// series' own or the listing's in `calendars`, while `t` falls on a day up
+// to its last (`validThrough`). Null past it, where a change of clocks it
+// doesn't list would read as standard time, an hour out: found in review,
+// Toronto's July 2027 close read "15:00 EST".
+function clockCalendar(quote, t, calendars) {
   var cal = quote.calendar || calendarFor(calendars, quote)
+  return cal && dateStringOf(localDate(t, cal)) <= cal.validThrough ? cal : null
+}
+
+// A time where `quote` trades: by its calendar's offset for that moment's
+// date (`clockCalendar`), so a time across a change of clocks reads true;
+// else by the clock Yahoo's periods say its day kept (`Quote.clockAt`), or
+// Yahoo's own offset. Its zone is named where the reader's clock differs.
+function printClock(quote, t, calendars) {
+  var cal = clockCalendar(quote, t, calendars)
   if (cal) return calendarClock(cal, t, quote)
   var clock = Quote.clockAt(quote, t)
   return Format.zonedHhmm(t, clock.offset, clock.zone)
