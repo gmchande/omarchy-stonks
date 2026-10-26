@@ -5,7 +5,6 @@ import Quickshell
 import qs.Commons
 import qs.Commons as Commons
 import "History.js" as History
-import "KeyText.js" as KeyText
 // Tiled app window. Owns window lifecycle, keys, and look; the body reads
 // the service and owns the list, search, scrub, and help.
 Item {
@@ -119,51 +118,11 @@ Item {
       Keys.onPressed: function(event) {
         var body = root.body
         if (body.ownsKeys) return
-        // A letter by its key and Shift: Caps Lock sends "O" for o.
-        var t = KeyText.typed(event)
         if (event.key === Qt.Key_Escape) {
           if (body.showingHelp) body.showingHelp = false
           else if (!body.endScrub()) root.close()
           event.accepted = true
-          return
-        }
-        if (event.key === Qt.Key_Up) { body.moveCursor(-1); event.accepted = true }
-        else if (event.key === Qt.Key_Down) { body.moveCursor(1); event.accepted = true }
-        else if (event.key === Qt.Key_Left) { body.nudgeScrub(-1); event.accepted = true }
-        else if (event.key === Qt.Key_Right) { body.nudgeScrub(1); event.accepted = true }
-        else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-          body.featureSymbol(body.watchlist.cursorRow)
-          event.accepted = true
-        } else if (event.key === Qt.Key_Backspace || event.key === Qt.Key_Delete) {
-          body.removeRow(body.watchlist.cursorRow)
-          event.accepted = true
-        } else {
-          if (t === "?") body.toggleHelp()
-          else if (t === "a" || t === "+") body.startAdding()
-          else if (t === "x") body.removeRow(body.watchlist.cursorRow)
-          else if (t === "X") body.openRowMenu(body.watchlist.cursorRow, null)
-          else if (t === "c") body.cycleChangeMode()
-          else if (t === "r") root.refresh()
-          else if (t === "[") body.stepRange(-1)
-          else if (t === "]") body.stepRange(1)
-          else if (t === "p") body.replay()
-          else if (t === "y") body.takeScreenshot()
-          else if (t === "s") body.toggleStyle()
-          else if (t === "S") body.toggleSounds()
-          else if (t === "o") body.cycleOrder()
-          else if (t === "O") body.reverseOrder()
-          else if (t === "w") body.openListMenu()
-          else if (t === "W") body.openManageLists()
-          else if (t === "m") body.openSymbolLists(body.watchlist.cursorRow)
-          else if (t === "u") body.undoRemoval()
-          else if (t === ",") body.stepList(-1)
-          else if (t === ".") body.stepList(1)
-          else if (t === "J") body.moveSelected(1)
-          else if (t === "K") body.moveSelected(-1)
-          else if (t >= "1" && t <= "9") body.featureAt(Number(t) - 1)
-          else return
-          event.accepted = true
-        }
+        } else if (body.pressKey(event)) event.accepted = true
       }
 
       // Past the body's width, on the window's margins, a click off the

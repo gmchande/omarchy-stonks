@@ -301,7 +301,6 @@ ShellRoot {
     function setOrder(value) { order = value; reversed = false }
     function reverseOrder() { reversed = !reversed }
     function switchList(name) {}
-    function stepList(delta) {}
     function createList(name) { return "" }
   }
 
@@ -339,6 +338,7 @@ ShellRoot {
         fontFamily: stub.fontFamily
         surfaceOpen: true
         margins: surface.wide ? Style.space(16) : 0
+        switchesPanels: !surface.wide
         chartHeight: surface.wide ? Style.space(220) : Style.space(190)
       }
     }

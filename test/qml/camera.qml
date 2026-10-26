@@ -243,20 +243,20 @@ ShellRoot {
       wait(100)
       var still = shots().length
       var unlit = !body.cameraLit
-      var rest = shoot(body, function() { keyClick(Qt.Key_Y) })
+      var rest = shoot(body, function() { keyClick(Qt.Key_C, Qt.ControlModifier) })
       var problems = landed(rest, "aapl", /^AAPL at .+$/).concat(ofChart(rest, "AAPL", "1D", "TUE 1 SEP 2026", rows))
-      harness.check("y in the popup saves one picture of AAPL's day in the pictures folder, copies it as a PNG, and sends Omarchy's notification with it",
+      harness.check("Ctrl+C in the popup saves one picture of AAPL's day in the pictures folder, copies it as a PNG, and sends Omarchy's notification with it",
         problems.length === 0 && still === 0 && rest.card.scrubX === -1 && !rest.card.retro, problems.join("; "))
       harness.check("the camera lights after its first shot, and not before", unlit && body.cameraLit)
 
       // Scrubbed back two steps: the picture shows the scrub and says its
       // time, and the footer names it.
-      keyClick(Qt.Key_H)
-      keyClick(Qt.Key_H)
+      keyClick(Qt.Key_Left)
+      keyClick(Qt.Key_Left)
       tryVerify(function() { return body.scrubT !== 0 }, 2000)
-      var scrubbed = shoot(body, function() { keyClick(Qt.Key_Y) })
+      var scrubbed = shoot(body, function() { keyClick(Qt.Key_C, Qt.ControlModifier) })
       problems = landed(scrubbed, "aapl", /^AAPL at \d\d:\d\d$/).concat(ofChart(scrubbed, "AAPL", "1D", "TUE 1 SEP 2026", rows))
-      harness.check("scrubbed, y takes the scrub: the picture shows it and says its time, its date only at the foot, and the footer says it too",
+      harness.check("scrubbed, Ctrl+C takes the scrub: the picture shows it and says its time, its date only at the foot, and the footer says it too",
         problems.length === 0 && scrubbed.card.scrubT === body.scrubShown && scrubbed.card.scrubX >= 0 && /^AT \d\d:\d\d [A-Z]+$/.test(scrubbed.card.when)
           && scrubbed.name !== rest.name,
         problems.join("; ") + " | " + scrubbed.card.when + " | " + scrubbed.footer)
@@ -289,16 +289,16 @@ ShellRoot {
       harness.check("a click on the window's camera, in retro, takes AAPL's 1Y as it is shown, its high and low marked",
         problems.length === 0 && year.card.retro && win.cameraLit, problems.join("; "))
 
-      // The pointer on the chart scrubs it, and y takes that moment: the
+      // The pointer on the chart scrubs it, and Ctrl+C takes that moment: the
       // way a mouse hand takes a scrubbed picture, since leaving the chart
       // for the camera ends the scrub.
       app.testKeyCatcher.forceActiveFocus()
       var chart = win.chartItem
       mouseMove(chart, chart.width * 0.4, chart.height / 2)
       tryVerify(function() { return win.scrubT !== 0 }, 2000)
-      var hovered = shoot(win, function() { keyClick(Qt.Key_Y) })
+      var hovered = shoot(win, function() { keyClick(Qt.Key_C, Qt.ControlModifier) })
       problems = landed(hovered, "aapl", /^AAPL 1Y on .+$/).concat(ofChart(hovered, "AAPL", "1Y", "1 YEAR", rows))
-      harness.check("y with the pointer on the window's chart takes the bar the pointer reads",
+      harness.check("Ctrl+C with the pointer on the window's chart takes the bar the pointer reads",
         problems.length === 0 && hovered.card.scrubT === win.scrubShown && hovered.card.scrubX >= 0,
         problems.join("; ") + " | " + hovered.card.scrubT + " vs " + win.scrubShown)
       mouseMove(win, 1, 1)
@@ -310,9 +310,9 @@ ShellRoot {
       service.feature("BTC-USD")
       tryVerify(function() { return win.featuredSymbol === "BTC-USD" && !win.chartLoading && !win.historyActive }, 8000)
       app.testKeyCatcher.forceActiveFocus()
-      var coin = shoot(win, function() { keyClick(Qt.Key_Y) })
+      var coin = shoot(win, function() { keyClick(Qt.Key_C, Qt.ControlModifier) })
       problems = landed(coin, "btc-usd", /^BTC-USD at \d\d:\d\d(?: [A-Z]+)?$/).concat(ofChart(coin, "BTC-USD", "1D", "SAT 12 SEP 2026", rows))
-      harness.check("y in the window takes Bitcoin's day", problems.length === 0, problems.join("; "))
+      harness.check("Ctrl+C in the window takes Bitcoin's day", problems.length === 0, problems.join("; "))
 
       // Omarchy 4.5 hands its screenshots to Omasnap, which keeps them in a
       // folder of its own; 4.0 to Tensaku, in the pictures folder. Each shot
@@ -348,7 +348,7 @@ ShellRoot {
         if (step.omasnap) env.PATH = Quickshell.env("STONKS_OMASNAP") + ":" + Quickshell.env("PATH")
         camera.testEnvironment = env
         app.testKeyCatcher.forceActiveFocus()
-        var shot = shoot(win, function() { keyClick(Qt.Key_Y) }, step.folder)
+        var shot = shoot(win, function() { keyClick(Qt.Key_C, Qt.ControlModifier) }, step.folder)
         problems = landed(shot, "btc-usd", /^BTC-USD at \d\d:\d\d(?: [A-Z]+)?$/, step.folder, step.editor)
         harness.check(step.label, problems.length === 0, problems.join("; "))
       }

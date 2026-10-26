@@ -194,7 +194,6 @@ ShellRoot {
     property var memberships: []
     function setMembership(symbol, name, member) { memberships = memberships.concat([symbol + "|" + name + "|" + member]) }
     function switchList(name) {}
-    function stepList(delta) {}
     function createList(name) { return "" }
   }
 

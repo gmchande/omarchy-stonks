@@ -412,8 +412,9 @@ ShellRoot {
         // precedence; the late add must not replace that selected hero.
         if (!mouse) {
           app.testKeys.forceActiveFocus()
-          keyClick("1")
-          root.check("a number key selects its displayed row over a pending add", service.featuredSymbol === body.watchlist.displayedSymbols[0])
+          for (var up = 0; up < body.watchlist.displayedSymbols.length; up++) keyClick(Qt.Key_Up)
+          keyClick(Qt.Key_Return)
+          root.check("Up to the top row and Enter selects it over a pending add", service.featuredSymbol === body.watchlist.displayedSymbols[0])
         }
         flag(symbol + ".quote.hold", false)
         awaitState(function() { return service.arriving.indexOf(symbol) < 0 }, 7000)

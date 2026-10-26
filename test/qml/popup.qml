@@ -1,4 +1,5 @@
 import QtQuick
+import QtTest
 import Quickshell
 import Quickshell.Io
 import qs.Commons
@@ -8,10 +9,11 @@ import "plugin/Quote.js" as Quote
 import "plugin/Settings.js" as Settings
 import "plugin" as Stonks
 
-// The real Panel and a real pill on a stub service, under the Wayland session
-// without mapping: lifecycle, list views, safe input and the pill wheel;
-// and on the real Service and version watch, the
-// first-run hint and the footer's notices.
+// The real Panel and a real pill on a stub service, offscreen, its card in a
+// plain window (CardWindow.qml) and pressed with real Qt keys: lifecycle,
+// list views, safe input and the pill wheel; and on the real Service and
+// version watch, the first-run hint, the footer's notices, the undo, and
+// search's field keeping the keys.
 ShellRoot {
   id: test
   property int failures: 0
@@ -34,7 +36,10 @@ ShellRoot {
     property var symbols: ["AAPL", "MSFT"]
     property var library: symbols
     property string listName: ""
-    property var lists: [{ name: "", label: "All", count: symbols.length, symbols: symbols }]
+    // All, a two-symbol list, and an empty one, as the list menu shows them.
+    property var lists: [{ name: "", label: "All", count: library.length, symbols: library }].concat(namedLists.map(function(l) {
+      return { name: l.name, label: l.name, count: l.symbols.length, symbols: l.symbols }
+    }))
     property var quotes: ({})
     property var entries: ({})
     property var histories: ({})
@@ -75,15 +80,12 @@ ShellRoot {
     function removeSymbol(symbol) {}
     function setManualOrder(next) { symbols = next.slice(); order = "manual" }
     function setOrder(value) { order = value }
-    function switchList(name) {}
-    // All, a two-symbol list, and an empty one, stepped the way , and . do.
+    // The list menu's choice: All is the library from step 14 on.
     property var allSymbols: []
     property var namedLists: [{ name: "Short", symbols: ["MZ", "AAPL"] }, { name: "Empty", symbols: [] }]
-    function stepList(delta) {
-      var names = [""].concat(namedLists.map(function(l) { return l.name }))
-      var next = names[(names.indexOf(listName) + delta + names.length) % names.length]
-      symbols = next === "" ? allSymbols : namedLists.filter(function(l) { return l.name === next })[0].symbols
-      listName = next
+    function switchList(name) {
+      symbols = name === "" ? allSymbols : namedLists.filter(function(l) { return l.name === name })[0].symbols
+      listName = name
     }
     function createList(name) { return "" }
   }
@@ -214,6 +216,44 @@ ShellRoot {
     return null
   }
 
+  // Real keys into a popup's card: the key tester sits in that card, so
+  // its keys go to the card's window. It never runs as a test itself.
+  TestCase {
+    id: keys
+    name: "PopupKeys"
+    when: false
+  }
+  function press(popup, key, modifiers) {
+    keys.parent = popup.testKeyCatcher
+    keys.keyClick(key, modifiers === undefined ? Qt.NoModifier : modifiers)
+  }
+  // Until `ready` holds, for up to a second: the views and the popup take
+  // the keys a turn after they open or close.
+  function waitFor(ready) {
+    for (var i = 0; i < 100 && !ready(); i++) keys.wait(10)
+  }
+  // Until the popup has its keys, as it takes them when it opens and a turn
+  // after a view closes.
+  function focusKeys(popup) {
+    test.waitFor(function() { return popup.testBodyKeys.activeFocus })
+  }
+  // A switch through the list menu: l, then the arrows `steps` rows from
+  // the list on show (down for more than 0), then Enter.
+  function switchByMenu(steps) {
+    test.focusKeys(panel)
+    test.press(panel, "l")
+    var menu = test.find(panel.testBody, "listMenu")
+    test.waitFor(function() { return menu.activeFocus })
+    for (var i = 0; i < Math.abs(steps); i++) test.press(panel, steps > 0 ? Qt.Key_Down : Qt.Key_Up)
+    test.press(panel, Qt.Key_Return)
+  }
+  // A row's chart, shown as a click on the row shows it.
+  function featureRow(index) {
+    var symbol = panel.testWatchlist.displayedSymbols[index]
+    service.feature(symbol)
+    panel.testWatchlist.select(symbol)
+  }
+
   function sampleQuote(symbol, price) {
     return {
       symbol: symbol, name: symbol, currency: "USD", exchange: "NASDAQ",
@@ -284,12 +324,14 @@ ShellRoot {
       // The key sheet closes before a view opens or a row key acts, as in the
       // window: one body rule, not each host's dispatcher.
       panel.testBody.showingHelp = true
-      panel.testKeyCatcher.textKey("a")
+      test.focusKeys(panel)
+      test.press(panel, "a")
       var searchAlone = !panel.testBody.showingHelp && panel.testBody.adding
       panel.testBody.cancelAdding()
       panel.testBody.showingHelp = true
-      panel.testKeyCatcher.moveRequested(0, 1)
-      test.check("in the popup, a over the key sheet opens search alone, and a row key shows the rows",
+      test.focusKeys(panel)
+      test.press(panel, Qt.Key_Down)
+      test.check("in the popup, a over the key sheet opens search alone, and ↓ shows the rows",
         searchAlone && !panel.testBody.showingHelp, searchAlone + "|" + panel.testBody.showingHelp)
       // ↓ put the cursor off the featured row; the key sheet, shown and
       // closed by ? and ? or by Escape, and Manage lists leave it there,
@@ -301,14 +343,14 @@ ShellRoot {
       var wl = panel.testBody.watchlist
       var keyedRow = wl.cursorRow
       var kept = []
-      panel.testKeyCatcher.textKey("?")
+      test.press(panel, "?")
       kept.push(wl.cursorRow)
-      panel.testKeyCatcher.textKey("?")
+      test.press(panel, "?")
       kept.push(wl.cursorRow)
-      panel.testKeyCatcher.textKey("?")
-      panel.testKeyCatcher.closeRequested()
+      test.press(panel, "?")
+      test.press(panel, Qt.Key_Escape)
       kept.push(wl.cursorRow)
-      panel.testKeyCatcher.textKey("W")
+      panel.testBody.openManageLists()
       kept.push(wl.cursorRow)
       panel.testBody.closeListViews()
       kept.push(wl.cursorRow)
@@ -524,7 +566,7 @@ ShellRoot {
           panel.close()
           panel.testBody.selectRange("1D")
           service.histories = ({})
-          panel.testBody.featureAt(0)
+          test.featureRow(0)
           panel.open()
         } else if (test.step === 2) {
           // Opening alone keeps the bar from revealing on hover, once the
@@ -545,11 +587,11 @@ ShellRoot {
           service.histories = {
             "AAPL|1W": test.history("AAPL", "1W"), "MSFT|1W": test.history("MSFT", "1W")
           }
-          panel.testBody.featureAt(1)
+          test.featureRow(1)
         } else if (test.step === 5) {
           test.shown("a cached range on a symbol change", panel.featuredSymbol === "MSFT")
           service.histories = { "MSFT|1W": test.history("MSFT", "1W") }
-          panel.testBody.featureAt(0)
+          test.featureRow(0)
         } else if (test.step === 6) {
           // A symbol change on a range whose history is not in keeps the last
           // chart whole until it lands (the owner's rule: never a third state).
@@ -562,14 +604,14 @@ ShellRoot {
         } else if (test.step === 7) {
           test.shown("an uncached range on a symbol change, once its response lands")
           panel.testBody.selectRange("1D")
-          panel.testBody.featureAt(1)
+          test.featureRow(1)
         } else if (test.step === 8) {
           test.shown("the day on a symbol change")
-          panel.testBody.featureAt(0)
+          test.featureRow(0)
           panel.testBody.selectRange("1W")
           var inHand = !panel.testBody.chartLoading && panel.testBody.chartRange === "1W"
           panel.testBody.selectRange("1D")
-          panel.testBody.featureAt(1)
+          test.featureRow(1)
           panel.testBody.selectRange("1M")
           var onItsWay = panel.testBody.chartLoading && !!panel.testBody.chart && panel.testBody.chartSymbol === "MSFT" && panel.testBody.chartRange === "1D"
           test.check("a cached range selects its data, an uncached range keeps the previous data while loading", inHand && onItsWay)
@@ -582,13 +624,13 @@ ShellRoot {
           test.closeHolding()
         } else if (test.step === 9) {
           test.heldThroughFade()
-          panel.testBody.featureAt(0)
+          test.featureRow(0)
           panel.close()
         } else if (test.step === 10) {
           test.check("a close after a symbol change closes the popup", !panel.opened)
           panel.open()
           test.check("reopening shows that symbol", panel.testBody.chartSymbol === service.featuredSymbol)
-          panel.testBody.featureAt(1)
+          test.featureRow(1)
           panel.open()
         } else if (test.step === 11) {
           test.setFixtureWatchlist()
@@ -601,8 +643,8 @@ ShellRoot {
           // Under the key sheet, a sort that carries the cursor's row below
           // the rows' view lets the cursor go, though the card has shrunk to
           // the sheet: the rows' view is what counts. From Grok's review of
-          // #24: the hidden rows kept the cursor, so x, Enter, or m acted on
-          // a row out of sight.
+          // #24: the hidden rows kept the cursor, so Delete, Enter, or the
+          // lists checklist acted on a row out of sight.
           list.contentY = 0
           var inView = Math.floor((list.height + list.rowGap) / list.rowPitch)
           var sortedPct = Settings.sortedSymbols(service.symbols, service.quotes, "pct", false)
@@ -610,34 +652,42 @@ ShellRoot {
             return i < inView - 1 && sortedPct.indexOf(s) > inView + 1
           })[0]
           list.select(carriedRow)
-          panel.testKeyCatcher.textKey("?")
+          // The search step 1 kept open through the closes gives the keys
+          // back to the popup.
+          panel.testBody.cancelAdding()
+          test.focusKeys(panel)
+          test.press(panel, "?")
+          var underSheet = panel.testBody.showingHelp
           service.setOrder("pct")
           var afterSortUnder = [list.cursorSymbol, list.cursorRow]
           service.setOrder("manual")
-          panel.testKeyCatcher.textKey("?")
+          test.press(panel, "?")
           test.check("in the popup, a sort under the key sheet that carries the cursor's row below the rows' view lets it go",
-            carriedRow !== undefined && afterSortUnder[0] === "" && afterSortUnder[1] !== carriedRow,
-            carriedRow + " | " + afterSortUnder.join(","))
+            underSheet && carriedRow !== undefined && afterSortUnder[0] === "" && afterSortUnder[1] !== carriedRow,
+            underSheet + " | " + carriedRow + " | " + afterSortUnder.join(","))
           panel.testBody.featureSymbol("MZ")
-          // The popup's own key route: W and m reach the list views through the
-          // real catcher, which then stands aside so j, x, and esc reach the view.
-          // Each keeps the card's height: it fits the rows' room.
-          panel.testKeyCatcher.textKey("W")
+          // The popup's own key route: l reaches the list menu through the
+          // popup's keys, and the menu's Manage lists… opens Manage lists;
+          // each then takes the keys, the catcher standing aside. Each keeps
+          // the card's height: it fits the rows' room.
+          test.focusKeys(panel)
+          test.press(panel, "l")
         } else if (test.step === 13) {
-          test.check("W opens Manage lists in the popup, which takes the keys",
-            panel.testBody.managingLists && panel.testKeyCatcher.blocked,
-            panel.testKeyCatcher.blocked)
+          var menu = test.find(panel.testBody, "listMenu")
+          test.check("l opens the list menu in the popup, which takes the keys",
+            panel.testBody.listMenuOpen && menu.activeFocus && panel.testKeyCatcher.blocked,
+            panel.testBody.listMenuOpen + "|" + menu.activeFocus + "|" + panel.testKeyCatcher.blocked)
+          for (var row = 0; row < menu.manageIndex; row++) test.press(panel, Qt.Key_Down)
+          test.press(panel, Qt.Key_Return)
+          test.check("the list menu's Manage lists…, taken with ↓ and Enter, opens Manage lists, which takes the keys",
+            panel.testBody.managingLists && !panel.testBody.listMenuOpen && panel.testKeyCatcher.blocked,
+            panel.testBody.managingLists + "|" + panel.testBody.listMenuOpen + "|" + panel.testKeyCatcher.blocked)
           panel.close()
           test.check("closing keeps Manage lists for the fade", panel.testBody.managingLists)
           panel.open()
           test.check("the next open closes Manage lists and gives the keys back",
             !panel.testBody.managingLists && !panel.testKeyCatcher.blocked)
-          panel.testKeyCatcher.textKey("m")
         } else if (test.step === 14) {
-          test.check("m opens the cursor row's lists in the popup, which takes the keys",
-            panel.testBody.listsSymbol === "MZ" && panel.testKeyCatcher.blocked,
-            panel.testBody.listsSymbol + "|" + panel.testKeyCatcher.blocked + "|" + panel.testKeyCatcher.blocked)
-          panel.testBody.closeListViews()
           // A high-resolution wheel sends a notch as small ticks: the pill
           // carries three quarters without a step, and the fourth moves the
           // featured symbol one row down.
@@ -651,24 +701,25 @@ ShellRoot {
           service.library = service.allSymbols
         } else if (test.step === 15) {
           test.check("editing a search keeps its stale results and cancel returns the rows", test.typeSearch())
-          panel.testKeyCatcher.textKey(".")
+          test.switchByMenu(1)
         } else if (test.step === 16) {
-          test.check(". switches to the two-symbol list", service.listName === "Short" && service.symbols.length === 2)
-          panel.testKeyCatcher.textKey(".")
+          test.check("the list menu switches to the two-symbol list", service.listName === "Short" && service.symbols.length === 2)
+          test.switchByMenu(1)
         } else if (test.step === 17) {
-          test.check(". switches to the empty list", service.listName === "Empty" && service.symbols.length === 0)
+          test.check("the list menu switches to the empty list", service.listName === "Empty" && service.symbols.length === 0)
           panel.testBody.startAdding()
         } else if (test.step === 18) {
           test.check("search on an empty list keeps its results and cancel acts", test.typeSearch())
-          panel.testKeyCatcher.textKey(",")
+          test.switchByMenu(-1)
         } else if (test.step === 19) {
-          test.check(", returns to the two-symbol list with its own rows", service.listName === "Short" && panel.testWatchlist.displayedSymbols.length === 2)
-          panel.testKeyCatcher.textKey(",")
+          test.check("the list menu returns to the two-symbol list with its own rows", service.listName === "Short" && panel.testWatchlist.displayedSymbols.length === 2)
+          test.switchByMenu(-1)
         } else if (test.step === 20) {
-          panel.testKeyCatcher.textKey("?")
+          test.focusKeys(panel)
+          test.press(panel, "?")
         } else if (test.step === 21) {
           test.check("? opens the sheet", panel.testBody.showingHelp)
-          panel.testKeyCatcher.textKey("?")
+          test.press(panel, "?")
         } else if (test.step === 22) {
           test.check("? returns to the rows", !panel.testBody.showingHelp)
           var wheeled = panel.testWatchlist
@@ -876,8 +927,9 @@ ShellRoot {
           service.changeMode = "pct"
           service.feature("AAPL")
           panel.open()
-          panel.testKeyCatcher.textKey("c")
-          panel.testKeyCatcher.textKey("c")
+          test.focusKeys(panel)
+          test.press(panel, "c")
+          test.press(panel, "c")
           var mode = service.changeMode
           service.feature("MZ")
           panel.close()
@@ -885,7 +937,7 @@ ShellRoot {
           test.check("c changes the mode and a reopened popup shows the newly selected symbol", mode === "open" && panel.testBody.chartSymbol === "MZ")
           panel.close()
           service.changeMode = "pct"
-          // A removal leaves the footer on the add, and u takes it back
+          // A removal leaves the footer on the add, and Ctrl+Z takes it back
           // later, after other looking around.
           test.hintPanel.open()
           test.removedEarlier = test.hintService.library[0]
@@ -894,20 +946,21 @@ ShellRoot {
         } else if (test.step === 44) {
           var gone = test.removedEarlier
           var goneMeanwhile = test.hintService.library.indexOf(gone) < 0
-          test.hintPanel.testKeyCatcher.textKey("u")
+          test.focusKeys(test.hintPanel)
+          test.press(test.hintPanel, Qt.Key_Z, Qt.ControlModifier)
           var back = test.hintService.library.indexOf(gone) >= 0
-          test.check("after a removal the footer is the add, and u later takes the removal back",
+          test.check("after a removal the footer is the add, and Ctrl+Z later takes the removal back",
             test.noteSaid.indexOf("+  Add a symbol") === 0 && goneMeanwhile && back,
             [test.noteSaid, goneMeanwhile, back].join("|"))
           // Until the next change to the lists: a new list ends the offer,
-          // and u says there is nothing to undo.
+          // and Ctrl+Z says there is nothing to undo.
           test.hintPanel.testBody.removeRow(gone)
           test.hintService.createList("Undo ends")
-          test.hintPanel.testKeyCatcher.textKey("u")
+          test.press(test.hintPanel, Qt.Key_Z, Qt.ControlModifier)
           var said = test.footerText(test.hintPanel)
           var stillGone = test.hintService.library.indexOf(gone) < 0
           test.hintService.deleteList("Undo ends")
-          test.check("after the next change to the lists u puts nothing back, and the footer says why",
+          test.check("after the next change to the lists Ctrl+Z puts nothing back, and the footer says why",
             stillGone && said === "Nothing to undo", stillGone + "|" + said)
           // A change in the data file is a change too, when it changes what
           // the lists hold; one that changes only the view keeps the offer.
@@ -916,7 +969,8 @@ ShellRoot {
           test.writeFile(test.dataPath, JSON.stringify(Object.assign({}, test.hintService.dataSettings, { range: "1Y" })))
         } else if (test.step === 45) {
           if (test.hold(test.hintService.range === "1Y")) return
-          test.hintPanel.testKeyCatcher.textKey("u")
+          test.focusKeys(test.hintPanel)
+          test.press(test.hintPanel, Qt.Key_Z, Qt.ControlModifier)
           var backAfterView = test.hintService.library.indexOf(test.removedEarlier) >= 0
           test.check("a data file that changes only the view keeps the undo",
             test.hintService.range === "1Y" && backAfterView, test.hintService.range + "|" + backAfterView)
@@ -926,7 +980,8 @@ ShellRoot {
         } else if (test.step === 46) {
           var madeElsewhere = test.hintService.lists.some(function(l) { return l.name === "Made elsewhere" })
           if (test.hold(madeElsewhere)) return
-          test.hintPanel.testKeyCatcher.textKey("u")
+          test.focusKeys(test.hintPanel)
+          test.press(test.hintPanel, Qt.Key_Z, Qt.ControlModifier)
           var saidAfterFile = test.footerText(test.hintPanel)
           var goneAfterFile = test.hintService.library.indexOf(test.removedEarlier) < 0
           test.hintPanel.close()
@@ -975,6 +1030,57 @@ ShellRoot {
             reopened.adding + "|" + kept.text)
           reopened.cancelAdding()
           test.hintPanel.close()
+        } else if (test.step === 50) {
+          // With search open, the keys that act on the rows elsewhere,
+          // Stonks' and Omarchy's alike, edit its field as any field's do,
+          // and none acts: no row goes, the removal on offer stays out, no
+          // menu opens, the cursor and the chart stay, and sounds, the look
+          // and the order stay as they were.
+          var searching = test.hintPanel.testBody
+          test.hintService.switchList("")
+          test.hintPanel.open()
+          test.removedEarlier = test.hintService.library[0]
+          searching.removeRow(test.removedEarlier)
+          searching.watchlist.select(test.hintService.library[0])
+          var target = searching.watchlist.cursorRow
+          var settled = function() {
+            return [test.hintService.library.join(","), test.hintService.soundsOn, test.hintService.retro,
+              test.hintService.order, test.hintService.reversed, searching.listMenuOpen,
+              searching.watchlist.cursorRow, test.hintService.featuredSymbol].join("|")
+          }
+          var settledBefore = settled()
+          test.focusKeys(test.hintPanel)
+          test.press(test.hintPanel, "a")
+          var field = test.find(searching.search, "searchField")
+          test.waitFor(function() { return field.activeFocus })
+          var typed = []
+          ;["l", "m", "s", "o"].forEach(function(letter) { test.press(test.hintPanel, letter) })
+          typed.push(field.text)
+          test.press(test.hintPanel, Qt.Key_Backspace)
+          typed.push(field.text)
+          test.press(test.hintPanel, Qt.Key_Z, Qt.ControlModifier)
+          typed.push(field.text)
+          test.press(test.hintPanel, Qt.Key_Left)
+          test.press(test.hintPanel, Qt.Key_Delete)
+          typed.push(field.text)
+          test.press(test.hintPanel, Qt.Key_C, Qt.ControlModifier)
+          typed.push(field.text)
+          ;["j", "k", "h", "x", Qt.Key_Space].forEach(function(key) { test.press(test.hintPanel, key) })
+          typed.push(field.text)
+          test.check("in the popup's search, l m s o, Backspace, Ctrl+Z, Delete, Ctrl+C, and Omarchy's j k h x and Space edit the field, and none acts on the rows, the lists, sounds, the look or the order",
+            target !== "" && typed.join(",") === "lmso,lms,lmso,lms,lms,lmsjkhx " && searching.adding && field.activeFocus
+              && settled() === settledBefore,
+            target + " | " + typed.join(",") + " | " + settledBefore + " -> " + settled())
+          test.press(test.hintPanel, Qt.Key_Escape)
+        } else if (test.step === 51) {
+          // Search closed, Ctrl+Z is the undo again: the removal was on offer
+          // all along.
+          test.focusKeys(test.hintPanel)
+          test.press(test.hintPanel, Qt.Key_Z, Qt.ControlModifier)
+          var undone = test.hintService.library.indexOf(test.removedEarlier) >= 0
+          test.hintPanel.close()
+          test.check("once search closes, Ctrl+Z takes back the removal it left alone",
+            !test.hintPanel.testBody.adding && undone, test.hintPanel.testBody.adding + "|" + undone)
           console.log("POPUP DONE")
           exitTimer.exitCode = test.failures ? 1 : 0
           exitTimer.start()

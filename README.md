@@ -118,15 +118,15 @@ the chart, and Enter or a click adds it. Search finds stocks, ETFs,
 indexes, and crypto.
 
 To remove a row, point at it and click the × beside its symbol, or press
-`x`: it goes from the list you're looking at. The row that slides into its
-place shows its × only once you move the pointer, so a second click can't
-remove it by mistake. Right-click a row to choose where it goes from, such
-as "Remove from Growth" or "Remove from all 3 lists". In All, where
-removing takes a symbol out of every list, the × and `x` ask first when one
-of your own lists holds it too.
+Delete: it goes from the list you're looking at. The row that slides into
+its place shows its × only once you move the pointer, so a second click
+can't remove it by mistake. Right-click a row to choose where it goes from,
+such as "Remove from Growth" or "Remove from all 3 lists". In All, where
+removing takes a symbol out of every list, the × and Delete ask first when
+one of your own lists holds it too.
 
 For 5 seconds after a removal, "Undo NVDA" shows beside "+ Add a symbol":
-click it to bring the row back. Until a list next changes, `u` does the
+click it to bring the row back. Until a list next changes, `Ctrl+Z` does the
 same, and so does "+ Add a symbol", where the symbol is the first result,
 with PUT BACK. Each puts it back in its lists at its old place, with the
 price it had, and Stonks asks for a new one at once.
@@ -202,57 +202,48 @@ has its own voice. A soft bell rings as the market of the stock you last
 looked at opens and as it closes, on time or not at all, and never while
 every screen is off or an app records from your microphone. Nothing else
 sounds by itself: no refresh or price. Click the speaker at the top right,
-or press `Shift+S`, to turn sounds off; Stonks remembers. Your system volume
+or press `m`, to turn sounds off; Stonks remembers. Your system volume
 sets how loud they are.
 
 ## Screenshots
 
-Click the camera at the top right, or press `y`, for a picture of the chart
-you're looking at, laid out to share: the price large with its currency
-beside it, its move, the day's bull or bear, the exchange, the time of the
-price with its zone, the price the move is measured from, a range's high
-and low on its chart, and at the foot the day's date or the range's length.
-Scrubbed, it shows the moment you scrubbed to. Your list is never in it. It
-lands where Omarchy's own screenshots do, on Omarchy 4.0 and on 4.5: a file
-in your screenshots folder, the picture on the clipboard, and Omarchy's
-notification, which opens it in your screenshot editor when you click it:
-Omasnap on 4.5, Tensaku on 4.0.
+Click the camera at the top right, or press `Ctrl+C`, for a picture of the
+chart you're looking at, laid out to share: the price large with its
+currency beside it, its move, the day's bull or bear, the exchange, the time
+of the price with its zone, the price the move is measured from, a range's
+high and low on its chart, and at the foot the day's date or the range's
+length. Scrubbed, it shows the moment you scrubbed to. Your list is never in
+it. It lands where Omarchy's own screenshots do, on Omarchy 4.0 and on 4.5:
+a file in your screenshots folder, the picture on the clipboard, and
+Omarchy's notification, which opens it in your screenshot editor when you
+click it: Omasnap on 4.5, Tensaku on 4.0.
 
 ## Keys
 
-`?` opens a sheet of the everyday keys. Every key is in this table:
+`?` opens a sheet of every key, the same as this table:
 
 | Key | Does |
 | --- | --- |
 | `↑` `↓` | Move the selection |
-| `j` `k` | Move the selection (popup) |
 | `⏎` | Show the selected row's chart |
-| Space | Show the selected row's chart (popup) |
-| `←` `→` | Scrub one chart step |
-| `h` `l` | Scrub one chart step (popup) |
-| `[` `]` | Change the chart range |
+| `←` `→` | Scrub the chart one step |
+| `[` `]` | Change the range |
 | `p` | Replay the chart |
-| `y` | Screenshot the chart |
-| `a` or `+` | Search and add a symbol |
-| `x` | Remove the selected row |
-| `Shift+X` | Choose where to remove the selected row from |
-| `u` | Undo the last removal, until a list next changes |
-| Delete or Backspace | Remove the selected row (window) |
-| `Shift+J` `Shift+K` | Move the selected row up or down, in manual order |
-| `o` | Change the list's order |
-| `Shift+O` | Reverse a sorted order |
-| `w` | Open the list menu |
-| `Shift+W` | Manage lists: rename, reorder, delete |
-| `m` | Tick the selected row's lists |
-| `,` `.` | Previous or next list |
-| `c` | Show the day's change as a percent, an amount, or since the open |
-| `s` | Switch between smooth and retro |
-| `Shift+S` | Turn sounds off or on |
+| `Ctrl+C` | Take a screenshot |
+| `a` | Add a symbol |
+| Delete or Backspace | Remove the selected row |
+| `Ctrl+Z` | Undo a removal |
+| `Shift+↑` `Shift+↓` | Move the row in your own order |
+| `o` | Change the order |
+| `Shift+O` | Reverse the order |
+| `l` | Open the list menu |
+| `c` | Show the change as %, amount or since the open |
+| `s` | Smooth or retro |
+| `m` | Sound on or off |
 | `r` | Refresh |
-| `1` to `9` | Show that row's chart |
 | Tab or `Shift+Tab` | Next or previous panel on the bar (popup) |
-| `?` | Open the key sheet |
-| `Esc` | Close the sheet, then the scrub, then the popup or window |
+| `?` | All keys |
+| `Esc` | Close |
 
 ## If something's wrong
 

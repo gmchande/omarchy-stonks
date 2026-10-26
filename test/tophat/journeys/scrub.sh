@@ -46,18 +46,18 @@ follows
 sleep 0.5
 check "the open popup, nothing scrubbed, holds no stream of silence" resting
 
-step "h scrubs back one step at a time, a chime each"
-press h h h h
+step "← scrubs back one step at a time, a chime each"
+press Left Left Left Left
 sleep 0.3
-shot h4
+shot back4
 follows
 sounds_here
 chimed "$moved" 4
 (( locator )) && check "the header says the moment scrubbed to (AT …)" scrubbed
 soon "the key scrub holds a stream of silence for its chimes" 3 holding
 
-step "l and the arrow keys step it too"
-press l Left Right
+step "→ steps it forward, and ← back again"
+press Right Left Right
 sleep 0.3
 shot keys
 follows

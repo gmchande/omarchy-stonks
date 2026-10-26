@@ -375,7 +375,6 @@ ShellRoot {
     function addSymbol(symbol) {}
     function setOrder(value) { order = value }
     function switchList(name) {}
-    function stepList(delta) {}
     function createList(name) { return "" }
   }
   // The version watch, as a render sets it.
@@ -1103,6 +1102,7 @@ ShellRoot {
           fontFamily: stub.fontFamily
           surfaceOpen: true
           headerWhenMissing: root.coldState === "loading" ? "Loading" : "No data"
+          switchesPanels: root.popup
           margins: root.popup ? 0 : Style.space(16)
           chartHeight: root.popup ? Style.space(190) : Style.space(220)
           minChartHeight: root.popup ? 0 : Style.space(136)

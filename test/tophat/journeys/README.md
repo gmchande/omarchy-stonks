@@ -66,7 +66,8 @@ or a control present before and gone after.
   by key, the lines and marks on each, a click and a wheel notch, and the
   range kept.
 - [Adding, removing, and putting back](lists.md): `lists.sh`. Search by key
-  and footer, the ×, `x` and its question, the row's menu, `u`, and PUT BACK.
+  and footer, the ×, Delete and its question, the row's menu, Ctrl+Z, and
+  PUT BACK.
 - [The unit sign](unit.md): `unit.sh`. %, ±, and since the open by `c`, the
   sign, and the change beside the price.
 - [Saving](saving.md): `saving.sh`. Every change written at once, a failed

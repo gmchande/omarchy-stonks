@@ -9,11 +9,12 @@ import "plugin" as Stonks
 // Every key the key sheet draws and the README's table lists acts, on the
 // surface it is listed for: pressed with real Qt keys through the real popup
 // (Panel.qml, its card in CardWindow.qml) and the real window (App.qml), it
-// changes what that surface shows. A key a handler lost, or one renamed in
+// changes what that surface shows. The sheet and the table list the same
+// keys, and a key either lists for one surface alone, or one Stonks no
+// longer answers, changes nothing. A key a handler lost, or one renamed in
 // the sheet or the README but not in the handlers, fails here. And the sheet
-// says the same on both surfaces and in both looks. A
-// replay has one speed, `p`'s, so Shift+P does nothing. HOME and curl are
-// scratch fixtures.
+// says the same on both surfaces, but for the popup's Tab, and in both
+// looks. HOME and curl are scratch fixtures.
 ShellRoot {
   id: harness
 
@@ -66,23 +67,21 @@ ShellRoot {
     return text
   }
 
-  // The keys a label names: "1–9" and "`1` to `9`" each digit between, "J K"
-  // and "`Shift+J`" alike as Shift+J.
+  // The keys a label names, in one spelling: a capital as Shift and it ("O"
+  // and "`Shift+O`"), ⇧ as Shift ("⇧↑" and "`Shift+↑`"), and the sheet's
+  // "Del ⌫" as the table's Delete and Backspace.
   function tokens(label) {
-    var range = /^`?(\d)`?\s*(?:–|to)\s*`?(\d)`?$/.exec(label)
-    if (range) {
-      var digits = []
-      for (var d = Number(range[1]); d <= Number(range[2]); d++) digits.push(String(d))
-      return digits
-    }
+    var named = { "Del": "Delete", "⌫": "Backspace" }
     return label.replace(/`/g, "").split(/\s+/)
       .filter(function(t) { return t !== "" && t !== "or" })
+      .map(function(t) { return named[t] || t.replace(/^⇧/, "Shift+") })
       .map(function(t) { return /^[A-Z]$/.test(t) ? "Shift+" + t : t })
   }
 
   // The keys the README's table lists for `surface`: a row ending "(popup)"
-  // or "(window)" is that surface's alone. Null with no table.
-  function readmeKeys(surface) {
+  // or "(window)" is that surface's alone. With `elsewhere`, the keys listed
+  // for the other surface alone instead. Null with no table.
+  function readmeKeys(surface, elsewhere) {
     var lines = readFile(readmePath).split("\n")
     var start = lines.indexOf("| Key | Does |")
     if (start < 0) return null
@@ -90,10 +89,20 @@ ShellRoot {
     for (var i = start + 2; i < lines.length && lines[i].charAt(0) === "|"; i++) {
       var cells = lines[i].split("|")
       var only = /\((popup|window)\)$/.exec(cells[2].trim())
-      if (!only || only[1] === surface) keys = keys.concat(tokens(cells[1].trim()))
+      var listed = elsewhere ? !!only && only[1] !== surface : !only || only[1] === surface
+      if (listed) keys = keys.concat(tokens(cells[1].trim()))
     }
     return keys
   }
+
+  // Keys Stonks answered before the 25 October key set, which now do nothing
+  // in the window, and in the popup but for Omarchy's own; Shift+P never did.
+  readonly property var dropped: ["j", "k", "h", "Space", "1", "2", "3", "4", "5", "6", "7", "8", "9", "+",
+    "x", "Shift+X", "u", "Shift+J", "Shift+K", "w", "Shift+W", ",", ".", "y", "Shift+S", "Shift+P"]
+  // What Omarchy's panel keys mean in every panel on the bar, the popup
+  // among them, as one of the listed keys (Ui/PanelKeyCatcher.qml): the
+  // sheet and the README never list them. l is Stonks' list menu there.
+  readonly property var omarchy: ({ "j": "↓", "k": "↑", "h": "←", "Space": "⏎", "x": "Delete", "Shift+X": "Delete" })
 
   Stonks.Service { id: service }
   Stonks.Updates { id: updates }
@@ -178,11 +187,9 @@ ShellRoot {
     // What a key needs to have something to do, past the base.
     readonly property var setups: ({
       "→": function(s) { s.body.nudgeScrub(-2) },
-      "l": function(s) { s.body.nudgeScrub(-2) },
-      "u": function(s) { s.body.removeFrom(s.body.watchlist.cursorRow, true) },
-      // These keys remove directly on a row held only by All. Shift+X below
-      // covers the menu for a row held by another list too.
-      "x": function(s) { s.body.watchlist.cursorSymbol = "LONG1" },
+      "Ctrl+Z": function(s) { s.body.removeFrom(s.body.watchlist.cursorRow, true) },
+      // These keys remove directly on a row held only by All. deleteAsks
+      // below covers the menu for a row held by another list too.
       "Delete": function(s) { s.body.watchlist.cursorSymbol = "LONG1" },
       "Backspace": function(s) { s.body.watchlist.cursorSymbol = "LONG1" },
       "Shift+O": function(s) { service.setOrder("pct") },
@@ -190,23 +197,38 @@ ShellRoot {
       "[": function(s) { service.setRange("1W") }
     })
 
-    // One key, as a person presses it; false for a key it can't name.
+    // One key, as a person presses it; false for a key it can't name. A
+    // shifted letter carries its capital as its text, as a keyboard sends it.
     function press(token) {
       var named = { "↑": Qt.Key_Up, "↓": Qt.Key_Down, "←": Qt.Key_Left, "→": Qt.Key_Right, "⏎": Qt.Key_Return,
         "Space": Qt.Key_Space, "Delete": Qt.Key_Delete, "Backspace": Qt.Key_Backspace, "Tab": Qt.Key_Tab,
         "Esc": Qt.Key_Escape }
-      if (named[token] !== undefined) keyClick(named[token])
-      else if (token === "Shift+Tab") keyClick(Qt.Key_Backtab, Qt.ShiftModifier)
-      else if (/^Shift\+[A-Z]$/.test(token)) keyClick(token.charAt(6), Qt.ShiftModifier)
-      else if (token.length === 1) keyClick(token)
+      var held = /^(Shift|Ctrl)\+(.+)$/.exec(token)
+      var modifier = held ? (held[1] === "Shift" ? Qt.ShiftModifier : Qt.ControlModifier) : Qt.NoModifier
+      var key = held ? held[2] : token
+      if (token === "Shift+Tab") keyClick(Qt.Key_Backtab, Qt.ShiftModifier)
+      else if (named[key] !== undefined) keyClick(named[key], modifier)
+      else if (/^[A-Z]$/.test(key) && held) keyClick(held[1] === "Shift" ? key : Qt["Key_" + key], modifier)
+      else if (key.length === 1 && !held) keyClick(key)
       else return false
       return true
+    }
+
+    // A key that should do nothing here changes nothing the surface shows.
+    function idle(s, token) {
+      base(s)
+      var unchanged = shown(s)
+      if (!press(token)) return false
+      wait(150)
+      return shown(s) === unchanged
     }
 
     // Expected effects are independent of the handlers and of README prose.
     // A documented key without a case fails; changing some unrelated state
     // cannot satisfy the expected target or excuse another settings change.
-    function acts(s, token) {
+    // `pressed` acts as the listed key `meaning`, itself when not given.
+    function acts(s, pressed, meaning) {
+      var token = meaning || pressed
       base(s)
       if (setups[token]) setups[token](s)
       var b = s.body
@@ -221,38 +243,35 @@ ShellRoot {
         sounds: service.soundsOn, camera: b.cameraLit, rowMenu: b.rowMenu ? b.rowMenu.symbol : "" }
       var refreshes = service.testRefreshes, tabs = harness.tabs
       var changed = [], effect = null
-      var target = selected
-      if (/^[1-9]$/.test(token)) target = rows[Number(token) - 1]
-      if (/^[1-9]$/.test(token) || token === "⏎" || token === "Space") {
+      if (token === "⏎") {
         changed = ["featured", "cursor"]
-        effect = function() { return service.featuredSymbol === target && b.watchlist.cursorRow === target }
-      } else if (["↑", "k", "↓", "j"].indexOf(token) >= 0) {
+        effect = function() { return service.featuredSymbol === selected && b.watchlist.cursorRow === selected }
+      } else if (token === "↑" || token === "↓") {
         changed = ["cursor"]
-        var cursor = rows[rows.indexOf(selected) + (["↑", "k"].indexOf(token) >= 0 ? -1 : 1)]
+        var cursor = rows[rows.indexOf(selected) + (token === "↑" ? -1 : 1)]
         effect = function() { return b.watchlist.cursorRow === cursor }
-      } else if (["←", "h", "→", "l"].indexOf(token) >= 0) {
+      } else if (token === "←" || token === "→") {
         changed = ["scrub"]
         var points = b.featuredDay.points
-        var right = token === "→" || token === "l"
         var nextTime = b.featuredDay.axis && b.featuredDay.axis.byPrint
           ? points[points.length - 2].t
-          : (b.scrubT || b.motion.scrubEnd) + (right ? 300 : -300)
+          : (b.scrubT || b.motion.scrubEnd) + (token === "→" ? 300 : -300)
         effect = function() { return b.scrubT === nextTime }
       } else if (token === "[" || token === "]") {
         changed = ["range"]
         effect = function() { return service.range === (token === "[" ? "1D" : "1W") }
       } else if (token === "p") { changed = ["scrub", "replay"]; effect = function() { return b.motion.replayRunning } }
-      else if (token === "a" || token === "+") { changed = ["adding"]; effect = function() { return b.adding && b.search.active } }
-      else if (["x", "Delete", "Backspace"].indexOf(token) >= 0) {
+      else if (token === "a") { changed = ["adding"]; effect = function() { return b.adding && b.search.active } }
+      else if (token === "Delete" || token === "Backspace") {
         changed = ["symbols", "cursor"]
         effect = function() { return service.symbols.join(",") === rows.filter(function(r) { return r !== selected }).join(",") }
-      } else if (token === "u") {
+      } else if (token === "Ctrl+Z") {
         changed = ["symbols", "cursor"]
         var removed = b.removal.symbol
         effect = function() { return service.symbols.indexOf(removed) >= 0 && service.symbols.length === rows.length + 1 }
-      } else if (token === "Shift+J" || token === "Shift+K") {
+      } else if (token === "Shift+↑" || token === "Shift+↓") {
         changed = ["symbols"]
-        var reordered = rows.slice(), at = rows.indexOf(selected), to = at + (token === "Shift+J" ? 1 : -1)
+        var reordered = rows.slice(), at = rows.indexOf(selected), to = at + (token === "Shift+↓" ? 1 : -1)
         reordered.splice(at, 1); reordered.splice(to, 0, selected)
         effect = function() { return service.symbols.join(",") === reordered.join(",") && b.watchlist.cursorRow === selected }
       } else if (token === "o") {
@@ -261,42 +280,28 @@ ShellRoot {
       } else if (token === "Shift+O") {
         changed = ["reversed", "cursor"]
         effect = function() { return service.reversed === !before.reversed }
-      } else if (token === "w") { changed = ["menu"]; effect = function() { return b.listMenuOpen } }
-      else if (token === "Shift+W") { changed = ["managing"]; effect = function() { return b.managingLists } }
-      else if (token === "m") { changed = ["listsSymbol"]; effect = function() { return b.listsSymbol === selected } }
-      else if (token === "," || token === ".") {
-        changed = ["list", "symbols", "featured", "order", "reversed", "cursor"]
-        effect = function() { return service.listName === (token === "," ? "Back" : "Walk") && service.symbols.join(",") === (token === "," ? "MSFT" : "AAPL") }
-      } else if (token === "c") {
+      } else if (token === "l") { changed = ["menu"]; effect = function() { return b.listMenuOpen } }
+      else if (token === "c") {
         changed = ["mode"]
         var mode = {pct:"abs", abs:"open", open:"pct"}[before.mode]
         effect = function() { return service.changeMode === mode }
       } else if (token === "s") {
         changed = ["retro"]
         effect = function() { return service.retro === !before.retro }
-      } else if (token === "Shift+S") {
+      } else if (token === "m") {
         changed = ["sounds"]
         effect = function() { return service.soundsOn === !before.sounds }
-      } else if (token === "y") {
+      } else if (token === "Ctrl+C") {
         changed = ["camera"]
         effect = function() { return b.cameraLit }
-      } else if (token === "Shift+X") {
-        changed = ["rowMenu"]
-        effect = function() { return !!b.rowMenu && b.rowMenu.symbol === selected
-          && b.rowMenu.lines.length === 1 && b.rowMenu.lines[0].label === "Remove from all 2 lists" }
       } else if (token === "r") { changed = ["refreshes"]; effect = function() { return service.testRefreshes === refreshes + 1 } }
       else if (token === "Tab" || token === "Shift+Tab") {
         changed = ["tabs", "direction"]
         effect = function() { return harness.tabs === tabs + 1 && harness.tabDirection === (token === "Tab" ? 1 : -1) }
       } else if (token === "?") { changed = ["help"]; effect = function() { return b.showingHelp } }
       else if (token === "Esc") { changed = ["open"]; effect = function() { return !b.surfaceOpen } }
-      if (!effect) {
-        if (token !== "Shift+P") return false
-        var unchanged = shown(s)
-        press(token)
-        return shown(s) !== unchanged
-      }
-      if (!press(token)) return false
+      if (!effect) return false
+      if (!press(pressed)) return false
       var acted = function() {
         var after = { featured: service.featuredSymbol, range: service.range,
           order: service.order, reversed: service.reversed, list: service.listName,
@@ -307,7 +312,7 @@ ShellRoot {
         sounds: service.soundsOn, camera: b.cameraLit, rowMenu: b.rowMenu ? b.rowMenu.symbol : "" }
         return effect() && Object.keys(before).every(function(k) { return changed.indexOf(k) >= 0 || before[k] === after[k] })
       }
-      var ok = within(token === "y" ? 3000 : 1500, acted)
+      var ok = within(token === "Ctrl+C" ? 3000 : 1500, acted)
       if (!ok) console.log("KEY EFFECT " + s.name + " " + token + " " + shown(s))
       return ok
     }
@@ -343,31 +348,39 @@ ShellRoot {
       return drawn
     }
 
+    // A label's keys, all of a sheet's or a table's, in one order.
+    function keysOf(labels) {
+      var keys = []
+      labels.map(harness.tokens).forEach(function(group) { keys = keys.concat(group) })
+      return keys.sort()
+    }
+
     function walk(s) {
       var sheet = drawnSheet(s)
       var sortedSheet = drawnSheet(s, "symbol")
-      var everyday = harness.tokens("↑ ↓ ⏎ 1 2 3 4 5 6 7 8 9 a x u ← → [ ] p y w o , . s S c r")
-      var missing = []
-      ;[sheet, sortedSheet].forEach(function(drawn, i) {
-        var keys = []
-        drawn.keys.map(harness.tokens).forEach(function(group) { keys = keys.concat(group) })
-        var required = everyday.concat(i === 0 ? ["Shift+J", "Shift+K"] : [])
-        required.forEach(function(key) { if (keys.indexOf(key) < 0) missing.push((i === 0 ? "manual " : "sorted ") + key) })
-      })
-      harness.check("in the " + s.name + ", the sheet lists the everyday keys in manual and sorted order",
-        missing.length === 0, missing.join(" "))
       var readme = harness.readmeKeys(s.name)
-      var sheetKeys = []
-      sheet.keys.map(harness.tokens).forEach(function(group) { sheetKeys = sheetKeys.concat(group) })
-      var absent = sheetKeys.filter(function(t) { return !readme || readme.indexOf(t) < 0 })
-      harness.check("in the " + s.name + ", every everyday sheet key is documented in the complete README",
-        !!readme && absent.length === 0, absent.join(" "))
       var listed = readme || []
+      var manualKeys = keysOf(sheet.keys).join(" ")
+      var sortedKeys = keysOf(sortedSheet.keys).join(" ")
+      var expectedSorted = keysOf(listed.filter(function(t) { return t !== "Shift+↑" && t !== "Shift+↓" })).join(" ")
+      harness.check("in the " + s.name + ", the sheet lists exactly the README's keys, the row's move only in manual order",
+        readme !== null && manualKeys === keysOf(listed).join(" ") && sortedKeys === expectedSorted,
+        "manual: " + manualKeys + " | sorted: " + sortedKeys + " | README: " + keysOf(listed).join(" "))
       var dead = listed.filter(function(t) { return !acts(s, t) })
       harness.check("in the " + s.name + ", every README key does its documented action (" + listed.length + " keys)",
         readme !== null && dead.length === 0, readme === null ? "no key table in the README" : "wrong: " + dead.join(" "))
       escapeOrder(s)
-      harness.check("in the " + s.name + ", Shift+P changes nothing", !acts(s, "Shift+P"))
+      if (s.name === "popup") {
+        var wrong = Object.keys(harness.omarchy).filter(function(t) { return !acts(s, t, harness.omarchy[t]) })
+        harness.check("in the popup, Omarchy's panel keys do what Omarchy defines: j k ↓ ↑, h ←, Space Enter, x and X Delete",
+          wrong.length === 0, "wrong: " + wrong.join(" "))
+      }
+      var still = harness.dropped.filter(function(t) { return s.name !== "popup" || !(t in harness.omarchy) })
+        .concat(harness.readmeKeys(s.name, true) || [])
+      var acting = still.filter(function(t) { return !idle(s, t) })
+      harness.check("in the " + s.name + ", the keys Stonks no longer answers" + (s.name === "popup" ? ", but for Omarchy's," : "")
+        + " and the other surface's own change nothing (" + still.length + " keys)",
+        acting.length === 0, "acting: " + acting.join(" "))
       var version = JSON.parse(harness.readFile(harness.manifestPath)).version
       harness.check("in the " + s.name + ", the sheet credits Stonks " + version + ", Yahoo, and Robinhood",
         sheet.credit.split("\n").indexOf("Stonks " + version) >= 0 && sheet.credit.indexOf("Yahoo") >= 0
@@ -375,21 +388,17 @@ ShellRoot {
       return sheet
     }
 
-    // With Caps Lock on, a letter acts as itself: j does what j does (in
-    // the popup it moves the selection) and never moves a row, o changes
-    // the order and never reverses it, w opens the list menu and never
-    // Manage lists, x removes and never opens the row's menu, and in Manage
-    // lists J moves no list. Caps Lock sends "J" with no Shift. Found in the
-    // 1.0.0 review: Caps Lock's J and K saved a reorder.
+    // With Caps Lock on, a letter acts as itself: o changes the order and
+    // never reverses it, l opens the list menu, m turns sounds off or on.
+    // Caps Lock sends "O" with no Shift. Found in the 1.0.0 review: Caps
+    // Lock's J and K saved a reorder.
     function capsLock(s) {
       var wrong = []
-      ;["j", "k", "o", "w", "x"].forEach(function(letter) {
+      ;["o", "l", "m"].forEach(function(letter) {
         var caps = letter.toUpperCase()
-        // x on a row Walk lacks, which it removes at once.
         var setup = function() {
           base(s)
           if (letter === "o") service.setOrder("pct")
-          if (letter === "x") s.body.watchlist.cursorSymbol = "LONG1"
           wait(50)
         }
         setup()
@@ -403,62 +412,42 @@ ShellRoot {
         if (locked !== plain) wrong.push(caps + " with Caps Lock: " + locked + " vs " + letter + ": " + plain)
       })
       base(s)
-      service.createList("Caps")
-      service.switchList("Walk")
-      s.body.openManageLists()
-      wait(100)
-      var lists = function() { return service.lists.map(function(l) { return l.name }).join(",") }
-      var listsBefore = lists()
-      keyClick("J")
-      wait(100)
-      if (lists() !== listsBefore) wrong.push("J with Caps Lock in Manage lists moved the list: " + listsBefore + " -> " + lists())
-      s.body.closeListViews()
-      service.deleteList("Caps")
-      wait(50)
-      harness.check("in the " + s.name + ", with Caps Lock on, j k o w x act as themselves, and J in Manage lists moves no list",
+      harness.check("in the " + s.name + ", with Caps Lock on, o l m act as themselves",
         wrong.length === 0, wrong.join(" | "))
     }
 
-    // Shift+X opens the selected row's menu, on its first line, in both
-    // surfaces alike, and Escape closes it, removing nothing. In All, for
-    // AAPL, which Walk holds too, the menu is the one line that reaches
-    // both lists; in Walk, that list by its name, then both.
-    function shiftX(s) {
-      var seen = []
-      ;["", "Walk"].forEach(function(list) {
-        base(s)
-        if (list !== "") service.switchList(list)
-        s.body.watchlist.cursorSymbol = "AAPL"
-        wait(50)
-        press("Shift+X")
-        wait(100)
-        var menu = s.body.rowMenu
-        var drawn = harness.find(s.body, "rowMenu")
-        seen.push(menu ? menu.symbol + ":" + drawn.cursor + ":" + menu.lines.map(function(l) { return l.label }).join("/") : "shut")
-        press("Esc")
-        wait(100)
-        seen.push((s.body.rowMenu === null) + ":" + (service.library.indexOf("AAPL") >= 0))
-      })
-      harness.check("in the " + s.name + ", Shift+X opens the selected row's menu on its first line, and Escape closes it removing nothing",
-        seen.join(" | ") === "AAPL:0:Remove from all 2 lists | true:true | AAPL:0:Remove from Walk/Remove from all 2 lists | true:true",
-        seen.join(" | "))
+    // In All, Delete on a row another list holds too asks first: the row's
+    // menu, on its first line, the one line that reaches both lists, in
+    // both surfaces alike; Escape closes it, removing nothing.
+    function deleteAsks(s) {
+      base(s)
+      s.body.watchlist.cursorSymbol = "AAPL"
+      wait(50)
+      press("Delete")
+      wait(100)
+      var menu = s.body.rowMenu
+      var drawn = harness.find(s.body, "rowMenu")
+      var seen = [menu ? menu.symbol + ":" + drawn.cursor + ":" + menu.lines.map(function(l) { return l.label }).join("/") : "shut"]
+      press("Esc")
+      wait(100)
+      seen.push((s.body.rowMenu === null) + ":" + (service.library.indexOf("AAPL") >= 0))
+      harness.check("in the " + s.name + ", Delete on a row another list holds asks on the row's menu, and Escape closes it removing nothing",
+        seen.join(" | ") === "AAPL:0:Remove from all 2 lists | true:true", seen.join(" | "))
     }
 
     function test_keys() {
-      // Ten rows, so 9 has a row, and a second list for , and .
+      // Ten rows to move through, and a list that holds AAPL too.
       for (var n = 1; n <= 7; n++) service.addSymbol("LONG" + n)
       quiet()
       service.createList("Walk")
       service.setMembership("AAPL", "Walk", true)
-      service.createList("Back")
-      service.setMembership("MSFT", "Back", true)
       service.switchList("")
       wait(100)
 
       // The popup first: the window, shown, would take the keys.
       var popupSheet = walk(harness.popup)
       capsLock(harness.popup)
-      shiftX(harness.popup)
+      deleteAsks(harness.popup)
       // The look changes its drawing, not the keys and words the reader gets.
       var looks = [false, true].map(function(retro) {
         service.persist({ style: retro ? "retro" : "smooth" })
@@ -471,9 +460,14 @@ ShellRoot {
 
       var windowSheet = walk(harness.window)
       capsLock(harness.window)
-      shiftX(harness.window)
-      harness.check("the window's sheet is the popup's", popupSheet.all.join("|") === windowSheet.all.join("|"),
-        popupSheet.all.join("|") + " vs " + windowSheet.all.join("|"))
+      deleteAsks(harness.window)
+      // The window has no bar to step through: its sheet lacks the Tab and
+      // ⇧Tab rows, each a key and what it does.
+      var tab = popupSheet.all.indexOf("Tab")
+      var tabRows = tab >= 0 && popupSheet.all[tab + 2] === "⇧Tab"
+      var popupWords = popupSheet.all.filter(function(text, i) { return !tabRows || i < tab || i > tab + 3 })
+      harness.check("the window's sheet is the popup's but for Tab and ⇧Tab", tabRows && popupWords.join("|") === windowSheet.all.join("|"),
+        popupWords.join("|") + " vs " + windowSheet.all.join("|"))
       app.close()
       harness.finish()
     }

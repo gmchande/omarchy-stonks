@@ -459,11 +459,11 @@ ShellRoot {
         harness.starts().length === 0 && stepChimes.length === 3 && stepChimes.every(function(b) { return /^smooth-([0-9]|10)$/.test(b) }),
         JSON.stringify(harness.record()))
 
-      // x, u, and an add through search: each its own sound, in smooth's
-      // voice, as a notification, at a short latency.
-      keyClick(Qt.Key_X)
+      // Delete, Ctrl+Z, and an add through search: each its own sound, in
+      // smooth's voice, as a notification, at a short latency.
+      keyClick(Qt.Key_Delete)
       var removed = startsBy(1)
-      keyClick(Qt.Key_U)
+      keyClick(Qt.Key_Z, Qt.ControlModifier)
       var undone = startsBy(2)
       keyClick(Qt.Key_A)
       wait(50)
@@ -476,7 +476,7 @@ ShellRoot {
       // add is heard then.
       quiet()
       var added = startsBy(3)
-      harness.check("in the popup, x plays the removal, u its undo, and an add from search the add, each in smooth's voice",
+      harness.check("in the popup, Delete plays the removal, Ctrl+Z its undo, and an add from search the add, each in smooth's voice",
         played(removed[0]) === "sounds/smooth/remove.wav" && played(undone[1]) === "sounds/smooth/undo.wav"
           && played(added[2]) === "sounds/smooth/add.wav" && service.library.length === library + 1,
         harness.starts().map(played).join(", "))
@@ -656,7 +656,7 @@ ShellRoot {
       wait(400)
 
       // A replay's sound stops with the replay: Esc, a row's chart, the
-      // popup closing. And one sound at a time: x mid-replay cuts it.
+      // popup closing. And one sound at a time: Delete mid-replay cuts it.
       var cuts = []
       var cut = function(how) {
         var before = harness.starts().length
@@ -667,7 +667,7 @@ ShellRoot {
         cuts.push(endOf(before + 1))
       }
       cut(function() { keyClick(Qt.Key_Escape) })
-      cut(function() { keyClick(Qt.Key_3) })
+      cut(function() { keyClick(Qt.Key_Down); keyClick(Qt.Key_Return) })
       cut(function() { panel.close(); wait(300) })
       harness.check("a replay's sound stops with the replay: Esc, another row's chart, and closing the popup", cuts.join(",") === "stopped,stopped,stopped", cuts.join(","))
       panel.open()
@@ -677,56 +677,56 @@ ShellRoot {
       var before = harness.starts().length
       keyClick(Qt.Key_P)
       startsBy(before + 1)
-      keyClick(Qt.Key_X)
+      keyClick(Qt.Key_Delete)
       var after = startsBy(before + 2)
       tryVerify(function() { return endOf(before + 1) !== "" }, 3000)
-      harness.check("one sound at a time: x during a replay stops the replay's sound and plays the removal",
+      harness.check("one sound at a time: Delete during a replay stops the replay's sound and plays the removal",
         endOf(before + 1) === "stopped" && played(after[before + 1]) === "sounds/smooth/remove.wav", endOf(before + 1) + "|" + played(after[before + 1]))
-      keyClick(Qt.Key_U)
+      keyClick(Qt.Key_Z, Qt.ControlModifier)
       startsBy(before + 3)
       quiet()
 
-      // y: the screenshot, and with it the shutter once, in smooth's voice.
+      // Ctrl+C: the screenshot, and with it the shutter once, in smooth's voice.
       before = harness.starts().length
-      keyClick(Qt.Key_Y)
+      keyClick(Qt.Key_C, Qt.ControlModifier)
       var shutter = startsBy(before + 1)
       tryVerify(function() { return body.cameraLit && !camera.busy }, 5000)
       wait(300)
-      harness.check("y sounds the shutter once as the screenshot is taken, in smooth's voice",
+      harness.check("Ctrl+C sounds the shutter once as the screenshot is taken, in smooth's voice",
         harness.starts().length === before + 1 && played(shutter[before]) === "sounds/smooth/shutter.wav",
         harness.starts().slice(before).map(played).join(", "))
 
-      // Shift+S: off, saved, the speaker muted, and nothing plays; a replay
-      // playing stops. Then x, u, an add, p, and a screenshot play nothing.
+      // m: off, saved, the speaker muted, and nothing plays; a replay
+      // playing stops. Then Delete, Ctrl+Z, an add, p, and a screenshot play nothing.
       before = harness.starts().length
       keyClick(Qt.Key_P)
       startsBy(before + 1)
-      keyClick("S", Qt.ShiftModifier)
+      keyClick(Qt.Key_M)
       tryVerify(function() { return endOf(before + 1) !== "" }, 3000)
       tryVerify(function() { var f = file(); return !!f && f.sounds === false }, 3000)
-      harness.check("Shift+S turns sounds off: saved, the speaker muted, the replay playing stopped",
+      harness.check("m turns sounds off: saved, the speaker muted, the replay playing stopped",
         !service.soundsOn && icon.on === false && endOf(before + 1) === "stopped", service.soundsOn + "|" + endOf(before + 1))
       before = harness.starts().length
       keyClick(Qt.Key_Escape)
-      keyClick(Qt.Key_X)
+      keyClick(Qt.Key_Delete)
       wait(100)
-      keyClick(Qt.Key_U)
+      keyClick(Qt.Key_Z, Qt.ControlModifier)
       wait(100)
       body.acceptSymbol("SPY")
       quiet()
       keyClick(Qt.Key_P)
       wait(2500)
-      keyClick(Qt.Key_Y)
+      keyClick(Qt.Key_C, Qt.ControlModifier)
       tryVerify(function() { return !camera.busy && body.note.indexOf("screenshot of SPY") >= 0 }, 5000)
       wait(100)
-      harness.check("with sounds off, x, u, an add, p, and a screenshot play nothing", harness.starts().length === before, JSON.stringify(harness.starts().slice(before)))
+      harness.check("with sounds off, Delete, Ctrl+Z, an add, p, and a screenshot play nothing", harness.starts().length === before, JSON.stringify(harness.starts().slice(before)))
       service.removeSymbol("SPY")
 
-      // Shift+S again: on, saved, and the add sound once, so you hear the level.
-      keyClick("S", Qt.ShiftModifier)
+      // m again: on, saved, and the add sound once, so you hear the level.
+      keyClick(Qt.Key_M)
       var onAgain = startsBy(before + 1)
       tryVerify(function() { var f = file(); return !!f && f.sounds === true }, 3000)
-      harness.check("Shift+S turns sounds back on, saved, and plays the add sound once",
+      harness.check("m turns sounds back on, saved, and plays the add sound once",
         service.soundsOn && icon.on === true && onAgain.length === before + 1 && played(onAgain[before]) === "sounds/smooth/add.wav",
         harness.starts().slice(before).map(played).join(", "))
 
@@ -902,7 +902,7 @@ ShellRoot {
       wait(400)
 
       // Unticking All in a row's lists removes it everywhere, heard as any
-      // removal is, and u takes it back.
+      // removal is, and Ctrl+Z takes it back.
       before = harness.starts().length
       var unticked = win.watchlist.displayedSymbols.filter(function(s) { return s !== "MSFT" })[0]
       var untickRow = win.watchlist.rowItem(unticked)
@@ -914,11 +914,11 @@ ShellRoot {
       tryVerify(function() { return service.library.indexOf(unticked) < 0 }, 2000)
       app.refocusKeys()
       wait(100)
-      keyClick(Qt.Key_U)
+      keyClick(Qt.Key_Z, Qt.ControlModifier)
       // The undo's sound is the last to start: the removal's, if any, began
       // at the untick.
       var untickSounds = startsBy(before + 1).slice(before).map(played)
-      harness.check("unticking All in a row's lists plays retro's removal, and u its undo",
+      harness.check("unticking All in a row's lists plays retro's removal, and Ctrl+Z its undo",
         untickSounds.join(", ") === "sounds/retro/remove.wav, sounds/retro/undo.wav" && service.library.indexOf(unticked) >= 0,
         untickSounds.join(", "))
 

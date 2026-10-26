@@ -5,12 +5,11 @@ import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Commons as Commons
 import "Tones.js" as Tones
-import "KeyText.js" as KeyText
 
 // A symbol's lists, in the rows' place: one tick box per list, All first.
 // Value-in, signals out; the body applies the membership rules. It owns its
-// keys while open: the arrows or j k move the cursor, Enter or Space ticks
-// the cursor's list, 1–9 tick that list, Escape or m closes. One cursor, as
+// keys while open: the arrows move the cursor, Enter ticks the cursor's
+// list, and Escape closes. One cursor, as
 // on the rows: moving the pointer puts it on the row under it, with the
 // rows' mark, and a click ticks the row clicked.
 FocusScope {
@@ -128,13 +127,10 @@ FocusScope {
 
   Keys.onPressed: function(event) {
     event.accepted = true
-    // A letter by its key and Shift: Caps Lock sends "J" for j.
-    var t = KeyText.typed(event)
-    if (event.key === Qt.Key_Escape || t === "m") root.dismissed()
-    else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) root.toggle(root.cursor)
-    else if (event.key === Qt.Key_Down || t === "j") root.moveCursor(1)
-    else if (event.key === Qt.Key_Up || t === "k") root.moveCursor(-1)
-    else if (t >= "1" && t <= "9") root.toggle(Number(t) - 1)
+    if (event.key === Qt.Key_Escape) root.dismissed()
+    else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) root.toggle(root.cursor)
+    else if (event.key === Qt.Key_Down) root.moveCursor(1)
+    else if (event.key === Qt.Key_Up) root.moveCursor(-1)
   }
 
   RowPointer {

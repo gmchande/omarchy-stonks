@@ -279,7 +279,7 @@ Item {
   readonly property int cell: Cells.iconCell(Style.fontScale)
 
   // The sounds as they are, the speaker with its waves, or off with a
-  // cross; a click turns them off or on, as Shift+S does. One width on or
+  // cross; a click turns them off or on, as m does. One width on or
   // off, so the toggle moves nothing. It hovers and presses as the look
   // icon does, and its target is the header's full height too.
   GridIcon {
@@ -316,7 +316,7 @@ Item {
     }
   }
 
-  // The camera, which takes a screenshot of the chart on show, as y does:
+  // The camera, which takes a screenshot of the chart on show, as Ctrl+C does:
   // solid, its lens a hole at rest; once it has taken one, lit in the full
   // ink with the shot's dot in its lens until the surface closes. It hovers
   // and presses as the look icon does, its target the header's full

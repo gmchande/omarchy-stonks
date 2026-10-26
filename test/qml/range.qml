@@ -559,10 +559,16 @@ ShellRoot {
       app.open("{}")
       waitForRendering(body)
       app.testKeyCatcher.forceActiveFocus()
+      // Up to the top row, down to row n, and Enter shows its chart.
+      var pickRow = function(n) {
+        for (var up = 0; up < body.watchlist.displayedSymbols.length; up++) keyClick(Qt.Key_Up)
+        for (var down = 0; down < n; down++) keyClick(Qt.Key_Down)
+        keyClick(Qt.Key_Return)
+      }
       harness.check("the window opens on the featured chart", body.chartSymbol === service.featuredSymbol)
-      keyClick(Qt.Key_1)
-      harness.check("a row key features its row", service.featuredSymbol === "AAPL")
-      keyClick(Qt.Key_2)
+      pickRow(0)
+      harness.check("Up to a row and Enter features it", service.featuredSymbol === "AAPL")
+      pickRow(1)
       var heroBeforeWheel = service.featuredSymbol
       mouseWheel(pill, pill.width / 2, pill.height / 2, 0, -120)
       var wheeledTo = service.featuredSymbol
@@ -697,7 +703,7 @@ ShellRoot {
       // NVDA's history never comes. Read straight after the key, before any
       // answer can land: the window names what is coming, and once the
       // fetch has failed says the range is unavailable.
-      keyClick(Qt.Key_3)
+      pickRow(2)
       var header = harness.find(body, "statusText")
       harness.check("while a range's first fetch is out the window names what is coming",
         service.featuredSymbol === "NVDA" && header.text === "LOADING NVDA 1W",
@@ -712,7 +718,7 @@ ShellRoot {
         within(8000, function() { return header.text === "1W UNAVAILABLE" && harness.find(body, "retryRange").visible }), header.text)
 
       // Back to a symbol with history: the window draws its range once in.
-      keyClick(Qt.Key_1)
+      pickRow(0)
       harness.check("a symbol change in the window brings that symbol's range",
         service.featuredSymbol === "AAPL"
           && within(5000, function() { return harness.showsRange(app, "1W") }),
@@ -742,9 +748,9 @@ ShellRoot {
       // A range whose cache has run out still has its chart: featured, it
       // draws in at once while the refetch is out. It opened blank until
       // the refetch landed, the first time after the laptop woke.
-      keyClick(Qt.Key_2)
+      pickRow(1)
       tryVerify(function() { return harness.answered("MSFT|1M") }, 5000)
-      keyClick(Qt.Key_1)
+      pickRow(0)
       var aged = Object.assign({}, service.testHistoryFeed.entries)
       aged["MSFT|1M"] = Object.assign({}, aged["MSFT|1M"], { receivedAt: aged["MSFT|1M"].receivedAt - 16 * 60 })
       service.testHistoryFeed.entries = aged
@@ -752,7 +758,7 @@ ShellRoot {
       // state it is out in: the fake curl could answer before the check.
       holdMsft.running = true
       tryVerify(function() { return !holdMsft.running }, 2000)
-      keyClick(Qt.Key_2)
+      pickRow(1)
       var stale = service.histories["MSFT|1M"]
       var out = service.testHistoryFeed.holds(service.testHistoryFeed.wanted, "MSFT|1M")
       var loadingAtOnce = body.chartLoading
@@ -761,7 +767,7 @@ ShellRoot {
         out + "|" + loadingAtOnce)
       releaseMsft.running = true
       tryVerify(function() { return !releaseMsft.running && harness.answered("MSFT|1M") && !service.testHistoryFeed.busy }, 5000)
-      keyClick(Qt.Key_1)
+      pickRow(0)
       tryVerify(function() { return service.featuredSymbol === "AAPL" && !service.testHistoryFeed.busy && !service.testFeed.busy }, 5000)
 
       // r fetches every quote again, and the range on show, which the cache
@@ -865,7 +871,7 @@ ShellRoot {
       // is read, not NVDA's calls: the rows in sight are fetched ahead on
       // the next range, NVDA's among them.
       var nvdaHistory = harness.calls("NVDA.history")
-      keyClick(Qt.Key_3)
+      pickRow(2)
       var leftKey = "NVDA|" + service.range
       tryVerify(function() { return service.testHistoryFeed.testRetrying }, 5000)
       var wantedSince = []

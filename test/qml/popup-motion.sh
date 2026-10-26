@@ -14,7 +14,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree popup-motion.qml
 cp "$here/CardWindow.qml" "$root/plugin/"
 patch_copy plugin/Panel.qml 's/^  KeyboardPanel {$/  CardWindow {/'
-patch_copy plugin/Panel.qml '/readonly property int panelWidth:/a\  readonly property var testBody: root.body\n  readonly property alias testKeyCatcher: keyCatcher\n  readonly property alias testCard: panel'
+patch_copy plugin/Panel.qml '/readonly property int panelWidth:/a\  readonly property var testBody: root.body\n  readonly property alias testBodyKeys: bodyKeys\n  readonly property alias testCard: panel'
 patch_copy plugin/BarWidget.qml '/id: panelLoader/,/source:/s/active: true/active: false/'
 # The flows wait for the quote feed to go quiet: nothing in flight or queued.
 patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testFeed: feed'

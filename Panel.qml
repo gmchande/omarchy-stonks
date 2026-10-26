@@ -4,7 +4,6 @@ import QtQuick
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
-import "KeyText.js" as KeyText
 
 // The watchlist popup. Owns popup lifecycle, keys, and look; the body reads
 // the service and owns the list, search, scrub, help, and the motion when
@@ -139,7 +138,7 @@ Panel {
     requestFundamentals()
   }
 
-  function refocusKeys() { Qt.callLater(function() { if (letterKeys) letterKeys.forceActiveFocus() }) }
+  function refocusKeys() { Qt.callLater(function() { if (bodyKeys) bodyKeys.forceActiveFocus() }) }
 
   onFeaturedSymbolChanged: requestFundamentals()
 
@@ -149,7 +148,7 @@ Panel {
     owner: root.barIdentity
     bar: root.bar
     open: root.opened
-    focusTarget: letterKeys
+    focusTarget: bodyKeys
     contentWidth: panel.fittedContentWidth(root.panelWidth)
     contentHeight: Math.round(root.cardHeight)
 
@@ -159,63 +158,30 @@ Panel {
       // The body is laid out at the card's new height while the edge eases.
       clip: true
       blocked: !!root.body && root.body.ownsKeys
+      // Omarchy's keys for every panel, past the body's own: j k and h
+      // move the selection and the scrub, Space is Enter, x removes. l is
+      // Stonks' list menu, which the body takes first.
       onMoveRequested: function(dx, dy) {
         if (dy !== 0) root.body.moveCursor(dy)
         if (dx !== 0) root.body.nudgeScrub(dx)
       }
       onActivateRequested: root.body.featureSymbol(root.body.watchlist.cursorRow)
+      onDeleteRequested: root.body.removeRow(root.body.watchlist.cursorRow)
       onCloseRequested: {
         if (root.body.showingHelp) root.body.showingHelp = false
         else if (!root.body.endScrub()) root.close()
       }
-      onDeleteRequested: root.body.removeRow(root.body.watchlist.cursorRow)
       onTabRequested: function(direction) {
         root.body.showingHelp = false
         root.switchPanel(direction)
       }
-      onTextKey: function(t) {
-        var body = root.body
-        if (t === "?") body.toggleHelp()
-        else if (t === "j") body.moveCursor(1)
-        else if (t === "k") body.moveCursor(-1)
-        else if (t === "h") body.nudgeScrub(-1)
-        else if (t === "l") body.nudgeScrub(1)
-        else if (t === "x") body.removeRow(body.watchlist.cursorRow)
-        else if (t === "X") body.openRowMenu(body.watchlist.cursorRow, null)
-        else if (t === "a" || t === "+") body.startAdding()
-        else if (t === "c") body.cycleChangeMode()
-        else if (t === "r") root.refresh()
-        else if (t === "[") body.stepRange(-1)
-        else if (t === "]") body.stepRange(1)
-        else if (t === "p") body.replay()
-        else if (t === "y") body.takeScreenshot()
-        else if (t === "s") body.toggleStyle()
-        else if (t === "S") body.toggleSounds()
-        else if (t === "o") body.cycleOrder()
-        else if (t === "O") body.reverseOrder()
-        else if (t === "w") body.openListMenu()
-        else if (t === "W") body.openManageLists()
-        else if (t === "m") body.openSymbolLists(body.watchlist.cursorRow)
-        else if (t === "u") body.undoRemoval()
-        else if (t === ",") body.stepList(-1)
-        else if (t === ".") body.stepList(1)
-        else if (t === "J") body.moveSelected(1)
-        else if (t === "K") body.moveSelected(-1)
-        else if (t >= "1" && t <= "9") body.featureAt(Number(t) - 1)
-      }
 
-      // The popup's keys land here first. The catcher reads a key's text,
-      // and Caps Lock sends "J" for j, which would move a row: a letter
-      // goes on as the text its key and Shift mean (`KeyText.typed`), and
-      // every other key on to the catcher.
+      // The popup's keys land here first, and the body's map takes them,
+      // as the window's do. Every other key goes on to the catcher.
       Item {
-        id: letterKeys
+        id: bodyKeys
         Keys.onPressed: function(event) {
-          if (event.key < Qt.Key_A || event.key > Qt.Key_Z || keyCatcher.blocked) return
-          var t = KeyText.typed(event)
-          if (t === "") return
-          keyCatcher.textKey(t)
-          event.accepted = true
+          if (!keyCatcher.blocked && root.body.pressKey(event)) event.accepted = true
         }
       }
 
@@ -239,6 +205,7 @@ Panel {
           sounds: root.sounds
           camera: root.camera
           surfaceOpen: root.opened
+          switchesPanels: true
           chartHeight: Style.space(190)
           foreground: root.bar ? root.bar.foreground : Commons.Color.foreground
           fontFamily: root.bar ? root.bar.fontFamily : Style.font.family

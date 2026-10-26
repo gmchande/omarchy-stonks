@@ -6,13 +6,13 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 import "Tones.js" as Tones
-import "KeyText.js" as KeyText
 
 // Manage lists, in the rows' place: rename, reorder, and delete the named
 // lists. All is listed first and cannot be changed. Value-in, signals out;
 // the body persists. Like the list menu it owns its keys while open: the
-// arrows or j k move the cursor, Enter renames, J K move the list, x asks to
-// delete and Enter confirms, Escape backs out one step. The buttons say only
+// arrows move the cursor, Enter renames, Shift and the arrows move the list,
+// Delete or Backspace asks to delete it and Enter confirms, Escape backs out
+// one step. The buttons say only
 // what they do; the one Enter takes is marked (`ListAction.enterTakes`).
 // One cursor, as on the rows: moving the pointer puts it, with the rows'
 // mark, on the row under it, which shows that row's buttons; a click on one
@@ -237,19 +237,17 @@ FocusScope {
     // While renaming, the field has the keys; what it lets past goes nowhere.
     event.accepted = true
     if (root.renaming) return
-    // A letter by its key and Shift: Caps Lock sends "J" for j.
-    var t = KeyText.typed(event)
+    var shifted = (event.modifiers & ~Qt.KeypadModifier) === Qt.ShiftModifier
     if (event.key === Qt.Key_Escape) { if (root.confirming) root.confirming = false; else root.dismissed() }
     else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
       if (root.confirming) root.confirmDelete()
       else root.startRenaming(root.cursor)
     }
-    else if (event.key === Qt.Key_Down || t === "j") root.moveCursor(1)
-    else if (event.key === Qt.Key_Up || t === "k") root.moveCursor(-1)
-    else if (t === "J") root.move(root.cursor, 1)
-    else if (t === "K") root.move(root.cursor, -1)
-    else if (t === "x" || event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) root.askDelete(root.cursor)
-    else if (t === "W") root.dismissed()
+    else if (shifted && event.key === Qt.Key_Down) root.move(root.cursor, 1)
+    else if (shifted && event.key === Qt.Key_Up) root.move(root.cursor, -1)
+    else if (event.key === Qt.Key_Down) root.moveCursor(1)
+    else if (event.key === Qt.Key_Up) root.moveCursor(-1)
+    else if (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) root.askDelete(root.cursor)
   }
 
   // Under everything else in the view: while a name is typed, a click that
