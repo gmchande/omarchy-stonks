@@ -10,11 +10,12 @@
 # stand-in, as Quickshell does, makes its instance's folder under the
 # XDG_RUNTIME_DIR it is given; its own runtime folder is gone, an interrupt
 # as it is made included, the session's entries reachable through it while
-# it ran; a run whose folder can't be made never starts; and a run whose
-# Quickshell says it saved in the session's folder fails. The stand-in dies
-# on a real signal with its core dump turned off (prctl PR_SET_DUMPABLE, 0:
-# prctl(2)), so no core is written and no one is notified. Prints FAILED per
-# miss.
+# it ran; a run whose folder can't be made never starts, nor one with no
+# display that isn't offscreen, which ends its harness on one line saying
+# why; and a run whose Quickshell says it saved in the session's folder
+# fails. The stand-in dies on a real signal with its core dump turned off
+# (prctl PR_SET_DUMPABLE, 0: prctl(2)), so no core is written and no one is
+# notified. Prints FAILED per miss.
 set -uo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "$here/../procs.sh"
@@ -41,8 +42,10 @@ trap 'exit 143' TERM
 failed=0
 miss() { echo "FAILED $*"; failed=1; }
 # The session's runtime folder as the runs see it: a fake one, so the check
-# never writes in the real one. Its Wayland socket stands in as a file.
-export XDG_RUNTIME_DIR=$tmp/xdg STANDIN_SESSION=$tmp/xdg
+# never writes in the real one. Its Wayland socket stands in as a file, and
+# names the runs' display.
+export XDG_RUNTIME_DIR=$tmp/xdg STANDIN_SESSION=$tmp/xdg WAYLAND_DISPLAY=wayland-0
+unset QT_QPA_PLATFORM
 mkdir -p "$XDG_RUNTIME_DIR"
 echo socket > "$XDG_RUNTIME_DIR/wayland-0"
 
@@ -210,6 +213,21 @@ grep -q "^FAIL the run's runtime folder .* could not be made; Quickshell was not
   || miss "no-session: no FAIL line saying why: $(cat "$tmp/no-session/log" 2> /dev/null)"
 folder=$(sed -n "s/^FAIL the run's runtime folder \(.*\) could not be made; Quickshell was not started$/\1/p" "$tmp/no-session/log")
 [ -e "$folder" ] && miss "no-session: its runtime folder $folder is still there"
+
+# No display, as from a shell outside the Wayland session: Quickshell is
+# never started, and the harness ends on one line saying why. Offscreen it
+# needs none, and starts.
+WAYLAND_DISPLAY= harness no-display pass 20
+wait "$h" 2> /dev/null
+status=$?
+[ "$status" = 1 ] || miss "no-display: the harness exited $status, not 1"
+[ -e "$tmp/no-display/pid" ] && miss "no-display: Quickshell was started"
+[ "$(cat "$tmp/no-display/out")" = "FAIL no display: WAYLAND_DISPLAY is unset and QT_QPA_PLATFORM isn't offscreen, so Quickshell was not started (Qt would abort and dump core)" ] \
+  || miss "no-display: not one line saying why: $(cat "$tmp/no-display/out")"
+WAYLAND_DISPLAY= QT_QPA_PLATFORM=offscreen harness offscreen pass 20
+ran "$h" offscreen
+[ "$code" = 0 ] || miss "offscreen: code $code, not 0"
+gone offscreen
 
 # TERM once the run's runtime folder is made, before Quickshell starts: the
 # folder goes all the same.
