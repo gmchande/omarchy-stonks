@@ -788,7 +788,9 @@ test("community themes that one hue, a faint colour, or a tinted light ground wo
     const got = M.trend(c.green, red, ground)
     if (c.want === "theme") expect([c.name, got]).toEqual([c.name, { up: c.green, down: red }])
     else greenAndRed(got)
-    const floor = c.want === "theme" ? 3 : 4.5
+    // Stonks' own reads at 4.5:1 on a light ground and 6:1 on a dark one,
+    // where a colour at 4.5:1 is dark enough to look muddy.
+    const floor = { theme: 3, light: 4.5, dark: 6 }[c.want]
     expect([c.name, M.paired(M.hexOf(colour(got.up)), colour(got.down))]).toEqual([c.name, true])
     expect([c.name, M.contrast(colour(got.up), ground) >= floor, M.contrast(colour(got.down), ground) >= floor]).toEqual([c.name, true, true])
   }

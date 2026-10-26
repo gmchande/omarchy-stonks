@@ -1571,8 +1571,8 @@ ShellRoot {
       var trendColours = [dayColours("tokyo-night"), daysIn("hackerman"), daysIn("solitude"), daysIn("white"), daysIn("kanagawa"),
         daysIn("tokyo-night"), daysIn("tokyo-night with kanagawa's green", greenOnly), daysIn("tokyo-night")]
       harness.check("up and down are the theme's green and red and follow a theme switch, Stonks' own pair for the bar's ground where the theme has none",
-        trendColours.join(" | ") === "tokyo-night #9ece6a #f7768e | hackerman #3fb950 #f85149 | solitude #3fb950 #f85149"
-          + " | white #116329 #a40e26 | kanagawa #76946a #c34043 | tokyo-night #9ece6a #f7768e"
+        trendColours.join(" | ") === "tokyo-night #9ece6a #f7768e | hackerman #3ea347 #e66761 | solitude #41a64a #ea6b64"
+          + " | white #1c892d #c94d49 | kanagawa #76946a #c34043 | tokyo-night #9ece6a #f7768e"
           + " | tokyo-night with kanagawa's green #76946a #f7768e | tokyo-night #9ece6a #f7768e",
         trendColours.join(" | "))
 

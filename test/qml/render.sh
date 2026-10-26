@@ -275,7 +275,9 @@ fi
 # TrendColors both read it as they do on the desktop. A state ending -large
 # has the shell's text size at 16 rather than 12, one ending -small at 10,
 # and one ending -size-N at N.
-themes=$(ls /usr/share/omarchy/themes | awk '{ print length, $0 }' | sort -rn | cut -d' ' -f2-)
+# STONKS_VISUAL_THEMES names a folder of other themes' folders, each with
+# its colors.toml, such as community themes, rendered as installed ones are.
+themes=$( (ls /usr/share/omarchy/themes; if [ -n "${STONKS_VISUAL_THEMES:-}" ]; then ls "$STONKS_VISUAL_THEMES"; fi) | awk '{ print length, $0 }' | sort -rn | cut -d' ' -f2-)
 theme_dir="$HOME/.local/state/omarchy/current"
 mkdir -p "$theme_dir"
 for state in $states; do
@@ -283,7 +285,9 @@ for state in $states; do
   shot="$work/$state.png"
   theme=tokyo-night
   for t in $themes; do [[ ${state%-large} == *-"$t" ]] && { theme=$t; break; }; done
-  ln -sfn "/usr/share/omarchy/themes/$theme" "$theme_dir/theme"
+  theme_path="/usr/share/omarchy/themes/$theme"
+  [ -d "$theme_path" ] || theme_path="$STONKS_VISUAL_THEMES/$theme"
+  ln -sfn "$theme_path" "$theme_dir/theme"
   if [[ $state == *-large ]]; then printf '[font]\nbase-size = 16\n' > "$HOME/.config/omarchy/shell.toml"
   elif [[ $state == *-small ]]; then printf '[font]\nbase-size = 10\n' > "$HOME/.config/omarchy/shell.toml"
   elif [[ $state =~ -size-([0-9]+)$ ]]; then printf '[font]\nbase-size = %s\n' "${BASH_REMATCH[1]}" > "$HOME/.config/omarchy/shell.toml"

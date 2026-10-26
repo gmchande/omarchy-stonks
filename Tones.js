@@ -2,7 +2,8 @@
 // How the theme's colours are put to work: which colours are up and down,
 // how much quieter secondary text is, and how strongly a chart's wash lies
 // over the ground. Every colour comes in from the theme, except Stonks' own
-// up and down for a theme with no green and red of its own (`OWN_PAIRS`).
+// up and down for a theme with no green and red of its own (`ownPair`),
+// and those are made for the theme's ground.
 // Colours are { r, g, b } in 0..1, as a QML color is; a colour made here is
 // a "#rrggbb" string, which a QML color property takes.
 
@@ -78,28 +79,101 @@ function paired(green, red) {
 var OWN_FLOOR = 3
 
 // Stonks' own up and down, for a theme without a pair or with one too faint
-// to read: one pair for a dark ground and one for a light one. The dark is
-// GitHub's dark-mode success and danger text colours; the light is Primer's
-// green 6 and red 6, a step darker than GitHub's light text colours, which
-// fall under 4.5:1 on tinted light grounds (Catppuccin Latte's at 4.49:1).
-// Each reads at 4.5:1 or more on the ground it is picked for in every
-// installed theme.
-var OWN_PAIRS = [
-  { up: "#3fb950", down: "#f85149" },
-  { up: "#116329", down: "#a40e26" }
-]
+// to read: a green and a red by hue, at OWN_CHROMA, and as near the ground
+// as reads at OWN_TARGET there. A fixed pair (GitHub's) read as a stranger
+// in the themes that need one: a deep crimson bear on Catppuccin Latte's
+// pastels and on White's greys. On a dark ground a colour at 4.5:1 is dark
+// enough to look muddy, so it sits further off, at 6:1. Where OWN_CHROMA
+// leaves sRGB at that lightness, it is lowered, down to HUE_CHROMA, the
+// least that still says its hue. The owner picked these from renders on
+// 26 October.
+var OWN_HUES = { up: 145, down: 25 }
+var OWN_CHROMA = 0.16
+var HUE_CHROMA = 0.07
+var OWN_TARGET = { light: 4.5, dark: 6 }
+
+// Whether `ground` is dark: white reads more strongly on it than black.
+function darkGround(ground) {
+  return contrast({ r: 1, g: 1, b: 1 }, ground) > contrast({ r: 0, g: 0, b: 0 }, ground)
+}
+
+// OKLCH to sRGB, or null outside sRGB's gamut.
+function fromOklch(L, C, hue) {
+  var a = C * Math.cos(hue * Math.PI / 180), b = C * Math.sin(hue * Math.PI / 180)
+  var l = Math.pow(L + 0.3963377774 * a + 0.2158037573 * b, 3)
+  var m = Math.pow(L - 0.1055613458 * a - 0.0638541728 * b, 3)
+  var s = Math.pow(L - 0.0894841775 * a - 1.2914855480 * b, 3)
+  var lin = [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s]
+  for (var i = 0; i < 3; i++) if (lin[i] < -1e-4 || lin[i] > 1 + 1e-4) return null
+  var encode = function(v) {
+    v = Math.max(0, Math.min(1, v))
+    return v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055
+  }
+  return { r: encode(lin[0]), g: encode(lin[1]), b: encode(lin[2]) }
+}
+
+// The colour of `hue` and `chroma` nearest `ground` in lightness that still
+// reads at `target` on it, on the side of the ground with more room: a
+// light ground takes a darker colour, a dark one a lighter. Where the
+// chroma leaves sRGB at that lightness, it is lowered, down to `least`;
+// null where even that doesn't fit.
+function readingColor(hue, chroma, least, target, ground) {
+  var lighter = darkGround(ground)
+  for (var c = chroma; c >= least - 1e-9; c -= 0.005) {
+    // Judged as written, "#rrggbb", which rounds each channel.
+    var reads = function(L) {
+      var probe = fromOklch(L, c, hue)
+      return probe !== null && contrast(hexColor(hexOf(probe)), ground) >= target
+    }
+    // Lightness walks from the ground's own toward the far end, in steps,
+    // to the first that reads in sRGB, then halves back to the edge.
+    var from = oklabLightness(ground), to = lighter ? 1 : 0
+    var prev = from
+    for (var step = 1; step <= 100; step++) {
+      var L = from + (to - from) * step / 100
+      if (!reads(L)) {
+        prev = L
+        continue
+      }
+      var lo = prev, hi = L
+      for (var i = 0; i < 20; i++) {
+        var mid = (lo + hi) / 2
+        if (reads(mid)) hi = mid
+        else lo = mid
+      }
+      return hexOf(fromOklch(hi, c, hue))
+    }
+  }
+  return null
+}
+
+// Stonks' own colour of `hue`: at OWN_TARGET while it keeps HUE_CHROMA;
+// else at the theme's floor, OWN_FLOOR, as a red on a red bar must be to
+// stay red; else as grey as it must be.
+function ownColor(hue, ground) {
+  var dark = darkGround(ground)
+  var target = dark ? OWN_TARGET.dark : OWN_TARGET.light
+  return readingColor(hue, OWN_CHROMA, HUE_CHROMA, target, ground)
+    || readingColor(hue, OWN_CHROMA, HUE_CHROMA, OWN_FLOOR, ground)
+    || readingColor(hue, OWN_CHROMA, 0, target, ground)
+    || hexOf(dark ? { r: 1, g: 1, b: 1 } : { r: 0, g: 0, b: 0 })
+}
+
+function ownPair(ground) {
+  return { up: ownColor(OWN_HUES.up, ground), down: ownColor(OWN_HUES.down, ground) }
+}
 
 // Up and down on `ground`. Up is the theme's green, as Omarchy colours
 // success in every app it themes, and down its red; never the accent, which
 // means selected. Where the theme has no real pair, or the fainter of its
-// two is under the floor on this ground, Stonks' own takes over: the pair
-// whose fainter colour stands out more from this ground, so each surface
-// picks for its own.
+// two is under the floor on this ground, Stonks' own takes over, made for
+// this ground, so each surface picks for its own.
 function trend(green, red, ground) {
   var faintest = function(up, down) { return Math.min(contrast(up, ground), contrast(down, ground)) }
   if (paired(green, red) && faintest(hexColor(green), red) >= OWN_FLOOR) return { up: green, down: red }
-  var dark = OWN_PAIRS[0], light = OWN_PAIRS[1]
-  return faintest(hexColor(dark.up), hexColor(dark.down)) >= faintest(hexColor(light.up), hexColor(light.down)) ? dark : light
+  return ownPair(ground)
 }
 
 // WCAG 2's contrast between two opaque colours.
