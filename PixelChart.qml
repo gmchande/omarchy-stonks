@@ -76,10 +76,14 @@ Item {
   // over the ground (`Tones.washAlpha`), never more than half the ink of the
   // cap above it (full, or the extended hours' 45%). A cap is the line, one
   // share of its own colour on both sides.
-  readonly property real aboveStem: Tones.washAlpha(aboveColor, upColor, ground, 0.35, 1)
-  readonly property real belowStem: Tones.washAlpha(belowColor, upColor, ground, 0.35, 1)
-  readonly property real aboveStemDim: Tones.washAlpha(aboveColor, upColor, ground, 0.35 * 0.45, 0.45)
-  readonly property real belowStemDim: Tones.washAlpha(belowColor, upColor, ground, 0.35 * 0.45, 0.45)
+  // `solid` draws each stem at its cap's ink instead, for a chart so small
+  // that faint stems leave only the caps, a dotted line: the pill's, 13
+  // columns at 1x (the design QA of 19 October).
+  property bool solid: false
+  readonly property real aboveStem: solid ? 1 : Tones.washAlpha(aboveColor, upColor, ground, 0.35, 1)
+  readonly property real belowStem: solid ? 1 : Tones.washAlpha(belowColor, upColor, ground, 0.35, 1)
+  readonly property real aboveStemDim: solid ? 0.45 : Tones.washAlpha(aboveColor, upColor, ground, 0.35 * 0.45, 0.45)
+  readonly property real belowStemDim: solid ? 0.45 : Tones.washAlpha(belowColor, upColor, ground, 0.35 * 0.45, 0.45)
 
   onGridChanged: { base.requestPaint(); ink.requestPaint() }
   onBaselineColorChanged: base.requestPaint()

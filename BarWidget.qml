@@ -277,7 +277,8 @@ BarWidget {
       }
 
       // The rows' pixel histogram at pill size, so the pill, a row, and the
-      // hero are one drawing at three sizes.
+      // hero are one drawing at three sizes; its stems solid, as faint ones
+      // read as a dotted line here.
       PixelChart {
         visible: root.barStyle === "sparkline" && root.retro
         anchors.verticalCenter: parent.verticalCenter
@@ -289,6 +290,7 @@ BarWidget {
         baselineColor: Qt.rgba(button.foreground.r, button.foreground.g, button.foreground.b, 0.25)
         pixel: 2
         gap: 1
+        solid: true
       }
 
       // The 23-degrees idea: an arrow whose tilt is the size of today's move,
