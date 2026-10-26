@@ -20,8 +20,9 @@ import "Tones.js" as Tones
 // price, with its currency beside it as a unit, and its move, large; what
 // the price is, its time and zone, a range's date, and what the move is
 // measured from; the line under the price the popup shows; the chart, its
-// axis ending at the newest price, with the scrub; and at the foot when,
-// the day's date or the range's length, and Stonks' mark. Never the list.
+// axis ending at the newest price, with a range's high and low marks and
+// the scrub; and at the foot when, the day's date or the range's length,
+// and Stonks' mark. Never the list.
 // In the surface's look and colours. Built for a shot and gone after it
 // (`StonksBody`).
 Rectangle {
@@ -29,11 +30,13 @@ Rectangle {
 
   property string symbol: ""
   // Yahoo's quote, the 1D chart's day, a range's history (null on the
-  // day), the newest print of all, and the price on show (`Figures.rowModel`
-  // or `History.historyRowModel`), as the surface has them.
+  // day) and its high and low marks (`History.rangeMarks`), the newest
+  // print of all, and the price on show (`Figures.rowModel` or
+  // `History.historyRowModel`), as the surface has them.
   property var quote: null
   property var day: null
   property var history: null
+  property var marks: null
   property var latest: null
   property var view: null
   property int scrubT: 0
@@ -260,7 +263,8 @@ Rectangle {
   }
 
   // The chart, at twice its strokes and cells, as the surface's look draws
-  // it, still: no draw-in, ripple, or blink.
+  // it, still: no draw-in, ripple, or blink. A range's marks are set at the
+  // picture's caption size, the dates spaced as the axis's ends are.
   Item {
     id: chart
     x: root.margin
@@ -269,6 +273,7 @@ Rectangle {
     height: 252 * root.u
 
     DayChart {
+      id: dayChart
       visible: !root.retro
       anchors.fill: parent
       weight: root.u
@@ -285,6 +290,7 @@ Rectangle {
       still: true
     }
     PixelChart {
+      id: pixelChart
       visible: root.retro
       anchors.fill: parent
       pixel: 8 * root.u
@@ -301,6 +307,18 @@ Rectangle {
       scrubX: root.scrubX
       surfaceOpen: false
       still: true
+    }
+    RangeMarks {
+      anchors.fill: parent
+      marks: root.marks
+      chart: root.retro ? pixelChart : dayChart
+      scrubX: root.scrubX
+      foreground: root.foreground
+      dim: root.dim
+      fontFamily: root.fontFamily
+      fontSize: 18 * root.u
+      letterSpacing: root.u
+      spacing: 1.8 * root.u
     }
     // A day with one print or none says so, as the popup's chart does.
     Rectangle {
