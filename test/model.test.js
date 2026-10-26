@@ -802,6 +802,13 @@ test("community themes that one hue, a faint colour, or a tinted light ground wo
   expect(M.trend("#3ddc84", red, M.hexColor("#0d0d0f"))).toEqual({ up: "#3ddc84", down: red })
   // A light bar under a dark popup takes the other pair: White's on black.
   greenAndRed(M.trend("#3a3a3a", M.hexColor("#2a2a2a"), M.hexColor("#000000")))
+  // On a mid-grey ground no green reads at 4.5:1, and the darkest tried
+  // rounded to black, which reads but says nothing: there, up is a green at
+  // the 3:1 floor. Found in review.
+  const mid = M.hexColor("#808080"), greyPair = M.trend("#777777", M.hexColor("#555555"), mid)
+  greenAndRed(greyPair)
+  const chroma = c => Math.hypot(M.oklab(c).a, M.oklab(c).b)
+  expect([greyPair.up, chroma(colour(greyPair.up)) >= 0.07, M.contrast(colour(greyPair.up), mid) >= 3]).toEqual([greyPair.up, true, true])
 })
 
 // Each parser fed hostile answers, in a child process with a time limit: a

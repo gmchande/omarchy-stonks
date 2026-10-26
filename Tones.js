@@ -122,17 +122,22 @@ function fromOklch(L, C, hue) {
 function readingColor(hue, chroma, least, target, ground) {
   var lighter = darkGround(ground)
   for (var c = chroma; c >= least - 1e-9; c -= 0.005) {
-    // Judged as written, "#rrggbb", which rounds each channel.
+    // Judged as written, "#rrggbb", which rounds each channel: near black
+    // a green rounds to #000000, which reads but says no hue, so it must
+    // keep the chroma it was made with, short of what rounding takes.
     var reads = function(L) {
       var probe = fromOklch(L, c, hue)
-      return probe !== null && contrast(hexColor(hexOf(probe)), ground) >= target
+      if (probe === null) return false
+      var written = oklab(hexColor(hexOf(probe)))
+      return Math.sqrt(written.a * written.a + written.b * written.b) >= c * 0.9
+        && contrast(hexColor(hexOf(probe)), ground) >= target
     }
     // Lightness walks from the ground's own toward the far end, in steps,
     // to the first that reads in sRGB, then halves back to the edge.
     var from = oklabLightness(ground), to = lighter ? 1 : 0
     var prev = from
-    for (var step = 1; step <= 100; step++) {
-      var L = from + (to - from) * step / 100
+    for (var step = 1; step <= 25; step++) {
+      var L = from + (to - from) * step / 25
       if (!reads(L)) {
         prev = L
         continue
@@ -161,8 +166,14 @@ function ownColor(hue, ground) {
     || hexOf(dark ? { r: 1, g: 1, b: 1 } : { r: 0, g: 0, b: 0 })
 }
 
+// Each ground's pair, made once: the search can take several milliseconds
+// where a ground leaves little room, and every surface asks for up and down
+// apart, on every theme switch.
+var ownPairs = {}
 function ownPair(ground) {
-  return { up: ownColor(OWN_HUES.up, ground), down: ownColor(OWN_HUES.down, ground) }
+  var key = hexOf(ground)
+  if (!ownPairs[key]) ownPairs[key] = { up: ownColor(OWN_HUES.up, ground), down: ownColor(OWN_HUES.down, ground) }
+  return ownPairs[key]
 }
 
 // Up and down on `ground`. Up is the theme's green, as Omarchy colours
