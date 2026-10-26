@@ -69,6 +69,11 @@ FocusScope {
   property string answer: ""
   // The answer on screen is for an earlier query than the field's.
   readonly property bool stale: answer !== "" && resultsQuery !== searchText.trim()
+  // An Enter pressed before the field's query had its answer: kept for that
+  // query, and the first answer for it decides, as Enter on it would
+  // (`land`); an edit, a close, or a failed lookup drops it. Found in
+  // review: "aapl" and Enter at once added nothing and said nothing.
+  property string enterFor: ""
   // A lookup has been out a quarter of a second with no answer on screen,
   // counted from the latest one to go out, so one answering sooner shows
   // nothing. It stays until an answer, an empty field, or a new open:
@@ -175,7 +180,7 @@ FocusScope {
     resultsScroll.contentY = 0
     activeQuery = ""
     requestedQuery = ""
-    searchText = ""
+    enterFor = ""
     searchDebounce.stop()
     searchField.text = ""
     showEmpty()
@@ -188,6 +193,7 @@ FocusScope {
   function cancel() {
     searchDebounce.stop()
     requestedQuery = ""
+    enterFor = ""
     cancelled()
   }
 
@@ -208,10 +214,14 @@ FocusScope {
   }
 
   // Every way of taking a result comes through here, and only a result for
-  // the query in the field is taken. On a failed lookup there is none to
-  // take: Enter asks again.
+  // the query in the field is taken: an Enter before its answer is kept for
+  // it (`enterFor`). On a failed lookup there is none to take: Enter asks
+  // again.
   function accept(index) {
-    if (stale) return
+    if (stale || (answer === "" && searchText.trim() !== "")) {
+      enterFor = searchText.trim()
+      return
+    }
     if (answer === "failed") retry()
     else if (index >= 0 && index < results.length) picked(results[index].symbol)
   }
@@ -247,6 +257,7 @@ FocusScope {
     var changed = text.trim() !== searchText.trim()
     searchText = text
     if (!changed) return
+    enterFor = ""
     if (text.trim() === "") {
       // No query is asked any more: a search still out is dropped.
       suspend()
@@ -287,10 +298,20 @@ FocusScope {
   // The gate's ticket the request out was let through on (`Gate.report`).
   property int ticket: 0
 
+  // A lookup of the field's query. One for another query still out is
+  // stopped, and this one goes as its stream ends (`land`): its answer
+  // would be thrown away, and waiting it out held the new query up to the
+  // request's 10 s. The one out for this same query answers it.
   function runSearch() {
     var q = searchText.trim()
     if (q.length < 1) return
-    if (searchProc.running) { requestedQuery = q; return }
+    if (searchProc.running) {
+      if (activeQuery === q) return
+      requestedQuery = q
+      activeQuery = ""
+      searchProc.running = false
+      return
+    }
     if (clearance && !clearance()) { requestedQuery = q; return }
     requestedQuery = ""
     activeQuery = q
@@ -334,6 +355,9 @@ FocusScope {
       resultsScroll.contentY = 0
       root.choose(first)
       searchField.forceActiveFocus()
+      var kept = root.enterFor
+      root.enterFor = ""
+      if (kept === root.resultsQuery && root.answer !== "failed") root.accept(root.resultIndex)
     }
     if (root.requestedQuery !== "") {
       root.requestedQuery = ""
@@ -348,6 +372,7 @@ FocusScope {
     slowSearch.stop()
     requestedQuery = ""
     activeQuery = ""
+    enterFor = ""
     // Its stream ends at once, empty, and is ignored: no query is asked.
     if (searchProc.running) searchProc.running = false
   }

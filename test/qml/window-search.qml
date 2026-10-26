@@ -650,15 +650,107 @@ ShellRoot {
       harness.check("the edited query's lookup is actually held with previous results present", lookupOut && previousResults)
       if (!lookupOut) { hold(false); body.resetInteraction(); return }
       var members = service.library.join(",")
+      var top = body.search.results[0].symbol
       keyClick(Qt.Key_Return)
       var stayed = body.adding && body.search.stale && service.library.join(",") === members
       harness.check("Enter cannot add a previous query's real result while the current lookup is held", previousResults && stayed)
       hold(false)
       if (!stayed) { body.resetInteraction(); return }
-      tryVerify(function() { return body.search.resultsQuery === "SHX" && body.search.answer === "results" }, 4000)
-      harness.check("the current query's answer replaces the earlier results",
-        body.search.resultsQuery === "SHX" && !message.visible && body.search.results.length > 0)
+      // The Enter is kept for SHX, and SHX's answer decides: its top result
+      // is added once it lands.
+      var taken = within(4000, function() { return service.library.indexOf(top) >= 0 })
+      harness.check("the Enter kept for the held query takes its answer's top result once it lands, and only then",
+        taken && body.search.resultsQuery === "SHX" && !message.visible, [taken, body.search.resultsQuery, top].join(","))
       body.resetInteraction()
+      // Back as it was: the add gone, no removal on offer, so the flows after
+      // open search empty, and the budget its add spent topped up, as a
+      // minute would.
+      if (taken) service.removeSymbol(top)
+      service.lastRemoval = null
+      service.testYahooGate.tokens = service.testYahooGate.capacity
+    }
+
+    // An Enter pressed before the field's query has its answer is kept for
+    // that query, and its first answer decides, by the rules Enter keeps
+    // (a typed symbol that exists adds itself); more typing, Escape, or a
+    // failed lookup drops it. A changed query stops the lookup still out
+    // for the old one rather than waiting behind it. Found in review:
+    // "aapl" and Enter at once added nothing, and a corrected query waited
+    // up to 10 s behind the request for the old one.
+    function earlyEnter(body, keys) {
+      var hold = function(on) {
+        fileProc.command = on ? ["touch", harness.fakeState + "/SEARCH.hold"] : ["rm", "-f", harness.fakeState + "/SEARCH.hold"]
+        fileProc.running = true
+        tryVerify(function() { return !fileProc.running }, 2000)
+      }
+      var type = function(word) { word.split("").forEach(function(k) { keyClick(k) }) }
+      var open = function() {
+        keys.forceActiveFocus()
+        keyClick(Qt.Key_A)
+        tryVerify(function() { return body.adding && body.search.active }, 2000)
+      }
+      // Typed and Enter at once, the answer held: nothing until it lands,
+      // then the typed symbol, one not followed, is added. An add after
+      // every flow before: the budget topped up, as addHeld's, and no
+      // removal on offer.
+      service.testYahooGate.tokens = service.testYahooGate.capacity
+      service.lastRemoval = null
+      var library = service.library.slice()
+      var unfollowed = library.indexOf("SLOW") < 0
+      open()
+      hold(true)
+      type("SLOW")
+      keyClick(Qt.Key_Return)
+      wait(600)
+      var waited = [unfollowed, harness.same(service.library, library), body.adding].join(",")
+      hold(false)
+      var added = within(4000, function() { return service.library.indexOf("SLOW") >= 0 })
+      body.resetInteraction()
+      if (added) service.removeSymbol("SLOW")
+      service.lastRemoval = null
+      service.testYahooGate.tokens = service.testYahooGate.capacity
+      // A changed query stops the lookup out for the old one: SHX goes out
+      // while SH's is still held, and only SHX is answered.
+      open()
+      hold(true)
+      var askedBefore = harness.calls("SEARCH.asked")
+      var answeredBefore = harness.calls("SEARCH.answered")
+      type("SH")
+      var firstOut = within(3000, function() { return body.search.activeQuery === "SH" && harness.calls("SEARCH.asked") === askedBefore + 1 })
+      keyClick("X")
+      var secondOut = within(3000, function() { return body.search.activeQuery === "SHX" && harness.calls("SEARCH.asked") === askedBefore + 2 })
+      hold(false)
+      tryVerify(function() { return body.search.resultsQuery === "SHX" }, 4000)
+      wait(600)
+      var changed = [firstOut, secondOut, harness.calls("SEARCH.answered") - answeredBefore].join(",")
+      body.resetInteraction()
+      // An Enter, then more typing: dropped. ON and Enter, then E: ONE's
+      // answer lands and nothing is added.
+      library = service.library.slice()
+      open()
+      hold(true)
+      type("ON")
+      keyClick(Qt.Key_Return)
+      keyClick("E")
+      hold(false)
+      tryVerify(function() { return body.search.resultsQuery === "ONE" }, 4000)
+      wait(300)
+      var edited = [harness.same(service.library, library), body.adding, body.search.results.length].join(",")
+      body.resetInteraction()
+      // An Enter, then a failed lookup: dropped, not asked again.
+      open()
+      hold(true)
+      askedBefore = harness.calls("SEARCH.asked")
+      type("OOPS")
+      keyClick(Qt.Key_Return)
+      hold(false)
+      tryVerify(function() { return body.search.answer === "failed" }, 4000)
+      wait(600)
+      var failed = [harness.same(service.library, library), body.adding, harness.calls("SEARCH.asked") - askedBefore].join(",")
+      body.resetInteraction()
+      harness.check("an Enter before the answer is kept for its query and the answer adds the typed symbol; a changed query stops the old lookup; more typing or a failed lookup drops the Enter",
+        waited === "true,true,true" && added && changed === "true,true,1" && edited === "true,true,1" && failed === "true,true,1",
+        [waited, added, changed, edited, failed].join(" ; "))
     }
 
     // A failed lookup is asked again, the same query through the same
@@ -934,6 +1026,7 @@ ShellRoot {
       twoSurfacesPreview(body, keys)
       addTakesOverHistory(body, keys)
       previewKeepsHeroFigures(body, keys)
+      earlyEnter(body, keys)
       app.close()
       harness.finish()
     }
