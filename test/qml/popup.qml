@@ -357,11 +357,6 @@ ShellRoot {
       test.check("in the popup, the key sheet and Manage lists leave the cursor where ↓ put it",
         keyedRow !== service.featuredSymbol && kept.every(function(s) { return s === keyedRow }),
         keyedRow + " for featured " + service.featuredSymbol + " | " + kept.join(","))
-      // Space is the shell's Enter in every panel, and Stonks keeps it.
-      test.focusKeys(panel)
-      test.press(panel, Qt.Key_Space)
-      test.check("in the popup, Space shows the selected row's chart, as Enter does",
-        service.featuredSymbol === keyedRow, keyedRow + "|" + service.featuredSymbol)
       panel.testBody.showingHelp = true
       panel.testBody.motion.scrubT = 123
       panel.close()

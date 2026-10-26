@@ -158,8 +158,6 @@ Panel {
       // The body is laid out at the card's new height while the edge eases.
       clip: true
       blocked: !!root.body && root.body.ownsKeys
-      // Space is the shell's Enter, which every panel gets.
-      onActivateRequested: root.body.featureSymbol(root.body.watchlist.cursorRow)
       onCloseRequested: {
         if (root.body.showingHelp) root.body.showingHelp = false
         else if (!root.body.endScrub()) root.close()
@@ -170,14 +168,15 @@ Panel {
       }
 
       // The popup's keys land here first, and the body's map takes them,
-      // as the window's do. Every other letter stops here too, so the
-      // catcher's own j, k, h, l and x never act. Esc, Tab and Space go on
-      // to the catcher.
+      // as the window's do. Every other letter, and Space, stops here too,
+      // so the catcher's own j, k, h, l, x and Space never act. Esc and Tab
+      // go on to the catcher.
       Item {
         id: bodyKeys
         Keys.onPressed: function(event) {
           if (keyCatcher.blocked) return
-          if (root.body.pressKey(event) || (event.key >= Qt.Key_A && event.key <= Qt.Key_Z)) event.accepted = true
+          if (root.body.pressKey(event) || event.key === Qt.Key_Space
+            || (event.key >= Qt.Key_A && event.key <= Qt.Key_Z)) event.accepted = true
         }
       }
 

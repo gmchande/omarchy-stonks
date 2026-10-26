@@ -363,9 +363,7 @@ ShellRoot {
       harness.check("in the " + s.name + ", every README key does its documented action (" + listed.length + " keys)",
         readme !== null && dead.length === 0, readme === null ? "no key table in the README" : "wrong: " + dead.join(" "))
       escapeOrder(s)
-      // Space in the popup is Omarchy's own Enter, which every panel gets.
-      var still = harness.dropped.filter(function(t) { return !(s.name === "popup" && t === "Space") })
-        .concat(harness.readmeKeys(s.name, true) || [])
+      var still = harness.dropped.concat(harness.readmeKeys(s.name, true) || [])
       var acting = still.filter(function(t) { return !idle(s, t) })
       harness.check("in the " + s.name + ", the keys Stonks no longer answers, and the other surface's own, change nothing (" + still.length + " keys)",
         acting.length === 0, "acting: " + acting.join(" "))
