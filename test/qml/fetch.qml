@@ -817,6 +817,22 @@ ShellRoot {
       harness.check("back in sight, what fell due goes at once: the crypto, and Robinhood's prints", caughtUp,
         harness.requests().slice(backFrom).join(", "))
       settle()
+      // Out of sight again, the pill steps to SHEL.L, whose cap and P/E no
+      // one has asked for: the window asks for them only once it is back in
+      // sight, as a closed one would on its next open.
+      stonksToplevel.workspace = workspaceThere
+      answerScreens()
+      var stepFrom = harness.requests().length
+      service.feature("SHEL.L")
+      settle()
+      var figures = function() { return harness.requests().slice(stepFrom).filter(function(l) { return /^fundamentals SHEL\.L /.test(l) }) }
+      var unseenAsked = within(1500, function() { return figures().length > 0 })
+      stonksToplevel.workspace = workspaceHere
+      var seenAsked = within(3000, function() { return figures().length > 0 })
+      harness.check("out of sight, the window asks for no cap and P/E as the pill steps, and back in sight it asks",
+        !unseenAsked && seenAsked, (unseenAsked ? "asked while out of sight" : "none while out of sight") + "; then " + figures().join(", "))
+      service.feature("NEST")
+      settle()
 
       // 00:35, two screens: the window's switched off, the other on and
       // showing another workspace. No screen shows the window, so it asks
@@ -1057,6 +1073,29 @@ ShellRoot {
       within(3000, function() { rewritten = modes([harness.dataPath]); return rewritten === "600" })
       harness.check("a data file a hand edit left open to every account is the owner's again on Stonks' next write",
         edited === "644" && rewritten === "600", edited + " then " + rewritten)
+
+      // The window left open on SHOP.TO, its cap and P/E and the USDCAD rate
+      // its P/E reads in, a day and more old: the next minute asks for both
+      // again, as the popup's next open would. Nothing else asks: the window
+      // stays open on one stock.
+      var funds = service.testFundamentalsFeed
+      openWindow()
+      service.feature("SHOP.TO")
+      within(5000, function() { return !!funds.fresh("SHOP.TO") && funds.rateHeld("USDCAD") && !funds.busy })
+      var day = 24 * 60 * 60
+      var entries = Object.assign({}, funds.entries)
+      entries["SHOP.TO"] = Object.assign({}, entries["SHOP.TO"], { checkedAt: entries["SHOP.TO"].checkedAt - 2 * day })
+      funds.entries = entries
+      funds.rates = Object.assign({}, funds.rates, { USDCAD: Object.assign({}, funds.rates.USDCAD, { checkedAt: funds.rates.USDCAD.checkedAt - 2 * day }) })
+      var agedFrom = harness.requests().length
+      tick(60)
+      var asked = within(3000, function() { return !!funds.fresh("SHOP.TO") && funds.rateHeld("USDCAD") && !funds.busy })
+      var agedAsks = harness.requests().slice(agedFrom).filter(function(l) { return /^(fundamentals SHOP\.TO|rate USDCAD) /.test(l) })
+      harness.check("a window left open on a stock asks again for its cap and P/E, and their rate, once they are a day old",
+        asked && agedAsks.some(function(l) { return /^fundamentals /.test(l) }) && agedAsks.some(function(l) { return /^rate /.test(l) }),
+        agedAsks.join(", ") || "nothing asked")
+      service.feature("NEST")
+      closeWindow()
 
       harness.finish()
     }

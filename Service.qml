@@ -293,6 +293,11 @@ Item {
       root.prunedMinute = Math.floor(root.now / 60)
       forgetLeft()
       refreshRange()
+      // The hero's cap and P/E, and its rate, are good for a day: a surface
+      // left open on it asks again once they are older (`FundamentalsFeed.fetch`
+      // asks nothing while both are fresh). A failed one waits to be wanted.
+      if (root.openSurfaces.length > 0 && (root.fundamentals[root.view.featured] || {}).status === "ok")
+        fetchFundamentals(root.view.featured)
     }
     // A refresh owed while every screen was off asks again as the clock
     // moves, so it goes once one is on, quotes due or not.
@@ -851,7 +856,12 @@ Item {
     if (s) {
       root.shownAsHero(s)
       previewRest.restart()
-    } else previewRest.stop()
+    } else {
+      previewRest.stop()
+      // The preview may have taken the hero's ask while its quote was out
+      // (`pendingFundamentals`).
+      if (root.openSurfaces.length > 0) fetchFundamentals(root.view.featured)
+    }
     root.showHistory(false)
     if (before && before !== root.previewSurface && s) root.previewTaken(before)
   }
