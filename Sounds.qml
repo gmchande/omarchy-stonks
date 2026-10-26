@@ -158,6 +158,7 @@ Item {
     interval: 50
     repeat: true
     onTriggered: {
+      if (root.replaysWaiting.length === 0) return stop()
       var now = Date.now()
       var ready = !root.turnedOn || root.awake(now)
       var due = root.replaysWaiting.filter(function(w) { return ready || now - w.since >= 1500 })
