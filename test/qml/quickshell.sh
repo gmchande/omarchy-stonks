@@ -44,11 +44,17 @@ qs_runtime=""
 # other code, such as the 255 a file that fails to load gives, is an exit,
 # which its log explains: no core to look for. A Quickshell whose log says
 # it saved under the session's runtime folder fails the run too, and one
-# whose runtime folder can't be made is never started.
+# whose runtime folder can't be made is never started. With no display,
+# unless it runs offscreen, Quickshell is never started either: Qt would
+# abort and dump core. The harness exits on one line saying so.
 quickshell_run() {
   local - secs=$1 log=$2 fd pid sig saved
   set +e
   shift 2
+  if [ -z "${WAYLAND_DISPLAY:-}" ] && [ "${QT_QPA_PLATFORM:-}" != offscreen ]; then
+    echo "FAIL no display: WAYLAND_DISPLAY is unset and QT_QPA_PLATFORM isn't offscreen, so Quickshell was not started (Qt would abort and dump core)"
+    exit 1
+  fi
   # Under /tmp, not the work folder ($TMPDIR, test/scratch.sh), and short: the
   # sockets Quickshell reaches through it must fit a Unix socket's 107 bytes,
   # Hyprland's hypr/<signature>/.socket2.sock the longest, as they do under
