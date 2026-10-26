@@ -96,9 +96,13 @@ ShellRoot {
   }
 
   // Keys Stonks answered before the 25 October key set, which now do nothing
-  // on either surface; Shift+P never did.
+  // in the window, and in the popup but for Omarchy's own; Shift+P never did.
   readonly property var dropped: ["j", "k", "h", "Space", "1", "2", "3", "4", "5", "6", "7", "8", "9", "+",
     "x", "Shift+X", "u", "Shift+J", "Shift+K", "w", "Shift+W", ",", ".", "y", "Shift+S", "Shift+P"]
+  // What Omarchy's panel keys mean in every panel on the bar, the popup
+  // among them, as one of the listed keys (Ui/PanelKeyCatcher.qml): the
+  // sheet and the README never list them. l is Stonks' list menu there.
+  readonly property var omarchy: ({ "j": "↓", "k": "↑", "h": "←", "Space": "⏎", "x": "Delete", "Shift+X": "Delete" })
 
   Stonks.Service { id: service }
   Stonks.Updates { id: updates }
@@ -193,7 +197,8 @@ ShellRoot {
       "[": function(s) { service.setRange("1W") }
     })
 
-    // One key, as a person presses it; false for a key it can't name.
+    // One key, as a person presses it; false for a key it can't name. A
+    // shifted letter carries its capital as its text, as a keyboard sends it.
     function press(token) {
       var named = { "↑": Qt.Key_Up, "↓": Qt.Key_Down, "←": Qt.Key_Left, "→": Qt.Key_Right, "⏎": Qt.Key_Return,
         "Space": Qt.Key_Space, "Delete": Qt.Key_Delete, "Backspace": Qt.Key_Backspace, "Tab": Qt.Key_Tab,
@@ -203,7 +208,7 @@ ShellRoot {
       var key = held ? held[2] : token
       if (token === "Shift+Tab") keyClick(Qt.Key_Backtab, Qt.ShiftModifier)
       else if (named[key] !== undefined) keyClick(named[key], modifier)
-      else if (/^[A-Z]$/.test(key) && held) keyClick(Qt["Key_" + key], modifier)
+      else if (/^[A-Z]$/.test(key) && held) keyClick(held[1] === "Shift" ? key : Qt["Key_" + key], modifier)
       else if (key.length === 1 && !held) keyClick(key)
       else return false
       return true
@@ -221,7 +226,9 @@ ShellRoot {
     // Expected effects are independent of the handlers and of README prose.
     // A documented key without a case fails; changing some unrelated state
     // cannot satisfy the expected target or excuse another settings change.
-    function acts(s, token) {
+    // `pressed` acts as the listed key `meaning`, itself when not given.
+    function acts(s, pressed, meaning) {
+      var token = meaning || pressed
       base(s)
       if (setups[token]) setups[token](s)
       var b = s.body
@@ -294,7 +301,7 @@ ShellRoot {
       } else if (token === "?") { changed = ["help"]; effect = function() { return b.showingHelp } }
       else if (token === "Esc") { changed = ["open"]; effect = function() { return !b.surfaceOpen } }
       if (!effect) return false
-      if (!press(token)) return false
+      if (!press(pressed)) return false
       var acted = function() {
         var after = { featured: service.featuredSymbol, range: service.range,
           order: service.order, reversed: service.reversed, list: service.listName,
@@ -363,9 +370,16 @@ ShellRoot {
       harness.check("in the " + s.name + ", every README key does its documented action (" + listed.length + " keys)",
         readme !== null && dead.length === 0, readme === null ? "no key table in the README" : "wrong: " + dead.join(" "))
       escapeOrder(s)
-      var still = harness.dropped.concat(harness.readmeKeys(s.name, true) || [])
+      if (s.name === "popup") {
+        var wrong = Object.keys(harness.omarchy).filter(function(t) { return !acts(s, t, harness.omarchy[t]) })
+        harness.check("in the popup, Omarchy's panel keys do what Omarchy defines: j k ↓ ↑, h ←, Space Enter, x and X Delete",
+          wrong.length === 0, "wrong: " + wrong.join(" "))
+      }
+      var still = harness.dropped.filter(function(t) { return s.name !== "popup" || !(t in harness.omarchy) })
+        .concat(harness.readmeKeys(s.name, true) || [])
       var acting = still.filter(function(t) { return !idle(s, t) })
-      harness.check("in the " + s.name + ", the keys Stonks no longer answers, and the other surface's own, change nothing (" + still.length + " keys)",
+      harness.check("in the " + s.name + ", the keys Stonks no longer answers" + (s.name === "popup" ? ", but for Omarchy's," : "")
+        + " and the other surface's own change nothing (" + still.length + " keys)",
         acting.length === 0, "acting: " + acting.join(" "))
       var version = JSON.parse(harness.readFile(harness.manifestPath)).version
       harness.check("in the " + s.name + ", the sheet credits Stonks " + version + ", Yahoo, and Robinhood",

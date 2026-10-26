@@ -1031,10 +1031,11 @@ ShellRoot {
           reopened.cancelAdding()
           test.hintPanel.close()
         } else if (test.step === 50) {
-          // With search open, the keys that act on the rows elsewhere edit
-          // its field as any field's do, and none acts as Stonks' key: no
-          // row goes, the removal on offer stays out, no menu opens, and
-          // sounds, the look and the order stay as they were.
+          // With search open, the keys that act on the rows elsewhere,
+          // Stonks' and Omarchy's alike, edit its field as any field's do,
+          // and none acts: no row goes, the removal on offer stays out, no
+          // menu opens, the cursor and the chart stay, and sounds, the look
+          // and the order stay as they were.
           var searching = test.hintPanel.testBody
           test.hintService.switchList("")
           test.hintPanel.open()
@@ -1044,7 +1045,8 @@ ShellRoot {
           var target = searching.watchlist.cursorRow
           var settled = function() {
             return [test.hintService.library.join(","), test.hintService.soundsOn, test.hintService.retro,
-              test.hintService.order, test.hintService.reversed, searching.listMenuOpen].join("|")
+              test.hintService.order, test.hintService.reversed, searching.listMenuOpen,
+              searching.watchlist.cursorRow, test.hintService.featuredSymbol].join("|")
           }
           var settledBefore = settled()
           test.focusKeys(test.hintPanel)
@@ -1063,8 +1065,10 @@ ShellRoot {
           typed.push(field.text)
           test.press(test.hintPanel, Qt.Key_C, Qt.ControlModifier)
           typed.push(field.text)
-          test.check("in the popup's search, l m s o, Backspace, Ctrl+Z, Delete and Ctrl+C edit the field, and none acts on the rows, the lists, sounds, the look or the order",
-            target !== "" && typed.join(",") === "lmso,lms,lmso,lms,lms" && searching.adding && field.activeFocus
+          ;["j", "k", "h", "x", Qt.Key_Space].forEach(function(key) { test.press(test.hintPanel, key) })
+          typed.push(field.text)
+          test.check("in the popup's search, l m s o, Backspace, Ctrl+Z, Delete, Ctrl+C, and Omarchy's j k h x and Space edit the field, and none acts on the rows, the lists, sounds, the look or the order",
+            target !== "" && typed.join(",") === "lmso,lms,lmso,lms,lms,lmsjkhx " && searching.adding && field.activeFocus
               && settled() === settledBefore,
             target + " | " + typed.join(",") + " | " + settledBefore + " -> " + settled())
           test.press(test.hintPanel, Qt.Key_Escape)
