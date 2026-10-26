@@ -588,11 +588,12 @@ ShellRoot {
 
       // A replay belongs to the chart it started on. Found offscreen: after
       // ], the day's replay went on scrubbing the week's chart for its 2 s.
+      // The sounds hold a replay until the output wakes, 1.5 s at most (the
+      // stand-in pw-cat's takes some 300 ms, longer on a busy machine), so
+      // the step waits for it to start, and reads the ] at once.
       keyClick(Qt.Key_P)
-      wait(300)
-      var replaying = body.motion.replayRunning && body.scrubT !== 0
+      var replaying = within(5000, function() { return body.motion.replayRunning && body.scrubT !== 0 })
       keyClick(Qt.Key_BracketRight)
-      wait(50)
       harness.check("] in the window sets the one shared range",
         service.range === "1W" && app.range === "1W", service.range + "|" + app.range)
       harness.check("] ends the day's replay at once, and the scrub with it",
