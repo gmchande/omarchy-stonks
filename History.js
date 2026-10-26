@@ -56,9 +56,13 @@ function historyDue(range, entry, quote, now, trading) {
 // whose periods are not periods (`Quote.answerClocks`), or whose bar times
 // are not moments; an offset that is not one is none. A price at or under
 // zero is none, as in the day's answer (`Quote.knownPrice`): a bar without a
-// close is left out, and its START is its first close when its previous
-// close isn't known. Found in the strain QA: "START 0.00", and a cliff at
-// the chart's left from a negative first close.
+// close is left out of `bars`, which the chart draws, and its START is its
+// first close when its previous close isn't known. Found in the strain QA:
+// "START 0.00", and a cliff at the chart's left from a negative first close.
+// A bar without a close that has a high, a low, or shares is kept in
+// `unclosed`, for the range's high, low, and volume: Tokyo's daily answer
+// leaves the day's close out after its close, and its VOL and high lost
+// what Yahoo sent. Found in review: Toyota's 3,096 high read 3,046.
 function parseHistory(json, range, centExchanges) {
   var result = json && json.chart && json.chart.result && json.chart.result[0]
   if (!result || !result.meta) return null
@@ -75,11 +79,13 @@ function parseHistory(json, range, centExchanges) {
   var clocks = Quote.answerClocks(meta.tradingPeriods)
   if (!timestamps || !opens || !highs || !lows || !closes || !clocks) return null
   var bars = []
+  var unclosed = []
   for (var i = 0; i < timestamps.length; i++) {
     if (!Format.isMoment(timestamps[i])) return null
-    if (Quote.knownPrice(closes[i]) === null) continue
-    bars.push({ t: timestamps[i], o: Quote.knownPrice(opens[i]), h: Quote.knownPrice(highs[i]), l: Quote.knownPrice(lows[i]),
-      c: closes[i], v: volumes ? volumes[i] : null })
+    var bar = { t: timestamps[i], o: Quote.knownPrice(opens[i]), h: Quote.knownPrice(highs[i]), l: Quote.knownPrice(lows[i]),
+      c: closes[i], v: volumes ? volumes[i] : null }
+    if (Quote.knownPrice(closes[i]) !== null) bars.push(bar)
+    else if (bar.h !== null || bar.l !== null || (Format.isFiniteNumber(bar.v) && bar.v > 0)) unclosed.push(Object.assign(bar, { c: null }))
   }
   bars.sort(function (a, b) { return a.t - b.t })
   if (bars.length >= 2 && bars[bars.length - 1].t === bars[bars.length - 2].t) bars.splice(bars.length - 2, 1)
@@ -112,6 +118,7 @@ function parseHistory(json, range, centExchanges) {
     clocks: clocks,
     liveAt: Format.isFiniteNumber(meta.regularMarketTime) ? meta.regularMarketTime : null,
     bars: bars,
+    unclosed: unclosed,
     baseline: baseline,
     firstTradeDate: firstTrade,
     droppedTimes: droppedTimes
@@ -130,6 +137,9 @@ function historyIntervalSeconds(interval) {
   return 0
 }
 
+// A range's last close, its change, and its high and low, each a bar's
+// `{ p, t }`, from its bars and those without a close (`unclosed`), whose
+// high and low Yahoo did send; none with no bar drawn.
 function periodStats(history) {
   var bars = history && history.bars ? history.bars : []
   var lastBar = bars.length ? bars[bars.length - 1] : null
@@ -137,8 +147,9 @@ function periodStats(history) {
   var chg = Quote.change({ prevClose: history ? history.baseline : null, points: [] }, last, "pct")
   var high = null
   var low = null
-  for (var i = 0; i < bars.length; i++) {
-    var bar = bars[i]
+  var counted = bars.length ? bars.concat(history.unclosed || []) : []
+  for (var i = 0; i < counted.length; i++) {
+    var bar = counted[i]
     if (Format.isFiniteNumber(bar.h) && (!high || bar.h > high.p)) high = { p: bar.h, t: bar.t }
     if (Format.isFiniteNumber(bar.l) && (!low || bar.l < low.p)) low = { p: bar.l, t: bar.t }
   }
@@ -299,18 +310,32 @@ function liveBarAppended(history) {
   return !!coarse && bars.length > 1 && bars[bars.length - 1].t === history.liveAt
 }
 
+// A bar without a close (`unclosed`) after every bar drawn: Tokyo's day,
+// after its close, before Yahoo's answer has its close. Null with none.
+function closelessLast(history) {
+  var bars = history && history.bars ? history.bars : []
+  var open = history && history.unclosed ? history.unclosed : []
+  var after = bars.length ? bars[bars.length - 1].t : -Infinity
+  var found = null
+  for (var i = 0; i < open.length; i++) if (open[i].t > after && (!found || open[i].t > found.t)) found = open[i]
+  return found
+}
+
 // Whether the last bar of a range of bars a day long or longer holds the
 // session that starts at `t` (`Quote.figuresDay`), by the exchange's
 // calendar: a day's bar is that day's, a week's bar the seven days from its
-// first, a month's its month. An appended live moment (`liveBarAppended`)
-// belongs to the bucket before it. An intraday bar holds only part of a day.
+// first, a month's its month. The last bar is one without a close after
+// those drawn (`closelessLast`), else the last drawn; an appended live
+// moment (`liveBarAppended`) belongs to the bucket before it. An intraday
+// bar holds only part of a day.
 function lastBarHolds(history, t) {
   var bars = history && history.bars ? history.bars : []
   var spans = { "1d": "day", "1wk": "week", "1mo": "month", "3mo": "quarter" }
   var span = spans[history ? history.interval : ""]
   if (!bars.length || !span || !Format.isFiniteNumber(t)) return false
   var last = bars.length - 1
-  var start = liveBarAppended(history) ? bars[last - 1].t : bars[last].t
+  var closeless = closelessLast(history)
+  var start = closeless ? closeless.t : liveBarAppended(history) ? bars[last - 1].t : bars[last].t
   var day = historyDateParts(history, t)
   var first = historyDateParts(history, start)
   var days = (Date.UTC(day.year, day.month, day.day) - Date.UTC(first.year, first.month, first.day)) / 86400000
@@ -332,24 +357,27 @@ function rangeEnds(history, stats, quote) {
   var high = stats.high
   var low = stats.low
   if (quote && lastBarHolds(history, quote.figuresDay)) {
-    var today = history.bars[history.bars.length - 1].t
+    var closeless = closelessLast(history)
+    var today = closeless ? closeless.t : history.bars[history.bars.length - 1].t
     if (Format.isFiniteNumber(quote.dayHigh) && quote.dayHigh > high.p) high = { p: quote.dayHigh, t: today }
     if (Format.isFiniteNumber(quote.dayLow) && quote.dayLow < low.p) low = { p: quote.dayLow, t: today }
   }
   return { high: high, low: low }
 }
 
-// What traded over a range: its bars' volumes added, as the day's VOL reads
-// (`Format.compactNumber`). An appended live moment is left out, since the
-// bucket before it counts its day. "" when a bar's volume isn't known, or
-// when none is above zero, as for an index Yahoo has no volume for.
+// What traded over a range: its bars' volumes added, those without a close
+// too (`unclosed`), as the day's VOL reads (`Format.compactNumber`). An
+// appended live moment is left out, since the bucket before it counts its
+// day. "" when any counted bar's volume isn't known, or when none is above
+// zero, as for an index Yahoo has no volume for.
 function rangeVolume(history) {
   var bars = history && history.bars ? history.bars : []
   var end = liveBarAppended(history) ? bars.length - 1 : bars.length
+  var counted = bars.slice(0, end).concat(end > 0 && history.unclosed ? history.unclosed : [])
   var sum = 0
-  for (var i = 0; i < end; i++) {
-    if (!Format.isFiniteNumber(bars[i].v)) return ""
-    sum += bars[i].v
+  for (var i = 0; i < counted.length; i++) {
+    if (!Format.isFiniteNumber(counted[i].v)) return ""
+    sum += counted[i].v
   }
   return sum > 0 ? Format.compactNumber(sum) : ""
 }
@@ -388,13 +416,16 @@ function rangeLine(history, ends, quote) {
 // A range's high and low (`rangeEnds`), marked on its chart (`RangeMarks`):
 // each where its bar sits along the chart, 0..1, as the scrub places a bar
 // (`historyFraction`), its price at the listing's decimals, and its date.
+// One made after the last bar drawn, on a bar without a close
+// (`closelessLast`), stands at the chart's right edge, where that day is.
 function rangeMarks(history, ends, quote) {
   if (!ends) return null
   var digits = quote ? quote.priceDigits : undefined
   var years = historySpansYears(history)
+  var drawnTo = history.bars[history.bars.length - 1].t
   var mark = function(point) {
     return {
-      x: historyFraction(history, point.t),
+      x: point.t > drawnTo ? 1 : historyFraction(history, point.t),
       price: Format.money(point.p, digits),
       date: historyStatsDateText(history, point.t, years, history.interval)
     }
