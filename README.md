@@ -263,7 +263,8 @@ price say the same.
   price keeps it, with the time it's from. Check your connection. If other
   sites load, Yahoo is down or refusing Stonks, and there's nothing to do
   but wait. Stonks keeps trying by itself, less often the longer Yahoo stays
-  away, and `r` won't hurry it.
+  away. When no answer came, `r` asks again at once; when Yahoo turned
+  Stonks away, `r` won't hurry it, since Yahoo asked for fewer requests.
 - **A row says "No data for this symbol" or "Refresh failed".** Yahoo said
   it has nothing for the symbol, or sent a broken answer three times
   running. A row with a price keeps it, with the time it's from, and `r`
@@ -298,9 +299,10 @@ price say the same.
   search didn't answer. Click RETRY, or press Enter. While Yahoo is turning
   Stonks away, a search fails at once: try again in a moment.
 - **The header says "schedule unavailable".** Stonks knows each exchange's
-  holidays up to a set date. This exchange's have run out, so it can't say
-  when the market next opens. Stonks doesn't update itself:
-  [update it](#update) for a renewed calendar.
+  holidays and clock changes up to a set date. This exchange's have run
+  out, so it can't say when the market next opens. Times still read
+  true, by the clock Yahoo sends with each price. Stonks doesn't update
+  itself: [update it](#update) for a renewed calendar.
 - **The footer says "Couldn't load your lists".** The file holding your
   lists, `~/.config/omarchy/grvc.stonks.json`, can't be opened or isn't
   valid JSON, often after a hand edit. Stonks keeps the lists it has and
@@ -327,7 +329,8 @@ The shell's log the form asks for can name the prices Stonks left out.
 - **Needs:** nothing beyond Omarchy 4. It runs `curl`, PipeWire's
   `pw-play`, `pw-cat`, and `pw-dump`, and `sh`, `bash`, `timeout`,
   `head`, `mkdir`, `chmod`, `mktemp`, `ln`, and `rm`, which Omarchy ships,
-  and, for a screenshot, `wl-copy` and `omarchy-notification-send`.
+  and, for a screenshot, `sed`, `tail`, `date`, `wl-copy`, and
+  `omarchy-notification-send`.
 - **Commands:** `curl` for every request; as Stonks starts, one `sh` that
   makes its cache folder, `mkdir` and `chmod`, yours alone, and `chmod` as
   it writes each of its files, to make it yours alone too; only when it
