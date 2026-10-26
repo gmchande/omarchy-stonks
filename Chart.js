@@ -65,7 +65,8 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
 // mark the bell, and the night's edges.
 // Prints outside a regular session are flagged `ext`; `brk` starts the line
 // again across a break in the exchange's day (Tokyo's lunch, from its
-// calendar in `calendars`: Yahoo sends 09:00 to 15:30 as one session), and
+// calendar in `calendars`: Yahoo sends 09:00 to 15:30 as one session; the
+// point after it is flagged `lunch` too, so a scrub there draws no dot), and
 // across the hours after a day that take no room (`axis.skip`), so no line
 // crosses hours the market was shut. A quiet hour of a US night is no
 // break: that day is laid out by print, where a quiet hour takes no room, so
@@ -79,10 +80,10 @@ function chartGeometry(quote, calendars) {
   var pts = quote.points
   var axis = chartSpan(quote)
   var reg = quote.session.regular
-  var breaks = reg ? Market.sessionBreaks(Market.calendarFor(calendars, quote), reg.start) : []
-  if (axis.skip && axis.skip.to > axis.skip.from) breaks = breaks.concat([{ start: axis.skip.from, end: axis.skip.to }])
-  var acrossBreak = function(a, b) {
-    return breaks.some(function(gap) { return a <= gap.start && b >= gap.end })
+  var lunches = reg ? Market.sessionBreaks(Market.calendarFor(calendars, quote), reg.start) : []
+  var breaks = axis.skip && axis.skip.to > axis.skip.from ? lunches.concat([{ start: axis.skip.from, end: axis.skip.to }]) : lunches
+  var across = function(gaps, a, b) {
+    return gaps.some(function(gap) { return a <= gap.start && b >= gap.end })
   }
   // An unknown close (`Quote.knownPrice`) has no place on the scale and no
   // dashed line: the prints alone set it. Found in review: a null close drew
@@ -109,7 +110,8 @@ function chartGeometry(quote, calendars) {
       x: printFraction(quote, axis, k),
       y: 1 - (pts[k].p - lo) / (hi - lo),
       ext: session !== "reg",
-      brk: dot || (k > 0 && out[k - 1].dot) || (!!prev && acrossBreak(prev.t, pts[k].t)),
+      brk: dot || (k > 0 && out[k - 1].dot) || (!!prev && across(breaks, prev.t, pts[k].t)),
+      lunch: !!prev && across(lunches, prev.t, pts[k].t),
       dot: dot
     })
   }
@@ -270,7 +272,10 @@ function lastRegularPoint(geometry) {
   return null
 }
 
-// Interpolated normalized y for a normalized x, or null past the line.
+// Interpolated normalized y for a normalized x, or null past the line and
+// inside Tokyo's lunch (`lunch`), where the line lifts: the owner's call on
+// the quality audit's finding 18, so the scrub's dot leaves the gap as the
+// line and the chime do.
 function yAt(points, x) {
   if (!points || !points.length) return null
   if (x < points[0].x || x > points[points.length - 1].x) return null
@@ -278,6 +283,7 @@ function yAt(points, x) {
   for (var i = 1; i < points.length; i++) {
     if (points[i].x >= x) {
       var a = points[i - 1], b = points[i]
+      if (b.lunch && x > a.x && x < b.x) return null
       var f = b.x === a.x ? 0 : (x - a.x) / (b.x - a.x)
       return a.y + (b.y - a.y) * f
     }

@@ -270,6 +270,22 @@ test("a scrub reads the print at or before it, from the day's first print throug
   expect(read(pts[pts.length - 1].t)).toEqual({ price: 2900.5, t: toyota.session.regular.end, close: true })
 })
 
+// The owner's call on the quality audit's finding 18: a scrub inside Tokyo's
+// lunch draws no dot, as the line lifts there and the chime goes silent.
+// Found in the audit: the dot sat on a line that isn't drawn.
+test("a scrub inside Tokyo's lunch draws no dot, as the line and the chimes leave it; either side of it the dot is on the line", () => {
+  const toyota = M.parseChart(fixture("overnight/sweep-2026-10-07-1455/7203.t.json"))
+  const pts = M.chartGeometry(toyota, calendars).points
+  const reopen = pts.findIndex(p => p.brk)
+  const [morning, afternoon] = [pts[reopen - 1], pts[reopen]]
+  const chime = load("ChartSound.js").lineBars({ points: pts })
+  const inside = [0.01, 0.5, 0.99].map(f => morning.x + (afternoon.x - morning.x) * f)
+  expect(inside.map(x => [M.yAt(pts, x), chime(x)])).toEqual(inside.map(() => [null, -1]))
+  expect([M.yAt(pts, morning.x), M.yAt(pts, afternoon.x)]).toEqual([morning.y, afternoon.y])
+  const beforeLunch = (pts[reopen - 2].x + morning.x) / 2
+  expect(M.yAt(pts, beforeLunch)).toBeCloseTo((pts[reopen - 2].y + morning.y) / 2, 9)
+})
+
 test("the day is drawn whole, and its range holds the previous close", () => {
   const spy = M.parseChart(fixture("spy-2026-09-11-day-prepost.json"))
   const spyReg = spy.session.regular

@@ -371,6 +371,40 @@ ShellRoot {
     return panel.testBody.chartLoading && panel.testBody.chart !== null
   }
 
+  // A range that failed says so, with its retry, as the window does
+  // (range.qml): the owner's call on the quality audit's finding 23, one
+  // wording on both surfaces. A symbol whose quote failed too is said as a
+  // failed symbol is anywhere, "No data", with no range to retry: its
+  // range has no chart without a quote (`Chart.viewChart`).
+  function failedRangeSaid(quoteFailed) {
+    var body = panel.testBody
+    var symbol = service.featuredSymbol
+    var was = { quotes: service.quotes, entries: service.entries, histories: service.histories }
+    var quotes = Object.assign({}, was.quotes)
+    var entries = Object.assign({}, was.entries)
+    if (quoteFailed) {
+      delete quotes[symbol]
+      entries[symbol] = { status: "failed", receivedAt: 0 }
+    }
+    var histories = {}
+    histories[symbol + "|1W"] = { status: "failed", history: null, receivedAt: service.now }
+    service.quotes = quotes
+    service.entries = entries
+    service.histories = histories
+    body.selectRange("1W")
+    var said = body.headerText + " | " + body.offersRetry
+    body.selectRange("1D")
+    service.quotes = was.quotes
+    service.entries = was.entries
+    service.histories = was.histories
+    return said
+  }
+  function checkFailedRange() {
+    var said = [failedRangeSaid(false), failedRangeSaid(true)].join(" / ")
+    test.check("a failed range says it is unavailable, with its retry, and with the quote failed too says No data, as the window does",
+      said === "1W unavailable | true / No data | false", said)
+  }
+
   // Search words and actions stay in this harness; placement is reviewed.
   function resultCount(search) {
     var rows = []
@@ -497,6 +531,7 @@ ShellRoot {
           // open has settled; closing lets it go.
           test.check("hover suppressed", api.centerHoverRevealSuppressed)
           test.shown("the day on open")
+          test.checkFailedRange()
           panel.close()
           test.check("hover released", !api.centerHoverRevealSuppressed)
           panel.testBody.selectRange("1W")
