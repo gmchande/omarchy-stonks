@@ -623,7 +623,7 @@ ShellRoot {
         wait(50)
         var drawn = harness.firstLineDrawn(app)
         var want = harness.rangeLineWanted("MSFT", range)
-        if (drawn.indexOf(want + " START ") !== 0) followed.push(how + ": " + drawn + ", want " + want + " START …")
+        if (drawn.indexOf(want + " Start ") !== 0) followed.push(how + ": " + drawn + ", want " + want + " Start …")
       }
       follows("] in smooth", "1W")
       service.persist({ style: "retro" })

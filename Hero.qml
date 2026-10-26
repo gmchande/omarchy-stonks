@@ -47,6 +47,9 @@ Item {
   property color ghost: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.05)
   property string fontFamily: Style.font.family
   property string symbol: ""
+  // The name on this line, where the header gives its title way
+  // (`HeaderStatus.titled`).
+  property bool nameOnLine: false
   // What the chart's dashed line is: said in the strip while a scrub reads
   // against it, where the extended-hours print steps aside.
   property string baselineText: ""
@@ -62,22 +65,22 @@ Item {
     if (view && quote) {
       // Only a warning takes the mark; an aged quote is said plainly, as its
       // row says it.
-      return (root.scrubbing || root.freshnessText === "" ? ""
-        : (Figures.freshnessWarns(root.shownFreshness) ? "! " : "") + root.freshnessText + " · ")
-        + view.name.toUpperCase()
+      var fresh = root.scrubbing || root.freshnessText === "" ? ""
+        : (Figures.freshnessWarns(root.shownFreshness) ? "! " : "") + root.freshnessText
+      return !root.nameOnLine ? fresh : (fresh ? fresh + " · " : "") + view.name.toUpperCase()
     }
     // A first fetch that failed: nothing was ever there to refresh, so it
     // says what the row says.
     return shownFreshness && shownFreshness.state === "failed" ? "! NO DATA FOR THIS SYMBOL"
       : shownFreshness && shownFreshness.state === "overdue" ? "! NO DATA" : ""
   }
-  // The exchange and currency stay whole; the lead, the name last, gives
-  // way to them. A name cut short no longer says the currency it ends with.
+  // The exchange and currency stay whole; the lead, a name last, gives way
+  // to them. A name cut short, or in the header, no longer says the
+  // currency it ends with.
   readonly property string listingMeta: {
     var font = listingMetrics.font // read, so a new text size measures again
-    return view && quote
-      ? " · " + Figures.listingMeta(quote, listingMetrics.advanceWidth(listingLead + " · " + Figures.listingMeta(quote, false)) > listingRoom)
-      : ""
+    var cut = !nameOnLine || listingMetrics.advanceWidth(listingLead + " · " + Figures.listingMeta(quote, false)) > listingRoom
+    return view && quote ? (listingLead !== "" ? " · " : "") + Figures.listingMeta(quote, cut) : ""
   }
   readonly property real listingRoom: Math.max(0, listingRow.width - symbolText.implicitWidth - Style.space(8))
   readonly property string changeCaption: view && view.periodLabel ? view.periodLabel

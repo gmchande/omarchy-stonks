@@ -72,14 +72,15 @@ Item {
   readonly property int textLeft: margins + inset
   readonly property int textRight: margins + gutter + inset
   property int chartHeight: Style.space(190)
-  // The least the chart may be (the window's 136 px): where it is set, the
-  // chart is sized to the surface (`shownChartHeight`), giving way first as
-  // the window gets short, so three rows still show, and taking what whole
-  // rows leave over otherwise. The popup's card fits its rows, so its chart
-  // follows the screen's room instead (`screenChartHeight`). Found in the
-  // design pass of 14 October: the smallest window showed one row of the
-  // list. 0, the popup's, gives none: a constant, so no change of
-  // chartHeight can find it stale.
+  // The least the chart may be (the window's 108 px, 136 before the header's
+  // second line took 28): where it is set, the chart is sized to the
+  // surface (`shownChartHeight`), giving way first as the window gets
+  // short, so three rows still show, and taking what whole rows leave over
+  // otherwise. The popup's card fits its rows, so its chart follows the
+  // screen's room instead (`screenChartHeight`). Found in the design pass
+  // of 14 October: the smallest window showed one row of the list. 0, the
+  // popup's, gives none: a constant, so no change of chartHeight can find
+  // it stale.
   property int minChartHeight: 0
   // The host's look.
   property color foreground: Commons.Color.foreground
@@ -166,7 +167,15 @@ Item {
   property int screenRoom: 0
   // Everything in the popup but its chart, its rows, and the hint: what the
   // chart and the rows share the screen's room with.
-  readonly property int chromeBesideScreenChart: margins * 2 + header.height + heroBand.heightBesideChart + footer.barHeight + groupGap * 3
+  readonly property int chromeBesideHeader: margins * 2 + heroBand.heightBesideChart + footer.barHeight + groupGap * 3
+  readonly property int chromeBesideScreenChart: chromeBesideHeader + header.height
+  // The header's title and rule give way after the chart, before the hint:
+  // where three rows wouldn't fit beside the chart's least with them, the
+  // header is the status words alone, as it was before it took the title.
+  // Found in the family-look build: at text size 20 on a 768 px screen the
+  // popup showed no row.
+  readonly property bool headerTitled: screenRoom <= 0
+    || chromeBesideHeader + header.titledHeight + leastScreenChart + threeRowsHeight <= screenRoom
   // The popup's chart: chartHeight wherever the screen holds three rows
   // beside it; where it wouldn't (large text on a short screen), it gives
   // way to them, down to a fifth of itself, which still shows the day's
@@ -1341,6 +1350,8 @@ Item {
     anchors.top: parent.top
     anchors.margins: root.margins
     statusForms: root.headerForms
+    title: root.featured && root.featuredQuote ? root.featured.name : ""
+    titled: root.headerTitled
     offersRetry: root.offersRetry
     retro: root.retro
     soundsOn: root.soundsOn
@@ -1397,6 +1408,7 @@ Item {
     // The chart's symbol, or before any chart is in, the one coming, which
     // the header names as it loads: never a dash in its place.
     symbol: root.chartSymbol || root.featuredSymbol
+    nameOnLine: !root.headerTitled
     view: root.featured
     quote: root.featuredQuote
     day: root.featuredDay

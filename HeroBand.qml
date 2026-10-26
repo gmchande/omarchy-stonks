@@ -45,6 +45,7 @@ Item {
   property color ground: Commons.Color.background
   property string fontFamily: Style.font.family
   property string symbol: ""
+  property bool nameOnLine: false
   property var view: null
   property var quote: null
   property var calendars: null
@@ -121,6 +122,7 @@ Item {
       width: parent.width
       calendars: root.calendars
       symbol: root.symbol
+      nameOnLine: root.nameOnLine
       view: root.view
       quote: root.quote
       day: root.day
@@ -506,8 +508,9 @@ Item {
         // the hover's brightening eases.
         property real lift: arrowMouse.containsMouse || wordMouse.containsMouse ? 1 : 0
         Behavior on lift { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
-        color: sorted ? root.foreground
-          : Qt.tint(root.dim, Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, lift))
+        // The list's name is the header's one word in full ink; the order
+        // brightens only under the pointer.
+        color: Qt.tint(root.dim, Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, lift))
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption
         font.bold: true
@@ -569,7 +572,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         cell: Cells.iconCell(Style.fontScale)
         shape: Cells.UNIT_SIGNS[root.changeMode]
-        color: root.foreground
+        color: unitMouse.containsMouse ? root.foreground : root.dim
       }
 
       MouseArea {
