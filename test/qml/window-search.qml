@@ -312,9 +312,8 @@ ShellRoot {
 
     // A search's preview, made while the hero's first quote is still out,
     // leaves the hero its cap and P/E: they are asked for once its quote is
-    // in and search has closed. Found in the codebase review of 26 October:
-    // the preview took the hero's one waiting ask, and the hero showed no
-    // cap or P/E until r.
+    // in. Found in the codebase review of 26 October: the preview took the
+    // hero's one waiting ask, and the hero showed no cap or P/E until r.
     function previewKeepsHeroFigures(body, keys) {
       var hero = service.featuredSymbol
       var hold = function(command) {
@@ -324,23 +323,61 @@ ShellRoot {
       }
       hold("touch")
       service.persist({ symbols: service.library.concat(["SLID"]), featured: "SLID" })
-      tryVerify(function() { return service.featuredSymbol === "SLID" && service.pendingFundamentals === "SLID" }, 3000)
+      tryVerify(function() { return service.featuredSymbol === "SLID" && !service.quotes.SLID }, 3000)
       var before = harness.calls("SLID.fundamentals")
       searchShop(body, keys)
       keyClick(Qt.Key_Down)
       var previewed = within(6000, function() {
-        return service.previewSymbol !== "" && !!service.previewEntries[service.previewSymbol] && service.pendingFundamentals !== "SLID"
+        return service.previewSymbol !== "" && !!service.previewEntries[service.previewSymbol]
       })
       hold("rm")
       tryVerify(function() { return !!service.quotes.SLID }, 8000)
-      wait(300)
-      keyClick(Qt.Key_Escape)
       var asked = within(3000, function() { return harness.calls("SLID.fundamentals") > before })
-      harness.check("a preview made before the hero's first quote leaves the hero its cap and P/E, asked for once search closes",
+      keyClick(Qt.Key_Escape)
+      harness.check("a preview made before the hero's first quote leaves the hero its cap and P/E, asked for as its quote lands",
         previewed && asked, "previewed " + previewed + ", SLID's asked " + (harness.calls("SLID.fundamentals") - before))
       service.removeSymbol("SLID")
       service.feature(hero)
       service.lastRemoval = null
+      wait(300)
+    }
+
+    // The other way: a preview made while its own quote is out keeps its ask
+    // for its cap and P/E through the stock's, which a surface makes as it
+    // opens or refreshes, and the service each minute. Found in the second
+    // review of 26 October: the stock's ask emptied the one place the
+    // preview's waited in, so the preview showed no cap or P/E.
+    function previewKeepsItsFigures(body, keys) {
+      // SHOP.TO as if never seen: no quote held for it, no figures.
+      var forget = function(feed, key) {
+        var next = Object.assign({}, feed[key])
+        delete next["SHOP.TO"]
+        feed[key] = next
+      }
+      forget(service.testPreviewFeed, "quotes")
+      forget(service.testPreviewFeed, "entries")
+      forget(service.testFundamentalsFeed, "entries")
+      var hold = function(command) {
+        fileProc.command = [command].concat(command === "rm" ? ["-f"] : []).concat([harness.fakeState + "/SHOP.TO.quote.hold"])
+        fileProc.running = true
+        tryVerify(function() { return !fileProc.running }, 2000)
+      }
+      hold("touch")
+      var before = harness.calls("SHOP.TO.fundamentals")
+      searchShop(body, keys)
+      keyClick(Qt.Key_Down)
+      var waiting = within(6000, function() {
+        return service.previewSymbol === "SHOP.TO" && service.previewShown && !service.testPreviewFeed.quotes["SHOP.TO"]
+      })
+      // The stock's own ask, its quote in, as a refresh makes it.
+      app.requestFundamentals()
+      hold("rm")
+      tryVerify(function() { return !!service.testPreviewFeed.quotes["SHOP.TO"] }, 8000)
+      var asked = within(3000, function() { return harness.calls("SHOP.TO.fundamentals") > before })
+      keyClick(Qt.Key_Escape)
+      body.resetInteraction()
+      harness.check("a preview made before its own quote keeps its ask for its cap and P/E through the stock's, asked for as its quote lands",
+        waiting && asked, "waiting " + waiting + ", SHOP.TO's asked " + (harness.calls("SHOP.TO.fundamentals") - before))
       wait(300)
     }
 
@@ -1026,6 +1063,7 @@ ShellRoot {
       twoSurfacesPreview(body, keys)
       addTakesOverHistory(body, keys)
       previewKeepsHeroFigures(body, keys)
+      previewKeepsItsFigures(body, keys)
       earlyEnter(body, keys)
       app.close()
       harness.finish()

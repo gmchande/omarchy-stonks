@@ -36,8 +36,12 @@ Item {
   // to try again says when it still didn't.
   signal saveChecked(bool saved)
   property int now: Math.floor(Date.now() / 1000)
-  // A symbol whose fundamentals were asked for before its first quote.
-  property string pendingFundamentals: ""
+  // The symbols whose fundamentals were asked for before their first
+  // quote, one for each asker: the stock on show ("stock") and search's
+  // preview ("preview"), so neither's ask takes the other's. Found in
+  // review: the stock's ask each minute emptied one slot the preview's
+  // waited in, and the preview showed no cap or P/E.
+  property var pendingFundamentals: ({ stock: "", preview: "" })
   // What the last removal took and the settings from just before it, on
   // offer until the next change to what the lists hold, however it comes: a
   // change here, on either surface, or in the data file.
@@ -630,7 +634,7 @@ Item {
     calendars: root.calendars
     bulk: false
     onQuotesChanged: {
-      if (root.pendingFundamentals) root.fetchFundamentals(root.pendingFundamentals)
+      root.askPendingFundamentals()
       root.askOvernight()
     }
   }
@@ -865,9 +869,8 @@ Item {
       previewRest.restart()
     } else {
       previewRest.stop()
-      // The preview may have taken the hero's ask while its quote was out
-      // (`pendingFundamentals`).
-      if (root.openSurfaces.length > 0) fetchFundamentals(root.view.featured)
+      // A preview gone asks for nothing it waited on.
+      root.keepPending("preview", "")
     }
     root.showHistory(false)
     if (before && before !== root.previewSurface && s) root.previewTaken(before)
@@ -895,7 +898,7 @@ Item {
   // answers for a US stock or ETF.
   onPreviewShownChanged: if (previewShown) {
     previewFeed.pump()
-    fetchFundamentals(previewSymbol)
+    fetchFundamentals(previewSymbol, "preview")
     askOvernight()
   }
 
@@ -948,18 +951,28 @@ Item {
     if (History.historyRanges().indexOf(value) >= 0) root.persist({ range: value })
   }
 
-  // An open surface asks for the hero's cap and P/E: the featured symbol's,
-  // or a preview's. One asked for before its quote goes when the quote
-  // lands, and only an equity's.
-  function fetchFundamentals(symbol) {
+  // An open surface asks for the hero's cap and P/E: the featured symbol's
+  // (`asker` "stock", or none), or a preview's ("preview"). One asked for
+  // before its quote waits in its asker's place (`pendingFundamentals`) and
+  // goes when the quote lands, and only an equity's.
+  function fetchFundamentals(symbol, asker) {
     var normalized = String(symbol || "").toUpperCase()
     var quote = root.quotes[normalized] || previewFeed.quotes[normalized]
-    if (!quote) {
-      root.pendingFundamentals = normalized
-      return
-    }
-    root.pendingFundamentals = ""
-    if (Fundamentals.hasFundamentals(quote)) fundamentalsFeed.fetch(normalized, quote.currency)
+    keepPending(asker || "stock", quote ? "" : normalized)
+    if (quote && Fundamentals.hasFundamentals(quote)) fundamentalsFeed.fetch(normalized, quote.currency)
+  }
+
+  function keepPending(asker, symbol) {
+    if (root.pendingFundamentals[asker] === symbol) return
+    var next = Object.assign({}, root.pendingFundamentals)
+    next[asker] = symbol
+    root.pendingFundamentals = next
+  }
+
+  // Each ask that waited on its quote, now that quotes have changed.
+  function askPendingFundamentals() {
+    var pending = root.pendingFundamentals
+    for (var asker in pending) if (pending[asker]) fetchFundamentals(pending[asker], asker)
   }
 
   // A quote that changed, by an answer, a restore, or a symbol leaving,
@@ -967,7 +980,7 @@ Item {
   // is over: an undo restores the quote before All takes the symbol back,
   // and a write between the two left it out of the file.
   onQuotesChanged: {
-    if (pendingFundamentals) fetchFundamentals(pendingFundamentals)
+    askPendingFundamentals()
     settleArrivals()
     root.quotesUnsaved = true
     Qt.callLater(flushQuotes)
