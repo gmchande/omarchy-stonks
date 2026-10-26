@@ -343,10 +343,12 @@ The shell's log the form asks for can name the prices Stonks left out.
   replay a chart, or move along it, or the bell is due, with 4 seconds
   under `timeout`, and one `sh` that
   starts a `pw-play` for each chime, with 2 seconds each under `timeout`,
-  and plays nothing else; while sounds are on and you scrub the chart, with
-  the pointer on it or by `←` `→`, and for a second after, `pw-cat` playing
-  silence, so each chime plays at once; `pw-dump` once as each bell is due, in
-  `bash` under `timeout` for 3 seconds and through `head` for 4 MB, to see
+  and plays nothing else; while sounds are on and your scrub of the chart
+  moves, with the pointer on it or by `←` `→`, and for a second after,
+  `pw-cat` playing silence, so each chime plays at once, each stream under
+  `timeout` for 60 seconds and started again while you scrub; `pw-dump`
+  once as each bell is due, in `bash` under `timeout` for 3 seconds and
+  through `head` for 4 MB, to see
   whether an app is recording from a microphone, reading only which streams
   run; an answer that runs out of time, fails, or goes over 4 MB counts as
   recording, so the bell stays quiet; only when you take a screenshot, one
@@ -366,10 +368,11 @@ The shell's log the form asks for can name the prices Stonks left out.
 - **Silence's cost:** while `pw-cat` plays silence, your speakers'
   amplifier stays powered and your headphones stay connected to this
   computer, as when any sound plays, and it takes about a tenth of a
-  percent of one processor core. It runs only while you scrub the chart,
-  or a replay waits for a sleeping output to wake, never just because the
-  popup or the window is open. A sound after 4 seconds of quiet from
-  Stonks starts with up to 150 ms of silence of its own, so a sleeping
+  percent of one processor core. It runs only while your scrub moves, and
+  a second after, or a replay waits for a sleeping output to wake, never
+  just because the popup or the window is open or a scrub stands still. A
+  sound after 4 seconds of quiet from Stonks starts with up to 150 ms of
+  silence of its own, so a sleeping
   output wakes before the sound and none of it is cut; a replay waits for
   the output instead, so its sound keeps in step with its sweep.
 - **Sites:** `query1.finance.yahoo.com` for quotes, charts, and the market

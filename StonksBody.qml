@@ -603,6 +603,7 @@ Item {
   // for its chimes.
   readonly property bool scrubbing: surfaceOpen && onScreen && !(service && service.screensOff) && motion.scrubT !== 0
   onScrubbingChanged: if (sounds) sounds.scrubbing(root, scrubbing)
+  onScrubTChanged: if (sounds && scrubbing) sounds.scrubMoved(root)
   // A surface taken down mid-replay, as a rebuilt bar or a removed screen
   // takes its popup, stops its replay's sound with it, and its scrub's
   // hold on the output.

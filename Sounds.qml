@@ -20,13 +20,17 @@ Item {
   // The surfaces whose chart is being scrubbed, by the pointer on it or by
   // keys, where a screen shows it (`scrubbing`).
   property var scrubbed: []
-  // The output is kept awake while sounds are on and a chart is scrubbed,
-  // and for 1 s after, so a chime struck after a pause plays at once: an
-  // output asleep wakes as a sound starts, and cuts or delays its start.
-  // Only then, and while a replay waits for the output to wake
-  // (`whenAwake`): headphones go to whichever computer plays, and an open
-  // popup alone mustn't take them.
-  readonly property bool keepingAwake: turnedOn && (scrubbed.length > 0 || afterScrub.running || replaysWaiting.length > 0)
+  // The output is kept awake while sounds are on and a scrub moves, and
+  // for 1 s after it last moved or ended (`scrubHeld`), so a chime struck
+  // after a pause plays at once: an output asleep wakes as a sound starts,
+  // and cuts or delays its start. Only then, and while a replay waits for
+  // the output to wake (`whenAwake`): headphones go to whichever computer
+  // plays, and an open popup alone mustn't take them, nor a scrub left
+  // standing. Found in review: one ← held the headphones for hours.
+  readonly property bool keepingAwake: turnedOn && (scrubHeld || replaysWaiting.length > 0)
+  // A scrub moved, started, or ended in the last second (`afterScrub`): a
+  // flag of its own, since the timer's restart turns `running` off and on.
+  property bool scrubHeld: false
   // The surface whose replay is playing, so that replay's end stops only
   // its own sound; null for any other sound.
   property var replayOwner: null
@@ -116,15 +120,24 @@ Item {
     return out
   }
 
-  // A surface says whether its chart is being scrubbed. As the last scrub
-  // ends, the 1 s hold starts before the list empties, so `keepingAwake`
-  // never dips in between.
+  // A surface says whether its chart is being scrubbed. A scrub that starts
+  // or ends holds the output for 1 s, as one that moves does (`scrubMoved`).
   function scrubbing(surface, on) {
     var others = scrubbed.filter(function(s) { return s !== surface })
     if (on) others.push(surface)
     if (others.length === scrubbed.length) return
-    if (others.length === 0) afterScrub.restart()
+    holdForScrub()
     scrubbed = others
+  }
+
+  // A surface's scrub moved: the output is held 1 s more.
+  function scrubMoved(surface) {
+    if (scrubbed.indexOf(surface) >= 0) holdForScrub()
+  }
+
+  function holdForScrub() {
+    scrubHeld = true
+    afterScrub.restart()
   }
 
   function bundled(look, name) {
@@ -330,19 +343,23 @@ Item {
 
   // The output kept awake (`keepingAwake`): a stream of silence, PipeWire's
   // pw-cat reading zeros, which holds the speakers or headphones open as a
-  // sound playing does, and nothing while sounds are off, no chart has
-  // been scrubbed for 1 s, and no replay waits. Its start may wake the
-  // output, as a sound's does; it says, verbosely, when its stream reaches
-  // the output ("-> streaming"), which ends the waking (`awakeAt`). The
-  // output counts as awake only while it runs: stopped, for 4 s more; ended
-  // on its own while it's wanted, as when PipeWire restarts, not at all,
-  // since the output may have gone with it. Then it starts again 2 s later.
-  Timer { id: afterScrub; interval: 1000 }
+  // sound playing does, and nothing while sounds are off, no scrub has
+  // moved for 1 s, and no replay waits. Its start may wake the output, as a
+  // sound's does; it says, verbosely, when its stream reaches the output
+  // ("-> streaming"), which ends the waking (`awakeAt`). The output counts
+  // as awake only while it runs: stopped, for 4 s more; ended on its own
+  // while it's wanted, as when PipeWire restarts, not at all, since the
+  // output may have gone with it. Then it starts again 2 s later. Each
+  // stream ends at `streamSeconds` under `timeout`, so none outlives a shell
+  // that dies without stopping it; one that reaches it while it's wanted
+  // starts again at once, the output still awake under it.
+  property int streamSeconds: 60
+  Timer { id: afterScrub; interval: 1000; onTriggered: root.scrubHeld = false }
   onKeepingAwakeChanged: silence.running = keepingAwake
   Process {
     id: silence
-    command: ["pw-cat", "-v", "--playback", "--raw", "--rate", "24000", "--channels", "1", "--format", "s16",
-      "--media-role", "Notification", "--latency", "30ms", "/dev/zero"]
+    command: ["timeout", "-k", "1", String(root.streamSeconds), "pw-cat", "-v", "--playback", "--raw", "--rate", "24000",
+      "--channels", "1", "--format", "s16", "--media-role", "Notification", "--latency", "30ms", "/dev/zero"]
     stderr: SplitParser {
       onRead: function(line) { if (root.awakeAt < 0 && line.indexOf("-> streaming") >= 0) root.awakeAt = Date.now() }
     }
@@ -351,9 +368,11 @@ Item {
       root.starting()
       root.asleepAfter = Infinity
     }
-    onExited: {
-      root.asleepAfter = Date.now() + (root.keepingAwake ? 0 : 4000)
-      if (root.keepingAwake) silenceAgain.restart()
+    onExited: function(exitCode) {
+      var renewed = exitCode === 124 && root.keepingAwake
+      root.asleepAfter = Date.now() + (root.keepingAwake && !renewed ? 0 : 4000)
+      if (renewed) Qt.callLater(function() { silence.running = root.keepingAwake })
+      else if (root.keepingAwake) silenceAgain.restart()
     }
   }
   Timer {

@@ -988,10 +988,11 @@ ShellRoot {
       harness.check("a click on another row stops the replay's sound with the replay", endOf(before + 3) === "stopped", endOf(before + 3))
 
       // The output kept awake (the stand-in pw-cat): a stream of silence
-      // only while a chart is scrubbed with sounds on, by the pointer on it
-      // or by keys, and a second after; none while the popup and the window
-      // are open and nothing is scrubbed, and none with sounds off. One that
-      // ends on its own while it's wanted starts again.
+      // only while a chart's scrub moves with sounds on, by the pointer on
+      // it or by keys, and a second after it last moved or ended; none while
+      // the popup and the window are open and nothing is scrubbed, none for
+      // a scrub left standing, and none with sounds off. One that ends on
+      // its own while it's wanted starts again.
       var silence = function() {
         var lines = harness.readFile(harness.fakeState + "/pw-cat.log").split("\n").filter(function(l) { return l !== "" })
         var stops = lines.filter(function(l) { return /^stopped /.test(l) })
@@ -1022,10 +1023,16 @@ ShellRoot {
         keyClick(Qt.Key_Left)
         wait(40)
       }
+      var burstEnd = Date.now()
       wait(200)
       var byKeys = silence().running && silence().starts === startsBefore + 1
       var struck = harness.chimes().slice(chimesBefore)
       var awake = struck[struck.length - 1]
+      // A scrub left standing lets the output go a second after its last
+      // step, and stays where it is. Found in review: one ← held Bluetooth
+      // headphones for as long as the scrub stood.
+      tryVerify(function() { return !silence().running }, 3000)
+      var parkedKeys = !silence().running && silence().stoppedAt - burstEnd >= 900 && win.motion.scrubT !== 0
       keyClick(Qt.Key_Escape)
       tryVerify(function() { return !silence().running }, 3000)
       startsBefore = silence().starts
@@ -1033,8 +1040,15 @@ ShellRoot {
         mouseMove(chart, chart.width * sx, chart.height / 2)
         wait(20)
       }
+      var restedAt = Date.now()
       tryVerify(function() { return silence().running }, 3000)
       var byPointer = silence().starts === startsBefore + 1
+      tryVerify(function() { return !silence().running }, 3000)
+      var parkedPointer = !silence().running && silence().stoppedAt - restedAt >= 900 && win.motion.scrubT !== 0
+      startsBefore = silence().starts
+      mouseMove(chart, chart.width * 0.65, chart.height / 2)
+      tryVerify(function() { return silence().running }, 3000)
+      var movesAgain = silence().starts === startsBefore + 1
       var leftAt = Date.now()
       mouseMove(win, 1, 1)
       tryVerify(function() { return !silence().running }, 3000)
@@ -1047,7 +1061,12 @@ ShellRoot {
       fileProc.command = ["rm", "-f", harness.fakeState + "/pw-cat.exit"]
       fileProc.running = true
       tryVerify(function() { return !fileProc.running }, 2000)
-      tryVerify(function() { return silence().running }, 5000)
+      // The scrub keeps moving, a step every 300 ms, so the stream is wanted
+      // when it comes back.
+      for (var step = 0; step < 20 && !silence().running; step++) {
+        keyClick(Qt.Key_Left)
+        wait(300)
+      }
       var backAfterExit = silence().running && silence().starts === startsBefore + 2
       // The output may have gone with the stream: the chime struck as it
       // comes back opens with the lead-in.
@@ -1060,13 +1079,42 @@ ShellRoot {
       tryVerify(function() { return !silence().running }, 3000)
       var offRests = !silence().running
       service.persist({ sounds: true })
+      keyClick(Qt.Key_Left)
       tryVerify(function() { return silence().running }, 3000)
       keyClick(Qt.Key_Escape)
       tryVerify(function() { return !silence().running }, 3000)
       var escRests = !silence().running && win.surfaceOpen && win.motion.scrubT === 0
-      harness.check("a stream of silence holds the output only while a chart is scrubbed with sounds on, by the pointer or by keys, until a second after the pointer leaves or Esc: not while the window is merely open, and not with sounds off; one that ends while it's wanted starts again",
-        restsOpen && byPointer && heldAfter && byKeys && backAfterExit && escRests && offRests,
-        [restsOpen, byPointer, heldAfter, byKeys, backAfterExit, escRests, offRests].join(","))
+      harness.check("a stream of silence holds the output only while a chart's scrub moves with sounds on, by the pointer or by keys, until a second after it last moved, the pointer leaves, or Esc: not while the window is merely open, not for a scrub left standing, which stays where it is, and not with sounds off; one that ends while it's wanted starts again",
+        restsOpen && byPointer && parkedKeys && parkedPointer && movesAgain && heldAfter && byKeys && backAfterExit && escRests && offRests,
+        [restsOpen, byPointer, parkedKeys, parkedPointer, movesAgain, heldAfter, byKeys, backAfterExit, escRests, offRests].join(","))
+
+      // A slow scrub, a step every 600 ms, pauses shorter than the hold,
+      // keeps one stream after a quiet spell, and once the output is awake
+      // each chime plays at once; a stream that reaches its time limit,
+      // 2 s here, starts again at once, the chimes still at once.
+      wait(4500)
+      sounds.streamSeconds = 2
+      startsBefore = silence().starts
+      var slowFrom = harness.chimes().length
+      var linesFrom = harness.readFile(harness.fakeState + "/pw-cat.log").split("\n").filter(function(l) { return l !== "" }).length
+      for (var slow = 0; slow < 9; slow++) {
+        keyClick(Qt.Key_Left)
+        wait(600)
+      }
+      var slowChimes = harness.chimes().slice(slowFrom)
+      var lines = harness.readFile(harness.fakeState + "/pw-cat.log").split("\n").filter(function(l) { return l !== "" }).slice(linesFrom)
+      // From each stream's end at its limit to the next one's start.
+      var gaps = lines.map(function(l, i) {
+        return /^start /.test(l) && i > 0 && /^stopped /.test(lines[i - 1]) ? Number(l.split(" ")[1]) - Number(lines[i - 1].split(" ")[1]) : -1
+      }).filter(function(g) { return g >= 0 })
+      keyClick(Qt.Key_Escape)
+      tryVerify(function() { return !silence().running }, 3000)
+      sounds.streamSeconds = 60
+      var slowLeads = slowChimes.map(harness.lead)
+      harness.check("a slow scrub, a step every 600 ms, plays its first chime after a quiet spell with the lead-in and every one after at once, through a stream that reaches its time limit and starts again at once",
+        slowChimes.length >= 4 && slowLeads[0] === 150 && slowLeads.slice(1).every(function(l) { return l === 0 })
+          && silence().starts - startsBefore >= 3 && gaps.length >= 2 && gaps.every(function(g) { return g < 300 }),
+        "leads " + slowLeads.join(",") + " | streams " + (silence().starts - startsBefore) + " | gaps " + gaps.join(",") + " ms")
 
       // A sound that may wake the output opens with silence, then the
       // sound whole: a scrub's chimes as it wakes the output after a quiet
