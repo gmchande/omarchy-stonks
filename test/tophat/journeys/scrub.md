@@ -6,7 +6,7 @@ chime sounds as the scrub moves, higher where the line is higher.
 
 ## Sub-features
 
-- `scrub-keys`: `h` `l` and `←` `→` step the scrub one chart step, each step a chime.
+- `scrub-keys`: `←` `→` step the scrub one chart step, each step a chime.
 - `scrub-pointer`: hovering the chart scrubs to the pointer, a chime each time the line's height under it changes.
 - `scrub-follows`: the header says "AT hh:mm · PHASE"; the price, the change, and the "┄ PREV CLOSE" legend show the moment; on 1D the rows follow too.
 - `scrub-end`: Esc, the pointer leaving the chart, and a click on the chart each end the scrub and put everything back on now.
@@ -15,7 +15,7 @@ chime sounds as the scrub moves, higher where the line is higher.
 ## How to get to it (user POV)
 
 - Open the popup from the pill, then move the pointer over the chart.
-- With the popup open, press `h` or `←` to step back, `l` or `→` to step forward.
+- With the popup open, press `←` to step back, `→` to step forward.
 - Esc ends the scrub (a second Esc closes the popup).
 
 ## Driving it with test/tophat
@@ -26,8 +26,8 @@ Preconditions: the demo watchlist, AAPL featured, on 1D, sounds on (the
 demo file doesn't turn them off).
 
 - **Open.** Click the pill (`pillSymbol`). The popup shows (`heroChart`); the header (`statusText`) shows the market's phase; no stream of silence runs (`silence.log`). Shot `01-now`.
-- **Keys back.** Press `h` four times, one at a time. The header says "AT …"; four `chime-*.wav` asks in `sounds.log`; a stream of silence runs. Shot `02-h4`.
-- **Keys forward and arrows.** `l`, `Left`, `Right`: three more chimes. Shot `03-keys`.
+- **Keys back.** Press `Left` four times, one at a time. The header says "AT …"; four `chime-*.wav` asks in `sounds.log`; a stream of silence runs. Shot `02-back4`.
+- **Keys forward and back.** `Right`, `Left`, `Right`: three more chimes. Shot `03-keys`.
 - **Esc.** The header is back on now; the popup stays open; the silence ends within 3 s. Shot `04-esc`.
 - **Pointer sweep.** Move across `heroChart` in 3 % steps. The header shows more than one moment; at least one chime; a stream of silence runs. Shots `05-pointer-early`, `05-pointer-end`.
 - **Leave.** Move onto the symbol above the chart (`heroSymbol`). The header is back on now; the silence ends within 3 s. Shot `06-left`.

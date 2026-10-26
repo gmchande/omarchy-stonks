@@ -7,6 +7,7 @@ import "Format.js" as Format
 import "Fundamentals.js" as Fundamentals
 import "History.js" as History
 import "KeySheet.js" as KeySheet
+import "KeyText.js" as KeyText
 import "Market.js" as Market
 import "Overnight.js" as Overnight
 import "Quote.js" as Quote
@@ -36,6 +37,8 @@ Item {
   // shows is open, as it was left, and asks for nothing an open one would.
   property bool onScreen: true
   property string headerWhenMissing: "No data"
+  // The surface steps to the bar's next panel on Tab: the popup.
+  property bool switchesPanels: false
   property int margins: 0
   // Where the body's content ends, the footer at its bottom: the popup's
   // card eases its edge to a new height while the body lays out at it at
@@ -531,7 +534,7 @@ Item {
     var quote = removal.quote
     return { symbol: removal.symbol, name: quote ? quote.name : removal.symbol, exchange: quote ? quote.exchange : "" }
   }
-  readonly property var keySheet: KeySheet.sheet(order)
+  readonly property var keySheet: KeySheet.sheet(order, switchesPanels)
   // The rows' mood, for the rule under the list name; it follows the scrub
   // as the rows do, and names its list, so the rule tells a switch from a
   // change. Read from the view, list and rows at once: `symbols` may not
@@ -661,53 +664,38 @@ Item {
     if (service) service.reverseOrder()
   }
 
-  // A key's command (KeyText.typed) as both surfaces take it, so the popup
-  // and the window answer the same keys; false for one that does nothing.
-  // The keys with no text, Esc, the arrows, Enter, Space, Delete and Tab,
-  // each surface reads itself.
-  function pressKey(t) {
-    if (t === "?") toggleHelp()
-    else if (t === "j") moveCursor(1)
-    else if (t === "k") moveCursor(-1)
-    else if (t === "h") nudgeScrub(-1)
-    else if (t === "l") nudgeScrub(1)
-    else if (t === "x") removeRow(watchlist.cursorRow)
-    else if (t === "X") openRowMenu(watchlist.cursorRow, null)
-    else if (t === "a" || t === "+") startAdding()
+  // A key as both surfaces take it, so the popup and the window answer the
+  // same keys; false for one Stonks doesn't answer. Esc, and the popup's
+  // Tab, each surface reads itself. A letter's command is its key and Shift
+  // (KeyText.typed): Caps Lock sends "O" for o, which would reverse.
+  function pressKey(event) {
+    var key = event.key
+    var mods = event.modifiers & ~Qt.KeypadModifier
+    var t = KeyText.typed(event)
+    if (mods === Qt.ControlModifier && key === Qt.Key_C) takeScreenshot()
+    else if (mods === Qt.ControlModifier && key === Qt.Key_Z) undoRemoval()
+    else if (mods === Qt.ShiftModifier && key === Qt.Key_Up) moveSelected(-1)
+    else if (mods === Qt.ShiftModifier && key === Qt.Key_Down) moveSelected(1)
+    else if (key === Qt.Key_Up) moveCursor(-1)
+    else if (key === Qt.Key_Down) moveCursor(1)
+    else if (key === Qt.Key_Left) nudgeScrub(-1)
+    else if (key === Qt.Key_Right) nudgeScrub(1)
+    else if (key === Qt.Key_Return || key === Qt.Key_Enter) featureSymbol(watchlist.cursorRow)
+    else if (key === Qt.Key_Delete || key === Qt.Key_Backspace) removeRow(watchlist.cursorRow)
+    else if (t === "?") toggleHelp()
+    else if (t === "a") startAdding()
     else if (t === "c") cycleChangeMode()
     else if (t === "r") refreshRequested()
     else if (t === "[") stepRange(-1)
     else if (t === "]") stepRange(1)
     else if (t === "p") replay()
-    else if (t === "y") takeScreenshot()
     else if (t === "s") toggleStyle()
-    else if (t === "S") toggleSounds()
+    else if (t === "m") toggleSounds()
     else if (t === "o") cycleOrder()
     else if (t === "O") reverseOrder()
-    else if (t === "w") openListMenu()
-    else if (t === "W") openManageLists()
-    else if (t === "m") openSymbolLists(watchlist.cursorRow)
-    else if (t === "u") undoRemoval()
-    else if (t === ",") stepList(-1)
-    else if (t === ".") stepList(1)
-    else if (t === "J") moveSelected(1)
-    else if (t === "K") moveSelected(-1)
-    else if (t >= "1" && t <= "9") featureAt(Number(t) - 1)
+    else if (t === "l") openListMenu()
     else return false
     return true
-  }
-
-  // A row by its place in the list as it is on screen, as 1 to 9 feature
-  // them: while the pointer holds the rows, that is not the service's order.
-  // The cursor goes with it, gliding the row into view as the arrows do, so
-  // its highlight shows and x and Enter act on it. Found in the edge-case
-  // pass of 15 October: a row scrolled out of sight was featured unseen.
-  function featureAt(index) {
-    showingHelp = false
-    var rows = watchlist.displayedSymbols
-    if (!service || index < 0 || index >= rows.length) return
-    service.feature(rows[index])
-    watchlist.select(rows[index])
   }
 
   // Acting on the rows closes what covers them first, the key sheet or
@@ -728,12 +716,7 @@ Item {
     watchlist.moveSelected(delta)
   }
 
-  function stepList(delta) {
-    showingHelp = false
-    if (service) service.stepList(delta)
-  }
-
-  // The × beside a row's symbol, x, and Delete or Backspace: the row goes
+  // The × beside a row's symbol, and Delete or Backspace: the row goes
   // from the list on show at once. Where that would reach lists not on
   // show, in All for a stock a named list holds too, they ask first, with
   // the row's menu on its one line.
@@ -853,7 +836,7 @@ Item {
 
   // The footer offers a removal made here back beside the add for a few
   // seconds, "Undo NVDA", so a removal by the mouse says what it took and
-  // can be taken back by the mouse; u takes it back long after. The add
+  // can be taken back by the mouse; Ctrl+Z takes it back long after. The add
   // stays where it is, and acts at once: in the review of 22 October the
   // owner took out a note that held the footer, since adding the next stock
   // meant waiting for it. The offer ends with the removal (undone, a newer
@@ -956,7 +939,7 @@ Item {
     sounds.whenAwake(root, function() { if (root.surfaceOpen) motion.replay() })
   }
 
-  // A screenshot of the chart on show, as the camera or y takes it: laid
+  // A screenshot of the chart on show, as the camera or Ctrl+C takes it: laid
   // out for sharing (`ShareCard`) where no screen shows it, as the hero and
   // the chart show it at that moment, grabbed once its canvases have
   // painted, and handed to the camera, which saves, copies, and announces
@@ -994,7 +977,7 @@ Item {
     })
   }
   // The other surface's shot may have taken the camera in the frames this
-  // one waited: then this card goes, and the next y or click is free. The
+  // one waited: then this card goes, and the next Ctrl+C or click is free. The
   // shutter sounds as the picture is taken, and the card goes then; the
   // footer says how the save, the copy, and the notification went after.
   function shootCard(card) {
@@ -1070,7 +1053,7 @@ Item {
   // A result already in the list on screen is shown, not added
   // (`showSymbol`); one still arriving lands as an add does, and, shown,
   // is featured even when its first fetch fails. The removal on offer
-  // (`putBack`), taken as the first result or by name, is put back as u
+  // (`putBack`), taken as the first result or by name, is put back as Ctrl+Z
   // puts it: in its lists at its place, the hero as it was.
   function acceptSymbol(symbol) {
     if (!service) return

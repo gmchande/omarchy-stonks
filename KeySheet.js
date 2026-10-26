@@ -3,47 +3,48 @@
 
 // What the key sheet shows. Knows nothing of how the keys are handled.
 
-// The key sheet behind the header's ?: the everyday keys, grouped by what
-// they touch, and the mouse in a few lines. The README's table holds every
-// key, and its words are the sheet's: where its line is too long for the
-// popup's half column, the sheet says it shorter in the same words. The
-// doubles and the shell's own keys are left to the table, so the sheet stays
-// short enough to read at a glance. J K, a row's drag, and the order's arrow
-// show only where they act: J K and the drag on manual order, the arrow on a
-// sorted one.
-function sheet(order) {
+// The key sheet behind the header's ?: every key, grouped by what it
+// touches, then the mouse in a few lines. The README's table lists the same
+// keys, in its words; where a line is too long for the popup's half column,
+// the sheet says it shorter. A key shows only where it acts: ⇧↑ ⇧↓ and a
+// row's drag on manual order, the order's arrow on a sorted one, and Tab in
+// the popup, which steps to the bar's next panel.
+function sheet(order, switchesPanels) {
   var manual = Settings.normalizeOrder(order) === "manual"
   var rows = [
     { key: "↑ ↓", does: "Move the selection" },
     { key: "⏎", does: "Show the row's chart" },
-    { key: "1–9", does: "Show that row's chart" },
-    { key: "a", does: "Search and add a symbol" },
-    { key: "x", does: "Remove the selected row" },
-    { key: "u", does: "Undo the last removal" }
+    { key: "a", does: "Add a symbol" },
+    { key: "Del ⌫", does: "Remove the selected row" },
+    { key: "Ctrl+Z", does: "Undo a removal" }
   ]
-  if (manual) rows.push({ key: "J K", does: "Move the row up or down" })
+  if (manual) rows.push({ key: "⇧↑ ⇧↓", does: "Move the row" })
+  var surface = []
+  if (switchesPanels) surface.push({ key: "Tab", does: "Next panel" }, { key: "⇧Tab", does: "Previous panel" })
+  surface.push({ key: "?", does: "All keys" }, { key: "Esc", does: "Close" })
   return {
     groups: [
       { title: "Rows", rows: rows },
       { title: "Chart", rows: [
-        { key: "← →", does: "Scrub one chart step" },
-        { key: "[ ]", does: "Change the chart range" },
+        { key: "← →", does: "Scrub one step" },
+        { key: "[ ]", does: "Change the range" },
         { key: "p", does: "Replay the chart" },
-        { key: "y", does: "Screenshot the chart" }
+        { key: "Ctrl+C", does: "Take a screenshot" }
       ]},
       { title: "Lists", rows: [
-        { key: "w", does: "Open the list menu" },
-        { key: "o", does: "Change the list's order" },
-        { key: ", .", does: "Previous or next list" }
+        { key: "l", does: "Open the list menu" },
+        { key: "o", does: "Change the order" },
+        { key: "O", does: "Reverse the order" }
       ]},
       { title: "Look", rows: [
-        { key: "s", does: "Switch smooth and retro" },
-        { key: "S", does: "Turn sounds off or on" },
         // The change mode is the day's: on a range the hero shows the period,
         // so c changes the rows and, on the day, the hero.
         { key: "c", does: "Cycle the day's change" },
+        { key: "s", does: "Smooth or retro" },
+        { key: "m", does: "Sound on or off" },
         { key: "r", does: "Refresh" }
-      ]}
+      ]},
+      { title: "Keys", rows: surface }
     ],
     mouse: { title: "Mouse", rows: [
       // Each fits one line of the popup at the shell's usual text size, so
@@ -58,7 +59,6 @@ function sheet(order) {
       // The replay had a tooltip under the animal, which covered the line
       // naming the stock: the sheet says it instead.
       { key: "animal", does: "Click the bull or bear to replay the chart" }
-    ]},
-    note: "Every key is in the README"
+    ]}
   }
 }

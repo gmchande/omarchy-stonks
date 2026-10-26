@@ -3,15 +3,14 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons
 import qs.Commons as Commons
-import "KeyText.js" as KeyText
 
 // A row's menu: the ways to remove it, each line saying which lists the
 // removal reaches, such as "Remove from Growth" and "Remove from all 3
 // lists". Value-in, signals out; the body says the lines and removes. It
 // looks and moves as the list menu does, with one cursor: opened by a key,
 // it starts on `startLine`; opened by the pointer, on no line, until the
-// pointer moves onto one. The arrows or j k move it, Enter or a click takes
-// a line, and Escape or Shift+X backs out.
+// pointer moves onto one. The arrows move it, Enter or a click takes a
+// line, and Escape backs out.
 FocusScope {
   id: root
 
@@ -66,11 +65,9 @@ FocusScope {
   }
 
   Keys.onPressed: function(event) {
-    // A letter by its key and Shift: Caps Lock sends "J" for j.
-    var t = KeyText.typed(event)
-    if (event.key === Qt.Key_Escape || t === "X") root.dismissed()
-    else if (event.key === Qt.Key_Down || t === "j") root.moveCursor(1)
-    else if (event.key === Qt.Key_Up || t === "k") root.moveCursor(-1)
+    if (event.key === Qt.Key_Escape) root.dismissed()
+    else if (event.key === Qt.Key_Down) root.moveCursor(1)
+    else if (event.key === Qt.Key_Up) root.moveCursor(-1)
     else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && root.cursor >= 0) root.taken(root.cursor)
     // Every other key stays with the menu, so nothing behind it acts.
     event.accepted = true

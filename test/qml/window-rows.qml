@@ -185,8 +185,12 @@ ShellRoot {
         var cursor = watchlist.cursorSymbol
         var scrolled = firstWhole(watchlist)
         keys.forceActiveFocus()
-        keyClick("W", Qt.ShiftModifier)
-        wait(50)
+        keyClick(Qt.Key_L)
+        tryVerify(function() { return body.listMenuOpen && harness.find(body, "listMenu") !== null }, 2000)
+        var menu = harness.find(body, "listMenu")
+        while (menu.cursor < menu.manageIndex) keyClick(Qt.Key_Down)
+        keyClick(Qt.Key_Return)
+        tryVerify(function() { return body.managingLists }, 2000)
         keyClick(Qt.Key_Return)
         wait(50)
         for (var i = 0; i < to.length; i++) keyClick(to.charAt(i))
@@ -213,12 +217,13 @@ ShellRoot {
       app.open("{}")
       wait(200)
 
-      // While the pointer holds rows a refresh has re-ranked, 1 to 9 and a
-      // removal's hand-off read the rows as they are on screen: 1 on All by
-      // % change, 2 on a list by $ change, and the hero's neighbour after a
-      // middle-click and after x. Found in the transition audit (lists 5,
-      // featured 4): 1 featured the row a refresh ranked first, not the one
-      // shown first, and the hero went to the service's neighbour.
+      // While the pointer holds rows a refresh has re-ranked, ↓ then Enter
+      // and a removal's hand-off read the rows as they are on screen: the
+      // first row on All by % change, the second on a list by $ change, and
+      // the hero's neighbour after a middle-click and after Delete. Found in
+      // the transition audit (lists 5, featured 4): a row key featured the
+      // row a refresh ranked first, not the one shown first, and the hero
+      // went to the service's neighbour.
       var quotesBefore = service.testFeed.quotes
       var rank = function(changes) {
         var next = Object.assign({}, service.testFeed.quotes)
@@ -230,14 +235,16 @@ ShellRoot {
         mouseMove(first, first.width / 2, first.height / 2)
         wait(50)
       }
-      var pickHeld = function(key, index, reranked) {
+      var pickHeld = function(index, reranked) {
         hold()
         var onScreen = watchlist.displayedSymbols.slice()
+        watchlist.cursorSymbol = onScreen[0]
         rank(reranked)
         wait(50)
         var rearranged = service.view.shown.join() !== onScreen.join() && watchlist.displayedSymbols.join() === onScreen.join()
         keys.forceActiveFocus()
-        keyClick(key)
+        for (var i = 0; i < index; i++) keyClick(Qt.Key_Down)
+        keyClick(Qt.Key_Return)
         wait(50)
         return rearranged + "," + (service.featuredSymbol === onScreen[index]) + " " + onScreen[index] + "->" + service.featuredSymbol
       }
@@ -245,15 +252,15 @@ ShellRoot {
       service.setOrder("pct")
       rank({ AAPL: 6, MSFT: 5, NVDA: 4, FLAT: 3, DOWN: 2, STRAY: 1 })
       wait(100)
-      var onePct = pickHeld(Qt.Key_1, 0, { STRAY: 10 })
+      var onePct = pickHeld(0, { STRAY: 10 })
       mouseMove(body, 1, 1)
       service.switchList("Pair")
       service.setOrder("pct")
       service.reverseOrder()
       rank({ MSFT: 5, NVDA: 4, FLAT: 3, DOWN: 2, STRAY: 1 })
       wait(100)
-      var twoReversed = pickHeld(Qt.Key_2, 1, { DOWN: 50 })
-      harness.check("1 to 9 feature the row shown there while the pointer holds re-ranked rows, by % in All and reversed in a list",
+      var twoReversed = pickHeld(1, { DOWN: 50 })
+      harness.check("arrows and Enter feature the row shown there while the pointer holds re-ranked rows, by % in All and reversed in a list",
         /^true,true /.test(onePct) && /^true,true /.test(twoReversed), onePct + " | " + twoReversed)
       mouseMove(body, 1, 1)
       service.switchList("")
@@ -272,12 +279,12 @@ ShellRoot {
         var got = service.featuredSymbol
         mouseMove(body, 1, 1)
         keys.forceActiveFocus()
-        keyClick(Qt.Key_U)
+        keyClick(Qt.Key_Z, Qt.ControlModifier)
         wait(100)
         return (got === next) + " " + next + "->" + got
       }
-      // Pair holds MSFT too, so in All the menu's one line, and x's, reach
-      // both lists.
+      // Pair holds MSFT too, so in All the menu's one line, and Delete's,
+      // reach both lists.
       var byClick = handOff(function() {
         var row = watchlist.rowItem("MSFT")
         mouseClick(row, row.width / 2, row.height / 2, Qt.RightButton)
@@ -288,11 +295,11 @@ ShellRoot {
       var byKey = handOff(function() {
         watchlist.cursorSymbol = "MSFT"
         keys.forceActiveFocus()
-        keyClick(Qt.Key_X)
+        keyClick(Qt.Key_Delete)
         wait(50)
         keyClick(Qt.Key_Return)
       })
-      harness.check("removing the held hero hands it to its neighbour on screen, by a right-click's menu and by x",
+      harness.check("removing the held hero hands it to its neighbour on screen, by a right-click's menu and by Delete",
         /^true /.test(byClick) && /^true /.test(byKey), byClick + " | " + byKey)
       service.testFeed.quotes = quotesBefore
       service.deleteList("Pair")
@@ -300,7 +307,7 @@ ShellRoot {
       wait(100)
     }
 
-    // Moving a row by J and K, and the keys that carry the cursor past the
+    // Moving a row by Shift+↓ and Shift+↑, and the keys that carry the cursor past the
     // edge: the list gliding along so nothing jumps on screen. Shift and the
     // wheel scroll as the wheel does.
     function movesByKeys(body, watchlist, keys) {
@@ -318,7 +325,7 @@ ShellRoot {
       six.forEach(function(s) { service.setMembership(s, "Moves", true) })
 
       // A move past the edge of the view carries the list along: the moved
-      // row keeps its place on screen on every frame, J at the bottom and K
+      // row keeps its place on screen on every frame, Shift+↓ at the bottom and Shift+↑
       // at the top of a list scrolled to its end; ↓ past the edge glides the
       // list. Found in the transition audit (lists 0, featured 5): the list
       // jumped a row, the moved row a slot the wrong way, and the two crossed
@@ -338,14 +345,14 @@ ShellRoot {
       reset("", "smooth")
       watchlist.cursorSymbol = "NVDA"
       keys.forceActiveFocus()
-      var jAtBottom = carried("NVDA", function() { keyClick(Qt.Key_J, Qt.ShiftModifier) })
+      var jAtBottom = carried("NVDA", function() { keyClick(Qt.Key_Down, Qt.ShiftModifier) })
       reset("Moves", "retro")
       watchlist.contentY = watchlist.contentHeight - watchlist.height
       wait(50)
       var topRow = watchlist.displayedSymbols[3]
       watchlist.cursorSymbol = topRow
       keys.forceActiveFocus()
-      var kAtTop = carried(topRow, function() { keyClick(Qt.Key_K, Qt.ShiftModifier) })
+      var kAtTop = carried(topRow, function() { keyClick(Qt.Key_Up, Qt.ShiftModifier) })
       // Shift and a notch over a row scroll the list a row, as a notch does,
       // and leave the order as it was.
       var notchOver = function(modifiers) {
@@ -372,7 +379,7 @@ ShellRoot {
       var downTarget = watchlist.displayedSymbols[3]
       tryVerify(function() { return watchlist.cursorRow === downTarget }, 2000)
       within(2000, function() { return watchlist.wholeInSight(3, watchlist.contentY) })
-      harness.check("J and K move their selected row, and Down selects the next row",
+      harness.check("Shift+↓ and Shift+↑ move their selected row, and Down selects the next row",
         /^true /.test(jAtBottom) && /^true /.test(kAtTop) && watchlist.cursorRow === downTarget && watchlist.wholeInSight(3, watchlist.contentY),
         [jAtBottom, kAtTop, watchlist.cursorRow].join(" | "))
       app.close()
@@ -488,12 +495,12 @@ ShellRoot {
       reset("Drags", "retro")
       watchlist.cursorSymbol = "MSFT"
       keys.forceActiveFocus()
-      keyClick(Qt.Key_X)
+      keyClick(Qt.Key_Delete)
       wait(100)
       at = centre("AAPL")
       mouseWheel(body, at.x, at.y, 0, -60)
       wait(40)
-      keyClick(Qt.Key_U)
+      keyClick(Qt.Key_Z, Qt.ControlModifier)
       within(2000, ready)
       var afterUndo = canAct() + "@" + watchlist.cursorRow
       mouseMove(body, 1, 1)
@@ -568,32 +575,31 @@ ShellRoot {
         var y = watchlist.displayedSymbols.indexOf(symbol) * watchlist.rowPitch
         return y >= 0 && y >= watchlist.contentY - 0.5 && y + watchlist.rowHeight <= watchlist.contentY + watchlist.height + 0.5
       }
-      // What x takes, and where the cursor went, from the cursor as it is.
-      // Tall holds every row, so in All x asks, and Enter takes it.
+      // What Delete takes, and where the cursor went, from the cursor as it
+      // is. Tall holds every row, so in All Delete asks, and Enter takes it.
       var removesInSight = function() {
         var cursor = watchlist.cursorRow
         var shown = sight(cursor)
         keys.forceActiveFocus()
-        keyClick(Qt.Key_X)
+        keyClick(Qt.Key_Delete)
         wait(50)
         if (body.rowMenu !== null) keyClick(Qt.Key_Return)
         wait(50)
         var took = service.lastRemoval ? service.lastRemoval.symbol : ""
-        keyClick(Qt.Key_U)
+        keyClick(Qt.Key_Z, Qt.ControlModifier)
         wait(100)
         return (shown && took === cursor) + " " + cursor + " " + took
       }
 
       // Found in the transition audit (lists 7, featured 5): after a list
       // switch, or the hero stepped out of sight by the pill, the cursor sat
-      // on the hero's row below the fold, and x took a row you never saw.
+      // on the hero's row below the fold, and Delete took a row you never saw.
       service.feature("STRAY")
       wait(100)
-      keys.forceActiveFocus()
-      keyClick(Qt.Key_Period)
+      service.switchList("Tall")
       wait(100)
       var afterSwitch = removesInSight()
-      keyClick(Qt.Key_Comma)
+      service.switchList("")
       wait(100)
       watchlist.contentY = 0
       service.feature("AAPL")
@@ -624,25 +630,27 @@ ShellRoot {
         /^true /.test(afterSwitch) && /^true /.test(afterStep) && downFromSight && movedOn && letGo,
         [afterSwitch, afterStep, downFromSight, movedOn, letGo].join(" | "))
 
-      // A number key features its row and glides it into view, the cursor
-      // with it, so its highlight shows and x takes it. Found in the
-      // edge-case pass of 15 October: 6 featured a row below the fold
-      // unseen.
+      // ↓ and Enter feature a row below the fold and glide it into view,
+      // the cursor with it, so its highlight shows and Delete takes it.
+      // Found in the edge-case pass of 15 October: a row key featured a row
+      // below the fold unseen.
       watchlist.contentY = 0
       service.feature(watchlist.displayedSymbols[0])
       wait(50)
       var sixth = watchlist.displayedSymbols[5]
+      watchlist.cursorSymbol = watchlist.displayedSymbols[0]
       keys.forceActiveFocus()
-      keyClick(Qt.Key_6)
+      for (var d = 0; d < 5; d++) keyClick(Qt.Key_Down)
+      keyClick(Qt.Key_Return)
       within(2000, function() { return sight(sixth) })
       var numbered = [service.featuredSymbol === sixth, sight(sixth)].join(",")
       var numberRemoves = removesInSight()
-      harness.check("a number key reaches its row with the cursor, and x takes it",
+      harness.check("↓ and Enter reach a row below the fold with the cursor, and Delete takes it",
         numbered === "true,true" && numberRemoves === "true " + sixth + " " + sixth,
         sixth + " " + numbered + " | " + numberRemoves)
 
       // A reopened surface brings the featured row into sight, its cursor
-      // on it, so Enter and x act on the row the hero shows. Found in the
+      // on it, so Enter and Delete act on the row the hero shows. Found in the
       // walk of dev on 14 October: featured from the pill below the fold,
       // the popup opened with the cursor on its top row, and Enter
       // featured that. Popup and window open through the same reset.
@@ -663,7 +671,7 @@ ShellRoot {
 
       // Removing the row the cursor is on hands the cursor to the row that
       // takes its place, as Mail and Finder do: the next row, or the one
-      // before when it was the last; by x, Delete, and Backspace, in a list
+      // before when it was the last; by Delete and Backspace, in a list
       // longer than the view and in a short one. Found in the live run of
       // #26: the cursor went to the first row in sight.
       var takesPlace = function(pick, key) {
@@ -683,20 +691,20 @@ ShellRoot {
         tryVerify(function() { return watchlist.cursorRow === expected && sight(expected) }, 2000)
         var got = watchlist.cursorRow
         var ok = removed === rows[index] && got === expected && sight(got)
-        keyClick(Qt.Key_U)
+        keyClick(Qt.Key_Z, Qt.ControlModifier)
         wait(100)
         return ok + " " + removed + "->" + got + " want " + expected
       }
       service.switchList("Tall")
       wait(100)
-      var longMiddle = takesPlace(function(rows) { return 3 }, Qt.Key_X)
+      var longMiddle = takesPlace(function(rows) { return 3 }, Qt.Key_Delete)
       var longLast = takesPlace(function(rows) { return rows.length - 1 }, Qt.Key_Delete)
       app.close()
       app.testWindow.implicitHeight = heightBefore
       app.open("{}")
       wait(200)
       var shortMiddle = takesPlace(function(rows) { return 2 }, Qt.Key_Backspace)
-      var shortLast = takesPlace(function(rows) { return rows.length - 1 }, Qt.Key_X)
+      var shortLast = takesPlace(function(rows) { return rows.length - 1 }, Qt.Key_Delete)
       service.switchList("")
       wait(100)
       harness.check("removing the cursor's row hands the cursor to the row that takes its place: next, or previous at the end, long and short",
@@ -794,7 +802,7 @@ ShellRoot {
 
       // A reopened window's cursor rests on the featured row, not where the
       // last visit left it. Found in the live check of #9: the bar stayed on
-      // the last visit's row, so Enter, Space, x, and m acted on it.
+      // the last visit's row, so Enter, Delete, and the arrows acted on it.
       keys.forceActiveFocus()
       keyClick(Qt.Key_Down)
       wait(50)
@@ -891,8 +899,8 @@ ShellRoot {
       app.testWindow.implicitWidth = 1200
       app.open("{}")
       wait(200)
-      keys.forceActiveFocus()
-      keyClick("X", Qt.ShiftModifier)
+      var menuRow = watchlist.rowItem(watchlist.cursorRow || "AAPL")
+      mouseClick(menuRow, menuRow.width / 2, menuRow.height / 2, Qt.RightButton)
       wait(100)
       var openWide = body.rowMenu !== null && app.testWindow.width > body.width + 200
       mouseClick(app.testWindow.contentItem, app.testWindow.width - 40, 200)
@@ -907,9 +915,9 @@ ShellRoot {
 
       watchlist.cursorSymbol = "AAPL"
       keys.forceActiveFocus()
-      keyClick(Qt.Key_J, Qt.ShiftModifier)
+      keyClick(Qt.Key_Down, Qt.ShiftModifier)
       wait(20)
-      harness.check("Shift+J cannot replace manual order from a sorted view",
+      harness.check("Shift+↓ cannot replace manual order from a sorted view",
         service.order === "pct" && service.symbols.join(",") === before)
 
       var sortedRow = watchlist.rowItem("NVDA")
@@ -924,26 +932,26 @@ ShellRoot {
         service.order === "pct" && service.symbols.join(",") === before
           && service.featuredSymbol === "AAPL" && watchlist.dragSymbol === "")
 
-      // The sheet draws the everyday keys, the same in the window as in the
-      // popup: never the bar's Tab or a double such as O, and the move keys
-      // only on manual, where they act.
+      // The sheet draws the move keys only on manual, where they act.
       var sortedHelp = helpKeys(keys, body)
       service.persist({ order: "manual" })
       var manualHelp = helpKeys(keys, body)
       harness.check("the move keys are shown only where manual order lets them act",
-        sortedHelp.indexOf("J K") < 0 && manualHelp.indexOf("J K") >= 0, sortedHelp + " | " + manualHelp)
+        sortedHelp.indexOf("⇧↑ ⇧↓") < 0 && manualHelp.indexOf("⇧↑ ⇧↓") >= 0 && sortedHelp.indexOf("↑ ↓") >= 0,
+        sortedHelp + " | " + manualHelp)
 
       watchlist.cursorSymbol = "AAPL"
       keys.forceActiveFocus()
-      keyClick(Qt.Key_J, Qt.ControlModifier | Qt.ShiftModifier)
+      keyClick(Qt.Key_Down, Qt.ControlModifier | Qt.ShiftModifier)
       wait(20)
-      harness.check("Ctrl+Shift+J does not reorder",
+      harness.check("Ctrl+Shift+↓ does not reorder",
         service.order === "manual" && harness.sameSymbols(["AAPL", "NVDA", "MSFT"]))
 
+      watchlist.cursorSymbol = "AAPL"
       keys.forceActiveFocus()
-      keyClick(Qt.Key_J, Qt.ShiftModifier)
+      keyClick(Qt.Key_Down, Qt.ShiftModifier)
       wait(100)
-      harness.check("Shift+J still moves and persists in manual order",
+      harness.check("Shift+↓ still moves and persists in manual order",
         service.order === "manual" && harness.sameSymbols(["NVDA", "AAPL", "MSFT"]))
 
       // Two slots each way, so a swap of the ends, or a move cut short in
@@ -1022,7 +1030,7 @@ ShellRoot {
       mouseMove(watchlist, 20, 20)
       wait(50)
       keys.forceActiveFocus()
-      keyClick(Qt.Key_U)
+      keyClick(Qt.Key_Z, Qt.ControlModifier)
       var placedAt = watchlist.displayedSymbols.indexOf(first)
       tryVerify(function() { return watchlist.wholeInSight(placedAt, watchlist.contentY) }, 2000)
       harness.check("an undo under the pointer returns the row at its sorted place and brings it into reach",
@@ -1045,7 +1053,7 @@ ShellRoot {
       keys.forceActiveFocus()
       var moving = watchlist.displayedSymbols[0]
       watchlist.cursorSymbol = moving
-      keyClick(Qt.Key_J, Qt.ShiftModifier)
+      keyClick(Qt.Key_Down, Qt.ShiftModifier)
       var moved = service.symbols.indexOf(moving)
       app.close()
       app.open("{}")
@@ -1054,8 +1062,8 @@ ShellRoot {
       watchlist.contentY = 0
       var returning = watchlist.displayedSymbols[0]
       watchlist.cursorSymbol = returning
-      keyClick(Qt.Key_X)
-      keyClick(Qt.Key_U)
+      keyClick(Qt.Key_Delete)
+      keyClick(Qt.Key_Z, Qt.ControlModifier)
       app.close()
       app.open("{}")
       harness.check("an undone removal stays restored after reopen", watchlist.displayedSymbols.indexOf(returning) >= 0 && service.library.indexOf(returning) >= 0)

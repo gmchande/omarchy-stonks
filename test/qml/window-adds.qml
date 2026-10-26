@@ -93,7 +93,7 @@ ShellRoot {
         tryVerify(function() { return quiet() && service.entries.MSFT !== answered }, 5000)
         watchlist.cursorSymbol = "MSFT"
         keys.forceActiveFocus()
-        keyClick(Qt.Key_X)
+        keyClick(Qt.Key_Delete)
         wait(100)
         var kept = service.lastRemoval ? service.lastRemoval.quote : null
         holdQuote("MSFT", true)
@@ -111,7 +111,7 @@ ShellRoot {
         body.headerTextChanged.disconnect(heard)
         return [asked, meanwhile, harness.calls("MSFT") - before, said.indexOf("Refreshing") < 0].join(",")
       }
-      var byU = putBack(function() { keyClick(Qt.Key_U) })
+      var byU = putBack(function() { keyClick(Qt.Key_Z, Qt.ControlModifier) })
       var byClick = putBack(function() {
         keyClick(Qt.Key_A)
         tryVerify(function() { return body.adding }, 2000)
@@ -120,9 +120,9 @@ ShellRoot {
         if (body.search.actionFor(body.search.results[0].symbol) === "PUT BACK")
           mouseClick(button, button.width / 2, button.height / 2)
       })
-      harness.check("a stock put back by u, and by PUT BACK clicked, asks for its quote at once, once, showing the quote it had until the new one lands, and the header says nothing of it",
+      harness.check("a stock put back by Ctrl+Z, and by PUT BACK clicked, asks for its quote at once, once, showing the quote it had until the new one lands, and the header says nothing of it",
         byU === "true,true,1,true" && byClick === "true,true,1,true" && !body.adding,
-        "u " + byU + " | PUT BACK " + byClick + " | adding " + body.adding)
+        "Ctrl+Z " + byU + " | PUT BACK " + byClick + " | adding " + body.adding)
     }
 
     function findAll(item, name, into) {
@@ -242,7 +242,7 @@ ShellRoot {
       }
       var fromMenu = arrive(function() {
         keys.forceActiveFocus()
-        keyClick(Qt.Key_W)
+        keyClick(Qt.Key_L)
         wait(50)
         var menu = harness.find(body, "listMenu")
         while (menu.cursor < menu.newIndex) keyClick(Qt.Key_Down)
@@ -257,7 +257,7 @@ ShellRoot {
         service.setMembership("FLAT", "Solo", true)
         wait(100)
         keys.forceActiveFocus()
-        keyClick(Qt.Key_X)
+        keyClick(Qt.Key_Delete)
         wait(50)
         keyClick(Qt.Key_A)
         wait(50)
@@ -317,7 +317,7 @@ ShellRoot {
       var listsBefore = JSON.stringify(service.lists)
       watchlist.cursorSymbol = "NVDA"
       keys.forceActiveFocus()
-      keyClick(Qt.Key_X)
+      keyClick(Qt.Key_Delete)
       wait(50)
       var gone = service.library.indexOf("NVDA") < 0
       var footer = harness.find(body, "footer")
@@ -341,7 +341,7 @@ ShellRoot {
       // Found in review: Enter there put the removal back and closed search.
       watchlist.cursorSymbol = "NVDA"
       keys.forceActiveFocus()
-      keyClick(Qt.Key_X)
+      keyClick(Qt.Key_Delete)
       wait(50)
       keyClick(Qt.Key_A)
       tryVerify(function() { return body.adding }, 2000)
@@ -354,7 +354,7 @@ ShellRoot {
       keyClick(Qt.Key_Escape)
       wait(50)
       keys.forceActiveFocus()
-      keyClick(Qt.Key_U)
+      keyClick(Qt.Key_Z, Qt.ControlModifier)
       wait(100)
       harness.check("Enter on a query typed over the offer, before its answer, puts nothing back",
         early === "true,true,true" && service.library.indexOf("NVDA") >= 0, early)
@@ -470,9 +470,9 @@ ShellRoot {
         var addedQuote = JSON.stringify(service.quotes.SLOW)
         keys.forceActiveFocus()
         watchlist.cursorSymbol = "SLOW"
-        keyClick(Qt.Key_X)
+        keyClick(Qt.Key_Delete)
         tryVerify(function() { return watchlist.displayedSymbols.indexOf("SLOW") < 0 }, 2000)
-        keyClick(Qt.Key_U)
+        keyClick(Qt.Key_Z, Qt.ControlModifier)
         tryVerify(function() { return watchlist.displayedSymbols.indexOf("SLOW") >= 0 }, 2000)
         app.close()
         app.open("{}")
@@ -558,17 +558,21 @@ ShellRoot {
       wait(20)
       var pendingNamed = service.featuredSymbol === "SLOW" && body.headerText === "Loading SLOW"
       var heldWhileOut = watchlist.displayedSymbols.indexOf("SLOW") < 0
-      // A number key counts only the rows you can see. It used to count the
-      // add still out, sorted last, and feature a symbol with no price.
+      // ↓ counts only the rows you can see: past the last row it cannot
+      // reach the add still out, sorted last, and Enter there cannot feature
+      // a symbol with no price.
       keys.forceActiveFocus()
-      keyClick(Qt.Key_1)
+      watchlist.cursorSymbol = watchlist.displayedSymbols[0]
+      keyClick(Qt.Key_Return)
       var chosenHero = service.featuredSymbol
-      keyClick(String(watchlist.displayedSymbols.length + 1))
-      var keyedPending = service.featuredSymbol !== chosenHero
+      var lastShown = watchlist.displayedSymbols[watchlist.displayedSymbols.length - 1]
+      watchlist.cursorSymbol = lastShown
+      keyClick(Qt.Key_Down)
+      var keyedPending = watchlist.cursorRow !== lastShown
       holdQuote("SLOW", false)
       tryVerify(function() { return !!service.quotes.SLOW && service.arriving.indexOf("SLOW") < 0 }, 5000)
       wait(200)
-      harness.check("an accepted pending add is named, an out-of-range row key cannot reclaim it, and its price joins at the sorted place",
+      harness.check("an accepted pending add is named, ↓ past the last row cannot reach it, and its price joins at the sorted place",
         pendingNamed && heldWhileOut && chosenHero !== "SLOW" && !keyedPending && !!body.featuredQuote && service.featuredSymbol === chosenHero
           && watchlist.displayedSymbols.indexOf("SLOW") === 3,
         [pendingNamed, heldWhileOut, keyedPending, !!body.featuredQuote, watchlist.cursorSymbol,
@@ -660,7 +664,7 @@ ShellRoot {
       var switchedHero = service.featuredSymbol
       var switchedHeader = body.headerText
       keys.forceActiveFocus()
-      keyClick(Qt.Key_1)
+      keyClick(Qt.Key_Return)
       holdQuote("SLOW", false)
       wait(50)
       watchlist.contentY = 0
@@ -722,14 +726,16 @@ ShellRoot {
         if (when === "before") {
           chosen = true
           keys.forceActiveFocus()
-          keyClick(String(watchlist.displayedSymbols.indexOf(target) + 1))
+          watchlist.cursorSymbol = target
+          keyClick(Qt.Key_Return)
         }
         holdQuote("SLOW", false)
         tryVerify(function() { return !!service.quotes.SLOW }, 5000)
         if (when === "joining") {
           chosen = body.landing === "SLOW" && body.landingJoined
-          keys.forceActiveFocus()
-          keyClick(String(watchlist.displayedSymbols.indexOf(target) + 1))
+          // In the one-row view the target is out of sight as the list
+          // eases, so no key reaches it; choose it as Enter would.
+          body.featureSymbol(target)
         }
         tryVerify(function() { return !watchlist.settling }, 2000)
         wait(400)
@@ -787,7 +793,7 @@ ShellRoot {
       watchlist.cursorSymbol = watchlist.displayedSymbols[0]
       var movedSymbol = watchlist.cursorSymbol
       var membersBefore = service.symbols.slice()
-      keyClick(Qt.Key_J, Qt.ShiftModifier)
+      keyClick(Qt.Key_Down, Qt.ShiftModifier)
       wait(50)
       var membersAfter = service.symbols.slice()
       harness.check("a manual reorder with an add still out saves every member",

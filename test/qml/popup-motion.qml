@@ -129,9 +129,11 @@ ShellRoot {
       return [String(find(panel.testBody, "footer").height + panel.testCard.card.contentBottomInset)]
     }
 
-    function key(text) {
-      panel.testKeyCatcher.forceActiveFocus()
-      keyClick(text)
+    // A key as a person presses it, once the popup has its keys: it takes
+    // them as it opens and a turn after a view closes.
+    function key(k, modifiers) {
+      tryVerify(function() { return panel.testBodyKeys.activeFocus }, 2000)
+      keyClick(k, modifiers === undefined ? Qt.NoModifier : modifiers)
     }
 
     // The pill's animal turning with its own day, judged on the animal's
@@ -208,8 +210,8 @@ ShellRoot {
       harness.check("an open from closed shows the fitted height from its first frame", opened.ok, opened.detail)
       wait(300)
 
-      eases("a switch to a shorter list eases the edge up, the footer riding it", function() { key(".") })
-      eases("a switch to a longer list eases the edge down, the footer covering the rows it passes", function() { key(",") })
+      eases("a switch to a shorter list eases the edge up, the footer riding it", function() { service.switchList("Short") })
+      eases("a switch to a longer list eases the edge down, the footer covering the rows it passes", function() { service.switchList("") })
 
       // Found in design pass 3: as the key sheet closed and the card grew,
       // the footer's line and words drew through the rows.
@@ -217,10 +219,10 @@ ShellRoot {
       wait(400)
       eases("the key sheet closing eases the edge down, the footer covering the rows it passes", function() { key("?") })
 
-      key(".")
+      service.switchList("Short")
       wait(400)
-      eases("a removal from a short list eases the edge up", function() { key("x") })
-      eases("its undo eases the edge down", function() { key("u") })
+      eases("a removal from a short list eases the edge up", function() { key(Qt.Key_Delete) })
+      eases("its undo eases the edge down", function() { key(Qt.Key_Z, Qt.ControlModifier) })
       eases("an add that lands eases the edge down", function() { panel.testBody.acceptSymbol("SPY") })
       quiet()
       eases("a membership change from another surface eases the edge down", function() {
@@ -229,9 +231,9 @@ ShellRoot {
 
       // The menu, a popover, passes over the footer as the card grows under
       // it: only the edge is judged.
-      key(".")
+      service.switchList("Empty")
       wait(400)
-      var menu = frames("menu", function() { key("w") }, "edge", ["0"])
+      var menu = frames("menu", function() { key("l") }, "edge", ["0"])
       var menuOk = menu.ok && service.listName === "Empty"
       harness.check("the list menu on an empty list eases the edge down to room for it and the footer"
         + (menuOk ? " — " + menu.detail.replace(/^edge [^|]*\| /, "") : ""), menuOk, menu.detail)

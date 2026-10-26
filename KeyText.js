@@ -1,8 +1,8 @@
 .pragma library
 
 // What a key press says as a command. A letter's is its key and Shift, never
-// its text's case: Caps Lock sends "J" for j, and "j" for Shift+J, and J
-// moves a row where j moves the selection. A letter held with Ctrl, Alt, or
+// its text's case: Caps Lock sends "O" for o, and "o" for Shift+O, and O
+// reverses the order where o changes it. A letter held with Ctrl, Alt, or
 // Meta says nothing. Any other key's is its text.
 
 // Qt's codes for the letter keys are their capitals' character codes, and

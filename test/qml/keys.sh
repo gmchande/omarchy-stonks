@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Every key the key sheet draws and the README's table lists, pressed with
 # real Qt keys in the real popup (Panel.qml) and the real window (App.qml):
-# each changes what the surface shows. And the sheet itself: the same on both
-# surfaces and in both looks, and its credit naming the
+# each changes what the surface shows, and the keys Stonks no longer answers
+# change nothing. And the sheet itself: the README's keys exactly, the same
+# on both surfaces but for Tab and in both looks, and its credit naming the
 # manifest's version, Yahoo, and Robinhood. The shell's layer-shell card
 # window does not load offscreen, so the copy of Panel.qml puts the card in
 # CardWindow.qml, as popup-motion.sh does. HOME and curl are scratch.

@@ -4,7 +4,6 @@ import QtQuick
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
-import "KeyText.js" as KeyText
 
 // The watchlist popup. Owns popup lifecycle, keys, and look; the body reads
 // the service and owns the list, search, scrub, help, and the motion when
@@ -139,7 +138,7 @@ Panel {
     requestFundamentals()
   }
 
-  function refocusKeys() { Qt.callLater(function() { if (letterKeys) letterKeys.forceActiveFocus() }) }
+  function refocusKeys() { Qt.callLater(function() { if (bodyKeys) bodyKeys.forceActiveFocus() }) }
 
   onFeaturedSymbolChanged: requestFundamentals()
 
@@ -149,7 +148,7 @@ Panel {
     owner: root.barIdentity
     bar: root.bar
     open: root.opened
-    focusTarget: letterKeys
+    focusTarget: bodyKeys
     contentWidth: panel.fittedContentWidth(root.panelWidth)
     contentHeight: Math.round(root.cardHeight)
 
@@ -159,41 +158,26 @@ Panel {
       // The body is laid out at the card's new height while the edge eases.
       clip: true
       blocked: !!root.body && root.body.ownsKeys
-      onMoveRequested: function(dx, dy) {
-        if (dy !== 0) root.body.moveCursor(dy)
-        if (dx !== 0) root.body.nudgeScrub(dx)
-      }
+      // Space is the shell's Enter, which every panel gets.
       onActivateRequested: root.body.featureSymbol(root.body.watchlist.cursorRow)
       onCloseRequested: {
         if (root.body.showingHelp) root.body.showingHelp = false
         else if (!root.body.endScrub()) root.close()
       }
-      onDeleteRequested: root.body.removeRow(root.body.watchlist.cursorRow)
       onTabRequested: function(direction) {
         root.body.showingHelp = false
         root.switchPanel(direction)
       }
-      onTextKey: function(t) { root.body.pressKey(t) }
 
-      // The popup's keys land here first. The catcher reads a key's text,
-      // and Caps Lock sends "J" for j, which would move a row: a letter
-      // goes on as the text its key and Shift mean (`KeyText.typed`).
-      // Delete and Backspace, which the catcher doesn't read, remove the
-      // row, as in the window. Every other key goes on to the catcher.
+      // The popup's keys land here first, and the body's map takes them,
+      // as the window's do. Every other letter stops here too, so the
+      // catcher's own j, k, h, l and x never act. Esc, Tab and Space go on
+      // to the catcher.
       Item {
-        id: letterKeys
+        id: bodyKeys
         Keys.onPressed: function(event) {
           if (keyCatcher.blocked) return
-          if (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) {
-            root.body.removeRow(root.body.watchlist.cursorRow)
-            event.accepted = true
-            return
-          }
-          if (event.key < Qt.Key_A || event.key > Qt.Key_Z) return
-          var t = KeyText.typed(event)
-          if (t === "") return
-          keyCatcher.textKey(t)
-          event.accepted = true
+          if (root.body.pressKey(event) || (event.key >= Qt.Key_A && event.key <= Qt.Key_Z)) event.accepted = true
         }
       }
 
@@ -217,6 +201,7 @@ Panel {
           sounds: root.sounds
           camera: root.camera
           surfaceOpen: root.opened
+          switchesPanels: true
           chartHeight: Style.space(190)
           foreground: root.bar ? root.bar.foreground : Commons.Color.foreground
           fontFamily: root.bar ? root.bar.fontFamily : Style.font.family

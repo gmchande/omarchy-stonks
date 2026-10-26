@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Adding, removing, and putting back (lists.md): search by key and by the
-# footer, the ×, x and its question in All, the row's menu, u, and PUT BACK,
-# each with its sound and what the data file kept. Usage: lib.sh's header.
+# footer, the ×, Delete and its question in All, the row's menu, Ctrl+Z, and
+# PUT BACK, each with its sound and what the data file kept. Usage: lib.sh's
+# header.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 journey_begin lists "$@"
 
@@ -58,10 +59,11 @@ if reachable "the footer and a result"; then
   keep_data added-NVDA
 fi
 
-step "1 shows AAPL; x on it, in All and US, asks first; Enter removes it from both"
-key 1
+step "↑ to AAPL and Enter shows it; Delete on it, in All and US, asks first; Enter removes it from both"
+for _ in 1 2 3 4 5 6 7 8 9; do key Up; done
+key Return
 was=$(place AAPL)
-key x
+key Delete
 sleep 0.3
 shot asked
 readout rowMenuLine
@@ -75,10 +77,10 @@ shot removed-AAPL
 rows
 keep_data removed-AAPL
 
-step "u puts AAPL back in both lists, at its place"
-key u
-soon "u put AAPL back in All" 5 in_all AAPL
-check "u put AAPL back in US" in_us AAPL
+step "Ctrl+Z puts AAPL back in both lists, at its place"
+key ctrl+z
+soon "Ctrl+Z put AAPL back in All" 5 in_all AAPL
+check "Ctrl+Z put AAPL back in US" in_us AAPL
 check "AAPL is back at its place ($was)" [ "$(place AAPL)" = "$was" ]
 soon "the undo sound played" 5 heard undo.wav
 sounds_here
@@ -128,8 +130,8 @@ if reachable "the row's menu"; then
   soon "the menu removed SPY" 5 not_in_all SPY
   soon "the remove sound played" 5 heard remove.wav
   sounds_here
-  key u
-  soon "u put SPY back" 5 in_all SPY
+  key ctrl+z
+  soon "Ctrl+Z put SPY back" 5 in_all SPY
   shot menu-undone
   keep_data menu-undone
 fi

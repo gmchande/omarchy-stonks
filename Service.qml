@@ -1349,10 +1349,6 @@ Item {
     root.persist({ list: name })
   }
 
-  function stepList(delta) {
-    root.switchList(Settings.steppedList(root.dataSettings, delta))
-  }
-
   // Makes and opens an empty list. Returns why not, or "" once it exists.
   function createList(name) {
     var problem = Settings.listNameProblem(name, root.dataSettings.lists)

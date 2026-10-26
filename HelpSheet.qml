@@ -17,8 +17,8 @@ import "Tones.js" as Tones
 Flickable {
   id: root
 
-  // KeySheet.sheet: { groups, mouse, note }.
-  property var sheet: ({ groups: [], mouse: null, note: "" })
+  // KeySheet.sheet: { groups, mouse }.
+  property var sheet: ({ groups: [], mouse: null })
   property color foreground: Commons.Color.foreground
   property color dim: Tones.dim(foreground, Commons.Color.background)
   property string fontFamily: Style.font.family
@@ -148,7 +148,7 @@ Flickable {
           // The credit closes the second column, in the room the first's
           // longer groups leave beside it, so a window of ordinary height
           // shows it without a scroll. Found in the 1.1.0 audit: at the
-          // sheet's foot, the y and S rows pushed it out of a 720 × 520
+          // sheet's foot, the last Look rows pushed it out of a 720 × 520
           // window's sight.
           Text {
             objectName: "helpCredit"
@@ -170,36 +170,15 @@ Flickable {
       delegate: Group { width: sheetColumn.width; keyName: "helpGesture" }
     }
 
-    Item {
-      width: sheetColumn.width
-      height: Math.max(note.implicitHeight, close.implicitHeight)
-
-      Text {
-        id: note
-        objectName: "helpNote"
-        anchors.left: parent.left
-        anchors.right: close.left
-        anchors.rightMargin: Style.space(16)
-        anchors.verticalCenter: parent.verticalCenter
-        textFormat: Text.PlainText
-        text: root.sheet.note
-        color: root.dim
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.bodySmall
-        wrapMode: Text.WordWrap
-      }
-
-      // Escape, as a button.
-      ListAction {
-        id: close
-        objectName: "helpClose"
-        view: root
-        anchors.right: parent.right
-        anchors.rightMargin: root.edge
-        anchors.verticalCenter: parent.verticalCenter
-        text: "CLOSE"
-        onActivated: root.closeRequested()
-      }
+    // Escape, as a button.
+    ListAction {
+      id: close
+      objectName: "helpClose"
+      view: root
+      anchors.right: parent.right
+      anchors.rightMargin: root.edge
+      text: "CLOSE"
+      onActivated: root.closeRequested()
     }
   }
 }

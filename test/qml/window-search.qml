@@ -541,6 +541,48 @@ ShellRoot {
         answered.length === 5 && last && said, answered.join(",") + " | last " + last + " | note " + note.text)
     }
 
+    // With search open and text typed, the Stonks keys that are also edit
+    // keys or letters go to the field: Ctrl+C, Ctrl+Z, Delete, Backspace,
+    // l, m, s and o remove no row, undo nothing, open no list menu, and
+    // leave the sound, the look and the order as they were.
+    function fieldOwnsKeys(body, watchlist, keys) {
+      service.switchList("")
+      wait(50)
+      watchlist.cursorSymbol = watchlist.displayedSymbols[watchlist.displayedSymbols.length - 1]
+      keys.forceActiveFocus()
+      keyClick(Qt.Key_Delete)
+      wait(50)
+      if (body.rowMenu !== null) keyClick(Qt.Key_Return)
+      wait(50)
+      var removed = service.lastRemoval ? service.lastRemoval.symbol : ""
+      var before = [service.library.join(","), service.soundsOn, service.retro, service.order, service.reversed].join("|")
+      var noteBefore = body.note
+      keys.forceActiveFocus()
+      keyClick(Qt.Key_A)
+      tryVerify(function() { return body.adding && body.search.active }, 2000)
+      var field = harness.find(body.search, "searchField")
+      keyClick("S")
+      keyClick("H")
+      keyClick(Qt.Key_C, Qt.ControlModifier)
+      keyClick(Qt.Key_Z, Qt.ControlModifier)
+      keyClick(Qt.Key_Delete)
+      keyClick(Qt.Key_Backspace)
+      ;[Qt.Key_L, Qt.Key_M, Qt.Key_S, Qt.Key_O].forEach(function(k) { keyClick(k) })
+      wait(100)
+      var typed = String(field.text)
+      var after = [service.library.join(","), service.soundsOn, service.retro, service.order, service.reversed].join("|")
+      var stayed = [body.adding, !body.listMenuOpen, body.rowMenu === null, !body.cameraLit, body.note === noteBefore,
+        !!service.lastRemoval && service.lastRemoval.symbol === removed].join(",")
+      keyClick(Qt.Key_Escape)
+      wait(50)
+      keys.forceActiveFocus()
+      keyClick(Qt.Key_Z, Qt.ControlModifier)
+      wait(100)
+      harness.check("in search, Ctrl+C, Ctrl+Z, Delete, Backspace and l m s o edit the field and act as no Stonks key",
+        removed !== "" && after === before && stayed === "true,true,true,true,true,true" && /lmso$/i.test(typed),
+        [removed, typed, stayed, before, after].join(" | "))
+    }
+
     // A held answer makes the waiting state observable without prescribing
     // its presentation delay. Editing names the current query; an old result
     // cannot be accepted for that query.
@@ -806,6 +848,7 @@ ShellRoot {
       searchAnswers(body, watchlist, keys)
       longSymbols(body, keys)
       smallestWindow(body, keys)
+      fieldOwnsKeys(body, watchlist, keys)
 
       // A search still out when the window closes is stopped, not waited
       // out, and brings nothing back: type SH, let it go out (the fake curl

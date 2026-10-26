@@ -399,7 +399,7 @@ Flickable {
   // A click on a row, at (x, y) in the scene. It stops the list where it
   // is, a glide or a touchpad's settle, as a flicking list stops under a
   // finger, and puts the cursor on the row, now in sight where the list
-  // rests: the row stays under the pointer, and x or Enter act on it.
+  // rests: the row stays under the pointer, and Delete or Enter act on it.
   // Gliding it whole into view or onto a row boundary instead moved it out
   // from under the pointer. And a double-click is one click, for the list
   // as for a row: a click within the double-click interval of the last,
@@ -736,7 +736,7 @@ Flickable {
   // As the surface opens: the rows in the service's order, at rest, and no
   // cursor of the last visit's, so it rests on the featured row until you
   // point or press a key. The featured row is brought into sight at once,
-  // so that cursor is the row the hero shows and Enter or x act on it.
+  // so that cursor is the row the hero shows and Enter or Delete act on it.
   // Found in the walk of dev on 14 October: featured from the pill below
   // the fold, the popup opened with the cursor on its top row, and Enter
   // featured that.

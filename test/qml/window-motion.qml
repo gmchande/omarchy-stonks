@@ -419,9 +419,10 @@ ShellRoot {
         service.feature("AAPL")
         tryVerify(function() { return !body.chartLoading && body.motion.drawn === 1 }, 5000)
         keys.forceActiveFocus()
-        // The number key of the first row that is not AAPL's.
+        // Enter on the first row that is not AAPL's.
         var other = body.watchlist.displayedSymbols.findIndex(function(s) { return s !== "AAPL" })
-        var symbol = run("symbol-" + look, function() { keyClick(Qt.Key_1 + other) })
+        body.watchlist.cursorSymbol = body.watchlist.displayedSymbols[other]
+        var symbol = run("symbol-" + look, function() { keyClick(Qt.Key_Return) })
         var range = run("range-" + look, function() { keyClick(Qt.Key_BracketRight) })
         results.push(look + " symbol " + (symbol.ok ? "ok" : "FAILED") + ": " + symbol.detail)
         results.push(look + " range " + (range.ok ? "ok" : "FAILED") + ": " + range.detail)
@@ -665,7 +666,7 @@ ShellRoot {
           var name = "join-" + look + "-" + attempt
           keys.forceActiveFocus()
           watchlist.cursorSymbol = "MSFT"
-          keyClick(Qt.Key_X)
+          keyClick(Qt.Key_Delete)
           tryVerify(function() { return watchlist.displayedSymbols.indexOf("MSFT") < 0 }, 2000)
           // The grab starts as the line's reveal leaves whole, the row just
           // shown: a hidden row has no picture to grab.
@@ -677,7 +678,7 @@ ShellRoot {
             grab.begin(name)
           }
           row.revealChanged.connect(marked)
-          keyClick(Qt.Key_U)
+          keyClick(Qt.Key_Z, Qt.ControlModifier)
           tryVerify(function() { return started && row.reveal === 1 }, 3000)
           var settledAt = grab.frames.length
           tryVerify(function() { return grab.frames.length >= settledAt + 4 }, 2000)
@@ -965,7 +966,7 @@ ShellRoot {
       // waits for the rows' own colours to arrive, since a fixed 60 ms on a
       // busy machine can come before the animation clock has run them.
       watchlist.cursorSymbol = "NVDA"
-      keyClick(Qt.Key_X)
+      keyClick(Qt.Key_Delete)
       keyClick(Qt.Key_S)
       var filled = function() {
         return watchlist.displayedSymbols.every(function(symbol) {
@@ -993,7 +994,7 @@ ShellRoot {
       // All, and past the note's moment. The next open takes the latest and
       // draws in.
       var quotesBefore = service.testFeed.quotes
-      keyClick(Qt.Key_U)
+      keyClick(Qt.Key_Z, Qt.ControlModifier)
       rest()
       var noted = body.note === "Nothing to undo"
       grab.begin("closing-at-rest")
@@ -1248,7 +1249,8 @@ ShellRoot {
       var started = within(2000, function() { return body.motion.replayRunning && body.scrubT !== 0 })
       var other = body.watchlist.displayedSymbols.findIndex(function(s) { return s !== service.featuredSymbol })
       var target = body.watchlist.displayedSymbols[other]
-      keyClick(Qt.Key_1 + other)
+      body.watchlist.cursorSymbol = target
+      keyClick(Qt.Key_Return)
       var ended = !body.motion.replayRunning && body.scrubT === 0
       harness.check("featuring a row during a replay ends that replay and its scrub",
         started && ended && service.featuredSymbol === target && within(5000, function() { return body.chartSymbol === target && !body.chartLoading }))

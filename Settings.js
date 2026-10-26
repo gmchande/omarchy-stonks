@@ -229,7 +229,7 @@ function listReversed(settings) {
   return list ? list.reversed : settings.reversed
 }
 
-// All first, then the named lists: what the menu offers and , . step through.
+// All first, then the named lists: what the menu offers.
 // Each carries its symbols, so a symbol's checklist can read its ticks.
 function listChoices(settings) {
   var out = [{ name: "", label: "All", count: settings.symbols.length, symbols: settings.symbols }]
@@ -238,13 +238,6 @@ function listChoices(settings) {
     out.push({ name: list.name, label: list.name, count: list.symbols.length, symbols: list.symbols })
   }
   return out
-}
-
-function steppedList(settings, delta) {
-  var choices = listChoices(settings)
-  var at = 0
-  for (var i = 0; i < choices.length; i++) if (choices[i].name === settings.list) at = i
-  return choices[(at + delta + choices.length) % choices.length].name
 }
 
 // The settings with one named list changed, or All when name is "".
