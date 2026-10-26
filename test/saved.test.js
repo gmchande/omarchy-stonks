@@ -1470,13 +1470,45 @@ test("a range's line and marks take in the quote's day while its last bar is tha
   expect(marksOf(weekly, thursday).high.price).toBe("400.00")
   expect(marksOf(weekly, { ...thursday, figuresDay: weekOf.t + 7 * DAY }).high.price).toBe("344.57")
   // A chart with no bar for the quote's day yet leaves it out: the Nikkei's
-  // 1Y answer ended on 13 October.
+  // 1Y answer, its 14 October bar taken away, ends on 13 October.
   const n225 = saved("n225")
-  expect(marksOf(n225.h, { ...n225.q, dayHigh: 80000 }).high.price).toBe("72,832")
+  expect(marksOf({ ...n225.h, unclosed: [] }, { ...n225.q, dayHigh: 80000 }).high.price).toBe("72,832")
+  // With that bar, sent without its close, the day is the quote's.
+  expect(marksOf(n225.h, { ...n225.q, dayHigh: 80000 }).high).toEqual({ x: 1, price: "80,000", date: "14 OCT 2026" })
   // An intraday bar holds only part of a day, so a day's high is not its.
   const week = M.parseHistory(fixture("history/nest-5d.json"), "1W")
   const lastBar = week.bars[week.bars.length - 1]
   expect(marksOf(week, { figuresDay: lastBar.t, dayHigh: 999, dayLow: 1, priceDigits: 2 }).high.price).toBe("254.74")
+})
+
+// Yahoo's daily answer for Tokyo leaves the day's close out after the
+// close, with the day's high, low, and shares: Toyota's 1Y on 16 October.
+// They count in the range's high, low, and VOL; the chart draws closes, so
+// it leaves the bar out, and no close is made up. Found in review: the
+// last three days read VOL 51.4M and a high of 3,046.
+test("a bar without a close counts its high, low, and volume in the range, and is not drawn", () => {
+  const json = fixture("history/7203-t-1y.json")
+  const year = M.parseHistory(json, "1Y")
+  expect(year.unclosed).toEqual([{ t: Date.UTC(2026, 9, 16) / 1000, o: 3051, h: 3096, l: 3047, c: null, v: 25007500 }])
+  expect(year.bars.length).toBe(242)
+  expect(year.bars.every(bar => bar.c > 0)).toBe(true)
+  // The answer's last three days, as Yahoo sent them.
+  const three = structuredClone(json)
+  const result = three.chart.result[0]
+  result.timestamp = result.timestamp.slice(-3)
+  for (const key of Object.keys(result.indicators.quote[0])) result.indicators.quote[0][key] = result.indicators.quote[0][key].slice(-3)
+  const days = M.parseHistory(three, "1Y")
+  expect(days.bars.length).toBe(2)
+  const line = said(M.rangeLine(days, M.rangeEnds(days, null, null), null))
+  expect(line.split(" · ").filter(part => part.startsWith("VOL"))).toEqual(["VOL 76.4M"])
+  expect(M.periodStats(days).high).toEqual({ p: 3096, t: Date.UTC(2026, 9, 16) / 1000 })
+  // Its mark stands at the chart's right edge, dated the day it was made.
+  const high = marksOf(days, null).high
+  expect([high.x, high.price, high.date]).toEqual([1, "3,096.00", "16 OCT"])
+  // Without its volume, the day's high still counts, and VOL is left out
+  // rather than undercount the range. Found in review.
+  const noVolume = { ...days, unclosed: days.unclosed.map(bar => ({ ...bar, v: null })) }
+  expect([M.rangeVolume(noVolume), M.periodStats(noVolume).high.p]).toEqual(["", 3096])
 })
 
 // On a range, the first info line is the range's: its low and high, the

@@ -12,9 +12,13 @@ follows() { readout statusText smoothPrice changeText baselineLegend; }
 scrubbed() { [[ "$(words statusText)" == "AT "* ]]; }
 unscrubbed() { ! scrubbed; }
 # holding: the stream of silence that keeps the output awake for the chimes
-# (the stand-in pw-cat's silence.log) is running now.
-holding() { [[ "$(tail -n 1 "$("$tophat" folder)/silence.log" 2> /dev/null | cut -d ' ' -f 1)" =~ ^(start|streaming)$ ]]; }
+# (the stand-in pw-cat's silence.log) is running now. streamed: one started
+# since silence_mark, as the scrub moved.
+silence_log() { echo "$("$tophat" folder)/silence.log"; }
+holding() { [[ "$(tail -n 1 "$(silence_log)" 2> /dev/null | cut -d ' ' -f 1)" =~ ^(start|streaming)$ ]]; }
 resting() { ! holding; }
+silence_mark() { silence_from=$(grep -c . "$(silence_log)" 2> /dev/null); }
+streamed() { tail -n +"$((${silence_from:-0} + 1))" "$(silence_log)" 2> /dev/null | grep -q '^start '; }
 # press KEY…: each key alone, as a hand presses them, since chimes struck
 # closer than 45 ms apart keep only the latest (Sounds.qml). moved counts the
 # keys that moved the scrub: a chart with few prints runs out of steps.
@@ -47,6 +51,7 @@ sleep 0.5
 check "the open popup, nothing scrubbed, holds no stream of silence" resting
 
 step "← scrubs back one step at a time, a chime each"
+silence_mark
 press Left Left Left Left
 sleep 0.3
 shot back4
@@ -54,7 +59,9 @@ follows
 sounds_here
 chimed "$moved" 4
 (( locator )) && check "the header says the moment scrubbed to (AT …)" scrubbed
-soon "the key scrub holds a stream of silence for its chimes" 3 holding
+check "the key scrub held a stream of silence for its chimes" streamed
+soon "a scrub left standing lets the output go within 3 s" 3 resting
+(( locator )) && check "the scrub left standing stays where it is (AT …)" scrubbed
 
 step "→ steps it forward, and ← back again"
 press Right Left Right
@@ -80,6 +87,7 @@ if reachable "hovering the chart"; then
   read -r cx cy cw < <(matches heroChart | jq -r '"\(.x) \(.y + .height / 2 | floor) \(.width)"')
   # The whole width in small steps: at night the 1D chart's line fills only
   # its left edge, and the rest scrubs to its last print.
+  silence_mark
   moments=()
   for f in $(seq 1 3 99); do
     move_to "$((cx + cw * f / 100))" "$cy"
@@ -93,7 +101,9 @@ if reachable "hovering the chart"; then
   sounds_here
   check "the header followed the pointer through more than one moment" [ "$distinct" -ge 2 ]
   check "the pointer's scrub asked for chimes" [ "$(chimes)" -ge 1 ]
-  soon "the pointer's scrub holds a stream of silence" 3 holding
+  check "the pointer's scrub held a stream of silence" streamed
+  soon "the pointer resting on the chart lets the output go within 3 s" 3 resting
+  check "the scrub under the resting pointer stays where it is (AT …)" scrubbed
 fi
 
 step "The pointer leaving the chart ends the scrub"

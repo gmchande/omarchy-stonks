@@ -263,7 +263,8 @@ price say the same.
   price keeps it, with the time it's from. Check your connection. If other
   sites load, Yahoo is down or refusing Stonks, and there's nothing to do
   but wait. Stonks keeps trying by itself, less often the longer Yahoo stays
-  away, and `r` won't hurry it.
+  away. When no answer came, `r` asks again at once; when Yahoo turned
+  Stonks away, `r` won't hurry it, since Yahoo asked for fewer requests.
 - **A row says "No data for this symbol" or "Refresh failed".** Yahoo said
   it has nothing for the symbol, or sent a broken answer three times
   running. A row with a price keeps it, with the time it's from, and `r`
@@ -298,9 +299,10 @@ price say the same.
   search didn't answer. Click RETRY, or press Enter. While Yahoo is turning
   Stonks away, a search fails at once: try again in a moment.
 - **The header says "schedule unavailable".** Stonks knows each exchange's
-  holidays up to a set date. This exchange's have run out, so it can't say
-  when the market next opens. Stonks doesn't update itself:
-  [update it](#update) for a renewed calendar.
+  holidays and clock changes up to a set date. This exchange's have run
+  out, so it can't say when the market next opens. Times still read
+  true, by the clock Yahoo sends with each price. Stonks doesn't update
+  itself: [update it](#update) for a renewed calendar.
 - **The footer says "Couldn't load your lists".** The file holding your
   lists, `~/.config/omarchy/grvc.stonks.json`, can't be opened or isn't
   valid JSON, often after a hand edit. Stonks keeps the lists it has and
@@ -327,7 +329,8 @@ The shell's log the form asks for can name the prices Stonks left out.
 - **Needs:** nothing beyond Omarchy 4. It runs `curl`, PipeWire's
   `pw-play`, `pw-cat`, and `pw-dump`, and `sh`, `bash`, `timeout`,
   `head`, `mkdir`, `chmod`, `mktemp`, `ln`, and `rm`, which Omarchy ships,
-  and, for a screenshot, `wl-copy` and `omarchy-notification-send`.
+  and, for a screenshot, `sed`, `tail`, `date`, `wl-copy`, and
+  `omarchy-notification-send`.
 - **Commands:** `curl` for every request; as Stonks starts, one `sh` that
   makes its cache folder, `mkdir` and `chmod`, yours alone, and `chmod` as
   it writes each of its files, to make it yours alone too; only when it
@@ -343,10 +346,12 @@ The shell's log the form asks for can name the prices Stonks left out.
   replay a chart, or move along it, or the bell is due, with 4 seconds
   under `timeout`, and one `sh` that
   starts a `pw-play` for each chime, with 2 seconds each under `timeout`,
-  and plays nothing else; while sounds are on and you scrub the chart, with
-  the pointer on it or by `←` `→`, and for a second after, `pw-cat` playing
-  silence, so each chime plays at once; `pw-dump` once as each bell is due, in
-  `bash` under `timeout` for 3 seconds and through `head` for 4 MB, to see
+  and plays nothing else; while sounds are on and your scrub of the chart
+  moves, with the pointer on it or by `←` `→`, and for a second after,
+  `pw-cat` playing silence, so each chime plays at once, each stream under
+  `timeout` for 60 seconds and started again while you scrub; `pw-dump`
+  once as each bell is due, in `bash` under `timeout` for 3 seconds and
+  through `head` for 4 MB, to see
   whether an app is recording from a microphone, reading only which streams
   run; an answer that runs out of time, fails, or goes over 4 MB counts as
   recording, so the bell stays quiet; only when you take a screenshot, one
@@ -366,10 +371,11 @@ The shell's log the form asks for can name the prices Stonks left out.
 - **Silence's cost:** while `pw-cat` plays silence, your speakers'
   amplifier stays powered and your headphones stay connected to this
   computer, as when any sound plays, and it takes about a tenth of a
-  percent of one processor core. It runs only while you scrub the chart,
-  or a replay waits for a sleeping output to wake, never just because the
-  popup or the window is open. A sound after 4 seconds of quiet from
-  Stonks starts with up to 150 ms of silence of its own, so a sleeping
+  percent of one processor core. It runs only while your scrub moves, and
+  a second after, or a replay waits for a sleeping output to wake, never
+  just because the popup or the window is open or a scrub stands still. A
+  sound after 4 seconds of quiet from Stonks starts with up to 150 ms of
+  silence of its own, so a sleeping
   output wakes before the sound and none of it is cut; a replay waits for
   the output instead, so its sound keeps in step with its sweep.
 - **Sites:** `query1.finance.yahoo.com` for quotes, charts, and the market

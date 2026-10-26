@@ -10,7 +10,7 @@ chime sounds as the scrub moves, higher where the line is higher.
 - `scrub-pointer`: hovering the chart scrubs to the pointer, a chime each time the line's height under it changes.
 - `scrub-follows`: the header says "AT hh:mm · PHASE"; the price, the change, and the "┄ PREV CLOSE" legend show the moment; on 1D the rows follow too.
 - `scrub-end`: Esc, the pointer leaving the chart, and a click on the chart each end the scrub and put everything back on now.
-- `scrub-silence`: while a scrub shows, by the pointer or the keys, a stream of silence keeps the output awake so each chime plays at once; it ends a second after the scrub does, and an open popup with nothing scrubbed holds none. After a quiet spell the first chimes open with up to 150 ms of silence of their own (`chime-lead*.wav`), shrinking as the output wakes so they keep their order.
+- `scrub-silence`: while a scrub moves, by the pointer or the keys, a stream of silence keeps the output awake so each chime plays at once; it ends a second after the scrub last moved or ended, so a scrub left standing, by a key or the pointer resting on the chart, stays where it is and lets the output go, and an open popup with nothing scrubbed holds none. After a quiet spell the first chimes open with up to 150 ms of silence of their own (`chime-lead*.wav`), shrinking as the output wakes so they keep their order.
 
 ## How to get to it (user POV)
 
@@ -26,10 +26,10 @@ Preconditions: the demo watchlist, AAPL featured, on 1D, sounds on (the
 demo file doesn't turn them off).
 
 - **Open.** Click the pill (`pillSymbol`). The popup shows (`heroChart`); the header (`statusText`) shows the market's phase; no stream of silence runs (`silence.log`). Shot `01-now`.
-- **Keys back.** Press `Left` four times, one at a time. The header says "AT …"; four `chime-*.wav` asks in `sounds.log`; a stream of silence runs. Shot `02-back4`.
+- **Keys back.** Press `Left` four times, one at a time. The header says "AT …"; four `chime-*.wav` asks in `sounds.log`; a stream of silence started (`silence.log`), and ends within 3 s as the scrub stands, still "AT …". Shot `02-back4`.
 - **Keys forward and back.** `Right`, `Left`, `Right`: three more chimes. Shot `03-keys`.
 - **Esc.** The header is back on now; the popup stays open; the silence ends within 3 s. Shot `04-esc`.
-- **Pointer sweep.** Move across `heroChart` in 3 % steps. The header shows more than one moment; at least one chime; a stream of silence runs. Shots `05-pointer-early`, `05-pointer-end`.
+- **Pointer sweep.** Move across `heroChart` in 3 % steps. The header shows more than one moment; at least one chime; a stream of silence started, and ends within 3 s with the pointer resting, the header still "AT …". Shots `05-pointer-early`, `05-pointer-end`.
 - **Leave.** Move onto the symbol above the chart (`heroSymbol`). The header is back on now; the silence ends within 3 s. Shot `06-left`.
 - **Click.** Hover the chart, then click it. The scrub snaps to now. Shot `07-clicked`.
 

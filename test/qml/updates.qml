@@ -173,8 +173,12 @@ ShellRoot {
       var side = harness.find(harness.find(app.testBody, "footer"), "footerUndo")
       mouseClick(side, side.width / 2, side.height / 2)
     }
-    // Shift+U, as a person presses it, in the open window.
+    // Shift+U, as a person presses it, in the open window, once it has the
+    // keyboard: just opened, it may not yet, and the key went nowhere.
     function shiftU() {
+      var window = app.testKeyCatcher.Window.window
+      window.requestActivate()
+      tryVerify(function() { return window.active }, 3000)
       app.testKeyCatcher.forceActiveFocus()
       keyClick("U", Qt.ShiftModifier)
       wait(100)
@@ -218,15 +222,17 @@ ShellRoot {
       var newer = "+  Add a symbol | Update to 1.0.10 | "
 
       // As the service starts, main names this build's version. Shift+U,
-      // with nothing offered, runs nothing.
+      // with nothing offered, runs nothing and says so, as Ctrl+Z does with
+      // nothing to undo.
       var started = answered(1)
       var first = visit()
       openWindow()
       shiftU()
       var idle = calls()
+      var said = app.testBody.note
       closeWindow()
-      harness.check("as the service starts, it asks GitHub once for main's version; the same version offers nothing, and Shift+U runs nothing",
-        quoted && started && first === add && idle === "", harness.asked() + " asks | " + first + " | " + idle)
+      harness.check("as the service starts, it asks GitHub once for main's version; the same version offers nothing, and Shift+U runs nothing and says \"Nothing to update\"",
+        quoted && started && first === add && idle === "" && said === "Nothing to update", harness.asked() + " asks | " + first + " | " + idle + " | " + said)
 
       // A second short of a day: nothing. A day on: asked again, older.
       put("MANIFEST.version", "1.0.8")

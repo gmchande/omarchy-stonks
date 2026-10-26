@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-16",
+  "generatedAt": "2026-10-26",
   "calendars": {
     "US": {
       "exchanges": ["NASDAQ", "NYSE", "NYSE ARCA", "NYSE AMERICAN", "CBOE", "S&P", "DOW"],
@@ -57,12 +57,14 @@
       "indexes": ["^GSPTSE"],
       "timezone": "America/Toronto",
       "utcOffsets": [
-        { "from": "2026-03-08", "to": "2026-11-01", "offset": -14400 }
+        { "from": "2026-03-08", "to": "2026-11-01", "offset": -14400 },
+        { "from": "2027-03-14", "to": "2027-11-07", "offset": -14400 },
+        { "from": "2028-03-12", "to": "2028-11-05", "offset": -14400 }
       ],
       "standardOffset": -18000,
       "zoneNames": { "-18000": "EST", "-14400": "EDT" },
       "sessions": [{ "open": "09:30", "close": "16:00" }],
-      "earlyCloses": { "2026-12-24": "13:00" },
+      "earlyCloses": { "2026-12-24": "13:00", "2027-12-24": "13:00" },
       "weekend": [6, 0],
       "closures": {
         "2026-01-01": "New Year's Day",
@@ -74,10 +76,35 @@
         "2026-09-07": "Labour Day",
         "2026-10-12": "Thanksgiving Day",
         "2026-12-25": "Christmas Day",
-        "2026-12-28": "In Lieu of Boxing Day"
+        "2026-12-28": "In Lieu of Boxing Day",
+        "2027-01-01": "New Year's Day",
+        "2027-02-15": "Family Day",
+        "2027-03-26": "Good Friday",
+        "2027-05-24": "Victoria Day",
+        "2027-07-01": "Canada Day",
+        "2027-08-02": "Civic Holiday",
+        "2027-09-06": "Labour Day",
+        "2027-10-11": "Thanksgiving Day",
+        "2027-12-27": "In Lieu of Christmas Day",
+        "2027-12-28": "In Lieu of Boxing Day",
+        "2028-01-03": "In Lieu of New Year's Day",
+        "2028-02-21": "Family Day",
+        "2028-04-14": "Good Friday",
+        "2028-05-22": "Victoria Day",
+        "2028-07-03": "In Lieu of Canada Day",
+        "2028-08-07": "Civic Holiday",
+        "2028-09-04": "Labour Day",
+        "2028-10-09": "Thanksgiving Day",
+        "2028-12-25": "Christmas Day",
+        "2028-12-26": "Boxing Day"
       },
-      "validThrough": "2026-12-31",
-      "source": "https://www.tsx.com/en/trading/calendars-and-trading-hours/calendar"
+      "validThrough": "2028-12-31",
+      "source": "https://www.tsx.com/en/trading/calendars-and-trading-hours/calendar",
+      "yearSources": {
+        "2026": "Published by TSX at the source.",
+        "2027": "Derived, not yet published by TSX: its rules as it applied them in 2021, the year with the same weekdays (https://investors.tmx.com/English/News--Events/news/news-details/2021/TMX-Group-Holiday-Operating-Schedule/default.aspx): a holiday on a weekend closes the next weekday not already closed, and Christmas Eve on a weekday closes at 13:00. Clock changes from America/Toronto's rules, the same days as New York's.",
+        "2028": "Derived, not yet published by TSX: its rules as it applied them in 2022 for January and February and in 2023 from March, the years with the same weekdays: New Year's Day on a Saturday closes Monday 3 January (https://investors.tmx.com/English/News--Events/news/news-details/2021/TMX-Group-Holiday-Operating-Schedule/default.aspx), Canada Day on a Saturday closes Monday 3 July (https://www.tsx.com/en/resource/2915), and Christmas Eve on a Sunday closes nothing early (https://www.newswire.ca/news-releases/tmx-group-holiday-operating-schedule-812136940.html). Clock changes from America/Toronto's rules, the same days as New York's."
+      }
     },
     "LSE": {
       "exchanges": ["LSE"],

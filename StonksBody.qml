@@ -208,13 +208,15 @@ Item {
   // never in the add's place, so adding by mouse never waits on it. Shift+U
   // runs what the footer offers: the update, or once it's on disk the
   // restart, which the notice offers only while no unsaved change outranks
-  // it, since a restart now would lose the changes.
+  // it, since a restart now would lose the changes. With neither on offer it
+  // says so, as Ctrl+Z does with nothing to undo.
   readonly property string updateOffer: releasedTo !== "" && updatedTo === "" ? releasedTo : ""
   readonly property bool restartOffered: updatedTo !== "" && !unsaved && !settingsUnreadable
   function runOffered() {
     if (!updates) return
     if (restartOffered) updates.restart()
     else if (updateOffer !== "") updates.update()
+    else say("Nothing to update")
   }
 
   // What this surface shows of the service, held in one place: the surface
@@ -603,6 +605,7 @@ Item {
   // for its chimes.
   readonly property bool scrubbing: surfaceOpen && onScreen && !(service && service.screensOff) && motion.scrubT !== 0
   onScrubbingChanged: if (sounds) sounds.scrubbing(root, scrubbing)
+  onScrubTChanged: if (sounds && scrubbing) sounds.scrubMoved(root)
   // A surface taken down mid-replay, as a rebuilt bar or a removed screen
   // takes its popup, stops its replay's sound with it, and its scrub's
   // hold on the output.

@@ -181,6 +181,32 @@ test("Toronto and London close early when their exchanges say, and London's 2028
   expect(status(easter, "2028-04-14")).toBe("Good Friday · opens Tue 08:00 BST")
 })
 
+test("a Toronto time in 2027 and 2028 reads by Toronto's clock, and past any calendar's last day by the clock Yahoo sends", () => {
+  const TSX = calendars.calendars.TSX
+  // SHOP.TO as Yahoo sends it in summer: EDT, the reader's own clock, so
+  // no zone is named.
+  const shop = { symbol: "SHOP.TO", exchange: "TSX", crypto: false, gmtoffset: -14400, zoneName: "EDT",
+    clocks: [], session: { pre: null, post: null, regular: null }, points: [] }
+  const july2027 = Date.UTC(2027, 6, 14, 20) / 1000
+  const july2028 = Date.UTC(2028, 6, 14, 20) / 1000
+  expect([M.printClock(shop, july2027, calendars), M.printClock(shop, july2028, calendars)]).toEqual(["16:00", "16:00"])
+  // A calendar that has run out, as Toronto's did on 31 December 2026:
+  // its times come from Yahoo's offset, never its standard time.
+  const ran = JSON.parse(JSON.stringify(calendars))
+  ran.calendars.TSX.validThrough = "2026-12-31"
+  ran.calendars.TSX.utcOffsets = ran.calendars.TSX.utcOffsets.slice(0, 1)
+  expect([M.printClock(shop, july2027, ran), M.clockOf(shop, july2027, ran), M.dateOf(shop, july2027, ran)])
+    .toEqual(["16:00", "16:00 EDT", "WED 14 JUL 2027"])
+  // Inside the calendar, its clock still decides, whatever offset the quote
+  // holds: December's close is 16:00 EST, not 17:00 EDT.
+  expect(M.printClock(shop, M.epochAt(TSX, "2026-12-30", "16:00"), ran)).toBe("16:00")
+  // The years' holidays and Christmas Eve's early close, by TSX's rules.
+  const kinds = ["2027-05-24", "2027-12-24", "2027-12-27", "2027-12-28", "2028-01-03", "2028-07-03", "2028-12-26", "2028-12-29"]
+    .map(day => M.dayKind(TSX, day).kind)
+  expect(kinds).toEqual(["closure", "open", "closure", "closure", "closure", "closure", "closure", "open"])
+  expect(M.segmentsOn(TSX, "2027-12-24").map(seg => seg.end)).toEqual([M.epochAt(TSX, "2027-12-24", "13:00")])
+})
+
 test("a listing's overnight session is named so, a holiday's evening too, and the night before a holiday trades none", () => {
   const nest = {
     symbol: "NEST", exchange: "NASDAQ", crypto: false, gmtoffset: M.offsetForDate(US, "2026-11-25"),
