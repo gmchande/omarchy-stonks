@@ -121,7 +121,7 @@ function fromOklch(L, C, hue) {
 // null where even that doesn't fit.
 function readingColor(hue, chroma, least, target, ground) {
   var lighter = darkGround(ground)
-  for (var c = chroma; c >= least - 1e-9; c -= 0.005) {
+  for (var c = chroma; c >= least - 1e-9; c -= 0.01) {
     // Judged as written, "#rrggbb", which rounds each channel: near black
     // a green rounds to #000000, which reads but says no hue, so it must
     // keep the chroma it was made with, short of what rounding takes.
@@ -133,11 +133,14 @@ function readingColor(hue, chroma, least, target, ground) {
         && contrast(hexColor(hexOf(probe)), ground) >= target
     }
     // Lightness walks from the ground's own toward the far end, in steps,
-    // to the first that reads in sRGB, then halves back to the edge.
+    // to the first that reads in sRGB, then halves back to the edge. The
+    // steps are fine: on a dark grey such as #484848, a light red fits sRGB
+    // and reads at 6:1 only within about 0.02 of lightness, which 25 steps
+    // passed over (found in review).
     var from = oklabLightness(ground), to = lighter ? 1 : 0
     var prev = from
-    for (var step = 1; step <= 25; step++) {
-      var L = from + (to - from) * step / 25
+    for (var step = 1; step <= 100; step++) {
+      var L = from + (to - from) * step / 100
       if (!reads(L)) {
         prev = L
         continue

@@ -809,6 +809,13 @@ test("community themes that one hue, a faint colour, or a tinted light ground wo
   greenAndRed(greyPair)
   const chroma = c => Math.hypot(M.oklab(c).a, M.oklab(c).b)
   expect([greyPair.up, chroma(colour(greyPair.up)) >= 0.07, M.contrast(colour(greyPair.up), mid) >= 3]).toEqual([greyPair.up, true, true])
+  // On a dark grey, a light red reads at 6:1 only in a narrow band of
+  // lightness, which a coarse search passed over for the 3:1 floor.
+  for (const grey of ["#454545", "#484848"]) {
+    const ground = M.hexColor(grey), pair = M.trend("#777777", M.hexColor("#555555"), ground)
+    greenAndRed(pair)
+    expect([grey, M.contrast(colour(pair.up), ground) >= 6, M.contrast(colour(pair.down), ground) >= 6]).toEqual([grey, true, true])
+  }
 })
 
 // Each parser fed hostile answers, in a child process with a time limit: a
