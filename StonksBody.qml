@@ -939,6 +939,7 @@ Item {
       quote: featuredQuote,
       day: featuredDay,
       history: historyShown ? history : null,
+      marks: rangeMarks,
       latest: motion.latest,
       view: featured,
       scrubT: scrubShown,
