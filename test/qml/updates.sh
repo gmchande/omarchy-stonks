@@ -5,7 +5,7 @@
 # with the version in MANIFEST.version. This build is 1.0.9.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree updates.qml
-patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property var testBody: root.body'
+patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property var testBody: root.body\n  readonly property alias testKeyCatcher: keyCatcher'
 # The harness owns the clock.
 patch_copy plugin/Service.qml 's/function wallSecond() { return Math.floor(Date.now() \/ 1000) }/function wallSecond() { return root.now }/'
 # A step waits for the look's answer to land.

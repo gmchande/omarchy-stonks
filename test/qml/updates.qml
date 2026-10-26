@@ -11,10 +11,11 @@ import "plugin" as Stonks
 // 1.0.9. The service asks GitHub for main's manifest as it starts and a day
 // after each ask GitHub answered, within seconds after one it didn't, never
 // while every screen is off. An equal, an older, a failed, and a refused
-// answer say nothing and show no "!". A newer one is said as a note on the
-// window's next open, once for each answer that names it: a click while it
-// shows runs the update in a terminal, and once it has gone the footer is
-// the add again. Once the update is on disk, the restart notice takes over.
+// answer say nothing and show no "!". A newer one is offered at the footer's
+// right end each time the window opens, beside the add, which still adds:
+// its click and Shift+U run the update in a terminal, and an undo takes its
+// place for the undo's seconds. Once the update is on disk, the restart
+// notice takes over, which a click and Shift+U act on.
 ShellRoot {
   id: harness
 
@@ -153,16 +154,32 @@ ShellRoot {
       service.now = harness.feed.askedAt + 24 * 60 * 60
     }
 
-    // What the footer says, its note's action included.
+    // What the footer says, its notice's action included, and what its
+    // right end offers: the update, an undo, or "".
     function footer() {
       var bar = harness.find(app.testBody, "footer")
       var action = harness.find(bar, "footerAction")
       return String(harness.find(bar, "footerText").text) + (action.visible ? String(action.text) : "")
     }
+    function offer() {
+      var side = harness.find(harness.find(app.testBody, "footer"), "footerUndo")
+      return side.visible ? String(harness.find(side, "footerUndoText").text) : ""
+    }
     function clickFooter() {
       var bar = harness.find(app.testBody, "footer")
       mouseClick(bar, bar.width / 2, bar.height / 2)
     }
+    function clickOffer() {
+      var side = harness.find(harness.find(app.testBody, "footer"), "footerUndo")
+      mouseClick(side, side.width / 2, side.height / 2)
+    }
+    // Shift+U, as a person presses it, in the open window.
+    function shiftU() {
+      app.testKeyCatcher.forceActiveFocus()
+      keyClick("U", Qt.ShiftModifier)
+      wait(100)
+    }
+    function calls() { return harness.readFile(harness.state + "/omarchy.calls") }
 
     // Every "!" on show: the pill's, and each row's.
     function marks() {
@@ -186,24 +203,30 @@ ShellRoot {
       app.close()
       tryVerify(function() { return service.openSurfaces.length === 0 }, 3000)
     }
-    // What the footer and the marks say as the window opens; then closed.
+    // What the footer, its offer, and the marks say as the window opens;
+    // then closed.
     function visit() {
       openWindow()
-      var said = footer() + " | " + marks().join(", ")
+      var said = footer() + " | " + offer() + " | " + marks().join(", ")
       closeWindow()
       return said
     }
 
     function test_updates() {
       var quoted = within(5000, function() { return ["AAPL", "MSFT", "NVDA"].every(function(s) { return !!service.quotes[s] }) })
-      var add = "+  Add a symbol | "
-      var newer = "Stonks 1.0.10 is out · click to update"
+      var add = "+  Add a symbol |  | "
+      var newer = "+  Add a symbol | Update to 1.0.10 | "
 
-      // As the service starts, main names this build's version.
+      // As the service starts, main names this build's version. Shift+U,
+      // with nothing offered, runs nothing.
       var started = answered(1)
       var first = visit()
-      harness.check("as the service starts, it asks GitHub once for main's version, and the same version says nothing",
-        quoted && started && first === add, harness.asked() + " asks | " + first)
+      openWindow()
+      shiftU()
+      var idle = calls()
+      closeWindow()
+      harness.check("as the service starts, it asks GitHub once for main's version; the same version offers nothing, and Shift+U runs nothing",
+        quoted && started && first === add && idle === "", harness.asked() + " asks | " + first + " | " + idle)
 
       // A second short of a day: nothing. A day on: asked again, older.
       put("MANIFEST.version", "1.0.8")
@@ -269,102 +292,79 @@ ShellRoot {
       var lit = answered(7)
       plugin.windowHost.monitors = []
       openWindow()
-      var said = footer() + " | " + marks().join(", ")
-      harness.check("while every screen is off it asks nothing; with one on, it asks, and the next open says the newer version in a note",
-        dark && lit && said === newer + " | ", dark + " " + lit + " | " + harness.asked() + " asks | " + said)
+      var said = footer() + " | " + offer() + " | " + marks().join(", ")
+      harness.check("while every screen is off it asks nothing; with one on, it asks, and the next open offers the newer version beside the add",
+        dark && lit && said === newer, dark + " " + lit + " | " + harness.asked() + " asks | " + said)
 
-      // A click while the note shows runs the update in a terminal.
-      clickFooter()
-      var ran = within(5000, function() { return harness.readFile(harness.state + "/omarchy.calls") === harness.updateCall + "\n" })
-      harness.check("a click on the note runs omarchy plugin update grvc.stonks in a terminal, and adds nothing",
-        ran && !app.testBody.adding, harness.readFile(harness.state + "/omarchy.calls") + " | " + app.testBody.adding)
+      // A click on the offer runs the update in a terminal, adds nothing,
+      // and the offer stays: nothing is on disk yet.
+      clickOffer()
+      var ran = within(5000, function() { return calls() === harness.updateCall + "\n" })
+      harness.check("a click on \"Update to 1.0.10\" runs omarchy plugin update grvc.stonks in a terminal, adds nothing, and stays",
+        ran && !app.testBody.adding && offer() === "Update to 1.0.10", calls() + " | " + app.testBody.adding + " | " + offer())
       closeWindow()
 
-      // Opened again before the next answer: the add, which a click starts.
+      // Opened again before the next answer: offered still, beside the
+      // add, which a click starts; Shift+U runs the update again. Found in
+      // the 1.0.4 update walk of 26 October: the old note had gone in its 5
+      // seconds, and the click meant for it opened search.
       openWindow()
-      var again = footer()
+      var again = footer() + " | " + offer()
       clickFooter()
       var adding = within(1000, function() { return app.testBody.adding })
       app.testBody.cancelAdding()
+      shiftU()
+      var keyed = within(5000, function() { return calls() === harness.updateCall + "\n" + harness.updateCall + "\n" })
       closeWindow()
-      harness.check("opened again before the next answer, the footer is the add, and a click on it starts adding",
-        again === "+  Add a symbol" && adding, again + " | adding " + adding)
+      harness.check("opened again, the update is still offered; a click on the add starts adding, and Shift+U runs the update",
+        again === "+  Add a symbol | Update to 1.0.10" && adding && keyed, again + " | adding " + adding + " | " + calls())
 
-      // A day on, main names it again: the note once more. Left alone, it
-      // goes, and the footer is the add, which a click starts.
-      nextDay()
-      var named = answered(8)
-      openWindow()
-      var back = footer()
-      var gone = within(8000, function() { return footer() === "+  Add a symbol" })
-      clickFooter()
-      adding = within(1000, function() { return app.testBody.adding })
-      app.testBody.cancelAdding()
-      closeWindow()
-      harness.check("the next day's answer says the note again; once it has gone, a click on the footer starts adding, not the update",
-        named && back === newer && gone && adding && harness.readFile(harness.state + "/omarchy.calls") === harness.updateCall + "\n",
-        back + " | gone " + gone + " | adding " + adding + " | " + harness.readFile(harness.state + "/omarchy.calls"))
-
-      // A failed answer names nothing: no note on the next open.
+      // A failed answer names nothing new: the version known stays offered.
       put("MANIFEST.down", "")
       nextDay()
-      var failedLater = answered(9) && visit()
+      var failedLater = answered(8) && visit()
       remove("MANIFEST.down")
-      harness.check("a failed answer once a newer version is known says nothing on the next open",
-        failedLater === add, harness.asked() + " asks | " + failedLater)
+      harness.check("a failed answer once a newer version is known keeps it offered",
+        failedLater === newer, harness.asked() + " asks | " + failedLater)
 
-      // A refused rename kept by a close comes back as the window opens, in
-      // Manage lists, over the rows and the footer: the next answer's note
-      // waits, unspent, for an open that shows the footer.
-      service.createList("Mine")
-      service.createList("Other")
+      // A removal's undo takes the offer's place for its seconds, and a
+      // click there undoes; then the update is offered again.
       openWindow()
-      app.testBody.openManageLists()
-      var manage = harness.find(app.testBody, "manageLists")
-      var field = harness.find(manage, "renameField")
-      manage.startRenaming(1)
-      tryVerify(function() { return field.activeFocus }, 3000)
-      field.text = "Other"
+      var gone = app.testBody.watchlist.displayedSymbols[0]
+      app.testBody.removeFrom(gone, true)
+      var undoing = within(2000, function() { return offer() === "Undo " + gone })
+      clickOffer()
+      var back = within(2000, function() { return service.symbols.indexOf(gone) >= 0 && offer() === "Update to 1.0.10" })
       closeWindow()
-      nextDay()
-      var heldNamed = answered(10)
-      openWindow()
-      var renamingBack = app.testBody.managingLists
-      app.testBody.closeListViews()
-      closeWindow()
-      var heldBack = visit()
-      service.deleteList("Mine")
-      service.deleteList("Other")
-      harness.check("a note due as Manage lists comes back over the footer waits for the next open that shows it",
-        heldNamed && renamingBack && heldBack === newer + " | ", renamingBack + " | " + heldBack)
+      harness.check("a removal's undo takes the offer's place, its click undoes and runs no update, and the update is offered again",
+        undoing && back && calls() === harness.updateCall + "\n" + harness.updateCall + "\n", undoing + " " + back + " | " + offer() + " | " + calls())
 
       // The update lands on disk as git writes it, the old file removed and
-      // a new one made, while the window stays open with the note held under
-      // the pointer: the restart's notice takes over at once, and a click
-      // restarts the shell. A later answer naming a newer version says no
-      // note over it.
+      // a new one made, while the window stays open: the restart's notice
+      // takes the add's place at once and the offer goes; Shift+U restarts
+      // the shell, and so does a click. A later answer naming a newer
+      // version offers nothing over it.
       nextDay()
-      var noteDay = answered(11)
+      var noteDay = answered(9)
       openWindow()
-      var noteShown = footer() === newer
-      var bar = harness.find(app.testBody, "footer")
-      mouseMove(bar, bar.width / 2, bar.height / 2)
+      var offered = offer() === "Update to 1.0.10"
       var manifest = JSON.parse(harness.readFile(harness.manifestPath))
       manifest.version = "1.0.10"
       run(["bash", "-c", "rm -f \"$2\" && printf '%s' \"$1\" > \"$2\"", "--", JSON.stringify(manifest, null, 2) + "\n", harness.manifestPath])
       var restart = "Updated to 1.0.10 · click to restart the shell"
-      var tookOver = within(3000, function() { return footer() === restart })
+      var tookOver = within(3000, function() { return footer() === restart && offer() === "" })
+      var updates = harness.updateCall + "\n" + harness.updateCall + "\n"
+      shiftU()
+      var keyRestart = within(5000, function() { return calls() === updates + "restart shell\n" })
       clickFooter()
-      var restarted = within(5000, function() {
-        return harness.readFile(harness.state + "/omarchy.calls") === harness.updateCall + "\nrestart shell\n"
-      })
+      var restarted = within(5000, function() { return calls() === updates + "restart shell\nrestart shell\n" })
       closeWindow()
       put("MANIFEST.version", "1.0.11")
       nextDay()
-      var afterDisk = answered(12) && visit()
-      harness.check("once the update is on disk, the open window's restart notice takes over a held note, a click restarts, and no note says a newer one over it",
-        noteDay && noteShown && tookOver && restarted && afterDisk === restart + " | ",
-        noteShown + " " + tookOver + " " + restarted + " | " + afterDisk + " | " + harness.readFile(harness.state + "/omarchy.calls"))
+      var afterDisk = answered(10) && visit()
+      harness.check("once the update is on disk, the open window's restart notice takes over and the offer goes; Shift+U and a click each restart, and no newer version is offered over it",
+        noteDay && offered && tookOver && keyRestart && restarted && afterDisk === restart + " |  | ",
+        offered + " " + tookOver + " " + keyRestart + " " + restarted + " | " + afterDisk + " | " + calls())
 
       // "updateCheck": false in the data file, as the README says: a day on,
       // and a day after that, GitHub is asked nothing. Taken out again, the
@@ -384,9 +384,9 @@ ShellRoot {
       var askedOff = harness.asked()
       edit("del(.updateCheck)")
       var backOn = within(3000, function() { return service.dataSettings.updateCheck === true })
-      var askedOn = answered(13)
+      var askedOn = answered(11)
       harness.check("with \"updateCheck\": false in the data file, GitHub is asked nothing for two days; without it, at once",
-        off && quiet && askedOff === 12 && backOn && askedOn, [off, quiet, askedOff + " asks while off", backOn, harness.asked() + " asks"].join(" | "))
+        off && quiet && askedOff === 10 && backOn && askedOn, [off, quiet, askedOff + " asks while off", backOn, harness.asked() + " asks"].join(" | "))
 
       harness.finish()
     }
