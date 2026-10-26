@@ -872,7 +872,7 @@ ShellRoot {
       harness.check("an index has no pre-market and no tail after its close, and its header names the next open, counting to it from the pre-market",
         indexNight.ready && indexMorning.ready
           && indexNight.text === "Closed · opens Wed 09:30 | last print in session"
-          && indexMorning.text === "Market opens in 3h 30m | last print in session",
+          && indexMorning.text === "Closed · opens in 3h 30m | last print in session",
         JSON.stringify({ night: indexNight, morning: indexMorning }))
       // 11:53, mid-session: midnight to midnight, the line ending at
       // now, about halfway, the rest of the day empty.

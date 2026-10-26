@@ -348,15 +348,24 @@ function statusForms(quote, now, scrubT, calendars, overnight) {
   // A published closure outranks a cached response that still describes a
   // session: on a holiday Yahoo may hand back a window nobody is trading.
   var closure = !overnight && kind && kind.kind === "closure"
-  // The day's named moments lead while they last, as they do in a scrub.
+  // The day's named moments lead while they last, as they do in a scrub. A
+  // morning with a break ahead counts to the break, not the day's close:
+  // Tokyo stops at 11:30, and at 11:26 "Market closes in 4h 4m" was wrong
+  // by four hours.
   if (!closure && bell && bell.bell === "close") {
     var named = phase === "opening" || phase === "lunch" || phase === "power" || phase === "closing"
-    var closes = "closes in " + Format.duration(bell.seconds)
-    return [(named ? phaseLabel(phase) + " · " : "Market ") + closes, sentence(closes)]
+    var pause = sessionBreaks(cal, now).filter(function(b) { return now < b.start })[0]
+    var closes = pause ? "lunch break in " + Format.duration(pause.start - now) : "closes in " + Format.duration(bell.seconds)
+    return [named ? phaseLabel(phase) + " · " + closes : pause ? sentence(closes) : "Market " + closes, sentence(closes)]
   }
+  // An index has no pre-market of its own, so before its open it is closed,
+  // said in the shape its stocks' "Pre-market · opens in 3h 10m" is,
+  // whatever periods Yahoo sent it.
   if (!closure && bell) {
     var opens = "opens in " + Format.duration(bell.seconds)
-    return [(phase === "pre" || phase === "overnight" ? phaseLabel(phase) + " · " : "Market ") + opens, sentence(opens)]
+    var before = quote.instrumentType === "INDEX" ? phaseLabel("closed") + " · "
+      : phase === "pre" || phase === "overnight" ? phaseLabel(phase) + " · " : "Market "
+    return [before + opens, sentence(opens)]
   }
   var reg = clockSession(q, now).regular
   if (!closure && phase === "post" && reg && now >= reg.end) {

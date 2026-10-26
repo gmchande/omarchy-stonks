@@ -703,6 +703,15 @@ ShellRoot {
           stub.featuredSymbol = listing.symbol
           stub.figures = listing.figures
           var onDay = {}
+          // On 1Y the 52-week line is the chart's own low and high
+          // (`Fundamentals.yearLine`): its words may differ from 1D's there,
+          // never its places.
+          var dayYear = {}
+          var yearAs = function(said, where) {
+            var was = dayYear[where], now = body.yearLine ? body.yearLine.range : null
+            if (!was || !now) return said
+            return said.replace(" " + now.lowText + "@", " " + was.lowText + "@").replace(" " + now.highText + "@", " " + was.highText + "@")
+          }
           listing.ranges.forEach(function(r) {
             stub.range = r[0]
             stub.historyEntry = r[1] ? { status: "ok", history: r[1], receivedAt: stub.now } : null
@@ -718,8 +727,10 @@ ShellRoot {
                 var where = place[0] + (retro ? " retro " : " smooth ") + listing.symbol
                 var said = infoSaid()
                 if (!!r[1] !== body.historyShown) shifted.push(where + " " + r[0] + " shows " + (body.historyShown ? "a range" : "the day"))
-                else if (onDay[where] === undefined) onDay[where] = said
-                else if (said !== onDay[where]) shifted.push(where + " " + r[0] + ": " + said + ", on 1D " + onDay[where])
+                else if (onDay[where] === undefined) {
+                  onDay[where] = said
+                  if (body.yearLine) dayYear[where] = { lowText: body.yearLine.range.lowText, highText: body.yearLine.range.highText }
+                } else if ((r[0] === "1Y" ? yearAs(said, where) : said) !== onDay[where]) shifted.push(where + " " + r[0] + ": " + said + ", on 1D " + onDay[where])
                 var off = r[1] ? rangeSaid(r[0], r[1]) : ""
                 if (off) unfollowed.push(where + " " + r[0] + ": " + off)
                 var short = shortOfEdge()
@@ -748,7 +759,7 @@ ShellRoot {
         wait(50)
         root.check("on 1M, 1Y, 5Y, and All the first info line says the range's name, its low and high as its marks have them, START, and its volume, a young listing's too, in both looks, in the popup and the window at its narrowest and widest",
           unfollowed.length === 0, unfollowed.join(" | "))
-        root.check("nothing on the info lines moves from 1D to 1M, 1Y, 5Y, and All, and the 52-week line says the same, a young listing's too, in both looks, in the popup and the window at its narrowest and widest",
+        root.check("nothing on the info lines moves from 1D to 1M, 1Y, 5Y, and All, and the 52-week line says the same, on 1Y the chart's own low and high, a young listing's too, in both looks, in the popup and the window at its narrowest and widest",
           shifted.length === 0, shifted.join(" | "))
         root.check("both info lines reach the band's right edge on every range, in both looks, in the popup and the window at its narrowest and widest",
           unreached.length === 0, unreached.join(" | "))
