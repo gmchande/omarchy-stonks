@@ -451,7 +451,7 @@ Item {
     // reads a moment, a refresh you asked for is out, or a range failed,
     // whose header offers its retry.
     if (yahooDown && !scrubShown && !refreshing && !(historyActive && historyFailed))
-      return ["No prices from Yahoo · Stonks keeps trying", "No prices from Yahoo"]
+      return ["Can't get prices · Stonks keeps trying", "Can't get prices"]
     // The chart asked for is on its way, named: what was on show stays.
     // Before any chart has been in, the empty hero's label names it alone,
     // in the one place a reader looks (`HeroBand`).

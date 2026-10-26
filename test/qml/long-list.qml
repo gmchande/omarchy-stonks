@@ -375,7 +375,7 @@ ShellRoot {
         }
       })
       harness.check("Yahoo refusing: nothing warns for 85 s, then the pill and every symbol's update is overdue within 90 s of falling due, and the header says it once instead of every row",
-        refusedAt > 0 && firstWarnAt >= 85 && allWarnAt > 0 && allWarnAt <= 155 && saidOnce === "No prices from Yahoo · Stonks keeps trying | 0 rows in sight warn",
+        refusedAt > 0 && firstWarnAt >= 85 && allWarnAt > 0 && allWarnAt <= 155 && saidOnce === "Can't get prices · Stonks keeps trying | 0 rows in sight warn",
         "refused at " + (refusedAt - start) + " s; first warning " + firstWarnAt + " s after, all " + allWarnAt + " s after; " + overdue() + " overdue now; " + saidOnce)
       remove("YAHOO.refuse")
       // The pause has doubled twice by now: the next probe is up to five

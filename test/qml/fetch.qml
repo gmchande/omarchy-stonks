@@ -401,18 +401,23 @@ ShellRoot {
       // Every listing unanswered is Yahoo's trouble, said once in the
       // header, not by every row. Found by the design panel of 23 October:
       // every row said "No data for this symbol".
-      harness.check("90 s asked and unanswered for every listing: the pill warns, the window's header says once that no prices come from Yahoo, a saved row says when its price is from, and a row with nothing saved says nothing",
-        /^true \| As of Tue \d\d:\d\d \|  \| No prices from Yahoo · Stonks keeps trying$/.test(lateNotes), lateNotes)
+      harness.check("90 s asked and unanswered for every listing: the pill warns, the window's header says once that it can't get prices, a saved row says when its price is from, and a row with nothing saved says nothing",
+        /^true \| As of Tue \d\d:\d\d \|  \| Can't get prices · Stonks keeps trying$/.test(lateNotes), lateNotes)
       // A chart asked for meanwhile, SHOP.TO's, with nothing saved: the
       // chart says nothing of loading under a header that says no prices
-      // come. Found in check-77: "Loading AAPL…" under that header.
+      // come. Found in check-77: "Loading AAPL…" under that header. The
+      // pill, on SHOP.TO with no price, says the header's words, not "No
+      // data", which is for a symbol Yahoo answered without one (range.qml).
       service.feature("SHOP.TO")
       tryVerify(function() { return body.chartLoading && body.motion.dimmed > 0 }, 3000)
       var coming = [body.chartLoading, harness.find(body, "loadingLabel").visible, body.headerText].join(" | ")
+      var pillUnanswered = pill.changeText
       service.feature("NEST")
       tryVerify(function() { return !body.chartLoading }, 3000)
-      harness.check("with no prices from Yahoo, a chart asked for says nothing of loading under the header that says so",
-        coming === "true | false | No prices from Yahoo · Stonks keeps trying", coming)
+      harness.check("with no prices coming, a chart asked for says nothing of loading under the header that says so",
+        coming === "true | false | Can't get prices · Stonks keeps trying", coming)
+      harness.check("a pill with no price, its symbol unanswered for 90 s, says it can't get prices",
+        pillUnanswered === "! Can't get prices", pillUnanswered)
       tick(9, 1)
       // The run is two requests: the pill's chart and one spark of the rest.
       var tries = harness.requests().filter(function(l) { return / 000$/.test(l) })

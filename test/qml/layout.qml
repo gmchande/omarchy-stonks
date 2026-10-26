@@ -1078,7 +1078,7 @@ ShellRoot {
           ["Lunch break · reopens 12:30 JST · in 59m", "Lunch break · reopens 12:30 JST", "Reopens 12:30 JST"],
           ["At 16:30 BST · Closing bell", "At 16:30 BST"], ["At 02:25 EDT · Overnight", "At 02:25 EDT"],
           ["WEEK OF 28 SEP 2026 · 712,345.00", "WEEK OF 28 SEP 2026"], ["21 SEP 10:00 AEST · 712,345.00", "21 SEP 10:00 AEST"],
-          ["No prices from Yahoo · Stonks keeps trying", "No prices from Yahoo"], ["Refreshing"], ["Loading SHIB-USD YTD"]]
+          ["Can't get prices · Stonks keeps trying", "Can't get prices"], ["Refreshing"], ["Loading SHIB-USD YTD"]]
         var closures = 0
         var unnamed = []
         for (var calId in calendars.calendars) {

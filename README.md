@@ -251,7 +251,7 @@ A "!" on the pill means its stock's quote is late or its last refresh
 failed: point at the pill to read which. The row and the line above the
 price say the same.
 
-- **The header says "No prices from Yahoo".** Every symbol you follow is
+- **The header says "Can't get prices".** Every symbol you follow is
   waiting on Yahoo, or Yahoo turned every one away, so Stonks says it once
   rather than on every row. Rows with a price keep it, with the time it's
   from, and the rest show their symbol alone. What to do is as for "No
