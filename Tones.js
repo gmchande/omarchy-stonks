@@ -97,8 +97,9 @@ function darkGround(ground) {
   return contrast({ r: 1, g: 1, b: 1 }, ground) > contrast({ r: 0, g: 0, b: 0 }, ground)
 }
 
-// OKLCH to sRGB, or null outside sRGB's gamut.
-function fromOklch(L, C, hue) {
+// OKLCH to sRGB, or null outside sRGB's gamut; `clipped`, each channel
+// held to it instead.
+function fromOklch(L, C, hue, clipped) {
   var a = C * Math.cos(hue * Math.PI / 180), b = C * Math.sin(hue * Math.PI / 180)
   var l = Math.pow(L + 0.3963377774 * a + 0.2158037573 * b, 3)
   var m = Math.pow(L - 0.1055613458 * a - 0.0638541728 * b, 3)
@@ -106,7 +107,7 @@ function fromOklch(L, C, hue) {
   var lin = [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
     -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
     -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s]
-  for (var i = 0; i < 3; i++) if (lin[i] < -1e-4 || lin[i] > 1 + 1e-4) return null
+  for (var i = 0; i < 3; i++) if (!clipped && (lin[i] < -1e-4 || lin[i] > 1 + 1e-4)) return null
   var encode = function(v) {
     v = Math.max(0, Math.min(1, v))
     return v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055
@@ -117,44 +118,64 @@ function fromOklch(L, C, hue) {
 // The colour of `hue` and `chroma` nearest `ground` in lightness that still
 // reads at `target` on it, on the side of the ground with more room: a
 // light ground takes a darker colour, a dark one a lighter. Where the
-// chroma leaves sRGB at that lightness, it is lowered, down to `least`;
-// null where even that doesn't fit.
+// chroma leaves sRGB at that lightness, it is lowered, as little as it
+// must, down to `least`; null where even that doesn't fit.
 function readingColor(hue, chroma, least, target, ground) {
   var lighter = darkGround(ground)
-  for (var c = chroma; c >= least - 1e-9; c -= 0.01) {
-    // Judged as written, "#rrggbb", which rounds each channel: near black
-    // a green rounds to #000000, which reads but says no hue, so it must
-    // keep the chroma it was made with, short of what rounding takes.
-    var reads = function(L) {
-      var probe = fromOklch(L, c, hue)
-      if (probe === null) return false
-      var written = oklab(hexColor(hexOf(probe)))
-      return Math.sqrt(written.a * written.a + written.b * written.b) >= c * 0.9
-        && contrast(hexColor(hexOf(probe)), ground) >= target
+  var from = oklabLightness(ground), to = lighter ? 1 : 0
+  // The colour at chroma `c`, or null. Judged as written, "#rrggbb", which
+  // rounds each channel.
+  var at = function(c) {
+    var written = function(L) { return hexOf(fromOklch(L, c, hue, true)) }
+    var reads = function(L) { return contrast(hexColor(written(L)), ground) >= target }
+    // In sRGB, and keeping the chroma it was made with, short of what
+    // rounding takes: near black a green rounds to #000000, which reads
+    // but says no hue.
+    var fits = function(L) {
+      if (fromOklch(L, c, hue) === null) return false
+      var o = oklab(hexColor(written(L)))
+      return Math.sqrt(o.a * o.a + o.b * o.b) >= c * 0.9
     }
-    // Lightness walks from the ground's own toward the far end, in steps,
-    // to the first that reads in sRGB, then halves back to the edge. The
-    // steps are fine: on a dark grey such as #484848, a light red fits sRGB
-    // and reads at 6:1 only within about 0.02 of lightness, which 25 steps
-    // passed over (found in review).
-    var from = oklabLightness(ground), to = lighter ? 1 : 0
-    var prev = from
+    // Contrast only grows away from the ground, so the lightness where it
+    // first reads is found by halving. There the colour is the hue's
+    // nearest the ground, and where sRGB ends just past it, as for a light
+    // red on #484848 or a light green on a #bb0022 bar, within 0.003 of
+    // lightness, it is the only one that reads; a walk in steps passed
+    // over it (found in review).
+    if (!reads(to)) return null
+    var lo = from, hi = to
+    for (var i = 0; i < 30; i++) {
+      var mid = (lo + hi) / 2
+      if (reads(mid)) hi = mid
+      else lo = mid
+    }
+    if (fits(hi)) return written(hi)
+    // Out of sRGB there on the near side, as a deep colour can be: the
+    // first lightness further on that fits.
     for (var step = 1; step <= 100; step++) {
-      var L = from + (to - from) * step / 100
-      if (!reads(L)) {
-        prev = L
-        continue
-      }
-      var lo = prev, hi = L
-      for (var i = 0; i < 20; i++) {
-        var mid = (lo + hi) / 2
-        if (reads(mid)) hi = mid
-        else lo = mid
-      }
-      return hexOf(fromOklch(hi, c, hue))
+      var L = hi + (to - hi) * step / 100
+      if (fits(L)) return written(L)
     }
+    return null
   }
-  return null
+  // Less chroma only widens what fits sRGB at a lightness, so the most
+  // that reads is found by halving between `least` and `chroma`. Stepping
+  // down passed over it: on a #bb0022 bar, a green at 0.075 reads at 6:1,
+  // and steps of 0.01 fell to the 3:1 floor (found in review).
+  var best = at(chroma)
+  if (best !== null) return best
+  best = at(least)
+  if (best === null) return null
+  var lo = least, hi = chroma
+  for (var n = 0; n < 6; n++) {
+    var mid = (lo + hi) / 2
+    var found = at(mid)
+    if (found !== null) {
+      best = found
+      lo = mid
+    } else hi = mid
+  }
+  return best
 }
 
 // Stonks' own colour of `hue`: at OWN_TARGET while it keeps HUE_CHROMA;
