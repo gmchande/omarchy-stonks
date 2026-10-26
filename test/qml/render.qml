@@ -815,13 +815,16 @@ ShellRoot {
       }
       // popup-search-vfiax-*: Yahoo's answer holds a mutual fund alone;
       // -eurusd-: two indexes shown, a currency and futures left out. The
-      // note has to fit the popup's width on one line.
+      // note has to fit the popup's width on one line. The currency is
+      // Yahoo's top answer, so no result is chosen, as search's own landing
+      // chooses (`SymbolSearch.land`).
       var leftOut = root.stateName.indexOf("-vfiax-") > 0 ? ["vfiax", vfiaxFile]
         : root.stateName.indexOf("-eurusd-") > 0 ? ["eurusd", eurusdFile] : null
       if (leftOut) {
         var answer = Search.parseSearch(JSON.parse(leftOut[1].text()))
         body.search.results = answer.results
         body.search.note = answer.note
+        body.search.resultIndex = answer.topLeftOut ? -1 : 0
         body.search.resultsQuery = leftOut[0]
         body.search.searchText = leftOut[0]
         root.searchField(body.search).text = leftOut[0]
