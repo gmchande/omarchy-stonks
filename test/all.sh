@@ -12,8 +12,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/queue.sh"
 
 # validate_clone: omarchy plugin validate on what a clone of this checkout
 # holds: the tracked files as they are here, an uncommitted edit included,
-# never an ignored one (out/, docs/, AGENTS.md, test/fixtures/). Links stay
-# links, so a tracked one still fails.
+# never an ignored one (out/, docs/, AGENTS.local.md, test/fixtures/). Links
+# stay links, so a tracked one still fails.
 validate_clone() {
   local tree code file
   tree=$(mktemp -d "$logs/clone.XXXXXX")
