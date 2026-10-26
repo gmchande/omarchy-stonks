@@ -136,8 +136,9 @@ function readingColor(hue, chroma, least, target, ground) {
       var o = oklab(hexColor(written(L)))
       return Math.sqrt(o.a * o.a + o.b * o.b) >= c * 0.9
     }
-    // Contrast only grows away from the ground, so the lightness where it
-    // first reads is found by halving. There the colour is the hue's
+    // Away from the ground contrast can dip just off it, but it crosses the
+    // target once, so the lightness where it first reads is found by
+    // halving. There the colour is the hue's
     // nearest the ground, and where sRGB ends just past it, as for a light
     // red on #484848 or a light green on a #bb0022 bar, within 0.003 of
     // lightness, it is the only one that reads; a walk in steps passed
