@@ -35,17 +35,9 @@ Item {
   property color foreground: Commons.Color.foreground
   property color dim: Tones.dim(foreground, Commons.Color.background)
   property string fontFamily: Style.font.family
-  // Its measures: the shell's text size and spacing on a surface, or the
-  // picture's own in the screenshot, which no text size moves (`ShareCard`).
-  property real fontSize: Style.font.caption
-  property real letterSpacing: 1
-  property real spacing: Style.effectiveSpacingScale
-  readonly property real lift: root.space(4)
+  readonly property real lift: Style.space(4)
   // Where the scrub's line stands, in this item's pixels, -1 without one.
   readonly property real scrubAt: root.chart && root.scrubX >= 0 ? root.chart.xAt(root.scrubX) : -1
-
-  // `n` of the popup's pixels at text size 12, as `Style.space` rounds them.
-  function space(n) { return Math.max(1, Math.round(n * root.spacing)) }
 
   // The marks draw in with the line: the chart's draw-in uncovers them as
   // it uncovers its ink, the room a mark lifts into included.
@@ -63,12 +55,12 @@ Item {
         required property var modelData
         required property int index
         readonly property real at: root.chart.xAt(mark.modelData.x)
-        readonly property real gap: root.space(6)
+        readonly property real gap: Style.space(6)
         // How far the line keeps from the mark's words: past the scrub's dot.
-        readonly property real clear: root.space(6)
+        readonly property real clear: Style.space(6)
         // Over its bar, turned toward the chart's middle, on the chart.
         readonly property real restX: Math.max(0, Math.min(root.width - mark.width,
-          mark.modelData.x < 0.5 ? mark.at - root.space(2) : mark.at - mark.width + root.space(2)))
+          mark.modelData.x < 0.5 ? mark.at - Style.space(2) : mark.at - mark.width + Style.space(2)))
         // How far its words' ink, as drawn at rest, would reach into the
         // chart's ink under each of them, with the mark on its edge: down
         // into it for the high, up into it for the low. A price's thousands
@@ -115,7 +107,7 @@ Item {
           text: mark.modelData.price
           color: root.foreground
           font.family: root.fontFamily
-          font.pixelSize: root.fontSize
+          font.pixelSize: Style.font.caption
           font.bold: true
         }
         Text {
@@ -126,9 +118,9 @@ Item {
           text: mark.modelData.date
           color: root.dim
           font.family: root.fontFamily
-          font.pixelSize: root.fontSize
+          font.pixelSize: Style.font.caption
           font.bold: true
-          font.letterSpacing: root.letterSpacing
+          font.letterSpacing: 1
         }
       }
     }

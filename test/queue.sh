@@ -91,11 +91,12 @@ began=$(centiseconds)
 
 # Before anything runs: every harness script sources lib.sh, ends on finish
 # and its finish line, and is started by one of the runners. A script that
-# misses one can pass without its checks having run. quickshell.sh is
-# lib.sh's runner, and crash-check.sh proves it without the saved answers.
+# misses one can pass without its checks having run. The daily totals
+# (fetch-day.sh) are a measurement, run by hand; quickshell.sh is lib.sh's
+# runner, and crash-check.sh proves it without the saved answers.
 for script in test/qml/*.sh; do
   name=${script##*/}
-  case "$name" in lib.sh|quickshell.sh|crash-check.sh|render.sh) continue ;; esac
+  case "$name" in lib.sh|quickshell.sh|crash-check.sh|render.sh|fetch-day.sh) continue ;; esac
   grep -q '^source .*/lib\.sh"$' "$script" || echo "FAILED $script does not source lib.sh"
   tail -n 1 "$script" | grep -qE '^finish "[^"]+"$' || echo "FAILED $script does not end with finish \"...\""
   grep -qE "^start .* bash test/qml/${name//./\\.}$" test/all.sh test/review.sh \
