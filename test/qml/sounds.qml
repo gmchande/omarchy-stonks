@@ -27,6 +27,15 @@ ShellRoot {
     if (!ok) failures++
   }
 
+  // The quantum, in frames, a stream started with `args` holds the graph
+  // at, at `rate`: PipeWire rounds its latency down to a power of two. A
+  // stream that names no latency in ms gets 0, so it fails any check.
+  function quantum(args, rate) {
+    var m = / --latency (\d+(?:\.\d+)?)ms /.exec(" " + args + " ")
+    if (!m) return 0
+    return Math.pow(2, Math.floor(Math.log(Number(m[1]) * rate / 1000) / Math.LN2))
+  }
+
   function find(item, name) {
     if (!item) return null
     if (item.objectName === name) return item
@@ -460,7 +469,7 @@ ShellRoot {
         JSON.stringify(harness.record()))
 
       // Delete, Ctrl+Z, and an add through search: each its own sound, in
-      // smooth's voice, as a notification, at a short latency.
+      // smooth's voice, as a notification.
       keyClick(Qt.Key_Delete)
       var removed = startsBy(1)
       keyClick(Qt.Key_Z, Qt.ControlModifier)
@@ -480,8 +489,8 @@ ShellRoot {
         played(removed[0]) === "sounds/smooth/remove.wav" && played(undone[1]) === "sounds/smooth/undo.wav"
           && played(added[2]) === "sounds/smooth/add.wav" && service.library.length === library + 1,
         harness.starts().map(played).join(", "))
-      harness.check("each plays through pw-play as a notification, at 20 ms",
-        harness.starts().every(function(s) { return s.args === "--media-role Notification --latency 20ms" }), harness.starts()[0].args)
+      harness.check("each plays through pw-play as a notification",
+        harness.starts().every(function(s) { return / --media-role Notification /.test(" " + s.args + " ") }), harness.starts()[0].args)
 
       // p: a replay heard, made from the chart as it starts; left to run,
       // it plays to its end.
@@ -1181,6 +1190,17 @@ ShellRoot {
       harness.check("the bell rings at the open in retro's voice, a moment after Stonks starts too, not late, not twice with the clock set back, not while a microphone records though a level meter may run, not when its answer reaches 4 MB or comes after 3 s, again after a stalled answer is stopped, and not with sounds off",
         rang.join(",") === "1,0,1,0,1,0,0,0,1,0" && stallStopped,
         rang.join(",") + " | stalled answer stopped " + stallStopped)
+
+      // Every stream Stonks started, each sound's, chime's, replay's and
+      // bell's pw-play and each silence's pw-cat, asks for a latency that
+      // leaves the default quantum, 1024 frames, where it is at 48 and
+      // 44.1 kHz: each move of it puts AirPods further behind, until they
+      // go silent.
+      var streams = harness.record().filter(function(e) { return e.what === "start" }).map(function(e) { return e.args })
+        .concat(harness.readFile(harness.fakeState + "/pw-cat.log").split("\n").filter(function(l) { return /^start /.test(l) }))
+      var moving = streams.filter(function(args) { return harness.quantum(args, 48000) !== 1024 || harness.quantum(args, 44100) !== 1024 })
+      harness.check("every stream Stonks started, chimes, sounds, replays, the bell and the silence, asks for a latency that leaves the 1024-frame quantum where it is",
+        streams.length > 0 && moving.length === 0, streams.length + " streams | " + moving.slice(0, 3).join(" | "))
 
       console.log("SOUNDS DONE")
       done.exitCode = harness.failures ? 1 : 0

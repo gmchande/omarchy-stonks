@@ -316,9 +316,13 @@ Item {
 
   // One at a time: exec stops a sound still playing, and starts this one
   // once it has gone. Each has 4 s, twice the longest, a replay's 2 s, so a
-  // PipeWire that stalls can't hold one.
+  // PipeWire that stalls can't hold one. Every stream Stonks starts asks
+  // for 30 ms, which PipeWire rounds down to the default quantum, 1024
+  // frames at 48 and 44.1 kHz, so none moves it: each move back up puts a
+  // Bluetooth output about 11 ms further behind, and AirPods go silent once
+  // a few seconds of chimes add up to a couple of hundred.
   function start(file) {
-    player.exec(["timeout", "-k", "1", "4", "pw-play", "--media-role", "Notification", "--latency", "20ms", file])
+    player.exec(["timeout", "-k", "1", "4", "pw-play", "--media-role", "Notification", "--latency", "30ms", file])
   }
 
   Process { id: player }
@@ -337,7 +341,7 @@ Item {
   Process {
     id: silence
     command: ["pw-cat", "-v", "--playback", "--raw", "--rate", "24000", "--channels", "1", "--format", "s16",
-      "--media-role", "Notification", "/dev/zero"]
+      "--media-role", "Notification", "--latency", "30ms", "/dev/zero"]
     stderr: SplitParser {
       onRead: function(line) { if (root.awakeAt < 0 && line.indexOf("-> streaming") >= 0) root.awakeAt = Date.now() }
     }
@@ -407,6 +411,6 @@ Item {
     running: root.turnedOn
     stdinEnabled: true
     command: ["sh", "-c", "while read -r name; do case $name in " + root.chimeNames + ") "
-      + "( timeout -k 1 2 pw-play --media-role Notification --latency 20ms \"$1/$name\" & ) ;; esac; done", "sh", root.folder]
+      + "( timeout -k 1 2 pw-play --media-role Notification --latency 30ms \"$1/$name\" & ) ;; esac; done", "sh", root.folder]
   }
 }
