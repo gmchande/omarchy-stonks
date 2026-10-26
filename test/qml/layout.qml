@@ -2173,34 +2173,67 @@ ShellRoot {
         stub.retro = false
         wait(50)
 
-        // No header control opens a tooltip over the card, smooth and retro:
-        // a hover on the animal, the look, or ? past the shell's 400 ms
-        // delay leaves every tip in the body closed. Found by the owner on
-        // 15 October: "Replay the chart (p)" covered the line naming the
-        // stock. What a click on each does is on the ? sheet.
+        // Each header icon on the right says on hover, past the shell's 400
+        // ms delay, what a click does, in the one tip open, wholly above the
+        // body, and the animal says nothing, smooth and retro; with the
+        // body at the window's top, no room above, none opens. Found by the
+        // owner on 15 October: "Replay the chart (p)", then under the
+        // header, covered the line naming the stock; and in review, a tip
+        // Qt put under its icon hid the exchange and currency.
         var openTips = function(item, into) {
           if (!item) return into
-          if (item.opened === true && item.text !== undefined) into.push(item.objectName + " " + JSON.stringify(item.text))
+          if (item.opened === true && item.text !== undefined) into.push(item)
           var kids = item.data || []
           for (var k = 0; k < kids.length; k++) openTips(kids[k], into)
           return into
         }
-        var tipped = []
-        ;["animalToggle", "lookToggle", "helpToggle"].forEach(function(name) {
-          var toggle = find(body, name)
+        var tipFaults = []
+        var tipWords = []
+        ;[["animalToggle"], ["soundToggle", "Turn sounds off"], ["cameraButton", "Take a screenshot"],
+          ["lookToggle", "Switch to retro", "Switch to smooth"], ["helpToggle", "Show all keys"]].forEach(function(want) {
+          var toggle = find(body, want[0])
           ;[false, true].forEach(function(retro) {
             stub.retro = retro
-            wait(50)
-            if (!toggle) { tipped.push(name + " missing"); return }
-            mouseMove(toggle, toggle.width / 2, toggle.height / 2)
-            wait(600)
-            openTips(body, []).forEach(function(t) { tipped.push((retro ? "retro " : "smooth ") + name + ": " + t) })
-            mouseMove(body, body.width / 2, body.height - 4)
-            wait(50)
+            ;[0, 80].forEach(function(above) {
+              surface.y = above
+              wait(50)
+              var where = (retro ? "retro " : "smooth ") + want[0] + " with " + above + " px above"
+              if (!toggle) { tipFaults.push(where + " missing"); return }
+              mouseMove(toggle, toggle.width / 2, toggle.height / 2)
+              wait(600)
+              var tips = openTips(body, [])
+              var words = above === 0 ? undefined
+                : want[0] === "soundToggle" && !find(body, "soundIcon").on ? "Turn sounds on" : want[retro && want[2] ? 2 : 1]
+              if (words === undefined ? tips.length !== 0 : tips.length !== 1 || tips[0].text !== words)
+                tipFaults.push(where + ": " + JSON.stringify(tips.map(function(t) { return t.text })) + ", not " + JSON.stringify(words))
+              var reach = function() {
+                tips.forEach(function(t) {
+                  var bottom = t.contentItem.mapToItem(body, 0, t.contentItem.height).y
+                  if (bottom > 0) tipFaults.push(where + ": its tip reaches " + bottom + " px into the body")
+                })
+              }
+              reach()
+              // The card moving under the still pointer, as one easing to a
+              // new height does, to where a tip no longer fits above it: the
+              // tip goes, rather than moving under the icon.
+              if (tips.length) {
+                surface.y = 0
+                wait(200)
+                where += ", then moved to the window's top"
+                tips = openTips(body, [])
+                if (tips.length) tipFaults.push(where + ": its tip stayed open")
+                reach()
+              }
+              if (!retro && above > 0) tipWords.push(tips.map(function(t) { return t.text }).join(", "))
+              mouseMove(body, body.width / 2, body.height - 4)
+              wait(50)
+            })
           })
         })
-        root.check("no header control opens a tooltip over the card, smooth and retro",
-          tipped.length === 0, tipped.join(" | "))
+        surface.y = 0
+        console.log("header tips: " + tipWords.join(" | "))
+        root.check("each header icon's hover says what a click does, wholly above the body, none where there's no room above, and the animal's nothing, smooth and retro",
+          tipFaults.length === 0, tipFaults.join(" | "))
         stub.retro = false
         wait(50)
 
@@ -2552,6 +2585,8 @@ ShellRoot {
         var shortSeen = []
         var touched = []
         var coldFaults = []
+        var tipFaults = []
+        var tipsSeen = 0
         var coldSeen = 0
         var exact = function(item, y) { return item.mapToItem(body, 0, y).y }
         var quotesBeforeCoin = stub.quotes
@@ -2664,6 +2699,34 @@ ShellRoot {
               hero.quote = Qt.binding(function() { return body.featuredQuote })
               wait(50)
             }
+            // The camera's tip at every size: none with the body at the
+            // window's top, and wholly above it with room there. Found in
+            // review: at text size 20 at a screen's top edge, a tip Qt put
+            // under its icon hid the exchange and currency.
+            var cameraButton = find(body, "cameraButton")
+            ;[0, 80].forEach(function(above) {
+              surface.y = above
+              wait(50)
+              mouseMove(cameraButton, cameraButton.width / 2, cameraButton.height / 2)
+              wait(600)
+              var tips = []
+              var collect = function(item) {
+                if (!item) return
+                if (item.opened === true && item.text !== undefined) tips.push(item)
+                var kids = item.data || []
+                for (var k = 0; k < kids.length; k++) collect(kids[k])
+              }
+              collect(body)
+              if (tips.length !== (above > 0 ? 1 : 0)) tipFaults.push(where + ": " + tips.length + " tips with " + above + " px above")
+              tips.forEach(function(t) {
+                var bottom = t.contentItem.mapToItem(body, 0, t.contentItem.height).y
+                if (bottom > 0) tipFaults.push(where + ": the camera's tip reaches " + bottom + " px into the body")
+              })
+              mouseMove(body, body.width / 2, body.height - 4)
+              wait(50)
+            })
+            surface.y = 0
+            tipsSeen++
           })
         }
         // At text sizes 16 and 20 on an 850 px screen, with 12 lists, the
@@ -2726,6 +2789,8 @@ ShellRoot {
           touched.length === 0, touched.join(" | "))
         root.check("on a 768 px screen where the header gives its title way, a stock with no quote yet leaves the ticker's line empty, in both looks",
           coldSeen > 0 && coldFaults.length === 0, coldSeen + " seen; " + coldFaults.join(" | "))
+        root.check("on a 768 px screen at every text size from 9 to 20, the camera's tip shows wholly above the body where there's room, and not at all where there isn't, in both looks",
+          tipsSeen > 0 && tipFaults.length === 0, tipsSeen + " seen; " + tipFaults.join(" | "))
 
         // After the text size changes with the list scrolled, no row is cut
         // at the list's top or bottom, the row at its top stays there unless

@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
@@ -13,9 +14,12 @@ import "Tones.js" as Tones
 // look nor a flat day moves them. While its market rests it sleeps: eyes
 // shut and a dim "z" just past the slot, above the words. The height is the
 // slot's in both looks, and the look is one small icon in both, so toggling
-// moves nothing. None of them has a tooltip: under the header one covered
-// the line naming the stock, and what a click does is on the ? sheet with
-// the keys.
+// moves nothing. Each icon on the right says on hover what a click does,
+// in the shell's own tooltip in the shell's own place, above it, as
+// Wi-Fi's do: under the header one covered the line naming the stock (15
+// October). The animal has none, by the owner's call (26 October). A tip
+// is never moved under its icon (`HeaderTip`), and where the window has no
+// room above, as in Stonks' own window, none shows.
 Item {
   id: root
 
@@ -135,6 +139,29 @@ Item {
   }
 
   NumberAnimation { id: shutting; target: root; property: "closing"; duration: 320 }
+
+  // An icon's tip, 3 px above it whatever the style. Qt moves a tip that
+  // doesn't fit there under its icon, where a long line by the ticker
+  // reaches it, so a tip shows only while it fits (`roomAbove`).
+  component HeaderTip: PanelToolTip {
+    y: -implicitHeight - 3
+  }
+  // The header's top in its window, followed as the card moves, as one
+  // easing to a new height does under a still pointer: mapToItem alone is
+  // read once (found in review). The shell's KeyboardPanel watches its
+  // anchor the same way.
+  TransformWatcher {
+    id: placement
+    a: root
+    b: root.Window.contentItem
+  }
+  readonly property real topInWindow: topAfter(placement.transform)
+  function topAfter(moved) { return root.mapToItem(null, 0, 0).y }
+  // Whether `tip` fits above `control`, its margin clear of the window's
+  // top edge.
+  function roomAbove(control, tip) {
+    return topInWindow + control.mapToItem(root, 0, 0).y - tip.implicitHeight - 3 >= tip.topMargin
+  }
 
   // The title and the words, then the rule, a band's gap short of a group's
   // under them, so the group's gap the body leaves after the header makes
@@ -363,6 +390,14 @@ Item {
       hoverEnabled: true
       cursorShape: Qt.PointingHandCursor
       onClicked: root.soundsRequested()
+
+      HeaderTip {
+        id: soundTip
+        objectName: "soundTip"
+        visible: soundMouse.containsMouse && root.roomAbove(soundMouse, soundTip)
+        text: root.soundsOn ? "Turn sounds off" : "Turn sounds on"
+        fontFamily: root.fontFamily
+      }
     }
   }
 
@@ -403,6 +438,14 @@ Item {
       hoverEnabled: true
       cursorShape: Qt.PointingHandCursor
       onClicked: root.screenshotRequested()
+
+      HeaderTip {
+        id: cameraTip
+        objectName: "cameraTip"
+        visible: cameraMouse.containsMouse && root.roomAbove(cameraMouse, cameraTip)
+        text: "Take a screenshot"
+        fontFamily: root.fontFamily
+      }
     }
   }
 
@@ -442,6 +485,14 @@ Item {
       hoverEnabled: true
       cursorShape: Qt.PointingHandCursor
       onClicked: root.styleRequested(root.retro ? "smooth" : "retro")
+
+      HeaderTip {
+        id: lookTip
+        objectName: "lookTip"
+        visible: lookMouse.containsMouse && root.roomAbove(lookMouse, lookTip)
+        text: root.retro ? "Switch to smooth" : "Switch to retro"
+        fontFamily: root.fontFamily
+      }
     }
   }
 
@@ -480,6 +531,14 @@ Item {
       hoverEnabled: true
       cursorShape: Qt.PointingHandCursor
       onClicked: root.helpRequested()
+
+      HeaderTip {
+        id: helpTip
+        objectName: "helpTip"
+        visible: helpMouse.containsMouse && root.roomAbove(helpMouse, helpTip)
+        text: root.helpShown ? "Hide the keys" : "Show all keys"
+        fontFamily: root.fontFamily
+      }
     }
   }
 }
