@@ -78,9 +78,10 @@ Item {
   // to them. A name cut short, or in the header, no longer says the
   // currency it ends with.
   readonly property string listingMeta: {
+    if (!view || !quote) return ""
     var font = listingMetrics.font // read, so a new text size measures again
     var cut = !nameOnLine || listingMetrics.advanceWidth(listingLead + " · " + Figures.listingMeta(quote, false)) > listingRoom
-    return view && quote ? (listingLead !== "" ? " · " : "") + Figures.listingMeta(quote, cut) : ""
+    return (listingLead !== "" ? " · " : "") + Figures.listingMeta(quote, cut)
   }
   readonly property real listingRoom: Math.max(0, listingRow.width - symbolText.implicitWidth - Style.space(8))
   readonly property string changeCaption: view && view.periodLabel ? view.periodLabel

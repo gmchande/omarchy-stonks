@@ -2551,6 +2551,8 @@ ShellRoot {
         var shortFaults = []
         var shortSeen = []
         var touched = []
+        var coldFaults = []
+        var coldSeen = 0
         var exact = function(item, y) { return item.mapToItem(body, 0, y).y }
         var quotesBeforeCoin = stub.quotes
         stub.quotes = Object.assign({}, quotesBeforeCoin, { "BTC-USD": Quote.parseChart(JSON.parse(btcFile.text())) })
@@ -2649,6 +2651,19 @@ ShellRoot {
                 if (onInk) touched.push(where + ": the " + name + " mark's " + onInk + ", chart " + chart)
               })
             })
+            // Where the header gives its title way, the name is back on the
+            // ticker's line, which is measured; with no quote yet, before a
+            // first answer or after a failed one, it says nothing rather
+            // than throw. Found in review: it read a null quote's currency.
+            if (!body.headerTitled) {
+              var hero = find(body, "hero")
+              hero.quote = null
+              wait(50)
+              if (hero.listingMeta !== "") coldFaults.push(where + ": \"" + hero.listingMeta + "\"")
+              coldSeen++
+              hero.quote = Qt.binding(function() { return body.featuredQuote })
+              wait(50)
+            }
           })
         }
         // At text sizes 16 and 20 on an 850 px screen, with 12 lists, the
@@ -2709,6 +2724,8 @@ ShellRoot {
           shortFaults.length === 0, shortFaults.join(" | "))
         root.check("on a 768 px screen at every text size from 9 to 20 a range's marks never touch the ink, and a chart at full height shows both, in both looks",
           touched.length === 0, touched.join(" | "))
+        root.check("on a 768 px screen where the header gives its title way, a stock with no quote yet leaves the ticker's line empty, in both looks",
+          coldSeen > 0 && coldFaults.length === 0, coldSeen + " seen; " + coldFaults.join(" | "))
 
         // After the text size changes with the list scrolled, no row is cut
         // at the list's top or bottom, the row at its top stays there unless
