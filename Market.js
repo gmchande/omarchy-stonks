@@ -39,7 +39,6 @@ function sessionPhase(quote, t) {
   if (quote.crypto) return "always"
   if (!s.regular) return "closed"
   var local = Format.localClock(t, Quote.clockAt(quote, t).offset)
-  if (local.weekday === 0 || local.weekday === 6) return "weekend"
   if (s.pre && t >= s.pre.start && t < s.regular.start) return "pre"
   if (t >= s.regular.start && t < s.regular.end) {
     if (t < s.regular.start + 30 * 60) return "opening"
@@ -49,7 +48,11 @@ function sessionPhase(quote, t) {
     return "open"
   }
   if (s.post && t >= s.post.start && t < s.post.end) return "post"
-  return "closed"
+  // A weekend is a Saturday or Sunday the session isn't on: Saudi's exchange
+  // trades on Sunday, so its Sunday is open, then closed after its bell.
+  var day = function(at) { return Math.floor((at + Quote.clockAt(quote, at).offset) / 86400) }
+  var weekend = (local.weekday === 0 || local.weekday === 6) && day(t) !== day(s.regular.start)
+  return weekend ? "weekend" : "closed"
 }
 
 function phaseLabel(phase) {

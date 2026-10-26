@@ -336,6 +336,34 @@ test("sessionPhase follows the bells the exchange announced", () => {
   expect(M.sessionPhase({ ...q, timezoneName: "Europe/London" }, reg.start + 2.75 * 3600)).toBe("open")
 })
 
+// Saudi's exchange trades Sunday to Thursday, 10:00 to 15:00 at UTC+3. No
+// saved answer is from one, so Toyota's day is moved to Sunday 25 October's
+// session there, priced to 11:45.
+test("a session on a Sunday trades, and its evening is closed, not the weekend", () => {
+  const json = fixture("7203-t-day.json")
+  const r = json.chart.result[0]
+  const sunday = Date.UTC(2026, 9, 25) / 1000
+  const start = sunday + 7 * 3600, end = sunday + 12 * 3600, noon = sunday + 9 * 3600
+  const shift = start - r.meta.currentTradingPeriod.regular.start
+  r.timestamp = r.timestamp.map(t => t + shift).filter(t => t <= noon - 900)
+  for (const k of Object.keys(r.indicators.quote[0])) r.indicators.quote[0][k] = r.indicators.quote[0][k].slice(0, r.timestamp.length)
+  const p = { timezone: "AST", gmtoffset: 10800 }
+  const periods = { pre: { ...p, start, end: start }, regular: { ...p, start, end }, post: { ...p, start: end, end } }
+  Object.assign(r.meta, { symbol: "2222.SR", exchangeName: "SAU", timezone: "AST", exchangeTimezoneName: "Asia/Riyadh",
+    gmtoffset: 10800, currency: "SAR", regularMarketTime: noon - 900, currentTradingPeriod: periods,
+    tradingPeriods: { pre: [[periods.pre]], regular: [[periods.regular]], post: [[periods.post]] } })
+  const q = M.parseChart(json, cents, noon)
+  // At noon its price is 15 minutes old: asked for each minute, kept fresh
+  // with nothing open, and its age said.
+  expect(M.sessionPhase(q, noon)).toBe("open")
+  expect(quoteCadence(q, noon, 60, false)).toBe(60)
+  expect(staysWarm(q, noon)).toBe(true)
+  expect(M.freshness({ status: "ok", answeredAt: noon - 5 }, q, noon, 0, false)).toMatchObject({ state: "aged" })
+  // The Saturday before is the weekend; Sunday after the bell is closed.
+  expect(M.sessionPhase(q, start - DAY)).toBe("weekend")
+  expect(M.sessionPhase(q, end + 3600)).toBe("closed")
+})
+
 test("crypto is always open, never sees a weekend, and still reports quote age", () => {
   const t = btc.session.regular.start + 3600
   expect(M.sessionPhase(btc, t)).toBe("always")
