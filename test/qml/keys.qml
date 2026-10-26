@@ -449,10 +449,12 @@ ShellRoot {
       var windowSheet = walk(harness.window)
       capsLock(harness.window)
       deleteAsks(harness.window)
-      // The window has no bar to step through: its sheet lacks Tab's line.
-      var tab = popupSheet.all.indexOf("Tab ⇧Tab")
-      var popupWords = popupSheet.all.filter(function(text, i) { return i !== tab && i !== tab + 1 })
-      harness.check("the window's sheet is the popup's but for Tab", tab >= 0 && popupWords.join("|") === windowSheet.all.join("|"),
+      // The window has no bar to step through: its sheet lacks the Tab and
+      // ⇧Tab rows, each a key and what it does.
+      var tab = popupSheet.all.indexOf("Tab")
+      var tabRows = tab >= 0 && popupSheet.all[tab + 2] === "⇧Tab"
+      var popupWords = popupSheet.all.filter(function(text, i) { return !tabRows || i < tab || i > tab + 3 })
+      harness.check("the window's sheet is the popup's but for Tab and ⇧Tab", tabRows && popupWords.join("|") === windowSheet.all.join("|"),
         popupWords.join("|") + " vs " + windowSheet.all.join("|"))
       app.close()
       harness.finish()
