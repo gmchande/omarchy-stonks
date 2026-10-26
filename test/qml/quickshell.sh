@@ -30,6 +30,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/../procs.sh"
 qs_mark="STONKS_RUN=$$-$(date +%s%N)"
 qs_leader=""
+qs_leader_start=""
 qs_code=0
 qs_session_runtime=${XDG_RUNTIME_DIR:-/run/user/$UID}
 qs_runtime=""
@@ -82,6 +83,7 @@ quickshell_run() {
     echo "$! $?" > "$log.ended"
     exec sleep infinity' _ "$log" "$@" &
   qs_leader=$!
+  qs_leader_start=$(start_of "$qs_leader")
   # The stop kills the leader on purpose; out of the job table, its end
   # prints no "Killed" notice. How Quickshell ended comes through the fifo.
   disown "$qs_leader"
@@ -116,14 +118,27 @@ quickshell_stop() {
   set +e
   [ -n "$qs_leader" ] || qs_leader=$(marked "$qs_mark" | while read -r pid _; do
     [ "$(ppid_of "$pid")" = "$me" ] && echo "$pid"; done | head -n 1)
-  # The group is the run's while its leader carries the mark and leads it,
-  # which it does until killed.
-  if leads_marked "$qs_leader"; then
+  # An interrupt can come once the leader is recorded, before its start
+  # time: the leader is the process the run has just started, so its start
+  # time is read now.
+  [ -n "$qs_leader_start" ] || qs_leader_start=$(start_of "$qs_leader")
+  # The group is the run's while its leader is the process the run started,
+  # by its start time, and leads it, which it does until killed. Not by its
+  # mark: /proc/PID/environ reads empty while a process is part way through
+  # an exec, and the leader execs `sleep infinity` as it says Quickshell has
+  # ended, so a stop that came just then left it running, then found it
+  # still marked and failed the run as if it had left (GitHub's run of 26
+  # October).
+  if leader_is "$qs_leader" "$qs_leader_start"; then
     kill -TERM -- "-$qs_leader" 2> /dev/null
     for i in $(seq 10); do [ "$(pgrep -g "$qs_leader" | wc -l)" -le 1 ] && break; sleep 0.2; done
-    leads_marked "$qs_leader" && kill -KILL -- "-$qs_leader" 2> /dev/null
+    leader_is "$qs_leader" "$qs_leader_start" && kill -KILL -- "-$qs_leader" 2> /dev/null
+    # What left the group is looked for once the group has died, so a
+    # member still dying isn't taken for one.
+    for i in $(seq 20); do group_running "$qs_leader" || break; sleep 0.1; done
   fi
   qs_leader=""
+  qs_leader_start=""
   left=$(marked "$qs_mark")
   if [ -n "$left" ]; then
     kill -TERM $(cut -d' ' -f1 <<< "$left") 2> /dev/null
@@ -147,4 +162,13 @@ quickshell_exit() {
   trap '' INT TERM
   quickshell_stop
 }
-leads_marked() { [ -n "$1" ] && [ "$(pgid_of "$1")" = "$1" ] && grep -qzx -- "$qs_mark" "/proc/$1/environ" 2> /dev/null; }
+# group_running LEADER: a member of LEADER's group still runs. A zombie
+# doesn't: it carries no mark, and goes once reaped.
+group_running() {
+  local pid s
+  for pid in $(pgrep -g "$1"); do
+    s=$(stat_of "$pid") || continue
+    [ "${s%% *}" = Z ] || return 0
+  done
+  return 1
+}

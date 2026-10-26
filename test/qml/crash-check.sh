@@ -123,9 +123,10 @@ gone() {
 # own, as lib.sh runs it, in the background in a group of its own (job
 # control, so INT is not ignored): its pid in h, its folder $tmp/CASE. With
 # EARLY, the harness is sent TERM as it is about to record the group's
-# leader, once the stand-in has started its children; with EARLY=made, as
-# the run's runtime folder is made and Quickshell not yet started, noting
-# the folder in CASE/made.
+# leader, once the stand-in has started its children; with EARLY=start,
+# the same once it has recorded the leader, before its start time; with
+# EARLY=made, as the run's runtime folder is made and Quickshell not yet
+# started, noting the folder in CASE/made.
 harness() {
   local dir=$tmp/$1
   mkdir -p "$dir"
@@ -136,6 +137,7 @@ harness() {
     trap quickshell_exit EXIT; trap "exit 130" INT; trap "exit 143" TERM
     early() { local i; for i in $(seq 50); do [ -s "$STANDIN_DIR/left" ] && break; sleep 0.1; done; kill -TERM $$; }
     if [ "$EARLY" = made ]; then set -T; trap "[[ \$BASH_COMMAND == mkfifo* ]] && { [ -d \"\$qs_runtime\" ] && echo \"\$qs_runtime\" > \"\$STANDIN_DIR/made\"; kill -TERM \$\$; }" DEBUG
+    elif [ "$EARLY" = start ]; then set -T; trap "[[ \$BASH_COMMAND == qs_leader_start=* ]] && early" DEBUG
     elif [ -n "$EARLY" ]; then set -T; trap "[[ \$BASH_COMMAND == qs_leader=* ]] && early" DEBUG; fi
     quickshell_run "$2" "$3/log" -p nowhere
     echo "$qs_code" > "$3/code"' _ "$here" "$3" "$dir" < /dev/null > "$dir/out" 2>&1 &
@@ -238,7 +240,8 @@ wait "$h" 2> /dev/null
 
 # An interrupt of a harness: INT as a terminal sends it, TERM as test/queue.sh
 # does, each to the harness's group, mid-run; and TERM the moment
-# Quickshell has started, before the harness has recorded its group.
+# Quickshell has started, before the harness has recorded its group, and
+# once it has recorded the group's leader, before the leader's start time.
 for signal in INT TERM; do
   harness "$signal" hang 60 both
   within 5 test -s "$tmp/$signal/left" || miss "$signal: the stand-in never started"
@@ -250,6 +253,10 @@ harness early hang 60 both early
 wait "$h" 2> /dev/null
 sleep 0.5
 gone early
+harness early-start hang 60 both start
+wait "$h" 2> /dev/null
+sleep 0.5
+gone early-start
 
 # Side by side: one run crashes while another runs; the other's processes
 # and its runtime folder are left alone.
