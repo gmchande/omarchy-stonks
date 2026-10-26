@@ -1192,6 +1192,9 @@ Item {
     managingLists = false
     listsSymbol = ""
   }
+  // A symbol's lists close once it has left All, however it left: removed
+  // on the other surface or in the data file, there is nothing to tick.
+  onViewChanged: if (listsSymbol !== "" && view.library.indexOf(listsSymbol) < 0) listsSymbol = ""
 
   // The keys go back to the surface once no view has them; a turn later,
   // so one view closing as another opens hands the keys straight across.

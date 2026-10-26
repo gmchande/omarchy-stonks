@@ -400,7 +400,8 @@ The shell's log the form asks for can name the prices Stonks left out.
   saved straight there, with no copy anywhere else. Everything in
   `~/.cache/grvc.stonks` is readable by you alone (0600, the folder 0700),
   and so is the data file, from the moment Stonks makes it, and again
-  after an older Stonks or an editor left it readable to others.
+  from Stonks' next save after an older Stonks or an editor left it
+  readable to others.
   The shell keeps the pill's form on its bar entry in
   `~/.config/omarchy/shell.json`.
 - **Limits:** every request has a time limit and a size cap. Quotes come

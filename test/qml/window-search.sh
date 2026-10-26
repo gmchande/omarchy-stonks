@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Search in the window through the real App and Service with real Qt keys
 # and pointer: results that belong to their query, a search out at a close,
-# looking a result up on the hero before adding it, and one preview across
-# two surfaces. HOME and curl are scratch.
+# looking a result up on the hero before adding it, one preview across two
+# surfaces, and a preview before the hero's first quote that leaves the hero
+# its cap and P/E. HOME and curl are scratch.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree window-search.qml
 patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property var testBody: root.body\n  readonly property alias testKeyCatcher: keyCatcher\n  readonly property alias testWindow: window'

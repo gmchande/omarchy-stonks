@@ -72,10 +72,11 @@ Item {
     service.summon(symbol, range)
   }
 
-  // The cap and P/E for the symbol on show while the window is open; the
-  // service asks for the chart's history itself.
+  // The cap and P/E for the symbol on show while the window is open where a
+  // screen shows it, and as it comes back into sight; the service asks for
+  // the chart's history itself.
   function requestFundamentals() {
-    if (window.visible && ready && featuredSymbol) service.fetchFundamentals(featuredSymbol)
+    if (window.visible && onScreen && ready && featuredSymbol) service.fetchFundamentals(featuredSymbol)
   }
 
   function refresh() {
@@ -93,6 +94,7 @@ Item {
     if (window.visible) root.body.motion.revealChart()
   })
   onFeaturedSymbolChanged: requestFundamentals()
+  onOnScreenChanged: requestFundamentals()
 
   FloatingWindow {
     id: window

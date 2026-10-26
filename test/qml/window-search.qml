@@ -310,6 +310,40 @@ ShellRoot {
       wait(400)
     }
 
+    // A search's preview, made while the hero's first quote is still out,
+    // leaves the hero its cap and P/E: they are asked for once its quote is
+    // in and search has closed. Found in the codebase review of 26 October:
+    // the preview took the hero's one waiting ask, and the hero showed no
+    // cap or P/E until r.
+    function previewKeepsHeroFigures(body, keys) {
+      var hero = service.featuredSymbol
+      var hold = function(command) {
+        fileProc.command = [command].concat(command === "rm" ? ["-f"] : []).concat([harness.fakeState + "/SLID.quote.hold"])
+        fileProc.running = true
+        tryVerify(function() { return !fileProc.running }, 2000)
+      }
+      hold("touch")
+      service.persist({ symbols: service.library.concat(["SLID"]), featured: "SLID" })
+      tryVerify(function() { return service.featuredSymbol === "SLID" && service.pendingFundamentals === "SLID" }, 3000)
+      var before = harness.calls("SLID.fundamentals")
+      searchShop(body, keys)
+      keyClick(Qt.Key_Down)
+      var previewed = within(6000, function() {
+        return service.previewSymbol !== "" && !!service.previewEntries[service.previewSymbol] && service.pendingFundamentals !== "SLID"
+      })
+      hold("rm")
+      tryVerify(function() { return !!service.quotes.SLID }, 8000)
+      wait(300)
+      keyClick(Qt.Key_Escape)
+      var asked = within(3000, function() { return harness.calls("SLID.fundamentals") > before })
+      harness.check("a preview made before the hero's first quote leaves the hero its cap and P/E, asked for once search closes",
+        previewed && asked, "previewed " + previewed + ", SLID's asked " + (harness.calls("SLID.fundamentals") - before))
+      service.removeSymbol("SLID")
+      service.feature(hero)
+      service.lastRemoval = null
+      wait(300)
+    }
+
     // An add from search on a range, before the result's first answer,
     // takes over the history fetch its preview has out instead of asking
     // again: SHOP.TO's day and year held back, Enter on it, the add the
@@ -889,6 +923,7 @@ ShellRoot {
       looksUpBeforeAdding(body, watchlist, keys)
       twoSurfacesPreview(body, keys)
       addTakesOverHistory(body, keys)
+      previewKeepsHeroFigures(body, keys)
       app.close()
       harness.finish()
     }

@@ -3,7 +3,8 @@
 # Watchlist with real Qt keys: a version-1 file read as it is, making a list,
 # adding to it, switching, removing by the list's rules, and a second
 # Service reading back what the first wrote. And the list header's unit
-# sign, clicked in the window and the real popup (Panel.qml): the shell's
+# sign, clicked in the window and the real popup (Panel.qml), and a stock
+# removed in the popup closing its lists in the window: the shell's
 # layer-shell card window does not load offscreen, so the copy of Panel.qml
 # puts the card in CardWindow.qml, as keys.sh does. HOME and curl are
 # scratch.

@@ -2021,6 +2021,28 @@ ShellRoot {
       service.testFeed.quotes = plain
       wait(50)
 
+      // A stock's lists open in the window, and the stock removed in the
+      // popup: the window's lists close, as they do when the window removes
+      // it, since nothing is left to tick. Found in the codebase review of
+      // 26 October: All stayed unticked, and a click on it did nothing.
+      app.open("{}")
+      wait(200)
+      var away = service.library[service.library.length - 1]
+      app.testBody.openSymbolLists(away)
+      tryVerify(function() { return app.testBody.listsSymbol === away }, 2000)
+      panel.open()
+      tryVerify(function() { return !!panel.testBody && panel.testBody.surfaceOpen }, 3000)
+      panel.testBody.removeRow(away)
+      panel.close()
+      var closedThere = within(2000, function() {
+        return app.testBody.listsSymbol === "" && !harness.find(app.testBody, "symbolLists").visible
+      })
+      harness.check("a stock removed in the popup closes its lists in the window",
+        closedThere && service.library.indexOf(away) < 0, away + " | " + JSON.stringify(app.testBody.listsSymbol))
+      service.undoRemoval(away)
+      tryVerify(function() { return service.library.indexOf(away) >= 0 }, 3000)
+      app.close()
+
       harness.finish()
     }
   }
