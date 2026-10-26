@@ -110,13 +110,22 @@ ShellRoot {
 
   function yIn(item, y) { return Math.round(item.mapToItem(body, 0, y).y) }
   function xIn(item, x) { return Math.round(item.mapToItem(body, x, 0).x) }
-  // What's wrong with where an open tip lies, or "": it must lie wholly in
-  // the window, above its icon or under it, never over it.
+  // What's wrong with where an open tip lies, or "": all of it, its
+  // background as well as its words, since a style may draw the background
+  // wider (found in review), must lie in the window, above its icon or
+  // under it, never over it.
   function tipFault(tip, icon) {
-    var top = Math.round(tip.contentItem.mapToItem(null, 0, 0).y)
-    var bottom = top + Math.round(tip.contentItem.height)
+    var drawn = [tip.background, tip.contentItem].map(function(item) {
+      var at = item.mapToItem(null, 0, 0)
+      return { left: at.x, top: at.y, right: at.x + item.width, bottom: at.y + item.height }
+    })
+    var left = Math.round(Math.min(drawn[0].left, drawn[1].left))
+    var right = Math.round(Math.max(drawn[0].right, drawn[1].right))
+    var top = Math.round(Math.min(drawn[0].top, drawn[1].top))
+    var bottom = Math.round(Math.max(drawn[0].bottom, drawn[1].bottom))
     var iconTop = Math.round(icon.mapToItem(null, 0, 0).y)
-    if (top < 0 || bottom > window.height) return "its tip runs from " + top + " to " + bottom + ", out of the window"
+    if (left < 0 || top < 0 || right > window.width || bottom > window.height)
+      return "its tip runs from " + left + "," + top + " to " + right + "," + bottom + ", out of the window"
     if (bottom > iconTop && top < iconTop + icon.height) return "its tip covers its icon"
     return ""
   }
