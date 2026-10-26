@@ -5,13 +5,16 @@
 # drawn through the host's GPU. Each checkout runs one session at a time, and
 # sessions from different checkouts run side by side.
 #
-#   start [--fresh] [--zone ZONE] [--slow SECONDS] REF
+#   start [--fresh] [--zone ZONE] [--slow SECONDS] [--update-from OLD] REF
 #                                  sandbox the committed REF and start the session;
 #                                  --fresh: as a new user's machine, Stonks not
 #                                  installed, a terminal open with REF's clone at ~/stonks;
 #                                  --zone: the session's clocks in ZONE (Asia/Kolkata);
 #                                  --slow: every curl in the session answers SECONDS
-#                                  late (3), as on a weak hotspot
+#                                  late (3), as on a weak hotspot;
+#                                  --update-from: as a user of OLD (v1.0.4) whose
+#                                  Stonks is a clone of GitHub, with GitHub's main
+#                                  moved on to REF, a release of it
 #   stop                           end it and report the isolation evidence
 #   key KEY...                     keysym names; shift+j, ctrl+a, or J hold a modifier
 #   type TEXT                      type text
@@ -70,7 +73,9 @@ python=${TOPHAT_PYTHON:-/usr/bin/python3}
 services=(omarchy.clipboard omarchy.idle omarchy.lock omarchy.polkit omarchy.nightlight omarchy.battery)
 # Known routes into the owner's session, logged and answered with success.
 # They guard PATH lookups only: accident containment, not a security sandbox.
+# systemd-cat and logger write to the owner's journal.
 standins=(pkill pgrep killall pidwait uwsm uwsm-app systemctl systemd-run loginctl
+  systemd-cat logger
   hyprlock 1password brightnessctl powerprofilesctl omarchy-powerprofiles-set
   omarchy-system-lock omarchy-system-wake omarchy-launch-screensaver
   omarchy-brightness-display omarchy-brightness-keyboard omarchy-hook
@@ -83,6 +88,20 @@ allowed=(
   # The menu's "when" for its remove-SSHD entry: default/omarchy/omarchy-menu.jsonc:294
   "systemctl is-enabled --quiet sshd"
 )
+# And on an update start alone, the restart's own: bin/omarchy-restart-shell's
+# environment read and its invitations' restart, both answered by the
+# stand-in, which does nothing.
+update_allowed=(
+  "systemctl --user show-environment"
+  "systemctl --user try-restart omarchy-*-invitation.service"
+)
+# On an update start, the update's one launch through uwsm-app, as
+# bin/omarchy-launch-floating-terminal-with-presentation makes it for
+# `omarchy plugin update grvc.stonks` (Updates.qml), and the restarted
+# shell's through systemd-cat (bin/omarchy-launch-shell).
+update_launch=(-- xdg-terminal-exec --app-id=org.omarchy.terminal --title=Omarchy -e bash -c
+  'omarchy-show-logo; omarchy plugin update grvc.stonks; if (( $? != 130 )); then omarchy-show-done; fi')
+shell_launch=(-t omarchy-shell -- quickshell -n -p /usr/share/omarchy/shell)
 
 die() { echo "tophat: $*" >&2; exit 1; }
 
@@ -298,6 +317,7 @@ write_standins() {
     printf '#!/bin/sh\nprintf "%%s\\n" "%s $*" >> %q\nexit 0\n' "$name" "$run/stubs.log" > "$run/stubs/$name"
     chmod +x "$run/stubs/$name"
   done
+  [ -z "${update_from:-}" ] || write_update_standins "$run" || return 1
   cat > "$run/stubs/pw-play" << EOF
 #!/usr/bin/env bash
 log=$(printf %q "$run/sounds.log")
@@ -336,6 +356,68 @@ EOF
   chmod +x "$run/stubs/pw-cat"
 }
 
+# write_update_standins RUN: on an update start, three stand-ins let the
+# update's own shape through, inside the session, and log any other call
+# as every stand-in does. uwsm-app runs the update's terminal (update_launch)
+# as foot on the session's display, when its runtime folder is the
+# session's, and notes its session id in RUN/joined: the launch leaves the
+# run's group (the shell's startDetached and the script's setsid each start
+# a session), and stop ends what carries the run's mark in a joined
+# session. systemd-cat runs the restarted shell (shell_launch) with its
+# output in RUN/shell.log and its exit in RUN/shell.exit, where the first
+# shell's are, and logger -t omarchy-shell writes to that log too: neither
+# reaches the owner's journal.
+write_update_standins() {
+  local run=$1
+  same_as() { printf 'want=(%s)\n' "$(printf '%q ' "$@")"; cat << 'EOF'
+same() {
+  [ $# -eq ${#want[@]} ] || return 1
+  local i=0 arg
+  for arg; do [ "$arg" = "${want[i]}" ] || return 1; i=$((i + 1)); done
+}
+EOF
+  }
+  {
+    echo '#!/usr/bin/env bash'
+    printf 'log=%q runtime=%q joined=%q\n' "$run/stubs.log" "$runtime" "$run/joined"
+    same_as "${update_launch[@]}"
+    cat << 'EOF'
+if same "$@" && [ "${XDG_RUNTIME_DIR:-}" = "$runtime" ]; then
+  s=$(cat /proc/$$/stat); s=${s##*) }; read -r _ _ _ sid _ <<< "$s"
+  echo "$sid" >> "$joined"
+  exec foot --app-id=org.omarchy.terminal --title=Omarchy bash -c "${!#}"
+fi
+printf '%s\n' "uwsm-app $*" >> "$log"
+EOF
+  } > "$run/stubs/uwsm-app"
+  {
+    echo '#!/usr/bin/env bash'
+    printf 'log=%q shell_log=%q shell_exit=%q\n' "$run/stubs.log" "$run/shell.log" "$run/shell.exit"
+    same_as "${shell_launch[@]}"
+    cat << 'EOF'
+if same "$@"; then
+  "${@:4}" >> "$shell_log" 2>&1
+  code=$?
+  echo "$code" > "$shell_exit"
+  exit "$code"
+fi
+printf '%s\n' "systemd-cat $*" >> "$log"
+EOF
+  } > "$run/stubs/systemd-cat"
+  {
+    echo '#!/usr/bin/env bash'
+    printf 'log=%q shell_log=%q\n' "$run/stubs.log" "$run/shell.log"
+    cat << 'EOF'
+if [ $# -ge 3 ] && [ "$1" = -t ] && [ "$2" = omarchy-shell ]; then
+  printf 'logger: %s\n' "${*:3}" >> "$shell_log"
+  exit 0
+fi
+printf '%s\n' "logger $*" >> "$log"
+EOF
+  } > "$run/stubs/logger"
+  chmod +x "$run/stubs/uwsm-app" "$run/stubs/systemd-cat" "$run/stubs/logger"
+}
+
 # write_slow_curl RUN SECONDS CURL: the session's curl, ahead of the real one
 # on its PATH. Every Stonks request is one curl run (Fetch.js), so each
 # answers SECONDS late; the sleep is before curl starts, so curl's own
@@ -343,6 +425,60 @@ EOF
 write_slow_curl() {
   mkdir -p "$1/slow" || return 1
   printf '#!/bin/sh\nsleep %s\nexec %q "$@"\n' "$2" "$3" > "$1/slow/curl" && chmod +x "$1/slow/curl"
+}
+
+# write_release_curl RUN URL GITHUB CURL: on an update start, the session's
+# curl, ahead of the slow one or the real one (CURL). A run asking for URL
+# alone, main's manifest on GitHub (Release.js), gets GITHUB's main
+# manifest, written out as curl's -w line says (Fetch.curlCommand) with a
+# 200, and a line in RUN/release/asked; every other run is CURL's, its
+# arguments as given.
+write_release_curl() {
+  mkdir -p "$1/release" || return 1
+  cat > "$1/release/curl" << EOF
+#!/usr/bin/env bash
+url=$(printf %q "$2")
+github=$(printf %q "$3")
+next=$(printf %q "$4")
+asked=$(printf %q "$1/release/asked")
+EOF
+  cat >> "$1/release/curl" << 'EOF'
+[ "${!#}" = "$url" ] || exec "$next" "$@"
+format="" prev=""
+for arg; do
+  [ "$prev" = -w ] && format=$arg
+  prev=$arg
+done
+git -C "$github" show main:manifest.json || exit 1
+format=${format//'%{urlnum}'/0}
+format=${format//'%{http_code}'/200}
+format=${format//'%{exitcode}'/0}
+format=${format//'%header{retry-after}'/}
+printf '%b' "$format"
+date +%s >> "$asked"
+EOF
+  chmod +x "$1/release/curl"
+}
+
+# release_of OLD REF GITHUB: GITHUB's main moves on from OLD to REF, and to
+# a release of REF: when REF names no newer version than OLD, a commit on
+# top of it in GITHUB alone names OLD's next minor version (1.0.4 to
+# 1.1.0), as the release commit will. Prints the version main names.
+release_of() {
+  local old=$1 ref=$2 github=$3 was now
+  was=$(git -C "$checkout" show "$old:manifest.json" | jq -er .version) \
+    && now=$(git -C "$checkout" show "$ref:manifest.json" | jq -er .version) || return 1
+  git -C "$github" fetch -q "$checkout" "$ref" && git -C "$github" reset -q --hard FETCH_HEAD || return 1
+  if [ "$now" = "$was" ] || [ "$(printf '%s\n%s\n' "$now" "$was" | sort -V | tail -n 1)" = "$was" ]; then
+    now=$(awk -F. '{ print $1 "." $2 + 1 ".0" }' <<< "$was")
+    jq --arg v "$now" '.version = $v' "$github/manifest.json" > "$github/manifest.next" \
+      && mv "$github/manifest.next" "$github/manifest.json" \
+      && git -C "$github" -c user.name=Stonks -c user.email=release@stonks.invalid -c commit.gpgsign=false \
+        -c core.hooksPath=/dev/null commit -q -am "Stonks $now, standing in for the release commit" \
+      || return 1
+  fi
+  rm -f "$github/.git/FETCH_HEAD"
+  echo "$now"
 }
 
 # write_launcher RUN RUN_ID: start runs it as `setsid launch.sh`, so it leads
@@ -360,6 +496,7 @@ write_launcher() {
   local run=$1 id=$2 tz="" slow_path=""
   [ -n "${zone:-}" ] && tz="TZ=$(printf %q "$zone") "
   [ -n "${slow:-}" ] && slow_path='$run/slow:'
+  [ -n "${update_from:-}" ] && slow_path='$run/release:'$slow_path
   cat > "$run/launch.sh" << EOF
 #!/usr/bin/env bash
 run=$(printf %q "$run")
@@ -412,7 +549,11 @@ EOF
 # screenshot names no one's lists. A fresh start has no plugin folder, data
 # file, or cache: COMMIT is a clone at ~/stonks, the URL a new user's
 # install is given (a relative path, so the installer's warning shows no
-# home path), with a plain prompt and Omarchy's terminal config.
+# home path), with a plain prompt and Omarchy's terminal config. An update
+# start installs `update_from` as a clone of RUN/github, the stand-in for
+# GitHub, whose main then moves on to a release of COMMIT (`release_of`),
+# with the data file that release saved (test/data-files) and Omarchy's
+# terminal config for the update's terminal.
 build_sandbox() {
   local run=$1 commit=$2 home=$1/home style
   mkdir -p "$home/.config/omarchy" "$home/.local/state/omarchy/current" \
@@ -422,6 +563,18 @@ build_sandbox() {
       && git -C "$home/stonks" reset -q --hard FETCH_HEAD && rm -f "$home/stonks/.git/FETCH_HEAD"; } \
       || { echo "tophat: cannot clone $commit" >&2; return 1; }
     printf '%s\n' "PS1='\\w \\\$ '" > "$home/.bashrc"
+    mkdir -p "$home/.config/foot" && cp /usr/share/omarchy/config/foot/foot.ini "$home/.config/foot/" || return 1
+  elif [ -n "${update_from:-}" ]; then
+    local github=$run/github was data
+    { git init -q -b main "$github" && git -C "$github" fetch -q "$checkout" "$update_from" \
+      && git -C "$github" reset -q --hard FETCH_HEAD \
+      && git clone -q "$github" "$home/.config/omarchy/plugins/grvc.stonks" \
+      && release_of "$update_from" "$commit" "$github" > "$run/release.version"; } \
+      || { echo "tophat: cannot set up the update from $update_from to $commit" >&2; return 1; }
+    was=$(git -C "$checkout" show "$update_from:manifest.json" | jq -r .version)
+    data=$here/data-files/$was.json
+    [ -f "$data" ] || data=$here/tophat/demo.json
+    cp "$data" "$home/.config/omarchy/grvc.stonks.json" && cp "$data" "$run/data.before.json" || return 1
     mkdir -p "$home/.config/foot" && cp /usr/share/omarchy/config/foot/foot.ini "$home/.config/foot/" || return 1
   else
     mkdir -p "$home/.config/omarchy/plugins/grvc.stonks" || return 1
@@ -446,10 +599,11 @@ build_sandbox() {
 # ---- the host ---------------------------------------------------------------
 
 # host_windows: the host's mapped windows that a process of this run owns,
-# workspace 9 left out, one per line; fails when the host can't be read.
+# the update's terminal among them, workspace 9 left out, one per line;
+# fails when the host can't be read.
 host_windows() {
   local pids
-  pids=$(pgrep -g "$LEADER" | paste -sd,)
+  pids=$({ pgrep -g "$LEADER"; joined_pids; } | paste -sd,)
   hyprctl -j clients | jq -r --argjson pids "[$pids]" '.[] | select(.workspace.id != 9)
     | select(.pid as $p | $pids | index($p)) | "\(.class) (\(.title)), pid \(.pid), workspace \(.workspace.id)"'
 }
@@ -607,21 +761,31 @@ cmd_scroll() {
 # ---- start ------------------------------------------------------------------
 
 cmd_start() {
-  fresh=0 zone="" slow=""
+  fresh=0 zone="" slow="" update_from=""
   while :; do
     case ${1:-} in
       --fresh) fresh=1; shift ;;
       --zone) zone=${2:-}; zone_ok "$zone" || exit 1; shift 2 ;;
       --slow) slow=${2:-}; slow_ok "$slow" || exit 1; shift 2 ;;
+      --update-from)
+        update_from=$(git -C "$checkout" rev-parse --verify --quiet "${2:-}^{commit}") || die "no such commit: ${2:-}"
+        shift 2 ;;
       *) break ;;
     esac
   done
-  local ref=${1:?usage: start [--fresh] [--zone ZONE] [--slow SECONDS] REF} commit id tool curl=""
+  local ref=${1:?usage: start [--fresh] [--zone ZONE] [--slow SECONDS] [--update-from OLD] REF} commit id tool curl="" url=""
   commit=$(git -C "$checkout" rev-parse --verify --quiet "$ref^{commit}") || die "no such commit: $ref"
+  if [ -n "$update_from" ]; then
+    (( ! fresh )) || die "--fresh and --update-from are two first runs: pick one"
+    git -C "$checkout" merge-base --is-ancestor "$update_from" "$commit" \
+      || die "$ref doesn't hold ${update_from:0:7}, so main couldn't move to it: an update fast-forwards"
+    url=$(git -C "$checkout" show "$update_from:Release.js" | sed -n 's/^var MANIFEST_URL = "\(https:[^"]*\)"$/\1/p')
+    [ -n "$url" ] || die "${update_from:0:7} asks GitHub for no manifest (Release.js)"
+  fi
   for tool in Hyprland quickshell dbus-run-session python3 wtype grim wf-recorder setsid flock prlimit journalctl jq foot; do
     command -v "$tool" > /dev/null || die "$tool is not installed"
   done
-  if [ -n "$slow" ]; then curl=$(command -v curl) || die "curl is not installed"; fi
+  if [ -n "$slow" ] || [ -n "$update_from" ]; then curl=$(command -v curl) || die "curl is not installed"; fi
   # The nested Hyprland draws through the host's GPU, over its Wayland socket.
   case ${WAYLAND_DISPLAY:-} in
     "") die "no host display: start runs from the owner's session" ;;
@@ -640,10 +804,11 @@ cmd_start() {
   mkdir -p "$run" && printf 'RUN_ID=%q\n' "$id" > "$run/identity" || die "cannot make $run"
   echo "run folder: $run"
   build_sandbox "$run" "$commit" && { [ -z "$slow" ] || write_slow_curl "$run" "$slow" "$curl"; } \
+    && { [ -z "$update_from" ] || write_release_curl "$run" "$url" "$run/github" "$([ -n "$slow" ] && echo "$run/slow/curl" || echo "$curl")"; } \
     && write_nested_lua "$run" && nested_lua_ok "$run/nested.lua" \
     && write_launcher "$run" "$id" || die "the sandbox is not ready; nothing was launched"
   read_facts "$run/host-before" || die "the owner's facts could not be read; nothing was launched"
-  { printf 'RUN_ID=%q\nCHECKOUT=%q\nCOMMIT=%q\nSTART_EPOCH=%q\nFACTS_AT=%q\nRUNTIME=%q\nZONE=%q\nSLOW=%q\n' "$id" "$checkout" "$commit" "$((read_at / 1000000000))" "$read_at" "$runtime" "$zone" "$slow"; } > "$run/identity"
+  { printf 'RUN_ID=%q\nCHECKOUT=%q\nCOMMIT=%q\nSTART_EPOCH=%q\nFACTS_AT=%q\nRUNTIME=%q\nZONE=%q\nSLOW=%q\nUPDATE_FROM=%q\n' "$id" "$checkout" "$commit" "$((read_at / 1000000000))" "$read_at" "$runtime" "$zone" "$slow" "$update_from"; } > "$run/identity"
   trap 'start_failed "interrupted"' INT TERM
 
   setsid "$run/launch.sh" < /dev/null > /dev/null 2>&1 &
@@ -677,6 +842,9 @@ cmd_start() {
   if (( fresh )); then echo "fresh: Stonks not installed; in the terminal, its clone is ~/stonks"; fi
   if [ -n "$zone" ]; then echo "zone: $zone, $(TZ=$zone date +'%H:%M %Z') there"; fi
   if [ -n "$slow" ]; then echo "slow: every curl in the session answers $slow s late"; fi
+  if [ -n "$update_from" ]; then
+    echo "update: ${update_from:0:7} installed as a clone of $run/github, whose main is Stonks $(cat "$run/release.version"), $commit or a release commit on it"
+  fi
 }
 
 # find_instance: this run's Hyprland instance, from its lock file.
@@ -698,8 +866,9 @@ find_instance() {
 shell_up() { note_pids; [ "$(nested omarchy-shell shell ping 2>/dev/null)" = ok ]; }
 terminal_up() { note_pids; nested hyprctl -j clients | jq -e 'any(.[]; .class == "foot")' > /dev/null; }
 
-# note_pids: the group's members so far, for the core-dump check.
-note_pids() { pgrep -g "$LEADER" >> "$run/pids"; }
+# note_pids: the group's members so far, and the update's terminal's, for
+# the core-dump check.
+note_pids() { { pgrep -g "$LEADER"; joined_pids; } >> "$run/pids"; }
 
 services_off() {
   local plugins id ok=0
@@ -788,6 +957,42 @@ crashes() {
   return 0
 }
 
+# stand_in_allowed LINE: a stand-in call this run may make (allowed), or on
+# an update start (UPDATE_FROM) the restart's own (update_allowed).
+stand_in_allowed() {
+  local a
+  for a in "${allowed[@]}"; do [ "$1" = "$a" ] && return 0; done
+  [ -n "${UPDATE_FROM:-}" ] || return 1
+  for a in "${update_allowed[@]}"; do [ "$1" = "$a" ] && return 0; done
+  return 1
+}
+
+# joined_pids: the processes that carry the run's mark in a session the
+# update's terminal noted (RUN/joined, write_update_standins), one a line.
+joined_pids() {
+  [ -s "$run/joined" ] || return 0
+  local pid rest s sid
+  while read -r pid rest; do
+    s=$(cat "/proc/$pid/stat" 2> /dev/null) || continue
+    s=${s##*) }
+    read -r _ _ _ sid _ <<< "$s"
+    grep -qxF -- "$sid" "$run/joined" && echo "$pid"
+  done < <(marked "$(mark)")
+}
+
+# end_joined: the update's terminal and what it started end with the run,
+# TERM, then KILL; anything else that left the group stays for stop to fail.
+none_joined() { [ -z "$(joined_pids)" ]; }
+end_joined() {
+  local sig pid
+  for sig in TERM KILL; do
+    none_joined && return 0
+    for pid in $(joined_pids); do kill "-$sig" "$pid" 2> /dev/null; done
+    within 5 none_joined && return 0
+  done
+  none_joined
+}
+
 # stop_run: end everything this run started and report what it saw.
 # Returns non-zero on anything the run may have caused.
 stop_run() {
@@ -800,6 +1005,7 @@ stop_run() {
     elif [ -n "$line" ]; then echo "FAILED a window of this run mapped on the host: $line" >&2; status=1; fi
   fi
   end_session || { echo "FAILED the session's group did not end" >&2; status=1; }
+  end_joined || { echo "FAILED the update's terminal did not end: $(joined_pids | paste -sd ' ')" >&2; status=1; }
   sleep 0.5
   # Processes that carry the run's mark but left its group: reported, never
   # signalled.
@@ -807,9 +1013,8 @@ stop_run() {
   [ -n "$line" ] && { echo "FAILED processes left the run's group and are still running (not signalled):" >&2; echo "$line" >&2; status=1; }
   if [ -s "$run/stubs.log" ]; then
     while read -r line; do
-      blocked=1
-      for a in "${allowed[@]}"; do [ "$line" = "$a" ] && blocked=0; done
-      (( blocked )) && { echo "FAILED blocked attempt: $line" >&2; status=1; } || echo "allowed stand-in call: $line"
+      if stand_in_allowed "$line"; then echo "allowed stand-in call: $line"
+      else echo "FAILED blocked attempt: $line" >&2; status=1; fi
     done < "$run/stubs.log"
   fi
   errors=$(grep -nE 'TypeError|ReferenceError|Error:' "$run/shell.log" 2> /dev/null)
@@ -1125,6 +1330,84 @@ EOF
   (( code == 7 )) || miss "the slow curl should return the real curl's exit 7, got $code"
   [ "$(cat "$tmp/curl-args" 2> /dev/null)" = "$(printf '%s\n' -sS 'a b' '$HOME')" ] \
     || miss "the slow curl should pass its arguments as given, got: $(cat "$tmp/curl-args" 2> /dev/null)"
+
+  # The update start's stand-ins. In an ordinary run uwsm-app, systemd-cat,
+  # and logger only log, whatever they are asked, and stop fails on each,
+  # and on the restart's systemctl calls. On an update start the update's
+  # terminal and the restarted shell alone run, inside the session; any
+  # other shape only logs.
+  mkdir -p "$tmp/fakebin" "$tmp/ordinary/stubs" "$tmp/update/stubs"
+  for t in foot quickshell; do
+    printf '#!/bin/sh\nprintf "%%s\\n" "%s $*" >> %q\n' "$t" "$tmp/ran" > "$tmp/fakebin/$t"; chmod +x "$tmp/fakebin/$t"
+  done
+  update_from="" write_standins "$tmp/ordinary"
+  update_from=check write_standins "$tmp/update"
+  local stubs_of
+  stubs_of() {  # RUN [RUNTIME]: the update's three shapes, asked of RUN's stand-ins
+    local dir=$1/stubs at=${2:-$runtime}
+    XDG_RUNTIME_DIR=$at PATH="$tmp/fakebin:$PATH" "$dir/uwsm-app" "${update_launch[@]}"
+    XDG_RUNTIME_DIR=$at PATH="$tmp/fakebin:$PATH" "$dir/systemd-cat" "${shell_launch[@]}"
+    XDG_RUNTIME_DIR=$at PATH="$tmp/fakebin:$PATH" "$dir/logger" -t omarchy-shell "relaunching"
+  }
+  stubs_of "$tmp/ordinary"
+  [ -s "$tmp/ran" ] && miss "an ordinary run's stand-ins should run nothing, ran: $(cat "$tmp/ran")"
+  [ "$(wc -l < "$tmp/ordinary/stubs.log")" = 3 ] || miss "an ordinary run's uwsm-app, systemd-cat and logger should each log, got: $(cat "$tmp/ordinary/stubs.log" 2> /dev/null)"
+  local call
+  while read -r call; do
+    UPDATE_FROM="" stand_in_allowed "$call" && miss "an ordinary run's stop should fail on: $call"
+  done < <(cat "$tmp/ordinary/stubs.log"; printf '%s\n' "${update_allowed[@]}")
+  rm -f "$tmp/ran"
+  stubs_of "$tmp/update"
+  [ "$(cat "$tmp/ran" 2> /dev/null)" = "$(printf '%s\n' "foot --app-id=org.omarchy.terminal --title=Omarchy bash -c ${update_launch[-1]}" "quickshell -n -p /usr/share/omarchy/shell")" ] \
+    || miss "an update start should run the update's terminal as foot and the restarted shell, ran: $(cat "$tmp/ran" 2> /dev/null)"
+  [ -s "$tmp/update/stubs.log" ] && miss "an update start's own shapes should log no stand-in call, logged: $(cat "$tmp/update/stubs.log")"
+  [ -s "$tmp/update/joined" ] || miss "the update's terminal should note its session"
+  grep -qx 'logger: relaunching' "$tmp/update/shell.log" 2> /dev/null || miss "logger -t omarchy-shell should write to the run's shell.log"
+  [ "$(cat "$tmp/update/shell.exit" 2> /dev/null)" = 0 ] || miss "the restarted shell's exit should go to the run's shell.exit"
+  rm -f "$tmp/ran"
+  stubs_of "$tmp/update" "$tmp/elsewhere" 2> /dev/null
+  XDG_RUNTIME_DIR=$runtime PATH="$tmp/fakebin:$PATH" "$tmp/update/stubs/uwsm-app" -- xdg-terminal-exec -e bash -c 'echo hi'
+  XDG_RUNTIME_DIR=$runtime PATH="$tmp/fakebin:$PATH" "$tmp/update/stubs/systemd-cat" -t other -- quickshell -n -p /usr/share/omarchy/shell
+  XDG_RUNTIME_DIR=$runtime PATH="$tmp/fakebin:$PATH" "$tmp/update/stubs/logger" -t other hello
+  grep -q '^foot' "$tmp/ran" 2> /dev/null && miss "the update's terminal should open only on the session's runtime folder, and only for the update, ran: $(cat "$tmp/ran")"
+  [ "$(grep -c '^quickshell' "$tmp/ran" 2> /dev/null)" = 1 ] || miss "systemd-cat should run only the shell's own launch, ran: $(cat "$tmp/ran" 2> /dev/null)"
+  [ "$(grep -c . "$tmp/update/stubs.log" 2> /dev/null)" = 4 ] || miss "every other shape on an update start should log as a stand-in call, logged: $(cat "$tmp/update/stubs.log" 2> /dev/null)"
+  for call in "${update_allowed[@]}"; do
+    UPDATE_FROM=check stand_in_allowed "$call" || miss "an update start's stop should take: $call"
+  done
+  UPDATE_FROM=check stand_in_allowed "systemctl --user restart omarchy-shell.service" && miss "an update start's stop should still fail on another systemctl call"
+  # Main's manifest: the release curl answers that one address from the
+  # stand-in GitHub, as curl's -w line says, and hands every other run to
+  # the next curl as given.
+  git init -q -b main "$tmp/github" && printf '{"version":"9.9.9"}\n' > "$tmp/github/manifest.json" \
+    && git -C "$tmp/github" add manifest.json \
+    && git -C "$tmp/github" -c user.name=c -c user.email=c@c.invalid -c commit.gpgsign=false -c core.hooksPath=/dev/null commit -q -m m \
+    || miss "the stand-in GitHub could not be made"
+  write_release_curl "$tmp/rel" "https://example.invalid/main/manifest.json" "$tmp/github" "$tmp/real-curl"
+  out=$("$tmp/rel/release/curl" -sS -w '\nMARK %{urlnum} %{http_code} %{exitcode} %header{retry-after}\n' "https://example.invalid/main/manifest.json")
+  [ "$out" = "$(printf '{"version":"9.9.9"}\n\nMARK 0 200 0 ')" ] || miss "the release curl should answer main's manifest with a 200, got: $out"
+  "$tmp/rel/release/curl" -sS "https://example.invalid/other" > /dev/null 2>&1; code=$?
+  (( code == 7 )) && [ "$(cat "$tmp/curl-args")" = "$(printf '%s\n' -sS https://example.invalid/other)" ] \
+    || miss "the release curl should hand another address to the next curl, got exit $code and: $(cat "$tmp/curl-args")"
+  # A release of a build naming no newer version is the next minor one, in
+  # the stand-in GitHub alone; a build naming a newer one is its own.
+  local repo=$tmp/releases was_checkout=$checkout
+  git init -q -b main "$repo" && for v in 1.0.4 1.0.4 1.2.0; do
+    printf '{"version":"%s"}\n' "$v" > "$repo/manifest.json" && git -C "$repo" add manifest.json \
+      && git -C "$repo" -c user.name=c -c user.email=c@c.invalid -c commit.gpgsign=false -c core.hooksPath=/dev/null commit -q --allow-empty -m "$v"
+  done
+  checkout=$repo
+  local first second third
+  first=$(git -C "$repo" rev-parse HEAD~2) second=$(git -C "$repo" rev-parse HEAD~1) third=$(git -C "$repo" rev-parse HEAD)
+  git init -q -b main "$tmp/gh-a" && [ "$(release_of "$first" "$second" "$tmp/gh-a")" = 1.1.0 ] \
+    && [ "$(git -C "$tmp/gh-a" show main:manifest.json | jq -r .version)" = 1.1.0 ] \
+    && [ "$(git -C "$tmp/gh-a" rev-parse main~1)" = "$second" ] \
+    || miss "a release of a build still named 1.0.4 should be 1.1.0, one commit on it in the stand-in GitHub"
+  git init -q -b main "$tmp/gh-b" && [ "$(release_of "$first" "$third" "$tmp/gh-b")" = 1.2.0 ] \
+    && [ "$(git -C "$tmp/gh-b" rev-parse main)" = "$(git -C "$repo" rev-parse HEAD)" ] \
+    || miss "a release of a build named 1.2.0 should be that build itself"
+  [ "$(git -C "$repo" rev-list --count HEAD)" = 3 ] || miss "a release should add nothing to the checkout"
+  checkout=$was_checkout
 
   # The private bus.
   bus_ok 2> /dev/null || miss "a private bus should start here"

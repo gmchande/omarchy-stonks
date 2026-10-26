@@ -4,7 +4,6 @@ import QtQuick
 import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Commons as Commons
-import qs.Ui
 import "Tones.js" as Tones
 
 // Manage lists, in the rows' place: rename, reorder, and delete the named
@@ -528,7 +527,7 @@ FocusScope {
 
     // One field, laid over whichever row is being renamed, up to its choices:
     // clear of the cursor's bar, its words where the name's were.
-    TextField {
+    Field {
       id: nameField
       objectName: "renameField"
       visible: root.renaming
@@ -538,7 +537,9 @@ FocusScope {
       leftPadding: root.inset - x
       height: root.itemHeight
       verticalPadding: 0
+      retro: root.retro
       foreground: root.foreground
+      dim: root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.bodySmall
       onTextChanged: root.problem = ""

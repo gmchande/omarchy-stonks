@@ -5,18 +5,19 @@ import qs.Ui
 import "Tones.js" as Tones
 
 // Pinned "+ Add a symbol" bar. Surfaces own the add flow. For a moment it can
-// carry a note instead, in the foreground: why a key did nothing, with what
-// a click does about it (`noteAction`), said whole so a long list name is
-// what gets cut. It stays while the pointer is on it (`hovered`). Until what
-// it says is fixed, a notice, in the foreground too, under any note, whose
-// click is the surface's (`acts`), its action said whole as a note's is
-// (`noticeAction`). A hint for the visit is a quiet line of its own above
-// the bar, which it never replaces, and takes no click; the surface can have
-// it give way (`showsHint`). For a few seconds after a removal, an undo
-// stands at the bar's right end, a button of its own (`undoLabel`), so the
-// add beside it never waits: its words stay centred on the whole bar, where
-// they always are. It is painted in its surface's ground, so riding a
-// growing edge it covers the rows it passes.
+// carry a note instead, in the foreground: why a key did nothing. It stays
+// while the pointer is on it (`hovered`). Until what it says is fixed, a
+// notice, in the foreground too, under any note, whose click is the
+// surface's (`acts`), its action said whole (`noticeAction`), so a long
+// list name is what gets cut. A hint for the visit is a quiet line of its
+// own above the bar, which it never replaces, and takes no click; the
+// surface can have it give way (`showsHint`). For a few seconds after a
+// removal, an undo stands at the bar's right end, a button of its own
+// (`undoLabel`), so the add beside it never waits: its words stay centred
+// on the whole bar, where they always are. While a newer Stonks is out,
+// that place holds its update (`updateLabel`), which gives way to an undo
+// for the undo's seconds. It is painted in its surface's ground, so riding
+// a growing edge it covers the rows it passes.
 Item {
   id: root
 
@@ -29,7 +30,6 @@ Item {
   // footer's words and fill line up with theirs. Its ground still spans it.
   property int gutter: 0
   property string note: ""
-  property string noteAction: ""
   property string notice: ""
   property string noticeAction: ""
   // The notice in fewer words, shown whole where the notice won't fit:
@@ -51,8 +51,14 @@ Item {
   property string undoLabel: ""
   property real undoOpacity: 1
   readonly property bool undoHovered: undoMouse.containsMouse
-  // The undo's button and the gap before it, none without an offer.
-  readonly property real undoRoom: undoLabel !== "" ? undoText.implicitWidth + Style.space(20) + Style.space(4) : 0
+  // The update on offer, "Update to 1.1.0", or "" for none.
+  property string updateLabel: ""
+  // What the bar's right end holds: the undo while one is on offer, else
+  // the update.
+  readonly property bool undoing: undoLabel !== ""
+  readonly property string sideLabel: undoing ? undoLabel : updateLabel
+  // That button and the gap before it, none without one.
+  readonly property real undoRoom: sideLabel !== "" ? undoText.implicitWidth + Style.space(20) + Style.space(4) : 0
 
   readonly property bool hovered: addMouse.containsMouse
   // The note as its moment ends, 1 to 0; what it covered fades in after it
@@ -78,6 +84,7 @@ Item {
 
   signal clicked()
   signal undoClicked()
+  signal updateClicked()
 
   // The hint's lines and the gap under them, above the bar, whether or not
   // they show; and what they take, none without a hint showing.
@@ -130,10 +137,10 @@ Item {
       : addMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
       : addMouse.containsMouse ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
 
-    // The words centred on the whole bar, so an undo coming or going moves
-    // nothing, unless that would run them into the undo: then the box they
-    // centre in narrows, to end just clear of it. Centred by anchors, so
-    // they land on the pixel they always did.
+    // The words centred on the whole bar, so the button at its end coming
+    // or going moves nothing, unless that would run them into it: then the
+    // box they centre in narrows, to end just clear of it. Centred by
+    // anchors, so they land on the pixel they always did.
     Item {
       width: Math.min(root.width - root.gutter, 2 * (root.width - root.gutter - root.undoRoom - Style.space(10)) - footerRow.width)
       height: parent.height
@@ -155,7 +162,7 @@ Item {
         Text {
           id: footerWords
           objectName: "footerText"
-          // Clear of the undo.
+          // Clear of the button at the bar's end.
           readonly property real room: root.width - root.gutter - root.undoRoom - Style.space(20) - (noteAction.visible ? noteAction.implicitWidth : 0)
           width: Math.min(implicitWidth, room)
           elide: Text.ElideRight
@@ -175,7 +182,7 @@ Item {
           objectName: "footerAction"
           visible: text !== ""
           textFormat: Text.PlainText
-          text: root.note !== "" ? root.noteAction : root.notice !== "" ? root.noticeAction : ""
+          text: root.note === "" && root.notice !== "" ? root.noticeAction : ""
           color: root.foreground
           opacity: root.note !== "" ? root.noteOpacity : root.coveredOpacity
           font.family: root.fontFamily
@@ -197,7 +204,7 @@ Item {
 
   Rectangle {
     objectName: "footerUndo"
-    visible: root.undoLabel !== ""
+    visible: root.sideLabel !== ""
     anchors.top: parent.top
     anchors.bottom: parent.bottom
     anchors.topMargin: root.hintHeight + Style.space(6)
@@ -205,7 +212,7 @@ Item {
     anchors.rightMargin: root.gutter
     width: root.undoRoom - Style.space(4)
     radius: root.retro ? 0 : Style.cornerRadius
-    opacity: root.undoOpacity
+    opacity: root.undoing ? root.undoOpacity : 1
     color: undoMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
       : undoMouse.containsMouse ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
 
@@ -214,7 +221,7 @@ Item {
       objectName: "footerUndoText"
       anchors.centerIn: parent
       textFormat: Text.PlainText
-      text: root.undoLabel
+      text: root.sideLabel
       color: root.foreground
       font.family: root.fontFamily
       font.pixelSize: Style.font.bodySmall
@@ -225,8 +232,8 @@ Item {
       anchors.fill: parent
       hoverEnabled: true
       cursorShape: Qt.PointingHandCursor
-      onClicked: root.undoClicked()
-      // A double-click is one click: the undo, then nothing.
+      onClicked: root.undoing ? root.undoClicked() : root.updateClicked()
+      // A double-click is one click: the undo or the update, then nothing.
       onDoubleClicked: {}
     }
   }

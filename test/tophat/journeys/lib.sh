@@ -12,7 +12,8 @@
 #   shell.log, stop.log the nested shell's log and the session's stop
 #   result              PASS, or FAIL and the count
 #
-# A journey's arguments: [--slow SECONDS] [--zone ZONE] REF. It starts the
+# A journey's arguments: [--slow SECONDS] [--zone ZONE] [--update-from OLD] REF
+# (test/tophat.sh start). It starts the
 # session on REF, drives it, and stops it however it ends. The folder is
 # JOURNEY_OUT, or else ~/Work/temporary/tophat/journeys/NAME/TIME-COMMIT,
 # outside any cleanup.
@@ -60,12 +61,12 @@ journey_begin() {
   local opts=() ref
   while (( $# )); do
     case $1 in
-      --slow|--zone) opts+=("$1" "${2:?$1 takes a value}"); shift 2 ;;
+      --slow|--zone|--update-from) opts+=("$1" "${2:?$1 takes a value}"); shift 2 ;;
       -*) echo "journey: unknown option $1" >&2; exit 2 ;;
       *) break ;;
     esac
   done
-  ref=${1:?usage: $journey.sh [--slow SECONDS] [--zone ZONE] REF}
+  ref=${1:?usage: $journey.sh [--slow SECONDS] [--zone ZONE] [--update-from OLD] REF}
   commit=$(git -C "$checkout" rev-parse --verify --quiet "$ref^{commit}") || { echo "journey: no such commit: $ref" >&2; exit 2; }
   out=${JOURNEY_OUT:-$tophat_base/journeys/$journey/$(date +%Y%m%d-%H%M%S)-${commit:0:7}}
   mkdir -p "$out" || exit 2

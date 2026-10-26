@@ -105,9 +105,12 @@ BarWidget {
   readonly property color barGround: Qt.rgba(Commons.Color.bar.background.r, Commons.Color.bar.background.g, Commons.Color.bar.background.b, 1)
   readonly property color dimColor: Tones.dim(button.foreground, barGround)
   // A failed or overdue refresh marks the pill too: the bar is the surface
-  // most likely to be trusted at a glance.
+  // most likely to be trusted at a glance. With no price, an answer the
+  // source sent without one says "No data", and a wait it never answered
+  // (overdue) says so in the header's words, naming no source: not every
+  // reader knows Yahoo (the owner, 26 October).
   readonly property string changeText: featured ? (warns ? "! " : "") + Format.lookSigns(featured.changeLine, retro)
-    : (warns ? "! No data" : "…")
+    : !warns ? "…" : freshness.state === "overdue" ? "! Can't get prices" : "! No data"
   // A side bar's stacked form: the symbol's lines over the move's, each at
   // most four characters (`Format.stackedSymbol`), the move in the rows'
   // unit, money in money and else a percent (`Format.stackedMoney`,
@@ -274,7 +277,8 @@ BarWidget {
       }
 
       // The rows' pixel histogram at pill size, so the pill, a row, and the
-      // hero are one drawing at three sizes.
+      // hero are one drawing at three sizes; its stems solid, as faint ones
+      // read as a dotted line here.
       PixelChart {
         visible: root.barStyle === "sparkline" && root.retro
         anchors.verticalCenter: parent.verticalCenter
@@ -286,6 +290,7 @@ BarWidget {
         baselineColor: Qt.rgba(button.foreground.r, button.foreground.g, button.foreground.b, 0.25)
         pixel: 2
         gap: 1
+        solid: true
       }
 
       // The 23-degrees idea: an arrow whose tilt is the size of today's move,

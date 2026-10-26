@@ -4,7 +4,6 @@ import QtQuick
 import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Commons as Commons
-import qs.Ui
 import "Tones.js" as Tones
 import "KeyText.js" as KeyText
 
@@ -422,7 +421,7 @@ FocusScope {
         onClicked: root.startNaming()
       }
 
-      TextField {
+      Field {
         id: nameField
         objectName: "listNameField"
         anchors.left: parent.left
@@ -434,7 +433,9 @@ FocusScope {
         verticalPadding: 0
         // The typed name starts where "New list…" and the lists' names do.
         leftPadding: Style.space(24)
+        retro: root.retro
         foreground: root.foreground
+        dim: root.dim
         font.family: root.fontFamily
         font.pixelSize: Style.font.bodySmall
         placeholderText: "List name"

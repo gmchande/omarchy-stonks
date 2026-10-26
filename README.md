@@ -241,6 +241,7 @@ click it: Omasnap on 4.5, Tensaku on 4.0.
 | `s` | Smooth or retro |
 | `m` | Sound on or off |
 | `r` | Refresh |
+| `Shift+U` | Update Stonks when a newer one is out, then restart the shell |
 | Tab or `Shift+Tab` | Next or previous panel on the bar (popup) |
 | `?` | All keys |
 | `Esc` | Close |
@@ -251,7 +252,7 @@ A "!" on the pill means its stock's quote is late or its last refresh
 failed: point at the pill to read which. The row and the line above the
 price say the same.
 
-- **The header says "No prices from Yahoo".** Every symbol you follow is
+- **The header says "Can't get prices".** Every symbol you follow is
   waiting on Yahoo, or Yahoo turned every one away, so Stonks says it once
   rather than on every row. Rows with a price keep it, with the time it's
   from, and the rest show their symbol alone. What to do is as for "No
@@ -358,9 +359,10 @@ The shell's log the form asks for can name the prices Stonks left out.
   which stops it after 5 seconds; only when you click that notification,
   Omarchy runs your screenshot editor on the file: `omasnap` where it's
   installed, else `OMARCHY_SCREENSHOT_EDITOR`, else Tensaku; `omarchy restart
-  shell` only when you click the notice that an update is on disk; and, only
-  when you click the note that a newer Stonks is out, `omarchy plugin update
-  grvc.stonks` in a terminal.
+  shell` only when you click the notice that an update is on disk, or press
+  `Shift+U` while it shows; and, only when you click "Update to …" or press
+  `Shift+U` while it shows, `omarchy plugin update grvc.stonks` in a
+  terminal.
 - **Silence's cost:** while `pw-cat` plays silence, your speakers'
   amplifier stays powered and your headphones stay connected to this
   computer, as when any sound plays, and it takes about a tenth of a
@@ -423,7 +425,7 @@ The shell's log the form asks for can name the prices Stonks left out.
   hour of prices when it has prices from the last half hour, and for a
   whole day otherwise.
 - **Updates:** never by itself. When a newer version is out, the footer
-  says so for 5 seconds.
+  offers it.
 
 Every request runs through the one curl command in [`Fetch.js`](Fetch.js),
 which sets its limits. [`test/boundaries.sh`](test/boundaries.sh) fails if a
@@ -440,12 +442,13 @@ omarchy restart shell
 ```
 
 Once a day, Stonks asks GitHub for the newest version. When it's newer than
-yours, the footer says "Stonks … is out · click to update" for 5 seconds
-as the popup or the window opens, once for each day's answer. A
-click while it shows opens a terminal that runs `omarchy plugin update
+yours, the footer's right end says "Update to …" each time the popup or the
+window opens, until you update; "+ Add a symbol" stays where it is. A click
+on it, or `Shift+U`, opens a terminal that runs `omarchy plugin update
 grvc.stonks`, which shows what changes and asks before it updates. Until
 the shell restarts, the old version keeps running, and the footer says
-"Updated to … · click to restart the shell".
+"Updated to … · click to restart the shell"; a click, or `Shift+U`,
+restarts it.
 
 To stop the daily look, add `"updateCheck": false` to
 `~/.config/omarchy/grvc.stonks.json`; Stonks then asks GitHub nothing, and

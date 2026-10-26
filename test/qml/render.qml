@@ -108,6 +108,7 @@ ShellRoot {
     || stateName.indexOf("popup-rowlines-") === 0 || stateName.indexOf("popup-52w-") === 0
     || stateName.indexOf("popup-breadth-even-") === 0
     || stateName.indexOf("window-lists-") === 0 || orderState
+    || /^(popup|window|min-window)-update-offer-/.test(stateName)
   readonly property bool sheet: stateName === "sprite-candidates"
   // pill-sheet-large: the same at a larger text size (render.sh);
   // pill-sheet-<theme>: in another theme.
@@ -382,8 +383,6 @@ ShellRoot {
     id: updates
     property string newVersion: ""
     property string releasedVersion: ""
-    property bool releaseUnsaid: false
-    function sayRelease() { releaseUnsaid = false }
     property string runningVersion: "1.0.0"
   }
 
@@ -815,13 +814,16 @@ ShellRoot {
       }
       // popup-search-vfiax-*: Yahoo's answer holds a mutual fund alone;
       // -eurusd-: two indexes shown, a currency and futures left out. The
-      // note has to fit the popup's width on one line.
+      // note has to fit the popup's width on one line. The currency is
+      // Yahoo's top answer, so no result is chosen, as search's own landing
+      // chooses (`SymbolSearch.land`).
       var leftOut = root.stateName.indexOf("-vfiax-") > 0 ? ["vfiax", vfiaxFile]
         : root.stateName.indexOf("-eurusd-") > 0 ? ["eurusd", eurusdFile] : null
       if (leftOut) {
         var answer = Search.parseSearch(JSON.parse(leftOut[1].text()))
         body.search.results = answer.results
         body.search.note = answer.note
+        body.search.resultIndex = answer.topLeftOut ? -1 : 0
         body.search.resultsQuery = leftOut[0]
         body.search.searchText = leftOut[0]
         root.searchField(body.search).text = leftOut[0]
@@ -887,11 +889,15 @@ ShellRoot {
       updates.newVersion = "1.0.0"
     } else if (root.stateName.indexOf("popup-notice-save-again-") === 0) {
       body.note = "Still not saved · your disk may be full"
-    } else if (root.stateName.indexOf("popup-update-note-") === 0) {
-      // A newer Stonks, said as the popup opens.
-      updates.releasedVersion = "1.0.10"
-      updates.releaseUnsaid = true
-      body.offerRelease()
+    } else if (/^(popup|window|min-window)-update-offer-/.test(root.stateName)) {
+      // <surface>-update-offer-<look>: a newer Stonks offered at the bar's
+      // right end; -named-: beside a named list's longer add, -long-: beside
+      // one too long to say whole; -undo-: an undo in its place for the
+      // undo's seconds.
+      updates.releasedVersion = "1.1.0"
+      if (root.stateName.indexOf("-named-") > 0) stub.listName = "My Watchlist"
+      if (root.stateName.indexOf("-long-") > 0) stub.listName = "Semiconductors & AI infrastructure"
+      if (root.stateName.indexOf("-undo-") > 0) body.undoOffered = { symbol: "SHOP.TO" }
     } else if (/^(popup|window|min-window)-lists-/.test(root.stateName)) {
       // popup-lists-<menu|naming|named|empty|long|manage|rename|confirm|symbol>-<look>,
       // window-lists-<manage|symbol>-<look>, and min-window-lists-<menu|manage|symbol>-<look>,

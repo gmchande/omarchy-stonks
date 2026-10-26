@@ -137,7 +137,7 @@ test("a quiet trading span joins its prints; Tokyo's scheduled lunch alone break
   expect(M.timeAtFraction(one,M.chartGeometry(one,calendars).points[0].x)).toBe(us.points[0].t)
 })
 
-test("Tokyo's lunch break comes from the calendar; the morning session stays on Yahoo", () => {
+test("Tokyo's lunch break comes from the calendar; the morning session stays on Yahoo, counting to the break", () => {
   const morning = 1788832800
   const lunch = 1788836400
   const jpx = {
@@ -149,7 +149,9 @@ test("Tokyo's lunch break comes from the calendar; the morning session stays on 
     session: { pre: null, post: null, regular: { start: M.epochAt(JPX, "2026-09-08", "09:00"), end: M.epochAt(JPX, "2026-09-08", "15:30") } },
     points: []
   }
-  expect(M.marketStatus(jpx, morning, 0, calendars)).toBe("Market closes in 4h 30m")
+  // 11:00: the morning ends at the 11:30 break, not at the 15:30 close.
+  expect(M.statusForms(jpx, morning, 0, calendars)).toEqual(["Lunch break in 30m", "Lunch break in 30m"])
+  expect(M.marketStatus(jpx, M.epochAt(JPX, "2026-09-08", "11:26"), 0, calendars)).toBe("Lunch break in 4m")
   // Tokyo's clock is named for a reader in New York.
   expect(M.marketStatus(jpx, lunch, 0, calendars)).toBe("Lunch break · reopens 12:30 JST · in 30m")
 })
@@ -995,7 +997,7 @@ test("a fetched name or code past its length reads as not sent", () => {
     { symbol: "VFIAX", quoteType: "MUTUALFUND", typeDisp: long(1e5) },
     { symbol: "OTHER", quoteType: "WARRANT", typeDisp: long(1e5) }
   ] })
-  expect(found).toEqual({ results: [{ symbol: "SHOP", name: "Shopify", exchange: "", instrumentType: "EQUITY" }], note: "Stonks doesn’t show mutual funds or warrants" })
+  expect(found).toEqual({ results: [{ symbol: "SHOP", name: "Shopify", exchange: "", instrumentType: "EQUITY" }], note: "Stonks doesn’t show mutual funds or warrants", topLeftOut: false })
   const cap = { meta: { type: ["trailingMarketCap"] }, trailingMarketCap: [{ asOfDate: "2026-09-30", currencyCode: long(1e5), reportedValue: { raw: 4e12 } }] }
   expect(M.parseFundamentals({ timeseries: { result: [cap] } }).cap.currency).toBe("")
   // A spark listing under a symbol past its length is one Yahoo didn't send.

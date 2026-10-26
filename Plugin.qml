@@ -28,7 +28,7 @@ Item {
 
   Service { id: dataService; screens: host }
 
-  Updates { id: versionWatch; mainVersion: dataService.mainVersion; mainNamedAt: dataService.mainNamedAt }
+  Updates { id: versionWatch; mainVersion: dataService.mainVersion }
 
   TrendColors { id: colors }
 

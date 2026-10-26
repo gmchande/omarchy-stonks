@@ -845,6 +845,14 @@ ShellRoot {
       ;["E", "U", "R", "U", "S", "D"].forEach(function(k) { keyClick(k) })
       tryVerify(function() { return body.search.resultsQuery === "EURUSD" }, 3000)
       waitForPolish(note.parent)
+      // Yahoo's top answer is the currency, which Stonks leaves out, so no
+      // result is chosen and Enter adds nothing. Found in the product QA of
+      // 19 October: Enter added 18QQ.Z, a Zurich index.
+      var libraryBefore = service.library.slice()
+      var unchosen = body.search.resultIndex
+      keyClick(Qt.Key_Return)
+      wait(50)
+      var enterOnCurrency = [unchosen, harness.same(service.library, libraryBefore), body.adding, body.search.resultsQuery].join(",")
       keyClick(Qt.Key_Down)
       keyClick(Qt.Key_Down)
       var beside = [body.search.results.map(function(r) { return r.symbol }).join(" "), message.visible, note.visible,
@@ -864,6 +872,8 @@ ShellRoot {
         fundAlone + " / " + beside)
       harness.check("an empty field clears the results, the rows still away while search is open",
         cleared === "true,true,false", cleared)
+      harness.check("a search whose top answer is a kind Stonks leaves out chooses no result, and Enter adds nothing",
+        enterOnCurrency === "-1,true,true,EURUSD", enterOnCurrency)
       // Emptied while a query is out, the field drops it: no answer comes
       // for it. Found in cubic's review of #25.
       ;["S", "H"].forEach(function(k) { keyClick(k) })

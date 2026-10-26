@@ -16,8 +16,11 @@ var MOST_QUOTES = 40
 
 // Yahoo's answer as search shows it: the results Stonks can follow, each
 // { symbol, name, exchange, instrumentType }, the exchange and the kind as a
-// quote names them (`Quote.parseChart`), and a note naming what else the
-// answer held, or "" when it held nothing else; null when its quotes are
+// quote names them (`Quote.parseChart`), a note naming what else the
+// answer held, or "" when it held nothing else, and whether Yahoo's top
+// answer is one of those (`topLeftOut`), so search takes no result for it:
+// "eurusd" found the currency first and a Zurich index after it, and Enter
+// added the index (the product QA of 19 October). Null when its quotes are
 // not a list within MOST_QUOTES.
 // Stonks follows stocks, ETFs, indexes, and cryptocurrencies; Yahoo also
 // finds mutual funds, currencies, futures, and more, and a search that
@@ -29,6 +32,7 @@ function parseSearch(json) {
   if (!quotes) return null
   var results = []
   var left = []
+  var topLeftOut = false
   for (var i = 0; i < quotes.length; i++) {
     // Each name and code as Yahoo sent it, or "" (`Format.fetchedText`).
     var q = {
@@ -43,13 +47,14 @@ function parseSearch(json) {
     // (encodeURIComponent throws), and no ticker holds either half.
     if (!q.symbol || /[\ud800-\udfff]/.test(q.symbol)) continue
     if (q.quoteType && FOLLOWED.indexOf(q.quoteType) < 0) {
+      if (results.length === 0 && left.length === 0) topLeftOut = true
       left.push(q)
       continue
     }
     results.push({ symbol: q.symbol, name: searchName(q), exchange: Quote.EXCHANGE_NAMES[q.exchange] || q.exchange.toUpperCase(),
       instrumentType: q.quoteType })
   }
-  return { results: results, note: leftOutNote(left) }
+  return { results: results, note: leftOutNote(left), topLeftOut: topLeftOut }
 }
 
 // The kinds Yahoo's search has been seen to send that Stonks leaves out.

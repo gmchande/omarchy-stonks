@@ -5,7 +5,6 @@ import QtQuick.Controls as Controls
 import Quickshell.Io
 import qs.Commons
 import qs.Commons as Commons
-import qs.Ui
 import "Fetch.js" as Fetch
 import "Search.js" as Search
 import "Tones.js" as Tones
@@ -311,15 +310,20 @@ FocusScope {
 
   // An answer counts only for the query still being asked: a search dropped
   // by a close or a new open has no query, and an empty field takes no
-  // results. "" is no answer.
+  // results. "" is no answer. The first result is chosen, so Enter takes
+  // it, unless Yahoo's top answer is a kind Stonks leaves out
+  // (`Search.parseSearch`): then nothing is, and the note under the
+  // results says why; the arrows and a click still reach every result.
   function land(body) {
     slowSearch.stop()
     if (root.active && root.activeQuery !== "" && root.activeQuery === root.searchText.trim()) {
+      var first = 0
       try {
         var parsed = Search.parseSearch(JSON.parse(body))
         root.results = parsed.results
         root.note = parsed.note
         root.answer = parsed.results.length > 0 || parsed.note !== "" ? "results" : "none"
+        if (parsed.topLeftOut) first = -1
       } catch (e) {
         root.results = []
         root.note = ""
@@ -328,7 +332,7 @@ FocusScope {
       root.resultsQuery = root.activeQuery
       root.slow = false
       resultsScroll.contentY = 0
-      root.choose(0)
+      root.choose(first)
       searchField.forceActiveFocus()
     }
     if (root.requestedQuery !== "") {
@@ -563,14 +567,16 @@ FocusScope {
     anchors.rightMargin: root.gutter
     height: root.rowHeight + Style.space(6)
 
-    TextField {
+    Field {
       id: searchField
       objectName: "searchField"
       anchors.left: parent.left
       anchors.right: cancelButton.left
       anchors.rightMargin: Style.space(10)
       anchors.verticalCenter: parent.verticalCenter
+      retro: root.retro
       foreground: root.foreground
+      dim: root.dim
       placeholderText: root.placeholder
       onTextChanged: root.setQuery(text)
       onAccepted: root.accept(root.resultIndex)

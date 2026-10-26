@@ -149,8 +149,7 @@ Item {
     if (root.rowMenu && root.rowMenuGround(root.rowMenu.symbol) !== root.rowMenu.ground) root.rowMenu = null
   })
   // A short word in the footer's place, for a moment, held while the pointer
-  // is on it: why a key did nothing, or that a newer Stonks is out, which a
-  // click on it updates (`updateOffered`).
+  // is on it: why a key did nothing.
   property string note: ""
   // A screenshot was taken on this visit: the header's camera stays lit
   // until the surface closes, and the next open puts it out.
@@ -204,20 +203,19 @@ Item {
   readonly property string noticeAction: !unsaved ? ""
     : settingsUnreadable ? " · couldn't load your lists" : " · click to try again"
   readonly property string noticeShort: unsaved ? "Not saved" : ""
-  // The note says a newer Stonks is out, said as a surface opens with its
-  // footer in sight, once for each answer that names it
-  // (`Updates.releaseUnsaid`): a standing notice would take the add's place
-  // for days. An update reaching the disk meanwhile ends it: the restart's
-  // notice says what to do next.
-  property bool updateOffered: false
-  function offerRelease() {
-    if (!updates || !updates.releaseUnsaid || showingHelp || adding || listViewOpen) return
-    updates.sayRelease()
-    updateOffered = true
-    note = "Stonks " + updates.releasedVersion + " is out"
-    holdNote()
+  // A newer Stonks on main, offered at the footer's right end until it
+  // reaches the disk (`updateOffer`), where the restart's notice takes over;
+  // never in the add's place, so adding by mouse never waits on it. Shift+U
+  // runs what the footer offers: the update, or once it's on disk the
+  // restart, which the notice offers only while no unsaved change outranks
+  // it, since a restart now would lose the changes.
+  readonly property string updateOffer: releasedTo !== "" && updatedTo === "" ? releasedTo : ""
+  readonly property bool restartOffered: updatedTo !== "" && !unsaved && !settingsUnreadable
+  function runOffered() {
+    if (!updates) return
+    if (restartOffered) updates.restart()
+    else if (updateOffer !== "") updates.update()
   }
-  onUpdatedToChanged: if (updatedTo !== "" && updateOffered) clearNote()
 
   // What this surface shows of the service, held in one place: the surface
   // reads the service only while it is open. From a close until the next
@@ -262,6 +260,8 @@ Item {
   // A refresh the reader asked for has a request out (`Service.refreshing`).
   property bool refreshing: false
   property string updatedTo: ""
+  // A newer Stonks on main, "" for none (`Updates.releasedVersion`).
+  property string releasedTo: ""
   // The clock: a closed surface's holds still too, so nothing it would show
   // is derived again every second.
   property int now: 0
@@ -292,6 +292,7 @@ Item {
   Binding on editsUnsaved { when: root.reading; value: root.service?.editsUnsaved; restoreMode: Binding.RestoreNone }
   Binding on refreshing { when: root.reading; value: root.service?.refreshing; restoreMode: Binding.RestoreNone }
   Binding on updatedTo { when: root.reading; value: root.updates ? root.updates.newVersion : ""; restoreMode: Binding.RestoreNone }
+  Binding on releasedTo { when: root.reading; value: root.updates ? root.updates.releasedVersion : ""; restoreMode: Binding.RestoreNone }
   Binding on now { when: root.reading; value: root.service?.now; restoreMode: Binding.RestoreNone }
 
   readonly property var symbols: view.rows
@@ -451,7 +452,7 @@ Item {
     // reads a moment, a refresh you asked for is out, or a range failed,
     // whose header offers its retry.
     if (yahooDown && !scrubShown && !refreshing && !(historyActive && historyFailed))
-      return ["No prices from Yahoo · Stonks keeps trying", "No prices from Yahoo"]
+      return ["Can't get prices · Stonks keeps trying", "Can't get prices"]
     // The chart asked for is on its way, named: what was on show stays.
     // Before any chart has been in, the empty hero's label names it alone,
     // in the one place a reader looks (`HeroBand`).
@@ -693,6 +694,7 @@ Item {
     else if (t === "m") toggleSounds()
     else if (t === "o") cycleOrder()
     else if (t === "O") reverseOrder()
+    else if (t === "U") runOffered()
     else if (t === "l") openListMenu()
     else return false
     return true
@@ -792,7 +794,6 @@ Item {
   }
 
   function say(text) {
-    updateOffered = false
     note = text
     holdNote()
   }
@@ -896,7 +897,6 @@ Item {
     noteFade.stop()
     noteShown = 1
     note = ""
-    updateOffered = false
   }
 
   function selectRange(value) {
@@ -1303,18 +1303,16 @@ Item {
     footer.settle()
     hint = ""
     resumeTyped()
-    offerRelease()
   }
 
-  // A refusal stays a moment; an offer to update long enough to act on
-  // it. Its last 600 ms it fades, still taking a click while any of it
-  // shows, and what it covered fades in after it, so the change under a
-  // click is seen coming. Found in the walk of dev on 14 October: a click
-  // meant for the note, just after it went, opened search.
+  // A refusal stays a moment. Its last 600 ms it fades, still taking a
+  // click while any of it shows, and what it covered fades in after it, so
+  // the change under a click is seen coming. Found in the walk of dev on 14
+  // October: a click meant for the note, just after it went, opened search.
   property real noteShown: 1
   Timer {
     id: noteTimer
-    interval: (root.updateOffered ? 5000 : 2500) - noteFade.duration
+    interval: 2500 - noteFade.duration
     onTriggered: noteFade.start()
   }
   NumberAnimation {
@@ -1610,7 +1608,6 @@ Item {
     gutter: root.gutter
     rowHeight: root.rowHeight
     note: root.note
-    noteAction: root.updateOffered ? " · click to update" : ""
     noteOpacity: root.noteShown
     notice: root.notice
     noticeAction: root.noticeAction
@@ -1620,22 +1617,20 @@ Item {
     ground: root.ground
     label: root.listName !== "" ? "+  Add a symbol to " + root.listName : "+  Add a symbol"
     labelShort: root.listName !== "" ? "+  Add a symbol" : ""
-    acts: root.updateOffered || !root.settingsUnreadable
+    acts: !root.settingsUnreadable
     onHoveredChanged: root.holdNote()
     undoLabel: root.undoOffered ? "Undo " + root.undoOffered.symbol : ""
     undoOpacity: root.undoShown
     onUndoHoveredChanged: root.holdUndo()
     onUndoClicked: root.undoRemoval()
-    // The click acts on what the footer shows: a newer version's note runs
-    // the update, the update's notice restarts the shell, and the file's
-    // does nothing, nor does a refusal over it; while a save hasn't landed,
-    // any click tries again; a refusal otherwise, or the label, adds.
+    updateLabel: root.updateOffer !== "" ? "Update to " + root.updateOffer : ""
+    onUpdateClicked: root.updates.update()
+    // The click acts on what the footer shows: the update's notice
+    // restarts the shell, and the file's does nothing, nor does a refusal
+    // over it; while a save hasn't landed, any click tries again; a refusal
+    // otherwise, or the label, adds.
     onClicked: {
-      if (root.updateOffered) {
-        root.clearNote()
-        root.updates.update()
-      }
-      else if (root.settingsUnreadable) return
+      if (root.settingsUnreadable) return
       else if (root.saveFailed) root.saveAgain()
       else if (root.note === "" && root.updatedTo !== "") root.updates.restart()
       else root.startAdding()

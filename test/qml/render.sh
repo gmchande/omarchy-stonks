@@ -157,8 +157,14 @@ every_state() (
     states="$states popup-lists-rowmenu-$look window-lists-rowmenu-$look popup-lists-rowmenuall-$look popup-search-putback-$look"
   done
   states="$states popup-note-retro"
-  # A newer Stonks out, said as a note: it has to fit the popup's width.
-  states="$states popup-update-note-smooth popup-update-note-retro"
+  # A newer Stonks offered at the footer's right end: beside All's add, a
+  # named list's longer one, one too long to say whole, and an undo in its
+  # place; in both looks, at 16, and in the window at its smallest.
+  for look in smooth retro; do
+    states="$states popup-update-offer-$look popup-update-offer-$look-size-16 popup-update-offer-named-$look"
+    states="$states popup-update-offer-undo-$look window-update-offer-$look min-window-update-offer-$look"
+  done
+  states="$states popup-update-offer-named-retro-size-16 popup-update-offer-long-smooth popup-update-offer-undo-named-retro-size-16"
   # What search leaves out, said alone (vfiax) or under the results it shows
   # (eurusd), in both looks.
   for look in smooth retro; do

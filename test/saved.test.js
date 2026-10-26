@@ -722,7 +722,7 @@ test("a day answer whose trading periods are one list of days has them as its re
   expect(M.marketStatus(shel, opening, 0, calendars)).toBe("Opening bell · closes in 8h 20m")
   const toyota = M.parseChart(fixture("7203-t-2026-10-23-day.json"))
   expect(toyota.session.regular).toEqual({ start: M.epochAt(JPX, "2026-10-23", "09:00"), end: M.epochAt(JPX, "2026-10-23", "15:30") })
-  expect(M.marketStatus(toyota, M.epochAt(JPX, "2026-10-23", "11:00"), 0, calendars)).toMatch(/^Market closes in /)
+  expect(M.marketStatus(toyota, M.epochAt(JPX, "2026-10-23", "11:00"), 0, calendars)).toBe("Lunch break in 30m")
   const gspc = M.parseChart(fixture("gspc-2026-10-23-night.json"))
   expect(gspc.session.regular).toEqual({ start: M.epochAt(US, "2026-10-22", "09:30"), end: M.epochAt(US, "2026-10-22", "16:00") })
   expect(dayLineAt(gspc, at("2026-10-23", "03:03")).title).toBe("THU")
@@ -901,10 +901,10 @@ test("a day past its 52-week mark widens the 52-week range to it", () => {
 // saved on 14 October 2026, when that day held each listing's 1Y high or
 // low: a stock's high (RGTI, on a day at its 52-week low) and low (GOOG), a
 // cryptocurrency's high, an index's low, a Toronto listing's low, and an ETF
-// whose first day held neither. On 1Y the 52-week line takes in the range's
-// ends, so the two lines never disagree. Found in the 1.1.0 audit: RGTI's
-// 1Y line said 58.15 over a 52-week high of 57.97.
-test("on 1Y the 52-week line takes in the range's low and high", () => {
+// whose first day held neither. On 1Y the 52-week line is the range's own
+// low and high, so the line and the chart's marks always agree. Found in
+// the 1.1.0 audit: RGTI's 1Y line said 58.15 over a 52-week high of 57.97.
+test("on 1Y the 52-week line is the range's low and high", () => {
   const saved = name => {
     const q = M.parseChart(fixture(`first-day-2026-10-14/${name}-day.json`))
     const h = M.parseHistory(fixture(`first-day-2026-10-14/${name}-1y.json`), "1Y")
@@ -918,6 +918,11 @@ test("on 1Y the 52-week line takes in the range's low and high", () => {
   expect(lines(saved("n225"))).toEqual(["46,544–72,832", "46,544–72,832", "46,911–72,832"])
   expect(lines(saved("td-to"))).toEqual(["109.56–175.33", "109.56–175.33", "110.17–175.33"])
   expect(lines(saved("spy"))).toEqual(["629.28–781.62", "629.28–781.62", "629.28–781.62"])
+  // A 52-week figure of Yahoo's wider than the chart's ends gives way to
+  // them: the line said 600.00–800.00 under a chart marked 629.28 and
+  // 781.62 before the 1.1.0 tag.
+  const spy = saved("spy")
+  expect(ends(M.yearLine({ ...spy.q, fiftyTwoWeekLow: 600, fiftyTwoWeekHigh: 800 }, null, spy.ends))).toBe("629.28–781.62")
   // A day at Yahoo's high under a higher first day is not at the line's
   // high, so takes no tone.
   const rgti = saved("rgti")
@@ -973,7 +978,7 @@ test("a quote held from an earlier session says the calendar's session while it 
   const toyota = M.parseChart(fixture("7203-t-2026-10-23-day.json"))
   const tokyo = hm => M.marketStatus(toyota, M.epochAt(JPX, "2026-10-26", hm), 0, calendars)
   expect([tokyo("09:00"), tokyo("11:45"), tokyo("13:00")])
-    .toEqual(["Opening bell · closes in 6h 30m", "Lunch break · reopens 12:30 JST · in 45m", "Market closes in 2h 30m"])
+    .toEqual(["Opening bell · lunch break in 2h 30m", "Lunch break · reopens 12:30 JST · in 45m", "Market closes in 2h 30m"])
   // The hour is the calendar's on the day, not the held answer's: AAPL's
   // answer of Tuesday 1 September, in EDT, held to Monday 2 November, in
   // EST. Found in review: it said "Lunch lull" at 11:00.
@@ -1155,10 +1160,13 @@ test("parseSearch keeps tradable results with names and readable exchanges", () 
 test("search names the kinds it leaves out, beside what it shows or alone", () => {
   const vfiax = fixture("search-vfiax.json")
   const eurusd = fixture("search-eurusd.json")
-  expect(M.parseSearch(vfiax)).toEqual({ results: [], note: "Stonks doesn’t show mutual funds" })
+  expect(M.parseSearch(vfiax)).toEqual({ results: [], note: "Stonks doesn’t show mutual funds", topLeftOut: true })
   const pair = M.parseSearch(eurusd)
   expect(pair.results.map(r => r.symbol)).toEqual(["18QQ.Z", "Q0SF.Z"])
   expect(pair.note).toBe("Stonks doesn’t show currencies or futures")
+  // Yahoo's top answer is the currency, so search takes neither index for
+  // it (window-search.qml).
+  expect([pair.topLeftOut, M.parseSearch(search).topLeftOut]).toEqual([true, false])
   // Three kinds, in the answer's order; a kind with no name of Stonks' own
   // goes by Yahoo's word for it.
   expect(M.parseSearch({ quotes: vfiax.quotes.concat(eurusd.quotes) }).note)
@@ -1761,16 +1769,18 @@ test("in a session's first minute a quote still the last session's says nothing 
   }
 })
 
-test("before the open an index counts to the bell, and its open goes when the stocks' does", () => {
+test("before the open an index counts to the bell, closed, and its open goes when the stocks' does", () => {
   // Friday 23 October, 06:22: the S&P 500's periods are still Thursday's,
   // its current period Friday's; AAPL's day is Friday's already. Found in
   // the daytime QA: "Closed · opens Fri 09:30" and "−0.41% open" for the
-  // index, "Pre-market · opens in 3h 11m" and "—" for every stock.
+  // index, "Pre-market · opens in 3h 11m" and "—" for every stock. The
+  // index says it in the stocks' shape: before the 1.1.0 tag it said
+  // "Market opens in 3h 10m".
   const now = at("2026-10-23", "06:20")
   const read = (set, name, received) => M.parseChart(fixture(`moments/${set}/${name}.json`), cents, received)
   const gspc = read("premarket-2026-10-23-0622", "gspc", at("2026-10-23", "06:22"))
   const aapl = read("premarket-2026-10-23-0622", "aapl", at("2026-10-23", "06:22"))
-  expect(M.marketStatus(gspc, now, 0, calendars)).toBe("Market opens in 3h 10m")
+  expect(M.statusForms(gspc, now, 0, calendars)).toEqual(["Closed · opens in 3h 10m", "Opens in 3h 10m"])
   expect(M.marketStatus(aapl, now, 0, calendars)).toBe("Pre-market · opens in 3h 10m")
   for (const q of [gspc, aapl]) expect([q.symbol, M.rowModel(q, 0, "open").changeLine]).toEqual([q.symbol, "—"])
   // At 01:00 the stocks' answers are still Tuesday's, and so is the

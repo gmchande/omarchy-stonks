@@ -15,11 +15,8 @@ import "Release.js" as Release
 Item {
   id: root
 
-  // The version main names, "" until an answer has named one, and the wall
-  // second of the ask whose answer last named it, so a surface can say each
-  // day's answer once (`Updates.releaseUnsaid`).
+  // The version main names, "" until an answer has named one.
   property string version: ""
-  property int namedAt: 0
   property bool ready: false
   // The service's clock: `now` moves the feed to look, and the wall clock
   // (`wallSecond`) is what it reads.
@@ -66,7 +63,6 @@ Item {
     var named = got.length && got[0].kind === "ok" ? Release.manifestVersion(got[0].body) : ""
     if (named === "") return
     root.version = named
-    root.namedAt = root.askedAt
   }
 
   Process {

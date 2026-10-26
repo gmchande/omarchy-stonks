@@ -154,7 +154,7 @@ ShellRoot {
       return JSON.stringify([b.surfaceOpen, b.watchlist.cursorRow, service.featuredSymbol, b.scrubT, b.motion.replayRunning,
         service.range, b.adding, b.listMenuOpen, b.managingLists, b.listsSymbol, service.order, service.reversed,
         service.listName, service.symbols.join(","), service.retro, service.soundsOn, service.changeMode, b.showingHelp,
-        service.testRefreshes, harness.tabs, b.cameraLit, b.rowMenu ? b.rowMenu.symbol : ""])
+        service.testRefreshes, harness.tabs, b.cameraLit, b.rowMenu ? b.rowMenu.symbol : "", updates.testUpdates])
     }
 
     // Every key starts from here: the surface open on All, manual order, the
@@ -172,6 +172,8 @@ ShellRoot {
       if (service.order !== "manual") service.setOrder("manual")
       if (service.range !== "1D") service.setRange("1D")
       if (!service.soundsOn) service.persist({ sounds: true })
+      // No newer Stonks out, so Shift+U has nothing to run.
+      updates.mainVersion = ""
       var rows = b.watchlist.displayedSymbols
       service.feature(rows[rows.length - 1])
       // The second row in sight: an open brings the featured last row into
@@ -193,6 +195,8 @@ ShellRoot {
       "Delete": function(s) { s.body.watchlist.cursorSymbol = "LONG1" },
       "Backspace": function(s) { s.body.watchlist.cursorSymbol = "LONG1" },
       "Shift+O": function(s) { service.setOrder("pct") },
+      // A newer Stonks on main, which the footer offers.
+      "Shift+U": function(s) { updates.mainVersion = "99.0.0" },
       // The day is the first range.
       "[": function(s) { service.setRange("1W") }
     })
@@ -240,7 +244,7 @@ ShellRoot {
         cursor: b.watchlist.cursorRow, scrub: b.scrubT, replay: b.motion.replayRunning,
         adding: b.adding, menu: b.listMenuOpen, managing: b.managingLists, listsSymbol: b.listsSymbol,
         help: b.showingHelp, open: b.surfaceOpen, refreshes: service.testRefreshes, tabs: harness.tabs, direction: harness.tabDirection,
-        sounds: service.soundsOn, camera: b.cameraLit, rowMenu: b.rowMenu ? b.rowMenu.symbol : "" }
+        sounds: service.soundsOn, camera: b.cameraLit, rowMenu: b.rowMenu ? b.rowMenu.symbol : "", updates: updates.testUpdates }
       var refreshes = service.testRefreshes, tabs = harness.tabs
       var changed = [], effect = null
       if (token === "⏎") {
@@ -281,6 +285,7 @@ ShellRoot {
         changed = ["reversed", "cursor"]
         effect = function() { return service.reversed === !before.reversed }
       } else if (token === "l") { changed = ["menu"]; effect = function() { return b.listMenuOpen } }
+      else if (token === "Shift+U") { changed = ["updates"]; effect = function() { return updates.testUpdates === before.updates + 1 } }
       else if (token === "c") {
         changed = ["mode"]
         var mode = {pct:"abs", abs:"open", open:"pct"}[before.mode]
@@ -309,7 +314,7 @@ ShellRoot {
         cursor: b.watchlist.cursorRow, scrub: b.scrubT, replay: b.motion.replayRunning,
         adding: b.adding, menu: b.listMenuOpen, managing: b.managingLists, listsSymbol: b.listsSymbol,
         help: b.showingHelp, open: b.surfaceOpen, refreshes: service.testRefreshes, tabs: harness.tabs, direction: harness.tabDirection,
-        sounds: service.soundsOn, camera: b.cameraLit, rowMenu: b.rowMenu ? b.rowMenu.symbol : "" }
+        sounds: service.soundsOn, camera: b.cameraLit, rowMenu: b.rowMenu ? b.rowMenu.symbol : "", updates: updates.testUpdates }
         return effect() && Object.keys(before).every(function(k) { return changed.indexOf(k) >= 0 || before[k] === after[k] })
       }
       var ok = within(token === "Ctrl+C" ? 3000 : 1500, acted)

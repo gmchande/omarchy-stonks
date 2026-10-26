@@ -167,16 +167,18 @@ function peText(value) {
 // price's place in it, then the cap and the P/E, each only when known. A
 // day past Yahoo's 52-week mark widens the range to it, so the day's high
 // and the year's read the same, both in the up tone (the low in the down
-// tone). On 1Y the range's own low and high (`yearEnds`, the 1Y range's
-// `History.rangeEnds`, else null) widen it too, so the two lines never
-// disagree: Yahoo's 52 weeks leave out the 1Y range's first day. A longer
-// range never does, its ends can be older than a year. They are compared
-// at the listing's decimals, so a bar's float noise never passes a mark it
-// reads as. A day only takes the tone while its end is the one shown. The
-// cap moves with the headline price from its own date's close; a cap more
-// than CAP_MAX_AGE_DAYS whole days older than the price is left out. The
-// P/E is the headline price over the latest EPS, at its pair's rate in
-// `rates` where it needs one (`peRatio`). The cap names its currency
+// tone). On 1Y the range is the chart's own low and high instead
+// (`yearEnds`, the 1Y range's `History.rangeEnds`, else null), so the line
+// and the chart's high and low marks always agree: Yahoo's 52 weeks leave
+// out the 1Y range's first day, and Yahoo's figure widened to take in the
+// chart's ends could still pass them. A longer range never stands in, its
+// ends can be older than a year. There an end takes its tone where the day
+// reaches it, compared at the listing's decimals, so a bar's float noise
+// never passes a mark it reads as. The cap moves with the headline price
+// from its own date's close; a cap more than CAP_MAX_AGE_DAYS whole days
+// older than the price is left out. The P/E is the headline price over the
+// latest EPS, at its pair's rate in `rates` where it needs one
+// (`peRatio`). The cap names its currency
 // wherever Yahoo does, so one in yen never reads as one in dollars beside
 // it, whatever the reader's own; a London cap is in GBP while its prices
 // are in GBp.
@@ -187,19 +189,22 @@ function yearLine(quote, figures, yearEnds, rates) {
   if (!quote) return null
   var q = quote
   var head = Quote.headlineQuote(q)
-  var both = Format.isFiniteNumber(q.fiftyTwoWeekLow) && Format.isFiniteNumber(q.fiftyTwoWeekHigh)
-  var atHigh = both && Format.isFiniteNumber(q.dayHigh) && q.dayHigh >= q.fiftyTwoWeekHigh
-  var atLow = both && Format.isFiniteNumber(q.dayLow) && q.dayLow <= q.fiftyTwoWeekLow
-  var low = both ? (atLow ? q.dayLow : q.fiftyTwoWeekLow) : null
-  var high = both ? (atHigh ? q.dayHigh : q.fiftyTwoWeekHigh) : null
   var reads = function(v) { return Number(v.toFixed(Format.isFiniteNumber(q.priceDigits) ? q.priceDigits : Format.moneyDigits(Math.abs(v)))) }
-  if (both && yearEnds && reads(yearEnds.low.p) < reads(low)) {
+  var both = Format.isFiniteNumber(q.fiftyTwoWeekLow) && Format.isFiniteNumber(q.fiftyTwoWeekHigh)
+  var low = null
+  var high = null
+  var atHigh = false
+  var atLow = false
+  if (yearEnds) {
     low = yearEnds.low.p
-    atLow = false
-  }
-  if (both && yearEnds && reads(yearEnds.high.p) > reads(high)) {
     high = yearEnds.high.p
-    atHigh = false
+    atHigh = Format.isFiniteNumber(q.dayHigh) && reads(q.dayHigh) >= reads(high)
+    atLow = Format.isFiniteNumber(q.dayLow) && reads(q.dayLow) <= reads(low)
+  } else if (both) {
+    atHigh = Format.isFiniteNumber(q.dayHigh) && q.dayHigh >= q.fiftyTwoWeekHigh
+    atLow = Format.isFiniteNumber(q.dayLow) && q.dayLow <= q.fiftyTwoWeekLow
+    low = atLow ? q.dayLow : q.fiftyTwoWeekLow
+    high = atHigh ? q.dayHigh : q.fiftyTwoWeekHigh
   }
   var line = Format.infoRange(low, high, head ? head.price : null, q.priceDigits)
   if (atHigh) line.highTone = "up"

@@ -653,10 +653,8 @@ Item {
     clearance: function() { return root.screensClear() }
     gate: githubGate
   }
-  // The version on main, "" until GitHub has named one, and when it last
-  // did (`Updates`).
+  // The version on main, "" until GitHub has named one (`Updates`).
   readonly property alias mainVersion: releaseFeed.version
-  readonly property alias mainNamedAt: releaseFeed.namedAt
 
   // A user's refresh, from a key, the pill, or IPC: every watched quote
   // whose last answer is more than 10 s old, and the overnight prints of
