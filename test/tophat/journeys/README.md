@@ -72,6 +72,9 @@ or a control present before and gone after.
   sign, and the change beside the price.
 - [Saving](saving.md): `saving.sh`. Every change written at once, a failed
   save said and retried, and what was saved shown again.
+- [The update](update.md): `update.sh`. An older release's user hears of
+  a newer one in the footer, updates in Omarchy's terminal, restarts the
+  shell, and keeps their data file; `test/review.sh` runs it.
 
 ## Keeping the map
 
