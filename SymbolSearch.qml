@@ -5,7 +5,6 @@ import QtQuick.Controls as Controls
 import Quickshell.Io
 import qs.Commons
 import qs.Commons as Commons
-import qs.Ui
 import "Fetch.js" as Fetch
 import "Search.js" as Search
 import "Tones.js" as Tones
@@ -563,14 +562,16 @@ FocusScope {
     anchors.rightMargin: root.gutter
     height: root.rowHeight + Style.space(6)
 
-    TextField {
+    Field {
       id: searchField
       objectName: "searchField"
       anchors.left: parent.left
       anchors.right: cancelButton.left
       anchors.rightMargin: Style.space(10)
       anchors.verticalCenter: parent.verticalCenter
+      retro: root.retro
       foreground: root.foreground
+      dim: root.dim
       placeholderText: root.placeholder
       onTextChanged: root.setQuery(text)
       onAccepted: root.accept(root.resultIndex)
