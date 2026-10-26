@@ -478,6 +478,15 @@ Item {
       root.dataReadEnded(null)
     }
   }
+  // The data file as it is this moment, read at once: only for a write that
+  // meets a read in flight (`savedElsewhere`).
+  FileView {
+    id: dataNow
+    path: root.dataPath
+    preload: false
+    blockAllReads: true
+    printErrors: false
+  }
   // A read of the data file is in flight, or owed; the first starts as its
   // path is set. Quickshell 0.3.1 ignores a reload() asked for while one is,
   // so a change saved meanwhile would never be read: it is held instead,
@@ -1141,6 +1150,7 @@ Item {
   // as a read's own (`takeMissingFile`) may: Quickshell 0.3.2 forgets a
   // read started inside a read's handlers (fileview.cpp, operationFinished).
   function writeDataFile(settings) {
+    if (root.savedElsewhere()) return
     var body = JSON.stringify(settings, null, 2) + "\n"
     if (typeof dataFile.setText !== "function") {
       console.warn("stonks: cannot write " + root.dataPath)
@@ -1155,6 +1165,22 @@ Item {
     if (root.dataMissing) return root.makeDataFile()
     dataFile.setText(body)
     Qt.callLater(root.readDataFile)
+  }
+
+  // Whether a save from elsewhere is in the data file while a read of it is
+  // in flight. A write would drop that read unheard (fileview.cpp, saveSync's
+  // cancelAsync), and the save with it, one that can't be read too; so the
+  // file is read at once, and a text Stonks neither read nor wrote wins, as
+  // it would once read. Kept in memory alone, the change is said unsaved
+  // where that text can't be read. Found in the review of 26 October: a
+  // range changed as a hand edit landed wrote over it.
+  function savedElsewhere() {
+    if (!root.dataReading) return false
+    dataNow.reload()
+    var now = String(dataNow.text())
+    if (now === dataFile.text() || now === root.dataWritten || (root.staleTexts !== null && root.staleTexts[now] === true)) return false
+    if (!root.parseDataText(now)) root.editsUnsaved = true
+    return true
   }
 
   // The data file, last read as not there, is made rather than written:
