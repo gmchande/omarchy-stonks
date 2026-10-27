@@ -24,8 +24,10 @@ tree=$(git rev-parse "$ref^{tree}")
 runs="$(git rev-parse --path-format=absolute --git-common-dir)/stonks-runs"
 if [ -n "$runner" ]; then
   read -r _ _ _ at took _ <<< "$(grep "^$tree [^ ]* $runner .* ALL PASS$" "$runs" 2> /dev/null | tail -n 1)" || true
-  if [ -n "${at:-}" ]; then
-    began=$(( $(date -d "$at" +%s) - ${took%s} ))
+  # The time a run took is whole seconds and an s, as test/queue.sh writes
+  # it; anything else is no record, since Bash arithmetic would run it.
+  if [ -n "${at:-}" ] && [[ $took =~ ^[0-9]+s$ ]]; then
+    began=$(( $(date -d "$at" +%s) - 10#${took%s} ))
     packages=$(stat -c %Y /var/lib/pacman/local 2> /dev/null || echo 0)
     # The newest change to any saved answer, a file or a folder (a removal
     # changes its folder), outside the answers' own git folder.

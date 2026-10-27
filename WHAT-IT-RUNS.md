@@ -7,7 +7,8 @@ version.
 Every request runs through the one curl command in [`Fetch.js`](Fetch.js),
 which sets its limits. [`test/boundaries.sh`](test/boundaries.sh) fails if a
 command, a file read or write, or a request turns up outside the few files
-allowed them. It runs on every push:
+allowed them. It runs on every push to `dev` and `main`, on every pull
+request to them, and when started by hand:
 
 [![Checks](https://github.com/gmchande/omarchy-stonks/actions/workflows/fresh-clone.yml/badge.svg)](https://github.com/gmchande/omarchy-stonks/actions/workflows/fresh-clone.yml)
 
@@ -132,15 +133,21 @@ affiliated with Yahoo or Robinhood.
 
 ### Robinhood
 
-Stonks asks whether your US stocks and ETFs trade overnight, and for their
-overnight prices, both at once:
+Stonks asks Robinhood two questions about your US stocks and ETFs: whether
+each trades overnight, and its overnight prices. It asks the first about a
+stock once a day, or 5 minutes after an answer fails, and asks for prices
+only for a stock that trades overnight or isn't known yet:
 
-- for the stock on the pill, once each time the shell starts, as its first
-  price comes in;
-- for the rest when the popup or window first opens, and for each one you
-  add;
-- while one is open, every 5 minutes through a night that trades;
-- when you press `r`, for the stock on the chart.
+- for the stock on the pill, both once each time the shell starts, as its
+  first price comes in;
+- while the popup or window is open, for the rest and each one you add:
+  whether it trades when that's due, and its prices when it has none,
+  every 5 minutes through a night that trades, once after each night ends,
+  and 5 minutes after an answer fails;
+- the same for a search result you rest on before you add it, when it
+  isn't in any list;
+- when you press `r`, the prices of the charts on show that trade
+  overnight, unless it asked for prices in the last 10 seconds.
 
 It asks for the last hour of prices when it has prices from the last half
 hour, and for a whole day otherwise.
