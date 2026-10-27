@@ -93,9 +93,10 @@ var HOUR_REACH = 30 * 60
 // What to ask Robinhood for a listing's prints at `now`, by its entry
 // (`OvernightFeed.entries`): "hour" while its newest slot in hand is within
 // HOUR_REACH, so the answer joins on to it with no slot missed between;
-// "day" for one never answered, or answered longer ago.
+// "day" for one never answered, or answered longer ago, or whose newest
+// slot is ahead of the clock, which no honest answer holds.
 function overnightSpan(entry, now) {
-  return !!entry && entry.through !== null && entry.through !== undefined && now - entry.through <= HOUR_REACH ? "hour" : "day"
+  return !!entry && entry.through !== null && entry.through !== undefined && entry.through <= now && now - entry.through <= HOUR_REACH ? "hour" : "day"
 }
 
 // The requests for the prints of `symbols` at `now`, by their entries
@@ -123,7 +124,9 @@ function overnightBatches(symbols, entries, now) {
 // answer is a bad one (`Format.fetchedList`): a result for each symbol
 // asked, one each in the saved answers, so twice the most asked at once; a
 // listing's prints, span=day's 288 five-minute slots, 288 in the saved
-// answers.
+// answers. MOST_PRINTS is also the most prints kept for a listing
+// (`joinHour`): a 1D chart draws from a midnight to the next open, at most
+// 402 of a 24/5 market's slots, from 00:00 to 20:00 and 20:00 to 09:30.
 var MOST_RESULTS = 2 * HOUR_BATCH
 var MOST_PRINTS = 1000
 
@@ -207,11 +210,13 @@ function overnightAnswer(result, symbol) {
 // The prints in hand (`had`, { bars, through }) brought up to date by an
 // hour's answer (`hour`, `overnightAnswer`'s): the hour's slots replace
 // what was kept from its first slot on, a bar still forming among them, and
-// the older ones stay. An hour with nothing in it changes nothing.
+// the older ones stay, the newest MOST_PRINTS of them all, so a surface
+// left open keeps no more than a chart can draw. An hour with nothing in
+// it changes nothing.
 function joinHour(had, hour) {
   if (hour.from === null) return { bars: had.bars, through: had.through }
   return {
-    bars: had.bars.filter(function(b) { return b.t < hour.from }).concat(hour.bars),
+    bars: had.bars.filter(function(b) { return b.t < hour.from }).concat(hour.bars).slice(-MOST_PRINTS),
     through: had.through === null || hour.through > had.through ? hour.through : had.through
   }
 }

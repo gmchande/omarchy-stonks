@@ -396,7 +396,8 @@ function parseChart(json, centExchanges, receivedAt) {
     // day, unless the session is a later day's of a two-day answer, whose
     // close before it is Yahoo's previous close, the headline's.
     prevClose: knownPrice(chosen === 0 && meta.chartPreviousClose !== undefined ? meta.chartPreviousClose : meta.previousClose),
-    marketTime: Format.isFiniteNumber(meta.regularMarketTime) && meta.regularMarketTime > 0 ? meta.regularMarketTime : null,
+    // A time no Date holds (`Format.isMoment`) is none, as one not sent is.
+    marketTime: Format.isMoment(meta.regularMarketTime) && meta.regularMarketTime > 0 ? meta.regularMarketTime : null,
     dayOpen: firstRegular ? knownPrice(firstRegular.o) : null,
     // The regular session `dayOpen` is the open of, once its first bar has
     // come; null before, and while the figures are the coming session's.

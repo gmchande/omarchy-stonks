@@ -396,9 +396,10 @@ The shell's log the form asks for can name the prices Stonks left out.
   London's and Tokyo's among them. Stonks isn't investment advice, and isn't
   affiliated with Yahoo or Robinhood.
 - **Files it writes:** your lists and settings in
-  `~/.config/omarchy/grvc.stonks.json`, the last quotes in
-  `~/.cache/grvc.stonks/quotes.json`, and, while sounds are on, a replay's
-  sound in `~/.cache/grvc.stonks/replay.wav`, written over at each replay of
+  `~/.config/omarchy/grvc.stonks.json`; in its cache folder,
+  `$XDG_CACHE_HOME/grvc.stonks` when `XDG_CACHE_HOME` is set, else
+  `~/.cache/grvc.stonks`, the last quotes in `quotes.json`, and, while
+  sounds are on, a replay's sound in `replay.wav`, written over at each replay of
   another chart, and beside it the chimes' notes, `chime-*.wav`, each also
   with its silence first, and the other sounds with theirs, `lead-*.wav`,
   written again only when what they're made from has changed or one is
@@ -410,8 +411,8 @@ The shell's log the form asks for can name the prices Stonks left out.
   else `OMARCHY_SCREENSHOT_DIR`, else the `directory` in Omasnap's
   `[output]` settings, else `Screenshots` in your Pictures folder; without
   it, `OMARCHY_SCREENSHOT_DIR`, else your Pictures folder;
-  saved straight there, with no copy anywhere else. Everything in
-  `~/.cache/grvc.stonks` is readable by you alone (0600, the folder 0700),
+  saved straight there, with no copy anywhere else. Everything in the
+  cache folder is readable by you alone (0600, the folder 0700),
   and so is the data file, from the moment Stonks makes it, and again
   from Stonks' next save after an older Stonks or an editor left it
   readable to others.
@@ -476,7 +477,7 @@ launcher files, if you added them, stay. Delete what you no longer want:
 
 ```sh
 rm ~/.config/omarchy/grvc.stonks.json   # your lists; keep it to reinstall later
-rm -r ~/.cache/grvc.stonks
+rm -r "${XDG_CACHE_HOME:-$HOME/.cache}/grvc.stonks"
 rm -f ~/.local/share/applications/stonks.desktop ~/.local/share/icons/hicolor/scalable/apps/grvc.stonks.svg
 ```
 

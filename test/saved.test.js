@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test"
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { load } from "./load.js"
 
@@ -1632,6 +1632,44 @@ test("a refresh within half an hour asks Robinhood for the last hour, which brin
   expect(M.overnightSpan({ through: earlier.through }, earlier.through + 60 * 60)).toBe("day")
   expect(M.overnightSpan(undefined, earlier.through)).toBe("day")
   expect(M.overnightSpan({ through: null }, earlier.through)).toBe("day")
+})
+
+test("the prints Stonks keeps for a listing hold every one its 1D chart draws, however long a surface stays open", () => {
+  // Every saved Robinhood answer, oldest first, each joined on to what is in
+  // hand as an hour's answer is: weeks of prints, far past MOST_PRINTS,
+  // where a real surface is asked for a day again after half an hour. At
+  // each moment, each listing's chart is the one every print sent so far
+  // would draw.
+  const sets = readdirSync(join(fixtures, "moments")).filter(set => existsSync(join(fixtures, "moments", set, "robinhood-day.json")))
+    .map(set => {
+      const answer = fixture(`moments/${set}/robinhood-day.json`)
+      const parsed = M.parseOvernight(answer, answer.results.map(r => r.symbol))
+      return { set, parsed, through: Math.max(...Object.values(parsed).map(a => a.through ?? 0)) }
+    })
+    .sort((a, b) => a.through - b.through)
+  const kept = {}
+  const sent = {}
+  let drawn = 0
+  for (const { set, parsed } of sets) {
+    for (const [symbol, answer] of Object.entries(parsed)) {
+      kept[symbol] = kept[symbol] ? M.joinHour(kept[symbol], answer) : answer
+      sent[symbol] = sent[symbol] || new Map()
+      for (const bar of answer.bars) sent[symbol].set(bar.t, bar)
+    }
+    for (const file of readdirSync(join(fixtures, "moments", set))) {
+      if (!file.endsWith(".json") || file.startsWith("robinhood")) continue
+      const quote = M.parseChart(fixture(`moments/${set}/${file}`))
+      const symbol = quote && M.robinhoodSymbol(quote.symbol)
+      if (!quote || !quote.session.regular || !kept[symbol]?.bars.length) continue
+      const all = { bars: [...sent[symbol].values()].sort((a, b) => a.t - b.t), through: kept[symbol].through }
+      const chart = M.dayChart(quote, all, calendars)
+      if (!chart.latest) continue
+      expect([set, file, M.dayChart(quote, kept[symbol], calendars)]).toEqual([set, file, chart])
+      drawn++
+    }
+  }
+  expect(Math.max(...Object.values(kept).map(k => k.bars.length))).toBe(M.MOST_PRINTS)
+  expect(drawn).toBeGreaterThan(100)
 })
 
 test("a run of Robinhood's prints never takes more requests than a day for all would", () => {
