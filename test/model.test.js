@@ -70,7 +70,7 @@ test("stray filtering never judges the newest bar or an uneven gap", () => {
   expect(keptBars(long)).toEqual(long)
   // An hourly history across a weekend: every bar opens at 100, Friday's
   // last and Monday's first close at 98. A history has no sessions to say a
-  // gap lies inside one, so none is bridged. Found in review.
+  // gap lies inside one, so none is bridged.
   const weekend = [
     { t: 0, o: 100, c: 100 }, { t: 3600, o: 100, c: 98 }, { t: 3600 + 66 * 3600, o: 100, c: 98 },
     { t: 3600 + 67 * 3600, o: 100, c: 100 }
@@ -283,8 +283,8 @@ test("formatting", () => {
     .toEqual(["\u22121.6 %", "0.0 %", "+9.9 %", "+10 %", "\u221212 %", "+123 %", "+999 %", "+1.2 K%", "+10 K%", "+54 K%"])
   // It rounds what the rows show, never the float behind it, so the two
   // agree whatever prices made the move: 20 to 21.99 is 9.94999…%, which
-  // the rows show as +9.95% and the pill showed as +9.9% while 100 to
-  // 109.95 read +10%. Found in review: around 9.95%, 0.05%, and 99.95%.
+  // the rows show as +9.95% and the pill must not show as +9.9% while 100
+  // to 109.95 reads +10%: around 9.95%, 0.05%, and 99.95%.
   const shown = [[20, 21.99], [20, 18.01], [100, 109.95], [100, 90.05], [20, 21.988], [20, 20.01], [20, 19.99],
     [100, 100.05], [100, 99.95], [20, 39.99], [100, 199.95], [20, 0.01], [100, 0.05]]
     .map(([prevClose, price]) => {
@@ -568,7 +568,7 @@ test("the view's chart can be drawn once its data is in, or its first fetch has 
   expect(M.viewChart("A", "1M", { A: quote }, ok, { "A|1M": { status: "failed", history: null } })).toMatchObject({ history: null, failed: true })
 })
 
-// Named lists (Phase 4). All is the library, stored as the version-1
+// Named lists. All is the library, stored as the version-1
 // `symbols`; named lists are subsets with their own order.
 const library = (extra = {}) => M.fileSettings({
   symbols: ["NEST", "BO", "IRIS", "SPY"], featured: "NEST", order: "pct",
@@ -961,8 +961,8 @@ test("weeks and months either side of 25 October and 1 November keep their dates
     } finally { process.env.TZ = "America/New_York" }
   }
   // The live moment Yahoo appends keeps today's date, even at a whole hour
-  // of a coin's day, where no clock changes. Found in review: Saturday 31
-  // October's 23:00 UTC read as the week of 1 November.
+  // of a coin's day, where no clock changes: Saturday 31 October's 23:00
+  // UTC is not the week of 1 November.
   const live = stamp("2026-10-31T23:00:00Z")
   const coin = { range: "5Y", interval: "1wk", gmtoffset: 0, liveAt: live,
     bars: [{ t: stamp("2026-10-26T00:00:00Z"), c: 100 }, { t: live, c: 101 }] }
@@ -971,7 +971,7 @@ test("weeks and months either side of 25 October and 1 November keep their dates
 
 test("a session's one bar says nothing until its five minutes are past", () => {
   // An index's opening bar with its close already in, three minutes into
-  // the session: it read "Traded only at 09:30" (found in review).
+  // the session, must not read "Traded only at 09:30".
   const bell = at("2026-10-20", "09:30")
   const day = { symbol: "^GSPC", exchange: "S&P", instrumentType: "INDEX", gmtoffset: -14400,
     session: { pre: null, regular: { start: bell, end: at("2026-10-20", "16:00") }, post: null },
@@ -1037,7 +1037,7 @@ test("community themes that one hue, a faint colour, or a tinted light ground wo
   greenAndRed(M.trend("#3a3a3a", M.hexColor("#2a2a2a"), M.hexColor("#000000")))
   // On a mid-grey ground no green reads at 4.5:1, and the darkest tried
   // rounded to black, which reads but says nothing: there, up is a green at
-  // the 3:1 floor. Found in review.
+  // the 3:1 floor.
   const mid = M.hexColor("#808080"), greyPair = M.trend("#777777", M.hexColor("#555555"), mid)
   greenAndRed(greyPair)
   const chroma = c => Math.hypot(M.oklab(c).a, M.oklab(c).b)
@@ -1109,14 +1109,14 @@ test("a hostile chart or spark answer reads as no answer, at once", async () => 
     { name: "opens posing", call: read, answer: chartAnswer(r => { bars(r).open = POSING }) },
     { name: "a session's days posing", call: read, answer: chartAnswer(r => { r.meta.tradingPeriods.regular = POSING }) },
     { name: "a day's periods posing", call: read, answer: chartAnswer(r => { r.meta.tradingPeriods.regular = [POSING] }) },
-    // A spark day with this threw as it was read, and its feed asked nothing
-    // more until Stonks restarted.
+    // A spark day that throws as it is read leaves its feed asking nothing
+    // more until Stonks restarts.
     { name: "a day's period null", call: read, answer: chartAnswer(r => { r.meta.tradingPeriods.pre = [[null]] }) },
     { name: "a spark day with a period null", call: "M.sparkQuote(json, null, [])",
       answer: chartAnswer(r => { r.meta.tradingPeriods.pre = [[null]] }).chart.result[0] },
-    // The 1.0.4 security review's: a day's one period ending at an object,
-    // which threw where a bar was compared with it. One no bar was compared
-    // with was kept in the quote, and every look for what was due threw.
+    // A day's one period ending at an object throws where a bar is compared
+    // with it; one no bar is compared with stays in the quote, where every
+    // look for what is due throws.
     { name: "a spark day whose period ends at an object", call: "M.sparkQuote(json, null, [])",
       answer: chartAnswer(null, [[period(T0, { toString: null })]]).chart.result[0] },
     { name: "a current period ending at an object", call: read,
@@ -1127,8 +1127,8 @@ test("a hostile chart or spark answer reads as no answer, at once", async () => 
     { name: "closes over budget", call: read, answer: chartAnswer(r => { bars(r).close = times(M.MOST_BARS + 1).map(() => 10) }) },
     { name: "a session's days over budget", call: read,
       answer: chartAnswer(r => { r.meta.tradingPeriods.pre = times(M.MOST_DAYS + 1).map(() => [period(T0 - 3600, T0)]) }) },
-    // A 322-byte answer the review of this fix found: the retro chart filled
-    // 222 billion columns from its middle print back to its last.
+    // A 322-byte answer whose retro chart would fill 222 billion columns from
+    // its middle print back to its last.
     { name: "bar times out of order", call: read, answer: chartAnswer(r => { r.timestamp = [T0, -8e12, T0 + 600] }) },
     { name: "a day's periods over budget", call: read,
       answer: chartAnswer(r => { r.meta.tradingPeriods.pre = [times(M.MOST_PERIODS + 1).map(() => period(T0 - 3600, T0))] }) },
@@ -1176,7 +1176,6 @@ test("a hostile cap and P/E answer leaves the figures it would have fed unknown,
   const day = Date.UTC(2026, 8, 30) / 1000 + 14 * 3600
   const cases = [
     { name: "an answer, as sent", call: read, answer: timeseries(), want: figures },
-    // The marketplace's review of 1.0.2 found this one.
     { name: "the cap's series posing", call: read, answer: timeseries(r => { r[0].trailingMarketCap = POSING }), want: { cap: quarter, eps: figures.eps } },
     { name: "both caps' series posing", call: read,
       answer: timeseries(r => { r[0].trailingMarketCap = POSING; r[1].quarterlyMarketCap = POSING }), want: { cap: null, eps: figures.eps } },
@@ -1220,9 +1219,9 @@ test("a hostile search or Robinhood answer reads as no answer, at once", async (
   expect(await hostile(cases)).toEqual(cases.map(c => [c.name, c.want === undefined ? null : c.want]))
 }, 60000)
 
-// Half a UTF-16 pair can't go in a URL: the quote feed took its first-answer
-// slot, then encodeURIComponent threw before any request started, and no
-// new symbol's quote came until the shell restarted.
+// Half a UTF-16 pair can't go in a URL: the quote feed would take its
+// first-answer slot, encodeURIComponent would throw before any request
+// started, and no new symbol's quote would come until the shell restarts.
 test("search leaves out a symbol no request can carry", () => {
   const found = M.parseSearch(JSON.parse('{"quotes":[{"symbol":"\\ud800","quoteType":"EQUITY"},{"symbol":"AAPL","quoteType":"EQUITY"}]}'))
   expect(found.results.map(r => M.chartUrl(r.symbol))).toEqual([M.chartUrl("AAPL")])
@@ -1245,8 +1244,8 @@ test("search names are whole, so the row's own ellipsis is the only cut", () => 
   ])
 })
 
-// An object in a close cell threw where its price was drawn or written, and
-// an overflowing number read Infinity. Each is a gap in the chart, as a
+// An object in a close cell throws where its price is drawn or written, and
+// an overflowing number reads Infinity. Each is a gap in the chart, as a
 // missing close is.
 test("a close that isn't a finite number is a missing bar, in the day and in a range", () => {
   for (const bad of [{ toString: null }, JSON.parse("1e309"), "10"]) for (const at of [1, 2]) {
@@ -1257,8 +1256,8 @@ test("a close that isn't a finite number is a missing bar, in the day and in a r
 })
 
 // An answer's offset is the clock a print outside its periods is read by:
-// an object there threw wherever a time was worked out, every look for
-// what was due among them. One that isn't an offset is none.
+// an object there throws wherever a time is worked out, every look for
+// what is due among them. One that isn't an offset is none.
 test("an answer's offset that isn't one is none, in the day and in a range", () => {
   for (const bad of [{ toString: null }, "-14400", 1e13]) {
     const sent = offset => r => { r.meta.gmtoffset = offset }
@@ -1267,10 +1266,9 @@ test("an answer's offset that isn't one is none, in the day and in a range", () 
   }
 })
 
-// The 1.1.0 security read-through's: a Robinhood whose hour answers each
-// ran five minutes on had the shell keep 150 more prints at every one,
-// 15,000 after a hundred, and with their times ahead of the clock, it was
-// asked for an hour again for ever.
+// A Robinhood whose hour answers each run five minutes on would have the
+// shell keep 150 more prints at every one, 15,000 after a hundred, and with
+// their times ahead of the clock, ask for an hour again for ever.
 test("a hostile Robinhood's hours keep at most a day's request's prints, and times ahead of the clock ask for a day", () => {
   const hour = k => M.overnightAnswer({ symbol: "X", historicals: Array.from({ length: 150 }, (_, j) =>
     ({ begins_at: new Date((T0 + k * 300 + j) * 1000).toISOString(), close_price: "10", session: "overnight", interpolated: false })) }, "X")
@@ -1282,9 +1280,9 @@ test("a hostile Robinhood's hours keep at most a day's request's prints, and tim
   expect(M.overnightSpan({ through: T0 + 60 }, T0)).toBe("day")
 })
 
-// The 1.1.0 security read-through's: a time of 1e300 was kept as the
-// quote's, and the words that say how fresh it is, and the screenshot's,
-// threw. One a Date holds only at UTC's clock throws at Tokyo's.
+// A time of 1e300 kept as the quote's throws in the words that say how
+// fresh it is, and the screenshot's. One a Date holds only at UTC's clock
+// throws at Tokyo's.
 test("a quote's time no Date holds is none: its price and chart stay, and its time reads as not sent", () => {
   const sent = time => M.parseChart(chartAnswer(r => { r.meta.regularMarketTime = time; r.meta.gmtoffset = 32400 }), [])
   const none = sent(undefined)
