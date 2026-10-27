@@ -142,7 +142,7 @@ function pick(root, base) {
     const helper = helped.get(runner) || []
     let verdict = 'pick', why
     if (runnerChanged.length) why = `the runners changed (${runnerChanged.join(', ')})`
-    else if (helper.length) why = `its runner runs ${helper.join(', ')} itself`
+    else if (helper.length) why = `its runner's own steps reach ${helper.slice(0, 3).join(', ')}${helper.length > 3 ? ` and ${helper.length - 3} more` : ''}`
     else if (!journey && !/^test\/qml\/[^/]+\.sh$/.test(check)) why = 'reads files it does not name, so it runs on every diff'
     else {
       const reached = reach(journey ? [check, ...shell] : [check])
