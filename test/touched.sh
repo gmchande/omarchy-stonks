@@ -9,10 +9,10 @@
 #
 # The suites' steps run through their own runners, so through the one lock
 # and queue (test/queue.sh), with STONKS_ONLY naming the checks picked. The
-# journeys test/review.sh doesn't run go after, one at a time, on HEAD: a
-# journey runs a commit, so with uncommitted edits none runs, and the run
-# fails saying so. The saved answers are a repository of their own: a
-# change there isn't in the diff.
+# journeys test/review.sh doesn't run go beside them, one at a time, on
+# HEAD. A journey runs a commit, so with edits no commit holds, no journey
+# runs, and the run fails saying so. The saved answers are a repository of
+# their own: a change there isn't in the diff.
 #
 #   test/touched.sh [BASE]
 #   test/touched.sh self-check   the rules on a made-up checkout
@@ -46,17 +46,34 @@ for file in "${unrun[@]}"; do
 done
 
 failed=()
+# The journeys go beside the suites, as tophat sessions do, one after
+# another, each in its own nested session; their output prints at the end.
+journeys_log=$(mktemp)
+trap 'rm -f "$journeys_log" "$journeys_log.failed"' EXIT
+if [ "${#journeys[@]}" -gt 0 ]; then
+  set -m
+  (
+    for journey in "${journeys[@]}"; do
+      echo
+      echo "== $journey HEAD"
+      bash "$journey" HEAD || echo "$journey" >> "$journeys_log.failed"
+    done > "$journeys_log" 2>&1
+  ) &
+  set +m
+  journeys_pid=$!
+  trap 'kill -- "-$journeys_pid" 2> /dev/null; exit 130' INT TERM
+fi
 export STONKS_ONLY="${only[*]}"
 for runner in all review; do
   [[ " ${runs[*]} " == *" $runner "* ]] || continue
   echo
   test/$runner.sh || failed+=("test/$runner.sh")
 done
-for journey in "${journeys[@]}"; do
-  echo
-  echo "== $journey HEAD"
-  bash "$journey" HEAD || failed+=("$journey")
-done
+if [ -n "${journeys_pid:-}" ]; then
+  wait "$journeys_pid"
+  cat "$journeys_log"
+  [ ! -f "$journeys_log.failed" ] || mapfile -t -O "${#failed[@]}" failed < "$journeys_log.failed"
+fi
 
 echo
 [ "${#failed[@]}" -eq 0 ] || printf 'failed: %s\n' "${failed[@]}"

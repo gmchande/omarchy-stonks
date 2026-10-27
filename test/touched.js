@@ -51,10 +51,12 @@ function names(file) {
   return [base, ...dirname(file).split('/').filter(d => d !== '.' && d !== 'test')]
 }
 
-// words FILE: what FILE names, its whole-line comments left out; nothing
-// for a file that doesn't exist (deleted) or isn't text.
+// words FILE: what FILE names, its whole-line comments left out. Only code
+// loads what it names: a script, a QML page or a rule file, or a script with
+// no extension (the fake curl). Data names nothing, the manifest included:
+// only the shell loads its entry points, and only a journey runs the shell.
 function words(root, file) {
-  if (file.endsWith('.md') || !existsSync(join(root, file))) return new Set()
+  if (!(code.test(file) || !basename(file).includes('.')) || !existsSync(join(root, file))) return new Set()
   const buffer = readFileSync(join(root, file))
   if (buffer.subarray(0, 8000).includes(0)) return new Set()
   const comment = /\.(qml|js|mjs)$/.test(file) ? /^\s*(\/\/|\/\*)/ : /\.lua$/.test(file) ? /^\s*--/ : /^\s*#/
@@ -112,6 +114,15 @@ function pick(root, base) {
     if (/^test\/tophat\/journeys\/[^/]+\.sh$/.test(file) && !file.endsWith('/lib.sh') && !checks.has(file)) checks.set(file, 'journey')
   }
 
+  // What the shell loads of the plugin, which only a journey runs: the
+  // manifest's entry points, or every file when the manifest can't be read.
+  let shell
+  try {
+    shell = ['manifest.json', ...Object.values(JSON.parse(readFileSync(join(root, 'manifest.json'), 'utf8')).entryPoints)]
+  } catch {
+    shell = files
+  }
+
   const runnerChanged = changed.filter(f => everything.includes(f))
   const picks = []
   for (const [check, runner] of checks) {
@@ -120,7 +131,7 @@ function pick(root, base) {
     if (runnerChanged.length) why = `the runners changed (${runnerChanged.join(', ')})`
     else if (!journey && !/^test\/qml\/[^/]+\.sh$/.test(check)) why = 'reads files it does not name, so it runs on every diff'
     else {
-      const reached = reach(journey ? [check, 'manifest.json'] : [check])
+      const reached = reach(journey ? [check, ...shell] : [check])
       const hit = changed.filter(f => reached.has(f))
       if (hit.length) why = `reaches ${hit.slice(0, 3).join(', ')}${hit.length > 3 ? ` and ${hit.length - 3} more` : ''}`
       else { verdict = 'leave'; why = `reaches none of the ${changed.length} changed files` }
@@ -146,7 +157,7 @@ function selfCheck() {
     put('test/review.sh', 'source "$(dirname "${BASH_SOURCE[0]}")/queue.sh"\nstart "renders" bash test/qml/r.sh\nrun --with test/qml/r.sh "render diff" render_diff\nverdict\n')
     put('test/queue.sh', 'verdict() { :; }\n')
     put('test/quick.sh', 'echo ok\n')
-    put('test/qml/lib.sh', 'PATH="$here/bin:$PATH"\nusage() { echo "every harness: test/all.sh"; }\n')
+    put('test/qml/lib.sh', 'PATH="$here/bin:$PATH"\ncp "$plugin"/*.qml "$plugin/manifest.json" "$root/plugin/"\nusage() { echo "every harness: test/all.sh"; }\n')
     put('test/qml/bin/curl', '#!/bin/sh\necho answer\n')
     put('test/qml/x.sh', 'source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"\nplugin_tree x.qml\n')
     put('test/qml/x.qml', 'Stonks.Main {\n  id: y\n}\n')
