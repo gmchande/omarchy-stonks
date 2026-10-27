@@ -61,12 +61,13 @@ the rows follow the pointer. Click the bull, or on a down day the bear, to
 replay the chart.
 
 Pick a range under the chart, from 1D to All. Every stock then shows that
-range, even after a restart, while the rows stay on the day's move. To see
-the change as a percent, an amount, or since the open, click the sign at
-the end of the list's header, or on 1D the change beside the price.
+range, even after a restart, while the rows stay on the day's move. To show
+the change as a percent, an amount, or since the open, click the %, ±, or
+bell at the end of the list's header, or on 1D the change beside the price.
 
-Under the ranges, two lines place the price between the range's low and
-high and the past 52 weeks', beside the volume, market cap, and P/E. The
+Under the ranges, two lines show the low and the high with the price
+between them: one marked with the range, such as 1D, and one marked 52W for
+the past 52 weeks. Beside them are the volume, market cap, and P/E. The
 top line says where the market is, in its own time, and a smaller line
 under the price shows the pre-market, after-hours, or overnight price. An
 old price says "As of" and its time. [The help](HELP.md#reading-the-day)
@@ -99,7 +100,7 @@ undoing, and sorting.
 
 Stonks also opens in a tiled window: the popup's chart and rows at the
 window's width, with the same lists, range, and quotes. Right-click the
-pill, or run `omarchy-shell grvc.stonks openWindow '{}'`.
+pill, or run `omarchy-shell grvc.stonks toggleWindow`.
 
 For keys that open and close the popup and the window, add these lines to
 `~/.config/hypr/bindings.lua`. Omarchy doesn't use either key by default:
@@ -186,7 +187,8 @@ a price that looks wrong.
   search; Robinhood for overnight prices; GitHub once a day for the newest
   version number. No account, no API key, nothing else.
 - **Files it writes:** your lists in `~/.config/omarchy/grvc.stonks.json`,
-  the last quotes and sounds in `~/.cache/grvc.stonks`, and the screenshots
+  the last quotes and sounds in `~/.cache/grvc.stonks` (or under
+  `$XDG_CACHE_HOME`), and the screenshots
   you take.
 - **Updates:** never by itself. When a newer version is out, the footer
   offers it.
@@ -203,7 +205,7 @@ omarchy restart shell
 ```
 
 Or, when the footer says "Update to …", click it or press `Shift+U`: a
-terminal runs the update, and a second click restarts the shell.
+terminal runs the update, and a click on the footer then restarts the shell.
 [The help](HELP.md#updates) says how to stop Stonks checking GitHub.
 
 ## Remove
@@ -213,7 +215,8 @@ omarchy plugin remove grvc.stonks
 ```
 
 That removes the plugin and its pill. Your lists, the saved quotes, and the
-launcher files, if you added them, stay. Delete what you no longer want:
+launcher files, if you added them as [the help](HELP.md#the-window) says,
+stay. Delete what you no longer want:
 
 ```sh
 rm ~/.config/omarchy/grvc.stonks.json   # your lists; keep it to reinstall later
