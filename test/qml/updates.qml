@@ -1,5 +1,4 @@
 import QtQuick
-import QtTest
 import Quickshell
 import Quickshell.Io
 import qs.Commons
@@ -16,48 +15,17 @@ import "plugin" as Stonks
 // its click and Shift+U run the update in a terminal, and an undo takes its
 // place for the undo's seconds. Once the update is on disk, the restart
 // notice takes over, which a click and Shift+U act on.
-ShellRoot {
+Harness {
   id: harness
+  marker: "UPDATES DONE"
 
-  property int failures: 0
   readonly property string state: Quickshell.env("STONKS_FAKE_STATE")
   readonly property string manifestPath: String(Qt.resolvedUrl("plugin/manifest.json")).replace(/^file:\/\//, "")
   readonly property string updateCall: "launch floating terminal with presentation omarchy plugin update grvc.stonks"
 
-  function check(label, ok, detail) {
-    console.log((ok ? "PASS " : "FAIL ") + label + (!ok && detail !== undefined ? " — " + detail : ""))
-    if (!ok) failures++
-  }
-
-  // A fresh view per read: a FileView that has loaded once can return its
-  // old text straight after reload().
-  function readFile(path) {
-    var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true; printErrors: false }', harness)
-    view.path = path
-    var text = String(view.text() || "")
-    view.destroy()
-    return text
-  }
-
   // How many times main's manifest was asked for, whatever came back.
   function asked() {
     return harness.readFile(harness.state + "/requests.log").split("\n").filter(function(l) { return /^manifest /.test(l) }).length
-  }
-
-  function find(item, name) {
-    if (!item) return null
-    if (item.objectName === name) return item
-    for (var i = 0; i < item.children.length; i++) {
-      var found = find(item.children[i], name)
-      if (found) return found
-    }
-    return item.contentItem ? find(item.contentItem, name) : null
-  }
-
-  function finish() {
-    console.log("UPDATES DONE")
-    done.exitCode = failures ? 1 : 0
-    done.start()
   }
 
   // The plugin as the shell composes it, with this harness as its shell.
@@ -127,14 +95,9 @@ ShellRoot {
 
   Process { id: writer }
 
-  TestCase {
+  Steps {
     name: "Updates"
     when: service.pluginsReady && pillWindow.visible
-
-    function within(ms, fn) {
-      for (var t = 0; t < ms && !fn(); t += 20) wait(20)
-      return fn()
-    }
 
     function run(command) {
       writer.command = command
@@ -189,6 +152,7 @@ ShellRoot {
       tryVerify(function() { return window.active }, 3000)
       app.testKeyCatcher.forceActiveFocus()
       keyClick("U", Qt.ShiftModifier)
+      // Time for a run the key must not start to show in omarchy.calls.
       wait(100)
     }
     function calls() { return harness.readFile(harness.state + "/omarchy.calls") }
@@ -266,8 +230,7 @@ ShellRoot {
       // No answer at all, as straight after a wake before the network is
       // back: while Yahoo gets none either, GitHub is not asked again,
       // minutes on; once Yahoo answers again, it is asked at once, not a day
-      // later. It was asked again each time GitHub's pause ended, about once
-      // a minute for as long as the network was down.
+      // later.
       put("GITHUB.offline", "")
       put("YAHOO.offline", "")
       nextDay()
@@ -275,6 +238,7 @@ ShellRoot {
       openWindow()
       for (var m = 0; m < 5; m++) {
         service.now += 60
+        // Time for an ask that must not go.
         wait(200)
       }
       var held = harness.asked() === 5 && service.yahooGate.paused
@@ -285,7 +249,7 @@ ShellRoot {
       // The quotes the outage held catch up before the window closes.
       for (var s = 0; s < 20 && Object.keys(service.owed).length > 0; s++) {
         service.now += 5
-        wait(100)
+        within(100, function() { return Object.keys(service.owed).length === 0 })
       }
       closeWindow()
       var said = visit()
@@ -319,9 +283,7 @@ ShellRoot {
       closeWindow()
 
       // Opened again before the next answer: offered still, beside the
-      // add, which a click starts; Shift+U runs the update again. Found in
-      // the 1.0.4 update walk of 26 October: the old note had gone in its 5
-      // seconds, and the click meant for it opened search.
+      // add, which a click starts; Shift+U runs the update again.
       openWindow()
       var again = footer() + " | " + offer()
       clickFooter()
@@ -430,9 +392,7 @@ ShellRoot {
       harness.check("with \"updateCheck\": false in the data file, GitHub is asked nothing for two days; without it, at once",
         off && quiet && askedOff === 10 && backOn && askedOn, [off, quiet, askedOff + " asks while off", backOn, harness.asked() + " asks"].join(" | "))
 
-      harness.finish()
+      finish()
     }
   }
-
-  HarnessExit { id: done }
 }
