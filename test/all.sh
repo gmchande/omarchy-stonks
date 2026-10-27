@@ -7,6 +7,18 @@
 # test/review.sh; input readiness and a target's reachability to the action
 # they protect; the queue, the lock and the verdict to test/queue.sh. Needs
 # Omarchy installed and the Wayland session for the harnesses.
+#
+# test/all.sh NAME... runs only the named checks, as the full run would: a
+# harness by its test/qml/NAME.sh, a quick check by the name it's picked by
+# below. Such a run is never recorded and never ends ALL PASS.
+some=""
+for arg; do
+  shift
+  case $arg in
+    -*) set -- "$@" "$arg" ;;
+    *) some+="${some:+ }$arg" ;;
+  esac
+done
 source "$(dirname "${BASH_SOURCE[0]}")/queue.sh"
 
 # validate_clone: omarchy plugin validate on what a clone of this checkout
@@ -48,14 +60,15 @@ start "history harness" bash test/qml/history.sh
 start "camera harness at scale 2" env QT_SCALE_FACTOR=2 STONKS_CAMERA_SIZES=1 bash test/qml/camera.sh
 start "keys harness" bash test/qml/keys.sh
 start "popup harness" bash test/qml/popup.sh
+known_names unit frames font boundaries lint lint-gate validate launcher
 fill
 
-run "unit tests (every *.test.js)" bash test/unit.sh
-run "frame checker self-check" bun test/qml/frames.js self-check
-run "required font glyphs" bun test/font.js
-run "source boundaries" bash test/boundaries.sh
-run "qmllint (only the baseline in test/lint.sh)" bash test/lint.sh
-run "qmllint gate self-check" bash test/lint.sh self-check
-run "omarchy plugin validate (what a clone holds)" validate_clone
-run "launcher entry validates" desktop-file-validate share/stonks.desktop
+picked unit && run "unit tests (every *.test.js)" bash test/unit.sh
+picked frames && run "frame checker self-check" bun test/qml/frames.js self-check
+picked font && run "required font glyphs" bun test/font.js
+picked boundaries && run "source boundaries" bash test/boundaries.sh
+picked lint && run "qmllint (only the baseline in test/lint.sh)" bash test/lint.sh
+picked lint-gate && run "qmllint gate self-check" bash test/lint.sh self-check
+picked validate && run "omarchy plugin validate (what a clone holds)" validate_clone
+picked launcher && run "launcher entry validates" desktop-file-validate share/stonks.desktop
 verdict
