@@ -210,10 +210,12 @@ they are.
 
 Click the camera at the top right, or press `Ctrl+C`, for a picture of the
 chart you're looking at, laid out to share: the price large with its
-currency beside it, its move, the day's bull or bear, the exchange, the time
-of the price with its zone, the price the move is measured from, a range's
-high and low on its chart, and at the foot the day's date or the range's
-length. Scrubbed, it shows the moment you scrubbed to. Your list is never in
+currency beside it (an index's level has none), its move, the day's bull or
+bear, the exchange, the time of the price with its zone, the price the move
+is measured from, a range's high and low on its chart, and at the foot the
+day's date or the range's length and dates. Scrubbed, it shows the moment
+you scrubbed to, naming the pre-market, after hours or overnight when it
+falls there. Your list is never in
 it. It lands where Omarchy's own screenshots do, on Omarchy 4.0 and on 4.5:
 a file in your screenshots folder, the picture on the clipboard, and
 Omarchy's notification, which opens it in your screenshot editor when you
