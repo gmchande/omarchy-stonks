@@ -1085,7 +1085,7 @@ test("a quote held from an earlier session says the calendar's session while it 
   expect([aapl("11:00"), aapl("12:10")]).toEqual(["Market closes in 5h", "Lunch lull · closes in 3h 50m"])
 })
 
-test("a published closure or a break between segments is closed, whatever Yahoo's periods say", () => {
+test("a published closure is closed, whatever Yahoo's periods say", () => {
   const labor = 1788793200
   const fakeOpen = {
     ...sep4,
@@ -1105,7 +1105,7 @@ test("a published closure or a break between segments is closed, whatever Yahoo'
   expect(M.statusForms(fakeOpen, labor, 0, null)).toEqual(["Power hour · closes in 1h", "Closes in 1h"])
 })
 
-test("the bell rings once at a market's open and once at its close, never late, at lunch, on a holiday, or for a coin", () => {
+test("the bell rings once at a market's open and once at its close, never late, on a holiday, or for a coin", () => {
   const q = duringSession(quote)
   const bell = (quote, before, now) => M.bellBetween(quote, before, now, calendars)
   // The minute's tick over the open and the close, and a step just over.
