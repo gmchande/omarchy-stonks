@@ -53,7 +53,7 @@ record() {
 checkout() {
   tree=$(clean_tree)
   commit=$(git rev-parse -q --verify HEAD 2> /dev/null)
-  [ -n "$tree" ] || echo "$runner: this run won't be recorded: the tree has uncommitted edits or untracked files (git status)"
+  [ -n "$tree" ] || [ -n "${STONKS_ONLY+set}" ] || echo "$runner: this run won't be recorded: the tree has uncommitted edits or untracked files (git status)"
 }
 # refuse_passed: ends the run when this tree already passed this runner and
 # no package has changed since, unless --again. The newest pass counts:
