@@ -137,7 +137,7 @@ function words(o) {
     // line is at, named as the popup names it (`Figures.dayBaselineText`).
     var base = o.scrubT ? Figures.scrubbedBase(o.day) : Quote.headlineBase(quote)
     out.from = o.changeMode === "open" ? "OPEN " + Format.money(base.dayOpen, digits)
-      : o.scrubT ? Figures.dayBaselineText(o.day, Figures.exchangeDay(o.day, o.now))
+      : o.scrubT ? Figures.dayBaselineText(o.day, Figures.exchangeDay(o.day, o.now), o.scrubT)
       : "PREV CLOSE " + Format.money(base.prevClose, digits)
     var pts = o.day.points
     if (pts.length) {

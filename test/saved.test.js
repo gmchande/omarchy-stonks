@@ -1791,7 +1791,17 @@ test("the evening's night is on the day's chart, measured from the day's previou
   expect([...new Set(night.map(p => M.animalKind(M.rowModel(day, p.t, "pct"))))]).toEqual(["bull"])
   expect(againstDashedLine(day, "23:00")).toBe(`23:00 all against ${M.money(quote.prevClose)}`)
   expect(stripAt(built, at("2026-10-06", "23:00")).changeText).toBe("\u22120.76%")
-  expect(M.dayBaselineText(day, M.exchangeDay(day, at("2026-10-06", "23:00")))).toBe(`PREV CLOSE ${M.money(quote.prevClose)}`)
+  // Beside the scrub, the dashed line's close is named for what it is: on
+  // the session, the previous close; past the session's close, in the
+  // after-hours or the night, where Tuesday's own close is the last one,
+  // the close before Tuesday.
+  const today = M.exchangeDay(day, at("2026-10-06", "23:00"))
+  const labelAt = clock => M.dayBaselineText(day, today, at("2026-10-06", clock))
+  expect(["12:00", "15:55", "16:00", "17:00", "22:50"].map(labelAt)).toEqual([
+    `PREV CLOSE ${M.money(quote.prevClose)}`, `PREV CLOSE ${M.money(quote.prevClose)}`,
+    `CLOSE BEFORE TUE ${M.money(quote.prevClose)}`, `CLOSE BEFORE TUE ${M.money(quote.prevClose)}`,
+    `CLOSE BEFORE TUE ${M.money(quote.prevClose)}`])
+  expect(M.dayBaselineText(day, today, 0)).toBe(`PREV CLOSE ${M.money(quote.prevClose)}`)
 })
 
 test("a weekend shows Friday all day, then Sunday night's trades after it, the weekend taking no room", () => {

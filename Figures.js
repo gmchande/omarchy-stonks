@@ -215,16 +215,21 @@ function dayTitle(quote, today) {
   return pastDayName(quote, quote.figuresDay, today) || "1D"
 }
 
-// The name of a day before `today` that holds `t`: its weekday in the
+// The name of a day before `today` that holds `t` (`dayName`); "" for
+// today.
+function pastDayName(quote, t, today) {
+  var day = exchangeDay(quote, t)
+  return day !== null && today - day > 0 ? dayName(quote, t, today) : ""
+}
+
+// The name of the day that holds `t`, up to `today`: its weekday in the
 // exchange's calendar ("FRI"), which names one day of the six before
 // today, since no calendar closes longer than five (Tokyo's Golden Week).
 // A day a week old or more, as a halted listing's, says its month ("SEP"),
-// never a weekday that would read as this week's. "" for today.
-function pastDayName(quote, t, today) {
-  var day = exchangeDay(quote, t)
-  if (day === null || !(today - day > 0)) return ""
+// never a weekday that would read as this week's.
+function dayName(quote, t, today) {
   var d = new Date((t + (quote.gmtoffset || 0)) * 1000)
-  return today - day < 7 ? Format.WEEKDAYS[d.getUTCDay()].toUpperCase() : Format.MONTHS[d.getUTCMonth()]
+  return today - exchangeDay(quote, t) < 7 ? Format.WEEKDAYS[d.getUTCDay()].toUpperCase() : Format.MONTHS[d.getUTCMonth()]
 }
 
 // Every title `dayTitle` can give.
@@ -306,14 +311,16 @@ function scrubbedBase(quote) {
 
 // What a scrub of the 1D `day` reads its moves from, said beside its dashed
 // line: the line's own close, the one before the day's session
-// (`Quote.dayBase`), which every print of the chart reads from. On the
-// session's own day that is the previous close. Once the day is past, as
-// overnight or on a weekend, the last close is the session's own, so the
-// line names the session it comes before: "CLOSE BEFORE TUE".
-function dayBaselineText(day, today) {
+// (`Quote.dayBase`), which every print of the chart reads from. Within the
+// session, on its own day, that is the previous close. Once the session
+// has closed, the last close is its own: so a scrub past its close
+// (`scrubT`, 0 at rest), and any reading once the day is past (`today`),
+// as overnight or on a weekend, names the session the line's close comes
+// before: "CLOSE BEFORE TUE".
+function dayBaselineText(day, today, scrubT) {
   var reg = day.session.regular
-  var before = reg ? pastDayName(day, reg.start, today) : ""
-  return (before ? "CLOSE BEFORE " + before : "PREV CLOSE") + " " + Format.money(Quote.dayBase(day), day.priceDigits)
+  var closed = !!reg && (pastDayName(day, reg.start, today) !== "" || (scrubT > 0 && scrubT >= reg.end))
+  return (closed ? "CLOSE BEFORE " + dayName(day, reg.start, today) : "PREV CLOSE") + " " + Format.money(Quote.dayBase(day), day.priceDigits)
 }
 
 // The day's animal for a row (`rowModel`): "bull" up, "bear" down, by
