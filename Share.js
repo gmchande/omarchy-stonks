@@ -99,25 +99,33 @@ function barDate(history, bar) {
 // `day` (the 1D chart's), `history` (a range's, or null on the day),
 // `latest`, `scrubT` (0 at rest), `changeMode`, `range`, `now`, and
 // `calendars`.
-//   when: what the price is, and its time and zone; on a range, its date
-//   too, which on the day the foot says;
+//   when: what the price is, and its time and zone; a scrub outside the
+//   regular session named by its session, as the line under the price is;
+//   on a range, its date too, which on the day the foot says;
 //   from: what the change is measured from, as the chart's dashed line;
 //   extended: the line under the price the popup shows, with its time;
-//   start, end: the axis's two ends;
+//   currency: beside the price; none beside an index's level, which isn't
+//   money;
+//   start, end: the day's axis's two ends; a range has none;
 //   span: when, at the foot: on the day, the date of the price on show,
 //   the day its move belongs to (after midnight, the close before the
-//   chart's day); on a range, the range's length;
+//   chart's day); on a range, the range's length and its first and last
+//   dates, said once here;
 //   said: the moment in the footer's words.
 function words(o) {
   var quote = o.quote
   var digits = quote.priceDigits
   var at = moment(o)
-  var out = { when: "", from: "", extended: "", extendedTone: "flat", start: "", end: "", span: "", said: "" }
+  var out = { when: "", from: "", extended: "", extendedTone: "flat", start: "", end: "", span: "", said: "",
+    currency: quote.instrumentType === "INDEX" ? "" : Figures.currencyLabel(String(quote.currency || "")) }
   if (at.bar) {
     out.when = barDate(o.history, at.bar)
     out.said = "on " + out.when
   } else if (at.t) {
-    out.when = (at.close ? quote.exchange + " CLOSE · " : "AT ") + clockOf(quote, at.t, o.calendars)
+    var phase = o.scrubT && !at.close ? Market.scrubPhase(o.day, o.scrubT) : ""
+    var outside = phase === "pre" || phase === "post" || phase === "overnight"
+    out.when = (at.close ? quote.exchange + " CLOSE · " : outside ? Market.phaseLabel(phase).toUpperCase() + " " : "AT ")
+      + clockOf(quote, at.t, o.calendars)
       + (o.history ? " · " + dateOf(quote, at.t, o.calendars) : "")
     if (!o.history) out.span = dateOf(quote, at.t, o.calendars)
     out.said = at.close ? "at the close" : "at " + Market.printClock(quote, at.t, o.calendars)
@@ -128,8 +136,8 @@ function words(o) {
     // Each end with its year: the picture is read later, elsewhere.
     var bars = o.history.bars
     if (bars.length) {
-      out.start = History.historyDateText(o.history, bars[0].t, true, o.history.interval)
-      out.end = History.historyDateText(o.history, bars[bars.length - 1].t, true, o.history.interval)
+      out.span += " · " + History.historyDateText(o.history, bars[0].t, true, o.history.interval)
+        + " – " + History.historyDateText(o.history, bars[bars.length - 1].t, true, o.history.interval)
     }
   } else {
     // What the change on show is measured from: the quote's at rest

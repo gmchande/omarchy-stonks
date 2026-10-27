@@ -2326,11 +2326,28 @@ test("the header's animal sleeps while its market does: by phase and calendar, n
 })
 
 // Bitcoin's picture says its day, in UTC, the time it has no calendar for;
-// its file and the footer keep the dash.
-test("a screenshot of Bitcoin's day names its date and its time in UTC", () => {
+// its file and the footer keep the dash. A scrub outside the regular session
+// names it, as the picture at rest does: a big price read as the session's
+// would mislead. A range says its dates once, at the foot, with no axis
+// dates for a mark to repeat. An index's level isn't money: no currency.
+test("a screenshot says when its price is, its session, its range's dates once, and an index's level without a currency", () => {
   const Share = load("Share.js")
   const words = Share.words({ quote: btc, day: M.dayChart(btc, null, calendars).day, history: null, latest: null,
     scrubT: 0, changeMode: "pct", range: "1D", now: btc.marketTime + 60, calendars })
   expect([words.span, words.when]).toEqual(["SAT 12 SEP 2026", "AT 18:32 UTC"])
   expect([Share.subject("BTC-USD", "1D", words.said), Share.fileSymbol("BTC-USD")]).toEqual(["BTC-USD at 18:32 UTC", "btc-usd"])
+  const scrubbed = (day, quote, t) => Share.words({ quote, day, history: null, latest: null, scrubT: t,
+    changeMode: "pct", range: "1D", now: t, calendars }).when
+  const spy = M.parseChart(fixture("spy-2026-09-11-day-prepost.json"))
+  expect(["07:30", "12:00", "18:10"].map(clock => scrubbed(spy, spy, at("2026-09-11", clock))))
+    .toEqual(["PRE-MARKET 07:30 EDT", "AT 12:00 EDT", "AFTER HOURS 18:10 EDT"])
+  const night = dayAt("night", "nest")
+  expect(scrubbed(night.day, night.quote, at("2026-10-01", "21:30"))).toBe("OVERNIGHT 21:30 EDT")
+  const year = Share.words({ quote, day: quote, history: M.parseHistory(fixture("history/aapl-1y.json"), "1Y"),
+    latest: null, scrubT: 0, changeMode: "pct", range: "1Y", now: quote.marketTime + 60, calendars })
+  expect([year.span, year.start, year.end]).toEqual(["1 YEAR · 12 SEP 2025 – 11 SEP 2026", "", ""])
+  const gspc = savedDay("listings-2026-10-07-1455", "gspc")
+  expect([gspc, spy, savedDay("listings-2026-10-07-1455", "shel.l")].map(q => Share.words({ quote: q, day: q,
+    history: null, latest: null, scrubT: 0, changeMode: "pct", range: "1D", now: q.marketTime + 60, calendars }).currency))
+    .toEqual(["", "USD", "PENCE"])
 })
