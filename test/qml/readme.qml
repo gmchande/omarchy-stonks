@@ -10,7 +10,8 @@ import "plugin" as Stonks
 // The README's pictures, through the real Service, popup (Panel.qml, its
 // card in CardWindow.qml), window (App.qml), and pill (BarWidget.qml), on the
 // demo watchlist at the saved moment readme.sh names. Each picture is
-// grabbed into STONKS_README_RAW; readme.sh puts them together.
+// grabbed into STONKS_README_RAW; readme.sh makes the README's from them,
+// and the marketplace picture takes retro-spy and strip-spy.
 Harness {
   id: harness
   marker: "README DONE"
@@ -40,8 +41,8 @@ Harness {
   Stonks.App { id: app; service: service; updates: updates; trendColors: colors }
   Process { id: themeSwitch; onExited: harness.themeLinked = true }
 
-  // The pill on strips of bar: one as wide as the popup's card, which
-  // readme.sh widens into preview.png's bar; and each of its four forms.
+  // The pill on strips of bar: one as wide as the popup's card, for the
+  // marketplace picture's bar; and each of its four forms.
   FloatingWindow {
     visible: true
     color: "transparent"
@@ -162,17 +163,6 @@ Harness {
       tryVerify(function() { return saved }, 3000, "grab " + name)
     }
 
-    // preview.png keeps a popup down to its list's fourth row, fading out
-    // over it: each end as a share of the card's height, for readme.sh.
-    function previewFade(name, body) {
-      var card = panel.testCard.card
-      var bottom = function(row) {
-        var item = body.watchlist.rowItem(body.watchlist.displayedSymbols[row])
-        return item.mapToItem(card, 0, item.height).y / card.height
-      }
-      console.log("PREVIEW_FADE " + name + " " + bottom(2).toFixed(4) + " " + bottom(3).toFixed(4))
-    }
-
     function test_pictures() {
       quiet()
       verify(service.symbols.join(",") === harness.demo.join(",") && service.featuredSymbol === "AAPL"
@@ -181,8 +171,7 @@ Harness {
       panel.open()
       var body = panel.testBody
       tryVerify(function() { return body.surfaceOpen }, 3000)
-      grab("strip", heroStrip, body, robinhoodIn)
-      grab("forms", forms)
+      grab("forms", forms, body, robinhoodIn)
 
       // Scrubbed back an hour and a half, as ← steps do, a print at a time:
       // a capture taken mid-session lands in the same session.
@@ -191,7 +180,6 @@ Harness {
       for (var step = 0; step < 500 && body.motion.scrubT > back; step++) body.nudgeScrub(-1)
       verify(body.motion.scrubT > 0 && body.motion.scrubT <= back, "the scrub reached an hour and a half back: " + body.motion.scrubT + " vs " + back)
       grab("scrub", panel.testCard.card, body, function() { return body.motion.scrubT !== 0 })
-      previewFade("scrub", body)
       body.endScrub()
       tryVerify(function() { return atRest(body) }, 3000, "the rows back on now")
 
@@ -215,7 +203,13 @@ Harness {
       service.persist({ style: "retro" })
       panel.open()
       grab("retro", panel.testCard.card, body, function() { return service.retro && body.surfaceOpen })
-      previewFade("retro", body)
+      // The marketplace picture: SPY in retro, and the pill on the bar.
+      service.feature("SPY")
+      tryVerify(function() { return service.featuredSymbol === "SPY" }, 3000, "SPY featured")
+      grab("retro-spy", panel.testCard.card, body, function() { return service.retro && body.surfaceOpen && service.featuredSymbol === "SPY" })
+      grab("strip-spy", heroStrip, body, robinhoodIn)
+      service.feature("AAPL")
+      tryVerify(function() { return service.featuredSymbol === "AAPL" }, 3000, "AAPL featured again")
       panel.close()
       service.persist({ style: "smooth" })
       tryVerify(function() { return !body.surfaceOpen && !service.retro }, 3000)
