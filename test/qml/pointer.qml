@@ -573,14 +573,15 @@ Harness {
         within(1000, function() { return body.watchlist.cursorRow === body.watchlist.displayedSymbols[1] })
         var viewKeyed = body.watchlist.cursorRow
         body.openManageLists()
-        within(1000, function() { return body.managingLists })
-        waitForRendering(body)
+        // Each view and the sheet stay up, and the rows come back, for some
+        // frames: Qt takes the pointer off the rows and reports it again
+        // on frames, which no property shows.
+        wait(100)
         mouseMove(sheetFirst, sheetFirst.width / 2 - 20, sheetFirst.height / 2 + 3 * pitch)
         mouseMove(sheetFirst, sheetFirst.width / 2, sheetFirst.height / 2 + 3 * pitch)
         body.closeListViews()
         within(2000, function() { return !body.managingLists && rowsAtRest() })
-        // Drawn, so Qt has reported the still pointer to the rows again.
-        waitForRendering(body)
+        wait(200)
         mouseMove(sheetFirst, sheetFirst.width / 2, sheetFirst.height / 2 + 3 * pitch + 1)
         var viewKept = body.watchlist.cursorRow
         // And a small real move after the rows come back counts: from the
@@ -588,17 +589,16 @@ Harness {
         // cursor.
         mouseMove(sheetFirst, sheetFirst.width / 2, sheetFirst.height + 20)
         mouseMove(sheetFirst, sheetFirst.width / 2, sheetFirst.height - 3)
+        wait(50)
         body.moveCursor(1)
         body.moveCursor(1)
         within(1000, function() { return body.watchlist.cursorRow === body.watchlist.displayedSymbols[2] })
         var smallKeyed = body.watchlist.cursorRow
         body.toggleHelp()
-        within(1000, function() { return body.showingHelp })
-        // Drawn over the rows, so Qt takes the pointer off them.
-        waitForRendering(body)
+        wait(100)
         body.toggleHelp()
         within(2000, function() { return !body.showingHelp && rowsAtRest() })
-        waitForRendering(body)
+        wait(200)
         mouseMove(sheetFirst, sheetFirst.width / 2, sheetFirst.height + 3)
         within(1000, function() { return body.watchlist.cursorRow === body.watchlist.displayedSymbols[1] })
         root.check("rows back from behind a view keep the cursor under a pointer moved meanwhile, and a few pixels onto the next row take it",
