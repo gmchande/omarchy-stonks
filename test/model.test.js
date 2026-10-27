@@ -637,6 +637,48 @@ test("membership across several lists", () => {
   expect(M.listReversed(M.withListReversed(library({ list: "My Watchlist" })))).toBe(false)
 })
 
+// The keys a sheet or README label names, in one spelling: a capital as
+// Shift and it, ⇧ as Shift, and the sheet's "Del ⌫" as Delete and Backspace.
+const keyTokens = label => label.replace(/`/g, "").split(/\s+/)
+  .filter(t => t !== "" && t !== "or")
+  .map(t => ({ "Del": "Delete", "⌫": "Backspace" })[t] || t.replace(/^⇧/, "Shift+"))
+  .map(t => /^[A-Z]$/.test(t) ? "Shift+" + t : t)
+const sortedKeys = labels => labels.flatMap(keyTokens).sort()
+
+test("the key sheet lists exactly the README's keys for each surface, the row's move only in manual order", () => {
+  const lines = readFileSync(join(root, "README.md"), "utf8").split("\n")
+  const start = lines.indexOf("| Key | Does |")
+  expect(start).toBeGreaterThan(0)
+  const table = []
+  for (let i = start + 2; lines[i] && lines[i][0] === "|"; i++) table.push(lines[i].split("|").map(c => c.trim()))
+  // A row ending "(popup)" or "(window)" is that surface's alone.
+  const readme = surface => sortedKeys(table.filter(c => {
+    const only = /\((popup|window)\)$/.exec(c[2])
+    return !only || only[1] === surface
+  }).map(c => c[1]))
+  const drawn = (order, switchesPanels) =>
+    sortedKeys(M.sheet(order, switchesPanels).groups.flatMap(g => g.rows.map(r => r.key)))
+  const moves = ["Shift+↑", "Shift+↓"]
+  expect(drawn("manual", true)).toEqual(readme("popup"))
+  expect(drawn("manual", false)).toEqual(readme("window"))
+  expect(drawn("pct", true)).toEqual(readme("popup").filter(k => !moves.includes(k)))
+  expect(drawn("symbol", false)).toEqual(readme("window").filter(k => !moves.includes(k)))
+})
+
+test("a letter says its key and Shift, never its text's case, and nothing held with Ctrl or Alt", () => {
+  const { typed } = load("KeyText.js")
+  const SHIFT = 0x02000000, CTRL = 0x04000000, ALT = 0x08000000, KEYPAD = 0x20000000
+  // Caps Lock sends "O" with no Shift, and "o" with it.
+  expect(["o", "l", "m"].map(l => typed({ key: l.toUpperCase().charCodeAt(0), modifiers: 0, text: l.toUpperCase() })))
+    .toEqual(["o", "l", "m"])
+  expect(typed({ key: 79, modifiers: SHIFT, text: "o" })).toBe("O")
+  expect(typed({ key: 79, modifiers: SHIFT | KEYPAD, text: "o" })).toBe("O")
+  expect(typed({ key: 80, modifiers: 0, text: "p" })).toBe("p")
+  expect(typed({ key: 80, modifiers: CTRL, text: "\u0010" })).toBe("")
+  expect(typed({ key: 80, modifiers: ALT, text: "p" })).toBe("")
+  expect(typed({ key: 63, modifiers: SHIFT, text: "?" })).toBe("?")
+})
+
 test("a stock's day is asked for two days from its pre-market until the bell, when Yahoo's day no longer holds the last session", () => {
   const stock = { symbol: "X", exchange: "NASDAQ", instrumentType: "EQUITY", crypto: false }
   const two = (q, date, clock) => M.twoDays(q, at(date, clock), calendars)
