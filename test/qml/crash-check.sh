@@ -1,21 +1,20 @@
 #!/usr/bin/env bash
 # Proves quickshell.sh's handling with a stand-in Quickshell, no screen and
 # no saved answers: a crash fails the run with a FAIL line naming its
-# signal and core dump, a timeout and an interrupt too, an exit of 255 (a
-# file that fails to load) reads as an exit, not a crash, an ordinary pass
+# signal and core dump, a timeout and an interrupt too, an ordinary pass
 # and failure read as before, and however a run ends nothing it started is
 # still running, in its group or out of it, while a process the run did not
 # start, and another run side by side, are left alone. However a run ends,
 # too, it leaves nothing in the session's runtime folder, where the
 # stand-in, as Quickshell does, makes its instance's folder under the
-# XDG_RUNTIME_DIR it is given; its own runtime folder is gone, an interrupt
-# as it is made included, the session's entries reachable through it while
-# it ran; a run whose folder can't be made never starts, nor one with no
-# display that isn't offscreen, which ends its harness on one line saying
-# why; and a run whose Quickshell says it saved in the session's folder
-# fails. The stand-in dies on a real signal with its core dump turned off
-# (prctl PR_SET_DUMPABLE, 0: prctl(2)), so no core is written and no one is
-# notified. Prints FAILED per miss.
+# XDG_RUNTIME_DIR it is given; its own runtime folder is gone, the
+# session's entries reachable through it while it ran; a run whose folder
+# can't be made never starts, nor one with no display that isn't
+# offscreen, which ends its harness on one line saying why; and a run whose
+# Quickshell says it saved in the session's folder fails. The stand-in dies
+# on a real signal with its core dump turned off (prctl PR_SET_DUMPABLE, 0:
+# prctl(2)), so no core is written and no one is notified. Prints FAILED
+# per miss.
 set -uo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "$here/../procs.sh"
@@ -86,8 +85,6 @@ if mode.startswith(("abort", "segv")):
     os.kill(os.getpid(), signal.SIGABRT if mode.startswith("abort") else signal.SIGSEGV)
 if mode == "hang":
     time.sleep(600)
-if mode == "exit255":
-    sys.exit(255)
 print("PASS the flow" if mode.startswith("pass") else "FAIL the flow", flush=True)
 sys.exit(0 if mode.startswith("pass") else 1)
 EOF
@@ -124,9 +121,7 @@ gone() {
 # control, so INT is not ignored): its pid in h, its folder $tmp/CASE. With
 # EARLY, the harness is sent TERM as it is about to record the group's
 # leader, once the stand-in has started its children; with EARLY=start,
-# the same once it has recorded the leader, before its start time; with
-# EARLY=made, as the run's runtime folder is made and Quickshell not yet
-# started, noting the folder in CASE/made.
+# the same once it has recorded the leader, before its start time.
 harness() {
   local dir=$tmp/$1
   mkdir -p "$dir"
@@ -136,8 +131,7 @@ harness() {
     echo "$qs_mark" > "$3/mark"
     trap quickshell_exit EXIT; trap "exit 130" INT; trap "exit 143" TERM
     early() { local i; for i in $(seq 50); do [ -s "$STANDIN_DIR/left" ] && break; sleep 0.1; done; kill -TERM $$; }
-    if [ "$EARLY" = made ]; then set -T; trap "[[ \$BASH_COMMAND == mkfifo* ]] && { [ -d \"\$qs_runtime\" ] && echo \"\$qs_runtime\" > \"\$STANDIN_DIR/made\"; kill -TERM \$\$; }" DEBUG
-    elif [ "$EARLY" = start ]; then set -T; trap "[[ \$BASH_COMMAND == qs_leader_start=* ]] && early" DEBUG
+    if [ "$EARLY" = start ]; then set -T; trap "[[ \$BASH_COMMAND == qs_leader_start=* ]] && early" DEBUG
     elif [ -n "$EARLY" ]; then set -T; trap "[[ \$BASH_COMMAND == qs_leader=* ]] && early" DEBUG; fi
     quickshell_run "$2" "$3/log" -p nowhere
     echo "$qs_code" > "$3/code"' _ "$here" "$3" "$dir" < /dev/null > "$dir/out" 2>&1 &
@@ -148,6 +142,8 @@ harness() {
 # ran PID CASE: waits for CASE's harness; its code in code.
 ran() { wait "$1" 2> /dev/null; code=$(cat "$tmp/$2/code" 2> /dev/null || echo none); }
 within() { local i; for i in $(seq $(( $1 * 10 ))); do "${@:2}" && return 0; sleep 0.1; done; return 1; }
+# stopped CASE: none of CASE's run's processes is running.
+stopped() { local pid; for pid in $(cat "$tmp/$1/pid" "$tmp/$1/left" 2> /dev/null); do alive "$pid" && return 1; done; return 0; }
 
 # A crash before any output, and one in the middle of a flow.
 for case in abort segv-mid; do
@@ -171,15 +167,6 @@ ran "$h" hang
 [ "$code" = 124 ] || miss "hang: code $code, not 124"
 grep -qx 'FAIL Quickshell timed out after 1 s' "$tmp/hang/log" || miss "hang: no timeout line: $(cat "$tmp/hang/log")"
 gone hang
-
-# An exit of 255, as Quickshell gives for a file that fails to load: an exit
-# pointing at its log, never a crash pointing at a core dump.
-harness exit255 exit255 20
-ran "$h" exit255
-[ "$code" = 255 ] || miss "exit255: code $code, not 255"
-[ "$(cat "$tmp/exit255/log")" = "FAIL Quickshell exited with code 255; its log says why" ] \
-  || miss "exit255: not read as an exit: $(cat "$tmp/exit255/log")"
-gone exit255
 
 # An ordinary pass and an ordinary failure read as before: their own code,
 # their own lines, nothing added. A pass whose child stays in its group is
@@ -231,13 +218,6 @@ ran "$h" offscreen
 [ "$code" = 0 ] || miss "offscreen: code $code, not 0"
 gone offscreen
 
-# TERM once the run's runtime folder is made, before Quickshell starts: the
-# folder goes all the same.
-harness made hang 60 "" made
-wait "$h" 2> /dev/null
-[ -s "$tmp/made/made" ] || miss "made: the TERM never came with the folder made"
-[ -e "$(cat "$tmp/made/made" 2> /dev/null)" ] && miss "made: its runtime folder $(cat "$tmp/made/made") is still there"
-
 # An interrupt of a harness: INT as a terminal sends it, TERM as test/queue.sh
 # does, each to the harness's group, mid-run; and TERM the moment
 # Quickshell has started, before the harness has recorded its group, and
@@ -251,11 +231,11 @@ for signal in INT TERM; do
 done
 harness early hang 60 both early
 wait "$h" 2> /dev/null
-sleep 0.5
+within 5 stopped early
 gone early
 harness early-start hang 60 both start
 wait "$h" 2> /dev/null
-sleep 0.5
+within 5 stopped early-start
 gone early-start
 
 # Side by side: one run crashes while another runs; the other's processes

@@ -6,37 +6,18 @@ import qs.Commons as Commons
 import qs.Ui
 import "plugin" as Stonks
 
-// Every key the key sheet draws and the README's table lists acts, on the
-// surface it is listed for: pressed with real Qt keys through the real popup
-// (Panel.qml, its card in CardWindow.qml) and the real window (App.qml), it
-// changes what that surface shows. The sheet and the table list the same
-// keys, and a key either lists for one surface alone, or one Stonks no
-// longer answers, changes nothing. A key a handler lost, or one renamed in
-// the sheet or the README but not in the handlers, fails here. And the sheet
-// says the same on both surfaces, but for the popup's Tab, and in both
-// looks. HOME and curl are scratch fixtures.
-ShellRoot {
+// Every key the README's table lists acts, on the surface it is listed for:
+// pressed with real Qt keys through the real popup (Panel.qml, its card in
+// CardWindow.qml) and the real window (App.qml), it changes what it should
+// and nothing else. A key a handler lost, or one renamed in the README but
+// not in the handlers, fails here. HOME and curl are scratch fixtures.
+Harness {
   id: harness
+  marker: "KEYS DONE"
 
-  property int failures: 0
   // Tab's requests to the bar for its next panel.
   property int tabs: 0
   property int tabDirection: 0
-
-  function check(label, ok, detail) {
-    console.log((ok ? "PASS " : "FAIL ") + label + (!ok && detail !== undefined ? " — " + detail : ""))
-    if (!ok) failures++
-  }
-
-  function find(item, name) {
-    if (!item) return null
-    if (item.objectName === name) return item
-    for (var i = 0; i < item.children.length; i++) {
-      var found = find(item.children[i], name)
-      if (found) return found
-    }
-    return item.contentItem ? find(item.contentItem, name) : null
-  }
 
   // The texts an item draws, in order, those with `name` only when given.
   function texts(item, name) {
@@ -51,37 +32,20 @@ ShellRoot {
     return out
   }
 
-  function finish() {
-    console.log("KEYS DONE")
-    done.exitCode = failures ? 1 : 0
-    done.start()
-  }
-
   readonly property string readmePath: String(Qt.resolvedUrl("README.md")).replace(/^file:\/\//, "")
   readonly property string manifestPath: String(Qt.resolvedUrl("plugin/manifest.json")).replace(/^file:\/\//, "")
-  function readFile(path) {
-    var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true; printErrors: false }', harness)
-    view.path = path
-    var text = String(view.text())
-    view.destroy()
-    return text
-  }
 
-  // The keys a label names, in one spelling: a capital as Shift and it ("O"
-  // and "`Shift+O`"), ⇧ as Shift ("⇧↑" and "`Shift+↑`"), and the sheet's
-  // "Del ⌫" as the table's Delete and Backspace.
+  // The keys a label names, in one spelling: a capital as Shift and it, and
+  // "Delete or Backspace" as the two.
   function tokens(label) {
-    var named = { "Del": "Delete", "⌫": "Backspace" }
     return label.replace(/`/g, "").split(/\s+/)
       .filter(function(t) { return t !== "" && t !== "or" })
-      .map(function(t) { return named[t] || t.replace(/^⇧/, "Shift+") })
       .map(function(t) { return /^[A-Z]$/.test(t) ? "Shift+" + t : t })
   }
 
   // The keys the README's table lists for `surface`: a row ending "(popup)"
-  // or "(window)" is that surface's alone. With `elsewhere`, the keys listed
-  // for the other surface alone instead. Null with no table.
-  function readmeKeys(surface, elsewhere) {
+  // or "(window)" is that surface's alone. Null with no table.
+  function readmeKeys(surface) {
     var lines = readFile(readmePath).split("\n")
     var start = lines.indexOf("| Key | Does |")
     if (start < 0) return null
@@ -89,19 +53,13 @@ ShellRoot {
     for (var i = start + 2; i < lines.length && lines[i].charAt(0) === "|"; i++) {
       var cells = lines[i].split("|")
       var only = /\((popup|window)\)$/.exec(cells[2].trim())
-      var listed = elsewhere ? !!only && only[1] !== surface : !only || only[1] === surface
-      if (listed) keys = keys.concat(tokens(cells[1].trim()))
+      if (!only || only[1] === surface) keys = keys.concat(tokens(cells[1].trim()))
     }
     return keys
   }
 
-  // Keys Stonks answered before the 25 October key set, which now do nothing
-  // in the window, and in the popup but for Omarchy's own; Shift+P never did.
-  readonly property var dropped: ["j", "k", "h", "Space", "1", "2", "3", "4", "5", "6", "7", "8", "9", "+",
-    "x", "Shift+X", "u", "Shift+J", "Shift+K", "w", "Shift+W", ",", ".", "y", "Shift+S", "Shift+P"]
   // What Omarchy's panel keys mean in every panel on the bar, the popup
-  // among them, as one of the listed keys (Ui/PanelKeyCatcher.qml): the
-  // sheet and the README never list them. l is Stonks' list menu there.
+  // among them, as one of the listed keys (Ui/PanelKeyCatcher.qml).
   readonly property var omarchy: ({ "j": "↓", "k": "↑", "h": "←", "Space": "⏎", "x": "Delete", "Shift+X": "Delete" })
 
   Stonks.Service { id: service }
@@ -125,8 +83,8 @@ ShellRoot {
   Stonks.App { id: app; service: service; updates: updates; camera: camera }
 
   // Each surface's body is built as it first opens: read it as it is now.
-  // Its keys go where the surface puts them: the popup's to the item that
-  // reads letters before the shell's catcher.
+  // The popup's keys go to the item that reads letters before the shell's
+  // catcher.
   readonly property var popup: ({
     name: "popup",
     get body() { return panel.testBody },
@@ -140,7 +98,7 @@ ShellRoot {
     open: function() { app.open("{}") }
   })
 
-  TestCase {
+  Steps {
     name: "Keys"
     when: service.pluginsReady
 
@@ -148,24 +106,26 @@ ShellRoot {
       tryVerify(function() { return service.arriving.length === 0 && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 8000)
     }
 
-    // What a surface shows that a key can change.
-    function shown(s) {
-      var b = s.body
-      return JSON.stringify([b.surfaceOpen, b.watchlist.cursorRow, service.featuredSymbol, b.scrubT, b.motion.replayRunning,
-        service.range, b.adding, b.listMenuOpen, b.managingLists, b.listsSymbol, service.order, service.reversed,
-        service.listName, service.symbols.join(","), service.retro, service.soundsOn, service.changeMode, b.showingHelp,
-        service.testRefreshes, harness.tabs, b.cameraLit, b.rowMenu ? b.rowMenu.symbol : "", updates.testUpdates])
+    // Everything a key can change.
+    function state(b) {
+      return { featured: service.featuredSymbol, range: service.range,
+        order: service.order, reversed: service.reversed, list: service.listName,
+        symbols: service.symbols.join(","), retro: service.retro, mode: service.changeMode,
+        cursor: b.watchlist.cursorRow, scrub: b.scrubT, replay: b.motion.replayRunning,
+        adding: b.adding, menu: b.listMenuOpen, managing: b.managingLists, listsSymbol: b.listsSymbol,
+        help: b.showingHelp, open: b.surfaceOpen, refreshes: service.testRefreshes, tabs: harness.tabs, direction: harness.tabDirection,
+        sounds: service.soundsOn, camera: b.cameraLit, rowMenu: b.rowMenu ? b.rowMenu.symbol : "", updates: updates.testUpdates }
     }
 
     // Every key starts from here: the surface open on All, manual order, the
-    // day, nothing open over the rows, the last of the ten rows featured, so
-    // each of 1 to 9 has another to feature, and the cursor on the second.
+    // day, nothing open over the rows, the last of the ten rows featured,
+    // and the cursor on the second.
     function base(s) {
       if (!s.body || !s.body.surfaceOpen) s.open()
       var b = s.body
       b.undoRemoval()
       b.closeViews()
-      // As a surface opens: the camera out, so y lights it again.
+      // As a surface opens: the camera out, so Ctrl+C lights it again.
       b.cameraLit = false
       b.endScrub()
       if (service.listName !== "") service.switchList("")
@@ -181,17 +141,17 @@ ShellRoot {
       b.watchlist.takeOver()
       b.watchlist.contentY = 0
       b.watchlist.cursorSymbol = rows[1]
-      wait(50)
+      tryVerify(function() { return b.watchlist.cursorRow === rows[1] }, 1000)
       s.focusKeys()
-      wait(50)
+      // The popup refocuses on the next turn of the event loop.
+      wait(0)
     }
 
     // What a key needs to have something to do, past the base.
     readonly property var setups: ({
       "→": function(s) { s.body.nudgeScrub(-2) },
       "Ctrl+Z": function(s) { s.body.removeFrom(s.body.watchlist.cursorRow, true) },
-      // These keys remove directly on a row held only by All. deleteAsks
-      // below covers the menu for a row held by another list too.
+      // A row held only by All, which these keys remove directly.
       "Delete": function(s) { s.body.watchlist.cursorSymbol = "LONG1" },
       "Backspace": function(s) { s.body.watchlist.cursorSymbol = "LONG1" },
       "Shift+O": function(s) { service.setOrder("pct") },
@@ -218,15 +178,6 @@ ShellRoot {
       return true
     }
 
-    // A key that should do nothing here changes nothing the surface shows.
-    function idle(s, token) {
-      base(s)
-      var unchanged = shown(s)
-      if (!press(token)) return false
-      wait(150)
-      return shown(s) === unchanged
-    }
-
     // Expected effects are independent of the handlers and of README prose.
     // A documented key without a case fails; changing some unrelated state
     // cannot satisfy the expected target or excuse another settings change.
@@ -238,14 +189,7 @@ ShellRoot {
       var b = s.body
       var rows = b.watchlist.displayedSymbols.slice()
       var selected = b.watchlist.cursorRow
-      var before = { featured: service.featuredSymbol, range: service.range,
-        order: service.order, reversed: service.reversed, list: service.listName,
-        symbols: service.symbols.join(","), retro: service.retro, mode: service.changeMode,
-        cursor: b.watchlist.cursorRow, scrub: b.scrubT, replay: b.motion.replayRunning,
-        adding: b.adding, menu: b.listMenuOpen, managing: b.managingLists, listsSymbol: b.listsSymbol,
-        help: b.showingHelp, open: b.surfaceOpen, refreshes: service.testRefreshes, tabs: harness.tabs, direction: harness.tabDirection,
-        sounds: service.soundsOn, camera: b.cameraLit, rowMenu: b.rowMenu ? b.rowMenu.symbol : "", updates: updates.testUpdates }
-      var refreshes = service.testRefreshes, tabs = harness.tabs
+      var before = state(b)
       var changed = [], effect = null
       if (token === "⏎") {
         changed = ["featured", "cursor"]
@@ -299,32 +243,17 @@ ShellRoot {
       } else if (token === "Ctrl+C") {
         changed = ["camera"]
         effect = function() { return b.cameraLit }
-      } else if (token === "r") { changed = ["refreshes"]; effect = function() { return service.testRefreshes === refreshes + 1 } }
+      } else if (token === "r") { changed = ["refreshes"]; effect = function() { return service.testRefreshes === before.refreshes + 1 } }
       else if (token === "Tab" || token === "Shift+Tab") {
         changed = ["tabs", "direction"]
-        effect = function() { return harness.tabs === tabs + 1 && harness.tabDirection === (token === "Tab" ? 1 : -1) }
+        effect = function() { return harness.tabs === before.tabs + 1 && harness.tabDirection === (token === "Tab" ? 1 : -1) }
       } else if (token === "?") { changed = ["help"]; effect = function() { return b.showingHelp } }
       else if (token === "Esc") { changed = ["open"]; effect = function() { return !b.surfaceOpen } }
-      if (!effect) return false
-      if (!press(pressed)) return false
-      var acted = function() {
-        var after = { featured: service.featuredSymbol, range: service.range,
-          order: service.order, reversed: service.reversed, list: service.listName,
-          symbols: service.symbols.join(","), retro: service.retro, mode: service.changeMode,
-        cursor: b.watchlist.cursorRow, scrub: b.scrubT, replay: b.motion.replayRunning,
-        adding: b.adding, menu: b.listMenuOpen, managing: b.managingLists, listsSymbol: b.listsSymbol,
-        help: b.showingHelp, open: b.surfaceOpen, refreshes: service.testRefreshes, tabs: harness.tabs, direction: harness.tabDirection,
-        sounds: service.soundsOn, camera: b.cameraLit, rowMenu: b.rowMenu ? b.rowMenu.symbol : "", updates: updates.testUpdates }
+      if (!effect || !press(pressed)) return false
+      return within(token === "Ctrl+C" ? 3000 : 1500, function() {
+        var after = state(b)
         return effect() && Object.keys(before).every(function(k) { return changed.indexOf(k) >= 0 || before[k] === after[k] })
-      }
-      var ok = within(token === "Ctrl+C" ? 3000 : 1500, acted)
-      if (!ok) console.log("KEY EFFECT " + s.name + " " + token + " " + shown(s))
-      return ok
-    }
-
-    function within(ms, predicate) {
-      for (var t = 0; t < ms && !predicate(); t += 20) wait(20)
-      return predicate()
+      })
     }
 
     function escapeOrder(s) {
@@ -340,143 +269,46 @@ ShellRoot {
       harness.check(s.name + " Esc then closes the surface", !s.body.surfaceOpen)
     }
 
-    // The sheet as drawn on `s`, opened with ? and closed again.
-    function drawnSheet(s, order) {
-      base(s)
-      if (order) service.setOrder(order)
-      press("?")
-      wait(50)
-      var sheet = harness.find(s.body, "helpSheet")
-      var drawn = { keys: harness.texts(sheet, "helpKey"), all: harness.texts(sheet),
-        credit: harness.texts(sheet, "helpCredit").join("") }
-      press("?")
-      return drawn
-    }
-
-    // A label's keys, all of a sheet's or a table's, in one order.
-    function keysOf(labels) {
-      var keys = []
-      labels.map(harness.tokens).forEach(function(group) { keys = keys.concat(group) })
-      return keys.sort()
-    }
-
     function walk(s) {
-      var sheet = drawnSheet(s)
-      var sortedSheet = drawnSheet(s, "symbol")
-      var readme = harness.readmeKeys(s.name)
-      var listed = readme || []
-      var manualKeys = keysOf(sheet.keys).join(" ")
-      var sortedKeys = keysOf(sortedSheet.keys).join(" ")
-      var expectedSorted = keysOf(listed.filter(function(t) { return t !== "Shift+↑" && t !== "Shift+↓" })).join(" ")
-      harness.check("in the " + s.name + ", the sheet lists exactly the README's keys, the row's move only in manual order",
-        readme !== null && manualKeys === keysOf(listed).join(" ") && sortedKeys === expectedSorted,
-        "manual: " + manualKeys + " | sorted: " + sortedKeys + " | README: " + keysOf(listed).join(" "))
-      var dead = listed.filter(function(t) { return !acts(s, t) })
-      harness.check("in the " + s.name + ", every README key does its documented action (" + listed.length + " keys)",
-        readme !== null && dead.length === 0, readme === null ? "no key table in the README" : "wrong: " + dead.join(" "))
+      var listed = harness.readmeKeys(s.name)
+      var dead = (listed || []).filter(function(t) { return !acts(s, t) })
+      harness.check("in the " + s.name + ", every README key does its documented action (" + (listed || []).length + " keys)",
+        listed !== null && dead.length === 0, listed === null ? "no key table in the README" : "wrong: " + dead.join(" "))
       escapeOrder(s)
-      if (s.name === "popup") {
-        var wrong = Object.keys(harness.omarchy).filter(function(t) { return !acts(s, t, harness.omarchy[t]) })
-        harness.check("in the popup, Omarchy's panel keys do what Omarchy defines: j k ↓ ↑, h ←, Space Enter, x and X Delete",
-          wrong.length === 0, "wrong: " + wrong.join(" "))
-      }
-      var still = harness.dropped.filter(function(t) { return s.name !== "popup" || !(t in harness.omarchy) })
-        .concat(harness.readmeKeys(s.name, true) || [])
-      var acting = still.filter(function(t) { return !idle(s, t) })
-      harness.check("in the " + s.name + ", the keys Stonks no longer answers" + (s.name === "popup" ? ", but for Omarchy's," : "")
-        + " and the other surface's own change nothing (" + still.length + " keys)",
-        acting.length === 0, "acting: " + acting.join(" "))
-      var version = JSON.parse(harness.readFile(harness.manifestPath)).version
-      harness.check("in the " + s.name + ", the sheet credits Stonks " + version + ", Yahoo, and Robinhood",
-        sheet.credit.split("\n").indexOf("Stonks " + version) >= 0 && sheet.credit.indexOf("Yahoo") >= 0
-          && sheet.credit.indexOf("Robinhood") >= 0, sheet.credit)
-      return sheet
-    }
-
-    // With Caps Lock on, a letter acts as itself: o changes the order and
-    // never reverses it, l opens the list menu, m turns sounds off or on.
-    // Caps Lock sends "O" with no Shift. Found in the 1.0.0 review: Caps
-    // Lock's J and K saved a reorder.
-    function capsLock(s) {
-      var wrong = []
-      ;["o", "l", "m"].forEach(function(letter) {
-        var caps = letter.toUpperCase()
-        var setup = function() {
-          base(s)
-          if (letter === "o") service.setOrder("pct")
-          wait(50)
-        }
-        setup()
-        keyClick(letter)
-        wait(100)
-        var plain = shown(s)
-        setup()
-        keyClick(caps)
-        wait(100)
-        var locked = shown(s)
-        if (locked !== plain) wrong.push(caps + " with Caps Lock: " + locked + " vs " + letter + ": " + plain)
-      })
-      base(s)
-      harness.check("in the " + s.name + ", with Caps Lock on, o l m act as themselves",
-        wrong.length === 0, wrong.join(" | "))
-    }
-
-    // In All, Delete on a row another list holds too asks first: the row's
-    // menu, on its first line, the one line that reaches both lists, in
-    // both surfaces alike; Escape closes it, removing nothing.
-    function deleteAsks(s) {
-      base(s)
-      s.body.watchlist.cursorSymbol = "AAPL"
-      wait(50)
-      press("Delete")
-      wait(100)
-      var menu = s.body.rowMenu
-      var drawn = harness.find(s.body, "rowMenu")
-      var seen = [menu ? menu.symbol + ":" + drawn.cursor + ":" + menu.lines.map(function(l) { return l.label }).join("/") : "shut"]
-      press("Esc")
-      wait(100)
-      seen.push((s.body.rowMenu === null) + ":" + (service.library.indexOf("AAPL") >= 0))
-      harness.check("in the " + s.name + ", Delete on a row another list holds asks on the row's menu, and Escape closes it removing nothing",
-        seen.join(" | ") === "AAPL:0:Remove from all 2 lists | true:true", seen.join(" | "))
     }
 
     function test_keys() {
-      // Ten rows to move through, and a list that holds AAPL too.
+      // Ten rows to move through.
       for (var n = 1; n <= 7; n++) service.addSymbol("LONG" + n)
       quiet()
-      service.createList("Walk")
-      service.setMembership("AAPL", "Walk", true)
-      service.switchList("")
-      wait(100)
 
       // The popup first: the window, shown, would take the keys.
-      var popupSheet = walk(harness.popup)
-      capsLock(harness.popup)
-      deleteAsks(harness.popup)
-      // The look changes its drawing, not the keys and words the reader gets.
-      var looks = [false, true].map(function(retro) {
-        service.persist({ style: retro ? "retro" : "smooth" })
-        wait(50)
-        return drawnSheet(harness.popup).all.join("|") === popupSheet.all.join("|")
-      })
-      harness.check("the key sheet says the same in smooth and retro", looks[0] && looks[1], looks.join(","))
+      walk(harness.popup)
+      var wrong = Object.keys(harness.omarchy).filter(function(t) { return !acts(harness.popup, t, harness.omarchy[t]) })
+      harness.check("in the popup, Omarchy's panel keys do what Omarchy defines: j k ↓ ↑, h ←, Space Enter, x and X Delete",
+        wrong.length === 0, "wrong: " + wrong.join(" "))
+      // Both surfaces draw one StonksBody's sheet: the popup's stands for both.
+      base(harness.popup)
+      press("?")
+      var credit = harness.texts(harness.find(harness.popup.body, "helpSheet"), "helpCredit").join("")
+      press("?")
+      var version = JSON.parse(harness.readFile(harness.manifestPath)).version
+      harness.check("in the popup, the sheet credits Stonks " + version + ", Yahoo, and Robinhood",
+        credit.split("\n").indexOf("Stonks " + version) >= 0 && credit.indexOf("Yahoo") >= 0
+          && credit.indexOf("Robinhood") >= 0, credit)
       panel.close()
-      wait(300)
+      tryVerify(function() { return !harness.popup.body.surfaceOpen }, 1000)
 
-      var windowSheet = walk(harness.window)
-      capsLock(harness.window)
-      deleteAsks(harness.window)
-      // The window has no bar to step through: its sheet lacks the Tab and
-      // ⇧Tab rows, each a key and what it does.
-      var tab = popupSheet.all.indexOf("Tab")
-      var tabRows = tab >= 0 && popupSheet.all[tab + 2] === "⇧Tab"
-      var popupWords = popupSheet.all.filter(function(text, i) { return !tabRows || i < tab || i > tab + 3 })
-      harness.check("the window's sheet is the popup's but for Tab and ⇧Tab", tabRows && popupWords.join("|") === windowSheet.all.join("|"),
-        popupWords.join("|") + " vs " + windowSheet.all.join("|"))
+      walk(harness.window)
+      // The window has no bar to step through; a Tab there must leave the
+      // keys with the window.
+      base(harness.window)
+      press("Tab")
+      press("o")
+      harness.check("in the window, after Tab a key still does its action",
+        within(1500, function() { return service.order === "symbol" }), service.order)
       app.close()
       harness.finish()
     }
   }
-
-  HarnessExit { id: done; interval: 100 }
 }

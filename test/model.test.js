@@ -1,5 +1,5 @@
-import { test, expect } from "bun:test"
-import { readFileSync } from "node:fs"
+import { test, expect, describe } from "bun:test"
+import { readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { load } from "./load.js"
 
@@ -70,7 +70,7 @@ test("stray filtering never judges the newest bar or an uneven gap", () => {
   expect(keptBars(long)).toEqual(long)
   // An hourly history across a weekend: every bar opens at 100, Friday's
   // last and Monday's first close at 98. A history has no sessions to say a
-  // gap lies inside one, so none is bridged. Found in review.
+  // gap lies inside one, so none is bridged.
   const weekend = [
     { t: 0, o: 100, c: 100 }, { t: 3600, o: 100, c: 98 }, { t: 3600 + 66 * 3600, o: 100, c: 98 },
     { t: 3600 + 67 * 3600, o: 100, c: 100 }
@@ -118,6 +118,28 @@ test("an extended-hours print extends the day range as far as it reaches", () =>
   }
 })
 
+// A day whose post session runs an hour past its last print, five minutes old.
+const openDay = (price, prevClose) => {
+  const now = 1789669200
+  return {
+    symbol: "DAY", name: "Day", currency: "USD", exchange: "NASDAQ", timezoneName: "America/New_York",
+    gmtoffset: -14400, instrumentType: "EQUITY", crypto: false, price, prevClose, marketTime: now,
+    session: {
+      pre: { start: now - 25200, end: now - 19800 },
+      regular: { start: now - 19800, end: now + 3600 },
+      post: { start: now + 3600, end: now + 18000 }
+    },
+    points: [{ t: now - 19800, p: prevClose ?? price }, { t: now - 300, p: price }]
+  }
+}
+
+test("the day's axis runs past its last print, and key scrubbing stops at the last print", () => {
+  const day = openDay(110, 100)
+  const last = day.points.at(-1).t
+  expect(M.chartGeometry(day).end).toBeGreaterThan(last)
+  expect(M.stepTime(day, last, 50, last)).toBe(last)
+})
+
 test("a quiet trading span joins its prints; Tokyo's scheduled lunch alone breaks the line", () => {
   const us = {
     symbol: "THIN", exchange: "NYQ", crypto: false, prevClose: 100,
@@ -154,6 +176,17 @@ test("Tokyo's lunch break comes from the calendar; the morning session stays on 
   expect(M.marketStatus(jpx, M.epochAt(JPX, "2026-09-08", "11:26"), 0, calendars)).toBe("Lunch break in 4m")
   // Tokyo's clock is named for a reader in New York.
   expect(M.marketStatus(jpx, lunch, 0, calendars)).toBe("Lunch break · reopens 12:30 JST · in 30m")
+  // Asked every minute through the morning, on the slow clock at lunch.
+  expect(quoteCadence(jpx, morning, 60, true)).toBe(60)
+  expect(quoteCadence(jpx, lunch, 60, true)).toBe(900)
+  expect(M.inRegularSession(jpx, lunch, calendars)).toBe(false)
+  // A lunch break without its countdown, then when it reopens.
+  expect(M.statusForms(jpx, lunch, 0, calendars))
+    .toEqual(["Lunch break · reopens 12:30 JST · in 30m", "Lunch break · reopens 12:30 JST", "Reopens 12:30 JST"])
+  // The bell rings at 09:00 and 15:30, not around lunch.
+  const tokyo = hm => M.epochAt(JPX, "2026-09-08", hm)
+  expect(["09:00", "11:30", "12:30", "15:30"].map(hm => M.bellBetween(jpx, tokyo(hm) - 60, tokyo(hm) + 1, calendars)))
+    .toEqual(["open", "", "", "close"])
 })
 
 test("Toronto and London close early when their exchanges say, and London's 2028 holidays are named", () => {
@@ -250,8 +283,8 @@ test("formatting", () => {
     .toEqual(["\u22121.6 %", "0.0 %", "+9.9 %", "+10 %", "\u221212 %", "+123 %", "+999 %", "+1.2 K%", "+10 K%", "+54 K%"])
   // It rounds what the rows show, never the float behind it, so the two
   // agree whatever prices made the move: 20 to 21.99 is 9.94999…%, which
-  // the rows show as +9.95% and the pill showed as +9.9% while 100 to
-  // 109.95 read +10%. Found in review: around 9.95%, 0.05%, and 99.95%.
+  // the rows show as +9.95% and the pill must not show as +9.9% while 100
+  // to 109.95 reads +10%: around 9.95%, 0.05%, and 99.95%.
   const shown = [[20, 21.99], [20, 18.01], [100, 109.95], [100, 90.05], [20, 21.988], [20, 20.01], [20, 19.99],
     [100, 100.05], [100, 99.95], [20, 39.99], [100, 199.95], [20, 0.01], [100, 0.05]]
     .map(([prevClose, price]) => {
@@ -301,6 +334,16 @@ test("each look has one sign language", () => {
   expect(M.lookSigns("+2.55%", true)).toBe("▲2.55%")
   expect(M.lookSigns("\u22120.59%", true)).toBe("▼0.59%")
   expect(M.lookSigns("—", true)).toBe("—")
+})
+
+test("an unknown chart direction stays unset, and a flat day draws no animal", () => {
+  const unknown = M.rowModel(openDay(100, null), 0, "pct")
+  expect(unknown.dayUp).toBeNull()
+  expect(M.animalKind(unknown)).toBe("")
+  const flat = M.rowModel(openDay(100.001, 100), 0, "pct")
+  expect(flat.tone).toBe("flat")
+  expect(M.animalKind(flat)).toBe("")
+  expect(M.animalKind(M.rowModel(openDay(110, 100), 0, "pct"))).toBe("bull")
 })
 
 test("a run's output splits into its answers, each said by what came back", () => {
@@ -493,17 +536,8 @@ test("coverage is short only when the response begins within one interval of lis
 
 test("a response with no bars draws nothing and claims nothing", () => {
   const empty = M.parseHistory({ chart: { result: [{ meta: { symbol: "NEW", chartPreviousClose: 10 }, indicators: { quote: [{}] } }] } }, "1Y")
-  expect(M.periodStats(empty)).toEqual({
-    last: null,
-    change: { abs: null, pct: null, up: true },
-    high: null,
-    low: null,
-    belowHigh: null,
-    coverage: { from: null, to: null, bars: 0, short: false }
-  })
-  expect(M.historyGeometry(empty)).toEqual({
-    points: [], baselineY: null, ticks: [], lo: null, hi: null, start: null, end: null, day: false
-  })
+  expect(M.periodStats(empty)).toMatchObject({ last: null, high: null, low: null, coverage: { short: false } })
+  expect(M.historyGeometry(empty).points).toEqual([])
   expect(M.historyBarAt(empty, 0.5)).toBeNull()
   expect(M.historyFraction(empty, 1)).toBe(-1)
   expect(M.historyBarAt({ bars: [{ t: 1, c: 2 }] }, NaN)).toBeNull()
@@ -534,7 +568,7 @@ test("the view's chart can be drawn once its data is in, or its first fetch has 
   expect(M.viewChart("A", "1M", { A: quote }, ok, { "A|1M": { status: "failed", history: null } })).toMatchObject({ history: null, failed: true })
 })
 
-// Named lists (Phase 4). All is the library, stored as the version-1
+// Named lists. All is the library, stored as the version-1
 // `symbols`; named lists are subsets with their own order.
 const library = (extra = {}) => M.fileSettings({
   symbols: ["NEST", "BO", "IRIS", "SPY"], featured: "NEST", order: "pct",
@@ -564,6 +598,8 @@ test("the data file reads as written and repairs hand edits", () => {
   expect(M.fileSettings(null).symbols).toEqual(["NVDA", "AAPL", "MSFT", "SPY", "TSLA"])
   expect(M.fileSettings(null).refreshIntervalSec).toBe(60)
   expect([M.fileSettings(null).style, M.fileSettings({ style: "smooth" }).style]).toEqual(["retro", "smooth"])
+  // A saved range comes back; one Stonks doesn't draw is the day.
+  expect([M.fileSettings({ range: "1M" }).range, M.fileSettings({ range: "2D" }).range]).toEqual(["1M", "1D"])
   // Symbols are upper-cased, trimmed, and kept once, from a string or a list.
   expect(M.fileSettings({ symbols: "nvda, aapl AAPL" }).symbols).toEqual(["NVDA", "AAPL"])
   expect(M.fileSettings({ symbols: ["spy", " tsla ", "SPY"] }).symbols).toEqual(["SPY", "TSLA"])
@@ -589,6 +625,70 @@ test("the data file reads as written and repairs hand edits", () => {
     { name: "Wins", symbols: [], order: "manual", reversed: false },
     { name: "Losers", symbols: [], order: "pct", reversed: true }
   ])
+  // An order an older build saved by the amount reads as % change, on All
+  // and on a list, each keeping its direction and members.
+  const byAmount = M.fileSettings({ symbols: ["AAPL", "MSFT"], order: "abs", reversed: true,
+    lists: [{ name: "Yen", symbols: ["MSFT"], order: "abs" }] })
+  expect([byAmount.order, byAmount.reversed]).toEqual(["pct", true])
+  expect(byAmount.lists).toEqual([{ name: "Yen", symbols: ["MSFT"], order: "pct", reversed: false }])
+})
+
+// Each data file a release wrote (test/data-files/VERSION.json; data-files.sh
+// write makes the next), read as the Service reads it. What the user made is
+// written out here, not read from the file, so a reader that loses something
+// can't lose it from what the check expects too: All in an order made by
+// hand, a list in manual order arranged by hand, one sorted, one sorted the
+// other way, and one empty; the current list a named one, a featured symbol
+// off the top, and every view setting off its default. 1.0.0 knew no sounds,
+// so its file reads them on, their default; from 1.0.4 the file has them
+// off, and the daily version check off too.
+const dataFiles = join(import.meta.dir, "data-files")
+for (const file of readdirSync(dataFiles).filter(name => name.endsWith(".json"))) describe(file.replace(/\.json$/, ""), () => {
+  const old = file === "1.0.0.json"
+  const made = {
+    lists: [
+      { name: "", symbols: ["SPY", "AAPL", "7203.T", "BTC-USD", "^GSPC", "SHEL.L", "JNJ"], order: "manual", reversed: false },
+      { name: "US", symbols: ["SPY", "JNJ", "AAPL", "^GSPC"], order: "manual", reversed: false },
+      { name: "World", symbols: ["SHEL.L", "7203.T", "AAPL"], order: "name", reversed: false },
+      { name: "Movers", symbols: ["BTC-USD", "JNJ", "7203.T"], order: "pct", reversed: true },
+      { name: "Later", symbols: [], order: "manual", reversed: false }
+    ],
+    list: "World", featured: "7203.T", range: "1Y", style: "retro", changeMode: "abs", refreshIntervalSec: 300, hinted: true,
+    sounds: old, updateCheck: old
+  }
+  const text = readFileSync(join(dataFiles, file), "utf8")
+  // As Service.parseDataText reads it: one JSON object, through fileSettings.
+  const parsed = (() => { try { return JSON.parse(text.trim()) } catch (e) { return null } })()
+  const read = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? M.fileSettings(parsed) : null
+  const label = list => (list.name || "All") + ": " + (list.symbols.join(", ") || "empty") + ", " + list.order + (list.reversed ? " reversed" : "")
+  const shown = s => ({ name: s.list, symbols: M.listSymbols(s), order: M.listOrder(s), reversed: M.listReversed(s) })
+  // A switch to a list, as the Service persists it.
+  const switched = (s, name) => M.fileSettings(Object.assign({}, s, { list: name }))
+  const names = lists => lists.map(list => list.name)
+  const current = made.lists.find(list => list.name === made.list)
+  test("the file reads", () => expect(read).not.toBeNull())
+  test("All, then " + names(made.lists.slice(1)).join(", ") + ", in that order", () => expect(names(M.listChoices(read))).toEqual(names(made.lists)))
+  test("the current list is " + label(current), () => expect(label(shown(read))).toBe(label(current)))
+  test("featured " + made.featured, () => expect([read.featured, read.symbols.includes(read.featured)]).toEqual([made.featured, true]))
+  test("on " + made.range, () => expect(read.range).toBe(made.range))
+  test("in " + made.style, () => expect(read.style).toBe(made.style))
+  test("the change as " + made.changeMode, () => expect(read.changeMode).toBe(made.changeMode))
+  test("refreshed every " + made.refreshIntervalSec + " s", () => expect(read.refreshIntervalSec).toBe(made.refreshIntervalSec))
+  test("the first-run hint not shown again", () => expect(read.hinted).toBe(made.hinted))
+  test("sounds " + (made.sounds ? "on" : "off"), () => expect(read.sounds).toBe(made.sounds))
+  test("the version check " + (made.updateCheck ? "on" : "off"), () => expect(read.updateCheck).toBe(made.updateCheck))
+  for (const list of made.lists) test(label(list), () => expect(label(shown(switched(read, list.name)))).toBe(label(list)))
+  // After a downgrade, or on a machine sharing the file: the other machine's
+  // file is on US; this one switches back to World and sorts it, and writes.
+  test("a later version's keys stay through a write: one at the top, one in a list", () => {
+    const later = JSON.parse(text)
+    later.alerts = [{ symbol: "AAPL", above: 400 }]
+    later.lists[1].pinned = true
+    later.list = "US"
+    const written = JSON.parse(JSON.stringify(M.withListOrder(switched(M.fileSettings(later), made.list), "symbol")))
+    expect([written.list, written.lists[1].name, written.lists[1].order]).toEqual([made.list, "World", "symbol"])
+    expect([written.alerts, written.lists[1].pinned]).toEqual([later.alerts, true])
+  })
 })
 
 // lists.qml drives adding, removing, stepping, naming, and ordering through
@@ -637,6 +737,153 @@ test("membership across several lists", () => {
   expect(M.listReversed(M.withListReversed(library({ list: "My Watchlist" })))).toBe(false)
 })
 
+test("o runs manual, symbol, name, % change and back, and the order word's arrow says which way the values run", () => {
+  expect(["manual", "symbol", "name", "pct"].map(M.nextOrder)).toEqual(["symbol", "name", "pct", "manual"])
+  expect(["manual", "symbol", "name", "pct"].map(order => M.orderLabel(order, false)))
+    .toEqual(["↕  MANUAL", "↑  SYMBOL", "↑  NAME", "↓  % CHANGE"])
+  expect(["manual", "symbol", "pct"].map(order => M.orderLabel(order, true))).toEqual(["↕  MANUAL", "↓  SYMBOL", "↑  % CHANGE"])
+})
+
+test("a list's name is refused empty, as All, or taken in any case or padding; a new list is made current and empty, its name trimmed", () => {
+  const s = library()
+  expect([M.listNameProblem("  ", s.lists), M.listNameProblem(" growth ", s.lists), M.listNameProblem("all", s.lists)])
+    .toEqual(["Name the list", "growth already exists", "All already exists"])
+  const made = M.withListCreated(s, "  Wins ")
+  expect([made.list, M.listSymbols(made), made.lists.map(list => list.name)]).toEqual(["Wins", [], ["My Watchlist", "Growth", "Wins"]])
+  expect(M.withListCreated(s, "GROWTH")).toBe(s)
+  // A rename meets the same rules against the other lists, so a change of
+  // case alone renames, and the current list follows its new name.
+  expect([M.renameProblem(s, "Growth", "my watchlist"), M.renameProblem(s, "Growth", "GROWTH")]).toEqual(["my watchlist already exists", ""])
+  const renamed = M.withListRenamed(library({ list: "Growth" }), "Growth", "GROWTH")
+  expect([renamed.list, renamed.lists.map(list => list.name)]).toEqual(["GROWTH", ["My Watchlist", "GROWTH"]])
+})
+
+test("All can't be renamed, moved, or deleted, a list moves only between the named lists, and deleting one leaves the rest as they were", () => {
+  const s = library({ list: "Growth" })
+  for (const same of [M.withListRenamed(s, "", "Mine"), M.withListMoved(s, "", 1), M.withListDeleted(s, ""),
+    M.withListMoved(s, "My Watchlist", -1), M.withListMoved(s, "Growth", 1)]) expect(same).toEqual(s)
+  expect(M.withListMoved(s, "Growth", -1).lists.map(list => list.name)).toEqual(["Growth", "My Watchlist"])
+  const other = M.withListDeleted(s, "My Watchlist")
+  expect([other.list, other.symbols, other.lists]).toEqual(["Growth", s.symbols, [s.lists[1]]])
+  const current = M.withListDeleted(s, "Growth")
+  expect([current.list, current.symbols, current.lists]).toEqual(["", s.symbols, [s.lists[0]]])
+})
+
+test("undo puts a removed stock back at its place in All and in each list that held it, and the hero only if the removal moved it", () => {
+  const before = library()
+  const shown = ["NEST", "BO", "IRIS", "SPY"]
+  const out = M.withMembership(before, "BO", "", false, shown)
+  const back = M.withRemovalUndone(out, before, "BO", out.featured)
+  expect([back.symbols, back.lists.map(list => list.symbols), back.featured])
+    .toEqual([before.symbols, before.lists.map(list => list.symbols), "NEST"])
+  // The hero removed hands on to the next row, and comes back with its
+  // row, unless another hero was chosen since.
+  const heroOut = M.withMembership(before, "NEST", "", false, shown)
+  expect(heroOut.featured).toBe("BO")
+  expect(M.withRemovalUndone(heroOut, before, "NEST", heroOut.featured).featured).toBe("NEST")
+  expect(M.withRemovalUndone(M.fileSettings({ ...heroOut, featured: "SPY" }), before, "NEST", heroOut.featured).featured).toBe("SPY")
+  // Out of one list only, it goes back into that list at its place.
+  const offGrowth = M.withMembership(library({ list: "Growth" }), "BO", "Growth", false, ["BO", "IRIS"])
+  expect(M.withRemovalUndone(offGrowth, library({ list: "Growth" }), "BO", offGrowth.featured).lists[1].symbols).toEqual(["BO", "IRIS"])
+})
+
+test("the rule under the list name counts up, flat, and down as the rows' tones read them, and a row with no quote as none", () => {
+  const q = (symbol, prevClose, dayOpen, price) => ({ symbol, name: symbol, prevClose, dayOpen, price, priceDigits: 2, marketTime: 1, points: [], session: { regular: null } })
+  // FLAT closed where it started the day, and is up since its open.
+  const quotes = { UP: q("UP", 100, 101, 110), FLAT: q("FLAT", 100, 99, 100), DOWN: q("DOWN", 100, 99, 90) }
+  const symbols = ["UP", "FLAT", "DOWN", "GONE"]
+  for (const mode of ["pct", "open"]) {
+    const rows = { up: 0, flat: 0, down: 0, none: 1 }
+    for (const symbol of symbols.slice(0, 3)) rows[M.rowModel(quotes[symbol], 0, mode).tone]++
+    expect([mode, M.listBreadth(symbols, quotes, 0, mode)]).toEqual([mode, rows])
+  }
+  expect(M.listBreadth(symbols, quotes, 0, "pct")).toEqual({ up: 1, flat: 1, down: 1, none: 1 })
+  expect(M.listBreadth(symbols, quotes, 0, "open")).toEqual({ up: 2, flat: 0, down: 1, none: 1 })
+})
+
+// What ends the undo on offer: a data file, hand-edited or another
+// build's, that changes what the lists hold, and none that changes only the
+// view.
+test("only a change to what the lists hold ends the undo", () => {
+  const s = library()
+  expect(M.listsHeld(Object.assign({}, s, { range: "1Y", featured: "SPY", order: "symbol", list: "Growth" }))).toBe(M.listsHeld(s))
+  expect(M.listsHeld(Object.assign({}, s, { lists: s.lists.concat([{ name: "Made elsewhere", symbols: [] }]) }))).not.toBe(M.listsHeld(s))
+})
+
+test("sorting ranks the rows as a view over the manual list", () => {
+  const q = (symbol, name, prevClose, price) => ({ symbol, name, prevClose, price, marketTime: 1, points: [], session: { regular: null } })
+  // Names that sort unlike the symbols, so each order is its own.
+  const quotes = { UP: q("UP", "Alpha Inc", 100, 110), DN: q("DN", "Mid Co", 100, 95), FL: q("FL", "Zeta Corp", 100, 100) }
+  const manual = ["FL", "DN", "UP", "NEW"]
+  expect(M.sortedSymbols(manual, quotes, "manual")).toEqual(manual)
+  expect(M.sortedSymbols(manual, quotes, "symbol")).toEqual(["DN", "FL", "UP", "NEW"])
+  expect(M.sortedSymbols(manual, quotes, "name")).toEqual(["UP", "DN", "FL", "NEW"])
+  expect(M.sortedSymbols(manual, quotes, "pct")).toEqual(["UP", "FL", "DN", "NEW"])
+  // Reversed, each sorted order runs the other way; a symbol with no quote
+  // stays at the bottom, and manual has no direction.
+  expect(M.sortedSymbols(manual, quotes, "symbol", true)).toEqual(["UP", "FL", "DN", "NEW"])
+  expect(M.sortedSymbols(manual, quotes, "pct", true)).toEqual(["DN", "FL", "UP", "NEW"])
+  expect(M.sortedSymbols(manual, quotes, "manual", true)).toEqual(manual)
+  // A tie keeps the manual order, whichever way the sort runs.
+  const tie = { FL2: { ...quotes.FL, symbol: "FL2" }, FL: quotes.FL }
+  expect(M.sortedSymbols(["FL2", "FL"], tie, "pct")).toEqual(["FL2", "FL"])
+  expect(M.sortedSymbols(["FL2", "FL"], tie, "pct", true)).toEqual(["FL2", "FL"])
+  // Lumen is up 10%, NVIDIA 2%: by percent Lumen leads, though NVIDIA's
+  // amount is larger, and it still leads with amounts showing: they can't
+  // be ranked across currencies.
+  const pair = { LUMA: q("LUMA", "Lumen", 10, 11), NVDA: q("NVDA", "NVIDIA", 180, 183.6) }
+  expect(M.sortedSymbols(["LUMA", "NVDA"], pair, "pct")).toEqual(["LUMA", "NVDA"])
+  expect(M.sortedSymbols(["LUMA", "NVDA"], pair, "pct", false, "abs")).toEqual(["LUMA", "NVDA"])
+  // Showing since the open, the rows rank by the move from the open they
+  // show: UP is up 10% on the close but 0.9% on the open, DN down 5% on the
+  // close but up 5.6% on the open.
+  const opened = { UP: { ...quotes.UP, dayOpen: 109 }, DN: { ...quotes.DN, dayOpen: 90 } }
+  expect(M.sortedSymbols(["UP", "DN"], opened, "pct", false, "pct")).toEqual(["UP", "DN"])
+  expect(M.sortedSymbols(["UP", "DN"], opened, "pct", false, "open")).toEqual(["DN", "UP"])
+})
+
+// The keys a sheet or README label names, in one spelling: a capital as
+// Shift and it, ⇧ as Shift, and the sheet's "Del ⌫" as Delete and Backspace.
+const keyTokens = label => label.replace(/`/g, "").split(/\s+/)
+  .filter(t => t !== "" && t !== "or")
+  .map(t => ({ "Del": "Delete", "⌫": "Backspace" })[t] || t.replace(/^⇧/, "Shift+"))
+  .map(t => /^[A-Z]$/.test(t) ? "Shift+" + t : t)
+const sortedKeys = labels => labels.flatMap(keyTokens).sort()
+
+test("the key sheet lists exactly the README's keys for each surface, the row's move only in manual order", () => {
+  const lines = readFileSync(join(root, "README.md"), "utf8").split("\n")
+  const start = lines.indexOf("| Key | Does |")
+  expect(start).toBeGreaterThan(0)
+  const table = []
+  for (let i = start + 2; lines[i] && lines[i][0] === "|"; i++) table.push(lines[i].split("|").map(c => c.trim()))
+  // A row ending "(popup)" or "(window)" is that surface's alone.
+  const readme = surface => sortedKeys(table.filter(c => {
+    const only = /\((popup|window)\)$/.exec(c[2])
+    return !only || only[1] === surface
+  }).map(c => c[1]))
+  const drawn = (order, switchesPanels) =>
+    sortedKeys(M.sheet(order, switchesPanels).groups.flatMap(g => g.rows.map(r => r.key)))
+  const moves = ["Shift+↑", "Shift+↓"]
+  expect(drawn("manual", true)).toEqual(readme("popup"))
+  expect(drawn("manual", false)).toEqual(readme("window"))
+  expect(drawn("pct", true)).toEqual(readme("popup").filter(k => !moves.includes(k)))
+  expect(drawn("symbol", false)).toEqual(readme("window").filter(k => !moves.includes(k)))
+})
+
+test("a letter says its key and Shift, never its text's case, and nothing held with Ctrl or Alt", () => {
+  const { typed } = load("KeyText.js")
+  const SHIFT = 0x02000000, CTRL = 0x04000000, ALT = 0x08000000, KEYPAD = 0x20000000
+  // Caps Lock sends "O" with no Shift, and "o" with it.
+  expect(["o", "l", "m"].map(l => typed({ key: l.toUpperCase().charCodeAt(0), modifiers: 0, text: l.toUpperCase() })))
+    .toEqual(["o", "l", "m"])
+  expect(typed({ key: 79, modifiers: SHIFT, text: "o" })).toBe("O")
+  expect(typed({ key: 79, modifiers: SHIFT | KEYPAD, text: "o" })).toBe("O")
+  expect(typed({ key: 80, modifiers: 0, text: "p" })).toBe("p")
+  expect(typed({ key: 80, modifiers: CTRL, text: "\u0010" })).toBe("")
+  expect(typed({ key: 80, modifiers: ALT, text: "p" })).toBe("")
+  expect(typed({ key: 63, modifiers: SHIFT, text: "?" })).toBe("?")
+})
+
 test("a stock's day is asked for two days from its pre-market until the bell, when Yahoo's day no longer holds the last session", () => {
   const stock = { symbol: "X", exchange: "NASDAQ", instrumentType: "EQUITY", crypto: false }
   const two = (q, date, clock) => M.twoDays(q, at(date, clock), calendars)
@@ -655,6 +902,30 @@ test("a stock's day is asked for two days from its pre-market until the bell, wh
   expect(two(null, "2026-10-23", "12:00")).toBe(true)
 })
 
+test("a range left on show is asked again every 15 minutes of its session, every hour for daily bars, a failed refresh at the same pace, and once after the close for its last bars", () => {
+  const close = at("2026-10-07", "16:00")
+  const day = { session: { regular: { start: at("2026-10-07", "09:30"), end: close } } }
+  const due = (range, entry, now, trading) => M.historyDue(range, entry, day, now, trading)
+  const answered = t => ({ answeredAt: t, receivedAt: t })
+  const three = at("2026-10-07", "15:00")
+  // While New York trades: a week's 15-minute bars every 15 minutes, a
+  // year's daily bars every hour.
+  expect([due("1W", answered(three), three + 15 * 60 - 1, true), due("1W", answered(three), three + 15 * 60, true)]).toEqual([false, true])
+  expect([due("1Y", answered(three), three + 60 * 60 - 1, true), due("1Y", answered(three), three + 60 * 60, true)]).toEqual([false, true])
+  // A failed refresh counts from when it failed, not from the last good
+  // answer, so it is tried again at the same pace.
+  const failed = { answeredAt: three, receivedAt: three - 60 * 60 }
+  expect([due("1W", failed, three + 15 * 60 - 1, true), due("1W", failed, three + 15 * 60, true)]).toEqual([false, true])
+  // After the close: once while its last good answer came before the close,
+  // a failed one included; then not again.
+  const tenTo = at("2026-10-07", "15:50")
+  expect(due("1W", answered(tenTo), at("2026-10-07", "16:05"), false)).toBe(true)
+  expect(due("1W", { answeredAt: at("2026-10-07", "16:05"), receivedAt: tenTo }, at("2026-10-07", "16:20"), false)).toBe(true)
+  expect(due("1W", answered(at("2026-10-07", "16:05")), at("2026-10-07", "19:00"), false)).toBe(false)
+  // Before the session, nothing new: closed and not yet past its end.
+  expect(due("1W", answered(at("2026-10-07", "08:00")), at("2026-10-07", "09:00"), false)).toBe(false)
+})
+
 test("an open surface asks Robinhood again every five minutes of a night, and once after it", () => {
   const due = (asked, now) => M.overnightDue(asked, now, calendars)
   expect(due(0, at("2026-10-02", "13:00"))).toBe(true)
@@ -667,6 +938,30 @@ test("an open surface asks Robinhood again every five minutes of a night, and on
   expect(due(at("2026-10-02", "04:11"), at("2026-10-02", "19:59"))).toBe(false)
   expect(due(at("2026-10-02", "13:00"), at("2026-10-03", "12:00"))).toBe(false)
   expect(due(at("2026-10-03", "12:00"), at("2026-10-04", "20:05"))).toBe(true)
+  // A failed answer is asked again five minutes on, whatever the hour.
+  const asked = at("2026-10-02", "04:11")
+  expect(M.overnightDue(asked, at("2026-10-02", "04:15"), calendars, true)).toBe(false)
+  expect(M.overnightDue(asked, at("2026-10-02", "04:16"), calendars, true)).toBe(true)
+  expect(M.overnightDue(asked, at("2026-10-02", "08:00"), calendars, false)).toBe(false)
+})
+
+test("a run of Robinhood's prints never takes more requests than a day for all would", () => {
+  const now = 1791000000
+  const warm = { through: now - 10 * 60 }
+  const names = n => Array.from({ length: n }, (_, i) => "S" + i)
+  const spans = batches => batches.map(b => b.span + " " + b.symbols.length).join(", ")
+  // A small list's first open at night, the pill's stock already in hand:
+  // one day for all three, not a day and an hour.
+  expect(M.overnightBatches(["AAPL", "MSFT", "SPY"], { AAPL: warm }, now))
+    .toEqual([{ span: "day", symbols: ["MSFT", "SPY", "AAPL"] }])
+  // A long list's first open: the pill's stock fills the last day's room.
+  const long = names(115)
+  expect(spans(M.overnightBatches(long, { S0: warm }, now))).toBe("day 25, day 25, day 25, day 25, day 15")
+  // Its refreshes through the night: the last hour, two requests, not five.
+  const inHand = Object.fromEntries(long.map(s => [s, warm]))
+  expect(spans(M.overnightBatches(long, inHand, now))).toBe("hour 75, hour 40")
+  // Three added to it meanwhile: their days, and the rest's hour.
+  expect(spans(M.overnightBatches(long.concat(["N1", "N2", "N3"]), inHand, now))).toBe("day 3, hour 75, hour 40")
 })
 
 test("each print says its own time across a change of clocks, and the day marks an early close", () => {
@@ -730,8 +1025,8 @@ test("weeks and months either side of 25 October and 1 November keep their dates
     } finally { process.env.TZ = "America/New_York" }
   }
   // The live moment Yahoo appends keeps today's date, even at a whole hour
-  // of a coin's day, where no clock changes. Found in review: Saturday 31
-  // October's 23:00 UTC read as the week of 1 November.
+  // of a coin's day, where no clock changes: Saturday 31 October's 23:00
+  // UTC is not the week of 1 November.
   const live = stamp("2026-10-31T23:00:00Z")
   const coin = { range: "5Y", interval: "1wk", gmtoffset: 0, liveAt: live,
     bars: [{ t: stamp("2026-10-26T00:00:00Z"), c: 100 }, { t: live, c: 101 }] }
@@ -740,7 +1035,7 @@ test("weeks and months either side of 25 October and 1 November keep their dates
 
 test("a session's one bar says nothing until its five minutes are past", () => {
   // An index's opening bar with its close already in, three minutes into
-  // the session: it read "Traded only at 09:30" (found in review).
+  // the session, must not read "Traded only at 09:30".
   const bell = at("2026-10-20", "09:30")
   const day = { symbol: "^GSPC", exchange: "S&P", instrumentType: "INDEX", gmtoffset: -14400,
     session: { pre: null, regular: { start: bell, end: at("2026-10-20", "16:00") }, post: null },
@@ -749,11 +1044,13 @@ test("a session's one bar says nothing until its five minutes are past", () => {
   expect(M.dayNote(day, bell + 300, calendars)).toBe("Traded only at 09:30")
 })
 
-test("a failed answer is asked again five minutes on, whatever the hour", () => {
-  const asked = at("2026-10-02", "04:11")
-  expect(M.overnightDue(asked, at("2026-10-02", "04:15"), calendars, true)).toBe(false)
-  expect(M.overnightDue(asked, at("2026-10-02", "04:16"), calendars, true)).toBe(true)
-  expect(M.overnightDue(asked, at("2026-10-02", "08:00"), calendars, false)).toBe(false)
+test("Robinhood's word on all-day trading is asked once, again a day on, or five minutes after a failure", () => {
+  const t = at("2026-10-07", "01:00")
+  expect(M.allDayDue(null, t)).toBe(true)
+  expect(M.allDayDue({ status: "ok", allDay: true, at: t }, t + 24 * 3600 - 1)).toBe(false)
+  expect(M.allDayDue({ status: "ok", allDay: false, at: t }, t + 24 * 3600)).toBe(true)
+  expect(M.allDayDue({ status: "failed", allDay: false, at: t }, t + 5 * 60 - 1)).toBe(false)
+  expect(M.allDayDue({ status: "failed", allDay: false, at: t }, t + 5 * 60)).toBe(true)
 })
 
 test("community themes that one hue, a faint colour, or a tinted light ground would trip", () => {
@@ -804,7 +1101,7 @@ test("community themes that one hue, a faint colour, or a tinted light ground wo
   greenAndRed(M.trend("#3a3a3a", M.hexColor("#2a2a2a"), M.hexColor("#000000")))
   // On a mid-grey ground no green reads at 4.5:1, and the darkest tried
   // rounded to black, which reads but says nothing: there, up is a green at
-  // the 3:1 floor. Found in review.
+  // the 3:1 floor.
   const mid = M.hexColor("#808080"), greyPair = M.trend("#777777", M.hexColor("#555555"), mid)
   greenAndRed(greyPair)
   const chroma = c => Math.hypot(M.oklab(c).a, M.oklab(c).b)
@@ -876,14 +1173,14 @@ test("a hostile chart or spark answer reads as no answer, at once", async () => 
     { name: "opens posing", call: read, answer: chartAnswer(r => { bars(r).open = POSING }) },
     { name: "a session's days posing", call: read, answer: chartAnswer(r => { r.meta.tradingPeriods.regular = POSING }) },
     { name: "a day's periods posing", call: read, answer: chartAnswer(r => { r.meta.tradingPeriods.regular = [POSING] }) },
-    // A spark day with this threw as it was read, and its feed asked nothing
-    // more until Stonks restarted.
+    // A spark day that throws as it is read leaves its feed asking nothing
+    // more until Stonks restarts.
     { name: "a day's period null", call: read, answer: chartAnswer(r => { r.meta.tradingPeriods.pre = [[null]] }) },
     { name: "a spark day with a period null", call: "M.sparkQuote(json, null, [])",
       answer: chartAnswer(r => { r.meta.tradingPeriods.pre = [[null]] }).chart.result[0] },
-    // The 1.0.4 security review's: a day's one period ending at an object,
-    // which threw where a bar was compared with it. One no bar was compared
-    // with was kept in the quote, and every look for what was due threw.
+    // A day's one period ending at an object throws where a bar is compared
+    // with it; one no bar is compared with stays in the quote, where every
+    // look for what is due throws.
     { name: "a spark day whose period ends at an object", call: "M.sparkQuote(json, null, [])",
       answer: chartAnswer(null, [[period(T0, { toString: null })]]).chart.result[0] },
     { name: "a current period ending at an object", call: read,
@@ -894,8 +1191,8 @@ test("a hostile chart or spark answer reads as no answer, at once", async () => 
     { name: "closes over budget", call: read, answer: chartAnswer(r => { bars(r).close = times(M.MOST_BARS + 1).map(() => 10) }) },
     { name: "a session's days over budget", call: read,
       answer: chartAnswer(r => { r.meta.tradingPeriods.pre = times(M.MOST_DAYS + 1).map(() => [period(T0 - 3600, T0)]) }) },
-    // A 322-byte answer the review of this fix found: the retro chart filled
-    // 222 billion columns from its middle print back to its last.
+    // A 322-byte answer whose retro chart would fill 222 billion columns from
+    // its middle print back to its last.
     { name: "bar times out of order", call: read, answer: chartAnswer(r => { r.timestamp = [T0, -8e12, T0 + 600] }) },
     { name: "a day's periods over budget", call: read,
       answer: chartAnswer(r => { r.meta.tradingPeriods.pre = [times(M.MOST_PERIODS + 1).map(() => period(T0 - 3600, T0))] }) },
@@ -943,7 +1240,6 @@ test("a hostile cap and P/E answer leaves the figures it would have fed unknown,
   const day = Date.UTC(2026, 8, 30) / 1000 + 14 * 3600
   const cases = [
     { name: "an answer, as sent", call: read, answer: timeseries(), want: figures },
-    // The marketplace's review of 1.0.2 found this one.
     { name: "the cap's series posing", call: read, answer: timeseries(r => { r[0].trailingMarketCap = POSING }), want: { cap: quarter, eps: figures.eps } },
     { name: "both caps' series posing", call: read,
       answer: timeseries(r => { r[0].trailingMarketCap = POSING; r[1].quarterlyMarketCap = POSING }), want: { cap: null, eps: figures.eps } },
@@ -987,16 +1283,33 @@ test("a hostile search or Robinhood answer reads as no answer, at once", async (
   expect(await hostile(cases)).toEqual(cases.map(c => [c.name, c.want === undefined ? null : c.want]))
 }, 60000)
 
-// Half a UTF-16 pair can't go in a URL: the quote feed took its first-answer
-// slot, then encodeURIComponent threw before any request started, and no
-// new symbol's quote came until the shell restarted.
+// Half a UTF-16 pair can't go in a URL: the quote feed would take its
+// first-answer slot, encodeURIComponent would throw before any request
+// started, and no new symbol's quote would come until the shell restarts.
 test("search leaves out a symbol no request can carry", () => {
   const found = M.parseSearch(JSON.parse('{"quotes":[{"symbol":"\\ud800","quoteType":"EQUITY"},{"symbol":"AAPL","quoteType":"EQUITY"}]}'))
   expect(found.results.map(r => M.chartUrl(r.symbol))).toEqual([M.chartUrl("AAPL")])
 })
 
-// An object in a close cell threw where its price was drawn or written, and
-// an overflowing number read Infinity. Each is a gap in the chart, as a
+test("search names are whole, so the row's own ellipsis is the only cut", () => {
+  const rows = M.parseSearch({ quotes: [
+    // Yahoo's short name stops at 31 characters; the long name is whole.
+    { symbol: "TSLT", shortname: "T-REX 2X Long Tesla Daily Targe", longname: "T-REX 2X Long Tesla Daily Target ETF", exchange: "BTS", quoteType: "ETF" },
+    // A German listing pads its share class onto the short name.
+    { symbol: "VUAA.DE", shortname: "Vanguard S&P 500 UCITS ETF    R", longname: null, exchange: "GER", quoteType: "ETF" },
+    { symbol: "MTX.F", shortname: "MTU Aero Engines AG           N", exchange: "FRA", quoteType: "EQUITY" },
+    // Neither an option nor a row without a symbol is something to add.
+    { symbol: "TSLA260918C00400000", shortname: "TSLA Sep 2026 400 call", exchange: "OPR", quoteType: "OPTION" },
+    { shortname: "No symbol", exchange: "NMS", quoteType: "EQUITY" },
+    { symbol: "BARE", exchange: "NMS", quoteType: "EQUITY" }
+  ] }).results
+  expect(rows.map(r => r.name)).toEqual([
+    "T-REX 2X Long Tesla Daily Target ETF", "Vanguard S&P 500 UCITS ETF", "MTU Aero Engines AG", "BARE"
+  ])
+})
+
+// An object in a close cell throws where its price is drawn or written, and
+// an overflowing number reads Infinity. Each is a gap in the chart, as a
 // missing close is.
 test("a close that isn't a finite number is a missing bar, in the day and in a range", () => {
   for (const bad of [{ toString: null }, JSON.parse("1e309"), "10"]) for (const at of [1, 2]) {
@@ -1007,8 +1320,8 @@ test("a close that isn't a finite number is a missing bar, in the day and in a r
 })
 
 // An answer's offset is the clock a print outside its periods is read by:
-// an object there threw wherever a time was worked out, every look for
-// what was due among them. One that isn't an offset is none.
+// an object there throws wherever a time is worked out, every look for
+// what is due among them. One that isn't an offset is none.
 test("an answer's offset that isn't one is none, in the day and in a range", () => {
   for (const bad of [{ toString: null }, "-14400", 1e13]) {
     const sent = offset => r => { r.meta.gmtoffset = offset }
@@ -1017,10 +1330,9 @@ test("an answer's offset that isn't one is none, in the day and in a range", () 
   }
 })
 
-// The 1.1.0 security read-through's: a Robinhood whose hour answers each
-// ran five minutes on had the shell keep 150 more prints at every one,
-// 15,000 after a hundred, and with their times ahead of the clock, it was
-// asked for an hour again for ever.
+// A Robinhood whose hour answers each run five minutes on would have the
+// shell keep 150 more prints at every one, 15,000 after a hundred, and with
+// their times ahead of the clock, ask for an hour again for ever.
 test("a hostile Robinhood's hours keep at most a day's request's prints, and times ahead of the clock ask for a day", () => {
   const hour = k => M.overnightAnswer({ symbol: "X", historicals: Array.from({ length: 150 }, (_, j) =>
     ({ begins_at: new Date((T0 + k * 300 + j) * 1000).toISOString(), close_price: "10", session: "overnight", interpolated: false })) }, "X")
@@ -1032,9 +1344,9 @@ test("a hostile Robinhood's hours keep at most a day's request's prints, and tim
   expect(M.overnightSpan({ through: T0 + 60 }, T0)).toBe("day")
 })
 
-// The 1.1.0 security read-through's: a time of 1e300 was kept as the
-// quote's, and the words that say how fresh it is, and the screenshot's,
-// threw. One a Date holds only at UTC's clock throws at Tokyo's.
+// A time of 1e300 kept as the quote's throws in the words that say how
+// fresh it is, and the screenshot's. One a Date holds only at UTC's clock
+// throws at Tokyo's.
 test("a quote's time no Date holds is none: its price and chart stay, and its time reads as not sent", () => {
   const sent = time => M.parseChart(chartAnswer(r => { r.meta.regularMarketTime = time; r.meta.gmtoffset = 32400 }), [])
   const none = sent(undefined)
@@ -1081,4 +1393,14 @@ test("a fetched name or code past its length reads as not sent", () => {
   // A spark listing under a symbol past its length is one Yahoo didn't send.
   const spark = symbol => M.sparkResults({ spark: { result: [{ symbol, response: [chartAnswer().chart.result[0]] }] } })
   expect([Object.keys(spark("X")), Object.keys(spark(long(1e5)))]).toEqual([["X"], []])
+})
+
+// The update check offers main's version only when it comes after the
+// running one, number by number.
+test("a version is newer number by number, and a manifest names one only whole", () => {
+  const R = load("Release.js")
+  expect(R.isNewer("1.0.10", "1.0.9")).toBe(true)
+  expect([["1.0.8", "1.0.9"], ["1.0.9", "1.0.9"], ["x", "1.0.9"]].map(([a, b]) => R.isNewer(a, b))).toEqual([false, false, false])
+  expect(R.manifestVersion('{ "version": "9.9.9" }')).toBe("9.9.9")
+  expect([R.manifestVersion('{\n  "id": "grvc.st'), R.manifestVersion('{ "id": "grvc.stonks" }')]).toEqual(["", ""])
 })

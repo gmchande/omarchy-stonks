@@ -11,36 +11,15 @@ import "plugin" as Stonks
 // card in CardWindow.qml), window (App.qml), and pill (BarWidget.qml), on the
 // demo watchlist at the saved moment readme.sh names. Each picture is
 // grabbed into STONKS_README_RAW; readme.sh puts them together.
-ShellRoot {
+Harness {
   id: harness
+  marker: "README DONE"
 
-  property int failures: 0
   readonly property string rawDir: Quickshell.env("STONKS_README_RAW")
   readonly property var demo: ["AAPL", "JNJ", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T"]
   readonly property var us: ["AAPL", "JNJ", "SPY"]
   readonly property string themeLink: Quickshell.env("HOME") + "/.local/state/omarchy/current/theme"
   property bool themeLinked: false
-
-  function check(label, ok, detail) {
-    console.log((ok ? "PASS " : "FAIL ") + label + (!ok && detail !== undefined ? " — " + detail : ""))
-    if (!ok) failures++
-  }
-
-  function find(item, name) {
-    if (!item) return null
-    if (item.objectName === name) return item
-    for (var i = 0; i < item.children.length; i++) {
-      var found = find(item.children[i], name)
-      if (found) return found
-    }
-    return null
-  }
-
-  function finish() {
-    console.log("README DONE")
-    done.exitCode = failures ? 1 : 0
-    done.start()
-  }
 
   Stonks.Service { id: service }
   Stonks.Updates { id: updates }
@@ -123,7 +102,7 @@ ShellRoot {
     barSize: Style.bar.sizeHorizontal
   }
 
-  TestCase {
+  Steps {
     name: "Readme"
     when: service.pluginsReady
 
@@ -132,7 +111,7 @@ ShellRoot {
         return harness.demo.every(function(s) { return !!service.quotes[s] })
           && service.arriving.length === 0 && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0
       }, 15000, "every demo listing answered")
-      harness.check("the theme's green is read", colors.green !== "", colors.green)
+      verify(colors.green !== "", "the theme's green is read")
     }
 
     // Robinhood's word on the US listings, asked for once a surface opens:
@@ -150,7 +129,7 @@ ShellRoot {
     // and freeze where they are while a list view covers them, and the live
     // mark done marking a new price (liveStill).
     function atRest(body) {
-      var rule = harness.find(body, "breadthRule")
+      var rule = find(body, "breadthRule")
       var share = function(n) { return rule.total ? n / rule.total : 0 }
       return !body.chartLoading && body.motion.reveal === 1
         && Math.abs(rule.upShare - share(rule.breadth.up)) < 1e-6
@@ -163,9 +142,9 @@ ShellRoot {
     // blinks too, so it rests once whole for longer than a blink's 700 ms.
     property var capWholeSince: 0
     function liveStill(body) {
-      var halo = harness.find(body, "liveHalo")
+      var halo = find(body, "liveHalo")
       if (halo && halo.visible && (halo.scale !== 1 || halo.opacity !== 0.25)) return false
-      var cap = harness.find(body, "liveCap")
+      var cap = find(body, "liveCap")
       if (!cap || !cap.visible) return true
       if (cap.opacity !== 1) { capWholeSince = 0; return false }
       if (!capWholeSince) capWholeSince = Date.now()
@@ -181,7 +160,6 @@ ShellRoot {
       var saved = false
       item.grabToImage(function(result) { saved = result.saveToFile(harness.rawDir + "/" + name + ".png") })
       tryVerify(function() { return saved }, 3000, "grab " + name)
-      harness.check("grabbed " + name, saved)
     }
 
     // preview.png keeps a popup down to its list's fourth row, fading out
@@ -197,9 +175,8 @@ ShellRoot {
 
     function test_pictures() {
       quiet()
-      harness.check("the demo watchlist, AAPL featured, on All and the day",
-        service.symbols.join(",") === harness.demo.join(",") && service.featuredSymbol === "AAPL"
-          && service.listName === "" && service.range === "1D", service.symbols.join(","))
+      verify(service.symbols.join(",") === harness.demo.join(",") && service.featuredSymbol === "AAPL"
+        && service.listName === "" && service.range === "1D", "the demo watchlist, AAPL featured, on All and the day: " + service.symbols.join(","))
 
       panel.open()
       var body = panel.testBody
@@ -212,8 +189,7 @@ ShellRoot {
       var back = service.now - 90 * 60
       body.nudgeScrub(-1)
       for (var step = 0; step < 500 && body.motion.scrubT > back; step++) body.nudgeScrub(-1)
-      harness.check("the scrub reached an hour and a half back", body.motion.scrubT > 0 && body.motion.scrubT <= back,
-        body.motion.scrubT + " vs " + back)
+      verify(body.motion.scrubT > 0 && body.motion.scrubT <= back, "the scrub reached an hour and a half back: " + body.motion.scrubT + " vs " + back)
       grab("scrub", panel.testCard.card, body, function() { return body.motion.scrubT !== 0 })
       previewFade("scrub", body)
       body.endScrub()
@@ -222,7 +198,7 @@ ShellRoot {
       // The list's name takes the open menu's fill, easing in: grabbed once
       // that fill has held for five polls.
       body.openListMenu()
-      var control = harness.find(body, "listControl")
+      var control = find(body, "listControl")
       var lastFill = "", heldFor = 0
       grab("lists", panel.testCard.card, body, function() {
         var fill = String(control.color)
@@ -270,5 +246,4 @@ ShellRoot {
     }
   }
 
-  HarnessExit { id: done; interval: 100 }
 }

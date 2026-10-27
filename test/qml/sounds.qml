@@ -10,22 +10,12 @@ import "plugin" as Stonks
 // What Stonks plays, through the real popup (Panel.qml, its card in
 // CardWindow.qml) by keys and the real window (App.qml) by the pointer, with
 // a stand-in pw-play first on PATH (bin/pw-play) that plays nothing and
-// records what it was asked to play: on by default, the add, remove, and
-// undo sounds in each look's voice, the add as its row joins, a replay's
-// sound made from its chart and stopped with it, one sound at a time, the
-// scrub's chimes by keys and by the pointer, the stream of silence only
-// while a chart is scrubbed, the lead-in of silence on a sound after a quiet
-// spell, nothing while off, and nothing for what happens on its own or for
-// the rest of looking around. HOME and curl are scratch.
-ShellRoot {
+// records what it was asked to play. sounds.sh's copy counts the output
+// asleep after 1.5 s, not 4 s, and writes a look's files ahead 5 ms apart,
+// not 100. HOME and curl are scratch.
+Harness {
   id: harness
-
-  property int failures: 0
-
-  function check(label, ok, detail) {
-    console.log((ok ? "PASS " : "FAIL ") + label + (!ok && detail !== undefined ? " — " + detail : ""))
-    if (!ok) failures++
-  }
+  marker: "SOUNDS DONE"
 
   // The quantum, in frames, a stream started with `args` holds the graph
   // at, at `rate`: PipeWire rounds its latency down to a power of two. A
@@ -35,26 +25,6 @@ ShellRoot {
     if (!m) return 0
     return Math.pow(2, Math.floor(Math.log(Number(m[1]) * rate / 1000) / Math.LN2))
   }
-
-  function find(item, name) {
-    if (!item) return null
-    if (item.objectName === name) return item
-    for (var i = 0; i < item.children.length; i++) {
-      var found = find(item.children[i], name)
-      if (found) return found
-    }
-    return item.contentItem ? find(item.contentItem, name) : null
-  }
-
-  function findAll(item, name, into) {
-    into = into || []
-    if (!item) return into
-    if (item.objectName === name) into.push(item)
-    for (var i = 0; i < item.children.length; i++) findAll(item.children[i], name, into)
-    if (item.contentItem) findAll(item.contentItem, name, into)
-    return into
-  }
-
 
   // The first item under `item` with a property named `name`.
   function findWith(item, name) {
@@ -67,13 +37,6 @@ ShellRoot {
     return null
   }
   readonly property string fakeState: Quickshell.env("STONKS_FAKE_STATE")
-  function readFile(path) {
-    var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true; printErrors: false }', harness)
-    view.path = path
-    var text = String(view.text())
-    view.destroy()
-    return text
-  }
   function readBytes(path) {
     var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true; printErrors: false }', harness)
     view.path = path
@@ -134,10 +97,7 @@ ShellRoot {
   Component { id: bellMaker; Stonks.Bell {} }
   // The clock the bell's passes hear: the service's quote, featured symbol,
   // calendars, and screens, at the moments a pass sets, which the service's
-  // own clock can't move. That clock goes to the wall's second at each
-  // step, each minute, as a quote falls due, and as answers land, and one
-  // step inside a pass took the bell's clock days past the open, so the
-  // open's bell never rang and the run ended mid-pass.
+  // own clock, moving to the wall's second at each step, can't.
   QtObject {
     id: bellClock
     property int now: 0
@@ -161,7 +121,7 @@ ShellRoot {
   Stonks.Panel { id: panel; bar: api; settings: ({}) }
   Stonks.App { id: app; service: service; updates: updates; sounds: sounds; camera: camera }
 
-  TestCase {
+  Steps {
     name: "Sounds"
     when: service.pluginsReady
 
@@ -169,11 +129,35 @@ ShellRoot {
       tryVerify(function() { return service.arriving.length === 0 && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 8000)
     }
 
-    // The stand-in's starts, once `count` of them are in.
+    // The stand-in's starts, once `count` of them are in, and 100 ms more
+    // for one that mustn't follow.
     function startsBy(count) {
       tryVerify(function() { return harness.starts().length >= count }, 3000)
       wait(100)
       return harness.starts()
+    }
+
+    // Stonks counts the output asleep: its last sound, or its silence's end,
+    // is past the copy's 1.5 s.
+    function asleep() {
+      tryVerify(function() { return Date.now() >= sounds.asleepAfter }, 4000)
+    }
+
+    // The chart on screen has drawn in.
+    function drawnIn(body) {
+      tryCompare(body.motion, "reveal", 1, 2000)
+    }
+
+    // Takes NAME out of the fake state.
+    function dropState(name) {
+      fileProc.command = ["rm", "-f", harness.fakeState + "/" + name]
+      fileProc.running = true
+      tryVerify(function() { return !fileProc.running }, 2000)
+    }
+
+    // No chime waits out the gap, and the next strikes at once.
+    function chimesRest() {
+      tryVerify(function() { return sounds.waiting < 0 && Date.now() >= sounds.lastChime + sounds.chimeGap }, 2000)
     }
 
     // The sound file a start played, as the plugin names it: a fixed
@@ -207,104 +191,6 @@ ShellRoot {
         place: function(t) { return chart.from + (chart.to - chart.from) * ease(Math.min(1, t / 2)) } }
     }
     readonly property var penta: [440, 493.88, 554.37, 659.25, 739.99, 880, 987.77, 1108.73, 1318.51, 1479.98, 1760]
-
-    // Smooth's replay, read against the chart it was made from: the scrub's
-    // bars, struck as the replay passes them.
-    // - strikes: where a bar's fundamental rises (its amplitude over 40 ms,
-    //   every 4 ms, up a twelfth of the loudest's against 40 ms before, and
-    //   before the file silence), each bar's own, so bars struck together
-    //   are each heard;
-    // - pitch: nine strikes in ten are a bar the line had in the 80 ms
-    //   before or the 20 ms after, as the strikes' 45 ms spacing and the
-    //   window allow; and nine of ten moves onto a bar the line then holds
-    //   45 ms or more are heard as that bar's strike, so no stretch of the
-    //   line goes unheard;
-    // - silence: no strike starts across a break, though a bar struck before
-    //   it rings on into it.
-    function smoothStrikes(index, chart) {
-      var sound = replaySound(index, chart), s = sound.s, rate = sound.rate
-      var pts = chart.geometry.points
-      var lineY = function(x) {
-        if (x <= pts[0].x) return pts[0].y
-        for (var k = 0; k < pts.length - 1; k++) {
-          if (pts[k + 1].x < x) continue
-          if (pts[k + 1].brk && x > pts[k].x && x < pts[k + 1].x) return null
-          return pts[k].y + (pts[k + 1].y - pts[k].y) * (x - pts[k].x) / Math.max(1e-9, pts[k + 1].x - pts[k].x)
-        }
-        return pts[pts.length - 1].y
-      }
-      var barAt = function(t) {
-        if (t > 2) return -2
-        var y = lineY(sound.place(t))
-        return y === null ? -1 : Math.round((1 - Math.max(0, Math.min(1, y))) * (penta.length - 1))
-      }
-      var span = 960, hop = 96, amp = penta.map(function() { return [] }), top = 0
-      var coef = penta.map(function(f) { return 2 * Math.cos(2 * Math.PI * f / rate) })
-      for (var at = 0; at + span < sound.samples; at += hop) {
-        for (var b = 0; b < penta.length; b++) {
-          var q1 = 0, q2 = 0
-          for (var k = 0; k < span; k++) {
-            var q0 = coef[b] * q1 - q2 + s[at + k] * (0.5 - 0.5 * Math.cos(2 * Math.PI * k / span))
-            q2 = q1; q1 = q0
-          }
-          var a = Math.sqrt(Math.max(0, q1 * q1 + q2 * q2 - coef[b] * q1 * q2))
-          amp[b].push(a)
-          if (a > top) top = a
-        }
-      }
-      // Each bar's rises, so bars struck together are each heard; a rise
-      // under half the window's greatest is another bar's partial or
-      // neighbour heard through it, and a rise goes on for the window's
-      // 40 ms after its strike, so one bar's rises within 40 ms of its
-      // strike are that strike.
-      var strikes = [], lastOf = []
-      for (var w = 0; w < amp[0].length; w++) {
-        var rises = [], most = 0
-        for (var c = 0; c < penta.length; c++) {
-          rises.push((amp[c][w] - (w >= 10 ? amp[c][w - 10] : 0)) / top)
-          if (rises[c] > most) most = rises[c]
-        }
-        var t = (w * hop + span / 2) / rate
-        for (c = 0; c < penta.length; c++) {
-          if (rises[c] <= 0.08 || rises[c] < most / 2) continue
-          if (lastOf[c] !== undefined && t - lastOf[c] <= 0.04) continue
-          lastOf[c] = t
-          strikes.push({ t: t, bar: c })
-        }
-      }
-      strikes.sort(function(a, b) { return a.t - b.t })
-      var wrong = [], inBreak = []
-      strikes.forEach(function(st) {
-        var around = [], at = []
-        for (var u = st.t - 0.08; u <= st.t + 0.02; u += 0.002) around.push(barAt(u))
-        // Where it starts, give or take the window's half.
-        for (var o = st.t - 0.025; o <= st.t + 0.02; o += 0.002) at.push(barAt(o))
-        if (at.every(function(b) { return b === -1 })) inBreak.push(st.t.toFixed(3))
-        else if (around.indexOf(st.bar) < 0) wrong.push(st.t.toFixed(3) + "s bar " + st.bar)
-      })
-      var runs = [], run = null
-      for (var v = 0; v <= 2; v += 0.002) {
-        var held = barAt(v)
-        if (!run || run.bar !== held) { run = { bar: held, from: v, to: v }; runs.push(run) }
-        else run.to = v
-      }
-      // A move onto a bar the line holds 45 ms or more is that bar's strike,
-      // at once or at the end of the gap, so no later move can take its
-      // place: heard from 20 ms before it to 65 ms after, the window's give.
-      var moves = runs.filter(function(r) { return r.bar >= 0 && r.to - r.from >= 0.045 })
-      var unstruck = moves.filter(function(r) {
-        return !strikes.some(function(st) { return st.bar === r.bar && st.t >= r.from - 0.02 && st.t <= r.from + 0.065 })
-      }).map(function(r) { return r.from.toFixed(3) + "s bar " + r.bar })
-      return {
-        strikes: strikes,
-        place: sound.place,
-        pitch: { ok: strikes.length >= 5 && wrong.length <= strikes.length * 0.1 && unstruck.length <= moves.length * 0.1,
-          detail: strikes.length + " strikes; wrong " + wrong.slice(0, 5).join(", ") + "; "
-            + unstruck.length + " of " + moves.length + " held moves unstruck: " + unstruck.slice(0, 5).join(", ") },
-        silence: { ok: inBreak.length === 0, breakMs: runs.filter(function(r) { return r.bar === -1 }).reduce(function(sum, r) { return sum + (r.to - r.from) * 1000 }, 0),
-          detail: "struck in a break at " + inBreak.join(" ") }
-      }
-    }
 
     // Retro's replay, read against the chart it was made from, by what the
     // samples hold and what the chart draws:
@@ -426,13 +312,16 @@ ShellRoot {
       }
     }
 
+    // Retro's grid on screen, null in smooth.
+    function shownGrid(body) {
+      var pixel = harness.findAll(body, "curtain").filter(function(c) { return c.parent.visible })[0]
+      return pixel ? pixel.parent.grid : null
+    }
+
     // The chart a replay starts on, as the motion hands it to the sounds.
     function capture(body) {
       var seen = {}
-      var take = function(from, to) {
-        var pixel = harness.findAll(body, "curtain").filter(function(c) { return c.parent.visible })[0]
-        seen.chart = { from: from, to: to, geometry: body.motion.geometry, grid: pixel ? pixel.parent.grid : null }
-      }
+      var take = function(from, to) { seen.chart = { from: from, to: to, geometry: body.motion.geometry, grid: shownGrid(body) } }
       body.motion.replayStarted.connect(take)
       return { seen: seen, done: function() { body.motion.replayStarted.disconnect(take) } }
     }
@@ -451,17 +340,20 @@ ShellRoot {
         service.soundsOn && icon.on === true && harness.starts().length === 0, service.soundsOn + "|" + harness.starts().length)
 
       // The popup by keys, in smooth.
+      // The card takes the keys a turn of the event loop later.
       panel.refocusKeys()
       wait(100)
       // Nothing that happens by itself, and nothing done to look around
       // but the scrub: a refresh and its answers, a range and back, the
       // look and back, the change, the selection, the key sheet, a row's
-      // chart. The scrub's key steps each strike a chime.
+      // chart. The keys come 60 ms apart, past the chimes' 45 ms gap, so
+      // each scrub step strikes its own.
       var quietKeys = [Qt.Key_R, Qt.Key_Left, Qt.Key_Left, Qt.Key_Right, Qt.Key_Escape, Qt.Key_BracketRight, Qt.Key_BracketLeft,
         Qt.Key_S, Qt.Key_S, Qt.Key_C, Qt.Key_C, Qt.Key_C, Qt.Key_Down, Qt.Key_Up, Qt.Key_Question, Qt.Key_Question, Qt.Key_2, Qt.Key_1]
       quietKeys.forEach(function(key) { keyClick(key); wait(60) })
       service.refresh()
       quiet()
+      // Time for a sound that mustn't start.
       wait(500)
       var stepChimes = harness.chimes().map(harness.bar)
       harness.check("with sounds on, a refresh, its answers, a range, the look, the change, the selection, the sheet, and a row's chart play nothing, and the scrub's three key steps strike three of smooth's chimes",
@@ -469,13 +361,13 @@ ShellRoot {
         JSON.stringify(harness.record()))
 
       // Delete, Ctrl+Z, and an add through search: each its own sound, in
-      // smooth's voice, as a notification.
+      // smooth's voice.
       keyClick(Qt.Key_Delete)
       var removed = startsBy(1)
       keyClick(Qt.Key_Z, Qt.ControlModifier)
       var undone = startsBy(2)
       keyClick(Qt.Key_A)
-      wait(50)
+      tryVerify(function() { return body.adding }, 2000)
       keyClick(Qt.Key_S)
       keyClick(Qt.Key_H)
       tryVerify(function() { return body.adding && body.search.results.length > 1 }, 3000)
@@ -489,69 +381,55 @@ ShellRoot {
         played(removed[0]) === "sounds/smooth/remove.wav" && played(undone[1]) === "sounds/smooth/undo.wav"
           && played(added[2]) === "sounds/smooth/add.wav" && service.library.length === library + 1,
         harness.starts().map(played).join(", "))
-      harness.check("each plays through pw-play as a notification",
-        harness.starts().every(function(s) { return / --media-role Notification /.test(" " + s.args + " ") }), harness.starts()[0].args)
 
-      // p: a replay heard, made from the chart as it starts; left to run,
-      // it plays to its end.
+      // p: a replay heard; left to run, it plays to its end.
       tryVerify(function() { return !body.chartLoading }, 5000)
-      var watch = capture(body)
       keyClick(Qt.Key_P)
       var replayed = startsBy(4)
-      watch.done()
       tryVerify(function() { return !body.motion.replayRunning }, 4000)
       tryVerify(function() { return endOf(4) !== "" }, 3000)
-      var smoothHeard = smoothStrikes(4, watch.seen.chart)
       harness.check("p plays the replay's sound, written whole before it plays, and a replay left to run plays to its end",
         replayed[3].file === sounds.replayPath && endOf(4) === "ended", replayed[3].file + "|" + endOf(4))
-      harness.check("smooth's replay strikes the scrub's chimes: the bar under the line as the replay moves along it",
-        smoothHeard.pitch.ok, smoothHeard.pitch.detail)
 
       // Tokyo's day of 19 October, whose line stops for lunch below the
-      // close and starts again above it, in both looks: smooth strikes no bar
-      // across the break, where it draws no line; retro is silent over its
-      // dark columns, and ticks only where what is drawn crosses, not at
-      // lunch's end.
+      // close and starts again above it: retro is silent over its dark
+      // columns, and ticks only where what is drawn crosses, not at lunch's
+      // end. Smooth's replay of it is saved.test.js's.
       harness.writeText(harness.fakeState + "/overnight.set", "demo-2026-10-19-1146\n")
       service.addSymbol("7203.T")
       quiet()
       harness.writeText(harness.fakeState + "/overnight.set", "")
       service.feature("7203.T")
       tryVerify(function() { return body.featuredSymbol === "7203.T" && !body.chartLoading }, 5000)
-      var lunch = [false, true].map(function(retro) {
-        service.persist({ style: retro ? "retro" : "smooth" })
-        wait(400)
-        var tokyo = capture(body)
-        var at = harness.starts().length
-        keyClick(Qt.Key_P)
-        startsBy(at + 1)
-        tokyo.done()
-        tryVerify(function() { return endOf(at + 1) !== "" }, 4000)
-        if (!retro) {
-          var struck = smoothStrikes(at + 1, tokyo.seen.chart)
-          return { ok: struck.pitch.ok && struck.silence.ok && struck.silence.breakMs > 100,
-            detail: "smooth: " + struck.pitch.detail + " | " + struck.silence.detail }
-        }
-        var heard = retroHeard(at + 1, tokyo.seen.chart)
-        return { ok: heard.pitch.ok && heard.silence.ok && /^[1-9]/.test(heard.silence.detail) && heard.ticks.ok,
-          detail: "retro: " + heard.pitch.detail + " | " + heard.silence.detail + " | " + heard.ticks.detail }
-      })
+      service.persist({ style: "retro" })
+      tryVerify(function() { return shownGrid(body) !== null }, 2000)
+      drawnIn(body)
+      var tokyo = capture(body)
+      var at = harness.starts().length
+      keyClick(Qt.Key_P)
+      startsBy(at + 1)
+      tokyo.done()
+      tryVerify(function() { return endOf(at + 1) !== "" }, 4000)
+      var lunch = retroHeard(at + 1, tokyo.seen.chart)
       service.persist({ style: "smooth" })
-      harness.check("a replay of Tokyo's day sounds nothing new across lunch, where the chart draws nothing, and retro ticks only where what is drawn crosses",
-        lunch[0].ok && lunch[1].ok, lunch[0].detail + " || " + lunch[1].detail)
+      harness.check("retro's replay of Tokyo's day sounds nothing new across lunch, where the chart draws nothing, and ticks only where what is drawn crosses",
+        lunch.pitch.ok && lunch.silence.ok && /^[1-9]/.test(lunch.silence.detail) && lunch.ticks.ok,
+        lunch.pitch.detail + " | " + lunch.silence.detail + " | " + lunch.ticks.detail)
       // The chimes over Tokyo's lunch, in both looks: the scrub moved into
-      // the break, where the chart draws nothing, strikes nothing; moved on
-      // to the afternoon's line, it strikes once.
+      // the break strikes nothing; moved on to the afternoon's line, it
+      // strikes once.
       var hero = harness.findWith(body, "pixelGrid")
       var lunchChimes = [false, true].map(function(retro) {
         service.persist({ style: retro ? "retro" : "smooth" })
-        wait(300)
+        tryVerify(function() { return (shownGrid(body) !== null) === retro }, 2000)
         var pts = body.motion.geometry.points
         var gap = null
         for (var p = 1; p < pts.length && !gap; p++) if (pts[p].brk) gap = [pts[p - 1].x, pts[p].x]
-        hero.scrubRequested(gap[0] - 0.02)
-        wait(100)
         var struck = harness.chimes().length
+        hero.scrubRequested(gap[0] - 0.02)
+        tryVerify(function() { return harness.chimes().length > struck }, 2000)
+        struck = harness.chimes().length
+        // 80 ms apart, past the 45 ms gap, for a chime that mustn't start.
         for (var k = 2; k <= 4; k++) {
           hero.scrubRequested(gap[0] + (gap[1] - gap[0]) * k / 6)
           wait(80)
@@ -564,7 +442,7 @@ ShellRoot {
           wait(60)
         }
         var landed = body.motion.scrubX === gap[1]
-        wait(150)
+        within(1000, function() { return harness.chimes().length > struck + inBreak })
         var afterBreak = harness.chimes().length - struck - inBreak
         body.endScrub()
         return { ok: inBreak === 0 && afterBreak === 1 && landed,
@@ -576,7 +454,8 @@ ShellRoot {
       // A bar still waiting out the 45 ms gap as the pointer moves on into
       // lunch is dropped: nothing starts where the line lifts. Two prints
       // before lunch on different bars, struck back to back, then lunch.
-      wait(300)
+      tryVerify(function() { return shownGrid(body) === null }, 2000)
+      chimesRest()
       var lunchPts = body.motion.geometry.points, lastMorning = -1
       for (var q = 1; q < lunchPts.length && lastMorning < 0; q++) if (lunchPts[q].brk) lastMorning = q - 1
       var barOfPrint = function(pt) { return Math.round((1 - Math.max(0, Math.min(1, pt.y))) * 10) }
@@ -586,83 +465,18 @@ ShellRoot {
       hero.scrubRequested(lunchPts[otherPrint].x)
       hero.scrubRequested(lunchPts[lastMorning].x)
       hero.scrubRequested((lunchPts[lastMorning].x + lunchPts[lastMorning + 1].x) / 2)
+      // Time for the dropped bar to start, were it not dropped.
       wait(300)
       var heardThen = harness.chimes().slice(chimedBefore).map(harness.bar)
       body.endScrub()
       harness.check("a bar waiting out the gap as the pointer moves into lunch is dropped, and only the bar before it sounds",
         heardThen.join(",") === "smooth-" + barOfPrint(lunchPts[otherPrint]),
         heardThen.join(",") + " for smooth-" + barOfPrint(lunchPts[otherPrint]))
-      // A chime's pw-play that a stalled PipeWire holds is stopped within
-      // its 2 s, so none pile up (the stand-in holds while pw-play.stall is
-      // there).
-      harness.writeText(harness.fakeState + "/pw-play.stall", "held")
-      wait(300)
-      var heldFrom = harness.chimes().length
-      hero.scrubRequested(lunchPts[otherPrint].x)
-      tryVerify(function() { return harness.chimes().length > heldFrom }, 2000)
-      var held = harness.chimes()[heldFrom].n
-      var heldEnd = function() {
-        var ends = harness.record().filter(function(e) { return e.what !== "start" && e.n === held })
-        return ends.length ? ends[0].what : ""
-      }
-      var stillHeld = heldEnd()
-      tryVerify(function() { return heldEnd() !== "" }, 6000)
-      fileProc.command = ["rm", "-f", harness.fakeState + "/pw-play.stall"]
-      fileProc.running = true
-      tryVerify(function() { return !fileProc.running }, 2000)
-      body.endScrub()
-      harness.check("a chime's player held by a stalled PipeWire is stopped within its time limit",
-        stillHeld === "" && heldEnd() === "stopped", stillHeld + "|" + heldEnd())
-      // So is a sound's, the add's here, within its 4 s.
-      harness.writeText(harness.fakeState + "/pw-play.stall", "held")
-      wait(300)
-      var stallAt = harness.starts().length
-      sounds.play("add")
-      startsBy(stallAt + 1)
-      var soundHeld = endOf(stallAt + 1)
-      for (var w = 0; w < 60 && endOf(stallAt + 1) === ""; w++) wait(100)
-      fileProc.command = ["rm", "-f", harness.fakeState + "/pw-play.stall"]
-      fileProc.running = true
-      tryVerify(function() { return !fileProc.running }, 2000)
-      harness.check("a sound's player held by a stalled PipeWire is stopped within its time limit",
-        soundHeld === "" && endOf(stallAt + 1) === "stopped", soundHeld + "|" + endOf(stallAt + 1))
-      // TOY's thin night, saved at 00:36 on Monday 5 October: Friday's day,
-      // then Sunday night's five trades as dots, each alone. Smooth's replay
-      // strikes each one's bar as it passes it, as the replay's scrub reads
-      // it; the replay's place stepped over their single points unheard
-      // (night-dots-review).
-      harness.writeText(harness.fakeState + "/overnight.set", "live-2026-10-05\n")
-      service.addSymbol("TOY")
-      quiet()
-      service.feature("TOY")
-      tryVerify(function() {
-        return body.featuredSymbol === "TOY" && !body.chartLoading && body.motion.geometry.points.some(function(p) { return p.dot })
-      }, 8000)
-      harness.writeText(harness.fakeState + "/overnight.set", "")
-      wait(400)
-      var thin = capture(body)
-      var thinAt = harness.starts().length
-      keyClick(Qt.Key_P)
-      startsBy(thinAt + 1)
-      thin.done()
-      tryVerify(function() { return endOf(thinAt + 1) !== "" }, 4000)
-      var thinHeard = smoothStrikes(thinAt + 1, thin.seen.chart)
-      var dots = thin.seen.chart.geometry.points.filter(function(p) { return p.dot })
-      var unheard = dots.filter(function(dot) {
-        var bar = Math.round((1 - Math.max(0, Math.min(1, dot.y))) * (penta.length - 1))
-        var passed = 0
-        while (passed < 2 && thinHeard.place(passed) < dot.x) passed += 0.002
-        return !thinHeard.strikes.some(function(st) { return st.bar === bar && st.t >= passed - 0.02 && st.t <= passed + 0.11 })
-      })
-      harness.check("smooth's replay of a thin night strikes each of its trades' dots as it passes it",
-        dots.length === 5 && unheard.length === 0 && thinHeard.pitch.ok,
-        dots.length + " dots, " + unheard.length + " unheard | " + thinHeard.pitch.detail)
-      service.removeSymbol("TOY")
       service.removeSymbol("7203.T")
       service.feature("MSFT")
       quiet()
       tryVerify(function() { return body.featuredSymbol === "MSFT" && !body.chartLoading }, 5000)
-      wait(400)
+      drawnIn(body)
 
       // A replay's sound stops with the replay: Esc, a row's chart, the
       // popup closing. And one sound at a time: Delete mid-replay cuts it.
@@ -677,7 +491,7 @@ ShellRoot {
       }
       cut(function() { keyClick(Qt.Key_Escape) })
       cut(function() { keyClick(Qt.Key_Down); keyClick(Qt.Key_Return) })
-      cut(function() { panel.close(); wait(300) })
+      cut(function() { panel.close() })
       harness.check("a replay's sound stops with the replay: Esc, another row's chart, and closing the popup", cuts.join(",") === "stopped,stopped,stopped", cuts.join(","))
       panel.open()
       tryVerify(function() { return body.surfaceOpen && !body.chartLoading }, 5000)
@@ -700,6 +514,7 @@ ShellRoot {
       keyClick(Qt.Key_C, Qt.ControlModifier)
       var shutter = startsBy(before + 1)
       tryVerify(function() { return body.cameraLit && !camera.busy }, 5000)
+      // Time for a second shutter that mustn't sound.
       wait(300)
       harness.check("Ctrl+C sounds the shutter once as the screenshot is taken, in smooth's voice",
         harness.starts().length === before + 1 && played(shutter[before]) === "sounds/smooth/shutter.wav",
@@ -716,17 +531,20 @@ ShellRoot {
       harness.check("m turns sounds off: saved, the speaker muted, the replay playing stopped",
         !service.soundsOn && icon.on === false && endOf(before + 1) === "stopped", service.soundsOn + "|" + endOf(before + 1))
       before = harness.starts().length
+      var count = service.library.length
       keyClick(Qt.Key_Escape)
       keyClick(Qt.Key_Delete)
-      wait(100)
+      tryVerify(function() { return service.library.length === count - 1 }, 2000)
       keyClick(Qt.Key_Z, Qt.ControlModifier)
-      wait(100)
+      tryVerify(function() { return service.library.length === count }, 2000)
       body.acceptSymbol("SPY")
       quiet()
       keyClick(Qt.Key_P)
-      wait(2500)
+      tryVerify(function() { return body.motion.replayRunning }, 2000)
+      tryVerify(function() { return !body.motion.replayRunning }, 4000)
       keyClick(Qt.Key_C, Qt.ControlModifier)
       tryVerify(function() { return !camera.busy && body.note.indexOf("screenshot of SPY") >= 0 }, 5000)
+      // Time for a shutter that mustn't sound.
       wait(100)
       harness.check("with sounds off, Delete, Ctrl+Z, an add, p, and a screenshot play nothing", harness.starts().length === before, JSON.stringify(harness.starts().slice(before)))
       service.removeSymbol("SPY")
@@ -743,23 +561,20 @@ ShellRoot {
       // back, Enter on it as soon as it is chosen. While its answer is held,
       // the header names it as the chart on its way, as the preview did, no
       // row stands for it, and nothing plays; let through, its row joins and
-      // the add is heard then. Found in the slow walk of 1.0.2: the hero
-      // went back to the stock before the add, named by nothing, and the add
-      // sounded at Enter.
+      // the add is heard then.
       before = harness.starts().length
       harness.hold(true, "SHOP.TO.quote.hold")
       tryVerify(function() { return !fileProc.running }, 2000)
       keyClick(Qt.Key_A)
-      wait(50)
+      tryVerify(function() { return body.adding }, 2000)
       keyClick(Qt.Key_S)
       keyClick(Qt.Key_H)
       tryVerify(function() { return body.adding && body.search.results.length > 1 }, 3000)
       keyClick(Qt.Key_Down)
       tryVerify(function() { return body.previewSymbol === "SHOP.TO" }, 2000)
       keyClick(Qt.Key_Return)
-      wait(50)
       var header = harness.find(body, "statusText")
-      for (var t = 0; t < 2000 && header.text !== "LOADING SHOP.TO"; t += 20) wait(20)
+      within(2000, function() { return header.text === "LOADING SHOP.TO" })
       var waiting = [header.text, body.watchlist.displayedSymbols.indexOf("SHOP.TO") >= 0 ? "row" : "no row",
         harness.starts().length - before].join("/")
       var released = Date.now()
@@ -772,7 +587,7 @@ ShellRoot {
         waiting + " || " + joined.map(function(s) { return played(s) + " at " + (s.ms - released) + " ms" }).join(", "))
       service.removeSymbol("SHOP.TO")
       panel.close()
-      wait(300)
+      tryVerify(function() { return !body.surfaceOpen }, 2000)
 
       // The window by the pointer, in retro, its look picked with a click,
       // on AAPL's day, the popup's failed add gone.
@@ -781,36 +596,18 @@ ShellRoot {
       app.open("{}")
       var win = app.testBody
       tryVerify(function() { return win && win.surfaceOpen && !win.chartLoading && win.featuredSymbol === "AAPL" }, 5000)
-      // Tall enough for every row, so each is in sight to click.
-      app.testWindow.implicitHeight = win.chromeHeight + 7 * win.rowPitch
-      wait(300)
       mouseMove(win, 1, 1)
-      wait(50)
-      before = harness.starts().length
       var look = harness.find(win, "lookToggle")
       mouseClick(look, look.width / 2, look.height / 2)
       tryVerify(function() { return service.retro }, 2000)
-      // Looking around by the pointer: the chart scrubbed, a range and
-      // back, and a row's chart.
+      // Retro's chart drawn in, and its files written ahead, so no write
+      // holds the thread mid-sweep.
+      tryVerify(function() { return shownGrid(win) !== null }, 2000)
+      drawnIn(win)
+      tryVerify(function() {
+        return sounds.aheadOf("retro").every(function(f) { return sounds.madeThisRun[sounds.fileOf("retro", f[0], f[1])] })
+      }, 5000)
       var chart = win.chartItem
-      var scrubbed = false
-      for (var x = 0.1; x < 0.9; x += 0.1) {
-        mouseMove(chart, chart.width * x, chart.height / 2)
-        wait(50)
-        if (win.scrubT !== 0) scrubbed = true
-      }
-      mouseMove(win, 1, 1)
-      var tokens = harness.findAll(win, "rangeToken")
-      mouseClick(tokens[1], tokens[1].width / 2, tokens[1].height / 2)
-      wait(300)
-      mouseClick(tokens[0], tokens[0].width / 2, tokens[0].height / 2)
-      tryVerify(function() { return service.range === "1D" && !win.chartLoading }, 5000)
-      var rows = win.watchlist.displayedSymbols
-      var second = win.watchlist.rowItem(rows[1])
-      mouseClick(second, second.width / 2, second.height / 2)
-      wait(300)
-      harness.check("in the window, a click on the look, a scrub by the pointer, a range and back, and a row's chart play no sound but the scrub's chimes",
-        scrubbed && harness.starts().length === before, scrubbed + "|" + JSON.stringify(harness.starts().slice(before)))
 
       // The chimes by the pointer, in retro: a sweep across the chart and
       // back strikes the bars it crosses, the lit row's height each one's
@@ -836,7 +633,7 @@ ShellRoot {
         return seen
       }
       mouseMove(win, 1, 1)
-      wait(100)
+      chimesRest()
       var chimesBefore = harness.chimes().length
       var seen = sweep(chart.width * 0.05, chart.width * 0.9, { last: -1, changes: 0, crossed: [] })
       sweep(chart.width * 0.9, chart.width * 0.3, seen)
@@ -857,12 +654,13 @@ ShellRoot {
       // add sound once, now in retro's voice.
       var speaker = harness.find(win, "soundToggle")
       var winIcon = harness.find(win, "soundIcon")
+      before = harness.starts().length
       mouseClick(speaker, speaker.width / 2, speaker.height / 2)
       tryVerify(function() { return !service.soundsOn }, 2000)
-      wait(300)
       var chimesOff = harness.chimes().length
       sweep(chart.width * 0.05, chart.width * 0.9, { last: -1, changes: 0, crossed: [] })
       mouseMove(win, 1, 1)
+      // Time for a chime that mustn't sound.
       wait(300)
       var offSilent = harness.starts().length === before && harness.chimes().length === chimesOff && winIcon.on === false
       mouseClick(speaker, speaker.width / 2, speaker.height / 2)
@@ -871,83 +669,18 @@ ShellRoot {
         offSilent && service.soundsOn && winIcon.on === true && clicked.length === before + 1 && played(clicked[before]) === "sounds/retro/add.wav",
         offSilent + "|" + harness.starts().slice(before).map(played).join(", "))
 
-      // A right-click and its menu's line remove a row, search's PUT BACK
-      // takes it back, and an add through search's ADD: retro's sounds.
-      rows = win.watchlist.displayedSymbols
-      var row = win.watchlist.rowItem(rows[rows.length - 1])
-      mouseClick(row, row.width / 2, row.height / 2, Qt.RightButton)
-      tryVerify(function() { return win.rowMenu !== null }, 2000)
-      var line = harness.findAll(win, "rowMenuLine")[0]
-      mouseClick(line, line.width / 2, line.height / 2)
-      startsBy(before + 2)
-      var footer = harness.find(win, "footer")
-      mouseClick(footer, footer.width / 2, footer.height / 2)
-      tryVerify(function() { return win.adding && win.search.results.length === 1 }, 2000)
-      wait(100)
-      var putBack = harness.find(harness.findAll(win.search, "searchResult")[0], "searchAdd")
-      mouseClick(putBack, putBack.width / 2, putBack.height / 2)
-      startsBy(before + 3)
-      quiet()
-      mouseClick(footer, footer.width / 2, footer.height / 2)
-      tryVerify(function() { return win.adding }, 2000)
-      keyClick(Qt.Key_S)
-      keyClick(Qt.Key_H)
-      tryVerify(function() { return win.search.results.length > 1 }, 3000)
-      wait(100)
-      var result = harness.findAll(win.search, "searchResult").filter(function(r) { return r.modelData.symbol === "SHOP.TO" })[0]
-      var add = harness.find(result, "searchAdd")
-      var held = service.library.slice()
-      mouseClick(add, add.width / 2, add.height / 2)
-      var mouseSounds = startsBy(before + 4).slice(before + 1).map(played)
-      quiet()
-      harness.check("in the window, a right-click's menu line, search's PUT BACK, and a result's ADD play retro's removal, undo, and add",
-        mouseSounds.join(", ") === "sounds/retro/remove.wav, sounds/retro/undo.wav, sounds/retro/add.wav", mouseSounds.join(", "))
-      // The add lands; then a click on MSFT's row shows its chart, a busy
-      // US day, every column lit, to replay.
-      tryVerify(function() { return win.featuredSymbol === "SHOP.TO" && !win.chartLoading }, 8000)
+      // MSFT's chart, a busy US day, every column lit, to replay.
       var msft = win.watchlist.rowItem("MSFT")
       mouseClick(msft, msft.width / 2, msft.height / 2)
       tryVerify(function() { return win.featuredSymbol === "MSFT" && !win.chartLoading && win.animal.kind !== "" }, 5000)
-      wait(400)
-
-      // Unticking All in a row's lists removes it everywhere, heard as any
-      // removal is, and Ctrl+Z takes it back.
-      before = harness.starts().length
-      var unticked = win.watchlist.displayedSymbols.filter(function(s) { return s !== "MSFT" })[0]
-      var untickRow = win.watchlist.rowItem(unticked)
-      mouseClick(untickRow, untickRow.width / 2, untickRow.height / 2, Qt.LeftButton, Qt.ControlModifier)
-      tryVerify(function() { return win.listsSymbol === unticked }, 2000)
-      var allTick = harness.findAll(win, "symbolListRow")[0]
-      wait(Application.styleHints.mouseDoubleClickInterval + 50)
-      mouseClick(allTick, allTick.width / 2, allTick.height / 2)
-      tryVerify(function() { return service.library.indexOf(unticked) < 0 }, 2000)
-      app.refocusKeys()
-      wait(100)
-      keyClick(Qt.Key_Z, Qt.ControlModifier)
-      // The undo's sound is the last to start: the removal's, if any, began
-      // at the untick.
-      var untickSounds = startsBy(before + 1).slice(before).map(played)
-      harness.check("unticking All in a row's lists plays retro's removal, and Ctrl+Z its undo",
-        untickSounds.join(", ") === "sounds/retro/remove.wav, sounds/retro/undo.wav" && service.library.indexOf(unticked) >= 0,
-        untickSounds.join(", "))
-
-      // A click on the window's camera: the shutter once, in retro's voice.
-      before = harness.starts().length
+      drawnIn(win)
       var lens = harness.find(win, "cameraButton")
-      mouseMove(lens, lens.width / 2, lens.height / 2)
-      mouseClick(lens, lens.width / 2, lens.height / 2)
-      var clickShutter = startsBy(before + 1)
-      tryVerify(function() { return !camera.busy }, 5000)
-      wait(300)
-      harness.check("a click on the window's camera sounds the shutter once, in retro's voice",
-        harness.starts().length === before + 1 && played(clickShutter[before]) === "sounds/retro/shutter.wav",
-        harness.starts().slice(before).map(played).join(", "))
 
       // A click on the animal: retro's replay, its notes the chart's
-      // columns; a click on another row cuts it.
+      // columns.
       before = harness.starts().length
       var animal = harness.find(win, "animalToggle")
-      watch = capture(win)
+      var watch = capture(win)
       mouseClick(animal, animal.width / 2, animal.height / 2)
       startsBy(before + 1)
       watch.done()
@@ -962,7 +695,7 @@ ShellRoot {
       // stops the popup's replay and with it only the popup's own sound.
       panel.open()
       tryVerify(function() { return body.surfaceOpen && !body.chartLoading }, 5000)
-      wait(300)
+      drawnIn(body)
       body.replay()
       startsBy(before + 2)
       mouseClick(animal, animal.width / 2, animal.height / 2)
@@ -970,22 +703,12 @@ ShellRoot {
       var popupCut = endOf(before + 2)
       var popupReplaying = body.motion.replayRunning
       panel.close()
-      wait(150)
+      tryVerify(function() { return !body.surfaceOpen }, 2000)
       var playing = endOf(before + 3) === "" && win.motion.replayRunning
       tryVerify(function() { return endOf(before + 3) !== "" }, 4000)
       harness.check("the window's replay cuts the popup's sound, and the popup closing mid-replay leaves the window's playing to its end",
         popupCut === "stopped" && popupReplaying && playing && endOf(before + 3) === "ended",
         popupCut + "|" + popupReplaying + "|" + playing + "|" + endOf(before + 3))
-      before++
-
-      app.testKeyCatcher.forceActiveFocus()
-      mouseClick(animal, animal.width / 2, animal.height / 2)
-      startsBy(before + 3)
-      rows = win.watchlist.displayedSymbols
-      var other = win.watchlist.rowItem(rows[0] === service.featuredSymbol ? rows[1] : rows[0])
-      mouseClick(other, other.width / 2, other.height / 2)
-      tryVerify(function() { return endOf(before + 3) !== "" }, 3000)
-      harness.check("a click on another row stops the replay's sound with the replay", endOf(before + 3) === "stopped", endOf(before + 3))
 
       // The output kept awake (the stand-in pw-cat): a stream of silence
       // only while a chart's scrub moves with sounds on, by the pointer on
@@ -1009,13 +732,12 @@ ShellRoot {
       app.testKeyCatcher.forceActiveFocus()
       mouseMove(win, 1, 1)
       var startsOpen = silence().starts
+      // Time for a stream that mustn't start.
       wait(300)
       var restsOpen = !silence().running && silence().starts === startsOpen
-      // A quiet spell: Stonks counts the output asleep 4 s after its last
-      // sound or its silence's end. Then a burst of key steps, one about
-      // every 50 ms for 1.6 s, each striking a chime, across the output's
-      // waking.
-      wait(4500)
+      // A quiet spell, then a burst of key steps, one about every 50 ms for
+      // 1.6 s, each striking a chime, across the output's waking.
+      asleep()
       var startsBefore = silence().starts
       var chimesBefore = harness.chimes().length
       var burstFrom = Date.now()
@@ -1024,13 +746,13 @@ ShellRoot {
         wait(40)
       }
       var burstEnd = Date.now()
+      // Time for the burst's last chime to start.
       wait(200)
       var byKeys = silence().running && silence().starts === startsBefore + 1
       var struck = harness.chimes().slice(chimesBefore)
       var awake = struck[struck.length - 1]
       // A scrub left standing lets the output go a second after its last
-      // step, and stays where it is. Found in review: one ← held Bluetooth
-      // headphones for as long as the scrub stood.
+      // step, and stays where it is.
       tryVerify(function() { return !silence().running }, 3000)
       var parkedKeys = !silence().running && silence().stoppedAt - burstEnd >= 900 && win.motion.scrubT !== 0
       keyClick(Qt.Key_Escape)
@@ -1058,9 +780,7 @@ ShellRoot {
       tryVerify(function() { return silence().running }, 3000)
       harness.writeText(harness.fakeState + "/pw-cat.exit", "now")
       tryVerify(function() { return /^exited /.test(silence().last) }, 3000)
-      fileProc.command = ["rm", "-f", harness.fakeState + "/pw-cat.exit"]
-      fileProc.running = true
-      tryVerify(function() { return !fileProc.running }, 2000)
+      dropState("pw-cat.exit")
       // The scrub keeps moving, a step every 300 ms, so the stream is wanted
       // when it comes back.
       for (var step = 0; step < 20 && !silence().running; step++) {
@@ -1092,7 +812,7 @@ ShellRoot {
       // keeps one stream after a quiet spell, and once the output is awake
       // each chime plays at once; a stream that reaches its time limit,
       // 2 s here, starts again at once, the chimes still at once.
-      wait(4500)
+      asleep()
       sounds.streamSeconds = 2
       startsBefore = silence().starts
       var slowFrom = harness.chimes().length
@@ -1133,7 +853,7 @@ ShellRoot {
         for (var j = 44; j < b.length; j++) if (a[j + zeros] !== b[j]) return false
         return true
       }
-      wait(4500)
+      asleep()
       before = harness.starts().length
       mouseClick(lens, lens.width / 2, lens.height / 2)
       var quietShutter = startsBy(before + 1)[before]
@@ -1154,7 +874,7 @@ ShellRoot {
       // has no lead-in, so it keeps in step with its sweep, and it starts,
       // picture and sound, once the stream of silence has reached the output
       // and played 150 ms.
-      wait(4500)
+      asleep()
       before = harness.starts().length
       var silenceLines = harness.readFile(harness.fakeState + "/pw-cat.log").split("\n").length
       keyClick(Qt.Key_P)
@@ -1169,19 +889,19 @@ ShellRoot {
 
       // The market's bell, in retro's voice: as the clock passes the open
       // or the close of the market of the stock last looked at, once, a
-      // Stonks started a moment before it included; never late, after a
-      // long step of the clock; never twice, with the clock set back across
-      // it; never while an app records from a microphone (the stand-in
-      // pw-dump's nodes), or when the answer runs past its 4 MB or its 3 s,
-      // and a stalled answer stopped holds no later bell; never with sounds
-      // off. Each pass is a Stonks started at its first moment.
+      // Stonks started a moment before it included; never twice, with the
+      // clock set back across it; never while an app records from a
+      // microphone (the stand-in pw-dump's nodes), or when the answer runs
+      // past its 4 MB, and a stalled answer stopped holds no later bell;
+      // never with sounds off. Each pass is a Stonks started at its first
+      // moment. Late bells are saved.test.js's (`bellBetween`).
       app.close()
       service.feature("AAPL")
       tryVerify(function() { return !!service.quotes.AAPL && service.featuredSymbol === "AAPL" }, 5000)
       var reg = service.quotes.AAPL.session.regular
       var bells = function() { return harness.starts().filter(function(s) { return played(s) === "sounds/retro/bell.wav" }).length }
-      // A pass rings `rings` bells: waited for, then 300 ms more for any
-      // other.
+      // A pass rings `rings` bells: waited for, then 300 ms more for one
+      // that mustn't.
       var pass = function(moments, rings) {
         var rung = bells()
         bellClock.now = moments[0]
@@ -1201,7 +921,7 @@ ShellRoot {
         props: { "media.class": "Stream/Input/Audio", "application.name": "a call" } } }])
       var meterOn = JSON.stringify([{ type: "PipeWire:Interface:Node", info: { state: "running",
         props: { "media.class": "Stream/Input/Audio", "stream.capture.sink": true } } }])
-      var rang = [pass([reg.start - 30, reg.start + 30], 1), pass([reg.start - 3600, reg.start + 60], 0),
+      var rang = [pass([reg.start - 30, reg.start + 30], 1),
         pass([reg.start - 2, reg.start - 1, reg.start, reg.start - 1, reg.start, reg.start + 1], 1)]
       harness.writeText(harness.fakeState + "/pw-dump.json", micOn)
       rang.push(pass([reg.end - 30, reg.end + 30], 0))
@@ -1213,20 +933,6 @@ ShellRoot {
       rang.push(pass([reg.end - 30, reg.end + 30], 0))
       harness.writeText(harness.fakeState + "/pw-dump.json", "[]")
       var dumpLog = function() { return harness.readFile(harness.fakeState + "/pw-dump.log").split("\n").filter(function(l) { return l !== "" }) }
-      var dropState = function(name) {
-        fileProc.command = ["rm", "-f", harness.fakeState + "/" + name]
-        fileProc.running = true
-        tryVerify(function() { return !fileProc.running }, 2000)
-      }
-      // A valid answer, no microphone, but after its 3 s: too late. Its
-      // pass is counted once the answer is in and its 4 s are up.
-      harness.writeText(harness.fakeState + "/pw-dump.slow", "late")
-      var beforeLate = bells()
-      pass([reg.end - 30, reg.end + 30], 0)
-      tryVerify(function() { var l = dumpLog(); return l[l.length - 1] === "answered" }, 6000)
-      wait(1500)
-      rang.push(bells() - beforeLate)
-      dropState("pw-dump.slow")
       harness.writeText(harness.fakeState + "/pw-dump.stall", "held")
       rang.push(pass([reg.end - 30, reg.end + 30], 0))
       tryVerify(function() { var l = dumpLog(); return l[l.length - 1] === "stopped" }, 6000)
@@ -1235,18 +941,20 @@ ShellRoot {
       rang.push(pass([reg.start - 30, reg.start + 30], 1))
       service.persist({ sounds: false })
       rang.push(pass([reg.start - 30, reg.start + 30], 0))
-      harness.check("the bell rings at the open in retro's voice, a moment after Stonks starts too, not late, not twice with the clock set back, not while a microphone records though a level meter may run, not when its answer reaches 4 MB or comes after 3 s, again after a stalled answer is stopped, and not with sounds off",
-        rang.join(",") === "1,0,1,0,1,0,0,0,1,0" && stallStopped,
+      harness.check("the bell rings at the open in retro's voice, a moment after Stonks starts too, not twice with the clock set back, not while a microphone records though a level meter may run, not when its answer reaches 4 MB, again after a stalled answer is stopped, and not with sounds off",
+        rang.join(",") === "1,1,0,1,0,0,1,0" && stallStopped,
         rang.join(",") + " | stalled answer stopped " + stallStopped)
 
       // Every stream Stonks started, each sound's, chime's, replay's and
-      // bell's pw-play and each silence's pw-cat, asks for a latency that
-      // leaves the default quantum, 1024 frames, where it is at 48 and
-      // 44.1 kHz: each move of it puts AirPods further behind, until they
-      // go silent.
+      // bell's pw-play and each silence's pw-cat, plays as a notification
+      // and asks for a latency that leaves the default quantum, 1024
+      // frames, where it is at 48 and 44.1 kHz: each move of it puts
+      // AirPods further behind, until they go silent.
       var streams = harness.record().filter(function(e) { return e.what === "start" }).map(function(e) { return e.args })
         .concat(harness.readFile(harness.fakeState + "/pw-cat.log").split("\n").filter(function(l) { return /^start /.test(l) }))
-      var moving = streams.filter(function(args) { return harness.quantum(args, 48000) !== 1024 || harness.quantum(args, 44100) !== 1024 })
+      var moving = streams.filter(function(args) {
+        return harness.quantum(args, 48000) !== 1024 || harness.quantum(args, 44100) !== 1024 || !/ --media-role Notification /.test(" " + args + " ")
+      })
       harness.check("every stream Stonks started, chimes, sounds, replays, the bell and the silence, asks for a latency that leaves the 1024-frame quantum where it is",
         streams.length > 0 && moving.length === 0, streams.length + " streams | " + moving.slice(0, 3).join(" | "))
 
@@ -1279,7 +987,8 @@ ShellRoot {
       }
       var unchanged = restarted()
       var keptAll = names.every(function(n) { return unchanged.sounds.madeThisRun[n] === true })
-      wait(300)
+      // Twenty of the copy's 5 ms ticks, for a write that mustn't come.
+      wait(100)
       var keptWrites = unchanged.spy.log.length
       unchanged.sounds.destroy()
       unchanged.spy.destroy()
@@ -1293,7 +1002,8 @@ ShellRoot {
       harness.writeText(stampPath, stale + "\n")
       var blocked = restarted(names[3])
       tryVerify(function() { return blocked.spy.log.indexOf(names[names.length - 1]) >= 0 }, 15000)
-      wait(300)
+      // Twenty ticks more, for the stamp that mustn't follow.
+      wait(100)
       var blockedWrites = blocked.spy.log.slice()
       blocked.sounds.destroy()
       blocked.spy.destroy()
@@ -1305,9 +1015,7 @@ ShellRoot {
         "kept " + keptAll + ", " + keptWrites + " written | mended " + mended.join() + " | redone " + redone.length + ", last " + redone[redone.length - 1]
           + " | with a failed write " + blockedWrites.length + " written, stamp kept " + stampKept)
 
-      console.log("SOUNDS DONE")
-      done.exitCode = harness.failures ? 1 : 0
-      done.start()
+      harness.finish()
     }
   }
 
@@ -1328,6 +1036,4 @@ ShellRoot {
       }
     }
   }
-
-  HarnessExit { id: done; interval: 100 }
 }

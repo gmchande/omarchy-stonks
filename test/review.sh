@@ -6,18 +6,16 @@
 # (test/fixtures-dir.sh) almost all of it skips.
 #
 # - The offscreen renders (out/render/): every state on every kind of
-#   listing in both looks, for your eyes. The base's too, from its own
-#   files and renderer, so the render diff (test/render-diff.sh) lists every
-#   picture the change moved, side by side in out/render-diff/. The base is
-#   the merge-base with origin/dev, or with STONKS_RENDER_BASE (a release's
-#   tag, before the next release).
-# - The README's pictures, into a scratch folder, so test/qml/readme.sh
-#   still works when a release renders them for real.
+#   listing, in each look where the look draws it differently, for your
+#   eyes, and the popup's place under its pill (popup-anchor.qml). The
+#   base's too, from its own files and renderer, so the render diff
+#   (test/render-diff.sh) lists every picture the change moved, side by
+#   side in out/render-diff/. The base is the merge-base with origin/dev,
+#   or with STONKS_RENDER_BASE (a release's tag, before the next release).
 # - Nothing jumps: positions across looks, symbols, and ranges.
 # - Window and popup motion, judged on rendered frames (test/qml/frames.js),
 #   never on the property behind it.
-# - The long list: a power user's day on a slow network, on wall-clock
-#   budgets.
+# - The long list: a power user's 154 symbols, on wall-clock budgets.
 #
 # Each set of renders, the head's and the base's, is drawn once: a run keeps
 # each set it draws whole under the name test/render-key.sh makes from
@@ -132,7 +130,6 @@ fi
 # part passed.
 head_parts=()
 base_parts=()
-start "nothing-jumps layout harness" bash test/qml/layout.sh
 if [ -z "$head_set" ]; then
   parts=4
   [ -z "$draw_base" ] || parts=2
@@ -142,20 +139,16 @@ if [ -z "$head_set" ]; then
   done
 fi
 if [ -n "$draw_base" ]; then
-  # A base from before the parts renders whole.
-  if grep -q -- '--part I/N' "$logs/base/test/qml/render.sh"; then
-    for part in 1 2; do
-      base_parts+=("${#labels[@]}")
-      start "base renders, $part of 2" env STONKS_VISUAL_DIR="$base_render" bash "$logs/base/test/qml/render.sh" --part "$part/2"
-    done
-  else
+  for part in 1 2; do
     base_parts+=("${#labels[@]}")
-    start "base renders" env STONKS_VISUAL_DIR="$base_render" bash "$logs/base/test/qml/render.sh"
-  fi
+    start "base renders, $part of 2" env STONKS_VISUAL_DIR="$base_render" bash "$logs/base/test/qml/render.sh" --part "$part/2"
+  done
 fi
-start "long list harness" bash test/qml/long-list.sh
+start "nothing-jumps layout harness, surfaces" bash test/qml/layout.sh surfaces
 start "window motion harness" bash test/qml/window-motion.sh
-start "README pictures, into a scratch folder" env STONKS_README_OUT="$logs/readme" bash test/qml/readme.sh
+start "nothing-jumps layout harness, live" bash test/qml/layout.sh live
+start "long list harness" bash test/qml/long-list.sh
+start "nothing-jumps layout harness, sizes" bash test/qml/layout.sh sizes
 start "popup motion harness" bash test/qml/popup-motion.sh
 fill
 

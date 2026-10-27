@@ -8,13 +8,12 @@
 # list still in one run a minute; r twice; r's "Refreshing" while its quotes
 # are out, and none from the schedule, Yahoo's pause, or every screen off;
 # Yahoo refusing and recovering; a network back within seconds; a list of
-# 50 every minute; a range left open asked again; the pill's wheel; an add,
-# a removal and its undo; a search's preview; the window left on a
-# workspace no screen shows; in a second run, a US holiday while London and
-# Toronto trade; and in a third, the US open on Friday 23 October. HOME and
-# curl are scratch; the fake curl answers from test/fixtures/moments/
-# fetch-2026-10-07 and listings-2026-10-07-1455, and at the open from
-# bell-2026-10-23-0929 and bell-2026-10-23-0930.
+# 50 every minute; the pill's wheel; a removal and its undo; a search's
+# preview; the window left on a workspace no screen shows; in a second run,
+# a US holiday while London and Toronto trade; and in a third, the US open
+# on Friday 23 October. HOME and curl are scratch; the fake curl answers
+# from test/fixtures/moments/fetch-2026-10-07 and listings-2026-10-07-1455,
+# and at the open from bell-2026-10-23-0929 and bell-2026-10-23-0930.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree fetch.qml
 patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property var testBody: root.body\n  readonly property alias testWindow: window'

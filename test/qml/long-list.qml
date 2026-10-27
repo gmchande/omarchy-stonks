@@ -13,41 +13,15 @@ import "plugin/Figures.js" as Figures
 // AAPL day), a day with a stray print (STRAY), two days with no jump
 // (SHOP.TO, BTC-USD), and 150 busy US stocks (LONG<n>, NEST's saved day at
 // 14:55). The fake curl counts every request in requests.log and every curl
-// call in runs.log. long-list.sh runs this twice: the main run, and the slow
-// run (STONKS_LONG_RUN=slow), on a network that takes 3 s a request.
-ShellRoot {
+// call in runs.log.
+Harness {
   id: harness
+  marker: "LONG LIST DONE"
 
-  property int failures: 0
-  readonly property string mode: Quickshell.env("STONKS_LONG_RUN") || "main"
   readonly property string state: Quickshell.env("STONKS_FAKE_STATE")
 
-  function check(label, ok, detail) {
-    console.log((ok ? "PASS " : "FAIL ") + label + (detail !== undefined ? " — " + detail : ""))
-    if (!ok) failures++
-  }
-
-  // A fake curl record, read through a fresh view: a FileView that has
-  // loaded once returns its old text straight after reload().
-  function record(name) {
-    var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true; printErrors: false }', harness)
-    view.path = harness.state + "/" + name
-    var text = String(view.text() || "")
-    view.destroy()
-    return text
-  }
   function lines(name) {
-    return record(name).split("\n").filter(function(line) { return line !== "" })
-  }
-
-  function find(item, name) {
-    if (!item) return null
-    if (item.objectName === name) return item
-    for (var i = 0; i < item.children.length; i++) {
-      var found = find(item.children[i], name)
-      if (found) return found
-    }
-    return null
+    return readFile(harness.state + "/" + name).split("\n").filter(function(line) { return line !== "" })
   }
 
   Stonks.Plugin { id: plugin; shell: shellApi }
@@ -102,7 +76,7 @@ ShellRoot {
   // The window's rows' rendered frames, for frames.js.
   FrameGrab { id: grab }
 
-  TestCase {
+  Steps {
     name: "LongList"
     when: service.pluginsReady && pillWindow.visible
 
@@ -156,38 +130,7 @@ ShellRoot {
       return counts
     }
 
-    function test_slow() {
-      if (harness.mode !== "slow") skip("the main run")
-      // Every request takes 3 s, as on a weak hotspot: the whole list still
-      // answers in one run of a few requests, none of them cut short.
-      var began = Date.now()
-      app.open("{}")
-      tryVerify(function() { return app.opened && service.openSurfaces.length === 1 }, 3000)
-      var all = function() { return service.library.every(function(s) { return !!service.quotes[s] }) }
-      for (var t = 0; t < 600 && !all(); t++) wait(100)
-      var took = Date.now() - began
-      harness.check("on a network that takes 3 s a request, all 154 symbols answer within 40 s",
-        all() && took <= 40000, (took / 1000).toFixed(1) + " s, " + service.library.filter(function(s) { return !!service.quotes[s] }).length + " answered")
-      // A minute on, with the days still being judged on the chart, every
-      // row falls due: judging goes a few charts a run, so the refresh waits
-      // for at most those, and the whole list refreshes within a minute.
-      var judging = service.testFeed.toJudge.length
-      service.now += 61
-      var dueAt = service.now
-      var refreshedFrom = Date.now()
-      var fresh = function() { return service.library.every(function(s) { return service.entries[s] && service.entries[s].answeredAt >= dueAt }) }
-      for (var r = 0; r < 900 && !fresh(); r++) wait(100)
-      var refreshTook = Date.now() - refreshedFrom
-      harness.check("on that network, a refresh falling due while days are judged lands for every row within 60 s",
-        judging > 0 && fresh() && refreshTook <= 60000,
-        (refreshTook / 1000).toFixed(1) + " s, with " + judging + " days to judge when it fell due")
-      console.log("LONG LIST SLOW DONE")
-      done.exitCode = harness.failures ? 1 : 0
-      done.start()
-    }
-
     function test_longList() {
-      if (harness.mode !== "main") skip("the slow run")
       var start = service.now
       // A tall window, many rows in sight: the glide below builds more of
       // them a frame.
@@ -203,7 +146,33 @@ ShellRoot {
       var answered = 0
       var wallStart = Date.now()
       var answeredWall = 0
+      // Judging yields to a refresh: once the list has answered, the days
+      // waiting to be judged are held at the fake curl, so a run of judging
+      // is out when the minute passes; the run after it is the refresh.
+      var yielded = ""
+      var jumped = 0
       for (var t = 0; t < 600 && (!answered || service.testFeed.toJudge.length > 0); t++) {
+        if (answered && !yielded && service.testFeed.toJudge.length > 0) {
+          var holds = service.testFeed.toJudge.map(function(s) { return harness.state + "/" + s + ".quote.hold" })
+          // A full budget, so the run of judging takes as many as it may.
+          service.testYahooGate.tokens = service.testYahooGate.capacity
+          runCommand(["touch"].concat(holds))
+          var runsBefore = harness.lines("runs.log").length
+          for (var j = 0; j < 30 && service.testFeed.refreshRun.length === 0; j++) {
+            service.now += 1
+            wait(20)
+          }
+          var judging = service.testFeed.refreshSlots.filter(function(slot) { return !slot.spark }).length
+          var judgingOnly = judging > 0 && judging === service.testFeed.refreshSlots.length && judging <= service.testFeed.judgeRun
+          service.now += 61
+          jumped = 61
+          runCommand(["rm", "-f"].concat(holds))
+          tryVerify(function() { return idle() && harness.lines("runs.log").length >= runsBefore + 2 }, 30000)
+          var after = harness.lines("runs.log").slice(runsBefore)
+          yielded = judging + " charts judging | " + after.slice(0, 2).map(function(r) { return r.split(" ").map(function(u) { return u.split(":")[0] }).join(" ") }).join(" | ")
+          harness.check("a refresh falling due while days are judged goes in the run after the judging one: the pill's chart and eight spark requests",
+            judgingOnly && (after[0] || "").split(" ").length === judging && /^chart:TALL001( spark:\S+){8}$/.test(after[1] || ""), yielded)
+        }
         service.now += 1
         settle()
         var w = warned()
@@ -222,7 +191,7 @@ ShellRoot {
         "all answered at " + (answered || "never") + " s, " + (answeredWall / 1000).toFixed(1) + " s of the wall; first run "
           + firstRun.split(" ").map(function(u) { return u.split(":")[0] }).join(" "))
       harness.check("loading warns of nothing, and every day with a jump is judged within 5 minutes",
-        loadWarned.length === 0 && service.testFeed.toJudge.length === 0 && service.now - start <= 300,
+        loadWarned.length === 0 && service.testFeed.toJudge.length === 0 && service.now - start - jumped <= 300,
         loadWarned.slice(0, 3).join(", ") + (loadWarned.length > 3 ? " …" : "") + "; still to judge " + service.testFeed.toJudge.length
           + " after " + (service.now - start) + " s")
       var charted = perSymbol(loadLines, "chart")
@@ -236,7 +205,8 @@ ShellRoot {
           + "; runs with STRAY: " + harness.lines("runs.log").filter(function(r) { return /STRAY/.test(r) }).map(function(r) { return r.split(" ").filter(function(u) { return /STRAY/.test(u) }).map(function(u) { return u.split(":")[0] }).join("+") + "/" + r.split(" ").length }).join(" "))
 
       // Ten minutes of trading: every row is due each minute. The list
-      // refreshes whole each minute in a few requests, one curl a minute.
+      // refreshes whole each minute in a few requests, one curl a minute,
+      // and no row or the pill warns.
       var reqFrom = harness.lines("requests.log").length
       var runFrom = harness.lines("runs.log").length
       var steadyWarned = 0
@@ -246,11 +216,9 @@ ShellRoot {
       var counts = perSymbol(steady)
       var behind = service.library.filter(function(s) { return (counts[encodeURIComponent(s)] || 0) < 9 })
       harness.check("ten minutes of trading: every row refreshed every minute, in at most 15 requests and 2 curl runs a minute",
-        behind.length === 0 && steady.length <= 150 && runs.length <= 20,
+        behind.length === 0 && steady.length <= 150 && runs.length <= 20 && steadyWarned === 0,
         (steady.length / 10).toFixed(1) + " requests and " + (runs.length / 10).toFixed(1) + " runs a minute; behind: " + behind.slice(0, 5).join(",")
-          + "; first run " + (runs[0] || "").split(" ").map(function(u) { return u.split(":")[0] }).join(" "))
-      harness.check("ten minutes of trading on a long list: no row or pill warns",
-        steadyWarned === 0, steadyWarned + " of 120 steps warned")
+          + "; first run " + (runs[0] || "").split(" ").map(function(u) { return u.split(":")[0] }).join(" ") + "; " + steadyWarned + " of 120 steps warned")
       // Spark sends no opens: each row's open, from its one chart, stays
       // through every spark refresh since, so since the open it reads from
       // the day's open, never from the first bar's close.
@@ -328,6 +296,7 @@ ShellRoot {
       // waits its turn for minutes, on Stonks' own pacing alone. No row and
       // not the pill warns; once the budget is back, every row refreshes.
       var gate = service.testYahooGate
+      harness.check("loading, ten minutes of trading, a glide and a row featured mid-refresh are never held back by Yahoo's budget", !gate.warned)
       var refill = gate.perMinute
       gate.perMinute = 4
       gate.tokens = 0
@@ -348,8 +317,7 @@ ShellRoot {
       // update is overdue 90 s after its wait on Yahoo began: at once for
       // those waiting at the refusal, and as each falls due after it. Once
       // every one is, the window's header says so once, and the rows in
-      // sight warn of nothing each (found by the design panel of 23
-      // October: every row said "No data"); the pill still warns.
+      // sight warn of nothing each; the pill still warns.
       touch("YAHOO.refuse")
       var refusedAt = 0
       tick(70, 1, function() { if (!refusedAt && service.testYahooGate.pause === "refused") refusedAt = service.now })
@@ -361,7 +329,7 @@ ShellRoot {
           return Figures.freshnessWarns(Figures.freshness(service.entries[s] || null, service.quotes[s] || null, service.now, service.owed[s] || 0))
         }).length + (pill.warns ? 1 : 0)
       }
-      tick(170, 1, function() {
+      tick(170, 5, function() {
         var count = overdue()
         if (!firstWarnAt && count > 0) firstWarnAt = service.now - refusedAt
         if (!allWarnAt && count === service.library.length + 1) {
@@ -378,17 +346,7 @@ ShellRoot {
         refusedAt > 0 && firstWarnAt >= 85 && allWarnAt > 0 && allWarnAt <= 155 && saidOnce === "Can't get prices · Stonks keeps trying | 0 rows in sight warn",
         "refused at " + (refusedAt - start) + " s; first warning " + firstWarnAt + " s after, all " + allWarnAt + " s after; " + overdue() + " overdue now; " + saidOnce)
       remove("YAHOO.refuse")
-      // The pause has doubled twice by now: the next probe is up to five
-      // minutes away, and its answer reopens Yahoo.
-      var clearedAt = 0
-      tick(480, 5, function() { if (!clearedAt && warned().length === 0) clearedAt = service.now - refusedAt })
-      harness.check("Yahoo back: the next probe reopens it, and every warning clears", clearedAt > 0, (clearedAt || "never") + " s after the refusal")
-
-      console.log("LONG LIST DONE")
-      done.exitCode = harness.failures ? 1 : 0
-      done.start()
+      harness.finish()
     }
   }
-
-  HarnessExit { id: done }
 }

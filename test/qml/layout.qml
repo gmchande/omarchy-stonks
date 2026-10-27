@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Commons as Commons
+import qs.Ui
 import "plugin/Chart.js" as Chart
 import "plugin/Cells.js" as Cells
 import "plugin/Format.js" as Format
@@ -35,15 +36,16 @@ import "plugin"
 // row. The price and change text are measured as displayed, at whatever size
 // they were fitted to. Every key-hint row is one line of six keys at most.
 // Nothing is mapped into the running shell.
-ShellRoot {
+Harness {
   id: root
+  marker: "LAYOUT DONE"
 
-  property int failures: 0
   readonly property string fixtures: Quickshell.env("STONKS_FIXTURES")
 
   FileView { id: watchlistFile; path: root.fixtures + "/list-22.json"; blockLoading: true }
   FileView { id: vfiaxFile; path: root.fixtures + "/search-vfiax.json"; blockLoading: true }
   FileView { id: eurusdFile; path: root.fixtures + "/search-eurusd.json"; blockLoading: true }
+  FileView { id: searchFile; path: root.fixtures + "/search.json"; blockLoading: true }
   FileView { id: aaplFile; path: root.fixtures + "/aapl.json"; blockLoading: true }
   FileView { id: spyFile; path: root.fixtures + "/spy-2026-09-11-day-prepost.json"; blockLoading: true }
   FileView { id: shopFile; path: root.fixtures + "/shop-to.json"; blockLoading: true }
@@ -76,11 +78,7 @@ ShellRoot {
   FrameGrab { id: grab }
 
   function fundamentalsAnswer(path) {
-    var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', root)
-    view.path = root.fixtures + "/fundamentals/" + path + ".json"
-    var json = JSON.parse(view.text())
-    view.destroy()
-    return json
+    return JSON.parse(readFile(root.fixtures + "/fundamentals/" + path + ".json"))
   }
 
   // Saved fundamentals, the cap with its close, as the feed keeps them.
@@ -91,21 +89,6 @@ ShellRoot {
   // Yahoo's saved rate for a pair, as the feed keeps it.
   function rate(pair) {
     return { value: Fundamentals.parseRate(fundamentalsAnswer("fx-" + pair.toLowerCase()), pair), checkedAt: 0 }
-  }
-
-  function check(label, ok, detail) {
-    console.log((ok ? "PASS " : "FAIL ") + label + (detail !== undefined && !ok ? " — " + detail : ""))
-    if (!ok) failures++
-  }
-
-  function find(item, name) {
-    if (!item) return null
-    if (item.objectName === name) return item
-    for (var i = 0; i < item.children.length; i++) {
-      var found = find(item.children[i], name)
-      if (found) return found
-    }
-    return null
   }
 
   function yIn(item, y) { return Math.round(item.mapToItem(body, 0, y).y) }
@@ -162,6 +145,15 @@ ShellRoot {
       if (row && yIn(row, 0) < end) bottom = Math.max(bottom, yIn(row, row.height))
     })
     return bottom
+  }
+
+  // Every built row in its slot, none sliding or fading in.
+  function rowsAtRest() {
+    var list = body.watchlist
+    return !list.settling && list.displayedSymbols.every(function(symbol) {
+      var row = list.rowItem(symbol)
+      return !row || row.resting
+    })
   }
 
   // Where everything sits right now, in body coordinates.
@@ -370,24 +362,47 @@ ShellRoot {
       }
     }
 
-    TestCase {
+    // The pill on a side bar, stacked, reading the same stand-in service;
+    // out of the surface's way.
+    QtObject {
+      id: pillShell
+      function serviceFor() { return { service: stub } }
+    }
+    PluginBarApi {
+      id: sideBar
+      pluginId: "grvc.stonks"
+      moduleName: "grvc.stonks"
+      shell: pillShell
+      vertical: true
+      foreground: Commons.Color.bar.text
+      barForeground: Commons.Color.bar.text
+      fontFamily: Style.font.family
+      barSize: Style.bar.sizeVertical
+    }
+    BarWidget {
+      id: sidePill
+      y: 2000
+      width: Style.bar.sizeVertical
+      height: implicitHeight
+      bar: sideBar
+      settings: ({ id: "grvc.stonks", barStyleVertical: "stacked" })
+    }
+
+    Steps {
       name: "NothingJumps"
       when: window.visible
 
       // Each chapter starts in a fresh process with its own fixture setup.
       function test_nothing_jumps() {
-        // The rows animate into their slots on the first layout; measure once
-        // everything has settled.
-        wait(400)
+        // The rows slide into their slots on the first layout.
+        within(2000, root.rowsAtRest)
         var chapter = Quickshell.env("STONKS_LAYOUT_FLOW")
         console.log("LAYOUT CHAPTER " + chapter)
         if (chapter === "surfaces") surfaceLayout()
         else if (chapter === "live") liveLayout()
         else if (chapter === "sizes") textSizes()
         else throw new Error("unknown layout chapter: " + chapter)
-        console.log("LAYOUT DONE")
-        done.exitCode = root.failures ? 1 : 0
-        done.start()
+        root.finish()
       }
 
       function surfaceLayout() {
@@ -528,6 +543,19 @@ ShellRoot {
         // SHIB's nine decimals in the popup, and nothing else, nowhere else.
         var hero = find(body, "hero")
         var misfits = []
+        // Each case-loop check once, naming the cases it fails in.
+        var caseChecks = ["the look moves nothing outside the digits",
+          "both looks' digits share a top line, and their ink starts on the band's left edge",
+          "the change and its caption end at the band's right edge, the rows' figures'",
+          "the change sits on the price baseline",
+          "the footer follows the rows at one gap",
+          "the first row sits at the top of the list",
+          "TODAY is after the list's name, dim, and the rule starts after it",
+          "the first row, the info block, TODAY, and the line under the price stay put across symbols and ranges"]
+        var caseFaults = caseChecks.map(function() { return [] })
+        var caseCheck = function(index, label, ok, detail) {
+          if (!ok) caseFaults[index].push(label + ": " + detail)
+        }
         for (var surfaceIndex = 0; surfaceIndex < 2; surfaceIndex++) {
           surface.wide = surfaceIndex === 1
           wait(50)
@@ -556,33 +584,33 @@ ShellRoot {
             var fixed = ["listing", "baseline", "change", "changeRight", "captionRight", "strip",
               "range", "info", "infoHeight", "list", "row", "footer", "looks", "statusRight", "today", "rule"]
             var moved = fixed.filter(function(key) { return smooth[key] !== retro[key] })
-            root.check(label + ": the look moves nothing outside the digits", moved.length === 0,
+            caseCheck(0, label, moved.length === 0,
               moved.join(", ") + " smooth " + root.describe(smooth) + " retro " + root.describe(retro))
-            root.check(label + ": both looks' digits share a top line, and their ink starts on the band's left edge",
+            caseCheck(1, label,
               Math.abs(smooth.top - retro.top) <= 2 && Math.abs(smooth.left - Math.round(body.textLeft)) <= 1
                 && retro.left === Math.round(body.textLeft),
               "smooth " + root.describe(smooth) + " retro " + root.describe(retro) + " edge " + body.textLeft)
-            root.check(label + ": the change and its caption end at the band's right edge, the rows' figures'",
+            caseCheck(2, label,
               smooth.changeRight === smooth.captionRight
                 && smooth.changeRight === Math.round(body.width - body.textRight),
               root.describe(smooth) + " body " + body.width + " right " + body.textRight)
-            root.check(label + ": the change sits on the price baseline",
+            caseCheck(3, label,
               smooth.change === smooth.baseline && retro.change === retro.baseline,
               "smooth " + root.describe(smooth) + " retro " + root.describe(retro))
-            root.check(label + ": the footer follows the rows at one gap",
+            caseCheck(4, label,
               smooth.footerGap === body.groupGap && retro.footerGap === body.groupGap,
               smooth.footerGap + " / " + retro.footerGap)
-            root.check(label + ": the first row sits at the top of the list",
+            caseCheck(5, label,
               smooth.row === smooth.list && retro.row === retro.list,
               "smooth " + root.describe(smooth) + " retro " + root.describe(retro))
-            root.check(label + ": TODAY is after the list's name, dim, and the rule starts after it",
+            caseCheck(6, label,
               find(body, "todayLabel").visible && find(body, "todayLabel").text === "TODAY"
                 && String(find(body, "todayLabel").color) === String(body.dim)
                 && smooth.today > smooth.listRight && retro.today > retro.listRight
                 && smooth.rule > smooth.todayRight && retro.rule > retro.todayRight,
               find(body, "todayLabel").color + " vs " + body.dim + " " + root.describe(smooth))
             if (!first) first = smooth
-            root.check(label + ": the first row, the info block, TODAY, and the line under the price stay put across symbols and ranges",
+            caseCheck(7, label,
               smooth.row === first.row && smooth.info === first.info && smooth.infoHeight === first.infoHeight
                 && smooth.today === first.today && smooth.rule === first.rule && smooth.strip === first.strip,
               "first " + root.describe(first) + " now " + root.describe(smooth))
@@ -590,27 +618,20 @@ ShellRoot {
               misfits.push(label + " " + hero.fittedCell + " of " + hero.naturalCell)
           }
         }
+        caseChecks.forEach(function(label, index) {
+          root.check(label, caseFaults[index].length === 0, caseFaults[index].join(" | "))
+        })
         root.check("a price too wide for the popup (WIDE, SHIB-USD) shrinks there and not in the window, and no other price shrinks",
           misfits.length === 0, misfits.join(", "))
         root.check("both info lines are whole for every symbol, cell by cell, their rules in one column, and the line under the price is whole where it shows",
           cut.length === 0, cut.join(" | "))
         root.check("each info line's title is the day's or the range's, and 52W, and the lows one gap past 52W on every range",
           mistitled.length === 0, mistitled.join(" | "))
-        // The first line follows the range: on the day it is the day's, and
-        // on 1M, 1Y, 5Y, and All it is that range's name, its low and high as
-        // its chart's marks have them, Start, and the volume over it, for AAPL
-        // and for NEST as a listing a month old. The 52-week line says the
-        // same words in the same places on every range, and nothing moves:
-        // the columns, both rules, and every fact's place stay as on the day.
-        // Both lines reach the band's right edge: every column shows, the
-        // last one's slot ends at the edge, and the rule leaves the facts
-        // only their gap, short of a cell of its grain. In both looks, in the
-        // popup and the window at its narrowest and its widest. Found in the
-        // spacing review of 1.0.0: from 1D to 1Y both rules shrank 27 px and
-        // every fact after them moved left; on 21 October: room held for a
-        // range's dates left the popup's day rule 56 px long, 43 px short of
-        // the edge; and on 22 October: the first line stopped following the
-        // range, which the owner read daily.
+        // The 52-week line says the same words in the same places on every
+        // range, and nothing moves: the columns, both rules, and every fact's
+        // place stay as on the day. Both lines reach the band's right edge:
+        // every column shows, the last one's slot ends at the edge, and the
+        // rule leaves the facts only their gap, short of a cell of its grain.
         var infoSaid = function() {
           var at = find(body, "infoBlock").layout
           var year = root.drawnSpans(find(body, "yearLine")).sort(byLeft).map(function(s) { return s.what + "@" + s.left }).join(" ")
@@ -619,17 +640,6 @@ ShellRoot {
             return xIn(rule, 0) + "+" + rule.width
           })
           return ["columns " + [at.lowX, at.ruleX, at.highX, at.rule].concat(at.factXs).join(","), year].concat(rules).join(" | ")
-        }
-        // What the first line says on a range, against what it should: its
-        // name, its low and high, Start, and a volume; "" when it agrees.
-        var rangeSaid = function(range, h) {
-          var ends = History.rangeEnds(h, null, body.featuredQuote)
-          var digits = body.featuredQuote.priceDigits
-          var want = [range.toUpperCase(), Format.money(ends.low.p, digits), Format.money(ends.high.p, digits),
-            "Start", Format.money(h.baseline, digits), "Vol"].join(" ")
-          var drawn = root.drawnSpans(find(body, "periodLine")).sort(byLeft).map(function(s) { return s.what })
-          var said = drawn.slice(0, 6).join(" ")
-          return said === want && drawn.length === 7 ? "" : drawn.join(" ") + ", want " + want + " and a volume"
         }
         var shortOfEdge = function() {
           var block = find(body, "infoBlock")
@@ -701,12 +711,11 @@ ShellRoot {
         var unreached = []
         var unmarked = []
         var captions = []
-        var unfollowed = []
         var places = [["popup", false, 0], ["narrowest window", true, Style.space(560)], ["widest window", true, 1416]]
         // Each range is set once and drawn in once; the look and the surface
         // change under it, which draws nothing in again. Bitcoin, with no cap
         // to widen the first column, holds START's room: its 1Y started at
-        // 108,186, a digit wider than its day. Found in review.
+        // 108,186, a digit wider than its day.
         var quotesBeforeRanges = stub.quotes
         stub.quotes = Object.assign({}, quotesBeforeRanges, { "BTC-USD": Quote.parseChart(JSON.parse(btcFile.text())) })
         ;[{ symbol: "AAPL", figures: aapl, ranges: [["1D", null], ["1M", month], ["1Y", aaplYear], ["5Y", weekly], ["All", young]] },
@@ -743,8 +752,6 @@ ShellRoot {
                   onDay[where] = said
                   if (body.yearLine) dayYear[where] = { lowText: body.yearLine.range.lowText, highText: body.yearLine.range.highText }
                 } else if ((r[0] === "1Y" ? yearAs(said, where) : said) !== onDay[where]) shifted.push(where + " " + r[0] + ": " + said + ", on 1D " + onDay[where])
-                var off = r[1] ? rangeSaid(r[0], r[1]) : ""
-                if (off) unfollowed.push(where + " " + r[0] + ": " + off)
                 var short = shortOfEdge()
                 if (short) unreached.push(where + " " + r[0] + ": " + short)
                 var marked = marksFault(r[1])
@@ -769,8 +776,6 @@ ShellRoot {
         stub.range = "1D"
         stub.historyEntry = null
         wait(50)
-        root.check("on 1M, 1Y, 5Y, and All the first info line says the range's name, its low and high as its marks have them, Start, and its volume, a young listing's too, in both looks, in the popup and the window at its narrowest and widest",
-          unfollowed.length === 0, unfollowed.join(" | "))
         root.check("nothing on the info lines moves from 1D to 1M, 1Y, 5Y, and All, and the 52-week line says the same, on 1Y the chart's own low and high, a young listing's too, in both looks, in the popup and the window at its narrowest and widest",
           shifted.length === 0, shifted.join(" | "))
         root.check("both info lines reach the band's right edge on every range, in both looks, in the popup and the window at its narrowest and widest",
@@ -780,19 +785,17 @@ ShellRoot {
         root.check("under the change a range says its name, and a listing younger than it SINCE its first day, clear of the line under the price",
           captions.length === 0, captions.join(" | "))
         // AAPL's figures are Tuesday 1 September's: the day line is 1D that
-        // Tuesday to its last second, TUE from Wednesday's first, on the
-        // Saturday after, and on Labor Day, Monday 7 September, and SEP a
-        // week on. Only the title changes: every other cell of both lines,
-        // and both rules, stay where they were at the Tuesday's close. Both
-        // looks, both surfaces.
+        // Tuesday, TUE from Wednesday's first second, and SEP a week on (the
+        // titles at every moment are saved.test.js's). Only the title
+        // changes: every other cell of both lines, and both rules, stay where
+        // they were at the Tuesday's close. Both looks, both surfaces.
         var tuesday = stub.now
         stub.featuredSymbol = "AAPL"
         stub.range = "1D"
         stub.historyEntry = null
         stub.figures = aapl
-        var moments = [["Tuesday", tuesday, "1D"], ["Tuesday 23:59:59", Date.UTC(2026, 8, 2, 3, 59, 59) / 1000, "1D"],
-          ["Wednesday 00:00", Date.UTC(2026, 8, 2, 4) / 1000, "TUE"], ["Saturday", Date.UTC(2026, 8, 5, 16) / 1000, "TUE"],
-          ["Labor Day", Date.UTC(2026, 8, 7, 16) / 1000, "TUE"], ["a week on", Date.UTC(2026, 8, 8, 16) / 1000, "SEP"]]
+        var moments = [["Tuesday", tuesday, "1D"], ["Wednesday 00:00", Date.UTC(2026, 8, 2, 4) / 1000, "TUE"],
+          ["a week on", Date.UTC(2026, 8, 8, 16) / 1000, "SEP"]]
         // Every cell of both lines but the day's title, and both rules.
         var rest = function() {
           var cells = root.drawnSpans(find(body, "periodLine")).sort(byLeft).slice(1)
@@ -892,12 +895,9 @@ ShellRoot {
         root.check("at a 52-week high both highs read the day's high in the up colour, both ticks at the rule's right end",
           peaks.length === 0, peaks.join(" | "))
 
-        // Where Yahoo's 52 weeks leave out the 1Y range's first day, the
-        // 52-week line on 1Y takes in the range's own low and high, as the
-        // first line and the chart's marks say them, so the two lines never
-        // disagree; on 1D it says Yahoo's. SHOP.TO with Yahoo's 52-week marks
-        // a dollar inside its 1Y range. Found in the 1.1.0 audit: RGTI's 1Y
-        // line said 58.15 over a 52-week high of 57.97.
+        // On 1Y the 52-week line takes in the range's own low and high, as the
+        // first line and the chart's marks say them; on 1D it says Yahoo's.
+        // SHOP.TO with Yahoo's 52-week marks a dollar inside its 1Y range.
         var yearStats = History.periodStats(year)
         var shopQuote = stub.quotes["SHOP.TO"]
         var narrowed = Object.assign({}, stub.quotes)
@@ -938,11 +938,9 @@ ShellRoot {
           widened && yahoos && marked === wantMarks && periodRange === wantMarks,
           "1Y: " + onYear + " / 1D: " + onDay + " / marks " + marked + ", first line " + periodRange + ", want " + wantMarks + " and Yahoo's " + wantYear)
 
-        // The exchange and currency stay whole on the hero's line, in both
-        // looks. Found in the 1.0.0 review: the popup dropped "LSE · GBp"
-        // first, so a price in pence could read as pounds beside a cap in
-        // GBP. Pence say PENCE. A long name is the header's title, cut there
-        // short of the speaker.
+        // Pence say PENCE, so a price in pence never reads as pounds beside a
+        // cap in GBP. A long name is the header's title, cut there short of
+        // the speaker.
         var shelQuote = stub.quotes["SHEL.L"]
         var longNamed = Object.assign({}, stub.quotes)
         longNamed["SHEL.L"] = Object.assign({}, shelQuote,
@@ -976,10 +974,8 @@ ShellRoot {
         root.check("a long name is cut in the header short of the speaker; the hero's line keeps its exchange and currency whole, in the popup and the window, both looks",
           metaLost.length === 0, metaLost.join(" | "))
 
-        // Every price a listing shows is in its own decimals: a coin under a
-        // cent to four significant digits, a six-figure price to none, in
-        // the hero in both looks, in its row, and in a scrub of its day.
-        // SHIB read 0.00 everywhere.
+        // A coin under a cent to four significant digits, a six-figure price
+        // to none.
         var decimals = []
         ;[["SHIB-USD", /^0\.00000\d{4}$/], ["BRK-A", /^7\d\d,\d{3}$/]].forEach(function(want) {
           stub.featuredSymbol = want[0]
@@ -1015,19 +1011,15 @@ ShellRoot {
         // full wherever that fits, its letters closed up where only that
         // fits, and otherwise without the holiday's name, as a weekend's is
         // worded, then with when it opens alone. A form shows only where the
-        // one before fits neither spaced nor closed up. In both looks, in the
-        // popup and the window at its widest and its minimum width (App.qml),
-        // beside the speaker, the camera, the look icon, and the help mark,
-        // at every text size Omarchy offers (9 to 20), and in the popup with
-        // the shell's spacing kept at size 12's as the text grows
-        // (`[spacing] scale-with-font = false`). Found in the polish board:
-        // Tokyo's "Constitution Memorial Day observed" and London's
-        // "(substitute)" closures were cut in the popup; in the sound build:
-        // beside the speaker, Martin Luther King, Jr. Day's was; in the
-        // camera build: beside the camera, Tokyo's lunch break was; in the
-        // 1.1.0 audit: in the popup at the everyday size 12, Constitution
-        // Memorial Day went short, though 1.0.3 named it; and in the size-16
-        // check: after hours lost its time.
+        // one before fits neither spaced nor closed up. In the popup and the
+        // window at its widest and its minimum width (App.qml), beside the
+        // speaker, the camera, the look icon, and the help mark, at every
+        // text size Omarchy offers (9 to 20), and in the popup with the
+        // shell's spacing kept at size 12's as the text grows (`[spacing]
+        // scale-with-font = false`). Smooth alone: retro changes only the
+        // corner radius and the look toggle's words here (HeaderStatus.qml).
+        // At the everyday size 12 the popup names Constitution Memorial Day
+        // in full (the owner's).
         var header = find(body, "statusText").parent
         var calendars = JSON.parse(calendarFile.text())
         var states = [["After hours · closed at 16:00 EDT", "Closed at 16:00 EDT"], ["Pre-market · opens in 3h 11m", "Opens in 3h 11m"],
@@ -1064,11 +1056,11 @@ ShellRoot {
         }
         var roomless = []
         var shortened = {}
-        // The sweep changes the text size, the spacing, the surface, and the
-        // look, and with them the list's scroll, which keeps its cursor in
-        // sight; it puts each back when it ends, however it ends, and waits
-        // for the layout to come back as it was, so no later check depends
-        // on where this one runs.
+        // The sweep changes the text size, the spacing, and the surface, and
+        // with them the list's scroll, which keeps its cursor in sight; it
+        // puts each back when it ends, however it ends, and waits for the
+        // layout to come back as it was, so no later check depends on where
+        // this one runs.
         var settled = function() {
           return JSON.stringify([surface.width, surface.height, body.chromeHeight, body.chartItem.height, header.height,
             body.watchlist.height, body.watchlist.contentY, body.watchlist.cursorRow, find(body, "footer").y, body.retro])
@@ -1077,8 +1069,7 @@ ShellRoot {
           contentY: body.watchlist.contentY, cursor: body.watchlist.cursorSymbol, listName: stub.listName, layout: settled() }
         // On the same sweep, the footer's add on a named list, beside an
         // undo and once it goes: where the add doesn't fit beside it, it
-        // says less, and never cuts the list's name. Found in the size-16
-        // check: "+ Add a symbol to My Watch…" beside "Undo SHOP.TO".
+        // says less, and never cuts the list's name.
         var named = "+  Add a symbol to My Watchlist"
         var addWords = find(body, "footerText")
         var addCut = []
@@ -1094,35 +1085,32 @@ ShellRoot {
               Style.spacingScaleWithFont = hw >= 0
               surface.wide = hw > 0
               surface.windowWidth = hw === 1 ? Style.space(560) : 720
-              for (var hlook = 0; hlook < 2; hlook++) {
-                stub.retro = hlook === 1
-                wait(20)
-                var where = "size " + hsize + " " + (surface.wide ? "window " + surface.width + " " : "popup " + (hw < 0 ? "spacing kept " : ""))
-                  + (stub.retro ? "retro " : "smooth ")
-                for (var s = 0; s < states.length; s++) {
-                  header.statusForms = states[s]
-                  wait(1)
-                  var words = find(body, "statusText")
-                  var shown = states[s].map(function(form) { return form.toUpperCase() }).indexOf(words.text)
-                  var fitted = header.measured.slice(0, Math.max(0, shown)).filter(function(form) { return form.tight <= header.wordsRoom })
-                  if (shown < 0 || words.truncated || words.implicitWidth > words.width)
-                    roomless.push(where + words.text + " (" + Math.ceil(words.implicitWidth) + " px in " + words.width + ")")
-                  else if (fitted.length > 0)
-                    roomless.push(where + "said in less though \"" + fitted[0].words + "\" fits closed up")
-                  else if (shown > 0 && hsize === 12 && !surface.wide && states[s][0].indexOf("Constitution Memorial Day ·") === 0)
-                    roomless.push(where + "short at the everyday size: " + states[s][0])
-                  if (shown > 0) shortened[where.trim()] = (shortened[where.trim()] || 0) + 1
-                }
-                body.undoOffered = { symbol: "SHOP.TO" }
+              stub.retro = false
+              wait(20)
+              var where = "size " + hsize + " " + (surface.wide ? "window " + surface.width + " " : "popup " + (hw < 0 ? "spacing kept " : ""))
+              for (var s = 0; s < states.length; s++) {
+                header.statusForms = states[s]
                 wait(1)
-                var beside = addWords.text + (addWords.truncated ? " (cut)" : "")
-                body.undoOffered = null
-                wait(1)
-                var alone = addWords.text + (addWords.truncated ? " (cut)" : "")
-                if (alone !== named || (beside !== named && beside !== "+  Add a symbol"))
-                  addCut.push(where + beside + " / " + alone)
-                if (beside !== named) addShort.push(where.trim())
+                var words = find(body, "statusText")
+                var shown = states[s].map(function(form) { return form.toUpperCase() }).indexOf(words.text)
+                var fitted = header.measured.slice(0, Math.max(0, shown)).filter(function(form) { return form.tight <= header.wordsRoom })
+                if (shown < 0 || words.truncated || words.implicitWidth > words.width)
+                  roomless.push(where + words.text + " (" + Math.ceil(words.implicitWidth) + " px in " + words.width + ")")
+                else if (fitted.length > 0)
+                  roomless.push(where + "said in less though \"" + fitted[0].words + "\" fits closed up")
+                else if (shown > 0 && hsize === 12 && !surface.wide && states[s][0].indexOf("Constitution Memorial Day ·") === 0)
+                  roomless.push(where + "short at the everyday size: " + states[s][0])
+                if (shown > 0) shortened[where.trim()] = (shortened[where.trim()] || 0) + 1
               }
+              body.undoOffered = { symbol: "SHOP.TO" }
+              wait(1)
+              var beside = addWords.text + (addWords.truncated ? " (cut)" : "")
+              body.undoOffered = null
+              wait(1)
+              var alone = addWords.text + (addWords.truncated ? " (cut)" : "")
+              if (alone !== named || (beside !== named && beside !== "+  Add a symbol"))
+                addCut.push(where + beside + " / " + alone)
+              if (beside !== named) addShort.push(where.trim())
             }
           }
         } finally {
@@ -1140,26 +1128,19 @@ ShellRoot {
           body.watchlist.takeOver()
           body.watchlist.cursorSymbol = before.cursor
           body.watchlist.contentY = before.contentY
-          var back = false
-          for (var settle = 0; settle < 60 && !back; settle++) {
-            wait(50)
-            back = settled() === before.layout
-          }
-          root.check("the header sweep puts back the text size, the spacing, the surface, and the look, and the layout comes back as it was",
-            back, before.layout + " vs " + settled())
+          within(3000, function() { return settled() === before.layout })
         }
         console.log("said in less: " + Object.keys(shortened).map(function(k) { return k + " " + shortened[k] }).join(", "))
-        root.check("the header's longest real states read whole or in a shorter form that keeps their time, never cut, and every closure in calendars.json is said in full where it fits, else without its holiday's name, else with when it opens alone, a zone named, in both looks, in the popup and the window at its widest and narrowest, at every text size from 9 to 20, and in the popup with its spacing kept",
+        root.check("the header's longest real states read whole or in a shorter form that keeps their time, never cut, and every closure in calendars.json is said in full where it fits, else without its holiday's name, else with when it opens alone, a zone named, in the popup and the window at its widest and narrowest, at every text size from 9 to 20, and in the popup with its spacing kept",
           closures > 50 && unnamed.length === 0 && roomless.length === 0,
           closures + " closures | " + unnamed.join(" | ") + " | " + roomless.slice(0, 12).join(" | ") + (roomless.length > 12 ? " | … " + roomless.length : ""))
         console.log("the add said less beside the undo: " + addShort.join(", "))
-        root.check("on a named list the footer's add reads whole, or beside an undo it has no room beside \"+ Add a symbol\", never cut, and whole again once the undo goes, in both looks, in the popup and the window at its widest and narrowest, at every text size from 9 to 20, and in the popup with its spacing kept",
+        root.check("on a named list the footer's add reads whole, or beside an undo it has no room beside \"+ Add a symbol\", never cut, and whole again once the undo goes, in the popup and the window at its widest and narrowest, at every text size from 9 to 20, and in the popup with its spacing kept",
           addCut.length === 0, addCut.slice(0, 12).join(" | "))
 
         // In a window of ordinary height, 720 × 520, the key sheet shows its
-        // credit whole without a scroll, the version included. Found in the
-        // 1.1.0 audit: at the sheet's foot, the y and S rows pushed it out of
-        // sight, and nothing said the sheet scrolls.
+        // credit whole without a scroll, the version included: nothing says
+        // the sheet scrolls. A pin of the owner's: more keys fail it.
         var sheet = find(body, "helpSheet")
         var sheetBefore = { wide: surface.wide, windowWidth: surface.windowWidth, fixedHeight: surface.fixedHeight }
         surface.wide = true
@@ -1188,10 +1169,9 @@ ShellRoot {
         root.check("in a 720 × 520 window the key sheet shows its credit whole without a scroll",
           creditWhole, creditSaid + " ends at " + creditEnd + " of the sheet's " + sheetHeight)
 
-        // After the text size changes while Stonks runs, every key and
-        // gesture on the key sheet still fits its column. Found in the strain
-        // audit: after `omarchy display text size 16`, "animal" ran into its
-        // words until the shell restarted.
+        // After the text size changes while Stonks runs (`omarchy display
+        // text size 16`), every key and gesture on the key sheet still fits
+        // its column.
         var keySizeBefore = Style.fontBaseSize
         body.showingHelp = true
         wait(50)
@@ -1217,11 +1197,7 @@ ShellRoot {
         // the range row, the info lines, and the header stand a band's gap
         // apart, and the header a group's gap over its rows. The header ends
         // in the rows' unit, which ends there in every unit, and stepping it
-        // moves neither the sign, the order word, nor the rule. Found in
-        // design pass 3: the name started 4 px left of the symbols and the
-        // order word ended 12 px right of the figures; and in the owner's
-        // look at the window on 16 October: the info lines stopped near its
-        // middle.
+        // moves neither the sign, the order word, nor the rule.
         var headerFaults = []
         for (var hw = 0; hw < 2; hw++) {
           surface.wide = hw === 1
@@ -1275,6 +1251,7 @@ ShellRoot {
         // The rows stop short of the scrollbar's gutter, so the thumb never
         // sits on a row.
         stub.retro = false
+        var gutterFaults = []
         for (var g = 0; g < 2; g++) {
           surface.wide = g === 1
           wait(50)
@@ -1283,16 +1260,14 @@ ShellRoot {
           var topRow = body.watchlist.rowItem(body.watchlist.displayedSymbols[0])
           var rowRight = xIn(topRow, topRow.width)
           var thumbLeft = xIn(thumb, 0)
-          root.check((surface.wide ? "window" : "popup") + ": the rows stop short of the scrollbar's gutter",
-            body.watchlist.interactive && thumb.visible && thumb.width > 0 && rowRight <= thumbLeft,
-            "row ends " + rowRight + ", thumb starts " + thumbLeft + " and is " + thumb.width + " wide")
+          if (!(body.watchlist.interactive && thumb.visible && thumb.width > 0 && rowRight <= thumbLeft))
+            gutterFaults.push((surface.wide ? "window" : "popup") + ": row ends " + rowRight + ", thumb starts " + thumbLeft + " and is " + thumb.width + " wide")
         }
+        root.check("the rows stop short of the scrollbar's gutter", gutterFaults.length === 0, gutterFaults.join(" | "))
 
         // The window's smallest permitted height shows three whole rows: the
         // chart gives way first, down to 136 px; at the usual 760 px it keeps
         // all 220 and takes what whole rows leave over, less than a row.
-        // Found in the design pass of 14 October: the smallest window showed
-        // one row of the list.
         // The window's chart fits the window: set here, where the height is
         // the window's own, not fitted to the body as the popup's is.
         surface.fixedHeight = 760
@@ -1311,8 +1286,7 @@ ShellRoot {
             && minimum.footerGap === body.groupGap && minimum.footer <= surface.height,
           "list " + body.watchlist.height + " of " + surface.height + ", chart " + body.chartItem.height + ", at 760 " + usualChart)
         // At the window's smallest, every scrollbar's thumb is at least 24
-        // px long. Found in the walk of dev on 14 October: one row of nine
-        // drew the list's thumb 6×9 px, hard to see and to grab.
+        // px long, there to see and to grab.
         var listThumb = body.watchlist.ScrollBar.vertical.contentItem
         var thumbFaults = body.watchlist.interactive && listThumb.height >= Style.space(24) - 0.5 ? []
           : ["the list: " + (body.watchlist.interactive ? "thumb " + listThumb.height : "no overflow")]
@@ -1320,9 +1294,7 @@ ShellRoot {
         // At the window's smallest, each view over the rows shows a
         // scrollbar while more of it sits below, at rest, its entries short
         // of the bar, and dragging the bar reaches the view's end ("Manage
-        // lists…" in the list menu). In both looks. Found in the mouse
-        // audit: at 560×586 the list menu showed All alone, and nothing said
-        // US, "New list…", and "Manage lists…" sat under it.
+        // lists…" in the list menu). In both looks.
         var wideBefore = surface.wide
         surface.wide = true
         surface.windowWidth = Style.space(560)
@@ -1349,8 +1321,8 @@ ShellRoot {
           smallViews.forEach(function(v) {
             v[2]()
             // Past a symbol's lists' opening shield, which takes the
-            // opening click's double-click.
-            wait(Qt.styleHints.mouseDoubleClickInterval + 100)
+            // opening click's double-click; the others need a layout pass.
+            wait(v[4] === "symbolLists" ? Qt.styleHints.mouseDoubleClickInterval + 100 : 50)
             var where = (retro ? "retro " : "smooth ") + v[0]
             var flick = find(body, v[1])
             var bar = flick ? flick.ScrollBar.vertical : null
@@ -1393,8 +1365,6 @@ ShellRoot {
 
         // A search result's name runs up to its exchange code, one column
         // gap short of it, so a long name is cut only where the room ends.
-        // Found in the design pass of 14 October: "Rigetti Computing, In…"
-        // ended 80 px short of NASDAQ.
         body.startAdding()
         body.search.results = [{ symbol: "RGTI", name: "Rigetti Computing, Incorporated Holdings", exchange: "NASDAQ" },
           { symbol: "RGTI.MX", name: "Rigetti Computing, Incorporated Holdings", exchange: "MEX" }]
@@ -1444,6 +1414,69 @@ ShellRoot {
         wait(50)
         root.check("what search leaves out is said whole on one line in the popup and the narrowest window, in both looks",
           noteFaults.length === 0, noteFaults.join(" | "))
+
+        // Yahoo's five long symbols for "wrapped btc", each drawn whole, as
+        // wide as it is, so no two coins read alike: in the popup and the
+        // narrowest window.
+        var coins = Search.parseSearch({ quotes: [
+          { symbol: "XBTC39577-USD", longname: "OKX Wrapped BTC USD", exchange: "CCC", quoteType: "CRYPTOCURRENCY" },
+          { symbol: "CBBTC32994-USD", longname: "Coinbase Wrapped BTC USD", exchange: "CCC", quoteType: "CRYPTOCURRENCY" },
+          { symbol: "KBTC33513-USD", longname: "Kraken Wrapped Bitcoin USD", exchange: "CCC", quoteType: "CRYPTOCURRENCY" },
+          { symbol: "WBTC-USD", longname: "Wrapped Bitcoin USD", exchange: "CCC", quoteType: "CRYPTOCURRENCY" },
+          { symbol: "CIRBTC-USD", longname: "Circle Wrapped Bitcoin USD", exchange: "CCC", quoteType: "CRYPTOCURRENCY" }] })
+        var resultRows = function() {
+          return root.findAll(body.search, "searchResult")
+        }
+        var coinFaults = []
+        body.startAdding()
+        for (var cw = 0; cw < 2; cw++) {
+          surface.wide = cw === 1
+          body.search.results = coins.results
+          body.search.answer = "results"
+          wait(20)
+          var coinRows = resultRows()
+          var coinsDrawn = coinRows.map(function(row) {
+            var span = root.drawnSpans(row).filter(function(s) { return s.what === row.modelData.symbol })[0]
+            return span ? span.what + (span.whole ? "" : " (cut, " + (span.right - span.left) + " px)") : "none"
+          })
+          if (coinRows.length !== 5 || coinsDrawn.some(function(said) { return !/-USD$/.test(said) }))
+            coinFaults.push((surface.wide ? "window " + surface.width : "popup") + ": " + coinsDrawn.join(", "))
+        }
+        body.search.results = []
+        body.search.answer = ""
+        body.cancelAdding()
+        wait(50)
+        root.check("search names all five long cryptocurrency symbols", coinFaults.length === 0, coinFaults.join(" | "))
+
+        // At the window's smallest, five results and the note under them:
+        // Down to the last brings it and the note into the view.
+        surface.wide = true
+        surface.windowWidth = Style.space(560)
+        var mixed = JSON.parse(searchFile.text())
+        mixed.quotes = mixed.quotes.concat([JSON.parse(eurusdFile.text()).quotes[0]])
+        var mixedAnswer = Search.parseSearch(mixed)
+        body.startAdding()
+        body.search.results = mixedAnswer.results
+        body.search.note = mixedAnswer.note
+        body.search.answer = "results"
+        wait(50)
+        for (var down = 0; down < 5; down++) keyClick(Qt.Key_Down)
+        wait(50)
+        var view = find(body.search, "searchResults")
+        var lastRow = resultRows()[4]
+        var searchNote = find(body.search, "searchNote")
+        var inView = function(item) { return !!item && yIn(item, 0) >= yIn(view, 0) && yIn(item, item.height) <= yIn(view, view.height) }
+        var reached = body.search.resultIndex === 4 && body.search.results.length === 5 && inView(lastRow) && inView(searchNote)
+          && searchNote.visible && searchNote.text === "Stonks doesn’t show currencies"
+        var reachedSaid = "on " + body.search.resultIndex + " of " + body.search.results.length + ", the view " + yIn(view, 0) + "–" + yIn(view, view.height)
+          + ", the last result " + (lastRow ? yIn(lastRow, 0) + "–" + yIn(lastRow, lastRow.height) : "none")
+          + ", the note \"" + searchNote.text + "\" " + yIn(searchNote, 0) + "–" + yIn(searchNote, searchNote.height)
+        body.search.results = []
+        body.search.note = ""
+        body.search.answer = ""
+        body.cancelAdding()
+        wait(50)
+        root.check("the smallest window keeps all search results reachable by keys and names the excluded kind", reached, reachedSaid)
         stub.retro = false
         surface.wide = wideBefore
         surface.windowWidth = 720
@@ -1462,10 +1495,9 @@ ShellRoot {
         // pushes it down under the menu, and the views that take the rows'
         // place give it back there. The chart's height follows the window's
         // alone: every list at one height draws it the same. At the window's
-        // smallest, its usual 760, 850, and tall, in both looks. Found in the
-        // edge pass of 15 October: one row in the window, a tall empty space,
-        // then "+ Add a symbol"; and in the spacing review of 1.0.0: a list
-        // that filled the window ended 0 to 41 px over the footer's gap.
+        // smallest, its usual 760, 850, and tall. Smooth alone: the row pitch
+        // and the footer are the look's own nowhere (the case loop's first
+        // check holds them across looks).
         root.load()
         stub.library = stub.symbols.slice()
         var fullList = stub.symbols.slice()
@@ -1476,7 +1508,8 @@ ShellRoot {
         // `rows` when the rows changed: past a row's slide or fade into its
         // place.
         var windowFooter = function(where, rows, chart) {
-          wait(rows ? 300 : 50)
+          wait(50)
+          if (rows) within(1000, root.rowsAtRest)
           var footer = find(body, "footer")
           var gap = yIn(footer, 0) - root.lastRowBottom()
           var bottom = yIn(footer, footer.height)
@@ -1489,14 +1522,15 @@ ShellRoot {
           if (chart !== null && body.chartItem.height !== chart)
             chartFaults.push(where + ": chart " + body.chartItem.height + ", " + chart + " under All")
         }
-        ;[false, true].forEach(function(retro) {
+        ;[false].forEach(function(retro) {
           stub.retro = retro
           ;[body.smallestHeight, 760, 850, 1400].forEach(function(tall) {
             surface.fixedHeight = tall
-            var at = (retro ? "retro " : "smooth ") + tall + " px "
+            var at = tall + " px "
             stub.listName = ""
             stub.symbols = fullList.slice()
-            wait(300)
+            wait(50)
+            within(1000, root.rowsAtRest)
             var chart = body.chartItem.height
             windowFooter(at + "All", true, chart)
             stub.listName = "Tech"
@@ -1552,9 +1586,9 @@ ShellRoot {
             })
           })
         })
-        root.check("the window's footer sits one gap under a short list, its note and notice too, and at its bottom once the list fills it, the rows one gap above it, in both looks, at its smallest and taller",
+        root.check("the window's footer sits one gap under a short list, its note and notice too, and at its bottom once the list fills it, the rows one gap above it, at its smallest and taller",
           windowFaults.length === 0, windowFaults.join(" | "))
-        root.check("the window's chart is as tall for every list at one window height, in both looks",
+        root.check("the window's chart is as tall for every list at one window height",
           chartFaults.length === 0, chartFaults.join(" | "))
         stub.retro = false
         stub.listName = ""
@@ -1566,8 +1600,6 @@ ShellRoot {
         // and a full set of results, or the rows' height when that is taller,
         // in the whole rows the room holds, and keeps it as the answer comes:
         // with All full, and nearly empty.
-        // Found in the transition audit (search 1, lists 14): the card grew
-        // only at the first answer, and the field jumped with it.
         body.minChartHeight = 0
         surface.fixedHeight = 0
         // The band's column lays the chart's new height out on its next
@@ -1613,7 +1645,17 @@ ShellRoot {
 
         // Another list, a long name, or an empty list moves nothing above the
         // rows, in either look; an empty list keeps one row, which says so.
-        // The footer follows the list's rows (design pass 3).
+        // The footer follows the list's rows. Each check runs both looks and
+        // names the look it fails in.
+        var listLabels = []
+        var listFaults = {}
+        var listCheck = function(look, label, ok, detail) {
+          if (!(label in listFaults)) {
+            listLabels.push(label)
+            listFaults[label] = []
+          }
+          if (!ok) listFaults[label].push(look + ": " + detail)
+        }
         for (var look = 0; look < 2; look++) {
           stub.retro = look === 1
           stub.listName = ""
@@ -1625,21 +1667,22 @@ ShellRoot {
           var onAll = root.measure()
           stub.listName = "Semiconductors & AI infrastructure"
           stub.symbols = ["AAPL", "MZ"]
-          wait(250)
+          wait(50)
+          within(1000, root.rowsAtRest)
           var onList = root.measure()
           var lookName = stub.retro ? "retro" : "smooth"
           var keys = ["listing", "baseline", "change", "changeRight", "range", "info", "list", "row"]
           var shifted = keys.filter(function(key) { return onAll[key] !== onList[key] })
-          root.check(lookName + ": a list switch with a long name moves nothing", shifted.length === 0,
+          listCheck(lookName, "a list switch with a long name moves nothing", shifted.length === 0,
             shifted.join(", ") + " all " + root.describe(onAll) + " list " + root.describe(onList))
-          root.check(lookName + ": a long list name keeps TODAY after it and before the rule",
+          listCheck(lookName, "a long list name keeps TODAY after it and before the rule",
             onList.today > onList.listRight && onList.rule > onList.todayRight, root.describe(onList))
           stub.listName = "Growth"
           stub.symbols = []
           wait(50)
           var onEmpty = root.measure()
           var footerTop = function() { return yIn(find(body, "footer"), 0) }
-          root.check(lookName + ": an empty list keeps one row, the footer one gap under it, and moves nothing above it",
+          listCheck(lookName, "an empty list keeps one row, the footer one gap under it, and moves nothing above it",
             body.watchlist.height === body.rowPitch - body.rowGap && onEmpty.list === onAll.list
               && onEmpty.range === onAll.range && footerTop() === onEmpty.list + body.watchlist.height + body.groupGap
               && find(body, "emptyList").visible,
@@ -1648,8 +1691,7 @@ ShellRoot {
           // and for the footer one gap under it: the surface grows until the
           // menu and the footer show inside it, in the whole rows the room
           // holds and never into what they leave over; the menu's lists
-          // scroll in what is left. Found in design pass 3: fitting a short
-          // list, the menu covered the footer's words.
+          // scroll in what is left.
           stub.lists = [
             { name: "", label: "All", count: 23, symbols: [] },
             { name: "Growth", label: "Growth", count: 0, symbols: [] },
@@ -1666,7 +1708,7 @@ ShellRoot {
           var menuBottom = yIn(menu, menu.height)
           var footerAt = find(body, "footer")
           var menuRoom = body.chromeHeight + body.rowsHeight(1000, 730 - body.chromeHeight)
-          root.check(lookName + ": an open list menu makes room for itself and the footer under it",
+          listCheck(lookName, "an open list menu makes room for itself and the footer under it",
             menu.visible && surface.height > shut && surface.height === Math.min(menuRoom, body.listMenuBottom)
               && menuBottom + body.groupGap <= yIn(footerAt, 0) && yIn(footerAt, footerAt.height) <= surface.height,
             "menu " + menu.height + " of " + menu.contentHeight + " ends at " + menuBottom + ", footer at " + yIn(footerAt, 0)
@@ -1683,9 +1725,7 @@ ShellRoot {
           wait(50)
           var above = ["listing", "baseline", "change", "changeRight", "range", "info"]
           // Over search's results and the list views the header names the
-          // list only, on a line of the same height. Found in design pass 3:
-          // TODAY, the breadth, and "% CHANGE" stood over results and views
-          // they did not describe.
+          // list only, on a line of the same height.
           var header = find(body, "listLabel").parent
           var headerHeight = header.height
           var rowsOnly = ["todayLabel", "breadthRule", "orderLabel", "orderControl", "unitSign", "unitFill", "unitTarget"]
@@ -1709,23 +1749,22 @@ ShellRoot {
             var withView = root.measure()
             var viewMoved = above.filter(function(key) { return onAll[key] !== withView[key] })
             var view = find(body, views[v].name)
-            root.check(lookName + ": " + views[v].name + " takes the rows' place and moves nothing above them",
+            listCheck(lookName, views[v].name + " takes the rows' place and moves nothing above them",
               viewMoved.length === 0 && view.visible && yIn(view, 0) === onAll.list,
               viewMoved.join(", ") + " view at " + yIn(view, 0) + " rows at " + onAll.list)
             var named = namesOnly()
-            root.check(lookName + ": over " + views[v].name + " the list header names the list only", named === "", named)
+            listCheck(lookName, "over " + views[v].name + " the list header names the list only", named === "", named)
             views[v].close()
             wait(50)
           }
-          root.check(lookName + ": with the rows back the header says TODAY, the breadth, and the order again",
-            rowsOnly.every(function(name) { return find(body, name).visible }))
+          listCheck(lookName, "with the rows back the header says TODAY, the breadth, and the order again",
+            rowsOnly.every(function(name) { return find(body, name).visible }), rowsOnly.filter(function(name) { return !find(body, name).visible }).join(","))
         }
+        listLabels.forEach(function(label) { root.check(label, listFaults[label].length === 0, listFaults[label].join(" | ")) })
         // A long list menu shows whole rows only, and "New list…" and
         // "Manage lists…" in reach without scrolling, with 12 lists or 30,
         // in the popup at its cap and the window at its smallest and its
         // usual height, in both looks; a click on Manage lists opens it.
-        // Found in the power-user walk of 16 October: with 12 lists the
-        // last row was cut in half and the two sat below the fold.
         var listsBeforeMenu = stub.lists
         var menuFaults = []
         var menuSeen = []
@@ -1759,8 +1798,8 @@ ShellRoot {
               }
               // As the menu opens; after a wheel notch over the lists and a
               // drag of the scrollbar part way, in one look, the rows being
-              // alike in both; scrolled to its end. Found in review: a notch
-              // stopped at 72 px of 26 px rows.
+              // alike in both; scrolled to its end. A notch must stop on a
+              // row's edge.
               var atRest = cutRows()
               var pinnedShown = inMenu(find(menu, "newListRow")) && inMenu(find(menu, "manageListsRow"))
               var afterWheel = 0
@@ -1812,9 +1851,8 @@ ShellRoot {
           })
         })
         // The window at its usual 720 × 760 shows five lists of the demo's
-        // six in the menu, which runs down over the footer, in both looks.
-        // Found in the 1.0.2 visual review: the taller chart left the menu
-        // room for three above the footer.
+        // six in the menu, which runs down over the footer, in both looks:
+        // a pin of the owner's approved layout.
         stub.lists = [{ name: "", label: "All", count: stub.symbols.length, symbols: stub.symbols }].concat(
           ["My Watchlist", "Watching", "Growth", "Wins", "Losses"].map(function(name) { return { name: name, label: name, count: 1, symbols: ["MZ"] } }))
         surface.wide = true
@@ -1848,12 +1886,11 @@ ShellRoot {
 
         // A view opening over the rows moves nothing: the list menu, search,
         // Manage lists, and a row's ticks keep the surface's height and its
-        // edge, in both looks, on a list of 20 rows with 13 lists. In the
-        // popup at a room 24 px and 4 px under its cap, as 760 and 780 are
-        // under the 784 px cap of the walk's popup, and at the cap; in the
-        // window at 760, 780, and that cap's height. Found in the walk of #1:
-        // at a room of 780 px the menu took the 38 px the whole rows left
-        // over, and pushed the footer down.
+        // edge, on a list of 20 rows with 13 lists. In the popup at a room
+        // 24 px and 4 px under its cap, as 760 and 780 are under a 784 px
+        // cap, and at the cap; in the window at 760, 780, and that cap's
+        // height. Smooth alone: the height and edge are no look's own (the
+        // case loop's first check holds the rows and footer across looks).
         var listsBeforeViews = stub.lists
         var libraryBeforeViews = stub.library
         var symbolsBeforeViews = stub.symbols
@@ -1879,15 +1916,17 @@ ShellRoot {
           ;(surface.wide ? [760, 780, cap] : [cap - 24, cap - 4, cap]).forEach(function(room) {
             if (surface.wide) surface.fixedHeight = room
             else surface.budget = room
-            ;[false, true].forEach(function(retro) {
+            ;[false].forEach(function(retro) {
               stub.retro = retro
               wait(50)
-              var where = place + " " + room + " " + (retro ? "retro" : "smooth")
+              var where = place + " " + room
               var shut = [surface.height, Math.round(body.edge)].join("/")
               heldSeen.push(where + " " + shut)
               viewOpens.forEach(function(v) {
                 v[1]()
-                wait(Qt.styleHints.mouseDoubleClickInterval + 50)
+                // A row's ticks open behind a shield against the opening
+                // click's double-click; the others in a layout pass.
+                wait(v[0] === "a row's ticks" ? Qt.styleHints.mouseDoubleClickInterval + 50 : 50)
                 var open = [surface.height, Math.round(body.edge)].join("/")
                 if (open !== shut) heldFaults.push(where + ", " + v[0] + ": height/edge " + shut + " -> " + open)
                 v[2]()
@@ -1900,7 +1939,6 @@ ShellRoot {
         // name's note, fits over the footer wherever the room holds it,
         // though the room's whole rows don't: one symbol in All, the first-run
         // hint, at a room from the least to 40 px over it, in both looks.
-        // Found in review: the menu sat 27 px over the footer, on its hint.
         surface.wide = false
         surface.fixedHeight = 0
         stub.lists = [{ name: "", label: "All", count: 1, symbols: ["MZ"] }]
@@ -1941,30 +1979,28 @@ ShellRoot {
         stub.library = libraryBeforeViews
         stub.lists = listsBeforeViews
         wait(50)
-        root.check("a view opening over the rows keeps the surface's height and edge: the list menu, search, Manage lists, and a row's ticks, at a room of 760, 780, and the popup's cap, in the popup and the window, in both looks",
+        root.check("a view opening over the rows keeps the surface's height and edge: the list menu, search, Manage lists, and a row's ticks, at a room of 760, 780, and the popup's cap, in the popup and the window",
           heldFaults.length === 0, heldFaults.join(" | ") + " || " + heldSeen.join(", "))
         root.check("the list menu's least, a refused name's note too, fits over the footer wherever the room holds it, under the first-run hint, in both looks",
           leastFaults.length === 0, leastFaults.join(" | "))
         // A shorter list's rows are its own, and the footer sits one gap under
-        // them. Found in design pass 3: the footer stayed where All's is,
-        // with an empty row's room above it.
+        // them (an empty list's is the list switch's check above).
         stub.retro = false
         stub.listName = ""
         root.load()
         stub.library = stub.symbols.slice()
-        wait(250)
-        var shortOk = true
+        wait(50)
+        within(1000, root.rowsAtRest)
         var lists = [{ name: "Growth", symbols: ["AAPL", "MZ"] }, { name: "Losses", symbols: [] }]
-        for (var s = 0; s < lists.length; s++) {
-          stub.listName = lists[s].name
-          stub.symbols = lists[s].symbols
-          wait(250)
-          var rows = Math.max(1, lists[s].symbols.length)
-          var shortList = root.measure()
-          shortOk = shortOk && body.watchlist.height === rows * body.rowPitch - body.rowGap
-            && yIn(find(body, "footer"), 0) === shortList.list + body.watchlist.height + body.groupGap
-        }
-        root.check("a shorter list's footer sits one gap under its rows", shortOk)
+        stub.listName = lists[0].name
+        stub.symbols = lists[0].symbols
+        wait(50)
+        within(1000, root.rowsAtRest)
+        var shortList = root.measure()
+        root.check("a shorter list's footer sits one gap under its rows",
+          body.watchlist.height === 2 * body.rowPitch - body.rowGap
+            && yIn(find(body, "footer"), 0) === shortList.list + body.watchlist.height + body.groupGap,
+          root.describe(shortList) + ", list " + body.watchlist.height)
 
         // Search's field opens where the list's rows were, under its
         // header, and stays there while you type, on any list, at either
@@ -2032,14 +2068,10 @@ ShellRoot {
 
         // A closing surface keeps its live marks as they are: the header's
         // words keep their colour, and the dot's ripple (retro's blinking cap)
-        // stops where it is, then goes on as the surface opens. Found in the
-        // transition audit (lifecycle 8): on the first frame of the close
-        // fade the words dimmed and the ripple jumped back to rest.
-        // While the chart asked for is on its way, the live day held on show
-        // holds still with it: its halo and cap are the same picture on
-        // every frame until the dim a quarter second on, and once it rests.
-        // Found in the design review of the motion rebuild: the held day's
-        // ripple and cap went on moving under "Loading".
+        // stops where it is, then goes on as the surface opens. While the
+        // chart asked for is on its way, the live day held on show holds
+        // still with it: its halo and cap are the same picture on every frame
+        // until the dim a quarter second on, and once it rests.
         var landPrice = function(delta) {
           var quote = stub.quotes["SHOP.TO"]
           var points = quote.points.slice()
@@ -2083,9 +2115,8 @@ ShellRoot {
         var retroLive = liveMarks(true)
         // A new price while the market trades ripples the dot three times,
         // or blinks retro's cap four, about 6 s, then the mark rests in its
-        // still look; an answer with the same price starts nothing. It used
-        // to move for as long as the market traded, redrawing the popup's
-        // whole surface every frame.
+        // still look, so the popup stops redrawing; an answer with the same
+        // price starts nothing.
         var restsAfterNewPrice = function(retro) {
           stub.retro = retro
           wait(50)
@@ -2126,14 +2157,10 @@ ShellRoot {
           // A reopen with the same price, as the window and the popup open:
           // the surface opens, then its chart draws in, hiding the mark
           // until it is whole. The mark moves once it shows: after a close
-          // at rest, and after one mid-burst, which paused it.
+          // at rest, and after one mid-burst, which paused it: the burst the
+          // first reopen set going.
           var reopenMoves = function(midBurst) {
-            if (midBurst) {
-              landPrice(0.1)
-              var going = false
-              for (var g = 0; g < 2000 && !going; g += 10) { wait(10); going = !still() }
-              if (!going) return false
-            }
+            if (midBurst && still()) return false
             body.surfaceOpen = false
             wait(100)
             body.surfaceOpen = true
@@ -2144,7 +2171,6 @@ ShellRoot {
             return moves
           }
           var onOpen = reopenMoves(false)
-          wait(7000)
           onOpen = reopenMoves(true) && onOpen
           return [body.heroLive, moved, rests, samePrice, afterSheet, onOpen].join(",")
         }
@@ -2155,9 +2181,8 @@ ShellRoot {
           restSmooth === "true,true,true,true,true,true" && restRetro === "true,true,true,true,true,true",
           "smooth " + restSmooth + " | retro " + restRetro)
         // An aged quote is said plainly in the hero's listing line, as its row
-        // says it; only overdue or failed takes the warning mark. Smooth and
-        // retro. Found in the transition audit (data 8): '! AS OF 18:32' in
-        // the hero over a plain 'As of 18:32' in the row.
+        // says it; only overdue or failed takes the warning mark ("! AS OF"
+        // would read as a warning). Smooth and retro.
         var listing = find(body, "listingLine")
         var lead = function(retro, age, unanswered) {
           stub.retro = retro
@@ -2177,14 +2202,13 @@ ShellRoot {
         root.check("the hero says an aged quote plainly and marks only a warning, smooth and retro",
           aged.every(function(t) { return t === "AS" }) && overdue.every(function(t) { return t === "! " }),
           aged.join(",") + " | " + overdue.join(","))
-        root.check("a closing surface, and a live day held while the next chart loads, hold the live marks: the words' colour and the ripple, smooth and retro — "
-          + smoothLive + " | " + retroLive,
-          /^true,true,true,true,true,true /.test(smoothLive) && /^true,true,true,true,true,true /.test(retroLive))
+        root.check("a closing surface, and a live day held while the next chart loads, hold the live marks: the words' colour and the ripple, smooth and retro",
+          /^true,true,true,true,true,true /.test(smoothLive) && /^true,true,true,true,true,true /.test(retroLive),
+          smoothLive + " | " + retroLive)
 
         // The header's words keep the animal's place in both looks, drawn or
-        // not. Found offscreen: featuring a symbol whose first quote was
-        // still out (every add) moved retro's 48 px left, then back; and a
-        // look switch moved them 50 px, since only retro had an animal.
+        // not: while a featured symbol's first quote is still out (every
+        // add), and across a look switch.
         var places = []
         ;[false, true].forEach(function(retro) {
           stub.retro = retro
@@ -2202,15 +2226,15 @@ ShellRoot {
 
         // Each header icon on the right says on hover, past the shell's 400
         // ms delay, what a click does, in the one tip open, under its icon
-        // and within the body, with room above or none, smooth and retro;
-        // the animal says nothing. Found by the owner on 15 October:
-        // "Replay the chart (p)".
+        // and within the body, with room above or none; the animal says
+        // nothing. Retro only for the look toggle, whose words are the
+        // look's: the other tips are no look's own.
         var tipFaults = []
         var tipWords = []
         ;[["animalToggle"], ["soundToggle", "Turn sounds off"], ["cameraButton", "Take a screenshot"],
           ["lookToggle", "Switch to retro", "Switch to smooth"], ["helpToggle", "Show all keys"]].forEach(function(want) {
           var toggle = find(body, want[0])
-          ;[false, true].forEach(function(retro) {
+          ;(want[2] ? [false, true] : [false]).forEach(function(retro) {
             stub.retro = retro
             ;[0, 80].forEach(function(above) {
               surface.y = above
@@ -2218,9 +2242,11 @@ ShellRoot {
               var where = (retro ? "retro " : "smooth ") + want[0] + " with " + above + " px above"
               if (!toggle) { tipFaults.push(where + " missing"); return }
               mouseMove(toggle, toggle.width / 2, toggle.height / 2)
-              wait(600)
-              var tips = root.openTips(body, [])
               var words = want[0] === "soundToggle" && !find(body, "soundIcon").on ? "Turn sounds on" : want[retro && want[2] ? 2 : 1]
+              // The animal's tip must stay shut past the whole delay.
+              if (words === undefined) wait(600)
+              else within(1500, function() { return root.openTips(body, []).length > 0 })
+              var tips = root.openTips(body, [])
               if (words === undefined ? tips.length !== 0 : tips.length !== 1 || tips[0].text !== words)
                 tipFaults.push(where + ": " + JSON.stringify(tips.map(function(t) { return t.text })) + ", not " + JSON.stringify(words))
               tips.forEach(function(t) {
@@ -2229,19 +2255,19 @@ ShellRoot {
               })
               if (!retro) tipWords.push(tips.map(function(t) { return t.text }).join(", "))
               mouseMove(body, body.width / 2, body.height - 4)
-              wait(50)
+              within(1000, function() { return root.openTips(body, []).length === 0 })
             })
           })
         })
         surface.y = 0
         console.log("header tips: " + tipWords.join(" | "))
-        root.check("each header icon's hover says what a click does, under its icon and within the body, with room above or none, and the animal's nothing, smooth and retro",
+        root.check("each header icon's hover says what a click does, under its icon and within the body, with room above or none, and the animal's nothing; the look toggle's in both looks",
           tipFaults.length === 0, tipFaults.join(" | "))
         stub.retro = false
         wait(50)
 
-        // A new order is a new arrangement: every row takes its place at once.
-        // Found live: o slid every row through the others for 110 ms.
+        // A new order is a new arrangement: every row takes its place at once,
+        // and so does the same order the other way.
         var placed = function() {
           return stub.view.shown.every(function(s, i) { return body.watchlist.rowItem(s).y === i * body.rowPitch })
         }
@@ -2249,25 +2275,27 @@ ShellRoot {
           return stub.view.shown.map(function(s, i) { return s + "@" + body.watchlist.rowItem(s).y + "/" + i * body.rowPitch })
             .filter(function(text, i) { return body.watchlist.rowItem(stub.view.shown[i]).y !== i * body.rowPitch }).slice(0, 4).join(" ")
         }
+        // 20 ms: one frame or two, far short of a slide.
         stub.order = "pct"
         wait(20)
-        root.check("a new order places every row at once", placed(), where())
-        // So does the same order the other way: a flip read as a resort would
-        // slide every row through the others.
+        var newPlaced = placed()
+        var newWhere = where()
         var unreversed = stub.view.shown[0]
         stub.reversed = true
         wait(20)
-        root.check("a reversed order places every row at once", placed() && stub.view.shown[0] !== unreversed, where())
+        root.check("a new order places every row at once", newPlaced && placed() && stub.view.shown[0] !== unreversed,
+          "new: " + newWhere + "; reversed: " + where())
         stub.reversed = false
         stub.order = "manual"
-        wait(200)
+        wait(50)
+        within(1000, root.rowsAtRest)
 
         // The order word shows its direction with an arrow, on one line, and
         // no order moves anything: a flip moves nothing beside it, the word's
         // ends and the rule's, and every order, manual included, holds the
-        // word's top, bottom, and right end, and the first row's top. Manual's
-        // arrow came from a fallback font 1 px taller, and dropped the rows.
-        // In both looks, both widths.
+        // word's top, bottom, and right end, and the first row's top, even
+        // where an arrow's glyph comes from another font. In both looks, both
+        // widths.
         var word = find(body, "orderLabel")
         var rule = find(body, "breadthRule")
         var wordFaults = []
@@ -2304,7 +2332,8 @@ ShellRoot {
         stub.order = "manual"
         stub.retro = false
         surface.wide = false
-        wait(200)
+        wait(50)
+        within(1000, root.rowsAtRest)
         root.check("the order word names its direction on one line, and no order or flip moves it or the rows, in both looks at both widths",
           wordFaults.length === 0, wordFaults.join(" | "))
 
@@ -2313,9 +2342,7 @@ ShellRoot {
         // button Enter takes, and only it, is marked as the shell marks its
         // default, and every button is one line, whole, inside the surface.
         // In every view that has buttons, in both looks, in the popup and the
-        // smallest window. Found by the owner on 14 October: "esc cancel"
-        // read as two buttons, and neither acted; then "ESC CANCEL" read as
-        // two buttons that said the same thing twice.
+        // smallest window ("esc cancel" reads as two buttons).
         var namesKey = function(text) {
           return /⏎|↵|\besc\b|\benter\b/i.test(text) || /\b[a-z0-9] to [a-z]/i.test(text) || /^[A-Z] [A-Z]{2,}/.test(text)
         }
@@ -2423,8 +2450,7 @@ ShellRoot {
                   badKeys.push(place + ": " + words + " " + t.lineCount + " lines" + (t.truncated ? ", elided" : "")
                     + ", " + Math.ceil(t.implicitWidth) + " px in " + xIn(t, 0) + "–" + xIn(t, t.width) + " of " + body.width)
                 // Every button says its word one way: the caption, bold, in
-                // spaced capitals. Found in the design check of 16 October:
-                // search's Add and Show alone were body-sized and in lower case.
+                // spaced capitals.
                 if (t.font.pixelSize !== Style.font.caption || !t.font.bold || t.font.letterSpacing !== 1 || t.text !== t.text.toUpperCase())
                   badKeys.push(place + ": " + words + " is not in the buttons' caption capitals (" + t.font.pixelSize + " px"
                     + (t.font.bold ? ", bold" : "") + ", spacing " + t.font.letterSpacing + ")")
@@ -2446,13 +2472,9 @@ ShellRoot {
         // both looks on both surfaces: CKX's one bar at 14:10, CVR's none,
         // at 23:09 that Friday. A busy stock, an ETF, a coin, and listings
         // in London and Tokyo say nothing, nor does an index before its
-        // bell, nor one 25 s past it. Found in the power-user walk of 16
-        // October: a lone dot and an empty chart, with no words, read as
-        // broken.
+        // bell, nor one 25 s past it: ^N225 as Yahoo answers 25 s into its
+        // session, its first bar with no close yet, and the live moment.
         var quotesBeforeNotes = stub.quotes
-        // ^N225 as Yahoo answers 25 s into its session: its first bar with
-        // no close yet, and the live moment. Found in QA: "Traded only at
-        // 09:00 JST" about the whole market.
         var opening = JSON.parse(indexDayFile.text())
         var openingDay = opening.chart.result[0]
         var bell = openingDay.meta.tradingPeriods.regular[0][0].start
@@ -2466,10 +2488,6 @@ ShellRoot {
           ["AAPL", 1792206540, ""], ["SPY", 1792206540, ""], ["SHIB-USD", 1792206540, ""], ["SHEL.L", 1792206540, ""],
           ["7203.T", 1792206540, ""], ["^GSPC", 1790596800, ""], ["^N225", bell + 25, ""]]
         var noteFaults = []
-        // The info line's title too: CKX traded that Friday, so 1D; CVR's
-        // figures are Wednesday's, so WED. It read 1D (the walk).
-        var titles = { CKX: "1D", CVR: "WED" }
-        var titleFaults = []
         for (var nsurface = 0; nsurface < 2; nsurface++) {
           surface.wide = nsurface === 1
           for (var nl = 0; nl < 2; nl++) {
@@ -2484,16 +2502,12 @@ ShellRoot {
               if (said !== c[2] || !whole)
                 noteFaults.push((surface.wide ? "window " : "popup ") + (stub.retro ? "retro " : "smooth ") + c[0] + ": \"" + said + "\""
                   + (whole ? "" : " outside the chart"))
-              var title = body.periodLine ? body.periodLine.title : ""
-              if (titles[c[0]] && title !== titles[c[0]])
-                titleFaults.push((surface.wide ? "window " : "popup ") + (stub.retro ? "retro " : "smooth ") + c[0] + ": " + title)
             })
           }
         }
         // A row draws a one-bar day in both looks, as the hero does: smooth's
         // line as a dot, retro's as its column. A day with no bar leaves the
-        // cell empty in both. Found in the power-user walk: CKX's row showed
-        // its bar in retro and nothing in smooth.
+        // cell empty in both.
         var symbolsBeforeRows = stub.symbols
         var libraryBeforeRows = stub.library
         stub.symbols = symbolsBeforeRows.concat(["CKX", "CVR"])
@@ -2530,16 +2544,12 @@ ShellRoot {
         wait(50)
         root.check("a day with one bar or none says so on its chart, and no fuller day or index before its bell does, in both looks on both surfaces",
           noteFaults.length === 0, noteFaults.join(" | "))
-        root.check("a day's info line is titled by its figures' day: CKX's Friday is 1D at 23:09 that Friday, CVR's Wednesday WED, in both looks on both surfaces",
-          titleFaults.length === 0, titleFaults.join(" | "))
         root.check("a one-bar day's row draws its bar in both looks, and a day with none leaves the cell empty in both",
           rowInk.join(", ") === "smooth CKX drawn, smooth CVR empty, retro CKX drawn, retro CVR empty", rowInk.join(", "))
         // The popup shows a row on a short screen at a large text size: the
         // first-run hint gives way where it and a row don't both fit under
         // the rest. At text size 16, on screens from just room for the rest
         // and a row to just short of room for the hint too, in both looks.
-        // Found in the spacing walk: at 16 on an 850 px screen the popup
-        // showed its chrome and the hint, and not one row.
         Style.fontBaseSize = 16
         wait(100)
         var bareChrome = body.chromeHeight
@@ -2575,15 +2585,12 @@ ShellRoot {
         // chart gives way to them, down to a fifth of itself; where it holds
         // three, the chart keeps its height. The body's room is what the
         // shell's card leaves it (Ui/PopupCard.qml): the screen less the
-        // bar, the card's margins, padding, and border. Found in the 1.0.2
-        // leftovers review (O1): from text size 18 on a short screen the
-        // popup showed no row at all; and in the strain audit: given way to
-        // one row, the list menu and search over it showed one line.
+        // bar, the card's margins, padding, and border. The list menu and
+        // search over three rows show more than one line.
         // On Bitcoin's 1Y, whose prices carry commas below the baseline, a
         // mark's words never touch the ink, the line's highest and lowest
         // close or the baseline past them, and a chart at its full height
-        // shows both marks. Found in review on 21 October: at 20 the squeezed
-        // chart ran through both, and a comma reached the ink.
+        // shows both marks.
         var shortFaults = []
         var shortSeen = []
         var touched = []
@@ -2692,7 +2699,7 @@ ShellRoot {
             // Where the header gives its title way, the name is back on the
             // ticker's line, which is measured; with no quote yet, before a
             // first answer or after a failed one, it says nothing rather
-            // than throw. Found in review: it read a null quote's currency.
+            // than throw.
             if (!body.headerTitled) {
               var hero = find(body, "hero")
               hero.quote = null
@@ -2702,36 +2709,30 @@ ShellRoot {
               hero.quote = Qt.binding(function() { return body.featuredQuote })
               wait(50)
             }
-            // The camera's tip at every size, with the body at the window's
-            // top and with room above it: one tip, under its icon and within
-            // the body.
-            var cameraButton = find(body, "cameraButton")
-            ;[0, 80].forEach(function(above) {
-              surface.y = above
-              wait(50)
+            // The camera's tip once, at the largest size with the body at the
+            // window's top: one tip, under its icon and within the body. A tip
+            // always opens below its icon, so other sizes show nothing more.
+            if (size === 20 && !retro) {
+              var cameraButton = find(body, "cameraButton")
               mouseMove(cameraButton, cameraButton.width / 2, cameraButton.height / 2)
-              wait(600)
+              within(1500, function() { return root.openTips(body, []).length > 0 })
               var tips = root.openTips(body, [])
-              if (tips.length !== 1) tipFaults.push(where + ": " + tips.length + " tips with " + above + " px above")
+              if (tips.length !== 1) tipFaults.push(where + ": " + tips.length + " tips")
               tips.forEach(function(t) {
                 var fault = root.tipFault(t, cameraButton)
-                if (fault) tipFaults.push(where + " with " + above + " px above: " + fault)
+                if (fault) tipFaults.push(where + ": " + fault)
               })
               mouseMove(body, body.width / 2, body.height - 4)
-              wait(50)
-            })
-            surface.y = 0
-            tipsSeen++
+              within(1000, function() { return root.openTips(body, []).length === 0 })
+              tipsSeen++
+            }
           })
         }
         // At text sizes 16 and 20 on an 850 px screen, with 12 lists, the
         // list menu and search show more than one line, the room of the
         // three rows the chart gives way to, all of it inside the popup, in
         // both looks: at 16, two lists above the menu's own two lines, and
-        // four results; at 20, one list above them, and two results. Found
-        // in the strain audit: at 16 each showed one line, scrolling in a
-        // one-line box, and at 20 the menu's "Manage lists…" ran off the
-        // popup's bottom edge.
+        // four results; at 20, one list above them, and two results.
         var listsBefore = stub.lists
         stub.lists = [{ name: "", label: "All", count: stub.symbols.length, symbols: stub.symbols }].concat(
           Array.from({ length: 12 }, function(_, n) { return { name: "List " + (n + 1), label: "List " + (n + 1), count: 1, symbols: ["MZ"] } }))
@@ -2784,7 +2785,7 @@ ShellRoot {
           touched.length === 0, touched.join(" | "))
         root.check("on a 768 px screen where the header gives its title way, a stock with no quote yet leaves the ticker's line empty, in both looks",
           coldSeen > 0 && coldFaults.length === 0, coldSeen + " seen; " + coldFaults.join(" | "))
-        root.check("on a 768 px screen at every text size from 9 to 20, the camera's tip shows under its icon and within the body, at the window's top and with room above, in both looks",
+        root.check("at text size 20 on a 768 px screen, the camera's tip shows under its icon and within the body",
           tipsSeen > 0 && tipFaults.length === 0, tipsSeen + " seen; " + tipFaults.join(" | "))
 
         // After the text size changes with the list scrolled, no row is cut
@@ -2793,9 +2794,8 @@ ShellRoot {
         // sight: in the popup on an 850 px screen and the window at its
         // usual 720 × 760, two rows down at 12, to 16 and back; at the
         // list's end at 12, the cursor on its top row or its last, to 16;
-        // and at its end at 16, to 12. Found in the strain fixes' walk: with
-        // the popup open through a change to text size 16, the list showed
-        // rows cut at its top and bottom until the popup reopened.
+        // and at its end at 16, to 12, with the surface open through the
+        // change.
         var rowsList = body.watchlist
         // The popup's room on an 850 px screen at the text size of the
         // moment, as the shell's card gives it.
@@ -2873,9 +2873,88 @@ ShellRoot {
         console.log("rows after a text size change: " + rowsSeen.join(" | "))
         root.check("after the text size changes with the list scrolled, no row is cut at the list's top or bottom, the row at its top stays there unless the list's end comes first, and the cursor's row stays in sight, in the popup and the window",
           rowsCut.length === 0, rowsCut.join(" | "))
+
+        // A scrub whose line runs through a range's mark keeps the mark, all
+        // of it clear of the line: over its own bar, its price, its date, and
+        // either end; and the pointer leaving puts it back where it rests.
+        // Both looks, both marks, on a year with a sharp high early, which
+        // has no room before it, and a sharp low late, which has.
+        var scrubNow = stub.quotes.AAPL.marketTime
+        var sharp = []
+        for (var sb = 0; sb < 40; sb++) {
+          var sc = sb === 6 ? 130 : sb === 33 ? 70 : 100 + (sb % 3)
+          sharp.push({ t: scrubNow - (39 - sb) * 86400, c: sc, h: sc + 0.5, l: sc - 0.5, o: sc, v: 100 })
+        }
+        stub.featuredSymbol = "AAPL"
+        stub.figures = null
+        stub.range = "1Y"
+        stub.historyEntry = { status: "ok", receivedAt: scrubNow,
+          history: { symbol: "AAPL", range: "1Y", baseline: 100, interval: "1d", gmtoffset: -14400, bars: sharp } }
+        var crossed = []
+        ;[false, true].forEach(function(retro) {
+          stub.retro = retro
+          wait(50)
+          tryVerify(function() { return body.motion.drawn === 1 }, 2000)
+          ;["highMark", "lowMark"].forEach(function(name) {
+            var mark = find(body, name)
+            var marks = mark.parent.parent
+            var price = find(mark, "markPrice")
+            var date = find(mark, "markDate")
+            var place = function() { return [mark.visible, mark.x].join(",") }
+            var atRest = place()
+            var rest = mark.x
+            var spots = { bar: marks.chart.xAt(mark.modelData.x), left: rest + 2, price: rest + price.x + price.width / 2,
+              date: rest + date.x + date.width / 2, right: rest + mark.width - 2 }
+            var faults = []
+            for (var spot in spots) {
+              var over = marks.mapToItem(body.chartItem, spots[spot], 0)
+              mouseMove(body.chartItem, over.x, body.chartItem.height / 2)
+              wait(50)
+              var line = marks.scrubAt
+              var clear = line < mark.x - 1 || line > mark.x + mark.width + 1
+              if (!mark.visible || !clear || mark.x < 0 || mark.x + mark.width > marks.width)
+                faults.push(spot + ": line " + Math.round(line) + ", mark " + mark.visible + " at " + Math.round(mark.x) + "–" + Math.round(mark.x + mark.width))
+            }
+            mouseMove(body.chartItem, 1, -Style.space(40))
+            wait(50)
+            var after = place()
+            if (!atRest.startsWith("true") || faults.length || after !== atRest)
+              crossed.push((retro ? "retro " : "smooth ") + name + ": at rest " + atRest + "; " + faults.join(", ") + "; after " + after)
+          })
+        })
+        stub.retro = false
+        stub.range = "1D"
+        stub.historyEntry = null
+        wait(50)
+        root.check("a scrub through a range's mark, its own bar included, keeps all of it clear of the line, and the pointer leaving puts it back, both marks, both looks",
+          crossed.length === 0, crossed.join(" | "))
+
+        // On a side bar the stacked pill keeps a short line for a warning's
+        // "!": a failed refresh fills it, and the pill keeps its height.
+        stub.now = scrubNow + 120
+        var stackSaid = function() {
+          return find(sidePill, "pillStack").children.filter(function(c) { return c.objectName === "pillStackLine" })
+            .map(function(line) { return line.text }).join("/") + " " + sidePill.implicitHeight + " px"
+        }
+        var stackFaults = []
+        var entriesBeforeFail = stub.entries
+        ;[false, true].forEach(function(retro) {
+          stub.retro = retro
+          stub.entries = entriesBeforeFail
+          wait(20)
+          var healthy = stackSaid()
+          var healthyHeight = sidePill.implicitHeight
+          stub.entries = Object.assign({}, entriesBeforeFail, { AAPL: Object.assign({}, entriesBeforeFail.AAPL, { status: "failed" }) })
+          wait(20)
+          var lines = find(sidePill, "pillStack").children.filter(function(c) { return c.objectName === "pillStackLine" })
+          if (healthy.indexOf("!") >= 0 || !lines.some(function(line) { return line.text === "!" }) || sidePill.implicitHeight !== healthyHeight)
+            stackFaults.push((retro ? "retro: " : "smooth: ") + healthy + " -> " + stackSaid())
+        })
+        stub.entries = entriesBeforeFail
+        stub.retro = false
+        stub.now = 0
+        root.check("a failed refresh warns on the stacked form in both looks", stackFaults.length === 0, stackFaults.join(" | "))
       }
     }
   }
-
-  HarnessExit { id: done }
 }

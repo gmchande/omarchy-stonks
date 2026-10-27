@@ -43,12 +43,13 @@ code=0
 
 # feed_tree HARNESS FILE...: copies of just the named plugin files, so a
 # feed loads without the shell's Ui and Commons. Copies, so a script can
-# patch them. Every tree holds HarnessExit.qml, a harness's one way out.
+# patch them. Every tree holds HarnessExit.qml, a harness's one way out, and
+# the shared helpers, Harness.qml and Steps.qml.
 feed_tree() {
   root="$work/config"
   mkdir -p "$root"
   cp "$here/$1" "$root/shell.qml"
-  cp "$here/HarnessExit.qml" "$root/"
+  cp "$here/HarnessExit.qml" "$here/Harness.qml" "$here/Steps.qml" "$root/"
   shift
   for file in "$@"; do cp "$plugin/$file" "$root/"; done
 }
@@ -66,7 +67,7 @@ plugin_tree() {
   cp -r "$plugin/sounds" "$root/plugin/"
   ln -s /usr/share/omarchy/shell/Ui /usr/share/omarchy/shell/Commons "$root/"
   cp "$here/$1" "$root/shell.qml"
-  cp "$here/HarnessExit.qml" "$root/"
+  cp "$here/HarnessExit.qml" "$here/Harness.qml" "$here/Steps.qml" "$root/"
   patch_copy plugin/WindowHost.qml 's/readonly property var monitors: Hyprland.monitors.values/property var monitors: []/'
 }
 

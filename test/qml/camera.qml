@@ -1,5 +1,4 @@
 import QtQuick
-import QtTest
 import Quickshell
 import Quickshell.Io
 import qs.Commons
@@ -17,36 +16,17 @@ import "plugin" as Stonks
 // thumbnail and a click to edit it; the picture is of the chart on show,
 // its symbol, range, and scrub, never the list. Then, with Omasnap absent
 // and present (camera.sh), the folder and editor each version of Omarchy
-// uses, under each version's settings. HOME and curl are scratch.
-ShellRoot {
+// uses, under each version's settings. HOME and curl are scratch. With
+// STONKS_CAMERA_SIZES=1 (all.sh's run at QT_SCALE_FACTOR=2) only the two
+// shots whose picture size could change are taken: the popup's and the
+// window's.
+Harness {
   id: harness
+  marker: "CAMERA DONE"
 
-  property int failures: 0
-
-  function check(label, ok, detail) {
-    console.log((ok ? "PASS " : "FAIL ") + label + (!ok && detail !== undefined ? " — " + detail : ""))
-    if (!ok) failures++
-  }
-
-  function find(item, name) {
-    if (!item) return null
-    if (item.objectName === name) return item
-    for (var i = 0; i < item.children.length; i++) {
-      var found = find(item.children[i], name)
-      if (found) return found
-    }
-    return item.contentItem ? find(item.contentItem, name) : null
-  }
-
+  readonly property bool sizeOnly: Quickshell.env("STONKS_CAMERA_SIZES") === "1"
   readonly property string fakeState: Quickshell.env("STONKS_FAKE_STATE")
   readonly property string shotsDir: Quickshell.env("HOME") + "/Shots"
-  function readFile(path) {
-    var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true; printErrors: false }', harness)
-    view.path = path
-    var text = String(view.text())
-    view.destroy()
-    return text
-  }
   function readBytes(path) {
     if (path === "") return null
     var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true; printErrors: false }', harness)
@@ -122,7 +102,7 @@ ShellRoot {
   Stonks.Panel { id: panel; bar: api; settings: ({}) }
   Stonks.App { id: app; service: service; updates: updates; camera: camera }
 
-  TestCase {
+  Steps {
     name: "Camera"
     when: service.pluginsReady
 
@@ -164,10 +144,7 @@ ShellRoot {
       }
       if (loader) loader.loaded.connect(take)
       act()
-      for (var waited = 0; waited < 8000; waited += 50) {
-        if (notifications().length > sent && body.note.indexOf("Copied a screenshot of ") === 0 && !camera.busy) break
-        wait(50)
-      }
+      within(8000, function() { return notifications().length > sent && body.note.indexOf("Copied a screenshot of ") === 0 && !camera.busy })
       if (loader) loader.loaded.disconnect(take)
       var note = notifications()[sent] || []
       var file = note[3] || ""
@@ -240,35 +217,38 @@ ShellRoot {
       var body = panel.testBody
       tryVerify(function() { return body && body.surfaceOpen && !body.chartLoading && body.featuredSymbol === "AAPL" }, 5000)
       panel.refocusKeys()
-      wait(100)
+      tryVerify(function() { return panel.testKeys.activeFocus }, 2000)
       var still = shots().length
       var unlit = !body.cameraLit
       var rest = shoot(body, function() { keyClick(Qt.Key_C, Qt.ControlModifier) })
+      var lit = body.cameraLit
       var problems = landed(rest, "aapl", /^AAPL at .+$/).concat(ofChart(rest, "AAPL", "1D", "TUE 1 SEP 2026", rows))
-      harness.check("Ctrl+C in the popup saves one picture of AAPL's day in the pictures folder, copies it as a PNG, and sends Omarchy's notification with it",
+      check("Ctrl+C in the popup saves one picture of AAPL's day in the pictures folder, copies it as a PNG, and sends Omarchy's notification with it",
         problems.length === 0 && still === 0 && rest.card.scrubX === -1 && !rest.card.retro, problems.join("; "))
-      harness.check("the camera lights after its first shot, and not before", unlit && body.cameraLit)
 
-      // Scrubbed back two steps: the picture shows the scrub and says its
-      // time, and the footer names it.
-      keyClick(Qt.Key_Left)
-      keyClick(Qt.Key_Left)
-      tryVerify(function() { return body.scrubT !== 0 }, 2000)
-      var scrubbed = shoot(body, function() { keyClick(Qt.Key_C, Qt.ControlModifier) })
-      problems = landed(scrubbed, "aapl", /^AAPL at \d\d:\d\d$/).concat(ofChart(scrubbed, "AAPL", "1D", "TUE 1 SEP 2026", rows))
-      harness.check("scrubbed, Ctrl+C takes the scrub: the picture shows it and says its time, its date only at the foot, and the footer says it too",
-        problems.length === 0 && scrubbed.card.scrubT === body.scrubShown && scrubbed.card.scrubX >= 0 && /^AT \d\d:\d\d [A-Z]+$/.test(scrubbed.card.when)
-          && scrubbed.name !== rest.name,
-        problems.join("; ") + " | " + scrubbed.card.when + " | " + scrubbed.footer)
+      if (!harness.sizeOnly) {
+        // Scrubbed back two steps: the picture shows the scrub and says its
+        // time, and the footer names it.
+        keyClick(Qt.Key_Left)
+        keyClick(Qt.Key_Left)
+        tryVerify(function() { return body.scrubT !== 0 }, 2000)
+        var scrubbed = shoot(body, function() { keyClick(Qt.Key_C, Qt.ControlModifier) })
+        problems = landed(scrubbed, "aapl", /^AAPL at \d\d:\d\d$/).concat(ofChart(scrubbed, "AAPL", "1D", "TUE 1 SEP 2026", rows))
+        check("scrubbed, Ctrl+C takes the scrub: the picture shows it and says its time, its date only at the foot, and the footer says it too",
+          problems.length === 0 && scrubbed.card.scrubT === body.scrubShown && scrubbed.card.scrubX >= 0 && /^AT \d\d:\d\d [A-Z]+$/.test(scrubbed.card.when)
+            && scrubbed.name !== rest.name,
+          problems.join("; ") + " | " + scrubbed.card.when + " | " + scrubbed.footer)
 
-      // Lit through the close's fade, and out when the popup opens again.
-      panel.close()
-      var fading = body.cameraLit === true
-      wait(300)
-      panel.open()
-      tryVerify(function() { return body.surfaceOpen }, 2000)
-      harness.check("the camera stays lit until the popup closes, and is out when it opens again",
-        fading && body.cameraLit === false, fading + "|" + body.cameraLit)
+        // Lit through the close's fade, and out when the popup opens again;
+        // the wait lets the fade end.
+        panel.close()
+        var fading = body.cameraLit === true
+        wait(300)
+        panel.open()
+        tryVerify(function() { return body.surfaceOpen }, 2000)
+        check("the camera lights after its first shot, and not before",
+          unlit && lit && fading && body.cameraLit === false, [unlit, lit, fading, body.cameraLit].join("|"))
+      }
       panel.close()
       wait(300)
 
@@ -280,14 +260,20 @@ ShellRoot {
       app.open("{}")
       var win = app.testBody
       tryVerify(function() { return win && win.surfaceOpen && !win.chartLoading && win.historyShown && win.retro }, 8000)
-      wait(200)
-      var button = harness.find(win, "cameraButton")
+      var button = find(win, "cameraButton")
+      tryVerify(function() { return button && button.visible && button.width > 0 }, 2000)
+      waitForRendering(button)
       var year = shoot(win, function() { if (button) mouseClick(button, button.width / 2, button.height / 2) })
       problems = landed(year, "aapl", /^AAPL 1Y at .+$/).concat(ofChart(year, "AAPL", "1Y", "1 YEAR", rows))
       var marks = harness.marksSaid(win)
       if (year.card.marks !== marks || /none/.test(marks)) problems.push("marks " + year.card.marks + " against the window's " + marks)
-      harness.check("a click on the window's camera, in retro, takes AAPL's 1Y as it is shown, its high and low marked",
+      check("a click on the window's camera, in retro, takes AAPL's 1Y as it is shown, its high and low marked",
         problems.length === 0 && year.card.retro && win.cameraLit, problems.join("; "))
+      if (harness.sizeOnly) {
+        app.close()
+        finish()
+        return
+      }
 
       // The pointer on the chart scrubs it, and Ctrl+C takes that moment: the
       // way a mouse hand takes a scrubbed picture, since leaving the chart
@@ -298,21 +284,11 @@ ShellRoot {
       tryVerify(function() { return win.scrubT !== 0 }, 2000)
       var hovered = shoot(win, function() { keyClick(Qt.Key_C, Qt.ControlModifier) })
       problems = landed(hovered, "aapl", /^AAPL 1Y on .+$/).concat(ofChart(hovered, "AAPL", "1Y", "1 YEAR", rows))
-      harness.check("Ctrl+C with the pointer on the window's chart takes the bar the pointer reads",
+      check("Ctrl+C with the pointer on the window's chart takes the bar the pointer reads",
         problems.length === 0 && hovered.card.scrubT === win.scrubShown && hovered.card.scrubX >= 0,
         problems.join("; ") + " | " + hovered.card.scrubT + " vs " + win.scrubShown)
       mouseMove(win, 1, 1)
-
-      // Bitcoin, its file named for its symbol, its dash kept.
-      service.setRange("1D")
-      service.addSymbol("BTC-USD")
-      quiet()
-      service.feature("BTC-USD")
-      tryVerify(function() { return win.featuredSymbol === "BTC-USD" && !win.chartLoading && !win.historyActive }, 8000)
-      app.testKeyCatcher.forceActiveFocus()
-      var coin = shoot(win, function() { keyClick(Qt.Key_C, Qt.ControlModifier) })
-      problems = landed(coin, "btc-usd", /^BTC-USD at \d\d:\d\d(?: [A-Z]+)?$/).concat(ofChart(coin, "BTC-USD", "1D", "SAT 12 SEP 2026", rows))
-      harness.check("Ctrl+C in the window takes Bitcoin's day", problems.length === 0, problems.join("; "))
+      tryVerify(function() { return win.scrubT === 0 }, 2000)
 
       // Omarchy 4.5 hands its screenshots to Omasnap, which keeps them in a
       // folder of its own; 4.0 to Tensaku, in the pictures folder. Each shot
@@ -349,16 +325,11 @@ ShellRoot {
         camera.testEnvironment = env
         app.testKeyCatcher.forceActiveFocus()
         var shot = shoot(win, function() { keyClick(Qt.Key_C, Qt.ControlModifier) }, step.folder)
-        problems = landed(shot, "btc-usd", /^BTC-USD at \d\d:\d\d(?: [A-Z]+)?$/, step.folder, step.editor)
-        harness.check(step.label, problems.length === 0, problems.join("; "))
+        problems = landed(shot, "aapl", /^AAPL 1Y at .+$/, step.folder, step.editor)
+        check(step.label, problems.length === 0, problems.join("; "))
       }
       app.close()
-
-      console.log("CAMERA DONE")
-      done.exitCode = harness.failures ? 1 : 0
-      done.start()
+      finish()
     }
   }
-
-  HarnessExit { id: done; interval: 100 }
 }

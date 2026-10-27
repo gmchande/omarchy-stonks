@@ -23,8 +23,9 @@ import "plugin"
 // as its whole rows, the way Panel sizes it. sprite-candidates draws the
 // bull and bear candidates at 1x and 4x. pill-sheet draws the real bar pill
 // for NEST in every bar style and look, on a horizontal and a vertical bar.
-ShellRoot {
+Harness {
   id: root
+  marker: "RENDER DONE"
 
   // window-of-<state>: a popup-<state> in the window instead (the ranges,
   // the 52-week high, an overnight moment), the same data. The sweep has
@@ -34,14 +35,11 @@ ShellRoot {
   // its full size, in place of the surface; share-scrub-of-<state>: the
   // same scrubbed to the day's middle print. lit-<state>: the surface after
   // a screenshot, its camera lit; quiet-<state>: with sounds off; both may
-  // lead, quiet- first. <state>-large: the state with the shell's text at
-  // 16 (render.sh), its gaps and icons grown with it, in the everyday frame
-  // (the popup 480 wide, the smallest window 560): narrower than the shell
-  // draws the surface at 16, so a squeeze test, not what a reader sees.
-  // <state>-size-N: the state at text size N in the frame the shell gives
-  // it there, the popup and the smallest window grown with the text, as a
-  // reader sees it. Either way, the state as named without the suffix; the
-  // pill sheet keeps its name and draws its own frame.
+  // lead, quiet- first. <state>-size-N: the state at text size N
+  // (render.sh) in the frame the shell gives it there, the popup and the
+  // smallest window grown with the text, as a reader sees it; the state as
+  // named without the suffix. The pill sheet keeps its name and draws its
+  // own frame.
   readonly property string asked: Quickshell.env("STONKS_VISUAL_STATE") || "retro"
   readonly property bool quiet: /^quiet-/.test(asked)
   readonly property bool lit: /^(quiet-)?lit-/.test(asked)
@@ -50,7 +48,7 @@ ShellRoot {
   readonly property string requested: {
     var state = asked.replace(/^(quiet-)?(lit-)?/, "")
     if (shareOf) state = "popup-" + state.slice(state.indexOf("-of-") + 4)
-    return state.indexOf("pill-sheet") === 0 ? state : state.replace(/-(large|size-\d+)$/, "")
+    return state.indexOf("pill-sheet") === 0 ? state : state.replace(/-size-\d+$/, "")
   }
   // A -size-N state's text scale, as Style.fontScale has it; 1 for the rest.
   readonly property real sizeScale: {
@@ -60,8 +58,8 @@ ShellRoot {
   readonly property bool minWindowOf: requested.indexOf("min-window-of-") === 0
   readonly property bool windowOf: minWindowOf || requested.indexOf("window-of-") === 0
   readonly property string stateName: windowOf ? "popup-" + requested.slice((minWindowOf ? "min-window-of-" : "window-of-").length) : requested
-  // Real pointer states retired from the behavior flows. These pictures
-  // join the ordinary render diff; no behavior test prescribes their ink.
+  // A control under real pointer input: its hover, or its press filmed and
+  // judged (frames.js press), then drawn held.
   readonly property var controlState: /^(popup|window)-controls-([a-z]+)-(hover|press)-(smooth|retro)$/.exec(stateName)
   readonly property var anchorState: /^popup-anchor-(left|center|right)-(open|held|next)-(smooth|retro)$/.exec(stateName)
   FileView { id: anchorPoses; path: Quickshell.env("STONKS_ANCHOR_POSES"); blockLoading: true }
@@ -261,11 +259,9 @@ ShellRoot {
      "....############....", "...##############...", "...###.######.###...", "...##############...",
      "....#####..#####....", "........####........"]
   ]
-  // The bears tried on 14 October for a face to match the bull's: the bear
-  // that walked here until then (read as a pig), the teddy with inner ears
-  // and a mouth, the grizzly (the default), and the bull's twin with a
-  // short muzzle. Earlier faces whose outline ran straight up into pointed
-  // ears read as cats.
+  // The bear candidates for a face to match the bull's: one read as a pig,
+  // the teddy with inner ears and a mouth, the grizzly (the default), and the
+  // bull's twin with a short muzzle.
   readonly property var bearCandidates: [
     ["....................", ".........#####......", ".......##########...", "..###.############..",
      ".#.###.############.", "####.##############.", "###################.", ".##################.",
@@ -728,13 +724,19 @@ ShellRoot {
           baseline: 95, firstTradeDate: history.bars[0].t, bars: history.bars.slice(0, 5)
         } }
       } else if (root.stateName === "popup-history-loading") {
-        // A refetch out with the range in hand: the last answer, aged.
-        root.shownHistoryEntry = { status: "ok", history: history, receivedAt: root.now - 900 }
+        // 1Y asked from the day on show (Component.onCompleted), its answer
+        // not in yet.
+        root.shownRange = "1D"
       } else if (root.stateName === "history-empty-loading") {
         // No answer yet.
         root.shownHistoryEntry = null
       } else if (root.stateName === "popup-history-failed") {
-        root.shownHistoryEntry = { status: "failed", history: history, receivedAt: root.now - 900 }
+        // 1Y asked with the network gone: the range fails as every
+        // listing's refresh has, the day stands in, and the header offers
+        // the range's retry rather than saying Yahoo sends nothing.
+        root.shownHistoryEntry = { status: "failed", history: null, receivedAt: root.now }
+        stub.entries = { AAPL: { status: "failed", answeredAt: root.now, receivedAt: root.now - 300 },
+          "SHOP.TO": { status: "failed", answeredAt: root.now, receivedAt: root.now - 300 } }
       } else if (root.stateName.indexOf("popup-history-unavailable-") === 0) {
         // A first fetch that failed: the day stands in, and the header
         // offers the retry.
@@ -756,6 +758,7 @@ ShellRoot {
 
   Component.onCompleted: {
     load()
+    if (root.stateName === "popup-history-loading") root.shownRange = "1Y"
     // The next symbol asked for, past its quarter second: what is on show
     // for the held one dims as it rests (`ChartMotion.dimmed`).
     if (root.loadingNext) {
@@ -1013,7 +1016,7 @@ ShellRoot {
         result.saveToFile(root.outPath)
         done(0)
         console.log("SHARE footer | " + body.note)
-        exitTimer.start()
+        root.finish()
       }, Qt.size(item.width, item.height))
     }
   }
@@ -1320,6 +1323,8 @@ ShellRoot {
       }
     }
 
+    // A still state's picture, 300 ms in, once its window has laid out and
+    // drawn: nothing in the shell says when that is done.
     Timer {
       interval: 300
       running: !root.interactivePicture
@@ -1332,25 +1337,19 @@ ShellRoot {
         if (root.beforeGrab) root.beforeGrab()
         frame.grabToImage(function(result) {
           result.saveToFile(root.outPath)
-          exitTimer.start()
+          root.finish()
         })
       }
     }
   }
 
-  TestCase {
+  Steps {
     name: "ReviewPictures"
     when: root.interactivePicture && renderWindow.visible
     // Failed QtTest assertions still leave through the quiescent exit.
-    function cleanupTestCase() { exitTimer.start() }
+    function cleanupTestCase() { root.finish() }
 
-    function findAll(item, name) {
-      var out = []
-      if (item.objectName === name) out.push(item)
-      for (var i = 0; i < item.children.length; i++) out = out.concat(findAll(item.children[i], name))
-      return out
-    }
-    function one(name) { return findAll(body, name)[0] }
+    function one(name) { return root.findAll(body, name)[0] }
 
     function test_picture() {
       if (root.motionPose) {
@@ -1375,15 +1374,15 @@ ShellRoot {
           var removed = stub.shown[stub.shown.length - 2]
           stub.symbols = stub.symbols.filter(function(symbol) { return symbol !== removed })
           stub.shown = stub.shown.filter(function(symbol) { return symbol !== removed })
-          wait(200)
+          within(2000, function() { return !rows.rowItem(removed) && stub.shown.every(function(symbol) { return rows.rowResting(symbol) }) })
         } else if (pose === "notefade") {
-          // Removal no longer makes a notice. A refusal still fades here.
+          // A refusal's note, half faded.
           stub.order = "pct"
           rows.cursorSymbol = member
           body.moveSelected(1)
           if (body.note !== "Switch to manual order to move rows") {
             console.error("FAIL fading refusal state contains the move refusal")
-            exitTimer.exitCode = 1
+            root.failures++
           }
           body.noteShown = 0.5
         } else if (pose === "breadth") {
@@ -1426,7 +1425,7 @@ ShellRoot {
         anchorProbe.hold()
         if (!anchorProbe.QsWindow || anchorProbe.QsWindow.window !== renderWindow || !anchorProbe.parent) {
           console.error("FAIL the default held anchor finds its real pill's window")
-          exitTimer.exitCode = 1
+          root.failures++
           return
         }
         var heldAt = anchorProbe.mapToItem(renderWindow.contentItem, 0, 0)
@@ -1444,7 +1443,7 @@ ShellRoot {
       stub.order = "pct"
       waitForRendering(body)
       var target = null
-      if (control === "range") target = findAll(one("rangeRow"), "rangeToken")[1]
+      if (control === "range") target = root.findAll(one("rangeRow"), "rangeToken")[1]
       else if (control === "list") target = one("listLabel")
       else if (control === "orderword") target = one("orderLabel")
       else if (control === "orderarrow") target = one("orderArrow")
@@ -1457,20 +1456,20 @@ ShellRoot {
       else if (control === "remove") {
         body.watchlist.cursorSymbol = stub.shown[1]
         waitForRendering(body)
-        target = findAll(body.watchlist.rowItem(stub.shown[1]), "rowRemove")[0]
+        target = root.findAll(body.watchlist.rowItem(stub.shown[1]), "rowRemove")[0]
       } else if (control === "done" || control === "deadmove" || control === "livemove") {
         body.openManageLists()
         waitForRendering(body)
         target = control === "done" ? one("manageDone")
-          : findAll(findAll(body, "manageRow")[1], control === "deadmove" ? "moveUp" : "moveDown")[0]
+          : root.findAll(root.findAll(body, "manageRow")[1], control === "deadmove" ? "moveUp" : "moveDown")[0]
       } else if (control === "symbol") {
         body.openSymbolLists(stub.shown[0])
         waitForRendering(body)
         // The click that opened this view is shielded for a double-click.
         // Begin the row's film only once that row can receive the press.
-        var shield = findAll(one("symbolLists"), "openingShield")[0]
+        var shield = root.findAll(one("symbolLists"), "openingShield")[0]
         tryVerify(function() { return !shield.visible }, 2000)
-        target = findAll(body, "symbolListRow")[0]
+        target = root.findAll(body, "symbolListRow")[0]
       } else if (control === "search") {
         body.adding = true
         body.search.results = Search.parseSearch(JSON.parse(searchFile.text())).results
@@ -1480,7 +1479,7 @@ ShellRoot {
         root.searchField(body.search).text = "SHOP"
         body.search.suspend()
         waitForRendering(body)
-        target = findAll(body.search, "searchResult")[1]
+        target = root.findAll(body.search, "searchResult")[1]
       }
       verify(!!target, "review control exists: " + control)
       waitForRendering(body)
@@ -1495,11 +1494,13 @@ ShellRoot {
           : control === "look" ? one("lookFill")
           : control === "help" ? one("helpFill")
           : control === "footer" ? one("footerFill")
-          : control === "done" ? findAll(target, "actionFill")[0]
-          : control === "symbol" ? findAll(target, "rowFill")[0]
-          : control === "remove" ? findAll(target, "rowRemoveFill")[0] : target
+          : control === "done" ? root.findAll(target, "actionFill")[0]
+          : control === "symbol" ? root.findAll(target, "rowFill")[0]
+          : control === "remove" ? root.findAll(target, "rowRemoveFill")[0] : target
         var corner = fill.mapToItem(body, 0, 0)
         var box = [Math.ceil(corner.x) + 1, Math.ceil(corner.y) + 1, Math.floor(fill.width) - 3, Math.floor(fill.height) - 3]
+        // Off the control, so the film opens on it at rest; the time lets
+        // any hover fill the move left fade (160 ms).
         mouseMove(body, body.width / 2, 10)
         wait(200)
         pressFilm.source = body
@@ -1515,7 +1516,7 @@ ShellRoot {
         tryVerify(function() { return pressFilm.verdict !== null }, 10000)
         if (!pressFilm.verdict.ok) {
           console.error("FAIL pressed feedback " + control + " — " + pressFilm.verdict.detail)
-          exitTimer.exitCode = 1
+          root.failures++
         }
       } else {
         // RowPointer treats its first sighting as a resting pointer.
@@ -1528,14 +1529,15 @@ ShellRoot {
     }
 
     function savePicture() {
+      // The hover and press fills, the scroll and the poses' rows, settle
+      // within two 160 ms fades; nothing says when all of them have.
       wait(320)
       var saved = false
       frame.grabToImage(function(result) { saved = result.saveToFile(root.outPath) })
       tryVerify(function() { return saved }, 3000)
-      exitTimer.start()
+      root.finish()
     }
   }
 
   FrameGrab { id: pressFilm }
-  HarnessExit { id: exitTimer }
 }
