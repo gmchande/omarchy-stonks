@@ -282,15 +282,23 @@ ShellRoot {
         service.listName + "|" + JSON.stringify(service.lists))
 
       // A switch with the pointer resting on the rows still lays out the new
-      // list, which a resort under the pointer would hold back.
+      // list, which a resort under the pointer would hold back. Each wait is
+      // on the step's own condition, up to 3 s, and says how long it took.
       var row = watchlist.rowItem("NVDA")
       mouseMove(row, row.width / 2, row.height / 2)
-      wait(50)
+      var restAsked = Date.now()
+      within(3000, function() { return watchlist.sortHeld })
+      var restMs = Date.now() - restAsked
       switchByKeys("")
-      harness.check("a list switch under the pointer shows the new list's rows",
-        watchlist.sortHeld && harness.same(watchlist.displayedSymbols, service.shown)
-          && watchlist.contentY === 0,
-        watchlist.sortHeld + "|" + watchlist.displayedSymbols + "|" + service.shown + "|" + watchlist.contentY)
+      var switched = function() {
+        return watchlist.sortHeld && harness.same(watchlist.displayedSymbols, service.shown) && watchlist.contentY === 0
+      }
+      var switchAsked = Date.now()
+      within(3000, switched)
+      var switchMs = Date.now() - switchAsked
+      harness.check("a list switch under the pointer shows the new list's rows", switched(),
+        watchlist.sortHeld + "|" + watchlist.displayedSymbols + "|" + service.shown + "|" + watchlist.contentY
+          + " | held " + restMs + " ms after the move, laid out " + switchMs + " ms after the switch")
       mouseMove(body, body.width / 2, 10)
       switchByKeys("Growth")
 
