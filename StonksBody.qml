@@ -457,23 +457,27 @@ Item {
   // The market as the header says it, said in less and less.
   readonly property var marketForms: featuredQuote ? Market.statusForms(dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars,
     Overnight.nightTrades(featuredQuote, !!chart && chart.allDay, now, calendars)) : []
+  // Trouble, said once, unless a scrub reads a moment, a refresh you asked
+  // for is out, or a range failed, whose header offers its retry: while a
+  // row warns and Yahoo is paused, why and when Stonks tries again; with
+  // every row warning and no pause, that Stonks keeps trying; and a price
+  // on show whose refresh failed, why. Null without trouble. The header
+  // says it at full strength (`HeaderStatus.trouble`).
+  readonly property var troubleForms: {
+    if (!service || scrubShown || refreshing || (historyActive && historyFailed)) return null
+    if (hostPause && warnings > 0) return hostPause.forms
+    if (yahooDown) return ["Can't get prices · Stonks keeps trying", "Can't get prices"]
+    if (featuredQuote && featuredFreshness.state === "failed")
+      return ["No usable answer for " + (chartSymbol || featuredSymbol), "No usable answer"]
+    return null
+  }
   // The header's words, then the same said in less for a header with no
   // room for them (`HeaderStatus`), each form shorter than the one before:
   // trouble in fewer words, a scrubbed bar's
   // date without its price, and the market's (`Market.statusForms`).
   readonly property var headerForms: {
     if (!service) return [headerWhenMissing]
-    // Trouble, said once, unless a scrub reads a moment, a refresh you asked
-    // for is out, or a range failed, whose header offers its retry: while a
-    // row warns and Yahoo is paused, why and when Stonks tries again; with
-    // every row warning and no pause, that Stonks keeps trying; and a price
-    // on show whose refresh failed, why.
-    if (!scrubShown && !refreshing && !(historyActive && historyFailed)) {
-      if (hostPause && warnings > 0) return hostPause.forms
-      if (yahooDown) return ["Can't get prices · Stonks keeps trying", "Can't get prices"]
-      if (featuredQuote && featuredFreshness.state === "failed")
-        return ["No usable answer for " + (chartSymbol || featuredSymbol), "No usable answer"]
-    }
+    if (troubleForms) return troubleForms
     // The chart asked for is on its way, named: what was on show stays.
     // Before any chart has been in, the empty hero's label names it alone,
     // in the one place a reader looks (`HeroBand`).
@@ -1366,6 +1370,7 @@ Item {
     ground: root.ground
     scrubbing: root.scrubT !== 0
     live: root.heroLive
+    trouble: !!root.troubleForms
     still: !root.surfaceOpen
     helpShown: root.showingHelp
     foreground: root.foreground

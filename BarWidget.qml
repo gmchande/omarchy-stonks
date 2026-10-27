@@ -414,7 +414,9 @@ BarWidget {
         anchors.verticalCenter: parent.verticalCenter
         textFormat: Text.PlainText
         text: root.changeText
-        color: root.featured ? root.trendColor : root.dimColor
+        // With no price, a warning's words ("! Can't get prices") are in the
+        // bar's ink, as the header says trouble; the waiting "…" stays dim.
+        color: root.featured ? root.trendColor : root.warns ? button.foreground : root.dimColor
         font.family: button.fontFamily
         font.pixelSize: button.fontSize
       }

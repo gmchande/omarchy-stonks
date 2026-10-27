@@ -49,6 +49,9 @@ Item {
   property var animal: ({ kind: "", chart: "", asleep: false, bell: false, scrubbed: false })
   property bool scrubbing: false
   property bool live: false
+  // The words say prices stopped (`StonksBody.troubleForms`): at full
+  // strength, so they stand out with no colour, since red says down.
+  property bool trouble: false
   // The surface is closing: the look icon's step and the animal's turn stop
   // where they are.
   property bool still: false
@@ -310,7 +313,7 @@ Item {
     y: root.titled ? titleText.y + titleText.implicitHeight + Style.space(2) : Math.round((root.contentHeight - implicitHeight) / 2)
     textFormat: Text.PlainText
     text: root.measured.length ? root.measured[root.fit.form].words : ""
-    color: root.scrubbing || root.live ? root.foreground : root.dim
+    color: root.scrubbing || root.live || root.trouble ? root.foreground : root.dim
     font.family: root.fontFamily
     font.pixelSize: Style.font.caption
     font.bold: true
