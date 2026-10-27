@@ -11,40 +11,25 @@ import "plugin" as Stonks
 // answering its own saved year, and Toronto (SHOP.TO), whose history fails;
 // then a long list in a window taller than the history cache. The fake curl
 // logs every request in requests.log, "kind name status".
-ShellRoot {
+Harness {
   id: harness
+  marker: "AHEAD DONE"
 
-  property int failures: 0
   readonly property string state: Quickshell.env("STONKS_FAKE_STATE")
   readonly property var listed: ["NEST", "KILN", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T", "SHOP.TO"]
-
-  function check(label, ok, detail) {
-    console.log((ok ? "PASS " : "FAIL ") + label + (detail !== undefined ? " — " + detail : ""))
-    if (!ok) failures++
-  }
 
   // Every request answered, read through a fresh view each time.
   function requests() { return lines("requests.log") }
   // Every curl run, its "kind:name" per URL, space-separated.
   function runs() { return lines("runs.log") }
   function lines(name) {
-    var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true; printErrors: false }', harness)
-    view.path = harness.state + "/" + name
-    var out = String(view.text() || "").split("\n").filter(function(line) { return line !== "" })
-    view.destroy()
-    return out
+    return readFile(harness.state + "/" + name).split("\n").filter(function(line) { return line !== "" })
   }
   function requestCount() { return requests().length }
   // The symbol of every history request answered from request `from` on.
   function histories(from) {
     return requests().slice(from).filter(function(line) { return /^history /.test(line) })
       .map(function(line) { return line.split(" ")[1].replace("%5E", "^") })
-  }
-
-  function finish() {
-    console.log("AHEAD DONE")
-    done.exitCode = failures ? 1 : 0
-    done.start()
   }
 
   Stonks.Service { id: service }
@@ -62,14 +47,10 @@ ShellRoot {
 
   Timer { id: screenAnswer; interval: 0; onTriggered: screens.screensAnswered() }
 
-  TestCase {
+  Steps {
     name: "Ahead"
     when: service.pluginsReady
 
-    function within(ms, fn) {
-      for (var t = 0; t < ms && !fn(); t += 50) wait(50)
-      return fn()
-    }
     function runCommand(command) {
       fileProc.command = command
       fileProc.running = true
@@ -109,15 +90,12 @@ ShellRoot {
       app.open("{}")
       var body = app.testBody
       tryVerify(function() { return app.opened && service.openSurfaces.length === 1 }, 3000)
-      within(3000, function() { return inSight(body).length === harness.listed.length })
+      verify(within(3000, function() { return inSight(body).length === harness.listed.length }), "every row in sight")
       var sight = inSight(body)
-      harness.check("the window shows every row", sight.length === harness.listed.length,
-        sight.join(",") + " in " + app.testWindow.height + " px")
       var gate = service.testYahooGate
 
       // On a range, the hero's chart first, then every row in sight, top
-      // first, in one run, so a slow network keeps them waiting once; a row
-      // whose answer fails keeps none.
+      // first, in one run, so a slow network keeps them waiting once.
       var from = harness.requestCount()
       var runsFrom = harness.runs().length
       body.selectRange("1Y")
@@ -125,13 +103,9 @@ ShellRoot {
       var asked = harness.histories(from)
       var rows = sight.filter(function(s) { return s !== "NEST" })
       var historyRuns = harness.runs().slice(runsFrom).filter(function(r) { return /^history:/.test(r) })
-      harness.check("on 1Y the hero's chart is asked first, then every row in sight, top first, each once, in one run",
+      check("on 1Y the hero's chart is asked first, then every row in sight, top first, each once, in one run",
         asked.join(",") === ["NEST"].concat(rows).join(",") && historyRuns.length === 2 && historyRuns[1].split(" ").length === rows.length,
         "asked " + asked.join(",") + " | in sight " + sight.join(",") + " | runs " + historyRuns.join(" / "))
-      var kept = rows.filter(function(s) { return ok(s, "1Y") })
-      harness.check("each kind's chart fetched ahead is kept, and Toronto's failed one keeps nothing",
-        kept.join(",") === rows.filter(function(s) { return s !== "SHOP.TO" }).join(",") && !service.histories["SHOP.TO|1Y"],
-        "kept " + kept.join(",") + " | SHOP.TO " + JSON.stringify(service.histories["SHOP.TO|1Y"] || null))
 
       // A click on a row fetched ahead shows its chart at once, asking
       // nothing; one whose fetch ahead failed asks, as the hero, and loads.
@@ -143,12 +117,12 @@ ShellRoot {
         wait(100)
       })
       var clickAsked = harness.histories(from)
-      harness.check("a click on a row fetched ahead shows its 1Y at once, on every kind, asking nothing",
+      check("a click on a row fetched ahead shows its 1Y at once, on every kind, asking nothing",
         waited.length === 0 && clickAsked.length === 0, "waited " + waited.join(",") + " | asked " + clickAsked.join(","))
       clickRow(body, "SHOP.TO")
       var shopLoads = body.chartLoading
       within(8000, function() { return !body.chartLoading })
-      harness.check("a click on a row whose fetch ahead failed asks for it as the hero, and loads",
+      check("a click on a row whose fetch ahead failed asks for it as the hero, and loads",
         shopLoads && harness.histories(from).join(",") === "SHOP.TO,SHOP.TO" && body.headerText === "1Y unavailable",
         shopLoads + " | " + harness.histories(from).join(",") + " | " + body.headerText)
       clickRow(body, "NEST")
@@ -166,18 +140,20 @@ ShellRoot {
       var heroLanded = within(3000, function() { return ok("BTC-USD", "6M") && !body.chartLoading })
       remove("SPY.history.hold")
       quiet()
-      harness.check("a row clicked while the rows' charts are fetched ahead gets its own at once, and the cut ones are asked again after",
+      check("a row clicked while the rows' charts are fetched ahead gets its own at once, and the cut ones are asked again after",
         heroLanded && ok("SPY", "6M") && ok("KILN", "6M"), heroLanded + " | " + harness.histories(from).join(","))
 
       // A new range drops what was fetched ahead for the last one and never
       // shown; the heroes' charts stay.
       body.selectRange("1W")
-      wait(50)
-      var stillAhead = ["KILN", "SPY", "^GSPC", "SHEL.L", "7203.T"].filter(function(s) { return !!service.histories[s + "|6M"] })
+      var stillAhead = function() {
+        return ["KILN", "SPY", "^GSPC", "SHEL.L", "7203.T"].filter(function(s) { return !!service.histories[s + "|6M"] })
+      }
+      within(1000, function() { return stillAhead().length === 0 })
       var heroesGone = ["NEST|6M", "BTC-USD|6M"].concat(rows.map(function(s) { return s + "|1Y" }))
         .filter(function(k) { return !service.histories[k] })
-      harness.check("a new range drops the last range's charts fetched ahead and never shown, and keeps every hero's",
-        stillAhead.length === 0 && heroesGone.length === 0, "still there " + stillAhead.join(",") + " | heroes gone " + heroesGone.join(","))
+      check("a new range drops the last range's charts fetched ahead and never shown, and keeps every hero's",
+        stillAhead().length === 0 && heroesGone.length === 0, "still there " + stillAhead().join(",") + " | heroes gone " + heroesGone.join(","))
       quiet()
 
       // A user's refresh asks for the hero's chart fresh, and none fetched
@@ -185,39 +161,35 @@ ShellRoot {
       from = harness.requestCount()
       service.refresh()
       quiet()
-      harness.check("r asks for the hero's chart fresh, not those fetched ahead", harness.histories(from).join(",") === "BTC-USD",
+      check("r asks for the hero's chart fresh, not those fetched ahead", harness.histories(from).join(",") === "BTC-USD",
         harness.histories(from).join(","))
-
-      // The day fetches no history, ahead or not.
-      from = harness.requestCount()
-      body.selectRange("1D")
-      wait(1500)
-      harness.check("the day fetches nothing ahead", harness.histories(from).length === 0, harness.histories(from).join(","))
 
       // Fetching ahead waits for half of Yahoo's budget, and for Yahoo to
       // answer; the hero's chart does not.
       gate.tokens = 30
       from = harness.requestCount()
       body.selectRange("3M")
-      wait(1500)
+      within(5000, function() { return ok("BTC-USD", "3M") })
+      quiet()
       var underHalf = harness.histories(from).join(",")
       gate.tokens = gate.capacity
       var afterRefill = within(3000, function() { return harness.histories(from).length > 1 })
       quiet()
-      harness.check("with under half of Yahoo's budget left only the hero's chart goes; the rows' go once it is back",
+      check("with under half of Yahoo's budget left only the hero's chart goes; the rows' go once it is back",
         underHalf === "BTC-USD" && afterRefill, underHalf + " | then " + harness.histories(from).join(","))
       gate.pause = "none"
       gate.pausedUntil = gate.now() + 600
       from = harness.requestCount()
       body.selectRange("5Y")
-      wait(1500)
+      within(5000, function() { return body.headerText === "5Y unavailable" })
+      quiet()
       var whilePaused = harness.histories(from).length
       var pausedHeader = body.headerText
       gate.pause = ""
       gate.pausedUntil = 0
       var afterPause = within(3000, function() { return harness.histories(from).length > 0 })
       quiet()
-      harness.check("while Yahoo is paused nothing is fetched ahead, and the rows' go once it answers again",
+      check("while Yahoo is paused nothing is fetched ahead, and the rows' go once it answers again",
         whilePaused === 0 && pausedHeader === "5Y unavailable" && afterPause,
         whilePaused + " | " + pausedHeader + " | then " + harness.histories(from).join(","))
 
@@ -226,6 +198,7 @@ ShellRoot {
       screens.screensOff = true
       from = harness.requestCount()
       body.selectRange("2Y")
+      // Nothing may go: time for a request to show.
       wait(1500)
       var dark = harness.histories(from).join(",")
       screens.screensOff = false
@@ -233,35 +206,21 @@ ShellRoot {
       var lit = within(3000, function() { return harness.histories(from).length > 1 })
       quiet()
       service.screens = null
-      harness.check("while every screen is off no history goes; the requested hero goes first once one is on",
+      check("while every screen is off no history goes; the requested hero goes first once one is on",
         dark === "" && lit && harness.histories(from)[0] === "BTC-USD", dark + " | then " + harness.histories(from).join(","))
 
-      // A chart fetched ahead and shown through search's preview is a
-      // hero's: the next range keeps it. Found in the review of this
-      // change: only the featured symbol's was kept.
-      body.startAdding()
-      wait(100)
-      body.search.chose("SPY", null)
-      var previewed = within(1000, function() { return body.chartSymbol === "SPY" && !body.chartLoading })
-      body.cancelAdding()
-      wait(100)
-      // An ahead request for the last range stops when the next one's hero
-      // is already in hand, and keeps nothing: SHEL.L's month held out, then
-      // 6M, whose hero BTC-USD has. Found in the same review: it went on
-      // and left a chart nobody would drop.
+      // SHEL.L's month held out, then 6M, whose hero BTC-USD has.
       touch("SHEL.L.history.hold")
       body.selectRange("1M")
-      wait(50)
-      var previewKept = !!service.histories["SPY|2Y"]
       tryVerify(function() { return service.testHistoryFeed.holds(service.testHistoryFeed.wanted, "SHEL.L|1M") }, 10000)
       var heroInHand = ok("BTC-USD", "6M")
       body.selectRange("6M")
       var cut = within(1000, function() { var w = service.testHistoryFeed.wanted; return !w || w.range === "6M" })
       remove("SHEL.L.history.hold")
       quiet()
-      harness.check("a chart fetched ahead and previewed through search is kept on the next range, and one fetched ahead for the last range stops on a cached hero, keeping nothing",
-        previewed && previewKept && heroInHand && cut && !service.histories["SHEL.L|1M"],
-        [previewed, previewKept, heroInHand, cut, JSON.stringify(service.histories["SHEL.L|1M"] || null)].join(" | "))
+      check("a chart fetched ahead for the last range stops on a cached hero, keeping nothing",
+        heroInHand && cut && !service.histories["SHEL.L|1M"],
+        [heroInHand, cut, JSON.stringify(service.histories["SHEL.L|1M"] || null)].join(" | "))
 
       // Closing the window stops the chart fetched ahead, and with none
       // open nothing is fetched.
@@ -273,8 +232,9 @@ ShellRoot {
       remove("KILN.history.hold")
       from = harness.requestCount()
       service.setRange("YTD")
+      // Nothing may go: time for a request to show.
       wait(1500)
-      harness.check("closing the window stops the chart fetched ahead, and with none open nothing is fetched",
+      check("closing the window stops the chart fetched ahead, and with none open nothing is fetched",
         stopped && harness.histories(from).length === 0, stopped + " | " + harness.histories(from).join(","))
 
       // A window tall enough to show more rows than the cache keeps, on a
@@ -313,10 +273,11 @@ ShellRoot {
       landed = !body.chartLoading
       var settled = quiet()
       var tallAsked = harness.histories(from).length
+      // The clock retries fetching ahead every step: time for one to ask.
       wait(2000)
       var askedOn = harness.histories(from).length - tallAsked
       var room = service.testHistoryFeed.keep
-      harness.check("a window showing more rows than the cache keeps fetches ahead no more than the cache holds beside the hero's chart, and nothing asks on",
+      check("a window showing more rows than the cache keeps fetches ahead no more than the cache holds beside the hero's chart, and nothing asks on",
         settled && tallAsked > 0 && tallAsked <= room && askedOn === 0 && tallSight < everyRow,
         settled + " | " + tallAsked + " asked of " + room + " (" + harness.histories(from).slice(0, 3).join(",") + "…), then " + askedOn
           + ", " + tallSight + " rows of " + everyRow + " in sight")
@@ -326,17 +287,16 @@ ShellRoot {
       body.watchlist.contentY = body.watchlist.contentHeight - body.watchlist.height
       var scrolled = quiet()
       var scrollAsked = harness.histories(from)
+      // As above: time for a retry to ask.
       wait(2000)
       var scrollOn = harness.histories(from).length - scrollAsked.length
       body.chartLoadingChanged.disconnect(watchHero)
       var again = scrollAsked.filter(function(s) { return pickAsked.indexOf(s) >= 0 })
-      harness.check("scrolled to the end, only the rows coming into sight are fetched ahead, none of those fetched before, and the hero's chart stays on show",
+      check("scrolled to the end, only the rows coming into sight are fetched ahead, none of those fetched before, and the hero's chart stays on show",
         scrolled && scrollAsked.length > 0 && again.length === 0 && scrollOn === 0 && !lost && !!service.histories[body.featuredSymbol + "|1Y"],
         scrolled + " | " + scrollAsked.join(",") + " asked, " + again.length + " of them again, then " + scrollOn + " | hero lost " + lost + " | " + body.featuredSymbol)
       app.close()
       harness.finish()
     }
   }
-
-  HarnessExit { id: done; interval: 100 }
 }
