@@ -3,7 +3,7 @@
 Stonks puts a stock watchlist in your Omarchy 4 bar. A small pill shows how
 a stock is doing today; click it for that stock's chart and your lists.
 
-<img src="preview.png" alt="Stonks in the Omarchy bar: its pill shows SPY's sparkline and change. Below the bar, the pixel bull, the STONKS wordmark, 'Stocks in your Omarchy bar.' and 'Free · No account · No API key', beside the retro popup: SPY at 769.94, up 0.88%, with the bull, over the day's chart in pixel columns">
+<img src="preview.png" alt="Stonks in the Omarchy bar: its pill shows NVDA's sparkline and change. Below the bar, the pixel bull, the STONKS wordmark, 'Stocks in your Omarchy bar.' and 'Free · No account · No API key', beside the retro popup: NVIDIA at 215.38, up 2.10%, with the bull, over the day's chart in pixel columns">
 
 - A pixel bull on an up day and a bear on a down one, asleep while the
   market rests.

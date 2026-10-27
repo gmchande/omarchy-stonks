@@ -6,23 +6,31 @@
 # scale, plus one popup in Catppuccin Latte. Writes media/*.png, or into
 # STONKS_README_OUT to look at first.
 #
-# `readme.sh --grabs SCALE DIR` writes no picture: it leaves every grab,
-# drawn at SCALE, in DIR. The maintainer's marketplace picture, preview.png,
-# shows two of them (retro-spy at scale 3, strip-spy at scale 6).
+# `readme.sh --marketplace SCALE DIR` writes no README picture: it grabs
+# the maintainer's marketplace picture's two, drawn at SCALE, into DIR:
+# popup.png, NVDA's retro popup, and strip.png, its pill on the bar, from
+# the capture named below with NVDA on the demo watchlist.
 # The popup's card window is CardWindow.qml, as in keys.sh. HOME and curl
 # are scratch.
 scale=2 keep=""
-if [ "${1:-}" = --grabs ]; then
-  [ $# -eq 3 ] || { echo "usage: readme.sh [--grabs SCALE DIR]" >&2; exit 2; }
+if [ "${1:-}" = --marketplace ]; then
+  [ $# -eq 3 ] || { echo "usage: readme.sh [--marketplace SCALE DIR]" >&2; exit 2; }
   scale=$2 keep=$(realpath -m "$3")
 fi
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 out="${STONKS_README_OUT:-$plugin/media}"
-# The capture the committed pictures show. Named, not the newest, so a new
+# The captures the committed pictures show. Named, not the newest, so a new
 # capture changes nothing until the commit that renders from it names it.
+# The marketplace's is a weekday noon in New York that holds NVDA.
 moment=demo-2026-10-19-1146
-[ -d "$STONKS_FIXTURES/moments/$moment" ] || { echo "FAIL no saved capture $moment (test/capture-demo.sh)"; exit 1; }
-stamp=${moment#demo-}
+listed=$(jq -c '.symbols' "$plugin/test/demo.json")
+if [ -n "$keep" ]; then
+  moment=watch-2026-10-26-1200
+  listed=$(jq -c '.symbols + ["NVDA"]' "$plugin/test/demo.json")
+  export STONKS_README_MARKETPLACE=NVDA
+fi
+[ -d "$STONKS_FIXTURES/moments/$moment" ] || { echo "FAIL no saved capture $moment"; exit 1; }
+stamp=${moment#*-}
 at=$(( $(date -d "${stamp:0:10} ${stamp:11:2}:${stamp:13:2}" +%s) + 60 ))
 echo "the demo watchlist at $moment"
 
@@ -40,7 +48,7 @@ patch_copy plugin/Service.qml "s/property int now: Math.floor(Date.now() \/ 1000
 patch_copy plugin/Service.qml 's/function wallSecond() { return Math.floor(Date.now() \/ 1000) }/function wallSecond() { return root.now }/'
 # The pills on their strips open no popup of their own.
 patch_copy plugin/BarWidget.qml '/id: panelLoader/,/source:/s/active: true/active: false/'
-jq '. + { hinted: true }' "$plugin/test/demo.json" > "$HOME/.config/omarchy/grvc.stonks.json"
+jq --argjson listed "$listed" '. + { hinted: true, symbols: $listed }' "$plugin/test/demo.json" > "$HOME/.config/omarchy/grvc.stonks.json"
 echo "$moment" > "$STONKS_FAKE_STATE/overnight.set"
 mkdir -p "$HOME/.local/state/omarchy/current"
 tokyo=/usr/share/omarchy/themes/tokyo-night
@@ -50,13 +58,13 @@ mkdir -p "$STONKS_README_RAW"
 export QT_QPA_PLATFORM=offscreen QT_SCALE_FACTOR=$scale
 run_qs 90
 raw=$STONKS_README_RAW
-grabs=(forms scrub lists retro retro-spy strip-spy window light)
 if [ -n "$keep" ]; then
-  for grab in "${grabs[@]}"; do
+  for grab in popup strip; do
     [ -s "$raw/$grab.png" ] || echo "FAIL $grab was not grabbed" >> "$work/log"
   done
   finish "README DONE"
 fi
+grabs=(forms scrub lists retro window light)
 
 # Each picture as a palette PNG, so a clone stays small, the pill's forms
 # with the black between their strips clear. Only this run's grabs make

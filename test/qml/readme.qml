@@ -10,15 +10,18 @@ import "plugin" as Stonks
 // The README's pictures, through the real Service, popup (Panel.qml, its
 // card in CardWindow.qml), window (App.qml), and pill (BarWidget.qml), on the
 // demo watchlist at the saved moment readme.sh names. Each picture is
-// grabbed into STONKS_README_RAW; readme.sh makes the README's from them,
-// and the marketplace picture takes retro-spy and strip-spy.
+// grabbed into STONKS_README_RAW; readme.sh makes the README's from them.
+// With STONKS_README_MARKETPLACE naming a symbol on the list, it grabs only
+// the marketplace picture's two: that symbol's retro popup and its pill on
+// the bar.
 Harness {
   id: harness
   marker: "README DONE"
 
   readonly property string rawDir: Quickshell.env("STONKS_README_RAW")
-  readonly property var demo: ["AAPL", "JNJ", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T"]
-  readonly property var us: ["AAPL", "JNJ", "SPY"]
+  readonly property string marketplace: Quickshell.env("STONKS_README_MARKETPLACE") || ""
+  readonly property var demo: ["AAPL", "JNJ", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T"].concat(marketplace ? [marketplace] : [])
+  readonly property var us: ["AAPL", "JNJ", "SPY"].concat(marketplace ? [marketplace] : [])
   readonly property string themeLink: Quickshell.env("HOME") + "/.local/state/omarchy/current/theme"
   property bool themeLinked: false
 
@@ -165,6 +168,7 @@ Harness {
 
     function test_pictures() {
       quiet()
+      if (harness.marketplace) return marketplacePictures()
       verify(service.symbols.join(",") === harness.demo.join(",") && service.featuredSymbol === "AAPL"
         && service.listName === "" && service.range === "1D", "the demo watchlist, AAPL featured, on All and the day: " + service.symbols.join(","))
 
@@ -203,13 +207,6 @@ Harness {
       service.persist({ style: "retro" })
       panel.open()
       grab("retro", panel.testCard.card, body, function() { return service.retro && body.surfaceOpen })
-      // The marketplace picture: SPY in retro, and the pill on the bar.
-      service.feature("SPY")
-      tryVerify(function() { return service.featuredSymbol === "SPY" }, 3000, "SPY featured")
-      grab("retro-spy", panel.testCard.card, body, function() { return service.retro && body.surfaceOpen && service.featuredSymbol === "SPY" })
-      grab("strip-spy", heroStrip, body, robinhoodIn)
-      service.feature("AAPL")
-      tryVerify(function() { return service.featuredSymbol === "AAPL" }, 3000, "AAPL featured again")
       panel.close()
       service.persist({ style: "smooth" })
       tryVerify(function() { return !body.surfaceOpen && !service.retro }, 3000)
@@ -234,6 +231,22 @@ Harness {
       tryVerify(function() { return colors.green !== before }, 2000, "Catppuccin Latte read")
       panel.open()
       grab("light", panel.testCard.card, body, function() { return body.surfaceOpen })
+      panel.close()
+      harness.finish()
+    }
+
+    // The marketplace picture's: the symbol featured in retro, from a fresh
+    // open, and its pill on the bar.
+    function marketplacePictures() {
+      var symbol = harness.marketplace
+      verify(service.symbols.join(",") === harness.demo.join(","), "the demo watchlist and " + symbol + ": " + service.symbols.join(","))
+      service.persist({ style: "retro" })
+      service.feature(symbol)
+      tryVerify(function() { return service.featuredSymbol === symbol }, 3000, symbol + " featured")
+      panel.open()
+      var body = panel.testBody
+      grab("popup", panel.testCard.card, body, function() { return service.retro && body.surfaceOpen && service.featuredSymbol === symbol })
+      grab("strip", heroStrip, body, robinhoodIn)
       panel.close()
       harness.finish()
     }
