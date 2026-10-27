@@ -1250,9 +1250,82 @@ ShellRoot {
       harness.check("every stream Stonks started, chimes, sounds, replays, the bell and the silence, asks for a latency that leaves the 1024-frame quantum where it is",
         streams.length > 0 && moving.length === 0, streams.length + " streams | " + moving.slice(0, 3).join(" | "))
 
+      // The chimes and lead-ins in the cache are written once and kept
+      // while they hold the current sound: the next start writes none. A
+      // file gone, or one rewritten since the look's stamp (as an older
+      // Stonks, which keeps no stamp, writes every file each run), is
+      // written again; a stamp naming other sources, as after a deploy that
+      // changed a sound and kept the version, has the whole look written
+      // again, its stamp last. A write that fails leaves the stamp as it
+      // was, so the next start writes the look again. Each start is Sounds
+      // made again over the same folder, its writes counted on the way to
+      // the real ones, or one failed on the way (`failing`).
+      var look = sounds.voice
+      var names = sounds.aheadOf(look).map(function(f) { return sounds.fileOf(look, f[0], f[1]) })
+      var stampPath = sounds.folder + "/stamp-" + look
+      tryVerify(function() { return sounds.surveyed && harness.readFile(stampPath).trim() === sounds.sources[look] }, 15000)
+      var restarted = function(failing) {
+        var spy = spyFiles.createObject(harness, { real: service.files, failing: failing || "" })
+        var again = soundsMaker.createObject(harness, { files: spy, retro: sounds.retro })
+        tryVerify(function() { return again.surveyed }, 5000)
+        return { sounds: again, spy: spy }
+      }
+      var finished = function(run) {
+        tryVerify(function() { return run.spy.log.indexOf("stamp-" + look) >= 0 }, 15000)
+        var writes = run.spy.log.slice()
+        run.sounds.destroy()
+        run.spy.destroy()
+        return writes
+      }
+      var unchanged = restarted()
+      var keptAll = names.every(function(n) { return unchanged.sounds.madeThisRun[n] === true })
+      wait(300)
+      var keptWrites = unchanged.spy.log.length
+      unchanged.sounds.destroy()
+      unchanged.spy.destroy()
+      fileProc.command = ["sh", "-c", "rm -f -- \"$1/" + names[3] + "\" && touch -- \"$1/" + names[names.length - 1] + "\"", "sh", sounds.folder]
+      fileProc.running = true
+      tryVerify(function() { return !fileProc.running }, 2000)
+      var mended = finished(restarted())
+      var stale = "0123456789abcdef0123456789abcdef"
+      harness.writeText(stampPath, stale + "\n")
+      var redone = finished(restarted())
+      harness.writeText(stampPath, stale + "\n")
+      var blocked = restarted(names[3])
+      tryVerify(function() { return blocked.spy.log.indexOf(names[names.length - 1]) >= 0 }, 15000)
+      wait(300)
+      var blockedWrites = blocked.spy.log.slice()
+      blocked.sounds.destroy()
+      blocked.spy.destroy()
+      var stampKept = harness.readFile(stampPath).trim() === stale
+      var expected = [names[3], names[names.length - 1], "stamp-" + look].join()
+      harness.check("a start writes none of the sounds the cache holds current, only one gone or rewritten since the stamp, and every one after a sound changed, the stamp last, and none when a write failed",
+        keptAll && keptWrites === 0 && mended.join() === expected && redone.join() === names.concat(["stamp-" + look]).join()
+          && blockedWrites.join() === names.join() && stampKept,
+        "kept " + keptAll + ", " + keptWrites + " written | mended " + mended.join() + " | redone " + redone.length + ", last " + redone[redone.length - 1]
+          + " | with a failed write " + blockedWrites.length + " written, stamp kept " + stampKept)
+
       console.log("SOUNDS DONE")
       done.exitCode = harness.failures ? 1 : 0
       done.start()
+    }
+  }
+
+  Component { id: soundsMaker; Stonks.Sounds {} }
+  // A start's files, counting each write on its way to the real ones.
+  Component {
+    id: spyFiles
+    QtObject {
+      property var real: null
+      property var log: []
+      property string failing: ""
+      readonly property string folder: real.folder
+      readonly property bool made: real.made
+      function write(path, data) {
+        var name = path.slice(folder.length + 1)
+        log.push(name)
+        return name !== failing && real.write(path, data)
+      }
     }
   }
 

@@ -201,13 +201,17 @@ ShellRoot {
       wait(100)
 
       // The card's window exists once it shows: its frames are grabbed from
-      // the same turn as the open, before its first frame.
+      // the same turn as the open, before its first frame. The open itself,
+      // the first since Stonks started, holds the thread at most 150 ms.
+      var openedAt = Date.now()
       panel.open()
+      var firstOpen = Date.now() - openedAt
       grab.source = panel.testCard.surface
       grab.begin("open")
       wait(500)
       var opened = verdict("edgeheld")
       harness.check("an open from closed shows the fitted height from its first frame", opened.ok, opened.detail)
+      harness.check("the popup's first open holds the thread at most 150 ms — " + firstOpen + " ms", firstOpen <= 150)
       wait(300)
 
       eases("a switch to a shorter list eases the edge up, the footer riding it", function() { service.switchList("Short") })
@@ -279,6 +283,17 @@ ShellRoot {
       tryVerify(function() { return !panel.testBody.chartLoading && panel.testBody.motion.dimmed === 0 }, 5000)
       service.setRange("1D")
       panel.close()
+      // Each later open from closed holds the thread at most 20 ms.
+      var later = []
+      for (var n = 0; n < 5; n++) {
+        wait(300)
+        var laterAt = Date.now()
+        panel.open()
+        later.push(Date.now() - laterAt)
+        wait(300)
+        panel.close()
+      }
+      harness.check("each later open of the popup holds the thread at most 20 ms — " + later.join(", ") + " ms", Math.max.apply(null, later) <= 20)
       pillTurns()
       harness.finish()
     }

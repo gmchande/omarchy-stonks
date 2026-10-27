@@ -1381,13 +1381,16 @@ ShellRoot {
         if (drawFrom || r <= leftAt || anim.duration <= 0) return
         drawFrom = animationOrigin(anim, r)
       }
-      // The body is built as the window first opens, before its draw-in
-      // starts: the watch goes on it as it is built.
-      var watchBody = function() { if (app.testBody) app.testBody.motion.revealChanged.connect(watchDraw) }
-      app.testBodyChanged.connect(watchBody)
-      app.open("{}")
-      app.testBodyChanged.disconnect(watchBody)
+      // The body is built a second after the service is ready, before this
+      // first open: the watch goes on it before the open. The open itself
+      // holds the thread at most 150 ms.
+      tryVerify(function() { return !!app.testBody }, 3000)
       var body = app.testBody
+      body.motion.revealChanged.connect(watchDraw)
+      var openedAt = Date.now()
+      app.open("{}")
+      var firstOpen = Date.now() - openedAt
+      harness.check("the window's first open holds the thread at most 150 ms — " + firstOpen + " ms", firstOpen <= 150)
       grab.source = body.chartItem
       grab.begin("first-open")
       tryVerify(function() { return !body.chartLoading && body.motion.reveal === 1 }, 5000)
@@ -1420,6 +1423,17 @@ ShellRoot {
       animalFrames(body)
       sleepFrames(body)
       closingHolds(body, watchlist, keys)
+      // Each later open holds the thread at most 20 ms.
+      var later = []
+      for (var n = 0; n < 5; n++) {
+        app.close()
+        wait(200)
+        var laterAt = Date.now()
+        app.open("{}")
+        later.push(Date.now() - laterAt)
+        wait(400)
+      }
+      harness.check("each later open of the window holds the thread at most 20 ms — " + later.join(", ") + " ms", Math.max.apply(null, later) <= 20)
       app.close()
       harness.finish()
     }

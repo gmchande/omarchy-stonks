@@ -328,9 +328,9 @@ The shell's log the form asks for can name the prices Stonks left out.
 
 - **Needs:** nothing beyond Omarchy 4. It runs `curl`, PipeWire's
   `pw-play`, `pw-cat`, and `pw-dump`, and `sh`, `bash`, `timeout`,
-  `head`, `mkdir`, `chmod`, `mktemp`, `ln`, and `rm`, which Omarchy ships,
-  and, for a screenshot, `sed`, `tail`, `date`, `wl-copy`, and
-  `omarchy-notification-send`.
+  `head`, `md5sum`, `mkdir`, `chmod`, `mktemp`, `ln`, and `rm`, which
+  Omarchy ships, and, for a screenshot, `sed`, `tail`, `date`, `wl-copy`,
+  and `omarchy-notification-send`.
 - **Commands:** `curl` for every request; as Stonks starts, one `sh` that
   makes its cache folder, `mkdir` and `chmod`, yours alone, and `chmod` as
   it writes each of its files, to make it yours alone too; only when it
@@ -341,7 +341,10 @@ The shell's log the form asks for can name the prices Stonks left out.
   its name, never over a file there, and `rm` takes the extra name away;
   each of these under `timeout`, which stops it after 5 seconds; a save
   that can't be made this way says your changes aren't saved; while
-  sounds are on, `pw-play` to play a sound, only
+  sounds are on, once a run, one `sh` under `timeout` for 5
+  seconds that reads, by `md5sum`, the files its sounds are made from, and
+  which sound files in its cache folder hold them, through `head` for 64
+  KB; `pw-play` to play a sound, only
   when you add, remove, or undo a row, take a screenshot, turn sounds on,
   replay a chart, or move along it, or the bell is due, with 4 seconds
   under `timeout`, and one `sh` that
@@ -398,7 +401,9 @@ The shell's log the form asks for can name the prices Stonks left out.
   sound in `~/.cache/grvc.stonks/replay.wav`, written over at each replay of
   another chart, and beside it the chimes' notes, `chime-*.wav`, each also
   with its silence first, and the other sounds with theirs, `lead-*.wav`,
-  written each run; and
+  written again only when what they're made from has changed or one is
+  missing, with `stamp-smooth` and `stamp-retro`, which say what they were
+  made from; and
   for each screenshot you take, one picture,
   `stonks-<symbol>-<date>_<time>.png`, in the folder Omarchy's own
   screenshots use: where Omasnap is installed, `OMASNAP_SCREENSHOT_DIR`,
