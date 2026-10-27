@@ -496,7 +496,7 @@ Harness {
       follows("a click on 1M", "1M")
       keyClick(Qt.Key_BracketLeft)
       follows("[", "1W")
-      harness.check("the first info line says the range's name, low, and high as the range changes by keys and by mouse, in both looks",
+      harness.check("the first info line says the range's name, low, and high as the range changes by keys and by mouse",
         followed.length === 0, followed.join(" | "))
       // r with the week in hand says "Refreshing" in the header while what it
       // asked for is out, MSFT's week held back here, and the market again
@@ -977,7 +977,7 @@ Harness {
       var downRange = History.historyRowModel(service.histories["DOWN|6M"].history, service.quotes.DOWN, 0)
       var dayLineDrawn = JSON.stringify(harness.find(pill, "pillLine").geometry) === JSON.stringify(Chart.chartGeometry(service.quotes.DOWN))
       var dayWrong = pillInEveryStyle(function(retro) { return Format.lookSigns(downDay.changeLine, retro) }, Commons.Color.urgent)
-      harness.check("on 6M every bar style in both looks shows the day in its colour, and a middle-click keeps the entry's other keys",
+      harness.check("on 6M every bar style shows the day in its colour, and a middle-click keeps the entry's other keys",
         service.range === "6M" && downDay.tone === "down" && downRange.tone === "up" && dayLineDrawn && dayWrong.length === 0,
         service.range + " " + downDay.tone + "/" + downRange.tone + " line " + dayLineDrawn + " " + dayWrong.join(" | "))
 
@@ -1035,7 +1035,7 @@ Harness {
       barApi.barSize = 0
       walk.push(drawn())
       pill.settings = settingsBefore
-      harness.check("the vertical stacked form names the day's symbol and change in both modes and looks",
+      harness.check("the vertical stacked form names the day's symbol and change in both modes",
         verticalWrong.length === 0, verticalWrong.join(" | "))
       harness.check("a horizontal bar's arrow and a vertical bar's form are kept apart, and on a vertical bar every middle-click changes what shows",
         walk.join(",") === "icon icon,arrow arrow,stacked stacked,icon icon,stacked stacked,arrow arrow", walk.join(","))
@@ -1072,7 +1072,7 @@ Harness {
       var backOnRight = formIn("right")
       barApi.layoutConfig = ({})
       pill.settings = settingsBeforeMove
-      harness.check("on the right the pill is its icon, the bull on an up day, the bear on a down one, and a level line on a flat one, until a middle-click there picks a form, kept for the right; the centre and left keep theirs",
+      harness.check("on the right the pill is its icon until a middle-click there picks a form, kept for the right; the centre and left keep theirs",
         centreForm === "sparkline" && movedRight === "icon alone" && pickedRight === "arrow"
           && wrote.barStyleRight === "arrow" && wrote.barStyle === "sparkline"
           && backInCentre === "sparkline" && onLeft === "sparkline" && backOnRight === "arrow",
@@ -1119,7 +1119,7 @@ Harness {
         + harness.themeDir + "/colors.toml'"]
       var trendColours = [dayColours("tokyo-night"), daysIn("kanagawa"), daysIn("tokyo-night"),
         daysIn("tokyo-night with kanagawa's green", greenOnly), daysIn("tokyo-night")]
-      harness.check("up and down are the theme's green and red and follow a theme switch, Stonks' own pair for the bar's ground where the theme has none",
+      harness.check("up and down are the theme's green and red and follow a theme switch",
         trendColours.join(" | ") === "tokyo-night #9ece6a #f7768e | kanagawa #76946a #c34043 | tokyo-night #9ece6a #f7768e"
           + " | tokyo-night with kanagawa's green #76946a #f7768e | tokyo-night #9ece6a #f7768e",
         trendColours.join(" | "))
