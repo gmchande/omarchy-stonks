@@ -29,10 +29,11 @@ function fetchedText(value, most) {
 var MOST_NAME = 200
 var MOST_CODE = 64
 
-// Whether `t`, in epoch seconds, is a moment a Date can hold (±8.64e12 s),
-// so no reading of it throws: a fetched 1e300 would.
+// Whether `t`, in epoch seconds, is a moment a Date can hold (±8.64e12 s)
+// at any clock offset (under a day, `Quote.isOffset`), so no reading of it
+// throws: a fetched 1e300 would.
 function isMoment(t) {
-  return isFiniteNumber(t) && Math.abs(t) <= 8.64e12
+  return isFiniteNumber(t) && Math.abs(t) <= 8.64e12 - 86400
 }
 
 var MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]

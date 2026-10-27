@@ -1017,6 +1017,38 @@ test("an answer's offset that isn't one is none, in the day and in a range", () 
   }
 })
 
+// The 1.1.0 security read-through's: a Robinhood whose hour answers each
+// ran five minutes on had the shell keep 150 more prints at every one,
+// 15,000 after a hundred, and with their times ahead of the clock, it was
+// asked for an hour again for ever.
+test("a hostile Robinhood's hours keep at most a day's request's prints, and times ahead of the clock ask for a day", () => {
+  const hour = k => M.overnightAnswer({ symbol: "X", historicals: Array.from({ length: 150 }, (_, j) =>
+    ({ begins_at: new Date((T0 + k * 300 + j) * 1000).toISOString(), close_price: "10", session: "overnight", interpolated: false })) }, "X")
+  let kept = hour(0)
+  for (let k = 1; k <= 100; k++) kept = M.joinHour(kept, hour(k))
+  expect(kept.bars.length).toBe(M.MOST_PRINTS)
+  expect(kept.bars.slice(-150)).toEqual(hour(100).bars)
+  expect(M.overnightSpan(kept, T0)).toBe("day")
+  expect(M.overnightSpan({ through: T0 + 60 }, T0)).toBe("day")
+})
+
+// The 1.1.0 security read-through's: a time of 1e300 was kept as the
+// quote's, and the words that say how fresh it is, and the screenshot's,
+// threw. One a Date holds only at UTC's clock throws at Tokyo's.
+test("a quote's time no Date holds is none: its price and chart stay, and its time reads as not sent", () => {
+  const sent = time => M.parseChart(chartAnswer(r => { r.meta.regularMarketTime = time; r.meta.gmtoffset = 32400 }), [])
+  const none = sent(undefined)
+  const said = q => [M.freshnessText(M.freshness({ status: "ok", answeredAt: T0 }, q, T0 + 600, 0, false), q, null),
+    M.words({ quote: q, day: q, history: null, latest: null, scrubT: 0, changeMode: "pct", range: "1D", now: T0 + 600, calendars: null })]
+  for (const bad of [1e300, 8.64e12]) {
+    expect(sent(bad)).toEqual(none)
+    expect(said(sent(bad))).toEqual(said(none))
+  }
+  expect(none.price).toBe(10)
+  expect(none.points.length).toBe(3)
+  expect(said(none)[0]).toBe("TIME NOT SENT")
+})
+
 test("a fetched name or code past its length reads as not sent", () => {
   const long = n => "N".repeat(n)
   const day = edit => M.parseChart(chartAnswer(r => edit(r.meta)), [])
