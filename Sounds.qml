@@ -1,7 +1,8 @@
 import QtQuick
 import Quickshell.Io
 import "ChartSound.js" as ChartSound
-// The sounds, while they are on (`turnedOn`, the data file's `sounds`):
+// The sounds, while they are on (`turnedOn`, the data file's `sounds`, off
+// until it says true; while off, nothing here runs):
 // for what you just did, adding a symbol, removing a row, undoing the
 // removal, which plays the removal backwards, taking a screenshot, the
 // shutter, a replay, which plays the chart, and the chimes, the chart's
@@ -15,7 +16,7 @@ import "ChartSound.js" as ChartSound
 Item {
   id: root
 
-  property bool turnedOn: true
+  property bool turnedOn: false
   property bool retro: false
   // The output is kept awake while sounds are on and a scrub moves, and
   // for 1 s after it last moved or ended (`scrubHeld`), so a chime struck

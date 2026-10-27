@@ -162,8 +162,9 @@ function fileSettings(src) {
     range: History.historyRanges().indexOf(from.range) >= 0 ? from.range : "1D",
     // The popup's first-run hint has shown, and never shows again.
     hinted: from.hinted === true,
-    // The sounds for what you do, on until you turn them off.
-    sounds: from.sounds !== false,
+    // The sounds, off until the file says true: a new install and a file
+    // from before them start silent.
+    sounds: from.sounds === true,
     // The daily look on GitHub for a newer Stonks, on unless the file says
     // false: off, Stonks asks GitHub nothing.
     updateCheck: from.updateCheck !== false

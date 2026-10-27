@@ -582,10 +582,12 @@ const library = (extra = {}) => M.fileSettings({
 test("the data file reads as written and repairs hand edits", () => {
   const v1 = { version: 1, symbols: ["NEST", "SILK"], featured: "SILK", order: "pct", changeMode: "pct", style: "retro", refreshIntervalSec: 60 }
   const read = M.fileSettings(v1)
-  // Older files keep sounds and the version check on; only a saved false
-  // turns either off. Newer settings may add other defaults.
-  expect(read).toMatchObject({ ...v1, reversed: false, lists: [], list: "", range: "1D", hinted: false, sounds: true, updateCheck: true })
-  expect([false, "no", 0].map(v => M.fileSettings({ sounds: v }).sounds)).toEqual([false, true, true])
+  // Sounds start off, in a new install and in a file from before them, and
+  // only a saved true turns them on; the version check stays on unless a
+  // saved false turns it off. Newer settings may add other defaults.
+  expect(read).toMatchObject({ ...v1, reversed: false, lists: [], list: "", range: "1D", hinted: false, sounds: false, updateCheck: true })
+  expect(M.fileSettings(null).sounds).toBe(false)
+  expect([true, "yes", 1].map(v => M.fileSettings({ sounds: v }).sounds)).toEqual([true, false, false])
   expect([false, "no", 0].map(v => M.fileSettings({ updateCheck: v }).updateCheck)).toEqual([false, true, true])
   expect(M.listSymbols(read)).toEqual(["NEST", "SILK"])
   expect(M.listOrder(read)).toBe("pct")
@@ -639,12 +641,13 @@ test("the data file reads as written and repairs hand edits", () => {
 // can't lose it from what the check expects too: All in an order made by
 // hand, a list in manual order arranged by hand, one sorted, one sorted the
 // other way, and one empty; the current list a named one, a featured symbol
-// off the top, and every view setting off its default. 1.0.0 knew no sounds,
-// so its file reads them on, their default; from 1.0.4 the file has them
-// off, and the daily version check off too.
+// off the top, and every view setting off its default. Neither 1.0.0 nor
+// 1.0.4 knew sounds or the version check, so their files read sounds off and
+// the check on, their defaults; from 1.1.0 the file has sounds on and the
+// check off.
 const dataFiles = join(import.meta.dir, "data-files")
 for (const file of readdirSync(dataFiles).filter(name => name.endsWith(".json"))) describe(file.replace(/\.json$/, ""), () => {
-  const old = file === "1.0.0.json"
+  const old = Bun.semver.order(file.replace(/\.json$/, ""), "1.1.0") < 0
   const made = {
     lists: [
       { name: "", symbols: ["SPY", "AAPL", "7203.T", "BTC-USD", "^GSPC", "SHEL.L", "JNJ"], order: "manual", reversed: false },
@@ -654,7 +657,7 @@ for (const file of readdirSync(dataFiles).filter(name => name.endsWith(".json"))
       { name: "Later", symbols: [], order: "manual", reversed: false }
     ],
     list: "World", featured: "7203.T", range: "1Y", style: "retro", changeMode: "abs", refreshIntervalSec: 300, hinted: true,
-    sounds: old, updateCheck: old
+    sounds: !old, updateCheck: old
   }
   const text = readFileSync(join(dataFiles, file), "utf8")
   // As Service.parseDataText reads it: one JSON object, through fileSettings.
