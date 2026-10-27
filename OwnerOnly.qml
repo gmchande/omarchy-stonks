@@ -35,16 +35,20 @@ Item {
 
   // Writes `data`, text or bytes, whole to `path` in the folder, by a
   // rename, so a reader of the last one keeps it; true once it is there,
-  // false while it waits for the folder.
+  // false while it waits for the folder or when it failed. A blocking
+  // write says it failed before it returns; one whose bytes are the last
+  // write's says neither that nor that it saved.
+  property bool failed: false
   function write(path, data) {
     if (!root.made) {
       root.held[path] = data
       return false
     }
     file.path = path
+    root.failed = false
     if (typeof data === "string") file.setText(data)
     else file.setData(data)
-    return true
+    return !root.failed
   }
 
   function keep(paths) {
@@ -86,6 +90,7 @@ Item {
     blockWrites: true
     atomicWrites: true
     onSaved: root.keep([file.path])
+    onSaveFailed: root.failed = true
   }
 
   Process {

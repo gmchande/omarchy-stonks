@@ -47,8 +47,9 @@ Item {
   // What each look's files are made from now: the md5 of this file,
   // ChartSound.js, and the look's bundled sounds, as `takeSurvey` read
   // them, which the look's `stamp-<look>` in the folder holds once all its
-  // files do; and the looks this run wrote a file of, whose stamp is
-  // written again once all are.
+  // files do; and the looks this run wrote a file of, "landed" while every
+  // write did, else "failed", whose stamp is written again only once all
+  // landed: a stamp over a failed write would keep the old sound for good.
   property var sources: ({})
   property var rewrote: ({})
   property bool surveyed: false
@@ -270,9 +271,9 @@ Item {
     var file = fileOf(look, what, lead)
     if (!madeThisRun[file]) {
       var bytes = typeof what === "number" ? ChartSound.wav(ChartSound.chime(look === "retro", what)) : bundledBytes(look, what)
-      files.write(folder + "/" + file, lead ? led(bytes, lead) : bytes)
+      var landed = files.write(folder + "/" + file, lead ? led(bytes, lead) : bytes)
       madeThisRun[file] = true
-      rewrote[look] = true
+      if (rewrote[look] !== "failed") rewrote[look] = landed ? "landed" : "failed"
     }
     return folder + "/" + file
   }
@@ -333,8 +334,8 @@ Item {
       stop()
       // After the look's files, so none is newer than the stamp that
       // vouches for it.
-      if (root.rewrote[look] && root.sources[look]) root.files.write(root.folder + "/stamp-" + look, root.sources[look] + "\n")
-      root.rewrote[look] = false
+      if (root.rewrote[look] === "landed" && root.sources[look]) root.files.write(root.folder + "/stamp-" + look, root.sources[look] + "\n")
+      delete root.rewrote[look]
     }
   }
 
