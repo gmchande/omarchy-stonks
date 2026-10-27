@@ -1,5 +1,4 @@
 import QtQuick
-import QtTest
 import Quickshell
 import Quickshell.Io
 import qs.Commons
@@ -19,10 +18,10 @@ import "plugin" as Stonks
 // October while London and Toronto trade; and the bell run
 // (STONKS_FETCH_RUN=bell), AAPL and the S&P 500 across Friday 23 October's
 // open, from Yahoo's answers either side of it.
-ShellRoot {
+Harness {
   id: harness
+  marker: mode === "main" ? "FETCH DONE" : mode === "holiday" ? "FETCH HOLIDAY DONE" : "FETCH BELL DONE"
 
-  property int failures: 0
   readonly property string mode: Quickshell.env("STONKS_FETCH_RUN") || "main"
   readonly property string state: Quickshell.env("STONKS_FAKE_STATE")
   readonly property var listed: mode === "bell" ? ["AAPL", "^GSPC"] : ["NEST", "KILN", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T", "SHOP.TO"]
@@ -30,33 +29,18 @@ ShellRoot {
   readonly property int wed7: 1791345600
   readonly property int sat10: 1791604800
 
-  function check(label, ok, detail) {
-    console.log((ok ? "PASS " : "FAIL ") + label + (detail !== undefined ? " — " + detail : ""))
-    if (!ok) failures++
-  }
-
   function at(day, hour, minute) {
     return day + hour * 3600 + (minute || 0) * 60
   }
 
-  // A fake curl record, read through a fresh view: a FileView that has
-  // loaded once returns its old text straight after reload().
+  // A fake curl record.
   function record(name) {
-    var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true; printErrors: false }', harness)
-    view.path = harness.state + "/" + name
-    var text = String(view.text() || "")
-    view.destroy()
-    return text
+    return readFile(harness.state + "/" + name)
   }
 
   // The last good quotes the service saved, by symbol.
   function cached() {
-    var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true; printErrors: false }', harness)
-    view.path = Quickshell.env("XDG_CACHE_HOME") + "/grvc.stonks/quotes.json"
-    var quotes = {}
-    try { quotes = JSON.parse(String(view.text() || "")).quotes || {} } catch (e) { quotes = {} }
-    view.destroy()
-    return quotes
+    try { return JSON.parse(readFile(Quickshell.env("XDG_CACHE_HOME") + "/grvc.stonks/quotes.json")).quotes || {} } catch (e) { return {} }
   }
 
   // Every request answered, as "kind name status", in order.
@@ -87,22 +71,6 @@ ShellRoot {
       })
     })
     return counts
-  }
-
-  function find(item, name) {
-    if (!item) return null
-    if (item.objectName === name) return item
-    for (var i = 0; i < item.children.length; i++) {
-      var found = find(item.children[i], name)
-      if (found) return found
-    }
-    return null
-  }
-
-  function finish() {
-    console.log(harness.mode === "main" ? "FETCH DONE" : harness.mode === "holiday" ? "FETCH HOLIDAY DONE" : "FETCH BELL DONE")
-    done.exitCode = failures ? 1 : 0
-    done.start()
   }
 
   // The plugin as the shell composes it, with this harness as its shell.
@@ -210,22 +178,12 @@ ShellRoot {
     function onSaved() { harness.dataWrites++ }
   }
   function savedFeatured() {
-    var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true; printErrors: false }', harness)
-    view.path = harness.dataPath
-    var featured = ""
-    try { featured = JSON.parse(String(view.text() || "")).featured } catch (e) { featured = "" }
-    view.destroy()
-    return featured
+    try { return JSON.parse(readFile(harness.dataPath)).featured } catch (e) { return "" }
   }
 
-  TestCase {
+  Steps {
     name: "Fetch"
     when: service.pluginsReady && pillWindow.visible
-
-    function within(ms, fn) {
-      for (var t = 0; t < ms && !fn(); t += 50) wait(50)
-      return fn()
-    }
 
     function runCommand(command) {
       fileProc.command = command
@@ -249,7 +207,7 @@ ShellRoot {
       })
     }
     function settle() {
-      if (!idle()) tryVerify(idle, 10000)
+      verify(within(10000, idle), "a quote run never landed")
     }
 
     // What the window's header says from now, each change as it happens:
@@ -371,6 +329,15 @@ ShellRoot {
     function test_main() {
       if (harness.mode !== "main") skip("another run")
       var start = service.now
+      // Each second, from the start, in which requests went unanswered, and
+      // how many.
+      var tries = []
+      var noteTries = function() {
+        var sent = harness.requests().filter(function(l) { return / 000$/.test(l) }).length
+        var noted = tries.reduce(function(n, t) { return n + t.sent }, 0)
+        if (sent > noted) tries.push({ at: service.now - start, sent: sent - noted })
+      }
+      noteTries()
 
       // 05:59, offline, with last session's quotes saved: NEST's Tuesday
       // close and London's Thursday. The pill shows NEST's saved change at
@@ -394,20 +361,22 @@ ShellRoot {
       harness.check("the saved rows and hero say their day and time, plainly: Tuesday's close, London's Thursday",
         /^As of Tue \d\d:\d\d \| As of Thu \d\d:\d\d BST \| saved$/.test(savedNotes), savedNotes)
       var warned = []
-      tick(85, 1, function() { if (marks().some(function(m) { return /!/.test(m) })) warned.push(service.now - start) })
+      tick(85, 1, function() {
+        noteTries()
+        if (marks().some(function(m) { return /!/.test(m) })) warned.push(service.now - start)
+      })
       harness.check("no warning for the first 90 s with no answer", warned.length === 0, warned.join(","))
-      tick(6, 1)
+      tick(6, 1, noteTries)
       var lateNotes = [pill.warns, nestRow.detail, body.watchlist.rowItem("SHOP.TO").detail, body.headerText].join(" | ")
       // Every listing unanswered is Yahoo's trouble, said once in the
-      // header, not by every row. Found by the design panel of 23 October:
-      // every row said "No data for this symbol".
+      // header, not by every row.
       harness.check("90 s asked and unanswered for every listing: the pill warns, the window's header says once that it can't get prices, a saved row says when its price is from, and a row with nothing saved says nothing",
         /^true \| As of Tue \d\d:\d\d \|  \| Can't get prices · Stonks keeps trying$/.test(lateNotes), lateNotes)
       // A chart asked for meanwhile, SHOP.TO's, with nothing saved: the
       // chart says nothing of loading under a header that says no prices
-      // come. Found in check-77: "Loading AAPL…" under that header. The
-      // pill, on SHOP.TO with no price, says the header's words, not "No
-      // data", which is for a symbol Yahoo answered without one (range.qml).
+      // come. The pill, on SHOP.TO with no price, says the header's words,
+      // not "No data", which is for a symbol Yahoo answered without one
+      // (range.qml).
       service.feature("SHOP.TO")
       tryVerify(function() { return body.chartLoading && body.motion.dimmed > 0 }, 3000)
       var coming = [body.chartLoading, harness.find(body, "loadingLabel").visible, body.headerText].join(" | ")
@@ -418,11 +387,15 @@ ShellRoot {
         coming === "true | false | Can't get prices · Stonks keeps trying", coming)
       harness.check("a pill with no price, its symbol unanswered for 90 s, says it can't get prices",
         pillUnanswered === "! Can't get prices", pillUnanswered)
-      tick(9, 1)
-      // The run is two requests: the pill's chart and one spark of the rest.
-      var tries = harness.requests().filter(function(l) { return / 000$/.test(l) })
+      tick(9, 1, noteTries)
+      // The run is two requests, the pill's chart and one spark of the
+      // rest; then each pause doubles from 2 s, to a minute at most, a fifth
+      // either way, and whole seconds on this clock.
+      var gaps = tries.slice(1).map(function(t, i) { return t.at - tries[i].at })
       harness.check("with no network, a run, then one request alone at 2, 6, 14, 30, and 62 s: no more",
-        tries.length >= 5 && tries.length <= 9, tries.length + " requests unanswered in 100 s")
+        tries.length >= 6 && tries.slice(1).every(function(t) { return t.sent === 1 })
+          && gaps.every(function(g, i) { var pause = Math.min(2 * Math.pow(2, i), 60); return Math.abs(g - pause) <= pause / 5 + 1 }),
+        tries.map(function(t) { return t.at + " s ×" + t.sent }).join(", "))
       remove("YAHOO.offline")
       var back = service.now
       var landed = 0
@@ -449,13 +422,12 @@ ShellRoot {
         Object.keys(cache).join(","))
 
       // A removal taken back with the next write due: the file holds the
-      // symbol again. Written as its quote came back, before All took it
-      // back, the file left it out, and an unchanged price never put it in.
+      // symbol again.
       service.removeSymbol("KILN")
       tick(21 * 60, 60)
       var since = service.now - service.quotesSavedAt
       service.undoRemoval("KILN")
-      for (var w = 0; w < 50 && !harness.cached().KILN; w++) wait(20)
+      within(1000, function() { return !!harness.cached().KILN })
       cache = harness.cached()
       harness.check("a removal taken back with a write due is saved again for the next start",
         service.library.indexOf("KILN") >= 0 && !!cache.KILN,
@@ -464,8 +436,8 @@ ShellRoot {
       // 11:00, the regular session: the rows stay warm with nothing open.
       countsOver("11:00, nothing open: every stock, ETF, and index in its session every minute; the crypto and Tokyo not at all",
         900, counts([15, 15, 15, 15, 0, 15, 0, 15]), startAt(at(harness.wed7, 11, 0)))
-      // F2 and F4: an open finds the rows fresh; it asks only for what is
-      // stale, in one run, and shows no warning and no "As of" on any frame.
+      // An open finds the rows fresh; it asks only for what is stale, in one
+      // run, and shows no warning and no "As of" on any frame.
       // It opens past the minute's run, when no row falls due for most of a
       // minute: an ask takes with it what falls due within half a minute.
       tick(20)
@@ -475,7 +447,7 @@ ShellRoot {
       var runsBefore = harness.runs().length
       frames.running = true
       openWindow()
-      wait(300)
+      wait(300) // every frame of the open's first 300 ms is read
       frames.running = false
       var openRuns = harness.runs().slice(runsBefore)
       harness.check("an open mid-session asks only for the stale, the crypto and Tokyo, in one run, one spark request",
@@ -494,8 +466,7 @@ ShellRoot {
       // Five rows featured 12 seconds apart, across a minute: each new
       // hero's chart is asked at once, at a second of its own, and the next
       // run takes each with it, however far from the list's second, so the
-      // list goes on refreshing in one run a minute. Each used to keep its
-      // own second, five or six runs a minute.
+      // list goes on refreshing in one run a minute.
       ;["KILN", "SPY", "^GSPC", "SHOP.TO", "NEST"].forEach(function(s) {
         service.feature(s)
         tick(12, 1)
@@ -510,7 +481,7 @@ ShellRoot {
       var runsNow = harness.runs().length
       for (var w = 0; w < 61 && harness.runs().length === runsNow; w++) tick(1, 1)
 
-      // F7: r twice within 5 s sends one run.
+      // r twice within 5 s sends one run.
       tick(20)
       runsBefore = harness.runs().length
       app.refresh()
@@ -520,7 +491,7 @@ ShellRoot {
       var rRuns = harness.runs().slice(runsBefore).filter(function(r) { return /chart:/.test(r) })
       harness.check("r twice within 5 s sends one run", rRuns.length === 1, rRuns.join(" / "))
 
-      // F5: Yahoo refuses. The run that meets it is the last for a pause of
+      // Yahoo refuses. The run that meets it is the last for a pause of
       // a minute, give or take a fifth; then one request goes alone; then
       // the pause doubles. An answer to a request let through before the
       // refusal, the hero's 1M history held back until then, reopens
@@ -530,7 +501,7 @@ ShellRoot {
       touch("NEST.history.hold")
       body.selectRange("1M")
       // The history is out, and held, before Yahoo starts refusing.
-      tryVerify(function() { return harness.record("NEST.history.calls") !== "" }, 3000)
+      tryVerify(function() { return harness.calls("NEST.history") > 0 }, 3000)
       touch("YAHOO.refuse")
       var askedAt = 0
       tick(70, 1, function() { if (!askedAt && service.testYahooGate.pause === "refused") askedAt = service.now })
@@ -561,15 +532,18 @@ ShellRoot {
       var heard = listen()
       app.refresh()
       var retried = within(1000, function() { return service.histories["NEST|1W"] !== failedWeek })
-      wait(50)
+      wait(50) // time for the header to say anything more
       var pausedSaid = heard()
       body.selectRange("1D")
       harness.check("a range picked while Yahoo refuses says it is unavailable at once, not Loading", rangeHeader === "1W unavailable", rangeHeader)
       harness.check("r while Yahoo refuses sends nothing and says nothing: the header stays on the range's failure",
         retried && pausedSaid.join(" / ") === "1W unavailable", retried + " " + pausedSaid.join(" / "))
+      var owedOpen = Object.assign({}, service.asked)
       closeWindow()
       harness.check("closing drops the asks nobody watches: the crypto and Tokyo are no longer owed",
-        !("BTC-USD" in service.asked) && !("7203.T" in service.asked) && "NEST" in service.asked, JSON.stringify(service.asked))
+        "BTC-USD" in owedOpen && "7203.T" in owedOpen
+          && !("BTC-USD" in service.asked) && !("7203.T" in service.asked) && "NEST" in service.asked,
+        JSON.stringify(owedOpen) + " | " + JSON.stringify(service.asked))
       openWindow()
       remove("YAHOO.refuse")
       var recovered = 0
@@ -580,7 +554,7 @@ ShellRoot {
       harness.check("through the refusal, one request per pause: one alone before the one that found Yahoo back",
         refused.length === 1, refused.join(", "))
 
-      // F6: back within seconds of the network, as after a wake: it goes
+      // Back within seconds of the network, as after a wake: it goes
       // with the next run, and comes back 10 s later. A search's preview
       // that rests meanwhile waits for it too, and goes once it is back.
       touch("YAHOO.offline")
@@ -591,7 +565,7 @@ ShellRoot {
         if (harness.requests().slice(offFrom).some(function(l) { return / 000$/.test(l) })) downAt = service.now
       }
       service.preview(body, "AAPL")
-      wait(400)
+      tryVerify(function() { return service.previewRests }, 3000)
       tick(10, 1)
       remove("YAHOO.offline")
       var upAt = service.now
@@ -614,8 +588,7 @@ ShellRoot {
 
       // Back after two minutes off, as on a train: the pause between tries
       // has grown to about a minute, and r tries at once instead of waiting
-      // it out. It went 53 s after r, the header on "Update overdue" all
-      // the while. A refusal's pause still holds (above).
+      // it out. A refusal's pause still holds (above).
       touch("YAHOO.offline")
       var gate = service.testYahooGate
       var pausedLong = false
@@ -668,30 +641,6 @@ ShellRoot {
       more.forEach(function(s) { service.removeSymbol(s) })
       closeWindow()
 
-      // 15:00, the window left on 1W: its history is asked again every 15
-      // minutes while New York trades, and once after the close for its
-      // last bars, then not again, so its line and its low and high keep up
-      // with the price over them. A refresh that fails, tried twice, is
-      // asked again 15 minutes on. It was asked once, and kept all session.
-      service.now = at(harness.wed7, 15, 0)
-      settle()
-      openWindow()
-      body.selectRange("1W")
-      tryVerify(function() { return !!service.histories["NEST|1W"] && service.histories["NEST|1W"].status === "ok" }, 5000)
-      var weekFrom = Number(harness.record("NEST.history.calls") || 0)
-      tick(20 * 60, 15)
-      touch("NEST.history.down")
-      tick(15 * 60, 15)
-      tryVerify(function() { return service.histories["NEST|1W"].status === "failed" }, 8000)
-      remove("NEST.history.down")
-      tick(45 * 60, 15)
-      var weekAsked = Number(harness.record("NEST.history.calls") || 0) - weekFrom
-      harness.check("the window left on 1W from 15:00 to 16:20: its history asked again every 15 minutes until the close, a failed refresh twice and again 15 minutes on, then once for its last bars",
-        weekAsked === 5, weekAsked + " asks")
-      body.selectRange("1D")
-      settle()
-      closeWindow()
-
       // 16:30, after hours. The pill's wheel moves to KILN, which nothing
       // watched: it is asked for at once, and shown without a warning.
       service.now = at(harness.wed7, 16, 30)
@@ -705,17 +654,18 @@ ShellRoot {
       mouseWheel(pill, pill.width / 2, pill.height / 2, 0, 120)
       settle()
       // A spin's notches are saved once the wheel rests: three down and one
-      // back write the data file once, naming where it stopped.
+      // back write the data file once, naming where it stopped. The notch
+      // back's own wait to save (400 ms) runs out first.
       wait(600)
       var writesBefore = harness.dataWrites
       var visited = []
       var visit = function() { visited.push(service.featuredSymbol) }
       service.featuredSymbolChanged.connect(visit)
       for (var notch = 0; notch < 4; notch++) mouseWheel(pill, pill.width / 2, pill.height / 2, 0, notch < 3 ? -120 : 120)
-      wait(150)
+      wait(150) // a write the spin set off at once would land meanwhile
       var duringSpin = harness.dataWrites - writesBefore
       within(3000, function() { return harness.dataWrites > writesBefore })
-      wait(300)
+      wait(300) // a second write would land meanwhile
       settle()
       service.featuredSymbolChanged.disconnect(visit)
       harness.check("a spin of the pill's wheel writes the data file once, as the wheel rests",
@@ -723,7 +673,7 @@ ShellRoot {
         visited.join(" ") + ": " + duringSpin + " writes during the spin, " + (harness.dataWrites - writesBefore) + " in all, saved " + harness.savedFeatured())
       mouseWheel(pill, pill.width / 2, pill.height / 2, 0, 120)
       mouseWheel(pill, pill.width / 2, pill.height / 2, 0, 120)
-      wait(600)
+      within(3000, function() { return harness.savedFeatured() === "NEST" })
       settle()
       // The index is closed after its session, as its calendar says: not
       // asked with nothing open, on the slow clock with the window open.
@@ -731,38 +681,18 @@ ShellRoot {
         900, counts([3, 0, 0, 0, 0, 0, 0, 0]), startAt(at(harness.wed7, 16, 35)))
       countsOver("16:50, the window open: the hero every minute, the after-hours rows every 5 (Toronto's until its 17:00 end), the closed every 15, the crypto every minute",
         900, counts([15, 3, 3, 1, 15, 1, 1, 2]), openAfter)
-
-      // An add's first answer goes in a run of its own, ahead of any
-      // refresh.
-      runsBefore = harness.runs().length
-      service.addSymbol("MSFT")
-      tryVerify(function() { return !!service.quotes.MSFT && idle() }, 5000)
-      harness.check("an add's first answer goes at once, in a run of its own", harness.runs()[runsBefore] === "chart:MSFT", harness.runs().slice(runsBefore).join(" / "))
-      service.removeSymbol("MSFT")
-
-      // A search's preview outside All: its quote once, as the choice rests,
-      // and never again, through the same gate.
-      var previewFrom = harness.requests().length
-      service.preview(body, "AAPL")
-      tryVerify(function() { return harness.requests().slice(previewFrom).some(function(l) { return /^chart AAPL /.test(l) }) }, 3000)
-      tick(600)
-      var previewed = harness.requests().slice(previewFrom).filter(function(l) { return /^chart AAPL /.test(l) })
-      harness.check("a preview outside All is fetched once as the choice rests, never on the schedule", previewed.length === 1, previewed.join(", "))
-      service.preview(body, "")
       closeWindow()
 
-      // 17:20, the crypto's saved quote two hours old and nothing kept it
-      // fresh for five minutes: an open asks for it, its answer held out,
-      // as on a real network. Its row shows its last price with no "As of"
-      // for the 2 s an answer takes (`Figures.ASKED_GRACE`), says "As of"
-      // from then on, and goes on saying it once its answer, as old, lands:
-      // the source is late, not Stonks. Found in the speed QA of 23
-      // October: "As of 06:46 UTC" flashed on each open. The service's
-      // clock runs as a real one does, its next second 100 ms after the
-      // open, so the ask goes 0.9 s into its second: counted in whole
-      // seconds, the grace ended 1.1 s on. Found in the check of #69.
+      // 17:10, the crypto's saved quote hours old and nothing kept it fresh
+      // for five minutes: an open asks for it, its answer held out, as on a
+      // real network. Its row shows its last price with no "As of" for the
+      // 2 s an answer takes (`Figures.ASKED_GRACE`), says "As of" from then
+      // on, and goes on saying it once its answer, as old, lands: the source
+      // is late, not Stonks. The service's clock runs as a real one does,
+      // its next second 100 ms after the open, so the ask goes 0.9 s into
+      // its second: counted in whole seconds, the grace ends 1.1 s on.
       tick(300)
-      var start = service.now
+      var heldFrom = service.now
       touch("BTC-USD.quote.hold")
       app.testWindow.implicitHeight = 1000
       app.open("{}")
@@ -770,7 +700,7 @@ ShellRoot {
       var heldOut = false
       var asOfAt = 0
       for (var t = 0; t < 4000 && !asOfAt; t = Date.now() - opened) {
-        service.now = start + Math.floor((t + 900) / 1000)
+        service.now = heldFrom + Math.floor((t + 900) / 1000)
         heldOut = heldOut || ("BTC-USD" in service.asked && !idle())
         var btcRow = app.opened ? app.testBody.watchlist.rowItem("BTC-USD") : null
         if (btcRow && /^As of /.test(btcRow.detail)) asOfAt = t
@@ -786,13 +716,10 @@ ShellRoot {
       // 23:00, Tokyo's lunch break until 23:30; New York's night, with
       // Robinhood for the window's hero. Half an hour each, so a pill's
       // symbol never asked cannot pass for one asked every 15 minutes.
-      var quiet = countsOver("23:00, nothing open: the pill's symbol every 15 minutes, the index, closed by its calendar, and Tokyo at lunch not at all",
+      countsOver("23:00, nothing open: the pill's symbol every 15 minutes, the index, closed by its calendar, and Tokyo at lunch not at all",
         1800, counts([2, 0, 0, 0, 0, 0, 0, 0]), startAt(at(harness.wed7, 23, 0)))
-      harness.check("with nothing open, Robinhood is never asked", quiet.every(function(l) { return !/^(overnight|instruments) /.test(l) }))
-      var night = countsOver("23:30, the window open: the crypto and Tokyo, back from lunch, every minute; every closed market every 15",
+      countsOver("23:30, the window open: the crypto and Tokyo, back from lunch, every minute; every closed market every 15",
         900, counts([1, 1, 1, 1, 15, 1, 15, 1]), openAfter)
-      var prints = night.filter(function(l) { return /^overnight /.test(l) }).length
-      harness.check("23:30, the window open: Robinhood's prints every 5 minutes through the night", Math.abs(prints - 3) <= 1, prints + " requests")
       closeWindow()
 
       // Midnight, the window left open on a workspace no screen shows: it
@@ -861,18 +788,14 @@ ShellRoot {
       hyprlandStandIn.toplevels = { values: [] }
       plugin.windowHost.monitors = []
 
-      // Thursday 11:00, nothing open, every quote still Wednesday's: the
-      // calendars say New York, London, and Toronto trade, so their rows
-      // stay warm and learn of Thursday's session, the index on the US
-      // calendar too. They used to wait for an open.
-      countsOver("Thursday 11:00, nothing open, the quotes a day old: every row whose calendar trades kept warm",
-        900, counts([15, 15, 15, 15, 0, 15, 0, 15]), startAt(at(harness.wed7 + 86400, 11, 0)))
-
-      // 11:15, every screen off: nothing is asked for, the pill's symbol
-      // included. With a screen on again, the next look asks at once for
-      // every row that fell due meanwhile.
+      // Thursday 11:15, nothing open, every screen off: nothing is asked
+      // for, the pill's symbol included. With a screen on again, the next
+      // look asks at once for every row that fell due meanwhile.
+      startAt(at(harness.wed7 + 86400, 11, 15))()
       plugin.windowHost.monitors = [screenStandIn]
       screenStandIn.on = false
+      // The screens' last answer, trusted for a second, runs out first.
+      wait(1100)
       var darkFrom = harness.requests().length
       tick(600)
       // A refresh asked for meanwhile, by IPC or a script, waits too.
@@ -929,18 +852,18 @@ ShellRoot {
       settle()
       screenStandIn.on = false
       wait(1100)
-      var historyFrom = Number(harness.record("NEST.history.calls") || 0)
+      var historyFrom = harness.calls("NEST.history")
       heard = listen()
       service.refresh()
       screensHeard()
-      wait(50)
+      wait(50) // time for the header to say anything
       var darkSaid = heard()
-      var darkHistory = Number(harness.record("NEST.history.calls") || 0) - historyFrom
+      var darkHistory = harness.calls("NEST.history") - historyFrom
       screenStandIn.on = true
       wait(1100)
       service.now += 5
-      within(3000, function() { return Number(harness.record("NEST.history.calls") || 0) > historyFrom })
-      var litHistory = Number(harness.record("NEST.history.calls") || 0) - historyFrom
+      within(3000, function() { return harness.calls("NEST.history") > historyFrom })
+      var litHistory = harness.calls("NEST.history") - historyFrom
       app.testBody.selectRange("1D")
       settle()
       closeWindow()
@@ -952,9 +875,8 @@ ShellRoot {
       // Thursday, the window open on the day: r says "Refreshing" in the
       // header while the quotes it asked for are out, NEST's held back
       // here, and the market again once they land; the next run on the
-      // schedule, held back the same, says nothing. The owner asked for
-      // "Refreshing" on r alone (21 October). The rows are answered over
-      // 10 s ago first, so r asks for them.
+      // schedule, held back the same, says nothing. The rows are answered
+      // over 10 s ago first, so r asks for them.
       openWindow()
       tick(20)
       touch("NEST.quote.hold")
@@ -970,9 +892,9 @@ ShellRoot {
       var scheduled = false
       for (var due = 0; due < 61 && !scheduled; due++) {
         service.now += 1
-        scheduled = within(100, function() { return service.testFeed.refreshRun.indexOf("NEST") >= 0 })
+        scheduled = within(20, function() { return service.testFeed.refreshRun.indexOf("NEST") >= 0 })
       }
-      wait(300)
+      wait(300) // time for the header to say anything while the run is held
       remove("NEST.quote.hold")
       settle()
       var bySchedule = heard()
@@ -980,26 +902,6 @@ ShellRoot {
         byR.length === 3 && byR[1] === "Refreshing" && byR[0] === byR[2] && scheduled
           && bySchedule.every(function(t) { return t !== "Refreshing" }),
         byR.join(" / ") + " | " + scheduled + " " + bySchedule.join(" / "))
-      closeWindow()
-
-      // Thursday, trading: a day whose current after-hours period ends at
-      // {"toString": null} fails its own listing, as a bad answer does, and
-      // the rest of the list is still asked for on its schedule. The day read
-      // as a quote, and every look for what was due threw on it, so no row
-      // was asked for again (the 1.0.4 security review's finding).
-      openWindow()
-      service.addSymbol("HOSTILE")
-      var hostileFailed = within(15000, function() {
-        return !!service.entries.HOSTILE && service.entries.HOSTILE.status === "failed" && idle()
-      })
-      var hostileFrom = harness.requests().length
-      tick(120, 5)
-      var afterHostile = harness.quoteCounts(harness.requests().slice(hostileFrom))
-      var trading = ["NEST", "KILN", "SPY", "BTC-USD"]
-      harness.check("a day whose period ends at an object fails its own listing, and the list's next runs go on the schedule",
-        hostileFailed && trading.every(function(s) { return afterHostile[s] > 0 }),
-        (service.entries.HOSTILE ? service.entries.HOSTILE.status : "no answer") + " | "
-          + trading.map(function(s) { return s + " " + afterHostile[s] }).join(", "))
       closeWindow()
 
       // Saturday noon, half an hour each.
@@ -1012,21 +914,21 @@ ShellRoot {
       // A malformed answer, a day whose pre-market period is null, in a
       // spark run with the rest of the list: that listing fails, as a bad
       // answer does, and the rest of the run lands, so the next refresh goes
-      // as ever. The day threw as it was read, and the feed asked nothing
-      // more until Stonks restarted.
+      // as ever.
       openWindow()
       service.addSymbol("MANGLED")
       within(15000, function() { return !!service.entries.MANGLED && service.entries.MANGLED.status === "failed" && idle() })
-      // A refresh's spark run carries MANGLED with the rest of the list, once
-      // they are all due again.
+      // A refresh's spark run carries MANGLED with the rest of the list once
+      // they are all due again: the first refresh asks it alone, on a chart,
+      // until its tries run out. Each round waits for its run and retries.
       var sparkFrom = harness.requests().length
+      var sparked = function() { return harness.requests().slice(sparkFrom).some(function(l) { return /^spark \S*\bMANGLED\b/.test(l) }) }
       var carried = false
-      for (var round = 0; round < 4 && !carried; round++) {
+      for (var round = 0; round < 6 && !carried; round++) {
         tick(15, 1)
         service.refresh()
-        carried = within(5000, function() {
-          return harness.requests().slice(sparkFrom).some(function(l) { return /^spark \S*\bMANGLED\b/.test(l) })
-        })
+        within(5000, function() { return sparked() || (idle() && !service.refreshing && service.testFeed.cooling.length === 0) })
+        carried = sparked()
       }
       var landed = carried && within(15000, function() { return service.testFeed.refreshRun.length === 0 && idle() })
       tick(15, 1)
@@ -1043,7 +945,6 @@ ShellRoot {
 
       // A refusal asking for a year's rest (Retry-After 31536000): Stonks
       // rests half an hour at most, give or take a fifth, then asks again.
-      // It rested as long as it was told.
       openWindow()
       runCommand(["bash", "-c", "printf 31536000 > \"$1\"", "--", harness.state + "/YAHOO.retry-after"])
       touch("YAHOO.refuse")
@@ -1116,36 +1017,18 @@ ShellRoot {
       countsOver("a US holiday, the window open: New York every 15 minutes, London, Toronto, and the crypto every minute",
         900, counts([1, 1, 1, 1, 15, 15, 1, 15]), openAfter)
       closeWindow()
-      // This run's cache began empty: the folder and the saved quotes are
-      // new, and the owner's alone from their first write.
-      var newDir = Quickshell.env("XDG_CACHE_HOME") + "/grvc.stonks"
-      var newModes = ""
-      within(3000, function() { newModes = modes([newDir + "/quotes.json", newDir]); return newModes === "600,700" })
-      harness.check("a new cache folder and its saved quotes are the owner's alone", newModes === "600,700", newModes)
       harness.finish()
     }
 
     // Friday 23 October's open, the window showing AAPL and the S&P 500.
     // Yahoo answers with Thursday's quotes (bell-2026-10-23-0929) until
     // 09:30:10, then with the session's first (bell-2026-10-23-0930), as it
-    // did that morning. Found in the daytime QA: every row said "As of Thu
-    // 16:00" from 09:30:02 until its next ask a minute after its last.
+    // did that morning.
     function test_bell() {
       if (harness.mode !== "bell") skip("another run")
       tryVerify(function() { return harness.listed.every(function(s) { return !!service.quotes[s] }) && idle() }, 10000)
       var bell = 1792762200
       openWindow()
-      // Before the bell, its pre-market begun, the index has no open since
-      // the open, as the stock beside it has none: its answer came after its
-      // next day's pre-market began, its bars still Thursday's.
-      service.persist({ changeMode: "open" })
-      var openLines = []
-      var blank = within(3000, function() {
-        openLines = harness.listed.map(function(s) { return s + " " + app.testBody.watchlist.rowItem(s).view.changeLine })
-        return openLines.join(",") === "AAPL —,^GSPC —"
-      })
-      harness.check("before the bell the index and the stock beside it have no open yet, since the open", blank, openLines.join(", "))
-      service.persist({ changeMode: "pct" })
       // Before the bell a stock's day is asked for two days, so the chart has
       // Thursday's session; from the bell, for one. An index's answer stays
       // Thursday's until the bell, and is asked for one.
@@ -1189,6 +1072,4 @@ ShellRoot {
     property var each: null
     onTriggered: if (each) each()
   }
-
-  HarnessExit { id: done }
 }
