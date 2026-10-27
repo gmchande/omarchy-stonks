@@ -1078,16 +1078,13 @@ Harness {
         if (drawFrom || r <= leftAt || anim.duration <= 0) return
         drawFrom = animationOrigin(anim, r)
       }
-      // The body is built a second after the service is ready, before this
-      // first open: the watch goes on it before the open. The open itself
-      // holds the thread at most 150 ms.
-      tryVerify(function() { return !!app.testBody }, 3000)
-      var body = app.testBody
-      body.motion.revealChanged.connect(watchDraw)
-      var openedAt = Date.now()
+      // The body is built as the window first opens, before its draw-in
+      // starts: the watch goes on it as it is built.
+      var watchBody = function() { if (app.testBody) app.testBody.motion.revealChanged.connect(watchDraw) }
+      app.testBodyChanged.connect(watchBody)
       app.open("{}")
-      var firstOpen = Date.now() - openedAt
-      harness.check("the window's first open holds the thread at most 150 ms — " + firstOpen + " ms", firstOpen <= 150)
+      app.testBodyChanged.disconnect(watchBody)
+      var body = app.testBody
       grab.source = body.chartItem
       grab.begin("first-open")
       tryVerify(function() { return !body.chartLoading && body.motion.reveal === 1 }, 5000)

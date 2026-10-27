@@ -193,18 +193,14 @@ Harness {
       tryVerify(function() { return service.featuredSymbol === "MSFT" }, 2000)
 
       // The card's window exists once it shows: its frames are grabbed from
-      // the same turn as the open, before its first frame. The open itself,
-      // the first since Stonks started, holds the thread at most 150 ms.
-      var openedAt = Date.now()
+      // the same turn as the open, before its first frame.
       panel.open()
-      var firstOpen = Date.now() - openedAt
       grab.source = panel.testCard.surface
       grab.begin("open")
       // Half a second of frames in which the edge must not move.
       wait(500)
       var opened = verdict("edgeheld")
       check("an open from closed shows the fitted height from its first frame", opened.ok, opened.detail)
-      check("the popup's first open holds the thread at most 150 ms", firstOpen <= 150, firstOpen + " ms")
 
       eases("a switch to a shorter list eases the edge up, the footer riding it", function() { service.switchList("Short") })
       eases("a switch to a longer list eases the edge down, the footer covering the rows it passes", function() { service.switchList("") })

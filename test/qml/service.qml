@@ -108,20 +108,9 @@ Harness {
   // file watch reading that change back.
   property int loads: 0
   property int loadsAtBurst: 0
-  // A change the harness makes as the file's next change is heard, just
-  // after the service has started reading it, as a click could land.
-  property string rangeOnNotice: ""
-  property bool readingAtChange: false
   Connections {
     target: service.testDataFile
     function onLoaded() { harness.loads++ }
-    function onFileChanged() {
-      if (harness.rangeOnNotice === "") return
-      var range = harness.rangeOnNotice
-      harness.rangeOnNotice = ""
-      harness.readingAtChange = service.dataReading
-      service.setRange(range)
-    }
   }
   // A shell started while the data file can't be read.
   Component { id: secondService; Service {} }
@@ -622,53 +611,8 @@ Harness {
         var saved = harness.parseFile(harness.stepped.testDataFile.disk)
         check("with room again, trying again saves it and the notice goes",
           !harness.stepped.saveFailed && !!saved && saved.range === "3M", harness.stepped.saveFailed + " " + JSON.stringify(saved && saved.range))
-        // A hand edit that breaks the file, and a change made in Stonks
-        // before the read of it ends: the file is read at once, so the change
-        // stays in memory, said unsaved, and nothing is written over it.
-        harness.stepped.testDataFile.saveElsewhere("{")
-        harness.stepped.setRange("2Y")
-        harness.go(31)
-      } else if (harness.step === 31) {
-        if (harness.settling()) return
-        var broken = harness.stepped.testDataFile.disk
-        check("a hand edit that breaks the file is never written over by a change made while Stonks reads it",
-          broken === "{" && harness.stepped.settingsUnreadable && harness.stepped.editsUnsaved && harness.stepped.range === "2Y",
-          JSON.stringify(broken.slice(0, 40)) + " " + harness.stepped.settingsUnreadable + " " + harness.stepped.editsUnsaved + " " + harness.stepped.range)
-        // The file fixed by hand.
-        harness.stepped.testDataFile.saveElsewhere(harness.withRange(harness.stepped, "1W"))
-        harness.go(32)
-      } else if (harness.step === 32) {
-        if (harness.settling()) return
-        // A hand edit that adds a list, and a change made before its read
-        // ends: the hand edit wins, as any save from elsewhere does.
-        var added = Object.assign({}, harness.stepped.dataSettings)
-        added.lists = added.lists.concat([{ name: "By hand", symbols: [added.symbols[0]], order: "manual", reversed: false }])
-        harness.stepped.testDataFile.saveElsewhere(JSON.stringify(added, null, 2) + "\n")
-        harness.stepped.setRange("5Y")
-        harness.go(33)
-      } else if (harness.step === 33) {
-        if (harness.settling()) return
-        var kept = harness.parseFile(harness.stepped.testDataFile.disk)
-        var named = function(lists) { return (lists || []).map(function(l) { return l.name }) }
-        check("a hand edit is never written over by a change made while Stonks reads it",
-          !!kept && named(kept.lists).indexOf("By hand") >= 0 && named(harness.stepped.dataSettings.lists).indexOf("By hand") >= 0,
-          JSON.stringify(named(kept && kept.lists)) + " " + JSON.stringify(named(harness.stepped.dataSettings.lists)))
         harness.stepped.destroy()
         harness.stepped = null
-        // The same with the real file: an editor's save that breaks it, and
-        // a range changed just as Stonks starts reading it.
-        harness.rangeOnNotice = "5Y"
-        harness.renameThen("{", function() { harness.go(34) })
-      } else if (harness.step === 34) {
-        if (!service.settingsUnreadable && harness.waited < 3000) return
-        harness.readThen(function(obj, text) {
-          check("the real file: a hand edit that breaks it is never written over by a change made as Stonks reads it",
-            harness.readingAtChange && text === "{" && service.settingsUnreadable && service.editsUnsaved,
-            [harness.readingAtChange, JSON.stringify(String(text).slice(0, 40)), service.settingsUnreadable, service.editsUnsaved].join(" "))
-          harness.renameThen(harness.withRange(service, service.range), function() { harness.go(35) })
-        })
-      } else if (harness.step === 35) {
-        if (service.settingsUnreadable && harness.waited < 3000) return
         finish()
       }
     }

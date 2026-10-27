@@ -17,9 +17,6 @@ Item {
 
   property bool turnedOn: true
   property bool retro: false
-  // The surfaces whose chart is being scrubbed, by the pointer on it or by
-  // keys, where a screen shows it (`scrubbing`).
-  property var scrubbed: []
   // The output is kept awake while sounds are on and a scrub moves, and
   // for 1 s after it last moved or ended (`scrubHeld`), so a chime struck
   // after a pause plays at once: an output asleep wakes as a sound starts,
@@ -129,22 +126,9 @@ Item {
     return out
   }
 
-  // A surface says whether its chart is being scrubbed. A scrub that starts
-  // or ends holds the output for 1 s, as one that moves does (`scrubMoved`).
-  function scrubbing(surface, on) {
-    var others = scrubbed.filter(function(s) { return s !== surface })
-    if (on) others.push(surface)
-    if (others.length === scrubbed.length) return
-    holdForScrub()
-    scrubbed = others
-  }
-
-  // A surface's scrub moved: the output is held 1 s more.
-  function scrubMoved(surface) {
-    if (scrubbed.indexOf(surface) >= 0) holdForScrub()
-  }
-
-  function holdForScrub() {
+  // A chart's scrub moved, started, or ended where a screen shows it: the
+  // output is held 1 s more.
+  function scrubMoved() {
     scrubHeld = true
     afterScrub.restart()
   }
