@@ -36,7 +36,7 @@ Item {
   property bool offersRetry: false
   property bool retro: false
   // The sounds are on: the speaker shows its waves, or, off, a cross.
-  property bool soundsOn: true
+  property bool soundsOn: false
   // The animal, as the body decides it: `kind` "bull", "bear", or "" (a
   // flat day, or no direction yet), and `chart`, what it reads. A turn of
   // the same chart crossfades in smooth; any other change, and every one in

@@ -190,6 +190,8 @@ too alike, or too faint.
 
 ## Sounds
 
+Sounds start off. Click the speaker at the top right, or press `m`, to turn
+them on, and again to turn them off; Stonks remembers. While they're on,
 Stonks makes a short sound when you add a symbol, remove a row, or undo the
 removal, which plays the removal backwards, and a shutter when you take a
 screenshot. Run the pointer along the chart
@@ -201,9 +203,8 @@ the previous close on 1D, the range's first price on the others. Each look
 has its own voice. A soft bell rings as the market of the stock you last
 looked at opens and as it closes, on time or not at all, and never while
 every screen is off or an app records from your microphone. Nothing else
-sounds by itself: no refresh or price. Click the speaker at the top right,
-or press `m`, to turn sounds off; Stonks remembers. Your system volume
-sets how loud they are.
+sounds by itself: no refresh or price. Your system volume sets how loud
+they are.
 
 ## Screenshots
 

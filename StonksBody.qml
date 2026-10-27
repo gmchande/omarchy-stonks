@@ -225,7 +225,7 @@ Item {
   property var removal: null
   property string changeMode: "pct"
   property bool retro: false
-  property bool soundsOn: true
+  property bool soundsOn: false
   // The bar the scrub last struck on this pass over the chart, so moving
   // within a bar strikes nothing more; -1 between passes.
   property int chimed: -1

@@ -33,7 +33,7 @@ Harness {
     changeMode: "abs",
     refreshIntervalSec: 300,
     hinted: true,
-    sounds: false,
+    sounds: true,
     updateCheck: false
   })
 
