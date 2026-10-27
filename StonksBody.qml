@@ -72,15 +72,14 @@ Item {
   readonly property int textLeft: margins + inset
   readonly property int textRight: margins + gutter + inset
   property int chartHeight: Style.space(190)
-  // The least the chart may be (the window's 108 px, 136 before the header's
-  // second line took 28): where it is set, the chart is sized to the
-  // surface (`shownChartHeight`), giving way first as the window gets
-  // short, so three rows still show, and taking what whole rows leave over
-  // otherwise. The popup's card fits its rows, so its chart follows the
-  // screen's room instead (`screenChartHeight`). Found in the design pass
-  // of 14 October: the smallest window showed one row of the list. 0, the
-  // popup's, gives none: a constant, so no change of chartHeight can find
-  // it stale.
+  // The least the chart may be (the window's 136 px): where it is set, the
+  // chart is sized to the surface (`shownChartHeight`), giving way first as
+  // the window gets short, so three rows still show, and taking what whole
+  // rows leave over otherwise. The popup's card fits its rows, so its chart
+  // follows the screen's room instead (`screenChartHeight`). Found in the
+  // design pass of 14 October: the smallest window showed one row of the
+  // list. 0, the popup's, gives none: a constant, so no change of
+  // chartHeight can find it stale.
   property int minChartHeight: 0
   // The host's look.
   property color foreground: Commons.Color.foreground

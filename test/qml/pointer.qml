@@ -202,7 +202,7 @@ ShellRoot {
     visible: true
     color: "#101315"
     implicitWidth: 480
-    implicitHeight: 760
+    implicitHeight: 788
 
     StonksBody {
       id: body
@@ -214,7 +214,7 @@ ShellRoot {
       downColor: stub.downColor
       fontFamily: stub.fontFamily
       surfaceOpen: true
-      chartHeight: Style.space(162)
+      chartHeight: Style.space(190)
       rangeOptions: ["1D", "1Y"]
     }
 

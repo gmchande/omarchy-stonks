@@ -158,7 +158,7 @@ Item {
           headerWhenMissing: root.ready ? "No data" : ""
           margins: Style.space(16)
           chartHeight: Style.space(220)
-          minChartHeight: Style.space(108)
+          minChartHeight: Style.space(136)
           upColor: root.trendColors ? root.trendColors.upOn(ground) : Commons.Color.foreground
           downColor: root.trendColors ? root.trendColors.downOn(ground) : Commons.Color.urgent
           onKeysReleased: root.refocusKeys()

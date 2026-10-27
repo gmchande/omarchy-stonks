@@ -366,7 +366,7 @@ ShellRoot {
         surfaceOpen: true
         margins: surface.wide ? Style.space(16) : 0
         switchesPanels: !surface.wide
-        chartHeight: surface.wide ? Style.space(220) : Style.space(162)
+        chartHeight: surface.wide ? Style.space(220) : Style.space(190)
       }
     }
 
@@ -1289,14 +1289,14 @@ ShellRoot {
         }
 
         // The window's smallest permitted height shows three whole rows: the
-        // chart gives way first, down to 108 px; at the usual 760 px it keeps
+        // chart gives way first, down to 136 px; at the usual 760 px it keeps
         // all 220 and takes what whole rows leave over, less than a row.
         // Found in the design pass of 14 October: the smallest window showed
         // one row of the list.
         // The window's chart fits the window: set here, where the height is
         // the window's own, not fitted to the body as the popup's is.
         surface.fixedHeight = 760
-        body.minChartHeight = Style.space(108)
+        body.minChartHeight = Style.space(136)
         wait(50)
         var usualChart = body.chartItem.height
         surface.fixedHeight = body.smallestHeight !== undefined ? body.smallestHeight : body.chromeHeight + body.listRowHeight
@@ -1305,8 +1305,8 @@ ShellRoot {
         stub.historyEntry = null
         wait(50)
         var minimum = root.measure()
-        root.check("the window's smallest height shows three whole rows, its chart giving way to 108 px, and its usual height keeps the whole chart and less than a row more",
-          body.watchlist.height === 3 * body.rowPitch - body.rowGap && body.chartItem.height === Style.space(108)
+        root.check("the window's smallest height shows three whole rows, its chart giving way to 136 px, and its usual height keeps the whole chart and less than a row more",
+          body.watchlist.height === 3 * body.rowPitch - body.rowGap && body.chartItem.height === Style.space(136)
             && usualChart >= Style.space(220) && usualChart < Style.space(220) + body.rowPitch
             && minimum.footerGap === body.groupGap && minimum.footer <= surface.height,
           "list " + body.watchlist.height + " of " + surface.height + ", chart " + body.chartItem.height + ", at 760 " + usualChart)
@@ -1470,7 +1470,7 @@ ShellRoot {
         stub.library = stub.symbols.slice()
         var fullList = stub.symbols.slice()
         surface.wide = true
-        body.minChartHeight = Style.space(108)
+        body.minChartHeight = Style.space(136)
         var windowFaults = []
         var chartFaults = []
         // `rows` when the rows changed: past a row's slide or fade into its
@@ -1734,7 +1734,7 @@ ShellRoot {
             Array.from({ length: count - 1 }, function(_, n) { return { name: "List " + (n + 1), label: "List " + (n + 1), count: 1, symbols: ["MZ"] } }))
           ;[["popup", 0], ["window smallest", -1], ["window", 760]].forEach(function(place) {
             surface.wide = place[0] !== "popup"
-            body.minChartHeight = surface.wide ? Style.space(108) : 0
+            body.minChartHeight = surface.wide ? Style.space(136) : 0
             surface.fixedHeight = place[1] < 0 ? body.smallestHeight : place[1]
             ;[false, true].forEach(function(retro) {
               stub.retro = retro
@@ -1819,7 +1819,7 @@ ShellRoot {
           ["My Watchlist", "Watching", "Growth", "Wins", "Losses"].map(function(name) { return { name: name, label: name, count: 1, symbols: ["MZ"] } }))
         surface.wide = true
         surface.windowWidth = 720
-        body.minChartHeight = Style.space(108)
+        body.minChartHeight = Style.space(136)
         surface.fixedHeight = 760
         var fiveSeen = []
         ;[false, true].forEach(function(retro) {
@@ -2825,7 +2825,7 @@ ShellRoot {
           surface.fixedHeight = wide ? 760 : 0
           if (wide) {
             body.screenRoom = 0
-            body.minChartHeight = Qt.binding(function() { return Style.space(108) })
+            body.minChartHeight = Qt.binding(function() { return Style.space(136) })
           } else {
             body.screenRoom = Qt.binding(screenTall)
             surface.budget = Qt.binding(screenTall)
