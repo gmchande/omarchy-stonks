@@ -1,31 +1,13 @@
 #!/usr/bin/env bash
 # Overnight prices through the real Service, feeds, and App window, on a
-# clock the harness sets: which listings Robinhood is asked for, when, and
-# for which span, the pill's two questions side by side with nothing open,
-# the rest's at the first open, and 80 listings' prints in requests of at
-# most 75; the 1D chart as one New York calendar day, midnight to
-# midnight, on a weekday, a weekend, and Sunday night, for a night traded
-# through, and a thin night's chart as Yahoo's day then the night's trades
-# as dots by the clock; search's preview of a symbol in All and of one not
-# yet added; the overnight line under the price and its dimming; a scrub of
-# the night leaving the rows on now; none for a symbol that has not traded
-# tonight, an index, or a cryptocurrency, none at the weekend; a scrub to
-# the day's end after the close reading the close, an index's and a
-# stock's, and Tokyo's row on its close while it follows a Nasdaq scrub; a
-# failed answer asked again; the first live night's thin nights, their dots
-# drawn, scrubbed, and replayed in both looks, and a line on 1M at rest and
-# scrubbed; a night held open across midnight, the chart staying on
-# Tuesday until Wednesday's first print, then measured from Tuesday's close
-# at rest and scrubbed; and two names Robinhood does not trade all day,
-# KILN and BOLT, with no overnight line from a stray night trade, Yahoo's
-# own day laid out a print a step from the left edge, keys stepping print to
-# print, and SPY on Yahoo's day while Robinhood's instruments are down;
-# exchange times named by zone for a reader in New York; an index with
-# no pre-market, no tail after its close, and its next open; and the
-# header's animal asleep on Saturday and for a stock whose night doesn't
-# trade, awake for one whose night does and for a cryptocurrency, woken by
-# a scrub, in both looks. HOME
-# and curl are scratch; the fake curl answers from test/fixtures/moments.
+# clock the harness sets: what Robinhood is asked, when, and how much (the
+# pill's two questions side by side with nothing open, the rest's at the
+# first open, r for the chart on show, the five-minute night refresh, a
+# failed answer and a refusal, a symbol gone, 110 instruments and 80 prints);
+# and how its answers reach the line under the price, the header, the
+# animal, a scrub, a replay, search's preview, and the rows. The rules on
+# each saved moment are saved.test.js's. HOME and curl are scratch; the fake
+# curl answers from test/fixtures/moments.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree overnight.qml
 # The later saved moments hold NEST's day alone: the other symbols' quotes
