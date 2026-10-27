@@ -13,9 +13,9 @@ There's no set time for an answer.
 
 ## What counts
 
-The README's [What it runs](https://github.com/gmchande/omarchy-stonks#what-it-runs)
+[WHAT-IT-RUNS.md](https://github.com/gmchande/omarchy-stonks/blob/main/WHAT-IT-RUNS.md)
 lists everything Stonks does outside the shell: the commands it runs, the
-sites it contacts, and the files it writes. It's a security problem if
+sites it asks, and the files it writes. It's a security problem if
 anything can make Stonks:
 
 - run another command, or one of its own with arguments it didn't choose;

@@ -61,8 +61,8 @@ A maintainer releases from `dev`.
    every kind of listing at its odd hours. Fix or file what each finds.
 2. Someone who didn't build them reads the changes since the last release
    that run a command, touch a file, fetch, or show fetched text, taking
-   every answer and every other account as hostile, and checks the README's
-   "What it runs" and "Files it writes" against the code.
+   every answer and every other account as hostile, and checks
+   `WHAT-IT-RUNS.md` against the code.
 3. Bump `manifest.json`'s version in a release commit on `dev`, and render
    the README's pictures with `test/qml/readme.sh` if they should change.
 4. Run `STONKS_RENDER_BASE=vLAST test/review.sh --fresh` on it: `ALL PASS`,
