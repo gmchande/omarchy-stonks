@@ -7,8 +7,10 @@
 # is recorded for it.
 #
 # With --passed RUNNER, it prints nothing and says only whether RUNNER ended
-# ALL PASS on REF's tree since the last package change, the rule
-# test/queue.sh runs by, which a deploy can go by too.
+# ALL PASS on REF's tree in a run that began after the last package change
+# and after the saved answers last changed (test/fixtures-dir.sh): the rule
+# test/queue.sh runs by, which a deploy can go by too. A new capture, an
+# edited or removed answer, or a package update each make the next run count.
 #
 #   test/ran.sh                         this checkout's HEAD
 #   test/ran.sh origin/BRANCH           a pushed branch's head
@@ -21,10 +23,20 @@ ref=${1:-HEAD}
 tree=$(git rev-parse "$ref^{tree}")
 runs="$(git rev-parse --path-format=absolute --git-common-dir)/stonks-runs"
 if [ -n "$runner" ]; then
-  at=$(grep "^$tree [^ ]* $runner .* ALL PASS$" "$runs" 2> /dev/null | tail -n 1 | cut -d' ' -f4 || true)
-  updated=$(stat -c %Y /var/lib/pacman/local 2> /dev/null || echo 0)
-  [ -n "$at" ] && [ "$(date -d "$at" +%s)" -gt "$updated" ] && exit 0
-  echo "no $runner pass recorded for $ref's tree ($tree) since the last package change" >&2
+  read -r _ _ _ at took _ <<< "$(grep "^$tree [^ ]* $runner .* ALL PASS$" "$runs" 2> /dev/null | tail -n 1)" || true
+  if [ -n "${at:-}" ]; then
+    began=$(( $(date -d "$at" +%s) - ${took%s} ))
+    packages=$(stat -c %Y /var/lib/pacman/local 2> /dev/null || echo 0)
+    # The newest change to any saved answer, a file or a folder (a removal
+    # changes its folder), outside the answers' own git folder.
+    answers=0
+    if folder=$(test/fixtures-dir.sh 2> /dev/null); then
+      answers=$(find "$folder" -path "$folder/.git" -prune -o -printf '%T@\n' | sort -n | tail -n 1)
+      answers=${answers%.*}
+    fi
+    [ "$began" -gt "$packages" ] && [ "$began" -gt "$answers" ] && exit 0
+  fi
+  echo "no $runner pass recorded for $ref's tree ($tree) since the last package change and the saved answers' last change" >&2
   exit 1
 fi
 grep "^$tree " "$runs" 2> /dev/null | cut -d' ' -f2- && exit 0

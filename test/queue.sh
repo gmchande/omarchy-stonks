@@ -10,8 +10,9 @@
 #
 #   test/all.sh [--again]     test/review.sh [--again] [--fresh]
 #
-# A tree that already passed, since the last system update, isn't run again:
-# its record covers it. --again runs it anyway, as when chasing a flaky test.
+# A tree that already passed, since the last system update and the saved
+# answers' last change, isn't run again: its record covers it. --again runs
+# it anyway, as when chasing a flaky test.
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 source "$PWD/test/scratch.sh"
@@ -37,21 +38,18 @@ checkout() {
   commit=$(git rev-parse -q --verify HEAD 2> /dev/null)
   [ -n "$tree" ] || echo "$runner: this run won't be recorded: the tree has uncommitted edits or untracked files (git status)"
 }
-# refuse_passed: ends the run when this tree already passed this runner and
-# no package has changed since, unless --again. The newest pass counts:
-# pacman's database of what is installed changes with every install,
-# upgrade, and removal, an omarchy update's included.
+# refuse_passed: ends the run when this tree already passed this runner in a
+# run that began after the last package change and the saved answers' last
+# change (test/ran.sh --passed), unless --again.
 refuse_passed() {
-  local passed passed_commit passed_at updated
+  local passed_commit passed_at
   [ -n "$tree" ] && [ -z "$again" ] || return 0
-  passed=$(grep "^$tree [^ ]* $runner .* ALL PASS$" "$records" 2> /dev/null | tail -n 1)
-  [ -n "$passed" ] || return 0
-  updated=$(stat -c %Y /var/lib/pacman/local 2> /dev/null || echo 0)
-  read -r _ passed_commit _ passed_at _ <<< "$passed"
-  [ "$(date -d "$passed_at" +%s)" -gt "$updated" ] || return 0
+  test/ran.sh --passed "$runner" 2> /dev/null || return 0
+  read -r _ passed_commit _ passed_at _ <<< "$(grep "^$tree [^ ]* $runner .* ALL PASS$" "$records" | tail -n 1)"
   echo "$runner already passed on this tree at $(date -d "$passed_at" '+%H:%M on %-d %B') (commit ${passed_commit:0:7}),"
-  echo "and no package has changed since; its record covers it (test/ran.sh). To run it"
-  echo "again on purpose, as when chasing a flaky test: $runner --again"
+  echo "and neither a package nor a saved answer has changed since; its record covers"
+  echo "it (test/ran.sh). To run it again on purpose, as when chasing a flaky test:"
+  echo "$runner --again"
   exit 0
 }
 checkout
