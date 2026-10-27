@@ -13,7 +13,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree range.qml
 patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property var testBody: root.body\n  readonly property alias testKeyCatcher: keyCatcher'
 # The flows wait for the feeds to go quiet: nothing in flight or queued.
-patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testFeed: feed\n  readonly property alias testHistoryFeed: historyFeed'
+patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testFeed: feed\n  readonly property alias testHistoryFeed: historyFeed\n  readonly property alias testFundamentalsFeed: fundamentalsFeed'
 # The history and quote copies pause 200 ms before a retry, not 2.5 s.
 patch_copy plugin/HistoryFeed.qml 's/interval: 2500/interval: 200/'
 patch_copy plugin/QuoteFeed.qml 's/interval: 2500/interval: 200/'

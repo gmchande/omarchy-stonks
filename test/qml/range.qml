@@ -550,6 +550,25 @@ Harness {
         replayed && body.marketForms.length > 0 && body.headerText === body.marketForms[0] && body.featured.priceText === headline,
         replayed + " " + body.headerText + " vs " + body.marketForms[0] + "|" + body.featured.priceText)
 
+      // r in an open surface asks for the cap and P/E too, which are kept
+      // for a day: day-old ones are fetched again, fresh ones are not.
+      service.feature("AAPL")
+      tryVerify(function() { return service.fundamentals.AAPL && service.fundamentals.AAPL.status === "ok" }, 5000)
+      var asksBefore = harness.calls("AAPL.fundamentals")
+      keyClick("r")
+      tryVerify(function() { return !service.testFeed.busy && !service.testHistoryFeed.busy }, 10000)
+      var freshAsks = harness.calls("AAPL.fundamentals") - asksBefore
+      var agedFigures = Object.assign({}, service.testFundamentalsFeed.entries)
+      agedFigures.AAPL = Object.assign({}, agedFigures.AAPL, { checkedAt: agedFigures.AAPL.checkedAt - 25 * 60 * 60 })
+      service.testFundamentalsFeed.entries = agedFigures
+      keyClick("r")
+      var figuresAsked = within(5000, function() { return harness.calls("AAPL.fundamentals") > asksBefore })
+      tryVerify(function() { return service.fundamentals.AAPL.checkedAt > agedFigures.AAPL.checkedAt }, 5000)
+      harness.check("r fetches a day-old cap and P/E again, not fresh ones",
+        freshAsks === 0 && figuresAsked && harness.calls("AAPL.fundamentals") === asksBefore + 1
+          && service.fundamentals.AAPL.status === "ok",
+        freshAsks + "|" + (harness.calls("AAPL.fundamentals") - asksBefore))
+
       // IPC refreshes once, and every pill acknowledges it: dimmed, then
       // eased back. With a pill per screen, each one refreshed it, and the
       // second queued a second sweep. The answers are aged past the
