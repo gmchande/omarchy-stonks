@@ -16,14 +16,15 @@ import "plugin" as Stonks
 // thumbnail and a click to edit it; the picture is of the chart on show,
 // its symbol, range, and scrub, never the list. Then, with Omasnap absent
 // and present (camera.sh), the folder and editor each version of Omarchy
-// uses, under each version's settings. HOME and curl are scratch. Under a
-// scale factor (all.sh's run at QT_SCALE_FACTOR=2) only the two shots
-// whose picture size could change are taken: the popup's and the window's.
+// uses, under each version's settings. HOME and curl are scratch. With
+// STONKS_CAMERA_SIZES=1 (all.sh's run at QT_SCALE_FACTOR=2) only the two
+// shots whose picture size could change are taken: the popup's and the
+// window's.
 Harness {
   id: harness
   marker: "CAMERA DONE"
 
-  readonly property bool sizeOnly: Number(Quickshell.env("QT_SCALE_FACTOR") || 1) !== 1
+  readonly property bool sizeOnly: Quickshell.env("STONKS_CAMERA_SIZES") === "1"
   readonly property string fakeState: Quickshell.env("STONKS_FAKE_STATE")
   readonly property string shotsDir: Quickshell.env("HOME") + "/Shots"
   function readBytes(path) {
