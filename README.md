@@ -253,20 +253,22 @@ failed: point at the pill to read which, why, and when Stonks tries again.
 The row and the line above the price say the same.
 
 - **A row says "Update overdue" or "No data", and the header "No answer,
-  check your connection".** Stonks has waited 90 seconds on Yahoo, and no
-  answer came. A row with a price keeps it, with the time it's from. Check
-  your connection. If other sites load, Yahoo is down, and there's nothing
-  to do but wait. Stonks tries again within a minute, and `r` asks at once.
-- **A row says "Update overdue" or "No data", and the header "Turned away
-  by the price source".** Yahoo asked Stonks for fewer requests. The
-  header says when Stonks tries again, in a minute or up to half an hour,
-  as Yahoo asked. `r` won't hurry it.
+  check your connection", or "No connection?" where it's short of room.**
+  Stonks has waited 90 seconds on Yahoo, and no answer came. A row with a
+  price keeps it, with the time it's from. Check your connection. If other
+  sites load, Yahoo may be down or out of reach, and there's nothing to do
+  but wait. The header says when Stonks tries again, within two minutes,
+  and `r` asks at once.
+- **A row says "Update overdue" or "No data", and the header "Turned
+  away".** Yahoo asked Stonks for fewer requests. The
+  header says when Stonks tries again, from a minute to about half an hour
+  on, as Yahoo asked. `r` won't hurry it.
 - **The header says "Can't get prices · Stonks keeps trying".** Every
-  symbol you follow has gone 90 seconds without a price from Yahoo, and
-  Stonks doesn't know why, so it says so once rather than on every row.
-  Rows with a price keep it, with the time it's from, and the rest show
-  their symbol alone. Check your connection. If Yahoo has changed what it
-  sends, only a newer Stonks can fix that.
+  symbol you follow has a refresh that failed or is overdue, so Stonks
+  says so once rather than on every row. Rows with a price keep it, with
+  the time it's from, and the rest show their symbol alone. Check your
+  connection. If Yahoo has changed what it sends, only a newer Stonks can
+  fix that.
 - **A row says "No data for this symbol" or "Refresh failed", and the
   header "No usable answer".** Yahoo said it has nothing for the symbol, or
   sent a broken answer three times running. A row with a price keeps it,
