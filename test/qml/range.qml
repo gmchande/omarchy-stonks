@@ -563,7 +563,7 @@ Harness {
       service.testFundamentalsFeed.entries = agedFigures
       keyClick("r")
       var figuresAsked = within(5000, function() { return harness.calls("AAPL.fundamentals") > asksBefore })
-      tryVerify(function() { return service.fundamentals.AAPL.checkedAt > agedFigures.AAPL.checkedAt }, 5000)
+        && within(5000, function() { return service.fundamentals.AAPL.checkedAt > agedFigures.AAPL.checkedAt })
       harness.check("r fetches a day-old cap and P/E again, not fresh ones",
         freshAsks === 0 && figuresAsked && harness.calls("AAPL.fundamentals") === asksBefore + 1
           && service.fundamentals.AAPL.status === "ok",
