@@ -17,7 +17,9 @@ ShellRoot {
     if (!ok) failures++
   }
 
-  // The first item named `name` under `item`, its contentItem's too.
+  // The first item named `name` under `item`, through a popup's or a
+  // window's contentItem too. A Flickable's contentItem is already one of
+  // its children, so it is walked once.
   function find(item, name) {
     if (!item) return null
     if (item.objectName === name) return item
@@ -25,7 +27,7 @@ ShellRoot {
       var found = find(item.children[i], name)
       if (found) return found
     }
-    return item.contentItem ? find(item.contentItem, name) : null
+    return item.contentItem && item.contentItem.parent !== item ? find(item.contentItem, name) : null
   }
 
   function findAll(item, name, into) {
@@ -33,7 +35,7 @@ ShellRoot {
     if (!item) return out
     if (item.objectName === name) out.push(item)
     for (var i = 0; i < item.children.length; i++) findAll(item.children[i], name, out)
-    if (item.contentItem) findAll(item.contentItem, name, out)
+    if (item.contentItem && item.contentItem.parent !== item) findAll(item.contentItem, name, out)
     return out
   }
 
