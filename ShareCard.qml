@@ -15,14 +15,7 @@ import "Tones.js" as Tones
 // screen's own pixels on a screen of any scale, so its canvases paint
 // sharp and no larger than the picture: every measure is in the layout's
 // units, `u` window units each. What the popup shows above its ranges, at
-// share size, with the facts it leaves out (`Share.words`): the symbol,
-// its name and exchange; the day's animal, as the header draws it; the
-// price, with its currency beside it as a unit, and its move, large; what
-// the price is, its time and zone, a range's date, and what the move is
-// measured from; the line under the price the popup shows; the chart, its
-// axis ending at the newest price, with a range's high and low marks and
-// the scrub; and at the foot when, the day's date or the range's length,
-// and Stonks' mark. Never the list.
+// share size, with the facts it leaves out (`Share.words`); never the list.
 // In the surface's look and colours. Built for a shot and gone after it
 // (`StonksBody`).
 Rectangle {
@@ -55,10 +48,8 @@ Rectangle {
   property color downColor: Commons.Color.urgent
   property string fontFamily: Style.font.family
 
-  // A layout unit is a pixel of the 2400 × 1350 picture: 2 to the picture's
-  // 1200 × 675, so on a screen of any scale the card draws at the size it
-  // is saved at, its canvases no larger. `px` is one of the picture's
-  // pixels in the window's units: half a unit on a scale-2 screen.
+  // `px` is one of the picture's pixels in the window's units: half a unit
+  // on a scale-2 screen.
   readonly property real dpr: Screen.devicePixelRatio > 0 ? Screen.devicePixelRatio : 1
   readonly property real u: 2 / dpr
   readonly property real px: 1 / dpr

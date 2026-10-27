@@ -67,8 +67,8 @@ Flickable {
   // pointer: it takes the cursor, but its remove button waits for the
   // pointer to really move or a key to move the cursor, so a click there
   // features it. The button sits after the symbol, wherever its length puts
-  // it, so a notch could bring it under the pointer: in the edge pass of 15
-  // October the click meant to feature 7203.T removed it.
+  // it, so a notch can bring it under the pointer, and a click meant to
+  // feature the row would remove it.
   property string scrolledUnder: ""
   property var displayedSymbols: []
   property string dragSymbol: ""
@@ -82,9 +82,7 @@ Flickable {
   // A new text size gives the rows a new pitch: the list keeps the row at
   // its top, where the list was headed, rather than its scroll in pixels,
   // so it rests on whole rows, and then keeps the cursor's row whole in
-  // sight as a shorter surface does. Found in the strain fixes' walk: with
-  // the popup open through a change to text size 16, rows were cut at the
-  // list's top and bottom until the popup reopened.
+  // sight as a shorter surface does.
   property int lastPitch: 0
   onRowPitchChanged: {
     if (lastPitch > 0) {
@@ -120,11 +118,10 @@ Flickable {
   // list, the rows change under it, or a sort carries it off, is let go:
   // the cursor moves by the rule above and stays there when the row comes
   // back. Let go as the sight changes, not as cursorRow does: it reads the
-  // cursor it would clear. Sight is the rows' own view (`sightHeight`), as
-  // it is while they show: the popup's card shrinks to the key sheet or a
-  // view, and the list with it, and that is no scroll of yours. The
-  // surface made shorter is no scroll of yours either: the list scrolls to
-  // keep the cursor's row whole in sight (keepCursorInSight).
+  // cursor it would clear. Sight is the rows' own view (`sightHeight`), so
+  // the card shrinking to the key sheet or a view is no scroll of yours.
+  // The surface made shorter is no scroll of yours either: the list scrolls
+  // to keep the cursor's row whole in sight (keepCursorInSight).
   onHeadedYChanged: letGoUnseen()
   onSightHeightChanged: keepCursorInSight()
   onDisplayedSymbolsChanged: letGoUnseen()
@@ -144,10 +141,7 @@ Flickable {
   // glide was headed too: stopping the glide must not let it go on the
   // way. Without one, the featured row it rests on, when that was whole in
   // the sight before: a window settles through a size or two as it opens,
-  // and the featured row an open brought into sight stays there. Found in
-  // the walk of dev on 14 October (a shorter window moved a key cursor to
-  // the row still showing) and the tophat of 15 October (a window opening
-  // at 760, then 850, then 800 px tall lost the featured row).
+  // and the featured row an open brought into sight stays there.
   property real lastSight: 0
   function keepCursorInSight() {
     var keep = cursorSymbol !== "" ? (cursorSymbol !== dragSymbol ? cursorSymbol : "")
@@ -200,7 +194,7 @@ Flickable {
     visible: root.interactive
     active: root.interactive
     // At least 24 px long, so a long list's thumb is there to see and grab:
-    // at the window's smallest, one row of nine drew it 9 px.
+    // at the window's smallest, one row of nine would draw it 9 px.
     minimumSize: Math.min(1, Style.space(24) / Math.max(1, availableHeight))
     onPressedChanged: if (!pressed) root.snapToRow()
   }
@@ -227,7 +221,7 @@ Flickable {
 
   // The wheel glides the list rather than setting it, so a stream of small
   // ticks reads as motion instead of steps, and settles on a row boundary
-  // once the wheel goes quiet. Snapping every tick is what made it lurch.
+  // once the wheel goes quiet. Snapping every tick lurches.
   NumberAnimation {
     id: glide
     target: root
@@ -328,8 +322,6 @@ Flickable {
     wheelQuiet.stop()
   }
 
-  // Where the wheel has the list headed: its glide's destination, or where
-  // it is resting.
   function wheelTarget() {
     return glide.running ? glide.to : contentY
   }
@@ -386,9 +378,9 @@ Flickable {
   // took the removed one's place may be under a pointer at rest, the list's
   // own or one on the view that just closed over it (a symbol's lists), so
   // its remove button waits for the pointer to move, or a key to move the
-  // cursor, as one the wheel scrolls under it does: found by the design
-  // panel of 23 October, where a click on Toyota's × put Tesla's under the
-  // still pointer, and one more click removed Tesla.
+  // cursor, as one the wheel scrolls under it does: otherwise a click on
+  // a row's × puts the next row's × under the still pointer, and one more
+  // click removes that row too.
   function handTo(symbol) {
     var index = displayedSymbols.indexOf(symbol)
     if (index >= 0 && partInSight(index, headedY)) cursorSymbol = symbol
@@ -400,8 +392,8 @@ Flickable {
   // is, a glide or a touchpad's settle, as a flicking list stops under a
   // finger, and puts the cursor on the row, now in sight where the list
   // rests: the row stays under the pointer, and Delete or Enter act on it.
-  // Gliding it whole into view or onto a row boundary instead moved it out
-  // from under the pointer. And a double-click is one click, for the list
+  // Gliding it whole into view or onto a row boundary instead would move it
+  // out from under the pointer. And a double-click is one click, for the list
   // as for a row: a click within the double-click interval of the last,
   // at its place, does nothing, whatever button and whichever row is under
   // it by then, as the one sliding up into a removed row's place.
@@ -435,8 +427,7 @@ Flickable {
   // `counts`, it stops the list and puts the cursor on its row. Says
   // whether it acts. Under a pointer still since the wheel scrolled the
   // rows, the row it stops on waits for a move to show its remove button
-  // too: mid-glide, that is not the row the glide was headed for. Found in
-  // review: a click 30 ms into a glide showed the stopped row's at once.
+  // too: mid-glide, that is not the row the glide was headed for.
   function takeClick(symbol, x, y, counts) {
     var now = Date.now()
     lastClickTime = now
@@ -498,8 +489,8 @@ Flickable {
   // whole in sight: a row above comes in at the top, one below at the foot.
   // Bounded by the sight, not the list's own height: as a window gets
   // shorter the sight can change a moment before the height does, and a
-  // bound read from the old height held the row out of sight. Found in the
-  // tophat of 15 October: the key cursor on the last row was let go.
+  // bound read from the old height would hold the row out of sight and let
+  // go of a key cursor on the last row.
   function restingTopFor(index, top) {
     var y = index * rowPitch
     var bottom = Math.max(0, rowsLength() - sightHeight)
@@ -601,7 +592,7 @@ Flickable {
     return null
   }
 
-  // Every row by its symbol, in one pass: a lookup a row at a time scanned
+  // Every row by its symbol, in one pass: a lookup a row at a time scans
   // every row for each, 22,500 looks at 150 symbols.
   function rowItems() {
     var rows = {}
@@ -737,9 +728,6 @@ Flickable {
   // cursor of the last visit's, so it rests on the featured row until you
   // point or press a key. The featured row is brought into sight at once,
   // so that cursor is the row the hero shows and Enter or Delete act on it.
-  // Found in the walk of dev on 14 October: featured from the pill below
-  // the fold, the popup opened with the cursor on its top row, and Enter
-  // featured that.
   function reopen() {
     cursorSymbol = ""
     forgetClicks()
@@ -907,8 +895,8 @@ Flickable {
           restoreMode: Binding.RestoreNone
         }
         quote: place >= 0 ? sightQuote : null
-        // The scrub reaches only the rows in sight, as answers do: each
-        // step and each replay frame derived and repainted every row ever
+        // The scrub reaches only the rows in sight, as answers do: otherwise
+        // each step and each replay frame derives and repaints every row ever
         // scrolled past. A row coming into sight takes it before that frame.
         readonly property int sightScrub: inSight ? root.scrubShown : 0
         view: quote ? Figures.rowModel(quote, sightScrub, root.changeMode) : null

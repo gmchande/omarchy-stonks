@@ -86,8 +86,8 @@ function chartGeometry(quote, calendars) {
     return gaps.some(function(gap) { return a <= gap.start && b >= gap.end })
   }
   // An unknown close (`Quote.knownPrice`) has no place on the scale and no
-  // dashed line: the prints alone set it. Found in review: a null close drew
-  // a baseline at zero, the day flattened on top of it.
+  // dashed line: the prints alone set it. Otherwise a null close draws a
+  // baseline at zero, the day flattened on top of it.
   var base = Quote.dayBase(quote)
   var known = Format.isFiniteNumber(base)
   var lo = known ? base : (pts.length ? pts[0].p : 0)
@@ -192,7 +192,6 @@ function newestFraction(quote, axis) {
   return n ? Format.clamp(axisFraction(axis, quote.points[n - 1].t), 0, 1) : 0
 }
 
-// Where print `k` sits.
 function printFraction(quote, axis, k) {
   var n = dayPrints(quote, axis)
   if (!axis.byPrint || k >= n) return axisFraction(axis, quote.points[k].t)
@@ -273,9 +272,8 @@ function lastRegularPoint(geometry) {
 }
 
 // Interpolated normalized y for a normalized x, or null past the line and
-// inside Tokyo's lunch (`lunch`), where the line lifts: the owner's call on
-// the quality audit's finding 18, so the scrub's dot leaves the gap as the
-// line and the chime do.
+// inside Tokyo's lunch (`lunch`), where the line lifts, so the scrub's dot
+// leaves the gap as the line and the chime do.
 function yAt(points, x) {
   if (!points || !points.length) return null
   if (x < points[0].x || x > points[points.length - 1].x) return null

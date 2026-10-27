@@ -145,7 +145,7 @@ Harness {
       mouseClick(side, side.width / 2, side.height / 2)
     }
     // Shift+U, as a person presses it, in the open window, once it has the
-    // keyboard: just opened, it may not yet, and the key went nowhere.
+    // keyboard: just opened, it may not yet, and the key goes nowhere.
     function shiftU() {
       var window = app.testKeyCatcher.Window.window
       window.requestActivate()

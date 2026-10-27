@@ -25,11 +25,11 @@ import Quickshell.Io
 Item {
   id: root
 
-  // The shot under way: its symbol, its item, the folder omasnap.conf names
-  // and the pictures folder as Omasnap reads them, the file it is saved as
-  // and the editor a click opens it in, what to call once the picture is
-  // taken, and what to call with how it ended (`shoot`); no callback, no
-  // shot.
+  // The shot under way (`shoot`): its symbol, its item, the folder
+  // omasnap.conf names and the pictures folder as Omasnap reads them, the
+  // file it is saved as and the editor a click opens it in, what to call
+  // once the picture is taken, and what to call with how it ended; no
+  // `shotDone`, no shot.
   property string shotSymbol: ""
   property var shotItem: null
   property string shotOmasnapFolder: ""

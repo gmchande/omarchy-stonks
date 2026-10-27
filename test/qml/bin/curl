@@ -4,10 +4,11 @@
 # be driven through success, failure, retry, and recovery without the network.
 # It counts its calls per symbol in STONKS_FAKE_STATE/<SYMBOL>.calls, and a
 # symbol's history requests again in <SYMBOL>.history.calls; while
-# <SYMBOL>.history.hold exists, that symbol's history answer waits, and
-# while <SYMBOL>.quote.hold exists, its day's answer does. Every chart
-# answer names the symbol asked for, whichever saved day it carries, so a
-# quote kept under another symbol shows.
+# <SYMBOL>.history.hold exists, that symbol's history answer waits, while
+# <SYMBOL>.history.down exists it fails, and while <SYMBOL>.quote.hold
+# exists, its day's answer waits. Every chart answer names the symbol asked
+# for, whichever saved day it carries, so a quote kept under another symbol
+# shows.
 #
 #   AAPL, MSFT, NVDA   answer test/fixtures/aapl.json
 #   SLID         answers like AAPL; its fundamentals are NEST's, a loss
@@ -341,8 +342,6 @@ serve() {
   history() { stamp < "$fixtures/history/aapl-1y.json"; }
   if [[ "$url" == *"includeAdjustedClose=true"* ]]; then
     count "$STONKS_FAKE_STATE/$symbol.history.calls" > /dev/null
-    # A harness holds a symbol's history answer back while <SYMBOL>.history.hold exists,
-    # and fails it while <SYMBOL>.history.down does.
     while [ -e "$STONKS_FAKE_STATE/$symbol.history.hold" ]; do sleep 0.05; done
     [ -e "$STONKS_FAKE_STATE/$symbol.history.down" ] && exit 22
     case "$symbol" in
@@ -397,7 +396,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 # Reject before serving anything, and leave a record finish() cannot mistake
-# for a simulated outage. One parser invocation for the whole curl batch.
+# for a simulated outage. One bun call checks the whole batch, not one per URL.
 if ! validated=$(bun "$(dirname "${BASH_SOURCE[0]}")/../../request-url.js" "${urls[@]}"); then
   if [ ! -s "$state/unexpected.requests" ]; then
     printf 'validator failed: %s\n' "${urls[*]}" >> "$state/unexpected.requests"

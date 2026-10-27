@@ -126,9 +126,8 @@ quickshell_stop() {
   # by its start time, and leads it, which it does until killed. Not by its
   # mark: /proc/PID/environ reads empty while a process is part way through
   # an exec, and the leader execs `sleep infinity` as it says Quickshell has
-  # ended, so a stop that came just then left it running, then found it
-  # still marked and failed the run as if it had left (GitHub's run of 26
-  # October).
+  # ended, so a stop just then would leave it running, then find it still
+  # marked and fail the run as if it had left.
   if leader_is "$qs_leader" "$qs_leader_start"; then
     kill -TERM -- "-$qs_leader" 2> /dev/null
     for i in $(seq 10); do [ "$(pgrep -g "$qs_leader" | wc -l)" -le 1 ] && break; sleep 0.2; done

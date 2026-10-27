@@ -16,8 +16,7 @@ import "Tones.js" as Tones
 // moves nothing. Each icon on the right says on hover what a click does,
 // in the shell's own tooltip, under the icon and inside the card, covering
 // what is there while the pointer rests: a popup hangs from a top bar, at
-// the screen's top, with no room above (the owner, 26 October). The animal
-// has none, by the owner's call.
+// the screen's top, with no room above. The animal has none.
 Item {
   id: root
 
@@ -230,9 +229,9 @@ Item {
   // z as the bull is, so it reads as the animal's and not as a mark on the
   // first word, and stop as much sooner, so their room is the same. The
   // first form that fits that room shows: with its letters spaced, else
-  // closed up. Found in the 1.1.0 audit: beside the speaker and the camera,
-  // Tokyo's Constitution Memorial Day lost its name in the popup at the
-  // everyday text size; and in the size-16 check: after hours lost its time.
+  // closed up. Without this, beside the speaker and the camera, Tokyo's
+  // Constitution Memorial Day loses its name in the popup at the everyday
+  // text size, and after hours at size 16 loses its time.
   readonly property real wordsRoom: Math.max(0, soundIcon.x - Style.space(8) - statusWords.x
     - (root.offersRetry ? retry.implicitWidth + Style.space(16) : 0))
   readonly property var measured: [form0, form1, form2].slice(0, statusForms.length)

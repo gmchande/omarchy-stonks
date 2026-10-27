@@ -10,8 +10,7 @@ import "KeyText.js" as KeyText
 // The list menu: All and each named list with its count, a check on the
 // current one, then "New list…", which turns into a name field in place, and
 // "Manage lists…". Those two stay in sight under the lists, which scroll in
-// whole rows when they outgrow the room: with twelve lists the last showed
-// cut in half, and the two sat below it.
+// whole rows when they outgrow the room, so no list shows cut in half.
 // Value-in, signals out; the body switches and creates. One cursor, as on
 // the rows: it opens on the current list, moving the pointer puts it on the
 // row under it, the arrows move it from there, Enter takes one, and Escape
@@ -35,7 +34,6 @@ FocusScope {
 
   property int cursor: 0
   property bool naming: false
-  // What is typed for a new list; "" unless naming.
   readonly property string typedName: naming ? nameField.text : ""
 
   readonly property int itemHeight: Style.space(26)
@@ -84,7 +82,6 @@ FocusScope {
     }
   }
 
-  // The menu's start: the cursor on the current list.
   function reset() {
     naming = false
     problem = ""
@@ -103,8 +100,7 @@ FocusScope {
 
   // A key takes the list over from the wheel: its motion stops, so it
   // cannot carry the cursor on from where the key put it, and the lists
-  // land at once where they were settling, on a row's edge (a key mid-settle
-  // left them at 75 px of 26 px rows, found in review). "New list…" and
+  // land at once where they were settling, on a row's edge. "New list…" and
   // "Manage lists…" are always in sight.
   function showCursor() {
     scroll.cancelFlick()
@@ -119,14 +115,12 @@ FocusScope {
       scroll.contentY = top + itemHeight - scroll.height
   }
 
-  // List `index`'s top among the lists.
   function topOf(index) {
     return index * itemHeight
   }
 
   // A scroll by hand, the wheel's or the scrollbar's, comes to rest on a
-  // row's edge, so the lists in sight are whole rows: one notch stopped at
-  // 72 px of 26 px rows, cutting a row at each edge. A list wholly in sight
+  // row's edge, so the lists in sight are whole rows. A list wholly in sight
   // before stays so, the cursor's too.
   function settleOnRow() {
     var end = Math.max(0, scroll.contentHeight - scroll.height)
@@ -224,7 +218,7 @@ FocusScope {
   }
 
   // The edge is drawn over the ground, not see-through: Qt draws a border in
-  // place of the fill, so a translucent one showed the rows' cursor bar
+  // place of the fill, so a translucent one would show the rows' cursor bar
   // under the menu's left edge.
   Rectangle {
     anchors.fill: parent

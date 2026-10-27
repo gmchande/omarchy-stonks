@@ -30,7 +30,7 @@ Panel {
   // The popup shows up to six whole rows under its fixed content. Stated in
   // rows, so a different font or text size still gets six.
   readonly property int maxRows: 6
-  // Built as the popup first opens, and kept: null until then.
+  // Null until the popup first opens.
   readonly property var body: bodyLoader.item
   readonly property int heightCap: body ? panel.verticalContentInset + body.chromeHeight
     + maxRows * body.rowPitch - body.rowGap : 0

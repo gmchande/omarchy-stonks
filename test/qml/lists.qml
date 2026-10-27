@@ -101,7 +101,6 @@ Harness {
       return items
     }
 
-    // The data file once `ok` holds of it, or as it is after 3 s.
     function fileWhen(ok) {
       var file = {}
       within(3000, function() { file = harness.dataFile(); return ok(file) })
@@ -1371,7 +1370,6 @@ Harness {
       var orderWas = service.order
       service.setOrder("pct")
       tryVerify(function() { return service.order === "pct" && !service.reversed }, 2000)
-      // What each unit's figures look like, and the three's order by it.
       var fromClose = three.join(",")
       var wants = {
         abs: { says: function(l) { return l.indexOf("%") < 0 }, order: fromClose },

@@ -82,13 +82,10 @@ Item {
   onHairlineColorChanged: marks.requestPaint()
   onScrubXChanged: marks.requestPaint()
 
-  // Where along the axis `x` is, inside the pad the line is drawn within.
   function fractionAt(x) {
     return (x - pad) / (width - pad * 2)
   }
 
-  // Where a point `fraction` along the axis is drawn: `fractionAt`'s
-  // inverse.
   function xAt(fraction) {
     return pad + fraction * (width - pad * 2)
   }
@@ -237,7 +234,7 @@ Item {
       }
 
       // The above colour over the baseline and the below colour under it, in
-      // one pass: stroking each line twice, clipped to each side, doubled the
+      // one pass: stroking each line twice, clipped to each side, doubles the
       // paint. Two stops at one offset merge, so the second sits a hair below.
       // The line's dim ink is one share of its own colour on both sides: it
       // reads against the full line beside it, not against the other side.

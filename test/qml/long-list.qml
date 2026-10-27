@@ -204,9 +204,7 @@ Harness {
         "STRAY charted " + charted.STRAY + ", dropped " + (stray ? stray.droppedTimes.length : "-") + "; SHOP.TO " + (charted["SHOP.TO"] || 0) + ", BTC-USD " + (charted["BTC-USD"] || 0)
           + "; runs with STRAY: " + harness.lines("runs.log").filter(function(r) { return /STRAY/.test(r) }).map(function(r) { return r.split(" ").filter(function(u) { return /STRAY/.test(u) }).map(function(u) { return u.split(":")[0] }).join("+") + "/" + r.split(" ").length }).join(" "))
 
-      // Ten minutes of trading: every row is due each minute. The list
-      // refreshes whole each minute in a few requests, one curl a minute,
-      // and no row or the pill warns.
+      // Ten minutes of trading: every row is due each minute.
       var reqFrom = harness.lines("requests.log").length
       var runFrom = harness.lines("runs.log").length
       var steadyWarned = 0
@@ -293,8 +291,7 @@ Harness {
       settle()
 
       // The budget nearly spent and slow to refill: every row falls due and
-      // waits its turn for minutes, on Stonks' own pacing alone. No row and
-      // not the pill warns; once the budget is back, every row refreshes.
+      // waits its turn for minutes, on Stonks' own pacing alone.
       var gate = service.testYahooGate
       harness.check("loading, ten minutes of trading, a glide and a row featured mid-refresh are never held back by Yahoo's budget", !gate.warned)
       var refill = gate.perMinute
@@ -315,9 +312,7 @@ Harness {
 
       // Yahoo refusing: nothing more goes for the pause. Each symbol's
       // update is overdue 90 s after its wait on Yahoo began: at once for
-      // those waiting at the refusal, and as each falls due after it. Once
-      // every one is, the window's header says so once, and the rows in
-      // sight warn of nothing each; the pill still warns.
+      // those waiting at the refusal, and as each falls due after it.
       touch("YAHOO.refuse")
       var refusedAt = 0
       tick(70, 1, function() { if (!refusedAt && service.testYahooGate.pause === "refused") refusedAt = service.now })

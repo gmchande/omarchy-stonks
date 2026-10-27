@@ -1,11 +1,10 @@
 import QtQuick
-// The pointer over a list of rows, said only when it really moves within
-// them. The first place the pointer is seen at, as it comes in or as the
-// view opens or shows again under a resting pointer, is where it starts,
-// no move: Qt's first hover there says nothing about a hand, so the cursor
-// stays where the view put it. And Qt sends the hover again as rows scroll
-// under a still pointer; that is no move either, so a key gliding a list
-// never hands its cursor back to the pointer.
+// The pointer over a list of rows, reporting only a real move within them.
+// Where it is first seen, as it comes in or as the view opens or shows
+// again under a resting pointer, is where it starts: Qt's first hover there
+// says nothing about a hand, so the cursor stays where the view put it. Qt
+// also hovers again as rows scroll under a still pointer; that is no move
+// either, so a key gliding a list never hands its cursor to the pointer.
 HoverHandler {
   id: root
 

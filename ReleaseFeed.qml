@@ -5,13 +5,13 @@ import "Release.js" as Release
 // The newest Stonks, from main's manifest on GitHub (`Release`): what
 // `omarchy plugin update` would bring. Asked as the service is ready, then a
 // day after each ask, whatever GitHub said, and only while a screen is on
-// (`clearance`) and GitHub's gate lets it. An ask that got no answer at
-// all, as straight after a wake before the network is back, goes again once
-// Yahoo answers again after its own pause (`askAgain`), or a day on: asked
-// again each time GitHub's short pause ended, it went about once a minute
-// for as long as the network was down. Only a whole answer naming a version
-// changes `version`: a failure or a refusal leaves it as it was and says
-// nothing, since it is not a quote.
+// (`clearance`) and GitHub's gate lets it. An ask with no answer at all, as
+// just after a wake before the network is back, goes again once Yahoo
+// answers after its own pause (`askAgain`), or a day on; asked again at the
+// end of each of GitHub's short pauses, it would go about once a minute for
+// as long as the network is down. Only a whole answer naming a version
+// changes `version`; a failure or a refusal says nothing, since it is not a
+// quote.
 Item {
   id: root
 

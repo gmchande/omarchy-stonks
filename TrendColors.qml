@@ -6,9 +6,7 @@ import "Tones.js" as Tones
 // red, or Stonks' own pair where the two are no pair (`Tones.trend`). Each
 // surface asks for its own ground, as a light bar under a dark popup takes
 // the other pair. The shell's Color keeps only five roles, so the green is
-// read from the theme's colors.toml here. A theme switch replaces the
-// theme's files and then pushes its palette to the shell, so a change of
-// the shell's colours is when the file is new: it is read again then.
+// read from the theme's colors.toml here.
 Item {
   id: root
 
@@ -20,10 +18,9 @@ Item {
 
   // A theme switch puts the theme's files in place and then hands the shell
   // its palette and its shell.toml (`Color.loadColors`, `Color.loadShell`),
-  // so either is when the file is read again; up and down follow as the read
-  // lands.
-  // The shell's values are reassigned on every theme applied, so a theme
-  // whose foreground, accent, and red match the last one's is read too.
+  // so either is when the file is read again. The shell reassigns its values
+  // on every theme applied, so a theme whose foreground, accent, and red
+  // match the last one's is read too.
   FileView {
     id: colors
     path: Commons.Color.currentThemePath + "/colors.toml"

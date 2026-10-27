@@ -4,20 +4,19 @@ import qs.Commons as Commons
 import qs.Ui
 import "Tones.js" as Tones
 
-// Pinned "+ Add a symbol" bar. Surfaces own the add flow. For a moment it can
-// carry a note instead, in the foreground: why a key did nothing. It stays
-// while the pointer is on it (`hovered`). Until what it says is fixed, a
-// notice, in the foreground too, under any note, whose click is the
-// surface's (`acts`), its action said whole (`noticeAction`), so a long
-// list name is what gets cut. A hint for the visit is a quiet line of its
-// own above the bar, which it never replaces, and takes no click; the
-// surface can have it give way (`showsHint`). For a few seconds after a
-// removal, an undo stands at the bar's right end, a button of its own
-// (`undoLabel`), so the add beside it never waits: its words stay centred
-// on the whole bar, where they always are. While a newer Stonks is out,
-// that place holds its update (`updateLabel`), which gives way to an undo
-// for the undo's seconds. It is painted in its surface's ground, so riding
-// a growing edge it covers the rows it passes.
+// Pinned "+ Add a symbol" bar; surfaces own the add flow. For a moment it
+// can carry a note instead, in the foreground: why a key did nothing. It
+// stays while the pointer is on it (`hovered`). Until what it says is fixed,
+// a notice, also in the foreground, sits under any note; its click is the
+// surface's (`acts`) and its action is said whole (`noticeAction`), so a
+// long list name is what gets cut. A hint for the visit is a quiet line
+// above the bar, never replacing it and taking no click; the surface can
+// have it give way (`showsHint`). For a few seconds after a removal, an undo
+// stands at the bar's right end as its own button (`undoLabel`), so the add
+// never waits and its words stay centred on the whole bar. While a newer
+// Stonks is out, that place holds its update (`updateLabel`), which gives
+// way to an undo. The bar is painted in its surface's ground, so riding a
+// growing edge it covers the rows it passes.
 Item {
   id: root
 

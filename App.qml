@@ -61,8 +61,7 @@ Item {
   // The summon payload's symbol and range, once the service can act on them,
   // in one change. Both are shared with the popup, and the symbol with the
   // bar, so a request belongs to the visit that made it: one waiting on a
-  // service that was not ready yet is dropped if the window has been closed
-  // by the time it is.
+  // service not yet ready is dropped if the window has closed by then.
   function applyRequest() {
     if (!ready || !window.visible) return
     var symbol = requestedSymbol
@@ -105,8 +104,8 @@ Item {
     // The fixed content at its whole chart plus one row: below this the
     // list would have no room at all. The chart gives way first, so here
     // three rows show (StonksBody.minChartHeight). The width scales with
-    // the text size, as the popup's does: a fixed 560 at size 16 cut
-    // Tokyo's holiday header and left VOL and P/E off the info lines.
+    // the text size, as the popup's does: at a fixed 560, size 16 cuts
+    // Tokyo's holiday header and leaves VOL and P/E off the info lines.
     minimumSize: Qt.size(Style.space(560), root.body ? root.body.smallestHeight : 0)
     visible: false
 

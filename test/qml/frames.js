@@ -129,9 +129,9 @@ function same(frames) {
 // pixels drawn over it (the label naming what is coming) weigh nothing.
 // Only pixels at least 64 levels off the ground count, the line, caps, and
 // type: a smooth chart's faint wash is most of its pixels, and dimmed to a
-// few levels each it rounds to whole levels, which moved the median
-// 0.395, 0.421 across the last two frames of a dim whose line read 0.404,
-// 0.403. Where nothing stands that far off, any pixel 24 off does.
+// few levels each it rounds to whole levels, enough to move the median a
+// few hundredths while the line holds still. Where nothing stands that far
+// off, any pixel 24 off does.
 // The ground is what a dim fades toward: the most common colour among the
 // pixels two of its pictures share (`groundUnder`).
 function inkShare(image, whole, ground) {
@@ -421,11 +421,11 @@ function drawin(all, end = 1, plot = null, first = false) {
   const early = finish < wholeFrom - slack
   const tail = frames.slice(0, settled).filter(f => f.t > start + length + slack).length
   // The motion starts at the left edge as the change is made: its line
-  // starts no earlier than the mark, short of its own error (right
-  // draw-ins have read up to 10 ms early), so a chart that begins a
-  // quarter drawn or more reads as starting 24 ms or more before it, its
-  // length right or not; and within a few frames of the mark, counted in
-  // frames, which load does not stretch.
+  // starts no earlier than the mark, short of its own error (a right
+  // draw-in reads up to 10 ms early), so a chart that begins a quarter
+  // drawn or more reads as starting 24 ms or more before it, its length
+  // right or not; and within a few frames of the mark, counted in frames,
+  // which load does not stretch.
   const startsEarly = start < -24
   const lead = frames.filter(f => f.t < start).length
   // Ink before the draw-in began, a share of its extent, on the frame that
@@ -436,27 +436,26 @@ function drawin(all, end = 1, plot = null, first = false) {
   const ok = last >= 0.95 && backwards < 0 && gapAt < 0 && distinct >= 4 && line.length >= 3
     && length >= 270 && length <= 380 && !early && tail === 0 && !startsEarly && lead <= 4 && !flashed
   // Too few frames to read the motion by: a machine too loaded to render
-  // it, not a wrong draw-in. Found under the suite's load: the busy
-  // machine's draw-in showed its edge at 0, 0.88, then whole at 364 ms; and
-  // pinned to two cores beside the suite its frames came at 0, 93, 139, 191
-  // ms, and on one core at 0, 76, 117, 171 ms. A verdict is unreadable only
-  // when it failed for want of a curve to read (fewer than three frames on
-  // it under 0.9 of the way, or fewer than four distinct), with fewer than
-  // three frames in the first 150 ms, where a right one is still short of
-  // 0.85, and the frames say nothing either way: some allowed draw-in, 270
-  // to 380 ms OutCubic starting within 24 ms before the mark to 32 after,
-  // shows every one of them, give or take 10 ms of a frame's time and a
-  // column of edge (0.02 behind, 0.06 ahead for retro's whole columns);
-  // the chart is not whole before 200 ms, which a right one never is
-  // (retro's whole columns were whole from 225 ms); a curve read off three
-  // frames or more has its length, start, and end in bounds; and no ink is
-  // missing behind the edge, no edge goes back, the ink is not cut short,
-  // and none showed before it began. It needs the empty plot: without it a
-  // chart that starts part drawn reads as starting from nothing, so a
-  // capture judged without one is never unreadable. Frames no allowed
-  // draw-in could show, a 160 ms one at 0, 50, 80, 208 ms, contradict the
-  // motion and fail as wrong. A harness can film an unreadable draw-in
-  // again; it never passes as one.
+  // it, not a wrong draw-in. Under the suite's load a draw-in can show its
+  // edge at 0, 0.88, then whole at 364 ms, or come on frames at 0, 93, 139,
+  // 191 ms pinned to two cores and at 0, 76, 117, 171 ms on one. A verdict
+  // is unreadable only when it failed for want of a curve to read (fewer
+  // than three frames on it under 0.9 of the way, or fewer than four
+  // distinct), with fewer than three frames in the first 150 ms, where a
+  // right one is still short of 0.85, and the frames say nothing either
+  // way: some allowed draw-in, 270 to 380 ms OutCubic starting within 24 ms
+  // before the mark to 32 after, shows every one of them, give or take
+  // 10 ms of a frame's time and a column of edge (0.02 behind, 0.06 ahead
+  // for retro's whole columns); the chart is not whole before 200 ms, which
+  // a right one never is (retro's whole columns are whole from 225 ms); a
+  // curve read off three frames or more has its length, start, and end in
+  // bounds; and no ink is missing behind the edge, no edge goes back, the
+  // ink is not cut short, and none showed before it began. It needs the
+  // empty plot: without it a chart that starts part drawn reads as starting
+  // from nothing, so a capture judged without one is never unreadable.
+  // Frames no allowed draw-in could show, a 160 ms one at 0, 50, 80,
+  // 208 ms, contradict the motion and fail as wrong. A harness can film an
+  // unreadable draw-in again; it never passes as one.
   const readable = frames.filter(f => f.t > 0 && f.t <= 150).length
   const reach = (t, s, l) => t <= s ? 0 : t - s >= l ? 1 : 1 - Math.pow(1 - (t - s) / l, 3)
   const shows = (s, l) => frames.every((f, i) => edges[i] >= reach(f.t - 10, s, l) - 0.02 && edges[i] <= reach(f.t + 10, s, l) + 0.06)
@@ -541,11 +540,11 @@ function edge(all, band) {
   const settled = frames.findIndex((f, i) => frames.slice(i).every(later => later.e === to))
   const finish = frames[settled].t
   // Whole within a pixel of the curve's end, short of its own error. A
-  // span of a few rows reads its curve from few pixels: real 160 ms eases
-  // have read 130 to 204 ms, starting up to 23 ms before the mark, so 100
-  // and 240 ms read as wrong and 160 never does, and a jump of 60% at the
-  // mark reads as a start 50 ms before it. A jump of a quarter or less
-  // reads within that error.
+  // span of a few rows reads its curve from few pixels: a real 160 ms ease
+  // reads 130 to 204 ms, starting up to 23 ms before the mark, so 100 and
+  // 240 ms read as wrong and 160 never does, and a jump of 60% at the mark
+  // reads as a start 50 ms before it. A jump of a quarter or less reads
+  // within that error.
   const slack = 16
   const tail = finish > start + length + slack
   const lead = frames.filter(f => f.t < start).length
@@ -695,7 +694,7 @@ function selfCheck() {
   // frames that skip its first 150 ms fails as unreadable, and a wrong one
   // on frames that come fails as wrong.
   const stalled = [162, 103, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16]
-  // The frames busy runs gave pinned to two cores beside the suite, and to one.
+  // A busy run's frame gaps, pinned to two cores beside the suite, and to one.
   const pinned = [93, 46, 52, 70, 27, 13, 8, 25, 8, 17, 15, 24, 12, 21, 14]
   const oneCore = [76, 41, 54, 68, 25, 14, 10, 15, 17, 22, 17, 12, 22, 14, 10, 15]
   const sparse = [
@@ -720,8 +719,8 @@ function selfCheck() {
     // Within a frame's error of an allowed 380 ms one: it says nothing.
     ["400 ms, on frames at 0, 93, 139, 400 ms", (x, t) => x < outCubic(t, 400), [93, 46, 261, 16, 16, 16, 16, 16], true],
     // A busy run that starts 60% drawn, on frames at 0, 93, 139, 400 ms:
-    // read against the empty plot its first frame is 0.60 drawn, and judged
-    // without one, as the busy run once was, it is never unreadable.
+    // read against the empty plot its first frame is 0.60 drawn, and
+    // judged without one it is never unreadable.
     ["one starting 60% drawn, on frames at 0, 93, 139, 400 ms", (x, t) => x < 0.6 + 0.4 * outCubic(t, 320), [93, 46, 261, 16, 16, 16, 16, 16], false],
     ["one starting 60% drawn, on frames at 0, 93, 139, 400 ms, judged without the empty plot", (x, t) => x < 0.6 + 0.4 * outCubic(t, 320), [93, 46, 261, 16, 16, 16, 16, 16], false, 480, false],
   ]

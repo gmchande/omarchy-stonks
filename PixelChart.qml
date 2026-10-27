@@ -78,7 +78,7 @@ Item {
   // share of its own colour on both sides.
   // `solid` draws each stem at its cap's ink instead, for a chart so small
   // that faint stems leave only the caps, a dotted line: the pill's, 13
-  // columns at 1x (the design QA of 19 October).
+  // columns at 1x.
   property bool solid: false
   readonly property real aboveStem: solid ? 1 : Tones.washAlpha(aboveColor, upColor, ground, 0.35, 1)
   readonly property real belowStem: solid ? 1 : Tones.washAlpha(belowColor, upColor, ground, 0.35, 1)

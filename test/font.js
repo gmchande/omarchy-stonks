@@ -14,7 +14,7 @@ if (!family.split(',').includes('JetBrainsMono Nerd Font')) throw new Error('req
 const ranges = run(['fc-query','--format','%{charset}',file]).split(/\s+/).map(r => r.split('-').map(n=>parseInt(n,16)))
 const chars = new Map()
 // QML and the rule files use single/double quoted literals. Skip comments
-// before reading literals; decode escapes, including newly introduced glyphs.
+// before reading literals; decode escapes, so an escaped glyph is checked too.
 for (const name of readdirSync(root).filter(n=>/\.(qml|js)$/.test(n))) {
   const source = readFileSync(join(root,name),'utf8')
   const tokens = source.match(/\/\/[^\n]*|\/\*[\s\S]*?\*\/|"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'/g) || []

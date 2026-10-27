@@ -143,12 +143,10 @@ Harness {
       tryVerify(function() { return Date.now() >= sounds.asleepAfter }, 4000)
     }
 
-    // The chart on screen has drawn in.
     function drawnIn(body) {
       tryCompare(body.motion, "reveal", 1, 2000)
     }
 
-    // Takes NAME out of the fake state.
     function dropState(name) {
       fileProc.command = ["rm", "-f", harness.fakeState + "/" + name]
       fileProc.running = true

@@ -57,12 +57,12 @@ function historyDue(range, entry, quote, now, trading) {
 // are not moments; an offset that is not one is none. A price at or under
 // zero is none, as in the day's answer (`Quote.knownPrice`): a bar without a
 // close is left out of `bars`, which the chart draws, and its START is its
-// first close when its previous close isn't known. Found in the strain QA:
-// "START 0.00", and a cliff at the chart's left from a negative first close.
-// A bar without a close that has a high, a low, or shares is kept in
-// `unclosed`, for the range's high, low, and volume: Tokyo's daily answer
-// leaves the day's close out after its close, and its VOL and high lost
-// what Yahoo sent. Found in review: Toyota's 3,096 high read 3,046.
+// first close when its previous close isn't known. Read as prices, zeros
+// would put "START 0.00" on screen, and a negative first close would draw
+// a cliff at the chart's left. A bar without a close that has a high, a
+// low, or shares is kept in `unclosed`, for the range's high, low, and
+// volume: Tokyo's daily answer leaves the day's close out after its close,
+// and without it its VOL and high would lose what Yahoo sent.
 function parseHistory(json, range, centExchanges) {
   var result = json && json.chart && json.chart.result && json.chart.result[0]
   if (!result || !result.meta) return null
@@ -91,9 +91,9 @@ function parseHistory(json, range, centExchanges) {
   if (bars.length >= 2 && bars[bars.length - 1].t === bars[bars.length - 2].t) bars.splice(bars.length - 2, 1)
   // A new listing's history opens with its offer price: a bar at
   // the bell of its first day (`firstTradeDate`), one price and no shares,
-  // hours before its first trade. Found in the daytime QA: WREN's 1W and 1M
-  // plunged to its 18.00 offer at the left edge, its first trade 23.00 at
-  // 11:45, and named 18.00 the range's low. Every young listing tried had one.
+  // hours before its first trade. That bar is dropped: kept, a young
+  // listing's 1W and 1M would plunge to its offer price at the left edge
+  // and name it the range's low.
   var firstTrade = Format.isFiniteNumber(meta.firstTradeDate) ? meta.firstTradeDate : null
   bars = bars.filter(function(b) { return !(b.t === firstTrade && b.v === 0 && b.o === b.c && b.h === b.c && b.l === b.c) })
   var interval = Format.fetchedText(meta.dataGranularity, Format.MOST_CODE) || (spec && spec.interval)
@@ -158,7 +158,7 @@ function periodStats(history) {
   var firstTradeDate = history ? history.firstTradeDate : null
   // The range starts with the listing when its first bar is on its first
   // day of trading, or in the bar that holds it: a young listing's first
-  // trade can come hours after its first day's bell (WREN's at 11:45).
+  // trade can come hours after its first day's bell.
   var short = !!(first && Format.isFiniteNumber(first.t) && Format.isFiniteNumber(firstTradeDate) && interval > 0
     && first.t <= firstTradeDate + Math.max(interval, 24 * 60 * 60) && first.t + interval >= firstTradeDate)
   return {

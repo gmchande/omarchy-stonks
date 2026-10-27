@@ -131,7 +131,6 @@ Harness {
       service.feature(hero)
       tryVerify(function() { return body.chartSymbol === hero }, 3000)
 
-      // Escape puts the featured symbol back and adds nothing.
       searchShop(body, keys)
       keyClick(Qt.Key_Down)
       tryVerify(function() { return body.chartSymbol === "SHOP.TO" && !body.chartLoading }, 3000)
@@ -505,10 +504,10 @@ Harness {
     // A held answer makes the waiting state observable without prescribing
     // its presentation delay. Editing names the current query; an old result
     // cannot be accepted for that query, and the Enter is kept for it.
-    // Returns what #1's and the early Enter's checks read: `held`, an Enter
-    // on real results of an earlier query while the current one is out adds
-    // nothing; `kept`, that Enter takes the held query's top result once its
-    // answer lands.
+    // Returns what the stale Enter's and earlyEnter's checks read: `held`, an
+    // Enter on real results of an earlier query while the current one is out
+    // adds nothing; `kept`, that Enter takes the held query's top result once
+    // its answer lands.
     function firstSearchSaysSo(body, keys) {
       var message = harness.find(body.search, "searchMessage")
       keys.forceActiveFocus()

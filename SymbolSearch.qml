@@ -9,29 +9,26 @@ import "Fetch.js" as Fetch
 import "Search.js" as Search
 import "Tones.js" as Tones
 // Search field, results, and the Yahoo lookup. The body turns it on and off
-// (`active`) and handles picked / chose / cancelled, and gives it the room
-// of desiredHeight as it opens. The field sits at the top and the results
-// fill down under it, whole rows only, so nothing above them moves as
-// answers come and go. The last answer stays on screen while a new query is
-// out, dimmed and not takeable, so nothing can add a symbol found for an
-// earlier query; only an empty field clears it. An empty answer says there
-// are no matches, and a lookup that failed says so with RETRY beside it,
-// which Enter does too (`retry`). A first query, with no
-// answer on screen, whose lookup has been out a quarter of a second says
-// it is being searched for, so a slow network never leaves the space under
-// the field blank. What an answer held that Stonks doesn't follow, a mutual
-// fund or a currency, is named under the results it does show (`note`), so
-// a fund Yahoo has never reads as no
-// match. The keyboard owns the choice: it starts on the top result, the
-// arrows move it and keep it in view, Enter takes it, and every change of
-// it is told (`chose`), so the
-// hero can show it before it is added. The pointer tints the row under it,
-// and a click takes that row as Enter does: chosen, then added, or shown
-// when it is already in the list. So a pointer resting over the list never
-// changes what Enter adds. A
-// FocusScope so that hiding it takes the keyboard away from the field;
-// otherwise the hidden field keeps every later key the surface's own key
-// handler should see.
+// (`active`), handles picked / chose / cancelled, and gives it the room of
+// desiredHeight as it opens. The field sits at the top and the results fill
+// down under it, whole rows only, so nothing above them moves as answers
+// come and go. The last answer stays on screen while a new query is out,
+// dimmed and not takeable, so nothing can add a symbol found for an earlier
+// query; only an empty field clears it. An empty answer says there are no
+// matches, and a failed lookup says so with RETRY beside it, which Enter
+// does too (`retry`). A first query whose lookup has been out a quarter of
+// a second with no answer on screen says it is being searched for, so a
+// slow network never leaves the space under the field blank. What an answer
+// held that Stonks doesn't follow, a mutual fund or a currency, is named
+// under the results it does show (`note`), so a fund Yahoo has never reads
+// as no match. The keyboard owns the choice: it starts on the top result,
+// the arrows move it and keep it in view, Enter takes it, and every change
+// is told (`chose`), so the hero can show it before it is added. The
+// pointer tints the row under it, and a click takes that row as Enter does:
+// chosen, then added, or shown when already in the list. So a pointer
+// resting over the list never changes what Enter adds. A FocusScope so that
+// hiding it takes the keyboard from the field; otherwise the hidden field
+// keeps every later key the surface's own key handler should see.
 FocusScope {
   id: root
 
@@ -71,8 +68,7 @@ FocusScope {
   readonly property bool stale: answer !== "" && resultsQuery !== searchText.trim()
   // An Enter pressed before the field's query had its answer: kept for that
   // query, and the first answer for it decides, as Enter on it would
-  // (`land`); an edit, a close, or a failed lookup drops it. Found in
-  // review: "aapl" and Enter at once added nothing and said nothing.
+  // (`land`); an edit, a close, or a failed lookup drops it.
   property string enterFor: ""
   // A lookup has been out a quarter of a second with no answer on screen,
   // counted from the latest one to go out, so one answering sooner shows
@@ -118,8 +114,8 @@ FocusScope {
   // A row's columns: the symbol, the name, the exchange, and the label.
   readonly property int rowPadding: Style.space(10)
   readonly property int columnGap: Style.space(10)
-  // As wide as the answer's widest exchange code, so the name runs up to
-  // it: a fixed 110 px left NASDAQ 70 px of nothing while names were cut.
+  // As wide as the answer's widest exchange code, so the name runs up to it
+  // instead of stopping short of a fixed column.
   readonly property int exchangeWidth: {
     var font = exchangeMetrics.font // read, so a look's new font measures again
     var widest = 0
@@ -277,8 +273,7 @@ FocusScope {
   }
 
   // Choose a result and bring it into view: the last brings the note under
-  // it too, so the keys reach what the answer left out. Found in review: in
-  // the window at its smallest, the note stayed clipped under a fifth result.
+  // it too, so the keys reach what the answer left out.
   function showResult(index) {
     if (index < 0 || index >= results.length) return
     root.choose(index)
@@ -300,7 +295,7 @@ FocusScope {
 
   // A lookup of the field's query. One for another query still out is
   // stopped, and this one goes as its stream ends (`land`): its answer
-  // would be thrown away, and waiting it out held the new query up to the
+  // would be thrown away, and waiting it out holds the new query up to the
   // request's 10 s. The one out for this same query answers it.
   function runSearch() {
     var q = searchText.trim()
@@ -420,7 +415,6 @@ FocusScope {
     // smallest, the rows' scrollbar says so, at rest too, in the gutter the
     // results stop short of.
     Controls.ScrollBar.vertical: Controls.ScrollBar {
-      // Drawn while there is more, not only while used.
       policy: resultsScroll.interactive ? Controls.ScrollBar.AlwaysOn : Controls.ScrollBar.AlwaysOff
       visible: resultsScroll.interactive
       // At least 24 px long, so a long view's thumb is there to see and grab.
@@ -472,8 +466,6 @@ FocusScope {
               font.bold: true
               elide: Text.ElideRight
             }
-            // Every row keeps the label's slot, so the exchange codes stay in
-            // one column as the choice moves.
             Text {
               objectName: "searchName"
               width: root.sharedWidth - root.symbolWidth
@@ -501,7 +493,8 @@ FocusScope {
             // shell marks the button Enter takes (the selected fill, in the
             // selected colour): on the chosen result only, the one the hero
             // shows, and only while it can be taken. Other rows keep its
-            // slot, unseen.
+            // slot, unseen, so the exchange codes stay in one column as the
+            // choice moves.
             Rectangle {
               id: addButton
               objectName: "searchAdd"

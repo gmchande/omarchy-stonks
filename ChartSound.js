@@ -12,10 +12,9 @@
 // each bar; retro steps one note per pixel column, on the same bars, and
 // where the line crosses its baseline, yesterday's close or the range's
 // start, ticks in noise.
-// Each sound is levelled by its loudest 50 ms, under the fixed sounds.
-// Ported from the sound study's make.js, which measured them. The shell's
-// engine interprets a loop that runs once, so the work per sample is a
-// table read and a few sums: the place, the pitch, and the envelope move
+// Each sound is levelled by its loudest 50 ms, under the fixed sounds. The
+// shell's engine interprets a loop that runs once, so the work per sample is
+// a table read and a few sums: the place, the pitch, and the envelope move
 // once a millisecond (`STEP`), and each voice reads one cycle from a table.
 
 var RATE = 24000
@@ -27,7 +26,6 @@ function inOutSine(u) {
   return -(Math.cos(Math.PI * u) - 1) / 2
 }
 
-// Where the replay is along the chart `t` seconds in.
 function placeAt(t, from, to, seconds) {
   return from + (to - from) * inOutSine(Math.min(1, t / seconds))
 }
@@ -74,8 +72,8 @@ function fadeEdges(x, inMs, outMs) {
 
 // The sound, and the gain that puts its loudest 50 ms of RMS at `db` dBFS,
 // which `wav` applies as it writes. The window is a whole number the engine
-// keeps as one (`| 0`): indexed by Math.round's result, read as a fraction,
-// a retro replay's levelling took 16 ms instead of 2.
+// keeps as one (`| 0`): Math.round's result, read as a fraction, makes a
+// retro replay's levelling take 16 ms instead of 2.
 function levelled(x, db) {
   var win = Math.round(0.05 * RATE) | 0, best = 0, acc = 0
   for (var i = 0; i < x.length; i++) {
@@ -94,9 +92,9 @@ function levelled(x, db) {
 // second over what follows. A print that stands alone, a thin night's trade,
 // is struck as the place passes it, as the replay's scrub lands on it,
 // though the place steps over its one point. No tick where the line crosses
-// its baseline: it was a short tone at A6, the top bar's own pitch, and
-// among the bars it read as one more. Each bar sits as a chime does, so a
-// replay sounds as a sweep does.
+// its baseline: a tone there at A6, the top bar's own pitch, reads among
+// the bars as one more. Each bar sits as a chime does, so a replay sounds
+// as a sweep does.
 function smooth(geometry, from, to, seconds) {
   var bars = lineBars(geometry)
   var passed = lonePrints(geometry)
@@ -105,8 +103,8 @@ function smooth(geometry, from, to, seconds) {
   var heard = -1, last = -gap, waiting = -1, waitingAlone = false, before = from
   var strike = function(bar, at) {
     var note = smoothBarSamples(bar), n = Math.min(note.length, x.length - at)
-    // An index the engine keeps as a whole number: indexed by the sum of
-    // the loop's steps, read as a fraction, the mix took eight times as long.
+    // An index the engine keeps as a whole number: the sum of the loop's
+    // steps, read as a fraction, makes the mix eight times as slow.
     for (var j = 0, k = at | 0; j < n; j++, k++) x[k] += note[j]
     last = at
     waiting = -1
@@ -190,8 +188,8 @@ function pulseTable(f) {
 }
 
 // Retro's bar `bar` as a pulse cycle at the console's pitch, made once and
-// kept, as smooth's bars are: made afresh on every replay, the tables were
-// most of a retro replay's synthesis.
+// kept, as smooth's bars are: made afresh on every replay, the tables would
+// be most of a retro replay's synthesis.
 var pulseBars = []
 function pulseBar(bar) {
   if (!pulseBars[bar]) pulseBars[bar] = pulseTable(nesPitch(PENTATONIC[bar]))

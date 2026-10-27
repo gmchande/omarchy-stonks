@@ -2,19 +2,18 @@ import QtQuick
 import Quickshell.Io
 import "Fetch.js" as Fetch
 import "Overnight.js" as Overnight
-// Whether Robinhood trades each US stock or ETF all day, its 24 Hour Market
-// (`all_day_tradability`), from its keyless instruments, for every listing
-// asked in one run of requests of at most 50 listings each
-// (`Overnight.ALL_DAY_BATCH`), so each answer fits one page: only a listing
-// it does draws its overnight prints after its day
-// (`Chart.viewChart`). An entry is { status, allDay, at }, `at` the
-// service's clock as it asked: "ok" with Robinhood's answer, kept a day
-// (`Overnight.allDayDue`); or "failed", keeping the last good answer, and
-// not all-day without one. `entries` holds answers only. One run at a time:
-// a request asked for while one is out is not sent, and the service asks
-// again for what it still wants once that is answered. While Robinhood's
-// gate pauses the host, a request fails at once; the gate's budget may let
-// only some of a run's requests go.
+// Whether Robinhood trades each US stock or ETF all day in its 24 Hour
+// Market (`all_day_tradability`), from its keyless instruments: only a
+// listing it does draws its overnight prints after its day
+// (`Chart.viewChart`). Every listing asked goes in one run of requests of at
+// most 50 listings each (`Overnight.ALL_DAY_BATCH`), so each answer fits one
+// page. An entry is { status, allDay, at }, `at` the service's clock as it
+// asked: "ok" with Robinhood's answer, kept a day (`Overnight.allDayDue`); or
+// "failed", keeping the last good answer, and not all-day without one.
+// `entries` holds answers only. One run at a time: a request asked for while
+// one is out is not sent, and the service asks again for what it still wants
+// once that is answered. The gate's budget may let only some of a run's
+// requests go.
 Item {
   id: root
 

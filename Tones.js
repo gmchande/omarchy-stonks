@@ -80,13 +80,12 @@ var OWN_FLOOR = 3
 
 // Stonks' own up and down, for a theme without a pair or with one too faint
 // to read: a green and a red by hue, at OWN_CHROMA, and as near the ground
-// as reads at OWN_TARGET there. A fixed pair (GitHub's) read as a stranger
+// as reads at OWN_TARGET there. A fixed pair (GitHub's) reads as a stranger
 // in the themes that need one: a deep crimson bear on Catppuccin Latte's
 // pastels and on White's greys. On a dark ground a colour at 4.5:1 is dark
 // enough to look muddy, so it sits further off, at 6:1. Where OWN_CHROMA
 // leaves sRGB at that lightness, it is lowered, down to HUE_CHROMA, the
-// least that still says its hue. The owner picked these from renders on
-// 26 October.
+// least that still says its hue.
 var OWN_HUES = { up: 145, down: 25 }
 var OWN_CHROMA = 0.16
 var HUE_CHROMA = 0.07
@@ -138,11 +137,10 @@ function readingColor(hue, chroma, least, target, ground) {
     }
     // Away from the ground contrast can dip just off it, but it crosses the
     // target once, so the lightness where it first reads is found by
-    // halving. There the colour is the hue's
-    // nearest the ground, and where sRGB ends just past it, as for a light
-    // red on #484848 or a light green on a #bb0022 bar, within 0.003 of
-    // lightness, it is the only one that reads; a walk in steps passed
-    // over it (found in review).
+    // halving. There the colour is the hue's nearest the ground; where sRGB
+    // ends just past it, as for a light red on #484848 or a light green on a
+    // #bb0022 bar, within 0.003 of lightness, it is the only one that reads,
+    // and a walk in steps passes over it.
     if (!reads(to)) return null
     var lo = from, hi = to
     for (var i = 0; i < 30; i++) {
@@ -161,8 +159,8 @@ function readingColor(hue, chroma, least, target, ground) {
   }
   // Less chroma only widens what fits sRGB at a lightness, so the most
   // that reads is found by halving between `least` and `chroma`. Stepping
-  // down passed over it: on a #bb0022 bar, a green at 0.075 reads at 6:1,
-  // and steps of 0.01 fell to the 3:1 floor (found in review).
+  // down passes over it: on a #bb0022 bar, a green at 0.075 reads at 6:1,
+  // and steps of 0.01 fall to the 3:1 floor.
   var best = at(chroma)
   if (best !== null) return best
   best = at(least)

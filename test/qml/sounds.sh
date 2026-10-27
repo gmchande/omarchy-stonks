@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # What Stonks plays, through the real popup by keys and the real window by
 # the pointer, with a stand-in pw-play (bin/pw-play) that plays nothing and
-# records what it was asked to play. The shutter's shots land in the scratch
-# HOME, through the stand-ins for wl-copy and omarchy-notification-send
-# (bin/), as camera.sh's do. The shell's layer-shell card window does not
-# load offscreen, so the copy of Panel.qml puts the card in CardWindow.qml,
-# as keys.sh does. HOME and curl are scratch.
+# logs what it was asked to play. The shutter's shots land in the scratch
+# HOME through bin/'s stand-ins for wl-copy and omarchy-notification-send,
+# as camera.sh's do. The shell's layer-shell card window does not load
+# offscreen, so the copy of Panel.qml puts the card in CardWindow.qml, as
+# keys.sh does. HOME and curl are scratch.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree sounds.qml
 cp "$here/CardWindow.qml" "$root/plugin/"

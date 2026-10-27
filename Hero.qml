@@ -6,14 +6,10 @@ import "Figures.js" as Figures
 import "Format.js" as Format
 import "Tones.js" as Tones
 // Featured symbol, listing line, the price in both looks, the change, and the
-// caption strip under them. One box serves both looks: one fitted ink height
-// drives both digit renderers, so they share a top line, a baseline, and a
-// left edge however narrow it gets. The change and its caption are pinned to
-// the hero's right edge, so they never move with what else is on show. The
-// strip under the price carries the extended-hours print on the left (an
-// overnight print with its own time, dimmed once it is old) and the change's
-// caption on the right, and keeps its height when there is neither.
-// Surfaces own scrub and persist.
+// caption strip under them. One fitted ink height drives both digit
+// renderers, so they share a top line, a baseline, and a left edge at any
+// width. The change and its caption are pinned to the right edge, so they
+// never move with what else is on show. Surfaces own scrub and persist.
 Item {
   id: root
 
@@ -27,10 +23,9 @@ Item {
   property var day: null
   property var latest: null
   property var freshness: null
-  // Yahoo is sending nothing for any listing, said once by the header: the
-  // listing line says only when the price is from, with no warning, as the
-  // rows do (`Figures.quietFreshness`). A failed first answer still shows
-  // "—", not the "…" of one on its way.
+  // Yahoo is sending nothing for any listing, which the header says once:
+  // the listing line says only when the price is from, as the rows do
+  // (`Figures.quietFreshness`). A failed first answer still shows "—".
   property bool sourceDown: false
   readonly property var shownFreshness: sourceDown ? Figures.quietFreshness(freshness) : freshness
   property bool retro: false
@@ -184,7 +179,7 @@ Item {
 
   // The exchange and currency start where the name's drawn text ends, not
   // where its box does: a name cut short draws narrower than its box, and
-  // the gap read as a double space before the dot.
+  // the gap would read as a double space before the dot.
   Text {
     id: metaText
     objectName: "listingMeta"
@@ -216,7 +211,7 @@ Item {
     objectName: "blockPrice"
     visible: root.retro
     y: root.baselineY - baselineOffset
-    // Hidden, it rests: a scrub in smooth repainted it every step.
+    // Hidden, it rests: otherwise a scrub in smooth repaints it every step.
     text: root.retro ? root.priceText : ""
     cell: root.fittedCell
     color: root.foreground
@@ -245,9 +240,9 @@ Item {
   }
 
   // The strip under the price: the extended-hours print on the left, always
-  // in the same place and shape, and the change's caption on the right. An
-  // old print is drawn in the dim colour, price and change too, so it reads
-  // as old beside a fresh one and stays as legible as any dim text.
+  // in the same place and shape, and the change's caption on the right; it
+  // keeps its height when there is neither. An old print is drawn dim, price
+  // and change too, so it reads as old beside a fresh one.
   Row {
     id: extendedLine
     objectName: "extendedLine"

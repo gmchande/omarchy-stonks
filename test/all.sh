@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
-# Every check a pull request needs: what Stonks does, what it fetches, saves,
-# and says, and what a key or a click changes. Every unit-test file
+# Every check a pull request needs: what Stonks does, fetches, saves and
+# says, and what a key or a click changes. Every unit-test file
 # (test/unit.sh), source boundaries, QML lint, manifest and launcher
 # validation, the Quickshell flow harnesses, and the frame checker's
 # self-check on made-up frames. Pictures, positions and motion belong to
-# test/review.sh. Input readiness and a target's reachability stay with the
-# action they protect. The
-# queue, the lock, and the verdict are test/queue.sh's. Needs Omarchy
-# installed and the Wayland session for the harnesses.
+# test/review.sh; input readiness and a target's reachability to the action
+# they protect; the queue, the lock and the verdict to test/queue.sh. Needs
+# Omarchy installed and the Wayland session for the harnesses.
 source "$(dirname "${BASH_SOURCE[0]}")/queue.sh"
 
 # validate_clone: omarchy plugin validate on what a clone of this checkout

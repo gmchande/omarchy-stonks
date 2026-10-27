@@ -44,15 +44,13 @@ every_state() (
   states="window-help-smooth window-help-retro popup-help-smooth popup-help-retro popup-help-sorted-smooth popup-help-sorted-retro popup-holiday-retro popup-price4-solo-smooth popup-price4-solo-retro popup-price5-stack-smooth popup-price5-stack-retro popup-nest-1d-smooth popup-nest-1d-retro popup-history-failed popup-history-loading popup-history-1w-smooth popup-history-1w-retro popup-history-1m-smooth popup-history-1m-retro popup-history-1y-smooth popup-history-1y-retro popup-history-all-smooth popup-history-all-retro loading failed aged history-scrub history-empty-loading history-sparse sprite-candidates popup-search-smooth popup-search-retro popup-search-stale-smooth popup-search-none-smooth popup-search-failed-retro popup-search-preview-smooth popup-search-preview-retro popup-search-show-smooth popup-search-show-retro min-window-smooth min-window-retro w22-popup-smooth-aapl-1d w22-popup-retro-aapl-1d w22-window-smooth-aapl-1d w22-window-retro-aapl-1d w22-popup-smooth-aapl-5y w22-popup-retro-aapl-5y w22-popup-smooth-spy-1d w22-popup-retro-spy-1d w22-popup-smooth-shop-1d w22-popup-retro-shop-1d w22-popup-smooth-shop-1y w22-popup-retro-shop-1y w22-popup-smooth-mz-1d w22-popup-retro-mz-1d window-1416-smooth popup-room-one-open-smooth popup-room-growth-open-retro window-room-four-five-retro popup-room-five-long-smooth popup-room-five-long-retro popup-rowstates-smooth popup-rowstates-retro popup-note-smooth popup-hint-smooth popup-hint-retro popup-notice-file-smooth popup-notice-file-retro popup-notice-update-smooth popup-notice-update-retro popup-lists-menu-retro popup-lists-named-smooth popup-lists-empty-smooth popup-lists-long-retro popup-lists-manage-smooth popup-lists-symbol-smooth popup-lists-rename-smooth popup-lists-confirm-retro window-lists-manage-smooth window-lists-symbol-retro popup-rowlines-smooth popup-rowlines-retro popup-52w-smooth popup-52w-retro popup-breadth-even-smooth popup-breadth-even-retro popup-order-falls-smooth popup-order-rises-smooth popup-order-falls-retro popup-order-rises-retro popup-overnight-night-nest-smooth popup-overnight-night-nest-retro popup-overnight-night-silk-smooth popup-overnight-night-silk-retro popup-overnight-night-reed-retro popup-overnight-day-nest-smooth popup-overnight-day-nest-retro popup-overnight-sunday-nest-smooth popup-overnight-sunday-nest-retro popup-overnight-live-ez-smooth popup-overnight-live-ez-retro popup-overnight-live-toy-smooth popup-overnight-live-toy-retro popup-overnight-live-nest-1m-smooth popup-overnight-live-nest-1m-retro popup-overnight-live-nest-1m-scrub-smooth popup-overnight-live-nest-1m-scrub-retro popup-overnight-2026-10-07-1153-nest-smooth popup-overnight-2026-10-07-1153-nest-retro popup-overnight-2026-10-06-2300-nest-retro popup-overnight-2026-10-07-0005-nest-smooth popup-overnight-2026-10-07-0005-nest-retro popup-overnight-2026-10-07-0100-nest-smooth popup-overnight-2026-10-07-0100-nest-scrub-smooth popup-overnight-2026-10-07-0100-nest-scrub-retro popup-overnight-2026-10-07-0600-nest-retro popup-overnight-2026-10-03-1200-nest-smooth popup-overnight-2026-10-04-2230-nest-retro popup-fill-up-smooth popup-fill-down-smooth popup-fill-cross-smooth popup-fill-up-retro popup-fill-down-retro popup-fill-cross-retro popup-fill-up-smooth-kanagawa popup-fill-down-smooth-kanagawa popup-fill-cross-smooth-kanagawa popup-fill-up-retro-kanagawa popup-fill-down-retro-kanagawa popup-fill-cross-retro-kanagawa pill-sheet fetch-saved-smooth fetch-saved-retro fetch-overdue-smooth fetch-overdue-retro"
   # A missing regular price: the last chart trade labelled with its time.
   states="$states popup-last-trade-smooth popup-last-trade-retro"
-  # A save that didn't land, and a click on it that still didn't, in both
-  # looks.
+  # A save that didn't land, and a click on it that still didn't, both looks.
   states="$states popup-notice-save-smooth popup-notice-save-retro popup-notice-save-again-smooth popup-notice-save-again-retro"
   # A change made while the file can't be read, in both looks.
   states="$states popup-notice-file-edited-smooth popup-notice-file-edited-retro"
   # A removal offered back beside the add, in both looks, and in the window.
   states="$states popup-undo-smooth popup-undo-retro window-undo-retro"
-  # Every listing failed, said once in the header, in the popup in both
-  # looks.
+  # Every listing failed, said once in the header, in the popup, both looks.
   states="$states popup-failed popup-failed-smooth"
   # Paused mid-motion ink in both looks: breadth only in smooth, since
   # retro's cells draw the breadth and its pose never shows. Hover and held
@@ -75,8 +73,8 @@ every_state() (
   # The list menu over the cursor's row in both looks on both surfaces: its
   # edge shows nothing of the row under it.
   states="$states popup-lists-menu-smooth window-lists-menu-smooth window-lists-menu-retro"
-  # The buttons that took over key hints: a new list's ⏎ MAKE, and a failed
-  # range's R RETRY, in both looks.
+  # The buttons that stand in for key hints: a new list's ⏎ MAKE, and a
+  # failed range's R RETRY, in both looks.
   states="$states popup-lists-naming-smooth popup-history-unavailable-smooth popup-history-unavailable-retro"
   # A scrub through where the 1Y high's date rests, and the low's: the whole
   # mark stands clear of the line, in both looks.
@@ -85,32 +83,30 @@ every_state() (
   # A refresh the reader asked for, out: the header says so, in both looks.
   states="$states popup-refreshing-smooth popup-refreshing-retro"
   # A chart held past its quarter second, dimmed under the label naming the
-  # next, on a US stock, a non-US listing, and a cryptocurrency, in both
-  # looks.
+  # next, on a US stock, a non-US listing, and a cryptocurrency, both looks.
   for kind in aapl shel-l btc-usd; do
     for look in smooth retro; do
       states="$states popup-loading-$kind-$look"
     done
   done
-  # The power-user walk's odd days in both looks: CKX's one bar and CVR's
-  # none said in words, JPM's stray pair dropped, and LUMN in cents. And the
-  # list menu over 12 lists in the popup and 30 in the smallest window:
-  # whole rows, New list and Manage lists in sight.
+  # Odd days in both looks: CKX's one bar and CVR's none said in words,
+  # JPM's stray pair dropped, and LUMN in cents. And the list menu over 12
+  # lists in the popup and 30 in the smallest window: whole rows, New list
+  # and Manage lists in sight.
   for look in smooth retro; do
     for symbol in ckx cvr jpm lumn; do
       states="$states popup-power-$symbol-$look"
     done
   done
   states="$states popup-lists-menu12-smooth min-window-of-lists-menu30-smooth"
-  # The listing sweep: every kind of listing on 1D at each of its moments, in
-  # both looks.
+  # The listing sweep: every kind of listing on 1D at each of its moments.
   for moment in 2026-10-07-1455 2026-10-07-0100 2026-10-07-0600 2026-10-03-1200; do
     for symbol in nest kiln spy bolt gspc btc-usd shel.l 7203.t; do
       states="$states popup-sweep-$moment-$symbol-smooth popup-sweep-$moment-$symbol-retro"
     done
   done
-  # The look sweep's new listings in session, 8 October 10:54: a coin under
-  # a cent, Toronto, a six-figure price, and a long symbol. `render.sh
+  # More listings in session, 8 October 10:54: a coin under a cent,
+  # Toronto, a six-figure price, and a long symbol. `render.sh
   # popup-sweep-<moment>-<symbol>-<look>` renders any listing sweep moment,
   # and `render.sh popup-sweep-<folder>-<symbol>-<look>` any saved moment
   # whose folder is named for its minute (watch-2026-10-24-2238).

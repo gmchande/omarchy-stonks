@@ -67,7 +67,6 @@ Item {
     if (downEase.running) downEase.pause()
   }
 
-  // While still, nothing moves: a change waits for the open's `settle`.
   // Shares the ends already rest on or ease to leave them be: each scrub
   // step and replay frame brings a new breadth, mostly the same.
   function showBreadth() {

@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# A stand-in for omarchy-notification-send, first on PATH inside the
-# harnesses, so no harness ever shows a notification. It appends its
-# arguments to STONKS_FAKE_STATE/notifications.log as one line, each
-# argument followed by a tab, so a harness reads every one whole.
+# A stand-in for omarchy-notification-send, first on PATH in the harnesses,
+# so no harness shows a notification. Each call is one line of the log,
+# every argument followed by a tab, so a harness reads each one whole.
 printf '%s\t' "$@" >> "$STONKS_FAKE_STATE/notifications.log"
 echo >> "$STONKS_FAKE_STATE/notifications.log"
