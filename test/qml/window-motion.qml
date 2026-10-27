@@ -3,6 +3,7 @@ import QtTest
 import Quickshell
 import Quickshell.Io
 import "plugin" as Stonks
+import "plugin/Quote.js" as Quote
 
 // The window as it moves, through the real App and Service with real keys
 // and pointer, judged on its rendered frames and its rows' places: the
@@ -803,16 +804,13 @@ Harness {
       service.persist({ style: "smooth" })
       rest()
 
-      // At rest, a note on show, u's refusal with nothing to undo, the
-      // pointer holding the rows: the frames before the close are the
-      // picture every frame after it keeps, through an answer that lands
-      // (AAPL's next quote, its line turned and its price new), a hero
-      // chosen on another surface, the hero leaving All, the pointer
-      // leaving the rows, and past the note's moment. The next open takes
-      // the latest, rows laid out at once, and draws in.
+      // At rest, a note on show, u's refusal with nothing to undo: the
+      // frames before the close are the picture every frame after it keeps,
+      // through an answer that lands (AAPL's next quote, its line turned and
+      // its price new), a hero chosen on another surface, the hero leaving
+      // All, and past the note's moment. The next open takes the latest and
+      // draws in.
       var quotesBefore = service.testFeed.quotes
-      mouseMove(watchlist, 20, watchlist.rowPitch + 10)
-      var held = within(1000, function() { return watchlist.sortHeld })
       keyClick(Qt.Key_Z, Qt.ControlModifier)
       rest()
       var noted = body.note === "Nothing to undo"
@@ -835,9 +833,6 @@ Harness {
       frames(3)
       service.removeSymbol("AAPL")
       frames(3)
-      var pending = service.view.shown.join() !== watchlist.displayedSymbols.join()
-      mouseMove(body, 1, 1)
-      frames(3)
       grab.end()
       // Past the note's 2.5 s, which a closed surface holds on show.
       wait(2700)
@@ -846,18 +841,51 @@ Harness {
       grab.end()
       var atRest = verdict()
       reopen()
-      var laidOut = watchlist.displayedSymbols.join() === service.view.shown.join()
       var adopted = [service.featuredSymbol === "MSFT", body.chartSymbol === "MSFT",
         watchlist.displayedSymbols.indexOf("AAPL") < 0, body.motion.reveal < 1].join(",")
       harness.check("a closing surface stops the look icon, the rows, and the rule where they are, and holds its chart, figures, rows, and note through an answer, another surface's choice, a removal from All, and the note's time; the next open takes the latest and draws in — in flight "
         + stepping + " " + inFlight.detail + " | at rest " + noted + " " + atRest.detail + " | open " + adopted,
         stepping && inFlight.ok && noted && atRest.ok && adopted === "true,true,true,true")
-      harness.check("a closing surface holds the rows' order as the pointer leaves, and the next open lays them out at once",
-        held && pending && atRest.ok && laidOut, [held, pending, atRest.ok, laidOut].join(","))
       service.undoRemoval("AAPL")
       service.testFeed.quotes = quotesBefore
       tryVerify(function() { return service.arriving.length === 0 && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 5000)
       service.feature("AAPL")
+      rest()
+
+      // By % change, a refresh re-ranks the rows the pointer holds; then
+      // the surface closes and the pointer leaves: every frame after the
+      // close is the same picture, and the next open shows the new order.
+      service.setOrder("pct")
+      rest()
+      mouseMove(watchlist, 20, watchlist.rowPitch + 10)
+      var held = within(1000, function() { return watchlist.sortHeld })
+      var shown = watchlist.displayedSymbols.slice()
+      var last = shown[shown.length - 1]
+      var ranked = Object.assign({}, service.testFeed.quotes)
+      ranked[last] = Object.assign({}, ranked[last], { prevClose: Quote.regularClose(ranked[last]) / 1.5 })
+      service.testFeed.quotes = ranked
+      var pending = within(1000, function() { return service.view.shown[0] === last })
+        && watchlist.displayedSymbols.join() === shown.join()
+      rest()
+      grab.source = body
+      grab.begin("closing-pointer-leaves")
+      frames(3)
+      grab.end()
+      tryVerify(function() { return grab.waiting === 0 }, 3000)
+      close()
+      grab.resume()
+      frames(3)
+      mouseMove(body, 1, 1)
+      frames(6)
+      grab.end()
+      var leaving = verdict()
+      reopen()
+      var laidOut = watchlist.displayedSymbols.join() === service.view.shown.join() && watchlist.displayedSymbols[0] === last
+      harness.check("a closing surface holds the rows' order as the pointer leaves, and the next open lays them out at once"
+        + (leaving.ok ? " — " + leaving.detail : ""), held && pending && leaving.ok && laidOut,
+        [held, pending, laidOut].join(",") + ": " + leaving.detail)
+      service.testFeed.quotes = quotesBefore
+      service.setOrder("manual")
       rest()
     }
 
