@@ -42,17 +42,23 @@ Item {
   // row's are.
   readonly property font valueFont: Qt.font({ family: fontFamily, pixelSize: Style.font.caption, bold: true })
   readonly property font labelFont: Qt.font({ family: fontFamily, pixelSize: Style.font.caption, bold: true, letterSpacing: 1 })
+  // A fact's label as a shell panel's is, plain and in sentence case, and
+  // its figure at the column's end.
+  readonly property font factFont: Qt.font({ family: fontFamily, pixelSize: Style.font.caption })
+  function factLabel(text) { return text === "P/E" ? text : text.charAt(0) + text.slice(1).toLowerCase() }
   // A line of text rounds its ascent and its descent up to whole pixels
   // each, and so does this.
   readonly property int lineHeight: Math.ceil(metrics.ascent) + Math.ceil(metrics.descent)
 
   FontMetrics { id: metrics; font: root.valueFont }
+  FontMetrics { id: factMetrics; font: root.factFont }
 
   function valueWidth(text) { return text ? Math.ceil(metrics.advanceWidth(text)) : 0 }
   function labelWidth(text) { return text ? Math.ceil(metrics.advanceWidth(text) + text.length * root.labelFont.letterSpacing) : 0 }
   function factWidth(f) {
     var value = Math.max(valueWidth(f.widest), valueWidth(f.value))
-    return labelWidth(f.label) + (f.label ? innerGap : 0) + value + (f.after ? innerGap + labelWidth(f.after) : 0)
+    var label = f.label ? Math.ceil(factMetrics.advanceWidth(factLabel(f.label))) : 0
+    return label + (f.label ? innerGap : 0) + value
   }
   function toneColor(tone) { return tone === "up" ? upColor : tone === "down" ? downColor : foreground }
 
@@ -101,7 +107,7 @@ Item {
       xs.push(x + gap)
       x += gap + facts[j]
     }
-    return { price: price, rule: rule, lowX: lowX, ruleX: ruleX, highX: highX, factXs: xs }
+    return { price: price, rule: rule, lowX: lowX, ruleX: ruleX, highX: highX, factXs: xs, factWidths: facts.slice(0, shown) }
   }
 
   implicitHeight: lineHeight * 2 + rowGap
@@ -160,33 +166,28 @@ Item {
       Repeater {
         model: row.line ? Math.min(row.line.facts.length, root.layout.factXs.length) : 0
 
-        Row {
+        Item {
           id: fact
           required property int index
           readonly property var f: row.line.facts[index]
           visible: f.value !== ""
           x: root.layout.factXs[index]
-          spacing: root.innerGap
+          width: root.layout.factWidths[index]
+          height: row.height
 
           Text {
             visible: text !== ""
             textFormat: Text.PlainText
-            text: fact.f.label
+            text: root.factLabel(fact.f.label)
             color: root.dim
-            font: root.labelFont
+            font: root.factFont
           }
           Text {
+            anchors.right: parent.right
             textFormat: Text.PlainText
             text: fact.f.value
             color: root.foreground
             font: root.valueFont
-          }
-          Text {
-            visible: text !== ""
-            textFormat: Text.PlainText
-            text: fact.f.after || ""
-            color: root.dim
-            font: root.labelFont
           }
         }
       }

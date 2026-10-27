@@ -748,7 +748,7 @@ ShellRoot {
       service.testFeed.quotes = whole
       within(2000, function() { return body.featured.priceText === "249.87" })
       harness.check("with no regular price, the hero labels its last chart trade with Tuesday's time and keeps the overnight line",
-        quoteAnswered && fallback.indexOf("249.78 | LAST TRADE · TUE 15:55 · ") === 0
+        quoteAnswered && fallback.indexOf("249.78 | LAST TRADE · TUE 15:55 | ") === 0
           && fallback.indexOf(" | OVERNIGHT 00:50 248.04 ") > 0
           && rowFallback === "Last trade · Tue 15:55", "quote answered: " + quoteAnswered + " | " + fallback + " | row: " + rowFallback)
 

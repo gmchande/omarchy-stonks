@@ -58,7 +58,9 @@ holds the rules a change is judged by.
   anything that looks clickable acts when clicked. A button says only what it
   does, and no word on screen names a key: the keys are on the `?` sheet.
 - **Tooltips.** Few: a control has one only where it can't say what it does
-  by itself, and only where the tip covers nothing.
+  by itself. A tip shows as the shell's own do, above its control where
+  there's room and below where there isn't, and may cover what's beside the
+  control while the pointer rests on it.
 - **Text.** Every character drawn is one JetBrainsMono Nerd Font has.
 
 ## Words

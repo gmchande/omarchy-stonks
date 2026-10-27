@@ -1,19 +1,23 @@
 import QtQuick
 import qs.Commons
 import qs.Commons as Commons
+import qs.Ui
 import "Cells.js" as Cells
 import "Tones.js" as Tones
-// The animal, live status, the sounds, the camera, the look, and the help
-// mark.
+// The animal, the stock's name over the live status, the sounds, the
+// camera, the look, and the help mark, with a rule under them, as a shell
+// panel's hero has: an icon, a bold title, and its state in small capitals.
 // Surfaces own the actions; this only draws and signals. The animal is the
 // day's bull or bear in cells (`Cells.spriteFor`), the same in both looks,
 // in one slot the status words start after, drawn or not, so neither the
 // look nor a flat day moves them. While its market rests it sleeps: eyes
 // shut and a dim "z" just past the slot, above the words. The height is the
 // slot's in both looks, and the look is one small icon in both, so toggling
-// moves nothing. None of them has a tooltip: under the header one covered
-// the line naming the stock, and what a click does is on the ? sheet with
-// the keys.
+// moves nothing. Each icon on the right says on hover what a click does,
+// in the shell's own tooltip, under the icon and inside the card, covering
+// what is there while the pointer rests: a popup hangs from a top bar, at
+// the screen's top, with no room above (the owner, 26 October). The animal
+// has none, by the owner's call.
 Item {
   id: root
 
@@ -21,6 +25,14 @@ Item {
   // before (`StonksBody.headerForms`), up to three: where one doesn't fit,
   // the next shows.
   property var statusForms: []
+  // The stock's name, over the status words. Its line stays while there is
+  // none, so a name arriving moves nothing.
+  property string title: ""
+  // Whether the title's line and the rule show: the body gives them way
+  // where large text on a short screen would leave fewer than three rows
+  // beside the chart's least (`StonksBody.headerTitled`), and the header is
+  // the words alone on one line, the name back on the hero's.
+  property bool titled: true
   // The words say a range failed, and its button asks again, as r does.
   property bool offersRetry: false
   property bool retro: false
@@ -126,7 +138,26 @@ Item {
 
   NumberAnimation { id: shutting; target: root; property: "closing"; duration: 320 }
 
-  implicitHeight: Style.space(28)
+  // An icon's tip, 3 px under its target, centred on it but never past the
+  // header's right edge. Declared in the target, inside its icon.
+  component HeaderTip: PanelToolTip {
+    readonly property Item icon: parent.parent
+    y: parent.height + 3
+    x: Math.min((parent.width - implicitWidth) / 2, icon.parent.width - icon.x - parent.x - implicitWidth)
+  }
+
+  // The title and the words, then the rule, a band's gap short of a group's
+  // under them, so the group's gap the body leaves after the header makes
+  // the gap below the rule the gap above it. The rest centre on the two
+  // lines, not on the rule.
+  readonly property int twoLines: Math.max(Style.space(28),
+    titleText.implicitHeight + Style.space(2) + statusWords.implicitHeight)
+  readonly property int ruleGap: Style.space(14)
+  // The height with the title, whether or not it shows.
+  readonly property int titledHeight: twoLines + ruleGap * 2 - Style.space(8) + 1
+  readonly property int contentHeight: titled ? twoLines : Style.space(28)
+  readonly property int centerOffset: Math.round((contentHeight - height) / 2)
+  implicitHeight: titled ? titledHeight : Style.space(28)
   implicitWidth: parent ? parent.width : 0
   height: implicitHeight
   width: parent ? parent.width : implicitWidth
@@ -138,6 +169,7 @@ Item {
     height: Style.space(28)
     anchors.left: parent.left
     anchors.verticalCenter: parent.verticalCenter
+    anchors.verticalCenterOffset: root.centerOffset
 
     // One layer each, so smooth's turn crossfades between them.
     PixelSprite {
@@ -243,12 +275,39 @@ Item {
   FormWidths { id: form1; words: String(root.statusForms[1] || "").toUpperCase(); family: root.fontFamily }
   FormWidths { id: form2; words: String(root.statusForms[2] || "").toUpperCase(); family: root.fontFamily }
   Text {
+    id: titleText
+    objectName: "headerTitle"
+    visible: root.titled
+    anchors.left: slot.right
+    anchors.leftMargin: Style.space(14)
+    y: Math.round((root.contentHeight - implicitHeight - Style.space(2) - statusWords.implicitHeight) / 2)
+    width: Math.min(implicitWidth, Math.max(0, soundIcon.x - Style.space(8) - x))
+    textFormat: Text.PlainText
+    text: root.title
+    color: root.foreground
+    font.family: root.fontFamily
+    font.pixelSize: Style.font.title
+    font.bold: true
+    elide: Text.ElideRight
+  }
+
+  // The rule as the footer's, the shell's own separator.
+  PanelSeparator {
+    objectName: "headerRule"
+    visible: root.titled
+    y: root.contentHeight + root.ruleGap
+    width: root.width
+    foreground: root.foreground
+    strength: 0.08
+  }
+
+  Text {
     id: statusWords
     objectName: "statusText"
     anchors.left: slot.right
     anchors.leftMargin: Style.space(14)
     width: Math.min(implicitWidth, root.wordsRoom)
-    anchors.verticalCenter: parent.verticalCenter
+    y: root.titled ? titleText.y + titleText.implicitHeight + Style.space(2) : Math.round((root.contentHeight - implicitHeight) / 2)
     textFormat: Text.PlainText
     text: root.measured.length ? root.measured[root.fit.form].words : ""
     color: root.scrubbing || root.live ? root.foreground : root.dim
@@ -266,7 +325,7 @@ Item {
     visible: root.offersRetry
     anchors.left: statusWords.right
     anchors.leftMargin: Style.space(16)
-    anchors.verticalCenter: parent.verticalCenter
+    anchors.verticalCenter: statusWords.verticalCenter
     text: "RETRY"
     onActivated: root.retryRequested()
   }
@@ -289,6 +348,7 @@ Item {
     anchors.right: camera.left
     anchors.rightMargin: Style.space(14)
     anchors.verticalCenter: parent.verticalCenter
+    anchors.verticalCenterOffset: root.centerOffset
     cell: root.cell
     shape: on ? Cells.SOUND_ON : Cells.SOUND_OFF
     color: soundMouse.containsMouse ? root.foreground : root.dim
@@ -309,10 +369,17 @@ Item {
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.verticalCenter: parent.verticalCenter
       width: parent.width + Style.space(12)
-      height: root.height
+      height: root.contentHeight
       hoverEnabled: true
       cursorShape: Qt.PointingHandCursor
       onClicked: root.soundsRequested()
+
+      HeaderTip {
+        objectName: "soundTip"
+        visible: soundMouse.containsMouse
+        text: root.soundsOn ? "Turn sounds off" : "Turn sounds on"
+        fontFamily: root.fontFamily
+      }
     }
   }
 
@@ -328,6 +395,7 @@ Item {
     anchors.right: lookIcon.left
     anchors.rightMargin: Style.space(14)
     anchors.verticalCenter: parent.verticalCenter
+    anchors.verticalCenterOffset: root.centerOffset
     cell: root.cell
     shape: lit ? Cells.CAMERA_LIT : Cells.CAMERA
     color: lit || cameraMouse.containsMouse ? root.foreground : root.dim
@@ -348,10 +416,17 @@ Item {
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.verticalCenter: parent.verticalCenter
       width: parent.width + Style.space(12)
-      height: root.height
+      height: root.contentHeight
       hoverEnabled: true
       cursorShape: Qt.PointingHandCursor
       onClicked: root.screenshotRequested()
+
+      HeaderTip {
+        objectName: "cameraTip"
+        visible: cameraMouse.containsMouse
+        text: "Take a screenshot"
+        fontFamily: root.fontFamily
+      }
     }
   }
 
@@ -365,6 +440,7 @@ Item {
     anchors.right: helpMark.left
     anchors.rightMargin: Style.space(14)
     anchors.verticalCenter: parent.verticalCenter
+    anchors.verticalCenterOffset: root.centerOffset
     retro: root.retro
     still: root.still
     pixel: root.cell - 1
@@ -386,10 +462,17 @@ Item {
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.verticalCenter: parent.verticalCenter
       width: parent.width + Style.space(12)
-      height: root.height
+      height: root.contentHeight
       hoverEnabled: true
       cursorShape: Qt.PointingHandCursor
       onClicked: root.styleRequested(root.retro ? "smooth" : "retro")
+
+      HeaderTip {
+        objectName: "lookTip"
+        visible: lookMouse.containsMouse
+        text: root.retro ? "Switch to smooth" : "Switch to retro"
+        fontFamily: root.fontFamily
+      }
     }
   }
 
@@ -401,6 +484,7 @@ Item {
     anchors.right: parent.right
     anchors.rightMargin: Style.space(6)
     anchors.verticalCenter: parent.verticalCenter
+    anchors.verticalCenterOffset: root.centerOffset
     textFormat: Text.PlainText
     text: "?"
     color: helpMouse.containsMouse ? root.foreground : root.dim
@@ -423,10 +507,17 @@ Item {
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.verticalCenter: parent.verticalCenter
       width: Math.max(Style.space(24), parent.width + Style.space(12))
-      height: root.height
+      height: root.contentHeight
       hoverEnabled: true
       cursorShape: Qt.PointingHandCursor
       onClicked: root.helpRequested()
+
+      HeaderTip {
+        objectName: "helpTip"
+        visible: helpMouse.containsMouse
+        text: root.helpShown ? "Hide the keys" : "Show all keys"
+        fontFamily: root.fontFamily
+      }
     }
   }
 }

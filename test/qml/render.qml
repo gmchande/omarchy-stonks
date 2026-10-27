@@ -1110,8 +1110,8 @@ ShellRoot {
           headerWhenMissing: root.coldState === "loading" ? "Loading" : "No data"
           switchesPanels: root.popup
           margins: root.popup ? 0 : Style.space(16)
-          chartHeight: root.popup ? Style.space(190) : Style.space(220)
-          minChartHeight: root.popup ? 0 : Style.space(136)
+          chartHeight: root.popup ? Style.space(162) : Style.space(220)
+          minChartHeight: root.popup ? 0 : Style.space(108)
           ground: root.groundColor
         }
       }

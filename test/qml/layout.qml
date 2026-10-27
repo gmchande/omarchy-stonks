@@ -110,6 +110,33 @@ ShellRoot {
 
   function yIn(item, y) { return Math.round(item.mapToItem(body, 0, y).y) }
   function xIn(item, x) { return Math.round(item.mapToItem(body, x, 0).x) }
+  // What's wrong with where an open tip lies, or "": all of it, its
+  // background as well as its words, since a style may draw the background
+  // wider (found in review), must lie under its icon, within the body's
+  // width and the window's height.
+  function tipFault(tip, icon) {
+    var drawn = [tip.background, tip.contentItem].map(function(item) {
+      var at = item.mapToItem(null, 0, 0)
+      return { left: at.x, top: at.y, right: at.x + item.width, bottom: at.y + item.height }
+    })
+    var left = Math.round(Math.min(drawn[0].left, drawn[1].left))
+    var right = Math.round(Math.max(drawn[0].right, drawn[1].right))
+    var top = Math.round(Math.min(drawn[0].top, drawn[1].top))
+    var bottom = Math.round(Math.max(drawn[0].bottom, drawn[1].bottom))
+    var iconBottom = Math.round(icon.mapToItem(null, 0, icon.height).y)
+    var bodyLeft = Math.round(body.mapToItem(null, 0, 0).x)
+    if (top < iconBottom) return "its tip starts at " + top + ", not under its icon's " + iconBottom
+    if (left < bodyLeft || right > bodyLeft + Math.round(body.width)) return "its tip runs from " + left + " to " + right + ", out of the body's " + bodyLeft + " to " + Math.round(bodyLeft + body.width)
+    if (bottom > window.height) return "its tip runs to " + bottom + ", out of the window"
+    return ""
+  }
+  function openTips(item, into) {
+    if (!item) return into
+    if (item.opened === true && item.text !== undefined) into.push(item)
+    var kids = item.data || []
+    for (var k = 0; k < kids.length; k++) openTips(kids[k], into)
+    return into
+  }
 
   // The ink of a Text as it is drawn now, at the size it was fitted to.
   TextMetrics { id: shownInk }
@@ -339,23 +366,8 @@ ShellRoot {
         surfaceOpen: true
         margins: surface.wide ? Style.space(16) : 0
         switchesPanels: !surface.wide
-        chartHeight: surface.wide ? Style.space(220) : Style.space(190)
+        chartHeight: surface.wide ? Style.space(220) : Style.space(162)
       }
-    }
-
-    // Reads a grabbed picture's pixels, for ink measured as drawn.
-    Canvas {
-      id: inkCanvas
-      y: window.implicitHeight
-      width: window.implicitWidth
-      height: 120
-      renderTarget: Canvas.Image
-      renderStrategy: Canvas.Immediate
-    }
-    Text {
-      id: inkProbe
-      y: window.implicitHeight + 130
-      textFormat: Text.PlainText
     }
 
     TestCase {
@@ -586,7 +598,7 @@ ShellRoot {
           mistitled.length === 0, mistitled.join(" | "))
         // The first line follows the range: on the day it is the day's, and
         // on 1M, 1Y, 5Y, and All it is that range's name, its low and high as
-        // its chart's marks have them, START, and the volume over it, for AAPL
+        // its chart's marks have them, Start, and the volume over it, for AAPL
         // and for NEST as a listing a month old. The 52-week line says the
         // same words in the same places on every range, and nothing moves:
         // the columns, both rules, and every fact's place stay as on the day.
@@ -609,12 +621,12 @@ ShellRoot {
           return ["columns " + [at.lowX, at.ruleX, at.highX, at.rule].concat(at.factXs).join(","), year].concat(rules).join(" | ")
         }
         // What the first line says on a range, against what it should: its
-        // name, its low and high, START, and a volume; "" when it agrees.
+        // name, its low and high, Start, and a volume; "" when it agrees.
         var rangeSaid = function(range, h) {
           var ends = History.rangeEnds(h, null, body.featuredQuote)
           var digits = body.featuredQuote.priceDigits
           var want = [range.toUpperCase(), Format.money(ends.low.p, digits), Format.money(ends.high.p, digits),
-            "START", Format.money(h.baseline, digits), "VOL"].join(" ")
+            "Start", Format.money(h.baseline, digits), "Vol"].join(" ")
           var drawn = root.drawnSpans(find(body, "periodLine")).sort(byLeft).map(function(s) { return s.what })
           var said = drawn.slice(0, 6).join(" ")
           return said === want && drawn.length === 7 ? "" : drawn.join(" ") + ", want " + want + " and a volume"
@@ -757,7 +769,7 @@ ShellRoot {
         stub.range = "1D"
         stub.historyEntry = null
         wait(50)
-        root.check("on 1M, 1Y, 5Y, and All the first info line says the range's name, its low and high as its marks have them, START, and its volume, a young listing's too, in both looks, in the popup and the window at its narrowest and widest",
+        root.check("on 1M, 1Y, 5Y, and All the first info line says the range's name, its low and high as its marks have them, Start, and its volume, a young listing's too, in both looks, in the popup and the window at its narrowest and widest",
           unfollowed.length === 0, unfollowed.join(" | "))
         root.check("nothing on the info lines moves from 1D to 1M, 1Y, 5Y, and All, and the 52-week line says the same, on 1Y the chart's own low and high, a young listing's too, in both looks, in the popup and the window at its narrowest and widest",
           shifted.length === 0, shifted.join(" | "))
@@ -926,18 +938,19 @@ ShellRoot {
           widened && yahoos && marked === wantMarks && periodRange === wantMarks,
           "1Y: " + onYear + " / 1D: " + onDay + " / marks " + marked + ", first line " + periodRange + ", want " + wantMarks + " and Yahoo's " + wantYear)
 
-        // The exchange and currency stay whole on the hero's line; a long
-        // name gives way to them, in both looks. Found in the 1.0.0 review:
-        // the popup dropped "LSE · GBp" first, so a price in pence could
-        // read as pounds beside a cap in GBP. Pence say PENCE.
+        // The exchange and currency stay whole on the hero's line, in both
+        // looks. Found in the 1.0.0 review: the popup dropped "LSE · GBp"
+        // first, so a price in pence could read as pounds beside a cap in
+        // GBP. Pence say PENCE. A long name is the header's title, cut there
+        // short of the speaker.
         var shelQuote = stub.quotes["SHEL.L"]
         var longNamed = Object.assign({}, stub.quotes)
         longNamed["SHEL.L"] = Object.assign({}, shelQuote,
-          { name: "Shell plc, with a name long enough to fill the hero's whole line in the popup, and in the window at its widest too" })
+          { name: "Shell plc, with a name long enough to fill the header's whole line in the popup, and in the window at its widest too" })
         stub.quotes = longNamed
         stub.featuredSymbol = "SHEL.L"
         stub.figures = null
-        var wantMeta = " · " + shelQuote.exchange + " · PENCE"
+        var wantMeta = shelQuote.exchange + " · PENCE"
         var metaLost = []
         var wideWas = surface.wide
         ;[false, true].forEach(function(wide) {
@@ -945,88 +958,23 @@ ShellRoot {
           ;[false, true].forEach(function(retro) {
             stub.retro = retro
             wait(50)
-            var name = find(body, "listingLine")
             var meta = find(body, "listingMeta")
             var right = meta ? meta.x + meta.implicitWidth : 0
-            if (!meta || !meta.visible || meta.text !== wantMeta || !name.truncated || right > meta.parent.width + 0.5)
-              metaLost.push((wide ? "window " : "popup ") + (retro ? "retro " : "smooth ") + JSON.stringify(name ? name.text : "") + " + "
-                + JSON.stringify(meta ? meta.text : null) + (meta ? ", ends at " + Math.ceil(right) + " of " + meta.parent.width : ""))
+            var title = find(body, "headerTitle")
+            var speaker = find(body, "soundIcon")
+            var titleRight = xIn(title, title.width)
+            if (!meta || !meta.visible || meta.text !== wantMeta || right > meta.parent.width + 0.5
+              || !title.truncated || titleRight > xIn(speaker, 0))
+              metaLost.push((wide ? "window " : "popup ") + (retro ? "retro " : "smooth ") + JSON.stringify(title.text.slice(0, 12)) + " ends at "
+                + Math.ceil(titleRight) + ", the speaker at " + Math.floor(xIn(speaker, 0)) + " | " + JSON.stringify(meta ? meta.text : null)
+                + (meta ? ", ends at " + Math.ceil(right) + " of " + meta.parent.width : ""))
           })
         })
         surface.wide = wideWas
-        stub.retro = false
-        root.check("a long name gives way on the hero's line; its exchange and currency stay whole, in the popup and the window, both looks",
-          metaLost.length === 0, metaLost.join(" | "))
-
-        // One space before the dot after the name, whatever the name's
-        // length: the ink gap from the name's last character to the dot is
-        // the font's own, within a pixel, for the cut name in the popup and
-        // the window at five widths, and for a whole name. Found in the 1.0.2
-        // visual review: "TOYOTA MOTOR CORPORA…  · TSE", the name's box wider
-        // than its cut text.
-        var inkRuns = function(item) {
-          var grabbed = null
-          item.grabToImage(function(result) { grabbed = result })
-          tryVerify(function() { return grabbed !== null }, 3000, "grab " + item.objectName)
-          inkCanvas.loadImage(grabbed.url)
-          tryVerify(function() { return inkCanvas.isImageLoaded(grabbed.url) }, 3000, "load " + item.objectName)
-          var ctx = inkCanvas.getContext("2d")
-          ctx.clearRect(0, 0, inkCanvas.width, inkCanvas.height)
-          ctx.drawImage(grabbed.url, 0, 0)
-          var w = Math.min(inkCanvas.width, Math.ceil(item.width))
-          var h = Math.min(inkCanvas.height, Math.ceil(item.height))
-          var data = ctx.getImageData(0, 0, w, h).data
-          inkCanvas.unloadImage(grabbed.url)
-          var runs = []
-          for (var x = 0; x < w; x++) {
-            var inked = false
-            for (var y = 0; y < h && !inked; y++) inked = data[(y * w + x) * 4 + 3] > 24
-            if (inked && runs.length && runs[runs.length - 1].right === x) runs[runs.length - 1].right = x + 1
-            else if (inked) runs.push({ left: x, right: x + 1 })
-          }
-          return runs
-        }
-        // The gap from the name's last ink to the dot, against the same last
-        // character and words drawn as one line: one space each side as the
-        // font sets it, whatever the glyphs' bearings.
-        var dotGaps = []
-        var dotGap = function(label) {
-          var name = find(body, "listingLine")
-          var meta = find(body, "listingMeta")
-          var nameInk = inkRuns(name)
-          var metaInk = inkRuns(meta)
-          var drawn = meta.mapToItem(body, metaInk[0].left, 0).x - name.mapToItem(body, nameInk[nameInk.length - 1].right, 0).x
-          var last = name.truncated ? "…" : name.text.charAt(name.text.length - 1)
-          inkProbe.font = name.font
-          inkProbe.text = last
-          var lastInk = inkRuns(inkProbe)
-          var lastRight = lastInk[lastInk.length - 1].right
-          inkProbe.text = last + meta.text
-          var probeDot = inkRuns(inkProbe).filter(function(r) { return r.left >= lastRight })[0]
-          var set = probeDot.left - lastRight
-          if (Math.abs(drawn - set) > 1)
-            dotGaps.push(label + " " + JSON.stringify(name.text) + ": " + drawn.toFixed(1) + " px before the dot, " + set + " as one line")
-        }
-        ;[[false, 0], [true, 560], [true, 600], [true, 640], [true, 680], [true, 720]].forEach(function(place) {
-          surface.wide = place[0]
-          if (place[0]) surface.windowWidth = place[1]
-          ;[false, true].forEach(function(retro) {
-            stub.retro = retro
-            stub.featuredSymbol = "SHEL.L"
-            wait(50)
-            var where = (place[0] ? "window " + place[1] : "popup") + (retro ? " retro" : " smooth")
-            dotGap(where + " cut")
-            stub.featuredSymbol = "AAPL"
-            wait(50)
-            dotGap(where + " whole")
-          })
-        })
-        surface.wide = wideWas
-        surface.windowWidth = 720
         stub.retro = false
         stub.quotes = Object.assign({}, longNamed, { "SHEL.L": shelQuote })
-        root.check("the hero's line keeps one space between the name, cut or whole, and the dot after it, in the popup and the window at five widths, both looks",
-          dotGaps.length === 0, dotGaps.join(" | "))
+        root.check("a long name is cut in the header short of the speaker; the hero's line keeps its exchange and currency whole, in the popup and the window, both looks",
+          metaLost.length === 0, metaLost.join(" | "))
 
         // Every price a listing shows is in its own decimals: a coin under a
         // cent to four significant digits, a six-figure price to none, in
@@ -1341,14 +1289,14 @@ ShellRoot {
         }
 
         // The window's smallest permitted height shows three whole rows: the
-        // chart gives way first, down to 136 px; at the usual 760 px it keeps
+        // chart gives way first, down to 108 px; at the usual 760 px it keeps
         // all 220 and takes what whole rows leave over, less than a row.
         // Found in the design pass of 14 October: the smallest window showed
         // one row of the list.
         // The window's chart fits the window: set here, where the height is
         // the window's own, not fitted to the body as the popup's is.
         surface.fixedHeight = 760
-        body.minChartHeight = Style.space(136)
+        body.minChartHeight = Style.space(108)
         wait(50)
         var usualChart = body.chartItem.height
         surface.fixedHeight = body.smallestHeight !== undefined ? body.smallestHeight : body.chromeHeight + body.listRowHeight
@@ -1357,8 +1305,8 @@ ShellRoot {
         stub.historyEntry = null
         wait(50)
         var minimum = root.measure()
-        root.check("the window's smallest height shows three whole rows, its chart giving way to 136 px, and its usual height keeps the whole chart and less than a row more",
-          body.watchlist.height === 3 * body.rowPitch - body.rowGap && body.chartItem.height === Style.space(136)
+        root.check("the window's smallest height shows three whole rows, its chart giving way to 108 px, and its usual height keeps the whole chart and less than a row more",
+          body.watchlist.height === 3 * body.rowPitch - body.rowGap && body.chartItem.height === Style.space(108)
             && usualChart >= Style.space(220) && usualChart < Style.space(220) + body.rowPitch
             && minimum.footerGap === body.groupGap && minimum.footer <= surface.height,
           "list " + body.watchlist.height + " of " + surface.height + ", chart " + body.chartItem.height + ", at 760 " + usualChart)
@@ -1522,7 +1470,7 @@ ShellRoot {
         stub.library = stub.symbols.slice()
         var fullList = stub.symbols.slice()
         surface.wide = true
-        body.minChartHeight = Style.space(136)
+        body.minChartHeight = Style.space(108)
         var windowFaults = []
         var chartFaults = []
         // `rows` when the rows changed: past a row's slide or fade into its
@@ -1786,7 +1734,7 @@ ShellRoot {
             Array.from({ length: count - 1 }, function(_, n) { return { name: "List " + (n + 1), label: "List " + (n + 1), count: 1, symbols: ["MZ"] } }))
           ;[["popup", 0], ["window smallest", -1], ["window", 760]].forEach(function(place) {
             surface.wide = place[0] !== "popup"
-            body.minChartHeight = surface.wide ? Style.space(136) : 0
+            body.minChartHeight = surface.wide ? Style.space(108) : 0
             surface.fixedHeight = place[1] < 0 ? body.smallestHeight : place[1]
             ;[false, true].forEach(function(retro) {
               stub.retro = retro
@@ -1871,7 +1819,7 @@ ShellRoot {
           ["My Watchlist", "Watching", "Growth", "Wins", "Losses"].map(function(name) { return { name: name, label: name, count: 1, symbols: ["MZ"] } }))
         surface.wide = true
         surface.windowWidth = 720
-        body.minChartHeight = Style.space(136)
+        body.minChartHeight = Style.space(108)
         surface.fixedHeight = 760
         var fiveSeen = []
         ;[false, true].forEach(function(retro) {
@@ -2252,34 +2200,43 @@ ShellRoot {
         stub.retro = false
         wait(50)
 
-        // No header control opens a tooltip over the card, smooth and retro:
-        // a hover on the animal, the look, or ? past the shell's 400 ms
-        // delay leaves every tip in the body closed. Found by the owner on
-        // 15 October: "Replay the chart (p)" covered the line naming the
-        // stock. What a click on each does is on the ? sheet.
-        var openTips = function(item, into) {
-          if (!item) return into
-          if (item.opened === true && item.text !== undefined) into.push(item.objectName + " " + JSON.stringify(item.text))
-          var kids = item.data || []
-          for (var k = 0; k < kids.length; k++) openTips(kids[k], into)
-          return into
-        }
-        var tipped = []
-        ;["animalToggle", "lookToggle", "helpToggle"].forEach(function(name) {
-          var toggle = find(body, name)
+        // Each header icon on the right says on hover, past the shell's 400
+        // ms delay, what a click does, in the one tip open, under its icon
+        // and within the body, with room above or none, smooth and retro;
+        // the animal says nothing. Found by the owner on 15 October:
+        // "Replay the chart (p)".
+        var tipFaults = []
+        var tipWords = []
+        ;[["animalToggle"], ["soundToggle", "Turn sounds off"], ["cameraButton", "Take a screenshot"],
+          ["lookToggle", "Switch to retro", "Switch to smooth"], ["helpToggle", "Show all keys"]].forEach(function(want) {
+          var toggle = find(body, want[0])
           ;[false, true].forEach(function(retro) {
             stub.retro = retro
-            wait(50)
-            if (!toggle) { tipped.push(name + " missing"); return }
-            mouseMove(toggle, toggle.width / 2, toggle.height / 2)
-            wait(600)
-            openTips(body, []).forEach(function(t) { tipped.push((retro ? "retro " : "smooth ") + name + ": " + t) })
-            mouseMove(body, body.width / 2, body.height - 4)
-            wait(50)
+            ;[0, 80].forEach(function(above) {
+              surface.y = above
+              wait(50)
+              var where = (retro ? "retro " : "smooth ") + want[0] + " with " + above + " px above"
+              if (!toggle) { tipFaults.push(where + " missing"); return }
+              mouseMove(toggle, toggle.width / 2, toggle.height / 2)
+              wait(600)
+              var tips = root.openTips(body, [])
+              var words = want[0] === "soundToggle" && !find(body, "soundIcon").on ? "Turn sounds on" : want[retro && want[2] ? 2 : 1]
+              if (words === undefined ? tips.length !== 0 : tips.length !== 1 || tips[0].text !== words)
+                tipFaults.push(where + ": " + JSON.stringify(tips.map(function(t) { return t.text })) + ", not " + JSON.stringify(words))
+              tips.forEach(function(t) {
+                var fault = root.tipFault(t, toggle)
+                if (fault) tipFaults.push(where + ": " + fault)
+              })
+              if (!retro) tipWords.push(tips.map(function(t) { return t.text }).join(", "))
+              mouseMove(body, body.width / 2, body.height - 4)
+              wait(50)
+            })
           })
         })
-        root.check("no header control opens a tooltip over the card, smooth and retro",
-          tipped.length === 0, tipped.join(" | "))
+        surface.y = 0
+        console.log("header tips: " + tipWords.join(" | "))
+        root.check("each header icon's hover says what a click does, under its icon and within the body, with room above or none, and the animal's nothing, smooth and retro",
+          tipFaults.length === 0, tipFaults.join(" | "))
         stub.retro = false
         wait(50)
 
@@ -2630,6 +2587,10 @@ ShellRoot {
         var shortFaults = []
         var shortSeen = []
         var touched = []
+        var coldFaults = []
+        var tipFaults = []
+        var tipsSeen = 0
+        var coldSeen = 0
         var exact = function(item, y) { return item.mapToItem(body, 0, y).y }
         var quotesBeforeCoin = stub.quotes
         stub.quotes = Object.assign({}, quotesBeforeCoin, { "BTC-USD": Quote.parseChart(JSON.parse(btcFile.text())) })
@@ -2728,6 +2689,39 @@ ShellRoot {
                 if (onInk) touched.push(where + ": the " + name + " mark's " + onInk + ", chart " + chart)
               })
             })
+            // Where the header gives its title way, the name is back on the
+            // ticker's line, which is measured; with no quote yet, before a
+            // first answer or after a failed one, it says nothing rather
+            // than throw. Found in review: it read a null quote's currency.
+            if (!body.headerTitled) {
+              var hero = find(body, "hero")
+              hero.quote = null
+              wait(50)
+              if (hero.listingMeta !== "") coldFaults.push(where + ": \"" + hero.listingMeta + "\"")
+              coldSeen++
+              hero.quote = Qt.binding(function() { return body.featuredQuote })
+              wait(50)
+            }
+            // The camera's tip at every size, with the body at the window's
+            // top and with room above it: one tip, under its icon and within
+            // the body.
+            var cameraButton = find(body, "cameraButton")
+            ;[0, 80].forEach(function(above) {
+              surface.y = above
+              wait(50)
+              mouseMove(cameraButton, cameraButton.width / 2, cameraButton.height / 2)
+              wait(600)
+              var tips = root.openTips(body, [])
+              if (tips.length !== 1) tipFaults.push(where + ": " + tips.length + " tips with " + above + " px above")
+              tips.forEach(function(t) {
+                var fault = root.tipFault(t, cameraButton)
+                if (fault) tipFaults.push(where + " with " + above + " px above: " + fault)
+              })
+              mouseMove(body, body.width / 2, body.height - 4)
+              wait(50)
+            })
+            surface.y = 0
+            tipsSeen++
           })
         }
         // At text sizes 16 and 20 on an 850 px screen, with 12 lists, the
@@ -2788,6 +2782,10 @@ ShellRoot {
           shortFaults.length === 0, shortFaults.join(" | "))
         root.check("on a 768 px screen at every text size from 9 to 20 a range's marks never touch the ink, and a chart at full height shows both, in both looks",
           touched.length === 0, touched.join(" | "))
+        root.check("on a 768 px screen where the header gives its title way, a stock with no quote yet leaves the ticker's line empty, in both looks",
+          coldSeen > 0 && coldFaults.length === 0, coldSeen + " seen; " + coldFaults.join(" | "))
+        root.check("on a 768 px screen at every text size from 9 to 20, the camera's tip shows under its icon and within the body, at the window's top and with room above, in both looks",
+          tipsSeen > 0 && tipFaults.length === 0, tipsSeen + " seen; " + tipFaults.join(" | "))
 
         // After the text size changes with the list scrolled, no row is cut
         // at the list's top or bottom, the row at its top stays there unless
@@ -2827,7 +2825,7 @@ ShellRoot {
           surface.fixedHeight = wide ? 760 : 0
           if (wide) {
             body.screenRoom = 0
-            body.minChartHeight = Qt.binding(function() { return Style.space(136) })
+            body.minChartHeight = Qt.binding(function() { return Style.space(108) })
           } else {
             body.screenRoom = Qt.binding(screenTall)
             surface.budget = Qt.binding(screenTall)

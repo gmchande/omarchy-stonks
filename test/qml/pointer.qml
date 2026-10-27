@@ -214,7 +214,7 @@ ShellRoot {
       downColor: stub.downColor
       fontFamily: stub.fontFamily
       surfaceOpen: true
-      chartHeight: Style.space(190)
+      chartHeight: Style.space(162)
       rangeOptions: ["1D", "1Y"]
     }
 

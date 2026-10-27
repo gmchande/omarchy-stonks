@@ -826,7 +826,7 @@ ShellRoot {
       service.feature("AAPL")
       var named = listingSaid("AAPL")
       harness.check("a listing Yahoo names no currency for says its exchange alone, never USD; one it names keeps its code",
-        noneNamed === " · FTSE INDEX" && named === " · NASDAQ · USD", noneNamed + " | " + named)
+        noneNamed === "FTSE INDEX" && named === "NASDAQ · USD", noneNamed + " | " + named)
       service.removeSymbol("NOCUR")
       wait(50)
 
