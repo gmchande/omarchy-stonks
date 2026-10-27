@@ -40,7 +40,7 @@ function sheet(order, switchesPanels) {
         // so c changes the rows and, on the day, the hero.
         { key: "c", does: "Cycle the day's change" },
         { key: "s", does: "Smooth or retro" },
-        { key: "m", does: "Sound on (starts off)" },
+        { key: "m", does: "Sound on or off" },
         { key: "r", does: "Refresh" },
         // What the footer offers: a newer Stonks's update, then the restart.
         { key: "U", does: "Update Stonks" }
