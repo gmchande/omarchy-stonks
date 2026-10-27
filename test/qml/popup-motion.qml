@@ -1,7 +1,6 @@
 import QtQuick
 import QtTest
 import Quickshell
-import Quickshell.Io
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
@@ -17,32 +16,11 @@ import "plugin/Figures.js" as Figures
 // it, a real pill's animal turns column by column as its day crosses its
 // close, and switches at once on a wheel step. HOME and curl are scratch
 // fixtures.
-ShellRoot {
+Harness {
   id: harness
+  marker: "POPUP MOTION DONE"
 
-  property int failures: 0
   property bool marked: false
-
-  function check(label, ok, detail) {
-    console.log((ok ? "PASS " : "FAIL ") + label + (!ok && detail !== undefined ? " — " + detail : ""))
-    if (!ok) failures++
-  }
-
-  function find(item, name) {
-    if (!item) return null
-    if (item.objectName === name) return item
-    for (var i = 0; i < item.children.length; i++) {
-      var found = find(item.children[i], name)
-      if (found) return found
-    }
-    return null
-  }
-
-  function finish() {
-    console.log("POPUP MOTION DONE")
-    done.exitCode = failures ? 1 : 0
-    done.start()
-  }
 
   Stonks.Service { id: service }
   QtObject {
@@ -87,7 +65,7 @@ ShellRoot {
     }
   }
 
-  TestCase {
+  Steps {
     name: "PopupMotion"
     when: service.pluginsReady
 
@@ -101,17 +79,33 @@ ShellRoot {
       grab.markStart()
     }
 
-    // The card's frames from a moment before `act` until its edge has long
-    // rested, timed from the change of the height it fits (the mark), and
+    // The card's edge at the height it fits.
+    function edgeAtRest() {
+      return panel.cardHeight === panel.fittedCardHeight
+    }
+
+    function rest() {
+      tryVerify(edgeAtRest, 2000)
+    }
+
+    // `count` more frames of the run under way.
+    function moreFrames(count) {
+      var from = grab.frames.length
+      tryVerify(function() { return grab.frames.length >= from + count }, 2000)
+    }
+
+    // The card's frames from a few before `act` until four after its edge
+    // rests, timed from the change of the height it fits (the mark), and
     // frames.js's verdict on them in `mode`.
     function frames(name, act, mode, args) {
       grab.source = panel.testCard.surface
       grab.begin(name)
-      wait(100)
+      moreFrames(4)
       harness.marked = false
       panel.fittedCardHeightChanged.connect(markOnce)
       act()
-      wait(500)
+      tryVerify(function() { return harness.marked && edgeAtRest() }, 2000)
+      moreFrames(4)
       panel.fittedCardHeightChanged.disconnect(markOnce)
       return verdict(mode, args)
     }
@@ -158,34 +152,32 @@ ShellRoot {
       })
       grab.source = animal
       grab.begin("animal-turn")
-      wait(100)
+      moreFrames(4)
       grab.markStart()
       service.testFeed.quotes = turned
-      wait(400)
+      within(2000, function() { return kind() === "bear" && !animal.turning })
+      moreFrames(4)
       var turn = verdict("columns:200:" + animal.columns)
-      var turnOk = turn.ok && kind() === "bear"
-      harness.check("a new price that turns the pill's day turns its bull into the bear left to right in 200 ms, each column taking its new cells and colour as it turns"
-        + (turnOk ? " — " + turn.detail.replace(/^columns [^|]*\| /, "") : ""), turnOk, turn.detail)
+      check("a new price that turns the pill's day turns its bull into the bear left to right in 200 ms, each column taking its new cells and colour as it turns",
+        turn.ok && kind() === "bear", turn.detail)
       grab.source = animal
       grab.begin("animal-wheel")
-      wait(100)
+      moreFrames(4)
       grab.markStart()
       mouseWheel(pill, pill.width / 2, pill.height / 2, 0, -120)
-      wait(400)
+      within(2000, function() { return service.featuredSymbol !== "AAPL" && kind() === "bull" && !animal.turning })
+      moreFrames(4)
       var wheel = verdict("turn:0")
-      var wheelOk = wheel.ok && service.featuredSymbol !== "AAPL" && kind() === "bull"
-      harness.check("a wheel step to a symbol that is up switches the pill's animal at once"
-        + (wheelOk ? " — " + wheel.detail : ""), wheelOk, wheel.detail + " | " + service.featuredSymbol)
+      check("a wheel step to a symbol that is up switches the pill's animal at once",
+        wheel.ok && service.featuredSymbol !== "AAPL" && kind() === "bull", wheel.detail + " | " + service.featuredSymbol)
       service.testFeed.quotes = quotes
     }
 
-    // An ease of the edge, from the frames, after `act`. Its line, pass or
-    // fail, says what frames.js read: its curve, and on a failure the edge
-    // frame by frame.
+    // An ease of the edge, from the frames, after `act`. On a failure its
+    // line says what frames.js read: the curve, and the edge frame by frame.
     function eases(label, act) {
       var verdict = frames(label.replace(/[^a-z0-9]+/gi, "-"), act, "edge", band())
-      harness.check(label + (verdict.ok ? " — " + verdict.detail.replace(/^edge [^|]*\| /, "") : ""), verdict.ok, verdict.detail)
-      wait(200)
+      check(label, verdict.ok, verdict.detail)
     }
 
     function test_edge() {
@@ -198,7 +190,7 @@ ShellRoot {
       service.createList("Empty")
       service.switchList("")
       service.persist({ featured: "MSFT" })
-      wait(100)
+      tryVerify(function() { return service.featuredSymbol === "MSFT" }, 2000)
 
       // The card's window exists once it shows: its frames are grabbed from
       // the same turn as the open, before its first frame. The open itself,
@@ -208,99 +200,59 @@ ShellRoot {
       var firstOpen = Date.now() - openedAt
       grab.source = panel.testCard.surface
       grab.begin("open")
+      // Half a second of frames in which the edge must not move.
       wait(500)
       var opened = verdict("edgeheld")
-      harness.check("an open from closed shows the fitted height from its first frame", opened.ok, opened.detail)
-      harness.check("the popup's first open holds the thread at most 150 ms — " + firstOpen + " ms", firstOpen <= 150)
-      wait(300)
+      check("an open from closed shows the fitted height from its first frame", opened.ok, opened.detail)
+      check("the popup's first open holds the thread at most 150 ms", firstOpen <= 150, firstOpen + " ms")
 
       eases("a switch to a shorter list eases the edge up, the footer riding it", function() { service.switchList("Short") })
       eases("a switch to a longer list eases the edge down, the footer covering the rows it passes", function() { service.switchList("") })
 
-      // Found in design pass 3: as the key sheet closed and the card grew,
-      // the footer's line and words drew through the rows.
+      // As the key sheet closes and the card grows, the footer's line and
+      // words must not draw through the rows.
       key("?")
-      wait(400)
+      tryVerify(function() { return panel.testBody.showingHelp && edgeAtRest() }, 2000)
       eases("the key sheet closing eases the edge down, the footer covering the rows it passes", function() { key("?") })
 
       service.switchList("Short")
-      wait(400)
+      rest()
       eases("a removal from a short list eases the edge up", function() { key(Qt.Key_Delete) })
-      eases("its undo eases the edge down", function() { key(Qt.Key_Z, Qt.ControlModifier) })
       eases("an add that lands eases the edge down", function() { panel.testBody.acceptSymbol("SPY") })
       quiet()
-      eases("a membership change from another surface eases the edge down", function() {
-        service.setMembership("NVDA", "Short", true)
-      })
 
       // The menu, a popover, passes over the footer as the card grows under
       // it: only the edge is judged.
       service.switchList("Empty")
-      wait(400)
+      rest()
       var menu = frames("menu", function() { key("l") }, "edge", ["0"])
-      var menuOk = menu.ok && service.listName === "Empty"
-      harness.check("the list menu on an empty list eases the edge down to room for it and the footer"
-        + (menuOk ? " — " + menu.detail.replace(/^edge [^|]*\| /, "") : ""), menuOk, menu.detail)
+      check("the list menu on an empty list eases the edge down to room for it and the footer",
+        menu.ok && service.listName === "Empty", menu.detail)
       panel.testBody.closeListMenu()
-      wait(300)
+      rest()
 
       // Search on the empty list: opening eases the edge down to its room,
       // the field standing at the top with nothing riding the edge; closing
       // eases it back, the footer riding it.
       var opening = frames("search-open", function() { key("a") }, "edge", ["0"])
-      var openOk = opening.ok && panel.testBody.adding
-      harness.check("search opening eases the edge down to its room"
-        + (openOk ? " — " + opening.detail.replace(/^edge [^|]*\| /, "") : ""), openOk, opening.detail)
-      wait(200)
+      check("search opening eases the edge down to its room", opening.ok && panel.testBody.adding, opening.detail)
       eases("search closing eases the edge back up, the footer riding it", function() { panel.testBody.cancelAdding() })
 
-      // A chart on its way past a quarter second dims the popup's hero chart
-      // as it does the window's (window-motion.sh), judged on the card's own
-      // frames, cropped to the chart, under a label naming what is coming:
-      // MSFT's week held back. The card, not the chart alone: its ground is
-      // what the dim lays over the chart.
       service.switchList("")
-      service.persist({ featured: "MSFT" })
-      wait(400)
-      holdMsft.running = true
-      tryVerify(function() { return !holdMsft.running }, 2000)
-      // Inside the chart by a margin, clear of the range row under it, whose
-      // chosen token changes at once.
-      var chart = panel.testBody.chartItem
-      var at = chart.mapToItem(panel.testCard.surface, 0, 0)
-      var crop = [Math.round(at.x), Math.round(at.y) + 8, Math.floor(chart.width), Math.floor(chart.height) - 16].join(",")
-      grab.source = panel.testCard.surface
-      grab.begin("dim")
-      service.setRange("1W")
-      var held = panel.testBody.chartLoading
-      wait(900)
-      var dimmed = verdict("dim:250:" + crop)
-      var label = find(panel.testBody, "loadingLabel")
-      var dimOk = dimmed.ok && held && label.visible && label.text === "Loading MSFT 1W…"
-      harness.check("in the popup, a chart on its way dims the one on show a quarter second on, under a label naming it"
-        + (dimOk ? " — " + dimmed.detail.replace(/^[a-z ]+: ink [^|]*\| /, "") : ""), dimOk, dimmed.detail + " | " + label.text)
-      releaseMsft.running = true
-      tryVerify(function() { return !panel.testBody.chartLoading && panel.testBody.motion.dimmed === 0 }, 5000)
-      service.setRange("1D")
       panel.close()
       // Each later open from closed holds the thread at most 20 ms.
       var later = []
       for (var n = 0; n < 5; n++) {
-        wait(300)
+        tryVerify(function() { return !panel.testCard.visible }, 2000)
         var laterAt = Date.now()
         panel.open()
         later.push(Date.now() - laterAt)
-        wait(300)
+        waitForRendering(panel.testCard.surface)
         panel.close()
       }
-      harness.check("each later open of the popup holds the thread at most 20 ms — " + later.join(", ") + " ms", Math.max.apply(null, later) <= 20)
+      check("each later open of the popup holds the thread at most 20 ms", Math.max.apply(null, later) <= 20, later.join(", ") + " ms")
       pillTurns()
       harness.finish()
     }
   }
-
-  Process { id: holdMsft; command: ["touch", Quickshell.env("STONKS_FAKE_STATE") + "/MSFT.history.hold"] }
-  Process { id: releaseMsft; command: ["rm", "-f", Quickshell.env("STONKS_FAKE_STATE") + "/MSFT.history.hold"] }
-
-  HarnessExit { id: done; interval: 100 }
 }

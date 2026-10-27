@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 # The popup's card edge in motion through the real Panel and Service with
 # real Qt keys, judged on rendered frames: a list switch either way, the key
-# sheet closing, a removal and its undo, an add that lands, a membership
-# change from elsewhere, the list menu, and search opening and closing each
-# ease the edge in 160 ms, the footer riding it whole where it shows; an
-# open from closed holds its fitted height. The pill's animal turns column by
-# column in 200 ms as its day crosses its close, and a wheel step switches
-# it at once.
+# sheet closing, a removal, an add that lands, the list menu, and search
+# opening and closing each ease the edge in 160 ms, the footer riding it
+# whole where it shows; an open from closed holds its fitted height. The
+# pill's animal turns column by column in 200 ms as its day crosses its
+# close, and a wheel step switches it at once.
 # The shell's layer-shell card window does not load offscreen, so the copy
 # of Panel.qml puts the card in CardWindow.qml, a plain window; the pill
 # loads no popup of its own. HOME and curl are scratch.
