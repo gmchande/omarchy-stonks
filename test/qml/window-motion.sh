@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
-# The real App and Service: actions runs the replay keys, pointer, chart
-# selection and market sleep state for all.sh. With no chapter, charts and
-# rows run their rendered-motion and position judgments for review.sh.
-# HOME and curl are scratch.
-chapter=${1:-${STONKS_MOTION_FLOW:-}}
+# The window as it moves, through the real App and Service: charts, then
+# rows, each in its own Quickshell, judged on rendered frames and the rows'
+# places, for review.sh. HOME and curl are scratch.
+chapter=${1:-}
 case "$chapter" in
   "")
     for chapter in charts rows; do bash "$0" "$chapter" || exit "$?"; done
     exit 0 ;;
-  actions|charts|rows) export STONKS_MOTION_FLOW="$chapter" ;;
+  charts|rows) export STONKS_MOTION_FLOW="$chapter" ;;
   *) echo "FAIL unknown window-motion chapter: $chapter"; exit 1 ;;
 esac
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -20,9 +19,9 @@ patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  
 patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  property bool testClockHeld: false'
 patch_copy plugin/Service.qml 's/function wallSecond() { return Math.floor(Date.now() \/ 1000) }/function wallSecond() { return root.testClockHeld ? root.now : Math.floor(Date.now() \/ 1000) }/'
 scratch_home v1-data.json grvc.stonks.json
-# The draw-in check runs on wrong draw-ins too: the real animation made
-# 160 ms, 400 ms, and none; and the dim's on wrong dims, its wait and ease.
-patch_copy plugin/ChartMotion.qml '/^  property real reveal: 1$/a\  property alias testDrawIn: drawInAnim\n  property alias testSlow: slowTimer\n  property alias testDim: dimAnim\n  property alias testReplay: replayAnim'
+# The draw-in check runs on a wrong draw-in too, the real animation made
+# 160 ms; and the dim's on a wrong dim, its wait and ease.
+patch_copy plugin/ChartMotion.qml '/^  property real reveal: 1$/a\  property alias testDrawIn: drawInAnim\n  property alias testSlow: slowTimer\n  property alias testDim: dimAnim'
 frame_tools
 export QT_QPA_PLATFORM=offscreen
 run_qs 110

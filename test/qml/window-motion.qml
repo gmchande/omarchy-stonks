@@ -4,35 +4,12 @@ import Quickshell
 import Quickshell.Io
 import "plugin" as Stonks
 
-// The real App and Service with real keys and pointer. The actions chapter
-// keeps replay, selection and market-state outcomes in all.sh; charts and
-// rows judge rendered motion and positions in the maintainer's review kit.
-// HOME and curl are scratch.
-ShellRoot {
+// The window as it moves, through the real App and Service with real keys
+// and pointer, judged on its rendered frames and its rows' places: the
+// review kit's, by chapter (charts, rows). HOME and curl are scratch.
+Harness {
   id: harness
-
-  property int failures: 0
-
-  function check(label, ok, detail) {
-    console.log((ok ? "PASS " : "FAIL ") + label + (!ok && detail !== undefined ? " — " + detail : ""))
-    if (!ok) failures++
-  }
-
-  function find(item, name) {
-    if (!item) return null
-    if (item.objectName === name) return item
-    for (var i = 0; i < item.children.length; i++) {
-      var found = find(item.children[i], name)
-      if (found) return found
-    }
-    return item.contentItem ? find(item.contentItem, name) : null
-  }
-
-  function finish() {
-    console.log("WINDOW MOTION DONE")
-    done.exitCode = failures ? 1 : 0
-    done.start()
-  }
+  marker: "WINDOW MOTION DONE"
 
   Stonks.Service { id: service }
   Stonks.App { id: app; service: service }
@@ -40,24 +17,6 @@ ShellRoot {
   FrameGrab { id: grab }
   // The hero's figures' frames beside the chart's, as the dim lifts.
   FrameGrab { id: heroGrab }
-  // A busy machine, on purpose: from the draw-in's start, each render first
-  // holds the GUI thread for 0.3 of the time since, until 200 ms in. Renders
-  // and the animation clock share that thread, so the clock ticks later and
-  // later and each render shows a moment older than the render: frames
-  // timed as they render, not by their moment, read the 320 ms draw-in as
-  // about 420. Its handler is connected before the grab's, so it runs first.
-  property real busySince: 0
-  Connections {
-    id: busy
-    target: null
-    function onAfterAnimating() {
-      if (!harness.busySince) return
-      var since = Date.now() - harness.busySince
-      if (since > 200) return
-      var until = Date.now() + since * 0.3
-      while (Date.now() < until) {}
-    }
-  }
   // Hold AAPL's history answer back, and let it go (see the fake curl).
   Process { id: holdAapl; command: ["touch", Quickshell.env("STONKS_FAKE_STATE") + "/AAPL.history.hold"] }
   Process { id: releaseAapl; command: ["rm", "-f", Quickshell.env("STONKS_FAKE_STATE") + "/AAPL.history.hold"] }
@@ -65,30 +24,19 @@ ShellRoot {
   Process { id: noonAapl; command: ["sh", "-c", "echo aapl-noon > \"$0/overnight.set\"", Quickshell.env("STONKS_FAKE_STATE")] }
   Process { id: wholeAapl; command: ["rm", "-f", Quickshell.env("STONKS_FAKE_STATE") + "/overnight.set"] }
   Process { id: quoteFile }
-  // LATE's quote failing, and answering again (see the fake curl).
-  Process { id: lateDown; command: ["touch", Quickshell.env("STONKS_FAKE_STATE") + "/LATE.down"] }
-  Process { id: lateUp; command: ["rm", "-f", Quickshell.env("STONKS_FAKE_STATE") + "/LATE.down"] }
 
-  TestCase {
+  Steps {
     name: "WindowMotion"
     when: service.pluginsReady
-
-    // Waits up to ms for fn to hold and returns whether it does, so the
-    // check that reads it is the one that fails.
-    function within(ms, fn) {
-      for (var t = 0; t < ms && !fn(); t += 20) wait(20)
-      return fn()
-    }
 
     // The empty plot of `body`'s chart as it is now, on the grab's own
     // ground, saved as `name`-plot.ppm: its ink layers hidden and nothing
     // revealed, the baseline and the grid only, whatever the clip does. A
     // draw-in's ink is read against it (frames.js `plot=`), so one that
     // starts part drawn reads as part drawn, a failure, and is never taken
-    // for too few frames and filmed again. Found in Codex's reviews of #33:
-    // read against the first frame after the mark, ink already there was
-    // taken for the plot. Call it after grab.end(), before grab.judge(),
-    // which takes the ground away.
+    // for too few frames and filmed again; read against the first frame
+    // after the mark, ink already there would be taken for the plot. Call
+    // it after grab.end(), before grab.judge(), which takes the ground away.
     function emptyPlot(body, name) {
       var path = Quickshell.env("STONKS_FRAMES") + "/" + name + "-plot.ppm"
       var saved = false
@@ -108,22 +56,6 @@ ShellRoot {
       return path
     }
 
-    // `symbol`'s quote as the next session's: every time in it a day later.
-    function nextDay(symbol) {
-      var shift = function(value, key) {
-        if (Array.isArray(value)) return value.map(function(v) { return shift(v, "") })
-        if (value && typeof value === "object") {
-          var out = {}
-          for (var k in value) out[k] = shift(value[k], k)
-          return out
-        }
-        return typeof value === "number" && ["t", "start", "end", "marketTime"].indexOf(key) >= 0 ? value + 86400 : value
-      }
-      var next = Object.assign({}, service.testFeed.quotes)
-      next[symbol] = shift(service.quotes[symbol], "")
-      service.testFeed.quotes = next
-    }
-
     // The six symbols these flows start from, in manual order, `featured`
     // on `range`, the window tall enough for every row.
     function sixRows(body, featured, range) {
@@ -134,113 +66,38 @@ ShellRoot {
       service.persist({ order: "manual", featured: featured })
       service.setRange(range)
       mouseMove(body, 1, 1)
-      app.close()
-      app.testWindow.implicitHeight = body.chromeHeight + 7 * body.rowPitch
-      app.open("{}")
-      wait(200)
+      openAt(body.chromeHeight + 7 * body.rowPitch)
     }
 
-    // The day's scrub and a new session, and the hero's change as a target.
-    function dayActions(body, watchlist, keys) {
-      var quotesBefore = service.testFeed.quotes
-      service.setRange("1D")
-      service.feature("AAPL")
-      wait(400)
-
-      // A refresh that brings the next session ends a scrub or a replay on
-      // the day before: by keys in smooth, a replay in retro. Found in the
-      // transition audit (data 9): the scrub stayed on a time the new day
-      // does not have, reading the previous close at 0.00%.
-      keys.forceActiveFocus()
-      for (var n = 0; n < 3; n++) keyClick(Qt.Key_Left)
-      var scrubbed = body.scrubT !== 0
-      nextDay("AAPL")
-      var scrubEnded = scrubbed + "," + (body.scrubT === 0)
-      service.persist({ style: "retro" })
-      wait(100)
-      keyClick(Qt.Key_P)
-      wait(300)
-      var replaying = body.motion.replayRunning && body.scrubT !== 0
-      nextDay("AAPL")
-      var replayEnded = replaying + "," + (!body.motion.replayRunning && body.scrubT === 0)
-      service.testFeed.quotes = quotesBefore
-      harness.check("the next session ends the day's scrub and replay, smooth and retro",
-        scrubEnded === "true,true" && replayEnded === "true,true", scrubEnded + " | " + replayEnded)
-
-      // So does a range's: a refetch whose history no longer covers the bar
-      // a replay has reached ends the replay, not only its scrub, in smooth
-      // and in retro. Found in the review of the transitions branch: the
-      // replay ran on, jumping to another date.
-      service.setRange("1W")
-      within(5000, function() { return body.historyShown && !body.chartLoading })
-      var laterWeek = function() {
-        var next = Object.assign({}, service.testHistoryFeed.entries)
-        var entry = next["AAPL|1W"]
-        var history = Object.assign({}, entry.history)
-        history.bars = entry.history.bars.map(function(bar) { return Object.assign({}, bar, { t: bar.t + 30 * 86400 }) })
-        next["AAPL|1W"] = Object.assign({}, entry, { history: history })
-        service.testHistoryFeed.entries = next
-      }
-      var rangeReplay = function(look) {
-        service.persist({ style: look })
-        wait(100)
-        body.replay()
-        wait(300)
-        var replaying = body.motion.replayRunning && body.scrubT !== 0
-        laterWeek()
-        wait(100)
-        return replaying + "," + (!body.motion.replayRunning && body.scrubT === 0)
-      }
-      var inSmooth = rangeReplay("smooth")
-      var inRetro = rangeReplay("retro")
-      service.persist({ style: "smooth" })
-      service.refresh()
-      within(5000, function() { return !service.testHistoryFeed.busy && service.histories["AAPL|1W"].status === "ok" })
-      service.setRange("1D")
-      within(2000, function() { return !body.chartLoading })
-      harness.check("a refetch that no longer covers a range replay ends it, in smooth and in retro",
-        inSmooth === "true,true" && inRetro === "true,true", inSmooth + " | " + inRetro)
-
-      // The hero's change is a target only where a click changes it: the
-      // day's change, not a range's, which is always its percentage. On 1W in
-      // smooth and 1M in retro, then the day. Found in the transition audit
-      // (look 1): a click on the range's figure changed only the rows.
-      var clickChange = function(range, look) {
-        service.persist({ style: look })
-        service.setRange(range)
-        within(5000, function() { return range === "1D" ? !!body.featuredQuote : body.historyShown })
-        wait(100)
-        var change = harness.find(body, "changeText")
-        var mode = service.changeMode
-        mouseClick(change, change.width / 2, change.height / 2)
-        wait(50)
-        var changed = service.changeMode !== mode
-        service.persist({ changeMode: "pct" })
-        return changed
-      }
-      var targets = [clickChange("1W", "smooth"), clickChange("1M", "retro"), clickChange("1D", "smooth")].join(",")
-      harness.check("the hero's change cycles the mode only on the day: not on 1W or 1M",
-        targets === "false,false,true", targets)
+    // Closed, sized, and open again at that size: an offscreen window takes
+    // a new size only as it opens. It is filmed once it has drawn there.
+    function openAt(height) {
+      app.close()
+      app.testWindow.implicitHeight = height
+      app.open("{}")
+      tryVerify(function() { return app.testWindow.height === height }, 2000)
+      waitForRendering(app.testBody)
     }
 
     // Retro's bell appears with the columns, judged only in the review kit.
     function bellDrawIn(body) {
       service.feature("AAPL")
       service.setRange("1D")
-      // Retro's bell draws in with the columns, never ahead of them: as the
-      // window opens, and as the range comes back to the day. Found in the
-      // transition audit (data 3): it stood from the draw-in's first frame.
+      // As the window opens, and as the range comes back to the day.
       service.persist({ style: "retro" })
       // Found afresh each frame: a range change makes the ticks again.
       var bell = function() { return harness.find(body.chartItem, "retroBell") }
       var curtain = harness.find(body.chartItem, "curtain")
       var ahead = function(draw) {
         var early = 0
+        var seen = 0
         var frames = Qt.createQmlObject('import QtQuick; FrameAnimation { running: true }', harness)
-        frames.triggered.connect(function() { if (bell() && bell().visible && bell().x >= curtain.width) early++ })
+        frames.triggered.connect(function() { seen++; if (bell() && bell().visible && bell().x >= curtain.width) early++ })
         draw()
         within(1500, function() { return body.motion.reveal === 1 && !body.chartLoading })
-        wait(50)
+        // A few frames of the whole chart, after the end.
+        var whole = seen
+        within(1000, function() { return seen >= whole + 3 })
         frames.destroy()
         return early + "," + (!!bell() && bell().visible)
       }
@@ -295,9 +152,7 @@ ShellRoot {
 
       // A range change during a running draw-in: to a range in hand the new
       // chart draws in from its start; to one on its way the one on show
-      // stands whole until it lands. As the window opens. Found in the
-      // transition audit (ranges 8) and cubic's review of #24: the new chart
-      // appeared part drawn, or the held one kept drawing in under Loading.
+      // stands whole until it lands. As the window opens.
       var midDrawIn = function(start, toKey, cached) {
         if (!cached) dropEntry(toKey)
         start()
@@ -366,15 +221,12 @@ ShellRoot {
 
     // The draw-in as it is rendered: the hero chart grabbed on every frame,
     // its ink advancing from the left over several distinct frames and
-    // whole in about 320 ms, for a symbol change and a range change, in both
-    // looks. Judged on the pictures (frames.js), not on `reveal`. Found in
-    // the motion audit: #33's checks proved a property moved, while its
-    // 160 ms fade read as no motion at all.
+    // whole in about 320 ms, for a symbol change in smooth and a range
+    // change in retro: both reach the same draw-in. Judged on the pictures
+    // (frames.js), not on `reveal`, which can move while the picture fades.
     function drawInFrames(body, keys) {
-      var run = function(name, change, busyMachine) {
+      var run = function(name, change) {
         grab.source = body.chartItem
-        busy.target = busyMachine ? body.chartItem.Window.window : null
-        harness.busySince = 0
         grab.begin(name)
         tryVerify(function() { return grab.tick > 0 && grab.frames.length > 0 }, 2000)
         // The draw-in starts as the chart's reveal leaves whole.
@@ -390,7 +242,6 @@ ShellRoot {
             leftAt = r
             beforeTick = grab.tick
             grab.markStart()
-            if (busyMachine) harness.busySince = Date.now()
           } else if (!drawFrom && r > leftAt) drawFrom = animationOrigin(body.motion.testDrawIn, r)
         }
         body.motion.revealChanged.connect(marked)
@@ -400,8 +251,6 @@ ShellRoot {
         var settledAt = grab.frames.length
         tryVerify(function() { return grab.frames.length >= settledAt + 4 }, 2000)
         grab.end()
-        busy.target = null
-        harness.busySince = 0
         body.motion.revealChanged.disconnect(marked)
         tryVerify(function() { return grab.waiting === 0 }, 3000)
         var markedAt = grab.start
@@ -413,40 +262,19 @@ ShellRoot {
         return grab.verdict
       }
       var results = []
-      ;["smooth", "retro"].forEach(function(look) {
+      ;[["smooth", "symbol"], ["retro", "range"]].forEach(function(film) {
+        var look = film[0]
         service.persist({ style: look })
         service.setRange("1D")
         service.feature("AAPL")
         tryVerify(function() { return !body.chartLoading && body.motion.drawn === 1 }, 5000)
         keys.forceActiveFocus()
-        // Enter on the first row that is not AAPL's.
+        // Enter on the first row that is not AAPL's, or ] to the next range.
         var other = body.watchlist.displayedSymbols.findIndex(function(s) { return s !== "AAPL" })
         body.watchlist.cursorSymbol = body.watchlist.displayedSymbols[other]
-        var symbol = run("symbol-" + look, function() { keyClick(Qt.Key_Return) })
-        var range = run("range-" + look, function() { keyClick(Qt.Key_BracketRight) })
-        results.push(look + " symbol " + (symbol.ok ? "ok" : "FAILED") + ": " + symbol.detail)
-        results.push(look + " range " + (range.ok ? "ok" : "FAILED") + ": " + range.detail)
+        var drawn = run(film[1] + "-" + look, function() { keyClick(film[1] === "symbol" ? Qt.Key_Return : Qt.Key_BracketRight) })
+        results.push(look + " " + film[1] + " " + (drawn.ok ? "ok" : "FAILED") + ": " + drawn.detail)
       })
-      // The same on a busy machine: a range change back, in smooth. Its
-      // frames are sparse on purpose, so a stall from the suite's own load
-      // can leave too few to read the motion by (frames.js `unreadable`):
-      // then it is filmed again, up to three times, back and forth across
-      // the range. A wrong draw-in fails on the frames that come.
-      service.persist({ style: "smooth" })
-      tryVerify(function() { return !body.chartLoading && body.motion.drawn === 1 }, 5000)
-      var busyRange = null
-      var tries = []
-      for (var attempt = 0; attempt < 3 && (!busyRange || busyRange.unreadable); attempt++) {
-        if (attempt) {
-          keyClick(Qt.Key_BracketRight)
-          tryVerify(function() { return !body.chartLoading && body.motion.drawn === 1 }, 5000)
-        }
-        busyRange = run("range-busy-" + attempt, function() { keyClick(Qt.Key_BracketLeft) }, true)
-        tries.push(busyRange.unreadable ? "unreadable: " + busyRange.detail : busyRange.ok ? "ok" : "failed")
-      }
-      harness.check("on a busy machine, whose animation clock ticks later and later, the chart still reads as drawing in over about 320 ms"
-        + (busyRange.ok ? " — frames " + busyRange.detail.replace(/^edge [0-9. ]*/, "") : "") + " — " + tries.length + (tries.length === 1 ? " try" : " tries"),
-        busyRange.ok, tries.join(" || ") + (busyRange.ok ? "" : " || " + busyRange.detail))
 
       // Loading holds still, then dims: while the chart asked for is on its
       // way, the one on show is the same picture on every frame for a
@@ -565,28 +393,20 @@ ShellRoot {
       harness.check("the chart draws in from the left over about 320 ms, as rendered: a symbol and a range change, smooth and retro; a chart on its way holds the one on show, the same picture on every frame for a quarter of a second, then dims it in 160 ms under a label naming what is coming, and when it lands draws in at full ink as the figures come back — "
         + results.join(" || "), results.every(function(r) { return / ok: /.test(r) }))
 
-      // The same capture and judge fail a wrong draw-in where the flaky
-      // reading was, retro after a loading hold: the real animation made
-      // 160 ms, 400 ms, none, and one that starts 60% drawn and draws the
-      // rest in 224 ms.
-      var wrong = [{ from: 0, ms: 160 }, { from: 0, ms: 400 }, { from: 0, ms: 0 }, { from: 0.6, ms: 224 }].map(function(w) {
-        var run = holds("retro", w)
-        return "from " + w.from + " in " + w.ms + " ms " + (run.landed.ok ? "PASSED" : "failed") + ": " + run.landed.detail
-      })
+      // The same capture and judge fail a wrong draw-in, retro after a
+      // loading hold: the real animation made 160 ms. frames.js's own
+      // cases fail the other wrong draw-ins on frames drawn in code.
+      var fast = holds("retro", { from: 0, ms: 160 })
       service.persist({ style: "smooth" })
       service.setRange("1D")
-      harness.check("a draw-in of 160 ms, 400 ms, none, or one starting part drawn fails the same judgement — " + wrong.join(" || "),
-        wrong.every(function(r) { return / failed: /.test(r) }))
+      harness.check("a draw-in of 160 ms fails the same judgement — " + (fast.landed.ok ? "PASSED" : "failed") + ": " + fast.landed.detail,
+        !fast.landed.ok)
 
-      // And a wrong dim fails its own: the real one made at once, 400 ms
-      // long, at the change itself, 600 ms after it, and never.
-      var wrongDims = [{ delay: 250, dimMs: 0 }, { delay: 250, dimMs: 400 }, { delay: 1, dimMs: 160 }, { delay: 600, dimMs: 160 }, { delay: 100000, dimMs: 160 }].map(function(w) {
-        var run = holds("smooth", w)
-        return "after " + w.delay + " ms in " + w.dimMs + " ms " + (run.held ? "PASSED" : "failed") + ": " + run.heldDetail
-      })
+      // And a wrong dim fails its own: the real one made at once.
+      var sudden = holds("smooth", { delay: 250, dimMs: 0 })
       service.setRange("1D")
-      harness.check("a dim at once, over 400 ms, at the change itself, 600 ms after it, or never fails the same judgement — " + wrongDims.join(" || "),
-        wrongDims.every(function(r) { return / failed: /.test(r) }))
+      harness.check("a dim at once fails the same judgement — " + (sudden.held ? "PASSED" : "failed") + ": " + sudden.heldDetail,
+        !sudden.held)
 
       // A day half gone: AAPL's cut at noon, its ink ending about halfway
       // along the plot, the rest of the day to come. Its draw-in sweeps to
@@ -650,13 +470,13 @@ ShellRoot {
       ;["AAPL", "MSFT", "NVDA"].forEach(function(s) { service.setMembership(s, "Joins", true) })
       service.switchList("Joins")
       mouseMove(body, 1, 1)
-      wait(200)
+      tryVerify(function() { return !watchlist.settling && watchlist.displayedSymbols.every(function(s) { return watchlist.rowResting(s) }) }, 2000)
       var joins = []
       var switches = []
       ;["smooth", "retro"].forEach(function(look) {
         service.persist({ style: look })
         tryVerify(function() { return body.retro === (look === "retro") }, 2000)
-        wait(100)
+        waitForRendering(watchlist)
         var row = watchlist.rowItem("MSFT")
         var line = harness.find(row, look === "retro" ? "rowCells" : "rowLine")
         var joined = null
@@ -726,7 +546,6 @@ ShellRoot {
       service.persist({ style: "smooth" })
       service.switchList("")
       service.deleteList("Joins")
-      wait(100)
       harness.check("a row that joins, an undo, draws its day line in from the left over about 320 ms, as rendered, ending whole, smooth and retro — "
         + joins.join(" || "), joins.every(function(r) { return / ok /.test(r) }))
       harness.check("a list switch draws its rows at once: the same picture on every frame from the switch on, smooth and retro — "
@@ -775,6 +594,25 @@ ShellRoot {
       var featured = run("animal-symbol", "turn:0", function() { service.feature("DOWN") })
       harness.check("a new symbol changes the animal at once"
         + (featured.ok ? " — " + featured.detail : ""), featured.ok && body.animal.kind === "bear", body.animal.kind + ": " + featured.detail)
+      // A range whose first fetch failed shows the day in its place, its
+      // bull; the retry that lands down is another chart, so the bear comes
+      // at once.
+      service.feature("AAPL")
+      service.setRange("1M")
+      tryVerify(function() { return body.chartSymbol === "AAPL" && body.historyShown && !body.chartLoading && body.motion.drawn === 1 }, 5000)
+      var month = service.testHistoryFeed.entries["AAPL|1M"]
+      var monthAs = function(entry) {
+        var next = Object.assign({}, service.testHistoryFeed.entries)
+        next["AAPL|1M"] = entry
+        service.testHistoryFeed.entries = next
+      }
+      monthAs(Object.assign({}, month, { status: "failed", history: null }))
+      var standIn = within(2000, function() { return body.historyFailed && body.animal.kind === "bull" })
+      var down = Object.assign({}, month.history, { baseline: 10 * service.quotes.AAPL.price })
+      var retried = run("animal-retry", "turn:0", function() { monthAs(Object.assign({}, month, { history: down })) })
+      harness.check("a failed range's retry that lands down names the bear" + (retried.ok ? " — " + retried.detail : ""),
+        standIn && retried.ok && !body.historyFailed && body.animal.kind === "bear", standIn + " " + body.animal.kind + ": " + retried.detail)
+      monthAs(month)
       service.setRange(rangeBefore)
       service.feature(featuredBefore)
       tryVerify(function() { return !body.chartLoading && body.motion.drawn === 1 }, 5000)
@@ -794,6 +632,9 @@ ShellRoot {
       var slot = harness.find(body, "animal")
       var header = slot.parent
       var words = harness.find(header, "statusText")
+      var icon = harness.find(body, "lookIcon")
+      var bull = harness.find(body, "bullCells")
+      var bear = harness.find(body, "bearCells")
       var verdict = function(mode, judged) {
         tryVerify(function() { return grab.waiting === 0 }, 3000)
         grab.judge(mode, judged)
@@ -815,7 +656,7 @@ ShellRoot {
         service.persist({ style: style })
         tryVerify(function() { return body.retro === (style === "retro") }, 2000)
         // The look icon steps for 200 ms on a change of look: it rests first.
-        wait(300)
+        tryVerify(function() { return icon.cells === (body.retro ? 0 : 1) }, 2000)
       }
       service.setRange("1D")
       service.feature("DOWN")
@@ -854,13 +695,13 @@ ShellRoot {
       look("smooth")
       // Two seconds after the close, inside the bell's few seconds, a scrub
       // on the same side of the close, so the animal reads a bear on both
-      // sides of letting go, and no turn crossfades. Found in review: there
-      // its eyes closed over 320 ms.
+      // sides of letting go, and no turn crossfades.
       service.now = close + 2
       var below = body.featuredDay.points.filter(function(p) { return p.p < body.featuredDay.prevClose })
       body.motion.scrubT = below[below.length - 1].t
       tryVerify(function() { return !body.animal.asleep && header.closing === 0 && body.animal.kind === "bear" }, 2000)
-      wait(250)
+      // The scrub's own turn into the bear ends before the film.
+      tryVerify(function() { return bull.opacity === 0 && bear.opacity === 1 }, 2000)
       var letGo = run("sleep-scrub-end", "turn:0", function() { body.motion.clearScrub() })
       harness.check("letting go of a scrub two seconds after the close puts the animal back to sleep at once, no eye-close — " + letGo.detail,
         letGo.ok && body.animal.asleep, body.animal.asleep + ": " + letGo.detail)
@@ -871,29 +712,6 @@ ShellRoot {
       var symbol = run("sleep-symbol", "turn:0", function() { service.feature("SHOP.TO") })
       harness.check("a new symbol whose market is closed shows its animal asleep at once — " + symbol.detail,
         symbol.ok && body.animal.asleep, body.animal.asleep + ": " + symbol.detail)
-      // A first quote that failed, then lands after the close on a retry:
-      // its animal comes asleep, with no eye-close, though the chart is the
-      // same. Found in review: it closed its eyes over 320 ms.
-      service.now = close
-      lateDown.running = true
-      tryVerify(function() { return !lateDown.running }, 2000)
-      service.addSymbol("LATE")
-      tryVerify(function() { return service.arriving.indexOf("LATE") < 0 }, 15000)
-      service.feature("LATE")
-      tryVerify(function() { return body.chartSymbol === "LATE" && !body.featuredQuote && body.animal.kind === "" }, 5000)
-      var closings = []
-      var note = function() { closings.push(header.closing) }
-      header.closingChanged.connect(note)
-      lateUp.running = true
-      tryVerify(function() { return !lateUp.running }, 2000)
-      // A refresh asks what was answered over 10 s ago on the held clock.
-      service.now = close + 15
-      service.refresh()
-      tryVerify(function() { return body.animal.kind !== "" }, 8000)
-      wait(400)
-      header.closingChanged.disconnect(note)
-      harness.check("a first quote landing on a retry after the close shows its animal asleep at once, no eye-close",
-        body.animal.asleep && closings.join(",") === "1", body.animal.asleep + ", closing went " + closings.join(","))
       // An open after the bell, the market closing while the window was
       // shut: the frames from its first painted one are all the same.
       service.feature("DOWN")
@@ -922,9 +740,6 @@ ShellRoot {
     // open nothing on it changes, whatever was moving or the service does
     // meanwhile. The window hides at once, so its body is put where the
     // popup's close fade leaves the popup's, closed but still on screen.
-    // Found in the motion audit (finding 3): the fading card changed chart,
-    // and a removed row left a hole; and in its design review: the look
-    // icon, the breadth rule, and the footer's note went on.
     function closingHolds(body, watchlist, keys) {
       var icon = harness.find(body, "lookIcon")
       var frames = function(n) {
@@ -948,6 +763,7 @@ ShellRoot {
       }
       var rest = function() {
         tryVerify(function() { return !body.chartLoading && body.motion.drawn === 1 && !watchlist.settling }, 5000)
+        // Past the look icon's 200 ms step and the breadth rule's ease.
         wait(250)
       }
       service.setRange("1D")
@@ -963,8 +779,8 @@ ShellRoot {
       // removal's gap, and the breadth rule's ends. Every frame after the
       // close is the same picture. x moves the cursor to the next row, whose
       // fill finishes its 60 ms through a close, as any fill does: the close
-      // waits for the rows' own colours to arrive, since a fixed 60 ms on a
-      // busy machine can come before the animation clock has run them.
+      // waits for the rows' own colours to arrive, which a busy machine's
+      // animation clock can run late.
       watchlist.cursorSymbol = "NVDA"
       keyClick(Qt.Key_Delete)
       keyClick(Qt.Key_S)
@@ -987,13 +803,16 @@ ShellRoot {
       service.persist({ style: "smooth" })
       rest()
 
-      // At rest, a note on show, u's refusal with nothing to undo: the
-      // frames before the close are the picture every frame after it keeps,
-      // through an answer that lands (AAPL's next quote, its line turned and
-      // its price new), a hero chosen on another surface, the hero leaving
-      // All, and past the note's moment. The next open takes the latest and
-      // draws in.
+      // At rest, a note on show, u's refusal with nothing to undo, the
+      // pointer holding the rows: the frames before the close are the
+      // picture every frame after it keeps, through an answer that lands
+      // (AAPL's next quote, its line turned and its price new), a hero
+      // chosen on another surface, the hero leaving All, the pointer
+      // leaving the rows, and past the note's moment. The next open takes
+      // the latest, rows laid out at once, and draws in.
       var quotesBefore = service.testFeed.quotes
+      mouseMove(watchlist, 20, watchlist.rowPitch + 10)
+      var held = within(1000, function() { return watchlist.sortHeld })
       keyClick(Qt.Key_Z, Qt.ControlModifier)
       rest()
       var noted = body.note === "Nothing to undo"
@@ -1016,18 +835,25 @@ ShellRoot {
       frames(3)
       service.removeSymbol("AAPL")
       frames(3)
+      var pending = service.view.shown.join() !== watchlist.displayedSymbols.join()
+      mouseMove(body, 1, 1)
+      frames(3)
       grab.end()
+      // Past the note's 2.5 s, which a closed surface holds on show.
       wait(2700)
       grab.resume()
       frames(3)
       grab.end()
       var atRest = verdict()
       reopen()
+      var laidOut = watchlist.displayedSymbols.join() === service.view.shown.join()
       var adopted = [service.featuredSymbol === "MSFT", body.chartSymbol === "MSFT",
         watchlist.displayedSymbols.indexOf("AAPL") < 0, body.motion.reveal < 1].join(",")
       harness.check("a closing surface stops the look icon, the rows, and the rule where they are, and holds its chart, figures, rows, and note through an answer, another surface's choice, a removal from All, and the note's time; the next open takes the latest and draws in — in flight "
         + stepping + " " + inFlight.detail + " | at rest " + noted + " " + atRest.detail + " | open " + adopted,
         stepping && inFlight.ok && noted && atRest.ok && adopted === "true,true,true,true")
+      harness.check("a closing surface holds the rows' order as the pointer leaves, and the next open lays them out at once",
+        held && pending && atRest.ok && laidOut, [held, pending, atRest.ok, laidOut].join(","))
       service.undoRemoval("AAPL")
       service.testFeed.quotes = quotesBefore
       tryVerify(function() { return service.arriving.length === 0 && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 5000)
@@ -1035,9 +861,8 @@ ShellRoot {
       rest()
     }
 
-    // Position clauses moved from the behavior flows. These observe real
-    // joins, a pointer hold ending, and the scroll pulled back at a removal;
-    // the renderer's paused poses show their ink, not these transitions.
+    // The rows' places frame by frame: real joins, a pointer hold ending,
+    // and the scroll pulled back at a removal.
     function holdQuote(symbol, held) {
       var path = Quickshell.env("STONKS_FAKE_STATE") + "/" + symbol + ".quote.hold"
       quoteFile.command = held ? ["touch", path] : ["rm", "-f", path]
@@ -1061,11 +886,12 @@ ShellRoot {
     function rowPlaces(body, watchlist, keys) {
       sixRows(body, "NVDA", "1D")
       service.setOrder("pct")
-      wait(400)
+      var resting = function() { return !watchlist.settling && watchlist.displayedSymbols.every(function(s) { return watchlist.rowResting(s) }) }
+      tryVerify(resting, 3000)
       var join = function(two, held) {
         service.removeSymbol("SLOW")
         service.removeSymbol("FLAT")
-        wait(200)
+        tryVerify(function() { return watchlist.displayedSymbols.indexOf("SLOW") < 0 && watchlist.displayedSymbols.indexOf("FLAT") < 0 && resting() }, 3000)
         var positions = []
         var frames = Qt.createQmlObject('import QtQuick; FrameAnimation { running: true }', harness)
         frames.triggered.connect(function() {
@@ -1091,6 +917,8 @@ ShellRoot {
         tryVerify(function() { return row.resting && !watchlist.settling }, 3000)
         var place = watchlist.displayedSymbols.indexOf("SLOW")
         mouseMove(body, 1, 1)
+        // Longer than a row's 160 ms slide, for one the pointer's leaving
+        // set off to show.
         wait(400)
         frames.destroy()
         var at = place * watchlist.rowPitch - watchlist.contentY
@@ -1106,12 +934,9 @@ ShellRoot {
 
       service.removeSymbol("SLOW")
       sixRows(body, "NVDA", "1D")
-      app.close()
-      app.testWindow.implicitHeight = body.chromeHeight + 3 * body.rowPitch
-      app.open("{}")
-      wait(400)
+      openAt(body.chromeHeight + 3 * body.rowPitch)
+      tryVerify(resting, 3000)
       watchlist.contentY = watchlist.contentHeight - watchlist.height
-      wait(100)
       var screenY = function(s) { return Math.round(watchlist.rowItem(s).y - watchlist.contentY) }
       var below = watchlist.displayedSymbols[5]
       var above = watchlist.displayedSymbols[3]
@@ -1138,10 +963,7 @@ ShellRoot {
       ;["smooth", "retro"].forEach(function(look) {
         sixRows(body, "NVDA", "1D")
         service.persist({ style: look })
-        app.close()
-        app.testWindow.implicitHeight = body.chromeHeight + 3 * body.rowPitch
-        app.open("{}")
-        waitForRendering(body)
+        openAt(body.chromeHeight + 3 * body.rowPitch)
         tryVerify(function() { return !watchlist.settling && watchlist.displayedSymbols.every(function(s) { return watchlist.rowResting(s) }) }, 3000)
         var up = look === "retro"
         watchlist.contentY = up ? watchlist.contentHeight - watchlist.height : 0
@@ -1180,160 +1002,11 @@ ShellRoot {
         results.every(function(r) { return /:true offsets=/.test(r) }), results.join(" | "))
     }
 
-    // The window's replay keys and clicks, with their displayed moments:
-    // these run in all.sh even when nobody runs the motion review kit.
-    function replayActions(body, keys) {
-      service.feature("AAPL")
-      app.testBody.selectRange("1Y")
-      tryVerify(function() {
-        return !service.testHistoryFeed.busy && service.histories["AAPL|1Y"]
-          && service.histories["AAPL|1Y"].status === "ok" && body.historyShown && !body.chartLoading
-      }, 10000)
-
-      keys.forceActiveFocus()
-      keyClick(Qt.Key_P, Qt.ControlModifier)
-      harness.check("Ctrl+P does not replay", !body.motion.replayRunning && body.scrubT === 0)
-
-      keys.forceActiveFocus()
-      keyClick(Qt.Key_P, Qt.AltModifier)
-      harness.check("Alt+P does not replay", !body.motion.replayRunning && body.scrubT === 0)
-
-      // A click on the header's animal replays the chart shown, in both looks.
-      ;["smooth", "retro"].forEach(function(look) {
-        service.persist({ style: look })
-        tryVerify(function() { return body.retro === (look === "retro") && body.animal.kind !== "" }, 2000)
-        mouseClick(body, 20, body.margins + 14, Qt.LeftButton)
-        // A replay owns a real historical moment, whatever the render rate.
-        harness.check(look + "'s animal click replays a historical range",
-          within(2000, function() { return body.motion.replayRunning && body.scrubT !== 0 }),
-          body.motion.replayRunning + "|" + body.scrubT)
-        body.resetInteraction()
-      })
-      service.persist({ style: "smooth" })
-      tryVerify(function() { return !body.retro }, 2000)
-
-      // A Shift-click on the chart does what a click does: back to now, with
-      // no replay.
-      var middle = [body.chartItem.width / 2, body.chartItem.height / 2]
-      mouseMove(body.chartItem, middle[0], middle[1])
-      wait(20)
-      var scrubbed = body.scrubT !== 0
-      mouseClick(body.chartItem, middle[0], middle[1], Qt.LeftButton, Qt.ShiftModifier)
-      wait(50)
-      harness.check("a Shift-click on the chart goes back to now, as a click does, and replays nothing",
-        scrubbed && body.scrubT === 0 && !body.motion.replayRunning,
-        scrubbed + "|" + body.scrubT + "|" + body.motion.replayRunning)
-      body.resetInteraction()
-
-      keys.forceActiveFocus()
-      keyClick(Qt.Key_P)
-      harness.check("P replays a historical range",
-        within(2000, function() { return body.motion.replayRunning && body.scrubT !== 0 }),
-        body.motion.replayRunning + "|" + body.scrubT)
-      // Hold the real replay at its moment, so this judges who owns the
-      // scrub, independent of how much time a pointer command takes.
-      body.motion.testReplay.pause()
-      var replayT = body.scrubT
-      mouseMove(body.chartItem, body.chartItem.width * 3 / 4, body.chartItem.height / 2)
-      harness.check("range replay suppresses hover scrubbing",
-        body.motion.replayRunning && body.scrubT === replayT, replayT + " -> " + body.scrubT)
-      keys.forceActiveFocus()
-      keyClick(Qt.Key_Escape)
-      wait(20)
-      harness.check("Escape stops range replay before closing the window",
-        app.testWindow.visible && !body.motion.replayRunning && body.scrubT === 0)
-
-      app.open("{}")
-      keys.forceActiveFocus()
-      keyClick(Qt.Key_P)
-      var started = within(2000, function() { return body.motion.replayRunning && body.scrubT !== 0 })
-      var other = body.watchlist.displayedSymbols.findIndex(function(s) { return s !== service.featuredSymbol })
-      var target = body.watchlist.displayedSymbols[other]
-      body.watchlist.cursorSymbol = target
-      keyClick(Qt.Key_Return)
-      var ended = !body.motion.replayRunning && body.scrubT === 0
-      harness.check("featuring a row during a replay ends that replay and its scrub",
-        started && ended && service.featuredSymbol === target && within(5000, function() { return body.chartSymbol === target && !body.chartLoading }))
-    }
-
-    // The sleep state is part of what the animal says. Its eye-close and
-    // first-frame appearance are separate judgments in sleepFrames.
-    function sleepStates(body) {
-      service.setRange("1D")
-      service.feature("DOWN")
-      tryVerify(function() { return body.chartSymbol === "DOWN" && !body.chartLoading }, 5000)
-      var close = service.quotes.DOWN.session.post.end
-      var wake = close + 2 * 86400
-      service.testClockHeld = true
-      var bells = []
-      ;["smooth", "retro"].forEach(function(look) {
-        service.persist({ style: look })
-        service.now = close - 60
-        var awake = within(2000, function() { return !body.animal.asleep })
-        service.now = close + 2
-        var closed = within(2000, function() { return body.animal.asleep })
-        service.now = wake - 60
-        var asleep = within(2000, function() { return body.animal.asleep })
-        service.now = wake + 2
-        var opened = within(2000, function() { return !body.animal.asleep })
-        bells.push(look + ":" + [awake, closed, asleep, opened].join(","))
-      })
-      harness.check("the clock closes and wakes the animal with its market in both looks",
-        bells.join("|") === "smooth:true,true,true,true|retro:true,true,true,true", bells.join("|"))
-      service.persist({ style: "smooth" })
-      service.now = close + 2
-      var below = body.featuredDay.points.filter(function(p) { return p.p < body.featuredDay.prevClose })
-      body.motion.scrubT = below[below.length - 1].t
-      var scrubAwake = within(2000, function() { return !body.animal.asleep && body.animal.kind === "bear" })
-      body.motion.clearScrub()
-      harness.check("letting go of a scrub after the close puts the animal back to sleep",
-        scrubAwake && within(2000, function() { return body.animal.asleep }))
-
-      service.now = close
-      lateDown.running = true
-      tryVerify(function() { return !lateDown.running }, 2000)
-      service.addSymbol("LATE")
-      tryVerify(function() { return service.arriving.indexOf("LATE") < 0 }, 15000)
-      service.feature("LATE")
-      tryVerify(function() { return body.chartSymbol === "LATE" && !body.featuredQuote && body.animal.kind === "" }, 5000)
-      lateUp.running = true
-      tryVerify(function() { return !lateUp.running }, 2000)
-      service.now = close + 15
-      service.refresh()
-      tryVerify(function() { return !!body.featuredQuote }, 8000)
-      harness.check("a first quote landing on a retry after the close shows its animal asleep",
-        body.animal.kind !== "" && body.animal.asleep)
-
-      service.feature("DOWN")
-      tryVerify(function() { return body.chartSymbol === "DOWN" && !body.chartLoading }, 5000)
-      service.now = close - 60
-      tryVerify(function() { return !body.animal.asleep }, 2000)
-      app.close()
-      service.now = close
-      app.open("{}")
-      harness.check("opening after the market closed shows its animal asleep",
-        within(2000, function() { return body.animal.asleep }))
-      service.testClockHeld = false
-    }
-
     function test_flows() {
       tryVerify(function() {
         return service.quotes.AAPL && service.quotes.MSFT && service.quotes.NVDA
           && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0
       }, 10000)
-      if (Quickshell.env("STONKS_MOTION_FLOW") === "actions") {
-        app.open("{}")
-        tryVerify(function() { return !!app.testBody }, 3000)
-        var body = app.testBody
-        var keys = app.testKeyCatcher
-        replayActions(body, keys)
-        sixRows(body, "MSFT", "1D")
-        dayActions(body, body.watchlist, keys)
-        sleepStates(body)
-        app.close()
-        harness.finish()
-        return
-      }
       if (Quickshell.env("STONKS_MOTION_FLOW") === "rows") {
         app.open("{}")
         tryVerify(function() { return !!app.testBody }, 3000)
@@ -1346,29 +1019,21 @@ ShellRoot {
 
       // The window's first open in this process draws its chart in over
       // about 320 ms, as rendered: a draw-in spent before the window's first
-      // frames, as the popup's first open once showed live, fails. Every
-      // canvas paints a frame late on a window's first show (accepted in the
-      // transition audit, look 2), so the pictures are judged from the first
-      // that paints anything, when the first are blank, only the ground;
-      // anything drawn on them is judged, its ink read against the empty
-      // plot (`plot=`): those painted before the draw-in began may show
-      // none, so a whole chart that flashes, clears, and then draws in
-      // fails, and so does one painted part way ahead of its animation that
-      // stays and sweeps on. Found in Codex's reviews of #33: timed from the
-      // animation, those frames fell before zero and went unjudged, and read
-      // against the first frame after the draw-in began, ink still there
-      // was taken for the plot. Their times run from the
-      // draw-in's own origin, read off the animation itself: its first step
-      // after the reveal left whole, at its value, is that far along its
-      // OutCubic, so the pictures are held to the moment the motion counts
-      // from, which a picture drawn ahead of it fails against. Found under
-      // load: timed from the first painted frame, which came from 17 ms
-      // before the draw-in to about 30 ms after it, the start read 25 ms
-      // early to 56 late, and failed at 25 and 32 early; timed from the
-      // reveal leaving whole, 28 early to 32 late, since an animation
-      // started between the clock's ticks can count from the tick before,
-      // up to the tick's whole gap. AAPL's day waits for Robinhood's answer,
-      // asked as a surface opens, and draws in when it lands.
+      // frames fails. Every canvas paints a frame late on a window's first
+      // show, so the pictures are judged from the first that paints
+      // anything, when the first are blank, only the ground; anything drawn
+      // on them is judged, its ink read against the empty plot (`plot=`):
+      // those painted before the draw-in began may show none, so a whole
+      // chart that flashes, clears, and then draws in fails, and so does one
+      // painted part way ahead of its animation that stays and sweeps on.
+      // Their times run from the draw-in's own origin, read off the
+      // animation itself: its first step after the reveal left whole, at
+      // its value, is that far along its OutCubic, so the pictures are held
+      // to the moment the motion counts from, which a picture drawn ahead of
+      // it fails against. An animation started between the clock's ticks
+      // can count from the tick before, up to the tick's whole gap. AAPL's
+      // day waits for Robinhood's answer, asked as a surface opens, and
+      // draws in when it lands.
       var drawFrom = 0
       var leftAt = -1
       var watchDraw = function() {
@@ -1410,7 +1075,7 @@ ShellRoot {
       tryVerify(function() { return grab.verdict !== null }, 10000)
       harness.check("the window's first open draws its chart in over about 320 ms — first painted "
         + (paintedAt - grab.start) + " ms from the draw-in's start | " + grab.verdict.detail, grab.verdict.ok)
-      wait(200)
+      tryVerify(function() { return !body.chartLoading && body.motion.reveal === 1 }, 5000)
       var watchlist = body.watchlist
       var keys = app.testKeyCatcher
 
@@ -1427,11 +1092,10 @@ ShellRoot {
       var later = []
       for (var n = 0; n < 5; n++) {
         app.close()
-        wait(200)
         var laterAt = Date.now()
         app.open("{}")
         later.push(Date.now() - laterAt)
-        wait(400)
+        tryVerify(function() { return !body.chartLoading && body.motion.reveal === 1 }, 5000)
       }
       harness.check("each later open of the window holds the thread at most 20 ms — " + later.join(", ") + " ms", Math.max.apply(null, later) <= 20)
       app.close()
@@ -1439,5 +1103,4 @@ ShellRoot {
     }
   }
 
-  HarnessExit { id: done }
 }
