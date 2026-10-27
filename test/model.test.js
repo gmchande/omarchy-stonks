@@ -118,6 +118,28 @@ test("an extended-hours print extends the day range as far as it reaches", () =>
   }
 })
 
+// A day whose post session runs an hour past its last print, five minutes old.
+const openDay = (price, prevClose) => {
+  const now = 1789669200
+  return {
+    symbol: "DAY", name: "Day", currency: "USD", exchange: "NASDAQ", timezoneName: "America/New_York",
+    gmtoffset: -14400, instrumentType: "EQUITY", crypto: false, price, prevClose, marketTime: now,
+    session: {
+      pre: { start: now - 25200, end: now - 19800 },
+      regular: { start: now - 19800, end: now + 3600 },
+      post: { start: now + 3600, end: now + 18000 }
+    },
+    points: [{ t: now - 19800, p: prevClose ?? price }, { t: now - 300, p: price }]
+  }
+}
+
+test("the day's axis runs past its last print, and key scrubbing stops at the last print", () => {
+  const day = openDay(110, 100)
+  const last = day.points.at(-1).t
+  expect(M.chartGeometry(day).end).toBeGreaterThan(last)
+  expect(M.stepTime(day, last, 50, last)).toBe(last)
+})
+
 test("a quiet trading span joins its prints; Tokyo's scheduled lunch alone breaks the line", () => {
   const us = {
     symbol: "THIN", exchange: "NYQ", crypto: false, prevClose: 100,
@@ -312,6 +334,16 @@ test("each look has one sign language", () => {
   expect(M.lookSigns("+2.55%", true)).toBe("▲2.55%")
   expect(M.lookSigns("\u22120.59%", true)).toBe("▼0.59%")
   expect(M.lookSigns("—", true)).toBe("—")
+})
+
+test("an unknown chart direction stays unset, and a flat day draws no animal", () => {
+  const unknown = M.rowModel(openDay(100, null), 0, "pct")
+  expect(unknown.dayUp).toBeNull()
+  expect(M.animalKind(unknown)).toBe("")
+  const flat = M.rowModel(openDay(100.001, 100), 0, "pct")
+  expect(flat.tone).toBe("flat")
+  expect(M.animalKind(flat)).toBe("")
+  expect(M.animalKind(M.rowModel(openDay(110, 100), 0, "pct"))).toBe("bull")
 })
 
 test("a run's output splits into its answers, each said by what came back", () => {
@@ -705,6 +737,15 @@ test("membership across several lists", () => {
   expect(M.listReversed(M.withListReversed(library({ list: "My Watchlist" })))).toBe(false)
 })
 
+// What ends the undo on offer: a data file, hand-edited or another
+// build's, that changes what the lists hold, and none that changes only the
+// view.
+test("only a change to what the lists hold ends the undo", () => {
+  const s = library()
+  expect(M.listsHeld(Object.assign({}, s, { range: "1Y", featured: "SPY", order: "symbol", list: "Growth" }))).toBe(M.listsHeld(s))
+  expect(M.listsHeld(Object.assign({}, s, { lists: s.lists.concat([{ name: "Made elsewhere", symbols: [] }]) }))).not.toBe(M.listsHeld(s))
+})
+
 test("sorting ranks the rows as a view over the manual list", () => {
   const q = (symbol, name, prevClose, price) => ({ symbol, name, prevClose, price, marketTime: 1, points: [], session: { regular: null } })
   // Names that sort unlike the symbols, so each order is its own.
@@ -735,15 +776,6 @@ test("sorting ranks the rows as a view over the manual list", () => {
   const opened = { UP: { ...quotes.UP, dayOpen: 109 }, DN: { ...quotes.DN, dayOpen: 90 } }
   expect(M.sortedSymbols(["UP", "DN"], opened, "pct", false, "pct")).toEqual(["UP", "DN"])
   expect(M.sortedSymbols(["UP", "DN"], opened, "pct", false, "open")).toEqual(["DN", "UP"])
-})
-
-// What ends the undo on offer: a data file, hand-edited or another
-// build's, that changes what the lists hold, and none that changes only the
-// view.
-test("only a change to what the lists hold ends the undo", () => {
-  const s = library()
-  expect(M.listsHeld(Object.assign({}, s, { range: "1Y", featured: "SPY", order: "symbol", list: "Growth" }))).toBe(M.listsHeld(s))
-  expect(M.listsHeld(Object.assign({}, s, { lists: s.lists.concat([{ name: "Made elsewhere", symbols: [] }]) }))).not.toBe(M.listsHeld(s))
 })
 
 // The keys a sheet or README label names, in one spelling: a capital as
@@ -804,6 +836,30 @@ test("a stock's day is asked for two days from its pre-market until the bell, wh
   expect(two({ ...stock, symbol: "SHEL.L", exchange: "LSE" }, "2026-10-23", "06:00")).toBe(false)
   // A listing not yet answered: its market and hour aren't known.
   expect(two(null, "2026-10-23", "12:00")).toBe(true)
+})
+
+test("a range left on show is asked again every 15 minutes of its session, every hour for daily bars, a failed refresh at the same pace, and once after the close for its last bars", () => {
+  const close = at("2026-10-07", "16:00")
+  const day = { session: { regular: { start: at("2026-10-07", "09:30"), end: close } } }
+  const due = (range, entry, now, trading) => M.historyDue(range, entry, day, now, trading)
+  const answered = t => ({ answeredAt: t, receivedAt: t })
+  const three = at("2026-10-07", "15:00")
+  // While New York trades: a week's 15-minute bars every 15 minutes, a
+  // year's daily bars every hour.
+  expect([due("1W", answered(three), three + 15 * 60 - 1, true), due("1W", answered(three), three + 15 * 60, true)]).toEqual([false, true])
+  expect([due("1Y", answered(three), three + 60 * 60 - 1, true), due("1Y", answered(three), three + 60 * 60, true)]).toEqual([false, true])
+  // A failed refresh counts from when it failed, not from the last good
+  // answer, so it is tried again at the same pace.
+  const failed = { answeredAt: three, receivedAt: three - 60 * 60 }
+  expect([due("1W", failed, three + 15 * 60 - 1, true), due("1W", failed, three + 15 * 60, true)]).toEqual([false, true])
+  // After the close: once while its last good answer came before the close,
+  // a failed one included; then not again.
+  const tenTo = at("2026-10-07", "15:50")
+  expect(due("1W", answered(tenTo), at("2026-10-07", "16:05"), false)).toBe(true)
+  expect(due("1W", { answeredAt: at("2026-10-07", "16:05"), receivedAt: tenTo }, at("2026-10-07", "16:20"), false)).toBe(true)
+  expect(due("1W", answered(at("2026-10-07", "16:05")), at("2026-10-07", "19:00"), false)).toBe(false)
+  // Before the session, nothing new: closed and not yet past its end.
+  expect(due("1W", answered(at("2026-10-07", "08:00")), at("2026-10-07", "09:00"), false)).toBe(false)
 })
 
 test("an open surface asks Robinhood again every five minutes of a night, and once after it", () => {
