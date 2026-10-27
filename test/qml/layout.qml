@@ -112,8 +112,8 @@ ShellRoot {
   function xIn(item, x) { return Math.round(item.mapToItem(body, x, 0).x) }
   // What's wrong with where an open tip lies, or "": all of it, its
   // background as well as its words, since a style may draw the background
-  // wider (found in review), must lie in the window, above its icon or
-  // under it, never over it.
+  // wider (found in review), must lie under its icon, within the body's
+  // width and the window's height.
   function tipFault(tip, icon) {
     var drawn = [tip.background, tip.contentItem].map(function(item) {
       var at = item.mapToItem(null, 0, 0)
@@ -123,10 +123,11 @@ ShellRoot {
     var right = Math.round(Math.max(drawn[0].right, drawn[1].right))
     var top = Math.round(Math.min(drawn[0].top, drawn[1].top))
     var bottom = Math.round(Math.max(drawn[0].bottom, drawn[1].bottom))
-    var iconTop = Math.round(icon.mapToItem(null, 0, 0).y)
-    if (left < 0 || top < 0 || right > window.width || bottom > window.height)
-      return "its tip runs from " + left + "," + top + " to " + right + "," + bottom + ", out of the window"
-    if (bottom > iconTop && top < iconTop + icon.height) return "its tip covers its icon"
+    var iconBottom = Math.round(icon.mapToItem(null, 0, icon.height).y)
+    var bodyLeft = Math.round(body.mapToItem(null, 0, 0).x)
+    if (top < iconBottom) return "its tip starts at " + top + ", not under its icon's " + iconBottom
+    if (left < bodyLeft || right > bodyLeft + Math.round(body.width)) return "its tip runs from " + left + " to " + right + ", out of the body's " + bodyLeft + " to " + Math.round(bodyLeft + body.width)
+    if (bottom > window.height) return "its tip runs to " + bottom + ", out of the window"
     return ""
   }
   function openTips(item, into) {
@@ -2200,11 +2201,10 @@ ShellRoot {
         wait(50)
 
         // Each header icon on the right says on hover, past the shell's 400
-        // ms delay, what a click does, in the one tip open, and the animal
-        // says nothing, smooth and retro: above the body where there's room,
-        // as the shell's own tips sit, and under its icon where there isn't,
-        // as at the window's top, by the owner's call. Found by the owner on
-        // 15 October: "Replay the chart (p)".
+        // ms delay, what a click does, in the one tip open, under its icon
+        // and within the body, with room above or none, smooth and retro;
+        // the animal says nothing. Found by the owner on 15 October:
+        // "Replay the chart (p)".
         var tipFaults = []
         var tipWords = []
         ;[["animalToggle"], ["soundToggle", "Turn sounds off"], ["cameraButton", "Take a screenshot"],
@@ -2225,10 +2225,6 @@ ShellRoot {
                 tipFaults.push(where + ": " + JSON.stringify(tips.map(function(t) { return t.text })) + ", not " + JSON.stringify(words))
               tips.forEach(function(t) {
                 var fault = root.tipFault(t, toggle)
-                var top = t.contentItem.mapToItem(body, 0, 0).y
-                var bottom = top + t.contentItem.height
-                if (!fault && above > 0 && bottom > 0) fault = "its tip reaches " + bottom + " px into the body"
-                if (!fault && above === 0 && top < toggle.mapToItem(body, 0, toggle.height).y) fault = "its tip isn't under its icon"
                 if (fault) tipFaults.push(where + ": " + fault)
               })
               if (!retro) tipWords.push(tips.map(function(t) { return t.text }).join(", "))
@@ -2239,7 +2235,7 @@ ShellRoot {
         })
         surface.y = 0
         console.log("header tips: " + tipWords.join(" | "))
-        root.check("each header icon's hover says what a click does, above the body where there's room and under its icon where there isn't, and the animal's nothing, smooth and retro",
+        root.check("each header icon's hover says what a click does, under its icon and within the body, with room above or none, and the animal's nothing, smooth and retro",
           tipFaults.length === 0, tipFaults.join(" | "))
         stub.retro = false
         wait(50)
@@ -2707,8 +2703,8 @@ ShellRoot {
               wait(50)
             }
             // The camera's tip at every size, with the body at the window's
-            // top and with room above it: one tip, wholly in the window and
-            // clear of its icon.
+            // top and with room above it: one tip, under its icon and within
+            // the body.
             var cameraButton = find(body, "cameraButton")
             ;[0, 80].forEach(function(above) {
               surface.y = above
@@ -2788,7 +2784,7 @@ ShellRoot {
           touched.length === 0, touched.join(" | "))
         root.check("on a 768 px screen where the header gives its title way, a stock with no quote yet leaves the ticker's line empty, in both looks",
           coldSeen > 0 && coldFaults.length === 0, coldSeen + " seen; " + coldFaults.join(" | "))
-        root.check("on a 768 px screen at every text size from 9 to 20, the camera's tip shows wholly in the window and clear of its icon, at the window's top and with room above, in both looks",
+        root.check("on a 768 px screen at every text size from 9 to 20, the camera's tip shows under its icon and within the body, at the window's top and with room above, in both looks",
           tipsSeen > 0 && tipFaults.length === 0, tipsSeen + " seen; " + tipFaults.join(" | "))
 
         // After the text size changes with the list scrolled, no row is cut

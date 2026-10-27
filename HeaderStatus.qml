@@ -14,10 +14,10 @@ import "Tones.js" as Tones
 // shut and a dim "z" just past the slot, above the words. The height is the
 // slot's in both looks, and the look is one small icon in both, so toggling
 // moves nothing. Each icon on the right says on hover what a click does,
-// in the shell's own tooltip in the shell's own place, as Wi-Fi's do:
-// above it, or under it where the window has no room above, covering what
-// is there while the pointer rests, by the owner's call. The animal has
-// none, by the owner's call (26 October).
+// in the shell's own tooltip, under the icon and inside the card, covering
+// what is there while the pointer rests: a popup hangs from a top bar, at
+// the screen's top, with no room above (the owner, 26 October). The animal
+// has none, by the owner's call.
 Item {
   id: root
 
@@ -137,6 +137,14 @@ Item {
   }
 
   NumberAnimation { id: shutting; target: root; property: "closing"; duration: 320 }
+
+  // An icon's tip, 3 px under its target, centred on it but never past the
+  // header's right edge. Declared in the target, inside its icon.
+  component HeaderTip: PanelToolTip {
+    readonly property Item icon: parent.parent
+    y: parent.height + 3
+    x: Math.min((parent.width - implicitWidth) / 2, icon.parent.width - icon.x - parent.x - implicitWidth)
+  }
 
   // The title and the words, then the rule, a band's gap short of a group's
   // under them, so the group's gap the body leaves after the header makes
@@ -366,7 +374,7 @@ Item {
       cursorShape: Qt.PointingHandCursor
       onClicked: root.soundsRequested()
 
-      PanelToolTip {
+      HeaderTip {
         objectName: "soundTip"
         visible: soundMouse.containsMouse
         text: root.soundsOn ? "Turn sounds off" : "Turn sounds on"
@@ -413,7 +421,7 @@ Item {
       cursorShape: Qt.PointingHandCursor
       onClicked: root.screenshotRequested()
 
-      PanelToolTip {
+      HeaderTip {
         objectName: "cameraTip"
         visible: cameraMouse.containsMouse
         text: "Take a screenshot"
@@ -459,7 +467,7 @@ Item {
       cursorShape: Qt.PointingHandCursor
       onClicked: root.styleRequested(root.retro ? "smooth" : "retro")
 
-      PanelToolTip {
+      HeaderTip {
         objectName: "lookTip"
         visible: lookMouse.containsMouse
         text: root.retro ? "Switch to smooth" : "Switch to retro"
@@ -504,7 +512,7 @@ Item {
       cursorShape: Qt.PointingHandCursor
       onClicked: root.helpRequested()
 
-      PanelToolTip {
+      HeaderTip {
         objectName: "helpTip"
         visible: helpMouse.containsMouse
         text: root.helpShown ? "Hide the keys" : "Show all keys"
