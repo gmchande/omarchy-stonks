@@ -29,9 +29,12 @@ is judged by are in `AGENTS.md`.
 - A rule's test goes in `test/model.test.js`, which every clone runs, or in
   `test/saved.test.js` when it needs a saved answer; a flow's goes in the
   harness that walks it, `test/qml/NAME.qml`.
-- While you work, run the tests for what you change, such as
-  `bun test ./test/model.test.js` or `bash test/qml/lists.sh`, and render
-  the states you change, such as `test/qml/render.sh 'popup-lists-*'`.
+- While you work, run the checks for what you change, side by side, with
+  `test/all.sh NAME…`: a harness by its `test/qml/NAME.sh` name, such as
+  `test/all.sh lists keys unit`. A wrong name lists the names. Such a run
+  ends `PASSED ONLY` and the names, never `ALL PASS`, so run the whole of
+  `test/all.sh` before a pull request. Render the states you change, such
+  as `test/qml/render.sh 'popup-lists-*'`.
 - `test/review.sh` lists every picture your change moved. The maintainer
   runs it on a visible change.
 

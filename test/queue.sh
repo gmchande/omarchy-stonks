@@ -8,15 +8,21 @@
 # (test/fixtures-dir.sh): it says why, and the last line counts the skips,
 # ALL PASS only when nothing skipped.
 #
-#   test/all.sh [--again]     test/review.sh [--again] [--fresh]
+#   test/all.sh [--again] [NAME...]     test/review.sh [--again] [--fresh]
 #
 # A tree that already passed, since the last system update and the saved
 # answers' last change, isn't run again: its record covers it. --again runs
 # it anyway, as when chasing a flaky test.
+#
+# A runner that takes names sets $some to them before sourcing this: then
+# only the named checks run (start, picked, known_names), the run is never
+# recorded nor refused, and its last line names them instead of ALL PASS,
+# which only a full run may print.
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 source "$PWD/test/scratch.sh"
 runner=test/${0##*/}
+some=${some-}
 again=""
 for arg; do
   case $arg in
@@ -36,7 +42,8 @@ records="$(git rev-parse --path-format=absolute --git-common-dir)/stonks-runs"
 checkout() {
   tree=$(clean_tree)
   commit=$(git rev-parse -q --verify HEAD 2> /dev/null)
-  [ -n "$tree" ] || echo "$runner: this run won't be recorded: the tree has uncommitted edits or untracked files (git status)"
+  if [ -n "$some" ]; then tree=""
+  elif [ -z "$tree" ]; then echo "$runner: this run won't be recorded: the tree has uncommitted edits or untracked files (git status)"; fi
 }
 # refuse_passed: ends the run when this tree already passed this runner in a
 # run that began after the last package change and the saved answers' last
@@ -126,12 +133,38 @@ slots=6
 queue=()
 
 # start LABEL COMMAND...: queues COMMAND to run in the background, in order,
-# once fewer than $slots of them run (fill).
+# once fewer than $slots of them run (fill); a harness only when picked.
 start() {
-  local command
+  local command arg
+  for arg in "${@:2}"; do
+    [[ $arg == test/qml/*.sh ]] && { arg=${arg#test/qml/}; picked "${arg%.sh}" || return 0; break; }
+  done
   labels+=("$1")
   printf -v command '%q ' "${@:2}"
   queue+=("$command")
+}
+
+# picked NAME: whether this run runs the check NAME: every check, or only
+# the named ones ($some). start picks a harness by its test/qml/NAME.sh,
+# noting the name for known_names.
+known=""
+picked() {
+  [[ " $known " == *" $1 "* ]] || known+=" $1"
+  [ -z "$some" ] || [[ " $some " == *" $1 "* ]]
+}
+
+# known_names NAME...: once every harness is queued, ends the run, before
+# anything starts, when a name in $some is neither a harness's nor one of
+# NAMES.
+known_names() {
+  local - name
+  set -f
+  known+=" $*"
+  for name in $some; do
+    [[ " $known " == *" $name "* ]] && continue
+    echo "$runner: no check is named $name; the names are:$known"
+    exit 2
+  done
 }
 
 # fill: runs queued commands while fewer than $slots run, each in a process
@@ -212,6 +245,9 @@ verdict() {
   took=$(( ($(centiseconds) - began + 50) / 100 ))
   echo "$runner took $((took / 60)) min $((took % 60)) s"
   if [ "$status" -ne 0 ]; then last="SOME FAILED"
+  elif [ -n "$some" ]; then
+    last="PASSED ONLY $some"
+    [ "$skipped" -gt 0 ] && last+=", $skipped SKIPPED (no saved answers)"
   elif [ "$skipped" -gt 0 ]; then last="PASSED, $skipped SKIPPED (no saved answers)"
   else last="ALL PASS"; fi
   if [ -n "$tree" ] && [ "$(clean_tree)" = "$tree" ]; then
