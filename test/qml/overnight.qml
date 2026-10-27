@@ -27,10 +27,12 @@ Harness {
 
   function record(name) { return readFile(harness.state + "/" + name).trim() }
 
-  // Every symbol in a Robinhood request log, once each, sorted.
+  // Every symbol in a Robinhood request log, as Stonks names it, once each,
+  // sorted.
   function asked(log) {
     var seen = []
-    harness.record(log).split(/[\n,]/).forEach(function(s) {
+    harness.record(log).split(/[\n,]/).forEach(function(sent) {
+      var s = decodeURIComponent(sent).replace(/\.USD$/, "-USD")
       if (s && seen.indexOf(s) < 0) seen.push(s)
     })
     return seen.sort()
