@@ -1,5 +1,5 @@
-import { test, expect } from "bun:test"
-import { readFileSync } from "node:fs"
+import { test, expect, describe } from "bun:test"
+import { readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { load } from "./load.js"
 
@@ -154,6 +154,17 @@ test("Tokyo's lunch break comes from the calendar; the morning session stays on 
   expect(M.marketStatus(jpx, M.epochAt(JPX, "2026-09-08", "11:26"), 0, calendars)).toBe("Lunch break in 4m")
   // Tokyo's clock is named for a reader in New York.
   expect(M.marketStatus(jpx, lunch, 0, calendars)).toBe("Lunch break · reopens 12:30 JST · in 30m")
+  // Asked every minute through the morning, on the slow clock at lunch.
+  expect(quoteCadence(jpx, morning, 60, true)).toBe(60)
+  expect(quoteCadence(jpx, lunch, 60, true)).toBe(900)
+  expect(M.inRegularSession(jpx, lunch, calendars)).toBe(false)
+  // A lunch break without its countdown, then when it reopens.
+  expect(M.statusForms(jpx, lunch, 0, calendars))
+    .toEqual(["Lunch break · reopens 12:30 JST · in 30m", "Lunch break · reopens 12:30 JST", "Reopens 12:30 JST"])
+  // The bell rings at 09:00 and 15:30, not around lunch.
+  const tokyo = hm => M.epochAt(JPX, "2026-09-08", hm)
+  expect(["09:00", "11:30", "12:30", "15:30"].map(hm => M.bellBetween(jpx, tokyo(hm) - 60, tokyo(hm) + 1, calendars)))
+    .toEqual(["open", "", "", "close"])
 })
 
 test("Toronto and London close early when their exchanges say, and London's 2028 holidays are named", () => {
@@ -493,17 +504,8 @@ test("coverage is short only when the response begins within one interval of lis
 
 test("a response with no bars draws nothing and claims nothing", () => {
   const empty = M.parseHistory({ chart: { result: [{ meta: { symbol: "NEW", chartPreviousClose: 10 }, indicators: { quote: [{}] } }] } }, "1Y")
-  expect(M.periodStats(empty)).toEqual({
-    last: null,
-    change: { abs: null, pct: null, up: true },
-    high: null,
-    low: null,
-    belowHigh: null,
-    coverage: { from: null, to: null, bars: 0, short: false }
-  })
-  expect(M.historyGeometry(empty)).toEqual({
-    points: [], baselineY: null, ticks: [], lo: null, hi: null, start: null, end: null, day: false
-  })
+  expect(M.periodStats(empty)).toMatchObject({ last: null, high: null, low: null, coverage: { short: false } })
+  expect(M.historyGeometry(empty).points).toEqual([])
   expect(M.historyBarAt(empty, 0.5)).toBeNull()
   expect(M.historyFraction(empty, 1)).toBe(-1)
   expect(M.historyBarAt({ bars: [{ t: 1, c: 2 }] }, NaN)).toBeNull()
@@ -599,6 +601,64 @@ test("the data file reads as written and repairs hand edits", () => {
   expect(byAmount.lists).toEqual([{ name: "Yen", symbols: ["MSFT"], order: "pct", reversed: false }])
 })
 
+// Each data file a release wrote (test/data-files/VERSION.json; data-files.sh
+// write makes the next), read as the Service reads it. What the user made is
+// written out here, not read from the file, so a reader that loses something
+// can't lose it from what the check expects too: All in an order made by
+// hand, a list in manual order arranged by hand, one sorted, one sorted the
+// other way, and one empty; the current list a named one, a featured symbol
+// off the top, and every view setting off its default. 1.0.0 knew no sounds,
+// so its file reads them on, their default; from 1.0.4 the file has them
+// off, and the daily version check off too.
+const dataFiles = join(import.meta.dir, "data-files")
+for (const file of readdirSync(dataFiles).filter(name => name.endsWith(".json"))) describe(file.replace(/\.json$/, ""), () => {
+  const old = file === "1.0.0.json"
+  const made = {
+    lists: [
+      { name: "", symbols: ["SPY", "AAPL", "7203.T", "BTC-USD", "^GSPC", "SHEL.L", "JNJ"], order: "manual", reversed: false },
+      { name: "US", symbols: ["SPY", "JNJ", "AAPL", "^GSPC"], order: "manual", reversed: false },
+      { name: "World", symbols: ["SHEL.L", "7203.T", "AAPL"], order: "name", reversed: false },
+      { name: "Movers", symbols: ["BTC-USD", "JNJ", "7203.T"], order: "pct", reversed: true },
+      { name: "Later", symbols: [], order: "manual", reversed: false }
+    ],
+    list: "World", featured: "7203.T", range: "1Y", style: "retro", changeMode: "abs", refreshIntervalSec: 300, hinted: true,
+    sounds: old, updateCheck: old
+  }
+  const text = readFileSync(join(dataFiles, file), "utf8")
+  // As Service.parseDataText reads it: one JSON object, through fileSettings.
+  const parsed = (() => { try { return JSON.parse(text.trim()) } catch (e) { return null } })()
+  const read = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? M.fileSettings(parsed) : null
+  const label = list => (list.name || "All") + ": " + (list.symbols.join(", ") || "empty") + ", " + list.order + (list.reversed ? " reversed" : "")
+  const shown = s => ({ name: s.list, symbols: M.listSymbols(s), order: M.listOrder(s), reversed: M.listReversed(s) })
+  // A switch to a list, as the Service persists it.
+  const switched = (s, name) => M.fileSettings(Object.assign({}, s, { list: name }))
+  const names = lists => lists.map(list => list.name)
+  const current = made.lists.find(list => list.name === made.list)
+  test("the file reads", () => expect(read).not.toBeNull())
+  test("All, then " + names(made.lists.slice(1)).join(", ") + ", in that order", () => expect(names(M.listChoices(read))).toEqual(names(made.lists)))
+  test("the current list is " + label(current), () => expect(label(shown(read))).toBe(label(current)))
+  test("featured " + made.featured, () => expect([read.featured, read.symbols.includes(read.featured)]).toEqual([made.featured, true]))
+  test("on " + made.range, () => expect(read.range).toBe(made.range))
+  test("in " + made.style, () => expect(read.style).toBe(made.style))
+  test("the change as " + made.changeMode, () => expect(read.changeMode).toBe(made.changeMode))
+  test("refreshed every " + made.refreshIntervalSec + " s", () => expect(read.refreshIntervalSec).toBe(made.refreshIntervalSec))
+  test("the first-run hint not shown again", () => expect(read.hinted).toBe(made.hinted))
+  test("sounds " + (made.sounds ? "on" : "off"), () => expect(read.sounds).toBe(made.sounds))
+  test("the version check " + (made.updateCheck ? "on" : "off"), () => expect(read.updateCheck).toBe(made.updateCheck))
+  for (const list of made.lists) test(label(list), () => expect(label(shown(switched(read, list.name)))).toBe(label(list)))
+  // After a downgrade, or on a machine sharing the file: the other machine's
+  // file is on US; this one switches back to World and sorts it, and writes.
+  test("a later version's keys stay through a write: one at the top, one in a list", () => {
+    const later = JSON.parse(text)
+    later.alerts = [{ symbol: "AAPL", above: 400 }]
+    later.lists[1].pinned = true
+    later.list = "US"
+    const written = JSON.parse(JSON.stringify(M.withListOrder(switched(M.fileSettings(later), made.list), "symbol")))
+    expect([written.list, written.lists[1].name, written.lists[1].order]).toEqual([made.list, "World", "symbol"])
+    expect([written.alerts, written.lists[1].pinned]).toEqual([later.alerts, true])
+  })
+})
+
 // lists.qml drives adding, removing, stepping, naming, and ordering through
 // the real Service and keys, on a library where no symbol is in two named
 // lists and every add is already in All. These are the cases it cannot reach.
@@ -643,6 +703,38 @@ test("membership across several lists", () => {
   expect(M.listReversed(M.withListOrder(losers, "pct"))).toBe(false)
   expect(M.listReversed(M.withManualOrder(losers, ["IRIS", "BO"]))).toBe(false)
   expect(M.listReversed(M.withListReversed(library({ list: "My Watchlist" })))).toBe(false)
+})
+
+test("sorting ranks the rows as a view over the manual list", () => {
+  const q = (symbol, name, prevClose, price) => ({ symbol, name, prevClose, price, marketTime: 1, points: [], session: { regular: null } })
+  // Names that sort unlike the symbols, so each order is its own.
+  const quotes = { UP: q("UP", "Alpha Inc", 100, 110), DN: q("DN", "Mid Co", 100, 95), FL: q("FL", "Zeta Corp", 100, 100) }
+  const manual = ["FL", "DN", "UP", "NEW"]
+  expect(M.sortedSymbols(manual, quotes, "manual")).toEqual(manual)
+  expect(M.sortedSymbols(manual, quotes, "symbol")).toEqual(["DN", "FL", "UP", "NEW"])
+  expect(M.sortedSymbols(manual, quotes, "name")).toEqual(["UP", "DN", "FL", "NEW"])
+  expect(M.sortedSymbols(manual, quotes, "pct")).toEqual(["UP", "FL", "DN", "NEW"])
+  // Reversed, each sorted order runs the other way; a symbol with no quote
+  // stays at the bottom, and manual has no direction.
+  expect(M.sortedSymbols(manual, quotes, "symbol", true)).toEqual(["UP", "FL", "DN", "NEW"])
+  expect(M.sortedSymbols(manual, quotes, "pct", true)).toEqual(["DN", "FL", "UP", "NEW"])
+  expect(M.sortedSymbols(manual, quotes, "manual", true)).toEqual(manual)
+  // A tie keeps the manual order, whichever way the sort runs.
+  const tie = { FL2: { ...quotes.FL, symbol: "FL2" }, FL: quotes.FL }
+  expect(M.sortedSymbols(["FL2", "FL"], tie, "pct")).toEqual(["FL2", "FL"])
+  expect(M.sortedSymbols(["FL2", "FL"], tie, "pct", true)).toEqual(["FL2", "FL"])
+  // Lumen is up 10%, NVIDIA 2%: by percent Lumen leads, though NVIDIA's
+  // amount is larger, and it still leads with amounts showing: they can't
+  // be ranked across currencies.
+  const pair = { LUMA: q("LUMA", "Lumen", 10, 11), NVDA: q("NVDA", "NVIDIA", 180, 183.6) }
+  expect(M.sortedSymbols(["LUMA", "NVDA"], pair, "pct")).toEqual(["LUMA", "NVDA"])
+  expect(M.sortedSymbols(["LUMA", "NVDA"], pair, "pct", false, "abs")).toEqual(["LUMA", "NVDA"])
+  // Showing since the open, the rows rank by the move from the open they
+  // show: UP is up 10% on the close but 0.9% on the open, DN down 5% on the
+  // close but up 5.6% on the open.
+  const opened = { UP: { ...quotes.UP, dayOpen: 109 }, DN: { ...quotes.DN, dayOpen: 90 } }
+  expect(M.sortedSymbols(["UP", "DN"], opened, "pct", false, "pct")).toEqual(["UP", "DN"])
+  expect(M.sortedSymbols(["UP", "DN"], opened, "pct", false, "open")).toEqual(["DN", "UP"])
 })
 
 // The keys a sheet or README label names, in one spelling: a capital as
@@ -717,6 +809,30 @@ test("an open surface asks Robinhood again every five minutes of a night, and on
   expect(due(at("2026-10-02", "04:11"), at("2026-10-02", "19:59"))).toBe(false)
   expect(due(at("2026-10-02", "13:00"), at("2026-10-03", "12:00"))).toBe(false)
   expect(due(at("2026-10-03", "12:00"), at("2026-10-04", "20:05"))).toBe(true)
+  // A failed answer is asked again five minutes on, whatever the hour.
+  const asked = at("2026-10-02", "04:11")
+  expect(M.overnightDue(asked, at("2026-10-02", "04:15"), calendars, true)).toBe(false)
+  expect(M.overnightDue(asked, at("2026-10-02", "04:16"), calendars, true)).toBe(true)
+  expect(M.overnightDue(asked, at("2026-10-02", "08:00"), calendars, false)).toBe(false)
+})
+
+test("a run of Robinhood's prints never takes more requests than a day for all would", () => {
+  const now = 1791000000
+  const warm = { through: now - 10 * 60 }
+  const names = n => Array.from({ length: n }, (_, i) => "S" + i)
+  const spans = batches => batches.map(b => b.span + " " + b.symbols.length).join(", ")
+  // A small list's first open at night, the pill's stock already in hand:
+  // one day for all three, not a day and an hour.
+  expect(M.overnightBatches(["AAPL", "MSFT", "SPY"], { AAPL: warm }, now))
+    .toEqual([{ span: "day", symbols: ["MSFT", "SPY", "AAPL"] }])
+  // A long list's first open: the pill's stock fills the last day's room.
+  const long = names(115)
+  expect(spans(M.overnightBatches(long, { S0: warm }, now))).toBe("day 25, day 25, day 25, day 25, day 15")
+  // Its refreshes through the night: the last hour, two requests, not five.
+  const inHand = Object.fromEntries(long.map(s => [s, warm]))
+  expect(spans(M.overnightBatches(long, inHand, now))).toBe("hour 75, hour 40")
+  // Three added to it meanwhile: their days, and the rest's hour.
+  expect(spans(M.overnightBatches(long.concat(["N1", "N2", "N3"]), inHand, now))).toBe("day 3, hour 75, hour 40")
 })
 
 test("each print says its own time across a change of clocks, and the day marks an early close", () => {
@@ -797,13 +913,6 @@ test("a session's one bar says nothing until its five minutes are past", () => {
     points: [{ t: bell, p: 100 }] }
   expect(M.dayNote(day, bell + 180, calendars)).toBe("")
   expect(M.dayNote(day, bell + 300, calendars)).toBe("Traded only at 09:30")
-})
-
-test("a failed answer is asked again five minutes on, whatever the hour", () => {
-  const asked = at("2026-10-02", "04:11")
-  expect(M.overnightDue(asked, at("2026-10-02", "04:15"), calendars, true)).toBe(false)
-  expect(M.overnightDue(asked, at("2026-10-02", "04:16"), calendars, true)).toBe(true)
-  expect(M.overnightDue(asked, at("2026-10-02", "08:00"), calendars, false)).toBe(false)
 })
 
 test("Robinhood's word on all-day trading is asked once, again a day on, or five minutes after a failure", () => {
@@ -1052,6 +1161,23 @@ test("a hostile search or Robinhood answer reads as no answer, at once", async (
 test("search leaves out a symbol no request can carry", () => {
   const found = M.parseSearch(JSON.parse('{"quotes":[{"symbol":"\\ud800","quoteType":"EQUITY"},{"symbol":"AAPL","quoteType":"EQUITY"}]}'))
   expect(found.results.map(r => M.chartUrl(r.symbol))).toEqual([M.chartUrl("AAPL")])
+})
+
+test("search names are whole, so the row's own ellipsis is the only cut", () => {
+  const rows = M.parseSearch({ quotes: [
+    // Yahoo's short name stops at 31 characters; the long name is whole.
+    { symbol: "TSLT", shortname: "T-REX 2X Long Tesla Daily Targe", longname: "T-REX 2X Long Tesla Daily Target ETF", exchange: "BTS", quoteType: "ETF" },
+    // A German listing pads its share class onto the short name.
+    { symbol: "VUAA.DE", shortname: "Vanguard S&P 500 UCITS ETF    R", longname: null, exchange: "GER", quoteType: "ETF" },
+    { symbol: "MTX.F", shortname: "MTU Aero Engines AG           N", exchange: "FRA", quoteType: "EQUITY" },
+    // Neither an option nor a row without a symbol is something to add.
+    { symbol: "TSLA260918C00400000", shortname: "TSLA Sep 2026 400 call", exchange: "OPR", quoteType: "OPTION" },
+    { shortname: "No symbol", exchange: "NMS", quoteType: "EQUITY" },
+    { symbol: "BARE", exchange: "NMS", quoteType: "EQUITY" }
+  ] }).results
+  expect(rows.map(r => r.name)).toEqual([
+    "T-REX 2X Long Tesla Daily Target ETF", "Vanguard S&P 500 UCITS ETF", "MTU Aero Engines AG", "BARE"
+  ])
 })
 
 // An object in a close cell threw where its price was drawn or written, and

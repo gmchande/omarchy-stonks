@@ -2312,3 +2312,13 @@ test("the header's animal sleeps while its market does: by phase and calendar, n
     expect(awakeAt(savedDay(set, "shel.l"), ["07:00", "07:20", "16:40", "17:30"].map(london))).toEqual([false, true, true, false])
   expect(awakeAt(shop, ["07:30", "08:30", "16:10", "17:30"].map(toronto))).toEqual([false, true, true, false])
 })
+
+// Bitcoin's picture says its day, in UTC, the time it has no calendar for;
+// its file and the footer keep the dash.
+test("a screenshot of Bitcoin's day names its date and its time in UTC", () => {
+  const Share = load("Share.js")
+  const words = Share.words({ quote: btc, day: M.dayChart(btc, null, calendars).day, history: null, latest: null,
+    scrubT: 0, changeMode: "pct", range: "1D", now: btc.marketTime + 60, calendars })
+  expect([words.span, words.when]).toEqual(["SAT 12 SEP 2026", "AT 18:32 UTC"])
+  expect([Share.subject("BTC-USD", "1D", words.said), Share.fileSymbol("BTC-USD")]).toEqual(["BTC-USD at 18:32 UTC", "btc-usd"])
+})
