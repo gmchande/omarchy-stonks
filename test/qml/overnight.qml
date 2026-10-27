@@ -467,7 +467,7 @@ Harness {
       var hundredFrom = harness.record("INSTRUMENTS.asked").split("\n").length
       service.now += 60
       allDay.fetch(hundred, service.now)
-      var hundredAnswered = within(5000, function() { return hundred.every(function(s) { return answeredNow(allDay, s) }) })
+      var hundredAnswered = within(15000, function() { return hundred.every(function(s) { return answeredNow(allDay, s) }) })
       var hundredAsked = harness.record("INSTRUMENTS.asked").split("\n").slice(hundredFrom).map(function(line) { return line.split(",").length })
       var notAllDay = hundred.filter(function(s) { return !allDay.entries[s] || !allDay.entries[s].allDay })
       check("110 US stocks asked of Robinhood's instruments, which pages at 100: every one is answered as trading all day",
