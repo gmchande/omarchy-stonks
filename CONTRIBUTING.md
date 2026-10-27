@@ -1,74 +1,80 @@
 # Contributing to Stonks
 
-Stonks is QML and plain JavaScript, with no build step. The rules a change
-is judged by are in `AGENTS.md`.
+Stonks is QML and plain JavaScript, with no build step. `AGENTS.md` lists
+the rules a change is judged by.
 
 ## Run it
 
 - Clone the repo, or your fork, into
-  `~/.config/omarchy/plugins/grvc.stonks`, then run
+  `~/.config/omarchy/plugins/grvc.stonks`. Then run
   `omarchy-shell shell rescanPlugins` and
-  `omarchy plugin enable grvc.stonks center`. If Stonks is installed, that
-  folder is already its clone: work there, or run
+  `omarchy plugin enable grvc.stonks center`. If Stonks is already
+  installed, that folder is already a clone: work there, or run
   `omarchy plugin remove grvc.stonks` first.
-- After a change, run `omarchy restart shell`: a hot reload can leave the
-  old service answering.
-- The popup: `omarchy-shell shell toggle grvc.stonks`. The window:
-  `omarchy-shell grvc.stonks openWindow '{"symbol":"AAPL"}'`.
-- QML errors go to `journalctl --user -t omarchy-shell -f`.
+- After a change, run `omarchy restart shell`. A hot reload can leave the
+  old service running.
+- To open the popup, run `omarchy-shell shell toggle grvc.stonks`. To open
+  the window, run `omarchy-shell grvc.stonks openWindow '{"symbol":"AAPL"}'`.
+- QML errors show in `journalctl --user -t omarchy-shell -f`.
 
 ## Test it
 
-- `test/all.sh` runs every check a pull request needs, in about a minute
-  and a half, on a machine with Omarchy and a Wayland session. Its last
-  line must be `ALL PASS`.
-- Most checks replay saved Yahoo and Robinhood answers, which stay private
-  because their terms forbid republishing them. Without them those checks
-  skip, the run ends `PASSED, N SKIPPED`, and the maintainer runs them on
-  your branch.
-- A rule's test goes in `test/model.test.js`, which every clone runs, or in
-  `test/saved.test.js` when it needs a saved answer; a flow's goes in the
-  harness that walks it, `test/qml/NAME.qml`.
-- While you work, run the checks for what you change, side by side, with
-  `test/all.sh NAME…`: a harness by its `test/qml/NAME.sh` name, such as
-  `test/all.sh lists keys unit`. A wrong name lists the names. Such a run
-  ends `PASSED ONLY` and the names, never `ALL PASS`, so run the whole of
-  `test/all.sh` before a pull request. Render the states you change, such
-  as `test/qml/render.sh 'popup-lists-*'`.
-- `test/review.sh` lists every picture your change moved. The maintainer
-  runs it on a visible change.
+- `test/all.sh` runs every check a pull request needs. It takes about a
+  minute and a half, on a machine with Omarchy and a Wayland session.
+- Most checks replay saved answers from Yahoo and Robinhood. These stay
+  private, since the sites' terms forbid republishing them. Without them,
+  those checks skip and the run ends `PASSED, N SKIPPED`: say so in your
+  pull request, and the maintainer runs them on your branch. With them,
+  the last line must be `ALL PASS`.
+- A test of a rule goes in `test/model.test.js`, which every clone runs, or
+  in `test/saved.test.js` if it needs a saved answer. A test of a flow goes
+  in the harness that walks it, `test/qml/NAME.qml`.
+- While you work, run just the checks for what you change, side by side,
+  as in `test/all.sh lists keys unit`. A harness goes by the NAME in its
+  `test/qml/NAME.sh`, and other checks by names such as `unit`; an unknown
+  name lists them all. Such a run ends `PASSED ONLY`, never `ALL PASS`, so
+  run the whole of `test/all.sh` before a pull request.
+- Render the states you change, as in
+  `test/qml/render.sh 'popup-lists-*'`.
+- `test/review.sh` compares Stonks' pictures before and after your change.
+  The maintainer runs it when a change affects how Stonks looks.
 
 ## Pull requests
 
-- Fixes are welcome. For a new feature or a new look, open an issue first:
-  Stonks' product rules turn many ideas down.
-- Branch from `dev` and target `dev`: `main` is what users install. Leave
-  `manifest.json`'s version alone.
-- Rebase onto `dev` and run `test/all.sh` before you open it. Its body says
-  what you ran, what you saw, and what you couldn't check, and names no
-  one's lists, screens, or home paths. Commit no screenshots: every install
-  clones every branch.
-- cubic, an AI reviewer, comments on every pull request: fix what holds up,
-  and say why when a finding doesn't.
+- Fixes are welcome. For a new feature or a new look, open an issue first,
+  since Stonks' product rules turn many ideas down.
+- Branch from `dev` and target `dev`, since `main` is what users install.
+  Leave the version in `manifest.json` alone.
+- Before you open one, rebase onto `dev` and run `test/all.sh`. In the
+  description, say what you ran, what you saw, and what you couldn't
+  check. Leave out anyone's lists, screens, and home paths. Commit no
+  screenshots, since every install clones every branch.
+- cubic, an AI reviewer, may comment on your pull request. Fix what it
+  finds that's right, and say why when you think a finding is wrong.
 - Report a security problem privately, through the Security tab.
 
 ## Releases
 
 A maintainer releases from `dev`.
 
-1. Audit the build one lens at a time: mouse alone, keys alone, a first run,
-   a slow network, text size 16 on a short screen, 150 symbols in 12 lists,
-   every kind of listing at its odd hours. Fix or file what each finds.
-2. Someone who didn't build them reads the changes since the last release
-   that run a command, touch a file, fetch, or show fetched text, taking
-   every answer and every other account as hostile, and checks
-   `WHAT-IT-RUNS.md` against the code.
-3. Bump `manifest.json`'s version in a release commit on `dev`, and render
-   the README's pictures with `test/qml/readme.sh` if they should change.
-4. Run `STONKS_RENDER_BASE=vLAST test/review.sh --fresh` on it: `ALL PASS`,
-   and the marketplace's security scan finds nothing.
-5. `git push origin dev:main`, tag `vX.Y.Z`, and publish release notes: what
-   the release changes for you, then how to update, then a line for each
-   change you'll notice, written as `AGENTS.md`'s Words says.
-6. File the marketplace's verify form with `main`'s commit, keep `main`
-   still until it's published, and answer its maintainer within seven days.
+1. Audit the build one way at a time: by mouse alone, by keys alone, as a
+   first run, on a slow network, at text size 16 on a short screen, with
+   150 symbols in 12 lists, and with every kind of listing at its odd
+   hours. Fix or file what each finds.
+2. Someone who didn't write the changes since the last release reviews
+   them for security: every change that runs a command, reads or writes a
+   file, fetches, or shows fetched text. They treat every answer and
+   every other account as hostile, and check the README's "What it runs"
+   against the code.
+3. Bump the version in `manifest.json` in a release commit on `dev`. If the
+   README's pictures should change, render them with `test/qml/readme.sh`.
+4. Run `STONKS_RENDER_BASE=vLAST test/review.sh --fresh` on that commit. It
+   must end `ALL PASS`, and the marketplace's security scan must find
+   nothing.
+5. Run `git push origin dev:main`, tag `vX.Y.Z`, and publish the release
+   notes. They say what the release changes for you, then how to update,
+   then give a line for each change you'll notice, written as the Words
+   section of `AGENTS.md` says.
+6. File the marketplace's verify form with `main`'s commit. Keep `main`
+   still until the marketplace publishes it, and answer its maintainer
+   within seven days.
