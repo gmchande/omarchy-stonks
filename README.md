@@ -109,10 +109,9 @@ seconds, says so in the same places and puts a "!" on the pill.
 <img src="media/lists.png" width="480" alt="The list menu open over the rows: All with seven symbols, US with four, New list, and Manage lists">
 
 Click the list's name to switch lists, start one, or manage them. All holds
-every symbol you follow, and your own lists hold some of them. To choose the
-lists a row is in, Ctrl-click it, or select it and pick its line at the
-bottom of the list menu, such as "Lists with NVDA…". Removing a symbol from
-All removes it everywhere.
+every symbol you follow, and your own lists hold some of them. Ctrl-click a
+row, or select it and press Ctrl+Enter, to choose the lists it's in.
+Removing a symbol from All removes it everywhere.
 
 Click "+ Add a symbol" and type a name or a symbol. The top result shows in
 the chart, and Enter or a click adds it. Search finds stocks, ETFs,
@@ -228,6 +227,7 @@ click it: Omasnap on 4.5, Tensaku on 4.0.
 | --- | --- |
 | `↑` `↓` | Move the selection |
 | `⏎` | Show the selected row's chart |
+| `Ctrl+⏎` | Choose the selected row's lists |
 | `←` `→` | Scrub the chart one step |
 | `[` `]` | Change the range |
 | `p` | Replay the chart |

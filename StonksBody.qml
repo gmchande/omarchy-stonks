@@ -106,8 +106,6 @@ Item {
   property string previewSymbol: ""
   property bool showingHelp: false
   property bool listMenuOpen: false
-  // The row the list menu's last line opens the lists of (`openListMenu`).
-  property string listMenuRow: ""
   property bool managingLists: false
   // The symbol whose lists the checklist shows; "" while it is closed.
   property string listsSymbol: ""
@@ -640,6 +638,8 @@ Item {
     else if (mods === Qt.ControlModifier && key === Qt.Key_Z) undoRemoval()
     else if (mods === Qt.ShiftModifier && key === Qt.Key_Up) moveSelected(-1)
     else if (mods === Qt.ShiftModifier && key === Qt.Key_Down) moveSelected(1)
+    // Ctrl+Enter, as Ctrl-click: the selected row's lists.
+    else if (mods === Qt.ControlModifier && (key === Qt.Key_Return || key === Qt.Key_Enter)) openSymbolLists(watchlist.cursorRow)
     else if (key === Qt.Key_Up) moveCursor(-1)
     else if (key === Qt.Key_Down) moveCursor(1)
     else if (key === Qt.Key_Left) nudgeScrub(-1)
@@ -1107,14 +1107,11 @@ Item {
   }
 
   // The menu lies over rows that stay visible: the rows forget their last
-  // click, so a press that dismisses it never pairs with one before. Its
-  // last line names the row selected as it opens, which stays named while
-  // it is open, though the pointer moves over the rows in sight.
+  // click, so a press that dismisses it never pairs with one before.
   function openListMenu() {
     if (!keepRename()) return
     closeViews()
     watchlist.forgetClicks()
-    listMenuRow = watchlist.cursorRow
     listMenuOpen = true
   }
 
@@ -1726,8 +1723,6 @@ Item {
     onChosen: function(name) { root.chooseList(name) }
     onCreateRequested: function(name) { root.createList(name) }
     onManageRequested: root.openManageLists()
-    rowSymbol: root.listMenuRow
-    onRowListsRequested: root.openSymbolLists(root.listMenuRow)
     onDismissed: root.closeListMenu()
   }
 

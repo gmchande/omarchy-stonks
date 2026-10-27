@@ -229,6 +229,7 @@ Harness {
         changed = ["reversed", "cursor"]
         effect = function() { return service.reversed === !before.reversed }
       } else if (token === "w") { changed = ["menu"]; effect = function() { return b.listMenuOpen } }
+      else if (token === "Ctrl+⏎") { changed = ["listsSymbol"]; effect = function() { return b.listsSymbol === selected } }
       else if (token === "Shift+U") { changed = ["updates"]; effect = function() { return updates.testUpdates === before.updates + 1 } }
       else if (token === "c") {
         changed = ["mode"]
