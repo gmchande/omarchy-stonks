@@ -35,10 +35,10 @@ holds the rules a change is judged by.
   or the fainter is under 3:1 on a surface's ground, up and down there are
   Stonks' own pair for that ground, dark or light. Never adjust a theme's
   colours.
-- **Calm.** Nothing moves when the look, range, list, order, or charted
-  stock changes, except the footer for a list of another length: it rides
-  the popup's easing edge, and sits one gap under a short list in the
-  window.
+- **Calm.** Nothing jumps: when the look, range, list, order, or charted
+  stock changes, every element keeps its place and size, except the
+  footer for a list of another length: it rides the popup's easing edge,
+  and sits one gap under a short list in the window.
 - **Character.** Stonks has a few signs of life: the bull and the bear,
   their sleep while the market rests, the live dot's ripples, and the day's
   named moments, such as "Power hour". Each says something true and none
