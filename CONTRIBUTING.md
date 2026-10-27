@@ -19,16 +19,19 @@ is judged by are in `AGENTS.md`.
 
 ## Test it
 
-- `test/all.sh` runs every check a pull request needs, in about two
-  minutes, on a machine with Omarchy and a Wayland session. Its last line
-  must be `ALL PASS`.
+- `test/all.sh` runs every check a pull request needs, in about a minute
+  and a half, on a machine with Omarchy and a Wayland session. Its last
+  line must be `ALL PASS`.
 - Most checks replay saved Yahoo and Robinhood answers, which stay private
   because their terms forbid republishing them. Without them those checks
   skip, the run ends `PASSED, N SKIPPED`, and the maintainer runs them on
   your branch.
-- While you work, run the harness for what you change, such as
-  `bash test/qml/lists.sh`, and render the states you change, such as
-  `test/qml/render.sh 'popup-lists-*'`.
+- A rule's test goes in `test/model.test.js`, which every clone runs, or in
+  `test/saved.test.js` when it needs a saved answer; a flow's goes in the
+  harness that walks it, `test/qml/NAME.qml`.
+- While you work, run the tests for what you change, such as
+  `bun test ./test/model.test.js` or `bash test/qml/lists.sh`, and render
+  the states you change, such as `test/qml/render.sh 'popup-lists-*'`.
 - `test/review.sh` lists every picture your change moved. The maintainer
   runs it on a visible change.
 
