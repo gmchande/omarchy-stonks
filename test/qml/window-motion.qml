@@ -571,14 +571,18 @@ Harness {
       var below = day.points.filter(function(p) { return moved(p) < -0.001 })
       var slot = harness.find(body, "animal")
       var bull = harness.find(body, "bullCells")
-      var run = function(name, mode, change) {
+      // Marked before the change, or once it has returned (`after`): an
+      // answer taken in holds the thread for its own work, which a loaded
+      // machine stretches past a frame.
+      var run = function(name, mode, change, after) {
         tryVerify(function() { return body.animal.kind === "bull" && bull.opacity === 1 }, 2000)
         grab.source = slot
         grab.begin(name)
         var at = grab.frames.length
         tryVerify(function() { return grab.frames.length >= at + 3 }, 2000)
-        grab.markStart()
+        if (!after) grab.markStart()
         change()
+        if (after) grab.markStart()
         tryVerify(function() { return grab.frames.length > 0 && grab.frames[grab.frames.length - 1].at - grab.start >= 400 }, 5000)
         grab.end()
         tryVerify(function() { return grab.waiting === 0 }, 3000)
@@ -610,7 +614,7 @@ Harness {
       monthAs(Object.assign({}, month, { status: "failed", history: null }))
       var standIn = within(2000, function() { return body.historyFailed && body.animal.kind === "bull" })
       var down = Object.assign({}, month.history, { baseline: 10 * service.quotes.AAPL.price })
-      var retried = run("animal-retry", "turn:0", function() { monthAs(Object.assign({}, month, { history: down })) })
+      var retried = run("animal-retry", "turn:0", function() { monthAs(Object.assign({}, month, { history: down })) }, true)
       harness.check("a failed range's retry that lands down names the bear" + (retried.ok ? " — " + retried.detail : ""),
         standIn && retried.ok && !body.historyFailed && body.animal.kind === "bear", standIn + " " + body.animal.kind + ": " + retried.detail)
       monthAs(month)
