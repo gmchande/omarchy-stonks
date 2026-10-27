@@ -94,7 +94,7 @@ jobs:
       - name: Source boundaries
         run: bash test/boundaries.sh
 
-      - name: Run records name failed steps (self-check)
+      - name: Run records and output (self-check)
         run: bash test/ran.sh --self-check
 
       - name: test/touched.sh picks what a diff reaches (self-check)
