@@ -1802,6 +1802,12 @@ test("the evening's night is on the day's chart, measured from the day's previou
     `CLOSE BEFORE TUE ${M.money(quote.prevClose)}`, `CLOSE BEFORE TUE ${M.money(quote.prevClose)}`,
     `CLOSE BEFORE TUE ${M.money(quote.prevClose)}`])
   expect(M.dayBaselineText(day, today, 0)).toBe(`PREV CLOSE ${M.money(quote.prevClose)}`)
+  // Read six days on, the session is named by its weekday; a week on or
+  // more, as a halted listing's last day, by its date, never its month
+  // alone, which would read as before October.
+  expect([6, 7, 30].map(days => M.dayBaselineText(day, today + days, 0))).toEqual([
+    `CLOSE BEFORE TUE ${M.money(quote.prevClose)}`, `CLOSE BEFORE 6 OCT ${M.money(quote.prevClose)}`,
+    `CLOSE BEFORE 6 OCT ${M.money(quote.prevClose)}`])
 })
 
 test("a weekend shows Friday all day, then Sunday night's trades after it, the weekend taking no room", () => {

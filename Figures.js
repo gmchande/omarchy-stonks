@@ -316,11 +316,20 @@ function scrubbedBase(quote) {
 // has closed, the last close is its own: so a scrub past its close
 // (`scrubT`, 0 at rest), and any reading once the day is past (`today`),
 // as overnight or on a weekend, names the session the line's close comes
-// before: "CLOSE BEFORE TUE".
+// before: "CLOSE BEFORE TUE", or, a week old or more, its date, "CLOSE
+// BEFORE 12 SEP", since "BEFORE SEP" would read as before September.
 function dayBaselineText(day, today, scrubT) {
   var reg = day.session.regular
   var closed = !!reg && (pastDayName(day, reg.start, today) !== "" || (scrubT > 0 && scrubT >= reg.end))
-  return (closed ? "CLOSE BEFORE " + dayName(day, reg.start, today) : "PREV CLOSE") + " " + Format.money(Quote.dayBase(day), day.priceDigits)
+  return (closed ? "CLOSE BEFORE " + sessionName(day, reg.start, today) : "PREV CLOSE") + " " + Format.money(Quote.dayBase(day), day.priceDigits)
+}
+
+// The session that starts at `start`, named for the line beside the dashed
+// line: its weekday within the week (`dayName`), else its date.
+function sessionName(day, start, today) {
+  if (today - exchangeDay(day, start) < 7) return dayName(day, start, today)
+  var d = new Date((start + (day.gmtoffset || 0)) * 1000)
+  return d.getUTCDate() + " " + Format.MONTHS[d.getUTCMonth()]
 }
 
 // The day's animal for a row (`rowModel`): "bull" up, "bear" down, by

@@ -1062,9 +1062,9 @@ Harness {
       var modeBefore = service.changeMode
       app.testKeyCatcher.forceActiveFocus()
       keyClick("c")
-      var unsaved = within(3000, function() { return text() + action() === "Your changes aren't saved · couldn't load your lists" })
+      var unsaved = within(3000, function() { return text() + action() === "Your changes aren't saved · fix or remove grvc.stonks.json" })
       mouseClick(footer, footer.width / 2, footer.height / 2)
-      harness.check("a change while the data file can't be read applies, the window's footer says it isn't saved and why, a click on it does nothing, and the file is as it was",
+      harness.check("a change while the data file can't be read applies, the window's footer says it isn't saved and to fix or remove the file, a click on it does nothing, and the file is as it was",
         unsaved && service.changeMode !== modeBefore && !body.adding && harness.readFile(harness.dataPath) === "{\n",
         text() + action() + "|" + service.changeMode + "|" + body.adding)
       harness.writeFile(harness.dataPath, good)
