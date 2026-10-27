@@ -101,6 +101,8 @@ cp ~/.config/omarchy/plugins/grvc.stonks/share/grvc.stonks.svg ~/.local/share/ic
 
 While sounds are on:
 
+- Turning sounds on plays the add sound once, so you hear how loud they
+  are.
 - Adding a symbol, removing a row, and undoing the removal each make a
   short sound; the undo plays the removal backwards. A screenshot makes a
   shutter.
