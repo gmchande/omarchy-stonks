@@ -132,6 +132,16 @@ Harness {
         harness.record("INSTRUMENTS.asked") + " | " + harness.record("OVERNIGHT.asked"))
       runCommand(["rm", "-f", harness.state + "/ROBINHOOD.hold"])
       within(3000, function() { return !!service.testAllDayFeed.entries.NEST && !!service.testOvernightFeed.entries.NEST })
+      // Two five-minute steps with nothing open: time for an ask that must
+      // not come.
+      service.now += 5 * 60
+      wait(300)
+      service.now += 5 * 60
+      wait(300)
+      check("with nothing open, Robinhood is asked once, and never again",
+        harness.record("INSTRUMENTS.calls") === "1" && harness.record("OVERNIGHT.calls") === "1",
+        harness.record("INSTRUMENTS.calls") + ", " + harness.record("OVERNIGHT.calls"))
+      service.now = harness.saturday
 
       // Saturday noon, after Friday 25 September.
       runCommand(["touch", harness.state + "/ROBINHOOD.hold"])
@@ -466,8 +476,10 @@ Harness {
       for (var h = 1; h <= 110; h++) hundred.push("LONG" + ("00" + h).slice(-3))
       var hundredFrom = harness.record("INSTRUMENTS.asked").split("\n").length
       service.now += 60
+      // The clock's own ask out first: a feed with a request out sends none.
+      within(3000, function() { return !allDay.busy })
       allDay.fetch(hundred, service.now)
-      var hundredAnswered = within(15000, function() { return hundred.every(function(s) { return answeredNow(allDay, s) }) })
+      var hundredAnswered = within(5000, function() { return hundred.every(function(s) { return answeredNow(allDay, s) }) })
       var hundredAsked = harness.record("INSTRUMENTS.asked").split("\n").slice(hundredFrom).map(function(line) { return line.split(",").length })
       var notAllDay = hundred.filter(function(s) { return !allDay.entries[s] || !allDay.entries[s].allDay })
       check("110 US stocks asked of Robinhood's instruments, which pages at 100: every one is answered as trading all day",
