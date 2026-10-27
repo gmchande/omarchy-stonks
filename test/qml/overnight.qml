@@ -381,11 +381,18 @@ Harness {
       endScrub()
       within(1000, function() { return body.scrubT === 0 })
       var sleeps = "NEST " + nest + ", KILN " + kiln + ", scrubbed " + scrubbedAwake + ", let go " + harness.sleep()
-      check("01:00: NEST, whose night trades, is awake; KILN sleeps, a scrub wakes it, and letting go puts it back to sleep at once, in both looks",
+      check("01:00: NEST, whose night trades, is awake; KILN sleeps, a scrub wakes it, and letting go puts it back to sleep at once",
         sleeps === "NEST awake, KILN asleep, scrubbed awake, let go asleep", sleeps)
       check("01:00: NEST's header says Overnight, as the line under its price does; KILN's says Closed",
         nestHeader.indexOf("Overnight · opens Wed 09:30 | OVERNIGHT ") === 0 && kilnHeader === "Closed · opens Wed 09:30 | ",
         nestHeader + " || " + kilnHeader)
+      // The clock reaching KILN's pre-market wakes it while it is on show.
+      service.now = harness.midnight.wed7 + 4 * 3600 - 2
+      var beforeWake = within(1000, function() { return harness.sleep() === "asleep" })
+      service.now = harness.midnight.wed7 + 4 * 3600
+      var woke = within(2000, function() { return harness.sleep() === "awake" })
+      check("04:00: KILN's pre-market starting wakes its animal", body.chartSymbol === "KILN" && beforeWake && woke,
+        body.chartSymbol + " " + beforeWake + " " + woke)
 
       // 14:55. NEST's newest print, 235.32 at 14:55:42, is no five-minute
       // mark: retro rounding it back would read the print before, 235.31.
