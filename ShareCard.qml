@@ -361,15 +361,18 @@ Rectangle {
     color: root.ghost
   }
 
-  // When, at the foot, at the mark's size: the day's date or the range's
-  // length. And Stonks' logo, the pixel bull, whatever the day's animal
-  // is, and its name. The bull is in the name's ink, not the up colour: on
-  // a down day a green bull would read as the day's.
+  // When, at the foot, at the mark's size: the day's date, or the range's
+  // length and dates, spaced as the day's axis is so the longest, "YEAR TO
+  // DATE · 2 JAN 2026 – 11 SEP 2026", stays clear of the logo. And Stonks'
+  // logo, the pixel bull, whatever the day's animal is, and its name. The
+  // bull is in the name's ink, not the up colour: on a down day a green
+  // bull would read as the day's.
   Caption {
     objectName: "shareSpan"
     x: root.margin
     y: 654 * root.u - baselineOffset
     font.pixelSize: 28 * root.u
+    font.letterSpacing: (root.history ? 1 : 2) * root.u
     text: root.words ? root.words.span : ""
   }
   Text {
