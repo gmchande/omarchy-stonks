@@ -8,8 +8,8 @@
 #
 # `readme.sh --marketplace SCALE DIR` writes no README picture: it grabs
 # the maintainer's marketplace picture's two, drawn at SCALE, into DIR:
-# popup.png, NVDA's retro popup, and strip.png, its pill on the bar, from
-# the capture named below with NVDA on the demo watchlist.
+# popup.png, Nebius's (NBIS) retro popup, and strip.png, its pill on the
+# bar, from the capture named below with NBIS on the demo watchlist.
 # The popup's card window is CardWindow.qml, as in keys.sh. HOME and curl
 # are scratch.
 scale=2 keep=""
@@ -21,13 +21,13 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 out="${STONKS_README_OUT:-$plugin/media}"
 # The captures the committed pictures show. Named, not the newest, so a new
 # capture changes nothing until the commit that renders from it names it.
-# The marketplace's is a weekday noon in New York that holds NVDA.
+# The marketplace's is a weekday noon in New York that holds NBIS.
 moment=demo-2026-10-19-1146
 listed=$(jq -c '.symbols' "$plugin/test/demo.json")
 if [ -n "$keep" ]; then
   moment=watch-2026-10-26-1200
-  listed=$(jq -c '.symbols + ["NVDA"]' "$plugin/test/demo.json")
-  export STONKS_README_MARKETPLACE=NVDA
+  listed=$(jq -c '.symbols + ["NBIS"]' "$plugin/test/demo.json")
+  export STONKS_README_MARKETPLACE=NBIS
 fi
 [ -d "$STONKS_FIXTURES/moments/$moment" ] || { echo "FAIL no saved capture $moment"; exit 1; }
 stamp=${moment#*-}
