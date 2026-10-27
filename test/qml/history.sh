@@ -15,4 +15,4 @@ else
   echo "FAIL $(fetched HISTSTRAY) identical history responses produced ${logs:-0} dropped-bucket logs"
   code=1
 fi
-finish "ALL PASS"
+finish "HISTORY DONE"

@@ -4,30 +4,14 @@ import Quickshell.Io
 
 // Drives HistoryFeed through caching, supersession, retry, and last-good.
 // The feed has one chart wanted at a time, as the service asks for it.
-ShellRoot {
+Harness {
   id: harness
+  marker: "HISTORY DONE"
 
-  property int failures: 0
   property int step: 0
   property var onceHistory: null
   property int onceReceipt: 0
   property int failCalls: 0
-
-  function check(name, ok, detail) {
-    console.log((ok ? "PASS " : "FAIL ") + name + (detail !== undefined ? " — " + detail : ""))
-    if (!ok) harness.failures++
-  }
-
-  // The fake curl counts its calls per name in STONKS_FAKE_STATE. A fresh
-  // view per read: a FileView that has loaded once returns its old text
-  // straight after reload().
-  function calls(name) {
-    var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true; printErrors: false }', harness)
-    view.path = Quickshell.env("STONKS_FAKE_STATE") + "/" + name + ".calls"
-    var n = Number(String(view.text()).trim() || "0")
-    view.destroy()
-    return n
-  }
 
   // The key the surfaces read, "SYMBOL|RANGE".
   function entry(symbol, range) {
@@ -39,12 +23,6 @@ ShellRoot {
     ticker.start()
   }
 
-  function finish() {
-    console.log(harness.failures === 0 ? "ALL PASS" : harness.failures + " FAILED")
-    exitTimer.exitCode = harness.failures === 0 ? 0 : 1
-    exitTimer.start()
-  }
-
   HistoryFeed { id: feed }
 
   FileView {
@@ -53,11 +31,7 @@ ShellRoot {
     blockWrites: true
   }
   function record(name) {
-    var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true; printErrors: false }', harness)
-    view.path = Quickshell.env("STONKS_FAKE_STATE") + "/" + name
-    var text = String(view.text() || "")
-    view.destroy()
-    return text
+    return readFile(Quickshell.env("STONKS_FAKE_STATE") + "/" + name)
   }
 
   Component.onCompleted: {
@@ -229,6 +203,4 @@ ShellRoot {
     interval: 400
     onTriggered: waitFor(7)
   }
-
-  HarnessExit { id: exitTimer }
 }
