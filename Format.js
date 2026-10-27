@@ -115,18 +115,17 @@ function moneyDigits(abs) {
   return abs >= 10000 ? 0 : 2
 }
 
-// The decimals a listing's prices take, decided once from its headline
-// price, so a scrub or a refresh never changes their width: Yahoo's hint;
-// on a market that trades in whole cents from 1 up (`inCents`: the US, by
-// Reg NMS, `Market.centExchanges`), cents there, or the hint where coarser
-// (its hint of 4 under $5 read "4.6500"), while a coin (XRP-USD's 1.3065)
-// or a European listing (IAG's 4.9270 in Madrid) trades finer and keeps
-// it; under 1 the hint at least, and four significant digits (SHIB's
-// 0.000005420, where its hint of 5 reads 0.00001); none from 10,000 up,
-// where cents say nothing.
 // toFixed's own limit; no price comes near it.
 var MAX_PRICE_DIGITS = 100
 
+// The decimals a listing's prices take, decided once from its headline
+// price, so a scrub or a refresh never changes their width. Yahoo's hint,
+// but at most cents from 1 up where the market trades in whole cents
+// (`inCents`: the US by Reg NMS, `Market.centExchanges`; a hint of 4 would
+// write "4.6500"), while a coin (XRP-USD's 1.3065) or a European listing
+// (IAG's 4.9270) trades finer and keeps it. Under 1, at least four
+// significant digits (SHIB's 0.000005420, where its hint of 5 writes
+// 0.00001). None from 10,000 up, where cents say nothing.
 function priceDigits(price, hint, inCents) {
   var digits = isFiniteNumber(hint) && hint >= 0 ? hint : 2
   if (isFiniteNumber(price)) {
@@ -196,7 +195,6 @@ function narrowPctShown(value) {
 // many as fit its 28 px at the clock's sizes.
 var STACK_WIDTH = 4
 
-// `text` broken after every STACK_WIDTH characters.
 function stackChunks(text) {
   var out = []
   for (var i = 0; i < text.length; i += STACK_WIDTH) out.push(text.slice(i, i + STACK_WIDTH))

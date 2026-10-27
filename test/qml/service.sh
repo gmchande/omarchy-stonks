@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# The real Service through migration, into a data file its owner's alone
-# from its first write, persist, and external edits, with the fake curl and
-# a scratch HOME holding the bar entry; which symbols ask for a cap and P/E,
-# once a day, keeping the last good on a failure; a data file that can't be
-# read, never written over; a save from elsewhere during a read of the file;
-# and the version watch on the tree's copy of the manifest.
+# The real Service, with the fake curl and a scratch HOME holding the bar
+# entry: migration, a data file only its owner can read from the first
+# write, persist, external edits; which symbols ask for a cap and P/E, once
+# a day, keeping the last good on failure; an unreadable data file never
+# written over; a save from elsewhere mid-read; and the version watch on the
+# tree's manifest.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 feed_tree service.qml Service.qml OwnerOnly.qml Gate.qml Updates.qml QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml AllDayFeed.qml OvernightFeed.qml ReleaseFeed.qml Fetch.js Quote.js Format.js Market.js Overnight.js History.js Fundamentals.js Figures.js Chart.js Settings.js Release.js calendars.json manifest.json
 # The harness ages a fundamentals entry by a day, and counts the data file's

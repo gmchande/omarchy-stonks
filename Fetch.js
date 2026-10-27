@@ -11,11 +11,10 @@ var USER_AGENT = "Mozilla/5.0 (Omarchy Stonks)"
 var ANSWER_MARK = "@@stonks"
 
 // Caps, each above the largest real answer even uncompressed: a day's chart
-// is about 13 KB raw (BTC-USD's 22), a spark answer of 20 listings about
-// 90 KB (closes only), cap and P/E and a search a few KB, a history of 500
-// bars about 60 KB, Robinhood's prints 56.3 KB a listing for a day and
-// 2.6 KB for an hour, and its instruments a few KB, and Stonks' own
-// manifest under 2 KB.
+// about 13 KB (BTC-USD's 22), a spark of 20 listings about 90 KB (closes
+// only), a history of 500 bars about 60 KB, Robinhood's prints 56.3 KB a
+// listing a day and 2.6 KB an hour; cap and P/E, search, instruments a few
+// KB; the manifest under 2 KB.
 var DAY_CAP = 64000
 var SPARK_CAP = 400000
 var FUNDAMENTALS_CAP = 64000
@@ -56,8 +55,8 @@ function answerKind(status, exit) {
 }
 
 // A run's output as its answers, by the URL's place in the run: { index,
-// status, kind, body, retryAfter } (seconds, 0 when none was sent). A URL the
-// run never reached, stopped first, has none.
+// status, kind, body, retryAfter } (seconds, 0 when none was sent). A URL
+// the run never reached, stopped first, has none.
 function answers(text) {
   var out = []
   var pattern = new RegExp("\\n" + ANSWER_MARK + " (\\d+) (\\d{3}) (\\d+) ?([^\\n]*)\\n", "g")

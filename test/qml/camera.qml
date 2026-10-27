@@ -9,7 +9,7 @@ import "plugin" as Stonks
 // The screenshot, through the real popup (Panel.qml, its card in
 // CardWindow.qml) by keys and the real window (App.qml) by the pointer,
 // with stand-ins first on PATH for wl-copy and omarchy-notification-send
-// (bin/) that record what they were given: y and a click on the camera each
+// (bin/) that record what they get: Ctrl+C and a click on the camera each
 // save one picture, named for the symbol and the moment, in the folder the
 // reader's user-dirs.dirs names for pictures, put that picture on the
 // clipboard as a PNG, and send Omarchy's notification with that file, its
@@ -118,7 +118,6 @@ Harness {
       return listed.text.split("\n").filter(function(name) { return name !== "" })
     }
 
-    // Runs `script` in sh with `args`, and waits for it to end.
     function run(script, args) {
       runner.command = ["sh", "-c", script, "sh"].concat(args)
       runner.running = true

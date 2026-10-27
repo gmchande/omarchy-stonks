@@ -38,7 +38,6 @@ Harness {
     return seen.sort()
   }
 
-  // How many requests in a Robinhood request log named `symbol`.
   function requestsFor(log, symbol) {
     return harness.record(log).split("\n").filter(function(line) {
       return line.split(",").indexOf(symbol) >= 0
@@ -112,7 +111,6 @@ Harness {
       app.testBody.motion.clearScrub()
     }
 
-    // The latest span Robinhood was asked for.
     function lastSpan() {
       var spans = harness.record("OVERNIGHT.spans").split("\n")
       return spans[spans.length - 1]

@@ -29,8 +29,8 @@ function listingMeta(quote, nameCut) {
 }
 
 // A currency as Stonks says it: Yahoo's code, but pence, London's "GBp",
-// as PENCE. Beside the capitals around it, GBp read as GBP, and 3,648.00
-// as pounds: found by the design panel of 23 October.
+// as PENCE: beside the capitals around it, GBp reads as GBP, and 3,648.00
+// as pounds.
 function currencyLabel(code) {
   return code === "GBp" ? "PENCE" : code
 }
@@ -59,10 +59,9 @@ var OVERDUE_AFTER = 90
 // refresh is asked: about the time a normal answer takes, so a surface
 // opening on a row nothing kept fresh (a cryptocurrency, with nothing open)
 // shows no "As of" for the moment before the fresh price lands; on a slow
-// network it says "As of" from then until the answer. Found in the speed QA
-// of 23 October: BTC-USD's row flashed "As of 06:46 UTC" for 150 ms on each
-// open. Timed to the millisecond by the service (`Service.asking`): counted
-// in whole seconds of the clock it ended anywhere from 1 to 2 s on.
+// network it says "As of" from then until the answer. Timed to the
+// millisecond by the service (`Service.asking`): counted in whole seconds of
+// the clock it would end anywhere from 1 to 2 s on.
 var ASKED_GRACE = 2
 
 // entry: the feed's last answer, { status: "ok"|"failed"|"saved",
@@ -166,8 +165,7 @@ function extendedStack(quote, latest, now, day, changeMode) {
 // no close yet (^GSPC at 09:30:25; London's at 08:02, seen 15 minutes
 // late), and a bar is whole only once `now` is past its five minutes. Nor
 // for an empty day whose quote is a trade of its session, with a price and
-// a volume beside the chart: Yahoo had sent WREN's 09:30 trade and no bar
-// at 09:37 on Friday 23 October, found in the daytime QA.
+// a volume beside the chart: WREN's 09:30 trade with no bar at 09:37.
 function dayNote(day, now, calendars) {
   if (!day) return ""
   var pts = day.points
@@ -260,13 +258,13 @@ function measuredAt(quote, scrubT) {
 // open, the last session's close. Every print the chart draws reads from
 // that one close, the night's and the coming day's pre-market's after the
 // day too, so wherever the pointer is the change and the animal say where
-// that price stands against the dashed line (the owner, 23 October); at
-// rest the line under the price still measures the night from the day's
-// own close (`extendedStack`). dayUp is always versus that close, so the
-// chart fill does not flip when the change mode does, and it is the
-// direction at the moment shown, as a range's is. dayTone is that change's
-// tone, flat when it rounds to nothing, so the bull and bear follow a scrub
-// and a replay, and a flat day has neither.
+// that price stands against the dashed line; at rest the line under the
+// price still measures the night from the day's own close (`extendedStack`).
+// dayUp is always versus that close, so the chart fill does not flip when
+// the change mode does, and it is the direction at the moment shown, as a
+// range's is. dayTone is that change's tone, flat when it rounds to nothing,
+// so the bull and bear follow a scrub and a replay, and a flat day has
+// neither.
 // It carries no drawing: a line is drawn from its quote, so it redraws when
 // the quote does, not with the clock or the change mode. Nor does it read
 // the clock, so a row is not derived again every second. Pass the

@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# A stand-in for ln, first on PATH inside the harnesses: the real ln, except
-# that while STONKS_FAKE_STATE/ln.hold is there it waits first, and while
-# STONKS_FAKE_STATE/ln.fail is there it fails, as a disk refusing the link
-# would.
+# Stand-in ln, first on PATH in the harnesses: the real ln, but it waits
+# while STONKS_FAKE_STATE/ln.hold exists and fails, as a disk refusing the
+# link would, while STONKS_FAKE_STATE/ln.fail exists.
 state=${STONKS_FAKE_STATE:-}
 while [ -n "$state" ] && [ -e "$state/ln.hold" ]; do sleep 0.05; done
 if [ -n "$state" ] && [ -e "$state/ln.fail" ]; then

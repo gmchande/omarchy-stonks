@@ -223,7 +223,7 @@ test("a Toronto time in 2027 and 2028 reads by Toronto's clock, and past any cal
   const july2027 = Date.UTC(2027, 6, 14, 20) / 1000
   const july2028 = Date.UTC(2028, 6, 14, 20) / 1000
   expect([M.printClock(shop, july2027, calendars), M.printClock(shop, july2028, calendars)]).toEqual(["16:00", "16:00"])
-  // A calendar that has run out, as Toronto's did on 31 December 2026:
+  // A calendar that has run out, as Toronto's does after 31 December 2026:
   // its times come from Yahoo's offset, never its standard time.
   const ran = JSON.parse(JSON.stringify(calendars))
   ran.calendars.TSX.validThrough = "2026-12-31"
@@ -1057,15 +1057,15 @@ test("community themes that one hue, a faint colour, or a tinted light ground wo
   // Palettes from Omarchy's community themes, as the shell resolves them:
   // the green, the red (the shell's urgent), and the surface's ground.
   const colour = c => typeof c === "string" ? M.hexColor(c) : c
-  // Independent meaning, not the production pair supplying its own expected
-  // value. A valid tune of these greens/reds need not preserve exact hexes.
+  // Green and red judged by their channels, not by the code's own hexes,
+  // which a retune may change.
   const greenAndRed = pair => {
     const [up, down] = [colour(pair.up), colour(pair.down)]
     expect([up.g >= 1.25 * Math.max(up.r, up.b), down.r >= 1.25 * Math.max(down.g, down.b)]).toEqual([true, true])
   }
   const cases = [
     { name: "Clear light", green: "#008000", red: "#b00000", ground: "#ffffff", want: "theme" },
-    // One hue, or a grey, that a gap in a and b took for a pair.
+    // One hue, or a grey, that a gap in a and b alone takes for a pair.
     { name: "CpUnk", link: "https://github.com/stannorbvb-cmd/cpunk", green: "#D1D2D1", red: "#f82a2a", ground: "#040303", want: "dark" },
     { name: "Mars", link: "https://github.com/steve-lohmeyer/omarchy-mars-theme", green: "#7b534e", red: "#e07b5f", ground: "#000000", want: "dark" },
     { name: "Sakura", link: "https://github.com/bjarneo/omarchy-sakura-theme", green: "#f29b9a", red: "#e85f6f", ground: "#0d0509", want: "dark" },
@@ -1075,7 +1075,7 @@ test("community themes that one hue, a faint colour, or a tinted light ground wo
     // a mid green on a light one.
     { name: "Naysayer", link: "https://github.com/brianblakely/omarchy-naysayer-theme", green: "#90ee90", red: "#800000", ground: "#072626", want: "dark" },
     { name: "Solarized Light", link: "https://github.com/dfrico/omarchy-solarized-light-theme", green: "#859900", red: "#dc322f", ground: "#fdf6e3", want: "light" },
-    // Tinted light grounds, where GitHub's light text colours fell under
+    // Tinted light grounds, where GitHub's light text colours fall under
     // 4.5:1 (4.04:1 and 3.48:1).
     { name: "Gruvbox Light", link: "https://github.com/Kushal0924/omarchy-gruvbox-light-theme", green: "#98971a", red: "#cc241d", ground: "#f2e5bc", want: "light" },
     { name: "Map Quest", link: "https://github.com/ItsABigIgloo/omarchy-mapquest-theme", green: "#3a443d", red: "#4f351e", ground: "#ecd3a1", want: "light" }
@@ -1099,19 +1099,19 @@ test("community themes that one hue, a faint colour, or a tinted light ground wo
   expect(M.trend("#3ddc84", red, M.hexColor("#0d0d0f"))).toEqual({ up: "#3ddc84", down: red })
   // A light bar under a dark popup takes the other pair: White's on black.
   greenAndRed(M.trend("#3a3a3a", M.hexColor("#2a2a2a"), M.hexColor("#000000")))
-  // On a mid-grey ground no green reads at 4.5:1, and the darkest tried
-  // rounded to black, which reads but says nothing: there, up is a green at
-  // the 3:1 floor.
+  // On a mid-grey ground no green reads at 4.5:1, and the darkest rounds to
+  // black, which reads but says nothing: there, up is a green at the 3:1
+  // floor.
   const mid = M.hexColor("#808080"), greyPair = M.trend("#777777", M.hexColor("#555555"), mid)
   greenAndRed(greyPair)
   const chroma = c => Math.hypot(M.oklab(c).a, M.oklab(c).b)
   expect([greyPair.up, chroma(colour(greyPair.up)) >= 0.07, M.contrast(colour(greyPair.up), mid) >= 3]).toEqual([greyPair.up, true, true])
   // On a #bb0022 bar a light green reads at 6:1 only within 0.003 of
-  // lightness, which a search in steps passed over for the 3:1 floor.
+  // lightness, which a search in steps passes over for the 3:1 floor.
   const bar = M.hexColor("#bb0022"), barPair = M.trend("#777777", M.hexColor("#555555"), bar)
   expect([M.contrast(colour(barPair.up), bar) >= 6, chroma(colour(barPair.up)) >= 0.063]).toEqual([true, true])
   // On a dark grey, a light red reads at 6:1 only in a narrow band of
-  // lightness, which a coarse search passed over for the 3:1 floor.
+  // lightness, which a coarse search passes over for the 3:1 floor.
   for (const grey of ["#454545", "#484848"]) {
     const ground = M.hexColor(grey), pair = M.trend("#777777", M.hexColor("#555555"), ground)
     greenAndRed(pair)

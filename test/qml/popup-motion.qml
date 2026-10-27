@@ -79,7 +79,6 @@ Harness {
       grab.markStart()
     }
 
-    // The card's edge at the height it fits.
     function edgeAtRest() {
       return panel.cardHeight === panel.fittedCardHeight
     }
@@ -88,7 +87,6 @@ Harness {
       tryVerify(edgeAtRest, 2000)
     }
 
-    // `count` more frames of the run under way.
     function moreFrames(count) {
       var from = grab.frames.length
       tryVerify(function() { return grab.frames.length >= from + count }, 2000)
@@ -130,11 +128,7 @@ Harness {
       keyClick(k, modifiers === undefined ? Qt.NoModifier : modifiers)
     }
 
-    // The pill's animal turning with its own day, judged on the animal's
-    // own frames: a new price that takes AAPL below its close steps it from
-    // the bull to the bear left to right in 200 ms, each column taking the
-    // bear's cells and the down colour as it turns; a wheel step to a
-    // symbol that is up switches it at once.
+    // The pill's animal turning with its own day, judged on its own frames.
     function pillTurns() {
       service.persist({ featured: "AAPL" })
       var animal = find(pill, "pillAnimal")
@@ -173,8 +167,7 @@ Harness {
       service.testFeed.quotes = quotes
     }
 
-    // An ease of the edge, from the frames, after `act`. On a failure its
-    // line says what frames.js read: the curve, and the edge frame by frame.
+    // An ease of the edge after `act`, judged on the frames.
     function eases(label, act) {
       var verdict = frames(label.replace(/[^a-z0-9]+/gi, "-"), act, "edge", band())
       check(label, verdict.ok, verdict.detail)
@@ -227,9 +220,8 @@ Harness {
       panel.testBody.closeListMenu()
       rest()
 
-      // Search on the empty list: opening eases the edge down to its room,
-      // the field standing at the top with nothing riding the edge; closing
-      // eases it back, the footer riding it.
+      // Search on the empty list: its field stands at the top, so nothing
+      // rides the edge as it opens.
       var opening = frames("search-open", function() { key("a") }, "edge", ["0"])
       check("search opening eases the edge down to its room", opening.ok && panel.testBody.adding, opening.detail)
       eases("search closing eases the edge back up, the footer riding it", function() { panel.testBody.cancelAdding() })
@@ -258,9 +250,6 @@ Harness {
       harness.finish()
     }
 
-    // A list view showing through its surface's close moves no cursor as
-    // the pointer passes over it: the pointer onto All moves none of the
-    // three views' cursors.
     function viewsThroughClose() {
       service.createList("Third")
       service.setMembership("AAPL", "Short", true)

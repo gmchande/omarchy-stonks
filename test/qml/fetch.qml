@@ -9,15 +9,15 @@ import "plugin" as Stonks
 // a clock this harness sets, moving forward through Wednesday 7 October
 // 2026 and Saturday the 10th, New York time. The fake curl answers every
 // listing from its saved day of 7 October (test/fixtures/moments/
-// fetch-2026-10-07, then listings-2026-10-07-1455): a busy US stock (NEST, featured), a thin one (KILN),
-// an ETF (SPY), an index (^GSPC), a cryptocurrency (BTC-USD), London
-// (SHEL.L), Tokyo (7203.T), and Toronto (SHOP.TO). It counts every request
-// in requests.log and every curl call in runs.log. fetch.sh runs this three
-// times: the main run, which starts offline with saved quotes; the holiday
-// run (STONKS_FETCH_RUN=holiday), whose calendars close New York on 7
-// October while London and Toronto trade; and the bell run
-// (STONKS_FETCH_RUN=bell), AAPL and the S&P 500 across Friday 23 October's
-// open, from Yahoo's answers either side of it.
+// fetch-2026-10-07, then listings-2026-10-07-1455): a busy US stock (NEST,
+// featured), a thin one (KILN), an ETF (SPY), an index (^GSPC), a
+// cryptocurrency (BTC-USD), London (SHEL.L), Tokyo (7203.T), and Toronto
+// (SHOP.TO). It counts every request in requests.log and every curl call
+// in runs.log. fetch.sh runs this three times: the main run, which starts
+// offline with saved quotes; the holiday run (STONKS_FETCH_RUN=holiday),
+// whose calendars close New York on 7 October while London and Toronto
+// trade; and the bell run (STONKS_FETCH_RUN=bell), AAPL and the S&P 500
+// across Friday 23 October's open, from Yahoo's answers either side of it.
 Harness {
   id: harness
   marker: mode === "main" ? "FETCH DONE" : mode === "holiday" ? "FETCH HOLIDAY DONE" : "FETCH BELL DONE"
@@ -1065,8 +1065,7 @@ Harness {
     }
   }
 
-  // Calls `each` on every frame while running: what the screen says, read as
-  // each frame is made.
+  // Calls `each` on every frame while running, to read what each frame shows.
   FrameAnimation {
     id: frames
     property var each: null

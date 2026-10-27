@@ -92,8 +92,8 @@ Harness {
     var match = /^(popup|window)-room-(one|four|five|growth)-(open|one|five|none|failed|long)-(smooth|retro)$/.exec(stateName)
     return match ? { list: match[2], moment: match[3] } : null
   }
-  // window-1416-<look>: the tiled window at the full 1416 by 850 the live run
-  // measured, the 22-symbol list.
+  // window-1416-<look>: the tiled window at the full 1416 by 850 it measures
+  // live, the 22-symbol list.
   readonly property int windowWidth: {
     var match = /^window-(\d+)-(smooth|retro)$/.exec(stateName)
     return match ? Number(match[1]) : 0
@@ -157,8 +157,8 @@ Harness {
   // NEST, KILN, SPY, BOLT, the S&P 500 (gspc), BTC-USD, SHEL.L, and 7203.T,
   // with Robinhood's saved answers on which it trades all day.
   // <popup|window>-sweep-<folder>-<symbol>-<look>: any saved moment whose
-  // folder is named for its minute, <word>-<date>-<hhmm> (the weekend
-  // watch's watch-2026-10-24-2238), every listing its folder saved on 1D at
+  // folder is named for its minute, <word>-<date>-<hhmm>
+  // (watch-2026-10-24-2238), every listing its folder saved on 1D at
   // rest, <symbol> named as its answer's file (aapl, shel.l, gspc) and
   // featured, at the folder's clock, with Robinhood's saved answers on which
   // it trades all day. render.sh hands over the folder's answers
@@ -166,10 +166,10 @@ Harness {
   // <popup|window>-sweep-own-<shel.l|7203.t>-<look>: the 7 October 14:55
   // sweep with London before its session, or Tokyo at lunch, from that
   // listing's own saved day, at a clock inside that moment.
-  // <popup|window>-power-<symbol>-<look>: the power-user walk's odd days,
-  // Friday 16 October at 23:09, with Yahoo's own day (no Robinhood answer
-  // was saved): JPM's stray pair, PLUG's and AITX's one-tick bounces, CKX's
-  // one bar, CVR's none, and LUMN's four-decimal hint.
+  // <popup|window>-power-<symbol>-<look>: odd days saved Friday 16 October
+  // at 23:09, with Yahoo's own day and no Robinhood answer: JPM's stray
+  // pair, PLUG's and AITX's one-tick bounces, CKX's one bar, CVR's none,
+  // and LUMN's four-decimal hint.
   // <popup|window>-gaps-<1d|3m>-<look>: VANE, a thin NYSE stock, on
   // Wednesday 21 October at 10:06, with Robinhood's prints: 26 since
   // midnight, its night quiet for over an hour twice, and nine pre-market
@@ -728,7 +728,6 @@ Harness {
         // not in yet.
         root.shownRange = "1D"
       } else if (root.stateName === "history-empty-loading") {
-        // No answer yet.
         root.shownHistoryEntry = null
       } else if (root.stateName === "popup-history-failed") {
         // 1Y asked with the network gone: the range fails as every
@@ -766,8 +765,8 @@ Harness {
       stub.featuredSymbol = root.loadingNext
       body.motion.dimmed = 1
     } else if (body.motion.loading) {
-      // A chart still on its way dims a quarter second in, over 160 ms, and
-      // the grab at 300 ms caught it partway, further in one run than the
+      // A chart still on its way dims a quarter second in, over 160 ms, so
+      // a grab at 300 ms catches it partway, further in one run than the
       // next: it shows at rest, dimmed, so two renders of one tree match
       // (test/render-diff.sh).
       body.motion.dimmed = 1
@@ -906,7 +905,7 @@ Harness {
       // window-lists-<manage|symbol>-<look>, and min-window-lists-<menu|manage|symbol>-<look>,
       // the window at its smallest: named watchlists over the 22-symbol
       // library, the featured symbol staying put on a switch. -menu12- and
-      // -menu30-: the menu over 12 or 30 lists, the power-user walk's.
+      // -menu30-: the menu over 12 or 30 lists.
       var all = stub.symbols.slice()
       var named = /-(named|rowmenu)-/.test(root.stateName) ? { name: "My Watchlist", symbols: all.slice(0, 8) }
         : root.stateName.indexOf("-empty-") > 0 ? { name: "Growth", symbols: [] }
@@ -1046,8 +1045,8 @@ Harness {
       anchors.fill: parent
       color: root.groundColor
 
-      // The origins came from the real Panel/HeldAnchor/KeyboardPanel in
-      // popup-anchor.qml, unmapped on Wayland. This scene paints them.
+      // The origins are the real Panel/HeldAnchor/KeyboardPanel's in
+      // popup-anchor.qml, unmapped on Wayland; this scene paints them.
       Rectangle {
         visible: !!root.anchorState
         width: parent.width
@@ -1358,8 +1357,8 @@ Harness {
         var rows = body.watchlist
         var member = rows.displayedSymbols[2]
         var row = rows.rowItem(member)
-        // Fixed, paused poses make the render diff repeatable. The existing
-        // motion harness judges the transitions; these show their ink.
+        // Fixed, paused poses make the render diff repeatable. The motion
+        // harness judges the transitions; these show their ink.
         if (pose === "join") { row.join(); row.pause(); row.opacity = 0.5; row.reveal = 0.5 }
         else if (pose === "crossing") { row.carry(rows.rowPitch * 1.5); row.pause(); row.shift = -rows.rowPitch * 1.5 }
         else if (pose === "dragwheel") {
@@ -1376,7 +1375,6 @@ Harness {
           stub.shown = stub.shown.filter(function(symbol) { return symbol !== removed })
           within(2000, function() { return !rows.rowItem(removed) && stub.shown.every(function(symbol) { return rows.rowResting(symbol) }) })
         } else if (pose === "notefade") {
-          // A refusal's note, half faded.
           stub.order = "pct"
           rows.cursorSymbol = member
           body.moveSelected(1)

@@ -20,10 +20,9 @@
 // pre-market; a night that trades thinly (`thinNight`) after Yahoo's day
 // alone, its few trades each on its own. Any other has Yahoo's own day, 04:00 to
 // 20:00, then the coming day's pre-market a two-day answer holds: a thin
-// name trades a few shares overnight now and then (two at 23:10 on 6
-// October, in the saved answers), and none of them is a night's price. The
-// overnight print is never the headline, nor in the day's high, low, or
-// change: those stay Yahoo's.
+// name trades a few shares overnight now and then, and none of them is a
+// night's price. The overnight print is never the headline, nor in the
+// day's high, low, or change: those stay Yahoo's.
 
 var ROBINHOOD_URL = "https://api.robinhood.com/marketdata/historicals/"
 var INSTRUMENTS_URL = "https://api.robinhood.com/instruments/"
@@ -64,12 +63,11 @@ function robinhoodSymbol(symbol) {
 }
 
 // span=day is the last 288 five-minute slots Robinhood's 24/5 market traded,
-// its closed days left out (seen Sunday 4 October, 22:58 ET: Thursday 22:55
-// onward), so one answer holds every print a 1D chart can draw; span=hour is
-// the last 12 slots by the clock (seen Friday 23 October, 09:45 UTC: 08:45
-// to 09:40), a twenty-fourth of the bytes, which brings prints already in
-// hand up to date (`overnightSpan`). At most `OVERNIGHT_BATCH` symbols to a
-// day's request, `HOUR_BATCH` to an hour's.
+// its closed days left out, so one answer holds every print a 1D chart can
+// draw; span=hour is the last 12 slots by the clock, a twenty-fourth of the
+// bytes, which brings prints already in hand up to date (`overnightSpan`).
+// At most `OVERNIGHT_BATCH` symbols to a day's request, `HOUR_BATCH` to an
+// hour's.
 function overnightUrl(symbols, span) {
   return ROBINHOOD_URL + "?symbols=" + symbols.map(function(s) { return encodeURIComponent(robinhoodSymbol(s)) }).join(",")
     + "&interval=5minute&span=" + span + "&bounds=24_5"
@@ -102,9 +100,8 @@ function overnightSpan(entry, now) {
 // The requests for the prints of `symbols` at `now`, by their entries
 // (`overnightSpan`), each { span, symbols }: the days first, then the
 // hours. Never more requests than a day for all would take: where the hours
-// would add one, they fill the last day's spare places instead. Found in
-// the review of this change: a small list's first open, its pill's stock
-// already in hand, went in two requests, one more than before.
+// would add one, they fill the last day's spare places instead, so a small
+// list whose pill's stock is already in hand still opens in one request.
 function overnightBatches(symbols, entries, now) {
   var day = symbols.filter(function(s) { return overnightSpan(entries[s], now) === "day" })
   var hour = symbols.filter(function(s) { return overnightSpan(entries[s], now) === "hour" })
@@ -139,7 +136,7 @@ function allDayUrl(symbols) {
 // The listings to a request: Robinhood's instruments answer 100 results a
 // page and leave the rest to a `next` page, in their own order, and a
 // symbol may answer twice (`parseAllDay`), so half of that fits one page.
-// Asked for 118 at once, the 17 on page two read as not trading all day.
+// Otherwise the symbols on page two read as not trading all day.
 var ALL_DAY_BATCH = 50
 
 // Robinhood's instruments answer, by the Yahoo symbols asked for: true for a
@@ -361,11 +358,9 @@ function thinNight(night, answer) {
 // (`Figures.rowModel`). Through a night that trades thinly (`thinNight`),
 // it starts at Yahoo's day, and the night's own trades are each on their
 // own, by the clock (`axis.night`); the pre-market after it is a line, as
-// a busy stock's is. Found in the design panel of 23 October: after
-// midnight a busy stock's chart showed the night alone under the day
-// before's move, and a scrub of it turned the bear into a bull, while a
-// quiet one beside it showed the day; the owner chose the day, then the
-// night, until the bell.
+// a busy stock's is. Showing the night alone after midnight would put it
+// under the day before's move, and a scrub of it could turn a fall into a
+// rise.
 function dayChart(quote, answer, calendars) {
   var cal = Market.calendarFor(calendars, quote)
   if (!cal || !cal.overnight || !quote.session.regular) return { day: quote, latest: null }

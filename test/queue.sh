@@ -53,7 +53,7 @@ checkout
 refuse_passed
 
 # One run at a time on this machine, of either runner, from any checkout:
-# runs that overlapped filled its memory. A second run says what it waits
+# overlapping runs fill its memory. A second run says what it waits
 # for, then waits. The kernel lets go of the lock once this run and each
 # check it started have ended, however they end: a run killed outright still
 # holds it until its checks end, each within its own time limit. The
@@ -118,11 +118,10 @@ stop_all() {
 trap stop_all INT TERM
 trap 'rm -rf "$logs"' EXIT
 
-# At most this many checks started below run at once. Measured on 14
-# October, with every check in one run: all nineteen at once peaked at
-# 1.9 GB, four at once at 0.8 GB. On 21 October, test/all.sh at four at once
-# averaged 1.5 of 16 cores and peaked at 0.7 GB: its harnesses wait on their
-# own steps, not the machine, so six at once end it sooner.
+# At most this many checks started below run at once: all nineteen at once
+# peak at 1.9 GB, four at 0.8 GB. The harnesses wait on their own steps, not
+# the machine (test/all.sh at four uses 1.5 of 16 cores), so six at once end
+# a run sooner.
 slots=6
 queue=()
 

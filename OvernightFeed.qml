@@ -58,8 +58,7 @@ Item {
   // about 8 ms a turn (`landStep`), as the quote feed reads its runs: an
   // answer's text, or one listing of it, so a long list's prints never hold
   // the shell's thread for long. The run lands whole once its last listing
-  // is read (`land`), and is out (`busy`) until then. An hour's answer joins
-  // on to the prints in hand, and a day's replaces them. An answer with
+  // is read (`land`), and is out (`busy`) until then. An answer with
   // nothing new for a symbol keeps the prints it had, so its chart is not
   // built again. Each symbol's entry says when it was asked (`at`), so a
   // symbol no longer asked for ages on its own.
@@ -117,9 +116,9 @@ Item {
 
   // A listing asked for an hour whose prints in hand went meanwhile
   // (`Service.forgetLeft`) is left with no entry, answered or not, so the
-  // next ask is for its day, at once. Found in the review of this change:
-  // stamped as failed with nothing in it, a preview left and come back to
-  // showed no overnight price for five minutes.
+  // next ask is for its day, at once. Stamped as failed with nothing in it
+  // instead, a preview left and come back to would show no overnight price
+  // for five minutes.
   function land(job) {
     var next = Object.assign({}, entries)
     batches.forEach(function(batch) {

@@ -3,8 +3,8 @@
 # answered by the fake curl and the saved history fixtures.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 feed_tree history.qml HistoryFeed.qml Fetch.js History.js Market.js Quote.js Format.js
-# The copy pauses 200 ms before a retry, not 2.5 s, and says when it is
-# pausing, so a step can act inside the pause instead of on the clock.
+# Retry after 200 ms, not 2.5 s, and expose the pause so a step can act
+# inside it instead of on the clock.
 patch_copy HistoryFeed.qml 's/interval: 2500/interval: 200/'
 patch_copy HistoryFeed.qml '/readonly property bool busy:/a\  readonly property alias testRetrying: retryTimer.running'
 run_qs 20

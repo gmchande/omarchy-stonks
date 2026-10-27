@@ -101,11 +101,11 @@ test("across every saved intraday response the filter drops only those eleven ba
     ["moments/listings-2026-10-03-1200/brk-b.json", [1790973900, 1790974200, 1790974800, 1790975400]],
     // JPM's after hours on Friday 16 October: 16:50 and 17:00 opened at
     // 339.83 and 339.52 and closed at 318.24, 16:55 missing, and 17:05
-    // opened back at 339.50. Its sparkline ended in a spike.
+    // opened back at 339.50: left in, they end the sparkline in a spike.
     ["moments/power-user-2026-10-16/jpm.json", [1792183800, 1792184400]],
-    // A cent or two is trading under $2, where it is more than half a
-    // percent: PLUG's 188 bars lost 23, AITX's at $0.0016 lost 5 to one
-    // tick of 0.0001, and BOLT's 1.97 between 1.98s lost 5 over two days.
+    // A cent or two under $2 is more than half a percent and still a trade:
+    // PLUG's, AITX's at $0.0016 (a tick of 0.0001), and BOLT's 1.97 between
+    // 1.98s all stay.
     ["moments/power-user-2026-10-16/plug.json", []],
     ["moments/power-user-2026-10-16/aitx.json", []],
     ["moments/listings-2026-10-07-1455/bolt.json", []],
@@ -145,16 +145,15 @@ test("across every saved intraday response the filter drops only those eleven ba
 
 test("a bar with shares traded in it is a trade, never stray", () => {
   // TOY's climb into Friday 2 October's close, 15:50 and 15:55 on 38,404 and
-  // 121,968 shares, opened back from at 16:05 by an after-hours print: the
-  // filter took the climb for strays, and the line ended the session 3.54
-  // under the last trade.
+  // 121,968 shares, opened back from at 16:05 by an after-hours print: taken
+  // for strays, the line would end the session 3.54 under the last trade.
   const toy = M.parseChart(fixture("moments/live-2026-10-05/toy.json"))
   const close = M.epochAt(US, "2026-10-02", "15:50")
   expect(toy.points.filter(p => p.t === close || p.t === close + 300).map(p => p.p)).toEqual([320.0400085449219, 320.8299865722656])
   // From that close, 320.77 at 16:00, Yahoo's 317.05 at 16:05 and 318.57 at
   // 16:10, no shares, the bar after each opening back at 320.77, are strays:
   // Robinhood's tape of those minutes has no trade until 319.80 at 16:25, its
-  // price held at 320.77. The filter drew them only while it dropped the climb.
+  // price held at 320.77.
   expect(toy.droppedTimes).toEqual([close + 900, close + 1200])
 })
 
@@ -266,8 +265,6 @@ test("a scrub reads the print at or before it, from the day's first print throug
   expect(read(pts[pts.length - 1].t)).toEqual({ price: 2900.5, t: toyota.session.regular.end, close: true })
 })
 
-// A scrub inside Tokyo's lunch draws no dot, as the line lifts there and the
-// chime goes silent: no dot on a line that isn't drawn.
 test("a scrub inside Tokyo's lunch draws no dot, as the line and the chimes leave it; either side of it the dot is on the line", () => {
   const toyota = M.parseChart(fixture("overnight/sweep-2026-10-07-1455/7203.t.json"))
   const pts = M.chartGeometry(toyota, calendars).points
@@ -410,7 +407,7 @@ test("the day is drawn whole, and its range holds the previous close", () => {
   expect(geo.ticks[0] - M.lastRegularPoint(geo).x).toBeCloseTo(300 / (geo.end - geo.start), 10)
   // SPY gapped up on 11 September: the session traded 763.97 to 766.31, more
   // than six points above the 757.83 previous close, and only the pre-market
-  // climbs between them. Drawing the session alone left the line in the top
+  // climbs between them: the session alone would leave the line in the top
   // fifth over an empty chart.
   expect(geo.lo).toBeLessThan(757.83)
   expect(geo.hi).toBeGreaterThan(766.31)
@@ -484,8 +481,8 @@ test("crypto is always open, never sees a weekend, and still reports quote age",
 })
 
 test("after the close the header names the day and the next open from the calendar", () => {
-  // Saturday 5 September 2026 with Friday's response: the old code counted
-  // down to Monday 7 September, which Nasdaq had closed for Labor Day.
+  // Saturday 5 September 2026 with Friday's response: the countdown must not
+  // go to Monday 7 September, which Nasdaq closed for Labor Day.
   const saturday = 1788582233
   const short = JSON.parse(JSON.stringify(calendars))
   short.calendars.US.validThrough = "2026-09-06"
@@ -798,11 +795,11 @@ const said = line => line && [
 // the listing's exchange, counted in whole days at the quote's UTC offset.
 const dayLineAt = (q, t) => M.dayLine(q, Math.floor((t + (q.gmtoffset || 0)) / 86400))
 
-// Since 23 October Yahoo sends some day answers with their trading periods
-// in a range's shape, one list of days, in place of pre, regular, and post:
-// every non-US listing's, and an index's at night. Those periods are the
-// regular session's: SHEL.L is open through its session, not "Closed · opens
-// Mon", and ^GSPC's day line over Thursday's figures says THU, not 1D.
+// Yahoo sends some day answers with their trading periods in a range's
+// shape, one list of days, in place of pre, regular, and post: every non-US
+// listing's, and an index's at night. Those periods are the regular
+// session's: SHEL.L is open through its session, not "Closed · opens Mon",
+// and ^GSPC's day line over Thursday's figures says THU, not 1D.
 test("a day answer whose trading periods are one list of days has them as its regular session", () => {
   const shel = M.parseChart(fixture("shel-l-2026-10-23-trading.json"))
   const london = calendars.calendars.LSE
@@ -929,8 +926,8 @@ test("Yahoo's cap is the newer of its own snapshot and the quarter's end, with t
   expect(M.hasFundamentals({ ...quote, symbol: "^GSPC", instrumentType: "INDEX" })).toBe(false)
 })
 
-// The research of 25 October read Yahoo's own live figures for these: each
-// cap within 3% of Yahoo's, each P/E within 4%.
+// Against Yahoo's own live figures for these, each cap is within 3% and
+// each P/E within 4%.
 test("the 52-week line moves the cap with the price, and divides the price by the EPS in the price's currency", () => {
   const year = (q, f, held = rates) => said(M.yearLine(q, f, null, held))
   const facts = (q, f, held) => year(q, f, held).split(" · ").slice(2).join(" · ")
@@ -997,13 +994,12 @@ test("a day past its 52-week mark widens the 52-week range to it", () => {
   expect(said(M.yearLine(under, null)).split(" · ")[1]).toBe("314.74-–344.57 @325.13")
 })
 
-// Yahoo's 52 weeks leave out the 1Y range's first day. These answers were
-// saved on 14 October 2026, when that day held each listing's 1Y high or
-// low: a stock's high (RGTI, on a day at its 52-week low) and low (GOOG), a
-// cryptocurrency's high, an index's low, a Toronto listing's low, and an ETF
-// whose first day held neither. On 1Y the 52-week line is the range's own
-// low and high, so the line and the chart's marks always agree: RGTI's 1Y
-// line must not say 58.15 over a 52-week high of 57.97.
+// Yahoo's 52 weeks leave out the 1Y range's first day, so on 1Y the line is
+// the range's own low and high and always agrees with the chart's marks:
+// RGTI's 1Y line must not say 58.15 over a 52-week high of 57.97. Saved 14
+// October 2026, when that first day held a stock's high (RGTI) and low
+// (GOOG), a cryptocurrency's high, an index's low, a Toronto listing's low,
+// and an ETF's neither.
 test("on 1Y the 52-week line is the range's low and high", () => {
   const saved = name => {
     const q = M.parseChart(fixture(`first-day-2026-10-14/${name}-day.json`))
@@ -1059,12 +1055,11 @@ test("each symbol is asked for on its own market's clock", () => {
   expect(cadence(null, reg.start + 3600)).toBe(900)
 })
 
-// A quote held from an earlier session describes that session until the
-// new day's answer lands, so at the open it would say the market closed and
-// name the next day's open. While the calendar has a segment trading, its
-// session stands in. SHEL.L's answer of Friday 23 October, held to Monday,
-// must not say "Closed · opens Tue 08:00 GMT" at 08:00:10. Toyota's the
-// same, its lunch still a break.
+// A held quote describes its own session until the new day's answer lands,
+// so at the open it would say closed; while the calendar has a segment
+// trading, that session stands in. SHEL.L's Friday answer held to Monday
+// must not say "Closed · opens Tue 08:00 GMT" at 08:00:10; Toyota's lunch
+// is still a break.
 test("a quote held from an earlier session says the calendar's session while it trades", () => {
   const shel = M.parseChart(fixture("shel-l-2026-10-23-trading.json"))
   const london = calendars.calendars.LSE
@@ -1288,12 +1283,11 @@ test("5Y and longer draw on a log scale; shorter ranges stay linear", () => {
   for (const point of linear.points) expect(point.y).toBeCloseTo(linearY(point.p), 12)
 })
 
-// Nonsense in a well-formed answer is left out, as a zero high or low is: a
-// price at or under zero is none. A day's negative price, zero previous
-// close, and negative first close; a range's zero previous close and
-// negative first close, its START then its first good close, and its long
-// range still on a log scale: no "-5.00" on every coin, no "0.00%", no
-// "START 0.00", and no cliff at the chart's left.
+// A price at or under zero is none, as a zero high or low is: a day's
+// negative price, zero previous close, and negative first close; a range's
+// zero previous close and negative first close, its START then its first
+// good close, its long range still on a log scale. No "-5.00" on every
+// coin, no "0.00%", no "START 0.00", no cliff at the chart's left.
 test("a price at or under zero in an answer is left out", () => {
   const day = fixture("aapl.json")
   const meta = day.chart.result[0].meta
@@ -1340,8 +1334,6 @@ test("history scrub lookup snaps to a bar and maps its timestamp back", () => {
 // chart's marks show them (`rangeEnds`, `rangeMarks`).
 const marksOf = (h, q) => M.rangeMarks(h, M.rangeEnds(h, null, q), q)
 
-// A range marks its own high and low on its chart, each over the bar that
-// made it, dated at the bars' granularity.
 test("a range marks its high and low on its chart, over their bars, with their dates", () => {
   const aapl = M.parseHistory(fixture("history/aapl-1y.json"), "1Y")
   const week = M.parseHistory(fixture("history/nest-5d.json"), "1W")
@@ -1388,10 +1380,8 @@ test("a range marks its high and low on its chart, over their bars, with their d
 
 // A range is fetched each hour and the quote each minute, so a range's last
 // bar can trail the day: while that bar holds the quote's session, the
-// quote's day high and low count as its own, and the range's line and marks
-// keep up with the day's line and the 52 weeks'. RGTI made its 52-week low
-// of 11.77 on 14 October 2026; its 1Y answer from before that low still had
-// the day at 12.05.
+// quote's day high and low count as its own. RGTI made its 52-week low of
+// 11.77 on 14 October 2026; its 1Y answer from before had the day at 12.05.
 test("a range's line and marks take in the quote's day while its last bar is that day's", () => {
   const saved = name => ({
     q: M.parseChart(fixture(`first-day-2026-10-14/${name}-day.json`)),
@@ -1455,10 +1445,9 @@ test("a bar without a close counts its high, low, and volume in the range, and i
   expect([M.rangeVolume(noVolume), M.periodStats(noVolume).high.p]).toEqual(["", 3096])
 })
 
-// On a range, the first info line is the range's: its low and high, the
-// same as its marks, with the price's place between them, then START, the
-// price its change is measured from, and VOL, what traded over it, in the
-// places the day's OPEN and VOL take.
+// On a range, the first info line is the range's: its low and high (as its
+// marks) with the price between them, then START, the price its change is
+// measured from, and VOL over the range, where the day's OPEN and VOL sit.
 test("a range's line gives its low and high, START, and the volume traded over it", () => {
   const nest = M.parseChart(fixture("nest-2026-09-11-day-prepost.json"))
   const rangeLine = (h, q) => said(M.rangeLine(h, M.rangeEnds(h, null, q), q))
@@ -1864,7 +1853,7 @@ test("a night that trades thinly shows Yahoo's day, then the night's trades by t
   // A scrubbed trade of the night reads its move as a print of the day
   // does, from the dashed line's close or, since the open, from the day's
   // open; the legend names only that close. At rest the line under the
-  // price measures it from Thursday's close (#46).
+  // price measures it from Thursday's close.
   const line = stripAt(built, at("2026-10-01", "23:00"))
   expect(["pct", "abs", "open"].map(mode => M.rowModel(day, built.latest.t, mode).changeLine)).toEqual(["+0.76%", "+2.57", "+0.16% open"])
   expect(line.changeText).toBe("+0.04%")
@@ -1935,9 +1924,8 @@ test("until the next session opens every listing's 1D chart is its last session,
       expect([set, symbol, after[0], after.at(-1)]).toEqual([set, symbol, "overnight", set.endsWith("0600") ? "pre" : "overnight"])
     }
     if (set.endsWith("0230")) {
-      // Pointing at 02:25, as the owner saw them: each from Wednesday's
-      // close, while at rest the line under the price measures the night from
-      // Thursday's.
+      // Pointing at 02:25: each from Wednesday's close, while at rest the
+      // line under the price measures the night from Thursday's.
       const read = c => { const r = M.rowModel(c.day, at("2026-10-23", "02:25"), "pct"); return [r.priceText, r.changeText, M.animalKind(r)] }
       expect([nvda, aapl, jnj].map(read)).toEqual([["214.37", "\u22123.42%", "bear"], ["345.93", "+0.56%", "bull"], ["266.26", "+3.29%", "bull"]])
       expect(M.extendedStack(nvda.quote, nvda.latest, at("2026-10-23", "02:30"), nvda.day)).toMatchObject({ time: "02:25", price: "214.37", changeText: "+1.02%" })

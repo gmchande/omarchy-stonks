@@ -53,7 +53,6 @@ Item {
 
   readonly property bool busy: job !== null || wanted !== null
 
-  // Nothing is wanted or under way.
   signal idle()
   // A chart asked for ahead got no good answer, and keeps none.
   signal missed(string key)

@@ -997,12 +997,11 @@ Harness {
     // that arrived while they were out of sight.
     function rowsOutOfSightHold(watchlist) {
       // All, with a dozen more rows than the window has room for. Yahoo's
-      // budget is left as a minute's pause would leave it: these steps
-      // come faster than anyone makes them, and a spark day waits for the
+      // budget is left as a minute's pause would leave it: these steps come
+      // faster than anyone makes them, and a spark day waits for the
       // budget's spare half to be judged on its chart. Then nothing is out,
-      // queued, or waiting to be judged: a chart judging a day replaces
-      // that row's quote as it lands, and one landing between the moves
-      // below would replace the price this step sets.
+      // queued, or waiting to be judged: a chart judging a day replaces that
+      // row's quote as it lands, which would undo the price this step sets.
       service.switchList("")
       service.yahooGate.tokens = service.yahooGate.capacity
       for (var n = 1; n <= 12; n++) service.addSymbol("LONG" + n)

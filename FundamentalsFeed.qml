@@ -91,10 +91,9 @@ Item {
     fetchProc.running = true
   }
 
-  // An answer whose reading throws is a failed one. Found in the check of
-  // the 1.0.4 security review: closes whose offset was {"toString": null}
-  // threw out of here with the fetch still under way, so no symbol's cap
-  // and P/E would be asked for again until Stonks restarted.
+  // An answer whose reading throws is a failed one: a throw escaping here
+  // leaves the fetch under way, and no cap or P/E is asked for again until
+  // Stonks restarts.
   function receive(text) {
     var got = Fetch.answers(text)
     if (gate) gate.report(got.map(function(a) { return a.kind }), got.length ? got[0].retryAfter : 0, root.ticket)

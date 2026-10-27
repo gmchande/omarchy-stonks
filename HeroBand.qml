@@ -5,9 +5,9 @@ import "Cells.js" as Cells
 import "Figures.js" as Figures
 import "Settings.js" as Settings
 import "Tones.js" as Tones
-// Hero, chart, range row, info block, and the list and order rule. Every piece keeps
-// its height for every symbol, range, and look, so the list below never
-// moves. Surfaces own scrub and persist.
+// Hero, chart, range row, info block, and the list and order rule. Every
+// piece keeps its height for every symbol, range, and look, so the list
+// below never moves. Surfaces own scrub and persist.
 Item {
   id: root
 
@@ -160,8 +160,8 @@ Item {
         id: dayChart
         visible: !root.retro
         anchors.fill: parent
-        // The hidden look rests: it draws nothing until it shows, so a new
-        // chart paints once, in the look on screen.
+        // The hidden look rests: it draws nothing, draws in nothing and
+        // follows no scrub until it shows, so a new chart paints once.
         geometry: root.retro ? null : root.geometry
         up: root.view ? root.view.dayUp : true
         upColor: root.upColor
@@ -169,7 +169,6 @@ Item {
         baselineColor: root.dimmer
         hairlineColor: root.foreground
         ground: root.ground
-        // The hidden look rests: it neither draws in nor follows the scrub.
         scrubX: root.retro ? -1 : root.scrubX
         reveal: root.retro ? 1 : root.reveal
         replayX: root.retro ? -1 : root.replayX
@@ -504,8 +503,7 @@ Item {
         readonly property real wordStart: Math.round(gapMetrics.advanceWidth)
         readonly property real arrowReach: Math.min(breadthRule.anchors.rightMargin,
           Math.max(Style.space(6), Style.space(22) - wordStart))
-        // A sorted order is bright and manual dim, at once with the word; only
-        // the hover's brightening eases.
+        // Only the hover's brightening eases.
         property real lift: arrowMouse.containsMouse || wordMouse.containsMouse ? 1 : 0
         Behavior on lift { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
         // The list's name is the header's one word in full ink; the order

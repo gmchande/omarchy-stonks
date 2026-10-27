@@ -1,20 +1,19 @@
 #!/usr/bin/env bash
 # Proves quickshell.sh's handling with a stand-in Quickshell, no screen and
-# no saved answers: a crash fails the run with a FAIL line naming its
-# signal and core dump, a timeout and an interrupt too, an ordinary pass
-# and failure read as before, and however a run ends nothing it started is
-# still running, in its group or out of it, while a process the run did not
-# start, and another run side by side, are left alone. However a run ends,
-# too, it leaves nothing in the session's runtime folder, where the
-# stand-in, as Quickshell does, makes its instance's folder under the
-# XDG_RUNTIME_DIR it is given; its own runtime folder is gone, the
-# session's entries reachable through it while it ran; a run whose folder
-# can't be made never starts, nor one with no display that isn't
-# offscreen, which ends its harness on one line saying why; and a run whose
-# Quickshell says it saved in the session's folder fails. The stand-in dies
-# on a real signal with its core dump turned off (prctl PR_SET_DUMPABLE, 0:
-# prctl(2)), so no core is written and no one is notified. Prints FAILED
-# per miss.
+# no saved answers. A crash fails the run with a FAIL line naming its signal
+# and core dump, as do a timeout and an interrupt; an ordinary pass and
+# failure read unchanged. However a run ends, nothing it started is still
+# running, in its group or out of it, while a process it didn't start and a
+# run beside it are left alone; and nothing of it is left in the session's
+# runtime folder, where the stand-in, as Quickshell does, makes its
+# instance's folder under the XDG_RUNTIME_DIR it is given. Its own runtime
+# folder is gone, the session's entries reachable through it while it ran.
+# A run whose folder can't be made never starts, nor one with no display
+# that isn't offscreen, which ends its harness on one line saying why; a run
+# whose Quickshell says it saved in the session's folder fails. The stand-in
+# dies on a real signal with its core dump turned off (prctl
+# PR_SET_DUMPABLE, 0: prctl(2)), so no core is written and no one is
+# notified. Prints FAILED per miss.
 set -uo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "$here/../procs.sh"
@@ -168,7 +167,7 @@ ran "$h" hang
 grep -qx 'FAIL Quickshell timed out after 1 s' "$tmp/hang/log" || miss "hang: no timeout line: $(cat "$tmp/hang/log")"
 gone hang
 
-# An ordinary pass and an ordinary failure read as before: their own code,
+# An ordinary pass and an ordinary failure read unchanged: their own code,
 # their own lines, nothing added. A pass whose child stays in its group is
 # still a pass, and the child is stopped.
 for case in pass fail pass-in; do

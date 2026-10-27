@@ -195,8 +195,7 @@ Harness {
       body.endScrub()
       tryVerify(function() { return atRest(body) }, 3000, "the rows back on now")
 
-      // The list's name takes the open menu's fill, easing in: grabbed once
-      // that fill has held for five polls.
+      // The list's name eases into the open menu's fill.
       body.openListMenu()
       var control = find(body, "listControl")
       var lastFill = "", heldFor = 0

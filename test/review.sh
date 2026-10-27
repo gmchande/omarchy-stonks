@@ -46,7 +46,6 @@ kept() {
   [ -z "$fresh" ] && [ -n "$1" ] && [ -f "$store/$1/drawn" ] && touch "$store/$1" && echo "$store/$1"
 }
 
-# drop FOLDER: removes a kept set, its note first.
 drop() { rm -f "$1/drawn" && rm -rf "$1"; }
 
 # keep_set NAME TREE FOLDER WHAT: keeps FOLDER's pictures, drawn from TREE,

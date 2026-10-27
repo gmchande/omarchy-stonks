@@ -65,7 +65,7 @@ Item {
         ctx.strokeStyle = root.baselineColor
         ctx.lineWidth = 1
         // Round ends on every paint: the context keeps the last paint's cap,
-        // so without this a first paint drew square dashes and repaints round.
+        // so otherwise a first paint draws square dashes and repaints round.
         ctx.lineCap = "round"
         ctx.setLineDash([2, 3])
         ctx.beginPath()

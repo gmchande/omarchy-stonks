@@ -12,8 +12,7 @@ import "Tones.js" as Tones
 // keys and the pointer both move, takes the shell's hover-cursor fill and a
 // bar down the left edge, and on the featured row only the bar. A row held
 // in a drag takes the pressed fill and a border. A cursor you put there,
-// by pointer or key, shows a remove button, as the shell's Bluetooth panel
-// shows Forget on its cursor's row.
+// by pointer or key, shows a remove button.
 Rectangle {
   id: row
 
@@ -36,8 +35,8 @@ Rectangle {
   // Down to here in the row, the list menu lies over it: a line of words
   // that starts above this leaves out, the symbol with its remove button,
   // and the name, each on its own, so a row mostly below the menu keeps its
-  // name. A long name ran on past the menu's edge in pieces ("t" of a
-  // name's last word). 0 while the menu is shut.
+  // name, and a long name never shows past the menu's edge in pieces. 0
+  // while the menu is shut.
   property real menuCovers: 0
   // While it moves, lifted or sliding, the row carries the card's own ground
   // under its fill, so the rows it passes never show through.
@@ -95,8 +94,8 @@ Rectangle {
   readonly property var shownFreshness: sourceDown ? Figures.quietFreshness(freshness) : freshness
   readonly property bool warns: Figures.freshnessWarns(shownFreshness)
   readonly property string freshnessNote: quote ? Figures.freshnessText(shownFreshness, quote, calendars) : ""
-  // An aged quote is said plainly; only a failed or overdue refresh warns.
-  // The hero says the same on its listing line.
+  // An aged quote is said plainly; only a failed or overdue refresh warns
+  // (`! `). The hero says the same on its listing line.
   readonly property string detail: quote
     ? (freshnessNote !== "" ? (warns ? "! " : "") + capitalize(freshnessNote) : view.name)
     : sourceDown ? "" : (status === "failed" ? "! No data for this symbol" : warns ? "! No data" : "Loading…")
@@ -238,12 +237,12 @@ Rectangle {
         // at rest, the foreground under the pointer, never the urgent colour,
         // which here means a falling price. It sits just after the symbol it
         // removes, on its line, so nothing on the row moves or narrows for it,
-        // and it has no tip: the × says what it does, and a tip there covered
-        // the next row. The row's own pointer handles it, so a press there and
-        // a move still lift the row, and a double-click is one removal
-        // (Watchlist.clickRow); a left click that starts and ends on it removes
-        // rather than features, and one that starts on it and ends off it does
-        // nothing.
+        // and it has no tip: the × says what it does, and a tip there would
+        // cover the next row. The row's own pointer handles it, so a press
+        // there and a move still lift the row, and a double-click is one
+        // removal (Watchlist.clickRow); a left click that starts and ends on
+        // it removes rather than features, and one that starts on it and ends
+        // off it does nothing.
         Item {
           id: removeButton
           objectName: "rowRemove"
@@ -335,10 +334,9 @@ Rectangle {
 
           property real pressY: -1
           property bool dragged: false
-          // The press began on the remove button: only its release, on the
-          // button and with no drag between, removes, whatever Qt calls the press
-          // (a double-click's second press acts at mouse-down), and a release off
-          // it does nothing, as a button's does.
+          // The press began on the remove button: only a release on it with no
+          // drag between removes, whatever Qt calls the press (a double-click's
+          // second press acts at mouse-down).
           property bool pressedOnRemove: false
 
           function onRemove(x, y) {

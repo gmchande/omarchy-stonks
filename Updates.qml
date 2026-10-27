@@ -24,7 +24,6 @@ Item {
   property string newVersion: ""
   // The version on main, "" until GitHub has named one.
   property string mainVersion: ""
-  // Main's version when it is newer than the running one; "" otherwise.
   readonly property string releasedVersion: Release.isNewer(mainVersion, runningVersion) ? mainVersion : ""
 
   // A read asked for, by a surface opening or the file changing: its own

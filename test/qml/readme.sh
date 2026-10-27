@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# The README's pictures, rendered again in one command at a release
+# Renders the README's pictures again in one command at a release
 # (CONTRIBUTING.md, Releases): the real popup, window, and pill (readme.qml)
-# on the demo watchlist (test/demo.json), its quotes the saved capture named
-# below (test/capture-demo.sh), the clock a minute after that capture, in
-# Tokyo Night at twice the scale, and one popup in Catppuccin Latte. Writes
-# preview.png at the root and media/*.png, or all of them into
-# STONKS_README_OUT, a folder to look at them in first. The popup's card
-# window is CardWindow.qml, as in keys.sh. HOME and curl are scratch.
+# on the demo watchlist (test/demo.json), quoted from the capture named below
+# (test/capture-demo.sh) a minute after it, in Tokyo Night at twice the
+# scale, plus one popup in Catppuccin Latte. Writes preview.png at the root
+# and media/*.png, or all of them into STONKS_README_OUT to look at first.
+# The popup's card window is CardWindow.qml, as in keys.sh. HOME and curl
+# are scratch.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 out="${STONKS_README_OUT:-$plugin/media}"
 top="${STONKS_README_OUT:-$plugin}"
@@ -44,8 +44,7 @@ run_qs 90
 
 # Each picture as a palette PNG, so a clone stays small, the pill's forms
 # with the black between their strips clear. Only this run's grabs make
-# them: a step that failed leaves its grab missing, and finish names the
-# failure.
+# them: a failed step leaves its grab missing, and finish names it.
 raw=$STONKS_README_RAW
 files=("$top/preview.png")
 for name in pill scrub lists retro window light; do files+=("$out/$name.png"); done
@@ -55,15 +54,13 @@ fade() { rg -m 1 -o -r '$1' "PREVIEW_FADE $1 ([0-9.]+ [0-9.]+)" "$work/log"; }
 if [ "$code" -eq 0 ] && grabbed && [ -n "$(fade scrub)" ] && [ -n "$(fade retro)" ]; then
   small() { local dest=$1; shift; magick "$@" -strip -dither None -colors 128 "PNG8:$dest"; }
   # preview.png, the README's first picture and the marketplace's, at 2:1:
-  # the bar across the width with the pill at its centre, and under it two
-  # popups side by side, the README's scrub (smooth, back at 10:15, up,
-  # the bull) and retro (now, down, the bear), each down to its list's
-  # third row, fading out over the fourth (PREVIEW_FADE, from readme.qml).
-  # The ground is Tokyo Night's darkest background, standing in for a
-  # wallpaper, so the bar and the cards show against it. The marketplace's
-  # card scales the picture to 350 px wide and shows its top 175
-  # (build-catalog.mjs and style.css's .plugin-preview), so at 2:1 it shows
-  # it whole: both looks, their charts, and the first rows.
+  # the bar across the width with the pill at its centre, and under it the
+  # README's scrub (smooth, back at 10:15, up) and retro (now, down) popups
+  # side by side, each cut at its list's third row and fading over the
+  # fourth (PREVIEW_FADE, from readme.qml), on Tokyo Night's darkest
+  # background in place of a wallpaper. The marketplace's card scales it to
+  # 350 px wide and shows the top 175 (build-catalog.mjs, style.css's
+  # .plugin-preview), so at 2:1 it shows whole.
   pw=$(magick identify -format '%w' "$raw/scrub.png") ph=$(magick identify -format '%h' "$raw/scrub.png")
   sh=$(magick identify -format '%h' "$raw/strip.png")
   bar=$(magick "$raw/strip.png" -format '%[pixel:p{0,0}]' info:)

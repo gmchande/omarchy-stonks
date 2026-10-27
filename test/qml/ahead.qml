@@ -77,7 +77,7 @@ Harness {
       var row = body.watchlist.rowItem(symbol)
       mouseClick(row, 40, row.height / 2)
     }
-    // The rows any of which shows, top first, as the list lays them out.
+    // The rows with any part in sight, top first, as the list lays them out.
     function inSight(body) {
       var list = body.watchlist
       return list.displayedSymbols.filter(function(s, i) { return list.partInSight(i, list.contentY) })
@@ -107,8 +107,6 @@ Harness {
         asked.join(",") === ["NEST"].concat(rows).join(",") && historyRuns.length === 2 && historyRuns[1].split(" ").length === rows.length,
         "asked " + asked.join(",") + " | in sight " + sight.join(",") + " | runs " + historyRuns.join(" / "))
 
-      // A click on a row fetched ahead shows its chart at once, asking
-      // nothing; one whose fetch ahead failed asks, as the hero, and loads.
       from = harness.requestCount()
       var waited = []
       ;["KILN", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T"].forEach(function(s) {
@@ -128,10 +126,8 @@ Harness {
       clickRow(body, "NEST")
       quiet()
 
-      // The hero's chart never waits on those fetched ahead: SPY's is held
-      // out, and BTC-USD clicked meanwhile, though in the same run, stops it
-      // and lands alone while SPY's is still held; the run's rows are asked
-      // again after.
+      // SPY's 6M is held out; BTC-USD, clicked meanwhile in the same run,
+      // stops the run and lands alone.
       touch("SPY.history.hold")
       from = harness.requestCount()
       body.selectRange("6M")
@@ -143,8 +139,6 @@ Harness {
       check("a row clicked while the rows' charts are fetched ahead gets its own at once, and the cut ones are asked again after",
         heroLanded && ok("SPY", "6M") && ok("KILN", "6M"), heroLanded + " | " + harness.histories(from).join(","))
 
-      // A new range drops what was fetched ahead for the last one and never
-      // shown; the heroes' charts stay.
       body.selectRange("1W")
       var stillAhead = function() {
         return ["KILN", "SPY", "^GSPC", "SHEL.L", "7203.T"].filter(function(s) { return !!service.histories[s + "|6M"] })
@@ -156,16 +150,12 @@ Harness {
         stillAhead().length === 0 && heroesGone.length === 0, "still there " + stillAhead().join(",") + " | heroes gone " + heroesGone.join(","))
       quiet()
 
-      // A user's refresh asks for the hero's chart fresh, and none fetched
-      // ahead.
       from = harness.requestCount()
       service.refresh()
       quiet()
       check("r asks for the hero's chart fresh, not those fetched ahead", harness.histories(from).join(",") === "BTC-USD",
         harness.histories(from).join(","))
 
-      // Fetching ahead waits for half of Yahoo's budget, and for Yahoo to
-      // answer; the hero's chart does not.
       gate.tokens = 30
       from = harness.requestCount()
       body.selectRange("3M")
@@ -193,7 +183,6 @@ Harness {
         whilePaused === 0 && pausedHeader === "5Y unavailable" && afterPause,
         whilePaused + " | " + pausedHeader + " | then " + harness.histories(from).join(","))
 
-      // Nor while every screen is off.
       service.screens = screens
       screens.screensOff = true
       from = harness.requestCount()
@@ -222,8 +211,6 @@ Harness {
         heroInHand && cut && !service.histories["SHEL.L|1M"],
         [heroInHand, cut, JSON.stringify(service.histories["SHEL.L|1M"] || null)].join(" | "))
 
-      // Closing the window stops the chart fetched ahead, and with none
-      // open nothing is fetched.
       touch("KILN.history.hold")
       body.selectRange("10Y")
       tryVerify(function() { return service.testHistoryFeed.holds(service.testHistoryFeed.wanted, "KILN|10Y") }, 5000)
@@ -237,14 +224,11 @@ Harness {
       check("closing the window stops the chart fetched ahead, and with none open nothing is fetched",
         stopped && harness.histories(from).length === 0, stopped + " | " + harness.histories(from).join(","))
 
-      // A window tall enough to show more rows than the cache keeps, on a
-      // long list: fetching ahead stops at what the cache holds beside the
-      // hero's chart, and nothing asks on after; scrolled to the end, the
-      // rows coming into sight are fetched as those that left go, and the
-      // hero's chart, the oldest kept, stays on show throughout. The budget
-      // is topped up for the run of 45 first answers and for the rows,
-      // which would otherwise wait for it to refill; the 45 days are judged
-      // on the chart first, from the spare budget fetching ahead also uses.
+      // A window showing more rows than the cache keeps, on a long list,
+      // then scrolled to the end. The budget is topped up for the 45 first
+      // answers and for the rows, which would otherwise wait for it to
+      // refill; the 45 are judged on the chart first, from the spare budget
+      // fetching ahead also uses.
       var tall = []
       for (var n = 1; n <= 45; n++) tall.push("TALL" + (n < 10 ? "0" : "") + n)
       gate.tokens = gate.capacity
