@@ -238,7 +238,7 @@ click it: Omasnap on 4.5, Tensaku on 4.0.
 | `Shift+↑` `Shift+↓` | Move the row in your own order |
 | `o` | Change the order |
 | `Shift+O` | Reverse the order |
-| `l` | Open the list menu |
+| `w` | Open the list menu |
 | `c` | Show the change as %, amount or since the open |
 | `s` | Smooth or retro |
 | `m` | Sound on or off |

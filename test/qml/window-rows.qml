@@ -147,7 +147,7 @@ Harness {
         var cursor = watchlist.cursorSymbol
         var scrolled = firstWhole(watchlist)
         keys.forceActiveFocus()
-        keyClick(Qt.Key_L)
+        keyClick(Qt.Key_W)
         tryVerify(function() { return body.listMenuOpen && harness.find(body, "listMenu") !== null }, 2000)
         var menu = harness.find(body, "listMenu")
         while (menu.cursor < menu.manageIndex) keyClick(Qt.Key_Down)

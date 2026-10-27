@@ -658,7 +658,7 @@ Item {
     else if (t === "o") cycleOrder()
     else if (t === "O") reverseOrder()
     else if (t === "U") runOffered()
-    else if (t === "l") openListMenu()
+    else if (t === "w") openListMenu()
     else return false
     return true
   }

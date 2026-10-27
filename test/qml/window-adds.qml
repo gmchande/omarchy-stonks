@@ -155,7 +155,7 @@ Harness {
       // frames: what a frame shows, not the steps within one turn.
       var emptyLine = find(body, "emptyList")
       keys.forceActiveFocus()
-      keyClick(Qt.Key_L)
+      keyClick(Qt.Key_W)
       var menu = find(body, "listMenu")
       tryVerify(function() { return !!menu && menu.visible }, 2000)
       while (menu.cursor < menu.newIndex) keyClick(Qt.Key_Down)

@@ -214,7 +214,7 @@ Harness {
       // it: only the edge is judged.
       service.switchList("Empty")
       rest()
-      var menu = frames("menu", function() { key("l") }, "edge", ["0"])
+      var menu = frames("menu", function() { key("w") }, "edge", ["0"])
       check("the list menu on an empty list eases the edge down to room for it and the footer",
         menu.ok && service.listName === "Empty", menu.detail)
       panel.testBody.closeListMenu()

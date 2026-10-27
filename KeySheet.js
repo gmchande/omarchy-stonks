@@ -31,7 +31,7 @@ function sheet(order, switchesPanels) {
         { key: "Ctrl+C", does: "Take a screenshot" }
       ]},
       { title: "Lists", rows: [
-        { key: "l", does: "Open the list menu" },
+        { key: "w", does: "Open the list menu" },
         { key: "o", does: "Change the order" },
         { key: "O", does: "Reverse the order" }
       ]},
