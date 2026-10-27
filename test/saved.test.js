@@ -864,6 +864,18 @@ test("the day line is 1D, or its figures' weekday when they are not today's: its
 
 })
 
+test("the day line's title is 1D through its figures' last second, their weekday from the next midnight, over a weekend and a holiday, their month a week on", () => {
+  // AAPL's figures are Tuesday 1 September's.
+  const title = t => dayLineAt(quote, t).title
+  expect([title(at("2026-09-01", "23:59") + 59), title(at("2026-09-02", "00:00")), title(at("2026-09-05", "12:00")),
+    title(at("2026-09-07", "12:00")), title(at("2026-09-08", "12:00"))]).toEqual(["1D", "TUE", "TUE", "TUE", "SEP"])
+  // CKX traded on Friday 16 October, so at 23:09 that Friday its figures
+  // are the day's; CVR's are Wednesday's.
+  const ckx = M.parseChart(fixture("moments/power-user-2026-10-16/ckx.json"))
+  const cvr = M.parseChart(fixture("moments/power-user-2026-10-16/cvr.json"))
+  expect([dayLineAt(ckx, at("2026-10-16", "23:09")).title, dayLineAt(cvr, at("2026-10-16", "23:09")).title]).toEqual(["1D", "WED"])
+})
+
 // Saved answers from Sunday 25 October 2026, prices Friday's: the series,
 // the daily bars around the cap's date, the day, and Yahoo's rates.
 // NEST's, SPY's, and BTC-USD's are from 1 October.
