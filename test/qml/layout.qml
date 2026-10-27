@@ -1131,11 +1131,11 @@ Harness {
           within(3000, function() { return settled() === before.layout })
         }
         console.log("said in less: " + Object.keys(shortened).map(function(k) { return k + " " + shortened[k] }).join(", "))
-        root.check("the header's longest real states read whole or in a shorter form that keeps their time, never cut, and every closure in calendars.json is said in full where it fits, else without its holiday's name, else with when it opens alone, a zone named, in both looks, in the popup and the window at its widest and narrowest, at every text size from 9 to 20, and in the popup with its spacing kept",
+        root.check("the header's longest real states read whole or in a shorter form that keeps their time, never cut, and every closure in calendars.json is said in full where it fits, else without its holiday's name, else with when it opens alone, a zone named, in the popup and the window at its widest and narrowest, at every text size from 9 to 20, and in the popup with its spacing kept",
           closures > 50 && unnamed.length === 0 && roomless.length === 0,
           closures + " closures | " + unnamed.join(" | ") + " | " + roomless.slice(0, 12).join(" | ") + (roomless.length > 12 ? " | … " + roomless.length : ""))
         console.log("the add said less beside the undo: " + addShort.join(", "))
-        root.check("on a named list the footer's add reads whole, or beside an undo it has no room beside \"+ Add a symbol\", never cut, and whole again once the undo goes, in both looks, in the popup and the window at its widest and narrowest, at every text size from 9 to 20, and in the popup with its spacing kept",
+        root.check("on a named list the footer's add reads whole, or beside an undo it has no room beside \"+ Add a symbol\", never cut, and whole again once the undo goes, in the popup and the window at its widest and narrowest, at every text size from 9 to 20, and in the popup with its spacing kept",
           addCut.length === 0, addCut.slice(0, 12).join(" | "))
 
         // In a window of ordinary height, 720 × 520, the key sheet shows its
@@ -1425,7 +1425,7 @@ Harness {
           { symbol: "WBTC-USD", longname: "Wrapped Bitcoin USD", exchange: "CCC", quoteType: "CRYPTOCURRENCY" },
           { symbol: "CIRBTC-USD", longname: "Circle Wrapped Bitcoin USD", exchange: "CCC", quoteType: "CRYPTOCURRENCY" }] })
         var resultRows = function() {
-          return root.findAll(body.search, "searchResult").filter(function(row, i, all) { return all.indexOf(row) === i })
+          return root.findAll(body.search, "searchResult")
         }
         var coinFaults = []
         body.startAdding()
@@ -1586,9 +1586,9 @@ Harness {
             })
           })
         })
-        root.check("the window's footer sits one gap under a short list, its note and notice too, and at its bottom once the list fills it, the rows one gap above it, in both looks, at its smallest and taller",
+        root.check("the window's footer sits one gap under a short list, its note and notice too, and at its bottom once the list fills it, the rows one gap above it, at its smallest and taller",
           windowFaults.length === 0, windowFaults.join(" | "))
-        root.check("the window's chart is as tall for every list at one window height, in both looks",
+        root.check("the window's chart is as tall for every list at one window height",
           chartFaults.length === 0, chartFaults.join(" | "))
         stub.retro = false
         stub.listName = ""
@@ -1979,7 +1979,7 @@ Harness {
         stub.library = libraryBeforeViews
         stub.lists = listsBeforeViews
         wait(50)
-        root.check("a view opening over the rows keeps the surface's height and edge: the list menu, search, Manage lists, and a row's ticks, at a room of 760, 780, and the popup's cap, in the popup and the window, in both looks",
+        root.check("a view opening over the rows keeps the surface's height and edge: the list menu, search, Manage lists, and a row's ticks, at a room of 760, 780, and the popup's cap, in the popup and the window",
           heldFaults.length === 0, heldFaults.join(" | ") + " || " + heldSeen.join(", "))
         root.check("the list menu's least, a refused name's note too, fits over the footer wherever the room holds it, under the first-run hint, in both looks",
           leastFaults.length === 0, leastFaults.join(" | "))
@@ -2261,7 +2261,7 @@ Harness {
         })
         surface.y = 0
         console.log("header tips: " + tipWords.join(" | "))
-        root.check("each header icon's hover says what a click does, under its icon and within the body, with room above or none, and the animal's nothing, smooth and retro",
+        root.check("each header icon's hover says what a click does, under its icon and within the body, with room above or none, and the animal's nothing; the look toggle's in both looks",
           tipFaults.length === 0, tipFaults.join(" | "))
         stub.retro = false
         wait(50)
@@ -2785,7 +2785,7 @@ Harness {
           touched.length === 0, touched.join(" | "))
         root.check("on a 768 px screen where the header gives its title way, a stock with no quote yet leaves the ticker's line empty, in both looks",
           coldSeen > 0 && coldFaults.length === 0, coldSeen + " seen; " + coldFaults.join(" | "))
-        root.check("on a 768 px screen at every text size from 9 to 20, the camera's tip shows under its icon and within the body, at the window's top and with room above, in both looks",
+        root.check("at text size 20 on a 768 px screen, the camera's tip shows under its icon and within the body",
           tipsSeen > 0 && tipFaults.length === 0, tipsSeen + " seen; " + tipFaults.join(" | "))
 
         // After the text size changes with the list scrolled, no row is cut
