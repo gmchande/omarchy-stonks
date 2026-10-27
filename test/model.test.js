@@ -737,6 +737,70 @@ test("membership across several lists", () => {
   expect(M.listReversed(M.withListReversed(library({ list: "My Watchlist" })))).toBe(false)
 })
 
+test("o runs manual, symbol, name, % change and back, and the order word's arrow says which way the values run", () => {
+  expect(["manual", "symbol", "name", "pct"].map(M.nextOrder)).toEqual(["symbol", "name", "pct", "manual"])
+  expect(["manual", "symbol", "name", "pct"].map(order => M.orderLabel(order, false)))
+    .toEqual(["↕  MANUAL", "↑  SYMBOL", "↑  NAME", "↓  % CHANGE"])
+  expect(["manual", "symbol", "pct"].map(order => M.orderLabel(order, true))).toEqual(["↕  MANUAL", "↓  SYMBOL", "↑  % CHANGE"])
+})
+
+test("a list's name is refused empty, as All, or taken in any case or padding; a new list is made current and empty, its name trimmed", () => {
+  const s = library()
+  expect([M.listNameProblem("  ", s.lists), M.listNameProblem(" growth ", s.lists), M.listNameProblem("all", s.lists)])
+    .toEqual(["Name the list", "growth already exists", "All already exists"])
+  const made = M.withListCreated(s, "  Wins ")
+  expect([made.list, M.listSymbols(made), made.lists.map(list => list.name)]).toEqual(["Wins", [], ["My Watchlist", "Growth", "Wins"]])
+  expect(M.withListCreated(s, "GROWTH")).toBe(s)
+  // A rename meets the same rules against the other lists, so a change of
+  // case alone renames, and the current list follows its new name.
+  expect([M.renameProblem(s, "Growth", "my watchlist"), M.renameProblem(s, "Growth", "GROWTH")]).toEqual(["my watchlist already exists", ""])
+  const renamed = M.withListRenamed(library({ list: "Growth" }), "Growth", "GROWTH")
+  expect([renamed.list, renamed.lists.map(list => list.name)]).toEqual(["GROWTH", ["My Watchlist", "GROWTH"]])
+})
+
+test("All can't be renamed, moved, or deleted, a list moves only between the named lists, and deleting one leaves the rest as they were", () => {
+  const s = library({ list: "Growth" })
+  for (const same of [M.withListRenamed(s, "", "Mine"), M.withListMoved(s, "", 1), M.withListDeleted(s, ""),
+    M.withListMoved(s, "My Watchlist", -1), M.withListMoved(s, "Growth", 1)]) expect(same).toEqual(s)
+  expect(M.withListMoved(s, "Growth", -1).lists.map(list => list.name)).toEqual(["Growth", "My Watchlist"])
+  const other = M.withListDeleted(s, "My Watchlist")
+  expect([other.list, other.symbols, other.lists]).toEqual(["Growth", s.symbols, [s.lists[1]]])
+  const current = M.withListDeleted(s, "Growth")
+  expect([current.list, current.symbols, current.lists]).toEqual(["", s.symbols, [s.lists[0]]])
+})
+
+test("undo puts a removed stock back at its place in All and in each list that held it, and the hero only if the removal moved it", () => {
+  const before = library()
+  const shown = ["NEST", "BO", "IRIS", "SPY"]
+  const out = M.withMembership(before, "BO", "", false, shown)
+  const back = M.withRemovalUndone(out, before, "BO", out.featured)
+  expect([back.symbols, back.lists.map(list => list.symbols), back.featured])
+    .toEqual([before.symbols, before.lists.map(list => list.symbols), "NEST"])
+  // The hero removed hands on to the next row, and comes back with its
+  // row, unless another hero was chosen since.
+  const heroOut = M.withMembership(before, "NEST", "", false, shown)
+  expect(heroOut.featured).toBe("BO")
+  expect(M.withRemovalUndone(heroOut, before, "NEST", heroOut.featured).featured).toBe("NEST")
+  expect(M.withRemovalUndone(M.fileSettings({ ...heroOut, featured: "SPY" }), before, "NEST", heroOut.featured).featured).toBe("SPY")
+  // Out of one list only, it goes back into that list at its place.
+  const offGrowth = M.withMembership(library({ list: "Growth" }), "BO", "Growth", false, ["BO", "IRIS"])
+  expect(M.withRemovalUndone(offGrowth, library({ list: "Growth" }), "BO", offGrowth.featured).lists[1].symbols).toEqual(["BO", "IRIS"])
+})
+
+test("the rule under the list name counts up, flat, and down as the rows' tones read them, and a row with no quote as none", () => {
+  const q = (symbol, prevClose, dayOpen, price) => ({ symbol, name: symbol, prevClose, dayOpen, price, priceDigits: 2, marketTime: 1, points: [], session: { regular: null } })
+  // FLAT closed where it started the day, and is up since its open.
+  const quotes = { UP: q("UP", 100, 101, 110), FLAT: q("FLAT", 100, 99, 100), DOWN: q("DOWN", 100, 99, 90) }
+  const symbols = ["UP", "FLAT", "DOWN", "GONE"]
+  for (const mode of ["pct", "open"]) {
+    const rows = { up: 0, flat: 0, down: 0, none: 1 }
+    for (const symbol of symbols.slice(0, 3)) rows[M.rowModel(quotes[symbol], 0, mode).tone]++
+    expect([mode, M.listBreadth(symbols, quotes, 0, mode)]).toEqual([mode, rows])
+  }
+  expect(M.listBreadth(symbols, quotes, 0, "pct")).toEqual({ up: 1, flat: 1, down: 1, none: 1 })
+  expect(M.listBreadth(symbols, quotes, 0, "open")).toEqual({ up: 2, flat: 0, down: 1, none: 1 })
+})
+
 // What ends the undo on offer: a data file, hand-edited or another
 // build's, that changes what the lists hold, and none that changes only the
 // view.

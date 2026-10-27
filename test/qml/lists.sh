@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
 # Named watchlists through the real Service, App, StonksBody, ListMenu, and
-# Watchlist with real Qt keys: a version-1 file read as it is, making a list,
-# adding to it, switching, removing by the list's rules, and a second
-# Service reading back what the first wrote. And the list header's unit
-# sign, clicked in the window and the real popup (Panel.qml), and a stock
-# removed in the popup closing its lists in the window: the shell's
-# layer-shell card window does not load offscreen, so the copy of Panel.qml
-# puts the card in CardWindow.qml, as keys.sh does. HOME and curl are
-# scratch.
+# Watchlist with real Qt keys and pointer: making a list, adding to it,
+# switching, removing by the list's rules, and the views that own the keys.
+# And a stock removed in the real popup (Panel.qml) closing its lists in the
+# window: the shell's layer-shell card window does not load offscreen, so
+# the copy of Panel.qml puts the card in CardWindow.qml, as keys.sh does.
+# HOME and curl are scratch.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree lists.qml
 cp "$here/CardWindow.qml" "$root/plugin/"
