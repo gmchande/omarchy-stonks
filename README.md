@@ -249,28 +249,30 @@ click it: Omasnap on 4.5, Tensaku on 4.0.
 ## If something's wrong
 
 A "!" on the pill means its stock's quote is late or its last refresh
-failed: point at the pill to read which. The row and the line above the
-price say the same.
+failed: point at the pill to read which, why, and when Stonks tries again.
+The row and the line above the price say the same.
 
-- **The header says "Can't get prices".** Every symbol you follow is
-  waiting on Yahoo, or Yahoo turned every one away, so Stonks says it once
-  rather than on every row. Rows with a price keep it, with the time it's
-  from, and the rest show their symbol alone. What to do is as for "No
-  data" below. If Yahoo has changed what it sends, only a newer Stonks can
-  fix that.
-- **A row says "No data" or "Update overdue".** Stonks has waited 90
-  seconds on Yahoo: no answer came, or Yahoo turned it away. A row with a
-  price keeps it, with the time it's from. Check your connection. If other
-  sites load, Yahoo is down or refusing Stonks, and there's nothing to do
-  but wait. Stonks keeps trying by itself, less often the longer Yahoo stays
-  away. When no answer came, `r` asks again at once; when Yahoo turned
-  Stonks away, `r` won't hurry it, since Yahoo asked for fewer requests.
-- **A row says "No data for this symbol" or "Refresh failed".** Yahoo said
-  it has nothing for the symbol, or sent a broken answer three times
-  running. A row with a price keeps it, with the time it's from, and `r`
-  tries again. A symbol Yahoo has dropped, after a merger, a rename, or a
-  delisting, stays this way: search for the company to find what Yahoo
-  calls it now.
+- **A row says "Update overdue" or "No data", and the header "No answer,
+  check your connection".** Stonks has waited 90 seconds on Yahoo, and no
+  answer came. A row with a price keeps it, with the time it's from. Check
+  your connection. If other sites load, Yahoo is down, and there's nothing
+  to do but wait. Stonks tries again within a minute, and `r` asks at once.
+- **A row says "Update overdue" or "No data", and the header "Turned away
+  by the price source".** Yahoo asked Stonks for fewer requests. The
+  header says when Stonks tries again, in a minute or up to half an hour,
+  as Yahoo asked. `r` won't hurry it.
+- **The header says "Can't get prices · Stonks keeps trying".** Every
+  symbol you follow has gone 90 seconds without a price from Yahoo, and
+  Stonks doesn't know why, so it says so once rather than on every row.
+  Rows with a price keep it, with the time it's from, and the rest show
+  their symbol alone. Check your connection. If Yahoo has changed what it
+  sends, only a newer Stonks can fix that.
+- **A row says "No data for this symbol" or "Refresh failed", and the
+  header "No usable answer".** Yahoo said it has nothing for the symbol, or
+  sent a broken answer three times running. A row with a price keeps it,
+  with the time it's from, and `r` tries again. A symbol Yahoo has
+  dropped, after a merger, a rename, or a delisting, stays this way: search
+  for the company to find what Yahoo calls it now.
 - **A stock or index says "As of" while its market is open.** Yahoo sends
   many exchanges' prices late, and some indexes'. When we measured,
   London's, São Paulo's, and the Cboe's VIX came 15 minutes late and

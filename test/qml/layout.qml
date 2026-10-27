@@ -16,6 +16,7 @@ import "plugin/Overnight.js" as Overnight
 import "plugin/Quote.js" as Quote
 import "plugin/Settings.js" as Settings
 import "plugin/Search.js" as Search
+import "plugin/Figures.js" as Figures
 import "plugin"
 
 // Nothing jumps. The 22-symbol list with a cap symbol, an ETF, non-US
@@ -1029,7 +1030,9 @@ Harness {
           ["Lunch break · reopens 12:30 JST · in 59m", "Lunch break · reopens 12:30 JST", "Reopens 12:30 JST"],
           ["At 16:30 BST · Closing bell", "At 16:30 BST"], ["At 02:25 EDT · Overnight", "At 02:25 EDT"],
           ["WEEK OF 28 SEP 2026 · 712,345.00", "WEEK OF 28 SEP 2026"], ["21 SEP 10:00 AEST · 712,345.00", "21 SEP 10:00 AEST"],
-          ["Can't get prices · Stonks keeps trying", "Can't get prices"], ["Refreshing"], ["Loading SHIB-USD YTD"]]
+          ["Can't get prices · Stonks keeps trying", "Can't get prices"],
+          Figures.hostPause("none", 72, 0).forms, Figures.hostPause("refused", 30 * 60, 0).forms,
+          ["No usable answer for SHIB-USD", "No usable answer"], ["Refreshing"], ["Loading SHIB-USD YTD"]]
         var closures = 0
         var unnamed = []
         for (var calId in calendars.calendars) {

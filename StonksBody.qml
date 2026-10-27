@@ -369,15 +369,20 @@ Item {
   readonly property var featuredDay: motion.day
   readonly property var featuredFreshness: Figures.freshness(entryOf(chartSymbol || featuredSymbol), featuredQuote, now,
     owed[chartSymbol || featuredSymbol] || 0, !!asking[chartSymbol || featuredSymbol])
-  // Yahoo is sending nothing for any listing: every symbol in All has a
-  // failed or overdue refresh. The header says so once, naming Yahoo, and
-  // the hero and the rows say what they have, with no warning each
+  // How many symbols in All have a failed or overdue refresh. With every
+  // one, Yahoo is sending nothing for any listing: the header says so once,
+  // and the hero and the rows say what they have, with no warning each
   // (`Figures.quietFreshness`). Found by the design panel of 23 October:
   // with Yahoo failing, every row said "No data for this symbol", as if
   // each stock had stopped existing.
-  readonly property bool yahooDown: lists.length > 0 && lists[0].symbols.length > 0 && lists[0].symbols.every(function(symbol) {
+  readonly property int warnings: lists.length > 0 ? lists[0].symbols.filter(function(symbol) {
     return Figures.freshnessWarns(Figures.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0, !!asking[symbol]))
-  })
+  }).length : 0
+  readonly property bool yahooDown: warnings > 0 && warnings === lists[0].symbols.length
+  // Why Yahoo stopped and when Stonks tries again, while its gate is paused
+  // (`Figures.hostPause`).
+  readonly property var hostPause: service && service.yahooGate
+    ? Figures.hostPause(service.yahooGate.pause, service.yahooGate.pausedUntil, now) : null
   readonly property var featuredGeometry: motion.geometry
   readonly property real scrubX: motion.scrubX
   readonly property bool dayScrubbed: !historyActive && scrubShown !== 0
@@ -454,15 +459,21 @@ Item {
     Overnight.nightTrades(featuredQuote, !!chart && chart.allDay, now, calendars)) : []
   // The header's words, then the same said in less for a header with no
   // room for them (`HeaderStatus`), each form shorter than the one before:
-  // Yahoo's trouble without what Stonks does about it, a scrubbed bar's
+  // trouble in fewer words, a scrubbed bar's
   // date without its price, and the market's (`Market.statusForms`).
   readonly property var headerForms: {
     if (!service) return [headerWhenMissing]
-    // Yahoo is sending nothing for any listing, said once, unless a scrub
-    // reads a moment, a refresh you asked for is out, or a range failed,
-    // whose header offers its retry.
-    if (yahooDown && !scrubShown && !refreshing && !(historyActive && historyFailed))
-      return ["Can't get prices · Stonks keeps trying", "Can't get prices"]
+    // Trouble, said once, unless a scrub reads a moment, a refresh you asked
+    // for is out, or a range failed, whose header offers its retry: while a
+    // row warns and Yahoo is paused, why and when Stonks tries again; with
+    // every row warning and no pause, that Stonks keeps trying; and a price
+    // on show whose refresh failed, why.
+    if (!scrubShown && !refreshing && !(historyActive && historyFailed)) {
+      if (hostPause && warnings > 0) return hostPause.forms
+      if (yahooDown) return ["Can't get prices · Stonks keeps trying", "Can't get prices"]
+      if (featuredQuote && featuredFreshness.state === "failed")
+        return ["No usable answer for " + (chartSymbol || featuredSymbol), "No usable answer"]
+    }
     // The chart asked for is on its way, named: what was on show stays.
     // Before any chart has been in, the empty hero's label names it alone,
     // in the one place a reader looks (`HeroBand`).

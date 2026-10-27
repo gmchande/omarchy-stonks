@@ -54,6 +54,14 @@ every_state() (
   # Every listing failed, said once in the header, in the popup in both
   # looks.
   states="$states popup-failed popup-failed-smooth"
+  # Prices stopped, as the header says why and when Stonks tries again, in
+  # both looks and at text size 16; the pill's words and its hover's.
+  for trouble in noanswer refused trying failed; do
+    for look in smooth retro; do
+      states="$states popup-trouble-$trouble-$look popup-trouble-$trouble-$look-size-16"
+    done
+  done
+  states="$states pill-sheet-trouble"
   # Paused mid-motion ink in both looks: breadth only in smooth, since
   # retro's cells draw the breadth and its pose never shows. Hover and held
   # presses with real pointer input, and the refused list views, in smooth:

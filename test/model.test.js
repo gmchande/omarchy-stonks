@@ -1361,6 +1361,23 @@ test("a quote's time no Date holds is none: its price and chart stay, and its ti
   expect(said(none)[0]).toBe("TIME NOT SENT")
 })
 
+// The reader acts on when Stonks tries again, so each time said, in every
+// form, is one the gate keeps: a no-answer pause runs past a minute only at
+// its 72 s most.
+test("a paused host says why prices stopped and when Stonks tries again, on the reader's clock, in every form; an open one says nothing", () => {
+  const at = Date.UTC(2026, 9, 27, 20, 0) / 1000
+  expect(M.hostPause("", at + 30, at)).toBe(null)
+  expect(M.hostPause("none", at + 60, at)).toEqual({ why: "No answer, check your connection", when: "Trying again within a minute",
+    forms: ["No answer, check your connection · Trying again within a minute", "No connection? Next try in 1m", "No answer · Next try 1m"] })
+  expect(M.hostPause("none", at + 72, at).forms).toEqual(["No answer, check your connection · Trying again within 2 minutes",
+    "No connection? Next try in 2m", "No answer · Next try 2m"])
+  expect(M.hostPause("none", at, at).forms[2]).toBe("No answer · Next try 1m")
+  expect(M.hostPause("refused", at + 12 * 60 + 40, at)).toEqual({ why: "Turned away by the price source", when: "Trying again at 16:12",
+    forms: ["Turned away by the price source · Trying again at 16:12", "Turned away · Next try at 16:12", "Refused · Next try 16:12"] })
+  expect(M.hostPause("refused", at, at).forms).toEqual(["Turned away by the price source · Trying again now", "Turned away · Next try now",
+    "Refused · Next try now"])
+})
+
 test("a fetched name or code past its length reads as not sent", () => {
   const long = n => "N".repeat(n)
   const day = edit => M.parseChart(chartAnswer(r => edit(r.meta)), [])

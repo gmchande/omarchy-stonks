@@ -82,6 +82,16 @@ Harness {
   // loading and failed: a cold start, the first quotes out or failed, in
   // retro, or in smooth with -smooth; in the popup with popup- before.
   readonly property string coldState: (/^(?:popup-)?(loading|failed)(?:-smooth)?$/.exec(stateName) || ["", ""])[1]
+  // popup-trouble-<kind>-<look>: prices stopped, as the header says it:
+  // Yahoo not answering (noanswer) or refusing (refused), both refreshes
+  // overdue with Yahoo open (trying), or AAPL's refresh failed (failed).
+  readonly property string troubleKind: (/^popup-trouble-(noanswer|refused|trying|failed)-/.exec(stateName) || ["", ""])[1]
+  // Yahoo's gate for a trouble state: paused 40 s more for no answer, or
+  // to 12:40 on for a refusal; open otherwise.
+  function troubleGate(kind) {
+    return kind === "noanswer" ? { pause: "none", pausedUntil: root.now + 40 }
+      : kind === "refused" ? { pause: "refused", pausedUntil: root.now + 12 * 60 + 40 } : { pause: "", pausedUntil: 0 }
+  }
   // The popup while adding, and the window at the size App.qml permits.
   readonly property bool searchState: stateName.indexOf("-search") >= 0
   readonly property bool minWindow: stateName.indexOf("min-window-") === 0
@@ -326,6 +336,7 @@ Harness {
     property string changeMode: "pct"
     property int now: root.now
     property var owed: ({})
+    readonly property var yahooGate: root.troubleGate(root.troubleKind)
     property string range: root.shownRange
     // The history on show, keyed to its symbol: a held chart's stays its own
     // while the next symbol's is on its way.
@@ -448,6 +459,13 @@ Harness {
       stub.quotes = { AAPL: aapl, "SHOP.TO": shop }
       stub.entries = { AAPL: { status: "ok", receivedAt: root.now - 300 }, "SHOP.TO": { status: "ok", receivedAt: root.now - 300 } }
       stub.owed = { AAPL: root.now - 91, "SHOP.TO": root.now - 91 }
+    } else if (root.troubleKind) {
+      // Both refreshes overdue, Yahoo paused or not, or AAPL's failed with
+      // its price on show (`troubleGate`).
+      stub.quotes = { AAPL: aapl, "SHOP.TO": shop }
+      stub.entries = { AAPL: { status: root.troubleKind === "failed" ? "failed" : "ok", answeredAt: root.now, receivedAt: root.now - 300 },
+        "SHOP.TO": { status: "ok", answeredAt: root.now, receivedAt: root.now - (root.troubleKind === "failed" ? 0 : 300) } }
+      stub.owed = root.troubleKind === "failed" ? {} : { AAPL: root.now - 91, "SHOP.TO": root.now - 91 }
     } else {
       stub.quotes = { AAPL: aapl, "SHOP.TO": shop }
       stub.entries = { AAPL: { status: "ok", receivedAt: root.now }, "SHOP.TO": { status: "ok", receivedAt: root.now } }
@@ -1138,6 +1156,20 @@ Harness {
                 .concat([{ style: "text", retro: retroLook, day: "up", compact: true }, { style: "icon", retro: retroLook, day: "up", compact: true }])
             }
             if (!root.pillSheet) return []
+            // pill-sheet-trouble: the text and icon forms in each look, in
+            // each trouble (`troubleGate`), and with no price yet while
+            // Yahoo doesn't answer, each with the hover's words beside it.
+            if (root.stateName === "pill-sheet-trouble") {
+              var troubled = []
+              ;[false, true].forEach(function(retro) {
+                ;["noanswer", "refused", "trying", "failed", "noanswer-noprice"].forEach(function(trouble) {
+                  ;["text", "icon"].forEach(function(style) {
+                    troubled.push({ style: style, retro: retro, day: trouble === "noanswer-noprice" ? "waiting" : "down", trouble: trouble })
+                  })
+                })
+              })
+              return troubled
+            }
             var rows = []
             for (var look = 0; look < 2; look++) {
               var retro = look === 1
@@ -1164,7 +1196,8 @@ Harness {
               width: pillRow.modelData.compact ? 80 : 170
               anchors.verticalCenter: parent.verticalCenter
               text: (pillRow.modelData.compact ? "" : (pillRow.modelData.retro ? "RETRO" : "SMOOTH") + " · ") + (pillRow.modelData.right ? "RIGHT SECTION" : pillRow.modelData.style.toUpperCase())
-                + (pillRow.modelData.style === "icon" || pillRow.modelData.right || pillRow.modelData.day !== "down" ? " · " + pillRow.modelData.day.toUpperCase() : "")
+                + (pillRow.modelData.trouble ? " · " + pillRow.modelData.trouble.toUpperCase()
+                  : pillRow.modelData.style === "icon" || pillRow.modelData.right || pillRow.modelData.day !== "down" ? " · " + pillRow.modelData.day.toUpperCase() : "")
               color: Commons.Color.muted
               font.family: Style.font.family
               font.pixelSize: 10
@@ -1184,12 +1217,14 @@ Harness {
                 id: pillService
                 property string featuredSymbol: "NEST"
                 property var quotes: ({ NEST: root.pillQuoteFor(pillRow.modelData.day === "refresh failed" ? "down" : pillRow.modelData.day) })
-                property var entries: ({ NEST: { status: pillRow.modelData.day === "failed" || pillRow.modelData.day === "refresh failed" ? "failed"
+                property var entries: ({ NEST: { status: pillRow.modelData.day === "failed" || pillRow.modelData.day === "refresh failed"
+                  || pillRow.modelData.trouble === "failed" ? "failed"
                   : pillRow.modelData.day === "waiting" ? "pending" : "ok", receivedAt: root.now } })
                 property string changeMode: "pct"
                 property bool retro: pillRow.modelData.retro
                 property int now: root.now
-                property var owed: ({})
+                property var owed: pillRow.modelData.trouble && pillRow.modelData.trouble !== "failed" ? { NEST: root.now - 91 } : ({})
+                readonly property var yahooGate: root.troubleGate((pillRow.modelData.trouble || "").replace("-noprice", ""))
               }
               QtObject {
                 id: pillShell
@@ -1208,6 +1243,7 @@ Harness {
                 layoutConfig: pillRow.modelData.right ? { left: [], center: [], right: [{ id: "grvc.stonks" }] } : ({})
               }
               BarWidget {
+                id: horizontalPill
                 anchors.verticalCenter: parent.verticalCenter
                 x: pillRow.modelData.right ? parent.width - width - 8 : 0
                 width: implicitWidth
@@ -1256,6 +1292,29 @@ Harness {
                 height: implicitHeight
                 bar: verticalApi
                 settings: ({ id: "grvc.stonks", barStyleVertical: pillRow.modelData.style === "icon" ? "icon" : "stacked" })
+              }
+            }
+
+            // The hover's words, in a bubble drawn as the bar draws its own.
+            Rectangle {
+              visible: !!pillRow.modelData.trouble
+              anchors.verticalCenter: parent.verticalCenter
+              width: hoverWords.implicitWidth + 20
+              height: hoverWords.implicitHeight + 14
+              color: Commons.Color.tooltip.background
+              border.color: Commons.Color.tooltip.border
+              radius: Style.cornerRadius
+
+              Text {
+                id: hoverWords
+                anchors.centerIn: parent
+                textFormat: Text.PlainText
+                text: (pillRow.modelData.style === "icon" ? horizontalPill.featuredSymbol + " " + horizontalPill.changeText + " · " : "")
+                  + horizontalPill.warningText
+                color: Commons.Color.tooltip.text
+                font.family: Style.font.family
+                font.pixelSize: Style.font.body
+                horizontalAlignment: Text.AlignHCenter
               }
             }
           }

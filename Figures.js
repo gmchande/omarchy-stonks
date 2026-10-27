@@ -122,6 +122,35 @@ function freshnessWarns(fresh) {
   return !!fresh && (fresh.state === "failed" || fresh.state === "overdue")
 }
 
+// Why prices stopped and when Stonks tries again, from the gate of the host
+// quotes come from (`Gate.qml`): its `pause`, "none" when nothing answered
+// or "refused", and `pausedUntil`, the second its next request may go, which
+// the service's clock wakes for. Null while the host answers: then Stonks
+// doesn't know why. A pause for no answer lasts 72 s at most, so it is said
+// in minutes, rounded up; a refusal's can last half an hour, so it names the
+// time on the reader's clock. `why` and `when` in full, for the pill's
+// hover; `forms`, the header's, each shorter than the one before, the last
+// one fitting the popup at text size 20. No source is named: not every
+// reader knows Yahoo (the owner, 26 October).
+function hostPause(pause, pausedUntil, now) {
+  var left = pausedUntil - now
+  if (pause === "none") {
+    var minutes = Format.duration(Math.max(1, left))
+    var noAnswer = { why: "No answer, check your connection",
+      when: "Trying again within " + (left > 60 ? Math.ceil(left / 60) + " minutes" : "a minute") }
+    noAnswer.forms = [noAnswer.why + " · " + noAnswer.when, "No connection? Next try in " + minutes, "No answer · Next try " + minutes]
+    return noAnswer
+  }
+  if (pause === "refused") {
+    var at = left > 0 ? Format.hhmm(pausedUntil, Format.readerOffset(pausedUntil)) : ""
+    var refused = { why: "Turned away by the price source", when: at ? "Trying again at " + at : "Trying again now" }
+    refused.forms = [refused.why + " · " + refused.when, "Turned away · Next try " + (at ? "at " + at : "now"),
+      "Refused · Next try " + (at || "now")]
+    return refused
+  }
+  return null
+}
+
 // The extended-hours line under the price: the newest print outside the
 // regular session (`latest`, the chart's newest print of all, or the
 // quote's own last), with its move against the quote's regular close. Null

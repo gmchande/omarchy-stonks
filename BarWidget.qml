@@ -54,8 +54,16 @@ BarWidget {
   readonly property var freshness: service && featuredSymbol
     ? Figures.freshness(service.entries[featuredSymbol] || null, featuredQuote, service.now, service.owed[featuredSymbol] || 0) : null
   readonly property bool warns: Figures.freshnessWarns(freshness)
-  // What the "!" means, in the popup's words, for the hover on every form.
-  readonly property string warningText: warns ? Figures.freshnessText(freshness, featuredQuote, service.calendars) : ""
+  // What the "!" means, in the popup's words, for the hover on every form,
+  // then why and when Stonks tries again, where it knows: Yahoo's pause
+  // (`Figures.hostPause`), or a failed refresh of a price on show, which no
+  // usable answer ended. The pill itself has no room for them.
+  readonly property var hostPause: service && service.yahooGate
+    ? Figures.hostPause(service.yahooGate.pause, service.yahooGate.pausedUntil, service.now) : null
+  readonly property string warningText: !warns ? ""
+    : Figures.freshnessText(freshness, featuredQuote, service.calendars)
+      + (hostPause ? "\n" + hostPause.why + "\n" + hostPause.when
+        : freshness.state === "failed" && featured ? "\nNo usable answer for this symbol" : "")
   // The shell copies a hover's words only as the pointer enters. While it
   // stays, a warning that starts, ends, or changes its words goes to the bar
   // again, once every binding has the new words: no bubble names a warning
