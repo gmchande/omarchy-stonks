@@ -202,7 +202,7 @@ ShellRoot {
     visible: true
     color: "#101315"
     implicitWidth: 480
-    implicitHeight: 760
+    implicitHeight: 788
 
     StonksBody {
       id: body
