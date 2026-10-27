@@ -1137,8 +1137,9 @@ Harness {
           addCut.length === 0, addCut.slice(0, 12).join(" | "))
 
         // In a window of ordinary height, 720 × 520, the key sheet shows its
-        // credit whole without a scroll, the version included: nothing says
-        // the sheet scrolls. More keys fail it.
+        // credit whole without a scroll, the version included, and where
+        // more runs past the bottom, the scrollbar says so at rest. More
+        // keys fail it.
         var sheet = find(body, "helpSheet")
         var sheetBefore = { wide: surface.wide, windowWidth: surface.windowWidth, fixedHeight: surface.fixedHeight }
         surface.wide = true
@@ -1158,14 +1159,18 @@ Harness {
         var creditSaid = credits.length === 1 ? credits[0].text.replace(/\n/g, " / ") : credits.length + " credits"
         var sheetHeight = sheet.height
         var creditWhole = credits.length === 1 && !credits[0].truncated && creditEnd > 0 && creditEnd <= sheetHeight && sheet.contentY === 0
+        var helpBar = find(sheet, "helpScrollBar")
+        var overflows = sheet.contentHeight > sheet.height
+        var barSays = overflows === (!!helpBar && helpBar.visible && helpBar.size < 1)
         body.showingHelp = false
         sheet.version = Qt.binding(function() { return body.updates && body.updates.runningVersion || "" })
         surface.wide = sheetBefore.wide
         surface.windowWidth = sheetBefore.windowWidth
         surface.fixedHeight = sheetBefore.fixedHeight
         wait(50)
-        root.check("in a 720 × 520 window the key sheet shows its credit whole without a scroll",
-          creditWhole, creditSaid + " ends at " + creditEnd + " of the sheet's " + sheetHeight)
+        root.check("in a 720 × 520 window the key sheet shows its credit whole without a scroll, and a scrollbar says when more runs past the bottom",
+          creditWhole && barSays, creditSaid + " ends at " + creditEnd + " of the sheet's " + sheetHeight
+            + " | " + Math.round(sheet.contentHeight) + " tall, bar " + (helpBar ? helpBar.visible + " " + helpBar.size : "none"))
 
         // After the text size changes while Stonks runs (`omarchy display
         // text size 16`), every key and gesture on the key sheet still fits

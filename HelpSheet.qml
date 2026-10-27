@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
@@ -72,6 +73,15 @@ Flickable {
   clip: true
   boundsBehavior: Flickable.StopAtBounds
   interactive: contentHeight > height
+  // While more of the sheet sits out of sight, as in a short window, the
+  // scrollbar says so, at rest too, in the gutter CLOSE ends short of.
+  Controls.ScrollBar.vertical: Controls.ScrollBar {
+    objectName: "helpScrollBar"
+    policy: root.interactive ? Controls.ScrollBar.AlwaysOn : Controls.ScrollBar.AlwaysOff
+    visible: root.interactive
+    // At least 24 px long, so a long sheet's thumb is there to see and grab.
+    minimumSize: Math.min(1, Style.space(24) / Math.max(1, availableHeight))
+  }
 
   // One group: its title, then a line per entry, the key bold and what it
   // does dim. `keyName` tells the keys from the mouse's gestures.
