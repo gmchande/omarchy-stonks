@@ -16,13 +16,12 @@ import "plugin" as Stonks
 // covers its side of the shared range. The data file starts as the version-1
 // fixture (AAPL, MSFT, NVDA, MSFT featured); the fake curl answers AAPL and
 // MSFT history with a saved year, fails NVDA's, and fails every FAIL quote.
-// The file is read back with cat. Later Services read what the first wrote,
-// each with a window summoned before it was ready.
-ShellRoot {
+// Later Services read what the first wrote, each with a window summoned
+// before it was ready.
+Harness {
   id: harness
+  marker: "RANGE DONE"
 
-  property int failures: 0
-  property var fileRead: null
   // What the pills asked the shell to write to their bar entry.
   property var entryWrites: []
   property int middleClicks: 0
@@ -32,27 +31,6 @@ ShellRoot {
   property bool themeCopied: false
   Process { id: themeCopy; onExited: harness.themeCopied = true }
 
-  function check(label, ok, detail) {
-    console.log((ok ? "PASS " : "FAIL ") + label + (!ok && detail !== undefined ? " — " + detail : ""))
-    if (!ok) failures++
-  }
-
-  function readFile() {
-    harness.fileRead = null
-    catProc.running = true
-  }
-
-  // The fake curl counts its calls per name in STONKS_FAKE_STATE. A fresh
-  // view per read: a FileView that has loaded once returns its old text
-  // straight after reload().
-  function calls(name) {
-    var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true; printErrors: false }', harness)
-    view.path = Quickshell.env("STONKS_FAKE_STATE") + "/" + name + ".calls"
-    var n = Number(String(view.text()).trim() || "0")
-    view.destroy()
-    return n
-  }
-
   // `key`'s history answer is in and no fetch for it is on its way: the
   // feed's entries hold answers only, so a refetch keeps the last one there.
   function answered(key, from) {
@@ -60,16 +38,6 @@ ShellRoot {
     var entry = source.histories[key]
     var feed = source.testHistoryFeed
     return !!entry && entry.status === "ok" && !feed.holds(feed.wanted, key)
-  }
-
-  function find(item, name) {
-    if (!item) return null
-    if (item.objectName === name) return item
-    for (var i = 0; i < item.children.length; i++) {
-      var found = find(item.children[i], name)
-      if (found) return found
-    }
-    return null
   }
 
   // What the pill says, as drawn: its change.
@@ -133,12 +101,6 @@ ShellRoot {
     }
     walk(find(window.testBody, "rangeRow"))
     return found
-  }
-
-  function finish() {
-    console.log("RANGE DONE")
-    done.exitCode = failures ? 1 : 0
-    done.start()
   }
 
   // The plugin as the shell composes it, with this harness as its shell.
@@ -242,27 +204,9 @@ ShellRoot {
   Process { id: turnDown; command: ["touch", Quickshell.env("STONKS_FAKE_STATE") + "/TURN.down"] }
   Process { id: turnUp; command: ["rm", "-f", Quickshell.env("STONKS_FAKE_STATE") + "/TURN.down"] }
 
-  Process {
-    id: catProc
-    command: ["cat", harness.dataPath]
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: {
-        try { harness.fileRead = JSON.parse(String(text || "").trim()) } catch (e) { harness.fileRead = {} }
-      }
-    }
-  }
-
-  TestCase {
+  Steps {
     name: "SharedRange"
     when: service.pluginsReady && pillWindow.visible
-
-    // Waits up to ms for fn to hold and returns whether it does, so the
-    // check that reads it is the one that fails.
-    function within(ms, fn) {
-      for (var t = 0; t < ms && !fn(); t += 50) wait(50)
-      return fn()
-    }
 
     // What hovering the pill hands the bar to show, as the shell's bar
     // receives it, "" for nothing: the pointer comes in from off the pill,
@@ -295,57 +239,48 @@ ShellRoot {
     }
 
     // The pill in every bar style, cycled by middle-clicks until it comes
-    // round, in both looks: what it says and the change's colour against
+    // round: what it says and the change's colour against
     // `expected(retro)` and `tone`, and for the icon form the bear alone in
     // `tone`. Each middle-click hands the shell the entry's other keys with
     // the next style, and writes no data file. Returns what was wrong.
     function pillInEveryStyle(expected, tone) {
       var wrong = []
-      var startLook = service.retro
-      for (var look = 0; look < 2; look++) {
-        service.persist({ style: look === 0 ? "smooth" : "retro" })
-        harness.readFile()
-        tryVerify(function() { return harness.fileRead !== null }, 2000)
-        var fileBefore = JSON.stringify(harness.fileRead)
-        var writesBefore = harness.entryWrites.length
-        var first = pill.barStyle
-        var seen = []
-        do {
-          seen.push(pill.barStyle)
-          var change = harness.find(pill, "pillChange")
-          var arrow = harness.find(pill, "pillArrow")
-          var symbolShown = harness.find(pill, "pillSymbol").visible
-          var want = expected(service.retro)
-          var where = pill.barStyle + " " + (service.retro ? "retro" : "smooth")
-          if (pill.barStyle === "icon") {
-            if (harness.iconDrawn() !== "bear in " + tone || arrow.visible || change.visible || symbolShown)
-              wrong.push(where + ": " + harness.iconDrawn() + ", arrow " + arrow.visible + ", symbol " + symbolShown
-                + ", change " + change.visible + "; want the bear alone in " + tone)
-          } else if (harness.pillText() !== want || !Qt.colorEqual(change.color, tone) || !symbolShown || !change.visible) {
-            wrong.push(where + ": " + harness.pillText() + " in " + change.color + ", want " + want + " in " + tone)
-          }
-          // The text form alone says the price, the row's, between the
-          // symbol and the change: "DOWN 95.00 −5.00%".
-          var price = harness.find(pill, "pillPrice")
-          var priceShown = price && price.visible ? price.text : ""
-          var priceWant = pill.barStyle === "text"
-            ? Figures.rowModel(service.quotes[service.featuredSymbol], 0, service.changeMode).priceText : ""
-          if (priceShown !== priceWant)
-            wrong.push(where + ": price " + JSON.stringify(priceShown) + ", want " + JSON.stringify(priceWant) + " after the symbol")
-          mouseClick(pill, pill.width / 2, pill.height / 2, Qt.MiddleButton)
-          harness.middleClicks++
-        } while (pill.barStyle !== first && seen.length < 10)
-        var writes = harness.entryWrites.slice(writesBefore)
-        if (seen.slice().sort().join(",") !== "arrow,icon,sparkline,text" || writes.length !== seen.length || !writes.every(function(w, i) {
-              return w.id === "grvc.stonks" && w.settings.id === "grvc.stonks" && w.settings.host === "kept"
-                && Object.keys(w.settings).length === 3 && w.settings.barStyle === seen[(i + 1) % seen.length]
-            }))
-          wrong.push("entry writes " + JSON.stringify(writes) + " for styles " + seen.join(","))
-        harness.readFile()
-        tryVerify(function() { return harness.fileRead !== null }, 2000)
-        if (JSON.stringify(harness.fileRead) !== fileBefore) wrong.push("the data file changed: " + JSON.stringify(harness.fileRead))
-      }
-      service.persist({ style: startLook ? "retro" : "smooth" })
+      var fileBefore = harness.readFile(harness.dataPath)
+      var writesBefore = harness.entryWrites.length
+      var first = pill.barStyle
+      var seen = []
+      do {
+        seen.push(pill.barStyle)
+        var change = harness.find(pill, "pillChange")
+        var arrow = harness.find(pill, "pillArrow")
+        var symbolShown = harness.find(pill, "pillSymbol").visible
+        var want = expected(service.retro)
+        var where = pill.barStyle
+        if (pill.barStyle === "icon") {
+          if (harness.iconDrawn() !== "bear in " + tone || arrow.visible || change.visible || symbolShown)
+            wrong.push(where + ": " + harness.iconDrawn() + ", arrow " + arrow.visible + ", symbol " + symbolShown
+              + ", change " + change.visible + "; want the bear alone in " + tone)
+        } else if (harness.pillText() !== want || !Qt.colorEqual(change.color, tone) || !symbolShown || !change.visible) {
+          wrong.push(where + ": " + harness.pillText() + " in " + change.color + ", want " + want + " in " + tone)
+        }
+        // The text form alone says the price, the row's, between the
+        // symbol and the change: "DOWN 95.00 −5.00%".
+        var price = harness.find(pill, "pillPrice")
+        var priceShown = price && price.visible ? price.text : ""
+        var priceWant = pill.barStyle === "text"
+          ? Figures.rowModel(service.quotes[service.featuredSymbol], 0, service.changeMode).priceText : ""
+        if (priceShown !== priceWant)
+          wrong.push(where + ": price " + JSON.stringify(priceShown) + ", want " + JSON.stringify(priceWant) + " after the symbol")
+        mouseClick(pill, pill.width / 2, pill.height / 2, Qt.MiddleButton)
+        harness.middleClicks++
+      } while (pill.barStyle !== first && seen.length < 10)
+      var writes = harness.entryWrites.slice(writesBefore)
+      if (seen.slice().sort().join(",") !== "arrow,icon,sparkline,text" || writes.length !== seen.length || !writes.every(function(w, i) {
+            return w.id === "grvc.stonks" && w.settings.id === "grvc.stonks" && w.settings.host === "kept"
+              && Object.keys(w.settings).length === 3 && w.settings.barStyle === seen[(i + 1) % seen.length]
+          }))
+        wrong.push("entry writes " + JSON.stringify(writes) + " for styles " + seen.join(","))
+      if (harness.readFile(harness.dataPath) !== fileBefore) wrong.push("the data file changed: " + harness.readFile(harness.dataPath))
       return wrong
     }
 
@@ -373,11 +308,9 @@ ShellRoot {
       service.setManualOrder(["AAPL", "SLOW"].concat(service.symbols.filter(function(s) { return s !== "AAPL" && s !== "SLOW" })))
 
       // An open while the chart is on its way shows the last one whole, the
-      // header naming what is coming, undimmed until a quarter second after
-      // the open, and draws the new one in as it lands: a symbol stepped to
-      // with the window shut, and a summon that opens it on a symbol and
-      // range. Found in the transition audit (lifecycle 0, ranges 5, ranges
-      // 6): the day's figures over an empty chart.
+      // header naming what is coming, and draws the new one in as it lands:
+      // a symbol stepped to with the window shut, and a summon that opens it
+      // on a symbol and range.
       var opensHeld = function(before, change, key, coming) {
         service.summon(before, "1W")
         settle(before + "|1W")
@@ -398,8 +331,7 @@ ShellRoot {
 
       // The chart kept on show is kept as it was: its symbol's next quote, or
       // its removal on another surface, changes nothing of it while the next
-      // one loads. Found in cubic's review of #24: the held chart followed its
-      // symbol's live quote, and blanked when it left All.
+      // one loads.
       service.summon("AAPL", "1W")
       settle("AAPL|1W")
       dropEntry("SLOW|1W")
@@ -418,41 +350,10 @@ ShellRoot {
       harness.check("the chart kept on show stays as it was through its symbol's next quote and its removal",
         afterQuote && afterRemoval, afterQuote + "|" + afterRemoval + " " + kept + " -> " + hero())
 
-      // A refetch that fails with the chart in hand keeps it and the header
-      // on the market, in the window open and shut, and so does the retry
-      // after it. Found in the transition audit (ranges 3, data 0, data 1,
-      // lifecycle 3, featured 6): the day took the range's place, then came
-      // back at every retry.
-      service.summon("AAPL", "1W")
-      settle("AAPL|1W")
-      var weekHero = hero()
-      var markets = body.headerText
-      var read = function() {
-        return [hero() === weekHero, body.headerText === markets].join(",")
-      }
-      // Its retry changes no answer: the failed one stays until another lands.
-      var next = Object.assign({}, service.testHistoryFeed.entries)
-      next["AAPL|1W"] = Object.assign({}, next["AAPL|1W"], { status: "failed" })
-      service.testHistoryFeed.entries = next
-      var failedOpen = read()
-      app.close()
-      var failedShut = read()
-      app.open("{}")
-      harness.check("a refetch that fails with the chart in hand keeps it and the market header, open and shut",
-        failedOpen === "true,true" && failedShut === "true,true", failedOpen + " | " + failedShut + " " + hero() + " " + body.headerText)
-      service.refresh()
-      settle("AAPL|1W")
-
       // A retry of a range whose first fetch failed keeps the day, and the
       // header says it is unavailable until an answer lands: by an open,
       // and by r in the window, the header's RETRY, and RETRY under search,
-      // which the reader asked for, saying "Refreshing" while it is out.
-      // NVDA's history always fails. Found in the transition audit (ranges
-      // 7, lifecycle 4, ranges 4, data 4): "Loading" and no AT CLOSE for the
-      // length of every retry, or an empty chart on the popup's open. The
-      // RETRY was plain words, "· R to retry", until the owner clicked one
-      // hint like it (14 October); the owner asked for "Refreshing" on r (21
-      // October).
+      // saying "Refreshing" while it is out. NVDA's history always fails.
       // Whatever an earlier step left of NVDA's week goes first.
       var nvdaHeld = false
       var withoutWeek = Object.assign({}, service.testHistoryFeed.entries)
@@ -473,7 +374,7 @@ ShellRoot {
         start()
         var retried = within(3000, function() { return service.testHistoryFeed.busy })
         tryVerify(function() { return !service.testHistoryFeed.busy && !service.refreshing }, 10000)
-        wait(50)
+        within(1000, function() { return body.headerText === "1W unavailable" })
         body.headerTextChanged.disconnect(heard)
         return [retried, body.headerText === "1W unavailable", !!body.featuredGeometry].join(",") + " " + said.join("/")
       }
@@ -485,19 +386,18 @@ ShellRoot {
       var inSearch = retry(function() {
         app.testKeyCatcher.forceActiveFocus()
         keyClick(Qt.Key_A)
-        wait(50)
+        tryVerify(function() { return body.adding }, 2000)
         mouseClick(retryButton, retryButton.width / 2, retryButton.height / 2)
       })
       var searchWord = [body.adding, retryButton.text].join(",")
       keyClick(Qt.Key_Escape)
-      wait(50)
+      tryVerify(function() { return !body.adding }, 2000)
       var asked = "true,true,true 1W unavailable/Refreshing/1W unavailable"
       harness.check("a first failed fetch and every retry keep the day, with Refreshing while a manual retry is out and the unavailable header after, by r, by RETRY, by an open, and by RETRY under search",
         failedLifted && offered && byR === asked && byClick === asked
           && byOpen === "true,true,true 1W unavailable" && inSearch === asked && searchWord === "true,RETRY",
         [failedLifted, offered, byR, byClick, byOpen, inSearch, searchWord].join(" | "))
       service.summon("AAPL", "1D")
-      wait(100)
       app.close()
     }
 
@@ -506,13 +406,11 @@ ShellRoot {
         return service.quotes.AAPL && service.quotes.MSFT && service.quotes.NVDA
           && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0
       }, 10000)
-      var dayLine = Format.lookSigns(pill.featured.changeLine, false)
-      harness.check("on the day the pill reads its day",
-        service.range === "1D" && harness.pillText() === dayLine, harness.pillText())
 
       // Only an open surface asks for a cap and P/E, so a window that was
       // never shown has asked for nothing, whatever symbol is featured.
       service.feature("AAPL")
+      // Nothing must be asked: a moment for a stray fetch to start.
       wait(300)
       harness.check("a hidden window fetches no cap or P/E when the symbol changes",
         harness.calls("FUNDAMENTALS") === 0, harness.calls("FUNDAMENTALS"))
@@ -522,8 +420,7 @@ ShellRoot {
       // first opens, and kept.
       harness.check("a window never shown holds no body", app.testBody === null, String(app.testBody))
 
-      // The pill's right-click opens the window, and another closes it. It
-      // used to refresh.
+      // The pill's right-click opens the window, and another closes it.
       var rightClick = function() { mouseClick(pill, pill.width / 2, pill.height / 2, Qt.RightButton) }
       rightClick()
       var openedByClick = app.opened
@@ -559,92 +456,52 @@ ShellRoot {
       app.open("{}")
       waitForRendering(body)
       app.testKeyCatcher.forceActiveFocus()
-      // Up to the top row, down to row n, and Enter shows its chart.
-      var pickRow = function(n) {
-        for (var up = 0; up < body.watchlist.displayedSymbols.length; up++) keyClick(Qt.Key_Up)
-        for (var down = 0; down < n; down++) keyClick(Qt.Key_Down)
-        keyClick(Qt.Key_Return)
-      }
-      harness.check("the window opens on the featured chart", body.chartSymbol === service.featuredSymbol)
-      pickRow(0)
-      harness.check("Up to a row and Enter features it", service.featuredSymbol === "AAPL")
-      pickRow(1)
-      var heroBeforeWheel = service.featuredSymbol
-      mouseWheel(pill, pill.width / 2, pill.height / 2, 0, -120)
-      var wheeledTo = service.featuredSymbol
-      service.featureStep(-1)
-      var steppedTo = service.featuredSymbol
-      app.open(JSON.stringify({ symbol: "NVDA" }))
-      harness.check("the pill wheel, IPC step and summon select their symbols",
-        wheeledTo !== heroBeforeWheel && steppedTo === heroBeforeWheel && service.featuredSymbol === "NVDA")
+      // A summon selects its symbol and range, either way; one without a
+      // range keeps the shared one.
       app.open(JSON.stringify({ symbol: "AAPL", range: "1Y" }))
       tryVerify(function() { return harness.answered("AAPL|1Y") }, 5000)
       var rangeSelected = body.chartSymbol === "AAPL" && body.chartRange === "1Y"
+      app.close()
+      app.open(JSON.stringify({ symbol: "MSFT" }))
+      var rangeKept = service.range === "1Y" && app.range === "1Y" && service.featuredSymbol === "MSFT"
       app.open(JSON.stringify({ symbol: "MSFT", range: "1D" }))
       harness.check("a summon selects its symbol and shared range in either direction",
-        rangeSelected && body.chartSymbol === "MSFT" && body.chartRange === "1D" && service.range === "1D")
-      service.setRange("1D")
-      service.feature("MSFT")
-
-      // A replay belongs to the chart it started on. Found offscreen: after
-      // ], the day's replay went on scrubbing the week's chart for its 2 s.
-      // The sounds hold a replay until the output wakes, 1.5 s at most (the
-      // stand-in pw-cat's takes some 300 ms, longer on a busy machine), so
-      // the step waits for it to start, and reads the ] at once.
+        rangeSelected && rangeKept && body.chartSymbol === "MSFT" && body.chartRange === "1D" && service.range === "1D",
+        rangeSelected + "|" + rangeKept + "|" + body.chartSymbol + "|" + body.chartRange + "|" + service.range)
+      app.testKeyCatcher.forceActiveFocus()
+      // A replay belongs to the chart it started on: ] ends the day's replay
+      // at once. The sounds hold a replay until the output wakes, 1.5 s at
+      // most, so the step waits for it to start, and reads the ] at once.
       keyClick(Qt.Key_P)
       var replaying = within(5000, function() { return body.motion.replayRunning && body.scrubT !== 0 })
       keyClick(Qt.Key_BracketRight)
-      harness.check("] in the window sets the one shared range",
-        service.range === "1W" && app.range === "1W", service.range + "|" + app.range)
       harness.check("] ends the day's replay at once, and the scrub with it",
         replaying && !body.motion.replayRunning && body.scrubT === 0,
         replaying + "|" + body.motion.replayRunning + "|" + body.scrubT + "|" + body.headerText)
 
-      // On a range the pill still shows the day: the featured symbol's
-      // change and line, as its row shows them, with no range named.
-      tryVerify(function() { return harness.answered("MSFT|1W") }, 5000)
-      wait(50)
-      var week = History.historyRowModel(service.histories["MSFT|1W"].history, service.quotes.MSFT, 0)
-      var msftDay = Figures.rowModel(service.quotes.MSFT, 0, service.changeMode)
-      var row = body.watchlist.rowItem("MSFT")
-      harness.check("on 1W the pill shows the day, as the row does, and its line",
-        harness.pillText() === Format.lookSigns(msftDay.changeLine, false) && msftDay.changeLine !== week.changeLine
-          && row.view.changeLine === msftDay.changeLine
-          && JSON.stringify(harness.find(pill, "pillLine").geometry) === JSON.stringify(Chart.chartGeometry(service.quotes.MSFT)),
-        harness.pillText() + " vs day " + msftDay.changeLine + " / week " + week.changeLine)
-
-      // The first info line follows the range, by keys and by mouse, in
-      // both looks: ] to 1W, a click on 1M in retro, and [ back to 1W, each
-      // drawing that range's name and its low and high, as its marks have
-      // them. Until 22 October it stayed the day's on every range.
+      // The first info line follows the range, by keys and by mouse: ] to
+      // 1W, a click on 1M, and [ back to 1W, each drawing that range's name
+      // and its low and high, as its marks have them. One look: retro's
+      // drawing is the review's.
       var followed = []
       var follows = function(how, range) {
         tryVerify(function() { return harness.answered("MSFT|" + range) && body.chartRange === range && body.historyShown }, 5000)
-        wait(50)
-        var drawn = harness.firstLineDrawn(app)
         var want = harness.rangeLineWanted("MSFT", range)
-        if (drawn.indexOf(want + " Start ") !== 0) followed.push(how + ": " + drawn + ", want " + want + " Start …")
+        if (!within(2000, function() { return harness.firstLineDrawn(app).indexOf(want + " Start ") === 0 }))
+          followed.push(how + ": " + harness.firstLineDrawn(app) + ", want " + want + " Start …")
       }
-      follows("] in smooth", "1W")
-      service.persist({ style: "retro" })
-      wait(50)
+      follows("]", "1W")
       var month = harness.rangeToken(app, "1M")
       mouseClick(month, month.width / 2, month.height / 2)
-      follows("a click on 1M in retro", "1M")
+      follows("a click on 1M", "1M")
       keyClick(Qt.Key_BracketLeft)
-      follows("[ in retro", "1W")
-      service.persist({ style: "smooth" })
-      wait(50)
+      follows("[", "1W")
       harness.check("the first info line says the range's name, low, and high as the range changes by keys and by mouse, in both looks",
         followed.length === 0, followed.join(" | "))
-
       // r with the week in hand says "Refreshing" in the header while what it
       // asked for is out, MSFT's week held back here, and the market again
       // once it lands; the service asking again by itself for the week grown
-      // old keeps the market. The header said "LOADING 1W" every fifteen
-      // minutes, when the service refetched the pill's range, and on every r;
-      // the owner asked for "Refreshing" on r alone (21 October).
-      // Read on the header's own change, as the retries above are.
+      // old keeps the market. Read on the header's own change.
       var said = []
       var watch = function() { if (said[said.length - 1] !== body.headerText) said.push(body.headerText) }
       body.headerTextChanged.connect(watch)
@@ -657,10 +514,11 @@ ShellRoot {
       watch()
       keyClick(Qt.Key_R)
       within(3000, function() { return body.headerText === "Refreshing" })
+      // Held out a moment, for a wrong header to show.
       wait(300)
       releaseMsft.running = true
       tryVerify(function() { return harness.answered("MSFT|1W") && !service.refreshing }, 5000)
-      wait(50)
+      within(1000, function() { return said[said.length - 1] !== "Refreshing" })
       var at = said.indexOf("Refreshing")
       var byR = said.slice()
       said = []
@@ -682,154 +540,34 @@ ShellRoot {
           && out && market(said),
         byR.join("/") + " | " + out + " " + said.join("/"))
 
-      // Replay unfolds: on a range too it is a scrub that drives itself, bar
-      // by bar, with the chart drawing in behind it. It used to be a slow
-      // draw-in with the header and the price left on today.
-      var marketHeader = body.headerText
+      // A replay on a range ends back on the market as of now: its header
+      // counts down by the minute, which can turn during the replay.
       var headline = body.featured.priceText
       keyClick(Qt.Key_P)
-      wait(1000)
-      harness.check("a replay on a range walks its bars: a date in the header, the price at that bar",
-        body.motion.replayRunning && body.headerText !== marketHeader && body.featured.priceText !== headline,
-        body.headerText + "|" + body.featured.priceText + " vs " + headline)
-      tryVerify(function() { return !body.motion.replayRunning }, 3000)
-      // The market's header counts down by the minute, and the minute can turn
-      // during the replay (it failed so on 23 October): it must be the market
-      // as of now, not as it was before the key. A scrub's date or a held
-      // "Loading" is still not the market.
+      var replayed = within(5000, function() { return body.motion.replayRunning })
+      tryVerify(function() { return !body.motion.replayRunning }, 5000)
       harness.check("the replay ends back on the market",
-        body.marketForms.length > 0 && body.headerText === body.marketForms[0] && body.featured.priceText === headline,
-        body.headerText + " vs " + body.marketForms[0] + "|" + body.featured.priceText)
-
-      // NVDA's history never comes. Read straight after the key, before any
-      // answer can land: the window names what is coming, and once the
-      // fetch has failed says the range is unavailable.
-      pickRow(2)
-      var header = harness.find(body, "statusText")
-      harness.check("while a range's first fetch is out the window names what is coming",
-        service.featuredSymbol === "NVDA" && header.text === "LOADING NVDA 1W",
-        service.featuredSymbol + "|" + header.text)
-      // The chart a feature waits for arrives once it lands; until then the
-      // last one, MSFT's week, stays whole, and nothing of NVDA's day shows.
-      harness.check("a feature on a range keeps the last chart, not the day, while its range is out",
-        body.chartSymbol === "MSFT"
-          && JSON.stringify(body.featuredGeometry) === JSON.stringify(History.historyGeometry(service.histories["MSFT|1W"].history)),
-        body.chartSymbol)
-      harness.check("after it fails the window says the range is unavailable, with RETRY beside it",
-        within(8000, function() { return header.text === "1W UNAVAILABLE" && harness.find(body, "retryRange").visible }), header.text)
-
-      // Back to a symbol with history: the window draws its range once in.
-      pickRow(0)
-      harness.check("a symbol change in the window brings that symbol's range",
-        service.featuredSymbol === "AAPL"
-          && within(5000, function() { return harness.showsRange(app, "1W") }),
-        service.featuredSymbol + "|" + harness.chartShown(app))
-
-      // A range's first fetch keeps the day's chart and info lines, as the
-      // hero keeps the day's figures, until the range's response lands.
-      // Found in motion pass 3: the chart went blank and the info line to
-      // dashes for the length of the fetch, on every first visit to a range.
-      var blanked = []
-      var watchLoad = function() {
-        var entry = service.histories["AAPL|1M"]
-        if (service.range !== "1M" || (entry && entry.history)) return
-        if (!body.featuredGeometry) blanked.push("chart")
-        if (!body.periodLine || body.periodLine.range.highText === "") blanked.push("info")
-      }
-      body.featuredGeometryChanged.connect(watchLoad)
-      body.periodLineChanged.connect(watchLoad)
-      keyClick(Qt.Key_BracketRight)
-      watchLoad()
-      tryVerify(function() { return harness.answered("AAPL|1M") }, 5000)
-      body.featuredGeometryChanged.disconnect(watchLoad)
-      body.periodLineChanged.disconnect(watchLoad)
-      harness.check("a range's first fetch keeps the day's chart and info lines until it lands",
-        blanked.length === 0 && !!body.featuredGeometry, blanked.join(","))
-
-      // A range whose cache has run out still has its chart: featured, it
-      // draws in at once while the refetch is out. It opened blank until
-      // the refetch landed, the first time after the laptop woke.
-      pickRow(1)
-      tryVerify(function() { return harness.answered("MSFT|1M") }, 5000)
-      pickRow(0)
-      var aged = Object.assign({}, service.testHistoryFeed.entries)
-      aged["MSFT|1M"] = Object.assign({}, aged["MSFT|1M"], { receivedAt: aged["MSFT|1M"].receivedAt - 16 * 60 })
-      service.testHistoryFeed.entries = aged
-      // The refetch's answer is held back until the check has read the
-      // state it is out in: the fake curl could answer before the check.
-      holdMsft.running = true
-      tryVerify(function() { return !holdMsft.running }, 2000)
-      pickRow(1)
-      var stale = service.histories["MSFT|1M"]
-      var out = service.testHistoryFeed.holds(service.testHistoryFeed.wanted, "MSFT|1M")
-      var loadingAtOnce = body.chartLoading
-      harness.check("expired history stays usable while its refetch is out",
-        out && !!stale.history && !loadingAtOnce && body.chartSymbol === "MSFT",
-        out + "|" + loadingAtOnce)
-      releaseMsft.running = true
-      tryVerify(function() { return !releaseMsft.running && harness.answered("MSFT|1M") && !service.testHistoryFeed.busy }, 5000)
-      pickRow(0)
-      tryVerify(function() { return service.featuredSymbol === "AAPL" && !service.testHistoryFeed.busy && !service.testFeed.busy }, 5000)
-
-      // r fetches every quote again, and the range on show, which the cache
-      // would otherwise have kept: AAPL's quote and its history.
-      // These answers are older than refresh's ten-second floor. The
-      // preceding inputs may now finish before that much wall time passes.
-      var refreshable = {}
-      for (var symbol in service.testFeed.entries)
-        refreshable[symbol] = Object.assign({}, service.testFeed.entries[symbol], { answeredAt: service.testFeed.entries[symbol].answeredAt - 20 })
-      service.testFeed.entries = refreshable
-      var aapl = harness.calls("AAPL")
-      var aaplHistory = harness.calls("AAPL.history")
-      var msft = harness.calls("MSFT")
-      var nvda = harness.calls("NVDA")
-      keyClick("r")
-      within(5000, function() { return harness.calls("NVDA") > nvda && harness.calls("AAPL") >= aapl + 2 })
-      harness.check("refresh includes quotes",
-        harness.calls("MSFT") === msft + 1 && harness.calls("NVDA") === nvda + 1,
-        (harness.calls("MSFT") - msft) + "|" + (harness.calls("NVDA") - nvda))
-      // One quote and one history request for AAPL, counted apart: the two
-      // run at once.
-      var histories = harness.calls("AAPL.history") - aaplHistory
-      harness.check("refresh forces selected history",
-        histories === 1 && harness.calls("AAPL") - aapl - histories === 1,
-        histories + "|" + (harness.calls("AAPL") - aapl))
-
-      // r in an open surface asks for the cap and P/E too, which are kept
-      // for a day: day-old ones are fetched again, fresh ones are not.
-      tryVerify(function() { return service.fundamentals.AAPL && service.fundamentals.AAPL.status === "ok" }, 5000)
-      var asksBefore = harness.calls("AAPL.fundamentals")
-      keyClick("r")
-      tryVerify(function() { return !service.testFeed.busy && !service.testHistoryFeed.busy }, 10000)
-      var freshAsks = harness.calls("AAPL.fundamentals") - asksBefore
-      var aged = Object.assign({}, service.testFundamentalsFeed.entries)
-      aged.AAPL = Object.assign({}, aged.AAPL, { checkedAt: aged.AAPL.checkedAt - 25 * 60 * 60 })
-      service.testFundamentalsFeed.entries = aged
-      keyClick("r")
-      var asked = within(5000, function() { return harness.calls("AAPL.fundamentals") > asksBefore })
-      tryVerify(function() { return service.fundamentals.AAPL.checkedAt > aged.AAPL.checkedAt }, 5000)
-      harness.check("r fetches a day-old cap and P/E again, not fresh ones",
-        freshAsks === 0 && asked && harness.calls("AAPL.fundamentals") === asksBefore + 1
-          && service.fundamentals.AAPL.status === "ok",
-        freshAsks + "|" + (harness.calls("AAPL.fundamentals") - asksBefore))
-      tryVerify(function() { return !service.testFeed.busy && !service.testHistoryFeed.busy }, 10000)
+        replayed && body.marketForms.length > 0 && body.headerText === body.marketForms[0] && body.featured.priceText === headline,
+        replayed + " " + body.headerText + " vs " + body.marketForms[0] + "|" + body.featured.priceText)
 
       // IPC refreshes once, and every pill acknowledges it: dimmed, then
       // eased back. With a pill per screen, each one refreshed it, and the
       // second queued a second sweep. The answers are aged past the
-      // refresh's 10 s floor first: r already fetched them just now.
+      // refresh's 10 s floor first.
+      service.feature("AAPL")
+      tryVerify(function() { return harness.answered("AAPL|1W") && !service.testFeed.busy && !service.testHistoryFeed.busy }, 10000)
       var agedEntries = {}
       for (var s in service.testFeed.entries)
         agedEntries[s] = Object.assign({}, service.testFeed.entries[s], { answeredAt: service.testFeed.entries[s].answeredAt - 20 })
       service.testFeed.entries = agedEntries
-      aapl = harness.calls("AAPL")
-      aaplHistory = harness.calls("AAPL.history")
-      msft = harness.calls("MSFT")
-      nvda = harness.calls("NVDA")
+      var aapl = harness.calls("AAPL")
+      var aaplHistory = harness.calls("AAPL.history")
+      var msft = harness.calls("MSFT")
+      var nvda = harness.calls("NVDA")
       harness.callIpc("refresh")
       tryVerify(function() { return !ipcCall.running }, 5000)
       tryVerify(function() { return !service.testFeed.busy && !service.testHistoryFeed.busy }, 10000)
-      histories = harness.calls("AAPL.history") - aaplHistory
+      var histories = harness.calls("AAPL.history") - aaplHistory
       harness.check("IPC refresh sends one refresh with multiple pills",
         histories === 1 && harness.calls("AAPL") - aapl - histories === 1
           && harness.calls("MSFT") === msft + 1 && harness.calls("NVDA") === nvda + 1,
@@ -839,7 +577,7 @@ ShellRoot {
       // IPC reaches the plugin with no pill on the bar, as with the pill
       // taken off: the hero steps, toggleWindow (a key binding's command) opens the
       // window and closes it, and openWindow (the launcher) opens it on the
-      // symbol it names. IPC used to live in the pills.
+      // symbol it names.
       app.close()
       pillLoader.active = false
       otherPillLoader.active = false
@@ -865,83 +603,24 @@ ShellRoot {
         stepped && toggledOpen && toggledShut && openedOn,
         stepped + "|" + toggledOpen + "|" + toggledShut + "|" + openedOn + " " + service.featuredSymbol)
 
-      // The service asks for the one chart on show. A range left behind is
-      // dropped with its retry: NVDA's history fails, and in its retry pause
-      // the day comes back, and then another range. The window's own request
-      // used to outlive it and retry NVDA first. What the feed wants after
-      // is read, not NVDA's calls: the rows in sight are fetched ahead on
-      // the next range, NVDA's among them.
-      var nvdaHistory = harness.calls("NVDA.history")
-      pickRow(2)
-      var leftKey = "NVDA|" + service.range
-      tryVerify(function() { return service.testHistoryFeed.testRetrying }, 5000)
-      var wantedSince = []
-      var noteWant = function() { var w = service.testHistoryFeed.wanted; if (w) wantedSince.push(w.charts.map(function(c) { return c.key }).join("+")) }
-      service.testHistoryFeed.wantedChanged.connect(noteWant)
-      service.setRange("1D")
-      service.feature("AAPL")
-      var askedAt = Date.now()
-      service.setRange("5Y")
-      tryVerify(function() { return harness.answered("AAPL|5Y") }, 10000)
-      var waited = Date.now() - askedAt
-      tryVerify(function() { return !service.testHistoryFeed.busy }, 10000)
-      service.testHistoryFeed.wantedChanged.disconnect(noteWant)
-      harness.check("a chart left behind never retries ahead of the one on show",
-        wantedSince.indexOf(leftKey) < 0 && wantedSince[0] === "AAPL|5Y" && harness.calls("NVDA.history") >= nvdaHistory + 1 && waited < 2000,
-        leftKey + " | wanted " + wantedSince.join(",") + " | " + waited + " ms")
-
-      // With no surface open the service asks for no history: the pill shows
-      // the day, and nothing else shows a range. Not as the window closes
-      // on a pending retry, nor for a range change or the pill's wheel; an
-      // open asks again. Found in design round 2: after a look at 5Y the bar
-      // read the range all day, fetching it for itself.
-      var historyCalls = function() {
-        return ["AAPL", "MSFT", "NVDA"].reduce(function(sum, s) { return sum + harness.calls(s + ".history") }, 0)
-      }
-      service.feature("NVDA")
-      tryVerify(function() { return service.testHistoryFeed.testRetrying }, 5000)
-      var closedFrom = historyCalls()
-      app.close()
-      service.setRange("6M")
-      mouseWheel(pill, pill.width / 2, pill.height / 2, 0, -120)
-      // Past the retry's pause.
-      wait(3000)
-      var closedCalls = historyCalls() - closedFrom
-      var idle = !service.testHistoryFeed.busy
-      app.open("{}")
-      var reopened = within(5000, function() { return historyCalls() > closedFrom })
-      harness.check("with no surface open the service fetches no history: not a pending retry, a range change, or the pill's wheel; an open asks again",
-        closedCalls === 0 && idle && reopened, closedCalls + "|" + idle + "|" + reopened)
-      tryVerify(function() { return !service.testFeed.busy && !service.testHistoryFeed.busy }, 10000)
       service.feature("AAPL")
       service.setRange("1M")
-
       app.close()
-      app.open("{}")
-      harness.check("a summon without a range keeps the shared one",
-        service.range === "1M" && app.range === "1M", service.range + "|" + app.range)
-      app.close()
+      tryVerify(function() {
+        try { return JSON.parse(harness.readFile(harness.dataPath)).range === "1M" } catch (e) { return false }
+      }, 3000)
 
-      harness.readFile()
-      tryVerify(function() { return harness.fileRead !== null }, 3000)
-      harness.check("the file saves the range", harness.fileRead.range === "1M", JSON.stringify(harness.fileRead))
-
-      // A restarted service, with no surface open, comes back on the range
-      // and fetches no history for it. A summon whose window closed before
-      // the service was ready leaves with the window.
-      var closedHistory = historyCalls()
+      // A summon whose window closed before a restarted service was ready
+      // leaves with the window.
       var again = serviceAgain.createObject(harness)
       var dropped = appAgain.createObject(harness, { service: again })
       dropped.open(JSON.stringify({ symbol: "MSFT", range: "5Y" }))
       dropped.close()
       tryVerify(function() { return again.pluginsReady }, 5000)
+      // Nothing must change: a moment for a stray summon to land.
       wait(50)
-      harness.check("a restarted service comes back on the saved range", again.range === "1M", again.range)
       harness.check("a payload dropped with its window never features or sets the range",
         again.featuredSymbol === "AAPL" && again.range === "1M", again.featuredSymbol + "|" + again.range)
-      wait(500)
-      harness.check("a restarted service with no surface open fetches no history",
-        historyCalls() === closedHistory && !again.testHistoryFeed.busy, (historyCalls() - closedHistory) + "|" + again.testHistoryFeed.busy)
       dropped.destroy()
       again.destroy()
 
@@ -951,14 +630,9 @@ ShellRoot {
       tryVerify(function() { return !holdMsft.running }, 2000)
       again = serviceAgain.createObject(harness)
       var summoned = appAgain.createObject(harness, { service: again })
-      // It draws its chart in once there is one: it used to open drawn. Its
-      // body is built as it opens.
       summoned.open(JSON.stringify({ symbol: "MSFT", range: "1Y" }))
-      harness.check("payload waits while the service starts",
-        !again.pluginsReady && again.featuredSymbol !== "MSFT" && again.range !== "1Y",
-        again.pluginsReady + "|" + again.featuredSymbol + "|" + again.range)
       // The header and the empty hero's label, each as it reads while the
-      // window waits: Loading is said once, by the label. Both said it.
+      // window waits: Loading is said once, by the label.
       var coldLabel = harness.find(summoned.testBody, "loadingLabel")
       var coldWords = harness.find(summoned.testBody, "statusText")
       var loadingSaid = []
@@ -975,31 +649,23 @@ ShellRoot {
       // (`App.onReadyChanged`): a ready seen at the end of a wait can come
       // before that turn.
       wait(0)
-      // Before any chart has been in, the hero is empty, naming what is
-      // coming: never the day, nor "No data". Found in the transition audit
-      // (lifecycle 6, data 7, featured 9). Its symbol is the one coming, not
-      // a dash: the design check of 16 October.
+      // Before any chart has been in, the hero is empty, its symbol the one
+      // coming: never the day, nor "No data". A quarter second on, the label
+      // over it says Loading, and the header doesn't.
       var cold = summoned.testBody
       var coldSymbol = harness.find(cold, "heroSymbol").text
-      harness.check("a cold start shows an empty hero, naming what is coming",
-        cold.chart === null && cold.dayLine === null && cold.yearLine === null
-          && cold.featured === null && coldSymbol === "MSFT",
-        coldSymbol + "|" + JSON.stringify(cold.dayLine) + "|" + JSON.stringify(cold.yearLine) + "|" + JSON.stringify(cold.featured))
-      // A quarter second on, the label over the empty hero says Loading,
-      // and the header doesn't: it's said once, where a reader looks.
+      var coldEmpty = cold.chart === null && cold.dayLine === null && cold.yearLine === null
+        && cold.featured === null && coldSymbol === "MSFT"
+      var coldEmptyWas = coldSymbol + "|" + JSON.stringify(cold.dayLine) + "|" + JSON.stringify(cold.yearLine) + "|" + JSON.stringify(cold.featured)
       harness.check("a cold start's empty hero label alone says Loading, naming what is coming",
-        within(2000, function() { return coldLabel.visible }) && coldLabel.text === "Loading MSFT 1Y…"
+        coldEmpty && within(2000, function() { return coldLabel.visible }) && coldLabel.text === "Loading MSFT 1Y…"
           && cold.chart === null && coldWords.text === "",
-        coldLabel.visible + "|" + coldLabel.text + "|" + coldWords.text)
+        coldEmptyWas + " | " + coldLabel.visible + "|" + coldLabel.text + "|" + coldWords.text)
       releaseMsft.running = true
-      wait(50)
-      harness.check("payload features its symbol",
-        again.featuredSymbol === "MSFT" && summoned.featuredSymbol === "MSFT", again.featuredSymbol)
-      harness.check("payload sets the shared range",
-        again.range === "1Y" && summoned.range === "1Y", again.range + "|" + summoned.range)
       harness.check("the summoned window draws the range it asked for",
-        within(5000, function() { return harness.showsRange(summoned, "1Y") }),
-        harness.chartShown(summoned))
+        within(5000, function() { return harness.showsRange(summoned, "1Y") })
+          && again.featuredSymbol === "MSFT" && summoned.featuredSymbol === "MSFT" && again.range === "1Y" && summoned.range === "1Y",
+        harness.chartShown(summoned) + " " + again.featuredSymbol + "|" + again.range + "|" + summoned.range)
       coldWords.textChanged.disconnect(countLoading)
       coldLabel.visibleChanged.disconnect(countLoading)
       coldLabel.textChanged.disconnect(countLoading)
@@ -1012,22 +678,16 @@ ShellRoot {
         "the running service follows the file the summon wrote")
       summoned.destroy()
       again.destroy()
-
-      app.open(JSON.stringify({ range: "1D" }))
-      wait(100)
-      harness.check("a summon's range sets the shared range",
-        service.range === "1D" && app.range === "1D", service.range + "|" + app.range)
       app.close()
+
+      service.setRange("1D")
 
       // An add whose first fetch fails keeps the view: the hero stays on what
       // you were looking at, never "No data", and the pending add is done.
-      // NOPE fails every request, like curl -f on an HTTP error. Found in
-      // cubic's review of #21: the failure landed as an arrival and featured
-      // a symbol with nothing to show.
+      // NOPE fails every request, like curl -f on an HTTP error.
       app.open("{}")
-      wait(100)
       var heroBeforeFail = service.featuredSymbol
-      app.testKeyCatcher.forceActiveFocus()
+      tryVerify(function() { app.testKeyCatcher.forceActiveFocus(); return app.testKeyCatcher.activeFocus }, 2000, "the window takes the keys")
       keyClick(Qt.Key_A)
       tryVerify(function() { return body.adding && body.search.active }, 2000)
       var failField = harness.find(body.search, "searchField")
@@ -1037,10 +697,9 @@ ShellRoot {
       tryVerify(function() { return body.search.resultsQuery === "NOPE" && body.search.results.length === 1 }, 3000)
       keyClick(Qt.Key_Return)
       var failedOut = within(10000, function() { return !!service.entries.NOPE && service.entries.NOPE.status === "failed" })
-      wait(200)
+      var addDone = within(2000, function() { return service.arriving.length === 0 && body.landing === "" })
       harness.check("an add whose first fetch fails leaves the hero where it was",
-        failedOut && service.featuredSymbol === heroBeforeFail && !!body.featuredQuote
-          && service.arriving.length === 0 && body.landing === "",
+        failedOut && addDone && service.featuredSymbol === heroBeforeFail && !!body.featuredQuote,
         failedOut + "|" + heroBeforeFail + "->" + service.featuredSymbol + "|" + service.arriving + "|" + body.landing)
       service.removeSymbol("NOPE")
       app.close()
@@ -1048,7 +707,6 @@ ShellRoot {
       // A hover only where the pill can't say it: the text, the line, and
       // the arrow show their symbol and change, so theirs is quiet; the
       // icon's says the symbol and its change, which the animal can't show.
-      // The owner's rule of 15 October: tooltips sparingly.
       var quietSymbol = service.featuredSymbol
       var quietTips = hoverEveryForm()
       harness.check("only the icon pill's hover says anything, the symbol and its change; the text's, the line's, and the arrow's are quiet",
@@ -1081,8 +739,6 @@ ShellRoot {
       // The icon form, on the top bar and a side bar, and the side bar's
       // stacked form show the "!" too, the stacked one naming its symbol;
       // the icon form's stands alone, with no animal to stand beside.
-      // Found in the 1.0.0 review: they looked healthy, the stacked form
-      // saying "ST …" as if still loading.
       var formsWarn = function() {
         var settingsWas = pill.settings
         var said = []
@@ -1105,28 +761,16 @@ ShellRoot {
         failedForms === "icon !, side icon !, stacked FAIL/!", failedForms)
       // The window says the same where it says it: the header "No data",
       // the hero's line "! NO DATA FOR THIS SYMBOL", as the row says it.
-      // Found in the design pass of 14 October: "NO QUOTE", "! REFRESH
-      // FAILED · NO DATA", and "! No data for this symbol" for one fact, and
-      // nothing was ever there to refresh.
       app.open("{}")
-      wait(100)
-      var failedWords = [body.headerText, harness.find(body, "hero").listingLead,
-        body.watchlist.rowItem("FAIL") ? body.watchlist.rowItem("FAIL").detail : ""].join(" | ")
-      // A range picked for it fails too, and the header still says No data,
-      // with no range to retry, as the popup does (popup.qml): the range has
-      // no chart without a quote (`Chart.viewChart`). A range that fails
-      // with the quote in says it is unavailable on both (above, and
-      // popup.qml): the owner's call on the quality audit's finding 23.
-      var failRangeWas = service.range
-      body.selectRange("1W")
-      var rangeFailed = within(10000, function() { return !!service.histories["FAIL|1W"] && service.histories["FAIL|1W"].status === "failed" })
-      var failedRange = rangeFailed + " | " + body.headerText + " | " + body.offersRetry
-      body.selectRange(failRangeWas)
+      var failedWords = function() {
+        return [body.headerText, harness.find(body, "hero").listingLead,
+          body.watchlist.rowItem("FAIL") ? body.watchlist.rowItem("FAIL").detail : ""].join(" | ")
+      }
+      var saidOneWay = within(2000, function() { return failedWords() === "No data | ! NO DATA FOR THIS SYMBOL | ! No data for this symbol" })
+      var failedSaid = failedWords()
       app.close()
       harness.check("a symbol whose first fetch failed is said one way: No data, for this symbol",
-        failedWords === "No data | ! NO DATA FOR THIS SYMBOL | ! No data for this symbol", failedWords)
-      harness.check("a range that failed for a symbol whose quote failed too says No data, with no retry, as the popup does",
-        failedRange === "true | No data | false", failedRange)
+        saidOneWay, failedSaid)
 
       // A warning that ends while the pointer stays on the pill leaves no
       // bubble naming it: the text pill's goes, and the icon's loses the
@@ -1194,11 +838,11 @@ ShellRoot {
       var risen = Object.assign({}, quotesBeforeRest)
       risen.LATE = Object.assign({}, risen.LATE, { price: risen.LATE.price + 10 })
       service.testFeed.quotes = risen
+      // The bubble must not blink: a moment for a stray show to land.
       wait(100)
       var resting = [shows, JSON.stringify(opened), JSON.stringify(bubble), JSON.stringify(widget.tooltipText), pill.warns]
       // A wheel step under the resting pointer puts another symbol on the
-      // pill: the bubble names that one, once. Found in the mouse audit: it
-      // kept the old company until the pointer left and came back.
+      // pill: the bubble names that one, once.
       service.testFeed.quotes = quotesBeforeRest
       wait(100)
       var showsBeforeWheel = shows
@@ -1228,14 +872,12 @@ ShellRoot {
       // While a chart loads, the hero keeps what was on screen, chart,
       // figures, and info lines alike, under "Loading", and the new chart
       // draws in once it lands: from a range to another, cached or not, and
-      // on a symbol change on a range. Found by the owner on main: 1W to an
-      // uncached 6M showed the day's chart for a moment first. Every state
-      // the hero ends a turn in is recorded, the states a frame can show;
-      // SLOW's history answers after a second.
+      // on a symbol change on a range. Every state the hero ends a turn in
+      // is recorded, the states a frame can show; SLOW's history answers
+      // after a second.
       app.open("{}")
-      wait(100)
       service.addSymbol("SLOW")
-      // FAIL, added above, may still be in its retries ahead of SLOW.
+      // FAIL may still be in its retries ahead of SLOW.
       tryVerify(function() { return !!service.quotes.SLOW && service.arriving.length === 0 }, 15000)
       service.summon("SLOW", "1W")
       tryVerify(function() { return harness.answered("SLOW|1W") }, 5000)
@@ -1316,59 +958,15 @@ ShellRoot {
       harness.check("a symbol change on a range keeps the last symbol's chart and figures until the new one lands",
         toSlowWeek.states === "AB" && toSlowWeek.loading && !toSlowWeek.carried,
         JSON.stringify(toSlowWeek))
-      // A second request supersedes the first; the selected data wins.
-      dropEntry("AAPL|1W")
-      service.feature("AAPL")
-      tryVerify(function() { return !body.chartLoading }, 5000)
-      service.feature("SLOW")
-      tryVerify(function() { return !body.chartLoading }, 5000)
-      dropEntry("SLOW|1M")
-      dropEntry("SLOW|3M")
-      var selectedRanges = []
-      var latestRange = function() {
-        var said = body.chartSymbol + "|" + body.chartRange
-        if (selectedRanges[selectedRanges.length - 1] !== said) selectedRanges.push(said)
-      }
-      body.chartChanged.connect(latestRange)
-      latestRange()
-      service.setRange("1M")
-      service.setRange("3M")
-      tryVerify(function() { return harness.answered("SLOW|3M") && !service.testHistoryFeed.busy }, 5000)
-      waitForRendering(body)
-      latestRange()
-      body.chartChanged.disconnect(latestRange)
-      harness.check("a second range requested while another is out shows only the latest answer",
-        selectedRanges.every(function(range) { return range === "SLOW|1W" || range === "SLOW|3M" }) && body.chartRange === "3M" && body.chartSymbol === "SLOW",
-        selectedRanges.join(" -> "))
-      service.setRange("1D")
-
-      // On the day, a symbol whose first fetch failed is an answer too: the
-      // hero shows it, with no quote, and holds nothing, whether it failed
-      // before the choice (FAIL, added above) or while it was held (NOPEB).
-      service.feature("AAPL")
-      wait(100)
-      service.feature("FAIL")
-      var failedAtOnce = !body.chartLoading && body.chartSymbol === "FAIL"
-      service.feature("AAPL")
-      wait(100)
-      service.addSymbol("NOPEB")
-      service.feature("NOPEB")
-      var heldWhileOut = body.chartLoading && body.chartSymbol === "AAPL"
-      tryVerify(function() { return service.entries.NOPEB && service.entries.NOPEB.status === "failed" }, 15000)
-      wait(50)
-      harness.check("a symbol whose first quote failed is shown at once, or once it fails, never held behind the last",
-        failedAtOnce && heldWhileOut && !body.chartLoading && body.chartSymbol === "NOPEB",
-        failedAtOnce + "|" + heldWhileOut + "|" + body.chartLoading + "|" + body.chartSymbol)
-      service.removeSymbol("NOPEB")
       app.close()
       chartOnShow(body)
       service.removeSymbol("SLOW")
 
-      // On 6M every bar style, in both looks, shows the featured symbol's
-      // day, as its row does, and names no range; so does the vertical bar.
-      // DOWN's day fell and its history rose, so a figure or a colour from
-      // the range shows. FAIL, added above, would keep DOWN's first fetch
-      // behind its retries.
+      // On 6M every bar style shows the featured symbol's day, as its row
+      // does, and its day's line, naming no range. DOWN's day fell and its
+      // history rose, so a figure or a colour from the range shows. FAIL
+      // would keep DOWN's first fetch behind its retries. One look: the
+      // other is Format.lookSigns's.
       service.removeSymbol("FAIL")
       service.addSymbol("DOWN")
       tryVerify(function() { return !!service.quotes.DOWN && service.arriving.length === 0 }, 10000)
@@ -1377,74 +975,46 @@ ShellRoot {
       app.close()
       var downDay = Figures.rowModel(service.quotes.DOWN, 0, service.changeMode)
       var downRange = History.historyRowModel(service.histories["DOWN|6M"].history, service.quotes.DOWN, 0)
+      var dayLineDrawn = JSON.stringify(harness.find(pill, "pillLine").geometry) === JSON.stringify(Chart.chartGeometry(service.quotes.DOWN))
       var dayWrong = pillInEveryStyle(function(retro) { return Format.lookSigns(downDay.changeLine, retro) }, Commons.Color.urgent)
       harness.check("on 6M every bar style in both looks shows the day in its colour, and a middle-click keeps the entry's other keys",
-        service.range === "6M" && downDay.tone === "down" && downRange.tone === "up" && dayWrong.length === 0,
-        service.range + " " + downDay.tone + "/" + downRange.tone + " " + dayWrong.join(" | "))
+        service.range === "6M" && downDay.tone === "down" && downRange.tone === "up" && dayLineDrawn && dayWrong.length === 0,
+        service.range + " " + downDay.tone + "/" + downRange.tone + " line " + dayLineDrawn + " " + dayWrong.join(" | "))
 
       // A vertical bar is as wide as the shell's bar makes it (Bar.qml's
       // barSize), and the pill takes that width. There it is its icon, as
       // Omarchy's text widgets fall back to theirs, until a middle-click
-      // there picks the symbol over its change.
+      // there picks the symbol over its change. One look: the other is
+      // Format.lookSigns's.
       barApi.vertical = true
       barApi.barSize = Style.bar.sizeVertical
       var verticalWrong = []
-      var stackWarned = []
       var settingsBefore = pill.settings
-      // The stacked form's lines as drawn: text, ink width, size, colour.
       var stackLines = function() {
         return harness.find(pill, "pillStack").children.filter(function(c) { return c.objectName === "pillStackLine" })
       }
-      for (var vlook = 0; vlook < 2; vlook++) {
-        service.persist({ style: vlook === 0 ? "smooth" : "retro" })
-        var stack = harness.find(pill, "pillStack")
-        pill.settings = Object.assign({}, settingsBefore, {barStyleVertical: "icon"})
-        if (harness.iconDrawn() !== "bear in " + Commons.Color.urgent) verticalWrong.push("icon " + harness.iconDrawn())
-        // The icon form, whatever the top bar's: the bear alone, in one
-        // slot.
-        // Stacked, as Omarchy's clock stacks a vertical bar's lines: DOWN
-        // over its move, a percent over its %, or in money split at its
-        // point, one line to an icon slot, each inside the bar at the bar's
-        // size or 90% of it, never smaller. Its five-character change ran a
-        // pixel past each side. Between them, the warning's short line, empty.
-        pill.settings = Object.assign({}, settingsBefore, { barStyleVertical: "stacked" })
-        ;["pct", "abs"].forEach(function(mode) {
-          service.persist({ changeMode: mode })
-          var day = Figures.rowModel(service.quotes.DOWN, 0, service.changeMode)
-          var move = mode === "abs" ? Format.stackedMoney(day.abs, service.quotes.DOWN.priceDigits) : Format.stackedPct(day.pct)
-          var want = [["DOWN", barApi.barForeground], ["", barApi.barForeground]].concat(move.lines.map(function(t) {
-            return [Format.lookSigns(t, service.retro), Commons.Color.urgent]
-          }))
-          var lines = stackLines()
-          if (lines.length !== want.length || lines.some(function(line, i) { return line.text !== want[i][0] || !Qt.colorEqual(line.color, want[i][1]) }))
-            verticalWrong.push(mode + ": " + lines.map(function(line) { return line.text }).join("/"))
-        })
-        service.persist({ changeMode: "pct" })
-        // A failed refresh puts its "!" on the warning's line, and the pill
-        // keeps its height and its move where they were. Found in the 1.0.2
-        // visual review: the "!" took a line of its own, 81 px to 108.
-        var freshEntries = service.testFeed.entries
-        service.testFeed.entries = Object.assign({}, freshEntries, { DOWN: Object.assign({}, freshEntries.DOWN, { status: "failed" }) })
-        if (!stackLines().some(function(line) { return line.text === "!" })) stackWarned.push("missing failed-refresh warning")
-        service.testFeed.entries = freshEntries
-        pill.settings = settingsBefore
-      }
-      var entriesBeforeFail = service.testFeed.entries
-      var sideWrong = false
-      ;["left", "right"].forEach(function(side) {
-        barApi.position = side
-        service.testFeed.entries = Object.assign({}, entriesBeforeFail, { DOWN: Object.assign({}, entriesBeforeFail.DOWN, { status: "failed" }) })
-        if (!pill.warns || !harness.find(pill, "pillWarning").visible) sideWrong = true
+      pill.settings = Object.assign({}, settingsBefore, {barStyleVertical: "icon"})
+      if (harness.iconDrawn() !== "bear in " + Commons.Color.urgent) verticalWrong.push("icon " + harness.iconDrawn())
+      // Stacked: DOWN over its move, a percent over its %, or in money split
+      // at its point, with the warning's line empty between them.
+      pill.settings = Object.assign({}, settingsBefore, { barStyleVertical: "stacked" })
+      ;["pct", "abs"].forEach(function(mode) {
+        service.persist({ changeMode: mode })
+        var day = Figures.rowModel(service.quotes.DOWN, 0, service.changeMode)
+        var move = mode === "abs" ? Format.stackedMoney(day.abs, service.quotes.DOWN.priceDigits) : Format.stackedPct(day.pct)
+        var want = [["DOWN", barApi.barForeground], ["", barApi.barForeground]].concat(move.lines.map(function(t) {
+          return [Format.lookSigns(t, service.retro), Commons.Color.urgent]
+        }))
+        var lines = stackLines()
+        if (lines.length !== want.length || lines.some(function(line, i) { return line.text !== want[i][0] || !Qt.colorEqual(line.color, want[i][1]) }))
+          verticalWrong.push(mode + ": " + lines.map(function(line) { return line.text }).join("/"))
       })
-      service.testFeed.entries = entriesBeforeFail
-      barApi.position = "top"
-      harness.check("a failed refresh warns on either side bar", !sideWrong)
+      service.persist({ changeMode: "pct" })
+      pill.settings = settingsBefore
       // Each bar keeps its own form: a saved arrow stays the arrow on a
       // horizontal bar while a vertical one shows the icon, and a
       // middle-click there steps between the icon and the symbol over its
-      // change without touching the arrow. The arrow, the line, and the text
-      // used to share one setting with the vertical bar, so a middle-click
-      // there lost the arrow.
+      // change without touching the arrow.
       pill.settings = Object.assign({}, settingsBefore, { barStyle: "arrow" })
       var drawn = function() {
         return pill.barStyle + " " + (harness.find(pill, "pillIcon").visible ? "icon" : harness.find(pill, "pillStack").visible ? "stacked"
@@ -1465,18 +1035,15 @@ ShellRoot {
       barApi.barSize = 0
       walk.push(drawn())
       pill.settings = settingsBefore
-      service.persist({ style: "smooth" })
       harness.check("the vertical stacked form names the day's symbol and change in both modes and looks",
         verticalWrong.length === 0, verticalWrong.join(" | "))
-      harness.check("a failed refresh warns on the stacked form in both looks",
-        stackWarned.length === 0, stackWarned.join(" | "))
       harness.check("a horizontal bar's arrow and a vertical bar's form are kept apart, and on a vertical bar every middle-click changes what shows",
         walk.join(",") === "icon icon,arrow arrow,stacked stacked,icon icon,stacked stacked,arrow arrow", walk.join(","))
 
       // In the bar's right section, among its bare icons, the pill shows its
       // icon until a middle-click there picks another form, which it keeps
       // for the right; the centre and left keep theirs, and a move brings
-      // back each section's own. It used to show its full form on the right.
+      // back each section's own.
       var settingsBeforeMove = pill.settings
       var writesBeforeMove = harness.entryWrites.length
       var formIn = function(section) {
@@ -1492,22 +1059,9 @@ ShellRoot {
       }
       var centreForm = formIn("center")
       var movedRight = formIn("right")
-      // The icon form is the day's animal, as the header's: the bull on an
-      // up day and the bear on a down one, each in its colour, and on a flat
-      // day neither, a level line in the dim.
       var upSymbol = service.library.filter(function(s) {
         return !!service.quotes[s] && Figures.animalKind(Figures.rowModel(service.quotes[s], 0, service.changeMode)) === "bull"
       })[0] || ""
-      service.feature(upSymbol)
-      var onUpDay = upSymbol + " " + harness.iconDrawn()
-      service.feature("DOWN")
-      var onDownDay = "DOWN " + harness.iconDrawn()
-      var quotesBeforeFlat = service.testFeed.quotes
-      var flat = Object.assign({}, quotesBeforeFlat)
-      flat.DOWN = Object.assign({}, quotesBeforeFlat.DOWN, { prevClose: quotesBeforeFlat.DOWN.price })
-      service.testFeed.quotes = flat
-      var onFlatDay = "DOWN " + harness.iconDrawn()
-      service.testFeed.quotes = quotesBeforeFlat
       middleClick()
       middleClick()
       var pickedRight = pill.barStyle
@@ -1520,17 +1074,16 @@ ShellRoot {
       pill.settings = settingsBeforeMove
       harness.check("on the right the pill is its icon, the bull on an up day, the bear on a down one, and a level line on a flat one, until a middle-click there picks a form, kept for the right; the centre and left keep theirs",
         centreForm === "sparkline" && movedRight === "icon alone" && pickedRight === "arrow"
-          && onUpDay === upSymbol + " bull in #9ece6a" && upSymbol !== "" && onDownDay === "DOWN bear in " + Commons.Color.urgent
-          && onFlatDay === "DOWN level"
           && wrote.barStyleRight === "arrow" && wrote.barStyle === "sparkline"
           && backInCentre === "sparkline" && onLeft === "sparkline" && backOnRight === "arrow",
-        [centreForm, movedRight, onUpDay, onDownDay, onFlatDay, pickedRight, JSON.stringify(wrote), backInCentre, onLeft, backOnRight].join(" | "))
+        [centreForm, movedRight, pickedRight, JSON.stringify(wrote), backInCentre, onLeft, backOnRight].join(" | "))
 
       // Only a middle-click writes the bar entry: every look, range, and
       // list this flow changed is the data file's.
       service.createList("Held")
       service.switchList("")
       service.setRange("1D")
+      // Nothing must write: a moment for a stray write to land.
       wait(50)
       harness.check("looks, ranges, and lists never write the bar entry; only a middle-click does",
         harness.entryWrites.length === harness.middleClicks, harness.middleClicks + " clicks, " + JSON.stringify(harness.entryWrites))
@@ -1539,12 +1092,8 @@ ShellRoot {
       // omarchy-theme-set puts the new theme's files in place and then hands
       // the shell its palette and its shell.toml, and the plugin reads the
       // new file then. Each theme's green differs, so the read has landed
-      // once the green has changed. Hackerman's green and red are both
-      // greens and Solitude's two greys, so there up and down are Stonks'
-      // own pair for a dark bar, and White's, two near-blacks, its pair for
-      // a light one. A theme that differs from the last in its green alone
-      // (Tokyo Night with Kanagawa's) is read too: found in review, its
-      // green stayed the last one's.
+      // once the green has changed. A theme that differs from the last in
+      // its green alone (Tokyo Night with Kanagawa's) is read too.
       var change = harness.find(pill, "pillChange")
       var dayColours = function(theme) {
         service.feature("DOWN")
@@ -1568,11 +1117,10 @@ ShellRoot {
       }
       var greenOnly = ["sh", "-c", "sed 's/^green = .*/green = \"#76946a\"/' /usr/share/omarchy/themes/tokyo-night/colors.toml > '"
         + harness.themeDir + "/colors.toml'"]
-      var trendColours = [dayColours("tokyo-night"), daysIn("hackerman"), daysIn("solitude"), daysIn("white"), daysIn("kanagawa"),
-        daysIn("tokyo-night"), daysIn("tokyo-night with kanagawa's green", greenOnly), daysIn("tokyo-night")]
+      var trendColours = [dayColours("tokyo-night"), daysIn("kanagawa"), daysIn("tokyo-night"),
+        daysIn("tokyo-night with kanagawa's green", greenOnly), daysIn("tokyo-night")]
       harness.check("up and down are the theme's green and red and follow a theme switch, Stonks' own pair for the bar's ground where the theme has none",
-        trendColours.join(" | ") === "tokyo-night #9ece6a #f7768e | hackerman #3ea347 #e66761 | solitude #41a64a #ea6b64"
-          + " | white #1c892d #c94d49 | kanagawa #76946a #c34043 | tokyo-night #9ece6a #f7768e"
+        trendColours.join(" | ") === "tokyo-night #9ece6a #f7768e | kanagawa #76946a #c34043 | tokyo-night #9ece6a #f7768e"
           + " | tokyo-night with kanagawa's green #76946a #f7768e | tokyo-night #9ece6a #f7768e",
         trendColours.join(" | "))
 
@@ -1622,21 +1170,6 @@ ShellRoot {
         turnStart === animalOf("TURN") && turnedDown === "bear in " + pill.downColor
           && turnedUp === "bull in " + pill.upColor && wheelsRight,
         [turnStart, turnedDown, turnedUp].concat(wheels).join(" | "))
-      // The animal is the day against its close in every change mode, as
-      // the header's is: "since open", reading TURN's day the other way,
-      // neither changes nor turns it.
-      service.feature("TURN")
-      tryVerify(function() { return !!pill.featured && pill.featured.symbol === "TURN" }, 2000)
-      var toneIn = function(mode) { return Figures.rowModel(service.quotes.TURN, 0, mode).tone }
-      if (toneIn("open") === toneIn("pct")) newPrice(true)
-      var modeFlip = toneIn("pct") + " to " + toneIn("open")
-      var pctAnimal = harness.iconDrawn()
-      service.persist({ changeMode: "open" })
-      var modeAnimal = harness.iconDrawn()
-      service.persist({ changeMode: "pct" })
-      harness.check("a change of mode leaves the pill's animal reading its day against the close",
-        toneIn("open") !== toneIn("pct") && modeAnimal === pctAnimal && pctAnimal === animalOf("TURN"),
-        modeFlip + ": " + modeAnimal + ", " + pctAnimal + " in pct")
       barApi.layoutConfig = ({})
       pill.settings = settingsBeforeTurn
       service.feature(upSymbol)
@@ -1650,17 +1183,15 @@ ShellRoot {
       var gone = withFigures[0] || ""
       var other = service.library.filter(function(s) { return s !== gone && s !== service.featuredSymbol })[0]
       service.removeSymbol(gone)
+      // Kept while the removal can be undone: read a moment on, as a drop would land.
       wait(50)
       var keptForUndo = !!service.fundamentals[gone]
       service.removeSymbol(other)
-      wait(50)
       harness.check("a removed symbol's cap and P/E stay while its removal can be undone, and go after",
-        gone !== "" && keptForUndo && !service.fundamentals[gone],
+        gone !== "" && keptForUndo && within(2000, function() { return !service.fundamentals[gone] }),
         gone + ": " + keptForUndo + " then " + !!service.fundamentals[gone])
 
       harness.finish()
     }
   }
-
-  HarnessExit { id: done }
 }

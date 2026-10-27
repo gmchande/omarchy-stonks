@@ -714,6 +714,8 @@ test("rowModel shows the regular close at rest and the print under the finger", 
     points: [{ t: reg.start + 60, p: 110 }, { t: reg.end - 60, p: 105 }]
   }
   expect(view(0, "open", flip)).toMatchObject({ price: 105, tone: "down", dayUp: true })
+  // The pill's animal reads the day against its close in every mode.
+  expect([M.animalKind(M.rowModel(flip, 0, "open")), M.animalKind(M.rowModel(flip, 0, "pct"))]).toEqual(["bull", "bull"])
   // With no data nothing is invented: no price, no change, no direction.
   const nothing = { ...quote, price: null, marketTime: null, points: [] }
   expect(view(0, "pct", nothing)).toMatchObject({ priceText: "—", changeText: "—", dayUp: null })

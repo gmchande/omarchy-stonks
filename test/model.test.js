@@ -564,6 +564,8 @@ test("the data file reads as written and repairs hand edits", () => {
   expect(M.fileSettings(null).symbols).toEqual(["NVDA", "AAPL", "MSFT", "SPY", "TSLA"])
   expect(M.fileSettings(null).refreshIntervalSec).toBe(60)
   expect([M.fileSettings(null).style, M.fileSettings({ style: "smooth" }).style]).toEqual(["retro", "smooth"])
+  // A saved range comes back; one Stonks doesn't draw is the day.
+  expect([M.fileSettings({ range: "1M" }).range, M.fileSettings({ range: "2D" }).range]).toEqual(["1M", "1D"])
   // Symbols are upper-cased, trimmed, and kept once, from a string or a list.
   expect(M.fileSettings({ symbols: "nvda, aapl AAPL" }).symbols).toEqual(["NVDA", "AAPL"])
   expect(M.fileSettings({ symbols: ["spy", " tsla ", "SPY"] }).symbols).toEqual(["SPY", "TSLA"])
