@@ -40,10 +40,18 @@ Item {
   readonly property string folder: files ? files.folder : ""
   readonly property string replayPath: folder + "/replay.wav"
   readonly property string voice: retro ? "retro" : "smooth"
-  // The files in the cache's folder written this run, by name: each look's
-  // chimes and lead-ins, written ahead as sounds turn on or the look
-  // changes, and again on the next run.
+  // The files in the cache's folder that hold the current sound, by name:
+  // each look's chimes and lead-ins, written ahead as sounds turn on or the
+  // look changes, or left current by an earlier run (`takeSurvey`).
   property var madeThisRun: ({})
+  // What each look's files are made from now: the md5 of this file,
+  // ChartSound.js, and the look's bundled sounds, as `takeSurvey` read
+  // them, which the look's `stamp-<look>` in the folder holds once all its
+  // files do; and the looks this run wrote a file of, whose stamp is
+  // written again once all are.
+  property var sources: ({})
+  property var rewrote: ({})
+  property bool surveyed: false
   readonly property var fixedSounds: ["add", "remove", "undo", "shutter", "bell"]
   // A chime's lead-ins, in ms (`leadAt`).
   readonly property var leadSteps: [30, 60, 90, 120, 150]
@@ -264,6 +272,7 @@ Item {
       var bytes = typeof what === "number" ? ChartSound.wav(ChartSound.chime(look === "retro", what)) : bundledBytes(look, what)
       files.write(folder + "/" + file, lead ? led(bytes, lead) : bytes)
       madeThisRun[file] = true
+      rewrote[look] = true
     }
     return folder + "/" + file
   }
@@ -294,7 +303,9 @@ Item {
   // Turned off, the sound playing stops, and a chime waiting with it. The
   // look's files are written ahead, one every 100 ms, so the first pass
   // over the chart writes nothing: written back to back, smooth's eleven
-  // chimes held the shell's thread for about 80 ms.
+  // chimes held the shell's thread for about 80 ms. Only the files that
+  // don't hold the current sound are written (`takeSurvey`): writing all 71
+  // of a look's on every start held the thread 3 to 66 ms each, for 7 s.
   onTurnedOnChanged: {
     if (!turnedOn) {
       replayOwner = null
@@ -312,11 +323,69 @@ Item {
     repeat: true
     onTriggered: {
       if (!root.turnedOn) return stop()
+      if (!root.surveyed) {
+        if (root.folder !== "" && !survey.running) survey.running = true
+        return
+      }
       var look = root.voice
       var due = root.aheadOf(look).filter(function(f) { return !root.madeThisRun[root.fileOf(look, f[0], f[1])] })
-      if (due.length === 0) return stop()
-      root.written(look, due[0][0], due[0][1])
+      if (due.length > 0) return root.written(look, due[0][0], due[0][1])
+      stop()
+      // After the look's files, so none is newer than the stamp that
+      // vouches for it.
+      if (root.rewrote[look] && root.sources[look]) root.files.write(root.folder + "/stamp-" + look, root.sources[look] + "\n")
+      root.rewrote[look] = false
     }
+  }
+
+  // What the sounds are made from, by `md5sum`, and each look's stamp and
+  // the files no newer than it, once a run, before anything is written
+  // ahead. A file newer than its look's stamp was written by a Stonks that
+  // keeps no stamp, an older one, so it may hold another sound. The answer
+  // runs under 8 KB; it is read up to 64. Heard as it ends, or as it fails
+  // to start, which says no exit.
+  Process {
+    id: survey
+    command: ["timeout", "5", "sh", "-c", "{ cd -- \"$1\" && md5sum -- ChartSound.js Sounds.qml sounds/*/*.wav && cd -- \"$2\" || exit 0\n"
+      + "for look in smooth retro; do\n"
+      + "  [ -f \"stamp-$look\" ] || continue\n"
+      + "  printf 'stamp %s %s\\n' \"$look\" \"$(head -c 64 -- \"stamp-$look\")\"\n"
+      + "  for f in chime-*\"$look\"-*.wav lead-\"$look\"-*.wav; do\n"
+      + "    [ -f \"$f\" ] && ! [ \"$f\" -nt \"stamp-$look\" ] && printf 'have %s\\n' \"$f\"\n"
+      + "  done\n"
+      + "done; } | head -c 65536", "sh", String(Qt.resolvedUrl(".")).replace(/^file:\/\//, ""), root.folder]
+    stdout: StdioCollector { id: surveyAnswer }
+    onRunningChanged: if (!running) root.takeSurvey(surveyAnswer.text)
+  }
+
+  // A look's files that hold the current sound count as made this run: its
+  // stamp says what they are made from now, and the folder has them. Any
+  // other is written ahead, and one missing too. Without an answer, every
+  // file is, as each run did before stamps.
+  function takeSurvey(text) {
+    var sums = { smooth: [], retro: [] }
+    var stamps = {}
+    var have = {}
+    String(text).split("\n").forEach(function(line) {
+      var sum = line.match(/^[0-9a-f]{32}  (.+)$/)
+      var own = sum ? sum[1].match(/^sounds\/(smooth|retro)\//) : null
+      var word = line.split(" ")
+      if (own) sums[own[1]].push(line)
+      else if (sum) ["smooth", "retro"].forEach(function(look) { sums[look].push(line) })
+      else if (word[0] === "stamp" && word.length === 3) stamps[word[1]] = word[2]
+      else if (word[0] === "have" && word.length === 2) have[word[1]] = true
+    })
+    ;["smooth", "retro"].forEach(function(look) {
+      // ChartSound.js, this file, and every bundled sound.
+      if (sums[look].length !== 2 + root.fixedSounds.length) return
+      root.sources[look] = Qt.md5(sums[look].join("\n"))
+      if (stamps[look] !== root.sources[look]) return
+      root.aheadOf(look).forEach(function(f) {
+        var file = root.fileOf(look, f[0], f[1])
+        if (have[file]) root.madeThisRun[file] = true
+      })
+    })
+    root.surveyed = true
   }
 
   Timer {
