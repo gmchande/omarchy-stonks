@@ -51,9 +51,19 @@ Harness {
     return state.indexOf("pill-sheet") === 0 ? state : state.replace(/-size-\d+$/, "")
   }
   // A -size-N state's text scale, as Style.fontScale has it; 1 for the rest.
-  readonly property real sizeScale: {
-    var m = /-size-(\d+)$/.exec(asked)
-    return m ? Math.max(1 / 12, Number(m[1]) / 12) : 1
+  readonly property int askedSize: { var m = /-size-(\d+)$/.exec(asked); return m ? Number(m[1]) : 0 }
+  readonly property real sizeScale: askedSize ? Math.max(1 / 12, askedSize / 12) : 1
+  // The shell reads the text size after it starts: a state at another size
+  // (render.sh: -size-N, -large at 16, -small at 10) shows its window once
+  // it has, so the window takes the size the surface asks at that size.
+  readonly property int landingSize: askedSize || (/-large$/.test(asked) ? 16 : /-small$/.test(asked) ? 10 : 0)
+  readonly property bool sizeLanded: landingSize === 0 || Style.fontBaseSize === landingSize
+  // A picture is of the frame the surface asked for: a window that kept
+  // another size draws a state no reader sees, so it fails.
+  function judgeFrame() {
+    if (renderWindow.width !== Math.round(renderWindow.implicitWidth) || renderWindow.height !== Math.round(renderWindow.implicitHeight))
+      console.log("FAIL the frame is " + renderWindow.width + " × " + renderWindow.height + ", not the "
+        + Math.round(renderWindow.implicitWidth) + " × " + Math.round(renderWindow.implicitHeight) + " the surface asks")
   }
   readonly property bool minWindowOf: requested.indexOf("min-window-of-") === 0
   readonly property bool windowOf: minWindowOf || requested.indexOf("window-of-") === 0
@@ -1022,13 +1032,14 @@ Harness {
 
   FloatingWindow {
     id: renderWindow
-    visible: true
+    visible: root.sizeLanded
     color: root.groundColor
-    // The larger text size lands after the window has taken its size, so
-    // the large sheet is given room for its seven rows, and a -size-N state
-    // is given the widths Style.space gives the surfaces at size N: the
-    // popup's 480 and the smallest window's 560 grow with the text, and the
-    // window is 720 or its smallest, whichever is wider.
+    // The window shows once the text size has landed (`sizeLanded`); the
+    // large sheet, at the size render.sh gives it, is given room for its
+    // seven rows, and a -size-N state the widths Style.space gives the
+    // surfaces at size N: the popup's 480 and the smallest window's 560
+    // grow with the text, and the window is 720 or its smallest, whichever
+    // is wider.
     implicitWidth: root.anchorState ? 1000 : root.pillSheet ? Math.max(520, pillColumn.implicitWidth + 48) : root.themeState ? 480 + 410 : root.sheet ? 1000
       : (root.windowWidth ? root.windowWidth : (root.smallest ? Math.round(560 * root.sizeScale)
         : (root.popup ? Math.round(480 * root.sizeScale) : Math.max(720, Math.round(560 * root.sizeScale)))))
@@ -1326,7 +1337,7 @@ Harness {
     // drawn: nothing in the shell says when that is done.
     Timer {
       interval: 300
-      running: !root.interactivePicture
+      running: !root.interactivePicture && renderWindow.visible
       onTriggered: {
         if (root.shareOf) {
           body.camera = shareCamera
@@ -1334,6 +1345,7 @@ Harness {
           return
         }
         if (root.beforeGrab) root.beforeGrab()
+        root.judgeFrame()
         frame.grabToImage(function(result) {
           result.saveToFile(root.outPath)
           root.finish()
@@ -1530,6 +1542,7 @@ Harness {
       // The hover and press fills, the scroll and the poses' rows, settle
       // within two 160 ms fades; nothing says when all of them have.
       wait(320)
+      root.judgeFrame()
       var saved = false
       frame.grabToImage(function(result) { saved = result.saveToFile(root.outPath) })
       tryVerify(function() { return saved }, 3000)
