@@ -84,13 +84,14 @@ function pick(root, base) {
   const byName = new Map()
   for (const file of files) for (const name of names(file)) byName.set(name, [...(byName.get(name) || []), file])
   const scanned = new Map()
-  const reach = seeds => {
+  const reach = (seeds, stop = new Set()) => {
     const seen = new Set(seeds), queue = [...seeds]
     while (queue.length) {
       const file = queue.pop()
       // The runners name every check, and a change to them reaches
       // everything anyway: what they name reaches no check through them.
       if (!scanned.has(file)) scanned.set(file, everything.includes(file) ? new Set() : words(root, file))
+      if (stop.has(file)) continue
       for (const word of scanned.get(file)) for (const next of byName.get(word) || []) {
         if (!seen.has(next)) { seen.add(next); queue.push(next) }
       }
@@ -123,12 +124,25 @@ function pick(root, base) {
     shell = files
   }
 
+  // What a runner runs itself, beside its checks: the scripts its own steps
+  // call (test/review.sh's render diff), and what those name. A change
+  // there reaches every check of that runner.
+  const helped = new Map()
+  for (const runner of Object.keys(runners)) {
+    const named = [...words(root, runner)].flatMap(word => byName.get(word) || [])
+    const helpers = named.filter(f => !checks.has(f) && !everything.includes(f))
+    const reached = reach(helpers, new Set([...checks.keys(), ...everything]))
+    helped.set(runners[runner], changed.filter(f => reached.has(f) && !checks.has(f)))
+  }
+
   const runnerChanged = changed.filter(f => everything.includes(f))
   const picks = []
   for (const [check, runner] of checks) {
     const journey = check.startsWith('test/tophat/journeys/')
+    const helper = helped.get(runner) || []
     let verdict = 'pick', why
     if (runnerChanged.length) why = `the runners changed (${runnerChanged.join(', ')})`
+    else if (helper.length) why = `its runner runs ${helper.join(', ')} itself`
     else if (!journey && !/^test\/qml\/[^/]+\.sh$/.test(check)) why = 'reads files it does not name, so it runs on every diff'
     else {
       const reached = reach(journey ? [check, ...shell] : [check])
@@ -154,7 +168,8 @@ function selfCheck() {
     put('NOTES.md', 'Child, Lone and Rules.js, in words.\n')
     put('sounds/bell.wav', Buffer.from([82, 73, 70, 70, 0, 0, 0, 0]))
     put('test/all.sh', 'source "$(dirname "${BASH_SOURCE[0]}")/queue.sh"\nstart "x harness" bash test/qml/x.sh\nstart "y harness" bash test/qml/y.sh\nrun "quick check" bash test/quick.sh\nverdict\n')
-    put('test/review.sh', 'source "$(dirname "${BASH_SOURCE[0]}")/queue.sh"\nstart "renders" bash test/qml/r.sh\nrun --with test/qml/r.sh "render diff" render_diff\nverdict\n')
+    put('test/review.sh', 'source "$(dirname "${BASH_SOURCE[0]}")/queue.sh"\nrender_diff() { bash test/diff.sh; }\nstart "renders" bash test/qml/r.sh\nrun --with test/qml/r.sh "render diff" render_diff\nverdict\n')
+    put('test/diff.sh', 'echo diff\n')
     put('test/queue.sh', 'verdict() { :; }\n')
     put('test/quick.sh', 'echo ok\n')
     put('test/qml/lib.sh', 'PATH="$here/bin:$PATH"\ncp "$plugin"/*.qml "$plugin/manifest.json" "$root/plugin/"\nusage() { echo "every harness: test/all.sh"; }\n')
@@ -182,6 +197,7 @@ function selfCheck() {
       ['a note nothing reads', 'NOTES.md', ['test/quick.sh'], ['test/qml/x.sh', 'test/qml/y.sh', 'test/qml/r.sh', 'test/tophat/journeys/j.sh']],
       ['a new data file, not yet added to git', 'test/data/2.json', ['test/qml/y.sh'], ['test/qml/x.sh', 'test/qml/r.sh']],
       ['the runners\' queue', 'test/queue.sh', ['test/qml/x.sh', 'test/qml/y.sh', 'test/qml/r.sh', 'test/tophat/journeys/j.sh', 'test/quick.sh'], []],
+      ['a script a runner runs itself', 'test/diff.sh', ['test/qml/r.sh'], ['test/qml/x.sh', 'test/qml/y.sh']],
       ['a deleted type', '-Lone.qml', ['test/qml/y.sh'], ['test/qml/x.sh']],
     ]
     for (const [label, change, want, notWant] of cases) {

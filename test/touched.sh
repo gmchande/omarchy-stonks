@@ -70,7 +70,9 @@ for runner in all review; do
   test/$runner.sh || failed+=("test/$runner.sh")
 done
 if [ -n "${journeys_pid:-}" ]; then
-  wait "$journeys_pid"
+  # The worker ends 0 once every journey ran, failed or not; anything else
+  # means it was stopped before all of them did.
+  wait "$journeys_pid" || failed+=("the journeys, whose run stopped early (status $?)")
   cat "$journeys_log"
   [ ! -f "$journeys_log.failed" ] || mapfile -t -O "${#failed[@]}" failed < "$journeys_log.failed"
 fi
