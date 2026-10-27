@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "symbols": [
+    "SPY",
+    "AAPL",
+    "7203.T",
+    "BTC-USD",
+    "^GSPC",
+    "SHEL.L",
+    "JNJ"
+  ],
+  "featured": "7203.T",
+  "order": "manual",
+  "reversed": false,
+  "changeMode": "abs",
+  "style": "retro",
+  "refreshIntervalSec": 300,
+  "lists": [
+    {
+      "name": "US",
+      "symbols": [
+        "SPY",
+        "JNJ",
+        "AAPL",
+        "^GSPC"
+      ],
+      "order": "manual",
+      "reversed": false
+    },
+    {
+      "name": "World",
+      "symbols": [
+        "SHEL.L",
+        "7203.T",
+        "AAPL"
+      ],
+      "order": "name",
+      "reversed": false
+    },
+    {
+      "name": "Movers",
+      "symbols": [
+        "BTC-USD",
+        "JNJ",
+        "7203.T"
+      ],
+      "order": "pct",
+      "reversed": true
+    },
+    {
+      "name": "Later",
+      "symbols": [],
+      "order": "manual",
+      "reversed": false
+    }
+  ],
+  "list": "World",
+  "range": "1Y",
+  "hinted": true,
+  "sounds": true,
+  "updateCheck": false
+}
