@@ -301,7 +301,7 @@ Harness {
         scrubAt(Chart.fractionAtTime(toy, 1791174000 + 240))
         var scrubbed = [body.headerText, body.featured.priceText].join(" | ")
         endScrub()
-        check(look + ": a scrub at TOY's 00:20 dot lands on it, says its time, and reads its move from the dashed line's close, which the legend names; at rest the line under the price reads it from Friday's",
+        check(look + ": a scrub at TOY's 00:20 dot lands on it and says its time",
           scrubbed === "At 00:20 · Overnight | 322.00", scrubbed)
         scrubAt(0)
         var edge = body.headerText
@@ -519,7 +519,7 @@ Harness {
         && rowView.priceText === body.featured.priceText && rowView.changeText === body.featured.changeText
       var rowRead = rowsAt + " vs " + body.scrubShown + ": " + rowView.priceText + " " + rowView.changeText + " vs " + body.featured.priceText + " " + body.featured.changeText
       endScrub()
-      check("Friday 06:00: NVDA's chart is Thursday, then its night and pre-market, its scrub reading each from the dashed line's close, its row following into the pre-market",
+      check("Friday 06:00: NVDA's row follows its scrub into the pre-market",
         rowFollows, rowRead)
 
       // Every request of the run, Robinhood's instruments' too.
