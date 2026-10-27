@@ -206,9 +206,7 @@ Panel {
           camera: root.camera
           surfaceOpen: root.opened
           switchesPanels: true
-          // 190 before the header took a second line and a rule: the chart
-          // gives back their 28 px, so the card stays its height.
-          chartHeight: Style.space(162)
+          chartHeight: Style.space(190)
           foreground: root.bar ? root.bar.foreground : Commons.Color.foreground
           fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
           // The card's colour, opaque whatever the theme's popup alpha.
