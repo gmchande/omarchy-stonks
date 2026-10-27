@@ -1034,8 +1034,7 @@ Harness {
           // Laid out and drawn, so the rows sit where they're read and the
           // pointer's hover reaches them.
           waitForRendering(view)
-          // Harness.findAll walks a Flickable's contentItem twice: one of each.
-          rows = root.findAll(view, rowName).filter(function(r, i, all) { return all.indexOf(r) === i })
+          rows = root.findAll(view, rowName)
           var at = rows[1].mapToItem(body, rows[1].width / 2, rows[1].height / 2)
           mouseMove(body, at.x, at.y - 6)
           mouseMove(body, at.x, at.y)
