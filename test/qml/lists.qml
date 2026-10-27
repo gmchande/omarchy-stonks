@@ -781,16 +781,22 @@ Harness {
         helpKeeps === "true,false,false,false,Pwr" && helpRefused === "false,true,true,true,Pwr", helpKeeps + " | " + helpRefused)
       service.renameList("Pwr", "Power")
 
-      // A symbol's lists by keys, then Ctrl-click. Opened as a Ctrl-click
-      // opens them, on the cursor row.
+      // A symbol's lists by keys, then Ctrl-click. By keys: l, the arrows to
+      // the menu's last line, which names the cursor row, and Enter, which
+      // opens its lists as a Ctrl-click does.
       var power = function() { return service.dataSettings.lists[0].symbols }
       keys.forceActiveFocus()
       wl.cursorSymbol = "NVDA"
-      body.openSymbolLists("NVDA")
+      keyClick(Qt.Key_L)
+      focused(menu)
+      for (var down = 0; down < 40 && menu.cursor !== menu.lastIndex; down++) keyClick(Qt.Key_Down)
+      var rowLine = harness.find(menu, "rowListsRow")
+      var named = !!rowLine && rowLine.visible && menu.cursor === menu.rowListsIndex && menu.rowSymbol === "NVDA"
+      keyClick(Qt.Key_Return)
       focused(checklist)
-      harness.check("a symbol's lists open on the first named list, with the keys",
-        body.listsSymbol === "NVDA" && checklist.visible && checklist.activeFocus && checklist.cursor === 1
-          && !wl.visible)
+      harness.check("l, the arrows to \"Lists with NVDA…\", and Enter open the cursor row's lists on the first named list, with the keys",
+        named && body.listsSymbol === "NVDA" && !body.listMenuOpen && checklist.visible && checklist.activeFocus
+          && checklist.cursor === 1 && !wl.visible, named + "|" + body.listsSymbol + "|" + checklist.cursor)
       keyClick(Qt.Key_Return)
       var ticked = power().join(",")
       keyClick(Qt.Key_Return)

@@ -8,14 +8,16 @@ import "Tones.js" as Tones
 import "KeyText.js" as KeyText
 
 // The list menu: All and each named list with its count, a check on the
-// current one, then "New list…", which turns into a name field in place, and
-// "Manage lists…". Those two stay in sight under the lists, which scroll in
-// whole rows when they outgrow the room, so no list shows cut in half.
-// Value-in, signals out; the body switches and creates. One cursor, as on
-// the rows: it opens on the current list, moving the pointer puts it on the
-// row under it, the arrows move it from there, Enter takes one, and Escape
-// or l backs out. It takes the rows' mark, the hover-cursor fill and
-// the bar; a click takes the row clicked.
+// current one, then "New list…", which turns into a name field in place,
+// "Manage lists…", and, while a row is selected, "Lists with NVDA…", the
+// lists that row is in, as a Ctrl-click on it opens them. Those stay in
+// sight under the lists, which scroll in whole rows when they outgrow the
+// room, so no list shows cut in half. Value-in, signals out; the body
+// switches and creates. One cursor, as on the rows: it opens on the
+// current list, moving the pointer puts it on the row under it, the arrows
+// move it from there, Enter takes one, and Escape or l backs out. It takes
+// the rows' mark, the hover-cursor fill and the bar; a click takes the row
+// clicked.
 FocusScope {
   id: root
 
@@ -31,6 +33,9 @@ FocusScope {
   // Why the typed name was refused, said under the field: while a name is
   // typed the menu holds still.
   property string problem: ""
+  // The selected row's symbol, whose lists the last line opens; "" for no
+  // row, and no line.
+  property string rowSymbol: ""
 
   property int cursor: 0
   property bool naming: false
@@ -41,8 +46,11 @@ FocusScope {
   readonly property int inset: Style.space(4)
   readonly property int newIndex: choices.length
   readonly property int manageIndex: choices.length + 1
-  // The separator, "New list…" with its note, and "Manage lists…".
-  readonly property int pinnedHeight: separatorHeight + itemHeight * 2 + (problem !== "" ? itemHeight : 0)
+  readonly property int rowListsIndex: rowSymbol !== "" ? choices.length + 2 : -1
+  readonly property int lastIndex: rowSymbol !== "" ? rowListsIndex : manageIndex
+  // The separator, "New list…" with its note, "Manage lists…", and the
+  // row's lists.
+  readonly property int pinnedHeight: separatorHeight + itemHeight * (rowSymbol !== "" ? 3 : 2) + (problem !== "" ? itemHeight : 0)
   readonly property int contentHeight: choices.length * itemHeight + pinnedHeight + inset * 2
   // The lists in sight: as many whole rows as the room holds, one at least.
   readonly property int rowsShown: maxHeight > 0
@@ -55,6 +63,7 @@ FocusScope {
   signal chosen(string name)
   signal createRequested(string name)
   signal manageRequested()
+  signal rowListsRequested()
   signal dismissed()
 
   width: Style.space(236)
@@ -94,7 +103,7 @@ FocusScope {
   }
 
   function moveCursor(delta) {
-    cursor = Math.max(0, Math.min(manageIndex, cursor + delta))
+    cursor = Math.max(0, Math.min(lastIndex, cursor + delta))
     showCursor()
   }
 
@@ -159,6 +168,7 @@ FocusScope {
   function take(index) {
     if (index === newIndex) startNaming()
     else if (index === manageIndex) manageRequested()
+    else if (index === rowListsIndex) rowListsRequested()
     else if (index >= 0 && index < choices.length) chosen(choices[index].name)
   }
 
@@ -186,6 +196,7 @@ FocusScope {
     var pinItem = pinned.childAt(pin.x, pin.y)
     if (pinItem === newRow) { cursor = newIndex; return }
     if (pinItem === manageRow) { cursor = manageIndex; return }
+    if (pinItem === rowListsRow) { cursor = rowListsIndex; return }
     var seen = scroll.mapFromItem(null, x, y)
     if (seen.x < 0 || seen.x >= scroll.width || seen.y < 0 || seen.y >= scroll.height) return
     var at = column.mapFromItem(null, x, y)
@@ -506,6 +517,48 @@ FocusScope {
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         onClicked: root.manageRequested()
+      }
+    }
+
+    Item {
+      id: rowListsRow
+      objectName: "rowListsRow"
+      visible: root.rowSymbol !== ""
+      width: pinned.width
+      height: root.itemHeight
+      readonly property bool isCursor: root.cursor === root.rowListsIndex && !root.naming
+
+      Rectangle {
+        anchors.fill: parent
+        radius: root.retro ? 0 : Style.cornerRadius
+        color: rowListsRow.isCursor ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
+        Behavior on color { ColorAnimation { duration: 60 } }
+      }
+
+      CursorBar {
+        visible: rowListsRow.isCursor
+        retro: root.retro
+        foreground: root.foreground
+      }
+
+      Text {
+        x: Style.space(24)
+        width: parent.width - x - Style.space(8)
+        anchors.verticalCenter: parent.verticalCenter
+        textFormat: Text.PlainText
+        text: "Lists with " + root.rowSymbol + "…"
+        elide: Text.ElideRight
+        color: root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.bodySmall
+      }
+
+      MouseArea {
+        anchors.fill: parent
+        enabled: !root.naming
+        hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
+        onClicked: root.rowListsRequested()
       }
     }
   }

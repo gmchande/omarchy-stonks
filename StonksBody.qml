@@ -106,6 +106,8 @@ Item {
   property string previewSymbol: ""
   property bool showingHelp: false
   property bool listMenuOpen: false
+  // The row the list menu's last line opens the lists of (`openListMenu`).
+  property string listMenuRow: ""
   property bool managingLists: false
   // The symbol whose lists the checklist shows; "" while it is closed.
   property string listsSymbol: ""
@@ -174,19 +176,19 @@ Item {
   readonly property bool hintShown: hint !== "" && (screenRoom <= 0
     || chromeBesideScreenChart + screenChartHeight + footer.hintRoom + threeRowsHeight <= screenRoom)
   // A standing word in the footer's place, under a note, until fixed: the
-  // data file can't be read, and once a change is made meanwhile, that it
-  // isn't saved, since only memory holds it; a save didn't land, which a
-  // click retries, ahead of the update, since a restart would lose the
-  // changes; or an update waits on a shell restart, which a click does.
-  // Where `noticeAction` doesn't fit beside it (text size 16 in the popup),
-  // `noticeShort` says less, never cut.
+  // data file can't be read, and what to do about it, and once a change is
+  // made meanwhile, that it isn't saved, since only memory holds it; a save
+  // didn't land, which a click retries, ahead of the update, since a
+  // restart would lose the changes; or an update waits on a shell restart,
+  // which a click does. Where `noticeAction` doesn't fit beside it (text
+  // size 16 in the popup), `noticeShort` says less, never cut.
   readonly property bool unsaved: settingsUnreadable ? editsUnsaved : saveFailed
   readonly property string notice: unsaved ? "Your changes aren't saved"
     : settingsUnreadable ? "Couldn't load your lists"
     : updatedTo !== "" ? "Updated to " + updatedTo + " · click to restart the shell" : ""
-  readonly property string noticeAction: !unsaved ? ""
-    : settingsUnreadable ? " · couldn't load your lists" : " · click to try again"
-  readonly property string noticeShort: unsaved ? "Not saved" : ""
+  readonly property string noticeAction: unsaved ? (settingsUnreadable ? " · couldn't load your lists" : " · click to try again")
+    : settingsUnreadable ? " · fix or remove grvc.stonks.json" : ""
+  readonly property string noticeShort: unsaved ? "Not saved" : settingsUnreadable ? "Lists not loaded" : ""
   // A newer Stonks on main, offered at the footer's right end until on disk
   // (`updateOffer`), then the restart's notice; never in the add's place,
   // so adding by mouse never waits on it. Shift+U runs what the footer
@@ -405,7 +407,7 @@ Item {
   // What the dashed line is, said while a scrub reads against it, and on a
   // thin night's day the close the night's trades read from too.
   readonly property string baselineText: historyShown ? chartRange.toUpperCase() + " START " + Format.money(history.baseline, featuredQuote ? featuredQuote.priceDigits : undefined)
-    : (!historyActive && featuredDay ? Figures.dayBaselineText(featuredDay) : "")
+    : (!historyActive && featuredDay ? Figures.dayBaselineText(featuredDay, Figures.exchangeDay(featuredDay, now)) : "")
   // A range that failed, which r, or the header's button, asks for again.
   readonly property string unavailableText: chartRange.toUpperCase() + " unavailable"
   readonly property bool offersRetry: headerText === unavailableText
@@ -1105,11 +1107,14 @@ Item {
   }
 
   // The menu lies over rows that stay visible: the rows forget their last
-  // click, so a press that dismisses it never pairs with one before.
+  // click, so a press that dismisses it never pairs with one before. Its
+  // last line names the row selected as it opens, which stays named while
+  // it is open, though the pointer moves over the rows in sight.
   function openListMenu() {
     if (!keepRename()) return
     closeViews()
     watchlist.forgetClicks()
+    listMenuRow = watchlist.cursorRow
     listMenuOpen = true
   }
 
@@ -1721,6 +1726,8 @@ Item {
     onChosen: function(name) { root.chooseList(name) }
     onCreateRequested: function(name) { root.createList(name) }
     onManageRequested: root.openManageLists()
+    rowSymbol: root.listMenuRow
+    onRowListsRequested: root.openSymbolLists(root.listMenuRow)
     onDismissed: root.closeListMenu()
   }
 
