@@ -25,4 +25,5 @@ jq -n '{ version: 1, symbols: (["TALL001", "STRAY", "SHOP.TO", "BTC-USD"] + [ran
 run_qs 600
 # One step spends the budget on purpose, and the harness checks that
 # nothing before it was held back: the log's line is that step's.
-STONKS_BUDGET_EXPECTED=1 finish "LONG LIST DONE"
+export STONKS_BUDGET_EXPECTED=1
+finish "LONG LIST DONE"

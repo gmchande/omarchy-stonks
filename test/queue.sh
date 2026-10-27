@@ -97,7 +97,7 @@ for script in test/qml/*.sh; do
   case "$name" in lib.sh|quickshell.sh|crash-check.sh|render.sh|data-files.sh|readme.sh) continue ;; esac
   grep -q '^source .*/lib\.sh"$' "$script" || echo "FAILED $script does not source lib.sh"
   tail -n 1 "$script" | grep -qE '^finish "[^"]+"$' || echo "FAILED $script does not end with finish \"...\""
-  grep -qE "^start .* bash test/qml/${name//./\\.}$" test/all.sh test/review.sh \
+  grep -qE "^start .* bash test/qml/${name//./\\.}( .*)?$" test/all.sh test/review.sh \
     || echo "FAILED $script is started by neither test/all.sh nor test/review.sh"
 done | grep . && { echo "SOME FAILED"; exit 1; }
 

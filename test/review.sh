@@ -15,8 +15,7 @@
 # - Nothing jumps: positions across looks, symbols, and ranges.
 # - Window and popup motion, judged on rendered frames (test/qml/frames.js),
 #   never on the property behind it.
-# - The long list: a power user's day on a slow network, on wall-clock
-#   budgets.
+# - The long list: a power user's 154 symbols, on wall-clock budgets.
 #
 # Each set of renders, the head's and the base's, is drawn once: a run keeps
 # each set it draws whole under the name test/render-key.sh makes from
