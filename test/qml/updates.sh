@@ -11,6 +11,9 @@ patch_copy plugin/Service.qml 's/function wallSecond() { return Math.floor(Date.
 # A step waits for the look's answer to land.
 patch_copy plugin/Service.qml '/readonly property alias mainVersion:/a\  readonly property alias testReleaseFeed: releaseFeed'
 patch_copy plugin/ReleaseFeed.qml '/property int askedAt: 0/a\  readonly property alias testAsking: fetchProc.running'
+# A step turns the manifest's watch off, to stand for a write it misses,
+# and waits out the reads again that a cut-off manifest brings.
+patch_copy plugin/Updates.qml '/property string mainVersion: ""/a\  readonly property alias testManifest: manifest\n  readonly property alias testReread: reread'
 # The pill's popup stays unloaded, and the window host asks stand-ins, not
 # the owner's Hyprland, for the window and the screens (as fetch.sh).
 patch_copy plugin/BarWidget.qml '/id: panelLoader/,/source:/s/active: true/active: false/'

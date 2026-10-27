@@ -36,9 +36,9 @@ and an issue saves building one that won't merge.
   Omarchy installed and a Wayland session. A second run on the same machine
   waits for the first to end. With the saved answers it takes about 1 min
   50 s, and its last line must be `ALL PASS`. A run on a clean tree is
-  recorded against it (`test/ran.sh`), and neither suite runs a tree that
-  already passed, until a package changes; `--again` runs it anyway, as
-  when chasing a flaky test.
+  recorded against it (`test/ran.sh`), a failed one with the steps that
+  failed, and neither suite runs a tree that already passed, until a
+  package changes; `--again` runs it anyway, as when chasing a flaky test.
 - A run's work folders (renders, temporary homes) are on disk, in
   `~/.cache/stonks-test` (`STONKS_TEST_TMP` names another), never in `/tmp`,
   which can be a tmpfs in memory. Each run removes the ones it made, however

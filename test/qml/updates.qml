@@ -143,6 +143,14 @@ ShellRoot {
     }
     function put(name, text) { run(["bash", "-c", "printf '%s' \"$1\" > \"$2\"", "--", text, harness.state + "/" + name]) }
     function remove(name) { run(["rm", "-f", harness.state + "/" + name]) }
+    // writeManifest TEXT: the plugin's manifest is TEXT at once, written
+    // in place from here, with no process to wait on.
+    function writeManifest(text) {
+      var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockWrites: true; atomicWrites: false; printErrors: false }', harness)
+      view.path = harness.manifestPath
+      view.setText(text)
+      view.destroy()
+    }
 
     // The look asked for `count` times in all, and its last answer in.
     function answered(count) {
@@ -344,6 +352,34 @@ ShellRoot {
       closeWindow()
       harness.check("a removal's undo takes the offer's place, its click undoes and runs no update, and the update is offered again",
         undoing && back && calls() === harness.updateCall + "\n" + harness.updateCall + "\n", undoing + " " + back + " | " + offer() + " | " + calls())
+
+      // A write the manifest's watch misses, caught half done: the read its
+      // event brings finds the manifest cut off, and the rest lands with no
+      // event, as when git's write ends while the shell sets its watch up
+      // again (the watch is off here to stand for that). The read goes
+      // again shortly and the restart's notice comes. Each read asked for
+      // gets its own reads again: here the first one's run out on a
+      // manifest still cut off before a later event's read catches it so
+      // too. Put back, the watch on, the notice goes.
+      openWindow()
+      var thisBuild = harness.readFile(harness.manifestPath)
+      var updated = JSON.parse(thisBuild)
+      updated.version = "1.0.10"
+      var updatedText = JSON.stringify(updated, null, 2) + "\n"
+      var reread = plugin.updates.testReread
+      plugin.updates.testManifest.watchChanges = false
+      writeManifest(updatedText.slice(0, 40))
+      plugin.updates.check()
+      var spent = within(3000, function() { return reread.tries === 4 && !reread.running })
+      plugin.updates.check()
+      writeManifest(updatedText)
+      var cutOffNotice = within(3000, function() { return footer() === "Updated to 1.0.10 · click to restart the shell" && offer() === "" })
+      plugin.updates.testManifest.watchChanges = true
+      writeManifest(thisBuild)
+      var putBack = within(3000, function() { return footer() === "+  Add a symbol" && offer() === "Update to 1.0.10" })
+      closeWindow()
+      harness.check("a manifest read cut off, the rest of its write unseen by the watch, is read again shortly, and so is a later read once the first one's reads again ran out: the open window's restart notice comes, and goes once the manifest is put back",
+        spent && cutOffNotice && putBack, spent + " " + cutOffNotice + " " + putBack + " | " + footer() + " | " + offer())
 
       // The update lands on disk as git writes it, the old file removed and
       // a new one made, while the window stays open: the restart's notice
