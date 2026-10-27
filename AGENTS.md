@@ -55,8 +55,7 @@ for someone who has never seen Stonks and gives it thirty seconds.
   you last looked at", not "the featured symbol". One name for each thing:
   the pill, the popup, the window, a row, a list, All, smooth, retro.
 - Plain and specific: present tense, active verbs, a number over an
-  adjective, each thing said once. American spelling, since most readers are
-  in the US.
+  adjective, each thing said once.
 - Trouble says what's on screen, then why, then what to do.
 - Change the words with the code, and promise nothing it doesn't do.
 
