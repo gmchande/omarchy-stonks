@@ -239,7 +239,13 @@ Harness {
       eases("search closing eases the edge back up, the footer riding it", function() { panel.testBody.cancelAdding() })
 
       service.switchList("")
+      // The card closes as it was: the key sheet over a scrub stays for the
+      // close, and the next open clears both.
+      panel.testBody.showingHelp = true
+      panel.testBody.motion.scrubT = 123
       panel.close()
+      check("closing keeps the sheet and the scrub for the fade",
+        panel.testBody.showingHelp && panel.testBody.scrubT === 123, panel.testBody.showingHelp + "|" + panel.testBody.scrubT)
       // Each later open from closed holds the thread at most 20 ms.
       var later = []
       for (var n = 0; n < 5; n++) {
@@ -252,7 +258,49 @@ Harness {
       }
       check("each later open of the popup holds the thread at most 20 ms", Math.max.apply(null, later) <= 20, later.join(", ") + " ms")
       pillTurns()
+      viewsThroughClose()
       harness.finish()
+    }
+
+    // A list view showing through its surface's close moves no cursor as
+    // the pointer passes over it: the pointer onto All moves none of the
+    // three views' cursors.
+    function viewsThroughClose() {
+      service.createList("Third")
+      service.setMembership("AAPL", "Short", true)
+      service.setMembership("AAPL", "Empty", true)
+      service.setMembership("AAPL", "Third", true)
+      panel.open()
+      var body = panel.testBody
+      var views = [
+        [function() { body.openListMenu() }, function() { body.closeListMenu() }, "listMenu", "listChoice"],
+        [function() { body.openSymbolLists("AAPL") }, function() { body.closeListViews() }, "symbolLists", "symbolListRow"],
+        [function() { body.openManageLists() }, function() { body.closeListViews() }, "manageLists", "manageRow"]
+      ].map(function(v) {
+        v[0]()
+        var view = null, rows = []
+        tryVerify(function() { view = find(body, v[2]); rows = view ? findAll(view, v[3]) : []; return rows.length >= 3 && rows[2].height > 0 }, 2000, v[2] + " open")
+        waitForRendering(body)
+        var onTwo = rows[2].mapToItem(body, rows[2].width / 2, rows[2].height / 2)
+        var onAll = rows[0].mapToItem(body, rows[0].width / 2, rows[0].height / 2)
+        mouseMove(body, onTwo.x, onTwo.y - 6)
+        mouseMove(body, onTwo.x, onTwo.y)
+        within(1000, function() { return view.cursor === 2 })
+        var before = view.cursor
+        body.surfaceOpen = false
+        mouseMove(body, onAll.x, onAll.y - 6)
+        mouseMove(body, onAll.x, onAll.y)
+        // Time for a cursor that wrongly follows the pointer to move.
+        wait(50)
+        var after = view.cursor
+        body.surfaceOpen = true
+        v[1]()
+        tryVerify(function() { return !find(body, v[2]) || !find(body, v[2]).visible }, 2000, v[2] + " closed")
+        return (before === 2 && after === 2) + " " + v[2] + " " + before + "->" + after
+      })
+      check("a list view showing through its surface's close moves no cursor as the pointer passes",
+        views.every(function(c) { return c.indexOf("true ") === 0 }), views.join(" | "))
+      panel.close()
     }
   }
 }
