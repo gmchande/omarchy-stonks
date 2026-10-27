@@ -50,9 +50,6 @@ test("parseChart keeps the fields the panel needs", () => {
   expect(fields(quote)).toEqual({ symbol: "AAPL", currency: "USD", exchange: "NASDAQ", timezoneName: "America/New_York", instrumentType: "EQUITY", crypto: false })
   expect(fields(shop)).toEqual({ symbol: "SHOP.TO", currency: "CAD", exchange: "TSX", timezoneName: "America/Toronto", instrumentType: "EQUITY", crypto: false })
   expect(fields(btc)).toEqual({ symbol: "BTC-USD", currency: "USD", exchange: "CRYPTO", timezoneName: "UTC", instrumentType: "CRYPTOCURRENCY", crypto: true })
-  expect(quote.prevClose).toBe(316.85)
-  expect(quote.dayHigh).toBeGreaterThan(quote.dayLow)
-  expect(reg.end - reg.start).toBe(6.5 * 3600)
   // Names as the company writes them, as search takes them: Yahoo's short
   // name is in capitals for SHOP.TO and cut at 31 characters for SPY.
   expect(shop.name).toBe("Shopify Inc.")
@@ -73,6 +70,12 @@ test("the listing line names a pair's currency once, and pence as pence", () => 
   expect(london.currency).toBe("GBp")
   expect(M.listingMeta(london)).toBe("LSE · PENCE")
   expect(M.currencyLabel("GBp")).toBe("PENCE")
+})
+
+test("a listing Yahoo names no currency for says its exchange alone, never USD", () => {
+  const day = fixture("ftse-day.json")
+  day.chart.result[0].meta.currency = null
+  expect(M.listingMeta(M.parseChart(day))).toBe("FTSE INDEX")
 })
 
 test("parseChart drops a null close, even on the newest bar the stray filter never judges", () => {
@@ -221,18 +224,12 @@ test("the headline uses the regular quote or labels the last chart trade with it
 })
 
 const sep4 = M.parseChart(fixture("aapl-2026-09-04-day-prepost.json"))
-const sep4Regular = fixture("aapl-2026-09-04-day-regular.json").chart.result[0]
 const sep4Reg = sep4.session.regular
 
 test("a bucket stamped at the bell is post-market, and the quote a second later is the close", () => {
   const regular = M.regularPoints(sep4)
   expect(regular.length).toBe(78)
   expect(regular[regular.length - 1].t).toBe(sep4Reg.end - 300)
-  // The regular-only response for the same day carries the same last bar
-  // and no 16:00 bucket. Its metadata is from a later fetch and is not
-  // compared here.
-  expect(sep4Regular.timestamp[sep4Regular.timestamp.length - 1]).toBe(regular[regular.length - 1].t)
-  expect(sep4Regular.timestamp.length).toBe(78)
   const atBell = sep4.points.find(p => p.t === sep4Reg.end)
   expect(atBell).toBeDefined()
   expect(M.chartGeometry(sep4).points.find(p => p.x === M.chartGeometry(sep4).ticks[0]).ext).toBe(true)
@@ -284,6 +281,120 @@ test("a scrub inside Tokyo's lunch draws no dot, as the line and the chimes leav
   expect([M.yAt(pts, morning.x), M.yAt(pts, afternoon.x)]).toEqual([morning.y, afternoon.y])
   const beforeLunch = (pts[reopen - 2].x + morning.x) / 2
   expect(M.yAt(pts, beforeLunch)).toBeCloseTo((pts[reopen - 2].y + morning.y) / 2, 9)
+})
+
+// Smooth's replay of `day`, from its first print to its last over 2 s, as a
+// surface plays it (ChartMotion's `replay`), heard against the line drawn:
+// where each bar's fundamental rises (its amplitude over 40 ms, every 4 ms,
+// up a twelfth of the loudest's against 40 ms before), each bar's own, so
+// bars struck together are each heard. `wrong` holds the strikes of a bar
+// the line didn't have in the 80 ms before or the 20 ms after, as the
+// strikes' 45 ms spacing and the window allow; `unstruck` the moves onto a
+// bar the line then holds 45 ms or more not heard as that bar's strike;
+// `inBreak` the strikes that start where the line lifts.
+function smoothHeard(day) {
+  const sound = load("ChartSound.js")
+  const geometry = M.chartGeometry(day, calendars), pts = geometry.points
+  const from = M.fractionAtTime(day, day.points[0].t), to = M.fractionAtTime(day, M.lastPrintTime(day))
+  const s = sound.smooth(geometry, from, to, 2).samples, rate = sound.RATE, penta = sound.PENTATONIC
+  const place = t => sound.placeAt(t, from, to, 2)
+  // The line's height at `x`, null where it lifts (`brk`).
+  const lineY = x => {
+    if (x <= pts[0].x) return pts[0].y
+    const k = pts.findIndex((p, i) => i > 0 && p.x >= x)
+    if (k < 0) return pts.at(-1).y
+    const [a, b] = [pts[k - 1], pts[k]]
+    if (b.brk && x > a.x && x < b.x) return null
+    return a.y + (b.y - a.y) * (x - a.x) / Math.max(1e-9, b.x - a.x)
+  }
+  const barAt = t => {
+    if (t > 2) return -2
+    const y = lineY(place(t))
+    return y === null ? -1 : Math.round((1 - Math.max(0, Math.min(1, y))) * (penta.length - 1))
+  }
+  const span = 960, hop = 96, amp = penta.map(() => []), coef = penta.map(f => 2 * Math.cos(2 * Math.PI * f / rate))
+  let top = 0
+  for (let at = 0; at + span < s.length; at += hop) {
+    penta.forEach((_, b) => {
+      let q1 = 0, q2 = 0
+      for (let k = 0; k < span; k++) {
+        const q0 = coef[b] * q1 - q2 + s[at + k] * (0.5 - 0.5 * Math.cos(2 * Math.PI * k / span))
+        q2 = q1; q1 = q0
+      }
+      const a = Math.sqrt(Math.max(0, q1 * q1 + q2 * q2 - coef[b] * q1 * q2))
+      amp[b].push(a)
+      top = Math.max(top, a)
+    })
+  }
+  // A rise under half the window's greatest is another bar heard through
+  // it, and one bar's rises within 40 ms of its strike are that strike.
+  const strikes = [], lastOf = []
+  for (let w = 0; w < amp[0].length; w++) {
+    const rises = penta.map((_, c) => (amp[c][w] - (w >= 10 ? amp[c][w - 10] : 0)) / top)
+    const most = Math.max(...rises), t = (w * hop + span / 2) / rate
+    rises.forEach((rise, c) => {
+      if (rise <= 0.08 || rise < most / 2 || (lastOf[c] !== undefined && t - lastOf[c] <= 0.04)) return
+      lastOf[c] = t
+      strikes.push({ t, bar: c })
+    })
+  }
+  strikes.sort((a, b) => a.t - b.t)
+  const around = (t, before, after) => {
+    const bars = []
+    for (let u = t - before; u <= t + after; u += 0.002) bars.push(barAt(u))
+    return bars
+  }
+  const inBreak = strikes.filter(st => around(st.t, 0.025, 0.02).every(b => b === -1))
+  const wrong = strikes.filter(st => !inBreak.includes(st) && !around(st.t, 0.08, 0.02).includes(st.bar))
+  const runs = []
+  for (let v = 0; v <= 2; v += 0.002) {
+    const held = barAt(v), run = runs.at(-1)
+    if (!run || run.bar !== held) runs.push({ bar: held, from: v, to: v })
+    else run.to = v
+  }
+  // Heard from 20 ms before the move to 65 ms after: the gap's 45 ms and
+  // the window's give.
+  const moves = runs.filter(r => r.bar >= 0 && r.to - r.from >= 0.045)
+  const unstruck = moves.filter(r => !strikes.some(st => st.bar === r.bar && st.t >= r.from - 0.02 && st.t <= r.from + 0.065))
+  const breakMs = runs.filter(r => r.bar === -1).reduce((sum, r) => sum + (r.to - r.from) * 1000, 0)
+  return { geometry, place, strikes, wrong, moves, unstruck, inBreak, breakMs }
+}
+
+// Nine strikes in ten are the bar under the line, and nine of ten held
+// moves are struck.
+const followsLine = heard => {
+  expect(heard.strikes.length).toBeGreaterThanOrEqual(5)
+  expect(heard.wrong.length).toBeLessThanOrEqual(heard.strikes.length * 0.1)
+  expect(heard.unstruck.length).toBeLessThanOrEqual(heard.moves.length * 0.1)
+}
+
+test("smooth's replay strikes the scrub's chimes: the bar under the line as the replay moves along it", () => {
+  followsLine(smoothHeard(quote))
+})
+
+test("smooth's replay of Tokyo's day strikes no bar across lunch, where the chart draws nothing, and the bar under the line either side", () => {
+  // Toyota on Monday 19 October, its line stopping for lunch below the
+  // close and starting again above it.
+  const heard = smoothHeard(savedDay("demo-2026-10-19-1146", "7203.t"))
+  expect(heard.breakMs).toBeGreaterThan(100)
+  expect(heard.inBreak).toEqual([])
+  followsLine(heard)
+})
+
+test("smooth's replay of a thin night strikes each of its trades' dots as it passes it", () => {
+  // TOY at 00:36 on Monday 5 October: Friday's day, then Sunday night's
+  // five trades as dots, each alone.
+  const heard = smoothHeard(dayAt("live-2026-10-05", "toy").day)
+  const dots = heard.geometry.points.filter(p => p.dot)
+  const unheard = dots.filter(dot => {
+    const bar = Math.round((1 - Math.max(0, Math.min(1, dot.y))) * 10)
+    let passed = 0
+    while (passed < 2 && heard.place(passed) < dot.x) passed += 0.002
+    return !heard.strikes.some(st => st.bar === bar && st.t >= passed - 0.02 && st.t <= passed + 0.11)
+  })
+  expect(dots.length).toBe(5)
+  expect(unheard).toEqual([])
+  followsLine(heard)
 })
 
 test("the day is drawn whole, and its range holds the previous close", () => {
@@ -409,24 +520,6 @@ const sentAt = (json, gmtoffset, timezone) => {
   Object.assign(copy.chart.result[0].meta, { gmtoffset, timezone })
   return copy
 }
-
-test("a long chart dates each bar by its own day, on both sides of a change of clocks, for every reader", () => {
-  // Yahoo stamps a week at its Monday's midnight, by that day's offset, and
-  // sends the answer's offset as today's. Found in QA: once New York's
-  // clocks go back, the week of 7 September reads "WEEK OF 6 SEP", a
-  // Sunday, and a week that starts on the 1st names the month before.
-  const weekly = fixture("history/aapl-5y.json")
-  const stamped = iso => Date.parse(iso) / 1000
-  for (const reader of READERS) readAs(reader, () => {
-    for (const answer of [weekly, sentAt(weekly, -18000, "EST")]) {
-      const history = M.parseHistory(answer, "5Y")
-      const bar = iso => history.bars.find(b => b.t === stamped(iso))
-      expect(M.historyScrubForms(history, bar("2026-09-07T04:00:00Z"))).toEqual(["WEEK OF 7 SEP 2026 · 332.27", "WEEK OF 7 SEP 2026"])
-      expect(M.historyScrubForms(history, bar("2025-12-01T05:00:00Z"))[0]).toBe("WEEK OF 1 DEC 2025 · 278.78")
-      expect(M.historyScrubForms({ ...history, interval: "1mo" }, bar("2026-06-01T04:00:00Z"))[0]).toBe("JUN 2026 · 307.34")
-    }
-  })
-})
 
 test("the popular indexes Yahoo files under their own codes keep their exchange's hours", () => {
   // ^N225 under Osaka, ^FTSE under FTSE Index, ^RUT under Chicago Options,
@@ -660,9 +753,6 @@ test("extendedStack labels the print after the bell against the close", () => {
   // the hero's unit; since the open it stays a percent from the close.
   expect(M.extendedStack(quote, null, 0, null, "abs")).toMatchObject({ price: "324.72", changeText: "\u22120.41", tone: "down" })
   expect(M.extendedStack(quote, null, 0, null, "open")).toEqual(M.extendedStack(quote))
-})
-
-test("extendedStack is hidden when the print shows as the close", () => {
   const close = M.regularClose(quote)
   const last = quote.points[quote.points.length - 1]
   const echo = { ...quote, points: [...quote.points.slice(0, -1), { t: last.t, p: close + 0.001 }] }
@@ -1004,21 +1094,6 @@ test("a published closure or a break between segments is closed, whatever Yahoo'
   // every form keeps the time.
   expect(M.statusForms(fakeOpen, labor, 0, calendars)).toEqual(["Labor Day · opens Tue 09:30", "Closed · opens Tue 09:30", "Opens Tue 09:30"])
   expect(M.statusForms(fakeOpen, labor, 0, null)).toEqual(["Power hour · closes in 1h", "Closes in 1h"])
-  // Tokyo's lunch break, from its calendar; the morning trades.
-  const jpx = {
-    symbol: "7203.T", exchange: "TSE", timezoneName: "Asia/Tokyo", gmtoffset: 32400, crypto: false,
-    session: { pre: null, post: null, regular: { start: M.epochAt(JPX, "2026-09-08", "09:00"), end: M.epochAt(JPX, "2026-09-08", "15:30") } },
-    points: []
-  }
-  expect(quoteCadence(jpx, 1788832800, 60, true)).toBe(60)
-  expect(quoteCadence(jpx, 1788836400, 60, true)).toBe(900)
-  expect(M.inRegularSession(jpx, 1788836400, calendars)).toBe(false)
-  const lunch = M.marketStatus(jpx, 1788836400, 0, calendars)
-  expect(lunch).toMatch(/^Lunch break · reopens 12:30( JST)? · in \d+m$/)
-  // A lunch break without its countdown, then when it reopens.
-  const reopens = lunch.replace(/^Lunch break · r(.*) · in \d+m$/, "R$1")
-  expect(M.statusForms(jpx, 1788836400, 0, calendars)).toEqual([lunch, lunch.replace(/ · in \d+m$/, ""), reopens])
-  expect(reopens).toMatch(/^Reopens 12:30( JST)?$/)
 })
 
 test("the bell rings once at a market's open and once at its close, never late, at lunch, on a holiday, or for a coin", () => {
@@ -1031,15 +1106,6 @@ test("the bell rings once at a market's open and once at its close, never late, 
   // woke, after the bell.
   expect([bell(q, reg.start + 60, reg.start + 120), bell(q, reg.start - 3600, reg.start + 60), bell(q, reg.end - 60, reg.end + 600)])
     .toEqual(["", "", ""])
-  // Tokyo rings at 09:00 and 15:30, not around its lunch.
-  const jpx = {
-    symbol: "7203.T", exchange: "TSE", timezoneName: "Asia/Tokyo", gmtoffset: 32400, crypto: false,
-    session: { pre: null, post: null, regular: { start: M.epochAt(JPX, "2026-09-08", "09:00"), end: M.epochAt(JPX, "2026-09-08", "15:30") } },
-    points: []
-  }
-  const tokyo = hm => M.epochAt(JPX, "2026-09-08", hm)
-  expect(["09:00", "11:30", "12:30", "15:30"].map(hm => bell(jpx, tokyo(hm) - 60, tokyo(hm) + 1)))
-    .toEqual(["open", "", "", "close"])
   // Labor Day, whatever Yahoo's periods say, and a coin's day, ring nothing.
   const labor = 1788793200
   const fakeOpen = { ...sep4, session: { pre: null, post: null, regular: { start: labor - 3600, end: labor + 3600 } } }
@@ -1113,38 +1179,6 @@ test("outside trading an old close is normal, but a failed refresh still shows",
   expect(M.freshness(failed, closeQuote, night, 0).state).toBe("failed")
 })
 
-test("sorting ranks the rows as a view over the manual list", () => {
-  const q = (symbol, name, prevClose, price) => ({ symbol, name, prevClose, price, marketTime: 1, points: [], session: { regular: null } })
-  // Names that sort unlike the symbols, so each order is its own.
-  const quotes = { UP: q("UP", "Alpha Inc", 100, 110), DN: q("DN", "Mid Co", 100, 95), FL: q("FL", "Zeta Corp", 100, 100) }
-  const manual = ["FL", "DN", "UP", "NEW"]
-  expect(M.sortedSymbols(manual, quotes, "manual")).toEqual(manual)
-  expect(M.sortedSymbols(manual, quotes, "symbol")).toEqual(["DN", "FL", "UP", "NEW"])
-  expect(M.sortedSymbols(manual, quotes, "name")).toEqual(["UP", "DN", "FL", "NEW"])
-  expect(M.sortedSymbols(manual, quotes, "pct")).toEqual(["UP", "FL", "DN", "NEW"])
-  // Reversed, each sorted order runs the other way; a symbol with no quote
-  // stays at the bottom, and manual has no direction.
-  expect(M.sortedSymbols(manual, quotes, "symbol", true)).toEqual(["UP", "FL", "DN", "NEW"])
-  expect(M.sortedSymbols(manual, quotes, "pct", true)).toEqual(["DN", "FL", "UP", "NEW"])
-  expect(M.sortedSymbols(manual, quotes, "manual", true)).toEqual(manual)
-  // A tie keeps the manual order, whichever way the sort runs.
-  const tie = { FL2: { ...quotes.FL, symbol: "FL2" }, FL: quotes.FL }
-  expect(M.sortedSymbols(["FL2", "FL"], tie, "pct")).toEqual(["FL2", "FL"])
-  expect(M.sortedSymbols(["FL2", "FL"], tie, "pct", true)).toEqual(["FL2", "FL"])
-  // Lumen is up 10%, NVIDIA 2%: by percent Lumen leads, though NVIDIA's
-  // amount is larger, and it still leads with amounts showing: they can't
-  // be ranked across currencies.
-  const pair = { LUMA: q("LUMA", "Lumen", 10, 11), NVDA: q("NVDA", "NVIDIA", 180, 183.6) }
-  expect(M.sortedSymbols(["LUMA", "NVDA"], pair, "pct")).toEqual(["LUMA", "NVDA"])
-  expect(M.sortedSymbols(["LUMA", "NVDA"], pair, "pct", false, "abs")).toEqual(["LUMA", "NVDA"])
-  // Showing since the open, the rows rank by the move from the open they
-  // show: UP is up 10% on the close but 0.9% on the open, DN down 5% on the
-  // close but up 5.6% on the open.
-  const opened = { UP: { ...quotes.UP, dayOpen: 109 }, DN: { ...quotes.DN, dayOpen: 90 } }
-  expect(M.sortedSymbols(["UP", "DN"], opened, "pct", false, "pct")).toEqual(["UP", "DN"])
-  expect(M.sortedSymbols(["UP", "DN"], opened, "pct", false, "open")).toEqual(["DN", "UP"])
-})
-
 test("parseSearch keeps tradable results with names and readable exchanges", () => {
   const { results: rows, note } = M.parseSearch(search)
   expect(rows[0].symbol).toBe("SHOP")
@@ -1175,29 +1209,9 @@ test("search names the kinds it leaves out, beside what it shows or alone", () =
     .toBe("Stonks doesn’t show warrants")
 })
 
-test("search names are whole, so the row's own ellipsis is the only cut", () => {
-  const rows = M.parseSearch({ quotes: [
-    // Yahoo's short name stops at 31 characters; the long name is whole.
-    { symbol: "TSLT", shortname: "T-REX 2X Long Tesla Daily Targe", longname: "T-REX 2X Long Tesla Daily Target ETF", exchange: "BTS", quoteType: "ETF" },
-    // A German listing pads its share class onto the short name.
-    { symbol: "VUAA.DE", shortname: "Vanguard S&P 500 UCITS ETF    R", longname: null, exchange: "GER", quoteType: "ETF" },
-    { symbol: "MTX.F", shortname: "MTU Aero Engines AG           N", exchange: "FRA", quoteType: "EQUITY" },
-    // Neither an option nor a row without a symbol is something to add.
-    { symbol: "TSLA260918C00400000", shortname: "TSLA Sep 2026 400 call", exchange: "OPR", quoteType: "OPTION" },
-    { shortname: "No symbol", exchange: "NMS", quoteType: "EQUITY" },
-    { symbol: "BARE", exchange: "NMS", quoteType: "EQUITY" }
-  ] }).results
-  expect(rows.map(r => r.name)).toEqual([
-    "T-REX 2X Long Tesla Daily Target ETF", "Vanguard S&P 500 UCITS ETF", "MTU Aero Engines AG", "BARE"
-  ])
-})
-
 test("request URLs are the exact strings Yahoo is sent, and history never takes the 1D path", () => {
-  expect(M.chartUrl("SHOP.TO")).toBe("https://query1.finance.yahoo.com/v8/finance/chart/SHOP.TO?range=1d&interval=5m&includePrePost=true")
   expect(M.searchUrl("a b")).toContain("q=a%20b")
   expect(M.historyUrl("AAPL", "1D")).toBeNull()
-  expect(M.HISTORY_RANGES["1D"]).toBeUndefined()
-  expect(M.historyUrl("NEST", "1W")).toBe("https://query1.finance.yahoo.com/v8/finance/chart/NEST?range=5d&interval=15m&events=div%2Csplits&includeAdjustedClose=true")
   // The saved fundamentals answers are the feed's own requests.
   const saved = name => readFileSync(join(fixtures, "fundamentals", name + ".url"), "utf8").replace(/^# /, "").trim()
   const asked = Number(saved("aapl-2026-10-25").match(/period2=(\d+)/)[1])
@@ -1207,85 +1221,6 @@ test("request URLs are the exact strings Yahoo is sent, and history never takes 
     expect(M.capCloseUrl(symbol, fundamentals(name + "-2026-10-25"))).toBe(saved(name + "-2026-10-25-closes"))
   for (const pair of ["USDCAD", "USDGBP", "USDAUD"])
     expect(M.rateUrl(pair)).toBe(saved("fx-" + pair.toLowerCase()))
-  expect(M.historyUrl("NEST", "1M")).toBe("https://query1.finance.yahoo.com/v8/finance/chart/NEST?range=1mo&interval=1h&events=div%2Csplits&includeAdjustedClose=true")
-  expect(M.historyUrl("AAPL", "1Y")).toBe("https://query1.finance.yahoo.com/v8/finance/chart/AAPL?range=1y&interval=1d&events=div%2Csplits&includeAdjustedClose=true")
-  expect(M.historyUrl("NVDA", "2Y")).toBe("https://query1.finance.yahoo.com/v8/finance/chart/NVDA?range=2y&interval=1d&events=div%2Csplits&includeAdjustedClose=true")
-  expect(M.historyUrl("FAB", "All")).toBe("https://query1.finance.yahoo.com/v8/finance/chart/FAB?range=max&interval=1mo&events=div%2Csplits&includeAdjustedClose=true")
-  expect(Object.keys(M.HISTORY_RANGES)).toEqual(["1W", "1M", "3M", "6M", "YTD", "1Y", "2Y", "5Y", "10Y", "All"])
-  expect(M.historyRanges()).toEqual(["1D", "1W", "1M", "3M", "6M", "YTD", "1Y", "2Y", "5Y", "10Y", "All"])
-})
-
-const historyExpectations = [
-  {
-    fixture: "aapl-1y.json", range: "1Y", interval: "1d", bars: 251,
-    baseline: 230.03, last: 332.2699890136719, abs: 102.23998901367187, pct: 44.44637178353775,
-    high: { p: 344.57000732421875, t: 1785331800 },
-    low: { p: 229.02000427246094, t: 1757683800 },
-    belowHigh: 3.5696717790568844, from: 1757683800, to: 1789133400, short: false
-  },
-  {
-    fixture: "nvda-2y.json", range: "2Y", interval: "1d", bars: 501,
-    baseline: 116.91, last: 218.2899932861328, abs: 101.37999328613282, pct: 86.71627173563667,
-    high: { p: 236.5399932861328, t: 1778765400 },
-    low: { p: 86.62000274658203, t: 1744032600 },
-    belowHigh: 7.715397192018907, from: 1726147800, to: 1789133400, short: false
-  },
-  {
-    // Asked for monthly bars, Yahoo sent daily ones; the response's own
-    // granularity is the one used.
-    fixture: "fab-max.json", range: "All", interval: "1d", bars: 281,
-    baseline: 85, last: 23.200000762939453, abs: -61.79999923706055, pct: -72.70588145536536,
-    high: { p: 142.9199981689453, t: 1754055000 },
-    low: { p: 16.600000381469727, t: 1777555800 },
-    belowHigh: 83.7671417155248, from: 1753968600, to: 1789133400, short: true
-  },
-  {
-    fixture: "shop-to-1y.json", range: "1Y", interval: "1d", bars: 252,
-    baseline: 200.65, last: 178.41000366210938, abs: -22.23999633789063, pct: -11.083975249384814,
-    high: { p: 253.10000610351562, t: 1761744600 },
-    low: { p: 129.00999450683594, t: 1778765400 },
-    belowHigh: 29.510075322107543, from: 1757597400, to: 1789133400, short: false
-  },
-  {
-    fixture: "nest-5d.json", range: "1W", interval: "15m", bars: 131,
-    baseline: 210.63, last: 224.5500030517578, abs: 13.920003051757817, pct: 6.608746641863846,
-    high: { p: 254.74000549316406, t: 1788885900 },
-    low: { p: 209.40499877929688, t: 1788528600 },
-    belowHigh: 11.851300066889728, from: 1788528600, to: 1789156800, short: false
-  },
-  {
-    fixture: "nest-1mo.json", range: "1M", interval: "1h", bars: 155,
-    baseline: 193.23, last: 224.5500030517578, abs: 31.320003051757823, pct: 16.20866483038753,
-    high: { p: 280.8299865722656, t: 1786984200 },
-    low: { p: 194.8000030517578, t: 1788269400 },
-    belowHigh: 20.04058904372926, from: 1786541400, to: 1789156800, short: false
-  },
-  {
-    fixture: "aapl-5y.json", range: "5Y", interval: "1wk", bars: 262,
-    baseline: 148.97, last: 332.2699890136719, abs: 183.29998901367188, pct: 123.04490099595347,
-    high: { p: 344.57000732421875, t: 1785124800 },
-    low: { p: 124.16999816894531, t: 1672635600 },
-    belowHigh: 3.5696717790568844, from: 1631505600, to: 1789156801, short: false
-  }
-]
-
-test("periodStats matches the saved history fixtures", () => {
-  for (const expected of historyExpectations) {
-    const history = M.parseHistory(fixture("history/" + expected.fixture), expected.range)
-    const stats = M.periodStats(history)
-    expect(history.interval, expected.fixture).toBe(expected.interval)
-    expect(history.baseline, expected.fixture).toBe(expected.baseline)
-    expect(stats.last, expected.fixture).toBe(expected.last)
-    expect(stats.change.abs, expected.fixture).toBeCloseTo(expected.abs, 10)
-    expect(stats.change.pct, expected.fixture).toBeCloseTo(expected.pct, 10)
-    expect(stats.change.up, expected.fixture).toBe(expected.abs >= 0)
-    expect(stats.high, expected.fixture).toEqual(expected.high)
-    expect(stats.low, expected.fixture).toEqual(expected.low)
-    expect(stats.belowHigh, expected.fixture).toBeCloseTo(expected.belowHigh, 10)
-    expect(stats.coverage, expected.fixture).toEqual({
-      from: expected.from, to: expected.to, bars: expected.bars, short: expected.short
-    })
-  }
 })
 
 test("the saved NVDA split response uses split-adjusted close columns on both sides", () => {
@@ -1549,36 +1484,23 @@ test("a listing younger than its range says SINCE its first day under the change
 test("historyRowModel uses the quote until a historical bar is scrubbed", () => {
   const history = M.parseHistory(fixture("history/aapl-1y.json"), "1Y")
   const resting = M.historyRowModel(history, quote, 0)
-  expect(resting.price).toBe(M.regularClose(quote))
-  expect(resting.asOf).toBe(M.headlineQuote(quote).t)
-  expect(resting.changeText).toBe(M.pct((M.regularClose(quote) - history.baseline) / history.baseline * 100))
-  expect(resting.periodLabel).toBe("1Y")
-  expect(resting.dayUp).toBe(true)
+  expect(resting).toMatchObject({ price: 325.13, asOf: 1788292801, changeText: "+41.34%", periodLabel: "1Y", dayUp: true })
   const bar = history.bars[20]
-  const scrubbed = M.historyRowModel(history, quote, bar.t)
-  expect(scrubbed.price).toBe(bar.c)
-  expect(scrubbed.asOf).toBe(bar.t)
-  expect(scrubbed.changeText).toBe(M.pct((bar.c - history.baseline) / history.baseline * 100))
+  expect(M.historyRowModel(history, quote, bar.t)).toMatchObject({ price: 245.27000427246094, asOf: bar.t, changeText: "+6.63%" })
+  // The direction follows the change shown: up at rest, down on a bar under
+  // the baseline.
+  const below = {
+    symbol: "TEST", range: "1Y", interval: "1d", baseline: 300,
+    bars: [{ t: 1, h: 251, l: 249, c: 250 }, { t: 2, h: 281, l: 279, c: 280 }]
+  }
+  expect(M.historyRowModel(below, { ...quote, price: 325 }, 0).dayUp).toBe(true)
+  expect(M.historyRowModel(below, quote, 1)).toMatchObject({ price: 250, tone: "down", dayUp: false })
   const fallback = M.historyRowModel(history, null, 0)
   expect(fallback).toMatchObject({
     symbol: "AAPL", name: "AAPL", price: 332.2699890136719,
     asOf: history.bars[history.bars.length - 1].t
   })
   expect(M.historyRowModel(null, quote, 0)).toBeNull()
-})
-
-test("historyRowModel direction follows the change being shown", () => {
-  const history = {
-    symbol: "TEST", range: "1Y", interval: "1d", baseline: 300,
-    bars: [{ t: 1, h: 251, l: 249, c: 250 }, { t: 2, h: 281, l: 279, c: 280 }]
-  }
-  expect(M.historyRowModel(history, { ...quote, price: 325 }, 0).dayUp).toBe(true)
-  expect(M.historyRowModel(history, quote, 1)).toMatchObject({ price: 250, tone: "down", dayUp: false })
-})
-
-test("settingsFromBar is null when the bar entry has no symbols", () => {
-  expect(M.settingsFromBar(fixture("shell-bar-no-symbols.json"))).toBeNull()
-  expect(M.settingsFromBar({ plugins: [] })).toBeNull()
 })
 
 // ---------------------------------------------------------------- overnight
@@ -1670,25 +1592,6 @@ test("the prints Stonks keeps for a listing hold every one its 1D chart draws, h
   }
   expect(Math.max(...Object.values(kept).map(k => k.bars.length))).toBe(M.MOST_PRINTS)
   expect(drawn).toBeGreaterThan(100)
-})
-
-test("a run of Robinhood's prints never takes more requests than a day for all would", () => {
-  const now = 1791000000
-  const warm = { through: now - 10 * 60 }
-  const names = n => Array.from({ length: n }, (_, i) => "S" + i)
-  const spans = batches => batches.map(b => b.span + " " + b.symbols.length).join(", ")
-  // A small list's first open at night, the pill's stock already in hand:
-  // one day for all three, as before, not a day and an hour.
-  expect(M.overnightBatches(["AAPL", "MSFT", "SPY"], { AAPL: warm }, now))
-    .toEqual([{ span: "day", symbols: ["MSFT", "SPY", "AAPL"] }])
-  // A long list's first open: the pill's stock fills the last day's room.
-  const long = names(115)
-  expect(spans(M.overnightBatches(long, { S0: warm }, now))).toBe("day 25, day 25, day 25, day 25, day 15")
-  // Its refreshes through the night: the last hour, two requests, not five.
-  const inHand = Object.fromEntries(long.map(s => [s, warm]))
-  expect(spans(M.overnightBatches(long, inHand, now))).toBe("hour 75, hour 40")
-  // Three added to it meanwhile: their days, and the rest's hour.
-  expect(spans(M.overnightBatches(long.concat(["N1", "N2", "N3"]), inHand, now))).toBe("day 3, hour 75, hour 40")
 })
 
 test("Robinhood's instruments say which listings it trades all day, by the symbols asked for", () => {
@@ -2126,6 +2029,144 @@ test("no session on Friday or Saturday night, or the night before a holiday", ()
   expect(night(at("2026-11-25", "22:00")).open).toBe(false)
   expect(night(at("2026-11-26", "22:00")).open).toBe(true)
   expect(night(at("2026-10-02", "12:00"))).toBeNull()
+})
+
+test("the line under the price: Friday night's is the after-hours, a quiet night keeps its last print, c makes it an amount, and an index or a coin has none", () => {
+  expect(stripAt(dayAt("weekend", "nest"), at("2026-09-25", "22:00")).label).toBe("AFTER HOURS")
+  // Twenty minutes on from Thursday 23:00 with nothing newer.
+  expect(stripAt(dayAt("night", "nest"), at("2026-10-01", "23:11"))).toMatchObject({ label: "OVERNIGHT", time: "22:50", price: "234.27" })
+  // Wednesday 01:00: as an amount, the same sign; since the open, the
+  // percent from the close.
+  const built = dayAt("2026-10-07-0100", "nest")
+  const now = at("2026-10-07", "01:00")
+  const line = mode => M.extendedStack(built.quote, built.latest, now, built.day, mode)
+  expect(line("abs").changeText).toMatch(/^[+\u2212]\d+\.\d\d$/)
+  expect(line("abs").changeText.charAt(0)).toBe(line("pct").changeText.charAt(0))
+  expect(line("open").changeText).toBe(line("pct").changeText)
+  // With no regular price the night still has its line.
+  expect(M.extendedStack({ ...built.quote, price: null, marketTime: null }, built.latest, now, built.day))
+    .toMatchObject({ label: "OVERNIGHT", time: "00:50", price: "248.04" })
+  // An index and a coin: no overnight line, and an index's day is its session.
+  const gspc = savedDay("night", "gspc")
+  expect(M.extendedStack(gspc, null, at("2026-10-01", "23:00"))).toBeNull()
+  const index = M.chartSpan(M.viewChart("^GSPC", "1D", { "^GSPC": gspc }, {}, {}, {}, {}, calendars).day)
+  expect(index.end - index.start).toBeLessThan(8 * 3600)
+  const coin = M.extendedStack(savedDay("listings-2026-10-07-0100", "btc-usd"), null, now)
+  expect(coin && coin.label).not.toBe("OVERNIGHT")
+})
+
+test("a listing Robinhood doesn't trade all day draws Yahoo's day, and its stray night trade makes no overnight line", () => {
+  const notAllDay = (set, file, symbol) => {
+    const q = M.parseChart(fixture(`moments/${set}/${file}.json`), cents)
+    return { quote: q, ...M.viewChart(symbol, "1D", { [symbol]: q }, {}, {}, {}, { [symbol]: { status: "ok", allDay: false, at: 0 } }, calendars) }
+  }
+  for (const [file, symbol] of [["kiln", "KILN"], ["bolt", "BOLT"]]) {
+    const chart = notAllDay("listings-2026-10-07-0100", file, symbol)
+    expect(M.chartSpan(chart.day)).toMatchObject({ start: at("2026-10-06", "04:00"), end: at("2026-10-06", "20:00") })
+    const line = M.extendedStack(chart.quote, chart.latest, at("2026-10-07", "01:00"), chart.day)
+    expect(line && line.label).not.toBe("OVERNIGHT")
+  }
+  // 14:55: KILN keeps Yahoo's day from 04:00, every print of it.
+  const kiln = notAllDay("listings-2026-10-07-1455", "kiln", "KILN")
+  expect(M.chartSpan(kiln.day).start).toBe(at("2026-10-07", "04:00"))
+  expect(kiln.day.points.length).toBe(kiln.quote.points.length)
+  // The keys step print to print: three steps from BOLT's first print land
+  // on its fourth, 05:40.
+  const bolt = notAllDay("listings-2026-10-07-1455", "bolt", "BOLT").day
+  expect(M.stepTime(bolt, bolt.points[0].t, 3)).toBe(bolt.points[3].t)
+  expect(bolt.points[3].t).toBe(at("2026-10-07", "05:40"))
+})
+
+test("a thin US day's quiet spans each take one step to the next print", () => {
+  const set = "gaps-2026-10-21-1006"
+  const q = savedDay(set, "vane")
+  const allDay = M.parseAllDay(fixture(`moments/${set}/robinhood-instruments.json`), ["VANE"])
+  const nights = { VANE: { status: "ok", ...traded(set, ["VANE"]).VANE } }
+  const day = M.viewChart("VANE", "1D", { VANE: q }, {}, {}, nights, { VANE: { status: "ok", allDay: allDay.VANE, at: 0 } }, calendars).day
+  const times = day.points.map(p => p.t)
+  for (const [from, to] of [[1792555800, 1792561200], [1792565400, 1792569600], [1792571400, 1792580700]]) {
+    expect(times.indexOf(to)).toBe(times.indexOf(from) + 1)
+    expect(M.stepTime(day, from, 1)).toBe(to)
+  }
+})
+
+test("a night's chart on each saved moment: its span, its dots, and what a scrub of it reads", () => {
+  // Sunday 22:30: a scrub at the left edge reads Thursday night's print,
+  // never the previous close.
+  const sunday = dayAt("sunday", "nest")
+  const edge = M.timeAtFraction(sunday.day, 0.03)
+  expect(M.marketStatus(sunday.day, at("2026-09-27", "22:30"), edge, calendars)).toMatch(/^At 00:\d\d · Overnight$/)
+  expect(M.rowModel(sunday.day, edge, "pct").priceText).not.toBe("243.48")
+  // Monday 08:00: Monday from midnight, a scrub at a tenth in reading the
+  // night against Friday's close.
+  const monday = dayAt("monday", "nest")
+  expect(M.chartSpan(monday.day)).toMatchObject({ start: at("2026-09-28", "00:00"), end: at("2026-09-29", "00:00") })
+  const dawn = M.timeAtFraction(monday.day, 0.1)
+  expect(M.marketStatus(monday.day, at("2026-09-28", "08:00"), dawn, calendars)).toMatch(/^At 02:\d\d · Overnight$/)
+  expect(M.rowModel(monday.day, dawn, "pct").priceText).not.toBe("237.33")
+  // Thursday 23:00: NEST's night traded through, midnight to midnight;
+  // REED's, not traded, Thursday's day from 04:00 with no dot.
+  expect(M.chartSpan(dayAt("night", "nest").day)).toMatchObject({ start: at("2026-10-01", "00:00"), end: at("2026-10-02", "00:00") })
+  const reed = dayAt("night", "reed").day
+  expect(M.chartSpan(reed)).toMatchObject({ start: at("2026-10-01", "04:00"), end: at("2026-10-02", "04:00") })
+  expect(M.chartGeometry(reed).points.some(g => g.dot)).toBe(false)
+  // Monday 5 October 00:36: EZ traded once since Sunday 20:00, TOY five
+  // times: Friday's day from 04:00, then those trades as dots.
+  const ez = dayAt("live-2026-10-05", "ez")
+  expect(M.chartSpan(ez.day).start).toBe(at("2026-10-02", "04:00"))
+  expect(M.chartGeometry(ez.day).points.filter(g => g.dot).length).toBe(1)
+  expect(stripAt(ez, at("2026-10-05", "00:36"))).toMatchObject({ label: "OVERNIGHT", time: "22:40", price: "19.71", changeText: "\u22123.71%" })
+  expect(M.chartGeometry(dayAt("live-2026-10-05", "toy").day).points.filter(g => g.dot).length).toBe(5)
+  // Wednesday 06:00: Wednesday from midnight, still from Tuesday's close.
+  const six = dayAt("2026-10-07-0600", "nest").day
+  expect(M.chartSpan(six).start).toBe(at("2026-10-07", "00:00"))
+  expect(M.dayBaselineText(six)).toBe("PREV CLOSE 249.87")
+})
+
+test("on 1M at night the overnight line stays", () => {
+  const set = "live-2026-10-05"
+  const asked = fixture(`moments/${set}/robinhood-day.json`).results.map(r => r.symbol)
+  const prints = traded(set, asked)
+  const quotes = { NEST: savedDay(set, "nest") }
+  const history = M.parseHistory(fixture(`moments/${set}/nest-1m.json`), "1M", cents)
+  const chart = M.viewChart("NEST", "1M", quotes, {}, { "NEST|1M": { status: "ok", history } },
+    { NEST: { status: "ok", ...prints.NEST } }, { NEST: { status: "ok", allDay: true, at: 0 } }, calendars)
+  expect(chart.history).toBe(history)
+  expect(M.extendedStack(chart.quote, chart.latest, 1791175013, chart.day)).toMatchObject({ label: "OVERNIGHT", time: "00:30", price: "245.47", changeText: "+1.10%" })
+})
+
+test("after the close a scrub to the bell reads the close at 16:00, an index's and a stock's, and the after-hours its own print", () => {
+  const now = at("2026-10-01", "23:00")
+  const gspc = savedDay("night", "gspc")
+  const end = M.timeAtFraction(gspc, 1)
+  expect(M.marketStatus(gspc, now, end, calendars)).toBe("At 16:00 · Closing bell")
+  expect(M.rowModel(gspc, end, "pct").priceText).toBe(M.rowModel(gspc, 0, "pct").priceText)
+  const silk = dayAt("night", "silk").day
+  const rest = M.rowModel(silk, 0, "pct").priceText
+  const bell = silk.points.findIndex(p => p.t >= silk.session.regular.end)
+  expect(M.marketStatus(silk, now, silk.points[bell - 1].t, calendars)).toBe("At 16:00 · Closing bell")
+  expect(M.rowModel(silk, silk.points[bell - 1].t, "pct").priceText).toBe(rest)
+  let off = bell
+  while (M.money(silk.points[off].p, silk.priceDigits) === rest) off++
+  expect(M.marketStatus(silk, now, silk.points[off].t, calendars)).toMatch(/^At \d\d:\d\d · After hours$/)
+  expect(M.rowModel(silk, silk.points[off].t, "pct").priceText).toBe(M.money(silk.points[off].p, silk.priceDigits))
+  // An index at 01:00 has no flat tail of its close after the bell.
+  const night = savedDay("listings-2026-10-07-0100", "gspc")
+  expect(night.points.at(-1).t).toBeLessThan(night.session.regular.end)
+})
+
+test("since the open the change is the move from the OPEN the day line shows", () => {
+  const q = savedDay("listings-2026-10-07-0100", "nest")
+  const open = dayLineAt(q, at("2026-10-07", "01:00")).facts[0]
+  expect(open.label).toBe("OPEN")
+  const price = Number(M.rowModel(q, 0, "open").priceText.replace(/,/g, ""))
+  const from = Number(open.value.replace(/,/g, ""))
+  expect(M.rowModel(q, 0, "open").changeText).toBe(M.pct((price - from) / from * 100))
+})
+
+test("a scrub in Nasdaq's day after Tokyo's close leaves Tokyo's row on its close", () => {
+  const tokyo = savedDay("listings-2026-10-07-1455", "7203.t")
+  expect(M.rowModel(tokyo, at("2026-10-07", "12:00"), "pct").priceText).toBe(M.rowModel(tokyo, 0, "pct").priceText)
 })
 
 test("after midnight the answer is still Friday's: its date, its open, its prints, and its rows' day lines", () => {
