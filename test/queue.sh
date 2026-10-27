@@ -157,7 +157,8 @@ picked() {
 # anything starts, when a name in $some is neither a harness's nor one of
 # NAMES.
 known_names() {
-  local name
+  local - name
+  set -f
   known+=" $*"
   for name in $some; do
     [[ " $known " == *" $name "* ]] && continue
