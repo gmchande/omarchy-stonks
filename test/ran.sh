@@ -44,9 +44,14 @@ EOF
   : > "$work/repo/test/review.sh"
   # commit MESSAGE: the made-up checkout's edits, so a run on it is clean.
   commit() { git -C "$work/repo" add -A && git -C "$work/repo" -c user.name=check -c user.email=check@example.com commit -qm "$1"; }
-  # runs: a run of its test/all.sh on its own lock, and its record's last line.
+  # runs [ONLY]: a run of its test/all.sh on its own lock, narrowed to ONLY
+  # when given, as test/touched.sh narrows one, and its record's last line.
   runs() {
-    (cd "$work/repo" && XDG_RUNTIME_DIR="$work/runtime" bash test/all.sh > "$work/out" 2>&1) || true
+    (
+      cd "$work/repo" && unset STONKS_ONLY
+      [ -z "${1:-}" ] || export STONKS_ONLY=$1
+      XDG_RUNTIME_DIR="$work/runtime" bash test/all.sh > "$work/out" 2>&1
+    ) || true
     last=$(tail -n 1 "$work/repo/.git/stonks-runs" 2> /dev/null || true)
   }
   check() { if [ "$2" = "$3" ]; then echo "PASS $1"; else echo "FAIL $1: got '$2', want '$3'"; code=1; fi; }
@@ -54,7 +59,7 @@ EOF
   runs
   check "a failed run's record names each step that failed, as its output does" "${last#* SOME FAILED}" " | a made-up quick check, that fails | a made-up harness, that fails"
   before=$last
-  STONKS_ONLY=test/qml/fine.sh runs
+  runs test/qml/fine.sh
   check "a run test/touched.sh narrowed leaves no record" "$last" "$before"
   check "the narrowed run says what it left out" "$(grep -c '^left out, as test/touched.sh asked: a made-up harness, that fails$' "$work/out" || true)" 1
   cp "$work/repo/test/qml/fine.sh" "$work/repo/test/qml/unstarted.sh" && commit "a harness no runner starts"

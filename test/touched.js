@@ -40,13 +40,14 @@ const runners = {'test/all.sh': 'all', 'test/review.sh': 'review'}
 const everything = ['test/queue.sh', 'test/scratch.sh', 'test/all.sh', 'test/review.sh', 'test/touched.sh', 'test/touched.js']
 const code = /\.(qml|js|mjs|sh|py|lua)$/
 
-// names FILE: the words that reach FILE when a check names them. Code and
-// docs are read by name; data through its folder too, every folder but
-// test/ itself.
+// names FILE: the words that reach FILE when a check names them. A QML
+// type is named by its file's name, which starts with a capital; any other
+// file by its whole name, and data through its folder too, every folder
+// but test/ itself.
 function names(file) {
   const base = basename(file)
-  if (file.endsWith('.qml')) return [base.slice(0, -4)]
-  if (code.test(file) || file.endsWith('.md')) return [base]
+  if (/^[A-Z].*\.qml$/.test(base)) return [base.slice(0, -4)]
+  if (code.test(file) || /\.(qml|md)$/.test(file)) return [base]
   return [base, ...dirname(file).split('/').filter(d => d !== '.' && d !== 'test')]
 }
 
@@ -85,7 +86,9 @@ function pick(root, base) {
     const seen = new Set(seeds), queue = [...seeds]
     while (queue.length) {
       const file = queue.pop()
-      if (!scanned.has(file)) scanned.set(file, words(root, file))
+      // The runners name every check, and a change to them reaches
+      // everything anyway: what they name reaches no check through them.
+      if (!scanned.has(file)) scanned.set(file, everything.includes(file) ? new Set() : words(root, file))
       for (const word of scanned.get(file)) for (const next of byName.get(word) || []) {
         if (!seen.has(next)) { seen.add(next); queue.push(next) }
       }
@@ -143,10 +146,10 @@ function selfCheck() {
     put('test/review.sh', 'source "$(dirname "${BASH_SOURCE[0]}")/queue.sh"\nstart "renders" bash test/qml/r.sh\nrun --with test/qml/r.sh "render diff" render_diff\nverdict\n')
     put('test/queue.sh', 'verdict() { :; }\n')
     put('test/quick.sh', 'echo ok\n')
-    put('test/qml/lib.sh', 'PATH="$here/bin:$PATH"\n')
+    put('test/qml/lib.sh', 'PATH="$here/bin:$PATH"\nusage() { echo "every harness: test/all.sh"; }\n')
     put('test/qml/bin/curl', '#!/bin/sh\necho answer\n')
     put('test/qml/x.sh', 'source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"\nplugin_tree x.qml\n')
-    put('test/qml/x.qml', 'Stonks.Main {}\n')
+    put('test/qml/x.qml', 'Stonks.Main {\n  id: y\n}\n')
     put('test/qml/y.sh', 'source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"\nplugin_tree y.qml\nfor file in "$here"/../data/*.json; do load "$file"; done\n')
     put('test/qml/y.qml', '// Child is not loaded here, only named in a comment.\nStonks.Lone {}\n')
     put('test/qml/r.sh', 'source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"\nplugin_tree r.qml\n')
