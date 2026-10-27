@@ -737,6 +737,15 @@ test("sorting ranks the rows as a view over the manual list", () => {
   expect(M.sortedSymbols(["UP", "DN"], opened, "pct", false, "open")).toEqual(["DN", "UP"])
 })
 
+// What ends the undo on offer: a data file, hand-edited or another
+// build's, that changes what the lists hold, and none that changes only the
+// view.
+test("only a change to what the lists hold ends the undo", () => {
+  const s = library()
+  expect(M.listsHeld(Object.assign({}, s, { range: "1Y", featured: "SPY", order: "symbol", list: "Growth" }))).toBe(M.listsHeld(s))
+  expect(M.listsHeld(Object.assign({}, s, { lists: s.lists.concat([{ name: "Made elsewhere", symbols: [] }]) }))).not.toBe(M.listsHeld(s))
+})
+
 // The keys a sheet or README label names, in one spelling: a capital as
 // Shift and it, ⇧ as Shift, and the sheet's "Del ⌫" as Delete and Backspace.
 const keyTokens = label => label.replace(/`/g, "").split(/\s+/)
