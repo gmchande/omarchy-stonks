@@ -58,10 +58,12 @@ only '^import Quickshell\.Io' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml
 # sends a notification.
 only 'grabToImage|saveToFile|wl-copy|wl-paste|omarchy-notification-send|notify-send' Camera.qml
 # A command started by exec is a sound's, and only there; it is pw-play
-# under its time limit, and nothing else. Only the sounds ask PipeWire
+# under its time limit, and nothing else. A chime's pw-play has its own 2 s,
+# so a stalled PipeWire piles none up. Only the sounds ask PipeWire
 # anything, or hold its output awake.
 only '\.exec\(|pw-play|pw-dump|pw-cat' Sounds.qml
 none '\.exec\((?!\["timeout", "-k", "1", "4", "pw-play",)' Sounds.qml
+none '(?<!timeout -k 1 2 )pw-play --' Sounds.qml
 # Every command the camera and the file keeper run is under `timeout`.
 none 'command:\s*\[(?!"timeout",)' Camera.qml OwnerOnly.qml
 only '\bIpcHandler\s*\{' IpcTarget.qml
