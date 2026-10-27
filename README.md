@@ -12,7 +12,7 @@ move the pointer across the chart to see the price at any moment on it.
 - Stocks, ETFs, indexes, and crypto, from New York to London and Tokyo, each
   in its own currency.
 - Lists of your own, such as a portfolio or a sector.
-- Two looks, smooth and retro, in your theme's colours, light or dark.
+- Two looks, smooth and retro, in your theme's colors, light or dark.
 - No account and no API key.
 
 It doesn't track holdings, send price alerts, or convert prices into another currency.
@@ -31,7 +31,7 @@ omarchy plugin add https://github.com/gmchande/omarchy-stonks.git --enable
 ```
 
 Omarchy warns that plugins run unsandboxed and asks you to confirm. Then it
-asks where in the bar to put `grvc.stonks`, which is Stonks' id. The centre
+asks where in the bar to put `grvc.stonks`, which is Stonks' id. The center
 is the default.
 
 To read the code first, leave out `--enable`, say no when Omarchy offers to
@@ -98,7 +98,7 @@ window were closed, such as a coin's, says it only if its new price takes
 more than 2 seconds to come. At the open, the last close says it only if
 the session's first price takes more than a minute to come; Stonks asks for
 it every 15 seconds until then. If Yahoo sends no regular price, Stonks keeps
-the last regular chart trade, labelled "Last trade" with its time.
+the last regular chart trade, labeled "Last trade" with its time.
 If Yahoo sends a price without its time, it says "Time not sent", and
 "Saved" too if kept from the last session.
 A refresh that fails, or gets no answer in 90
@@ -184,7 +184,7 @@ top right to switch between smooth and retro.
 
 <img src="media/light.png" width="480" alt="The popup in Catppuccin Latte, a light theme: Stonks' own green and red, for a light ground, on the theme's pale background">
 
-Both looks draw in your theme's colours, light themes too: up in its green
+Both looks draw in your theme's colors, light themes too: up in its green
 and down in its red, or in Stonks' own pair where the theme's are missing,
 too alike, or too faint.
 

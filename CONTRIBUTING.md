@@ -61,7 +61,8 @@ A maintainer releases from `dev`.
    the README's pictures with `test/qml/readme.sh` if they should change.
 4. Run `STONKS_RENDER_BASE=vLAST test/review.sh --fresh` on it: `ALL PASS`,
    and the marketplace's security scan finds nothing.
-5. `git push origin dev:main`, tag `vX.Y.Z`, and publish release notes as
-   `AGENTS.md`'s Words says.
+5. `git push origin dev:main`, tag `vX.Y.Z`, and publish release notes: what
+   the release changes for you, then how to update, then a line for each
+   change you'll notice, written as `AGENTS.md`'s Words says.
 6. File the marketplace's verify form with `main`'s commit, keep `main`
    still until it's published, and answer its maintainer within seven days.

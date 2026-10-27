@@ -23,7 +23,7 @@
       "barStyle": "sparkline"
     },
     "schema": [
-      { "key": "barStyle", "type": "enum", "label": "Pill", "options": ["sparkline", "arrow", "text", "icon"], "defaultValue": "sparkline", "description": "How the pill looks in the centre or left section of a top or bottom bar. Middle-click the pill to change it." },
+      { "key": "barStyle", "type": "enum", "label": "Pill", "options": ["sparkline", "arrow", "text", "icon"], "defaultValue": "sparkline", "description": "How the pill looks in the center or left section of a top or bottom bar. Middle-click the pill to change it." },
       { "key": "barStyleRight", "type": "enum", "label": "Pill on the right", "options": ["sparkline", "arrow", "text", "icon"], "defaultValue": "icon", "description": "How the pill looks in the right section of a top or bottom bar, among the bar's icons. Middle-click the pill there to change it." },
       { "key": "barStyleVertical", "type": "enum", "label": "Pill on a side bar", "options": ["icon", "stacked"], "defaultValue": "icon", "description": "How the pill looks on a bar at the side of the screen: the day's bull or bear, or the symbol over its change. Middle-click the pill there to switch." }
     ]
