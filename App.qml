@@ -28,9 +28,7 @@ Item {
   readonly property bool opened: window.visible
   readonly property string featuredSymbol: ready ? service.featuredSymbol : ""
   readonly property string range: ready ? service.range : "1D"
-  // Built a second after the service is ready, closed, or by an open before
-  // then, and kept: null until then. Synchronous, so an open finds no body
-  // or a whole one, never one half built.
+  // Built as the window first opens, and kept: null until then.
   readonly property var body: bodyLoader.item
 
   function open(payloadJson) {
@@ -90,22 +88,11 @@ Item {
 
   // A window summoned while its service starts draws its chart in once
   // there is a symbol to draw.
-  onReadyChanged: if (ready) {
-    bodyAhead.start()
-    Qt.callLater(function() {
-      root.applyRequest()
-      root.requestFundamentals()
-      if (window.visible) root.body.motion.revealChart()
-    })
-  }
-  // The body is built closed, so the first open after a restart finds it
-  // built; a closed body reads nothing, so it asks for nothing. A second
-  // on, clear of the start's own work (Panel.qml says what that saves).
-  Timer {
-    id: bodyAhead
-    interval: 1000
-    onTriggered: bodyLoader.active = true
-  }
+  onReadyChanged: if (ready) Qt.callLater(function() {
+    root.applyRequest()
+    root.requestFundamentals()
+    if (window.visible) root.body.motion.revealChart()
+  })
   onFeaturedSymbolChanged: requestFundamentals()
   onOnScreenChanged: requestFundamentals()
 

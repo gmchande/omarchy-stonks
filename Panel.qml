@@ -7,9 +7,7 @@ import qs.Ui
 
 // The watchlist popup. Owns popup lifecycle, keys, and look; the body reads
 // the service and owns the list, search, scrub, help, and the motion when
-// the chart changes. The body is built a second after the service is
-// ready, closed, so even the first open after a restart finds it built, and
-// kept.
+// the chart changes. The body is built as the popup first opens, and kept.
 Panel {
   id: root
   moduleName: "grvc.stonks"
@@ -32,8 +30,7 @@ Panel {
   // The popup shows up to six whole rows under its fixed content. Stated in
   // rows, so a different font or text size still gets six.
   readonly property int maxRows: 6
-  // Built a second after the service is ready, or by an open before then,
-  // and kept: null until then.
+  // Built as the popup first opens, and kept: null until then.
   readonly property var body: bodyLoader.item
   readonly property int heightCap: body ? panel.verticalContentInset + body.chromeHeight
     + maxRows * body.rowPitch - body.rowGap : 0
@@ -71,21 +68,7 @@ Panel {
     service.persist({ hinted: true })
   }
   readonly property bool serviceReady: !!service && service.pluginsReady === true
-  onServiceReadyChanged: {
-    offerHint()
-    if (serviceReady) bodyAhead.start()
-  }
-  Component.onCompleted: if (serviceReady) bodyAhead.start()
-  // A closed body reads nothing, so it asks for nothing and moves nothing
-  // (`StonksBody.reading`). Synchronous, so an open finds no body or a whole
-  // one, never one half built. A second on, clear of the start's own work:
-  // built a turn after the service was ready, it held the thread in one
-  // piece with that work, 48 to 82 ms against 29 to 49.
-  Timer {
-    id: bodyAhead
-    interval: 1000
-    onTriggered: bodyLoader.active = true
-  }
+  onServiceReadyChanged: offerHint()
 
   // The card's place along the bar, held from an open from closed until the
   // next; an open during the close fade keeps it, since the card is still on
