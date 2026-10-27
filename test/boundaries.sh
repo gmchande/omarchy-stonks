@@ -49,8 +49,8 @@ none() {
 # quote URL is the quote feed's, the fundamentals URLs the fundamentals
 # feed's, the overnight URL the overnight feed's, the all-day URL the
 # all-day feed's, and the manifest's URL the release feed's. The plugin has
-# one IPC target, and a second, the locator, only in the tophat's nested
-# session; only the window's host acts on Hyprland.
+# one IPC target, and a second, the locator, only in a test session
+# (TOPHAT_RUN, Plugin.qml); only the window's host acts on Hyprland.
 only '\bProcess\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Updates.qml Sounds.qml Camera.qml OwnerOnly.qml
 only '\bFileView\s*\{' Service.qml Updates.qml TrendColors.qml OwnerOnly.qml Sounds.qml
 only '\bSettings\s*\{|^import QtCore' Camera.qml

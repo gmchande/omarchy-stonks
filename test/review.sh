@@ -18,12 +18,6 @@
 #   never on the property behind it.
 # - The long list: a power user's day on a slow network, on wall-clock
 #   budgets.
-# - The tophat's guards, without a screen. Try a visible change in a nested
-#   session first (test/tophat.sh, its usage at the top).
-# - The update, in the tophat's nested session: the last release's user
-#   hears of this build in the footer, updates, restarts the shell, and
-#   keeps their data file (test/tophat/journeys/update.sh), after the
-#   motion harnesses, which it would crowd.
 #
 # Each set of renders, the head's and the base's, is drawn once: a run keeps
 # each set it draws whole under the name test/render-key.sh makes from
@@ -163,12 +157,10 @@ start "long list harness" bash test/qml/long-list.sh
 start "window motion harness" bash test/qml/window-motion.sh
 start "README pictures, into a scratch folder" env STONKS_README_OUT="$logs/readme" bash test/qml/readme.sh
 start "popup motion harness" bash test/qml/popup-motion.sh
-start "tophat guards (no screen)" bash test/tophat.sh self-check
 fill
 
 run "installed theme diagnostic" bun test/themes.js
 drain
-run "the update from the last release, in the tophat (test/tophat/journeys/update.sh)" bash test/tophat/journeys/update.sh HEAD
 run "render diff, against ${base:0:7} (out/render-diff/)" render_diff
 run "keep the renders this run drew" keep_sets
 verdict

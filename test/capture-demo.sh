@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Saves the endpoints' answers for the demo watchlist (test/tophat/demo.json)
+# Saves the endpoints' answers for the demo watchlist (test/demo.json)
 # at this moment, into the saved answers' moments/demo-<YYYY-MM-DD-HHMM>,
 # New York time, for the README's pictures: Yahoo's 1D chart for each
 # listing, as Stonks asks for it, and for the US listings Robinhood's
@@ -17,7 +17,7 @@ final="$fixtures/moments/demo-$moment"
 dir=$(mktemp -d "$fixtures/moments/.capture-XXXX")
 trap 'rm -rf "$dir"' EXIT
 ua="Mozilla/5.0 (Omarchy Stonks)"
-listed=$(jq -r '.symbols[]' test/tophat/demo.json)
+listed=$(jq -r '.symbols[]' test/demo.json)
 get() { curl -fsS --compressed --max-time 15 -A "$ua" "$1" || return; sleep 2; }
 for s in $listed; do
   file=$(tr 'A-Z' 'a-z' <<< "${s#^}")
@@ -36,7 +36,7 @@ cat > "$dir/.url" << EOF
 # Robinhood (symbols=$us&interval=5minute&span=day&bounds=24_5)
 # Robinhood's bars keep begins_at, close_price, volume, session, and interpolated.
 # Robinhood instruments (?symbols=$us), the same minute: symbol and all_day_tradability kept.
-# The demo watchlist (test/tophat/demo.json), for the README's pictures.
+# The demo watchlist (test/demo.json), for the README's pictures.
 # Saved by test/capture-demo.sh.
 EOF
 mv "$dir/.url" "$final.url"

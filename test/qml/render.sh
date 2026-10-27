@@ -83,8 +83,8 @@ every_state() (
     done
     states="$states popup-controls-deadmove-hover-$look popup-controls-livemove-hover-$look popup-controls-breadth-hover-$look"
   done
-  # The listing sweep (CONTRIBUTING.md, Verify it): every kind of listing on
-  # 1D at each of its moments, in both looks.
+  # The listing sweep: every kind of listing on 1D at each of its moments, in
+  # both looks.
   # The list menu over the cursor's row in both looks on both surfaces: its
   # edge shows nothing of the row under it.
   states="$states popup-lists-menu-smooth window-lists-menu-smooth window-lists-menu-retro"

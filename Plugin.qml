@@ -10,8 +10,8 @@ import Quickshell
 // `serviceFor("grvc.stonks")`: the data as `service`, the colours as
 // `trendColors`, the version watch as `updates`, the sounds as `sounds`,
 // the camera as `camera`, the window as `windowHost`, and the IPC target as
-// `ipc`. In the tophat's nested session alone, `locator` says where a named
-// control is (Locator.qml).
+// `ipc`. In a test session alone (TOPHAT_RUN set), `locator` says where a
+// named control is (Locator.qml).
 Item {
   id: root
 
@@ -60,8 +60,8 @@ Item {
     windowHost: host
   }
 
-  // The tophat's nested session marks everything it starts with
-  // TOPHAT_RUN (test/tophat.sh); no owner's shell has it.
+  // A test session sets TOPHAT_RUN for everything it starts; a shell
+  // started any other way doesn't have it.
   Loader {
     id: locatorLoader
     active: (Quickshell.env("TOPHAT_RUN") || "") !== ""

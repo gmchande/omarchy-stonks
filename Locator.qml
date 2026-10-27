@@ -1,13 +1,13 @@
 import QtQuick
 import Quickshell.Io
 
-// Where a named control is, for the tophat's scripted journeys
-// (test/tophat/journeys/): a journey then moves and clicks there through
-// real input, never through a call into Stonks. Plugin.qml loads this only
-// in the tophat's nested session, whose processes carry TOPHAT_RUN, so no
-// owner's shell offers it. The pill's and the popup's surfaces start at the
-// output's corner (the bar's top edge, the popup's full-screen overlay), so
-// a rectangle here is one on the nested output too.
+// Where a named control is, for scripted test sessions: a script then moves
+// and clicks there through real input, never through a call into Stonks.
+// Plugin.qml loads this only when the shell runs with TOPHAT_RUN set in its
+// environment, which a test session sets for everything it starts and no
+// shell started any other way has. The pill's and the popup's surfaces
+// start at the output's corner (the bar's top edge, the popup's full-screen
+// overlay), so a rectangle here is one on the session's output too.
 Item {
   id: root
 
