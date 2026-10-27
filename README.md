@@ -11,7 +11,7 @@ how one stock is doing today. Click it for the chart and your lists.
   stocks and ETFs that trade overnight.
 - Point anywhere on the chart to see the price at that moment.
 - Prices as Yahoo and Robinhood send them, in each listing's own currency
-  and its exchange's own time. Nothing is converted.
+  and its exchange's own time. Prices aren't converted.
 - Lists of your own, such as a portfolio or a sector.
 - A screenshot of any chart, sized so X shows it whole.
 - Everything works by mouse alone or by keyboard alone.
@@ -46,13 +46,13 @@ follow.
 
 ## The pill
 
-<img src="media/pill.png" width="200" alt="The pill four ways: a sparkline, an arrow, the price as text, and the day's bear">
+<img src="media/pill.png" width="200" alt="The pill four ways: a sparkline, an arrow, the price as text, and an icon for the day">
 
-The pill shows today's move for the stock you last looked at, as a
-sparkline, an arrow, the price as text, or a pixel bull or bear for the
-day. Middle-click it to switch. It keeps your choice after a restart. On a
-bar at the side of the screen, middle-click switches between that last
-form and the symbol over its change.
+The pill shows today's move for the stock you last looked at. It can show
+a sparkline, an arrow, the price as text, or an icon: a bull on an up day,
+a bear on a down one. Middle-click it to switch. It keeps your choice after
+a restart. On a bar at the side of the screen, middle-click switches
+between the icon and the symbol over its change.
 
 Scroll over the pill to step through your list. Click it for the popup,
 right-click it for the window, and drag it to move it along the bar.
@@ -62,7 +62,8 @@ right-click it for the window, and drag it to move it along the bar.
 <img src="media/scrub.png" width="480" alt="The popup scrubbed back an hour and a half, to 10:15 in the morning. The price, the change, and the rows show that moment">
 
 Run the pointer along the chart to go back through the day. The price, the
-change, and the rows follow it.
+change, and the rows follow it. Click the icon at the top left to replay
+the chart.
 
 Pick a range under the chart, from 1D to ALL. Every stock then shows that
 range, even after a restart. The rows always show the day.
@@ -74,8 +75,9 @@ header.
 Under the ranges, the first line shows the range's low and high, with the
 price between them. Beside it are the open and the volume on 1D, or the
 range's starting price and volume on a longer range. The second line shows
-the 52-week low and high, with the market cap and P/E. The market cap is
-Yahoo's last reported figure, moved with the price since that report. When
+the 52-week low and high, with the market cap and P/E. Stonks estimates
+the market cap from Yahoo's last reported figure, moved with the price
+since. When
 a company reports earnings in another currency, Stonks converts them at
 Yahoo's rate for the day, inside the P/E and nowhere else.
 
@@ -162,17 +164,19 @@ its own.
 
 ## Sounds
 
-Sounds start off. To turn them on or off, press `m`, or click the speaker
-at the top right. With sounds on, adding, removing, or undoing a row makes
-a short sound, and the chart chimes as you run the pointer along it. A soft
-bell rings when the market opens and when it closes, but never while an app
-is recording from your microphone. Refreshes and prices make no sound.
+Sounds are off until you turn them on. Press `m`, or click the speaker at
+the top right. With sounds on, adding, removing, or undoing a row makes a
+short sound, and the chart chimes as you run the pointer along it. A soft
+bell rings as the market of the stock you last looked at opens and closes,
+but never while an app is recording from your microphone. Refreshes and
+prices make no sound.
 
 ## Screenshots
 
 Press `Ctrl+C`, or click the camera at the top right, for a picture of the
 chart, sized so X shows it whole. It shows the price, its move, the
-exchange, and the time with its zone. Your list is never in it.
+exchange, and the time with its zone. If you've scrubbed the chart, it
+shows that moment. Your list is never in it.
 
 Stonks treats it like Omarchy's own screenshots. It saves the picture to
 your screenshots folder, copies it to the clipboard, and shows a
@@ -217,15 +221,16 @@ the pill to see which.
 <summary>What each message means, and what to do</summary>
 
 - **"Can't get prices" in the header, or "No data" or "Update overdue" on
-  a row.** Yahoo hasn't answered for 90 seconds, or has turned Stonks
-  away. Rows keep their last price and its time. Check your connection.
+  a row.** Yahoo hasn't sent a price Stonks can use in time, or has
+  turned Stonks away. Rows keep any price they had, with its time. Check your connection.
   Stonks keeps trying on its own, less often the longer Yahoo stays away.
   `r` asks again at once, unless Yahoo is turning Stonks away. If Yahoo
   has changed what it sends, only a newer Stonks can fix it.
 - **"No data for this symbol" or "Refresh failed" on a row.** Yahoo has
   nothing for the symbol, or sent a broken answer three times in a row.
-  Press `r` to try again. After a merger, a rename, or a delisting, search
-  for the company to find its new symbol.
+  Press `r` to try again. After a merger or a rename, search for the
+  company to find what Yahoo calls it now. A delisted company may be gone
+  for good.
 - **"As of" while the market is open.** Yahoo sends some prices late. When
   we measured, London, São Paulo, and the VIX came 15 minutes late, and
   Mexico 20. Nasdaq, NYSE, Toronto, and crypto came within a minute.
@@ -238,7 +243,8 @@ the pill to see which.
   £35.80. The large price is the regular session's, and the smaller line
   under it shows trades outside it, which some apps show as the main price.
   The change is from the previous close, unless you've switched it to
-  since the open. On a longer range, it's from the range's start.
+  since the open. On a longer range, it's from the range's start. Stonks
+  leaves out prices of zero or less, and stray points in Yahoo's charts.
 - **"No trades charted" or "Traded only at" a time.** The listing traded
   too little that day to draw a line.
 - **"1W unavailable" or "Search didn't answer", with RETRY.** Yahoo didn't
@@ -254,8 +260,8 @@ the pill to see which.
   remove it to start over.
 - **"Your changes aren't saved" in the footer.** Stonks can't write your
   lists file, because the disk is full or the file or its folder is
-  read-only. A restart loses your changes. Free some space or fix the
-  permissions, then click the footer.
+  read-only. A restart loses every change since the last save. Free some
+  space or fix the permissions, then click the footer.
 
 To report a wrong price or anything else, use the
 [bug form](https://github.com/gmchande/omarchy-stonks/issues/new?template=bug.yml).
@@ -278,6 +284,8 @@ personal use, so either may change or stop without notice.
 - `curl` for every request, with a time limit and a size cap.
 - `sh`, `mkdir`, `chmod`, `mktemp`, `ln`, and `rm`, to make its files and
   keep them readable only by you.
+- `timeout`, to stop its file, sound, and screenshot commands if they
+  hang.
 - With sounds on: `pw-play` for each sound; `pw-cat` playing silence while
   you move along the chart, so each chime plays at once; `pw-dump`, in
   `bash`, as the bell is due, to check that no app is recording; and `sh`
@@ -291,10 +299,12 @@ personal use, so either may change or stop without notice.
 **Sites**, and nothing else:
 
 - `query1.finance.yahoo.com` for prices, charts, the market cap and P/E,
-  and the currency rate a P/E needs, with up to 20 listings a request.
-  Each listing's price every minute while its market trades, every 5
-  minutes in pre-market and after hours unless it's on show, and every 15
-  minutes while its market is closed.
+  and the currency rate a P/E needs. Stonks keeps prices fresh for the
+  pill's stock, for every stock, ETF, and index in All during its regular
+  session, and for every row while the popup or the window is open. Each
+  comes every minute while its market trades, every 5 minutes before and
+  after the session (every minute for the stock on show), and every 15
+  minutes while the market is closed.
 - `query2.finance.yahoo.com` for search, as you type.
 - `api.robinhood.com` for overnight prices: once a day for which stocks
   trade overnight, once for the pill's stock as the shell starts, and
@@ -315,7 +325,8 @@ away, it waits as long as the site asks, up to half an hour.
 - Each screenshot, as `stonks-<symbol>-<date>_<time>.png` in the folder
   Omarchy's own screenshots use.
 
-Only you can read your lists file and the cache folder.
+Only you can read the cache folder. Stonks makes your lists file readable
+only by you when it creates or saves it.
 [`test/boundaries.sh`](test/boundaries.sh) fails if any code outside a
 few allowed files runs a command, reads or writes a file, or makes a
 request.

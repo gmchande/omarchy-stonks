@@ -1,6 +1,7 @@
 # Security
 
-Stonks runs inside the Omarchy shell, unsandboxed, with your user's rights.
+Stonks runs inside the Omarchy shell, with no sandbox and the same
+permissions as your account.
 
 ## Report a problem privately
 
@@ -21,7 +22,8 @@ writes. It's a security problem if anything can make Stonks:
 - contact another site;
 - write another file;
 - read any file other than the ones it writes, its own files, the shell's
-  settings, and the theme's colors.
+  settings, the theme's colors, and the Omasnap and Pictures folder
+  settings that say where screenshots go.
 
 It counts whether it comes from a symbol, an answer from Yahoo or
 Robinhood, or a data file.

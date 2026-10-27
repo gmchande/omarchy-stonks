@@ -5,7 +5,7 @@
   "version": "1.1.0",
   "author": "Gaurav Chande",
   "license": "MIT",
-  "description": "A stock watchlist for your bar. The pill shows how a stock is doing today, and a click opens its chart and your lists. Point at the chart to see the price at any moment, overnight included for the US stocks and ETFs that trade overnight. Take a screenshot sized so X shows it whole. Stocks, ETFs, indexes, and crypto from around the world, each in its own currency. Prices come from Yahoo Finance and Robinhood, with no account or API key.",
+  "description": "A stock watchlist for your bar. The pill shows how a stock is doing today, and a click opens its chart and your lists. Point at the chart to see the price at any moment. Overnight prices cover the US stocks and ETFs that trade overnight. Take a screenshot sized so X shows it whole. Stocks, ETFs, indexes, and crypto from around the world, each in its own currency. Prices come from Yahoo Finance and Robinhood, with no account or API key.",
   "kinds": ["service", "bar-widget"],
   "keepLoaded": true,
   "entryPoints": {
