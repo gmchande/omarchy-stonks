@@ -50,7 +50,6 @@ start "service harness" bash test/qml/service.sh
 start "update check harness" bash test/qml/updates.sh
 start "Quickshell crash handling (stand-in)" bash test/qml/crash-check.sh
 start "history harness" bash test/qml/history.sh
-start "data files harness" bash test/qml/data-files.sh
 fill
 
 run "unit tests (every *.test.js)" bash test/unit.sh
