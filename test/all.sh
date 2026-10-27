@@ -45,7 +45,7 @@ start "camera harness" bash test/qml/camera.sh
 # On a scale-2 screen too: the picture is drawn and saved at 2400 x 1350
 # there, not at twice that or half of it.
 start "camera harness at scale 2" env QT_SCALE_FACTOR=2 bash test/qml/camera.sh
-start "quote queue harness" bash test/qml/run.sh
+start "quote queue harness" bash test/qml/quote-queue.sh
 start "service harness" bash test/qml/service.sh
 start "update check harness" bash test/qml/updates.sh
 start "Quickshell crash handling (stand-in)" bash test/qml/crash-check.sh
