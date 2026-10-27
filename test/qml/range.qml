@@ -562,7 +562,8 @@ Harness {
       agedFigures.AAPL = Object.assign({}, agedFigures.AAPL, { checkedAt: agedFigures.AAPL.checkedAt - 25 * 60 * 60 })
       service.testFundamentalsFeed.entries = agedFigures
       keyClick("r")
-      var figuresAsked = within(5000, function() { return harness.calls("AAPL.fundamentals") > asksBefore })
+      // Within 2 s: the minute's own ask (Service's onNowChanged) would pass a wider wait.
+      var figuresAsked = within(2000, function() { return harness.calls("AAPL.fundamentals") > asksBefore })
         && within(5000, function() { return service.fundamentals.AAPL.checkedAt > agedFigures.AAPL.checkedAt })
       harness.check("r fetches a day-old cap and P/E again, not fresh ones",
         freshAsks === 0 && figuresAsked && harness.calls("AAPL.fundamentals") === asksBefore + 1
