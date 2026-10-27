@@ -51,12 +51,9 @@ and an issue saves building one that won't merge.
   maintainer runs them on your branch.
 - GitHub runs the checks a fresh clone can on every push and pull request to
   `dev` and `main` (`.github/workflows/fresh-clone.yml`).
-- While you work, run `test/touched.sh`: it runs the steps of both suites,
-  and the journeys, that your diff from `dev` can reach, and says what it
-  left out and why. A change to a file most of Stonks loads, such as
-  `StonksBody.qml`, reaches nearly every check. For one area alone,
-  `bash test/qml/lists.sh` runs its harness and
-  `test/qml/render.sh 'popup-lists-*'` renders the states you name.
+- While you work, run the harness for the area you change, such as
+  `bash test/qml/lists.sh`, and render the states you change, such as
+  `test/qml/render.sh 'popup-lists-*'`.
 - A test checks what Stonks does: what it fetches, saves, and says, and what
   a key or a click changes. It never checks a picture, a position, or a
   timing. How Stonks looks and moves is the maintainer's to review, on your
