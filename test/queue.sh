@@ -3,23 +3,15 @@
 # this, queues its harnesses (start), fills the slots (fill), runs its quick
 # checks (run), and ends on verdict. The harnesses run side by side, a few
 # at a time, each with its own HOME, QML cache, and fake curl state
-# (qml/lib.sh), while the quick checks run. Each step prints one line, in
-# order, with its time; a failed one adds the few lines that say why. Every
-# step's whole output goes to the run's full log (out/runs/all.log for
-# test/all.sh), which the summary names. A check that exits 77 had no saved
-# answers to run on (test/fixtures-dir.sh): it says why, and the last line
-# counts the skips, ALL PASS only when nothing skipped.
+# (qml/lib.sh), while the quick checks run; each one's output prints in
+# order, with its time. A check that exits 77 had no saved answers to run on
+# (test/fixtures-dir.sh): it says why, and the last line counts the skips,
+# ALL PASS only when nothing skipped.
 #
 #   test/all.sh [--again]     test/review.sh [--again] [--fresh]
 #
 # A tree that already passed, since the last system update, isn't run again:
 # its record covers it. --again runs it anyway, as when chasing a flaky test.
-#
-# test/touched.sh runs only the steps a diff can reach. It sets STONKS_ONLY
-# to the files of the checks it picked, and then a step runs only when its
-# command, or the file its --with names, is one of them, and a step whose
-# command names no file of the checkout runs anyway. Such a run is never
-# recorded: it vouches for no tree.
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 source "$PWD/test/scratch.sh"
@@ -35,27 +27,15 @@ done
 # The run's record (test/ran.sh): the tree it ran on, so the next one to
 # merge it checks the record instead of running it again. Only a run that
 # begins and ends on a clean tree (no edit, no untracked file) is recorded:
-# any other ran on something no commit holds. A failed run's record names
-# each step that failed after its last line, `SOME FAILED | LABEL | LABEL`.
-# It goes in the git folder every worktree shares, which no one edits by
-# hand.
+# any other ran on something no commit holds. It goes in the git folder
+# every worktree shares, which no one edits by hand.
 clean_tree() { [ -z "$(git status --porcelain 2> /dev/null)" ] && git rev-parse -q --verify 'HEAD^{tree}' 2> /dev/null; }
 records="$(git rev-parse --path-format=absolute --git-common-dir)/stonks-runs"
-failed=()
-# record SECONDS LAST: the record of a run that took SECONDS and ended on
-# LAST, when it ran every step on a clean tree that is still the one it began
-# on.
-record() {
-  [ -z "${STONKS_ONLY+set}" ] && [ -n "$tree" ] && [ "$(clean_tree)" = "$tree" ] || return 0
-  local steps=""
-  [ "${#failed[@]}" -eq 0 ] || steps=$(printf ' | %s' "${failed[@]}")
-  echo "$tree $commit $runner $(date -Iseconds) ${1}s $2$steps" >> "$records"
-}
 # checkout: what the run runs on: its clean tree, if it is clean, and HEAD.
 checkout() {
   tree=$(clean_tree)
   commit=$(git rev-parse -q --verify HEAD 2> /dev/null)
-  [ -n "$tree" ] || [ -n "${STONKS_ONLY+set}" ] || echo "$runner: this run won't be recorded: the tree has uncommitted edits or untracked files (git status)"
+  [ -n "$tree" ] || echo "$runner: this run won't be recorded: the tree has uncommitted edits or untracked files (git status)"
 }
 # refuse_passed: ends the run when this tree already passed this runner and
 # no package has changed since, unless --again. The newest pass counts:
@@ -99,11 +79,6 @@ if ! flock -n 9; then
   refuse_passed
 fi
 echo "$runner, pid $$ in $PWD" > "$lock"
-# The run's full log: every step's whole output, in order, as it said it,
-# kept in the checkout's out/ until this runner runs there again.
-full=$PWD/out/runs/${runner##*/}
-full=${full%.sh}.log
-mkdir -p "${full%/*}" && : > "$full" || exit 1
 
 # centiseconds: time since boot, which a clock change does not move.
 centiseconds() {
@@ -118,21 +93,14 @@ began=$(centiseconds)
 # and its finish line, and is started by one of the runners. A script that
 # misses one can pass without its checks having run. quickshell.sh is
 # lib.sh's runner, and crash-check.sh proves it without the saved answers.
-wiring=$(for script in test/qml/*.sh; do
+for script in test/qml/*.sh; do
   name=${script##*/}
   case "$name" in lib.sh|quickshell.sh|crash-check.sh|render.sh) continue ;; esac
   grep -q '^source .*/lib\.sh"$' "$script" || echo "FAILED $script does not source lib.sh"
   tail -n 1 "$script" | grep -qE '^finish "[^"]+"$' || echo "FAILED $script does not end with finish \"...\""
   grep -qE "^start .* bash test/qml/${name//./\\.}$" test/all.sh test/review.sh \
     || echo "FAILED $script is started by neither test/all.sh nor test/review.sh"
-done)
-if [ -n "$wiring" ]; then
-  echo "$wiring"
-  failed=("harness wiring")
-  record $(( ($(centiseconds) - began + 50) / 100 )) "SOME FAILED"
-  echo "SOME FAILED"
-  exit 1
-fi
+done | grep . && { echo "SOME FAILED"; exit 1; }
 
 status=0
 logs=$(mktemp -d)
@@ -162,41 +130,12 @@ trap 'rm -rf "$logs"' EXIT
 slots=6
 queue=()
 
-# picked WORD...: whether a step whose command or --with holds these words
-# runs: always, unless test/touched.sh named the files of its checks in
-# STONKS_ONLY. Then only a step naming one of them, as itself or at the end
-# of a longer path (the base's copy of a check), or a step naming no file
-# of the checkout at all.
-picked() {
-  local word file named=""
-  [ -n "${STONKS_ONLY+set}" ] || return 0
-  for word; do
-    [ -f "$word" ] || continue
-    named=1
-    for file in $STONKS_ONLY; do [[ $word == "$file" || $word == */"$file" ]] && return 0; done
-  done
-  [ -z "$named" ]
-}
-left=()
-# take [--with FILE] LABEL COMMAND...: the step's label and command, in
-# step_label and step_command, when it runs (picked); else notes it as left
-# out and fails. --with names the check a command that is a function of the
-# runner's belongs to.
-take() {
-  local with=()
-  if [ "$1" = --with ]; then with=("$2"); shift 2; fi
-  picked "${with[@]}" "${@:2}" || { left+=("$1"); return 1; }
-  step_label=$1
-  step_command=("${@:2}")
-}
-
-# start [--with FILE] LABEL COMMAND...: queues COMMAND to run in the
-# background, in order, once fewer than $slots of them run (fill).
+# start LABEL COMMAND...: queues COMMAND to run in the background, in order,
+# once fewer than $slots of them run (fill).
 start() {
   local command
-  take "$@" || return 0
-  labels+=("$step_label")
-  printf -v command '%q ' "${step_command[@]}"
+  labels+=("$1")
+  printf -v command '%q ' "${@:2}"
   queue+=("$command")
 }
 
@@ -225,44 +164,21 @@ fill() {
   done
 }
 
-# report LABEL CODE CS LOG: a step's line, its verdict and time, and for a
-# failure or a skip what its output says why; its whole output, LOG, goes
-# to the full log.
+# report CODE [CS]: a check's verdict, and its time when it has one.
 skipped=0
 report() {
-  local took=" ($(printf '%d.%ds' $(($3 / 100)) $(($3 % 100 / 10))))" verdict
-  if [ "$2" -eq 0 ]; then verdict=ok
-  elif [ "$2" -eq 77 ]; then verdict=skipped; skipped=$((skipped + 1))
-  else verdict=FAILED; status=1; failed+=("$1"); fi
-  { echo "== $1"; cat "$4"; echo "   $verdict$took"; } >> "$full"
-  printf '%-8s %s%s\n' "$verdict" "$1" "$took"
-  if [ "$verdict" = FAILED ]; then why "$4" 6
-  elif [ "$verdict" = skipped ]; then why "$4" 1; fi
+  local took=${2:+ ($(printf '%d.%ds' $(($2 / 100)) $(($2 % 100 / 10))))}
+  if [ "$1" -eq 0 ]; then echo "   ok$took"
+  elif [ "$1" -eq 77 ]; then echo "   skipped$took"; skipped=$((skipped + 1))
+  else echo "   FAILED$took"; status=1; fi
 }
-# why LOG N: at most N lines of LOG that say why, indented under the step:
-# its FAIL, FAILED and SKIP lines, each once (a harness's shell log repeats
-# them), or else its last lines.
-why() {
-  local lines count
-  lines=$(sed 's/^ *DEBUG qml: //' "$1" | grep -E '(^|[^[:alnum:]])(FAIL|FAILED|SKIP)([^[:alnum:]]|$)|\(fail\)' | awk '!seen[$0]++')
-  [ -n "$lines" ] || lines=$(grep -v '^[[:space:]]*$' "$1" | tail -n "$2")
-  [ -n "$lines" ] || return 0
-  head -n "$2" <<< "$lines" | sed 's/^/         /'
-  count=$(wc -l <<< "$lines")
-  [ "$count" -le "$2" ] || echo "         and $((count - $2)) more lines in $full"
-}
-# run [--with FILE] LABEL COMMAND...: a quick check, in the foreground, with
-# its verdict; then the queue fills any slot that came free meanwhile.
-ran=0
+# run LABEL COMMAND...: a quick check, in the foreground, with its verdict;
+# then the queue fills any slot that came free meanwhile.
 run() {
-  local log begin code
-  take "$@" || return 0
-  ran=$((ran + 1))
-  log=$logs/run.$ran
-  begin=$(centiseconds)
-  "${step_command[@]}" > "$log" 2>&1 9>&-
-  code=$?
-  report "$step_label" "$code" $(( $(centiseconds) - begin )) "$log"
+  echo "== $1"
+  shift
+  "$@" 9>&-
+  report $?
   fill
 }
 
@@ -285,25 +201,27 @@ passed() {
   for i; do [ "$(cat "$logs/$i.code" 2> /dev/null)" = 0 ] || return 1; done
 }
 
-# verdict: once the queue has run dry, each queued check's line in order,
-# then the summary: the run's own time, where its full log is, and the last
-# line, which a run on a clean tree also records against it. Exits non-zero
-# on any failure.
+# verdict: once the queue has run dry, each queued check's output and
+# verdict in order, the run's own time, and the last line, which a run on a
+# clean tree also records against it. Exits non-zero on any failure.
 verdict() {
   local i code took last
   while [ "${#queue[@]}" -gt 0 ]; do sleep 0.2; fill; done
   for i in "${!pids[@]}"; do
     wait "${pids[$i]}"
     code=$?
-    report "${labels[$i]}" "$code" "$(cat "$logs/$i.cs" 2> /dev/null || echo 0)" "$logs/$i"
+    echo "== ${labels[$i]}"
+    cat "$logs/$i"
+    report "$code" "$(cat "$logs/$i.cs" 2> /dev/null)"
   done
   took=$(( ($(centiseconds) - began + 50) / 100 ))
-  echo "$runner took $((took / 60)) min $((took % 60)) s; every step's whole output: $full"
-  [ "${#left[@]}" -eq 0 ] || echo "left out, as test/touched.sh asked: $(printf '%s; ' "${left[@]}" | sed 's/; $//')"
+  echo "$runner took $((took / 60)) min $((took % 60)) s"
   if [ "$status" -ne 0 ]; then last="SOME FAILED"
   elif [ "$skipped" -gt 0 ]; then last="PASSED, $skipped SKIPPED (no saved answers)"
   else last="ALL PASS"; fi
-  record "$took" "$last"
+  if [ -n "$tree" ] && [ "$(clean_tree)" = "$tree" ]; then
+    echo "$tree $commit $runner $(date -Iseconds) ${took}s $last" >> "$records"
+  fi
   echo "$last"
   exit "$status"
 }
