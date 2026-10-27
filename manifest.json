@@ -5,7 +5,7 @@
   "version": "1.1.0",
   "author": "Gaurav Chande",
   "license": "MIT",
-  "description": "A stock watchlist for your bar: a pixel bull on up days and a bear on down ones, asleep while the market rests, and a chart you scrub for the price at any moment. Overnight prices for US stocks, and a screenshot sized to post on X. Stocks, ETFs, indexes and crypto from markets around the world, each in its own currency. Prices from Yahoo Finance and Robinhood, with no account or key.",
+  "description": "A stock watchlist for your bar. A pixel bull marks an up day and a bear a down day, and both sleep while the market is closed. Point at the chart to see the price at any moment. You also get overnight prices for US stocks and a screenshot sized to post on X. Stocks, ETFs, indexes, and crypto from around the world, each in its own currency. Prices come from Yahoo Finance and Robinhood, with no account or API key.",
   "kinds": ["service", "bar-widget"],
   "keepLoaded": true,
   "entryPoints": {
