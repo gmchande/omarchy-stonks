@@ -209,16 +209,21 @@ function dayLine(quote, today) {
 }
 
 // The day line's title, three letters at most, as a range's token is:
-// "1D" for today's figures (`today` is `exchangeDay` of the clock). Another
-// day's, as on a weekend, a holiday, before the session, or overnight, say
-// their session's weekday in the exchange's calendar ("FRI"), which names
-// one day of the six before today: no calendar closes longer than five
-// (Tokyo's Golden Week). Figures a week old or more, as a halted listing's,
-// say their month ("SEP"), never a weekday that would read as this week's.
+// "1D" for today's figures (`today` is `exchangeDay` of the clock), else
+// their session's name (`pastDayName`).
 function dayTitle(quote, today) {
-  var day = exchangeDay(quote, quote.figuresDay)
-  if (day === null || !(today - day > 0)) return "1D"
-  var d = new Date((quote.figuresDay + (quote.gmtoffset || 0)) * 1000)
+  return pastDayName(quote, quote.figuresDay, today) || "1D"
+}
+
+// The name of a day before `today` that holds `t`: its weekday in the
+// exchange's calendar ("FRI"), which names one day of the six before
+// today, since no calendar closes longer than five (Tokyo's Golden Week).
+// A day a week old or more, as a halted listing's, says its month ("SEP"),
+// never a weekday that would read as this week's. "" for today.
+function pastDayName(quote, t, today) {
+  var day = exchangeDay(quote, t)
+  if (day === null || !(today - day > 0)) return ""
+  var d = new Date((t + (quote.gmtoffset || 0)) * 1000)
   return today - day < 7 ? Format.WEEKDAYS[d.getUTCDay()].toUpperCase() : Format.MONTHS[d.getUTCMonth()]
 }
 
@@ -301,9 +306,14 @@ function scrubbedBase(quote) {
 
 // What a scrub of the 1D `day` reads its moves from, said beside its dashed
 // line: the line's own close, the one before the day's session
-// (`Quote.dayBase`), which every print of the chart reads from.
-function dayBaselineText(day) {
-  return "PREV CLOSE " + Format.money(Quote.dayBase(day), day.priceDigits)
+// (`Quote.dayBase`), which every print of the chart reads from. On the
+// session's own day that is the previous close. Once the day is past, as
+// overnight or on a weekend, the last close is the session's own, so the
+// line names the session it comes before: "CLOSE BEFORE TUE".
+function dayBaselineText(day, today) {
+  var reg = day.session.regular
+  var before = reg ? pastDayName(day, reg.start, today) : ""
+  return (before ? "CLOSE BEFORE " + before : "PREV CLOSE") + " " + Format.money(Quote.dayBase(day), day.priceDigits)
 }
 
 // The day's animal for a row (`rowModel`): "bull" up, "bear" down, by
