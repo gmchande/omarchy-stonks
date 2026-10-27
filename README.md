@@ -1,21 +1,34 @@
 # Stonks
 
 Stonks puts a stock watchlist in your Omarchy 4 bar. A small pill shows how
-a stock is doing today. Click it for that stock's chart and your lists, and
-move the pointer across the chart to see the price at any moment on it.
+a stock is doing today; click it for that stock's chart and your lists.
 
 <img src="preview.png" alt="Stonks in the Omarchy bar: its pill shows SPY's sparkline and change. Below the bar, the pixel bull, the STONKS wordmark, 'Stocks in your Omarchy bar.' and 'Free · No account · No API key', beside the retro popup: SPY at 769.94, up 0.88%, with the bull, over the day's chart in pixel columns">
 
-- Charts from one day to all time.
-- Pre-market, after-hours, and overnight prices, and when the market opens
-  or closes.
-- Stocks, ETFs, indexes, and crypto, from New York to London and Tokyo, each
-  in its own currency.
+- A pixel bull on an up day and a bear on a down one, asleep while the
+  market rests.
+- Overnight prices for the US stocks and ETFs that trade overnight, as well
+  as pre-market and after-hours.
+- A chart you scrub: point anywhere on it for the price at that moment.
+- A screenshot sized to post on X whole, saved to the folder Omarchy's own
+  screenshots use, with Omarchy's own notification and editor.
+- Nothing fetched while your screens are off. Each stock is fetched only as
+  often as its market moves, and Stonks backs off when Yahoo refuses it.
+
+And the rest:
+
+- Stocks, ETFs, indexes, and crypto, from New York to London and Tokyo,
+  charted from one day to all time.
+- Prices as they were sent, in the listing's own currency and its
+  exchange's time, marked "As of" when they're late, and never converted.
 - Lists of your own, such as a portfolio or a sector.
-- Two looks, smooth and retro, in your theme's colors, light or dark.
+- Retro by default, in block digits and pixel columns; `s` switches to
+  smooth. Up is your theme's green and down its red, light themes too.
+- Everything works from the keys: `?` lists them, Tab moves to the next
+  panel on the bar, and Esc closes.
 - No account and no API key.
 
-It doesn't track holdings, send price alerts, or convert prices into another currency.
+It doesn't track holdings or send price alerts.
 
 Website: [getstonks.app](https://getstonks.app)
 
@@ -45,7 +58,8 @@ AAPL, MSFT, SPY, and TSLA. Add your own and remove any you don't follow.
 
 The pill shows today's move for the stock you last looked at, as a
 sparkline, an arrow, the price as text, or the day's animal: the bull on an
-up day, the bear on a down one. Middle-click it to change its form. On a
+up day, the bear on a down one. Middle-click it to change its form, which
+it keeps after a restart. On a
 bar at the side of the screen it shows the animal, and a middle-click there
 switches to the symbol over its change.
 
@@ -117,9 +131,9 @@ the pill, and add Stonks to the app launcher.
 
 <img src="media/retro.png" width="480" alt="The popup in retro: block digits and a chart of pixel columns">
 
-Stonks opens in retro: the price in block digits and the charts in pixel
-columns, the way Omarchy draws its logo. Click the small chart icon at the
-top right to switch between smooth and retro.
+Retro draws the price in block digits and the charts in pixel columns, the
+way Omarchy draws its logo. Click the small chart icon at the top right, or
+press `s`, to switch between smooth and retro.
 
 <img src="media/light.png" width="480" alt="The popup in Catppuccin Latte, a light theme: Stonks' own green and red, for a light ground, on the theme's pale background">
 
