@@ -60,7 +60,7 @@ run "required font glyphs" bun test/font.js
 run "source boundaries" bash test/boundaries.sh
 run "qmllint (only the baseline in test/lint.sh)" bash test/lint.sh
 run "qmllint gate self-check" bash test/lint.sh self-check
-run "run records name failed steps (self-check)" bash test/ran.sh --self-check
+run "run records and output (self-check)" bash test/ran.sh --self-check
 run "test/touched.sh picks what a diff reaches (self-check)" bash test/touched.sh self-check
 run "omarchy plugin validate (what a clone holds)" validate_clone
 run "launcher entry validates" desktop-file-validate share/stonks.desktop

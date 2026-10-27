@@ -3,10 +3,12 @@
 # this, queues its harnesses (start), fills the slots (fill), runs its quick
 # checks (run), and ends on verdict. The harnesses run side by side, a few
 # at a time, each with its own HOME, QML cache, and fake curl state
-# (qml/lib.sh), while the quick checks run; each one's output prints in
-# order, with its time. A check that exits 77 had no saved answers to run on
-# (test/fixtures-dir.sh): it says why, and the last line counts the skips,
-# ALL PASS only when nothing skipped.
+# (qml/lib.sh), while the quick checks run. Each step prints one line, in
+# order, with its time; a failed one adds the few lines that say why. Every
+# step's whole output goes to the run's full log (out/runs/all.log for
+# test/all.sh), which the summary names. A check that exits 77 had no saved
+# answers to run on (test/fixtures-dir.sh): it says why, and the last line
+# counts the skips, ALL PASS only when nothing skipped.
 #
 #   test/all.sh [--again]     test/review.sh [--again] [--fresh]
 #
@@ -97,6 +99,11 @@ if ! flock -n 9; then
   refuse_passed
 fi
 echo "$runner, pid $$ in $PWD" > "$lock"
+# The run's full log: every step's whole output, in order, as it said it,
+# kept in the checkout's out/ until this runner runs there again.
+full=$PWD/out/runs/${runner##*/}
+full=${full%.sh}.log
+mkdir -p "${full%/*}" && : > "$full" || exit 1
 
 # centiseconds: time since boot, which a clock change does not move.
 centiseconds() {
@@ -218,21 +225,44 @@ fill() {
   done
 }
 
-# report LABEL CODE [CS]: a check's verdict, and its time when it has one.
+# report LABEL CODE CS LOG: a step's line, its verdict and time, and for a
+# failure or a skip what its output says why; its whole output, LOG, goes
+# to the full log.
 skipped=0
 report() {
-  local took=${3:+ ($(printf '%d.%ds' $(($3 / 100)) $(($3 % 100 / 10))))}
-  if [ "$2" -eq 0 ]; then echo "   ok$took"
-  elif [ "$2" -eq 77 ]; then echo "   skipped$took"; skipped=$((skipped + 1))
-  else echo "   FAILED$took"; status=1; failed+=("$1"); fi
+  local took=" ($(printf '%d.%ds' $(($3 / 100)) $(($3 % 100 / 10))))" verdict
+  if [ "$2" -eq 0 ]; then verdict=ok
+  elif [ "$2" -eq 77 ]; then verdict=skipped; skipped=$((skipped + 1))
+  else verdict=FAILED; status=1; failed+=("$1"); fi
+  { echo "== $1"; cat "$4"; echo "   $verdict$took"; } >> "$full"
+  printf '%-8s %s%s\n' "$verdict" "$1" "$took"
+  if [ "$verdict" = FAILED ]; then why "$4" 6
+  elif [ "$verdict" = skipped ]; then why "$4" 1; fi
+}
+# why LOG N: at most N lines of LOG that say why, indented under the step:
+# its FAIL, FAILED and SKIP lines, each once (a harness's shell log repeats
+# them), or else its last lines.
+why() {
+  local lines count
+  lines=$(sed 's/^ *DEBUG qml: //' "$1" | grep -E '(^|[^[:alnum:]])(FAIL|FAILED|SKIP)([^[:alnum:]]|$)|\(fail\)' | awk '!seen[$0]++')
+  [ -n "$lines" ] || lines=$(grep -v '^[[:space:]]*$' "$1" | tail -n "$2")
+  [ -n "$lines" ] || return 0
+  head -n "$2" <<< "$lines" | sed 's/^/         /'
+  count=$(wc -l <<< "$lines")
+  [ "$count" -le "$2" ] || echo "         and $((count - $2)) more lines in $full"
 }
 # run [--with FILE] LABEL COMMAND...: a quick check, in the foreground, with
 # its verdict; then the queue fills any slot that came free meanwhile.
+ran=0
 run() {
+  local log begin code
   take "$@" || return 0
-  echo "== $step_label"
-  "${step_command[@]}" 9>&-
-  report "$step_label" $?
+  ran=$((ran + 1))
+  log=$logs/run.$ran
+  begin=$(centiseconds)
+  "${step_command[@]}" > "$log" 2>&1 9>&-
+  code=$?
+  report "$step_label" "$code" $(( $(centiseconds) - begin )) "$log"
   fill
 }
 
@@ -255,22 +285,21 @@ passed() {
   for i; do [ "$(cat "$logs/$i.code" 2> /dev/null)" = 0 ] || return 1; done
 }
 
-# verdict: once the queue has run dry, each queued check's output and
-# verdict in order, the run's own time, and the last line, which a run on a
-# clean tree also records against it. Exits non-zero on any failure.
+# verdict: once the queue has run dry, each queued check's line in order,
+# then the summary: the run's own time, where its full log is, and the last
+# line, which a run on a clean tree also records against it. Exits non-zero
+# on any failure.
 verdict() {
   local i code took last
   while [ "${#queue[@]}" -gt 0 ]; do sleep 0.2; fill; done
   for i in "${!pids[@]}"; do
     wait "${pids[$i]}"
     code=$?
-    echo "== ${labels[$i]}"
-    cat "$logs/$i"
-    report "${labels[$i]}" "$code" "$(cat "$logs/$i.cs" 2> /dev/null)"
+    report "${labels[$i]}" "$code" "$(cat "$logs/$i.cs" 2> /dev/null || echo 0)" "$logs/$i"
   done
   took=$(( ($(centiseconds) - began + 50) / 100 ))
-  echo "$runner took $((took / 60)) min $((took % 60)) s"
-  [ "${#left[@]}" -eq 0 ] || printf 'left out, as test/touched.sh asked: %s\n' "${left[@]}"
+  echo "$runner took $((took / 60)) min $((took % 60)) s; every step's whole output: $full"
+  [ "${#left[@]}" -eq 0 ] || echo "left out, as test/touched.sh asked: $(printf '%s; ' "${left[@]}" | sed 's/; $//')"
   if [ "$status" -ne 0 ]; then last="SOME FAILED"
   elif [ "$skipped" -gt 0 ]; then last="PASSED, $skipped SKIPPED (no saved answers)"
   else last="ALL PASS"; fi

@@ -86,7 +86,7 @@ suites() {
       say "$runner ended without ALL PASS on record for ${commit:0:7} (out/batch/${commit:0:7}.log): stopping, nothing reverted"
       exit 1
     fi
-    why="$runner failed: $(awk '/^== / { label = substr($0, 4) } /^   FAILED/ { printf "%s%s", sep, label; sep = "; " }' "$log") (out/batch/${commit:0:7}.log)"
+    why="$runner failed: $(awk '/^FAILED   / { label = substr($0, 10); sub(/ \([0-9]+\.[0-9]s\)$/, "", label); printf "%s%s", sep, label; sep = "; " }' "$log") (out/batch/${commit:0:7}.log)"
     say "$why"
     return 1
   done

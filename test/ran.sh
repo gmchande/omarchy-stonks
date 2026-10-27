@@ -14,7 +14,9 @@
 # `SOME FAILED | LABEL | LABEL`. --self-check proves it on a made-up
 # checkout with steps that fail, its own lock and record: a run names its
 # failed steps, a harness no runner starts fails as "harness wiring", and a
-# run test/touched.sh narrowed leaves no record.
+# run test/touched.sh narrowed leaves no record. It proves the run's output
+# too (test/queue.sh): a line a passing step, a failed one's reasons, and
+# the summary last, naming the full log that holds every step's output.
 #
 #   test/ran.sh                         this checkout's HEAD
 #   test/ran.sh origin/BRANCH           a pushed branch's head
@@ -24,15 +26,16 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 self_check() {
-  local code=0 last recorded before
+  local code=0 last recorded before full
   source "$PWD/test/scratch.sh"
   work=$(mktemp -d)
   trap 'rm -rf "$work"' EXIT
   mkdir -p "$work/repo/test/qml" "$work/runtime"
   cp test/queue.sh test/scratch.sh "$work/repo/test/"
-  echo 'finish() { echo "$1"; [ "$1" = PASS ]; exit; }' > "$work/repo/test/qml/lib.sh"
-  printf 'source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"\nfinish "%s"\n' FAIL > "$work/repo/test/qml/broken.sh"
-  printf 'source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"\nfinish "%s"\n' PASS > "$work/repo/test/qml/fine.sh"
+  echo out/ > "$work/repo/.gitignore"
+  printf '%s\n' 'code=0' 'fail() { echo "FAIL $*"; code=1; }' 'finish() { echo "$1"; exit "$code"; }' > "$work/repo/test/qml/lib.sh"
+  printf '%s\n' 'source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"' 'echo "made-up noise from the failing one"' 'fail "the made-up reason"' 'echo "more made-up noise"' 'finish "BROKEN DONE"' > "$work/repo/test/qml/broken.sh"
+  printf '%s\n' 'source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"' 'echo "made-up noise from the passing one"' 'finish "FINE DONE"' > "$work/repo/test/qml/fine.sh"
   cat > "$work/repo/test/all.sh" << 'EOF'
 source "$(dirname "${BASH_SOURCE[0]}")/queue.sh"
 start "a made-up harness, that fails" bash test/qml/broken.sh
@@ -60,6 +63,13 @@ EOF
   git -C "$work/repo" init -q && commit "made up"
   runs
   check "a failed run's record names each step that failed, as its output does" "${last#* SOME FAILED}" " | a made-up quick check, that fails | a made-up harness, that fails"
+  check "a passing step says one line, with its time, and nothing of its output" \
+    "$(grep -cE '^ok       a made-up harness that passes \([0-9]+\.[0-9]s\)$' "$work/out"; grep -c 'made-up noise' "$work/out")" "$(printf '1\n0')"
+  check "a failed step says its name, then the lines that say why" \
+    "$(grep -A1 -E '^FAILED   a made-up harness, that fails \([0-9]+\.[0-9]s\)$' "$work/out" | tail -n +2)" "         FAIL the made-up reason"
+  full=$(tail -n 2 "$work/out" | head -n 1 | sed -n "s/^test\/all.sh took .*; every step's whole output: //p")
+  check "the summary comes last and names the full log, which holds every step's output" \
+    "$(tail -n 1 "$work/out"; grep -c 'made-up noise' "$full" 2> /dev/null)" "$(printf 'SOME FAILED\n3')"
   before=$recorded
   runs test/qml/fine.sh
   check "a run test/touched.sh narrowed leaves no record" "$recorded" "$before"
