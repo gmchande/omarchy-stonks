@@ -13,16 +13,15 @@ There's no set time for an answer.
 
 ## What counts
 
-[WHAT-IT-RUNS.md](https://github.com/gmchande/omarchy-stonks/blob/main/WHAT-IT-RUNS.md)
-lists everything Stonks does outside the shell: the commands it runs, the
-sites it asks, and the files it writes. It's a security problem if
-anything can make Stonks:
+The README's [What it runs](https://github.com/gmchande/omarchy-stonks#what-it-runs)
+lists the commands Stonks runs, the sites it asks, and the files it
+writes. It's a security problem if anything can make Stonks:
 
 - run another command, or one of its own with arguments it didn't choose;
 - contact another site;
 - write another file;
 - read any file other than the ones it writes, its own files, the shell's
-  settings, and the theme's colours.
+  settings, and the theme's colors.
 
 It counts whether it comes from a symbol, an answer from Yahoo or
 Robinhood, or a data file.

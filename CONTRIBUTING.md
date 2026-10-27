@@ -20,24 +20,24 @@ the rules a change is judged by.
 ## Test it
 
 - `test/all.sh` runs every check a pull request needs. It takes about a
-  minute and a half, on a machine with Omarchy and a Wayland session. Its
-  last line must be `ALL PASS`.
+  minute and a half, on a machine with Omarchy and a Wayland session.
 - Most checks replay saved answers from Yahoo and Robinhood. These stay
   private, since the sites' terms forbid republishing them. Without them,
-  those checks skip and the run ends `PASSED, N SKIPPED`. The maintainer
-  then runs them on your branch.
+  those checks skip and the run ends `PASSED, N SKIPPED`: say so in your
+  pull request, and the maintainer runs them on your branch. With them,
+  the last line must be `ALL PASS`.
 - A test of a rule goes in `test/model.test.js`, which every clone runs, or
   in `test/saved.test.js` if it needs a saved answer. A test of a flow goes
   in the harness that walks it, `test/qml/NAME.qml`.
 - While you work, run just the checks for what you change, side by side,
-  with `test/all.sh NAME…`. Name a harness as its `test/qml/NAME.sh` is
-  named, and a quick check by its own name, as in
-  `test/all.sh lists keys unit`. A wrong name lists the names. Such a run
-  ends `PASSED ONLY` and the names, never `ALL PASS`, so run the whole of
-  `test/all.sh` before a pull request. Render the states you change, as in
+  as in `test/all.sh lists keys unit`. A harness goes by the NAME in its
+  `test/qml/NAME.sh`, and other checks by names such as `unit`; an unknown
+  name lists them all. Such a run ends `PASSED ONLY`, never `ALL PASS`, so
+  run the whole of `test/all.sh` before a pull request.
+- Render the states you change, as in
   `test/qml/render.sh 'popup-lists-*'`.
-- `test/review.sh` lists every picture your change moved. The maintainer
-  runs it on a visible change.
+- `test/review.sh` compares Stonks' pictures before and after your change.
+  The maintainer runs it when a change affects how Stonks looks.
 
 ## Pull requests
 
@@ -49,8 +49,8 @@ the rules a change is judged by.
   description, say what you ran, what you saw, and what you couldn't
   check. Leave out anyone's lists, screens, and home paths. Commit no
   screenshots, since every install clones every branch.
-- cubic, an AI reviewer, comments on every pull request. Fix what holds up,
-  and say why when a finding doesn't.
+- cubic, an AI reviewer, may comment on your pull request. Fix what it
+  finds that's right, and say why when you think a finding is wrong.
 - Report a security problem privately, through the Security tab.
 
 ## Releases
@@ -61,10 +61,11 @@ A maintainer releases from `dev`.
    first run, on a slow network, at text size 16 on a short screen, with
    150 symbols in 12 lists, and with every kind of listing at its odd
    hours. Fix or file what each finds.
-2. Someone who didn't build them reads every change since the last release
-   that runs a command, touches a file, fetches, or shows fetched text.
-   They treat every answer and every other account as hostile, and check
-   `WHAT-IT-RUNS.md` against the code.
+2. Someone who didn't write the changes since the last release reviews
+   them for security: every change that runs a command, reads or writes a
+   file, fetches, or shows fetched text. They treat every answer and
+   every other account as hostile, and check the README's "What it runs"
+   against the code.
 3. Bump the version in `manifest.json` in a release commit on `dev`. If the
    README's pictures should change, render them with `test/qml/readme.sh`.
 4. Run `STONKS_RENDER_BASE=vLAST test/review.sh --fresh` on that commit. It
