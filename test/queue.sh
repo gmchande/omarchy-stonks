@@ -42,14 +42,11 @@ checkout() {
 # run that began after the last package change and the saved answers' last
 # change (test/ran.sh --passed), unless --again.
 refuse_passed() {
-  local passed_commit passed_at
   [ -n "$tree" ] && [ -z "$again" ] || return 0
   test/ran.sh --passed "$runner" 2> /dev/null || return 0
-  read -r _ passed_commit _ passed_at _ <<< "$(grep "^$tree [^ ]* $runner .* ALL PASS$" "$records" | tail -n 1)"
-  echo "$runner already passed on this tree at $(date -d "$passed_at" '+%H:%M on %-d %B') (commit ${passed_commit:0:7}),"
-  echo "and neither a package nor a saved answer has changed since; its record covers"
-  echo "it (test/ran.sh). To run it again on purpose, as when chasing a flaky test:"
-  echo "$runner --again"
+  echo "$runner already passed on this tree, and neither a package nor a saved"
+  echo "answer has changed since; its record covers it (test/ran.sh shows it)."
+  echo "To run it again on purpose, as when chasing a flaky test: $runner --again"
   exit 0
 }
 checkout
