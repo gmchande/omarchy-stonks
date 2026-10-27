@@ -6,7 +6,8 @@ import "Release.js" as Release
 // under a service the shell keeps loaded, which runs the code it started with
 // until the shell restarts. The manifest is read as the service starts, as
 // it changes, and again as a surface opens (`check`), where the notice
-// shows, so no missed file event can hide it. While it names a version
+// shows, so no missed file event can hide it; a read that catches it half
+// written goes again shortly (`takeManifest`). While it names a version
 // other than the running one, a downgrade too, `newVersion` names it, and
 // `restart()` restarts the shell. While main names a newer one than the
 // running one (`mainVersion`, the service's, from GitHub),
@@ -26,17 +27,32 @@ Item {
   // Main's version when it is newer than the running one; "" otherwise.
   readonly property string releasedVersion: Release.isNewer(mainVersion, runningVersion) ? mainVersion : ""
 
+  // A read asked for, by a surface opening or the file changing: its own
+  // few reads again, whatever an earlier one used.
   function check() {
+    reread.tries = 0
+    readManifest()
+  }
+
+  function readManifest() {
     manifest.reload()
     takeManifest(manifest.text())
   }
 
-  // A manifest that doesn't parse, half written by git, or that names no
-  // version changes nothing.
+  // A manifest that is missing or doesn't parse, half written by git, or
+  // that names no version changes nothing, and is read again shortly, a few
+  // times: the write it caught can end in the moment the shell's watch on
+  // the file is being set up again, and send no event of its own.
   function takeManifest(text) {
     var version = ""
-    try { version = String(JSON.parse(text).version || "") } catch (e) { return }
-    if (version === "") return
+    try { version = String(JSON.parse(text).version || "") } catch (e) {}
+    if (version === "") {
+      if (reread.tries < 4) {
+        reread.tries++
+        reread.restart()
+      }
+      return
+    }
     if (runningVersion === "") runningVersion = version
     newVersion = version !== runningVersion ? version : ""
   }
@@ -64,6 +80,13 @@ Item {
     watchChanges: true
     printErrors: false
     onFileChanged: root.check()
+  }
+
+  Timer {
+    id: reread
+    property int tries: 0
+    interval: 250
+    onTriggered: root.readManifest()
   }
 
   Process {
