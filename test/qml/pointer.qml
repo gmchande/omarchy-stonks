@@ -404,7 +404,7 @@ Harness {
           return (acted && cursor === target && removedIt) + " " + target + " cursor " + cursor
         }
         var byClick = clickedThenX()
-        root.check("a click or a Ctrl-click mid-glide puts the cursor on its row, and x then removes that row",
+        root.check("a click mid-glide puts the cursor on its row, and x then removes that row",
           /^true /.test(byClick), byClick)
 
         // A double-click is one click for the list, not only for a row: its
@@ -776,7 +776,7 @@ Harness {
           return still
         }
         var smoothInert = inert()
-        root.check("a closing surface takes no click, right-click, wheel, or scrub, smooth and retro",
+        root.check("a closing surface takes no click, right-click, wheel, or scrub",
           smoothInert === "true,true,true,true,true,true,true,true", smoothInert)
 
         var orderWord = root.find(body, "orderLabel")
