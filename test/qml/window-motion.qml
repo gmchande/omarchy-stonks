@@ -1381,13 +1381,12 @@ ShellRoot {
         if (drawFrom || r <= leftAt || anim.duration <= 0) return
         drawFrom = animationOrigin(anim, r)
       }
-      // The body is built as the window first opens, before its draw-in
-      // starts: the watch goes on it as it is built.
-      var watchBody = function() { if (app.testBody) app.testBody.motion.revealChanged.connect(watchDraw) }
-      app.testBodyChanged.connect(watchBody)
-      app.open("{}")
-      app.testBodyChanged.disconnect(watchBody)
+      // The body is built a turn after the service is ready, before this
+      // first open: the watch goes on it before the open.
+      tryVerify(function() { return !!app.testBody }, 3000)
       var body = app.testBody
+      body.motion.revealChanged.connect(watchDraw)
+      app.open("{}")
       grab.source = body.chartItem
       grab.begin("first-open")
       tryVerify(function() { return !body.chartLoading && body.motion.reveal === 1 }, 5000)
