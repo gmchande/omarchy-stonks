@@ -98,6 +98,13 @@ Harness {
       harness.check("the preview's info lines are its own: its day and its cap",
         stats && !!body.periodLine && body.periodLine.range.lowText + "–" + body.periodLine.range.highText === "192.88–196.46",
         JSON.stringify(body.periodLine) + " / " + JSON.stringify(body.yearLine))
+      // An hour on the schedule's clock, and a user's refresh. The fetch
+      // must not come, so time passes: a fetch answers in 0.4 s.
+      service.now += 3600
+      service.askDue()
+      service.refresh()
+      wait(600)
+      harness.check("neither the schedule nor r refreshes a preview", calls("SHOP.TO", before.to) === 1, calls("SHOP.TO", before.to))
       // From a choice that has rested, arrowing on past results asks for
       // none of them either: each new choice waits its own rest, which the
       // 400 ms must let pass.
