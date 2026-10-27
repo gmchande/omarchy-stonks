@@ -24,4 +24,4 @@ scratch_home shell-bar-only.json shell.json
 umask 022
 touch "$STONKS_FAKE_STATE/chmod.hold"
 run_qs 70
-finish "ALL PASS"
+finish "SERVICE DONE"

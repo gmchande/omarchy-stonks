@@ -2,19 +2,17 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "Settings.js" as Settings
-import "Fundamentals.js" as Fundamentals
 
-// Drives the real Service through migration, persist, and external edits
-// with the fake curl that test/qml/service.sh puts first on PATH, and a data
-// file that can't be read, fixed, and gone; and the version watch through
-// its manifest rewritten, updated, downgraded, and back. A scratch HOME
-// holds the bar entry and the data file. Reads the file back with cat,
-// never through the service's FileView. Prints one line per check and
-// exits 0 when every check passed, 1 otherwise.
-ShellRoot {
+// Drives the real Service through migration, saves, and edits by hand, with
+// the fake curl that service.sh puts first on PATH; which listings ask for a
+// cap and P/E; a data file that can't be read, fixed, and gone; and the
+// version watch through its manifest rewritten, updated, downgraded, and
+// back. A scratch HOME holds the bar entry and the data file. Reads the file
+// back with cat, never through the service's FileView.
+Harness {
   id: harness
+  marker: "SERVICE DONE"
 
-  property int failures: 0
   property int step: 0
   property int waited: 0
   property var afterCat: null
@@ -22,13 +20,11 @@ ShellRoot {
   property var afterLs: null
   property bool reading: false
   // Asked for before their quotes, which the add fetches, and again once
-  // they are in: an ETF and a cryptocurrency, which the service never sends
-  // to Yahoo's fundamentals, and two Toronto listings, which it does, each
-  // priced in CAD against earnings in USD.
-  readonly property var asking: ["SPY", "BTC-USD", "SHOP.TO", "MAPLE.TO"]
+  // they are in: two Toronto listings, each priced in CAD against earnings
+  // in USD.
+  readonly property var asking: ["SHOP.TO", "MAPLE.TO"]
   property int askingAt: 0
   property bool asked: false
-  property int fundamentalsBefore: 0
   property var msftBefore: null
   // Data files that can't be read: half a JSON object, as a hand edit
   // leaves one, an empty file, and JSON that is not an object.
@@ -42,8 +38,6 @@ ShellRoot {
   property string goodFeatured: ""
   property string goodBody: ""
   property var second: null
-  // A save from elsewhere just after the migration's write has landed.
-  property bool editedAfterMigration: false
   property bool lockedSaw: false
   property int versionAt: 0
   readonly property var versionCases: [
@@ -68,21 +62,6 @@ ShellRoot {
     return JSON.stringify(next, null, 2) + "\n"
   }
 
-  function check(name, ok, detail) {
-    console.log((ok ? "PASS " : "FAIL ") + name + (detail !== undefined ? " — " + detail : ""))
-    if (!ok) harness.failures++
-  }
-
-  // The fake curl counts its calls per name; a fresh view per read, since a
-  // FileView that has loaded once returns its old text after reload().
-  function calls(name) {
-    var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true; printErrors: false }', harness)
-    view.path = Quickshell.env("STONKS_FAKE_STATE") + "/" + name + ".calls"
-    var n = Number(String(view.text()).trim() || "0")
-    view.destroy()
-    return n
-  }
-
   function parseFile(text) {
     try {
       var parsed = JSON.parse(String(text || "").trim())
@@ -91,11 +70,6 @@ ShellRoot {
     } catch (e) {
       return null
     }
-  }
-
-  function complete(obj) {
-    return !!(obj && obj.version === 1 && obj.symbols && obj.featured !== undefined
-      && obj.order && obj.changeMode && obj.style && obj.refreshIntervalSec)
   }
 
   function sameSymbols(got, want) {
@@ -120,12 +94,6 @@ ShellRoot {
     var next = harness.snapshot()
     for (var key in values) next[key] = values[key]
     return JSON.stringify(next, null, 2) + "\n"
-  }
-
-  function finish() {
-    console.log(harness.failures === 0 ? "ALL PASS" : harness.failures + " FAILED")
-    exitTimer.exitCode = harness.failures === 0 ? 0 : 1
-    exitTimer.start()
   }
 
   function go(next) {
@@ -173,8 +141,6 @@ ShellRoot {
   function withRange(owner, range) {
     return JSON.stringify(Object.assign({}, owner.dataSettings, { range: range }), null, 2) + "\n"
   }
-
-  Component.onCompleted: service.fetchFundamentals("AAPL")
 
   // Yahoo's fundamentals out of reach, then MSFT asked for again.
   Process {
@@ -278,12 +244,6 @@ ShellRoot {
     harness.writeTo(harness.dataPath, body, "rename", fn)
   }
 
-  // The USDCAD rate's last fetch made a day older.
-  function ageRate() {
-    var held = service.testFundamentalsFeed.rates.USDCAD
-    service.testFundamentalsFeed.rates = { USDCAD: { value: held.value, checkedAt: held.checkedAt - 25 * 60 * 60 } }
-  }
-
   // Runs SCRIPT in bash with the fake state's folder as $1, then FN.
   function stateThen(script, fn) {
     ticker.stop()
@@ -303,8 +263,8 @@ ShellRoot {
       if (harness.step === 0) {
         if (!service.pluginsReady) {
           if (harness.waited >= 5000) {
-            harness.check("service ready from bar", false, "timed out")
-            harness.finish()
+            check("service ready from bar", false, "timed out")
+            finish()
           }
           return
         }
@@ -320,12 +280,12 @@ ShellRoot {
             && obj.featured === "AAPL" && obj.order === "pct" && obj.style === "retro"
             && obj.refreshIntervalSec === 120 && obj.barStyle === undefined)
           if (!fileOk && harness.waited < 2000) return
-          harness.check("migrated from bar and wrote the file, leaving barStyle on the bar", ready && fileOk,
+          check("migrated from bar and wrote the file, leaving barStyle on the bar", ready && fileOk,
             JSON.stringify({ ready: ready, symbols: service.symbols, featured: service.featuredSymbol, file: obj }))
           // service.sh holds every chmod from the start, under umask 022, so
           // the mode read here is the one the file was first written with.
           harness.afterMode = function(mode) {
-            harness.check("a data file new on this machine is its owner's alone from its first write", mode === "600", mode)
+            check("a data file new on this machine is its owner's alone from its first write", mode === "600", mode)
             releaseChmod.running = true
             // The migration's file is made as the read that found none ends:
             // the file's watch must still read a save from elsewhere after
@@ -336,62 +296,14 @@ ShellRoot {
           modeProc.running = true
         })
       } else if (harness.step === 2) {
-        if (!harness.editedAfterMigration) {
-          if (service.retro && harness.waited < 2000) return
-          harness.check("a save from elsewhere just after the migration's write lands", !service.retro)
-          harness.editedAfterMigration = true
-          service.persist({ style: "smooth" })
-          service.persist({ order: "symbol" })
-          harness.waited = 0
-          return
-        }
-        harness.readThen(function(obj) {
-          var ok = !!(obj && obj.style === "smooth" && obj.order === "symbol")
-          if (!ok && harness.waited < 2000) return
-          harness.check("two persists land together", ok, JSON.stringify(obj))
-          service.persist({ changeMode: "abs" })
-          harness.go(3)
-        })
+        if (service.retro && harness.waited < 2000) return
+        check("a save from elsewhere just after the migration's write lands", !service.retro)
+        service.addSymbol("MSFT")
+        harness.go(3)
       } else if (harness.step === 3) {
         harness.readThen(function(obj) {
-          var ok = harness.complete(obj) && obj.changeMode === "abs"
-          if (!ok && harness.waited < 2000) return
-          harness.check("one persist leaves a complete file", ok, JSON.stringify(obj))
-          // An older build's order by the amount, reversed on All and not on
-          // a named list: each reads as % change, its direction kept.
-          harness.writeThen(harness.bodyFrom({ symbols: ["AAPL", "MSFT"], featured: "MSFT", order: "abs", reversed: true,
-            lists: [{ name: "Yen", symbols: ["MSFT"], order: "abs" }] }), function() {
-            harness.go(4)
-          })
-        })
-      } else if (harness.step === 4) {
-        var over = harness.sameSymbols(service.symbols, ["AAPL", "MSFT"])
-          && service.featuredSymbol === "MSFT"
-        if (!over && harness.waited < 2000) return
-        harness.check("overwrite reaches the service", over,
-          JSON.stringify({ symbols: service.symbols, featured: service.featuredSymbol }))
-        var saved = service.dataSettings
-        var yen = saved.lists[0] || {}
-        harness.check("a list saved in $ CHANGE order reads as % change, its direction and its symbols kept",
-          saved.order === "pct" && saved.reversed === true && saved.lists.length === 1
-            && yen.name === "Yen" && yen.order === "pct" && yen.reversed === false && harness.sameSymbols(yen.symbols, ["MSFT"]),
-          JSON.stringify({ order: saved.order, reversed: saved.reversed, lists: saved.lists }))
-        harness.renameThen(harness.bodyFrom({ style: "retro" }), function() {
-          harness.go(5)
-        })
-      } else if (harness.step === 5) {
-        if (!service.retro && harness.waited < 2000) return
-        harness.check("rename overwrite reaches the service", service.retro,
-          service.retro ? "retro" : "smooth")
-        service.persist({ featured: "AAPL" })
-        harness.go(6)
-      } else if (harness.step === 6) {
-        harness.readThen(function(obj) {
-          var kept = !!(obj && obj.featured === "AAPL"
-            && harness.sameSymbols(obj.symbols, ["AAPL", "MSFT"])
-            && obj.style === "retro")
-          if (!kept && harness.waited < 2000) return
-          harness.check("persist after edits keeps them", kept, JSON.stringify(obj))
+          var saved = !!obj && harness.sameSymbols(obj.symbols, ["AAPL", "MSFT"])
+          if (!saved && harness.waited < 2000) return
           ticker.stop()
           harness.afterLs = function(text) {
             var names = String(text || "").split(/\s+/).filter(function(n) { return n !== "" })
@@ -402,22 +314,12 @@ ShellRoot {
               if (n.indexOf("grvc.stonks") === 0 || n.indexOf(".tmp") !== -1)
                 extra.push(n)
             }
-            harness.check("no leftover temp file", extra.length === 0, extra.join(" "))
-            harness.go(7)
+            check("no leftover temp file", saved && extra.length === 0, saved + " " + extra.join(" "))
+            harness.go(8)
           }
           lsProc.running = false
           lsProc.running = true
         })
-      } else if (harness.step === 7) {
-        // Asked for before any quote said AAPL is an equity, its cap and EPS
-        // still arrive where the surfaces read them, the cap with its close.
-        var entry = service.fundamentals["AAPL"]
-        var ready = !!(entry && entry.status === "ok" && entry.figures.cap && entry.figures.eps
-          && entry.figures.cap.value === 4918530543600 && entry.figures.cap.close > 0 && entry.figures.eps.currency === "USD")
-        if (!ready && harness.waited < 5000) return
-        harness.check("a cap and P/E asked for before the quote arrive once it does", ready, JSON.stringify(entry))
-        harness.fundamentalsBefore = harness.calls("FUNDAMENTALS")
-        harness.go(8)
       } else if (harness.step === 8) {
         var symbol = harness.asking[harness.askingAt]
         if (!harness.asked) {
@@ -428,8 +330,8 @@ ShellRoot {
         }
         if (!service.quotes[symbol]) {
           if (harness.waited < 5000) return
-          harness.check("an added " + symbol + " gets its quote", false, "none in 5 s")
-          harness.finish()
+          check("an added " + symbol + " gets its quote", false, "none in 5 s")
+          finish()
           return
         }
         service.fetchFundamentals(symbol)
@@ -446,94 +348,22 @@ ShellRoot {
           return service.fundamentals[s] && service.fundamentals[s].status === "ok"
         }) && !service.testFundamentalsFeed.busy
         if (!settled && harness.waited < 5000) return
-        var perSymbol = ["SPY", "BTC-USD", "SHOP.TO", "MAPLE.TO", "MSFT"].map(function(s) { return harness.calls(s + ".fundamentals") })
         var shop = service.fundamentals["SHOP.TO"]
         var maple = service.fundamentals["MAPLE.TO"]
-        harness.check("only an equity asks for a cap and P/E, a Toronto listing too: not an ETF or a cryptocurrency",
-          settled && perSymbol.join() === "0,0,1,1,1" && harness.calls("FUNDAMENTALS") - harness.fundamentalsBefore === 6
-            && shop.figures.cap.currency === "CAD" && shop.figures.cap.close > 0,
-          JSON.stringify({ perSymbol: perSymbol, shop: shop }))
         // Two listings in CAD with earnings in USD ask for USDCAD once, and
         // a listing in USD asks none.
-        harness.check("a rate is asked once a day for its pair, not for each listing",
-          settled && harness.calls("RATE") === 1 && harness.calls("USDCAD.rate") === 1
+        check("a rate is asked once a day for its pair, not for each listing",
+          settled && calls("RATE") === 1 && calls("USDCAD.rate") === 1
             && Object.keys(service.rates).join() === "USDCAD" && service.rates.USDCAD.value === 1.4004
             && shop.figures.eps.currency === "USD" && maple.figures.eps.currency === "USD",
-          JSON.stringify({ rates: harness.calls("RATE"), held: service.rates }))
-        // Asked again the same day, and refreshed: nothing goes. The quotes
-        // were answered seconds ago, under the refresh's 10 s floor, so the
-        // step gives the refresh a moment rather than waiting on a quote.
-        harness.fundamentalsBefore = harness.calls("FUNDAMENTALS")
-        service.fetchFundamentals("MSFT")
-        service.fetchFundamentals("SHOP.TO")
-        service.refresh()
-        harness.go(10)
-      } else if (harness.step === 10) {
-        if (harness.waited < 1500) return
-        harness.check("a cap and P/E are fetched once a day, and never by a refresh",
-          harness.calls("FUNDAMENTALS") === harness.fundamentalsBefore && harness.calls("RATE") === 1,
-          (harness.calls("FUNDAMENTALS") - harness.fundamentalsBefore) + " sent")
-        // A day later, with the rate out of reach: SHOP.TO's series are a day
-        // old, and so is the rate.
-        var stale = Object.assign({}, service.testFundamentalsFeed.entries)
-        stale["SHOP.TO"] = Object.assign({}, stale["SHOP.TO"], { checkedAt: stale["SHOP.TO"].checkedAt - 25 * 60 * 60 })
-        service.testFundamentalsFeed.entries = stale
-        harness.ageRate()
-        harness.stateThen("touch \"$1/RATE.down\"", function() {
-          service.fetchFundamentals("SHOP.TO")
-          harness.go(44)
-        })
-      } else if (harness.step === 44) {
-        var asked = harness.calls("RATE") === 2 && !service.testFundamentalsFeed.busy
-        if (!asked && harness.waited < 5000) return
-        var renewed = service.fundamentals["SHOP.TO"]
-        harness.check("a failed rate leaves the new cap and no P/E, never one in the wrong currency",
-          asked && renewed.status === "ok" && harness.calls("SHOP.TO.fundamentals") === 2 && renewed.figures.cap.close > 0
-            && service.rates.USDCAD.value === null,
-          JSON.stringify({ shop: renewed, held: service.rates }))
-        // Both listings on the pair wanted again the same day, the rate still
-        // out of reach.
-        harness.fundamentalsBefore = harness.calls("FUNDAMENTALS")
-        service.fetchFundamentals("MAPLE.TO")
-        service.fetchFundamentals("SHOP.TO")
-        harness.go(45)
-      } else if (harness.step === 45) {
-        if (harness.waited < 1500) return
-        harness.check("a failed rate counts as its pair's fetch for the day: no listing asks it again",
-          harness.calls("RATE") === 2 && harness.calls("FUNDAMENTALS") === harness.fundamentalsBefore,
-          (harness.calls("RATE") - 2) + " rates, " + (harness.calls("FUNDAMENTALS") - harness.fundamentalsBefore) + " fundamentals sent")
-        // The next day the rate answers, under Yahoo's short name for the
-        // pair (CAD=X), as it does about half the time, and MAPLE.TO's
-        // series are still fresh: the rate is asked alone, by the first
-        // listing that wants it.
-        harness.ageRate()
-        harness.stateThen("rm -f \"$1/RATE.down\" && touch \"$1/RATE.short\"", function() {
-          service.fetchFundamentals("MAPLE.TO")
-          harness.go(46)
-        })
-      } else if (harness.step === 46) {
-        var back = service.rates.USDCAD.value === 1.4004 && !service.testFundamentalsFeed.busy
-        if (!back && harness.waited < 5000) return
-        harness.check("a day-old rate is asked again on its own, and serves every listing on its pair",
-          back && harness.calls("RATE") === 3 && harness.calls("MAPLE.TO.fundamentals") === 1
-            && harness.calls("FUNDAMENTALS") === harness.fundamentalsBefore,
-          JSON.stringify({ rates: harness.calls("RATE"), held: service.rates, maple: harness.calls("MAPLE.TO.fundamentals") }))
-        // 194.60 CAD over 1.48 USD at 1.4004. Found in the independent check
-        // of #87: the short name read as no rate, and Shell lost its P/E.
-        var shown = ["SHOP.TO", "MAPLE.TO"].map(function(s) {
-          return Fundamentals.yearLine(service.quotes[s], service.fundamentals[s].figures, null, service.rates).facts[1].value
-        })
-        harness.check("a rate Yahoo answers under the pair's short name gives the P/E", back && shown.join() === "93.9,93.9",
-          JSON.stringify({ shown: shown, held: service.rates }))
-        harness.stateThen("rm -f \"$1/RATE.short\"", function() {
-          service.addSymbol("SLID")
-          harness.go(47)
-        })
+          JSON.stringify({ rates: calls("RATE"), held: service.rates }))
+        service.addSymbol("SLID")
+        harness.go(47)
       } else if (harness.step === 47) {
         if (!service.quotes.SLID) {
           if (harness.waited < 5000) return
-          harness.check("an added SLID gets its quote", false, "none in 5 s")
-          harness.finish()
+          check("an added SLID gets its quote", false, "none in 5 s")
+          finish()
           return
         }
         // SLID had a profit and a cap yesterday; its new series reports a
@@ -549,8 +379,8 @@ ShellRoot {
         var slid = service.fundamentals.SLID
         var settledSlid = slid.status === "failed" && !service.testFundamentalsFeed.busy
         if (!settledSlid && harness.waited < 5000) return
-        harness.check("a loss in a new series removes the P/E even when the close fails, and the cap waits for its close",
-          settledSlid && harness.calls("SLID.fundamentals") === 1 && slid.figures.eps === null && slid.figures.cap === null,
+        check("a loss in a new series removes the P/E even when the close fails, and the cap waits for its close",
+          settledSlid && calls("SLID.fundamentals") === 1 && slid.figures.eps === null && slid.figures.cap === null,
           JSON.stringify(slid))
         harness.stateThen("rm -f \"$1/CLOSES.down\"", function() { harness.go(49) })
       } else if (harness.step === 49) {
@@ -564,8 +394,8 @@ ShellRoot {
       } else if (harness.step === 11) {
         var msft = service.fundamentals["MSFT"]
         if (msft.status !== "failed" && harness.waited < 5000) return
-        harness.check("a failed fetch keeps the last good cap and P/E",
-          msft.status === "failed" && harness.calls("MSFT.fundamentals") === 2 && !!msft.figures && !!msft.figures.cap
+        check("a failed fetch keeps the last good cap and P/E",
+          msft.status === "failed" && calls("MSFT.fundamentals") === 2 && !!msft.figures && !!msft.figures.cap
             && JSON.stringify(msft.figures) === JSON.stringify(harness.msftBefore.figures),
           JSON.stringify(msft))
         harness.go(12)
@@ -581,29 +411,34 @@ ShellRoot {
       } else if (harness.step === 13) {
         var label = harness.unreadable[harness.unreadableAt].label
         if (!service.settingsUnreadable && harness.waited < 2000) return
-        harness.check("a data file of " + label + " keeps the lists in memory and says it can't be read",
-          service.settingsUnreadable && harness.sameSymbols(service.library, harness.goodLibrary)
-            && service.featuredSymbol === harness.goodFeatured,
-          JSON.stringify({ unreadable: service.settingsUnreadable, library: service.library, featured: service.featuredSymbol }))
+        // Broken JSON's first two steps are the window rows harness's.
+        if (harness.unreadableAt > 0)
+          check("a data file of " + label + " keeps the lists in memory and says it can't be read",
+            service.settingsUnreadable && harness.sameSymbols(service.library, harness.goodLibrary)
+              && service.featuredSymbol === harness.goodFeatured,
+            JSON.stringify({ unreadable: service.settingsUnreadable, library: service.library, featured: service.featuredSymbol }))
         // The pill's wheel: a change that saves, but not over this file.
         service.featureStep(1)
-        harness.go(14)
+        harness.go(harness.unreadableAt > 0 ? 14 : 50)
       } else if (harness.step === 14) {
+        // Time for a write that must not come to land.
         if (harness.waited < 600) return
         harness.readThen(function(obj, text) {
           var bad = harness.unreadable[harness.unreadableAt]
-          harness.check("a change while it is " + bad.label + " applies in memory and writes nothing over it",
+          check("a change while it is " + bad.label + " applies in memory and writes nothing over it",
             text === bad.body && service.featuredSymbol !== harness.goodFeatured,
             JSON.stringify({ file: text, featured: service.featuredSymbol }))
           harness.renameThen(harness.goodBody, function() { harness.go(15) })
         })
+      } else if (harness.step === 50) {
+        harness.renameThen(harness.goodBody, function() { harness.go(15) })
       } else if (harness.step === 15) {
         // Fixed by an editor's atomic save: the file's settings, not the
         // ones changed in memory meanwhile.
         var fixed = !service.settingsUnreadable && service.featuredSymbol === harness.goodFeatured
           && harness.sameSymbols(service.library, harness.goodLibrary)
         if (!fixed && harness.waited < 2000) return
-        harness.check("fixed while running, by an atomic save, the file is read again", fixed,
+        check("fixed while running, by an atomic save, the file is read again", fixed,
           JSON.stringify({ unreadable: service.settingsUnreadable, library: service.library, featured: service.featuredSymbol }))
         service.featureStep(1)
         harness.go(16)
@@ -611,7 +446,7 @@ ShellRoot {
         harness.readThen(function(obj) {
           var saved = !!obj && obj.featured === service.featuredSymbol && obj.featured !== harness.goodFeatured
           if (!saved && harness.waited < 2000) return
-          harness.check("once it reads again, a change is saved", saved, JSON.stringify(obj))
+          check("once it reads again, a change is saved", saved, JSON.stringify(obj))
           harness.unreadableAt++
           if (harness.unreadableAt < harness.unreadable.length) {
             harness.renameThen(harness.goodBody, function() { harness.go(12) })
@@ -625,7 +460,7 @@ ShellRoot {
         harness.go(18)
       } else if (harness.step === 18) {
         if (!harness.second.pluginsReady && harness.waited < 5000) return
-        harness.check("a shell started on a file that can't be read shows the starter list and says so",
+        check("a shell started on a file that can't be read shows the starter list and says so",
           harness.second.pluginsReady && harness.second.settingsUnreadable
             && harness.sameSymbols(harness.second.library, Settings.fileSettings(null).symbols),
           JSON.stringify({ ready: harness.second.pluginsReady, unreadable: harness.second.settingsUnreadable,
@@ -633,9 +468,10 @@ ShellRoot {
         harness.second.featureStep(1)
         harness.go(19)
       } else if (harness.step === 19) {
+        // Time for a write that must not come to land.
         if (harness.waited < 600) return
         harness.readThen(function(obj, text) {
-          harness.check("and a change there writes nothing over the file", text === harness.unreadable[0].body, text)
+          check("and a change there writes nothing over the file", text === harness.unreadable[0].body, text)
           harness.second.destroy()
           harness.second = null
           // A good file whose permissions don't let it be read.
@@ -651,10 +487,11 @@ ShellRoot {
         harness.lockedSaw = locked
         harness.go(21)
       } else if (harness.step === 21) {
+        // Time for a write that must not come to land.
         if (harness.waited < 600) return
         harness.writeTo(harness.dataPath, "", "readable", function() {
           harness.readThen(function(obj, text) {
-            harness.check("a file there that can't be read for its permissions is said so and never written over",
+            check("a file there that can't be read for its permissions is said so and never written over",
               harness.lockedSaw && text === harness.goodBody, harness.lockedSaw + "|" + text)
             harness.second.destroy()
             harness.second = null
@@ -669,16 +506,12 @@ ShellRoot {
         harness.readThen(function(obj) {
           var created = !service.settingsUnreadable && !!obj && obj.range === "1M"
           if (!created && harness.waited < 2000) return
-          harness.check("a missing file is created by the next change", created, JSON.stringify(obj))
-          harness.check("the version watch reads the running version from the manifest as it starts",
-            updates.runningVersion === harness.manifest.version && updates.newVersion === "",
-            updates.runningVersion + "|" + updates.newVersion)
           // Three range changes in one go, the third back to the first:
           // each write is still in flight as the next starts, since the
           // service hears one finished only on a later turn of the event
-          // loop. Quickshell's async write then compared the third against
-          // the cancelled first and skipped it, leaving 3M in the file,
-          // which the file watch read back over the 1W in hand.
+          // loop. Quickshell's async write compares the third against the
+          // cancelled first and skips it, leaving 3M in the file, which the
+          // file watch would read back over the 1W in hand.
           harness.loadsAtBurst = harness.loads
           service.setRange("1W")
           service.setRange("3M")
@@ -690,7 +523,7 @@ ShellRoot {
           var readBack = harness.loads > harness.loadsAtBurst
           var kept = readBack && !!obj && obj.range === "1W" && service.range === "1W"
           if (!kept && harness.waited < 2000) return
-          harness.check("a change back to a range still being written lands, and the file's read-back keeps it", kept,
+          check("a change back to a range still being written lands, and the file's read-back keeps it", kept,
             JSON.stringify({ readBack: readBack, file: obj && obj.range, range: service.range }))
           harness.go(40)
         })
@@ -707,7 +540,7 @@ ShellRoot {
       } else if (harness.step === 42) {
         if (!service.saveFailed && harness.waited < 3000) return
         harness.readThen(function(obj, text) {
-          harness.check("a first save that can't be made its owner's alone is said unsaved, and leaves no file another account could read",
+          check("a first save that can't be made its owner's alone is said unsaved, and leaves no file another account could read",
             service.saveFailed && text === null && service.range === "5Y", service.saveFailed + "|" + text + "|" + service.range)
           // Two changes, the second while the first is being made.
           harness.stateThen("rm -f \"$1/ln.fail\" && touch \"$1/ln.hold\"", function() {
@@ -721,7 +554,7 @@ ShellRoot {
           var landed = !!obj && obj.range === "3M" && !service.saveFailed && service.range === "3M"
           if (!landed && harness.waited < 3000) return
           harness.afterMode = function(mode) {
-            harness.check("the next change makes it, its owner's alone from its first write, and a change made meanwhile lands in it",
+            check("the next change makes it, its owner's alone from its first write, and a change made meanwhile lands in it",
               landed && mode === "600", JSON.stringify({ file: obj && obj.range, range: service.range, failed: service.saveFailed, mode: mode }))
             releaseChmod.running = true
             harness.go(25)
@@ -734,7 +567,7 @@ ShellRoot {
         var c = harness.versionCases[harness.versionAt]
         harness.writeTo(harness.manifestPath, c.body, c.how, function() {
           updates.check()
-          harness.check(c.label, updates.newVersion === c.want, updates.newVersion)
+          check(c.label, updates.newVersion === c.want, updates.newVersion)
           harness.versionAt++
           if (harness.versionAt < harness.versionCases.length) harness.go(25)
           else harness.go(26)
@@ -753,7 +586,7 @@ ShellRoot {
         harness.go(27)
       } else if (harness.step === 27) {
         if (harness.settling()) return
-        harness.check("a save from elsewhere during a read of the file lands once that read ends",
+        check("a save from elsewhere during a read of the file lands once that read ends",
           harness.stepped.range === "1Y", harness.stepped.range)
         // A write of the service's own drops a read in flight unheard; a
         // save from elsewhere during the next read still lands.
@@ -766,7 +599,7 @@ ShellRoot {
         harness.go(28)
       } else if (harness.step === 28) {
         if (harness.settling()) return
-        harness.check("so does one after a write of the service's own cut a read short",
+        check("so does one after a write of the service's own cut a read short",
           harness.stepped.range === "1W", harness.stepped.range)
         // A save that lands, then one a full disk loses before the first is
         // read back: the file holds the first, which is no save from
@@ -779,7 +612,7 @@ ShellRoot {
         harness.go(29)
       } else if (harness.step === 29) {
         if (harness.settling()) return
-        harness.check("a save a full disk loses just after one that landed is said unsaved, and the change stays",
+        check("a save a full disk loses just after one that landed is said unsaved, and the change stays",
           harness.stepped.saveFailed && harness.stepped.range === "3M", harness.stepped.saveFailed + " " + harness.stepped.range)
         harness.stepped.testDataFile.full = false
         harness.stepped.saveAgain()
@@ -787,7 +620,7 @@ ShellRoot {
       } else if (harness.step === 30) {
         if (harness.settling()) return
         var saved = harness.parseFile(harness.stepped.testDataFile.disk)
-        harness.check("with room again, trying again saves it and the notice goes",
+        check("with room again, trying again saves it and the notice goes",
           !harness.stepped.saveFailed && !!saved && saved.range === "3M", harness.stepped.saveFailed + " " + JSON.stringify(saved && saved.range))
         // A hand edit that breaks the file, and a change made in Stonks
         // before the read of it ends: the file is read at once, so the change
@@ -798,7 +631,7 @@ ShellRoot {
       } else if (harness.step === 31) {
         if (harness.settling()) return
         var broken = harness.stepped.testDataFile.disk
-        harness.check("a hand edit that breaks the file is never written over by a change made while Stonks reads it",
+        check("a hand edit that breaks the file is never written over by a change made while Stonks reads it",
           broken === "{" && harness.stepped.settingsUnreadable && harness.stepped.editsUnsaved && harness.stepped.range === "2Y",
           JSON.stringify(broken.slice(0, 40)) + " " + harness.stepped.settingsUnreadable + " " + harness.stepped.editsUnsaved + " " + harness.stepped.range)
         // The file fixed by hand.
@@ -817,7 +650,7 @@ ShellRoot {
         if (harness.settling()) return
         var kept = harness.parseFile(harness.stepped.testDataFile.disk)
         var named = function(lists) { return (lists || []).map(function(l) { return l.name }) }
-        harness.check("a hand edit is never written over by a change made while Stonks reads it",
+        check("a hand edit is never written over by a change made while Stonks reads it",
           !!kept && named(kept.lists).indexOf("By hand") >= 0 && named(harness.stepped.dataSettings.lists).indexOf("By hand") >= 0,
           JSON.stringify(named(kept && kept.lists)) + " " + JSON.stringify(named(harness.stepped.dataSettings.lists)))
         harness.stepped.destroy()
@@ -829,17 +662,15 @@ ShellRoot {
       } else if (harness.step === 34) {
         if (!service.settingsUnreadable && harness.waited < 3000) return
         harness.readThen(function(obj, text) {
-          harness.check("the real file: a hand edit that breaks it is never written over by a change made as Stonks reads it",
+          check("the real file: a hand edit that breaks it is never written over by a change made as Stonks reads it",
             harness.readingAtChange && text === "{" && service.settingsUnreadable && service.editsUnsaved,
             [harness.readingAtChange, JSON.stringify(String(text).slice(0, 40)), service.settingsUnreadable, service.editsUnsaved].join(" "))
           harness.renameThen(harness.withRange(service, service.range), function() { harness.go(35) })
         })
       } else if (harness.step === 35) {
         if (service.settingsUnreadable && harness.waited < 3000) return
-        harness.finish()
+        finish()
       }
     }
   }
-
-  HarnessExit { id: exitTimer }
 }

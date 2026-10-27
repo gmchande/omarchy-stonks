@@ -589,6 +589,12 @@ test("the data file reads as written and repairs hand edits", () => {
     { name: "Wins", symbols: [], order: "manual", reversed: false },
     { name: "Losers", symbols: [], order: "pct", reversed: true }
   ])
+  // An order an older build saved by the amount reads as % change, on All
+  // and on a list, each keeping its direction and members.
+  const byAmount = M.fileSettings({ symbols: ["AAPL", "MSFT"], order: "abs", reversed: true,
+    lists: [{ name: "Yen", symbols: ["MSFT"], order: "abs" }] })
+  expect([byAmount.order, byAmount.reversed]).toEqual(["pct", true])
+  expect(byAmount.lists).toEqual([{ name: "Yen", symbols: ["MSFT"], order: "pct", reversed: false }])
 })
 
 // lists.qml drives adding, removing, stepping, naming, and ordering through
@@ -796,6 +802,15 @@ test("a failed answer is asked again five minutes on, whatever the hour", () => 
   expect(M.overnightDue(asked, at("2026-10-02", "04:15"), calendars, true)).toBe(false)
   expect(M.overnightDue(asked, at("2026-10-02", "04:16"), calendars, true)).toBe(true)
   expect(M.overnightDue(asked, at("2026-10-02", "08:00"), calendars, false)).toBe(false)
+})
+
+test("Robinhood's word on all-day trading is asked once, again a day on, or five minutes after a failure", () => {
+  const t = at("2026-10-07", "01:00")
+  expect(M.allDayDue(null, t)).toBe(true)
+  expect(M.allDayDue({ status: "ok", allDay: true, at: t }, t + 24 * 3600 - 1)).toBe(false)
+  expect(M.allDayDue({ status: "ok", allDay: false, at: t }, t + 24 * 3600)).toBe(true)
+  expect(M.allDayDue({ status: "failed", allDay: false, at: t }, t + 5 * 60 - 1)).toBe(false)
+  expect(M.allDayDue({ status: "failed", allDay: false, at: t }, t + 5 * 60)).toBe(true)
 })
 
 test("community themes that one hue, a faint colour, or a tinted light ground would trip", () => {
@@ -1123,4 +1138,14 @@ test("a fetched name or code past its length reads as not sent", () => {
   // A spark listing under a symbol past its length is one Yahoo didn't send.
   const spark = symbol => M.sparkResults({ spark: { result: [{ symbol, response: [chartAnswer().chart.result[0]] }] } })
   expect([Object.keys(spark("X")), Object.keys(spark(long(1e5)))]).toEqual([["X"], []])
+})
+
+// The update check offers main's version only when it comes after the
+// running one, number by number.
+test("a version is newer number by number, and a manifest names one only whole", () => {
+  const R = load("Release.js")
+  expect(R.isNewer("1.0.10", "1.0.9")).toBe(true)
+  expect([["1.0.8", "1.0.9"], ["1.0.9", "1.0.9"], ["x", "1.0.9"]].map(([a, b]) => R.isNewer(a, b))).toEqual([false, false, false])
+  expect(R.manifestVersion('{ "version": "9.9.9" }')).toBe("9.9.9")
+  expect([R.manifestVersion('{\n  "id": "grvc.st'), R.manifestVersion('{ "id": "grvc.stonks" }')]).toEqual(["", ""])
 })
