@@ -88,13 +88,10 @@ for flag in --compressed --max-filesize; do
 done
 only '\bGate\s*\{' Service.qml
 # The rule files (every *.js here) are data rules: no host, no I/O, no wall
-# clock of their own, and no colour of their own but Stonks' up and down for
-# a theme without a pair, the entries of `Tones.OWN_PAIRS`.
+# clock of their own, and no colour of their own: even Stonks' up and down
+# for a theme without a pair are made from the theme's (`Tones.ownPair`).
 none '\bQt\.|\bQuickshell\b|XMLHttpRequest|Date\.now\(|\bDate\s*\(\s*\)' *.js
-others=()
-for file in *.js; do [ "$file" = Tones.js ] || others+=("$file"); done
-none "([\"'])#[0-9a-fA-F]{3,8}\\1" "${others[@]}"
-none "^(?!  \\{ up: \"#[0-9a-f]{6}\", down: \"#[0-9a-f]{6}\" \\},?$).*([\"'])#[0-9a-fA-F]{3,8}\\1" Tones.js
+none "([\"'])#[0-9a-fA-F]{3,8}\\1" *.js
 # Colours come from the shell's Color singleton, so a component used without
 # its colours still themes: no hex literal in either quote, no numeric
 # Qt.rgba, and no literal but "transparent" as a colour's whole value.

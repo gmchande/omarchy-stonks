@@ -788,7 +788,9 @@ test("community themes that one hue, a faint colour, or a tinted light ground wo
     const got = M.trend(c.green, red, ground)
     if (c.want === "theme") expect([c.name, got]).toEqual([c.name, { up: c.green, down: red }])
     else greenAndRed(got)
-    const floor = c.want === "theme" ? 3 : 4.5
+    // Stonks' own reads at 4.5:1 on a light ground and 6:1 on a dark one,
+    // where a colour at 4.5:1 is dark enough to look muddy.
+    const floor = { theme: 3, light: 4.5, dark: 6 }[c.want]
     expect([c.name, M.paired(M.hexOf(colour(got.up)), colour(got.down))]).toEqual([c.name, true])
     expect([c.name, M.contrast(colour(got.up), ground) >= floor, M.contrast(colour(got.down), ground) >= floor]).toEqual([c.name, true, true])
   }
@@ -800,6 +802,24 @@ test("community themes that one hue, a faint colour, or a tinted light ground wo
   expect(M.trend("#3ddc84", red, M.hexColor("#0d0d0f"))).toEqual({ up: "#3ddc84", down: red })
   // A light bar under a dark popup takes the other pair: White's on black.
   greenAndRed(M.trend("#3a3a3a", M.hexColor("#2a2a2a"), M.hexColor("#000000")))
+  // On a mid-grey ground no green reads at 4.5:1, and the darkest tried
+  // rounded to black, which reads but says nothing: there, up is a green at
+  // the 3:1 floor. Found in review.
+  const mid = M.hexColor("#808080"), greyPair = M.trend("#777777", M.hexColor("#555555"), mid)
+  greenAndRed(greyPair)
+  const chroma = c => Math.hypot(M.oklab(c).a, M.oklab(c).b)
+  expect([greyPair.up, chroma(colour(greyPair.up)) >= 0.07, M.contrast(colour(greyPair.up), mid) >= 3]).toEqual([greyPair.up, true, true])
+  // On a #bb0022 bar a light green reads at 6:1 only within 0.003 of
+  // lightness, which a search in steps passed over for the 3:1 floor.
+  const bar = M.hexColor("#bb0022"), barPair = M.trend("#777777", M.hexColor("#555555"), bar)
+  expect([M.contrast(colour(barPair.up), bar) >= 6, chroma(colour(barPair.up)) >= 0.063]).toEqual([true, true])
+  // On a dark grey, a light red reads at 6:1 only in a narrow band of
+  // lightness, which a coarse search passed over for the 3:1 floor.
+  for (const grey of ["#454545", "#484848"]) {
+    const ground = M.hexColor(grey), pair = M.trend("#777777", M.hexColor("#555555"), ground)
+    greenAndRed(pair)
+    expect([grey, M.contrast(colour(pair.up), ground) >= 6, M.contrast(colour(pair.down), ground) >= 6]).toEqual([grey, true, true])
+  }
 })
 
 // Each parser fed hostile answers, in a child process with a time limit: a
