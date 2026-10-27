@@ -617,6 +617,16 @@ Harness {
           && service.histories["AAPL|1Y"].status === "ok" && body.historyShown && !body.chartLoading
       }, 10000)
 
+      // The header's animal, clicked: a replay owns a real historical
+      // moment, whatever the render rate.
+      mouseMove(body, 1, 1)
+      tryVerify(function() { return body.animal.kind !== "" }, 2000)
+      mouseClick(body, 20, body.margins + 14, Qt.LeftButton)
+      harness.check("smooth's animal click replays a historical range",
+        within(2000, function() { return body.motion.replayRunning && body.scrubT !== 0 }),
+        body.motion.replayRunning + "|" + body.scrubT)
+      body.resetInteraction()
+
       var middle = [body.chartItem.width / 2, body.chartItem.height / 2]
       mouseMove(body.chartItem, middle[0], middle[1])
       var scrubbed = within(1000, function() { return body.scrubT !== 0 })
