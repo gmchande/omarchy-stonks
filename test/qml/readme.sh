@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The README's pictures, rendered again in one command: the real popup,
-# window, and pill (readme.qml) on the demo watchlist (test/tophat/demo.json),
+# window, and pill (readme.qml) on the demo watchlist (test/demo.json),
 # its quotes the saved capture named below (test/capture-demo.sh), the clock
 # a minute after that capture, in Tokyo Night at twice the scale, and one
 # popup in Catppuccin Latte. Writes preview.png at the root and media/*.png,
@@ -32,7 +32,7 @@ patch_copy plugin/Service.qml "s/property int now: Math.floor(Date.now() \/ 1000
 patch_copy plugin/Service.qml 's/function wallSecond() { return Math.floor(Date.now() \/ 1000) }/function wallSecond() { return root.now }/'
 # The pills on their strips open no popup of their own.
 patch_copy plugin/BarWidget.qml '/id: panelLoader/,/source:/s/active: true/active: false/'
-jq '. + { hinted: true }' "$plugin/test/tophat/demo.json" > "$HOME/.config/omarchy/grvc.stonks.json"
+jq '. + { hinted: true }' "$plugin/test/demo.json" > "$HOME/.config/omarchy/grvc.stonks.json"
 echo "$moment" > "$STONKS_FAKE_STATE/overnight.set"
 mkdir -p "$HOME/.local/state/omarchy/current"
 tokyo=/usr/share/omarchy/themes/tokyo-night

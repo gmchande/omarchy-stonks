@@ -8,7 +8,7 @@
 #
 # With --passed RUNNER, it prints nothing and says only whether RUNNER ended
 # ALL PASS on REF's tree since the last package change, the rule
-# test/queue.sh runs by: test/live.sh and test/batch.sh go by it.
+# test/queue.sh runs by, which a deploy can go by too.
 #
 #   test/ran.sh                         this checkout's HEAD
 #   test/ran.sh origin/BRANCH           a pushed branch's head

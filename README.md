@@ -481,8 +481,8 @@ If you added them, also delete the `{ "id": "grvc.stonks" }` entry in
 
 ## Contributing
 
-How Stonks is built, how to run your checkout, the checks, and how to send a
-change are in [CONTRIBUTING.md](CONTRIBUTING.md).
+How to run your checkout, its tests, and how to send a change are in
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 License: MIT, see [LICENSE](LICENSE). The sounds in `sounds/` and the ones
 Stonks makes as it runs were made for Stonks, from code, and are MIT too.
