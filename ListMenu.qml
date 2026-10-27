@@ -14,7 +14,7 @@ import "KeyText.js" as KeyText
 // Value-in, signals out; the body switches and creates. One cursor, as on
 // the rows: it opens on the current list, moving the pointer puts it on the
 // row under it, the arrows move it from there, Enter takes one, and Escape
-// or l backs out. It takes the rows' mark, the hover-cursor fill and
+// or w backs out. It takes the rows' mark, the hover-cursor fill and
 // the bar; a click takes the row clicked.
 FocusScope {
   id: root
@@ -206,13 +206,13 @@ FocusScope {
   Keys.onPressed: function(event) {
     // While naming, the field has the keys; what it lets past goes nowhere.
     if (root.naming) { event.accepted = true; return }
-    // A letter by its key and Shift: Caps Lock sends "L" for l.
+    // A letter by its key and Shift: Caps Lock sends "W" for w.
     var t = KeyText.typed(event)
     if (event.key === Qt.Key_Escape) { root.dismissed(); event.accepted = true }
     else if (event.key === Qt.Key_Down) { root.moveCursor(1); event.accepted = true }
     else if (event.key === Qt.Key_Up) { root.moveCursor(-1); event.accepted = true }
     else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { root.take(root.cursor); event.accepted = true }
-    else if (t === "l") { root.dismissed(); event.accepted = true }
+    else if (t === "w") { root.dismissed(); event.accepted = true }
     // Every other key stays with the menu, so nothing behind it acts.
     else event.accepted = true
   }

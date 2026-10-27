@@ -485,7 +485,7 @@ Harness {
       keyClick(Qt.Key_Z, Qt.ControlModifier)
       keyClick(Qt.Key_Delete)
       keyClick(Qt.Key_Backspace)
-      ;[Qt.Key_L, Qt.Key_M, Qt.Key_S, Qt.Key_O].forEach(function(k) { keyClick(k) })
+      ;[Qt.Key_W, Qt.Key_M, Qt.Key_S, Qt.Key_O].forEach(function(k) { keyClick(k) })
       wait(100)
       var typed = String(field.text)
       var after = [service.library.join(","), service.soundsOn, service.retro, service.order, service.reversed].join("|")
@@ -496,8 +496,8 @@ Harness {
       keys.forceActiveFocus()
       keyClick(Qt.Key_Z, Qt.ControlModifier)
       wait(100)
-      harness.check("in search, Ctrl+C, Ctrl+Z, Delete, Backspace and l m s o edit the field and act as no Stonks key",
-        removed !== "" && after === before && stayed === "true,true,true,true,true,true" && /lmso$/i.test(typed),
+      harness.check("in search, Ctrl+C, Ctrl+Z, Delete, Backspace and w m s o edit the field and act as no Stonks key",
+        removed !== "" && after === before && stayed === "true,true,true,true,true,true" && /wmso$/i.test(typed),
         [removed, typed, stayed, before, after].join(" | "))
     }
 

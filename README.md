@@ -110,8 +110,8 @@ seconds, says so in the same places and puts a "!" on the pill.
 
 Click the list's name to switch lists, start one, or manage them. All holds
 every symbol you follow, and your own lists hold some of them. Ctrl-click a
-row to choose the lists it's in. Removing a symbol from All removes it
-everywhere.
+row, or select it and press Ctrl+Enter, to choose the lists it's in.
+Removing a symbol from All removes it everywhere.
 
 Click "+ Add a symbol" and type a name or a symbol. The top result shows in
 the chart, and Enter or a click adds it. Search finds stocks, ETFs,
@@ -227,6 +227,7 @@ click it: Omasnap on 4.5, Tensaku on 4.0.
 | --- | --- |
 | `↑` `↓` | Move the selection |
 | `⏎` | Show the selected row's chart |
+| `Ctrl+⏎` | Choose the selected row's lists |
 | `←` `→` | Scrub the chart one step |
 | `[` `]` | Change the range |
 | `p` | Replay the chart |
@@ -237,7 +238,7 @@ click it: Omasnap on 4.5, Tensaku on 4.0.
 | `Shift+↑` `Shift+↓` | Move the row in your own order |
 | `o` | Change the order |
 | `Shift+O` | Reverse the order |
-| `l` | Open the list menu |
+| `w` | Open the list menu |
 | `c` | Show the change as %, amount or since the open |
 | `s` | Smooth or retro |
 | `m` | Sound on or off |
@@ -309,9 +310,9 @@ price say the same.
   valid JSON, often after a hand edit. Stonks keeps the lists it has and
   writes nothing over the file until it can read it again. A change you
   make meanwhile shows, and the footer says "Your changes aren't saved ·
-  couldn't load your lists": the file read again, or a restart, loses it.
-  Fix the file and Stonks reads it as you save, or remove it to start over
-  with the five starter symbols.
+  fix or remove grvc.stonks.json": the file read again, or a restart,
+  loses it. Fix the file and Stonks reads it as you save, or remove it to
+  start over with the five starter symbols.
 - **The footer says "Your changes aren't saved".** Stonks couldn't write
   the file holding your lists: the disk is full, or the file or its
   folder, `~/.config/omarchy`, is read-only. Your lists stay as they look

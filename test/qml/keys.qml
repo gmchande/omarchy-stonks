@@ -60,7 +60,7 @@ Harness {
 
   // What Omarchy's panel keys mean in every panel on the bar, the popup
   // among them, as one of the listed keys (Ui/PanelKeyCatcher.qml).
-  readonly property var omarchy: ({ "j": "↓", "k": "↑", "h": "←", "Space": "⏎", "x": "Delete", "Shift+X": "Delete" })
+  readonly property var omarchy: ({ "j": "↓", "k": "↑", "h": "←", "l": "→", "Space": "⏎", "x": "Delete", "Shift+X": "Delete" })
 
   Stonks.Service { id: service }
   Stonks.Updates { id: updates }
@@ -228,7 +228,8 @@ Harness {
       } else if (token === "Shift+O") {
         changed = ["reversed", "cursor"]
         effect = function() { return service.reversed === !before.reversed }
-      } else if (token === "l") { changed = ["menu"]; effect = function() { return b.listMenuOpen } }
+      } else if (token === "w") { changed = ["menu"]; effect = function() { return b.listMenuOpen } }
+      else if (token === "Ctrl+⏎") { changed = ["listsSymbol"]; effect = function() { return b.listsSymbol === selected } }
       else if (token === "Shift+U") { changed = ["updates"]; effect = function() { return updates.testUpdates === before.updates + 1 } }
       else if (token === "c") {
         changed = ["mode"]
@@ -285,7 +286,7 @@ Harness {
       // The popup first: the window, shown, would take the keys.
       walk(harness.popup)
       var wrong = Object.keys(harness.omarchy).filter(function(t) { return !acts(harness.popup, t, harness.omarchy[t]) })
-      harness.check("in the popup, Omarchy's panel keys do what Omarchy defines: j k ↓ ↑, h ←, Space Enter, x and X Delete",
+      harness.check("in the popup, Omarchy's panel keys do what Omarchy defines: j k ↓ ↑, h ← and l →, Space Enter, x and X Delete",
         wrong.length === 0, "wrong: " + wrong.join(" "))
       // Both surfaces draw one StonksBody's sheet: the popup's stands for both.
       base(harness.popup)

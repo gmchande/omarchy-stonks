@@ -147,7 +147,7 @@ Harness {
         var cursor = watchlist.cursorSymbol
         var scrolled = firstWhole(watchlist)
         keys.forceActiveFocus()
-        keyClick(Qt.Key_L)
+        keyClick(Qt.Key_W)
         tryVerify(function() { return body.listMenuOpen && harness.find(body, "listMenu") !== null }, 2000)
         var menu = harness.find(body, "listMenu")
         while (menu.cursor < menu.manageIndex) keyClick(Qt.Key_Down)
@@ -1041,10 +1041,10 @@ Harness {
       watchlist.contentY = 0
     }
 
-    // The window's footer says the file's notice, and a real click on it
-    // does nothing. Over a short list it sits one gap under the rows, not at
-    // the window's bottom. A change while the file can't be read is said
-    // unsaved, and why.
+    // The window's footer says the file's notice and what to do, and a real
+    // click on it does nothing. Over a short list it sits one gap under the
+    // rows, not at the window's bottom. A change while the file can't be
+    // read is said unsaved, and why.
     function noticesInTheWindow(body) {
       openAt(760)
       service.createList("Short")
@@ -1052,19 +1052,19 @@ Harness {
       service.switchList("Short")
       var footer = harness.find(body, "footer")
       var text = function() { return String(harness.find(footer, "footerText").text) }
+      var action = function() { return String(harness.find(footer, "footerAction").text) }
       var good = harness.readFile(harness.dataPath)
       harness.writeFile(harness.dataPath, "{\n")
-      var said = within(5000, function() { return text() === harness.fileNotice })
+      var said = within(5000, function() { return text() + action() === harness.fileNotice + " · fix or remove grvc.stonks.json" })
       mouseClick(footer, footer.width / 2, footer.height / 2)
-      harness.check("the window's footer says the data file can't be read, and a click on it does nothing",
-        said && !body.adding, text() + "|" + body.adding)
+      harness.check("the window's footer says the data file can't be read and to fix or remove it, and a click on it does nothing",
+        said && !body.adding, text() + action() + "|" + body.adding)
       var modeBefore = service.changeMode
       app.testKeyCatcher.forceActiveFocus()
       keyClick("c")
-      var action = function() { return String(harness.find(footer, "footerAction").text) }
-      var unsaved = within(3000, function() { return text() + action() === "Your changes aren't saved · couldn't load your lists" })
+      var unsaved = within(3000, function() { return text() + action() === "Your changes aren't saved · fix or remove grvc.stonks.json" })
       mouseClick(footer, footer.width / 2, footer.height / 2)
-      harness.check("a change while the data file can't be read applies, the window's footer says it isn't saved and why, a click on it does nothing, and the file is as it was",
+      harness.check("a change while the data file can't be read applies, the window's footer says it isn't saved and to fix or remove the file, a click on it does nothing, and the file is as it was",
         unsaved && service.changeMode !== modeBefore && !body.adding && harness.readFile(harness.dataPath) === "{\n",
         text() + action() + "|" + service.changeMode + "|" + body.adding)
       harness.writeFile(harness.dataPath, good)

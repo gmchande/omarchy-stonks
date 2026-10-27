@@ -134,9 +134,10 @@ function words(o) {
   } else {
     // What the change on show is measured from: the quote's at rest
     // (`Quote.headlineBase`), and while scrubbed the close the day's dashed
-    // line is at (`Figures.rowModel`), every print of the chart alike.
+    // line is at, named as the popup names it (`Figures.dayBaselineText`).
     var base = o.scrubT ? Figures.scrubbedBase(o.day) : Quote.headlineBase(quote)
     out.from = o.changeMode === "open" ? "OPEN " + Format.money(base.dayOpen, digits)
+      : o.scrubT ? Figures.dayBaselineText(o.day, Figures.exchangeDay(o.day, o.now), o.scrubT)
       : "PREV CLOSE " + Format.money(base.prevClose, digits)
     var pts = o.day.points
     if (pts.length) {

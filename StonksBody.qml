@@ -175,18 +175,19 @@ Item {
     || chromeBesideScreenChart + screenChartHeight + footer.hintRoom + threeRowsHeight <= screenRoom)
   // A standing word in the footer's place, under a note, until fixed: the
   // data file can't be read, and once a change is made meanwhile, that it
-  // isn't saved, since only memory holds it; a save didn't land, which a
-  // click retries, ahead of the update, since a restart would lose the
-  // changes; or an update waits on a shell restart, which a click does.
-  // Where `noticeAction` doesn't fit beside it (text size 16 in the popup),
-  // `noticeShort` says less, never cut.
+  // isn't saved, since only memory holds it, each with what to do, which
+  // names the file; a save didn't land, which a click retries, ahead of the
+  // update, since a restart would lose the changes; or an update waits on a
+  // shell restart, which a click does. Where `noticeAction` doesn't fit
+  // beside it (text size 16 in the popup), `noticeShort` says less, never
+  // cut.
   readonly property bool unsaved: settingsUnreadable ? editsUnsaved : saveFailed
   readonly property string notice: unsaved ? "Your changes aren't saved"
     : settingsUnreadable ? "Couldn't load your lists"
     : updatedTo !== "" ? "Updated to " + updatedTo + " · click to restart the shell" : ""
-  readonly property string noticeAction: !unsaved ? ""
-    : settingsUnreadable ? " · couldn't load your lists" : " · click to try again"
-  readonly property string noticeShort: unsaved ? "Not saved" : ""
+  readonly property string noticeAction: settingsUnreadable ? " · fix or remove grvc.stonks.json"
+    : unsaved ? " · click to try again" : ""
+  readonly property string noticeShort: unsaved ? "Not saved" : settingsUnreadable ? "Lists not loaded" : ""
   // A newer Stonks on main, offered at the footer's right end until on disk
   // (`updateOffer`), then the restart's notice; never in the add's place,
   // so adding by mouse never waits on it. Shift+U runs what the footer
@@ -405,7 +406,7 @@ Item {
   // What the dashed line is, said while a scrub reads against it, and on a
   // thin night's day the close the night's trades read from too.
   readonly property string baselineText: historyShown ? chartRange.toUpperCase() + " START " + Format.money(history.baseline, featuredQuote ? featuredQuote.priceDigits : undefined)
-    : (!historyActive && featuredDay ? Figures.dayBaselineText(featuredDay) : "")
+    : (!historyActive && featuredDay ? Figures.dayBaselineText(featuredDay, Figures.exchangeDay(featuredDay, now), scrubShown) : "")
   // A range that failed, which r, or the header's button, asks for again.
   readonly property string unavailableText: chartRange.toUpperCase() + " unavailable"
   readonly property bool offersRetry: headerText === unavailableText
@@ -638,6 +639,8 @@ Item {
     else if (mods === Qt.ControlModifier && key === Qt.Key_Z) undoRemoval()
     else if (mods === Qt.ShiftModifier && key === Qt.Key_Up) moveSelected(-1)
     else if (mods === Qt.ShiftModifier && key === Qt.Key_Down) moveSelected(1)
+    // Ctrl+Enter, as Ctrl-click: the selected row's lists.
+    else if (mods === Qt.ControlModifier && (key === Qt.Key_Return || key === Qt.Key_Enter)) openSymbolLists(watchlist.cursorRow)
     else if (key === Qt.Key_Up) moveCursor(-1)
     else if (key === Qt.Key_Down) moveCursor(1)
     else if (key === Qt.Key_Left) nudgeScrub(-1)
@@ -656,7 +659,7 @@ Item {
     else if (t === "o") cycleOrder()
     else if (t === "O") reverseOrder()
     else if (t === "U") runOffered()
-    else if (t === "l") openListMenu()
+    else if (t === "w") openListMenu()
     else return false
     return true
   }

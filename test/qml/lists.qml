@@ -118,11 +118,11 @@ Harness {
       tryVerify(function() { return !body.adding }, 2000)
     }
 
-    // A list switch as a hand makes it: l opens the list menu on the
+    // A list switch as a hand makes it: w opens the list menu on the
     // current list, the arrows walk to `name` ("" for All), Enter takes it.
     function switchByKeys(name) {
       var menu = harness.find(app.testBody, "listMenu")
-      keyClick(Qt.Key_L)
+      keyClick(Qt.Key_W)
       focused(menu)
       var want = menu.choices.map(function(c) { return c.name }).indexOf(name)
       for (var i = 0; i < 40 && menu.cursor !== want; i++) keyClick(menu.cursor < want ? Qt.Key_Down : Qt.Key_Up)
@@ -130,11 +130,11 @@ Harness {
       keysBack()
     }
 
-    // Manage lists as a hand opens it: l, the arrows to "Manage lists…",
+    // Manage lists as a hand opens it: w, the arrows to "Manage lists…",
     // Enter.
     function manageByKeys() {
       var menu = harness.find(app.testBody, "listMenu")
-      keyClick(Qt.Key_L)
+      keyClick(Qt.Key_W)
       focused(menu)
       for (var i = 0; i < 40 && menu.cursor !== menu.manageIndex; i++) keyClick(Qt.Key_Down)
       keyClick(Qt.Key_Return)
@@ -158,8 +158,8 @@ Harness {
       var nameField = harness.find(menu, "listNameField")
       var renameField = harness.find(manage, "renameField")
 
-      // l, ↓ to New list…, Enter, the name, Enter.
-      keyClick(Qt.Key_L)
+      // w, ↓ to New list…, Enter, the name, Enter.
+      keyClick(Qt.Key_W)
       focused(menu)
       keyClick(Qt.Key_Down)
       keyClick(Qt.Key_Return)
@@ -190,20 +190,20 @@ Harness {
       harness.check("a symbol already in All is not fetched again for a list",
         harness.calls("NVDA") === nvdaCalls)
 
-      // l, ↑ to All, Enter; then l, ↓ to Growth, Enter.
+      // w, ↑ to All, Enter; then w, ↓ to Growth, Enter.
       keysBack()
-      keyClick(Qt.Key_L)
+      keyClick(Qt.Key_W)
       focused(menu)
       keyClick(Qt.Key_Up)
       keyClick(Qt.Key_Return)
       keysBack()
       var toAll = [service.listName, body.listMenuOpen, service.symbols].join("|")
-      keyClick(Qt.Key_L)
+      keyClick(Qt.Key_W)
       focused(menu)
       keyClick(Qt.Key_Down)
       keyClick(Qt.Key_Return)
       keysBack()
-      harness.check("l, ↑ to All, and Enter switch back to All",
+      harness.check("w, ↑ to All, and Enter switch back to All",
         toAll === "|false|AAPL,MSFT,NVDA" && service.listName === "Growth" && !body.listMenuOpen
           && harness.same(service.symbols, ["NVDA", "AAPL"]),
         toAll + " then " + service.listName + "|" + service.symbols)
@@ -323,7 +323,7 @@ Harness {
       // The name field's Escape goes back to the menu, which ↑ and Enter
       // then pick from.
       keysBack()
-      keyClick(Qt.Key_L)
+      keyClick(Qt.Key_W)
       focused(menu)
       keyClick(Qt.Key_Down)
       keyClick(Qt.Key_Down)
@@ -342,7 +342,7 @@ Harness {
       // staying open; Escape from Manage lists; Escape from a symbol's lists.
       switchByKeys("")
       var afterPick = service.listName === ""
-      keyClick(Qt.Key_L)
+      keyClick(Qt.Key_W)
       focused(menu)
       keyClick(Qt.Key_Down)
       keyClick(Qt.Key_Down)
@@ -503,13 +503,13 @@ Harness {
       keyClick(Qt.Key_Return)
       keyClick(Qt.Key_Escape)
       keysBack()
-      // The list menu, opened by l with the pointer resting on All: Enter
+      // The list menu, opened by w with the pointer resting on All: Enter
       // takes the current list. Off the middle, where the pointer rested the
       // last time the menu was open, so this is a new place to its pointer.
       var menuAllAt = center(placed("listChoice")[0])
       menuAllAt.x += 20
       mouseMove(body, menuAllAt.x, menuAllAt.y)
-      keyClick(Qt.Key_L)
+      keyClick(Qt.Key_W)
       focused(menu)
       mouseMove(body, menuAllAt.x, menuAllAt.y + 1)
       var menuOpenedOn = menu.cursor
@@ -610,7 +610,7 @@ Harness {
       var names = function() { return service.dataSettings.lists.map(function(l) { return l.name }) }
       keys.forceActiveFocus()
       manageByKeys()
-      harness.check("l, ↓ to Manage lists… and Enter open Manage lists in the rows' place, on the first named list",
+      harness.check("w, ↓ to Manage lists… and Enter open Manage lists in the rows' place, on the first named list",
         body.managingLists && !body.listMenuOpen && manage.visible && manage.activeFocus && manage.cursor === 1
           && !wl.visible && !harness.find(body, "footer").visible,
         body.managingLists + "|" + manage.activeFocus + "|" + manage.cursor)
@@ -781,16 +781,18 @@ Harness {
         helpKeeps === "true,false,false,false,Pwr" && helpRefused === "false,true,true,true,Pwr", helpKeeps + " | " + helpRefused)
       service.renameList("Pwr", "Power")
 
-      // A symbol's lists by keys, then Ctrl-click. Opened as a Ctrl-click
-      // opens them, on the cursor row.
+      // A symbol's lists by keys, then Ctrl-click. By keys: Ctrl+Enter on
+      // the cursor row, which opens its lists as a Ctrl-click does, and
+      // features nothing.
       var power = function() { return service.dataSettings.lists[0].symbols }
       keys.forceActiveFocus()
       wl.cursorSymbol = "NVDA"
-      body.openSymbolLists("NVDA")
+      var heroBefore = service.featuredSymbol
+      keyClick(Qt.Key_Return, Qt.ControlModifier)
       focused(checklist)
-      harness.check("a symbol's lists open on the first named list, with the keys",
-        body.listsSymbol === "NVDA" && checklist.visible && checklist.activeFocus && checklist.cursor === 1
-          && !wl.visible)
+      harness.check("Ctrl+Enter opens the cursor row's lists on the first named list, with the keys, featuring nothing",
+        body.listsSymbol === "NVDA" && service.featuredSymbol === heroBefore && checklist.visible && checklist.activeFocus
+          && checklist.cursor === 1 && !wl.visible, body.listsSymbol + "|" + service.featuredSymbol + "|" + checklist.cursor)
       keyClick(Qt.Key_Return)
       var ticked = power().join(",")
       keyClick(Qt.Key_Return)
@@ -962,7 +964,7 @@ Harness {
       tryVerify(function() { return body.search.results.length > 0 }, 3000)
       keyClick(Qt.Key_Escape)
       keysBack()
-      keyClick(Qt.Key_L)
+      keyClick(Qt.Key_W)
       focused(menu)
       keyClick(Qt.Key_Down)
       keyClick(Qt.Key_Escape)
@@ -993,7 +995,7 @@ Harness {
       focused(searchField)
       keyClick(Qt.Key_Escape)
       keysBack()
-      keyClick(Qt.Key_L)
+      keyClick(Qt.Key_W)
       focused(menu)
       keyClick(Qt.Key_Escape)
       keysBack()
@@ -1029,8 +1031,8 @@ Harness {
         return acted
       }
       var closings = [
-        keysAfter(function() { keyClick(Qt.Key_L) }, function() { return menu }),
-        keysAfter(function() { keyClick(Qt.Key_L); focused(menu); keyClick(Qt.Key_Up); keyClick(Qt.Key_Up); keyClick(Qt.Key_Return) },
+        keysAfter(function() { keyClick(Qt.Key_W) }, function() { return menu }),
+        keysAfter(function() { keyClick(Qt.Key_W); focused(menu); keyClick(Qt.Key_Up); keyClick(Qt.Key_Up); keyClick(Qt.Key_Return) },
           function() { return keys }),
         keysAfter(function() { body.openManageLists() }, function() { return manage }),
         keysAfter(function() { body.openManageLists(); focused(manage); keyClick(Qt.Key_Return) }, function() { return renameField }),
@@ -1089,7 +1091,7 @@ Harness {
         var top = menu.cursor * menu.itemHeight
         return top >= menuScroll.contentY && top + menu.itemHeight <= menuScroll.contentY + menuScroll.height
       }
-      keyClick(Qt.Key_L)
+      keyClick(Qt.Key_W)
       focused(menu)
       var scrolls = menuScroll.contentHeight > menuScroll.height
       menuScroll.contentY = menuScroll.contentHeight - menuScroll.height
@@ -1098,12 +1100,12 @@ Harness {
       var reopenedAt = []
       var readMenu = function() { if (menu.active) reopenedAt.push(menuScroll.contentY + ":" + menu.cursor + ":" + cursorShown()) }
       menu.activeChanged.connect(readMenu)
-      keyClick(Qt.Key_L)
+      keyClick(Qt.Key_W)
       focused(menu)
       keyClick(Qt.Key_Escape)
       keysBack()
       service.switchList("Probe 12")
-      keyClick(Qt.Key_L)
+      keyClick(Qt.Key_W)
       focused(menu)
       keyClick(Qt.Key_Escape)
       keysBack()
@@ -1126,7 +1128,7 @@ Harness {
         var left = !view.naming && !view.renaming
         return [refused, editing, left].join(",")
       }
-      keyClick(Qt.Key_L)
+      keyClick(Qt.Key_W)
       focused(menu)
       menu.startNaming()
       focused(nameField)
@@ -1216,7 +1218,7 @@ Harness {
       var replacedDropped = [body.managingLists, listNames().indexOf("Probe 8") > 0, listNames().indexOf("Probe 9") > 0].join(",")
       service.switchList("")
       keys.forceActiveFocus()
-      keyClick(Qt.Key_L)
+      keyClick(Qt.Key_W)
       focused(menu)
       menu.startNaming()
       focused(nameField)
@@ -1224,7 +1226,7 @@ Harness {
       closeAndOpen()
       var newKept = [service.listName, body.listMenuOpen, body.adding].join(",")
       keys.forceActiveFocus()
-      keyClick(Qt.Key_L)
+      keyClick(Qt.Key_W)
       focused(menu)
       menu.startNaming()
       focused(nameField)
@@ -1284,7 +1286,7 @@ Harness {
       openWindow()
 
       // A name being typed has the keys: Ctrl+Z, Ctrl+C, Delete, Backspace,
-      // and l m s o edit it, as in any text field, and do nothing of
+      // and w m s o edit it, as in any text field, and do nothing of
       // Stonks': no list switched, no sound, look, or order changed, no
       // scrub, no row removed, the removal before it not undone, no
       // screenshot. In the list menu's name field and Manage lists' rename.
@@ -1307,20 +1309,20 @@ Harness {
         keyClick(Qt.Key_Left)
         keyClick(Qt.Key_Delete)
         seen.push(field.text)
-        typeText("lmso")
+        typeText("wmso")
         seen.push(field.text)
         keyClick(Qt.Key_A, Qt.ControlModifier)
         keyClick(Qt.Key_C, Qt.ControlModifier)
         seen.push(field.text + ":" + field.selectedText)
         keyClick(Qt.Key_End)
         keyClick(Qt.Key_Z, Qt.ControlModifier)
-        seen.push(field.text !== "Almso")
+        seen.push(field.text !== "Awmso")
         // Time for a key that got past the field to act.
         wait(100)
         return seen.join(",")
       }
       keys.forceActiveFocus()
-      keyClick(Qt.Key_L)
+      keyClick(Qt.Key_W)
       focused(menu)
       for (var down = 0; down < 40 && menu.cursor !== menu.newIndex; down++) keyClick(Qt.Key_Down)
       keyClick(Qt.Key_Return)
@@ -1343,8 +1345,8 @@ Harness {
       var undoneAfter = holds("Keys", inKeys)
       keyClick(Qt.Key_C, Qt.ControlModifier)
       within(3000, function() { return stubCamera.shots === 1 })
-      harness.check("in the list menu's name field and Manage lists' rename, Ctrl+Z, Ctrl+C, Delete, Backspace, and l m s o edit the text and do nothing of Stonks'; closed, Ctrl+Z and Ctrl+C act",
-        namingKeys && renamingNow && inName === "Ab,A,Almso,Almso:Almso,true" && inRename === inName
+      harness.check("in the list menu's name field and Manage lists' rename, Ctrl+Z, Ctrl+C, Delete, Backspace, and w m s o edit the text and do nothing of Stonks'; closed, Ctrl+Z and Ctrl+C act",
+        namingKeys && renamingNow && inName === "Ab,A,Awmso,Awmso:Awmso,true" && inRename === inName
           && nameState === untouched && renameState === untouched
           && closedViews && undoneAfter && stubCamera.shots === 1,
         [namingKeys, renamingNow, inName, inRename, nameState === untouched ? "same" : untouched + " -> " + nameState,
