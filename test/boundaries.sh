@@ -49,12 +49,11 @@ none() {
 # quote URL is the quote feed's, the fundamentals URLs the fundamentals
 # feed's, the overnight URL the overnight feed's, the all-day URL the
 # all-day feed's, and the manifest's URL the release feed's. The plugin has
-# one IPC target, and a second, the locator, only in a test session
-# (TOPHAT_RUN, Plugin.qml); only the window's host acts on Hyprland.
+# one IPC target; only the window's host acts on Hyprland.
 only '\bProcess\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Updates.qml Sounds.qml Camera.qml OwnerOnly.qml
 only '\bFileView\s*\{' Service.qml Updates.qml TrendColors.qml OwnerOnly.qml Sounds.qml
 only '\bSettings\s*\{|^import QtCore' Camera.qml
-only '^import Quickshell\.Io' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Service.qml IpcTarget.qml Locator.qml Updates.qml TrendColors.qml Sounds.qml Camera.qml OwnerOnly.qml
+only '^import Quickshell\.Io' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Service.qml IpcTarget.qml Updates.qml TrendColors.qml Sounds.qml Camera.qml OwnerOnly.qml
 # Only the camera grabs and saves a picture, puts it on the clipboard, and
 # sends a notification.
 only 'grabToImage|saveToFile|wl-copy|wl-paste|omarchy-notification-send|notify-send' Camera.qml
@@ -65,7 +64,7 @@ only '\.exec\(|pw-play|pw-dump|pw-cat' Sounds.qml
 none '\.exec\((?!\["timeout", "-k", "1", "4", "pw-play",)' Sounds.qml
 # Every command the camera and the file keeper run is under `timeout`.
 none 'command:\s*\[(?!"timeout",)' Camera.qml OwnerOnly.qml
-only '\bIpcHandler\s*\{' IpcTarget.qml Locator.qml
+only '\bIpcHandler\s*\{' IpcTarget.qml
 only '^import Quickshell\.Hyprland' WindowHost.qml
 only '\b(QuoteFeed|HistoryFeed|FundamentalsFeed|OvernightFeed|AllDayFeed|ReleaseFeed)\s*\{' Service.qml
 only 'Quote\.chartUrl\(' QuoteFeed.qml
