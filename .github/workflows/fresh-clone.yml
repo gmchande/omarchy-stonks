@@ -94,6 +94,12 @@ jobs:
       - name: Source boundaries
         run: bash test/boundaries.sh
 
+      - name: Run records name failed steps (self-check)
+        run: bash test/ran.sh --self-check
+
+      - name: test/touched.sh picks what a diff reaches (self-check)
+        run: bash test/touched.sh self-check
+
       - name: Quickshell crash handling self-check (stand-in)
         run: bash test/qml/crash-check.sh
 

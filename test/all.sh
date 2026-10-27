@@ -2,8 +2,9 @@
 # Every check a pull request needs: what Stonks does, what it fetches, saves,
 # and says, and what a key or a click changes. Every unit-test file
 # (test/unit.sh), source boundaries, QML lint, manifest and launcher
-# validation, the Quickshell flow harnesses, and the frame checker's
-# self-check on made-up frames. Pictures, positions and motion belong to
+# validation, the Quickshell flow harnesses, the frame checker's self-check
+# on made-up frames, and the self-checks of the run records (test/ran.sh)
+# and of what test/touched.sh picks. Pictures, positions and motion belong to
 # test/review.sh. Input readiness and a target's reachability stay with the
 # action they protect. The
 # queue, the lock, and the verdict are test/queue.sh's. Needs Omarchy
@@ -59,6 +60,8 @@ run "required font glyphs" bun test/font.js
 run "source boundaries" bash test/boundaries.sh
 run "qmllint (only the baseline in test/lint.sh)" bash test/lint.sh
 run "qmllint gate self-check" bash test/lint.sh self-check
+run "run records name failed steps (self-check)" bash test/ran.sh --self-check
+run "test/touched.sh picks what a diff reaches (self-check)" bash test/touched.sh self-check
 run "omarchy plugin validate (what a clone holds)" validate_clone
 run "launcher entry validates" desktop-file-validate share/stonks.desktop
 verdict

@@ -169,6 +169,6 @@ fill
 run "installed theme diagnostic" bun test/themes.js
 drain
 run "the update from the last release, in the tophat (test/tophat/journeys/update.sh)" bash test/tophat/journeys/update.sh HEAD
-run "render diff, against ${base:0:7} (out/render-diff/)" render_diff
-run "keep the renders this run drew" keep_sets
+run --with test/qml/render.sh "render diff, against ${base:0:7} (out/render-diff/)" render_diff
+run --with test/qml/render.sh "keep the renders this run drew" keep_sets
 verdict

@@ -12,6 +12,12 @@
 #
 # A tree that already passed, since the last system update, isn't run again:
 # its record covers it. --again runs it anyway, as when chasing a flaky test.
+#
+# test/touched.sh runs only the steps a diff can reach. It sets STONKS_ONLY
+# to the files of the checks it picked, and then a step runs only when its
+# command, or the file its --with names, is one of them, and a step whose
+# command names no file of the checkout runs anyway. Such a run is never
+# recorded: it vouches for no tree.
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 source "$PWD/test/scratch.sh"
@@ -27,10 +33,22 @@ done
 # The run's record (test/ran.sh): the tree it ran on, so the next one to
 # merge it checks the record instead of running it again. Only a run that
 # begins and ends on a clean tree (no edit, no untracked file) is recorded:
-# any other ran on something no commit holds. It goes in the git folder
-# every worktree shares, which no one edits by hand.
+# any other ran on something no commit holds. A failed run's record names
+# each step that failed after its last line, `SOME FAILED | LABEL | LABEL`.
+# It goes in the git folder every worktree shares, which no one edits by
+# hand.
 clean_tree() { [ -z "$(git status --porcelain 2> /dev/null)" ] && git rev-parse -q --verify 'HEAD^{tree}' 2> /dev/null; }
 records="$(git rev-parse --path-format=absolute --git-common-dir)/stonks-runs"
+failed=()
+# record SECONDS LAST: the record of a run that took SECONDS and ended on
+# LAST, when it ran every step on a clean tree that is still the one it began
+# on.
+record() {
+  [ -z "${STONKS_ONLY+set}" ] && [ -n "$tree" ] && [ "$(clean_tree)" = "$tree" ] || return 0
+  local steps=""
+  [ "${#failed[@]}" -eq 0 ] || steps=$(printf ' | %s' "${failed[@]}")
+  echo "$tree $commit $runner $(date -Iseconds) ${1}s $2$steps" >> "$records"
+}
 # checkout: what the run runs on: its clean tree, if it is clean, and HEAD.
 checkout() {
   tree=$(clean_tree)
@@ -93,14 +111,21 @@ began=$(centiseconds)
 # and its finish line, and is started by one of the runners. A script that
 # misses one can pass without its checks having run. quickshell.sh is
 # lib.sh's runner, and crash-check.sh proves it without the saved answers.
-for script in test/qml/*.sh; do
+wiring=$(for script in test/qml/*.sh; do
   name=${script##*/}
   case "$name" in lib.sh|quickshell.sh|crash-check.sh|render.sh) continue ;; esac
   grep -q '^source .*/lib\.sh"$' "$script" || echo "FAILED $script does not source lib.sh"
   tail -n 1 "$script" | grep -qE '^finish "[^"]+"$' || echo "FAILED $script does not end with finish \"...\""
   grep -qE "^start .* bash test/qml/${name//./\\.}$" test/all.sh test/review.sh \
     || echo "FAILED $script is started by neither test/all.sh nor test/review.sh"
-done | grep . && { echo "SOME FAILED"; exit 1; }
+done)
+if [ -n "$wiring" ]; then
+  echo "$wiring"
+  failed=("harness wiring")
+  record $(( ($(centiseconds) - began + 50) / 100 )) "SOME FAILED"
+  echo "SOME FAILED"
+  exit 1
+fi
 
 status=0
 logs=$(mktemp -d)
@@ -130,12 +155,41 @@ trap 'rm -rf "$logs"' EXIT
 slots=6
 queue=()
 
-# start LABEL COMMAND...: queues COMMAND to run in the background, in order,
-# once fewer than $slots of them run (fill).
+# picked WORD...: whether a step whose command or --with holds these words
+# runs: always, unless test/touched.sh named the files of its checks in
+# STONKS_ONLY. Then only a step naming one of them, as itself or at the end
+# of a longer path (the base's copy of a check), or a step naming no file
+# of the checkout at all.
+picked() {
+  local word file named=""
+  [ -n "${STONKS_ONLY+set}" ] || return 0
+  for word; do
+    [ -f "$word" ] || continue
+    named=1
+    for file in $STONKS_ONLY; do [[ $word == "$file" || $word == */"$file" ]] && return 0; done
+  done
+  [ -z "$named" ]
+}
+left=()
+# take [--with FILE] LABEL COMMAND...: the step's label and command, in
+# step_label and step_command, when it runs (picked); else notes it as left
+# out and fails. --with names the check a command that is a function of the
+# runner's belongs to.
+take() {
+  local with=()
+  if [ "$1" = --with ]; then with=("$2"); shift 2; fi
+  picked "${with[@]}" "${@:2}" || { left+=("$1"); return 1; }
+  step_label=$1
+  step_command=("${@:2}")
+}
+
+# start [--with FILE] LABEL COMMAND...: queues COMMAND to run in the
+# background, in order, once fewer than $slots of them run (fill).
 start() {
   local command
-  labels+=("$1")
-  printf -v command '%q ' "${@:2}"
+  take "$@" || return 0
+  labels+=("$step_label")
+  printf -v command '%q ' "${step_command[@]}"
   queue+=("$command")
 }
 
@@ -164,21 +218,21 @@ fill() {
   done
 }
 
-# report CODE [CS]: a check's verdict, and its time when it has one.
+# report LABEL CODE [CS]: a check's verdict, and its time when it has one.
 skipped=0
 report() {
-  local took=${2:+ ($(printf '%d.%ds' $(($2 / 100)) $(($2 % 100 / 10))))}
-  if [ "$1" -eq 0 ]; then echo "   ok$took"
-  elif [ "$1" -eq 77 ]; then echo "   skipped$took"; skipped=$((skipped + 1))
-  else echo "   FAILED$took"; status=1; fi
+  local took=${3:+ ($(printf '%d.%ds' $(($3 / 100)) $(($3 % 100 / 10))))}
+  if [ "$2" -eq 0 ]; then echo "   ok$took"
+  elif [ "$2" -eq 77 ]; then echo "   skipped$took"; skipped=$((skipped + 1))
+  else echo "   FAILED$took"; status=1; failed+=("$1"); fi
 }
-# run LABEL COMMAND...: a quick check, in the foreground, with its verdict;
-# then the queue fills any slot that came free meanwhile.
+# run [--with FILE] LABEL COMMAND...: a quick check, in the foreground, with
+# its verdict; then the queue fills any slot that came free meanwhile.
 run() {
-  echo "== $1"
-  shift
-  "$@" 9>&-
-  report $?
+  take "$@" || return 0
+  echo "== $step_label"
+  "${step_command[@]}" 9>&-
+  report "$step_label" $?
   fill
 }
 
@@ -212,16 +266,15 @@ verdict() {
     code=$?
     echo "== ${labels[$i]}"
     cat "$logs/$i"
-    report "$code" "$(cat "$logs/$i.cs" 2> /dev/null)"
+    report "${labels[$i]}" "$code" "$(cat "$logs/$i.cs" 2> /dev/null)"
   done
   took=$(( ($(centiseconds) - began + 50) / 100 ))
   echo "$runner took $((took / 60)) min $((took % 60)) s"
+  [ "${#left[@]}" -eq 0 ] || printf 'left out, as test/touched.sh asked: %s\n' "${left[@]}"
   if [ "$status" -ne 0 ]; then last="SOME FAILED"
   elif [ "$skipped" -gt 0 ]; then last="PASSED, $skipped SKIPPED (no saved answers)"
   else last="ALL PASS"; fi
-  if [ -n "$tree" ] && [ "$(clean_tree)" = "$tree" ]; then
-    echo "$tree $commit $runner $(date -Iseconds) ${took}s $last" >> "$records"
-  fi
+  record "$took" "$last"
   echo "$last"
   exit "$status"
 }
