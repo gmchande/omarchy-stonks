@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# The README's pictures, rendered again in one command: the real popup,
-# window, and pill (readme.qml) on the demo watchlist (test/demo.json),
-# its quotes the saved capture named below (test/capture-demo.sh), the clock
-# a minute after that capture, in Tokyo Night at twice the scale, and one
-# popup in Catppuccin Latte. Writes preview.png at the root and media/*.png,
-# or all of them into STONKS_README_OUT (test/review.sh renders into a
-# scratch folder, so the script can't quietly break). The popup's card
+# The README's pictures, rendered again in one command at a release
+# (CONTRIBUTING.md, Releases): the real popup, window, and pill (readme.qml)
+# on the demo watchlist (test/demo.json), its quotes the saved capture named
+# below (test/capture-demo.sh), the clock a minute after that capture, in
+# Tokyo Night at twice the scale, and one popup in Catppuccin Latte. Writes
+# preview.png at the root and media/*.png, or all of them into
+# STONKS_README_OUT, a folder to look at them in first. The popup's card
 # window is CardWindow.qml, as in keys.sh. HOME and curl are scratch.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 out="${STONKS_README_OUT:-$plugin/media}"
@@ -92,11 +92,9 @@ if [ "$code" -eq 0 ] && grabbed && [ -n "$(fade scrub)" ] && [ -n "$(fade retro)
   small "$out/pill.png" "$raw/forms.png" -transparent black
   for name in scrub lists retro window light; do small "$out/$name.png" "$raw/$name.png"; done
 fi
+missing=0
 for file in "${files[@]}"; do
-  if [ -s "$file" ]; then
-    echo "PASS ${file##*/} $(magick identify -format '%wx%h' "$file"), $(( $(stat -c %s "$file") / 1024 )) KB"
-  else
-    echo "FAIL ${file##*/} was not written" >> "$work/log"
-  fi
+  [ -s "$file" ] || { echo "FAIL ${file##*/} was not written" >> "$work/log"; missing=1; }
 done
+[ "$missing" = 1 ] || echo "PASS the README's ${#files[@]} pictures render"
 finish "README DONE"
