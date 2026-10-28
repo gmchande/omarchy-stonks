@@ -297,7 +297,7 @@ function printClock(quote, t, calendars) {
 
 // A closure as the header names it: the holiday, without the calendar's
 // "observed" or "(substitute)". The reader learns the market is shut,
-// why, and when it opens without it, and the popup has no room for Tokyo's
+// why, and when it opens without it, and the panel has no room for Tokyo's
 // "Constitution Memorial Day observed" beside its next open. The calendars
 // keep their source's names, since they are renewed from it.
 function holidayName(name) {
