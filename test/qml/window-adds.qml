@@ -100,8 +100,25 @@ Harness {
       keyClick(Qt.Key_S)
       keyClick(Qt.Key_H)
       tryVerify(function() {
-        return body.search.results.length > 1 && findAll(body.search, "searchResult").length >= body.search.results.length
+        return body.search.results.length > 1 && shownResults(body).length === body.search.results.length
       }, 3000)
+    }
+
+    // The result rows on screen, top first, each showing its place's result.
+    // findAll lists rows in the order they were made, which is not their
+    // order on screen.
+    function shownResults(body) {
+      var results = body.search.results
+      var rows = []
+      findAll(body.search, "searchResult").forEach(function(r) {
+        var result = results[r.index]
+        if (r.visible && result && result.symbol === r.modelData.symbol) rows[r.index] = r
+      })
+      return rows.filter(function(r) { return !!r })
+    }
+
+    function shownResult(body, symbol) {
+      return shownResults(body).filter(function(r) { return r.modelData.symbol === symbol })[0]
     }
 
     // Picks `symbol` by keys and returns the word its result said.
@@ -189,14 +206,14 @@ Harness {
       // fails), and for one already in it, the keyboard's choice on another
       // result. The 200 ms after the hero lands is the second click's time
       // to do harm.
-      var doublePick = function(index, symbol) {
+      var doublePick = function(symbol) {
         service.feature(watchlist.displayedSymbols[3])
         tryVerify(function() { return rested(body) }, 2000)
         var heroes = []
         var watchHero = function() { heroes.push(service.featuredSymbol) }
         service.dataSettingsChanged.connect(watchHero)
         searchShop(body, keys)
-        var result = findAll(body.search, "searchResult")[index]
+        var result = shownResult(body, symbol)
         var at = result.mapToItem(body, result.width / 4, result.height / 2)
         mouseDoubleClickSequence(body, at.x, at.y)
         within(1500, function() { return service.featuredSymbol === symbol })
@@ -206,7 +223,7 @@ Harness {
         mouseMove(body, 1, 1)
         return hero + ":" + heroes.filter(function(h, i) { return i === 0 || h !== heroes[i - 1] }).join(">")
       }
-      var newPick = doublePick(0, "SHOP")
+      var newPick = doublePick("SHOP")
       service.removeSymbol("SHOP")
       service.removeSymbol("SHOP.TO")
       tryVerify(quiet, 5000)
@@ -217,7 +234,7 @@ Harness {
       tryVerify(function() { return !!service.quotes["SHOP.TO"] }, 5000)
       service.setMembership("SHOP.TO", "Mid3", false)
       tryVerify(function() { return watchlist.displayedSymbols.indexOf("SHOP.TO") < 0 && rested(body) }, 2000)
-      var knownPick = doublePick(1, "SHOP.TO")
+      var knownPick = doublePick("SHOP.TO")
       check("a double-click on a result adds it once and features no row under it, new to All and already in it",
         newPick === "SHOP:SHOP" && knownPick === "SHOP.TO:SHOP.TO",
         newPick + " | " + knownPick)
@@ -267,7 +284,7 @@ Harness {
       keyClick(Qt.Key_Down)
       keyClick(Qt.Key_Down)
       var arrivingShow = [service.arriving.indexOf("SHHI.NE") >= 0,
-        find(findAll(body.search, "searchResult")[2], "searchAdd").children[0].text].join(",")
+        find(shownResult(body, "SHHI.NE"), "searchAdd").children[0].text].join(",")
       keyClick(Qt.Key_Return)
       within(12000, function() {
         return !!service.entries["SHHI.NE"] && service.entries["SHHI.NE"].status === "failed" && watchlist.cursorRow === "SHHI.NE"
@@ -288,7 +305,7 @@ Harness {
       tryVerify(function() { return rested(body) }, 2000)
       var library = service.library.join(",")
       searchShop(body, keys)
-      var results = findAll(body.search, "searchResult").filter(function(r, i, all) { return all.indexOf(r) === i })
+      var results = shownResults(body)
       var words = results.map(function(r) { return find(r, "searchAdd").children[0].text })
       keyClick(Qt.Key_Down)
       keyClick(Qt.Key_Down)
@@ -310,7 +327,7 @@ Harness {
       pickSymbol(body, keys, "FLAKY")
       var waiting = [body.landing, service.arriving.indexOf("FLAKY") >= 0].join(",")
       searchShop(body, keys)
-      var shownWord = find(findAll(body.search, "searchResult")[0], "searchAdd").children[0].text
+      var shownWord = find(shownResults(body)[0], "searchAdd").children[0].text
       keyClick(Qt.Key_Return)
       within(1000, function() { return !body.adding })
       var shownFirst = [shownWord, service.featuredSymbol, body.adding].join(",")

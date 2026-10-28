@@ -25,24 +25,28 @@ Item {
   property string pendingUrl: ""
   // The gate's ticket the request out was let through on (`Gate.report`).
   property int ticket: 0
-  // The symbol, and its price's currency, to fetch once the one under way is
-  // done.
-  property string wanted: ""
-  property string wantedCurrency: ""
+  // What waits for the fetch under way, in the order asked: one ask for
+  // each asker (`Service.fetchFundamentals`), { asker, symbol, currency }.
+  // An asker's new ask replaces its last, whose symbol it no longer shows,
+  // and never another's: the stock on show waits behind search's preview.
+  property var waiting: []
   // The fetch under way: { symbol, currency, step, figures, pair }, step
   // "series", "close", or "rate", figures null until the series are in.
   property var job: null
 
-  readonly property bool busy: job !== null || wanted !== ""
+  readonly property bool busy: job !== null || waiting.length > 0
   readonly property int day: 24 * 60 * 60
 
-  function fetch(symbol, currency) {
+  function fetch(symbol, currency, asker) {
     var normalized = String(symbol || "").toUpperCase()
-    if (!normalized || (job && job.symbol === normalized)) return
+    if (!normalized) return
+    var others = waiting.filter(function(w) { return w.asker !== asker })
     var current = root.fresh(normalized)
-    if (current && root.rateHeld(Fundamentals.ratePair(current.figures, currency))) return
-    root.wanted = normalized
-    root.wantedCurrency = String(currency || "")
+    var needless = (job && job.symbol === normalized)
+      || others.some(function(w) { return w.symbol === normalized })
+      || (current && root.rateHeld(Fundamentals.ratePair(current.figures, currency)))
+    root.waiting = needless ? others
+      : others.concat([{ asker: asker, symbol: normalized, currency: String(currency || "") }])
     root.launch()
   }
 
@@ -62,10 +66,11 @@ Item {
   }
 
   function launch() {
-    if (job || !wanted) return
-    var current = root.fresh(wanted)
-    root.job = { symbol: wanted, currency: wantedCurrency, step: "series", figures: null, pair: "" }
-    root.wanted = ""
+    if (job || !waiting.length) return
+    var next = waiting[0]
+    root.waiting = waiting.slice(1)
+    var current = root.fresh(next.symbol)
+    root.job = { symbol: next.symbol, currency: next.currency, step: "series", figures: null, pair: "" }
     if (current) root.askRate(current.figures)
     else root.run(Fundamentals.fundamentalsUrl(job.symbol, root.nowSecond()))
   }

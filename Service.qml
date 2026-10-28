@@ -834,9 +834,10 @@ Item {
   function fetchFundamentals(symbol, asker) {
     var normalized = String(symbol || "").toUpperCase()
     var quote = root.quotes[normalized] || previewFeed.quotes[normalized]
-    var ask = Asks.fundamentalsAsk(root.pendingFundamentals, asker || "stock", normalized, quote)
+    var by = asker || "stock"
+    var ask = Asks.fundamentalsAsk(root.pendingFundamentals, by, normalized, quote)
     if (ask.pending !== root.pendingFundamentals) root.pendingFundamentals = ask.pending
-    if (ask.fetch) fundamentalsFeed.fetch(normalized, quote.currency)
+    if (ask.fetch) fundamentalsFeed.fetch(normalized, quote.currency, by)
   }
 
   function keepPending(asker, symbol) {
