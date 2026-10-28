@@ -236,9 +236,9 @@ again.
   only a newer Stonks can fix it.
 - **"Refresh failed", or "No data for this symbol" on a row.** Yahoo has
   nothing for the symbol, or sent a broken answer three times in a row.
-  Stonks keeps retrying on its own, and `r` retries at once. After a merger or a
-  rename, search for the company to find what Yahoo calls it now. A
-  delisted company may be gone for good.
+  Stonks keeps retrying on its own. After a merger or a rename, search for
+  the company to find what Yahoo calls it now. A delisted company may be
+  gone for good.
 - **"As of" while the market is open.** Yahoo sends some prices late. When
   we measured, London, São Paulo, and the VIX came 15 minutes late, and
   Mexico 20. Nasdaq, NYSE, Toronto, and crypto came within a minute.
