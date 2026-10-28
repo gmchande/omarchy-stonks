@@ -129,8 +129,9 @@ function freshnessWarns(fresh) {
 // in minutes, rounded up; a refusal's can last half an hour, so it names the
 // time on the reader's clock. `why` and `when` in full, for the pill's
 // hover; `forms`, the header's, each shorter than the one before, the last
-// one fitting the popup at text size 20. Each form says what Stonks knows,
-// that nothing answered or that it was asked to wait, and guesses no cause.
+// one fitting the popup at text size 20, where a refusal's says when alone.
+// Each form says what Stonks knows, that nothing answered or that it was
+// asked to wait, and guesses no cause.
 // No source is named: not every reader knows Yahoo (the owner, 26 October).
 function hostPause(pause, pausedUntil, now) {
   var left = pausedUntil - now
@@ -145,7 +146,7 @@ function hostPause(pause, pausedUntil, now) {
     var at = left > 0 ? Format.hhmm(pausedUntil, Format.readerOffset(pausedUntil)) : ""
     var refused = { why: "The site Stonks gets prices from asked it to wait", when: at ? "Trying again at " + at : "Trying again now" }
     refused.forms = [refused.why + " · " + refused.when, "Asked to wait · Next try " + (at ? "at " + at : "now"),
-      "Asked to wait · Next try " + (at || "now")]
+      at ? "Next try at " + at : refused.when]
     return refused
   }
   return null

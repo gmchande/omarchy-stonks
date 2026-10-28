@@ -221,20 +221,20 @@ again.
 <details>
 <summary>What each message means, and what to do</summary>
 
-- **"No answer" in the header, with "Refresh late" or "No data" on a
-  row.** Stonks asked Yahoo for prices and nothing came back. Rows keep
-  any price they had, with its time. Check your connection. If other sites
-  load, Yahoo may be down or out of reach. The header says when Stonks
-  tries again, within two minutes, and `r` asks at once.
-- **"Asked to wait" in the header, with "Refresh late" or "No data" on a
-  row.** Yahoo asked Stonks to send fewer requests. The header says when
-  Stonks tries again, from a minute to about half an hour on, as Yahoo
-  asked, and `r` won't hurry it.
-- **"Can't get prices" in the header.** Every stock you follow has a
-  refresh that failed or is late, so Stonks says so once rather than on
-  every row. Rows keep any price they had, with its time. Stonks keeps
-  trying on its own, less often the longer Yahoo stays away. If Yahoo has
-  changed what it sends, only a newer Stonks can fix it.
+- **"No answer" in the header.** Stonks asked Yahoo for prices and
+  nothing came back. Rows keep any price they had, with its time. Check
+  your connection. If other sites load, Yahoo may be down or out of reach.
+  The header says when Stonks tries again, within two minutes, and `r`
+  asks at once.
+- **"Asked to wait" in the header.** Yahoo asked Stonks to send fewer
+  requests. The header says when Stonks tries again, from a minute to
+  about half an hour on, and `r` won't hurry it.
+- **"Refresh late" or "No data" on a row, or "Can't get prices" in the
+  header.** A price hasn't come in time. When that's true of every stock
+  you follow, the header says so once instead of on every row. Rows keep any
+  price they had, with its time. Stonks keeps trying on its own, less
+  often the longer Yahoo stays away. If Yahoo has changed what it sends,
+  only a newer Stonks can fix it.
 - **"No data for this symbol" or "Refresh failed" on a row, and "No price
   came back" in the header.** Yahoo has nothing for the symbol, or sent a
   broken answer three times in a row. Press `r` to try again. After a

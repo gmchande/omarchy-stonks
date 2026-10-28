@@ -1585,9 +1585,9 @@ test("a paused host says why prices stopped and when Stonks tries again, on the 
     "No answer · Next try in 2m", "No answer · Next try 2m"])
   expect(M.hostPause("none", at, at).forms[2]).toBe("No answer · Next try 1m")
   expect(M.hostPause("refused", at + 12 * 60 + 40, at)).toEqual({ why: "The site Stonks gets prices from asked it to wait", when: "Trying again at 16:12",
-    forms: ["The site Stonks gets prices from asked it to wait · Trying again at 16:12", "Asked to wait · Next try at 16:12", "Asked to wait · Next try 16:12"] })
+    forms: ["The site Stonks gets prices from asked it to wait · Trying again at 16:12", "Asked to wait · Next try at 16:12", "Next try at 16:12"] })
   expect(M.hostPause("refused", at, at).forms).toEqual(["The site Stonks gets prices from asked it to wait · Trying again now", "Asked to wait · Next try now",
-    "Asked to wait · Next try now"])
+    "Trying again now"])
 })
 
 test("a fetched name or code past its length reads as not sent", () => {
