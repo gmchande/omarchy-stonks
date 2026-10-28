@@ -1,5 +1,6 @@
 .pragma library
 .import "Format.js" as Format
+.import "History.js" as History
 .import "Market.js" as Market
 .import "Overnight.js" as Overnight
 .import "Quote.js" as Quote
@@ -49,7 +50,7 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
     } else if (range === "1D") return null
   }
   if (range === "1D" || !quote) return chart
-  var entry = histories[symbol + "|" + range]
+  var entry = histories[History.historyKey(symbol, range)]
   if (!entry) return null
   if (entry.history) chart.history = entry.history
   else chart.failed = true

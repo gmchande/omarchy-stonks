@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell.Io
+import "Asks.js" as Asks
 import "Fetch.js" as Fetch
 import "Market.js" as Market
 import "Quote.js" as Quote
@@ -134,8 +135,7 @@ Item {
   property int refreshTicket: 0
 
   function firstAnswer(symbol) {
-    var entry = entries[symbol]
-    return !entry || entry.status === "saved"
+    return Asks.firstAnswer(entries[symbol])
   }
 
   // Asks for each of `list` it does not already owe, as of `at`, the
@@ -168,15 +168,10 @@ Item {
   onNowChanged: pump()
 
   // A refresh owed for a symbol no longer watched leaves the queue, unless
-  // its run is still out; first answers always stay.
+  // its run is still out; first answers always stay (`Asks.keptAsks`).
   function dropUnwatched() {
-    var next = {}
-    var dropped = false
-    for (var symbol in asked) {
-      if (firstAnswer(symbol) || watched.indexOf(symbol) >= 0 || inRun(symbol)) next[symbol] = asked[symbol]
-      else dropped = true
-    }
-    if (dropped) root.asked = next
+    var next = Asks.keptAsks(asked, watched, entries, firstRun.concat(refreshRun))
+    if (next !== asked) root.asked = next
   }
 
   function inRun(symbol) {
@@ -231,14 +226,11 @@ Item {
   }
 
   // The next run of a lane: every symbol it owes that is not cooling or in
-  // the other lane's run, as many requests as the gate lets go: the heroes'
-  // charts first, the lead's leading, then spark batches in ask order, so
-  // one the budget held goes before those asked since. A run with nothing
-  // of that in the refresh lane carries instead a chart for each of up to
-  // `judgeRun` symbols waiting to be judged, only from the budget's spare
-  // half (`Gate.spare`): judging never splits a run, and a refresh falling
-  // due waits for at most one run of it. The preview's feed (`bulk` false)
-  // asks only the chart.
+  // a run, as many requests as the gate lets go (`Asks.quoteSlots`). A run
+  // with nothing of that in the refresh lane carries instead a chart for
+  // each of up to `judgeRun` symbols waiting to be judged, only from the
+  // budget's spare half (`Gate.spare`): judging never splits a run, and a
+  // refresh falling due waits for at most one run of it.
   readonly property int judgeRun: 4
   function launch(first) {
     var proc = first ? firstProc : refreshProc
@@ -246,25 +238,11 @@ Item {
     // say it stopped before its stream has ended. Nothing launches while a
     // run's answers are applied (`applying`).
     if (applying || (first ? firstRun : refreshRun).length > 0) return
-    var waiting = symbols.filter(function(symbol) {
-      return symbol in asked && firstAnswer(symbol) === first && cooling.indexOf(symbol) < 0 && !inRun(symbol)
-    })
-    var judging = first ? [] : toJudge.filter(function(symbol) {
-      return !(symbol in asked) && cooling.indexOf(symbol) < 0 && !inRun(symbol)
-    })
+    var held = cooling.concat(firstRun, refreshRun)
+    var waiting = Asks.laneWaiting(symbols, asked, entries, first, held)
+    var judging = first ? [] : Asks.laneJudging(toJudge, asked, held)
     if ((waiting.length === 0 && judging.length === 0) || (clearance && !clearance())) return
-    waiting.sort(function(a, b) {
-      return (b === lead) - (a === lead) || asked[a] - asked[b] || symbols.indexOf(a) - symbols.indexOf(b)
-    })
-    var charted = function(symbol) { return !bulk || heroes.indexOf(symbol) >= 0 }
-    var slots = waiting.filter(charted).map(function(symbol) { return { symbols: [symbol], spark: false } })
-    var batched = waiting.filter(function(symbol) { return !charted(symbol) })
-    // A batch of one is a chart: one request either way, and the chart's
-    // has opens, so its day needs no judging.
-    for (var i = 0; i < batched.length; i += Quote.SPARK_BATCH) {
-      var batch = batched.slice(i, i + Quote.SPARK_BATCH)
-      slots.push({ symbols: batch, spark: batch.length > 1 })
-    }
+    var slots = Asks.quoteSlots(waiting, asked, symbols, lead, heroes, bulk)
     var granted = slots.length > 0 && gate ? gate.take(slots.length, bulk) : slots.length
     var run = slots.slice(0, granted)
     for (var j = 0; slots.length === 0 && j < Math.min(judging.length, judgeRun) && (!gate || (gate.spare() && gate.take(1, bulk) === 1)); j++)
@@ -307,9 +285,7 @@ Item {
   // on the chart.
   onHeroesChanged: chartHeroes(false)
   function chartHeroes(afterLanding) {
-    ask(heroes.filter(function(symbol) {
-      return quotes[symbol] && quotes[symbol].closesOnly && !(afterLanding && entries[symbol] && entries[symbol].status === "failed")
-    }), root.stamp())
+    ask(Asks.sparkHeroes(heroes, quotes, entries, afterLanding), root.stamp())
   }
 
   // A run's answers are read a little at a time, about 8 ms a turn
@@ -424,17 +400,19 @@ Item {
       // the rest of its run; one fetched only to judge that fails changes
       // nothing, and the next spark day asks again.
       var judging = !slot.spark && toJudge.indexOf(symbol) >= 0
-      if (!slot.spark) nextJudge = nextJudge.filter(function(s) { return s !== symbol })
       var outcome = answer.kind === "ok" ? answer.outcomes[symbol] : null
-      var quote = outcome && outcome !== "missing" ? outcome.quote : null
-      if (judging && !(symbol in asked) && !quote) return
-      if (quote) {
+      var verdict = Asks.answerVerdict(answer.kind, outcome, nextTries[symbol] || 0, judging && !(symbol in asked))
+      // A refusal or no answer leaves it asked, for the gate to pace.
+      if (verdict === "host") return
+      if (!slot.spark) nextJudge = nextJudge.filter(function(s) { return s !== symbol })
+      if (verdict === "unchanged") return
+      if (verdict === "show") {
         // A day with a jump no chart has judged shows, and waits for one.
         if (outcome.unjudged && nextJudge.indexOf(symbol) < 0) nextJudge.push(symbol)
-        show(symbol, quote)
+        show(symbol, outcome.quote)
         if (judging && entries[symbol]) nextEntries[symbol].answeredAt = entries[symbol].answeredAt
-      } else if (answer.kind !== "missing" && outcome !== "missing" && (nextTries[symbol] || 0) < 2) {
-        // A bad answer: a short pause, then the same symbol again.
+      } else if (verdict === "retry") {
+        // A short pause, then the same symbol again.
         nextTries[symbol] = (nextTries[symbol] || 0) + 1
         cool.push(symbol)
         return
@@ -451,8 +429,6 @@ Item {
       if (!slot) continue
       kinds.push(answer.kind)
       retryAfter = Math.max(retryAfter, answer.retryAfter)
-      // A refusal or no answer leaves its symbols asked, for the gate to pace.
-      if (answer.kind === "refused" || answer.kind === "none") continue
       for (var k = 0; k < slot.symbols.length; k++) settle(answer, slot, slot.symbols[k])
     }
     if (nextQuotes) root.quotes = nextQuotes

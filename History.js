@@ -30,6 +30,12 @@ function historyRanges() {
   return ["1D"].concat(Object.keys(HISTORY_RANGES))
 }
 
+// A range's history in the cache, and in what the service asks of it, by
+// its symbol and range.
+function historyKey(symbol, range) {
+  return String(symbol || "").toUpperCase() + "|" + String(range || "")
+}
+
 // Whether the range on show, its last answer `entry` (HistoryFeed's), is
 // asked again at `now`: while its listing's market trades (`trading`, the
 // caller's word, by the listing's calendar; a history holds regular hours

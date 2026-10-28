@@ -58,7 +58,7 @@ Item {
   signal missed(string key)
 
   function keyFor(symbol, range) {
-    return String(symbol || "").toUpperCase() + "|" + String(range || "")
+    return History.historyKey(symbol, range)
   }
 
   // Whether `request` (`wanted`'s shape) asks for the chart `key`.
