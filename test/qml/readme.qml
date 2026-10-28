@@ -7,12 +7,12 @@ import qs.Commons as Commons
 import qs.Ui
 import "plugin" as Stonks
 
-// The README's pictures, through the real Service, popup (Panel.qml, its
+// The README's pictures, through the real Service, panel (Panel.qml, its
 // card in CardWindow.qml), window (App.qml), and pill (BarWidget.qml), on the
 // demo watchlist at the saved moment readme.sh names. Each picture is
 // grabbed into STONKS_README_RAW; readme.sh makes the README's from them.
 // With STONKS_README_MARKETPLACE naming a symbol on the list, it grabs only
-// the marketplace picture's two: that symbol's retro popup and its pill on
+// the marketplace picture's two: that symbol's retro panel and its pill on
 // the bar.
 Harness {
   id: harness
@@ -44,7 +44,7 @@ Harness {
   Stonks.App { id: app; service: service; updates: updates; trendColors: colors }
   Process { id: themeSwitch; onExited: harness.themeLinked = true }
 
-  // The pill on strips of bar: one as wide as the popup's card, for the
+  // The pill on strips of bar: one as wide as the panel's card, for the
   // marketplace picture's bar; and each of its four forms.
   FloatingWindow {
     visible: true

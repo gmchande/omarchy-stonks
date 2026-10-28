@@ -3,10 +3,10 @@
 
 // The key sheet behind the header's ?: every key, grouped by what it
 // touches, then the mouse in a few lines. The README's table lists the same
-// keys, in its words; where a line is too long for the popup's half column,
+// keys, in its words; where a line is too long for the panel's half column,
 // the sheet says it shorter. A key shows only where it acts: ⇧↑ ⇧↓ and a
 // row's drag on manual order, the order's arrow on a sorted one, and Tab in
-// the popup, which steps to the bar's next panel. Knows nothing of how the
+// the panel, which steps to the next widget's panel. Knows nothing of how the
 // keys are handled.
 function sheet(order, switchesPanels) {
   var manual = Settings.normalizeOrder(order) === "manual"
@@ -50,7 +50,7 @@ function sheet(order, switchesPanels) {
       { title: "Keys", rows: surface }
     ],
     mouse: { title: "Mouse", rows: [
-      // Each fits one line of the popup at the shell's usual text size, so
+      // Each fits one line of the panel at the shell's usual text size, so
       // the pill's and the row's take two.
       { key: "pill", does: "Scroll steps through your stocks · drag moves it" },
       { key: "", does: "Middle-click changes how the pill looks · right-click opens the window" },

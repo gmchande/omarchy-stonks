@@ -10,7 +10,7 @@ import "Figures.js" as Figures
 import "Format.js" as Format
 import "Tones.js" as Tones
 // The bar pill: one featured symbol with its day line and change, whatever
-// range the popup or the window shows. Left click opens the popup, scroll
+// range the panel or the window shows. Left click opens the panel, scroll
 // walks the watchlist, middle click cycles the pill style, right click opens
 // the window. The data service owns the data; the pill reads it.
 BarWidget {
@@ -54,7 +54,7 @@ BarWidget {
   readonly property var freshness: service && featuredSymbol
     ? Figures.freshness(service.entries[featuredSymbol] || null, featuredQuote, service.now, service.owed[featuredSymbol] || 0) : null
   readonly property bool warns: Figures.freshnessWarns(freshness)
-  // What the "!" means, in the popup's words, for the hover on every form,
+  // What the "!" means, in the panel's words, for the hover on every form,
   // then why and when Stonks tries again, where it knows: Yahoo's pause
   // (`Figures.hostPause`), or that a price on show couldn't be updated. The
   // pill itself has no room for them.
@@ -108,7 +108,7 @@ BarWidget {
     shownDay = animalDay()
     shownKind = Figures.animalKind(featured)
   }
-  // Quieter than the bar's ink by the same rule as the popup's secondary
+  // Quieter than the bar's ink by the same rule as the panel's secondary
   // text, against the bar's own ground.
   readonly property color barGround: Qt.rgba(Commons.Color.bar.background.r, Commons.Color.bar.background.g, Commons.Color.bar.background.b, 1)
   readonly property color dimColor: Tones.dim(button.foreground, barGround)
@@ -248,7 +248,7 @@ BarWidget {
     // its hover says what the other forms show, the symbol and its change;
     // on every form, what a warning's "!" means. The line, the arrow, and
     // the text show their symbol and change already, so say nothing else.
-    // None while its popup is open: the bubble lands on the card's header.
+    // None while its panel is open: the bubble lands on the card's header.
     tooltipText: root.opened ? ""
       : (root.iconOnly ? (root.featuredSymbol || "STONKS") + " " + root.changeText : "")
         + (root.iconOnly && root.warningText !== "" ? " · " : "") + root.warningText

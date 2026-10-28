@@ -16,7 +16,7 @@ ShellRoot {
     if (!ok) failures++
   }
 
-  // The first item named `name` under `item`, through a popup's or a
+  // The first item named `name` under `item`, through a panel's or a
   // window's contentItem too. A Flickable's contentItem is already one of
   // its children, so it is walked once.
   function find(item, name) {

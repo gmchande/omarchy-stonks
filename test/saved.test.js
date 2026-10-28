@@ -1535,7 +1535,7 @@ test("Robinhood's answer keeps only the bars that traded, by the symbols asked f
 
 test("a refresh within half an hour asks Robinhood for the last hour, which brings the day in hand up to what a day asked then holds", () => {
   // Saved Wednesday 7 October at 00:05 and 01:00 New York, 55 minutes
-  // apart, as a night's refreshes come with the popup closed between.
+  // apart, as a night's refreshes come with the panel closed between.
   const earlier = traded("2026-10-07-0005", ["NEST"]).NEST
   const later = fixture("moments/2026-10-07-0100/robinhood-day.json")
   const hour = { results: later.results.map(r => ({ ...r, span: "hour", historicals: r.historicals.slice(-12) })) }

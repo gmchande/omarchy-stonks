@@ -7,7 +7,7 @@ import qs.Ui
 import "plugin" as Stonks
 
 // Every key the README's table lists acts, on the surface it is listed for:
-// pressed with real Qt keys through the real popup (Panel.qml, its card in
+// pressed with real Qt keys through the real panel (Panel.qml, its card in
 // CardWindow.qml) and the real window (App.qml), it changes what it should
 // and nothing else. A key a handler lost, or one renamed in the README but
 // not in the handlers, fails here. HOME and curl are scratch fixtures.
@@ -59,8 +59,8 @@ Harness {
     return keys
   }
 
-  // What Omarchy's panel keys mean in every panel on the bar, the popup
-  // among them, as one of the listed keys (Ui/PanelKeyCatcher.qml).
+  // What Omarchy's panel keys mean in every widget's panel on the bar,
+  // Stonks' among them, as one of the listed keys (Ui/PanelKeyCatcher.qml).
   readonly property var omarchy: ({ "j": "↓", "k": "↑", "h": "←", "l": "→", "Space": "⏎", "x": "Delete", "Shift+X": "Delete" })
 
   Stonks.Service { id: service }
@@ -84,7 +84,7 @@ Harness {
   Stonks.App { id: app; service: service; updates: updates; camera: camera }
 
   // Each surface's body is built as it first opens: read it as it is now.
-  // The popup's keys go to the item that reads letters before the shell's
+  // The panel's keys go to the item that reads letters before the shell's
   // catcher.
   readonly property var popup: ({
     name: "popup",
@@ -144,7 +144,7 @@ Harness {
       b.watchlist.cursorSymbol = rows[1]
       tryVerify(function() { return b.watchlist.cursorRow === rows[1] }, 1000)
       s.focusKeys()
-      // The popup refocuses on the next turn of the event loop.
+      // The panel refocuses on the next turn of the event loop.
       wait(0)
     }
 
@@ -284,18 +284,18 @@ Harness {
       for (var n = 1; n <= 7; n++) service.addSymbol("LONG" + n)
       quiet()
 
-      // The popup first: the window, shown, would take the keys.
+      // The panel first: the window, shown, would take the keys.
       walk(harness.popup)
       var wrong = Object.keys(harness.omarchy).filter(function(t) { return !acts(harness.popup, t, harness.omarchy[t]) })
-      harness.check("in the popup, Omarchy's panel keys do what Omarchy defines: j k ↓ ↑, h ← and l →, Space Enter, x and X Delete",
+      harness.check("in the panel, Omarchy's panel keys do what Omarchy defines: j k ↓ ↑, h ← and l →, Space Enter, x and X Delete",
         wrong.length === 0, "wrong: " + wrong.join(" "))
-      // Both surfaces draw one StonksBody's sheet: the popup's stands for both.
+      // Both surfaces draw one StonksBody's sheet: the panel's stands for both.
       base(harness.popup)
       press("?")
       var credit = harness.texts(harness.find(harness.popup.body, "helpSheet"), "helpCredit").join("")
       press("?")
       var version = JSON.parse(harness.readFile(harness.manifestPath)).version
-      harness.check("in the popup, the sheet credits Stonks " + version + ", Yahoo, and Robinhood",
+      harness.check("in the panel, the sheet credits Stonks " + version + ", Yahoo, and Robinhood",
         credit.split("\n").indexOf("Stonks " + version) >= 0 && credit.indexOf("Yahoo") >= 0
           && credit.indexOf("Robinhood") >= 0, credit)
       panel.close()

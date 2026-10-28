@@ -7,7 +7,7 @@ import qs.Commons as Commons
 import qs.Ui
 import "plugin" as Stonks
 
-// What Stonks plays, through the real popup (Panel.qml, its card in
+// What Stonks plays, through the real panel (Panel.qml, its card in
 // CardWindow.qml) by keys and the real window (App.qml) by the pointer, with
 // a stand-in pw-play first on PATH (bin/pw-play) that plays nothing and
 // records what it was asked to play. sounds.sh's copy counts the output
@@ -344,7 +344,7 @@ Harness {
       service.persist({ sounds: true })
       tryVerify(function() { return icon.on && sounds.surveyed }, 5000)
 
-      // The popup by keys, in smooth.
+      // The panel by keys, in smooth.
       // The card takes the keys a turn of the event loop later.
       panel.refocusKeys()
       wait(100)
@@ -382,7 +382,7 @@ Harness {
       // add is heard then.
       quiet()
       var added = startsBy(3)
-      harness.check("in the popup, Delete plays the removal, Ctrl+Z its undo, and an add from search the add, each in smooth's voice",
+      harness.check("in the panel, Delete plays the removal, Ctrl+Z its undo, and an add from search the add, each in smooth's voice",
         played(removed[0]) === "sounds/smooth/remove.wav" && played(undone[1]) === "sounds/smooth/undo.wav"
           && played(added[2]) === "sounds/smooth/add.wav" && service.library.length === library + 1,
         harness.starts().map(played).join(", "))
@@ -484,7 +484,7 @@ Harness {
       drawnIn(body)
 
       // A replay's sound stops with the replay: Esc, a row's chart, the
-      // popup closing. And one sound at a time: Delete mid-replay cuts it.
+      // panel closing. And one sound at a time: Delete mid-replay cuts it.
       var cuts = []
       var cut = function(how) {
         var before = harness.starts().length
@@ -497,7 +497,7 @@ Harness {
       cut(function() { keyClick(Qt.Key_Escape) })
       cut(function() { keyClick(Qt.Key_Down); keyClick(Qt.Key_Return) })
       cut(function() { panel.close() })
-      harness.check("a replay's sound stops with the replay: Esc, another row's chart, and closing the popup", cuts.join(",") === "stopped,stopped,stopped", cuts.join(","))
+      harness.check("a replay's sound stops with the replay: Esc, another row's chart, and closing the panel", cuts.join(",") === "stopped,stopped,stopped", cuts.join(","))
       panel.open()
       tryVerify(function() { return body.surfaceOpen && !body.chartLoading }, 5000)
       panel.refocusKeys()
@@ -595,7 +595,7 @@ Harness {
       tryVerify(function() { return !body.surfaceOpen }, 2000)
 
       // The window by the pointer, in retro, its look picked with a click,
-      // on AAPL's day, the popup's failed add gone.
+      // on AAPL's day, the panel's failed add gone.
       service.library.filter(function(s) { return ["AAPL", "MSFT", "NVDA"].indexOf(s) < 0 }).forEach(function(s) { service.removeSymbol(s) })
       service.feature("AAPL")
       app.open("{}")
@@ -695,9 +695,9 @@ Harness {
         retroReplay.pitch.ok && retroReplay.silence.ok && retroReplay.ticks.ok,
         retroReplay.pitch.detail + " | " + retroReplay.silence.detail + " | " + retroReplay.ticks.detail)
 
-      // Two surfaces, one player: the popup's replay, cut by the window's,
-      // whose sound then plays to its end through the popup's close, which
-      // stops the popup's replay and with it only the popup's own sound.
+      // Two surfaces, one player: the panel's replay, cut by the window's,
+      // whose sound then plays to its end through the panel's close, which
+      // stops the panel's replay and with it only the panel's own sound.
       panel.open()
       tryVerify(function() { return body.surfaceOpen && !body.chartLoading }, 5000)
       drawnIn(body)
@@ -711,14 +711,14 @@ Harness {
       tryVerify(function() { return !body.surfaceOpen }, 2000)
       var playing = endOf(before + 3) === "" && win.motion.replayRunning
       tryVerify(function() { return endOf(before + 3) !== "" }, 4000)
-      harness.check("the window's replay cuts the popup's sound, and the popup closing mid-replay leaves the window's playing to its end",
+      harness.check("the window's replay cuts the panel's sound, and the panel closing mid-replay leaves the window's playing to its end",
         popupCut === "stopped" && popupReplaying && playing && endOf(before + 3) === "ended",
         popupCut + "|" + popupReplaying + "|" + playing + "|" + endOf(before + 3))
 
       // The output kept awake (the stand-in pw-cat): a stream of silence
       // only while a chart's scrub moves with sounds on, by the pointer on
       // it or by keys, and a second after it last moved or ended; none while
-      // the popup and the window are open and nothing is scrubbed, none for
+      // the panel and the window are open and nothing is scrubbed, none for
       // a scrub left standing, and none with sounds off. One that ends on
       // its own while it's wanted starts again.
       var silence = function() {
@@ -728,7 +728,7 @@ Harness {
           starts: lines.filter(function(l) { return /^start /.test(l) }).length, last: lines[lines.length - 1] || "",
           stoppedAt: stops.length ? Number(stops[stops.length - 1].split(" ")[1]) : 0 }
       }
-      // The window opened again takes the keys back from the popup's card,
+      // The window opened again takes the keys back from the panel's card,
       // which the replay above opened last; it starts no silence.
       tryVerify(function() { return !silence().running }, 3000)
       app.close()

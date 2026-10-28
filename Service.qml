@@ -10,7 +10,7 @@ import "Overnight.js" as Overnight
 import "Settings.js" as Settings
 // The one data owner. Data settings live in grvc.stonks.json and are
 // written only here, including what you are looking at: the list, the
-// featured symbol, and the chart range the popup and the window share.
+// featured symbol, and the chart range the panel and the window share.
 // List membership follows Settings.js's rules; this file persists their result.
 Item {
   id: root
@@ -67,7 +67,7 @@ Item {
   // good hands the hero back, as an add whose preview had already failed
   // leaves it; another hero chosen meanwhile ends it.
   property var heroTaken: null
-  // The surfaces open now where a screen shows them: the popup on any bar,
+  // The surfaces open now where a screen shows them: the panel on any bar,
   // the window on a workspace on view (`StonksBody.onScreen`). The chart's
   // history is wanted only while one is (`surfaceShown`).
   property var openSurfaces: []
@@ -101,7 +101,7 @@ Item {
   readonly property string order: Settings.listOrder(dataSettings)
   readonly property bool reversed: Settings.listReversed(dataSettings)
   readonly property string range: dataSettings.range
-  // The popup's first-run hint has shown.
+  // The panel's first-run hint has shown.
   readonly property bool hinted: dataSettings.hinted
   // What the surfaces show of the settings, as one value, so a change of it
   // is whole whatever changed: the hero, the range, the list and its key

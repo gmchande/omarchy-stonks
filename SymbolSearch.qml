@@ -48,7 +48,7 @@ FocusScope {
   readonly property int rowPitch: rowHeight + rowGap
   // From the field's rule to the first result: with it, the field and a
   // full answer are as tall as a full list's six rows and footer, so search
-  // on a short list grows the popup no taller than a full one.
+  // on a short list grows the panel no taller than a full one.
   readonly property int resultsGap: Style.space(4)
   readonly property int desiredHeight: fieldBar.height + resultsGap + rowPitch * maxResults - rowGap
   // The results' room under the field, in whole rows: a row is never cut.

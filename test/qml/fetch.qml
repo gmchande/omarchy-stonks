@@ -983,7 +983,7 @@ Harness {
 
       // The window left open on SHOP.TO, its cap and P/E and the USDCAD rate
       // its P/E reads in, a day and more old: the next minute asks for both
-      // again, as the popup's next open would. Nothing else asks: the window
+      // again, as the panel's next open would. Nothing else asks: the window
       // stays open on one stock.
       var funds = service.testFundamentalsFeed
       openWindow()

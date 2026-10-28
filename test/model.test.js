@@ -1208,7 +1208,7 @@ test("Robinhood is asked once a session for the pill's stock with nothing open, 
 })
 
 test("a refresh's chart is owed until a new answer replaces the one it had, then a chart with no answer is asked, and the day asks none", () => {
-  // The window previews NVDA while the popup shows AAPL; the window alone
+  // The window previews NVDA while the panel shows AAPL; the window alone
   // charts only its preview, once it rests.
   const charts = M.chartsOnShow(["popup", "window"], "AAPL", "NVDA", "window", true)
   expect(charts).toEqual(["AAPL", "NVDA"])
@@ -1304,12 +1304,12 @@ test("community themes that one hue, a faint colour, or a tinted light ground wo
     expect([c.name, M.contrast(colour(got.up), ground) >= floor, M.contrast(colour(got.down), ground) >= floor]).toEqual([c.name, true, true])
   }
   // The floor is each surface's own: Ferrari F1's red bar takes Stonks'
-  // pair, where the theme's red is at 1.66:1, while its dark popup keeps the
+  // pair, where the theme's red is at 1.66:1, while its dark panel keeps the
   // theme's (https://github.com/hueilost/omarchy-theme-ferrari-f1).
   const red = M.hexColor("#ff2800")
   greenAndRed(M.trend("#3ddc84", red, M.hexColor("#c40000")))
   expect(M.trend("#3ddc84", red, M.hexColor("#0d0d0f"))).toEqual({ up: "#3ddc84", down: red })
-  // A light bar under a dark popup takes the other pair: White's on black.
+  // A light bar under a dark panel takes the other pair: White's on black.
   greenAndRed(M.trend("#3a3a3a", M.hexColor("#2a2a2a"), M.hexColor("#000000")))
   // On a mid-grey ground no green reads at 4.5:1, and the darkest rounds to
   // black, which reads but says nothing: there, up is a green at the 3:1

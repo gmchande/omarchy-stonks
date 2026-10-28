@@ -20,7 +20,7 @@ Harness {
   readonly property string fakeState: Quickshell.env("STONKS_FAKE_STATE")
   Process { id: fileProc }
   Stonks.App { id: app; service: service }
-  // A second surface on the same service, as a popup beside the window.
+  // A second surface on the same service, as a panel beside the window.
   Component { id: otherSurface; Stonks.StonksBody {} }
 
   Steps {
@@ -185,7 +185,7 @@ Harness {
     }
 
     // A second surface beside the window, on the same service, as the
-    // popup is: its search taking the preview closes the window's search,
+    // panel is: its search taking the preview closes the window's search,
     // so neither hero shows one result while Enter would add another; the
     // window's hero, back on the featured symbol, gets its range's history
     // while the other previews; and a surface that goes while previewing
@@ -413,7 +413,7 @@ Harness {
       harness.check("an add on its way leaves the next preview its own year, asked for while the add's is out",
         othersOwn, othersOwn)
 
-      // Another surface open beside the window, as the popup is, closes
+      // Another surface open beside the window, as the panel is, closes
       // while the add is out, and the added row's year is still asked for
       // once.
       var beside = otherSurface.createObject(null, { service: service, width: 480, height: 760 })

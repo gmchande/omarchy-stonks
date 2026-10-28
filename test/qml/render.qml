@@ -19,7 +19,7 @@ import "plugin"
 // Offscreen window body. A stub surface feeds StonksBody from fixtures.
 // Grab the opaque window-sized layer so margins stay in the PNG. The
 // w22-<surface>-<look>-<symbol>-<range> states render the 22-symbol list with
-// a real day featured, at identical state in both looks; a popup is as tall
+// a real day featured, at identical state in both looks; a panel is as tall
 // as its whole rows, the way Panel sizes it. sprite-candidates draws the
 // bull and bear candidates at 1x and 4x. pill-sheet draws the real bar pill
 // for NEST in every bar style and look, on a horizontal and a vertical bar.
@@ -36,7 +36,7 @@ Harness {
   // same scrubbed to the day's middle print. lit-<state>: the surface after
   // a screenshot, its camera lit; quiet-<state>: with sounds off; both may
   // lead, quiet- first. <state>-size-N: the state at text size N
-  // (render.sh) in the frame the shell gives it there, the popup and the
+  // (render.sh) in the frame the shell gives it there, the panel and the
   // smallest window grown with the text, as a reader sees it; the state as
   // named without the suffix. The pill sheet keeps its name and draws its
   // own frame.
@@ -90,7 +90,7 @@ Harness {
   // The smallest window App.qml allows.
   readonly property bool smallest: minWindow || minWindowOf || (!!w22 && w22.min)
   // loading and failed: a cold start, the first quotes out or failed, in
-  // retro, or in smooth with -smooth; in the popup with popup- before.
+  // retro, or in smooth with -smooth; in the panel with popup- before.
   readonly property string coldState: (/^(?:popup-)?(loading|failed)(?:-smooth)?$/.exec(stateName) || ["", ""])[1]
   // popup-trouble-<kind>-<look>: prices stopped, as the header says it:
   // Yahoo not answering (noanswer) or refusing (refused), both refreshes
@@ -102,7 +102,7 @@ Harness {
     return kind === "noanswer" ? { pause: "none", pausedUntil: root.now + 40 }
       : kind === "refused" ? { pause: "refused", pausedUntil: root.now + 12 * 60 + 40 } : { pause: "", pausedUntil: 0 }
   }
-  // The popup while adding, and the window at the size App.qml permits.
+  // The panel while adding, and the window at the size App.qml permits.
   readonly property bool searchState: stateName.indexOf("-search") >= 0
   readonly property bool minWindow: stateName.indexOf("min-window-") === 0
   // <popup|window>-room-<list>-<moment>-<look>: search on a list of one,
@@ -233,7 +233,7 @@ Harness {
   }
   // The theme's up and down, as the plugin reads them.
   property TrendColors trendColors: TrendColors {}
-  // The surface's ground: the popup's card, opaque, or the window's.
+  // The surface's ground: the panel's card, opaque, or the window's.
   readonly property color groundColor: popup
     ? Qt.rgba(Commons.Color.popups.background.r, Commons.Color.popups.background.g, Commons.Color.popups.background.b, 1) : Commons.Color.background
   // The bar's own ground and ink, opaque, for the pills.
@@ -844,7 +844,7 @@ Harness {
       }
       // popup-search-vfiax-*: Yahoo's answer holds a mutual fund alone;
       // -eurusd-: two indexes shown, a currency and futures left out. The
-      // note has to fit the popup's width on one line. The currency is
+      // note has to fit the panel's width on one line. The currency is
       // Yahoo's top answer, so no result is chosen, as search's own landing
       // chooses (`SymbolSearch.land`).
       var leftOut = root.stateName.indexOf("-vfiax-") > 0 ? ["vfiax", vfiaxFile]
@@ -909,11 +909,11 @@ Harness {
       if (root.stateName.indexOf("-named-") > 0) stub.listName = "My Watchlist"
       body.undoOffered = { symbol: "SHOP.TO" }
     } else if (root.stateName.indexOf("popup-hint-") === 0) {
-      // The first open's footer: the hint's lines have to fit the popup's
+      // The first open's footer: the hint's lines have to fit the panel's
       // width, above "+ Add a symbol".
       body.showFirstRunHint()
     } else if (root.stateName.indexOf("popup-notice-file-") === 0) {
-      // The footer's notices have to fit the popup's width.
+      // The footer's notices have to fit the panel's width.
       stub.settingsUnreadable = true
     } else if (root.stateName.indexOf("popup-notice-update-") === 0) {
       updates.newVersion = "1.0.0"
@@ -943,7 +943,7 @@ Harness {
       stub.lists = [choice("", all), choice("My Watchlist", all.slice(0, 8)), choice("Watching", all.slice(3, 8)),
         choice("Growth", []), choice("Wins", all.slice(10, 14)), choice("Losses", all.slice(14, 17))]
       if (named) {
-        // All stays the library, so the popup keeps All's height on a list.
+        // All stays the library, so the panel keeps All's height on a list.
         stub.library = all
         stub.listName = named.name
         stub.order = "manual"
@@ -1055,7 +1055,7 @@ Harness {
     // The window shows once the text size has landed (`sizeLanded`); the
     // large sheet, at the size render.sh gives it, is given room for its
     // seven rows, and a -size-N state the widths Style.space gives the
-    // surfaces at size N: the popup's 480 and the smallest window's 560
+    // surfaces at size N: the panel's 480 and the smallest window's 560
     // grow with the text, and the window is 720 or its smallest, whichever
     // is wider.
     implicitWidth: root.anchorState ? 1000 : root.pillSheet ? Math.max(520, pillColumn.implicitWidth + 48) : root.themeState ? 480 + 410 : root.sheet ? 1000
@@ -1108,7 +1108,7 @@ Harness {
         radius: Style.cornerRadius
       }
 
-      // The popup's body as the card holds it: inset by the card's border and
+      // The panel's body as the card holds it: inset by the card's border and
       // padding (`KeyboardPanel`'s), its own margins none, in a box that
       // clips it at its edges (`Panel.qml`'s key catcher), so what draws past
       // the body is cut here as on screen. The window's body has its own
@@ -1127,7 +1127,7 @@ Harness {
         StonksBody {
           id: body
           // As App.qml draws it: past 720 the body keeps that width, centred.
-          // The gallery's popup is at the left, the pills beside it.
+          // The gallery's panel is at the left, the pills beside it.
           width: root.themeState ? parent.width : Math.min(parent.width, Style.space(720))
           height: parent.height
           x: (parent.width - width) / 2
