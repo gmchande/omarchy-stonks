@@ -887,13 +887,18 @@ test("a letter says its key and Shift, never its text's case, and nothing held w
   expect(typed({ key: 63, modifiers: SHIFT, text: "?" })).toBe("?")
 })
 
-test("a stock's day is asked for two days from its pre-market until the bell, when Yahoo's day no longer holds the last session", () => {
-  const stock = { symbol: "X", exchange: "NASDAQ", instrumentType: "EQUITY", crypto: false }
+test("a stock's day is asked for two days from its pre-market until the bell, and past it until it trades, when Yahoo's day no longer holds the last session", () => {
+  const stock = { symbol: "X", exchange: "NASDAQ", instrumentType: "EQUITY", crypto: false, points: [{ t: at("2026-10-23", "04:05"), p: 1 }] }
   const two = (q, date, clock) => M.twoDays(q, at(date, clock), calendars)
   // Friday 23 October: one day through the night, which still holds
   // Thursday; two from the pre-market's open; one again at the bell.
   expect(["03:59", "04:00", "06:22", "09:29", "09:30", "20:00"].map(c => two(stock, "2026-10-23", c)))
     .toEqual([false, true, true, true, false, false])
+  // A stock that hasn't traded since Thursday stays on two days past the
+  // bell, so its chart keeps Thursday until it trades, to the post-market's
+  // close.
+  const quiet = { ...stock, points: [{ t: at("2026-10-22", "15:35"), p: 1 }] }
+  expect(["09:30", "13:00", "19:59", "20:00"].map(c => two(quiet, "2026-10-23", c))).toEqual([true, true, true, false])
   // No session to wait for: a Saturday, Thanksgiving.
   expect([two(stock, "2026-10-24", "06:00"), two(stock, "2026-11-26", "06:00")]).toEqual([false, false])
   // An index's answer stays the last session's until its open. A coin's is

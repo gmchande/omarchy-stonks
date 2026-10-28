@@ -495,12 +495,14 @@ function staysWarm(quote, now, calNow) {
 // one with no quote yet, whose market and hour aren't known; a
 // cryptocurrency's always, for its last 24 hours (`Quote.coinDay`); on a
 // trading day of a calendar with a pre-market, from the pre-market's open
-// until the session opens; and on any other, from the session's open, by
-// its calendar or else Yahoo's current period (Sydney's), until the quote
-// holds a print of it. Yahoo's day answer for a stock turns
-// to the coming day with its pre-market (AAPL's at 06:22 on Friday 23
-// October held Friday from 04:00 and nothing of Thursday), and London's
-// and Tokyo's at their open, its first bar a quarter of an hour behind
+// until the session opens, and on to the post-market's close while the
+// quote holds no print of the day; and on any other, from the session's
+// open, by its calendar or else Yahoo's current period (Sydney's), until
+// the quote holds a print of it. Yahoo's day answer for a stock turns to
+// the coming day with its pre-market (AAPL's at 06:22 on Friday 23 October
+// held Friday from 04:00 and nothing of Thursday; CVR's at 09:35 on Monday
+// 26 October held nothing, its first trade 13:10's), and London's and
+// Tokyo's at their open, its first bar a quarter of an hour behind
 // (SHEL.L's at 04:05 New York on Monday 26 October held nothing), while
 // the 1D chart shows the last day until the new one has a print
 // (`Quote.tailDay`). Never an index's, whose answer stays the last
@@ -512,10 +514,14 @@ function twoDays(quote, now, calendars) {
   var cal = calendarFor(calendars, quote)
   var date = cal ? dateStringOf(localDate(now, cal)) : ""
   var segs = cal ? segmentsOn(cal, date) : []
-  if (cal && cal.pre) return segs.length > 0 && now >= epochAt(cal, date, cal.pre.open) && now < segs[0].start
-  var open = segs.length ? { start: segs[0].start, end: segs[segs.length - 1].end } : !cal && quote.current ? quote.current.regular : null
   var pts = quote.points
-  return !!open && now >= open.start && now < open.end && !(pts.length && pts[pts.length - 1].t >= open.start)
+  var printedSince = function(t) { return pts.length > 0 && pts[pts.length - 1].t >= t }
+  if (cal && cal.pre) {
+    var pre = epochAt(cal, date, cal.pre.open)
+    return segs.length > 0 && now >= pre && (now < segs[0].start || (now < epochAt(cal, date, cal.post.close) && !printedSince(pre)))
+  }
+  var open = segs.length ? { start: segs[0].start, end: segs[segs.length - 1].end } : !cal && quote.current ? quote.current.regular : null
+  return !!open && now >= open.start && now < open.end && !printedSince(open.start)
 }
 
 // How long after a session opens its first price may still be on its way,

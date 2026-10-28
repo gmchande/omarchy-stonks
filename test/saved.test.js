@@ -1852,6 +1852,22 @@ test("the evening's night is on the day's chart, measured from the day's previou
 // When a watch moment's answers came, by its times.txt: how long after
 // its day a quote was answered decides whether that day is over.
 const answeredAt = set => Date.parse(readFileSync(join(fixtures, "moments", set, "times.txt"), "utf8").match(/answers to (\S+)/)[1]) / 1000
+// Two of Yahoo's day answers for a listing joined into the two-day answer
+// one request would have brought at the later's time: the earlier's bars
+// and periods, then the later's, and the later's quote. A later answer with
+// no periods yet has its current period's.
+const joined = (earlier, later) => {
+  const a = earlier.chart.result[0]
+  const b = later.chart.result[0]
+  const periods = (p, q) => Array.isArray(p) ? [...p, ...(q || [[b.meta.currentTradingPeriod.regular]])]
+    : Object.fromEntries(Object.keys(p).map(k => [k, [...p[k], ...q[k]]]))
+  const bars = r => r.indicators.quote[0]
+  return { chart: { result: [{
+    meta: { ...b.meta, range: "2d", tradingPeriods: periods(a.meta.tradingPeriods, b.meta.tradingPeriods) },
+    timestamp: [...a.timestamp, ...(b.timestamp || [])],
+    indicators: { quote: [Object.fromEntries(["open", "high", "low", "close", "volume"].map(f => [f, [...bars(a)[f], ...((b.timestamp && bars(b)[f]) || [])]]))] }
+  }] } }
+}
 
 test("a weekend shows Friday from midnight to 20:00, filling the width, then Sunday's night alone from its first print, on past midnight to 04:00", () => {
   // Saturday noon: Friday's day is over, Robinhood's answer reaching its
@@ -2109,16 +2125,7 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   const sunday = at("2026-10-25", "20:05")
   const turned = M.parseChart(tokyo("watch-2026-10-25-2005"), cents)
   expect([turned.points.length, M.twoDays(turned, sunday, calendars)]).toEqual([0, true])
-  const both = later => {
-    const a = tokyo("watch-2026-10-25-1950").chart.result[0]
-    const b = tokyo(later).chart.result[0]
-    const bars = r => r.indicators.quote[0]
-    return M.parseChart({ chart: { result: [{
-      meta: { ...b.meta, range: "2d", tradingPeriods: [...a.meta.tradingPeriods, ...(b.meta.tradingPeriods || [[b.meta.currentTradingPeriod.regular]])] },
-      timestamp: [...a.timestamp, ...(b.timestamp || [])],
-      indicators: { quote: [Object.fromEntries(["open", "high", "low", "close", "volume"].map(f => [f, [...bars(a)[f], ...((b.timestamp && bars(b)[f]) || [])]]))] }
-    }] } }, cents)
-  }
+  const both = later => M.parseChart(joined(tokyo("watch-2026-10-25-1950"), tokyo(later)), cents)
   const tokyoDate = q => M.dateStringOf(M.localDate(q.session.regular.start, JPX))
   const tokyoDay = q => M.viewChart("7203.T", "1D", { "7203.T": q }, {}, {}, {}, {}, calendars).day
   const friday = tokyoDay(both("watch-2026-10-25-2005"))
@@ -2244,6 +2251,18 @@ test("a listing Robinhood doesn't trade all day draws Yahoo's day, filling the w
   expect(M.chartSpan(aapl.day)).toMatchObject({ start: at("2026-10-23", "04:00"), end: at("2026-10-23", "20:00") })
   expect([...new Set(aapl.day.points.map(p => p.s))]).toEqual(["pre"])
   expect([M.dayBase(aapl.day), M.lastRegularPoint(M.chartGeometry(aapl.day))]).toEqual([M.regularClose(aapl.quote), null])
+  // CVR at 09:35 on Monday 26 October hadn't traded since Friday, and
+  // Yahoo's day answer held Monday's periods and no bar: alone, an empty
+  // chart. It is still asked for two days past the bell (`twoDays`), and
+  // the chart stays on Friday until Monday's first trade, 13:10's.
+  const cvrAt = (set, received) => M.parseChart(joined(fixture("moments/watch-2026-10-25-1000/cvr.json"), fixture(`moments/${set}/cvr.json`)), cents, received)
+  const opened = cvrAt("watch-2026-10-26-0935", at("2026-10-26", "09:35"))
+  expect(M.twoDays(opened, at("2026-10-26", "09:35"), calendars)).toBe(true)
+  const cvrDay = q => M.viewChart("CVR", "1D", { CVR: q }, {}, {}, {}, { CVR: { status: "ok", allDay: false, at: 0 } }, calendars).day
+  expect([sessionDate(cvrDay(opened)), cvrDay(opened).points.length]).toEqual(["2026-10-23", 2])
+  const traded = cvrAt("watch-2026-10-26-1500", at("2026-10-26", "15:00"))
+  expect([sessionDate(cvrDay(traded)), cvrDay(traded).points[0].t, M.twoDays(traded, at("2026-10-26", "15:00"), calendars)])
+    .toEqual(["2026-10-26", at("2026-10-26", "13:10"), false])
   for (const [file, symbol] of [["kiln", "KILN"], ["bolt", "BOLT"]]) {
     const chart = notAllDay("listings-2026-10-07-0100", file, symbol)
     expect(M.chartSpan(chart.day)).toMatchObject({ start: at("2026-10-06", "04:00"), end: at("2026-10-06", "20:00") })
