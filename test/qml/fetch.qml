@@ -147,19 +147,30 @@ Harness {
   // A screen as Hyprland reports it, for the window host (fetch.sh): on or
   // off, as it says when asked again, a turn later, as Hyprland's answer
   // comes, showing this workspace. It counts the asks it has not answered
-  // yet (`screensHeard`).
+  // yet (`screensHeard`). While `holding`, it answers none asked meanwhile,
+  // and once let go, those all at once.
   QtObject {
     id: screenStandIn
     property bool on: true
     property var lastIpcObject: ({ dpmsStatus: true })
     property var activeWorkspace: workspaceHere
     property int unanswered: 0
+    property bool holding: false
+    property int held: 0
     function refresh() {
       unanswered++
-      Qt.callLater(function() {
-        screenStandIn.lastIpcObject = { dpmsStatus: screenStandIn.on }
-        screenStandIn.unanswered--
-      })
+      if (holding) held++
+      else Qt.callLater(function() { screenStandIn.answer(1) })
+    }
+    function answer(asks) {
+      screenStandIn.lastIpcObject = { dpmsStatus: screenStandIn.on }
+      screenStandIn.unanswered -= asks
+    }
+    onHoldingChanged: {
+      var asks = held
+      if (holding || asks === 0) return
+      held = 0
+      Qt.callLater(function() { screenStandIn.answer(asks) })
     }
   }
   // A second screen, always on, showing the other workspace.
@@ -329,15 +340,16 @@ Harness {
     function test_main() {
       if (harness.mode !== "main") skip("another run")
       var start = service.now
-      // Each second, from the start, in which requests went unanswered, and
-      // how many.
+      // Each second, from the start, in which quote requests went
+      // unanswered, and how many. The window's ask for its stock's cap and
+      // P/E is no quote request, and lands in the first second or the next
+      // as the machine allows.
       var tries = []
       var noteTries = function() {
-        var sent = harness.requests().filter(function(l) { return / 000$/.test(l) }).length
+        var sent = harness.requests().filter(function(l) { return /^(chart|spark) .* 000$/.test(l) }).length
         var noted = tries.reduce(function(n, t) { return n + t.sent }, 0)
         if (sent > noted) tries.push({ at: service.now - start, sent: sent - noted })
       }
-      noteTries()
 
       // 05:59, offline, with last session's quotes saved: NEST's Tuesday
       // close and London's Thursday. The pill shows NEST's saved change at
@@ -346,6 +358,9 @@ Harness {
         !!pill.featured && pill.changeText !== "…" && !pill.warns && service.entries.NEST.status === "saved",
         pill.changeText + " | " + JSON.stringify(service.entries.NEST))
       openWindow()
+      // The start's run has landed (`settle`), still in its first second:
+      // counted any earlier, a request of it still out reads as a retry.
+      noteTries()
       var body = app.testBody
       var nestRow = body.watchlist.rowItem("NEST")
       var shelRow = body.watchlist.rowItem("SHEL.L")
@@ -392,7 +407,7 @@ Harness {
       // rest; then each pause doubles from 2 s, to a minute at most, a fifth
       // either way, and whole seconds on this clock.
       var gaps = tries.slice(1).map(function(t, i) { return t.at - tries[i].at })
-      harness.check("with no network, a run, then one request alone at 2, 6, 14, 30, and 62 s: no more",
+      harness.check("with no network, a quote run, then one quote request alone at 2, 6, 14, 30, and 62 s: no more",
         tries.length >= 6 && tries.slice(1).every(function(t) { return t.sent === 1 })
           && gaps.every(function(g, i) { var pause = Math.min(2 * Math.pow(2, i), 60); return Math.abs(g - pause) <= pause / 5 + 1 }),
         tries.map(function(t) { return t.at + " s ×" + t.sent }).join(", "))
@@ -748,6 +763,54 @@ Harness {
       var caughtUp = within(3000, function() { return harness.quoteCounts(harness.requests().slice(backFrom))["BTC-USD"] === 1 })
       harness.check("back in sight, what fell due goes at once: the crypto", caughtUp,
         harness.requests().slice(backFrom).join(", "))
+      settle()
+      // In sight, the window's stock waits for its cap and P/E behind
+      // another's, as on a slow network, and the window leaves sight before
+      // its turn: what waited is not asked for while no screen shows it.
+      var funds = service.testFundamentalsFeed
+      touch("FUNDAMENTALS.hold")
+      service.feature("7203.T")
+      settle()
+      var heldOut = within(3000, function() { return funds.busy })
+      var leftFrom = harness.requests().length
+      service.feature("SHEL.L")
+      settle()
+      stonksToplevel.workspace = workspaceThere
+      answerScreens()
+      remove("FUNDAMENTALS.hold")
+      // Idle only once whatever waited has been fetched too.
+      var heldDone = within(3000, function() { return !funds.busy })
+      var leftAsks = harness.requests().slice(leftFrom).filter(function(l) { return /^fundamentals SHEL\.L /.test(l) })
+      harness.check("a cap and P/E waiting behind another's when the window leaves sight are not asked for",
+        heldOut && heldDone && leftAsks.length === 0,
+        [heldOut, heldDone, leftAsks.join(", ") || "none asked"].join(" | "))
+      service.feature("NEST")
+      settle()
+      stonksToplevel.workspace = workspaceHere
+      answerScreens()
+      settle()
+      // In sight again, the stock's cap and P/E wait on the screens' answer,
+      // which is slow to come, and the window leaves sight first: they are
+      // not asked for either. The screens' last answer, trusted for a
+      // second, runs out first.
+      wait(1100)
+      screenStandIn.holding = true
+      var unsentFrom = harness.requests().length
+      service.feature("SHEL.L")
+      var unsent = within(1500, function() { return funds.busy && funds.pendingUrl !== "" })
+      stonksToplevel.workspace = workspaceThere
+      var hidden = within(3000, function() { return service.openSurfaces.length === 0 })
+      screenStandIn.holding = false
+      screensHeard()
+      var unsentDone = within(3000, function() { return !funds.busy })
+      var unsentAsks = harness.requests().slice(unsentFrom).filter(function(l) { return /^fundamentals SHEL\.L /.test(l) })
+      harness.check("a cap and P/E still waiting on the screens' answer when the window leaves sight are not asked for",
+        unsent && hidden && unsentDone && unsentAsks.length === 0,
+        [unsent, hidden, unsentDone, unsentAsks.join(", ") || "none asked"].join(" | "))
+      service.feature("NEST")
+      settle()
+      stonksToplevel.workspace = workspaceHere
+      answerScreens()
       settle()
       // Out of sight again, the pill steps to SHEL.L, whose cap and P/E no
       // one has asked for: the window asks for them only once it is back in

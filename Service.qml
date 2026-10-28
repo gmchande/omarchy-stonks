@@ -775,12 +775,13 @@ Item {
   }
   // A resting preview on a surface a screen shows asks for what it holds
   // back while it is not: its quote, its cap and P/E, and Robinhood's two
-  // answers for a US stock or ETF.
+  // answers for a US stock or ETF. Out of sight, it takes back the cap and
+  // P/E it still waits for.
   onPreviewShownChanged: if (previewShown) {
     previewFeed.pump()
     fetchFundamentals(previewSymbol, "preview")
     askOvernight()
-  }
+  } else withdrawFundamentals("preview")
 
   // A surface says when it opens and closes, and as it goes. The clock
   // catches up at once, and moves on at the pace that now holds.
@@ -789,6 +790,10 @@ Item {
     var next = open ? others.concat([surface]) : others
     if (next.length === root.openSurfaces.length) return
     root.openSurfaces = next
+    // With no surface in sight, the stock on show is on none: what it waits
+    // for is asked again when one comes back (`requestFundamentals` in App
+    // and Panel).
+    if (!next.length) root.withdrawFundamentals("stock")
     if (!open) root.sights = root.sights.filter(function(s) { return s.surface !== surface })
     root.tick()
     root.showHistory(false)
@@ -838,14 +843,22 @@ Item {
   function fetchFundamentals(symbol, asker) {
     var normalized = String(symbol || "").toUpperCase()
     var quote = root.quotes[normalized] || previewFeed.quotes[normalized]
-    var ask = Asks.fundamentalsAsk(root.pendingFundamentals, asker || "stock", normalized, quote)
+    var by = asker || "stock"
+    var ask = Asks.fundamentalsAsk(root.pendingFundamentals, by, normalized, quote)
     if (ask.pending !== root.pendingFundamentals) root.pendingFundamentals = ask.pending
-    if (ask.fetch) fundamentalsFeed.fetch(normalized, quote.currency)
+    if (ask.fetch) fundamentalsFeed.fetch(normalized, quote.currency, by)
   }
 
   function keepPending(asker, symbol) {
     var next = Asks.pendingWith(root.pendingFundamentals, asker, symbol)
     if (next !== root.pendingFundamentals) root.pendingFundamentals = next
+  }
+
+  // An asker no screen shows takes back its cap and P/E, waiting on a quote
+  // or behind another fetch.
+  function withdrawFundamentals(asker) {
+    root.keepPending(asker, "")
+    fundamentalsFeed.withdraw(asker)
   }
 
   // Each ask that waited on its quote, now that quotes have changed.
