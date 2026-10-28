@@ -2490,7 +2490,7 @@ Harness {
         stub.quotes = Object.assign({}, quotesBeforeNotes, { CKX: Quote.parseChart(JSON.parse(ckxFile.text())),
           CVR: Quote.parseChart(JSON.parse(cvrFile.text())), "^GSPC": Quote.parseChart(JSON.parse(preOpenIndexFile.text())),
           "^N225": Quote.parseChart(opening) })
-        var noteCases = [["CKX", 1792206540, "Traded only at 14:10"], ["CVR", 1792206540, "No trades charted"],
+        var noteCases = [["CKX", 1792206540, "Traded only at 14:10"], ["CVR", 1792206540, "No trades today"],
           ["AAPL", 1792206540, ""], ["SPY", 1792206540, ""], ["SHIB-USD", 1792206540, ""], ["SHEL.L", 1792206540, ""],
           ["7203.T", 1792206540, ""], ["^GSPC", 1790596800, ""], ["^N225", bell + 25, ""]]
         var noteFaults = []

@@ -177,14 +177,16 @@ test("a young listing's ranges start at its first trade and keep its thin trades
 
 test("a day with no bar says nothing against the trade its quote holds", () => {
   // WREN at 09:37 on Friday 23 October: Yahoo's quote is its 09:30 trade,
-  // 20.62 on 366 shares, and its day has no bar: no "No trades charted"
+  // 20.62 on 366 shares, and its day has no bar: no "No trades today"
   // under "1D 20.62 20.62 VOL 366".
   const wren = M.parseChart(fixture("moments/bell-2026-10-23-0937/wren.json"), cents)
   expect([wren.points.length, wren.price, wren.volume]).toEqual([0, 20.62, 366])
   expect(M.dayNote(wren, M.epochAt(US, "2026-10-23", "09:37"), calendars)).toBe("")
-  // CVR untraded on Friday 16 October, its quote Wednesday's, still says so.
+  // CVR untraded on Friday 16 October, its quote Wednesday's, still says
+  // so, and names the day once the chart shows an earlier one.
   const cvr = M.parseChart(fixture("moments/power-user-2026-10-16/cvr.json"), cents)
-  expect(M.dayNote(cvr, M.epochAt(US, "2026-10-16", "14:09"), calendars)).toBe("No trades charted")
+  expect(M.dayNote(cvr, M.epochAt(US, "2026-10-16", "14:09"), calendars)).toBe("No trades today")
+  expect(M.dayNote(cvr, M.epochAt(US, "2026-10-17", "12:00"), calendars)).toBe("No trades on Fri")
 })
 
 test("the headline uses the regular quote or labels the last chart trade with its time", () => {
@@ -198,10 +200,10 @@ test("the headline uses the regular quote or labels the last chart trade with it
   const untimed = M.freshness({ status: "ok" }, noTime, quote.marketTime, 0)
   expect(untimed.asOf).toBeNull()
   expect(untimed.live).toBe(false)
-  expect(M.freshnessText(untimed, noTime, calendars)).toBe("TIME NOT SENT")
-  expect(M.freshnessText({ ...untimed, state: "saved" }, noTime, calendars)).toBe("SAVED · TIME NOT SENT")
-  expect(M.freshnessText({ ...untimed, state: "failed" }, noTime, calendars)).toBe("REFRESH FAILED · TIME NOT SENT")
-  expect(M.freshnessText({ ...untimed, state: "overdue" }, noTime, calendars)).toBe("NOT UPDATING · TIME NOT SENT")
+  expect(M.freshnessText(untimed, noTime, calendars)).toBe("TIME UNKNOWN")
+  expect(M.freshnessText({ ...untimed, state: "saved" }, noTime, calendars)).toBe("TIME UNKNOWN")
+  expect(M.freshnessText({ ...untimed, state: "failed" }, noTime, calendars)).toBe("REFRESH FAILED · TIME UNKNOWN")
+  expect(M.freshnessText({ ...untimed, state: "overdue" }, noTime, calendars)).toBe("NOT UPDATING · TIME UNKNOWN")
   const nothing = { ...quote, price: null, points: [] }
   expect(M.headlineQuote(nothing)).toBeNull()
   expect(M.regularClose(nothing)).toBeNull()
@@ -497,7 +499,7 @@ test("after the close the header names the day and the next open from the calend
     [M.epochAt(US, "2026-11-26", "12:00"), calendars, "Thanksgiving Day · opens Fri 09:30"],
     [M.epochAt(US, "2027-06-18", "12:00"), calendars, "Juneteenth · opens Mon 09:30"],
     // Past validThrough the schedule is unknown, and the header says so.
-    [saturday, short, "Weekend · schedule unavailable"]
+    [saturday, short, "Weekend · market hours unknown"]
   ]
   for (const [now, cals, expected] of rows) expect([now, M.marketStatus(sep4, now, 0, cals)]).toEqual([now, expected])
 })

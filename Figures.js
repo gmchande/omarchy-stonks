@@ -105,7 +105,7 @@ function freshnessText(fresh, quote, calendars) {
   var head = quote ? Quote.headlineQuote(quote) : null
   if (!fresh.asOf) {
     if (head) return (fresh.state === "failed" ? "REFRESH FAILED · "
-      : fresh.state === "overdue" ? "NOT UPDATING · " : fresh.state === "saved" ? "SAVED · " : "") + "TIME NOT SENT"
+      : fresh.state === "overdue" ? "NOT UPDATING · " : "") + "TIME UNKNOWN"
     return fresh.state === "failed" ? "NO DATA FOR THIS SYMBOL" : fresh.state === "unavailable" || fresh.state === "overdue" ? "NO DATA" : ""
   }
   var chartTrade = head && head.source === "chart"
@@ -184,8 +184,9 @@ function extendedStack(quote, latest, now, day, changeMode) {
 }
 
 // What a day's chart says in words where it has almost nothing to draw:
-// no bar at all ("No trades charted": CVR on Friday 16 October, its last
-// trade Wednesday's), or one ("Traded only at 14:10": CKX's one bar, its
+// no bar at all ("No trades today": CVR on Friday 16 October, its last
+// trade Wednesday's; "No trades on Fri" once the chart shows an earlier
+// day), or one ("Traded only at 14:10": CKX's one bar, its
 // time where the listing trades, the zone named where the reader's
 // differs). A bar is five minutes of trades, so the words speak of the
 // chart, not of each trade. "" otherwise, and for an empty day before its
@@ -204,10 +205,12 @@ function dayNote(day, now, calendars) {
   if (pts.length === 1) return pts[0].t % bar === 0 && now >= pts[0].t + bar ? "Traded only at " + Market.printClock(day, pts[0].t, calendars) : ""
   if (pts.length > 1) return ""
   var regular = day.session.regular
-  if (!regular) return "No trades charted"
+  if (!regular) return "No trades today"
   var head = Quote.headlineQuote(day)
   var tradedToday = !!head && head.t !== null && head.t >= regular.start
-  return now < regular.start || tradedToday ? "" : "No trades charted"
+  if (now < regular.start || tradedToday) return ""
+  return exchangeDay(day, regular.start) === exchangeDay(day, now) ? "No trades today"
+    : "No trades on " + Format.WEEKDAYS[Format.localClock(regular.start, day.gmtoffset).weekday]
 }
 
 // The day a moment falls on in the quote's exchange, as a day count: two

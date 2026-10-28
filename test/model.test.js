@@ -859,17 +859,17 @@ test("the key sheet lists exactly the README's keys for each surface, the row's 
   expect(start).toBeGreaterThan(0)
   const table = []
   for (let i = start + 2; lines[i] && lines[i][0] === "|"; i++) table.push(lines[i].split("|").map(c => c.trim()))
-  // A row ending "(popup)" or "(window)" is that surface's alone.
+  // A row ending "(panel only)" or "(window only)" is that surface's alone.
   const readme = surface => sortedKeys(table.filter(c => {
-    const only = /\((popup|window)\)$/.exec(c[2])
+    const only = /\((panel|window) only\)$/.exec(c[2])
     return !only || only[1] === surface
   }).map(c => c[1]))
   const drawn = (order, switchesPanels) =>
     sortedKeys(M.sheet(order, switchesPanels).groups.flatMap(g => g.rows.map(r => r.key)))
   const moves = ["Shift+↑", "Shift+↓"]
-  expect(drawn("manual", true)).toEqual(readme("popup"))
+  expect(drawn("manual", true)).toEqual(readme("panel"))
   expect(drawn("manual", false)).toEqual(readme("window"))
-  expect(drawn("pct", true)).toEqual(readme("popup").filter(k => !moves.includes(k)))
+  expect(drawn("pct", true)).toEqual(readme("panel").filter(k => !moves.includes(k)))
   expect(drawn("symbol", false)).toEqual(readme("window").filter(k => !moves.includes(k)))
 })
 
@@ -1570,7 +1570,7 @@ test("a quote's time no Date holds is none: its price and chart stay, and its ti
   }
   expect(none.price).toBe(10)
   expect(none.points.length).toBe(3)
-  expect(said(none)[0]).toBe("TIME NOT SENT")
+  expect(said(none)[0]).toBe("TIME UNKNOWN")
 })
 
 // The reader acts on when Stonks tries again, so each time said, in every

@@ -146,7 +146,7 @@ Item {
   // open clears it.
   property string hint: ""
   function showFirstRunHint() {
-    hint = "Drag the pill to move it along the bar\nMiddle-click changes its form · right-click opens the window"
+    hint = "Drag the pill to move it along the bar\nMiddle-click changes how the pill looks · right-click opens the window"
   }
   // The most height the screen leaves the body, whatever the card fits; 0
   // where the body's height is its own (the window).

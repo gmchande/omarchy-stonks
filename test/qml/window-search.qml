@@ -707,8 +707,8 @@ Harness {
         retryShown(), body.adding, harness.same(service.library, library)].join(",")
       body.resetInteraction()
       harness.check("a failed lookup offers RETRY; Enter and a click on it ask the same query again, once, through Yahoo's gate, held by a refusal and not by a pause for no answer, and adding nothing",
-        offered === "Search didn’t answer,true"
-          && byEnter === "Search didn’t answer / - / Searching for “SH”… / Search didn’t answer,1,true"
+        offered === "Couldn’t search · check your connection,true"
+          && byEnter === "Couldn’t search · check your connection / - / Searching for “SH”… / Couldn’t search · check your connection,1,true"
           && joined === "true,1,failed" && paused === "0,0,failed,true" && byClick === "SH,true,1,false,true,true",
         [offered, byEnter, joined, paused, byClick].join(" ; "))
     }
@@ -816,7 +816,7 @@ Harness {
         whileOut === "true,true,true" && freshAgain && cleared === "true,true,false", whileOut + "|" + freshAgain + "|" + cleared)
       harness.check("an empty answer and a failed lookup each say so in place, differently",
         noMatches === "true,true,No matches for “ZZZ”"
-          && failed === "true,Search didn’t answer",
+          && failed === "true,Couldn’t search · check your connection",
         noMatches + " / " + failed)
       harness.check("an answer of kinds Stonks leaves out names them where \"No matches\" would be, and under the results it shows, the arrows stopping at the last result",
         fundAlone === "0,false,true,Stonks doesn’t show mutual funds"

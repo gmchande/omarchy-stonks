@@ -26,7 +26,7 @@ function sheet(order, switchesPanels) {
     groups: [
       { title: "Rows", rows: rows },
       { title: "Chart", rows: [
-        { key: "← →", does: "Scrub one step" },
+        { key: "← →", does: "Move along the chart" },
         { key: "[ ]", does: "Change the range" },
         { key: "p", does: "Replay the chart" },
         { key: "Ctrl+C", does: "Take a screenshot" }
@@ -39,7 +39,7 @@ function sheet(order, switchesPanels) {
       { title: "Look", rows: [
         // The change mode is the day's: on a range the hero shows the period,
         // so c changes the rows and, on the day, the hero.
-        { key: "c", does: "Cycle the day's change" },
+        { key: "c", does: "Show the change in %, price or since the open" },
         { key: "s", does: "Smooth or retro" },
         { key: "m", does: "Sound on or off" },
         { key: "r", does: "Refresh" },
@@ -53,7 +53,7 @@ function sheet(order, switchesPanels) {
       // Each fits one line of the popup at the shell's usual text size, so
       // the pill's and the row's take two.
       { key: "pill", does: "Scroll steps through your stocks · drag moves it" },
-      { key: "", does: "Middle-click changes form · right-click opens the window" },
+      { key: "", does: "Middle-click changes how the pill looks · right-click opens the window" },
       { key: "row", does: "Click shows its chart · right-click offers to remove it" },
       { key: "", does: manual ? "Ctrl-click opens its lists · drag moves it" : "Ctrl-click opens its lists" },
       // The sort word beside the list's name: in manual order the arrow and

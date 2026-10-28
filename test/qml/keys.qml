@@ -43,8 +43,9 @@ Harness {
       .map(function(t) { return /^[A-Z]$/.test(t) ? "Shift+" + t : t })
   }
 
-  // The keys the README's table lists for `surface`: a row ending "(popup)"
-  // or "(window)" is that surface's alone. Null with no table.
+  // The keys the README's table lists for `surface`: a row ending "(panel
+  // only)" or "(window only)" is that surface's alone (the panel's surface
+  // is named "popup" here). Null with no table.
   function readmeKeys(surface) {
     var lines = readFile(readmePath).split("\n")
     var start = lines.indexOf("| Key | Does |")
@@ -52,8 +53,8 @@ Harness {
     var keys = []
     for (var i = start + 2; i < lines.length && lines[i].charAt(0) === "|"; i++) {
       var cells = lines[i].split("|")
-      var only = /\((popup|window)\)$/.exec(cells[2].trim())
-      if (!only || only[1] === surface) keys = keys.concat(tokens(cells[1].trim()))
+      var only = /\((panel|window) only\)$/.exec(cells[2].trim())
+      if (!only || (only[1] === "panel" ? "popup" : only[1]) === surface) keys = keys.concat(tokens(cells[1].trim()))
     }
     return keys
   }

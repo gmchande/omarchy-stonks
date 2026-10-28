@@ -3,7 +3,7 @@
 Stonks puts your stock watchlist in the Omarchy 4 bar. A small pill shows
 how one stock is doing today. Click it for the chart and your lists.
 
-<img src="preview.png" alt="Stonks in the Omarchy bar. The pill shows Nebius (NBIS) up 2.88%. Below it, the popup shows Nebius Group at 163.31 over the day's chart in pixel columns. Beside it: 'Stocks in your Omarchy bar. Free · No account · No API key'">
+<img src="preview.png" alt="Stonks in the Omarchy bar. The pill shows Nebius (NBIS) up 2.88%. Below it, the panel shows Nebius Group at 163.31 over the day's chart in pixel columns. Beside it: 'Stocks in your Omarchy bar. Free · No account · No API key'">
 
 - Stocks, ETFs, indexes, and crypto from New York to London and Tokyo,
   with charts from one day to all time.
@@ -54,12 +54,12 @@ a bear on a down one. Middle-click it to switch. It keeps your choice after
 a restart. On a bar at the side of the screen, middle-click switches
 between the icon and the symbol over its change.
 
-Scroll over the pill to step through your list. Click it for the popup,
+Scroll over the pill to step through your list. Click it for the panel,
 right-click it for the window, and drag it to move it along the bar.
 
 ## Reading the day
 
-<img src="media/scrub.png" width="480" alt="The popup scrubbed back an hour and a half, to 10:15 in the morning. The price, the change, and the rows show that moment">
+<img src="media/scrub.png" width="480" alt="The panel scrubbed back an hour and a half, to 10:15 in the morning. The price, the change, and the rows show that moment">
 
 Run the pointer along the chart to go back through the day. The price, the
 change, and the rows follow it. Click the icon at the top left to replay
@@ -120,18 +120,18 @@ in different currencies can't be compared.
 
 ## The window
 
-<img src="media/window.png" width="720" alt="Stonks' window: the popup's chart and rows, at the window's width">
+<img src="media/window.png" width="720" alt="Stonks' window: the panel's chart and rows, at the window's width">
 
-Stonks also opens as a tiled window, with the popup's chart and rows at
+Stonks also opens as a tiled window, with the panel's chart and rows at
 the window's width. Right-click the pill, or run
 `omarchy-shell grvc.stonks toggleWindow`. To float it, add a window rule
 that matches class `org.quickshell` and title `Stonks`.
 
-To open the popup and the window from the keyboard, add these lines to
+To open the panel and the window from the keyboard, add these lines to
 `~/.config/hypr/bindings.lua`. Omarchy doesn't use either key by default:
 
 ```lua
-o.bind("SUPER + ALT + T", "Stonks popup", "omarchy-shell shell toggle grvc.stonks")
+o.bind("SUPER + ALT + T", "Stonks panel", "omarchy-shell shell toggle grvc.stonks")
 o.bind("SUPER + SHIFT + T", "Stonks window", "omarchy-shell grvc.stonks toggleWindow")
 ```
 
@@ -150,13 +150,13 @@ cp ~/.config/omarchy/plugins/grvc.stonks/share/grvc.stonks.svg ~/.local/share/ic
 
 ## Smooth or retro
 
-<img src="media/retro.png" width="480" alt="The popup in retro: block digits and a chart of pixel columns">
+<img src="media/retro.png" width="480" alt="The panel in retro: block digits and a chart of pixel columns">
 
 Retro draws the price in block digits and the chart in pixel columns, the
 way Omarchy draws its logo. Smooth uses plain digits and a line chart. To
 switch, press `s`, or click the small chart icon at the top right.
 
-<img src="media/light.png" width="480" alt="The popup on Catppuccin Latte, a light theme, in Stonks' own green and red, made for a light background">
+<img src="media/light.png" width="480" alt="The panel on Catppuccin Latte, a light theme, in Stonks' own green and red, made for a light background">
 
 Both use your theme's green for up and its red for down, on light themes
 too. Where a theme's pair is missing, too alike, or too faint, Stonks uses
@@ -192,7 +192,7 @@ screenshot editor.
 | `↑` `↓` | Move the selection |
 | `⏎` | Show the selected row's chart |
 | `Ctrl+⏎` | Choose the selected row's lists |
-| `←` `→` | Scrub the chart one step |
+| `←` `→` | Move along the chart |
 | `[` `]` | Change the range |
 | `p` | Replay the chart |
 | `Ctrl+C` | Take a screenshot |
@@ -203,12 +203,12 @@ screenshot editor.
 | `o` | Change the order |
 | `Shift+O` | Reverse the order |
 | `w` | Open the list menu |
-| `c` | Show the day's change as a percent or an amount, or since the open |
+| `c` | Show the change in %, price or since the open |
 | `s` | Switch between smooth and retro |
 | `m` | Turn sounds on or off |
 | `r` | Refresh |
 | `Shift+U` | Update Stonks when a new version is out, and restart the shell to run it |
-| Tab or `Shift+Tab` | Next or previous panel on the bar (popup) |
+| Tab or `Shift+Tab` | Switch to the bar's next or previous panel (panel only) |
 | `?` | Show every key |
 | `Esc` | Close |
 
@@ -253,11 +253,11 @@ again.
   The change is from the previous close, unless you've switched it to
   since the open. On a longer range, it's from the range's start. Stonks
   leaves out prices of zero or less, and stray points in Yahoo's charts.
-- **"No trades charted" or "Traded only at" a time.** The listing traded
-  too little that day to draw a line.
-- **"1W unavailable" or "Search didn't answer", with RETRY.** Yahoo didn't
-  send that chart or those results. Click RETRY.
-- **"schedule unavailable".** Stonks' calendar for this exchange has run
+- **"No trades today", "No trades on" a day, or "Traded only at" a time.**
+  The listing traded too little that day to draw a line.
+- **"1W unavailable" or "Couldn't search · check your connection", with
+  RETRY.** Yahoo didn't send that chart or those results. Click RETRY.
+- **"market hours unknown".** Stonks' calendar for this exchange has run
   out, so it can't say when the market next opens. Prices and
   times are still right. [Update Stonks](#update) for a new calendar.
 - **"Couldn't load your lists" in the footer.** Your lists file,
@@ -310,14 +310,14 @@ personal use, so either may change or stop without notice.
 - `query1.finance.yahoo.com` for prices, charts, the market cap and P/E,
   and the currency rate a P/E needs. Stonks keeps prices fresh for the
   pill's stock, for every stock, ETF, and index in All during its regular
-  session, and for every row while the popup or the window is open. Each
+  session, and for every row while the panel or the window is open. Each
   comes every minute while its market trades, every 5 minutes before and
   after the session (every minute for the stock on show), and every 15
   minutes while the market is closed.
 - `query2.finance.yahoo.com` for search, as you type.
 - `api.robinhood.com` for overnight prices: once a day for which stocks
   trade overnight, once for the pill's stock as the shell starts, and
-  every 5 minutes through the night while the popup or the window is
+  every 5 minutes through the night while the panel or the window is
   open.
 - `raw.githubusercontent.com` for the newest version number, as the shell
   starts and once a day. To turn this off, add `"updateCheck": false` to
