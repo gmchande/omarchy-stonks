@@ -164,7 +164,10 @@ Harness {
       screenStandIn.lastIpcObject = { dpmsStatus: screenStandIn.on }
       screenStandIn.unanswered -= asks
     }
-    onHoldingChanged: if (!holding && unanswered > 0) Qt.callLater(function() { screenStandIn.answer(screenStandIn.unanswered) })
+    onHoldingChanged: {
+      var held = unanswered
+      if (!holding && held > 0) Qt.callLater(function() { screenStandIn.answer(held) })
+    }
   }
   // A second screen, always on, showing the other workspace.
   QtObject {
