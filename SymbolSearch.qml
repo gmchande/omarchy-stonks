@@ -553,7 +553,7 @@ FocusScope {
     verticalAlignment: Text.AlignVCenter
     textFormat: Text.PlainText
     text: root.answer === "none" ? "No matches for “" + root.resultsQuery + "”"
-      : root.answer === "failed" ? "Couldn’t search · check your connection"
+      : root.answer === "failed" ? "Couldn’t search · " + (root.gate && root.gate.pause === "refused" ? "server busy" : "check your connection")
       : "Searching for “" + root.searchText.trim() + "”…"
     color: root.dim
     font.family: root.fontFamily

@@ -696,7 +696,7 @@ Harness {
       // Time for a request the gate should have held.
       wait(600)
       var paused = [harness.calls("SEARCH.asked") - askedBefore, harness.calls("SEARCH.answered") - answeredBefore,
-        body.search.answer, retryShown()].join(",")
+        body.search.answer, retryShown(), message.text].join(",")
       // RETRY, Yahoo's search back while the gate still pauses for no
       // answer: the lookup goes at once, its answer lands, nothing added.
       gate.begin("none", 60)
@@ -706,10 +706,10 @@ Harness {
       var byClick = [body.search.resultsQuery, body.search.results.length > 0, harness.calls("SEARCH.answered") - answeredBefore,
         retryShown(), body.adding, harness.same(service.library, library)].join(",")
       body.resetInteraction()
-      harness.check("a failed lookup offers RETRY; Enter and a click on it ask the same query again, once, through Yahoo's gate, held by a refusal and not by a pause for no answer, and adding nothing",
+      harness.check("a failed lookup offers RETRY; Enter and a click on it ask the same query again, once, through Yahoo's gate, held by a refusal, which the line names as the server being busy, and not by a pause for no answer, and adding nothing",
         offered === "Couldn’t search · check your connection,true"
           && byEnter === "Couldn’t search · check your connection / - / Searching for “SH”… / Couldn’t search · check your connection,1,true"
-          && joined === "true,1,failed" && paused === "0,0,failed,true" && byClick === "SH,true,1,false,true,true",
+          && joined === "true,1,failed" && paused === "0,0,failed,true,Couldn’t search · server busy" && byClick === "SH,true,1,false,true,true",
         [offered, byEnter, joined, paused, byClick].join(" ; "))
     }
 
