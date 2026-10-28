@@ -325,7 +325,8 @@ personal use, so either may change or stop without notice.
   `~/.config/omarchy/grvc.stonks.json`.
 
 Stonks asks for nothing while every screen is off. When a site turns it
-away, it waits as long as the site asks, up to half an hour.
+away, it waits before asking again: as long as the site asks, or longer
+each time, up to about half an hour.
 
 **Files:**
 
