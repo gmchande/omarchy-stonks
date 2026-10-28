@@ -315,6 +315,36 @@ Harness {
       wait(300)
     }
 
+    // A preview gone before its turn takes back its ask for its cap and
+    // P/E: SHOP.TO's waits behind the stock's own, held as on a slow
+    // network, and search closes with the window still open on the stock.
+    function previewLeavesItsFigures(body, keys) {
+      var funds = service.testFundamentalsFeed
+      var entries = Object.assign({}, funds.entries)
+      delete entries[service.featuredSymbol]
+      delete entries["SHOP.TO"]
+      funds.entries = entries
+      hold("FUNDAMENTALS.hold", true)
+      var before = harness.calls("SHOP.TO.fundamentals")
+      app.requestFundamentals()
+      var stockOut = within(3000, function() { return !!funds.job && funds.job.symbol === service.featuredSymbol })
+      searchShop(body, keys)
+      keyClick(Qt.Key_Down)
+      var waiting = within(6000, function() {
+        return service.previewSymbol === "SHOP.TO" && funds.waiting.some(function(w) { return w.symbol === "SHOP.TO" })
+      })
+      keyClick(Qt.Key_Escape)
+      body.resetInteraction()
+      var gone = within(2000, function() { return !service.previewShown })
+      hold("FUNDAMENTALS.hold", false)
+      // Idle only once whatever waited has been fetched too.
+      var settled = within(5000, function() { return !funds.busy })
+      var asked = harness.calls("SHOP.TO.fundamentals") - before
+      harness.check("a preview's cap and P/E still waiting behind the stock's when search closes are not asked for",
+        stockOut && waiting && gone && settled && asked === 0,
+        [stockOut, waiting, gone, settled, "SHOP.TO's asked " + asked].join(" | "))
+    }
+
     // An add from search on a range, before the result's first answer,
     // takes over the history fetch its preview has out instead of asking
     // again: SHOP.TO's day and year held back, Enter on it, the add the
@@ -870,6 +900,7 @@ Harness {
       addTakesOverHistory(body, keys)
       previewKeepsHeroFigures(body, keys)
       previewKeepsItsFigures(body, keys)
+      previewLeavesItsFigures(body, keys)
       earlyEnter(body, keys, held.kept)
       app.close()
       harness.finish()
