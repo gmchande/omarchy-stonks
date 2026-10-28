@@ -147,8 +147,8 @@ Harness {
   // A screen as Hyprland reports it, for the window host (fetch.sh): on or
   // off, as it says when asked again, a turn later, as Hyprland's answer
   // comes, showing this workspace. It counts the asks it has not answered
-  // yet (`screensHeard`). While `holding`, it answers none, and once let
-  // go, all of them at once.
+  // yet (`screensHeard`). While `holding`, it answers none asked meanwhile,
+  // and once let go, those all at once.
   QtObject {
     id: screenStandIn
     property bool on: true
@@ -156,17 +156,21 @@ Harness {
     property var activeWorkspace: workspaceHere
     property int unanswered: 0
     property bool holding: false
+    property int held: 0
     function refresh() {
       unanswered++
-      if (!holding) Qt.callLater(function() { screenStandIn.answer(1) })
+      if (holding) held++
+      else Qt.callLater(function() { screenStandIn.answer(1) })
     }
     function answer(asks) {
       screenStandIn.lastIpcObject = { dpmsStatus: screenStandIn.on }
       screenStandIn.unanswered -= asks
     }
     onHoldingChanged: {
-      var held = unanswered
-      if (!holding && held > 0) Qt.callLater(function() { screenStandIn.answer(held) })
+      var asks = held
+      if (holding || asks === 0) return
+      held = 0
+      Qt.callLater(function() { screenStandIn.answer(asks) })
     }
   }
   // A second screen, always on, showing the other workspace.
