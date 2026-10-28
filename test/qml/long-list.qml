@@ -338,13 +338,13 @@ Harness {
           saidOnce = body.headerText + " | " + rowsWarning.length + " rows in sight warn"
         }
       })
-      var refusedWords = /^The site Stonks gets prices from asked it to wait · Trying again at \d\d:\d\d \| 0 rows in sight warn$/
+      var refusedWords = /^The price server is busy\. Retrying at \d\d:\d\d\. \| 0 rows in sight warn$/
       harness.check("Yahoo refusing: nothing warns for 85 s, then the pill and every symbol's update is overdue within 90 s of falling due, and the header says it once instead of every row, with why and when Stonks tries again",
         refusedAt > 0 && firstWarnAt >= 85 && allWarnAt > 0 && allWarnAt <= 155 && refusedWords.test(saidOnce),
         "refused at " + (refusedAt - start) + " s; first warning " + firstWarnAt + " s after, all " + allWarnAt + " s after; " + overdue() + " overdue now; " + saidOnce)
       // The time the header names is when Stonks asks Yahoo again: the
       // refusal that answers it begins the next pause in that minute.
-      var named = (/Trying again at (\d\d:\d\d)$/.exec(app.testBody.headerText) || [])[1]
+      var named = (/Retrying at (\d\d:\d\d)\.$/.exec(app.testBody.headerText) || [])[1]
       var pausedUntil = gate.pausedUntil
       for (var waited = 0; waited < 31 * 60 && gate.pausedUntil === pausedUntil; waited++) tick(1, 1)
       var askedAt = Format.hhmm(gate.now(), Format.readerOffset(gate.now()))

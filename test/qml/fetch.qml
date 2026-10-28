@@ -370,7 +370,7 @@ Harness {
       var lateNotes = [pill.warns, nestRow.detail, body.watchlist.rowItem("SHOP.TO").detail, body.headerText].join(" | ")
       // Every listing unanswered is Yahoo's trouble, said once in the
       // header, not by every row, with why and when Stonks tries again.
-      var noAnswer = "No answer, check your connection · Trying again within a minute"
+      var noAnswer = "Can't connect. Check your internet. Retrying in 1 minute."
       harness.check("90 s asked and unanswered for every listing: the pill warns, the window's header says once why prices stopped and when Stonks tries again, a saved row says when its price is from, and a row with nothing saved says nothing",
         new RegExp("^true \\| As of Tue \\d\\d:\\d\\d \\|  \\| " + noAnswer + "$").test(lateNotes), lateNotes)
       // A chart asked for meanwhile, SHOP.TO's, with nothing saved: the
@@ -387,7 +387,7 @@ Harness {
       harness.check("with no prices coming, a chart asked for says nothing of loading under the header that says so",
         coming === "true | false | " + noAnswer, coming)
       harness.check("a pill with no price, its symbol unanswered for 90 s, says it can't get prices, and its hover why and when it tries again",
-        pillUnanswered === "! Can't get prices | NO DATA\nNo answer, check your connection\nTrying again within a minute", pillUnanswered)
+        pillUnanswered === "! Can't get prices | NO DATA\nCan't connect. Check your internet.\nRetrying in 1 minute.", pillUnanswered)
       tick(9, 1, noteTries)
       // The run is two requests, the pill's chart and one spark of the
       // rest; then each pause doubles from 2 s, to a minute at most, a fifth
@@ -518,7 +518,7 @@ Harness {
       tick(78, 1, function() {
         var sent = harness.yahoo(harness.requests().slice(refusedFrom)).length
         if (sent > lone.length) lone.push(service.now - askedAt)
-        if (!warnedAt && pill.warns && /^! Refresh late/.test(body.watchlist.rowItem("KILN").detail)) warnedAt = service.now - askedAt
+        if (!warnedAt && pill.warns && /^! Not updating/.test(body.watchlist.rowItem("KILN").detail)) warnedAt = service.now - askedAt
       })
       harness.check("refused: nothing goes for the pause, then one request alone, between 48 and 72 s",
         askedAt > 0 && lone.length === 1 && lone[0] >= 48 && lone[0] <= 73, "refused at " + askedAt + ", alone at " + lone.join(","))

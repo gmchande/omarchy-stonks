@@ -1579,15 +1579,15 @@ test("a quote's time no Date holds is none: its price and chart stay, and its ti
 test("a paused host says why prices stopped and when Stonks tries again, on the reader's clock, in every form; an open one says nothing", () => {
   const at = Date.UTC(2026, 9, 27, 20, 0) / 1000
   expect(M.hostPause("", at + 30, at)).toBe(null)
-  expect(M.hostPause("none", at + 60, at)).toEqual({ why: "No answer, check your connection", when: "Trying again within a minute",
-    forms: ["No answer, check your connection · Trying again within a minute", "No answer · Next try in 1m", "No answer · Next try 1m"] })
-  expect(M.hostPause("none", at + 72, at).forms).toEqual(["No answer, check your connection · Trying again within 2 minutes",
-    "No answer · Next try in 2m", "No answer · Next try 2m"])
-  expect(M.hostPause("none", at, at).forms[2]).toBe("No answer · Next try 1m")
-  expect(M.hostPause("refused", at + 12 * 60 + 40, at)).toEqual({ why: "The site Stonks gets prices from asked it to wait", when: "Trying again at 16:12",
-    forms: ["The site Stonks gets prices from asked it to wait · Trying again at 16:12", "Asked to wait · Next try at 16:12", "Refused · Next try 16:12"] })
-  expect(M.hostPause("refused", at, at).forms).toEqual(["The site Stonks gets prices from asked it to wait · Trying again now", "Asked to wait · Next try now",
-    "Refused · Next try now"])
+  expect(M.hostPause("none", at + 60, at)).toEqual({ why: "Can't connect. Check your internet.", when: "Retrying in 1 minute.",
+    forms: ["Can't connect. Check your internet. Retrying in 1 minute.", "Can't connect · Retrying in 1m", "Can't connect · 1m"] })
+  expect(M.hostPause("none", at + 72, at).forms).toEqual(["Can't connect. Check your internet. Retrying in 2 minutes.",
+    "Can't connect · Retrying in 2m", "Can't connect · 2m"])
+  expect(M.hostPause("none", at, at).forms[2]).toBe("Can't connect · 1m")
+  expect(M.hostPause("refused", at + 12 * 60 + 40, at)).toEqual({ why: "The price server is busy.", when: "Retrying at 16:12.",
+    forms: ["The price server is busy. Retrying at 16:12.", "Server busy · Retrying at 16:12", "Server busy · 16:12"] })
+  expect(M.hostPause("refused", at, at).forms).toEqual(["The price server is busy. Retrying now.", "Server busy · Retrying now",
+    "Server busy · Retrying"])
 })
 
 test("a fetched name or code past its length reads as not sent", () => {
