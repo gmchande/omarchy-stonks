@@ -350,7 +350,6 @@ Harness {
         var noted = tries.reduce(function(n, t) { return n + t.sent }, 0)
         if (sent > noted) tries.push({ at: service.now - start, sent: sent - noted })
       }
-      noteTries()
 
       // 05:59, offline, with last session's quotes saved: NEST's Tuesday
       // close and London's Thursday. The pill shows NEST's saved change at
@@ -359,6 +358,9 @@ Harness {
         !!pill.featured && pill.changeText !== "…" && !pill.warns && service.entries.NEST.status === "saved",
         pill.changeText + " | " + JSON.stringify(service.entries.NEST))
       openWindow()
+      // The start's run has landed (`settle`), still in its first second:
+      // counted any earlier, a request of it still out reads as a retry.
+      noteTries()
       var body = app.testBody
       var nestRow = body.watchlist.rowItem("NEST")
       var shelRow = body.watchlist.rowItem("SHEL.L")
