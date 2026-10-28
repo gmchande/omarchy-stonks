@@ -190,15 +190,19 @@ Item {
   readonly property string noticeShort: unsaved ? "Not saved" : settingsUnreadable ? "Lists not loaded" : ""
   // A newer Stonks on main, offered at the footer's right end until on disk
   // (`updateOffer`), then the restart's notice; never in the add's place,
-  // so adding by mouse never waits on it. Shift+U runs what the footer
-  // offers, the restart only while no unsaved change outranks it. With
-  // neither, it says so, as Ctrl+Z does with nothing to undo.
+  // so adding by mouse never waits on it. The update restarts the shell
+  // once it lands, and the notice's click or Shift+U does after an update
+  // run elsewhere, each only while no unsaved change outranks it
+  // (`restartable`): then the notice waits for the save. Shift+U runs what
+  // the footer offers. With neither, it says so, as Ctrl+Z does with
+  // nothing to undo.
   readonly property string updateOffer: releasedTo !== "" && updatedTo === "" ? releasedTo : ""
-  readonly property bool restartOffered: updatedTo !== "" && !unsaved && !settingsUnreadable
+  readonly property bool restartable: !unsaved && !settingsUnreadable
+  readonly property bool restartOffered: updatedTo !== "" && restartable
   function runOffered() {
     if (!updates) return
     if (restartOffered) updates.restart()
-    else if (updateOffer !== "") updates.update()
+    else if (updateOffer !== "") updates.update(restartable)
     else say("Nothing to update")
   }
 
@@ -1581,7 +1585,7 @@ Item {
     onUndoHoveredChanged: root.holdUndo()
     onUndoClicked: root.undoRemoval()
     updateLabel: root.updateOffer !== "" ? "Update to " + root.updateOffer : ""
-    onUpdateClicked: root.updates.update()
+    onUpdateClicked: root.updates.update(root.restartable)
     // The click acts on what the footer shows: the update's notice
     // restarts the shell, and the file's does nothing, nor does a refusal
     // over it; while a save hasn't landed, any click tries again; a refusal
