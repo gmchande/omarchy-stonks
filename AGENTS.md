@@ -1,6 +1,6 @@
 # Stonks
 
-Stonks is a stock watchlist for the Omarchy shell: a pill in the bar, a popup
+Stonks is a stock watchlist for the Omarchy shell: a pill in the bar, a panel
 and a window, in QML. `CONTRIBUTING.md` says how to run, test and send a
 change. This file says what a change is judged by, and why.
 
@@ -53,7 +53,7 @@ for someone who has never seen Stonks and gives it thirty seconds.
 
 - Say what Stonks does for them, in their words, not the code's: "the stock
   you last looked at", not "the featured symbol". One name for each thing:
-  the pill, the popup, the window, a row, a list, All, smooth, retro.
+  the pill, the panel, the window, a row, a list, All, smooth, retro.
 - Plain and specific: present tense, active verbs, a number over an
   adjective, each thing said once.
 - Trouble says what's on screen, then why, then what to do.
@@ -63,7 +63,7 @@ for someone who has never seen Stonks and gives it thirty seconds.
 
 - A test fails only when something a user relies on breaks. It never
   restates the code.
-- Test a rule in its `.js` file with `bun`. Walk the popup or the window only
+- Test a rule in its `.js` file with `bun`. Walk the panel or the window only
   for what passes between pieces, such as a key and its action, or a save and
   the next read.
 - A fix's test fails on the code before the fix, as a case in a test that
