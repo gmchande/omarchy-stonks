@@ -10,7 +10,9 @@
 # for, whichever saved day it carries, so a quote kept under another symbol
 # shows.
 #
-#   AAPL, MSFT, NVDA   answer test/fixtures/aapl.json
+#   AAPL, MSFT, NVDA   answer test/fixtures/aapl.json, up 2.61%, without its
+#                after-hours trades, so the day's move is on top; while
+#                STONKS_FAKE_STATE/after-hours exists, with them
 #   SLID         answers like AAPL; its fundamentals are NEST's, a loss
 #   FAIL         fails every time, like curl -f on an HTTP error
 #   FLAKY        fails twice, then answers like AAPL (retry and recovery)
@@ -20,8 +22,9 @@
 #                like AAPL (a warning that ends when an answer lands)
 #   SLOW         waits a second, then answers like AAPL (its 1W history: NEST's week)
 #   STRAY        answers the saved NEST day with one dropped bucket
-#   DOWN         answers the saved NEST day, which fell 1.56%; its history is
-#                NEST's saved week, which rose, so its day and range disagree
+#   DOWN         answers the saved NEST day, which fell 1.56%, without its
+#                after-hours trades; its history is NEST's saved week, which
+#                rose, so its day and range disagree
 #   FLAT         answers the AAPL day with its previous close at its price
 #   TURN         answers the AAPL day, up; while STONKS_FAKE_STATE/TURN.down
 #                exists, with its previous close above its price, down
@@ -338,7 +341,16 @@ serve() {
     exit
   fi
   stamp() { sed "s/\"symbol\":\"[^\"]*\"/\"symbol\":\"$symbol\"/"; }
-  answer() { stamp < "$fixtures/aapl.json"; }
+  # Leaves out a day's buckets from its close on: no trade after it, so the
+  # day's move is the one on top. An answer with no prints stays as it is.
+  closed() { jq -c '.chart.result[0] |= (if .timestamp then (.meta.currentTradingPeriod.regular.end as $end
+    | [.timestamp[] | . < $end] as $keep
+    | .timestamp |= map(select(. < $end))
+    | .indicators.quote[0] |= map_values(. as $values | [range(0; $keep | length) | select($keep[.]) | $values[.]])) else . end)'; }
+  # AAPL's day, up 2.61%, closed with no trade after it; with
+  # STONKS_FAKE_STATE/after-hours, its after hours too, its newest price on
+  # top.
+  answer() { if [ -e "$state/after-hours" ]; then stamp < "$fixtures/aapl.json"; else stamp < "$fixtures/aapl.json" | closed; fi; }
   history() { stamp < "$fixtures/history/aapl-1y.json"; }
   if [[ "$url" == *"includeAdjustedClose=true"* ]]; then
     count "$STONKS_FAKE_STATE/$symbol.history.calls" > /dev/null
@@ -366,7 +378,8 @@ serve() {
     BLIP) [ "$calls" -eq 2 ] || [ "$calls" -eq 3 ] && exit 22; answer ;;
     LATE) [ -e "$state/LATE.down" ] && exit 22; answer ;;
     SLOW) sleep 1; answer ;;
-    STRAY|DOWN) stamp < "$fixtures/nest-2026-09-11-day-prepost.json" ;;
+    STRAY) stamp < "$fixtures/nest-2026-09-11-day-prepost.json" ;;
+    DOWN) stamp < "$fixtures/nest-2026-09-11-day-prepost.json" | closed ;;
     FLAT) answer | sed 's/"chartPreviousClose":316.85/"chartPreviousClose":325.13/' ;;
     TURN) if [ -e "$state/TURN.down" ]; then answer | sed 's/"chartPreviousClose":316.85/"chartPreviousClose":330.00/'; else answer; fi ;;
     SHOP.TO) cat "$fixtures/shop-to.json" ;;

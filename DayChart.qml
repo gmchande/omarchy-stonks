@@ -7,8 +7,8 @@ import "Tones.js" as Tones
 // it and the baseline in the up colour above and the down colour below, the
 // way the retro columns fall. The day adds its own furniture: the dimmer
 // extended hours, the ticks at the bell and the night's edges, a line that
-// starts again after a break in the exchange's day, a thin night's trades
-// as dots, and the dot on the last regular print.
+// starts again after a break in the exchange's day, and the dot on the last
+// regular print.
 // Three layers, so each paints only when what it draws changes: the
 // baseline, the data's ink under a clip the draw-in widens, and the scrub.
 Item {
@@ -92,8 +92,8 @@ Item {
 
   // How high and low the ink reaches between `x0` and `x1`, in pixels: the
   // prints there and the nearest either side, which the line joins to
-  // them, each with the line's half width, or a lone print's or a night
-  // trade's dot (`strokeRuns`); and the baseline, which runs the whole
+  // them, each with the line's half width, or a lone print's dot
+  // (`strokeRuns`); and the baseline, which runs the whole
   // width. What is laid over the chart keeps clear of it (`RangeMarks`).
   function inkExtentIn(x0, x1) {
     var g = geometry
@@ -108,7 +108,7 @@ Item {
     var pts = g && g.points ? g.points : []
     for (var i = 0; i < pts.length; i++) {
       var lone = (i === 0 || pts[i].brk) && (i === pts.length - 1 || pts[i + 1].brk)
-      var r = pts[i].dot ? 2 * weight : lone ? 3 * weight : weight
+      var r = lone ? 3 * weight : weight
       var before = xAt(pts[Math.max(0, i - 1)].x) - r
       var after = xAt(pts[Math.min(pts.length - 1, i + 1)].x) + r
       if (after >= x0 && before <= x1) reach(pts[i].y, r)
@@ -248,16 +248,15 @@ Item {
 
       // A stretch of one print, a day's only one or one alone beside a
       // break, is a dot three times the line's width, in its session's tone,
-      // so it reads at a glance; a thin night's trade, twice its width, so
-      // trades minutes apart stay apart. It never breathes: that is the live
-      // dot's alone.
+      // so it reads at a glance. It never breathes: that is the live dot's
+      // alone.
       function strokeRuns(ctx, lines, pad, w, h) {
         for (var r = 0; r < lines.length; r++) {
           var line = lines[r]
           if (line.length === 1) {
             ctx.fillStyle = ctx.strokeStyle
             ctx.beginPath()
-            ctx.arc(pad + line[0].x * w, pad + line[0].y * h, ctx.lineWidth * (line[0].dot ? 1 : 1.5), 0, Math.PI * 2)
+            ctx.arc(pad + line[0].x * w, pad + line[0].y * h, ctx.lineWidth * 1.5, 0, Math.PI * 2)
             ctx.fill()
             continue
           }

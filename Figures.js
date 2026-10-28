@@ -242,37 +242,41 @@ function dayTitles() {
 
 // How the list reads on the figures its rows show: up, flat, and down, and
 // the rows with no figure yet. The rows' own price and tone rules, so the
-// rule under the list name never disagrees with them.
-function listBreadth(symbols, quotes, scrubT, mode) {
+// rule under the list name never disagrees with them: at rest, each
+// listing's newest price since its close where it has one (`newest`, by
+// symbol, `Overnight.newestPrint`).
+function listBreadth(symbols, quotes, scrubT, mode, newest) {
   var out = { up: 0, flat: 0, down: 0, none: 0 }
   for (var i = 0; i < symbols.length; i++) {
     var quote = quotes[symbols[i]]
-    var read = quote ? (scrubT ? Quote.readingAt(quote, scrubT) : Quote.headlineQuote(quote)) : null
-    var price = read ? read.price : null
-    var chg = quote ? Quote.change(measuredAt(quote, scrubT), price, mode) : null
+    var read = quote ? reading(quote, scrubT, newest ? newest[symbols[i]] : null) : null
+    var chg = read ? Quote.change(read.base, read.price, mode) : null
     if (!chg || chg.pct === null) out.none++
     else out[Format.changeTone(chg, mode, quote.priceDigits)]++
   }
   return out
 }
 
-// What a moment of a quote's day is measured from (`rowModel`), shaped as
-// `Quote.change` reads it: at rest the headline's (`Quote.headlineBase`),
-// and a scrubbed moment the dashed line's (`scrubbedBase`).
-function measuredAt(quote, scrubT) {
-  return scrubT ? scrubbedBase(quote, scrubT) : Quote.headlineBase(quote)
+// What a quote reads at `scrubT`, { price, t, base }, `base` shaped as
+// `Quote.change` reads it: a scrubbed moment of its day (`Quote.readingAt`)
+// from the close it is measured from (`scrubbedBase`); at rest, its price
+// on top (`Quote.restingRead`), the newest since the close (`newest`) where
+// there is one.
+function reading(quote, scrubT, newest) {
+  if (!scrubT) return Quote.restingRead(quote, newest)
+  var read = Quote.readingAt(quote, scrubT)
+  return { price: read.price, t: read.t, base: scrubbedBase(quote, scrubT) }
 }
 
-// The one projection every price on screen comes from. The headline is
-// the regular-market quote, its change from Yahoo's previous close or the
-// day's open (`Quote.headlineBase`); a
-// non-zero scrubT reads that moment of the day (`Quote.readingAt`), its
-// change from the close the dashed line is at (`Quote.dayBase`): before the
-// open, the last session's close. Every print the chart draws reads from
-// that one close, the night's too, so wherever the pointer is the change
-// and the animal say where that price stands against the dashed line; at
-// rest the line under the price still measures the night from the day's
-// own close (`extendedStack`).
+// The one projection every price on screen comes from. At rest it is the
+// price on top: the regular-market quote, its change from Yahoo's previous
+// close or the day's open (`Quote.headlineBase`), or, once the listing has
+// traded since its regular close, its newest price (`newest`,
+// `Overnight.newestPrint`), its change from that close, its session and
+// time said beside it (`newestCaptions`). A non-zero scrubT reads that
+// moment of the day (`Quote.readingAt`), its change from the close the
+// dashed line is at (`Quote.dayBase`), or, past the session's close, from
+// that close, as the price on top is (`scrubbedBase`).
 // dayUp is always versus that close, so the chart fill does not flip when
 // the change mode does, and it is the direction at the moment shown, as a
 // range's is. dayTone is that change's tone, flat when it rounds to nothing,
@@ -282,18 +286,17 @@ function measuredAt(quote, scrubT) {
 // the quote does, not with the clock or the change mode. Nor does it read
 // the clock, so a row is not derived again every second. Pass the
 // already-snapped scrub time.
-function rowModel(quote, scrubT, mode) {
-  var read = scrubT ? Quote.readingAt(quote, scrubT) : Quote.headlineQuote(quote)
-  var price = read ? read.price : null
-  var measured = measuredAt(quote, scrubT)
-  var chg = Quote.change(measured, price, mode)
-  var direction = Quote.change(measured, price, "pct")
+function rowModel(quote, scrubT, mode, newest) {
+  var since = !scrubT && newest ? newest : null
+  var read = reading(quote, scrubT, since)
+  var chg = Quote.change(read.base, read.price, mode)
+  var direction = Quote.change(read.base, read.price, "pct")
   return {
     symbol: quote.symbol,
     name: quote.name,
-    price: price,
-    priceText: Format.money(price, quote.priceDigits),
-    asOf: read ? read.t : null,
+    price: read.price,
+    priceText: Format.money(read.price, quote.priceDigits),
+    asOf: read.t,
     // Null stays null: an unavailable change must not read as unchanged.
     pct: chg.pct,
     abs: chg.abs,
@@ -301,36 +304,101 @@ function rowModel(quote, scrubT, mode) {
     dayUp: direction.pct === null ? null : direction.up,
     dayTone: Format.changeTone(direction, "pct", quote.priceDigits),
     changeText: Format.changeText(chg, mode, quote.priceDigits),
-    changeLine: Format.changeText(chg, mode, quote.priceDigits) + (mode === "open" && chg.pct !== null ? " open" : ""),
-    periodLabel: quote.rolling && mode !== "open" ? "24H" : Format.changeCaption(mode)
+    changeLine: Format.changeText(chg, mode, quote.priceDigits) + (mode === "open" && chg.pct !== null && !since ? " open" : ""),
+    periodLabel: since ? "" : quote.rolling && mode !== "open" ? "24H" : Format.changeCaption(mode),
+    // The newest price since the close on top, { t, p, phase }, or null.
+    newest: since
   }
 }
 
 // What a scrubbed moment `t` of a quote's day is measured from, shaped as
 // `Quote.change` reads it: the close the day is measured from, and its
-// open. A moment of the coming day a two-day answer holds after it, once
+// open. A print after the session's close is read from that close
+// (`readsClose`), as the price on top is once the listing trades after
+// it. A moment of the coming day a two-day answer holds after it, once
 // that day has a print, is that day's, as the 1D chart draws it
 // (`Quote.tailDay`): from the quote's own close, with no open yet, so a
 // row following a scrub into the pre-market reads what the hero does.
 function scrubbedBase(quote, t) {
   var tail = Quote.tailStart(quote)
-  if (tail !== null && t >= tail && Quote.lastPrintTime(quote) >= tail) return { prevClose: Quote.regularClose(quote), dayOpen: null }
+  if ((tail !== null && t >= tail && Quote.lastPrintTime(quote) >= tail) || readsClose(quote, t))
+    return { prevClose: Quote.regularClose(quote), dayOpen: null }
   return { prevClose: Quote.dayBase(quote), dayOpen: quote.dayOpen }
 }
 
-// What a scrub of the 1D `day` reads its moves from, said beside its dashed
-// line: the line's own close, the one before the day's session
-// (`Quote.dayBase`), which every print of the chart reads from. Within the
-// session, on its own day, that is the previous close. Once the session
-// has closed, the last close is its own: so a scrub past its close
-// (`scrubT`, 0 at rest), and any reading once the day is past (`today`),
-// as overnight or on a weekend, names the session the line's close comes
-// before: "CLOSE BEFORE TUE", or, a week old or more, its date, "CLOSE
-// BEFORE 12 SEP", since "BEFORE SEP" would read as before September.
+// Whether a scrub at `t` reads a print after its day's regular session
+// closed, of a listing with extended hours whose quote is that close: the
+// after hours and the night after them. The close itself, read at the
+// bell (`Quote.readingAt`), is the session's.
+function readsClose(quote, t) {
+  var reg = quote.session.regular
+  var head = Quote.headlineQuote(quote)
+  if (!reg || !quote.session.post || quote.crypto || t < reg.end || !head || head.t === null || head.t < reg.end) return false
+  return !Quote.readingAt(quote, t).close
+}
+
+// What a scrub of the 1D `day` reads its moves from, said where the line
+// under the price was: the dashed line's close, the one before the day's
+// session (`Quote.dayBase`). Within the session, on its own day, that is
+// the previous close. Once the session has closed, the last close is its
+// own: so a scrub past its close (`scrubT`, 0 at rest), and any reading
+// once the day is past (`today`), as overnight or on a weekend, names the
+// session the line's close comes before: "CLOSE BEFORE TUE", or, a week
+// old or more, its date, "CLOSE BEFORE 12 SEP", since "BEFORE SEP" would
+// read as before September. A scrub of a print after the session's close
+// reads from the session's own close (`readsClose`), named as the line
+// under the price names it at rest, "TUE CLOSE 249.87": not the dashed
+// line's, so the panel draws no dashed mark beside it.
 function dayBaselineText(day, today, scrubT) {
   var reg = day.session.regular
+  if (scrubT > 0 && readsClose(day, scrubT))
+    return closeLabel(day, today) + " " + Format.money(Quote.regularClose(day), day.priceDigits)
   var closed = !!reg && (pastDayName(day, reg.start, today) !== "" || (scrubT > 0 && scrubT >= reg.end))
   return (closed ? "CLOSE BEFORE " + sessionName(day, reg.start, today) : "PREV CLOSE") + " " + Format.money(Quote.dayBase(day), day.priceDigits)
+}
+
+// The regular close's name, for the line under the price: "CLOSE" on its
+// own day (`today`), else with its day's name, "FRI CLOSE".
+function closeLabel(quote, today) {
+  var head = Quote.headlineQuote(quote)
+  var day = head && head.t !== null ? pastDayName(quote, head.t, today) : ""
+  return (day ? day + " " : "") + "CLOSE"
+}
+
+// The line under the price while the newest price since the close is on
+// top (`rowModel`'s `newest`): the regular close and its own day's move, in
+// the hero's unit, a percent since the open, as `extendedStack`'s are.
+function closeLine(quote, today, changeMode) {
+  var unit = changeMode === "abs" ? "abs" : "pct"
+  var row = rowModel(quote, 0, unit)
+  return { label: closeLabel(quote, today), time: "", price: row.priceText, changeText: row.changeText, tone: row.tone, stale: false }
+}
+
+// The newest price's session and time (`newest`, { t, phase }), with its
+// day where the listing trades when it isn't `now`'s: "OVERNIGHT 23:25",
+// "AFTER HOURS FRI 19:55". Each form shorter than the one before, for a
+// caption with no room for the one before: then without the day. Upper
+// case for the hero's caption; the rows and the pill's hover say it in
+// sentence case (`newestNote`).
+function newestCaptions(quote, newest, now, calendars) {
+  var label = newest.phase === "overnight" ? "OVERNIGHT" : newest.phase === "post" ? "AFTER HOURS" : "PRE-MARKET"
+  var clock = Market.printClock(quote, newest.t, calendars)
+  var day = Market.printDay(quote, newest.t, now, calendars).toUpperCase()
+  return [label + " " + day + clock, label + " " + clock]
+}
+
+// The newest price's session and time as a row's name line and the pill's
+// hover say it: "Overnight 23:25", "After hours Fri 19:55".
+function newestNote(quote, newest, now, calendars) {
+  var label = newest.phase === "overnight" ? "Overnight" : newest.phase === "post" ? "After hours" : "Pre-market"
+  return label + " " + Market.printDay(quote, newest.t, now, calendars) + Market.printClock(quote, newest.t, calendars)
+}
+
+// Whether the newest price on top is old: a night's print missed by more
+// than one of Robinhood's bars (`Overnight.OVERNIGHT_STALE`), as the line
+// under the price dims it.
+function newestStale(newest, now) {
+  return !!newest && newest.phase === "overnight" && now - newest.t > Overnight.OVERNIGHT_STALE
 }
 
 // The session that starts at `start`, named for the line beside the dashed

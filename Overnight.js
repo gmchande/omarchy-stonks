@@ -18,12 +18,12 @@
 // York date of its newest print, from the first hour it can trade that day
 // to the last, a night staying on the evening's chart until 04:00;
 // Robinhood's prints for the hours outside Yahoo's day, and Yahoo's own. A
-// night that trades thinly (`thinNight`) has its few trades each on its
-// own. Any other has Yahoo's own day, 04:00 to 20:00, or the coming day's
-// once a two-day answer holds a print of it: a thin name trades a few
-// shares overnight now and then, and none of them is a night's price. The
-// overnight print is never the headline, nor in the day's high, low, or
-// change: those stay Yahoo's.
+// night that trades thinly (`thinNight`) is a line through its few trades,
+// each where the clock puts it. Any other has Yahoo's own day, 04:00 to
+// 20:00, or the coming day's once a two-day answer holds a print of it: a
+// thin name trades a few shares overnight now and then, and none of them
+// is a night's price. Since the close, the newest print is the price on
+// top (`newestPrint`); the day's high, low, and open stay Yahoo's.
 
 var ROBINHOOD_URL = "https://api.robinhood.com/marketdata/historicals/"
 var INSTRUMENTS_URL = "https://api.robinhood.com/instruments/"
@@ -276,21 +276,60 @@ function marketAsleep(quote, allDay, t, calendars) {
 
 // Robinhood's prints and Yahoo's own, in time order, each with its session:
 // Yahoo's day and what a two-day answer holds after it, the coming day's
-// pre-market (`Quote.tailStart`); Robinhood's before Yahoo's day and after
-// it, up to where Yahoo's own begin again.
+// pre-market (`Quote.tailStart`); Robinhood's beside them (`beside`).
 function prints(quote, bars) {
-  var from = Quote.dayStart(quote)
-  var to = Quote.dayEnd(quote)
-  var yahooAgain = Quote.tailStart(quote)
   var out = []
-  for (var i = 0; i < bars.length; i++) {
-    if ((bars[i].t < from || bars[i].t >= to) && (yahooAgain === null || bars[i].t < yahooAgain)) out.push(bars[i])
-  }
+  for (var i = 0; i < bars.length; i++) if (beside(quote, bars[i].t)) out.push(bars[i])
   for (var j = 0; j < quote.points.length; j++) {
     var pt = quote.points[j]
     out.push({ t: pt.t, p: pt.p, s: Quote.pointSession(quote, pt) })
   }
   out.sort(function(a, b) { return a.t - b.t })
+  return out
+}
+
+// Whether Robinhood's bar at `t` is drawn beside `quote`'s own prints:
+// before Yahoo's day or after it, up to where Yahoo's own begin again.
+function beside(quote, t) {
+  var yahooAgain = Quote.tailStart(quote)
+  return (t < Quote.dayStart(quote) || t >= Quote.dayEnd(quote)) && (yahooAgain === null || t < yahooAgain)
+}
+
+// The newest print of all, the one `prints` ends on, without laying them
+// all out: Yahoo's last, or Robinhood's last beside it (`bars`, in time
+// order), whichever is newer. Null with neither.
+function latestPrint(quote, bars) {
+  var pts = quote.points
+  var own = pts.length ? { t: pts[pts.length - 1].t, p: pts[pts.length - 1].p, s: Quote.pointSession(quote, pts[pts.length - 1]) } : null
+  for (var i = bars.length - 1; i >= 0; i--) if (beside(quote, bars[i].t)) return !own || bars[i].t > own.t ? bars[i] : own
+  return own
+}
+
+// The newest price a US stock or ETF has traded at since its last regular
+// close, { t, p, phase }: the newest print of all (`latest`, `latestPrint`'s,
+// else the quote's own last) where it is an after-hours, overnight, or
+// pre-market one (`Quote.extendedPrint`). It is the price on top wherever
+// the listing's price shows, its move from that close
+// (`Figures.rowModel`). Null in the regular session, with no trade since
+// the close, and for a listing with no extended hours, an index, a coin,
+// or one abroad.
+function newestPrint(quote, latest, calendars) {
+  return quote && hasOvernight(quote, calendars) ? Quote.extendedPrint(quote, latest) : null
+}
+
+// The newest price since the close of each of `symbols` that has one
+// (`newestPrint`), by symbol: from Yahoo's own prints (`quotes`) and, for
+// one Robinhood trades all day (`allDay`, answers), its night's (`nights`,
+// answers), as its chart takes them (`latestPrint`).
+function newestPrints(symbols, quotes, nights, allDay, calendars) {
+  var out = {}
+  for (var i = 0; i < symbols.length; i++) {
+    var q = quotes[symbols[i]]
+    if (!q || !hasOvernight(q, calendars)) continue
+    var answer = allDay && allDay[symbols[i]] && allDay[symbols[i]].allDay && nights ? nights[symbols[i]] : null
+    var newest = newestPrint(q, latestPrint(q, answer && answer.bars ? answer.bars : []), calendars)
+    if (newest) out[symbols[i]] = newest
+  }
   return out
 }
 
@@ -414,11 +453,12 @@ function windowTicks(cal, win, session, latest) {
 // last print on the right edge at its own time, and nothing is drawn where
 // no trade was. Measured from the last regular close before it
 // (`Quote.dayBase`): the quote's previous close on its own day, else its
-// close, Friday's under Sunday's night. A scrub reads every print from
-// that close (`Figures.rowModel`). Through a night that trades thinly
-// (`thinNight`), a trading day starts at its pre-market, and the night's
-// own trades are each on their own, by the clock (`axis.night`), as are
-// Sunday's.
+// close, Friday's under Sunday's night. A scrub reads a print up to the
+// session's close from that dashed close, and one after it from the
+// session's own close, as the price on top does (`Figures.scrubbedBase`).
+// Through a night that trades thinly (`thinNight`), a trading day starts at
+// its pre-market, and the line runs through the night's few trades by the
+// clock (`axis.night`), as Sunday's does.
 function dayChart(quote, answer, calendars) {
   var cal = Market.calendarFor(calendars, quote)
   if (!cal || !cal.overnight || !quote.session.regular) return { day: quote, latest: null }

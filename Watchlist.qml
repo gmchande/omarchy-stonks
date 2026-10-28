@@ -24,6 +24,9 @@ Flickable {
   // caught up when they run.
   property var view: ({ list: "", listKey: "=", order: "manual", reversed: false, rows: [], shown: [], library: [] })
   property var quotes: ({})
+  // Each row's newest price since its close, by symbol, its price on top
+  // (`Service.newestPrints`).
+  property var newestPrints: ({})
   property var entries: ({})
   property string featuredSymbol: ""
   property int scrubShown: 0
@@ -899,7 +902,10 @@ Flickable {
         // each step and each replay frame derives and repaints every row ever
         // scrolled past. A row coming into sight takes it before that frame.
         readonly property int sightScrub: inSight ? root.scrubShown : 0
-        view: quote ? Figures.rowModel(quote, sightScrub, root.changeMode) : null
+        view: quote ? Figures.rowModel(quote, sightScrub, root.changeMode, root.newestPrints[symbol] || null) : null
+        // The newest price's session and time, said on the name line; the
+        // clock only for a row in sight (`Figures.newestNote`).
+        newestNote: view && view.newest && inSight ? Figures.newestNote(quote, view.newest, root.now, root.calendars) : ""
         status: root.entryOf(symbol) ? root.entryOf(symbol).status : "loading"
         // Freshness reads the clock every second: only rows in sight do.
         freshness: place >= 0 && inSight ? root.freshnessOf(symbol) : null

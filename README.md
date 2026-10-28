@@ -82,8 +82,11 @@ a company reports earnings in another currency, Stonks converts them at
 Yahoo's rate for the day, inside the P/E and nowhere else.
 
 The top line names the moment in the market's day, such as Power hour, and
-says when the market opens or closes, by the exchange's clock. A smaller
-line under the price shows the pre-market, after-hours, or overnight price.
+says when the market opens or closes, by the exchange's clock. A US stock
+that has traded since the close shows that newest price on top, its move
+since the close, and its session and time, such as OVERNIGHT 23:25; the
+line under it shows the close and the day's move. Elsewhere, a smaller line
+under the price shows the pre-market or after-hours price.
 The 1D chart shows one trading day, from the first hour the stock can trade
 that day to the last. Over the weekend it shows Friday until Sunday night's
 trading begins. A night stays on the chart it began on until 04:00, New
@@ -243,8 +246,9 @@ the pill to see which.
   Robinhood reports those trades late.
 - **A price looks wrong.** Check the currency: Stonks never converts.
   PENCE means pence, as Yahoo quotes many London listings, so 3,580.00 is
-  £35.80. The large price is the regular session's, and the smaller line
-  under it shows trades outside it, which some apps show as the main price.
+  £35.80. A US stock's large price is its newest trade, after the close
+  too, with the close on the line under it. Elsewhere the large price is
+  the regular session's, and the smaller line shows trades outside it.
   The change is from the previous close, unless you've switched it to
   since the open. On a longer range, it's from the range's start. Stonks
   leaves out prices of zero or less, and stray points in Yahoo's charts.
@@ -312,8 +316,8 @@ personal use, so either may change or stop without notice.
 - `query2.finance.yahoo.com` for search, as you type.
 - `api.robinhood.com` for overnight prices: once a day for which stocks
   trade overnight, once for the pill's stock as the shell starts, and
-  every 5 minutes through the night while the popup or the window is
-  open.
+  every 5 minutes through the night for the pill's stock and every row in
+  All that trades overnight, whether or not the popup or the window is open.
 - `raw.githubusercontent.com` for the newest version number, as the shell
   starts and once a day. To turn this off, add `"updateCheck": false` to
   `~/.config/omarchy/grvc.stonks.json`.

@@ -61,10 +61,9 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
 // Normalized [0..1] x/y for drawing. x runs along the day's axis
 // (`chartSpan`): the day the response describes, from the pre-market open so
 // the line arrives at the bell from where it actually came, stretching to
-// hold post-market prints; or, for a US listing, its last session and what
-// came after it until the next open (`Overnight.dayChart`,
-// `Overnight.sessionDay`), laid out by print (`printFraction`). `ticks`
-// mark the bell, and the night's edges.
+// hold post-market prints; or, for a US listing, its trading day
+// (`Overnight.dayChart`, `Overnight.sessionDay`), laid out by print
+// (`printFraction`). `ticks` mark the bell, and the night's edges.
 // Prints outside a regular session are flagged `ext`; `brk` starts the line
 // again across a break in the exchange's day (Tokyo's lunch, from its
 // calendar in `calendars`: Yahoo sends 09:00 to 15:30 as one session; the
@@ -73,8 +72,8 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
 // crosses hours the market was shut. A quiet hour of a US night is no
 // break: that day is laid out by print, where a quiet hour takes no room, so
 // a gap there would read as missing prices. A thin night's trades
-// (`axis.night`) are each a `dot`, on its own, joined to nothing: laid out
-// by the clock, the hours between them are there to see. The vertical range
+// (`axis.night`) are laid out by the clock, one line through them, so the
+// hours between them are there to see. The vertical range
 // holds every drawn print and the close the day is measured from
 // (`Quote.dayBase`) where it is known, with headroom, so the baseline is
 // always in view.
@@ -100,21 +99,16 @@ function chartGeometry(quote, calendars) {
   }
   var pad = (hi - lo) * 0.08 || 0.5
   lo -= pad; hi += pad
-  var dots = dayPrints(quote, axis)
   var out = []
   for (var k = 0; k < pts.length; k++) {
     var session = Quote.pointSession(quote, pts[k])
     var prev = k > 0 ? pts[k - 1] : null
-    // A thin night's own trades are dots; the pre-market after it is a line
-    // again, starting after the last of them.
-    var dot = k >= dots && pts[k].t < axis.night.end
     out.push({
       x: printFraction(quote, axis, k),
       y: 1 - (pts[k].p - lo) / (hi - lo),
       ext: session !== "reg",
-      brk: dot || (k > 0 && out[k - 1].dot) || (!!prev && across(breaks, prev.t, pts[k].t)),
-      lunch: !!prev && across(lunches, prev.t, pts[k].t),
-      dot: dot
+      brk: !!prev && across(breaks, prev.t, pts[k].t),
+      lunch: !!prev && across(lunches, prev.t, pts[k].t)
     })
   }
   var ticks = []

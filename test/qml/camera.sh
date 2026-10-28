@@ -12,6 +12,8 @@
 # curl are scratch; the scratch HOME names its Pictures folder in
 # user-dirs.dirs, as a reader's may.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# AAPL's day with its after hours, for the scrub into them (bin/curl).
+touch "$STONKS_FAKE_STATE/after-hours"
 plugin_tree camera.qml
 cp "$here/CardWindow.qml" "$root/plugin/"
 patch_copy plugin/Panel.qml 's/^  KeyboardPanel {$/  CardWindow {/'

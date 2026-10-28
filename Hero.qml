@@ -51,9 +51,17 @@ Item {
   property int priceSize: Style.font.displayLarge * 2
 
   readonly property string freshnessText: quote ? Figures.freshnessText(shownFreshness, quote, calendars) : ""
-  // The extended-hours print, on every range. A scrub's price is a past one,
-  // so the print rests and the baseline's legend takes its place.
-  readonly property var extended: quote && !scrubbing ? Figures.extendedStack(quote, latest, now, day, changeMode) : null
+  // The newest price since the close, when it is the one on top
+  // (`Figures.rowModel`): its session and time are said under the change,
+  // and the line under the price is the close and its day's move.
+  readonly property var newest: view && view.newest ? view.newest : null
+  readonly property bool newestOld: Figures.newestStale(newest, now)
+  // The line under the price: with the newest price on top, the close
+  // (`Figures.closeLine`); else the extended-hours print, on every range. A
+  // scrub's price is a past one, so the line rests and the baseline's
+  // legend takes its place.
+  readonly property var extended: newest ? Figures.closeLine(quote, Figures.exchangeDay(quote, now), changeMode)
+    : quote && !scrubbing ? Figures.extendedStack(quote, latest, now, day, changeMode) : null
   readonly property string priceText: view ? view.priceText
     : (freshness && freshness.state === "failed" ? "—" : "…")
   readonly property string listingLead: {
@@ -79,8 +87,17 @@ Item {
     return (listingLead !== "" ? " · " : "") + Figures.listingMeta(quote, cut)
   }
   readonly property real listingRoom: Math.max(0, listingRow.width - symbolText.implicitWidth - Style.space(8))
-  readonly property string changeCaption: view && view.periodLabel ? view.periodLabel
-    : (extended !== null ? "AT CLOSE" : "")
+  // Under the change: with the newest price on top, its session and time,
+  // the day dropped where the line under the price leaves no room for it
+  // (`Figures.newestCaptions`); else what the change is measured from.
+  readonly property var newestCaptions: newest ? Figures.newestCaptions(quote, newest, now, calendars) : null
+  readonly property string changeCaption: {
+    if (!newestCaptions) return view && view.periodLabel ? view.periodLabel : (extended !== null ? "AT CLOSE" : "")
+    var font = captionMetrics.font // read, so a new text size measures again
+    // The caption's letter spacing is a pixel a letter.
+    var full = captionMetrics.advanceWidth(newestCaptions[0]) + newestCaptions[0].length
+    return full + Style.space(12) + extendedLine.implicitWidth <= width ? newestCaptions[0] : newestCaptions[1]
+  }
 
   readonly property int gap: Style.space(28)
   // The digits' ink at the surface's price size, and the box kept for it: a
@@ -199,7 +216,8 @@ Item {
     y: root.baselineY - baselineOffset
     textFormat: Text.PlainText
     text: root.priceText
-    color: root.foreground
+    // An old night's price dims, as its line under the price did.
+    color: root.newestOld ? root.dim : root.foreground
     font.family: root.fontFamily
     font.pixelSize: root.fittedSize
     font.bold: true
@@ -214,7 +232,7 @@ Item {
     // Hidden, it rests: otherwise a scrub in smooth repaints it every step.
     text: root.retro ? root.priceText : ""
     cell: root.fittedCell
-    color: root.foreground
+    color: root.newestOld ? root.dim : root.foreground
     ghostColor: root.ghost
   }
 
@@ -294,7 +312,7 @@ Item {
     visible: root.scrubbing && root.baselineText !== ""
     y: root.baselineY + root.captionDrop - baselineOffset
     textFormat: Text.PlainText
-    text: "┄ " + root.baselineText
+    text: root.baselineText
     color: root.dim
     font.family: root.fontFamily
     font.pixelSize: Style.font.caption

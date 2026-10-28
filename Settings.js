@@ -81,14 +81,16 @@ function orderLabel(order, reversed) {
 // Symbols in display order. Sorted views keep quotes that have not
 // arrived at the bottom, in their manual order, and the sort is stable so
 // ties keep their manual order too, whichever way it runs. `changeMode` is
-// the rows' unit, which % change ranks by.
-function sortedSymbols(symbols, quotes, order, reversed, changeMode) {
+// the rows' unit, which % change ranks by, the move each row shows: from
+// its newest price since the close where it has one (`newest`, by symbol,
+// `Overnight.newestPrint`).
+function sortedSymbols(symbols, quotes, order, reversed, changeMode, newest) {
   order = normalizeOrder(order)
   if (order === "manual") return symbols.slice()
   var keyed = []
   for (var i = 0; i < symbols.length; i++) {
     var q = quotes[symbols[i]]
-    keyed.push({ symbol: symbols[i], index: i, key: q ? sortKey(q, order, changeMode) : null })
+    keyed.push({ symbol: symbols[i], index: i, key: q ? sortKey(q, order, changeMode, newest ? newest[symbols[i]] : null) : null })
   }
   var first = sortsAscending(order, reversed) ? -1 : 1
   keyed.sort(function(a, b) {
@@ -104,10 +106,11 @@ function sortedSymbols(symbols, quotes, order, reversed, changeMode) {
   return out
 }
 
-function sortKey(quote, order, changeMode) {
+function sortKey(quote, order, changeMode, newest) {
   if (order === "symbol") return quote.symbol.toUpperCase()
   if (order === "name") return String(quote.name || quote.symbol).toUpperCase()
-  return Quote.change(Quote.headlineBase(quote), Quote.regularClose(quote), changeMode === "open" ? "open" : "pct").pct
+  var read = Quote.restingRead(quote, newest)
+  return Quote.change(read.base, read.price, changeMode === "open" ? "open" : "pct").pct
 }
 
 function barEntryFor(config, id) {

@@ -80,8 +80,28 @@ Harness {
       waitForRendering(app.testBody)
     }
 
-    // Retro's bell appears with the columns, judged only in the review kit.
+    // Retro's bell appears with the columns, judged only in the review kit:
+    // the close's, on AAPL's day with its after hours (bin/curl), where the
+    // columns run on past it.
     function bellDrawIn(body) {
+      // A user's refresh fetches only answers over 10 s old: these are aged
+      // past it, as a minute on the clock would.
+      var afterHours = function(on) {
+        quoteFile.command = on ? ["touch", Quickshell.env("STONKS_FAKE_STATE") + "/after-hours"]
+          : ["rm", "-f", Quickshell.env("STONKS_FAKE_STATE") + "/after-hours"]
+        quoteFile.running = true
+        tryVerify(function() { return !quoteFile.running }, 2000)
+        var aged = {}
+        for (var s in service.testFeed.entries)
+          aged[s] = Object.assign({}, service.testFeed.entries[s], { answeredAt: service.testFeed.entries[s].answeredAt - 20 })
+        service.testFeed.entries = aged
+        service.refresh()
+        tryVerify(function() {
+          var q = service.quotes.AAPL
+          return !!q && (q.points[q.points.length - 1].t >= q.session.regular.end) === on && !service.testFeed.busy
+        }, 8000)
+      }
+      afterHours(true)
       service.feature("AAPL")
       service.setRange("1D")
       // As the window opens, and as the range comes back to the day.
@@ -107,6 +127,7 @@ Harness {
       within(5000, function() { return body.historyShown && !body.chartLoading && body.motion.reveal === 1 })
       var onDay = ahead(function() { service.setRange("1D") })
       service.persist({ style: "smooth" })
+      afterHours(false)
       harness.check("retro's bell draws in with the columns: on an open and on a range change back to the day",
         onOpen === "0,true" && onDay === "0,true", onOpen + " | " + onDay)
     }

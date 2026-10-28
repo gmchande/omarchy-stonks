@@ -702,6 +702,20 @@ function headlineBase(quote) {
   return { prevClose: quote.prevClose, dayOpen: quote.nextDayBegun ? null : quote.dayOpen }
 }
 
+// The price at rest and what its move is measured from, shaped as `change`
+// reads it: the newest print since the regular close (`newest`,
+// `Overnight.newestPrint`), from that close, its "since the open" too, as
+// no session has opened since; else the headline (`headlineBase`). Every
+// place a listing's price shows at rest reads this one, so none disagree.
+function restingRead(quote, newest) {
+  if (newest) {
+    var close = regularClose(quote)
+    return { price: newest.p, t: newest.t, base: { prevClose: close, dayOpen: close } }
+  }
+  var head = headlineQuote(quote)
+  return { price: head ? head.price : null, t: head ? head.t : null, base: headlineBase(quote) }
+}
+
 // The latest print outside a regular session, the newest print of all
 // (`latest` when given, else the quote's own last): pre-market, post-market,
 // or overnight. Null while the regular session's print is the newest.

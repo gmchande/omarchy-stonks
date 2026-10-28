@@ -172,30 +172,36 @@ function answerVerdict(kind, outcome, tries, judgingOnly) {
 // ---- Robinhood
 
 // What Robinhood is asked now, { tradability, prints }, or null for
-// nothing. While a surface is open (`open`), for every US stock and ETF
-// (`overnightSymbols`): whether it trades all day, once a day each
-// (`Overnight.allDayDue`); and the prints of each not known to trade only by
-// day, each by its own last ask (`Overnight.overnightDue`), taking with it
-// each one due within half a night's interval, so the list stays one
-// request a night's 5 minutes. A resting preview on view outside All
+// nothing. While a surface is open (`open`), or while a night trades with
+// none open, for every US stock and ETF (`overnightSymbols`): whether it
+// trades all day, once a day each (`Overnight.allDayDue`); and the prints
+// of each not known to trade only by day, each by its own last ask
+// (`Overnight.overnightDue`), taking with it each one due within half a
+// night's interval, so the list stays one request a night's 5 minutes.
+// Through a night the newest price is on top on the pill and the rows
+// (`Overnight.newestPrint`), so the pill's stays current and the rows' are
+// in hand as a surface opens. A resting preview on view outside All
 // (`previewShown`, `preview`), a US stock or ETF by `previewQuote`, is
-// asked with them. With nothing open, once a session (`pillAsked`), for the
-// pill's symbol alone, what Robinhood has not answered for it, as soon as
-// Yahoo has answered it live. The chart waited on, the preview's or else
-// the pill's, goes alone ahead of the rest while it has no answer.
-// `allDay` and `nights` are the two feeds' entries; `quoteEntries` Yahoo's.
+// asked with them. Otherwise, with nothing open, once a session
+// (`pillAsked`), for the pill's symbol alone, what Robinhood has not
+// answered for it, as soon as Yahoo has answered it live. The chart waited
+// on, the preview's or else the pill's, goes alone ahead of the rest while
+// it has no answer. `allDay` and `nights` are the two feeds' entries;
+// `quoteEntries` Yahoo's.
 function overnightAsks(s) {
-  var open = s.open
+  var cal = Overnight.overnightMarket(s.calendars)
+  var tonight = cal ? Overnight.nightAt(cal, s.now) : null
+  var all = s.open || (!!tonight && tonight.open)
   var pill = s.pill
   var pillEntry = s.quoteEntries[pill]
   var live = !!pillEntry && pillEntry.status === "ok" && s.overnightSymbols.indexOf(pill) >= 0
-  if (!open && (s.pillAsked || !live)) return null
-  var previewing = open && s.previewShown && !!s.previewQuote && s.library.indexOf(s.preview) < 0
+  if (!all && (s.pillAsked || !live)) return null
+  var previewing = s.open && s.previewShown && !!s.previewQuote && s.library.indexOf(s.preview) < 0
     && Overnight.hasOvernight(s.previewQuote, s.calendars)
   var waited = previewing ? s.preview : pill
-  var listings = open ? s.overnightSymbols.concat(previewing ? [s.preview] : []) : [pill]
+  var listings = all ? s.overnightSymbols.concat(previewing ? [s.preview] : []) : [pill]
   var tradability = listings.filter(function(x) {
-    return open ? Overnight.allDayDue(s.allDay[x], s.now) : !s.allDay[x]
+    return all ? Overnight.allDayDue(s.allDay[x], s.now) : !s.allDay[x]
   })
   var drawn = listings.filter(function(x) { return !s.allDay[x] || s.allDay[x].allDay })
   // The listings of one ask share its second (`entry.at`), so each ask is
@@ -204,7 +210,7 @@ function overnightAsks(s) {
   var printsDue = function(x, at) {
     var entry = s.nights[x]
     if (!entry) return true
-    if (!open) return false
+    if (!all) return false
     var key = at + " " + entry.at + " " + entry.status
     if (!(key in judged)) judged[key] = Overnight.overnightDue(entry.at, at, s.calendars, entry.status === "failed")
     return judged[key]

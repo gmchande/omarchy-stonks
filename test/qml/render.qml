@@ -127,6 +127,8 @@ Harness {
   readonly property var pillUpQuote: pillQuote ? Object.assign({}, pillQuote, { prevClose: pillQuote.price * 0.97 }) : null
   readonly property var pillFlatQuote: pillQuote ? Object.assign({}, pillQuote, { prevClose: pillQuote.price }) : null
   function pillQuoteFor(day) { return day === "up" ? pillUpQuote : day === "flat" ? pillFlatQuote : day === "down" ? pillQuote : null }
+  // The pill at night (pill-sheet-night), { quote, newest }.
+  property var nightPill: null
   readonly property bool popup: windowOf ? false : w22 ? w22.popup : stateName.indexOf("popup") === 0 || themeState
   // <popup-help|popup-help-sorted|window-help>-<look>: the key sheet.
   readonly property var help: {
@@ -351,6 +353,8 @@ Harness {
     // answered, on the overnight states only.
     property var nights: ({})
     property var allDay: ({})
+    // Each listing's newest price since its close, as the service reads it.
+    readonly property var newestPrints: Overnight.newestPrints(symbols, quotes, nights, allDay, calendars)
     readonly property var view: ({ featured: featuredSymbol, range: range, list: listName, listKey: "=" + listName,
       order: order, reversed: reversed, rows: symbols, shown: shown, library: library,
       chart: Chart.viewChart(featuredSymbol, range, quotes, entries, histories, nights, allDay, root.overnight ? calendars : null) })
@@ -417,6 +421,23 @@ Harness {
     if (root.pillSheet) {
       root.pillQuote = nestDay
       root.now = nestDay.marketTime + 120
+      // pill-sheet-night: NBIS on Sunday 25 October at 23:35, its newest
+      // price tonight on top, as the service reads it.
+      if (root.stateName === "pill-sheet-night") {
+        var moment = function(name) {
+          var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', root)
+          view.path = fixtureDir + "/moments/watch-2026-10-25-2335/" + name + ".json"
+          var text = JSON.parse(view.text())
+          view.destroy()
+          return text
+        }
+        var sunday = Market.epochAt(stub.calendars.calendars.US, "2026-10-25", "23:35")
+        var nbis = Quote.parseChart(moment("nbis"), Market.centExchanges(stub.calendars), sunday)
+        var day = moment("robinhood-day")
+        var bars = Overnight.parseOvernight(day, day.results.map(function(r) { return r.symbol })).NBIS.bars
+        root.nightPill = { quote: nbis, newest: Overnight.newestPrint(nbis, Overnight.latestPrint(nbis, bars), stub.calendars) }
+        root.now = sunday
+      }
       return
     }
     if (root.loadingKind) {
@@ -1149,6 +1170,11 @@ Harness {
                 .concat([{ style: "text", retro: retroLook, day: "up", compact: true }, { style: "icon", retro: retroLook, day: "up", compact: true }])
             }
             if (!root.pillSheet) return []
+            // At night, every form in each look, NBIS's price tonight on top.
+            if (root.stateName === "pill-sheet-night")
+              return [false, true].reduce(function(all, retro) {
+                return all.concat(["sparkline", "arrow", "text", "icon"].map(function(style) { return { style: style, retro: retro, day: "night" } }))
+              }, [])
             var rows = []
             for (var look = 0; look < 2; look++) {
               var retro = look === 1
@@ -1193,14 +1219,18 @@ Harness {
 
               QtObject {
                 id: pillService
-                property string featuredSymbol: "NEST"
-                property var quotes: ({ NEST: root.pillQuoteFor(pillRow.modelData.day === "refresh failed" ? "down" : pillRow.modelData.day) })
-                property var entries: ({ NEST: { status: pillRow.modelData.day === "failed" || pillRow.modelData.day === "refresh failed" ? "failed"
+                readonly property bool night: pillRow.modelData.day === "night" && !!root.nightPill
+                property string featuredSymbol: night ? "NBIS" : "NEST"
+                property var quotes: night ? ({ NBIS: root.nightPill.quote })
+                  : ({ NEST: root.pillQuoteFor(pillRow.modelData.day === "refresh failed" ? "down" : pillRow.modelData.day) })
+                property var entries: ({ [featuredSymbol]: { status: pillRow.modelData.day === "failed" || pillRow.modelData.day === "refresh failed" ? "failed"
                   : pillRow.modelData.day === "waiting" ? "pending" : "ok", receivedAt: root.now } })
                 property string changeMode: "pct"
                 property bool retro: pillRow.modelData.retro
                 property int now: root.now
                 property var owed: ({})
+                property var newestPrints: night ? ({ NBIS: root.nightPill.newest }) : ({})
+                property var calendars: night ? stub.calendars : null
               }
               QtObject {
                 id: pillShell

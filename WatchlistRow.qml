@@ -95,9 +95,12 @@ Rectangle {
   readonly property bool warns: Figures.freshnessWarns(shownFreshness)
   readonly property string freshnessNote: quote ? Figures.freshnessText(shownFreshness, quote, calendars) : ""
   // An aged quote is said plainly; only a failed or overdue refresh warns
-  // (`! `). The hero says the same on its listing line.
+  // (`! `). The hero says the same on its listing line. A newest price
+  // since the close says its session and time (`newestNote`) where the
+  // name was.
+  property string newestNote: ""
   readonly property string detail: quote
-    ? (freshnessNote !== "" ? (warns ? "! " : "") + capitalize(freshnessNote) : view.name)
+    ? (freshnessNote !== "" ? (warns ? "! " : "") + capitalize(freshnessNote) : newestNote !== "" ? newestNote : view.name)
     : sourceDown ? "" : (status === "failed" ? "! No data for this symbol" : warns ? "! No data" : "Loading…")
 
   // Sentence case, a day's name kept a name and a zone's its capitals:

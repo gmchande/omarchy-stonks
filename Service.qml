@@ -132,7 +132,7 @@ Item {
       order: order,
       reversed: reversed,
       rows: rows,
-      shown: Settings.sortedSymbols(rows, feed.quotes, order, reversed, dataSettings.changeMode),
+      shown: Settings.sortedSymbols(rows, feed.quotes, order, reversed, dataSettings.changeMode, order === "manual" ? null : root.newestPrints),
       library: all,
       // The chart asked for once it can be drawn (`Chart.viewChart`), null
       // while it is on its way: each surface keeps the one it has on screen.
@@ -218,6 +218,10 @@ Item {
   readonly property var allDaySymbols: overnightSymbols.filter(function(s) {
     return !!allDayFeed.entries[s] && allDayFeed.entries[s].allDay
   })
+  // Each listing's newest price since its regular close, by symbol: the
+  // price on top on the pill, the rows, and the panel and the window
+  // (`Overnight.newestPrints`).
+  readonly property var newestPrints: Overnight.newestPrints(library, feed.quotes, overnightFeed.entries, allDayFeed.entries, calendars)
   // Robinhood's two questions, whether it trades a listing all day and its
   // prints, go side by side, so a 1D chart waits for one answer, never two
   // in a row: what is asked is `Asks.overnightAsks`'s. A feed with a

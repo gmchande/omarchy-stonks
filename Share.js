@@ -72,6 +72,9 @@ function moment(o) {
     var read = Quote.readingAt(o.day, o.scrubT)
     return { t: read.t, close: read.close, bar: null }
   }
+  // At rest on the day, the newest price since the close (`newest`) where
+  // it is the one on top.
+  if (!o.history && o.newest) return { t: o.newest.t, close: false, bar: null, phase: o.newest.phase }
   var head = Quote.headlineQuote(o.quote)
   if (!head && o.history) {
     var last = History.historyBarAt(o.history, 1)
@@ -97,8 +100,9 @@ function barDate(history, bar) {
 
 // The picture's words, from what the surface shows: `quote` (Yahoo's),
 // `day` (the 1D chart's), `history` (a range's, or null on the day),
-// `latest`, `scrubT` (0 at rest), `changeMode`, `range`, `now`, and
-// `calendars`.
+// `latest`, `newest` (the newest price since the close, on top at rest:
+// `Figures.rowModel`'s), `scrubT` (0 at rest), `changeMode`, `range`,
+// `now`, and `calendars`.
 //   when: what the price is, and its time and zone; a scrub outside the
 //   regular session named by its session, as the line under the price is;
 //   on a range, its date too, which on the day the foot says;
@@ -122,7 +126,7 @@ function words(o) {
     out.when = barDate(o.history, at.bar)
     out.said = "on " + out.when
   } else if (at.t) {
-    var phase = o.scrubT && !at.close ? Market.scrubPhase(o.day, o.scrubT) : ""
+    var phase = at.phase || (o.scrubT && !at.close ? Market.scrubPhase(o.day, o.scrubT) : "")
     var outside = phase === "pre" || phase === "post" || phase === "overnight"
     out.when = (at.close ? quote.exchange + " CLOSE · " : outside ? Market.phaseLabel(phase).toUpperCase() + " " : "AT ")
       + clockOf(quote, at.t, o.calendars)
@@ -141,11 +145,14 @@ function words(o) {
     }
   } else {
     // What the change on show is measured from: the quote's at rest
-    // (`Quote.headlineBase`), and while scrubbed the close the day's dashed
-    // line is at, named as the panel names it (`Figures.dayBaselineText`).
+    // (`Quote.headlineBase`), or the close under a newest price on top;
+    // while scrubbed, the close the scrub reads from, named as the panel
+    // names it (`Figures.dayBaselineText`).
+    var today = Figures.exchangeDay(o.day, o.now)
     var base = o.scrubT ? Figures.scrubbedBase(o.day, o.scrubT) : Quote.headlineBase(quote)
-    out.from = o.changeMode === "open" ? "OPEN " + Format.money(base.dayOpen, digits)
-      : o.scrubT ? Figures.dayBaselineText(o.day, Figures.exchangeDay(o.day, o.now), o.scrubT)
+    out.from = o.newest && !o.scrubT ? Figures.closeLabel(quote, today) + " " + Format.money(Quote.regularClose(quote), digits)
+      : o.changeMode === "open" ? "OPEN " + Format.money(base.dayOpen, digits)
+      : o.scrubT ? Figures.dayBaselineText(o.day, today, o.scrubT)
       : "PREV CLOSE " + Format.money(base.prevClose, digits)
     var pts = o.day.points
     if (pts.length) {
@@ -158,8 +165,16 @@ function words(o) {
       out.end = (last.d !== first.d ? Format.WEEKDAYS[last.weekday].toUpperCase() + " " : "") + last.clock
     }
   }
-  // The panel's line under the price, as it shows it: at rest, its tone,
-  // and an old overnight print dimmed (`Figures.extendedStack`).
+  // The panel's line under the price, as it shows it: at rest, the close
+  // under a newest price on top (`Figures.closeLine`), else the
+  // extended-hours print, its tone, and an old overnight print dimmed
+  // (`Figures.extendedStack`).
+  if (!o.scrubT && o.newest) {
+    var below = Figures.closeLine(quote, Figures.exchangeDay(quote, o.now), o.changeMode)
+    out.extended = below.label + " · " + below.price + " " + below.changeText
+    out.extendedTone = below.tone
+    return out
+  }
   var ext = !o.scrubT ? Figures.extendedStack(quote, o.latest, o.now, o.day, o.changeMode) : null
   var print = ext ? Quote.extendedPrint(quote, o.latest) : null
   if (ext && print) {

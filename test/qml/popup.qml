@@ -33,6 +33,7 @@ Harness {
       return { name: l.name, label: l.name, count: l.symbols.length, symbols: l.symbols }
     }))
     property var quotes: ({})
+    property var newestPrints: ({})
     property var entries: ({})
     property var histories: ({})
     property var fundamentals: ({})

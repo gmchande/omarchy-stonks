@@ -60,6 +60,15 @@ Harness {
     return words.join(" ")
   }
 
+  // What's on top while the listing on show has traded since its close: the
+  // session and time, the newest price, and its move since the close
+  // ("OVERNIGHT 22:20 234.84 −1.05%"); "" without.
+  function top() {
+    var body = app.testBody
+    if (!body.featured || !body.featured.newest) return ""
+    return [find(body, "changeCaption").text, body.featured.priceText, body.featured.changeText].join(" ")
+  }
+
   Stonks.Service { id: service }
   Stonks.App { id: app; service: service }
 
@@ -178,17 +187,17 @@ Harness {
       // the open surface asks by itself, and five minutes on, again.
       useSet("sunday")
       service.now = harness.sunday
-      within(3000, function() { return harness.strip().indexOf("OVERNIGHT") === 0 })
-      check("Sunday night trades, measured from Friday's close",
-        harness.strip() === "OVERNIGHT 22:20 234.84 \u22121.05%" && body.featured.priceText === "237.33",
-        harness.strip() + " | " + body.featured.priceText)
+      within(3000, function() { return harness.top().indexOf("OVERNIGHT") === 0 })
+      check("Sunday night trades on top, measured from Friday's close, the close beneath",
+        harness.top() === "OVERNIGHT 22:20 234.84 \u22121.05%" && harness.strip() === "FRI CLOSE 237.33 \u22122.53%",
+        harness.top() + " | " + harness.strip())
       var sundayCalls = Number(harness.record("OVERNIGHT.calls"))
       service.now = harness.sunday + 5 * 60
       within(2000, function() { return Number(harness.record("OVERNIGHT.calls")) > sundayCalls })
       check("while a night trades, the open surface asks every five minutes, for the last hour only, the chart Sunday's night from 20:00",
         Number(calls) + 1 === sundayCalls && Number(harness.record("OVERNIGHT.calls")) === sundayCalls + 1 && lastSpan() === "hour"
-          && within(2000, function() { return body.featuredGeometry.start === harness.midnight.fri25 + 2 * 86400 + 20 * 3600 && harness.strip() === "OVERNIGHT 22:20 234.84 \u22121.05%" }),
-        calls + ", " + sundayCalls + ", " + harness.record("OVERNIGHT.calls") + " " + lastSpan() + " | " + harness.strip())
+          && within(2000, function() { return body.featuredGeometry.start === harness.midnight.fri25 + 2 * 86400 + 20 * 3600 && harness.top() === "OVERNIGHT 22:20 234.84 \u22121.05%" }),
+        calls + ", " + sundayCalls + ", " + harness.record("OVERNIGHT.calls") + " " + lastSpan() + " | " + harness.top())
 
       // Monday 04:11, the night's last bars due, and Robinhood down.
       var feed = service.testOvernightFeed
@@ -196,7 +205,7 @@ Harness {
       var before = Number(harness.record("OVERNIGHT.calls"))
       service.now = 1790583060
       within(2000, function() { return feed.entries.NEST.status === "failed" })
-      var keptLine = harness.strip()
+      var keptLine = harness.top()
       runCommand(["rm", "-f", harness.state + "/OVERNIGHT.down"])
       service.now = 1790583060 + 2 * 60
       // Two minutes on nothing may be asked: time for an ask to show.
@@ -205,13 +214,13 @@ Harness {
       service.now = 1790583060 + 6 * 60
       within(2000, function() { return feed.entries.NEST.status === "ok" })
       check("a failed answer keeps the last good prints, and is asked again five minutes on until it answers",
-        keptLine.indexOf("OVERNIGHT 22:20") === 0 && paced === before + 1 && feed.entries.NEST.status === "ok"
+        keptLine.indexOf("OVERNIGHT SUN 22:20") === 0 && paced === before + 1 && feed.entries.NEST.status === "ok"
           && Number(harness.record("OVERNIGHT.calls")) === before + 2,
         keptLine + " | " + before + ", " + paced + ", " + harness.record("OVERNIGHT.calls") + " " + feed.entries.NEST.status)
 
       // r's request for the prints meets a 429, and the gate holds the
       // next r's.
-      var line = harness.strip()
+      var line = harness.top()
       runCommand(["touch", harness.state + "/ROBINHOOD.refuse"])
       service.now = 1790583060 + 12 * 60
       pressKey(Qt.Key_R)
@@ -225,8 +234,8 @@ Harness {
       var quotesAfter = harness.record("requests.log").split("\n").filter(function(l) { return /^(chart|spark) /.test(l) }).length
       check("a Robinhood refusal pauses Robinhood alone: one request refused, the next held, Yahoo's quotes still asked, the prints kept",
         service.testRobinhoodGate.pause === "refused" && refusedCalls === 1 && service.testYahooGate.pause === ""
-          && quotesAfter > quotesBefore && harness.strip() === line,
-        [service.testRobinhoodGate.pause, refusedCalls, service.testYahooGate.pause, quotesBefore + " → " + quotesAfter, line + " → " + harness.strip()].join(" | "))
+          && quotesAfter > quotesBefore && harness.top() === line,
+        [service.testRobinhoodGate.pause, refusedCalls, service.testYahooGate.pause, quotesBefore + " → " + quotesAfter, line + " → " + harness.top()].join(" | "))
       runCommand(["rm", "-f", harness.state + "/ROBINHOOD.refuse"])
       service.now += 5 * 60
       within(2000, function() { return feed.entries.NEST.status === "ok" && service.testRobinhoodGate.pause === "" })
@@ -237,25 +246,27 @@ Harness {
       keyClick(Qt.Key_R)
       // Every saved day of the night in, so the breadth is the night's.
       within(5000, function() {
-        return body.featured && body.featured.priceText === "232.28" && !body.chartLoading
+        return harness.strip().indexOf("CLOSE 232.28 ") === 0 && !body.chartLoading
           && ["SILK", "REED", "^GSPC"].every(function(s) {
             return service.quotes[s].session.regular.start === service.quotes.NEST.session.regular.start
           })
       })
-      within(3000, function() { return harness.strip().indexOf("OVERNIGHT") === 0 })
+      within(3000, function() { return harness.top().indexOf("OVERNIGHT") === 0 })
       var info = body.dayLine
-      check("it is never the headline, nor in the day's high: the night's 243.20 leaves Thursday's 239.63",
-        body.featured.priceText === "232.28" && !!info && info.range.highText === "239.63", body.featured.priceText + " | " + JSON.stringify(info))
+      check("the night's newest price is on top, Thursday's close beneath, and the night is never in the day's high: its 243.20 leaves Thursday's 239.63",
+        /^OVERNIGHT \d\d:\d\d 234\.27 /.test(harness.top()) && harness.strip().indexOf("CLOSE 232.28 ") === 0
+          && !!info && info.range.highText === "239.63", harness.top() + " | " + harness.strip() + " | " + JSON.stringify(info))
 
       var row = body.watchlist.rowItem("NEST")
       var breadth = JSON.stringify(body.breadth)
+      var onTop = body.featured.priceText
       scrubAt(Chart.fractionAtTime(body.featuredDay, harness.night - 90 * 60))
       var nightScrub = body.headerText + " | " + body.featured.priceText + " | row " + row.view.priceText + " | " + JSON.stringify(body.breadth)
-      var heroMoved = body.featured.priceText !== "232.28"
-      var rowsStill = row.view.priceText === "232.28" && JSON.stringify(body.breadth) === breadth
+      var heroMoved = body.featured.priceText !== onTop
+      var rowsStill = row.view.priceText === onTop && JSON.stringify(body.breadth) === breadth
       endScrub()
       check("a scrub of the night reads the night on the hero, and leaves the rows and the breadth on now",
-        nightScrub.indexOf("At 21:") === 0 && heroMoved && rowsStill, nightScrub + " vs " + breadth)
+        nightScrub.indexOf("At 21:") === 0 && heroMoved && rowsStill, nightScrub + " vs " + onTop + " " + breadth)
 
       // SILK's quote came from the list's spark run, closes only: its day
       // is read once the hero's chart is in.
@@ -385,10 +396,10 @@ Harness {
       within(8000, function() { return !!service.quotes.KILN && !!service.quotes.BOLT && service.arriving.length === 0 })
       featureShown("NEST")
       var nest = harness.sleep()
-      var nestHeader = body.headerText + " | " + harness.strip()
+      var nestHeader = body.headerText + " | " + harness.top()
       featureShown("KILN")
       var kiln = harness.sleep()
-      var kilnHeader = body.headerText + " | " + harness.strip()
+      var kilnHeader = body.headerText + " | " + harness.top()
       scrubAt(0.5)
       var scrubbedAwake = harness.sleep()
       endScrub()
@@ -396,8 +407,8 @@ Harness {
       var sleeps = "NEST " + nest + ", KILN " + kiln + ", scrubbed " + scrubbedAwake + ", let go " + harness.sleep()
       check("01:00: NEST, whose night trades, is awake; KILN sleeps, a scrub wakes it, and letting go puts it back to sleep at once",
         sleeps === "NEST awake, KILN asleep, scrubbed awake, let go asleep", sleeps)
-      check("01:00: NEST's header says Overnight, as the line under its price does; KILN's says Closed",
-        nestHeader.indexOf("Overnight · opens Wed 09:30 | OVERNIGHT ") === 0 && kilnHeader === "Closed · opens Wed 09:30 | ",
+      check("01:00: NEST's header says Overnight, as the caption by its price does; KILN's says Closed, its price on top Tuesday's after hours",
+        nestHeader.indexOf("Overnight · opens Wed 09:30 | OVERNIGHT ") === 0 && kilnHeader.indexOf("Closed · opens Wed 09:30 | AFTER HOURS TUE ") === 0,
         nestHeader + " || " + kilnHeader)
       // The clock reaching KILN's pre-market wakes it while it is on show.
       service.now = harness.midnight.wed7 + 4 * 3600 - 2

@@ -23,10 +23,16 @@ BarWidget {
   readonly property var panel: panelLoader.item
   readonly property string featuredSymbol: service ? service.featuredSymbol : ""
   readonly property var featuredQuote: service && featuredSymbol ? (service.quotes[featuredSymbol] || null) : null
-  // The day, as its row shows it. The line comes from the quote it draws,
-  // so the clock never redraws it.
+  // The day, as its row shows it: its newest price since the close on top
+  // where it has one (`Service.newestPrints`). The line comes from the
+  // quote it draws, so the clock never redraws it.
   readonly property var featured: featuredQuote
-    ? Figures.rowModel(featuredQuote, 0, service.changeMode) : null
+    ? Figures.rowModel(featuredQuote, 0, service.changeMode, service.newestPrints[featuredSymbol] || null) : null
+  // The newest price's session and time, which the pill has no room for:
+  // its hover says it (`Figures.newestNote`).
+  readonly property string newestNote: featured && featured.newest
+    ? Figures.newestNote(featuredQuote, featured.newest, service.now, service.calendars) : ""
+  readonly property string newestPhase: featured && featured.newest ? featured.newest.phase : ""
   // A day with no print draws nothing, as its row does.
   readonly property var lineGeometry: featuredQuote && featuredQuote.points.length ? Chart.chartGeometry(featuredQuote, service.calendars) : null
   // In the bar's right section, among its bare icons, the pill has a form of
@@ -69,6 +75,7 @@ BarWidget {
   }
   onWarningTextChanged: Qt.callLater(reshowTooltip)
   onFeaturedSymbolChanged: Qt.callLater(reshowTooltip)
+  onNewestPhaseChanged: Qt.callLater(reshowTooltip)
   onOpenedChanged: Qt.callLater(reshowTooltip)
   // Up and down for the bar's own ground (`TrendColors`).
   readonly property color upColor: plugin && plugin.trendColors ? plugin.trendColors.upOn(barGround) : button.foreground
@@ -238,12 +245,14 @@ BarWidget {
       : root.stackedHeight) : -1
     // A hover only for what the pill can't say: the icon names nothing, so
     // its hover says what the other forms show, the symbol and its change;
-    // on every form, what a warning's "!" means. The line, the arrow, and
-    // the text show their symbol and change already, so say nothing else.
-    // None while its popup is open: the bubble lands on the card's header.
+    // on every form, the session and time of a newest price since the close
+    // ("Overnight 23:25"), and what a warning's "!" means. The line, the
+    // arrow, and the text show their symbol and change already, so say
+    // nothing else. None while its panel is open: the bubble lands on the
+    // card's header.
     tooltipText: root.opened ? ""
-      : (root.iconOnly ? (root.featuredSymbol || "STONKS") + " " + root.changeText : "")
-        + (root.iconOnly && root.warningText !== "" ? " · " : "") + root.warningText
+      : [root.iconOnly ? (root.featuredSymbol || "STONKS") + " " + root.changeText : "", root.newestNote, root.warningText]
+        .filter(function(part) { return part !== "" }).join(" · ")
 
     onPressed: function(b) {
       if (b === Qt.RightButton) { if (root.plugin) root.plugin.windowHost.toggle() }

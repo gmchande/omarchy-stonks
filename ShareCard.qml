@@ -58,7 +58,7 @@ Rectangle {
   readonly property color dimmer: Tones.dimmer(foreground, ground)
   readonly property color ghost: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.05)
   readonly property var words: quote && day ? Share.words({ quote: quote, day: day, history: history, latest: latest,
-    scrubT: scrubT, changeMode: changeMode, range: range, now: now, calendars: calendars }) : null
+    newest: view ? view.newest : null, scrubT: scrubT, changeMode: changeMode, range: range, now: now, calendars: calendars }) : null
   readonly property var shownDay: Share.pictureDay(day)
   readonly property var geometry: history ? History.historyGeometry(history) : shownDay ? Chart.chartGeometry(shownDay, calendars) : null
   readonly property real scrubX: !scrubT ? -1 : history ? History.historyFraction(history, scrubT)
