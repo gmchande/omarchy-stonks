@@ -207,7 +207,7 @@ screenshot editor.
 | `s` | Switch between smooth and retro |
 | `m` | Turn sounds on or off |
 | `r` | Refresh |
-| `Shift+U` | Update Stonks when a new version is out; once it's done, press again to restart the shell |
+| `Shift+U` | Update Stonks when a new version is out, and restart the shell to run it |
 | Tab or `Shift+Tab` | Next or previous panel on the bar (popup) |
 | `?` | Show every key |
 | `Esc` | Close |
@@ -293,8 +293,10 @@ personal use, so either may change or stop without notice.
 - For a screenshot: `sh` with `sed`, `tail`, `date`, and `head` to find
   your screenshots folder and name the file, `wl-copy` for the clipboard,
   and `omarchy-notification-send`.
-- Only when you ask for an update: `omarchy plugin update grvc.stonks` in
-  a terminal, then `omarchy restart shell`.
+- Only when you ask for an update: a terminal running
+  `omarchy plugin update grvc.stonks`, with `git rev-parse HEAD` in
+  Stonks' folder before and after it, and `omarchy restart shell` only
+  when the update moved that folder.
 
 **Sites**, and nothing else:
 
@@ -341,8 +343,9 @@ omarchy restart shell
 ```
 
 Or, when the footer says "Update to …", click it or press `Shift+U`. A
-terminal opens and runs the update. Then click the footer again to restart
-the shell. Stonks never updates itself.
+terminal opens and shows what changes. Say yes, and it updates Stonks and
+restarts the shell. After an update run anywhere else, the footer says
+"Updated to … · click to restart the shell". Stonks never updates itself.
 
 ## Remove
 

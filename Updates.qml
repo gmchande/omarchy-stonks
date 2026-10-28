@@ -13,7 +13,9 @@ import "Release.js" as Release
 // running one (`mainVersion`, the service's, from GitHub),
 // `releasedVersion` names it, which every surface offers until it's on
 // disk, and `update()` runs the update in a terminal, where Omarchy shows
-// what changes and asks.
+// what changes and asks, then restarts the shell once it has moved the
+// files, unless a restart would lose changes. An update run anywhere else
+// leaves the restart to the notice.
 Item {
   id: root
 
@@ -62,9 +64,19 @@ Item {
     restartShell.startDetached()
   }
 
-  // Detached, so the terminal stays whatever the shell does meanwhile.
-  function update() {
-    updatePlugin.startDetached()
+  // Detached, so the terminal stays whatever the shell does meanwhile, and
+  // so Stonks can't wait on it: with `restart`, the terminal's own shell
+  // restarts the shell, only when the update exits 0 with the clone's HEAD
+  // moved. A no, an "up to date", a failed fetch and a rolled-back
+  // validation leave HEAD where it was or exit 1, and Omarchy has rescanned
+  // the plugins by its exit. The launcher joins its arguments into a
+  // `bash -c` script, so the last one is shell. While the session is locked
+  // the restart refuses there. Without `restart`, for changes a restart
+  // would lose, the update runs alone. Either way the notice stays for a
+  // later click.
+  function update(restart) {
+    if (restart) updateAndRestart.startDetached()
+    else updatePlugin.startDetached()
   }
 
   Component.onCompleted: takeManifest(manifest.text())
@@ -96,5 +108,13 @@ Item {
   Process {
     id: updatePlugin
     command: ["omarchy", "launch", "floating", "terminal", "with", "presentation", "omarchy", "plugin", "update", "grvc.stonks"]
+  }
+
+  Process {
+    id: updateAndRestart
+    command: ["omarchy", "launch", "floating", "terminal", "with", "presentation",
+      "p=$HOME/.config/omarchy/plugins/grvc.stonks; was=$(git -C \"$p\" rev-parse HEAD);"
+      + " omarchy plugin update grvc.stonks && [[ $(git -C \"$p\" rev-parse HEAD) != \"$was\" ]]"
+      + " && echo 'Restarting the shell…' && omarchy restart shell"]
   }
 }

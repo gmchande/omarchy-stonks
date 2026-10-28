@@ -43,7 +43,8 @@ function sheet(order, switchesPanels) {
         { key: "s", does: "Smooth or retro" },
         { key: "m", does: "Sound on or off" },
         { key: "r", does: "Refresh" },
-        // What the footer offers: a newer Stonks's update, then the restart.
+        // What the footer offers: a newer Stonks's update, which restarts
+        // the shell, or after an update run elsewhere, the restart.
         { key: "U", does: "Update Stonks" }
       ]},
       { title: "Keys", rows: surface }
