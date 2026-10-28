@@ -338,7 +338,7 @@ Harness {
           saidOnce = body.headerText + " | " + rowsWarning.length + " rows in sight warn"
         }
       })
-      var refusedWords = /^Turned away by the price source · Trying again at \d\d:\d\d \| 0 rows in sight warn$/
+      var refusedWords = /^The site Stonks gets prices from asked it to wait · Trying again at \d\d:\d\d \| 0 rows in sight warn$/
       harness.check("Yahoo refusing: nothing warns for 85 s, then the pill and every symbol's update is overdue within 90 s of falling due, and the header says it once instead of every row, with why and when Stonks tries again",
         refusedAt > 0 && firstWarnAt >= 85 && allWarnAt > 0 && allWarnAt <= 155 && refusedWords.test(saidOnce),
         "refused at " + (refusedAt - start) + " s; first warning " + firstWarnAt + " s after, all " + allWarnAt + " s after; " + overdue() + " overdue now; " + saidOnce)

@@ -215,22 +215,31 @@ screenshot editor.
 ## If something's wrong
 
 A "!" on the pill means a refresh of its stock failed or is late. Point at
-the pill to see which.
+the pill to see which, and, where Stonks knows, why and when it tries
+again.
 
 <details>
 <summary>What each message means, and what to do</summary>
 
-- **"Can't get prices" in the header, or "No data" or "Update overdue" on
-  a row.** Yahoo hasn't sent a price Stonks can use in time, or has
-  turned Stonks away. Rows keep any price they had, with its time. Check your connection.
-  Stonks keeps trying on its own, less often the longer Yahoo stays away.
-  `r` asks again at once, unless Yahoo is turning Stonks away. If Yahoo
-  has changed what it sends, only a newer Stonks can fix it.
-- **"No data for this symbol" or "Refresh failed" on a row.** Yahoo has
-  nothing for the symbol, or sent a broken answer three times in a row.
-  Press `r` to try again. After a merger or a rename, search for the
-  company to find what Yahoo calls it now. A delisted company may be gone
-  for good.
+- **"No answer" in the header, with "Refresh late" or "No data" on a
+  row.** Stonks asked Yahoo for prices and nothing came back. Rows keep
+  any price they had, with its time. Check your connection. If other sites
+  load, Yahoo may be down or out of reach. The header says when Stonks
+  tries again, within two minutes, and `r` asks at once.
+- **"Asked to wait" in the header, with "Refresh late" or "No data" on a
+  row.** Yahoo asked Stonks to send fewer requests. The header says when
+  Stonks tries again, from a minute to about half an hour on, as Yahoo
+  asked, and `r` won't hurry it.
+- **"Can't get prices" in the header.** Every stock you follow has a
+  refresh that failed or is late, so Stonks says so once rather than on
+  every row. Rows keep any price they had, with its time. Stonks keeps
+  trying on its own, less often the longer Yahoo stays away. If Yahoo has
+  changed what it sends, only a newer Stonks can fix it.
+- **"No data for this symbol" or "Refresh failed" on a row, and "No price
+  came back" in the header.** Yahoo has nothing for the symbol, or sent a
+  broken answer three times in a row. Press `r` to try again. After a
+  merger or a rename, search for the company to find what Yahoo calls it
+  now. A delisted company may be gone for good.
 - **"As of" while the market is open.** Yahoo sends some prices late. When
   we measured, London, São Paulo, and the VIX came 15 minutes late, and
   Mexico 20. Nasdaq, NYSE, Toronto, and crypto came within a minute.

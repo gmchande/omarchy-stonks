@@ -518,7 +518,7 @@ Harness {
       tick(78, 1, function() {
         var sent = harness.yahoo(harness.requests().slice(refusedFrom)).length
         if (sent > lone.length) lone.push(service.now - askedAt)
-        if (!warnedAt && pill.warns && /^! Update overdue/.test(body.watchlist.rowItem("KILN").detail)) warnedAt = service.now - askedAt
+        if (!warnedAt && pill.warns && /^! Refresh late/.test(body.watchlist.rowItem("KILN").detail)) warnedAt = service.now - askedAt
       })
       harness.check("refused: nothing goes for the pause, then one request alone, between 48 and 72 s",
         askedAt > 0 && lone.length === 1 && lone[0] >= 48 && lone[0] <= 73, "refused at " + askedAt + ", alone at " + lone.join(","))

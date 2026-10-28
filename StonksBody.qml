@@ -435,7 +435,7 @@ Item {
     if (hostPause && warnings > 0) return hostPause.forms
     if (yahooDown) return ["Can't get prices · Stonks keeps trying", "Can't get prices"]
     if (featuredQuote && featuredFreshness.state === "failed")
-      return ["No usable answer for " + (chartSymbol || featuredSymbol), "No usable answer"]
+      return ["No price came back for " + (chartSymbol || featuredSymbol), "No price came back"]
     return null
   }
   // The header's words, then the same said in less for a header with no

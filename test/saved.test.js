@@ -201,7 +201,7 @@ test("the headline uses the regular quote or labels the last chart trade with it
   expect(M.freshnessText(untimed, noTime, calendars)).toBe("TIME NOT SENT")
   expect(M.freshnessText({ ...untimed, state: "saved" }, noTime, calendars)).toBe("SAVED · TIME NOT SENT")
   expect(M.freshnessText({ ...untimed, state: "failed" }, noTime, calendars)).toBe("REFRESH FAILED · TIME NOT SENT")
-  expect(M.freshnessText({ ...untimed, state: "overdue" }, noTime, calendars)).toBe("UPDATE OVERDUE · TIME NOT SENT")
+  expect(M.freshnessText({ ...untimed, state: "overdue" }, noTime, calendars)).toBe("REFRESH LATE · TIME NOT SENT")
   const nothing = { ...quote, price: null, points: [] }
   expect(M.headlineQuote(nothing)).toBeNull()
   expect(M.regularClose(nothing)).toBeNull()
@@ -216,7 +216,7 @@ test("the headline uses the regular quote or labels the last chart trade with it
     expect(M.freshnessWarns(fresh)).toBe(false)
     expect(M.freshnessText({ ...fresh, earlier: false }, fallback, calendars)).toBe("LAST TRADE · 15:55")
     expect(M.freshnessText({ ...fresh, state: "failed" }, fallback, calendars)).toBe("REFRESH FAILED · LAST TRADE · TUE 15:55")
-    expect(M.freshnessText({ ...fresh, state: "overdue" }, fallback, calendars)).toBe("UPDATE OVERDUE · LAST TRADE · TUE 15:55")
+    expect(M.freshnessText({ ...fresh, state: "overdue" }, fallback, calendars)).toBe("REFRESH LATE · LAST TRADE · TUE 15:55")
   }
   expect(M.freshnessText(M.freshness({ status: "ok" }, night, now, 0), night, calendars)).toBe("")
 })
@@ -1141,7 +1141,7 @@ test("freshness keeps quote age, an unanswered ask, and the refresh outcome apar
   // last answer; one nobody asked for never is.
   expect(M.freshness(ok, live, trading, trading - 89).state).toBe("fresh")
   expect(M.freshness(ok, live, trading, trading - 90)).toMatchObject({ state: "overdue", live: false })
-  expect(M.freshnessText(M.freshness(ok, live, trading, trading - 90), q)).toBe("UPDATE OVERDUE · AS OF 10:29")
+  expect(M.freshnessText(M.freshness(ok, live, trading, trading - 90), q)).toBe("REFRESH LATE · AS OF 10:29")
   expect(M.freshnessWarns(M.freshness(ok, live, trading, trading - 90))).toBe(true)
   expect(M.freshness({ status: "ok", receivedAt: trading - 86400 }, live, trading, 0).state).toBe("fresh")
   // A failed refresh is a failure whatever the quote's age, and keeps its as-of.
@@ -1169,7 +1169,7 @@ test("a quote kept from an earlier session says when it is from, and warns only 
   expect([nextDay.state, nextDay.live, M.freshnessWarns(nextDay), M.freshnessText(nextDay, q)])
     .toEqual(["saved", false, false, "AS OF TUE 15:59"])
   const late = M.freshness(saved, close, reg.start + DAY + 90, reg.start + DAY)
-  expect([late.state, M.freshnessText(late, q)]).toEqual(["overdue", "UPDATE OVERDUE · AS OF TUE 15:59"])
+  expect([late.state, M.freshnessText(late, q)]).toEqual(["overdue", "REFRESH LATE · AS OF TUE 15:59"])
 })
 
 test("outside trading an old close is normal, but a failed refresh still shows", () => {
