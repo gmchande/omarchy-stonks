@@ -22,10 +22,8 @@ Harness {
 
   readonly property string state: Quickshell.env("STONKS_FAKE_STATE")
   readonly property string manifestPath: String(Qt.resolvedUrl("plugin/manifest.json")).replace(/^file:\/\//, "")
-  // How `calls()` names a floating terminal that runs Stonks' update, and
-  // restarts the shell after it or leaves the restart to the notice.
-  readonly property string updateCall: "update and restart in a terminal"
-  readonly property string updateAloneCall: "update alone in a terminal"
+  // How `calls()` names a floating terminal that runs Stonks' update.
+  readonly property string updateCall: "update in a terminal"
 
   // How many times main's manifest was asked for, whatever came back.
   function asked() {
@@ -161,9 +159,13 @@ Harness {
     }
     // The stand-in omarchy's calls, one a line.
     function calls() {
-      return harness.readFile(harness.state + "/omarchy.calls")
-        .replace(/^launch floating terminal with presentation .*omarchy plugin update grvc\.stonks\b.*omarchy restart shell.*$/gm, harness.updateCall)
-        .replace(/^launch floating terminal with presentation omarchy plugin update grvc\.stonks$/gm, harness.updateAloneCall)
+      return harness.readFile(harness.state + "/omarchy.calls").replace(
+        /^launch floating terminal with presentation .*omarchy plugin update grvc\.stonks\b.*$/gm, harness.updateCall)
+    }
+    // The update's terminal asking for the restart, as it does over IPC
+    // once the update has moved the files.
+    function askRestart() {
+      run(["quickshell", "ipc", "--id", Quickshell.instanceId, "call", "grvc.stonks", "restartForUpdate"])
     }
 
     // Every "!" on show: the pill's, and each row's.
@@ -324,23 +326,31 @@ Harness {
       harness.check("a removal's undo takes the offer's place, its click undoes and runs no update, and the update is offered again",
         undoing && back && calls() === harness.updateCall + "\n" + harness.updateCall + "\n", undoing + " " + back + " | " + offer() + " | " + calls())
 
-      // A change made while the data file can't be read, which a restart
-      // would lose: the offer's click runs the update alone, and leaves the
-      // restart to the notice. The file put back, the change goes with it.
+      // The update's terminal open, a change made after it while the data
+      // file can't be read, which a restart would lose: the restart the
+      // terminal asks for once the update has moved the files restarts
+      // nothing, and the notice waits. The file put back, the change goes
+      // with it, and the ask restarts the shell.
+      var launches = harness.updateCall + "\n" + harness.updateCall + "\n" + harness.updateCall + "\n"
+      openWindow()
+      clickOffer()
+      var launched = within(5000, function() { return calls() === launches })
+      closeWindow()
       var dataFile = Quickshell.env("HOME") + "/.config/omarchy/grvc.stonks.json"
       var good = harness.readFile(dataFile)
       run(["bash", "-c", "printf '{\\n' > \"$1\"", "--", dataFile])
       var broken = within(3000, function() { return service.settingsUnreadable })
       service.persist({ changeMode: service.changeMode === "abs" ? "pct" : "abs" })
-      openWindow()
-      var unsavedSaid = within(3000, function() { return footer() === "Your changes aren't saved · fix or remove grvc.stonks.json" })
-      clickOffer()
-      var alone = within(5000, function() { return calls() === harness.updateCall + "\n" + harness.updateCall + "\n" + harness.updateAloneCall + "\n" })
-      closeWindow()
+      askRestart()
+      // Time for a restart the ask must not start to show in omarchy.calls.
+      wait(200)
+      var held = service.editsUnsaved && calls() === launches
       run(["bash", "-c", "printf '%s' \"$1\" > \"$2\"", "--", good, dataFile])
       var fixed = within(3000, function() { return !service.settingsUnreadable && !service.editsUnsaved })
-      harness.check("with a change unsaved, a click on \"Update to 1.0.10\" runs the update with no restart after it",
-        broken && unsavedSaid && alone && fixed, [broken, unsavedSaid, alone, fixed].join(" ") + " | " + footer() + " | " + calls())
+      askRestart()
+      var restarted = within(5000, function() { return calls() === launches + "restart shell\n" })
+      harness.check("a change left unsaved after the update's terminal opened holds back the restart the terminal asks for; with nothing unsaved, the ask restarts the shell",
+        launched && broken && held && fixed && restarted, [launched, broken, held, fixed, restarted].join(" ") + " | " + calls())
 
       // A write the manifest's watch misses, caught half done: the read its
       // event brings finds the manifest cut off, and the rest lands with no
@@ -384,7 +394,7 @@ Harness {
       run(["bash", "-c", "rm -f \"$2\" && printf '%s' \"$1\" > \"$2\"", "--", JSON.stringify(manifest, null, 2) + "\n", harness.manifestPath])
       var restart = "Updated to 1.0.10 · click to restart the shell"
       var tookOver = within(3000, function() { return footer() === restart && offer() === "" })
-      var updates = harness.updateCall + "\n" + harness.updateCall + "\n" + harness.updateAloneCall + "\n"
+      var updates = calls()
       shiftU()
       var keyRestart = within(5000, function() { return calls() === updates + "restart shell\n" })
       clickFooter()

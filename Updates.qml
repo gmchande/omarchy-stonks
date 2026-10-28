@@ -13,8 +13,8 @@ import "Release.js" as Release
 // running one (`mainVersion`, the service's, from GitHub),
 // `releasedVersion` names it, which every surface offers until it's on
 // disk, and `update()` runs the update in a terminal, where Omarchy shows
-// what changes and asks, then restarts the shell once it has moved the
-// files, unless a restart would lose changes. An update run anywhere else
+// what changes and asks. Once the update has moved the files, the terminal
+// asks for the restart (`restartForUpdate`). An update run anywhere else
 // leaves the restart to the notice.
 Item {
   id: root
@@ -27,6 +27,9 @@ Item {
   // The version on main, "" until GitHub has named one.
   property string mainVersion: ""
   readonly property string releasedVersion: Release.isNewer(mainVersion, runningVersion) ? mainVersion : ""
+  // A change Stonks hasn't saved, which a restart would lose (the
+  // service's, as the footer says it).
+  property bool changesUnsaved: false
 
   // A read asked for, by a surface opening or the file changing: its own
   // few reads again, whatever an earlier one used.
@@ -64,19 +67,26 @@ Item {
     restartShell.startDetached()
   }
 
+  // The update's terminal asks once the update has moved Stonks' files: the
+  // shell restarts, unless a change is unsaved then, and the notice waits
+  // for the save. The answer is what the terminal shows.
+  function restartForUpdate() {
+    if (changesUnsaved)
+      return "The shell didn't restart: Stonks has changes it hasn't saved, which a restart would lose. Once they're saved, click Stonks' footer to restart."
+    restart()
+    return "Restarting the shell…"
+  }
+
   // Detached, so the terminal stays whatever the shell does meanwhile, and
-  // so Stonks can't wait on it: with `restart`, the terminal's own shell
-  // restarts the shell, only when the update exits 0 with the clone's HEAD
-  // moved. A no, an "up to date", a failed fetch and a rolled-back
-  // validation leave HEAD where it was or exit 1, and Omarchy has rescanned
-  // the plugins by its exit. The launcher joins its arguments into a
-  // `bash -c` script, so the last one is shell. While the session is locked
-  // the restart refuses there. Without `restart`, for changes a restart
-  // would lose, the update runs alone. Either way the notice stays for a
-  // later click.
-  function update(restart) {
-    if (restart) updateAndRestart.startDetached()
-    else updatePlugin.startDetached()
+  // so Stonks can't wait on it: the terminal's own shell asks for the
+  // restart, only when the update exits 0 with the clone's HEAD moved. A
+  // no, an "up to date", a failed fetch and a rolled-back validation leave
+  // HEAD where it was or exit 1, and Omarchy has rescanned the plugins by
+  // its exit. One update terminal runs at a time (`flock`), so another's
+  // update can't move HEAD under this one's no. The launcher joins its
+  // arguments into a `bash -c` script, so the last one is shell.
+  function update() {
+    updatePlugin.startDetached()
   }
 
   Component.onCompleted: takeManifest(manifest.text())
@@ -107,14 +117,11 @@ Item {
 
   Process {
     id: updatePlugin
-    command: ["omarchy", "launch", "floating", "terminal", "with", "presentation", "omarchy", "plugin", "update", "grvc.stonks"]
-  }
-
-  Process {
-    id: updateAndRestart
     command: ["omarchy", "launch", "floating", "terminal", "with", "presentation",
-      "p=$HOME/.config/omarchy/plugins/grvc.stonks; was=$(git -C \"$p\" rev-parse HEAD);"
+      "p=$HOME/.config/omarchy/plugins/grvc.stonks; { if flock -n 9; then was=$(git -C \"$p\" rev-parse HEAD);"
       + " omarchy plugin update grvc.stonks && [[ $(git -C \"$p\" rev-parse HEAD) != \"$was\" ]]"
-      + " && echo 'Restarting the shell…' && omarchy restart shell"]
+      + " && omarchy-shell grvc.stonks restartForUpdate;"
+      + " else echo 'Stonks is already updating in another terminal. Close this one and answer there.'; false; fi;"
+      + " } 9> \"$XDG_RUNTIME_DIR/grvc.stonks-update.lock\""]
   }
 }

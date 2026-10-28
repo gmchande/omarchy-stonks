@@ -16,7 +16,7 @@ patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property 
 # asks for nothing.
 patch_copy plugin/Service.qml 's/^  function refresh() {$/  property int testRefreshes: 0\n&\n    testRefreshes++/'
 # Shift+U reaches the version watch's update, counted, never run.
-patch_copy plugin/Updates.qml 's/^  function update(restart) {$/  property int testUpdates: 0\n&\n    testUpdates++; return/'
+patch_copy plugin/Updates.qml 's/^  function update() {$/  property int testUpdates: 0\n&\n    testUpdates++; return/'
 # The flows wait for the quote feed to go quiet: nothing in flight or queued.
 patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testFeed: feed'
 scratch_home v1-data.json grvc.stonks.json

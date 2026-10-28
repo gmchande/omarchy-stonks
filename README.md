@@ -294,9 +294,11 @@ personal use, so either may change or stop without notice.
   your screenshots folder and name the file, `wl-copy` for the clipboard,
   and `omarchy-notification-send`.
 - Only when you ask for an update: a terminal running
-  `omarchy plugin update grvc.stonks`, with `git rev-parse HEAD` in
-  Stonks' folder before and after it, and `omarchy restart shell` only
-  when the update moved that folder.
+  `omarchy plugin update grvc.stonks`, with `flock` so only one runs, and
+  `git rev-parse HEAD` in Stonks' folder before and after it. When the
+  update moved that folder, the terminal runs
+  `omarchy-shell grvc.stonks restartForUpdate`, and Stonks runs
+  `omarchy restart shell` unless it has changes it hasn't saved.
 
 **Sites**, and nothing else:
 
@@ -344,8 +346,9 @@ omarchy restart shell
 
 Or, when the footer says "Update to …", click it or press `Shift+U`. A
 terminal opens and shows what changes. Say yes, and it updates Stonks and
-restarts the shell. After an update run anywhere else, the footer says
-"Updated to … · click to restart the shell". Stonks never updates itself.
+restarts the shell, unless Stonks has changes it hasn't saved. Then, or
+after an update run anywhere else, the footer says "Updated to … · click to
+restart the shell". Stonks never updates itself.
 
 ## Remove
 

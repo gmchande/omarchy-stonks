@@ -23,7 +23,13 @@ Item {
 
   Service { id: dataService; screens: host }
 
-  Updates { id: versionWatch; mainVersion: dataService.mainVersion }
+  // A restart loses a change the data file doesn't hold, as the footer's
+  // notices say (`StonksBody.unsaved`).
+  Updates {
+    id: versionWatch
+    mainVersion: dataService.mainVersion
+    changesUnsaved: dataService.settingsUnreadable ? dataService.editsUnsaved : dataService.saveFailed
+  }
 
   TrendColors { id: colors }
 
@@ -53,5 +59,6 @@ Item {
     shell: root.shell
     service: dataService
     windowHost: host
+    updates: versionWatch
   }
 }

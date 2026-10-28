@@ -10,6 +10,7 @@ Item {
   property var shell: null
   property var service: null
   property var windowHost: null
+  property var updates: null
 
   // Every pill acknowledges a refresh asked for here.
   signal refreshed()
@@ -35,5 +36,8 @@ Item {
 
     function toggleWindow(): void { if (root.windowHost) root.windowHost.toggle() }
     function openWindow(payloadJson: string): void { if (root.windowHost) root.windowHost.open(payloadJson) }
+
+    // The update's terminal, once the update has moved Stonks' files.
+    function restartForUpdate(): string { return root.updates ? root.updates.restartForUpdate() : "" }
   }
 }
