@@ -340,11 +340,13 @@ Harness {
     function test_main() {
       if (harness.mode !== "main") skip("another run")
       var start = service.now
-      // Each second, from the start, in which requests went unanswered, and
-      // how many.
+      // Each second, from the start, in which quote requests went
+      // unanswered, and how many. The window's ask for its stock's cap and
+      // P/E is no quote request, and lands in the first second or the next
+      // as the machine allows.
       var tries = []
       var noteTries = function() {
-        var sent = harness.requests().filter(function(l) { return / 000$/.test(l) }).length
+        var sent = harness.requests().filter(function(l) { return /^(chart|spark) .* 000$/.test(l) }).length
         var noted = tries.reduce(function(n, t) { return n + t.sent }, 0)
         if (sent > noted) tries.push({ at: service.now - start, sent: sent - noted })
       }
@@ -403,7 +405,7 @@ Harness {
       // rest; then each pause doubles from 2 s, to a minute at most, a fifth
       // either way, and whole seconds on this clock.
       var gaps = tries.slice(1).map(function(t, i) { return t.at - tries[i].at })
-      harness.check("with no network, a run, then one request alone at 2, 6, 14, 30, and 62 s: no more",
+      harness.check("with no network, a quote run, then one quote request alone at 2, 6, 14, 30, and 62 s: no more",
         tries.length >= 6 && tries.slice(1).every(function(t) { return t.sent === 1 })
           && gaps.every(function(g, i) { var pause = Math.min(2 * Math.pow(2, i), 60); return Math.abs(g - pause) <= pause / 5 + 1 }),
         tries.map(function(t) { return t.at + " s ×" + t.sent }).join(", "))
