@@ -147,20 +147,24 @@ Harness {
   // A screen as Hyprland reports it, for the window host (fetch.sh): on or
   // off, as it says when asked again, a turn later, as Hyprland's answer
   // comes, showing this workspace. It counts the asks it has not answered
-  // yet (`screensHeard`).
+  // yet (`screensHeard`). While `holding`, it answers none, and once let
+  // go, all of them at once.
   QtObject {
     id: screenStandIn
     property bool on: true
     property var lastIpcObject: ({ dpmsStatus: true })
     property var activeWorkspace: workspaceHere
     property int unanswered: 0
+    property bool holding: false
     function refresh() {
       unanswered++
-      Qt.callLater(function() {
-        screenStandIn.lastIpcObject = { dpmsStatus: screenStandIn.on }
-        screenStandIn.unanswered--
-      })
+      if (!holding) Qt.callLater(function() { screenStandIn.answer(1) })
     }
+    function answer(asks) {
+      screenStandIn.lastIpcObject = { dpmsStatus: screenStandIn.on }
+      screenStandIn.unanswered -= asks
+    }
+    onHoldingChanged: if (!holding && unanswered > 0) Qt.callLater(function() { screenStandIn.answer(screenStandIn.unanswered) })
   }
   // A second screen, always on, showing the other workspace.
   QtObject {
@@ -769,6 +773,29 @@ Harness {
       harness.check("a cap and P/E waiting behind another's when the window leaves sight are not asked for",
         heldOut && heldDone && leftAsks.length === 0,
         [heldOut, heldDone, leftAsks.join(", ") || "none asked"].join(" | "))
+      service.feature("NEST")
+      settle()
+      stonksToplevel.workspace = workspaceHere
+      answerScreens()
+      settle()
+      // In sight again, the stock's cap and P/E wait on the screens' answer,
+      // which is slow to come, and the window leaves sight first: they are
+      // not asked for either. The screens' last answer, trusted for a
+      // second, runs out first.
+      wait(1100)
+      screenStandIn.holding = true
+      var unsentFrom = harness.requests().length
+      service.feature("SHEL.L")
+      var unsent = within(1500, function() { return funds.busy && funds.pendingUrl !== "" })
+      stonksToplevel.workspace = workspaceThere
+      var hidden = within(3000, function() { return service.openSurfaces.length === 0 })
+      screenStandIn.holding = false
+      screensHeard()
+      var unsentDone = within(3000, function() { return !funds.busy })
+      var unsentAsks = harness.requests().slice(unsentFrom).filter(function(l) { return /^fundamentals SHEL\.L /.test(l) })
+      harness.check("a cap and P/E still waiting on the screens' answer when the window leaves sight are not asked for",
+        unsent && hidden && unsentDone && unsentAsks.length === 0,
+        [unsent, hidden, unsentDone, unsentAsks.join(", ") || "none asked"].join(" | "))
       service.feature("NEST")
       settle()
       stonksToplevel.workspace = workspaceHere
