@@ -308,13 +308,13 @@ function rowModel(quote, scrubT, mode) {
 
 // What a scrubbed moment `t` of a quote's day is measured from, shaped as
 // `Quote.change` reads it: the close the day is measured from, and its
-// open. A moment of the coming day a two-day answer holds after it is that
-// day's, as the 1D chart draws it (`Quote.tailDay`): from the quote's own
-// close, with no open yet, so a row following a scrub into the pre-market
-// reads what the hero does.
+// open. A moment of the coming day a two-day answer holds after it, once
+// that day has a print, is that day's, as the 1D chart draws it
+// (`Quote.tailDay`): from the quote's own close, with no open yet, so a
+// row following a scrub into the pre-market reads what the hero does.
 function scrubbedBase(quote, t) {
   var tail = Quote.tailStart(quote)
-  if (tail !== null && t >= tail) return { prevClose: Quote.regularClose(quote), dayOpen: null }
+  if (tail !== null && t >= tail && Quote.lastPrintTime(quote) >= tail) return { prevClose: Quote.regularClose(quote), dayOpen: null }
   return { prevClose: Quote.dayBase(quote), dayOpen: quote.dayOpen }
 }
 

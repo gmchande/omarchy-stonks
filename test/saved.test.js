@@ -501,12 +501,17 @@ test("crypto is always open, never sees a weekend, reads its last 24 hours every
   // open, low and high all read those 24 hours; the chart fills the width,
   // the dot on the newest print.
   const raw = fixture("moments/coin-2026-10-28-1322/btc-usd.json").chart.result[0]
-  const bars = raw.timestamp.map((t, i) => ({ t, p: raw.indicators.quote[0].close[i] })).filter(b => b.p !== null)
+  const q = raw.indicators.quote[0]
+  const bars = raw.timestamp.map((t, i) => ({ t, p: q.close[i], h: q.high[i], l: q.low[i] })).filter(b => b.p !== null)
   const ago = bars.filter(b => b.t <= bars.at(-1).t - DAY).at(-1)
   const coin = M.parseChart({ chart: { result: [raw] } }, cents)
-  const inDay = bars.filter(b => b.t >= ago.t).map(b => b.p)
+  // Its low and high are its bars' since then, which a close can miss.
+  const since = bars.filter(b => b.t > ago.t)
+  const low = Math.min(ago.p, ...since.map(b => b.l))
+  const high = Math.max(ago.p, ...since.map(b => b.h))
   expect([coin.points[0].t, coin.points.at(-1).t, coin.prevClose, coin.dayOpen, coin.dayLow, coin.dayHigh])
-    .toEqual([ago.t, bars.at(-1).t, ago.p, ago.p, Math.min(...inDay), Math.max(...inDay)])
+    .toEqual([ago.t, bars.at(-1).t, ago.p, ago.p, low, high])
+  expect(low < Math.min(...since.map(b => b.p)) || high > Math.max(...since.map(b => b.p))).toBe(true)
   expect(ago.t).toBeLessThan(Date.UTC(2026, 9, 28) / 1000)
   const row = M.rowModel(coin, 0, "pct")
   expect([row.changeText, row.periodLabel, M.dayTitle(coin, M.exchangeDay(coin, coin.marketTime))])
@@ -2106,6 +2111,9 @@ test("until 04:00 every listing's 1D chart is its last session and the night aft
   // hero's move, from Thursday's close, not Wednesday's.
   const fiveAm = nvda.quote.points.find(p => p.t >= at("2026-10-23", "05:00")).t
   expect(M.rowModel(nvda.quote, fiveAm, "pct").changeText).toBe(M.rowModel(nvda.day, fiveAm, "pct").changeText)
+  // WREN, with no pre-market print, is still on Thursday: a row of it at
+  // that moment reads its last print against its own chart's dashed line.
+  expect(M.rowModel(wren.quote, fiveAm, "pct").changeText).toBe(M.rowModel(wren.day, wren.day.points.at(-1).t, "pct").changeText)
   expect(M.rowModel(nvda.quote, 0, "pct").changeText).toBe("\u22124.40%")
   expect(sessionDate(gspc.day)).toBe("2026-10-22")
 })
@@ -2249,6 +2257,10 @@ test("a listing Robinhood doesn't trade all day draws Yahoo's day, filling the w
   expect(M.timeAtFraction(brk.day, 1)).toBe(at("2026-10-23", "16:00"))
   const early = notAllDay("watch-2026-10-25-1000", "brk-a", "BRK-A", at("2026-10-23", "19:00")).day
   expect(M.chartGeometry(early).points.at(-1).x).toBe(0.75)
+  // CVR's Friday, its last trade 15:35: over, that trade sits on the right
+  // edge, and the 16:00 close after it has no tick left of it.
+  const cvrFriday = notAllDay("watch-2026-10-25-1000", "cvr", "CVR", answeredAt("watch-2026-10-25-1000")).day
+  expect([cvrFriday.points.at(-1).t, M.chartGeometry(cvrFriday).ticks]).toEqual([at("2026-10-23", "15:35"), []])
   // Friday 06:00, AAPL read as a listing Robinhood doesn't trade all day:
   // its two-day answer holds Friday's pre-market, so the chart is Friday's
   // day from its first print, dashed at Thursday's close, with no dot.

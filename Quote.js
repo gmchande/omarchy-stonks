@@ -287,9 +287,12 @@ function parseChart(json, centExchanges, receivedAt) {
   var quote = (result.indicators && result.indicators.quote && result.indicators.quote[0]) || {}
   var closes = Format.fetchedList(quote.close || [], MOST_BARS)
   var opens = Format.fetchedList(quote.open || [], MOST_BARS)
-  // Shares traded in each bar, which the stray filter reads; none read from
-  // an answer without them, as spark's.
+  // Shares traded in each bar, which the stray filter reads, and its high
+  // and low, which a coin's day reads (`coinDay`); none read from an answer
+  // without them, as spark's.
   var volumes = quote.volume ? Format.fetchedList(quote.volume, MOST_BARS) : null
+  var highs = quote.high ? Format.fetchedList(quote.high, MOST_BARS) : null
+  var lows = quote.low ? Format.fetchedList(quote.low, MOST_BARS) : null
   var clocks = answerClocks(meta.tradingPeriods)
   var current = meta.currentTradingPeriod || {}
   if (!timestamps || !closes || !opens || !clocks || !currentPeriods(current)) return null
@@ -317,7 +320,7 @@ function parseChart(json, centExchanges, receivedAt) {
   for (var i = 0; i < timestamps.length; i++) {
     if (!Format.isMoment(timestamps[i]) || (i > 0 && !(timestamps[i] > timestamps[i - 1]))) return null
     if (knownPrice(closes[i]) !== null && (from === null || timestamps[i] >= from))
-      bars.push({ t: timestamps[i], o: opens[i], c: closes[i], v: volumes ? volumes[i] : null })
+      bars.push({ t: timestamps[i], o: opens[i], c: closes[i], v: volumes ? volumes[i] : null, h: highs ? highs[i] : null, l: lows ? lows[i] : null })
   }
   var filtered = filterStrayCloses(bars, periods, answerTick(meta, bars, centExchanges))
   var kept = filtered.bars
@@ -446,33 +449,36 @@ function parseChart(json, centExchanges, receivedAt) {
       openSession: firstRegular ? regular.start : null
     } : null
   }
-  var rolled = coin ? coinDay(points) : null
+  var rolled = coin ? coinDay(points, kept) : null
   return rolled ? Object.assign(out, rolled) : out
 }
 
 // A cryptocurrency never closes, so its day is the last 24 hours of its
 // prints (`points`, an answer reaching back that far: `Market.twoDays`):
 // from the print 24 hours before the newest, the price the move is
-// measured from and the day's open, to the newest, with the low and high
-// between them, so the move, the chart, its dashed line and the day's
-// figures read the same 24 hours, the rows and the pill too (`rolling`).
-// One continuous session. Null for an answer that doesn't reach back 24
-// hours, as a one-day answer may not, whose quote stays Yahoo's UTC day.
-function coinDay(points) {
+// measured from and the day's open, to the newest, so the move, the chart,
+// its dashed line and the day's figures read the same 24 hours, the rows
+// and the pill too (`rolling`). Its low and high are its bars' (`bars`)
+// since then, which a close can miss; unknown from an answer without
+// them, spark's. One continuous session. Null for an answer that doesn't
+// reach back 24 hours, as a one-day answer may not, whose quote stays
+// Yahoo's UTC day.
+function coinDay(points, bars) {
   var newest = points.length ? points[points.length - 1] : null
   var first = 0
   while (newest && first + 1 < points.length && points[first + 1].t <= newest.t - 86400) first++
   if (!newest || points[first].t > newest.t - 86400) return null
   var day = points.slice(first)
-  var prices = day.map(function(p) { return p.p })
+  var since = bars.filter(function(b) { return b.t > day[0].t })
+  var ranged = since.length > 0 && since.every(function(b) { return knownPrice(b.h) !== null && knownPrice(b.l) !== null })
   return {
     rolling: true,
     points: day,
     prevClose: day[0].p,
     dayOpen: day[0].p,
     openSession: null,
-    dayHigh: Math.max.apply(null, prices),
-    dayLow: Math.min.apply(null, prices),
+    dayHigh: ranged ? Math.max.apply(null, since.map(function(b) { return b.h }).concat([day[0].p])) : null,
+    dayLow: ranged ? Math.min.apply(null, since.map(function(b) { return b.l }).concat([day[0].p])) : null,
     figuresDay: day[0].t,
     nextDayBegun: false,
     session: { pre: null, regular: { start: day[0].t, end: newest.t }, post: null }

@@ -213,9 +213,12 @@ function printIndexAt(quote, t) {
 
 // Where a tick at `t` sits: by print, halfway between the day's prints
 // either side of it, and by the clock past the newest; -1 before the first.
+// A day that is over has nothing past its newest print, on the right edge
+// (`newestFraction`): a tick there sits on the edge, where none is drawn.
 function tickFraction(quote, axis, t) {
   var pts = quote.points
   var n = dayPrints(quote, axis)
+  if (axis.byPrint && axis.over && n && t > pts[n - 1].t) return 1
   if (!axis.byPrint || !n || t > pts[n - 1].t) return axisFraction(axis, t)
   var k = printIndexAt(quote, t - 1) + 1
   if (k === 0) return -1
