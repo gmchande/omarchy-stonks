@@ -450,8 +450,10 @@ Harness {
       wait(300) // every frame of the open's first 300 ms is read
       frames.running = false
       var openRuns = harness.runs().slice(runsBefore)
-      harness.check("an open mid-session asks only for the stale, the crypto and Tokyo, in one run, one spark request",
-        openRuns.length === 1 && openRuns[0] === "spark:BTC-USD,7203.T", openRuns.join(" / "))
+      // The coin goes in a spark request of its own, asked for two days, so
+      // the rest stay one day: Tokyo alone is a chart.
+      harness.check("an open mid-session asks only for the stale, the crypto and Tokyo, in one run, the coin in a request of its own",
+        openRuns.length === 1 && openRuns[0] === "chart:7203.T spark:BTC-USD", openRuns.join(" / "))
       harness.check("an open mid-session shows no warning and no As of on any frame", shownMarks.length === 0, shownMarks.join(" | "))
       closeWindow()
       tick(30)
