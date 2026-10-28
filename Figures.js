@@ -158,19 +158,20 @@ function extendedStack(quote, latest, now, day, changeMode) {
 // time where the listing trades, the zone named where the reader's
 // differs). A bar is five minutes of trades, so the words speak of the
 // chart, not of each trade. "" otherwise, and for an empty day before its
-// session opens at `now`: an index has no print before its bell. Nor while
-// the one point may still be the session's first bar, forming: Yahoo's
-// live moment, which it stamps at the price's own second, apart from the
-// bars at their five-minute starts, stands alone while the first bar has
-// no close yet (^GSPC at 09:30:25; London's at 08:02, seen 15 minutes
-// late), and a bar is whole only once `now` is past its five minutes. Nor
+// session opens at `now`: an index has no print before its bell. Nor for
+// one bar before its day is over at `now`, its last hour ended (its
+// session's, or a 1D chart's own, its night's close where a night follows
+// it: `axis.closes`): only then is it the only one. The S&P 500's first
+// bar at 09:35 and Sunday night's first at 20:05 are the first of many.
+// Nor for Yahoo's live moment, which it stamps at the price's own second,
+// apart from the bars at their five-minute starts. Nor
 // for an empty day whose quote is a trade of its session, with a price and
 // a volume beside the chart: WREN's 09:30 trade with no bar at 09:37.
 function dayNote(day, now, calendars) {
   if (!day) return ""
   var pts = day.points
-  var bar = 5 * 60
-  if (pts.length === 1) return pts[0].t % bar === 0 && now >= pts[0].t + bar ? "Traded only at " + Market.printClock(day, pts[0].t, calendars) : ""
+  var over = now >= (day.axis && day.axis.closes ? day.axis.closes : Quote.dayEnd(day))
+  if (pts.length === 1) return pts[0].t % (5 * 60) === 0 && over ? "Traded only at " + Market.printClock(day, pts[0].t, calendars) : ""
   if (pts.length > 1) return ""
   var regular = day.session.regular
   if (!regular) return "No trades charted"

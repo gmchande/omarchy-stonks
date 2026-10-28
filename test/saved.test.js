@@ -1907,6 +1907,12 @@ test("a weekend shows Friday from midnight to 20:00, filling the width, then Sun
   // 20:00 to midnight.
   expect(M.chartSpan(dayAt("watch-2026-10-25-1950", "nbis").day).start).toBe(at("2026-10-23", "00:00"))
   expect(M.chartSpan(dayAt("watch-2026-10-25-2005", "nbis").day)).toMatchObject({ start: at("2026-10-25", "20:00"), end: at("2026-10-26", "00:00") })
+  // Its one print is the night's first, not its only one: no "Traded only
+  // at 20:00" while the night runs, to its close at 04:00.
+  const lone = dayAt("watch-2026-10-25-2005", "nbis").day
+  expect([lone.points.length, M.dayNote(lone, at("2026-10-25", "20:06"), calendars), M.dayNote(lone, at("2026-10-26", "03:59"), calendars)])
+    .toEqual([1, "", ""])
+  expect(M.dayNote(lone, at("2026-10-26", "04:00"), calendars)).toBe("Traded only at 20:00")
   // Sunday 23:35: the night alone, dashed at Friday's close, the one the
   // move under the price is measured from, so a scrub of the newest print
   // and the line under the price say the same. No regular print, no dot.

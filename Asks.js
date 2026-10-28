@@ -121,18 +121,25 @@ function laneJudging(toJudge, asked, held) {
 // batches of up to `Quote.SPARK_BATCH`, each in the order asked, so one the
 // budget held goes before those asked since. A batch of one is a chart: one
 // request either way, and the chart's has opens, so its day needs no
-// judging. A feed that isn't `bulk`, the preview's, asks only charts.
-function quoteSlots(waiting, asked, symbols, lead, heroes, bulk) {
+// judging. The coins (`coins`) go in spark batches of their own, one alone
+// too: a coin is asked for two days (`Market.twoDays`), and a batch asks
+// two for all when one of them wants two, so beside the stocks it would
+// double their answer; its open is its price 24 hours ago, read from the
+// closes. A feed that isn't `bulk`, the preview's, asks only charts.
+function quoteSlots(waiting, asked, symbols, lead, heroes, bulk, coins) {
   var order = waiting.slice().sort(function(a, b) {
     return (b === lead) - (a === lead) || asked[a] - asked[b] || symbols.indexOf(a) - symbols.indexOf(b)
   })
   var charted = function(s) { return !bulk || heroes.indexOf(s) >= 0 }
+  var coin = function(s) { return !!coins && coins.indexOf(s) >= 0 }
   var slots = order.filter(charted).map(function(s) { return { symbols: [s], spark: false } })
-  var batched = order.filter(function(s) { return !charted(s) })
+  var batched = order.filter(function(s) { return !charted(s) && !coin(s) })
   for (var i = 0; i < batched.length; i += Quote.SPARK_BATCH) {
     var batch = batched.slice(i, i + Quote.SPARK_BATCH)
     slots.push({ symbols: batch, spark: batch.length > 1 })
   }
+  var coined = order.filter(function(s) { return !charted(s) && coin(s) })
+  for (var j = 0; j < coined.length; j += Quote.SPARK_BATCH) slots.push({ symbols: coined.slice(j, j + Quote.SPARK_BATCH), spark: true })
   return slots
 }
 

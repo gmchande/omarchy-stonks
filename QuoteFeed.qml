@@ -14,7 +14,8 @@ import "Quote.js" as Quote
 // refresh. The pill's symbol (`lead`) goes first in a run; it and any other
 // hero's (`heroes`) go on the chart endpoint, whose opens a hero's line and
 // the day's open need. The rest go in spark batches of up to 20
-// (`Quote.sparkUrl`), closes only, judged by each listing's last chart
+// (`Quote.sparkUrl`), the coins in their own (`Asks.quoteSlots`), closes
+// only, judged by each listing's last chart
 // verdict (`Quote.sparkQuote`), which also carries the day's open. One whose
 // spark day holds a jump that verdict can't speak for, or a session opened
 // since it, shows all the same, and waits to be judged on the
@@ -242,7 +243,8 @@ Item {
     var waiting = Asks.laneWaiting(symbols, asked, entries, first, held)
     var judging = first ? [] : Asks.laneJudging(toJudge, asked, held)
     if ((waiting.length === 0 && judging.length === 0) || (clearance && !clearance())) return
-    var slots = Asks.quoteSlots(waiting, asked, symbols, lead, heroes, bulk)
+    var coins = waiting.filter(function(s) { return !!quotes[s] && !!quotes[s].crypto })
+    var slots = Asks.quoteSlots(waiting, asked, symbols, lead, heroes, bulk, coins)
     var granted = slots.length > 0 && gate ? gate.take(slots.length, bulk) : slots.length
     var run = slots.slice(0, granted)
     for (var j = 0; slots.length === 0 && j < Math.min(judging.length, judgeRun) && (!gate || (gate.spare() && gate.take(1, bulk) === 1)); j++)

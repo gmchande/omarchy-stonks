@@ -1086,15 +1086,16 @@ test("weeks and months either side of 25 October and 1 November keep their dates
   expect(coin.bars.map(bar => M.historyScrubForms(coin, bar)[1])).toEqual(["WEEK OF 26 OCT", "WEEK OF 31 OCT"])
 })
 
-test("a session's one bar says nothing until its five minutes are past", () => {
-  // An index's opening bar with its close already in, three minutes into
-  // the session, must not read "Traded only at 09:30".
+test("a session's one bar says nothing until its day is over", () => {
+  // An index's opening bar at 09:35, five minutes into the session, is the
+  // first of the day's bars, not its only one: "Traded only at 09:30"
+  // waits for the close.
   const bell = at("2026-10-20", "09:30")
   const day = { symbol: "^GSPC", exchange: "S&P", instrumentType: "INDEX", gmtoffset: -14400,
     session: { pre: null, regular: { start: bell, end: at("2026-10-20", "16:00") }, post: null },
     points: [{ t: bell, p: 100 }] }
-  expect(M.dayNote(day, bell + 180, calendars)).toBe("")
-  expect(M.dayNote(day, bell + 300, calendars)).toBe("Traded only at 09:30")
+  expect(["09:33", "09:35", "15:59"].map(c => M.dayNote(day, at("2026-10-20", c), calendars))).toEqual(["", "", ""])
+  expect(M.dayNote(day, at("2026-10-20", "16:00"), calendars)).toBe("Traded only at 09:30")
 })
 
 test("Robinhood's word on all-day trading is asked once, again a day on, or five minutes after a failure", () => {
@@ -1189,6 +1190,10 @@ test("a quote run charts the pill's quote first and the other heroes next, then 
   // The preview's feed asks only charts.
   expect(M.quoteSlots(["P", "Q"], { P: 1, Q: 1 }, ["P", "Q"], "", [], false))
     .toEqual([{ symbols: ["P"], spark: false }, { symbols: ["Q"], spark: false }])
+  // A coin, asked for two days, goes in a spark request of its own, alone
+  // too, so the stocks' batch stays one day.
+  expect(M.quoteSlots(["A", "BTC-USD", "B", "C"], { A: 1, "BTC-USD": 1, B: 1, C: 1 }, ["A", "BTC-USD", "B", "C"], "", [], true, ["BTC-USD"]))
+    .toEqual([{ symbols: ["A", "B", "C"], spark: true }, { symbols: ["BTC-USD"], spark: true }])
   // Each lane runs its own kind, a first answer (none yet, or a quote kept
   // from an earlier session) or a refresh, never one cooling after a bad
   // answer or out on a run; a day waiting to be judged goes only when its

@@ -440,8 +440,10 @@ function dayChart(quote, answer, calendars) {
       prevClose: own ? quote.prevClose : Quote.regularClose(quote),
       dayOpen: own ? quote.dayOpen : null,
       openSession: own ? quote.openSession : null,
+      // `closes`: when the day's last hour ends, its night's close where a
+      // night follows it (`Figures.dayNote`).
       axis: { start: start, end: end, ticks: windowTicks(cal, win, session, latest), byPrint: true, over: over,
-        night: thin ? win.night : null },
+        night: thin ? win.night : null, closes: win.night ? win.night.end : win.end },
       calendar: cal
     }),
     latest: latest
