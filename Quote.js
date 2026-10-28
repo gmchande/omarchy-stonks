@@ -302,15 +302,17 @@ function parseChart(json, centExchanges, receivedAt) {
   // and the bars of the day after it (`next`), the coming day's pre-market,
   // stay as its tail, each with its session. Without the quote's time, the
   // last day with a regular-session bar, so before the open the session is
-  // still the last one. A one-day answer is its day.
+  // still the last one. A one-day answer is its day. A cryptocurrency's
+  // answer is read whole, every day of it, for its last 24 hours (`coinDay`).
   var quoted = Format.isFiniteNumber(meta.regularMarketTime) && meta.regularMarketTime > 0 ? meta.regularMarketTime : null
+  var coin = meta.instrumentType === "CRYPTOCURRENCY"
   var days = meta.tradingPeriods ? answerDays(meta.tradingPeriods) : [current]
   var since = function(d) { return quoted !== null ? quoted : barIn(timestamps, closes, days[d].regular) }
   var chosen = 0
   for (var d = 1; d < days.length; d++) if (days[d].regular && since(d) !== null && days[d].regular.start <= since(d)) chosen = d
   var periods = days[chosen]
-  var next = chosen + 1 < days.length ? days[chosen + 1] : null
-  var from = chosen > 0 ? periodsStart(periods) : null
+  var next = !coin && chosen + 1 < days.length ? days[chosen + 1] : null
+  var from = !coin && chosen > 0 ? periodsStart(periods) : null
   var bars = []
   for (var i = 0; i < timestamps.length; i++) {
     if (!Format.isMoment(timestamps[i]) || (i > 0 && !(timestamps[i] > timestamps[i - 1]))) return null
@@ -363,7 +365,7 @@ function parseChart(json, centExchanges, receivedAt) {
   var nextDayBegun = index ? !!nextDay && Format.isFiniteNumber(receivedAt) && receivedAt >= nextDay.start : !!next
   var symbol = Format.fetchedText(meta.symbol, Format.MOST_CODE)
   var instrumentType = Format.fetchedText(meta.instrumentType, Format.MOST_CODE)
-  return {
+  var out = {
     symbol: symbol,
     // The long name, as search takes it: the short one arrives in capitals
     // for some listings and is cut at 31 characters.
@@ -409,6 +411,10 @@ function parseChart(json, centExchanges, receivedAt) {
     // The start of the session the day's open, high, low, and volume are.
     figuresDay: figuresDay,
     nextDayBegun: nextDayBegun,
+    // Whether the answer came once its day had ended, its post-market or
+    // else its regular session: its prints are all the day will have, and
+    // its chart fills the width (`Overnight.sessionDay`).
+    wholeDay: !!regular && Format.isFiniteNumber(receivedAt) && receivedAt >= (periods.post || periods.regular).end,
     session: {
       pre: index ? null : periodOf(periods.pre),
       regular: regular,
@@ -439,6 +445,35 @@ function parseChart(json, centExchanges, receivedAt) {
       open: firstRegular ? knownPrice(firstRegular.o) : null,
       openSession: firstRegular ? regular.start : null
     } : null
+  }
+  return coin ? Object.assign(out, coinDay(points)) : out
+}
+
+// A cryptocurrency never closes, so its day is the last 24 hours of its
+// prints (`points`, an answer reaching back that far: `Market.twoDays`):
+// from the print 24 hours before the newest, the price the move is
+// measured from and the day's open, to the newest, with the low and high
+// between them, so the move, the chart, its dashed line and the day's
+// figures read the same 24 hours, the rows and the pill too. An answer
+// that doesn't reach back 24 hours has no such price: its move is unknown.
+// One continuous session, every print of it regular (`pointSession`).
+function coinDay(points) {
+  var newest = points.length ? points[points.length - 1] : null
+  var first = 0
+  while (newest && first + 1 < points.length && points[first + 1].t <= newest.t - 86400) first++
+  var base = newest && points[first].t <= newest.t - 86400 ? points[first] : null
+  var day = base ? points.slice(first) : points
+  var prices = day.map(function(p) { return p.p })
+  return {
+    points: day,
+    prevClose: base ? base.p : null,
+    dayOpen: base ? base.p : null,
+    openSession: null,
+    dayHigh: prices.length ? Math.max.apply(null, prices) : null,
+    dayLow: prices.length ? Math.min.apply(null, prices) : null,
+    figuresDay: day.length ? day[0].t : null,
+    nextDayBegun: false,
+    session: { pre: null, regular: day.length ? { start: day[0].t, end: newest.t } : null, post: null }
   }
 }
 
@@ -711,11 +746,27 @@ function change(quote, priceNow, mode) {
 
 // A print's session: its own tag where the series carries one, else where it
 // falls against the response's regular session. Buckets are stamped by their
-// start, so the one stamped at the bell is post-market.
+// start, so the one stamped at the bell is post-market, but for the closing
+// trade's (`closingPrint`). A cryptocurrency's are all one session's.
 function pointSession(quote, pt) {
   if (pt.s) return pt.s
+  if (quote.crypto) return "reg"
   var reg = regularOrPrints(quote)
+  if (pt.t === reg.end && closingPrint(quote, pt)) return "reg"
   return pt.t >= reg.end ? "post" : pt.t < reg.start ? "pre" : "reg"
+}
+
+// Whether the bucket stamped at the bell (`pt`) holds the session's closing
+// trade: Yahoo's regular price, stamped inside that bucket, is its close.
+// It is the regular session's last print, so the dot and the line's bright
+// part end on the close the headline shows: CVR's Monday 26 October traded
+// at 13:10 for 10.55 and closed at 16:00 for 9.82, down 6.48%, and with
+// the close counted as after hours the dot sat green on 10.55. London
+// stamps its close an hour on, past its bucket (`readingAt`).
+function closingPrint(quote, pt) {
+  var t = quote.marketTime
+  return !!quote.session.regular && Format.isFiniteNumber(quote.price) && t !== null && t >= pt.t && t < pt.t + 300
+    && sameClose(pt.p, quote.price)
 }
 
 // The regular session, or the prints' own span when Yahoo sent none.
@@ -749,6 +800,28 @@ function dayEnd(quote) {
 // quote with nothing after its day.
 function tailStart(quote) {
   return quote.next ? periodsStart(quote.next) : null
+}
+
+// The coming day a two-day answer holds after a quote's day (`next`), once
+// it has a print, shaped as a quote: its periods, and its prints from its
+// start (`tailStart`), with no open yet; measured from the quote's own
+// close, the last before it (`dayBase`). Null before its first print, when
+// the day the 1D chart shows is still the quote's: a new day takes over
+// only once it has a print. The headline and the day's figures stay the
+// quote's.
+function tailDay(quote) {
+  var from = tailStart(quote)
+  var pts = quote.points
+  if (from === null || !pts.length || pts[pts.length - 1].t < from) return null
+  return Object.assign({}, quote, {
+    session: quote.next,
+    next: null,
+    points: pts.filter(function(p) { return p.t >= from }),
+    prevClose: regularClose(quote),
+    dayOpen: null,
+    openSession: null,
+    wholeDay: false
+  })
 }
 
 function bucketTimes(times) {

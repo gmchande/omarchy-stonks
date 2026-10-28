@@ -12,19 +12,19 @@
 // the day once its quote is in; for a US stock or ETF once Robinhood has said
 // whether it trades it all day too (`allDay`, answers only, a failed one not
 // all-day), and, for one it does, once the overnight feed has answered
-// (`nights`, answers only), when the day is its last session and what came
-// after it until the next open (`Overnight.dayChart`), and for one it does
-// not, Yahoo's own day and what a two-day answer holds after it
-// (`Overnight.sessionDay`); a range once its history and the symbol's quote
-// are, since the headline is never the last bar. A range takes the day
-// too once it is in, for the night's print under the price, and never waits
-// for it.
+// (`nights`, answers only), when the day is one trading day, the newest
+// print's (`Overnight.dayChart`), and for one it does not, Yahoo's own day
+// (`Overnight.sessionDay`); any other listing's is its quote's day, or the
+// coming day a two-day answer holds once it has a print (`Quote.tailDay`):
+// London's or Tokyo's stays the last until its first bar lands. A range
+// once its history and the symbol's quote are, since the headline is never
+// the last bar. A range takes the day too once it is in, for the night's
+// print under the price, and never waits for it.
 // `quote` is Yahoo's, as it came: the headline and the day's figures. `day`
-// is what the 1D chart draws and a scrub of it reads, the quote itself
-// outside the US; `latest` is the newest print of all, for the line under
-// the price, or null where the quote's own last print is it; `allDay`,
-// whether Robinhood has said it trades the listing all day, so its nights
-// trade (`Overnight.marketAsleep`).
+// is what the 1D chart draws and a scrub of it reads; `latest` is the
+// newest print of all, for the line under the price, or null where the
+// quote's own last print is it; `allDay`, whether Robinhood has said it
+// trades the listing all day, so its nights trade (`Overnight.marketAsleep`).
 // `histories` holds answers only (HistoryFeed): history in hand is drawn
 // while a refetch is out and after one fails. A first fetch that failed is
 // an answer too: a quote's, on any range, shows the symbol with no quote and
@@ -35,7 +35,8 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
   var quote = quotes[symbol] || null
   var quoteFailed = !quote && !!entries[symbol] && entries[symbol].status === "failed"
   if (!quote && !quoteFailed) return null
-  var chart = { symbol: symbol, range: range, quote: quote, day: quote, latest: null, history: null, failed: false, allDay: false }
+  var chart = { symbol: symbol, range: range, quote: quote, day: quote && (Quote.tailDay(quote) || quote), latest: null,
+    history: null, failed: false, allDay: false }
   if (quote && Overnight.hasOvernight(quote, calendars)) {
     // A listing never asked of Robinhood (`allDay` not given, as in a
     // harness that stubs the service) has Yahoo's own day.
@@ -187,10 +188,13 @@ function dayPrints(quote, axis) {
 }
 
 // Where the clock puts the day's newest print, 0..1: the end of the prints'
-// room.
+// room. A day that is over (`axis.over`) fills the width, its newest print
+// on the right edge, whatever its time: SHOP's last bar of Friday 23
+// October was 19:05's.
 function newestFraction(quote, axis) {
   var n = dayPrints(quote, axis)
-  return n ? Format.clamp(axisFraction(axis, quote.points[n - 1].t), 0, 1) : 0
+  if (!n) return 0
+  return axis.over ? 1 : Format.clamp(axisFraction(axis, quote.points[n - 1].t), 0, 1)
 }
 
 function printFraction(quote, axis, k) {

@@ -210,8 +210,10 @@ function dayLine(quote, today) {
 
 // The day line's title, three letters at most, as a range's token is:
 // "1D" for today's figures (`today` is `exchangeDay` of the clock), else
-// their session's name (`pastDayName`).
+// their session's name (`pastDayName`); a cryptocurrency's, its last 24
+// hours (`Quote.coinDay`), "24H".
 function dayTitle(quote, today) {
+  if (quote.crypto) return "24H"
   return pastDayName(quote, quote.figuresDay, today) || "1D"
 }
 
@@ -234,7 +236,7 @@ function dayName(quote, t, today) {
 
 // Every title `dayTitle` can give.
 function dayTitles() {
-  return ["1D"].concat(Format.WEEKDAYS.map(function(w) { return w.toUpperCase() }), Format.MONTHS)
+  return ["1D", "24H"].concat(Format.WEEKDAYS.map(function(w) { return w.toUpperCase() }), Format.MONTHS)
 }
 
 // How the list reads on the figures its rows show: up, flat, and down, and
@@ -257,7 +259,7 @@ function listBreadth(symbols, quotes, scrubT, mode) {
 // `Quote.change` reads it: at rest the headline's (`Quote.headlineBase`),
 // and a scrubbed moment the dashed line's (`scrubbedBase`).
 function measuredAt(quote, scrubT) {
-  return scrubT ? scrubbedBase(quote) : Quote.headlineBase(quote)
+  return scrubT ? scrubbedBase(quote, scrubT) : Quote.headlineBase(quote)
 }
 
 // The one projection every price on screen comes from. The headline is
@@ -266,10 +268,10 @@ function measuredAt(quote, scrubT) {
 // non-zero scrubT reads that moment of the day (`Quote.readingAt`), its
 // change from the close the dashed line is at (`Quote.dayBase`): before the
 // open, the last session's close. Every print the chart draws reads from
-// that one close, the night's and the coming day's pre-market's after the
-// day too, so wherever the pointer is the change and the animal say where
-// that price stands against the dashed line; at rest the line under the
-// price still measures the night from the day's own close (`extendedStack`).
+// that one close, the night's too, so wherever the pointer is the change
+// and the animal say where that price stands against the dashed line; at
+// rest the line under the price still measures the night from the day's
+// own close (`extendedStack`).
 // dayUp is always versus that close, so the chart fill does not flip when
 // the change mode does, and it is the direction at the moment shown, as a
 // range's is. dayTone is that change's tone, flat when it rounds to nothing,
@@ -299,13 +301,19 @@ function rowModel(quote, scrubT, mode) {
     dayTone: Format.changeTone(direction, "pct", quote.priceDigits),
     changeText: Format.changeText(chg, mode, quote.priceDigits),
     changeLine: Format.changeText(chg, mode, quote.priceDigits) + (mode === "open" && chg.pct !== null ? " open" : ""),
-    periodLabel: Format.changeCaption(mode)
+    periodLabel: quote.crypto && mode !== "open" ? "24H" : Format.changeCaption(mode)
   }
 }
 
-// What a scrubbed moment of a quote's day is measured from, shaped as
-// `Quote.change` reads it: the close the day is measured from, and its open.
-function scrubbedBase(quote) {
+// What a scrubbed moment `t` of a quote's day is measured from, shaped as
+// `Quote.change` reads it: the close the day is measured from, and its
+// open. A moment of the coming day a two-day answer holds after it is that
+// day's, as the 1D chart draws it (`Quote.tailDay`): from the quote's own
+// close, with no open yet, so a row following a scrub into the pre-market
+// reads what the hero does.
+function scrubbedBase(quote, t) {
+  var tail = Quote.tailStart(quote)
+  if (tail !== null && t >= tail) return { prevClose: Quote.regularClose(quote), dayOpen: null }
   return { prevClose: Quote.dayBase(quote), dayOpen: quote.dayOpen }
 }
 

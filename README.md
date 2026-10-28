@@ -84,8 +84,10 @@ Yahoo's rate for the day, inside the P/E and nowhere else.
 The top line names the moment in the market's day, such as Power hour, and
 says when the market opens or closes, by the exchange's clock. A smaller
 line under the price shows the pre-market, after-hours, or overnight price.
-Between sessions, the 1D chart shows the last session, then the night and
-pre-market trades after it.
+The 1D chart shows one trading day, from the first hour the stock can trade
+that day to the last, and all weekend it shows Friday. A night stays on
+the chart it began on until 04:00, New York time. A coin never closes, so
+its chart, its change, and its low and high cover the last 24 hours.
 
 A price says "As of" and its time when it's old: more than two minutes
 behind while its market trades, or saved from before and not yet

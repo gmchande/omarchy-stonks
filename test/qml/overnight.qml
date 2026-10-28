@@ -185,9 +185,9 @@ Harness {
       var sundayCalls = Number(harness.record("OVERNIGHT.calls"))
       service.now = harness.sunday + 5 * 60
       within(2000, function() { return Number(harness.record("OVERNIGHT.calls")) > sundayCalls })
-      check("while a night trades, the open surface asks every five minutes, for the last hour only",
+      check("while a night trades, the open surface asks every five minutes, for the last hour only, the chart Sunday's night from 20:00",
         Number(calls) + 1 === sundayCalls && Number(harness.record("OVERNIGHT.calls")) === sundayCalls + 1 && lastSpan() === "hour"
-          && within(2000, function() { return body.featuredGeometry.start === harness.midnight.fri25 && harness.strip() === "OVERNIGHT 22:20 234.84 \u22121.05%" }),
+          && within(2000, function() { return body.featuredGeometry.start === harness.midnight.fri25 + 2 * 86400 + 20 * 3600 && harness.strip() === "OVERNIGHT 22:20 234.84 \u22121.05%" }),
         calls + ", " + sundayCalls + ", " + harness.record("OVERNIGHT.calls") + " " + lastSpan() + " | " + harness.strip())
 
       // Monday 04:11, the night's last bars due, and Robinhood down.
@@ -291,7 +291,8 @@ Harness {
       within(3000, function() { return !body.adding && body.chartSymbol === "SILK" && !body.chartLoading })
 
       // Monday 5 October, 00:36, the first live night: TOY traded five
-      // times since Sunday 20:00, the last at 00:20.
+      // times since Sunday 20:00, the last at 00:20, and its chart is that
+      // night's, running on past midnight.
       useSet("live-2026-10-05")
       service.now = harness.live
       pressKey(Qt.Key_R)
@@ -303,10 +304,10 @@ Harness {
         featureShown("TOY")
         var toy = body.featuredDay
         var offset = service.quotes.TOY.gmtoffset
-        // Since Sunday 20:00.
-        var trades = toy.points.filter(function(p) { return p.t >= harness.midnight.fri2 + 2 * 86400 + 20 * 3600 })
-        // Four minutes into its bar: retro maps the pointer to its cell.
-        scrubAt(Chart.fractionAtTime(toy, 1791174000 + 240))
+        var sunday = harness.midnight.fri2 + 2 * 86400
+        var trades = toy.points.filter(function(p) { return p.t >= sunday + 20 * 3600 })
+        // The 00:20 dot, the newest, at the right edge.
+        scrubAt(Chart.fractionAtTime(toy, 1791174000))
         var scrubbed = [body.headerText, body.featured.priceText].join(" | ")
         endScrub()
         check(look + ": a scrub at TOY's 00:20 dot lands on it and says its time",
@@ -321,10 +322,14 @@ Harness {
         var replayed = body.headerText + " | " + body.featured.priceText
         within(4000, function() { return !body.motion.replayRunning })
         body.headerTextChanged.disconnect(watch)
-        var missed = trades.map(function(p) { return "At " + Format.hhmm(p.t, offset) + " · Overnight" })
-          .filter(function(said) { return replayRead.indexOf(said) < 0 })
-        check(look + ": the left edge and a replay's first moment read Friday's first print, and the replay reads every one of the night's trades",
-          trades.length === 5 && edge.indexOf("At 04:") === 0 && replayed === "At 04:00 · Pre-market | 328.38" && missed.length === 0,
+        // A trade before midnight is Sunday's, and says so. The first is
+        // where the replay starts.
+        var read = replayRead.concat([replayed.split(" | ")[0]])
+        var missed = trades.map(function(p) { return "At " + (p.t < sunday + 86400 ? "Sun " : "") + Format.hhmm(p.t, offset) + " · Overnight" })
+          .filter(function(said) { return read.indexOf(said) < 0 })
+        check(look + ": the left edge and a replay's first moment read the night's first trade, and the replay reads every one of them",
+          trades.length === 5 && trades.length === toy.points.length && edge === "At Sun 20:00 · Overnight"
+            && replayed === "At Sun 20:00 · Overnight | 325.96" && missed.length === 0,
           trades.length + " trades ; " + edge + " ; " + replayed + " ; missed " + missed.join(", "))
       })
 
@@ -520,14 +525,14 @@ Harness {
         refused && caughtUp && afterProbe.length > 2 && afterProbe[0] === 25,
         "refused " + refused + "; requests after the pause of " + afterProbe.join(", ") + "; every night refreshed " + caughtUp)
 
-      // Friday 23 October at 06:00: NVDA's chart is Thursday, then its night
-      // and pre-market, which its quote holds.
+      // Friday 23 October at 06:00: NVDA's chart is Friday from midnight,
+      // its night and pre-market, which its quote holds after Thursday.
       useSet("night-2026-10-23-0600")
       service.now = 1792749600
       service.addSymbol("NVDA")
       within(8000, function() { return !!service.quotes.NVDA && service.arriving.length === 0 })
       featureShown("NVDA")
-      within(5000, function() { return body.chartSymbol === "NVDA" && !body.chartLoading && body.featuredGeometry.start === 1792641600
+      within(5000, function() { return body.chartSymbol === "NVDA" && !body.chartLoading && body.featuredGeometry.start === 1792728000
         && harness.strip().indexOf("PRE-MARKET") === 0 })
       scrubAt(1.003)
       var rowsAt = body.watchlistScrubShown
