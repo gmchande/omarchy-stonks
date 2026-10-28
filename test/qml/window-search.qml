@@ -687,6 +687,13 @@ Harness {
       within(3000, function() { return body.search.answer === "failed" })
       wait(600)
       var joined = [editOut, harness.calls("SEARCH.asked") - askedBefore, body.search.answer].join(",")
+      // Nothing answering at all, as with the network down: the line says
+      // to check the connection, where a bad answer said to try again.
+      hold("YAHOO.offline", true)
+      clickRetry()
+      within(3000, function() { return body.search.answer === "failed" && message.text !== offered.split(",")[0] })
+      var offline = message.text
+      hold("YAHOO.offline", false)
       // RETRY, while the gate pauses Stonks: no request, the failure stays.
       var gate = service.testYahooGate
       gate.begin("refused", 60)
@@ -706,11 +713,12 @@ Harness {
       var byClick = [body.search.resultsQuery, body.search.results.length > 0, harness.calls("SEARCH.answered") - answeredBefore,
         retryShown(), body.adding, harness.same(service.library, library)].join(",")
       body.resetInteraction()
-      harness.check("a failed lookup offers RETRY; Enter and a click on it ask the same query again, once, through Yahoo's gate, held by a refusal, which the line names as the server being busy, and not by a pause for no answer, and adding nothing",
-        offered === "Couldn’t search · check your connection,true"
-          && byEnter === "Couldn’t search · check your connection / - / Searching for “SH”… / Couldn’t search · check your connection,1,true"
-          && joined === "true,1,failed" && paused === "0,0,failed,true,Couldn’t search · server busy" && byClick === "SH,true,1,false,true,true",
-        [offered, byEnter, joined, paused, byClick].join(" ; "))
+      harness.check("a failed lookup says why and offers RETRY; Enter and a click on it ask the same query again, once, through Yahoo's gate, held by a refusal, which the line names as the server being busy, and not by a pause for no answer, and adding nothing",
+        offered === "Couldn’t search · try again,true"
+          && byEnter === "Couldn’t search · try again / - / Searching for “SH”… / Couldn’t search · try again,1,true"
+          && joined === "true,1,failed" && offline === "Couldn’t search · check your connection"
+          && paused === "0,0,failed,true,Couldn’t search · server busy" && byClick === "SH,true,1,false,true,true",
+        [offered, byEnter, joined, offline, paused, byClick].join(" ; "))
     }
 
     function test_flows() {
@@ -816,7 +824,7 @@ Harness {
         whileOut === "true,true,true" && freshAgain && cleared === "true,true,false", whileOut + "|" + freshAgain + "|" + cleared)
       harness.check("an empty answer and a failed lookup each say so in place, differently",
         noMatches === "true,true,No matches for “ZZZ”"
-          && failed === "true,Couldn’t search · check your connection",
+          && failed === "true,Couldn’t search · try again",
         noMatches + " / " + failed)
       harness.check("an answer of kinds Stonks leaves out names them where \"No matches\" would be, and under the results it shows, the arrows stopping at the last result",
         fundAlone === "0,false,true,Stonks doesn’t show mutual funds"

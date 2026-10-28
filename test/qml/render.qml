@@ -92,10 +92,11 @@ Harness {
   // loading and failed: a cold start, the first quotes out or failed, in
   // retro, or in smooth with -smooth; in the panel with popup- before.
   readonly property string coldState: (/^(?:popup-)?(loading|failed)(?:-smooth)?$/.exec(stateName) || ["", ""])[1]
-  // popup-trouble-<kind>-<look>: prices stopped, as the header says it:
-  // Yahoo not answering (noanswer) or refusing (refused), both refreshes
-  // overdue with Yahoo open (trying), or AAPL's refresh failed (failed).
-  readonly property string troubleKind: (/^popup-trouble-(noanswer|refused|trying|failed)-/.exec(stateName) || ["", ""])[1]
+  // <popup|window>-trouble-<kind>-<look>: prices stopped, as the header
+  // says it: Yahoo not answering (noanswer) or refusing (refused), both
+  // refreshes overdue with Yahoo open (trying), or AAPL's refresh failed
+  // (failed). The window says Yahoo's pause in a sentence.
+  readonly property string troubleKind: (/^(?:popup|window)-trouble-(noanswer|refused|trying|failed)-/.exec(stateName) || ["", ""])[1]
   // Yahoo's gate for a trouble state: paused 40 s more for no answer, or
   // to 12:40 on for a refusal; open otherwise.
   function troubleGate(kind) {
@@ -326,8 +327,9 @@ Harness {
     // A save that didn't land (popup-notice-save-*), said again after a
     // click that still didn't (popup-notice-save-again-*).
     readonly property bool saveFailed: root.stateName.indexOf("popup-notice-save-") === 0
-    // A change made while the file can't be read (popup-notice-file-edited-*).
-    readonly property bool editsUnsaved: root.stateName.indexOf("popup-notice-file-edited-") === 0
+    // A change made while the file can't be read
+    // (<popup|window>-notice-file-edited-*).
+    readonly property bool editsUnsaved: /^(popup|window)-notice-file-edited-/.test(root.stateName)
     // A refresh the reader asked for, out (popup-refreshing-*).
     readonly property bool refreshing: root.stateName.indexOf("popup-refreshing-") === 0
     // Sounds on, their default, so the header's speaker shows its waves;
@@ -840,6 +842,8 @@ Harness {
         body.search.results = []
         body.search.resultsQuery = "ZZZ"
         body.search.searchText = "ZZZ"
+        // A failed lookup as most are: nothing answered.
+        body.search.failure = "none"
         body.search.answer = root.stateName.indexOf("-none-") > 0 ? "none" : "failed"
       }
       // popup-search-vfiax-*: Yahoo's answer holds a mutual fund alone;
@@ -877,6 +881,7 @@ Harness {
         body.search.results = moment === "long" ? coins : moment === "one" ? saved.slice(0, 1) : moment === "five" ? saved.slice(0, 5) : []
         body.search.searchText = query
         body.search.resultsQuery = query
+        body.search.failure = "none"
         body.search.answer = moment === "none" ? "none" : moment === "failed" ? "failed" : "results"
         // The field says the query; the same text asks for nothing.
         root.searchField(body.search).text = query
@@ -912,8 +917,8 @@ Harness {
       // The first open's footer: the hint's lines have to fit the panel's
       // width, above "+ Add a symbol".
       body.showFirstRunHint()
-    } else if (root.stateName.indexOf("popup-notice-file-") === 0) {
-      // The footer's notices have to fit the panel's width.
+    } else if (/^(popup|window)-notice-file-/.test(root.stateName)) {
+      // The footer's notices whole, in the panel's width and the window's.
       stub.settingsUnreadable = true
     } else if (root.stateName.indexOf("popup-notice-update-") === 0) {
       updates.newVersion = "1.0.0"

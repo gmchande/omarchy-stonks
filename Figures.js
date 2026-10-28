@@ -127,26 +127,27 @@ function freshnessWarns(fresh) {
 // the service's clock wakes for. Null while the host answers: then Stonks
 // doesn't know why. A pause for no answer lasts 72 s at most, so it is said
 // in minutes, rounded up; a refusal's can last half an hour, so it names the
-// time on the reader's clock. `why` and `when` in full, for the pill's
-// hover and the window; `forms`, the header's, each shorter than the one
-// before, the last one fitting the popup at text size 20 and still saying
-// what happened and when. The words are the ones other apps use for the
-// same trouble (the owner, 28 October). No site is named: not every reader
-// knows Yahoo (the owner, 26 October).
+// time on the reader's clock. `why` and `when` for the pill's hover, and as
+// one `sentence` for the window's header; `forms`, the panel's header, each
+// shorter than the one before, the last one fitting the panel at text size
+// 20 and still saying what happened and when. The words are the ones other
+// apps use for the same trouble (the owner, 28 October). No site is named:
+// not every reader knows Yahoo (the owner, 26 October).
 function hostPause(pause, pausedUntil, now) {
   var left = pausedUntil - now
   if (pause === "none") {
     var minutes = Format.duration(Math.max(1, left))
     var noAnswer = { why: "Can't connect. Check your internet.",
       when: "Retrying in " + (left > 60 ? Math.ceil(left / 60) + " minutes." : "1 minute.") }
-    noAnswer.forms = [noAnswer.why + " " + noAnswer.when, "Can't connect · Retrying in " + minutes, "Can't connect · " + minutes]
+    noAnswer.sentence = noAnswer.why + " " + noAnswer.when
+    noAnswer.forms = ["Can't connect · Retrying in " + minutes, "Can't connect · " + minutes]
     return noAnswer
   }
   if (pause === "refused") {
     var at = left > 0 ? Format.hhmm(pausedUntil, Format.readerOffset(pausedUntil)) : ""
     var refused = { why: "The price server is busy.", when: at ? "Retrying at " + at + "." : "Retrying now." }
-    refused.forms = [refused.why + " " + refused.when, "Server busy · Retrying " + (at ? "at " + at : "now"),
-      at ? "Server busy · " + at : "Server busy · Retrying"]
+    refused.sentence = refused.why + " " + refused.when
+    refused.forms = ["Server busy · Retrying " + (at ? "at " + at : "now"), at ? "Server busy · " + at : "Server busy · Retrying"]
     return refused
   }
   return null

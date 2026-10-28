@@ -178,22 +178,17 @@ Item {
   // isn't saved, since only memory holds it, each with what to do, which
   // names the file; a save didn't land, which a click retries, ahead of the
   // update, since a restart would lose the changes; or an update waits on a
-  // shell restart, which a click does. Each is said in less and less
-  // (`noticeForms`, [words, action], the footer showing the first that
-  // fits): the file by its full path, then without "or remove", then the
-  // same beside the notice's short words, then by its name alone (text size
-  // 16 in the panel), never cut (the owner, 28 October).
+  // shell restart, which a click does. The notice's words stay whole; what
+  // to do follows it on its line, or on a line of its own where both don't
+  // fit (`noticeActions`, longest first): the file by its full path, then
+  // without "or remove" (the owner, 28 October).
   readonly property bool unsaved: settingsUnreadable ? editsUnsaved : saveFailed
   readonly property string notice: unsaved ? "Your changes aren't saved"
     : settingsUnreadable ? "Couldn't load your lists"
     : updatedTo !== "" ? "Updated to " + updatedTo + " · click to restart the shell" : ""
-  readonly property string noticeShort: unsaved ? "Not saved" : "Lists not loaded"
-  readonly property var noticeForms: notice === "" ? []
-    : settingsUnreadable ? [[notice, " · fix or remove ~/.config/omarchy/grvc.stonks.json"],
-      [notice, " · fix ~/.config/omarchy/grvc.stonks.json"], [noticeShort, " · fix ~/.config/omarchy/grvc.stonks.json"],
-      [noticeShort, " · fix or remove grvc.stonks.json"]]
-    : unsaved ? [[notice, " · click to try again"], [noticeShort, " · click to try again"]]
-    : [[notice, ""]]
+  readonly property var noticeActions: settingsUnreadable
+    ? ["fix or remove ~/.config/omarchy/grvc.stonks.json", "fix ~/.config/omarchy/grvc.stonks.json"]
+    : unsaved ? ["click to try again"] : []
   // A newer Stonks on main, offered at the footer's right end until on disk
   // (`updateOffer`), then the restart's notice; never in the add's place,
   // so adding by mouse never waits on it. The update restarts the shell
@@ -435,10 +430,12 @@ Item {
   // row warns and Yahoo is paused, why and when Stonks tries again; with
   // every row warning and no pause, that Stonks keeps trying; and a price
   // on show whose refresh failed, why. Null without trouble. The header
-  // says it at full strength (`HeaderStatus.trouble`).
+  // says it at full strength (`HeaderStatus.trouble`). Yahoo's pause is
+  // said short in the panel, which switches panels on the bar, and as a
+  // sentence first in the window, which has the room (`Figures.hostPause`).
   readonly property var troubleForms: {
     if (!service || scrubShown || refreshing || (historyActive && historyFailed)) return null
-    if (hostPause && warnings > 0) return hostPause.forms
+    if (hostPause && warnings > 0) return switchesPanels ? hostPause.forms : [hostPause.sentence].concat(hostPause.forms)
     if (yahooDown) return ["Can't get prices · Stonks keeps trying", "Can't get prices"]
     if (featuredQuote && featuredFreshness.state === "failed")
       return ["Refresh failed for " + (chartSymbol || featuredSymbol) + " · Retrying", "Refresh failed · Retrying", "Refresh failed"]
@@ -1593,7 +1590,7 @@ Item {
     note: root.note
     noteOpacity: root.noteShown
     notice: root.notice
-    noticeForms: root.noticeForms
+    noticeActions: root.noticeActions
     hint: root.hint
     showsHint: root.hintShown
     ground: root.ground

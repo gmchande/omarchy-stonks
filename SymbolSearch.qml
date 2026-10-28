@@ -292,6 +292,10 @@ FocusScope {
   property var clearance: null
   // The gate's ticket the request out was let through on (`Gate.report`).
   property int ticket: 0
+  // Why the last lookup failed, for its line: "none" when nothing answered
+  // (`Fetch.answerKind`), "refused" when Yahoo turned it away or its gate
+  // holds for a refusal, "other" for a bad answer or a spent budget.
+  property string failure: ""
 
   // A lookup of the field's query. One for another query still out is
   // stopped, and this one goes as its stream ends (`land`): its answer
@@ -311,6 +315,7 @@ FocusScope {
     requestedQuery = ""
     activeQuery = q
     if (gate && gate.take(1) === 0) {
+      root.failure = gate.pause === "refused" || gate.pause === "none" ? gate.pause : "other"
       land("")
       return
     }
@@ -391,7 +396,10 @@ FocusScope {
       onStreamFinished: {
         var got = Fetch.answers(String(text || ""))
         if (root.gate) root.gate.report(got.map(function(a) { return a.kind }), got.length ? got[0].retryAfter : 0, root.ticket)
-        root.land(got.length && got[0].kind === "ok" ? got[0].body : "")
+        // No answer at all, as from a curl stopped short, is nothing answered.
+        var kind = got.length ? got[0].kind : "none"
+        root.failure = kind === "none" || kind === "refused" ? kind : "other"
+        root.land(kind === "ok" ? got[0].body : "")
       }
     }
   }
@@ -553,7 +561,8 @@ FocusScope {
     verticalAlignment: Text.AlignVCenter
     textFormat: Text.PlainText
     text: root.answer === "none" ? "No matches for “" + root.resultsQuery + "”"
-      : root.answer === "failed" ? "Couldn’t search · " + (root.gate && root.gate.pause === "refused" ? "server busy" : "check your connection")
+      : root.answer === "failed" ? "Couldn’t search · " + (root.failure === "refused" ? "server busy"
+        : root.failure === "none" ? "check your connection" : "try again")
       : "Searching for “" + root.searchText.trim() + "”…"
     color: root.dim
     font.family: root.fontFamily

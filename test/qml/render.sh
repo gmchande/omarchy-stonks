@@ -53,10 +53,11 @@ every_state() (
   # Every listing failed, said once in the header, in the popup, both looks.
   states="$states popup-failed popup-failed-smooth"
   # Prices stopped, as the header says why and when Stonks tries again, in
-  # both looks and at text size 16; the pill's words and its hover's.
+  # both looks and at text size 16, in the panel and the window; the pill's
+  # words and its hover's.
   for trouble in noanswer refused trying failed; do
     for look in smooth retro; do
-      states="$states popup-trouble-$trouble-$look popup-trouble-$trouble-$look-size-16"
+      states="$states popup-trouble-$trouble-$look popup-trouble-$trouble-$look-size-16 window-trouble-$trouble-$look"
     done
   done
   states="$states pill-sheet-trouble"

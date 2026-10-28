@@ -1030,6 +1030,8 @@ Harness {
           ["WEEK OF 28 SEP 2026 · 712,345.00", "WEEK OF 28 SEP 2026"], ["21 SEP 10:00 AEST · 712,345.00", "21 SEP 10:00 AEST"],
           ["Can't get prices · Stonks keeps trying", "Can't get prices"],
           Figures.hostPause("none", 72, 0).forms, Figures.hostPause("refused", 30 * 60, 0).forms,
+          [Figures.hostPause("none", 72, 0).sentence].concat(Figures.hostPause("none", 72, 0).forms),
+          [Figures.hostPause("refused", 30 * 60, 0).sentence].concat(Figures.hostPause("refused", 30 * 60, 0).forms),
           ["Refresh failed for SHIB-USD · Retrying", "Refresh failed · Retrying", "Refresh failed"], ["Refreshing"], ["Loading SHIB-USD YTD"]]
         var closures = 0
         var unnamed = []
