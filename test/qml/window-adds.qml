@@ -155,7 +155,7 @@ Harness {
       // frames: what a frame shows, not the steps within one turn.
       var emptyLine = find(body, "emptyList")
       keys.forceActiveFocus()
-      keyClick(Qt.Key_L)
+      keyClick(Qt.Key_W)
       var menu = find(body, "listMenu")
       tryVerify(function() { return !!menu && menu.visible }, 2000)
       while (menu.cursor < menu.newIndex) keyClick(Qt.Key_Down)
@@ -532,6 +532,15 @@ Harness {
         watchlist.contentY = 0
         var target = watchlist.displayedSymbols.filter(function(s) { return s !== service.featuredSymbol })[0]
         var chosen = false
+        // The glide to the joined row lasts 160 ms, less than a poll of a
+        // loaded machine may take to come round, so the target is chosen as
+        // the glide starts. In the one-row view it is out of sight as the
+        // list eases, so no key reaches it; it is chosen as Enter would.
+        var chooseInGlide = function() {
+          if (chosen || !watchlist.settling || body.landing !== "SLOW" || !body.landingJoined) return
+          chosen = true
+          body.featureSymbol(target)
+        }
         holdQuote("SLOW", true)
         pickSymbol(body, keys, "SLOW")
         if (when === "before") {
@@ -539,16 +548,11 @@ Harness {
           keys.forceActiveFocus()
           watchlist.cursorSymbol = target
           keyClick(Qt.Key_Return)
-        }
+        } else watchlist.settlingChanged.connect(chooseInGlide)
         holdQuote("SLOW", false)
         tryVerify(function() { return !!service.quotes.SLOW }, 5000)
-        if (when === "joining") {
-          chosen = body.landing === "SLOW" && body.landingJoined
-          // In the one-row view the target is out of sight as the list
-          // eases, so no key reaches it; choose it as Enter would.
-          body.featureSymbol(target)
-        }
         within(2000, function() { return rested(body) })
+        if (when !== "before") watchlist.settlingChanged.disconnect(chooseInGlide)
         var kept = [chosen, service.featuredSymbol === target, watchlist.displayedSymbols.indexOf("SLOW") === 3].join(",")
         removeForGood("SLOW")
         return kept

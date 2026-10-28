@@ -370,9 +370,9 @@ Harness {
       // catcher standing aside.
       body.featureSymbol("MZ")
       focusKeys(panel)
-      harness.press(panel, "l")
+      harness.press(panel, "w")
       var menu = null
-      harness.check("l opens the list menu in the popup, which takes the keys",
+      harness.check("w opens the list menu in the popup, which takes the keys",
         within(1000, function() {
           menu = harness.find(body, "listMenu")
           return body.listMenuOpen && !!menu && menu.activeFocus && panel.testKeyCatcher.blocked
@@ -549,7 +549,7 @@ Harness {
       var field = harness.find(body.search, "searchField")
       within(1000, function() { return field.activeFocus })
       var typed = []
-      ;["l", "m", "s", "o"].forEach(function(letter) { harness.press(popup, letter) })
+      ;["w", "m", "s", "o"].forEach(function(letter) { harness.press(popup, letter) })
       typed.push(field.text)
       harness.press(popup, Qt.Key_Backspace)
       typed.push(field.text)
@@ -560,10 +560,10 @@ Harness {
       typed.push(field.text)
       harness.press(popup, Qt.Key_C, Qt.ControlModifier)
       typed.push(field.text)
-      ;["j", "k", "h", "x", Qt.Key_Space].forEach(function(key) { harness.press(popup, key) })
+      ;["j", "k", "h", "l", "x", Qt.Key_Space].forEach(function(key) { harness.press(popup, key) })
       typed.push(field.text)
-      harness.check("in the popup's search, l m s o, Backspace, Ctrl+Z, Delete, Ctrl+C, and Omarchy's j k h x and Space edit the field, and none acts on the rows, the lists, sounds, the look or the order",
-        target !== "" && typed.join(",") === "lmso,lms,lmso,lms,lms,lmsjkhx " && body.adding && field.activeFocus
+      harness.check("in the popup's search, w m s o, Backspace, Ctrl+Z, Delete, Ctrl+C, and Omarchy's j k h l x and Space edit the field, and none acts on the rows, the lists, sounds, the look or the order",
+        target !== "" && typed.join(",") === "wmso,wms,wmso,wms,wms,wmsjkhlx " && body.adding && field.activeFocus
           && settled() === settledBefore,
         target + " | " + typed.join(",") + " | " + settledBefore + " -> " + settled())
       harness.press(popup, Qt.Key_Escape)

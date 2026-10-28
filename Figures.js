@@ -29,8 +29,8 @@ function listingMeta(quote, nameCut) {
 }
 
 // A currency as Stonks says it: Yahoo's code, but pence, London's "GBp",
-// as PENCE. Beside the capitals around it, GBp read as GBP, and 3,648.00
-// as pounds: found by the design panel of 23 October.
+// as PENCE: beside the capitals around it, GBp reads as GBP, and 3,648.00
+// as pounds.
 function currencyLabel(code) {
   return code === "GBp" ? "PENCE" : code
 }
@@ -59,10 +59,9 @@ var OVERDUE_AFTER = 90
 // refresh is asked: about the time a normal answer takes, so a surface
 // opening on a row nothing kept fresh (a cryptocurrency, with nothing open)
 // shows no "As of" for the moment before the fresh price lands; on a slow
-// network it says "As of" from then until the answer. Found in the speed QA
-// of 23 October: BTC-USD's row flashed "As of 06:46 UTC" for 150 ms on each
-// open. Timed to the millisecond by the service (`Service.asking`): counted
-// in whole seconds of the clock it ended anywhere from 1 to 2 s on.
+// network it says "As of" from then until the answer. Timed to the
+// millisecond by the service (`Service.asking`): counted in whole seconds of
+// the clock it would end anywhere from 1 to 2 s on.
 var ASKED_GRACE = 2
 
 // entry: the feed's last answer, { status: "ok"|"failed"|"saved",
@@ -195,8 +194,7 @@ function extendedStack(quote, latest, now, day, changeMode) {
 // no close yet (^GSPC at 09:30:25; London's at 08:02, seen 15 minutes
 // late), and a bar is whole only once `now` is past its five minutes. Nor
 // for an empty day whose quote is a trade of its session, with a price and
-// a volume beside the chart: Yahoo had sent WREN's 09:30 trade and no bar
-// at 09:37 on Friday 23 October, found in the daytime QA.
+// a volume beside the chart: WREN's 09:30 trade with no bar at 09:37.
 function dayNote(day, now, calendars) {
   if (!day) return ""
   var pts = day.points
@@ -240,17 +238,27 @@ function dayLine(quote, today) {
 }
 
 // The day line's title, three letters at most, as a range's token is:
-// "1D" for today's figures (`today` is `exchangeDay` of the clock). Another
-// day's, as on a weekend, a holiday, before the session, or overnight, say
-// their session's weekday in the exchange's calendar ("FRI"), which names
-// one day of the six before today: no calendar closes longer than five
-// (Tokyo's Golden Week). Figures a week old or more, as a halted listing's,
-// say their month ("SEP"), never a weekday that would read as this week's.
+// "1D" for today's figures (`today` is `exchangeDay` of the clock), else
+// their session's name (`pastDayName`).
 function dayTitle(quote, today) {
-  var day = exchangeDay(quote, quote.figuresDay)
-  if (day === null || !(today - day > 0)) return "1D"
-  var d = new Date((quote.figuresDay + (quote.gmtoffset || 0)) * 1000)
-  return today - day < 7 ? Format.WEEKDAYS[d.getUTCDay()].toUpperCase() : Format.MONTHS[d.getUTCMonth()]
+  return pastDayName(quote, quote.figuresDay, today) || "1D"
+}
+
+// The name of a day before `today` that holds `t` (`dayName`); "" for
+// today.
+function pastDayName(quote, t, today) {
+  var day = exchangeDay(quote, t)
+  return day !== null && today - day > 0 ? dayName(quote, t, today) : ""
+}
+
+// The name of the day that holds `t`, up to `today`: its weekday in the
+// exchange's calendar ("FRI"), which names one day of the six before
+// today, since no calendar closes longer than five (Tokyo's Golden Week).
+// A day a week old or more, as a halted listing's, says its month ("SEP"),
+// never a weekday that would read as this week's.
+function dayName(quote, t, today) {
+  var d = new Date((t + (quote.gmtoffset || 0)) * 1000)
+  return today - exchangeDay(quote, t) < 7 ? Format.WEEKDAYS[d.getUTCDay()].toUpperCase() : Format.MONTHS[d.getUTCMonth()]
 }
 
 // Every title `dayTitle` can give.
@@ -289,13 +297,13 @@ function measuredAt(quote, scrubT) {
 // open, the last session's close. Every print the chart draws reads from
 // that one close, the night's and the coming day's pre-market's after the
 // day too, so wherever the pointer is the change and the animal say where
-// that price stands against the dashed line (the owner, 23 October); at
-// rest the line under the price still measures the night from the day's
-// own close (`extendedStack`). dayUp is always versus that close, so the
-// chart fill does not flip when the change mode does, and it is the
-// direction at the moment shown, as a range's is. dayTone is that change's
-// tone, flat when it rounds to nothing, so the bull and bear follow a scrub
-// and a replay, and a flat day has neither.
+// that price stands against the dashed line; at rest the line under the
+// price still measures the night from the day's own close (`extendedStack`).
+// dayUp is always versus that close, so the chart fill does not flip when
+// the change mode does, and it is the direction at the moment shown, as a
+// range's is. dayTone is that change's tone, flat when it rounds to nothing,
+// so the bull and bear follow a scrub and a replay, and a flat day has
+// neither.
 // It carries no drawing: a line is drawn from its quote, so it redraws when
 // the quote does, not with the clock or the change mode. Nor does it read
 // the clock, so a row is not derived again every second. Pass the
@@ -332,9 +340,25 @@ function scrubbedBase(quote) {
 
 // What a scrub of the 1D `day` reads its moves from, said beside its dashed
 // line: the line's own close, the one before the day's session
-// (`Quote.dayBase`), which every print of the chart reads from.
-function dayBaselineText(day) {
-  return "PREV CLOSE " + Format.money(Quote.dayBase(day), day.priceDigits)
+// (`Quote.dayBase`), which every print of the chart reads from. Within the
+// session, on its own day, that is the previous close. Once the session
+// has closed, the last close is its own: so a scrub past its close
+// (`scrubT`, 0 at rest), and any reading once the day is past (`today`),
+// as overnight or on a weekend, names the session the line's close comes
+// before: "CLOSE BEFORE TUE", or, a week old or more, its date, "CLOSE
+// BEFORE 12 SEP", since "BEFORE SEP" would read as before September.
+function dayBaselineText(day, today, scrubT) {
+  var reg = day.session.regular
+  var closed = !!reg && (pastDayName(day, reg.start, today) !== "" || (scrubT > 0 && scrubT >= reg.end))
+  return (closed ? "CLOSE BEFORE " + sessionName(day, reg.start, today) : "PREV CLOSE") + " " + Format.money(Quote.dayBase(day), day.priceDigits)
+}
+
+// The session that starts at `start`, named for the line beside the dashed
+// line: its weekday within the week (`dayName`), else its date.
+function sessionName(day, start, today) {
+  if (today - exchangeDay(day, start) < 7) return dayName(day, start, today)
+  var d = new Date((start + (day.gmtoffset || 0)) * 1000)
+  return d.getUTCDate() + " " + Format.MONTHS[d.getUTCMonth()]
 }
 
 // The day's animal for a row (`rowModel`): "bull" up, "bear" down, by

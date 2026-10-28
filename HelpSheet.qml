@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
@@ -10,8 +11,8 @@ import "Tones.js" as Tones
 // a dim credit line (the version and where prices come from) closing the
 // second, then the mouse's lines across both under them, and its close
 // button.
-// One column left half the window empty and pushed the last group below the
-// fold. The two columns stack independently, groups in order, the first
+// One column would leave half the window empty and push the last group
+// below the fold. The two stack independently, groups in order, the first
 // taking groups until it holds about half the lines, so a short group never
 // sits beside a long one with a hole under it.
 Flickable {
@@ -54,9 +55,9 @@ Flickable {
   }
   readonly property int columnWidth: (width - inset - columns.spacing) / 2
   // The key column, as wide as the widest key or gesture, so what each
-  // does keeps the room a popup's half column has. Read, so a new font
-  // measures again: a text size changed while the shell runs left "animal"
-  // running into its words.
+  // does keeps the room a popup's half column has. The binding reads
+  // keyMetrics.font so a new font measures again: a text size changed while
+  // the shell runs would otherwise run a key into its words.
   readonly property int keyWidth: {
     var font = keyMetrics.font
     var widest = 0
@@ -72,6 +73,15 @@ Flickable {
   clip: true
   boundsBehavior: Flickable.StopAtBounds
   interactive: contentHeight > height
+  // While more of the sheet sits out of sight, as in a short window, the
+  // scrollbar says so, at rest too, in the gutter CLOSE ends short of.
+  Controls.ScrollBar.vertical: Controls.ScrollBar {
+    objectName: "helpScrollBar"
+    policy: root.interactive ? Controls.ScrollBar.AlwaysOn : Controls.ScrollBar.AlwaysOff
+    visible: root.interactive
+    // At least 24 px long, so a long sheet's thumb is there to see and grab.
+    minimumSize: Math.min(1, Style.space(24) / Math.max(1, availableHeight))
+  }
 
   // One group: its title, then a line per entry, the key bold and what it
   // does dim. `keyName` tells the keys from the mouse's gestures.
@@ -147,9 +157,7 @@ Flickable {
 
           // The credit closes the second column, in the room the first's
           // longer groups leave beside it, so a window of ordinary height
-          // shows it without a scroll. Found in the 1.1.0 audit: at the
-          // sheet's foot, the last Look rows pushed it out of a 720 × 520
-          // window's sight.
+          // shows it without a scroll.
           Text {
             objectName: "helpCredit"
             visible: sheetSide.index === 1

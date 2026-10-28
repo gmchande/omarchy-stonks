@@ -10,14 +10,18 @@ import "plugin" as Stonks
 // The README's pictures, through the real Service, popup (Panel.qml, its
 // card in CardWindow.qml), window (App.qml), and pill (BarWidget.qml), on the
 // demo watchlist at the saved moment readme.sh names. Each picture is
-// grabbed into STONKS_README_RAW; readme.sh puts them together.
+// grabbed into STONKS_README_RAW; readme.sh makes the README's from them.
+// With STONKS_README_MARKETPLACE naming a symbol on the list, it grabs only
+// the marketplace picture's two: that symbol's retro popup and its pill on
+// the bar.
 Harness {
   id: harness
   marker: "README DONE"
 
   readonly property string rawDir: Quickshell.env("STONKS_README_RAW")
-  readonly property var demo: ["AAPL", "JNJ", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T"]
-  readonly property var us: ["AAPL", "JNJ", "SPY"]
+  readonly property string marketplace: Quickshell.env("STONKS_README_MARKETPLACE") || ""
+  readonly property var demo: ["AAPL", "JNJ", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T"].concat(marketplace ? [marketplace] : [])
+  readonly property var us: ["AAPL", "JNJ", "SPY"].concat(marketplace ? [marketplace] : [])
   readonly property string themeLink: Quickshell.env("HOME") + "/.local/state/omarchy/current/theme"
   property bool themeLinked: false
 
@@ -40,8 +44,8 @@ Harness {
   Stonks.App { id: app; service: service; updates: updates; trendColors: colors }
   Process { id: themeSwitch; onExited: harness.themeLinked = true }
 
-  // The pill on strips of bar: one as wide as the popup's card, which
-  // readme.sh widens into preview.png's bar; and each of its four forms.
+  // The pill on strips of bar: one as wide as the popup's card, for the
+  // marketplace picture's bar; and each of its four forms.
   FloatingWindow {
     visible: true
     color: "transparent"
@@ -162,27 +166,16 @@ Harness {
       tryVerify(function() { return saved }, 3000, "grab " + name)
     }
 
-    // preview.png keeps a popup down to its list's fourth row, fading out
-    // over it: each end as a share of the card's height, for readme.sh.
-    function previewFade(name, body) {
-      var card = panel.testCard.card
-      var bottom = function(row) {
-        var item = body.watchlist.rowItem(body.watchlist.displayedSymbols[row])
-        return item.mapToItem(card, 0, item.height).y / card.height
-      }
-      console.log("PREVIEW_FADE " + name + " " + bottom(2).toFixed(4) + " " + bottom(3).toFixed(4))
-    }
-
     function test_pictures() {
       quiet()
+      if (harness.marketplace) return marketplacePictures()
       verify(service.symbols.join(",") === harness.demo.join(",") && service.featuredSymbol === "AAPL"
         && service.listName === "" && service.range === "1D", "the demo watchlist, AAPL featured, on All and the day: " + service.symbols.join(","))
 
       panel.open()
       var body = panel.testBody
       tryVerify(function() { return body.surfaceOpen }, 3000)
-      grab("strip", heroStrip, body, robinhoodIn)
-      grab("forms", forms)
+      grab("forms", forms, body, robinhoodIn)
 
       // Scrubbed back an hour and a half, as ← steps do, a print at a time:
       // a capture taken mid-session lands in the same session.
@@ -191,12 +184,10 @@ Harness {
       for (var step = 0; step < 500 && body.motion.scrubT > back; step++) body.nudgeScrub(-1)
       verify(body.motion.scrubT > 0 && body.motion.scrubT <= back, "the scrub reached an hour and a half back: " + body.motion.scrubT + " vs " + back)
       grab("scrub", panel.testCard.card, body, function() { return body.motion.scrubT !== 0 })
-      previewFade("scrub", body)
       body.endScrub()
       tryVerify(function() { return atRest(body) }, 3000, "the rows back on now")
 
-      // The list's name takes the open menu's fill, easing in: grabbed once
-      // that fill has held for five polls.
+      // The list's name eases into the open menu's fill.
       body.openListMenu()
       var control = find(body, "listControl")
       var lastFill = "", heldFor = 0
@@ -216,7 +207,6 @@ Harness {
       service.persist({ style: "retro" })
       panel.open()
       grab("retro", panel.testCard.card, body, function() { return service.retro && body.surfaceOpen })
-      previewFade("retro", body)
       panel.close()
       service.persist({ style: "smooth" })
       tryVerify(function() { return !body.surfaceOpen && !service.retro }, 3000)
@@ -241,6 +231,22 @@ Harness {
       tryVerify(function() { return colors.green !== before }, 2000, "Catppuccin Latte read")
       panel.open()
       grab("light", panel.testCard.card, body, function() { return body.surfaceOpen })
+      panel.close()
+      harness.finish()
+    }
+
+    // The marketplace picture's: the symbol featured in retro, from a fresh
+    // open, and its pill on the bar.
+    function marketplacePictures() {
+      var symbol = harness.marketplace
+      verify(service.symbols.join(",") === harness.demo.join(","), "the demo watchlist and " + symbol + ": " + service.symbols.join(","))
+      service.persist({ style: "retro" })
+      service.feature(symbol)
+      tryVerify(function() { return service.featuredSymbol === symbol }, 3000, symbol + " featured")
+      panel.open()
+      var body = panel.testBody
+      grab("popup", panel.testCard.card, body, function() { return service.retro && body.surfaceOpen && service.featuredSymbol === symbol })
+      grab("strip", heroStrip, body, robinhoodIn)
       panel.close()
       harness.finish()
     }

@@ -131,7 +131,6 @@ Harness {
       service.feature(hero)
       tryVerify(function() { return body.chartSymbol === hero }, 3000)
 
-      // Escape puts the featured symbol back and adds nothing.
       searchShop(body, keys)
       keyClick(Qt.Key_Down)
       tryVerify(function() { return body.chartSymbol === "SHOP.TO" && !body.chartLoading }, 3000)
@@ -486,7 +485,7 @@ Harness {
       keyClick(Qt.Key_Z, Qt.ControlModifier)
       keyClick(Qt.Key_Delete)
       keyClick(Qt.Key_Backspace)
-      ;[Qt.Key_L, Qt.Key_M, Qt.Key_S, Qt.Key_O].forEach(function(k) { keyClick(k) })
+      ;[Qt.Key_W, Qt.Key_M, Qt.Key_S, Qt.Key_O].forEach(function(k) { keyClick(k) })
       wait(100)
       var typed = String(field.text)
       var after = [service.library.join(","), service.soundsOn, service.retro, service.order, service.reversed].join("|")
@@ -497,18 +496,18 @@ Harness {
       keys.forceActiveFocus()
       keyClick(Qt.Key_Z, Qt.ControlModifier)
       wait(100)
-      harness.check("in search, Ctrl+C, Ctrl+Z, Delete, Backspace and l m s o edit the field and act as no Stonks key",
-        removed !== "" && after === before && stayed === "true,true,true,true,true,true" && /lmso$/i.test(typed),
+      harness.check("in search, Ctrl+C, Ctrl+Z, Delete, Backspace and w m s o edit the field and act as no Stonks key",
+        removed !== "" && after === before && stayed === "true,true,true,true,true,true" && /wmso$/i.test(typed),
         [removed, typed, stayed, before, after].join(" | "))
     }
 
     // A held answer makes the waiting state observable without prescribing
     // its presentation delay. Editing names the current query; an old result
     // cannot be accepted for that query, and the Enter is kept for it.
-    // Returns what #1's and the early Enter's checks read: `held`, an Enter
-    // on real results of an earlier query while the current one is out adds
-    // nothing; `kept`, that Enter takes the held query's top result once its
-    // answer lands.
+    // Returns what the stale Enter's and earlyEnter's checks read: `held`, an
+    // Enter on real results of an earlier query while the current one is out
+    // adds nothing; `kept`, that Enter takes the held query's top result once
+    // its answer lands.
     function firstSearchSaysSo(body, keys) {
       var message = harness.find(body.search, "searchMessage")
       keys.forceActiveFocus()

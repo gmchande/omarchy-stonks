@@ -66,7 +66,7 @@ function isTrading(phase) {
 // Seconds to a bell the exchange has actually announced: the close while
 // the session runs, the open while it is still ahead. Yahoo describes one
 // session per response, so once it has ended there is nothing to count to.
-// Guessing the next open by adding days walked straight into Labor Day.
+// Guessed by adding days, the next open would land on holidays like Labor Day.
 function secondsToBell(quote, now) {
   var reg = clockSession(quote, now).regular
   if (!reg || quote.crypto) return null
@@ -277,8 +277,8 @@ function scrubPhase(quote, t) {
 // The calendar that knows the clock of `quote`'s exchange at `t`: the
 // series' own or the listing's in `calendars`, while `t` falls on a day up
 // to its last (`validThrough`). Null past it, where a change of clocks it
-// doesn't list would read as standard time, an hour out: found in review,
-// Toronto's July 2027 close read "15:00 EST".
+// doesn't list would read as standard time, an hour out: Toronto's July
+// 2027 close would read "15:00 EST".
 function clockCalendar(quote, t, calendars) {
   var cal = quote.calendar || calendarFor(calendars, quote)
   return cal && dateStringOf(localDate(t, cal)) <= cal.validThrough ? cal : null
@@ -330,8 +330,7 @@ function marketStatus(quote, now, scrubT, calendars, overnight) {
 // extended price shows, and the day's ("Opens Tue 09:30", "Closed at
 // 16:00"), and a scrub without its moment's name ("At 02:25"); a schedule
 // that has run out says only that. Every form keeps the time, its day, and
-// its zone. Found in the size-16 check: beside the speaker and the camera,
-// after hours lost its time.
+// its zone.
 function statusForms(quote, now, scrubT, calendars, overnight) {
   if (scrubT) {
     var read = Quote.readingAt(quote, scrubT)
@@ -345,9 +344,8 @@ function statusForms(quote, now, scrubT, calendars, overnight) {
     return ["Lunch break · " + reopens + " · in " + Format.duration(brk - now), "Lunch break · " + reopens, sentence(reopens)]
   }
   // The stand-in reads the hour by the calendar's clock today, not the
-  // held answer's, which may be from before a change of clocks. Found in
-  // review: a New York quote held from EDT into EST said "Lunch lull" at
-  // 11:00.
+  // held answer's, which may be from before a change of clocks: otherwise
+  // a New York quote held from EDT into EST would say "Lunch lull" at 11:00.
   var held = !overnight && !isTrading(sessionPhase(quote, now)) ? calendarRegular(cal, now) : null
   var q = held ? Object.assign({}, quote, { session: { pre: null, regular: held, post: null }, current: null,
     clocks: [], gmtoffset: localDate(now, cal).offset }) : quote
@@ -359,8 +357,8 @@ function statusForms(quote, now, scrubT, calendars, overnight) {
   var closure = !overnight && kind && kind.kind === "closure"
   // The day's named moments lead while they last, as they do in a scrub. A
   // morning with a break ahead counts to the break, not the day's close:
-  // Tokyo stops at 11:30, and at 11:26 "Market closes in 4h 4m" was wrong
-  // by four hours.
+  // Tokyo stops at 11:30, so at 11:26 "Market closes in 4h 4m" would be
+  // four hours wrong.
   if (!closure && bell && bell.bell === "close") {
     var named = phase === "opening" || phase === "lunch" || phase === "power" || phase === "closing"
     var pause = sessionBreaks(cal, now).filter(function(b) { return now < b.start })[0]
@@ -394,8 +392,7 @@ function sentence(words) {
 // the last session's until it opens (the S&P 500's until 09:30:12 on Friday
 // 23 October), so its own bell has nothing to count to: through its
 // calendar's pre-market on a trading day it counts to the open, as the
-// stocks beside it do. Found in the daytime QA: "Closed · opens Fri 09:30"
-// on the Friday, beside every stock's "Pre-market · opens in 3h 11m".
+// stocks beside it do.
 function indexBell(quote, cal, now) {
   if (quote.instrumentType !== "INDEX" || !cal || !cal.pre) return null
   var date = dateStringOf(localDate(now, cal))
@@ -497,16 +494,16 @@ function twoDays(quote, now, calendars) {
 
 // How long after a session opens its first price may still be on its way,
 // and how often a quote still waiting on it is asked for meanwhile: Yahoo
-// answered with the last session's quote until 09:30:09 for the S&P 500 and
-// 09:30:12 for AAPL on Friday 23 October (the daytime QA).
+// answered with the last session's quote until 09:30:09 for the S&P 500
+// and 09:30:12 for AAPL on Friday 23 October.
 var OPENING_WAIT = 60
 var OPENING_ASK = 15
 
 // Whether `quote`'s regular session opened under OPENING_WAIT ago at `now`
 // and its headline is still from before it: the session's first price is
-// on its way. Found in the daytime QA: every US row said "As of Thu 16:00"
-// for the first 46 seconds of Friday's session, the answers asked at
-// 09:30:00 still Thursday's and the next not due for a minute.
+// on its way. Answers asked at 09:30:00 can still bring back the last
+// session's; without this, every US row would say "As of Thu 16:00" until
+// the next ask, a minute on.
 function awaitingOpen(quote, now) {
   if (!quote || quote.crypto) return false
   var reg = clockSession(quote, now).regular

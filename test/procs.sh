@@ -1,8 +1,7 @@
 # Process groups and run marks, for the Quickshell runs (qml/quickshell.sh,
-# qml/crash-check.sh). A run marks what it starts with NAME=VALUE in their
-# environment, which every child inherits, so its processes are found by
-# that mark, never by name: the owner's shell and other runs are the same
-# programs.
+# qml/crash-check.sh). A run marks what it starts with NAME=VALUE in the
+# inherited environment and finds its processes by that mark, never by
+# name: the user's shell and other runs are the same programs.
 
 # stat_of PID: the fields of /proc/PID/stat after the command name, so
 # $2 is the parent, $3 the process group, and $20 the start time.

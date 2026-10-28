@@ -1059,13 +1059,9 @@ Harness {
       // chart that flashes, clears, and then draws in fails, and so does one
       // painted part way ahead of its animation that stays and sweeps on.
       // Their times run from the draw-in's own origin, read off the
-      // animation itself: its first step after the reveal left whole, at
-      // its value, is that far along its OutCubic, so the pictures are held
-      // to the moment the motion counts from, which a picture drawn ahead of
-      // it fails against. An animation started between the clock's ticks
-      // can count from the tick before, up to the tick's whole gap. AAPL's
-      // day waits for Robinhood's answer, asked as a surface opens, and
-      // draws in when it lands.
+      // animation itself (`animationOrigin`), so a picture drawn ahead of
+      // the motion fails. AAPL's day waits for Robinhood's answer, asked as
+      // a surface opens, and draws in when it lands.
       var drawFrom = 0
       var leftAt = -1
       var watchDraw = function() {

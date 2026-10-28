@@ -53,13 +53,12 @@ Item {
 
   readonly property bool busy: job !== null || wanted !== null
 
-  // Nothing is wanted or under way.
   signal idle()
   // A chart asked for ahead got no good answer, and keeps none.
   signal missed(string key)
 
   function keyFor(symbol, range) {
-    return String(symbol || "").toUpperCase() + "|" + String(range || "")
+    return History.historyKey(symbol, range)
   }
 
   // Whether `request` (`wanted`'s shape) asks for the chart `key`.

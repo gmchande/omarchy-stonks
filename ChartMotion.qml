@@ -19,24 +19,23 @@ Item {
   // The exchanges' calendars, for the breaks in a day (`Chart.chartGeometry`).
   property var calendars: null
 
-  // The chart on screen: the view's once it can be drawn, and until then
-  // the one already on screen, as it was. Null only before any chart has
-  // been in. A binding, so no reader sees it out of step with the view.
-  // `held` is the chart last presented, set only by the view handler below
-  // and read here only while the view has no chart: it changes only in a
-  // change that brings a chart, when this reads the view's instead, so the
-  // order the handler and this binding run in cannot matter.
+  // The chart on screen: the view's once it can be drawn, until then the
+  // one already on screen; null only before any chart has been in. A
+  // binding, so no reader sees it out of step with the view. `held`, set
+  // only by the view handler below, changes only in a change that brings a
+  // chart, when this reads the view's instead, and is read here only while
+  // the view has no chart, so the order the handler and this binding run
+  // in cannot matter.
   readonly property var chart: view && view.chart ? view.chart : held
   property var held: null
   // The chart asked for is still on its way: the one on screen is another.
   readonly property bool loading: !chart || !view || chart.symbol !== view.featured || chart.range !== view.range
-  // How far what is on show for the held chart has dimmed, 0..1: once the
-  // chart asked for has been on its way a quarter of a second, counted from
-  // the last change that asked for another, so one that arrives sooner
-  // changes nothing, and back as it lands, as the new chart draws in.
-  // Another chart asked for while the dim still lifts goes back to it at
-  // once, and one asked for while it holds keeps it. The hero reads it;
-  // this piece runs it.
+  // How far the held chart has dimmed, 0..1: to 1 once the chart asked for
+  // has been on its way a quarter of a second since the last change that
+  // asked for another, so one that arrives sooner changes nothing; back to
+  // 0 as it lands and draws in. Another chart asked for while the dim lifts
+  // goes back to it at once; one asked for while it holds keeps it. The
+  // hero reads it; this piece runs it.
   property real dimmed: 0
   onLoadingChanged: {
     if (!loading) {
@@ -187,7 +186,6 @@ Item {
     scrubT = Math.max(scrubStart, Chart.stepTime(day, scrubT || scrubEnd, steps, scrubEnd))
   }
 
-  // Back to now: the replay stops and the scrub with it.
   function clearScrub() {
     stopReplay()
     scrubT = 0

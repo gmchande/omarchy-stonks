@@ -51,9 +51,19 @@ Harness {
     return state.indexOf("pill-sheet") === 0 ? state : state.replace(/-size-\d+$/, "")
   }
   // A -size-N state's text scale, as Style.fontScale has it; 1 for the rest.
-  readonly property real sizeScale: {
-    var m = /-size-(\d+)$/.exec(asked)
-    return m ? Math.max(1 / 12, Number(m[1]) / 12) : 1
+  readonly property int askedSize: { var m = /-size-(\d+)$/.exec(asked); return m ? Number(m[1]) : 0 }
+  readonly property real sizeScale: askedSize ? Math.max(1 / 12, askedSize / 12) : 1
+  // The shell reads the text size after it starts: a state at another size
+  // (render.sh: -size-N, -large at 16, -small at 10) shows its window once
+  // it has, so the window takes the size the surface asks at that size.
+  readonly property int landingSize: askedSize || (/-large$/.test(asked) ? 16 : /-small$/.test(asked) ? 10 : 0)
+  readonly property bool sizeLanded: landingSize === 0 || Style.fontBaseSize === landingSize
+  // A picture is of the frame the surface asked for: a window that kept
+  // another size draws a state no reader sees, so it fails.
+  function judgeFrame() {
+    if (renderWindow.width !== Math.round(renderWindow.implicitWidth) || renderWindow.height !== Math.round(renderWindow.implicitHeight))
+      console.log("FAIL the frame is " + renderWindow.width + " × " + renderWindow.height + ", not the "
+        + Math.round(renderWindow.implicitWidth) + " × " + Math.round(renderWindow.implicitHeight) + " the surface asks")
   }
   readonly property bool minWindowOf: requested.indexOf("min-window-of-") === 0
   readonly property bool windowOf: minWindowOf || requested.indexOf("window-of-") === 0
@@ -102,8 +112,8 @@ Harness {
     var match = /^(popup|window)-room-(one|four|five|growth)-(open|one|five|none|failed|long)-(smooth|retro)$/.exec(stateName)
     return match ? { list: match[2], moment: match[3] } : null
   }
-  // window-1416-<look>: the tiled window at the full 1416 by 850 the live run
-  // measured, the 22-symbol list.
+  // window-1416-<look>: the tiled window at the full 1416 by 850 it measures
+  // live, the 22-symbol list.
   readonly property int windowWidth: {
     var match = /^window-(\d+)-(smooth|retro)$/.exec(stateName)
     return match ? Number(match[1]) : 0
@@ -167,8 +177,8 @@ Harness {
   // NEST, KILN, SPY, BOLT, the S&P 500 (gspc), BTC-USD, SHEL.L, and 7203.T,
   // with Robinhood's saved answers on which it trades all day.
   // <popup|window>-sweep-<folder>-<symbol>-<look>: any saved moment whose
-  // folder is named for its minute, <word>-<date>-<hhmm> (the weekend
-  // watch's watch-2026-10-24-2238), every listing its folder saved on 1D at
+  // folder is named for its minute, <word>-<date>-<hhmm>
+  // (watch-2026-10-24-2238), every listing its folder saved on 1D at
   // rest, <symbol> named as its answer's file (aapl, shel.l, gspc) and
   // featured, at the folder's clock, with Robinhood's saved answers on which
   // it trades all day. render.sh hands over the folder's answers
@@ -176,10 +186,10 @@ Harness {
   // <popup|window>-sweep-own-<shel.l|7203.t>-<look>: the 7 October 14:55
   // sweep with London before its session, or Tokyo at lunch, from that
   // listing's own saved day, at a clock inside that moment.
-  // <popup|window>-power-<symbol>-<look>: the power-user walk's odd days,
-  // Friday 16 October at 23:09, with Yahoo's own day (no Robinhood answer
-  // was saved): JPM's stray pair, PLUG's and AITX's one-tick bounces, CKX's
-  // one bar, CVR's none, and LUMN's four-decimal hint.
+  // <popup|window>-power-<symbol>-<look>: odd days saved Friday 16 October
+  // at 23:09, with Yahoo's own day and no Robinhood answer: JPM's stray
+  // pair, PLUG's and AITX's one-tick bounces, CKX's one bar, CVR's none,
+  // and LUMN's four-decimal hint.
   // <popup|window>-gaps-<1d|3m>-<look>: VANE, a thin NYSE stock, on
   // Wednesday 21 October at 10:06, with Robinhood's prints: 26 since
   // midnight, its night quiet for over an hour twice, and nine pre-market
@@ -746,7 +756,6 @@ Harness {
         // not in yet.
         root.shownRange = "1D"
       } else if (root.stateName === "history-empty-loading") {
-        // No answer yet.
         root.shownHistoryEntry = null
       } else if (root.stateName === "popup-history-failed") {
         // 1Y asked with the network gone: the range fails as every
@@ -784,8 +793,8 @@ Harness {
       stub.featuredSymbol = root.loadingNext
       body.motion.dimmed = 1
     } else if (body.motion.loading) {
-      // A chart still on its way dims a quarter second in, over 160 ms, and
-      // the grab at 300 ms caught it partway, further in one run than the
+      // A chart still on its way dims a quarter second in, over 160 ms, so
+      // a grab at 300 ms catches it partway, further in one run than the
       // next: it shows at rest, dimmed, so two renders of one tree match
       // (test/render-diff.sh).
       body.motion.dimmed = 1
@@ -924,7 +933,7 @@ Harness {
       // window-lists-<manage|symbol>-<look>, and min-window-lists-<menu|manage|symbol>-<look>,
       // the window at its smallest: named watchlists over the 22-symbol
       // library, the featured symbol staying put on a switch. -menu12- and
-      // -menu30-: the menu over 12 or 30 lists, the power-user walk's.
+      // -menu30-: the menu over 12 or 30 lists.
       var all = stub.symbols.slice()
       var named = /-(named|rowmenu)-/.test(root.stateName) ? { name: "My Watchlist", symbols: all.slice(0, 8) }
         : root.stateName.indexOf("-empty-") > 0 ? { name: "Growth", symbols: [] }
@@ -1041,13 +1050,14 @@ Harness {
 
   FloatingWindow {
     id: renderWindow
-    visible: true
+    visible: root.sizeLanded
     color: root.groundColor
-    // The larger text size lands after the window has taken its size, so
-    // the large sheet is given room for its seven rows, and a -size-N state
-    // is given the widths Style.space gives the surfaces at size N: the
-    // popup's 480 and the smallest window's 560 grow with the text, and the
-    // window is 720 or its smallest, whichever is wider.
+    // The window shows once the text size has landed (`sizeLanded`); the
+    // large sheet, at the size render.sh gives it, is given room for its
+    // seven rows, and a -size-N state the widths Style.space gives the
+    // surfaces at size N: the popup's 480 and the smallest window's 560
+    // grow with the text, and the window is 720 or its smallest, whichever
+    // is wider.
     implicitWidth: root.anchorState ? 1000 : root.pillSheet ? Math.max(520, pillColumn.implicitWidth + 48) : root.themeState ? 480 + 410 : root.sheet ? 1000
       : (root.windowWidth ? root.windowWidth : (root.smallest ? Math.round(560 * root.sizeScale)
         : (root.popup ? Math.round(480 * root.sizeScale) : Math.max(720, Math.round(560 * root.sizeScale)))))
@@ -1064,8 +1074,8 @@ Harness {
       anchors.fill: parent
       color: root.groundColor
 
-      // The origins came from the real Panel/HeldAnchor/KeyboardPanel in
-      // popup-anchor.qml, unmapped on Wayland. This scene paints them.
+      // The origins are the real Panel/HeldAnchor/KeyboardPanel's in
+      // popup-anchor.qml, unmapped on Wayland; this scene paints them.
       Rectangle {
         visible: !!root.anchorState
         width: parent.width
@@ -1386,7 +1396,7 @@ Harness {
     // drawn: nothing in the shell says when that is done.
     Timer {
       interval: 300
-      running: !root.interactivePicture
+      running: !root.interactivePicture && renderWindow.visible
       onTriggered: {
         if (root.shareOf) {
           body.camera = shareCamera
@@ -1394,6 +1404,7 @@ Harness {
           return
         }
         if (root.beforeGrab) root.beforeGrab()
+        root.judgeFrame()
         frame.grabToImage(function(result) {
           result.saveToFile(root.outPath)
           root.finish()
@@ -1417,8 +1428,8 @@ Harness {
         var rows = body.watchlist
         var member = rows.displayedSymbols[2]
         var row = rows.rowItem(member)
-        // Fixed, paused poses make the render diff repeatable. The existing
-        // motion harness judges the transitions; these show their ink.
+        // Fixed, paused poses make the render diff repeatable. The motion
+        // harness judges the transitions; these show their ink.
         if (pose === "join") { row.join(); row.pause(); row.opacity = 0.5; row.reveal = 0.5 }
         else if (pose === "crossing") { row.carry(rows.rowPitch * 1.5); row.pause(); row.shift = -rows.rowPitch * 1.5 }
         else if (pose === "dragwheel") {
@@ -1435,7 +1446,6 @@ Harness {
           stub.shown = stub.shown.filter(function(symbol) { return symbol !== removed })
           within(2000, function() { return !rows.rowItem(removed) && stub.shown.every(function(symbol) { return rows.rowResting(symbol) }) })
         } else if (pose === "notefade") {
-          // A refusal's note, half faded.
           stub.order = "pct"
           rows.cursorSymbol = member
           body.moveSelected(1)
@@ -1591,6 +1601,7 @@ Harness {
       // The hover and press fills, the scroll and the poses' rows, settle
       // within two 160 ms fades; nothing says when all of them have.
       wait(320)
+      root.judgeFrame()
       var saved = false
       frame.grabToImage(function(result) { saved = result.saveToFile(root.outPath) })
       tryVerify(function() { return saved }, 3000)

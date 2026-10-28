@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "id": "grvc.stonks",
   "name": "Stonks",
-  "version": "1.0.4",
+  "version": "1.1.0",
   "author": "Gaurav Chande",
   "license": "MIT",
-  "description": "A stock ticker and watchlist for your bar: a bull on up days, a bear on down, and a day chart you can scrub, smooth or retro. It follows stocks on markets around the world, and US ones through pre-market, after-hours, and overnight trading. Prices come from Yahoo Finance and Robinhood.",
+  "description": "A stock watchlist for your bar. The pill shows how a stock is doing today, and a click opens its chart and your lists. Point at the chart to see the price at any moment. Overnight prices cover the US stocks and ETFs that trade overnight. Take a screenshot sized so X shows it whole. Stocks, ETFs, indexes, and crypto from around the world, each in its own currency. Prices come from Yahoo Finance and Robinhood, with no account or API key.",
   "kinds": ["service", "bar-widget"],
   "keepLoaded": true,
   "entryPoints": {
@@ -14,7 +14,7 @@
   },
   "barWidget": {
     "displayName": "Stonks",
-    "description": "Today's move for your stocks, with a chart a click away.",
+    "description": "Today's move for the stock you last looked at, with its chart a click away.",
     "category": "Info",
     "aliases": ["stocks", "stonks", "ticker"],
     "allowMultiple": false,
@@ -25,7 +25,7 @@
     "schema": [
       { "key": "barStyle", "type": "enum", "label": "Pill", "options": ["sparkline", "arrow", "text", "icon"], "defaultValue": "sparkline", "description": "How the pill looks in the center or left section of a top or bottom bar. Middle-click the pill to change it." },
       { "key": "barStyleRight", "type": "enum", "label": "Pill on the right", "options": ["sparkline", "arrow", "text", "icon"], "defaultValue": "icon", "description": "How the pill looks in the right section of a top or bottom bar, among the bar's icons. Middle-click the pill there to change it." },
-      { "key": "barStyleVertical", "type": "enum", "label": "Pill on a side bar", "options": ["icon", "stacked"], "defaultValue": "icon", "description": "How the pill looks on a bar at the side of the screen: the day's bull or bear, or the symbol over its change. Middle-click the pill there to switch." }
+      { "key": "barStyleVertical", "type": "enum", "label": "Pill on a side bar", "options": ["icon", "stacked"], "defaultValue": "icon", "description": "How the pill looks on a bar at the side of the screen: an icon for the day's move, or the symbol over its change. Middle-click the pill there to switch." }
     ]
   }
 }

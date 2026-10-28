@@ -1,7 +1,8 @@
 import QtQuick
 import Quickshell.Io
 import "ChartSound.js" as ChartSound
-// The sounds, while they are on (`turnedOn`, the data file's `sounds`):
+// The sounds, while they are on (`turnedOn`, the data file's `sounds`, off
+// until it says true; while off, nothing here runs):
 // for what you just did, adding a symbol, removing a row, undoing the
 // removal, which plays the removal backwards, taking a screenshot, the
 // shutter, a replay, which plays the chart, and the chimes, the chart's
@@ -15,15 +16,14 @@ import "ChartSound.js" as ChartSound
 Item {
   id: root
 
-  property bool turnedOn: true
+  property bool turnedOn: false
   property bool retro: false
   // The output is kept awake while sounds are on and a scrub moves, and
   // for 1 s after it last moved or ended (`scrubHeld`), so a chime struck
   // after a pause plays at once: an output asleep wakes as a sound starts,
   // and cuts or delays its start. Only then, and while a replay waits for
   // the output to wake (`whenAwake`): headphones go to whichever computer
-  // plays, and an open popup alone mustn't take them, nor a scrub left
-  // standing. Found in review: one ← held the headphones for hours.
+  // plays, so neither an open popup nor a scrub left standing takes them.
   readonly property bool keepingAwake: turnedOn && (scrubHeld || replaysWaiting.length > 0)
   // A scrub moved, started, or ended in the last second (`afterScrub`): a
   // flag of its own, since the timer's restart turns `running` off and on.
@@ -78,8 +78,8 @@ Item {
   // silence's end (`asleepAfter`). A sound that wakes it opens with the
   // whole lead-in, and so does every one after while it wakes: until the
   // stream of silence says it reached the output (`awakeAt`, pw-cat's
-  // "streaming"), or without that stream, for 550 ms. On this laptop's
-  // speakers waking took 135 to 182 ms; Bluetooth can take longer. Then the
+  // "streaming"), or without that stream, for 550 ms. Measured laptop
+  // speakers wake in 135 to 182 ms; Bluetooth can take longer. Then the
   // lead-in shrinks a third as fast as time passes, in 30 ms steps, to none
   // 450 ms on: chimes come at least 45 ms apart (`chimeGap`), so one never
   // sounds before a chime struck ahead of it.
@@ -181,7 +181,7 @@ Item {
   // `pw-play` starts: the write blocks, and lands by a rename, so a player
   // still reading the last one keeps it. A replay of what the last one
   // played, the same look, chart, and run, plays its file again: making it
-  // held a retro start about 10 ms more than a smooth one. None plays while
+  // holds a retro start about 10 ms longer than a smooth one. None plays while
   // its file can't be written yet (`OwnerOnly.write`).
   property var replayMade: null
   function playReplay(owner, chart) {
@@ -288,9 +288,9 @@ Item {
   // Turned off, the sound playing stops, and a chime waiting with it. The
   // look's files are written ahead, one every 100 ms, so the first pass
   // over the chart writes nothing: written back to back, smooth's eleven
-  // chimes held the shell's thread for about 80 ms. Only the files that
+  // chimes hold the shell's thread for about 80 ms. Only the files that
   // don't hold the current sound are written (`takeSurvey`): writing all 71
-  // of a look's on every start held the thread 3 to 66 ms each, for 7 s.
+  // of a look's on every start holds the thread 3 to 66 ms each, for 7 s.
   onTurnedOnChanged: {
     if (!turnedOn) {
       replayOwner = null
@@ -345,8 +345,7 @@ Item {
 
   // A look's files that hold the current sound count as made this run: its
   // stamp says what they are made from now, and the folder has them. Any
-  // other is written ahead, and one missing too. Without an answer, every
-  // file is, as each run did before stamps.
+  // other, a missing one too, is written ahead; without an answer, all are.
   function takeSurvey(text) {
     var sums = { smooth: [], retro: [] }
     var stamps = {}
@@ -477,7 +476,7 @@ Item {
   // it skips. Each pw-play has 2 s, four times a chime's length, so a
   // PipeWire that stalls can't pile them up. Each starts from a subshell
   // that ends at once, so this shell keeps no record of it: started from
-  // the shell itself, each chime grew it by about a third of a kilobyte,
+  // the shell itself, each chime grows it by about a third of a kilobyte,
   // 10 MB over 20,000 chimes. When Stonks goes its input closes and it
   // ends; a chime ringing then rings out, half a second at most.
   Process {

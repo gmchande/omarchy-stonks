@@ -19,12 +19,12 @@ var MOST_QUOTES = 40
 // quote names them (`Quote.parseChart`), a note naming what else the
 // answer held, or "" when it held nothing else, and whether Yahoo's top
 // answer is one of those (`topLeftOut`), so search takes no result for it:
-// "eurusd" found the currency first and a Zurich index after it, and Enter
-// added the index (the product QA of 19 October). Null when its quotes are
-// not a list within MOST_QUOTES.
+// otherwise "eurusd", which finds the currency first and a Zurich index
+// after it, adds the index on Enter. Null when its quotes are not a list
+// within MOST_QUOTES.
 // Stonks follows stocks, ETFs, indexes, and cryptocurrencies; Yahoo also
-// finds mutual funds, currencies, futures, and more, and a search that
-// hid them without a word read "No matches" for a fund Yahoo has.
+// finds mutual funds, currencies, futures, and more, and hiding them without
+// a word reads "No matches" for a fund Yahoo has.
 var FOLLOWED = ["EQUITY", "ETF", "INDEX", "CRYPTOCURRENCY"]
 
 function parseSearch(json) {
@@ -69,8 +69,7 @@ var KIND_NAMES = {
 // "Stonks doesn’t show currencies or futures": each kind left out once, in
 // the answer's order, a kind not in KIND_NAMES by Yahoo's own word for it.
 // Said the same under results or with none, and short, so it fits the
-// popup on one line: "Also found a currency and futures, which Stonks
-// doesn’t show" ran past it with a mutual fund and a currency.
+// popup on one line.
 function leftOutNote(left) {
   var names = []
   for (var i = 0; i < left.length; i++) {
@@ -90,7 +89,7 @@ function leftOutNote(left) {
 // own ellipsis is the only cut; the short name, without that letter, is the
 // fallback. The letter is read from the end, a character at a time: a regex
 // for "two spaces, a capital, the end" retries from every space, and a
-// fetched name of 63,000 spaces held the shell's thread for over two
+// fetched name of 63,000 spaces holds the shell's thread for over two
 // seconds. (Qt's JavaScript has no trimEnd.)
 function searchName(q) {
   if (q.longname) return q.longname

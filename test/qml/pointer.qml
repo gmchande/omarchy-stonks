@@ -224,9 +224,7 @@ Harness {
         stub.setOrder("pct")
         root.setQuotes(["UP", "DOWN", "DEEP"], [110, 95, 90])
 
-        // The wheel over a token walks the ranges, the way it does between
-        // them: a notch down is the next, longer range. The pointer rests on
-        // the token first, the way a hand reaches for it.
+        // The pointer rests on the token first, the way a hand reaches for it.
         var rangeRow = root.find(body, "rangeRow")
         var tokens = root.findAll(rangeRow, "rangeToken")
         var second = tokens[1].mapToItem(body, tokens[1].width / 2, tokens[1].height / 2)
@@ -293,11 +291,9 @@ Harness {
         mouseMove(body.watchlist, 12, body.watchlist.rowPitch + 6)
         mouseMove(body.watchlist, 12, body.watchlist.rowPitch + 12)
         within(1000, function() { return body.watchlist.sortHeld })
-        // A search's choice, accepted through the same pointer path as a
-        // real search, then its first answer, as the service's fetch would
-        // bring it, up 100%, which sorts it first. With the pointer still
-        // over the rows it joins there, is selected there, and stays when
-        // the pointer leaves.
+        // A search's choice, clicked as in a real search, then its first
+        // answer, up 100%, which sorts it first, with the pointer still over
+        // the rows.
         body.startAdding()
         body.search.results = [{ symbol: "NEW", name: "New result", exchange: "NASDAQ" }]
         body.search.answer = "results"
@@ -354,8 +350,6 @@ Harness {
         root.check("four high-resolution ticks add up to one row",
           firstWhole(body.watchlist) === 1)
 
-        // A row lifted mid-glide takes the list over: neither the glide nor
-        // the wheel's pending settle moves the list under it.
         body.watchlist.wheelBy(0.3)
         wait(40) // into the glide
         var lifted = body.watchlist.displayedSymbols[2]
@@ -367,9 +361,7 @@ Harness {
         body.watchlist.cancelDrag()
         body.watchlist.snapToRow()
 
-        // A held row keeps the cursor while the wheel scrolls the list under
-        // it, and once it drops: it rides the pointer wherever its old place
-        // went.
+        // The held row rides the pointer wherever its old place went.
         body.watchlist.contentY = 0
         within(2000, rowsAtRest)
         var held = body.watchlist.displayedSymbols[1]
@@ -384,8 +376,6 @@ Harness {
           heldScrolled + " | " + body.watchlist.cursorRow + " for " + held)
         fixture()
 
-        // A click mid-glide puts the cursor on the row it acts on, so x then
-        // removes that row.
         var clickedThenX = function() {
           body.watchlist.contentY = 0
           within(2000, rowsAtRest)
@@ -584,9 +574,7 @@ Harness {
         wait(200)
         mouseMove(sheetFirst, sheetFirst.width / 2, sheetFirst.height / 2 + 3 * pitch + 1)
         var viewKept = body.watchlist.cursorRow
-        // And a small real move after the rows come back counts: from the
-        // last few pixels of a row, a few pixels onto the next one take the
-        // cursor.
+        // And a small real move after the rows come back counts.
         mouseMove(sheetFirst, sheetFirst.width / 2, sheetFirst.height + 20)
         mouseMove(sheetFirst, sheetFirst.width / 2, sheetFirst.height - 3)
         wait(50)
@@ -606,10 +594,6 @@ Harness {
             && smallKeyed === body.watchlist.displayedSymbols[2] && body.watchlist.cursorRow === body.watchlist.displayedSymbols[1],
           viewKeyed + " -> " + viewKept + " | " + smallKeyed + " -> " + body.watchlist.cursorRow)
 
-        // The surface made shorter until the cursor's row would be below the
-        // fold keeps a cursor of your own: the list scrolls to keep its row
-        // whole in sight, under the key sheet, and mid a key's glide toward
-        // a row below the fold.
         mouseMove(body, body.width / 2, 20)
         var rowsInView = Math.floor((body.watchlist.height + body.watchlist.rowGap) / pitch)
         var bodyHeight = body.height
@@ -641,8 +625,6 @@ Harness {
           rowsInView > 1 && shrunk[0] === lowRow + "," + lowRow + ",true"
             && shrunk[1] === pastRow + "," + pastRow + ",true",
           shrunk.join(" | "))
-        // And when the sight shrinks a moment before the list's own height
-        // does: the scroll is bounded by the sight.
         var w2 = body.watchlist
         var lastRow = w2.displayedSymbols[w2.displayedSymbols.length - 1]
         w2.select(lastRow)
@@ -658,11 +640,9 @@ Harness {
         body.watchlist.cursorSymbol = ""
         mouseMove(body, body.width / 2, 20)
 
-        // One cursor, as the shell's own panels have it: the pointer puts it
-        // on the row under it; a wheel notch with the pointer still leaves
-        // it, once the glide rests, on the row then under the pointer, never
-        // the first row in sight; ↓ moves it on from there; the pointer
-        // leaving the list leaves it.
+        // One cursor, as the shell's own panels have it: after a wheel notch
+        // under a still pointer it rests on the row then under the pointer,
+        // never the first row in sight.
         var wl = body.watchlist
         wl.contentY = 0
         within(2000, rowsAtRest)
@@ -686,8 +666,6 @@ Harness {
           steps.every(function(step) { return step.every(function(part) { return part === true }) }),
           steps.map(function(step) { return step.join(",") }).join(" | "))
 
-        // Search: the keyboard's choice (the top result) is what Enter adds,
-        // wherever the pointer rests.
         body.startAdding()
         within(1000, function() { return body.adding })
         body.search.results = [
@@ -710,8 +688,6 @@ Harness {
           stub.symbols.indexOf("TOPR") >= 0 && stub.symbols.indexOf("THRD") < 0 && !body.adding)
         mouseMove(body, body.width / 2, 20)
 
-        // A view still showing as its surface closes takes nothing: a click
-        // on a result or a checklist box acts on nothing and takes no focus.
         // The surface's closing is surfaceOpen going false, as the popup's
         // fade begins.
         body.startAdding()
@@ -739,10 +715,8 @@ Harness {
         root.check("a view showing through its surface's close takes no click and no focus",
           searchInert && listsInert, searchInert + "|" + listsInert + "|" + stub.memberships)
 
-        // Nothing else on a closing surface acts either: a click, a right-click,
-        // or the wheel on a row, a click on the footer or the header's look,
-        // and the pointer over the chart. The shield doesn't depend on the
-        // look, so smooth alone.
+        // Nor does a row, the footer, the header's look, or the chart. The
+        // shield doesn't depend on the look, so smooth alone.
         var inert = function() {
           mouseMove(body, 1, 1)
           var rows = body.watchlist.displayedSymbols.slice()
@@ -817,8 +791,6 @@ Harness {
 
         root.setQuotes(["FIT1", "FIT2"], [101, 102])
         within(2000, function() { return body.watchlist.rowItem("FIT2") !== null && rowsAtRest() })
-        // The row's menu removes a row from All; the last one stays, and the
-        // footer says why for a moment.
         var fit2 = body.watchlist.rowItem("FIT2")
         mouseClick(fit2, fit2.width / 2, fit2.height / 2, Qt.RightButton)
         takeMenuLine(0)
@@ -831,8 +803,6 @@ Harness {
           stub.symbols.join(",") === "FIT1" && body.note === "Keep at least one symbol", stub.symbols + "|" + body.note)
         root.check("the note clears on its own", within(4000, function() { return body.note === "" }))
         stub.order = "manual"
-        // A cursor you put on a row, by pointer or key, shows its remove
-        // button; the cursor resting on the featured row shows none.
         root.setQuotes(["FIT1", "FIT2", "FIT3", "FIT4"], [101, 102, 103, 104])
         mouseMove(body, body.width / 2, body.height - 4)
         body.watchlist.cursorSymbol = ""
@@ -923,7 +893,6 @@ Harness {
           within(1000, function() { var b = removeOf("FIT1"); return b && b.visible })
           var firstRemove = removeOf("FIT1")
           var onButton = firstRemove && firstRemove.visible ? firstRemove.mapToItem(body, firstRemove.width / 2, firstRemove.height / 2) : null
-          // Each removal, in order.
           var removals = []
           var symbolsBefore = stub.symbols.slice()
           var watchRemovals = function() {
@@ -958,12 +927,10 @@ Harness {
         root.check("a double-click's second press on a remove button, after the wheel, removes nothing let go off it, and its row let go on it however late",
           slidOff === "FIT1 -> FIT2,FIT3" && heldLong === "FIT1,FIT2 -> FIT3", slidOff + " | " + heldLong)
 
-        // A row the wheel scrolls under a still pointer takes the cursor but
-        // shows no remove button, so a click there features it; the button
-        // shows once the pointer really moves, or a key moves the cursor. A
-        // tick that moves the list less than a row hides it too. Every symbol
-        // here is as long as the next, so each row's button sits where the
-        // one above it sat.
+        // A row the wheel scrolls under a still pointer shows no remove
+        // button, and neither does one a tick moves less than a row. Every
+        // symbol here is as long as the next, so each row's button sits where
+        // the one above it sat.
         var even = root.symbols(20)
         root.setQuotes(even, even.map(function(s, i) { return 100 + i }))
         body.watchlist.contentY = 0
@@ -1042,7 +1009,6 @@ Harness {
           mouseWheel(body, at.x, at.y, 0, -240, Qt.NoModifier)
           var stopped = -1
           if (interrupt) {
-            // Into the wheel's motion, so the interrupt lands while it runs.
             wait(30)
             interrupt()
             stopped = view.cursor
@@ -1055,9 +1021,6 @@ Harness {
           within(1000, function() { return !body.listMenuOpen && !body.managingLists && body.listsSymbol === "" })
           return { pointed: pointed, under: under, stopped: stopped, rested: rested }
         }
-        // A key, or the surface closing with the view showing through its
-        // fade, while the wheel's motion runs stops it: the cursor moves no
-        // further.
         var wheels = [
           [function() { body.openListMenu() }, function() { body.closeListMenu() }, "listMenu", "listChoice"],
           [function() { body.openSymbolLists("FIT1") }, function() { body.closeListViews() }, "symbolLists", "symbolListRow"],

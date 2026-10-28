@@ -22,10 +22,9 @@ import "Tones.js" as Tones
 // touches no more ink than at rest. So the line never cuts its words, its
 // own bar included, and it steps back when the line moves off. With room
 // on neither side, as on a chart narrower than two marks, it gives way
-// while crossed. Found in the overnight QA of 23 October: AAPL's 1Y scrub
-// ran through "20│JAN 2026"; hiding the mark instead hid the year's high
-// while you scrubbed toward it (check-night), and moving only the date left
-// the line through "351│.73" (check-77).
+// while crossed. The whole mark moves, not hides, so the high stays in view
+// while you scrub toward it, and not the date alone, which leaves the line
+// through the price.
 Item {
   id: root
 

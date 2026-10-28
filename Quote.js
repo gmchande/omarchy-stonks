@@ -142,9 +142,8 @@ var MIXED_RUN = 4
 // `tick` is the listing's (`Format.priceTick`): a move of a tick or two is
 // trading, never stray. So is a bar with shares traded in it (`v`): every
 // stray in the saved answers came with none, and a thin listing's own
-// trades often open back where the bar before closed. Found in the daytime
-// QA: a young listing's 1W lost 11 of its 108 bars, its week's high among
-// them, 23.875 on 257,049 shares.
+// trades often open back where the bar before closed. Otherwise a thin
+// young listing's week would lose real bars, its high among them.
 function filterStrayCloses(bars, periods, tick) {
   var source = bars || []
   if (source.length < 3) return { bars: source.slice(), droppedTimes: [] }
@@ -385,8 +384,8 @@ function parseChart(json, centExchanges, receivedAt) {
     // Kept apart from the chart samples: see headlineQuote. A price at or
     // under zero is none, as a close, a previous close, an open, a high, and
     // a low are (`knownPrice`): Yahoo sends zeros for prices it doesn't
-    // have. Found in the strain QA: a negative price read "-5.00" on every
-    // coin, and a zero previous close "0.00%".
+    // have, and it can send negatives: shown, a negative price would read
+    // "-5.00" and a zero previous close "0.00%".
     price: knownPrice(meta.regularMarketPrice),
     // The decimals every price of this listing is shown in, from its
     // headline price, Yahoo's hint, and its market (`Format.priceDigits`).
@@ -446,7 +445,7 @@ function parseChart(json, centExchanges, receivedAt) {
 // Whether a quote says nothing new over the last one for the same symbol:
 // the points compared one by one, a bar Yahoo revises mid-day too, then
 // every other figure as a value (`sameRecord`), never written out as text,
-// which for a long list's landing took longer than the rest of it.
+// which for a long list's landing would take longer than the rest of it.
 function sameQuote(a, b) {
   var pa = a.points || []
   var pb = b.points || []
@@ -503,12 +502,12 @@ function barIn(timestamps, closes, period) {
 // post sessions from its first period's start to its last's end; none from
 // a list past MOST_DAYS or MOST_PERIODS, an answer `parseChart` has already
 // refused (`answerClocks`). A day answer lists one day, a two-day answer
-// two (`chartUrl`). Since 23 October a day answer may come in a range's
-// shape, one list of days, as every non-US listing's and an index's at
-// night do: its periods are the regular session's, with no pre or post.
-// Found in the overnight QA: SHEL.L said "Closed · opens Mon" through its
-// session, its chart a straight line. Always one day at least, its sessions
-// null when none is listed.
+// two (`chartUrl`). A day answer may also come in a range's shape, one list
+// of days, as every non-US listing's and an index's at night do: its
+// periods are the regular session's, with no pre or post. Not read so, a
+// listing such as SHEL.L would say "Closed · opens Mon" through its session,
+// its chart a straight line. Always one day at least, its sessions null when
+// none is listed.
 function answerDays(periods) {
   var names = ["pre", "regular", "post"]
   var lists = {}
@@ -538,12 +537,11 @@ function answerDays(periods) {
 // sent by, so the week after a change of clocks a period before it still
 // says its own (Sydney's 10:00 AEST open of 21 September, in an answer sent
 // in AEDT). Both shapes Yahoo sends: pre, regular, and post, each a list of
-// days, and one list of days, a range's and now some day answers' too
-// (`answerDays`). Null when a list of
-// days or of a day's periods is not a list within MOST_DAYS or MOST_PERIODS,
-// or a period is not one (`isPeriod`) with an offset (`isOffset`): a spark
-// day with a null period threw here, and its feed stopped until Stonks
-// restarted.
+// days, and one list of days, a range's and some day answers' (`answerDays`).
+// Null when a list of days or of a day's periods is not a list within
+// MOST_DAYS or MOST_PERIODS, or a period is not one (`isPeriod`) with an
+// offset (`isOffset`): a spark day with a null period would throw here and
+// stop its feed until Stonks restarts.
 function answerClocks(periods) {
   var lists = !periods ? [] : Array.isArray(periods) ? [periods] : [periods.pre, periods.regular, periods.post]
   var out = []
@@ -565,11 +563,10 @@ function answerClocks(periods) {
 }
 
 // Whether `p` is a period every reading of it can take: an object whose
-// start and end are moments (`Format.isMoment`). Found in the 1.0.4
-// security review: a period's end of {"toString": null} threw where a bar
-// was compared with it, and one the parser never compared was kept in the
-// quote, where every look for what was due threw on it, and no row was
-// asked for again until Stonks restarted.
+// start and end are moments (`Format.isMoment`). Otherwise a period's end
+// of {"toString": null} would throw where a bar is compared with it, and,
+// kept in the quote, on every look for what is due, so no row would be
+// asked for again until Stonks restarts.
 function isPeriod(p) {
   return !!p && typeof p === "object" && Format.isMoment(p.start) && Format.isMoment(p.end)
 }
@@ -643,11 +640,9 @@ function regularClose(quote) {
 // The close the answer's own day is measured from: the one before its
 // regular session. That is Yahoo's previous close once the quote is that
 // session's; until the session opens the quote is still the last session's
-// close, and Yahoo's previous close the one before it. Found in the daytime
-// QA: at 06:22 on Friday 23 October AAPL's answer held Friday's pre-market,
-// its quote Thursday's 348.22 and its previous close Wednesday's 343.99, and
-// the pre-market read +0.56% where the line under the price said −0.41%.
-// The headline's change stays the quote's own (`headlineBase`).
+// close, and Yahoo's previous close the one before it: measured from that,
+// the pre-market's change would disagree with the line under the price. The
+// headline's change stays the quote's own (`headlineBase`).
 function dayBase(quote) {
   var reg = quote.session.regular
   var head = headlineQuote(quote)
@@ -657,10 +652,9 @@ function dayBase(quote) {
 // What the headline's change is measured from, shaped as `change` reads
 // it: Yahoo's previous close, and the day's open, but none once the
 // listing's next day has begun (`nextDayBegun`), for a stock and an index
-// alike; a scrub of the last session still reads from its open. Found in
-// the daytime QA: before Friday's open the S&P 500 said "−0.41% open",
-// Thursday's, every stock beside it "—"; and in its check, the index said
-// "—" from midnight, the stocks Tuesday's until 04:00.
+// alike, so before the open no index says the last session's "% open"
+// while the stocks beside it say "—". A scrub of the last session still
+// reads from its open.
 function headlineBase(quote) {
   return { prevClose: quote.prevClose, dayOpen: quote.nextDayBegun ? null : quote.dayOpen }
 }
@@ -688,8 +682,8 @@ function readingAt(quote, t) {
   var pts = quote.points
   if (!pts.length || t < pts[0].t) return { price: dayBase(quote), t: t, close: false }
   // The last print at or before `t`, halving the prints, which run in time
-  // order: a walk from the first cost every row a step for each print of
-  // the day on every scrub step.
+  // order: a walk from the first would cost every row a step for each print
+  // of the day on every scrub step.
   var k = 0
   var top = pts.length - 1
   while (k < top) {

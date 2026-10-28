@@ -56,7 +56,5 @@
   ],
   "list": "World",
   "range": "1Y",
-  "hinted": true,
-  "sounds": false,
-  "updateCheck": false
+  "hinted": true
 }

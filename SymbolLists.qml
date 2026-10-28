@@ -7,11 +7,10 @@ import qs.Commons as Commons
 import "Tones.js" as Tones
 
 // A symbol's lists, in the rows' place: one tick box per list, All first.
-// Value-in, signals out; the body applies the membership rules. It owns its
-// keys while open: the arrows move the cursor, Enter ticks the cursor's
-// list, and Escape closes. One cursor, as
-// on the rows: moving the pointer puts it on the row under it, with the
-// rows' mark, and a click ticks the row clicked.
+// Value-in, signals out; the body applies the membership rules. While open
+// it owns the keys: arrows move the cursor, Enter ticks the cursor's list,
+// Escape closes. One cursor, as on the rows: the pointer puts it on the row
+// under it, and a click ticks the row clicked.
 FocusScope {
   id: root
 
@@ -28,9 +27,8 @@ FocusScope {
   property int cursor: 0
 
   readonly property int itemHeight: Style.space(30)
-  // The scrollbar's gutter at the right, as the list's rows keep it, and the
-  // rows' words' inset from their fills, so this view's words line up with
-  // the rows it covers.
+  // The rows' scrollbar gutter and the inset of their words, so this view's
+  // words line up with the rows it covers.
   property int gutter: 0
   readonly property int inset: Style.space(10)
   readonly property int contentHeight: itemHeight + choices.length * itemHeight
@@ -42,13 +40,11 @@ FocusScope {
     return !!choices[index] && choices[index].symbols.indexOf(symbol) >= 0
   }
 
-  // True while the checklist is open on an open surface. Turned on, it
-  // starts before its first frame and takes the keys a turn later if it is
-  // still on; turned off, however it closes, the surface's closing included,
-  // it gives the keys up and keeps what it shows for the close fade.
+  // True while the checklist is open on an open surface. Turned on, it takes
+  // the keys a turn later if still on; turned off, however it closes, it
+  // gives the keys up and keeps showing through the close fade, taking no
+  // pointer or key, so nothing acts on a view that is closing.
   property bool active: false
-  // Off, it still shows, through the close fade, but takes no pointer or
-  // key: nothing acts or takes focus from a view that is closing.
   enabled: active
   onActiveChanged: {
     if (active) {
@@ -70,8 +66,7 @@ FocusScope {
     scroll.contentY = 0
   }
 
-  // The cursor to the row the pointer moved onto, at (x, y) in the scene;
-  // the title is no row.
+  // The cursor to the row under (x, y) in the scene; the title is no row.
   function pointAt(x, y) {
     var at = scroll.mapFromItem(null, x, y)
     if (at.x < 0 || at.x >= scroll.width || at.y < 0 || at.y >= scroll.height) return
@@ -79,10 +74,9 @@ FocusScope {
     if (index < choices.length) cursor = index
   }
 
-  // A double-click is one click (WatchlistRow): the view opens in the rows'
-  // place, under the pointer, so the click that follows the Ctrl-click that
-  // opened it, within the double-click interval, lands nowhere, and never
-  // unticks the list under it.
+  // The view opens under the pointer, so the click that follows the
+  // Ctrl-click that opened it, within the double-click interval, lands
+  // nowhere and never unticks the list under it (WatchlistRow).
   Timer {
     id: opening
     interval: Application.styleHints.mouseDoubleClickInterval
@@ -226,21 +220,19 @@ FocusScope {
     clip: true
     boundsBehavior: Flickable.StopAtBounds
     interactive: contentHeight > height
-    // The wheel scrolling the rows under a still pointer moves the cursor
-    // to the row now under it, and any scroll a hand makes, the scrollbar's
-    // included, keeps it in sight; a key's scroll (showCursor) is no
-    // movement.
+    // The wheel under a still pointer moves the cursor to the row now under
+    // it, and any scroll by hand, the scrollbar's included, keeps it in
+    // sight; a key's scroll (showCursor) is no movement.
     onContentYChanged: {
       if (!root.active || !(moving || listsBar.pressed)) return
       if (moving && pointer.hovered) root.pointAt(pointer.scenePosition.x, pointer.scenePosition.y)
       root.keepCursorInSight()
     }
-    // While more lists sit out of sight, as in the window at its smallest,
-    // the rows' scrollbar says so, at rest too, in the gutter the lists stop
-    // short of.
+    // While lists sit out of sight, the scrollbar says so, at rest too, in
+    // the gutter the lists stop short of.
     Controls.ScrollBar.vertical: Controls.ScrollBar {
       id: listsBar
-      // Drawn while there is more, not only while used.
+      // Drawn while there is more, not only while in use.
       policy: scroll.interactive ? Controls.ScrollBar.AlwaysOn : Controls.ScrollBar.AlwaysOff
       visible: scroll.interactive
       // At least 24 px long, so a long view's thumb is there to see and grab.

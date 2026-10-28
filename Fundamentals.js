@@ -177,11 +177,10 @@ function peText(value) {
 // never passes a mark it reads as. The cap moves with the headline price
 // from its own date's close; a cap more than CAP_MAX_AGE_DAYS whole days
 // older than the price is left out. The P/E is the headline price over the
-// latest EPS, at its pair's rate in `rates` where it needs one
-// (`peRatio`). The cap names its currency
-// wherever Yahoo does, so one in yen never reads as one in dollars beside
-// it, whatever the reader's own; a London cap is in GBP while its prices
-// are in GBp.
+// latest EPS, at its pair's rate in `rates` where it needs one (`peRatio`).
+// The cap names its currency wherever Yahoo does, so one in yen never reads
+// as one in dollars beside it, whatever the reader's own; a London cap is in
+// GBP while its prices are in GBp.
 // Only an equity has cap and P/E slots, kept whether known or not, so the
 // line keeps its shape: the cap's as wide as its currency and 999.9B before
 // the cap comes; the P/E's as wide as 99.9.

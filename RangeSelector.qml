@@ -10,12 +10,11 @@ import "Tones.js" as Tones
 // its right, so they line up with the blocks above and below; each token's
 // target reaches halfway to its neighbours', so the targets tile the row.
 // The chosen one sits in the shell's selected fill, reaching past its word
-// as the featured row's does past its words, and alone has a bright label;
-// the one under the pointer takes the hover fill and keeps its dim label, so
-// a hover never reads as a second choice; and a pressed one takes the
-// pressed fill from the moment the button goes down, as the shell's buttons
-// do. Each token takes the wheel itself: a notch is one range, however
-// finely the wheel reports it.
+// as the featured row's does, and alone has a bright label; the hovered one
+// takes the hover fill and keeps its dim label, so a hover never reads as a
+// second choice; a pressed one takes the pressed fill from the moment the
+// button goes down, as the shell's buttons do. A wheel notch is one range,
+// however finely the wheel reports it.
 Item {
   id: root
 
@@ -38,9 +37,9 @@ Item {
   readonly property font wordFont: Qt.font({ family: fontFamily, pixelSize: Style.font.caption, bold: true, letterSpacing: 1 })
   FontMetrics { id: metrics; font: root.wordFont }
   implicitHeight: Math.ceil(metrics.ascent) + Math.ceil(metrics.descent)
-  // The metrics' font carries the letter spacing, so its advance is the
-  // word as drawn. The font is read, so a new text size measures again: a
-  // popup built before `omarchy display text size` overshot both edges.
+  // The metrics' font carries the letter spacing, so its advance is the word
+  // as drawn. Reading the font measures again on a new text size, or a popup
+  // built before `omarchy display text size` overshoots both edges.
   readonly property var wordWidths: {
     var font = metrics.font
     return options.map(function(o) {

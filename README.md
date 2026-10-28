@@ -1,21 +1,25 @@
 # Stonks
 
-Stonks puts a stock watchlist in your Omarchy 4 bar. A small pill shows how
-a stock is doing today. Click it for that stock's chart and your lists, and
-move the pointer across the chart to see the price at any moment on it.
+Stonks puts your stock watchlist in the Omarchy 4 bar. A small pill shows
+how one stock is doing today. Click it for the chart and your lists.
 
-<img src="preview.png" alt="Stonks in the Omarchy bar: its pill shows SPY's sparkline and change. Below the bar, the pixel bull, the STONKS wordmark, 'Stocks in your Omarchy bar.' and 'Free · No account · No API key', beside the retro popup: SPY at 769.94, up 0.88%, with the bull, over the day's chart in pixel columns">
+<img src="preview.png" alt="Stonks in the Omarchy bar. The pill shows Nebius (NBIS) up 2.88%. Below it, the popup shows Nebius Group at 163.31 over the day's chart in pixel columns. Beside it: 'Stocks in your Omarchy bar. Free · No account · No API key'">
 
-- Charts from one day to all time.
-- Pre-market, after-hours, and overnight prices, and when the market opens
-  or closes.
-- Stocks, ETFs, indexes, and crypto, from New York to London and Tokyo, each
-  in its own currency.
+- Stocks, ETFs, indexes, and crypto from New York to London and Tokyo,
+  with charts from one day to all time.
+- Pre-market and after-hours prices, and overnight prices for the US
+  stocks and ETFs that trade overnight.
+- Point anywhere on the chart to see the price at that moment.
+- Prices as Yahoo and Robinhood send them, in each listing's own currency
+  and its exchange's own time. Prices aren't converted.
 - Lists of your own, such as a portfolio or a sector.
-- Two looks, smooth and retro, in your theme's colors, light or dark.
-- No account and no API key.
+- A screenshot of any chart, sized so X shows it whole.
+- Everything works by mouse alone or by keyboard alone.
+- Light on your computer: Stonks fetches nothing while your screens are
+  off, and fetches each stock only as often as its market moves.
+- Free, with no account and no API key.
 
-It doesn't track holdings, send price alerts, or convert prices into another currency.
+Stonks doesn't track your holdings or send price alerts.
 
 Website: [getstonks.app](https://getstonks.app)
 
@@ -24,141 +28,106 @@ Website: [getstonks.app](https://getstonks.app)
 
 ## Install
 
-Needs Omarchy 4.
+You need Omarchy 4.
 
 ```sh
 omarchy plugin add https://github.com/gmchande/omarchy-stonks.git --enable
 ```
 
-Omarchy warns that plugins run unsandboxed and asks you to confirm. Then it
-asks where in the bar to put `grvc.stonks`, which is Stonks' id. The center
-is the default.
-
-To read the code first, leave out `--enable`, say no when Omarchy offers to
-enable it, and run `omarchy plugin enable grvc.stonks` when you're ready.
+Omarchy warns that plugins run without a sandbox and asks you to confirm.
+Then it asks where in the bar to put `grvc.stonks`, which is Stonks' id.
+The center is the default. To read the code before it runs, leave out
+`--enable` and say no when Omarchy offers to enable it. Run
+`omarchy plugin enable grvc.stonks` when you're ready.
 
 Stonks starts with five symbols so the pill has something to show: NVDA,
-AAPL, MSFT, SPY, and TSLA. Add your own and remove any you don't follow.
+AAPL, MSFT, SPY, and TSLA. Add your own and remove the ones you don't
+follow.
 
 ## The pill
 
-<img src="media/pill.png" width="200" alt="The pill's four forms: a sparkline, an arrow, the price as text, and the day's bear">
+<img src="media/pill.png" width="200" alt="The pill four ways: a sparkline, an arrow, the price as text, and an icon for the day">
 
-The pill shows today's move for the stock you last looked at, in one of four
-forms: a sparkline, an arrow, the price as text, or the day's animal, the
-bull on an up day and the bear on a down one. Middle-click it to change its
-form. On a bar at the side of the screen it shows the animal, and a
-middle-click there switches to the symbol over its change.
+The pill shows today's move for the stock you last looked at. It can show
+a sparkline, an arrow, the price as text, or an icon: a bull on an up day,
+a bear on a down one. Middle-click it to switch. It keeps your choice after
+a restart. On a bar at the side of the screen, middle-click switches
+between the icon and the symbol over its change.
 
-Scroll over it to step through your list, left-click for the popup,
-right-click for the window, and drag it to move it along the bar.
+Scroll over the pill to step through your list. Click it for the popup,
+right-click it for the window, and drag it to move it along the bar.
 
 ## Reading the day
 
-<img src="media/scrub.png" width="480" alt="The popup scrubbed back an hour and a half, to 10:15 in the morning: the price, the change, and the rows follow the pointer">
+<img src="media/scrub.png" width="480" alt="The popup scrubbed back an hour and a half, to 10:15 in the morning. The price, the change, and the rows show that moment">
 
-Hover the chart to scrub back through the day: the price, the change, and
-the rows follow the pointer. Click the bull, or on a down day the bear, to
-replay the chart.
+Run the pointer along the chart to go back through the day. The price, the
+change, and the rows follow it. Click the icon at the top left to replay
+the chart.
 
-Pick a range under the chart, from 1D to All. Every stock then shows that
-range, even after a restart. The rows stay on the day's move. To see it as
-a percent, an amount, or since the open, click the sign at the end of the
-list's header, or on 1D the change beside the price. A range marks its
-high and low on the chart, with their dates, and a stock younger than the
-range says when it began: "SINCE 31 JUL 2025".
+Pick a range under the chart, from 1D to ALL. Every stock then shows that
+range, even after a restart. The rows always show the day.
 
-Under the ranges, two lines place the price between its low and high. The
-first is the range's: on 1D the day's, beside its open and volume, and on a
-longer range that range's, beside START, the price its change is measured
-from, and the volume traded over it. The second is the past 52 weeks', beside
-the market cap and P/E. The market cap is an estimate: Yahoo's last reported
-figure, moved with the price since. The P/E is the price over the last
-year's earnings per share. Where a company reports earnings in another
-currency, as Shopify does in US dollars, Stonks converts them at Yahoo's
-rate of the day, inside the P/E alone.
+Rows show the day's change as a percent or an amount, or the percent change
+since the open. To switch, click the %, ±, or bell at the end of the list's
+header.
 
-The top line says where the market is, in its own time: counting down to
-the open or the close, after hours, or closed. With less room, as at a
-larger text size, it says less and keeps the time: "CLOSED AT 16:00". A
-smaller line under the price shows the pre-market, after-hours, or
-overnight price. The overnight price is for the US stocks and ETFs
-Robinhood trades overnight. Until the
-next session opens, the 1D chart shows the last session, the one the price
-and its move are about, then the night after it and the pre-market.
-Pointing anywhere on it measures that price from the dashed line, the
-close the chart is drawn against; the smaller line measures the overnight
-price from the last close. A stock that trades only now and then shows the
-night's trades as dots.
+Under the ranges, the first line shows the range's low and high, with the
+price between them. Beside it are the open and the volume on 1D, or the
+range's starting price and volume on a longer range. The second line shows
+the 52-week low and high, with the market cap and P/E. Stonks estimates
+the market cap from Yahoo's last reported figure, moved with the price
+since. When
+a company reports earnings in another currency, Stonks converts them at
+Yahoo's rate for the day, inside the P/E and nowhere else.
 
-An old price says "As of" and its time, on its row and above the price.
-Old means more than two minutes behind while its market trades, or saved
-from the last session. A price nothing kept fresh while the popup and the
-window were closed, such as a coin's, says it only if its new price takes
-more than 2 seconds to come. At the open, the last close says it only if
-the session's first price takes more than a minute to come; Stonks asks for
-it every 15 seconds until then. If Yahoo sends no regular price, Stonks keeps
-the last regular chart trade, labeled "Last trade" with its time.
-If Yahoo sends a price without its time, it says "Time not sent", and
-"Saved" too if kept from the last session.
-A refresh that fails, or gets no answer in 90
-seconds, says so in the same places and puts a "!" on the pill.
+The top line names the moment in the market's day, such as Power hour, and
+says when the market opens or closes, by the exchange's clock. A smaller
+line under the price shows the pre-market, after-hours, or overnight price.
+Between sessions, the 1D chart shows the last session, then the night and
+pre-market trades after it.
+
+A price says "As of" and its time when it's old: more than two minutes
+behind while its market trades, or saved from before and not yet
+refreshed.
 
 ## Your lists
 
 <img src="media/lists.png" width="480" alt="The list menu open over the rows: All with seven symbols, US with four, New list, and Manage lists">
 
-Click the list's name to switch lists, start one, or manage them. All holds
-every symbol you follow, and your own lists hold some of them. Ctrl-click a
-row to choose the lists it's in. Removing a symbol from All removes it
-everywhere.
+Click the list's name to switch lists, start a new one, or manage them. All
+holds every symbol you follow, and your own lists each hold some of them.
+To choose which lists a row is in, Ctrl-click it, or select it and press
+Ctrl+Enter.
 
-Click "+ Add a symbol" and type a name or a symbol. The top result shows in
-the chart, and Enter or a click adds it. Search finds stocks, ETFs,
-indexes, and crypto.
+To add a stock, click "+ Add a symbol" and type a name or a symbol. The
+chart shows the highlighted result before you add it. Press Enter to add
+it, or click any result to add that one.
 
-To remove a row, point at it and click the × beside its symbol, or press
-Delete: it goes from the list you're looking at. The row that slides into
-its place shows its × only once you move the pointer, so a second click
-can't remove it by mistake. Right-click a row to choose where it goes from,
-such as "Remove from Growth" or "Remove from all 3 lists". In All, where
-removing takes a symbol out of every list, the × and Delete ask first when
-one of your own lists holds it too.
-
-For 5 seconds after a removal, "Undo NVDA" shows beside "+ Add a symbol":
-click it to bring the row back. Until a list next changes, `Ctrl+Z` does the
-same, and so does "+ Add a symbol", where the symbol is the first result,
-with PUT BACK. Each puts it back in its lists at its old place, with the
-price it had, and Stonks asks for a new one at once.
+To remove a row, point at it and click the × beside its symbol, or select
+it and press Delete. It leaves the list you're looking at. Removing it from
+All removes it from every list, and asks first if one of your lists holds
+it. Right-click a row to choose which lists it leaves. For 5 seconds, a
+button such as "Undo NVDA" shows beside "+ Add a symbol". `Ctrl+Z` also
+undoes it, until you change a list again.
 
 The line beside the list's name shows how many rows are up, in green, and
-down, in red. Click the order word to sort by symbol, name, or change, and
-click its arrow to reverse the sort.
-
-The sign at the end of the line says what the rows' figures are: % for a
-percent, ± for an amount, and a bell for since the open. Click it to step
-every row to the next. Sorted by change, the rows rank by the percent they
-show, from the open when they show since the open. Amounts can't be ranked
-across currencies, so while the rows show amounts they stay in percent
-order.
+down, in red. Point at it for the counts. Click the order at the right of
+the header, such as MANUAL, to sort by symbol, name, or change, or to go
+back to your own order. Click its arrow to reverse the sort. Sorting by
+change ranks rows by percent, even while they show amounts, since amounts
+in different currencies can't be compared.
 
 ## The window
 
-<img src="media/window.png" width="720" alt="Stonks' window: the popup's chart and rows at the window's width">
+<img src="media/window.png" width="720" alt="Stonks' window: the popup's chart and rows, at the window's width">
 
-Stonks also opens in a tiled window: the popup's chart and rows at the
-window's width. To open it, right-click the pill or run
-`omarchy-shell grvc.stonks openWindow '{}'`. It shares the popup's lists,
-range, and quotes. To float it, match class `org.quickshell` and title
-`Stonks` in a window rule.
+Stonks also opens as a tiled window, with the popup's chart and rows at
+the window's width. Right-click the pill, or run
+`omarchy-shell grvc.stonks toggleWindow`. To float it, add a window rule
+that matches class `org.quickshell` and title `Stonks`.
 
-The window also works with no pill. Run
-`omarchy plugin disable grvc.stonks`, then add `{ "id": "grvc.stonks" }` to
-`plugins` in `~/.config/omarchy/shell.json` to keep the plugin loaded. To
-bring the pill back, remove that entry first, then run
-`omarchy plugin enable grvc.stonks center`.
-
-For keys that open and close the popup and the window, add these lines to
+To open the popup and the window from the keyboard, add these lines to
 `~/.config/hypr/bindings.lua`. Omarchy doesn't use either key by default:
 
 ```lua
@@ -166,7 +135,12 @@ o.bind("SUPER + ALT + T", "Stonks popup", "omarchy-shell shell toggle grvc.stonk
 o.bind("SUPER + SHIFT + T", "Stonks window", "omarchy-shell grvc.stonks toggleWindow")
 ```
 
-For Stonks in the app launcher, which `omarchy plugin add` doesn't set up:
+To use the window without the pill, run `omarchy plugin disable grvc.stonks`,
+then add `{ "id": "grvc.stonks" }` to `plugins` in
+`~/.config/omarchy/shell.json` to keep Stonks loaded. To bring the pill
+back, remove that entry, then run `omarchy plugin enable grvc.stonks center`.
+
+To add Stonks to the app launcher:
 
 ```sh
 cp ~/.config/omarchy/plugins/grvc.stonks/share/stonks.desktop ~/.local/share/applications/
@@ -178,54 +152,46 @@ cp ~/.config/omarchy/plugins/grvc.stonks/share/grvc.stonks.svg ~/.local/share/ic
 
 <img src="media/retro.png" width="480" alt="The popup in retro: block digits and a chart of pixel columns">
 
-Stonks opens in retro: the price in block digits and the charts in pixel
-columns, the way Omarchy draws its logo. Click the small chart icon at the
-top right to switch between smooth and retro.
+Retro draws the price in block digits and the chart in pixel columns, the
+way Omarchy draws its logo. Smooth uses plain digits and a line chart. To
+switch, press `s`, or click the small chart icon at the top right.
 
-<img src="media/light.png" width="480" alt="The popup in Catppuccin Latte, a light theme: Stonks' own green and red, for a light ground, on the theme's pale background">
+<img src="media/light.png" width="480" alt="The popup on Catppuccin Latte, a light theme, in Stonks' own green and red, made for a light background">
 
-Both looks draw in your theme's colors, light themes too: up in its green
-and down in its red, or in Stonks' own pair where the theme's are missing,
-too alike, or too faint.
+Both use your theme's green for up and its red for down, on light themes
+too. Where a theme's pair is missing, too alike, or too faint, Stonks uses
+its own.
 
 ## Sounds
 
-Stonks makes a short sound when you add a symbol, remove a row, or undo the
-removal, which plays the removal backwards, and a shutter when you take a
-screenshot. Run the pointer along the chart
-and it plays like a row of chimes, higher where the line is higher: the bars
-you cross ring, up to 22 a second, ending on the one under the pointer, and
-each step of `←` `→` rings too. A replay sweeps the same bars along the
-line; in retro it also ticks where the line crosses the chart's baseline:
-the previous close on 1D, the range's first price on the others. Each look
-has its own voice. A soft bell rings as the market of the stock you last
-looked at opens and as it closes, on time or not at all, and never while
-every screen is off or an app records from your microphone. Nothing else
-sounds by itself: no refresh or price. Click the speaker at the top right,
-or press `m`, to turn sounds off; Stonks remembers. Your system volume
-sets how loud they are.
+Sounds are off until you turn them on. Press `m`, or click the speaker at
+the top right. With sounds on, adding, removing, or undoing a row makes a
+short sound, and the chart chimes as you run the pointer along it. A soft
+bell rings as the market of the stock you last looked at opens and closes,
+but never while an app is recording from your microphone. Refreshes and
+prices make no sound.
 
 ## Screenshots
 
-Click the camera at the top right, or press `Ctrl+C`, for a picture of the
-chart you're looking at, laid out to share: the price large with its
-currency beside it, its move, the day's bull or bear, the exchange, the time
-of the price with its zone, the price the move is measured from, a range's
-high and low on its chart, and at the foot the day's date or the range's
-length. Scrubbed, it shows the moment you scrubbed to. Your list is never in
-it. It lands where Omarchy's own screenshots do, on Omarchy 4.0 and on 4.5:
-a file in your screenshots folder, the picture on the clipboard, and
-Omarchy's notification, which opens it in your screenshot editor when you
-click it: Omasnap on 4.5, Tensaku on 4.0.
+Press `Ctrl+C`, or click the camera at the top right, for a picture of the
+chart, sized so X shows it whole. It shows the price, its move, the
+exchange, and the time with its zone. If you've scrubbed the chart, it
+shows that moment. Your list is never in it.
+
+Stonks treats it like Omarchy's own screenshots. It saves the picture to
+your screenshots folder, copies it to the clipboard, and shows a
+notification. Click the notification to open the picture in your
+screenshot editor.
 
 ## Keys
 
-`?` opens a sheet of every key, the same as this table:
+`?` lists the same keys as this table:
 
 | Key | Does |
 | --- | --- |
 | `↑` `↓` | Move the selection |
 | `⏎` | Show the selected row's chart |
+| `Ctrl+⏎` | Choose the selected row's lists |
 | `←` `→` | Scrub the chart one step |
 | `[` `]` | Change the range |
 | `p` | Replay the chart |
@@ -233,222 +199,140 @@ click it: Omasnap on 4.5, Tensaku on 4.0.
 | `a` | Add a symbol |
 | Delete or Backspace | Remove the selected row |
 | `Ctrl+Z` | Undo a removal |
-| `Shift+↑` `Shift+↓` | Move the row in your own order |
+| `Shift+↑` `Shift+↓` | Move the selected row, in your own order |
 | `o` | Change the order |
 | `Shift+O` | Reverse the order |
-| `l` | Open the list menu |
-| `c` | Show the change as %, amount or since the open |
-| `s` | Smooth or retro |
-| `m` | Sound on or off |
+| `w` | Open the list menu |
+| `c` | Show the day's change as a percent or an amount, or since the open |
+| `s` | Switch between smooth and retro |
+| `m` | Turn sounds on or off |
 | `r` | Refresh |
-| `Shift+U` | Update Stonks when a newer one is out, then restart the shell |
+| `Shift+U` | Update Stonks when a new version is out, and restart the shell to run it |
 | Tab or `Shift+Tab` | Next or previous panel on the bar (popup) |
-| `?` | All keys |
+| `?` | Show every key |
 | `Esc` | Close |
 
 ## If something's wrong
 
-A "!" on the pill means its stock's quote is late or its last refresh
-failed: point at the pill to read which, why, and when Stonks tries again.
-The row and the line above the price say the same.
+A "!" on the pill means a refresh of its stock failed or is late. Point at
+the pill to see which.
 
-- **A row says "Update overdue" or "No data", and the header "No answer,
-  check your connection", or "No connection?" where it's short of room.**
-  Stonks has waited 90 seconds on Yahoo, and no answer came. A row with a
-  price keeps it, with the time it's from. Check your connection. If other
-  sites load, Yahoo may be down or out of reach, and there's nothing to do
-  but wait. The header says when Stonks tries again, within two minutes,
-  and `r` asks at once.
-- **A row says "Update overdue" or "No data", and the header "Turned
-  away".** Yahoo asked Stonks for fewer requests. The
-  header says when Stonks tries again, from a minute to about half an hour
-  on, as Yahoo asked. `r` won't hurry it.
-- **The header says "Can't get prices · Stonks keeps trying".** Every
-  symbol you follow has a refresh that failed or is overdue, so Stonks
-  says so once rather than on every row. Rows with a price keep it, with
-  the time it's from, and the rest show their symbol alone. Check your
-  connection. If Yahoo has changed what it sends, only a newer Stonks can
-  fix that.
-- **A row says "No data for this symbol" or "Refresh failed", and the
-  header "No usable answer".** Yahoo said it has nothing for the symbol, or
-  sent a broken answer three times running. A row with a price keeps it,
-  with the time it's from, and `r` tries again. A symbol Yahoo has
-  dropped, after a merger, a rename, or a delisting, stays this way: search
-  for the company to find what Yahoo calls it now.
-- **A stock or index says "As of" while its market is open.** Yahoo sends
-  many exchanges' prices late, and some indexes'. When we measured,
-  London's, São Paulo's, and the Cboe's VIX came 15 minutes late and
-  Mexico's 20. Nasdaq's, NYSE's, Toronto's, and crypto came within a
-  minute. For any other exchange, Tokyo's among them, see [Yahoo's table of delays](https://help.yahoo.com/kb/SLN2310.html).
-  A thin stock can say it too, when its last trade was more than two
-  minutes ago. The overnight price shows its own time, usually 10 to 15
-  minutes back, since Robinhood reports those trades late, and dims once
-  it's 20 minutes old.
-- **A price looks wrong.** Each price is in its listing's currency, never
-  converted, and shows no code where Yahoo names none, as for some
-  indexes. A price marked PENCE is in pence, as Yahoo quotes many London
-  listings: 3,580.00 is £35.80. The large price is the regular session's.
-  Pre-market, after-hours, and overnight trades show on the smaller line
-  under it, which some apps show as the main price. The change is from the
-  previous close, unless you've clicked it to show since the open. On a
-  longer range, it's from the range's start. Stonks shows Yahoo's prices as
-  sent, except for the odd stray price Yahoo drops into a chart, which it
-  leaves out.
-- **The day's chart says "No trades charted" or "Traded only at" a time.**
-  The listing traded too little that day to draw a line.
-- **The header says "1W unavailable", with RETRY beside it.** Yahoo didn't
-  send that range's chart. Click RETRY, or press `r`. While Yahoo is
-  turning Stonks away, a range fails at once.
-- **Search says "Search didn't answer", with RETRY beside it.** Yahoo's
-  search didn't answer. Click RETRY, or press Enter. While Yahoo is turning
-  Stonks away, a search fails at once: try again in a moment.
-- **The header says "schedule unavailable".** Stonks knows each exchange's
-  holidays and clock changes up to a set date. This exchange's have run
-  out, so it can't say when the market next opens. Times still read
-  true, by the clock Yahoo sends with each price. Stonks doesn't update
-  itself: [update it](#update) for a renewed calendar.
-- **The footer says "Couldn't load your lists".** The file holding your
-  lists, `~/.config/omarchy/grvc.stonks.json`, can't be opened or isn't
-  valid JSON, often after a hand edit. Stonks keeps the lists it has and
-  writes nothing over the file until it can read it again. A change you
-  make meanwhile shows, and the footer says "Your changes aren't saved ·
-  couldn't load your lists": the file read again, or a restart, loses it.
-  Fix the file and Stonks reads it as you save, or remove it to start over
-  with the five starter symbols.
-- **The footer says "Your changes aren't saved".** Stonks couldn't write
-  the file holding your lists: the disk is full, or the file or its
-  folder, `~/.config/omarchy`, is read-only. Your lists stay as they look
-  until the shell restarts, and a restart loses every change since the
-  last save. Free some space or fix the permissions, then click the
-  footer. Any change you make tries again too.
+<details>
+<summary>What each message means, and what to do</summary>
 
-To report a price or chart that looks wrong, or anything this doesn't
-answer, use the [bug form](https://github.com/gmchande/omarchy-stonks/issues/new?template=bug.yml).
-For a price, give the symbol, the range, and the time (scrub the chart to
-it), what Stonks showed, and what your broker or the exchange showed then.
-The shell's log the form asks for can name the prices Stonks left out.
+- **"Can't get prices" in the header, or "No data" or "Update overdue" on
+  a row.** Yahoo hasn't sent a price Stonks can use in time, or has
+  turned Stonks away. Rows keep any price they had, with its time. Check your connection.
+  Stonks keeps trying on its own, less often the longer Yahoo stays away.
+  `r` asks again at once, unless Yahoo is turning Stonks away. If Yahoo
+  has changed what it sends, only a newer Stonks can fix it.
+- **"No data for this symbol" or "Refresh failed" on a row.** Yahoo has
+  nothing for the symbol, or sent a broken answer three times in a row.
+  Press `r` to try again. After a merger or a rename, search for the
+  company to find what Yahoo calls it now. A delisted company may be gone
+  for good.
+- **"As of" while the market is open.** Yahoo sends some prices late. When
+  we measured, London, São Paulo, and the VIX came 15 minutes late, and
+  Mexico 20. Nasdaq, NYSE, Toronto, and crypto came within a minute.
+  [Yahoo's table](https://help.yahoo.com/kb/SLN2310.html) lists the rest.
+  A thinly traded stock says "As of" when its last trade was more than two
+  minutes ago. Overnight prices usually run 10 to 15 minutes behind, since
+  Robinhood reports those trades late.
+- **A price looks wrong.** Check the currency: Stonks never converts.
+  PENCE means pence, as Yahoo quotes many London listings, so 3,580.00 is
+  £35.80. The large price is the regular session's, and the smaller line
+  under it shows trades outside it, which some apps show as the main price.
+  The change is from the previous close, unless you've switched it to
+  since the open. On a longer range, it's from the range's start. Stonks
+  leaves out prices of zero or less, and stray points in Yahoo's charts.
+- **"No trades charted" or "Traded only at" a time.** The listing traded
+  too little that day to draw a line.
+- **"1W unavailable" or "Search didn't answer", with RETRY.** Yahoo didn't
+  send that chart or those results. Click RETRY.
+- **"schedule unavailable".** Stonks' calendar for this exchange has run
+  out, so it can't say when the market next opens. Prices and
+  times are still right. [Update Stonks](#update) for a new calendar.
+- **"Couldn't load your lists" in the footer.** Your lists file,
+  `~/.config/omarchy/grvc.stonks.json`, can't be read or isn't valid JSON,
+  often after a hand edit. Stonks won't write over it. Changes you make
+  meanwhile are lost when Stonks reads the file again or the shell
+  restarts. Fix the file and save it, and Stonks reads it at once. Or
+  remove it to start over.
+- **"Your changes aren't saved" in the footer.** Stonks can't write your
+  lists file, because the disk is full or the file or its folder is
+  read-only. A restart loses every change since the last save. Free some
+  space or fix the permissions, then click the footer.
+
+To report a wrong price or anything else, use the
+[bug form](https://github.com/gmchande/omarchy-stonks/issues/new?template=bug.yml).
+For a price, give the symbol, the range, and the time, what Stonks showed,
+and what your broker or the exchange showed then.
+
+</details>
 
 ## What it runs
 
-- **Needs:** nothing beyond Omarchy 4. It runs `curl`, PipeWire's
-  `pw-play`, `pw-cat`, and `pw-dump`, and `sh`, `bash`, `timeout`,
-  `head`, `md5sum`, `mkdir`, `chmod`, `mktemp`, `ln`, and `rm`, which
-  Omarchy ships, and, for a screenshot, `sed`, `tail`, `date`, `wl-copy`,
+Stonks isn't investment advice, and isn't affiliated with Yahoo or
+Robinhood. Yahoo's endpoints are unofficial, and Robinhood's data is for
+personal use, so either may change or stop without notice.
+
+<details>
+<summary>The commands it runs, the sites it asks, and the files it writes</summary>
+
+**Commands**, all of which Omarchy ships:
+
+- `curl` for every request, with a time limit and a size cap.
+- `sh`, `mkdir`, `chmod`, `mktemp`, `ln`, and `rm`, to make its files and
+  keep them readable only by you.
+- `timeout`, to stop its file, sound, and screenshot commands if they
+  hang.
+- With sounds on: `pw-play` for each sound; `pw-cat` playing silence while
+  you move along the chart, so each chime plays at once; `pw-dump`, in
+  `bash`, as the bell is due, to check that no app is recording; and `sh`
+  with `md5sum` and `head`, once a run, to check its saved sounds.
+- For a screenshot: `sh` with `sed`, `tail`, `date`, and `head` to find
+  your screenshots folder and name the file, `wl-copy` for the clipboard,
   and `omarchy-notification-send`.
-- **Commands:** `curl` for every request; as Stonks starts, one `sh` that
-  makes its cache folder, `mkdir` and `chmod`, yours alone, and `chmod` as
-  it writes each of its files, to make it yours alone too; only when it
-  saves `~/.config/omarchy/grvc.stonks.json` and finds none there, one
-  `sh` that makes it, yours alone before it holds anything: `mktemp` makes
-  a file beside it that only you can read, the `sh` writes your settings
-  into it from its environment, never its arguments, `ln` puts it under
-  its name, never over a file there, and `rm` takes the extra name away;
-  each of these under `timeout`, which stops it after 5 seconds; a save
-  that can't be made this way says your changes aren't saved; while
-  sounds are on, once a run, one `sh` under `timeout` for 5
-  seconds that reads, by `md5sum`, the files its sounds are made from, and
-  which sound files in its cache folder hold them, through `head` for 64
-  KB; `pw-play` to play a sound, only
-  when you add, remove, or undo a row, take a screenshot, turn sounds on,
-  replay a chart, or move along it, or the bell is due, with 4 seconds
-  under `timeout`, and one `sh` that
-  starts a `pw-play` for each chime, with 2 seconds each under `timeout`,
-  and plays nothing else; while sounds are on and your scrub of the chart
-  moves, with the pointer on it or by `←` `→`, and for a second after,
-  `pw-cat` playing silence, so each chime plays at once, each stream under
-  `timeout` for 60 seconds and started again while you scrub; `pw-dump`
-  once as each bell is due, in `bash` under `timeout` for 3 seconds and
-  through `head` for 4 MB, to see
-  whether an app is recording from a microphone, reading only which streams
-  run; an answer that runs out of time, fails, or goes over 4 MB counts as
-  recording, so the bell stays quiet; only when you take a screenshot, one
-  `sh` that looks for `omasnap`, Omarchy 4.5's screenshot tool, and names
-  the picture's file in your screenshots folder, making the folder if it
-  isn't there, its answer through `head` for 8 KB; another that hands
-  `wl-copy` the picture on its input, to
-  put it on the clipboard; and `omarchy-notification-send` with Omarchy's
-  own words, as Omarchy 4.0's own screenshots do; each under `timeout`,
-  which stops it after 5 seconds; only when you click that notification,
-  Omarchy runs your screenshot editor on the file: `omasnap` where it's
-  installed, else `OMARCHY_SCREENSHOT_EDITOR`, else Tensaku; `omarchy restart
-  shell` only when you click the notice that an update is on disk, or press
-  `Shift+U` while it shows; and, only when you click "Update to …" or press
-  `Shift+U` while it shows, `omarchy plugin update grvc.stonks` in a
-  terminal.
-- **Silence's cost:** while `pw-cat` plays silence, your speakers'
-  amplifier stays powered and your headphones stay connected to this
-  computer, as when any sound plays, and it takes about a tenth of a
-  percent of one processor core. It runs only while your scrub moves, and
-  a second after, or a replay waits for a sleeping output to wake, never
-  just because the popup or the window is open or a scrub stands still. A
-  sound after 4 seconds of quiet from Stonks starts with up to 150 ms of
-  silence of its own, so a sleeping
-  output wakes before the sound and none of it is cut; a replay waits for
-  the output instead, so its sound keeps in step with its sweep.
-- **Sites:** `query1.finance.yahoo.com` for quotes, charts, and the market
-  cap and P/E, with the day's currency rate a P/E needs;
-  `query2.finance.yahoo.com` for search; `api.robinhood.com`
-  for overnight prices and which stocks trade overnight; and
-  `raw.githubusercontent.com` for the newest version number, as the shell
-  starts and then once a day; when no answer comes, again once Yahoo
-  answers again, or a day later; never with `"updateCheck": false` in
-  `~/.config/omarchy/grvc.stonks.json`. Nothing else.
-- **Data:** Yahoo's endpoints are unofficial, and its terms restrict
-  automated access; Robinhood's data is for personal use. Either may change
-  or stop without notice. Some prices come late: [Yahoo's table](https://help.yahoo.com/kb/SLN2310.html)
-  lists delays of up to 30 minutes for many exchanges and some indexes,
-  London's and Tokyo's among them. Stonks isn't investment advice, and isn't
-  affiliated with Yahoo or Robinhood.
-- **Files it writes:** your lists and settings in
-  `~/.config/omarchy/grvc.stonks.json`; in its cache folder,
-  `$XDG_CACHE_HOME/grvc.stonks` when `XDG_CACHE_HOME` is set, else
-  `~/.cache/grvc.stonks`, the last quotes in `quotes.json`, and, while
-  sounds are on, a replay's sound in `replay.wav`, written over at each replay of
-  another chart, and beside it the chimes' notes, `chime-*.wav`, each also
-  with its silence first, and the other sounds with theirs, `lead-*.wav`,
-  written again only when what they're made from has changed or one is
-  missing, with `stamp-smooth` and `stamp-retro`, which say what they were
-  made from; and
-  for each screenshot you take, one picture,
-  `stonks-<symbol>-<date>_<time>.png`, in the folder Omarchy's own
-  screenshots use: where Omasnap is installed, `OMASNAP_SCREENSHOT_DIR`,
-  else `OMARCHY_SCREENSHOT_DIR`, else the `directory` in Omasnap's
-  `[output]` settings, else `Screenshots` in your Pictures folder; without
-  it, `OMARCHY_SCREENSHOT_DIR`, else your Pictures folder;
-  saved straight there, with no copy anywhere else. Everything in the
-  cache folder is readable by you alone (0600, the folder 0700),
-  and so is the data file, from the moment Stonks makes it, and again
-  from Stonks' next save after an older Stonks or an editor left it
-  readable to others.
-  The shell keeps the pill's form on its bar entry in
-  `~/.config/omarchy/shell.json`.
-- **Limits:** every request has a time limit and a size cap. Quotes come
-  up to 20 listings to a request, so a long list refreshes in a few
-  requests a minute, and overnight prices up to 25 for a whole day and 75
-  for the last hour. Before a US session opens, from 04:00 New York, and
-  for a listing's first price, Stonks asks for two days of prices in place
-  of one, so the chart has the last session. Stonks fetches each
-  listing only as often as its market can move, and leaves a site that
-  refuses it alone for a while, as long as it asks up to half an hour. A
-  window no screen shows, on another workspace or a screen switched off,
-  fetches only what a closed one does.
-- **Robinhood:** Stonks asks whether your US stocks and ETFs trade
-  overnight, and for their overnight prices, both at once: for the stock on
-  the pill once each time the shell starts, as its first price comes in; for
-  the rest when the popup or window first opens, and for each one you add;
-  and, while one is open, every 5 minutes through a night that trades;
-  and when you press `r`, for the stock on the chart. It asks for the last
-  hour of prices when it has prices from the last half hour, and for a
-  whole day otherwise.
-- **Updates:** never by itself. When a newer version is out, the footer
-  offers it.
+- Only when you ask for an update: `omarchy plugin update grvc.stonks` in
+  a terminal, then `omarchy restart shell` when `git` shows the update
+  moved Stonks' folder.
 
-Every request runs through the one curl command in [`Fetch.js`](Fetch.js),
-which sets its limits. [`test/boundaries.sh`](test/boundaries.sh) fails if a
-command, a file read or write, or a request turns up outside the few files
-allowed them. It runs on every push:
+**Sites**, and nothing else:
 
-[![Checks](https://github.com/gmchande/omarchy-stonks/actions/workflows/fresh-clone.yml/badge.svg)](https://github.com/gmchande/omarchy-stonks/actions/workflows/fresh-clone.yml)
+- `query1.finance.yahoo.com` for prices, charts, the market cap and P/E,
+  and the currency rate a P/E needs. Stonks keeps prices fresh for the
+  pill's stock, for every stock, ETF, and index in All during its regular
+  session, and for every row while the popup or the window is open. Each
+  comes every minute while its market trades, every 5 minutes before and
+  after the session (every minute for the stock on show), and every 15
+  minutes while the market is closed.
+- `query2.finance.yahoo.com` for search, as you type.
+- `api.robinhood.com` for overnight prices: once a day for which stocks
+  trade overnight, once for the pill's stock as the shell starts, and
+  every 5 minutes through the night while the popup or the window is
+  open.
+- `raw.githubusercontent.com` for the newest version number, as the shell
+  starts and once a day. To turn this off, add `"updateCheck": false` to
+  `~/.config/omarchy/grvc.stonks.json`.
+
+Stonks asks for nothing while every screen is off. When a site turns it
+away, it waits as long as the site asks, up to half an hour.
+
+**Files:**
+
+- `~/.config/omarchy/grvc.stonks.json`: your lists and settings.
+- `~/.cache/grvc.stonks`, or `$XDG_CACHE_HOME/grvc.stonks` when that's
+  set: the last prices, and the sounds Stonks makes for itself.
+- Each screenshot, as `stonks-<symbol>-<date>_<time>.png` in the folder
+  Omarchy's own screenshots use.
+
+Only you can read the cache folder. Stonks makes your lists file readable
+only by you when it creates or saves it.
+[`test/boundaries.sh`](test/boundaries.sh) fails if any code outside a
+few allowed files runs a command, reads or writes a file, or makes a
+request.
+
+</details>
 
 ## Update
 
@@ -457,18 +341,11 @@ omarchy plugin update grvc.stonks
 omarchy restart shell
 ```
 
-Once a day, Stonks asks GitHub for the newest version. When it's newer than
-yours, the footer's right end says "Update to …" each time the popup or the
-window opens, until you update; "+ Add a symbol" stays where it is. A click
-on it, or `Shift+U`, opens a terminal that runs `omarchy plugin update
-grvc.stonks`, which shows what changes and asks before it updates. Until
-the shell restarts, the old version keeps running, and the footer says
-"Updated to … · click to restart the shell"; a click, or `Shift+U`,
-restarts it.
-
-To stop the daily look, add `"updateCheck": false` to
-`~/.config/omarchy/grvc.stonks.json`; Stonks then asks GitHub nothing, and
-you update by the commands above. Take it out to look again.
+Or, when the footer says "Update to …", click it or press `Shift+U`. A
+terminal opens and shows what changes. Say yes, and it updates Stonks and
+restarts the shell, unless Stonks has changes it hasn't saved. Then, or
+after an update run anywhere else, the footer says "Updated to … · click to
+restart the shell". Stonks never updates itself.
 
 ## Remove
 
@@ -476,8 +353,9 @@ you update by the commands above. Take it out to look again.
 omarchy plugin remove grvc.stonks
 ```
 
-That removes the plugin and its pill. Your lists, the saved quotes, and the
-launcher files, if you added them, stay. Delete what you no longer want:
+That removes the plugin and its pill, but leaves your lists, the saved
+prices, and the launcher files if you added them. Delete what you don't
+want:
 
 ```sh
 rm ~/.config/omarchy/grvc.stonks.json   # your lists; keep it to reinstall later
@@ -485,14 +363,14 @@ rm -r "${XDG_CACHE_HOME:-$HOME/.cache}/grvc.stonks"
 rm -f ~/.local/share/applications/stonks.desktop ~/.local/share/icons/hicolor/scalable/apps/grvc.stonks.svg
 ```
 
-If you added them, also delete the `{ "id": "grvc.stonks" }` entry in
-`plugins` in `~/.config/omarchy/shell.json`, and the `o.bind` lines in
+If you added them, also delete the `{ "id": "grvc.stonks" }` entry from
+`plugins` in `~/.config/omarchy/shell.json`, and the `o.bind` lines from
 `~/.config/hypr/bindings.lua`.
 
 ## Contributing
 
-How to run your checkout, its tests, and how to send a change are in
-[CONTRIBUTING.md](CONTRIBUTING.md).
+[CONTRIBUTING.md](CONTRIBUTING.md) says how to run your own copy, test it,
+and send a change.
 
-License: MIT, see [LICENSE](LICENSE). The sounds in `sounds/` and the ones
-Stonks makes as it runs were made for Stonks, from code, and are MIT too.
+License: MIT, see [LICENSE](LICENSE). The sounds in `sounds/`, and the ones
+Stonks makes as it runs, were made from code for Stonks. They're MIT too.

@@ -116,7 +116,7 @@ BarWidget {
   // most likely to be trusted at a glance. With no price, an answer the
   // source sent without one says "No data", and a wait it never answered
   // (overdue) says so in the header's words, naming no source: not every
-  // reader knows Yahoo (the owner, 26 October).
+  // reader knows Yahoo.
   readonly property string changeText: featured ? (warns ? "! " : "") + Format.lookSigns(featured.changeLine, retro)
     : !warns ? "…" : freshness.state === "overdue" ? "! Can't get prices" : "! No data"
   // A side bar's stacked form: the symbol's lines over the move's, each at

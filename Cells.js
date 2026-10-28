@@ -71,10 +71,9 @@ function blockCells(text) {
 // both looks, and the pill's icon form. 20 wide, 14 tall; "#" is a lit
 // pixel. Two faces, front on. The bull reads by its long horns and its
 // nostrils. The bear reads by round ears that stand out from its head,
-// with a notch under each, and cheeks wider than its ears: earlier faces
-// whose outline ran straight up into the ears read as cats.
-// test/qml/render.qml draws the other candidates beside these, and marks
-// whichever pair is here as the default.
+// with a notch under each, and cheeks wider than its ears: an outline
+// running straight up into the ears reads as a cat. test/qml/render.qml
+// draws the other candidates beside these, marking this pair the default.
 var BULL_SPRITE = [
   "....................",
   "#..................#",

@@ -570,9 +570,8 @@ Harness {
           && service.fundamentals.AAPL.status === "ok",
         freshAsks + "|" + (harness.calls("AAPL.fundamentals") - asksBefore))
 
-      // IPC refreshes once, and every pill acknowledges it: dimmed, then
-      // eased back. With a pill per screen, each one refreshed it, and the
-      // second queued a second sweep. The answers are aged past the
+      // IPC refreshes once, not once per pill, and every pill acknowledges
+      // it: dimmed, then eased back. The answers are aged past the
       // refresh's 10 s floor first.
       service.feature("AAPL")
       tryVerify(function() { return harness.answered("AAPL|1W") && !service.testFeed.busy && !service.testHistoryFeed.busy }, 10000)

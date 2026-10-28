@@ -15,7 +15,7 @@ import Quickshell.Io
 // picture can show: the clock's last tick, or the mark when it came after
 // that tick (a change made at the mark shows at once). Timed by the render
 // instead, a late clock shows each moment later than it was, and a
-// 160 ms ease on a busy machine read as 240. Times are ms since `start`,
+// 160 ms ease on a busy machine reads as 240. Times are ms since `start`,
 // which a harness sets as its motion starts (`markStart`). A harness copies
 // this beside its shell.qml (`frame_tools`, lib.sh).
 Item {

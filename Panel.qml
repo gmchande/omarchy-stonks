@@ -30,7 +30,7 @@ Panel {
   // The popup shows up to six whole rows under its fixed content. Stated in
   // rows, so a different font or text size still gets six.
   readonly property int maxRows: 6
-  // Built as the popup first opens, and kept: null until then.
+  // Null until the popup first opens.
   readonly property var body: bodyLoader.item
   readonly property int heightCap: body ? panel.verticalContentInset + body.chromeHeight
     + maxRows * body.rowPitch - body.rowGap : 0
@@ -158,9 +158,8 @@ Panel {
       // The body is laid out at the card's new height while the edge eases.
       clip: true
       blocked: !!root.body && root.body.ownsKeys
-      // Omarchy's keys for every panel, past the body's own: j k and h
-      // move the selection and the scrub, Space is Enter, x removes. l is
-      // Stonks' list menu, which the body takes first.
+      // Omarchy's keys for every panel, past the body's own: j k move the
+      // selection, h l the scrub, Space is Enter, x removes.
       onMoveRequested: function(dx, dy) {
         if (dy !== 0) root.body.moveCursor(dy)
         if (dx !== 0) root.body.nudgeScrub(dx)

@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # The screenshot, through the real popup by keys and the real window by the
-# pointer, with stand-ins for wl-copy and omarchy-notification-send
-# (bin/) that record what they were given and reach no clipboard and no
-# notification: each shot saves one picture, named for its symbol and the
-# moment, in the folder Omarchy's screenshots use, puts that picture on the
-# clipboard as a PNG, and sends Omarchy's notification with that file; the
-# picture is of the chart on show, never the list. Then the folder and the
-# editor on Omarchy 4.0 and on 4.5, with Omasnap absent and present, under
-# each version's settings. The shell's layer-shell card window does not
-# load offscreen, so the copy of Panel.qml puts the card in CardWindow.qml,
-# as sounds.sh does. HOME and curl are scratch; the scratch HOME names its
-# Pictures folder in user-dirs.dirs, as a reader's may.
+# pointer, with stand-ins for wl-copy and omarchy-notification-send (bin/)
+# that record what they were given and reach no clipboard and no
+# notification: each shot saves one picture of the chart on show, never the
+# list, named for its symbol and the moment, in the folder Omarchy's
+# screenshots use, puts it on the clipboard as a PNG, and sends Omarchy's
+# notification with that file. Then the folder and the editor on Omarchy 4.0
+# and 4.5, with Omasnap absent and present, under each version's settings.
+# The shell's layer-shell card window does not load offscreen, so the copy
+# of Panel.qml puts the card in CardWindow.qml, as sounds.sh does. HOME and
+# curl are scratch; the scratch HOME names its Pictures folder in
+# user-dirs.dirs, as a reader's may.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree camera.qml
 cp "$here/CardWindow.qml" "$root/plugin/"

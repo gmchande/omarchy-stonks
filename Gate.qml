@@ -112,7 +112,7 @@ Item {
 
   // A reader asked again, by r or RETRY: the network may be back, so a pause
   // for no answer at all ends now, and its lone request goes with what was
-  // asked. It had waited up to a minute after the network came back. A
+  // asked, rather than up to a minute after the network is back. A
   // refusal's pause holds: the host asked for fewer requests.
   function hurry() {
     if (pause === "none" && !probing && pausedUntil > now()) root.pausedUntil = now()

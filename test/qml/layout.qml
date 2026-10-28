@@ -22,21 +22,20 @@ import "plugin"
 // Nothing jumps. The 22-symbol list with a cap symbol, an ETF, non-US
 // listings in Toronto, Tokyo, and London, a four-digit price, and a price
 // wide enough to force a shrink, on the day and on a range, at both surface
-// sizes and in both looks: the
-// listing line, the price's measured top line, baseline and left edge, the
-// change's baseline and right edge, the range row, the info block, the
-// header's look control and the end of its words, the list's TODAY and its
-// rule, and the first row must not move with the look, and the first row
-// must not move with the symbol or the range. Both looks' digits start on
-// the band's left edge. The header's words keep room for its longest states
-// at the popup's width. The footer sits one gap under the rows whichever
-// list shows, the window's too, at its bottom once its list fills it, the
-// window's chart taking what whole rows leave over, the
+// sizes and in both looks: the listing line, the price's measured top line,
+// baseline and left edge, the change's baseline and right edge, the range
+// row, the info block, the header's look control and the end of its words,
+// the list's TODAY and its rule, and the first row must not move with the
+// look, and the first row must not move with the symbol or the range. Both
+// looks' digits start on the band's left edge. The header's words keep room
+// for its longest states at the popup's width. The footer sits one gap under
+// the rows whichever list shows, the window's too, at its bottom once its
+// list fills it, the window's chart taking what whole rows leave over, the
 // rows stop short of the scrollbar's gutter, an open list menu makes room
 // for itself, and the window's smallest permitted height still holds a whole
-// row. The price and change text are measured as displayed, at whatever size
-// they were fitted to. Every key-hint row is one line of six keys at most.
-// Nothing is mapped into the running shell.
+// row. The price and change text are measured as displayed, at whatever
+// size they are fitted to. Every key-hint row is one line of six keys at
+// most. Nothing is mapped into the running shell.
 Harness {
   id: root
   marker: "LAYOUT DONE"
@@ -66,9 +65,8 @@ Harness {
   FileView { id: liveFile; path: root.fixtures + "/moments/live-2026-10-05/nest.json"; blockLoading: true }
   FileView { id: liveMonthFile; path: root.fixtures + "/moments/live-2026-10-05/nest-1m.json"; blockLoading: true }
   FileView { id: liveNightFile; path: root.fixtures + "/moments/live-2026-10-05/robinhood-day.json"; blockLoading: true }
-  // The power-user walk's thin days, Friday 16 October: CKX's one bar,
-  // CVR's none; and the S&P 500 on Monday 28 September at 08:00, before its
-  // bell, with no print yet.
+  // Thin days, Friday 16 October: CKX's one bar, CVR's none; and the S&P
+  // 500 on Monday 28 September at 08:00, before its bell, with no print yet.
   FileView { id: ckxFile; path: root.fixtures + "/moments/power-user-2026-10-16/ckx.json"; blockLoading: true }
   FileView { id: cvrFile; path: root.fixtures + "/moments/power-user-2026-10-16/cvr.json"; blockLoading: true }
   FileView { id: preOpenIndexFile; path: root.fixtures + "/moments/monday/gspc.json"; blockLoading: true }
@@ -96,8 +94,8 @@ Harness {
   function xIn(item, x) { return Math.round(item.mapToItem(body, x, 0).x) }
   // What's wrong with where an open tip lies, or "": all of it, its
   // background as well as its words, since a style may draw the background
-  // wider (found in review), must lie under its icon, within the body's
-  // width and the window's height.
+  // wider, must lie under its icon, within the body's width and the
+  // window's height.
   function tipFault(tip, icon) {
     var drawn = [tip.background, tip.contentItem].map(function(item) {
       var at = item.mapToItem(null, 0, 0)
@@ -410,8 +408,8 @@ Harness {
         // Under the open list menu each line of a row's words shows unless
         // it starts under the menu: the symbol, with its remove button, and
         // the name, each on its own, with one list to six, in both looks.
-        // Found in the 1.0.2 visual review: a row 11 px under the menu lost
-        // its symbol and its name, and showed its price and chart alone.
+        // A row 11 px under the menu keeps its symbol and its name, not its
+        // price and chart alone.
         var coverFaults = []
         var straddled = 0
         var coverSeen = []
@@ -569,8 +567,8 @@ Harness {
             stub.historyEntry = c.history ? { status: "ok", history: c.history, receivedAt: stub.now } : null
             stub.figures = c.figures
             stub.retro = false
-            // The list from its top: a sight that shrank as the cases
-            // changed the chrome kept the featured row in it, scrolled.
+            // The list from its top: a sight that shrinks as the cases
+            // change the chrome keeps the featured row in it, scrolled.
             body.watchlist.contentY = 0
             wait(50)
             var smooth = root.measure()
@@ -1020,7 +1018,7 @@ Harness {
         // scale-with-font = false`). Smooth alone: retro changes only the
         // corner radius and the look toggle's words here (HeaderStatus.qml).
         // At the everyday size 12 the popup names Constitution Memorial Day
-        // in full (the owner's).
+        // in full.
         var header = find(body, "statusText").parent
         var calendars = JSON.parse(calendarFile.text())
         var states = [["After hours · closed at 16:00 EDT", "Closed at 16:00 EDT"], ["Pre-market · opens in 3h 11m", "Opens in 3h 11m"],
@@ -1142,8 +1140,9 @@ Harness {
           addCut.length === 0, addCut.slice(0, 12).join(" | "))
 
         // In a window of ordinary height, 720 × 520, the key sheet shows its
-        // credit whole without a scroll, the version included: nothing says
-        // the sheet scrolls. A pin of the owner's: more keys fail it.
+        // credit whole without a scroll, the version included, and where
+        // more runs past the bottom, the scrollbar says so at rest. More
+        // keys fail it.
         var sheet = find(body, "helpSheet")
         var sheetBefore = { wide: surface.wide, windowWidth: surface.windowWidth, fixedHeight: surface.fixedHeight }
         surface.wide = true
@@ -1163,14 +1162,18 @@ Harness {
         var creditSaid = credits.length === 1 ? credits[0].text.replace(/\n/g, " / ") : credits.length + " credits"
         var sheetHeight = sheet.height
         var creditWhole = credits.length === 1 && !credits[0].truncated && creditEnd > 0 && creditEnd <= sheetHeight && sheet.contentY === 0
+        var helpBar = find(sheet, "helpScrollBar")
+        var overflows = sheet.contentHeight > sheet.height
+        var barSays = overflows === (!!helpBar && helpBar.visible && helpBar.size < 1)
         body.showingHelp = false
         sheet.version = Qt.binding(function() { return body.updates && body.updates.runningVersion || "" })
         surface.wide = sheetBefore.wide
         surface.windowWidth = sheetBefore.windowWidth
         surface.fixedHeight = sheetBefore.fixedHeight
         wait(50)
-        root.check("in a 720 × 520 window the key sheet shows its credit whole without a scroll",
-          creditWhole, creditSaid + " ends at " + creditEnd + " of the sheet's " + sheetHeight)
+        root.check("in a 720 × 520 window the key sheet shows its credit whole without a scroll, and a scrollbar says when more runs past the bottom",
+          creditWhole && barSays, creditSaid + " ends at " + creditEnd + " of the sheet's " + sheetHeight
+            + " | " + Math.round(sheet.contentHeight) + " tall, bar " + (helpBar ? helpBar.visible + " " + helpBar.size : "none"))
 
         // After the text size changes while Stonks runs (`omarchy display
         // text size 16`), every key and gesture on the key sheet still fits
@@ -1349,9 +1352,9 @@ Harness {
             if (Math.abs(flick.contentY - (flick.contentHeight - flick.height)) > 1 || !shows())
               smallFaults.push(where + ": the bar's drag ends at " + flick.contentY + " of " + (flick.contentHeight - flick.height)
                 + ", the thumb then at opacity " + thumb.opacity)
-            // The next key acts on an entry that shows: the drag brought the
-            // cursor along. Found in review: Enter after the drag unticked a
-            // list scrolled out of sight.
+            // The next key acts on an entry that shows: the drag brings the
+            // cursor along, so Enter after it never unticks a list scrolled
+            // out of sight.
             var view = v[4] ? find(body, v[4]) : null
             if (view) {
               var cursorTop = view.topOf ? view.topOf(view.cursor) : view.cursor * view.itemHeight
@@ -1606,7 +1609,7 @@ Harness {
         body.minChartHeight = 0
         surface.fixedHeight = 0
         // The band's column lays the chart's new height out on its next
-        // polish: the window's chart above was taller than the popup's.
+        // polish: the window's chart above is taller than the popup's.
         wait(50)
         var opens = function() {
           var rowsHeight = body.fittedHeight(730)
@@ -1633,7 +1636,7 @@ Harness {
           /^true,true /.test(fullAll) && /^true,true /.test(shortAll), fullAll + " | " + shortAll)
         // Any budget takes every whole row it can hold and no more; at the
         // popup's cap, its fixed content and six whole rows, that is six. The
-        // search check above left a short list behind.
+        // search check above leaves a short list behind.
         root.load()
         wait(50)
         var cap = body.chromeHeight + 6 * body.rowPitch - body.rowGap
@@ -1855,7 +1858,7 @@ Harness {
         })
         // The window at its usual 720 × 760 shows five lists of the demo's
         // six in the menu, which runs down over the footer, in both looks:
-        // a pin of the owner's approved layout.
+        // the approved layout, pinned.
         stub.lists = [{ name: "", label: "All", count: stub.symbols.length, symbols: stub.symbols }].concat(
           ["My Watchlist", "Watching", "Growth", "Wins", "Losses"].map(function(name) { return { name: name, label: name, count: 1, symbols: ["MZ"] } }))
         surface.wide = true

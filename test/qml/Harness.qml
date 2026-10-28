@@ -2,10 +2,9 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// The root every flow harness stands on: what each one wrote out again
-// before. A harness is `Harness { id: harness; marker: "LISTS DONE" ... }`
-// and calls these unqualified. lib.sh's finish fails a run that never
-// printed its marker.
+// The root every flow harness stands on. A harness is
+// `Harness { id: harness; marker: "LISTS DONE" ... }` and calls these
+// unqualified. lib.sh's finish fails a run that never printed its marker.
 ShellRoot {
   id: harness
 

@@ -5,8 +5,8 @@
 // The data file's settings and lists, and every rule that changes them:
 // settings in, settings out. Knows nothing of quotes, except to rank them.
 // Each rule takes settings as `fileSettings` returns them, changes none it
-// is given, and normalises what it returns once: a save at 150 symbols in
-// 12 lists normalised every list four to nine times.
+// is given, and normalises what it returns once: normalising at each step,
+// a save at 150 symbols in 12 lists normalises every list four to nine times.
 
 function nextChangeMode(mode) {
   return mode === "pct" ? "abs" : mode === "abs" ? "open" : "pct"
@@ -80,9 +80,8 @@ function orderLabel(order, reversed) {
 
 // Symbols in display order. Sorted views keep quotes that have not
 // arrived at the bottom, in their manual order, and the sort is stable so
-// ties keep their manual order too, whichever way it runs. Text sorts run
-// A to Z and change sorts biggest gain first; reversed, the other way.
-// `changeMode` is the rows' unit, which % change ranks by.
+// ties keep their manual order too, whichever way it runs. `changeMode` is
+// the rows' unit, which % change ranks by.
 function sortedSymbols(symbols, quotes, order, reversed, changeMode) {
   order = normalizeOrder(order)
   if (order === "manual") return symbols.slice()
@@ -163,8 +162,9 @@ function fileSettings(src) {
     range: History.historyRanges().indexOf(from.range) >= 0 ? from.range : "1D",
     // The popup's first-run hint has shown, and never shows again.
     hinted: from.hinted === true,
-    // The sounds for what you do, on until you turn them off.
-    sounds: from.sounds !== false,
+    // The sounds, off until the file says true: a new install and a file
+    // from before them start silent.
+    sounds: from.sounds === true,
     // The daily look on GitHub for a newer Stonks, on unless the file says
     // false: off, Stonks asks GitHub nothing.
     updateCheck: from.updateCheck !== false
@@ -207,7 +207,6 @@ function listNameProblem(name, lists) {
   return ""
 }
 
-// The current list, or null on All.
 function currentList(settings) {
   var i = listIndex(settings.lists, settings.list)
   return i >= 0 ? settings.lists[i] : null
@@ -395,7 +394,6 @@ function settingsFromBar(config) {
   return fileSettings(from)
 }
 
-// A manual list with one symbol moved to a new slot.
 function movedSymbols(symbols, from, to) {
   var list = symbols.slice()
   if (from < 0 || from >= list.length || to < 0 || to >= list.length) return list

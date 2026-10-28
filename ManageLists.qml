@@ -11,11 +11,10 @@ import "Tones.js" as Tones
 // the body persists. Like the list menu it owns its keys while open: the
 // arrows move the cursor, Enter renames, Shift and the arrows move the list,
 // Delete or Backspace asks to delete it and Enter confirms, Escape backs out
-// one step. The buttons say only
-// what they do; the one Enter takes is marked (`ListAction.enterTakes`).
-// One cursor, as on the rows: moving the pointer puts it, with the rows'
-// mark, on the row under it, which shows that row's buttons; a click on one
-// takes it.
+// one step. The buttons say only what they do; the one Enter takes is
+// marked (`ListAction.enterTakes`). One cursor, as on the rows: moving the
+// pointer puts it, with the rows' mark, on the row under it, which shows
+// that row's buttons; a click on one takes it.
 FocusScope {
   id: root
 
@@ -58,7 +57,6 @@ FocusScope {
     showCursor()
     if (problem !== "") Qt.callLater(showProblem)
   }
-  // What is typed for the rename; "" unless renaming.
   readonly property string typedName: renaming ? nameField.text : ""
 
   readonly property int itemHeight: Style.space(30)
@@ -113,8 +111,8 @@ FocusScope {
   }
 
   // The cursor to the row the pointer moved onto, at (x, y) in the scene;
-  // the title is no row. A row renaming or asking keeps
-  // it, so the question stays on its own list.
+  // the title is no row. A row renaming or asking keeps it, so the question
+  // stays on its own list.
   function pointAt(x, y) {
     if (renaming || confirming) return
     var at = scroll.mapFromItem(null, x, y)
@@ -189,9 +187,8 @@ FocusScope {
   }
 
   // A click away from the field, or DONE, keeps what was typed, as Enter
-  // does; an emptied field keeps the old name.
-  // Escape alone throws the typing away. A name refused stays in the
-  // field, saying why.
+  // does; an emptied field keeps the old name. Escape alone throws the
+  // typing away. A name refused stays in the field, saying why.
   function keepName() {
     if (nameField.text.trim() === "") stopEditing()
     else saveName()

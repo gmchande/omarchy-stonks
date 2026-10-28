@@ -24,12 +24,10 @@ Item {
   // Hyprland has it on a workspace other than the focused one.
   readonly property bool elsewhere: !!toplevel && !!toplevel.workspace && toplevel.workspace !== Hyprland.focusedWorkspace
   // A screen shows it: a monitor that is on (as `screensOff` reads it) has
-  // the window's workspace active, or the special workspace over it. Until
-  // Hyprland lists it, and with no screens to ask, as in a harness, it
-  // counts as shown. Out of sight it is open as it was left, and the
-  // service asks for what a closed surface asks, so a window left on
-  // another workspace, or on a screen switched off, costs nothing a closed
-  // one doesn't.
+  // the window's workspace active, or the special workspace over it; until
+  // Hyprland lists it, or with no screens to ask, as in a harness, it counts
+  // as shown. Out of sight it stays open as it was left, and the service
+  // asks only for what a closed surface asks.
   readonly property bool onScreen: {
     var workspace = toplevel ? toplevel.workspace : null
     if (!workspace || root.monitors.length === 0) return true

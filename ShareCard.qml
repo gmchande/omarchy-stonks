@@ -15,14 +15,7 @@ import "Tones.js" as Tones
 // screen's own pixels on a screen of any scale, so its canvases paint
 // sharp and no larger than the picture: every measure is in the layout's
 // units, `u` window units each. What the popup shows above its ranges, at
-// share size, with the facts it leaves out (`Share.words`): the symbol,
-// its name and exchange; the day's animal, as the header draws it; the
-// price, with its currency beside it as a unit, and its move, large; what
-// the price is, its time and zone, a range's date, and what the move is
-// measured from; the line under the price the popup shows; the chart, its
-// axis ending at the newest price, with a range's high and low marks and
-// the scrub; and at the foot when, the day's date or the range's length,
-// and Stonks' mark. Never the list.
+// share size, with the facts it leaves out (`Share.words`); never the list.
 // In the surface's look and colours. Built for a shot and gone after it
 // (`StonksBody`).
 Rectangle {
@@ -55,10 +48,8 @@ Rectangle {
   property color downColor: Commons.Color.urgent
   property string fontFamily: Style.font.family
 
-  // A layout unit is a pixel of the 2400 × 1350 picture: 2 to the picture's
-  // 1200 × 675, so on a screen of any scale the card draws at the size it
-  // is saved at, its canvases no larger. `px` is one of the picture's
-  // pixels in the window's units: half a unit on a scale-2 screen.
+  // `px` is one of the picture's pixels in the window's units: half a unit
+  // on a scale-2 screen.
   readonly property real dpr: Screen.devicePixelRatio > 0 ? Screen.devicePixelRatio : 1
   readonly property real u: 2 / dpr
   readonly property real px: 1 / dpr
@@ -81,8 +72,9 @@ Rectangle {
   height: 675 * u
   color: ground
 
-  // The symbol, its name, and exchange: the name gives way to the
-  // exchange, which stays whole. The currency is the price's (below).
+  // The symbol, its name as the header's title sets it, and its exchange as
+  // a caption: the name gives way to the exchange, which stays whole. The
+  // currency is the price's (below).
   Text {
     id: symbolText
     objectName: "shareSymbol"
@@ -103,13 +95,12 @@ Rectangle {
     width: Math.max(0, Math.min(implicitWidth, room))
     anchors.baseline: symbolText.baseline
     textFormat: Text.PlainText
-    text: root.quote ? String(root.quote.name || "").toUpperCase() : ""
+    text: root.quote ? String(root.quote.name || "") : ""
     elide: Text.ElideRight
-    color: root.dim
+    color: root.foreground
     font.family: root.fontFamily
-    font.pixelSize: 18 * root.u
+    font.pixelSize: 24 * root.u
     font.bold: true
-    font.letterSpacing: 2 * root.u
   }
   Text {
     id: metaText
@@ -119,7 +110,10 @@ Rectangle {
     textFormat: Text.PlainText
     text: root.quote ? " · " + root.quote.exchange : ""
     color: root.dim
-    font: nameText.font
+    font.family: root.fontFamily
+    font.pixelSize: 18 * root.u
+    font.bold: true
+    font.letterSpacing: 2 * root.u
   }
 
   // The day's animal, as the header draws it, the same in both looks.
@@ -155,7 +149,7 @@ Rectangle {
   // The price gives up the currency's width when room is short.
   readonly property real priceRoom: width - margin * 2 - changeText.implicitWidth - 48 * u
     - currencyText.implicitWidth - currencyGap
-  readonly property real currencyGap: 16 * u
+  readonly property real currencyGap: currencyText.text ? 16 * u : 0
   // Measured in the picture's pixels, at the size the price is drawn at on
   // a scale-1 screen, so the sizes it gives are the same on every screen.
   TextMetrics {
@@ -201,14 +195,15 @@ Rectangle {
     ghostColor: root.ghost
   }
   // The currency beside the price, set like a unit, on its baseline, dim
-  // and at the ticker's size: a price in pence says "PENCE".
+  // and at the ticker's size: a price in pence says "PENCE", and an index's
+  // level, which isn't money, has none (`Share.words`).
   Text {
     id: currencyText
     objectName: "shareCurrency"
     x: (root.retro ? priceRetro.x + priceRetro.width : priceSmooth.x + priceSmooth.implicitWidth) + root.currencyGap
     y: root.priceBaseline - baselineOffset
     textFormat: Text.PlainText
-    text: root.quote ? Figures.currencyLabel(String(root.quote.currency || "")) : ""
+    text: root.words ? root.words.currency : ""
     color: root.dim
     font: symbolText.font
   }
@@ -264,13 +259,15 @@ Rectangle {
 
   // The chart, at twice its strokes and cells, as the surface's look draws
   // it, still: no draw-in, ripple, or blink. A range's marks are set at the
-  // picture's caption size, the dates spaced as the axis's ends are.
+  // picture's caption size, the dates spaced as the day's axis's ends are.
+  // A range has no axis row, its dates said once at the foot, so its chart
+  // takes the row's height.
   Item {
     id: chart
     x: root.margin
     y: 314 * root.u
     width: root.width - root.margin * 2
-    height: 252 * root.u
+    height: (root.history ? 276 : 252) * root.u
 
     DayChart {
       id: dayChart
@@ -340,7 +337,7 @@ Rectangle {
     }
   }
 
-  // The axis's two ends: the day's first and newest times, a range's dates.
+  // The axis's two ends on the day: its first and newest times.
   Caption {
     objectName: "shareStart"
     x: root.margin
@@ -364,15 +361,18 @@ Rectangle {
     color: root.ghost
   }
 
-  // When, at the foot, at the mark's size: the day's date or the range's
-  // length. And Stonks' logo, the pixel bull, whatever the day's animal
-  // is, and its name. The bull is in the name's ink, not the up colour: on
-  // a down day a green bull would read as the day's.
+  // When, at the foot, at the mark's size: the day's date, or the range's
+  // length and dates, spaced as the day's axis is so the longest, "YEAR TO
+  // DATE · 2 JAN 2026 – 11 SEP 2026", stays clear of the logo. And Stonks'
+  // logo, the pixel bull, whatever the day's animal is, and its name. The
+  // bull is in the name's ink, not the up colour: on a down day a green
+  // bull would read as the day's.
   Caption {
     objectName: "shareSpan"
     x: root.margin
     y: 654 * root.u - baselineOffset
     font.pixelSize: 28 * root.u
+    font.letterSpacing: (root.history ? 1 : 2) * root.u
     text: root.words ? root.words.span : ""
   }
   Text {

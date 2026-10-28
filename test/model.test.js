@@ -12,7 +12,7 @@ const root = join(import.meta.dir, "..")
 process.env.TZ = "America/New_York"
 // Every rule file's names, under one name: each is defined once.
 const M = Object.assign({}, ...["Format", "Fetch", "Quote", "Market", "Overnight", "History", "Fundamentals", "Figures",
-  "Chart", "Tones", "Settings", "KeySheet", "Search", "Cells", "Share"].map(name => load(name + ".js")))
+  "Chart", "Tones", "Settings", "KeySheet", "Search", "Cells", "Share", "Asks"].map(name => load(name + ".js")))
 
 const calendars = JSON.parse(readFileSync(join(root, "calendars.json"), "utf8"))
 const US = calendars.calendars.US
@@ -223,7 +223,7 @@ test("a Toronto time in 2027 and 2028 reads by Toronto's clock, and past any cal
   const july2027 = Date.UTC(2027, 6, 14, 20) / 1000
   const july2028 = Date.UTC(2028, 6, 14, 20) / 1000
   expect([M.printClock(shop, july2027, calendars), M.printClock(shop, july2028, calendars)]).toEqual(["16:00", "16:00"])
-  // A calendar that has run out, as Toronto's did on 31 December 2026:
+  // A calendar that has run out, as Toronto's does after 31 December 2026:
   // its times come from Yahoo's offset, never its standard time.
   const ran = JSON.parse(JSON.stringify(calendars))
   ran.calendars.TSX.validThrough = "2026-12-31"
@@ -582,10 +582,12 @@ const library = (extra = {}) => M.fileSettings({
 test("the data file reads as written and repairs hand edits", () => {
   const v1 = { version: 1, symbols: ["NEST", "SILK"], featured: "SILK", order: "pct", changeMode: "pct", style: "retro", refreshIntervalSec: 60 }
   const read = M.fileSettings(v1)
-  // Older files keep sounds and the version check on; only a saved false
-  // turns either off. Newer settings may add other defaults.
-  expect(read).toMatchObject({ ...v1, reversed: false, lists: [], list: "", range: "1D", hinted: false, sounds: true, updateCheck: true })
-  expect([false, "no", 0].map(v => M.fileSettings({ sounds: v }).sounds)).toEqual([false, true, true])
+  // Sounds start off, in a new install and in a file from before them, and
+  // only a saved true turns them on; the version check stays on unless a
+  // saved false turns it off. Newer settings may add other defaults.
+  expect(read).toMatchObject({ ...v1, reversed: false, lists: [], list: "", range: "1D", hinted: false, sounds: false, updateCheck: true })
+  expect(M.fileSettings(null).sounds).toBe(false)
+  expect([true, "yes", 1].map(v => M.fileSettings({ sounds: v }).sounds)).toEqual([true, false, false])
   expect([false, "no", 0].map(v => M.fileSettings({ updateCheck: v }).updateCheck)).toEqual([false, true, true])
   expect(M.listSymbols(read)).toEqual(["NEST", "SILK"])
   expect(M.listOrder(read)).toBe("pct")
@@ -639,12 +641,13 @@ test("the data file reads as written and repairs hand edits", () => {
 // can't lose it from what the check expects too: All in an order made by
 // hand, a list in manual order arranged by hand, one sorted, one sorted the
 // other way, and one empty; the current list a named one, a featured symbol
-// off the top, and every view setting off its default. 1.0.0 knew no sounds,
-// so its file reads them on, their default; from 1.0.4 the file has them
-// off, and the daily version check off too.
+// off the top, and every view setting off its default. Neither 1.0.0 nor
+// 1.0.4 knew sounds or the version check, so their files read sounds off and
+// the check on, their defaults; from 1.1.0 the file has sounds on and the
+// check off.
 const dataFiles = join(import.meta.dir, "data-files")
 for (const file of readdirSync(dataFiles).filter(name => name.endsWith(".json"))) describe(file.replace(/\.json$/, ""), () => {
-  const old = file === "1.0.0.json"
+  const old = Bun.semver.order(file.replace(/\.json$/, ""), "1.1.0") < 0
   const made = {
     lists: [
       { name: "", symbols: ["SPY", "AAPL", "7203.T", "BTC-USD", "^GSPC", "SHEL.L", "JNJ"], order: "manual", reversed: false },
@@ -654,7 +657,7 @@ for (const file of readdirSync(dataFiles).filter(name => name.endsWith(".json"))
       { name: "Later", symbols: [], order: "manual", reversed: false }
     ],
     list: "World", featured: "7203.T", range: "1Y", style: "retro", changeMode: "abs", refreshIntervalSec: 300, hinted: true,
-    sounds: old, updateCheck: old
+    sounds: !old, updateCheck: old
   }
   const text = readFileSync(join(dataFiles, file), "utf8")
   // As Service.parseDataText reads it: one JSON object, through fileSettings.
@@ -1053,19 +1056,228 @@ test("Robinhood's word on all-day trading is asked once, again a day on, or five
   expect(M.allDayDue({ status: "failed", allDay: false, at: t }, t + 5 * 60)).toBe(true)
 })
 
+// What the service and the quote feed ask for, and when (Asks.js), on
+// Wednesday 21 October: a US stock, whose pre-market, session and after
+// hours are Yahoo's; London's, which closes at 11:30 in New York; a coin.
+const WED = "2026-10-21"
+const usStock = symbol => ({
+  symbol, exchange: "NASDAQ", instrumentType: "EQUITY", crypto: false, points: [],
+  session: {
+    pre: { start: at(WED, "04:00"), end: at(WED, "09:30") },
+    regular: { start: at(WED, "09:30"), end: at(WED, "16:00") },
+    post: { start: at(WED, "16:00"), end: at(WED, "20:00") }
+  }
+})
+const shel = {
+  symbol: "SHEL.L", exchange: "LSE", instrumentType: "EQUITY", crypto: false, points: [],
+  session: { pre: null, post: null, regular: { start: M.epochAt(calendars.calendars.LSE, WED, "08:00"), end: M.epochAt(calendars.calendars.LSE, WED, "16:30") } }
+}
+const coin = symbol => ({ symbol, exchange: "CCC", instrumentType: "CRYPTOCURRENCY", crypto: true, points: [] })
+const answered = t => ({ status: "ok", receivedAt: t, answeredAt: t })
+
+test("with nothing open, the pill's quote and each listing in its regular session are kept fresh, and all of All while a surface is open", () => {
+  const quotes = { AAPL: usStock("AAPL"), "SHEL.L": shel, "BTC-USD": coin("BTC-USD") }
+  const all = Object.keys(quotes)
+  const watched = (clock, featured, open) => {
+    const now = at(WED, clock)
+    return M.watchedSymbols(all, featured, open, quotes, now, M.calendarsAt(calendars, now))
+  }
+  // 10:00 in New York: both markets trade; a coin never rests, so only the
+  // pill keeps it fresh.
+  expect(watched("10:00", "", false)).toEqual(["AAPL", "SHEL.L"])
+  expect(watched("12:00", "", false)).toEqual(["AAPL"])
+  expect(watched("12:00", "BTC-USD", false)).toEqual(["AAPL", "BTC-USD"])
+  // After hours: the pill's alone, unless a surface is open.
+  expect(watched("17:00", "AAPL", false)).toEqual(["AAPL"])
+  expect(watched("17:00", "", true)).toEqual(all)
+})
+
+test("a quote run takes every quote due within half a minute of one due, and names the second the next falls due", () => {
+  const now = at(WED, "12:00")
+  const calNow = M.calendarsAt(calendars, now)
+  const quotes = { A: coin("A"), B: coin("B"), C: coin("C"), D: coin("D") }
+  const due = (entries, asked = {}) => M.quotesDue(Object.keys(quotes), entries, asked, quotes, [], now, 60, calNow)
+  // A is a minute old: B, due in 20 s, goes with it; C, due in 40 s, waits
+  // and wakes the clock.
+  expect(due({ A: answered(now - 60), B: answered(now - 40), C: answered(now - 20) })).toEqual({ due: ["A", "B"], next: now + 40 })
+  // With none due, nothing goes early.
+  expect(due({ A: answered(now - 50), B: answered(now - 40) })).toEqual({ due: [], next: now + 10 })
+  // A failed answer is due on the same clock; one stamped ahead of the
+  // clock, set back since, is due at once.
+  expect(due({ A: { status: "failed", receivedAt: 0, answeredAt: now - 60 }, B: answered(now + 300) }).due).toEqual(["A", "B"])
+  // A first answer, a quote kept from an earlier session, and one already
+  // asked for are the feed's to ask.
+  expect(due({ B: { status: "saved", receivedAt: now - 3600, answeredAt: 0 }, C: answered(now - 60) }, { C: now - 5 }))
+    .toEqual({ due: [], next: 0 })
+  // After hours an open surface's hero is asked on the interval, the rest
+  // every 5 minutes.
+  const late = at(WED, "17:00")
+  const stocks = { AAPL: usStock("AAPL"), MSFT: usStock("MSFT") }
+  expect(M.quotesDue(["AAPL", "MSFT"], { AAPL: answered(late - 60), MSFT: answered(late - 60) }, {}, stocks, ["AAPL"], late, 60,
+    M.calendarsAt(calendars, late))).toEqual({ due: ["AAPL"], next: late + 240 })
+})
+
+test("a refresh asks again only for quotes answered more than 10 s ago, and for Robinhood's prints only on charts it trades all day", () => {
+  const now = at(WED, "12:00")
+  const entries = { OLD: answered(now - 11), NEW: answered(now - 10), KEPT: { status: "saved", receivedAt: 1, answeredAt: 0 } }
+  expect(M.refreshQuotes(["OLD", "NEW", "KEPT", "NONE"], entries, now)).toEqual(["OLD"])
+  expect(M.refreshPrints(["AAPL", "SHEL.L"], ["AAPL"], now - 11, now)).toEqual(["AAPL"])
+  expect(M.refreshPrints(["AAPL"], ["AAPL"], now - 10, now)).toEqual([])
+})
+
+test("a quote run charts the pill's quote first and the other heroes next, then the rest in spark batches of 20 in the order asked", () => {
+  const symbols = Array.from({ length: 23 }, (_, i) => "S" + i)
+  // S22 was asked a second before the rest: the budget held it back.
+  const asked = Object.fromEntries(symbols.map(s => [s, s === "S22" ? 99 : 100]))
+  const slots = M.quoteSlots(symbols, asked, symbols, "S5", ["S9", "S5"], true)
+  const batch = ["S22", "S0", "S1", "S2", "S3", "S4", "S6", "S7", "S8"].concat(symbols.slice(10, 21))
+  // The one left over is one request either way, and a chart's has opens.
+  expect(slots).toEqual([
+    { symbols: ["S5"], spark: false }, { symbols: ["S9"], spark: false },
+    { symbols: batch, spark: true }, { symbols: ["S21"], spark: false }
+  ])
+  // The preview's feed asks only charts.
+  expect(M.quoteSlots(["P", "Q"], { P: 1, Q: 1 }, ["P", "Q"], "", [], false))
+    .toEqual([{ symbols: ["P"], spark: false }, { symbols: ["Q"], spark: false }])
+  // Each lane runs its own kind, a first answer (none yet, or a quote kept
+  // from an earlier session) or a refresh, never one cooling after a bad
+  // answer or out on a run; a day waiting to be judged goes only when its
+  // own refresh isn't asked anyway.
+  const entries = { R: answered(1), C: answered(1), K: { status: "saved", receivedAt: 1, answeredAt: 0 } }
+  const waiting = { N: 1, K: 1, R: 1, C: 1 }
+  expect(M.laneWaiting(["N", "K", "R", "C", "X"], waiting, entries, true, [])).toEqual(["N", "K"])
+  expect(M.laneWaiting(["N", "K", "R", "C", "X"], waiting, entries, false, ["C"])).toEqual(["R"])
+  expect(M.laneJudging(["R", "J", "H"], waiting, ["H"])).toEqual(["J"])
+  // A hero whose quote came from spark, with no opens, is asked for its
+  // chart, but not again at once after its chart failed.
+  const sparked = { H: { closesOnly: true }, C: {} }
+  expect(M.sparkHeroes(["H", "C"], sparked, {}, false)).toEqual(["H"])
+  expect(M.sparkHeroes(["H"], sparked, { H: { status: "failed" } }, true)).toEqual([])
+  expect(M.sparkHeroes(["H"], sparked, { H: { status: "failed" } }, false)).toEqual(["H"])
+})
+
+test("a refresh for a quote no longer watched leaves the queue unless its run is out, and a first answer always stays", () => {
+  const entries = { GONE: answered(1), OUT: answered(1), KEPT: answered(1) }
+  expect(M.keptAsks({ NEW: 5, GONE: 5, OUT: 5, KEPT: 5 }, ["KEPT"], entries, ["OUT"])).toEqual({ NEW: 5, OUT: 5, KEPT: 5 })
+})
+
+test("a bad quote answer is tried three times in all, a missing symbol fails at once, and a refusal waits for its host", () => {
+  const read = { quote: { symbol: "A" }, unjudged: false }
+  expect(M.answerVerdict("ok", read, 2, false)).toBe("show")
+  expect([0, 1, 2].map(tries => M.answerVerdict("bad", null, tries, false))).toEqual(["retry", "retry", "fail"])
+  // A whole answer that doesn't read is a bad one; a spark answer without
+  // the symbol, a missing one.
+  expect(M.answerVerdict("ok", null, 0, false)).toBe("retry")
+  expect([M.answerVerdict("missing", null, 0, false), M.answerVerdict("ok", "missing", 0, false)]).toEqual(["fail", "fail"])
+  expect([M.answerVerdict("refused", null, 2, false), M.answerVerdict("none", null, 2, false)]).toEqual(["host", "host"])
+  // A chart asked only to judge a day already shown changes nothing when
+  // it brings no quote.
+  expect([M.answerVerdict("bad", null, 0, true), M.answerVerdict("ok", read, 0, true)]).toEqual(["unchanged", "show"])
+})
+
+test("Robinhood is asked once a session for the pill's stock with nothing open, and for every US listing while a surface is, the chart waited on alone first", () => {
+  const now = at(WED, "21:00")
+  const base = {
+    open: false, pill: "AAPL", pillAsked: false, quoteEntries: { AAPL: answered(now) }, overnightSymbols: ["AAPL", "MSFT"],
+    library: ["AAPL", "MSFT", "SHEL.L"], preview: "", previewShown: false, previewQuote: null, allDay: {}, nights: {}, now, calendars
+  }
+  const asks = changes => M.overnightAsks({ ...base, ...changes })
+  // Nothing open: the pill's stock alone, once Yahoo has answered it live,
+  // and once a session; what Robinhood has answered for it is enough.
+  expect(asks({})).toEqual({ tradability: ["AAPL"], prints: ["AAPL"] })
+  expect(asks({ quoteEntries: { AAPL: { status: "saved", receivedAt: 1, answeredAt: 0 } } })).toBe(null)
+  expect(asks({ pillAsked: true })).toBe(null)
+  expect(asks({ allDay: { AAPL: { status: "ok", allDay: true, at: now - DAY - 60 } }, nights: { AAPL: { status: "ok", at: now - 3600 } } })).toBe(null)
+  // A surface open: every US listing, the pill's alone while it has no
+  // answer.
+  expect(asks({ open: true })).toEqual({ tradability: ["AAPL"], prints: ["AAPL"] })
+  const pillAnswered = ago => ({ open: true, allDay: { AAPL: { status: "ok", allDay: true, at: now - 60 } }, nights: { AAPL: { status: "ok", at: now - ago } } })
+  expect(asks(pillAnswered(60))).toEqual({ tradability: ["MSFT"], prints: ["MSFT"] })
+  // Prints asked 3 minutes ago go with those due, within half of a night's
+  // 5 minutes.
+  expect(asks(pillAnswered(180)).prints).toEqual(["AAPL", "MSFT"])
+  // One Robinhood trades only by day never has its prints asked.
+  const byDay = { ...pillAnswered(60), allDay: { AAPL: { status: "ok", allDay: true, at: now - 60 }, MSFT: { status: "ok", allDay: false, at: now - 60 } } }
+  expect(asks(byDay)).toBe(null)
+  // A preview outside All on view, a US stock by search's result before its
+  // quote, is asked with them, alone first while it has no answer; off
+  // view, it waits.
+  const nvda = { preview: "NVDA", previewShown: true, previewQuote: { symbol: "NVDA", exchange: "NASDAQ", instrumentType: "EQUITY" } }
+  expect(asks({ ...pillAnswered(60), ...nvda })).toEqual({ tradability: ["NVDA"], prints: ["NVDA"] })
+  expect(asks({ ...pillAnswered(60), ...nvda, previewShown: false })).toEqual({ tradability: ["MSFT"], prints: ["MSFT"] })
+})
+
+test("a refresh's chart is owed until a new answer replaces the one it had, then a chart with no answer is asked, and the day asks none", () => {
+  // The window previews NVDA while the popup shows AAPL; the window alone
+  // charts only its preview, once it rests.
+  const charts = M.chartsOnShow(["popup", "window"], "AAPL", "NVDA", "window", true)
+  expect(charts).toEqual(["AAPL", "NVDA"])
+  expect(M.chartsOnShow(["window"], "AAPL", "NVDA", "window", true)).toEqual(["NVDA"])
+  expect(M.chartsOnShow(["window"], "AAPL", "NVDA", "window", false)).toEqual([])
+  expect(M.chartsOnShow([], "AAPL", "", null, false)).toEqual([])
+  expect(M.historyCharts(charts, "1D")).toEqual([])
+  const both = { "AAPL|1W": { status: "ok", history: {} }, "NVDA|1W": { status: "ok", history: {} } }
+  expect(M.nextHistory(charts, "1W", both, {})).toBe(null)
+  expect(M.nextHistory(charts, "1W", { "AAPL|1W": both["AAPL|1W"] }, {})).toEqual({ symbol: "NVDA", force: false })
+  // A refresh owes both, fetched fresh in turn; a failed answer settles one
+  // as a good one does.
+  const owing = M.historyOwing(charts, "1W", both)
+  expect(M.nextHistory(charts, "1W", both, owing)).toEqual({ symbol: "AAPL", force: true })
+  expect(M.nextHistory(charts, "1W", { ...both, "AAPL|1W": { status: "failed" } }, owing)).toEqual({ symbol: "NVDA", force: true })
+  // Left on show, the first hero whose range has grown old is asked again,
+  // by the preview's quote where only it has one.
+  const noon = at(WED, "12:00")
+  const aged = { "NVDA|1W": { history: {}, answeredAt: noon - 60 }, "AAPL|1W": { history: {}, answeredAt: noon - 15 * 60 } }
+  expect(M.staleHistory(["NVDA", "AAPL"], "1W", aged, {}, { AAPL: usStock("AAPL"), NVDA: usStock("NVDA") }, noon, calendars)).toBe("AAPL")
+  expect(M.staleHistory(["NVDA"], "1W", aged, {}, { NVDA: usStock("NVDA") }, noon, calendars)).toBe("")
+})
+
+test("the rows in sight have their charts fetched ahead, the heroes' aside, as many as the cache keeps beside them, and none on the day", () => {
+  const sights = [{ surface: "popup", symbols: ["A", "B", "HERO"] }, { surface: "window", symbols: ["B", "C", "D"] }]
+  expect(M.aheadRows(true, "1W", ["HERO"], sights, 40)).toEqual(["A", "B", "C", "D"])
+  expect(M.aheadRows(true, "1W", ["HERO"], sights, 4)).toEqual(["A", "B", "C"])
+  expect(M.aheadRows(true, "1D", [], sights, 40)).toEqual([])
+  expect(M.aheadRows(false, "1W", [], sights, 40)).toEqual([])
+  // One answered or missed ahead on this range is not asked again on it.
+  expect(M.aheadCharts(["A", "B", "C"], "1W", { "A|1W": {} }, { "B|1W": true })).toEqual(["C"])
+  expect(M.aheadCharts(["A"], "1M", { "A|1W": {} }, {})).toEqual(["A"])
+})
+
+test("a cap and P/E asked for before its quote waits in its asker's place, and only an equity's is fetched", () => {
+  const none = { stock: "", preview: "" }
+  const early = M.fundamentalsAsk(none, "stock", "MSFT", null)
+  expect(early).toEqual({ pending: { stock: "MSFT", preview: "" }, fetch: false })
+  // The preview's ask leaves the stock's waiting.
+  const both = M.fundamentalsAsk(early.pending, "preview", "SHOP.TO", null).pending
+  expect(both).toEqual({ stock: "MSFT", preview: "SHOP.TO" })
+  expect(M.fundamentalsAsk(both, "stock", "MSFT", usStock("MSFT"))).toEqual({ pending: { stock: "", preview: "SHOP.TO" }, fetch: true })
+  expect(M.fundamentalsAsk(none, "stock", "BTC-USD", coin("BTC-USD")).fetch).toBe(false)
+})
+
+test("the clock steps just past each second while a surface is open and each minute while none is, sooner for a quote due or a pause ending", () => {
+  const now = at(WED, "12:00")
+  const ms = now * 1000 + 250
+  expect(M.clockWait(true, ms, now, [])).toBe(755)
+  expect(M.clockWait(false, ms, now, [])).toBe(59755)
+  // Only a deadline after the service's second and before the next step
+  // counts; one the wall clock has passed already is at once.
+  expect(M.clockWait(false, ms, now, [now + 20, now - 5, now + 600, 0])).toBe(19755)
+  expect(M.clockWait(false, ms, now - 3, [now - 1])).toBe(5)
+})
+
 test("community themes that one hue, a faint colour, or a tinted light ground would trip", () => {
   // Palettes from Omarchy's community themes, as the shell resolves them:
   // the green, the red (the shell's urgent), and the surface's ground.
   const colour = c => typeof c === "string" ? M.hexColor(c) : c
-  // Independent meaning, not the production pair supplying its own expected
-  // value. A valid tune of these greens/reds need not preserve exact hexes.
+  // Green and red judged by their channels, not by the code's own hexes,
+  // which a retune may change.
   const greenAndRed = pair => {
     const [up, down] = [colour(pair.up), colour(pair.down)]
     expect([up.g >= 1.25 * Math.max(up.r, up.b), down.r >= 1.25 * Math.max(down.g, down.b)]).toEqual([true, true])
   }
   const cases = [
     { name: "Clear light", green: "#008000", red: "#b00000", ground: "#ffffff", want: "theme" },
-    // One hue, or a grey, that a gap in a and b took for a pair.
+    // One hue, or a grey, that a gap in a and b alone takes for a pair.
     { name: "CpUnk", link: "https://github.com/stannorbvb-cmd/cpunk", green: "#D1D2D1", red: "#f82a2a", ground: "#040303", want: "dark" },
     { name: "Mars", link: "https://github.com/steve-lohmeyer/omarchy-mars-theme", green: "#7b534e", red: "#e07b5f", ground: "#000000", want: "dark" },
     { name: "Sakura", link: "https://github.com/bjarneo/omarchy-sakura-theme", green: "#f29b9a", red: "#e85f6f", ground: "#0d0509", want: "dark" },
@@ -1075,7 +1287,7 @@ test("community themes that one hue, a faint colour, or a tinted light ground wo
     // a mid green on a light one.
     { name: "Naysayer", link: "https://github.com/brianblakely/omarchy-naysayer-theme", green: "#90ee90", red: "#800000", ground: "#072626", want: "dark" },
     { name: "Solarized Light", link: "https://github.com/dfrico/omarchy-solarized-light-theme", green: "#859900", red: "#dc322f", ground: "#fdf6e3", want: "light" },
-    // Tinted light grounds, where GitHub's light text colours fell under
+    // Tinted light grounds, where GitHub's light text colours fall under
     // 4.5:1 (4.04:1 and 3.48:1).
     { name: "Gruvbox Light", link: "https://github.com/Kushal0924/omarchy-gruvbox-light-theme", green: "#98971a", red: "#cc241d", ground: "#f2e5bc", want: "light" },
     { name: "Map Quest", link: "https://github.com/ItsABigIgloo/omarchy-mapquest-theme", green: "#3a443d", red: "#4f351e", ground: "#ecd3a1", want: "light" }
@@ -1099,19 +1311,19 @@ test("community themes that one hue, a faint colour, or a tinted light ground wo
   expect(M.trend("#3ddc84", red, M.hexColor("#0d0d0f"))).toEqual({ up: "#3ddc84", down: red })
   // A light bar under a dark popup takes the other pair: White's on black.
   greenAndRed(M.trend("#3a3a3a", M.hexColor("#2a2a2a"), M.hexColor("#000000")))
-  // On a mid-grey ground no green reads at 4.5:1, and the darkest tried
-  // rounded to black, which reads but says nothing: there, up is a green at
-  // the 3:1 floor.
+  // On a mid-grey ground no green reads at 4.5:1, and the darkest rounds to
+  // black, which reads but says nothing: there, up is a green at the 3:1
+  // floor.
   const mid = M.hexColor("#808080"), greyPair = M.trend("#777777", M.hexColor("#555555"), mid)
   greenAndRed(greyPair)
   const chroma = c => Math.hypot(M.oklab(c).a, M.oklab(c).b)
   expect([greyPair.up, chroma(colour(greyPair.up)) >= 0.07, M.contrast(colour(greyPair.up), mid) >= 3]).toEqual([greyPair.up, true, true])
   // On a #bb0022 bar a light green reads at 6:1 only within 0.003 of
-  // lightness, which a search in steps passed over for the 3:1 floor.
+  // lightness, which a search in steps passes over for the 3:1 floor.
   const bar = M.hexColor("#bb0022"), barPair = M.trend("#777777", M.hexColor("#555555"), bar)
   expect([M.contrast(colour(barPair.up), bar) >= 6, chroma(colour(barPair.up)) >= 0.063]).toEqual([true, true])
   // On a dark grey, a light red reads at 6:1 only in a narrow band of
-  // lightness, which a coarse search passed over for the 3:1 floor.
+  // lightness, which a coarse search passes over for the 3:1 floor.
   for (const grey of ["#454545", "#484848"]) {
     const ground = M.hexColor(grey), pair = M.trend("#777777", M.hexColor("#555555"), ground)
     greenAndRed(pair)

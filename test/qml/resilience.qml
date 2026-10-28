@@ -191,8 +191,7 @@ Harness {
       wake()
       awaitState(function() { return !history.busy }, 5000)
       check("wake sends the current held range once", calls("AAPL.history") === count + 1 && history.entries["AAPL|2Y"].status === "ok" && !history.entries["AAPL|1Y"])
-      // Screens on, but their answer is stale: a new chart waits for the
-      // asynchronous answer, then arrives with no other user action.
+      // Screens on, but their answer is stale.
       screens.answering = true
       service.screensAnsweredMs = 0
       count = calls("MSFT.history")
@@ -202,8 +201,7 @@ Harness {
       wake()
       awaitState(function() { return !history.busy }, 5000)
       check("a fresh on-screen answer releases the held hero", calls("MSFT.history") === count + 1 && history.entries["MSFT|1Y"].status === "ok")
-      // A failed answer starts its retry pause while lit, then darkness
-      // reaches the retry. The wake must run the still-wanted retry.
+      // A retry pause that starts while lit and ends in the dark.
       history.request("FAIL", "1Y", true)
       awaitState(function() { return calls("FAIL.history") >= 1 }, 3000)
       screens.screensOff = true
@@ -213,8 +211,7 @@ Harness {
       wake()
       awaitState(function() { return !history.busy }, 5000)
       check("the pending retry runs once after wake", calls("FAIL.history") === count + 1 && history.entries["FAIL|1Y"].status === "failed")
-      // An answer already in flight may land while dark; starting the
-      // next wanted chart must still wait for a screen.
+      // An answer already in flight lands in the dark.
       flag("AAPL.history.hold", true)
       count = calls("AAPL.history")
       history.request("AAPL", "6M", true)
@@ -249,9 +246,9 @@ Harness {
 
     function test_4_fundamentalsAndSearchDarkness() { guarded("test_4_fundamentalsAndSearchDarkness", checks_test_4_fundamentalsAndSearchDarkness) }
     function checks_test_4_fundamentalsAndSearchDarkness() {
-      // Members of All: a cap and P/E is kept only for All, the preview,
-      // and a removal on offer (`Service.forgetLeft`), pruned each minute,
-      // which could prune AAPL's before the check.
+      // AAPL in All: a cap and P/E is kept only for All, the preview, and a
+      // removal on offer, pruned each minute (`Service.forgetLeft`), which
+      // could otherwise drop AAPL's before the check.
       service.persist({ symbols: ["BTC-USD", "AAPL", "MSFT"] })
       quiet()
       service.screens = screens
@@ -285,8 +282,8 @@ Harness {
         harness.snapshotEnd >= queuedEnd + 24 * 60 * 60, queuedEnd + " queued, " + harness.snapshotEnd + " sent")
       service.testFundamentals.clockOffset = 0
       body.cancelAdding()
-      // Hold the snapshot answer, turn the screens off, then let it land.
-      // Its closes are a separate command and must not start in darkness.
+      // The snapshot lands in the dark; its closes, a separate command, must
+      // wait for a screen.
       flag("FUNDAMENTALS.hold", true)
       before = calls("FUNDAMENTALS")
       service.testFundamentals.fetch("MSFT")
@@ -300,9 +297,7 @@ Harness {
       check("wake sends the held fundamentals closes once", calls("FUNDAMENTALS") === before + 2 && service.fundamentals.MSFT.status === "ok")
       app.close()
       service.screens = null
-      // Closes whose offset is {"toString": null} throw as they are read:
-      // that symbol's cap and P/E fails, and the next symbol's still comes.
-      // The throw left the fetch under way, and no other was asked for.
+      // Closes whose offset is {"toString": null} throw as they are read.
       var feed = service.testFundamentals
       before = calls("FUNDAMENTALS")
       feed.fetch("SKEWED")

@@ -16,11 +16,10 @@ import "Share.js" as Share
 import "Tones.js" as Tones
 // Shared body for the window and the popup: header, hero band, list,
 // search, footer, help, and the chart's motion (ChartMotion). It reads the
-// service and acts through it; the surface around it keeps its lifecycle,
-// keys, and look.
-// The footer sits at the edge, one gap under the rows: a surface that sizes
-// itself asks fittedHeight for a height of whole rows for the list shown;
-// in the window, the edge is where the content ends, or its own bottom.
+// service and acts through it; the surface keeps its lifecycle, keys, and
+// look. The footer sits at the edge, one gap under the rows: a surface
+// that sizes itself asks fittedHeight for whole rows; in the window, the
+// edge is where the content ends, or the window's bottom.
 Item {
   id: root
 
@@ -40,46 +39,37 @@ Item {
   // The surface steps to the bar's next panel on Tab: the popup.
   property bool switchesPanels: false
   property int margins: 0
-  // Where the body's content ends, the footer at its bottom: the popup's
-  // card eases its edge to a new height while the body lays out at it at
-  // once, the footer riding it, and a row below it is out of sight. The
-  // window's is the content's own height while that fits, so a short list
-  // has the footer one gap under its rows, as in the popup, and its own
-  // bottom once the list fills it, where the chart's share of the height
-  // (`shownChartHeight`) leaves the rows ending one gap above it. Found in
-  // the edge pass of 15 October: a list of one row in the window left a
-  // tall gap above the footer.
+  // Where the content ends, the footer at its bottom. The popup's card eases
+  // its edge to a new height while the body lays out at it at once, so a
+  // row below it is out of sight. In the window it is the content's own
+  // height while that fits, so a short list has the footer one gap under
+  // its rows, and the window's bottom once the list fills it.
   property real edge: Math.min(height, fittedHeight(Infinity))
-  // One vertical rhythm for both looks and both surfaces. A band's gap
-  // stands between the band's blocks: the hero, the chart, the range row,
-  // the info lines, and the list's header. A group's gap, half of it,
-  // stands between a thing and what it heads: the header over the hero, the
-  // list's header over its rows or a view in their place, and the rows over
-  // the footer that adds to them. The info lines' own lines are 4 apart.
-  // Every row of words in the band is its caption line, a control's fill
-  // reaching past it, so the gaps are the gaps seen.
+  // One vertical rhythm for both looks and surfaces. A band's gap stands
+  // between the band's blocks (hero, chart, range row, info lines, list
+  // header); a group's gap, half of it, between a thing and what it heads
+  // (header over hero, list header over rows, rows over footer). Info lines
+  // are 4 apart. Each row of words in the band is its caption line, a
+  // control's fill reaching past it, so the gaps are the gaps seen.
   readonly property int bandGap: Style.space(16)
   readonly property int groupGap: Style.space(8)
-  // Every block's words share two edges, the rows' own: `inset` in from
-  // the rows' fills, which stop one `gutter` short of the right, where the
-  // scrollbar lives. A block with a fill (a row, a search answer, a view's
-  // row, the footer) spans the rows' width, its words inset; the band and
-  // the key sheet's words stand at the words' edges, a control's fill
-  // reaching past its word. The key sheet's descriptions may run on past
-  // the right one, as wrapped words do; the header is the surface's own row.
+  // Every block's words share the rows' two edges: `inset` in from the
+  // rows' fills, which stop one `gutter` short of the right for the
+  // scrollbar. A block with a fill (row, search answer, view row, footer)
+  // spans the rows' width, its words inset; the band's and the key sheet's
+  // words stand at the edges, a control's fill reaching past. Key sheet
+  // descriptions may wrap past the right edge; the header is the surface's.
   readonly property int inset: Style.space(10)
   readonly property int gutter: Style.space(8)
   readonly property int textLeft: margins + inset
   readonly property int textRight: margins + gutter + inset
   property int chartHeight: Style.space(190)
-  // The least the chart may be (the window's 136 px): where it is set, the
-  // chart is sized to the surface (`shownChartHeight`), giving way first as
-  // the window gets short, so three rows still show, and taking what whole
-  // rows leave over otherwise. The popup's card fits its rows, so its chart
-  // follows the screen's room instead (`screenChartHeight`). Found in the
-  // design pass of 14 October: the smallest window showed one row of the
-  // list. 0, the popup's, gives none: a constant, so no change of
-  // chartHeight can find it stale.
+  // The least the chart may be (the window's 136 px): where set, the chart
+  // is sized to the surface (`shownChartHeight`), giving way first as the
+  // window gets short so three rows still show. The popup's card fits its
+  // rows, so its chart follows the screen's room (`screenChartHeight`). 0,
+  // the popup's, gives none: a constant, so no chartHeight change finds it
+  // stale.
   property int minChartHeight: 0
   // The host's look.
   property color foreground: Commons.Color.foreground
@@ -129,15 +119,12 @@ Item {
   // as a tiled window does, closes it, as a desktop's menus close.
   onWidthChanged: rowMenu = null
   onHeightChanged: rowMenu = null
-  // And it says what it was opened on: the list on show, and the lists
-  // its symbol is in. A change from another surface or the file to either,
-  // or one that takes its row away, closes it, so a line never acts on a
-  // list it doesn't name. Read from the view and the lists themselves, as
-  // a binding, so it hears the change however it comes: a handler of the
-  // view's change could read the list's name before it had moved, and the
-  // lists may keep their array when only the list on show changes. Found in
-  // review: opened on Growth, then All on the popup, "Remove from Growth"
-  // took it from every list.
+  // It also closes on a change to what it was opened on (the list on show,
+  // the lists its symbol is in, or its row), from anywhere, so a line never
+  // acts on a list it doesn't name. Read as a binding from the view and the
+  // lists: a handler of the view's change could read the list's name before
+  // it moves, and the lists may keep their array when only the list on show
+  // changes.
   function rowMenuGround(symbol) {
     if (view.rows.indexOf(symbol) < 0) return ""
     return JSON.stringify([view.list, lists.filter(function(list) { return list.symbols.indexOf(symbol) >= 0 }).map(function(list) { return list.name })])
@@ -169,70 +156,59 @@ Item {
   readonly property int chromeBesideHeader: margins * 2 + heroBand.heightBesideChart + footer.barHeight + groupGap * 3
   readonly property int chromeBesideScreenChart: chromeBesideHeader + header.height
   // The header's title and rule give way after the chart, before the hint:
-  // where three rows wouldn't fit beside the chart's least with them, the
-  // header is the status words alone, as it was before it took the title.
-  // Found in the family-look build: at text size 20 on a 768 px screen the
-  // popup showed no row.
+  // where three rows wouldn't fit beside the chart's least, the header is
+  // the status words alone.
   readonly property bool headerTitled: screenRoom <= 0
     || chromeBesideHeader + header.titledHeight + leastScreenChart + threeRowsHeight <= screenRoom
   // The popup's chart: chartHeight wherever the screen holds three rows
-  // beside it; where it wouldn't (large text on a short screen), it gives
-  // way to them, down to a fifth of itself, which still shows the day's
-  // shape: rows in view matter more than a tall chart, and the list menu
-  // and search, which take the rows' room, show three lines too. Read from
-  // the screen's room, never the card's, which fits the chart. Found in the
-  // 1.0.2 leftovers review (O1): from text size 18 on a short screen the
-  // popup showed no row at all; and in the strain audit: given way to one
-  // row, at 16 on an 850 px screen the list menu and search showed one line.
+  // beside it, else down to a fifth of itself, which still shows the day's
+  // shape: rows in view matter more, and the list menu and search, in the
+  // rows' room, show three lines too. Read from the screen's room, never
+  // the card's, which fits the chart.
   readonly property int leastScreenChart: Math.round(chartHeight / 5)
   readonly property int screenChartHeight: screenRoom <= 0 ? chartHeight
     : Math.max(leastScreenChart, Math.min(chartHeight, screenRoom - chromeBesideScreenChart - threeRowsHeight))
-  // The hint gives way where it would leave fewer than three rows in sight,
-  // after the chart has: read from the screen's room, never the card's,
-  // which fits what the footer takes. Found in the spacing walk: at text
-  // size 16 on an 850 px screen the popup showed its chrome and hint and
-  // not one row.
+  // The hint gives way, after the chart, where it would leave fewer than
+  // three rows in sight: read from the screen's room, never the card's,
+  // which fits what the footer takes.
   readonly property bool hintShown: hint !== "" && (screenRoom <= 0
     || chromeBesideScreenChart + screenChartHeight + footer.hintRoom + threeRowsHeight <= screenRoom)
-  // A standing word in the footer's place, under a note, until what it says
-  // is fixed: the data file can't be read, and once a change has been made
-  // meanwhile, that it isn't saved, since only memory holds it; a save
-  // didn't land, which a click tries again, ahead of the update, since a
-  // restart now would lose the changes; or an update waits on a shell
-  // restart, which a click does. Why a change isn't saved is said whole
-  // (`noticeAction`), and where its words don't fit beside that, as at text
-  // size 16 in the popup, they say less, whole (`noticeShort`), never cut.
-  // Found in the strain audit: with the file unreadable, edits looked kept
-  // and were gone at the next restart.
+  // A standing word in the footer's place, under a note, until fixed: the
+  // data file can't be read, and once a change is made meanwhile, that it
+  // isn't saved, since only memory holds it, each with what to do, which
+  // names the file; a save didn't land, which a click retries, ahead of the
+  // update, since a restart would lose the changes; or an update waits on a
+  // shell restart, which a click does. Where `noticeAction` doesn't fit
+  // beside it (text size 16 in the popup), `noticeShort` says less, never
+  // cut.
   readonly property bool unsaved: settingsUnreadable ? editsUnsaved : saveFailed
   readonly property string notice: unsaved ? "Your changes aren't saved"
     : settingsUnreadable ? "Couldn't load your lists"
     : updatedTo !== "" ? "Updated to " + updatedTo + " · click to restart the shell" : ""
-  readonly property string noticeAction: !unsaved ? ""
-    : settingsUnreadable ? " · couldn't load your lists" : " · click to try again"
-  readonly property string noticeShort: unsaved ? "Not saved" : ""
-  // A newer Stonks on main, offered at the footer's right end until it
-  // reaches the disk (`updateOffer`), where the restart's notice takes over;
-  // never in the add's place, so adding by mouse never waits on it. Shift+U
-  // runs what the footer offers: the update, or once it's on disk the
-  // restart, which the notice offers only while no unsaved change outranks
-  // it, since a restart now would lose the changes. With neither on offer it
-  // says so, as Ctrl+Z does with nothing to undo.
+  readonly property string noticeAction: settingsUnreadable ? " · fix or remove grvc.stonks.json"
+    : unsaved ? " · click to try again" : ""
+  readonly property string noticeShort: unsaved ? "Not saved" : settingsUnreadable ? "Lists not loaded" : ""
+  // A newer Stonks on main, offered at the footer's right end until on disk
+  // (`updateOffer`), then the restart's notice; never in the add's place,
+  // so adding by mouse never waits on it. The update restarts the shell
+  // once it lands, and the notice's click or Shift+U does after an update
+  // run elsewhere, each only while no unsaved change outranks it
+  // (`restartable`): then the notice waits for the save. Shift+U runs what
+  // the footer offers. With neither, it says so, as Ctrl+Z does with
+  // nothing to undo.
   readonly property string updateOffer: releasedTo !== "" && updatedTo === "" ? releasedTo : ""
-  readonly property bool restartOffered: updatedTo !== "" && !unsaved && !settingsUnreadable
+  readonly property bool restartable: !unsaved && !settingsUnreadable
+  readonly property bool restartOffered: updatedTo !== "" && restartable
   function runOffered() {
     if (!updates) return
     if (restartOffered) updates.restart()
-    else if (updateOffer !== "") updates.update()
+    else if (updateOffer !== "") updates.update(restartable)
     else say("Nothing to update")
   }
 
-  // What this surface shows of the service, held in one place: the surface
-  // reads the service only while it is open. From a close until the next
-  // open each of these keeps what it last read, so nothing on a closing
-  // surface changes during the popup's close fade, whatever the service does
-  // meanwhile: a chart that lands, a hero chosen on another surface, a
-  // removal from All. The next open takes the latest at once.
+  // What this surface shows of the service, read only while open: from a
+  // close to the next open each keeps its last value, so nothing changes
+  // during the popup's close fade. The next open takes the latest at once.
   readonly property var emptyView: ({ featured: "", range: "1D", list: "", listKey: "=", order: "manual", reversed: false,
     rows: [], shown: [], library: [], chart: null })
   // What the rows show, the hero and the range asked for, and the chart
@@ -254,7 +230,7 @@ Item {
   property var removal: null
   property string changeMode: "pct"
   property bool retro: false
-  property bool soundsOn: true
+  property bool soundsOn: false
   // The bar the scrub last struck on this pass over the chart, so moving
   // within a bar strikes nothing more; -1 between passes.
   property int chimed: -1
@@ -315,11 +291,10 @@ Item {
   readonly property string range: view.range
   readonly property string order: view.order
   readonly property bool reversed: view.reversed
-  // The chart on screen, the motion's: the view's once it can be drawn, and
-  // until then the one already on screen, as it was, so the hero keeps what
-  // it showed, chart, figures, and info lines alike, until the new one is in
-  // and draws in; a quarter of a second on, they dim (`motion.dimmed`). Null
-  // only before any chart has been in.
+  // The chart on screen, the motion's: the view's once it can be drawn,
+  // until then the one already shown, so the hero keeps its chart, figures,
+  // and info lines until the new one draws in; after a quarter second they
+  // dim (`motion.dimmed`). Null only before any chart.
   readonly property var chart: motion.chart
   // The chart asked for is still on its way: what is on screen is another.
   readonly property bool chartLoading: motion.loading
@@ -351,13 +326,10 @@ Item {
     ? History.historyBarAt(history, History.historyFraction(history, scrubT)) : null
   readonly property int scrubShown: motion.scrubShown
   // The rows show the day: they follow a scrub of it, and stay on now while
-  // one reads a range, or the 1D chart's hours outside Yahoo's day, before
-  // it or the night after it; but into the coming day's pre-market a
-  // two-day answer holds, which each row's quote holds too
-  // (`Quote.tailStart`), they follow it. The quote and the day change one
-  // after the other, so this can be read between them, the day still null:
-  // then the scrub stands until the day comes in. Found in the design
-  // panel's walk of 23 October: a TypeError here, the day null under a quote.
+  // one reads a range or the 1D chart's hours outside Yahoo's day, except
+  // into the coming day's pre-market, which each row's quote holds too
+  // (`Quote.tailStart`). The quote and the day change one after the other,
+  // so the day may still be null here: the scrub stands until it comes in.
   readonly property var featuredTail: featuredQuote ? Quote.tailStart(featuredQuote) : null
   readonly property int watchlistScrubShown: historyActive || !featuredQuote || scrubShown < Quote.dayStart(featuredQuote)
     || (!!featuredDay && !!featuredDay.axis && scrubShown >= Quote.dayEnd(featuredQuote)
@@ -371,10 +343,8 @@ Item {
     owed[chartSymbol || featuredSymbol] || 0, !!asking[chartSymbol || featuredSymbol])
   // How many symbols in All have a failed or overdue refresh. With every
   // one, Yahoo is sending nothing for any listing: the header says so once,
-  // and the hero and the rows say what they have, with no warning each
-  // (`Figures.quietFreshness`). Found by the design panel of 23 October:
-  // with Yahoo failing, every row said "No data for this symbol", as if
-  // each stock had stopped existing.
+  // and the hero and rows say what they have without a warning each
+  // (`Figures.quietFreshness`).
   readonly property int warnings: lists.length > 0 ? lists[0].symbols.filter(function(symbol) {
     return Figures.freshnessWarns(Figures.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0, !!asking[symbol]))
   }).length : 0
@@ -425,16 +395,13 @@ Item {
   // Today in the featured listing's exchange, which changes only at its
   // midnight, so the day line is not derived again every second.
   readonly property int featuredToday: featuredQuote ? Figures.exchangeDay(featuredQuote, now) : 0
-  // The info block's first line describes what the chart shows: the day's
-  // on 1D, a range's low and high with START and VOL on a longer one, over
-  // the 52 weeks. Before any chart, nothing. A range marks its high and low
-  // on its chart too, with their dates (`rangeMarks`). The info table holds
-  // room for both first lines' facts on every range (`infoFactLists`),
-  // START as wide as the day's prices or the 52 weeks', which hold a range
-  // up to a year's, so a range change moves nothing; a longer range whose
-  // prices take another digit widens the price columns. Until 21 October
-  // the range's line held room for its dates too, which left the day's rule
-  // short of the edge.
+  // The info block's first line describes the chart: the day's on 1D, a
+  // range's low and high with START and VOL on a longer one, over the 52
+  // weeks; before any chart, nothing. A range also marks its high and low,
+  // with their dates, on its chart (`rangeMarks`). The info table holds
+  // room for both first lines' facts on every range (`infoFactLists`), so a
+  // range change moves nothing; a range whose prices take another digit
+  // widens the price columns.
   readonly property var dayLine: chart ? Figures.dayLine(featuredQuote, featuredToday) : null
   readonly property var rangeEnds: historyShown ? History.rangeEnds(history, historyStats, featuredQuote) : null
   readonly property var periodLine: !chart ? null : historyShown ? History.rangeLine(history, rangeEnds, featuredQuote) : dayLine
@@ -448,7 +415,7 @@ Item {
   // What the dashed line is, said while a scrub reads against it, and on a
   // thin night's day the close the night's trades read from too.
   readonly property string baselineText: historyShown ? chartRange.toUpperCase() + " START " + Format.money(history.baseline, featuredQuote ? featuredQuote.priceDigits : undefined)
-    : (!historyActive && featuredDay ? Figures.dayBaselineText(featuredDay) : "")
+    : (!historyActive && featuredDay ? Figures.dayBaselineText(featuredDay, Figures.exchangeDay(featuredDay, now), scrubShown) : "")
   // A range that failed, which r, or the header's button, asks for again.
   readonly property string unavailableText: chartRange.toUpperCase() + " unavailable"
   readonly property bool offersRetry: headerText === unavailableText
@@ -501,15 +468,12 @@ Item {
     : margins * 2 + header.height + heroBand.implicitHeight + footer.height + groupGap * 3
   readonly property int chromeBesideChart: margins * 2 + header.height + heroBand.heightBesideChart + footer.height + groupGap * 3
   // The chart as drawn where it fits the surface (the window's): its height
-  // follows the surface's alone, never the list's, so a switch of lists
-  // moves nothing. Where three rows would not fit beside chartHeight it
-  // gives way, down to minChartHeight; otherwise it takes what whole rows
-  // leave over, less than a row, so the rows end one gap above the footer.
-  // Found in the spacing review of 1.0.0: a window whose list didn't fit
-  // left 0 to 41 px above the footer. Read from the chrome beside it,
-  // never from the chart, so its size never reads itself back. Elsewhere
-  // the chart and the chrome are read as they always were, so a height
-  // fitted to the body, as the popup's is, never passes through it.
+  // follows the surface's alone, never the list's, so a list switch moves
+  // nothing. Where three rows don't fit beside chartHeight it gives way,
+  // down to minChartHeight; otherwise it takes what whole rows leave over,
+  // so the rows end one gap above the footer. Read from the chrome beside
+  // it, never the chart, so its size never reads itself back; elsewhere a
+  // height fitted to the body, as the popup's, never passes through it.
   readonly property bool chartFitsSurface: minChartHeight > 0 && minChartHeight < chartHeight
   readonly property int roomBesideChart: height - chromeBesideChart - chartHeight
   readonly property int shownChartHeight: roomBesideChart < threeRowsHeight
@@ -589,20 +553,15 @@ Item {
     return rowsHeight(listName !== "" ? Math.max(1, symbols.length) : symbols.length, space)
   }
 
-  // The body's height within `maxHeight`: the key sheet's own height while it
-  // shows, otherwise whole rows for the list shown, the footer one gap under
-  // them. A view over the rows (the list menu, search, Manage lists, a row's
-  // ticks) keeps that height and fits the rows' room, scrolling what it
-  // holds: it grows the surface only for a list shorter than itself, and
-  // only in whole rows the room holds, never into what the rows leave over.
-  // Found in the walk of #1: at a room of 780 px the menu took the 38 px
-  // under the rows' 742 and pushed the footer down. Search takes its height
-  // as it opens, before any typing: the field and a full set of results, so
-  // the card's edge holds still while you type. An open list menu taller
-  // than a short list makes room for itself and for the footer under it,
-  // and at least for its least (`listMenuLeastBottom`) where the room holds
-  // that though its whole rows don't: a refused name on a one-symbol list
-  // under the first-run hint sat 27 px over the footer (found in review).
+  // The body's height within `maxHeight`: the key sheet's own while it
+  // shows, otherwise whole rows for the list shown, the footer one gap
+  // under them. A view over the rows (list menu, search, Manage lists, a
+  // row's ticks) keeps that height and scrolls in the rows' room: it grows
+  // the surface only for a list shorter than itself, and only in whole
+  // rows, never into what the rows leave over. Search takes its full height
+  // as it opens, so the card's edge holds still while you type. An open
+  // list menu gets at least its least (`listMenuLeastBottom`) and the
+  // footer under it, where the room holds that though its whole rows don't.
   function fittedHeight(maxHeight) {
     if (showingHelp) return Math.min(maxHeight, helpHeight)
     var rows = chromeHeight + wholeRowsHeight(maxHeight - chromeHeight)
@@ -699,6 +658,8 @@ Item {
     else if (mods === Qt.ControlModifier && key === Qt.Key_Z) undoRemoval()
     else if (mods === Qt.ShiftModifier && key === Qt.Key_Up) moveSelected(-1)
     else if (mods === Qt.ShiftModifier && key === Qt.Key_Down) moveSelected(1)
+    // Ctrl+Enter, as Ctrl-click: the selected row's lists.
+    else if (mods === Qt.ControlModifier && (key === Qt.Key_Return || key === Qt.Key_Enter)) openSymbolLists(watchlist.cursorRow)
     else if (key === Qt.Key_Up) moveCursor(-1)
     else if (key === Qt.Key_Down) moveCursor(1)
     else if (key === Qt.Key_Left) nudgeScrub(-1)
@@ -717,7 +678,7 @@ Item {
     else if (t === "o") cycleOrder()
     else if (t === "O") reverseOrder()
     else if (t === "U") runOffered()
-    else if (t === "l") openListMenu()
+    else if (t === "w") openListMenu()
     else return false
     return true
   }
@@ -858,13 +819,12 @@ Item {
   }
 
   // The footer offers a removal made here back beside the add for a few
-  // seconds, "Undo NVDA", so a removal by the mouse says what it took and
-  // can be taken back by the mouse; Ctrl+Z takes it back long after. The add
-  // stays where it is, and acts at once: in the review of 22 October the
-  // owner took out a note that held the footer, since adding the next stock
-  // meant waiting for it. The offer ends with the removal (undone, a newer
-  // one, or the lists changed), a close, or its time, which waits while the
-  // pointer is on it and fades its last 600 ms, as a note does.
+  // seconds, "Undo NVDA", so a mouse removal says what it took and can be
+  // undone by mouse; Ctrl+Z works long after. The add stays where it is and
+  // acts at once, so adding the next stock never waits on the offer. The
+  // offer ends with the removal (undone, a newer one, or the lists changed),
+  // a close, or its time, which waits while the pointer is on it and fades
+  // its last 600 ms, as a note does.
   property var undoOffered: null
   property real undoShown: 1
   onRemovalChanged: if (undoOffered !== null && removal !== undoOffered) endUndo()
@@ -1016,16 +976,14 @@ Item {
     if (!taken) shareLoader.source = ""
   }
 
-  // Back from a scrub or a replay to now; false when there was none.
   function endScrub() {
     if (!motion.replayRunning && !motion.scrubT) return false
     motion.clearScrub()
     return true
   }
 
-  // Every view over the rows closed, the key sheet too. Each that takes the
-  // keys gives up its own; the surface takes them back once none has them
-  // (keysReleased).
+  // Closes every view over the rows and the key sheet; the surface takes
+  // the keys back once none has them (keysReleased).
   function closeViews() {
     cancelAdding()
     showingHelp = false
@@ -1060,23 +1018,18 @@ Item {
 
   // A symbol you add has nothing to show until its first answer, so the
   // service keeps it out of the rows until then. Then its row joins at its
-  // place, the list eases it into view once, and when the list and the row
-  // are at rest it is featured the way a click on that row features it,
-  // unless you chose another hero meanwhile or switched to a list without
-  // it. The latest add is the one; closing drops it (freeze). The add is
-  // heard as its row joins, not before.
-  // Search closes first, the preview staying on the hero: the rows show
-  // again as they were, and the add then joins them the way any new row
-  // does, faded in at its place with the rows below it sliding. The service
-  // makes the preview's symbol the featured one as it adds it, so the
-  // preview ends with the hero unchanged: a result that has answered stays
-  // drawn, and one still on its way stays named as the chart on its way
-  // (`loadingText`) until it lands.
+  // place, the list eases it into view once, and once both are at rest it
+  // is featured as a click on the row would, unless you chose another hero
+  // or switched to a list without it meanwhile. The latest add is the one;
+  // closing drops it (freeze). The add is heard as its row joins.
+  // Search closes first, the preview staying on the hero, and the add joins
+  // the rows as any new row does. The service features the preview's
+  // symbol as it adds it, so the hero is unchanged: drawn if answered, else
+  // named as on its way (`loadingText`) until it lands.
   // A result already in the list on screen is shown, not added
-  // (`showSymbol`); one still arriving lands as an add does, and, shown,
-  // is featured even when its first fetch fails. The removal on offer
-  // (`putBack`), taken as the first result or by name, is put back as Ctrl+Z
-  // puts it: in its lists at its place, the hero as it was.
+  // (`showSymbol`); one still arriving lands as an add does, and is
+  // featured even when its first fetch fails. The removal on offer
+  // (`putBack`) is put back as Ctrl+Z puts it.
   function acceptSymbol(symbol) {
     if (!service) return
     var s = String(symbol || "").trim().toUpperCase()
@@ -1259,14 +1212,12 @@ Item {
   }
 
   // A name being typed outlives a close, as it outlives a click away: only
-  // Escape or CANCEL throws it away. A rename is saved and a new list is
-  // made, as Enter would, through the service, so the fading card shows
-  // what it showed (a new list becomes the current one, with no search
-  // opened for it). A name refused, a taken one or All, is kept as it was
-  // left (`draft`) and comes back, saying why, as this surface next opens.
-  // A search being typed is kept the same way, and opens again with its
-  // words as this surface next opens. Found in the overnight QA of 23
-  // October: a click away lost "nvidia". An empty field keeps nothing.
+  // Escape or CANCEL throws it away. A rename is saved and a new list made,
+  // as Enter would, so the fading card shows what it showed (a new list
+  // becomes current, with no search opened for it). A refused name (taken,
+  // or All) is kept (`draft`) and comes back, saying why, at the next open.
+  // A search being typed is kept too and reopens with its words; an empty
+  // field keeps nothing.
   property var draft: null
   function keepTyped() {
     if (!service) return
@@ -1329,8 +1280,8 @@ Item {
 
   // A refusal stays a moment. Its last 600 ms it fades, still taking a
   // click while any of it shows, and what it covered fades in after it, so
-  // the change under a click is seen coming. Found in the walk of dev on 14
-  // October: a click meant for the note, just after it went, opened search.
+  // the change under a click is seen coming: a click meant for the note,
+  // just after it went, would otherwise open search.
   property real noteShown: 1
   Timer {
     id: noteTimer
@@ -1650,7 +1601,7 @@ Item {
     onUndoHoveredChanged: root.holdUndo()
     onUndoClicked: root.undoRemoval()
     updateLabel: root.updateOffer !== "" ? "Update to " + root.updateOffer : ""
-    onUpdateClicked: root.updates.update()
+    onUpdateClicked: root.updates.update(root.restartable)
     // The click acts on what the footer shows: the update's notice
     // restarts the shell, and the file's does nothing, nor does a refusal
     // over it; while a save hasn't landed, any click tries again; a refusal
@@ -1667,9 +1618,9 @@ Item {
   // built as one is asked for, with what the surface shows at that moment,
   // and gone once it is handed on. Clipped to nothing rather than hidden:
   // a hidden item's parts read themselves as hidden, and the retro chart's
-  // lit cap fell to its top row. A canvas paints on the frame after it is
+  // lit cap falls to its top row. A canvas paints on the frame after it is
   // asked to, so the grab waits two drawn frames: grabbed at once, the
-  // chart came out empty in the probe of 21 October.
+  // chart comes out empty.
   Item {
     width: 0
     height: 0
@@ -1779,10 +1730,10 @@ Item {
     z: 10
     x: root.margins
     y: root.listMenuTop
-    // Where the chart takes the spare height (the window's), down over the
-    // footer, as it lies over the rows: stopped above the footer it showed
-    // three lists of six at 720 × 760. Elsewhere one gap above the footer,
-    // which the popup's card makes room for under it (`listMenuBottom`).
+    // Where the chart takes the spare height (the window's), it runs down
+    // over the footer, as it lies over the rows, so a short window shows
+    // more lists. Elsewhere it ends one gap above the footer, which the
+    // popup's card makes room for (`listMenuBottom`).
     maxHeight: root.height - root.listMenuTop - root.margins - (root.chartFitsSurface ? 0 : root.groupGap + footer.height)
     choices: root.lists
     current: root.listName

@@ -143,12 +143,10 @@ Harness {
       tryVerify(function() { return Date.now() >= sounds.asleepAfter }, 4000)
     }
 
-    // The chart on screen has drawn in.
     function drawnIn(body) {
       tryCompare(body.motion, "reveal", 1, 2000)
     }
 
-    // Takes NAME out of the fake state.
     function dropState(name) {
       fileProc.command = ["rm", "-f", harness.fakeState + "/" + name]
       fileProc.running = true
@@ -330,14 +328,21 @@ Harness {
       quiet()
       var file = function() { try { return JSON.parse(harness.readFile(service.dataPath)) } catch (e) { return null } }
 
-      // On from a data file that has never named them, and nothing played
-      // at start.
+      // Off from a data file that has never named them: nothing played,
+      // nothing kept the output awake, and the sound files were never
+      // looked at.
       panel.open()
       var body = panel.testBody
       tryVerify(function() { return body && body.surfaceOpen && !body.chartLoading }, 5000)
       var icon = harness.find(body, "soundIcon")
-      harness.check("sounds are on by default, the header's speaker showing it, and nothing has played",
-        service.soundsOn && icon.on === true && harness.starts().length === 0, service.soundsOn + "|" + harness.starts().length)
+      var streams = harness.readFile(harness.fakeState + "/pw-cat.log")
+      harness.check("sounds are off by default, the header's speaker showing it, and nothing sound-related has run",
+        !service.soundsOn && icon.on === false && harness.starts().length === 0 && streams === "" && !sounds.surveyed,
+        service.soundsOn + "|" + harness.starts().length + "|" + streams + "|" + sounds.surveyed)
+
+      // Every sound from here is checked with sounds on.
+      service.persist({ sounds: true })
+      tryVerify(function() { return icon.on && sounds.surveyed }, 5000)
 
       // The popup by keys, in smooth.
       // The card takes the keys a turn of the event loop later.
@@ -974,7 +979,7 @@ Harness {
       tryVerify(function() { return sounds.surveyed && harness.readFile(stampPath).trim() === sounds.sources[look] }, 15000)
       var restarted = function(failing) {
         var spy = spyFiles.createObject(harness, { real: service.files, failing: failing || "" })
-        var again = soundsMaker.createObject(harness, { files: spy, retro: sounds.retro })
+        var again = soundsMaker.createObject(harness, { files: spy, retro: sounds.retro, turnedOn: true })
         tryVerify(function() { return again.surveyed }, 5000)
         return { sounds: again, spy: spy }
       }

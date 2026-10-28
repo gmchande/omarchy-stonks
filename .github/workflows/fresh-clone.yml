@@ -6,9 +6,9 @@
 # - QML lint (test/lint.sh): it lints against the installed shell's QML.
 # - Lint's self-check: it needs the qmllint of the shell's own Qt; Ubuntu's
 #   is older and words its diagnostics differently.
-# - The Quickshell harnesses (test/qml/*.sh): they
-#   need Quickshell and a Wayland session. The crash handling's self-check
-#   runs: its Quickshell is a stand-in.
+# - The Quickshell harnesses (test/qml/*.sh): they need Quickshell and a
+#   Wayland session. The crash handling's self-check runs: its Quickshell is
+#   a stand-in.
 #
 # And the maintainer's review kit (test/review.sh): pictures and frame
 # timings vary by machine.

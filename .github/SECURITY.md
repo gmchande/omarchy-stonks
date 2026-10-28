@@ -1,6 +1,7 @@
 # Security
 
-Stonks runs inside the Omarchy shell, unsandboxed, with your user's rights.
+Stonks runs inside the Omarchy shell, with no sandbox and the same
+permissions as your account.
 
 ## Report a problem privately
 
@@ -14,15 +15,15 @@ There's no set time for an answer.
 ## What counts
 
 The README's [What it runs](https://github.com/gmchande/omarchy-stonks#what-it-runs)
-lists everything Stonks does outside the shell: the commands it runs, the
-sites it contacts, and the files it writes. It's a security problem if
-anything can make Stonks:
+lists the commands Stonks runs, the sites it asks, and the files it
+writes. It's a security problem if anything can make Stonks:
 
 - run another command, or one of its own with arguments it didn't choose;
 - contact another site;
 - write another file;
 - read any file other than the ones it writes, its own files, the shell's
-  settings, and the theme's colours.
+  settings, the theme's colors, and the Omasnap and Pictures folder
+  settings that say where screenshots go.
 
 It counts whether it comes from a symbol, an answer from Yahoo or
 Robinhood, or a data file.
