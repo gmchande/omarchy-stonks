@@ -446,8 +446,10 @@ Harness {
       var updateFirst = within(2000, function() { return harness.footerText(popup) === harness.updateNotice })
       harness.writeFile(harness.dataPath, "")
       within(5000, function() { return harness.hintService.settingsUnreadable })
-      var both = harness.footerText(popup)
-      harness.check("a file that can't be read is said over an update", updateFirst && both === harness.fileNotice,
+      // The file's notice in whichever of its forms fits, the file named.
+      var both = harness.footerText(popup) + String(find(find(popup.testBody, "footer"), "footerAction").text)
+      harness.check("a file that can't be read is said over an update", updateFirst && popup.testBody.notice === harness.fileNotice
+        && popup.testBody.noticeForms.some(function(form) { return form[0] + form[1] === both }) && /grvc\.stonks\.json$/.test(both),
         updateFirst + "|" + both)
       harness.writeFile(harness.dataPath, goodData)
       within(5000, function() { return !harness.hintService.settingsUnreadable })

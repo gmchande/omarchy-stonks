@@ -8,9 +8,9 @@ import "Tones.js" as Tones
 // can carry a note instead, in the foreground: why a key did nothing. It
 // stays while the pointer is on it (`hovered`). Until what it says is fixed,
 // a notice, also in the foreground, sits under any note; its click is the
-// surface's (`acts`) and its action is said whole (`noticeAction`), so a
-// long list name is what gets cut. A hint for the visit is a quiet line
-// above the bar, never replacing it and taking no click; the surface can
+// surface's (`acts`), and it shows the first of its forms that fits whole
+// (`noticeForms`). A hint for the visit is a quiet line above the bar,
+// never replacing it and taking no click; the surface can
 // have it give way (`showsHint`). For a few seconds after a removal, an undo
 // stands at the bar's right end as its own button (`undoLabel`), so the add
 // never waits and its words stay centred on the whole bar. While a newer
@@ -30,10 +30,10 @@ Item {
   property int gutter: 0
   property string note: ""
   property string notice: ""
-  property string noticeAction: ""
-  // The notice in fewer words, shown whole where the notice won't fit:
-  // a notice cut mid-word reads as broken. "" when it has no shorter form.
-  property string noticeShort: ""
+  // The notice said in less and less, longest first: [words, action], the
+  // action said whole beside the words. The first form that fits shows,
+  // else the last: a notice cut mid-word reads as broken.
+  property var noticeForms: []
   property string hint: ""
   // Whether the hint shows. Its room (`hintRoom`) is measured either way,
   // so the surface can judge whether it fits without reading it back.
@@ -89,6 +89,31 @@ Item {
   // they show; and what they take, none without a hint showing.
   readonly property int hintRoom: hint !== "" ? hintText.implicitHeight + Style.space(6) : 0
   readonly property int hintHeight: showsHint ? hintRoom : 0
+  // The hint as drawn: a line of two actions joined by " · " that won't fit
+  // gives each action its own line, never one word wrapped alone (the
+  // owner, 28 October).
+  readonly property string hintLines: hint.split("\n").map(function(line) {
+    if (line.indexOf(" · ") < 0 || hintMetrics.advanceWidth(line) <= width - gutter) return line
+    return line.split(" · ").map(function(part) { return part.charAt(0).toUpperCase() + part.slice(1) }).join("\n")
+  }).join("\n")
+  FontMetrics {
+    id: hintMetrics
+    font: hintText.font
+  }
+  // The notice's form shown, [words, action]: the first that fits beside
+  // the bar's end button.
+  readonly property var noticeShown: {
+    if (notice === "" || noticeForms.length === 0) return ["", ""]
+    var room = width - gutter - undoRoom - Style.space(20)
+    for (var i = 0; i < noticeForms.length - 1; i++)
+      if (footerMetrics.advanceWidth(noticeForms[i][0] + noticeForms[i][1]) <= room) return noticeForms[i]
+    return noticeForms[noticeForms.length - 1]
+  }
+  FontMetrics {
+    id: footerMetrics
+    font.family: root.fontFamily
+    font.pixelSize: Style.font.bodySmall
+  }
   // The bar and the gap over it, under the hint.
   readonly property int barHeight: rowHeight + Style.space(6)
 
@@ -113,7 +138,7 @@ Item {
     wrapMode: Text.WordWrap
     horizontalAlignment: Text.AlignHCenter
     textFormat: Text.PlainText
-    text: root.hint
+    text: root.hintLines
     color: root.dim
     font.family: root.fontFamily
     font.pixelSize: Style.font.bodySmall
@@ -149,13 +174,14 @@ Item {
         anchors.centerIn: parent
 
         // The words whole, measured, never shown: where they don't fit
-        // beside their action and clear of the undo, their short form shows
-        // (`noticeShort`, `labelShort`).
+        // clear of the undo, their short form shows (`labelShort`), so a
+        // long list name is what gets cut. A notice is already the form
+        // that fits (`noticeShown`).
         Text {
           id: fullWords
           visible: false
           textFormat: Text.PlainText
-          text: root.note !== "" ? root.note : root.notice !== "" ? root.notice : root.label
+          text: root.note !== "" ? root.note : root.notice !== "" ? root.noticeShown[0] : root.label
           font: footerWords.font
         }
         Text {
@@ -168,8 +194,7 @@ Item {
           // Cut short, it ends against its action, not a gap's width away.
           horizontalAlignment: Text.AlignRight
           textFormat: Text.PlainText
-          text: root.note === "" && shortWords !== "" && fullWords.implicitWidth > room ? shortWords : fullWords.text
-          readonly property string shortWords: root.notice !== "" ? root.noticeShort : root.labelShort
+          text: root.note === "" && root.notice === "" && root.labelShort !== "" && fullWords.implicitWidth > room ? root.labelShort : fullWords.text
           color: root.note !== "" || root.notice !== "" ? root.foreground : root.dim
           opacity: root.note !== "" ? root.noteOpacity : root.coveredOpacity
           font.family: root.fontFamily
@@ -181,7 +206,7 @@ Item {
           objectName: "footerAction"
           visible: text !== ""
           textFormat: Text.PlainText
-          text: root.note === "" && root.notice !== "" ? root.noticeAction : ""
+          text: root.note === "" && root.notice !== "" ? root.noticeShown[1] : ""
           color: root.foreground
           opacity: root.note !== "" ? root.noteOpacity : root.coveredOpacity
           font.family: root.fontFamily

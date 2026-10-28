@@ -333,7 +333,7 @@ Harness {
       var broken = within(3000, function() { return service.settingsUnreadable })
       service.persist({ changeMode: service.changeMode === "abs" ? "pct" : "abs" })
       openWindow()
-      var unsavedSaid = within(3000, function() { return footer() === "Your changes aren't saved · fix or remove grvc.stonks.json" })
+      var unsavedSaid = within(3000, function() { return footer() === "Your changes aren't saved · fix or remove ~/.config/omarchy/grvc.stonks.json" })
       clickOffer()
       var alone = within(5000, function() { return calls() === harness.updateCall + "\n" + harness.updateCall + "\n" + harness.updateAloneCall + "\n" })
       closeWindow()

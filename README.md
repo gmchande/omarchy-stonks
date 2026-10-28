@@ -234,9 +234,9 @@ again.
   any price they had, with its time. Stonks keeps trying on its own, less
   often the longer Yahoo stays away. If Yahoo has changed what it sends,
   only a newer Stonks can fix it.
-- **"Couldn't update" and a symbol, or "Refresh failed" or "No data for
-  this symbol" on a row.** Yahoo has nothing for the symbol, or sent a broken
-  answer three times in a row. Press `r` to try again. After a merger or a
+- **"Refresh failed", or "No data for this symbol" on a row.** Yahoo has
+  nothing for the symbol, or sent a broken answer three times in a row.
+  Stonks keeps retrying on its own, and `r` retries at once. After a merger or a
   rename, search for the company to find what Yahoo calls it now. A
   delisted company may be gone for good.
 - **"As of" while the market is open.** Yahoo sends some prices late. When

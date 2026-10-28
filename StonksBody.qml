@@ -178,16 +178,22 @@ Item {
   // isn't saved, since only memory holds it, each with what to do, which
   // names the file; a save didn't land, which a click retries, ahead of the
   // update, since a restart would lose the changes; or an update waits on a
-  // shell restart, which a click does. Where `noticeAction` doesn't fit
-  // beside it (text size 16 in the panel), `noticeShort` says less, never
-  // cut.
+  // shell restart, which a click does. Each is said in less and less
+  // (`noticeForms`, [words, action], the footer showing the first that
+  // fits): the file by its full path, then without "or remove", then the
+  // same beside the notice's short words, then by its name alone (text size
+  // 16 in the panel), never cut (the owner, 28 October).
   readonly property bool unsaved: settingsUnreadable ? editsUnsaved : saveFailed
   readonly property string notice: unsaved ? "Your changes aren't saved"
     : settingsUnreadable ? "Couldn't load your lists"
     : updatedTo !== "" ? "Updated to " + updatedTo + " · click to restart the shell" : ""
-  readonly property string noticeAction: settingsUnreadable ? " · fix or remove grvc.stonks.json"
-    : unsaved ? " · click to try again" : ""
-  readonly property string noticeShort: unsaved ? "Not saved" : settingsUnreadable ? "Lists not loaded" : ""
+  readonly property string noticeShort: unsaved ? "Not saved" : "Lists not loaded"
+  readonly property var noticeForms: notice === "" ? []
+    : settingsUnreadable ? [[notice, " · fix or remove ~/.config/omarchy/grvc.stonks.json"],
+      [notice, " · fix ~/.config/omarchy/grvc.stonks.json"], [noticeShort, " · fix ~/.config/omarchy/grvc.stonks.json"],
+      [noticeShort, " · fix or remove grvc.stonks.json"]]
+    : unsaved ? [[notice, " · click to try again"], [noticeShort, " · click to try again"]]
+    : [[notice, ""]]
   // A newer Stonks on main, offered at the footer's right end until on disk
   // (`updateOffer`), then the restart's notice; never in the add's place,
   // so adding by mouse never waits on it. The update restarts the shell
@@ -435,7 +441,7 @@ Item {
     if (hostPause && warnings > 0) return hostPause.forms
     if (yahooDown) return ["Can't get prices · Stonks keeps trying", "Can't get prices"]
     if (featuredQuote && featuredFreshness.state === "failed")
-      return ["Couldn't update " + (chartSymbol || featuredSymbol), "Couldn't update"]
+      return ["Refresh failed for " + (chartSymbol || featuredSymbol) + " · Retrying", "Refresh failed · Retrying", "Refresh failed"]
     return null
   }
   // The header's words, then the same said in less for a header with no
@@ -1587,8 +1593,7 @@ Item {
     note: root.note
     noteOpacity: root.noteShown
     notice: root.notice
-    noticeAction: root.noticeAction
-    noticeShort: root.noticeShort
+    noticeForms: root.noticeForms
     hint: root.hint
     showsHint: root.hintShown
     ground: root.ground

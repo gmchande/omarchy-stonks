@@ -63,7 +63,7 @@ BarWidget {
   readonly property string warningText: !warns ? ""
     : Figures.freshnessText(freshness, featuredQuote, service.calendars)
       + (hostPause ? "\n" + hostPause.why + "\n" + hostPause.when
-        : freshness.state === "failed" && featured ? "\nCouldn't update " + featuredSymbol : "")
+        : freshness.state === "failed" && featured ? "\nRefresh failed for " + featuredSymbol + " · Retrying" : "")
   // The shell copies a hover's words only as the pointer enters. While it
   // stays, a warning that starts, ends, or changes its words goes to the bar
   // again, once every binding has the new words: no bubble names a warning

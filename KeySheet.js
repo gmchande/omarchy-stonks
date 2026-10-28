@@ -51,9 +51,11 @@ function sheet(order, switchesPanels) {
     ],
     mouse: { title: "Mouse", rows: [
       // Each fits one line of the panel at the shell's usual text size, so
-      // the pill's and the row's take two.
+      // the pill's take three and the row's two; two actions that wouldn't
+      // fit one line take one each, never wrapping a word alone.
       { key: "pill", does: "Scroll steps through your stocks · drag moves it" },
-      { key: "", does: "Middle-click changes how the pill looks · right-click opens the window" },
+      { key: "", does: "Middle-click changes how the pill looks" },
+      { key: "", does: "Right-click opens the window" },
       { key: "row", does: "Click shows its chart · right-click offers to remove it" },
       { key: "", does: manual ? "Ctrl-click opens its lists · drag moves it" : "Ctrl-click opens its lists" },
       // The sort word beside the list's name: in manual order the arrow and
