@@ -91,11 +91,15 @@ Item {
   readonly property int hintHeight: showsHint ? hintRoom : 0
   // The hint as drawn: a line of two actions joined by " · " that won't fit
   // gives each action its own line, never one word wrapped alone (the
-  // owner, 28 October).
-  readonly property string hintLines: hint.split("\n").map(function(line) {
-    if (line.indexOf(" · ") < 0 || hintMetrics.advanceWidth(line) <= width - gutter) return line
-    return line.split(" · ").map(function(part) { return part.charAt(0).toUpperCase() + part.slice(1) }).join("\n")
-  }).join("\n")
+  // owner, 28 October). The font is read so a new text size measures again.
+  readonly property string hintLines: {
+    var room = width - gutter
+    var font = hintMetrics.font
+    return hint.split("\n").map(function(line) {
+      if (line.indexOf(" · ") < 0 || hintMetrics.advanceWidth(line) <= room) return line
+      return line.split(" · ").map(function(part) { return part.charAt(0).toUpperCase() + part.slice(1) }).join("\n")
+    }).join("\n")
+  }
   FontMetrics {
     id: hintMetrics
     font: hintText.font
@@ -105,6 +109,7 @@ Item {
   readonly property var noticeShown: {
     if (notice === "" || noticeForms.length === 0) return ["", ""]
     var room = width - gutter - undoRoom - Style.space(20)
+    var font = footerMetrics.font
     for (var i = 0; i < noticeForms.length - 1; i++)
       if (footerMetrics.advanceWidth(noticeForms[i][0] + noticeForms[i][1]) <= room) return noticeForms[i]
     return noticeForms[noticeForms.length - 1]
