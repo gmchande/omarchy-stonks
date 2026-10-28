@@ -50,6 +50,13 @@ Item {
     root.launch()
   }
 
+  // An asker no screen shows any more takes back what it waits for; a
+  // fetch under way still lands.
+  function withdraw(asker) {
+    var left = waiting.filter(function(w) { return w.asker !== asker })
+    if (left.length !== waiting.length) root.waiting = left
+  }
+
   function nowSecond() {
     return Math.floor(Date.now() / 1000)
   }

@@ -437,25 +437,37 @@ Harness {
         tryVerify(function() { return watchlist.displayedSymbols.indexOf("SLOW") < 0 && rested(body) }, 2000)
         watchlist.contentY = wheel === "before" ? watchlist.rowPitch : 0
         var wheeled = false
+        var turned = false
         var destination = "SLOW"
         var beforeArrival = function() {
           if (wheel !== "before" || wheeled || !service.quotes.SLOW) return
           wheeled = true
           watchlist.wheelBy(-1)
         }
+        // The wheel turns as the joined row glides in: a turn after the
+        // join, whose own glide to the row starts after it says so. The
+        // join comes a turn or more after the quote, later under load.
+        var duringLanding = function() {
+          if (wheel !== "during" || !body.landingJoined) return
+          Qt.callLater(function() {
+            if (turned) return
+            turned = true
+            wheeled = body.landing === "SLOW"
+            watchlist.wheelBy(1)
+            destination = watchlist.displayedSymbols[Math.round(watchlist.wheelTarget() / watchlist.rowPitch)]
+            var next = Object.assign({}, service.testFeed.quotes)
+            next.DOWN = Object.assign({}, next.DOWN, { price: next.DOWN.price + 0.01 })
+            service.testFeed.quotes = next
+          })
+        }
         service.quotesChanged.connect(beforeArrival)
+        body.landingJoinedChanged.connect(duringLanding)
         pickSymbol(body, keys, "SLOW")
         tryVerify(function() { return !!service.quotes.SLOW && service.arriving.indexOf("SLOW") < 0 }, 5000)
-        if (wheel === "during") {
-          wheeled = body.landing === "SLOW" && body.landingJoined
-          watchlist.wheelBy(1)
-          destination = watchlist.displayedSymbols[Math.round(watchlist.wheelTarget() / watchlist.rowPitch)]
-          var next = Object.assign({}, service.testFeed.quotes)
-          next.DOWN = Object.assign({}, next.DOWN, { price: next.DOWN.price + 0.01 })
-          service.testFeed.quotes = next
-        }
+        if (wheel === "during") tryVerify(function() { return turned }, 5000)
         within(3000, function() { return rested(body) })
         service.quotesChanged.disconnect(beforeArrival)
+        body.landingJoinedChanged.disconnect(duringLanding)
         var kept = service.featuredSymbol === "SLOW" && watchlist.displayedSymbols.indexOf("SLOW") === 3
           && (wheel === "" || wheeled) && firstWholeSymbol() === destination
         return kept ? "true" : [service.featuredSymbol, wheeled, firstWholeSymbol(), destination].join("/")

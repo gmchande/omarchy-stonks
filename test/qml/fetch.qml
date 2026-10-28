@@ -749,6 +749,31 @@ Harness {
       harness.check("back in sight, what fell due goes at once: the crypto, and Robinhood's prints", caughtUp,
         harness.requests().slice(backFrom).join(", "))
       settle()
+      // In sight, the window's stock waits for its cap and P/E behind
+      // another's, as on a slow network, and the window leaves sight before
+      // its turn: what waited is not asked for while no screen shows it.
+      var funds = service.testFundamentalsFeed
+      touch("FUNDAMENTALS.hold")
+      service.feature("7203.T")
+      settle()
+      var heldOut = within(3000, function() { return funds.busy })
+      var leftFrom = harness.requests().length
+      service.feature("SHEL.L")
+      settle()
+      stonksToplevel.workspace = workspaceThere
+      answerScreens()
+      remove("FUNDAMENTALS.hold")
+      // Idle only once whatever waited has been fetched too.
+      var heldDone = within(3000, function() { return !funds.busy })
+      var leftAsks = harness.requests().slice(leftFrom).filter(function(l) { return /^fundamentals SHEL\.L /.test(l) })
+      harness.check("a cap and P/E waiting behind another's when the window leaves sight are not asked for",
+        heldOut && heldDone && leftAsks.length === 0,
+        [heldOut, heldDone, leftAsks.join(", ") || "none asked"].join(" | "))
+      service.feature("NEST")
+      settle()
+      stonksToplevel.workspace = workspaceHere
+      answerScreens()
+      settle()
       // Out of sight again, the pill steps to SHEL.L, whose cap and P/E no
       // one has asked for: the window asks for them only once it is back in
       // sight, as a closed one would on its next open.
