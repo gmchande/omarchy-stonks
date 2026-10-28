@@ -170,8 +170,9 @@ Harness {
           tryVerify(function() { return idle() && harness.lines("runs.log").length >= runsBefore + 2 }, 30000)
           var after = harness.lines("runs.log").slice(runsBefore)
           yielded = judging + " charts judging | " + after.slice(0, 2).map(function(r) { return r.split(" ").map(function(u) { return u.split(":")[0] }).join(" ") }).join(" | ")
-          harness.check("a refresh falling due while days are judged goes in the run after the judging one: the pill's chart and eight spark requests",
-            judgingOnly && (after[0] || "").split(" ").length === judging && /^chart:TALL001( spark:\S+){8}$/.test(after[1] || ""), yielded)
+          // BTC-USD, asked for two days, goes in a spark request of its own.
+          harness.check("a refresh falling due while days are judged goes in the run after the judging one: the pill's chart, eight spark requests, and the coin's own",
+            judgingOnly && (after[0] || "").split(" ").length === judging && /^chart:TALL001( spark:\S+){8} spark:BTC-USD$/.test(after[1] || ""), yielded)
         }
         service.now += 1
         settle()
