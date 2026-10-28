@@ -344,7 +344,7 @@ Item {
   // its baseline as `prevClose` (`Chart.viewChart`).
   readonly property var featuredDay: motion.day
   readonly property var featuredFreshness: Figures.freshness(entryOf(chartSymbol || featuredSymbol), featuredQuote, now,
-    owed[chartSymbol || featuredSymbol] || 0, !!asking[chartSymbol || featuredSymbol])
+    owed[chartSymbol || featuredSymbol] || 0, !!asking[chartSymbol || featuredSymbol], historyShown ? null : featuredNewest)
   // Yahoo is sending nothing for any listing: every symbol in All has a
   // failed or overdue refresh. The header says so once, naming Yahoo, and
   // the hero and rows say what they have without a warning each

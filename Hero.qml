@@ -53,8 +53,9 @@ Item {
   readonly property string freshnessText: quote ? Figures.freshnessText(shownFreshness, quote, calendars) : ""
   // The newest price since the close, when it is the one on top
   // (`Figures.rowModel`): its session and time are said under the change,
-  // and the line under the price is the close and its day's move.
-  readonly property var newest: view && view.newest ? view.newest : null
+  // and the line under the price is the close and its day's move. None
+  // while the quote it is from is gone, as a failed preview's is.
+  readonly property var newest: quote && view && view.newest ? view.newest : null
   readonly property bool newestOld: Figures.newestStale(newest, now)
   // The line under the price: with the newest price on top, the close
   // (`Figures.closeLine`); else the extended-hours print, on every range. A

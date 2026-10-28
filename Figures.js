@@ -76,14 +76,18 @@ var ASKED_GRACE = 2
 // a source sending late (London, 15 minutes) is answered every minute and
 // says "As of" throughout. A quote still the last session's in the first
 // moments of a session is "asking" too, as Stonks asks again for its first
-// price (`Market.awaitingOpen`).
-function freshness(entry, quote, now, owedSince, inGrace) {
+// price (`Market.awaitingOpen`). Its words name the time of the price on
+// top: the newest since the close where there is one (`newest`,
+// `Overnight.newestPrint`), as a Robinhood print stays on top while Yahoo
+// fails, else Yahoo's.
+function freshness(entry, quote, now, owedSince, inGrace, newest) {
   var head = quote ? Quote.headlineQuote(quote) : null
   var phase = quote ? Market.sessionPhase(quote, now) : "closed"
   var asOf = head ? head.t : null
+  var shownAt = head && newest ? newest.t : asOf
   var overdue = owedSince > 0 && now - owedSince >= OVERDUE_AFTER
   // The quote stands for another day than the clock's: the words name the day.
-  var earlier = !!asOf && exchangeDay(quote, asOf) !== exchangeDay(quote, now)
+  var earlier = !!shownAt && exchangeDay(quote, shownAt) !== exchangeDay(quote, now)
   var asking = (!!inGrace && !!entry && now - entry.answeredAt > LIVE_QUOTE_MAX_AGE) || Market.awaitingOpen(quote, now)
   var state = entry && entry.status === "failed" ? "failed"
     : overdue ? "overdue"
@@ -91,13 +95,15 @@ function freshness(entry, quote, now, owedSince, inGrace) {
     : entry && entry.status === "saved" ? "saved"
     : asOf !== null && Market.isTrading(phase) && now - asOf > LIVE_QUOTE_MAX_AGE ? (asking ? "asking" : "aged")
     : "fresh"
-  return { state: state, asOf: asOf, earlier: earlier, live: asOf !== null && state === "fresh" && Market.isTrading(phase), phase: phase }
+  return { state: state, asOf: shownAt, session: newest ? newest.phase : "", earlier: earlier,
+    live: asOf !== null && state === "fresh" && Market.isTrading(phase), phase: phase }
 }
 
 // The words for a freshness state, or "" when nothing needs saying. A quote
 // kept from an earlier session says when it is from until its first answer.
 // The time is the quote's exchange's (`Market.printClock`), its zone named
-// where the reader's clock differs.
+// where the reader's clock differs; a newest price since the close on top
+// is named by its session, "OVERNIGHT 00:50", as its caption is.
 function freshnessText(fresh, quote, calendars) {
   if (!fresh) return ""
   // With nothing ever answered there was nothing to refresh: "Refresh
@@ -109,7 +115,8 @@ function freshnessText(fresh, quote, calendars) {
     return fresh.state === "failed" ? "NO DATA FOR THIS SYMBOL" : fresh.state === "unavailable" || fresh.state === "overdue" ? "NO DATA" : ""
   }
   var chartTrade = head && head.source === "chart"
-  var asOf = (chartTrade ? "LAST TRADE · " : "AS OF ") + (fresh.earlier ? Format.WEEKDAYS[Format.localClock(fresh.asOf, quote.gmtoffset).weekday].toUpperCase() + " " : "")
+  var lead = fresh.session ? Market.phaseLabel(fresh.session).toUpperCase() + " " : chartTrade ? "LAST TRADE · " : "AS OF "
+  var asOf = lead + (fresh.earlier ? Format.WEEKDAYS[Format.localClock(fresh.asOf, quote.gmtoffset).weekday].toUpperCase() + " " : "")
     + Market.printClock(quote, fresh.asOf, calendars)
   if (fresh.state === "failed") return "REFRESH FAILED · " + asOf
   if (fresh.state === "overdue") return "UPDATE OVERDUE · " + asOf
@@ -317,12 +324,16 @@ function rowModel(quote, scrubT, mode, newest) {
 // (`readsClose`), as the price on top is once the listing trades after
 // it. A moment of the coming day a two-day answer holds after it, once
 // that day has a print, is that day's, as the 1D chart draws it
-// (`Quote.tailDay`): from the quote's own close, with no open yet, so a
-// row following a scrub into the pre-market reads what the hero does.
+// (`Quote.tailDay`): from the quote's own close, so a row following a
+// scrub into the pre-market reads what the hero does. With no session
+// opened since that close, both read "since the open" from it too, as the
+// price on top does (`Quote.restingRead`).
 function scrubbedBase(quote, t) {
   var tail = Quote.tailStart(quote)
-  if ((tail !== null && t >= tail && Quote.lastPrintTime(quote) >= tail) || readsClose(quote, t))
-    return { prevClose: Quote.regularClose(quote), dayOpen: null }
+  if ((tail !== null && t >= tail && Quote.lastPrintTime(quote) >= tail) || readsClose(quote, t)) {
+    var close = Quote.regularClose(quote)
+    return { prevClose: close, dayOpen: close }
+  }
   return { prevClose: Quote.dayBase(quote), dayOpen: quote.dayOpen }
 }
 

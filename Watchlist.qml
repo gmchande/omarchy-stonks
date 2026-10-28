@@ -281,7 +281,7 @@ Flickable {
   }
 
   function freshnessOf(symbol) {
-    return Figures.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0, !!asking[symbol])
+    return Figures.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0, !!asking[symbol], newestPrints[symbol] || null)
   }
 
   function moveCursor(delta) {

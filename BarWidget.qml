@@ -58,7 +58,8 @@ BarWidget {
   // Freshness is judged with or without a quote: a first fetch that failed
   // is what "! No data" is for.
   readonly property var freshness: service && featuredSymbol
-    ? Figures.freshness(service.entries[featuredSymbol] || null, featuredQuote, service.now, service.owed[featuredSymbol] || 0) : null
+    ? Figures.freshness(service.entries[featuredSymbol] || null, featuredQuote, service.now, service.owed[featuredSymbol] || 0, false,
+      service.newestPrints[featuredSymbol] || null) : null
   readonly property bool warns: Figures.freshnessWarns(freshness)
   // What the "!" means, in the popup's words, for the hover on every form.
   readonly property string warningText: warns ? Figures.freshnessText(freshness, featuredQuote, service.calendars) : ""

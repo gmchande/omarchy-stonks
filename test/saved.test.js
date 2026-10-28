@@ -1729,12 +1729,19 @@ test("once a listing trades after its close, its newest price is on top, measure
   expect(M.newestCaptions(quote, newest, one, calendars)[0]).toBe("OVERNIGHT 00:50")
   expect(M.closeLine(quote, M.exchangeDay(quote, one), "pct")).toMatchObject({ label: "TUE CLOSE", price: "249.87", changeText: "+7.44%", tone: "up" })
   expect(M.rowModel(day, latest.t, "pct")).toMatchObject({ changeText: "\u22120.73%", dayUp: false })
+  // Since the open too: no session has opened since Tuesday's close.
+  expect(M.rowModel(day, latest.t, "open").changeText).toBe(M.rowModel(quote, 0, "open", newest).changeText)
+  expect(M.rowModel(quote, 0, "open", newest).changeText).toBe("\u22120.73%")
   expect(M.dayBaselineText(day, M.exchangeDay(day, one), latest.t)).toBe("TUE CLOSE 249.87")
   expect(againstDashedLine(day, "01:00")).toBe(`01:00 all against ${M.money(quote.prevClose)}`)
   expect(M.dayBase(day)).toBe(quote.prevClose)
   const noon = quote.points.find(p => p.t >= at("2026-10-06", "12:00")).t
   expect(M.rowModel(day, noon, "pct").changeText).toBe(M.rowModel(quote, noon, "pct").changeText)
   expect(M.dayBaselineText(day, M.exchangeDay(day, one), noon)).toBe("CLOSE BEFORE TUE 232.57")
+  // Yahoo failing while Robinhood answers: the warning names the time of
+  // the price on top, the night's, not Tuesday's close.
+  const failed = M.freshness({ status: "failed", answeredAt: one - 60 }, quote, one, 0, false, newest)
+  expect(M.freshnessText(failed, quote, calendars)).toBe("REFRESH FAILED · OVERNIGHT 00:50")
   // Read with no newest price, the close is on top.
   expect(M.rowModel(quote, 0, "pct").changeText).toBe("+7.44%")
 })

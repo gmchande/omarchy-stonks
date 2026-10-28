@@ -117,13 +117,13 @@ every_state() (
   # all weekend, with a night and without; SHOP's thin Friday; Sunday's
   # night alone, busy and thin; the night on past midnight; Monday's
   # pre-market and open, its session, its after hours on a busy day after
-  # the bell, and its evening's night, busy and thin; Friday's pre-market
-  # and open; a coin's last 24 hours; Tokyo at its open and London's
-  # morning; and CVR's two trades, its close carrying the dot.
+  # the bell, and its evening's night, busy and thin; Friday's pre-market;
+  # a coin's last 24 hours; Tokyo at its open and London's morning; and
+  # CVR's two trades, its close carrying the dot.
   for moment in watch-2026-10-25-1000-nbis watch-2026-10-25-1000-brk-a thinfeed-2026-10-23-2030-shop \
     watch-2026-10-25-2335-nbis watch-2026-10-25-2335-jnj watch-2026-10-26-0100-nbis night-2026-10-23-0600-aapl \
     watch-2026-10-26-0420-nbis watch-2026-10-26-0935-nbis watch-2026-10-26-1200-nbis watch-2026-10-26-1800-nbis \
-    watch-2026-10-26-2005-nbis watch-2026-10-26-2005-jnj night-2026-10-23-0931-aapl watch-2026-10-25-2020-7203.t \
+    watch-2026-10-26-2005-nbis watch-2026-10-26-2005-jnj watch-2026-10-25-2020-7203.t \
     watch-2026-10-26-0420-shel.l coin-2026-10-25-2005-btc-usd watch-2026-10-26-1800-cvr; do
     states="$states popup-sweep-$moment-smooth popup-sweep-$moment-retro"
   done
