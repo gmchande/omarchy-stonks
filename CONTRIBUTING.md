@@ -13,7 +13,7 @@ the rules a change is judged by.
   `omarchy plugin remove grvc.stonks` first.
 - After a change, run `omarchy restart shell`. A hot reload can leave the
   old service running.
-- To open the popup, run `omarchy-shell shell toggle grvc.stonks`. To open
+- To open the panel, run `omarchy-shell shell toggle grvc.stonks`. To open
   the window, run `omarchy-shell grvc.stonks openWindow '{"symbol":"AAPL"}'`.
 - QML errors show in `journalctl --user -t omarchy-shell -f`.
 
