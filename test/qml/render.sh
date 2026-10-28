@@ -113,6 +113,15 @@ every_state() (
   for symbol in shib-usd ry.to brk-a brk-b; do
     states="$states popup-sweep-2026-10-08-1054-$symbol-smooth popup-sweep-2026-10-08-1054-$symbol-retro"
   done
+  # The 1D chart's day at its edges, in both looks: Friday all weekend,
+  # with a night and without; SHOP's thin Friday; Sunday's night alone,
+  # busy and thin; the night on past midnight; a pre-market's new day; a
+  # coin's last 24 hours; and CVR's two trades, its close carrying the dot.
+  for moment in watch-2026-10-25-1000-nbis watch-2026-10-25-1000-brk-a thinfeed-2026-10-23-2030-shop \
+    watch-2026-10-25-2335-nbis watch-2026-10-25-2335-jnj watch-2026-10-26-0100-nbis night-2026-10-23-0600-aapl \
+    coin-2026-10-25-2005-btc-usd watch-2026-10-26-1800-cvr; do
+    states="$states popup-sweep-$moment-smooth popup-sweep-$moment-retro"
+  done
   # A thin stock's day, fewer prints than the chart's columns, and its 3M,
   # in both looks on both surfaces: retro lights every column the line joins.
   for look in smooth retro; do

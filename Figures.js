@@ -210,10 +210,10 @@ function dayLine(quote, today) {
 
 // The day line's title, three letters at most, as a range's token is:
 // "1D" for today's figures (`today` is `exchangeDay` of the clock), else
-// their session's name (`pastDayName`); a cryptocurrency's, its last 24
-// hours (`Quote.coinDay`), "24H".
+// their session's name (`pastDayName`); a coin's last 24 hours
+// (`Quote.coinDay`), "24H".
 function dayTitle(quote, today) {
-  if (quote.crypto) return "24H"
+  if (quote.rolling) return "24H"
   return pastDayName(quote, quote.figuresDay, today) || "1D"
 }
 
@@ -301,7 +301,7 @@ function rowModel(quote, scrubT, mode) {
     dayTone: Format.changeTone(direction, "pct", quote.priceDigits),
     changeText: Format.changeText(chg, mode, quote.priceDigits),
     changeLine: Format.changeText(chg, mode, quote.priceDigits) + (mode === "open" && chg.pct !== null ? " open" : ""),
-    periodLabel: quote.crypto && mode !== "open" ? "24H" : Format.changeCaption(mode)
+    periodLabel: quote.rolling && mode !== "open" ? "24H" : Format.changeCaption(mode)
   }
 }
 

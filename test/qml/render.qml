@@ -517,10 +517,17 @@ Harness {
         : live ? ["NEST", "EZ", "TOY"] : root.overnight.power ? ["JPM", "PLUG", "AITX", "CKX", "CVR", "LUMN"]
         : root.overnight.dated ? ["NEST"] : ["NEST", "SILK", "REED"]
       if (looked || root.overnight.power || named) listed = [featured].concat(listed.filter(function(s) { return s !== featured }))
+      // The moment each was saved at: Friday 2 October 13:42, Thursday
+      // 1 October 23:00, Sunday 27 September 22:30, Monday 5 October 00:36;
+      // a dated one at its name, New York time.
+      var dated = root.overnight.dated ? /^(.{10})-(\d\d)(\d\d)$/.exec(root.overnight.moment) : null
+      root.now = dated ? Market.epochAt(Overnight.overnightMarket(stub.calendars), dated[1], dated[2] + ":" + dated[3])
+        : { day: 1790962920, night: 1790910000, sunday: 1790562600, live: 1791175013 }[root.overnight.moment]
       var quotes = {}, entries = {}, nights = {}, allDay = {}
-      // Read as the feeds read them: the US listings in cents from $1.
+      // Read as the feeds read them, answered at the moment: the US listings
+      // in cents from $1.
       listed.forEach(function(s) {
-        quotes[s] = Quote.parseChart(read(file(s)), Market.centExchanges(stub.calendars))
+        quotes[s] = Quote.parseChart(read(file(s)), Market.centExchanges(stub.calendars), root.now)
         if (root.overnight.lastTrade) quotes[s] = Object.assign({}, quotes[s], { price: null, marketTime: null })
       })
       // The US listings: Robinhood's word on which it trades all day, saved
@@ -550,12 +557,6 @@ Harness {
         allDay[s] = { status: "ok", allDay: tradable ? tradable[s] : true, at: 0 }
         if (allDay[s].allDay && (answer || !named)) nights[s] = Object.assign({ status: "ok" }, answer[s])
       })
-      // The moment each was saved at: Friday 2 October 13:42, Thursday
-      // 1 October 23:00, Sunday 27 September 22:30, Monday 5 October 00:36;
-      // a dated one at its name, New York time.
-      var dated = root.overnight.dated ? /^(.{10})-(\d\d)(\d\d)$/.exec(root.overnight.moment) : null
-      root.now = dated ? Market.epochAt(Overnight.overnightMarket(stub.calendars), dated[1], dated[2] + ":" + dated[3])
-        : { day: 1790962920, night: 1790910000, sunday: 1790562600, live: 1791175013 }[root.overnight.moment]
       if (root.overnight.own) {
         var own = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', root)
         own.path = fixtureDir + "/" + root.overnight.own.file + ".json"

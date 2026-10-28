@@ -446,7 +446,8 @@ function parseChart(json, centExchanges, receivedAt) {
       openSession: firstRegular ? regular.start : null
     } : null
   }
-  return coin ? Object.assign(out, coinDay(points)) : out
+  var rolled = coin ? coinDay(points) : null
+  return rolled ? Object.assign(out, rolled) : out
 }
 
 // A cryptocurrency never closes, so its day is the last 24 hours of its
@@ -454,26 +455,27 @@ function parseChart(json, centExchanges, receivedAt) {
 // from the print 24 hours before the newest, the price the move is
 // measured from and the day's open, to the newest, with the low and high
 // between them, so the move, the chart, its dashed line and the day's
-// figures read the same 24 hours, the rows and the pill too. An answer
-// that doesn't reach back 24 hours has no such price: its move is unknown.
-// One continuous session, every print of it regular (`pointSession`).
+// figures read the same 24 hours, the rows and the pill too (`rolling`).
+// One continuous session. Null for an answer that doesn't reach back 24
+// hours, as a one-day answer may not, whose quote stays Yahoo's UTC day.
 function coinDay(points) {
   var newest = points.length ? points[points.length - 1] : null
   var first = 0
   while (newest && first + 1 < points.length && points[first + 1].t <= newest.t - 86400) first++
-  var base = newest && points[first].t <= newest.t - 86400 ? points[first] : null
-  var day = base ? points.slice(first) : points
+  if (!newest || points[first].t > newest.t - 86400) return null
+  var day = points.slice(first)
   var prices = day.map(function(p) { return p.p })
   return {
+    rolling: true,
     points: day,
-    prevClose: base ? base.p : null,
-    dayOpen: base ? base.p : null,
+    prevClose: day[0].p,
+    dayOpen: day[0].p,
     openSession: null,
-    dayHigh: prices.length ? Math.max.apply(null, prices) : null,
-    dayLow: prices.length ? Math.min.apply(null, prices) : null,
-    figuresDay: day.length ? day[0].t : null,
+    dayHigh: Math.max.apply(null, prices),
+    dayLow: Math.min.apply(null, prices),
+    figuresDay: day[0].t,
     nextDayBegun: false,
-    session: { pre: null, regular: day.length ? { start: day[0].t, end: newest.t } : null, post: null }
+    session: { pre: null, regular: { start: day[0].t, end: newest.t }, post: null }
   }
 }
 

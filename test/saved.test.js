@@ -513,9 +513,10 @@ test("crypto is always open, never sees a weekend, reads its last 24 hours every
     .toEqual([M.pct((coin.price - ago.p) / ago.p * 100), "24H", "24H"])
   const line = M.chartGeometry(coin)
   expect([M.dayBase(coin), line.points[0].x, line.points.at(-1).x, M.lastRegularPoint(line)]).toEqual([ago.p, 0, 1, line.points.at(-1)])
-  // An answer that doesn't reach back 24 hours, a one-day answer early in
-  // the UTC day, has no price 24 hours ago: its move is unknown.
-  expect(M.rowModel(btc, 0, "pct").changeText).toBe("—")
+  // An answer that doesn't reach back 24 hours, a one-day answer, has no
+  // price 24 hours ago: its quote stays Yahoo's UTC day, titled as a day.
+  expect([btc.rolling, btc.prevClose, M.dayTitle(btc, M.exchangeDay(btc, btc.marketTime))])
+    .toEqual([undefined, fixture("btc-usd-day.json").chart.result[0].meta.chartPreviousClose, "1D"])
 })
 
 test("after the close the header names the day and the next open from the calendar", () => {
