@@ -92,7 +92,8 @@ Harness {
         "Ctrl+Z " + byU + " | PUT BACK " + byClick + " | adding " + body.adding)
     }
 
-    // Search open with its answer (the saved SHOP results) in the rows' place.
+    // Search open with its answer to SH (the saved SHOP results) in the
+    // rows' place: an earlier answer, to S, may land first.
     function searchShop(body, keys) {
       keys.forceActiveFocus()
       keyClick(Qt.Key_A)
@@ -100,21 +101,23 @@ Harness {
       keyClick(Qt.Key_S)
       keyClick(Qt.Key_H)
       tryVerify(function() {
-        return body.search.results.length > 1 && shownResults(body).length === body.search.results.length
+        return body.search.resultsQuery.toUpperCase() === "SH" && !body.search.stale
+          && body.search.results.length > 1 && shownResults(body).length === body.search.results.length
       }, 3000)
     }
 
-    // The result rows on screen, top first, each showing its place's result.
-    // findAll lists rows in the order they were made, which is not their
-    // order on screen.
+    // The result rows on screen, top first, or none until each result has
+    // one row, laid out in order. findAll lists rows in the order they were
+    // made, and a new answer's rows sit below the last answer's until those
+    // go.
     function shownResults(body) {
       var results = body.search.results
+      var made = findAll(body.search, "searchResult")
       var rows = []
-      findAll(body.search, "searchResult").forEach(function(r) {
-        var result = results[r.index]
-        if (r.visible && result && result.symbol === r.modelData.symbol) rows[r.index] = r
-      })
-      return rows.filter(function(r) { return !!r })
+      made.forEach(function(r) { if (results[r.index] && results[r.index].symbol === r.modelData.symbol) rows[r.index] = r })
+      var ready = made.length === results.length && rows.filter(function(r) { return !!r }).length === results.length
+        && rows.every(function(r, i) { return i === 0 || r.y > rows[i - 1].y })
+      return ready ? rows : []
     }
 
     function shownResult(body, symbol) {

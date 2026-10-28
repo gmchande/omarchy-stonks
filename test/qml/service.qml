@@ -332,9 +332,11 @@ Harness {
           harness.go(8)
           return
         }
-        // Then search's preview asks for another while the stock's ask
-        // still waits: neither takes the other's place.
-        service.fetchFundamentals("MSFT", "preview")
+        // Then search's preview asks for MAPLE.TO too, while the stock's ask
+        // for it still waits, and the stock moves on to MSFT: the
+        // preview's ask still stands.
+        service.fetchFundamentals("MAPLE.TO", "preview")
+        service.fetchFundamentals("MSFT")
         harness.stateThen("rm -f \"$1/FUNDAMENTALS.hold\"", function() { harness.go(9) })
       } else if (harness.step === 9) {
         var settled = ["SHOP.TO", "MAPLE.TO", "MSFT"].every(function(s) {
@@ -343,8 +345,9 @@ Harness {
         if (!settled && harness.waited < 5000) return
         var shop = service.fundamentals["SHOP.TO"]
         var maple = service.fundamentals["MAPLE.TO"]
-        check("the stock's cap and P/E, asked while another's are fetched, still come when search's preview asks for a third",
-          settled, JSON.stringify({ "SHOP.TO": shop, "MAPLE.TO": maple, MSFT: service.fundamentals.MSFT }))
+        check("a preview's cap and P/E still come when the stock on show, waiting for the same, moves on, asked of Yahoo once",
+          settled && calls("MAPLE.TO.fundamentals") === 1,
+          calls("MAPLE.TO.fundamentals") + " " + JSON.stringify({ "SHOP.TO": shop, "MAPLE.TO": maple, MSFT: service.fundamentals.MSFT }))
         // Two listings in CAD with earnings in USD ask for USDCAD once, and
         // a listing in USD asks none.
         check("a rate is asked once a day for its pair, not for each listing",

@@ -29,6 +29,7 @@ Item {
   // each asker (`Service.fetchFundamentals`), { asker, symbol, currency }.
   // An asker's new ask replaces its last, whose symbol it no longer shows,
   // and never another's: the stock on show waits behind search's preview.
+  // Two askers may wait for one symbol, which one fetch answers.
   property var waiting: []
   // The fetch under way: { symbol, currency, step, figures, pair }, step
   // "series", "close", or "rate", figures null until the series are in.
@@ -43,7 +44,6 @@ Item {
     var others = waiting.filter(function(w) { return w.asker !== asker })
     var current = root.fresh(normalized)
     var needless = (job && job.symbol === normalized)
-      || others.some(function(w) { return w.symbol === normalized })
       || (current && root.rateHeld(Fundamentals.ratePair(current.figures, currency)))
     root.waiting = needless ? others
       : others.concat([{ asker: asker, symbol: normalized, currency: String(currency || "") }])
@@ -68,7 +68,7 @@ Item {
   function launch() {
     if (job || !waiting.length) return
     var next = waiting[0]
-    root.waiting = waiting.slice(1)
+    root.waiting = waiting.filter(function(w) { return w.symbol !== next.symbol })
     var current = root.fresh(next.symbol)
     root.job = { symbol: next.symbol, currency: next.currency, step: "series", figures: null, pair: "" }
     if (current) root.askRate(current.figures)
