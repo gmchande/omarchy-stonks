@@ -79,12 +79,13 @@ Item {
 
   // Detached, so the terminal stays whatever the shell does meanwhile, and
   // so Stonks can't wait on it: the terminal's own shell asks for the
-  // restart, only when the update exits 0 with the clone's HEAD moved. A
-  // no, an "up to date", a failed fetch and a rolled-back validation leave
-  // HEAD where it was or exit 1, and Omarchy has rescanned the plugins by
-  // its exit. One update terminal runs at a time (`flock`), so another's
-  // update can't move HEAD under this one's no. The launcher joins its
-  // arguments into a `bash -c` script, so the last one is shell.
+  // restart, only when the update exits 0 and the clone's last move is this
+  // run's fast-forward, which git names after GIT_REFLOG_ACTION. A no, an
+  // "up to date" and a failed fetch move nothing, a rolled-back validation
+  // moves it again, and so does another update that lands meanwhile, which
+  // leaves its restart to the notice. Omarchy has rescanned the plugins by
+  // its exit. The launcher joins its arguments into a `bash -c` script, so
+  // the last one is shell.
   function update() {
     updatePlugin.startDetached()
   }
@@ -118,10 +119,8 @@ Item {
   Process {
     id: updatePlugin
     command: ["omarchy", "launch", "floating", "terminal", "with", "presentation",
-      "p=$HOME/.config/omarchy/plugins/grvc.stonks; { if flock -n 9; then was=$(git -C \"$p\" rev-parse HEAD);"
-      + " omarchy plugin update grvc.stonks && [[ $(git -C \"$p\" rev-parse HEAD) != \"$was\" ]]"
-      + " && omarchy-shell grvc.stonks restartForUpdate;"
-      + " else echo 'Stonks is already updating in another terminal. Close this one and answer there.'; false; fi;"
-      + " } 9> \"$XDG_RUNTIME_DIR/grvc.stonks-update.lock\""]
+      "export GIT_REFLOG_ACTION=\"grvc.stonks update $EPOCHREALTIME\"; omarchy plugin update grvc.stonks"
+      + " && [[ $(git -C \"$HOME/.config/omarchy/plugins/grvc.stonks\" reflog -1 --format=%gs) == \"$GIT_REFLOG_ACTION: Fast-forward\" ]]"
+      + " && omarchy-shell grvc.stonks restartForUpdate"]
   }
 }

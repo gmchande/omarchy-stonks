@@ -294,9 +294,8 @@ personal use, so either may change or stop without notice.
   your screenshots folder and name the file, `wl-copy` for the clipboard,
   and `omarchy-notification-send`.
 - Only when you ask for an update: a terminal running
-  `omarchy plugin update grvc.stonks`, with `flock` so only one runs, and
-  `git rev-parse HEAD` in Stonks' folder before and after it. When the
-  update moved that folder, the terminal runs
+  `omarchy plugin update grvc.stonks`, then `git reflog` in Stonks' folder
+  to see whether that update moved it. If it did, the terminal runs
   `omarchy-shell grvc.stonks restartForUpdate`, and Stonks runs
   `omarchy restart shell` unless it has changes it hasn't saved.
 
