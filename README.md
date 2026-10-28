@@ -317,7 +317,7 @@ personal use, so either may change or stop without notice.
 - `api.robinhood.com` for overnight prices: once a day for which stocks
   trade overnight, once for the pill's stock as the shell starts, and
   every 5 minutes through the night for the pill's stock and every row in
-  All that trades overnight, whether or not the popup or the window is open.
+  All that trades overnight, even with nothing open.
 - `raw.githubusercontent.com` for the newest version number, as the shell
   starts and once a day. To turn this off, add `"updateCheck": false` to
   `~/.config/omarchy/grvc.stonks.json`.
