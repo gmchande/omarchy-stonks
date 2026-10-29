@@ -1086,12 +1086,15 @@ Item {
   // ends; and only once an answer has come, so quotes kept from an earlier
   // session are never written back as they are. Marked by every answer, it
   // was rewritten whole every 10 minutes around the clock, a weekend's
-  // unmoving prices too.
+  // unmoving prices too. It waits while a surface opens, a quote run is out
+  // or a chart draws in, and goes on a later tick: on a long list it takes
+  // 20 ms of the shell's thread, which in an open would stall it.
   property bool quotesUnsaved: false
   property int quotesSavedAt: 0
 
   function flushQuotes() {
     if (!root.quotesUnsaved || (root.quotesSavedAt && root.now - root.quotesSavedAt < 10 * 60)) return
+    if (root.opening || feed.landing.length > 0 || root.drawing.length > 0) return
     if (!Object.keys(feed.entries).some(function(s) { return feed.entries[s].status === "ok" })) return
     root.quotesUnsaved = false
     root.quotesSavedAt = root.now

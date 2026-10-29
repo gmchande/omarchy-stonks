@@ -465,15 +465,34 @@ Harness {
       var held = false
       var readWhileHeld = []
       var noteRead = function() { if (service.testFeed.holding) readWhileHeld.push(Object.keys(service.asked).length) }
+      // The saved prices' next write falls due as the window opens, with a
+      // price changed since the last. The clock moves on a second in the
+      // open's turn and again while the chart draws in, as the shell's own
+      // does when they land on a new one.
+      service.quotesSavedAt = service.now - 10 * 60
+      service.quotesUnsaved = true
+      var writes = []
+      var noteWrite = function() {
+        writes.push([service.opening, service.testFeed.landing.length > 0, service.drawing.length > 0].join(","))
+      }
+      var newSecond = function() { if (service.opening) service.now += 1 }
+      var drawInSecond = false
       var watchFrames = function() {
         marks().forEach(function(m) { if (shownMarks.indexOf(m) < 0) shownMarks.push(m) })
         held = held || service.testFeed.holding
+        if (!drawInSecond && !service.opening && service.drawing.length > 0) {
+          drawInSecond = true
+          service.now += 1
+        }
       }
       frames.each = watchFrames
       service.quotesChanged.connect(noteRead)
+      service.quotesSavedAtChanged.connect(noteWrite)
+      service.openingChanged.connect(newSecond)
       var runsBefore = harness.runs().length
       frames.running = true
       openWindow()
+      service.openingChanged.disconnect(newSecond)
       wait(300) // every frame of the open's first 300 ms is read
       frames.running = false
       service.quotesChanged.disconnect(noteRead)
@@ -487,9 +506,24 @@ Harness {
         held && readWhileHeld.length === 0 && !service.testFeed.holding, held + " | read while held: " + readWhileHeld.join(","))
       closeWindow()
       tick(30)
+      // Each write is opening, prices still coming, chart drawing in.
+      harness.check("an open with the saved prices due writes them once its prices are in: not as it opens, nor while its chart draws in or its prices come",
+        drawInSecond && writes.length === 1 && writes[0] === "false,false,false", drawInSecond + " | " + writes.join(" | "))
+      // Again, with nothing to ask: the write waits for the chart's draw-in.
+      service.quotesSavedAt = service.now - 10 * 60
+      service.quotesUnsaved = true
+      writes = []
+      drawInSecond = false
       runsBefore = harness.runs().length
+      frames.running = true
       openWindow()
+      tryVerify(function() { return drawInSecond && service.drawing.length === 0 }, 2000)
+      frames.running = false
+      tick(1, 1)
+      service.quotesSavedAtChanged.disconnect(noteWrite)
       harness.check("an open 30 s later asks for nothing", harness.runs().length === runsBefore, harness.runs().slice(runsBefore).join(" / "))
+      harness.check("an open that asks for nothing writes the saved prices due once its chart has drawn in",
+        drawInSecond && writes.length === 1 && writes[0] === "false,false,false", drawInSecond + " | " + writes.join(" | "))
       // London closes at 16:30, 11:30 here, half a minute before this
       // window ends: its last minute's request does not go.
       countsOver("11:15, the window open: every listing trading every minute, London until its close; Tokyo, closed, every 15",
@@ -1104,7 +1138,8 @@ Harness {
       // opens with each answer a second late, as on a slow network: the run
       // asks for the rows in the order they show, reads each answer as it
       // lands, the coin's a second after the rows', and the list keeps its
-      // places until the coin's is in too, then moves once.
+      // places until the coin's is in too, then moves once. The saved
+      // prices, due as it opens, are written after the coin's answer too.
       startAt(at(harness.wed7 + 86400, 13, 0))()
       service.addSymbol("TURN")
       within(10000, function() { return !!service.quotes.TURN && service.arriving.length === 0 && idle() })
@@ -1137,6 +1172,9 @@ Harness {
       }
       service.viewChanged.connect(watchShown)
       service.askedChanged.connect(watchAsked)
+      service.quotesSavedAt = service.now - 10 * 60
+      writes = []
+      service.quotesSavedAtChanged.connect(noteWrite)
       var runsBefore = harness.runs().length
       app.testWindow.implicitHeight = 1000
       app.open("{}")
@@ -1149,6 +1187,8 @@ Harness {
       service.viewChanged.disconnect(watchShown)
       service.askedChanged.disconnect(watchAsked)
       remove("DELAY")
+      tick(1, 1)
+      service.quotesSavedAtChanged.disconnect(noteWrite)
       var openRun = harness.runs().slice(runsBefore).filter(function(r) { return /^(chart|spark):/.test(r) })[0] || ""
       var sparks = openRun.split(" ").map(function(slot) { return slot.replace(/^spark:/, "").replace(/%5E/g, "^").split(",") })
       var rows = sparks[0] || []
@@ -1164,6 +1204,8 @@ Harness {
           && (harness.calls("OVERNIGHT") === printsAsked || moves[0].printsIn)
           && (harness.calls("INSTRUMENTS") === tradabilityAsked || moves[0].tradabilityIn),
         yahooIn + " " + heldWithYahooIn + " | " + JSON.stringify(moves) + " | at open " + shownAtOpen.join(","))
+      harness.check("an open's saved prices are written once the coin's answer is in too, not between the rows' and the coin's",
+        writes.length === 1 && writes[0] === "false,false,false", writes.join(" | "))
       remove("TURN.down")
       service.setOrder("manual")
       service.removeSymbol("TURN")
