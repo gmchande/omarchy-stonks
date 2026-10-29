@@ -414,6 +414,10 @@ function parseChart(json, centExchanges, receivedAt) {
     // The start of the session the day's open, high, low, and volume are.
     figuresDay: figuresDay,
     nextDayBegun: nextDayBegun,
+    // Whether the answer came once its day had ended, its post-market or
+    // else its regular session: its prints are all the day will have, and
+    // its chart ends at the last of them (`Overnight.tradedAxis`).
+    wholeDay: !!regular && Format.isFiniteNumber(receivedAt) && receivedAt >= (periods.post || periods.regular).end,
     session: {
       pre: index ? null : periodOf(periods.pre),
       regular: regular,
@@ -838,7 +842,8 @@ function tailDay(quote) {
     points: pts.filter(function(p) { return p.t >= from }),
     prevClose: regularClose(quote),
     dayOpen: null,
-    openSession: null
+    openSession: null,
+    wholeDay: false
   })
 }
 

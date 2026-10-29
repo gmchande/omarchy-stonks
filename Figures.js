@@ -381,14 +381,17 @@ function closeLabel(quote, today) {
 // While the newest price is after the close on its own day (`newest.closed`:
 // its after hours, and the weekend after it), the move since that close too
 // (`since`, `sinceTone`), "CLOSE 153.27 ▼3.45% · ▲1.35% SINCE": the move
-// on top then measures the whole day. Once the next day has begun, the
-// move on top is the one since that close, so it isn't said twice.
+// on top then measures the whole day. A move since that rounds to nothing
+// isn't said: the price on top is the close's. Once the next day has
+// begun, the move on top is the one since that close, so it isn't said
+// twice.
 function closeLine(quote, today, changeMode, newest) {
   var unit = changeMode === "abs" ? "abs" : "pct"
   var row = rowModel(quote, 0, unit)
   var since = newest.closed ? Quote.change({ prevClose: Quote.regularClose(quote), points: [] }, newest.p, unit) : null
+  var sinceTone = since ? Format.changeTone(since, unit, quote.priceDigits) : "flat"
   return { label: closeLabel(quote, today), time: "", price: row.priceText, changeText: row.changeText, tone: row.tone, stale: false,
-    since: since ? Format.changeText(since, unit, quote.priceDigits) : "", sinceTone: since ? Format.changeTone(since, unit, quote.priceDigits) : "flat" }
+    since: since && sinceTone !== "flat" ? Format.changeText(since, unit, quote.priceDigits) : "", sinceTone: sinceTone }
 }
 
 // The newest price's session and time (`newest`, { t, phase }), with its

@@ -93,12 +93,14 @@ On a longer range the chart ends on that price, and the move is the
 range's, up to it. Elsewhere, a smaller line under the price shows the
 pre-market or after-hours price.
 
-The 1D chart shows one trading day, each price at its time. For a US stock
-Robinhood trades at night, the day is 24 hours, from its night's open the
-evening before (20:00, New York time) to the next, and the chart turns to
-the next day with that night's first trade. Over the weekend it shows
-Friday until Sunday night's first trade. A stock that doesn't trade at
-night shows 04:00 to 20:00. When the rows all measure a day that isn't
+The 1D chart shows one trading day, each price at its time, from the
+day's first trade, or the open if that's earlier, to the day's end while
+it runs, and to its last trade once it's over. For a US stock Robinhood
+trades at night, the day runs from its night's open the evening before
+(20:00, New York time) to the next, and the chart turns to the next day
+with that night's first trade. Over the weekend it shows Friday until
+Sunday night's first trade. A stock that doesn't trade at night ends its
+day at 20:00. When the rows all measure a day that isn't
 today, such as Friday at the weekend, the list says so where it says
 TODAY. A coin never closes, so its chart, its change, and its low and
 high cover the last 24 hours.
