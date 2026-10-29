@@ -314,8 +314,8 @@ personal use, so either may change or stop without notice.
   every 5 minutes before and after the session, and every 15 minutes while
   it's closed. As the shell starts, it asks once for every row. When you
   open the panel or the window, it asks for the stock at the top, then the
-  rows you can see, then the rest of the list, and keeps them fresh while
-  it's open: every minute while a row's market trades, and every 5 minutes
+  rows you can see, then the rest of All, and keeps them fresh while it's
+  open: every minute while a row's market trades, and every 5 minutes
   before and after the session (every minute for the stock on show). It
   leaves out a row whose market hasn't traded since its last price.
 - `query2.finance.yahoo.com` for search, as you type.
