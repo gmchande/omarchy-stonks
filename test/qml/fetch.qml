@@ -442,21 +442,22 @@ Harness {
 
       // A removal taken back with the next write due: the file holds the
       // symbol again. Stonks takes one back only from the panel or the
-      // window, which asks for the row's price again; here nothing is open,
-      // and the step waits for that ask, which the next count would hear.
+      // window, which asks for the row's price again; here nothing is open.
+      // The write waits for that ask, and the step for both, so the next
+      // count doesn't hear the ask.
       service.removeSymbol("KILN")
       tick(21 * 60, 60)
       var since = service.now - service.quotesSavedAt
       var undoFrom = harness.requests().length
       service.undoRemoval("KILN")
-      within(1000, function() { return !!harness.cached().KILN })
+      var askedAgain = within(5000, function() { return !("KILN" in service.asked) && idle() })
+      var undoAsks = harness.quoteCounts(harness.requests().slice(undoFrom)).KILN
+      harness.check("a removal taken back asks for the row's price again, once", askedAgain && undoAsks === 1, undoAsks + " asks")
+      tick(1, 1)
       cache = harness.cached()
       harness.check("a removal taken back with a write due is saved again for the next start",
         service.library.indexOf("KILN") >= 0 && !!cache.KILN,
         since + " s since the last write | " + Object.keys(cache).join(","))
-      var askedAgain = within(5000, function() { return !("KILN" in service.asked) && idle() })
-      var undoAsks = harness.quoteCounts(harness.requests().slice(undoFrom)).KILN
-      harness.check("a removal taken back asks for the row's price again, once", askedAgain && undoAsks === 1, undoAsks + " asks")
 
       // 11:00, the regular session: with nothing open, no row is kept fresh
       // for a surface no screen shows.
@@ -1218,6 +1219,36 @@ Harness {
         writes.length === 1 && writes[0] === "false,false,false", writes.join(" | "))
       remove("TURN.down")
       service.setOrder("manual")
+      service.removeSymbol("TURN")
+      closeWindow()
+
+      // The saved prices, due while a run is out, wait for that run and not
+      // for the runs after it, which on a slow link with a long list open
+      // can follow each other with no gap. NEST's chart holds r's run out;
+      // TURN's first answer, asked meanwhile, holds a run of its own.
+      openWindow()
+      tryVerify(function() { return service.drawing.length === 0 }, 2000)
+      tick(20)
+      touch("NEST.quote.hold")
+      app.refresh()
+      var refreshOut = within(3000, function() { return service.testFeed.landing.length === 1 })
+      service.quotesSavedAt = service.now - 10 * 60
+      service.quotesUnsaved = true
+      writes = []
+      service.quotesSavedAtChanged.connect(noteWrite)
+      service.now += 1
+      touch("TURN.quote.hold")
+      service.addSymbol("TURN")
+      var bothOut = within(3000, function() { return service.testFeed.landing.length === 2 })
+      remove("NEST.quote.hold")
+      var refreshIn = within(5000, function() { return service.testFeed.landing.length === 1 })
+      service.now += 1
+      service.quotesSavedAtChanged.disconnect(noteWrite)
+      remove("TURN.quote.hold")
+      settle()
+      harness.check("the saved prices, due while a run is out, are written once it is in, though a later run is still out",
+        refreshOut && bothOut && refreshIn && writes.length === 1 && writes[0] === "false,true,false",
+        [refreshOut, bothOut, refreshIn].join(",") + " | " + writes.join(" | "))
       service.removeSymbol("TURN")
       closeWindow()
 

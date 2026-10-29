@@ -834,6 +834,7 @@ Item {
     // asks for those first (`Asks.readingOrder`).
     if (open) {
       root.opening = true
+      root.saveWaitsFor = null
       Qt.callLater(function() {
         root.opening = false
         feed.pump()
@@ -1086,16 +1087,23 @@ Item {
   // ends; and only once an answer has come, so quotes kept from an earlier
   // session are never written back as they are. Marked by every answer, it
   // was rewritten whole every 10 minutes around the clock, a weekend's
-  // unmoving prices too. It waits while a surface opens, a quote run is out
-  // or a chart draws in, and goes on a later tick: on a long list it takes
-  // 20 ms of the shell's thread, which in an open would stall it.
+  // unmoving prices too. It waits while a surface opens or a chart draws in,
+  // and for the quote runs out as it falls due, then goes on a later tick:
+  // on a long list it takes 20 ms of the shell's thread, which among an
+  // open's prices would stall them. Only those runs (`saveWaitsFor`), so
+  // runs back to back on a slow link can't hold it for good; an open starts
+  // the wait again, for its own.
   property bool quotesUnsaved: false
   property int quotesSavedAt: 0
+  property var saveWaitsFor: null
 
   function flushQuotes() {
     if (!root.quotesUnsaved || (root.quotesSavedAt && root.now - root.quotesSavedAt < 10 * 60)) return
-    if (root.opening || feed.landing.length > 0 || root.drawing.length > 0) return
+    if (root.opening || root.drawing.length > 0) return
     if (!Object.keys(feed.entries).some(function(s) { return feed.entries[s].status === "ok" })) return
+    if (!root.saveWaitsFor) root.saveWaitsFor = feed.landing.slice()
+    if (root.saveWaitsFor.some(function(run) { return feed.landing.indexOf(run) >= 0 })) return
+    root.saveWaitsFor = null
     root.quotesUnsaved = false
     root.quotesSavedAt = root.now
     var saved = {}
