@@ -108,7 +108,10 @@ function barDate(history, bar) {
 //   regular session named by its session, as the line under the price is;
 //   on a range, its date too, which on the day the foot says;
 //   from: what the change is measured from, as the chart's dashed line;
-//   extended: the line under the price the panel shows, with its time;
+//   extended: the line under the price the panel shows, with its time,
+//   and its tone (`extendedTone`);
+//   since: after the close, on its own day, the move since it, in its own
+//   tone (`sinceTone`), as the panel shows it beside that line;
 //   currency: beside the price; none beside an index's level, which isn't
 //   money;
 //   start, end: the day's axis's two ends; a range has none;
@@ -121,7 +124,7 @@ function words(o) {
   var quote = o.quote
   var digits = quote.priceDigits
   var at = moment(o)
-  var out = { when: "", from: "", extended: "", extendedTone: "flat", start: "", end: "", span: "", said: "",
+  var out = { when: "", from: "", extended: "", extendedTone: "flat", since: "", sinceTone: "flat", start: "", end: "", span: "", said: "",
     currency: quote.instrumentType === "INDEX" ? "" : Figures.currencyLabel(String(quote.currency || "")) }
   if (at.bar) {
     out.when = barDate(o.history, at.bar)
@@ -166,13 +169,15 @@ function words(o) {
     }
   }
   // The panel's line under the price, as it shows it: at rest, the close
-  // under a newest price on top, and the move since it (`Figures.closeLine`),
-  // else the extended-hours print, its tone, and an old overnight print
-  // dimmed (`Figures.extendedStack`).
+  // under a newest price on top, and the move since it in its own tone
+  // (`Figures.closeLine`), else the extended-hours print, its tone, and an
+  // old overnight print dimmed (`Figures.extendedStack`).
   if (!o.scrubT && o.newest) {
     var below = Figures.closeLine(quote, Figures.exchangeDay(quote, o.now), o.changeMode, o.newest)
-    out.extended = below.label + " · " + below.price + " " + below.changeText + (below.since ? " · " + below.since + " SINCE" : "")
+    out.extended = below.label + " · " + below.price + " " + below.changeText
     out.extendedTone = below.tone
+    out.since = below.since
+    out.sinceTone = below.sinceTone
     return out
   }
   var ext = !o.scrubT ? Figures.extendedStack(quote, o.latest, o.now, o.day, o.changeMode) : null

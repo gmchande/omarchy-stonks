@@ -80,16 +80,19 @@ Item {
   // A range whose first fetch failed shows the day.
   readonly property var geometry: historyShown ? History.historyGeometry(history) : dayGeometry
   // Scrubbing and replay keep to the prints: from the first to the last.
-  // The axis runs on either side, from midnight and to the bell or to
-  // midnight, and the hours there hold no price to read and no session to
-  // name.
+  // While the day runs its axis runs on past them to its end, and those
+  // hours hold no price to read and no session to name.
   readonly property int scrubStart: day && day.points.length ? day.points[0].t : 0
   readonly property int scrubEnd: day && Quote.lastPrintTime(day) !== null ? Quote.lastPrintTime(day) : 0
 
   // The moment shown: 0 for now, otherwise a time on the day or a bar's.
   property int scrubT: 0
-  // The moment as the look shows it: retro's day moves in five minutes.
-  readonly property int scrubShown: historyActive || !retro || !scrubT ? scrubT : Math.round(scrubT / 300) * 300
+  // The moment as the look shows it: retro's day moves in five minutes,
+  // never past the first or last print, and a scrub held at either reads
+  // that print, so a lone trade or the newest isn't swapped for the one
+  // before it.
+  readonly property int scrubShown: historyActive || !retro || !scrubT || scrubT === scrubStart || scrubT === scrubEnd ? scrubT
+    : Math.max(scrubStart, Math.min(scrubEnd, Math.round(scrubT / 300) * 300))
   // Where the moment shown sits on the chart, 0..1, or -1.
   readonly property real scrubX: historyShown && scrubShown ? History.historyFraction(history, scrubShown)
     : (!historyActive && day && scrubShown ? Chart.fractionAtTime(day, scrubShown) : -1)

@@ -2647,7 +2647,8 @@ test("the header's animal sleeps while its market does: by phase and calendar, n
 // names it, as the picture at rest does: a big price read as the session's
 // would mislead. A range says its dates once, at the foot, with no axis
 // dates for a mark to repeat. An index's level isn't money: no currency.
-test("a screenshot says when its price is, its session, its range's dates once, and an index's level without a currency", () => {
+// After the close, the move since it keeps its own tone, as on the panel.
+test("a screenshot says when its price is, its session, its range's dates once, an index's level without a currency, and the move since the close in its own tone", () => {
   const Share = load("Share.js")
   const words = Share.words({ quote: btc, day: M.dayChart(btc, null, calendars).day, history: null, latest: null,
     scrubT: 0, changeMode: "pct", range: "1D", now: btc.marketTime + 60, calendars })
@@ -2667,4 +2668,10 @@ test("a screenshot says when its price is, its session, its range's dates once, 
   expect([gspc, spy, savedDay("listings-2026-10-07-1455", "shel.l")].map(q => Share.words({ quote: q, day: q,
     history: null, latest: null, scrubT: 0, changeMode: "pct", range: "1D", now: q.marketTime + 60, calendars }).currency))
     .toEqual(["", "USD", "PENCE"])
+  // NBIS at 17:58 on Monday 26 October: down on the day, up since the close.
+  const tops = topsAt("watch-2026-10-26-1800")
+  const nbis = dayAt("watch-2026-10-26-1800", "nbis")
+  const after = Share.words({ quote: tops.quotes.NBIS, day: nbis.day, history: null, latest: nbis.latest, newest: tops.newest.NBIS,
+    scrubT: 0, changeMode: "pct", range: "1D", now: tops.now, calendars })
+  expect([after.extended, after.extendedTone, after.since, after.sinceTone]).toEqual(["CLOSE · 153.27 \u22123.45%", "down", "+1.35%", "up"])
 })
