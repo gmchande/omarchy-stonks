@@ -27,12 +27,12 @@
 # (CONTRIBUTING.md, Releases).
 #
 # The queue, the lock, and the verdict are test/queue.sh's: one run of
-# either runner at a time. It takes every option but --fresh. --fresh runs
-# a tree that already passed too, since that run may have reused a set.
+# either runner at a time. It takes --fresh, and passes any other option on
+# to queue.sh, which refuses it.
 fresh=""
 for arg; do
   shift
-  if [ "$arg" = --fresh ]; then fresh=1; set -- "$@" --again; else set -- "$@" "$arg"; fi
+  if [ "$arg" = --fresh ]; then fresh=1; else set -- "$@" "$arg"; fi
 done
 source "$(dirname "${BASH_SOURCE[0]}")/queue.sh"
 
