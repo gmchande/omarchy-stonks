@@ -1082,6 +1082,7 @@ Harness {
       harness.check("a malformed day in a spark run fails its own listing and stops nothing: the run lands, and the next refresh goes too",
         carried && landed && nextLanded && service.entries.MANGLED.status === "failed",
         [carried, landed, nextLanded, service.entries.MANGLED.status, JSON.stringify(service.testFeed.refreshRun)].join(" | "))
+      service.removeSymbol("MANGLED")
       closeWindow()
 
       // A refusal asking for a year's rest (Retry-After 31536000): Stonks
@@ -1250,6 +1251,38 @@ Harness {
         refreshOut && bothOut && refreshIn && writes.length === 1 && writes[0] === "false,true,false",
         [refreshOut, bothOut, refreshIn].join(",") + " | " + writes.join(" | "))
       service.removeSymbol("TURN")
+      closeWindow()
+
+      // An open while the pill's refresh is out: the rows it asks for wait
+      // behind that run, and the saved prices, due, wait for them too.
+      tick(90)
+      touch("NEST.quote.hold")
+      service.now = service.dueAt
+      var pillOut = within(3000, function() { return service.testFeed.landing.length === 1 })
+      runCommand(["sh", "-c", "echo 1 > \"$1/DELAY\"", "sh", harness.state])
+      service.quotesSavedAt = service.now - 10 * 60
+      service.quotesUnsaved = true
+      var openRows = []
+      var rowsAskedAtWrite = []
+      var noteRowsAsked = function() {
+        rowsAskedAtWrite.push(openRows.filter(function(s) { return s in service.asked }).join(",") || "none")
+      }
+      service.quotesSavedAtChanged.connect(noteRowsAsked)
+      app.open("{}")
+      var rowsWait = within(3000, function() { return app.opened && service.drawing.length === 0 && "KILN" in service.asked })
+      openRows = Object.keys(service.asked).filter(function(s) { return s !== "NEST" })
+      service.now += 1
+      remove("NEST.quote.hold")
+      var rowsOut = within(5000, function() { return !("NEST" in service.asked) && service.testFeed.landing.length === 1 })
+      service.now += 1
+      remove("DELAY")
+      settle()
+      within(10000, function() { return openRows.every(function(s) { return !(s in service.asked) }) })
+      service.now += 1
+      service.quotesSavedAtChanged.disconnect(noteRowsAsked)
+      harness.check("an open while the pill's refresh is out writes the saved prices once the rows it asked for are in too",
+        pillOut && rowsWait && rowsOut && rowsAskedAtWrite.length === 1 && rowsAskedAtWrite[0] === "none",
+        [pillOut, rowsWait, rowsOut].join(",") + " | rows asked at each write: " + rowsAskedAtWrite.join(" / "))
       closeWindow()
 
       harness.finish()
