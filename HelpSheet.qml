@@ -28,7 +28,7 @@ Flickable {
   // rows' figures do, one gutter and an inset short of the right (`edge`):
   // the sheet clips at its edges, so CLOSE's fill reaching past its word
   // stays whole. What each key does may run on past that edge, as wrapped
-  // words do, rather than break a line in the popup.
+  // words do, rather than break a line in the panel.
   property int inset: 0
   property int edge: 0
   // Stonks' version, as the version watch read it from the manifest; ""
@@ -55,7 +55,7 @@ Flickable {
   }
   readonly property int columnWidth: (width - inset - columns.spacing) / 2
   // The key column, as wide as the widest key or gesture, so what each
-  // does keeps the room a popup's half column has. The binding reads
+  // does keeps the room a panel's half column has. The binding reads
   // keyMetrics.font so a new font measures again: a text size changed while
   // the shell runs would otherwise run a key into its words.
   readonly property int keyWidth: {

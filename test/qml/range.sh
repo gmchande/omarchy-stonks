@@ -3,7 +3,8 @@
 # range picked in the window, the pill showing the day on a range in every
 # style, the window's hold while a range's history is out or failed, r (its
 # "Refreshing" while out), the window opened and closed by the pill's
-# right-click and by IPC, against the popup and another workspace, real IPC
+# right-click and by IPC, against the panel and another workspace, the
+# panel closed by Omarchy's screensaver, real IPC
 # refreshing once for two pills and reaching the plugin with no pill at all,
 # the pill's first-fetch states, tooltips, forms and animal, and later
 # Services with a window summoned before each was ready, and the hero
@@ -21,9 +22,11 @@ patch_copy plugin/QuoteFeed.qml 's/interval: 2500/interval: 200/'
 # window to put one in, and no flow here opens one.
 patch_copy plugin/BarWidget.qml '/id: panelLoader/,/source:/s/active: true/active: false/'
 # The harness never asks the owner's Hyprland: the window host's lookup,
-# workspace check, and focus call run against the harness's stand-in.
+# workspace check, and focus call run against the harness's stand-in, and
+# it hears Hyprland's events from the stand-in too.
 patch_copy plugin/WindowHost.qml '/readonly property bool opened:/a\  property var hyprlandStandIn: null'
 patch_copy plugin/WindowHost.qml 's/Hyprland\.\(toplevels\|focusedWorkspace\|dispatch\)/root.hyprlandStandIn.\1/g'
+patch_copy plugin/WindowHost.qml 's/target: Hyprland$/target: root.hyprlandStandIn/'
 scratch_home v1-data.json grvc.stonks.json
 # The theme where the shell reads it, Tokyo Night's, a copy the flow
 # replaces to switch themes the way omarchy-theme-set does.

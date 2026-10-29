@@ -2,8 +2,8 @@ import QtQuick
 import Quickshell.Io
 
 // The plugin's one IPC target, `omarchy-shell grvc.stonks <function>`, with
-// or without a pill on the bar. The popup's verbs go through the shell,
-// which opens the popup on the focused screen's pill.
+// or without a pill on the bar. The panel's verbs go through the shell,
+// which opens the panel on the focused screen's pill.
 Item {
   id: root
 

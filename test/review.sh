@@ -27,14 +27,17 @@
 # (CONTRIBUTING.md, Releases).
 #
 # The queue, the lock, and the verdict are test/queue.sh's: one run of
-# either runner at a time. It takes every option but --fresh. --fresh runs
-# a tree that already passed too, since that run may have reused a set.
+# either runner at a time. It takes --fresh, and passes any other option on
+# to queue.sh, which refuses it.
 fresh=""
 for arg; do
   shift
-  if [ "$arg" = --fresh ]; then fresh=1; set -- "$@" --again; else set -- "$@" "$arg"; fi
+  if [ "$arg" = --fresh ]; then fresh=1; else set -- "$@" "$arg"; fi
 done
 source "$(dirname "${BASH_SOURCE[0]}")/queue.sh"
+# What a kept set says drew it: HEAD, and whether the checkout had edits.
+commit=$(git rev-parse -q --verify HEAD)
+edited=$(git status --porcelain)
 
 store="$(git rev-parse --path-format=absolute --git-common-dir)/stonks-renders"
 keep=20
@@ -65,7 +68,7 @@ keep_set() {
 # then only the newest $keep.
 keep_sets() {
   local what=${commit:0:7} status=0 old
-  [ -n "$tree" ] || what="$what with uncommitted edits"
+  [ -z "$edited" ] || what="$what with uncommitted edits"
   if [ "${#head_parts[@]}" -gt 0 ] && passed "${head_parts[@]}"; then
     keep_set "$head_key" . out/render "$what" || status=1
   fi

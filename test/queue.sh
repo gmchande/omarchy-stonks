@@ -8,56 +8,18 @@
 # (test/fixtures-dir.sh): it says why, and the last line counts the skips,
 # ALL PASS only when nothing skipped.
 #
-#   test/all.sh [--again] [NAME...]     test/review.sh [--again] [--fresh]
-#
-# A tree that already passed, since the last system update and the saved
-# answers' last change, isn't run again: its record covers it. --again runs
-# it anyway, as when chasing a flaky test.
-#
 # A runner that takes names sets $some to them before sourcing this: then
-# only the named checks run (start, picked, known_names), the run is never
-# recorded nor refused, and its last line names them instead of ALL PASS,
-# which only a full run may print.
+# only the named checks run (start, picked, known_names), and its last line
+# names them instead of ALL PASS, which only a full run may print.
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 source "$PWD/test/scratch.sh"
 runner=test/${0##*/}
 some=${some-}
-again=""
 for arg; do
-  case $arg in
-    --again) again=1 ;;
-    *) echo "$runner: unknown option $arg"; exit 2 ;;
-  esac
+  echo "$runner: unknown option $arg"
+  exit 2
 done
-
-# The run's record (test/ran.sh): the tree it ran on, so the next one to
-# merge it checks the record instead of running it again. Only a run that
-# begins and ends on a clean tree (no edit, no untracked file) is recorded:
-# any other ran on something no commit holds. It goes in the git folder
-# every worktree shares, which no one edits by hand.
-clean_tree() { [ -z "$(git status --porcelain 2> /dev/null)" ] && git rev-parse -q --verify 'HEAD^{tree}' 2> /dev/null; }
-records="$(git rev-parse --path-format=absolute --git-common-dir)/stonks-runs"
-# checkout: what the run runs on: its clean tree, if it is clean, and HEAD.
-checkout() {
-  tree=$(clean_tree)
-  commit=$(git rev-parse -q --verify HEAD 2> /dev/null)
-  if [ -n "$some" ]; then tree=""
-  elif [ -z "$tree" ]; then echo "$runner: this run won't be recorded: the tree has uncommitted edits or untracked files (git status)"; fi
-}
-# refuse_passed: ends the run when this tree already passed this runner in a
-# run that began after the last package change and the saved answers' last
-# change (test/ran.sh --passed), unless --again.
-refuse_passed() {
-  [ -n "$tree" ] && [ -z "$again" ] || return 0
-  test/ran.sh --passed "$runner" 2> /dev/null || return 0
-  echo "$runner already passed on this tree, and neither a package nor a saved"
-  echo "answer has changed since; its record covers it (test/ran.sh shows it)."
-  echo "To run it again on purpose, as when chasing a flaky test: $runner --again"
-  exit 0
-}
-checkout
-refuse_passed
 
 # One run at a time on this machine, of either runner, from any checkout:
 # overlapping runs fill its memory. A second run says what it waits
@@ -76,9 +38,6 @@ exec 9>> "$lock" || exit 1
 if ! flock -n 9; then
   echo "$runner: waiting for the run already going ($(cat "$lock"))"
   flock 9 || exit 1
-  # The checkout may have moved meanwhile, and that run may have passed it.
-  checkout
-  refuse_passed
 fi
 echo "$runner, pid $$ in $PWD" > "$lock"
 
@@ -230,8 +189,8 @@ passed() {
 }
 
 # verdict: once the queue has run dry, each queued check's output and
-# verdict in order, the run's own time, and the last line, which a run on a
-# clean tree also records against it. Exits non-zero on any failure.
+# verdict in order, the run's own time, and the last line. Exits non-zero
+# on any failure.
 verdict() {
   local i code took last
   while [ "${#queue[@]}" -gt 0 ]; do sleep 0.2; fill; done
@@ -250,9 +209,6 @@ verdict() {
     [ "$skipped" -gt 0 ] && last+=", $skipped SKIPPED (no saved answers)"
   elif [ "$skipped" -gt 0 ]; then last="PASSED, $skipped SKIPPED (no saved answers)"
   else last="ALL PASS"; fi
-  if [ -n "$tree" ] && [ "$(clean_tree)" = "$tree" ]; then
-    echo "$tree $commit $runner $(date -Iseconds) ${took}s $last" >> "$records"
-  fi
   echo "$last"
   exit "$status"
 }

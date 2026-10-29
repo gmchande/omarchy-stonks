@@ -5,7 +5,9 @@
 # HOME through bin/'s stand-ins for wl-copy and omarchy-notification-send,
 # as camera.sh's do. The shell's layer-shell card window does not load
 # offscreen, so the copy of Panel.qml puts the card in CardWindow.qml, as
-# keys.sh does. HOME and curl are scratch.
+# keys.sh does. HOME and curl are scratch. Omarchy's Do Not Disturb, as
+# the stand-in omarchy-shell answers, is on until the bell's passes, so
+# every sound you cause is heard under it.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree sounds.qml
 cp "$here/CardWindow.qml" "$root/plugin/"
@@ -26,6 +28,7 @@ scratch_home v1-data.json grvc.stonks.json
 : > "$STONKS_FAKE_STATE/pw-play.log"
 : > "$STONKS_FAKE_STATE/pw-cat.log"
 : > "$STONKS_FAKE_STATE/pw-dump.log"
+echo on > "$STONKS_FAKE_STATE/dnd"
 export QT_QPA_PLATFORM=offscreen
 run_qs 120
 finish "SOUNDS DONE"

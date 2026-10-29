@@ -177,14 +177,16 @@ test("a young listing's ranges start at its first trade and keep its thin trades
 
 test("a day with no bar says nothing against the trade its quote holds", () => {
   // WREN at 09:37 on Friday 23 October: Yahoo's quote is its 09:30 trade,
-  // 20.62 on 366 shares, and its day has no bar: no "No trades charted"
+  // 20.62 on 366 shares, and its day has no bar: no "No trades today"
   // under "1D 20.62 20.62 VOL 366".
   const wren = M.parseChart(fixture("moments/bell-2026-10-23-0937/wren.json"), cents)
   expect([wren.points.length, wren.price, wren.volume]).toEqual([0, 20.62, 366])
   expect(M.dayNote(wren, M.epochAt(US, "2026-10-23", "09:37"), calendars)).toBe("")
-  // CVR untraded on Friday 16 October, its quote Wednesday's, still says so.
+  // CVR untraded on Friday 16 October, its quote Wednesday's, still says
+  // so, and names the day once the chart shows an earlier one.
   const cvr = M.parseChart(fixture("moments/power-user-2026-10-16/cvr.json"), cents)
-  expect(M.dayNote(cvr, M.epochAt(US, "2026-10-16", "14:09"), calendars)).toBe("No trades charted")
+  expect(M.dayNote(cvr, M.epochAt(US, "2026-10-16", "14:09"), calendars)).toBe("No trades today")
+  expect(M.dayNote(cvr, M.epochAt(US, "2026-10-17", "12:00"), calendars)).toBe("No trades on Fri")
 })
 
 test("the headline uses the regular quote or labels the last chart trade with its time", () => {
@@ -198,10 +200,10 @@ test("the headline uses the regular quote or labels the last chart trade with it
   const untimed = M.freshness({ status: "ok" }, noTime, quote.marketTime, 0)
   expect(untimed.asOf).toBeNull()
   expect(untimed.live).toBe(false)
-  expect(M.freshnessText(untimed, noTime, calendars)).toBe("TIME NOT SENT")
-  expect(M.freshnessText({ ...untimed, state: "saved" }, noTime, calendars)).toBe("SAVED · TIME NOT SENT")
-  expect(M.freshnessText({ ...untimed, state: "failed" }, noTime, calendars)).toBe("REFRESH FAILED · TIME NOT SENT")
-  expect(M.freshnessText({ ...untimed, state: "overdue" }, noTime, calendars)).toBe("UPDATE OVERDUE · TIME NOT SENT")
+  expect(M.freshnessText(untimed, noTime, calendars)).toBe("TIME UNKNOWN")
+  expect(M.freshnessText({ ...untimed, state: "saved" }, noTime, calendars)).toBe("TIME UNKNOWN")
+  expect(M.freshnessText({ ...untimed, state: "failed" }, noTime, calendars)).toBe("REFRESH FAILED · TIME UNKNOWN")
+  expect(M.freshnessText({ ...untimed, state: "overdue" }, noTime, calendars)).toBe("NOT UPDATING · TIME UNKNOWN")
   const nothing = { ...quote, price: null, points: [] }
   expect(M.headlineQuote(nothing)).toBeNull()
   expect(M.regularClose(nothing)).toBeNull()
@@ -216,7 +218,7 @@ test("the headline uses the regular quote or labels the last chart trade with it
     expect(M.freshnessWarns(fresh)).toBe(false)
     expect(M.freshnessText({ ...fresh, earlier: false }, fallback, calendars)).toBe("LAST TRADE · 15:55")
     expect(M.freshnessText({ ...fresh, state: "failed" }, fallback, calendars)).toBe("REFRESH FAILED · LAST TRADE · TUE 15:55")
-    expect(M.freshnessText({ ...fresh, state: "overdue" }, fallback, calendars)).toBe("UPDATE OVERDUE · LAST TRADE · TUE 15:55")
+    expect(M.freshnessText({ ...fresh, state: "overdue" }, fallback, calendars)).toBe("NOT UPDATING · LAST TRADE · TUE 15:55")
   }
   expect(M.freshnessText(M.freshness({ status: "ok" }, night, now, 0), night, calendars)).toBe("")
 })
@@ -534,7 +536,7 @@ test("after the close the header names the day and the next open from the calend
     [M.epochAt(US, "2026-11-26", "12:00"), calendars, "Thanksgiving Day · opens Fri 09:30"],
     [M.epochAt(US, "2027-06-18", "12:00"), calendars, "Juneteenth · opens Mon 09:30"],
     // Past validThrough the schedule is unknown, and the header says so.
-    [saturday, short, "Weekend · schedule unavailable"]
+    [saturday, short, "Weekend · market hours unknown"]
   ]
   for (const [now, cals, expected] of rows) expect([now, M.marketStatus(sep4, now, 0, cals)]).toEqual([now, expected])
 })
@@ -1178,7 +1180,7 @@ test("freshness keeps quote age, an unanswered ask, and the refresh outcome apar
   // last answer; one nobody asked for never is.
   expect(M.freshness(ok, live, trading, trading - 89).state).toBe("fresh")
   expect(M.freshness(ok, live, trading, trading - 90)).toMatchObject({ state: "overdue", live: false })
-  expect(M.freshnessText(M.freshness(ok, live, trading, trading - 90), q)).toBe("UPDATE OVERDUE · AS OF 10:29")
+  expect(M.freshnessText(M.freshness(ok, live, trading, trading - 90), q)).toBe("NOT UPDATING · AS OF 10:29")
   expect(M.freshnessWarns(M.freshness(ok, live, trading, trading - 90))).toBe(true)
   expect(M.freshness({ status: "ok", receivedAt: trading - 86400 }, live, trading, 0).state).toBe("fresh")
   // A failed refresh is a failure whatever the quote's age, and keeps its as-of.
@@ -1206,7 +1208,7 @@ test("a quote kept from an earlier session says when it is from, and warns only 
   expect([nextDay.state, nextDay.live, M.freshnessWarns(nextDay), M.freshnessText(nextDay, q)])
     .toEqual(["saved", false, false, "AS OF TUE 15:59"])
   const late = M.freshness(saved, close, reg.start + DAY + 90, reg.start + DAY)
-  expect([late.state, M.freshnessText(late, q)]).toEqual(["overdue", "UPDATE OVERDUE · AS OF TUE 15:59"])
+  expect([late.state, M.freshnessText(late, q)]).toEqual(["overdue", "NOT UPDATING · AS OF TUE 15:59"])
 })
 
 test("outside trading an old close is normal, but a failed refresh still shows", () => {
@@ -1570,7 +1572,7 @@ test("Robinhood's answer keeps only the bars that traded, by the symbols asked f
 
 test("a refresh within half an hour asks Robinhood for the last hour, which brings the day in hand up to what a day asked then holds", () => {
   // Saved Wednesday 7 October at 00:05 and 01:00 New York, 55 minutes
-  // apart, as a night's refreshes come with the popup closed between.
+  // apart, as a night's refreshes come with the panel closed between.
   const earlier = traded("2026-10-07-0005", ["NEST"]).NEST
   const later = fixture("moments/2026-10-07-0100/robinhood-day.json")
   const hour = { results: later.results.map(r => ({ ...r, span: "hour", historicals: r.historicals.slice(-12) })) }

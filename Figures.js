@@ -111,7 +111,7 @@ function freshnessText(fresh, quote, calendars) {
   var head = quote ? Quote.headlineQuote(quote) : null
   if (!fresh.asOf) {
     if (head) return (fresh.state === "failed" ? "REFRESH FAILED · "
-      : fresh.state === "overdue" ? "UPDATE OVERDUE · " : fresh.state === "saved" ? "SAVED · " : "") + "TIME NOT SENT"
+      : fresh.state === "overdue" ? "NOT UPDATING · " : "") + "TIME UNKNOWN"
     return fresh.state === "failed" ? "NO DATA FOR THIS SYMBOL" : fresh.state === "unavailable" || fresh.state === "overdue" ? "NO DATA" : ""
   }
   var chartTrade = head && head.source === "chart"
@@ -119,13 +119,45 @@ function freshnessText(fresh, quote, calendars) {
   var asOf = lead + (fresh.earlier ? Format.WEEKDAYS[Format.localClock(fresh.asOf, quote.gmtoffset).weekday].toUpperCase() + " " : "")
     + Market.printClock(quote, fresh.asOf, calendars)
   if (fresh.state === "failed") return "REFRESH FAILED · " + asOf
-  if (fresh.state === "overdue") return "UPDATE OVERDUE · " + asOf
+  if (fresh.state === "overdue") return "NOT UPDATING · " + asOf
   if (chartTrade || fresh.state === "aged" || fresh.state === "saved") return asOf
   return ""
 }
 
 function freshnessWarns(fresh) {
   return !!fresh && (fresh.state === "failed" || fresh.state === "overdue")
+}
+
+// Why prices stopped and when Stonks tries again, from the gate of the host
+// quotes come from (`Gate.qml`): its `pause`, "none" when nothing answered
+// or "refused", and `pausedUntil`, the second its next request may go, which
+// the service's clock wakes for. Null while the host answers: then Stonks
+// doesn't know why. A pause for no answer lasts 72 s at most, so it is said
+// in minutes, rounded up; a refusal's can last half an hour, so it names the
+// time on the reader's clock. `why` and `when` for the pill's hover, and as
+// one `sentence` for the window's header; `forms`, the panel's header, each
+// shorter than the one before, the last one fitting the panel at text size
+// 20 and still saying what happened and when. The words are the ones other
+// apps use for the same trouble (the owner, 28 October). No site is named:
+// not every reader knows Yahoo (the owner, 26 October).
+function hostPause(pause, pausedUntil, now) {
+  var left = pausedUntil - now
+  if (pause === "none") {
+    var minutes = Format.duration(Math.max(1, left))
+    var noAnswer = { why: "Can't connect. Check your internet.",
+      when: "Retrying in " + (left > 60 ? Math.ceil(left / 60) + " minutes." : "1 minute.") }
+    noAnswer.sentence = noAnswer.why + " " + noAnswer.when
+    noAnswer.forms = ["Can't connect · Retrying in " + minutes, "Can't connect · " + minutes]
+    return noAnswer
+  }
+  if (pause === "refused") {
+    var at = left > 0 ? Format.hhmm(pausedUntil, Format.readerOffset(pausedUntil)) : ""
+    var refused = { why: "The price server is busy.", when: at ? "Retrying at " + at + "." : "Retrying now." }
+    refused.sentence = refused.why + " " + refused.when
+    refused.forms = ["Server busy · Retrying " + (at ? "at " + at : "now"), at ? "Server busy · " + at : "Server busy · Retrying"]
+    return refused
+  }
+  return null
 }
 
 // The extended-hours line under the price: the newest print outside the
@@ -160,8 +192,9 @@ function extendedStack(quote, latest, now, day, changeMode) {
 }
 
 // What a day's chart says in words where it has almost nothing to draw:
-// no bar at all ("No trades charted": CVR on Friday 16 October, its last
-// trade Wednesday's), or one ("Traded only at 14:10": CKX's one bar, its
+// no bar at all ("No trades today": CVR on Friday 16 October, its last
+// trade Wednesday's; "No trades on Fri" once the chart shows an earlier
+// day), or one ("Traded only at 14:10": CKX's one bar, its
 // time where the listing trades, the zone named where the reader's
 // differs). A bar is five minutes of trades, so the words speak of the
 // chart, not of each trade. "" otherwise, and for an empty day before its
@@ -181,10 +214,12 @@ function dayNote(day, now, calendars) {
   if (pts.length === 1) return pts[0].t % (5 * 60) === 0 && over ? "Traded only at " + Market.printClock(day, pts[0].t, calendars) : ""
   if (pts.length > 1) return ""
   var regular = day.session.regular
-  if (!regular) return "No trades charted"
+  if (!regular) return "No trades today"
   var head = Quote.headlineQuote(day)
   var tradedToday = !!head && head.t !== null && head.t >= regular.start
-  return now < regular.start || tradedToday ? "" : "No trades charted"
+  if (now < regular.start || tradedToday) return ""
+  return exchangeDay(day, regular.start) === exchangeDay(day, now) ? "No trades today"
+    : "No trades on " + Format.WEEKDAYS[Format.localClock(regular.start, day.gmtoffset).weekday]
 }
 
 // The day a moment falls on in the quote's exchange, as a day count: two

@@ -316,7 +316,7 @@ FocusScope {
             anchors.rightMargin: Style.space(16)
             anchors.verticalCenter: parent.verticalCenter
             textFormat: Text.PlainText
-            text: "UNTICK TO REMOVE EVERYWHERE"
+            text: "UNCHECK TO REMOVE IT EVERYWHERE"
             color: root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption

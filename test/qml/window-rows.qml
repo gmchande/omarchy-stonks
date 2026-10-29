@@ -1057,14 +1057,14 @@ Harness {
       var action = function() { return String(harness.find(footer, "footerAction").text) }
       var good = harness.readFile(harness.dataPath)
       harness.writeFile(harness.dataPath, "{\n")
-      var said = within(5000, function() { return text() + action() === harness.fileNotice + " · fix or remove grvc.stonks.json" })
+      var said = within(5000, function() { return text() + action() === harness.fileNotice + " · fix or remove ~/.config/omarchy/grvc.stonks.json" })
       mouseClick(footer, footer.width / 2, footer.height / 2)
       harness.check("the window's footer says the data file can't be read and to fix or remove it, and a click on it does nothing",
         said && !body.adding, text() + action() + "|" + body.adding)
       var modeBefore = service.changeMode
       app.testKeyCatcher.forceActiveFocus()
       keyClick("c")
-      var unsaved = within(3000, function() { return text() + action() === "Your changes aren't saved · fix or remove grvc.stonks.json" })
+      var unsaved = within(3000, function() { return text() + action() === "Your changes aren't saved · fix or remove ~/.config/omarchy/grvc.stonks.json" })
       mouseClick(footer, footer.width / 2, footer.height / 2)
       harness.check("a change while the data file can't be read applies, the window's footer says it isn't saved and to fix or remove the file, a click on it does nothing, and the file is as it was",
         unsaved && service.changeMode !== modeBefore && !body.adding && harness.readFile(harness.dataPath) === "{\n",

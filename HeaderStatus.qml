@@ -15,7 +15,7 @@ import "Tones.js" as Tones
 // slot's in both looks, and the look is one small icon in both, so toggling
 // moves nothing. Each icon on the right says on hover what a click does,
 // in the shell's own tooltip, under the icon and inside the card, covering
-// what is there while the pointer rests: a popup hangs from a top bar, at
+// what is there while the pointer rests: a panel hangs from a top bar, at
 // the screen's top, with no room above. The animal has none.
 Item {
   id: root
@@ -48,6 +48,9 @@ Item {
   property var animal: ({ kind: "", chart: "", asleep: false, bell: false, scrubbed: false })
   property bool scrubbing: false
   property bool live: false
+  // The words say prices stopped (`StonksBody.troubleForms`): at full
+  // strength, so they stand out with no colour, since red says down.
+  property bool trouble: false
   // The surface is closing: the look icon's step and the animal's turn stop
   // where they are.
   property bool still: false
@@ -207,7 +210,7 @@ Item {
 
   // Asleep, a small dim "z" in cells over the animal's back, just past its
   // slot, coming in as the eyes shut. It sits at the header's top, never
-  // above it: the popup's body starts there and clips what draws past it.
+  // above it: the panel's body starts there and clips what draws past it.
   PixelSprite {
     objectName: "sleepCells"
     readonly property int cell: Math.floor(Math.min(slot.width / 20, slot.height / 14))
@@ -230,7 +233,7 @@ Item {
   // first word, and stop as much sooner, so their room is the same. The
   // first form that fits that room shows: with its letters spaced, else
   // closed up. Without this, beside the speaker and the camera, Tokyo's
-  // Constitution Memorial Day loses its name in the popup at the everyday
+  // Constitution Memorial Day loses its name in the panel at the everyday
   // text size, and after hours at size 16 loses its time.
   readonly property real wordsRoom: Math.max(0, soundIcon.x - Style.space(8) - statusWords.x
     - (root.offersRetry ? retry.implicitWidth + Style.space(16) : 0))
@@ -309,7 +312,7 @@ Item {
     y: root.titled ? titleText.y + titleText.implicitHeight + Style.space(2) : Math.round((root.contentHeight - implicitHeight) / 2)
     textFormat: Text.PlainText
     text: root.measured.length ? root.measured[root.fit.form].words : ""
-    color: root.scrubbing || root.live ? root.foreground : root.dim
+    color: root.scrubbing || root.live || root.trouble ? root.foreground : root.dim
     font.family: root.fontFamily
     font.pixelSize: Style.font.caption
     font.bold: true
@@ -476,7 +479,7 @@ Item {
   }
 
   // Inset by its fill's margin, so the pressed fill ends on the header's
-  // edge: the popup clips anything past it.
+  // edge: the panel clips anything past it.
   Text {
     id: helpMark
     objectName: "helpMark"

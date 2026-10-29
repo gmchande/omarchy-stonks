@@ -4,7 +4,7 @@ import qs.Commons as Commons
 import "Tones.js" as Tones
 // Up and down, from the current theme: its green and the shell's urgent, its
 // red, or Stonks' own pair where the two are no pair (`Tones.trend`). Each
-// surface asks for its own ground, as a light bar under a dark popup takes
+// surface asks for its own ground, as a light bar under a dark panel takes
 // the other pair. The shell's Color keeps only five roles, so the green is
 // read from the theme's colors.toml here.
 Item {
