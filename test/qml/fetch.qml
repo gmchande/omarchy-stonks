@@ -20,11 +20,12 @@ import "plugin" as Stonks
 // across Friday 23 October's open, from Yahoo's answers either side of it.
 Harness {
   id: harness
-  marker: mode === "main" ? "FETCH DONE" : mode === "holiday" ? "FETCH HOLIDAY DONE" : "FETCH BELL DONE"
+  marker: mode === "main" ? "FETCH DONE" : mode === "holiday" ? "FETCH HOLIDAY DONE" : mode === "bell" ? "FETCH BELL DONE" : "FETCH COLD DONE"
 
   readonly property string mode: Quickshell.env("STONKS_FETCH_RUN") || "main"
   readonly property string state: Quickshell.env("STONKS_FAKE_STATE")
-  readonly property var listed: mode === "bell" ? ["AAPL", "^GSPC"] : ["NEST", "KILN", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T", "SHOP.TO"]
+  readonly property var listed: mode === "bell" ? ["AAPL", "^GSPC"] : mode === "cold" ? ["LATE", "FAIL"]
+    : ["NEST", "KILN", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T", "SHOP.TO"]
   // Midnight starting Wednesday 7 October and Saturday 10 October in New York.
   readonly property int wed7: 1791345600
   readonly property int sat10: 1791604800
@@ -1403,6 +1404,43 @@ Harness {
           && postAsks.length > 0 && postAsks.every(function(l) { return / 1d$/.test(l) }),
         "before: " + preAsks.join(" / ") + "; after: " + postAsks.join(" / "))
       closeWindow()
+      harness.finish()
+    }
+
+    // LATE on the pill, its price saved. FAIL is added, its first answer
+    // held, and LATE's next price comes with the save due: the save waits
+    // for FAIL. Every price fails before FAIL's ask settles, LATE's next
+    // asks and FAIL's, and the save still keeps LATE's newer price, which a
+    // start offline shows.
+    function test_cold() {
+      if (harness.mode !== "cold") skip("another run")
+      tryVerify(function() { return !!service.entries.LATE && service.entries.LATE.status === "ok" && idle() && !!harness.cached().LATE }, 10000)
+      tick(30)
+      runCommand(["touch", harness.state + "/FAIL.quote.hold"])
+      service.addSymbol("FAIL")
+      var failOut = within(3000, function() { return "FAIL" in service.asked && service.testFeed.landing.length === 1 })
+      // A newer price than the one saved, due to be saved.
+      service.quotesSavedAt = service.now - 10 * 60
+      service.quotesUnsaved = true
+      service.testFeed.ask(["LATE"], service.now)
+      var lateIn = within(5000, function() { return !("LATE" in service.asked) && service.entries.LATE.receivedAt === service.now })
+      var newer = service.entries.LATE.receivedAt
+      var savedWhileFailOut = harness.cached().LATE.receivedAt
+      runCommand(["touch", harness.state + "/LATE.down"])
+      var lateFailed = within(20000, function() {
+        service.now += 5
+        return service.entries.LATE.status === "failed"
+      })
+      runCommand(["rm", "-f", harness.state + "/FAIL.quote.hold"])
+      var failFailed = within(20000, function() {
+        service.now += 5
+        return !!service.entries.FAIL && service.entries.FAIL.status === "failed" && !("FAIL" in service.asked) && idle()
+      })
+      service.now += 1
+      var saved = harness.cached().LATE
+      harness.check("a save that waited while every price failed keeps the newer price that came, for a start offline",
+        failOut && lateIn && savedWhileFailOut < newer && lateFailed && failFailed && !!saved && saved.receivedAt === newer,
+        [failOut, lateIn, savedWhileFailOut < newer, lateFailed, failFailed].join(",") + " | LATE saved from " + (saved ? saved.receivedAt : "nothing") + ", its newer price " + newer)
       harness.finish()
     }
   }

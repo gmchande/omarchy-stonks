@@ -975,6 +975,7 @@ Item {
   // from them; and the pill's first live answer asks Robinhood for it
   // (`askOvernight`).
   onEntriesChanged: {
+    if (!root.answeredOnce) root.answeredOnce = Object.keys(feed.entries).some(function(s) { return feed.entries[s].status === "ok" })
     settleArrivals()
     Qt.callLater(flushQuotes)
     Qt.callLater(answersLanded)
@@ -1098,11 +1099,13 @@ Item {
   property bool quotesUnsaved: false
   property int quotesSavedAt: 0
   property var saveWaitsFor: null
+  // An answer has come this session, though every price may have failed
+  // since: what did come is still saved.
+  property bool answeredOnce: false
 
   function flushQuotes() {
     if (!root.quotesUnsaved || (root.quotesSavedAt && root.now - root.quotesSavedAt < 10 * 60)) return
-    if (root.opening || root.drawing.length > 0) return
-    if (!Object.keys(feed.entries).some(function(s) { return feed.entries[s].status === "ok" })) return
+    if (!root.answeredOnce || root.opening || root.drawing.length > 0) return
     if (!root.saveWaitsFor) root.saveWaitsFor = { runs: feed.landing.slice(), asked: Object.assign({}, feed.asked) }
     var waits = root.saveWaitsFor
     var answering = !yahooGate.paused && !root.screensOff
