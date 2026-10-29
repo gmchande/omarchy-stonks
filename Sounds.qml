@@ -466,9 +466,11 @@ Item {
   }
 
   // A byte past 4 MB is read, so an answer that reaches the cap shows it.
+  // omarchy-shell's -q would hide the answer too, so its errors go nowhere
+  // instead.
   Process {
     id: listening
-    command: ["bash", "-c", "[ \"$(timeout -k 1 2 omarchy-shell -q notifications dndState)\" = on ] && exit 1\n"
+    command: ["bash", "-c", "[ \"$(timeout -k 1 2 omarchy-shell notifications dndState 2> /dev/null)\" = on ] && exit 1\n"
       + "set -o pipefail; timeout -k 1 3 pw-dump | head -c 4000001"]
     stdout: StdioCollector { id: answer }
     onExited: function(code) {
