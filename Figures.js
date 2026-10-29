@@ -437,16 +437,19 @@ function closeLine(quote, today, changeMode, newest) {
 // The newest price's session and time (`newest`, { t, phase }), with its
 // day where the listing trades when it isn't `now`'s: "OVERNIGHT 23:25",
 // "AFTER HOURS FRI 19:55"; on a longer range after what its move is
-// measured over (`period`, "1W"), "1W · OVERNIGHT 23:25", so the range's
-// move never reads as the night's. Each form shorter than the one before,
-// for a caption with no room for the one before: then without the day.
+// measured over (`period`, "1W", or "SINCE OPEN"), "1W · OVERNIGHT 23:25",
+// so the range's move never reads as the night's. Each form shorter than
+// the one before, for a caption with no room for the one before: then
+// without the day, then, with a period, the period alone, which says what
+// the move is measured over.
 // Upper case for the hero's caption; the rows and the pill's hover say it
 // in sentence case (`newestNote`).
 function newestCaptions(quote, newest, now, calendars, period) {
   var label = (period ? period + " · " : "") + (newest.phase === "overnight" ? "OVERNIGHT" : newest.phase === "post" ? "AFTER HOURS" : "PRE-MARKET")
   var clock = Market.printClock(quote, newest.t, calendars)
   var day = Market.printDay(quote, newest.t, now, calendars).toUpperCase()
-  return [label + " " + day + clock, label + " " + clock]
+  var forms = [label + " " + day + clock, label + " " + clock]
+  return period ? forms.concat([period]) : forms
 }
 
 // The newest price's session and time as a row's name line and the pill's

@@ -1861,7 +1861,10 @@ test("in every phase, a stock that has traded since its close shows that newest 
   {
     const at = topsAt("watch-2026-10-26-1800")
     const open = M.rowModel(at.quotes.NBIS, 0, "open", at.newest.NBIS)
-    expect(M.newestCaptions(at.quotes.NBIS, open.newest, at.now, calendars, open.periodLabel)[0]).toBe("SINCE OPEN · AFTER HOURS 17:58")
+    // Where no form with the time fits beside the line under the price,
+    // SINCE OPEN alone.
+    expect(M.newestCaptions(at.quotes.NBIS, open.newest, at.now, calendars, open.periodLabel))
+      .toEqual(["SINCE OPEN · AFTER HOURS 17:58", "SINCE OPEN · AFTER HOURS 17:58", "SINCE OPEN"])
     expect(M.rowModel(at.quotes.NBIS, 0, "pct", at.newest.NBIS).periodLabel).toBe("")
   }
   // Sunday 23:35, the list sorted by change and its up and down count read
