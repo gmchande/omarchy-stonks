@@ -130,7 +130,7 @@ Harness {
   }
   readonly property string dataPath: Quickshell.env("HOME") + "/.config/omarchy/grvc.stonks.json"
   readonly property string manifestPath: String(Qt.resolvedUrl("plugin/manifest.json")).replace(/^file:\/\//, "")
-  readonly property string hintStart: "Drag the pill to move it along the bar"
+  readonly property string hintStart: "Drag the pill in your bar to move it"
   readonly property string fileNotice: "Couldn't load your lists"
   readonly property string updateNotice: "Updated to 9.9.9 · click to restart the shell"
 
