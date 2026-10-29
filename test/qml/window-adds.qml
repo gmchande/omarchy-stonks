@@ -92,7 +92,8 @@ Harness {
         "Ctrl+Z " + byU + " | PUT BACK " + byClick + " | adding " + body.adding)
     }
 
-    // Search open with its answer (the saved SHOP results) in the rows' place.
+    // Search open with its answer to SH (the saved SHOP results) in the
+    // rows' place: an earlier answer, to S, may land first.
     function searchShop(body, keys) {
       keys.forceActiveFocus()
       keyClick(Qt.Key_A)
@@ -100,8 +101,27 @@ Harness {
       keyClick(Qt.Key_S)
       keyClick(Qt.Key_H)
       tryVerify(function() {
-        return body.search.results.length > 1 && findAll(body.search, "searchResult").length >= body.search.results.length
+        return body.search.resultsQuery.toUpperCase() === "SH" && !body.search.stale
+          && body.search.results.length > 1 && shownResults(body).length === body.search.results.length
       }, 3000)
+    }
+
+    // The result rows on screen, top first, or none until each result has
+    // one row, laid out in order. findAll lists rows in the order they were
+    // made, and a new answer's rows sit below the last answer's until those
+    // go.
+    function shownResults(body) {
+      var results = body.search.results
+      var made = findAll(body.search, "searchResult")
+      var rows = []
+      made.forEach(function(r) { if (results[r.index] && results[r.index].symbol === r.modelData.symbol) rows[r.index] = r })
+      var ready = made.length === results.length && rows.filter(function(r) { return !!r }).length === results.length
+        && rows.every(function(r, i) { return i === 0 || r.y > rows[i - 1].y })
+      return ready ? rows : []
+    }
+
+    function shownResult(body, symbol) {
+      return shownResults(body).filter(function(r) { return r.modelData.symbol === symbol })[0]
     }
 
     // Picks `symbol` by keys and returns the word its result said.
@@ -189,14 +209,14 @@ Harness {
       // fails), and for one already in it, the keyboard's choice on another
       // result. The 200 ms after the hero lands is the second click's time
       // to do harm.
-      var doublePick = function(index, symbol) {
+      var doublePick = function(symbol) {
         service.feature(watchlist.displayedSymbols[3])
         tryVerify(function() { return rested(body) }, 2000)
         var heroes = []
         var watchHero = function() { heroes.push(service.featuredSymbol) }
         service.dataSettingsChanged.connect(watchHero)
         searchShop(body, keys)
-        var result = findAll(body.search, "searchResult")[index]
+        var result = shownResult(body, symbol)
         var at = result.mapToItem(body, result.width / 4, result.height / 2)
         mouseDoubleClickSequence(body, at.x, at.y)
         within(1500, function() { return service.featuredSymbol === symbol })
@@ -206,7 +226,7 @@ Harness {
         mouseMove(body, 1, 1)
         return hero + ":" + heroes.filter(function(h, i) { return i === 0 || h !== heroes[i - 1] }).join(">")
       }
-      var newPick = doublePick(0, "SHOP")
+      var newPick = doublePick("SHOP")
       service.removeSymbol("SHOP")
       service.removeSymbol("SHOP.TO")
       tryVerify(quiet, 5000)
@@ -217,7 +237,7 @@ Harness {
       tryVerify(function() { return !!service.quotes["SHOP.TO"] }, 5000)
       service.setMembership("SHOP.TO", "Mid3", false)
       tryVerify(function() { return watchlist.displayedSymbols.indexOf("SHOP.TO") < 0 && rested(body) }, 2000)
-      var knownPick = doublePick(1, "SHOP.TO")
+      var knownPick = doublePick("SHOP.TO")
       check("a double-click on a result adds it once and features no row under it, new to All and already in it",
         newPick === "SHOP:SHOP" && knownPick === "SHOP.TO:SHOP.TO",
         newPick + " | " + knownPick)
@@ -267,7 +287,7 @@ Harness {
       keyClick(Qt.Key_Down)
       keyClick(Qt.Key_Down)
       var arrivingShow = [service.arriving.indexOf("SHHI.NE") >= 0,
-        find(findAll(body.search, "searchResult")[2], "searchAdd").children[0].text].join(",")
+        find(shownResult(body, "SHHI.NE"), "searchAdd").children[0].text].join(",")
       keyClick(Qt.Key_Return)
       within(12000, function() {
         return !!service.entries["SHHI.NE"] && service.entries["SHHI.NE"].status === "failed" && watchlist.cursorRow === "SHHI.NE"
@@ -288,7 +308,7 @@ Harness {
       tryVerify(function() { return rested(body) }, 2000)
       var library = service.library.join(",")
       searchShop(body, keys)
-      var results = findAll(body.search, "searchResult").filter(function(r, i, all) { return all.indexOf(r) === i })
+      var results = shownResults(body)
       var words = results.map(function(r) { return find(r, "searchAdd").children[0].text })
       keyClick(Qt.Key_Down)
       keyClick(Qt.Key_Down)
@@ -310,7 +330,7 @@ Harness {
       pickSymbol(body, keys, "FLAKY")
       var waiting = [body.landing, service.arriving.indexOf("FLAKY") >= 0].join(",")
       searchShop(body, keys)
-      var shownWord = find(findAll(body.search, "searchResult")[0], "searchAdd").children[0].text
+      var shownWord = find(shownResults(body)[0], "searchAdd").children[0].text
       keyClick(Qt.Key_Return)
       within(1000, function() { return !body.adding })
       var shownFirst = [shownWord, service.featuredSymbol, body.adding].join(",")
@@ -417,25 +437,37 @@ Harness {
         tryVerify(function() { return watchlist.displayedSymbols.indexOf("SLOW") < 0 && rested(body) }, 2000)
         watchlist.contentY = wheel === "before" ? watchlist.rowPitch : 0
         var wheeled = false
+        var turned = false
         var destination = "SLOW"
         var beforeArrival = function() {
           if (wheel !== "before" || wheeled || !service.quotes.SLOW) return
           wheeled = true
           watchlist.wheelBy(-1)
         }
+        // The wheel turns as the joined row glides in: a turn after the
+        // join, whose own glide to the row starts after it says so. The
+        // join comes a turn or more after the quote, later under load.
+        var duringLanding = function() {
+          if (wheel !== "during" || !body.landingJoined) return
+          Qt.callLater(function() {
+            if (turned) return
+            turned = true
+            wheeled = body.landing === "SLOW"
+            watchlist.wheelBy(1)
+            destination = watchlist.displayedSymbols[Math.round(watchlist.wheelTarget() / watchlist.rowPitch)]
+            var next = Object.assign({}, service.testFeed.quotes)
+            next.DOWN = Object.assign({}, next.DOWN, { price: next.DOWN.price + 0.01 })
+            service.testFeed.quotes = next
+          })
+        }
         service.quotesChanged.connect(beforeArrival)
+        body.landingJoinedChanged.connect(duringLanding)
         pickSymbol(body, keys, "SLOW")
         tryVerify(function() { return !!service.quotes.SLOW && service.arriving.indexOf("SLOW") < 0 }, 5000)
-        if (wheel === "during") {
-          wheeled = body.landing === "SLOW" && body.landingJoined
-          watchlist.wheelBy(1)
-          destination = watchlist.displayedSymbols[Math.round(watchlist.wheelTarget() / watchlist.rowPitch)]
-          var next = Object.assign({}, service.testFeed.quotes)
-          next.DOWN = Object.assign({}, next.DOWN, { price: next.DOWN.price + 0.01 })
-          service.testFeed.quotes = next
-        }
+        if (wheel === "during") tryVerify(function() { return turned }, 5000)
         within(3000, function() { return rested(body) })
         service.quotesChanged.disconnect(beforeArrival)
+        body.landingJoinedChanged.disconnect(duringLanding)
         var kept = service.featuredSymbol === "SLOW" && watchlist.displayedSymbols.indexOf("SLOW") === 3
           && (wheel === "" || wheeled) && firstWholeSymbol() === destination
         return kept ? "true" : [service.featuredSymbol, wheeled, firstWholeSymbol(), destination].join("/")

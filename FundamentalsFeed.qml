@@ -25,25 +25,46 @@ Item {
   property string pendingUrl: ""
   // The gate's ticket the request out was let through on (`Gate.report`).
   property int ticket: 0
-  // The symbol, and its price's currency, to fetch once the one under way is
-  // done.
-  property string wanted: ""
-  property string wantedCurrency: ""
-  // The fetch under way: { symbol, currency, step, figures, pair }, step
-  // "series", "close", or "rate", figures null until the series are in.
+  // What waits for the fetch under way, in the order asked: one ask for
+  // each asker (`Service.fetchFundamentals`), { asker, symbol, currency }.
+  // An asker's new ask replaces its last, whose symbol it no longer shows,
+  // and never another's: the stock on show waits behind search's preview.
+  // Two askers may wait for one symbol, which one fetch answers.
+  property var waiting: []
+  // The fetch under way: { symbol, currency, step, figures, pair, askers },
+  // step "series", "close", or "rate", figures null until the series are
+  // in, askers those it answers.
   property var job: null
 
-  readonly property bool busy: job !== null || wanted !== ""
+  readonly property bool busy: job !== null || waiting.length > 0
   readonly property int day: 24 * 60 * 60
 
-  function fetch(symbol, currency) {
+  function fetch(symbol, currency, asker) {
     var normalized = String(symbol || "").toUpperCase()
-    if (!normalized || (job && job.symbol === normalized)) return
+    if (!normalized) return
+    var others = waiting.filter(function(w) { return w.asker !== asker })
     var current = root.fresh(normalized)
-    if (current && root.rateHeld(Fundamentals.ratePair(current.figures, currency))) return
-    root.wanted = normalized
-    root.wantedCurrency = String(currency || "")
+    var underWay = !!job && job.symbol === normalized
+    if (underWay && job.askers.indexOf(asker) < 0) root.job = Object.assign({}, job, { askers: job.askers.concat([asker]) })
+    var needless = underWay || (current && root.rateHeld(Fundamentals.ratePair(current.figures, currency)))
+    root.waiting = needless ? others
+      : others.concat([{ asker: asker, symbol: normalized, currency: String(currency || "") }])
     root.launch()
+  }
+
+  // An asker no screen shows any more takes back what it waits for, and a
+  // series not yet sent that no other asker wants, which waits on the
+  // screens' answer; one sent still lands.
+  function withdraw(asker) {
+    var left = waiting.filter(function(w) { return w.asker !== asker })
+    if (left.length !== waiting.length) root.waiting = left
+    if (!job || !pendingUrl || job.step !== "series" || job.askers.indexOf(asker) < 0) return
+    var askers = job.askers.filter(function(a) { return a !== asker })
+    if (askers.length) {
+      root.job = Object.assign({}, job, { askers: askers })
+      return
+    }
+    root.done()
   }
 
   function nowSecond() {
@@ -62,10 +83,12 @@ Item {
   }
 
   function launch() {
-    if (job || !wanted) return
-    var current = root.fresh(wanted)
-    root.job = { symbol: wanted, currency: wantedCurrency, step: "series", figures: null, pair: "" }
-    root.wanted = ""
+    if (job || !waiting.length) return
+    var next = waiting[0]
+    var askers = waiting.filter(function(w) { return w.symbol === next.symbol }).map(function(w) { return w.asker })
+    root.waiting = waiting.filter(function(w) { return w.symbol !== next.symbol })
+    var current = root.fresh(next.symbol)
+    root.job = { symbol: next.symbol, currency: next.currency, step: "series", figures: null, pair: "", askers: askers }
     if (current) root.askRate(current.figures)
     else root.run(Fundamentals.fundamentalsUrl(job.symbol, root.nowSecond()))
   }
