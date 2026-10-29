@@ -128,12 +128,14 @@ every_state() (
     states="$states popup-sweep-$moment-smooth popup-sweep-$moment-retro"
   done
   # NBIS on Sunday night and Monday evening on 1W, 1M and 1Y: each range's
-  # line ends on the newest price, the one on top.
+  # line ends on the newest price, the one on top. And its longest caption,
+  # YTD after hours at the weekend, at text size 16.
   for moment in watch-2026-10-25-2335 watch-2026-10-26-2005; do
     for range in 1w 1m 1y; do
       states="$states popup-sweep-$moment-nbis-$range-smooth popup-sweep-$moment-nbis-$range-retro"
     done
   done
+  states="$states popup-sweep-watch-2026-10-25-1000-nbis-ytd-smooth-size-16 popup-sweep-watch-2026-10-25-1000-nbis-ytd-retro-size-16"
   # A thin stock's day, fewer prints than the chart's columns, and its 3M,
   # in both looks on both surfaces: retro lights every column the line joins.
   for look in smooth retro; do

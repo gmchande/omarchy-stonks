@@ -489,8 +489,8 @@ function historyScrubForms(history, bar, digits) {
 
 // The range's price and move, as the hero shows it: a scrubbed bar's, else
 // the price on top, the newest since the close where the line ends on it
-// (`newestBar`), its session and time said as on the day (`newest`, with no
-// period said under the move), else the headline's. Each measured from the
+// (`newestBar`), its session and time said after the range's name
+// (`newest`), else the headline's. Each measured from the
 // range's start (`baseline`).
 function historyRowModel(history, quote, scrubT) {
   if (!history) return null
@@ -516,8 +516,8 @@ function historyRowModel(history, quote, scrubT) {
     // What the change is measured over, said under it the way AT CLOSE is:
     // the range, or, for a listing younger than a range short of All, the
     // day it began trading. With the newest price on top, its session and
-    // time are said there instead (`Hero.changeCaption`).
-    periodLabel: tail ? "" : stats.coverage.short && history.range !== "All"
+    // time follow (`Figures.newestCaptions`).
+    periodLabel: stats.coverage.short && history.range !== "All"
       ? "SINCE " + historyStatsDateText(history, history.firstTradeDate, true, "1d")
       : String(history.range || "").toUpperCase(),
     newest: tail ? { t: tail.t, p: tail.c, phase: tail.newest } : null

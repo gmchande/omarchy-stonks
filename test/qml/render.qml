@@ -205,8 +205,8 @@ Harness {
     if (match) return { moment: match[1], symbol: match[2] === "gspc" ? "^GSPC" : match[2].toUpperCase(), month: false, scrub: false,
       dated: true, sweep: true }
     // A saved moment's listing on a range: its history saved for that
-    // moment in history/<file>-<moment>-<5d|1mo|1y>.json.
-    match = /^(?:popup|window)-sweep-([a-z]+-(\d{4}-\d\d-\d\d-\d{4}))-([a-z0-9.^-]+?)(?:-(1w|1m|1y))?-(smooth|retro)$/.exec(stateName)
+    // moment in history/<file>-<moment>-<5d|1mo|ytd|1y>.json.
+    match = /^(?:popup|window)-sweep-([a-z]+-(\d{4}-\d\d-\d\d-\d{4}))-([a-z0-9.^-]+?)(?:-(1w|1m|ytd|1y))?-(smooth|retro)$/.exec(stateName)
     if (match) return { moment: match[2], folder: match[1], file: match[3], month: false, scrub: false, dated: true, sweep: true,
       range: match[4] ? match[4].toUpperCase() : "",
       saved: String(Quickshell.env("STONKS_VISUAL_SAVED") || "").split(" ").filter(function(f) { return f !== "" }) }
@@ -598,7 +598,7 @@ Harness {
       if (root.overnight.range) {
         var kept = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', root)
         kept.path = fixtureDir + "/history/" + root.overnight.file + "-" + root.overnight.moment + "-"
-          + { "1W": "5d", "1M": "1mo", "1Y": "1y" }[root.overnight.range] + ".json"
+          + { "1W": "5d", "1M": "1mo", "YTD": "ytd", "1Y": "1y" }[root.overnight.range] + ".json"
         root.shownRange = root.overnight.range
         root.shownHistoryEntry = { status: "ok", history: History.parseHistory(JSON.parse(kept.text()), root.overnight.range), receivedAt: root.now }
         kept.destroy()

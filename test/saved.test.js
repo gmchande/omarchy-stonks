@@ -1822,10 +1822,11 @@ test("in every phase, a stock that has traded since its close shows that newest 
   expect(M.newestNote(sunday.quotes.PSIX, sunday.newest.PSIX, sunday.now, calendars)).toBe("After hours Fri 19:00")
   // On 1W, 1M and 1Y too, NBIS's line ends on its newest price, the price
   // on top, as Robinhood's ranges did at 20:00 on 28 October: the move from
-  // the range's start to it, its session and time said as on the day, a
-  // scrub at the line's end reading it, and the range's low taking it. The
-  // range's volume stays Yahoo's bars'.
-  for (const [set, moment] of [["watch-2026-10-25-2335", "2026-10-25-2335"], ["watch-2026-10-26-2005", "2026-10-26-2005"]]) {
+  // the range's start to it, said under it by the range's name and then the
+  // price's session and time, so the week's move never reads as the
+  // night's beside the row's; a scrub at the line's end reading it, and the
+  // range's low taking it. The range's volume stays Yahoo's bars'.
+  for (const [set, moment, when] of [["watch-2026-10-25-2335", "2026-10-25-2335", "OVERNIGHT 23:30"], ["watch-2026-10-26-2005", "2026-10-26-2005", "OVERNIGHT 20:00"]]) {
     const at = topsAt(set)
     const top = M.rowModel(at.quotes.NBIS, 0, "pct", at.newest.NBIS)
     for (const [range, span] of [["1W", "5d"], ["1M", "1mo"], ["1Y", "1y"]]) {
@@ -1835,7 +1836,8 @@ test("in every phase, a stock that has traded since its close shows that newest 
       const history = chart.history
       const model = M.historyRowModel(history, at.quotes.NBIS, 0)
       const line = M.historyGeometry(history).points
-      expect([where, model.priceText, model.newest, model.periodLabel, line.at(-1).p]).toEqual([where, top.priceText, at.newest.NBIS, "", at.newest.NBIS.p])
+      expect([where, model.priceText, model.newest, line.at(-1).p]).toEqual([where, top.priceText, at.newest.NBIS, at.newest.NBIS.p])
+      expect([where, M.newestCaptions(at.quotes.NBIS, model.newest, at.now, calendars, model.periodLabel)[0]]).toEqual([where, `${range} · ${when}`])
       expect([where, model.changeText]).toEqual([where, M.pct((at.newest.NBIS.p - raw.baseline) / raw.baseline * 100)])
       expect([where, M.historyRowModel(history, at.quotes.NBIS, at.newest.NBIS.t).priceText]).toEqual([where, top.priceText])
       expect([where, M.rangeVolume(history)]).toEqual([where, M.rangeVolume(raw)])
@@ -2457,7 +2459,7 @@ test("on 1M at night the line ends on the night's price, the one on top", () => 
     { NEST: { status: "ok", ...prints.NEST } }, { NEST: { status: "ok", allDay: true, at: 0 } }, calendars)
   expect(chart.history.bars.slice(0, -1)).toEqual(history.bars)
   expect(chart.history.bars.at(-1)).toMatchObject({ c: 245.47, newest: "overnight" })
-  expect(M.historyRowModel(chart.history, chart.quote, 0)).toMatchObject({ priceText: "245.47", periodLabel: "" })
+  expect(M.historyRowModel(chart.history, chart.quote, 0)).toMatchObject({ priceText: "245.47", periodLabel: "1M" })
 })
 
 test("after the close a scrub to the bell reads the close at 16:00, an index's and a stock's, and the after-hours its own print", () => {

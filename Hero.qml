@@ -89,9 +89,11 @@ Item {
   }
   readonly property real listingRoom: Math.max(0, listingRow.width - symbolText.implicitWidth - Style.space(8))
   // Under the change: with the newest price on top, its session and time,
-  // the day dropped where the line under the price leaves no room for it
-  // (`Figures.newestCaptions`); else what the change is measured from.
-  readonly property var newestCaptions: newest ? Figures.newestCaptions(quote, newest, now, calendars) : null
+  // after the range's name on a longer range, the day dropped where the
+  // line under the price leaves no room for it (`Figures.newestCaptions`);
+  // else what the change is measured from.
+  readonly property var newestCaptions: newest
+    ? Figures.newestCaptions(quote, newest, now, calendars, view && view.periodLabel ? view.periodLabel : "") : null
   readonly property string changeCaption: {
     if (!newestCaptions) return view && view.periodLabel ? view.periodLabel : (extended !== null ? "AT CLOSE" : "")
     var font = captionMetrics.font // read, so a new text size measures again
