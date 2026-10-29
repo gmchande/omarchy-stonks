@@ -291,11 +291,12 @@ Harness {
     readonly property var view: ({ featured: featuredSymbol, range: range, list: listName, listKey: "=" + listName,
       order: order, reversed: reversed, rows: symbols, shown: Settings.sortedSymbols(symbols, quotes, order, reversed, changeMode),
       library: library, chart: Chart.viewChart(featuredSymbol, range, quotes, entries, histories, nights,
-        { NEST: { status: "ok", allDay: true, at: 0 } }, featuredSymbol === "NEST" ? nightCalendars : null) })
+        allDay, featuredSymbol === "NEST" ? nightCalendars : null) })
     // NEST's prints, and the calendars its chart's day reads; only NEST has
     // them, Robinhood trading it all day, so no other symbol waits on
     // Robinhood, and the body's own calendars stay null.
     property var nights: ({})
+    property var allDay: ({ NEST: { status: "ok", allDay: true, at: 0 } })
     property var nightCalendars: null
     property bool retro: false
     property color foreground: "#cacccc"
@@ -484,8 +485,8 @@ Harness {
           { symbol: "SHEL.L", range: "1D", history: null, figures: root.figures("shel-l") },
           { symbol: "SHIB-USD", range: "1D", history: null, figures: null },
           { symbol: "BRK-A", range: "1D", history: null, figures: null },
-          // 1M with an overnight print under the price.
-          { symbol: "NEST", range: "1M", history: month, figures: null, line: "OVERNIGHT" }
+          // 1M at night: the night's price on top, the close under it.
+          { symbol: "NEST", range: "1M", history: month, figures: null, line: "CLOSE" }
         ]
         // Both info lines whole: every cell of each drawn in full, none
         // overlapping the next or the rule, none past the block's edge, and
@@ -753,12 +754,15 @@ Harness {
                 } else if ((r[0] === "1Y" ? yearAs(said, where) : said) !== onDay[where]) shifted.push(where + " " + r[0] + ": " + said + ", on 1D " + onDay[where])
                 var short = shortOfEdge()
                 if (short) unreached.push(where + " " + r[0] + ": " + short)
-                var marked = marksFault(r[1])
+                var marked = marksFault(r[1] ? body.history : null)
                 if (marked) unmarked.push(where + " " + r[0] + ": " + marked)
                 if (r[1]) {
                   var caption = find(body, "changeCaption")
                   var strip = find(body, "extendedLine")
-                  var want = r[1] === youngMonth ? /^SINCE \d{1,2} [A-Z]{3} \d{4}$/ : new RegExp("^" + r[0].toUpperCase() + "$")
+                  // With the night's price on top, its session and time
+                  // follow the range's name (`Figures.newestCaptions`).
+                  var period = r[1] === youngMonth ? "SINCE \\d{1,2} [A-Z]{3} \\d{4}" : r[0].toUpperCase()
+                  var want = new RegExp("^" + period + "( · (OVERNIGHT|AFTER HOURS|PRE-MARKET) .+)?$")
                   if (!want.test(caption.text) || (strip.visible && xIn(strip, strip.width) >= xIn(caption, 0)))
                     captions.push(where + " " + r[0] + " says \"" + caption.text + "\" from " + xIn(caption, 0)
                       + (strip.visible ? ", the line under the price ending at " + xIn(strip, strip.width) : ""))

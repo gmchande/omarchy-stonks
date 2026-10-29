@@ -102,6 +102,8 @@ Harness {
     property var lists: [{ name: "", label: "All", count: symbols.length, symbols: symbols }]
     property var quotes: ({})
     property var newestPrints: ({})
+    property var nights: ({})
+    property var allDay: ({})
     property var entries: ({})
     property var calendars: null
     property string featuredSymbol: ""

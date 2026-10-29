@@ -1798,11 +1798,22 @@ test("in every phase, a stock that has traded since its close shows that newest 
     expect([set, ...expected.map(e => e.split(" ")[0] + " " + at.top(e.split(" ")[0]))]).toEqual([set, ...expected])
     for (const s of ["BRK-A", "^GSPC", "BTC-USD", "SHEL.L", "7203.T", "SHOP.TO"]) expect([set, s, at.newest[s]]).toEqual([set, s, undefined])
     // The panel reads the newest price from its chart's newest print, the
-    // rows and the pill from the list's: the same one.
+    // rows and the pill from the list's: the same one. A row's line and the
+    // pill's draw the day the 1D chart does.
     for (const s of at.symbols) {
       const view = M.viewChart(s, "1D", at.quotes, {}, {}, at.nights, at.allDay, calendars)
       expect([set, s, M.newestPrint(at.quotes[s], view.latest, calendars)]).toEqual([set, s, at.newest[s] || null])
+      expect([set, s, M.dayDrawn(at.quotes[s], at.nights[s], at.allDay[s], calendars).day]).toEqual([set, s, view.day])
     }
+  }
+  // Sunday 23:35: JNJ's row and pill draw tonight's trades, ending on its
+  // newest price above Friday's close, beside its +0.11%, not Friday's day,
+  // which fell 1.42%.
+  {
+    const at = topsAt("watch-2026-10-25-2335")
+    const day = M.dayDrawn(at.quotes.JNJ, at.nights.JNJ, at.allDay.JNJ, calendars).day
+    const line = M.chartGeometry(day, calendars)
+    expect([day.points.at(-1).p, line.points.at(-1).y < line.baselineY]).toEqual([264.11, true])
   }
   // Sunday 23:35, the list sorted by change and its up and down count read
   // the price on top: NBIS, −3.92% tonight, is the list's worst, though

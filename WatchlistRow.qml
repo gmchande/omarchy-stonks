@@ -77,10 +77,12 @@ Rectangle {
   signal dragEnded()
   signal dragCanceled()
 
-  // The day line is the quote's own drawing: it changes when the quote does,
-  // never with the clock, the change mode, or another symbol's quote. A day
-  // with no print leaves the cell empty: the hero alone draws its baseline.
-  readonly property var geometry: quote && quote.points.length ? Chart.chartGeometry(quote, calendars) : null
+  // The day line is the day the 1D chart draws (`day`, `Chart.dayDrawn`):
+  // it changes when the quote or Robinhood's answer does, never with the
+  // clock, the change mode, or another symbol's quote. A day with no print
+  // leaves the cell empty: the hero alone draws its baseline.
+  property var day: null
+  readonly property var geometry: day && day.points.length ? Chart.chartGeometry(day, calendars) : null
 
   readonly property color trend: !view || view.tone === "flat" ? dim : view.tone === "up" ? upColor : downColor
   // What the feed has done for this symbol, from Figures.freshness. A failed

@@ -460,9 +460,11 @@ function parseChart(json, centExchanges, receivedAt) {
 // its dashed line and the day's figures read the same 24 hours, the rows
 // and the pill too (`rolling`). Its low and high are its bars' (`bars`)
 // since then, which a close can miss; unknown from an answer without
-// them, spark's. One continuous session. Null for an answer that doesn't
-// reach back 24 hours, as a one-day answer may not, whose quote stays
-// Yahoo's UTC day.
+// them, spark's. Its volume stays Yahoo's `regularMarketVolume`, which for
+// a coin is already the last 24 hours: Yahoo's page shows the same figure
+// as "Volume (24hr)" (BTC, ETH and SOL on 29 October). One continuous
+// session. Null for an answer that doesn't reach back 24 hours, as a
+// one-day answer may not, whose quote stays Yahoo's UTC day.
 function coinDay(points, bars) {
   var newest = points.length ? points[points.length - 1] : null
   var first = 0

@@ -424,8 +424,9 @@ Harness {
     if (root.pillSheet) {
       root.pillQuote = nestDay
       root.now = nestDay.marketTime + 120
-      // pill-sheet-night: NBIS on Sunday 25 October at 23:35, its newest
-      // price tonight on top, as the service reads it.
+      // pill-sheet-night: JNJ on Sunday 25 October at 23:35, its newest
+      // price tonight on top, up, over tonight's line, as the service reads
+      // them; Friday's day fell.
       if (root.stateName === "pill-sheet-night") {
         var moment = function(name) {
           var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', root)
@@ -435,10 +436,11 @@ Harness {
           return text
         }
         var sunday = Market.epochAt(stub.calendars.calendars.US, "2026-10-25", "23:35")
-        var nbis = Quote.parseChart(moment("nbis"), Market.centExchanges(stub.calendars), sunday)
+        var jnj = Quote.parseChart(moment("jnj"), Market.centExchanges(stub.calendars), sunday)
         var day = moment("robinhood-day")
-        var bars = Overnight.parseOvernight(day, day.results.map(function(r) { return r.symbol })).NBIS.bars
-        root.nightPill = { quote: nbis, newest: Overnight.newestPrint(nbis, Overnight.latestPrint(nbis, bars), stub.calendars) }
+        var night = Overnight.parseOvernight(day, day.results.map(function(r) { return r.symbol })).JNJ
+        root.nightPill = { quote: jnj, newest: Overnight.newestPrint(jnj, Overnight.latestPrint(jnj, night.bars), stub.calendars),
+          night: Object.assign({ status: "ok" }, night) }
         root.now = sunday
       }
       return
@@ -1181,7 +1183,7 @@ Harness {
                 .concat([{ style: "text", retro: retroLook, day: "up", compact: true }, { style: "icon", retro: retroLook, day: "up", compact: true }])
             }
             if (!root.pillSheet) return []
-            // At night, every form in each look, NBIS's price tonight on top.
+            // At night, every form in each look, JNJ's price tonight on top.
             if (root.stateName === "pill-sheet-night")
               return [false, true].reduce(function(all, retro) {
                 return all.concat(["sparkline", "arrow", "text", "icon"].map(function(style) { return { style: style, retro: retro, day: "night" } }))
@@ -1231,8 +1233,8 @@ Harness {
               QtObject {
                 id: pillService
                 readonly property bool night: pillRow.modelData.day === "night" && !!root.nightPill
-                property string featuredSymbol: night ? "NBIS" : "NEST"
-                property var quotes: night ? ({ NBIS: root.nightPill.quote })
+                property string featuredSymbol: night ? "JNJ" : "NEST"
+                property var quotes: night ? ({ JNJ: root.nightPill.quote })
                   : ({ NEST: root.pillQuoteFor(pillRow.modelData.day === "refresh failed" ? "down" : pillRow.modelData.day) })
                 property var entries: ({ [featuredSymbol]: { status: pillRow.modelData.day === "failed" || pillRow.modelData.day === "refresh failed" ? "failed"
                   : pillRow.modelData.day === "waiting" ? "pending" : "ok", receivedAt: root.now } })
@@ -1240,7 +1242,9 @@ Harness {
                 property bool retro: pillRow.modelData.retro
                 property int now: root.now
                 property var owed: ({})
-                property var newestPrints: night ? ({ NBIS: root.nightPill.newest }) : ({})
+                property var newestPrints: night ? ({ JNJ: root.nightPill.newest }) : ({})
+                property var nights: night ? ({ JNJ: root.nightPill.night }) : ({})
+                property var allDay: night ? ({ JNJ: { status: "ok", allDay: true, at: 0 } }) : ({})
                 property var calendars: night ? stub.calendars : null
               }
               QtObject {

@@ -220,6 +220,10 @@ Item {
   // Each listing's newest price since its close, by symbol, the price on
   // top of its row (`Service.newestPrints`).
   property var newestPrints: ({})
+  // Robinhood's answers by symbol, for the day each row's line draws
+  // (`Service.nights`, `Service.allDay`).
+  property var nights: ({})
+  property var allDay: ({})
   // The preview's receipt, which says whether its quote failed.
   property var previewEntries: ({})
   // Every symbol's cap and P/E, and the rates P/Es need by currency pair,
@@ -265,6 +269,8 @@ Item {
   Binding on quotes { when: root.reading; value: root.service?.quotes; restoreMode: Binding.RestoreNone }
   Binding on entries { when: root.reading; value: root.service?.entries; restoreMode: Binding.RestoreNone }
   Binding on newestPrints { when: root.reading; value: root.service?.newestPrints; restoreMode: Binding.RestoreNone }
+  Binding on nights { when: root.reading; value: root.service?.nights; restoreMode: Binding.RestoreNone }
+  Binding on allDay { when: root.reading; value: root.service?.allDay; restoreMode: Binding.RestoreNone }
   Binding on previewEntries { when: root.reading; value: root.service?.previewEntries; restoreMode: Binding.RestoreNone }
   Binding on fundamentalEntries { when: root.reading; value: root.service?.fundamentals; restoreMode: Binding.RestoreNone }
   Binding on rates { when: root.reading; value: root.service?.rates; restoreMode: Binding.RestoreNone }
@@ -1421,6 +1427,8 @@ Item {
     view: root.view
     quotes: root.quotes
     newestPrints: root.newestPrints
+    nights: root.nights
+    allDay: root.allDay
     entries: root.entries
     featuredSymbol: root.featuredSymbol
     scrubShown: root.watchlistScrubShown

@@ -27,6 +27,10 @@ Flickable {
   // Each row's newest price since its close, by symbol, its price on top
   // (`Service.newestPrints`).
   property var newestPrints: ({})
+  // Robinhood's answers by symbol (`Service.nights`, `Service.allDay`): a
+  // row's line draws the day the 1D chart does (`Chart.dayDrawn`).
+  property var nights: ({})
+  property var allDay: ({})
   property var entries: ({})
   property string featuredSymbol: ""
   property int scrubShown: 0
@@ -898,6 +902,16 @@ Flickable {
           restoreMode: Binding.RestoreNone
         }
         quote: place >= 0 ? sightQuote : null
+        // The day its line draws, the 1D chart's (`Chart.dayDrawn`), taken
+        // in sight as the quote is: Robinhood's answers for other rows
+        // redraw no row out of sight.
+        property var sightDay: null
+        Binding on sightDay {
+          value: rowDelegate.quote ? Chart.dayDrawn(rowDelegate.quote, root.nights[rowDelegate.symbol], root.allDay[rowDelegate.symbol], root.calendars).day : null
+          when: rowDelegate.place >= 0 && rowDelegate.inSight
+          restoreMode: Binding.RestoreNone
+        }
+        day: quote ? sightDay : null
         // The scrub reaches only the rows in sight, as answers do: otherwise
         // each step and each replay frame derives and repaints every row ever
         // scrolled past. A row coming into sight takes it before that frame.
@@ -918,7 +932,7 @@ Flickable {
           && root.dragSymbol === ""
         lifted: symbol === root.dragSymbol
         retro: root.retro
-        scrubX: quote && sightScrub ? Chart.fractionAtTime(quote, sightScrub) : -1
+        scrubX: day && sightScrub ? Chart.fractionAtTime(day, sightScrub) : -1
         foreground: root.foreground
         dim: root.dim
         dimmer: root.dimmer

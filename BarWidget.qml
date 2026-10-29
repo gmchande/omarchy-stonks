@@ -24,8 +24,7 @@ BarWidget {
   readonly property string featuredSymbol: service ? service.featuredSymbol : ""
   readonly property var featuredQuote: service && featuredSymbol ? (service.quotes[featuredSymbol] || null) : null
   // The day, as its row shows it: its newest price since the close on top
-  // where it has one (`Service.newestPrints`). The line comes from the
-  // quote it draws, so the clock never redraws it.
+  // where it has one (`Service.newestPrints`).
   readonly property var featured: featuredQuote
     ? Figures.rowModel(featuredQuote, 0, service.changeMode, service.newestPrints[featuredSymbol] || null) : null
   // The newest price's session and time, which the pill has no room for:
@@ -33,8 +32,12 @@ BarWidget {
   readonly property string newestNote: featured && featured.newest
     ? Figures.newestNote(featuredQuote, featured.newest, service.now, service.calendars) : ""
   readonly property string newestPhase: featured && featured.newest ? featured.newest.phase : ""
+  // The line: the day the 1D chart draws (`Chart.dayDrawn`), as the row's
+  // does, from the answers it is drawn from, so the clock never redraws it.
   // A day with no print draws nothing, as its row does.
-  readonly property var lineGeometry: featuredQuote && featuredQuote.points.length ? Chart.chartGeometry(featuredQuote, service.calendars) : null
+  readonly property var lineDay: featuredQuote
+    ? Chart.dayDrawn(featuredQuote, service.nights[featuredSymbol], service.allDay[featuredSymbol], service.calendars).day : null
+  readonly property var lineGeometry: lineDay && lineDay.points.length ? Chart.chartGeometry(lineDay, service.calendars) : null
   // In the bar's right section, among its bare icons, the pill has a form of
   // its own, `barStyleRight`: the icon until a middle-click there picks
   // another. The centre and left share `barStyle`. On a side bar it has
