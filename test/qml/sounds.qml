@@ -898,8 +898,12 @@ Harness {
       // clock set back across it; never while an app records from a
       // microphone (the stand-in pw-dump's nodes), or when the answer runs
       // past its 4 MB, and a stalled answer stopped holds no later bell;
-      // never with sounds off. Each pass is a Stonks started at its first
-      // moment. Late bells are saved.test.js's (`bellBetween`).
+      // never under Omarchy's Do Not Disturb (the stand-in omarchy-shell's
+      // answer), which every sound before here played under, but when the
+      // shell doesn't answer, as without Omarchy's notifications; never
+      // with sounds off. Each pass is a Stonks started at its first moment.
+      // Late bells are saved.test.js's (`bellBetween`).
+      harness.writeText(harness.fakeState + "/dnd", "off")
       app.close()
       service.feature("AAPL")
       tryVerify(function() { return !!service.quotes.AAPL && service.featuredSymbol === "AAPL" }, 5000)
@@ -944,10 +948,14 @@ Harness {
       dropState("pw-dump.stall")
       var stallStopped = dumpLog()[dumpLog().length - 1] === "stopped"
       rang.push(pass([reg.start - 30, reg.start + 30], 1))
+      harness.writeText(harness.fakeState + "/dnd", "on")
+      rang.push(pass([reg.end - 30, reg.end + 30], 0))
+      dropState("dnd")
+      rang.push(pass([reg.end - 30, reg.end + 30], 1))
       service.persist({ sounds: false })
       rang.push(pass([reg.start - 30, reg.start + 30], 0))
-      harness.check("the bell rings at the open in retro's voice, a moment after Stonks starts too, not twice with the clock set back, not while a microphone records though a level meter may run, not when its answer reaches 4 MB, again after a stalled answer is stopped, and not with sounds off",
-        rang.join(",") === "1,1,0,1,0,0,1,0" && stallStopped,
+      harness.check("the bell rings at the open in retro's voice, a moment after Stonks starts too, not twice with the clock set back, not while a microphone records though a level meter may run, not when its answer reaches 4 MB, again after a stalled answer is stopped, not under Do Not Disturb, but when the shell doesn't say, and not with sounds off",
+        rang.join(",") === "1,1,0,1,0,0,1,0,1,0" && stallStopped,
         rang.join(",") + " | stalled answer stopped " + stallStopped)
 
       // Every stream Stonks started, each sound's, chime's, replay's and

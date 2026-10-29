@@ -111,7 +111,8 @@ Harness {
 
   // Hyprland as the window host reads it: the window on a workspace, and a
   // browser tab titled Stonks that is not it. Records what it is asked to
-  // dispatch.
+  // dispatch, and sends a window's opening as Hyprland's event says it
+  // (`opens`).
   QtObject { id: workspaceHere }
   QtObject { id: workspaceThere }
   QtObject {
@@ -134,6 +135,14 @@ Harness {
     property var focusedWorkspace: workspaceHere
     property var dispatched: []
     function dispatch(request) { dispatched = dispatched.concat([request]) }
+    signal rawEvent(var event)
+    function opens(windowClass, title) {
+      var data = "5ca1e,1," + windowClass + "," + title
+      rawEvent({ name: "openwindow", data: data, parse: function(count) {
+        var parts = data.split(",")
+        return parts.slice(0, count - 1).concat([parts.slice(count - 1).join(",")])
+      } })
+    }
   }
   Binding { target: plugin.windowHost; property: "hyprlandStandIn"; value: hyprlandStandIn }
 
@@ -438,6 +447,16 @@ Harness {
       var overWindow = [shellApi.popupOpen, app.opened].join(",")
       harness.check("with the panel open, a right-click closes it and opens the window, or keeps the window open",
         fromPopup === "false,true" && overWindow === "false,true", fromPopup + " | " + overWindow)
+
+      // Omarchy's screensaver opening closes the popup, and leaves the
+      // window open under it; another window opening leaves the popup open.
+      shellApi.popupOpen = true
+      hyprlandStandIn.opens("Alacritty", "screensaver, notes")
+      var afterOther = [shellApi.popupOpen, app.opened].join(",")
+      hyprlandStandIn.opens("org.omarchy.screensaver", "Screensaver")
+      var afterScreensaver = [shellApi.popupOpen, app.opened].join(",")
+      harness.check("the screensaver opening closes the popup and leaves the window open, and another window opening closes nothing",
+        afterOther === "true,true" && afterScreensaver === "false,true", afterOther + " | " + afterScreensaver)
 
       // On another workspace the window comes forward there and stays open;
       // on this one it closes.
