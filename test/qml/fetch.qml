@@ -293,13 +293,17 @@ Harness {
     // period may land a tick either side of the window's edge, so a count
     // may be one off; one expected never to be asked must not be at all.
     // `each` is called after every step of the clock (`tick`).
+    // A count starts with nothing asked or out, so a step before can't
+    // land its answers in it, as the fake curl logs a request as it answers.
     function countsOver(label, seconds, want, begin, each) {
+      var before = Object.keys(service.asked).concat(service.testFeed.landing.length > 0 ? ["a run out"] : [])
       var from = harness.requests().length
       begin()
       tick(seconds - 5, 5, each)
       var got = harness.quoteCounts(harness.requests().slice(from))
       var off = harness.listed.filter(function(s) { return want[s] === 0 ? got[s] !== 0 : Math.abs(got[s] - want[s]) > 1 })
-      harness.check(label, off.length === 0, harness.listed.map(function(s) { return s + " " + got[s] + "/" + want[s] }).join(", "))
+      harness.check(label, before.length === 0 && off.length === 0,
+        (before.length ? "asked before it: " + before.join(",") + " | " : "") + harness.listed.map(function(s) { return s + " " + got[s] + "/" + want[s] }).join(", "))
       return harness.requests().slice(from)
     }
 
@@ -437,16 +441,22 @@ Harness {
         Object.keys(cache).join(","))
 
       // A removal taken back with the next write due: the file holds the
-      // symbol again.
+      // symbol again. Stonks takes one back only from the panel or the
+      // window, which asks for the row's price again; here nothing is open,
+      // and the step waits for that ask, which the next count would hear.
       service.removeSymbol("KILN")
       tick(21 * 60, 60)
       var since = service.now - service.quotesSavedAt
+      var undoFrom = harness.requests().length
       service.undoRemoval("KILN")
       within(1000, function() { return !!harness.cached().KILN })
       cache = harness.cached()
       harness.check("a removal taken back with a write due is saved again for the next start",
         service.library.indexOf("KILN") >= 0 && !!cache.KILN,
         since + " s since the last write | " + Object.keys(cache).join(","))
+      var askedAgain = within(5000, function() { return !("KILN" in service.asked) && idle() })
+      var undoAsks = harness.quoteCounts(harness.requests().slice(undoFrom)).KILN
+      harness.check("a removal taken back asks for the row's price again, once", askedAgain && undoAsks === 1, undoAsks + " asks")
 
       // 11:00, the regular session: with nothing open, no row is kept fresh
       // for a surface no screen shows.
