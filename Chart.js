@@ -18,8 +18,9 @@
 // coming day a two-day answer holds once it has a print (`Quote.tailDay`):
 // London's or Tokyo's stays the last until its first bar lands. A range
 // once its history and the symbol's quote are, since the headline is never
-// the last bar. A range takes the day too once it is in, for the night's
-// print under the price, and never waits for it.
+// the last bar. A range takes the day too once it is in, for the newest
+// price since the close, which its history ends on, as the price on top
+// does (`History.withNewest`), and never waits for it.
 // `quote` is Yahoo's, as it came: the headline and the day's figures. `day`
 // is what the 1D chart draws and a scrub of it reads; `latest` is the
 // newest print of all, for the line under the price, or null where the
@@ -53,7 +54,7 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
   if (range === "1D" || !quote) return chart
   var entry = histories[History.historyKey(symbol, range)]
   if (!entry) return null
-  if (entry.history) chart.history = entry.history
+  if (entry.history) chart.history = History.withNewest(entry.history, Overnight.newestPrint(quote, chart.latest, calendars))
   else chart.failed = true
   return chart
 }

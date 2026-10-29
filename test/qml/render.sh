@@ -127,6 +127,13 @@ every_state() (
     watch-2026-10-26-0420-shel.l coin-2026-10-25-2005-btc-usd watch-2026-10-26-1800-cvr; do
     states="$states popup-sweep-$moment-smooth popup-sweep-$moment-retro"
   done
+  # NBIS on Sunday night and Monday evening on 1W, 1M and 1Y: each range's
+  # line ends on the newest price, the one on top.
+  for moment in watch-2026-10-25-2335 watch-2026-10-26-2005; do
+    for range in 1w 1m 1y; do
+      states="$states popup-sweep-$moment-nbis-$range-smooth popup-sweep-$moment-nbis-$range-retro"
+    done
+  done
   # A thin stock's day, fewer prints than the chart's columns, and its 3M,
   # in both looks on both surfaces: retro lights every column the line joins.
   for look in smooth retro; do

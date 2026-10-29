@@ -1820,6 +1820,30 @@ test("in every phase, a stock that has traded since its close shows that newest 
   // A row's name line and the pill's hover say its session and time.
   expect(M.newestNote(sunday.quotes.NBIS, nbis, sunday.now, calendars)).toBe("Overnight 23:30")
   expect(M.newestNote(sunday.quotes.PSIX, sunday.newest.PSIX, sunday.now, calendars)).toBe("After hours Fri 19:00")
+  // On 1W, 1M and 1Y too, NBIS's line ends on its newest price, the price
+  // on top, as Robinhood's ranges did at 20:00 on 28 October: the move from
+  // the range's start to it, its session and time said as on the day, a
+  // scrub at the line's end reading it, and the range's low taking it. The
+  // range's volume stays Yahoo's bars'.
+  for (const [set, moment] of [["watch-2026-10-25-2335", "2026-10-25-2335"], ["watch-2026-10-26-2005", "2026-10-26-2005"]]) {
+    const at = topsAt(set)
+    const top = M.rowModel(at.quotes.NBIS, 0, "pct", at.newest.NBIS)
+    for (const [range, span] of [["1W", "5d"], ["1M", "1mo"], ["1Y", "1y"]]) {
+      const where = `${set} ${range}`
+      const raw = M.parseHistory(fixture(`history/nbis-${moment}-${span}.json`), range)
+      const chart = M.viewChart("NBIS", range, at.quotes, {}, { ["NBIS|" + range]: { status: "ok", history: raw } }, at.nights, at.allDay, calendars)
+      const history = chart.history
+      const model = M.historyRowModel(history, at.quotes.NBIS, 0)
+      const line = M.historyGeometry(history).points
+      expect([where, model.priceText, model.newest, model.periodLabel, line.at(-1).p]).toEqual([where, top.priceText, at.newest.NBIS, "", at.newest.NBIS.p])
+      expect([where, model.changeText]).toEqual([where, M.pct((at.newest.NBIS.p - raw.baseline) / raw.baseline * 100)])
+      expect([where, M.historyRowModel(history, at.quotes.NBIS, at.newest.NBIS.t).priceText]).toEqual([where, top.priceText])
+      expect([where, M.rangeVolume(history)]).toEqual([where, M.rangeVolume(raw)])
+    }
+  }
+  const week = M.viewChart("NBIS", "1W", sunday.quotes, {},
+    { "NBIS|1W": { status: "ok", history: M.parseHistory(fixture("history/nbis-2026-10-25-2335-5d.json"), "1W") } }, sunday.nights, sunday.allDay, calendars).history
+  expect(M.rangeEnds(week).low).toEqual({ p: 152.51, t: sunday.newest.NBIS.t })
 })
 
 test("before the open the day is measured from the last session's close, though Yahoo's previous close is the one before", () => {
@@ -2423,7 +2447,7 @@ test("a night's chart on each saved moment: its span, its trades, and what a scr
   expect(M.dayBaselineText(six, M.exchangeDay(six, at("2026-10-07", "06:00")))).toBe("PREV CLOSE 249.87")
 })
 
-test("on 1M at night the overnight line stays", () => {
+test("on 1M at night the line ends on the night's price, the one on top", () => {
   const set = "live-2026-10-05"
   const asked = fixture(`moments/${set}/robinhood-day.json`).results.map(r => r.symbol)
   const prints = traded(set, asked)
@@ -2431,8 +2455,9 @@ test("on 1M at night the overnight line stays", () => {
   const history = M.parseHistory(fixture(`moments/${set}/nest-1m.json`), "1M", cents)
   const chart = M.viewChart("NEST", "1M", quotes, {}, { "NEST|1M": { status: "ok", history } },
     { NEST: { status: "ok", ...prints.NEST } }, { NEST: { status: "ok", allDay: true, at: 0 } }, calendars)
-  expect(chart.history).toBe(history)
-  expect(M.extendedStack(chart.quote, chart.latest, 1791175013, chart.day)).toMatchObject({ label: "OVERNIGHT", time: "00:30", price: "245.47", changeText: "+1.10%" })
+  expect(chart.history.bars.slice(0, -1)).toEqual(history.bars)
+  expect(chart.history.bars.at(-1)).toMatchObject({ c: 245.47, newest: "overnight" })
+  expect(M.historyRowModel(chart.history, chart.quote, 0)).toMatchObject({ priceText: "245.47", periodLabel: "" })
 })
 
 test("after the close a scrub to the bell reads the close at 16:00, an index's and a stock's, and the after-hours its own print", () => {

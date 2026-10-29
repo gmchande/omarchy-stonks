@@ -316,6 +316,36 @@ function liveBarAppended(history) {
   return !!coarse && bars.length > 1 && bars[bars.length - 1].t === history.liveAt
 }
 
+// `history` ending on the newest price since the listing's regular close
+// (`print`, { t, p, phase }, `Overnight.newestPrint`), as Robinhood's ranges
+// end on it: a bar of its own after the last, or in place of the live moment
+// Yahoo appends to a week's, a month's, or a quarter's bars, which stands
+// for the price now too. The bar is that one trade, so it counts in the
+// range's low and high, where the line reaches it, and not in its volume
+// (`rangeVolume`), as the day's VOL leaves out the night. The history as it
+// came with no print after its last bar.
+function withNewest(history, print) {
+  var bars = history.bars
+  if (!print || !bars.length || print.t <= bars[bars.length - 1].t) return history
+  var own = liveBarAppended(history) ? bars.slice(0, -1) : bars
+  return Object.assign({}, history, {
+    bars: own.concat([{ t: print.t, o: print.p, h: print.p, l: print.p, c: print.p, v: null, newest: print.phase }])
+  })
+}
+
+// The bar `withNewest` ended `history` on, or null.
+function newestBar(history) {
+  var bars = history && history.bars ? history.bars : []
+  return bars.length && bars[bars.length - 1].newest ? bars[bars.length - 1] : null
+}
+
+// The index of the last bar of Yahoo's own: before an appended live moment
+// (`liveBarAppended`), whose day the bucket before it holds, or the newest
+// price (`newestBar`).
+function ownLast(history) {
+  return history.bars.length - (liveBarAppended(history) || newestBar(history) ? 2 : 1)
+}
+
 // A bar without a close (`unclosed`) after every bar drawn: Tokyo's day,
 // after its close, before Yahoo's answer has its close. Null with none.
 function closelessLast(history) {
@@ -331,17 +361,15 @@ function closelessLast(history) {
 // session that starts at `t` (`Quote.figuresDay`), by the exchange's
 // calendar: a day's bar is that day's, a week's bar the seven days from its
 // first, a month's its month. The last bar is one without a close after
-// those drawn (`closelessLast`), else the last drawn; an appended live
-// moment (`liveBarAppended`) belongs to the bucket before it. An intraday
-// bar holds only part of a day.
+// those drawn (`closelessLast`), else the last of Yahoo's own (`ownLast`).
+// An intraday bar holds only part of a day.
 function lastBarHolds(history, t) {
   var bars = history && history.bars ? history.bars : []
   var spans = { "1d": "day", "1wk": "week", "1mo": "month", "3mo": "quarter" }
   var span = spans[history ? history.interval : ""]
   if (!bars.length || !span || !Format.isFiniteNumber(t)) return false
-  var last = bars.length - 1
   var closeless = closelessLast(history)
-  var start = closeless ? closeless.t : liveBarAppended(history) ? bars[last - 1].t : bars[last].t
+  var start = closeless ? closeless.t : bars[ownLast(history)].t
   var day = historyDateParts(history, t)
   var first = historyDateParts(history, start)
   var days = (Date.UTC(day.year, day.month, day.day) - Date.UTC(first.year, first.month, first.day)) / 86400000
@@ -364,7 +392,7 @@ function rangeEnds(history, stats, quote) {
   var low = stats.low
   if (quote && lastBarHolds(history, quote.figuresDay)) {
     var closeless = closelessLast(history)
-    var today = closeless ? closeless.t : history.bars[history.bars.length - 1].t
+    var today = closeless ? closeless.t : history.bars[ownLast(history)].t
     if (Format.isFiniteNumber(quote.dayHigh) && quote.dayHigh > high.p) high = { p: quote.dayHigh, t: today }
     if (Format.isFiniteNumber(quote.dayLow) && quote.dayLow < low.p) low = { p: quote.dayLow, t: today }
   }
@@ -374,11 +402,12 @@ function rangeEnds(history, stats, quote) {
 // What traded over a range: its bars' volumes added, those without a close
 // too (`unclosed`), as the day's VOL reads (`Format.compactNumber`). An
 // appended live moment is left out, since the bucket before it counts its
-// day. "" when any counted bar's volume isn't known, or when none is above
-// zero, as for an index Yahoo has no volume for.
+// day, and so is the newest price (`withNewest`). "" when any counted bar's
+// volume isn't known, or when none is above zero, as for an index Yahoo has
+// no volume for.
 function rangeVolume(history) {
   var bars = history && history.bars ? history.bars : []
-  var end = liveBarAppended(history) ? bars.length - 1 : bars.length
+  var end = bars.length ? ownLast(history) + 1 : 0
   var counted = bars.slice(0, end).concat(end > 0 && history.unclosed ? history.unclosed : [])
   var sum = 0
   for (var i = 0; i < counted.length; i++) {
@@ -401,16 +430,17 @@ function rangeFacts(widest, start, volume) {
 }
 
 // The info block's first line on a range, in the day line's shape: the
-// range's name, its low and high (`rangeEnds`) with the headline price's
-// place between them, else the last bar's close's, then its facts
-// (`rangeFacts`). The dates of the low and high are on the chart's marks
-// (`rangeMarks`). Null with no bars.
+// range's name, its low and high (`rangeEnds`) with the price on top's
+// place between them, where its line ends: the newest price
+// (`withNewest`), else the headline's, else the last bar's close. Then its
+// facts (`rangeFacts`). The dates of the low and high are on the chart's
+// marks (`rangeMarks`). Null with no bars.
 function rangeLine(history, ends, quote) {
   if (!ends) return null
   var digits = quote ? quote.priceDigits : undefined
   var head = quote ? Quote.headlineQuote(quote) : null
   var last = history.bars[history.bars.length - 1]
-  var range = Format.infoRange(ends.low.p, ends.high.p, head ? head.price : last.c, digits)
+  var range = Format.infoRange(ends.low.p, ends.high.p, !newestBar(history) && head ? head.price : last.c, digits)
   var start = Format.isFiniteNumber(history.baseline) ? Format.money(history.baseline, digits) : ""
   return {
     title: String(history.range || "").toUpperCase(),
@@ -442,33 +472,41 @@ function rangeMarks(history, ends, quote) {
 // A scrubbed bar as the header says it, its date and its price, then its
 // date alone, for a header with no room for both: the hero shows the price
 // large. An intraday bar's date and time read by its own day's clock, so a
-// time across a change of clocks reads as the exchange's clock said then.
+// time across a change of clocks reads as the exchange's clock said then;
+// the newest price (`withNewest`) is a trade, named by its day and time on
+// every range.
 function historyScrubForms(history, bar, digits) {
   if (!history || !bar) return [""]
   var years = historySpansYears(history)
-  var date = historyDateText(history, bar.t, years, history.interval)
-  if (history.interval === "1wk") date = "WEEK OF " + date
-  if (history.interval === "15m" || history.interval === "30m" || history.interval === "1h") {
+  var date = historyDateText(history, bar.t, years, bar.newest ? "1d" : history.interval)
+  if (history.interval === "1wk" && !bar.newest) date = "WEEK OF " + date
+  if (bar.newest || history.interval === "15m" || history.interval === "30m" || history.interval === "1h") {
     var clock = Quote.clockAt(history, bar.t)
     date += " " + Format.zonedHhmm(bar.t, clock.offset, clock.zone)
   }
   return [date + " · " + Format.money(bar.c, digits), date]
 }
 
+// The range's price and move, as the hero shows it: a scrubbed bar's, else
+// the price on top, the newest since the close where the line ends on it
+// (`newestBar`), its session and time said as on the day (`newest`, with no
+// period said under the move), else the headline's. Each measured from the
+// range's start (`baseline`).
 function historyRowModel(history, quote, scrubT) {
   if (!history) return null
   var stats = periodStats(history)
   var bar = scrubT ? historyBarAt(history, historyFraction(history, scrubT)) : null
-  var head = !bar && quote ? Quote.headlineQuote(quote) : null
+  var tail = bar ? null : newestBar(history)
+  var head = !bar && !tail && quote ? Quote.headlineQuote(quote) : null
   var price = bar && Format.isFiniteNumber(bar.c) ? bar.c
-    : (head ? head.price : stats.last)
+    : tail ? tail.c : (head ? head.price : stats.last)
   var chg = Quote.change({ prevClose: history.baseline, points: [] }, price, "pct")
   return {
     symbol: history.symbol || (quote ? quote.symbol : ""),
     name: quote ? quote.name : (history.symbol || ""),
     price: price,
     priceText: Format.money(price, quote ? quote.priceDigits : undefined),
-    asOf: bar ? bar.t : (head ? head.t : stats.coverage.to),
+    asOf: bar ? bar.t : tail ? tail.t : (head ? head.t : stats.coverage.to),
     pct: chg.pct,
     tone: Format.changeTone(chg, "pct"),
     dayUp: chg.pct === null ? null : chg.up,
@@ -477,9 +515,11 @@ function historyRowModel(history, quote, scrubT) {
     changeLine: Format.pct(chg.pct),
     // What the change is measured over, said under it the way AT CLOSE is:
     // the range, or, for a listing younger than a range short of All, the
-    // day it began trading.
-    periodLabel: stats.coverage.short && history.range !== "All"
+    // day it began trading. With the newest price on top, its session and
+    // time are said there instead (`Hero.changeCaption`).
+    periodLabel: tail ? "" : stats.coverage.short && history.range !== "All"
       ? "SINCE " + historyStatsDateText(history, history.firstTradeDate, true, "1d")
-      : String(history.range || "").toUpperCase()
+      : String(history.range || "").toUpperCase(),
+    newest: tail ? { t: tail.t, p: tail.c, phase: tail.newest } : null
   }
 }

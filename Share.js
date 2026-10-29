@@ -72,9 +72,9 @@ function moment(o) {
     var read = Quote.readingAt(o.day, o.scrubT)
     return { t: read.t, close: read.close, bar: null }
   }
-  // At rest on the day, the newest price since the close (`newest`) where
-  // it is the one on top.
-  if (!o.history && o.newest) return { t: o.newest.t, close: false, bar: null, phase: o.newest.phase }
+  // At rest, the newest price since the close (`newest`) where it is the
+  // one on top, on the day and on a range, whose line ends on it.
+  if (o.newest) return { t: o.newest.t, close: false, bar: null, phase: o.newest.phase }
   var head = Quote.headlineQuote(o.quote)
   if (!head && o.history) {
     var last = History.historyBarAt(o.history, 1)
@@ -85,13 +85,14 @@ function moment(o) {
 }
 
 // A range's bar as its scrub names it (`History.historyScrubForms`): its
-// date, a week's "WEEK OF", and an intraday bar's time, here always with
-// its zone, without the price, which the picture shows large.
+// date, a week's "WEEK OF", and an intraday bar's time, or the newest
+// price's (`History.withNewest`), here always with its zone, without the
+// price, which the picture shows large.
 function barDate(history, bar) {
-  var intraday = history.interval === "15m" || history.interval === "30m" || history.interval === "1h"
-  var date = History.historyDateText(history, bar.t, History.historySpansYears(history), history.interval)
-  if (history.interval === "1wk") date = "WEEK OF " + date
-  if (intraday) {
+  var timed = !!bar.newest || history.interval === "15m" || history.interval === "30m" || history.interval === "1h"
+  var date = History.historyDateText(history, bar.t, History.historySpansYears(history), bar.newest ? "1d" : history.interval)
+  if (history.interval === "1wk" && !bar.newest) date = "WEEK OF " + date
+  if (timed) {
     var clock = Quote.clockAt(history, bar.t)
     date += " " + Format.hhmm(bar.t, clock.offset) + " " + (clock.zone || Format.offsetName(clock.offset))
   }

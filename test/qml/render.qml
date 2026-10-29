@@ -204,8 +204,11 @@ Harness {
     match = /^(?:popup|window)-sweep-(\d{4}-\d\d-\d\d-\d{4})-(nest|kiln|spy|bolt|gspc|btc-usd|shel\.l|7203\.t|shib-usd|ry\.to|brk-a|brk-b)-(smooth|retro)$/.exec(stateName)
     if (match) return { moment: match[1], symbol: match[2] === "gspc" ? "^GSPC" : match[2].toUpperCase(), month: false, scrub: false,
       dated: true, sweep: true }
-    match = /^(?:popup|window)-sweep-([a-z]+-(\d{4}-\d\d-\d\d-\d{4}))-([a-z0-9.^-]+)-(smooth|retro)$/.exec(stateName)
+    // A saved moment's listing on a range: its history saved for that
+    // moment in history/<file>-<moment>-<5d|1mo|1y>.json.
+    match = /^(?:popup|window)-sweep-([a-z]+-(\d{4}-\d\d-\d\d-\d{4}))-([a-z0-9.^-]+?)(?:-(1w|1m|1y))?-(smooth|retro)$/.exec(stateName)
     if (match) return { moment: match[2], folder: match[1], file: match[3], month: false, scrub: false, dated: true, sweep: true,
+      range: match[4] ? match[4].toUpperCase() : "",
       saved: String(Quickshell.env("STONKS_VISUAL_SAVED") || "").split(" ").filter(function(f) { return f !== "" }) }
     match = /^(?:popup|window)-gaps-(1d|3m)-(smooth|retro)$/.exec(stateName)
     return match ? { moment: "2026-10-21-1006", folder: "gaps-2026-10-21-1006", symbol: "VANE", listed: ["VANE"], month: false,
@@ -592,6 +595,14 @@ Harness {
         root.shownHistoryEntry = { status: "ok", history: History.parseHistory(read(root.overnight.symbol.toLowerCase() + "-" + range.toLowerCase()), range), receivedAt: root.now }
       }
       stub.symbols = listed
+      if (root.overnight.range) {
+        var kept = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', root)
+        kept.path = fixtureDir + "/history/" + root.overnight.file + "-" + root.overnight.moment + "-"
+          + { "1W": "5d", "1M": "1mo", "1Y": "1y" }[root.overnight.range] + ".json"
+        root.shownRange = root.overnight.range
+        root.shownHistoryEntry = { status: "ok", history: History.parseHistory(JSON.parse(kept.text()), root.overnight.range), receivedAt: root.now }
+        kept.destroy()
+      }
       stub.shown = listed.slice()
       stub.quotes = quotes
       stub.entries = entries

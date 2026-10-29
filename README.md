@@ -85,8 +85,10 @@ The top line names the moment in the market's day, such as Power hour, and
 says when the market opens or closes, by the exchange's clock. A US stock
 that has traded since the close shows that newest price on top, its move
 since the close, and its session and time, such as OVERNIGHT 23:25; the
-line under it shows the close and the day's move. Elsewhere, a smaller line
-under the price shows the pre-market or after-hours price.
+line under it shows the close and the day's move. On a longer range the
+chart ends on that price, and the move is the range's, up to it.
+Elsewhere, a smaller line under the price shows the pre-market or
+after-hours price.
 The 1D chart shows one trading day, from the first hour the stock can trade
 that day to the last. Over the weekend it shows Friday until Sunday night's
 trading begins. A night stays on the chart it began on until 04:00, New
