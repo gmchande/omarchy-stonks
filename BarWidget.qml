@@ -32,11 +32,12 @@ BarWidget {
   readonly property string newestNote: featured && featured.newest
     ? Figures.newestNote(featuredQuote, featured.newest, service.now, service.calendars) : ""
   readonly property string newestPhase: featured && featured.newest ? featured.newest.phase : ""
-  // The line: the day the 1D chart draws (`Chart.dayDrawn`), as the row's
-  // does, from the answers it is drawn from, so the clock never redraws it.
-  // A day with no print draws nothing, as its row does.
+  // The line: the day the 1D chart draws, drawn once Robinhood has said
+  // which (`Chart.lineDay`), as the row's is, from the answers it is drawn
+  // from, so the clock never redraws it. A day with no print draws nothing,
+  // as its row does.
   readonly property var lineDay: featuredQuote
-    ? Chart.dayDrawn(featuredQuote, service.nights[featuredSymbol], service.allDay[featuredSymbol], service.calendars).day : null
+    ? Chart.lineDay(featuredSymbol, featuredQuote, service.nights, service.allDay, service.calendars) : null
   readonly property var lineGeometry: lineDay && lineDay.points.length ? Chart.chartGeometry(lineDay, service.calendars) : null
   // In the bar's right section, among its bare icons, the pill has a form of
   // its own, `barStyleRight`: the icon until a middle-click there picks

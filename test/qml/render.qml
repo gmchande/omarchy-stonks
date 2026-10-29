@@ -353,9 +353,10 @@ Harness {
     property var arriving: []
     property var lastRemoval: null
     // Robinhood's prints, and its word on which listings it trades all day,
-    // answered, on the overnight states only.
+    // answered, on the overnight states only; on the rest, never asked, so
+    // each listing has Yahoo's own day (`Chart.dayDrawn`).
     property var nights: ({})
-    property var allDay: ({})
+    property var allDay: null
     // Each listing's newest price since its close, as the service reads it.
     readonly property var newestPrints: Overnight.newestPrints(symbols, quotes, nights, allDay, calendars)
     readonly property var view: ({ featured: featuredSymbol, range: range, list: listName, listKey: "=" + listName,

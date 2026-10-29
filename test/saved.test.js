@@ -1799,11 +1799,16 @@ test("in every phase, a stock that has traded since its close shows that newest 
     for (const s of ["BRK-A", "^GSPC", "BTC-USD", "SHEL.L", "7203.T", "SHOP.TO"]) expect([set, s, at.newest[s]]).toEqual([set, s, undefined])
     // The panel reads the newest price from its chart's newest print, the
     // rows and the pill from the list's: the same one. A row's line and the
-    // pill's draw the day the 1D chart does.
+    // pill's draw the day the 1D chart does, and, while Robinhood's answers
+    // are out, as at the first open after a restart, none for a US listing,
+    // as the chart waits too: a line that drew Yahoo's day then would take
+    // another shape once they land.
     for (const s of at.symbols) {
       const view = M.viewChart(s, "1D", at.quotes, {}, {}, at.nights, at.allDay, calendars)
       expect([set, s, M.newestPrint(at.quotes[s], view.latest, calendars)]).toEqual([set, s, at.newest[s] || null])
-      expect([set, s, M.dayDrawn(at.quotes[s], at.nights[s], at.allDay[s], calendars).day]).toEqual([set, s, view.day])
+      expect([set, s, M.lineDay(s, at.quotes[s], at.nights, at.allDay, calendars)]).toEqual([set, s, view.day])
+      const waiting = M.viewChart(s, "1D", at.quotes, {}, {}, {}, {}, calendars)
+      expect([set, s, M.lineDay(s, at.quotes[s], {}, {}, calendars)]).toEqual([set, s, waiting ? waiting.day : null])
     }
   }
   // Sunday 23:35: JNJ's row and pill draw tonight's trades, ending on its
@@ -1811,7 +1816,7 @@ test("in every phase, a stock that has traded since its close shows that newest 
   // which fell 1.42%.
   {
     const at = topsAt("watch-2026-10-25-2335")
-    const day = M.dayDrawn(at.quotes.JNJ, at.nights.JNJ, at.allDay.JNJ, calendars).day
+    const day = M.lineDay("JNJ", at.quotes.JNJ, at.nights, at.allDay, calendars)
     const line = M.chartGeometry(day, calendars)
     expect([day.points.at(-1).p, line.points.at(-1).y < line.baselineY]).toEqual([264.11, true])
   }

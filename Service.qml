@@ -224,7 +224,7 @@ Item {
   readonly property var newestPrints: Overnight.newestPrints(library, feed.quotes, overnightFeed.entries, allDayFeed.entries, calendars)
   // Robinhood's answers, by symbol: its prints (`nights`) and whether it
   // trades each all day (`allDay`), so a row's line and the pill's draw the
-  // day the 1D chart does (`Chart.dayDrawn`).
+  // day the 1D chart does (`Chart.lineDay`).
   readonly property var nights: overnightFeed.entries
   readonly property var allDay: allDayFeed.entries
   // Robinhood's two questions, whether it trades a listing all day and its

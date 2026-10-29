@@ -28,7 +28,7 @@ Flickable {
   // (`Service.newestPrints`).
   property var newestPrints: ({})
   // Robinhood's answers by symbol (`Service.nights`, `Service.allDay`): a
-  // row's line draws the day the 1D chart does (`Chart.dayDrawn`).
+  // row's line draws the day the 1D chart does (`Chart.lineDay`).
   property var nights: ({})
   property var allDay: ({})
   property var entries: ({})
@@ -902,12 +902,12 @@ Flickable {
           restoreMode: Binding.RestoreNone
         }
         quote: place >= 0 ? sightQuote : null
-        // The day its line draws, the 1D chart's (`Chart.dayDrawn`), taken
-        // in sight as the quote is: Robinhood's answers for other rows
-        // redraw no row out of sight.
+        // The day its line draws, the 1D chart's, once Robinhood has said
+        // which (`Chart.lineDay`), taken in sight as the quote is:
+        // Robinhood's answers for other rows redraw no row out of sight.
         property var sightDay: null
         Binding on sightDay {
-          value: rowDelegate.quote ? Chart.dayDrawn(rowDelegate.quote, root.nights[rowDelegate.symbol], root.allDay[rowDelegate.symbol], root.calendars).day : null
+          value: rowDelegate.quote ? Chart.lineDay(rowDelegate.symbol, rowDelegate.quote, root.nights, root.allDay, root.calendars) : null
           when: rowDelegate.place >= 0 && rowDelegate.inSight
           restoreMode: Binding.RestoreNone
         }

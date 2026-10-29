@@ -38,9 +38,7 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
   if (!quote && !quoteFailed) return null
   var chart = { symbol: symbol, range: range, quote: quote, day: null, latest: null, history: null, failed: false, allDay: false }
   if (quote) {
-    // A listing never asked of Robinhood (`allDay` not given, as in a
-    // harness that stubs the service) has Yahoo's own day, with no prints.
-    var drawn = dayDrawn(quote, nights ? nights[symbol] : null, allDay ? allDay[symbol] : { allDay: false }, calendars)
+    var drawn = dayDrawn(symbol, quote, nights, allDay, calendars)
     if (drawn.waiting && range === "1D") return null
     chart.day = drawn.day
     chart.latest = drawn.latest
@@ -54,18 +52,22 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
   return chart
 }
 
-// The day the 1D chart draws for `quote`, { day, latest, allDay, waiting },
-// which a row's line and the pill's draw too, so all three show one day:
-// for a US stock or ETF Robinhood trades all day (`tradability`, its
-// answer), the newest print's trading day with its night (`night`, its
-// answer, `Overnight.dayChart`), and `latest`, that newest print; for one
-// it doesn't, Yahoo's own day (`Overnight.sessionDay`); while Robinhood
-// hasn't answered either, Yahoo's day as it came, `waiting`. Any other
-// listing's is its quote's day, or the coming day a two-day answer holds
-// once it has a print (`Quote.tailDay`).
-function dayDrawn(quote, night, tradability, calendars) {
+// The day the 1D chart draws for `symbol`'s `quote`, { day, latest,
+// allDay, waiting }, which a row's line and the pill's draw too, so all
+// three show one day (`lineDay`): for a US stock or ETF Robinhood trades
+// all day (`allDay`, its answers by symbol), the newest print's trading
+// day with its night (`nights`, its answers, `Overnight.dayChart`), and
+// `latest`, that newest print; for one it doesn't, Yahoo's own day
+// (`Overnight.sessionDay`); while Robinhood hasn't answered either, Yahoo's
+// day as it came, `waiting`. A listing never asked of Robinhood (`allDay`
+// not given, as in a harness that stubs the service) has Yahoo's own day,
+// with no prints. Any other listing's is its quote's day, or the coming day
+// a two-day answer holds once it has a print (`Quote.tailDay`).
+function dayDrawn(symbol, quote, nights, allDay, calendars) {
   var out = { day: Quote.tailDay(quote) || quote, latest: null, allDay: false, waiting: false }
   if (!Overnight.hasOvernight(quote, calendars)) return out
+  var tradability = allDay ? allDay[symbol] : { allDay: false }
+  var night = nights ? nights[symbol] : null
   out.allDay = !!tradability && tradability.allDay
   if (tradability && !tradability.allDay) out.day = Overnight.sessionDay(quote)
   else if (tradability && night) {
@@ -74,6 +76,14 @@ function dayDrawn(quote, night, tradability, calendars) {
     out.latest = built.latest
   } else out.waiting = true
   return out
+}
+
+// The day a row's line and the pill's draw: the 1D chart's (`dayDrawn`),
+// or null while that day waits on Robinhood's answer, as the chart does, so
+// a line draws once, in the shape it keeps until a new price changes it.
+function lineDay(symbol, quote, nights, allDay, calendars) {
+  var drawn = dayDrawn(symbol, quote, nights, allDay, calendars)
+  return drawn.waiting ? null : drawn.day
 }
 
 // Normalized [0..1] x/y for drawing. x runs along the day's axis
