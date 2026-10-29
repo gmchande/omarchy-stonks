@@ -2,8 +2,8 @@
 # Every check a pull request needs: what Stonks does, fetches, saves and
 # says, and what a key or a click changes. Every unit-test file
 # (test/unit.sh), source boundaries, QML lint, manifest and launcher
-# validation, the Quickshell flow harnesses, the frame checker's
-# self-check on made-up frames, and test/ran.sh's on made-up run records.
+# validation, the Quickshell flow harnesses, and the frame checker's
+# self-check on made-up frames.
 # Pictures, positions and motion belong to test/review.sh; input readiness
 # and a target's reachability to the action they protect; the queue, the
 # lock and the verdict to test/queue.sh. Needs
@@ -11,7 +11,7 @@
 #
 # test/all.sh NAME... runs only the named checks, as the full run would: a
 # harness by its test/qml/NAME.sh, a quick check by the name it's picked by
-# below. Such a run is never recorded and never ends ALL PASS.
+# below. Such a run never ends ALL PASS.
 some=""
 for arg; do
   shift
@@ -61,12 +61,11 @@ start "history harness" bash test/qml/history.sh
 start "camera harness at scale 2" env QT_SCALE_FACTOR=2 STONKS_CAMERA_SIZES=1 bash test/qml/camera.sh
 start "keys harness" bash test/qml/keys.sh
 start "popup harness" bash test/qml/popup.sh
-known_names unit frames ran font boundaries lint lint-gate validate launcher
+known_names unit frames font boundaries lint lint-gate validate launcher
 fill
 
 picked unit && run "unit tests (every *.test.js)" bash test/unit.sh
 picked frames && run "frame checker self-check" bun test/qml/frames.js self-check
-picked ran && run "run record check" bash test/ran-check.sh
 picked font && run "required font glyphs" bun test/font.js
 picked boundaries && run "source boundaries" bash test/boundaries.sh
 picked lint && run "qmllint (only the baseline in test/lint.sh)" bash test/lint.sh
