@@ -849,11 +849,13 @@ Item {
 
   // The surfaces whose chart is drawing itself in (`StonksBody.drawingIn`):
   // while one is, the feeds read only the chart waited on (`chartWaited`),
-  // and the rest once the motion ends, so reading never stutters it.
+  // and the rest once the motion ends, so reading never stutters it. Only
+  // an open surface counts: one taken down mid-draw-in, as a rebuilt bar
+  // takes its popup, can start its chart again as it goes.
   property var drawing: []
   function drawingIn(surface, running) {
     var others = root.drawing.filter(function(s) { return s !== surface })
-    var next = running ? others.concat([surface]) : others
+    var next = running && root.openSurfaces.indexOf(surface) >= 0 ? others.concat([surface]) : others
     if (next.length !== root.drawing.length) root.drawing = next
   }
   // The chart a surface waits on to draw: the stock on show's, or a resting
