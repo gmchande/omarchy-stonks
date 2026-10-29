@@ -3,8 +3,8 @@
 # range picked in the window, the pill showing the day on a range in every
 # style, the window's hold while a range's history is out or failed, r (its
 # "Refreshing" while out), the window opened and closed by the pill's
-# right-click and by IPC, against the popup and another workspace, the
-# popup closed by Omarchy's screensaver, real IPC
+# right-click and by IPC, against the panel and another workspace, the
+# panel closed by Omarchy's screensaver, real IPC
 # refreshing once for two pills and reaching the plugin with no pill at all,
 # the pill's first-fetch states, tooltips, forms and animal, and later
 # Services with a window summoned before each was ready, and the hero

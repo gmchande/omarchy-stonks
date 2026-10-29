@@ -137,7 +137,7 @@ function normalizeRefreshInterval(value) {
 // for the same reason. Named lists are subsets of All with their own
 // order and direction; `list` is the current one, "" for All. A symbol a hand-edited file
 // puts only in a named list joins All rather than being dropped. `range` is
-// the chart range the popup and the window show. A key this version doesn't
+// the chart range the panel and the window show. A key this version doesn't
 // know, at the top or in a list, stays as it is: a later version's, after a
 // downgrade or from another machine sharing the file.
 function fileSettings(src) {
@@ -160,7 +160,7 @@ function fileSettings(src) {
     lists: lists,
     list: listIndex(lists, from.list) >= 0 ? lists[listIndex(lists, from.list)].name : "",
     range: History.historyRanges().indexOf(from.range) >= 0 ? from.range : "1D",
-    // The popup's first-run hint has shown, and never shows again.
+    // The panel's first-run hint has shown, and never shows again.
     hinted: from.hinted === true,
     // The sounds, off until the file says true: a new install and a file
     // from before them start silent.

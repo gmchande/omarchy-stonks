@@ -4,7 +4,7 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 
-// The popup's card in a plain window, for the offscreen platform, where the
+// The panel's card in a plain window, for the offscreen platform, where the
 // shell's KeyboardPanel, a layer-shell PanelWindow, does not load. Only the
 // window is stood in: the card is the shell's BorderSurface, with the
 // shell's border spec, padding, and radius. What lives on KeyboardPanel

@@ -1152,7 +1152,7 @@ Harness {
         menuRefusal + " | " + manageRefusal)
 
       // A rename or a delete question pending in this window is about its
-      // list, not its row: the popup moving that list meanwhile changes
+      // list, not its row: the panel moving that list meanwhile changes
       // nothing about which list DONE renames or Enter deletes.
       var listNames = function() { return service.lists.map(function(l) { return l.name }) }
       body.openManageLists()
@@ -1361,7 +1361,7 @@ Harness {
       // the open; amounts can't be ranked across currencies, so with amounts
       // showing the rows stay in percent order. Of three rows, the first
       // leads from the close, the second by the amount, and the third from
-      // the open. The popup's header is the same StonksBody's.
+      // the open. The panel's header is the same StonksBody's.
       var plain = service.testFeed.quotes
       var moved = Object.assign({}, plain)
       var three = service.library.slice(0, 3)
@@ -1401,7 +1401,7 @@ Harness {
       service.testFeed.quotes = plain
 
       // A stock's lists open in the window, and the stock removed in the
-      // popup: the window's lists close, as they do when the window removes
+      // panel: the window's lists close, as they do when the window removes
       // it, since nothing is left to tick.
       var away = service.library[service.library.length - 1]
       body.openSymbolLists(away)
@@ -1413,7 +1413,7 @@ Harness {
       var closedThere = within(2000, function() {
         return body.listsSymbol === "" && !checklist.visible
       })
-      harness.check("a stock removed in the popup closes its lists in the window",
+      harness.check("a stock removed in the panel closes its lists in the window",
         closedThere && service.library.indexOf(away) < 0, away + " | " + JSON.stringify(body.listsSymbol))
       service.undoRemoval(away)
       tryVerify(function() { return service.library.indexOf(away) >= 0 }, 3000)

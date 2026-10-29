@@ -24,7 +24,7 @@ Item {
   // after a pause plays at once: an output asleep wakes as a sound starts,
   // and cuts or delays its start. Only then, and while a replay waits for
   // the output to wake (`whenAwake`): headphones go to whichever computer
-  // plays, so neither an open popup nor a scrub left standing takes them.
+  // plays, so neither an open panel nor a scrub left standing takes them.
   readonly property bool keepingAwake: turnedOn && (scrubHeld || replaysWaiting.length > 0)
   // A scrub moved, started, or ended in the last second (`afterScrub`): a
   // flag of its own, since the timer's restart turns `running` off and on.

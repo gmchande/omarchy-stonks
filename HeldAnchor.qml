@@ -1,7 +1,7 @@
 import QtQuick
 import Quickshell
 
-// Where the popup's card stands along the bar, held from an open until the
+// Where the panel's card stands along the bar, held from an open until the
 // next. The shell places a card under its anchor live (KeyboardPanel's
 // `cardOrigin`, through a TransformWatcher), and the pill widens or narrows
 // as `c` or a featured symbol changes what it says, which would move the open

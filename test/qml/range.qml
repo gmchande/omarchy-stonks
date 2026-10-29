@@ -12,7 +12,7 @@ import "plugin/History.js" as History
 import "plugin" as Stonks
 
 // One shared range through the real Service, App, and BarWidget, with real
-// keys in the window. The popup cannot load offscreen; the popup harness
+// keys in the window. The panel cannot load offscreen; the panel harness
 // covers its side of the shared range. The data file starts as the version-1
 // fixture (AAPL, MSFT, NVDA, MSFT featured); the fake curl answers AAPL and
 // MSFT history with a saved year, fails NVDA's, and fails every FAIL quote.
@@ -151,7 +151,7 @@ Harness {
 
   QtObject {
     id: shellApi
-    // Whether the popup is open, as the shell would say: the pills here
+    // Whether the panel is open, as the shell would say: the pills here
     // load none.
     property bool popupOpen: false
     function serviceFor() { return plugin }
@@ -437,7 +437,7 @@ Harness {
       harness.check("a right-click on the pill opens the window, and another closes it",
         openedByClick && !app.opened, openedByClick + " -> " + app.opened)
 
-      // With the popup open, a request for the window closes the popup and
+      // With the panel open, a request for the window closes the panel and
       // opens the window, or leaves it open when it already is.
       shellApi.popupOpen = true
       rightClick()
@@ -445,17 +445,17 @@ Harness {
       shellApi.popupOpen = true
       rightClick()
       var overWindow = [shellApi.popupOpen, app.opened].join(",")
-      harness.check("with the popup open, a right-click closes it and opens the window, or keeps the window open",
+      harness.check("with the panel open, a right-click closes it and opens the window, or keeps the window open",
         fromPopup === "false,true" && overWindow === "false,true", fromPopup + " | " + overWindow)
 
-      // Omarchy's screensaver opening closes the popup, and leaves the
-      // window open under it; another window opening leaves the popup open.
+      // Omarchy's screensaver opening closes the panel, and leaves the
+      // window open under it; another window opening leaves the panel open.
       shellApi.popupOpen = true
       hyprlandStandIn.opens("Alacritty", "screensaver, notes")
       var afterOther = [shellApi.popupOpen, app.opened].join(",")
       hyprlandStandIn.opens("org.omarchy.screensaver", "Screensaver")
       var afterScreensaver = [shellApi.popupOpen, app.opened].join(",")
-      harness.check("the screensaver opening closes the popup and leaves the window open, and another window opening closes nothing",
+      harness.check("the screensaver opening closes the panel and leaves the window open, and another window opening closes nothing",
         afterOther === "true,true" && afterScreensaver === "false,true", afterOther + " | " + afterScreensaver)
 
       // On another workspace the window comes forward there and stays open;
@@ -768,7 +768,7 @@ Harness {
       harness.check("the pill says no data when the first fetch failed",
         within(10000, function() { return pillChange.text === "! No data" }), pillChange.text)
       // The "!" names itself on hover on every form, the text's included,
-      // in the popup's words; the text's says nothing else.
+      // in the panel's words; the text's says nothing else.
       var warningTips = hoverEveryForm()
       harness.check("hovering a pill with a failed first fetch says so on every form, and the text form says only that",
         warningTips.slice(0, 3).join(" | ") === 'text "NO DATA FOR THIS SYMBOL" | sparkline "NO DATA FOR THIS SYMBOL" | arrow "NO DATA FOR THIS SYMBOL"'

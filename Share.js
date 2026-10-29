@@ -103,7 +103,7 @@ function barDate(history, bar) {
 //   regular session named by its session, as the line under the price is;
 //   on a range, its date too, which on the day the foot says;
 //   from: what the change is measured from, as the chart's dashed line;
-//   extended: the line under the price the popup shows, with its time;
+//   extended: the line under the price the panel shows, with its time;
 //   currency: beside the price; none beside an index's level, which isn't
 //   money;
 //   start, end: the day's axis's two ends; a range has none;
@@ -142,7 +142,7 @@ function words(o) {
   } else {
     // What the change on show is measured from: the quote's at rest
     // (`Quote.headlineBase`), and while scrubbed the close the day's dashed
-    // line is at, named as the popup names it (`Figures.dayBaselineText`).
+    // line is at, named as the panel names it (`Figures.dayBaselineText`).
     var base = o.scrubT ? Figures.scrubbedBase(o.day) : Quote.headlineBase(quote)
     out.from = o.changeMode === "open" ? "OPEN " + Format.money(base.dayOpen, digits)
       : o.scrubT ? Figures.dayBaselineText(o.day, Figures.exchangeDay(o.day, o.now), o.scrubT)
@@ -158,7 +158,7 @@ function words(o) {
       out.end = (last.d !== first.d ? Format.WEEKDAYS[last.weekday].toUpperCase() + " " : "") + last.clock
     }
   }
-  // The popup's line under the price, as it shows it: at rest, its tone,
+  // The panel's line under the price, as it shows it: at rest, its tone,
   // and an old overnight print dimmed (`Figures.extendedStack`).
   var ext = !o.scrubT ? Figures.extendedStack(quote, o.latest, o.now, o.day, o.changeMode) : null
   var print = ext ? Quote.extendedPrint(quote, o.latest) : null

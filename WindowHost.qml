@@ -4,9 +4,9 @@ import QtQuick
 import Quickshell.Hyprland
 
 // Hosts the window, whatever is on the bar, and decides what a request for
-// it does with the popup and Hyprland's workspaces, and whether a screen
+// it does with the panel and Hyprland's workspaces, and whether a screen
 // shows it. The window itself is App's. It also asks Hyprland, for the
-// service, whether every screen is off, and closes the popup as Omarchy's
+// service, whether every screen is off, and closes the panel as Omarchy's
 // screensaver starts.
 Item {
   id: root
@@ -49,13 +49,13 @@ Item {
   }
 
   // The pill's right-click and IPC toggleWindow: the window open on this
-  // workspace, with no popup over it, closes; otherwise it comes forward.
+  // workspace, with no panel over it, closes; otherwise it comes forward.
   function toggle() {
     if (app.opened && !elsewhere && !popupOpen()) app.close()
     else open("{}")
   }
 
-  // Opens the window, or brings it forward where it is, closing the popup.
+  // Opens the window, or brings it forward where it is, closing the panel.
   // The payload may name a symbol and a range.
   function open(payloadJson) {
     var shown = app.opened
@@ -108,9 +108,9 @@ Item {
     }
   }
 
-  // Omarchy's screensaver window opening closes the popup, which would
+  // Omarchy's screensaver window opening closes the panel, which would
   // otherwise stay over it; the window stays, under it, as any app does.
-  // Heard only while the popup is open.
+  // Heard only while the panel is open.
   Connections {
     target: Hyprland
     enabled: root.popupOpen()

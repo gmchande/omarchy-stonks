@@ -50,7 +50,7 @@ Flickable {
   // The card's own colour, which a moving row carries under its fill.
   property color ground: "transparent"
   // The rows' own view height, as it is while they show: the list's own
-  // height unless the surface says otherwise. The popup's card shrinks to
+  // height unless the surface says otherwise. The panel's card shrinks to
   // the key sheet or a view, and the list with it, while its rows are
   // hidden; sight is judged against the rows' view all the same.
   property real sightHeight: height

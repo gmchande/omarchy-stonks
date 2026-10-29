@@ -6,6 +6,7 @@ import qs.Commons
 import qs.Ui
 import "plugin" as Stonks
 import "plugin/Figures.js" as Figures
+import "plugin/Format.js" as Format
 
 // A power user's list: 154 symbols through the real Plugin, Service, App,
 // and a pill, on a clock this harness sets, from Wednesday 7 October 2026 at
@@ -337,9 +338,18 @@ Harness {
           saidOnce = body.headerText + " | " + rowsWarning.length + " rows in sight warn"
         }
       })
-      harness.check("Yahoo refusing: nothing warns for 85 s, then the pill and every symbol's update is overdue within 90 s of falling due, and the header says it once instead of every row",
-        refusedAt > 0 && firstWarnAt >= 85 && allWarnAt > 0 && allWarnAt <= 155 && saidOnce === "Can't get prices · Stonks keeps trying | 0 rows in sight warn",
+      var refusedWords = /^The price server is busy\. Retrying at \d\d:\d\d\. \| 0 rows in sight warn$/
+      harness.check("Yahoo refusing: nothing warns for 85 s, then the pill and every symbol's update is overdue within 90 s of falling due, and the header says it once instead of every row, with why and when Stonks tries again",
+        refusedAt > 0 && firstWarnAt >= 85 && allWarnAt > 0 && allWarnAt <= 155 && refusedWords.test(saidOnce),
         "refused at " + (refusedAt - start) + " s; first warning " + firstWarnAt + " s after, all " + allWarnAt + " s after; " + overdue() + " overdue now; " + saidOnce)
+      // The time the header names is when Stonks asks Yahoo again: the
+      // refusal that answers it begins the next pause in that minute.
+      var named = (/Retrying at (\d\d:\d\d)\.$/.exec(app.testBody.headerText) || [])[1]
+      var pausedUntil = gate.pausedUntil
+      for (var waited = 0; waited < 31 * 60 && gate.pausedUntil === pausedUntil; waited++) tick(1, 1)
+      var askedAt = Format.hhmm(gate.now(), Format.readerOffset(gate.now()))
+      harness.check("Yahoo refusing: Stonks asks again in the minute the header names",
+        !!named && askedAt === named, "named " + named + ", asked again at " + askedAt)
       remove("YAHOO.refuse")
       harness.finish()
     }

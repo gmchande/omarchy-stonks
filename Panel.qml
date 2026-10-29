@@ -5,9 +5,9 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 
-// The watchlist popup. Owns popup lifecycle, keys, and look; the body reads
+// The watchlist panel. Owns its lifecycle, keys, and look; the body reads
 // the service and owns the list, search, scrub, help, and the motion when
-// the chart changes. The body is built as the popup first opens, and kept.
+// the chart changes. The body is built as the panel first opens, and kept.
 Panel {
   id: root
   moduleName: "grvc.stonks"
@@ -27,20 +27,20 @@ Panel {
   readonly property string featuredSymbol: service ? service.featuredSymbol : ""
   readonly property string range: service ? service.range : "1D"
   readonly property int panelWidth: Style.space(480)
-  // The popup shows up to six whole rows under its fixed content. Stated in
+  // The panel shows up to six whole rows under its fixed content. Stated in
   // rows, so a different font or text size still gets six.
   readonly property int maxRows: 6
-  // Null until the popup first opens.
+  // Null until the panel first opens.
   readonly property var body: bodyLoader.item
   readonly property int heightCap: body ? panel.verticalContentInset + body.chromeHeight
     + maxRows * body.rowPitch - body.rowGap : 0
   // The card's height for what the body shows: whole rows up to the cap, so
-  // the footer ends the popup with no gap, or a view's own height. The
+  // the footer ends the panel with no gap, or a view's own height. The
   // body's room is the most the card gives it.
   readonly property int bodyRoom: Math.min(root.heightCap, panel.availableCardHeight > 0 ? panel.availableCardHeight : root.heightCap)
     - panel.verticalContentInset
   readonly property int fittedCardHeight: body ? panel.fittedContentHeight(body.fittedHeight(root.bodyRoom), root.heightCap) : 0
-  // While the popup is open its edge eases to that height, so a view that
+  // While the panel is open its edge eases to that height, so a view that
   // changes it moves the edge instead of jumping it; the body lays out at
   // the new height at once and the card's edge reveals or covers it, the
   // footer riding it. The shell's card is an item
@@ -57,7 +57,7 @@ Panel {
   }
 
   // The first visit there ever was says how Stonks is moved and changed,
-  // once: the service saves that it has. A popup opened while the service
+  // once: the service saves that it has. A panel opened while the service
   // still reads its file says it as soon as the service is ready. A visit
   // whose footer has a notice ahead of the hint (the data file can't be
   // read, a save didn't land, an update waits) neither shows nor records
@@ -78,7 +78,7 @@ Panel {
     pill: root.anchorItem
   }
 
-  // The views reset as the popup opens, before its first frame, not as it
+  // The views reset as the panel opens, before its first frame, not as it
   // closes: the card fades out showing what you were looking at. Shown
   // first, so the body reads the service again (its held inputs) and the
   // reset lays out the latest. An open while open changes nothing on screen.
@@ -127,7 +127,7 @@ Panel {
       root.bar.setCenterHoverRevealSuppressed(value)
   }
 
-  // The cap and P/E for the symbol on show while the popup is open; the
+  // The cap and P/E for the symbol on show while the panel is open; the
   // service asks for the chart's history itself.
   function requestFundamentals() {
     if (root.opened && service && featuredSymbol) service.fetchFundamentals(featuredSymbol)
@@ -175,7 +175,7 @@ Panel {
         root.switchPanel(direction)
       }
 
-      // The popup's keys land here first, and the body's map takes them,
+      // The panel's keys land here first, and the body's map takes them,
       // as the window's do. Every other key goes on to the catcher.
       Item {
         id: bodyKeys
@@ -208,7 +208,7 @@ Panel {
           chartHeight: Style.space(190)
           foreground: root.bar ? root.bar.foreground : Commons.Color.foreground
           fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
-          // The card's colour, opaque whatever the theme's popup alpha.
+          // The card's colour, opaque whatever the theme's panel alpha.
           ground: Qt.rgba(Commons.Color.popups.background.r, Commons.Color.popups.background.g, Commons.Color.popups.background.b, 1)
           upColor: root.trendColors ? root.trendColors.upOn(ground) : Commons.Color.foreground
           downColor: root.trendColors ? root.trendColors.downOn(ground) : Commons.Color.urgent

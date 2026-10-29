@@ -7,7 +7,7 @@ import qs.Ui
 import "plugin" as Stonks
 import "plugin/Figures.js" as Figures
 
-// The popup's card edge in motion, judged on rendered frames (frames.js):
+// The panel's card edge in motion, judged on rendered frames (frames.js):
 // the real Panel and Service with real Qt keys, the card in a plain window
 // (CardWindow.qml) since the shell's layer-shell one does not load
 // offscreen. Each change of what the card fits eases its edge there in the
@@ -37,7 +37,7 @@ Harness {
   }
   Stonks.Panel { id: panel; bar: api; settings: ({}) }
   FrameGrab { id: grab }
-  // A real pill in its icon form, its own popup off (popup-motion.sh), on
+  // A real pill in its icon form, its own panel off (popup-motion.sh), on
   // a plain window in the bar's ground, for its animal's frames and the wheel.
   // Its shell hands it the plugin's up and down, as Plugin.qml does.
   Stonks.TrendColors { id: trendColors }
@@ -121,7 +121,7 @@ Harness {
       return [String(find(panel.testBody, "footer").height + panel.testCard.card.contentBottomInset)]
     }
 
-    // A key as a person presses it, once the popup has its keys: it takes
+    // A key as a person presses it, once the panel has its keys: it takes
     // them as it opens and a turn after a view closes.
     function key(k, modifiers) {
       tryVerify(function() { return panel.testBodyKeys.activeFocus }, 2000)
@@ -244,7 +244,7 @@ Harness {
         waitForRendering(panel.testCard.surface)
         panel.close()
       }
-      check("each later open of the popup holds the thread at most 20 ms", Math.max.apply(null, later) <= 20, later.join(", ") + " ms")
+      check("each later open of the panel holds the thread at most 20 ms", Math.max.apply(null, later) <= 20, later.join(", ") + " ms")
       pillTurns()
       viewsThroughClose()
       harness.finish()

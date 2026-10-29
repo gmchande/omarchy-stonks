@@ -3,10 +3,10 @@
 
 // The key sheet behind the header's ?: every key, grouped by what it
 // touches, then the mouse in a few lines. The README's table lists the same
-// keys, in its words; where a line is too long for the popup's half column,
+// keys, in its words; where a line is too long for the panel's half column,
 // the sheet says it shorter. A key shows only where it acts: ⇧↑ ⇧↓ and a
 // row's drag on manual order, the order's arrow on a sorted one, and Tab in
-// the popup, which steps to the bar's next panel. Knows nothing of how the
+// the panel, which steps to the next widget's panel. Knows nothing of how the
 // keys are handled.
 function sheet(order, switchesPanels) {
   var manual = Settings.normalizeOrder(order) === "manual"
@@ -26,7 +26,7 @@ function sheet(order, switchesPanels) {
     groups: [
       { title: "Rows", rows: rows },
       { title: "Chart", rows: [
-        { key: "← →", does: "Scrub one step" },
+        { key: "← →", does: "Move along the chart" },
         { key: "[ ]", does: "Change the range" },
         { key: "p", does: "Replay the chart" },
         { key: "Ctrl+C", does: "Take a screenshot" }
@@ -39,7 +39,7 @@ function sheet(order, switchesPanels) {
       { title: "Look", rows: [
         // The change mode is the day's: on a range the hero shows the period,
         // so c changes the rows and, on the day, the hero.
-        { key: "c", does: "Cycle the day's change" },
+        { key: "c", does: "Show the change in %, price or since the open" },
         { key: "s", does: "Smooth or retro" },
         { key: "m", does: "Sound on or off" },
         { key: "r", does: "Refresh" },
@@ -50,10 +50,12 @@ function sheet(order, switchesPanels) {
       { title: "Keys", rows: surface }
     ],
     mouse: { title: "Mouse", rows: [
-      // Each fits one line of the popup at the shell's usual text size, so
-      // the pill's and the row's take two.
+      // Each fits one line of the panel at the shell's usual text size, so
+      // the pill's take three and the row's two; two actions that wouldn't
+      // fit one line take one each, never wrapping a word alone.
       { key: "pill", does: "Scroll steps through your stocks · drag moves it" },
-      { key: "", does: "Middle-click changes form · right-click opens the window" },
+      { key: "", does: "Middle-click changes how the pill looks" },
+      { key: "", does: "Right-click opens the window" },
       { key: "row", does: "Click shows its chart · right-click offers to remove it" },
       { key: "", does: manual ? "Ctrl-click opens its lists · drag moves it" : "Ctrl-click opens its lists" },
       // The sort word beside the list's name: in manual order the arrow and

@@ -100,8 +100,8 @@ Harness {
     settings: ({ id: "grvc.stonks", barStyle: "sparkline" })
   }
 
-  // The real data service and a popup on it. HOME is the harness's scratch
-  // one, with no data file, as on a fresh install. The popup opens at once,
+  // The real data service and a panel on it. HOME is the harness's scratch
+  // one, with no data file, as on a fresh install. The panel opens at once,
   // while the service still reads its settings. A restart makes both again.
   Component { id: hintServiceComponent; Stonks.Service {} }
   Component { id: hintPanelComponent; Stonks.Panel { bar: hintApi; settings: ({}) } }
@@ -130,7 +130,7 @@ Harness {
   }
   readonly property string dataPath: Quickshell.env("HOME") + "/.config/omarchy/grvc.stonks.json"
   readonly property string manifestPath: String(Qt.resolvedUrl("plugin/manifest.json")).replace(/^file:\/\//, "")
-  readonly property string hintStart: "Drag the pill to move it along the bar"
+  readonly property string hintStart: "Drag the pill in your bar to move it"
   readonly property string fileNotice: "Couldn't load your lists"
   readonly property string updateNotice: "Updated to 9.9.9 · click to restart the shell"
 
@@ -158,7 +158,7 @@ Harness {
     return line && line.visible ? String(line.text) : ""
   }
 
-  // Real keys into a popup's card: the key tester sits in that card, so its
+  // Real keys into a panel's card: the key tester sits in that card, so its
   // keys go to the card's window. It never runs as a test itself.
   TestCase {
     id: keys
@@ -240,7 +240,7 @@ Harness {
     name: "Popup"
     when: harness.hintPanel !== null
 
-    // The popup takes its keys a turn after it opens or a view closes.
+    // The panel takes its keys a turn after it opens or a view closes.
     function focusKeys(popup) {
       within(1000, function() { return popup.testBodyKeys.activeFocus })
     }
@@ -260,7 +260,7 @@ Harness {
       body.showingHelp = true
       focusKeys(panel)
       harness.press(panel, Qt.Key_Down)
-      harness.check("in the popup, a over the key sheet opens search alone, and ↓ shows the rows",
+      harness.check("in the panel, a over the key sheet opens search alone, and ↓ shows the rows",
         searchAlone && !body.showingHelp, searchAlone + "|" + body.showingHelp)
 
       // The card shrinks to the key sheet, the list with it; Manage lists
@@ -279,22 +279,22 @@ Harness {
       kept.push(wl.cursorRow)
       body.closeListViews()
       kept.push(wl.cursorRow)
-      harness.check("in the popup, the key sheet and Manage lists leave the cursor where ↓ put it",
+      harness.check("in the panel, the key sheet and Manage lists leave the cursor where ↓ put it",
         keyedRow !== service.featuredSymbol && kept.every(function(s) { return s === keyedRow }),
         keyedRow + " for featured " + service.featuredSymbol + " | " + kept.join(","))
 
-      // A closed popup re-derives nothing every second; it catches up as it
+      // A closed panel re-derives nothing every second; it catches up as it
       // opens.
       panel.close()
       var closedAt = body.now
       service.now += 7
-      harness.check("a closed popup's clock holds still", body.now === closedAt, closedAt + " -> " + body.now)
+      harness.check("a closed panel's clock holds still", body.now === closedAt, closedAt + " -> " + body.now)
       var opensBefore = harness.opensTold
       var asksBefore = harness.fundamentalsCalls
       panel.open()
-      harness.check("an open popup's clock is the service's", body.now === service.now)
-      harness.check("reopen tells the service the popup is open", harness.opensTold > opensBefore)
-      harness.check("popup asks for a cap and P/E", harness.fundamentalsCalls > asksBefore)
+      harness.check("an open panel's clock is the service's", body.now === service.now)
+      harness.check("reopen tells the service the panel is open", harness.opensTold > opensBefore)
+      harness.check("panel asks for a cap and P/E", harness.fundamentalsCalls > asksBefore)
 
       // The shell puts the pill's bubble under the pill, where it would
       // cover the card's header.
@@ -306,7 +306,7 @@ Harness {
       var openTip = pill.testButton.tooltipText
       pill.panel.close()
       pill.settings = formBefore
-      harness.check("the icon pill's hover names its symbol, and says nothing while its popup is open",
+      harness.check("the icon pill's hover names its symbol, and says nothing while its panel is open",
         closedTip !== "" && openTip === "", JSON.stringify(closedTip) + " -> " + JSON.stringify(openTip))
 
       panel.close()
@@ -362,17 +362,17 @@ Harness {
       var afterSort = [list.cursorSymbol, list.cursorRow]
       service.setOrder("manual")
       harness.press(panel, "?")
-      harness.check("in the popup, a sort under the key sheet that carries the cursor's row below the rows' view lets it go",
+      harness.check("in the panel, a sort under the key sheet that carries the cursor's row below the rows' view lets it go",
         underSheet && removalLetGo && carriedRow !== undefined && sortLetGo,
         [underSheet, topRow + " -> " + afterRemoval.join(","), carriedRow + " -> " + afterSort.join(",")].join(" | "))
 
-      // The popup's own key route: each view takes the keys, the shell's
+      // The panel's own key route: each view takes the keys, the shell's
       // catcher standing aside.
       body.featureSymbol("MZ")
       focusKeys(panel)
       harness.press(panel, "w")
       var menu = null
-      harness.check("w opens the list menu in the popup, which takes the keys",
+      harness.check("w opens the list menu in the panel, which takes the keys",
         within(1000, function() {
           menu = harness.find(body, "listMenu")
           return body.listMenuOpen && !!menu && menu.activeFocus && panel.testKeyCatcher.blocked
@@ -412,7 +412,7 @@ Harness {
       popup.open()
       var secondHint = harness.hintLine(popup)
       popup.close()
-      harness.check("the first popup visit shows the hint beside the add action, opened before the service was ready, and the next does not",
+      harness.check("the first panel visit shows the hint beside the add action, opened before the service was ready, and the next does not",
         harness.openedUnready && firstHint.indexOf(harness.hintStart) === 0 && firstFooter === "+  Add a symbol"
           && secondHint === "",
         [harness.openedUnready, firstHint, firstFooter, secondHint].join("|"))
@@ -426,7 +426,7 @@ Harness {
       popup.open()
       var afterRestart = popup.testBody.hint
       popup.close()
-      harness.check("after a restart the popup shows no hint: the data file says it has shown",
+      harness.check("after a restart the panel shows no hint: the data file says it has shown",
         savedHinted && restarted && afterRestart === "", savedHinted + "|" + restarted + "|" + afterRestart)
 
       harness.hintService.persist({ hinted: false })
@@ -446,9 +446,13 @@ Harness {
       var updateFirst = within(2000, function() { return harness.footerText(popup) === harness.updateNotice })
       harness.writeFile(harness.dataPath, "")
       within(5000, function() { return harness.hintService.settingsUnreadable })
+      // The file's notice whole, and what to do with the file's folder,
+      // beside it or on a line of its own.
       var both = harness.footerText(popup)
-      harness.check("a file that can't be read is said over an update", updateFirst && both === harness.fileNotice,
-        updateFirst + "|" + both)
+      var fix = String(find(find(popup.testBody, "footer"), "footerAction").text)
+      harness.check("a file that can't be read is said over an update, its sentence whole and the file named with its folder",
+        updateFirst && both === harness.fileNotice && /^( · f|F)ix or remove ~\/\.config\/omarchy\/grvc\.stonks\.json$/.test(fix),
+        updateFirst + "|" + both + "|" + fix)
       harness.writeFile(harness.dataPath, goodData)
       within(5000, function() { return !harness.hintService.settingsUnreadable })
 
@@ -525,7 +529,7 @@ Harness {
       harness.find(listMenu, "listNameField").text = "Made on close"
       popup.close()
       var madeOnClose = names().indexOf("Made on close") > 0 && harness.hintService.listName === "Made on close"
-      harness.check("closing the popup keeps a rename being typed and makes a new list being named",
+      harness.check("closing the panel keeps a rename being typed and makes a new list being named",
         renamedOnClose && madeOnClose, names().join(",") + "|" + harness.hintService.listName)
 
       // With search open, the keys that act on the rows elsewhere, Stonks'
@@ -562,7 +566,7 @@ Harness {
       typed.push(field.text)
       ;["j", "k", "h", "l", "x", Qt.Key_Space].forEach(function(key) { harness.press(popup, key) })
       typed.push(field.text)
-      harness.check("in the popup's search, w m s o, Backspace, Ctrl+Z, Delete, Ctrl+C, and Omarchy's j k h l x and Space edit the field, and none acts on the rows, the lists, sounds, the look or the order",
+      harness.check("in the panel's search, w m s o, Backspace, Ctrl+Z, Delete, Ctrl+C, and Omarchy's j k h l x and Space edit the field, and none acts on the rows, the lists, sounds, the look or the order",
         target !== "" && typed.join(",") === "wmso,wms,wmso,wms,wms,wmsjkhlx " && body.adding && field.activeFocus
           && settled() === settledBefore,
         target + " | " + typed.join(",") + " | " + settledBefore + " -> " + settled())
