@@ -1093,7 +1093,8 @@ Item {
   // thread, which among an open's prices would stall them. Only those
   // (`saveWaitsFor`), not a later ask of the same quote, so runs back to
   // back on a slow link can't hold it for good; an open starts the wait
-  // again, for its own.
+  // again, for its own. An ask Yahoo's pause holds, or one waiting while
+  // every screen is off, can wait long, and the save doesn't.
   property bool quotesUnsaved: false
   property int quotesSavedAt: 0
   property var saveWaitsFor: null
@@ -1104,8 +1105,9 @@ Item {
     if (!Object.keys(feed.entries).some(function(s) { return feed.entries[s].status === "ok" })) return
     if (!root.saveWaitsFor) root.saveWaitsFor = { runs: feed.landing.slice(), asked: Object.assign({}, feed.asked) }
     var waits = root.saveWaitsFor
+    var answering = !yahooGate.paused && !root.screensOff
     if (waits.runs.some(function(run) { return feed.landing.indexOf(run) >= 0 })
-      || Object.keys(waits.asked).some(function(s) { return feed.asked[s] === waits.asked[s] })) return
+      || (answering && Object.keys(waits.asked).some(function(s) { return feed.asked[s] === waits.asked[s] }))) return
     root.saveWaitsFor = null
     root.quotesUnsaved = false
     root.quotesSavedAt = root.now

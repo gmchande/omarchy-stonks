@@ -938,7 +938,17 @@ Harness {
       // The screens' last answer, trusted for a second, runs out first.
       wait(1100)
       var darkFrom = harness.requests().length
-      tick(600)
+      // The saved prices, due once the pill's ask waits for a screen, don't
+      // wait for it.
+      tick(60)
+      screensHeard()
+      var nestWaits = "NEST" in service.asked && service.screensOff
+      service.quotesSavedAt = service.now - 10 * 60
+      service.quotesUnsaved = true
+      var darkSavedFrom = service.quotesSavedAt
+      tick(540)
+      var savedInDark = nestWaits && service.quotesSavedAt !== darkSavedFrom && "NEST" in service.asked
+      var darkSave = [nestWaits, service.quotesSavedAt !== darkSavedFrom, "NEST" in service.asked].join(",")
       // A refresh asked for meanwhile, by IPC or a script, waits too.
       service.refresh()
       screensHeard()
@@ -955,6 +965,7 @@ Harness {
         harness.listed.every(function(s) { return dark[s] === 0 })
           && harness.listed.every(function(s) { return lit[s] === (s === "NEST" ? 1 : 0) }),
         "off: " + JSON.stringify(dark) + " | on: " + JSON.stringify(lit))
+      harness.check("every screen off, the saved prices due are written, though the pill's ask waits for a screen", savedInDark, darkSave)
 
       // A run queued behind a host's pause, the screens gone off since
       // their last answer: the pause ending between minute looks starts
@@ -1284,6 +1295,54 @@ Harness {
         pillOut && rowsWait && rowsOut && rowsAskedAtWrite.length === 1 && rowsAskedAtWrite[0] === "none",
         [pillOut, rowsWait, rowsOut].join(",") + " | rows asked at each write: " + rowsAskedAtWrite.join(" / "))
       closeWindow()
+
+      // The saved prices, due with NEST and KILN asked, wait for those two
+      // asks and not for NEST's next: NEST answers, is asked again and held,
+      // and the write goes once KILN is in.
+      tick(90)
+      touch("NEST.quote.hold")
+      touch("KILN.quote.hold")
+      service.testFeed.ask(["NEST", "KILN"], service.now)
+      var bothAsked = within(3000, function() { return service.testFeed.landing.length === 1 })
+      service.quotesSavedAt = service.now - 10 * 60
+      service.quotesUnsaved = true
+      writes = []
+      var nestAskedAtWrite = []
+      var noteNest = function() { nestAskedAtWrite.push("NEST" in service.asked) }
+      service.quotesSavedAtChanged.connect(noteWrite)
+      service.quotesSavedAtChanged.connect(noteNest)
+      service.now += 1
+      remove("NEST.quote.hold")
+      var nestIn = within(5000, function() { return !("NEST" in service.asked) })
+      service.now += 11
+      touch("NEST.quote.hold")
+      service.testFeed.ask(["NEST"], service.now)
+      var beforeKiln = writes.length
+      remove("KILN.quote.hold")
+      var kilnIn = within(5000, function() { return !("KILN" in service.asked) && "NEST" in service.asked })
+      service.now += 1
+      service.quotesSavedAtChanged.disconnect(noteWrite)
+      service.quotesSavedAtChanged.disconnect(noteNest)
+      remove("NEST.quote.hold")
+      settle()
+      harness.check("the saved prices wait for the asks out as they fall due, not for a later ask of the same quote",
+        bothAsked && nestIn && kilnIn && beforeKiln === 0 && writes.length === 1 && nestAskedAtWrite[0] === true,
+        [bothAsked, nestIn, kilnIn, beforeKiln].join(",") + " | " + writes.join(" / ") + " | NEST asked at the write: " + nestAskedAtWrite.join(","))
+
+      // A refusal holds the pill's ask out for its pause: the saved prices,
+      // due, don't wait for it.
+      tick(90)
+      touch("YAHOO.refuse")
+      service.now = service.dueAt
+      var refused = within(5000, function() { return service.testYahooGate.paused && "NEST" in service.asked && service.testFeed.landing.length === 0 })
+      service.quotesSavedAt = service.now - 10 * 60
+      service.quotesUnsaved = true
+      var refusedSavedFrom = service.quotesSavedAt
+      service.now += 1
+      var savedInPause = service.quotesSavedAt !== refusedSavedFrom
+      remove("YAHOO.refuse")
+      harness.check("the saved prices due during Yahoo's pause are written, though the asks it holds wait", refused && savedInPause,
+        refused + " | " + savedInPause)
 
       harness.finish()
     }
