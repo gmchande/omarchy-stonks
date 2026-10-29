@@ -240,9 +240,19 @@ Item {
   function askOvernight() {
     if (!root.pluginsReady) return
     var open = root.openSurfaces.length > 0
+    var asks = root.overnightWanted()
+    if (!asks || !root.screensClear()) return
+    // The pill's own ask waits for a request already out, then goes.
+    if (!open && (allDayFeed.busy || overnightFeed.busy)) return
+    if (!open) root.pillAsked = true
+    allDayFeed.fetch(asks.tradability, root.now)
+    overnightFeed.fetch(asks.prints, root.now)
+  }
+  // What Robinhood is still to be asked now, null for nothing.
+  function overnightWanted() {
     var previewed = root.previewSymbol
-    var asks = Asks.overnightAsks({
-      open: open,
+    return Asks.overnightAsks({
+      open: root.openSurfaces.length > 0,
       pill: root.view.featured,
       pillAsked: root.pillAsked,
       quoteEntries: feed.entries,
@@ -258,12 +268,6 @@ Item {
       now: root.now,
       calendars: root.calendars
     })
-    if (!asks || !root.screensClear()) return
-    // The pill's own ask waits for a request already out, then goes.
-    if (!open && (allDayFeed.busy || overnightFeed.busy)) return
-    if (!open) root.pillAsked = true
-    allDayFeed.fetch(asks.tradability, root.now)
-    overnightFeed.fetch(asks.prints, root.now)
   }
   // The clock's work, as it moves: the asks fall due at their own second
   // (`dueAt`), and the rest by the minute, when a market's session may have
@@ -861,12 +865,15 @@ Item {
   // while the prices the open asked for come in, so the rows move once,
   // when they're in (`Settings.shownOrder`): until no feed has anything
   // asked or out, a turn after the last says so, once what it answered is
-  // applied; or until a site's pause holds what is left. Changing the
-  // order, the list, or its rows lets it go at once.
+  // applied, and Robinhood has nothing left to be asked (one request out
+  // holds the next, the rows' behind the pill's); or until a site's pause
+  // holds what is left. Changing the order, the list, or its rows lets it
+  // go at once.
   property var heldOrder: null
   function releaseOrder() {
     if (!root.heldOrder) return
-    if ((feed.busy || overnightFeed.busy || allDayFeed.busy) && !yahooGate.paused && !robinhoodGate.paused) return
+    var waiting = feed.busy || overnightFeed.busy || allDayFeed.busy || !!root.overnightWanted()
+    if (waiting && !yahooGate.paused && !robinhoodGate.paused) return
     root.heldOrder = null
   }
   onOrderChanged: root.heldOrder = null

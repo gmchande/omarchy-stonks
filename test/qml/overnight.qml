@@ -540,6 +540,34 @@ Harness {
         refused && caughtUp && afterProbe.length > 2 && afterProbe[0] === 25,
         "refused " + refused + "; requests after the pause of " + afterProbe.join(", ") + "; every night refreshed " + caughtUp)
 
+      // The same night, the window closed for 40 minutes and the list in
+      // order of change. The pill's own prints are out, held, as the window
+      // opens: the rows' prints wait behind them, and the list holds its
+      // order until those are in too, not just the pill's.
+      app.close()
+      tryVerify(function() { return service.openSurfaces.length === 0 }, 3000)
+      service.setOrder("pct")
+      runCommand(["touch", harness.state + "/ROBINHOOD.hold"])
+      service.now = thursdayNight + 45 * 60
+      var pillOut = within(3000, function() { return prints.busy })
+      var openCalls = Number(harness.record("OVERNIGHT.calls"))
+      var releasedAt = -1
+      var noteRelease = function() { if (!service.heldOrder && releasedAt < 0) releasedAt = Number(harness.record("OVERNIGHT.calls")) }
+      service.heldOrderChanged.connect(noteRelease)
+      app.open("{}")
+      tryVerify(function() { return app.opened && service.openSurfaces.length === 1 }, 3000)
+      var heldOpen = !!service.heldOrder
+      within(5000, function() { return !service.testFeed.busy })
+      runCommand(["rm", "-f", harness.state + "/ROBINHOOD.hold"])
+      within(10000, function() { return !service.heldOrder })
+      within(10000, function() { return !prints.busy && !allDay.busy })
+      service.heldOrderChanged.disconnect(noteRelease)
+      var finalCalls = Number(harness.record("OVERNIGHT.calls"))
+      check("a list in order of change, opened while the pill's prints are out, keeps its order until the rows' prints asked behind them are in",
+        pillOut && heldOpen && finalCalls > openCalls + 1 && releasedAt === finalCalls,
+        "pill out " + pillOut + ", held " + heldOpen + "; Robinhood calls at the open " + openCalls + ", at the release " + releasedAt + ", in the end " + finalCalls)
+      service.setOrder("manual")
+
       // Friday 23 October at 06:00: NVDA's chart is Friday from midnight,
       // its night and pre-market, which its quote holds after Thursday.
       useSet("night-2026-10-23-0600")
