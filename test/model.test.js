@@ -1230,7 +1230,7 @@ test("a bad quote answer is tried three times in all, a missing symbol fails at 
   expect([M.answerVerdict("bad", null, 0, true), M.answerVerdict("ok", read, 0, true)]).toEqual(["unchanged", "show"])
 })
 
-test("Robinhood is asked once a session for the pill's stock with nothing open by day, and for every US listing while a surface is or a night trades, the chart waited on alone first", () => {
+test("Robinhood is asked once a session for the pill's stock with nothing open by day, for it alone each 5 minutes while a night trades, and for every US listing while a surface is open, the chart waited on alone first", () => {
   const now = at(WED, "21:00")
   const base = {
     open: false, pill: "AAPL", pillAsked: false, quoteEntries: { AAPL: answered(now) }, overnightSymbols: ["AAPL", "MSFT"],
@@ -1244,15 +1244,14 @@ test("Robinhood is asked once a session for the pill's stock with nothing open b
   expect(asks({ now: noon, quoteEntries: { AAPL: { status: "saved", receivedAt: 1, answeredAt: 0 } } })).toBe(null)
   expect(asks({ now: noon, pillAsked: true })).toBe(null)
   expect(asks({ now: noon, allDay: { AAPL: { status: "ok", allDay: true, at: noon - DAY - 60 } }, nights: { AAPL: { status: "ok", at: noon - 3600 } } })).toBe(null)
-  // Nothing open while a night trades: every US listing, as with a surface
-  // open, the pill's alone first while it has no answer, then all of them
-  // each 5 minutes, so the pill's newest price stays current and the rows'
-  // are in hand as a surface opens.
+  // Nothing open while a night trades: the pill's stock alone, each 5
+  // minutes, so its newest price stays current; All's rows wait for a
+  // surface to open, asked or not.
   expect(asks({ pillAsked: true })).toEqual({ tradability: ["AAPL"], prints: ["AAPL"] })
-  const allAnswered = ago => ({ pillAsked: true, allDay: { AAPL: { status: "ok", allDay: true, at: now - 60 }, MSFT: { status: "ok", allDay: true, at: now - 60 } },
-    nights: { AAPL: { status: "ok", at: now - ago }, MSFT: { status: "ok", at: now - ago } } })
-  expect(asks(allAnswered(60))).toBe(null)
-  expect(asks(allAnswered(5 * 60))).toEqual({ tradability: [], prints: ["AAPL", "MSFT"] })
+  const pillAnsweredAgo = ago => ({ pillAsked: true, allDay: { AAPL: { status: "ok", allDay: true, at: now - 60 } },
+    nights: { AAPL: { status: "ok", at: now - ago } } })
+  expect(asks(pillAnsweredAgo(60))).toBe(null)
+  expect(asks(pillAnsweredAgo(5 * 60))).toEqual({ tradability: [], prints: ["AAPL"] })
   // A surface open: every US listing, the pill's alone while it has no
   // answer.
   expect(asks({ open: true })).toEqual({ tradability: ["AAPL"], prints: ["AAPL"] })

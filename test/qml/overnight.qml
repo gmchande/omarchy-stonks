@@ -344,20 +344,24 @@ Harness {
           trades.length + " trades ; " + edge + " ; " + replayed + " ; missed " + missed.join(", "))
       })
 
-      // On 1M, with its history in.
+      // On 1M, with its history in: the night's price on top, as on the
+      // day, named after the range, and the close and its day's move under
+      // it.
       useLook(false)
       featureShown("NEST")
       pressKey(Qt.Key_BracketRight)
       keyClick(Qt.Key_BracketRight)
       within(5000, function() { return body.chartRange === "1M" && body.historyShown && !body.historyFailed && !body.chartLoading })
       var month = harness.strip()
+      var monthTop = harness.top()
       scrubAt(0.5)
       var legend = find(body, "baselineLegend")
       var scrubbedMonth = harness.strip() + " | " + (legend.visible ? legend.text : "")
       endScrub()
-      check("smooth: a 1M scrub rests the line, and the baseline's legend takes its place; the scrub's end brings it back",
-        month.indexOf("OVERNIGHT ") === 0 && scrubbedMonth.indexOf(" | ┄ 1M START ") === 0 && harness.strip() === month,
-        month + " | " + scrubbedMonth + " then " + harness.strip())
+      check("smooth: on 1M at night the night's price is on top after the range's name; a scrub rests the line under it, and the baseline's legend takes its place; the scrub's end brings it back",
+        monthTop.indexOf("1M · OVERNIGHT ") === 0 && month.indexOf("FRI CLOSE ") === 0 && scrubbedMonth.indexOf(" | ┄ 1M START ") === 0
+          && harness.strip() === month,
+        monthTop + " | " + month + " | " + scrubbedMonth + " then " + harness.strip())
 
       // Wednesday 7 October, 01:00, back on 1D: Tuesday's chart, its night
       // after midnight at the right end.

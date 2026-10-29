@@ -742,8 +742,8 @@ Harness {
       // Midnight, the window left open on a workspace no screen shows: it
       // asks what a closed one asks, the pill's symbol every 15 minutes and
       // Tokyo, trading, every minute, and Robinhood every 5 minutes through
-      // the night, for the pill's newest price and All's. Back in sight,
-      // what fell due goes at once.
+      // the night, for the pill's newest price alone. Back in sight, what
+      // fell due goes at once.
       hyprlandStandIn.toplevels = { values: [stonksToplevel] }
       plugin.windowHost.monitors = [screenStandIn]
       stonksToplevel.workspace = workspaceThere
