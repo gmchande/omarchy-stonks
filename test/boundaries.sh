@@ -37,12 +37,12 @@ none() {
 
 # External commands run only in the feeds, search, the version watch's
 # shell restart and update, the sounds' pw-play, its chimes' sh, the
-# bell's pw-dump, and the silence's pw-cat, the camera's screenshot
-# hand-off, and the sh and chmod that keep Stonks' files its owner's and
-# the sh that makes the data file so (OwnerOnly); files are read and
-# written only by the service, the version watch reads the manifest, the
-# trend colours read the theme's colours, the sounds read their own
-# bundled sounds,
+# bell's omarchy-shell and pw-dump, and the silence's pw-cat, the camera's
+# screenshot hand-off, and the sh and chmod that keep Stonks' files its
+# owner's and the sh that makes the data file so (OwnerOnly); files are
+# read and written only by the service, the version watch reads the
+# manifest, the trend colours read the theme's colours, the sounds read
+# their own bundled sounds,
 # the cache's files, the saved quotes and the sounds' replay, chimes, and
 # lead-ins, are written only through OwnerOnly, and the camera writes its
 # screenshot and reads Omasnap's settings; one service owns the feeds; the

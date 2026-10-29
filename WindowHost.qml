@@ -6,7 +6,8 @@ import Quickshell.Hyprland
 // Hosts the window, whatever is on the bar, and decides what a request for
 // it does with the popup and Hyprland's workspaces, and whether a screen
 // shows it. The window itself is App's. It also asks Hyprland, for the
-// service, whether every screen is off.
+// service, whether every screen is off, and closes the popup as Omarchy's
+// screensaver starts.
 Item {
   id: root
 
@@ -104,6 +105,17 @@ Item {
     enabled: root.screensOff || (root.opened && root.monitors.length > 0)
     function onRawEvent(event) {
       if (root.screensOff || root.screenOff || event.name === "activespecial") Hyprland.refreshMonitors()
+    }
+  }
+
+  // Omarchy's screensaver window opening closes the popup, which would
+  // otherwise stay over it; the window stays, under it, as any app does.
+  // Heard only while the popup is open.
+  Connections {
+    target: Hyprland
+    enabled: root.popupOpen()
+    function onRawEvent(event) {
+      if (event.name === "openwindow" && event.parse(4)[2] === "org.omarchy.screensaver") root.shell.hide("grvc.stonks")
     }
   }
 

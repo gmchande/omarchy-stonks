@@ -7,7 +7,8 @@ import "ChartSound.js" as ChartSound
 // removal, which plays the removal backwards, taking a screenshot, the
 // shutter, a replay, which plays the chart, and the chimes, the chart's
 // bars as the scrub crosses them (`ChartSound`); and the market's bell
-// (`Bell`). Each in the look's voice.
+// (`Bell`), the one sound you didn't cause, which keeps quiet while
+// Omarchy's Do Not Disturb is on (`ring`). Each in the look's voice.
 // The fixed sounds, the bell, and the replay play one at a time: a new one
 // stops the one playing. The chimes overlap and ring out. Nothing else
 // sounds: no refresh or price. `pw-play`, which PipeWire ships, plays them
@@ -434,13 +435,18 @@ Item {
     onTriggered: if (root.keepingAwake && !silence.running) silence.running = true
   }
 
-  // The market's bell, unless an app is recording from a microphone, as a
-  // call does: `pw-dump` lists PipeWire's nodes once, as the bell is due,
-  // for at most 3 s and 4 MB (the list runs to about half a megabyte), so
-  // no answer can hold the bell or fill the shell. An answer that ran out
-  // of time, failed, or reached the cap counts as recording, by the
-  // pipeline's own exit and the bytes it gave, never by the clock: the bell
-  // stays quiet. One still out is stopped within 4 s, before the next bell.
+  // The market's bell, unless Omarchy's Do Not Disturb is on, or an app is
+  // recording from a microphone, as a call does. As the bell is due, the
+  // shell is asked once whether Do Not Disturb is on (`omarchy-shell
+  // notifications dndState`, as Omarchy's own toggle asks), for at most
+  // 2 s; a shell that doesn't answer, as with another app showing
+  // notifications, leaves the bell to ring. Then `pw-dump` lists
+  // PipeWire's nodes once, for at most 3 s and 4 MB (the list runs to
+  // about half a megabyte), so no answer can hold the bell or fill the
+  // shell. An answer that ran out of time, failed, or reached the cap
+  // counts as recording, by the pipeline's own exit and the bytes it gave,
+  // never by the clock: the bell stays quiet. One still out is stopped
+  // within 7 s, before the next bell.
   function ring() {
     if (turnedOn && !listening.running) listening.running = true
   }
@@ -462,7 +468,8 @@ Item {
   // A byte past 4 MB is read, so an answer that reaches the cap shows it.
   Process {
     id: listening
-    command: ["bash", "-c", "set -o pipefail; timeout -k 1 3 pw-dump | head -c 4000001"]
+    command: ["bash", "-c", "[ \"$(timeout -k 1 2 omarchy-shell -q notifications dndState)\" = on ] && exit 1\n"
+      + "set -o pipefail; timeout -k 1 3 pw-dump | head -c 4000001"]
     stdout: StdioCollector { id: answer }
     onExited: function(code) {
       if (root.turnedOn && code === 0 && answer.data.byteLength <= 4000000 && !root.recording(answer.text)) root.play("bell")

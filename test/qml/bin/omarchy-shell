@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# A stand-in for omarchy-shell, first on PATH inside the harnesses, so a
+# harness never asks the owner's shell anything. It appends its arguments as
+# one line to STONKS_FAKE_STATE/omarchy-shell.calls, and answers
+# `notifications dndState` with what STONKS_FAKE_STATE/dnd holds, "on" or
+# "off"; with no such file it answers nothing, as a shell without Omarchy's
+# notifications does under -q. Every other call answers nothing.
+echo "$*" >> "$STONKS_FAKE_STATE/omarchy-shell.calls"
+[ "$1" = "-q" ] && shift
+if [ "$1 $2" = "notifications dndState" ] && [ -e "$STONKS_FAKE_STATE/dnd" ]; then
+  cat "$STONKS_FAKE_STATE/dnd"
+fi
+exit 0
