@@ -535,7 +535,6 @@ Item {
     heroes: [root.view.featured].concat(root.previewShown && root.library.indexOf(root.previewSymbol) >= 0 ? [root.previewSymbol] : [])
     reading: function() { return Asks.readingOrder(root.view.featured, root.sights, root.view.shown, root.library) }
     holding: root.drawing.length > 0
-    waited: root.chartWaited
     onBusyChanged: Qt.callLater(root.releaseOrder)
     now: root.now
     clock: root
@@ -604,7 +603,6 @@ Item {
     id: overnightFeed
     gate: robinhoodGate
     holding: root.drawing.length > 0
-    waited: root.chartWaited
     onEntriesChanged: Qt.callLater(root.askOvernight)
     onBusyChanged: Qt.callLater(root.releaseOrder)
   }
@@ -849,20 +847,16 @@ Item {
   property bool opening: false
 
   // The surfaces whose chart is drawing itself in (`StonksBody.drawingIn`):
-  // while one is, the feeds read only the chart waited on (`chartWaited`),
-  // and the rest once the motion ends, so reading never stutters it. Only
-  // an open surface counts: one taken down mid-draw-in, as a rebuilt bar
-  // takes its panel, can start its chart again as it goes.
+  // while one is, the feeds read no answer until the motion ends, so
+  // reading never stutters it. Only an open surface counts: one taken down
+  // mid-draw-in, as a rebuilt bar takes its panel, can start its chart
+  // again as it goes.
   property var drawing: []
   function drawingIn(surface, running) {
     var others = root.drawing.filter(function(s) { return s !== surface })
     var next = running && root.openSurfaces.indexOf(surface) >= 0 ? others.concat([surface]) : others
     if (next.length !== root.drawing.length) root.drawing = next
   }
-  // The chart a surface waits on to draw: the stock on show's, or a resting
-  // preview's on view, while it can't be drawn yet; "" for none.
-  readonly property string chartWaited: !root.view.chart ? root.view.featured
-    : root.previewShown && !root.previewView.chart ? root.previewSymbol : ""
 
   // The order a list in order of change showed as a surface opened, held
   // while the prices the open asked for come in, so the rows move once,

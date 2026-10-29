@@ -575,7 +575,12 @@ Harness {
       var pillOut = within(3000, function() { return prints.busy })
       var openCalls = Number(harness.record("OVERNIGHT.calls"))
       var releasedAt = -1
-      var noteRelease = function() { if (!service.heldOrder && releasedAt < 0) releasedAt = Number(harness.record("OVERNIGHT.calls")) }
+      var releasedIdle = false
+      var noteRelease = function() {
+        if (service.heldOrder || releasedAt >= 0) return
+        releasedAt = Number(harness.record("OVERNIGHT.calls"))
+        releasedIdle = !prints.busy && !allDay.busy
+      }
       service.heldOrderChanged.connect(noteRelease)
       app.open("{}")
       tryVerify(function() { return app.opened && service.openSurfaces.length === 1 }, 3000)
@@ -587,8 +592,9 @@ Harness {
       service.heldOrderChanged.disconnect(noteRelease)
       var finalCalls = Number(harness.record("OVERNIGHT.calls"))
       check("a list in order of change, opened while the pill's prints are out, keeps its order until the rows' prints asked behind them are in",
-        pillOut && heldOpen && finalCalls > openCalls + 1 && releasedAt === finalCalls,
-        "pill out " + pillOut + ", held " + heldOpen + "; Robinhood calls at the open " + openCalls + ", at the release " + releasedAt + ", in the end " + finalCalls)
+        pillOut && heldOpen && finalCalls > openCalls + 1 && releasedAt === finalCalls && releasedIdle,
+        "pill out " + pillOut + ", held " + heldOpen + "; Robinhood calls at the open " + openCalls + ", at the release " + releasedAt
+          + " with Robinhood " + (releasedIdle ? "idle" : "still out") + ", in the end " + finalCalls)
       service.setOrder("manual")
 
       // Friday 23 October at 06:00: NVDA's chart is Friday from its night's
@@ -610,6 +616,31 @@ Harness {
       endScrub()
       check("Friday 06:00: NVDA's row follows its scrub into the pre-market",
         rowFollows, rowRead)
+
+      // WREN, added and on show with no chart yet, while a chart draws in
+      // (as the window's would): its first answers wait, Yahoo's and
+      // Robinhood's, and are read once the motion ends.
+      within(5000, function() { return !prints.busy && !allDay.busy && !service.testFeed.busy })
+      runCommand(["touch", harness.state + "/WREN.quote.hold"])
+      runCommand(["touch", harness.state + "/ROBINHOOD.hold"])
+      service.addSymbol("WREN")
+      service.feature("WREN")
+      service.drawingIn(app.testBody, true)
+      prints.fetch(["WREN"], service.now)
+      var heldOut = within(3000, function() { return prints.busy && "WREN" in service.asked })
+      runCommand(["rm", "-f", harness.state + "/WREN.quote.hold", harness.state + "/ROBINHOOD.hold"])
+      var arrived = within(8000, function() {
+        return !!prints.landing && service.testFeed.landing.some(function(job) {
+          return job.ended && job.slots.some(function(slot) { return slot.symbols.indexOf("WREN") >= 0 })
+        })
+      })
+      var readWhileDrawing = !!service.quotes.WREN || !!prints.entries.WREN
+      service.drawingIn(app.testBody, false)
+      var readAfter = within(8000, function() { return !!service.quotes.WREN && !!prints.entries.WREN && !prints.busy })
+      check("while a chart draws in, the first answers for the stock on show wait too, Yahoo's and Robinhood's, and are read once it ends",
+        heldOut && arrived && !readWhileDrawing && readAfter,
+        [heldOut, arrived].join(",") + " | read while drawing " + readWhileDrawing + ", after " + readAfter)
+      service.removeSymbol("WREN")
 
       // Monday 26 October, 09:35: BRK-A has traded once, at 09:31:04. In
       // retro, a scrub of that lone trade reads it, at its time, never the

@@ -154,18 +154,17 @@ Harness {
         harness.misfiled.join(", "))
       feed.symbols = ["MSFT", "NVDA"]
     } else if (harness.step === 15) {
-      // A chart drawing itself in holds the feed: only the chart it waits
-      // on, MSFT's, is read; NVDA's answer waits, still asked, for the
-      // motion to end.
+      // A chart drawing itself in holds the feed: no answer is read, the
+      // hero's MSFT included; each waits, still asked, for the motion to end.
       feed.lead = "MSFT"
-      feed.waited = "MSFT"
       feed.holding = true
       harness.refresh()
       heldWatch.start()
       return
     } else if (harness.step === 16) {
       check("once the hold ends, what it held is read",
-        receipt("NVDA") === harness.now && !("NVDA" in feed.asked), receipt("NVDA") + " vs " + harness.now)
+        ["MSFT", "NVDA"].every(function(s) { return receipt(s) === harness.now && !(s in feed.asked) }),
+        receipt("MSFT") + ", " + receipt("NVDA") + " vs " + harness.now)
       feed.lead = ""
       feed.symbols = ["MSFT", "SLOW"]
     } else if (harness.step === 17) {
@@ -210,10 +209,11 @@ Harness {
     repeat: true
     onTriggered: {
       var run = feed.landing[0]
-      if (receipt("MSFT") !== harness.now || !run || !run.ended) return
+      if (!run || !run.ended) return
       heldWatch.stop()
-      check("while a chart draws in, only the chart it waits on is read; the rest waits, still asked",
-        receipt("NVDA") < harness.now && "NVDA" in feed.asked, receipt("NVDA") + " vs " + harness.now)
+      check("while a chart draws in, no answer is read, the hero's included; each waits, still asked",
+        ["MSFT", "NVDA"].every(function(s) { return receipt(s) < harness.now && s in feed.asked }),
+        receipt("MSFT") + ", " + receipt("NVDA") + " vs " + harness.now)
       feed.holding = false
       ticker.start()
     }

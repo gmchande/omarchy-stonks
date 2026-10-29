@@ -55,11 +55,10 @@ Item {
   // The order a run asks for those asked together, as a function read at
   // launch (`Asks.readingOrder`); the members' own order without one.
   property var reading: null
-  // While the service holds answers, as a chart draws itself in, only the
-  // chart it waits on (`waited`) is read; the rest wait for the motion to
-  // end, so reading them never stutters it.
+  // While the service holds answers, as a chart draws itself in, none is
+  // read; they wait for the motion to end, so reading them never stutters
+  // it.
   property bool holding: false
-  property string waited: ""
   onHoldingChanged: if (!holding) landTimer.start()
   property int now: 0
   // The service, whose wall clock stamps each ask and answer of the feed's
@@ -326,26 +325,20 @@ Item {
     landTimer.start()
   }
 
-  // Whether `answer` may be read now: always, unless the service holds
-  // answers, when only the chart it waits on is.
-  function readable(job, answer) {
-    var slot = job.slots[answer.index]
-    return !holding || (!!slot && !slot.spark && slot.symbols[0] === waited)
-  }
-
   function landStep() {
+    if (holding) return
     var until = Date.now() + 8
     var more = false
     landing.forEach(function(job) {
       var read = []
-      while (job.read < job.answers.length && Date.now() < until && readable(job, job.answers[job.read])) {
+      while (job.read < job.answers.length && Date.now() < until) {
         var answer = job.answers[job.read]
         if (!readOn(answer, job.slots[answer.index])) continue
         read.push(answer)
         job.read++
       }
       if (read.length > 0) apply(job, read)
-      if (job.read < job.answers.length && readable(job, job.answers[job.read])) more = true
+      if (job.read < job.answers.length) more = true
     })
     var ended = landing.filter(function(job) { return job.ended && job.read >= job.answers.length })
     if (ended.length > 0) {
