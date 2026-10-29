@@ -39,30 +39,48 @@ function calendarsAt(calendars, now) {
   }
 }
 
-// The symbols of All whose quotes are kept fresh: the featured symbol,
-// which the pill shows; every stock, ETF and index through its own regular
-// session, so an open finds the rows fresh (`Market.staysWarm`); and all of
-// them while a surface is open (`open`). `calNow` is `calendarsAt`'s.
-function watchedSymbols(library, featured, open, quotes, now, calNow) {
-  return library.filter(function(s) {
-    return open || s === featured || Market.staysWarm(quotes[s], now, calNow(quotes[s]))
-  })
+// The symbols of All whose quotes are kept fresh: the pill's alone with
+// nothing open, and all of them while a surface is open (`open`), which
+// asks for each as it opens.
+function watchedSymbols(library, featured, open) {
+  return library.filter(function(s) { return open || s === featured })
+}
+
+// The order a run asks for quotes in, ties of the second they were asked
+// for broken by it (`quoteSlots`): the stock at the top, then each open
+// surface's rows in sight from the top down (`sights`, { surface, symbols },
+// as in `aheadRows`), then the list as shown, then the rest of All.
+function readingOrder(featured, sights, shown, library) {
+  var order = featured ? [featured] : []
+  var add = function(s) { if (order.indexOf(s) < 0) order.push(s) }
+  sights.forEach(function(sight) { sight.symbols.forEach(add) })
+  shown.forEach(add)
+  library.forEach(add)
+  return order
 }
 
 // Of `watched`, the quotes to ask for at `now`, and the second the first of
 // the rest falls due, 0 for none: { due, next }. One is due once its last
 // answer, ok or failed, is as old as its market's cadence
 // (`Market.quoteCadence`), or the refresh interval for one an open
-// surface's hero shows (`heroes`). Whatever is asked takes with it each one
-// due within `DUE_SOON`. A symbol with no answer yet, one kept from an
-// earlier session, or one already asked for is the feed's to ask.
-function quotesDue(watched, entries, asked, quotes, heroes, now, interval, calNow) {
+// surface's hero shows (`heroes`); but a row whose market can't have moved
+// since its last price waits for its market to trade again
+// (`Market.quietUntil`). The pill's own (`pill`) keeps its cadence, so a
+// calendar that is wrong about a session can't leave the pill behind, and
+// so does a failed one, which may answer next time.
+// Whatever is asked takes with it each one due within `DUE_SOON`. A symbol
+// with no answer yet, one kept from an earlier session, or one already
+// asked for is the feed's to ask.
+function quotesDue(watched, entries, asked, quotes, heroes, pill, now, interval, calNow) {
   var at = {}
+  var dayOf = Market.tradingDays()
   watched.forEach(function(s) {
     var entry = entries[s]
     if (!entry || entry.status === "saved" || s in asked) return
-    at[s] = entry.answeredAt > now ? now
-      : entry.answeredAt + Market.quoteCadence(quotes[s], now, interval, heroes.indexOf(s) >= 0, calNow(quotes[s]))
+    var cal = calNow(quotes[s])
+    var quiet = s === pill || entry.status !== "ok" ? 0 : Market.quietUntil(quotes[s], entry.receivedAt, now, cal.cal, dayOf)
+    at[s] = entry.answeredAt > now ? now : quiet
+      || entry.answeredAt + Market.quoteCadence(quotes[s], now, interval, heroes.indexOf(s) >= 0, cal)
   })
   var symbols = Object.keys(at)
   var asking = symbols.some(function(s) { return at[s] <= now })
@@ -119,7 +137,8 @@ function laneJudging(toJudge, asked, held) {
 // A run's requests for `waiting`, in order, each { symbols, spark }: a
 // chart for each hero (`heroes`), the pill's (`lead`) leading, then spark
 // batches of up to `Quote.SPARK_BATCH`, each in the order asked, so one the
-// budget held goes before those asked since. A batch of one is a chart: one
+// budget held goes before those asked since, and those asked together in
+// `symbols`' order (`readingOrder`). A batch of one is a chart: one
 // request either way, and the chart's has opens, so its day needs no
 // judging. The coins (`coins`) go in spark batches of their own, one alone
 // too: a coin is asked for two days (`Market.twoDays`), and a batch asks

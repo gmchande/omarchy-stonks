@@ -152,10 +152,70 @@ Harness {
       check("every quote kept, through every step, is the symbol it is kept under",
         harness.misfiled.length === 0 && Object.keys(feed.quotes).every(function(key) { return feed.quotes[key].symbol === key }),
         harness.misfiled.join(", "))
+      feed.symbols = ["MSFT", "NVDA"]
+    } else if (harness.step === 15) {
+      // A chart drawing itself in holds the feed: no answer is read, the
+      // hero's MSFT included; each waits, still asked, for the motion to end.
+      feed.lead = "MSFT"
+      feed.holding = true
+      harness.refresh()
+      heldWatch.start()
+      return
+    } else if (harness.step === 16) {
+      check("once the hold ends, what it held is read",
+        ["MSFT", "NVDA"].every(function(s) { return receipt(s) === harness.now && !(s in feed.asked) }),
+        receipt("MSFT") + ", " + receipt("NVDA") + " vs " + harness.now)
+      feed.lead = ""
+      feed.symbols = ["MSFT", "SLOW"]
+    } else if (harness.step === 17) {
+      // A reader's refresh of both: MSFT answers at once, SLOW a second
+      // later. Asked for again meanwhile, MSFT is still waited on as the
+      // first run ends.
+      harness.now += 60
+      feed.ask(["MSFT", "SLOW"], harness.now, true)
+      reaskWatch.start()
+      return
+    } else if (harness.step === 18) {
+      check("a symbol a reader asks for again while its last run is out stays waited on as that run ends",
+        harness.reaskedWaited, JSON.stringify(feed.userAsked))
       finish()
       return
     }
     ticker.start()
+  }
+
+  // MSFT's answer is in and SLOW's still out: MSFT is asked for again.
+  property bool reasked: false
+  property bool reaskEnded: false
+  property bool reaskedWaited: false
+  Timer {
+    id: reaskWatch
+    interval: 20
+    repeat: true
+    onTriggered: {
+      if (receipt("MSFT") !== harness.now || !("SLOW" in feed.asked)) return
+      reaskWatch.stop()
+      harness.reasked = true
+      feed.ask(["MSFT"], harness.now, true)
+      ticker.start()
+    }
+  }
+
+  // The held run has ended: both answers are in hand, unread.
+  Timer {
+    id: heldWatch
+    interval: 20
+    repeat: true
+    onTriggered: {
+      var run = feed.landing[0]
+      if (!run || !run.ended) return
+      heldWatch.stop()
+      check("while a chart draws in, no answer is read, the hero's included; each waits, still asked",
+        ["MSFT", "NVDA"].every(function(s) { return receipt(s) < harness.now && s in feed.asked }),
+        receipt("MSFT") + ", " + receipt("NVDA") + " vs " + harness.now)
+      feed.holding = false
+      ticker.start()
+    }
   }
 
   Connections {
@@ -164,6 +224,13 @@ Harness {
       for (var key in feed.quotes)
         if (feed.quotes[key] && feed.quotes[key].symbol !== key) harness.misfiled.push(key + " as " + feed.quotes[key].symbol)
       if (harness.step === 13 && feed.quotes["NVDA"] && feed.refreshRun.length > 0) harness.nvdaBeforeRefresh = true
+    }
+    // The first run of the reader's refresh ends: is MSFT's new ask still
+    // waited on?
+    function onRefreshRunChanged() {
+      if (harness.step !== 17 || !harness.reasked || harness.reaskEnded || feed.refreshRun.length > 0) return
+      harness.reaskEnded = true
+      harness.reaskedWaited = "MSFT" in feed.userAsked
     }
     // quote-queue.sh patches testRetrying into the copy: the retry pause is running.
     function onTestRetryingChanged() {

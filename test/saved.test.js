@@ -31,7 +31,6 @@ const cents = M.centExchanges(calendars)
 // A listing's cadence and warmth, by its calendar's reading, as askDue
 // reads them.
 const calNow = (q, now) => M.calendarNow(M.calendarFor(calendars, q), now)
-const staysWarm = (q, now) => M.staysWarm(q, now, calNow(q, now))
 const quoteCadence = (q, now, interval, hero) => M.quoteCadence(q, now, interval, hero, calNow(q, now))
 const quote = M.parseChart(fixture("aapl.json"))
 const shop = M.parseChart(fixture("shop-to.json"))
@@ -470,11 +469,10 @@ test("a session on a Sunday trades, and its evening is closed, not the weekend",
     gmtoffset: 10800, currency: "SAR", regularMarketTime: noon - 900, currentTradingPeriod: periods,
     tradingPeriods: { pre: [[periods.pre]], regular: [[periods.regular]], post: [[periods.post]] } })
   const q = M.parseChart(json, cents, noon)
-  // At noon its price is 15 minutes old: asked for each minute, kept fresh
-  // with nothing open, and its age said.
+  // At noon its price is 15 minutes old: asked for each minute, and its age
+  // said.
   expect(M.sessionPhase(q, noon)).toBe("open")
   expect(quoteCadence(q, noon, 60, false)).toBe(60)
-  expect(staysWarm(q, noon)).toBe(true)
   expect(M.freshness({ status: "ok", answeredAt: noon - 5 }, q, noon, 0, false)).toMatchObject({ state: "aged" })
   // The Saturday before is the weekend; Sunday after the bell is closed.
   expect(M.sessionPhase(q, start - DAY)).toBe("weekend")
@@ -2579,31 +2577,42 @@ test("a quote held past its bars' session takes the phase and the bell from Yaho
   expect([M.inRegularSession(london, morning, calendars), quoteCadence(london, morning, 60, false)]).toEqual([true, 60])
 })
 
-test("a quote held from an earlier day stays warm by its calendar; one with no calendar, on the slow clock once its periods are past", () => {
+test("a quote held from an earlier day trades by its calendar, and one answered after its close waits for its market's next session", () => {
   // NEST's answer of Wednesday 7 October at 14:55, held into Thursday.
   const nest = M.parseChart(fixture("moments/listings-2026-10-07-1455/nest.json"))
   const thursday = at("2026-10-08", "11:00")
+  const quiet = (q, receivedAt, now) => M.quietUntil(q, receivedAt, now, M.calendarFor(calendars, q), M.tradingDays())
   expect(M.sessionPhase(nest, thursday)).toBe("closed")
-  expect([M.inRegularSession(nest, thursday, calendars), staysWarm(nest, thursday), quoteCadence(nest, thursday, 60, false)])
-    .toEqual([true, true, 60])
-  // Before Thursday's open, and on Saturday: closed.
-  expect(staysWarm(nest, at("2026-10-08", "08:00"))).toBe(false)
-  expect(staysWarm(nest, at("2026-10-10", "12:00"))).toBe(false)
-  // The S&P 500 is on the US calendar (S&P is one of its exchanges): kept
-  // fresh through Thursday's session like any US listing, at the refresh
-  // interval, and not before Wednesday's open.
+  expect([M.inRegularSession(nest, thursday, calendars), quoteCadence(nest, thursday, 60, false)]).toEqual([true, 60])
+  // Answered in its session, it may still move: asked again on its cadence.
+  expect(quiet(nest, at("2026-10-07", "14:55"), at("2026-10-07", "22:00"))).toBe(0)
+  // Answered after its after-hours, it waits for Thursday's pre-market; by
+  // Saturday Thursday and Friday have traded, and it is asked again.
+  expect(quiet(nest, at("2026-10-07", "20:30"), at("2026-10-07", "22:00"))).toBe(at("2026-10-08", "04:00"))
+  expect(quiet(nest, at("2026-10-07", "20:30"), at("2026-10-10", "12:00"))).toBe(0)
+  // The S&P 500 is on the US calendar (S&P is one of its exchanges), at the
+  // refresh interval through Thursday's session. Its periods stay the last
+  // session's until its open, so its calendar's hours say whether it may
+  // move: answered Wednesday at 20:30, it waits for Thursday; answered just
+  // after Thursday's open, still with Wednesday's periods, it is asked
+  // again.
   const gspc = M.parseChart(fixture("moments/listings-2026-10-07-1455/gspc.json"))
-  expect([staysWarm(gspc, at("2026-10-07", "11:00")), staysWarm(gspc, at("2026-10-07", "06:00"))]).toEqual([true, false])
-  expect([staysWarm(gspc, thursday), quoteCadence(gspc, thursday, 60, false)]).toEqual([true, 60])
-  expect(staysWarm(gspc, at("2026-10-10", "12:00"))).toBe(false)
-  // An index whose exchange has no calendar (Russell's, Yahoo's WCB): in its
-  // periods it is warm; once they are past, it is asked on the slow clock to
-  // learn of the next.
+  expect([M.inRegularSession(gspc, thursday, calendars), quoteCadence(gspc, thursday, 60, false)]).toEqual([true, 60])
+  expect(quiet(gspc, at("2026-10-07", "20:30"), at("2026-10-07", "22:00"))).toBe(at("2026-10-08", "04:00"))
+  expect(quiet(gspc, at("2026-10-08", "09:30") + 5, at("2026-10-08", "09:31"))).toBe(0)
+  // An index whose exchange has no calendar (Russell's, Yahoo's WCB): once
+  // its periods are past, nothing says when it trades next, so it is asked
+  // on the slow clock to learn of it.
   const russell = { ...gspc, exchange: "WCB" }
-  expect([staysWarm(russell, at("2026-10-07", "11:00")), staysWarm(russell, at("2026-10-07", "06:00"))]).toEqual([true, false])
-  expect([staysWarm(russell, thursday), quoteCadence(russell, thursday, 60, false)]).toEqual([true, 900])
-  // A cryptocurrency never stays warm with nothing open.
-  expect(staysWarm(btc, btc.session.regular.start + 3600)).toBe(false)
+  expect(quoteCadence(russell, thursday, 60, false)).toBe(900)
+  expect(quiet(russell, at("2026-10-07", "20:30"), at("2026-10-07", "22:00"))).toBe(0)
+  // London's calendar has no pre-market, but Yahoo's period for it does:
+  // answered at 03:50 on Monday 26 October, in that pre-market, SHEL.L may
+  // still move, and is asked on its cadence.
+  const shelPre = M.parseChart(fixture("moments/watch-2026-10-26-0350/shel.l.json"))
+  expect(quiet(shelPre, at("2026-10-26", "03:50"), at("2026-10-26", "03:56"))).toBe(0)
+  // A cryptocurrency always trades.
+  expect(quiet(btc, btc.session.regular.end + 3600, btc.session.regular.end + 7200)).toBe(0)
 })
 
 test("the header's animal sleeps while its market does: by phase and calendar, never by the data's age", () => {

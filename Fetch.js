@@ -55,12 +55,15 @@ function answerKind(status, exit) {
 }
 
 // A run's output as its answers, by the URL's place in the run: { index,
-// status, kind, body, retryAfter } (seconds, 0 when none was sent). A URL
-// the run never reached, stopped first, has none.
-function answers(text) {
+// status, kind, body, retryAfter } (seconds, 0 when none was sent), and
+// `end`, where the next answer's text begins. From `from`, where an earlier
+// read of the same run's output left off, so a run read as it comes reads
+// each answer once. A URL the run never reached, stopped first, has none.
+function answers(text, from) {
   var out = []
   var pattern = new RegExp("\\n" + ANSWER_MARK + " (\\d+) (\\d{3}) (\\d+) ?([^\\n]*)\\n", "g")
-  var from = 0
+  from = from || 0
+  pattern.lastIndex = from
   var match
   while ((match = pattern.exec(text)) !== null) {
     var status = Number(match[2])
@@ -71,7 +74,8 @@ function answers(text) {
       status: status,
       kind: answerKind(status, exit),
       body: text.slice(from, match.index),
-      retryAfter: retryAfter
+      retryAfter: retryAfter,
+      end: pattern.lastIndex
     })
     from = pattern.lastIndex
   }

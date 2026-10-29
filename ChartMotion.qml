@@ -193,6 +193,7 @@ Item {
   }
 
   // The one motion: the chart draws in from the left, in 320 ms.
+  readonly property bool drawingIn: drawInAnim.running
   function drawIn() {
     drawInAnim.restart()
   }

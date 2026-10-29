@@ -10,8 +10,9 @@
 # Yahoo refusing and recovering; a network back within seconds; a list of
 # 50 every minute; the pill's wheel; a removal and its undo; a search's
 # preview; the window left on a workspace no screen shows; in a second run,
-# a US holiday while London and Toronto trade; and in a third, the US open
-# on Friday 23 October. HOME and curl are scratch; the fake curl answers
+# a US holiday while London and Toronto trade; in a third, the US open on
+# Friday 23 October; and in a fourth, a save that waits while every price
+# fails. HOME and curl are scratch; the fake curl answers
 # from test/fixtures/moments/fetch-2026-10-07 and listings-2026-10-07-1455,
 # and at the open from bell-2026-10-23-0929 and bell-2026-10-23-0930.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -20,7 +21,7 @@ patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property 
 # The harness owns the clock, from Wednesday 7 October at 05:59 New York.
 patch_copy plugin/Service.qml 's/function wallSecond() { return Math.floor(Date.now() \/ 1000) }/function wallSecond() { return root.now }/'
 patch_copy plugin/Service.qml 's/property int now: Math.floor(Date.now() \/ 1000)/property int now: 1791367140/'
-patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testFeed: feed\n  readonly property alias testPreviewFeed: previewFeed\n  readonly property alias testYahooGate: yahooGate\n  readonly property alias testDataFile: dataFile\n  readonly property alias testFundamentalsFeed: fundamentalsFeed'
+patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testFeed: feed\n  readonly property alias testPreviewFeed: previewFeed\n  readonly property alias testYahooGate: yahooGate\n  readonly property alias testDataFile: dataFile\n  readonly property alias testFundamentalsFeed: fundamentalsFeed\n  readonly property alias testOvernightFeed: overnightFeed\n  readonly property alias testAllDayFeed: allDayFeed'
 patch_copy plugin/QuoteFeed.qml 's/interval: 2500/interval: 200/'
 # The pills' popups stay unloaded, and the window host asks a stand-in, not
 # the owner's Hyprland (as range.sh), and hears its events from the stand-in
@@ -76,15 +77,26 @@ printf '{ "version": 1, "symbols": ["AAPL", "^GSPC"], "featured": "AAPL", "order
   > "$HOME/.config/omarchy/grvc.stonks.json"
 patch_copy plugin/Service.qml 's/property int now: 1791367140/property int now: 1792762080/'
 STONKS_FETCH_RUN=bell run_qs 120
+bell_code=$code
+mv "$work/log" "$work/bell.log"
+
+# The cold run: a first start, nothing saved, LATE alone.
+rm -rf "$STONKS_FAKE_STATE" "$XDG_CACHE_HOME/grvc.stonks"
+mkdir -p "$STONKS_FAKE_STATE"
+echo bell-2026-10-23-0929 listings-2026-10-07-1455 > "$STONKS_FAKE_STATE/overnight.set"
+printf '{ "version": 1, "symbols": ["LATE"], "featured": "LATE", "order": "manual", "refreshIntervalSec": 60 }\n' \
+  > "$HOME/.config/omarchy/grvc.stonks.json"
+STONKS_FETCH_RUN=cold run_qs 120
 [ "$main_code" -ne 0 ] && code=$main_code
 [ "$holiday_code" -ne 0 ] && code=$holiday_code
-cat "$work/main.log" "$work/holiday.log" "$work/log" > "$work/all.log"
+[ "$bell_code" -ne 0 ] && code=$bell_code
+cat "$work/main.log" "$work/holiday.log" "$work/bell.log" "$work/log" > "$work/all.log"
 mv "$work/all.log" "$work/log"
 
-for done_line in "FETCH DONE" "FETCH HOLIDAY DONE"; do
+for done_line in "FETCH DONE" "FETCH HOLIDAY DONE" "FETCH BELL DONE"; do
   if ! rg -q -F "$done_line" "$work/log"; then
     echo "FAIL a run never reached $done_line"
     code=1
   fi
 done
-finish "FETCH BELL DONE"
+finish "FETCH COLD DONE"

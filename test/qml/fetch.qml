@@ -20,11 +20,12 @@ import "plugin" as Stonks
 // across Friday 23 October's open, from Yahoo's answers either side of it.
 Harness {
   id: harness
-  marker: mode === "main" ? "FETCH DONE" : mode === "holiday" ? "FETCH HOLIDAY DONE" : "FETCH BELL DONE"
+  marker: mode === "main" ? "FETCH DONE" : mode === "holiday" ? "FETCH HOLIDAY DONE" : mode === "bell" ? "FETCH BELL DONE" : "FETCH COLD DONE"
 
   readonly property string mode: Quickshell.env("STONKS_FETCH_RUN") || "main"
   readonly property string state: Quickshell.env("STONKS_FAKE_STATE")
-  readonly property var listed: mode === "bell" ? ["AAPL", "^GSPC"] : ["NEST", "KILN", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T", "SHOP.TO"]
+  readonly property var listed: mode === "bell" ? ["AAPL", "^GSPC"] : mode === "cold" ? ["LATE", "FAIL"]
+    : ["NEST", "KILN", "SPY", "^GSPC", "BTC-USD", "SHEL.L", "7203.T", "SHOP.TO"]
   // Midnight starting Wednesday 7 October and Saturday 10 October in New York.
   readonly property int wed7: 1791345600
   readonly property int sat10: 1791604800
@@ -215,7 +216,7 @@ Harness {
     function idle() {
       return [service.testFeed, service.testPreviewFeed].every(function(feed) {
         return feed.firstRun.length === 0 && feed.refreshRun.length === 0
-      })
+      }) && !service.testOvernightFeed.busy && !service.opening
     }
     function settle() {
       verify(within(10000, idle), "a quote run never landed")
@@ -293,13 +294,17 @@ Harness {
     // period may land a tick either side of the window's edge, so a count
     // may be one off; one expected never to be asked must not be at all.
     // `each` is called after every step of the clock (`tick`).
+    // A count starts with nothing asked or out, so a step before can't
+    // land its answers in it, as the fake curl logs a request as it answers.
     function countsOver(label, seconds, want, begin, each) {
+      var before = Object.keys(service.asked).concat(service.testFeed.landing.length > 0 ? ["a run out"] : [])
       var from = harness.requests().length
       begin()
       tick(seconds - 5, 5, each)
       var got = harness.quoteCounts(harness.requests().slice(from))
       var off = harness.listed.filter(function(s) { return want[s] === 0 ? got[s] !== 0 : Math.abs(got[s] - want[s]) > 1 })
-      harness.check(label, off.length === 0, harness.listed.map(function(s) { return s + " " + got[s] + "/" + want[s] }).join(", "))
+      harness.check(label, before.length === 0 && off.length === 0,
+        (before.length ? "asked before it: " + before.join(",") + " | " : "") + harness.listed.map(function(s) { return s + " " + got[s] + "/" + want[s] }).join(", "))
       return harness.requests().slice(from)
     }
 
@@ -427,10 +432,10 @@ Harness {
       // 06:05, pre-market: nothing open, then the window. 15 minutes each.
       // The index has no pre- or post-market: it is closed until its
       // session, on the slow clock with the window open.
-      countsOver("06:05, nothing open: only the pill's symbol, every 5 minutes, and London, trading, every minute",
-        900, counts([3, 0, 0, 0, 0, 15, 0, 0]), startAt(at(harness.wed7, 6, 5)))
-      countsOver("06:20, the window open: the hero every minute, the pre-market rows every 5, closed markets every 15, London and the crypto every minute",
-        900, counts([15, 3, 3, 1, 15, 15, 1, 1]), openAfter)
+      countsOver("06:05, nothing open: only the pill's symbol, every 5 minutes, though London trades",
+        900, counts([3, 0, 0, 0, 0, 0, 0, 0]), startAt(at(harness.wed7, 6, 5)))
+      countsOver("06:20, the window open: the hero every minute, the pre-market rows every 5, closed markets every 15 but Tokyo, answered after its close, London and the crypto every minute",
+        900, counts([15, 3, 3, 1, 15, 15, 0, 1]), openAfter)
       closeWindow()
       cache = harness.cached()
       harness.check("the rest of the first answers are saved within ten minutes on the clock, every listing's",
@@ -438,44 +443,100 @@ Harness {
         Object.keys(cache).join(","))
 
       // A removal taken back with the next write due: the file holds the
-      // symbol again.
+      // symbol again. Stonks takes one back only from the panel or the
+      // window, which asks for the row's price again; here nothing is open.
+      // The write waits for that ask, and the step for both, so the next
+      // count doesn't hear the ask.
       service.removeSymbol("KILN")
       tick(21 * 60, 60)
       var since = service.now - service.quotesSavedAt
+      var undoFrom = harness.requests().length
       service.undoRemoval("KILN")
-      within(1000, function() { return !!harness.cached().KILN })
+      var askedAgain = within(5000, function() { return !("KILN" in service.asked) && idle() })
+      var undoAsks = harness.quoteCounts(harness.requests().slice(undoFrom)).KILN
+      harness.check("a removal taken back asks for the row's price again, once", askedAgain && undoAsks === 1, undoAsks + " asks")
+      tick(1, 1)
       cache = harness.cached()
       harness.check("a removal taken back with a write due is saved again for the next start",
         service.library.indexOf("KILN") >= 0 && !!cache.KILN,
         since + " s since the last write | " + Object.keys(cache).join(","))
 
-      // 11:00, the regular session: the rows stay warm with nothing open.
-      countsOver("11:00, nothing open: every stock, ETF, and index in its session every minute; the crypto and Tokyo not at all",
-        900, counts([15, 15, 15, 15, 0, 15, 0, 15]), startAt(at(harness.wed7, 11, 0)))
-      // An open finds the rows fresh; it asks only for what is stale, in one
-      // run, and shows no warning and no "As of" on any frame.
+      // 11:00, the regular session: with nothing open, no row is kept fresh
+      // for a surface no screen shows.
+      countsOver("11:00, nothing open: the pill's symbol alone, every minute, though every other market but Tokyo trades",
+        900, counts([15, 0, 0, 0, 0, 0, 0, 0]), startAt(at(harness.wed7, 11, 0)))
+      // An open asks for every row whose market may have moved since its
+      // last price, in one run, and its answers land within the 2 s before
+      // a row says "As of": no warning and no "As of" on any frame. Tokyo,
+      // answered after its close, can't have moved.
       // It opens past the minute's run, when no row falls due for most of a
       // minute: an ask takes with it what falls due within half a minute.
       tick(20)
       var shownMarks = []
-      var watchFrames = function() { marks().forEach(function(m) { if (shownMarks.indexOf(m) < 0) shownMarks.push(m) }) }
+      // While the chart draws itself in, the feed holds the rows' answers:
+      // none is read until the motion ends.
+      var held = false
+      var readWhileHeld = []
+      var noteRead = function() { if (service.testFeed.holding) readWhileHeld.push(Object.keys(service.asked).length) }
+      // The saved prices' next write falls due as the window opens, with a
+      // price changed since the last. The clock moves on a second in the
+      // open's turn and again while the chart draws in, as the shell's own
+      // does when they land on a new one.
+      service.quotesSavedAt = service.now - 10 * 60
+      service.quotesUnsaved = true
+      var writes = []
+      var noteWrite = function() {
+        writes.push([service.opening, service.testFeed.landing.length > 0, service.drawing.length > 0].join(","))
+      }
+      var newSecond = function() { if (service.opening) service.now += 1 }
+      var drawInSecond = false
+      var watchFrames = function() {
+        marks().forEach(function(m) { if (shownMarks.indexOf(m) < 0) shownMarks.push(m) })
+        held = held || service.testFeed.holding
+        if (!drawInSecond && !service.opening && service.drawing.length > 0) {
+          drawInSecond = true
+          service.now += 1
+        }
+      }
       frames.each = watchFrames
+      service.quotesChanged.connect(noteRead)
+      service.quotesSavedAtChanged.connect(noteWrite)
+      service.openingChanged.connect(newSecond)
       var runsBefore = harness.runs().length
       frames.running = true
       openWindow()
+      service.openingChanged.disconnect(newSecond)
       wait(300) // every frame of the open's first 300 ms is read
       frames.running = false
+      service.quotesChanged.disconnect(noteRead)
       var openRuns = harness.runs().slice(runsBefore)
       // The coin goes in a spark request of its own, asked for two days, so
-      // the rest stay one day: Tokyo alone is a chart.
-      harness.check("an open mid-session asks only for the stale, the crypto and Tokyo, in one run, the coin in a request of its own",
-        openRuns.length === 1 && openRuns[0] === "chart:7203.T spark:BTC-USD", openRuns.join(" / "))
+      // the rest stay one day.
+      harness.check("an open mid-session asks for every row whose market may have moved, in one run, the coin in a request of its own",
+        openRuns.length === 1 && openRuns[0] === "spark:KILN,SPY,%5EGSPC,SHEL.L,SHOP.TO spark:BTC-USD", openRuns.join(" / "))
       harness.check("an open mid-session shows no warning and no As of on any frame", shownMarks.length === 0, shownMarks.join(" | "))
+      harness.check("an open holds the rows' answers while its chart draws in, and reads none of them meanwhile",
+        held && readWhileHeld.length === 0 && !service.testFeed.holding, held + " | read while held: " + readWhileHeld.join(","))
       closeWindow()
       tick(30)
+      // Each write is opening, prices still coming, chart drawing in.
+      harness.check("an open with the saved prices due writes them once its prices are in: not as it opens, nor while its chart draws in or its prices come",
+        drawInSecond && writes.length === 1 && writes[0] === "false,false,false", drawInSecond + " | " + writes.join(" | "))
+      // Again, with nothing to ask: the write waits for the chart's draw-in.
+      service.quotesSavedAt = service.now - 10 * 60
+      service.quotesUnsaved = true
+      writes = []
+      drawInSecond = false
       runsBefore = harness.runs().length
+      frames.running = true
       openWindow()
+      tryVerify(function() { return drawInSecond && service.drawing.length === 0 }, 2000)
+      frames.running = false
+      tick(1, 1)
+      service.quotesSavedAtChanged.disconnect(noteWrite)
       harness.check("an open 30 s later asks for nothing", harness.runs().length === runsBefore, harness.runs().slice(runsBefore).join(" / "))
+      harness.check("an open that asks for nothing writes the saved prices due once its chart has drawn in",
+        drawInSecond && writes.length === 1 && writes[0] === "false,false,false", drawInSecond + " | " + writes.join(" | "))
       // London closes at 16:30, 11:30 here, half a minute before this
       // window ends: its last minute's request does not go.
       countsOver("11:15, the window open: every listing trading every minute, London until its close; Tokyo, closed, every 15",
@@ -656,6 +717,23 @@ Harness {
         Math.abs(longCounts.NEST - 10) <= 1 && starved.length === 0 && longBang.length === 0 && longReqs.length <= 60,
         "NEST " + longCounts.NEST + ", LONG01 " + longCounts.LONG01 + ", LONG42 " + longCounts.LONG42 + ", starved " + starved
           + ", warned " + longBang.length + ", " + longReqs.length + " requests in 10 min")
+      // The window closed on LONG36 far down the list, and two minutes on
+      // opened again: it shows the rows down to LONG36, and its run asks for
+      // those first, ahead of the rows no screen shows.
+      closeWindow()
+      service.feature("LONG36")
+      settle()
+      tick(120)
+      var farFrom = harness.runs().length
+      openWindow()
+      var farSight = app.testBody.watchlist.sightSymbols.filter(function(s) { return s !== "LONG36" })
+      var farRun = harness.runs().slice(farFrom).filter(function(r) { return /^(chart|spark):/.test(r) })[0] || ""
+      var farFirst = (farRun.split(" ").filter(function(slot) { return /^spark:/.test(slot) })[0] || "").replace(/^spark:/, "").split(",")
+      harness.check("an open far down the list asks first for the rows in sight, top down",
+        farSight.length > 1 && farSight.indexOf("NEST") < 0 && farFirst.slice(0, farSight.length).join(",") === farSight.join(","),
+        "in sight " + farSight.join(",") + " | " + farRun)
+      service.feature("NEST")
+      settle()
       more.forEach(function(s) { service.removeSymbol(s) })
       closeWindow()
 
@@ -736,21 +814,21 @@ Harness {
       // symbol never asked cannot pass for one asked every 15 minutes.
       countsOver("23:00, nothing open: the pill's symbol every 15 minutes, the index, closed by its calendar, and Tokyo at lunch not at all",
         1800, counts([2, 0, 0, 0, 0, 0, 0, 0]), startAt(at(harness.wed7, 23, 0)))
-      countsOver("23:30, the window open: the crypto and Tokyo, back from lunch, every minute; every closed market every 15",
-        900, counts([1, 1, 1, 1, 15, 1, 15, 1]), openAfter)
+      countsOver("23:30, the window open: the crypto and Tokyo, back from lunch, every minute; every closed market every 15 but London, answered after its close",
+        900, counts([1, 1, 1, 1, 15, 0, 15, 1]), openAfter)
       closeWindow()
 
       // Midnight, the window left open on a workspace no screen shows: it
-      // asks what a closed one asks, the pill's symbol every 15 minutes and
-      // Tokyo, trading, every minute, and Robinhood every 5 minutes through
-      // the night, for the pill's newest price alone. Back in sight, what
-      // fell due goes at once.
+      // asks what a closed one asks, the pill's symbol every 15 minutes, not
+      // Tokyo though it trades, and Robinhood every 5 minutes through the
+      // night, for the pill's newest price alone. Back in sight, what fell
+      // due goes at once.
       hyprlandStandIn.toplevels = { values: [stonksToplevel] }
       plugin.windowHost.monitors = [screenStandIn]
       stonksToplevel.workspace = workspaceThere
       var nightAsks = function(lines) { return lines.filter(function(l) { return /^overnight /.test(l) }).length }
-      var away = countsOver("00:00, the window open on a workspace no screen shows: the pill's symbol every 15 minutes, Tokyo, trading, every minute, nothing else",
-        1800, counts([2, 0, 0, 0, 0, 0, 30, 0]), function() {
+      var away = countsOver("00:00, the window open on a workspace no screen shows: the pill's symbol every 15 minutes, nothing else",
+        1800, counts([2, 0, 0, 0, 0, 0, 0, 0]), function() {
           startAt(at(harness.wed7 + 86400, 0, 0))()
           answerScreens()
           app.open("{}")
@@ -835,8 +913,8 @@ Harness {
       // what a closed one asks, though not every screen is off: Robinhood
       // every 5 minutes too, for the pill on the screen that's on.
       plugin.windowHost.monitors = [screenStandIn, otherScreen]
-      var dark = countsOver("00:35, the window's screen off and the other on: the pill's symbol, Tokyo every minute, nothing else",
-        900, counts([1, 0, 0, 0, 0, 0, 15, 0]), function() {
+      var dark = countsOver("00:35, the window's screen off and the other on: the pill's symbol, nothing else",
+        900, counts([1, 0, 0, 0, 0, 0, 0, 0]), function() {
           screenStandIn.on = false
           screenStandIn.refresh()
           screensHeard()
@@ -855,14 +933,24 @@ Harness {
 
       // Thursday 11:15, nothing open, every screen off: nothing is asked
       // for, the pill's symbol included. With a screen on again, the next
-      // look asks at once for every row that fell due meanwhile.
+      // look asks at once for the pill's.
       startAt(at(harness.wed7 + 86400, 11, 15))()
       plugin.windowHost.monitors = [screenStandIn]
       screenStandIn.on = false
       // The screens' last answer, trusted for a second, runs out first.
       wait(1100)
       var darkFrom = harness.requests().length
-      tick(600)
+      // The saved prices, due once the pill's ask waits for a screen, don't
+      // wait for it.
+      tick(60)
+      screensHeard()
+      var nestWaits = "NEST" in service.asked && service.screensOff
+      service.quotesSavedAt = service.now - 10 * 60
+      service.quotesUnsaved = true
+      var darkSavedFrom = service.quotesSavedAt
+      tick(540)
+      var savedInDark = nestWaits && service.quotesSavedAt !== darkSavedFrom && "NEST" in service.asked
+      var darkSave = [nestWaits, service.quotesSavedAt !== darkSavedFrom, "NEST" in service.asked].join(",")
       // A refresh asked for meanwhile, by IPC or a script, waits too.
       service.refresh()
       screensHeard()
@@ -875,16 +963,17 @@ Harness {
       within(3000, function() { return harness.quoteCounts(harness.requests().slice(darkFrom)).NEST > 0 })
       settle()
       var lit = harness.quoteCounts(harness.requests().slice(darkFrom))
-      harness.check("every screen off, nothing is asked for, a refresh included; a screen on, the next look asks for every warm row at once",
+      harness.check("every screen off, nothing is asked for, a refresh included; a screen on, the next look asks for the pill's symbol at once",
         harness.listed.every(function(s) { return dark[s] === 0 })
-          && ["NEST", "KILN", "SPY", "SHOP.TO"].every(function(s) { return lit[s] === 1 }) && lit["BTC-USD"] === 0,
+          && harness.listed.every(function(s) { return lit[s] === (s === "NEST" ? 1 : 0) }),
         "off: " + JSON.stringify(dark) + " | on: " + JSON.stringify(lit))
+      harness.check("every screen off, the saved prices due are written, though the pill's ask waits for a screen", savedInDark, darkSave)
 
       // A run queued behind a host's pause, the screens gone off since
       // their last answer: the pause ending between minute looks starts
       // nothing until a fresh answer says a screen is on.
-      // The network goes; two minutes on, the warm rows fall due and their
-      // run finds no answer, which pauses the host.
+      // The network goes; two minutes on, the pill's symbol falls due and
+      // its run finds no answer, which pauses the host.
       touch("YAHOO.offline")
       var outageFrom = harness.runs().length
       service.now = (Math.floor(service.now / 60) + 2) * 60 + 5
@@ -1006,6 +1095,7 @@ Harness {
       harness.check("a malformed day in a spark run fails its own listing and stops nothing: the run lands, and the next refresh goes too",
         carried && landed && nextLanded && service.entries.MANGLED.status === "failed",
         [carried, landed, nextLanded, service.entries.MANGLED.status, JSON.stringify(service.testFeed.refreshRun)].join(" | "))
+      service.removeSymbol("MANGLED")
       closeWindow()
 
       // A refusal asking for a year's rest (Retry-After 31536000): Stonks
@@ -1068,6 +1158,194 @@ Harness {
       service.feature("NEST")
       closeWindow()
 
+      // Thursday 13:00, the list in order of change, TURN added and up. With
+      // nothing open TURN turns down, and nothing asks for it. The window
+      // opens with each answer a second late, as on a slow network: the run
+      // asks for the rows in the order they show, reads each answer as it
+      // lands, the coin's a second after the rows', and the list keeps its
+      // places until the coin's is in too, then moves once. The saved
+      // prices, due as it opens, are written after the coin's answer too.
+      startAt(at(harness.wed7 + 86400, 13, 0))()
+      service.addSymbol("TURN")
+      within(10000, function() { return !!service.quotes.TURN && service.arriving.length === 0 && idle() })
+      service.feature("NEST")
+      service.setOrder("pct")
+      settle()
+      touch("TURN.down")
+      tick(180)
+      runCommand(["sh", "-c", "echo 1 > \"$1/DELAY\"", "sh", harness.state])
+      // Robinhood's answers wait until Yahoo's are in, so they're the last.
+      touch("ROBINHOOD.hold")
+      var printsAsked = harness.calls("OVERNIGHT")
+      var tradabilityAsked = harness.calls("INSTRUMENTS")
+      var printsAtOpen = service.testOvernightFeed.entries
+      var tradabilityAtOpen = service.testAllDayFeed.entries
+      var shownAtOpen = service.view.shown.slice()
+      var moves = []
+      var rowsIn = false
+      var watchShown = function() {
+        var last = moves.length ? moves[moves.length - 1].order : shownAtOpen
+        if (service.view.shown.join(",") !== last.join(","))
+          moves.push({ order: service.view.shown.slice(), coinOut: "BTC-USD" in service.asked,
+            printsIn: service.testOvernightFeed.entries !== printsAtOpen,
+            tradabilityIn: service.testAllDayFeed.entries !== tradabilityAtOpen })
+      }
+      var turnAsked = false
+      var watchAsked = function() {
+        turnAsked = turnAsked || "TURN" in service.asked
+        rowsIn = rowsIn || (turnAsked && !("TURN" in service.asked) && "BTC-USD" in service.asked)
+      }
+      service.viewChanged.connect(watchShown)
+      service.askedChanged.connect(watchAsked)
+      service.quotesSavedAt = service.now - 10 * 60
+      writes = []
+      service.quotesSavedAtChanged.connect(noteWrite)
+      var runsBefore = harness.runs().length
+      app.testWindow.implicitHeight = 1000
+      app.open("{}")
+      tryVerify(function() { return app.opened && service.openSurfaces.length === 1 }, 3000)
+      var yahooIn = within(15000, function() { return !service.testFeed.busy })
+      var heldWithYahooIn = !!service.heldOrder
+      remove("ROBINHOOD.hold")
+      settle()
+      within(3000, function() { return !service.heldOrder })
+      service.viewChanged.disconnect(watchShown)
+      service.askedChanged.disconnect(watchAsked)
+      remove("DELAY")
+      tick(1, 1)
+      service.quotesSavedAtChanged.disconnect(noteWrite)
+      var openRun = harness.runs().slice(runsBefore).filter(function(r) { return /^(chart|spark):/.test(r) })[0] || ""
+      var sparks = openRun.split(" ").map(function(slot) { return slot.replace(/^spark:/, "").replace(/%5E/g, "^").split(",") })
+      var rows = sparks[0] || []
+      harness.check("an open asks for the rows in the order they show, the coin in a request after them",
+        rows.indexOf("TURN") >= 0 && rows.join(",") === shownAtOpen.filter(function(s) { return rows.indexOf(s) >= 0 }).join(",")
+          && sparks.length === 2 && sparks[1].join(",") === "BTC-USD",
+        openRun + " | shown " + shownAtOpen.join(","))
+      harness.check("an open's rows land before the coin's answer, a request later",
+        rowsIn, turnAsked ? "rows never landed alone" : "TURN never asked")
+      harness.check("a list in order of change keeps its places until every price the open asked for is in, Robinhood's last, then moves once",
+        yahooIn && heldWithYahooIn && harness.calls("OVERNIGHT") + harness.calls("INSTRUMENTS") > printsAsked + tradabilityAsked
+          && moves.length === 1 && !moves[0].coinOut && moves[0].order.indexOf("TURN") > shownAtOpen.indexOf("TURN")
+          && (harness.calls("OVERNIGHT") === printsAsked || moves[0].printsIn)
+          && (harness.calls("INSTRUMENTS") === tradabilityAsked || moves[0].tradabilityIn),
+        yahooIn + " " + heldWithYahooIn + " | " + JSON.stringify(moves) + " | at open " + shownAtOpen.join(","))
+      harness.check("an open's saved prices are written once the coin's answer is in too, not between the rows' and the coin's",
+        writes.length === 1 && writes[0] === "false,false,false", writes.join(" | "))
+      remove("TURN.down")
+      service.setOrder("manual")
+      service.removeSymbol("TURN")
+      closeWindow()
+
+      // The saved prices, due while a run is out, wait for that run and not
+      // for the runs after it, which on a slow link with a long list open
+      // can follow each other with no gap. NEST's chart holds r's run out;
+      // TURN's first answer, asked meanwhile, holds a run of its own.
+      openWindow()
+      tryVerify(function() { return service.drawing.length === 0 }, 2000)
+      tick(20)
+      touch("NEST.quote.hold")
+      app.refresh()
+      var refreshOut = within(3000, function() { return service.testFeed.landing.length === 1 })
+      service.quotesSavedAt = service.now - 10 * 60
+      service.quotesUnsaved = true
+      writes = []
+      service.quotesSavedAtChanged.connect(noteWrite)
+      service.now += 1
+      touch("TURN.quote.hold")
+      service.addSymbol("TURN")
+      var bothOut = within(3000, function() { return service.testFeed.landing.length === 2 })
+      remove("NEST.quote.hold")
+      var refreshIn = within(5000, function() { return service.testFeed.landing.length === 1 })
+      service.now += 1
+      service.quotesSavedAtChanged.disconnect(noteWrite)
+      remove("TURN.quote.hold")
+      settle()
+      harness.check("the saved prices, due while a run is out, are written once it is in, though a later run is still out",
+        refreshOut && bothOut && refreshIn && writes.length === 1 && writes[0] === "false,true,false",
+        [refreshOut, bothOut, refreshIn].join(",") + " | " + writes.join(" | "))
+      service.removeSymbol("TURN")
+      closeWindow()
+
+      // An open while the pill's refresh is out: the rows it asks for wait
+      // behind that run, and the saved prices, due, wait for them too.
+      tick(90)
+      touch("NEST.quote.hold")
+      service.now = service.dueAt
+      var pillOut = within(3000, function() { return service.testFeed.landing.length === 1 })
+      runCommand(["sh", "-c", "echo 1 > \"$1/DELAY\"", "sh", harness.state])
+      service.quotesSavedAt = service.now - 10 * 60
+      service.quotesUnsaved = true
+      var openRows = []
+      var rowsAskedAtWrite = []
+      var noteRowsAsked = function() {
+        rowsAskedAtWrite.push(openRows.filter(function(s) { return s in service.asked }).join(",") || "none")
+      }
+      service.quotesSavedAtChanged.connect(noteRowsAsked)
+      app.open("{}")
+      var rowsWait = within(3000, function() { return app.opened && service.drawing.length === 0 && "KILN" in service.asked })
+      openRows = Object.keys(service.asked).filter(function(s) { return s !== "NEST" })
+      service.now += 1
+      remove("NEST.quote.hold")
+      var rowsOut = within(5000, function() { return !("NEST" in service.asked) && service.testFeed.landing.length === 1 })
+      service.now += 1
+      remove("DELAY")
+      settle()
+      within(10000, function() { return openRows.every(function(s) { return !(s in service.asked) }) })
+      service.now += 1
+      service.quotesSavedAtChanged.disconnect(noteRowsAsked)
+      harness.check("an open while the pill's refresh is out writes the saved prices once the rows it asked for are in too",
+        pillOut && rowsWait && rowsOut && rowsAskedAtWrite.length === 1 && rowsAskedAtWrite[0] === "none",
+        [pillOut, rowsWait, rowsOut].join(",") + " | rows asked at each write: " + rowsAskedAtWrite.join(" / "))
+      closeWindow()
+
+      // The saved prices, due with NEST and KILN asked, wait for those two
+      // asks and not for NEST's next: NEST answers, is asked again and held,
+      // and the write goes once KILN is in.
+      tick(90)
+      touch("NEST.quote.hold")
+      touch("KILN.quote.hold")
+      service.testFeed.ask(["NEST", "KILN"], service.now)
+      var bothAsked = within(3000, function() { return service.testFeed.landing.length === 1 })
+      service.quotesSavedAt = service.now - 10 * 60
+      service.quotesUnsaved = true
+      writes = []
+      var nestAskedAtWrite = []
+      var noteNest = function() { nestAskedAtWrite.push("NEST" in service.asked) }
+      service.quotesSavedAtChanged.connect(noteWrite)
+      service.quotesSavedAtChanged.connect(noteNest)
+      service.now += 1
+      remove("NEST.quote.hold")
+      var nestIn = within(5000, function() { return !("NEST" in service.asked) })
+      service.now += 11
+      touch("NEST.quote.hold")
+      service.testFeed.ask(["NEST"], service.now)
+      var beforeKiln = writes.length
+      remove("KILN.quote.hold")
+      var kilnIn = within(5000, function() { return !("KILN" in service.asked) && "NEST" in service.asked })
+      service.now += 1
+      service.quotesSavedAtChanged.disconnect(noteWrite)
+      service.quotesSavedAtChanged.disconnect(noteNest)
+      remove("NEST.quote.hold")
+      settle()
+      harness.check("the saved prices wait for the asks out as they fall due, not for a later ask of the same quote",
+        bothAsked && nestIn && kilnIn && beforeKiln === 0 && writes.length === 1 && nestAskedAtWrite[0] === true,
+        [bothAsked, nestIn, kilnIn, beforeKiln].join(",") + " | " + writes.join(" / ") + " | NEST asked at the write: " + nestAskedAtWrite.join(","))
+
+      // A refusal holds the pill's ask out for its pause: the saved prices,
+      // due, don't wait for it.
+      tick(90)
+      touch("YAHOO.refuse")
+      service.now = service.dueAt
+      var refused = within(5000, function() { return service.testYahooGate.paused && "NEST" in service.asked && service.testFeed.landing.length === 0 })
+      service.quotesSavedAt = service.now - 10 * 60
+      service.quotesUnsaved = true
+      var refusedSavedFrom = service.quotesSavedAt
+      service.now += 1
+      var savedInPause = service.quotesSavedAt !== refusedSavedFrom
+      remove("YAHOO.refuse")
+      harness.check("the saved prices due during Yahoo's pause are written, though the asks it holds wait", refused && savedInPause,
+        refused + " | " + savedInPause)
+
       harness.finish()
     }
 
@@ -1077,10 +1355,10 @@ Harness {
       tryVerify(function() { return harness.listed.every(function(s) { return !!service.quotes[s] }) && idle() }, 10000)
       // The index is on the US calendar, so the holiday closes it too,
       // whatever Yahoo's periods (a trading day's here) say.
-      countsOver("a US holiday, nothing open: the pill's symbol every 15 minutes; London and Toronto, trading, every minute",
-        900, counts([1, 0, 0, 0, 0, 15, 0, 15]), startAt(at(harness.wed7, 11, 0)))
-      countsOver("a US holiday, the window open: New York every 15 minutes, London, Toronto, and the crypto every minute",
-        900, counts([1, 1, 1, 1, 15, 15, 1, 15]), openAfter)
+      countsOver("a US holiday, nothing open: the pill's symbol every 15 minutes, though London and Toronto trade",
+        900, counts([1, 0, 0, 0, 0, 0, 0, 0]), startAt(at(harness.wed7, 11, 0)))
+      countsOver("a US holiday, the window open: New York every 15 minutes, London, Toronto, and the crypto every minute, Tokyo, answered after its close, not at all",
+        900, counts([1, 1, 1, 1, 15, 15, 0, 15]), openAfter)
       closeWindow()
       harness.finish()
     }
@@ -1126,6 +1404,43 @@ Harness {
           && postAsks.length > 0 && postAsks.every(function(l) { return / 1d$/.test(l) }),
         "before: " + preAsks.join(" / ") + "; after: " + postAsks.join(" / "))
       closeWindow()
+      harness.finish()
+    }
+
+    // LATE on the pill, its price saved. FAIL is added, its first answer
+    // held, and LATE's next price comes with the save due: the save waits
+    // for FAIL. Every price fails before FAIL's ask settles, LATE's next
+    // asks and FAIL's, and the save still keeps LATE's newer price, which a
+    // start offline shows.
+    function test_cold() {
+      if (harness.mode !== "cold") skip("another run")
+      tryVerify(function() { return !!service.entries.LATE && service.entries.LATE.status === "ok" && idle() && !!harness.cached().LATE }, 10000)
+      tick(30)
+      runCommand(["touch", harness.state + "/FAIL.quote.hold"])
+      service.addSymbol("FAIL")
+      var failOut = within(3000, function() { return "FAIL" in service.asked && service.testFeed.landing.length === 1 })
+      // A newer price than the one saved, due to be saved.
+      service.quotesSavedAt = service.now - 10 * 60
+      service.quotesUnsaved = true
+      service.testFeed.ask(["LATE"], service.now)
+      var lateIn = within(5000, function() { return !("LATE" in service.asked) && service.entries.LATE.receivedAt === service.now })
+      var newer = service.entries.LATE.receivedAt
+      var savedWhileFailOut = harness.cached().LATE.receivedAt
+      runCommand(["touch", harness.state + "/LATE.down"])
+      var lateFailed = within(20000, function() {
+        service.now += 5
+        return service.entries.LATE.status === "failed"
+      })
+      runCommand(["rm", "-f", harness.state + "/FAIL.quote.hold"])
+      var failFailed = within(20000, function() {
+        service.now += 5
+        return !!service.entries.FAIL && service.entries.FAIL.status === "failed" && !("FAIL" in service.asked) && idle()
+      })
+      service.now += 1
+      var saved = harness.cached().LATE
+      harness.check("a save that waited while every price failed keeps the newer price that came, for a start offline",
+        failOut && lateIn && savedWhileFailOut < newer && lateFailed && failFailed && !!saved && saved.receivedAt === newer,
+        [failOut, lateIn, savedWhileFailOut < newer, lateFailed, failFailed].join(",") + " | LATE saved from " + (saved ? saved.receivedAt : "nothing") + ", its newer price " + newer)
       harness.finish()
     }
   }

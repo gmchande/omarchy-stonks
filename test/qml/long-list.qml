@@ -163,8 +163,9 @@ Harness {
             service.now += 1
             wait(20)
           }
-          var judging = service.testFeed.refreshSlots.filter(function(slot) { return !slot.spark }).length
-          var judgingOnly = judging > 0 && judging === service.testFeed.refreshSlots.length && judging <= service.testFeed.judgeRun
+          var refreshing = (service.testFeed.landing.filter(function(job) { return !job.first })[0] || { slots: [] }).slots
+          var judging = refreshing.filter(function(slot) { return !slot.spark }).length
+          var judgingOnly = judging > 0 && judging === refreshing.length && judging <= service.testFeed.judgeRun
           service.now += 61
           jumped = 61
           runCommand(["rm", "-f"].concat(holds))
@@ -185,9 +186,9 @@ Harness {
         }
       }
       var loadLines = harness.lines("requests.log")
-      // The first quote run: GitHub's look goes in a run of its own as the
-      // service starts.
-      var firstRun = harness.lines("runs.log").filter(function(r) { return !/^manifest:/.test(r) })[0] || ""
+      // The first quote run: GitHub's look, and the stock's cap and P/E, go
+      // in runs of their own.
+      var firstRun = harness.lines("runs.log").filter(function(r) { return /^(chart|spark):/.test(r) })[0] || ""
       harness.check("154 symbols answer in one run, the pill's chart and eight spark requests, within 2 s of the clock and 15 s of the wall",
         answered > 0 && answered <= 2 && answeredWall <= 15000 && firstRun.split(" ").length === 9 && /^chart:TALL001( spark:\S+){8}$/.test(firstRun),
         "all answered at " + (answered || "never") + " s, " + (answeredWall / 1000).toFixed(1) + " s of the wall; first run "

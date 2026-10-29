@@ -132,7 +132,8 @@ Item {
       order: order,
       reversed: reversed,
       rows: rows,
-      shown: Settings.sortedSymbols(rows, feed.quotes, order, reversed, dataSettings.changeMode, order === "manual" ? null : root.newestPrints),
+      shown: Settings.shownOrder(root.heldOrder, Settings.sortedSymbols(rows, feed.quotes, order, reversed,
+        dataSettings.changeMode, order === "manual" ? null : root.newestPrints)),
       library: all,
       // The chart asked for once it can be drawn (`Chart.viewChart`), null
       // while it is on its way: each surface keeps the one it has on screen.
@@ -239,9 +240,19 @@ Item {
   function askOvernight() {
     if (!root.pluginsReady) return
     var open = root.openSurfaces.length > 0
+    var asks = root.overnightWanted()
+    if (!asks || !root.screensClear()) return
+    // The pill's own ask waits for a request already out, then goes.
+    if (!open && (allDayFeed.busy || overnightFeed.busy)) return
+    if (!open) root.pillAsked = true
+    allDayFeed.fetch(asks.tradability, root.now)
+    overnightFeed.fetch(asks.prints, root.now)
+  }
+  // What Robinhood is still to be asked now, null for nothing.
+  function overnightWanted() {
     var previewed = root.previewSymbol
-    var asks = Asks.overnightAsks({
-      open: open,
+    return Asks.overnightAsks({
+      open: root.openSurfaces.length > 0,
       pill: root.view.featured,
       pillAsked: root.pillAsked,
       quoteEntries: feed.entries,
@@ -257,12 +268,6 @@ Item {
       now: root.now,
       calendars: root.calendars
     })
-    if (!asks || !root.screensClear()) return
-    // The pill's own ask waits for a request already out, then goes.
-    if (!open && (allDayFeed.busy || overnightFeed.busy)) return
-    if (!open) root.pillAsked = true
-    allDayFeed.fetch(asks.tradability, root.now)
-    overnightFeed.fetch(asks.prints, root.now)
   }
   // The clock's work, as it moves: the asks fall due at their own second
   // (`dueAt`), and the rest by the minute, when a market's session may have
@@ -310,10 +315,10 @@ Item {
     var open = root.openSurfaces.length > 0
     var featured = root.view.featured
     var calNow = Asks.calendarsAt(root.calendars, now)
-    var watched = Asks.watchedSymbols(root.library, featured, open, feed.quotes, now, calNow)
+    var watched = Asks.watchedSymbols(root.library, featured, open)
     if (watched.join(",") !== root.watched.join(",")) root.watched = watched
     var heroes = open ? [featured].concat(root.previewShown ? [root.previewSymbol] : []) : []
-    var asks = Asks.quotesDue(watched, feed.entries, feed.asked, feed.quotes, heroes, now, root.refreshIntervalSec, calNow)
+    var asks = Asks.quotesDue(watched, feed.entries, feed.asked, feed.quotes, heroes, featured, now, root.refreshIntervalSec, calNow)
     root.dueAt = asks.next
     if (asks.due.length > 0) feed.ask(asks.due, now)
   }
@@ -528,9 +533,12 @@ Item {
     lead: root.view.featured
     // A member previewed shows on the hero too, from this feed.
     heroes: [root.view.featured].concat(root.previewShown && root.library.indexOf(root.previewSymbol) >= 0 ? [root.previewSymbol] : [])
+    reading: function() { return Asks.readingOrder(root.view.featured, root.sights, root.view.shown, root.library) }
+    holding: root.drawing.length > 0
+    onBusyChanged: Qt.callLater(root.releaseOrder)
     now: root.now
     clock: root
-    clearance: function() { return root.screensClear() }
+    clearance: function() { return !root.opening && root.screensClear() }
     gate: yahooGate
     centExchanges: root.centExchanges
     calendars: root.calendars
@@ -585,8 +593,19 @@ Item {
   }
   // Robinhood's feeds send one request at a time; each answer asks again
   // for what is still wanted, while it still is (`askOvernight`).
-  AllDayFeed { id: allDayFeed; gate: robinhoodGate; onEntriesChanged: Qt.callLater(root.askOvernight) }
-  OvernightFeed { id: overnightFeed; gate: robinhoodGate; onEntriesChanged: Qt.callLater(root.askOvernight) }
+  AllDayFeed {
+    id: allDayFeed
+    gate: robinhoodGate
+    onEntriesChanged: Qt.callLater(root.askOvernight)
+    onBusyChanged: Qt.callLater(root.releaseOrder)
+  }
+  OvernightFeed {
+    id: overnightFeed
+    gate: robinhoodGate
+    holding: root.drawing.length > 0
+    onEntriesChanged: Qt.callLater(root.askOvernight)
+    onBusyChanged: Qt.callLater(root.releaseOrder)
+  }
   // Off by the data file's `updateCheck`, it asks GitHub nothing.
   ReleaseFeed {
     id: releaseFeed
@@ -692,7 +711,9 @@ Item {
   }
 
   // The rows each open surface shows, top first, as { surface, symbols }
-  // (`rowsSeen`): on a range, their charts are fetched ahead of a click.
+  // (`rowsSeen`): an open asks for their quotes first
+  // (`Asks.readingOrder`), and on a range their charts are fetched ahead of
+  // a click.
   property var sights: []
   // The charts asked for ahead on this range and not shown since, which a
   // change of range drops; and those that got no good answer, which are
@@ -799,11 +820,71 @@ Item {
     // for is asked again when one comes back (`requestFundamentals` in App
     // and Panel).
     if (!next.length) root.withdrawFundamentals("stock")
-    if (!open) root.sights = root.sights.filter(function(s) { return s.surface !== surface })
+    if (!open) {
+      root.sights = root.sights.filter(function(s) { return s.surface !== surface })
+      root.drawingIn(surface, false)
+    }
+    // A list in order of change keeps its places while the prices the open
+    // asks for come in (`releaseOrder`).
+    if (open && Settings.normalizeOrder(root.order) === "pct") root.heldOrder = root.view.shown
+    // The surface lays out its rows as it opens, and says which are in
+    // sight (`rowsSeen`): the open's quote run goes a turn later, so it
+    // asks for those first (`Asks.readingOrder`).
+    if (open) {
+      root.opening = true
+      root.saveWaitsFor = null
+      Qt.callLater(function() {
+        root.opening = false
+        feed.pump()
+      })
+    }
     root.tick()
     root.showHistory(false)
     root.askOvernight()
     root.askDue()
+    Qt.callLater(root.releaseOrder)
+  }
+  property bool opening: false
+
+  // The surfaces whose chart is drawing itself in (`StonksBody.drawingIn`):
+  // while one is, the feeds read no answer until the motion ends, so
+  // reading never stutters it. Only an open surface counts: one taken down
+  // mid-draw-in, as a rebuilt bar takes its panel, can start its chart
+  // again as it goes.
+  property var drawing: []
+  function drawingIn(surface, running) {
+    var others = root.drawing.filter(function(s) { return s !== surface })
+    var next = running && root.openSurfaces.indexOf(surface) >= 0 ? others.concat([surface]) : others
+    if (next.length !== root.drawing.length) root.drawing = next
+  }
+
+  // The order a list in order of change showed as a surface opened, held
+  // while the prices the open asked for come in, so the rows move once,
+  // when they're in (`Settings.shownOrder`): until no feed has anything
+  // asked or out, a turn after the last says so, once what it answered is
+  // applied, and Robinhood has nothing left to be asked (one request out
+  // holds the next, the rows' behind the pill's); or until a site's pause
+  // holds what is left. Changing the order, the list, or its rows lets it
+  // go at once.
+  property var heldOrder: null
+  function releaseOrder() {
+    if (!root.heldOrder) return
+    var waiting = feed.busy || overnightFeed.busy || allDayFeed.busy || !!root.overnightWanted()
+    if (waiting && !yahooGate.paused && !robinhoodGate.paused) return
+    root.heldOrder = null
+  }
+  onOrderChanged: root.heldOrder = null
+  onReversedChanged: root.heldOrder = null
+  onChangeModeChanged: root.heldOrder = null
+  onListNameChanged: root.heldOrder = null
+  onListsHeldChanged: root.heldOrder = null
+  Connections {
+    target: yahooGate
+    function onPausedChanged() { root.releaseOrder() }
+  }
+  Connections {
+    target: robinhoodGate
+    function onPausedChanged() { root.releaseOrder() }
   }
 
   // Asked for once per change of the chart asked for, read from the view, so
@@ -888,6 +969,7 @@ Item {
   // from them; and the pill's first live answer asks Robinhood for it
   // (`askOvernight`).
   onEntriesChanged: {
+    if (!root.answeredOnce) root.answeredOnce = Object.keys(feed.entries).some(function(s) { return feed.entries[s].status === "ok" })
     settleArrivals()
     Qt.callLater(flushQuotes)
     Qt.callLater(answersLanded)
@@ -1000,13 +1082,30 @@ Item {
   // ends; and only once an answer has come, so quotes kept from an earlier
   // session are never written back as they are. Marked by every answer, it
   // was rewritten whole every 10 minutes around the clock, a weekend's
-  // unmoving prices too.
+  // unmoving prices too. It waits while a surface opens or a chart draws in,
+  // and for the quote runs out and the asks for quotes as it falls due,
+  // then goes on a later tick: on a long list it takes 20 ms of the shell's
+  // thread, which among an open's prices would stall them. Only those
+  // (`saveWaitsFor`), not a later ask of the same quote, so runs back to
+  // back on a slow link can't hold it for good; an open starts the wait
+  // again, for its own. An ask Yahoo's pause holds, or one waiting while
+  // every screen is off, can wait long, and the save doesn't.
   property bool quotesUnsaved: false
   property int quotesSavedAt: 0
+  property var saveWaitsFor: null
+  // An answer has come this session, though every price may have failed
+  // since: what did come is still saved.
+  property bool answeredOnce: false
 
   function flushQuotes() {
     if (!root.quotesUnsaved || (root.quotesSavedAt && root.now - root.quotesSavedAt < 10 * 60)) return
-    if (!Object.keys(feed.entries).some(function(s) { return feed.entries[s].status === "ok" })) return
+    if (!root.answeredOnce || root.opening || root.drawing.length > 0) return
+    if (!root.saveWaitsFor) root.saveWaitsFor = { runs: feed.landing.slice(), asked: Object.assign({}, feed.asked) }
+    var waits = root.saveWaitsFor
+    var answering = !yahooGate.paused && !root.screensOff
+    if (waits.runs.some(function(run) { return feed.landing.indexOf(run) >= 0 })
+      || (answering && Object.keys(waits.asked).some(function(s) { return feed.asked[s] === waits.asked[s] }))) return
+    root.saveWaitsFor = null
     root.quotesUnsaved = false
     root.quotesSavedAt = root.now
     var saved = {}

@@ -106,6 +106,15 @@ function sortedSymbols(symbols, quotes, order, reversed, changeMode, newest) {
   return out
 }
 
+// The rows in the order they show: `sorted`, unless an order held while an
+// open's prices come in (`held`) orders exactly the same rows, so the list
+// moves once, when they're in.
+function shownOrder(held, sorted) {
+  if (!held || held.length !== sorted.length) return sorted
+  for (var i = 0; i < sorted.length; i++) if (held.indexOf(sorted[i]) < 0) return sorted
+  return held
+}
+
 function sortKey(quote, order, changeMode, newest) {
   if (order === "symbol") return quote.symbol.toUpperCase()
   if (order === "name") return String(quote.name || quote.symbol).toUpperCase()

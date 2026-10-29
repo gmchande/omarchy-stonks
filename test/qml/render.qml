@@ -397,6 +397,7 @@ Harness {
     function screensClear() { return true }
     function surfaceShown(surface, open) {}
     function rowsSeen(surface, symbols) {}
+    function drawingIn(surface, running) {}
     function feature(symbol) { featuredSymbol = symbol }
     function removeSymbol(symbol) {}
     function setManualOrder(symbols) {}

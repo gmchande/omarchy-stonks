@@ -313,6 +313,7 @@ Harness {
     function screensClear() { return true }
     function surfaceShown(surface, open) {}
     function rowsSeen(surface, symbols) {}
+    function drawingIn(surface, running) {}
     // A search's choice shown on the hero; this stub's hero never changes.
     readonly property var previewView: view
     readonly property var previewEntries: ({})

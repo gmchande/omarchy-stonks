@@ -614,10 +614,14 @@ Item {
       service.preview(root, "")
     }
   }
-  // The rows in sight while they show, whose charts the service fetches
-  // ahead on a range.
+  // The rows in sight while they show, whose quotes an open asks for first
+  // and whose charts the service fetches ahead on a range.
   readonly property var rowsInSight: surfaceOpen && onScreen && rowsShown ? watchlist.sightSymbols : []
   onRowsInSightChanged: if (service) service.rowsSeen(root, rowsInSight)
+  // The chart drawing itself in on show, while the service holds the
+  // answers that would stutter it.
+  readonly property bool drawingIn: surfaceOpen && onScreen && motion.drawingIn
+  onDrawingInChanged: if (service) service.drawingIn(root, drawingIn)
   // One search previews at a time: another surface's search that starts
   // choosing takes the preview, and this search closes, so its hero never
   // shows one result while Enter would add another.
