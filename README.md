@@ -167,9 +167,10 @@ its own.
 Sounds are off until you turn them on. Press `m`, or click the speaker at
 the top right. With sounds on, adding, removing, or undoing a row makes a
 short sound, and the chart chimes as you run the pointer along it. A soft
-bell rings as the market of the stock you last looked at opens and closes,
-but never while an app is recording from your microphone. Refreshes and
-prices make no sound.
+bell rings as the market of the stock you last looked at opens and closes.
+The bell keeps quiet while Omarchy's Do Not Disturb is on or an app is
+recording from your microphone; the sounds of what you do still play.
+Refreshes and prices make no sound.
 
 ## Screenshots
 
@@ -287,9 +288,10 @@ personal use, so either may change or stop without notice.
 - `timeout`, to stop its file, sound, and screenshot commands if they
   hang.
 - With sounds on: `pw-play` for each sound; `pw-cat` playing silence while
-  you move along the chart, so each chime plays at once; `pw-dump`, in
-  `bash`, as the bell is due, to check that no app is recording; and `sh`
-  with `md5sum` and `head`, once a run, to check its saved sounds.
+  you move along the chart, so each chime plays at once; as the bell is
+  due, `bash` with `omarchy-shell notifications dndState` to check Do Not
+  Disturb, and `pw-dump` to check that no app is recording; and `sh` with
+  `md5sum` and `head`, once a run, to check its saved sounds.
 - For a screenshot: `sh` with `sed`, `tail`, `date`, and `head` to find
   your screenshots folder and name the file, `wl-copy` for the clipboard,
   and `omarchy-notification-send`.
