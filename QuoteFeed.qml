@@ -5,9 +5,9 @@ import "Fetch.js" as Fetch
 import "Market.js" as Market
 import "Quote.js" as Quote
 // The quote feed: every symbol asked for goes in one run, one curl over one
-// connection, and a run's answers land together. Hand it the members, what
-// is watched, and what is due; read quotes, entries, and asks back. The
-// panel never touches a Process.
+// connection, whose answers are read as each one lands. Hand it the
+// members, what is watched, and what is due; read quotes, entries, and asks
+// back. The panel never touches a Process.
 //
 // Two lanes, one run each at a time: first answers (a symbol with no
 // answer this session) and refreshes, so an add never waits behind a
@@ -52,6 +52,15 @@ Item {
   // The symbols a hero shows, the lead and a resting preview of a member:
   // each goes on the chart, whose opens its line and the day's open need.
   property var heroes: lead ? [lead] : []
+  // The order a run asks for those asked together, as a function read at
+  // launch (`Asks.readingOrder`); the members' own order without one.
+  property var reading: null
+  // While the service holds answers, as a chart draws itself in, only the
+  // chart it waits on (`waited`) is read; the rest wait for the motion to
+  // end, so reading them never stutters it.
+  property bool holding: false
+  property string waited: ""
+  onHoldingChanged: if (!holding) landTimer.start()
   property int now: 0
   // The service, whose wall clock stamps each ask and answer of the feed's
   // own (`stamp`): between its ticks `now` can be a minute behind.
@@ -131,9 +140,6 @@ Item {
   property var tries: ({})
   // Symbols waiting out the pause after a bad answer.
   property var cooling: []
-  // The gate's ticket each lane's run was let through on (`Gate.report`).
-  property int firstTicket: 0
-  property int refreshTicket: 0
 
   function firstAnswer(symbol) {
     return Asks.firstAnswer(entries[symbol])
@@ -244,7 +250,7 @@ Item {
     var judging = first ? [] : Asks.laneJudging(toJudge, asked, held)
     if ((waiting.length === 0 && judging.length === 0) || (clearance && !clearance())) return
     var coins = waiting.filter(function(s) { return !!quotes[s] && !!quotes[s].crypto })
-    var slots = Asks.quoteSlots(waiting, asked, symbols, lead, heroes, bulk, coins)
+    var slots = Asks.quoteSlots(waiting, asked, reading ? reading() : symbols, lead, heroes, bulk, coins)
     var granted = slots.length > 0 && gate ? gate.take(slots.length, bulk) : slots.length
     var run = slots.slice(0, granted)
     for (var j = 0; slots.length === 0 && j < Math.min(judging.length, judgeRun) && (!gate || (gate.spare() && gate.take(1, bulk) === 1)); j++)
@@ -253,15 +259,10 @@ Item {
     var runSymbols = []
     run.forEach(function(slot) { runSymbols = runSymbols.concat(slot.symbols) })
     // The lane is taken before anything its asks set off can launch again.
-    if (first) {
-      root.firstSlots = run
-      root.firstRun = runSymbols
-    } else {
-      root.refreshSlots = run
-      root.refreshRun = runSymbols
-    }
-    if (first && gate) root.firstTicket = gate.ticket
-    if (!first && gate) root.refreshTicket = gate.ticket
+    if (first) root.firstRun = runSymbols
+    else root.refreshRun = runSymbols
+    root.landing = landing.concat([{ first: first, slots: run, ticket: gate ? gate.ticket : 0,
+      answers: [], parsed: 0, read: 0, ended: false, kinds: [], retryAfter: 0, cool: [] }])
     // A chart that only judges a day already shown owes no answer.
     owe(runSymbols.filter(function(symbol) { return symbol in asked }))
     var spark = run.some(function(slot) { return slot.spark })
@@ -271,10 +272,6 @@ Item {
     proc.running = true
   }
 
-  // Each lane's run under way as its requests, in the order of their URLs:
-  // { symbols, spark }, one symbol to a chart.
-  property var firstSlots: []
-  property var refreshSlots: []
   // Symbols whose spark day holds a jump no chart verdict speaks for, each
   // waiting for its chart from the budget's spare half.
   property var toJudge: []
@@ -290,64 +287,103 @@ Item {
     ask(Asks.sparkHeroes(heroes, quotes, entries, afterLanding), root.stamp())
   }
 
-  // A run's answers are read a little at a time, about 8 ms a turn
-  // (`landStep`): a chart answer, a spark answer's text, or one listing of
-  // it, so a long run never holds the shell's thread for long. The run lands
-  // whole once its last answer is read (`land`), and until then its lane
-  // runs nothing new. Each answer gets `outcomes`, by symbol: { quote,
-  // unjudged }, null for a bad answer, or "missing". A listing whose reading
-  // throws is a bad answer too, so the run still lands and the lane goes on:
-  // one spark day that threw left its run out for good, and the lane asked
-  // nothing more until Stonks restarted.
+  // A run's answers are read as curl writes each one, a little at a time,
+  // about 8 ms a turn (`landStep`): a chart answer, a spark answer's text,
+  // or one listing of it, so a long run never holds the shell's thread for
+  // long. What a turn reads is applied at once (`apply`), so the rows asked
+  // first show first. The run ends once its stream has and its last answer
+  // is read (`finish`), and until then its lane runs nothing new. Each
+  // answer gets `outcomes`, by symbol: { quote, unjudged }, null for a bad
+  // answer, or "missing". A listing whose reading throws is a bad answer
+  // too, so the run still ends and the lane goes on: one spark day that
+  // threw left its run out for good, and the lane asked nothing more until
+  // Stonks restarted.
+  //
+  // Each run out, from its launch: its requests (`slots`), the gate's ticket
+  // it went on, its answers so far, how far its output is parsed and its
+  // answers read, whether its stream has ended, and what its answers tell
+  // the gate and the retry as it ends.
   property var landing: []
+  function runOf(first) {
+    for (var i = 0; i < landing.length; i++) if (landing[i].first === first && !landing[i].ended) return landing[i]
+    return null
+  }
+  // The lane's output so far, as it grows, and all of it as its stream ends.
+  function arrived(first, text) {
+    var job = runOf(first)
+    if (!job) return
+    var got = Fetch.answers(text, job.parsed)
+    if (got.length === 0) return
+    job.parsed = got[got.length - 1].end
+    job.answers = job.answers.concat(got)
+    landTimer.start()
+  }
   function receive(first, text) {
-    root.landing = landing.concat([{ first: first, slots: first ? firstSlots : refreshSlots, answers: Fetch.answers(text), read: 0 }])
+    var job = runOf(first)
+    if (!job) return
+    arrived(first, text)
+    job.ended = true
     landTimer.start()
   }
 
+  // Whether `answer` may be read now: always, unless the service holds
+  // answers, when only the chart it waits on is.
+  function readable(job, answer) {
+    var slot = job.slots[answer.index]
+    return !holding || (!!slot && !slot.spark && slot.symbols[0] === waited)
+  }
+
   function landStep() {
-    var job = landing[0]
-    if (!job) return
     var until = Date.now() + 8
-    while (job.read < job.answers.length && Date.now() < until) {
-      var answer = job.answers[job.read]
-      var slot = job.slots[answer.index]
-      if (answer.kind !== "ok" || !slot) {
+    var more = false
+    landing.forEach(function(job) {
+      var read = []
+      while (job.read < job.answers.length && Date.now() < until && readable(job, job.answers[job.read])) {
+        var answer = job.answers[job.read]
+        if (!readOn(answer, job.slots[answer.index])) continue
+        read.push(answer)
         job.read++
-      } else if (!slot.spark) {
-        var quote = null
-        try { quote = Quote.parseChart(JSON.parse(answer.body), root.centExchanges, root.stamp()) } catch (e) { quote = null }
-        answer.body = null
-        answer.outcomes = {}
-        answer.outcomes[slot.symbols[0]] = quote ? { quote: quote, unjudged: false } : null
-        job.read++
-      } else if (!answer.outcomes) {
-        try { answer.days = Quote.sparkResults(JSON.parse(answer.body)) } catch (e) { answer.days = null }
-        answer.body = null
-        answer.outcomes = {}
-        answer.done = 0
-      } else {
-        var symbol = slot.symbols[answer.done++]
-        var previous = quotes[symbol]
-        var outcome = null
-        try {
-          outcome = !answer.days ? null : !(symbol in answer.days) ? "missing"
-            : Quote.sparkQuote(answer.days[symbol], previous && previous.verdict || null, root.centExchanges, root.stamp())
-        } catch (e) { outcome = null }
-        answer.outcomes[symbol] = outcome
-        if (answer.done >= slot.symbols.length) {
-          answer.days = null
-          job.read++
-        }
       }
+      if (read.length > 0) apply(job, read)
+      if (job.read < job.answers.length && readable(job, job.answers[job.read])) more = true
+    })
+    var ended = landing.filter(function(job) { return job.ended && job.read >= job.answers.length })
+    if (ended.length > 0) {
+      root.landing = landing.filter(function(job) { return ended.indexOf(job) < 0 })
+      ended.forEach(finish)
     }
-    if (job.read < job.answers.length) {
-      landTimer.start()
-      return
+    if (more) landTimer.start()
+  }
+
+  // One step of reading `answer`, true once it is read whole.
+  function readOn(answer, slot) {
+    if (answer.kind !== "ok" || !slot) return true
+    if (!slot.spark) {
+      var quote = null
+      try { quote = Quote.parseChart(JSON.parse(answer.body), root.centExchanges, root.stamp()) } catch (e) { quote = null }
+      answer.body = null
+      answer.outcomes = {}
+      answer.outcomes[slot.symbols[0]] = quote ? { quote: quote, unjudged: false } : null
+      return true
     }
-    root.landing = landing.slice(1)
-    land(job)
-    if (landing.length > 0) landTimer.start()
+    if (!answer.outcomes) {
+      try { answer.days = Quote.sparkResults(JSON.parse(answer.body)) } catch (e) { answer.days = null }
+      answer.body = null
+      answer.outcomes = {}
+      answer.done = 0
+      return false
+    }
+    var symbol = slot.symbols[answer.done++]
+    var previous = quotes[symbol]
+    var outcome = null
+    try {
+      outcome = !answer.days ? null : !(symbol in answer.days) ? "missing"
+        : Quote.sparkQuote(answer.days[symbol], previous && previous.verdict || null, root.centExchanges, root.stamp())
+    } catch (e) { outcome = null }
+    answer.outcomes[symbol] = outcome
+    if (answer.done < slot.symbols.length) return false
+    answer.days = null
+    return true
   }
 
   Timer {
@@ -356,30 +392,17 @@ Item {
     onTriggered: root.landStep()
   }
 
-  // While a run's answers are applied nothing launches: what they set off
-  // (a new hero, a quote shown) would read the feed half updated.
+  // While answers are applied nothing launches: what they set off (a new
+  // hero, a quote shown) would read the feed half updated.
   property bool applying: false
-  function land(job) {
+  function apply(job, got) {
     root.applying = true
-    var first = job.first
-    if (first) {
-      root.firstRun = []
-      root.firstSlots = []
-    } else {
-      root.userAsked = without(userAsked, refreshRun)
-      root.refreshRun = []
-      root.refreshSlots = []
-    }
     var at = root.stamp()
-    var got = job.answers
     var nextQuotes = null
     var nextEntries = Object.assign({}, entries)
     var nextAsked = Object.assign({}, asked)
     var nextTries = Object.assign({}, tries)
     var nextJudge = toJudge.slice()
-    var cool = []
-    var kinds = []
-    var retryAfter = 0
     var show = function(symbol, quote) {
       var dropped = Quote.bucketTimes(quote.droppedTimes)
       var previous = quotes[symbol]
@@ -414,9 +437,9 @@ Item {
         show(symbol, outcome.quote)
         if (judging && entries[symbol]) nextEntries[symbol].answeredAt = entries[symbol].answeredAt
       } else if (verdict === "retry") {
-        // A short pause, then the same symbol again.
+        // A short pause once the run ends, then the same symbol again.
         nextTries[symbol] = (nextTries[symbol] || 0) + 1
-        cool.push(symbol)
+        job.cool.push(symbol)
         return
       } else {
         var entry = nextEntries[symbol] || { receivedAt: 0 }
@@ -425,25 +448,38 @@ Item {
       delete nextAsked[symbol]
       delete nextTries[symbol]
     }
-    for (var i = 0; i < got.length; i++) {
-      var answer = got[i]
+    got.forEach(function(answer) {
       var slot = job.slots[answer.index]
-      if (!slot) continue
-      kinds.push(answer.kind)
-      retryAfter = Math.max(retryAfter, answer.retryAfter)
-      for (var k = 0; k < slot.symbols.length; k++) settle(answer, slot, slot.symbols[k])
-    }
+      if (!slot) return
+      job.kinds.push(answer.kind)
+      job.retryAfter = Math.max(job.retryAfter, answer.retryAfter)
+      slot.symbols.forEach(function(symbol) { settle(answer, slot, symbol) })
+    })
     if (nextQuotes) root.quotes = nextQuotes
     root.entries = nextEntries
     root.toJudge = nextJudge.filter(function(s) { return symbols.indexOf(s) >= 0 })
     root.asked = nextAsked
     root.tries = nextTries
+    root.applying = false
+  }
+
+  // A run ends: its lane is free, what it left asked is kept only while
+  // watched, what answered badly waits its pause, and the gate hears every
+  // answer at once.
+  function finish(job) {
+    root.applying = true
+    if (job.first) {
+      root.firstRun = []
+    } else {
+      root.userAsked = without(userAsked, refreshRun)
+      root.refreshRun = []
+    }
     dropUnwatched()
-    if (cool.length) {
-      root.cooling = cooling.concat(cool)
+    if (job.cool.length) {
+      root.cooling = cooling.concat(job.cool)
       retryTimer.restart()
     }
-    if (gate) gate.report(kinds, retryAfter, first ? firstTicket : refreshTicket)
+    if (gate) gate.report(job.kinds, job.retryAfter, job.ticket)
     root.applying = false
     // Asks for what is due next, a spark hero's chart among it.
     chartHeroes(true)
@@ -493,12 +529,14 @@ Item {
     }
   }
 
-  // A run ends with its stream, never with the process stopping: both fire
-  // for one run, and a failed curl still ends the stream.
+  // A run's output is read as it grows, and the run ends with its stream,
+  // never with the process stopping: both fire for one run, and a failed
+  // curl still ends the stream.
   Process {
     id: firstProc
     stdout: StdioCollector {
-      waitForEnd: true
+      waitForEnd: false
+      onDataChanged: root.arrived(true, String(text || ""))
       onStreamFinished: root.receive(true, String(text || ""))
     }
   }
@@ -506,7 +544,8 @@ Item {
   Process {
     id: refreshProc
     stdout: StdioCollector {
-      waitForEnd: true
+      waitForEnd: false
+      onDataChanged: root.arrived(false, String(text || ""))
       onStreamFinished: root.receive(false, String(text || ""))
     }
   }

@@ -477,18 +477,41 @@ function inExtendedHours(quote, now, calendars) {
   return pre || post
 }
 
-// Whether a stock, ETF, or index is kept fresh with nothing open: through
-// its regular session; and a listing with no calendar to say when that is
-// (an index's), on the slow clock once every period its quote knows is
-// past, so it learns of its next session. By its calendar's reading at
-// `now` (`calendarNow`).
-function staysWarm(quote, now, calNow) {
-  if (!quote || quote.crypto) return false
-  if (regularNow(quote, now, calNow)) return true
-  if (calNow.cal) return false
-  var latest = quote.current && quote.current.regular ? quote.current : quote.session
-  var last = latest.post || latest.regular
-  return !!last && now >= last.end
+// How long after a market's last trade, after hours included, its quote
+// may still change: the close and late prints settle in that time.
+var SETTLED = 15 * 60
+
+// The second a listing's market next trades, pre-market included, while its
+// quote, last answered at `receivedAt`, can't change before then: the answer
+// came SETTLED after the session it describes had ended, outside its
+// calendar's trading hours that day (SETTLED past their end), and its
+// market hasn't opened since. Asking sooner brings back the same price. The
+// next trading is the earlier of its calendar's next open (the pre-market's,
+// where the calendar has one) and Yahoo's period to come; 0 while it may
+// still change, or nothing says when it trades next. A quote can describe
+// an earlier session than the one trading as it is answered (an index's
+// stays the last session's until its open), so the calendar has the last
+// word. Never a cryptocurrency's, which always trades.
+function quietUntil(quote, receivedAt, now, cal) {
+  if (!quote || quote.crypto || !receivedAt) return 0
+  var s = quote.session
+  if (!s || !s.regular || receivedAt < (s.post || s.regular).end + SETTLED) return 0
+  var starts = []
+  if (cal) {
+    var date = dateStringOf(localDate(receivedAt, cal))
+    var segs = segmentsOn(cal, date)
+    if (segs.length > 0) {
+      var from = cal.pre ? epochAt(cal, date, cal.pre.open) : segs[0].start
+      var to = cal.post ? epochAt(cal, date, cal.post.close) : segs[segs.length - 1].end
+      if (receivedAt >= from && receivedAt < to + SETTLED) return 0
+    }
+    var open = nextOpen(cal, receivedAt)
+    if (open) starts.push(cal.pre ? epochAt(cal, open.dateString, cal.pre.open) : open.t)
+  }
+  var c = quote.current
+  if (c && c.regular && (c.pre || c.regular).start > receivedAt) starts.push((c.pre || c.regular).start)
+  var next = starts.length ? Math.min.apply(null, starts) : 0
+  return next > now ? next : 0
 }
 
 // Whether a listing's day answer is asked for two days (`Quote.chartUrl`):

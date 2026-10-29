@@ -132,7 +132,8 @@ Item {
       order: order,
       reversed: reversed,
       rows: rows,
-      shown: Settings.sortedSymbols(rows, feed.quotes, order, reversed, dataSettings.changeMode, order === "manual" ? null : root.newestPrints),
+      shown: Settings.shownOrder(root.heldOrder, Settings.sortedSymbols(rows, feed.quotes, order, reversed,
+        dataSettings.changeMode, order === "manual" ? null : root.newestPrints)),
       library: all,
       // The chart asked for once it can be drawn (`Chart.viewChart`), null
       // while it is on its way: each surface keeps the one it has on screen.
@@ -310,10 +311,10 @@ Item {
     var open = root.openSurfaces.length > 0
     var featured = root.view.featured
     var calNow = Asks.calendarsAt(root.calendars, now)
-    var watched = Asks.watchedSymbols(root.library, featured, open, feed.quotes, now, calNow)
+    var watched = Asks.watchedSymbols(root.library, featured, open)
     if (watched.join(",") !== root.watched.join(",")) root.watched = watched
     var heroes = open ? [featured].concat(root.previewShown ? [root.previewSymbol] : []) : []
-    var asks = Asks.quotesDue(watched, feed.entries, feed.asked, feed.quotes, heroes, now, root.refreshIntervalSec, calNow)
+    var asks = Asks.quotesDue(watched, feed.entries, feed.asked, feed.quotes, heroes, featured, now, root.refreshIntervalSec, calNow)
     root.dueAt = asks.next
     if (asks.due.length > 0) feed.ask(asks.due, now)
   }
@@ -528,6 +529,10 @@ Item {
     lead: root.view.featured
     // A member previewed shows on the hero too, from this feed.
     heroes: [root.view.featured].concat(root.previewShown && root.library.indexOf(root.previewSymbol) >= 0 ? [root.previewSymbol] : [])
+    reading: function() { return Asks.readingOrder(root.view.featured, root.sights, root.view.shown, root.library) }
+    holding: root.drawing.length > 0
+    waited: root.chartWaited
+    onBusyChanged: root.releaseOrder()
     now: root.now
     clock: root
     clearance: function() { return root.screensClear() }
@@ -586,7 +591,14 @@ Item {
   // Robinhood's feeds send one request at a time; each answer asks again
   // for what is still wanted, while it still is (`askOvernight`).
   AllDayFeed { id: allDayFeed; gate: robinhoodGate; onEntriesChanged: Qt.callLater(root.askOvernight) }
-  OvernightFeed { id: overnightFeed; gate: robinhoodGate; onEntriesChanged: Qt.callLater(root.askOvernight) }
+  OvernightFeed {
+    id: overnightFeed
+    gate: robinhoodGate
+    holding: root.drawing.length > 0
+    waited: root.chartWaited
+    onEntriesChanged: Qt.callLater(root.askOvernight)
+    onBusyChanged: root.releaseOrder()
+  }
   // Off by the data file's `updateCheck`, it asks GitHub nothing.
   ReleaseFeed {
     id: releaseFeed
@@ -692,7 +704,9 @@ Item {
   }
 
   // The rows each open surface shows, top first, as { surface, symbols }
-  // (`rowsSeen`): on a range, their charts are fetched ahead of a click.
+  // (`rowsSeen`): an open asks for their quotes first
+  // (`Asks.readingOrder`), and on a range their charts are fetched ahead of
+  // a click.
   property var sights: []
   // The charts asked for ahead on this range and not shown since, which a
   // change of range drops; and those that got no good answer, which are
@@ -799,11 +813,57 @@ Item {
     // for is asked again when one comes back (`requestFundamentals` in App
     // and Panel).
     if (!next.length) root.withdrawFundamentals("stock")
-    if (!open) root.sights = root.sights.filter(function(s) { return s.surface !== surface })
+    if (!open) {
+      root.sights = root.sights.filter(function(s) { return s.surface !== surface })
+      root.drawingIn(surface, false)
+    }
+    // A list in order of change keeps its places while the prices the open
+    // asks for come in (`releaseOrder`).
+    if (open && Settings.normalizeOrder(root.order) === "pct") root.heldOrder = root.view.shown
     root.tick()
     root.showHistory(false)
     root.askOvernight()
     root.askDue()
+    Qt.callLater(root.releaseOrder)
+  }
+
+  // The surfaces whose chart is drawing itself in (`StonksBody.drawingIn`):
+  // while one is, the feeds read only the chart waited on (`chartWaited`),
+  // and the rest once the motion ends, so reading never stutters it.
+  property var drawing: []
+  function drawingIn(surface, running) {
+    var others = root.drawing.filter(function(s) { return s !== surface })
+    var next = running ? others.concat([surface]) : others
+    if (next.length !== root.drawing.length) root.drawing = next
+  }
+  // The chart a surface waits on to draw: the stock on show's, or a resting
+  // preview's on view, while it can't be drawn yet; "" for none.
+  readonly property string chartWaited: !root.view.chart ? root.view.featured
+    : root.previewShown && !root.previewView.chart ? root.previewSymbol : ""
+
+  // The order a list in order of change showed as a surface opened, held
+  // while the prices the open asked for come in, so the rows move once,
+  // when they're in (`Settings.shownOrder`): until neither feed has
+  // anything asked or out, or a site's pause holds what is left. Changing
+  // the order, the list, or its rows lets it go at once.
+  property var heldOrder: null
+  function releaseOrder() {
+    if (!root.heldOrder) return
+    if ((feed.busy || overnightFeed.busy) && !yahooGate.paused && !robinhoodGate.paused) return
+    root.heldOrder = null
+  }
+  onOrderChanged: root.heldOrder = null
+  onReversedChanged: root.heldOrder = null
+  onChangeModeChanged: root.heldOrder = null
+  onListNameChanged: root.heldOrder = null
+  onListsHeldChanged: root.heldOrder = null
+  Connections {
+    target: yahooGate
+    function onPausedChanged() { root.releaseOrder() }
+  }
+  Connections {
+    target: robinhoodGate
+    function onPausedChanged() { root.releaseOrder() }
   }
 
   // Asked for once per change of the chart asked for, read from the view, so

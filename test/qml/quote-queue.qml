@@ -152,10 +152,41 @@ Harness {
       check("every quote kept, through every step, is the symbol it is kept under",
         harness.misfiled.length === 0 && Object.keys(feed.quotes).every(function(key) { return feed.quotes[key].symbol === key }),
         harness.misfiled.join(", "))
+      feed.symbols = ["MSFT", "NVDA"]
+    } else if (harness.step === 15) {
+      // A chart drawing itself in holds the feed: only the chart it waits
+      // on, MSFT's, is read; NVDA's answer waits, still asked, for the
+      // motion to end.
+      feed.lead = "MSFT"
+      feed.waited = "MSFT"
+      feed.holding = true
+      harness.refresh()
+      heldWatch.start()
+      return
+    } else if (harness.step === 16) {
+      check("once the hold ends, what it held is read",
+        receipt("NVDA") === harness.now && !("NVDA" in feed.asked), receipt("NVDA") + " vs " + harness.now)
       finish()
       return
     }
     ticker.start()
+  }
+
+  // The held run has ended and MSFT's answer is read: NVDA's is in hand,
+  // unread.
+  Timer {
+    id: heldWatch
+    interval: 20
+    repeat: true
+    onTriggered: {
+      var run = feed.landing[0]
+      if (receipt("MSFT") !== harness.now || !run || !run.ended) return
+      heldWatch.stop()
+      check("while a chart draws in, only the chart it waits on is read; the rest waits, still asked",
+        receipt("NVDA") < harness.now && "NVDA" in feed.asked, receipt("NVDA") + " vs " + harness.now)
+      feed.holding = false
+      ticker.start()
+    }
   }
 
   Connections {

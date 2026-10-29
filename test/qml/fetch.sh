@@ -20,7 +20,7 @@ patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property 
 # The harness owns the clock, from Wednesday 7 October at 05:59 New York.
 patch_copy plugin/Service.qml 's/function wallSecond() { return Math.floor(Date.now() \/ 1000) }/function wallSecond() { return root.now }/'
 patch_copy plugin/Service.qml 's/property int now: Math.floor(Date.now() \/ 1000)/property int now: 1791367140/'
-patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testFeed: feed\n  readonly property alias testPreviewFeed: previewFeed\n  readonly property alias testYahooGate: yahooGate\n  readonly property alias testDataFile: dataFile\n  readonly property alias testFundamentalsFeed: fundamentalsFeed'
+patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testFeed: feed\n  readonly property alias testPreviewFeed: previewFeed\n  readonly property alias testYahooGate: yahooGate\n  readonly property alias testDataFile: dataFile\n  readonly property alias testFundamentalsFeed: fundamentalsFeed\n  readonly property alias testOvernightFeed: overnightFeed'
 patch_copy plugin/QuoteFeed.qml 's/interval: 2500/interval: 200/'
 # The pills' popups stay unloaded, and the window host asks a stand-in, not
 # the owner's Hyprland (as range.sh), and hears its events from the stand-in

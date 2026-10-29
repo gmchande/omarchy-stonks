@@ -34,6 +34,13 @@ Item {
   // URLs, until it is answered.
   property var batches: []
   readonly property bool busy: batches.length > 0
+  // While the service holds answers, as a chart draws itself in, a run is
+  // read only if it carries the chart waited on (`waited`); the rest wait
+  // for the motion to end, since a day's answer is read in one piece that
+  // can't be sliced: 17 to 24 ms for 25 listings.
+  property bool holding: false
+  property string waited: ""
+  onHoldingChanged: if (!holding && landing) landTimer.start()
 
   // `at` is the service's clock as it asks: the clock's own handlers may run
   // before this binding to it has caught up. While the gate holds the host,
@@ -80,6 +87,7 @@ Item {
 
   function landStep() {
     var job = landing
+    if (holding && !batches.some(function(b) { return b.symbols.indexOf(waited) >= 0 })) return
     var until = Date.now() + 8
     while (job.batch < batches.length && Date.now() < until) {
       var batch = batches[job.batch].symbols

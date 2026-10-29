@@ -309,12 +309,15 @@ personal use, so either may change or stop without notice.
 **Sites**, and nothing else:
 
 - `query1.finance.yahoo.com` for prices, charts, the market cap and P/E,
-  and the currency rate a P/E needs. Stonks keeps prices fresh for the
-  pill's stock, for every stock, ETF, and index in All during its regular
-  session, and for every row while the popup or the window is open. Each
-  comes every minute while its market trades, every 5 minutes before and
-  after the session (every minute for the stock on show), and every 15
-  minutes while the market is closed.
+  and the currency rate a P/E needs. With only the pill on screen, Stonks
+  asks for the pill's stock alone: every minute while its market trades,
+  every 5 minutes before and after the session, and every 15 minutes while
+  it's closed. As the shell starts, it asks once for every row. When you
+  open the panel or the window, it asks for the stock at the top, then the
+  rows you can see, then the rest of the list, and keeps them fresh while
+  it's open: every minute while a row's market trades, and every 5 minutes
+  before and after the session (every minute for the stock on show). It
+  leaves out a row whose market hasn't traded since its last price.
 - `query2.finance.yahoo.com` for search, as you type.
 - `api.robinhood.com` for overnight prices: once a day for which stocks
   trade overnight, once for the pill's stock as the shell starts, and
