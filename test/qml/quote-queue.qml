@@ -201,8 +201,7 @@ Harness {
     }
   }
 
-  // The held run has ended and MSFT's answer is read: NVDA's is in hand,
-  // unread.
+  // The held run has ended: both answers are in hand, unread.
   Timer {
     id: heldWatch
     interval: 20
