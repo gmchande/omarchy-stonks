@@ -6,7 +6,7 @@ import Quickshell.Hyprland
 // Hosts the window, whatever is on the bar, and decides what a request for
 // it does with the panel and Hyprland's workspaces, and whether a screen
 // shows it. The window itself is App's. It also asks Hyprland, for the
-// service, whether every screen is off, and closes the popup as Omarchy's
+// service, whether every screen is off, and closes the panel as Omarchy's
 // screensaver starts.
 Item {
   id: root
@@ -108,9 +108,9 @@ Item {
     }
   }
 
-  // Omarchy's screensaver window opening closes the popup, which would
+  // Omarchy's screensaver window opening closes the panel, which would
   // otherwise stay over it; the window stays, under it, as any app does.
-  // Heard only while the popup is open.
+  // Heard only while the panel is open.
   Connections {
     target: Hyprland
     enabled: root.popupOpen()

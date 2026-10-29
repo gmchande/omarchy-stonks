@@ -448,14 +448,14 @@ Harness {
       harness.check("with the panel open, a right-click closes it and opens the window, or keeps the window open",
         fromPopup === "false,true" && overWindow === "false,true", fromPopup + " | " + overWindow)
 
-      // Omarchy's screensaver opening closes the popup, and leaves the
-      // window open under it; another window opening leaves the popup open.
+      // Omarchy's screensaver opening closes the panel, and leaves the
+      // window open under it; another window opening leaves the panel open.
       shellApi.popupOpen = true
       hyprlandStandIn.opens("Alacritty", "screensaver, notes")
       var afterOther = [shellApi.popupOpen, app.opened].join(",")
       hyprlandStandIn.opens("org.omarchy.screensaver", "Screensaver")
       var afterScreensaver = [shellApi.popupOpen, app.opened].join(",")
-      harness.check("the screensaver opening closes the popup and leaves the window open, and another window opening closes nothing",
+      harness.check("the screensaver opening closes the panel and leaves the window open, and another window opening closes nothing",
         afterOther === "true,true" && afterScreensaver === "false,true", afterOther + " | " + afterScreensaver)
 
       // On another workspace the window comes forward there and stays open;
