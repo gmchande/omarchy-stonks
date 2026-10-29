@@ -88,10 +88,10 @@ session and time, such as OVERNIGHT 23:25. The move beside the price
 always runs from the chart's dashed line, the close before the day on the
 chart, so the number, the line, the bull or bear, the rows and the pill
 agree. The line under the price shows the close and its day's move, and
-after the close, the move since it: CLOSE 153.27 ▼3.45% · ▲1.35% SINCE.
-On a longer range the chart ends on that price, and the move is the
-range's, up to it. Elsewhere, a smaller line under the price shows the
-pre-market or after-hours price.
+after the close, the move since it: CLOSE 153.27 ▼3.45% · ▲1.35% SINCE,
+on every range. On a longer range the chart ends on that price, and the
+move is the range's, up to it. Elsewhere, a smaller line under the price
+shows the pre-market or after-hours price.
 
 The 1D chart shows one trading day, each price at its time, from the
 day's first trade, or the open if that's earlier, to the day's end while
@@ -100,10 +100,11 @@ trades at night, the day runs from its night's open the evening before
 (20:00, New York time) to the next, and the chart turns to the next day
 with that night's first trade. Over the weekend it shows Friday until
 Sunday night's first trade. A stock that doesn't trade at night ends its
-day at 20:00. When the rows all measure a day that isn't
-today, such as Friday at the weekend, the list says so where it says
-TODAY. A coin never closes, so its chart, its change, and its low and
-high cover the last 24 hours.
+day at 20:00. Once the chart shows the next day, the low, high, open and
+volume under it name the day they belong to, such as MON. When the rows all
+measure a day that has ended, such as Friday at the weekend, the list
+says so where it says TODAY. A coin never closes, so its chart, its
+change, and its low and high cover the last 24 hours.
 
 A price says "As of" and its time when it's old: more than two minutes
 behind while its market trades, or saved from before and not yet

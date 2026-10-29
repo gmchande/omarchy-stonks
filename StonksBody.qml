@@ -411,7 +411,7 @@ Item {
   // room for both first lines' facts on every range (`infoFactLists`), so a
   // range change moves nothing; a range whose prices take another digit
   // widens the price columns.
-  readonly property var dayLine: chart ? Figures.dayLine(featuredQuote, featuredToday) : null
+  readonly property var dayLine: chart ? Figures.dayLine(featuredQuote, featuredToday, featuredDay) : null
   readonly property var rangeEnds: historyShown ? History.rangeEnds(history, historyStats, featuredQuote) : null
   readonly property var periodLine: !chart ? null : historyShown ? History.rangeLine(history, rangeEnds, featuredQuote) : dayLine
   readonly property var infoFactLists: !dayLine ? [] : [dayLine.facts, History.rangeFacts(dayLine.range.widest)]

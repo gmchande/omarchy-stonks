@@ -1834,14 +1834,33 @@ test("in every phase, a stock that has traded since its close shows that newest 
     const line = M.chartGeometry(day, calendars)
     expect([day.points.at(-1).p, line.points.at(-1).y < line.baselineY]).toEqual([264.11, true])
   }
-  // The list's header names the day the rows measure where it isn't
-  // today: Friday all weekend. On Sunday night the rows that trade at
-  // night measure Monday, the rest Friday: the header names neither.
+  // The list's header names the day the rows measure where it has ended:
+  // Friday all weekend. On Sunday night the rows that trade at night
+  // measure Monday, the rest Friday: the header names neither. Rows that
+  // all measure tomorrow from tonight's trades, on Sunday night or a
+  // weekday evening, say TODAY.
   const header = set => { const at = topsAt(set); return M.rowsDay(at.symbols, at.quotes, at.newest, at.now, calendars) }
   expect(["watch-2026-10-25-1000", "watch-2026-10-25-2335", "watch-2026-10-26-1200"].map(header)).toEqual(["FRI", "TODAY", "TODAY"])
+  for (const [set, rows] of [["watch-2026-10-25-2335", ["NBIS", "JNJ"]], ["watch-2026-10-26-2005", ["NBIS"]]]) {
+    const at = topsAt(set)
+    expect([set, M.rowsDay(rows, at.quotes, at.newest, at.now, calendars)]).toEqual([set, "TODAY"])
+  }
+  // Monday 20:05: NBIS's chart is Tuesday's from its first night trade;
+  // the low, high, open and volume under it are still Monday's, and say so,
+  // as they do after midnight.
   {
-    const at = topsAt("watch-2026-10-25-2335")
-    expect(M.rowsDay(["NBIS", "JNJ"], at.quotes, at.newest, at.now, calendars)).toBe("MON")
+    const at = topsAt("watch-2026-10-26-2005")
+    const day = dayAt("watch-2026-10-26-2005", "nbis").day
+    expect(M.dayLine(at.quotes.NBIS, M.exchangeDay(at.quotes.NBIS, at.now), day).title).toBe("MON")
+    expect(M.dayLine(at.quotes.NBIS, M.exchangeDay(at.quotes.NBIS, at.now), at.quotes.NBIS).title).toBe("1D")
+  }
+  // Monday 17:58, since the open: the change still says SINCE OPEN, then
+  // the newest price's session and time.
+  {
+    const at = topsAt("watch-2026-10-26-1800")
+    const open = M.rowModel(at.quotes.NBIS, 0, "open", at.newest.NBIS)
+    expect(M.newestCaptions(at.quotes.NBIS, open.newest, at.now, calendars, open.periodLabel)[0]).toBe("SINCE OPEN · AFTER HOURS 17:58")
+    expect(M.rowModel(at.quotes.NBIS, 0, "pct", at.newest.NBIS).periodLabel).toBe("")
   }
   // Sunday 23:35, the list sorted by change and its up and down count read
   // the price on top: NBIS, −3.92% tonight, is the list's worst, though
@@ -1885,6 +1904,18 @@ test("in every phase, a stock that has traded since its close shows that newest 
   const week = M.viewChart("NBIS", "1W", sunday.quotes, {},
     { "NBIS|1W": { status: "ok", history: M.parseHistory(fixture("history/nbis-2026-10-25-2335-5d.json"), "1W") } }, sunday.nights, sunday.allDay, calendars).history
   expect(M.rangeEnds(week).low).toEqual({ p: 152.51, t: sunday.newest.NBIS.t })
+  // Monday 17:58 on 1W, Yahoo's week as it stood then (the 20:05 answer cut
+  // to its bars before 17:58): the line under the price shows the close, so
+  // it adds the move since it, as 1D does.
+  {
+    const at = topsAt("watch-2026-10-26-1800")
+    const raw = M.parseHistory(fixture("history/nbis-2026-10-26-2005-5d.json"), "1W")
+    const then = { ...raw, bars: raw.bars.filter(b => b.t < at.newest.NBIS.t) }
+    const chart = M.viewChart("NBIS", "1W", at.quotes, {}, { "NBIS|1W": { status: "ok", history: then } }, at.nights, at.allDay, calendars)
+    const model = M.historyRowModel(chart.history, at.quotes.NBIS, 0)
+    const line = M.closeLine(at.quotes.NBIS, M.exchangeDay(at.quotes.NBIS, at.now), "pct", model.newest)
+    expect([line.label, line.changeText, line.since, line.sinceTone]).toEqual(["CLOSE", "\u22123.45%", "+1.35%", "up"])
+  }
 })
 
 test("before the open the day is measured from the last session's close, though Yahoo's previous close is the one before", () => {

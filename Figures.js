@@ -193,21 +193,24 @@ function exchangeDay(quote, t) {
   return quote && Format.isFiniteNumber(t) ? Math.floor((t + (quote.gmtoffset || 0)) / 86400) : null
 }
 
-// The info block's first line on the day, titled by `dayTitle`: its regular
+// The info block's first line on the day, titled by `dayTitle` against the
+// later of today and the day the chart draws (`day`), so Monday's figures
+// under Tuesday's chart, from its first night trade, say MON: its regular
 // low and high once known, the price's place between them, then its open
 // and volume. An end the day pushes to its 52-week mark takes that
 // direction's tone, as the 52-week line's does (`Fundamentals.yearLine`).
 // The open keeps its slot before the session's first bar, so the line keeps
 // its shape; VOL's is as wide as 999.9M. With no quote there is no line.
-function dayLine(quote, today) {
+function dayLine(quote, today, day) {
   if (!quote) return null
   var q = quote
+  var drawn = day && day.session && day.session.regular ? exchangeDay(q, day.session.regular.start) : null
   var head = Quote.headlineQuote(q)
   var range = Format.infoRange(q.dayLow, q.dayHigh, head ? head.price : null, q.priceDigits)
   if (range.high !== null && Format.isFiniteNumber(q.fiftyTwoWeekHigh) && range.high >= q.fiftyTwoWeekHigh) range.highTone = "up"
   if (range.low !== null && Format.isFiniteNumber(q.fiftyTwoWeekLow) && range.low <= q.fiftyTwoWeekLow) range.lowTone = "down"
   return {
-    title: dayTitle(q, today),
+    title: dayTitle(q, drawn !== null && drawn > today ? drawn : today),
     range: range,
     facts: [
       { label: "OPEN", value: Format.isFiniteNumber(q.dayOpen) ? Format.money(q.dayOpen, q.priceDigits) : "", widest: range.widest },
@@ -248,8 +251,9 @@ function dayTitles() {
 }
 
 // The day the rows measure, named above them: "TODAY", or, where every US
-// stock and ETF among them (`symbols`, `quotes`) measures one day other
-// than `now`'s, that day's name, "FRI" at the weekend. A row measures the
+// stock and ETF among them (`symbols`, `quotes`) measures one day that has
+// ended by `now`, that day's name, "FRI" at the weekend; rows measuring
+// tomorrow from tonight's trades say TODAY. A row measures the
 // day of its newest price since the close (`newest`, by symbol,
 // `Overnight.newestPrint`), else its headline's. Listings abroad and coins
 // measure their own days, which their rows name.
@@ -266,7 +270,7 @@ function rowsDay(symbols, quotes, newest, now, calendars) {
     shared = day
   }
   var today = shared ? exchangeDay(shared.quote, now) : null
-  return !shared || shared.day === today ? "TODAY" : dayName(shared.quote, shared.t, today)
+  return !shared || shared.day >= today ? "TODAY" : dayName(shared.quote, shared.t, today)
 }
 
 // How the list reads on the figures its rows show: up, flat, and down, and
@@ -302,7 +306,8 @@ function reading(quote, scrubT, newest) {
 // close or the day's open (`Quote.headlineBase`), or, once the listing has
 // traded since its regular close, its newest price (`newest`,
 // `Overnight.newestPrint`), its change from the 1D chart's dashed line,
-// its session and time said beside it (`newestCaptions`). A non-zero
+// its session and time said beside it (`newestCaptions`), after SINCE OPEN
+// since the open. A non-zero
 // scrubT reads that moment of the day (`Quote.readingAt`), its change from
 // the close the dashed line is at (`scrubbedBase`).
 // dayUp is always versus that close, so the chart fill does not flip when
@@ -333,7 +338,7 @@ function rowModel(quote, scrubT, mode, newest) {
     dayTone: Format.changeTone(direction, "pct", quote.priceDigits),
     changeText: Format.changeText(chg, mode, quote.priceDigits),
     changeLine: Format.changeText(chg, mode, quote.priceDigits) + (mode === "open" && chg.pct !== null ? " open" : ""),
-    periodLabel: since ? "" : quote.rolling && mode !== "open" ? "24H" : Format.changeCaption(mode),
+    periodLabel: since && mode !== "open" ? "" : quote.rolling && mode !== "open" ? "24H" : Format.changeCaption(mode),
     // The newest price since the close on top, { t, p, phase }, or null.
     newest: since
   }
