@@ -481,20 +481,49 @@ function inExtendedHours(quote, now, calendars) {
 // may still change: the close and late prints settle in that time.
 var SETTLED = 15 * 60
 
+// A calendar's trading hours on `date`, from the pre-market's open to the
+// post-market's close where it has them (`from`, `to`, both 0 on a day it
+// doesn't trade), and when it next opens after that day, pre-market
+// included (`next`, 0 past what the calendar knows), each in seconds.
+function tradingDay(cal, date) {
+  var segs = segmentsOn(cal, date)
+  var opens = function(day, first) { return cal.pre ? epochAt(cal, day, cal.pre.open) : first }
+  var open = nextOpen(cal, epochAt(cal, nextDateString(date), "00:00"))
+  return {
+    from: segs.length ? opens(date, segs[0].start) : 0,
+    to: segs.length ? (cal.post ? epochAt(cal, date, cal.post.close) : segs[segs.length - 1].end) : 0,
+    next: open ? opens(open.dateString, open.t) : 0
+  }
+}
+
+// A function from a calendar and a second to its trading hours that day
+// (`tradingDay`), each day read once, not once a listing.
+function tradingDays() {
+  var read = new Map()
+  return function(cal, t) {
+    var date = dateStringOf(localDate(t, cal))
+    if (!read.has(cal)) read.set(cal, {})
+    var days = read.get(cal)
+    if (!(date in days)) days[date] = tradingDay(cal, date)
+    return days[date]
+  }
+}
+
 // The second a listing's market next trades, pre-market included, while its
 // quote, last answered at `receivedAt`, can't change before then: the answer
 // came SETTLED after the session it describes had ended, outside its
-// calendar's trading hours that day (SETTLED past their end), and its
-// market hasn't opened since. Asking sooner brings back the same price. The
-// next trading is the earlier of its calendar's next open (the pre-market's,
-// where the calendar has one) and Yahoo's period to come; 0 while it may
-// still change, or nothing says when it trades next. A quote can describe
-// an earlier session than the one trading as it is answered (an index's
-// stays the last session's until its open), so the calendar has the last
-// word, and so does a period of Yahoo's under way as it was answered
-// (London's pre-market, which its calendar doesn't hold). Never a
+// calendar's trading hours that day (`dayOf`, from `tradingDays`; SETTLED
+// past their end), and its market hasn't opened since. Asking sooner brings
+// back the same price. The next trading is the earlier of its calendar's
+// next open (the pre-market's, where the calendar has one) and Yahoo's
+// period to come; 0 while it may still change, or nothing says when it
+// trades next. A quote can describe an earlier session than the one trading
+// as it is answered (an index's stays the last session's until its open),
+// so the calendar has the last word, and so does a period of Yahoo's under
+// way as it was answered (London's pre-market, which its calendar doesn't
+// hold). Never a
 // cryptocurrency's, which always trades.
-function quietUntil(quote, receivedAt, now, cal) {
+function quietUntil(quote, receivedAt, now, cal, dayOf) {
   if (!quote || quote.crypto || !receivedAt) return 0
   var s = quote.session
   if (!s || !s.regular || receivedAt < (s.post || s.regular).end + SETTLED) return 0
@@ -502,15 +531,10 @@ function quietUntil(quote, receivedAt, now, cal) {
   if (c && c.regular && receivedAt >= (c.pre || c.regular).start && receivedAt < (c.post || c.regular).end + SETTLED) return 0
   var starts = []
   if (cal) {
-    var date = dateStringOf(localDate(receivedAt, cal))
-    var segs = segmentsOn(cal, date)
-    if (segs.length > 0) {
-      var from = cal.pre ? epochAt(cal, date, cal.pre.open) : segs[0].start
-      var to = cal.post ? epochAt(cal, date, cal.post.close) : segs[segs.length - 1].end
-      if (receivedAt >= from && receivedAt < to + SETTLED) return 0
-    }
-    var open = nextOpen(cal, receivedAt)
-    if (open) starts.push(cal.pre ? epochAt(cal, open.dateString, cal.pre.open) : open.t)
+    var day = dayOf(cal, receivedAt)
+    if (day.to && receivedAt >= day.from && receivedAt < day.to + SETTLED) return 0
+    var open = receivedAt < day.from ? day.from : day.next
+    if (open) starts.push(open)
   }
   if (c && c.regular && (c.pre || c.regular).start > receivedAt) starts.push((c.pre || c.regular).start)
   var next = starts.length ? Math.min.apply(null, starts) : 0

@@ -73,11 +73,12 @@ function readingOrder(featured, sights, shown, library) {
 // asked for is the feed's to ask.
 function quotesDue(watched, entries, asked, quotes, heroes, pill, now, interval, calNow) {
   var at = {}
+  var dayOf = Market.tradingDays()
   watched.forEach(function(s) {
     var entry = entries[s]
     if (!entry || entry.status === "saved" || s in asked) return
     var cal = calNow(quotes[s])
-    var quiet = s === pill || entry.status !== "ok" ? 0 : Market.quietUntil(quotes[s], entry.receivedAt, now, cal.cal)
+    var quiet = s === pill || entry.status !== "ok" ? 0 : Market.quietUntil(quotes[s], entry.receivedAt, now, cal.cal, dayOf)
     at[s] = entry.answeredAt > now ? now : quiet
       || entry.answeredAt + Market.quoteCadence(quotes[s], now, interval, heroes.indexOf(s) >= 0, cal)
   })

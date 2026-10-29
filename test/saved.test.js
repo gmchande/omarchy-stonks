@@ -2554,7 +2554,7 @@ test("a quote held from an earlier day trades by its calendar, and one answered 
   // NEST's answer of Wednesday 7 October at 14:55, held into Thursday.
   const nest = M.parseChart(fixture("moments/listings-2026-10-07-1455/nest.json"))
   const thursday = at("2026-10-08", "11:00")
-  const quiet = (q, receivedAt, now) => M.quietUntil(q, receivedAt, now, M.calendarFor(calendars, q))
+  const quiet = (q, receivedAt, now) => M.quietUntil(q, receivedAt, now, M.calendarFor(calendars, q), M.tradingDays())
   expect(M.sessionPhase(nest, thursday)).toBe("closed")
   expect([M.inRegularSession(nest, thursday, calendars), quoteCadence(nest, thursday, 60, false)]).toEqual([true, 60])
   // Answered in its session, it may still move: asked again on its cadence.
