@@ -57,11 +57,11 @@ Item {
   // while the quote it is from is gone, as a failed preview's is.
   readonly property var newest: quote && view && view.newest ? view.newest : null
   readonly property bool newestOld: Figures.newestStale(newest, now)
-  // The line under the price: with the newest price on top, the close
-  // (`Figures.closeLine`); else the extended-hours print, on every range. A
-  // scrub's price is a past one, so the line rests and the baseline's
-  // legend takes its place.
-  readonly property var extended: newest ? Figures.closeLine(quote, Figures.exchangeDay(quote, now), changeMode)
+  // The line under the price: with the newest price on top, the close and
+  // the move since it (`Figures.closeLine`); else the extended-hours print,
+  // on every range. A scrub's price is a past one, so the line rests and
+  // the baseline's legend takes its place.
+  readonly property var extended: newest ? Figures.closeLine(quote, Figures.exchangeDay(quote, now), changeMode, newest)
     : quote && !scrubbing ? Figures.extendedStack(quote, latest, now, day, changeMode) : null
   readonly property string priceText: view ? view.priceText
     : (freshness && freshness.state === "failed" ? "—" : "…")
@@ -307,6 +307,35 @@ Item {
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
       font.bold: true
+    }
+    // After the close, on its own day, the move since it (`Figures.closeLine`).
+    Text {
+      visible: !!root.extended && !!root.extended.since
+      textFormat: Text.PlainText
+      text: "·"
+      color: root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.bold: true
+    }
+    Text {
+      visible: !!root.extended && !!root.extended.since
+      textFormat: Text.PlainText
+      text: root.extended && root.extended.since ? Format.lookSigns(root.extended.since, root.retro) : ""
+      color: root.toneColor(root.extended && root.extended.since ? root.extended.sinceTone : "flat")
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.bold: true
+    }
+    Text {
+      visible: !!root.extended && !!root.extended.since
+      textFormat: Text.PlainText
+      text: "SINCE"
+      color: root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.bold: true
+      font.letterSpacing: 1
     }
   }
 

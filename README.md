@@ -83,16 +83,24 @@ Yahoo's rate for the day, inside the P/E and nowhere else.
 
 The top line names the moment in the market's day, such as Power hour, and
 says when the market opens or closes, by the exchange's clock. A US stock
-that has traded since the close shows that newest price on top, its move
-since the close, and its session and time, such as OVERNIGHT 23:25; the
-line under it shows the close and the day's move. On a longer range the
-chart ends on that price, and the move is the range's, up to it.
-Elsewhere, a smaller line under the price shows the pre-market or
-after-hours price.
-The 1D chart shows one trading day, from the first hour the stock can trade
-that day to the last. Over the weekend it shows Friday until Sunday night's
-trading begins. A night stays on the chart it began on until 04:00, New
-York time. A coin never closes, so its chart, its change, and its low and
+that has traded since the close shows that newest price on top, with its
+session and time, such as OVERNIGHT 23:25. The move beside the price
+always runs from the chart's dashed line, the close before the day on the
+chart, so the number, the line, the bull or bear, the rows and the pill
+agree. The line under the price shows the close and its day's move, and
+after the close, the move since it: CLOSE 153.27 ▼3.45% · ▲1.35% SINCE.
+On a longer range the chart ends on that price, and the move is the
+range's, up to it. Elsewhere, a smaller line under the price shows the
+pre-market or after-hours price.
+
+The 1D chart shows one trading day, each price at its time. For a US stock
+Robinhood trades at night, the day is 24 hours, from its night's open the
+evening before (20:00, New York time) to the next, and the chart turns to
+the next day with that night's first trade. Over the weekend it shows
+Friday until Sunday night's first trade. A stock that doesn't trade at
+night shows 04:00 to 20:00. When the rows all measure a day that isn't
+today, such as Friday at the weekend, the list says so where it says
+TODAY. A coin never closes, so its chart, its change, and its low and
 high cover the last 24 hours.
 
 A price says "As of" and its time when it's old: more than two minutes
@@ -251,8 +259,9 @@ the pill to see which.
   £35.80. A US stock's large price is its newest trade, after the close
   too, with the close on the line under it. Elsewhere the large price is
   the regular session's, and the smaller line shows trades outside it.
-  The change is from the previous close, unless you've switched it to
-  since the open. On a longer range, it's from the range's start. Stonks
+  The change is from the close before the day on the chart, unless you've
+  switched it to since the open. On a longer range, it's from the range's
+  start. Stonks
   leaves out prices of zero or less, and stray points in Yahoo's charts.
 - **"No trades charted" or "Traded only at" a time.** The listing traded
   too little that day to draw a line.

@@ -362,9 +362,9 @@ Item {
   readonly property real scrubX: motion.scrubX
   readonly property bool dayScrubbed: !historyActive && scrubShown !== 0
   // The newest price since the close on top of the hero, from the chart's
-  // newest print, as the row's and the pill's from the same prints
-  // (`Overnight.newestPrint`).
-  readonly property var featuredNewest: featuredQuote ? Overnight.newestPrint(featuredQuote, motion.latest, calendars) : null
+  // newest print and measured from its dashed line, as the row's and the
+  // pill's from the same prints (`Overnight.newestPrint`).
+  readonly property var featuredNewest: featuredQuote && featuredDay ? Overnight.newestPrint(featuredQuote, motion.latest, calendars, featuredDay) : null
   readonly property var dailyFeatured: featuredQuote
     ? Figures.rowModel(dayScrubbed ? featuredDay : featuredQuote, dayScrubbed ? scrubShown : 0, changeMode, featuredNewest) : null
   readonly property var featured: historyShown ? History.historyRowModel(history, featuredQuote, scrubShown) : dailyFeatured
@@ -422,12 +422,9 @@ Item {
     historyShown && history.range === "1Y" ? rangeEnds : null, rates) : null
   readonly property var rangeMarks: historyShown ? History.rangeMarks(history, rangeEnds, featuredQuote) : null
   // What a scrub reads its move from, said under the price: the dashed
-  // line's close or the range's start, led by the dashed line's mark; a
-  // print past the session's close, from that close (`Figures.readsClose`),
-  // with none.
+  // line's close or the range's start, led by the dashed line's mark.
   readonly property string baselineText: historyShown ? "┄ " + chartRange.toUpperCase() + " START " + Format.money(history.baseline, featuredQuote ? featuredQuote.priceDigits : undefined)
-    : (!historyActive && featuredDay ? (scrubShown && Figures.readsClose(featuredDay, scrubShown) ? "" : "┄ ")
-      + Figures.dayBaselineText(featuredDay, Figures.exchangeDay(featuredDay, now), scrubShown) : "")
+    : (!historyActive && featuredDay ? "┄ " + Figures.dayBaselineText(featuredDay, Figures.exchangeDay(featuredDay, now), scrubShown) : "")
   // A range that failed, which r, or the header's button, asks for again.
   readonly property string unavailableText: chartRange.toUpperCase() + " unavailable"
   readonly property bool offersRetry: headerText === unavailableText
@@ -1341,6 +1338,7 @@ Item {
   HeroBand {
     id: heroBand
     calendars: root.calendars
+    rowsDay: Figures.rowsDay(root.view.rows, root.quotes, root.newestPrints, root.now, root.calendars)
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: header.bottom

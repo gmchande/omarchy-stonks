@@ -88,10 +88,8 @@ Item {
 
   // The moment shown: 0 for now, otherwise a time on the day or a bar's.
   property int scrubT: 0
-  // The moment as the look shows it: retro's day moves in five minutes,
-  // unless it is laid out by print, where the moment is a print's own.
-  readonly property bool byPrint: !historyActive && !!day && !!Chart.chartSpan(day).byPrint
-  readonly property int scrubShown: historyActive || byPrint || !retro || !scrubT ? scrubT : Math.round(scrubT / 300) * 300
+  // The moment as the look shows it: retro's day moves in five minutes.
+  readonly property int scrubShown: historyActive || !retro || !scrubT ? scrubT : Math.round(scrubT / 300) * 300
   // Where the moment shown sits on the chart, 0..1, or -1.
   readonly property real scrubX: historyShown && scrubShown ? History.historyFraction(history, scrubShown)
     : (!historyActive && day && scrubShown ? Chart.fractionAtTime(day, scrubShown) : -1)

@@ -414,10 +414,6 @@ function parseChart(json, centExchanges, receivedAt) {
     // The start of the session the day's open, high, low, and volume are.
     figuresDay: figuresDay,
     nextDayBegun: nextDayBegun,
-    // Whether the answer came once its day had ended, its post-market or
-    // else its regular session: its prints are all the day will have, and
-    // its chart fills the width (`Overnight.sessionDay`).
-    wholeDay: !!regular && Format.isFiniteNumber(receivedAt) && receivedAt >= (periods.post || periods.regular).end,
     session: {
       pre: index ? null : periodOf(periods.pre),
       regular: regular,
@@ -706,14 +702,13 @@ function headlineBase(quote) {
 
 // The price at rest and what its move is measured from, shaped as `change`
 // reads it: the newest print since the regular close (`newest`,
-// `Overnight.newestPrint`), from that close, its "since the open" too, as
-// no session has opened since; else the headline (`headlineBase`). Every
-// place a listing's price shows at rest reads this one, so none disagree.
+// `Overnight.newestPrint`), from the 1D chart's dashed line (`base`), and
+// since the open of its own day, a day not yet open having none; else the
+// headline (`headlineBase`). Every place a listing's price shows at rest
+// reads this one, so none disagree.
 function restingRead(quote, newest) {
-  if (newest) {
-    var close = regularClose(quote)
-    return { price: newest.p, t: newest.t, base: { prevClose: close, dayOpen: close } }
-  }
+  if (newest)
+    return { price: newest.p, t: newest.t, base: { prevClose: newest.base, dayOpen: newest.own ? headlineBase(quote).dayOpen : null } }
   var head = headlineQuote(quote)
   return { price: head ? head.price : null, t: head ? head.t : null, base: headlineBase(quote) }
 }
@@ -843,8 +838,7 @@ function tailDay(quote) {
     points: pts.filter(function(p) { return p.t >= from }),
     prevClose: regularClose(quote),
     dayOpen: null,
-    openSession: null,
-    wholeDay: false
+    openSession: null
   })
 }
 

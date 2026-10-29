@@ -146,19 +146,18 @@ function words(o) {
     }
   } else {
     // What the change on show is measured from: the quote's at rest
-    // (`Quote.headlineBase`), or the close under a newest price on top;
-    // while scrubbed, the close the scrub reads from, named as the panel
-    // names it (`Figures.dayBaselineText`).
+    // (`Quote.restingRead`); with a newest price on top, or while scrubbed,
+    // the chart's dashed line, named as the panel names it
+    // (`Figures.dayBaselineText`).
     var today = Figures.exchangeDay(o.day, o.now)
-    var base = o.scrubT ? Figures.scrubbedBase(o.day, o.scrubT) : Quote.headlineBase(quote)
-    out.from = o.newest && !o.scrubT ? Figures.closeLabel(quote, today) + " " + Format.money(Quote.regularClose(quote), digits)
-      : o.changeMode === "open" ? "OPEN " + Format.money(base.dayOpen, digits)
-      : o.scrubT ? Figures.dayBaselineText(o.day, today, o.scrubT)
+    var base = o.scrubT ? Figures.scrubbedBase(o.day, o.scrubT) : Quote.restingRead(quote, o.newest || null).base
+    out.from = o.changeMode === "open" ? "OPEN " + Format.money(base.dayOpen, digits)
+      : o.scrubT || o.newest ? Figures.dayBaselineText(o.day, today, o.scrubT)
       : "PREV CLOSE " + Format.money(base.prevClose, digits)
     var pts = o.day.points
     if (pts.length) {
       var axis = Chart.chartSpan(pictureDay(o.day))
-      var first = local(o.day, axis.byPrint ? pts[0].t : axis.start, o.calendars)
+      var first = local(o.day, axis.start, o.calendars)
       var last = local(o.day, pts[pts.length - 1].t, o.calendars)
       out.start = first.clock
       // A chart that runs past its day, into the night and the next
@@ -167,12 +166,12 @@ function words(o) {
     }
   }
   // The panel's line under the price, as it shows it: at rest, the close
-  // under a newest price on top (`Figures.closeLine`), else the
-  // extended-hours print, its tone, and an old overnight print dimmed
-  // (`Figures.extendedStack`).
+  // under a newest price on top, and the move since it (`Figures.closeLine`),
+  // else the extended-hours print, its tone, and an old overnight print
+  // dimmed (`Figures.extendedStack`).
   if (!o.scrubT && o.newest) {
-    var below = Figures.closeLine(quote, Figures.exchangeDay(quote, o.now), o.changeMode)
-    out.extended = below.label + " · " + below.price + " " + below.changeText
+    var below = Figures.closeLine(quote, Figures.exchangeDay(quote, o.now), o.changeMode, o.newest)
+    out.extended = below.label + " · " + below.price + " " + below.changeText + (below.since ? " · " + below.since + " SINCE" : "")
     out.extendedTone = below.tone
     return out
   }

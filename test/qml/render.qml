@@ -358,7 +358,7 @@ Harness {
     property var nights: ({})
     property var allDay: null
     // Each listing's newest price since its close, as the service reads it.
-    readonly property var newestPrints: Overnight.newestPrints(symbols, quotes, nights, allDay, calendars)
+    readonly property var newestPrints: Chart.newestPrints(symbols, quotes, nights, allDay, calendars)
     readonly property var view: ({ featured: featuredSymbol, range: range, list: listName, listKey: "=" + listName,
       order: order, reversed: reversed, rows: symbols, shown: shown, library: library,
       chart: Chart.viewChart(featuredSymbol, range, quotes, entries, histories, nights, allDay, root.overnight ? calendars : null) })
@@ -440,7 +440,8 @@ Harness {
         var jnj = Quote.parseChart(moment("jnj"), Market.centExchanges(stub.calendars), sunday)
         var day = moment("robinhood-day")
         var night = Overnight.parseOvernight(day, day.results.map(function(r) { return r.symbol })).JNJ
-        root.nightPill = { quote: jnj, newest: Overnight.newestPrint(jnj, Overnight.latestPrint(jnj, night.bars), stub.calendars),
+        var built = Overnight.dayChart(jnj, night, stub.calendars)
+        root.nightPill = { quote: jnj, newest: Overnight.newestPrint(jnj, built.latest, stub.calendars, built.day),
           night: Object.assign({ status: "ok" }, night) }
         root.now = sunday
       }

@@ -220,8 +220,8 @@ Item {
   })
   // Each listing's newest price since its regular close, by symbol: the
   // price on top on the pill, the rows, and the panel and the window
-  // (`Overnight.newestPrints`).
-  readonly property var newestPrints: Overnight.newestPrints(library, feed.quotes, overnightFeed.entries, allDayFeed.entries, calendars)
+  // (`Chart.newestPrints`).
+  readonly property var newestPrints: Chart.newestPrints(library, feed.quotes, overnightFeed.entries, allDayFeed.entries, calendars)
   // Robinhood's answers, by symbol: its prints (`nights`) and whether it
   // trades each all day (`allDay`), so a row's line and the pill's draw the
   // day the 1D chart does (`Chart.lineDay`).
