@@ -14,7 +14,7 @@ import "Tones.js" as Tones
 // (16:9, which X shows whole), drawn at twice that, 2400 × 1350 of the
 // screen's own pixels on a screen of any scale, so its canvases paint
 // sharp and no larger than the picture: every measure is in the layout's
-// units, `u` window units each. What the popup shows above its ranges, at
+// units, `u` window units each. What the panel shows above its ranges, at
 // share size, with the facts it leaves out (`Share.words`); never the list.
 // In the surface's look and colours. Built for a shot and gone after it
 // (`StonksBody`).
@@ -248,13 +248,23 @@ Rectangle {
     y: 266 * root.u - baselineOffset
     text: root.words ? root.words.from : ""
   }
-  // The line under the price the popup shows, an old overnight print dim.
+  // The line under the price the panel shows, an old overnight print dim,
+  // and after the close the move since it, in its own tone.
   Caption {
+    id: extendedText
     objectName: "shareExtended"
     x: root.margin
     y: 294 * root.u - baselineOffset
     text: root.words ? Format.lookSigns(root.words.extended, root.retro) : ""
     color: root.words && root.words.extendedTone !== "old" ? root.toneColor(root.words.extendedTone) : root.dim
+  }
+  Caption {
+    objectName: "shareSince"
+    visible: !!root.words && root.words.since !== ""
+    x: extendedText.x + extendedText.implicitWidth
+    y: extendedText.y
+    text: root.words && root.words.since ? " · " + Format.lookSigns(root.words.since, root.retro) + " SINCE" : ""
+    color: root.toneColor(root.words ? root.words.sinceTone : "flat")
   }
 
   // The chart, at twice its strokes and cells, as the surface's look draws
@@ -317,7 +327,7 @@ Rectangle {
       letterSpacing: root.u
       spacing: 1.8 * root.u
     }
-    // A day with one print or none says so, as the popup's chart does.
+    // A day with one print or none says so, as the panel's chart does.
     Rectangle {
       readonly property string text: root.geometry && root.geometry.day ? Figures.dayNote(root.day, root.now, root.calendars) : ""
       visible: text !== ""

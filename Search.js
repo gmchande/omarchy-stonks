@@ -69,7 +69,7 @@ var KIND_NAMES = {
 // "Stonks doesn’t show currencies or futures": each kind left out once, in
 // the answer's order, a kind not in KIND_NAMES by Yahoo's own word for it.
 // Said the same under results or with none, and short, so it fits the
-// popup on one line.
+// panel on one line.
 function leftOutNote(left) {
   var names = []
   for (var i = 0; i < left.length; i++) {

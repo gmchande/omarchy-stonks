@@ -57,11 +57,11 @@ Item {
   // while the quote it is from is gone, as a failed preview's is.
   readonly property var newest: quote && view && view.newest ? view.newest : null
   readonly property bool newestOld: Figures.newestStale(newest, now)
-  // The line under the price: with the newest price on top, the close
-  // (`Figures.closeLine`); else the extended-hours print, on every range. A
-  // scrub's price is a past one, so the line rests and the baseline's
-  // legend takes its place.
-  readonly property var extended: newest ? Figures.closeLine(quote, Figures.exchangeDay(quote, now), changeMode)
+  // The line under the price: with the newest price on top, the close and
+  // the move since it (`Figures.closeLine`); else the extended-hours print,
+  // on every range. A scrub's price is a past one, so the line rests and
+  // the baseline's legend takes its place.
+  readonly property var extended: newest ? Figures.closeLine(quote, Figures.exchangeDay(quote, now), changeMode, newest)
     : quote && !scrubbing ? Figures.extendedStack(quote, latest, now, day, changeMode) : null
   readonly property string priceText: view ? view.priceText
     : (freshness && freshness.state === "failed" ? "—" : "…")
@@ -89,17 +89,23 @@ Item {
   }
   readonly property real listingRoom: Math.max(0, listingRow.width - symbolText.implicitWidth - Style.space(8))
   // Under the change: with the newest price on top, its session and time,
-  // after the range's name on a longer range, the day dropped where the
-  // line under the price leaves no room for it (`Figures.newestCaptions`);
-  // else what the change is measured from.
+  // after the range's name on a longer range or SINCE OPEN
+  // (`Figures.newestCaptions`); else what the change is measured from. The
+  // longest form that fits beside what the strip shows on the left, the
+  // line under the price or a scrub's baseline, so the two never meet; none
+  // where even the shortest doesn't fit.
   readonly property var newestCaptions: newest
     ? Figures.newestCaptions(quote, newest, now, calendars, view && view.periodLabel ? view.periodLabel : "") : null
+  readonly property real captionRoom: width - Style.space(12)
+    - Math.max(extendedLine.visible ? extendedLine.implicitWidth : 0, baselineLegend.visible ? baselineLegend.implicitWidth : 0)
   readonly property string changeCaption: {
-    if (!newestCaptions) return view && view.periodLabel ? view.periodLabel : (extended !== null ? "AT CLOSE" : "")
+    var forms = newestCaptions || [view && view.periodLabel ? view.periodLabel : (extended !== null ? "AT CLOSE" : "")]
     var font = captionMetrics.font // read, so a new text size measures again
-    // The caption's letter spacing is a pixel a letter.
-    var full = captionMetrics.advanceWidth(newestCaptions[0]) + newestCaptions[0].length
-    return full + Style.space(12) + extendedLine.implicitWidth <= width ? newestCaptions[0] : newestCaptions[1]
+    for (var i = 0; i < forms.length; i++) {
+      // The caption's letter spacing is a pixel a letter.
+      if (forms[i] === "" || captionMetrics.advanceWidth(forms[i]) + forms[i].length <= captionRoom) return forms[i]
+    }
+    return ""
   }
 
   readonly property int gap: Style.space(28)
@@ -308,9 +314,39 @@ Item {
       font.pixelSize: Style.font.caption
       font.bold: true
     }
+    // After the close, on its own day, the move since it (`Figures.closeLine`).
+    Text {
+      visible: !!root.extended && !!root.extended.since
+      textFormat: Text.PlainText
+      text: "·"
+      color: root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.bold: true
+    }
+    Text {
+      visible: !!root.extended && !!root.extended.since
+      textFormat: Text.PlainText
+      text: root.extended && root.extended.since ? Format.lookSigns(root.extended.since, root.retro) : ""
+      color: root.toneColor(root.extended && root.extended.since ? root.extended.sinceTone : "flat")
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.bold: true
+    }
+    Text {
+      visible: !!root.extended && !!root.extended.since
+      textFormat: Text.PlainText
+      text: "SINCE"
+      color: root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.bold: true
+      font.letterSpacing: 1
+    }
   }
 
   Text {
+    id: baselineLegend
     objectName: "baselineLegend"
     visible: root.scrubbing && root.baselineText !== ""
     y: root.baselineY + root.captionDrop - baselineOffset

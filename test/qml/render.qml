@@ -19,7 +19,7 @@ import "plugin"
 // Offscreen window body. A stub surface feeds StonksBody from fixtures.
 // Grab the opaque window-sized layer so margins stay in the PNG. The
 // w22-<surface>-<look>-<symbol>-<range> states render the 22-symbol list with
-// a real day featured, at identical state in both looks; a popup is as tall
+// a real day featured, at identical state in both looks; a panel is as tall
 // as its whole rows, the way Panel sizes it. sprite-candidates draws the
 // bull and bear candidates at 1x and 4x. pill-sheet draws the real bar pill
 // for NEST in every bar style and look, on a horizontal and a vertical bar.
@@ -36,7 +36,7 @@ Harness {
   // same scrubbed to the day's middle print. lit-<state>: the surface after
   // a screenshot, its camera lit; quiet-<state>: with sounds off; both may
   // lead, quiet- first. <state>-size-N: the state at text size N
-  // (render.sh) in the frame the shell gives it there, the popup and the
+  // (render.sh) in the frame the shell gives it there, the panel and the
   // smallest window grown with the text, as a reader sees it; the state as
   // named without the suffix. The pill sheet keeps its name and draws its
   // own frame.
@@ -90,9 +90,20 @@ Harness {
   // The smallest window App.qml allows.
   readonly property bool smallest: minWindow || minWindowOf || (!!w22 && w22.min)
   // loading and failed: a cold start, the first quotes out or failed, in
-  // retro, or in smooth with -smooth; in the popup with popup- before.
+  // retro, or in smooth with -smooth; in the panel with popup- before.
   readonly property string coldState: (/^(?:popup-)?(loading|failed)(?:-smooth)?$/.exec(stateName) || ["", ""])[1]
-  // The popup while adding, and the window at the size App.qml permits.
+  // <popup|window>-trouble-<kind>-<look>: prices stopped, as the header
+  // says it: Yahoo not answering (noanswer) or refusing (refused), both
+  // refreshes overdue with Yahoo open (trying), or AAPL's refresh failed
+  // (failed). The window says Yahoo's pause in a sentence.
+  readonly property string troubleKind: (/^(?:popup|window)-trouble-(noanswer|refused|trying|failed)-/.exec(stateName) || ["", ""])[1]
+  // Yahoo's gate for a trouble state: paused 40 s more for no answer, or
+  // to 12:40 on for a refusal; open otherwise.
+  function troubleGate(kind) {
+    return kind === "noanswer" ? { pause: "none", pausedUntil: root.now + 40 }
+      : kind === "refused" ? { pause: "refused", pausedUntil: root.now + 12 * 60 + 40 } : { pause: "", pausedUntil: 0 }
+  }
+  // The panel while adding, and the window at the size App.qml permits.
   readonly property bool searchState: stateName.indexOf("-search") >= 0
   readonly property bool minWindow: stateName.indexOf("min-window-") === 0
   // <popup|window>-room-<list>-<moment>-<look>: search on a list of one,
@@ -228,7 +239,7 @@ Harness {
   }
   // The theme's up and down, as the plugin reads them.
   property TrendColors trendColors: TrendColors {}
-  // The surface's ground: the popup's card, opaque, or the window's.
+  // The surface's ground: the panel's card, opaque, or the window's.
   readonly property color groundColor: popup
     ? Qt.rgba(Commons.Color.popups.background.r, Commons.Color.popups.background.g, Commons.Color.popups.background.b, 1) : Commons.Color.background
   // The bar's own ground and ink, opaque, for the pills.
@@ -321,8 +332,9 @@ Harness {
     // A save that didn't land (popup-notice-save-*), said again after a
     // click that still didn't (popup-notice-save-again-*).
     readonly property bool saveFailed: root.stateName.indexOf("popup-notice-save-") === 0
-    // A change made while the file can't be read (popup-notice-file-edited-*).
-    readonly property bool editsUnsaved: root.stateName.indexOf("popup-notice-file-edited-") === 0
+    // A change made while the file can't be read
+    // (<popup|window>-notice-file-edited-*).
+    readonly property bool editsUnsaved: /^(popup|window)-notice-file-edited-/.test(root.stateName)
     // A refresh the reader asked for, out (popup-refreshing-*).
     readonly property bool refreshing: root.stateName.indexOf("popup-refreshing-") === 0
     // Sounds on, their default, so the header's speaker shows its waves;
@@ -341,6 +353,7 @@ Harness {
     property string changeMode: "pct"
     property int now: root.now
     property var owed: ({})
+    readonly property var yahooGate: root.troubleGate(root.troubleKind)
     property string range: root.shownRange
     // The history on show, keyed to its symbol: a held chart's stays its own
     // while the next symbol's is on its way.
@@ -353,11 +366,12 @@ Harness {
     property var arriving: []
     property var lastRemoval: null
     // Robinhood's prints, and its word on which listings it trades all day,
-    // answered, on the overnight states only.
+    // answered, on the overnight states only; on the rest, never asked, so
+    // each listing has Yahoo's own day (`Chart.dayDrawn`).
     property var nights: ({})
-    property var allDay: ({})
+    property var allDay: null
     // Each listing's newest price since its close, as the service reads it.
-    readonly property var newestPrints: Overnight.newestPrints(symbols, quotes, nights, allDay, calendars)
+    readonly property var newestPrints: Chart.newestPrints(symbols, quotes, nights, allDay, calendars)
     readonly property var view: ({ featured: featuredSymbol, range: range, list: listName, listKey: "=" + listName,
       order: order, reversed: reversed, rows: symbols, shown: shown, library: library,
       chart: Chart.viewChart(featuredSymbol, range, quotes, entries, histories, nights, allDay, root.overnight ? calendars : null) })
@@ -440,7 +454,8 @@ Harness {
         var jnj = Quote.parseChart(moment("jnj"), Market.centExchanges(stub.calendars), sunday)
         var day = moment("robinhood-day")
         var night = Overnight.parseOvernight(day, day.results.map(function(r) { return r.symbol })).JNJ
-        root.nightPill = { quote: jnj, newest: Overnight.newestPrint(jnj, Overnight.latestPrint(jnj, night.bars), stub.calendars),
+        var built = Overnight.dayChart(jnj, night, stub.calendars)
+        root.nightPill = { quote: jnj, newest: Overnight.newestPrint(jnj, built.latest, stub.calendars, built.day),
           night: Object.assign({ status: "ok" }, night) }
         root.now = sunday
       }
@@ -485,6 +500,13 @@ Harness {
       stub.quotes = { AAPL: aapl, "SHOP.TO": shop }
       stub.entries = { AAPL: { status: "ok", receivedAt: root.now - 300 }, "SHOP.TO": { status: "ok", receivedAt: root.now - 300 } }
       stub.owed = { AAPL: root.now - 91, "SHOP.TO": root.now - 91 }
+    } else if (root.troubleKind) {
+      // Both refreshes overdue, Yahoo paused or not, or AAPL's failed with
+      // its price on show (`troubleGate`).
+      stub.quotes = { AAPL: aapl, "SHOP.TO": shop }
+      stub.entries = { AAPL: { status: root.troubleKind === "failed" ? "failed" : "ok", answeredAt: root.now, receivedAt: root.now - 300 },
+        "SHOP.TO": { status: "ok", answeredAt: root.now, receivedAt: root.now - (root.troubleKind === "failed" ? 0 : 300) } }
+      stub.owed = root.troubleKind === "failed" ? {} : { AAPL: root.now - 91, "SHOP.TO": root.now - 91 }
     } else {
       stub.quotes = { AAPL: aapl, "SHOP.TO": shop }
       stub.entries = { AAPL: { status: "ok", receivedAt: root.now }, "SHOP.TO": { status: "ok", receivedAt: root.now } }
@@ -858,11 +880,13 @@ Harness {
         body.search.results = []
         body.search.resultsQuery = "ZZZ"
         body.search.searchText = "ZZZ"
+        // A failed lookup as most are: nothing answered.
+        body.search.failure = "none"
         body.search.answer = root.stateName.indexOf("-none-") > 0 ? "none" : "failed"
       }
       // popup-search-vfiax-*: Yahoo's answer holds a mutual fund alone;
       // -eurusd-: two indexes shown, a currency and futures left out. The
-      // note has to fit the popup's width on one line. The currency is
+      // note has to fit the panel's width on one line. The currency is
       // Yahoo's top answer, so no result is chosen, as search's own landing
       // chooses (`SymbolSearch.land`).
       var leftOut = root.stateName.indexOf("-vfiax-") > 0 ? ["vfiax", vfiaxFile]
@@ -895,6 +919,7 @@ Harness {
         body.search.results = moment === "long" ? coins : moment === "one" ? saved.slice(0, 1) : moment === "five" ? saved.slice(0, 5) : []
         body.search.searchText = query
         body.search.resultsQuery = query
+        body.search.failure = "none"
         body.search.answer = moment === "none" ? "none" : moment === "failed" ? "failed" : "results"
         // The field says the query; the same text asks for nothing.
         root.searchField(body.search).text = query
@@ -927,11 +952,11 @@ Harness {
       if (root.stateName.indexOf("-named-") > 0) stub.listName = "My Watchlist"
       body.undoOffered = { symbol: "SHOP.TO" }
     } else if (root.stateName.indexOf("popup-hint-") === 0) {
-      // The first open's footer: the hint's lines have to fit the popup's
+      // The first open's footer: the hint's lines have to fit the panel's
       // width, above "+ Add a symbol".
       body.showFirstRunHint()
-    } else if (root.stateName.indexOf("popup-notice-file-") === 0) {
-      // The footer's notices have to fit the popup's width.
+    } else if (/^(popup|window)-notice-file-/.test(root.stateName)) {
+      // The footer's notices whole, in the panel's width and the window's.
       stub.settingsUnreadable = true
     } else if (root.stateName.indexOf("popup-notice-update-") === 0) {
       updates.newVersion = "1.0.0"
@@ -961,7 +986,7 @@ Harness {
       stub.lists = [choice("", all), choice("My Watchlist", all.slice(0, 8)), choice("Watching", all.slice(3, 8)),
         choice("Growth", []), choice("Wins", all.slice(10, 14)), choice("Losses", all.slice(14, 17))]
       if (named) {
-        // All stays the library, so the popup keeps All's height on a list.
+        // All stays the library, so the panel keeps All's height on a list.
         stub.library = all
         stub.listName = named.name
         stub.order = "manual"
@@ -1073,7 +1098,7 @@ Harness {
     // The window shows once the text size has landed (`sizeLanded`); the
     // large sheet, at the size render.sh gives it, is given room for its
     // seven rows, and a -size-N state the widths Style.space gives the
-    // surfaces at size N: the popup's 480 and the smallest window's 560
+    // surfaces at size N: the panel's 480 and the smallest window's 560
     // grow with the text, and the window is 720 or its smallest, whichever
     // is wider.
     implicitWidth: root.anchorState ? 1000 : root.pillSheet ? Math.max(520, pillColumn.implicitWidth + 48) : root.themeState ? 480 + 410 : root.sheet ? 1000
@@ -1126,7 +1151,7 @@ Harness {
         radius: Style.cornerRadius
       }
 
-      // The popup's body as the card holds it: inset by the card's border and
+      // The panel's body as the card holds it: inset by the card's border and
       // padding (`KeyboardPanel`'s), its own margins none, in a box that
       // clips it at its edges (`Panel.qml`'s key catcher), so what draws past
       // the body is cut here as on screen. The window's body has its own
@@ -1145,7 +1170,7 @@ Harness {
         StonksBody {
           id: body
           // As App.qml draws it: past 720 the body keeps that width, centred.
-          // The gallery's popup is at the left, the pills beside it.
+          // The gallery's panel is at the left, the pills beside it.
           width: root.themeState ? parent.width : Math.min(parent.width, Style.space(720))
           height: parent.height
           x: (parent.width - width) / 2
@@ -1189,6 +1214,20 @@ Harness {
               return [false, true].reduce(function(all, retro) {
                 return all.concat(["sparkline", "arrow", "text", "icon"].map(function(style) { return { style: style, retro: retro, day: "night" } }))
               }, [])
+            // pill-sheet-trouble: the text and icon forms in each look, in
+            // each trouble (`troubleGate`), and with no price yet while
+            // Yahoo doesn't answer, each with the hover's words beside it.
+            if (root.stateName === "pill-sheet-trouble") {
+              var troubled = []
+              ;[false, true].forEach(function(retro) {
+                ;["noanswer", "refused", "trying", "failed", "noanswer-noprice"].forEach(function(trouble) {
+                  ;["text", "icon"].forEach(function(style) {
+                    troubled.push({ style: style, retro: retro, day: trouble === "noanswer-noprice" ? "waiting" : "down", trouble: trouble })
+                  })
+                })
+              })
+              return troubled
+            }
             var rows = []
             for (var look = 0; look < 2; look++) {
               var retro = look === 1
@@ -1215,7 +1254,8 @@ Harness {
               width: pillRow.modelData.compact ? 80 : 170
               anchors.verticalCenter: parent.verticalCenter
               text: (pillRow.modelData.compact ? "" : (pillRow.modelData.retro ? "RETRO" : "SMOOTH") + " · ") + (pillRow.modelData.right ? "RIGHT SECTION" : pillRow.modelData.style.toUpperCase())
-                + (pillRow.modelData.style === "icon" || pillRow.modelData.right || pillRow.modelData.day !== "down" ? " · " + pillRow.modelData.day.toUpperCase() : "")
+                + (pillRow.modelData.trouble ? " · " + pillRow.modelData.trouble.toUpperCase()
+                  : pillRow.modelData.style === "icon" || pillRow.modelData.right || pillRow.modelData.day !== "down" ? " · " + pillRow.modelData.day.toUpperCase() : "")
               color: Commons.Color.muted
               font.family: Style.font.family
               font.pixelSize: 10
@@ -1237,12 +1277,14 @@ Harness {
                 property string featuredSymbol: night ? "JNJ" : "NEST"
                 property var quotes: night ? ({ JNJ: root.nightPill.quote })
                   : ({ NEST: root.pillQuoteFor(pillRow.modelData.day === "refresh failed" ? "down" : pillRow.modelData.day) })
-                property var entries: ({ [featuredSymbol]: { status: pillRow.modelData.day === "failed" || pillRow.modelData.day === "refresh failed" ? "failed"
+                property var entries: ({ [featuredSymbol]: { status: pillRow.modelData.day === "failed" || pillRow.modelData.day === "refresh failed"
+                  || pillRow.modelData.trouble === "failed" ? "failed"
                   : pillRow.modelData.day === "waiting" ? "pending" : "ok", receivedAt: root.now } })
                 property string changeMode: "pct"
                 property bool retro: pillRow.modelData.retro
                 property int now: root.now
-                property var owed: ({})
+                property var owed: pillRow.modelData.trouble && pillRow.modelData.trouble !== "failed" ? { NEST: root.now - 91 } : ({})
+                readonly property var yahooGate: root.troubleGate((pillRow.modelData.trouble || "").replace("-noprice", ""))
                 property var newestPrints: night ? ({ JNJ: root.nightPill.newest }) : ({})
                 property var nights: night ? ({ JNJ: root.nightPill.night }) : ({})
                 property var allDay: night ? ({ JNJ: { status: "ok", allDay: true, at: 0 } }) : ({})
@@ -1265,6 +1307,7 @@ Harness {
                 layoutConfig: pillRow.modelData.right ? { left: [], center: [], right: [{ id: "grvc.stonks" }] } : ({})
               }
               BarWidget {
+                id: horizontalPill
                 anchors.verticalCenter: parent.verticalCenter
                 x: pillRow.modelData.right ? parent.width - width - 8 : 0
                 width: implicitWidth
@@ -1313,6 +1356,29 @@ Harness {
                 height: implicitHeight
                 bar: verticalApi
                 settings: ({ id: "grvc.stonks", barStyleVertical: pillRow.modelData.style === "icon" ? "icon" : "stacked" })
+              }
+            }
+
+            // The hover's words, in a bubble drawn as the bar draws its own.
+            Rectangle {
+              visible: !!pillRow.modelData.trouble
+              anchors.verticalCenter: parent.verticalCenter
+              width: hoverWords.implicitWidth + 20
+              height: hoverWords.implicitHeight + 14
+              color: Commons.Color.tooltip.background
+              border.color: Commons.Color.tooltip.border
+              radius: Style.cornerRadius
+
+              Text {
+                id: hoverWords
+                anchors.centerIn: parent
+                textFormat: Text.PlainText
+                text: (pillRow.modelData.style === "icon" ? horizontalPill.featuredSymbol + " " + horizontalPill.changeText + " · " : "")
+                  + horizontalPill.warningText
+                color: Commons.Color.tooltip.text
+                font.family: Style.font.family
+                font.pixelSize: Style.font.body
+                horizontalAlignment: Text.AlignHCenter
               }
             }
           }

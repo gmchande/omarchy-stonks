@@ -38,7 +38,7 @@ Item {
   FontMetrics { id: metrics; font: root.wordFont }
   implicitHeight: Math.ceil(metrics.ascent) + Math.ceil(metrics.descent)
   // The metrics' font carries the letter spacing, so its advance is the word
-  // as drawn. Reading the font measures again on a new text size, or a popup
+  // as drawn. Reading the font measures again on a new text size, or a panel
   // built before `omarchy display text size` overshoots both edges.
   readonly property var wordWidths: {
     var font = metrics.font

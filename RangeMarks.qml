@@ -43,7 +43,7 @@ Item {
   // Where the scrub's line stands, in this item's pixels, -1 without one.
   readonly property real scrubAt: root.chart && root.scrubX >= 0 ? root.chart.xAt(root.scrubX) : -1
 
-  // `n` of the popup's pixels at text size 12, as `Style.space` rounds them.
+  // `n` of the panel's pixels at text size 12, as `Style.space` rounds them.
   function space(n) { return Math.max(1, Math.round(n * root.spacing)) }
 
   // The marks draw in with the line: the chart's draw-in uncovers them as

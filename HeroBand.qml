@@ -61,6 +61,8 @@ Item {
   property string order: "manual"
   property bool reversed: false
   property string listLabel: "All"
+  // The day the rows measure (`Figures.rowsDay`): "TODAY", or "FRI".
+  property string rowsDay: "TODAY"
   property var breadth: ({ list: "", up: 0, flat: 0, down: 0, none: 0 })
   property bool listMenuOpen: false
   property bool replayRunning: false
@@ -396,8 +398,8 @@ Item {
         onClicked: root.listClicked()
       }
 
-      // The rows and the rule are the day's on every range, and say so while
-      // the rows show.
+      // The rows and the rule are the day's on every range, and say which
+      // while the rows show.
       Text {
         id: todayText
         objectName: "todayLabel"
@@ -406,7 +408,7 @@ Item {
         anchors.leftMargin: Style.space(12)
         anchors.verticalCenter: parent.verticalCenter
         textFormat: Text.PlainText
-        text: "TODAY"
+        text: root.rowsDay
         color: root.dim
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption

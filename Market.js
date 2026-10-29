@@ -249,9 +249,9 @@ function calendarRegular(cal, now) {
 
 function scheduleNote(quote, now, calendars) {
   var cal = calendarFor(calendars, quote)
-  if (!cal) return calendarMap(calendars) ? "" : " · schedule unavailable"
+  if (!cal) return calendarMap(calendars) ? "" : " · market hours unknown"
   var nxt = nextOpen(cal, now)
-  return nxt ? " · " + formatNextOpen(cal, nxt) : " · schedule unavailable"
+  return nxt ? " · " + formatNextOpen(cal, nxt) : " · market hours unknown"
 }
 
 function previousDateString(dateString) {

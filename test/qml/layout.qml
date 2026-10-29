@@ -16,6 +16,7 @@ import "plugin/Overnight.js" as Overnight
 import "plugin/Quote.js" as Quote
 import "plugin/Settings.js" as Settings
 import "plugin/Search.js" as Search
+import "plugin/Figures.js" as Figures
 import "plugin"
 
 // Nothing jumps. The 22-symbol list with a cap symbol, an ETF, non-US
@@ -27,7 +28,7 @@ import "plugin"
 // the list's TODAY and its rule, and the first row must not move with the
 // look, and the first row must not move with the symbol or the range. Both
 // looks' digits start on the band's left edge. The header's words keep room
-// for its longest states at the popup's width. The footer sits one gap under
+// for its longest states at the panel's width. The footer sits one gap under
 // the rows whichever list shows, the window's too, at its bottom once its
 // list fills it, the window's chart taking what whole rows leave over, the
 // rows stop short of the scrollbar's gutter, an open list menu makes room
@@ -64,6 +65,9 @@ Harness {
   FileView { id: liveFile; path: root.fixtures + "/moments/live-2026-10-05/nest.json"; blockLoading: true }
   FileView { id: liveMonthFile; path: root.fixtures + "/moments/live-2026-10-05/nest-1m.json"; blockLoading: true }
   FileView { id: liveNightFile; path: root.fixtures + "/moments/live-2026-10-05/robinhood-day.json"; blockLoading: true }
+  // NBIS at 17:58 on Monday 26 October, after hours on its close's own day.
+  FileView { id: eveningFile; path: root.fixtures + "/moments/watch-2026-10-26-1800/nbis.json"; blockLoading: true }
+  FileView { id: eveningNightFile; path: root.fixtures + "/moments/watch-2026-10-26-1800/robinhood-day.json"; blockLoading: true }
   // Thin days, Friday 16 October: CKX's one bar, CVR's none; and the S&P
   // 500 on Monday 28 September at 08:00, before its bell, with no print yet.
   FileView { id: ckxFile; path: root.fixtures + "/moments/power-user-2026-10-16/ckx.json"; blockLoading: true }
@@ -291,10 +295,11 @@ Harness {
     readonly property var view: ({ featured: featuredSymbol, range: range, list: listName, listKey: "=" + listName,
       order: order, reversed: reversed, rows: symbols, shown: Settings.sortedSymbols(symbols, quotes, order, reversed, changeMode),
       library: library, chart: Chart.viewChart(featuredSymbol, range, quotes, entries, histories, nights,
-        allDay, featuredSymbol === "NEST" ? nightCalendars : null) })
+        allDay, nights[featuredSymbol] ? nightCalendars : null) })
     // NEST's prints, and the calendars its chart's day reads; only NEST has
     // them, Robinhood trading it all day, so no other symbol waits on
-    // Robinhood, and the body's own calendars stay null.
+    // Robinhood, and the body's own calendars stay null. The caption check
+    // adds NBIS's for itself.
     property var nights: ({})
     property var allDay: ({ NEST: { status: "ok", allDay: true, at: 0 } })
     property var nightCalendars: null
@@ -331,7 +336,7 @@ Harness {
     implicitWidth: 760
     implicitHeight: 900
 
-    // The surface under test: the popup's content box (Panel's
+    // The surface under test: the panel's content box (Panel's
     // Style.space(480) card less its padding and border), or the window's.
     Item {
       id: surface
@@ -339,7 +344,7 @@ Harness {
       // The window's width: the body's widest, or the window's minimum.
       property int windowWidth: 720
       property int fixedHeight: 0
-      // The room the popup's card gives the body, never past its cap of six
+      // The room the panel's card gives the body, never past its cap of six
       // rows (`Panel.bodyRoom`): its rows fill it in whole rows, the rest
       // left over (`StonksBody.fittedHeight`).
       property int budget: 730
@@ -541,7 +546,7 @@ Harness {
             mistitled.push(label + " titles " + period[0].what + " and " + year[0].what + ", lows " + gap + " px past 52W")
         }
         // A price shrinks only when it cannot fit beside the change: WIDE and
-        // SHIB's nine decimals in the popup, and nothing else, nowhere else.
+        // SHIB's nine decimals in the panel, and nothing else, nowhere else.
         var hero = find(body, "hero")
         var misfits = []
         // Each case-loop check once, naming the cases it fails in.
@@ -622,7 +627,7 @@ Harness {
         caseChecks.forEach(function(label, index) {
           root.check(label, caseFaults[index].length === 0, caseFaults[index].join(" | "))
         })
-        root.check("a price too wide for the popup (WIDE, SHIB-USD) shrinks there and not in the window, and no other price shrinks",
+        root.check("a price too wide for the panel (WIDE, SHIB-USD) shrinks there and not in the window, and no other price shrinks",
           misfits.length === 0, misfits.join(", "))
         root.check("both info lines are whole for every symbol, cell by cell, their rules in one column, and the line under the price is whole where it shows",
           cut.length === 0, cut.join(" | "))
@@ -780,9 +785,9 @@ Harness {
         stub.range = "1D"
         stub.historyEntry = null
         wait(50)
-        root.check("nothing on the info lines moves from 1D to 1M, 1Y, 5Y, and All, and the 52-week line says the same, on 1Y the chart's own low and high, a young listing's too, in both looks, in the popup and the window at its narrowest and widest",
+        root.check("nothing on the info lines moves from 1D to 1M, 1Y, 5Y, and All, and the 52-week line says the same, on 1Y the chart's own low and high, a young listing's too, in both looks, in the panel and the window at its narrowest and widest",
           shifted.length === 0, shifted.join(" | "))
-        root.check("both info lines reach the band's right edge on every range, in both looks, in the popup and the window at its narrowest and widest",
+        root.check("both info lines reach the band's right edge on every range, in both looks, in the panel and the window at its narrowest and widest",
           unreached.length === 0, unreached.join(" | "))
         root.check("a range marks its high and low whole on the chart's top and bottom edges, by the bars that made them, and the day marks none",
           unmarked.length === 0, unmarked.join(" | "))
@@ -975,7 +980,7 @@ Harness {
         surface.wide = wideWas
         stub.retro = false
         stub.quotes = Object.assign({}, longNamed, { "SHEL.L": shelQuote })
-        root.check("a long name is cut in the header short of the speaker; the hero's line keeps its exchange and currency whole, in the popup and the window, both looks",
+        root.check("a long name is cut in the header short of the speaker; the hero's line keeps its exchange and currency whole, in the panel and the window, both looks",
           metaLost.length === 0, metaLost.join(" | "))
 
         // A coin under a cent to four significant digits, a six-figure price
@@ -1015,14 +1020,14 @@ Harness {
         // full wherever that fits, its letters closed up where only that
         // fits, and otherwise without the holiday's name, as a weekend's is
         // worded, then with when it opens alone. A form shows only where the
-        // one before fits neither spaced nor closed up. In the popup and the
+        // one before fits neither spaced nor closed up. In the panel and the
         // window at its widest and its minimum width (App.qml), beside the
         // speaker, the camera, the look icon, and the help mark, at every
-        // text size Omarchy offers (9 to 20), and in the popup with the
+        // text size Omarchy offers (9 to 20), and in the panel with the
         // shell's spacing kept at size 12's as the text grows (`[spacing]
         // scale-with-font = false`). Smooth alone: retro changes only the
         // corner radius and the look toggle's words here (HeaderStatus.qml).
-        // At the everyday size 12 the popup names Constitution Memorial Day
+        // At the everyday size 12 the panel names Constitution Memorial Day
         // in full.
         var header = find(body, "statusText").parent
         var calendars = JSON.parse(calendarFile.text())
@@ -1033,7 +1038,11 @@ Harness {
           ["Lunch break · reopens 12:30 JST · in 59m", "Lunch break · reopens 12:30 JST", "Reopens 12:30 JST"],
           ["At 16:30 BST · Closing bell", "At 16:30 BST"], ["At 02:25 EDT · Overnight", "At 02:25 EDT"],
           ["WEEK OF 28 SEP 2026 · 712,345.00", "WEEK OF 28 SEP 2026"], ["21 SEP 10:00 AEST · 712,345.00", "21 SEP 10:00 AEST"],
-          ["Can't get prices · Stonks keeps trying", "Can't get prices"], ["Refreshing"], ["Loading SHIB-USD YTD"]]
+          ["Can't get prices · Stonks keeps trying", "Can't get prices"],
+          Figures.hostPause("none", 72, 0).forms, Figures.hostPause("refused", 30 * 60, 0).forms,
+          [Figures.hostPause("none", 72, 0).sentence].concat(Figures.hostPause("none", 72, 0).forms),
+          [Figures.hostPause("refused", 30 * 60, 0).sentence].concat(Figures.hostPause("refused", 30 * 60, 0).forms),
+          ["Refresh failed for SHIB-USD · Retrying", "Refresh failed · Retrying", "Refresh failed"], ["Refreshing"], ["Loading SHIB-USD YTD"]]
         var closures = 0
         var unnamed = []
         for (var calId in calendars.calendars) {
@@ -1083,7 +1092,7 @@ Harness {
         try {
           for (var hsize = 9; hsize <= 20; hsize++) {
             Style.fontBaseSize = hsize
-            // The popup with its spacing kept, then the popup and the
+            // The panel with its spacing kept, then the panel and the
             // window's two widths as the spacing grows with the text.
             for (var hw = -1; hw < 3; hw++) {
               Style.spacingScaleWithFont = hw >= 0
@@ -1135,12 +1144,73 @@ Harness {
           within(3000, function() { return settled() === before.layout })
         }
         console.log("said in less: " + Object.keys(shortened).map(function(k) { return k + " " + shortened[k] }).join(", "))
-        root.check("the header's longest real states read whole or in a shorter form that keeps their time, never cut, and every closure in calendars.json is said in full where it fits, else without its holiday's name, else with when it opens alone, a zone named, in the popup and the window at its widest and narrowest, at every text size from 9 to 20, and in the popup with its spacing kept",
+        root.check("the header's longest real states read whole or in a shorter form that keeps their time, never cut, and every closure in calendars.json is said in full where it fits, else without its holiday's name, else with when it opens alone, a zone named, in the panel and the window at its widest and narrowest, at every text size from 9 to 20, and in the panel with its spacing kept",
           closures > 50 && unnamed.length === 0 && roomless.length === 0,
           closures + " closures | " + unnamed.join(" | ") + " | " + roomless.slice(0, 12).join(" | ") + (roomless.length > 12 ? " | … " + roomless.length : ""))
         console.log("the add said less beside the undo: " + addShort.join(", "))
-        root.check("on a named list the footer's add reads whole, or beside an undo it has no room beside \"+ Add a symbol\", never cut, and whole again once the undo goes, in the popup and the window at its widest and narrowest, at every text size from 9 to 20, and in the popup with its spacing kept",
+        root.check("on a named list the footer's add reads whole, or beside an undo it has no room beside \"+ Add a symbol\", never cut, and whole again once the undo goes, in the panel and the window at its widest and narrowest, at every text size from 9 to 20, and in the panel with its spacing kept",
           addCut.length === 0, addCut.slice(0, 12).join(" | "))
+
+        // NBIS at 17:58, after hours on its close's own day: the line under
+        // the price says the close and the move since it, and the caption
+        // under the change its session and time, after SINCE OPEN since the
+        // open. At every text size, in both looks, in the panel and the
+        // window at its narrowest and widest, the caption keeps clear of the
+        // line, in the longest form that fits: at the everyday size in the
+        // panel, SINCE OPEN alone, since its time doesn't fit beside the line.
+        var captionBefore = { quotes: stub.quotes, nights: stub.nights, allDay: stub.allDay, calendars: stub.calendars, now: stub.now,
+          featured: stub.featuredSymbol, mode: stub.changeMode, size: Style.fontBaseSize, wide: surface.wide,
+          windowWidth: surface.windowWidth, retro: stub.retro }
+        var clashes = []
+        var everyday = []
+        try {
+          stub.now = 1793052024
+          stub.quotes = Object.assign({}, stub.quotes, { NBIS: Quote.parseChart(JSON.parse(eveningFile.text()), undefined, stub.now) })
+          stub.nights = Object.assign({}, stub.nights,
+            { NBIS: Object.assign({ status: "ok" }, Overnight.parseOvernight(JSON.parse(eveningNightFile.text()), ["NBIS"]).NBIS) })
+          stub.allDay = Object.assign({}, stub.allDay, { NBIS: { status: "ok", allDay: true, at: 0 } })
+          stub.calendars = stub.nightCalendars
+          stub.featuredSymbol = "NBIS"
+          for (var csize = 9; csize <= 20; csize++) {
+            Style.fontBaseSize = csize
+            for (var cw = 0; cw < 3; cw++) {
+              surface.wide = cw > 0
+              surface.windowWidth = cw === 1 ? Style.space(560) : 720
+              for (var cl = 0; cl < 2; cl++) {
+                stub.retro = cl === 1
+                ;["pct", "open"].forEach(function(mode) {
+                  stub.changeMode = mode
+                  wait(20)
+                  var strip = find(body, "extendedLine")
+                  var caption = find(body, "changeCaption")
+                  var said = strip.visible ? strip.children.filter(function(c) { return c.visible && c.text !== undefined })
+                    .map(function(c) { return c.text }).join(" ") : ""
+                  var where = "size " + csize + " " + (surface.wide ? "window " + surface.width : "panel") + (stub.retro ? " retro " : " smooth ") + mode
+                  if (said.indexOf("SINCE") < 0) clashes.push(where + " shows \"" + said + "\" under the price")
+                  else if (caption.text !== "" && xIn(strip, strip.width) + Style.space(12) > xIn(caption, 0))
+                    clashes.push(where + ": \"" + said + "\" ends at " + xIn(strip, strip.width) + ", \"" + caption.text + "\" starts at " + xIn(caption, 0))
+                  if (csize === captionBefore.size && !surface.wide && !stub.retro) everyday.push(caption.text)
+                })
+              }
+            }
+          }
+        } finally {
+          stub.featuredSymbol = captionBefore.featured
+          stub.changeMode = captionBefore.mode
+          stub.quotes = captionBefore.quotes
+          stub.nights = captionBefore.nights
+          stub.allDay = captionBefore.allDay
+          stub.calendars = captionBefore.calendars
+          stub.now = captionBefore.now
+          Style.fontBaseSize = captionBefore.size
+          surface.wide = captionBefore.wide
+          surface.windowWidth = captionBefore.windowWidth
+          stub.retro = captionBefore.retro
+          wait(50)
+        }
+        root.check("after the close, the caption under the change keeps clear of the line under the price and its SINCE, since the open too, at every text size, in both looks, in the panel and the window at its narrowest and widest",
+          clashes.length === 0 && everyday.join(" / ") === "AFTER HOURS 17:58 / SINCE OPEN",
+          "at the everyday size in the panel " + everyday.join(" / ") + " | " + clashes.slice(0, 12).join(" | ") + (clashes.length > 12 ? " | … " + clashes.length : ""))
 
         // In a window of ordinary height, 720 × 520, the key sheet shows its
         // credit whole without a scroll, the version included, and where
@@ -1278,7 +1348,7 @@ Harness {
         // chart gives way first, down to 136 px; at the usual 760 px it keeps
         // all 220 and takes what whole rows leave over, less than a row.
         // The window's chart fits the window: set here, where the height is
-        // the window's own, not fitted to the body as the popup's is.
+        // the window's own, not fitted to the body as the panel's is.
         surface.fixedHeight = 760
         body.minChartHeight = Style.space(136)
         wait(50)
@@ -1390,7 +1460,7 @@ Harness {
         root.check("a search result's name runs up to its exchange code, one column gap short",
           nameGap >= 0 && nameGap <= body.search.columnGap + 1, "gap " + nameGap + " px")
 
-        // What search leaves out is said on one line, whole, in the popup
+        // What search leaves out is said on one line, whole, in the panel
         // and the window at its narrowest, in both looks: Yahoo's answers
         // for "vfiax" (a mutual fund alone) and "eurusd" (two indexes shown,
         // a currency and futures not), and the two together, three kinds.
@@ -1421,11 +1491,11 @@ Harness {
         body.search.answer = ""
         body.cancelAdding()
         wait(50)
-        root.check("what search leaves out is said whole on one line in the popup and the narrowest window, in both looks",
+        root.check("what search leaves out is said whole on one line in the panel and the narrowest window, in both looks",
           noteFaults.length === 0, noteFaults.join(" | "))
 
         // Yahoo's five long symbols for "wrapped btc", each drawn whole, as
-        // wide as it is, so no two coins read alike: in the popup and the
+        // wide as it is, so no two coins read alike: in the panel and the
         // narrowest window.
         var coins = Search.parseSearch({ quotes: [
           { symbol: "XBTC39577-USD", longname: "OKX Wrapped BTC USD", exchange: "CCC", quoteType: "CRYPTOCURRENCY" },
@@ -1497,7 +1567,7 @@ Harness {
           smallFaults.length === 0, smallFaults.join(" | "))
 
         // The window's footer sits one gap under a short list, as the
-        // popup's does, and at the window's bottom once the list fills it,
+        // panel's does, and at the window's bottom once the list fills it,
         // the rows then ending one gap above it, the chart taking what they
         // leave over; its note, hint, and notice go with it. An empty named
         // list keeps one row over it, an open list menu taller than the rows
@@ -1550,7 +1620,7 @@ Harness {
             body.hint = "Wheel over the pill to step symbols"
             body.note = "Keep at least one symbol"
             stub.settingsUnreadable = true
-            // Only the popup shows a hint (Panel.qml), so its height here
+            // Only the panel shows a hint (Panel.qml), so its height here
             // judges the footer, not the chart.
             windowFooter(at + "one row, its hint, note, and notice", false, null)
             body.hint = ""
@@ -1612,7 +1682,7 @@ Harness {
         body.minChartHeight = 0
         surface.fixedHeight = 0
         // The band's column lays the chart's new height out on its next
-        // polish: the window's chart above is taller than the popup's.
+        // polish: the window's chart above is taller than the panel's.
         wait(50)
         var opens = function() {
           var rowsHeight = body.fittedHeight(730)
@@ -1638,7 +1708,7 @@ Harness {
         root.check("search takes its height as it opens and keeps it as the answer comes, All full and nearly empty",
           /^true,true /.test(fullAll) && /^true,true /.test(shortAll), fullAll + " | " + shortAll)
         // Any budget takes every whole row it can hold and no more; at the
-        // popup's cap, its fixed content and six whole rows, that is six. The
+        // panel's cap, its fixed content and six whole rows, that is six. The
         // search check above leaves a short list behind.
         root.load()
         wait(50)
@@ -1649,7 +1719,7 @@ Harness {
           return fitted > budget || fitted + body.rowPitch <= budget
             || (fitted - body.chromeHeight + body.rowGap) % body.rowPitch !== 0
         })
-        root.check("the popup takes every whole row its budget allows", loose.length === 0,
+        root.check("the panel takes every whole row its budget allows", loose.length === 0,
           budgets.map(function(b) { return b + "->" + body.fittedHeight(b) }).join(" "))
 
         // Another list, a long name, or an empty list moves nothing above the
@@ -1772,7 +1842,7 @@ Harness {
         listLabels.forEach(function(label) { root.check(label, listFaults[label].length === 0, listFaults[label].join(" | ")) })
         // A long list menu shows whole rows only, and "New list…" and
         // "Manage lists…" in reach without scrolling, with 12 lists or 30,
-        // in the popup at its cap and the window at its smallest and its
+        // in the panel at its cap and the window at its smallest and its
         // usual height, in both looks; a click on Manage lists opens it.
         var listsBeforeMenu = stub.lists
         var menuFaults = []
@@ -1841,7 +1911,7 @@ Harness {
               }
               scroll.contentY = Math.max(0, scroll.contentHeight - scroll.height)
               var cuts = [atRest, afterWheel, afterDrag, afterKey, cutRows()]
-              // The popup's menu ends a gap above the footer; the window's
+              // The panel's menu ends a gap above the footer; the window's
               // may run over it, to the body's margin.
               var menuFloor = surface.wide ? surface.height - body.margins : yIn(find(body, "footer"), 0) - body.groupGap
               menuSeen.push(where + ": " + scroll.height / menu.itemHeight + " rows")
@@ -1888,14 +1958,14 @@ Harness {
         surface.fixedHeight = 0
         body.minChartHeight = 0
         wait(50)
-        root.check("a long list menu shows whole rows, and New list and Manage lists without scrolling, in the popup and the window, in both looks",
+        root.check("a long list menu shows whole rows, and New list and Manage lists without scrolling, in the panel and the window, in both looks",
           menuFaults.length === 0, menuFaults.join(" | ") + " || " + menuSeen.join(", "))
         root.check("the window's list menu at its usual 720 × 760 shows five of six lists, over the footer and inside the window, in both looks",
           fiveSeen.indexOf("FAULT") < 0, fiveSeen.join(", "))
 
         // A view opening over the rows moves nothing: the list menu, search,
         // Manage lists, and a row's ticks keep the surface's height and its
-        // edge, on a list of 20 rows with 13 lists. In the popup at a room
+        // edge, on a list of 20 rows with 13 lists. In the panel at a room
         // 24 px and 4 px under its cap, as 760 and 780 are under a 784 px
         // cap, and at the cap; in the window at 760, 780, and that cap's
         // height. Smooth alone: the height and edge are no look's own (the
@@ -1988,7 +2058,7 @@ Harness {
         stub.library = libraryBeforeViews
         stub.lists = listsBeforeViews
         wait(50)
-        root.check("a view opening over the rows keeps the surface's height and edge: the list menu, search, Manage lists, and a row's ticks, at a room of 760, 780, and the popup's cap, in the popup and the window",
+        root.check("a view opening over the rows keeps the surface's height and edge: the list menu, search, Manage lists, and a row's ticks, at a room of 760, 780, and the panel's cap, in the panel and the window",
           heldFaults.length === 0, heldFaults.join(" | ") + " || " + heldSeen.join(", "))
         root.check("the list menu's least, a refused name's note too, fits over the footer wherever the room holds it, under the first-run hint, in both looks",
           leastFaults.length === 0, leastFaults.join(" | "))
@@ -2124,7 +2194,7 @@ Harness {
         var retroLive = liveMarks(true)
         // A new price while the market trades ripples the dot three times,
         // or blinks retro's cap four, about 6 s, then the mark rests in its
-        // still look, so the popup stops redrawing; an answer with the same
+        // still look, so the panel stops redrawing; an answer with the same
         // price starts nothing.
         var restsAfterNewPrice = function(retro) {
           stub.retro = retro
@@ -2163,7 +2233,7 @@ Harness {
           wait(300)
           body.showingHelp = false
           afterSheet = burst && atRest(2000) && afterSheet
-          // A reopen with the same price, as the window and the popup open:
+          // A reopen with the same price, as the window and the panel open:
           // the surface opens, then its chart draws in, hiding the mark
           // until it is whole. The mark moves once it shows: after a close
           // at rest, and after one mid-burst, which paused it: the burst the
@@ -2350,7 +2420,7 @@ Harness {
         // the keys are on the key sheet, whose table is left out here. The
         // button Enter takes, and only it, is marked as the shell marks its
         // default, and every button is one line, whole, inside the surface.
-        // In every view that has buttons, in both looks, in the popup and the
+        // In every view that has buttons, in both looks, in the panel and the
         // smallest window ("esc cancel" reads as two buttons).
         var namesKey = function(text) {
           return /⏎|↵|\besc\b|\benter\b/i.test(text) || /\b[a-z0-9] to [a-z]/i.test(text) || /^[A-Z] [A-Z]{2,}/.test(text)
@@ -2474,7 +2544,7 @@ Harness {
         stub.retro = false
         stub.lists = listsBefore
         wait(50)
-        root.check("no word on screen names a key, Enter's button alone is marked, and every button is one whole line in the caption capitals, in both looks in the popup and the smallest window",
+        root.check("no word on screen names a key, Enter's button alone is marked, and every button is one whole line in the caption capitals, in both looks in the panel and the smallest window",
           badKeys.length === 0, badKeys.join(" | "))
 
         // A day with one bar or none says so where its chart would be, in
@@ -2493,7 +2563,7 @@ Harness {
         stub.quotes = Object.assign({}, quotesBeforeNotes, { CKX: Quote.parseChart(JSON.parse(ckxFile.text())),
           CVR: Quote.parseChart(JSON.parse(cvrFile.text())), "^GSPC": Quote.parseChart(JSON.parse(preOpenIndexFile.text())),
           "^N225": Quote.parseChart(opening) })
-        var noteCases = [["CKX", 1792206540, "Traded only at 14:10"], ["CVR", 1792206540, "No trades charted"],
+        var noteCases = [["CKX", 1792206540, "Traded only at 14:10"], ["CVR", 1792206540, "No trades today"],
           ["AAPL", 1792206540, ""], ["SPY", 1792206540, ""], ["SHIB-USD", 1792206540, ""], ["SHEL.L", 1792206540, ""],
           ["7203.T", 1792206540, ""], ["^GSPC", 1790596800, ""], ["^N225", bell + 25, ""]]
         var noteFaults = []
@@ -2555,7 +2625,7 @@ Harness {
           noteFaults.length === 0, noteFaults.join(" | "))
         root.check("a one-bar day's row draws its bar in both looks, and a day with none leaves the cell empty in both",
           rowInk.join(", ") === "smooth CKX drawn, smooth CVR empty, retro CKX drawn, retro CVR empty", rowInk.join(", "))
-        // The popup shows a row on a short screen at a large text size: the
+        // The panel shows a row on a short screen at a large text size: the
         // first-run hint gives way where it and a row don't both fit under
         // the rest. At text size 16, on screens from just room for the rest
         // and a row to just short of room for the hint too, in both looks.
@@ -2581,14 +2651,14 @@ Harness {
         stub.retro = false
         Style.fontBaseSize = 12
         wait(100)
-        root.check("at text size 16, on a screen too short for the first-run hint and a row, the popup shows a row, in both looks",
+        root.check("at text size 16, on a screen too short for the first-run hint and a row, the panel shows a row, in both looks",
           rowless.length === 0, rowless.join(", "))
 
       }
 
       function textSizes() {
         stub.now = 0
-        // The popup shows three rows on a 768 px screen at every text size
+        // The panel shows three rows on a 768 px screen at every text size
         // Omarchy offers (`omarchy display text size`, 9 to 20), in both
         // looks: where the screen would hold fewer beside the chart, the
         // chart gives way to them, down to a fifth of itself; where it holds
@@ -2739,7 +2809,7 @@ Harness {
         }
         // At text sizes 16 and 20 on an 850 px screen, with 12 lists, the
         // list menu and search show more than one line, the room of the
-        // three rows the chart gives way to, all of it inside the popup, in
+        // three rows the chart gives way to, all of it inside the panel, in
         // both looks: at 16, two lists above the menu's own two lines, and
         // four results; at 20, one list above them, and two results.
         var listsBefore = stub.lists
@@ -2776,7 +2846,7 @@ Harness {
         })
         stub.lists = listsBefore
         console.log("views on an 850 px screen: " + viewSeen.join(", "))
-        root.check("at text sizes 16 and 20 on an 850 px screen, the list menu and search show more than one line, all inside the popup, in both looks",
+        root.check("at text sizes 16 and 20 on an 850 px screen, the list menu and search show more than one line, all inside the panel, in both looks",
           viewFaults.length === 0, viewFaults.join(" | "))
         body.screenRoom = 0
         surface.budget = 730
@@ -2787,8 +2857,8 @@ Harness {
         stub.historyEntry = null
         Style.fontBaseSize = 12
         wait(100)
-        console.log("popup charts on a 768 px screen: " + shortSeen.join(", "))
-        root.check("on a 768 px screen at every text size from 9 to 20 the popup shows three rows, its chart giving way to them only where it must and as far as a fifth of itself, in both looks",
+        console.log("panel charts on a 768 px screen: " + shortSeen.join(", "))
+        root.check("on a 768 px screen at every text size from 9 to 20 the panel shows three rows, its chart giving way to them only where it must and as far as a fifth of itself, in both looks",
           shortFaults.length === 0, shortFaults.join(" | "))
         root.check("on a 768 px screen at every text size from 9 to 20 a range's marks never touch the ink, and a chart at full height shows both, in both looks",
           touched.length === 0, touched.join(" | "))
@@ -2800,13 +2870,13 @@ Harness {
         // After the text size changes with the list scrolled, no row is cut
         // at the list's top or bottom, the row at its top stays there unless
         // the list's end comes first, and the cursor's row stays whole in
-        // sight: in the popup on an 850 px screen and the window at its
+        // sight: in the panel on an 850 px screen and the window at its
         // usual 720 × 760, two rows down at 12, to 16 and back; at the
         // list's end at 12, the cursor on its top row or its last, to 16;
         // and at its end at 16, to 12, with the surface open through the
         // change.
         var rowsList = body.watchlist
-        // The popup's room on an 850 px screen at the text size of the
+        // The panel's room on an 850 px screen at the text size of the
         // moment, as the shell's card gives it.
         var screenTall = function() {
           return 850 - Style.bar.sizeHorizontal - 2 * Style.gapsOut - 2 * Style.spacing.popupPadding - 2 * Math.max(1, Style.space(2))
@@ -2830,7 +2900,7 @@ Harness {
           surface.wide = wide
           surface.windowWidth = 720
           // The window's height is its own, its chart giving way to three
-          // rows (App.qml); the popup's is the card's room for the body.
+          // rows (App.qml); the panel's is the card's room for the body.
           surface.fixedHeight = wide ? 760 : 0
           if (wide) {
             body.screenRoom = 0
@@ -2880,7 +2950,7 @@ Harness {
         rowsList.cursorSymbol = ""
         wait(100)
         console.log("rows after a text size change: " + rowsSeen.join(" | "))
-        root.check("after the text size changes with the list scrolled, no row is cut at the list's top or bottom, the row at its top stays there unless the list's end comes first, and the cursor's row stays in sight, in the popup and the window",
+        root.check("after the text size changes with the list scrolled, no row is cut at the list's top or bottom, the row at its top stays there unless the list's end comes first, and the cursor's row stays in sight, in the panel and the window",
           rowsCut.length === 0, rowsCut.join(" | "))
 
         // A scrub whose line runs through a range's mark keeps the mark, all

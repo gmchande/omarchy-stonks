@@ -144,7 +144,7 @@ test("a quiet trading span joins its prints; Tokyo's scheduled lunch alone break
   const us = {
     symbol: "THIN", exchange: "NYQ", crypto: false, prevClose: 100,
     session: {regular: {start: at("2026-10-21", "09:30"), end: at("2026-10-21", "16:00")}},
-    axis: {start:at("2026-10-21", "00:00"),end:at("2026-10-22", "00:00"),byPrint:true,ticks:[]},
+    axis: {start:at("2026-10-21", "00:00"),end:at("2026-10-22", "00:00"),ticks:[]},
     points: ["00:05", "02:10", "06:45", "09:35"].map((t,i)=>({t:at("2026-10-21",t),p:100+i}))
   }
   const line=M.chartGeometry(us,calendars)
@@ -872,17 +872,17 @@ test("the key sheet lists exactly the README's keys for each surface, the row's 
   expect(start).toBeGreaterThan(0)
   const table = []
   for (let i = start + 2; lines[i] && lines[i][0] === "|"; i++) table.push(lines[i].split("|").map(c => c.trim()))
-  // A row ending "(popup)" or "(window)" is that surface's alone.
+  // A row ending "(panel only)" or "(window only)" is that surface's alone.
   const readme = surface => sortedKeys(table.filter(c => {
-    const only = /\((popup|window)\)$/.exec(c[2])
+    const only = /\((panel|window) only\)$/.exec(c[2])
     return !only || only[1] === surface
   }).map(c => c[1]))
   const drawn = (order, switchesPanels) =>
     sortedKeys(M.sheet(order, switchesPanels).groups.flatMap(g => g.rows.map(r => r.key)))
   const moves = ["Shift+↑", "Shift+↓"]
-  expect(drawn("manual", true)).toEqual(readme("popup"))
+  expect(drawn("manual", true)).toEqual(readme("panel"))
   expect(drawn("manual", false)).toEqual(readme("window"))
-  expect(drawn("pct", true)).toEqual(readme("popup").filter(k => !moves.includes(k)))
+  expect(drawn("pct", true)).toEqual(readme("panel").filter(k => !moves.includes(k)))
   expect(drawn("symbol", false)).toEqual(readme("window").filter(k => !moves.includes(k)))
 })
 
@@ -1010,30 +1010,31 @@ test("each print says its own time across a change of clocks, the 1D's day keeps
   const sundayPrint = { t: at("2026-11-01", "21:00"), p: 100.5, s: "overnight" }
   const sunday = M.dayChart(quote, { bars: [sundayPrint], through: sundayPrint.t }, calendars)
   expect(M.extendedStack(quote, sunday.latest, at("2026-11-01", "21:05"), sunday.day)).toMatchObject({ label: "OVERNIGHT", time: "21:00" })
-  // Friday in summer time is 00:00 to 20:00, twenty hours, filled once
-  // Robinhood's answer has reached its end. Sunday's night in winter time
-  // is 20:00 to midnight, four hours, dashed at Friday's close; past
-  // midnight it runs on, with a tick at midnight; at 04:00 Monday takes
-  // over from its own midnight, its night already in it.
+  // Each day's prints stand at their times, from its first trade, or the
+  // open if that is earlier, to its end while it runs and to its last trade
+  // once it is over. Friday in summer time, over once Robinhood's answer
+  // reaches 19:55: from the open to its one print, 19:55's, on the right
+  // edge. Sunday's first night trade, at 21:00, turns to Monday, in winter
+  // time: from it to Monday's 20:00, across the change of clocks, dashed at
+  // Friday's close, its night after midnight and its pre-market on the same
+  // chart, ticked at midnight, 04:00 and the close.
   const chart = bars => M.dayChart(quote, { bars, through: bars.at(-1).t }, calendars).day
   const friday = M.dayChart(quote, { bars: [], through: at("2026-10-30", "19:55") }, calendars).day
-  expect([M.chartSpan(friday).end - M.chartSpan(friday).start, M.chartGeometry(friday).points.at(-1).x]).toEqual([20 * 3600, 1])
-  expect(M.chartSpan(sunday.day)).toMatchObject({ start: at("2026-11-01", "20:00"), end: at("2026-11-02", "00:00") })
-  expect(M.chartSpan(sunday.day).end - M.chartSpan(sunday.day).start).toBe(4 * 3600)
+  expect(M.chartSpan(friday)).toMatchObject({ start: at("2026-10-30", "09:30"), end: at("2026-10-30", "19:55") })
+  expect(M.chartGeometry(friday).points.at(-1).x).toBe(1)
+  expect(M.chartSpan(sunday.day)).toMatchObject({ start: at("2026-11-01", "21:00"), end: at("2026-11-02", "20:00") })
+  expect(M.chartSpan(sunday.day).end - M.chartSpan(sunday.day).start).toBe(23 * 3600)
   expect(M.dayBase(sunday.day)).toBe(100)
   const late = { t: at("2026-11-02", "01:30"), p: 100.7, s: "overnight" }
-  const night = chart([sundayPrint, late])
-  expect(M.chartSpan(night)).toMatchObject({ start: at("2026-11-01", "20:00"), end: late.t })
-  // Two trades in a night of 67 slots so far: a thin night, by the clock.
-  const eight = at("2026-11-01", "20:00")
-  expect(M.chartGeometry(night).ticks).toEqual([(at("2026-11-02", "00:00") - eight) / (late.t - eight)])
   const monday = chart([sundayPrint, late, { t: at("2026-11-02", "04:00"), p: 100.9, s: "pre" }])
-  expect(M.chartSpan(monday)).toMatchObject({ start: at("2026-11-02", "00:00"), end: at("2026-11-03", "00:00") })
-  expect(monday.points.map(p => p.s)).toEqual(["overnight", "pre"])
+  expect(M.chartSpan(monday)).toMatchObject({ start: at("2026-11-01", "21:00"), end: at("2026-11-02", "20:00") })
+  expect(monday.points.map(p => p.s)).toEqual(["overnight", "overnight", "pre"])
+  expect(M.chartGeometry(monday).ticks).toEqual([3, 7, 19].map(h => h / 23))
   expect(M.lastRegularPoint(M.chartGeometry(monday))).toBeNull()
-  // The day after Thanksgiving closes at 13:00, and its tick says so: laid
-  // out by print, it stands between the 12:55 print and the 15:00 one, and
-  // none stands at 16:00, past the newest print, where the clock runs.
+  // The day after Thanksgiving closes at 13:00, and its tick says so, by
+  // the clock between the 12:55 print and the 15:00 one. Its after hours
+  // end at 17:00, as Robinhood's hours for it say: the day runs from its
+  // first trade, Thanksgiving's 22:00, to 17:00.
   const early = {
     ...quote, gmtoffset: -18000, marketTime: at("2026-11-27", "13:00"),
     session: {
@@ -1046,23 +1047,23 @@ test("each print says its own time across a change of clocks, the 1D's day keeps
   const thursdayPrint = { t: at("2026-11-26", "22:00"), p: 100.2, s: "overnight" }
   const friday27 = M.dayChart(early, { bars: [thursdayPrint], through: thursdayPrint.t }, calendars).day
   const geometry = M.chartGeometry(friday27)
-  const [noon, afternoon] = geometry.points.map(p => p.x)
-  expect(geometry.ticks.filter(x => x > noon && x < afternoon)).toHaveLength(1)
-  expect(geometry.ticks.filter(x => x > afternoon).map(x => M.timeAtFraction(friday27, x))).not.toContain(at("2026-11-27", "16:00"))
-  // Its after hours end at 17:00, as Robinhood's hours for it say: the day
-  // ends there. Thanksgiving's own night, before it, is a Sunday's: 20:00
-  // to midnight, dashed at Wednesday's close; and Wednesday ends at 20:00,
-  // as a Friday does.
-  expect(M.chartSpan(friday27)).toMatchObject({ start: at("2026-11-27", "00:00"), end: at("2026-11-27", "17:00") })
+  const [, noon, afternoon] = geometry.points.map(p => p.x)
+  expect(geometry.ticks.filter(x => x > noon && x < afternoon).map(x => M.timeAtFraction(friday27, x))).toEqual([at("2026-11-27", "13:00")])
+  expect(M.chartSpan(friday27)).toMatchObject({ start: at("2026-11-26", "22:00"), end: at("2026-11-27", "17:00") })
+  // Wednesday before it, with no trade before the open, runs from the open
+  // to its own 20:00, no night trading before the holiday; it stays on
+  // through Thanksgiving,
+  // until the first trade of the night before Friday, which turns to
+  // Friday, dashed at Wednesday's close.
   const wednesday = { ...early, marketTime: at("2026-11-25", "16:00"), price: 99,
     session: { pre: { start: at("2026-11-25", "04:00"), end: at("2026-11-25", "09:30") },
       regular: { start: at("2026-11-25", "09:30"), end: at("2026-11-25", "16:00") },
       post: { start: at("2026-11-25", "16:00"), end: at("2026-11-25", "20:00") } },
     points: [{ t: at("2026-11-25", "19:55"), p: 99 }] }
   expect(M.chartSpan(M.dayChart(wednesday, { bars: [], through: null }, calendars).day))
-    .toMatchObject({ start: at("2026-11-25", "00:00"), end: at("2026-11-25", "20:00") })
+    .toMatchObject({ start: at("2026-11-25", "09:30"), end: at("2026-11-25", "20:00") })
   const thanksgiving = M.dayChart(wednesday, { bars: [thursdayPrint], through: thursdayPrint.t }, calendars).day
-  expect(M.chartSpan(thanksgiving)).toMatchObject({ start: at("2026-11-26", "20:00"), end: at("2026-11-27", "00:00") })
+  expect(M.chartSpan(thanksgiving)).toMatchObject({ start: at("2026-11-26", "22:00"), end: at("2026-11-27", "17:00") })
   expect(M.dayBase(thanksgiving)).toBe(99)
 })
 
@@ -1333,7 +1334,7 @@ test("Robinhood is asked once a session for the pill's stock with nothing open b
 })
 
 test("a refresh's chart is owed until a new answer replaces the one it had, then a chart with no answer is asked, and the day asks none", () => {
-  // The window previews NVDA while the popup shows AAPL; the window alone
+  // The window previews NVDA while the panel shows AAPL; the window alone
   // charts only its preview, once it rests.
   const charts = M.chartsOnShow(["popup", "window"], "AAPL", "NVDA", "window", true)
   expect(charts).toEqual(["AAPL", "NVDA"])
@@ -1429,12 +1430,12 @@ test("community themes that one hue, a faint colour, or a tinted light ground wo
     expect([c.name, M.contrast(colour(got.up), ground) >= floor, M.contrast(colour(got.down), ground) >= floor]).toEqual([c.name, true, true])
   }
   // The floor is each surface's own: Ferrari F1's red bar takes Stonks'
-  // pair, where the theme's red is at 1.66:1, while its dark popup keeps the
+  // pair, where the theme's red is at 1.66:1, while its dark panel keeps the
   // theme's (https://github.com/hueilost/omarchy-theme-ferrari-f1).
   const red = M.hexColor("#ff2800")
   greenAndRed(M.trend("#3ddc84", red, M.hexColor("#c40000")))
   expect(M.trend("#3ddc84", red, M.hexColor("#0d0d0f"))).toEqual({ up: "#3ddc84", down: red })
-  // A light bar under a dark popup takes the other pair: White's on black.
+  // A light bar under a dark panel takes the other pair: White's on black.
   greenAndRed(M.trend("#3a3a3a", M.hexColor("#2a2a2a"), M.hexColor("#000000")))
   // On a mid-grey ground no green reads at 4.5:1, and the darkest rounds to
   // black, which reads but says nothing: there, up is a green at the 3:1
@@ -1695,7 +1696,26 @@ test("a quote's time no Date holds is none: its price and chart stay, and its ti
   }
   expect(none.price).toBe(10)
   expect(none.points.length).toBe(3)
-  expect(said(none)[0]).toBe("TIME NOT SENT")
+  expect(said(none)[0]).toBe("TIME UNKNOWN")
+})
+
+// The reader acts on when Stonks tries again, so each time said, in every
+// form, is one the gate keeps: a no-answer pause runs past a minute only at
+// its 72 s most.
+test("a paused host says why prices stopped and when Stonks tries again, on the reader's clock, in every form; an open one says nothing", () => {
+  const at = Date.UTC(2026, 9, 27, 20, 0) / 1000
+  expect(M.hostPause("", at + 30, at)).toBe(null)
+  expect(M.hostPause("none", at + 60, at)).toEqual({ why: "Can't connect. Check your internet.", when: "Retrying in 1 minute.",
+    sentence: "Can't connect. Check your internet. Retrying in 1 minute.", forms: ["Can't connect · Retrying in 1m", "Can't connect · 1m"] })
+  const late = M.hostPause("none", at + 72, at)
+  expect([late.sentence].concat(late.forms)).toEqual(["Can't connect. Check your internet. Retrying in 2 minutes.",
+    "Can't connect · Retrying in 2m", "Can't connect · 2m"])
+  expect(M.hostPause("none", at, at).forms[1]).toBe("Can't connect · 1m")
+  expect(M.hostPause("refused", at + 12 * 60 + 40, at)).toEqual({ why: "The price server is busy.", when: "Retrying at 16:12.",
+    sentence: "The price server is busy. Retrying at 16:12.", forms: ["Server busy · Retrying at 16:12", "Server busy · 16:12"] })
+  const now = M.hostPause("refused", at, at)
+  expect([now.sentence].concat(now.forms)).toEqual(["The price server is busy. Retrying now.", "Server busy · Retrying now",
+    "Server busy · Retrying"])
 })
 
 test("a fetched name or code past its length reads as not sent", () => {

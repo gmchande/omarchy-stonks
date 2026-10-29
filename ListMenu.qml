@@ -26,7 +26,7 @@ FocusScope {
   property color dim: Tones.dim(foreground, Commons.Color.background)
   property string fontFamily: Style.font.family
   property int maxHeight: 0
-  // Opaque whatever the theme's popup alpha, so the rows never show through.
+  // Opaque whatever the theme's panel alpha, so the rows never show through.
   property color background: Qt.rgba(Commons.Color.popups.background.r, Commons.Color.popups.background.g, Commons.Color.popups.background.b, 1)
   // Why the typed name was refused, said under the field: while a name is
   // typed the menu holds still.

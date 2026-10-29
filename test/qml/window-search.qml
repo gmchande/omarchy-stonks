@@ -20,7 +20,7 @@ Harness {
   readonly property string fakeState: Quickshell.env("STONKS_FAKE_STATE")
   Process { id: fileProc }
   Stonks.App { id: app; service: service }
-  // A second surface on the same service, as a popup beside the window.
+  // A second surface on the same service, as a panel beside the window.
   Component { id: otherSurface; Stonks.StonksBody {} }
 
   Steps {
@@ -185,7 +185,7 @@ Harness {
     }
 
     // A second surface beside the window, on the same service, as the
-    // popup is: its search taking the preview closes the window's search,
+    // panel is: its search taking the preview closes the window's search,
     // so neither hero shows one result while Enter would add another; the
     // window's hero, back on the featured symbol, gets its range's history
     // while the other previews; and a surface that goes while previewing
@@ -443,7 +443,7 @@ Harness {
       harness.check("an add on its way leaves the next preview its own year, asked for while the add's is out",
         othersOwn, othersOwn)
 
-      // Another surface open beside the window, as the popup is, closes
+      // Another surface open beside the window, as the panel is, closes
       // while the add is out, and the added row's year is still asked for
       // once.
       var beside = otherSurface.createObject(null, { service: service, width: 480, height: 760 })
@@ -717,6 +717,13 @@ Harness {
       within(3000, function() { return body.search.answer === "failed" })
       wait(600)
       var joined = [editOut, harness.calls("SEARCH.asked") - askedBefore, body.search.answer].join(",")
+      // Nothing answering at all, as with the network down: the line says
+      // to check the connection, where a bad answer said to try again.
+      hold("YAHOO.offline", true)
+      clickRetry()
+      within(3000, function() { return body.search.answer === "failed" && message.text !== offered.split(",")[0] })
+      var offline = message.text
+      hold("YAHOO.offline", false)
       // RETRY, while the gate pauses Stonks: no request, the failure stays.
       var gate = service.testYahooGate
       gate.begin("refused", 60)
@@ -726,7 +733,7 @@ Harness {
       // Time for a request the gate should have held.
       wait(600)
       var paused = [harness.calls("SEARCH.asked") - askedBefore, harness.calls("SEARCH.answered") - answeredBefore,
-        body.search.answer, retryShown()].join(",")
+        body.search.answer, retryShown(), message.text].join(",")
       // RETRY, Yahoo's search back while the gate still pauses for no
       // answer: the lookup goes at once, its answer lands, nothing added.
       gate.begin("none", 60)
@@ -736,11 +743,12 @@ Harness {
       var byClick = [body.search.resultsQuery, body.search.results.length > 0, harness.calls("SEARCH.answered") - answeredBefore,
         retryShown(), body.adding, harness.same(service.library, library)].join(",")
       body.resetInteraction()
-      harness.check("a failed lookup offers RETRY; Enter and a click on it ask the same query again, once, through Yahoo's gate, held by a refusal and not by a pause for no answer, and adding nothing",
-        offered === "Search didn’t answer,true"
-          && byEnter === "Search didn’t answer / - / Searching for “SH”… / Search didn’t answer,1,true"
-          && joined === "true,1,failed" && paused === "0,0,failed,true" && byClick === "SH,true,1,false,true,true",
-        [offered, byEnter, joined, paused, byClick].join(" ; "))
+      harness.check("a failed lookup says why and offers RETRY; Enter and a click on it ask the same query again, once, through Yahoo's gate, held by a refusal, which the line names as the server being busy, and not by a pause for no answer, and adding nothing",
+        offered === "Couldn’t search · try again,true"
+          && byEnter === "Couldn’t search · try again / - / Searching for “SH”… / Couldn’t search · try again,1,true"
+          && joined === "true,1,failed" && offline === "Couldn’t search · check your connection"
+          && paused === "0,0,failed,true,Couldn’t search · server busy" && byClick === "SH,true,1,false,true,true",
+        [offered, byEnter, joined, offline, paused, byClick].join(" ; "))
     }
 
     function test_flows() {
@@ -846,7 +854,7 @@ Harness {
         whileOut === "true,true,true" && freshAgain && cleared === "true,true,false", whileOut + "|" + freshAgain + "|" + cleared)
       harness.check("an empty answer and a failed lookup each say so in place, differently",
         noMatches === "true,true,No matches for “ZZZ”"
-          && failed === "true,Search didn’t answer",
+          && failed === "true,Couldn’t search · try again",
         noMatches + " / " + failed)
       harness.check("an answer of kinds Stonks leaves out names them where \"No matches\" would be, and under the results it shows, the arrows stopping at the last result",
         fundAlone === "0,false,true,Stonks doesn’t show mutual funds"

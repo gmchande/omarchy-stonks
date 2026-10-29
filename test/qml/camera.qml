@@ -6,7 +6,7 @@ import qs.Commons as Commons
 import qs.Ui
 import "plugin" as Stonks
 
-// The screenshot, through the real popup (Panel.qml, its card in
+// The screenshot, through the real panel (Panel.qml, its card in
 // CardWindow.qml) by keys and the real window (App.qml) by the pointer,
 // with stand-ins first on PATH for wl-copy and omarchy-notification-send
 // (bin/) that record what they get: Ctrl+C and a click on the camera each
@@ -18,7 +18,7 @@ import "plugin" as Stonks
 // and present (camera.sh), the folder and editor each version of Omarchy
 // uses, under each version's settings. HOME and curl are scratch. With
 // STONKS_CAMERA_SIZES=1 (all.sh's run at QT_SCALE_FACTOR=2) only the two
-// shots whose picture size could change are taken: the popup's and the
+// shots whose picture size could change are taken: the panel's and the
 // window's.
 Harness {
   id: harness
@@ -214,7 +214,7 @@ Harness {
       // is the chart's, so none may be on the picture.
       var rows = service.library.concat(service.lists.map(function(l) { return l.label }), ["All"])
 
-      // The popup by keys, in smooth, on AAPL's day at rest.
+      // The panel by keys, in smooth, on AAPL's day at rest.
       service.feature("AAPL")
       panel.open()
       var body = panel.testBody
@@ -226,7 +226,7 @@ Harness {
       var rest = shoot(body, function() { keyClick(Qt.Key_C, Qt.ControlModifier) })
       var lit = body.cameraLit
       var problems = landed(rest, "aapl", /^AAPL at .+$/).concat(ofChart(rest, "AAPL", "1D", "TUE 1 SEP 2026", rows))
-      check("Ctrl+C in the popup saves one picture of AAPL's day in the pictures folder, copies it as a PNG, and sends Omarchy's notification with it",
+      check("Ctrl+C in the panel saves one picture of AAPL's day in the pictures folder, copies it as a PNG, and sends Omarchy's notification with it",
         problems.length === 0 && still === 0 && rest.card.scrubX === -1 && !rest.card.retro, problems.join("; "))
 
       if (!harness.sizeOnly) {
@@ -242,7 +242,7 @@ Harness {
             && scrubbed.name !== rest.name,
           problems.join("; ") + " | " + scrubbed.card.when + " | " + scrubbed.footer)
 
-        // Lit through the close's fade, and out when the popup opens again;
+        // Lit through the close's fade, and out when the panel opens again;
         // the wait lets the fade end.
         panel.close()
         var fading = body.cameraLit === true

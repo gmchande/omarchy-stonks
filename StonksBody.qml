@@ -14,7 +14,7 @@ import "Quote.js" as Quote
 import "Settings.js" as Settings
 import "Share.js" as Share
 import "Tones.js" as Tones
-// Shared body for the window and the popup: header, hero band, list,
+// Shared body for the window and the panel: header, hero band, list,
 // search, footer, help, and the chart's motion (ChartMotion). It reads the
 // service and acts through it; the surface keeps its lifecycle, keys, and
 // look. The footer sits at the edge, one gap under the rows: a surface
@@ -36,10 +36,10 @@ Item {
   // shows is open, as it was left, and asks for nothing an open one would.
   property bool onScreen: true
   property string headerWhenMissing: "No data"
-  // The surface steps to the bar's next panel on Tab: the popup.
+  // Whether the surface steps to the next widget's panel on Tab: the panel's.
   property bool switchesPanels: false
   property int margins: 0
-  // Where the content ends, the footer at its bottom. The popup's card eases
+  // Where the content ends, the footer at its bottom. The panel's card eases
   // its edge to a new height while the body lays out at it at once, so a
   // row below it is out of sight. In the window it is the content's own
   // height while that fits, so a short list has the footer one gap under
@@ -66,9 +66,9 @@ Item {
   property int chartHeight: Style.space(190)
   // The least the chart may be (the window's 136 px): where set, the chart
   // is sized to the surface (`shownChartHeight`), giving way first as the
-  // window gets short so three rows still show. The popup's card fits its
+  // window gets short so three rows still show. The panel's card fits its
   // rows, so its chart follows the screen's room (`screenChartHeight`). 0,
-  // the popup's, gives none: a constant, so no chartHeight change finds it
+  // the panel's, gives none: a constant, so no chartHeight change finds it
   // stale.
   property int minChartHeight: 0
   // The host's look.
@@ -141,17 +141,17 @@ Item {
   // A screenshot was taken on this visit: the header's camera stays lit
   // until the surface closes, and the next open puts it out.
   property bool cameraLit: false
-  // A quiet line above the footer for this visit: the popup's first-run
+  // A quiet line above the footer for this visit: the panel's first-run
   // hint (`showFirstRunHint`), how the pill is moved and changed. The next
   // open clears it.
   property string hint: ""
   function showFirstRunHint() {
-    hint = "Drag the pill to move it along the bar\nMiddle-click changes its form · right-click opens the window"
+    hint = "Drag the pill in your bar to move it\nMiddle-click changes its look · right-click opens the window"
   }
   // The most height the screen leaves the body, whatever the card fits; 0
   // where the body's height is its own (the window).
   property int screenRoom: 0
-  // Everything in the popup but its chart, its rows, and the hint: what the
+  // Everything in the panel but its chart, its rows, and the hint: what the
   // chart and the rows share the screen's room with.
   readonly property int chromeBesideHeader: margins * 2 + heroBand.heightBesideChart + footer.barHeight + groupGap * 3
   readonly property int chromeBesideScreenChart: chromeBesideHeader + header.height
@@ -160,7 +160,7 @@ Item {
   // the status words alone.
   readonly property bool headerTitled: screenRoom <= 0
     || chromeBesideHeader + header.titledHeight + leastScreenChart + threeRowsHeight <= screenRoom
-  // The popup's chart: chartHeight wherever the screen holds three rows
+  // The panel's chart: chartHeight wherever the screen holds three rows
   // beside it, else down to a fifth of itself, which still shows the day's
   // shape: rows in view matter more, and the list menu and search, in the
   // rows' room, show three lines too. Read from the screen's room, never
@@ -178,16 +178,17 @@ Item {
   // isn't saved, since only memory holds it, each with what to do, which
   // names the file; a save didn't land, which a click retries, ahead of the
   // update, since a restart would lose the changes; or an update waits on a
-  // shell restart, which a click does. Where `noticeAction` doesn't fit
-  // beside it (text size 16 in the popup), `noticeShort` says less, never
-  // cut.
+  // shell restart, which a click does. The notice's words stay whole; what
+  // to do follows it on its line, or on a line of its own where both don't
+  // fit (`noticeActions`, longest first): the file by its full path, then
+  // without "or remove" (the owner, 28 October).
   readonly property bool unsaved: settingsUnreadable ? editsUnsaved : saveFailed
   readonly property string notice: unsaved ? "Your changes aren't saved"
     : settingsUnreadable ? "Couldn't load your lists"
     : updatedTo !== "" ? "Updated to " + updatedTo + " · click to restart the shell" : ""
-  readonly property string noticeAction: settingsUnreadable ? " · fix or remove grvc.stonks.json"
-    : unsaved ? " · click to try again" : ""
-  readonly property string noticeShort: unsaved ? "Not saved" : settingsUnreadable ? "Lists not loaded" : ""
+  readonly property var noticeActions: settingsUnreadable
+    ? ["fix or remove ~/.config/omarchy/grvc.stonks.json", "fix ~/.config/omarchy/grvc.stonks.json"]
+    : unsaved ? ["click to try again"] : []
   // A newer Stonks on main, offered at the footer's right end until on disk
   // (`updateOffer`), then the restart's notice; never in the add's place,
   // so adding by mouse never waits on it. The update restarts the shell
@@ -208,7 +209,7 @@ Item {
 
   // What this surface shows of the service, read only while open: from a
   // close to the next open each keeps its last value, so nothing changes
-  // during the popup's close fade. The next open takes the latest at once.
+  // during the panel's close fade. The next open takes the latest at once.
   readonly property var emptyView: ({ featured: "", range: "1D", list: "", listKey: "=", order: "manual", reversed: false,
     rows: [], shown: [], library: [], chart: null })
   // What the rows show, the hero and the range asked for, and the chart
@@ -319,7 +320,7 @@ Item {
   readonly property int rowGap: Style.space(2)
   readonly property int rowPitch: listRowHeight + rowGap
   // The least rows the list keeps in sight beside a chart that gives way,
-  // in the window (`shownChartHeight`) and the popup (`screenChartHeight`).
+  // in the window (`shownChartHeight`) and the panel (`screenChartHeight`).
   readonly property int threeRowsHeight: 3 * rowPitch - rowGap
 
   // The chart on screen as the motion measures it, and the moment it shows.
@@ -351,20 +352,25 @@ Item {
   readonly property var featuredDay: motion.day
   readonly property var featuredFreshness: Figures.freshness(entryOf(chartSymbol || featuredSymbol), featuredQuote, now,
     owed[chartSymbol || featuredSymbol] || 0, !!asking[chartSymbol || featuredSymbol], featuredNewest)
-  // Yahoo is sending nothing for any listing: every symbol in All has a
-  // failed or overdue refresh. The header says so once, naming Yahoo, and
-  // the hero and rows say what they have without a warning each
+  // How many symbols in All have a failed or overdue refresh. With every
+  // one, Yahoo is sending nothing for any listing: the header says so once,
+  // and the hero and rows say what they have without a warning each
   // (`Figures.quietFreshness`).
-  readonly property bool yahooDown: lists.length > 0 && lists[0].symbols.length > 0 && lists[0].symbols.every(function(symbol) {
+  readonly property int warnings: lists.length > 0 ? lists[0].symbols.filter(function(symbol) {
     return Figures.freshnessWarns(Figures.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0, !!asking[symbol]))
-  })
+  }).length : 0
+  readonly property bool yahooDown: warnings > 0 && warnings === lists[0].symbols.length
+  // Why Yahoo stopped and when Stonks tries again, while its gate is paused
+  // (`Figures.hostPause`).
+  readonly property var hostPause: service && service.yahooGate
+    ? Figures.hostPause(service.yahooGate.pause, service.yahooGate.pausedUntil, now) : null
   readonly property var featuredGeometry: motion.geometry
   readonly property real scrubX: motion.scrubX
   readonly property bool dayScrubbed: !historyActive && scrubShown !== 0
   // The newest price since the close on top of the hero, from the chart's
-  // newest print, as the row's and the pill's from the same prints
-  // (`Overnight.newestPrint`).
-  readonly property var featuredNewest: featuredQuote ? Overnight.newestPrint(featuredQuote, motion.latest, calendars) : null
+  // newest print and measured from its dashed line, as the row's and the
+  // pill's from the same prints (`Overnight.newestPrint`).
+  readonly property var featuredNewest: featuredQuote && featuredDay ? Overnight.newestPrint(featuredQuote, motion.latest, calendars, featuredDay) : null
   readonly property var dailyFeatured: featuredQuote
     ? Figures.rowModel(dayScrubbed ? featuredDay : featuredQuote, dayScrubbed ? scrubShown : 0, changeMode, featuredNewest) : null
   readonly property var featured: historyShown ? History.historyRowModel(history, featuredQuote, scrubShown) : dailyFeatured
@@ -411,7 +417,7 @@ Item {
   // room for both first lines' facts on every range (`infoFactLists`), so a
   // range change moves nothing; a range whose prices take another digit
   // widens the price columns.
-  readonly property var dayLine: chart ? Figures.dayLine(featuredQuote, featuredToday) : null
+  readonly property var dayLine: chart ? Figures.dayLine(featuredQuote, featuredToday, featuredDay) : null
   readonly property var rangeEnds: historyShown ? History.rangeEnds(history, historyStats, featuredQuote) : null
   readonly property var periodLine: !chart ? null : historyShown ? History.rangeLine(history, rangeEnds, featuredQuote) : dayLine
   readonly property var infoFactLists: !dayLine ? [] : [dayLine.facts, History.rangeFacts(dayLine.range.widest)]
@@ -422,12 +428,9 @@ Item {
     historyShown && history.range === "1Y" ? rangeEnds : null, rates) : null
   readonly property var rangeMarks: historyShown ? History.rangeMarks(history, rangeEnds, featuredQuote) : null
   // What a scrub reads its move from, said under the price: the dashed
-  // line's close or the range's start, led by the dashed line's mark; a
-  // print past the session's close, from that close (`Figures.readsClose`),
-  // with none.
+  // line's close or the range's start, led by the dashed line's mark.
   readonly property string baselineText: historyShown ? "┄ " + chartRange.toUpperCase() + " START " + Format.money(history.baseline, featuredQuote ? featuredQuote.priceDigits : undefined)
-    : (!historyActive && featuredDay ? (scrubShown && Figures.readsClose(featuredDay, scrubShown) ? "" : "┄ ")
-      + Figures.dayBaselineText(featuredDay, Figures.exchangeDay(featuredDay, now), scrubShown) : "")
+    : (!historyActive && featuredDay ? "┄ " + Figures.dayBaselineText(featuredDay, Figures.exchangeDay(featuredDay, now), scrubShown) : "")
   // A range that failed, which r, or the header's button, asks for again.
   readonly property string unavailableText: chartRange.toUpperCase() + " unavailable"
   readonly property bool offersRetry: headerText === unavailableText
@@ -436,17 +439,29 @@ Item {
   // The market as the header says it, said in less and less.
   readonly property var marketForms: featuredQuote ? Market.statusForms(dayScrubbed ? featuredDay : featuredQuote, now, scrubShown, calendars,
     Overnight.nightTrades(featuredQuote, !!chart && chart.allDay, now, calendars)) : []
+  // Trouble, said once, unless a scrub reads a moment, a refresh you asked
+  // for is out, or a range failed, whose header offers its retry: while a
+  // row warns and Yahoo is paused, why and when Stonks tries again; with
+  // every row warning and no pause, that Stonks keeps trying; and a price
+  // on show whose refresh failed, why. Null without trouble. The header
+  // says it at full strength (`HeaderStatus.trouble`). Yahoo's pause is
+  // said short in the panel, which switches panels on the bar, and as a
+  // sentence first in the window, which has the room (`Figures.hostPause`).
+  readonly property var troubleForms: {
+    if (!service || scrubShown || refreshing || (historyActive && historyFailed)) return null
+    if (hostPause && warnings > 0) return switchesPanels ? hostPause.forms : [hostPause.sentence].concat(hostPause.forms)
+    if (yahooDown) return ["Can't get prices · Stonks keeps trying", "Can't get prices"]
+    if (featuredQuote && featuredFreshness.state === "failed")
+      return ["Refresh failed for " + (chartSymbol || featuredSymbol) + " · Retrying", "Refresh failed · Retrying", "Refresh failed"]
+    return null
+  }
   // The header's words, then the same said in less for a header with no
   // room for them (`HeaderStatus`), each form shorter than the one before:
-  // Yahoo's trouble without what Stonks does about it, a scrubbed bar's
+  // trouble in fewer words, a scrubbed bar's
   // date without its price, and the market's (`Market.statusForms`).
   readonly property var headerForms: {
     if (!service) return [headerWhenMissing]
-    // Yahoo is sending nothing for any listing, said once, unless a scrub
-    // reads a moment, a refresh you asked for is out, or a range failed,
-    // whose header offers its retry.
-    if (yahooDown && !scrubShown && !refreshing && !(historyActive && historyFailed))
-      return ["Can't get prices · Stonks keeps trying", "Can't get prices"]
+    if (troubleForms) return troubleForms
     // The chart asked for is on its way, named: what was on show stays.
     // Before any chart has been in, the empty hero's label names it alone,
     // in the one place a reader looks (`HeroBand`).
@@ -475,7 +490,7 @@ Item {
   // down to minChartHeight; otherwise it takes what whole rows leave over,
   // so the rows end one gap above the footer. Read from the chrome beside
   // it, never the chart, so its size never reads itself back; elsewhere a
-  // height fitted to the body, as the popup's, never passes through it.
+  // height fitted to the body, as the panel's, never passes through it.
   readonly property bool chartFitsSurface: minChartHeight > 0 && minChartHeight < chartHeight
   readonly property int roomBesideChart: height - chromeBesideChart - chartHeight
   readonly property int shownChartHeight: roomBesideChart < threeRowsHeight
@@ -494,7 +509,7 @@ Item {
   readonly property int searchHeight: margins * 2 + header.height + heroBand.implicitHeight
     + groupGap * 2 + search.desiredHeight
   readonly property int wholeListHeight: wholeRowsHeight(height - chromeHeight)
-  // The most height the surface gives the body, as the popup's card does
+  // The most height the surface gives the body, as the panel's card does
   // when it fits the rows; 0 where the body's height is its own (the
   // window). The list's sight is its rows' view at that height, whatever
   // the card has shrunk to for the key sheet or a view.
@@ -584,14 +599,14 @@ Item {
   onOnScreenChanged: if (service) service.surfaceShown(root, surfaceOpen && onScreen)
   onServiceChanged: if (service && surfaceOpen && onScreen) service.surfaceShown(root, true)
   // The chart scrubbed, by the pointer on it or by keys, where a screen
-  // shows it, and not while every screen is off, which the popup's own
+  // shows it, and not while every screen is off, which the panel's own
   // `onScreen` doesn't follow: the sounds keep the output awake a second
   // after it last moved, started, or ended, for its chimes.
   readonly property bool scrubbing: surfaceOpen && onScreen && !(service && service.screensOff) && motion.scrubT !== 0
   onScrubbingChanged: if (sounds) sounds.scrubMoved()
   onScrubTChanged: if (sounds && scrubbing) sounds.scrubMoved()
   // A surface taken down mid-replay, as a rebuilt bar or a removed screen
-  // takes its popup, stops its replay's sound with it.
+  // takes its panel, stops its replay's sound with it.
   Component.onDestruction: {
     if (sounds) sounds.stopReplay(root)
     if (service) {
@@ -652,8 +667,8 @@ Item {
     if (service) service.reverseOrder()
   }
 
-  // A key as both surfaces take it, so the popup and the window answer the
-  // same keys; false for one Stonks doesn't answer. Esc, and the popup's
+  // A key as both surfaces take it, so the panel and the window answer the
+  // same keys; false for one Stonks doesn't answer. Esc, and the panel's
   // Tab, each surface reads itself. A letter's command is its key and Shift
   // (KeyText.typed): Caps Lock sends "O" for o, which would reverse.
   function pressKey(event) {
@@ -1309,7 +1324,7 @@ Item {
 
   // The surface's own row, on the margins as the rows' fills are, not on
   // the words' edges: the longest closure's status (a holiday's name, the
-  // next open, its zone) needs every pixel of the popup's width.
+  // next open, its zone) needs every pixel of the panel's width.
   HeaderStatus {
     id: header
     anchors.left: parent.left
@@ -1327,6 +1342,7 @@ Item {
     ground: root.ground
     scrubbing: root.scrubT !== 0
     live: root.heroLive
+    trouble: !!root.troubleForms
     still: !root.surfaceOpen
     helpShown: root.showingHelp
     foreground: root.foreground
@@ -1345,6 +1361,7 @@ Item {
   HeroBand {
     id: heroBand
     calendars: root.calendars
+    rowsDay: Figures.rowsDay(root.view.rows, root.quotes, root.newestPrints, root.now, root.calendars)
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: header.bottom
@@ -1493,7 +1510,7 @@ Item {
     fontFamily: root.fontFamily
     gutter: root.gutter
     // What to type, and the list it adds to; short, so a list's name fits
-    // the popup's field.
+    // the panel's field.
     placeholder: root.listName !== "" ? "Symbol or company for " + root.listName + "…" : "Symbol or company…"
     members: root.members
     putBack: root.putBack
@@ -1574,7 +1591,7 @@ Item {
   }
 
   // At the body's visible bottom, the edge, one gap under the list's rows;
-  // it rides the popup's easing edge. It carries the surface's ground and
+  // it rides the panel's easing edge. It carries the surface's ground and
   // stacks over the rows and the empty list's line, so a growing edge
   // carries it across them without drawing its words through a row.
   AddFooter {
@@ -1595,8 +1612,7 @@ Item {
     note: root.note
     noteOpacity: root.noteShown
     notice: root.notice
-    noticeAction: root.noticeAction
-    noticeShort: root.noticeShort
+    noticeActions: root.noticeActions
     hint: root.hint
     showsHint: root.hintShown
     ground: root.ground
@@ -1668,7 +1684,7 @@ Item {
     onCloseRequested: root.showingHelp = false
   }
 
-  // A closing surface takes no press, click, or wheel: the popup's card
+  // A closing surface takes no press, click, or wheel: the panel's card
   // still shows while it fades, and nothing on it acts. Hover passes, so
   // nothing under the pointer changes as the card goes.
   MouseArea {
@@ -1741,7 +1757,7 @@ Item {
     // Where the chart takes the spare height (the window's), it runs down
     // over the footer, as it lies over the rows, so a short window shows
     // more lists. Elsewhere it ends one gap above the footer, which the
-    // popup's card makes room for (`listMenuBottom`).
+    // panel's card makes room for (`listMenuBottom`).
     maxHeight: root.height - root.listMenuTop - root.margins - (root.chartFitsSurface ? 0 : root.groupGap + footer.height)
     choices: root.lists
     current: root.listName

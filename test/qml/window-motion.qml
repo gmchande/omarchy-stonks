@@ -765,7 +765,7 @@ Harness {
     // A closing surface holds its picture: from the close until the next
     // open nothing on it changes, whatever was moving or the service does
     // meanwhile. The window hides at once, so its body is put where the
-    // popup's close fade leaves the popup's, closed but still on screen.
+    // panel's close fade leaves the panel's, closed but still on screen.
     function closingHolds(body, watchlist, keys) {
       var icon = harness.find(body, "lookIcon")
       var frames = function(n) {

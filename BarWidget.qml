@@ -10,7 +10,7 @@ import "Figures.js" as Figures
 import "Format.js" as Format
 import "Tones.js" as Tones
 // The bar pill: one featured symbol with its day line and change, whatever
-// range the popup or the window shows. Left click opens the popup, scroll
+// range the panel or the window shows. Left click opens the panel, scroll
 // walks the watchlist, middle click cycles the pill style, right click opens
 // the window. The data service owns the data; the pill reads it.
 BarWidget {
@@ -32,11 +32,12 @@ BarWidget {
   readonly property string newestNote: featured && featured.newest
     ? Figures.newestNote(featuredQuote, featured.newest, service.now, service.calendars) : ""
   readonly property string newestPhase: featured && featured.newest ? featured.newest.phase : ""
-  // The line: the day the 1D chart draws (`Chart.dayDrawn`), as the row's
-  // does, from the answers it is drawn from, so the clock never redraws it.
-  // A day with no print draws nothing, as its row does.
+  // The line: the day the 1D chart draws, drawn once Robinhood has said
+  // which (`Chart.lineDay`), as the row's is, from the answers it is drawn
+  // from, so the clock never redraws it. A day with no print draws nothing,
+  // as its row does.
   readonly property var lineDay: featuredQuote
-    ? Chart.dayDrawn(featuredQuote, service.nights[featuredSymbol], service.allDay[featuredSymbol], service.calendars).day : null
+    ? Chart.lineDay(featuredSymbol, featuredQuote, service.nights, service.allDay, service.calendars) : null
   readonly property var lineGeometry: lineDay && lineDay.points.length ? Chart.chartGeometry(lineDay, service.calendars) : null
   // In the bar's right section, among its bare icons, the pill has a form of
   // its own, `barStyleRight`: the icon until a middle-click there picks
@@ -64,8 +65,16 @@ BarWidget {
     ? Figures.freshness(service.entries[featuredSymbol] || null, featuredQuote, service.now, service.owed[featuredSymbol] || 0, false,
       service.newestPrints[featuredSymbol] || null) : null
   readonly property bool warns: Figures.freshnessWarns(freshness)
-  // What the "!" means, in the popup's words, for the hover on every form.
-  readonly property string warningText: warns ? Figures.freshnessText(freshness, featuredQuote, service.calendars) : ""
+  // What the "!" means, in the panel's words, for the hover on every form,
+  // then why and when Stonks tries again, where it knows: Yahoo's pause
+  // (`Figures.hostPause`), or that a price on show couldn't be updated. The
+  // pill itself has no room for them.
+  readonly property var hostPause: service && service.yahooGate
+    ? Figures.hostPause(service.yahooGate.pause, service.yahooGate.pausedUntil, service.now) : null
+  readonly property string warningText: !warns ? ""
+    : Figures.freshnessText(freshness, featuredQuote, service.calendars)
+      + (hostPause ? "\n" + hostPause.why + "\n" + hostPause.when
+        : freshness.state === "failed" && featured ? "\nRetrying" : "")
   // The shell copies a hover's words only as the pointer enters. While it
   // stays, a warning that starts, ends, or changes its words goes to the bar
   // again, once every binding has the new words: no bubble names a warning
@@ -111,7 +120,7 @@ BarWidget {
     shownDay = animalDay()
     shownKind = Figures.animalKind(featured)
   }
-  // Quieter than the bar's ink by the same rule as the popup's secondary
+  // Quieter than the bar's ink by the same rule as the panel's secondary
   // text, against the bar's own ground.
   readonly property color barGround: Qt.rgba(Commons.Color.bar.background.r, Commons.Color.bar.background.g, Commons.Color.bar.background.b, 1)
   readonly property color dimColor: Tones.dim(button.foreground, barGround)
@@ -419,7 +428,9 @@ BarWidget {
         anchors.verticalCenter: parent.verticalCenter
         textFormat: Text.PlainText
         text: root.changeText
-        color: root.featured ? root.trendColor : root.dimColor
+        // With no price, a warning's words ("! Can't get prices") are in the
+        // bar's ink, as the header says trouble; the waiting "…" stays dim.
+        color: root.featured ? root.trendColor : root.warns ? button.foreground : root.dimColor
         font.family: button.fontFamily
         font.pixelSize: button.fontSize
       }

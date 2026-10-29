@@ -317,7 +317,7 @@ function liveBarAppended(history) {
 }
 
 // `history` ending on the newest price since the listing's regular close
-// (`print`, { t, p, phase }, `Overnight.newestPrint`), as Robinhood's ranges
+// (`print`, { t, p, phase, closed }, `Overnight.newestPrint`), as Robinhood's ranges
 // end on it: a bar of its own after the last, or in place of the live moment
 // Yahoo appends to a week's, a month's, or a quarter's bars, which stands
 // for the price now too. The bar is that one trade, so it counts in the
@@ -329,7 +329,7 @@ function withNewest(history, print) {
   if (!print || !bars.length || print.t <= bars[bars.length - 1].t) return history
   var own = liveBarAppended(history) ? bars.slice(0, -1) : bars
   return Object.assign({}, history, {
-    bars: own.concat([{ t: print.t, o: print.p, h: print.p, l: print.p, c: print.p, v: null, newest: print.phase }])
+    bars: own.concat([{ t: print.t, o: print.p, h: print.p, l: print.p, c: print.p, v: null, newest: print.phase, closed: !!print.closed }])
   })
 }
 
@@ -520,6 +520,6 @@ function historyRowModel(history, quote, scrubT) {
     periodLabel: stats.coverage.short && history.range !== "All"
       ? "SINCE " + historyStatsDateText(history, history.firstTradeDate, true, "1d")
       : String(history.range || "").toUpperCase(),
-    newest: tail ? { t: tail.t, p: tail.c, phase: tail.newest } : null
+    newest: tail ? { t: tail.t, p: tail.c, phase: tail.newest, closed: tail.closed } : null
   }
 }

@@ -10,7 +10,7 @@ import "Overnight.js" as Overnight
 import "Settings.js" as Settings
 // The one data owner. Data settings live in grvc.stonks.json and are
 // written only here, including what you are looking at: the list, the
-// featured symbol, and the chart range the popup and the window share.
+// featured symbol, and the chart range the panel and the window share.
 // List membership follows Settings.js's rules; this file persists their result.
 Item {
   id: root
@@ -67,7 +67,7 @@ Item {
   // good hands the hero back, as an add whose preview had already failed
   // leaves it; another hero chosen meanwhile ends it.
   property var heroTaken: null
-  // The surfaces open now where a screen shows them: the popup on any bar,
+  // The surfaces open now where a screen shows them: the panel on any bar,
   // the window on a workspace on view (`StonksBody.onScreen`). The chart's
   // history is wanted only while one is (`surfaceShown`).
   property var openSurfaces: []
@@ -101,7 +101,7 @@ Item {
   readonly property string order: Settings.listOrder(dataSettings)
   readonly property bool reversed: Settings.listReversed(dataSettings)
   readonly property string range: dataSettings.range
-  // The popup's first-run hint has shown.
+  // The panel's first-run hint has shown.
   readonly property bool hinted: dataSettings.hinted
   // What the surfaces show of the settings, as one value, so a change of it
   // is whole whatever changed: the hero, the range, the list and its key
@@ -221,11 +221,11 @@ Item {
   })
   // Each listing's newest price since its regular close, by symbol: the
   // price on top on the pill, the rows, and the panel and the window
-  // (`Overnight.newestPrints`).
-  readonly property var newestPrints: Overnight.newestPrints(library, feed.quotes, overnightFeed.entries, allDayFeed.entries, calendars)
+  // (`Chart.newestPrints`).
+  readonly property var newestPrints: Chart.newestPrints(library, feed.quotes, overnightFeed.entries, allDayFeed.entries, calendars)
   // Robinhood's answers, by symbol: its prints (`nights`) and whether it
   // trades each all day (`allDay`), so a row's line and the pill's draw the
-  // day the 1D chart does (`Chart.dayDrawn`).
+  // day the 1D chart does (`Chart.lineDay`).
   readonly property var nights: overnightFeed.entries
   readonly property var allDay: allDayFeed.entries
   // Robinhood's two questions, whether it trades a listing all day and its
@@ -852,7 +852,7 @@ Item {
   // while one is, the feeds read only the chart waited on (`chartWaited`),
   // and the rest once the motion ends, so reading never stutters it. Only
   // an open surface counts: one taken down mid-draw-in, as a rebuilt bar
-  // takes its popup, can start its chart again as it goes.
+  // takes its panel, can start its chart again as it goes.
   property var drawing: []
   function drawingIn(surface, running) {
     var others = root.drawing.filter(function(s) { return s !== surface })

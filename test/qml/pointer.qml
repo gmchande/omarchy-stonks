@@ -692,7 +692,7 @@ Harness {
           stub.symbols.indexOf("TOPR") >= 0 && stub.symbols.indexOf("THRD") < 0 && !body.adding)
         mouseMove(body, body.width / 2, 20)
 
-        // The surface's closing is surfaceOpen going false, as the popup's
+        // The surface's closing is surfaceOpen going false, as the panel's
         // fade begins.
         body.startAdding()
         within(1000, function() { return body.adding })
