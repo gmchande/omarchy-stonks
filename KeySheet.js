@@ -2,12 +2,12 @@
 .import "Settings.js" as Settings
 
 // The key sheet behind the header's ?: every key, grouped by what it
-// touches, with a line under m for the bell, then the mouse in a few lines.
-// The README's table lists the same keys, in its words; where a line is too
-// long for the popup's half column, the sheet says it shorter. A key shows
-// only where it acts: ⇧↑ ⇧↓ and a row's drag on manual order, the order's
-// arrow on a sorted one, and Tab in the popup, which steps to the bar's
-// next panel. Knows nothing of how the keys are handled.
+// touches, then the mouse in a few lines. The README's table lists the same
+// keys, in its words; where a line is too long for the popup's half column,
+// the sheet says it shorter. A key shows only where it acts: ⇧↑ ⇧↓ and a
+// row's drag on manual order, the order's arrow on a sorted one, and Tab in
+// the popup, which steps to the bar's next panel. Knows nothing of how the
+// keys are handled.
 function sheet(order, switchesPanels) {
   var manual = Settings.normalizeOrder(order) === "manual"
   var rows = [
@@ -42,10 +42,6 @@ function sheet(order, switchesPanels) {
         { key: "c", does: "Cycle the day's change" },
         { key: "s", does: "Smooth or retro" },
         { key: "m", does: "Sound on or off" },
-        // The one sound you didn't cause keeps quiet under Omarchy's Do Not
-        // Disturb; what you do still sounds. One phrase a line, as the
-        // credit's, so the half column never breaks one.
-        { key: "", does: "The bell keeps quiet\nin Do Not Disturb" },
         { key: "r", does: "Refresh" },
         // What the footer offers: a newer Stonks's update, which restarts
         // the shell, or after an update run elsewhere, the restart.
