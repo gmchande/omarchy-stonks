@@ -166,10 +166,40 @@ Harness {
     } else if (harness.step === 16) {
       check("once the hold ends, what it held is read",
         receipt("NVDA") === harness.now && !("NVDA" in feed.asked), receipt("NVDA") + " vs " + harness.now)
+      feed.lead = ""
+      feed.symbols = ["MSFT", "SLOW"]
+    } else if (harness.step === 17) {
+      // A reader's refresh of both: MSFT answers at once, SLOW a second
+      // later. Asked for again meanwhile, MSFT is still waited on as the
+      // first run ends.
+      harness.now += 60
+      feed.ask(["MSFT", "SLOW"], harness.now, true)
+      reaskWatch.start()
+      return
+    } else if (harness.step === 18) {
+      check("a symbol a reader asks for again while its last run is out stays waited on as that run ends",
+        harness.reaskedWaited, JSON.stringify(feed.userAsked))
       finish()
       return
     }
     ticker.start()
+  }
+
+  // MSFT's answer is in and SLOW's still out: MSFT is asked for again.
+  property bool reasked: false
+  property bool reaskEnded: false
+  property bool reaskedWaited: false
+  Timer {
+    id: reaskWatch
+    interval: 20
+    repeat: true
+    onTriggered: {
+      if (receipt("MSFT") !== harness.now || !("SLOW" in feed.asked)) return
+      reaskWatch.stop()
+      harness.reasked = true
+      feed.ask(["MSFT"], harness.now, true)
+      ticker.start()
+    }
   }
 
   // The held run has ended and MSFT's answer is read: NVDA's is in hand,
@@ -195,6 +225,13 @@ Harness {
       for (var key in feed.quotes)
         if (feed.quotes[key] && feed.quotes[key].symbol !== key) harness.misfiled.push(key + " as " + feed.quotes[key].symbol)
       if (harness.step === 13 && feed.quotes["NVDA"] && feed.refreshRun.length > 0) harness.nvdaBeforeRefresh = true
+    }
+    // The first run of the reader's refresh ends: is MSFT's new ask still
+    // waited on?
+    function onRefreshRunChanged() {
+      if (harness.step !== 17 || !harness.reasked || harness.reaskEnded || feed.refreshRun.length > 0) return
+      harness.reaskEnded = true
+      harness.reaskedWaited = "MSFT" in feed.userAsked
     }
     // quote-queue.sh patches testRetrying into the copy: the retry pause is running.
     function onTestRetryingChanged() {

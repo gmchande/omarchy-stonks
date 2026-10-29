@@ -2579,6 +2579,11 @@ test("a quote held from an earlier day trades by its calendar, and one answered 
   const russell = { ...gspc, exchange: "WCB" }
   expect(quoteCadence(russell, thursday, 60, false)).toBe(900)
   expect(quiet(russell, at("2026-10-07", "20:30"), at("2026-10-07", "22:00"))).toBe(0)
+  // London's calendar has no pre-market, but Yahoo's period for it does:
+  // answered at 03:50 on Monday 26 October, in that pre-market, SHEL.L may
+  // still move, and is asked on its cadence.
+  const shelPre = M.parseChart(fixture("moments/watch-2026-10-26-0350/shel.l.json"))
+  expect(quiet(shelPre, at("2026-10-26", "03:50"), at("2026-10-26", "03:56"))).toBe(0)
   // A cryptocurrency always trades.
   expect(quiet(btc, btc.session.regular.end + 3600, btc.session.regular.end + 7200)).toBe(0)
 })

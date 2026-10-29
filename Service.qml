@@ -532,10 +532,10 @@ Item {
     reading: function() { return Asks.readingOrder(root.view.featured, root.sights, root.view.shown, root.library) }
     holding: root.drawing.length > 0
     waited: root.chartWaited
-    onBusyChanged: root.releaseOrder()
+    onBusyChanged: Qt.callLater(root.releaseOrder)
     now: root.now
     clock: root
-    clearance: function() { return root.screensClear() }
+    clearance: function() { return !root.opening && root.screensClear() }
     gate: yahooGate
     centExchanges: root.centExchanges
     calendars: root.calendars
@@ -590,14 +590,19 @@ Item {
   }
   // Robinhood's feeds send one request at a time; each answer asks again
   // for what is still wanted, while it still is (`askOvernight`).
-  AllDayFeed { id: allDayFeed; gate: robinhoodGate; onEntriesChanged: Qt.callLater(root.askOvernight) }
+  AllDayFeed {
+    id: allDayFeed
+    gate: robinhoodGate
+    onEntriesChanged: Qt.callLater(root.askOvernight)
+    onBusyChanged: Qt.callLater(root.releaseOrder)
+  }
   OvernightFeed {
     id: overnightFeed
     gate: robinhoodGate
     holding: root.drawing.length > 0
     waited: root.chartWaited
     onEntriesChanged: Qt.callLater(root.askOvernight)
-    onBusyChanged: root.releaseOrder()
+    onBusyChanged: Qt.callLater(root.releaseOrder)
   }
   // Off by the data file's `updateCheck`, it asks GitHub nothing.
   ReleaseFeed {
@@ -820,12 +825,23 @@ Item {
     // A list in order of change keeps its places while the prices the open
     // asks for come in (`releaseOrder`).
     if (open && Settings.normalizeOrder(root.order) === "pct") root.heldOrder = root.view.shown
+    // The surface lays out its rows as it opens, and says which are in
+    // sight (`rowsSeen`): the open's quote run goes a turn later, so it
+    // asks for those first (`Asks.readingOrder`).
+    if (open) {
+      root.opening = true
+      Qt.callLater(function() {
+        root.opening = false
+        feed.pump()
+      })
+    }
     root.tick()
     root.showHistory(false)
     root.askOvernight()
     root.askDue()
     Qt.callLater(root.releaseOrder)
   }
+  property bool opening: false
 
   // The surfaces whose chart is drawing itself in (`StonksBody.drawingIn`):
   // while one is, the feeds read only the chart waited on (`chartWaited`),
@@ -843,13 +859,14 @@ Item {
 
   // The order a list in order of change showed as a surface opened, held
   // while the prices the open asked for come in, so the rows move once,
-  // when they're in (`Settings.shownOrder`): until neither feed has
-  // anything asked or out, or a site's pause holds what is left. Changing
-  // the order, the list, or its rows lets it go at once.
+  // when they're in (`Settings.shownOrder`): until no feed has anything
+  // asked or out, a turn after the last says so, once what it answered is
+  // applied; or until a site's pause holds what is left. Changing the
+  // order, the list, or its rows lets it go at once.
   property var heldOrder: null
   function releaseOrder() {
     if (!root.heldOrder) return
-    if ((feed.busy || overnightFeed.busy) && !yahooGate.paused && !robinhoodGate.paused) return
+    if ((feed.busy || overnightFeed.busy || allDayFeed.busy) && !yahooGate.paused && !robinhoodGate.paused) return
     root.heldOrder = null
   }
   onOrderChanged: root.heldOrder = null

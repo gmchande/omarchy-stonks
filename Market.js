@@ -491,11 +491,15 @@ var SETTLED = 15 * 60
 // still change, or nothing says when it trades next. A quote can describe
 // an earlier session than the one trading as it is answered (an index's
 // stays the last session's until its open), so the calendar has the last
-// word. Never a cryptocurrency's, which always trades.
+// word, and so does a period of Yahoo's under way as it was answered
+// (London's pre-market, which its calendar doesn't hold). Never a
+// cryptocurrency's, which always trades.
 function quietUntil(quote, receivedAt, now, cal) {
   if (!quote || quote.crypto || !receivedAt) return 0
   var s = quote.session
   if (!s || !s.regular || receivedAt < (s.post || s.regular).end + SETTLED) return 0
+  var c = quote.current
+  if (c && c.regular && receivedAt >= (c.pre || c.regular).start && receivedAt < (c.post || c.regular).end + SETTLED) return 0
   var starts = []
   if (cal) {
     var date = dateStringOf(localDate(receivedAt, cal))
@@ -508,7 +512,6 @@ function quietUntil(quote, receivedAt, now, cal) {
     var open = nextOpen(cal, receivedAt)
     if (open) starts.push(cal.pre ? epochAt(cal, open.dateString, cal.pre.open) : open.t)
   }
-  var c = quote.current
   if (c && c.regular && (c.pre || c.regular).start > receivedAt) starts.push((c.pre || c.regular).start)
   var next = starts.length ? Math.min.apply(null, starts) : 0
   return next > now ? next : 0

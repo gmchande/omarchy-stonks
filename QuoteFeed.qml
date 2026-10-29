@@ -88,8 +88,8 @@ Item {
   property var asked: ({})
   property var owed: ({})
   // The symbols a reader's refresh asked for (`ask` with `user`), each until
-  // a run with it comes back, whatever its answer says, or it leaves the
-  // queue. Yahoo pausing Stonks ends the wait: what the pause holds goes
+  // its answer comes back, whatever it says, or a run with it ends without
+  // one, or it leaves the queue. Yahoo pausing Stonks ends the wait: what the pause holds goes
   // later, as the gate lets it, unannounced. `userOut`: one of them is on a
   // request now.
   property var userAsked: ({})
@@ -262,7 +262,7 @@ Item {
     if (first) root.firstRun = runSymbols
     else root.refreshRun = runSymbols
     root.landing = landing.concat([{ first: first, slots: run, ticket: gate ? gate.ticket : 0,
-      answers: [], parsed: 0, read: 0, ended: false, kinds: [], retryAfter: 0, cool: [] }])
+      answers: [], parsed: 0, read: 0, ended: false, kinds: [], retryAfter: 0, cool: [], back: [] }])
     // A chart that only judges a day already shown owes no answer.
     owe(runSymbols.filter(function(symbol) { return symbol in asked }))
     var spark = run.some(function(slot) { return slot.spark })
@@ -301,8 +301,8 @@ Item {
   //
   // Each run out, from its launch: its requests (`slots`), the gate's ticket
   // it went on, its answers so far, how far its output is parsed and its
-  // answers read, whether its stream has ended, and what its answers tell
-  // the gate and the retry as it ends.
+  // answers read, whether its stream has ended, what its answers tell the
+  // gate and the retry as it ends, and the symbols whose answers are back.
   property var landing: []
   function runOf(first) {
     for (var i = 0; i < landing.length; i++) if (landing[i].first === first && !landing[i].ended) return landing[i]
@@ -448,13 +448,21 @@ Item {
       delete nextAsked[symbol]
       delete nextTries[symbol]
     }
+    var back = []
     got.forEach(function(answer) {
       var slot = job.slots[answer.index]
       if (!slot) return
       job.kinds.push(answer.kind)
       job.retryAfter = Math.max(job.retryAfter, answer.retryAfter)
       slot.symbols.forEach(function(symbol) { settle(answer, slot, symbol) })
+      back = back.concat(slot.symbols)
     })
+    // What a reader's refresh waited on is back, whatever it says; one asked
+    // for again since waits on its next run.
+    if (!job.first) {
+      job.back = job.back.concat(back)
+      root.userAsked = without(userAsked, back)
+    }
     if (nextQuotes) root.quotes = nextQuotes
     root.entries = nextEntries
     root.toJudge = nextJudge.filter(function(s) { return symbols.indexOf(s) >= 0 })
@@ -471,7 +479,7 @@ Item {
     if (job.first) {
       root.firstRun = []
     } else {
-      root.userAsked = without(userAsked, refreshRun)
+      root.userAsked = without(userAsked, refreshRun.filter(function(s) { return job.back.indexOf(s) < 0 }))
       root.refreshRun = []
     }
     dropUnwatched()

@@ -215,7 +215,7 @@ Harness {
     function idle() {
       return [service.testFeed, service.testPreviewFeed].every(function(feed) {
         return feed.firstRun.length === 0 && feed.refreshRun.length === 0
-      }) && !service.testOvernightFeed.busy
+      }) && !service.testOvernightFeed.busy && !service.opening
     }
     function settle() {
       verify(within(10000, idle), "a quote run never landed")
@@ -670,6 +670,23 @@ Harness {
         Math.abs(longCounts.NEST - 10) <= 1 && starved.length === 0 && longBang.length === 0 && longReqs.length <= 60,
         "NEST " + longCounts.NEST + ", LONG01 " + longCounts.LONG01 + ", LONG42 " + longCounts.LONG42 + ", starved " + starved
           + ", warned " + longBang.length + ", " + longReqs.length + " requests in 10 min")
+      // The window closed on LONG36 far down the list, and two minutes on
+      // opened again: it shows the rows down to LONG36, and its run asks for
+      // those first, ahead of the rows no screen shows.
+      closeWindow()
+      service.feature("LONG36")
+      settle()
+      tick(120)
+      var farFrom = harness.runs().length
+      openWindow()
+      var farSight = app.testBody.watchlist.sightSymbols.filter(function(s) { return s !== "LONG36" })
+      var farRun = harness.runs().slice(farFrom).filter(function(r) { return /^(chart|spark):/.test(r) })[0] || ""
+      var farFirst = (farRun.split(" ").filter(function(slot) { return /^spark:/.test(slot) })[0] || "").replace(/^spark:/, "").split(",")
+      harness.check("an open far down the list asks first for the rows in sight, top down",
+        farSight.length > 1 && farSight.indexOf("NEST") < 0 && farFirst.slice(0, farSight.length).join(",") === farSight.join(","),
+        "in sight " + farSight.join(",") + " | " + farRun)
+      service.feature("NEST")
+      settle()
       more.forEach(function(s) { service.removeSymbol(s) })
       closeWindow()
 
@@ -1097,13 +1114,21 @@ Harness {
       touch("TURN.down")
       tick(180)
       runCommand(["sh", "-c", "echo 1 > \"$1/DELAY\"", "sh", harness.state])
+      // Robinhood's answers wait until Yahoo's are in, so they're the last.
+      touch("ROBINHOOD.hold")
+      var printsAsked = harness.calls("OVERNIGHT")
+      var tradabilityAsked = harness.calls("INSTRUMENTS")
+      var printsAtOpen = service.testOvernightFeed.entries
+      var tradabilityAtOpen = service.testAllDayFeed.entries
       var shownAtOpen = service.view.shown.slice()
       var moves = []
       var rowsIn = false
       var watchShown = function() {
         var last = moves.length ? moves[moves.length - 1].order : shownAtOpen
         if (service.view.shown.join(",") !== last.join(","))
-          moves.push({ order: service.view.shown.slice(), coinOut: "BTC-USD" in service.asked })
+          moves.push({ order: service.view.shown.slice(), coinOut: "BTC-USD" in service.asked,
+            printsIn: service.testOvernightFeed.entries !== printsAtOpen,
+            tradabilityIn: service.testAllDayFeed.entries !== tradabilityAtOpen })
       }
       var turnAsked = false
       var watchAsked = function() {
@@ -1113,7 +1138,13 @@ Harness {
       service.viewChanged.connect(watchShown)
       service.askedChanged.connect(watchAsked)
       var runsBefore = harness.runs().length
-      openWindow()
+      app.testWindow.implicitHeight = 1000
+      app.open("{}")
+      tryVerify(function() { return app.opened && service.openSurfaces.length === 1 }, 3000)
+      var yahooIn = within(15000, function() { return !service.testFeed.busy })
+      var heldWithYahooIn = !!service.heldOrder
+      remove("ROBINHOOD.hold")
+      settle()
       within(3000, function() { return !service.heldOrder })
       service.viewChanged.disconnect(watchShown)
       service.askedChanged.disconnect(watchAsked)
@@ -1127,9 +1158,12 @@ Harness {
         openRun + " | shown " + shownAtOpen.join(","))
       harness.check("an open's rows land before the coin's answer, a request later",
         rowsIn, turnAsked ? "rows never landed alone" : "TURN never asked")
-      harness.check("a list in order of change keeps its places until every price the open asked for is in, then moves once",
-        moves.length === 1 && !moves[0].coinOut && moves[0].order.indexOf("TURN") > shownAtOpen.indexOf("TURN"),
-        JSON.stringify(moves) + " | at open " + shownAtOpen.join(","))
+      harness.check("a list in order of change keeps its places until every price the open asked for is in, Robinhood's last, then moves once",
+        yahooIn && heldWithYahooIn && harness.calls("OVERNIGHT") + harness.calls("INSTRUMENTS") > printsAsked + tradabilityAsked
+          && moves.length === 1 && !moves[0].coinOut && moves[0].order.indexOf("TURN") > shownAtOpen.indexOf("TURN")
+          && (harness.calls("OVERNIGHT") === printsAsked || moves[0].printsIn)
+          && (harness.calls("INSTRUMENTS") === tradabilityAsked || moves[0].tradabilityIn),
+        yahooIn + " " + heldWithYahooIn + " | " + JSON.stringify(moves) + " | at open " + shownAtOpen.join(","))
       remove("TURN.down")
       service.setOrder("manual")
       service.removeSymbol("TURN")
