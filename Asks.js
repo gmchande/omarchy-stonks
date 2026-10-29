@@ -121,18 +121,25 @@ function laneJudging(toJudge, asked, held) {
 // batches of up to `Quote.SPARK_BATCH`, each in the order asked, so one the
 // budget held goes before those asked since. A batch of one is a chart: one
 // request either way, and the chart's has opens, so its day needs no
-// judging. A feed that isn't `bulk`, the preview's, asks only charts.
-function quoteSlots(waiting, asked, symbols, lead, heroes, bulk) {
+// judging. The coins (`coins`) go in spark batches of their own, one alone
+// too: a coin is asked for two days (`Market.twoDays`), and a batch asks
+// two for all when one of them wants two, so beside the stocks it would
+// double their answer; its open is its price 24 hours ago, read from the
+// closes. A feed that isn't `bulk`, the preview's, asks only charts.
+function quoteSlots(waiting, asked, symbols, lead, heroes, bulk, coins) {
   var order = waiting.slice().sort(function(a, b) {
     return (b === lead) - (a === lead) || asked[a] - asked[b] || symbols.indexOf(a) - symbols.indexOf(b)
   })
   var charted = function(s) { return !bulk || heroes.indexOf(s) >= 0 }
+  var coin = function(s) { return !!coins && coins.indexOf(s) >= 0 }
   var slots = order.filter(charted).map(function(s) { return { symbols: [s], spark: false } })
-  var batched = order.filter(function(s) { return !charted(s) })
+  var batched = order.filter(function(s) { return !charted(s) && !coin(s) })
   for (var i = 0; i < batched.length; i += Quote.SPARK_BATCH) {
     var batch = batched.slice(i, i + Quote.SPARK_BATCH)
     slots.push({ symbols: batch, spark: batch.length > 1 })
   }
+  var coined = order.filter(function(s) { return !charted(s) && coin(s) })
+  for (var j = 0; j < coined.length; j += Quote.SPARK_BATCH) slots.push({ symbols: coined.slice(j, j + Quote.SPARK_BATCH), spark: true })
   return slots
 }
 
@@ -167,28 +174,35 @@ function answerVerdict(kind, outcome, tries, judgingOnly) {
 // What Robinhood is asked now, { tradability, prints }, or null for
 // nothing. While a surface is open (`open`), for every US stock and ETF
 // (`overnightSymbols`): whether it trades all day, once a day each
-// (`Overnight.allDayDue`); and the prints of each not known to trade only by
-// day, each by its own last ask (`Overnight.overnightDue`), taking with it
-// each one due within half a night's interval, so the list stays one
+// (`Overnight.allDayDue`); and the prints of each not known to trade only
+// by day, each by its own last ask (`Overnight.overnightDue`), taking with
+// it each one due within half a night's interval, so the list stays one
 // request a night's 5 minutes. A resting preview on view outside All
 // (`previewShown`, `preview`), a US stock or ETF by `previewQuote`, is
-// asked with them. With nothing open, once a session (`pillAsked`), for the
-// pill's symbol alone, what Robinhood has not answered for it, as soon as
-// Yahoo has answered it live. The chart waited on, the preview's or else
-// the pill's, goes alone ahead of the rest while it has no answer.
-// `allDay` and `nights` are the two feeds' entries; `quoteEntries` Yahoo's.
+// asked with them. With nothing open while a night trades, the pill's
+// symbol alone, the same way, so the newest price on top of the pill
+// (`Overnight.newestPrint`) stays current. Otherwise, with nothing open,
+// once a session (`pillAsked`), for the pill's symbol alone, what
+// Robinhood has not answered for it, as soon as Yahoo has answered it
+// live. The chart waited on, the preview's or else the pill's, goes alone
+// ahead of the rest while it has no answer. `allDay` and `nights` are the
+// two feeds' entries; `quoteEntries` Yahoo's.
 function overnightAsks(s) {
-  var open = s.open
   var pill = s.pill
+  var cal = Overnight.overnightMarket(s.calendars)
+  var tonight = cal && !s.open ? Overnight.nightAt(cal, s.now) : null
+  var night = !!tonight && tonight.open && s.overnightSymbols.indexOf(pill) >= 0
+  // Asked again as each answer falls due, not once a session.
+  var kept = s.open || night
   var pillEntry = s.quoteEntries[pill]
   var live = !!pillEntry && pillEntry.status === "ok" && s.overnightSymbols.indexOf(pill) >= 0
-  if (!open && (s.pillAsked || !live)) return null
-  var previewing = open && s.previewShown && !!s.previewQuote && s.library.indexOf(s.preview) < 0
+  if (!kept && (s.pillAsked || !live)) return null
+  var previewing = s.open && s.previewShown && !!s.previewQuote && s.library.indexOf(s.preview) < 0
     && Overnight.hasOvernight(s.previewQuote, s.calendars)
   var waited = previewing ? s.preview : pill
-  var listings = open ? s.overnightSymbols.concat(previewing ? [s.preview] : []) : [pill]
+  var listings = s.open ? s.overnightSymbols.concat(previewing ? [s.preview] : []) : [pill]
   var tradability = listings.filter(function(x) {
-    return open ? Overnight.allDayDue(s.allDay[x], s.now) : !s.allDay[x]
+    return kept ? Overnight.allDayDue(s.allDay[x], s.now) : !s.allDay[x]
   })
   var drawn = listings.filter(function(x) { return !s.allDay[x] || s.allDay[x].allDay })
   // The listings of one ask share its second (`entry.at`), so each ask is
@@ -197,7 +211,7 @@ function overnightAsks(s) {
   var printsDue = function(x, at) {
     var entry = s.nights[x]
     if (!entry) return true
-    if (!open) return false
+    if (!kept) return false
     var key = at + " " + entry.at + " " + entry.status
     if (!(key in judged)) judged[key] = Overnight.overnightDue(entry.at, at, s.calendars, entry.status === "failed")
     return judged[key]

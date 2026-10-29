@@ -122,6 +122,29 @@ every_state() (
   for symbol in shib-usd ry.to brk-a brk-b; do
     states="$states popup-sweep-2026-10-08-1054-$symbol-smooth popup-sweep-2026-10-08-1054-$symbol-retro"
   done
+  # The 1D chart's day at each phase, in both looks, its price on top: Friday
+  # all weekend, with a night and without; SHOP's thin Friday; Sunday's
+  # night alone, busy and thin; the night on past midnight; Monday's
+  # pre-market and open, its session, its after hours on a busy day after
+  # the bell, and its evening's night, busy and thin; Friday's pre-market;
+  # a coin's last 24 hours; Tokyo at its open and London's morning; and
+  # CVR's two trades, its close carrying the dot.
+  for moment in watch-2026-10-25-1000-nbis watch-2026-10-25-1000-brk-a thinfeed-2026-10-23-2030-shop \
+    watch-2026-10-25-2335-nbis watch-2026-10-25-2335-jnj watch-2026-10-26-0100-nbis night-2026-10-23-0600-aapl \
+    watch-2026-10-26-0420-nbis watch-2026-10-26-0935-nbis watch-2026-10-26-1200-nbis watch-2026-10-26-1800-nbis \
+    watch-2026-10-26-2005-nbis watch-2026-10-26-2005-jnj watch-2026-10-25-2020-7203.t \
+    watch-2026-10-26-0420-shel.l coin-2026-10-25-2005-btc-usd watch-2026-10-26-1800-cvr; do
+    states="$states popup-sweep-$moment-smooth popup-sweep-$moment-retro"
+  done
+  # NBIS on Sunday night and Monday evening on 1W, 1M and 1Y: each range's
+  # line ends on the newest price, the one on top. And its longest caption,
+  # YTD after hours at the weekend, at text size 16.
+  for moment in watch-2026-10-25-2335 watch-2026-10-26-2005; do
+    for range in 1w 1m 1y; do
+      states="$states popup-sweep-$moment-nbis-$range-smooth popup-sweep-$moment-nbis-$range-retro"
+    done
+  done
+  states="$states popup-sweep-watch-2026-10-25-1000-nbis-ytd-smooth-size-16 popup-sweep-watch-2026-10-25-1000-nbis-ytd-retro-size-16"
   # A thin stock's day, fewer prints than the chart's columns, and its 3M,
   # in both looks on both surfaces: retro lights every column the line joins.
   for look in smooth retro; do
@@ -200,8 +223,8 @@ every_state() (
     done
   done
   # The pill at a larger and a smaller text size, as `omarchy display text
-  # size 16` and `10` set it: a side bar is then 37 and 23 pixels wide.
-  states="$states pill-sheet-large pill-sheet-small"
+  # size` would set it; and at night, its price tonight on top.
+  states="$states pill-sheet-large pill-sheet-small pill-sheet-night"
   # The screenshot the camera takes, in both looks, of every kind of
   # listing: a thin stock, an ETF, an index, Bitcoin, London after its
   # close, Tokyo at lunch, a stock after hours, scrubbed, and a range at

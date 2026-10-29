@@ -138,6 +138,8 @@ Harness {
   readonly property var pillUpQuote: pillQuote ? Object.assign({}, pillQuote, { prevClose: pillQuote.price * 0.97 }) : null
   readonly property var pillFlatQuote: pillQuote ? Object.assign({}, pillQuote, { prevClose: pillQuote.price }) : null
   function pillQuoteFor(day) { return day === "up" ? pillUpQuote : day === "flat" ? pillFlatQuote : day === "down" ? pillQuote : null }
+  // The pill at night (pill-sheet-night), { quote, newest }.
+  property var nightPill: null
   readonly property bool popup: windowOf ? false : w22 ? w22.popup : stateName.indexOf("popup") === 0 || themeState
   // <popup-help|popup-help-sorted|window-help>-<look>: the key sheet.
   readonly property var help: {
@@ -213,8 +215,11 @@ Harness {
     match = /^(?:popup|window)-sweep-(\d{4}-\d\d-\d\d-\d{4})-(nest|kiln|spy|bolt|gspc|btc-usd|shel\.l|7203\.t|shib-usd|ry\.to|brk-a|brk-b)-(smooth|retro)$/.exec(stateName)
     if (match) return { moment: match[1], symbol: match[2] === "gspc" ? "^GSPC" : match[2].toUpperCase(), month: false, scrub: false,
       dated: true, sweep: true }
-    match = /^(?:popup|window)-sweep-([a-z]+-(\d{4}-\d\d-\d\d-\d{4}))-([a-z0-9.^-]+)-(smooth|retro)$/.exec(stateName)
+    // A saved moment's listing on a range: its history saved for that
+    // moment in history/<file>-<moment>-<5d|1mo|ytd|1y>.json.
+    match = /^(?:popup|window)-sweep-([a-z]+-(\d{4}-\d\d-\d\d-\d{4}))-([a-z0-9.^-]+?)(?:-(1w|1m|ytd|1y))?-(smooth|retro)$/.exec(stateName)
     if (match) return { moment: match[2], folder: match[1], file: match[3], month: false, scrub: false, dated: true, sweep: true,
+      range: match[4] ? match[4].toUpperCase() : "",
       saved: String(Quickshell.env("STONKS_VISUAL_SAVED") || "").split(" ").filter(function(f) { return f !== "" }) }
     match = /^(?:popup|window)-gaps-(1d|3m)-(smooth|retro)$/.exec(stateName)
     return match ? { moment: "2026-10-21-1006", folder: "gaps-2026-10-21-1006", symbol: "VANE", listed: ["VANE"], month: false,
@@ -361,9 +366,12 @@ Harness {
     property var arriving: []
     property var lastRemoval: null
     // Robinhood's prints, and its word on which listings it trades all day,
-    // answered, on the overnight states only.
+    // answered, on the overnight states only; on the rest, never asked, so
+    // each listing has Yahoo's own day (`Chart.dayDrawn`).
     property var nights: ({})
-    property var allDay: ({})
+    property var allDay: null
+    // Each listing's newest price since its close, as the service reads it.
+    readonly property var newestPrints: Chart.newestPrints(symbols, quotes, nights, allDay, calendars)
     readonly property var view: ({ featured: featuredSymbol, range: range, list: listName, listKey: "=" + listName,
       order: order, reversed: reversed, rows: symbols, shown: shown, library: library,
       chart: Chart.viewChart(featuredSymbol, range, quotes, entries, histories, nights, allDay, root.overnight ? calendars : null) })
@@ -430,6 +438,26 @@ Harness {
     if (root.pillSheet) {
       root.pillQuote = nestDay
       root.now = nestDay.marketTime + 120
+      // pill-sheet-night: JNJ on Sunday 25 October at 23:35, its newest
+      // price tonight on top, up, over tonight's line, as the service reads
+      // them; Friday's day fell.
+      if (root.stateName === "pill-sheet-night") {
+        var moment = function(name) {
+          var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', root)
+          view.path = fixtureDir + "/moments/watch-2026-10-25-2335/" + name + ".json"
+          var text = JSON.parse(view.text())
+          view.destroy()
+          return text
+        }
+        var sunday = Market.epochAt(stub.calendars.calendars.US, "2026-10-25", "23:35")
+        var jnj = Quote.parseChart(moment("jnj"), Market.centExchanges(stub.calendars), sunday)
+        var day = moment("robinhood-day")
+        var night = Overnight.parseOvernight(day, day.results.map(function(r) { return r.symbol })).JNJ
+        var built = Overnight.dayChart(jnj, night, stub.calendars)
+        root.nightPill = { quote: jnj, newest: Overnight.newestPrint(jnj, built.latest, stub.calendars, built.day),
+          night: Object.assign({ status: "ok" }, night) }
+        root.now = sunday
+      }
       return
     }
     if (root.loadingKind) {
@@ -537,10 +565,17 @@ Harness {
         : live ? ["NEST", "EZ", "TOY"] : root.overnight.power ? ["JPM", "PLUG", "AITX", "CKX", "CVR", "LUMN"]
         : root.overnight.dated ? ["NEST"] : ["NEST", "SILK", "REED"]
       if (looked || root.overnight.power || named) listed = [featured].concat(listed.filter(function(s) { return s !== featured }))
+      // The moment each was saved at: Friday 2 October 13:42, Thursday
+      // 1 October 23:00, Sunday 27 September 22:30, Monday 5 October 00:36;
+      // a dated one at its name, New York time.
+      var dated = root.overnight.dated ? /^(.{10})-(\d\d)(\d\d)$/.exec(root.overnight.moment) : null
+      root.now = dated ? Market.epochAt(Overnight.overnightMarket(stub.calendars), dated[1], dated[2] + ":" + dated[3])
+        : { day: 1790962920, night: 1790910000, sunday: 1790562600, live: 1791175013 }[root.overnight.moment]
       var quotes = {}, entries = {}, nights = {}, allDay = {}
-      // Read as the feeds read them: the US listings in cents from $1.
+      // Read as the feeds read them, answered at the moment: the US listings
+      // in cents from $1.
       listed.forEach(function(s) {
-        quotes[s] = Quote.parseChart(read(file(s)), Market.centExchanges(stub.calendars))
+        quotes[s] = Quote.parseChart(read(file(s)), Market.centExchanges(stub.calendars), root.now)
         if (root.overnight.lastTrade) quotes[s] = Object.assign({}, quotes[s], { price: null, marketTime: null })
       })
       // The US listings: Robinhood's word on which it trades all day, saved
@@ -570,12 +605,6 @@ Harness {
         allDay[s] = { status: "ok", allDay: tradable ? tradable[s] : true, at: 0 }
         if (allDay[s].allDay && (answer || !named)) nights[s] = Object.assign({ status: "ok" }, answer[s])
       })
-      // The moment each was saved at: Friday 2 October 13:42, Thursday
-      // 1 October 23:00, Sunday 27 September 22:30, Monday 5 October 00:36;
-      // a dated one at its name, New York time.
-      var dated = root.overnight.dated ? /^(.{10})-(\d\d)(\d\d)$/.exec(root.overnight.moment) : null
-      root.now = dated ? Market.epochAt(Overnight.overnightMarket(stub.calendars), dated[1], dated[2] + ":" + dated[3])
-        : { day: 1790962920, night: 1790910000, sunday: 1790562600, live: 1791175013 }[root.overnight.moment]
       if (root.overnight.own) {
         var own = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', root)
         own.path = fixtureDir + "/" + root.overnight.own.file + ".json"
@@ -590,6 +619,14 @@ Harness {
         root.shownHistoryEntry = { status: "ok", history: History.parseHistory(read(root.overnight.symbol.toLowerCase() + "-" + range.toLowerCase()), range), receivedAt: root.now }
       }
       stub.symbols = listed
+      if (root.overnight.range) {
+        var kept = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', root)
+        kept.path = fixtureDir + "/history/" + root.overnight.file + "-" + root.overnight.moment + "-"
+          + { "1W": "5d", "1M": "1mo", "YTD": "ytd", "1Y": "1y" }[root.overnight.range] + ".json"
+        root.shownRange = root.overnight.range
+        root.shownHistoryEntry = { status: "ok", history: History.parseHistory(JSON.parse(kept.text()), root.overnight.range), receivedAt: root.now }
+        kept.destroy()
+      }
       stub.shown = listed.slice()
       stub.quotes = quotes
       stub.entries = entries
@@ -1171,6 +1208,11 @@ Harness {
                 .concat([{ style: "text", retro: retroLook, day: "up", compact: true }, { style: "icon", retro: retroLook, day: "up", compact: true }])
             }
             if (!root.pillSheet) return []
+            // At night, every form in each look, JNJ's price tonight on top.
+            if (root.stateName === "pill-sheet-night")
+              return [false, true].reduce(function(all, retro) {
+                return all.concat(["sparkline", "arrow", "text", "icon"].map(function(style) { return { style: style, retro: retro, day: "night" } }))
+              }, [])
             // pill-sheet-trouble: the text and icon forms in each look, in
             // each trouble (`troubleGate`), and with no price yet while
             // Yahoo doesn't answer, each with the hover's words beside it.
@@ -1230,9 +1272,11 @@ Harness {
 
               QtObject {
                 id: pillService
-                property string featuredSymbol: "NEST"
-                property var quotes: ({ NEST: root.pillQuoteFor(pillRow.modelData.day === "refresh failed" ? "down" : pillRow.modelData.day) })
-                property var entries: ({ NEST: { status: pillRow.modelData.day === "failed" || pillRow.modelData.day === "refresh failed"
+                readonly property bool night: pillRow.modelData.day === "night" && !!root.nightPill
+                property string featuredSymbol: night ? "JNJ" : "NEST"
+                property var quotes: night ? ({ JNJ: root.nightPill.quote })
+                  : ({ NEST: root.pillQuoteFor(pillRow.modelData.day === "refresh failed" ? "down" : pillRow.modelData.day) })
+                property var entries: ({ [featuredSymbol]: { status: pillRow.modelData.day === "failed" || pillRow.modelData.day === "refresh failed"
                   || pillRow.modelData.trouble === "failed" ? "failed"
                   : pillRow.modelData.day === "waiting" ? "pending" : "ok", receivedAt: root.now } })
                 property string changeMode: "pct"
@@ -1240,6 +1284,10 @@ Harness {
                 property int now: root.now
                 property var owed: pillRow.modelData.trouble && pillRow.modelData.trouble !== "failed" ? { NEST: root.now - 91 } : ({})
                 readonly property var yahooGate: root.troubleGate((pillRow.modelData.trouble || "").replace("-noprice", ""))
+                property var newestPrints: night ? ({ JNJ: root.nightPill.newest }) : ({})
+                property var nights: night ? ({ JNJ: root.nightPill.night }) : ({})
+                property var allDay: night ? ({ JNJ: { status: "ok", allDay: true, at: 0 } }) : ({})
+                property var calendars: night ? stub.calendars : null
               }
               QtObject {
                 id: pillShell

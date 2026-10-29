@@ -218,6 +218,13 @@ Item {
   property var view: emptyView
   property var quotes: ({})
   property var entries: ({})
+  // Each listing's newest price since its close, by symbol, the price on
+  // top of its row (`Service.newestPrints`).
+  property var newestPrints: ({})
+  // Robinhood's answers by symbol, for the day each row's line draws
+  // (`Service.nights`, `Service.allDay`).
+  property var nights: ({})
+  property var allDay: ({})
   // The preview's receipt, which says whether its quote failed.
   property var previewEntries: ({})
   // Every symbol's cap and P/E, and the rates P/Es need by currency pair,
@@ -262,6 +269,9 @@ Item {
   }
   Binding on quotes { when: root.reading; value: root.service?.quotes; restoreMode: Binding.RestoreNone }
   Binding on entries { when: root.reading; value: root.service?.entries; restoreMode: Binding.RestoreNone }
+  Binding on newestPrints { when: root.reading; value: root.service?.newestPrints; restoreMode: Binding.RestoreNone }
+  Binding on nights { when: root.reading; value: root.service?.nights; restoreMode: Binding.RestoreNone }
+  Binding on allDay { when: root.reading; value: root.service?.allDay; restoreMode: Binding.RestoreNone }
   Binding on previewEntries { when: root.reading; value: root.service?.previewEntries; restoreMode: Binding.RestoreNone }
   Binding on fundamentalEntries { when: root.reading; value: root.service?.fundamentals; restoreMode: Binding.RestoreNone }
   Binding on rates { when: root.reading; value: root.service?.rates; restoreMode: Binding.RestoreNone }
@@ -341,7 +351,7 @@ Item {
   // its baseline as `prevClose` (`Chart.viewChart`).
   readonly property var featuredDay: motion.day
   readonly property var featuredFreshness: Figures.freshness(entryOf(chartSymbol || featuredSymbol), featuredQuote, now,
-    owed[chartSymbol || featuredSymbol] || 0, !!asking[chartSymbol || featuredSymbol])
+    owed[chartSymbol || featuredSymbol] || 0, !!asking[chartSymbol || featuredSymbol], featuredNewest)
   // How many symbols in All have a failed or overdue refresh. With every
   // one, Yahoo is sending nothing for any listing: the header says so once,
   // and the hero and rows say what they have without a warning each
@@ -357,8 +367,12 @@ Item {
   readonly property var featuredGeometry: motion.geometry
   readonly property real scrubX: motion.scrubX
   readonly property bool dayScrubbed: !historyActive && scrubShown !== 0
+  // The newest price since the close on top of the hero, from the chart's
+  // newest print and measured from its dashed line, as the row's and the
+  // pill's from the same prints (`Overnight.newestPrint`).
+  readonly property var featuredNewest: featuredQuote && featuredDay ? Overnight.newestPrint(featuredQuote, motion.latest, calendars, featuredDay) : null
   readonly property var dailyFeatured: featuredQuote
-    ? Figures.rowModel(dayScrubbed ? featuredDay : featuredQuote, dayScrubbed ? scrubShown : 0, changeMode) : null
+    ? Figures.rowModel(dayScrubbed ? featuredDay : featuredQuote, dayScrubbed ? scrubShown : 0, changeMode, featuredNewest) : null
   readonly property var featured: historyShown ? History.historyRowModel(history, featuredQuote, scrubShown) : dailyFeatured
   // A live marker is honest only when the headline and chart endpoint are the same day quote.
   readonly property bool heroLive: (!historyActive || historyFailed)
@@ -403,7 +417,7 @@ Item {
   // room for both first lines' facts on every range (`infoFactLists`), so a
   // range change moves nothing; a range whose prices take another digit
   // widens the price columns.
-  readonly property var dayLine: chart ? Figures.dayLine(featuredQuote, featuredToday) : null
+  readonly property var dayLine: chart ? Figures.dayLine(featuredQuote, featuredToday, featuredDay) : null
   readonly property var rangeEnds: historyShown ? History.rangeEnds(history, historyStats, featuredQuote) : null
   readonly property var periodLine: !chart ? null : historyShown ? History.rangeLine(history, rangeEnds, featuredQuote) : dayLine
   readonly property var infoFactLists: !dayLine ? [] : [dayLine.facts, History.rangeFacts(dayLine.range.widest)]
@@ -413,10 +427,10 @@ Item {
   readonly property var yearLine: chart ? Fundamentals.yearLine(featuredQuote, fundamentals ? fundamentals.figures : null,
     historyShown && history.range === "1Y" ? rangeEnds : null, rates) : null
   readonly property var rangeMarks: historyShown ? History.rangeMarks(history, rangeEnds, featuredQuote) : null
-  // What the dashed line is, said while a scrub reads against it, and on a
-  // thin night's day the close the night's trades read from too.
-  readonly property string baselineText: historyShown ? chartRange.toUpperCase() + " START " + Format.money(history.baseline, featuredQuote ? featuredQuote.priceDigits : undefined)
-    : (!historyActive && featuredDay ? Figures.dayBaselineText(featuredDay, Figures.exchangeDay(featuredDay, now), scrubShown) : "")
+  // What a scrub reads its move from, said under the price: the dashed
+  // line's close or the range's start, led by the dashed line's mark.
+  readonly property string baselineText: historyShown ? "┄ " + chartRange.toUpperCase() + " START " + Format.money(history.baseline, featuredQuote ? featuredQuote.priceDigits : undefined)
+    : (!historyActive && featuredDay ? "┄ " + Figures.dayBaselineText(featuredDay, Figures.exchangeDay(featuredDay, now), scrubShown) : "")
   // A range that failed, which r, or the header's button, asks for again.
   readonly property string unavailableText: chartRange.toUpperCase() + " unavailable"
   readonly property bool offersRetry: headerText === unavailableText
@@ -533,7 +547,7 @@ Item {
   // change. Read from the view, list and rows at once: `symbols` may not
   // have caught up with a switch when this is evaluated.
   readonly property var breadth: Object.assign({ list: view.list },
-    Figures.listBreadth(view.rows, quotes, watchlistScrubShown, changeMode))
+    Figures.listBreadth(view.rows, quotes, watchlistScrubShown, changeMode, newestPrints))
   readonly property alias watchlist: watchlist
   readonly property alias search: search
   readonly property alias chartItem: heroBand.chartItem
@@ -1343,6 +1357,7 @@ Item {
   HeroBand {
     id: heroBand
     calendars: root.calendars
+    rowsDay: Figures.rowsDay(root.view.rows, root.quotes, root.newestPrints, root.now, root.calendars)
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: header.bottom
@@ -1428,6 +1443,9 @@ Item {
     visible: root.rowsShown
     view: root.view
     quotes: root.quotes
+    newestPrints: root.newestPrints
+    nights: root.nights
+    allDay: root.allDay
     entries: root.entries
     featuredSymbol: root.featuredSymbol
     scrubShown: root.watchlistScrubShown

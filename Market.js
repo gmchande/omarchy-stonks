@@ -330,11 +330,13 @@ function marketStatus(quote, now, scrubT, calendars, overnight) {
 // extended price shows, and the day's ("Opens Tue 09:30", "Closed at
 // 16:00"), and a scrub without its moment's name ("At 02:25"); a schedule
 // that has run out says only that. Every form keeps the time, its day, and
-// its zone.
+// its zone. A scrubbed print from another day than `now`'s where the
+// listing trades names that day ("At Sun 21:10 · Overnight": Sunday
+// night's chart is still on screen at Monday 01:00).
 function statusForms(quote, now, scrubT, calendars, overnight) {
   if (scrubT) {
     var read = Quote.readingAt(quote, scrubT)
-    var at = "At " + printClock(quote, read.t, calendars)
+    var at = "At " + printDay(quote, read.t, now, calendars) + printClock(quote, read.t, calendars)
     return [at + " · " + phaseLabel(read.close ? "closing" : scrubPhase(quote, scrubT)), at]
   }
   var cal = calendarFor(calendars, quote)
@@ -382,6 +384,22 @@ function statusForms(quote, now, scrubT, calendars, overnight) {
   var note = phase === "post" ? "" : scheduleNote(quote, now, calendars)
   var names = closure ? [holidayName(kind.name), phaseLabel("closed")] : [phaseLabel(phase)]
   return names.map(function(name) { return name + note }).concat(note ? [sentence(note.slice(" · ".length))] : [])
+}
+
+// The day `t` falls on where `quote` trades, said before its clock when it
+// isn't the day of `now` there: its weekday within the week ("Sun "), else
+// its date ("6 Oct "), never a weekday that would read as this week's.
+// The day by the clock `printClock` reads.
+function printDay(quote, t, now, calendars) {
+  var day = function(at) {
+    var cal = clockCalendar(quote, at, calendars)
+    var offset = cal ? localDate(at, cal).offset : Quote.clockAt(quote, at).offset
+    return Math.floor((at + offset) / 86400)
+  }
+  var days = day(now) - day(t)
+  if (days === 0) return ""
+  var d = new Date((day(t) * 86400) * 1000)
+  return (days > 0 && days < 7 ? Format.WEEKDAYS[d.getUTCDay()] : d.getUTCDate() + " " + sentence(Format.MONTHS[d.getUTCMonth()].toLowerCase())) + " "
 }
 
 function sentence(words) {
@@ -474,22 +492,36 @@ function staysWarm(quote, now, calNow) {
 }
 
 // Whether a listing's day answer is asked for two days (`Quote.chartUrl`):
-// one with no quote yet, whose market and hour aren't known; and, on a
+// one with no quote yet, whose market and hour aren't known; a
+// cryptocurrency's always, for its last 24 hours (`Quote.coinDay`); on a
 // trading day of a calendar with a pre-market, from the pre-market's open
-// until the session opens. Yahoo's day answer for a stock turns to the
-// coming day with its pre-market (AAPL's at 06:22 on Friday 23 October held
-// Friday from 04:00 and nothing of Thursday), and the 1D chart shows the
-// last session, then what came after it, until the bell. Never an index's,
-// whose answer stays the last session's until its open, nor a
-// cryptocurrency's, which has no session to wait for.
+// until the session opens, and on to the post-market's close while the
+// quote holds no print of the day; and on any other, from the session's
+// open, by its calendar or else Yahoo's current period (Sydney's), until
+// the quote holds a print of it. Yahoo's day answer for a stock turns to
+// the coming day with its pre-market (AAPL's at 06:22 on Friday 23 October
+// held Friday from 04:00 and nothing of Thursday; CVR's at 09:35 on Monday
+// 26 October held nothing, its first trade 13:10's), and London's and
+// Tokyo's at their open, its first bar a quarter of an hour behind
+// (SHEL.L's at 04:05 New York on Monday 26 October held nothing), while
+// the 1D chart shows the last day until the new one has a print
+// (`Quote.tailDay`). Never an index's, whose answer stays the last
+// session's until its open.
 function twoDays(quote, now, calendars) {
   if (!quote) return true
-  if (quote.crypto || quote.instrumentType === "INDEX") return false
+  if (quote.crypto) return true
+  if (quote.instrumentType === "INDEX") return false
   var cal = calendarFor(calendars, quote)
-  if (!cal || !cal.pre) return false
-  var date = dateStringOf(localDate(now, cal))
-  var segs = segmentsOn(cal, date)
-  return segs.length > 0 && now >= epochAt(cal, date, cal.pre.open) && now < segs[0].start
+  var date = cal ? dateStringOf(localDate(now, cal)) : ""
+  var segs = cal ? segmentsOn(cal, date) : []
+  var pts = quote.points
+  var printedSince = function(t) { return pts.length > 0 && pts[pts.length - 1].t >= t }
+  if (cal && cal.pre) {
+    var pre = epochAt(cal, date, cal.pre.open)
+    return segs.length > 0 && now >= pre && (now < segs[0].start || (now < epochAt(cal, date, cal.post.close) && !printedSince(pre)))
+  }
+  var open = segs.length ? { start: segs[0].start, end: segs[segs.length - 1].end } : !cal && quote.current ? quote.current.regular : null
+  return !!open && now >= open.start && now < open.end && !printedSince(open.start)
 }
 
 // How long after a session opens its first price may still be on its way,

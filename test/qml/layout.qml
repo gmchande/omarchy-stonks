@@ -65,6 +65,9 @@ Harness {
   FileView { id: liveFile; path: root.fixtures + "/moments/live-2026-10-05/nest.json"; blockLoading: true }
   FileView { id: liveMonthFile; path: root.fixtures + "/moments/live-2026-10-05/nest-1m.json"; blockLoading: true }
   FileView { id: liveNightFile; path: root.fixtures + "/moments/live-2026-10-05/robinhood-day.json"; blockLoading: true }
+  // NBIS at 17:58 on Monday 26 October, after hours on its close's own day.
+  FileView { id: eveningFile; path: root.fixtures + "/moments/watch-2026-10-26-1800/nbis.json"; blockLoading: true }
+  FileView { id: eveningNightFile; path: root.fixtures + "/moments/watch-2026-10-26-1800/robinhood-day.json"; blockLoading: true }
   // Thin days, Friday 16 October: CKX's one bar, CVR's none; and the S&P
   // 500 on Monday 28 September at 08:00, before its bell, with no print yet.
   FileView { id: ckxFile; path: root.fixtures + "/moments/power-user-2026-10-16/ckx.json"; blockLoading: true }
@@ -271,6 +274,7 @@ Harness {
     property string listName: ""
     property var lists: [{ name: "", label: "All", count: symbols.length, symbols: symbols }]
     property var quotes: ({})
+    property var newestPrints: ({})
     property var entries: ({})
     property var calendars: null
     property string featuredSymbol: "AAPL"
@@ -291,11 +295,13 @@ Harness {
     readonly property var view: ({ featured: featuredSymbol, range: range, list: listName, listKey: "=" + listName,
       order: order, reversed: reversed, rows: symbols, shown: Settings.sortedSymbols(symbols, quotes, order, reversed, changeMode),
       library: library, chart: Chart.viewChart(featuredSymbol, range, quotes, entries, histories, nights,
-        { NEST: { status: "ok", allDay: true, at: 0 } }, featuredSymbol === "NEST" ? nightCalendars : null) })
+        allDay, nights[featuredSymbol] ? nightCalendars : null) })
     // NEST's prints, and the calendars its chart's day reads; only NEST has
     // them, Robinhood trading it all day, so no other symbol waits on
-    // Robinhood, and the body's own calendars stay null.
+    // Robinhood, and the body's own calendars stay null. The caption check
+    // adds NBIS's for itself.
     property var nights: ({})
+    property var allDay: ({ NEST: { status: "ok", allDay: true, at: 0 } })
     property var nightCalendars: null
     property bool retro: false
     property color foreground: "#cacccc"
@@ -484,8 +490,8 @@ Harness {
           { symbol: "SHEL.L", range: "1D", history: null, figures: root.figures("shel-l") },
           { symbol: "SHIB-USD", range: "1D", history: null, figures: null },
           { symbol: "BRK-A", range: "1D", history: null, figures: null },
-          // 1M with an overnight print under the price.
-          { symbol: "NEST", range: "1M", history: month, figures: null, line: "OVERNIGHT" }
+          // 1M at night: the night's price on top, the close under it.
+          { symbol: "NEST", range: "1M", history: month, figures: null, line: "CLOSE" }
         ]
         // Both info lines whole: every cell of each drawn in full, none
         // overlapping the next or the rule, none past the block's edge, and
@@ -753,12 +759,15 @@ Harness {
                 } else if ((r[0] === "1Y" ? yearAs(said, where) : said) !== onDay[where]) shifted.push(where + " " + r[0] + ": " + said + ", on 1D " + onDay[where])
                 var short = shortOfEdge()
                 if (short) unreached.push(where + " " + r[0] + ": " + short)
-                var marked = marksFault(r[1])
+                var marked = marksFault(r[1] ? body.history : null)
                 if (marked) unmarked.push(where + " " + r[0] + ": " + marked)
                 if (r[1]) {
                   var caption = find(body, "changeCaption")
                   var strip = find(body, "extendedLine")
-                  var want = r[1] === youngMonth ? /^SINCE \d{1,2} [A-Z]{3} \d{4}$/ : new RegExp("^" + r[0].toUpperCase() + "$")
+                  // With the night's price on top, its session and time
+                  // follow the range's name (`Figures.newestCaptions`).
+                  var period = r[1] === youngMonth ? "SINCE \\d{1,2} [A-Z]{3} \\d{4}" : r[0].toUpperCase()
+                  var want = new RegExp("^" + period + "( · (OVERNIGHT|AFTER HOURS|PRE-MARKET) .+)?$")
                   if (!want.test(caption.text) || (strip.visible && xIn(strip, strip.width) >= xIn(caption, 0)))
                     captions.push(where + " " + r[0] + " says \"" + caption.text + "\" from " + xIn(caption, 0)
                       + (strip.visible ? ", the line under the price ending at " + xIn(strip, strip.width) : ""))
@@ -1140,6 +1149,67 @@ Harness {
         console.log("the add said less beside the undo: " + addShort.join(", "))
         root.check("on a named list the footer's add reads whole, or beside an undo it has no room beside \"+ Add a symbol\", never cut, and whole again once the undo goes, in the panel and the window at its widest and narrowest, at every text size from 9 to 20, and in the panel with its spacing kept",
           addCut.length === 0, addCut.slice(0, 12).join(" | "))
+
+        // NBIS at 17:58, after hours on its close's own day: the line under
+        // the price says the close and the move since it, and the caption
+        // under the change its session and time, after SINCE OPEN since the
+        // open. At every text size, in both looks, in the panel and the
+        // window at its narrowest and widest, the caption keeps clear of the
+        // line, in the longest form that fits: at the everyday size in the
+        // panel, SINCE OPEN alone, since its time doesn't fit beside the line.
+        var captionBefore = { quotes: stub.quotes, nights: stub.nights, allDay: stub.allDay, calendars: stub.calendars, now: stub.now,
+          featured: stub.featuredSymbol, mode: stub.changeMode, size: Style.fontBaseSize, wide: surface.wide,
+          windowWidth: surface.windowWidth, retro: stub.retro }
+        var clashes = []
+        var everyday = []
+        try {
+          stub.now = 1793052024
+          stub.quotes = Object.assign({}, stub.quotes, { NBIS: Quote.parseChart(JSON.parse(eveningFile.text()), undefined, stub.now) })
+          stub.nights = Object.assign({}, stub.nights,
+            { NBIS: Object.assign({ status: "ok" }, Overnight.parseOvernight(JSON.parse(eveningNightFile.text()), ["NBIS"]).NBIS) })
+          stub.allDay = Object.assign({}, stub.allDay, { NBIS: { status: "ok", allDay: true, at: 0 } })
+          stub.calendars = stub.nightCalendars
+          stub.featuredSymbol = "NBIS"
+          for (var csize = 9; csize <= 20; csize++) {
+            Style.fontBaseSize = csize
+            for (var cw = 0; cw < 3; cw++) {
+              surface.wide = cw > 0
+              surface.windowWidth = cw === 1 ? Style.space(560) : 720
+              for (var cl = 0; cl < 2; cl++) {
+                stub.retro = cl === 1
+                ;["pct", "open"].forEach(function(mode) {
+                  stub.changeMode = mode
+                  wait(20)
+                  var strip = find(body, "extendedLine")
+                  var caption = find(body, "changeCaption")
+                  var said = strip.visible ? strip.children.filter(function(c) { return c.visible && c.text !== undefined })
+                    .map(function(c) { return c.text }).join(" ") : ""
+                  var where = "size " + csize + " " + (surface.wide ? "window " + surface.width : "panel") + (stub.retro ? " retro " : " smooth ") + mode
+                  if (said.indexOf("SINCE") < 0) clashes.push(where + " shows \"" + said + "\" under the price")
+                  else if (caption.text !== "" && xIn(strip, strip.width) + Style.space(12) > xIn(caption, 0))
+                    clashes.push(where + ": \"" + said + "\" ends at " + xIn(strip, strip.width) + ", \"" + caption.text + "\" starts at " + xIn(caption, 0))
+                  if (csize === captionBefore.size && !surface.wide && !stub.retro) everyday.push(caption.text)
+                })
+              }
+            }
+          }
+        } finally {
+          stub.featuredSymbol = captionBefore.featured
+          stub.changeMode = captionBefore.mode
+          stub.quotes = captionBefore.quotes
+          stub.nights = captionBefore.nights
+          stub.allDay = captionBefore.allDay
+          stub.calendars = captionBefore.calendars
+          stub.now = captionBefore.now
+          Style.fontBaseSize = captionBefore.size
+          surface.wide = captionBefore.wide
+          surface.windowWidth = captionBefore.windowWidth
+          stub.retro = captionBefore.retro
+          wait(50)
+        }
+        root.check("after the close, the caption under the change keeps clear of the line under the price and its SINCE, since the open too, at every text size, in both looks, in the panel and the window at its narrowest and widest",
+          clashes.length === 0 && everyday.join(" / ") === "AFTER HOURS 17:58 / SINCE OPEN",
+          "at the everyday size in the panel " + everyday.join(" / ") + " | " + clashes.slice(0, 12).join(" | ") + (clashes.length > 12 ? " | … " + clashes.length : ""))
 
         // In a window of ordinary height, 720 × 520, the key sheet shows its
         // credit whole without a scroll, the version included, and where

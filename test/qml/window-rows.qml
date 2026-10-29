@@ -75,11 +75,13 @@ Harness {
       return -1
     }
 
-    // A copy of `symbol`'s quote whose day change is `pct` percent, for a
+    // A copy of `symbol`'s quote whose day change is `pct` percent, with no
+    // trade after its close so that change is the one on top, for a
     // refresh that re-ranks the rows.
     function movedBy(symbol, pct) {
       var quote = Object.assign({}, service.quotes[symbol])
       quote.prevClose = Quote.regularClose(quote) / (1 + pct / 100)
+      quote.points = quote.points.filter(function(p) { return p.t < quote.session.regular.end })
       return quote
     }
 

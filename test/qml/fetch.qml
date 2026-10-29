@@ -466,8 +466,10 @@ Harness {
       wait(300) // every frame of the open's first 300 ms is read
       frames.running = false
       var openRuns = harness.runs().slice(runsBefore)
-      harness.check("an open mid-session asks only for the stale, the crypto and Tokyo, in one run, one spark request",
-        openRuns.length === 1 && openRuns[0] === "spark:BTC-USD,7203.T", openRuns.join(" / "))
+      // The coin goes in a spark request of its own, asked for two days, so
+      // the rest stay one day: Tokyo alone is a chart.
+      harness.check("an open mid-session asks only for the stale, the crypto and Tokyo, in one run, the coin in a request of its own",
+        openRuns.length === 1 && openRuns[0] === "chart:7203.T spark:BTC-USD", openRuns.join(" / "))
       harness.check("an open mid-session shows no warning and no As of on any frame", shownMarks.length === 0, shownMarks.join(" | "))
       closeWindow()
       tick(30)
@@ -740,12 +742,13 @@ Harness {
 
       // Midnight, the window left open on a workspace no screen shows: it
       // asks what a closed one asks, the pill's symbol every 15 minutes and
-      // Tokyo, trading, every minute, and nothing of Robinhood, whose prints
-      // a window in sight asks every 5 minutes through the night. Back in
-      // sight, what fell due goes at once.
+      // Tokyo, trading, every minute, and Robinhood every 5 minutes through
+      // the night, for the pill's newest price alone. Back in sight, what
+      // fell due goes at once.
       hyprlandStandIn.toplevels = { values: [stonksToplevel] }
       plugin.windowHost.monitors = [screenStandIn]
       stonksToplevel.workspace = workspaceThere
+      var nightAsks = function(lines) { return lines.filter(function(l) { return /^overnight /.test(l) }).length }
       var away = countsOver("00:00, the window open on a workspace no screen shows: the pill's symbol every 15 minutes, Tokyo, trading, every minute, nothing else",
         1800, counts([2, 0, 0, 0, 0, 0, 30, 0]), function() {
           startAt(at(harness.wed7 + 86400, 0, 0))()
@@ -754,15 +757,12 @@ Harness {
           tryVerify(function() { return app.opened }, 3000)
           answerScreens()
         }, answerScreens)
-      harness.check("out of sight, the window asks nothing of Robinhood", away.every(function(l) { return !/^(overnight|instruments) /.test(l) }),
+      harness.check("out of sight at night, the window asks Robinhood every 5 minutes, as a closed one does", nightAsks(away) === 6,
         away.filter(function(l) { return /^(overnight|instruments) /.test(l) }).join(", "))
       var backFrom = harness.requests().length
       stonksToplevel.workspace = workspaceHere
-      var caughtUp = within(3000, function() {
-        var back = harness.requests().slice(backFrom)
-        return harness.quoteCounts(back)["BTC-USD"] === 1 && back.some(function(l) { return /^overnight /.test(l) })
-      })
-      harness.check("back in sight, what fell due goes at once: the crypto, and Robinhood's prints", caughtUp,
+      var caughtUp = within(3000, function() { return harness.quoteCounts(harness.requests().slice(backFrom))["BTC-USD"] === 1 })
+      harness.check("back in sight, what fell due goes at once: the crypto", caughtUp,
         harness.requests().slice(backFrom).join(", "))
       settle()
       // In sight, the window's stock waits for its cap and P/E behind
@@ -832,7 +832,8 @@ Harness {
 
       // 00:35, two screens: the window's switched off, the other on and
       // showing another workspace. No screen shows the window, so it asks
-      // what a closed one asks, though not every screen is off.
+      // what a closed one asks, though not every screen is off: Robinhood
+      // every 5 minutes too, for the pill on the screen that's on.
       plugin.windowHost.monitors = [screenStandIn, otherScreen]
       var dark = countsOver("00:35, the window's screen off and the other on: the pill's symbol, Tokyo every minute, nothing else",
         900, counts([1, 0, 0, 0, 0, 0, 15, 0]), function() {
@@ -842,7 +843,7 @@ Harness {
           startAt(at(harness.wed7 + 86400, 0, 35))()
           answerScreens()
         }, answerScreens)
-      harness.check("its screen off, the window asks nothing of Robinhood", dark.every(function(l) { return !/^(overnight|instruments) /.test(l) }),
+      harness.check("its screen off and another on, the window asks Robinhood every 5 minutes, as a closed one does", nightAsks(dark) === 3,
         dark.filter(function(l) { return /^(overnight|instruments) /.test(l) }).join(", "))
       screenStandIn.on = true
       screenStandIn.refresh()

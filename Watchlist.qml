@@ -24,6 +24,13 @@ Flickable {
   // caught up when they run.
   property var view: ({ list: "", listKey: "=", order: "manual", reversed: false, rows: [], shown: [], library: [] })
   property var quotes: ({})
+  // Each row's newest price since its close, by symbol, its price on top
+  // (`Service.newestPrints`).
+  property var newestPrints: ({})
+  // Robinhood's answers by symbol (`Service.nights`, `Service.allDay`): a
+  // row's line draws the day the 1D chart does (`Chart.lineDay`).
+  property var nights: ({})
+  property var allDay: ({})
   property var entries: ({})
   property string featuredSymbol: ""
   property int scrubShown: 0
@@ -278,7 +285,7 @@ Flickable {
   }
 
   function freshnessOf(symbol) {
-    return Figures.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0, !!asking[symbol])
+    return Figures.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0, !!asking[symbol], newestPrints[symbol] || null)
   }
 
   function moveCursor(delta) {
@@ -895,11 +902,24 @@ Flickable {
           restoreMode: Binding.RestoreNone
         }
         quote: place >= 0 ? sightQuote : null
+        // The day its line draws, the 1D chart's, once Robinhood has said
+        // which (`Chart.lineDay`), taken in sight as the quote is:
+        // Robinhood's answers for other rows redraw no row out of sight.
+        property var sightDay: null
+        Binding on sightDay {
+          value: rowDelegate.quote ? Chart.lineDay(rowDelegate.symbol, rowDelegate.quote, root.nights, root.allDay, root.calendars) : null
+          when: rowDelegate.place >= 0 && rowDelegate.inSight
+          restoreMode: Binding.RestoreNone
+        }
+        day: quote ? sightDay : null
         // The scrub reaches only the rows in sight, as answers do: otherwise
         // each step and each replay frame derives and repaints every row ever
         // scrolled past. A row coming into sight takes it before that frame.
         readonly property int sightScrub: inSight ? root.scrubShown : 0
-        view: quote ? Figures.rowModel(quote, sightScrub, root.changeMode) : null
+        view: quote ? Figures.rowModel(quote, sightScrub, root.changeMode, root.newestPrints[symbol] || null) : null
+        // The newest price's session and time, said on the name line; the
+        // clock only for a row in sight (`Figures.newestNote`).
+        newestNote: view && view.newest && inSight ? Figures.newestNote(quote, view.newest, root.now, root.calendars) : ""
         status: root.entryOf(symbol) ? root.entryOf(symbol).status : "loading"
         // Freshness reads the clock every second: only rows in sight do.
         freshness: place >= 0 && inSight ? root.freshnessOf(symbol) : null
@@ -912,7 +932,7 @@ Flickable {
           && root.dragSymbol === ""
         lifted: symbol === root.dragSymbol
         retro: root.retro
-        scrubX: quote && sightScrub ? Chart.fractionAtTime(quote, sightScrub) : -1
+        scrubX: day && sightScrub ? Chart.fractionAtTime(day, sightScrub) : -1
         foreground: root.foreground
         dim: root.dim
         dimmer: root.dimmer

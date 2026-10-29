@@ -1001,10 +1001,10 @@ Harness {
       service.removeSymbol("SLOW")
 
       // On 6M every bar style shows the featured symbol's day, as its row
-      // does, and its day's line, naming no range. DOWN's day fell and its
-      // history rose, so a figure or a colour from the range shows. FAIL
-      // would keep DOWN's first fetch behind its retries. One look: the
-      // other is Format.lookSigns's.
+      // does, and the day line the 1D chart draws, naming no range. DOWN's
+      // day fell and its history rose, so a figure or a colour from the
+      // range shows. FAIL would keep DOWN's first fetch behind its retries.
+      // One look: the other is Format.lookSigns's.
       service.removeSymbol("FAIL")
       service.addSymbol("DOWN")
       tryVerify(function() { return !!service.quotes.DOWN && service.arriving.length === 0 }, 10000)
@@ -1013,7 +1013,8 @@ Harness {
       app.close()
       var downDay = Figures.rowModel(service.quotes.DOWN, 0, service.changeMode)
       var downRange = History.historyRowModel(service.histories["DOWN|6M"].history, service.quotes.DOWN, 0)
-      var dayLineDrawn = JSON.stringify(harness.find(pill, "pillLine").geometry) === JSON.stringify(Chart.chartGeometry(service.quotes.DOWN))
+      var dayLineDrawn = JSON.stringify(harness.find(pill, "pillLine").geometry)
+        === JSON.stringify(Chart.chartGeometry(service.view.chart.day, service.calendars))
       var dayWrong = pillInEveryStyle(function(retro) { return Format.lookSigns(downDay.changeLine, retro) }, Commons.Color.urgent)
       harness.check("on 6M every bar style shows the day in its colour, and a middle-click keeps the entry's other keys",
         service.range === "6M" && downDay.tone === "down" && downRange.tone === "up" && dayLineDrawn && dayWrong.length === 0,

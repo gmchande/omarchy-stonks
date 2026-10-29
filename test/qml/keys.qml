@@ -201,10 +201,7 @@ Harness {
         effect = function() { return b.watchlist.cursorRow === cursor }
       } else if (token === "←" || token === "→") {
         changed = ["scrub"]
-        var points = b.featuredDay.points
-        var nextTime = b.featuredDay.axis && b.featuredDay.axis.byPrint
-          ? points[points.length - 2].t
-          : (b.scrubT || b.motion.scrubEnd) + (token === "→" ? 300 : -300)
+        var nextTime = (b.scrubT || b.motion.scrubEnd) + (token === "→" ? 300 : -300)
         effect = function() { return b.scrubT === nextTime }
       } else if (token === "[" || token === "]") {
         changed = ["range"]

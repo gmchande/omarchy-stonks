@@ -144,7 +144,7 @@ test("a quiet trading span joins its prints; Tokyo's scheduled lunch alone break
   const us = {
     symbol: "THIN", exchange: "NYQ", crypto: false, prevClose: 100,
     session: {regular: {start: at("2026-10-21", "09:30"), end: at("2026-10-21", "16:00")}},
-    axis: {start:at("2026-10-21", "00:00"),end:at("2026-10-22", "00:00"),byPrint:true,ticks:[]},
+    axis: {start:at("2026-10-21", "00:00"),end:at("2026-10-22", "00:00"),ticks:[]},
     points: ["00:05", "02:10", "06:45", "09:35"].map((t,i)=>({t:at("2026-10-21",t),p:100+i}))
   }
   const line=M.chartGeometry(us,calendars)
@@ -887,20 +887,34 @@ test("a letter says its key and Shift, never its text's case, and nothing held w
   expect(typed({ key: 63, modifiers: SHIFT, text: "?" })).toBe("?")
 })
 
-test("a stock's day is asked for two days from its pre-market until the bell, when Yahoo's day no longer holds the last session", () => {
-  const stock = { symbol: "X", exchange: "NASDAQ", instrumentType: "EQUITY", crypto: false }
+test("a stock's day is asked for two days from its pre-market until the bell, and past it until it trades, when Yahoo's day no longer holds the last session", () => {
+  const stock = { symbol: "X", exchange: "NASDAQ", instrumentType: "EQUITY", crypto: false, points: [{ t: at("2026-10-23", "04:05"), p: 1 }] }
   const two = (q, date, clock) => M.twoDays(q, at(date, clock), calendars)
   // Friday 23 October: one day through the night, which still holds
   // Thursday; two from the pre-market's open; one again at the bell.
   expect(["03:59", "04:00", "06:22", "09:29", "09:30", "20:00"].map(c => two(stock, "2026-10-23", c)))
     .toEqual([false, true, true, true, false, false])
+  // A stock that hasn't traded since Thursday stays on two days past the
+  // bell, so its chart keeps Thursday until it trades, to the post-market's
+  // close.
+  const quiet = { ...stock, points: [{ t: at("2026-10-22", "15:35"), p: 1 }] }
+  expect(["09:30", "13:00", "19:59", "20:00"].map(c => two(quiet, "2026-10-23", c))).toEqual([true, true, true, false])
   // No session to wait for: a Saturday, Thanksgiving.
   expect([two(stock, "2026-10-24", "06:00"), two(stock, "2026-11-26", "06:00")]).toEqual([false, false])
-  // An index's answer stays the last session's until its open, a coin's
-  // day never waits, and London has no pre-market to turn at.
+  // An index's answer stays the last session's until its open. A coin's is
+  // always two days, for its last 24 hours.
   expect(two({ ...stock, symbol: "^GSPC", exchange: "S&P", instrumentType: "INDEX" }, "2026-10-23", "06:00")).toBe(false)
-  expect(two({ ...stock, symbol: "BTC-USD", exchange: "CRYPTO", instrumentType: "CRYPTOCURRENCY", crypto: true }, "2026-10-23", "06:00")).toBe(false)
-  expect(two({ ...stock, symbol: "SHEL.L", exchange: "LSE" }, "2026-10-23", "06:00")).toBe(false)
+  expect(two({ ...stock, symbol: "BTC-USD", exchange: "CRYPTO", instrumentType: "CRYPTOCURRENCY", crypto: true }, "2026-10-24", "03:00")).toBe(true)
+  // London has no pre-market: two days from its open, Monday 26 October at
+  // 08:00 GMT, 04:00 New York, until the quote holds a print of the session,
+  // which Yahoo sends a quarter of an hour late.
+  const london = { ...stock, symbol: "SHEL.L", exchange: "LSE", points: [{ t: at("2026-10-23", "11:30"), p: 1 }] }
+  expect(["03:59", "04:00", "04:15", "12:30"].map(c => two(london, "2026-10-26", c))).toEqual([false, true, true, false])
+  const traded = { ...london, points: [...london.points, { t: at("2026-10-26", "04:00"), p: 1 }] }
+  expect(two(traded, "2026-10-26", "04:20")).toBe(false)
+  // Sydney has no calendar: Yahoo's current period says when it opens.
+  const sydney = { ...stock, symbol: "BHP.AX", exchange: "ASX", points: [], current: { regular: { start: at("2026-10-25", "19:00"), end: at("2026-10-26", "01:00") } } }
+  expect(["18:59", "20:05"].map(c => two(sydney, "2026-10-25", c))).toEqual([false, true])
   // A listing not yet answered: its market and hour aren't known.
   expect(two(null, "2026-10-23", "12:00")).toBe(true)
 })
@@ -967,7 +981,7 @@ test("a run of Robinhood's prints never takes more requests than a day for all w
   expect(spans(M.overnightBatches(long.concat(["N1", "N2", "N3"]), inHand, now))).toBe("day 3, hour 75, hour 40")
 })
 
-test("each print says its own time across a change of clocks, and the day marks an early close", () => {
+test("each print says its own time across a change of clocks, the 1D's day keeps its hours across it, and the day marks an early close", () => {
   // Summer time ends Sunday 1 November 2026. On Sunday night Yahoo's response
   // is still Friday's, in summer time; the night's print is not.
   const quote = {
@@ -983,9 +997,31 @@ test("each print says its own time across a change of clocks, and the day marks 
   const sundayPrint = { t: at("2026-11-01", "21:00"), p: 100.5, s: "overnight" }
   const sunday = M.dayChart(quote, { bars: [sundayPrint], through: sundayPrint.t }, calendars)
   expect(M.extendedStack(quote, sunday.latest, at("2026-11-01", "21:05"), sunday.day)).toMatchObject({ label: "OVERNIGHT", time: "21:00" })
-  // The day after Thanksgiving closes at 13:00, and its tick says so: laid
-  // out by print, it stands between the 12:55 print and the 15:00 one, and
-  // none stands at 16:00, past the newest print, where the clock runs.
+  // Each day's prints stand at their times, from its first trade, or the
+  // open if that is earlier, to its end while it runs and to its last trade
+  // once it is over. Friday in summer time, over once Robinhood's answer
+  // reaches 19:55: from the open to its one print, 19:55's, on the right
+  // edge. Sunday's first night trade, at 21:00, turns to Monday, in winter
+  // time: from it to Monday's 20:00, across the change of clocks, dashed at
+  // Friday's close, its night after midnight and its pre-market on the same
+  // chart, ticked at midnight, 04:00 and the close.
+  const chart = bars => M.dayChart(quote, { bars, through: bars.at(-1).t }, calendars).day
+  const friday = M.dayChart(quote, { bars: [], through: at("2026-10-30", "19:55") }, calendars).day
+  expect(M.chartSpan(friday)).toMatchObject({ start: at("2026-10-30", "09:30"), end: at("2026-10-30", "19:55") })
+  expect(M.chartGeometry(friday).points.at(-1).x).toBe(1)
+  expect(M.chartSpan(sunday.day)).toMatchObject({ start: at("2026-11-01", "21:00"), end: at("2026-11-02", "20:00") })
+  expect(M.chartSpan(sunday.day).end - M.chartSpan(sunday.day).start).toBe(23 * 3600)
+  expect(M.dayBase(sunday.day)).toBe(100)
+  const late = { t: at("2026-11-02", "01:30"), p: 100.7, s: "overnight" }
+  const monday = chart([sundayPrint, late, { t: at("2026-11-02", "04:00"), p: 100.9, s: "pre" }])
+  expect(M.chartSpan(monday)).toMatchObject({ start: at("2026-11-01", "21:00"), end: at("2026-11-02", "20:00") })
+  expect(monday.points.map(p => p.s)).toEqual(["overnight", "overnight", "pre"])
+  expect(M.chartGeometry(monday).ticks).toEqual([3, 7, 19].map(h => h / 23))
+  expect(M.lastRegularPoint(M.chartGeometry(monday))).toBeNull()
+  // The day after Thanksgiving closes at 13:00, and its tick says so, by
+  // the clock between the 12:55 print and the 15:00 one. Its after hours
+  // end at 17:00, as Robinhood's hours for it say: the day runs from its
+  // first trade, Thanksgiving's 22:00, to 17:00.
   const early = {
     ...quote, gmtoffset: -18000, marketTime: at("2026-11-27", "13:00"),
     session: {
@@ -996,11 +1032,26 @@ test("each print says its own time across a change of clocks, and the day marks 
     points: [{ t: at("2026-11-27", "12:55"), p: 101 }, { t: at("2026-11-27", "15:00"), p: 101.5 }]
   }
   const thursdayPrint = { t: at("2026-11-26", "22:00"), p: 100.2, s: "overnight" }
-  const friday = M.dayChart(early, { bars: [thursdayPrint], through: thursdayPrint.t }, calendars).day
-  const geometry = M.chartGeometry(friday)
-  const [noon, afternoon] = geometry.points.map(p => p.x)
-  expect(geometry.ticks.filter(x => x > noon && x < afternoon)).toHaveLength(1)
-  expect(geometry.ticks.filter(x => x > afternoon).map(x => M.timeAtFraction(friday, x))).not.toContain(at("2026-11-27", "16:00"))
+  const friday27 = M.dayChart(early, { bars: [thursdayPrint], through: thursdayPrint.t }, calendars).day
+  const geometry = M.chartGeometry(friday27)
+  const [, noon, afternoon] = geometry.points.map(p => p.x)
+  expect(geometry.ticks.filter(x => x > noon && x < afternoon).map(x => M.timeAtFraction(friday27, x))).toEqual([at("2026-11-27", "13:00")])
+  expect(M.chartSpan(friday27)).toMatchObject({ start: at("2026-11-26", "22:00"), end: at("2026-11-27", "17:00") })
+  // Wednesday before it, with no trade before the open, runs from the open
+  // to its own 20:00, no night trading before the holiday; it stays on
+  // through Thanksgiving,
+  // until the first trade of the night before Friday, which turns to
+  // Friday, dashed at Wednesday's close.
+  const wednesday = { ...early, marketTime: at("2026-11-25", "16:00"), price: 99,
+    session: { pre: { start: at("2026-11-25", "04:00"), end: at("2026-11-25", "09:30") },
+      regular: { start: at("2026-11-25", "09:30"), end: at("2026-11-25", "16:00") },
+      post: { start: at("2026-11-25", "16:00"), end: at("2026-11-25", "20:00") } },
+    points: [{ t: at("2026-11-25", "19:55"), p: 99 }] }
+  expect(M.chartSpan(M.dayChart(wednesday, { bars: [], through: null }, calendars).day))
+    .toMatchObject({ start: at("2026-11-25", "09:30"), end: at("2026-11-25", "20:00") })
+  const thanksgiving = M.dayChart(wednesday, { bars: [thursdayPrint], through: thursdayPrint.t }, calendars).day
+  expect(M.chartSpan(thanksgiving)).toMatchObject({ start: at("2026-11-26", "22:00"), end: at("2026-11-27", "17:00") })
+  expect(M.dayBase(thanksgiving)).toBe(99)
 })
 
 test("weeks and months either side of 25 October and 1 November keep their dates, from either side's answer, for every reader", () => {
@@ -1036,15 +1087,16 @@ test("weeks and months either side of 25 October and 1 November keep their dates
   expect(coin.bars.map(bar => M.historyScrubForms(coin, bar)[1])).toEqual(["WEEK OF 26 OCT", "WEEK OF 31 OCT"])
 })
 
-test("a session's one bar says nothing until its five minutes are past", () => {
-  // An index's opening bar with its close already in, three minutes into
-  // the session, must not read "Traded only at 09:30".
+test("a session's one bar says nothing until its day is over", () => {
+  // An index's opening bar at 09:35, five minutes into the session, is the
+  // first of the day's bars, not its only one: "Traded only at 09:30"
+  // waits for the close.
   const bell = at("2026-10-20", "09:30")
   const day = { symbol: "^GSPC", exchange: "S&P", instrumentType: "INDEX", gmtoffset: -14400,
     session: { pre: null, regular: { start: bell, end: at("2026-10-20", "16:00") }, post: null },
     points: [{ t: bell, p: 100 }] }
-  expect(M.dayNote(day, bell + 180, calendars)).toBe("")
-  expect(M.dayNote(day, bell + 300, calendars)).toBe("Traded only at 09:30")
+  expect(["09:33", "09:35", "15:59"].map(c => M.dayNote(day, at("2026-10-20", c), calendars))).toEqual(["", "", ""])
+  expect(M.dayNote(day, at("2026-10-20", "16:00"), calendars)).toBe("Traded only at 09:30")
 })
 
 test("Robinhood's word on all-day trading is asked once, again a day on, or five minutes after a failure", () => {
@@ -1139,6 +1191,10 @@ test("a quote run charts the pill's quote first and the other heroes next, then 
   // The preview's feed asks only charts.
   expect(M.quoteSlots(["P", "Q"], { P: 1, Q: 1 }, ["P", "Q"], "", [], false))
     .toEqual([{ symbols: ["P"], spark: false }, { symbols: ["Q"], spark: false }])
+  // A coin, asked for two days, goes in a spark request of its own, alone
+  // too, so the stocks' batch stays one day.
+  expect(M.quoteSlots(["A", "BTC-USD", "B", "C"], { A: 1, "BTC-USD": 1, B: 1, C: 1 }, ["A", "BTC-USD", "B", "C"], "", [], true, ["BTC-USD"]))
+    .toEqual([{ symbols: ["A", "B", "C"], spark: true }, { symbols: ["BTC-USD"], spark: true }])
   // Each lane runs its own kind, a first answer (none yet, or a quote kept
   // from an earlier session) or a refresh, never one cooling after a bad
   // answer or out on a run; a day waiting to be judged goes only when its
@@ -1175,19 +1231,28 @@ test("a bad quote answer is tried three times in all, a missing symbol fails at 
   expect([M.answerVerdict("bad", null, 0, true), M.answerVerdict("ok", read, 0, true)]).toEqual(["unchanged", "show"])
 })
 
-test("Robinhood is asked once a session for the pill's stock with nothing open, and for every US listing while a surface is, the chart waited on alone first", () => {
+test("Robinhood is asked once a session for the pill's stock with nothing open by day, for it alone each 5 minutes while a night trades, and for every US listing while a surface is open, the chart waited on alone first", () => {
   const now = at(WED, "21:00")
   const base = {
     open: false, pill: "AAPL", pillAsked: false, quoteEntries: { AAPL: answered(now) }, overnightSymbols: ["AAPL", "MSFT"],
     library: ["AAPL", "MSFT", "SHEL.L"], preview: "", previewShown: false, previewQuote: null, allDay: {}, nights: {}, now, calendars
   }
   const asks = changes => M.overnightAsks({ ...base, ...changes })
-  // Nothing open: the pill's stock alone, once Yahoo has answered it live,
-  // and once a session; what Robinhood has answered for it is enough.
-  expect(asks({})).toEqual({ tradability: ["AAPL"], prints: ["AAPL"] })
-  expect(asks({ quoteEntries: { AAPL: { status: "saved", receivedAt: 1, answeredAt: 0 } } })).toBe(null)
-  expect(asks({ pillAsked: true })).toBe(null)
-  expect(asks({ allDay: { AAPL: { status: "ok", allDay: true, at: now - DAY - 60 } }, nights: { AAPL: { status: "ok", at: now - 3600 } } })).toBe(null)
+  // Nothing open by day: the pill's stock alone, once Yahoo has answered it
+  // live, and once a session; what Robinhood has answered for it is enough.
+  const noon = at(WED, "14:00")
+  expect(asks({ now: noon })).toEqual({ tradability: ["AAPL"], prints: ["AAPL"] })
+  expect(asks({ now: noon, quoteEntries: { AAPL: { status: "saved", receivedAt: 1, answeredAt: 0 } } })).toBe(null)
+  expect(asks({ now: noon, pillAsked: true })).toBe(null)
+  expect(asks({ now: noon, allDay: { AAPL: { status: "ok", allDay: true, at: noon - DAY - 60 } }, nights: { AAPL: { status: "ok", at: noon - 3600 } } })).toBe(null)
+  // Nothing open while a night trades: the pill's stock alone, each 5
+  // minutes, so its newest price stays current; All's rows wait for a
+  // surface to open, asked or not.
+  expect(asks({ pillAsked: true })).toEqual({ tradability: ["AAPL"], prints: ["AAPL"] })
+  const pillAnsweredAgo = ago => ({ pillAsked: true, allDay: { AAPL: { status: "ok", allDay: true, at: now - 60 } },
+    nights: { AAPL: { status: "ok", at: now - ago } } })
+  expect(asks(pillAnsweredAgo(60))).toBe(null)
+  expect(asks(pillAnsweredAgo(5 * 60))).toEqual({ tradability: [], prints: ["AAPL"] })
   // A surface open: every US listing, the pill's alone while it has no
   // answer.
   expect(asks({ open: true })).toEqual({ tradability: ["AAPL"], prints: ["AAPL"] })

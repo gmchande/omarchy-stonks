@@ -58,7 +58,7 @@ Rectangle {
   readonly property color dimmer: Tones.dimmer(foreground, ground)
   readonly property color ghost: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.05)
   readonly property var words: quote && day ? Share.words({ quote: quote, day: day, history: history, latest: latest,
-    scrubT: scrubT, changeMode: changeMode, range: range, now: now, calendars: calendars }) : null
+    newest: view ? view.newest : null, scrubT: scrubT, changeMode: changeMode, range: range, now: now, calendars: calendars }) : null
   readonly property var shownDay: Share.pictureDay(day)
   readonly property var geometry: history ? History.historyGeometry(history) : shownDay ? Chart.chartGeometry(shownDay, calendars) : null
   readonly property real scrubX: !scrubT ? -1 : history ? History.historyFraction(history, scrubT)
@@ -248,13 +248,23 @@ Rectangle {
     y: 266 * root.u - baselineOffset
     text: root.words ? root.words.from : ""
   }
-  // The line under the price the panel shows, an old overnight print dim.
+  // The line under the price the panel shows, an old overnight print dim,
+  // and after the close the move since it, in its own tone.
   Caption {
+    id: extendedText
     objectName: "shareExtended"
     x: root.margin
     y: 294 * root.u - baselineOffset
     text: root.words ? Format.lookSigns(root.words.extended, root.retro) : ""
     color: root.words && root.words.extendedTone !== "old" ? root.toneColor(root.words.extendedTone) : root.dim
+  }
+  Caption {
+    objectName: "shareSince"
+    visible: !!root.words && root.words.since !== ""
+    x: extendedText.x + extendedText.implicitWidth
+    y: extendedText.y
+    text: root.words && root.words.since ? " · " + Format.lookSigns(root.words.since, root.retro) + " SINCE" : ""
+    color: root.toneColor(root.words ? root.words.sinceTone : "flat")
   }
 
   // The chart, at twice its strokes and cells, as the surface's look draws

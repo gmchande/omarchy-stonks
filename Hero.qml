@@ -51,9 +51,18 @@ Item {
   property int priceSize: Style.font.displayLarge * 2
 
   readonly property string freshnessText: quote ? Figures.freshnessText(shownFreshness, quote, calendars) : ""
-  // The extended-hours print, on every range. A scrub's price is a past one,
-  // so the print rests and the baseline's legend takes its place.
-  readonly property var extended: quote && !scrubbing ? Figures.extendedStack(quote, latest, now, day, changeMode) : null
+  // The newest price since the close, when it is the one on top
+  // (`Figures.rowModel`): its session and time are said under the change,
+  // and the line under the price is the close and its day's move. None
+  // while the quote it is from is gone, as a failed preview's is.
+  readonly property var newest: quote && view && view.newest ? view.newest : null
+  readonly property bool newestOld: Figures.newestStale(newest, now)
+  // The line under the price: with the newest price on top, the close and
+  // the move since it (`Figures.closeLine`); else the extended-hours print,
+  // on every range. A scrub's price is a past one, so the line rests and
+  // the baseline's legend takes its place.
+  readonly property var extended: newest ? Figures.closeLine(quote, Figures.exchangeDay(quote, now), changeMode, newest)
+    : quote && !scrubbing ? Figures.extendedStack(quote, latest, now, day, changeMode) : null
   readonly property string priceText: view ? view.priceText
     : (freshness && freshness.state === "failed" ? "—" : "…")
   readonly property string listingLead: {
@@ -79,8 +88,25 @@ Item {
     return (listingLead !== "" ? " · " : "") + Figures.listingMeta(quote, cut)
   }
   readonly property real listingRoom: Math.max(0, listingRow.width - symbolText.implicitWidth - Style.space(8))
-  readonly property string changeCaption: view && view.periodLabel ? view.periodLabel
-    : (extended !== null ? "AT CLOSE" : "")
+  // Under the change: with the newest price on top, its session and time,
+  // after the range's name on a longer range or SINCE OPEN
+  // (`Figures.newestCaptions`); else what the change is measured from. The
+  // longest form that fits beside what the strip shows on the left, the
+  // line under the price or a scrub's baseline, so the two never meet; none
+  // where even the shortest doesn't fit.
+  readonly property var newestCaptions: newest
+    ? Figures.newestCaptions(quote, newest, now, calendars, view && view.periodLabel ? view.periodLabel : "") : null
+  readonly property real captionRoom: width - Style.space(12)
+    - Math.max(extendedLine.visible ? extendedLine.implicitWidth : 0, baselineLegend.visible ? baselineLegend.implicitWidth : 0)
+  readonly property string changeCaption: {
+    var forms = newestCaptions || [view && view.periodLabel ? view.periodLabel : (extended !== null ? "AT CLOSE" : "")]
+    var font = captionMetrics.font // read, so a new text size measures again
+    for (var i = 0; i < forms.length; i++) {
+      // The caption's letter spacing is a pixel a letter.
+      if (forms[i] === "" || captionMetrics.advanceWidth(forms[i]) + forms[i].length <= captionRoom) return forms[i]
+    }
+    return ""
+  }
 
   readonly property int gap: Style.space(28)
   // The digits' ink at the surface's price size, and the box kept for it: a
@@ -199,7 +225,8 @@ Item {
     y: root.baselineY - baselineOffset
     textFormat: Text.PlainText
     text: root.priceText
-    color: root.foreground
+    // An old night's price dims, as its line under the price did.
+    color: root.newestOld ? root.dim : root.foreground
     font.family: root.fontFamily
     font.pixelSize: root.fittedSize
     font.bold: true
@@ -214,7 +241,7 @@ Item {
     // Hidden, it rests: otherwise a scrub in smooth repaints it every step.
     text: root.retro ? root.priceText : ""
     cell: root.fittedCell
-    color: root.foreground
+    color: root.newestOld ? root.dim : root.foreground
     ghostColor: root.ghost
   }
 
@@ -287,14 +314,44 @@ Item {
       font.pixelSize: Style.font.caption
       font.bold: true
     }
+    // After the close, on its own day, the move since it (`Figures.closeLine`).
+    Text {
+      visible: !!root.extended && !!root.extended.since
+      textFormat: Text.PlainText
+      text: "·"
+      color: root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.bold: true
+    }
+    Text {
+      visible: !!root.extended && !!root.extended.since
+      textFormat: Text.PlainText
+      text: root.extended && root.extended.since ? Format.lookSigns(root.extended.since, root.retro) : ""
+      color: root.toneColor(root.extended && root.extended.since ? root.extended.sinceTone : "flat")
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.bold: true
+    }
+    Text {
+      visible: !!root.extended && !!root.extended.since
+      textFormat: Text.PlainText
+      text: "SINCE"
+      color: root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.bold: true
+      font.letterSpacing: 1
+    }
   }
 
   Text {
+    id: baselineLegend
     objectName: "baselineLegend"
     visible: root.scrubbing && root.baselineText !== ""
     y: root.baselineY + root.captionDrop - baselineOffset
     textFormat: Text.PlainText
-    text: "┄ " + root.baselineText
+    text: root.baselineText
     color: root.dim
     font.family: root.fontFamily
     font.pixelSize: Style.font.caption
