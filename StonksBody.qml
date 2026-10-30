@@ -423,9 +423,11 @@ Item {
   readonly property var infoFactLists: !dayLine ? [] : [dayLine.facts, History.rangeFacts(dayLine.range.widest)]
     .concat(yearLine ? [History.rangeFacts(yearLine.range.widest)] : [])
   // On 1Y the 52 weeks take in the range's own ends, so the two lines never
-  // disagree (`Fundamentals.yearLine`).
+  // disagree; elsewhere the day's prints and the newest price on top, where
+  // they pass Yahoo's marks (`Fundamentals.yearLine`).
   readonly property var yearLine: chart ? Fundamentals.yearLine(featuredQuote, fundamentals ? fundamentals.figures : null,
-    historyShown && history.range === "1Y" ? rangeEnds : null, rates) : null
+    historyShown && history.range === "1Y" ? rangeEnds : null, rates,
+    (featuredDay ? featuredDay.points : []).concat(featuredNewest ? [featuredNewest] : [])) : null
   readonly property var rangeMarks: historyShown ? History.rangeMarks(history, rangeEnds, featuredQuote) : null
   // What a scrub reads its move from, said under the price: the dashed
   // line's close or the range's start, led by the dashed line's mark.

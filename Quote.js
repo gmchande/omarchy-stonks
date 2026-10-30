@@ -396,10 +396,17 @@ function parseChart(json, centExchanges, receivedAt) {
     // headline price, Yahoo's hint, and its market (`Format.priceDigits`).
     priceDigits: Format.priceDigits(knownPrice(meta.regularMarketPrice) !== null ? meta.regularMarketPrice
       : (points.length ? points[points.length - 1].p : null), meta.priceHint, inCents(meta, centExchanges)),
-    // The close before the bars' session: the range's own, before its first
-    // day, unless the session is a later day's of a two-day answer, whose
-    // close before it is Yahoo's previous close, the headline's.
-    prevClose: knownPrice(chosen === 0 && meta.chartPreviousClose !== undefined ? meta.chartPreviousClose : meta.previousClose),
+    // The close before the bars' session. Yahoo's previous close is the
+    // close before the headline's day: so for a two-day answer read as the
+    // headline's day, the first or the later. The range's own, before its
+    // first day, only for an answer of one day, or a headline from before
+    // it: Yahoo's two-day answer for Tokyo gives Thursday's own close there
+    // (Toyota's at 09:07 on Friday 30 October, before Friday's first bar,
+    // read 0.00% with it), and a one-day answer's quote can be an older
+    // day's (CVR's, untraded, stamped two days back).
+    prevClose: knownPrice(meta.chartPreviousClose !== undefined
+      && (days.length === 1 || (chosen === 0 && (quoted === null || !regular || quoted < regular.start)))
+      ? meta.chartPreviousClose : meta.previousClose),
     // A time no Date holds (`Format.isMoment`) is none, as one not sent is.
     marketTime: Format.isMoment(meta.regularMarketTime) && meta.regularMarketTime > 0 ? meta.regularMarketTime : null,
     dayOpen: firstRegular ? knownPrice(firstRegular.o) : null,
@@ -770,12 +777,16 @@ function change(quote, priceNow, mode) {
 // A print's session: its own tag where the series carries one, else where it
 // falls against the response's regular session. Buckets are stamped by their
 // start, so the one stamped at the bell is post-market, but for the closing
-// trade's (`closingPrint`). A cryptocurrency's are all one session's.
+// trade's (`closingPrint`). So is a print at the close's price in the
+// seconds after the bell: Yahoo's live moment restating the close, as
+// PSIX's at 16:00:13 on 29 October, which made no after-hours trade. A
+// cryptocurrency's are all one session's.
 function pointSession(quote, pt) {
   if (pt.s) return pt.s
   if (quote.crypto) return "reg"
   var reg = regularOrPrints(quote)
   if (pt.t === reg.end && closingPrint(quote, pt)) return "reg"
+  if (pt.t > reg.end && pt.t < reg.end + 60 && !!quote.session.regular && closingPrint(quote, { t: reg.end, p: pt.p })) return "reg"
   return pt.t >= reg.end ? "post" : pt.t < reg.start ? "pre" : "reg"
 }
 
