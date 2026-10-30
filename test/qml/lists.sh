@@ -2,7 +2,7 @@
 # Named watchlists through the real Service, App, StonksBody, ListMenu, and
 # Watchlist with real Qt keys and pointer: making a list, adding to it,
 # switching, removing by the list's rules, and the views that own the keys.
-# And a stock removed in the real popup (Panel.qml) closing its lists in the
+# And a stock removed in the real panel (Panel.qml) closing its lists in the
 # window: the shell's layer-shell card window does not load offscreen, so
 # the copy of Panel.qml puts the card in CardWindow.qml, as keys.sh does.
 # HOME and curl are scratch.

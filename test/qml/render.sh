@@ -32,8 +32,8 @@ out="${STONKS_VISUAL_DIR:-$plugin/out/render}"
 mkdir -p "$out"
 plugin_tree render.qml
 frame_tools
-# The pill sheet's pills load no popup: the offscreen platform has no popup
-# window to put one in, and no render shows one.
+# The pill sheet's pills load no panel: the offscreen platform has no
+# PopupWindow to put one in, and no render shows one.
 patch_copy plugin/BarWidget.qml '/id: panelLoader/,/source:/s/active: true/active: false/'
 
 export QT_QPA_PLATFORM=offscreen
@@ -53,7 +53,7 @@ every_state() (
   states="$states popup-notice-file-update-retro-size-20"
   # A removal offered back beside the add, in both looks, and in the window.
   states="$states popup-undo-smooth popup-undo-retro window-undo-retro"
-  # Every listing failed, said once in the header, in the popup, both looks.
+  # Every listing failed, said once in the header, in the panel, both looks.
   states="$states popup-failed popup-failed-smooth"
   # Prices stopped, as the header says why and when Stonks tries again, in
   # both looks and at text size 16, in the panel and the window; the pill's
@@ -67,7 +67,7 @@ every_state() (
   # Paused mid-motion ink in both looks: breadth only in smooth, since
   # retro's cells draw the breadth and its pose never shows. Hover and held
   # presses with real pointer input, and the refused list views, in smooth:
-  # every fill is the same Style fill in both looks. The popup under its
+  # every fill is the same Style fill in both looks. The panel under its
   # pill as it opens at each end of the bar and the centre, and the centre's
   # next open after its pill widened (popup-anchor.qml checks the rest):
   # placement is the same in both looks.
@@ -103,7 +103,7 @@ every_state() (
   done
   # Odd days in both looks: CKX's one bar and CVR's none said in words,
   # JPM's stray pair dropped, and LUMN in cents. And the list menu over 12
-  # lists in the popup and 30 in the smallest window: whole rows, New list
+  # lists in the panel and 30 in the smallest window: whole rows, New list
   # and Manage lists in sight.
   for look in smooth retro; do
     for symbol in ckx cvr jpm lumn; do
@@ -196,7 +196,7 @@ every_state() (
   done
   states="$states min-window-search-smooth min-window-search-retro"
   # A cursor of your own shows its row's remove button: on a plain row in
-  # the window, and on the featured row's fill in the popup (popup-rowstates
+  # the window, and on the featured row's fill in the panel (popup-rowstates
   # has it on a plain row).
   for look in smooth retro; do
     states="$states window-rowstates-$look popup-rowstates-featured-$look"
@@ -205,7 +205,7 @@ every_state() (
   # under a cent, a six-figure price, London before its session and at its
   # 52-week high, Tokyo at lunch, pre-market, after hours, overnight, a
   # Saturday, the ranges, and a 1Y range whose first day passes Yahoo's 52
-  # weeks, in the popup, the squeeze; the listing sweep has the rest. The
+  # weeks, in the panel, the squeeze; the listing sweep has the rest. The
   # window lays them out wider: NEST's day, the 1Y range, and AAPL with
   # every fact (w22-window-*-aapl-1d).
   for look in smooth retro; do
@@ -224,7 +224,7 @@ every_state() (
   for theme in tokyo-night catppuccin-latte hackerman solitude white; do
     states="$states theme-smooth-$theme theme-retro-$theme"
   done
-  # The calendars' longest closures, in the popup and the smallest window.
+  # The calendars' longest closures, in the panel and the smallest window.
   for place in popup min-window; do
     for market in tokyo london; do
       states="$states $place-holiday-$market-smooth $place-holiday-$market-retro"
@@ -237,9 +237,9 @@ every_state() (
   # listing: a thin stock, an ETF, an index, Bitcoin, London after its
   # close, Tokyo at lunch, a stock after hours, scrubbed, and a range at
   # rest and scrubbed. And the header's icons at text sizes 9, 16, and 20,
-  # at rest in the popup and the smallest window, and at 9 in the window at
+  # at rest in the panel and the smallest window, and at 9 in the window at
   # its widest (at 16 and 20 it is as wide as the smallest); with sounds off
-  # and the camera lit after a shot in the popup, the narrowest at every
+  # and the camera lit after a shot in the panel, the narrowest at every
   # size; and the smallest window's longest closures at size 20, where the
   # header is tightest.
   for look in smooth retro; do

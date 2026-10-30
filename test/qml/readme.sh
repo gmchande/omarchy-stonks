@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # Renders the README's pictures again in one command at a release
-# (CONTRIBUTING.md, Releases): the real popup, window, and pill (readme.qml)
+# (CONTRIBUTING.md, Releases): the real panel, window, and pill (readme.qml)
 # on the demo watchlist (test/demo.json), quoted from the capture named below
 # (test/capture-demo.sh) a minute after it, in Tokyo Night at twice the
-# scale, plus one popup in Catppuccin Latte. Writes media/*.png, or into
+# scale, plus one panel in Catppuccin Latte. Writes media/*.png, or into
 # STONKS_README_OUT to look at first.
 #
 # `readme.sh --marketplace SCALE DIR` writes no README picture: it grabs
 # the maintainer's marketplace picture's two, drawn at SCALE, into DIR:
-# popup.png, Nebius's (NBIS) retro popup, and strip.png, its pill on the
+# popup.png, Nebius's (NBIS) retro panel, and strip.png, its pill on the
 # bar, from the capture named below with NBIS on the demo watchlist.
-# The popup's card window is CardWindow.qml, as in keys.sh. HOME and curl
+# The panel's card window is CardWindow.qml, as in keys.sh. HOME and curl
 # are scratch.
 scale=2 keep=""
 if [ "${1:-}" = --marketplace ]; then
@@ -46,7 +46,7 @@ patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  
 # The clock stands still a minute after the capture.
 patch_copy plugin/Service.qml "s/property int now: Math.floor(Date.now() \/ 1000)/property int now: $at/"
 patch_copy plugin/Service.qml 's/function wallSecond() { return Math.floor(Date.now() \/ 1000) }/function wallSecond() { return root.now }/'
-# The pills on their strips open no popup of their own.
+# The pills on their strips open no panel of their own.
 patch_copy plugin/BarWidget.qml '/id: panelLoader/,/source:/s/active: true/active: false/'
 jq --argjson listed "$listed" '. + { hinted: true, symbols: $listed }' "$plugin/test/demo.json" > "$HOME/.config/omarchy/grvc.stonks.json"
 echo "$moment" > "$STONKS_FAKE_STATE/overnight.set"

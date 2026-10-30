@@ -60,7 +60,7 @@ start "history harness" bash test/qml/history.sh
 # there, not at twice that or half of it. Only the two sized shots.
 start "camera harness at scale 2" env QT_SCALE_FACTOR=2 STONKS_CAMERA_SIZES=1 bash test/qml/camera.sh
 start "keys harness" bash test/qml/keys.sh
-start "popup harness" bash test/qml/popup.sh
+start "panel harness" bash test/qml/popup.sh
 known_names unit frames font boundaries lint lint-gate validate launcher
 fill
 

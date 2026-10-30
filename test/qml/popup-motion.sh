@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The popup's card edge in motion through the real Panel and Service with
+# The panel's card edge in motion through the real Panel and Service with
 # real Qt keys, judged on rendered frames: a list switch either way, the key
 # sheet closing, a removal, an add that lands, the list menu, and search
 # opening and closing each ease the edge in 160 ms, the footer riding it
@@ -8,7 +8,7 @@
 # close, and a wheel step switches it at once.
 # The shell's layer-shell card window does not load offscreen, so the copy
 # of Panel.qml puts the card in CardWindow.qml, a plain window; the pill
-# loads no popup of its own. HOME and curl are scratch.
+# loads no panel of its own. HOME and curl are scratch.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree popup-motion.qml
 cp "$here/CardWindow.qml" "$root/plugin/"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The screenshot, through the real popup by keys and the real window by the
+# The screenshot, through the real panel by keys and the real window by the
 # pointer, with stand-ins for wl-copy and omarchy-notification-send (bin/)
 # that record what they were given and reach no clipboard and no
 # notification: each shot saves one picture of the chart on show, never the

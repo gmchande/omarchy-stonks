@@ -46,7 +46,7 @@
 #   TALL<n>      answers like AAPL, its history too: a long list whose every
 #                range answers
 # A symbol search answers the saved SHOP results after 0.4 s, so a search
-# can still be out when the popup closes and opens again; FAST answers them
+# can still be out when the panel closes and opens again; FAST answers them
 # at once, as Yahoo does on a normal network; ZZZ answers with
 # no matches, OOPS gets no answer, WRONG answers 400, as Yahoo does a
 # question it calls wrong, ONE answers the first SHOP result alone,

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# What Stonks plays, through the real popup by keys and the real window by
+# What Stonks plays, through the real panel by keys and the real window by
 # the pointer, with a stand-in pw-play (bin/pw-play) that plays nothing and
 # logs what it was asked to play. The shutter's shots land in the scratch
 # HOME through bin/'s stand-ins for wl-copy and omarchy-notification-send,
