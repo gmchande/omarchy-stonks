@@ -761,8 +761,13 @@ Harness {
       // step, and stays where it is.
       tryVerify(function() { return !silence().running }, 3000)
       var parkedKeys = !silence().running && silence().stoppedAt - burstEnd >= 900 && win.motion.scrubT !== 0
+      // Esc ends it, which holds the output a second, as any end does. That
+      // stream starts a moment after the key, so the wait is for it to
+      // start and then end: a wait for the end alone can pass before it
+      // starts. The pointer's scrub then starts a stream of its own.
+      startsBefore = silence().starts
       keyClick(Qt.Key_Escape)
-      tryVerify(function() { return !silence().running }, 3000)
+      tryVerify(function() { return silence().starts > startsBefore && !silence().running }, 3000)
       startsBefore = silence().starts
       for (var sx = 0.1; sx < 0.6; sx += 0.05) {
         mouseMove(chart, chart.width * sx, chart.height / 2)
