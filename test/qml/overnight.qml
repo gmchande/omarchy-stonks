@@ -595,6 +595,39 @@ Harness {
         pillOut && heldOpen && finalCalls > openCalls + 1 && releasedAt === finalCalls && releasedIdle,
         "pill out " + pillOut + ", held " + heldOpen + "; Robinhood calls at the open " + openCalls + ", at the release " + releasedAt
           + " with Robinhood " + (releasedIdle ? "idle" : "still out") + ", in the end " + finalCalls)
+
+      // The same night, the window opening while a run of prints is out,
+      // which Robinhood refuses: the gate hears the refusal before the feed
+      // reads the run (`FetchRun`), and the list holds its order until it
+      // has. The run's output is handed in.
+      app.close()
+      tryVerify(function() { return service.openSurfaces.length === 0 }, 3000)
+      within(5000, function() { return !prints.busy && !allDay.busy && !service.testFeed.busy })
+      var printsRun = prints.testRun
+      prints.askedAt = service.now
+      prints.batches = [{ span: "day", symbols: ["NEST"] }]
+      printsRun.count = 1
+      printsRun.ticket = service.testRobinhoodGate.ticket
+      printsRun.told = false
+      printsRun.parsed = 0
+      printsRun.got = []
+      printsRun.out = true
+      var refusedIdle = null
+      var noteRefusedRelease = function() {
+        if (service.heldOrder || refusedIdle !== null) return
+        refusedIdle = !prints.busy && !allDay.busy
+      }
+      service.heldOrderChanged.connect(noteRefusedRelease)
+      app.open("{}")
+      tryVerify(function() { return app.opened && service.openSurfaces.length === 1 }, 3000)
+      var heldWhileOut = !!service.heldOrder
+      within(5000, function() { return !service.testFeed.busy && !allDay.busy })
+      printsRun.end("Too Many Requests\n@@stonks 0 429 0 60\n")
+      within(5000, function() { return !service.heldOrder })
+      service.heldOrderChanged.disconnect(noteRefusedRelease)
+      check("a list in order of change, opened while a run of prints is out that Robinhood refuses, keeps its order until that run is read",
+        heldWhileOut && service.testRobinhoodGate.pause === "refused" && refusedIdle === true,
+        "held " + heldWhileOut + ", pause " + service.testRobinhoodGate.pause + ", Robinhood idle at the release " + refusedIdle)
       service.setOrder("manual")
 
       // Friday 23 October at 06:00: NVDA's chart is Friday from its night's
