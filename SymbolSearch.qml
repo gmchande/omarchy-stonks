@@ -211,7 +211,7 @@ FocusScope {
   // Every way of taking a result comes through here, and only a result for
   // the query in the field is taken: an Enter before its answer is kept for
   // it (`enterFor`). On a failed lookup there is none to take: Enter asks
-  // again (`retry`).
+  // again (`retry`), unless Yahoo called the question wrong.
   function accept(index) {
     if (stale || (answer === "" && searchText.trim() !== "")) {
       enterFor = searchText.trim()

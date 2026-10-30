@@ -285,8 +285,9 @@ again.
 - **"1W unavailable" or "Couldn't search", with RETRY.** Yahoo didn't
   send that chart or those results. Click RETRY. While search says
   "server busy", RETRY works again once Yahoo lets Stonks back in, at most
-  about half an hour on. When search says "try other words", Yahoo can't
-  search for what you typed, such as an emoji, so there's no RETRY.
+  about half an hour on.
+- **"Couldn't search · try other words".** Yahoo can't search for what you
+  typed, such as an emoji. Type other words.
 - **"market hours unknown".** Stonks' calendar for this exchange has run
   out, so it can't say when the market next opens. Prices and
   times are still right. [Update Stonks](#update) for a new calendar.
