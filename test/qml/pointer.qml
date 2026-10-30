@@ -970,11 +970,20 @@ Harness {
           within(2000, function() { return !body.watchlist.settling })
           waits.push("tick " + before + " " + body.watchlist.cursorRow + " " + removesShown())
           // A click during a glide stops the list on a row on the way, which
-          // waits too.
+          // waits too. It lands once the list has moved, on a row, not the
+          // gap between two that slides under the pointer, where a click
+          // acts on nothing.
           mouseMove(body, onSecond.x + 3, onSecond.y)
           within(1000, function() { return removesShown() !== "none" })
+          var glideFrom = body.watchlist.contentY
           for (var notch = 0; notch < 4; notch++) mouseWheel(body, onSecond.x + 3, onSecond.y, 0, -120, Qt.NoButton, Qt.NoModifier)
-          wait(30) // into the four notches' glide
+          within(1000, function() {
+            var list = body.watchlist
+            return list.contentY !== glideFrom && list.contentY !== list.headedY && list.displayedSymbols.some(function(s) {
+              var row = list.rowItem(s)
+              return !!row && row.contains(row.mapFromItem(body, onSecond.x + 3, onSecond.y))
+            })
+          })
           mouseClick(body, onSecond.x + 3, onSecond.y)
           within(2000, function() { return !body.watchlist.settling })
           waits.push("glide " + (stub.featuredSymbol === body.watchlist.cursorRow) + " " + stub.symbols.length + " " + removesShown())
