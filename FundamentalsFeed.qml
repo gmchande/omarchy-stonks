@@ -9,20 +9,20 @@ import "Fundamentals.js" as Fundamentals
 // last good figures, or once the series came but not the cap's close, their
 // EPS and no cap. Then, when the EPS is in another currency than the price
 // and its pair's rate is a day old or none was asked, the rate, once
-// whichever listing wants it first: a failed one is kept as no rate, so the
-// pair has no P/E until it is asked again a day later. While Yahoo's gate
-// pauses the host, a fetch fails at once, and a rate is left unasked.
+// whichever listing wants it first. While Yahoo's gate pauses the host, a
+// fetch fails at once, and a rate is left unasked.
 // What it fetches is what the surfaces on screen show (`wanted`), worked out
 // by the service: each one not good for the day, in order, one at a time,
-// and again as the clock moves past its day. One that failed, or whose rate
-// the gate held back, waits until it is wanted anew, or for a reader's
-// refresh or Yahoo answering again after a pause (`retry`), so it isn't
-// asked again every second, nor at once.
+// and again as the clock moves past its day. One that failed, whose rate
+// failed, or whose rate the gate held back, waits until it is wanted anew,
+// or for a reader's refresh or Yahoo answering again after a pause
+// (`retry`), so it isn't asked again every second, nor at once. A failed
+// rate holds no rate for its pair, so the pair has no P/E until one comes.
 Item {
   id: root
 
   property var entries: ({})
-  // By pair ("USDCAD"): { value, checkedAt }, value null after a failure.
+  // By pair ("USDCAD"): { value, checkedAt }, a rate Yahoo sent.
   property var rates: ({})
   property var gate: null
   property var clearance: null
@@ -142,7 +142,11 @@ Item {
     }
     if (step === "rate") {
       var held = Object.assign({}, rates)
-      held[job.pair] = { value: read, checkedAt: clock.wallSecond() }
+      if (read) held[job.pair] = { value: read, checkedAt: clock.wallSecond() }
+      else {
+        delete held[job.pair]
+        root.miss(job.symbol)
+      }
       root.rates = held
       root.done()
     } else if (!read) {

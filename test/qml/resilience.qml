@@ -328,6 +328,27 @@ Harness {
       check("a rate Yahoo's pause holds back asks nothing more, and comes once Yahoo answers again",
         heldSettled && heldCalls === rateCalls && rateCame && calls("RATE") === rateCalls + 1,
         JSON.stringify({ settled: heldSettled, whilePaused: heldCalls - rateCalls, came: rateCame, asked: calls("RATE") - rateCalls }))
+      // A rate whose fetch fails waits as a failed cap and P/E does: no P/E,
+      // nothing asked again on its own, and a reader's refresh asks once
+      // more, and it comes.
+      noRate = Object.assign({}, feed.rates)
+      delete noRate.USDCAD
+      feed.rates = noRate
+      flag("RATE.down", true)
+      rateCalls = calls("RATE")
+      feed.wanted = []
+      feed.wanted = [{ symbol: "MSFT", currency: "CAD" }]
+      var failSettled = within(3000, function() { return calls("RATE") === rateCalls + 1 && !feed.busy })
+      // Time for an ask that mustn't come: the service's clock moves on.
+      wait(1500)
+      var failedCalls = calls("RATE") - rateCalls
+      var withoutRate = !(feed.rates.USDCAD && feed.rates.USDCAD.value)
+      flag("RATE.down", false)
+      service.refresh()
+      var refreshedRate = within(5000, function() { return !!feed.rates.USDCAD && !!feed.rates.USDCAD.value && !feed.busy })
+      check("a rate whose fetch failed asks nothing more on its own, and a refresh asks again, once, and it comes",
+        failSettled && failedCalls === 1 && withoutRate && refreshedRate && calls("RATE") === rateCalls + 2,
+        JSON.stringify({ settled: failSettled, beforeRefresh: failedCalls, came: refreshedRate, asked: calls("RATE") - rateCalls, held: feed.rates.USDCAD }))
       feed.wanted = Qt.binding(function() { return service.figuresWanted })
     }
 
