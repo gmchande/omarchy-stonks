@@ -17,7 +17,8 @@ import "Fundamentals.js" as Fundamentals
 // failed, or whose rate the gate held back, waits until it is wanted anew,
 // or for a reader's refresh or Yahoo answering again after a pause
 // (`retry`), so it isn't asked again every second, nor at once. A failed
-// rate holds no rate for its pair, so the pair has no P/E until one comes.
+// rate holds no rate for its pair, so the pair has no P/E until one comes,
+// and every listing that shares the pair waits with it (`failedPairs`).
 Item {
   id: root
 
@@ -40,6 +41,9 @@ Item {
   // The wanted symbols whose fetch failed, or whose rate the gate held back,
   // while they were wanted.
   property var failed: []
+  // The pairs whose rate failed, while a wanted symbol needs them: every
+  // listing sharing one waits with it.
+  property var failedPairs: []
 
   readonly property bool busy: job !== null || wanted.some(root.due)
   readonly property int day: 24 * 60 * 60
@@ -71,15 +75,23 @@ Item {
   // again after a pause.
   function retry() {
     if (failed.length) root.failed = []
+    if (failedPairs.length) root.failedPairs = []
     root.look()
   }
 
   // A symbol no longer wanted is wanted anew when it comes back, and a series
-  // not yet sent for it goes; one sent still lands. With nothing under way,
-  // the first wanted that is due goes.
+  // not yet sent for it goes; one sent still lands; a pair no wanted symbol
+  // needs is likewise asked anew. With nothing under way, the first wanted
+  // that is due goes.
   function look() {
     var still = failed.filter(root.wants)
     if (still.length !== failed.length) root.failed = still
+    var needed = wanted.map(function(w) {
+      var current = root.fresh(w.symbol)
+      return current ? Fundamentals.ratePair(current.figures, w.currency) : ""
+    })
+    var pairsStill = failedPairs.filter(function(pair) { return needed.indexOf(pair) >= 0 })
+    if (pairsStill.length !== failedPairs.length) root.failedPairs = pairsStill
     if (job) {
       if (pendingUrl && job.step === "series" && !root.wants(job.symbol)) root.done()
       return
@@ -98,9 +110,10 @@ Item {
     return current && current.status === "ok" && clock.wallSecond() - current.checkedAt < day ? current : null
   }
 
-  // Whether a pair needs no asking today: no pair, or one asked within a day.
+  // Whether a pair needs no asking now: no pair, one asked within a day, or
+  // one whose rate failed, until `retry`.
   function rateHeld(pair) {
-    return !pair || (!!rates[pair] && clock.wallSecond() - rates[pair].checkedAt < day)
+    return !pair || failedPairs.indexOf(pair) >= 0 || (!!rates[pair] && clock.wallSecond() - rates[pair].checkedAt < day)
   }
 
   function run(url) {
@@ -145,6 +158,7 @@ Item {
       if (read) held[job.pair] = { value: read, checkedAt: clock.wallSecond() }
       else {
         delete held[job.pair]
+        if (failedPairs.indexOf(job.pair) < 0) root.failedPairs = failedPairs.concat([job.pair])
         root.miss(job.symbol)
       }
       root.rates = held
