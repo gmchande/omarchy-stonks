@@ -251,8 +251,8 @@ again.
   If other sites load, Yahoo may be down or out of reach. Stonks retries
   within two minutes, and `r` retries at once.
 - **"Server busy".** Yahoo asked Stonks to send fewer requests. Stonks
-  retries at the time shown, from a minute to about half an hour on, and
-  `r` won't hurry it.
+  retries at the time shown, at most about half an hour on, and `r` won't
+  hurry it.
 - **"Not updating" or "No data" on a row, or "Can't get prices" in the
   header.** A price hasn't come in time. When that's true of every stock
   you follow, the header says so once instead of on every row. Rows keep
@@ -284,8 +284,10 @@ again.
   The listing traded too little that day to draw a line.
 - **"1W unavailable" or "Couldn't search", with RETRY.** Yahoo didn't
   send that chart or those results. Click RETRY. While search says
-  "server busy", RETRY works again once Yahoo lets Stonks back in, from a
-  minute to about half an hour on.
+  "server busy", RETRY works again once Yahoo lets Stonks back in, at most
+  about half an hour on.
+- **"Couldn't search · try other words".** Yahoo can't search for what you
+  typed, such as an emoji. Type other words.
 - **"market hours unknown".** Stonks' calendar for this exchange has run
   out, so it can't say when the market next opens. Prices and
   times are still right. [Update Stonks](#update) for a new calendar.

@@ -818,6 +818,17 @@ Harness {
       ;["O", "O", "P", "S"].forEach(function(k) { keyClick(k) })
       tryVerify(function() { return body.search.resultsQuery === "OOPS" }, 3000)
       var failed = [message.visible, message.text].join(",")
+      // A query Yahoo calls wrong: other words, no RETRY, and Enter asks
+      // nothing again.
+      var retry = harness.find(body.search, "searchRetry")
+      keyClick(Qt.Key_A, Qt.ControlModifier)
+      ;["W", "R", "O", "N", "G"].forEach(function(k) { keyClick(k) })
+      tryVerify(function() { return body.search.resultsQuery === "WRONG" }, 3000)
+      var askedWrong = harness.calls("SEARCH.asked")
+      keyClick(Qt.Key_Return)
+      // Time for a request that mustn't go (search answers in 0.4 s).
+      wait(600)
+      var wrong = [message.visible, message.text, retry.visible, harness.calls("SEARCH.asked") - askedWrong, body.search.answer].join(",")
       // An answer holding only kinds Stonks leaves out says what it found
       // where "No matches" would be; one with results too lists them and
       // says the rest under them, and the arrows stop at the last result.
@@ -848,10 +859,11 @@ Harness {
       var cleared = [body.search.results.length === 0, body.adding, watchlist.visible].join(",")
       harness.check("a query out keeps the last results stale and the rows away",
         whileOut === "true,true,true" && freshAgain && cleared === "true,true,false", whileOut + "|" + freshAgain + "|" + cleared)
-      harness.check("an empty answer and a failed lookup each say so in place, differently",
+      harness.check("an empty answer and a failed lookup each say so in place, differently, and a query Yahoo calls wrong asks for other words, never again",
         noMatches === "true,true,No matches for “ZZZ”"
-          && failed === "true,Couldn’t search · try again",
-        noMatches + " / " + failed)
+          && failed === "true,Couldn’t search · try again"
+          && wrong === "true,Couldn’t search · try other words,false,0,failed",
+        noMatches + " / " + failed + " / " + wrong)
       harness.check("an answer of kinds Stonks leaves out names them where \"No matches\" would be, and under the results it shows, the arrows stopping at the last result",
         fundAlone === "0,false,true,Stonks doesn’t show mutual funds"
           && beside === "18QQ.Z Q0SF.Z,false,true,Stonks doesn’t show currencies or futures,1",

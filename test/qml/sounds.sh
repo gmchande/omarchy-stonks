@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# What Stonks plays, through the real popup by keys and the real window by
+# What Stonks plays, through the real panel by keys and the real window by
 # the pointer, with a stand-in pw-play (bin/pw-play) that plays nothing and
 # logs what it was asked to play. The shutter's shots land in the scratch
 # HOME through bin/'s stand-ins for wl-copy and omarchy-notification-send,
@@ -24,6 +24,10 @@ patch_copy plugin/QuoteFeed.qml 's/interval: 2500/interval: 200/'
 patch_copy plugin/Sounds.qml 's/asleepAfter = Math.max(asleepAfter, now + 4000)/asleepAfter = Math.max(asleepAfter, now + 1500)/'
 patch_copy plugin/Sounds.qml '/root.asleepAfter = Date.now()/s/ : 4000)/ : 1500)/'
 patch_copy plugin/Sounds.qml '/id: ahead$/{n;s/interval: 100$/interval: 5/}'
+# The copy keeps each bar it strikes, in order (`testStruck`): the stand-in
+# player's record of them comes later and, on a busy machine, out of order.
+patch_copy plugin/Sounds.qml '/^  property real lastChime: 0$/a\  property var testStruck: []'
+patch_copy plugin/Sounds.qml 's/^    lastChime = Date.now()$/    root.testStruck = root.testStruck.concat([bar])\n    lastChime = Date.now()/'
 scratch_home v1-data.json grvc.stonks.json
 : > "$STONKS_FAKE_STATE/pw-play.log"
 : > "$STONKS_FAKE_STATE/pw-cat.log"

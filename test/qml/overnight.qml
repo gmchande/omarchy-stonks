@@ -158,26 +158,33 @@ Harness {
       var restOut = within(5000, function() {
         return harness.record("INSTRUMENTS.calls") === "2" && harness.record("OVERNIGHT.calls") === "2"
       })
-      // A row's line, while Robinhood's answer for it is out and once it
-      // has landed: drawn once, in the shape it keeps.
+      // A row's line, while Robinhood's answer for it is out, once it has
+      // landed, and a moment after: drawn once, in the shape it keeps. A
+      // row not there at all has no shape to read.
       var rowShape = function(symbol) {
         var row = body.watchlist.rowItem(symbol)
-        return row && row.geometry ? JSON.stringify(row.geometry.points) : ""
+        if (!row) return null
+        return row.geometry ? JSON.stringify(row.geometry.points) : ""
       }
       var heldShapes = ["SILK", "REED"].map(rowShape)
       runCommand(["rm", "-f", harness.state + "/ROBINHOOD.hold"])
       within(3000, function() { return !!service.testAllDayFeed.entries.SILK && !!service.testOvernightFeed.entries.SILK && !!service.testAllDayFeed.entries.REED })
       var landedShapes = ["SILK", "REED"].map(rowShape)
+      // Time for a reshape that must not come.
+      wait(500)
+      var laterShapes = ["SILK", "REED"].map(rowShape)
       check("a window opened after them shows the pill's 1D chart at once", firstFrame === "NEST", firstFrame)
       check("the first open asks for the rest's instruments and prints together: both out before either answers",
         restOut && harness.record("INSTRUMENTS.asked").split("\n")[1] === "SILK,REED"
           && harness.record("OVERNIGHT.asked").split("\n")[1] === "SILK,REED",
         harness.record("INSTRUMENTS.asked") + " | " + harness.record("OVERNIGHT.asked"))
       check("a row waiting on Robinhood draws no line, then the day the chart draws, once: it never takes another shape",
-        heldShapes.every(function(s) { return s === "" }) && landedShapes.every(function(s) { return s !== "" }),
+        heldShapes.every(function(s) { return s === "" })
+          && landedShapes.every(function(s, i) { return !!s && laterShapes[i] === s }),
         ["SILK", "REED"].map(function(s, i) {
-          return s + " " + (heldShapes[i] === "" ? "none" : heldShapes[i] === landedShapes[i] ? "same" : "drawn") + " -> "
-            + (landedShapes[i] === "" ? "none" : heldShapes[i] === landedShapes[i] ? "same" : "reshaped")
+          var said = function(shape) { return shape === null ? "no row" : shape === "" ? "none" : shape === heldShapes[i] ? "same" : "drawn" }
+          return s + " " + said(heldShapes[i]) + " -> " + said(landedShapes[i])
+            + " -> " + (laterShapes[i] === landedShapes[i] ? "kept" : "reshaped")
         }).join(", "))
       featureShown("NEST")
       // Read at the end, where every later ask is in the logs too.

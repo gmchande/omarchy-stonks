@@ -640,20 +640,32 @@ Harness {
       }
       mouseMove(win, 1, 1)
       chimesRest()
+      // The record holds every earlier strike first, so none lands among
+      // the sweep's.
+      tryVerify(function() { return harness.chimes().length >= sounds.testStruck.length }, 5000)
       var chimesBefore = harness.chimes().length
+      var struckBefore = sounds.testStruck.length
       var seen = sweep(chart.width * 0.05, chart.width * 0.9, { last: -1, changes: 0, crossed: [] })
       sweep(chart.width * 0.9, chart.width * 0.3, seen)
-      var endBar = "retro-" + barHere()
-      tryVerify(function() { var c = harness.chimes(); return c.length > chimesBefore && harness.bar(c[c.length - 1]) === endBar }, 2000)
-      wait(200)
-      var swept = harness.chimes().slice(chimesBefore).map(harness.bar)
+      var endBar = barHere()
+      // Every bar struck, none waiting, in the order Stonks struck them; and
+      // the player's record holding each, in retro's voice, in whatever
+      // order a busy machine started them.
+      chimesRest()
+      var struck = sounds.testStruck.slice(struckBefore)
+      tryVerify(function() { return harness.chimes().length - chimesBefore >= struck.length }, 5000)
+      var heard = harness.chimes().slice(chimesBefore).map(harness.bar)
       mouseMove(chart, chart.width * 0.3, chart.height / 3)
+      // Time for a strike that mustn't come.
       wait(300)
-      var rested = harness.chimes().length - chimesBefore - swept.length
+      chimesRest()
+      var rested = sounds.testStruck.length - struckBefore - struck.length
       harness.check("a sweep of the pointer over the chart and back strikes retro's bars it crosses, ends on the bar under the pointer, and a hand resting strikes nothing more",
-        swept.length > 1 && swept.length <= seen.changes && swept[swept.length - 1] === endBar && rested === 0
-          && swept.every(function(b) { return /^retro-/.test(b) && seen.crossed.indexOf(Number(b.slice(6))) >= 0 }),
-        swept.length + " struck of " + seen.changes + " moved onto; ends " + swept[swept.length - 1] + " under " + endBar + "; rested " + rested + "; " + swept.join(" "))
+        struck.length > 1 && struck.length <= seen.changes && struck[struck.length - 1] === endBar && rested === 0
+          && struck.every(function(b) { return seen.crossed.indexOf(b) >= 0 })
+          && heard.slice().sort().join(" ") === struck.map(function(b) { return "retro-" + b }).sort().join(" "),
+        struck.length + " struck of " + seen.changes + " moved onto; ends " + struck[struck.length - 1] + " under " + endBar
+          + "; rested " + rested + "; struck " + struck.join(" ") + "; heard " + heard.join(" "))
       mouseMove(win, 1, 1)
 
       // The speaker: a click turns sounds off, silently, and on, with the

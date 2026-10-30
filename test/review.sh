@@ -7,13 +7,13 @@
 #
 # - The offscreen renders (out/render/): every state on every kind of
 #   listing, in each look where the look draws it differently, for your
-#   eyes, and the popup's place under its pill (popup-anchor.qml). The
+#   eyes, and the panel's place under its pill (popup-anchor.qml). The
 #   base's too, from its own files and renderer, so the render diff
 #   (test/render-diff.sh) lists every picture the change moved, side by
 #   side in out/render-diff/. The base is the merge-base with origin/dev,
 #   or with STONKS_RENDER_BASE (a release's tag, before the next release).
 # - Nothing jumps: positions across looks, symbols, and ranges.
-# - Window and popup motion, judged on rendered frames (test/qml/frames.js),
+# - Window and panel motion, judged on rendered frames (test/qml/frames.js),
 #   never on the property behind it.
 # - The long list: a power user's 154 symbols, on wall-clock budgets.
 #
@@ -151,7 +151,7 @@ start "window motion harness" bash test/qml/window-motion.sh
 start "nothing-jumps layout harness, live" bash test/qml/layout.sh live
 start "long list harness" bash test/qml/long-list.sh
 start "nothing-jumps layout harness, sizes" bash test/qml/layout.sh sizes
-start "popup motion harness" bash test/qml/popup-motion.sh
+start "panel motion harness" bash test/qml/popup-motion.sh
 fill
 
 run "installed theme diagnostic" bun test/themes.js

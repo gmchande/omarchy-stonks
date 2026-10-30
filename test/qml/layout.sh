@@ -20,8 +20,8 @@ case "$chapter" in
 esac
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree layout.qml
-# The side bar's pill loads no popup: the offscreen platform has no popup
-# window to put one in.
+# The side bar's pill loads no panel: the offscreen platform has no
+# PopupWindow to put one in.
 patch_copy plugin/BarWidget.qml '/id: panelLoader/,/source:/s/active: true/active: false/'
 export QT_QPA_PLATFORM=offscreen
 export STONKS_CALENDARS="$plugin/calendars.json"

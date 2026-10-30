@@ -46,6 +46,8 @@ Harness {
     property bool retro: false
     property int now: 1788294000
     property var calendars: null
+    // Yahoo's pause, as the real Gate says it; null for none.
+    property var yahooGate: null
     property var owed: ({})
     property var arriving: []
     property var lastRemoval: null
@@ -285,15 +287,20 @@ Harness {
         keyedRow !== service.featuredSymbol && kept.every(function(s) { return s === keyedRow }),
         keyedRow + " for featured " + service.featuredSymbol + " | " + kept.join(","))
 
-      // A closed panel re-derives nothing every second; it catches up as it
-      // opens.
+      // A closed panel re-derives nothing every second, nor says a pause
+      // Yahoo began after it closed, so its close fade shows what was open;
+      // it catches up as it opens.
       panel.close()
       var closedAt = body.now
       service.now += 7
-      harness.check("a closed panel's clock holds still", body.now === closedAt, closedAt + " -> " + body.now)
+      service.yahooGate = { pause: "refused", pausedUntil: service.now + 60 }
+      harness.check("a closed panel's clock and Yahoo's pause hold still", body.now === closedAt && body.hostPause === null,
+        closedAt + " -> " + body.now + ", " + JSON.stringify(body.hostPause))
       var opensBefore = harness.opensTold
       panel.open()
-      harness.check("an open panel's clock is the service's", body.now === service.now)
+      harness.check("an open panel's clock and Yahoo's pause are the service's",
+        body.now === service.now && !!body.hostPause && body.hostPause.forms[0].indexOf("Server busy") === 0)
+      service.yahooGate = null
       harness.check("reopen tells the service the panel is open", harness.opensTold > opensBefore)
 
       // The shell puts the pill's bubble under the pill, where it would

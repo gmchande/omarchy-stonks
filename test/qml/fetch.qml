@@ -663,10 +663,15 @@ Harness {
       tryVerify(function() { return service.testPreviewFeed.firstRun.length === 0 }, 3000)
       harness.check("a preview held while the network was down is fetched once it is back",
         harness.requests().slice(offFrom).some(function(l) { return l === "chart AAPL 200" }), harness.requests().slice(offFrom).join(", "))
-      // Its cap and P/E too, which a request held by the pause failed.
-      var previewFigures = within(3000, function() { return harness.requests().slice(offFrom).some(function(l) { return l === "fundamentals AAPL 200" }) })
+      // Its cap and P/E too, which a request held by the pause failed: asked
+      // for, and kept.
+      var previewFigures = within(3000, function() {
+        return !!service.fundamentals.AAPL && service.fundamentals.AAPL.status === "ok"
+          && harness.requests().slice(offFrom).some(function(l) { return l === "fundamentals AAPL 200" })
+      })
       harness.check("a preview held while the network was down gets its cap and P/E once it is back",
-        previewFigures, harness.requests().slice(offFrom).filter(function(l) { return /^(fundamentals|rate) /.test(l) }).join(", ") || "none asked")
+        previewFigures, (harness.requests().slice(offFrom).filter(function(l) { return /^(fundamentals|rate) /.test(l) }).join(", ") || "none asked")
+          + " | " + JSON.stringify(service.fundamentals.AAPL && service.fundamentals.AAPL.status))
       service.preview(body, "")
 
       // Back after two minutes off, as on a train: the pause between tries
@@ -854,7 +859,8 @@ Harness {
       touch("FUNDAMENTALS.hold")
       service.feature("7203.T")
       settle()
-      var heldOut = within(3000, function() { return funds.busy })
+      // 7203.T's own series out and held, not another's.
+      var heldOut = within(3000, function() { return !!funds.job && funds.job.symbol === "7203.T" && funds.job.step === "series" && funds.pendingUrl === "" })
       var leftFrom = harness.requests().length
       service.feature("SHEL.L")
       settle()
@@ -880,7 +886,7 @@ Harness {
       screenStandIn.holding = true
       var unsentFrom = harness.requests().length
       service.feature("SHEL.L")
-      var unsent = within(1500, function() { return funds.busy && funds.pendingUrl !== "" })
+      var unsent = within(1500, function() { return !!funds.job && funds.job.symbol === "SHEL.L" && funds.pendingUrl !== "" })
       stonksToplevel.workspace = workspaceThere
       var hidden = within(3000, function() { return service.openSurfaces.length === 0 })
       screenStandIn.holding = false

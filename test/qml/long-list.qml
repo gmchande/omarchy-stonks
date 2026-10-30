@@ -172,9 +172,19 @@ Harness {
           tryVerify(function() { return idle() && harness.lines("runs.log").length >= runsBefore + 2 }, 30000)
           var after = harness.lines("runs.log").slice(runsBefore)
           yielded = judging + " charts judging | " + after.slice(0, 2).map(function(r) { return r.split(" ").map(function(u) { return u.split(":")[0] }).join(" ") }).join(" | ")
-          // BTC-USD, asked for two days, goes in a spark request of its own.
-          harness.check("a refresh falling due while days are judged goes in the run after the judging one: the pill's chart, eight spark requests, and the coin's own",
-            judgingOnly && (after[0] || "").split(" ").length === judging && /^chart:TALL001( spark:\S+){8} spark:BTC-USD$/.test(after[1] || ""), yielded)
+          // BTC-USD, asked for two days, goes in a spark request of its own,
+          // in its turn among the stocks': asked together, each batch goes
+          // where its first row reads, from the top down (`Asks.readingOrder`).
+          var refreshSlots = (after[1] || "").split(" ")
+          var readingNow = service.testFeed.reading()
+          var places = refreshSlots.slice(1).map(function(u) { return readingNow.indexOf(decodeURIComponent(u.slice(6).split(",")[0])) })
+          harness.check("a refresh falling due while days are judged goes in the run after the judging one: the pill's chart, eight spark requests, and the coin's own, in the order the rows read",
+            judgingOnly && (after[0] || "").split(" ").length === judging && refreshSlots[0] === "chart:TALL001" && refreshSlots.length === 10
+              && refreshSlots.slice(1).every(function(u) { return /^spark:\S+$/.test(u) })
+              && refreshSlots.filter(function(u) { return u === "spark:BTC-USD" }).length === 1
+              && refreshSlots.filter(function(u) { return /BTC-USD/.test(u) }).length === 1
+              && places.every(function(p, i) { return p >= 0 && (i === 0 || p > places[i - 1]) }),
+            yielded + " | " + (after[1] || "").replace(/,[^ ]*/g, ",…") + " | first rows read at " + places.join(" "))
         }
         service.now += 1
         settle()

@@ -254,7 +254,8 @@ Harness {
       screens.screensOff = true
       service.screensAnsweredMs = Date.now()
       var before = calls("FUNDAMENTALS")
-      service.testFundamentals.wanted = [{ symbol: "AAPL", currency: "USD" }]
+      // The window's stock is what's wanted (`Service.figuresWanted`).
+      service.feature("AAPL")
       app.open("{}")
       awaitState(function() { return !!app.testBody }, 3000)
       var body = app.testBody
@@ -286,7 +287,7 @@ Harness {
       // wait for a screen.
       flag("FUNDAMENTALS.hold", true)
       before = calls("FUNDAMENTALS")
-      service.testFundamentals.wanted = [{ symbol: "MSFT", currency: "USD" }]
+      service.feature("MSFT")
       awaitState(function() { return calls("FUNDAMENTALS") === before + 1 }, 3000)
       screens.screensOff = true
       flag("FUNDAMENTALS.hold", false)
@@ -297,6 +298,8 @@ Harness {
       check("wake sends the held fundamentals closes once", calls("FUNDAMENTALS") === before + 2 && service.fundamentals.MSFT.status === "ok")
       app.close()
       service.screens = null
+      // The feed's own rules from here, on what it is handed, as no stock on
+      // show can be: closes that throw, and a P/E in another currency.
       // Closes whose offset is {"toString": null} throw as they are read.
       var feed = service.testFundamentals
       before = calls("FUNDAMENTALS")
@@ -325,7 +328,29 @@ Harness {
       check("a rate Yahoo's pause holds back asks nothing more, and comes once Yahoo answers again",
         heldSettled && heldCalls === rateCalls && rateCame && calls("RATE") === rateCalls + 1,
         JSON.stringify({ settled: heldSettled, whilePaused: heldCalls - rateCalls, came: rateCame, asked: calls("RATE") - rateCalls }))
+      // A rate whose fetch fails waits as a failed cap and P/E does, for
+      // every listing sharing its pair: no P/E, nothing asked again on its
+      // own, and a reader's refresh asks once more, and it comes. AAPL,
+      // priced in CAD here, needs USDCAD as MSFT does.
+      noRate = Object.assign({}, feed.rates)
+      delete noRate.USDCAD
+      feed.rates = noRate
+      flag("RATE.down", true)
+      rateCalls = calls("RATE")
       feed.wanted = []
+      feed.wanted = [{ symbol: "MSFT", currency: "CAD" }, { symbol: "AAPL", currency: "CAD" }]
+      var failSettled = within(3000, function() { return calls("RATE") === rateCalls + 1 && !feed.busy })
+      // Time for an ask that mustn't come: the service's clock moves on.
+      wait(1500)
+      var failedCalls = calls("RATE") - rateCalls
+      var withoutRate = !(feed.rates.USDCAD && feed.rates.USDCAD.value)
+      flag("RATE.down", false)
+      service.refresh()
+      var refreshedRate = within(5000, function() { return !!feed.rates.USDCAD && !!feed.rates.USDCAD.value && !feed.busy })
+      check("a rate whose fetch failed is asked nothing more on its own, by either listing sharing it, and a refresh asks again, once, and it comes",
+        failSettled && failedCalls === 1 && withoutRate && refreshedRate && calls("RATE") === rateCalls + 2,
+        JSON.stringify({ settled: failSettled, beforeRefresh: failedCalls, came: refreshedRate, asked: calls("RATE") - rateCalls, held: feed.rates.USDCAD }))
+      feed.wanted = Qt.binding(function() { return service.figuresWanted })
     }
 
     function test_5_malformedOvernightRecovers() { guarded("test_5_malformedOvernightRecovers", checks_test_5_malformedOvernightRecovers) }

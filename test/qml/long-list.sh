@@ -14,7 +14,7 @@ patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property 
 patch_copy plugin/Service.qml 's/function wallSecond() { return Math.floor(Date.now() \/ 1000) }/function wallSecond() { return root.now }/'
 patch_copy plugin/Service.qml 's/property int now: Math.floor(Date.now() \/ 1000)/property int now: 1791399600/'
 patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testFeed: feed\n  readonly property alias testYahooGate: yahooGate'
-# The pill's popup stays unloaded, and the window host asks a stand-in, not
+# The pill's panel stays unloaded, and the window host asks a stand-in, not
 # the owner's Hyprland (as fetch.sh).
 patch_copy plugin/BarWidget.qml '/id: panelLoader/,/source:/s/active: true/active: false/'
 patch_copy plugin/WindowHost.qml '/readonly property bool opened:/a\  property var hyprlandStandIn: null'

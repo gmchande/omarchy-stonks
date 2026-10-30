@@ -1014,10 +1014,11 @@ test("each print says its own time across a change of clocks, the 1D's day keeps
   // open if that is earlier, to its end while it runs and to its last trade
   // once it is over. Friday in summer time, over once Robinhood's answer
   // reaches 19:55: from the open to its one print, 19:55's, on the right
-  // edge. Sunday's first night trade, at 21:00, turns to Monday, in winter
-  // time: from it to Monday's 20:00, across the change of clocks, dashed at
-  // Friday's close, its night after midnight and its pre-market on the same
-  // chart, ticked at midnight, 04:00 and the close.
+  // edge. Sunday's first night trade, at 21:00, turns to Monday: from it to
+  // Monday's 20:00, 23 hours of winter time, since the clocks changed at
+  // 02:00 that morning, dashed at Friday's summer-time close, its night
+  // after midnight and its pre-market on the same chart, ticked at
+  // midnight, 04:00 and the close.
   const chart = bars => M.dayChart(quote, { bars, through: bars.at(-1).t }, calendars).day
   const friday = M.dayChart(quote, { bars: [], through: at("2026-10-30", "19:55") }, calendars).day
   expect(M.chartSpan(friday)).toMatchObject({ start: at("2026-10-30", "09:30"), end: at("2026-10-30", "19:55") })
@@ -1101,9 +1102,9 @@ test("weeks and months either side of 25 October and 1 November keep their dates
 })
 
 test("a session's one bar says nothing until its day is over", () => {
-  // An index's opening bar at 09:35, five minutes into the session, is the
-  // first of the day's bars, not its only one: "Traded only at 09:30"
-  // waits for the close.
+  // An index's opening bar at the 09:30 bell, read from 09:33 on, is the
+  // first of the day's bars, not its only one: "Traded only at 09:30" waits
+  // for the close.
   const bell = at("2026-10-20", "09:30")
   const day = { symbol: "^GSPC", exchange: "S&P", instrumentType: "INDEX", gmtoffset: -14400,
     session: { pre: null, regular: { start: bell, end: at("2026-10-20", "16:00") }, post: null },
@@ -1253,9 +1254,12 @@ test("a quote run charts the pill's quote first and the other heroes next, then 
   expect(M.quoteSlots(["P", "Q"], { P: 1, Q: 1 }, ["P", "Q"], "", [], false))
     .toEqual([{ symbols: ["P"], spark: false }, { symbols: ["Q"], spark: false }])
   // A coin, asked for two days, goes in a spark request of its own, alone
-  // too, so the stocks' batch stays one day.
+  // too, so the stocks' batch stays one day; asked before them, the budget
+  // having held it, it goes first.
   expect(M.quoteSlots(["A", "BTC-USD", "B", "C"], { A: 1, "BTC-USD": 1, B: 1, C: 1 }, ["A", "BTC-USD", "B", "C"], "", [], true, ["BTC-USD"]))
     .toEqual([{ symbols: ["A", "B", "C"], spark: true }, { symbols: ["BTC-USD"], spark: true }])
+  expect(M.quoteSlots(["A", "BTC-USD", "B", "C"], { A: 2, "BTC-USD": 1, B: 2, C: 2 }, ["A", "BTC-USD", "B", "C"], "", [], true, ["BTC-USD"]))
+    .toEqual([{ symbols: ["BTC-USD"], spark: true }, { symbols: ["A", "B", "C"], spark: true }])
   // Each lane runs its own kind, a first answer (none yet, or a quote kept
   // from an earlier session) or a refresh, never one cooling after a bad
   // answer or out on a run; a day waiting to be judged goes only when its
