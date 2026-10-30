@@ -172,9 +172,14 @@ Harness {
           tryVerify(function() { return idle() && harness.lines("runs.log").length >= runsBefore + 2 }, 30000)
           var after = harness.lines("runs.log").slice(runsBefore)
           yielded = judging + " charts judging | " + after.slice(0, 2).map(function(r) { return r.split(" ").map(function(u) { return u.split(":")[0] }).join(" ") }).join(" | ")
-          // BTC-USD, asked for two days, goes in a spark request of its own.
+          // BTC-USD, asked for two days, goes in a spark request of its own,
+          // in its turn among the stocks' (`Asks.quoteSlots`).
+          var refreshSlots = (after[1] || "").split(" ")
           harness.check("a refresh falling due while days are judged goes in the run after the judging one: the pill's chart, eight spark requests, and the coin's own",
-            judgingOnly && (after[0] || "").split(" ").length === judging && /^chart:TALL001( spark:\S+){8} spark:BTC-USD$/.test(after[1] || ""), yielded)
+            judgingOnly && (after[0] || "").split(" ").length === judging && refreshSlots[0] === "chart:TALL001" && refreshSlots.length === 10
+              && refreshSlots.slice(1).every(function(u) { return /^spark:\S+$/.test(u) })
+              && refreshSlots.filter(function(u) { return u === "spark:BTC-USD" }).length === 1
+              && refreshSlots.filter(function(u) { return /BTC-USD/.test(u) }).length === 1, yielded + " | " + (after[1] || ""))
         }
         service.now += 1
         settle()
