@@ -1,5 +1,4 @@
 import QtQuick
-import Quickshell.Io
 import "Fetch.js" as Fetch
 import "Fundamentals.js" as Fundamentals
 // Yahoo's dated cap and trailing EPS, one symbol at a time, kept for the
@@ -35,8 +34,6 @@ Item {
   property int now: 0
   property var clock: null
   property string pendingUrl: ""
-  // The gate's ticket the request out was let through on (`Gate.report`).
-  property int ticket: 0
   // The fetch under way: { symbol, currency, step, figures, pair }, step
   // "series", "close", or "rate", figures null until the series are in.
   property var job: null
@@ -122,21 +119,17 @@ Item {
       root.done()
       return
     }
-    if (gate) root.ticket = gate.ticket
     // A series held while the screens are off ends at wake, not at the
     // earlier ask. The close refers to a fixed date and keeps its URL.
     var url = job.step === "series" ? Fundamentals.fundamentalsUrl(job.symbol, clock.wallSecond()) : pendingUrl
-    fetchProc.command = Fetch.curlCommand([url], Fetch.FUNDAMENTALS_CAP)
     root.pendingUrl = ""
-    fetchProc.running = true
+    fetchRun.send([url], Fetch.FUNDAMENTALS_CAP)
   }
 
   // An answer whose reading throws is a failed one: a throw escaping here
   // leaves the fetch under way, and no cap or P/E is asked for again until
   // Stonks restarts.
-  function receive(text) {
-    var got = Fetch.answers(text)
-    if (gate) gate.report(got.map(function(a) { return a.kind }), got.length ? got[0].retryAfter : 0, root.ticket)
+  function receive(got) {
     var step = job.step
     var read = null
     try {
@@ -198,11 +191,9 @@ Item {
     root.look()
   }
 
-  Process {
-    id: fetchProc
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root.receive(String(text || ""))
-    }
+  FetchRun {
+    id: fetchRun
+    gate: root.gate
+    onEnded: function(got) { root.receive(got) }
   }
 }

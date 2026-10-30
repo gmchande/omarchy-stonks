@@ -1,5 +1,4 @@
 import QtQuick
-import Quickshell.Io
 import "Asks.js" as Asks
 import "Fetch.js" as Fetch
 import "Market.js" as Market
@@ -7,7 +6,9 @@ import "Quote.js" as Quote
 // The quote feed: every symbol asked for goes in one run, one curl over one
 // connection, whose answers are read as each one lands. Hand it the
 // members, what is watched, and what is due; read quotes, entries, and asks
-// back. The panel never touches a Process.
+// back. The panel never touches a Process; its lanes' runs go out on
+// `FetchRun`, which tells Yahoo's gate what came back before a run's last
+// answer is read.
 //
 // Two lanes, one run each at a time: first answers (a symbol with no
 // answer this session) and refreshes, so an add never waits behind a
@@ -130,7 +131,7 @@ Item {
     if (hostPaused) root.userAsked = ({})
   }
 
-  readonly property bool busy: firstProc.running || refreshProc.running || landing.length > 0 || Object.keys(asked).length > 0
+  readonly property bool busy: firstFetch.out || refreshFetch.out || landing.length > 0 || Object.keys(asked).length > 0
 
   // Each lane's run under way, its symbols in the order of their requests.
   property var firstRun: []
@@ -239,7 +240,6 @@ Item {
   // refresh falling due waits for at most one run of it.
   readonly property int judgeRun: 4
   function launch(first) {
-    var proc = first ? firstProc : refreshProc
     // A lane's run is out from its launch until it lands: its process can
     // say it stopped before its stream has ended. Nothing launches while a
     // run's answers are applied (`applying`).
@@ -260,15 +260,14 @@ Item {
     // The lane is taken before anything its asks set off can launch again.
     if (first) root.firstRun = runSymbols
     else root.refreshRun = runSymbols
-    root.landing = landing.concat([{ first: first, slots: run, ticket: gate ? gate.ticket : 0,
-      answers: [], parsed: 0, read: 0, ended: false, kinds: [], retryAfter: 0, cool: [], back: [] }])
+    root.landing = landing.concat([{ first: first, slots: run, answers: [], read: 0, ended: false, cool: [], back: [] }])
     // A chart that only judges a day already shown owes no answer.
     owe(runSymbols.filter(function(symbol) { return symbol in asked }))
     var spark = run.some(function(slot) { return slot.spark })
-    proc.command = Fetch.curlCommand(run.map(function(slot) {
+    var urls = run.map(function(slot) {
       return slot.spark ? Quote.sparkUrl(slot.symbols, slot.symbols.some(root.twoDays)) : Quote.chartUrl(slot.symbols[0], root.twoDays(slot.symbols[0]))
-    }), spark ? Fetch.SPARK_CAP : Fetch.DAY_CAP)
-    proc.running = true
+    })
+    ;(first ? firstFetch : refreshFetch).send(urls, spark ? Fetch.SPARK_CAP : Fetch.DAY_CAP)
   }
 
   // Symbols whose spark day holds a jump no chart verdict speaks for, each
@@ -298,29 +297,26 @@ Item {
   // threw left its run out for good, and the lane asked nothing more until
   // Stonks restarted.
   //
-  // Each run out, from its launch: its requests (`slots`), the gate's ticket
-  // it went on, its answers so far, how far its output is parsed and its
-  // answers read, whether its stream has ended, what its answers tell the
-  // gate and the retry as it ends, and the symbols whose answers are back.
+  // Each run out, from its launch: its requests (`slots`), its answers so
+  // far and how far they are read, whether its stream has ended, what
+  // answered badly, to retry as it ends, and the symbols whose answers are
+  // back.
   property var landing: []
   function runOf(first) {
     for (var i = 0; i < landing.length; i++) if (landing[i].first === first && !landing[i].ended) return landing[i]
     return null
   }
-  // The lane's output so far, as it grows, and all of it as its stream ends.
-  function arrived(first, text) {
+  // The lane's answers as each one lands (`FetchRun.arrived`), and the end
+  // of its stream.
+  function arrived(first, got) {
     var job = runOf(first)
     if (!job) return
-    var got = Fetch.answers(text, job.parsed)
-    if (got.length === 0) return
-    job.parsed = got[got.length - 1].end
     job.answers = job.answers.concat(got)
     landTimer.start()
   }
-  function receive(first, text) {
+  function ended(first) {
     var job = runOf(first)
     if (!job) return
-    arrived(first, text)
     job.ended = true
     landTimer.start()
   }
@@ -445,8 +441,6 @@ Item {
     got.forEach(function(answer) {
       var slot = job.slots[answer.index]
       if (!slot) return
-      job.kinds.push(answer.kind)
-      job.retryAfter = Math.max(job.retryAfter, answer.retryAfter)
       slot.symbols.forEach(function(symbol) { settle(answer, slot, symbol) })
       back = back.concat(slot.symbols)
     })
@@ -465,8 +459,8 @@ Item {
   }
 
   // A run ends: its lane is free, what it left asked is kept only while
-  // watched, what answered badly waits its pause, and the gate hears every
-  // answer at once.
+  // watched, and what answered badly waits its pause. The gate heard every
+  // answer before the last was read (`FetchRun`).
   function finish(job) {
     root.applying = true
     if (job.first) {
@@ -480,7 +474,6 @@ Item {
       root.cooling = cooling.concat(job.cool)
       retryTimer.restart()
     }
-    if (gate) gate.report(job.kinds, job.retryAfter, job.ticket)
     root.applying = false
     // Asks for what is due next, a spark hero's chart among it.
     chartHeroes(true)
@@ -530,24 +523,19 @@ Item {
     }
   }
 
-  // A run's output is read as it grows, and the run ends with its stream,
-  // never with the process stopping: both fire for one run, and a failed
-  // curl still ends the stream.
-  Process {
-    id: firstProc
-    stdout: StdioCollector {
-      waitForEnd: false
-      onDataChanged: root.arrived(true, String(text || ""))
-      onStreamFinished: root.receive(true, String(text || ""))
-    }
+  FetchRun {
+    id: firstFetch
+    gate: root.gate
+    streaming: true
+    onArrived: function(got) { root.arrived(true, got) }
+    onEnded: root.ended(true)
   }
 
-  Process {
-    id: refreshProc
-    stdout: StdioCollector {
-      waitForEnd: false
-      onDataChanged: root.arrived(false, String(text || ""))
-      onStreamFinished: root.receive(false, String(text || ""))
-    }
+  FetchRun {
+    id: refreshFetch
+    gate: root.gate
+    streaming: true
+    onArrived: function(got) { root.arrived(false, got) }
+    onEnded: root.ended(false)
   }
 }

@@ -1240,6 +1240,67 @@ Harness {
       service.removeSymbol("TURN")
       closeWindow()
 
+      // The list in order of change opens while a refresh run is out. Its
+      // first price lands, then its second comes with a refusal for its
+      // third: the gate hears the refusal before the second price is read
+      // (`FetchRun`), and the list keeps its places until it is, then
+      // moves once. The run's output is handed in, so its parts arrive as
+      // a slow link splits them.
+      service.setOrder("pct")
+      settle()
+      var gate = service.testYahooGate
+      var lane = service.testFeed
+      var run = lane.testRefreshFetch
+      var rows = service.view.shown.slice()
+      // The top row falls to the bottom, and a row further down rises to the
+      // top: read apart, each would move the list.
+      var top = rows[0], second = rows[3], third = rows[1]
+      var chartAnswer = function(symbol, pct, index) {
+        var json = JSON.parse(harness.readFile(Quickshell.env("STONKS_FIXTURES") + "/aapl.json"))
+        var meta = json.chart.result[0].meta
+        meta.symbol = symbol
+        meta.chartPreviousClose = meta.regularMarketPrice / (1 + pct / 100)
+        return JSON.stringify(json) + "\n@@stonks " + index + " 200 0 \n"
+      }
+      var laneAsked = Object.assign({}, lane.asked)
+      ;[top, second, third].forEach(function(s) { laneAsked[s] = service.now })
+      lane.asked = laneAsked
+      lane.refreshRun = [top, second, third]
+      lane.landing = lane.landing.concat([{ first: false, answers: [], read: 0, ended: false, cool: [], back: [],
+        slots: [top, second, third].map(function(s) { return { symbols: [s], spark: false } }) }])
+      run.count = 3
+      run.ticket = gate.ticket
+      run.told = false
+      run.parsed = 0
+      run.got = []
+      run.out = true
+      var orderMoves = []
+      var noteOrder = function() {
+        var order = service.view.shown.join(",")
+        if (order !== (orderMoves.length ? orderMoves[orderMoves.length - 1] : rows.join(","))) orderMoves.push(order)
+      }
+      app.open("{}")
+      tryVerify(function() { return app.opened && service.openSurfaces.length === 1 }, 3000)
+      var heldAtOpen = !!service.heldOrder
+      service.viewChanged.connect(noteOrder)
+      var firstPart = chartAnswer(top, -40, 0)
+      run.arrived(run.read(firstPart))
+      var firstIn = within(3000, function() { return lane.entries[top].receivedAt === service.now })
+      var stillHeld = !!service.heldOrder && orderMoves.length === 0
+      run.end(firstPart + chartAnswer(second, 40, 1) + "Too Many Requests\n@@stonks 2 429 0 60\n")
+      var landed = within(3000, function() { return lane.landing.length === 0 && !service.heldOrder })
+      service.viewChanged.disconnect(noteOrder)
+      var last = (orderMoves[orderMoves.length - 1] || "").split(",")
+      harness.check("a list in order of change keeps its places while a run's prices are read after the gate has heard its refusal, then moves once",
+        heldAtOpen && firstIn && stillHeld && landed && gate.pause === "refused" && orderMoves.length === 1
+          && last[0] === second && last[last.length - 1] === top,
+        [heldAtOpen, firstIn, stillHeld, landed, gate.pause].join(",") + " | moves " + orderMoves.join(" then ") + " | from " + rows.join(","))
+      // Yahoo answers again; the refused row goes with the next run.
+      gate.report(["ok"], 0, gate.ticket)
+      settle()
+      service.setOrder("manual")
+      closeWindow()
+
       // The saved prices, due while a run is out, wait for that run and not
       // for the runs after it, which on a slow link with a long list open
       // can follow each other with no gap. NEST's chart holds r's run out;
@@ -1418,7 +1479,12 @@ Harness {
     // start offline shows.
     function test_cold() {
       if (harness.mode !== "cold") skip("another run")
-      tryVerify(function() { return !!service.entries.LATE && service.entries.LATE.status === "ok" && idle() && !!harness.cached().LATE }, 10000)
+      // LATE's price is read before its run's output ends (fetch.sh's
+      // EOF.delay): the save waits for that run, and goes on the clock's
+      // next step after it lands, as the clock moves on its own.
+      tryVerify(function() { return !!service.entries.LATE && service.entries.LATE.status === "ok" && idle() }, 10000)
+      service.now += 1
+      tryVerify(function() { return !!harness.cached().LATE }, 3000)
       tick(30)
       runCommand(["touch", harness.state + "/FAIL.quote.hold"])
       service.addSymbol("FAIL")

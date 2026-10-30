@@ -125,6 +125,10 @@
 #   GITHUB.offline
 #   DELAY                             each URL answers that many seconds
 #                                     late, as on a slow network
+#   EOF.delay                         each call's output ends 0.3 s after
+#                                     its last answer, as a busy machine's
+#                                     pipe can end it: a feed reads the run's
+#                                     every answer before it hears it end
 
 set -u
 fixtures="${STONKS_FIXTURES:?}"
@@ -476,3 +480,4 @@ for i in "${!urls[@]}"; do
   printf '%b' "$out"
 done
 echo "${run[*]}" >> "$state/runs.log"
+if [ -e "$state/EOF.delay" ]; then sleep 0.3; fi

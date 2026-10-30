@@ -523,6 +523,7 @@ Item {
     reading: function() { return Asks.readingOrder(root.view.featured, root.sights, root.view.shown, root.library) }
     holding: root.drawing.length > 0
     onBusyChanged: Qt.callLater(root.releaseOrder)
+    onLandingChanged: Qt.callLater(root.releaseOrder)
     now: root.now
     clock: root
     clearance: function() { return !root.opening && root.screensClear() }
@@ -855,13 +856,17 @@ Item {
   // asked or out, a turn after the last says so, once what it answered is
   // applied, and Robinhood has nothing left to be asked (one request out
   // holds the next, the rows' behind the pill's); or until a site's pause
-  // holds what is left. Changing the order, the list, or its rows lets it
-  // go at once.
+  // holds what is left, once every run out has been read: a gate hears a
+  // run before its feed reads it (`FetchRun`), so the prices it holds still
+  // move the list only once. A quote run is out until it lands (`landing`),
+  // and a Robinhood one until its answers are in its entries (`busy`).
+  // Changing the order, the list, or its rows lets it go at once.
   property var heldOrder: null
   function releaseOrder() {
     if (!root.heldOrder) return
-    var waiting = feed.busy || overnightFeed.busy || allDayFeed.busy || !!root.overnightWanted()
-    if (waiting && !yahooGate.paused && !robinhoodGate.paused) return
+    var out = feed.landing.length > 0 || overnightFeed.busy || allDayFeed.busy
+    var waiting = out || feed.busy || !!root.overnightWanted()
+    if (out || (waiting && !yahooGate.paused && !robinhoodGate.paused)) return
     root.heldOrder = null
   }
   onOrderChanged: root.heldOrder = null

@@ -10,7 +10,7 @@ patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property 
 patch_copy plugin/Service.qml 's/function wallSecond() { return Math.floor(Date.now() \/ 1000) }/function wallSecond() { return root.now }/'
 # A step waits for the look's answer to land.
 patch_copy plugin/Service.qml '/readonly property alias mainVersion:/a\  readonly property alias testReleaseFeed: releaseFeed'
-patch_copy plugin/ReleaseFeed.qml '/property int askedAt: 0/a\  readonly property alias testAsking: fetchProc.running'
+patch_copy plugin/ReleaseFeed.qml '/property int askedAt: 0/a\  readonly property alias testAsking: fetchRun.out'
 # A step turns the manifest's watch off, to stand for a write it misses,
 # and waits out the reads again that a cut-off manifest brings.
 patch_copy plugin/Updates.qml '/property string mainVersion: ""/a\  readonly property alias testManifest: manifest\n  readonly property alias testReread: reread'

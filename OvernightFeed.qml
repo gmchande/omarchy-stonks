@@ -1,5 +1,4 @@
 import QtQuick
-import Quickshell.Io
 import "Fetch.js" as Fetch
 import "Overnight.js" as Overnight
 // Robinhood's prints for every listing asked, in one run of requests: a day
@@ -24,8 +23,6 @@ Item {
 
   property var entries: ({})
   property var gate: null
-  // The gate's ticket the request out was let through on (`Gate.report`).
-  property int ticket: 0
   // When the last request went out, answered or not, which each of its
   // listings' entries keeps (`at`): the service asks again by those
   // (`Overnight.overnightDue`), and a user's refresh waits 10 s by this.
@@ -53,10 +50,8 @@ Item {
       heldTimer.restart()
       return
     }
-    if (gate) root.ticket = gate.ticket
     var cap = Math.max.apply(null, root.batches.map(function(b) { return Fetch.overnightCap(b.symbols.length, b.span) }))
-    fetchProc.command = Fetch.curlCommand(root.batches.map(function(b) { return Overnight.overnightUrl(b.symbols, b.span) }), cap)
-    fetchProc.running = true
+    fetchRun.send(root.batches.map(function(b) { return Overnight.overnightUrl(b.symbols, b.span) }), cap)
   }
 
   // Each request's answer is read with its own symbols, a little at a time,
@@ -68,12 +63,7 @@ Item {
   // built again. Each symbol's entry says when it was asked (`at`), so a
   // symbol no longer asked for ages on its own.
   property var landing: null
-  function receive(text) {
-    var got = Fetch.answers(text)
-    if (gate && got.length) {
-      gate.report(got.map(function(a) { return a.kind }),
-        Math.max.apply(null, got.map(function(a) { return a.retryAfter })), root.ticket)
-    }
+  function receive(got) {
     // `results` is the batch's answer once read, null before and for a bad
     // one; `listings` holds each symbol's answer read, by symbol.
     root.landing = {
@@ -150,14 +140,12 @@ Item {
   Timer {
     id: heldTimer
     interval: 0
-    onTriggered: root.receive("")
+    onTriggered: root.receive([])
   }
 
-  Process {
-    id: fetchProc
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root.receive(String(text || ""))
-    }
+  FetchRun {
+    id: fetchRun
+    gate: root.gate
+    onEnded: function(got) { root.receive(got) }
   }
 }

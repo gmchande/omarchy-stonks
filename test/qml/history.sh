@@ -2,7 +2,7 @@
 # The real HistoryFeed through caching, supersession, retry, and last-good,
 # answered by the fake curl and the saved history fixtures.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-feed_tree history.qml HistoryFeed.qml Fetch.js History.js Market.js Quote.js Format.js
+feed_tree history.qml HistoryFeed.qml FetchRun.qml Fetch.js History.js Market.js Quote.js Format.js
 # Retry after 200 ms, not 2.5 s, and expose the pause so a step can act
 # inside it instead of on the clock.
 patch_copy HistoryFeed.qml 's/interval: 2500/interval: 200/'
