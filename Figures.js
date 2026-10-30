@@ -478,10 +478,9 @@ function newestCaptions(quote, newest, now, calendars, period) {
 
 // Whether the newest price on top (`Overnight.newestPrint`) is a night's
 // trade joined to the day that closed before it, until 04:00
-// (`Overnight.eveningWindow`), so its move counts from the close before
-// that day.
+// (`newest.joined`), so its move counts from the close before that day.
 function nightJoined(newest) {
-  return !!newest && newest.closed && newest.phase === "overnight"
+  return !!newest && !!newest.joined
 }
 
 // The weekday of the regular close before the day the newest price's move

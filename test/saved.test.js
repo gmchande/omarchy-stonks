@@ -1727,6 +1727,15 @@ test("through a night, until 04:00, the chart keeps the day that closed with ton
   const newest = M.newestPrint(quote, latest, calendars, day)
   expect([newest.base, M.dayBase(day), newest.closed]).toEqual([quote.prevClose, quote.prevClose, true])
   expect(M.closeLine(quote, M.exchangeDay(quote, at("2026-10-07", "00:05")), "pct", newest)).toMatchObject({ label: "TUE CLOSE", since: "\u22120.66%" })
+  // Yahoo still on Friday while Robinhood answers Monday's night (Tuesday
+  // 01:30): the night is joined to Monday all the same, and named so.
+  const stale = savedDay("watch-2026-10-25-1000", "nbis")
+  const asked = fixture("moments/watch-2026-10-27-0130/robinhood-day.json").results.map(r => r.symbol)
+  const late = M.dayChart(stale, traded("watch-2026-10-27-0130", asked).NBIS, calendars)
+  const lateNewest = M.newestPrint(stale, late.latest, calendars, late.day)
+  const tue = at("2026-10-27", "01:30")
+  expect([M.newestCaptions(stale, lateNewest, tue, calendars)[0], M.newestNote(stale, lateNewest, tue, calendars),
+    M.rowsDay(["NBIS"], { NBIS: stale }, { NBIS: lateNewest }, tue, calendars)]).toEqual(["SINCE FRI CLOSE · 01:25", "Since Fri close · 01:25", "MON + NIGHT"])
 })
 
 // Wherever the pointer is on a 1D chart, its change and its animal say
@@ -1755,7 +1764,7 @@ test("once a listing trades after its close, its newest price is on top, measure
   const { day, latest } = built
   const one = at("2026-10-07", "01:00")
   const newest = M.newestPrint(quote, latest, calendars, day)
-  expect(newest).toEqual({ t: latest.t, p: 248.04, phase: "overnight", base: quote.prevClose, own: true, closed: true, dayStart: at("2026-10-06", "09:30") })
+  expect(newest).toEqual({ t: latest.t, p: 248.04, phase: "overnight", base: quote.prevClose, own: true, closed: true, joined: true, dayStart: at("2026-10-06", "09:30") })
   expect(M.money(newest.base)).toBe("232.57")
   const top = M.rowModel(quote, 0, "pct", newest)
   expect([top.priceText, top.changeText, M.animalKind(top)]).toEqual(["248.04", "+6.65%", "bull"])

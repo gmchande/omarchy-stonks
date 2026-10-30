@@ -296,18 +296,20 @@ function beside(quote, t) {
 }
 
 // The newest price a US stock or ETF has traded at since its last regular
-// close, { t, p, phase, base, own, closed, dayStart }: the newest print of all (`latest`,
-// the chart's, else the quote's own last) where it is an after-hours,
-// overnight, or pre-market one (`Quote.extendedPrint`). It is the price on
-// top wherever the listing's price shows (`Figures.rowModel`), its move
-// from the 1D chart's dashed line (`base`, `Quote.dayBase` of `day`, the
-// day the chart draws, `Chart.dayDrawn`), so the number, the line, the
-// animal, the rows and the pill agree. `own` says whether that day is the
-// quote's own, and `closed` whether its regular session has closed before
-// the print: its after hours, tonight's trades joined to it until 04:00,
-// and the weekend after a Friday; not its pre-market, nor a night or
-// pre-market a new day has begun with. `dayStart`
-// is that day's regular open, which names it. Null in the
+// close, { t, p, phase, base, own, closed, joined, dayStart }: the newest
+// print of all (`latest`, the chart's, else the quote's own last) where it
+// is an after-hours, overnight, or pre-market one (`Quote.extendedPrint`).
+// It is the price on top wherever the listing's price shows
+// (`Figures.rowModel`), its move from the 1D chart's dashed line (`base`,
+// `Quote.dayBase` of `day`, the day the chart draws, `Chart.dayDrawn`), so
+// the number, the line, the animal, the rows and the pill agree. `own`
+// says whether that day is the quote's own, and `closed` whether its
+// regular session has closed before the print: its after hours, tonight's
+// trades joined to it until 04:00, and the weekend after a Friday; not its
+// pre-market, nor a night or pre-market a new day has begun with. `joined`
+// says the print is tonight's, joined to the day that closed
+// (`eveningWindow`, `day.tonight`), whether or not Yahoo still holds that
+// day. `dayStart` is that day's regular open, which names it. Null in the
 // regular session, with no trade since the close, and for a listing with
 // no extended hours, an index, a coin, or one abroad.
 function newestPrint(quote, latest, calendars, day) {
@@ -315,7 +317,7 @@ function newestPrint(quote, latest, calendars, day) {
   if (!print) return null
   var own = day.session.regular.start === quote.session.regular.start
   return { t: print.t, p: print.p, phase: print.phase, base: Quote.dayBase(day), own: own, closed: own && print.t >= quote.session.regular.end,
-    dayStart: day.session.regular.start }
+    joined: print.phase === "overnight" && !!day.tonight && print.t >= day.tonight, dayStart: day.session.regular.start }
 }
 
 // The hours trading day `date` draws on its 1D chart, 24 of them: from its
@@ -500,6 +502,8 @@ function dayChart(quote, answer, calendars) {
       axis: Object.assign(tradedAxis(session, points, win.end, over, windowTicks(cal, win, session)),
         { closes: evening ? evening.night.end : win.end }, win.skip ? { skip: win.skip } : {}),
       litFrom: litFrom(points, evening, over),
+      // When tonight's trades begin on an evening's chart (`newestPrint`).
+      tonight: evening ? evening.night.start : null,
       calendar: cal
     }),
     latest: latest
