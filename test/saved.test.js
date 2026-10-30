@@ -1045,6 +1045,14 @@ test("a day past its 52-week mark widens the 52-week range to it", () => {
   // high, widens them too, so a week ending on it never tops the year.
   expect(said(M.yearLine(quote, null, null, rates, [{ t: quote.marketTime + 4 * 3600, p: 345.03 }])).split(" · ")[1]).toBe("225.95–345.03+ @325.13")
   expect(said(M.yearLine(quote, null, null, rates, [{ t: quote.marketTime + 4 * 3600, p: 225.5 }])).split(" · ")[1]).toBe("225.50-–344.57 @325.13")
+  // So does the price on top, which the chart's bars can trail.
+  expect(said(M.yearLine({ ...quote, price: 345.03 }, null, null, rates, [])).split(" · ")[1]).toBe("225.95–345.03+ @345.03")
+  // A trade that reads as the mark, short of it by float noise, leaves it.
+  expect(said(M.yearLine(quote, null, null, rates, [{ t: quote.marketTime, p: 344.57 + 1e-9 }])).split(" · ")[1]).toBe("225.95–344.57 @325.13")
+  // On 1Y the line keeps the range's own low and high, whatever trade is shown.
+  const ends = { low: { p: 200, t: 0 }, high: { p: 350, t: 0 } }
+  expect(said(M.yearLine(quote, null, ends, rates, [{ t: quote.marketTime, p: 400 }, { t: quote.marketTime, p: 100 }])).split(" · ")[1])
+    .toBe(said(M.yearLine(quote, null, ends, rates)).split(" · ")[1])
 })
 
 // Yahoo's 52 weeks leave out the 1Y range's first day, so on 1Y the line is

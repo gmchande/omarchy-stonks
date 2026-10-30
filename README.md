@@ -77,8 +77,9 @@ Under the ranges, the first line shows the range's low and high, with the
 price between them. Beside it are the open and the volume on 1D, or the
 range's starting price and volume on a longer range. The second line shows
 the 52-week low and high, with the market cap and P/E. Yahoo's 52 weeks
-leave out trades before and after the session, so a newer one Stonks shows
-beyond them, such as a night's, widens them to it. Stonks estimates
+leave out trades before and after the session, so when Stonks shows a
+trade beyond them, such as one overnight, the 52-week low or high widens
+to it. Stonks estimates
 the market cap from Yahoo's last reported figure, moved with the price
 since. When
 a company reports earnings in another currency, Stonks converts them at

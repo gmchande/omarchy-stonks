@@ -172,16 +172,18 @@ function peText(value) {
 // and the chart's high and low marks always agree: Yahoo's 52 weeks leave
 // out the 1Y range's first day, and Yahoo's figure widened to take in the
 // chart's ends could still pass them. Elsewhere a trade Stonks shows
-// (`trades`, the day's prints and the newest price on top) past Yahoo's
-// marks widens them too, as the day does: Yahoo's 52 weeks leave out the
-// night and the hours around the session, and a week ending on a night
-// trade must not top the year. A longer range never stands in, its
-// ends can be older than a year. There an end takes its tone where the day
-// reaches it, compared at the listing's decimals, so a bar's float noise
-// never passes a mark it reads as. The cap moves with the headline price
-// from its own date's close; a cap more than CAP_MAX_AGE_DAYS whole days
-// older than the price is left out. The P/E is the headline price over the
-// latest EPS, at its pair's rate in `rates` where it needs one (`peRatio`).
+// (`trades`, the day's prints and the newest price on top, and the
+// headline price, which a chart's bars can trail) past Yahoo's marks
+// widens them too, as the day does: Yahoo's 52 weeks leave out the night
+// and the hours around the session, and a week ending on a night trade
+// must not top the year. A longer range never stands in, its ends can be
+// older than a year. A trade and an end compare at the listing's
+// decimals, so a bar's float noise never passes a mark it reads as, and on
+// 1Y an end takes its tone where the day reaches it. The cap moves with
+// the headline price from its own date's close; a cap more than
+// CAP_MAX_AGE_DAYS whole days older than the price is left out. The P/E is
+// the headline price over the latest EPS, at its pair's rate in `rates`
+// where it needs one (`peRatio`).
 // The cap names its currency wherever Yahoo does, so one in yen never reads
 // as one in dollars beside it, whatever the reader's own; a London cap is in
 // GBP while its prices are in GBp.
@@ -208,10 +210,10 @@ function yearLine(quote, figures, yearEnds, rates, trades) {
     atLow = Format.isFiniteNumber(q.dayLow) && q.dayLow <= q.fiftyTwoWeekLow
     low = atLow ? q.dayLow : q.fiftyTwoWeekLow
     high = atHigh ? q.dayHigh : q.fiftyTwoWeekHigh
-    ;(trades || []).forEach(function(trade) {
+    ;(head ? [{ p: head.price }] : []).concat(trades || []).forEach(function(trade) {
       if (!trade || !Format.isFiniteNumber(trade.p)) return
-      if (trade.p > high) { high = trade.p; atHigh = true }
-      if (trade.p < low) { low = trade.p; atLow = true }
+      if (reads(trade.p) > reads(high)) { high = trade.p; atHigh = true }
+      if (reads(trade.p) < reads(low)) { low = trade.p; atLow = true }
     })
   }
   var line = Format.infoRange(low, high, head ? head.price : null, q.priceDigits)
