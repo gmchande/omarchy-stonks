@@ -8,12 +8,17 @@ import "Fundamentals.js" as Fundamentals
 // the price (`Fundamentals.yearLine`). An entry is "ok" with its figures,
 // either of which may be null when Yahoo has none, or "failed", keeping the
 // last good figures, or once the series came but not the cap's close, their
-// EPS and no cap; a failed one is asked again the next time it is
-// wanted. Then, when the EPS is in another currency than the price and its
-// pair's rate is a day old or none was asked, the rate, once whichever
-// listing wants it first: a failed one is kept as no rate, so the pair has
-// no P/E until it is asked again a day later. While Yahoo's gate pauses the
-// host, a fetch fails at once, and a rate is left unasked.
+// EPS and no cap. Then, when the EPS is in another currency than the price
+// and its pair's rate is a day old or none was asked, the rate, once
+// whichever listing wants it first: a failed one is kept as no rate, so the
+// pair has no P/E until it is asked again a day later. While Yahoo's gate
+// pauses the host, a fetch fails at once, and a rate is left unasked.
+// What it fetches is what the surfaces on screen show (`wanted`), worked out
+// by the service: each one not good for the day, in order, one at a time,
+// and again as the clock moves past its day. One that failed, or whose rate
+// the gate held back, waits until it is wanted anew, or for a reader's
+// refresh or Yahoo answering again after a pause (`retry`), so it isn't
+// asked again every second, nor at once.
 Item {
   id: root
 
@@ -22,75 +27,83 @@ Item {
   property var rates: ({})
   property var gate: null
   property var clearance: null
+  // The heroes on show's, each { symbol, currency }, in order
+  // (`Service.figuresWanted`).
+  property var wanted: []
+  // The service's clock: `now` moves the feed to look, and the wall clock
+  // (`wallSecond`) is what it reads.
+  property int now: 0
+  property var clock: null
   property string pendingUrl: ""
   // The gate's ticket the request out was let through on (`Gate.report`).
   property int ticket: 0
-  // What waits for the fetch under way, in the order asked: one ask for
-  // each asker (`Service.fetchFundamentals`), { asker, symbol, currency }.
-  // An asker's new ask replaces its last, whose symbol it no longer shows,
-  // and never another's: the stock on show waits behind search's preview.
-  // Two askers may wait for one symbol, which one fetch answers.
-  property var waiting: []
-  // The fetch under way: { symbol, currency, step, figures, pair, askers },
-  // step "series", "close", or "rate", figures null until the series are
-  // in, askers those it answers.
+  // The fetch under way: { symbol, currency, step, figures, pair }, step
+  // "series", "close", or "rate", figures null until the series are in.
   property var job: null
+  // The wanted symbols whose fetch failed, or whose rate the gate held back,
+  // while they were wanted.
+  property var failed: []
 
-  readonly property bool busy: job !== null || waiting.length > 0
+  readonly property bool busy: job !== null || wanted.some(root.due)
   readonly property int day: 24 * 60 * 60
 
-  function fetch(symbol, currency, asker) {
-    var normalized = String(symbol || "").toUpperCase()
-    if (!normalized) return
-    var others = waiting.filter(function(w) { return w.asker !== asker })
-    var current = root.fresh(normalized)
-    var underWay = !!job && job.symbol === normalized
-    if (underWay && job.askers.indexOf(asker) < 0) root.job = Object.assign({}, job, { askers: job.askers.concat([asker]) })
-    var needless = underWay || (current && root.rateHeld(Fundamentals.ratePair(current.figures, currency)))
-    root.waiting = needless ? others
-      : others.concat([{ asker: asker, symbol: normalized, currency: String(currency || "") }])
-    root.launch()
+  onWantedChanged: look()
+  onNowChanged: look()
+
+  function wants(symbol) {
+    return wanted.some(function(w) { return w.symbol === symbol })
   }
 
-  // An asker no screen shows any more takes back what it waits for, and a
-  // series not yet sent that no other asker wants, which waits on the
-  // screens' answer; one sent still lands.
-  function withdraw(asker) {
-    var left = waiting.filter(function(w) { return w.asker !== asker })
-    if (left.length !== waiting.length) root.waiting = left
-    if (!job || !pendingUrl || job.step !== "series" || job.askers.indexOf(asker) < 0) return
-    var askers = job.askers.filter(function(a) { return a !== asker })
-    if (askers.length) {
-      root.job = Object.assign({}, job, { askers: askers })
+  // Whether `w` needs fetching: never fetched, failed, or it or its rate a
+  // day old; not while it waits in `failed`.
+  function due(w) {
+    if (failed.indexOf(w.symbol) >= 0) return false
+    var entry = entries[w.symbol]
+    if (entry && entry.status === "failed") return true
+    var current = root.fresh(w.symbol)
+    return !current || !root.rateHeld(Fundamentals.ratePair(current.figures, w.currency))
+  }
+
+  // A wanted symbol's fetch failed or was held back: it waits for `retry`,
+  // or to be wanted anew, so it isn't asked again at once.
+  function miss(symbol) {
+    if (root.wants(symbol) && failed.indexOf(symbol) < 0) root.failed = failed.concat([symbol])
+  }
+
+  // What failed is asked again now: a reader's refresh, or Yahoo answering
+  // again after a pause.
+  function retry() {
+    if (failed.length) root.failed = []
+    root.look()
+  }
+
+  // A symbol no longer wanted is wanted anew when it comes back, and a series
+  // not yet sent for it goes; one sent still lands. With nothing under way,
+  // the first wanted that is due goes.
+  function look() {
+    var still = failed.filter(root.wants)
+    if (still.length !== failed.length) root.failed = still
+    if (job) {
+      if (pendingUrl && job.step === "series" && !root.wants(job.symbol)) root.done()
       return
     }
-    root.done()
-  }
-
-  function nowSecond() {
-    return Math.floor(Date.now() / 1000)
+    var next = wanted.filter(root.due)[0]
+    if (!next) return
+    var current = root.fresh(next.symbol)
+    root.job = { symbol: next.symbol, currency: next.currency, step: "series", figures: null, pair: "" }
+    if (current) root.askRate(current.figures)
+    else root.run(Fundamentals.fundamentalsUrl(next.symbol, clock.wallSecond()))
   }
 
   // A symbol's entry while it is good for the day, else null.
   function fresh(symbol) {
     var current = entries[symbol]
-    return current && current.status === "ok" && root.nowSecond() - current.checkedAt < day ? current : null
+    return current && current.status === "ok" && clock.wallSecond() - current.checkedAt < day ? current : null
   }
 
   // Whether a pair needs no asking today: no pair, or one asked within a day.
   function rateHeld(pair) {
-    return !pair || (!!rates[pair] && root.nowSecond() - rates[pair].checkedAt < day)
-  }
-
-  function launch() {
-    if (job || !waiting.length) return
-    var next = waiting[0]
-    var askers = waiting.filter(function(w) { return w.symbol === next.symbol }).map(function(w) { return w.asker })
-    root.waiting = waiting.filter(function(w) { return w.symbol !== next.symbol })
-    var current = root.fresh(next.symbol)
-    root.job = { symbol: next.symbol, currency: next.currency, step: "series", figures: null, pair: "", askers: askers }
-    if (current) root.askRate(current.figures)
-    else root.run(Fundamentals.fundamentalsUrl(job.symbol, root.nowSecond()))
+    return !pair || (!!rates[pair] && clock.wallSecond() - rates[pair].checkedAt < day)
   }
 
   function run(url) {
@@ -101,14 +114,18 @@ Item {
   function pump() {
     if (!pendingUrl || (clearance && !clearance())) return
     if (gate && gate.take(1) === 0) {
-      if (job.step === "rate") root.done()
-      else root.fail(job.symbol)
+      if (job.step !== "rate") {
+        root.fail(job.symbol)
+        return
+      }
+      root.miss(job.symbol)
+      root.done()
       return
     }
     if (gate) root.ticket = gate.ticket
     // A series held while the screens are off ends at wake, not at the
     // earlier ask. The close refers to a fixed date and keeps its URL.
-    var url = job.step === "series" ? Fundamentals.fundamentalsUrl(job.symbol, root.nowSecond()) : pendingUrl
+    var url = job.step === "series" ? Fundamentals.fundamentalsUrl(job.symbol, clock.wallSecond()) : pendingUrl
     fetchProc.command = Fetch.curlCommand([url], Fetch.FUNDAMENTALS_CAP)
     root.pendingUrl = ""
     fetchProc.running = true
@@ -132,7 +149,7 @@ Item {
     }
     if (step === "rate") {
       var held = Object.assign({}, rates)
-      held[job.pair] = { value: read, checkedAt: root.nowSecond() }
+      held[job.pair] = { value: read, checkedAt: clock.wallSecond() }
       root.rates = held
       root.done()
     } else if (!read) {
@@ -141,7 +158,7 @@ Item {
       root.job = Object.assign({}, job, { step: "close", figures: read })
       root.run(Fundamentals.capCloseUrl(job.symbol, read))
     } else {
-      root.keep(job.symbol, { status: "ok", figures: read, checkedAt: root.nowSecond() })
+      root.keep(job.symbol, { status: "ok", figures: read, checkedAt: clock.wallSecond() })
       root.askRate(read)
     }
   }
@@ -162,6 +179,7 @@ Item {
   // they are the truth for the EPS, so it stands, with its rate asked, and
   // the cap stays unknown until its close is.
   function fail(symbol) {
+    root.miss(symbol)
     var series = job.figures ? { figures: { cap: null, eps: job.figures.eps } } : {}
     root.keep(symbol, Object.assign({ figures: null, checkedAt: 0 }, entries[symbol], { status: "failed" }, series))
     if (job.figures) root.askRate(job.figures)
@@ -177,7 +195,7 @@ Item {
   function done() {
     root.pendingUrl = ""
     root.job = null
-    root.launch()
+    root.look()
   }
 
   Process {

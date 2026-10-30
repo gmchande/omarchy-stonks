@@ -58,7 +58,6 @@ Harness {
       screens.answering = false
       service.screens = null
       service.clockOffset = 0
-      service.testFundamentals.clockOffset = 0
       service.tick()
       service.surfaceShown(harness, false)
       service.setRange("1D")
@@ -255,7 +254,7 @@ Harness {
       screens.screensOff = true
       service.screensAnsweredMs = Date.now()
       var before = calls("FUNDAMENTALS")
-      service.testFundamentals.fetch("AAPL")
+      service.testFundamentals.wanted = [{ symbol: "AAPL", currency: "USD" }]
       app.open("{}")
       awaitState(function() { return !!app.testBody }, 3000)
       var body = app.testBody
@@ -273,20 +272,21 @@ Harness {
       check("dark fundamentals and a first search start no HTTP request",
         searchHeld && calls("FUNDAMENTALS") === before && calls("SEARCH.asked") === searches)
       var queuedEnd = Number(/period2=(\d+)/.exec(service.testFundamentals.pendingUrl)[1])
-      service.testFundamentals.clockOffset = 24 * 60 * 60
+      service.clockOffset = 24 * 60 * 60
       wake()
       awaitState(function() { return body.search.resultsQuery === "ZZZ" && !service.testFundamentals.busy }, 6000)
       check("wake resumes both pending search and fundamentals", calls("SEARCH.asked") === searches + 1
         && calls("FUNDAMENTALS") === before + 2 && service.fundamentals.AAPL.status === "ok")
       check("a fundamentals snapshot held overnight ends at wake, not at the earlier ask",
         harness.snapshotEnd >= queuedEnd + 24 * 60 * 60, queuedEnd + " queued, " + harness.snapshotEnd + " sent")
-      service.testFundamentals.clockOffset = 0
+      service.clockOffset = 0
+      service.tick()
       body.cancelAdding()
       // The snapshot lands in the dark; its closes, a separate command, must
       // wait for a screen.
       flag("FUNDAMENTALS.hold", true)
       before = calls("FUNDAMENTALS")
-      service.testFundamentals.fetch("MSFT")
+      service.testFundamentals.wanted = [{ symbol: "MSFT", currency: "USD" }]
       awaitState(function() { return calls("FUNDAMENTALS") === before + 1 }, 3000)
       screens.screensOff = true
       flag("FUNDAMENTALS.hold", false)
@@ -300,13 +300,32 @@ Harness {
       // Closes whose offset is {"toString": null} throw as they are read.
       var feed = service.testFundamentals
       before = calls("FUNDAMENTALS")
-      feed.fetch("SKEWED")
+      feed.wanted = [{ symbol: "SKEWED", currency: "USD" }]
       awaitState(function() { return calls("FUNDAMENTALS") === before + 2 }, 3000)
-      feed.fetch("NVDA")
+      feed.wanted = [{ symbol: "NVDA", currency: "USD" }]
       var nextCame = within(5000, function() { return !feed.busy && !!feed.entries.NVDA && feed.entries.NVDA.status === "ok" })
       check("closes that throw as they are read fail their own cap and P/E, and the next symbol's still comes",
         nextCame && !!feed.entries.SKEWED && feed.entries.SKEWED.status === "failed",
         JSON.stringify({ skewed: feed.entries.SKEWED, nvda: feed.entries.NVDA && feed.entries.NVDA.status, busy: feed.busy }))
+      // A rate the gate holds back waits for Yahoo: MSFT's figures fresh, as
+      // if priced in CAD with earnings in USD and no USDCAD rate yet, while
+      // Yahoo refuses. Nothing goes and the feed settles, and the rate comes
+      // once Yahoo answers again.
+      var gate = service.testGate
+      var noRate = Object.assign({}, feed.rates)
+      delete noRate.USDCAD
+      feed.rates = noRate
+      var rateCalls = calls("RATE")
+      gate.report(["refused"], 60, gate.ticket)
+      feed.wanted = [{ symbol: "MSFT", currency: "CAD" }]
+      var heldSettled = within(2000, function() { return !feed.busy })
+      var heldCalls = calls("RATE")
+      gate.report(["ok"], 0, gate.ticket)
+      var rateCame = within(5000, function() { return !!feed.rates.USDCAD && !feed.busy })
+      check("a rate Yahoo's pause holds back asks nothing more, and comes once Yahoo answers again",
+        heldSettled && heldCalls === rateCalls && rateCame && calls("RATE") === rateCalls + 1,
+        JSON.stringify({ settled: heldSettled, whilePaused: heldCalls - rateCalls, came: rateCame, asked: calls("RATE") - rateCalls }))
+      feed.wanted = []
     }
 
     function test_5_malformedOvernightRecovers() { guarded("test_5_malformedOvernightRecovers", checks_test_5_malformedOvernightRecovers) }

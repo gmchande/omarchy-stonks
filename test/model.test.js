@@ -1377,15 +1377,16 @@ test("the rows in sight have their charts fetched ahead, the heroes' aside, as m
   expect(M.aheadCharts(["A"], "1M", { "A|1W": {} }, {})).toEqual(["A"])
 })
 
-test("a cap and P/E asked for before its quote waits in its asker's place, and only an equity's is fetched", () => {
-  const none = { stock: "", preview: "" }
-  const early = M.fundamentalsAsk(none, "stock", "MSFT", null)
-  expect(early).toEqual({ pending: { stock: "MSFT", preview: "" }, fetch: false })
-  // The preview's ask leaves the stock's waiting.
-  const both = M.fundamentalsAsk(early.pending, "preview", "SHOP.TO", null).pending
-  expect(both).toEqual({ stock: "MSFT", preview: "SHOP.TO" })
-  expect(M.fundamentalsAsk(both, "stock", "MSFT", usStock("MSFT"))).toEqual({ pending: { stock: "", preview: "SHOP.TO" }, fetch: true })
-  expect(M.fundamentalsAsk(none, "stock", "BTC-USD", coin("BTC-USD")).fetch).toBe(false)
+test("the caps and P/Es wanted are the heroes on show's, the stock on show first, each once its quote is in, and only an equity's", () => {
+  const quotes = { MSFT: { ...usStock("MSFT"), currency: "USD" }, "BTC-USD": coin("BTC-USD") }
+  const preview = { "SHOP.TO": { ...usStock("SHOP.TO"), exchange: "TOR", currency: "CAD" } }
+  // SHOP.TO, search's preview, before its quote and after.
+  expect(M.figuresWanted(["MSFT", "SHOP.TO"], quotes, {})).toEqual([{ symbol: "MSFT", currency: "USD" }])
+  expect(M.figuresWanted(["MSFT", "SHOP.TO"], quotes, preview))
+    .toEqual([{ symbol: "MSFT", currency: "USD" }, { symbol: "SHOP.TO", currency: "CAD" }])
+  expect(M.figuresWanted(["MSFT", "MSFT"], quotes, {})).toEqual([{ symbol: "MSFT", currency: "USD" }])
+  expect(M.figuresWanted(["BTC-USD"], quotes, {})).toEqual([])
+  expect(M.figuresWanted([], quotes, preview)).toEqual([])
 })
 
 test("the clock steps just past each second while a surface is open and each minute while none is, sooner for a quote due or a pause ending", () => {

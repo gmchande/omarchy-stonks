@@ -663,6 +663,10 @@ Harness {
       tryVerify(function() { return service.testPreviewFeed.firstRun.length === 0 }, 3000)
       harness.check("a preview held while the network was down is fetched once it is back",
         harness.requests().slice(offFrom).some(function(l) { return l === "chart AAPL 200" }), harness.requests().slice(offFrom).join(", "))
+      // Its cap and P/E too, which a request held by the pause failed.
+      var previewFigures = within(3000, function() { return harness.requests().slice(offFrom).some(function(l) { return l === "fundamentals AAPL 200" }) })
+      harness.check("a preview held while the network was down gets its cap and P/E once it is back",
+        previewFigures, harness.requests().slice(offFrom).filter(function(l) { return /^(fundamentals|rate) /.test(l) }).join(", ") || "none asked")
       service.preview(body, "")
 
       // Back after two minutes off, as on a train: the pause between tries

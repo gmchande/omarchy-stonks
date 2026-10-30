@@ -202,8 +202,8 @@ function answerVerdict(kind, outcome, tries, judgingOnly) {
 // symbol alone, the same way, so the newest price on top of the pill
 // (`Overnight.newestPrint`) stays current. Otherwise, with nothing open,
 // for the pill's symbol alone, what Robinhood has not answered for it,
-// failed or not, as soon as Yahoo has answered it live: once for each
-// stock the pill shows. The chart waited on, the preview's or else the
+// failed or not, as soon as Yahoo has answered it live: at most once for
+// each stock the pill shows. The chart waited on, the preview's or else the
 // pill's, goes alone ahead of the rest while it has no answer. `allDay`
 // and `nights` are the two feeds' entries; `quoteEntries` Yahoo's.
 function overnightAsks(s) {
@@ -336,26 +336,20 @@ function aheadCharts(rows, range, entries, missed) {
 
 // ---- Cap and P/E
 
-// The asks for a hero's cap and P/E waiting on a quote, one for each asker
-// (`pending`: "stock", the stock on show, and "preview", search's), so
-// neither's ask takes the other's: `pending` with `asker`'s now `symbol`,
-// "" for none, and `pending` itself when that is no change.
-function pendingWith(pending, asker, symbol) {
-  if (pending[asker] === symbol) return pending
-  var next = Object.assign({}, pending)
-  next[asker] = symbol
-  return next
-}
-
-// An ask for `symbol`'s cap and P/E by `asker`, its quote `quote` or none:
-// { pending, fetch }. Asked before its quote, it waits in its asker's place
-// until one lands; with one, it is fetched only for an equity
-// (`Fundamentals.hasFundamentals`).
-function fundamentalsAsk(pending, asker, symbol, quote) {
-  return {
-    pending: pendingWith(pending, asker, quote ? "" : symbol),
-    fetch: !!quote && Fundamentals.hasFundamentals(quote)
-  }
+// The caps and P/Es the heroes on show need (`heroes`,
+// `Service.heroesOnShow`), in their order, each { symbol, currency }: an
+// equity's (`Fundamentals.hasFundamentals`), once its quote is in, from
+// `quotes` or else `previewQuotes`. One without its quote yet joins when it
+// lands.
+function figuresWanted(heroes, quotes, previewQuotes) {
+  var wanted = []
+  heroes.forEach(function(s) {
+    var quote = quotes[s] || previewQuotes[s]
+    if (!quote || !Fundamentals.hasFundamentals(quote)) return
+    if (wanted.some(function(w) { return w.symbol === s })) return
+    wanted.push({ symbol: s, currency: String(quote.currency || "") })
+  })
+  return wanted
 }
 
 // ---- The clock
