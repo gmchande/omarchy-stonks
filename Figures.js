@@ -299,7 +299,9 @@ function dayTitles() {
 
 // The day the rows measure, named above them: "TODAY", or, where every US
 // stock and ETF among them (`symbols`, `quotes`) measures one day that has
-// ended by `now`, that day's name, "FRI" at the weekend; rows measuring
+// ended by `now`, that day's name, "FRI" at the weekend, and "FRI + NIGHT"
+// once a row's newest price is a night's trade joined to it
+// (`nightJoined`), on Sunday night or past midnight; rows measuring
 // tomorrow from tonight's trades say TODAY. A row measures the
 // day of its newest price since the close (`newest`, by symbol,
 // `Overnight.newestPrint`), else its headline's; one with no time names no
@@ -307,6 +309,7 @@ function dayTitles() {
 // measure their own days, which their rows name.
 function rowsDay(symbols, quotes, newest, now, calendars) {
   var shared = null
+  var night = false
   for (var i = 0; i < symbols.length; i++) {
     var q = quotes[symbols[i]]
     if (!q || !Overnight.hasOvernight(q, calendars)) continue
@@ -316,9 +319,10 @@ function rowsDay(symbols, quotes, newest, now, calendars) {
     var day = { quote: q, t: t, day: exchangeDay(q, t) }
     if (shared && shared.day !== day.day) return "TODAY"
     shared = day
+    night = night || nightJoined(newest[symbols[i]])
   }
   var today = shared ? exchangeDay(shared.quote, now) : null
-  return !shared || shared.day >= today ? "TODAY" : dayName(shared.quote, shared.t, today)
+  return !shared || shared.day >= today ? "TODAY" : dayName(shared.quote, shared.t, today) + (night ? " + NIGHT" : "")
 }
 
 // How the list reads on the figures its rows show: up, flat, and down, and
@@ -451,25 +455,59 @@ function closeLine(quote, today, changeMode, newest) {
 // day where the listing trades when it isn't `now`'s: "OVERNIGHT 23:25",
 // "AFTER HOURS FRI 19:55"; on a longer range after what its move is
 // measured over (`period`, "1W", or "SINCE OPEN"), "1W · OVERNIGHT 23:25",
-// so the range's move never reads as the night's. Each form shorter than
-// the one before, for a caption with no room for the one before: then
-// without the day, then, with a period, the period alone, which says what
-// the move is measured over.
-// Upper case for the hero's caption; the rows and the pill's hover say it
-// in sentence case (`newestNote`).
+// so the range's move never reads as the night's. A night's trade joined
+// to the day that closed (`nightJoined`) names the close its move counts
+// from instead, "SINCE WED CLOSE · 21:50": that move covers the closed day
+// too. Each form shorter than the one before, for a caption with no room
+// for the one before: then without the day, then, with a period, the
+// period alone, which says what the move is measured over; a night's, the
+// close alone.
+// Upper case for the hero's caption; the pill's hover says it in sentence
+// case (`newestNote`), and a row gives the time alone (`newestTime`).
 function newestCaptions(quote, newest, now, calendars, period) {
-  var label = (period ? period + " · " : "") + (newest.phase === "overnight" ? "OVERNIGHT" : newest.phase === "post" ? "AFTER HOURS" : "PRE-MARKET")
-  var clock = Market.printClock(quote, newest.t, calendars)
   var day = Market.printDay(quote, newest.t, now, calendars).toUpperCase()
+  var clock = Market.printClock(quote, newest.t, calendars)
+  if (!period && nightJoined(newest)) {
+    var named = "SINCE " + closeBefore(quote, newest, calendars).toUpperCase() + " CLOSE"
+    return [named + " · " + day + clock, named + " · " + clock, named]
+  }
+  var label = (period ? period + " · " : "") + (newest.phase === "overnight" ? "OVERNIGHT" : newest.phase === "post" ? "AFTER HOURS" : "PRE-MARKET")
   var forms = [label + " " + day + clock, label + " " + clock]
   return period ? forms.concat([period]) : forms
 }
 
-// The newest price's session and time as a row's name line and the pill's
-// hover say it: "Overnight 23:25", "After hours Fri 19:55".
+// Whether the newest price on top (`Overnight.newestPrint`) is a night's
+// trade joined to the day that closed before it, until 04:00
+// (`newest.joined`), so its move counts from the close before that day.
+function nightJoined(newest) {
+  return !!newest && !!newest.joined
+}
+
+// The weekday of the regular close before the day the newest price's move
+// is measured on (`newest.dayStart`), by its calendar: "Fri" for Monday's.
+function closeBefore(quote, newest, calendars) {
+  var cal = Market.calendarFor(calendars, quote)
+  var date = Market.dateStringOf(Market.localDate(newest.dayStart, cal))
+  for (var i = 0; i < 10; i++) {
+    date = Market.previousDateString(date)
+    if (Market.dayKind(cal, date).kind === "open") break
+  }
+  return Format.WEEKDAYS[new Date(date + "T12:00:00Z").getUTCDay()]
+}
+
+// The newest price's session and time as the pill's hover says it:
+// "After hours Fri 19:55", "Pre-market 07:00", and at night the close its
+// move counts from, "Since Fri close · 21:50", as the hero's caption.
 function newestNote(quote, newest, now, calendars) {
-  var label = newest.phase === "overnight" ? "Overnight" : newest.phase === "post" ? "After hours" : "Pre-market"
-  return label + " " + Market.printDay(quote, newest.t, now, calendars) + Market.printClock(quote, newest.t, calendars)
+  var time = newestTime(quote, newest, now, calendars)
+  if (nightJoined(newest)) return "Since " + closeBefore(quote, newest, calendars) + " close · " + time
+  return (newest.phase === "overnight" ? "Overnight" : newest.phase === "post" ? "After hours" : "Pre-market") + " " + time
+}
+
+// The newest price's time, with its day where the listing trades when it
+// isn't `now`'s: "21:50", "Fri 19:42". A row says it after the name.
+function newestTime(quote, newest, now, calendars) {
+  return Market.printDay(quote, newest.t, now, calendars) + Market.printClock(quote, newest.t, calendars)
 }
 
 // Whether the newest price on top is old: a night's print missed by more

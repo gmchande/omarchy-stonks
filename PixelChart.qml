@@ -71,11 +71,11 @@ Item {
   // once they have: what is laid over the ink draws in with it
   // (`RangeMarks`).
   readonly property real inkDrawn: replayX < 0 && reveal >= 1 ? width : curtain.width
-  // The stems are retro's wash: the up colour's at 35%, dimmer for the
-  // extended hours, and each side at the alpha that adds the same lightness
-  // over the ground (`Tones.washAlpha`), never more than half the ink of the
-  // cap above it (full, or the extended hours' 45%). A cap is the line, one
-  // share of its own colour on both sides.
+  // The stems are retro's wash: the up colour's at 35%, dimmer under a cap
+  // the line draws dim, and each side at the alpha that adds the same
+  // lightness over the ground (`Tones.washAlpha`), never more than half the
+  // ink of the cap above it (full, or a dim cap's 45%). A cap is the line,
+  // one share of its own colour on both sides.
   // `solid` draws each stem at its cap's ink instead, for a chart so small
   // that faint stems leave only the caps, a dotted line: the pill's, 13
   // columns at 1x.
@@ -99,7 +99,9 @@ Item {
   // the price at the end of that stretch of the axis. A column no print
   // falls in, between two prints the line joins, holds the last print
   // before it: the price then. Only a break (`brk`) leaves columns dark, as
-  // it lifts the smooth look's pen.
+  // it lifts the smooth look's pen. A column's cap and stem are dimmer
+  // where the line draws dim (`dim`): the extended hours, or all but what
+  // trades now.
   function layout() {
     var pitch = pixel + gap
     var g = {
@@ -108,29 +110,29 @@ Item {
       rows: Math.max(1, Math.floor(height / pixel)),
       baseRow: 0,
       levels: [],
-      ext: [],
-      lastRegular: -1
+      dim: [],
+      lastLit: -1
     }
     if (!geometry || !geometry.points) return g
     // With no previous close known, the columns stand on the chart's floor.
     g.baseRow = hasBaseline ? Math.round(geometry.baselineY * (g.rows - 1)) : g.rows - 1
     var pts = geometry.points
-    // The cap sits on the last column whose own last print is regular,
+    // The lit cell sits on the last column whose own last print is bright,
     // never on one held after it. A column stays on the grid at both ends,
     // so the fill between two prints never runs past it.
     var last = -1
     for (var i = 0; i < pts.length; i++) {
       var col = Math.max(0, Math.min(g.columns - 1, Math.floor(pts[i].x * g.columns)))
-      if (col !== last && last >= 0 && !g.ext[last]) g.lastRegular = last
+      if (col !== last && last >= 0 && !g.dim[last]) g.lastLit = last
       for (var held = last + 1; i > 0 && !pts[i].brk && held < col; held++) {
         g.levels[held] = g.levels[last]
-        g.ext[held] = g.ext[last]
+        g.dim[held] = g.dim[last]
       }
       g.levels[col] = Math.round(pts[i].y * (g.rows - 1))
-      g.ext[col] = pts[i].ext
+      g.dim[col] = pts[i].dim
       last = col
     }
-    if (last >= 0 && !g.ext[last]) g.lastRegular = last
+    if (last >= 0 && !g.dim[last]) g.lastLit = last
     return g
   }
 
@@ -205,13 +207,13 @@ Item {
           var y = g.levels[c] * pixel
           var above = g.levels[c] <= baseRow
           var color = above ? root.aboveColor : root.belowColor
-          var dim = g.ext[c] ? 0.45 : 1
+          var dim = g.dim[c] ? 0.45 : 1
           var x = c * g.pitch
           var top = Math.min(y, baseY)
           var h = Math.abs(y - baseY)
           // The stem from each cap down to the baseline.
           if (h > 0) {
-            var stem = g.ext[c] ? (above ? root.aboveStemDim : root.belowStemDim) : (above ? root.aboveStem : root.belowStem)
+            var stem = g.dim[c] ? (above ? root.aboveStemDim : root.belowStemDim) : (above ? root.aboveStem : root.belowStem)
             ctx.fillStyle = Qt.rgba(color.r, color.g, color.b, stem)
             ctx.fillRect(x, top, pixel, h)
           }
@@ -263,14 +265,14 @@ Item {
     color: root.hairlineColor
   }
 
-  // The last regular print: one white cell over the cap, the pixel version
-  // of the smooth chart's dot. Only once the day has drawn in.
+  // The newest bright print: one white cell over the cap, the pixel
+  // version of the smooth chart's dot. Only once the day has drawn in.
   Rectangle {
     id: cap
     objectName: "liveCap"
-    visible: root.glow && root.day && root.grid.lastRegular >= 0 && root.reveal >= 1 && root.replayX < 0
-    x: root.grid.lastRegular * root.grid.pitch
-    y: visible ? root.grid.levels[root.grid.lastRegular] * root.pixel : 0
+    visible: root.glow && root.day && root.grid.lastLit >= 0 && root.reveal >= 1 && root.replayX < 0
+    x: root.grid.lastLit * root.grid.pitch
+    y: visible ? root.grid.levels[root.grid.lastLit] * root.pixel : 0
     width: root.pixel
     height: root.pixel
     color: root.hairlineColor

@@ -144,6 +144,20 @@ every_state() (
     watch-2026-10-26-0420-shel.l coin-2026-10-25-2005-btc-usd watch-2026-10-26-1800-cvr; do
     states="$states popup-sweep-$moment-smooth popup-sweep-$moment-retro"
   done
+  # 1D at night, the owner's complaints kept in sight: Thursday 29 October
+  # at 21:55, Nebius's day with tonight bright at its end and the close it
+  # counts from named, at text size 16 too; J&J's thin night; Power
+  # Solutions' finished day, edge to edge; bitcoin's two-day answer, its
+  # last 24 hours. Sunday 21:00, Friday then tonight; Tuesday 01:30, Monday
+  # and its night under MON + NIGHT; Tuesday 03:50 and the turn at 04:05;
+  # Monday 07:00, the pre-market bright.
+  for moment in thu-2026-10-29-2155-nbis thu-2026-10-29-2155-jnj thu-2026-10-29-2155-psix thu-2026-10-29-2155-btc-usd \
+    watch-2026-10-25-2100-nbis watch-2026-10-27-0130-nbis watch-2026-10-27-0350-nbis watch-2026-10-27-0405-nbis \
+    watch-2026-10-26-0700-nbis; do
+    states="$states popup-sweep-$moment-smooth popup-sweep-$moment-retro"
+  done
+  states="$states popup-sweep-thu-2026-10-29-2155-nbis-smooth-size-16 popup-sweep-thu-2026-10-29-2155-nbis-retro-size-16"
+  states="$states window-sweep-thu-2026-10-29-2155-nbis-smooth"
   # NBIS on Sunday night and Monday evening on 1W, 1M and 1Y: each range's
   # line ends on the newest price, the one on top. And its longest caption,
   # YTD after hours at the weekend, at text size 16.

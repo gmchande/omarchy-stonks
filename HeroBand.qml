@@ -61,7 +61,8 @@ Item {
   property string order: "manual"
   property bool reversed: false
   property string listLabel: "All"
-  // The day the rows measure (`Figures.rowsDay`): "TODAY", or "FRI".
+  // The day the rows measure (`Figures.rowsDay`): "TODAY", "FRI", or
+  // "MON + NIGHT".
   property string rowsDay: "TODAY"
   property var breadth: ({ list: "", up: 0, flat: 0, down: 0, none: 0 })
   property bool listMenuOpen: false

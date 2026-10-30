@@ -99,12 +99,14 @@ Rectangle {
   readonly property string freshnessNote: quote ? Figures.freshnessText(shownFreshness, quote, calendars) : ""
   // An aged quote is said plainly; only a failed or overdue refresh warns
   // (`! `). The hero says the same on its listing line. A newest price
-  // since the close says its session and time (`newestNote`) where the
-  // name was.
-  property string newestNote: ""
+  // since the close says its time after the name (`newestTime`), the name
+  // giving way so the time stays whole.
+  property string newestTime: ""
   readonly property string detail: quote
-    ? (freshnessNote !== "" ? (warns ? "! " : "") + capitalize(freshnessNote) : newestNote !== "" ? newestNote : view.name)
+    ? (freshnessNote !== "" ? (warns ? "! " : "") + capitalize(freshnessNote) : view.name)
     : sourceDown ? "" : (status === "failed" ? "! No data for this symbol" : warns ? "! No data" : "Loading…")
+  readonly property string detailTime: quote && freshnessNote === "" && newestTime !== ""
+    ? (detail !== "" ? " · " : "") + newestTime : ""
 
   // Sentence case, a day's name kept a name and a zone's its capitals:
   // "As of Fri 16:00", "As of Thu 16:39 BST".
@@ -229,7 +231,7 @@ Rectangle {
           x: row.gap
           anchors.bottom: parent.bottom
           anchors.bottomMargin: row.inset
-          width: row.width - x - row.priceWidth - row.gap * 2 - row.sparkWidth - row.gap
+          width: Math.min(implicitWidth, row.width - x - row.priceWidth - row.gap * 2 - row.sparkWidth - row.gap - timeText.implicitWidth)
           textFormat: Text.PlainText
           text: row.detail
           color: row.warns ? row.foreground : row.dim
@@ -237,6 +239,18 @@ Rectangle {
           font.pixelSize: Style.font.bodySmall
           font.bold: row.warns
           elide: Text.ElideRight
+        }
+        Text {
+          id: timeText
+          objectName: "rowTime"
+          visible: detailText.visible
+          x: detailText.x + detailText.width
+          anchors.baseline: detailText.baseline
+          textFormat: Text.PlainText
+          text: row.detailTime
+          color: row.dim
+          font.family: row.fontFamily
+          font.pixelSize: Style.font.bodySmall
         }
 
         // The shell's row action (PanelActionButton, as Bluetooth's Forget): dim
