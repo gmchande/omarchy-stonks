@@ -83,4 +83,4 @@ for someone who has never seen Stonks and gives it thirty seconds.
 - Read Omarchy's colors as `Commons.Color`, after `import qs.Commons as
   Commons`: a bare `Color` is Qt's own type.
 
-Also read `AGENTS.local.md` when it exists: it holds this machine's rules.
+Also read @AGENTS.local.md when it exists: it holds this machine's rules.
