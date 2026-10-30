@@ -219,8 +219,11 @@ Harness {
       check("while a night trades, the open surface asks every five minutes, for the last hour only, the chart Friday then Sunday's night from 20:00",
         Number(calls) + 1 === sundayCalls && Number(harness.record("OVERNIGHT.calls")) === sundayCalls + 1 && lastSpan() === "hour"
           && within(2000, function() {
-            var skip = body.featuredDay.axis.skip
-            return !!skip && skip.to === harness.midnight.fri25 + 2 * 86400 + 20 * 3600 && harness.top() === "SINCE THU CLOSE · 22:20 234.84 \u22123.55%"
+            var day = body.featuredDay
+            var skip = day.axis.skip
+            return !!skip && skip.to === harness.midnight.fri25 + 2 * 86400 + 20 * 3600
+              && day.points.some(function(p) { return p.t < skip.from }) && day.points.some(function(p) { return p.t >= skip.to && p.s === "overnight" })
+              && harness.top() === "SINCE THU CLOSE · 22:20 234.84 \u22123.55%"
           }),
         calls + ", " + sundayCalls + ", " + harness.record("OVERNIGHT.calls") + " " + lastSpan() + " | " + harness.top())
 
@@ -363,8 +366,9 @@ Harness {
         var digits = service.quotes.TOY.priceDigits
         var missed = trades.filter(function(p) { return read.indexOf(Format.money(p.p, digits)) < 0 })
           .map(function(p) { return Format.hhmm(p.t, offset) })
-        check(look + ": a replay starts at Friday's first trade and reads every trade of the night",
-          trades.length === 5 && /^At Fri /.test(replayed) && replayed.split(" | ")[1] === Format.money(toy.points[0].p, digits) && missed.length === 0,
+        check(look + ": a replay starts at Friday's first trade, at its time, and reads every trade of the night",
+          trades.length === 5 && replayed === "At Fri " + Format.hhmm(toy.points[0].t, offset) + " · Overnight | " + Format.money(toy.points[0].p, digits)
+            && missed.length === 0,
           trades.length + " trades ; " + replayed + " ; missed " + missed.join(", "))
       })
 

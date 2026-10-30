@@ -438,9 +438,7 @@ function windowTicks(cal, win, session) {
 }
 
 // The sessions drawn bright while they trade (`litFrom`); the rest of the
-// day is dim. The owner chose tonight's on 30 October; the pre-market's and
-// after hours' are theirs to confirm, and leaving one out of this list
-// lights the session through it instead.
+// day is dim. The owner chose all three on 30 October.
 var LIT_SESSIONS = ["pre", "post", "overnight"]
 
 // Where the bright part of a day's line starts (`Chart.chartGeometry`):

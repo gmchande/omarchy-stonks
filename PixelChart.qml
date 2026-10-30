@@ -71,11 +71,11 @@ Item {
   // once they have: what is laid over the ink draws in with it
   // (`RangeMarks`).
   readonly property real inkDrawn: replayX < 0 && reveal >= 1 ? width : curtain.width
-  // The stems are retro's wash: the up colour's at 35%, dimmer for the
-  // extended hours, and each side at the alpha that adds the same lightness
-  // over the ground (`Tones.washAlpha`), never more than half the ink of the
-  // cap above it (full, or the extended hours' 45%). A cap is the line, one
-  // share of its own colour on both sides.
+  // The stems are retro's wash: the up colour's at 35%, dimmer under a cap
+  // the line draws dim, and each side at the alpha that adds the same
+  // lightness over the ground (`Tones.washAlpha`), never more than half the
+  // ink of the cap above it (full, or a dim cap's 45%). A cap is the line,
+  // one share of its own colour on both sides.
   // `solid` draws each stem at its cap's ink instead, for a chart so small
   // that faint stems leave only the caps, a dotted line: the pill's, 13
   // columns at 1x.
@@ -99,9 +99,9 @@ Item {
   // the price at the end of that stretch of the axis. A column no print
   // falls in, between two prints the line joins, holds the last print
   // before it: the price then. Only a break (`brk`) leaves columns dark, as
-  // it lifts the smooth look's pen. A column's stem is dimmer for the
-  // extended hours (`ext`), as the smooth wash covers the session, and its
-  // cap for whatever the line draws dim (`dim`).
+  // it lifts the smooth look's pen. A column's cap and stem are dimmer
+  // where the line draws dim (`dim`): the extended hours, or all but what
+  // trades now.
   function layout() {
     var pitch = pixel + gap
     var g = {
@@ -110,7 +110,6 @@ Item {
       rows: Math.max(1, Math.floor(height / pixel)),
       baseRow: 0,
       levels: [],
-      ext: [],
       dim: [],
       lastLit: -1
     }
@@ -127,11 +126,9 @@ Item {
       if (col !== last && last >= 0 && !g.dim[last]) g.lastLit = last
       for (var held = last + 1; i > 0 && !pts[i].brk && held < col; held++) {
         g.levels[held] = g.levels[last]
-        g.ext[held] = g.ext[last]
         g.dim[held] = g.dim[last]
       }
       g.levels[col] = Math.round(pts[i].y * (g.rows - 1))
-      g.ext[col] = pts[i].ext
       g.dim[col] = pts[i].dim
       last = col
     }
@@ -216,7 +213,7 @@ Item {
           var h = Math.abs(y - baseY)
           // The stem from each cap down to the baseline.
           if (h > 0) {
-            var stem = g.ext[c] ? (above ? root.aboveStemDim : root.belowStemDim) : (above ? root.aboveStem : root.belowStem)
+            var stem = g.dim[c] ? (above ? root.aboveStemDim : root.belowStemDim) : (above ? root.aboveStem : root.belowStem)
             ctx.fillStyle = Qt.rgba(color.r, color.g, color.b, stem)
             ctx.fillRect(x, top, pixel, h)
           }

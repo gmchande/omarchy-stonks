@@ -103,22 +103,25 @@ after-hours price.
 
 The 1D chart shows one trading day, each price at its time, from the
 day's first trade, or the open if that's earlier, to the day's end while
-it runs, and to its last trade once it's over. What trades now is bright
-and the rest dim: the pre-market, the session, after hours, or the night.
-While the market rests, the session is bright.
+it runs, and to its last trade once it's over. The regular session is
+bright and the hours around it dim.
 
 For a US stock Robinhood trades at night, a day runs 24 hours, from its
 night's open the evening before (20:00, New York time) to the next. Through
 the night, until 04:00, the chart keeps the day that just closed and adds
 tonight's trades at its right end. Once the day's 24 hours are full, each
 five minutes added on the right takes five off the left, so nothing jumps.
+The session trading now is bright and the rest dim: the pre-market, the
+regular session, after hours, or tonight. Until that session's first trade,
+and while the market rests, the regular session stays bright.
 Soon after 04:00, once the new day's first prices arrive, the chart turns
 to the new day, which starts with the night just gone, and the move starts
-counting from the close just gone. A stock that
-didn't trade that night keeps its day until its next trade. After
-midnight the list says the day and its night, such as MON + NIGHT. Over a
-weekend or a holiday the chart shows the last trading day. On Sunday night
-and a holiday's evening, that day comes first, then the night, and the
+counting from the close just gone. A stock that didn't trade that night
+keeps its day until its next trade. Once the day's date has passed, the
+list says the day and its night: MON + NIGHT after midnight, FRI + NIGHT
+on Sunday night. Over a weekend or a holiday the chart shows the last
+trading day. On Sunday night and a holiday's evening, that day comes
+first, then the night, and the
 hours closed between them take no room. A day that closes early, such as
 the Friday after Thanksgiving, ends at 17:00 with no night after it.
 
