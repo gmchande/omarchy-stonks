@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import Quickshell.Hyprland
+import Quickshell.Wayland
 
 // Hosts the window, whatever is on the bar, and decides what a request for
 // it does with the panel and Hyprland's workspaces, and whether a screen
@@ -106,6 +107,17 @@ Item {
     function onRawEvent(event) {
       if (root.screensOff || root.screenOff || event.name === "activespecial") Hyprland.refreshMonitors()
     }
+  }
+  // Hyprland says nothing when a screen comes back on, so while every
+  // screen is off the first input after a second of none, the key press or
+  // pointer move that wakes them, asks again: what fell due goes at once,
+  // not at the clock's next step. Off, it hears nothing.
+  IdleMonitor {
+    id: input
+    enabled: root.screensOff
+    timeout: 1
+    respectInhibitors: false
+    onIsIdleChanged: if (!isIdle && root.screensOff) Hyprland.refreshMonitors()
   }
 
   // Omarchy's screensaver window opening closes the panel, which would

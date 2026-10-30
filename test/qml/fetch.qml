@@ -917,6 +917,55 @@ Harness {
         !unseenAsked && seenAsked, (unseenAsked ? "asked while out of sight" : "none while out of sight") + "; then " + figures().join(", "))
       service.feature("NEST")
       settle()
+      // In sight, a search that failed while Yahoo paused goes again as
+      // Yahoo answers, but waits on the screens' answer, slow to come, and
+      // the window leaves sight first: it is not asked for. Back in sight,
+      // it goes.
+      var body = app.testBody
+      var yahoo = service.testYahooGate
+      body.startAdding()
+      tryVerify(function() { return body.search.active }, 2000)
+      yahoo.begin("none", 60)
+      body.search.setQuery("SH")
+      var failedSearch = within(3000, function() { return body.search.answer === "failed" && body.search.resultsQuery === "SH" })
+      settle()
+      wait(1100)
+      screenStandIn.holding = true
+      var searchFrom = harness.calls("SEARCH.asked")
+      yahoo.report(["ok"], 0, yahoo.ticket)
+      var searchQueued = body.search.requestedQuery === "SH"
+      stonksToplevel.workspace = workspaceThere
+      var searchHidden = within(3000, function() { return service.openSurfaces.length === 0 })
+      screenStandIn.holding = false
+      screensHeard()
+      wait(600)
+      var unseenSearch = harness.calls("SEARCH.asked") - searchFrom
+      stonksToplevel.workspace = workspaceHere
+      var seenSearch = within(3000, function() { return harness.calls("SEARCH.asked") > searchFrom })
+      harness.check("a search that failed while Yahoo paused, its retry waiting on the screens' answer when the window leaves sight, is not asked for until back in sight",
+        failedSearch && searchQueued && searchHidden && unseenSearch === 0 && seenSearch,
+        [failedSearch, searchQueued, searchHidden, unseenSearch + " while out of sight", seenSearch].join(" | "))
+      // In sight, an edit stops the lookup still out for the old words, and
+      // the window leaves sight before that lookup's stream ends: the new
+      // words are not asked for until back in sight.
+      within(3000, function() { return body.search.answer !== "" })
+      touch("SEARCH.hold")
+      var oldFrom = harness.calls("SEARCH.asked")
+      body.search.setQuery("SHE")
+      var oldOut = within(3000, function() { return harness.calls("SEARCH.asked") > oldFrom })
+      var editFrom = harness.calls("SEARCH.asked")
+      body.search.setQuery("SHEL")
+      body.search.runSearch()
+      stonksToplevel.workspace = workspaceThere
+      remove("SEARCH.hold")
+      wait(800)
+      var unseenEdit = harness.calls("SEARCH.asked") - editFrom
+      stonksToplevel.workspace = workspaceHere
+      var seenEdit = within(3000, function() { return harness.calls("SEARCH.asked") > editFrom })
+      harness.check("an edit that stops the lookup out for the old words, the window leaving sight before it ends, asks the new words only once back in sight",
+        oldOut && unseenEdit === 0 && seenEdit, [oldOut, unseenEdit + " while out of sight", seenEdit].join(" | "))
+      body.cancelAdding()
+      settle()
 
       // 00:35, two screens: the window's switched off, the other on and
       // showing another workspace. No screen shows the window, so it asks
@@ -942,8 +991,8 @@ Harness {
       plugin.windowHost.monitors = []
 
       // Thursday 11:15, nothing open, every screen off: nothing is asked
-      // for, the pill's symbol included. With a screen on again, the next
-      // look asks at once for the pill's.
+      // for, the pill's symbol included. The key press that turns a screen
+      // on again asks at once for the pill's, with the clock still.
       startAt(at(harness.wed7 + 86400, 11, 15))()
       plugin.windowHost.monitors = [screenStandIn]
       screenStandIn.on = false
@@ -965,18 +1014,19 @@ Harness {
       service.refresh()
       screensHeard()
       var dark = harness.quoteCounts(harness.requests().slice(darkFrom))
-      screenStandIn.on = true
-      // The next look comes a minute on, when the screens' last answer is
-      // long past.
+      // A second with no input, then the key press that wakes the screen,
+      // when the screens' last answer is long past.
       wait(1100)
-      service.now += 60
-      within(3000, function() { return harness.quoteCounts(harness.requests().slice(darkFrom)).NEST > 0 })
+      plugin.windowHost.testInput.isIdle = true
+      screenStandIn.on = true
+      plugin.windowHost.testInput.isIdle = false
+      var woke = within(2000, function() { return harness.quoteCounts(harness.requests().slice(darkFrom)).NEST > 0 })
       settle()
       var lit = harness.quoteCounts(harness.requests().slice(darkFrom))
-      harness.check("every screen off, nothing is asked for, a refresh included; a screen on, the next look asks for the pill's symbol at once",
-        harness.listed.every(function(s) { return dark[s] === 0 })
+      harness.check("every screen off, nothing is asked for, a refresh included; the key press that turns a screen on asks for the pill's symbol at once",
+        woke && harness.listed.every(function(s) { return dark[s] === 0 })
           && harness.listed.every(function(s) { return lit[s] === (s === "NEST" ? 1 : 0) }),
-        "off: " + JSON.stringify(dark) + " | on: " + JSON.stringify(lit))
+        (woke ? "" : "not within 2 s | ") + "off: " + JSON.stringify(dark) + " | on: " + JSON.stringify(lit))
       harness.check("every screen off, the saved prices due are written, though the pill's ask waits for a screen", savedInDark, darkSave)
 
       // A run queued behind a host's pause, the screens gone off since

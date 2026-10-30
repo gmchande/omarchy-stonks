@@ -54,6 +54,18 @@ var LIVE_QUOTE_MAX_AGE = 120
 // a refresh owed counts as overdue.
 var OVERDUE_AFTER = 90
 
+// The second the first refresh owed turns overdue after `now`, by `owed`
+// (`QuoteFeed.owed`), so the clock can wake for the "!" only while
+// something is owed; 0 for none.
+function overdueAt(owed, now) {
+  var at = 0
+  for (var symbol in owed) {
+    var due = owed[symbol] + OVERDUE_AFTER
+    if (due > now && (!at || due < at)) at = due
+  }
+  return at
+}
+
 // How long, in seconds, a quote Stonks let go old, its last answer older
 // than a live one (LIVE_QUOTE_MAX_AGE), says nothing of its age once its
 // refresh is asked: about the time a normal answer takes, so a surface

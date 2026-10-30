@@ -296,6 +296,14 @@ FocusScope {
   // it does an emoji, and "other" for a bad answer or a spent budget.
   property string failure: ""
 
+  // Yahoo answered again after a pause (`Service.yahooBack`): a lookup that
+  // failed for want of Yahoo, nothing answering or Yahoo refusing or
+  // pausing, is asked again, once, as RETRY would. One whose words have
+  // changed is the typing's to ask.
+  function yahooBack() {
+    if (active && (failure === "none" || failure === "refused")) retry()
+  }
+
   // A lookup of the field's query. One for another query still out is
   // stopped, and this one goes as its stream ends (`land`): its answer
   // would be thrown away, and waiting it out holds the new query up to the
