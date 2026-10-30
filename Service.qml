@@ -1390,9 +1390,9 @@ Item {
 
   // The clock moves each second while a surface is open, for what it shows,
   // and each minute while none is; it also wakes at the second the next
-  // quote falls due (`dueAt`) and a host's pause ends, at once for one the
-  // wall clock has passed already. The wall clock is read in one place
-  // (`wallSecond`).
+  // quote falls due (`dueAt`), a host's pause ends, and a refresh owed turns
+  // overdue, so the pill's "!" comes on time; at once for one the wall clock
+  // has passed already. The wall clock is read in one place (`wallSecond`).
   function wallSecond() { return Math.floor(Date.now() / 1000) }
   function tick() {
     root.now = root.wallSecond()
@@ -1401,10 +1401,11 @@ Item {
   function armClock() {
     if (!root.pluginsReady) return
     clock.interval = Asks.clockWait(root.openSurfaces.length > 0, Date.now(), root.now,
-      [root.dueAt, yahooGate.pausedUntil, robinhoodGate.pausedUntil, githubGate.pausedUntil])
+      [root.dueAt, yahooGate.pausedUntil, robinhoodGate.pausedUntil, githubGate.pausedUntil, Figures.overdueAt(root.owed, root.now)])
     clock.restart()
   }
   onDueAtChanged: armClock()
+  onOwedChanged: armClock()
   onPluginsReadyChanged: armClock()
   Connections {
     target: yahooGate
