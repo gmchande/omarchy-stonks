@@ -254,7 +254,8 @@ Harness {
       screens.screensOff = true
       service.screensAnsweredMs = Date.now()
       var before = calls("FUNDAMENTALS")
-      service.testFundamentals.wanted = [{ symbol: "AAPL", currency: "USD" }]
+      // The window's stock is what's wanted (`Service.figuresWanted`).
+      service.feature("AAPL")
       app.open("{}")
       awaitState(function() { return !!app.testBody }, 3000)
       var body = app.testBody
@@ -286,7 +287,7 @@ Harness {
       // wait for a screen.
       flag("FUNDAMENTALS.hold", true)
       before = calls("FUNDAMENTALS")
-      service.testFundamentals.wanted = [{ symbol: "MSFT", currency: "USD" }]
+      service.feature("MSFT")
       awaitState(function() { return calls("FUNDAMENTALS") === before + 1 }, 3000)
       screens.screensOff = true
       flag("FUNDAMENTALS.hold", false)
@@ -297,6 +298,8 @@ Harness {
       check("wake sends the held fundamentals closes once", calls("FUNDAMENTALS") === before + 2 && service.fundamentals.MSFT.status === "ok")
       app.close()
       service.screens = null
+      // The feed's own rules from here, on what it is handed, as no stock on
+      // show can be: closes that throw, and a P/E in another currency.
       // Closes whose offset is {"toString": null} throw as they are read.
       var feed = service.testFundamentals
       before = calls("FUNDAMENTALS")
@@ -325,7 +328,7 @@ Harness {
       check("a rate Yahoo's pause holds back asks nothing more, and comes once Yahoo answers again",
         heldSettled && heldCalls === rateCalls && rateCame && calls("RATE") === rateCalls + 1,
         JSON.stringify({ settled: heldSettled, whilePaused: heldCalls - rateCalls, came: rateCame, asked: calls("RATE") - rateCalls }))
-      feed.wanted = []
+      feed.wanted = Qt.binding(function() { return service.figuresWanted })
     }
 
     function test_5_malformedOvernightRecovers() { guarded("test_5_malformedOvernightRecovers", checks_test_5_malformedOvernightRecovers) }
