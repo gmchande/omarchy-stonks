@@ -234,9 +234,8 @@ Item {
   // request out sends nothing more; each answer asks again for what is
   // still wanted, and one the gate held back goes as soon as it lets it.
   // Looked at as the clock ticks, answers land, the listings change, a
-  // surface opens, a preview rests, and the screens answer; never while
-  // every screen is off (`screensClear`).
-  property bool pillAsked: false
+  // surface opens, a preview rests, the chart changes, and the screens
+  // answer; never while every screen is off (`screensClear`).
   function askOvernight() {
     if (!root.pluginsReady) return
     var open = root.openSurfaces.length > 0
@@ -244,7 +243,6 @@ Item {
     if (!asks || !root.screensClear()) return
     // The pill's own ask waits for a request already out, then goes.
     if (!open && (allDayFeed.busy || overnightFeed.busy)) return
-    if (!open) root.pillAsked = true
     allDayFeed.fetch(asks.tradability, root.now)
     overnightFeed.fetch(asks.prints, root.now)
   }
@@ -254,7 +252,6 @@ Item {
     return Asks.overnightAsks({
       open: root.openSurfaces.length > 0,
       pill: root.view.featured,
-      pillAsked: root.pillAsked,
       quoteEntries: feed.entries,
       overnightSymbols: root.overnightSymbols,
       library: root.library,
@@ -906,6 +903,7 @@ Item {
     } else root.shownAsHero(view.featured)
     showHistory(false)
     askDue()
+    askOvernight()
   }
 
   // A chart fetched ahead and now on a hero, featured or previewed, is a

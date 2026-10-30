@@ -349,9 +349,9 @@ personal use, so either may change or stop without notice.
   leaves out a row whose market hasn't traded since its last price.
 - `query2.finance.yahoo.com` for search, as you type.
 - `api.robinhood.com` for overnight prices: once a day for which stocks
-  trade overnight, once for the pill's stock as the shell starts, and
-  every 5 minutes through the night for the pill's stock, and for every
-  row that trades overnight while the panel or the window is open.
+  trade overnight, once for each stock the pill shows, and every 5
+  minutes through the night for the pill's stock, and for every row that
+  trades overnight while the panel or the window is open.
 - `raw.githubusercontent.com` for the newest version number, as the shell
   starts and once a day. To turn this off, add `"updateCheck": false` to
   `~/.config/omarchy/grvc.stonks.json`.

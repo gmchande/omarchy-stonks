@@ -201,11 +201,11 @@ function answerVerdict(kind, outcome, tries, judgingOnly) {
 // asked with them. With nothing open while a night trades, the pill's
 // symbol alone, the same way, so the newest price on top of the pill
 // (`Overnight.newestPrint`) stays current. Otherwise, with nothing open,
-// once a session (`pillAsked`), for the pill's symbol alone, what
-// Robinhood has not answered for it, as soon as Yahoo has answered it
-// live. The chart waited on, the preview's or else the pill's, goes alone
-// ahead of the rest while it has no answer. `allDay` and `nights` are the
-// two feeds' entries; `quoteEntries` Yahoo's.
+// for the pill's symbol alone, what Robinhood has not answered for it,
+// failed or not, as soon as Yahoo has answered it live: once for each
+// stock the pill shows. The chart waited on, the preview's or else the
+// pill's, goes alone ahead of the rest while it has no answer. `allDay`
+// and `nights` are the two feeds' entries; `quoteEntries` Yahoo's.
 function overnightAsks(s) {
   var pill = s.pill
   var cal = Overnight.overnightMarket(s.calendars)
@@ -215,7 +215,7 @@ function overnightAsks(s) {
   var kept = s.open || night
   var pillEntry = s.quoteEntries[pill]
   var live = !!pillEntry && pillEntry.status === "ok" && s.overnightSymbols.indexOf(pill) >= 0
-  if (!kept && (s.pillAsked || !live)) return null
+  if (!kept && !live) return null
   var previewing = s.open && s.previewShown && !!s.previewQuote && s.library.indexOf(s.preview) < 0
     && Overnight.hasOvernight(s.previewQuote, s.calendars)
   var waited = previewing ? s.preview : pill
