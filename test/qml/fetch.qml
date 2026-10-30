@@ -1479,7 +1479,12 @@ Harness {
     // start offline shows.
     function test_cold() {
       if (harness.mode !== "cold") skip("another run")
-      tryVerify(function() { return !!service.entries.LATE && service.entries.LATE.status === "ok" && idle() && !!harness.cached().LATE }, 10000)
+      // LATE's price is read before its run's output ends (fetch.sh's
+      // EOF.delay): the save waits for that run, and goes on the clock's
+      // next step after it lands, as the clock moves on its own.
+      tryVerify(function() { return !!service.entries.LATE && service.entries.LATE.status === "ok" && idle() }, 10000)
+      service.now += 1
+      tryVerify(function() { return !!harness.cached().LATE }, 3000)
       tick(30)
       runCommand(["touch", harness.state + "/FAIL.quote.hold"])
       service.addSymbol("FAIL")

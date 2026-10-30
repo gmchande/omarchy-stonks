@@ -88,6 +88,10 @@ mkdir -p "$STONKS_FAKE_STATE"
 echo bell-2026-10-23-0929 listings-2026-10-07-1455 > "$STONKS_FAKE_STATE/overnight.set"
 printf '{ "version": 1, "symbols": ["LATE"], "featured": "LATE", "order": "manual", "refreshIntervalSec": 60 }\n' \
   > "$HOME/.config/omarchy/grvc.stonks.json"
+# Every run's output ends a moment after its last answer (bin/curl), so
+# the cold run's first save always waits out its run as a busy machine's
+# sometimes does.
+touch "$STONKS_FAKE_STATE/EOF.delay"
 STONKS_FETCH_RUN=cold run_qs 120
 [ "$main_code" -ne 0 ] && code=$main_code
 [ "$holiday_code" -ne 0 ] && code=$holiday_code
