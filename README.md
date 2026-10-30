@@ -251,8 +251,8 @@ again.
   If other sites load, Yahoo may be down or out of reach. Stonks retries
   within two minutes, and `r` retries at once.
 - **"Server busy".** Yahoo asked Stonks to send fewer requests. Stonks
-  retries at the time shown, from a minute to about half an hour on, and
-  `r` won't hurry it.
+  retries at the time shown, at most about half an hour on, and `r` won't
+  hurry it.
 - **"Not updating" or "No data" on a row, or "Can't get prices" in the
   header.** A price hasn't come in time. When that's true of every stock
   you follow, the header says so once instead of on every row. Rows keep
