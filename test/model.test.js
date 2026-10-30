@@ -1314,6 +1314,10 @@ test("Robinhood is asked once a session for the pill's stock with nothing open b
     nights: { AAPL: { status: "ok", at: now - ago } } })
   expect(asks(pillAnsweredAgo(60))).toBe(null)
   expect(asks(pillAnsweredAgo(5 * 60))).toEqual({ tradability: [], prints: ["AAPL"] })
+  // The pill on an index, answered live: with nothing open, by day or while
+  // a night trades, Robinhood is never asked about it.
+  const index = { pill: "^GSPC", quoteEntries: { "^GSPC": answered(now) } }
+  expect([asks({ ...index, now: noon }), asks(index)]).toEqual([null, null])
   // A surface open: every US listing, the pill's alone while it has no
   // answer.
   expect(asks({ open: true })).toEqual({ tradability: ["AAPL"], prints: ["AAPL"] })
