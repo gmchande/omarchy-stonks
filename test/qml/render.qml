@@ -5,6 +5,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "plugin/Asks.js" as Asks
 import "plugin/Cells.js" as Cells
 import "plugin/Chart.js" as Chart
 import "plugin/Fundamentals.js" as Fundamentals
@@ -585,10 +586,48 @@ Harness {
       var quotes = {}, entries = {}, nights = {}, allDay = {}
       // Read as the feeds read them, answered at the moment: the US listings
       // in cents from $1.
+      var ranges = {}
       listed.forEach(function(s) {
-        quotes[s] = Quote.parseChart(read(file(s)), Market.centExchanges(stub.calendars), root.now)
+        var answer = read(file(s))
+        ranges[s] = answer.chart.result[0].meta.range
+        quotes[s] = Quote.parseChart(answer, Market.centExchanges(stub.calendars), root.now)
         if (root.overnight.lastTrade) quotes[s] = Object.assign({}, quotes[s], { price: null, marketTime: null })
       })
+      // Each answer as Stonks asks for it at the moment, Yahoo's one day or
+      // two: two for every listing on a fresh shell's first ask, so a moment
+      // saved in two days throughout is that; otherwise as a surface open a
+      // while asks, by `Market.twoDays` judged on the saved answer, a row in
+      // a spark batch two when any of its batch wants two
+      // (`Asks.quoteSlots`). The other range draws another day, or a blank:
+      // a row saved in it is left out, those whose own ask differs first,
+      // and a featured stock saved in it fails the state, naming the answer
+      // to save.
+      var twoDays = function(s) { return Market.twoDays(quotes[s], root.now, stub.calendars) }
+      var askedRange = function(kept) {
+        var asks = {}
+        Asks.quoteSlots(kept, {}, kept, featured, [featured], true, kept.filter(function(s) { return quotes[s].crypto })).forEach(function(slot) {
+          var two = slot.symbols.some(twoDays)
+          slot.symbols.forEach(function(s) { asks[s] = two ? "2d" : "1d" })
+        })
+        return asks
+      }
+      var reads = function(s) { return root.overnight.own && s === featured }
+      var firstAsk = listed.every(function(s) { return ranges[s] === "2d" })
+      for (var asks = askedRange(listed); !firstAsk; asks = askedRange(listed)) {
+        var off = listed.filter(function(s) { return !reads(s) && ranges[s] !== asks[s] })
+        if (off.length === 0) break
+        var ownOff = off.filter(function(s) { return ranges[s] !== (twoDays(s) ? "2d" : "1d") })
+        var dropped = ownOff.length ? ownOff : off
+        if (dropped.indexOf(featured) >= 0) {
+          console.log("FAIL moments/" + folder + "/" + file(featured) + ".json is Yahoo's range=" + ranges[featured]
+            + ", where Stonks asks for range=" + asks[featured] + " at this moment: save that answer")
+          break
+        }
+        dropped.forEach(function(s) {
+          console.log("left out " + s + ": its saved answer is range=" + ranges[s] + ", where Stonks asks for range=" + asks[s])
+        })
+        listed = listed.filter(function(s) { return dropped.indexOf(s) < 0 })
+      }
       // The US listings: Robinhood's word on which it trades all day, saved
       // with the sweep's moments, and every one at the moments before them;
       // at a saved moment's folder, those Stonks asks Robinhood about, in
