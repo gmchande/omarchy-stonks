@@ -37,6 +37,10 @@ patch_copy plugin/WindowHost.qml 's/target: Hyprland$/target: root.hyprlandStand
 # Whether every screen is off is asked of the screens the harness hands the
 # host, stand-ins that answer as they are set.
 patch_copy plugin/WindowHost.qml 's/Hyprland\.refreshMonitors()/root.monitors.forEach(function(m) { m.refresh() })/g'
+# The input that wakes the screens comes from the harness too, never the
+# owner's own keys and pointer.
+patch_copy plugin/WindowHost.qml 's/^  IdleMonitor {$/  QtObject {\n    property bool enabled\n    property int timeout\n    property bool respectInhibitors\n    property bool isIdle: false/'
+patch_copy plugin/WindowHost.qml '/readonly property bool opened:/a\  readonly property alias testInput: input'
 export QT_QPA_PLATFORM=offscreen
 
 # The main run starts offline, with last session's quotes saved: NEST at

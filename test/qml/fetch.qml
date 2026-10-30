@@ -936,8 +936,8 @@ Harness {
       plugin.windowHost.monitors = []
 
       // Thursday 11:15, nothing open, every screen off: nothing is asked
-      // for, the pill's symbol included. With a screen on again, the next
-      // look asks at once for the pill's.
+      // for, the pill's symbol included. The key press that turns a screen
+      // on again asks at once for the pill's, with the clock still.
       startAt(at(harness.wed7 + 86400, 11, 15))()
       plugin.windowHost.monitors = [screenStandIn]
       screenStandIn.on = false
@@ -959,18 +959,19 @@ Harness {
       service.refresh()
       screensHeard()
       var dark = harness.quoteCounts(harness.requests().slice(darkFrom))
-      screenStandIn.on = true
-      // The next look comes a minute on, when the screens' last answer is
-      // long past.
+      // A second with no input, then the key press that wakes the screen,
+      // when the screens' last answer is long past.
       wait(1100)
-      service.now += 60
-      within(3000, function() { return harness.quoteCounts(harness.requests().slice(darkFrom)).NEST > 0 })
+      plugin.windowHost.testInput.isIdle = true
+      screenStandIn.on = true
+      plugin.windowHost.testInput.isIdle = false
+      var woke = within(2000, function() { return harness.quoteCounts(harness.requests().slice(darkFrom)).NEST > 0 })
       settle()
       var lit = harness.quoteCounts(harness.requests().slice(darkFrom))
-      harness.check("every screen off, nothing is asked for, a refresh included; a screen on, the next look asks for the pill's symbol at once",
-        harness.listed.every(function(s) { return dark[s] === 0 })
+      harness.check("every screen off, nothing is asked for, a refresh included; the key press that turns a screen on asks for the pill's symbol at once",
+        woke && harness.listed.every(function(s) { return dark[s] === 0 })
           && harness.listed.every(function(s) { return lit[s] === (s === "NEST" ? 1 : 0) }),
-        "off: " + JSON.stringify(dark) + " | on: " + JSON.stringify(lit))
+        (woke ? "" : "not within 2 s | ") + "off: " + JSON.stringify(dark) + " | on: " + JSON.stringify(lit))
       harness.check("every screen off, the saved prices due are written, though the pill's ask waits for a screen", savedInDark, darkSave)
 
       // A run queued behind a host's pause, the screens gone off since
