@@ -659,6 +659,31 @@ Harness {
       check("retro: a scrub of BRK-A's lone trade at 09:31 reads it, not the close before it",
         lone.indexOf("At 09:31") === 0 && /\| 813,23[45]$/.test(lone), lone)
 
+      // The window closed, JNJ added and the pill wheeled onto it from
+      // BRK-A, by day, with Robinhood failing: JNJ is asked once, as the
+      // pill lands, with no step of the clock, and never again.
+      app.close()
+      tryVerify(function() { return service.openSurfaces.length === 0 }, 3000)
+      within(5000, function() { return !prints.busy && !allDay.busy })
+      runCommand(["touch", harness.state + "/INSTRUMENTS.down", harness.state + "/OVERNIGHT.down"])
+      service.addSymbol("JNJ")
+      within(8000, function() { return !!service.quotes.JNJ && service.arriving.length === 0 })
+      service.featureStep(1)
+      var wheeled = service.featuredSymbol
+      var jnjFailed = within(3000, function() {
+        return !!allDay.entries.JNJ && allDay.entries.JNJ.status === "failed" && !!prints.entries.JNJ && prints.entries.JNJ.status === "failed"
+      })
+      var jnjAsked = [harness.allDayAsked("JNJ"), harness.printsAsked("JNJ")]
+      service.now += 5 * 60
+      wait(300)
+      service.now += 5 * 60
+      wait(300)
+      var jnjAfter = [harness.allDayAsked("JNJ"), harness.printsAsked("JNJ")]
+      runCommand(["rm", "-f", harness.state + "/INSTRUMENTS.down", harness.state + "/OVERNIGHT.down"])
+      check("with nothing open by day, the pill wheeled onto a stock Robinhood hasn't answered asks for it at once, and once failed, never again",
+        wheeled === "JNJ" && jnjFailed && jnjAsked.join(",") === "1,1" && jnjAfter.join(",") === "1,1",
+        wheeled + "; failed " + jnjFailed + "; asked " + jnjAsked.join(",") + ", ten minutes on " + jnjAfter.join(","))
+
       // Every request of the run, Robinhood's instruments' too.
       var never = ["^GSPC", "BTC-USD", "SHOP.TO"]
       var strays = harness.asked("OVERNIGHT.asked").concat(harness.asked("INSTRUMENTS.asked"))
