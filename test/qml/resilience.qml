@@ -307,6 +307,25 @@ Harness {
       check("closes that throw as they are read fail their own cap and P/E, and the next symbol's still comes",
         nextCame && !!feed.entries.SKEWED && feed.entries.SKEWED.status === "failed",
         JSON.stringify({ skewed: feed.entries.SKEWED, nvda: feed.entries.NVDA && feed.entries.NVDA.status, busy: feed.busy }))
+      // A rate the gate holds back waits for Yahoo: MSFT's figures fresh, as
+      // if priced in CAD with earnings in USD and no USDCAD rate yet, while
+      // Yahoo refuses. Nothing goes and the feed settles, and the rate comes
+      // once Yahoo answers again.
+      var gate = service.testGate
+      var noRate = Object.assign({}, feed.rates)
+      delete noRate.USDCAD
+      feed.rates = noRate
+      var rateCalls = calls("RATE")
+      gate.report(["refused"], 60, gate.ticket)
+      feed.wanted = [{ symbol: "MSFT", currency: "CAD" }]
+      var heldSettled = within(2000, function() { return !feed.busy })
+      var heldCalls = calls("RATE")
+      gate.report(["ok"], 0, gate.ticket)
+      var rateCame = within(5000, function() { return !!feed.rates.USDCAD && !feed.busy })
+      check("a rate Yahoo's pause holds back asks nothing more, and comes once Yahoo answers again",
+        heldSettled && heldCalls === rateCalls && rateCame && calls("RATE") === rateCalls + 1,
+        JSON.stringify({ settled: heldSettled, whilePaused: heldCalls - rateCalls, came: rateCame, asked: calls("RATE") - rateCalls }))
+      feed.wanted = []
     }
 
     function test_5_malformedOvernightRecovers() { guarded("test_5_malformedOvernightRecovers", checks_test_5_malformedOvernightRecovers) }

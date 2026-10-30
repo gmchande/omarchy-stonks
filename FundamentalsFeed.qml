@@ -15,9 +15,10 @@ import "Fundamentals.js" as Fundamentals
 // pauses the host, a fetch fails at once, and a rate is left unasked.
 // What it fetches is what the surfaces on screen show (`wanted`), worked out
 // by the service: each one not good for the day, in order, one at a time,
-// and again as the clock moves past its day. One that failed waits until it
-// is wanted anew, or for a reader's refresh or Yahoo answering again after
-// a pause (`retry`), so a failure isn't asked again every second.
+// and again as the clock moves past its day. One that failed, or whose rate
+// the gate held back, waits until it is wanted anew, or for a reader's
+// refresh or Yahoo answering again after a pause (`retry`), so it isn't
+// asked again every second, nor at once.
 Item {
   id: root
 
@@ -39,7 +40,8 @@ Item {
   // The fetch under way: { symbol, currency, step, figures, pair }, step
   // "series", "close", or "rate", figures null until the series are in.
   property var job: null
-  // The wanted symbols whose fetch failed while they were wanted.
+  // The wanted symbols whose fetch failed, or whose rate the gate held back,
+  // while they were wanted.
   property var failed: []
 
   readonly property bool busy: job !== null || wanted.some(root.due)
@@ -52,13 +54,20 @@ Item {
     return wanted.some(function(w) { return w.symbol === symbol })
   }
 
-  // Whether `w` needs fetching: never fetched, or it or its rate a day old;
-  // one that failed only once it is wanted anew.
+  // Whether `w` needs fetching: never fetched, failed, or it or its rate a
+  // day old; not while it waits in `failed`.
   function due(w) {
+    if (failed.indexOf(w.symbol) >= 0) return false
     var entry = entries[w.symbol]
-    if (entry && entry.status === "failed") return failed.indexOf(w.symbol) < 0
+    if (entry && entry.status === "failed") return true
     var current = root.fresh(w.symbol)
     return !current || !root.rateHeld(Fundamentals.ratePair(current.figures, w.currency))
+  }
+
+  // A wanted symbol's fetch failed or was held back: it waits for `retry`,
+  // or to be wanted anew, so it isn't asked again at once.
+  function miss(symbol) {
+    if (root.wants(symbol) && failed.indexOf(symbol) < 0) root.failed = failed.concat([symbol])
   }
 
   // What failed is asked again now: a reader's refresh, or Yahoo answering
@@ -105,8 +114,12 @@ Item {
   function pump() {
     if (!pendingUrl || (clearance && !clearance())) return
     if (gate && gate.take(1) === 0) {
-      if (job.step === "rate") root.done()
-      else root.fail(job.symbol)
+      if (job.step !== "rate") {
+        root.fail(job.symbol)
+        return
+      }
+      root.miss(job.symbol)
+      root.done()
       return
     }
     if (gate) root.ticket = gate.ticket
@@ -166,7 +179,7 @@ Item {
   // they are the truth for the EPS, so it stands, with its rate asked, and
   // the cap stays unknown until its close is.
   function fail(symbol) {
-    if (root.wants(symbol) && failed.indexOf(symbol) < 0) root.failed = failed.concat([symbol])
+    root.miss(symbol)
     var series = job.figures ? { figures: { cap: null, eps: job.figures.eps } } : {}
     root.keep(symbol, Object.assign({ figures: null, checkedAt: 0 }, entries[symbol], { status: "failed" }, series))
     if (job.figures) root.askRate(job.figures)
