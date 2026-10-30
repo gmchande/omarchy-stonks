@@ -593,12 +593,17 @@ Item {
   onFeaturedSymbolChanged: if (featuredSymbol !== landing) landing = ""
 
   // The service wants the chart's history only while a surface shows it,
-  // and a preview only while its search is open on an open surface.
+  // and a preview only while its search is open on an open surface. A
+  // search waiting on the screens' answer goes only where a screen shows
+  // it, and goes once one does.
   onSurfaceOpenChanged: {
     if (service) service.surfaceShown(root, surfaceOpen && onScreen)
     if (!surfaceOpen) previewTo("")
   }
-  onOnScreenChanged: if (service) service.surfaceShown(root, surfaceOpen && onScreen)
+  onOnScreenChanged: {
+    if (service) service.surfaceShown(root, surfaceOpen && onScreen)
+    if (onScreen) search.pump()
+  }
   onServiceChanged: if (service && surfaceOpen && onScreen) service.surfaceShown(root, true)
   // The chart scrubbed, by the pointer on it or by keys, where a screen
   // shows it, and not while every screen is off, which the panel's own
@@ -631,7 +636,8 @@ Item {
     target: root.service
     ignoreUnknownSignals: true
     function onPreviewTaken(surface) { if (surface === root) root.cancelAdding() }
-    function onScreensReady() { search.pump() }
+    function onScreensReady() { if (root.onScreen) search.pump() }
+    function onYahooBack() { if (root.onScreen) search.yahooBack() }
   }
 
   // Every action on the rows and the chart shows what it acts on: the key

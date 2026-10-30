@@ -738,13 +738,43 @@ Harness {
       within(3000, function() { return body.search.results.length > 0 })
       var byClick = [body.search.resultsQuery, body.search.results.length > 0, harness.calls("SEARCH.answered") - answeredBefore,
         retryShown(), body.adding, harness.same(service.library, library)].join(",")
+      // The lookup fails at once while the gate's lone request after a
+      // pause for no answer is out, and RETRY then fails at once too; when
+      // Yahoo answers that request, the lookup goes by itself, once.
+      var probe = function() {
+        gate.begin("none", 60)
+        gate.pausedUntil = gate.now()
+        gate.take(1)
+        keyClick("X")
+        keyClick(Qt.Key_Backspace)
+        return within(3000, function() { return body.search.answer === "failed" && body.search.resultsQuery === "SH" })
+      }
+      var probing = probe()
+      askedBefore = harness.calls("SEARCH.asked")
+      clickRetry()
+      wait(600)
+      var heldByProbe = [probing, harness.calls("SEARCH.asked") - askedBefore, body.search.answer].join(",")
+      gate.report(["ok"], 0, gate.ticket)
+      within(3000, function() { return body.search.results.length > 0 })
+      // Time for a second ask to show.
+      wait(600)
+      var byItself = [body.search.resultsQuery, harness.calls("SEARCH.asked") - askedBefore, retryShown()].join(",")
+      // The same, but closed before Yahoo answers: nothing is asked.
+      var closedProbe = probe()
+      keyClick(Qt.Key_Escape)
+      tryVerify(function() { return !body.search.active }, 2000)
+      askedBefore = harness.calls("SEARCH.asked")
+      gate.report(["ok"], 0, gate.ticket)
+      wait(600)
+      var closed = [closedProbe, harness.calls("SEARCH.asked") - askedBefore].join(",")
       body.resetInteraction()
-      harness.check("a failed lookup says why and offers RETRY; Enter and a click on it ask the same query again, once, through Yahoo's gate, held by a refusal, which the line names as the server being busy, and not by a pause for no answer, and adding nothing",
+      harness.check("a failed lookup says why and offers RETRY; Enter and a click on it ask the same query again, once, through Yahoo's gate, held by a refusal, which the line names as the server being busy, and not by a pause for no answer, and adding nothing; one failed while Yahoo pauses goes by itself, once, when Yahoo answers, unless closed",
         offered === "Couldn’t search · try again,true"
           && byEnter === "Couldn’t search · try again / - / Searching for “SH”… / Couldn’t search · try again,1,true"
           && joined === "true,1,failed" && offline === "Couldn’t search · check your connection"
-          && paused === "0,0,failed,true,Couldn’t search · server busy" && byClick === "SH,true,1,false,true,true",
-        [offered, byEnter, joined, offline, paused, byClick].join(" ; "))
+          && paused === "0,0,failed,true,Couldn’t search · server busy" && byClick === "SH,true,1,false,true,true"
+          && heldByProbe === "true,0,failed" && byItself === "SH,1,false" && closed === "true,0",
+        [offered, byEnter, joined, offline, paused, byClick, heldByProbe, byItself, closed].join(" ; "))
     }
 
     function test_flows() {

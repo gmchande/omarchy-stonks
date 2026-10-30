@@ -483,14 +483,16 @@ Item {
     id: yahooGate
     host: "Yahoo"
     clock: root
-    // Yahoo answering again says the network is back: a cap and P/E that
-    // failed while it paused is asked again.
+    // Yahoo answering again says the network is back: a cap and P/E, and
+    // a search on screen, that failed while it paused is asked again.
     onReopened: {
       root.showHistory(false)
       fundamentalsFeed.retry()
       releaseFeed.askAgain()
+      root.yahooBack()
     }
   }
+  signal yahooBack()
   // Robinhood is asked for its prints and its instruments once a session
   // for the pill's symbol, as a surface opens, as US listings are added,
   // every 5 minutes through a night, and on r: a few a minute, more while

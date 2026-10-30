@@ -911,6 +911,36 @@ Harness {
         !unseenAsked && seenAsked, (unseenAsked ? "asked while out of sight" : "none while out of sight") + "; then " + figures().join(", "))
       service.feature("NEST")
       settle()
+      // In sight, a search that failed while Yahoo paused goes again as
+      // Yahoo answers, but waits on the screens' answer, slow to come, and
+      // the window leaves sight first: it is not asked for. Back in sight,
+      // it goes.
+      var body = app.testBody
+      var yahoo = service.testYahooGate
+      body.startAdding()
+      tryVerify(function() { return body.search.active }, 2000)
+      yahoo.begin("none", 60)
+      body.search.setQuery("SH")
+      var failedSearch = within(3000, function() { return body.search.answer === "failed" && body.search.resultsQuery === "SH" })
+      settle()
+      wait(1100)
+      screenStandIn.holding = true
+      var searchFrom = harness.calls("SEARCH.asked")
+      yahoo.report(["ok"], 0, yahoo.ticket)
+      var searchQueued = body.search.requestedQuery === "SH"
+      stonksToplevel.workspace = workspaceThere
+      var searchHidden = within(3000, function() { return service.openSurfaces.length === 0 })
+      screenStandIn.holding = false
+      screensHeard()
+      wait(600)
+      var unseenSearch = harness.calls("SEARCH.asked") - searchFrom
+      stonksToplevel.workspace = workspaceHere
+      var seenSearch = within(3000, function() { return harness.calls("SEARCH.asked") > searchFrom })
+      harness.check("a search that failed while Yahoo paused, its retry waiting on the screens' answer when the window leaves sight, is not asked for until back in sight",
+        failedSearch && searchQueued && searchHidden && unseenSearch === 0 && seenSearch,
+        [failedSearch, searchQueued, searchHidden, unseenSearch + " while out of sight", seenSearch].join(" | "))
+      body.cancelAdding()
+      settle()
 
       // 00:35, two screens: the window's switched off, the other on and
       // showing another workspace. No screen shows the window, so it asks
