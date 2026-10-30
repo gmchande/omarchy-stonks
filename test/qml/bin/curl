@@ -82,8 +82,10 @@
 # or several, the first with the file answering, its saved Robinhood day
 # answers, results in the order asked, and span=hour with each listing's
 # last 12 slots of it, LONG<n> with NEST's
-# prints under its own name, its saved days answer for their symbols, and
-# its saved 1M and 3M histories (<symbol>-1m.json, <symbol>-3m.json) for theirs;
+# prints under its own name, its saved days answer for their symbols, a
+# range=2d ask from the moment's two-day answer (2d/<symbol>.json) where it
+# saved one, and its saved 1M and 3M histories (<symbol>-1m.json,
+# <symbol>-3m.json) for theirs;
 # otherwise Robinhood answers every symbol empty, as it does one it does not
 # trade. While STONKS_FAKE_STATE/OVERNIGHT.down exists, Robinhood fails,
 # counted all the same.
@@ -194,10 +196,11 @@ serve() {
     exit
   fi
   if [[ "$url" == *"/v7/finance/spark"* ]]; then
-    local list="${url#*symbols=}" sym body served days=() huge=0
+    local list="${url#*symbols=}" range="${url#*range=}" sym body served days=() huge=0
     list="${list%%&*}"
+    range="${range%%&*}"
     for sym in ${list//,/ }; do
-      body=$(serve "https://query1.finance.yahoo.com/v8/finance/chart/$sym?range=1d&interval=5m&includePrePost=true")
+      body=$(serve "https://query1.finance.yahoo.com/v8/finance/chart/$sym?range=$range&interval=5m&includePrePost=true")
       served=$?
       [ "$served" = 0 ] && days+=("$body")
       [ "$sym" = HUGE ] && huge=1
@@ -330,6 +333,8 @@ serve() {
   fi
   set_name="$(cat "$STONKS_FAKE_STATE/overnight.set" 2>/dev/null)"
   saved_day="$(in_moment "$(tr 'A-Z' 'a-z' <<< "${symbol#%5E}").json")"
+  saved_days="$(in_moment "2d/$(tr 'A-Z' 'a-z' <<< "${symbol#%5E}").json")"
+  [[ "$url" == *"range=2d&"* && -e "$saved_days" ]] && saved_day=$saved_days
   saved_month="$(in_moment "$(tr 'A-Z' 'a-z' <<< "${symbol#%5E}")-1m.json")"
   saved_quarter="$(in_moment "$(tr 'A-Z' 'a-z' <<< "${symbol#%5E}")-3m.json")"
   if [ -n "$set_name" ] && [ -e "$saved_day" ] && [[ "$url" != *"includeAdjustedClose=true"* ]]; then

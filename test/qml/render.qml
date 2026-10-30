@@ -587,25 +587,31 @@ Harness {
       // Read as the feeds read them, answered at the moment: the US listings
       // in cents from $1.
       var ranges = {}
+      var parsed = function(answer) {
+        var quote = Quote.parseChart(answer, Market.centExchanges(stub.calendars), root.now)
+        return root.overnight.lastTrade ? Object.assign({}, quote, { price: null, marketTime: null }) : quote
+      }
       listed.forEach(function(s) {
         var answer = read(file(s))
         ranges[s] = answer.chart.result[0].meta.range
-        quotes[s] = Quote.parseChart(answer, Market.centExchanges(stub.calendars), root.now)
-        if (root.overnight.lastTrade) quotes[s] = Object.assign({}, quotes[s], { price: null, marketTime: null })
+        quotes[s] = parsed(answer)
       })
       // Each answer as Stonks asks for it at the moment, Yahoo's one day or
       // two: two for every listing on a fresh shell's first ask, so a moment
       // saved in two days throughout is that; otherwise as a surface open a
       // while asks, by `Market.twoDays` judged on the saved answer, a row in
       // a spark batch two when any of its batch wants two
-      // (`Asks.quoteSlots`). The other range draws another day, or a blank:
-      // a row saved in it is left out, those whose own ask differs first,
-      // and a featured stock saved in it fails the state, naming the answer
-      // to save.
-      var twoDays = function(s) { return Market.twoDays(quotes[s], root.now, stub.calendars) }
+      // (`Asks.quoteSlots`). A capture saves Yahoo's two days beside its one
+      // (2d/<file>.json, test/capture-demo.sh), read where Stonks asks for
+      // two. Without it, the other range draws another day, or a blank: a
+      // row saved only in it is left out, those whose own ask differs first,
+      // and a featured stock saved only in it fails the state, naming the
+      // answer to save.
+      var judged = Object.assign({}, quotes)
+      var twoDays = function(s) { return Market.twoDays(judged[s], root.now, stub.calendars) }
       var askedRange = function(kept) {
         var asks = {}
-        Asks.quoteSlots(kept, {}, kept, featured, [featured], true, kept.filter(function(s) { return quotes[s].crypto })).forEach(function(slot) {
+        Asks.quoteSlots(kept, {}, kept, featured, [featured], true, kept.filter(function(s) { return judged[s].crypto })).forEach(function(slot) {
           var two = slot.symbols.some(twoDays)
           slot.symbols.forEach(function(s) { asks[s] = two ? "2d" : "1d" })
         })
@@ -614,6 +620,15 @@ Harness {
       var reads = function(s) { return root.overnight.own && s === featured }
       var firstAsk = listed.every(function(s) { return ranges[s] === "2d" })
       for (var asks = askedRange(listed); !firstAsk; asks = askedRange(listed)) {
+        var swapped = listed.filter(function(s) {
+          if (asks[s] !== "2d" || ranges[s] !== "1d") return false
+          var two = saved("2d/" + file(s))
+          if (two === "") return false
+          quotes[s] = parsed(JSON.parse(two))
+          ranges[s] = "2d"
+          return true
+        })
+        if (swapped.length > 0) continue
         var off = listed.filter(function(s) { return !reads(s) && ranges[s] !== asks[s] })
         if (off.length === 0) break
         var ownOff = off.filter(function(s) { return ranges[s] !== (twoDays(s) ? "2d" : "1d") })
