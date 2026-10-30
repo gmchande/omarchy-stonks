@@ -65,6 +65,16 @@ Harness {
       console.log("FAIL the frame is " + renderWindow.width + " × " + renderWindow.height + ", not the "
         + Math.round(renderWindow.implicitWidth) + " × " + Math.round(renderWindow.implicitHeight) + " the surface asks")
   }
+  // A focused field's caret blinks by the clock, so where a picture caught
+  // it was luck: lit afresh just before each picture, it shows in every
+  // one, its blink half a second off.
+  function holdCaret(item) {
+    if (item.cursorVisible === true) {
+      item.cursorVisible = false
+      item.cursorVisible = true
+    }
+    for (var i = 0; i < item.children.length; i++) holdCaret(item.children[i])
+  }
   readonly property bool minWindowOf: requested.indexOf("min-window-of-") === 0
   readonly property bool windowOf: minWindowOf || requested.indexOf("window-of-") === 0
   readonly property string stateName: windowOf ? "popup-" + requested.slice((minWindowOf ? "min-window-of-" : "window-of-").length) : requested
@@ -1459,6 +1469,7 @@ Harness {
         }
         if (root.beforeGrab) root.beforeGrab()
         root.judgeFrame()
+        root.holdCaret(frame)
         frame.grabToImage(function(result) {
           result.saveToFile(root.outPath)
           root.finish()
@@ -1656,6 +1667,7 @@ Harness {
       // within two 160 ms fades; nothing says when all of them have.
       wait(320)
       root.judgeFrame()
+      root.holdCaret(frame)
       var saved = false
       frame.grabToImage(function(result) { saved = result.saveToFile(root.outPath) })
       tryVerify(function() { return saved }, 3000)
