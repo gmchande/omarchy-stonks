@@ -90,21 +90,25 @@ function lineDay(symbol, quote, nights, allDay, calendars) {
 // (`Overnight.newestPrint`), by symbol, measured from the dashed line of
 // the day its chart draws (`dayDrawn`): from Yahoo's own prints (`quotes`)
 // and, for one Robinhood trades all day (`allDay`, answers), its night's
-// (`nights`, answers). None while that day waits on Robinhood, as the
-// chart and the lines do: until then a row and the pill hold the close, so
-// their move never turns to another day's without a new price.
+// (`nights`, answers). While that day waits on Robinhood, Yahoo's own
+// newest, on the day Yahoo's prints alone make (`Overnight.dayChart` with
+// no answer): until 04:00 the day that closed, as the chart will draw it,
+// so the answer brings only a newer price, never another footing.
 function newestPrints(symbols, quotes, nights, allDay, calendars) {
   var out = {}
   for (var i = 0; i < symbols.length; i++) {
     var q = quotes[symbols[i]]
     if (!q || !Overnight.hasOvernight(q, calendars)) continue
     var drawn = dayDrawn(symbols[i], q, nights, allDay, calendars)
-    if (drawn.waiting) continue
+    if (drawn.waiting) drawn = Overnight.dayChart(q, NO_ANSWER, calendars)
     var newest = Overnight.newestPrint(q, drawn.latest, calendars, drawn.day)
     if (newest) out[symbols[i]] = newest
   }
   return out
 }
+
+// Robinhood's answer before it comes (`Overnight.overnightAnswer`'s shape).
+var NO_ANSWER = { bars: [], from: null, through: null }
 
 // Normalized [0..1] x/y for drawing. x runs along the day's axis
 // (`chartSpan`) by the clock, each print at its time: the day the response
@@ -113,8 +117,10 @@ function newestPrints(symbols, quotes, nights, allDay, calendars) {
 // US listing, its trading day (`Overnight.dayChart`,
 // `Overnight.sessionDay`), so a quiet hour shows as one and a finished
 // day ends at its last print's time. `ticks` mark the bell, and the
-// night's edges. Prints outside a regular session are flagged `ext`; `brk`
-// starts the line again across a break in the exchange's day (Tokyo's
+// night's edges. Prints outside a regular session are flagged `ext`, and
+// those drawn dim `dim`: the extended hours, or, on a day lit where it
+// trades now (`litFrom`, `Overnight.litFrom`), every print before it.
+// `brk` starts the line again across a break in the exchange's day (Tokyo's
 // lunch, from its calendar in `calendars`: Yahoo sends 09:00 to 15:30 as
 // one session; the point after it is flagged `lunch` too, so a scrub there
 // draws no dot), and across the hours after a day that take no room
@@ -145,6 +151,7 @@ function chartGeometry(quote, calendars) {
   }
   var pad = (hi - lo) * 0.08 || 0.5
   lo -= pad; hi += pad
+  var lit = quote.litFrom !== undefined && quote.litFrom !== null
   var out = []
   for (var k = 0; k < pts.length; k++) {
     var session = Quote.pointSession(quote, pts[k])
@@ -153,6 +160,7 @@ function chartGeometry(quote, calendars) {
       x: axisFraction(axis, pts[k].t),
       y: 1 - (pts[k].p - lo) / (hi - lo),
       ext: session !== "reg",
+      dim: lit ? pts[k].t < quote.litFrom : session !== "reg",
       brk: !!prev && across(breaks, prev.t, pts[k].t),
       lunch: !!prev && across(lunches, prev.t, pts[k].t)
     })
@@ -225,11 +233,12 @@ function stepTime(quote, t, steps, last) {
   return Format.clamp(t + steps * 300, axis.start, last || axis.end)
 }
 
-// The last regular-session point of a chart geometry, where the dot sits.
-function lastRegularPoint(geometry) {
+// The newest bright point of a chart geometry, where the dot sits: the
+// newest print of what trades now, else the regular session's last.
+function lastLitPoint(geometry) {
   if (!geometry || !geometry.points) return null
   for (var i = geometry.points.length - 1; i >= 0; i--) {
-    if (!geometry.points[i].ext) return geometry.points[i]
+    if (!geometry.points[i].dim) return geometry.points[i]
   }
   return null
 }

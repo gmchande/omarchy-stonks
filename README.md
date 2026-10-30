@@ -89,27 +89,45 @@ Yahoo's rate for the day, inside the P/E and nowhere else.
 The top line names the moment in the market's day, such as Power hour, and
 says when the market opens or closes, by the exchange's clock. A US stock
 that has traded since the close shows that newest price on top, with its
-session and time, such as OVERNIGHT 23:25. The move beside the price
-always runs from the chart's dashed line, the close before the day on the
+session and time, such as AFTER HOURS 17:55, and its row shows the time
+after the company's name. At night, the words under the move name the
+close it counts from instead: SINCE WED CLOSE · 21:50. The move beside the
+price runs from the chart's dashed line, the close before the day on the
 chart, so the number, the line, the bull or bear, the rows and the pill
-agree. The line under the price shows the close and its day's move, and
-after the close, the move since it: CLOSE 153.27 ▼3.45% · ▲1.35% SINCE,
-on every range. On a longer range the chart ends on that price, and the
-move is the range's, up to it. Elsewhere, a smaller line under the price
-shows the pre-market or after-hours price.
+agree. Since the open, it runs from that day's open instead. The line under
+the price shows the close and its day's move, and after the close, the
+move since it: CLOSE 153.27 ▼3.45% · ▲1.35% SINCE, on every range. On a
+longer range the chart ends on that price, and the move is the range's, up
+to it. Elsewhere, a smaller line under the price shows the pre-market or
+after-hours price.
 
 The 1D chart shows one trading day, each price at its time, from the
 day's first trade, or the open if that's earlier, to the day's end while
-it runs, and to its last trade once it's over. For a US stock Robinhood
-trades at night, the day runs from its night's open the evening before
-(20:00, New York time) to the next, and the chart turns to the next day
-with that night's first trade. Over the weekend it shows Friday until
-Sunday night's first trade. A stock that doesn't trade at night ends its
-day at 20:00. Once the chart shows the next day, the low, high, open and
-volume under it name the day they belong to, such as MON. When the rows all
-measure a day that has ended, such as Friday at the weekend, the list
-says so where it says TODAY. A coin never closes, so its chart, its
-change, and its low and high cover the last 24 hours.
+it runs, and to its last trade once it's over. What trades now is bright
+and the rest dim: the pre-market, the session, after hours, or the night.
+While the market rests, the session is bright.
+
+For a US stock Robinhood trades at night, a day runs 24 hours, from its
+night's open the evening before (20:00, New York time) to the next. Through
+the night, until 04:00, the chart keeps the day that just closed and adds
+tonight's trades at its right end. Once the day's 24 hours are full, each
+five minutes added on the right takes five off the left, so nothing jumps.
+Soon after 04:00, once the new day's first prices arrive, the chart turns
+to the new day, which starts with the night just gone, and the move starts
+counting from the close just gone. A stock that
+didn't trade that night keeps its day until its next trade. After
+midnight the list says the day and its night, such as MON + NIGHT. Over a
+weekend or a holiday the chart shows the last trading day. On Sunday night
+and a holiday's evening, that day comes first, then the night, and the
+hours closed between them take no room. A day that closes early, such as
+the Friday after Thanksgiving, ends at 17:00 with no night after it.
+
+A US stock that doesn't trade at night shows its day up to 20:00, and
+keeps that day until its next trade. Once the chart shows a day
+before today, the low, high, open and volume under it name it, such as
+MON. When the rows all measure a day that has ended, such as Friday at the
+weekend, the list says so where it says TODAY. A coin never closes, so its
+chart, its change, and its low and high cover the last 24 hours.
 
 A price says "As of" and its time when it's old: more than two minutes
 behind while its market trades, or saved from before and not yet

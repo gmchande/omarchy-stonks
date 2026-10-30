@@ -6,9 +6,9 @@ import "Tones.js" as Tones
 // the price the change is measured from, and the line and the area between
 // it and the baseline in the up colour above and the down colour below, the
 // way the retro columns fall. The day adds its own furniture: the dimmer
-// extended hours, the ticks at the bell and the night's edges, a line that
-// starts again after a break in the exchange's day, and the dot on the last
-// regular print.
+// hours, all but what trades now or else the session, the ticks at the
+// bell and the night's edges, a line that starts again after a break in
+// the exchange's day, and the dot on the newest bright print.
 // Three layers, so each paints only when what it draws changes: the
 // baseline, the data's ink under a clip the draw-in widens, and the scrub.
 Item {
@@ -53,7 +53,7 @@ Item {
   readonly property color aboveColor: directionKnown ? upColor : baselineColor
   readonly property color belowColor: directionKnown ? downColor : baselineColor
   readonly property int pad: Math.round(3 * weight)
-  readonly property var lastPoint: Chart.lastRegularPoint(geometry)
+  readonly property var lastPoint: Chart.lastLitPoint(geometry)
   readonly property bool day: !!geometry && geometry.day === true
   readonly property color dotColor: lastPoint && lastPoint.y > geometry.baselineY ? belowColor : aboveColor
   // One print draws: the first print after midnight is a dot on its day.
@@ -205,13 +205,14 @@ Item {
         ctx.lineJoin = "round"
         ctx.lineCap = "round"
         ctx.lineWidth = 2 * root.weight
-        // The whole series in dim ink, then each regular session over it in
-        // full ink, so the extended hours on either side read as the quieter
-        // part of one continuous line.
+        // The whole series in dim ink, then what is bright over it in full
+        // ink (`dim`, `Chart.chartGeometry`): the regular session, or what
+        // trades now, so the rest reads as the quieter part of one
+        // continuous line.
         ctx.strokeStyle = sides(ctx, by, 0.45, 0.45)
         strokeRuns(ctx, runs(pts, function() { return true }), pad, w, h)
         ctx.strokeStyle = sides(ctx, by, 1, 1)
-        strokeRuns(ctx, runs(pts, function(p) { return !p.ext }), pad, w, h)
+        strokeRuns(ctx, runs(pts, function(p) { return !p.dim }), pad, w, h)
 
         // The ticks the line has reached draw in with it, on the baseline.
         if (root.hasBaseline) root.strokeTicks(ctx, by, false)
