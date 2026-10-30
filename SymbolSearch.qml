@@ -211,7 +211,7 @@ FocusScope {
   // Every way of taking a result comes through here, and only a result for
   // the query in the field is taken: an Enter before its answer is kept for
   // it (`enterFor`). On a failed lookup there is none to take: Enter asks
-  // again.
+  // again (`retry`).
   function accept(index) {
     if (stale || (answer === "" && searchText.trim() !== "")) {
       enterFor = searchText.trim()
@@ -226,9 +226,10 @@ FocusScope {
   // query's does until the answer lands (at once, while the gate pauses for
   // a refusal; a pause for no answer ends, `Gate.hurry`). It is asked once:
   // a lookup of it still waiting on the typing pause goes now instead, and
-  // one already out is the retry's.
+  // one already out is the retry's. A query Yahoo calls wrong isn't asked
+  // again: the same words get the same answer.
   function retry() {
-    if (stale || answer !== "failed") return
+    if (stale || answer !== "failed" || failure === "missing") return
     searchDebounce.stop()
     answer = ""
     if (fetchRun.out && activeQuery === searchText.trim()) {
@@ -291,7 +292,8 @@ FocusScope {
   property var clearance: null
   // Why the last lookup failed, for its line: "none" when nothing answered
   // (`Fetch.answerKind`), "refused" when Yahoo turned it away or its gate
-  // holds for a refusal, "other" for a bad answer or a spent budget.
+  // holds for a refusal, "missing" when Yahoo called the question wrong, as
+  // it does an emoji, and "other" for a bad answer or a spent budget.
   property string failure: ""
 
   // A lookup of the field's query. One for another query still out is
@@ -390,7 +392,7 @@ FocusScope {
     onEnded: function(got) {
       // No answer at all, as from a curl stopped short, is nothing answered.
       var kind = got.length ? got[0].kind : "none"
-      root.failure = kind === "none" || kind === "refused" ? kind : "other"
+      root.failure = kind === "none" || kind === "refused" || kind === "missing" ? kind : "other"
       root.land(kind === "ok" ? got[0].body : "")
     }
   }
@@ -537,7 +539,8 @@ FocusScope {
   }
 
   // No matches, no answer at all, or a slow first lookup, said where the
-  // results would be; a failed lookup offers RETRY after its words.
+  // results would be; a failed lookup offers RETRY after its words, unless
+  // Yahoo called the question wrong, when only other words can help.
   Text {
     id: searchMessage
     objectName: "searchMessage"
@@ -553,7 +556,7 @@ FocusScope {
     textFormat: Text.PlainText
     text: root.answer === "none" ? "No matches for “" + root.resultsQuery + "”"
       : root.answer === "failed" ? "Couldn’t search · " + (root.failure === "refused" ? "server busy"
-        : root.failure === "none" ? "check your connection" : "try again")
+        : root.failure === "none" ? "check your connection" : root.failure === "missing" ? "try other words" : "try again")
       : "Searching for “" + root.searchText.trim() + "”…"
     color: root.dim
     font.family: root.fontFamily
@@ -565,7 +568,7 @@ FocusScope {
     id: retrySearch
     objectName: "searchRetry"
     view: root
-    visible: root.answer === "failed"
+    visible: root.answer === "failed" && root.failure !== "missing"
     enabled: !root.stale
     opacity: searchMessage.opacity
     anchors.left: searchMessage.right
