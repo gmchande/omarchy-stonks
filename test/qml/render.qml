@@ -5,6 +5,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "plugin/Asks.js" as Asks
 import "plugin/Cells.js" as Cells
 import "plugin/Chart.js" as Chart
 import "plugin/Fundamentals.js" as Fundamentals
@@ -64,6 +65,16 @@ Harness {
     if (renderWindow.width !== Math.round(renderWindow.implicitWidth) || renderWindow.height !== Math.round(renderWindow.implicitHeight))
       console.log("FAIL the frame is " + renderWindow.width + " × " + renderWindow.height + ", not the "
         + Math.round(renderWindow.implicitWidth) + " × " + Math.round(renderWindow.implicitHeight) + " the surface asks")
+  }
+  // A focused field's caret blinks by the clock, so where a picture caught
+  // it was luck: lit afresh just before each picture, it shows in every
+  // one, its blink half a second off.
+  function holdCaret(item) {
+    if (item.cursorVisible === true) {
+      item.cursorVisible = false
+      item.cursorVisible = true
+    }
+    for (var i = 0; i < item.children.length; i++) holdCaret(item.children[i])
   }
   readonly property bool minWindowOf: requested.indexOf("min-window-of-") === 0
   readonly property bool windowOf: minWindowOf || requested.indexOf("window-of-") === 0
@@ -575,10 +586,63 @@ Harness {
       var quotes = {}, entries = {}, nights = {}, allDay = {}
       // Read as the feeds read them, answered at the moment: the US listings
       // in cents from $1.
+      var ranges = {}
+      var parsed = function(answer) {
+        var quote = Quote.parseChart(answer, Market.centExchanges(stub.calendars), root.now)
+        return root.overnight.lastTrade ? Object.assign({}, quote, { price: null, marketTime: null }) : quote
+      }
       listed.forEach(function(s) {
-        quotes[s] = Quote.parseChart(read(file(s)), Market.centExchanges(stub.calendars), root.now)
-        if (root.overnight.lastTrade) quotes[s] = Object.assign({}, quotes[s], { price: null, marketTime: null })
+        var answer = read(file(s))
+        ranges[s] = answer.chart.result[0].meta.range
+        quotes[s] = parsed(answer)
       })
+      // Each answer as Stonks asks for it at the moment, Yahoo's one day or
+      // two: two for every listing on a fresh shell's first ask, so a moment
+      // saved in two days throughout is that; otherwise as a surface open a
+      // while asks, by `Market.twoDays` judged on the saved answer, a row in
+      // a spark batch two when any of its batch wants two
+      // (`Asks.quoteSlots`). A capture saves Yahoo's two days beside its one
+      // (2d/<file>.json, test/capture-demo.sh), read where Stonks asks for
+      // two. Without it, the other range draws another day, or a blank: a
+      // row saved only in it is left out, those whose own ask differs first,
+      // and a featured stock saved only in it fails the state, naming the
+      // answer to save.
+      var judged = Object.assign({}, quotes)
+      var twoDays = function(s) { return Market.twoDays(judged[s], root.now, stub.calendars) }
+      var askedRange = function(kept) {
+        var asks = {}
+        Asks.quoteSlots(kept, {}, kept, featured, [featured], true, kept.filter(function(s) { return judged[s].crypto })).forEach(function(slot) {
+          var two = slot.symbols.some(twoDays)
+          slot.symbols.forEach(function(s) { asks[s] = two ? "2d" : "1d" })
+        })
+        return asks
+      }
+      var reads = function(s) { return root.overnight.own && s === featured }
+      var firstAsk = listed.every(function(s) { return ranges[s] === "2d" })
+      for (var asks = askedRange(listed); !firstAsk; asks = askedRange(listed)) {
+        var swapped = listed.filter(function(s) {
+          if (asks[s] !== "2d" || ranges[s] !== "1d") return false
+          var two = saved("2d/" + file(s))
+          if (two === "") return false
+          quotes[s] = parsed(JSON.parse(two))
+          ranges[s] = "2d"
+          return true
+        })
+        if (swapped.length > 0) continue
+        var off = listed.filter(function(s) { return !reads(s) && ranges[s] !== asks[s] })
+        if (off.length === 0) break
+        var ownOff = off.filter(function(s) { return ranges[s] !== (twoDays(s) ? "2d" : "1d") })
+        var dropped = ownOff.length ? ownOff : off
+        if (dropped.indexOf(featured) >= 0) {
+          console.log("FAIL moments/" + folder + "/" + file(featured) + ".json is Yahoo's range=" + ranges[featured]
+            + ", where Stonks asks for range=" + asks[featured] + " at this moment: save that answer")
+          break
+        }
+        dropped.forEach(function(s) {
+          console.log("left out " + s + ": its saved answer is range=" + ranges[s] + ", where Stonks asks for range=" + asks[s])
+        })
+        listed = listed.filter(function(s) { return dropped.indexOf(s) < 0 })
+      }
       // The US listings: Robinhood's word on which it trades all day, saved
       // with the sweep's moments, and every one at the moments before them;
       // at a saved moment's folder, those Stonks asks Robinhood about, in
@@ -956,8 +1020,10 @@ Harness {
       // width, above "+ Add a symbol".
       body.showFirstRunHint()
     } else if (/^(popup|window)-notice-file-/.test(root.stateName)) {
-      // The footer's notices whole, in the panel's width and the window's.
+      // The footer's notices whole, in the panel's width and the window's;
+      // -update-: beside a newer Stonks offered at the bar's right end.
       stub.settingsUnreadable = true
+      if (root.stateName.indexOf("-update-") > 0) updates.releasedVersion = "1.1.0"
     } else if (root.stateName.indexOf("popup-notice-update-") === 0) {
       updates.newVersion = "1.0.0"
     } else if (root.stateName.indexOf("popup-notice-save-again-") === 0) {
@@ -1459,6 +1525,7 @@ Harness {
         }
         if (root.beforeGrab) root.beforeGrab()
         root.judgeFrame()
+        root.holdCaret(frame)
         frame.grabToImage(function(result) {
           result.saveToFile(root.outPath)
           root.finish()
@@ -1656,6 +1723,7 @@ Harness {
       // within two 160 ms fades; nothing says when all of them have.
       wait(320)
       root.judgeFrame()
+      root.holdCaret(frame)
       var saved = false
       frame.grabToImage(function(result) { saved = result.saveToFile(root.outPath) })
       tryVerify(function() { return saved }, 3000)

@@ -18,8 +18,8 @@ patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  
 # The history and quote copies pause 200 ms before a retry, not 2.5 s.
 patch_copy plugin/HistoryFeed.qml 's/interval: 2500/interval: 200/'
 patch_copy plugin/QuoteFeed.qml 's/interval: 2500/interval: 200/'
-# The pills' popups stay unloaded: the offscreen platform has no popup
-# window to put one in, and no flow here opens one.
+# The pills' panels stay unloaded: the offscreen platform has no
+# PopupWindow to put one in, and no flow here opens one.
 patch_copy plugin/BarWidget.qml '/id: panelLoader/,/source:/s/active: true/active: false/'
 # The harness never asks the owner's Hyprland: the window host's lookup,
 # workspace check, and focus call run against the harness's stand-in, and

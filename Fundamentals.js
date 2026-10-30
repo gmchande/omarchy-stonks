@@ -149,7 +149,7 @@ function parseRate(json, pair) {
 
 // The headline price over the EPS in the price's currency, or null. The EPS
 // in another currency counts only at its pair's rate, from `rates`: by pair,
-// { value, checkedAt }, value null after a failed fetch.
+// { value, checkedAt }, none while no rate has come.
 function peRatio(figures, price, currency, rates) {
   var eps = figures ? figures.eps : null
   if (!eps) return null

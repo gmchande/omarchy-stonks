@@ -290,6 +290,11 @@ Item {
   Binding on refreshing { when: root.reading; value: root.service?.refreshing; restoreMode: Binding.RestoreNone }
   Binding on updatedTo { when: root.reading; value: root.updates ? root.updates.newVersion : ""; restoreMode: Binding.RestoreNone }
   Binding on releasedTo { when: root.reading; value: root.updates ? root.updates.releasedVersion : ""; restoreMode: Binding.RestoreNone }
+  // Yahoo's pause, held with the rest while closed (`hostPause`).
+  property string yahooPause: ""
+  property int yahooPausedUntil: 0
+  Binding on yahooPause { when: root.reading; value: root.service?.yahooGate?.pause ?? ""; restoreMode: Binding.RestoreNone }
+  Binding on yahooPausedUntil { when: root.reading; value: root.service?.yahooGate?.pausedUntil ?? 0; restoreMode: Binding.RestoreNone }
   Binding on now { when: root.reading; value: root.service?.now; restoreMode: Binding.RestoreNone }
 
   readonly property var symbols: view.rows
@@ -362,8 +367,7 @@ Item {
   readonly property bool yahooDown: warnings > 0 && warnings === lists[0].symbols.length
   // Why Yahoo stopped and when Stonks tries again, while its gate is paused
   // (`Figures.hostPause`).
-  readonly property var hostPause: service && service.yahooGate
-    ? Figures.hostPause(service.yahooGate.pause, service.yahooGate.pausedUntil, now) : null
+  readonly property var hostPause: Figures.hostPause(yahooPause, yahooPausedUntil, now)
   readonly property var featuredGeometry: motion.geometry
   readonly property real scrubX: motion.scrubX
   readonly property bool dayScrubbed: !historyActive && scrubShown !== 0

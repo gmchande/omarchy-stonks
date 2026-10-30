@@ -438,15 +438,15 @@ Item {
   // The market's bell, unless Omarchy's Do Not Disturb is on, or an app is
   // recording from a microphone, as a call does. As the bell is due, the
   // shell is asked once whether Do Not Disturb is on (`omarchy-shell
-  // notifications dndState`, as Omarchy's own toggle asks), for at most
-  // 2 s; a shell that doesn't answer, as with another app showing
-  // notifications, leaves the bell to ring. Then `pw-dump` lists
-  // PipeWire's nodes once, for at most 3 s and 4 MB (the list runs to
-  // about half a megabyte), so no answer can hold the bell or fill the
-  // shell. An answer that ran out of time, failed, or reached the cap
-  // counts as recording, by the pipeline's own exit and the bytes it gave,
-  // never by the clock: the bell stays quiet. One still out is stopped
-  // within 7 s, before the next bell.
+  // notifications dndState`, as Omarchy's own toggle asks), for 2 s and
+  // stopped by 3 s; a shell that doesn't answer, as with another app
+  // showing notifications, leaves the bell to ring. Then `pw-dump` lists
+  // PipeWire's nodes once, for 3 s and stopped by 4 s, and at most 4 MB
+  // (the list runs to about half a megabyte), so no answer can hold the
+  // bell or fill the shell. An answer that ran out of time, failed, or
+  // reached the cap counts as recording, by the pipeline's own exit and
+  // the bytes it gave, never by the clock: the bell stays quiet. One still
+  // out is stopped within 7 s, before the next bell.
   function ring() {
     if (turnedOn && !listening.running) listening.running = true
   }

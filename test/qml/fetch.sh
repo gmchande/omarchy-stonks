@@ -25,7 +25,7 @@ patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  
 patch_copy plugin/QuoteFeed.qml 's/interval: 2500/interval: 200/'
 # A step hands the refresh lane's run its output by hand (`FetchRun`).
 patch_copy plugin/QuoteFeed.qml '/readonly property bool busy:/a\  readonly property alias testRefreshFetch: refreshFetch'
-# The pills' popups stay unloaded, and the window host asks a stand-in, not
+# The pills' panels stay unloaded, and the window host asks a stand-in, not
 # the owner's Hyprland (as range.sh), and hears its events from the stand-in
 # too: the owner's own, a window title or a keyboard layout changing, would
 # ask the screens again while they are off, at a moment the harness doesn't

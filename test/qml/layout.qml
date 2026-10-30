@@ -565,7 +565,7 @@ Harness {
         for (var surfaceIndex = 0; surfaceIndex < 2; surfaceIndex++) {
           surface.wide = surfaceIndex === 1
           wait(50)
-          var place = surface.wide ? "window" : "popup"
+          var place = surface.wide ? "window" : "panel"
           var first = null
           for (var i = 0; i < cases.length; i++) {
             var c = cases[i]
@@ -717,7 +717,7 @@ Harness {
         var unreached = []
         var unmarked = []
         var captions = []
-        var places = [["popup", false, 0], ["narrowest window", true, Style.space(560)], ["widest window", true, 1416]]
+        var places = [["panel", false, 0], ["narrowest window", true, Style.space(560)], ["widest window", true, 1416]]
         // Each range is set once and drawn in once; the look and the surface
         // change under it, which draws nothing in again. Bitcoin, with no cap
         // to widen the first column, holds START's room: its 1Y started at
@@ -819,7 +819,7 @@ Harness {
           surface.wide = momentSurface === 1
           ;[false, true].forEach(function(retro) {
             stub.retro = retro
-            var where = (surface.wide ? "window " : "popup ") + (retro ? "retro" : "smooth")
+            var where = (surface.wide ? "window " : "panel ") + (retro ? "retro" : "smooth")
             var still = null
             moments.forEach(function(moment) {
               stub.now = moment[1]
@@ -873,7 +873,7 @@ Harness {
             stub.historyEntry = null
             stub.figures = aapl
             withQuote({})
-            var where = (surface.wide ? "window " : "popup ") + (retro ? "retro" : "smooth")
+            var where = (surface.wide ? "window " : "panel ") + (retro ? "retro" : "smooth")
             var before = ends()
             var tickBefore = tickEnd("periodRule")
             ;[999.9e6, 999.96e6, 1e9, 7].forEach(function(volume) {
@@ -953,7 +953,7 @@ Harness {
         var shelQuote = stub.quotes["SHEL.L"]
         var longNamed = Object.assign({}, stub.quotes)
         longNamed["SHEL.L"] = Object.assign({}, shelQuote,
-          { name: "Shell plc, with a name long enough to fill the header's whole line in the popup, and in the window at its widest too" })
+          { name: "Shell plc, with a name long enough to fill the header's whole line in the panel, and in the window at its widest too" })
         stub.quotes = longNamed
         stub.featuredSymbol = "SHEL.L"
         stub.figures = null
@@ -972,7 +972,7 @@ Harness {
             var titleRight = xIn(title, title.width)
             if (!meta || !meta.visible || meta.text !== wantMeta || right > meta.parent.width + 0.5
               || !title.truncated || titleRight > xIn(speaker, 0))
-              metaLost.push((wide ? "window " : "popup ") + (retro ? "retro " : "smooth ") + JSON.stringify(title.text.slice(0, 12)) + " ends at "
+              metaLost.push((wide ? "window " : "panel ") + (retro ? "retro " : "smooth ") + JSON.stringify(title.text.slice(0, 12)) + " ends at "
                 + Math.ceil(titleRight) + ", the speaker at " + Math.floor(xIn(speaker, 0)) + " | " + JSON.stringify(meta ? meta.text : null)
                 + (meta ? ", ends at " + Math.ceil(right) + " of " + meta.parent.width : ""))
           })
@@ -1100,7 +1100,7 @@ Harness {
               surface.windowWidth = hw === 1 ? Style.space(560) : 720
               stub.retro = false
               wait(20)
-              var where = "size " + hsize + " " + (surface.wide ? "window " + surface.width + " " : "popup " + (hw < 0 ? "spacing kept " : ""))
+              var where = "size " + hsize + " " + (surface.wide ? "window " + surface.width + " " : "panel " + (hw < 0 ? "spacing kept " : ""))
               for (var s = 0; s < states.length; s++) {
                 header.statusForms = states[s]
                 wait(1)
@@ -1318,7 +1318,7 @@ Harness {
             if (placed.name !== 0 || units[0].split(",")[1] !== "0" || units[1] !== units[0] || units[2] !== units[0]
                 || placed.range.join() !== "0,0" || placed.info.join() !== "0,0"
                 || placed.rangeToInfo !== body.bandGap || placed.infoToHeader !== body.bandGap || placed.headerToRows !== body.groupGap)
-              headerFaults.push((surface.wide ? "window " : "popup ") + (stub.retro ? "retro " : "smooth ") + JSON.stringify(placed))
+              headerFaults.push((surface.wide ? "window " : "panel ") + (stub.retro ? "retro " : "smooth ") + JSON.stringify(placed))
           }
         }
         surface.wide = false
@@ -1340,7 +1340,7 @@ Harness {
           var rowRight = xIn(topRow, topRow.width)
           var thumbLeft = xIn(thumb, 0)
           if (!(body.watchlist.interactive && thumb.visible && thumb.width > 0 && rowRight <= thumbLeft))
-            gutterFaults.push((surface.wide ? "window" : "popup") + ": row ends " + rowRight + ", thumb starts " + thumbLeft + " and is " + thumb.width + " wide")
+            gutterFaults.push((surface.wide ? "window" : "panel") + ": row ends " + rowRight + ", thumb starts " + thumbLeft + " and is " + thumb.width + " wide")
         }
         root.check("the rows stop short of the scrollbar's gutter", gutterFaults.length === 0, gutterFaults.join(" | "))
 
@@ -1480,7 +1480,7 @@ Harness {
               body.search.answer = "results"
               wait(20)
               var t = find(body.search, "searchNote")
-              var where = (surface.wide ? "window " + surface.width : "popup") + (stub.retro ? " retro: " : " smooth: ")
+              var where = (surface.wide ? "window " + surface.width : "panel") + (stub.retro ? " retro: " : " smooth: ")
               if (!t.visible || t.lineCount !== 1 || t.truncated || t.implicitWidth > t.width + 0.5)
                 noteFaults.push(where + t.text + " (" + Math.ceil(t.implicitWidth) + " px in " + t.width + ")")
             })
@@ -1519,7 +1519,7 @@ Harness {
             return span ? span.what + (span.whole ? "" : " (cut, " + (span.right - span.left) + " px)") : "none"
           })
           if (coinRows.length !== 5 || coinsDrawn.some(function(said) { return !/-USD$/.test(said) }))
-            coinFaults.push((surface.wide ? "window " + surface.width : "popup") + ": " + coinsDrawn.join(", "))
+            coinFaults.push((surface.wide ? "window " + surface.width : "panel") + ": " + coinsDrawn.join(", "))
         }
         body.search.results = []
         body.search.answer = ""
@@ -1850,8 +1850,8 @@ Harness {
         ;[12, 30].forEach(function(count) {
           stub.lists = [{ name: "", label: "All", count: stub.symbols.length, symbols: stub.symbols }].concat(
             Array.from({ length: count - 1 }, function(_, n) { return { name: "List " + (n + 1), label: "List " + (n + 1), count: 1, symbols: ["MZ"] } }))
-          ;[["popup", 0], ["window smallest", -1], ["window", 760]].forEach(function(place) {
-            surface.wide = place[0] !== "popup"
+          ;[["panel", 0], ["window smallest", -1], ["window", 760]].forEach(function(place) {
+            surface.wide = place[0] !== "panel"
             body.minChartHeight = surface.wide ? Style.space(136) : 0
             surface.fixedHeight = place[1] < 0 ? body.smallestHeight : place[1]
             ;[false, true].forEach(function(retro) {
@@ -1990,7 +1990,7 @@ Harness {
         ]
         var heldFaults = []
         var heldSeen = []
-        ;["popup", "window"].forEach(function(place) {
+        ;["panel", "window"].forEach(function(place) {
           surface.wide = place === "window"
           ;(surface.wide ? [760, 780, cap] : [cap - 24, cap - 4, cap]).forEach(function(room) {
             if (surface.wide) surface.fixedHeight = room
@@ -2106,7 +2106,7 @@ Harness {
             body.cancelAdding()
             wait(50)
             if (fieldY !== rowsY || typedY !== fieldY)
-              fieldPlaces.push((surface.wide ? "window " : "popup ") + (cases[c2].name || "All") + " rows at "
+              fieldPlaces.push((surface.wide ? "window " : "panel ") + (cases[c2].name || "All") + " rows at "
                 + rowsY + ", field " + fieldY + " -> " + typedY)
           }
         }
@@ -2388,7 +2388,7 @@ Harness {
             Object.keys(wants).forEach(function(order) {
               stub.order = order
               var at = []
-              var spot = (surface.wide ? "window " : "popup ") + (stub.retro ? "retro " : "smooth ") + order
+              var spot = (surface.wide ? "window " : "panel ") + (stub.retro ? "retro " : "smooth ") + order
               for (var dir = 0; dir < wants[order].length; dir++) {
                 stub.reversed = dir === 1
                 wait(20)
@@ -2402,7 +2402,7 @@ Harness {
               if (at.length > 1 && at[0] !== at[1]) wordFaults.push(spot + " moved: " + at.join(" -> "))
             })
             if (!held.every(function(h) { return h.at === held[0].at }))
-              wordFaults.push((surface.wide ? "window " : "popup ") + (stub.retro ? "retro" : "smooth")
+              wordFaults.push((surface.wide ? "window " : "panel ") + (stub.retro ? "retro" : "smooth")
                 + " across orders (first row's top, word's top, bottom, right): "
                 + held.map(function(h) { return h.order + " " + h.at }).join(" / "))
           }
@@ -2516,7 +2516,7 @@ Harness {
             views.forEach(function(v) {
               v.open()
               wait(60)
-              var place = (surface.wide ? "window " : "popup ") + (stub.retro ? "retro " : "smooth ") + v.name
+              var place = (surface.wide ? "window " : "panel ") + (stub.retro ? "retro " : "smooth ") + v.name
               var seen = survey(v.scope)
               seen.keys.forEach(function(t) { badKeys.push(place + ": \"" + t.text + "\" names a key") })
               if (seen.marked.join(",") !== v.enter) badKeys.push(place + ": marked for Enter [" + seen.marked.join(",") + "], want [" + v.enter + "]")
@@ -2579,7 +2579,7 @@ Harness {
               var said = note && note.visible ? note.text : ""
               var whole = !said || (xIn(note, 0) >= xIn(body.chartItem, 0) && xIn(note, note.width) <= xIn(body.chartItem, body.chartItem.width))
               if (said !== c[2] || !whole)
-                noteFaults.push((surface.wide ? "window " : "popup ") + (stub.retro ? "retro " : "smooth ") + c[0] + ": \"" + said + "\""
+                noteFaults.push((surface.wide ? "window " : "panel ") + (stub.retro ? "retro " : "smooth ") + c[0] + ": \"" + said + "\""
                   + (whole ? "" : " outside the chart"))
             })
           }
@@ -2833,7 +2833,7 @@ Harness {
             var menuEnd = yIn(menu, menu.height)
             var edge = Math.min(surface.height, tall)
             if (menu.rowsShown < least[1]) viewFaults.push(where + ": the list menu shows " + menu.rowsShown + " of 13 lists")
-            if (menuEnd > edge) viewFaults.push(where + ": the list menu ends at " + menuEnd + ", past the popup's " + edge)
+            if (menuEnd > edge) viewFaults.push(where + ": the list menu ends at " + menuEnd + ", past the panel's " + edge)
             body.closeListMenu()
             body.startAdding()
             wait(100)
@@ -2929,7 +2929,7 @@ Harness {
               Style.fontBaseSize = size
               wait(100)
               var shown = rowsInSight()
-              var said = (wide ? "window " : "popup ") + was + " to " + size + ": "
+              var said = (wide ? "window " : "panel ") + was + " to " + size + ": "
                 + shown.map(function(r) { return r.symbol + (r.whole ? "" : " (cut)") }).join(" ")
               was = size
               rowsSeen.push(said)
