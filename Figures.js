@@ -290,7 +290,8 @@ function dayTitles() {
 // ended by `now`, that day's name, "FRI" at the weekend; rows measuring
 // tomorrow from tonight's trades say TODAY. A row measures the
 // day of its newest price since the close (`newest`, by symbol,
-// `Overnight.newestPrint`), else its headline's. Listings abroad and coins
+// `Overnight.newestPrint`), else its headline's; one with no time names no
+// day, and says so itself (`freshnessText`). Listings abroad and coins
 // measure their own days, which their rows name.
 function rowsDay(symbols, quotes, newest, now, calendars) {
   var shared = null
@@ -299,7 +300,7 @@ function rowsDay(symbols, quotes, newest, now, calendars) {
     if (!q || !Overnight.hasOvernight(q, calendars)) continue
     var head = Quote.headlineQuote(q)
     var t = newest[symbols[i]] ? newest[symbols[i]].dayStart : head ? head.t : null
-    if (t === null) return "TODAY"
+    if (t === null) continue
     var day = { quote: q, t: t, day: exchangeDay(q, t) }
     if (shared && shared.day !== day.day) return "TODAY"
     shared = day

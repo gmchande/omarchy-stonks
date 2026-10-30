@@ -1865,6 +1865,13 @@ test("in every phase, a stock that has traded since its close shows that newest 
   // weekday evening, say TODAY.
   const header = set => { const at = topsAt(set); return M.rowsDay(at.symbols, at.quotes, at.newest, at.now, calendars) }
   expect(["watch-2026-10-25-1000", "watch-2026-10-25-2335", "watch-2026-10-26-1200"].map(header)).toEqual(["FRI", "TODAY", "TODAY"])
+  // A row Yahoo sent no time for measures no day it can name: the rest
+  // still name theirs.
+  {
+    const at = topsAt("watch-2026-10-25-1000")
+    const untimed = { ...at.quotes.NBIS, symbol: "UNTIMED", marketTime: undefined }
+    expect(M.rowsDay(at.symbols.concat("UNTIMED"), { ...at.quotes, UNTIMED: untimed }, at.newest, at.now, calendars)).toBe("FRI")
+  }
   for (const [set, rows] of [["watch-2026-10-25-2335", ["NBIS", "JNJ"]], ["watch-2026-10-26-2005", ["NBIS"]]]) {
     const at = topsAt(set)
     expect([set, M.rowsDay(rows, at.quotes, at.newest, at.now, calendars)]).toEqual([set, "TODAY"])
