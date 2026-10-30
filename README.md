@@ -416,3 +416,6 @@ and send a change.
 
 License: MIT, see [LICENSE](LICENSE). The sounds in `sounds/`, and the ones
 Stonks makes as it runs, were made from code for Stonks. They're MIT too.
+
+If Stonks earns a place in your bar, a heart on its page helps the next
+person find it.
