@@ -45,15 +45,16 @@ none() {
 # their own bundled sounds,
 # the cache's files, the saved quotes and the sounds' replay, chimes, and
 # lead-ins, are written only through OwnerOnly, and the camera writes its
-# screenshot and reads Omasnap's settings; one service owns the feeds; the
+# screenshot and reads Omasnap's settings; one service owns the feeds; every
+# request leaves from FetchRun, which only the feeds and search use; the
 # quote URL is the quote feed's, the fundamentals URLs the fundamentals
 # feed's, the overnight URL the overnight feed's, the all-day URL the
 # all-day feed's, and the manifest's URL the release feed's. The plugin has
 # one IPC target; only the window's host acts on Hyprland.
-only '\bProcess\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Updates.qml Sounds.qml Camera.qml OwnerOnly.qml
+only '\bProcess\s*\{' FetchRun.qml Updates.qml Sounds.qml Camera.qml OwnerOnly.qml
 only '\bFileView\s*\{' Service.qml Updates.qml TrendColors.qml OwnerOnly.qml Sounds.qml
 only '\bSettings\s*\{|^import QtCore' Camera.qml
-only '^import Quickshell\.Io' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml Service.qml IpcTarget.qml Updates.qml TrendColors.qml Sounds.qml Camera.qml OwnerOnly.qml
+only '^import Quickshell\.Io' FetchRun.qml Service.qml IpcTarget.qml Updates.qml TrendColors.qml Sounds.qml Camera.qml OwnerOnly.qml
 # Only the camera grabs and saves a picture, puts it on the clipboard, and
 # sends a notification.
 only 'grabToImage|saveToFile|wl-copy|wl-paste|omarchy-notification-send|notify-send' Camera.qml
@@ -69,6 +70,8 @@ none 'command:\s*\[(?!"timeout",)' Camera.qml OwnerOnly.qml
 only '\bIpcHandler\s*\{' IpcTarget.qml
 only '^import Quickshell\.Hyprland' WindowHost.qml
 only '\b(QuoteFeed|HistoryFeed|FundamentalsFeed|OvernightFeed|AllDayFeed|ReleaseFeed)\s*\{' Service.qml
+only '\bFetchRun\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml
+only 'Fetch\.curlCommand\(' FetchRun.qml
 only 'Quote\.chartUrl\(' QuoteFeed.qml
 only 'Fundamentals\.(fundamentalsUrl|capCloseUrl|rateUrl)\(' FundamentalsFeed.qml
 only 'Overnight\.overnightUrl\(' OvernightFeed.qml

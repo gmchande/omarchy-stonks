@@ -2,7 +2,6 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls as Controls
-import Quickshell.Io
 import qs.Commons
 import qs.Commons as Commons
 import "Fetch.js" as Fetch
@@ -232,7 +231,7 @@ FocusScope {
     if (stale || answer !== "failed") return
     searchDebounce.stop()
     answer = ""
-    if (searchProc.running && activeQuery === searchText.trim()) {
+    if (fetchRun.out && activeQuery === searchText.trim()) {
       requestedQuery = ""
       slowSearch.restart()
     } else {
@@ -290,8 +289,6 @@ FocusScope {
   // service has none.
   property var gate: null
   property var clearance: null
-  // The gate's ticket the request out was let through on (`Gate.report`).
-  property int ticket: 0
   // Why the last lookup failed, for its line: "none" when nothing answered
   // (`Fetch.answerKind`), "refused" when Yahoo turned it away or its gate
   // holds for a refusal, "other" for a bad answer or a spent budget.
@@ -304,11 +301,11 @@ FocusScope {
   function runSearch() {
     var q = searchText.trim()
     if (q.length < 1) return
-    if (searchProc.running) {
+    if (fetchRun.out) {
       if (activeQuery === q) return
       requestedQuery = q
       activeQuery = ""
-      searchProc.running = false
+      fetchRun.stop()
       return
     }
     if (clearance && !clearance()) { requestedQuery = q; return }
@@ -319,14 +316,12 @@ FocusScope {
       land("")
       return
     }
-    if (gate) root.ticket = gate.ticket
-    searchProc.command = Fetch.curlCommand([Search.searchUrl(q)], Fetch.SEARCH_CAP)
-    searchProc.running = true
+    fetchRun.send([Search.searchUrl(q)], Fetch.SEARCH_CAP)
     if (answer === "" && !slow) slowSearch.restart()
   }
 
   function pump() {
-    if (active && requestedQuery !== "" && !searchProc.running) root.runSearch()
+    if (active && requestedQuery !== "" && !fetchRun.out) root.runSearch()
   }
 
   // An answer counts only for the query still being asked: a search dropped
@@ -374,7 +369,7 @@ FocusScope {
     activeQuery = ""
     enterFor = ""
     // Its stream ends at once, empty, and is ignored: no query is asked.
-    if (searchProc.running) searchProc.running = false
+    if (fetchRun.out) fetchRun.stop()
   }
 
   Timer {
@@ -386,21 +381,17 @@ FocusScope {
   Timer {
     id: slowSearch
     interval: 250
-    onTriggered: if (searchProc.running && root.answer === "") root.slow = true
+    onTriggered: if (fetchRun.out && root.answer === "") root.slow = true
   }
 
-  Process {
-    id: searchProc
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: {
-        var got = Fetch.answers(String(text || ""))
-        if (root.gate) root.gate.report(got.map(function(a) { return a.kind }), got.length ? got[0].retryAfter : 0, root.ticket)
-        // No answer at all, as from a curl stopped short, is nothing answered.
-        var kind = got.length ? got[0].kind : "none"
-        root.failure = kind === "none" || kind === "refused" ? kind : "other"
-        root.land(kind === "ok" ? got[0].body : "")
-      }
+  FetchRun {
+    id: fetchRun
+    gate: root.gate
+    onEnded: function(got) {
+      // No answer at all, as from a curl stopped short, is nothing answered.
+      var kind = got.length ? got[0].kind : "none"
+      root.failure = kind === "none" || kind === "refused" ? kind : "other"
+      root.land(kind === "ok" ? got[0].body : "")
     }
   }
 

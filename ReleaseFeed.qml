@@ -1,5 +1,4 @@
 import QtQuick
-import Quickshell.Io
 import "Fetch.js" as Fetch
 import "Release.js" as Release
 // The newest Stonks, from main's manifest on GitHub (`Release`): what
@@ -24,8 +23,6 @@ Item {
   property var clock: null
   property var clearance: null
   property var gate: null
-  // The gate's ticket the request out was let through on (`Gate.report`).
-  property int ticket: 0
   // The wall second of the last ask; 0 before the first.
   property int askedAt: 0
   // The last ask got no answer at all.
@@ -36,15 +33,13 @@ Item {
   // Looked at as the clock moves, as the service is ready, and as the
   // screens answer.
   function pump() {
-    if (!ready || fetchProc.running) return
+    if (!ready || fetchRun.out) return
     var now = clock.wallSecond()
     if (askedAt > 0 && now - askedAt < interval) return
     if (clearance && !clearance()) return
     if (gate && gate.take(1) === 0) return
     root.askedAt = now
-    if (gate) root.ticket = gate.ticket
-    fetchProc.command = Fetch.curlCommand([Release.MANIFEST_URL], Fetch.MANIFEST_CAP)
-    fetchProc.running = true
+    fetchRun.send([Release.MANIFEST_URL], Fetch.MANIFEST_CAP)
   }
   onNowChanged: pump()
   onReadyChanged: pump()
@@ -56,20 +51,16 @@ Item {
     pump()
   }
 
-  function receive(text) {
-    var got = Fetch.answers(text)
-    if (gate) gate.report(got.map(function(a) { return a.kind }), got.length ? got[0].retryAfter : 0, root.ticket)
+  function receive(got) {
     root.unanswered = got.length > 0 && got.every(function(a) { return a.kind === "none" })
     var named = got.length && got[0].kind === "ok" ? Release.manifestVersion(got[0].body) : ""
     if (named === "") return
     root.version = named
   }
 
-  Process {
-    id: fetchProc
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root.receive(String(text || ""))
-    }
+  FetchRun {
+    id: fetchRun
+    gate: root.gate
+    onEnded: function(got) { root.receive(got) }
   }
 }

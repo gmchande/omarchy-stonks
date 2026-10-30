@@ -1,5 +1,4 @@
 import QtQuick
-import Quickshell.Io
 import "Fetch.js" as Fetch
 import "Overnight.js" as Overnight
 // Whether Robinhood trades each US stock or ETF all day in its 24 Hour
@@ -19,8 +18,6 @@ Item {
 
   property var entries: ({})
   property var gate: null
-  // The gate's ticket the request out was let through on (`Gate.report`).
-  property int ticket: 0
   property int askedAt: 0
   // The run out, as its requests' symbols, in the order of their URLs,
   // until it is answered.
@@ -40,19 +37,12 @@ Item {
       heldTimer.restart()
       return
     }
-    if (gate) root.ticket = gate.ticket
-    fetchProc.command = Fetch.curlCommand(root.batches.map(Overnight.allDayUrl), Fetch.instrumentsCap(root.batches[0].length))
-    fetchProc.running = true
+    fetchRun.send(root.batches.map(Overnight.allDayUrl), Fetch.instrumentsCap(root.batches[0].length))
   }
 
   // Each request's answer is read with its own symbols; a bad one fails
-  // them.
-  function receive(text) {
-    var got = Fetch.answers(text)
-    if (gate && got.length) {
-      gate.report(got.map(function(a) { return a.kind }),
-        Math.max.apply(null, got.map(function(a) { return a.retryAfter })), root.ticket)
-    }
+  // them, as does a run the gate held back (none).
+  function receive(got) {
     var next = Object.assign({}, entries)
     batches.forEach(function(batch, b) {
       var answer = got.filter(function(a) { return a.index === b })[0]
@@ -72,14 +62,12 @@ Item {
   Timer {
     id: heldTimer
     interval: 0
-    onTriggered: root.receive("")
+    onTriggered: root.receive([])
   }
 
-  Process {
-    id: fetchProc
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root.receive(String(text || ""))
-    }
+  FetchRun {
+    id: fetchRun
+    gate: root.gate
+    onEnded: function(got) { root.receive(got) }
   }
 }

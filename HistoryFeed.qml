@@ -1,5 +1,4 @@
 import QtQuick
-import Quickshell.Io
 import "Fetch.js" as Fetch
 import "History.js" as History
 import "Quote.js" as Quote
@@ -37,8 +36,6 @@ Item {
   // The exchanges whose listings trade in whole cents from $1
   // (`History.parseHistory`); none unless handed in.
   property var centExchanges: []
-  // The gate's ticket the request out was let through on (`Gate.report`).
-  property int ticket: 0
   // What is wanted, { range, ahead, charts }, `charts` each { key, symbol }:
   // one chart to show, or a run of charts asked for ahead; null when none
   // is, and once its answer is in.
@@ -145,7 +142,7 @@ Item {
       } else if (!stopped) {
         // Its stream ends at once, empty, and receive drops it.
         root.stopped = true
-        fetchProc.running = false
+        fetchRun.stop()
       }
       return
     }
@@ -187,11 +184,9 @@ Item {
       heldTimer.restart()
       return
     }
-    if (gate) root.ticket = gate.ticket
     root.attempts = attempts + 1
     var range = job.range
-    fetchProc.command = Fetch.curlCommand(job.charts.map(function(c) { return History.historyUrl(c.symbol, range) }), Fetch.HISTORY_CAP)
-    fetchProc.running = true
+    fetchRun.send(job.charts.map(function(c) { return History.historyUrl(c.symbol, range) }), Fetch.HISTORY_CAP)
   }
 
   function pump() {
@@ -212,11 +207,8 @@ Item {
     try { return History.parseHistory(JSON.parse(answer.body), range, root.centExchanges) } catch (e) { return null }
   }
 
-  function receive(text) {
+  function receive(got) {
     var request = job
-    var got = Fetch.answers(text)
-    if (gate) gate.report(got.map(function(a) { return a.kind }),
-      Math.max.apply(null, [0].concat(got.map(function(a) { return a.retryAfter }))), root.ticket)
     if (stopped || !covers(request, wanted)) {
       root.endJob()
       return
@@ -271,11 +263,9 @@ Item {
     onTriggered: root.settle([null])
   }
 
-  Process {
-    id: fetchProc
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root.receive(String(text || ""))
-    }
+  FetchRun {
+    id: fetchRun
+    gate: root.gate
+    onEnded: function(got) { root.receive(got) }
   }
 }
