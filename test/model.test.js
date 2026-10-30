@@ -1253,9 +1253,12 @@ test("a quote run charts the pill's quote first and the other heroes next, then 
   expect(M.quoteSlots(["P", "Q"], { P: 1, Q: 1 }, ["P", "Q"], "", [], false))
     .toEqual([{ symbols: ["P"], spark: false }, { symbols: ["Q"], spark: false }])
   // A coin, asked for two days, goes in a spark request of its own, alone
-  // too, so the stocks' batch stays one day.
+  // too, so the stocks' batch stays one day; asked before them, the budget
+  // having held it, it goes first.
   expect(M.quoteSlots(["A", "BTC-USD", "B", "C"], { A: 1, "BTC-USD": 1, B: 1, C: 1 }, ["A", "BTC-USD", "B", "C"], "", [], true, ["BTC-USD"]))
     .toEqual([{ symbols: ["A", "B", "C"], spark: true }, { symbols: ["BTC-USD"], spark: true }])
+  expect(M.quoteSlots(["A", "BTC-USD", "B", "C"], { A: 2, "BTC-USD": 1, B: 2, C: 2 }, ["A", "BTC-USD", "B", "C"], "", [], true, ["BTC-USD"]))
+    .toEqual([{ symbols: ["BTC-USD"], spark: true }, { symbols: ["A", "B", "C"], spark: true }])
   // Each lane runs its own kind, a first answer (none yet, or a quote kept
   // from an earlier session) or a refresh, never one cooling after a bad
   // answer or out on a run; a day waiting to be judged goes only when its

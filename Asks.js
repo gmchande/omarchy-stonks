@@ -144,7 +144,8 @@ function laneJudging(toJudge, asked, held) {
 // too: a coin is asked for two days (`Market.twoDays`), and a batch asks
 // two for all when one of them wants two, so beside the stocks it would
 // double their answer; its open is its price 24 hours ago, read from the
-// closes. A feed that isn't `bulk`, the preview's, asks only charts.
+// closes. Their batches take their place among the stocks' by the order
+// asked. A feed that isn't `bulk`, the preview's, asks only charts.
 function quoteSlots(waiting, asked, symbols, lead, heroes, bulk, coins) {
   var order = waiting.slice().sort(function(a, b) {
     return (b === lead) - (a === lead) || asked[a] - asked[b] || symbols.indexOf(a) - symbols.indexOf(b)
@@ -152,14 +153,17 @@ function quoteSlots(waiting, asked, symbols, lead, heroes, bulk, coins) {
   var charted = function(s) { return !bulk || heroes.indexOf(s) >= 0 }
   var coin = function(s) { return !!coins && coins.indexOf(s) >= 0 }
   var slots = order.filter(charted).map(function(s) { return { symbols: [s], spark: false } })
+  var batches = []
   var batched = order.filter(function(s) { return !charted(s) && !coin(s) })
   for (var i = 0; i < batched.length; i += Quote.SPARK_BATCH) {
     var batch = batched.slice(i, i + Quote.SPARK_BATCH)
-    slots.push({ symbols: batch, spark: batch.length > 1 })
+    batches.push({ symbols: batch, spark: batch.length > 1 })
   }
   var coined = order.filter(function(s) { return !charted(s) && coin(s) })
-  for (var j = 0; j < coined.length; j += Quote.SPARK_BATCH) slots.push({ symbols: coined.slice(j, j + Quote.SPARK_BATCH), spark: true })
-  return slots
+  for (var j = 0; j < coined.length; j += Quote.SPARK_BATCH) batches.push({ symbols: coined.slice(j, j + Quote.SPARK_BATCH), spark: true })
+  // Each batch is in the order asked, so its first symbol places it.
+  batches.sort(function(x, y) { return order.indexOf(x.symbols[0]) - order.indexOf(y.symbols[0]) })
+  return slots.concat(batches)
 }
 
 // The heroes whose quotes came from spark, with no opens for the hero's line
