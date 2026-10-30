@@ -1005,8 +1005,10 @@ Harness {
       // width, above "+ Add a symbol".
       body.showFirstRunHint()
     } else if (/^(popup|window)-notice-file-/.test(root.stateName)) {
-      // The footer's notices whole, in the panel's width and the window's.
+      // The footer's notices whole, in the panel's width and the window's;
+      // -update-: beside a newer Stonks offered at the bar's right end.
       stub.settingsUnreadable = true
+      if (root.stateName.indexOf("-update-") > 0) updates.releasedVersion = "1.1.0"
     } else if (root.stateName.indexOf("popup-notice-update-") === 0) {
       updates.newVersion = "1.0.0"
     } else if (root.stateName.indexOf("popup-notice-save-again-") === 0) {

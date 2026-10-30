@@ -48,6 +48,9 @@ every_state() (
   states="$states popup-notice-save-smooth popup-notice-save-retro popup-notice-save-again-smooth popup-notice-save-again-retro"
   # A change made while the file can't be read, in both looks.
   states="$states popup-notice-file-edited-smooth popup-notice-file-edited-retro"
+  # The unreadable file's notice beside a newer Stonks on offer, at size 20:
+  # its shortest action still fits on its own line.
+  states="$states popup-notice-file-update-retro-size-20"
   # A removal offered back beside the add, in both looks, and in the window.
   states="$states popup-undo-smooth popup-undo-retro window-undo-retro"
   # Every listing failed, said once in the header, in the popup, both looks.
