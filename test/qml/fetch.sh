@@ -23,6 +23,8 @@ patch_copy plugin/Service.qml 's/function wallSecond() { return Math.floor(Date.
 patch_copy plugin/Service.qml 's/property int now: Math.floor(Date.now() \/ 1000)/property int now: 1791367140/'
 patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testFeed: feed\n  readonly property alias testPreviewFeed: previewFeed\n  readonly property alias testYahooGate: yahooGate\n  readonly property alias testDataFile: dataFile\n  readonly property alias testFundamentalsFeed: fundamentalsFeed\n  readonly property alias testOvernightFeed: overnightFeed\n  readonly property alias testAllDayFeed: allDayFeed'
 patch_copy plugin/QuoteFeed.qml 's/interval: 2500/interval: 200/'
+# A step hands the refresh lane's run its output by hand (`FetchRun`).
+patch_copy plugin/QuoteFeed.qml '/readonly property bool busy:/a\  readonly property alias testRefreshFetch: refreshFetch'
 # The pills' popups stay unloaded, and the window host asks a stand-in, not
 # the owner's Hyprland (as range.sh), and hears its events from the stand-in
 # too: the owner's own, a window title or a keyboard layout changing, would
