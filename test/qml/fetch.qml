@@ -945,6 +945,25 @@ Harness {
       harness.check("a search that failed while Yahoo paused, its retry waiting on the screens' answer when the window leaves sight, is not asked for until back in sight",
         failedSearch && searchQueued && searchHidden && unseenSearch === 0 && seenSearch,
         [failedSearch, searchQueued, searchHidden, unseenSearch + " while out of sight", seenSearch].join(" | "))
+      // In sight, an edit stops the lookup still out for the old words, and
+      // the window leaves sight before that lookup's stream ends: the new
+      // words are not asked for until back in sight.
+      within(3000, function() { return body.search.answer !== "" })
+      touch("SEARCH.hold")
+      var oldFrom = harness.calls("SEARCH.asked")
+      body.search.setQuery("SHE")
+      var oldOut = within(3000, function() { return harness.calls("SEARCH.asked") > oldFrom })
+      var editFrom = harness.calls("SEARCH.asked")
+      body.search.setQuery("SHEL")
+      body.search.runSearch()
+      stonksToplevel.workspace = workspaceThere
+      remove("SEARCH.hold")
+      wait(800)
+      var unseenEdit = harness.calls("SEARCH.asked") - editFrom
+      stonksToplevel.workspace = workspaceHere
+      var seenEdit = within(3000, function() { return harness.calls("SEARCH.asked") > editFrom })
+      harness.check("an edit that stops the lookup out for the old words, the window leaving sight before it ends, asks the new words only once back in sight",
+        oldOut && unseenEdit === 0 && seenEdit, [oldOut, unseenEdit + " while out of sight", seenEdit].join(" | "))
       body.cancelAdding()
       settle()
 

@@ -598,8 +598,8 @@ Item {
 
   // The service wants the chart's history only while a surface shows it,
   // and a preview only while its search is open on an open surface. A
-  // search waiting on the screens' answer goes only where a screen shows
-  // it, and goes once one does.
+  // search held back while no screen shows it (its `clearance`) goes once
+  // one does.
   onSurfaceOpenChanged: {
     if (service) service.surfaceShown(root, surfaceOpen && onScreen)
     if (!surfaceOpen) previewTo("")
@@ -640,7 +640,7 @@ Item {
     target: root.service
     ignoreUnknownSignals: true
     function onPreviewTaken(surface) { if (surface === root) root.cancelAdding() }
-    function onScreensReady() { if (root.onScreen) search.pump() }
+    function onScreensReady() { search.pump() }
     function onYahooBack() { if (root.onScreen) search.yahooBack() }
   }
 
@@ -1513,7 +1513,8 @@ Item {
     anchors.bottomMargin: root.margins
     visible: root.adding
     gate: root.service ? root.service.yahooGate : null
-    clearance: root.service ? function() { return root.service.screensClear() } : null
+    // A search goes only where a screen shows it, and a screen is on.
+    clearance: root.service ? function() { return root.onScreen && root.service.screensClear() } : null
     active: root.adding && root.surfaceOpen
     retro: root.retro
     foreground: root.foreground
