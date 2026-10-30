@@ -283,9 +283,8 @@ Harness {
       wait(300)
     }
 
-    // The other way: a preview made while its own quote is out keeps its ask
-    // for its cap and P/E through the stock's, which a surface makes as it
-    // opens or refreshes, and the service each minute.
+    // The other way: a preview made while its own quote is out gets its cap
+    // and P/E as that quote lands, the stock's own already on show.
     function previewKeepsItsFigures(body, keys) {
       // SHOP.TO as if never seen: no quote held for it, no figures.
       var forget = function(feed, key) {
@@ -303,21 +302,19 @@ Harness {
       var waiting = within(6000, function() {
         return service.previewSymbol === "SHOP.TO" && service.previewShown && !service.testPreviewFeed.quotes["SHOP.TO"]
       })
-      // The stock's own ask, its quote in, as a refresh makes it.
-      app.requestFundamentals()
       hold("SHOP.TO.quote.hold", false)
       tryVerify(function() { return !!service.testPreviewFeed.quotes["SHOP.TO"] }, 8000)
       var asked = within(3000, function() { return harness.calls("SHOP.TO.fundamentals") > before })
       keyClick(Qt.Key_Escape)
       body.resetInteraction()
-      harness.check("a preview made before its own quote keeps its ask for its cap and P/E through the stock's, asked for as its quote lands",
+      harness.check("a preview made before its own quote gets its cap and P/E as its quote lands",
         waiting && asked, "waiting " + waiting + ", SHOP.TO's asked " + (harness.calls("SHOP.TO.fundamentals") - before))
       wait(300)
     }
 
-    // A preview gone before its turn takes back its ask for its cap and
-    // P/E: SHOP.TO's waits behind the stock's own, held as on a slow
-    // network, and search closes with the window still open on the stock.
+    // A preview gone before its turn wants its cap and P/E no more: SHOP.TO's
+    // waits behind the stock's own, held as on a slow network, and search
+    // closes with the window still open on the stock.
     function previewLeavesItsFigures(body, keys) {
       var funds = service.testFundamentalsFeed
       var entries = Object.assign({}, funds.entries)
@@ -326,12 +323,11 @@ Harness {
       funds.entries = entries
       hold("FUNDAMENTALS.hold", true)
       var before = harness.calls("SHOP.TO.fundamentals")
-      app.requestFundamentals()
       var stockOut = within(3000, function() { return !!funds.job && funds.job.symbol === service.featuredSymbol })
       searchShop(body, keys)
       keyClick(Qt.Key_Down)
       var waiting = within(6000, function() {
-        return service.previewSymbol === "SHOP.TO" && funds.waiting.some(function(w) { return w.symbol === "SHOP.TO" })
+        return service.previewSymbol === "SHOP.TO" && funds.wants("SHOP.TO")
       })
       keyClick(Qt.Key_Escape)
       body.resetInteraction()

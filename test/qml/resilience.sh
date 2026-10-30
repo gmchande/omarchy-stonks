@@ -5,8 +5,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree resilience.qml
 patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testGate: yahooGate\n  readonly property alias testFeed: feed\n  readonly property alias testHistory: historyFeed\n  readonly property alias testFundamentals: fundamentalsFeed\n  readonly property alias testDataFile: dataFile'
 patch_copy plugin/Service.qml 's/function wallSecond() { return Math.floor(Date.now() \/ 1000) }/property int clockOffset: 0\n  function wallSecond() { return Math.floor(Date.now() \/ 1000) + root.clockOffset }/'
-patch_copy plugin/FundamentalsFeed.qml '/id: root/a\  property int clockOffset: 0\n  readonly property var testCommand: fetchProc.command'
-patch_copy plugin/FundamentalsFeed.qml 's/Date.now()/(Date.now() + root.clockOffset * 1000)/g'
+patch_copy plugin/FundamentalsFeed.qml '/id: root/a\  readonly property var testCommand: fetchProc.command'
 patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property var testBody: root.body\n  readonly property alias testKeys: keyCatcher'
 printf '%s\n' '{"version":1,"symbols":["BTC-USD"],"featured":"BTC-USD","order":"manual","style":"smooth","range":"1D"}' > "$work/data.json"
 # A full disk without root: Quickshell starts in a user and mount namespace

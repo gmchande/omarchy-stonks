@@ -24,7 +24,6 @@ Panel {
   readonly property var sounds: plugin ? plugin.sounds : null
   readonly property var camera: plugin ? plugin.camera : null
   readonly property var trendColors: plugin ? plugin.trendColors : null
-  readonly property string featuredSymbol: service ? service.featuredSymbol : ""
   readonly property string range: service ? service.range : "1D"
   readonly property int panelWidth: Style.space(480)
   // The panel shows up to six whole rows under its fixed content. Stated in
@@ -99,7 +98,6 @@ Panel {
         root.cardHeight = root.fittedCardHeight
       }
     }
-    requestFundamentals()
     if (opening) root.body.motion.revealChart()
     Qt.callLater(function() { if (root.opened) setCenterHoverRevealSuppressed(true) })
   }
@@ -127,20 +125,11 @@ Panel {
       root.bar.setCenterHoverRevealSuppressed(value)
   }
 
-  // The cap and P/E for the symbol on show while the panel is open; the
-  // service asks for the chart's history itself.
-  function requestFundamentals() {
-    if (root.opened && service && featuredSymbol) service.fetchFundamentals(featuredSymbol)
-  }
-
   function refresh() {
     if (service) service.refresh()
-    requestFundamentals()
   }
 
   function refocusKeys() { Qt.callLater(function() { if (bodyKeys) bodyKeys.forceActiveFocus() }) }
-
-  onFeaturedSymbolChanged: requestFundamentals()
 
   KeyboardPanel {
     id: panel

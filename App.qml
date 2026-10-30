@@ -47,7 +47,6 @@ Item {
     applyRequest()
     if (opening) root.body.motion.revealChart()
     if (updates) updates.check()
-    requestFundamentals()
     refocusKeys()
   }
 
@@ -71,16 +70,8 @@ Item {
     service.summon(symbol, range)
   }
 
-  // The cap and P/E for the symbol on show while the window is open where a
-  // screen shows it, and as it comes back into sight; the service asks for
-  // the chart's history itself.
-  function requestFundamentals() {
-    if (window.visible && onScreen && ready && featuredSymbol) service.fetchFundamentals(featuredSymbol)
-  }
-
   function refresh() {
     if (ready) service.refresh()
-    requestFundamentals()
   }
 
   function refocusKeys() { Qt.callLater(function() { if (keyCatcher) keyCatcher.forceActiveFocus() }) }
@@ -89,11 +80,8 @@ Item {
   // there is a symbol to draw.
   onReadyChanged: if (ready) Qt.callLater(function() {
     root.applyRequest()
-    root.requestFundamentals()
     if (window.visible) root.body.motion.revealChart()
   })
-  onFeaturedSymbolChanged: requestFundamentals()
-  onOnScreenChanged: requestFundamentals()
 
   FloatingWindow {
     id: window

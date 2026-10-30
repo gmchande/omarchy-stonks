@@ -36,12 +36,6 @@ Item {
   // to try again says when it still didn't.
   signal saveChecked(bool saved)
   property int now: Math.floor(Date.now() / 1000)
-  // The symbols whose fundamentals were asked for before their first
-  // quote, one for each asker: the stock on show ("stock") and search's
-  // preview ("preview"), so neither's ask takes the other's. Found in
-  // review: the stock's ask each minute emptied one slot the preview's
-  // waited in, and the preview showed no cap or P/E.
-  property var pendingFundamentals: ({ stock: "", preview: "" })
   // What the last removal took and the settings from just before it, on
   // offer until the next change to what the lists hold, however it comes: a
   // change here, on either surface, or in the data file.
@@ -278,11 +272,6 @@ Item {
       root.prunedMinute = Math.floor(root.now / 60)
       forgetLeft()
       refreshRange()
-      // The hero's cap and P/E, and its rate, are good for a day: a surface
-      // left open on it asks again once they are older (`FundamentalsFeed.fetch`
-      // asks nothing while both are fresh). A failed one waits to be wanted.
-      if (root.openSurfaces.length > 0 && (root.fundamentals[root.view.featured] || {}).status === "ok")
-        fetchFundamentals(root.view.featured)
     }
     // A refresh owed while every screen was off asks again as the clock
     // moves, so it goes once one is on, quotes due or not.
@@ -314,8 +303,7 @@ Item {
     var calNow = Asks.calendarsAt(root.calendars, now)
     var watched = Asks.watchedSymbols(root.library, featured, open)
     if (watched.join(",") !== root.watched.join(",")) root.watched = watched
-    var heroes = open ? [featured].concat(root.previewShown ? [root.previewSymbol] : []) : []
-    var asks = Asks.quotesDue(watched, feed.entries, feed.asked, feed.quotes, heroes, featured, now, root.refreshIntervalSec, calNow)
+    var asks = Asks.quotesDue(watched, feed.entries, feed.asked, feed.quotes, root.heroesOnShow(), featured, now, root.refreshIntervalSec, calNow)
     root.dueAt = asks.next
     if (asks.due.length > 0) feed.ask(asks.due, now)
   }
@@ -495,9 +483,11 @@ Item {
     id: yahooGate
     host: "Yahoo"
     clock: root
-    // Yahoo answering again says the network is back.
+    // Yahoo answering again says the network is back: a cap and P/E that
+    // failed while it paused is asked again.
     onReopened: {
       root.showHistory(false)
+      fundamentalsFeed.retry()
       releaseFeed.askAgain()
     }
   }
@@ -577,14 +567,26 @@ Item {
     centExchanges: root.centExchanges
     calendars: root.calendars
     bulk: false
-    onQuotesChanged: {
-      root.askPendingFundamentals()
-      root.askOvernight()
-    }
+    onQuotesChanged: root.askOvernight()
   }
 
+  // The heroes the surfaces on screen show: the stock on show, and a resting
+  // preview on view; none with nothing open.
+  function heroesOnShow() {
+    return root.openSurfaces.length > 0 ? [root.view.featured].concat(root.previewShown ? [root.previewSymbol] : []) : []
+  }
+  // Their caps and P/Es (`Asks.figuresWanted`): the feed fetches what of it
+  // isn't good for the day, and nothing else asks for it. With nothing open
+  // it reads no quote, so the pill's prices don't work it out again.
+  readonly property var figuresWanted: {
+    var heroes = root.heroesOnShow()
+    return heroes.length > 0 ? Asks.figuresWanted(heroes, feed.quotes, previewFeed.quotes) : []
+  }
   FundamentalsFeed {
     id: fundamentalsFeed
+    wanted: root.figuresWanted
+    now: root.now
+    clock: root
     gate: yahooGate
     clearance: function() { return root.screensClear() }
   }
@@ -616,12 +618,13 @@ Item {
   readonly property alias mainVersion: releaseFeed.version
 
   // A user's refresh, from a key, the pill, or IPC: every watched quote
-  // whose last answer is more than 10 s old, and the overnight prints of
-  // the charts on show, unless asked for in the last 10 s, so a second
-  // press adds nothing; and the chart's history fresh whatever the cache
-  // holds. A host paused for no answer is tried at once (`Gate.hurry`).
-  // While every screen is off the quotes wait their turn, and the rest is
-  // owed (`refreshOwed`) until a screen is on.
+  // whose last answer is more than 10 s old, the cap and P/E on show that
+  // failed, and the overnight prints of the charts on show, unless asked
+  // for in the last 10 s, so a second press adds nothing; and the chart's
+  // history fresh whatever the cache holds. A host paused for no answer is
+  // tried at once (`Gate.hurry`). While every screen is off the quotes and
+  // the cap and P/E wait their turn, and the rest is owed (`refreshOwed`)
+  // until a screen is on.
   property bool refreshOwed: false
   function refresh() {
     if (!root.pluginsReady) return
@@ -629,6 +632,7 @@ Item {
     robinhoodGate.hurry()
     var now = root.wallSecond()
     feed.ask(Asks.refreshQuotes(root.watched, feed.entries, now), now, true)
+    fundamentalsFeed.retry()
     if (!root.screensClear()) {
       root.refreshOwed = true
       return
@@ -770,11 +774,7 @@ Item {
     if (s) {
       root.shownAsHero(s)
       previewRest.restart()
-    } else {
-      previewRest.stop()
-      // A preview gone asks for nothing it waited on.
-      root.keepPending("preview", "")
-    }
+    } else previewRest.stop()
     root.showHistory(false)
     if (before && before !== root.previewSurface && s) root.previewTaken(before)
   }
@@ -797,14 +797,12 @@ Item {
     }
   }
   // A resting preview on a surface a screen shows asks for what it holds
-  // back while it is not: its quote, its cap and P/E, and Robinhood's two
-  // answers for a US stock or ETF. Out of sight, it takes back the cap and
-  // P/E it still waits for.
+  // back while it is not: its quote, and Robinhood's two answers for a US
+  // stock or ETF.
   onPreviewShownChanged: if (previewShown) {
     previewFeed.pump()
-    fetchFundamentals(previewSymbol, "preview")
     askOvernight()
-  } else withdrawFundamentals("preview")
+  }
 
   // A surface says when it opens and closes, and as it goes. The clock
   // catches up at once, and moves on at the pace that now holds.
@@ -813,10 +811,6 @@ Item {
     var next = open ? others.concat([surface]) : others
     if (next.length === root.openSurfaces.length) return
     root.openSurfaces = next
-    // With no surface in sight, the stock on show is on none: what it waits
-    // for is asked again when one comes back (`requestFundamentals` in App
-    // and Panel).
-    if (!next.length) root.withdrawFundamentals("stock")
     if (!open) {
       root.sights = root.sights.filter(function(s) { return s.surface !== surface })
       root.drawingIn(surface, false)
@@ -920,43 +914,11 @@ Item {
     if (History.historyRanges().indexOf(value) >= 0) root.persist({ range: value })
   }
 
-  // An open surface asks for the hero's cap and P/E: the featured symbol's
-  // (`asker` "stock", or none), or a preview's ("preview"). One asked for
-  // before its quote waits in its asker's place (`pendingFundamentals`) and
-  // goes when the quote lands (`Asks.fundamentalsAsk`).
-  function fetchFundamentals(symbol, asker) {
-    var normalized = String(symbol || "").toUpperCase()
-    var quote = root.quotes[normalized] || previewFeed.quotes[normalized]
-    var by = asker || "stock"
-    var ask = Asks.fundamentalsAsk(root.pendingFundamentals, by, normalized, quote)
-    if (ask.pending !== root.pendingFundamentals) root.pendingFundamentals = ask.pending
-    if (ask.fetch) fundamentalsFeed.fetch(normalized, quote.currency, by)
-  }
-
-  function keepPending(asker, symbol) {
-    var next = Asks.pendingWith(root.pendingFundamentals, asker, symbol)
-    if (next !== root.pendingFundamentals) root.pendingFundamentals = next
-  }
-
-  // An asker no screen shows takes back its cap and P/E, waiting on a quote
-  // or behind another fetch.
-  function withdrawFundamentals(asker) {
-    root.keepPending(asker, "")
-    fundamentalsFeed.withdraw(asker)
-  }
-
-  // Each ask that waited on its quote, now that quotes have changed.
-  function askPendingFundamentals() {
-    var pending = root.pendingFundamentals
-    for (var asker in pending) if (pending[asker]) fetchFundamentals(pending[asker], asker)
-  }
-
   // A quote that changed, by an answer, a restore, or a symbol leaving,
   // leaves the saved quotes behind (`flushQuotes`), written once the turn
   // is over: an undo restores the quote before All takes the symbol back,
   // and a write between the two left it out of the file.
   onQuotesChanged: {
-    askPendingFundamentals()
     settleArrivals()
     root.quotesUnsaved = true
     Qt.callLater(flushQuotes)

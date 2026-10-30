@@ -19,13 +19,16 @@ Harness {
   property var afterWrite: null
   property var afterLs: null
   property bool reading: false
-  // Asked for before their quotes, which the add fetches, and again once
-  // they are in: two Toronto listings, each priced in CAD against earnings
-  // in USD.
+  // Shown before their quotes, which the add fetches: two Toronto listings,
+  // each priced in CAD against earnings in USD.
   readonly property var asking: ["SHOP.TO", "MAPLE.TO"]
   property int askingAt: 0
   property bool asked: false
   property var msftBefore: null
+  // Two surfaces on screen, as the service hears of them: the stock's, and
+  // the one whose search previews.
+  QtObject { id: stockSurface }
+  QtObject { id: searchSurface }
   // Data files that can't be read: half a JSON object, as a hand edit
   // leaves one, an empty file, and JSON that is not an object.
   readonly property var unreadable: [
@@ -136,7 +139,7 @@ Harness {
     id: endpointDown
     command: ["touch", Quickshell.env("STONKS_FAKE_STATE") + "/FUNDAMENTALS.down"]
     onExited: {
-      service.fetchFundamentals("MSFT")
+      service.feature("MSFT")
       harness.go(11)
     }
   }
@@ -304,8 +307,8 @@ Harness {
                 extra.push(n)
             }
             check("no leftover temp file", saved && extra.length === 0, saved + " " + extra.join(" "))
-            // Their cap and P/E wait until the last ask is in, so each
-            // waits behind the one under way, as on a slow network.
+            // Their cap and P/E wait until the last is in, so each waits
+            // behind the one under way, as on a slow network.
             harness.stateThen("touch \"$1/FUNDAMENTALS.hold\"", function() { harness.go(8) })
           }
           lsProc.running = false
@@ -314,8 +317,9 @@ Harness {
       } else if (harness.step === 8) {
         var symbol = harness.asking[harness.askingAt]
         if (!harness.asked) {
-          service.fetchFundamentals(symbol)
           service.addSymbol(symbol)
+          service.feature(symbol)
+          if (harness.askingAt === 0) service.surfaceShown(stockSurface, true)
           harness.asked = true
           return
         }
@@ -325,18 +329,18 @@ Harness {
           finish()
           return
         }
-        service.fetchFundamentals(symbol)
         harness.asked = false
         harness.askingAt = harness.askingAt + 1
         if (harness.askingAt < harness.asking.length) {
           harness.go(8)
           return
         }
-        // Then search's preview asks for MAPLE.TO too, while the stock's ask
-        // for it still waits, and the stock moves on to MSFT: the
-        // preview's ask still stands.
-        service.fetchFundamentals("MAPLE.TO", "preview")
-        service.fetchFundamentals("MSFT")
+        // Then search's preview rests on MAPLE.TO too, while the stock's
+        // still waits for it, and the stock moves on to MSFT: the preview's
+        // still stands.
+        service.surfaceShown(searchSurface, true)
+        service.preview(searchSurface, "MAPLE.TO", null)
+        service.feature("MSFT")
         harness.stateThen("rm -f \"$1/FUNDAMENTALS.hold\"", function() { harness.go(9) })
       } else if (harness.step === 9) {
         var settled = ["SHOP.TO", "MAPLE.TO", "MSFT"].every(function(s) {
@@ -370,7 +374,7 @@ Harness {
         yesterday.SLID = Object.assign({}, yesterday.MSFT, { checkedAt: yesterday.MSFT.checkedAt - 25 * 60 * 60 })
         service.testFundamentalsFeed.entries = yesterday
         harness.stateThen("touch \"$1/CLOSES.down\"", function() {
-          service.fetchFundamentals("SLID")
+          service.feature("SLID")
           harness.go(48)
         })
       } else if (harness.step === 48) {
@@ -396,6 +400,9 @@ Harness {
           msft.status === "failed" && calls("MSFT.fundamentals") === 2 && !!msft.figures && !!msft.figures.cap
             && JSON.stringify(msft.figures) === JSON.stringify(harness.msftBefore.figures),
           JSON.stringify(msft))
+        service.preview(searchSurface, "")
+        service.surfaceShown(searchSurface, false)
+        service.surfaceShown(stockSurface, false)
         harness.go(12)
       } else if (harness.step === 12) {
         // The data file goes bad by hand while the lists are in memory.

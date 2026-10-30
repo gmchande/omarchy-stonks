@@ -212,6 +212,9 @@ Harness {
   // TURN's day goes down and back up (see the fake curl).
   Process { id: turnDown; command: ["touch", Quickshell.env("STONKS_FAKE_STATE") + "/TURN.down"] }
   Process { id: turnUp; command: ["rm", "-f", Quickshell.env("STONKS_FAKE_STATE") + "/TURN.down"] }
+  // Yahoo's caps and P/Es fail, and answer again (see the fake curl).
+  Process { id: figuresDown; command: ["touch", Quickshell.env("STONKS_FAKE_STATE") + "/FUNDAMENTALS.down"] }
+  Process { id: figuresUp; command: ["rm", "-f", Quickshell.env("STONKS_FAKE_STATE") + "/FUNDAMENTALS.down"] }
 
   Steps {
     name: "SharedRange"
@@ -569,8 +572,9 @@ Harness {
         replayed && body.marketForms.length > 0 && body.headerText === body.marketForms[0] && body.featured.priceText === headline,
         replayed + " " + body.headerText + " vs " + body.marketForms[0] + "|" + body.featured.priceText)
 
-      // r in an open surface asks for the cap and P/E too, which are kept
-      // for a day: day-old ones are fetched again, fresh ones are not.
+      // r in an open surface leaves fresh caps and P/Es alone, which are kept
+      // for a day: day-old ones are fetched again, as the clock's next second
+      // would.
       service.feature("AAPL")
       tryVerify(function() { return service.fundamentals.AAPL && service.fundamentals.AAPL.status === "ok" }, 5000)
       var asksBefore = harness.calls("AAPL.fundamentals")
@@ -581,7 +585,7 @@ Harness {
       agedFigures.AAPL = Object.assign({}, agedFigures.AAPL, { checkedAt: agedFigures.AAPL.checkedAt - 25 * 60 * 60 })
       service.testFundamentalsFeed.entries = agedFigures
       keyClick("r")
-      // Within 2 s: the minute's own ask (Service's onNowChanged) would pass a wider wait.
+      // Within 2 s: the clock asks at its next second, r at once.
       var figuresAsked = within(2000, function() { return harness.calls("AAPL.fundamentals") > asksBefore })
         && within(5000, function() { return service.fundamentals.AAPL.checkedAt > agedFigures.AAPL.checkedAt })
       harness.check("r fetches a day-old cap and P/E again, not fresh ones",
@@ -611,6 +615,26 @@ Harness {
           && harness.calls("MSFT") === msft + 1 && harness.calls("NVDA") === nvda + 1,
         histories + "|" + (harness.calls("AAPL") - aapl) + "|"
           + (harness.calls("MSFT") - msft) + "|" + (harness.calls("NVDA") - nvda))
+
+      // A cap and P/E that failed waits for a reader's refresh, and IPC's,
+      // from a key binding, is one: AAPL's, a day old, fails as r asks
+      // again, then IPC's refresh asks once more, and it comes.
+      var agedAgain = Object.assign({}, service.testFundamentalsFeed.entries)
+      agedAgain.AAPL = Object.assign({}, agedAgain.AAPL, { checkedAt: agedAgain.AAPL.checkedAt - 25 * 60 * 60 })
+      figuresDown.running = true
+      tryVerify(function() { return !figuresDown.running }, 2000)
+      service.testFundamentalsFeed.entries = agedAgain
+      keyClick("r")
+      var figuresFailed = within(5000, function() { return service.fundamentals.AAPL.status === "failed" && !service.testFundamentalsFeed.job })
+      figuresUp.running = true
+      tryVerify(function() { return !figuresUp.running }, 2000)
+      var failedAsks = harness.calls("AAPL.fundamentals")
+      harness.callIpc("refresh")
+      tryVerify(function() { return !ipcCall.running }, 5000)
+      var figuresBack = within(5000, function() { return service.fundamentals.AAPL.status === "ok" })
+      harness.check("IPC refresh asks again for a cap and P/E that failed, and it comes",
+        figuresFailed && figuresBack && harness.calls("AAPL.fundamentals") === failedAsks + 1,
+        "failed " + figuresFailed + ", back " + figuresBack + ", asked " + (harness.calls("AAPL.fundamentals") - failedAsks) + " more")
 
       // IPC reaches the plugin with no pill on the bar, as with the pill
       // taken off: the hero steps, toggleWindow (a key binding's command) opens the

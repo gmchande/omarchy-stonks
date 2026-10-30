@@ -20,7 +20,6 @@ Harness {
   marker: "POPUP DONE"
 
   property int opensTold: 0
-  property int fundamentalsCalls: 0
 
   QtObject {
     id: service
@@ -60,7 +59,6 @@ Harness {
       feature(at < 0 ? shown[delta > 0 ? 0 : shown.length - 1] : shown[(at + delta + shown.length) % shown.length])
     }
     function refresh() {}
-    function fetchFundamentals(symbol) { harness.fundamentalsCalls++ }
     function persist(values) { if (values.changeMode !== undefined) changeMode = values.changeMode }
     function feature(symbol) { featuredSymbol = symbol }
     function setRange(value) { range = value }
@@ -294,11 +292,9 @@ Harness {
       service.now += 7
       harness.check("a closed panel's clock holds still", body.now === closedAt, closedAt + " -> " + body.now)
       var opensBefore = harness.opensTold
-      var asksBefore = harness.fundamentalsCalls
       panel.open()
       harness.check("an open panel's clock is the service's", body.now === service.now)
       harness.check("reopen tells the service the panel is open", harness.opensTold > opensBefore)
-      harness.check("panel asks for a cap and P/E", harness.fundamentalsCalls > asksBefore)
 
       // The shell puts the pill's bubble under the pill, where it would
       // cover the card's header.
