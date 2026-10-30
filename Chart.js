@@ -90,13 +90,16 @@ function lineDay(symbol, quote, nights, allDay, calendars) {
 // (`Overnight.newestPrint`), by symbol, measured from the dashed line of
 // the day its chart draws (`dayDrawn`): from Yahoo's own prints (`quotes`)
 // and, for one Robinhood trades all day (`allDay`, answers), its night's
-// (`nights`, answers).
+// (`nights`, answers). None while that day waits on Robinhood, as the
+// chart and the lines do: until then a row and the pill hold the close, so
+// their move never turns to another day's without a new price.
 function newestPrints(symbols, quotes, nights, allDay, calendars) {
   var out = {}
   for (var i = 0; i < symbols.length; i++) {
     var q = quotes[symbols[i]]
     if (!q || !Overnight.hasOvernight(q, calendars)) continue
     var drawn = dayDrawn(symbols[i], q, nights, allDay, calendars)
+    if (drawn.waiting) continue
     var newest = Overnight.newestPrint(q, drawn.latest, calendars, drawn.day)
     if (newest) out[symbols[i]] = newest
   }

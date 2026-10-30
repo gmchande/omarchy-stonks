@@ -171,7 +171,11 @@ function peText(value) {
 // (`yearEnds`, the 1Y range's `History.rangeEnds`, else null), so the line
 // and the chart's high and low marks always agree: Yahoo's 52 weeks leave
 // out the 1Y range's first day, and Yahoo's figure widened to take in the
-// chart's ends could still pass them. A longer range never stands in, its
+// chart's ends could still pass them. Elsewhere a trade Stonks shows
+// (`trades`, the day's prints and the newest price on top) past Yahoo's
+// marks widens them too, as the day does: Yahoo's 52 weeks leave out the
+// night and the hours around the session, and a week ending on a night
+// trade must not top the year. A longer range never stands in, its
 // ends can be older than a year. There an end takes its tone where the day
 // reaches it, compared at the listing's decimals, so a bar's float noise
 // never passes a mark it reads as. The cap moves with the headline price
@@ -184,7 +188,7 @@ function peText(value) {
 // Only an equity has cap and P/E slots, kept whether known or not, so the
 // line keeps its shape: the cap's as wide as its currency and 999.9B before
 // the cap comes; the P/E's as wide as 99.9.
-function yearLine(quote, figures, yearEnds, rates) {
+function yearLine(quote, figures, yearEnds, rates, trades) {
   if (!quote) return null
   var q = quote
   var head = Quote.headlineQuote(q)
@@ -204,6 +208,11 @@ function yearLine(quote, figures, yearEnds, rates) {
     atLow = Format.isFiniteNumber(q.dayLow) && q.dayLow <= q.fiftyTwoWeekLow
     low = atLow ? q.dayLow : q.fiftyTwoWeekLow
     high = atHigh ? q.dayHigh : q.fiftyTwoWeekHigh
+    ;(trades || []).forEach(function(trade) {
+      if (!trade || !Format.isFiniteNumber(trade.p)) return
+      if (trade.p > high) { high = trade.p; atHigh = true }
+      if (trade.p < low) { low = trade.p; atLow = true }
+    })
   }
   var line = Format.infoRange(low, high, head ? head.price : null, q.priceDigits)
   if (atHigh) line.highTone = "up"

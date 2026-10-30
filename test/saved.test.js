@@ -225,7 +225,7 @@ test("the headline uses the regular quote or labels the last chart trade with it
 const sep4 = M.parseChart(fixture("aapl-2026-09-04-day-prepost.json"))
 const sep4Reg = sep4.session.regular
 
-test("a bucket stamped at the bell is post-market, unless it holds the closing trade, and the quote a second later is the close", () => {
+test("a bucket stamped at the bell is post-market, unless it holds the closing trade, and the quote a second later is the close, as is a print at the close's price seconds after the bell", () => {
   const regular = M.regularPoints(sep4)
   expect(regular.length).toBe(78)
   expect(regular[regular.length - 1].t).toBe(sep4Reg.end - 300)
@@ -251,6 +251,18 @@ test("a bucket stamped at the bell is post-market, unless it holds the closing t
   expect(M.marketStatus(cvr, at("2026-10-26", "18:00"), cvr.points[1].t, calendars)).toBe("At 16:00 · Closing bell")
   // The trade at 13:10 reads its own price, not the close.
   expect(M.rowModel(cvr, cvr.points[0].t, "pct").priceText).toBe("10.55")
+  // Thursday 29 October at 20:20: PSIX made no after-hours trade. Yahoo's
+  // answer ends on its closing trade at 16:00:00 and its live moment at
+  // 16:00:13, at the close's price: that is the close, not an after-hours
+  // print, so nothing is on top but the close. BLDP traded after hours to
+  // 17:55, and says so.
+  const night = "night-2026-10-29-2020"
+  const quotes = { PSIX: savedDay(night, "psix"), BLDP: savedDay(night, "bldp") }
+  expect(quotes.PSIX.points.at(-1).t - quotes.PSIX.session.regular.end).toBe(13)
+  expect(M.pointSession(quotes.PSIX, quotes.PSIX.points.at(-1))).toBe("reg")
+  const notAllDay = { PSIX: { status: "ok", allDay: false, at: 0 }, BLDP: { status: "ok", allDay: false, at: 0 } }
+  const tops = M.newestPrints(["PSIX", "BLDP"], quotes, {}, notAllDay, calendars)
+  expect([tops.PSIX || null, M.newestNote(quotes.BLDP, tops.BLDP, answeredAt(night), calendars)]).toEqual([null, "After hours 17:55"])
 })
 
 test("after the close, the session's last print reads the close at the bell, and the bucket after it reads itself", () => {
@@ -1029,6 +1041,10 @@ test("a day past its 52-week mark widens the 52-week range to it", () => {
   const under = { ...quote, fiftyTwoWeekLow: quote.dayLow + 1 }
   expect(said(M.dayLine(under)).split(" · ")[1]).toBe("314.74-–327.30 @325.13")
   expect(said(M.yearLine(under, null)).split(" · ")[1]).toBe("314.74-–344.57 @325.13")
+  // A trade Stonks shows past Yahoo's marks, as a night's above its 52-week
+  // high, widens them too, so a week ending on it never tops the year.
+  expect(said(M.yearLine(quote, null, null, rates, [{ t: quote.marketTime + 4 * 3600, p: 345.03 }])).split(" · ")[1]).toBe("225.95–345.03+ @325.13")
+  expect(said(M.yearLine(quote, null, null, rates, [{ t: quote.marketTime + 4 * 3600, p: 225.5 }])).split(" · ")[1]).toBe("225.50-–344.57 @325.13")
 })
 
 // Yahoo's 52 weeks leave out the 1Y range's first day, so on 1Y the line is
@@ -1854,6 +1870,18 @@ test("in every phase, a stock that has traded since its close shows that newest 
     expect(M.dayLine(at.quotes.NBIS, M.exchangeDay(at.quotes.NBIS, at.now), day).title).toBe("MON")
     expect(M.dayLine(at.quotes.NBIS, M.exchangeDay(at.quotes.NBIS, at.now), at.quotes.NBIS).title).toBe("1D")
   }
+  // The same moment on a fresh shell, before Robinhood answers: NBIS's
+  // chart and line wait for the day, and so do its row and the pill,
+  // holding Monday's close and its move; once Robinhood answers they turn
+  // to the night's trade, a new price, measured from Monday's close.
+  {
+    const at = topsAt("watch-2026-10-26-2005")
+    const waiting = M.newestPrints(at.symbols, at.quotes, {}, {}, calendars)
+    const row = s => { const r = M.rowModel(at.quotes[s], 0, "pct", waiting[s] || null); return `${r.priceText} ${r.changeText}` }
+    expect([waiting.NBIS || null, row("NBIS")]).toEqual([null, "153.27 \u22123.45%"])
+    const answered = M.rowModel(at.quotes.NBIS, 0, "pct", at.newest.NBIS)
+    expect(`${answered.priceText} ${answered.changeText}`).toBe("156.80 +2.30%")
+  }
   // Monday 17:58, since the open: the change still says SINCE OPEN, then
   // the newest price's session and time.
   {
@@ -2249,7 +2277,7 @@ test("from the first trade of its night, a listing Robinhood trades all day show
   expect(sessionDate(gspc.day)).toBe("2026-10-22")
 })
 
-test("at the open the chart moves to the new session, and a listing abroad shows its last session until its new one has a bar", () => {
+test("at the open the chart moves to the new session, and a listing abroad shows its last session and its move until its new one has a bar", () => {
   // Friday 09:31: AAPL's chart is Friday from midnight, the S&P 500's Friday's
   // session.
   for (const { day, symbol } of chartsAt("night-2026-10-23-0931", ["aapl", "gspc"]))
@@ -2277,6 +2305,16 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   expect([tokyoDate(friday), friday.points.length]).toEqual(["2026-10-23", 66])
   const monday = tokyoDay(both("watch-2026-10-25-2020"))
   expect([tokyoDate(monday), monday.points.length]).toEqual(["2026-10-26", 2])
+  // Toyota at 09:07 on Friday 30 October, asked for two days before
+  // Friday's first bar: the quote is Thursday's close, 3,077, and Yahoo's
+  // two-day answer for Tokyo gives Thursday's own close as its chart's
+  // previous close. Thursday's move runs from Wednesday's 3,051, Yahoo's
+  // previous close for the quote's day: +0.85%, not 0.00%. Once Friday has
+  // bars, Friday's move, from Thursday's close.
+  const before = M.parseChart(fixture("moments/tokyo-2026-10-30-0907/7203.t.json"), cents)
+  expect([tokyoDate(tokyoDay(before)), M.rowModel(before, 0, "pct").changeText]).toEqual(["2026-10-29", "+0.85%"])
+  const after = M.parseChart(fixture("moments/tokyo-2026-10-30-0926/7203.t.json"), cents)
+  expect([tokyoDate(tokyoDay(after)), M.rowModel(after, 0, "pct").changeText]).toEqual(["2026-10-30", "+0.71%"])
 })
 
 test("a two-day answer is read as the headline's session, with the coming day's pre-market after it", () => {
