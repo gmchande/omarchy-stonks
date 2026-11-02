@@ -2,15 +2,8 @@
 .import "Format.js" as Format
 .import "Quote.js" as Quote
 
-// Exchange calendars and sessions: the schedules in calendars.json, the
-// phase a quote's periods put the clock in, the bells, the header's words,
-// a print's clock in its own exchange's time, and the refresh cadence the
-// phases ask for. Knows nothing of Robinhood, history, or settings.
-//
-// The calendars are a file the plugin carries, because no keyless holiday
-// feed exists. Yahoo still owns today; the calendars speak after the close,
-// before a day's window exists, between Tokyo's segments, and for the next
-// honest open.
+// Exchange sessions, bells, the header's words and the refresh cadence.
+// Yahoo owns today; the rest is calendars.json: no keyless holiday feed exists.
 
 var PHASES = {
   closed: "Closed", weekend: "Weekend", pre: "Pre-market",
@@ -18,10 +11,8 @@ var PHASES = {
   closing: "Closing bell", post: "After hours", always: "Open around the clock", overnight: "Overnight"
 }
 
-// The session the clock is in at `t`: the bars' own, until the clock has
-// left it and entered Yahoo's current period, which a quote held without a
-// fetch reaches (Monday's pre-market on Friday's bars, London's open on
-// Thursday's). The chart, the open, and the info line keep the bars'.
+// A quote held without a fetch passes from its bars' session into Yahoo's
+// current period, as Monday's pre-market on Friday's bars.
 function clockSession(quote, t) {
   var s = quote.session
   var c = quote.current
@@ -29,11 +20,8 @@ function clockSession(quote, t) {
   return t >= (c.pre || c.regular).start && t < (c.post || c.regular).end ? c : s
 }
 
-// The phase at time `t`, from the exchange's own periods and nothing else.
-// The chart endpoint carries no market state, and a missing series is not
-// evidence of a holiday, so a session the periods describe is trusted. Its
-// day and hour are by the clock of `t`'s own period (`Quote.clockAt`): a
-// scrub of Friday's lunch on the Sunday the clocks went back is at noon.
+// The chart endpoint carries no market state: the periods are all there is.
+// The hour is by the clock of `t`'s own period, across a change of clocks too.
 function sessionPhase(quote, t) {
   var s = clockSession(quote, t)
   if (quote.crypto) return "always"
@@ -48,8 +36,7 @@ function sessionPhase(quote, t) {
     return "open"
   }
   if (s.post && t >= s.post.start && t < s.post.end) return "post"
-  // A weekend is a Saturday or Sunday the session isn't on: Saudi's exchange
-  // trades on Sunday, so its Sunday is open, then closed after its bell.
+// Saudi's exchange trades on Sunday.
   var day = function(at) { return Math.floor((at + Quote.clockAt(quote, at).offset) / 86400) }
   var weekend = (local.weekday === 0 || local.weekday === 6) && day(t) !== day(s.regular.start)
   return weekend ? "weekend" : "closed"
@@ -63,10 +50,8 @@ function isTrading(phase) {
   return phase === "opening" || phase === "open" || phase === "lunch" || phase === "power" || phase === "closing" || phase === "always"
 }
 
-// Seconds to a bell the exchange has actually announced: the close while
-// the session runs, the open while it is still ahead. Yahoo describes one
-// session per response, so once it has ended there is nothing to count to.
-// Guessed by adding days, the next open would land on holidays like Labor Day.
+// Yahoo describes one session an answer, so after it there is nothing to
+// count to: adding days would land the next open on a holiday.
 function secondsToBell(quote, now) {
   var reg = clockSession(quote, now).regular
   if (!reg || quote.crypto) return null
@@ -80,9 +65,8 @@ function calendarMap(calendars) {
   return calendars.calendars ? calendars.calendars : calendars
 }
 
-// The listing's calendar: the one naming its exchange, or naming the index
-// itself, where Yahoo files it under a name that holds indexes on other
-// hours too (^FTSE beside FTSE's global ones, ^RUT beside Cboe's VVIX).
+// Yahoo files some indexes under a name that holds indexes on other hours
+// too (^FTSE beside FTSE's global ones, ^RUT beside Cboe's VVIX).
 function calendarFor(calendars, quote) {
   var map = calendarMap(calendars)
   if (!map || !quote || !quote.exchange) return null
@@ -93,9 +77,8 @@ function calendarFor(calendars, quote) {
   return null
 }
 
-// The exchanges whose listings trade in whole cents from $1: the US
-// calendar's, by Reg NMS. A coin or a European listing trades finer
-// (`Format.priceDigits`). None without calendars.
+// US exchanges trade in whole cents from $1 (Reg NMS); a coin or a European
+// listing trades finer.
 function centExchanges(calendars) {
   var map = calendarMap(calendars)
   return map && map.US && map.US.exchanges ? map.US.exchanges : []
@@ -141,8 +124,6 @@ function localDate(t, cal) {
   }
 }
 
-// A calendar's zone by its name at `offset` ("EDT" or "EST"), else the
-// quote's own where its offset is that one, else the offset itself.
 function zoneName(cal, offset, quote) {
   var names = cal && cal.zoneNames
   if (names && names[String(offset)]) return names[String(offset)]
@@ -150,7 +131,6 @@ function zoneName(cal, offset, quote) {
   return Format.offsetName(offset)
 }
 
-// A calendar's clock at `t`, its zone named where the reader's differs.
 function calendarClock(cal, t, quote) {
   var local = localDate(t, cal)
   return Format.zoned(clockOf(local), t, local.offset, zoneName(cal, local.offset, quote))
@@ -196,8 +176,6 @@ function nextOpen(cal, t) {
   return null
 }
 
-// The breaks between a trading day's segments, Tokyo's lunch: each from one
-// segment's close to the next one's open, on the calendar day of `t`.
 function sessionBreaks(cal, t) {
   var segs = cal ? segmentsOn(cal, dateStringOf(localDate(t, cal))) : []
   var out = []
@@ -218,12 +196,8 @@ function calendarQuiet(calendars, quote, now) {
   return !!quote && !quote.crypto && calendarNow(calendarFor(calendars, quote), now).quiet
 }
 
-// What a market's calendar says at `now`, the same for every listing on
-// it, so a walk over a list reads each calendar once (`Service.askDue`):
-// whether its day is a weekend or a published closure (`quiet`), the end of
-// the break between segments it is in (`breakEnd`, Tokyo's lunch), and
-// whether one of its segments trades (`segment`). A listing with no
-// calendar (`cal` null) has none of these.
+// The same for every listing on a calendar, so a walk over a list reads
+// each calendar once (`Service.askDue`).
 function calendarNow(cal, now) {
   var date = cal ? dateStringOf(localDate(now, cal)) : ""
   var kind = cal ? dayKind(cal, date).kind : ""
@@ -238,9 +212,6 @@ function calendarNow(cal, now) {
   }
 }
 
-// The calendar's regular session on the day of `now`, from its first
-// segment's open to its last's close, while one of them trades at `now`;
-// else null, as on a weekend, a closure, or with no calendar.
 function calendarRegular(cal, now) {
   var segs = cal ? segmentsOn(cal, dateStringOf(localDate(now, cal))) : []
   if (!segs.some(function(seg) { return now >= seg.start && now < seg.end })) return null
@@ -264,8 +235,6 @@ function clockOf(local) {
   return Format.pad2(local.hour) + ":" + Format.pad2(local.minute)
 }
 
-// Where a scrub sits: the session of the print it reads, outside Yahoo's
-// day; the exchange's own phase inside it.
 function scrubPhase(quote, t) {
   if (!quote.axis || (t >= Quote.dayStart(quote) && t < Quote.dayEnd(quote))) return sessionPhase(quote, t)
   var pts = quote.points
@@ -281,10 +250,6 @@ function clockCalendar(quote, t, calendars) {
   return cal && dateStringOf(localDate(t, cal)) <= cal.validThrough ? cal : null
 }
 
-// A time where `quote` trades: by its calendar's offset for that moment's
-// date (`clockCalendar`), so a time across a change of clocks reads true;
-// else by the clock Yahoo's periods say its day kept (`Quote.clockAt`), or
-// Yahoo's own offset. Its zone is named where the reader's clock differs.
 function printClock(quote, t, calendars) {
   var cal = clockCalendar(quote, t, calendars)
   if (cal) return calendarClock(cal, t, quote)
@@ -378,7 +343,6 @@ function inRegularSession(quote, now, calendars) {
   return regularNow(quote, now, calendarNow(calendarFor(calendars, quote), now))
 }
 
-// `inRegularSession` by its calendar's reading at `now` (`calendarNow`).
 function regularNow(quote, now, calNow) {
   if (!quote || quote.crypto || calNow.quiet || calNow.breakEnd) return false
   return isTrading(sessionPhase(quote, now)) || calNow.segment
@@ -418,14 +382,9 @@ function inExtendedHours(quote, now, calendars) {
   return pre || post
 }
 
-// How long after a market's last trade, after hours included, its quote
-// may still change: the close and late prints settle in that time.
+// The close and late prints settle within this of a market's last trade.
 var SETTLED = 15 * 60
 
-// A calendar's trading hours on `date`, from the pre-market's open to the
-// post-market's close where it has them (`from`, `to`, both 0 on a day it
-// doesn't trade), and when it next opens after that day, pre-market
-// included (`next`, 0 past what the calendar knows), each in seconds.
 function tradingDay(cal, date) {
   var segs = segmentsOn(cal, date)
   var opens = function(day, first) { return cal.pre ? epochAt(cal, day, cal.pre.open) : first }
@@ -437,8 +396,7 @@ function tradingDay(cal, date) {
   }
 }
 
-// A function from a calendar and a second to its trading hours that day
-// (`tradingDay`), each day read once, not once a listing.
+// Each calendar's day is read once, not once a listing.
 function tradingDays() {
   var read = new Map()
   return function(cal, t) {
@@ -450,11 +408,9 @@ function tradingDays() {
   }
 }
 
-// A quote can't change before its market next trades once its answer came
-// SETTLED after its session and outside its calendar's hours. Both the
-// calendar and Yahoo's current period can say it trades: an index's periods
-// stay the last session's until its open, and London's pre-market is
-// Yahoo's alone.
+// Asking sooner brings back the same price. An index's periods stay the last
+// session's until its open, and London's pre-market is Yahoo's alone, so the
+// calendar and Yahoo's current period both have a say.
 function quietUntil(quote, receivedAt, now, cal, dayOf) {
   if (!quote || quote.crypto || !receivedAt) return 0
   var s = quote.session
@@ -496,18 +452,17 @@ function twoDays(quote, now, calendars) {
 }
 
 // For minutes after an open, Yahoo's answers, all but a two-day chart, can
-// still count the day from the close before last. So each quote carries the
-// last close Stonks saw (`closeSeen`, saved with it), and a traded session on
-// the next weekday still counting from that close's own base counts from
-// that close. A split, a dividend or a holiday moves Yahoo's base, and Yahoo's
-// stands. A US stock's day turns at 04:00, hours before its first trade: a
-// calendar with a pre-market keeps Yahoo's.
+// still count the day from the close before last. Each quote carries the
+// last close Stonks saw (`closeSeen`, saved with it) for the next weekday's
+// session to count from. A split, a dividend or a holiday moves Yahoo's
+// base, and Yahoo's stands. A US stock's day turns at 04:00, hours before its
+// first trade: a calendar with a pre-market keeps Yahoo's.
 function carryClose(previous, quote, calendars) {
   if (!quote || quote.crypto || quote.instrumentType === "INDEX" || !quote.session.regular) return quote
   var cal = calendarFor(calendars, quote)
   if (cal && cal.pre) return quote
-  // A quote that is its session's close carries nothing: the next reads
-  // the close from it, so an unchanged answer after the bell stays one.
+// The next quote reads the close from this one, so an unchanged answer
+// after the bell stays unchanged.
   var seen = previous && !sessionClose(quote) ? sessionClose(previous) || previous.closeSeen || null : null
   if (!seen) return quote
   var reg = quote.session.regular
@@ -517,8 +472,6 @@ function carryClose(previous, quote, calendars) {
   return Object.assign({}, quote, stale ? { closeSeen: seen, prevClose: seen.close } : { closeSeen: seen })
 }
 
-// A quote's session close, as `carryClose` keeps it, once its headline is
-// that close: null before.
 function sessionClose(quote) {
   var reg = quote.session && quote.session.regular
   var head = Quote.headlineQuote(quote)
@@ -526,8 +479,6 @@ function sessionClose(quote) {
     ? { day: reg.start, close: head.price, before: quote.prevClose } : null
 }
 
-// Whether the day `to` starts on is the weekday after the one `from`
-// starts on, by the listing's own clock: Monday after Friday.
 function nextWeekday(quote, from, to) {
   var day = function(t) { return Math.floor((t + (quote.gmtoffset || 0)) / 86400) }
   var weekday = new Date(day(from) * 86400000).getUTCDay()
