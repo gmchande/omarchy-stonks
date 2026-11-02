@@ -1,9 +1,9 @@
 import QtQuick
 import Quickshell.Io
 
-// The plugin's one IPC target, `omarchy-shell grvc.stonks <function>`, with
-// or without a pill on the bar. The panel's verbs go through the shell,
-// which opens the panel on the focused screen's pill.
+// `omarchy-shell grvc.stonks <function>`, with or without a pill on the
+// bar. The panel's verbs go through the shell, which opens the panel on the
+// focused screen's pill.
 Item {
   id: root
 
@@ -11,11 +11,10 @@ Item {
   property var service: null
   property var windowHost: null
 
-  // Every pill acknowledges a refresh asked for here.
   signal refreshed()
 
-  // Every property and signal of the handler is offered over IPC, so what
-  // it is wired to lives on the item around it.
+  // IpcHandler offers its every property and signal over IPC, so what it
+  // is wired to lives on the item around it.
   IpcHandler {
     id: handler
     target: "grvc.stonks"
