@@ -1,37 +1,25 @@
 import QtQuick
 import "Fetch.js" as Fetch
 import "Release.js" as Release
-// The newest Stonks, from main's manifest on GitHub (`Release`): what
-// `omarchy plugin update` would bring. Asked as the service is ready, then a
-// day after each ask, whatever GitHub said, and only while a screen is on
-// (`clearance`) and GitHub's gate lets it. An ask with no answer at all, as
-// just after a wake before the network is back, goes again once Yahoo
-// answers after its own pause (`askAgain`), or a day on; asked again at the
-// end of each of GitHub's short pauses, it would go about once a minute for
-// as long as the network is down. Only a whole answer naming a version
-// changes `version`; a failure or a refusal says nothing, since it is not a
-// quote.
+// The newest Stonks: the version in main's manifest on GitHub. An ask with
+// no answer at all, as after a wake, goes again once Yahoo answers
+// (`askAgain`): asked at the end of each of GitHub's short pauses, it would
+// go about once a minute while the network is down.
 Item {
   id: root
 
-  // The version main names, "" until an answer has named one.
   property string version: ""
   property bool ready: false
-  // The service's clock: `now` moves the feed to look, and the wall clock
-  // (`wallSecond`) is what it reads.
+  // `now` moves the feed to look; `clock.wallSecond()` is what it reads.
   property int now: 0
   property var clock: null
   property var clearance: null
   property var gate: null
-  // The wall second of the last ask; 0 before the first.
   property int askedAt: 0
-  // The last ask got no answer at all.
   property bool unanswered: false
 
   readonly property int interval: 24 * 60 * 60
 
-  // Looked at as the clock moves, as the service is ready, and as the
-  // screens answer.
   function pump() {
     if (!ready || fetchRun.out) return
     var now = clock.wallSecond()
@@ -44,7 +32,6 @@ Item {
   onNowChanged: pump()
   onReadyChanged: pump()
 
-  // The network is back: an ask that got no answer goes now.
   function askAgain() {
     if (!unanswered) return
     root.askedAt = 0
