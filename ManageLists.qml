@@ -7,14 +7,7 @@ import qs.Commons as Commons
 import "Tones.js" as Tones
 
 // Manage lists, in the rows' place: rename, reorder, and delete the named
-// lists. All is listed first and cannot be changed. Value-in, signals out;
-// the body persists. Like the list menu it owns its keys while open: the
-// arrows move the cursor, Enter renames, Shift and the arrows move the list,
-// Delete or Backspace asks to delete it and Enter confirms, Escape backs out
-// one step. The buttons say only what they do; the one Enter takes is
-// marked (`ListAction.enterTakes`). One cursor, as on the rows: moving the
-// pointer puts it, with the rows' mark, on the row under it, which shows
-// that row's buttons; a click on one takes it.
+// lists. All comes first and can't change.
 FocusScope {
   id: root
 
@@ -23,20 +16,15 @@ FocusScope {
   property color foreground: Commons.Color.foreground
   property color dim: Tones.dim(foreground, Commons.Color.background)
   property string fontFamily: Style.font.family
-  // Why the typed name was refused, said under the field, and brought into
-  // view: while a name is typed the list holds still. Its line gone, as you
-  // type again or leave the field, the list rests within its rows at once.
   property string problem: ""
   onProblemChanged: if (problem !== "") Qt.callLater(showProblem); else settle()
-  // The rows' height counts the problem's line at once; the column's lays
-  // out a turn later.
+  // The column lays out a turn after the problem's line appears.
   function showProblem() {
     var bottom = (cursor + 2) * itemHeight
     if (bottom > scroll.contentY + scroll.height)
       scroll.contentY = Math.min(bottom - scroll.height, Math.max(0, rowsHeight - scroll.height))
   }
-  // Called as the problem's line goes: the rows without it, counted here,
-  // since `rowsHeight` may not have heard yet.
+  // `rowsHeight` may not have updated yet.
   function settle() {
     scroll.contentY = Math.min(scroll.contentY, Math.max(0, choices.length * itemHeight - scroll.height))
   }
@@ -44,10 +32,7 @@ FocusScope {
   property int cursor: 1
   property bool renaming: false
   property bool confirming: false
-  // The list a rename or the delete question is about, by name, not by row:
-  // the order can change on another surface meanwhile, and the cursor, the
-  // field, and the question follow the list, into view. Gone from the
-  // lists (deleted or renamed elsewhere), there is nothing left to act on.
+  // By name: the other surface can reorder, rename or delete it meanwhile.
   property string pendingName: ""
   onChoicesChanged: {
     if (!renaming && !confirming) return
@@ -60,9 +45,8 @@ FocusScope {
   readonly property string typedName: renaming ? nameField.text : ""
 
   readonly property int itemHeight: Style.space(30)
-  // The scrollbar's gutter at the right, as the list's rows keep it, and the
-  // rows' words' inset from their fills, so this view's words line up with
-  // the rows it covers.
+  // The rows' scrollbar gutter and text inset, so these words line up with
+  // the rows underneath.
   property int gutter: 0
   readonly property int inset: Style.space(10)
   readonly property int rowsHeight: choices.length * itemHeight + (problem !== "" ? itemHeight : 0)
@@ -74,14 +58,8 @@ FocusScope {
   signal deleteRequested(string name)
   signal dismissed()
 
-  // True while the view is open on an open surface. Turned on, it starts on
-  // the first named list, or All when there is none, before its first frame
-  // and takes the keys a turn later if it is still on; turned off, however
-  // it closes, the surface's closing included, it gives the keys up, its
-  // rename field's too, and keeps what it shows for the close fade.
   property bool active: false
-  // Off, it still shows, through the close fade, but takes no pointer or
-  // key: nothing acts or takes focus from a view that is closing.
+  // Shown through the close fade, but inert.
   enabled: active
   onActiveChanged: {
     if (active) {
@@ -110,9 +88,6 @@ FocusScope {
     showCursor()
   }
 
-  // The cursor to the row the pointer moved onto, at (x, y) in the scene;
-  // the title is no row. A row renaming or asking keeps it, so the question
-  // stays on its own list.
   function pointAt(x, y) {
     if (renaming || confirming) return
     var at = scroll.mapFromItem(null, x, y)
@@ -121,8 +96,6 @@ FocusScope {
     if (index < choices.length) cursor = index
   }
 
-  // A key takes the list over from the wheel: its motion stops, so it
-  // cannot carry the cursor on from where the key put it.
   function showCursor() {
     scroll.cancelFlick()
     var top = cursor * itemHeight
@@ -131,10 +104,8 @@ FocusScope {
       scroll.contentY = top + itemHeight - scroll.height
   }
 
-  // The scrollbar or the wheel moved the lists off the cursor: it comes to
-  // the nearest list wholly in sight, or, in a view too short for one, the
-  // list across its middle, so the next key acts on a list that shows. A
-  // rename or a delete's question keeps its row.
+  // After a scroll by hand: the nearest list wholly in sight, or in a view
+  // too short for one, the list across its middle.
   function keepCursorInSight() {
     if (renaming || confirming) return
     var top = scroll.contentY
@@ -162,8 +133,7 @@ FocusScope {
     })
   }
 
-  // A rename kept from a close that could not save it, as it was left:
-  // its list, its typing, and why it was refused.
+  // Back after a close that couldn't save the rename.
   function resumeRename(name, text, reason) {
     var at = choices.map(function(c) { return c.name }).indexOf(name)
     if (at < 1) return
@@ -172,7 +142,7 @@ FocusScope {
     problem = reason
   }
 
-  // The field gives up its focus, or the scope hands the keys straight back.
+  // The field drops its focus first, or the scope hands it straight back.
   function stopEditing() {
     renaming = false
     confirming = false
@@ -181,14 +151,10 @@ FocusScope {
     if (root.active) root.forceActiveFocus()
   }
 
-  // Enter in the field, or its button: the list it was started on.
   function saveName() {
     renameRequested(pendingName, nameField.text)
   }
 
-  // A click away from the field, or DONE, keeps what was typed, as Enter
-  // does; an emptied field keeps the old name. Escape alone throws the
-  // typing away. A name refused stays in the field, saying why.
   function keepName() {
     if (nameField.text.trim() === "") stopEditing()
     else saveName()
@@ -211,11 +177,7 @@ FocusScope {
     confirming = true
   }
 
-  // A double-click is one click: the question's DELETE comes up under the
-  // DELETE clicked to ask, so within the double-click interval (`justAsked`)
-  // it takes no press at all. Qt counts a double-click from its presses, so
-  // a second press held past the interval is still that double-click's, and
-  // its release must answer nothing. Enter always answers.
+  // The question's DELETE opens under the DELETE clicked to ask.
   Timer {
     id: justAsked
     interval: Application.styleHints.mouseDoubleClickInterval
@@ -230,7 +192,6 @@ FocusScope {
   }
 
   Keys.onPressed: function(event) {
-    // While renaming, the field has the keys; what it lets past goes nowhere.
     event.accepted = true
     if (root.renaming) return
     var shifted = (event.modifiers & ~Qt.KeypadModifier) === Qt.ShiftModifier
@@ -246,8 +207,6 @@ FocusScope {
     else if (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) root.askDelete(root.cursor)
   }
 
-  // Under everything else in the view: while a name is typed, a click that
-  // lands on none of the view's buttons, or its field, keeps the name.
   MouseArea {
     objectName: "renameAway"
     anchors.fill: parent
@@ -257,7 +216,7 @@ FocusScope {
 
   RowPointer {
     id: pointer
-    // A view showing through its surface's close moves no cursor.
+    // Through the close fade, the pointer moves no cursor.
     onMoved: function(x, y) { if (root.active) root.pointAt(x, y) }
   }
 
@@ -278,8 +237,6 @@ FocusScope {
       font.letterSpacing: 1
     }
 
-    // Over a rename DONE keeps the typed name first, and stays on a
-    // refusal.
     ListAction {
       view: root
       objectName: "manageDone"
@@ -304,27 +261,19 @@ FocusScope {
     contentHeight: column.implicitHeight
     clip: true
     boundsBehavior: Flickable.StopAtBounds
-    // A list that scrolls takes a press itself; while a name is typed it
-    // holds still, so a click on it reaches the view's own (`renameAway`).
+    // A Flickable that scrolls takes presses itself. Held still while
+    // renaming, so a click on it reaches `renameAway`.
     interactive: contentHeight > height && !root.renaming
-    // The wheel scrolling the rows under a still pointer moves the cursor
-    // to the row now under it, and any scroll a hand makes, the scrollbar's
-    // included, keeps it in sight; a key's scroll (showCursor) is no
-    // movement.
+    // `moving` stays false for a key's scroll.
     onContentYChanged: {
       if (!root.active || !(moving || manageBar.pressed)) return
       if (moving && pointer.hovered) root.pointAt(pointer.scenePosition.x, pointer.scenePosition.y)
       root.keepCursorInSight()
     }
-    // While more lists sit out of sight, as in the window at its smallest,
-    // the rows' scrollbar says so, at rest too, in the gutter the lists stop
-    // short of.
     Controls.ScrollBar.vertical: Controls.ScrollBar {
       id: manageBar
-      // Drawn while there is more, not only while used.
       policy: scroll.interactive ? Controls.ScrollBar.AlwaysOn : Controls.ScrollBar.AlwaysOff
       visible: scroll.interactive
-      // At least 24 px long, so a long view's thumb is there to see and grab.
       minimumSize: Math.min(1, Style.space(24) / Math.max(1, availableHeight))
     }
 
@@ -333,8 +282,7 @@ FocusScope {
       width: scroll.width - root.gutter
 
       Repeater {
-        // A row for each list, by count: a change to the lists rebinds the
-        // rows rather than building them all again, shut view or open.
+        // By count: a change to the lists rebinds the rows, not rebuilds them.
         model: root.choices.length
 
         Item {
@@ -402,8 +350,6 @@ FocusScope {
             height: root.itemHeight
             spacing: Style.space(14)
 
-            // An arrow with nowhere to move its list can't act: faded, with
-            // no hover or hand (`ListAction`).
             ListAction {
               view: root
               objectName: "moveUp"
@@ -458,7 +404,7 @@ FocusScope {
             font.bold: true
           }
 
-          // Delete asks here, in the row: the viewer has no dialogs.
+          // Delete asks in the row: Stonks has no dialogs.
           Text {
             visible: entry.asking
             x: root.inset
@@ -497,8 +443,6 @@ FocusScope {
               view: root
               objectName: "cancelDelete"
               anchors.verticalCenter: parent.verticalCenter
-              // The way out is always Cancel, as search's and the rename's
-              // are; DELETE, which you asked for, keeps Enter.
               text: "CANCEL"
               onActivated: root.confirming = false
             }
@@ -522,8 +466,7 @@ FocusScope {
       }
     }
 
-    // One field, laid over whichever row is being renamed, up to its choices:
-    // clear of the cursor's bar, its words where the name's were.
+    // Clear of the cursor's bar, its words where the name's were.
     Field {
       id: nameField
       objectName: "renameField"
@@ -551,7 +494,6 @@ FocusScope {
       }
     }
 
-    // The rename's choices, at the renamed row's end.
     Row {
       id: renameChoices
       visible: root.renaming
