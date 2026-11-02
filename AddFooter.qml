@@ -4,19 +4,9 @@ import qs.Commons as Commons
 import qs.Ui
 import "Tones.js" as Tones
 
-// Pinned "+ Add a symbol" bar; surfaces own the add flow. For a moment it
-// can carry a note instead, in the foreground: why a key did nothing. It
-// stays while the pointer is on it (`hovered`). Until what it says is fixed,
-// a notice, also in the foreground, sits under any note; its click is the
-// surface's (`acts`). It stays whole, with what to do beside it or on a
-// line of its own (`noticeActions`). A hint for the visit is a quiet line
-// above the bar, never replacing it and taking no click; the surface can
-// have it give way (`showsHint`). For a few seconds after a removal, an undo
-// stands at the bar's right end as its own button (`undoLabel`), so the add
-// never waits and its words stay centred on the whole bar. While a newer
-// Stonks is out, that place holds its update (`updateLabel`), which gives
-// way to an undo. The bar is painted in its surface's ground, so riding a
-// growing edge it covers the rows it passes.
+// The pinned "+ Add a symbol" bar. A note there says for a moment why a key
+// did nothing; a notice says, until it is fixed, what needs fixing. Painted
+// in its surface's ground, it covers the rows it passes on a growing edge.
 Item {
   id: root
 
@@ -25,43 +15,31 @@ Item {
   property color dim: Tones.dim(foreground, Commons.Color.background)
   property string fontFamily: Style.font.family
   property int rowHeight: Style.space(30)
-  // The scrollbar's gutter at the right, which the rows stop short of: the
-  // footer's words and fill line up with theirs. Its ground still spans it.
+  // The rows' scrollbar gutter: the words and fill stop short of it, the
+  // ground doesn't.
   property int gutter: 0
   property string note: ""
   property string notice: ""
-  // What to do about the notice, longest first, said whole: beside the
-  // notice where both fit, else on a line of its own, never cutting the
-  // notice (`noticeShown`). Empty for a notice that says it all.
+  // Longest first; empty when the notice says it all.
   property var noticeActions: []
   property string hint: ""
-  // Whether the hint shows. Its room (`hintRoom`) is measured either way,
-  // so the surface can judge whether it fits without reading it back.
   property bool showsHint: true
   // A click does something: the add, or the notice's own action.
   property bool acts: true
   property string label: "+  Add a symbol"
-  // The add in fewer words, shown where the add won't fit, as beside an
-  // undo: a list's name is never cut. "" when it has no shorter form.
+  // Shown where `label` won't fit, as beside an undo; "" when there is none.
   property string labelShort: ""
   property color ground: "transparent"
-  // The undo on offer, "Undo NVDA", or "" for none; it fades out with
-  // `undoOpacity`, and stays while the pointer is on it (`undoHovered`).
+  // "Undo NVDA", or "" for none.
   property string undoLabel: ""
   property real undoOpacity: 1
   readonly property bool undoHovered: undoMouse.containsMouse
-  // The update on offer, "Update to 1.1.0", or "" for none.
   property string updateLabel: ""
-  // What the bar's right end holds: the undo while one is on offer, else
-  // the update.
   readonly property bool undoing: undoLabel !== ""
   readonly property string sideLabel: undoing ? undoLabel : updateLabel
-  // That button and the gap before it, none without one.
   readonly property real undoRoom: sideLabel !== "" ? undoText.implicitWidth + Style.space(20) + Style.space(4) : 0
 
   readonly property bool hovered: addMouse.containsMouse
-  // The note as its moment ends, 1 to 0; what it covered fades in after it
-  // (fadeIn), in the house 160 ms.
   property real noteOpacity: 1
   property real coveredOpacity: 1
   function fadeIn() { coveredIn.restart() }
@@ -85,13 +63,12 @@ Item {
   signal undoClicked()
   signal updateClicked()
 
-  // The hint's lines and the gap under them, above the bar, whether or not
-  // they show; and what they take, none without a hint showing.
+  // Measured even while the hint is hidden, so the surface can judge whether
+  // it fits.
   readonly property int hintRoom: hint !== "" ? hintText.implicitHeight + Style.space(6) : 0
   readonly property int hintHeight: showsHint ? hintRoom : 0
-  // The hint as drawn: a line of two actions joined by " · " that won't fit
-  // gives each action its own line, never one word wrapped alone (the
-  // owner, 28 October). The font is read so a new text size measures again.
+  // Two actions joined by " · " that don't fit go on a line each, never one
+  // word wrapped alone. Reading the font measures again at a new text size.
   readonly property string hintLines: {
     var room = width - gutter
     var font = hintMetrics.font
@@ -104,10 +81,8 @@ Item {
     id: hintMetrics
     font: hintText.font
   }
-  // The notice's action as shown, and on how many lines: the whole action
-  // beside the notice where both fit clear of the bar's end button, else on
-  // a line of its own, capitalised, in the longest form that fits there
-  // (the owner, 28 October: clear beats compact for what needs fixing).
+  // Only the whole action goes beside the notice; a shorter form takes a
+  // line of its own.
   readonly property var noticeShown: {
     if (notice === "" || noticeActions.length === 0) return { action: "", lines: 1 }
     var room = width - gutter - undoRoom - Style.space(20)
@@ -123,8 +98,6 @@ Item {
     font.family: root.fontFamily
     font.pixelSize: Style.font.bodySmall
   }
-  // The bar and the gap over it, under the hint: a row's height, or a
-  // notice's two lines and their padding where it takes two.
   readonly property int barHeight: Math.max(rowHeight, footerRow.implicitHeight + Style.space(8)) + Style.space(6)
 
   implicitHeight: hintHeight + barHeight
@@ -143,8 +116,7 @@ Item {
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.rightMargin: root.gutter
-    // A line wider than the card, at a theme's own spacing, wraps; the hint
-    // takes the height it needs.
+    // At a theme's own spacing a line can be wider than the card.
     wrapMode: Text.WordWrap
     horizontalAlignment: Text.AlignHCenter
     textFormat: Text.PlainText
@@ -171,16 +143,12 @@ Item {
       : addMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
       : addMouse.containsMouse ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
 
-    // The words centred on the whole bar, so the button at its end coming
-    // or going moves nothing, unless that would run them into it: then the
-    // box they centre in narrows, to end just clear of it. Centred by
-    // anchors, so they land on the pixel they always did.
+    // Centred on the whole bar, so the end button coming or going moves
+    // nothing, unless the words would run into it.
     Item {
       width: Math.min(root.width - root.gutter, 2 * (root.width - root.gutter - root.undoRoom - Style.space(10)) - footerRow.width)
       height: parent.height
 
-      // One line, or a notice over its action where both don't fit
-      // (`noticeShown`), each line centred.
       Grid {
         id: footerRow
         anchors.centerIn: parent
@@ -188,9 +156,6 @@ Item {
         columns: twoLines ? 1 : 2
         horizontalItemAlignment: Grid.AlignHCenter
 
-        // The words whole, measured, never shown: where they don't fit
-        // clear of the undo, their short form shows (`labelShort`), so a
-        // long list name is what gets cut. A notice stays whole.
         Text {
           id: fullWords
           visible: false
@@ -201,7 +166,6 @@ Item {
         Text {
           id: footerWords
           objectName: "footerText"
-          // Clear of the button at the bar's end, and of the action beside it.
           readonly property real room: root.width - root.gutter - root.undoRoom - Style.space(20)
             - (noteAction.visible && !footerRow.twoLines ? noteAction.implicitWidth : 0)
           width: Math.min(implicitWidth, room)
