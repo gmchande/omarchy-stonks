@@ -100,6 +100,19 @@ none "([\"'])#[0-9a-fA-F]{3,8}\\1" *.js
 # its colours still themes: no hex literal in either quote, no numeric
 # Qt.rgba, and no literal but "transparent" as a colour's whole value.
 none "([\"'])#[0-9a-fA-F]{3,8}\\1|Qt\\.(rgba|hsla|hsva)\\(\\s*[0-9.]|(?i)(\\b\\w*color|fillstyle|strokestyle|property\\s+color\\s+\\w+)\\s*[:=]\\s*([\"'])(?!transparent\\4)[^\"'\\n]+\\4\\s*;?\\s*$" *.qml
+# Secondary text is mixed toward its ground (Tones.dim): Qt.darker gets
+# louder on a light theme. A comment may name it. The shell's TextField
+# draws its hint with Qt.darker, so a text box is a Field, which draws it in
+# Tones.dim.
+hits=$(rg -n -o -P '//.*(*SKIP)(*F)|\bQt\.darker\b|\bTextField\s*\{' -- *.qml)
+code=$?
+[ "$code" -le 1 ] || fail "rg could not check for Qt.darker"
+[ "$code" -ne 0 ] || while IFS=: read -r file line match; do
+  case $match in
+    Qt.darker) fail "$file:$line: Qt.darker gets louder on a light theme. Mix secondary text toward its ground with Tones.dim." ;;
+    *) [ "$file" = Field.qml ] || fail "$file:$line: the shell's TextField draws its hint with Qt.darker, which gets louder on a light theme. Use Field, which mixes it toward its ground with Tones.dim." ;;
+  esac
+done <<< "$hits"
 # The bar entry holds only the pill's forms: barStyle, and, absent until a
 # middle-click there, barStyleRight for the right section and
 # barStyleVertical for a side bar; the service's file holds the rest.
