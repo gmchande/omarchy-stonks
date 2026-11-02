@@ -8,39 +8,32 @@ import "Quote.js" as Quote
 Item {
   id: root
 
-  // Every member: each gets one first answer.
   property var symbols: []
   // The members refreshes are owed for; first answers always stay.
   property var watched: []
   property string lead: ""
-  // The symbols a hero shows, the lead and a resting preview of a member:
-  // each goes on the chart, whose opens its line and the day's open need.
+  // The lead and a resting preview: each goes on the chart, for its opens.
   property var heroes: lead ? [lead] : []
-  // The order a run asks for those asked together, as a function read at
-  // launch (`Asks.readingOrder`); the members' own order without one.
+  // Read at launch (`Asks.readingOrder`): the order a run asks in.
   property var reading: null
   // Answers wait while a chart draws itself in, so reading never stutters it.
   property bool holding: false
   onHoldingChanged: if (!holding) landTimer.start()
   property int now: 0
-  // The service, whose wall clock stamps each ask and answer of the feed's
-  // own (`stamp`): between its ticks `now` can be a minute behind.
+  // Asks and answers take the service's wall clock: between its ticks `now`
+  // can be a minute behind.
   property var clock: null
   function stamp() { return clock ? clock.wallSecond() : now }
-  // Asked before each run starts (the service's `screensClear`): false
-  // while every screen is off, or while that is being asked; what waits is
-  // pumped again once a screen is known on.
+  // Asked before each run (the service's `screensClear`): nothing goes while
+  // every screen is off, and what waits goes once a screen is on.
   property var clearance: null
   property var gate: null
-  // Runs of the list leave the gate's reserve to single requests; the
-  // preview's feed is one.
+  // The list's runs leave the gate's reserve to single requests, such as the
+  // preview's feed.
   property bool bulk: true
-  // The exchanges whose listings trade in whole cents from $1
-  // (`Quote.parseChart`); none unless handed in.
   property var centExchanges: []
-  // The exchange calendars, by which a listing's day is asked for two days
-  // before its session opens (`Market.twoDays`); a spark batch asks two for
-  // all when one of them wants two, so the requests stay as many.
+  // A spark batch asks two days for all when one wants two (`Market.twoDays`),
+  // so the requests stay as many.
   property var calendars: null
   function twoDays(symbol) { return Market.twoDays(quotes[symbol] || null, stamp(), calendars) }
 
@@ -58,16 +51,12 @@ Item {
   // or Yahoo pausing Stonks. `userOut`: one of them is on a request now.
   property var userAsked: ({})
   readonly property bool userOut: refreshRun.some(function(symbol) { return symbol in userAsked })
-  // An answer, or leaving the queue, ends what was owed and what a reader
-  // waits on.
   onAskedChanged: {
     var owing = queued(owed)
     if (owing !== owed) root.owed = owing
     var waiting = queued(userAsked)
     if (waiting !== userAsked) root.userAsked = waiting
   }
-  // `map` less each symbol no longer asked for: `map` itself when that is
-  // none.
   function queued(map) {
     var next = null
     for (var symbol in map) {
@@ -77,7 +66,6 @@ Item {
     }
     return next || map
   }
-  // `map` less `list`: `map` itself when it holds none of them.
   function without(map, list) {
     var next = null
     list.forEach(function(symbol) {
@@ -88,8 +76,8 @@ Item {
     return next || map
   }
   readonly property bool hostPaused: !!gate && gate.paused
-  // Only what waits becomes owed here: the gate is still setting up the
-  // pause as this fires, so nothing may be launched from it.
+  // The gate is still setting up the pause as this fires: nothing may launch
+  // from it.
   onHostPausedChanged: {
     oweWaiting()
     if (hostPaused) root.userAsked = ({})
@@ -101,20 +89,16 @@ Item {
   // lane, so an add never waits behind a refresh.
   property var firstRun: []
   property var refreshRun: []
-  // Bad answers so far for a symbol still asked for.
   property var tries: ({})
-  // Symbols waiting out the pause after a bad answer.
+  // Symbols waiting out the pause after a bad answer (`retryTimer`).
   property var cooling: []
 
   function firstAnswer(symbol) {
     return Asks.firstAnswer(entries[symbol])
   }
 
-  // Asks for each of `list` it does not already owe, as of `at`, the
-  // service's clock as it asks: the clock's own handlers may run before this
-  // feed's binding to it has caught up. A reader's refresh (`user`) waits on
-  // each of `list` now asked for, those already asked included, unless
-  // Yahoo is pausing Stonks.
+  // `at` is the service's clock as it asks: its handlers may run before this
+  // feed's binding to it has caught up.
   function ask(list, at, user) {
     var next = null
     list.forEach(function(symbol) {
@@ -136,7 +120,7 @@ Item {
   }
 
   onWatchedChanged: dropUnwatched()
-  // The clock: a pause or a budget that held a run may have let go.
+  // A pause or a budget that held a run may have let go.
   onNowChanged: pump()
 
   function dropUnwatched() {
@@ -175,12 +159,10 @@ Item {
     launch(false)
   }
 
-  // While the host is paused, everything waiting waits on Yahoo.
   function oweWaiting() {
     if (hostPaused) owe(symbols.filter(function(symbol) { return symbol in asked }))
   }
 
-  // Each of `list` not owed already is owed from now.
   function owe(list) {
     var next = null
     var at = root.stamp()
@@ -198,9 +180,8 @@ Item {
   // up on each URL within 10 s.
   readonly property int judgeRun: 4
   function launch(first) {
-    // A lane's run is out from its launch until it lands: its process can
-    // say it stopped before its stream has ended. Nothing launches while a
-    // run's answers are applied (`applying`).
+    // A run is out until it lands: its process can say it stopped before its
+    // stream has ended.
     if (applying || (first ? firstRun : refreshRun).length > 0) return
     var held = cooling.concat(firstRun, refreshRun)
     var waiting = Asks.laneWaiting(symbols, asked, entries, first, held)
@@ -228,8 +209,7 @@ Item {
     ;(first ? firstFetch : refreshFetch).send(urls, spark ? Fetch.SPARK_CAP : Fetch.DAY_CAP)
   }
 
-  // Symbols whose spark day holds a jump no chart verdict speaks for, each
-  // waiting for its chart from the budget's spare half.
+  // Symbols whose spark day holds a jump no chart verdict speaks for.
   property var toJudge: []
 
   // A hero from spark has no opens for its line or the day's open, so its
@@ -248,8 +228,6 @@ Item {
     for (var i = 0; i < landing.length; i++) if (landing[i].first === first && !landing[i].ended) return landing[i]
     return null
   }
-  // The lane's answers as each one lands (`FetchRun.arrived`), and the end
-  // of its stream.
   function arrived(first, got) {
     var job = runOf(first)
     if (!job) return
@@ -286,7 +264,6 @@ Item {
     if (more) landTimer.start()
   }
 
-  // One step of reading `answer`, true once it is read whole.
   function readOn(answer, slot) {
     if (answer.kind !== "ok" || !slot) return true
     if (!slot.spark) {
@@ -323,8 +300,8 @@ Item {
     onTriggered: root.landStep()
   }
 
-  // While answers are applied nothing launches: what they set off (a new
-  // hero, a quote shown) would read the feed half updated.
+  // What answers set off, a new hero or a quote shown, would read the feed
+  // half updated.
   property bool applying: false
   function apply(job, got) {
     root.applying = true
@@ -336,14 +313,13 @@ Item {
     var nextJudge = toJudge.slice()
     var show = function(symbol, answered) {
       var previous = quotes[symbol]
-      // The close Yahoo hasn't caught up with yet, from the quote before.
       var quote = Market.carryClose(previous, answered, calendars)
       var dropped = Quote.bucketTimes(quote.droppedTimes)
       var previousDropped = Quote.bucketTimes(previous ? previous.droppedTimes : null)
       if (dropped && dropped !== previousDropped && !quote.closesOnly)
         console.warn("stonks: " + symbol + " dropped stray buckets " + dropped)
-      // An answer with nothing new keeps the quote already shown, so nothing
-      // is derived from it again and no line repaints; its receipt still moves.
+      // An unchanged answer keeps the quote shown, so nothing is derived again
+      // and no line repaints.
       if (!previous || !Quote.sameQuote(quote, previous)) {
         if (!nextQuotes) nextQuotes = Object.assign({}, quotes)
         nextQuotes[symbol] = quote
@@ -351,7 +327,7 @@ Item {
       nextEntries[symbol] = { status: "ok", receivedAt: at, answeredAt: at }
     }
     var settle = function(answer, slot, symbol) {
-      // Removed while its run was out: the answer belongs to nobody.
+      // Removed while its run was out.
       if (symbols.indexOf(symbol) < 0) return
       // A judging chart keeps the spark answer's second: the symbol stays due
       // with the rest of its run.
@@ -363,12 +339,10 @@ Item {
       if (!slot.spark) nextJudge = nextJudge.filter(function(s) { return s !== symbol })
       if (verdict === "unchanged") return
       if (verdict === "show") {
-        // A day with a jump no chart has judged shows, and waits for one.
         if (outcome.unjudged && nextJudge.indexOf(symbol) < 0) nextJudge.push(symbol)
         show(symbol, outcome.quote)
         if (judging && entries[symbol]) nextEntries[symbol].answeredAt = entries[symbol].answeredAt
       } else if (verdict === "retry") {
-        // A short pause once the run ends, then the same symbol again.
         nextTries[symbol] = (nextTries[symbol] || 0) + 1
         job.cool.push(symbol)
         return
@@ -398,9 +372,7 @@ Item {
     root.applying = false
   }
 
-  // A run ends: its lane is free, what it left asked is kept only while
-  // watched, and what answered badly waits its pause. The gate heard every
-  // answer before the last was read (`FetchRun`).
+  // The gate heard every answer before the last was read (`FetchRun`).
   function finish(job) {
     root.applying = true
     if (job.first) {
@@ -415,14 +387,11 @@ Item {
       retryTimer.restart()
     }
     root.applying = false
-    // Asks for what is due next, a spark hero's chart among it.
     chartHeroes(true)
   }
 
-  // A symbol that comes with its answer, not as a first fetch: a removal
-  // taken back, with its quote, or a search's preview added, with its quote
-  // or its failed first fetch (`quote` null). One that never left keeps its
-  // own.
+  // A symbol that comes back with its answer: a removal taken back, or a
+  // search's preview added (`quote` null for its failed first fetch).
   function restore(symbol, quote, entry) {
     if (quotes[symbol] && !firstAnswer(symbol)) return
     if (quote) {
@@ -440,8 +409,7 @@ Item {
     }
   }
 
-  // Quotes kept from an earlier session, shown until each first answer:
-  // { symbol: { quote, receivedAt } }. A symbol already answered keeps its own.
+  // Quotes kept from an earlier session: { symbol: { quote, receivedAt } }.
   function seed(saved) {
     var nextQuotes = Object.assign({}, quotes)
     var nextEntries = Object.assign({}, entries)
