@@ -6,26 +6,16 @@ import qs.Commons as Commons
 import "Cells.js" as Cells
 import "Tones.js" as Tones
 
-// The info block's two lines as one table: each line its title, its range
-// as low, a rule with the price's tick, and high, then its facts
-// (`Figures.dayLine` or `History.rangeLine`, and `Fundamentals.yearLine`).
-// The columns are shared, so the two rules stand in one column. Each column
-// is as wide as the widest figure its slots can hold at the listing's
-// digits, never today's: each fact's as the widest any line puts there on
-// any range (`factLists`), and the title column as the widest of `titles`.
-// So a refresh moves only the tick, and a range change nothing. The rule
-// takes the room the columns leave, so the table spans the band's width at
-// any width; a trailing column that does not fit is left out whole, never
-// cut.
+// The info block's two lines as one table, so their rules share a column.
+// Each column is as wide as the widest figure it can hold at the listing's
+// digits on any range, never today's; the rule takes what the columns
+// leave, and a trailing column that doesn't fit is left out whole.
 Item {
   id: root
 
-  // The two lines; either may be null.
   property var lines: [null, null]
-  // Every title a line can hold.
+  // Every title and list of facts a line can hold, on any range.
   property var titles: []
-  // Every list of facts the first line can hold, on any range; the second's
-  // are its own.
   property var factLists: []
   property bool retro: false
   property color foreground: Commons.Color.foreground
@@ -38,16 +28,12 @@ Item {
   readonly property int gap: Style.space(14)
   readonly property int innerGap: Style.space(6)
   readonly property int minRule: Style.space(32)
-  // Figures in the caption's bold; labels the same, spaced as the range
-  // row's are.
   readonly property font valueFont: Qt.font({ family: fontFamily, pixelSize: Style.font.caption, bold: true })
   readonly property font labelFont: Qt.font({ family: fontFamily, pixelSize: Style.font.caption, bold: true, letterSpacing: 1 })
-  // A fact's label as a shell panel's is, plain and in sentence case, and
-  // its figure at the column's end.
+  // A label as the shell's panels set one: plain, in sentence case.
   readonly property font factFont: Qt.font({ family: fontFamily, pixelSize: Style.font.caption })
   function factLabel(text) { return text === "P/E" ? text : text.charAt(0) + text.slice(1).toLowerCase() }
-  // A line of text rounds its ascent and its descent up to whole pixels
-  // each, and so does this.
+  // Rounds ascent and descent up each, as a line of text does.
   readonly property int lineHeight: Math.ceil(metrics.ascent) + Math.ceil(metrics.descent)
 
   FontMetrics { id: metrics; font: root.valueFont }
@@ -62,7 +48,7 @@ Item {
   }
   function toneColor(tone) { return tone === "up" ? upColor : tone === "down" ? downColor : foreground }
 
-  // Each width reads the metrics' font, so a new text size measures again.
+  // Reading `metrics.font` measures again at a new text size.
   readonly property int titleWidth: {
     var font = metrics.font
     var widest = 0
@@ -92,9 +78,7 @@ Item {
     var shown = facts.length
     while (shown > 0 && fixed(shown) + minRule > width) shown--
     var rule = Math.max(minRule, width - fixed(shown))
-    // Whole cells on the grain, so retro's last cell ends where smooth's
-    // rule does; what the grain leaves goes before the facts, which end at
-    // the right edge.
+    // Whole retro cells, so both looks' rules end alike.
     rule = Math.floor((rule + 1) / Cells.RULE_PITCH) * Cells.RULE_PITCH - 1
     var lowX = titleWidth + gap
     var ruleX = lowX + price + innerGap
@@ -162,7 +146,6 @@ Item {
         font: root.valueFont
       }
 
-      // A fact's slot stays when it is not known; it draws nothing.
       Repeater {
         model: row.line ? Math.min(row.line.facts.length, root.layout.factXs.length) : 0
 
