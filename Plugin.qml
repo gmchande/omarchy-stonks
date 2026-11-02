@@ -2,12 +2,8 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 
-// The manifest's service entry: its parts side by side, each on its own,
-// with the market's bell playing through the sounds. The pills and the
-// panel reach them through `serviceFor("grvc.stonks")`: the data service as
-// `service`, the theme's up and down as `trendColors`, the plugin's version
-// watch as `updates`, the sounds as `sounds`, the screenshot's camera as
-// `camera`, the window's host as `windowHost`, and the IPC target as `ipc`.
+// The manifest's service entry. The pills and the panel reach its parts
+// through `serviceFor("grvc.stonks")`.
 Item {
   id: root
 
