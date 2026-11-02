@@ -2305,7 +2305,9 @@ test("every price stands at its time from its day's first trade, a quiet night a
   // Robinhood traded through it, and its trades fill the hour, each at its
   // time and read as the pre-market: NBIS rose to 157.70 at 08:40. Yahoo's
   // every bar stays as it came, and the price on top and the close the
-  // move counts from stay Yahoo's. SHOP traded in 8 of the hour's 13 slots.
+  // move counts from stay Yahoo's. SHOP's last bar before the hour was
+  // 08:20, so its stretch is the 13 slots from 08:25 to 09:25, and
+  // Robinhood traded in 8 of them.
   for (const [name, filled] of [["nbis", 12], ["crwv", 12], ["shop", 8]]) {
     const built = dayAt("open-2026-11-02-0941", name)
     const yahoo = built.quote.points

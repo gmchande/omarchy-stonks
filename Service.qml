@@ -249,7 +249,12 @@ Item {
         var key = symbol + " " + stretch.from + " " + stretch.to
         if (root.saidFills[key]) return
         root.saidFills[key] = true
-        console.warn("stonks: " + symbol + " filled from Robinhood's " + stretch.bars.length + " trades between "
+        var sessions = []
+        stretch.bars.forEach(function(b) {
+          var name = b.s === "pre" ? "pre-market" : "after-hours"
+          if (sessions.indexOf(name) < 0) sessions.push(name)
+        })
+        console.warn("stonks: " + symbol + " filled from Robinhood's " + stretch.bars.length + " " + sessions.join(" and ") + " trades between "
           + new Date(stretch.from * 1000).toISOString() + " and " + new Date(stretch.to * 1000).toISOString() + ", where Yahoo sent no bar")
       })
     })

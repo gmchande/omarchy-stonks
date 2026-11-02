@@ -211,9 +211,9 @@ function answerVerdict(kind, outcome, tries, judgingOnly) {
 // pill's, goes alone ahead of the rest while it has no answer. On a day
 // Yahoo left a stretch of its pre-market empty, read from the quotes of
 // every US stock and ETF (`quotes`, `Overnight.yahooHole`) and of the
-// preview on view,
-// asked here that Robinhood trades all day and whose prints in hand don't
-// reach it is asked once more, open or not (`Overnight.holeDue`).
+// preview on view, each listing asked here that Robinhood trades all day
+// and whose prints in hand don't reach that stretch is asked once more,
+// open or not (`Overnight.holeDue`).
 // `allDay` and `nights` are the two feeds' entries; `quoteEntries` Yahoo's.
 function overnightAsks(s) {
   var pill = s.pill

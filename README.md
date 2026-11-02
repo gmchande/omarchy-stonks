@@ -126,8 +126,8 @@ the line runs on from the day's last trade to the night's first. A day
 that closes early, such as
 the Friday after Thanksgiving, ends at 17:00 with no night after it.
 If Yahoo sends no prices for half an hour or more of the pre-market or
-after hours while Robinhood shows the stock trading, the chart draws
-Robinhood's trades there. They never replace a price Yahoo sent.
+after hours, and Robinhood shows trades in at least half of it, the chart
+draws Robinhood's trades there. They never replace a price Yahoo sent.
 
 A US stock that doesn't trade at night shows its day up to 20:00, and
 keeps that day until its next trade. Once the chart shows a day
@@ -375,11 +375,12 @@ personal use, so either may change or stop without notice.
   before and after the session (every minute for the stock on show). It
   leaves out a row whose market hasn't traded since its last price.
 - `query2.finance.yahoo.com` for search, as you type.
-- `api.robinhood.com` for overnight prices: once a day for which stocks
-  trade overnight, at most once for each stock the pill shows, and every 5
-  minutes through the night for the pill's stock, and for every row that
-  trades overnight while the panel or the window is open; and once more on
-  a morning Yahoo sends no prices for part of the pre-market.
+- `api.robinhood.com` for overnight prices, and for the trades that fill a
+  stretch Yahoo left empty: once a day for which stocks trade overnight, at
+  most once for each stock the pill shows, and every 5 minutes through the
+  night for the pill's stock, and for every row that trades overnight while
+  the panel or the window is open; and once more on a morning Yahoo sends no
+  prices for half an hour or more of the pre-market.
 - `raw.githubusercontent.com` for the newest version number, as the shell
   starts and once a day. To turn this off, add `"updateCheck": false` to
   `~/.config/omarchy/grvc.stonks.json`.
