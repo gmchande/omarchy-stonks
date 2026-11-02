@@ -2,9 +2,8 @@
 .import "Format.js" as Format
 .import "Quote.js" as Quote
 
-// Ranges: Yahoo's history answer, its stats, bars, dates, and words. Knows
-// nothing of the day or overnight prints, nor of calendars: a bar's clock
-// is its own day's, from the answer.
+// Yahoo's range answers: their bars, stats, dates and words. No calendars:
+// a bar's clock is its own day's, from the answer.
 
 var HISTORY_RANGES = {
   "1W": { range: "5d", interval: "15m" },
@@ -33,16 +32,8 @@ function historyKey(symbol, range) {
   return String(symbol || "").toUpperCase() + "|" + String(range || "")
 }
 
-// Whether the range on show, its last answer `entry` (HistoryFeed's), is
-// asked again at `now`: while its listing's market trades (`trading`, the
-// caller's word, by the listing's calendar; a history holds regular hours
-// only), every 15 minutes for a range of bars within the day (1W, 1M),
-// whose line moves with the hour, and every hour for one of daily bars or
-// longer, whose last bar moves through the session; and once after the
-// session in its quote (`quote`) has closed, if its last good history came
-// in before that, for its last bars. Each wait counts from the last answer,
-// a failed one too, so a failed refresh is tried again at the same pace;
-// never sooner than the cache's 15 minutes.
+// A history holds regular hours only. No wait is shorter than HistoryFeed's
+// 15-minute cache.
 function historyDue(range, entry, quote, now, trading) {
   var spec = HISTORY_RANGES[range]
   if (!spec || !entry || !quote) return false
@@ -53,19 +44,8 @@ function historyDue(range, entry, quote, now, trading) {
   return !!regular && regular.end <= now && entry.receivedAt < regular.end
 }
 
-// Yahoo's answer for a range. `centExchanges` as `Quote.parseChart` takes
-// them, for the stray filter's tick. Null, as there, for an answer that is
-// not a chart, whose bars or periods are not lists within Quote's budgets,
-// whose periods are not periods (`Quote.answerClocks`), or whose bar times
-// are not moments; an offset that is not one is none. A price at or under
-// zero is none, as in the day's answer (`Quote.knownPrice`): a bar without a
-// close is left out of `bars`, which the chart draws, and its START is its
-// first close when its previous close isn't known. Read as prices, zeros
-// would put "START 0.00" on screen, and a negative first close would draw
-// a cliff at the chart's left. A bar without a close that has a high, a
-// low, or shares is kept in `unclosed`, for the range's high, low, and
-// volume: Tokyo's daily answer leaves the day's close out after its close,
-// and without it its VOL and high would lose what Yahoo sent.
+// Tokyo's daily answer leaves the day's close out after its close; that
+// bar's high, low and shares still count, in `unclosed`.
 function parseHistory(json, range, centExchanges) {
   var result = json && json.chart && json.chart.result && json.chart.result[0]
   if (!result || !result.meta) return null
@@ -92,17 +72,13 @@ function parseHistory(json, range, centExchanges) {
   }
   bars.sort(function (a, b) { return a.t - b.t })
   if (bars.length >= 2 && bars[bars.length - 1].t === bars[bars.length - 2].t) bars.splice(bars.length - 2, 1)
-  // A new listing's history opens with its offer price: a bar at
-  // the bell of its first day (`firstTradeDate`), one price and no shares,
-  // hours before its first trade. That bar is dropped: kept, a young
-  // listing's 1W and 1M would plunge to its offer price at the left edge
-  // and name it the range's low.
+  // Yahoo opens a new listing's history with its offer price: one price, no
+  // shares, at its first day's bell, hours before its first trade.
   var firstTrade = Format.isFiniteNumber(meta.firstTradeDate) ? meta.firstTradeDate : null
   bars = bars.filter(function(b) { return !(b.t === firstTrade && b.v === 0 && b.o === b.c && b.h === b.c && b.l === b.c) })
   var interval = Format.fetchedText(meta.dataGranularity, Format.MOST_CODE) || (spec && spec.interval)
   var intervalSeconds = historyIntervalSeconds(interval)
-  // Only intraday buckets carry a stray close; a daily bar cannot. A move of
-  // a tick or two is trading (`Quote.filterStrayCloses`).
+  // A daily bar never carries a stray close.
   var droppedTimes = []
   if (intervalSeconds > 0 && intervalSeconds < 24 * 60 * 60) {
     var filtered = Quote.filterStrayCloses(bars, null, Quote.answerTick(meta, bars, centExchanges))
@@ -116,8 +92,8 @@ function parseHistory(json, range, centExchanges) {
     interval: interval,
     gmtoffset: Quote.isOffset(meta.gmtoffset) ? meta.gmtoffset : 0,
     zoneName: Format.fetchedText(meta.timezone, Format.MOST_CODE),
-    // An intraday answer's days, each with its own clock, and the live
-    // moment Yahoo appends, at the price's own second (`barOffset`).
+    // Each intraday day's clock, and the live moment Yahoo appends at the
+    // price's own second.
     clocks: clocks,
     liveAt: Format.isFiniteNumber(meta.regularMarketTime) ? meta.regularMarketTime : null,
     bars: bars,
@@ -156,9 +132,7 @@ function periodStats(history) {
   var interval = historyIntervalSeconds(history ? history.interval : "")
   var first = bars.length ? bars[0] : null
   var firstTradeDate = history ? history.firstTradeDate : null
-  // The range starts with the listing when its first bar is on its first
-  // day of trading, or in the bar that holds it: a young listing's first
-  // trade can come hours after its first day's bell.
+  // A young listing's first trade can come hours after its first day's bell.
   var short = !!(first && Format.isFiniteNumber(first.t) && Format.isFiniteNumber(firstTradeDate) && interval > 0
     && first.t <= firstTradeDate + Math.max(interval, 24 * 60 * 60) && first.t + interval >= firstTradeDate)
   return {
@@ -176,11 +150,8 @@ function periodStats(history) {
   }
 }
 
-// Normalized x/y for a range: bars evenly spaced, and a vertical range that
-// holds every close and the period's starting price the change is measured
-// from, with headroom. From 5Y up the scale is logarithmic, so a decade of
-// growth reads as a slope instead of a flat line and a wall: every price
-// is above zero (`parseHistory`).
+// The log scale (5Y up) shows a decade's growth as a slope, not a flat line
+// and a wall; every price is above zero.
 function historyGeometry(history) {
   var bars = history && history.bars ? history.bars : []
   var usable = []
@@ -251,14 +222,10 @@ function historyFraction(history, t) {
   return nearest / (bars.length - 1)
 }
 
-// The UTC offset a bar of `history` at `t` is dated by: its own day's. An
-// intraday bar's day is in Yahoo's periods (`Quote.clockAt`). A longer
-// bar's answer lists none, and Yahoo stamps a week or a month at its first
-// day's midnight by that day's offset, which is an hour either side of the
-// answer's across a change of clocks: London's summer weeks at 23:00 UTC
-// the Sunday before, its winter ones at 00:00. Any other stamp, a day's bar
-// at its open or the live moment, keeps to its day by the answer's; the
-// live moment even at a whole hour, as a coin's at 23:00 UTC.
+// Intraday bars take Yahoo's periods. Longer bars have none: Yahoo stamps a
+// week or month at its first day's midnight by that day's offset, an hour
+// off the answer's across a change of clocks. Any other stamp, the live
+// moment too (a coin's at 23:00 UTC), keeps the answer's offset.
 function barOffset(history, t) {
   if (history.clocks && history.clocks.length) return Quote.clockAt(history, t).offset
   var offset = history.gmtoffset || 0
@@ -296,23 +263,16 @@ function historyStatsDateText(history, t, withYear, interval) {
   return historyDateText(history, t, coarse || withYear, coarse ? "1mo" : "1d")
 }
 
-// Whether the last bar is the live moment (`liveAt`) Yahoo appends to a
-// week's, a month's, or a quarter's bars as a bar of its own: the bucket
-// before it already holds the live moment's day, its volume included.
+// Yahoo appends the live moment to weekly, monthly and quarterly bars as a
+// bar of its own; the bar before it already holds that day, volume included.
 function liveBarAppended(history) {
   var bars = history && history.bars ? history.bars : []
   var coarse = history && (history.interval === "1wk" || history.interval === "1mo" || history.interval === "3mo")
   return !!coarse && bars.length > 1 && bars[bars.length - 1].t === history.liveAt
 }
 
-// `history` ending on the newest price since the listing's regular close
-// (`print`, { t, p, phase, closed }, `Overnight.newestPrint`), as Robinhood's ranges
-// end on it: a bar of its own after the last, or in place of the live moment
-// Yahoo appends to a week's, a month's, or a quarter's bars, which stands
-// for the price now too. The bar is that one trade, so it counts in the
-// range's low and high, where the line reaches it, and not in its volume
-// (`rangeVolume`), as the day's VOL leaves out the night. The history as it
-// came with no print after its last bar.
+// Robinhood's ranges end on the newest price too. It replaces the live
+// moment, which also stands for the price now.
 function withNewest(history, print) {
   var bars = history.bars
   if (!print || !bars.length || print.t <= bars[bars.length - 1].t) return history
@@ -356,12 +316,8 @@ function lastBarHolds(history, t) {
   return months >= 0 && months < (span === "month" ? 1 : 3)
 }
 
-// A range's high and low, each a bar's `{ p, t }`. When the last bar holds
-// the session of the listing's `quote`, the quote's day high and low count
-// as that bar's: the range is fetched each hour, the quote each minute, so
-// on a day that passes the range's high, the range keeps up with the day's
-// line and the 52 weeks' (`Figures.dayLine`, `Fundamentals.yearLine`).
-// Null with no bars.
+// The range is fetched hourly and the quote each minute, so the quote's day
+// high and low stand in for the last bar's while it holds that day.
 function rangeEnds(history, stats, quote) {
   stats = stats || periodStats(history)
   if (!stats.high || !stats.low) return null
@@ -424,12 +380,7 @@ function rangeMarks(history, ends, quote) {
   return { high: mark(ends.high), low: mark(ends.low) }
 }
 
-// A scrubbed bar as the header says it, its date and its price, then its
-// date alone, for a header with no room for both: the hero shows the price
-// large. An intraday bar's date and time read by its own day's clock, so a
-// time across a change of clocks reads as the exchange's clock said then;
-// the newest price (`withNewest`) is a trade, named by its day and time on
-// every range.
+// The date alone is for a header with no room: the hero shows the price.
 function historyScrubForms(history, bar, digits) {
   if (!history || !bar) return [""]
   var years = historySpansYears(history)
@@ -463,10 +414,8 @@ function historyRowModel(history, quote, scrubT) {
     dayTone: Format.changeTone(chg, "pct"),
     changeText: Format.pct(chg.pct),
     changeLine: Format.pct(chg.pct),
-    // What the change is measured over, said under it the way AT CLOSE is:
-    // the range, or, for a listing younger than a range short of All, the
-    // day it began trading. With the newest price on top, its session and
-    // time follow (`Figures.newestCaptions`).
+    // Said under the change, as AT CLOSE is; the newest price's session and
+    // time follow it (`Figures.newestCaptions`).
     periodLabel: stats.coverage.short && history.range !== "All"
       ? "SINCE " + historyStatsDateText(history, history.firstTradeDate, true, "1d")
       : String(history.range || "").toUpperCase(),
