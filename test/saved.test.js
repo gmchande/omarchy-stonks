@@ -1998,6 +1998,8 @@ test("in every phase, a stock that has traded since its close shows that newest 
   expect(M.newestNote(sunday.quotes.NBIS, nbis, sunday.now, calendars)).toBe("Since Thu close · 23:30")
   expect(M.newestNote(sunday.quotes.PSIX, sunday.newest.PSIX, sunday.now, calendars)).toBe("After hours Fri 19:00")
   expect(M.newestTime(sunday.quotes.PSIX, sunday.newest.PSIX, sunday.now, calendars)).toBe("Fri 19:00")
+  // A week on, its date: a weekday would read as this week's.
+  expect(M.newestTime(sunday.quotes.PSIX, sunday.newest.PSIX, sunday.now + 7 * DAY, calendars)).toBe("23 Oct 19:00")
   // On 1W, 1M and 1Y too, NBIS's line ends on its newest price, the price
   // on top, as Robinhood's ranges did at 20:00 on 28 October: the move from
   // the range's start to it, said under it by the range's name and then the

@@ -274,11 +274,8 @@ function scrubPhase(quote, t) {
   return session === "reg" ? "open" : session || "closed"
 }
 
-// The calendar that knows the clock of `quote`'s exchange at `t`: the
-// series' own or the listing's in `calendars`, while `t` falls on a day up
-// to its last (`validThrough`). Null past it, where a change of clocks it
-// doesn't list would read as standard time, an hour out: Toronto's July
-// 2027 close would read "15:00 EST".
+// Past `validThrough` a change of clocks the calendar doesn't list would
+// read as standard time, an hour out.
 function clockCalendar(quote, t, calendars) {
   var cal = quote.calendar || calendarFor(calendars, quote)
   return cal && dateStringOf(localDate(t, cal)) <= cal.validThrough ? cal : null
@@ -295,44 +292,17 @@ function printClock(quote, t, calendars) {
   return Format.zonedHhmm(t, clock.offset, clock.zone)
 }
 
-// A closure as the header names it: the holiday, without the calendar's
-// "observed" or "(substitute)". The reader learns the market is shut,
-// why, and when it opens without it, and the panel has no room for Tokyo's
-// "Constitution Memorial Day observed" beside its next open. The calendars
-// keep their source's names, since they are renewed from it.
+// The calendars keep their source's names, since they are renewed from it.
 function holidayName(name) {
   return name.replace(/ (observed|\(substitute\))$/, "")
 }
 
-// The one time that matters: how long until the market opens or closes,
-// when the exchange has said. "Closes in" already says it is open. After
-// the bell the phase stands on its own, with the regular close named so
-// 16:00 is never mistaken for the end of after-hours trading. A quote held
-// from an earlier session, before the new day's answer lands, has the
-// calendar's session stand in while one of its segments trades
-// (`calendarRegular`), so the open says "Opening bell", not the next day's
-// open; an index counts to the open through its calendar's pre-market
-// (`indexBell`). A listing whose overnight session is on (`overnight`,
-// `Overnight.nightTrades`) is in it, as the line under the price says, a
-// weekend's or a holiday's evening included. While scrubbing, where in the
-// day the finger is: at the close's own time, the closing bell, when it
-// reads the close (`Quote.readingAt`).
 function marketStatus(quote, now, scrubT, calendars, overnight) {
   return statusForms(quote, now, scrubT, calendars, overnight)[0]
 }
 
-// The status, then the same said in less, each form shorter than the one
-// before, for a header with no room for the one before. First a closure's
-// notice without the holiday's name, worded as a weekend's is ("Closed ·
-// opens Tue 09:30"), and a lunch break without its countdown ("Lunch break
-// · reopens 12:30 JST"). Then the time alone, with what it is: without the
-// session's name, which the line under the price says whenever an
-// extended price shows, and the day's ("Opens Tue 09:30", "Closed at
-// 16:00"), and a scrub without its moment's name ("At 02:25"); a schedule
-// that has run out says only that. Every form keeps the time, its day, and
-// its zone. A scrubbed print from another day than `now`'s where the
-// listing trades names that day ("At Sun 21:10 · Overnight": Sunday
-// night's chart is still on screen at Monday 01:00).
+// The status, then shorter forms for a narrower header; each keeps the
+// time, its day and its zone.
 function statusForms(quote, now, scrubT, calendars, overnight) {
   if (scrubT) {
     var read = Quote.readingAt(quote, scrubT)
@@ -345,31 +315,22 @@ function statusForms(quote, now, scrubT, calendars, overnight) {
     var reopens = "reopens " + calendarClock(cal, brk, quote)
     return ["Lunch break · " + reopens + " · in " + Format.duration(brk - now), "Lunch break · " + reopens, sentence(reopens)]
   }
-  // The stand-in reads the hour by the calendar's clock today, not the
-  // held answer's, which may be from before a change of clocks: otherwise
-  // a New York quote held from EDT into EST would say "Lunch lull" at 11:00.
+// The calendar's clock today, not the held answer's, which may be from
+// before a change of clocks.
   var held = !overnight && !isTrading(sessionPhase(quote, now)) ? calendarRegular(cal, now) : null
   var q = held ? Object.assign({}, quote, { session: { pre: null, regular: held, post: null }, current: null,
     clocks: [], gmtoffset: localDate(now, cal).offset }) : quote
   var phase = overnight ? "overnight" : sessionPhase(q, now)
   var bell = secondsToBell(q, now) || indexBell(quote, cal, now)
   var kind = cal ? dayKind(cal, dateStringOf(localDate(now, cal))) : null
-  // A published closure outranks a cached response that still describes a
-  // session: on a holiday Yahoo may hand back a window nobody is trading.
+// On a holiday Yahoo may still send a session nobody trades.
   var closure = !overnight && kind && kind.kind === "closure"
-  // The day's named moments lead while they last, as they do in a scrub. A
-  // morning with a break ahead counts to the break, not the day's close:
-  // Tokyo stops at 11:30, so at 11:26 "Market closes in 4h 4m" would be
-  // four hours wrong.
   if (!closure && bell && bell.bell === "close") {
     var named = phase === "opening" || phase === "lunch" || phase === "power" || phase === "closing"
     var pause = sessionBreaks(cal, now).filter(function(b) { return now < b.start })[0]
     var closes = pause ? "lunch break in " + Format.duration(pause.start - now) : "closes in " + Format.duration(bell.seconds)
     return [named ? phaseLabel(phase) + " · " + closes : pause ? sentence(closes) : "Market " + closes, sentence(closes)]
   }
-  // An index has no pre-market of its own, so before its open it is closed,
-  // said in the shape its stocks' "Pre-market · opens in 3h 10m" is,
-  // whatever periods Yahoo sent it.
   if (!closure && bell) {
     var opens = "opens in " + Format.duration(bell.seconds)
     var before = quote.instrumentType === "INDEX" ? phaseLabel("closed") + " · "
@@ -386,10 +347,7 @@ function statusForms(quote, now, scrubT, calendars, overnight) {
   return names.map(function(name) { return name + note }).concat(note ? [sentence(note.slice(" · ".length))] : [])
 }
 
-// The day `t` falls on where `quote` trades, said before its clock when it
-// isn't the day of `now` there: its weekday within the week ("Sun "), else
-// its date ("6 Oct "), never a weekday that would read as this week's.
-// The day by the clock `printClock` reads.
+// By the clock `printClock` reads.
 function printDay(quote, t, now, calendars) {
   var day = function(at) {
     var cal = clockCalendar(quote, at, calendars)
@@ -406,11 +364,8 @@ function sentence(words) {
   return words.charAt(0).toUpperCase() + words.slice(1)
 }
 
-// An index has no pre-market of its own, and Yahoo's periods for it stay
-// the last session's until it opens (the S&P 500's until 09:30:12 on Friday
-// 23 October), so its own bell has nothing to count to: through its
-// calendar's pre-market on a trading day it counts to the open, as the
-// stocks beside it do.
+// Yahoo's periods for an index stay the last session's until it opens, so
+// through its calendar's pre-market it counts to the calendar's open.
 function indexBell(quote, cal, now) {
   if (quote.instrumentType !== "INDEX" || !cal || !cal.pre) return null
   var date = dateStringOf(localDate(now, cal))
@@ -419,10 +374,6 @@ function indexBell(quote, cal, now) {
   return { seconds: segs[0].start - now, bell: "open" }
 }
 
-// Whether a quote's own market is in its regular session now: Yahoo's
-// periods, or, for a quote held from an earlier day, the calendar's, which
-// the periods cannot know; less a published closure and a break between
-// segments (Tokyo's lunch). Never a cryptocurrency, which has none.
 function inRegularSession(quote, now, calendars) {
   return regularNow(quote, now, calendarNow(calendarFor(calendars, quote), now))
 }
@@ -433,13 +384,8 @@ function regularNow(quote, now, calNow) {
   return isTrading(sessionPhase(quote, now)) || calNow.segment
 }
 
-// The bell a quote's market rings as the clock moves on from `before` to
-// `now`: "open" where its regular session begins between them, "close"
-// where it ends, else "". A break between segments (Tokyo's lunch) rings
-// neither, so each rings once a day; a closure, a weekend, and a
-// cryptocurrency never enter a session, so ring nothing. A step of the
-// clock longer than 90 seconds, Stonks starting after the bell or the
-// machine waking from sleep, rings nothing: a bell is never late.
+// A step over 90 s is Stonks starting or the machine waking: a bell is
+// never late.
 function bellBetween(quote, before, now, calendars) {
   if (!quote || now <= before || now - before > 90) return ""
   var cal = calendarFor(calendars, quote)
@@ -451,13 +397,8 @@ function bellBetween(quote, before, now, calendars) {
   return was === is ? "" : is ? "open" : "close"
 }
 
-// Whether a quote's own market is in its pre-market or after hours now:
-// Yahoo's periods; or, for a quote held from an earlier day, whose periods,
-// its bars' and its current ones, don't describe today, the listing's own
-// extended hours, as long as its periods have them before and after its
-// regular session (an index's have none), around today's segments in its
-// calendar, so an early close's after hours ends as early; less a
-// published closure.
+// A quote whose periods don't describe today takes their extended hours'
+// lengths around today's segments.
 function inExtendedHours(quote, now, calendars) {
   if (!quote || quote.crypto || calendarQuiet(calendars, quote, now)) return false
   var phase = sessionPhase(quote, now)
@@ -509,20 +450,11 @@ function tradingDays() {
   }
 }
 
-// The second a listing's market next trades, pre-market included, while its
-// quote, last answered at `receivedAt`, can't change before then: the answer
-// came SETTLED after the session it describes had ended, outside its
-// calendar's trading hours that day (`dayOf`, from `tradingDays`; SETTLED
-// past their end), and its market hasn't opened since. Asking sooner brings
-// back the same price. The next trading is the earlier of its calendar's
-// next open (the pre-market's, where the calendar has one) and Yahoo's
-// period to come; 0 while it may still change, or nothing says when it
-// trades next. A quote can describe an earlier session than the one trading
-// as it is answered (an index's stays the last session's until its open),
-// so the calendar has the last word, and so does a period of Yahoo's under
-// way as it was answered (London's pre-market, which its calendar doesn't
-// hold). Never a
-// cryptocurrency's, which always trades.
+// A quote can't change before its market next trades once its answer came
+// SETTLED after its session and outside its calendar's hours. Both the
+// calendar and Yahoo's current period can say it trades: an index's periods
+// stay the last session's until its open, and London's pre-market is
+// Yahoo's alone.
 function quietUntil(quote, receivedAt, now, cal, dayOf) {
   if (!quote || quote.crypto || !receivedAt) return 0
   var s = quote.session
@@ -541,22 +473,11 @@ function quietUntil(quote, receivedAt, now, cal, dayOf) {
   return next > now ? next : 0
 }
 
-// Whether a listing's day answer is asked for two days (`Quote.chartUrl`):
-// one with no quote yet, whose market and hour aren't known; a
-// cryptocurrency's always, for its last 24 hours (`Quote.coinDay`); on a
-// trading day of a calendar with a pre-market, from the pre-market's open
-// until the session opens, and on to the post-market's close while the
-// quote holds no print of the day; and on any other, from the session's
-// open, by its calendar or else Yahoo's current period (Sydney's), until
-// the quote holds a print of it. Yahoo's day answer for a stock turns to
-// the coming day with its pre-market (AAPL's at 06:22 on Friday 23 October
-// held Friday from 04:00 and nothing of Thursday; CVR's at 09:35 on Monday
-// 26 October held nothing, its first trade 13:10's), and London's and
-// Tokyo's at their open, its first bar a quarter of an hour behind
-// (SHEL.L's at 04:05 New York on Monday 26 October held nothing), while
-// the 1D chart shows the last day until the new one has a print
-// (`Quote.tailDay`). Never an index's, whose answer stays the last
-// session's until its open.
+// Yahoo's day answer for a stock turns to the coming day with its
+// pre-market, and London's and Tokyo's with their open, whose first bar
+// comes about 15 minutes late. Two days keep the last session in the answer
+// until the new one has a print. An index's answer stays the last session's
+// until its open.
 function twoDays(quote, now, calendars) {
   if (!quote) return true
   if (quote.crypto) return true
@@ -574,25 +495,13 @@ function twoDays(quote, now, calendars) {
   return !!open && now >= open.start && now < open.end && !printedSince(open.start)
 }
 
-// A quote with the close a listing's day counts from where Yahoo hasn't
-// caught up with it yet. At Tokyo's open on Monday 2 November, for six
-// minutes after Toyota's first trades every answer but the two-day chart
-// still counted Monday from Thursday's close, 3,077, though Friday had
-// closed at 3,070, as the quote Stonks held said. So each quote carries the
-// last close Stonks saw for the listing (`closeSeen`, { day, close, before }:
-// its session's start, that close, and the close Yahoo counted that
-// session from), from the quote before it (`previous`), or from that quote
-// itself once it is its session's close (`sessionClose`); it is saved with
-// the quote, so a restart keeps it. A quote of the next weekday's session,
-// once that session has traded, that still counts from `before` counts
-// from `close`, the close Yahoo itself sent. A split or a dividend that
-// moves the base moves Yahoo's previous close off `before`, and Yahoo's
-// stands; so does it after a holiday, which no weekday rule can see. A
-// listing on a calendar with a pre-market keeps Yahoo's, as an index and
-// a coin do: a US stock's day turns at 04:00, hours before its first trade.
-// A shell that starts in those minutes holds no close to carry, and shows
-// Yahoo's until Yahoo corrects it. Seen in Tokyo only: London's and
-// Sydney's opens aren't captured yet.
+// For minutes after an open, Yahoo's answers, all but a two-day chart, can
+// still count the day from the close before last. So each quote carries the
+// last close Stonks saw (`closeSeen`, saved with it), and a traded session on
+// the next weekday still counting from that close's own base counts from
+// that close. A split, a dividend or a holiday moves Yahoo's base, and Yahoo's
+// stands. A US stock's day turns at 04:00, hours before its first trade: a
+// calendar with a pre-market keeps Yahoo's.
 function carryClose(previous, quote, calendars) {
   if (!quote || quote.crypto || quote.instrumentType === "INDEX" || !quote.session.regular) return quote
   var cal = calendarFor(calendars, quote)
@@ -625,18 +534,10 @@ function nextWeekday(quote, from, to) {
   return day(to) - day(from) === (weekday === 5 ? 3 : weekday === 6 ? 2 : 1)
 }
 
-// How long after a session opens its first price may still be on its way,
-// and how often a quote still waiting on it is asked for meanwhile: Yahoo
-// answered with the last session's quote until 09:30:09 for the S&P 500
-// and 09:30:12 for AAPL on Friday 23 October.
+// Yahoo can answer with the last session's quote for seconds after the open.
 var OPENING_WAIT = 60
 var OPENING_ASK = 15
 
-// Whether `quote`'s regular session opened under OPENING_WAIT ago at `now`
-// and its headline is still from before it: the session's first price is
-// on its way. Answers asked at 09:30:00 can still bring back the last
-// session's; without this, every US row would say "As of Thu 16:00" until
-// the next ask, a minute on.
 function awaitingOpen(quote, now) {
   if (!quote || quote.crypto) return false
   var reg = clockSession(quote, now).regular
@@ -644,15 +545,8 @@ function awaitingOpen(quote, now) {
   return !!reg && !!head && head.t !== null && head.t < reg.start && now >= reg.start && now < reg.start + OPENING_WAIT
 }
 
-// How often a symbol's quote is asked for, in seconds, by its own market
-// now and never by the rest of the list: the refresh interval while it
-// trades (always, for a cryptocurrency), and every OPENING_ASK seconds at
-// most while its session's first price is on its way (`awaitingOpen`); in
-// pre-market and after hours, when only the dim tail of its day can move,
-// every 5 minutes unless it is the hero of an open surface; and every 15
-// minutes while its market is closed, for a night, a weekend, a holiday, or
-// a break. A symbol with no quote is asked again on the slow clock too. By
-// its calendar's reading at `now` (`calendarNow`).
+// Outside the session only the day's dim tail can move, so only a hero
+// keeps the interval.
 function quoteCadence(quote, now, interval, hero, calNow) {
   if (!quote) return 15 * 60
   if (quote.crypto || regularNow(quote, now, calNow)) return awaitingOpen(quote, now) ? Math.min(OPENING_ASK, interval) : interval
