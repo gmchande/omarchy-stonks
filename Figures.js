@@ -353,6 +353,7 @@ function newestNote(quote, newest, now, calendars) {
   return (newest.phase === "overnight" ? "Overnight" : newest.phase === "post" ? "After hours" : "Pre-market") + " " + time
 }
 
+// A row says it after the name.
 function newestTime(quote, newest, now, calendars) {
   return Market.printDay(quote, newest.t, now, calendars) + Market.printClock(quote, newest.t, calendars)
 }

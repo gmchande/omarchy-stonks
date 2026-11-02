@@ -808,6 +808,8 @@ test("the rule under the list name counts up, flat, and down as the rows' tones 
   }
   expect(M.listBreadth(symbols, quotes, 0, "pct")).toEqual({ up: 1, flat: 1, down: 1, none: 1 })
   expect(M.listBreadth(symbols, quotes, 0, "open")).toEqual({ up: 2, flat: 0, down: 1, none: 1 })
+  // A row whose quote has no close to count from yet counts as none, not flat.
+  expect(M.listBreadth(["NEW"], { NEW: q("NEW", null, null, 50) }, 0, "pct")).toEqual({ up: 0, flat: 0, down: 0, none: 1 })
 })
 
 // What ends the undo on offer: a data file, hand-edited or another
@@ -1123,6 +1125,9 @@ test("a session's one bar says nothing until its day is over", () => {
     points: [{ t: bell, p: 100 }] }
   expect(["09:33", "09:35", "15:59"].map(c => M.dayNote(day, at("2026-10-20", c), calendars))).toEqual(["", "", ""])
   expect(M.dayNote(day, at("2026-10-20", "16:00"), calendars)).toBe("Traded only at 09:30")
+  // A reader on another clock is told the bar's zone.
+  process.env.TZ = "Europe/London"
+  try { expect(M.dayNote(day, at("2026-10-20", "16:00"), calendars)).toBe("Traded only at 09:30 EDT") } finally { process.env.TZ = "America/New_York" }
 })
 
 test("Robinhood's word on all-day trading is asked once, again a day on, or five minutes after a failure", () => {

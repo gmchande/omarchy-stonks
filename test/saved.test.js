@@ -68,6 +68,8 @@ test("the listing line names a pair's currency once, and pence as pence", () => 
   expect(london.currency).toBe("GBp")
   expect(M.listingMeta(london)).toBe("LSE · PENCE")
   expect(M.currencyLabel("GBp")).toBe("PENCE")
+  // Its price stays in pence, never turned into pounds.
+  expect(M.rowModel(london, 0, "pct").priceText).toBe("3,589.00")
 })
 
 test("a listing Yahoo names no currency for says its exchange alone, never USD", () => {
@@ -879,6 +881,8 @@ test("the day line is 1D, or its figures' weekday when they are not today's: its
   // Six days on, the weekday still names one day of the week before; a
   // week on it would read as today's, so the month stands in.
   expect([dayLineAt(nest, at("2026-09-17", "12:00")).title, dayLineAt(nest, at("2026-09-18", "12:00")).title]).toEqual(["FRI", "SEP"])
+  // VOL's slot is as wide as 999.9M, whatever the day's volume.
+  expect(dayLineAt(quote, at("2026-09-01", "17:30")).facts[1].widest).toBe("888.8M")
   // A listing untraded on its answer's day keeps its last trading day's
   // figures, and says that day: CVR at 23:09 on Friday 16 October answered
   // with Friday's session and Wednesday's figures, its quote stamped
@@ -995,6 +999,10 @@ test("the 52-week line moves the cap with the price, and divides the price by th
   expect(read("shel-l")).toBe("MKT CAP GBP 223.5B · P/E 11.9")
   expect(listing("ore-ax").pair).toBe("USDAUD")
   expect(read("ore-ax")).toBe("MKT CAP AUD 279.7B · P/E 20.1")
+  // Before its cap comes, a slot is as wide as its currency in capitals and 999.9B, the P/E's as 99.9.
+  expect(M.yearLine(listing("shel-l").q, null, null, rates).facts.map(f => f.widest)).toEqual(["GBP 888.8B", "88.8"])
+  // A cap whose currency Yahoo doesn't name says none.
+  expect(facts(listing("pier").q, { ...listing("pier").f, cap: { ...listing("pier").f.cap, currency: null } })).toBe("MKT CAP 1.1B · P/E 15.5")
   // Without its pair's rate, or after the rate failed, a P/E is left out,
   // never shown in the wrong currency; the cap still shows. A rate answer
   // for another pair is no rate.
@@ -1951,6 +1959,12 @@ test("in every phase, a stock that has traded since its close shows that newest 
     const untimed = { ...at.quotes.NBIS, symbol: "UNTIMED", marketTime: undefined }
     expect(M.rowsDay(at.symbols.concat("UNTIMED"), { ...at.quotes, UNTIMED: untimed }, at.newest, at.now, calendars)).toBe("FRI")
   }
+  // Rows that measure tomorrow, from tonight's trades, say TODAY.
+  {
+    const at = topsAt("watch-2026-10-26-2005")
+    const tomorrow = Object.fromEntries(Object.entries(at.newest).map(([s, n]) => [s, { ...n, dayStart: n.dayStart + DAY, joined: false }]))
+    expect(M.rowsDay(Object.keys(tomorrow), at.quotes, tomorrow, at.now, calendars)).toBe("TODAY")
+  }
   // Monday 20:05 the low, high, open and volume under the chart are
   // today's; past midnight they are Monday's, and say so.
   for (const [set, title] of [["watch-2026-10-26-2005", "1D"], ["watch-2026-10-27-0350", "MON"]]) {
@@ -1982,6 +1996,9 @@ test("in every phase, a stock that has traded since its close shows that newest 
     expect(M.newestCaptions(at.quotes.NBIS, open.newest, at.now, calendars, open.periodLabel))
       .toEqual(["SINCE OPEN · AFTER HOURS 17:58", "SINCE OPEN · AFTER HOURS 17:58", "SINCE OPEN"])
     expect(M.rowModel(at.quotes.NBIS, 0, "pct", at.newest.NBIS).periodLabel).toBe("")
+    // c makes the line under the price an amount; since the open it stays a percent.
+    expect(["abs", "open"].map(mode => M.closeLine(at.quotes.NBIS, M.exchangeDay(at.quotes.NBIS, at.now), mode, at.newest.NBIS).changeText))
+      .toEqual(["\u22125.47", "\u22123.45%"])
   }
   // Sunday 23:35, the list sorted by change and its up and down count read
   // the price on top: NBIS, −4.18% since Thursday's close, is the list's
@@ -1992,10 +2009,15 @@ test("in every phase, a stock that has traded since its close shows that newest 
   const breadth = M.listBreadth(sunday.symbols, sunday.quotes, 0, "pct", sunday.newest)
   const tones = sunday.symbols.map(s => M.rowModel(sunday.quotes[s], 0, "pct", sunday.newest[s] || null).tone)
   expect([breadth.up, breadth.down]).toEqual([tones.filter(t => t === "up").length, tones.filter(t => t === "down").length])
+  // Monday 04:20 JNJ's pre-market price, up on Friday's close though Friday fell, counts up.
+  const early = topsAt("watch-2026-10-26-0420")
+  expect(M.listBreadth(["JNJ"], early.quotes, 0, "pct", early.newest)).toEqual({ up: 1, flat: 0, down: 0, none: 0 })
   expect(M.sortedSymbols(sunday.symbols, sunday.quotes, "pct", false, "pct", null).at(-1)).not.toBe("NBIS")
   // A night's price dims once Robinhood has missed a bar.
   const nbis = sunday.newest.NBIS
   expect([M.newestStale(nbis, nbis.t + 20 * 60), M.newestStale(nbis, nbis.t + 20 * 60 + 1)]).toEqual([false, true])
+  // An after-hours price never dims.
+  expect(M.newestStale(sunday.newest.PSIX, sunday.newest.PSIX.t + DAY)).toBe(false)
   // The pill's hover names the close a night's move counts from, and an
   // after-hours trade's session; a row says the time after the name.
   expect(M.newestNote(sunday.quotes.NBIS, nbis, sunday.now, calendars)).toBe("Since Thu close · 23:30")
