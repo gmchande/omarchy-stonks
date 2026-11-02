@@ -392,9 +392,11 @@ Item {
     var nextAsked = Object.assign({}, asked)
     var nextTries = Object.assign({}, tries)
     var nextJudge = toJudge.slice()
-    var show = function(symbol, quote) {
-      var dropped = Quote.bucketTimes(quote.droppedTimes)
+    var show = function(symbol, answered) {
       var previous = quotes[symbol]
+      // The close Yahoo hasn't caught up with yet, from the quote before.
+      var quote = Market.carryClose(previous, answered, calendars)
+      var dropped = Quote.bucketTimes(quote.droppedTimes)
       var previousDropped = Quote.bucketTimes(previous ? previous.droppedTimes : null)
       if (dropped && dropped !== previousDropped && !quote.closesOnly)
         console.warn("stonks: " + symbol + " dropped stray buckets " + dropped)

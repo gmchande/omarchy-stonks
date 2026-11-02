@@ -144,6 +144,13 @@ every_state() (
     watch-2026-10-26-0420-shel.l coin-2026-10-25-2005-btc-usd watch-2026-10-26-1800-cvr; do
     states="$states popup-sweep-$moment-smooth popup-sweep-$moment-retro"
   done
+  # Toyota at Tokyo's open on Monday 2 November: Friday's move before the
+  # open and before Monday's first bar, never 0.00%, then Monday's trades
+  # from Friday's close. 19:15 and 19:20, which read right only from the
+  # close a running shell held, are in test/saved.test.js.
+  for moment in tokyo-2026-11-01-1855 tokyo-2026-11-01-1903 tokyo-2026-11-01-1921; do
+    states="$states popup-sweep-$moment-7203.t-smooth popup-sweep-$moment-7203.t-retro"
+  done
   # 1D at night, the owner's complaints kept in sight: Thursday 29 October
   # at 21:55, Nebius's day with tonight bright at its end and the close it
   # counts from named, at text size 16 too; J&J's thin night; Power
