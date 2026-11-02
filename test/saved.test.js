@@ -1331,6 +1331,9 @@ test("historyGeometry uses uniform bar spacing and retains bar facts", () => {
   expect(geometry.baselineY).toBeLessThan(1)
   expect(geometry.start).toBe(1757683800)
   expect(geometry.end).toBe(1789133400)
+  // A start above every close still sits on the chart.
+  const above = M.historyGeometry({ range: "1M", baseline: 120, bars: [{ t: 1, c: 100 }, { t: 2, c: 110 }] })
+  expect(above.baselineY > 0 && above.baselineY < 1).toBe(true)
 })
 
 test("5Y and longer draw on a log scale; shorter ranges stay linear", () => {
@@ -1664,6 +1667,8 @@ test("on a morning Yahoo left an hour empty, Robinhood is asked once more for th
     .toEqual([null, null, null, { tradability: [], prints: ["NBIS"] }])
   // One Robinhood trades only by day is never asked.
   expect(asks("09:35", { allDay: { ...allDay, NBIS: { status: "ok", allDay: false, at: asked } } })).toBe(null)
+  // Nor one not yet known to trade all day.
+  expect(asks("09:35", { allDay: {} })).toEqual({ tradability: ["NBIS"], prints: [] })
   // NBIS previewed outside All, whose only listing trades abroad: its own
   // quote tells of the hour, and it is asked.
   expect(asks("09:35", { open: true, library: ["SHEL.L"], overnightSymbols: [], preview: "NBIS", previewShown: true, previewQuote: quotes.NBIS }))
@@ -2045,6 +2050,9 @@ test("in every phase, a stock that has traded since its close shows that newest 
       expect([where, M.newestCaptions(at.quotes.NBIS, model.newest, at.now, calendars, model.periodLabel)[0]]).toEqual([where, `${range} · ${when}`])
       expect([where, model.changeText]).toEqual([where, M.pct((at.newest.NBIS.p - raw.baseline) / raw.baseline * 100)])
       expect([where, M.historyRowModel(history, at.quotes.NBIS, at.newest.NBIS.t).priceText]).toEqual([where, top.priceText])
+      // The range line marks the newest price's place, and a scrub names it by its day and time.
+      expect([where, M.rangeLine(history, M.rangeEnds(history), at.quotes.NBIS).range.price]).toEqual([where, at.newest.NBIS.p])
+      expect([where, M.historyScrubForms(history, history.bars.at(-1))[1].endsWith(when.slice(-5))]).toEqual([where, true])
       expect([where, M.rangeVolume(history)]).toEqual([where, M.rangeVolume(raw)])
     }
   }

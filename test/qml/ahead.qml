@@ -167,6 +167,18 @@ Harness {
       quiet()
       check("with under half of Yahoo's budget left only the hero's chart goes; the rows' go once it is back",
         underHalf === "BTC-USD" && afterRefill, underHalf + " | then " + harness.histories(from).join(","))
+      // Just over half left, a run fetched ahead takes only what keeps half.
+      gate.tokens = gate.capacity / 2 + 3
+      runsFrom = harness.runs().length
+      body.selectRange("All")
+      var allRuns = function() { return harness.runs().slice(runsFrom).filter(function(r) { return /^history:/.test(r) }) }
+      within(5000, function() { return allRuns().length > 1 })
+      var cutRun = allRuns()
+      gate.tokens = gate.capacity
+      within(8000, function() { return ok("7203.T", "All") })
+      quiet()
+      check("with just over half of Yahoo's budget left, a run fetched ahead takes only what keeps half",
+        cutRun.length > 1 && cutRun[1].split(" ").length < rows.length, cutRun.join(" / "))
       gate.pause = "none"
       gate.pausedUntil = gate.now() + 600
       from = harness.requestCount()
