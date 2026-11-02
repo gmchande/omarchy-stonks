@@ -902,7 +902,7 @@ test("the key sheet lists exactly the README's keys for each surface, the row's 
 
 test("a letter says its key and Shift, never its text's case, and nothing held with Ctrl or Alt", () => {
   const { typed } = load("KeyText.js")
-  const SHIFT = 0x02000000, CTRL = 0x04000000, ALT = 0x08000000, KEYPAD = 0x20000000
+  const SHIFT = 0x02000000, CTRL = 0x04000000, ALT = 0x08000000, META = 0x10000000, KEYPAD = 0x20000000
   // Caps Lock sends "O" with no Shift, and "o" with it.
   expect(["o", "l", "m"].map(l => typed({ key: l.toUpperCase().charCodeAt(0), modifiers: 0, text: l.toUpperCase() })))
     .toEqual(["o", "l", "m"])
@@ -911,6 +911,7 @@ test("a letter says its key and Shift, never its text's case, and nothing held w
   expect(typed({ key: 80, modifiers: 0, text: "p" })).toBe("p")
   expect(typed({ key: 80, modifiers: CTRL, text: "\u0010" })).toBe("")
   expect(typed({ key: 80, modifiers: ALT, text: "p" })).toBe("")
+  expect(typed({ key: 80, modifiers: META, text: "p" })).toBe("")
   expect(typed({ key: 63, modifiers: SHIFT, text: "?" })).toBe("?")
 })
 
