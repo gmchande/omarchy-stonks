@@ -296,7 +296,8 @@ async function runOne(tree, t, index, settled) {
   const results = []
   const text = existsSync(report) ? readFileSync(report, "utf8") : ""
   for (const m of text.matchAll(/<testcase name="([^"]*)"[^>]*? line="(\d+)"[^>]*?(\/>|>([\s\S]*?)<\/testcase>)/g)) {
-    results.push({ line: Number(m[2]), pass: m[3] === "/>" || !/<(failure|error)\b/.test(m[4] || ""), name: xml(m[1]) })
+    const body = m[4] || ""
+    results.push({ line: Number(m[2]), pass: !/<(failure|error)\b/.test(body), skip: /<skipped\b/.test(body), name: xml(m[1]) })
   }
   return { code, results }
 }
@@ -324,7 +325,7 @@ if (!here) {
 const outcomes = await runAll(here, due, (t, results) =>
   t.cases.every(checks => results.some(r => !r.pass && inCase(checks, r))))
 let skipped = 0
-const passing = []
+const passing = [], unverified = []
 due.forEach((t, index) => {
   const { code, results } = outcomes[index]
   if (code === 77) {
@@ -334,27 +335,38 @@ due.forEach((t, index) => {
   }
   for (const checks of t.cases) {
     const own = results.filter(r => inCase(checks, r))
-    // One that never ran there fails only where the run did.
-    if (own.length ? own.every(r => r.pass) : code === 0) passing.push({ t, start: checks[0].start, names: [...new Set(own.map(r => r.name))] })
+    const found = { t, start: checks[0].start, names: [...new Set(own.map(r => r.name))], skip: own.some(r => r.skip) }
+    // One that never ran there passes when the run did, and is unknown
+    // when the run failed before it, as a file that can't load does.
+    if (own.length ? own.every(r => r.pass) : code === 0) passing.push(found)
+    else if (!own.length) unverified.push(found)
   }
 })
 
 // A case that passes on the code before may only be one the change made
 // change: its form in the base's tests, by its name, fails on this
-// checkout's code.
+// checkout's code. A skipped case tests no code, so it never is.
 const adapted = new Set()
-const recheck = [...new Set(passing.map(p => p.t))]
+const recheck = [...new Set(passing.filter(p => !p.skip).map(p => p.t))]
 const old = recheck.length ? tree("base") : null
 if (old) {
   const after = await runAll(old, recheck, (t, results) =>
-    passing.filter(p => p.t === t).every(p => results.some(r => !r.pass && p.names.includes(r.name))))
-  for (const p of passing) {
+    passing.filter(p => p.t === t && !p.skip).every(p => results.some(r => !r.pass && p.names.includes(r.name))))
+  for (const p of passing.filter(p => !p.skip)) {
     const failedAfter = after[recheck.indexOf(p.t)].results.filter(r => !r.pass).map(r => r.name)
     if (p.names.some(name => failedAfter.includes(name))) adapted.add(p)
   }
 }
+for (const p of unverified) {
+  console.log(`unknown: the case at ${p.t.path}:${p.start} never ran on ${baseName}'s code, whose run failed before it, so it may pass there too`)
+}
 for (const p of passing) {
-  const where = p.names.length ? `"${p.names[0]}" (${p.t.path}:${p.start}) passes` : `the case at ${p.t.path}:${p.start} never runs, and nothing fails,`
+  if (p.skip) {
+    console.log(`FAILED before the change: "${p.names[0]}" (${p.t.path}:${p.start}) is skipped, so it fails on no code. Let it run, and see it fail on ${baseName}'s code (${short}).`)
+    continue
+  }
+  const where = p.names.length ? `"${p.names[0]}" (${p.t.path}:${p.start}) passes`
+    : `the case at ${p.t.path}:${p.start} never runs, and nothing fails,`
   if (adapted.has(p)) {
     console.log(`${where} on ${baseName}'s code too, but its form on ${baseName} fails on this code: the change made it change`)
   } else {
@@ -365,6 +377,6 @@ for (const p of passing) {
 }
 const failed = passing.length - adapted.size
 if (failed) process.exit(1)
-const checked = total - skipped - adapted.size
+const checked = total - skipped - adapted.size - unverified.length
 if (checked) console.log(`${checked} changed test cases and harness steps each fail on ${baseName}'s code (${short})`)
 process.exit(skipped ? 77 : 0)
