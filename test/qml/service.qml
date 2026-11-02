@@ -24,6 +24,8 @@ Harness {
   readonly property var asking: ["SHOP.TO", "MAPLE.TO"]
   property int askingAt: 0
   property bool asked: false
+  property var slidBefore: null
+  property var entriesBefore: null
   property var msftBefore: null
   // Two surfaces on screen, as the service hears of them: the stock's, and
   // the one whose search previews.
@@ -368,6 +370,19 @@ Harness {
           finish()
           return
         }
+        // SLID asked again answers the same: no quote changes, so the saved
+        // quotes have nothing new to write.
+        harness.slidBefore = service.quotes.SLID
+        harness.entriesBefore = service.entries
+        service.quotesUnsaved = false
+        service.testFeed.ask(["SLID"], service.wallSecond(), true)
+        harness.go(51)
+      } else if (harness.step === 51) {
+        var again = service.entries !== harness.entriesBefore && !("SLID" in service.asked)
+        if (!again && harness.waited < 5000) return
+        check("an answer that changes no quote leaves the saved quotes as they are",
+          again && service.quotes.SLID === harness.slidBefore && !service.quotesUnsaved,
+          JSON.stringify({ answered: again, same: service.quotes.SLID === harness.slidBefore, unsaved: service.quotesUnsaved }))
         // SLID had a profit and a cap yesterday; its new series reports a
         // loss, and its close request fails.
         var yesterday = Object.assign({}, service.testFundamentalsFeed.entries)

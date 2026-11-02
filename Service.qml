@@ -138,9 +138,7 @@ Item {
   // as they are, and its chart once it can be drawn. The view itself while
   // there is none. A US stock or ETF outside All waits on Robinhood's
   // answers as one in All does (`askOvernight`), so the preview says what
-  // the stock added would. Found in the overnight QA of 23 October: NVDA's
-  // preview said CLOSED and drew Thursday, then OVERNIGHT with tonight's
-  // chart a second after ADD.
+  // the stock added would.
   readonly property var previewView: {
     var symbol = root.previewSymbol
     if (!symbol) return view
@@ -171,7 +169,7 @@ Item {
   // clock, to the millisecond, as true: freshness's grace for a quote
   // opened old. `askedMs` holds when each was asked; a timer ends each
   // grace as it runs out. Counted in the clock's whole seconds, the grace
-  // ended anywhere from 1 to 2 s on (the check of #69, 23 October).
+  // would end anywhere from 1 to 2 s on.
   property var asking: ({})
   property var askedMs: ({})
   function trackAsks() {
@@ -680,9 +678,8 @@ Item {
     }
     root.refreshRest()
   }
-  // Rows never draw Robinhood's prints, only a chart does: asked for every
-  // row Robinhood trades all day, `r` sent 150 listings, two answers of
-  // 4 MB each, at any hour.
+  // Rows never draw Robinhood's prints, only a chart does: for 150 rows
+  // they come to two answers of 4 MB each.
   function refreshRest() {
     var now = root.wallSecond()
     root.showHistory(true)
@@ -821,9 +818,8 @@ Item {
   }
   // Search's result for the preview, { symbol, exchange, instrumentType },
   // or null: a US stock or ETF by it is asked of Robinhood as its quote is
-  // asked of Yahoo, side by side (`askOvernight`). Found in the night's
-  // check of 23 October: waiting for the quote first made NVDA's preview
-  // 3 s later on a slow network.
+  // asked of Yahoo, side by side (`askOvernight`): one after the other is
+  // seconds slower on a slow network.
   property var previewResult: null
 
   // Another surface's search took the preview `surface` had.
@@ -1086,9 +1082,8 @@ Item {
   // Written once a quote has changed, at most every 10 minutes on the
   // service's clock: at once, then, if more changed meanwhile, as the wait
   // ends; and only once an answer has come, so quotes kept from an earlier
-  // session are never written back as they are. Marked by every answer, it
-  // was rewritten whole every 10 minutes around the clock, a weekend's
-  // unmoving prices too. It waits while a surface opens or a chart draws in,
+  // session are never written back as they are. It waits while a surface
+  // opens or a chart draws in,
   // and for the quote runs out and the asks for quotes as it falls due,
   // then goes on a later tick: on a long list it takes 20 ms of the shell's
   // thread, which among an open's prices would stall them. Only those
@@ -1294,8 +1289,7 @@ Item {
   // it, so nothing is fetched again and the chart does not change; with
   // none yet, it is the chart asked for, which each surface names while it
   // is on its way (`ChartMotion.loading`), as the preview did, until its
-  // answer lands and its row joins. Found in the slow walk of 1.0.2: the
-  // hero went back to the stock before the add, as if the add were done.
+  // answer lands and its row joins.
   // A first fetch the preview saw fail joins with that, the add done there,
   // its row saying so; one that fails later hands the hero back
   // (`heroTaken`).
@@ -1345,7 +1339,7 @@ Item {
 
   // The last removal, put back where it was. Only once. Its quote is asked
   // for at once, as an add's is, not at its next refresh on the schedule:
-  // the quote it had shows until the new one lands. The owner, 22 October.
+  // the quote it had shows until the new one lands.
   // It is watched again first (`askDue`), so a run landing before the
   // restore's own look at the schedule can't drop the ask as unwatched.
   function undoRemoval(symbol) {

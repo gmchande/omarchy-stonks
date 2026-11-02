@@ -7,9 +7,9 @@
 # tree's manifest.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 feed_tree service.qml Service.qml OwnerOnly.qml Gate.qml Updates.qml FetchRun.qml QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml AllDayFeed.qml OvernightFeed.qml ReleaseFeed.qml Asks.js Fetch.js Quote.js Format.js Market.js Overnight.js History.js Fundamentals.js Figures.js Chart.js Settings.js Release.js calendars.json manifest.json
-# The harness ages a fundamentals entry by a day, and counts the data file's
-# reads, so a check waits on its read-back.
-patch_copy Service.qml '/readonly property var fundamentals:/a\  readonly property alias testFundamentalsFeed: fundamentalsFeed\n  readonly property alias testDataFile: dataFile'
+# The harness ages a fundamentals entry by a day, asks a quote again, and
+# counts the data file's reads, so a check waits on its read-back.
+patch_copy Service.qml '/readonly property var fundamentals:/a\  readonly property alias testFundamentalsFeed: fundamentalsFeed\n  readonly property alias testFeed: feed\n  readonly property alias testDataFile: dataFile'
 # A second Service whose data file is a stand-in the harness steps through
 # (DataFileStandIn.qml): Quickshell's own read can't be held part-way.
 cp "$here/DataFileStandIn.qml" "$root/"
