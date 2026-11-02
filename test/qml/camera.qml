@@ -17,7 +17,7 @@ import "plugin" as Stonks
 // its symbol, range, and scrub, never the list. Then, with Omasnap absent
 // and present (camera.sh), the folder and editor each version of Omarchy
 // uses, under each version's settings. HOME and curl are scratch. With
-// STONKS_CAMERA_SIZES=1 (all.sh's runs at QT_SCALE_FACTOR=2 and 1.25) only
+// STONKS_CAMERA_SIZES=1 (all.sh's runs at QT_SCALE_FACTOR=2 and 1.75) only
 // the two shots whose picture could change with the scale are taken: the
 // panel's and the window's.
 Harness {
