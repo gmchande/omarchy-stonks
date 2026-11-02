@@ -94,6 +94,9 @@ jobs:
       - name: Source boundaries
         run: bash test/boundaries.sh
 
+      - name: Set-time waits in the harnesses
+        run: bash test/waits.sh
+
       - name: Quickshell crash handling self-check (stand-in)
         run: bash test/qml/crash-check.sh
 
