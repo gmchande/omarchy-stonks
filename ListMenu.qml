@@ -7,15 +7,8 @@ import qs.Commons as Commons
 import "Tones.js" as Tones
 import "KeyText.js" as KeyText
 
-// The list menu: All and each named list with its count, a check on the
-// current one, then "New list…", which turns into a name field in place, and
-// "Manage lists…". Those two stay in sight under the lists, which scroll in
-// whole rows when they outgrow the room, so no list shows cut in half.
-// Value-in, signals out; the body switches and creates. One cursor, as on
-// the rows: it opens on the current list, moving the pointer puts it on the
-// row under it, the arrows move it from there, Enter takes one, and Escape
-// or w backs out. It takes the rows' mark, the hover-cursor fill and
-// the bar; a click takes the row clicked.
+// The list menu: All and each named list, then "New list…" and "Manage
+// lists…", pinned under the lists.
 FocusScope {
   id: root
 
@@ -26,10 +19,8 @@ FocusScope {
   property color dim: Tones.dim(foreground, Commons.Color.background)
   property string fontFamily: Style.font.family
   property int maxHeight: 0
-  // Opaque whatever the theme's panel alpha, so the rows never show through.
+  // Opaque whatever the theme's panel alpha.
   property color background: Qt.rgba(Commons.Color.popups.background.r, Commons.Color.popups.background.g, Commons.Color.popups.background.b, 1)
-  // Why the typed name was refused, said under the field: while a name is
-  // typed the menu holds still.
   property string problem: ""
 
   property int cursor: 0
@@ -41,16 +32,12 @@ FocusScope {
   readonly property int inset: Style.space(4)
   readonly property int newIndex: choices.length
   readonly property int manageIndex: choices.length + 1
-  // The separator, "New list…" with its note, and "Manage lists…".
   readonly property int pinnedHeight: separatorHeight + itemHeight * 2 + (problem !== "" ? itemHeight : 0)
   readonly property int contentHeight: choices.length * itemHeight + pinnedHeight + inset * 2
-  // The lists in sight: as many whole rows as the room holds, one at least.
   readonly property int rowsShown: maxHeight > 0
     ? Math.max(1, Math.min(choices.length, Math.floor((maxHeight - pinnedHeight - inset * 2) / itemHeight)))
     : choices.length
 
-  // The least it shows: one list row and the pinned rows, a refusal's note
-  // included.
   readonly property int leastHeight: itemHeight + pinnedHeight + inset * 2
   signal chosen(string name)
   signal createRequested(string name)
@@ -60,14 +47,8 @@ FocusScope {
   width: Style.space(236)
   height: rowsShown * itemHeight + pinnedHeight + inset * 2
 
-  // True while the menu is open on an open surface. Turned on, it starts on
-  // the current list before its first frame and takes the keys a turn later
-  // if it is still on; turned off, however it closes, the surface's closing
-  // included, it gives the keys up, its name field's too, and keeps what it
-  // shows for the close fade.
   property bool active: false
-  // Off, it still shows, through the close fade, but takes no pointer or
-  // key: nothing acts or takes focus from a view that is closing.
+  // Shown through the close fade, but inert.
   enabled: active
   onActiveChanged: {
     if (active) {
@@ -98,10 +79,6 @@ FocusScope {
     showCursor()
   }
 
-  // A key takes the list over from the wheel: its motion stops, so it
-  // cannot carry the cursor on from where the key put it, and the lists
-  // land at once where they were settling, on a row's edge. "New list…" and
-  // "Manage lists…" are always in sight.
   function showCursor() {
     scroll.cancelFlick()
     var end = Math.max(0, scroll.contentHeight - scroll.height)
@@ -119,9 +96,7 @@ FocusScope {
     return index * itemHeight
   }
 
-  // A scroll by hand, the wheel's or the scrollbar's, comes to rest on a
-  // row's edge, so the lists in sight are whole rows. A list wholly in sight
-  // before stays so, the cursor's too.
+  // A scroll by hand comes to rest on a row's edge, so no list shows cut.
   function settleOnRow() {
     var end = Math.max(0, scroll.contentHeight - scroll.height)
     var target = Math.min(end, Math.round(scroll.contentY / itemHeight) * itemHeight)
@@ -136,14 +111,11 @@ FocusScope {
     property: "contentY"
     duration: 160
     easing.type: Easing.OutCubic
-    // The rows moved under a still pointer: the cursor takes the one now
-    // under it, as the wheel's own scroll does.
     onFinished: if (root.active && pointer.hovered) root.pointAt(pointer.scenePosition.x, pointer.scenePosition.y)
   }
 
-  // The scrollbar or the wheel moved the lists off the cursor: it comes to
-  // the nearest list wholly in sight, or, where none is whole, the list
-  // across the middle, so the next key acts on an entry that shows.
+  // After a scroll by hand: the nearest list wholly in sight, else the list
+  // across the middle.
   function keepCursorInSight() {
     if (naming || cursor >= newIndex) return
     var top = scroll.contentY
@@ -169,17 +141,13 @@ FocusScope {
     Qt.callLater(function() { if (root.active && root.naming) nameField.forceActiveFocus() })
   }
 
-  // A new list's name kept from a close that could not make it, as it was
-  // left: its typing, and why it was refused.
+  // Back after a close that couldn't make the new list.
   function resumeNaming(text, reason) {
     startNaming()
     nameField.text = text
     problem = reason
   }
 
-  // The cursor to the row the pointer moved onto, at (x, y) in the scene:
-  // the separator and the note under the field are no row. While a name is
-  // typed, the field keeps the cursor.
   function pointAt(x, y) {
     if (naming) return
     var pin = pinned.mapFromItem(null, x, y)
@@ -197,29 +165,25 @@ FocusScope {
     naming = false
     problem = ""
     nameField.text = ""
-    // The field gives up its focus, or the scope hands the keys straight
-    // back to it.
+    // The field drops its focus first, or the scope hands it straight back.
     nameField.focus = false
     if (root.active) root.forceActiveFocus()
   }
 
   Keys.onPressed: function(event) {
-    // While naming, the field has the keys; what it lets past goes nowhere.
     if (root.naming) { event.accepted = true; return }
-    // A letter by its key and Shift: Caps Lock sends "W" for w.
     var t = KeyText.typed(event)
     if (event.key === Qt.Key_Escape) { root.dismissed(); event.accepted = true }
     else if (event.key === Qt.Key_Down) { root.moveCursor(1); event.accepted = true }
     else if (event.key === Qt.Key_Up) { root.moveCursor(-1); event.accepted = true }
     else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { root.take(root.cursor); event.accepted = true }
     else if (t === "w") { root.dismissed(); event.accepted = true }
-    // Every other key stays with the menu, so nothing behind it acts.
+    // Nothing behind the menu acts.
     else event.accepted = true
   }
 
-  // The edge is drawn over the ground, not see-through: Qt draws a border in
-  // place of the fill, so a translucent one would show the rows' cursor bar
-  // under the menu's left edge.
+  // Qt draws a border in place of the fill, so a translucent edge would
+  // show the rows' cursor bar under it.
   Rectangle {
     anchors.fill: parent
     radius: root.retro ? 0 : Style.cornerRadius
@@ -230,7 +194,7 @@ FocusScope {
 
   RowPointer {
     id: pointer
-    // A view showing through its surface's close moves no cursor.
+    // Through the close fade, the pointer moves no cursor.
     onMoved: function(x, y) { if (root.active) root.pointAt(x, y) }
   }
 
@@ -246,29 +210,20 @@ FocusScope {
     contentHeight: column.implicitHeight
     clip: true
     boundsBehavior: Flickable.StopAtBounds
-    // While a name is typed the menu holds still, and its rows take no
-    // click: a click anywhere but the field and ⏎ MAKE goes to the body,
-    // which keeps the name as Enter does (`StonksBody`, off the menu).
+    // A Flickable that scrolls takes presses itself. Held still while
+    // naming, so a click on it reaches the body, which keeps the name.
     interactive: contentHeight > height && !root.naming
-    // The wheel scrolling the rows under a still pointer moves the cursor
-    // to the row now under it, and any scroll a hand makes, the scrollbar's
-    // included, keeps it in sight; a key's scroll (showCursor) is no
-    // movement.
+    // `moving` stays false for a key's scroll.
     onContentYChanged: {
       if (!root.active || !(moving || menuBar.pressed)) return
       if (moving && pointer.hovered) root.pointAt(pointer.scenePosition.x, pointer.scenePosition.y)
       root.keepCursorInSight()
     }
     onMovementEnded: root.settleOnRow()
-    // While more lists sit out of sight, as in the window at its smallest,
-    // the rows' scrollbar says so, at rest too, and the lists stop short of
-    // its gutter.
     Controls.ScrollBar.vertical: Controls.ScrollBar {
       id: menuBar
-      // Drawn while there is more, not only while used.
       policy: scroll.interactive ? Controls.ScrollBar.AlwaysOn : Controls.ScrollBar.AlwaysOff
       visible: scroll.interactive
-      // At least 24 px long, so a long view's thumb is there to see and grab.
       minimumSize: Math.min(1, Style.space(24) / Math.max(1, availableHeight))
       onPressedChanged: if (!pressed) root.settleOnRow()
     }
@@ -278,8 +233,7 @@ FocusScope {
       width: scroll.width - (scroll.interactive ? Style.space(8) : 0)
 
       Repeater {
-        // A row for each list, by count: a change to the lists rebinds the
-        // rows rather than building them all again, shut menu or open.
+        // By count: a change to the lists rebinds the rows, not rebuilds them.
         model: root.choices.length
 
         Item {
@@ -425,7 +379,6 @@ FocusScope {
         anchors.bottom: parent.bottom
         visible: root.naming
         verticalPadding: 0
-        // The typed name starts where "New list…" and the lists' names do.
         leftPadding: Style.space(24)
         retro: root.retro
         foreground: root.foreground
@@ -440,7 +393,6 @@ FocusScope {
         }
       }
 
-      // Enter, as a button.
       ListAction {
         id: makeButton
         objectName: "makeList"
