@@ -639,6 +639,12 @@ test("the data file reads as written and repairs hand edits", () => {
     lists: [{ name: "Yen", symbols: ["MSFT"], order: "abs" }] })
   expect([byAmount.order, byAmount.reversed]).toEqual(["pct", true])
   expect(byAmount.lists).toEqual([{ name: "Yen", symbols: ["MSFT"], order: "pct", reversed: false }])
+  // Before the data file, the bar entry held the settings: they move over
+  // without the pill's own keys, and an entry with no symbols moves none.
+  const fromBar = entry => M.settingsFromBar({ bar: { layout: { right: [{ id: "grvc.stonks", ...entry }] } } })
+  const moved = fromBar({ symbols: ["nvda", "spy"], order: "name", barStyle: "icon" })
+  expect([moved.symbols, moved.order, "barStyle" in moved]).toEqual([["NVDA", "SPY"], "name", false])
+  expect(fromBar({ barStyle: "icon" })).toBeNull()
 })
 
 // Each data file a release wrote (test/data-files/VERSION.json; data-files.sh
@@ -765,6 +771,7 @@ test("a list's name is refused empty, as All, or taken in any case or padding; a
   expect([M.renameProblem(s, "Growth", "my watchlist"), M.renameProblem(s, "Growth", "GROWTH")]).toEqual(["my watchlist already exists", ""])
   const renamed = M.withListRenamed(library({ list: "Growth" }), "Growth", "GROWTH")
   expect([renamed.list, renamed.lists.map(list => list.name)]).toEqual(["GROWTH", ["My Watchlist", "GROWTH"]])
+  expect(M.withListRenamed(library({ list: "Growth" }), "Growth", "Wins").list).toBe("Wins")
 })
 
 test("All can't be renamed, moved, or deleted, a list moves only between the named lists, and deleting one leaves the rest as they were", () => {
@@ -817,6 +824,8 @@ test("only a change to what the lists hold ends the undo", () => {
   const s = library()
   expect(M.listsHeld(Object.assign({}, s, { range: "1Y", featured: "SPY", order: "symbol", list: "Growth" }))).toBe(M.listsHeld(s))
   expect(M.listsHeld(Object.assign({}, s, { lists: s.lists.concat([{ name: "Made elsewhere", symbols: [] }]) }))).not.toBe(M.listsHeld(s))
+  const growth = library({ list: "Growth" })
+  expect(M.listsHeld(M.withListOrder(growth, "symbol"))).toBe(M.listsHeld(growth))
 })
 
 test("sorting ranks the rows as a view over the manual list", () => {
