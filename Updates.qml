@@ -2,34 +2,19 @@ import QtQuick
 import Quickshell.Io
 import "Release.js" as Release
 
-// The plugin's own version. `omarchy plugin update` moves the plugin's files
-// under a service the shell keeps loaded, which runs the code it started with
-// until the shell restarts. The manifest is read as the service starts, as
-// it changes, and again as a surface opens (`check`), where the notice
-// shows, so no missed file event can hide it; a read that catches it half
-// written goes again shortly (`takeManifest`). While it names a version
-// other than the running one, a downgrade too, `newVersion` names it, and
-// `restart()` restarts the shell. While main names a newer one than the
-// running one (`mainVersion`, the service's, from GitHub),
-// `releasedVersion` names it, which every surface offers until it's on
-// disk, and `update()` runs the update in a terminal, where Omarchy shows
-// what changes and asks, then restarts the shell once it has moved the
-// files, unless a restart would lose changes. An update run anywhere else
-// leaves the restart to the notice.
+// `omarchy plugin update` moves the plugin's files, but the shell runs the
+// code it started with until it restarts. The manifest is read again as a
+// surface opens, so a missed file event can't hide the restart notice.
 Item {
   id: root
 
-  // The version this code is, as the manifest said when it was first read;
-  // "" until a manifest naming one has been.
+  // The manifest's version when first read: the code running.
   property string runningVersion: ""
-  // The manifest's version when it is not the running one; "" otherwise.
   property string newVersion: ""
-  // The version on main, "" until GitHub has named one.
   property string mainVersion: ""
   readonly property string releasedVersion: Release.isNewer(mainVersion, runningVersion) ? mainVersion : ""
 
-  // A read asked for, by a surface opening or the file changing: its own
-  // few reads again, whatever an earlier one used.
+  // A fresh set of tries, whatever an earlier read used.
   function check() {
     reread.tries = 0
     readManifest()
@@ -40,10 +25,8 @@ Item {
     takeManifest(manifest.text())
   }
 
-  // A manifest that is missing or doesn't parse, half written by git, or
-  // that names no version changes nothing, and is read again shortly, a few
-  // times: the write it caught can end in the moment the shell's watch on
-  // the file is being set up again, and send no event of its own.
+  // Git's write can end while the shell sets its watch up again, sending no
+  // event, so a manifest caught missing or cut off is read again shortly.
   function takeManifest(text) {
     var version = ""
     try { version = String(JSON.parse(text).version || "") } catch (e) {}
@@ -59,21 +42,16 @@ Item {
   }
 
   // Detached, so it outlives the shell it stops. While the session is
-  // locked the command refuses, and the notice stays for a later click.
+  // locked, Omarchy refuses the restart.
   function restart() {
     restartShell.startDetached()
   }
 
-  // Detached, so the terminal stays whatever the shell does meanwhile, and
-  // so Stonks can't wait on it: with `restart`, the terminal's own shell
-  // restarts the shell, only when the update exits 0 with the clone's HEAD
-  // moved. A no, an "up to date", a failed fetch and a rolled-back
+  // Detached, so the terminal outlives a restart. Omarchy shows what changes
+  // and asks. A no, "up to date", a failed fetch and a rolled-back
   // validation leave HEAD where it was or exit 1, and Omarchy has rescanned
   // the plugins by its exit. The launcher joins its arguments into a
-  // `bash -c` script, so the last one is shell. While the session is locked
-  // the restart refuses there. Without `restart`, for changes a restart
-  // would lose, the update runs alone. Either way the notice stays for a
-  // later click.
+  // `bash -c` script, so the last one is shell code.
   function update(restart) {
     if (restart) updateAndRestart.startDetached()
     else updatePlugin.startDetached()
@@ -81,9 +59,7 @@ Item {
 
   Component.onCompleted: takeManifest(manifest.text())
 
-  // Read when asked, and whole: `text()` waits for the read. Read again as
-  // it changes, so an update run from a surface that stays open, the
-  // window, says the restart's notice there at once.
+  // `text()` waits for the whole file.
   FileView {
     id: manifest
     path: Qt.resolvedUrl("manifest.json")
