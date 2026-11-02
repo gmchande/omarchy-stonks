@@ -157,6 +157,13 @@ every_state() (
   for symbol in nbis be fig shop; do
     states="$states popup-sweep-gap-2026-11-01-2148-$symbol-smooth popup-sweep-gap-2026-11-01-2148-$symbol-retro"
   done
+  # Monday 2 November at 09:41, when Yahoo sent no bar from 08:30 to 09:29:
+  # Robinhood's trades fill the hour on each line, CRWV's and NBIS's every
+  # slot of it, SHOP's 8 of the 13 slots from its last bar, at 08:20, to
+  # 09:25.
+  for symbol in nbis crwv shop; do
+    states="$states popup-sweep-open-2026-11-02-0941-$symbol-smooth popup-sweep-open-2026-11-02-0941-$symbol-retro"
+  done
   # 1D at night, the owner's complaints kept in sight: Thursday 29 October
   # at 21:55, Nebius's day with tonight bright at its end and the close it
   # counts from named, at text size 16 too; J&J's thin night; Power
