@@ -4,30 +4,19 @@ import "History.js" as History
 import "Quote.js" as Quote
 // The history for the charts on show, and those fetched ahead of a click.
 // One curl at a time, one retry of a bad answer, fifteen minutes of cache,
-// last-good kept on failure. The service says which chart it wants; a
-// newer want, or none, stops the curl and the retry of the old one at once,
-// so nothing nobody is looking at delays the chart that is. While Yahoo's
-// gate pauses the host, a request fails at once, so its view says
-// unavailable rather than "Loading".
+// last-good kept on failure.
 // The charts asked for ahead (`requestAhead`), the rows in sight, go as one
 // curl run of several URLs, so a slow network keeps them waiting once, not
-// once each. A run waits for the gate's spare budget (`Gate.spare`), and
-// goes with as many of its charts as that lets go; it has no retry, and
-// keeps only good answers: a row nobody clicked never says it is
-// unavailable; each miss is told (`missed`). A chart to show is never held
-// behind a run: it stops the run and goes alone.
+// once each.
 // `entries` holds answers only, "ok" or "failed": what is on its way is
 // `wanted`, so asking for a chart changes nothing a reader of the answers
-// sees until one lands. An entry keeps its last good history and when it
-// came (`receivedAt`), and when the last answer of any kind came
-// (`answeredAt`). With nothing wanted the feed says so (`idle`), as
+// sees until one lands. With nothing wanted the feed says so (`idle`), as
 // the time to ask for charts ahead.
 Item {
   id: root
 
   property var entries: ({})
   property var gate: null
-  // A screen answer lets pending work go; darkness spends no request or retry.
   property var clearance: null
   // The service, whose wall clock stamps each answer and ages the cache
   // (`wallSecond`); the system's without one.
@@ -36,9 +25,6 @@ Item {
   // The exchanges whose listings trade in whole cents from $1
   // (`History.parseHistory`); none unless handed in.
   property var centExchanges: []
-  // What is wanted, { range, ahead, charts }, `charts` each { key, symbol }:
-  // one chart to show, or a run of charts asked for ahead; null when none
-  // is, and once its answer is in.
   property var wanted: null
   // The request under way, launched and not yet answered: its curl or its
   // retry pause.
@@ -58,12 +44,9 @@ Item {
     return History.historyKey(symbol, range)
   }
 
-  // Whether `request` (`wanted`'s shape) asks for the chart `key`.
   function holds(request, key) {
     return !!request && request.charts.some(function(c) { return c.key === key })
   }
-  // Whether `request` is what `next` asks for: the same chart to show, or
-  // the same run.
   function covers(request, next) {
     return !!request && !!next && next.ahead === request.ahead && next.range === request.range
       && next.charts.every(function(c) { return root.holds(request, c.key) })
@@ -89,10 +72,7 @@ Item {
     root.entries = next
   }
 
-  // A chart to show. A cached answer under fifteen minutes old is enough
-  // unless `force`, a user's refresh, asks for a new one; the charts on
-  // show needing nothing, a run ahead for the same range goes on, and one
-  // for another stops.
+  // `force` is a user's refresh.
   function request(symbol, range, force) {
     var normalizedSymbol = String(symbol || "").toUpperCase()
     if (!History.historyUrl(normalizedSymbol, range)) {
@@ -110,7 +90,6 @@ Item {
     root.want({ range: range, ahead: false, charts: [{ key: key, symbol: normalizedSymbol }] })
   }
 
-  // The charts of `symbols` on `range`, fetched ahead of a click, in one run.
   function requestAhead(symbols, range) {
     var charts = symbols.map(function(s) { return String(s || "").toUpperCase() })
       .filter(function(s) { return !!History.historyUrl(s, range) })
@@ -118,7 +97,6 @@ Item {
     if (charts.length > 0) root.want({ range: range, ahead: true, charts: charts })
   }
 
-  // Charts fetched ahead for a range left behind go.
   function drop(keys) {
     var next = {}
     Object.keys(entries).forEach(function(k) { if (keys.indexOf(k) < 0) next[k] = entries[k] })
@@ -130,8 +108,6 @@ Item {
     root.want(null)
   }
 
-  // The job under way goes on only for the same chart to show, or the same
-  // run.
   function want(next) {
     root.wanted = next
     if (job && !covers(job, next)) {
@@ -161,9 +137,7 @@ Item {
   }
 
   // While the gate holds the host, a chart to show fails a turn later: the
-  // change that asked for it is still being told. A run goes with as many
-  // of its charts as the gate's spare budget lets go, in order; with none,
-  // it is let go, nothing kept.
+  // change that asked for it is still being told.
   function run() {
     if (clearance && !clearance()) { root.waitingForScreen = true; return }
     root.waitingForScreen = false
@@ -193,7 +167,6 @@ Item {
     if (job && waitingForScreen) root.run()
   }
 
-  // The job is over; then the chart wanted now, if any, goes.
   function endJob() {
     root.waitingForScreen = false
     root.job = null
@@ -223,7 +196,6 @@ Item {
     root.settle(histories)
   }
 
-  // The job's answers, by chart: a history, or null for a failure.
   function settle(histories) {
     var request = job
     // Answered, before the answers are told: a reader of `entries` may
