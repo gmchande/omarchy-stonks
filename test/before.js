@@ -147,9 +147,10 @@ function scan(source) {
         entry.name = /\bfunction\s+[\w$]+$/.test(before) ? "" : name
       }
       if (c === "{") {
-        // A function's body: after `function NAME(...)`, `(...) =>` or `x =>`.
         const paren = last === ")" ? opened.get(lastAt) : undefined
-        entry.fn = before.endsWith("=>")
+        // A function's body: after `function NAME(...)`, `(...) =>`, `x =>`,
+        // or a QML signal handler's `onName:`.
+        entry.fn = before.endsWith("=>") || /\bon[A-Z][\w$]*\s*:$/.test(before)
           || (paren !== undefined && /\bfunction(\s+[\w$]+)?\s*$/.test(source.slice(Math.max(0, paren - 200), paren)))
       }
       stack.push(entry)
@@ -227,9 +228,17 @@ if (total === 0) {
 // the saved answers linked in where there are some. A harness's check there
 // also says where it was called from, by the harness's line; it returns
 // null when Harness.qml's check can't be found to say so.
-const trees = []
+// Each tree goes as the run ends; an interrupt first stops what runs in
+// them, and waits for it to end.
+const trees = [], running = new Set()
 process.on("exit", () => trees.forEach(tree => rmSync(tree, { recursive: true, force: true })))
-for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => process.exit(130))
+for (const [signal, code] of [["SIGINT", 130], ["SIGTERM", 143]]) {
+  process.on(signal, async () => {
+    for (const child of running) child.kill("SIGTERM")
+    await Promise.all([...running].map(child => child.exited))
+    process.exit(code)
+  })
+}
 function tree(tests) {
   const tree = mkdtempSync(join(process.env.TMPDIR || tmpdir(), "before."))
   trees.push(tree)
@@ -270,6 +279,7 @@ async function runOne(tree, t, index, settled) {
   const args = t.harness ? ["bash", "-c", starts.get(t.harness)]
     : ["bun", "test", `./${t.path}`, "--reporter=junit", `--reporter-outfile=${report}`]
   const child = Bun.spawn(args, { cwd: tree, stdout: "pipe", stderr: "pipe", env: { ...process.env, STONKS_TEST_TMP: work } })
+  running.add(child)
   let stopped = false, seen = []
   const watch = t.harness && setInterval(() => {
     for (const name of readdirSync(work)) {
@@ -280,12 +290,13 @@ async function runOne(tree, t, index, settled) {
   }, 500)
   const [out] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()])
   const code = await child.exited
+  running.delete(child)
   clearInterval(watch)
   if (t.harness) return { code, results: stopped ? seen : steps(out) }
   const results = []
   const text = existsSync(report) ? readFileSync(report, "utf8") : ""
   for (const m of text.matchAll(/<testcase name="([^"]*)"[^>]*? line="(\d+)"[^>]*?(\/>|>([\s\S]*?)<\/testcase>)/g)) {
-    results.push({ line: Number(m[2]), pass: m[3] === "/>" || !/<(failure|error|skipped)\b/.test(m[4] || ""), name: xml(m[1]) })
+    results.push({ line: Number(m[2]), pass: m[3] === "/>" || !/<(failure|error)\b/.test(m[4] || ""), name: xml(m[1]) })
   }
   return { code, results }
 }
@@ -323,7 +334,8 @@ due.forEach((t, index) => {
   }
   for (const checks of t.cases) {
     const own = results.filter(r => inCase(checks, r))
-    if (own.length && own.every(r => r.pass)) passing.push({ t, start: checks[0].start, names: [...new Set(own.map(r => r.name))] })
+    // One that never ran there fails only where the run did.
+    if (own.length ? own.every(r => r.pass) : code === 0) passing.push({ t, start: checks[0].start, names: [...new Set(own.map(r => r.name))] })
   }
 })
 
@@ -342,11 +354,11 @@ if (old) {
   }
 }
 for (const p of passing) {
-  const where = `"${p.names[0]}" (${p.t.path}:${p.start})`
+  const where = p.names.length ? `"${p.names[0]}" (${p.t.path}:${p.start}) passes` : `the case at ${p.t.path}:${p.start} never runs, and nothing fails,`
   if (adapted.has(p)) {
-    console.log(`${where} passes on ${baseName}'s code too, but its form on ${baseName} fails on this code: the change made it change`)
+    console.log(`${where} on ${baseName}'s code too, but its form on ${baseName} fails on this code: the change made it change`)
   } else {
-    console.log(`FAILED before the change: ${where} passes on ${baseName}'s code too (${short}), `
+    console.log(`FAILED before the change: ${where} on ${baseName}'s code too (${short}), `
       + "so it can't tell the change from the code it replaces. Check what the reader sees, not a request or a value the code computed, "
       + `and see it fail on ${baseName}'s code.`)
   }

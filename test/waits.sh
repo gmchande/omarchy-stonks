@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # The set-time wait gate: counts each harness file's wait(N) with a number
-# written in, outside comments, and passes only when each count is its
-# baseline below. A count may only go down: a step waits for what it needs,
-# with within(ms, fn) (Steps.qml), never for a set time. Many of today's
-# step a stand-in clock on purpose.
+# written in, outside strings and comments, and passes only when each count
+# is its baseline below. A count may only go down: a step waits for what it
+# needs, with within(ms, fn) (Steps.qml), never for a set time. Many of
+# today's step a stand-in clock on purpose.
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
@@ -32,7 +32,10 @@ declare -A baseline=(
   [window-search.qml]=45
 )
 
-counts=$(rg --count-matches -P '//.*(*SKIP)(*F)|\bwait\(\s*[0-9]' -g '*.qml' -- test/qml)
+# Strings and comments, either kind, are skipped (\x22 and \x27 are the two
+# quotes).
+code_only='\x22(?:\\.|[^\x22\\\n])*\x22(*SKIP)(*F)|\x27(?:\\.|[^\x27\\\n])*\x27(*SKIP)(*F)|/\*[\s\S]*?\*/(*SKIP)(*F)|//.*(*SKIP)(*F)'
+counts=$(rg -U --count-matches -P "$code_only|\\bwait\\s*\\(\\s*[0-9]" -g '*.qml' -- test/qml)
 code=$?
 [ "$code" -le 1 ] || { echo "FAILED rg could not count the waits in test/qml"; exit 1; }
 failed=0
