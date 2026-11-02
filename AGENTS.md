@@ -30,6 +30,10 @@ change. This file says what a change is judged by, and why.
   uses its own for that ground. It never changes the theme's colors.
 - **Calm.** Nothing jumps: when the look, range, list or stock changes,
   everything keeps its place and size.
+- **1D at night.** A stock that trades at night keeps the day that just
+  closed until 04:00, with tonight joined at its end, and its % counts from
+  the close the screen names. The line breaks only for hours that take room
+  on the chart, such as Tokyo's lunch.
 - **Character.** The bull and the bear, their sleep while the market rests,
   the live dot and the day's named moments are part of the product. Each says
   something true and none cheers a number, so a cleanup keeps them.
