@@ -305,8 +305,9 @@ function ownPrints(quote, bars) {
 var HOLE_SLOTS = 6
 
 // The five-minute slots strictly between `a` and `b` that lie in a
-// pre-market or an after hours by Yahoo's periods, in time order: the
-// quote's day's, and the coming day's a two-day answer holds.
+// pre-market or an after hours by Yahoo's periods, in time order, each
+// { t, s } with its session, "pre" or "post": the quote's day's, and the
+// coming day's a two-day answer holds.
 function extendedSlots(quote, a, b) {
   var out = []
   var days = [quote.session, quote.next]
@@ -315,7 +316,7 @@ function extendedSlots(quote, a, b) {
     for (var k = 0; k < spans.length; k++) {
       if (!spans[k]) continue
       var end = Math.min(b, spans[k].end)
-      for (var t = Math.ceil(Math.max(a + 1, spans[k].start) / SLOT) * SLOT; t < end; t += SLOT) out.push(t)
+      for (var t = Math.ceil(Math.max(a + 1, spans[k].start) / SLOT) * SLOT; t < end; t += SLOT) out.push({ t: t, s: k === 0 ? "pre" : "post" })
     }
   }
   return out
@@ -329,7 +330,8 @@ function extendedSlots(quote, a, b) {
 // them, as on Monday 2 November, when Yahoo sent no bar from 08:30 to
 // 09:29. A thin stock's sparse trading, a trade or two in an hour, is no
 // such stretch. `bars` are Robinhood's trades in its slots, each with its
-// session by Yahoo's periods. Yahoo's prints stay as they came, and a
+// session by Yahoo's periods, the pre-market's or the after hours' it
+// fills. Yahoo's prints stay as they came, and a
 // stretch lies between two of the day's prints, so the newest print, the
 // price on top, is never Robinhood's from it.
 function filledStretches(quote, bars) {
@@ -344,9 +346,11 @@ function fillsBetween(quote, bars, drawn) {
     if (to - from <= HOLE_SLOTS * SLOT) continue
     var slots = extendedSlots(quote, from, to)
     if (slots.length < HOLE_SLOTS) continue
-    var traded = bars.filter(function(b) { return b.t > from && b.t < to && slots.indexOf(b.t) >= 0 })
+    var sessions = {}
+    for (var j = 0; j < slots.length; j++) sessions[slots[j].t] = slots[j].s
+    var traded = bars.filter(function(b) { return b.t > from && b.t < to && b.t in sessions })
     if (traded.length * 2 < slots.length) continue
-    out.push({ from: from, to: to, bars: traded.map(function(b) { return { t: b.t, p: b.p, s: Quote.pointSession(quote, { t: b.t, p: b.p }) } }) })
+    out.push({ from: from, to: to, bars: traded.map(function(b) { return { t: b.t, p: b.p, s: sessions[b.t] } }) })
   }
   return out
 }
@@ -375,7 +379,7 @@ function yahooHole(quote) {
     if (pts[i + 1].t - pts[i].t <= HOLE_SLOTS * SLOT) continue
     var slots = extendedSlots(quote, pts[i].t, Math.min(pts[i + 1].t, pre.end))
     var before = Math.floor((pts[i].t - pre.start) / SLOT) + 1
-    if (slots.length >= HOLE_SLOTS && before >= STEADY_SLOTS && steady * 2 >= before) last = slots[slots.length - 1]
+    if (slots.length >= HOLE_SLOTS && before >= STEADY_SLOTS && steady * 2 >= before) last = slots[slots.length - 1].t
   }
   return last
 }

@@ -223,10 +223,18 @@ Item {
   readonly property var nights: overnightFeed.entries
   readonly property var allDay: allDayFeed.entries
   // The stretches Yahoo left empty that Robinhood's trades fill on each
-  // day drawn (`Chart.dayFills`), each said once in the shell's log,
-  // as a dropped stray price is. `saidFills` holds those said, by symbol
-  // and stretch; it notifies nothing.
-  readonly property var filled: Chart.dayFills(allDaySymbols, feed.quotes, overnightFeed.entries)
+  // day drawn (`Chart.dayFills`), All's and a preview's outside it, each
+  // said once in the shell's log, as a dropped stray price is. `saidFills`
+  // holds those said, by symbol and stretch; it notifies nothing.
+  readonly property var filled: {
+    var previewed = root.previewSymbol
+    var tradability = previewed ? allDayFeed.entries[previewed] : null
+    var preview = tradability && tradability.allDay && library.indexOf(previewed) < 0 ? previewFeed.quotes[previewed] : null
+    if (!preview) return Chart.dayFills(allDaySymbols, feed.quotes, overnightFeed.entries)
+    var quotes = Object.assign({}, feed.quotes)
+    quotes[previewed] = preview
+    return Chart.dayFills(allDaySymbols.concat([previewed]), quotes, overnightFeed.entries)
+  }
   readonly property var saidFills: ({})
   onFilledChanged: {
     for (var symbol in filled) filled[symbol].forEach(function(stretch) {

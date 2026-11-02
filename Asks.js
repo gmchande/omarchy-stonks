@@ -210,7 +210,8 @@ function answerVerdict(kind, outcome, tries, judgingOnly) {
 // each stock the pill shows. The chart waited on, the preview's or else the
 // pill's, goes alone ahead of the rest while it has no answer. On a day
 // Yahoo left a stretch of its pre-market empty, read from the quotes of
-// every US stock and ETF (`quotes`, `Overnight.yahooHole`), each listing
+// every US stock and ETF (`quotes`, `Overnight.yahooHole`) and of the
+// preview on view,
 // asked here that Robinhood trades all day and whose prints in hand don't
 // reach it is asked once more, open or not (`Overnight.holeDue`).
 // `allDay` and `nights` are the two feeds' entries; `quoteEntries` Yahoo's.
@@ -235,11 +236,13 @@ function overnightAsks(s) {
   // The listings of one ask share its second (`entry.at`), so each ask is
   // judged once, not once a listing.
   var judged = {}
-  // The newest stretch Yahoo left empty whose Robinhood bars are in.
+  // The newest stretch Yahoo left empty whose Robinhood bars are in, read
+  // from All's US quotes and a preview's on view.
+  var quotes = s.overnightSymbols.map(function(x) { return s.quotes[x] })
+  if (previewing && s.previewQuote.session) quotes.push(s.previewQuote)
   var hole = null
-  for (var i = 0; i < s.overnightSymbols.length; i++) {
-    var quote = s.quotes[s.overnightSymbols[i]]
-    var last = quote ? Overnight.yahooHole(quote) : null
+  for (var i = 0; i < quotes.length; i++) {
+    var last = quotes[i] ? Overnight.yahooHole(quotes[i]) : null
     if (last !== null && last + Overnight.OVERNIGHT_LAG <= s.now && (hole === null || last > hole)) hole = last
   }
   var holeDue = function(x) {

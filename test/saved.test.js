@@ -1650,6 +1650,10 @@ test("on a morning Yahoo left an hour empty, Robinhood is asked once more for th
     .toEqual([null, null, null, { tradability: [], prints: ["NBIS"] }])
   // One Robinhood trades only by day is never asked.
   expect(asks("09:35", { allDay: { ...allDay, NBIS: { status: "ok", allDay: false, at: asked } } })).toBe(null)
+  // NBIS previewed outside All, whose only listing trades abroad: its own
+  // quote tells of the hour, and it is asked.
+  expect(asks("09:35", { open: true, library: ["SHEL.L"], overnightSymbols: [], preview: "NBIS", previewShown: true, previewQuote: quotes.NBIS }))
+    .toEqual({ tradability: [], prints: ["NBIS"] })
   // Every other saved day of a US stock or ETF, Yahoo's pre-market whole or
   // a thin stock's sparse: no such stretch, so no ask.
   const holes = []
@@ -2320,6 +2324,16 @@ test("every price stands at its time from its day's first trade, a quiet night a
     .toEqual(Array(9).fill("post"))
   expect(dayAt("gap-2026-11-01-2148", "shop").day.points.filter(p => p.t > at("2026-10-30", "04:00") && p.t < at("2026-10-30", "04:45")))
     .toEqual([])
+  // A two-day answer holds the coming morning after the day that closed:
+  // AAPL at 06:00 on Friday 23 October, with Yahoo's 04:30 to 05:25 taken
+  // out, fills that hour from Robinhood as Friday's pre-market, never as
+  // Thursday's after hours.
+  const twoDays = savedDay("night-2026-10-23-0600", "aapl")
+  const lost = { ...twoDays, points: twoDays.points.filter(p => p.t < at("2026-10-23", "04:30") || p.t >= at("2026-10-23", "05:30")) }
+  const asked0600 = fixture("moments/night-2026-10-23-0600/robinhood-day.json").results.map(r => r.symbol)
+  const friday23 = M.dayChart(lost, traded("night-2026-10-23-0600", asked0600).AAPL, calendars).day.points
+    .filter(p => p.t >= at("2026-10-23", "04:30") && p.t < at("2026-10-23", "05:30"))
+  expect([friday23.length, friday23.every(p => p.s === "pre")]).toEqual([11, true])
 })
 
 // The 1D charts of a saved moment as the view builds them (`Chart.viewChart`),
