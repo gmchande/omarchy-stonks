@@ -722,6 +722,10 @@ test("a listing's prices take the decimals they need, decided once from its head
   expect(shib.priceDigits).toBe(9)
   expect(M.rowModel(shib, 0, "pct").priceText).toBe("0.000005410")
   expect(M.rowModel(shib, shib.points[3].t, "pct").priceText).toMatch(/^0\.00000\d{4}$/)
+  // Its tick is never coarser than its second significant digit: Yahoo's
+  // hint of 5 decimals makes it 0.00001, twice its price.
+  const shibMeta = fixture("moments/listings-2026-10-08-1054/shib-usd.json").chart.result[0].meta
+  expect([shibMeta.priceHint, M.answerTick(shibMeta, [], cents)]).toEqual([5, 1e-7])
   // A move in money keeps cents where the price has none, and a coin's
   // decimals where it has more; its colour agrees with what is drawn.
   expect(M.signedMoney(-2105.766, 0)).toBe("\u22122,105.77")
