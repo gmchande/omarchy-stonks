@@ -520,6 +520,8 @@ test("crypto is always open, never sees a weekend, reads its last 24 hours every
     .toEqual([ago.t, bars.at(-1).t, ago.p, ago.p, low, high])
   expect(low < Math.min(...since.map(b => b.p)) || high > Math.max(...since.map(b => b.p))).toBe(true)
   expect(ago.t).toBeLessThan(Date.UTC(2026, 9, 28) / 1000)
+  // Its volume is Yahoo's, already the last 24 hours, never its bars' sum.
+  expect(coin.volume).toBe(raw.meta.regularMarketVolume)
   const row = M.rowModel(coin, 0, "pct")
   expect([row.changeText, row.periodLabel, M.dayTitle(coin, M.exchangeDay(coin, coin.marketTime))])
     .toEqual([M.pct((coin.price - ago.p) / ago.p * 100), "24H", "24H"])
