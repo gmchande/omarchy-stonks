@@ -1,48 +1,29 @@
 import QtQuick
 import "Fetch.js" as Fetch
 import "Fundamentals.js" as Fundamentals
-// Yahoo's dated cap and trailing EPS, one symbol at a time, kept for the
-// day, and the rates their P/Es need, kept for the day by pair. Curls in
-// turn: the series, then the close on the cap's date, which moves it with
-// the price (`Fundamentals.yearLine`). An entry is "ok" with its figures,
-// either of which may be null when Yahoo has none, or "failed", keeping the
-// last good figures, or once the series came but not the cap's close, their
-// EPS and no cap. Then, when the EPS is in another currency than the price
-// and its pair's rate is a day old or none was asked, the rate, once
-// whichever listing wants it first. While Yahoo's gate pauses the host, a
-// fetch fails at once, and a rate is left unasked.
-// What it fetches is what the surfaces on screen show (`wanted`), worked out
-// by the service: each one not good for the day, in order, one at a time,
-// and again as the clock moves past its day. One that failed, whose rate
-// failed, or whose rate the gate held back, waits until it is wanted anew,
-// or for a reader's refresh or Yahoo answering again after a pause
-// (`retry`), so it isn't asked again every second, nor at once. A failed
-// rate holds no rate for its pair, so the pair has no P/E until one comes,
-// and every listing that shares the pair waits with it (`failedPairs`).
+// Yahoo's cap and EPS for the symbols on screen, one at a time, and the
+// rates their P/Es need, each kept for the day.
 Item {
   id: root
 
   property var entries: ({})
-  // By pair ("USDCAD"): { value, checkedAt }, a rate Yahoo sent.
+  // By pair ("USDCAD").
   property var rates: ({})
   property var gate: null
   property var clearance: null
-  // The heroes on show's, each { symbol, currency }, in order
-  // (`Service.figuresWanted`).
+  // `Service.figuresWanted`, in order.
   property var wanted: []
-  // The service's clock: `now` moves the feed to look, and the wall clock
-  // (`wallSecond`) is what it reads.
+  // `now` wakes the feed; it reads `clock.wallSecond()`.
   property int now: 0
   property var clock: null
   property string pendingUrl: ""
-  // The fetch under way: { symbol, currency, step, figures, pair }, step
-  // "series", "close", or "rate", figures null until the series are in.
+  // `figures` is null until the series is in.
   property var job: null
-  // The wanted symbols whose fetch failed, or whose rate the gate held back,
-  // while they were wanted.
+  // These wait for `retry` or to be wanted anew, so they aren't asked again
+  // every second.
   property var failed: []
-  // The pairs whose rate failed, while a wanted symbol needs them: every
-  // listing sharing one waits with it.
+  // A failed rate holds no rate, and every listing sharing its pair waits
+  // with it.
   property var failedPairs: []
 
   readonly property bool busy: job !== null || wanted.some(root.due)
@@ -55,8 +36,6 @@ Item {
     return wanted.some(function(w) { return w.symbol === symbol })
   }
 
-  // Whether `w` needs fetching: never fetched, failed, or it or its rate a
-  // day old; not while it waits in `failed`.
   function due(w) {
     if (failed.indexOf(w.symbol) >= 0) return false
     var entry = entries[w.symbol]
@@ -65,24 +44,19 @@ Item {
     return !current || !root.rateHeld(Fundamentals.ratePair(current.figures, w.currency))
   }
 
-  // A wanted symbol's fetch failed or was held back: it waits for `retry`,
-  // or to be wanted anew, so it isn't asked again at once.
   function miss(symbol) {
     if (root.wants(symbol) && failed.indexOf(symbol) < 0) root.failed = failed.concat([symbol])
   }
 
-  // What failed is asked again now: a reader's refresh, or Yahoo answering
-  // again after a pause.
+  // A reader's refresh, or Yahoo answering again after a pause.
   function retry() {
     if (failed.length) root.failed = []
     if (failedPairs.length) root.failedPairs = []
     root.look()
   }
 
-  // A symbol no longer wanted is wanted anew when it comes back, and a series
-  // not yet sent for it goes; one sent still lands; a pair no wanted symbol
-  // needs is likewise asked anew. With nothing under way, the first wanted
-  // that is due goes.
+  // A series not yet sent for a symbol no longer wanted goes; one sent still
+  // lands.
   function look() {
     var still = failed.filter(root.wants)
     if (still.length !== failed.length) root.failed = still
@@ -104,14 +78,11 @@ Item {
     else root.run(Fundamentals.fundamentalsUrl(next.symbol, clock.wallSecond()))
   }
 
-  // A symbol's entry while it is good for the day, else null.
   function fresh(symbol) {
     var current = entries[symbol]
     return current && current.status === "ok" && clock.wallSecond() - current.checkedAt < day ? current : null
   }
 
-  // Whether a pair needs no asking now: no pair, one asked within a day, or
-  // one whose rate failed, until `retry`.
   function rateHeld(pair) {
     return !pair || failedPairs.indexOf(pair) >= 0 || (!!rates[pair] && clock.wallSecond() - rates[pair].checkedAt < day)
   }
@@ -133,15 +104,14 @@ Item {
       return
     }
     // A series held while the screens are off ends at wake, not at the
-    // earlier ask. The close refers to a fixed date and keeps its URL.
+    // earlier ask; the close's date is fixed.
     var url = job.step === "series" ? Fundamentals.fundamentalsUrl(job.symbol, clock.wallSecond()) : pendingUrl
     root.pendingUrl = ""
     fetchRun.send([url], Fetch.FUNDAMENTALS_CAP)
   }
 
-  // An answer whose reading throws is a failed one: a throw escaping here
-  // leaves the fetch under way, and no cap or P/E is asked for again until
-  // Stonks restarts.
+  // A throw escaping here would leave the fetch under way, and no cap or P/E
+  // would be asked for again until Stonks restarts.
   function receive(got) {
     var step = job.step
     var read = null
@@ -174,8 +144,6 @@ Item {
     }
   }
 
-  // The rate the figures' P/E needs, unless it needs none or it was asked
-  // within a day.
   function askRate(figures) {
     var pair = Fundamentals.ratePair(figures, job.currency)
     if (root.rateHeld(pair)) {
@@ -186,9 +154,8 @@ Item {
     root.run(Fundamentals.rateUrl(pair))
   }
 
-  // A failed fetch keeps the last good figures, unless the series came:
-  // they are the truth for the EPS, so it stands, with its rate asked, and
-  // the cap stays unknown until its close is.
+  // A failed fetch keeps the last good figures, but a series that came is
+  // the truth for the EPS: it stands, and the cap stays unknown.
   function fail(symbol) {
     root.miss(symbol)
     var series = job.figures ? { figures: { cap: null, eps: job.figures.eps } } : {}
