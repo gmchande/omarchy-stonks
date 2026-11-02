@@ -206,6 +206,17 @@ Harness {
       // with nothing offered, runs nothing and says so, as Ctrl+Z does with
       // nothing to undo.
       var started = answered(1)
+      // An update on disk before any surface has opened: the first open
+      // says the restart's notice, since the service read its own version
+      // as it started. Put back, the notice goes.
+      var startBuild = harness.readFile(harness.manifestPath)
+      var landed = JSON.parse(startBuild)
+      landed.version = "1.0.10"
+      writeManifest(JSON.stringify(landed, null, 2) + "\n")
+      var landedSaid = visit()
+      writeManifest(startBuild)
+      harness.check("an update on disk before any surface opens shows the restart's notice at the first open",
+        landedSaid === "Updated to 1.0.10 · click to restart the shell |  | ", landedSaid)
       var first = visit()
       openWindow()
       shiftU()
@@ -291,6 +302,21 @@ Harness {
         ran && !app.testBody.adding && offer() === "Update to 1.0.10", calls() + " | " + app.testBody.adding + " | " + offer())
       closeWindow()
 
+      // The terminal's script, run on a scratch clone with the stand-in
+      // omarchy: it restarts the shell only once the update moved the
+      // clone's HEAD, so "up to date" restarts nothing.
+      var script = harness.readFile(harness.state + "/omarchy.calls").split("\n")[0].replace(/^launch floating terminal with presentation /, "")
+      var terminal = function(moves) {
+        run(["bash", "-c", "p=$HOME/.config/omarchy/plugins/grvc.stonks; t=$2/terminal; rm -rf \"$p\" \"$t\"; mkdir -p \"$p\" \"$t\";"
+          + " [ \"$1\" = moves ] && touch \"$t/PLUGIN.moves\"; git -C \"$p\" init -q && git -C \"$p\" -c user.name=t -c user.email=t commit -q --allow-empty -m t;"
+          + " STONKS_FAKE_STATE=$t bash -c \"$3\" >/dev/null 2>&1; true", "--", moves, harness.state, script])
+        return harness.readFile(harness.state + "/terminal/omarchy.calls")
+      }
+      var upToDate = terminal("stays")
+      var moved = terminal("moves")
+      harness.check("the update's terminal restarts the shell after it only when the update moved the plugin's HEAD",
+        upToDate === "plugin update grvc.stonks\n" && moved === "plugin update grvc.stonks\nrestart shell\n", JSON.stringify(upToDate) + " / " + JSON.stringify(moved))
+
       // Opened again before the next answer: offered still, beside the
       // add, which a click starts; Shift+U runs the update again.
       openWindow()
@@ -364,11 +390,23 @@ Harness {
       writeManifest(updatedText)
       var cutOffNotice = within(3000, function() { return footer() === "Updated to 1.0.10 · click to restart the shell" && offer() === "" })
       plugin.updates.testManifest.watchChanges = true
+      // A later write caught cut off changes nothing, its reads again run
+      // out too: the notice stays. An older version on disk is a change
+      // too, and says its own notice.
+      writeManifest(updatedText.slice(0, 40))
+      var keptNotice = within(3000, function() { return reread.tries === 4 && !reread.running })
+        && footer() === "Updated to 1.0.10 · click to restart the shell"
+      var downgrade = JSON.parse(thisBuild)
+      downgrade.version = "1.0.8"
+      writeManifest(JSON.stringify(downgrade, null, 2) + "\n")
+      var downgraded = within(3000, function() { return footer() === "Updated to 1.0.8 · click to restart the shell" })
       writeManifest(thisBuild)
       var putBack = within(3000, function() { return footer() === "+  Add a symbol" && offer() === "Update to 1.0.10" })
       closeWindow()
       harness.check("a manifest read cut off, the rest of its write unseen by the watch, is read again shortly, and so is a later read once the first one's reads again ran out: the open window's restart notice comes, and goes once the manifest is put back",
         spent && cutOffNotice && putBack, spent + " " + cutOffNotice + " " + putBack + " | " + footer() + " | " + offer())
+      harness.check("once the notice shows, a manifest read cut off keeps it, and an older version on disk says its own",
+        keptNotice && downgraded, keptNotice + " " + downgraded + " | " + footer())
 
       // The update lands on disk as git writes it, the old file removed and
       // a new one made, while the window stays open: the restart's notice
@@ -397,6 +435,20 @@ Harness {
         noteDay && offered && tookOver && keyRestart && restarted && afterDisk === restart + " |  | ",
         offered + " " + tookOver + " " + keyRestart + " " + restarted + " | " + afterDisk + " | " + calls())
 
+      // An ask that got no answer, asked again as Yahoo answering again
+      // does, while GitHub's short pause after it lasts: it waits for the
+      // pause to end, then goes.
+      put("GITHUB.offline", "")
+      nextDay()
+      var none = answered(11)
+      remove("GITHUB.offline")
+      harness.feed.askAgain()
+      var waited = !harness.feed.testAsking && harness.asked() === 11
+      service.now += 3
+      var wentAfter = answered(12)
+      harness.check("an ask that got no answer, asked again during GitHub's pause, waits for the pause to end",
+        none && waited && wentAfter, [none, waited, wentAfter, harness.asked() + " asks"].join(" | "))
+
       // "updateCheck": false in the data file, as the README says: a day on,
       // and a day after that, GitHub is asked nothing. Taken out again, the
       // check goes at once.
@@ -414,9 +466,9 @@ Harness {
       var askedOff = harness.asked()
       edit("del(.updateCheck)")
       var backOn = within(3000, function() { return service.dataSettings.updateCheck === true })
-      var askedOn = answered(11)
+      var askedOn = answered(13)
       harness.check("with \"updateCheck\": false in the data file, GitHub is asked nothing for two days; without it, at once",
-        off && quiet && askedOff === 10 && backOn && askedOn, [off, quiet, askedOff + " asks while off", backOn, harness.asked() + " asks"].join(" | "))
+        off && quiet && askedOff === 12 && backOn && askedOn, [off, quiet, askedOff + " asks while off", backOn, harness.asked() + " asks"].join(" | "))
 
       finish()
     }

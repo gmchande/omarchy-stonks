@@ -1789,6 +1789,8 @@ test("a version is newer number by number, and a manifest names one only whole",
   const R = load("Release.js")
   expect(R.isNewer("1.0.10", "1.0.9")).toBe(true)
   expect([["1.0.8", "1.0.9"], ["1.0.9", "1.0.9"], ["x", "1.0.9"]].map(([a, b]) => R.isNewer(a, b))).toEqual([false, false, false])
+  // Nothing is offered over a running version not read yet, nor for a main version that isn't one.
+  expect([R.isNewer("1.0.10", ""), R.isNewer("2.x", "1.0.9")]).toEqual([false, false])
   expect(R.manifestVersion('{ "version": "9.9.9" }')).toBe("9.9.9")
   expect([R.manifestVersion('{\n  "id": "grvc.st'), R.manifestVersion('{ "id": "grvc.stonks" }')]).toEqual(["", ""])
 })
