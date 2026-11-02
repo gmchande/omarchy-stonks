@@ -1,60 +1,43 @@
 import QtQuick
 import Quickshell.Io
 import "ChartSound.js" as ChartSound
-// The sounds, while they are on (`turnedOn`, the data file's `sounds`, off
-// until it says true; while off, nothing here runs):
-// for what you just did, adding a symbol, removing a row, undoing the
-// removal, which plays the removal backwards, taking a screenshot, the
-// shutter, a replay, which plays the chart, and the chimes, the chart's
-// bars as the scrub crosses them (`ChartSound`); and the market's bell
-// (`Bell`), the one sound you didn't cause, which keeps quiet while
-// Omarchy's Do Not Disturb is on (`ring`). Each in the look's voice.
-// The fixed sounds, the bell, and the replay play one at a time: a new one
-// stops the one playing. The chimes overlap and ring out. Nothing else
-// sounds: no refresh or price. `pw-play`, which PipeWire ships, plays them
-// at the system's volume; there is no volume of Stonks' own. The surfaces
+// The sounds, each in the look's voice: what you just did, a replay, the
+// chimes as a scrub crosses the chart's bars (`ChartSound`), and the market's
+// bell (`Bell`). One sound plays at a time, a new one stopping the last; the
+// chimes overlap. `pw-play` plays them at the system's volume. The surfaces
 // and the bell say when; this knows only how.
 Item {
   id: root
 
   property bool turnedOn: false
   property bool retro: false
-  // The output is kept awake while sounds are on and a scrub moves, and
-  // for 1 s after it last moved or ended (`scrubHeld`), so a chime struck
-  // after a pause plays at once: an output asleep wakes as a sound starts,
-  // and cuts or delays its start. Only then, and while a replay waits for
-  // the output to wake (`whenAwake`): headphones go to whichever computer
-  // plays, so neither an open panel nor a scrub left standing takes them.
+  // An output asleep wakes as a sound starts, and cuts or delays it, so it is
+  // kept awake while a scrub moves, for 1 s after, and while a replay waits
+  // for it. Never longer: headphones go to whichever computer plays.
   readonly property bool keepingAwake: turnedOn && (scrubHeld || replaysWaiting.length > 0)
-  // A scrub moved, started, or ended in the last second (`afterScrub`): a
-  // flag of its own, since the timer's restart turns `running` off and on.
+  // Its own flag, since the timer's restart turns `running` off and on.
   property bool scrubHeld: false
-  // The surface whose replay is playing, so that replay's end stops only
-  // its own sound; null for any other sound.
+  // So a replay's end stops only its own sound.
   property var replayOwner: null
-  // Stonks' files (`Service.files`, `OwnerOnly`): the replay's and the
-  // chimes' are written in its cache folder, through it.
+  // `OwnerOnly`, which writes the replay's and the chimes' files.
   property var files: null
   readonly property string folder: files ? files.folder : ""
   readonly property string replayPath: folder + "/replay.wav"
   readonly property string voice: retro ? "retro" : "smooth"
-  // The files in the cache's folder that hold the current sound, by name:
-  // each look's chimes and lead-ins, written ahead as sounds turn on or the
-  // look changes, or left current by an earlier run (`takeSurvey`).
+  // The cache's files that hold the current sound: written this run, or left
+  // current by an earlier one (`takeSurvey`).
   property var madeThisRun: ({})
-  // What each look's files are made from now: the md5 of this file,
-  // ChartSound.js, and the look's bundled sounds, as `takeSurvey` read
-  // them, which the look's `stamp-<look>` in the folder holds once all its
-  // files do; and the looks this run wrote a file of, "landed" while every
-  // write did, else "failed", whose stamp is written again only once all
-  // landed: a stamp over a failed write would keep the old sound for good.
+  // Each look's md5 of what its files are made from (`takeSurvey`), which its
+  // `stamp-<look>` holds once all its files do; and whether this run's writes
+  // all "landed" or one "failed". A stamp over a failed write would keep the
+  // old sound for good.
   property var sources: ({})
   property var rewrote: ({})
   property bool surveyed: false
   readonly property var fixedSounds: ["add", "remove", "undo", "shutter", "bell"]
-  // A chime's lead-ins, in ms (`leadAt`).
+  // In ms (`leadAt`).
   readonly property var leadSteps: [30, 60, 90, 120, 150]
-  // The names the chimes' player plays, as its `case` patterns.
+  // The chimes' player's `case` patterns.
   readonly property string chimeNames: {
     var names = []
     ;["smooth", "retro"].forEach(function(look) {
@@ -64,34 +47,25 @@ Item {
     })
     return names.join("|")
   }
-  // At most one chime every 45 ms, 22 a second: a bar struck sooner waits
-  // out the gap, and the latest waiting wins (`waiting`, or -1), so a sweep
-  // ends on the bar under the pointer.
+  // A bar struck sooner waits, and the latest waiting wins.
   readonly property int chimeGap: 45
   property real lastChime: 0
   property int waiting: -1
 
-  // A sound that may start on an output asleep opens with up to 150 ms of
-  // silence, its lead-in (`led`), so the output's waking eats the silence
-  // and never the sound: it comes later, whole. PipeWire puts an output to
-  // sleep after 5 s with nothing playing; Stonks hears only its own sounds,
-  // so it counts the output asleep 4 s after its last start or its
-  // silence's end (`asleepAfter`). A sound that wakes it opens with the
-  // whole lead-in, and so does every one after while it wakes: until the
-  // stream of silence says it reached the output (`awakeAt`, pw-cat's
-  // "streaming"), or without that stream, for 550 ms. Measured laptop
-  // speakers wake in 135 to 182 ms; Bluetooth can take longer. Then the
-  // lead-in shrinks a third as fast as time passes, in 30 ms steps, to none
-  // 450 ms on: chimes come at least 45 ms apart (`chimeGap`), so one never
-  // sounds before a chime struck ahead of it.
+  // A sound that may wake an output asleep opens with up to 150 ms of silence,
+  // which the waking eats instead of the sound. PipeWire puts an output to
+  // sleep after 5 s with nothing playing; Stonks hears only its own sounds, so
+  // it counts the output asleep 4 s after its last. The whole lead-in holds
+  // until the silence's stream reaches the output, or for 550 ms without one:
+  // laptop speakers wake in 135 to 182 ms, Bluetooth slower. Then it shrinks a
+  // third as fast as time passes, in 30 ms steps, so with chimes 45 ms apart
+  // none sounds before the one struck ahead of it.
   readonly property int leadIn: 150
   property real asleepAfter: 0
   property real wokeAt: 0
-  // When the output last woke and was reached, 0 before any, or -1 while
-  // it wakes and nothing has said so yet.
+  // 0 before the output first woke, -1 while it wakes and nothing has said so.
   property real awakeAt: 0
 
-  // A sound starts now: the lead-in it opens with, in ms, or 0.
   function starting() {
     var now = Date.now()
     if (now >= asleepAfter) {
@@ -107,15 +81,13 @@ Item {
     return Math.min(leadIn, Math.max(0, Math.ceil((leadIn - (now - from) / 3) / 30) * 30))
   }
 
-  // Whether the output is awake and past its waking: reached 150 ms ago, so
-  // the silence playing since has covered it.
+  // Reached 150 ms ago, so the silence playing since has covered its waking.
   function awake(now) {
     if (now >= asleepAfter) return false
     return awakeAt >= 0 ? now >= awakeAt + leadIn : !silence.running && now - wokeAt >= 1000
   }
 
-  // `bytes`, a WAV with the plain 44-byte header the chimes' and the
-  // bundled sounds have, with `ms` of silence before the sound.
+  // A WAV with the plain 44-byte header the chimes and the bundled sounds have.
   function led(bytes, ms) {
     var zeros = Math.round(new DataView(bytes).getUint32(24, true) * ms / 1000) * 2
     var out = new ArrayBuffer(bytes.byteLength + zeros)
@@ -127,8 +99,6 @@ Item {
     return out
   }
 
-  // A chart's scrub moved, started, or ended where a screen shows it: the
-  // output is held 1 s more.
   function scrubMoved() {
     scrubHeld = true
     afterScrub.restart()
@@ -138,9 +108,8 @@ Item {
     return String(Qt.resolvedUrl("sounds/" + look + "/" + name + ".wav")).replace(/^file:\/\//, "")
   }
 
-  // One of the fixed sounds: "add", "remove", "undo", "shutter", or "bell";
-  // with the whole lead-in from the cache's folder when it needs any, once
-  // that is private, and without where it can't be (`OwnerOnly.made`).
+  // With the whole lead-in when it needs one, from the cache's folder once
+  // that is private (`OwnerOnly.made`).
   function play(name) {
     if (!turnedOn) return
     replayOwner = null
@@ -148,11 +117,8 @@ Item {
     start(lead && files.made ? written(voice, name, leadIn) : bundled(voice, name))
   }
 
-  // A replay's sound follows its sweep bar by bar, so it never opens with a
-  // lead-in: a replay asked for while the output may sleep waits for it
-  // instead, holding the silence until the output is awake (`awake`), or
-  // 1.5 s at most, and then starts, picture and sound together. `go`
-  // starts it; a surface asks again, or `stopReplay`, to drop its wait.
+  // A replay's sound keeps step with its sweep, so instead of a lead-in it
+  // waits for the output to be awake, 1.5 s at most. `go` starts it.
   property var replaysWaiting: []
   function whenAwake(owner, go) {
     replaysWaiting = replaysWaiting.filter(function(w) { return w.owner !== owner })
@@ -176,14 +142,9 @@ Item {
     }
   }
 
-  // A replay's sound, made from the chart as it starts: `chart` holds the
-  // chart's geometry, the retro chart's grid, where the replay runs from and
-  // to along it, and its length in seconds. The file is written whole before
-  // `pw-play` starts: the write blocks, and lands by a rename, so a player
-  // still reading the last one keeps it. A replay of what the last one
-  // played, the same look, chart, and run, plays its file again: making it
-  // holds a retro start about 10 ms longer than a smooth one. None plays while
-  // its file can't be written yet (`OwnerOnly.write`).
+  // The file is written whole before `pw-play` starts, and lands by a rename,
+  // so a player still reading the last one keeps it. The same replay again
+  // plays its file again: making it holds a retro start about 10 ms longer.
   property var replayMade: null
   function playReplay(owner, chart) {
     if (!turnedOn) return
@@ -201,8 +162,7 @@ Item {
     start(replayPath)
   }
 
-  // A replay cut short stops its sound, and no other; one still waiting
-  // for the output stays unstarted.
+  // One still waiting for the output never starts.
   function stopReplay(owner) {
     if (!owner) return
     replaysWaiting = replaysWaiting.filter(function(w) { return w.owner !== owner })
@@ -211,9 +171,7 @@ Item {
     player.running = false
   }
 
-  // A chime: bar `bar` (0..10, `ChartSound.barAt`) struck in the look's
-  // voice; -1, a place with no bar, strikes nothing, and drops a bar
-  // waiting, so nothing starts where the line lifts.
+  // `bar` is 0 to 10 (`ChartSound.barAt`), or -1 where the line lifts.
   function chime(bar) {
     if (!turnedOn) return
     if (bar < 0) {
@@ -230,7 +188,6 @@ Item {
     }
   }
 
-  // A bar struck now: one waiting is behind it, and never plays after it.
   function strike(bar) {
     chimeWait.stop()
     waiting = -1
@@ -239,19 +196,13 @@ Item {
     chimer.write(path.slice(folder.length + 1) + "\n")
   }
 
-  // A file's name in the cache's folder: a chime, `what` its bar,
-  // "chime-retro-3.wav", or "chime-lead90-retro-3.wav" with a 90 ms
-  // lead-in; or a fixed sound with the whole lead-in, `what` its name,
-  // "lead-smooth-add.wav".
   function fileOf(look, what, lead) {
     if (typeof what !== "number") return "lead-" + look + "-" + what + ".wav"
     return "chime-" + (lead ? "lead" + lead + "-" : "") + look + "-" + what + ".wav"
   }
 
-  // A file's path in the cache's folder (`fileOf`), `lead` ms of silence
-  // before its sound, written unless this run has: now, or once the folder
-  // is private (`OwnerOnly.write`), until then playing the file an earlier
-  // run left, if any.
+  // Until the folder is private (`OwnerOnly.write`), the file an earlier run
+  // left plays, if any.
   function written(look, what, lead) {
     var file = fileOf(look, what, lead)
     if (!madeThisRun[file]) {
@@ -263,19 +214,15 @@ Item {
     return folder + "/" + file
   }
 
-  // A bundled sound's bytes: a new path loads in the background, even
-  // with blockLoading, so the read waits for that load, or it would hand
-  // back the last file's.
+  // A new path loads in the background even with blockLoading, so the read
+  // waits for it, or it would hand back the last file's.
   function bundledBytes(look, name) {
     bundledFile.path = bundled(look, name)
     bundledFile.waitForJob()
     return bundledFile.data()
   }
-  // The bundled sounds, read to write their lead-ins.
   FileView { id: bundledFile; blockLoading: true }
 
-  // What a look writes ahead: its eleven chimes, each with every lead-in
-  // too, and its fixed sounds' lead-ins.
   function aheadOf(look) {
     var list = []
     for (var bar = 0; bar < 11; bar++) {
@@ -286,12 +233,8 @@ Item {
     return list
   }
 
-  // Turned off, the sound playing stops, and a chime waiting with it. The
-  // look's files are written ahead, one every 100 ms, so the first pass
-  // over the chart writes nothing: written back to back, smooth's eleven
-  // chimes hold the shell's thread for about 80 ms. Only the files that
-  // don't hold the current sound are written (`takeSurvey`): writing all 71
-  // of a look's on every start holds the thread 3 to 66 ms each, for 7 s.
+  // A look's files are written ahead one every 100 ms, so a first scrub writes
+  // none: back to back, smooth's eleven chimes hold the shell's thread 80 ms.
   onTurnedOnChanged: {
     if (!turnedOn) {
       replayOwner = null
@@ -317,19 +260,16 @@ Item {
       var due = root.aheadOf(look).filter(function(f) { return !root.madeThisRun[root.fileOf(look, f[0], f[1])] })
       if (due.length > 0) return root.written(look, due[0][0], due[0][1])
       stop()
-      // After the look's files, so none is newer than the stamp that
-      // vouches for it.
+      // Last, so no file is newer than the stamp that vouches for it.
       if (root.rewrote[look] === "landed" && root.sources[look]) root.files.write(root.folder + "/stamp-" + look, root.sources[look] + "\n")
       delete root.rewrote[look]
     }
   }
 
-  // What the sounds are made from, by `md5sum`, and each look's stamp and
-  // the files no newer than it, once a run, before anything is written
-  // ahead. A file newer than its look's stamp was written by a Stonks that
-  // keeps no stamp, an older one, so it may hold another sound. The answer
-  // runs under 8 KB; it is read up to 64. Heard as it ends, or as it fails
-  // to start, which says no exit.
+  // Once a run: the md5s of what the sounds are made from, each look's stamp,
+  // and the files no newer than it. A newer one was written by an older Stonks,
+  // which kept no stamp. The answer runs under 8 KB and is read up to 64. Read
+  // as `running` falls, since a command that fails to start never exits.
   Process {
     id: survey
     command: ["timeout", "5", "sh", "-c", "{ cd -- \"$1\" && md5sum -- ChartSound.js Sounds.qml sounds/*/*.wav && cd -- \"$2\" || exit 0\n"
@@ -344,9 +284,7 @@ Item {
     onRunningChanged: if (!running) root.takeSurvey(surveyAnswer.text)
   }
 
-  // A look's files that hold the current sound count as made this run: its
-  // stamp says what they are made from now, and the folder has them. Any
-  // other, a missing one too, is written ahead; without an answer, all are.
+  // Without an answer, every file is written ahead.
   function takeSurvey(text) {
     var sums = { smooth: [], retro: [] }
     var stamps = {}
@@ -382,31 +320,24 @@ Item {
     }
   }
 
-  // One at a time: exec stops a sound still playing, and starts this one
-  // once it has gone. Each has 4 s, twice the longest, a replay's 2 s, so a
-  // PipeWire that stalls can't hold one. Every stream Stonks starts asks
-  // for 30 ms, which PipeWire rounds down to the default quantum, 1024
-  // frames at 48 and 44.1 kHz, so none moves it: each move back up puts a
-  // Bluetooth output about 11 ms further behind, and AirPods go silent once
-  // a few seconds of chimes add up to a couple of hundred.
+  // exec stops a sound still playing. 4 s is twice the longest, a replay's, so
+  // a stalled PipeWire can't hold one. Every stream asks for 30 ms, which
+  // PipeWire rounds down to its quantum, 1024 frames, so none moves it: each
+  // move puts a Bluetooth output about 11 ms further behind, and AirPods go
+  // silent once a few seconds of chimes add up.
   function start(file) {
     player.exec(["timeout", "-k", "1", "4", "pw-play", "--media-role", "Notification", "--latency", "30ms", file])
   }
 
   Process { id: player }
 
-  // The output kept awake (`keepingAwake`): a stream of silence, PipeWire's
-  // pw-cat reading zeros, which holds the speakers or headphones open as a
-  // sound playing does, and nothing while sounds are off, no scrub has
-  // moved for 1 s, and no replay waits. Its start may wake the output, as a
-  // sound's does; it says, verbosely, when its stream reaches the output
-  // ("-> streaming"), which ends the waking (`awakeAt`). The output counts
-  // as awake only while it runs: stopped, for 4 s more; ended on its own
-  // while it's wanted, as when PipeWire restarts, not at all, since the
-  // output may have gone with it. Then it starts again 2 s later. Each
-  // stream ends at `streamSeconds` under `timeout`, so none outlives a shell
-  // that dies without stopping it; one that reaches it while it's wanted
-  // starts again at once, the output still awake under it.
+  // The silence that keeps the output awake: pw-cat reading zeros holds it
+  // open as a sound does, and says "-> streaming" once it reaches it. The
+  // output counts as awake only while it runs and 4 s after it stops. One that
+  // ends on its own while wanted, as when PipeWire restarts, may have taken the
+  // output with it, so it counts as asleep and starts again 2 s later. Each
+  // stream ends after `streamSeconds`, so none outlives a shell that dies, and
+  // starts again at once if still wanted.
   property int streamSeconds: 60
   Timer { id: afterScrub; interval: 1000; onTriggered: root.scrubHeld = false }
   onKeepingAwakeChanged: silence.running = keepingAwake
@@ -435,26 +366,18 @@ Item {
     onTriggered: if (root.keepingAwake && !silence.running) silence.running = true
   }
 
-  // The market's bell, unless Omarchy's Do Not Disturb is on, or an app is
-  // recording from a microphone, as a call does. As the bell is due, the
-  // shell is asked once whether Do Not Disturb is on (`omarchy-shell
-  // notifications dndState`, as Omarchy's own toggle asks), for 2 s and
-  // stopped by 3 s; a shell that doesn't answer, as with another app
-  // showing notifications, leaves the bell to ring. Then `pw-dump` lists
-  // PipeWire's nodes once, for 3 s and stopped by 4 s, and at most 4 MB
-  // (the list runs to about half a megabyte), so no answer can hold the
-  // bell or fill the shell. An answer that ran out of time, failed, or
-  // reached the cap counts as recording, by the pipeline's own exit and
-  // the bytes it gave, never by the clock: the bell stays quiet. One still
-  // out is stopped within 7 s, before the next bell.
+  // Quiet while Omarchy's Do Not Disturb is on, as Omarchy's own toggle asks
+  // it, or an app records from a microphone, as a call does. A shell that
+  // doesn't answer, as with another app showing notifications, leaves the bell
+  // to ring. `pw-dump` runs to about half a megabyte; an answer that times out,
+  // fails or passes 4 MB counts as recording. Both are stopped within 7 s,
+  // before the next bell.
   function ring() {
     if (turnedOn && !listening.running) listening.running = true
   }
 
-  // Whether PipeWire's nodes (`pw-dump`'s answer) hold a microphone being
-  // recorded: an app's capture stream running, not one reading a speaker's
-  // monitor, as a level meter does. An answer that can't be read keeps the
-  // bell quiet too.
+  // An app's capture stream running, not one reading a speaker's monitor, as a
+  // level meter does.
   function recording(dump) {
     var nodes
     try { nodes = JSON.parse(dump) } catch (e) { return true }
@@ -465,9 +388,8 @@ Item {
     })
   }
 
-  // A byte past 4 MB is read, so an answer that reaches the cap shows it.
-  // omarchy-shell's -q would hide the answer too, so its errors go nowhere
-  // instead.
+  // A byte past 4 MB shows an answer over the cap. omarchy-shell's -q would
+  // hide its answer too.
   Process {
     id: listening
     command: ["bash", "-c", "[ \"$(timeout -k 1 2 omarchy-shell notifications dndState 2> /dev/null)\" = on ] && exit 1\n"
@@ -478,16 +400,12 @@ Item {
     }
   }
 
-  // The chimes' player: one shell for as long as sounds are on, reading a
-  // chime's file name a line, and starting a pw-play for each in the
-  // background, so the chimes overlap and the shell's own thread starts no
-  // process per chime. It plays nothing but a chime's file: any other line
-  // it skips. Each pw-play has 2 s, four times a chime's length, so a
-  // PipeWire that stalls can't pile them up. Each starts from a subshell
-  // that ends at once, so this shell keeps no record of it: started from
-  // the shell itself, each chime grows it by about a third of a kilobyte,
-  // 10 MB over 20,000 chimes. When Stonks goes its input closes and it
-  // ends; a chime ringing then rings out, half a second at most.
+  // One shell while sounds are on, starting a pw-play in the background for
+  // each chime named on its input, so chimes overlap and the shell's thread
+  // starts no process per chime. Each has 2 s, four times a chime, so a
+  // stalled PipeWire can't pile them up, and starts from a subshell that ends
+  // at once: started from this shell, each grew it by a third of a kilobyte,
+  // 10 MB over 20,000 chimes. As Stonks goes, its input closes and it ends.
   Process {
     id: chimer
     running: root.turnedOn

@@ -9,10 +9,8 @@ import "Chart.js" as Chart
 import "Figures.js" as Figures
 import "Format.js" as Format
 import "Tones.js" as Tones
-// The bar pill: one featured symbol with its day line and change, whatever
-// range the panel or the window shows. Left click opens the panel, scroll
-// walks the watchlist, middle click cycles the pill style, right click opens
-// the window. The data service owns the data; the pill reads it.
+// The pill: the stock you last looked at, with its day's line and change
+// whatever range the panel or the window shows.
 BarWidget {
   id: root
   moduleName: "grvc.stonks"
@@ -23,30 +21,22 @@ BarWidget {
   readonly property var panel: panelLoader.item
   readonly property string featuredSymbol: service ? service.featuredSymbol : ""
   readonly property var featuredQuote: service && featuredSymbol ? (service.quotes[featuredSymbol] || null) : null
-  // The day, as its row shows it: its newest price since the close on top
-  // where it has one (`Service.newestPrints`).
+  // As its row shows it, with its newest price since the close.
   readonly property var featured: featuredQuote
     ? Figures.rowModel(featuredQuote, 0, service.changeMode, service.newestPrints[featuredSymbol] || null) : null
-  // The newest price's session and time, which the pill has no room for:
-  // its hover says it (`Figures.newestNote`).
+  // The pill has no room for the newest price's session and time; the hover
+  // says them.
   readonly property string newestNote: featured && featured.newest
     ? Figures.newestNote(featuredQuote, featured.newest, service.now, service.calendars) : ""
   readonly property string newestPhase: featured && featured.newest ? featured.newest.phase : ""
-  // The line: the day the 1D chart draws, drawn once Robinhood has said
-  // which (`Chart.lineDay`), as the row's is, from the answers it is drawn
-  // from, so the clock never redraws it. A day with no print draws nothing,
-  // as its row does.
+  // The day the 1D chart draws, once Robinhood has said which, so the clock
+  // never redraws it.
   readonly property var lineDay: featuredQuote
     ? Chart.lineDay(featuredSymbol, featuredQuote, service.nights, service.allDay, service.calendars) : null
   readonly property var lineGeometry: lineDay && lineDay.points.length ? Chart.chartGeometry(lineDay, service.calendars) : null
-  // In the bar's right section, among its bare icons, the pill has a form of
-  // its own, `barStyleRight`: the icon until a middle-click there picks
-  // another. The centre and left share `barStyle`. On a side bar it has
-  // `barStyleVertical`: the icon, as Omarchy's text widgets fall back to
-  // theirs there, until a middle-click picks the symbol over its change
-  // ("stacked"). Each rides the entry, as the clock keeps verticalFormat
-  // beside format, so a move between sections or between the top and a side
-  // brings back each one's own.
+  // The right section, among the bar's bare icons, and a side bar each keep
+  // a form of their own, the icon until a middle-click picks another, as the
+  // clock keeps verticalFormat beside format: a move brings each one's back.
   readonly property bool onRight: {
     var layout = bar && bar.layoutConfig ? bar.layoutConfig : null
     var right = layout && Array.isArray(layout.right) ? layout.right : []
@@ -56,33 +46,24 @@ BarWidget {
   }
   readonly property string styleKey: vertical ? "barStyleVertical" : onRight ? "barStyleRight" : "barStyle"
   readonly property string barStyle: setting(styleKey, vertical || onRight ? "icon" : "sparkline")
-  // Just the day's animal, a quiet icon among the bar's own.
   readonly property bool iconOnly: barStyle === "icon"
   readonly property bool retro: service ? service.retro : setting("style", "retro") === "retro"
-  // Freshness is judged with or without a quote: a first fetch that failed
-  // is what "! No data" is for.
+  // Judged without a quote too: a first fetch that failed is "! No data".
   readonly property var freshness: service && featuredSymbol
     ? Figures.freshness(service.entries[featuredSymbol] || null, featuredQuote, service.now, service.owed[featuredSymbol] || 0, false,
       service.newestPrints[featuredSymbol] || null) : null
   readonly property bool warns: Figures.freshnessWarns(freshness)
-  // What the "!" means, in the panel's words, for the hover on every form,
-  // then why and when Stonks tries again, where it knows: Yahoo's pause
-  // (`Figures.hostPause`), or that a price on show couldn't be updated. The
-  // pill itself has no room for them.
+  // The hover's words for the "!", then why and when Stonks tries again.
   readonly property var hostPause: service && service.yahooGate
     ? Figures.hostPause(service.yahooGate.pause, service.yahooGate.pausedUntil, service.now) : null
   readonly property string warningText: !warns ? ""
     : Figures.freshnessText(freshness, featuredQuote, service.calendars)
       + (hostPause ? "\n" + hostPause.why + "\n" + hostPause.when
         : freshness.state === "failed" && featured ? "\nRetrying" : "")
-  // The shell copies a hover's words only as the pointer enters. While it
-  // stays, a warning that starts, ends, or changes its words goes to the bar
-  // again, once every binding has the new words: no bubble names a warning
-  // that has ended, and the text form's empties out. So does another symbol
-  // on the pill, a wheel step's, so the bubble never names the company the
-  // pill has left; a symbol and its warning changing together show it once
-  // (Qt.callLater runs one function once). A new figure alone never
-  // re-shows it, so a resting pointer sees no blink.
+  // The shell copies a hover's words only as the pointer enters, so they go
+  // to the bar again while it stays: a warning's, a new symbol's, a new
+  // session's. Qt.callLater runs a function once, so changes together show
+  // once. A new figure alone never does, so a resting pointer sees no blink.
   function reshowTooltip() {
     if (button.tooltipHovered && button.bar) button.bar.showTooltip(button, button.tooltipText)
   }
@@ -94,14 +75,10 @@ BarWidget {
   readonly property color upColor: plugin && plugin.trendColors ? plugin.trendColors.upOn(barGround) : button.foreground
   readonly property color downColor: plugin && plugin.trendColors ? plugin.trendColors.downOn(barGround) : Commons.Color.urgent
   readonly property color trendColor: toneColor(featured ? featured.tone : "")
-  // A day's colour by its tone: up, down, or the dim of a flat one.
   function toneColor(tone) { return tone === "up" ? upColor : tone === "down" ? downColor : dimColor }
-  // The day and animal the icon form shows (`Figures.animalKind`, the
-  // header's rule). A new price that turns the same symbol's day between
-  // the bull and the bear steps the animal (`BarAnimal.turnTo`); another
-  // symbol or another day shows at once, and no change mode moves it: the
-  // turn says a price crossed, never that the reading changed.
-  // Read in the handler, never a binding, so it can't lag `featured`.
+  // The animal turns only for a price crossing on the same symbol's day
+  // (`BarAnimal.turnTo`), never for another symbol, day or change mode. Read
+  // in the handler, never a binding, so it can't lag `featured`.
   function animalDay() {
     return !featuredQuote ? "" : [featuredSymbol,
       featuredQuote.session && featuredQuote.session.regular ? featuredQuote.session.regular.start : 0].join("|")
@@ -120,25 +97,16 @@ BarWidget {
     shownDay = animalDay()
     shownKind = Figures.animalKind(featured)
   }
-  // Quieter than the bar's ink by the same rule as the panel's secondary
-  // text, against the bar's own ground.
   readonly property color barGround: Qt.rgba(Commons.Color.bar.background.r, Commons.Color.bar.background.g, Commons.Color.bar.background.b, 1)
   readonly property color dimColor: Tones.dim(button.foreground, barGround)
-  // A failed or overdue refresh marks the pill too: the bar is the surface
-  // most likely to be trusted at a glance. With no price, an answer the
-  // source sent without one says "No data", and a wait it never answered
-  // (overdue) says so in the header's words, naming no source: not every
-  // reader knows Yahoo.
+  // The bar is the surface most trusted at a glance, so a failed or overdue
+  // refresh marks the pill too. Overdue names no source: not every reader
+  // knows Yahoo.
   readonly property string changeText: featured ? (warns ? "! " : "") + Format.lookSigns(featured.changeLine, retro)
     : !warns ? "…" : freshness.state === "overdue" ? "! Can't get prices" : "! No data"
-  // A side bar's stacked form: the symbol's lines over the move's, each at
-  // most four characters (`Format.stackedSymbol`), the move in the rows'
-  // unit, money in money and else a percent (`Format.stackedMoney`,
-  // `stackedPct`), coloured by its sign as drawn. A warning's "!" goes on a
-  // short line of its own before the move, as the text form puts it before
-  // the change, kept whether the "!" shows or not, as the icon form keeps
-  // its room: the pill never changes height for a warning. With no quote at
-  // all the "!" is the move, in the place of the waiting "…".
+  // A side bar's stacked form: the symbol over the move, four characters a
+  // line at most, in the rows' unit. The "!" takes a short line of its own
+  // before the move, kept empty without one, so the pill never changes height.
   readonly property var stackedMove: !featured ? { lines: warns ? [] : ["…"], sign: 0 }
     : service.changeMode === "abs" ? Format.stackedMoney(featured.abs, featuredQuote.priceDigits) : Format.stackedPct(featured.pct)
   readonly property var stackedLines: Format.stackedSymbol(featuredSymbol || "ST")
@@ -146,8 +114,7 @@ BarWidget {
     .concat(featured ? [{ text: warns ? "!" : "", move: false, warning: true }]
       : warns ? [{ text: "!", move: false, warning: false }] : [])
     .concat(stackedMove.lines.map(function(t) { return { text: t, move: true, warning: false } }))
-  // The warning's line: the "!"'s ink and a gap each side, as the icon form
-  // keeps under its animal.
+  // The "!"'s ink and 2 px each side.
   readonly property int stackedWarningHeight: Math.ceil(stackedWarningMetrics.tightBoundingRect("!").height) + 2 * 2
   readonly property int stackedHeight: stackedLines.reduce(function(sum, line) {
     return sum + (line.warning ? stackedWarningHeight : Style.bar.iconSlot)
@@ -158,8 +125,8 @@ BarWidget {
     font.pixelSize: Math.max(1, Math.round(button.fontSize))
   }
 
-  // What is left of a notch between wheel events: a high-resolution wheel
-  // sends a notch as several small ticks, and a notch is one symbol.
+  // A high-resolution wheel sends a notch as several small ticks; a notch is
+  // one symbol.
   property real wheelRemainder: 0
 
   function walk(angleDelta) {
@@ -193,16 +160,14 @@ BarWidget {
       root.bar.shell.updateEntryInline(root.moduleName, entry)
   }
 
-  // A side bar has two forms, the icon and the symbol over its change, so a
-  // middle-click there steps between them.
   function cycleBarStyle() {
     var ring = ["sparkline", "arrow", "text", "icon"]
     root.persistBarStyle(root.vertical ? (root.iconOnly ? "stacked" : "icon")
       : ring[(ring.indexOf(barStyle) + 1) % ring.length])
   }
 
-  // Shape contract for shell.summon/hide/toggle routing (Bar.findPanelWidget
-  // requires open/close/opened on the bar-widget root).
+  // Bar.findPanelWidget routes summon, hide and toggle to a widget with open,
+  // close and opened.
   readonly property bool opened: panel ? panel.opened === true : false
 
   function open() { if (panel) panel.open() }
@@ -251,18 +216,13 @@ BarWidget {
     labelVisible: false
     hasVisualContent: true
     fixedWidth: root.vertical ? -1 : (root.iconOnly ? Style.bar.iconSlot : content.implicitWidth + Style.space(17))
-    // A side bar's icon slot holds the animal and the room under it for a
-    // warning's "!", with a pixel to spare each end: an icon slot, or more
-    // where the text is small enough that the two outgrow it.
+    // The animal and the room under it for a "!", a pixel to spare each end,
+    // and at least an icon slot.
     fixedHeight: root.vertical ? (root.iconOnly ? Math.max(Style.bar.iconSlot, Math.ceil(iconForm.implicitHeight) + 2)
       : root.stackedHeight) : -1
-    // A hover only for what the pill can't say: the icon names nothing, so
-    // its hover says what the other forms show, the symbol and its change;
-    // on every form, the session and time of a newest price since the close
-    // ("Overnight 23:25"), and what a warning's "!" means. The line, the
-    // arrow, and the text show their symbol and change already, so say
-    // nothing else. None while its panel is open: the bubble lands on the
-    // card's header.
+    // Only what the pill can't say: the icon form's symbol and change, a
+    // newest price's session and time ("Overnight 23:25"), and what a "!"
+    // means. None while the panel is open: the bubble would land on its header.
     tooltipText: root.opened ? ""
       : [root.iconOnly ? (root.featuredSymbol || "STONKS") + " " + root.changeText : "", root.newestNote, root.warningText]
         .filter(function(part) { return part !== "" }).join(" · ")
@@ -292,9 +252,8 @@ BarWidget {
         lineWidth: 1.5
       }
 
-      // The rows' pixel histogram at pill size, so the pill, a row, and the
-      // hero are one drawing at three sizes; its stems solid, as faint ones
-      // read as a dotted line here.
+      // The rows' histogram at pill size, its stems solid: faint ones read as
+      // a dotted line here.
       PixelChart {
         visible: root.barStyle === "sparkline" && root.retro
         anchors.verticalCenter: parent.verticalCenter
@@ -309,8 +268,7 @@ BarWidget {
         solid: true
       }
 
-      // The 23-degrees idea: an arrow whose tilt is the size of today's move,
-      // flat at zero and pinned at 45 degrees past a five percent day.
+      // Its tilt is the size of today's move: flat at zero, 45° past 5%.
       Text {
         objectName: "pillArrow"
         visible: root.barStyle === "arrow"
@@ -323,21 +281,16 @@ BarWidget {
         Behavior on rotation { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
       }
 
-      // The icon form, on either bar: the day's animal, the same in both
-      // looks, the header's bull or bear (`BarAnimal`) one cell a pixel, as
-      // tall as the bar's icons allow. A day that crosses its close turns it
-      // column by column (`shownKind`). With no animal it says what the
-      // other forms say: a flat day lies level in the dim of a flat change,
-      // as the line form's flat day does, and before the first quote the
-      // dim "…" of the text form.
+      // The day's animal, the same in both looks, one cell a pixel. Without
+      // one, a flat day lies level in the dim of a flat change, and before the
+      // first quote the text form's dim "…" waits.
       Item {
         id: iconForm
         objectName: "pillIcon"
         visible: root.iconOnly
         anchors.verticalCenter: parent.verticalCenter
-        // A side bar is barely wider than the animal, so a warning's "!" goes
-        // under it there, in room the slot keeps whether the "!" shows or
-        // not: the animal never moves for a warning.
+        // A side bar is barely wider than the animal, so a "!" goes under it,
+        // in room kept whether it shows or not.
         readonly property int warningGap: 2
         readonly property rect warningInk: warningMetrics.tightBoundingRect("!")
         implicitWidth: animal.implicitWidth
@@ -372,12 +325,9 @@ BarWidget {
           font.pixelSize: button.fontSize
         }
 
-        // A warning's "!", in the bar's ink as the hero's line says one. On a
-        // top or bottom bar it hangs in the slot's margin right of the
-        // animal; on a side bar it sits under it, its ink centred across the
-        // bar. A badge on its corner, as the shell's Tailscale icon wears
-        // one, blurs into the cells at this size. With nothing shown, a first
-        // fetch that failed, it stands alone where the animal would be.
+        // Right of the animal on a top or bottom bar, under it on a side bar.
+        // A badge on its corner, as Tailscale's icon wears, blurs into the
+        // cells at this size.
         Text {
           id: warning
           objectName: "pillWarning"
@@ -409,8 +359,7 @@ BarWidget {
         font.bold: true
       }
 
-      // The text form says the price too, as a ticker does: the bar is
-      // where a glance asks what it is now.
+      // The text form says the price too, as a ticker does.
       Text {
         objectName: "pillPrice"
         visible: root.barStyle === "text" && !!root.featured
@@ -428,17 +377,15 @@ BarWidget {
         anchors.verticalCenter: parent.verticalCenter
         textFormat: Text.PlainText
         text: root.changeText
-        // With no price, a warning's words ("! Can't get prices") are in the
-        // bar's ink, as the header says trouble; the waiting "…" stays dim.
+        // With no price, trouble is in the bar's ink, as the header says it.
         color: root.featured ? root.trendColor : root.warns ? button.foreground : root.dimColor
         font.family: button.fontFamily
         font.pixelSize: button.fontSize
       }
     }
 
-    // As Omarchy's clock draws a vertical bar: one line to an icon slot, at
-    // the bar's size, 90% at four characters, never smaller; the warning's
-    // line is shorter (`stackedWarningHeight`).
+    // As Omarchy's clock draws a vertical bar: a line to an icon slot, 90% at
+    // four characters.
     Column {
       objectName: "pillStack"
       visible: root.vertical && !root.iconOnly

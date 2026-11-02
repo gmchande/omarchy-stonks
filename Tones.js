@@ -1,11 +1,9 @@
 .pragma library
-// How the theme's colours are put to work: which colours are up and down,
-// how much quieter secondary text is, and how strongly a chart's wash lies
-// over the ground. Every colour comes in from the theme, except Stonks' own
-// up and down for a theme with no green and red of its own (`ownPair`),
-// and those are made for the theme's ground.
-// Colours are { r, g, b } in 0..1, as a QML color is; a colour made here is
-// a "#rrggbb" string, which a QML color property takes.
+// Which colours are up and down, how much quieter secondary text is, and how
+// strongly a chart's wash lies over the ground. Every colour comes from the
+// theme, but Stonks' own pair for a theme without a usable one (`ownPair`).
+// Colours are { r, g, b } in 0..1, as a QML color is; one made here is a
+// "#rrggbb" string.
 
 // A theme's colour by its first key present, read the way the shell reads
 // colors.toml (`Color.loadColors`): `green`, else the terminal's `color2`.
@@ -52,18 +50,12 @@ function oklabLightness(c) {
 }
 
 // Closer than this in hue, a theme's green and red are no pair: two greens,
-// two blues, two greys, or a grey beside a red. Lightness and chroma are
-// both left out (OKLab's ΔH), as a darker shade of one hue is also less
-// saturated: a bright and a dark green are 0.111 apart in a and b but
-// 0.001 in hue. Of the installed themes, the nearest without a pair is
-// Hackerman's two greens at 0.025 and the nearest with one Miasma's green
-// and brown at 0.064; the cut sits between them. Lumon, Solitude,
-// Vantablack, and White are at 0.002 or less, and every other installed
-// theme at 0.106 or more.
+// two blues, two greys, or a grey beside a red. Hue alone (OKLab's ΔH), since a
+// darker shade of a hue is also less saturated: a bright and a dark green are
+// 0.111 apart in a and b but 0.001 in hue.
 var PAIR_APART = 0.06
 
-// Whether the theme's green (a "#rrggbb" from colors.toml, or "") and red
-// (the shell's urgent) are a real pair.
+// `green` is colors.toml's "#rrggbb", or ""; `red` the shell's urgent.
 function paired(green, red) {
   var g = hexColor(green)
   if (!g) return false
@@ -73,31 +65,26 @@ function paired(green, red) {
   return Math.sqrt(Math.max(0, da * da + db * db - dc * dc)) >= PAIR_APART
 }
 
-// Fainter than this against a surface's ground, a theme's own green or red
-// is not clear enough to read there: Miasma's brown at 2.30:1 and Catppuccin
-// Latte's green at 2.96:1 on their own backgrounds.
+// A theme's own green or red fainter than this on a surface's ground is not
+// clear enough to read there.
 var OWN_FLOOR = 3
 
-// Stonks' own up and down, for a theme without a pair or with one too faint
-// to read: a green and a red by hue, at OWN_CHROMA, and as near the ground
-// as reads at OWN_TARGET there. A fixed pair (GitHub's) reads as a stranger
-// in the themes that need one: a deep crimson bear on Catppuccin Latte's
-// pastels and on White's greys. On a dark ground a colour at 4.5:1 is dark
-// enough to look muddy, so it sits further off, at 6:1. Where OWN_CHROMA
-// leaves sRGB at that lightness, it is lowered, down to HUE_CHROMA, the
-// least that still says its hue.
+// Stonks' own up and down: a green and a red by hue, as near the ground as
+// reads at OWN_TARGET, at OWN_CHROMA where sRGB allows, else down to
+// HUE_CHROMA, the least that still says its hue. A fixed pair, such as
+// GitHub's, looks foreign in the themes that need one: a deep crimson bear on
+// Catppuccin Latte's pastels.
 var OWN_HUES = { up: 145, down: 25 }
 var OWN_CHROMA = 0.16
 var HUE_CHROMA = 0.07
 var OWN_TARGET = { light: 4.5, dark: 6 }
 
-// Whether `ground` is dark: white reads more strongly on it than black.
+// White reads more strongly on it than black.
 function darkGround(ground) {
   return contrast({ r: 1, g: 1, b: 1 }, ground) > contrast({ r: 0, g: 0, b: 0 }, ground)
 }
 
-// OKLCH to sRGB, or null outside sRGB's gamut; `clipped`, each channel
-// held to it instead.
+// Null outside sRGB's gamut, unless `clipped`.
 function fromOklch(L, C, hue, clipped) {
   var a = C * Math.cos(hue * Math.PI / 180), b = C * Math.sin(hue * Math.PI / 180)
   var l = Math.pow(L + 0.3963377774 * a + 0.2158037573 * b, 3)
@@ -114,33 +101,24 @@ function fromOklch(L, C, hue, clipped) {
   return { r: encode(lin[0]), g: encode(lin[1]), b: encode(lin[2]) }
 }
 
-// The colour of `hue` and `chroma` nearest `ground` in lightness that still
-// reads at `target` on it, on the side of the ground with more room: a
-// light ground takes a darker colour, a dark one a lighter. Where the
-// chroma leaves sRGB at that lightness, it is lowered, as little as it
-// must, down to `least`; null where even that doesn't fit.
+// On the side of the ground with more room. Where `chroma` leaves sRGB at that
+// lightness, it is lowered as little as it must, down to `least`.
 function readingColor(hue, chroma, least, target, ground) {
   var lighter = darkGround(ground)
   var from = oklabLightness(ground), to = lighter ? 1 : 0
-  // The colour at chroma `c`, or null. Judged as written, "#rrggbb", which
-  // rounds each channel.
+  // Judged as written, "#rrggbb", which rounds each channel.
   var at = function(c) {
     var written = function(L) { return hexOf(fromOklch(L, c, hue, true)) }
     var reads = function(L) { return contrast(hexColor(written(L)), ground) >= target }
-    // In sRGB, and keeping the chroma it was made with, short of what
-    // rounding takes: near black a green rounds to #000000, which reads
-    // but says no hue.
+    // In sRGB, and keeping its chroma once rounded: near black a green rounds
+    // to #000000, which reads but says no hue.
     var fits = function(L) {
       if (fromOklch(L, c, hue) === null) return false
       var o = oklab(hexColor(written(L)))
       return Math.sqrt(o.a * o.a + o.b * o.b) >= c * 0.9
     }
-    // Away from the ground contrast can dip just off it, but it crosses the
-    // target once, so the lightness where it first reads is found by
-    // halving. There the colour is the hue's nearest the ground; where sRGB
-    // ends just past it, as for a light red on #484848 or a light green on a
-    // #bb0022 bar, within 0.003 of lightness, it is the only one that reads,
-    // and a walk in steps passes over it.
+    // Contrast crosses the target once away from the ground, so halving finds
+    // the nearest lightness that reads, where a walk in steps can pass over it.
     if (!reads(to)) return null
     var lo = from, hi = to
     for (var i = 0; i < 30; i++) {
@@ -149,18 +127,16 @@ function readingColor(hue, chroma, least, target, ground) {
       else lo = mid
     }
     if (fits(hi)) return written(hi)
-    // Out of sRGB there on the near side, as a deep colour can be: the
-    // first lightness further on that fits.
+    // Out of sRGB there, as a deep colour can be: the first lightness on that
+    // fits.
     for (var step = 1; step <= 100; step++) {
       var L = hi + (to - hi) * step / 100
       if (fits(L)) return written(L)
     }
     return null
   }
-  // Less chroma only widens what fits sRGB at a lightness, so the most
-  // that reads is found by halving between `least` and `chroma`. Stepping
-  // down passes over it: on a #bb0022 bar, a green at 0.075 reads at 6:1,
-  // and steps of 0.01 fall to the 3:1 floor.
+  // Less chroma only widens what fits sRGB, so halving finds the most that
+  // reads, where stepping down can pass over it.
   var best = at(chroma)
   if (best !== null) return best
   best = at(least)
@@ -177,9 +153,8 @@ function readingColor(hue, chroma, least, target, ground) {
   return best
 }
 
-// Stonks' own colour of `hue`: at OWN_TARGET while it keeps HUE_CHROMA;
-// else at the theme's floor, OWN_FLOOR, as a red on a red bar must be to
-// stay red; else as grey as it must be.
+// It keeps its hue down to OWN_FLOOR before it greys: a red on a red bar must,
+// to stay red.
 function ownColor(hue, ground) {
   var dark = darkGround(ground)
   var target = dark ? OWN_TARGET.dark : OWN_TARGET.light
@@ -189,9 +164,8 @@ function ownColor(hue, ground) {
     || hexOf(dark ? { r: 1, g: 1, b: 1 } : { r: 0, g: 0, b: 0 })
 }
 
-// Each ground's pair, made once: the search can take several milliseconds
-// where a ground leaves little room, and every surface asks for up and down
-// apart, on every theme switch.
+// Made once: the search can take several milliseconds, and every surface asks
+// for up and down apart, on every theme switch.
 var ownPairs = {}
 function ownPair(ground) {
   var key = hexOf(ground)
@@ -199,11 +173,8 @@ function ownPair(ground) {
   return ownPairs[key]
 }
 
-// Up and down on `ground`. Up is the theme's green, as Omarchy colours
-// success in every app it themes, and down its red; never the accent, which
-// means selected. Where the theme has no real pair, or the fainter of its
-// two is under the floor on this ground, Stonks' own takes over, made for
-// this ground, so each surface picks for its own.
+// Up is the theme's green, as Omarchy colours success in every app it themes,
+// and down its red. Each surface picks for its own ground.
 function trend(green, red, ground) {
   var faintest = function(up, down) { return Math.min(contrast(up, ground), contrast(down, ground)) }
   if (paired(green, red) && faintest(hexColor(green), red) >= OWN_FLOOR) return { up: green, down: red }
@@ -225,10 +196,8 @@ function mixed(from, to, share) {
   }
 }
 
-// Secondary text: the foreground mixed `share` of the way toward the ground
-// it sits on, so it is quieter on a light theme as on a dark one, but never
-// under `floor` contrast against that ground. Dim takes a third and keeps
-// body text's 4.5:1; dimmer takes half and keeps 3:1.
+// Mixed toward the ground, so it is quieter on a light theme as on a dark one,
+// but never under `floor` contrast: dim keeps body text's 4.5:1, dimmer 3:1.
 var DIM = { share: 0.32, floor: 4.5 }
 var DIMMER = { share: 0.5, floor: 3 }
 
@@ -253,24 +222,19 @@ function dimmer(foreground, ground) {
   return secondary(foreground, ground, DIMMER)
 }
 
-// A wash is a colour at some alpha over the surface's ground. At one alpha a
-// dark red adds far less light than a light blue, so a down day's wash would
-// look half as present as an up day's. Each side's alpha is worked out from
-// the theme instead: the alpha at which its colour adds the same lightness,
-// OKLab's L, over the ground as the up colour does at the alpha the chart
-// sets.
+// At one alpha a dark red adds far less light than a light blue, so a down
+// day's wash would look half as present as an up day's. Each side's alpha is
+// the one at which its colour adds the lightness (OKLab's L) the up colour
+// adds at the chart's alpha.
 
-// The lightness `color` at `alpha` adds over `ground`, either way, mixed
-// channel by channel in sRGB, as a canvas composites it.
+// Either way, mixed channel by channel in sRGB, as a canvas composites.
 function addedLightness(color, ground, alpha) {
   return Math.abs(oklabLightness(mixed(ground, color, alpha)) - oklabLightness(ground))
 }
 
-// The alpha at which `color` over `ground` adds the lightness `reference`
-// adds at `alpha`: `alpha` itself for the reference. Never more than half
-// `ink`, the alpha of the line or cap it sits under, so the line and the
-// caps stay the most important thing: a pale up colour over a dark red
-// (Kanagawa) would otherwise take the red's stems to solid ink.
+// Never more than half `ink`, the alpha of the line or cap above it, so those
+// stay the most important thing: a pale up colour over Kanagawa's dark red
+// would take the red's stems to solid ink.
 function washAlpha(color, reference, ground, alpha, ink) {
   var cap = ink / 2
   var target = addedLightness(reference, ground, alpha)

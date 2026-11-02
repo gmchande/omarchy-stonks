@@ -1,21 +1,13 @@
 .pragma library
 
-// The chart heard, in each look's voice: the chimes, and the replay.
-// The chimes are the chart as a row of bars you run a hand along: the
-// pentatonic's eleven notes, low at the chart's floor and high at its
-// ceiling, a bar each (`barAt`, `chime`), so no note is sad and a down day
-// sounds as kind as an up one.
-// The replay is made from the chart on screen as a replay starts. Its time
-// is the replay's own: its place along the chart goes from `from` to `to`
-// (0..1, the chart's x) over `seconds`, on Qt's InOutSine, as ChartMotion's
-// replay scrubs. Smooth strikes the scrub's chimes as the place moves onto
-// each bar; retro steps one note per pixel column, on the same bars, and
-// where the line crosses its baseline, yesterday's close or the range's
-// start, ticks in noise.
-// Each sound is levelled by its loudest 50 ms, under the fixed sounds. The
-// shell's engine interprets a loop that runs once, so the work per sample is
-// a table read and a few sums: the place, the pitch, and the envelope move
-// once a millisecond (`STEP`), and each voice reads one cycle from a table.
+// The chart heard, in each look's voice: the chimes and the replay. The chimes
+// are the chart as a row of bars under a hand: the pentatonic's eleven notes
+// from its floor to its ceiling, so no note is sad and a down day sounds as
+// kind as an up one. A replay's place runs from `from` to `to` (0..1 along the
+// chart) over `seconds` on Qt's InOutSine, as ChartMotion's replay scrubs.
+// The shell's engine interprets a loop that runs once, so the work per sample
+// is a table read and a few sums: the place, pitch and envelope move once a
+// millisecond (`STEP`), and each voice reads one cycle from a table.
 
 var RATE = 24000
 var STEP = 24
@@ -30,8 +22,7 @@ function placeAt(t, from, to, seconds) {
   return from + (to - from) * inOutSine(Math.min(1, t / seconds))
 }
 
-// One cycle of `shape(phase)`, phase 0..1, with a guard point for reading
-// between entries.
+// With a guard point for reading between entries.
 function cycle(shape) {
   var table = new Float32Array(TABLE + 1)
   for (var i = 0; i <= TABLE; i++) table[i] = shape(i / TABLE)
@@ -46,9 +37,8 @@ function biquad(type, f, q) {
   return { b0: b0, b1: (type === "lp" ? 1 - c : -(1 + c)) / a0, b2: b0, a1: -2 * c / a0, a2: (1 - a) / a0 }
 }
 
-// A high-pass then a low-pass, in place, in one pass: the high-pass's output
-// is the low-pass's input, so the low-pass reads its last two outputs
-// (`hy1`, `hy2`) before they move on.
+// The low-pass reads the high-pass's last two outputs (`hy1`, `hy2`) before
+// they move on.
 function band(x, low, high) {
   var h = biquad("hp", low, 0.707), l = biquad("lp", high, 0.707)
   var hx1 = 0, hx2 = 0, hy1 = 0, hy2 = 0, ly1 = 0, ly2 = 0
@@ -70,10 +60,8 @@ function fadeEdges(x, inMs, outMs) {
   return x
 }
 
-// The sound, and the gain that puts its loudest 50 ms of RMS at `db` dBFS,
-// which `wav` applies as it writes. The window is a whole number the engine
-// keeps as one (`| 0`): Math.round's result, read as a fraction, makes a
-// retro replay's levelling take 16 ms instead of 2.
+// `wav` applies the gain. `| 0` keeps the window whole in the engine: read as
+// a fraction, it made a retro replay's levelling take 16 ms instead of 2.
 function levelled(x, db) {
   var win = Math.round(0.05 * RATE) | 0, best = 0, acc = 0
   for (var i = 0; i < x.length; i++) {
@@ -84,17 +72,12 @@ function levelled(x, db) {
   return { samples: x, gain: best > 0 ? Math.pow(10, db / 20) / Math.sqrt(best / win) : 0 }
 }
 
-// Smooth: the scrub's chimes, struck as the replay's place moves onto each
-// bar of the line (`lineBars` on `geometry`, the chart's), as a pointer
-// swept along it strikes them: at most one every 45 ms, a bar struck sooner
-// waiting out the gap with the latest waiting winning, none where the chart
-// draws no line (a break: Tokyo's lunch), and each ringing out its half
-// second over what follows. A print that stands alone, a thin night's trade,
-// is struck as the place passes it, as the replay's scrub lands on it,
-// though the place steps over its one point. No tick where the line crosses
-// its baseline: a tone there at A6, the top bar's own pitch, reads among
-// the bars as one more. Each bar sits as a chime does, so a replay sounds
-// as a sweep does.
+// Smooth strikes the chimes as the place moves onto each bar, as a sweeping
+// pointer does (`Sounds.chime`): 45 ms apart at most, none where the line
+// breaks, each ringing out over what follows. A lone print, as a thin night's
+// trade, is struck as the place passes it, though no step lands on its point.
+// No tick where the line crosses its baseline: a tone there, at A6, the top
+// bar's pitch, reads as one more bar.
 function smooth(geometry, from, to, seconds) {
   var bars = lineBars(geometry)
   var passed = lonePrints(geometry)
@@ -103,15 +86,14 @@ function smooth(geometry, from, to, seconds) {
   var heard = -1, last = -gap, waiting = -1, waitingAlone = false, before = from
   var strike = function(bar, at) {
     var note = smoothBarSamples(bar), n = Math.min(note.length, x.length - at)
-    // An index the engine keeps as a whole number: the sum of the loop's
-    // steps, read as a fraction, makes the mix eight times as slow.
+    // `| 0` keeps the index whole: read as a fraction, the mix runs eight
+    // times as slow.
     for (var j = 0, k = at | 0; j < n; j++, k++) x[k] += note[j]
     last = at
     waiting = -1
     waitingAlone = false
   }
-  // The last step lands on the replay's end, where its scrub ends: a lone
-  // print there is passed too.
+  // The last step lands on the replay's end, so a lone print there is passed.
   for (var i = 0; i < end + STEP; i += STEP) {
     var place = placeAt(i / RATE, from, to, seconds)
     var bar = bars(place)
@@ -138,10 +120,9 @@ function smooth(geometry, from, to, seconds) {
   return { samples: x, gain: 1 }
 }
 
-// The bar of a print standing alone (`brk` on both sides of it: a thin
-// night's trade, or a day's only print) passed between two places along the
-// chart, after `a` and up to `b`, or -1 for none. It walks on from where it
-// was last asked, as a replay's place only moves on.
+// The bar of a lone print (`brk` on both sides: a thin night's trade, or a
+// day's only print) passed after `a` and up to `b`, or -1. It walks on from
+// where it was last asked, as a replay's place only moves on.
 function lonePrints(geometry) {
   var pts = geometry ? geometry.points : [], lone = []
   for (var i = 0; i < pts.length; i++) {
@@ -154,8 +135,7 @@ function lonePrints(geometry) {
   }
 }
 
-// Smooth's bar `bar` as a chime plays it, levelled, made once and kept: a
-// replay strikes dozens, and the scrub's chimes are written from it too.
+// Made once: a replay strikes dozens, and the chimes are written from them.
 var smoothBars = []
 function smoothBarSamples(bar) {
   if (!smoothBars[bar]) {
@@ -176,8 +156,7 @@ function nesPitch(f) {
   return 1789773 / (16 * Math.round(1789773 / (16 * f)))
 }
 
-// One cycle of a 25% pulse at `f`, band-limited to 7 kHz, so nothing folds
-// back.
+// Band-limited to 7 kHz, so nothing folds back.
 function pulseTable(f) {
   var duty = 0.25, top = Math.max(1, Math.floor(7000 / f))
   return cycle(function(phase) {
@@ -187,9 +166,8 @@ function pulseTable(f) {
   })
 }
 
-// Retro's bar `bar` as a pulse cycle at the console's pitch, made once and
-// kept, as smooth's bars are: made afresh on every replay, the tables would
-// be most of a retro replay's synthesis.
+// Made once: made on every replay, the tables were most of a retro replay's
+// synthesis.
 var pulseBars = []
 function pulseBar(bar) {
   if (!pulseBars[bar]) pulseBars[bar] = pulseTable(nesPitch(PENTATONIC[bar]))
@@ -201,14 +179,10 @@ function nesVolume(t, start, stepMs, floor) {
   return Math.max(floor, start - Math.floor(t * 1000 / stepMs)) / 15
 }
 
-// Retro: `grid` is the retro chart's own (PixelChart's): its columns, its
-// rows, each column's lit row (0 at the top), and the baseline's row. Each
-// column the replay reaches plays its lit row as a note, low at the floor,
-// high at the ceiling; a column with no print, which the chart leaves dark,
-// is silent. A repeated note is held, not struck again, its volume falling
-// in the console's steps; after silence it is struck again. Where a lit
-// column lands on the other side of the baseline from the lit one before
-// it, the noise channel ticks, 30 ms; across dark columns nothing crosses.
+// Retro plays each column the replay reaches as its lit row's note (`grid` is
+// PixelChart's), silent over dark ones. A repeated note is held, its volume
+// falling in the console's steps, and struck again after silence. Where a lit
+// column lands across the baseline from the last, the noise channel ticks.
 function retro(grid, from, to, seconds) {
   var x = new Float32Array(Math.round((seconds + 0.1) * RATE))
   var slewK = 1 - Math.exp(-1 / (0.0012 * RATE)), slew = 0
@@ -265,20 +239,18 @@ function retro(grid, from, to, seconds) {
   return levelled(fadeEdges(band(x, 90, 6500), 1, 4), -28)
 }
 
-// The bar a height on the chart (0 its floor, 1 its ceiling) sounds.
+// `height` 0 is the chart's floor, 1 its ceiling.
 function barOf(height) {
   return Math.round(Math.max(0, Math.min(1, height)) * (PENTATONIC.length - 1))
 }
 
-// The bar a row of the retro chart's grid (0 at the top) sounds.
+// `row` 0 is the grid's top.
 function rowBar(grid, row) {
   return barOf((grid.rows - 1 - row) / Math.max(1, grid.rows - 1))
 }
 
-// The bar the chart sounds at `x` (0..1 along it), or -1 where it draws
-// nothing: in smooth the line's height there (`lineBars`), as the scrub's
-// dot sits; in retro the lit row of the column there (`chart.grid`,
-// PixelChart's), dark columns silent.
+// -1 where the chart draws nothing. Smooth reads the line's height, where the
+// scrub's dot sits; retro the lit row of the column.
 function barAt(chart, x) {
   if (x < 0) return -1
   if (chart.retro) {
@@ -290,11 +262,9 @@ function barAt(chart, x) {
   return lineBars(chart.geometry)(x)
 }
 
-// The bar under smooth's line at each place along it, as `Chart.yAt` reads
-// the line: -1 before its first print, past its last, and across a break
-// (`brk`, Tokyo's lunch), where the line lifts. It walks on from where it
-// was last asked, so a replay, whose place only moves on, reads the line
-// once.
+// As `Chart.yAt` reads the line: -1 outside its prints and across a break
+// (`brk`), where it lifts. It walks on from where it was last asked, so a
+// replay reads the line once.
 function lineBars(geometry) {
   var pts = geometry ? geometry.points : [], k = 0
   return function(x) {
@@ -308,12 +278,11 @@ function lineBars(geometry) {
   }
 }
 
-// A chime: bar `bar` (0..10) struck, in the look's voice. Smooth's is a soft
-// metal bar struck with felt, ringing about half a second: a free bar's
-// modes (1, 2.756, 5.404), the upper ones dying first, and higher bars
-// ringing shorter, as real ones do. Retro's is a pulse blip that falls in
-// the console's volume steps, a tenth of a second. Each sits 8 dB under the
-// add sound, so a sweep's overlapping bars come to about 3 dB under it.
+// Smooth's is a soft metal bar struck with felt, about half a second: a free
+// bar's modes (1, 2.756, 5.404), the upper ones dying first and higher bars
+// ringing shorter, as real ones do. Retro's is a pulse blip falling in the
+// console's volume steps, a tenth of a second. Each sits 8 dB under the add
+// sound, so a sweep's overlapping bars come to about 3 dB under it.
 function chime(retro, bar) {
   return retro ? retroBar(bar) : { samples: smoothBarSamples(bar), gain: 1 }
 }
@@ -356,9 +325,8 @@ function retroBar(bar) {
   return levelled(fadeEdges(band(x, 90, 6500), 0.5, 3), -29)
 }
 
-// A levelled sound as a 16-bit mono WAV, its bytes, with a one-bit TPDF
-// dither. The samples go in in the machine's byte order, which on every
-// machine Omarchy runs on is the WAV's own, little-endian.
+// 16-bit mono with a one-bit TPDF dither, in the machine's byte order, which
+// on every machine Omarchy runs on is little-endian, as WAV's is.
 function wav(sound) {
   var samples = sound.samples, gain = sound.gain * 32767
   var bytes = new ArrayBuffer(44 + samples.length * 2)

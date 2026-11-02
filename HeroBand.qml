@@ -5,9 +5,9 @@ import "Cells.js" as Cells
 import "Figures.js" as Figures
 import "Settings.js" as Settings
 import "Tones.js" as Tones
-// Hero, chart, range row, info block, and the list and order rule. Every
-// piece keeps its height for every symbol, range, and look, so the list
-// below never moves. Surfaces own scrub and persist.
+// The hero, the chart, the range row, the info block and the list's header.
+// Each keeps its height for every symbol, range and look, so the list below
+// never moves.
 Item {
   id: root
 
@@ -18,21 +18,17 @@ Item {
   property string changeMode: "pct"
   property bool scrubbing: false
   property bool live: false
-  // The surface is closing: what moves stops where it is.
+  // Closing: what moves stops where it is.
   property bool still: false
-  // The chart on show is held while the next one loads: its live mark holds
-  // still with it.
+  // The chart on show waits for the next: its live mark holds still with it.
   property bool held: false
-  // Once the next chart has been on its way a while, what is on show for the
-  // held one dims, 0..1 (`ChartMotion.dimmed`), under a line naming what is
-  // coming; the header's controls, the range row, and the list stay. The
-  // dim is a veil of the ground laid over each, to 0.6: as if each faded to
-  // 0.4 over it, with no layer to flatten first.
+  // Once the next chart is a while on its way, the held one dims under a line
+  // naming what's coming (`ChartMotion.dimmed`): a veil of the ground over each
+  // piece, to 0.6, as if each faded to 0.4 with no layer to flatten first.
   property real dimmed: 0
   property string loadingText: ""
   readonly property color veil: Qt.rgba(ground.r, ground.g, ground.b, 0.6 * dimmed)
-  // The newest print's price: a new one ripples the live dot, and blinks
-  // retro's cap.
+  // A new one ripples the live dot, and blinks retro's cap.
   readonly property string newestPrice: root.day && root.day.points && root.day.points.length
     ? String(root.day.points[root.day.points.length - 1].p) : ""
   property color foreground: Commons.Color.foreground
@@ -53,8 +49,7 @@ Item {
   property var latest: null
   property var geometry: null
   property real scrubX: -1
-  // The draw-in's share of the ink, and a replay's place along the plot
-  // (-1 without one), which each painter draws in behind.
+  // The draw-in's share of the ink, and a replay's place (-1 without one).
   property real reveal: 1
   property real replayX: -1
   property int chartHeight: Style.space(190)
@@ -67,14 +62,13 @@ Item {
   property var breadth: ({ list: "", up: 0, flat: 0, down: 0, none: 0 })
   property bool listMenuOpen: false
   property bool replayRunning: false
-  // Search or a list view covers the rows: the header names the
-  // list they act on and says nothing about rows out of sight.
+  // Search or a list view covers the rows: the header names their list and
+  // says nothing of rows out of sight.
   property bool rowsCovered: false
   property var rangeOptions: []
   property string range: "1D"
-  // The info block's two lines, the day's or the range's over the 52 weeks;
-  // every list of facts the first can hold on any range; and a range's own
-  // high and low, marked on its chart (`History.rangeMarks`).
+  // The info block's day or range line over the 52 weeks'; every set of facts
+  // the first can hold on any range; and a range's high and low on its chart.
   property var periodLine: null
   property var yearLine: null
   property var factLists: []
@@ -85,11 +79,10 @@ Item {
   // Whether the hero's change is the day's, which a click cycles.
   property bool changeCycles: true
   readonly property alias chartItem: heroChart
-  // The retro chart's grid as drawn (`PixelChart.grid`), which a replay's
-  // sound steps through in retro, a note a column.
+  // A replay's sound steps through it in retro, a note a column.
   readonly property var pixelGrid: pixelChart.grid
 
-  // The hero's change or the rows' unit sign, clicked: the unit steps.
+  // The hero's change or the rows' unit, clicked: the unit steps.
   signal changeClicked()
   signal orderClicked()
   signal orderReverseClicked()
@@ -99,15 +92,13 @@ Item {
   signal snapToNow()
   signal rangeRequested(string range)
 
-  // At rest as a surface opens: the rule on the list's breadth.
   function settle() { breadthRule.settle() }
 
   // Between the band's blocks, the body's rhythm (`StonksBody.bandGap`).
   property int bandGap: Style.space(16)
 
   implicitHeight: band.implicitHeight
-  // The band's height but the chart's, summed from its other parts, so the
-  // body can size the chart from it without reading the chart back.
+  // Summed from its parts, so the body can size the chart without reading it.
   readonly property int heightBesideChart: heroItem.height + rangeRow.height + infoBlock.height + listHeader.height
     + band.spacing * 4
   implicitWidth: parent ? parent.width : 0
@@ -163,8 +154,8 @@ Item {
         id: dayChart
         visible: !root.retro
         anchors.fill: parent
-        // The hidden look rests: it draws nothing, draws in nothing and
-        // follows no scrub until it shows, so a new chart paints once.
+        // The hidden look draws nothing and follows no scrub until it shows,
+        // so a new chart paints once.
         geometry: root.retro ? null : root.geometry
         up: root.view ? root.view.dayUp : true
         upColor: root.upColor
@@ -214,8 +205,8 @@ Item {
         fontFamily: root.fontFamily
       }
 
-      // The held chart's veil; the chart that lands draws in at full ink.
-      // It reaches as far past the chart as a mark can lift off it.
+      // The chart that lands draws in at full ink. The veil reaches as far past
+      // the chart as a mark can lift off it.
       Rectangle {
         anchors.fill: parent
         anchors.topMargin: -rangeMarks.lift
@@ -224,8 +215,7 @@ Item {
         color: root.veil
       }
 
-      // What is coming, named over the dimmed chart; gone as it lands. With
-      // no name, as while Yahoo sends nothing, it says nothing.
+      // With no name, as while Yahoo sends nothing, it says nothing.
       Text {
         objectName: "loadingLabel"
         anchors.centerIn: parent
@@ -240,10 +230,9 @@ Item {
         elide: Text.ElideRight
       }
 
-      // A day with one bar or none says so where its line would be, on a
-      // patch of the ground so the dashed baseline stops short of it: a lone
-      // dot or an empty chart read as broken (`Figures.dayNote`). Beside a
-      // lone print it stands in the other half, clear of its dot or column.
+      // A day with one bar or none says so on a patch of the ground, which
+      // stops the dashed baseline short of it: a lone dot or an empty chart
+      // reads as broken. Beside a lone print it stands in the other half.
       Rectangle {
         objectName: "dayNote"
         readonly property string text: root.geometry && root.geometry.day ? Figures.dayNote(root.day, root.now, root.calendars) : ""
@@ -271,8 +260,8 @@ Item {
       MouseArea {
         anchors.fill: parent
         hoverEnabled: true
-        // The pointer reads the chart where it is drawn, so its right edge
-        // reaches the last print, alone as a dot too.
+        // Read where the chart is drawn, so the right edge reaches the last
+        // print.
         onPositionChanged: function(mouse) {
           if (!root.replayRunning) root.scrubRequested(root.retro ? mouse.x / width : dayChart.fractionAt(mouse.x))
         }
@@ -281,10 +270,8 @@ Item {
       }
     }
 
-    // The range row, then the info lines it chooses, then the list's header,
-    // a band's gap apart, as every block in the band is; the header stands a
-    // group's gap over its rows (the body's `listGap`), so it groups with
-    // the rows it titles.
+    // The blocks stand a band's gap apart, and the list's header a group's gap
+    // over its rows (`listGap`), so it groups with them.
     RangeSelector {
       id: rangeRow
       objectName: "rangeRow"
@@ -298,17 +285,15 @@ Item {
       onSelected: function(value) { root.rangeRequested(value) }
     }
 
-    // The day's or the range's, and the 52 weeks: two lines that are always
-    // there, so the list keeps its place for every symbol and range.
+    // Always two lines, so the list keeps its place.
     InfoTable {
       id: infoBlock
       objectName: "infoBlock"
       width: parent.width
       height: implicitHeight
       lines: [root.periodLine, root.yearLine]
-      // Every title a line can hold: each range's, the day's 1D, weekday, or
-      // month (`Figures.dayTitles`), and the 52 weeks'
-      // (`Fundamentals.yearLine`).
+      // Every title a line can hold (`Figures.dayTitles`,
+      // `Fundamentals.yearLine`).
       titles: root.rangeOptions.map(function(r) { return String(r).toUpperCase() }).concat(Figures.dayTitles(), ["52W"])
       factLists: root.factLists
       retro: root.retro
@@ -326,13 +311,11 @@ Item {
       }
     }
 
-    // The list's name, a menu, at the left of the rule, as Apple puts it at
-    // the top of the list; the order control at the right, then the rows'
-    // unit. The name starts at the rows' words, and the unit ends at the
-    // figures it names, the band's own edges. Its height is the caption
-    // line's, never a word's: a glyph drawn from another font is taller, and
-    // would move the rows. A line of text rounds its ascent and its descent
-    // up to whole pixels each, and so does this.
+    // The list's name, a menu, left of the rule, as Apple puts it atop a list;
+    // the order and the rows' unit on the right. Its height is the caption
+    // line's, never a word's: a glyph from another font is taller and would
+    // move the rows. Like a line of text, it rounds its ascent and descent up
+    // to whole pixels each.
     Item {
       id: listHeader
       width: parent.width
@@ -399,8 +382,7 @@ Item {
         onClicked: root.listClicked()
       }
 
-      // The rows and the rule are the day's on every range, and say which
-      // while the rows show.
+      // The rows and the rule are the day's on every range, and say which.
       Text {
         id: todayText
         objectName: "todayLabel"
@@ -417,8 +399,7 @@ Item {
         font.letterSpacing: 1
       }
 
-      // The rule between the name and the order is the list's breadth. It
-      // rests while the rows are covered and settles as they show again.
+      // The list's breadth. It rests while the rows are covered.
       BreadthRule {
         id: breadthRule
         objectName: "breadthRule"
@@ -439,11 +420,9 @@ Item {
         fontFamily: root.fontFamily
       }
 
-      // The order control hovers the way a range token does: the fill and
-      // the brighter word, so it reads as a control and not a label. In a
-      // sorted order the arrow and the word are two controls, each with its
-      // own fill: the arrow reverses the order, the word steps to the next.
-      // Manual has no direction, so there they are one control that steps.
+      // Hovers as a range does, so it reads as a control, not a label. In a
+      // sorted order the arrow reverses and the word steps to the next order,
+      // each with its own fill; manual has no direction, so both step.
       Rectangle {
         objectName: "orderControl"
         visible: !root.rowsCovered
@@ -461,8 +440,8 @@ Item {
         Behavior on color { ColorAnimation { duration: 160; easing.type: Easing.OutCubic } }
       }
 
-      // The arrow's fill pads it as the word's fill pads the word, so the two
-      // read as two buttons; its target is wider, through the gap.
+      // Padded as the word's fill pads the word, so the two read as two
+      // buttons.
       Rectangle {
         objectName: "orderArrowFill"
         visible: !root.rowsCovered && orderText.sorted
@@ -476,8 +455,7 @@ Item {
         Behavior on color { ColorAnimation { duration: 160; easing.type: Easing.OutCubic } }
       }
 
-      // The arrow alone, and the arrow with the two spaces after it, as the
-      // label draws them.
+      // The arrow alone, and with the two spaces after it.
       TextMetrics {
         id: arrowMetrics
         font: orderText.font
@@ -499,18 +477,16 @@ Item {
         textFormat: Text.PlainText
         text: Settings.orderLabel(root.order, root.reversed)
         readonly property bool sorted: root.order !== "manual"
-        // Where the word's first letter starts: the arrow's target runs up
-        // to it, through the gap, and reaches left far enough to make the
-        // shell's 22 px, though never past the gap before the breadth rule,
-        // whose hover says the counts.
+        // The arrow's target runs to the word's first letter, and left to make
+        // the shell's 22 px, but never into the breadth rule, whose hover says
+        // the counts.
         readonly property real wordStart: Math.round(gapMetrics.advanceWidth)
         readonly property real arrowReach: Math.min(breadthRule.anchors.rightMargin,
           Math.max(Style.space(6), Style.space(22) - wordStart))
-        // Only the hover's brightening eases.
         property real lift: arrowMouse.containsMouse || wordMouse.containsMouse ? 1 : 0
         Behavior on lift { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
-        // The list's name is the header's one word in full ink; the order
-        // brightens only under the pointer.
+        // Brighter only under the pointer: the list's name is the header's one
+        // word in full ink.
         color: Qt.tint(root.dim, Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, lift))
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption
@@ -529,8 +505,7 @@ Item {
           onClicked: orderText.sorted ? root.orderReverseClicked() : root.orderClicked()
         }
 
-        // Its target reaches halfway into the gap before the unit, whose
-        // target takes the other half.
+        // Half the gap before the unit; the unit's target takes the other half.
         MouseArea {
           id: wordMouse
           x: orderText.wordStart
@@ -546,12 +521,9 @@ Item {
         }
       }
 
-      // The rows' unit at the figures' edge, where a table puts a column's
-      // unit: % for a percent, ± for an amount, and the market's bell for
-      // since the open (`Cells.UNIT_SIGNS`), in the header icons' pen,
-      // bright as a sorted order word. The signs are one width, so a step
-      // moves nothing. A click steps the unit for every row, as c does; it
-      // hovers and presses as the order word does.
+      // The rows' unit at the figures' edge, where a table puts a column's:
+      // % for a percent, ± for an amount, the market's bell for since the open.
+      // The signs are one width, so a step moves nothing.
       Rectangle {
         objectName: "unitFill"
         visible: !root.rowsCovered

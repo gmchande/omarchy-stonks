@@ -8,29 +8,15 @@
 // Which chart a view shows (the day, or a range), and how it is laid out and
 // scrubbed. Knows nothing of parsing, settings, or colour.
 
-// The chart the view asks for, `symbol` on `range`, once it can be drawn:
-// the day once its quote is in; for a US stock or ETF once Robinhood has said
-// whether it trades it all day too (`allDay`, answers only, a failed one not
-// all-day), and, for one it does, once the overnight feed has answered
-// (`nights`, answers only), when the day is one trading day, the newest
-// print's (`Overnight.dayChart`), and for one it does not, Yahoo's own day
-// (`Overnight.sessionDay`); any other listing's is its quote's day, or the
-// coming day a two-day answer holds once it has a print (`Quote.tailDay`):
-// London's or Tokyo's stays the last until its first bar lands. A range
-// once its history and the symbol's quote are, since the headline is never
-// the last bar. A range takes the day too once it is in, for the newest
-// price since the close, which its history ends on, as the price on top
-// does (`History.withNewest`), and never waits for it.
-// `quote` is Yahoo's, as it came: the headline and the day's figures. `day`
-// is what the 1D chart draws and a scrub of it reads; `latest` is the
-// newest print of all, for the line under the price, or null where the
-// quote's own last print is it; `allDay`, whether Robinhood has said it
-// trades the listing all day, so its nights trade (`Overnight.marketAsleep`).
-// `histories` holds answers only (HistoryFeed): history in hand is drawn
-// while a refetch is out and after one fails. A first fetch that failed is
-// an answer too: a quote's, on any range, shows the symbol with no quote and
-// no chart; a range's has the day stand in (`failed`), through a retry until
-// an answer lands. Null while the chart is on its way.
+// The chart a view shows, `symbol` on `range`, or null while it is on its way.
+// The day waits for its quote and, where Robinhood may trade it all day, for
+// Robinhood (`dayDrawn`); a range for its history and the quote, since the
+// headline is never the last bar. A range ends on the day's newest price since
+// the close, and never waits for it. `histories` holds answers only, so what
+// is drawn stays while a refetch is out and after one fails. A failed first
+// fetch is an answer: a quote's shows the symbol alone, and a range's has the
+// day stand in (`failed`). `latest` is the newest print of all, or null where
+// the quote's own last print is it.
 function viewChart(symbol, range, quotes, entries, histories, nights, allDay, calendars) {
   if (!symbol) return null
   var quote = quotes[symbol] || null
@@ -52,17 +38,13 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
   return chart
 }
 
-// The day the 1D chart draws for `symbol`'s `quote`, { day, latest,
-// allDay, waiting }, which a row's line and the pill's draw too, so all
-// three show one day (`lineDay`): for a US stock or ETF Robinhood trades
-// all day (`allDay`, its answers by symbol), the newest print's trading
-// day with its night (`nights`, its answers, `Overnight.dayChart`), and
-// `latest`, that newest print; for one it doesn't, Yahoo's own day
-// (`Overnight.sessionDay`); while Robinhood hasn't answered either, Yahoo's
-// day as it came, `waiting`. A listing never asked of Robinhood (`allDay`
-// not given, as in a harness that stubs the service) has Yahoo's own day,
-// with no prints. Any other listing's is its quote's day, or the coming day
-// a two-day answer holds once it has a print (`Quote.tailDay`).
+// The day the chart, a row's line and the pill's draw, so all three show one.
+// For a US stock or ETF Robinhood trades all day, the newest print's trading
+// day with its night (`Overnight.dayChart`); for one it doesn't, Yahoo's own
+// (`Overnight.sessionDay`); `waiting` until Robinhood says which. Without
+// `allDay`, as in a harness that stubs the service, Yahoo's own. Any other
+// listing's is its quote's day, or the coming day once it has a print
+// (`Quote.tailDay`): London's or Tokyo's stays the last until its first bar.
 function dayDrawn(symbol, quote, nights, allDay, calendars) {
   var out = { day: Quote.tailDay(quote) || quote, latest: null, allDay: false, waiting: false }
   if (!Overnight.hasOvernight(quote, calendars)) return out
@@ -78,22 +60,17 @@ function dayDrawn(symbol, quote, nights, allDay, calendars) {
   return out
 }
 
-// The day a row's line and the pill's draw: the 1D chart's (`dayDrawn`),
-// or null while that day waits on Robinhood's answer, as the chart does, so
-// a line draws once, in the shape it keeps until a new price changes it.
+// Null while the day waits on Robinhood, as the chart does, so a line draws
+// once, in the shape it keeps until a new price changes it.
 function lineDay(symbol, quote, nights, allDay, calendars) {
   var drawn = dayDrawn(symbol, quote, nights, allDay, calendars)
   return drawn.waiting ? null : drawn.day
 }
 
-// The newest price since the close of each of `symbols` that has one
-// (`Overnight.newestPrint`), by symbol, measured from the dashed line of
-// the day its chart draws (`dayDrawn`): from Yahoo's own prints (`quotes`)
-// and, for one Robinhood trades all day (`allDay`, answers), its night's
-// (`nights`, answers). While that day waits on Robinhood, Yahoo's own
-// newest, on the day Yahoo's prints alone make (`Overnight.dayChart` with
-// no answer): until 04:00 the day that closed, as the chart will draw it,
-// so the answer brings only a newer price, never another footing.
+// Measured from the dashed line of the day each chart draws. While that day
+// waits on Robinhood, Yahoo's own prints make it: until 04:00 the day that
+// closed, as the chart will draw it, so the answer brings only a newer price,
+// never another footing.
 function newestPrints(symbols, quotes, nights, allDay, calendars) {
   var out = {}
   for (var i = 0; i < symbols.length; i++) {
@@ -110,28 +87,17 @@ function newestPrints(symbols, quotes, nights, allDay, calendars) {
 // Robinhood's answer before it comes (`Overnight.overnightAnswer`'s shape).
 var NO_ANSWER = { bars: [], from: null, through: null }
 
-// Normalized [0..1] x/y for drawing. x runs along the day's axis
-// (`chartSpan`) by the clock, each print at its time: the day the response
-// describes, from the pre-market open so the line arrives at the bell from
-// where it actually came, stretching to hold post-market prints; or, for a
-// US listing, its trading day (`Overnight.dayChart`,
-// `Overnight.sessionDay`), so a quiet hour shows as one and a finished
-// day ends at its last print's time. `ticks` mark the bell, and the
-// night's edges. Prints outside a regular session are flagged `ext`, and
-// those drawn dim `dim`: the extended hours, or, on a day lit where it
-// trades now (`litFrom`, `Overnight.litFrom`), every print before it.
-// `brk` lifts the line across a break in the exchange's day, hours that
-// take room by the clock (Tokyo's lunch, from its calendar in `calendars`:
-// Yahoo sends 09:00 to 15:30 as one session), so the line, the scrub's
-// dot, the chime and retro's columns leave the gap. Hours that take no room
-// (`axis.skip`: a weekend, a holiday's evening, the night before a coming
-// day's pre-market) are no break: the line runs on across them from the
-// last trade before to the first after, as it does through a quiet hour of
-// a US night (the owner chose it on 1 November, when Friday's line and
-// Sunday night's stood apart on every chart).
-// The vertical range holds every drawn print and the close the day
-// is measured from (`Quote.dayBase`) where it is known, with headroom, so
-// the baseline is always in view.
+// x runs by the clock along the day's axis (`chartSpan`): from the pre-market
+// open, so the line reaches the bell from where it came, to hold every print;
+// or, for a US listing, its trading day, so a quiet hour shows as one and a
+// finished day ends at its last print. `ext` marks prints outside the regular
+// session, and `dim` those drawn dim: the extended hours, or on a day lit
+// where it trades now (`Overnight.litFrom`), every print before that. `brk`
+// lifts the line across hours of the exchange's day that take room, such as
+// Tokyo's lunch, which Yahoo sends inside one 09:00 to 15:30 session. Hours
+// that take no room (`axis.skip`), such as a weekend, are no break: the line
+// runs across them, as through a quiet hour of a US night. The scale holds
+// every print and the close, so the baseline stays in view.
 function chartGeometry(quote, calendars) {
   var pts = quote.points
   var axis = chartSpan(quote)
@@ -140,9 +106,8 @@ function chartGeometry(quote, calendars) {
   var across = function(a, b) {
     return breaks.some(function(gap) { return a <= gap.start && b >= gap.end })
   }
-  // An unknown close (`Quote.knownPrice`) has no place on the scale and no
-  // dashed line: the prints alone set it. Otherwise a null close draws a
-  // baseline at zero, the day flattened on top of it.
+  // An unknown close has no place on the scale: as zero it would flatten the
+  // day against a baseline.
   var base = Quote.dayBase(quote)
   var known = Format.isFiniteNumber(base)
   var lo = known ? base : (pts.length ? pts[0].p : 0)
@@ -180,11 +145,9 @@ function chartGeometry(quote, calendars) {
   }
 }
 
-// The day's axis, where chartGeometry's x runs from and to, without the
-// drawing: a scrub step asks it of every row. `ticks` are the times it marks.
-// A quote with the coming day's pre-market after its day (`Quote.tailStart`)
-// runs on to its newest print, the hours between its day and that
-// pre-market, which nothing trades in, taking no room (`skip`).
+// Without the drawing: a scrub step asks it of every row. A quote with the
+// coming day's pre-market after its day runs on to its newest print, the hours
+// between taking no room (`skip`).
 function chartSpan(quote) {
   if (quote.axis) return quote.axis
   var reg = Quote.regularOrPrints(quote)
@@ -200,9 +163,7 @@ function axisFraction(axis, t) {
   return clockRoom(axis, t) / Math.max(1, clockRoom(axis, axis.end))
 }
 
-// How much of the axis the clock has run from its start to `t`: all of
-// it, but for the hours between a day's end and what trades after it
-// (`axis.skip`), a weekend's, which take no room.
+// The hours `axis.skip` covers take no room.
 function clockRoom(axis, t) {
   var skipped = axis.skip ? Math.max(0, Format.clamp(t, axis.skip.from, axis.skip.to) - axis.skip.from) : 0
   return t - axis.start - skipped
@@ -214,28 +175,26 @@ function clockAt(axis, room) {
   return axis.skip && t > axis.skip.from ? t + Math.max(0, axis.skip.to - axis.skip.from) : t
 }
 
-// The moment at `fraction` along the day.
 function timeAtFraction(quote, fraction) {
   var axis = chartSpan(quote)
   return Math.round(clockAt(axis, Format.clamp(fraction, 0, 1) * clockRoom(axis, axis.end)))
 }
 
-// Where the moment `t` sits along the day; -1 off the day.
+// -1 off the day.
 function fractionAtTime(quote, t) {
   var axis = chartSpan(quote)
   if (t < axis.start || t > axis.end) return -1
   return axisFraction(axis, t)
 }
 
-// `t` moved `steps` along the day, five minutes a step, kept on it and
-// short of `last`, the last print.
+// Five minutes a step, kept on the day and short of `last`, the last print.
 function stepTime(quote, t, steps, last) {
   var axis = chartSpan(quote)
   return Format.clamp(t + steps * 300, axis.start, last || axis.end)
 }
 
-// The newest bright point of a chart geometry, where the dot sits: the
-// newest print of what trades now, else the regular session's last.
+// Where the dot sits: the newest print of what trades now, else the regular
+// session's last.
 function lastLitPoint(geometry) {
   if (!geometry || !geometry.points) return null
   for (var i = geometry.points.length - 1; i >= 0; i--) {
@@ -244,9 +203,7 @@ function lastLitPoint(geometry) {
   return null
 }
 
-// Interpolated normalized y for a normalized x, or null past the line and
-// across a break (`brk`, Tokyo's lunch), where the line lifts, so the
-// scrub's dot leaves the gap as the line and the chime do.
+// Null past the line and across a break, where the line lifts.
 function yAt(points, x) {
   if (!points || !points.length) return null
   if (x < points[0].x || x > points[points.length - 1].x) return null
