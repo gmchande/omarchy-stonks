@@ -281,6 +281,7 @@ Rectangle {
 
     DayChart {
       id: dayChart
+      objectName: "shareDayChart"
       visible: !root.retro
       anchors.fill: parent
       weight: root.u

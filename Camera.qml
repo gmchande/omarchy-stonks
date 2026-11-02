@@ -120,10 +120,11 @@ Item {
         root.shotFile = file
         var item = root.shotItem
         // Grabbed at the item's size, which on the window's screen is the
-        // picture's in pixels (`ShareCard`), to the nearest whole unit: on
-        // a scale such as 1.75, where 2400 pixels are no whole number of
-        // units, a pixel off. The PNG is encoded here, on this thread, once
-        // the picture is taken.
+        // picture's in pixels (`ShareCard`). No size is passed: Qt sizes
+        // the grab from the item's fractional size times the screen's
+        // ratio, so a scale such as 1.75, where 2400 pixels are no whole
+        // number of units, still saves 2400. The PNG is encoded here, on
+        // this thread, once the picture is taken.
         if (!item.grabToImage(function(result) {
           var taken = root.shotTaken
           root.shotTaken = null
@@ -131,7 +132,7 @@ Item {
           if (taken) taken()
           if (result.saveToFile(root.shotFile)) copying.running = true
           else root.finish(1)
-        }, Qt.size(Math.round(item.width), Math.round(item.height)))) root.finish(1)
+        })) root.finish(1)
       }
     }
   }

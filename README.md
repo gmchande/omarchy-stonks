@@ -225,8 +225,10 @@ Refreshes and prices make no sound.
 
 Press `Ctrl+C`, or click the camera at the top right, for a picture of the
 chart, sized so X shows it whole. It shows the price, its move, the
-exchange, and the time with its zone. If you've scrubbed the chart, it
-shows that moment. Your list is never in it.
+exchange, and the time with its zone. If you've moved along the chart with
+`←` `→`, it shows that moment. With the pointer, press `Ctrl+C` while it's
+still on the chart: moving it off to the camera ends the scrub. Your list is
+never in it.
 
 Stonks treats it like Omarchy's own screenshots. It saves the picture to
 your screenshots folder, copies it to the clipboard, and shows a

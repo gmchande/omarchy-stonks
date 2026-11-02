@@ -56,9 +56,12 @@ start "Quickshell crash handling (stand-in)" bash test/qml/crash-check.sh
 start "camera harness" env QT_SCALE_FACTOR=1 bash test/qml/camera.sh
 start "update check harness" bash test/qml/updates.sh
 start "history harness" bash test/qml/history.sh
-# On a scale-2 screen too: the picture is drawn and saved at 2400 x 1350
-# there, not at twice that or half of it. Only the two sized shots.
+# On a scale-2 screen too, and on 1.75, where 2400 pixels are no whole
+# number of units: the picture is drawn and saved at 2400 x 1350 there, not
+# at twice that or half of it or a pixel off, and the same on each. Only
+# the two sized shots.
 start "camera harness at scale 2" env QT_SCALE_FACTOR=2 STONKS_CAMERA_SIZES=1 bash test/qml/camera.sh
+start "camera harness at scale 1.75" env QT_SCALE_FACTOR=1.75 STONKS_CAMERA_SIZES=1 bash test/qml/camera.sh
 start "keys harness" bash test/qml/keys.sh
 start "panel harness" bash test/qml/popup.sh
 known_names unit frames font boundaries lint lint-gate validate launcher
