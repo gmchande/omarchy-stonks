@@ -7,24 +7,19 @@
 // nothing of how the line under the price or the chart shows them.
 //
 // US listings trade overnight on ATSs, 20:00 to 04:00 New York time, Sunday
-// to Thursday nights, never the night before a market holiday. A stock or
-// an ETF on a US listing (decided from Yahoo's instrument type and the
-// listing's calendar, never from what Robinhood answers: it answers BTC with
-// a bitcoin ETF) is asked of Robinhood's instruments whether Robinhood
-// trades it all day, the 24 Hour Market its screen badges
-// (`all_day_tradability`), and of its keyless historicals for its prints,
-// side by side, so neither waits for the other. Only one it trades all day
-// draws its prints, on a 1D chart of one trading day (`dayChart`): the
-// trading day of its newest print, and through a night until 04:00 the day
-// that closed before it with tonight joined on; Robinhood's prints for the
-// hours outside Yahoo's day and for a stretch Yahoo left empty
-// (`filledStretches`), and Yahoo's own. A night that trades thinly is
-// a line through its few trades, each where the clock puts it. Any other
-// has Yahoo's own day, 04:00 to
-// 20:00, or the coming day's once a two-day answer holds a print of it: a
-// thin name trades a few shares overnight now and then, and none of them
-// is a night's price. Since the close, the newest print is the price on
-// top (`newestPrint`); the day's high, low, and open stay Yahoo's.
+// to Thursday nights, never the night before a market holiday. Robinhood is
+// asked whether it trades a listing all day, the 24 Hour Market its screen
+// badges (`all_day_tradability`), and for its prints, side by side, so
+// neither waits for the other. Only one it trades all day draws its prints,
+// on a 1D chart of one trading day (`dayChart`): the trading day of its
+// newest print, and through a night until 04:00 the day that closed before
+// it with tonight joined on; Robinhood's prints for the hours outside
+// Yahoo's day and for a stretch Yahoo left empty (`filledStretches`), and
+// Yahoo's own. Any other has Yahoo's own day, 04:00 to 20:00, or the coming
+// day's once a two-day answer holds a print of it: a thin name trades a few
+// shares overnight now and then, and none of them is a night's price. Since
+// the close, the newest print is the price on top (`newestPrint`); the
+// day's high, low, and open stay Yahoo's.
 
 var ROBINHOOD_URL = "https://api.robinhood.com/marketdata/historicals/"
 var INSTRUMENTS_URL = "https://api.robinhood.com/instruments/"
@@ -327,8 +322,7 @@ function extendedSlots(quote, a, b) {
 // them (`ownPrints`), `from` and `to` their times, HOLE_SLOTS or more slots
 // of a pre-market or an after hours with no print at all, where Robinhood
 // traded (its trades, never its flat interpolated bars) in at least half of
-// them, as on Monday 2 November, when Yahoo sent no bar from 08:30 to
-// 09:29. A thin stock's sparse trading, a trade or two in an hour, is no
+// them. A thin stock's sparse trading, a trade or two in an hour, is no
 // such stretch. `bars` are Robinhood's trades in its slots, each with its
 // session by Yahoo's periods, the pre-market's or the after hours' it
 // fills. Yahoo's prints stay as they came, and a
@@ -365,8 +359,6 @@ var STEADY_SLOTS = 12
 // though the listing traded steadily before it, in at least half the
 // pre-market's slots up to it and STEADY_SLOTS of them at least. A thin
 // stock's sparse trading leaves no such stretch. Of several, the last.
-// Found on Monday 2 November, when Yahoo sent no bar from 08:30 to 09:29
-// for any US listing.
 function yahooHole(quote) {
   var pre = quote.session.pre
   var pts = quote.points
@@ -386,8 +378,8 @@ function yahooHole(quote) {
 
 // Whether Robinhood is asked again by day for a listing's prints in hand
 // (`entry`, OvernightFeed's), on a day Yahoo left a stretch empty whose
-// last slot is `hole` (`yahooHole`), where those prints don't reach it: as
-// on 2 November, when they stopped at the night's end. Due once
+// last slot is `hole` (`yahooHole`), where those prints don't reach it, as
+// when they stop at the night's end. Due once
 // Robinhood's bar for that slot is in (OVERNIGHT_LAG on), and asked once:
 // an answer from then on settles it, whatever it holds; a failed one is
 // asked again OVERNIGHT_INTERVAL on.
@@ -448,7 +440,7 @@ function dayWindow(cal, date) {
 
 // When a trading day's post-market closes: as long after its last close as
 // the calendar's post-market lasts, to its close at most, so a half day's
-// 13:00 close ends at 17:00, as Robinhood's hours for 27 November say.
+// 13:00 close ends at 17:00, as Robinhood's hours for a half day say.
 function postClose(cal, date) {
   var segs = Market.segmentsOn(cal, date)
   var full = Market.epochAt(cal, date, cal.post.close)
@@ -546,8 +538,6 @@ function windowTicks(cal, win, session) {
   return ticks
 }
 
-// The sessions drawn bright while they trade (`litFrom`); the rest of the
-// day is dim. The owner chose all three on 30 October.
 var LIT_SESSIONS = ["pre", "post", "overnight"]
 
 // Where the bright part of a day's line starts (`Chart.chartGeometry`):

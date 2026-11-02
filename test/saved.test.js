@@ -2112,7 +2112,7 @@ test("before the open an index counts to the bell, closed, and its open goes whe
   expect(M.marketStatus(gspc, at("2026-10-23", "03:59"), 0, calendars)).toBe("Closed · opens Fri 09:30")
 })
 
-test("a night's trades join the day that closed, dashed at the close before it, read from it at rest and scrubbed, the night bright", () => {
+test("a night's trades join the day that closed, dashed at the close before it, read from it at rest and scrubbed, the after hours and the night bright", () => {
   // Tuesday 23:00: NEST has traded since 20:00, so the chart is Tuesday's
   // last 24 hours up to Robinhood's newest slot, tonight's trades bright at
   // its end, dashed at Monday's close. Its newest price on top and a scrub
@@ -2138,6 +2138,8 @@ test("a night's trades join the day that closed, dashed at the close before it, 
   // Before 20:00 the day runs to its own end: Monday 19:55, NBIS's after
   // hours on Monday's chart, from Sunday's 20:00 to its own.
   expect(M.chartSpan(dayAt("watch-2026-10-26-1955", "nbis").day)).toMatchObject({ start: at("2026-10-25", "20:00"), end: at("2026-10-26", "20:00") })
+  // Tuesday 18:00: NEST's after hours is bright from the bell.
+  expect(dayAt("2026-10-06-1800", "nest").day.litFrom).toBe(at("2026-10-06", "16:00"))
 })
 
 // When a watch moment's answers came, by its times.txt: how long after
