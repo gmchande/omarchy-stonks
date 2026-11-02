@@ -1212,6 +1212,9 @@ test("freshness keeps quote age, an unanswered ask, and the refresh outcome apar
   expect(M.freshness(failed, live, trading, 0)).toMatchObject({ state: "failed", live: false, asOf: trading - 30 })
   expect(M.freshnessText(M.freshness(failed, live, trading, 0), q)).toBe("REFRESH FAILED · AS OF 10:29")
   expect(M.freshnessWarns(M.freshness(failed, live, trading, 0))).toBe(true)
+  // While Yahoo sends nothing for any listing, the warning is said once for
+  // the list, and a row says only when its price is from.
+  expect(M.freshnessText(M.quietFreshness(M.freshness(failed, live, trading, 0)), q)).toBe("AS OF 10:29")
   // No quote at all: unavailable, failed when the first fetch failed, and a
   // warning once its ask has gone 90 s unanswered.
   expect(M.freshness(null, null, trading, 0)).toMatchObject({ state: "unavailable", live: false })

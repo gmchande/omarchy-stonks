@@ -7,11 +7,6 @@
 // What a quote shows: the rows' and the hero's figures, the list's breadth,
 // the day's info line, the line under the price, freshness, and the pill's
 // arrow. Knows nothing of how the quote was parsed or when markets open.
-//
-// Presentation follows Apple's Stocks app where it has already decided:
-// prices stay in the listing's currency, the currency code and exchange sit
-// on one line, the headline price is the regular close with the extended
-// hours print labelled separately.
 
 function arrowAngle(pctChange) {
   if (!Format.isFiniteNumber(pctChange)) return 0
@@ -35,9 +30,8 @@ function currencyLabel(code) {
   return code === "GBp" ? "PENCE" : code
 }
 
-// A freshness whose warning is said once for every listing, where Yahoo
-// sends nothing for any (`StonksBody.yahooDown`): a failed or overdue
-// refresh reads as an aged quote, which says only when its price is from.
+// A failed or overdue refresh reads as aged where Yahoo sends nothing for
+// any listing (`StonksBody.yahooDown`), which says so once.
 function quietFreshness(fresh) {
   return freshnessWarns(fresh) ? Object.assign({}, fresh, { state: "aged" }) : fresh
 }
@@ -149,9 +143,7 @@ function freshnessWarns(fresh) {
 // time on the reader's clock. `why` and `when` for the pill's hover, and as
 // one `sentence` for the window's header; `forms`, the panel's header, each
 // shorter than the one before, the last one fitting the panel at text size
-// 20 and still saying what happened and when. The words are the ones other
-// apps use for the same trouble (the owner, 28 October). No site is named:
-// not every reader knows Yahoo (the owner, 26 October).
+// 20 and still saying what happened and when.
 function hostPause(pause, pausedUntil, now) {
   var left = pausedUntil - now
   if (pause === "none") {
@@ -204,21 +196,18 @@ function extendedStack(quote, latest, now, day, changeMode) {
 }
 
 // What a day's chart says in words where it has almost nothing to draw:
-// no bar at all ("No trades today": CVR on Friday 16 October, its last
-// trade Wednesday's; "No trades on Fri" once the chart shows an earlier
-// day), or one ("Traded only at 14:10": CKX's one bar, its
-// time where the listing trades, the zone named where the reader's
-// differs). A bar is five minutes of trades, so the words speak of the
-// chart, not of each trade. "" otherwise, and for an empty day before its
-// session opens at `now`: an index has no print before its bell. Nor for
-// one bar before its day is over at `now`, its last hour ended (its
-// session's, or a 1D chart's own, its night's close where a night follows
-// it: `axis.closes`): only then is it the only one. The S&P 500's first
-// bar at 09:35 and Sunday night's first at 20:05 are the first of many.
-// Nor for Yahoo's live moment, which it stamps at the price's own second,
-// apart from the bars at their five-minute starts. Nor
+// no bar at all ("No trades today", "No trades on Fri" once the chart shows
+// an earlier day), or one ("Traded only at 14:10", its time where the
+// listing trades, the zone named where the reader's differs). A bar is five
+// minutes of trades, so the words speak of the chart, not of each trade.
+// "" otherwise, and for an empty day before its session opens at `now`: an
+// index has no print before its bell. Nor for one bar before its day is
+// over at `now`, its last hour ended (its session's, or a 1D chart's own,
+// its night's close where a night follows it: `axis.closes`): only then is
+// it the only one. Nor for Yahoo's live moment, which it stamps at the
+// price's own second, apart from the bars at their five-minute starts. Nor
 // for an empty day whose quote is a trade of its session, with a price and
-// a volume beside the chart: WREN's 09:30 trade with no bar at 09:37.
+// a volume beside the chart.
 function dayNote(day, now, calendars) {
   if (!day) return ""
   var pts = day.points
