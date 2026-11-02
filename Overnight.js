@@ -17,7 +17,8 @@
 // draws its prints, on a 1D chart of one trading day (`dayChart`): the
 // trading day of its newest print, and through a night until 04:00 the day
 // that closed before it with tonight joined on; Robinhood's prints for the
-// hours outside Yahoo's day, and Yahoo's own. A night that trades thinly is
+// hours outside Yahoo's day and for a stretch Yahoo left empty
+// (`filledStretches`), and Yahoo's own. A night that trades thinly is
 // a line through its few trades, each where the clock puts it. Any other
 // has Yahoo's own day, 04:00 to
 // 20:00, or the coming day's once a two-day answer holds a print of it: a
@@ -276,8 +277,19 @@ function marketAsleep(quote, allDay, t, calendars) {
 
 // Robinhood's prints and Yahoo's own, in time order, each with its session:
 // Yahoo's day and what a two-day answer holds after it, the coming day's
-// pre-market (`Quote.tailStart`); Robinhood's beside them (`beside`).
+// pre-market (`Quote.tailStart`); Robinhood's beside them (`beside`), and
+// in the stretches Yahoo left empty that Robinhood traded through
+// (`filledStretches`).
 function prints(quote, bars) {
+  var own = ownPrints(quote, bars)
+  var filled = fillsBetween(quote, bars, own)
+  for (var k = 0; k < filled.length; k++) own = own.concat(filled[k].bars)
+  if (filled.length) own.sort(function(a, b) { return a.t - b.t })
+  return own
+}
+
+// Yahoo's prints and Robinhood's beside them, in time order.
+function ownPrints(quote, bars) {
   var out = []
   for (var i = 0; i < bars.length; i++) if (beside(quote, bars[i].t)) out.push(bars[i])
   for (var j = 0; j < quote.points.length; j++) {
@@ -286,6 +298,99 @@ function prints(quote, bars) {
   }
   out.sort(function(a, b) { return a.t - b.t })
   return out
+}
+
+// The fewest empty five-minute slots of a pre-market or an after hours that
+// make a stretch Yahoo left empty: half an hour.
+var HOLE_SLOTS = 6
+
+// The five-minute slots strictly between `a` and `b` that lie in a
+// pre-market or an after hours by Yahoo's periods, in time order: the
+// quote's day's, and the coming day's a two-day answer holds.
+function extendedSlots(quote, a, b) {
+  var out = []
+  var days = [quote.session, quote.next]
+  for (var d = 0; d < days.length; d++) {
+    var spans = days[d] ? [days[d].pre, days[d].post] : []
+    for (var k = 0; k < spans.length; k++) {
+      if (!spans[k]) continue
+      var end = Math.min(b, spans[k].end)
+      for (var t = Math.ceil(Math.max(a + 1, spans[k].start) / SLOT) * SLOT; t < end; t += SLOT) out.push(t)
+    }
+  }
+  return out
+}
+
+// The stretches Robinhood's trades (`bars`) fill on a listing's day, each
+// { from, to, bars }: between two prints of Yahoo's and Robinhood's beside
+// them (`ownPrints`), `from` and `to` their times, HOLE_SLOTS or more slots
+// of a pre-market or an after hours with no print at all, where Robinhood
+// traded (its trades, never its flat interpolated bars) in at least half of
+// them, as on Monday 2 November, when Yahoo sent no bar from 08:30 to
+// 09:29. A thin stock's sparse trading, a trade or two in an hour, is no
+// such stretch. `bars` are Robinhood's trades in its slots, each with its
+// session by Yahoo's periods. Yahoo's prints stay as they came, and a
+// stretch lies between two of the day's prints, so the newest print, the
+// price on top, is never Robinhood's from it.
+function filledStretches(quote, bars) {
+  return fillsBetween(quote, bars, ownPrints(quote, bars))
+}
+
+function fillsBetween(quote, bars, drawn) {
+  var out = []
+  for (var i = 1; i < drawn.length; i++) {
+    var from = drawn[i - 1].t
+    var to = drawn[i].t
+    if (to - from <= HOLE_SLOTS * SLOT) continue
+    var slots = extendedSlots(quote, from, to)
+    if (slots.length < HOLE_SLOTS) continue
+    var traded = bars.filter(function(b) { return b.t > from && b.t < to && slots.indexOf(b.t) >= 0 })
+    if (traded.length * 2 < slots.length) continue
+    out.push({ from: from, to: to, bars: traded.map(function(b) { return { t: b.t, p: b.p, s: Quote.pointSession(quote, { t: b.t, p: b.p }) } }) })
+  }
+  return out
+}
+
+// The fewest pre-market slots, up to a stretch with no bar, that Yahoo must
+// have traded steadily through for the stretch to be its own (`yahooHole`):
+// an hour.
+var STEADY_SLOTS = 12
+
+// The last slot of a stretch Yahoo left empty in a quote's pre-market, or
+// null: HOLE_SLOTS or more slots with no bar, after which its bars resumed,
+// though the listing traded steadily before it, in at least half the
+// pre-market's slots up to it and STEADY_SLOTS of them at least. A thin
+// stock's sparse trading leaves no such stretch. Of several, the last.
+// Found on Monday 2 November, when Yahoo sent no bar from 08:30 to 09:29
+// for any US listing.
+function yahooHole(quote) {
+  var pre = quote.session.pre
+  var pts = quote.points
+  if (!pre) return null
+  var last = null
+  var steady = 0
+  for (var i = 0; i + 1 < pts.length && pts[i].t < pre.end; i++) {
+    if (pts[i].t < pre.start) continue
+    steady++
+    if (pts[i + 1].t - pts[i].t <= HOLE_SLOTS * SLOT) continue
+    var slots = extendedSlots(quote, pts[i].t, Math.min(pts[i + 1].t, pre.end))
+    var before = Math.floor((pts[i].t - pre.start) / SLOT) + 1
+    if (slots.length >= HOLE_SLOTS && before >= STEADY_SLOTS && steady * 2 >= before) last = slots[slots.length - 1]
+  }
+  return last
+}
+
+// Whether Robinhood is asked again by day for a listing's prints in hand
+// (`entry`, OvernightFeed's), on a day Yahoo left a stretch empty whose
+// last slot is `hole` (`yahooHole`), where those prints don't reach it: as
+// on 2 November, when they stopped at the night's end. Due once
+// Robinhood's bar for that slot is in (OVERNIGHT_LAG on), and asked once:
+// an answer from then on settles it, whatever it holds; a failed one is
+// asked again OVERNIGHT_INTERVAL on.
+function holeDue(hole, entry, now) {
+  var due = hole + OVERNIGHT_LAG
+  if (now < due || (entry.through !== null && entry.through >= hole)) return false
+  return entry.at < due || (entry.status === "failed" && now - entry.at >= OVERNIGHT_INTERVAL)
 }
 
 // Whether Robinhood's bar at `t` is drawn beside `quote`'s own prints:

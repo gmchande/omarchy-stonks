@@ -20,7 +20,7 @@ const fixtures = found.stdout.toString().trim()
 process.env.TZ = "America/New_York"
 // Every rule file's names, under one name: each is defined once.
 const M = Object.assign({}, ...["Format", "Fetch", "Quote", "Market", "Overnight", "History", "Fundamentals", "Figures",
-  "Chart", "Tones", "Settings", "KeySheet", "Search", "Cells"].map(name => load(name + ".js")))
+  "Chart", "Tones", "Settings", "KeySheet", "Search", "Cells", "Asks"].map(name => load(name + ".js")))
 
 const fixture = name => JSON.parse(readFileSync(join(fixtures, name), "utf8"))
 const calendars = JSON.parse(readFileSync(join(import.meta.dir, "..", "calendars.json"), "utf8"))
@@ -1617,6 +1617,60 @@ test("a refresh within half an hour asks Robinhood for the last hour, which brin
   expect(M.overnightSpan({ through: null }, earlier.through)).toBe("day")
 })
 
+test("on a morning Yahoo left an hour empty, Robinhood is asked once more for the listings it trades all day, once its bars for the hour are in, and on no other saved day", () => {
+  // Monday 2 November at 09:41: Yahoo sent no bar from 08:30 to 09:29, and
+  // the prints in hand stop where the night ended, asked at 04:10.
+  const set = "open-2026-11-02-0941"
+  const names = ["NBIS", "CRWV", "SHOP"]
+  const quotes = Object.fromEntries(names.map(s => [s, savedDay(set, s.toLowerCase())]))
+  const whole = traded(set, names)
+  const nightEnd = at("2026-11-02", "04:05")
+  const asked = at("2026-11-02", "04:10")
+  const inHand = Object.fromEntries(names.map(s => [s, { status: "ok", bars: whole[s].bars.filter(b => b.t <= nightEnd), through: nightEnd, at: asked }]))
+  const allDay = Object.fromEntries(names.map(s => [s, { status: "ok", allDay: true, at: asked }]))
+  const asks = (clock, changes = {}) => {
+    const now = at("2026-11-02", clock)
+    return M.overnightAsks({ open: false, pill: "NBIS", quoteEntries: Object.fromEntries(names.map(s => [s, { status: "ok", receivedAt: now, answeredAt: now }])),
+      quotes, overnightSymbols: names, library: names, preview: "", previewShown: false, previewQuote: null, allDay, nights: inHand, now, calendars, ...changes })
+  }
+  // NBIS and CRWV traded on Yahoo in every slot up to 08:25; SHOP, thin,
+  // left no stretch of its own, but is asked with them on such a day.
+  expect(names.map(s => M.yahooHole(quotes[s]))).toEqual([at("2026-11-02", "09:25"), at("2026-11-02", "09:25"), null])
+  // Robinhood's bar for 09:25 is in by 09:35: the pill's stock alone with
+  // nothing open, every row with a surface open, the pill on SHOP too.
+  expect([asks("09:34"), asks("09:35"), asks("09:35", { open: true }), asks("09:35", { pill: "SHOP" })]).toEqual([null,
+    { tradability: [], prints: ["NBIS"] }, { tradability: [], prints: names }, { tradability: [], prints: ["SHOP"] }])
+  // Once an answer from then on is in, nothing asks again, whether it
+  // reached the hour or not; a failed one is asked again 5 minutes on.
+  const after = entry => Object.fromEntries(names.map(s => [s, { ...inHand[s], ...entry }]))
+  const then = at("2026-11-02", "09:35")
+  expect([asks("10:30", { nights: after({ through: at("2026-11-02", "09:30"), at: then }) }),
+    asks("10:30", { nights: after({ through: at("2026-11-02", "09:20"), at: then }) }),
+    asks("09:39", { nights: after({ status: "failed", at: then }) }), asks("09:40", { nights: after({ status: "failed", at: then }) })])
+    .toEqual([null, null, null, { tradability: [], prints: ["NBIS"] }])
+  // One Robinhood trades only by day is never asked.
+  expect(asks("09:35", { allDay: { ...allDay, NBIS: { status: "ok", allDay: false, at: asked } } })).toBe(null)
+  // Every other saved day of a US stock or ETF, Yahoo's pre-market whole or
+  // a thin stock's sparse: no such stretch, so no ask.
+  const holes = []
+  let read = 0
+  const walk = dir => {
+    for (const name of readdirSync(join(fixtures, dir), { withFileTypes: true })) {
+      const path = join(dir, name.name)
+      if (name.isDirectory()) { if (name.name !== ".git") walk(path); continue }
+      if (!name.name.endsWith(".json")) continue
+      const json = fixture(path)
+      const quote = json && json.chart ? M.parseChart(json, cents) : null
+      if (!quote || !quote.session || !M.hasOvernight(quote, calendars)) continue
+      read++
+      if (M.yahooHole(quote) !== null) holes.push(path)
+    }
+  }
+  walk("")
+  expect(holes.sort()).toEqual([`moments/${set}/crwv.json`, `moments/${set}/nbis.json`])
+  expect(read).toBeGreaterThan(500)
+})
+
 test("the prints Stonks keeps for a listing hold every one its 1D chart draws, however long a surface stays open", () => {
   // Every saved Robinhood answer, oldest first, each joined on to what is in
   // hand as an hour's answer is: weeks of prints, far past MOST_PRINTS,
@@ -2183,7 +2237,7 @@ test("a weekend shows Friday from its first trade, Thursday's 20:00, to its last
   expect(open.day.points[first.points.indexOf(M.lastLitPoint(first))].t).toBeGreaterThanOrEqual(at("2026-10-26", "09:30"))
 })
 
-test("every price stands at its time from its day's first trade, a quiet night a line through its few trades", () => {
+test("every price stands at its time from its day's first trade, a quiet night a line through its few trades, and Robinhood's trades fill an hour Yahoo lost", () => {
   // Thursday 23:00: SILK traded 13 times since 20:00, joined to Thursday's
   // chart up to Robinhood's newest slot: a line through the 13 trades, each
   // where the clock puts it, with no break, dashed at Wednesday's close.
@@ -2241,6 +2295,31 @@ test("every price stands at its time from its day's first trade, a quiet night a
   const reed = dayAt("sunday", "reed").day
   expect(M.chartSpan(reed)).toMatchObject({ start: at("2026-09-25", "04:00"), end: at("2026-09-27", "22:20") })
   expect([M.lastPrintTime(reed), reed.litFrom]).toEqual([at("2026-09-25", "19:20"), null])
+  // Monday 2 November at 09:41, the first trading day after the clocks
+  // went back: Yahoo sent no bar from 08:30 to 09:29 for any US listing,
+  // and Stonks drew a straight line across the hour, a path no trade took.
+  // Robinhood traded through it, and its trades fill the hour, each at its
+  // time and read as the pre-market: NBIS rose to 157.70 at 08:40. Yahoo's
+  // every bar stays as it came, and the price on top and the close the
+  // move counts from stay Yahoo's. SHOP traded in 8 of the hour's 13 slots.
+  for (const [name, filled] of [["nbis", 12], ["crwv", 12], ["shop", 8]]) {
+    const built = dayAt("open-2026-11-02-0941", name)
+    const yahoo = built.quote.points
+    const hour = built.day.points.filter(p => p.t > yahoo.findLast(y => y.t < at("2026-11-02", "09:00")).t && p.t < at("2026-11-02", "09:30"))
+    expect([name, hour.length, hour.every(p => p.s === "pre")]).toEqual([name, filled, true])
+    expect([name, yahoo.every(y => built.day.points.some(p => p.t === y.t && p.p === y.p))]).toEqual([name, true])
+    expect([name, built.latest.t, built.latest.p, built.day.prevClose]).toEqual([name, yahoo.at(-1).t, yahoo.at(-1).p, built.quote.prevClose])
+  }
+  expect(dayAt("open-2026-11-02-0941", "nbis").day.points.find(p => p.t === at("2026-11-02", "08:40")).p).toBe(157.7)
+  // Yahoo's 5-minute history ended NEST's after hours on 6 October at
+  // 19:00: its trades to 19:55 fill the hour up to the night's first, at
+  // 20:00. A thin stock's sparse trading stays as it is: SHOP's one trade
+  // in the 40 minutes after its 04:00 bar on 30 October draws nothing.
+  const evening = dayAt("2026-10-06-2300", "nest").day.points
+  expect(evening.filter(p => p.t > at("2026-10-06", "19:00") && p.t < at("2026-10-06", "20:00")).map(p => p.s))
+    .toEqual(Array(9).fill("post"))
+  expect(dayAt("gap-2026-11-01-2148", "shop").day.points.filter(p => p.t > at("2026-10-30", "04:00") && p.t < at("2026-10-30", "04:45")))
+    .toEqual([])
 })
 
 // The 1D charts of a saved moment as the view builds them (`Chart.viewChart`),

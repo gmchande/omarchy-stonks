@@ -208,8 +208,12 @@ function answerVerdict(kind, outcome, tries, judgingOnly) {
 // for the pill's symbol alone, what Robinhood has not answered for it,
 // failed or not, as soon as Yahoo has answered it live: at most once for
 // each stock the pill shows. The chart waited on, the preview's or else the
-// pill's, goes alone ahead of the rest while it has no answer. `allDay`
-// and `nights` are the two feeds' entries; `quoteEntries` Yahoo's.
+// pill's, goes alone ahead of the rest while it has no answer. On a day
+// Yahoo left a stretch of its pre-market empty, read from the quotes of
+// every US stock and ETF (`quotes`, `Overnight.yahooHole`), each listing
+// asked here that Robinhood trades all day and whose prints in hand don't
+// reach it is asked once more, open or not (`Overnight.holeDue`).
+// `allDay` and `nights` are the two feeds' entries; `quoteEntries` Yahoo's.
 function overnightAsks(s) {
   var pill = s.pill
   var cal = Overnight.overnightMarket(s.calendars)
@@ -231,9 +235,22 @@ function overnightAsks(s) {
   // The listings of one ask share its second (`entry.at`), so each ask is
   // judged once, not once a listing.
   var judged = {}
+  // The newest stretch Yahoo left empty whose Robinhood bars are in.
+  var hole = null
+  for (var i = 0; i < s.overnightSymbols.length; i++) {
+    var quote = s.quotes[s.overnightSymbols[i]]
+    var last = quote ? Overnight.yahooHole(quote) : null
+    if (last !== null && last + Overnight.OVERNIGHT_LAG <= s.now && (hole === null || last > hole)) hole = last
+  }
+  var holeDue = function(x) {
+    return hole !== null && !!s.allDay[x] && s.allDay[x].allDay && Overnight.holeDue(hole, s.nights[x], s.now)
+  }
   var printsDue = function(x, at) {
     var entry = s.nights[x]
     if (!entry) return true
+    // Judged at the clock's own second, so it is asked once Robinhood's
+    // bars for the stretch are in, not with those due soon.
+    if (holeDue(x)) return true
     if (!kept) return false
     var key = at + " " + entry.at + " " + entry.status
     if (!(key in judged)) judged[key] = Overnight.overnightDue(entry.at, at, s.calendars, entry.status === "failed")

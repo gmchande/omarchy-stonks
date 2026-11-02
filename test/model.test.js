@@ -1311,7 +1311,7 @@ test("a bad quote answer is tried three times in all, a missing symbol fails at 
 test("Robinhood is asked once for each stock the pill shows with nothing open by day, for it alone each 5 minutes while a night trades, and for every US listing while a surface is open, the chart waited on alone first", () => {
   const now = at(WED, "21:00")
   const base = {
-    open: false, pill: "AAPL", quoteEntries: { AAPL: answered(now) }, overnightSymbols: ["AAPL", "MSFT"],
+    open: false, pill: "AAPL", quoteEntries: { AAPL: answered(now) }, quotes: {}, overnightSymbols: ["AAPL", "MSFT"],
     library: ["AAPL", "MSFT", "SHEL.L"], preview: "", previewShown: false, previewQuote: null, allDay: {}, nights: {}, now, calendars
   }
   const asks = changes => M.overnightAsks({ ...base, ...changes })

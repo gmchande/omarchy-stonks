@@ -222,6 +222,21 @@ Item {
   // day the 1D chart does (`Chart.lineDay`).
   readonly property var nights: overnightFeed.entries
   readonly property var allDay: allDayFeed.entries
+  // The stretches Yahoo left empty that Robinhood's trades fill on each
+  // day drawn (`Chart.dayFills`), each said once in the shell's log,
+  // as a dropped stray price is. `saidFills` holds those said, by symbol
+  // and stretch; it notifies nothing.
+  readonly property var filled: Chart.dayFills(allDaySymbols, feed.quotes, overnightFeed.entries)
+  readonly property var saidFills: ({})
+  onFilledChanged: {
+    for (var symbol in filled) filled[symbol].forEach(function(stretch) {
+      var key = symbol + " " + stretch.from + " " + stretch.to
+      if (saidFills[key]) return
+      saidFills[key] = true
+      console.warn("stonks: " + symbol + " filled from Robinhood's " + stretch.bars.length + " trades between "
+        + new Date(stretch.from * 1000).toISOString() + " and " + new Date(stretch.to * 1000).toISOString() + ", where Yahoo sent no bar")
+    })
+  }
   // Robinhood's two questions, whether it trades a listing all day and its
   // prints, go side by side, so a 1D chart waits for one answer, never two
   // in a row: what is asked is `Asks.overnightAsks`'s. A feed with a
@@ -247,6 +262,7 @@ Item {
       open: root.openSurfaces.length > 0,
       pill: root.view.featured,
       quoteEntries: feed.entries,
+      quotes: feed.quotes,
       overnightSymbols: root.overnightSymbols,
       library: root.library,
       preview: previewed,

@@ -125,6 +125,9 @@ first, then the night: the hours closed between them take no room, and
 the line runs on from the day's last trade to the night's first. A day
 that closes early, such as
 the Friday after Thanksgiving, ends at 17:00 with no night after it.
+If Yahoo sends no prices for half an hour or more of the pre-market or
+after hours while Robinhood shows the stock trading, the chart draws
+Robinhood's trades there. They never replace a price Yahoo sent.
 
 A US stock that doesn't trade at night shows its day up to 20:00, and
 keeps that day until its next trade. Once the chart shows a day

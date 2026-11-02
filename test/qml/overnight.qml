@@ -726,6 +726,35 @@ Harness {
         wheeled === "JNJ" && jnjFailed && jnjAsked.join(",") === "1,1" && jnjAfter.join(",") === "1,1",
         wheeled + "; failed " + jnjFailed + "; asked " + jnjAsked.join(",") + ", ten minutes on " + jnjAfter.join(","))
 
+      // Monday 2 November, when Yahoo sent no bar from 08:30 to 09:29: with
+      // nothing open, NBIS on the pill, its prints in hand stopping where
+      // the night ended, at 04:05. It is asked once more as Robinhood's bar
+      // for 09:25 comes in, at 09:35, and never again; its line then draws
+      // the hour from Robinhood's trades, said once in the log.
+      useSet("open-2026-11-02-0410 open-2026-11-02-0941")
+      service.now = 1793610720
+      service.addSymbol("NBIS")
+      within(8000, function() { return !!service.quotes.NBIS && service.arriving.length === 0 })
+      service.feature("NBIS")
+      var night = within(5000, function() { return !!prints.entries.NBIS && prints.entries.NBIS.through === 1793610300 && !prints.busy })
+      var nightAsks = harness.printsAsked("NBIS")
+      useSet("open-2026-11-02-0941")
+      service.now = 1793630099
+      wait(300)
+      var early = harness.printsAsked("NBIS")
+      service.now = 1793630100
+      var reached = within(3000, function() { return !!prints.entries.NBIS && prints.entries.NBIS.through >= 1793629500 && !prints.busy })
+      var holeAsks = harness.printsAsked("NBIS")
+      service.now = 1793630700
+      wait(300)
+      service.now = 1793633400
+      wait(300)
+      var said = Object.keys(service.saidFills).filter(function(k) { return k.indexOf("NBIS ") === 0 })
+      check("on a morning Yahoo left an hour empty, the pill's stock is asked once more for its prints when Robinhood's bars for the hour are in, never again, and its line draws Robinhood's trades there, said once in the log",
+        night && reached && [nightAsks, early, holeAsks, harness.printsAsked("NBIS")].join(",") === "1,1,2,2"
+          && (service.filled.NBIS || []).length === 1 && service.filled.NBIS[0].bars.length === 12 && said.length === 1,
+        [night, reached, nightAsks, early, holeAsks, harness.printsAsked("NBIS")].join(",") + " | filled " + JSON.stringify(service.filled.NBIS || null) + " | said " + said.join(";"))
+
       // Every request of the run, Robinhood's instruments' too.
       var never = ["^GSPC", "BTC-USD", "SHOP.TO"]
       var strays = harness.asked("OVERNIGHT.asked").concat(harness.asked("INSTRUMENTS.asked"))
