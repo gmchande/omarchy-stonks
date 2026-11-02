@@ -17,9 +17,9 @@ import "plugin" as Stonks
 // its symbol, range, and scrub, never the list. Then, with Omasnap absent
 // and present (camera.sh), the folder and editor each version of Omarchy
 // uses, under each version's settings. HOME and curl are scratch. With
-// STONKS_CAMERA_SIZES=1 (all.sh's run at QT_SCALE_FACTOR=2) only the two
-// shots whose picture size could change are taken: the panel's and the
-// window's.
+// STONKS_CAMERA_SIZES=1 (all.sh's runs at QT_SCALE_FACTOR=2 and 1.25) only
+// the two shots whose picture could change with the scale are taken: the
+// panel's and the window's.
 Harness {
   id: harness
   marker: "CAMERA DONE"
@@ -140,7 +140,8 @@ Harness {
         seen = { symbol: card.symbol, range: card.range, retro: card.retro, scrubX: card.scrubX, scrubT: card.scrubT,
           when: card.words ? card.words.when : "", span: card.words ? card.words.span : "",
           name: card.quote ? String(card.quote.name || "") : "",
-          currency: card.quote ? String(card.quote.currency || "") : "", texts: harness.texts(card), marks: harness.marksSaid(card) }
+          currency: card.quote ? String(card.quote.currency || "") : "", texts: harness.texts(card), marks: harness.marksSaid(card),
+          inset: harness.find(card, "shareDayChart").xAt(0) * card.dpr }
       }
       if (loader) loader.loaded.connect(take)
       act()
@@ -228,6 +229,10 @@ Harness {
       var problems = landed(rest, "aapl", /^AAPL at .+$/).concat(ofChart(rest, "AAPL", "1D", "TUE 1 SEP 2026", rows))
       check("Ctrl+C in the panel saves one picture of AAPL's day in the pictures folder, copies it as a PNG, and sends Omarchy's notification with it",
         problems.length === 0 && still === 0 && rest.card.scrubX === -1 && !rest.card.retro, problems.join("; "))
+      // The day's line starts 6 of the picture's pixels in from the chart's
+      // edge, whatever the screen's scale.
+      check("the picture's chart starts 6 pixels in from its edge, as on every screen",
+        Math.abs(rest.card.inset - 6) < 0.01, String(rest.card.inset))
 
       if (!harness.sizeOnly) {
         // Scrubbed back two steps, into AAPL's after hours: the picture shows

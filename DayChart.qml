@@ -52,7 +52,7 @@ Item {
   readonly property bool directionKnown: typeof up === "boolean"
   readonly property color aboveColor: directionKnown ? upColor : baselineColor
   readonly property color belowColor: directionKnown ? downColor : baselineColor
-  readonly property int pad: Math.round(3 * weight)
+  readonly property real pad: 3 * weight
   readonly property var lastPoint: Chart.lastLitPoint(geometry)
   readonly property bool day: !!geometry && geometry.day === true
   readonly property color dotColor: lastPoint && lastPoint.y > geometry.baselineY ? belowColor : aboveColor
