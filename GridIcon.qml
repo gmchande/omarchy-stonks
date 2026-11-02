@@ -2,18 +2,14 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.Commons as Commons
-// One of the header's own icons, the speaker, the camera, or the rows' unit
-// (`Cells`), in both looks: its path in the look icon's pen, over the look
-// icon's grid of `columns` × `rows` cells, `cell` px apart, each a pixel
-// short of the next. The path is drawn on cells 3 px apart and scaled with
-// the cell, the pen with it: 1.5 px, then 2, then 2.5. It paints only when
-// its shape, ink, or size does.
+// A header icon (the speaker, the camera, the unit) drawn from a `Cells`
+// path in the look icon's pen, on its grid of cells each a pixel short of
+// the next. Paths are drawn at a 3 px cell and scaled with it.
 Item {
   id: root
 
   property color color: Commons.Color.foreground
   property int cell: 3
-  // The shape (`Cells.SOUND_ON` and the rest): its columns, rows, and path.
   property var shape: null
 
   readonly property int columns: shape ? shape.columns : 0
