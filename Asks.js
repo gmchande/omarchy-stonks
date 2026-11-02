@@ -21,11 +21,8 @@
 // are never more than half a minute apart one way.
 var DUE_SOON = 30
 
-// A user's refresh asks again only for what answered more than this many
-// seconds ago, so a second press adds nothing.
 var REFRESH_AGAIN = 10
 
-// Tries in all for a quote whose answers are bad before it is failed.
 var TRIES = 3
 
 // A function from a quote to its market's calendar as read at `now`
@@ -39,17 +36,10 @@ function calendarsAt(calendars, now) {
   }
 }
 
-// The symbols of All whose quotes are kept fresh: the pill's alone with
-// nothing open, and all of them while a surface is open (`open`), which
-// asks for each as it opens.
 function watchedSymbols(library, featured, open) {
   return library.filter(function(s) { return open || s === featured })
 }
 
-// The order a run asks for quotes in, ties of the second they were asked
-// for broken by it (`quoteSlots`): the stock at the top, then each open
-// surface's rows in sight from the top down (`sights`, { surface, symbols },
-// as in `aheadRows`), then the list as shown, then the rest of All.
 function readingOrder(featured, sights, shown, library) {
   var order = featured ? [featured] : []
   var add = function(s) { if (order.indexOf(s) < 0) order.push(s) }
@@ -90,8 +80,6 @@ function quotesDue(watched, entries, asked, quotes, heroes, pill, now, interval,
   return { due: due, next: next }
 }
 
-// The watched quotes a user's refresh asks for: each answered, and not in
-// the last `REFRESH_AGAIN` seconds.
 function refreshQuotes(watched, entries, now) {
   return watched.filter(function(s) {
     var entry = entries[s]
@@ -99,15 +87,10 @@ function refreshQuotes(watched, entries, now) {
   })
 }
 
-// A symbol whose answer is a first answer: none yet this session, or only
-// a quote kept from an earlier one.
 function firstAnswer(entry) {
   return !entry || entry.status === "saved"
 }
 
-// The asks a quote feed keeps once what is watched changes: a refresh for a
-// symbol no longer watched is dropped unless its run is still out
-// (`running`); first answers always stay. `asked` itself when none goes.
 function keptAsks(asked, watched, entries, running) {
   var next = {}
   var dropped = false
@@ -118,18 +101,12 @@ function keptAsks(asked, watched, entries, running) {
   return dropped ? next : asked
 }
 
-// The symbols a lane's next run is for, in `symbols`' order: each asked for
-// whose answer is the lane's, a first answer (`first`) or a refresh, and
-// not `held`: cooling after a bad answer, or out on either lane's run.
 function laneWaiting(symbols, asked, entries, first, held) {
   return symbols.filter(function(s) {
     return s in asked && firstAnswer(entries[s]) === first && held.indexOf(s) < 0
   })
 }
 
-// The spark days waiting to be judged on the chart (`toJudge`) that a
-// refresh run may carry: none asked for anyway, whose own answer judges it,
-// and none `held`.
 function laneJudging(toJudge, asked, held) {
   return toJudge.filter(function(s) { return !(s in asked) && held.indexOf(s) < 0 })
 }
@@ -269,9 +246,6 @@ function overnightAsks(s) {
   return { tradability: alone(tradability, s.allDay), prints: alone(prints, s.nights) }
 }
 
-// The prints a user's refresh asks for: those of the charts on show that
-// Robinhood trades all day (`allDaySymbols`), unless asked in the last
-// `REFRESH_AGAIN` seconds. Rows never draw them, only a chart does.
 function refreshPrints(charts, allDaySymbols, askedAt, now) {
   if (now - askedAt <= REFRESH_AGAIN) return []
   return charts.filter(function(s) { return allDaySymbols.indexOf(s) >= 0 })
@@ -279,9 +253,6 @@ function refreshPrints(charts, allDaySymbols, askedAt, now) {
 
 // ---- Charts
 
-// The symbols the open surfaces' heroes chart: the featured symbol on every
-// open surface but the one previewing, and a resting preview on view
-// (`previewShown`). None with nothing open.
 function chartsOnShow(openSurfaces, featured, preview, previewSurface, previewShown) {
   if (openSurfaces.length === 0) return []
   var charts = []
@@ -292,15 +263,10 @@ function chartsOnShow(openSurfaces, featured, preview, previewSurface, previewSh
   return charts.filter(function(s) { return s !== "" })
 }
 
-// Those whose history they show on `range`: none on the day, which needs
-// none.
 function historyCharts(charts, range) {
   return range === "1D" ? [] : charts
 }
 
-// What a user's refresh owes of `charts`' histories: each one's answer at
-// the time, null for none, by key. One is owed until a new answer, ok or
-// failed, replaces that.
 function historyOwing(charts, range, entries) {
   var owing = {}
   charts.forEach(function(s) {
@@ -310,9 +276,6 @@ function historyOwing(charts, range, entries) {
   return owing
 }
 
-// The chart whose history is asked for next, { symbol, force }, or null: one
-// a refresh still owes (`owing`), fetched fresh, then one with no answer
-// yet, ok or failed.
 function nextHistory(charts, range, entries, owing) {
   var key = function(s) { return History.historyKey(s, range) }
   var owed = charts.filter(function(s) { return key(s) in owing && entries[key(s)] === owing[key(s)] })
@@ -321,9 +284,6 @@ function nextHistory(charts, range, entries, owing) {
   return unanswered.length > 0 ? { symbol: unanswered[0], force: false } : null
 }
 
-// The first of `charts` whose history in hand has grown old as its market
-// moved (`History.historyDue`), a failed refresh too, "" for none. Its quote
-// is from `quotes` or else `previewQuotes`.
 function staleHistory(charts, range, entries, quotes, previewQuotes, now, calendars) {
   for (var i = 0; i < charts.length; i++) {
     var s = charts[i]
@@ -335,11 +295,6 @@ function staleHistory(charts, range, entries, quotes, previewQuotes, now, calend
   return ""
 }
 
-// The rows in sight whose charts are fetched ahead of a click on `range`:
-// each open surface's (`sights`, { surface, symbols }, in the order they
-// opened), top first, but the heroes' (`heroes`), only as many as the
-// cache keeps (`keep`) beside the heroes' charts. None with nothing open or
-// on the day.
 function aheadRows(open, range, heroes, sights, keep) {
   if (!open || range === "1D") return []
   var rows = []
@@ -349,8 +304,6 @@ function aheadRows(open, range, heroes, sights, keep) {
   return rows.slice(0, keep - heroes.length)
 }
 
-// Of `rows`, those whose chart on `range` has no answer yet, nor has missed
-// one ahead (`missed`, by key).
 function aheadCharts(rows, range, entries, missed) {
   return rows.filter(function(s) {
     var key = History.historyKey(s, range)
@@ -360,11 +313,6 @@ function aheadCharts(rows, range, entries, missed) {
 
 // ---- Cap and P/E
 
-// The caps and P/Es the heroes on show need (`heroes`,
-// `Service.heroesOnShow`), in their order, each { symbol, currency }: an
-// equity's (`Fundamentals.hasFundamentals`), once its quote is in, from
-// `quotes` or else `previewQuotes`. One without its quote yet joins when it
-// lands.
 function figuresWanted(heroes, quotes, previewQuotes) {
   var wanted = []
   heroes.forEach(function(s) {
