@@ -2342,14 +2342,43 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   expect([tokyoDate(friday), friday.points.length]).toEqual(["2026-10-23", 66])
   const monday = tokyoDay(both("watch-2026-10-25-2020"))
   expect([tokyoDate(monday), monday.points.length]).toEqual(["2026-10-26", 2])
-  // Toyota at 09:07 on Friday 30 October, asked for two days before
-  // Friday's first bar: the quote is Thursday's close, 3,077, and Yahoo's
-  // two-day answer for Tokyo gives Thursday's own close as its chart's
-  // previous close. Thursday's move runs from Wednesday's 3,051, Yahoo's
-  // previous close for the quote's day: +0.85%, not 0.00%. Once Friday has
-  // bars, Friday's move, from Thursday's close.
-  const before = M.parseChart(fixture("moments/tokyo-2026-10-30-0907/7203.t.json"), cents)
-  expect([tokyoDate(tokyoDay(before)), M.rowModel(before, 0, "pct").changeText]).toEqual(["2026-10-29", "+0.85%"])
+  // Toyota at Tokyo's open on Monday 2 November, from 08:55 to 09:21 there
+  // (Sunday 18:55 to 19:21 New York), each answer as Stonks asks for it:
+  // one day before the open, two from the open until the quote holds a
+  // print of Monday, then one; the rows' spark answers beside the charts.
+  // Friday closed at 3,070, −0.23% from Thursday's 3,077. Until Monday's
+  // first bar the row reads Friday's move, never 0.00% (the two-day answer
+  // holding Friday alone gives Friday's own close as its previous close).
+  // Once trades land, Monday's move counts from Friday's 3,070, though for
+  // six minutes Yahoo's answers still count from Thursday's: the close
+  // Stonks held, carried (`carryClose`).
+  const open = (time, file) => M.parseChart(fixture(`moments/tokyo-2026-11-01-${time}/${file}`), cents)
+  const spark = (time, file) => M.parseChart({ chart: { result: [fixture(`moments/tokyo-2026-11-01-${time}/spark/${file}`).spark.result[0].response[0]] } }, cents)
+  const asks = []
+  let held = null
+  const read = (time, quote) => {
+    held = M.carryClose(held, quote, calendars)
+    const row = M.rowModel(held, 0, "pct")
+    asks.push(`${time} ${row.priceText} ${row.changeText}`)
+  }
+  const nyAt = time => at("2026-11-01", time.slice(0, 2) + ":" + time.slice(2))
+  for (const time of ["1855", "1903", "1910", "1915", "1920", "1921"]) {
+    const two = M.twoDays(held, nyAt(time), calendars)
+    read(time, open(time, (two ? "2d/" : "") + "7203.t.json"))
+    read(time + " row", spark(time, (two ? "2d/" : "") + "7203.t.json"))
+  }
+  expect(asks).toEqual(["1855 3,070.00 \u22120.23%", "1855 row 3,070.00 \u22120.23%",
+    "1903 3,070.00 \u22120.23%", "1903 row 3,070.00 \u22120.23%", "1910 3,070.00 \u22120.23%", "1910 row 3,070.00 \u22120.23%",
+    "1915 3,077.00 +0.23%", "1915 row 3,072.00 +0.07%", "1920 3,050.00 \u22120.65%", "1920 row 3,049.00 \u22120.68%",
+    "1921 3,053.00 \u22120.55%", "1921 row 3,054.00 \u22120.52%"])
+  // A shell started at 09:20, asking two days for its first answer, reads
+  // Friday's close from Yahoo itself; and the carried close is saved with
+  // the quote, so a restart in those minutes keeps it.
+  expect(M.rowModel(open("1920", "2d/7203.t.json"), 0, "pct").changeText).toBe("\u22120.62%")
+  const restarted = M.carryClose(JSON.parse(JSON.stringify(M.carryClose(null, open("1910", "2d/7203.t.json"), calendars))), open("1920", "7203.t.json"), calendars)
+  expect(M.rowModel(restarted, 0, "pct").changeText).toBe("\u22120.65%")
+  // Friday 30 October at 09:26 there, with Friday's first bars: Friday's
+  // move, from Thursday's close.
   const after = M.parseChart(fixture("moments/tokyo-2026-10-30-0926/7203.t.json"), cents)
   expect([tokyoDate(tokyoDay(after)), M.rowModel(after, 0, "pct").changeText]).toEqual(["2026-10-30", "+0.71%"])
 })

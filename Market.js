@@ -574,6 +574,57 @@ function twoDays(quote, now, calendars) {
   return !!open && now >= open.start && now < open.end && !printedSince(open.start)
 }
 
+// A quote with the close a listing's day counts from where Yahoo hasn't
+// caught up with it yet. At Tokyo's open on Monday 2 November, for six
+// minutes after Toyota's first trades every answer but the two-day chart
+// still counted Monday from Thursday's close, 3,077, though Friday had
+// closed at 3,070, as the quote Stonks held said. So each quote carries the
+// last close Stonks saw for the listing (`closeSeen`, { day, close, before }:
+// its session's start, that close, and the close Yahoo counted that
+// session from), from the quote before it (`previous`), or from that quote
+// itself once it is its session's close (`sessionClose`); it is saved with
+// the quote, so a restart keeps it. A quote of the next weekday's session,
+// once that session has traded, that still counts from `before` counts
+// from `close`, the close Yahoo itself sent. A split or a dividend that
+// moves the base moves Yahoo's previous close off `before`, and Yahoo's
+// stands; so does it after a holiday, which no weekday rule can see. A
+// listing on a calendar with a pre-market keeps Yahoo's, as an index and
+// a coin do: a US stock's day turns at 04:00, hours before its first trade.
+// A shell that starts in those minutes holds no close to carry, and shows
+// Yahoo's until Yahoo corrects it. Seen in Tokyo only: London's and
+// Sydney's opens aren't captured yet.
+function carryClose(previous, quote, calendars) {
+  if (!quote || quote.crypto || quote.instrumentType === "INDEX" || !quote.session.regular) return quote
+  var cal = calendarFor(calendars, quote)
+  if (cal && cal.pre) return quote
+  // A quote that is its session's close carries nothing: the next reads
+  // the close from it, so an unchanged answer after the bell stays one.
+  var seen = previous && !sessionClose(quote) ? sessionClose(previous) || previous.closeSeen || null : null
+  if (!seen) return quote
+  var reg = quote.session.regular
+  var head = Quote.headlineQuote(quote)
+  var traded = !!head && head.source === "quote" && head.t !== null && head.t >= reg.start
+  var stale = traded && nextWeekday(quote, seen.day, reg.start) && quote.prevClose === seen.before && seen.before !== seen.close
+  return Object.assign({}, quote, stale ? { closeSeen: seen, prevClose: seen.close } : { closeSeen: seen })
+}
+
+// A quote's session close, as `carryClose` keeps it, once its headline is
+// that close: null before.
+function sessionClose(quote) {
+  var reg = quote.session && quote.session.regular
+  var head = Quote.headlineQuote(quote)
+  return reg && head && head.source === "quote" && head.t !== null && head.t >= reg.end && Format.isFiniteNumber(quote.prevClose)
+    ? { day: reg.start, close: head.price, before: quote.prevClose } : null
+}
+
+// Whether the day `to` starts on is the weekday after the one `from`
+// starts on, by the listing's own clock: Monday after Friday.
+function nextWeekday(quote, from, to) {
+  var day = function(t) { return Math.floor((t + (quote.gmtoffset || 0)) / 86400) }
+  var weekday = new Date(day(from) * 86400000).getUTCDay()
+  return day(to) - day(from) === (weekday === 5 ? 3 : weekday === 6 ? 2 : 1)
+}
+
 // How long after a session opens its first price may still be on its way,
 // and how often a quote still waiting on it is asked for meanwhile: Yahoo
 // answered with the last session's quote until 09:30:09 for the S&P 500

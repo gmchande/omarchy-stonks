@@ -399,13 +399,16 @@ function parseChart(json, centExchanges, receivedAt) {
     // The close before the bars' session. Yahoo's previous close is the
     // close before the headline's day: so for a two-day answer read as the
     // headline's day, the first or the later. The range's own, before its
-    // first day, only for an answer of one day, or a headline from before
-    // it: Yahoo's two-day answer for Tokyo gives Thursday's own close there
-    // (Toyota's at 09:07 on Friday 30 October, before Friday's first bar,
-    // read 0.00% with it), and a one-day answer's quote can be an older
-    // day's (CVR's, untraded, stamped two days back).
+    // first day, only for a one-day answer, or a headline from before it: a
+    // two-day answer's isn't its first day's. Tokyo's gives the close before
+    // the day Yahoo counts as current there, whatever its bars hold: at
+    // 09:03 on Monday 2 November, before Monday's first bar, it held
+    // Friday's bars alone with Friday's own close as its previous close,
+    // which read 0.00% for Friday's −0.23%. A one-day answer's quote can be
+    // an older day's (CVR's, untraded, stamped two days back). Seen in
+    // Tokyo's answers only: London's and Sydney's opens aren't captured yet.
     prevClose: knownPrice(meta.chartPreviousClose !== undefined
-      && (days.length === 1 || (chosen === 0 && (quoted === null || !regular || quoted < regular.start)))
+      && ((days.length === 1 && meta.range !== "2d") || (chosen === 0 && (quoted === null || !regular || quoted < regular.start)))
       ? meta.chartPreviousClose : meta.previousClose),
     // A time no Date holds (`Format.isMoment`) is none, as one not sent is.
     marketTime: Format.isMoment(meta.regularMarketTime) && meta.regularMarketTime > 0 ? meta.regularMarketTime : null,
