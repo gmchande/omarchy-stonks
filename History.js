@@ -6,7 +6,6 @@
 // nothing of the day or overnight prints, nor of calendars: a bar's clock
 // is its own day's, from the answer.
 
-// 1D stays on chartUrl / parseChart. Every other range uses this table.
 var HISTORY_RANGES = {
   "1W": { range: "5d", interval: "15m" },
   "1M": { range: "1mo", interval: "1h" },
@@ -30,8 +29,6 @@ function historyRanges() {
   return ["1D"].concat(Object.keys(HISTORY_RANGES))
 }
 
-// A range's history in the cache, and in what the service asks of it, by
-// its symbol and range.
 function historyKey(symbol, range) {
   return String(symbol || "").toUpperCase() + "|" + String(range || "")
 }
@@ -143,9 +140,6 @@ function historyIntervalSeconds(interval) {
   return 0
 }
 
-// A range's last close, its change, and its high and low, each a bar's
-// `{ p, t }`, from its bars and those without a close (`unclosed`), whose
-// high and low Yahoo did send; none with no bar drawn.
 function periodStats(history) {
   var bars = history && history.bars ? history.bars : []
   var lastBar = bars.length ? bars[bars.length - 1] : null
@@ -297,11 +291,6 @@ function historyDateText(history, t, withYear, interval) {
   return text + (withYear ? " " + date.year : "")
 }
 
-// A bar coarser than a day has no day number to place it, so it always
-// carries its year: a five-year high inside one calendar year would
-// otherwise read "JUL". Day-level bars take the year only when the period
-// crosses one. The year is written whole, as the scrub writes it: "JAN 23"
-// read as the 23rd of January.
 function historyStatsDateText(history, t, withYear, interval) {
   var coarse = interval === "1wk" || interval === "1mo" || interval === "3mo"
   return historyDateText(history, t, coarse || withYear, coarse ? "1mo" : "1d")
@@ -333,21 +322,15 @@ function withNewest(history, print) {
   })
 }
 
-// The bar `withNewest` ended `history` on, or null.
 function newestBar(history) {
   var bars = history && history.bars ? history.bars : []
   return bars.length && bars[bars.length - 1].newest ? bars[bars.length - 1] : null
 }
 
-// The index of the last bar of Yahoo's own: before an appended live moment
-// (`liveBarAppended`), whose day the bucket before it holds, or the newest
-// price (`newestBar`).
 function ownLast(history) {
   return history.bars.length - (liveBarAppended(history) || newestBar(history) ? 2 : 1)
 }
 
-// A bar without a close (`unclosed`) after every bar drawn: Tokyo's day,
-// after its close, before Yahoo's answer has its close. Null with none.
 function closelessLast(history) {
   var bars = history && history.bars ? history.bars : []
   var open = history && history.unclosed ? history.unclosed : []
@@ -357,12 +340,6 @@ function closelessLast(history) {
   return found
 }
 
-// Whether the last bar of a range of bars a day long or longer holds the
-// session that starts at `t` (`Quote.figuresDay`), by the exchange's
-// calendar: a day's bar is that day's, a week's bar the seven days from its
-// first, a month's its month. The last bar is one without a close after
-// those drawn (`closelessLast`), else the last of Yahoo's own (`ownLast`).
-// An intraday bar holds only part of a day.
 function lastBarHolds(history, t) {
   var bars = history && history.bars ? history.bars : []
   var spans = { "1d": "day", "1wk": "week", "1mo": "month", "3mo": "quarter" }
@@ -399,12 +376,6 @@ function rangeEnds(history, stats, quote) {
   return { high: high, low: low }
 }
 
-// What traded over a range: its bars' volumes added, those without a close
-// too (`unclosed`), as the day's VOL reads (`Format.compactNumber`). An
-// appended live moment is left out, since the bucket before it counts its
-// day, and so is the newest price (`withNewest`). "" when any counted bar's
-// volume isn't known, or when none is above zero, as for an index Yahoo has
-// no volume for.
 function rangeVolume(history) {
   var bars = history && history.bars ? history.bars : []
   var end = bars.length ? ownLast(history) + 1 : 0
@@ -417,11 +388,6 @@ function rangeVolume(history) {
   return sum > 0 ? Format.compactNumber(sum) : ""
 }
 
-// A range line's facts, in the day line's places (`Figures.dayLine`): START,
-// the price the range's change is measured from, which the scrub's dashed
-// line names too, and VOL, what traded over it (`rangeVolume`). `widest` is
-// the widest price of the listing's at its decimals; each value is "" when
-// not known, as in the room the info table holds for them.
 function rangeFacts(widest, start, volume) {
   return [
     { label: "START", value: start || "", widest: widest },
@@ -429,12 +395,6 @@ function rangeFacts(widest, start, volume) {
   ]
 }
 
-// The info block's first line on a range, in the day line's shape: the
-// range's name, its low and high (`rangeEnds`) with the price on top's
-// place between them, where its line ends: the newest price
-// (`withNewest`), else the headline's, else the last bar's close. Then its
-// facts (`rangeFacts`). The dates of the low and high are on the chart's
-// marks (`rangeMarks`). Null with no bars.
 function rangeLine(history, ends, quote) {
   if (!ends) return null
   var digits = quote ? quote.priceDigits : undefined
@@ -449,11 +409,6 @@ function rangeLine(history, ends, quote) {
   }
 }
 
-// A range's high and low (`rangeEnds`), marked on its chart (`RangeMarks`):
-// each where its bar sits along the chart, 0..1, as the scrub places a bar
-// (`historyFraction`), its price at the listing's decimals, and its date.
-// One made after the last bar drawn, on a bar without a close
-// (`closelessLast`), stands at the chart's right edge, where that day is.
 function rangeMarks(history, ends, quote) {
   if (!ends) return null
   var digits = quote ? quote.priceDigits : undefined
@@ -487,11 +442,6 @@ function historyScrubForms(history, bar, digits) {
   return [date + " · " + Format.money(bar.c, digits), date]
 }
 
-// The range's price and move, as the hero shows it: a scrubbed bar's, else
-// the price on top, the newest since the close where the line ends on it
-// (`newestBar`), its session and time said after the range's name
-// (`newest`), else the headline's. Each measured from the
-// range's start (`baseline`).
 function historyRowModel(history, quote, scrubT) {
   if (!history) return null
   var stats = periodStats(history)
