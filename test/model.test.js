@@ -893,6 +893,11 @@ test("the key sheet lists exactly the README's keys for each surface, the row's 
   expect(drawn("manual", false)).toEqual(readme("window"))
   expect(drawn("pct", true)).toEqual(readme("panel").filter(k => !moves.includes(k)))
   expect(drawn("symbol", false)).toEqual(readme("window").filter(k => !moves.includes(k)))
+  // The mouse's drag is offered only in manual order, the order's arrow only
+  // in a sorted one.
+  const mouse = order => M.sheet(order, true).mouse.rows.map(r => r.does).join(" | ")
+  expect(["manual", "pct"].map(order => [mouse(order).includes("lists · drag moves it"), mouse(order).includes("arrow")]))
+    .toEqual([[true, false], [false, true]])
 })
 
 test("a letter says its key and Shift, never its text's case, and nothing held with Ctrl or Alt", () => {
