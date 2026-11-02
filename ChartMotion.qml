@@ -54,7 +54,6 @@ Item {
     easing.type: Easing.OutCubic
   }
 
-  // A range's history, or the day (`Chart.viewChart`).
   readonly property bool historyActive: !!chart && chart.range !== "1D"
   readonly property var history: chart ? chart.history : null
   readonly property bool historyShown: historyActive && !!history
@@ -167,7 +166,6 @@ Item {
     scrubT = 0
   }
 
-  // The one motion: 320 ms from the left.
   readonly property bool drawingIn: drawInAnim.running
   function drawIn() {
     drawInAnim.restart()

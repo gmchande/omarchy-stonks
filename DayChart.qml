@@ -144,7 +144,6 @@ Item {
     }
   }
 
-  // The draw-in widens this clip over ink that is already painted.
   Item {
     id: curtain
     width: root.replayX >= 0 ? root.width * Math.min(1, root.replayX)

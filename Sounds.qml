@@ -52,14 +52,13 @@ Item {
   property real lastChime: 0
   property int waiting: -1
 
-  // A sound that may wake an output asleep opens with up to 150 ms of silence,
-  // which the waking eats instead of the sound. PipeWire puts an output to
-  // sleep after 5 s with nothing playing; Stonks hears only its own sounds, so
-  // it counts the output asleep 4 s after its last. The whole lead-in holds
-  // until the silence's stream reaches the output, or for 550 ms without one:
-  // laptop speakers wake in 135 to 182 ms, Bluetooth slower. Then it shrinks a
-  // third as fast as time passes, in 30 ms steps, so with chimes 45 ms apart
-  // none sounds before the one struck ahead of it.
+  // A sound that may wake an output opens with up to 150 ms of silence, for
+  // the waking to eat. PipeWire sleeps an output after 5 s of nothing; Stonks
+  // hears only its own sounds, so it counts the output asleep 4 s after its
+  // last. The whole lead-in holds until the silence's stream reaches the
+  // output, or 550 ms without one (laptop speakers wake in 135 to 182 ms,
+  // Bluetooth slower), then shrinks a third as fast as time passes, in 30 ms
+  // steps, so no chime, 45 ms apart, overtakes the one before.
   readonly property int leadIn: 150
   property real asleepAfter: 0
   property real wokeAt: 0
@@ -320,24 +319,23 @@ Item {
     }
   }
 
-  // exec stops a sound still playing. 4 s is twice the longest, a replay's, so
-  // a stalled PipeWire can't hold one. Every stream asks for 30 ms, which
-  // PipeWire rounds down to its quantum, 1024 frames, so none moves it: each
-  // move puts a Bluetooth output about 11 ms further behind, and AirPods go
-  // silent once a few seconds of chimes add up.
+  // exec stops the sound playing. 4 s is twice a replay, the longest, so a
+  // stalled PipeWire can't hold one. Every stream asks for 30 ms, which
+  // PipeWire rounds down to its 1024-frame quantum, so none moves it: each move
+  // puts a Bluetooth output 11 ms further behind, and AirPods go silent once a
+  // few seconds of chimes add up.
   function start(file) {
     player.exec(["timeout", "-k", "1", "4", "pw-play", "--media-role", "Notification", "--latency", "30ms", file])
   }
 
   Process { id: player }
 
-  // The silence that keeps the output awake: pw-cat reading zeros holds it
-  // open as a sound does, and says "-> streaming" once it reaches it. The
-  // output counts as awake only while it runs and 4 s after it stops. One that
-  // ends on its own while wanted, as when PipeWire restarts, may have taken the
-  // output with it, so it counts as asleep and starts again 2 s later. Each
-  // stream ends after `streamSeconds`, so none outlives a shell that dies, and
-  // starts again at once if still wanted.
+  // The silence: pw-cat reading zeros holds the output open as a sound does,
+  // and says "-> streaming" once it reaches it. The output counts as awake
+  // while it runs and 4 s after it stops, but not after it ends on its own, as
+  // when PipeWire restarts: then it starts again 2 s later. Each ends after
+  // `streamSeconds`, so none outlives a shell that dies, and starts again at
+  // once if still wanted.
   property int streamSeconds: 60
   Timer { id: afterScrub; interval: 1000; onTriggered: root.scrubHeld = false }
   onKeepingAwakeChanged: silence.running = keepingAwake
@@ -366,12 +364,11 @@ Item {
     onTriggered: if (root.keepingAwake && !silence.running) silence.running = true
   }
 
-  // Quiet while Omarchy's Do Not Disturb is on, as Omarchy's own toggle asks
-  // it, or an app records from a microphone, as a call does. A shell that
-  // doesn't answer, as with another app showing notifications, leaves the bell
-  // to ring. `pw-dump` runs to about half a megabyte; an answer that times out,
-  // fails or passes 4 MB counts as recording. Both are stopped within 7 s,
-  // before the next bell.
+  // Quiet under Omarchy's Do Not Disturb, asked as Omarchy's toggle asks it,
+  // and while an app records from a microphone, as a call does. A shell that
+  // doesn't answer, as with another notifier, leaves the bell to ring.
+  // `pw-dump` runs to about half a megabyte; one that times out, fails or
+  // passes 4 MB counts as recording. Both stop within 7 s, before the next bell.
   function ring() {
     if (turnedOn && !listening.running) listening.running = true
   }
@@ -402,10 +399,9 @@ Item {
 
   // One shell while sounds are on, starting a pw-play in the background for
   // each chime named on its input, so chimes overlap and the shell's thread
-  // starts no process per chime. Each has 2 s, four times a chime, so a
-  // stalled PipeWire can't pile them up, and starts from a subshell that ends
-  // at once: started from this shell, each grew it by a third of a kilobyte,
-  // 10 MB over 20,000 chimes. As Stonks goes, its input closes and it ends.
+  // starts no process per chime. Each has 2 s, so a stalled PipeWire can't pile
+  // them up, and starts from a subshell that ends at once: from this shell,
+  // each grew it by a third of a kilobyte, 10 MB over 20,000 chimes.
   Process {
     id: chimer
     running: root.turnedOn
