@@ -2,35 +2,26 @@ import QtQuick
 import "Fetch.js" as Fetch
 import "History.js" as History
 import "Quote.js" as Quote
-// The history for the charts on show, and those fetched ahead of a click.
-// One curl at a time, one retry of a bad answer, fifteen minutes of cache,
-// last-good kept on failure.
-// The charts asked for ahead (`requestAhead`), the rows in sight, go as one
-// curl run of several URLs, so a slow network keeps them waiting once, not
-// once each.
-// `entries` holds answers only, "ok" or "failed": what is on its way is
-// `wanted`, so asking for a chart changes nothing a reader of the answers
-// sees until one lands. With nothing wanted the feed says so (`idle`), as
-// the time to ask for charts ahead.
+// History for the charts on show and those fetched ahead of a click.
+// Charts fetched ahead go as one curl run, so a slow network makes them
+// wait once, not once each. `entries` holds answers only; what is on its
+// way is `wanted`, so asking changes nothing a reader sees until one lands.
 Item {
   id: root
 
   property var entries: ({})
   property var gate: null
   property var clearance: null
-  // The service, whose wall clock stamps each answer and ages the cache
-  // (`wallSecond`); the system's without one.
+  // The service's wall clock, so answers age by its time.
   property var clock: null
   function stamp() { return clock ? clock.wallSecond() : Math.floor(Date.now() / 1000) }
-  // The exchanges whose listings trade in whole cents from $1
-  // (`History.parseHistory`); none unless handed in.
+  // Exchanges whose listings trade in whole cents from $1.
   property var centExchanges: []
   property var wanted: null
-  // The request under way, launched and not yet answered: its curl or its
-  // retry pause.
+  // Launched and not yet answered, its retry pause included.
   property var job: null
   property int attempts: 0
-  // The job's curl was stopped; its answer, whatever it says, is dropped.
+  // The job's curl was stopped; its answer is dropped.
   property bool stopped: false
   property bool waitingForScreen: false
 
@@ -52,11 +43,9 @@ Item {
       && next.charts.every(function(c) { return root.holds(request, c.key) })
   }
 
-  // At most `keep` charts' histories, in the order they were last set: the
-  // one set longest ago goes first, but never one `inUse`, the charts on
-  // show and the rows in sight fetched ahead (the service holds them to
-  // fewer than `keep`): pushed out, one would be fetched again at once,
-  // pushing out the next. `values` holds each key's new values.
+  // Evicts the oldest set first, never one in use (charts on show, rows
+  // fetched ahead): pushed out, it would be fetched again at once, pushing
+  // out the next.
   readonly property int keep: 40
   property var inUse: []
   function setEntries(values) {
@@ -103,7 +92,7 @@ Item {
     if (Object.keys(next).length !== Object.keys(entries).length) root.entries = next
   }
 
-  // No chart on show needs history: the day.
+  // The day needs no history.
   function clear() {
     root.want(null)
   }
@@ -198,8 +187,8 @@ Item {
 
   function settle(histories) {
     var request = job
-    // Answered, before the answers are told: a reader of `entries` may
-    // want the next chart at once, and that want must outlast this one.
+    // Cleared before `entries` changes: a reader may want the next chart at
+    // once, and that want must stand.
     root.wanted = null
     var now = root.stamp()
     var values = {}
