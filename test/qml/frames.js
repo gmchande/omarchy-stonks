@@ -588,13 +588,17 @@ function colourIn(image, [x0, y0, w, h]) {
 const apart = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])))
 
 // A press, as the shell's buttons answer one: the box's colour before the
-// mark is what lies under the control, and every frame from 20 ms on shows
-// something else (the first of them by 50 ms), a fill on its way; from
+// mark is what lies under the control, and every frame from 50 ms on shows
+// something else (the first of them by 100 ms), a fill on its way; from
 // 240 ms on, the fill laid over that ground, within rounding. A fill that
-// waits for the release, or a hover's fainter fill, fails.
+// waits for the release, starts 100 ms late, or settles on a hover's
+// fainter fill fails. A frame before 50 ms isn't judged: a fill whose first
+// tick lands a frame late, still the ground's colour at 20 ms on a busy
+// machine, is late by less than anyone sees (the list's row on battery, 1
+// November).
 function press(frames, fill, box) {
   const before = frames.filter(f => f.t < 0)
-  const after = frames.filter(f => f.t >= 20)
+  const after = frames.filter(f => f.t >= 50)
   const at = f => f.t + " ms " + colourIn(f.image, box).join(",")
   if (!before.length || !after.length || after[after.length - 1].t < 240)
     return { ok: false, detail: before.length + " frames before the press, the last at " + (frames.length ? frames[frames.length - 1].t : "-") + " ms" }
@@ -602,7 +606,7 @@ function press(frames, fill, box) {
   const wants = ground.map((g, i) => Math.round(g * (1 - fill[3]) + fill[i] * 255 * fill[3]))
   const still = after.find(f => apart(colourIn(f.image, box), ground) <= 2)
   const wrong = after.filter(f => f.t >= 240).find(f => apart(colourIn(f.image, box), wants) > 3)
-  const problem = after[0].t > 50 ? "no frame from 20 to 50 ms"
+  const problem = after[0].t > 100 ? "no frame from 50 to 100 ms"
     : still ? "the ground's colour still at " + at(still)
     : wrong ? "not the pressed fill at " + at(wrong) : ""
   return { ok: problem === "", detail: "ground " + ground.join(",") + ", the pressed fill over it " + wants.join(",")
@@ -906,6 +910,7 @@ function selfCheck() {
     ["eases to the pressed fill in 160 ms", true, t => outCubic(t, 160)],
     ["takes the pressed fill at once", true, t => t >= 0 ? 1 : 0],
     ["eases in 160 ms, frames 9 to 50 ms apart", true, t => outCubic(t, 160), 480, busy],
+    ["eases in 60 ms, its first tick on a 20 ms frame", true, t => outCubic(t, 60, 20), 360, [17]],
     ["waits for a release 400 ms in", false, t => t >= 400 ? 1 : 0, 480],
     ["settles on the hover's fill", false, t => outCubic(t, 160) * 0.08 / 0.22],
     ["starts 100 ms late", false, t => outCubic(t, 160, 100)],

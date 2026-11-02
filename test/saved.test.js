@@ -407,12 +407,12 @@ test("smooth's replay of Tokyo's day strikes no bar across lunch, where the char
 
 test("smooth's replay of a thin night follows the line through its trades", () => {
   // TOY at 00:36 on Monday 5 October: Friday, then Sunday night's five
-  // trades, a line through them where the clock puts each, unbroken after
-  // the weekend that takes no room.
+  // trades, a line through them where the clock puts each, running on from
+  // Friday across the weekend that takes no room.
   const day = dayAt("live-2026-10-05", "toy").day
   const heard = smoothHeard(day)
   const tonight = heard.geometry.points.filter((p, i) => day.points[i].t >= at("2026-10-04", "20:00"))
-  expect([tonight.length, tonight[0].brk, tonight.slice(1).some(p => p.brk)]).toEqual([5, true, false])
+  expect([tonight.length, heard.geometry.points.some(p => p.brk)]).toEqual([5, false])
   followsLine(heard)
 })
 
@@ -2213,13 +2213,26 @@ test("every price stands at its time from its day's first trade, a quiet night a
   expect(friday.points.map((p, k) => Math.abs(fridayLine[k].x - (p.t - eight) / 86400) < 1e-9).every(Boolean)).toBe(true)
   // Sunday 22:30, SILK, and Sunday 23:35, JNJ: Friday, then the night's
   // trades where the clock puts them, the weekend taking no room: the line
-  // starts again after it, and runs unbroken through the night.
+  // runs on across it from Friday's last trade, and through the night.
   for (const [set, name, date] of [["sunday", "silk", "2026-09-27"], ["watch-2026-10-25-2335", "jnj", "2026-10-25"]]) {
     const sunday = dayAt(set, name).day
     const line = M.chartGeometry(sunday).points
     const night = sunday.points.map((p, k) => [p, line[k]]).filter(([p]) => p.t >= at(date, "20:00"))
-    expect([set, night[0][1].brk, night.slice(1).some(([, g]) => g.brk)]).toEqual([set, true, false])
+    expect([set, line.some(g => g.brk)]).toEqual([set, false])
     expect(night.map(([, g]) => g.x)).toEqual(night.map(([p]) => M.fractionAtTime(sunday, p.t)))
+  }
+  // Sunday 1 November at 21:48, the night the owner saw Friday's line and
+  // tonight's stand apart on every chart: each runs on from Friday's last
+  // trade to tonight's first, and a scrub's dot and the chime ride the
+  // line between them. SHOP's Friday ended with its 18:35 trade.
+  const chime = load("ChartSound.js")
+  for (const name of ["nbis", "be", "fig", "shop"]) {
+    const day = dayAt("gap-2026-11-01-2148", name).day
+    const line = M.chartGeometry(day, calendars).points
+    const first = day.points.findIndex(p => p.t >= day.axis.skip.to)
+    const between = (line[first - 1].x + line[first].x) / 2
+    expect([name, line[first].brk, M.yAt(line, between) !== null, chime.lineBars({ points: line })(between) >= 0])
+      .toEqual([name, false, true, true])
   }
   expect(dayAt("watch-2026-10-25-2335", "jnj").day.points.filter(p => p.t >= at("2026-10-25", "20:00")).length).toBe(19)
   // REED had no print on Sunday night: Friday from its first trade, the
@@ -2393,10 +2406,10 @@ test("a two-day answer is read as the headline's session, with the coming day's 
   expect([tail.length, tail.every(p => p.s === "pre")]).toEqual([23, true])
   expect(M.extendedStack(aapl, null, at("2026-10-23", "06:00"), null)).toMatchObject({ label: "PRE-MARKET", changeText: "\u22120.49%" })
   // The row's line: Thursday, then the pre-market, the night between taking
-  // no room and the line starting again after it.
+  // no room and the line running on across it.
   const row = M.chartGeometry(aapl, calendars)
   const first = aapl.points.indexOf(tail[0])
-  expect([row.points[first].brk, row.points[first].x - row.points[first - 1].x < 0.02]).toEqual([true, true])
+  expect([row.points[first].brk, row.points[first].x - row.points[first - 1].x < 0.02]).toEqual([false, true])
   // Since the open at rest is "—", as the S&P 500's is: the coming session
   // has no open yet. A scrub of Thursday still reads from Thursday's open.
   // The two-day answer must not bring back Thursday's open.
