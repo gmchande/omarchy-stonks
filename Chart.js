@@ -120,23 +120,25 @@ var NO_ANSWER = { bars: [], from: null, through: null }
 // night's edges. Prints outside a regular session are flagged `ext`, and
 // those drawn dim `dim`: the extended hours, or, on a day lit where it
 // trades now (`litFrom`, `Overnight.litFrom`), every print before it.
-// `brk` starts the line again across a break in the exchange's day (Tokyo's
-// lunch, from its calendar in `calendars`: Yahoo sends 09:00 to 15:30 as
-// one session; the point after it is flagged `lunch` too, so a scrub there
-// draws no dot), and across the hours after a day that take no room
-// (`axis.skip`), so no line crosses hours the market was shut. A quiet hour
-// of a US night is no break: the line runs on through it to the next
-// trade. The vertical range holds every drawn print and the close the day
+// `brk` lifts the line across a break in the exchange's day, hours that
+// take room by the clock (Tokyo's lunch, from its calendar in `calendars`:
+// Yahoo sends 09:00 to 15:30 as one session), so the line, the scrub's
+// dot, the chime and retro's columns leave the gap. Hours that take no room
+// (`axis.skip`: a weekend, a holiday's evening, the night before a coming
+// day's pre-market) are no break: the line runs on across them from the
+// last trade before to the first after, as it does through a quiet hour of
+// a US night (the owner chose it on 1 November, when Friday's line and
+// Sunday night's stood apart on every chart).
+// The vertical range holds every drawn print and the close the day
 // is measured from (`Quote.dayBase`) where it is known, with headroom, so
 // the baseline is always in view.
 function chartGeometry(quote, calendars) {
   var pts = quote.points
   var axis = chartSpan(quote)
   var reg = quote.session.regular
-  var lunches = reg ? Market.sessionBreaks(Market.calendarFor(calendars, quote), reg.start) : []
-  var breaks = axis.skip && axis.skip.to > axis.skip.from ? lunches.concat([{ start: axis.skip.from, end: axis.skip.to }]) : lunches
-  var across = function(gaps, a, b) {
-    return gaps.some(function(gap) { return a <= gap.start && b >= gap.end })
+  var breaks = reg ? Market.sessionBreaks(Market.calendarFor(calendars, quote), reg.start) : []
+  var across = function(a, b) {
+    return breaks.some(function(gap) { return a <= gap.start && b >= gap.end })
   }
   // An unknown close (`Quote.knownPrice`) has no place on the scale and no
   // dashed line: the prints alone set it. Otherwise a null close draws a
@@ -161,8 +163,7 @@ function chartGeometry(quote, calendars) {
       y: 1 - (pts[k].p - lo) / (hi - lo),
       ext: session !== "reg",
       dim: lit ? pts[k].t < quote.litFrom : session !== "reg",
-      brk: !!prev && across(breaks, prev.t, pts[k].t),
-      lunch: !!prev && across(lunches, prev.t, pts[k].t)
+      brk: !!prev && across(prev.t, pts[k].t)
     })
   }
   var ticks = []
@@ -244,8 +245,8 @@ function lastLitPoint(geometry) {
 }
 
 // Interpolated normalized y for a normalized x, or null past the line and
-// inside Tokyo's lunch (`lunch`), where the line lifts, so the scrub's dot
-// leaves the gap as the line and the chime do.
+// across a break (`brk`, Tokyo's lunch), where the line lifts, so the
+// scrub's dot leaves the gap as the line and the chime do.
 function yAt(points, x) {
   if (!points || !points.length) return null
   if (x < points[0].x || x > points[points.length - 1].x) return null
@@ -253,7 +254,7 @@ function yAt(points, x) {
   for (var i = 1; i < points.length; i++) {
     if (points[i].x >= x) {
       var a = points[i - 1], b = points[i]
-      if (b.lunch && x > a.x && x < b.x) return null
+      if (b.brk && x > a.x && x < b.x) return null
       var f = b.x === a.x ? 0 : (x - a.x) / (b.x - a.x)
       return a.y + (b.y - a.y) * f
     }

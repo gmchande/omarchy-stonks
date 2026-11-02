@@ -121,8 +121,9 @@ keeps its day until its next trade. Once the day's date has passed, the
 list says the day and its night: MON + NIGHT after midnight, FRI + NIGHT
 on Sunday night. Over a weekend or a holiday the chart shows the last
 trading day. On Sunday night and a holiday's evening, that day comes
-first, then the night, and the
-hours closed between them take no room. A day that closes early, such as
+first, then the night: the hours closed between them take no room, and
+the line runs on from the day's last trade to the night's first. A day
+that closes early, such as
 the Friday after Thanksgiving, ends at 17:00 with no night after it.
 
 A US stock that doesn't trade at night shows its day up to 20:00, and

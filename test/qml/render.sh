@@ -151,6 +151,12 @@ every_state() (
   for moment in tokyo-2026-11-01-1855 tokyo-2026-11-01-1903 tokyo-2026-11-01-1921; do
     states="$states popup-sweep-$moment-7203.t-smooth popup-sweep-$moment-7203.t-retro"
   done
+  # Sunday 1 November at 21:48, when Friday's line and tonight's stood apart
+  # on every chart: each runs on from Friday's last trade to tonight's first,
+  # the weekend taking no room; SHOP's Friday ended at 18:35.
+  for symbol in nbis be fig shop; do
+    states="$states popup-sweep-gap-2026-11-01-2148-$symbol-smooth popup-sweep-gap-2026-11-01-2148-$symbol-retro"
+  done
   # 1D at night, the owner's complaints kept in sight: Thursday 29 October
   # at 21:55, Nebius's day with tonight bright at its end and the close it
   # counts from named, at text size 16 too; J&J's thin night; Power
