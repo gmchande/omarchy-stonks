@@ -10,22 +10,17 @@ import "Format.js" as Format
 import "History.js" as History
 import "Share.js" as Share
 import "Tones.js" as Tones
-// The screenshot: the chart on show laid out again for sharing, 1200 × 675
-// (16:9, which X shows whole), drawn at twice that, 2400 × 1350 of the
-// screen's own pixels on a screen of any scale, so its canvases paint
-// sharp and no larger than the picture: every measure is in the layout's
-// units, `u` window units each. What the panel shows above its ranges, at
-// share size, with the facts it leaves out (`Share.words`); never the list.
-// In the surface's look and colours. Built for a shot and gone after it
-// (`StonksBody`).
+// The screenshot: what the panel shows above its ranges, never the list, laid
+// out again at 1200 × 675 (16:9, which X shows whole), with the facts the
+// panel leaves out (`Share.words`), in the surface's look and colours. Drawn at
+// twice that in the screen's own pixels on a screen of any scale, so its
+// canvases paint sharp and no larger than the picture: every measure is in
+// `u`, the layout's unit in window units. Built for a shot and gone after it.
 Rectangle {
   id: root
 
   property string symbol: ""
-  // Yahoo's quote, the 1D chart's day, a range's history (null on the
-  // day) and its high and low marks (`History.rangeMarks`), the newest
-  // print of all, and the price on show (`Figures.rowModel` or
-  // `History.historyRowModel`), as the surface has them.
+  // As the surface has them; `marks` is a range's high and low.
   property var quote: null
   property var day: null
   property var history: null
@@ -38,8 +33,7 @@ Rectangle {
   property int now: 0
   property var calendars: null
   property bool retro: false
-  // The header's animal: "bull", "bear", or "" on a flat day, and asleep
-  // while its market rests.
+  // "bull", "bear", or "" on a flat day.
   property string animalKind: ""
   property bool asleep: false
   property color foreground: Commons.Color.foreground
@@ -48,8 +42,8 @@ Rectangle {
   property color downColor: Commons.Color.urgent
   property string fontFamily: Style.font.family
 
-  // `px` is one of the picture's pixels in the window's units: half a unit
-  // on a scale-2 screen.
+  // `px` is one of the picture's pixels in window units: half a unit on a
+  // scale-2 screen.
   readonly property real dpr: Screen.devicePixelRatio > 0 ? Screen.devicePixelRatio : 1
   readonly property real u: 2 / dpr
   readonly property real px: 1 / dpr
@@ -72,9 +66,7 @@ Rectangle {
   height: 675 * u
   color: ground
 
-  // The symbol, its name as the header's title sets it, and its exchange as
-  // a caption: the name gives way to the exchange, which stays whole. The
-  // currency is the price's (below).
+  // The name gives way to the exchange, which stays whole.
   Text {
     id: symbolText
     objectName: "shareSymbol"
@@ -116,7 +108,7 @@ Rectangle {
     font.letterSpacing: 2 * root.u
   }
 
-  // The day's animal, as the header draws it, the same in both looks.
+  // As the header draws it, the same in both looks.
   PixelSprite {
     id: animal
     objectName: "shareAnimal"
@@ -129,7 +121,6 @@ Rectangle {
     pixelRatio: root.dpr
     color: root.animalKind === "bull" ? root.upColor : root.downColor
   }
-  // Asleep, the header's dim "z" over its back.
   PixelSprite {
     visible: animal.visible && root.asleep
     columns: 3
@@ -143,15 +134,13 @@ Rectangle {
     color: root.dim
   }
 
-  // The price, as large as the room the move leaves it, in the look's
-  // digits, and the move pinned to the right edge on the same baseline.
+  // As large as the room the move leaves it.
   readonly property string priceText: view ? view.priceText : "—"
-  // The price gives up the currency's width when room is short.
   readonly property real priceRoom: width - margin * 2 - changeText.implicitWidth - 48 * u
     - currencyText.implicitWidth - currencyGap
   readonly property real currencyGap: currencyText.text ? 16 * u : 0
-  // Measured in the picture's pixels, at the size the price is drawn at on
-  // a scale-1 screen, so the sizes it gives are the same on every screen.
+  // At the size the price is drawn at on a scale-1 screen, so the sizes it gives
+  // are the same on every screen.
   TextMetrics {
     id: priceInk
     font.family: root.fontFamily
@@ -194,9 +183,7 @@ Rectangle {
     color: root.foreground
     ghostColor: root.ghost
   }
-  // The currency beside the price, set like a unit, on its baseline, dim
-  // and at the ticker's size: a price in pence says "PENCE", and an index's
-  // level, which isn't money, has none (`Share.words`).
+  // Set like a unit, dim at the ticker's size: a price in pence says "PENCE".
   Text {
     id: currencyText
     objectName: "shareCurrency"
@@ -221,9 +208,7 @@ Rectangle {
     font.bold: true
   }
 
-  // What the price is, its time and zone, and on a range its date (on the
-  // day the foot says it); and what the move is measured from, the chart's
-  // dashed line.
+  // What the price is and what the move is measured from.
   component Caption: Text {
     textFormat: Text.PlainText
     color: root.dim
@@ -248,8 +233,7 @@ Rectangle {
     y: 266 * root.u - baselineOffset
     text: root.words ? root.words.from : ""
   }
-  // The line under the price the panel shows, an old overnight print dim,
-  // and after the close the move since it, in its own tone.
+  // The line under the price the panel shows.
   Caption {
     id: extendedText
     objectName: "shareExtended"
@@ -267,11 +251,8 @@ Rectangle {
     color: root.toneColor(root.words ? root.words.sinceTone : "flat")
   }
 
-  // The chart, at twice its strokes and cells, as the surface's look draws
-  // it, still: no draw-in, ripple, or blink. A range's marks are set at the
-  // picture's caption size, the dates spaced as the day's axis's ends are.
-  // A range has no axis row, its dates said once at the foot, so its chart
-  // takes the row's height.
+  // At twice its strokes and cells, still: no draw-in, ripple or blink. A range
+  // says its dates once at the foot, so its chart takes the axis row's height.
   Item {
     id: chart
     x: root.margin
@@ -328,7 +309,6 @@ Rectangle {
       letterSpacing: root.u
       spacing: 1.8 * root.u
     }
-    // A day with one print or none says so, as the panel's chart does.
     Rectangle {
       readonly property string text: root.geometry && root.geometry.day ? Figures.dayNote(root.day, root.now, root.calendars) : ""
       visible: text !== ""
@@ -348,7 +328,6 @@ Rectangle {
     }
   }
 
-  // The axis's two ends on the day: its first and newest times.
   Caption {
     objectName: "shareStart"
     x: root.margin
@@ -372,12 +351,10 @@ Rectangle {
     color: root.ghost
   }
 
-  // When, at the foot, at the mark's size: the day's date, or the range's
-  // length and dates, spaced as the day's axis is so the longest, "YEAR TO
-  // DATE · 2 JAN 2026 – 11 SEP 2026", stays clear of the logo. And Stonks'
-  // logo, the pixel bull, whatever the day's animal is, and its name. The
-  // bull is in the name's ink, not the up colour: on a down day a green
-  // bull would read as the day's.
+  // Spaced as the day's axis is, so the longest, "YEAR TO DATE · 2 JAN 2026 –
+  // 11 SEP 2026", stays clear of the logo. The logo's bull is in the name's
+  // ink, whatever the day's animal: on a down day a green bull would read as
+  // the day's.
   Caption {
     objectName: "shareSpan"
     x: root.margin

@@ -1,7 +1,7 @@
 import QtQuick
 import qs.Commons as Commons
 
-// A pixel sprite (named to dodge QtQuick.Sprite) drawn from Cells.spritePixels: [{x, y}, ...] on a grid.
+// Named to dodge QtQuick.Sprite.
 Canvas {
   id: root
 
@@ -9,9 +9,8 @@ Canvas {
   property int columns: 20
   property int rows: 14
   property color color: Commons.Color.foreground
-  // Pixels to a window unit that the cells snap to: 1 on the surfaces, the
-  // screen's ratio in the screenshot, whose units are fractions of its
-  // pixels (`ShareCard`).
+  // Pixels to the window unit the cells snap to: the screen's ratio in the
+  // screenshot, whose units are fractions of its pixels.
   property real pixelRatio: 1
 
   implicitWidth: width

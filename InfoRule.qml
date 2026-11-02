@@ -4,9 +4,8 @@ import QtQuick
 import qs.Commons as Commons
 import "Cells.js" as Cells
 
-// A range as a thin rule, low at the left and high at the right, with a
-// tick over it where the price sits: the breadth rule's ink and thickness,
-// in retro its cells, the tick a column of three. Without both ends and a
+// A range as a thin rule, low at the left and high at the right, with a tick
+// where the price sits, in the breadth rule's ink. Without both ends and a
 // price it is the empty track, as the 1D chart leaves hours still to come.
 Item {
   id: root
@@ -21,7 +20,7 @@ Item {
   readonly property int pitch: Cells.RULE_PITCH
   readonly property color plain: Qt.rgba(foreground.r, foreground.g, foreground.b, Cells.RULE_INK)
   readonly property int cells: Math.max(0, Math.floor((width + 1) / pitch))
-  // Where the price sits, 0 to 1, or -1 for no tick.
+  // -1 for no tick.
   readonly property real place: low !== null && high !== null && price !== null && high > low
     ? Math.max(0, Math.min(1, (price - low) / (high - low))) : -1
   // On a cell in retro, so both looks put the tick in the same place.

@@ -5,26 +5,16 @@ import qs.Commons
 import qs.Commons as Commons
 import "Tones.js" as Tones
 
-// A range's own high and low, marked on its chart (`History.rangeMarks`):
-// the price bright and the date dim, the high on the chart's top edge and
-// the low on its bottom, in the line's headroom. Each stands over its bar
-// and is turned toward the chart's middle, so it stays on the chart.
-// `chart` is the look on show: where it draws a bar (`xAt`, retro's on its
-// bar's column), how far its ink has drawn in (`inkDrawn`), so a mark draws
-// in with the line, and how high and low its ink reaches under a mark
-// (`inkExtentIn`). A mark whose words would touch that ink moves off its
-// edge, into the band's gap, by as much as `lift`; one that would need
-// more, as on a chart squeezed short, is left out whole. While the scrub's
-// line (`scrubX`, the scrub's place along the chart, 0..1, or -1) runs
-// through a mark, or within `clear` of it, the whole mark, price and date,
-// steps to the side of where it rests, one mark's width and twice `clear`
-// along: before it, or, with no room there, after it, wherever that
-// touches no more ink than at rest. So the line never cuts its words, its
-// own bar included, and it steps back when the line moves off. With room
-// on neither side, as on a chart narrower than two marks, it gives way
-// while crossed. The whole mark moves, not hides, so the high stays in view
-// while you scrub toward it, and not the date alone, which leaves the line
-// through the price.
+// A range's own high and low on its chart (`History.rangeMarks`): the price
+// bright and the date dim, the high on the top edge and the low on the bottom,
+// in the line's headroom, each over its bar and turned toward the middle.
+// `chart` is the look on show, which says where it draws a bar, how far its
+// ink has drawn in, and how high its ink reaches under a mark. A mark that
+// would touch the ink lifts off the edge by up to `lift`, else is left out.
+// While the scrub's line runs within `clear` of a mark, the whole mark steps
+// one mark's width aside, before it or else after, where it touches no more
+// ink; with room on neither side it gives way. It moves rather than hides, so
+// the high stays in view as you scrub toward it.
 Item {
   id: root
 
@@ -34,20 +24,20 @@ Item {
   property color foreground: Commons.Color.foreground
   property color dim: Tones.dim(foreground, Commons.Color.background)
   property string fontFamily: Style.font.family
-  // Its measures: the shell's text size and spacing on a surface, or the
-  // picture's own in the screenshot, which no text size moves (`ShareCard`).
+  // The shell's text size and spacing, or the picture's own in the screenshot,
+  // which no text size moves.
   property real fontSize: Style.font.caption
   property real letterSpacing: 1
   property real spacing: Style.effectiveSpacingScale
   readonly property real lift: root.space(4)
-  // Where the scrub's line stands, in this item's pixels, -1 without one.
+  // In this item's pixels, -1 without one.
   readonly property real scrubAt: root.chart && root.scrubX >= 0 ? root.chart.xAt(root.scrubX) : -1
 
   // `n` of the panel's pixels at text size 12, as `Style.space` rounds them.
   function space(n) { return Math.max(1, Math.round(n * root.spacing)) }
 
-  // The marks draw in with the line: the chart's draw-in uncovers them as
-  // it uncovers its ink, the room a mark lifts into included.
+  // The chart's draw-in uncovers the marks with its ink, the room a mark lifts
+  // into included.
   Item {
     y: -root.lift
     width: root.chart ? Math.min(root.width, root.chart.inkDrawn) : 0
@@ -65,13 +55,10 @@ Item {
         readonly property real gap: root.space(6)
         // How far the line keeps from the mark's words: past the scrub's dot.
         readonly property real clear: root.space(6)
-        // Over its bar, turned toward the chart's middle, on the chart.
         readonly property real restX: Math.max(0, Math.min(root.width - mark.width,
           mark.modelData.x < 0.5 ? mark.at - root.space(2) : mark.at - mark.width + root.space(2)))
-        // How far its words' ink, as drawn at rest, would reach into the
-        // chart's ink under each of them, with the mark on its edge: down
-        // into it for the high, up into it for the low. A price's thousands
-        // commas reach below the baseline.
+        // How far its words' ink at rest would reach into the chart's ink under
+        // them. A price's thousands commas reach below the baseline.
         readonly property real overlap: mark.overlapAt(mark.restX)
         readonly property bool crossed: root.scrubAt >= 0 && root.scrubAt >= mark.restX - mark.clear
           && root.scrubAt <= mark.restX + mark.width + mark.clear
@@ -87,8 +74,6 @@ Item {
         y: root.lift + (mark.index === 0 ? -Math.min(mark.overlap, root.lift)
           : root.height - mark.height + Math.min(mark.overlap, root.lift))
 
-        // With the mark at `left`: how far its words' ink reaches into the
-        // chart's, the most of the two.
         function overlapAt(left) {
           return Math.max(mark.overlapOf(left, priceText, priceInk), mark.overlapOf(left + dateText.x, dateText, dateInk), 0)
         }
@@ -98,8 +83,7 @@ Item {
           return mark.index === 0 ? top + ink.tightBoundingRect.height - under.top
             : under.bottom - (root.height - mark.height + top)
         }
-        // The mark can stand at `left`: on the chart, and on no more of its
-        // ink than at rest.
+        // On the chart, and on no more of its ink than at rest.
         function fitsAt(left) {
           return left >= 0 && left + mark.width <= root.width && mark.overlapAt(left) <= mark.overlap
         }

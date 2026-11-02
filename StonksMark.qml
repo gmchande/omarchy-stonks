@@ -3,9 +3,8 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons as Commons
 import "Cells.js" as Cells
-// Stonks' mark in cells (`Cells.markLevels`): each column's cap lit and its
-// stem faint, down to the floor, climbing. The look icon's smooth cells,
-// which step in column by column (`shown`).
+// Stonks' mark in cells: each column's cap lit and its stem faint, climbing.
+// The look icon steps it in column by column (`shown`).
 Item {
   id: root
   property color color: Commons.Color.foreground

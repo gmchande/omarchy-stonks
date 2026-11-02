@@ -2,14 +2,11 @@ import QtQuick
 import qs.Commons as Commons
 import "Chart.js" as Chart
 import "Tones.js" as Tones
-// A small day line for a watchlist row. Value-in: hand it the normalized
-// geometry from Chart.chartGeometry and the colors, it draws. Given a known
-// direction it takes the hero's rule: the up colour above the dashed
-// baseline and the down colour below it. Without one (the pill, a row still
-// loading) it is one colour. A row's draw-in clips the line, not the
-// baseline, as the hero's does; one canvas repaints for it, so a row costs
-// no layer more. The scrub's dot is its own layer, so a scrub never
-// repaints the line.
+// A row's day line. With a known direction it takes the hero's rule, the up
+// colour above the dashed baseline and the down colour below; without one, as
+// on the pill or a row still loading, one colour. The draw-in clips the line,
+// not the baseline, in the one canvas, so a row costs no layer more; the
+// scrub's dot has its own layer, so a scrub never repaints the line.
 Item {
   id: root
 
@@ -21,18 +18,15 @@ Item {
   readonly property bool split: typeof up === "boolean"
   property color baselineColor: Tones.dimmer(Commons.Color.foreground, Commons.Color.background)
   property real lineWidth: 1.25
-  // 0..1 along the session, or -1 for none. Drawn as a small dot on the line.
+  // 0..1 along the session, or -1 for none.
   property real cursorX: -1
   readonly property real pad: 1.5
-  // How much of the line has been drawn, 0..1: it shows from the left edge
-  // to the newest print's dot, and at 1 the whole line shows. The baseline
-  // is always there.
+  // The baseline is always there; the line shows to the newest print's dot.
   property real reveal: 1
-  // One print draws, as a dot, as the hero's does: a day with one bar is no
-  // empty cell.
+  // One print draws as a dot, as the hero's does.
   readonly property bool drawable: !!geometry && !!geometry.points && geometry.points.length >= 1
-  // The previous close the dashed line draws, unknown for a quote without
-  // one (`Chart.chartGeometry`): then no line, and no direction to split by.
+  // Unknown for a quote without a previous close: no line, and no direction to
+  // split by.
   readonly property bool hasBaseline: !!geometry && typeof geometry.baselineY === "number" && isFinite(geometry.baselineY)
 
   onGeometryChanged: { ink.requestPaint(); marks.requestPaint() }
@@ -78,8 +72,7 @@ Item {
       ctx.lineWidth = root.lineWidth
       ctx.lineJoin = "round"
       ctx.lineCap = "round"
-      // Drawing in: the line and its dots only left of the sweep, which
-      // runs to the newest print's dot.
+      // The sweep runs to the newest print's dot.
       ctx.save()
       if (root.reveal < 1) {
         var inkRight = pad + pts[pts.length - 1].x * w + root.lineWidth * 1.5 + 1
@@ -87,9 +80,7 @@ Item {
         ctx.rect(0, 0, inkRight * Math.max(0, root.reveal), height)
         ctx.clip()
       }
-      // Split, the up colour over the baseline and the down colour under
-      // it, in one stroke; two stops at one offset merge, so the second sits
-      // a hair below.
+      // Two stops at one offset merge, so the second sits a hair below.
       if (root.split) {
         var stop = Math.max(0, Math.min(1, by / height))
         var g = ctx.createLinearGradient(0, 0, 0, height)
@@ -97,8 +88,7 @@ Item {
         g.addColorStop(Math.min(1, stop + 0.0001), root.downColor)
         ctx.strokeStyle = g
       } else ctx.strokeStyle = root.lineColor
-      // A point that starts again (`brk`: Tokyo's lunch) lifts the pen, as
-      // the hero's line does.
+      // A break (`brk`) lifts the pen, as the hero's line does.
       ctx.beginPath()
       for (var i = 0; i < pts.length; i++) {
         var x = pad + pts[i].x * w
@@ -107,8 +97,7 @@ Item {
         else ctx.lineTo(x, y)
       }
       ctx.stroke()
-      // A print alone on its stretch of line, a day's only one or one between
-      // two breaks, is a dot three line widths across.
+      // A lone print is a dot three line widths across.
       for (var k = 0; k < pts.length; k++) {
         if (!(k === 0 || pts[k].brk) || !(k === pts.length - 1 || pts[k + 1].brk)) continue
         var dy = pad + pts[k].y * h

@@ -6,14 +6,12 @@
 .import "Market.js" as Market
 .import "Quote.js" as Quote
 
-// What the screenshot says: the picture's line of facts, what its change is
-// measured from, its axis's ends, the footer's words, and
-// the file's name. Every figure is one Stonks already shows or knows, in
-// its own words. The picture leaves the reader's clock behind, so its
+// What the screenshot says, in Stonks' own words: every figure is one Stonks
+// already shows or knows. The picture outlives the reader's clock, so its
 // times always name their zone. Knows nothing of drawing or of files.
 
-// The day as the picture draws it: the 1D chart's day, its axis ending at
-// its newest print, so a picture taken at 16:03 has no empty evening.
+// Its axis ends at the newest print, so a picture taken at 16:03 has no empty
+// evening.
 function pictureDay(day) {
   if (!day || !day.points.length) return day
   var axis = Chart.chartSpan(day)
@@ -21,9 +19,8 @@ function pictureDay(day) {
   return Object.assign({}, day, { axis: Object.assign({}, axis, { end: Math.max(axis.start, newest) }) })
 }
 
-// Where `t` falls in `quote`'s exchange: its date, clock, and zone's name,
-// by the calendar that knows that day's clock (`Market.clockCalendar`),
-// else by Yahoo's.
+// By the calendar that knows that day's clock (`Market.clockCalendar`), else
+// by Yahoo's.
 function local(quote, t, calendars) {
   var cal = Market.clockCalendar(quote, t, calendars)
   if (cal) {
@@ -48,21 +45,20 @@ function dateOf(quote, t, calendars) {
   return Format.WEEKDAYS[l.weekday].toUpperCase() + " " + l.d + " " + Format.MONTHS[l.m - 1] + " " + l.y
 }
 
-// A range's length in words, for the picture's foot.
+// For the picture's foot.
 var SPANS = { "1W": "1 WEEK", "1M": "1 MONTH", "3M": "3 MONTHS", "6M": "6 MONTHS", "YTD": "YEAR TO DATE",
   "1Y": "1 YEAR", "2Y": "2 YEARS", "5Y": "5 YEARS", "10Y": "10 YEARS", "All": "ALL" }
 
-// The headline is the regular session's close, as a scrub at the bell reads
-// it (`Quote.readingAt`): never a cryptocurrency's, which has none.
+// As a scrub at the bell reads it (`Quote.readingAt`); a cryptocurrency has no
+// close.
 function headlineIsClose(quote) {
   var head = Quote.headlineQuote(quote)
   var reg = quote.session.regular
   return !quote.crypto && !!head && head.source === "quote" && !!reg && head.t >= reg.end
 }
 
-// The moment the picture's price stands for: `t`, whether it is the close,
-// and, for a range's bar, the bar: the scrubbed one, or, with no headline,
-// the last, whose close the range then shows (`History.historyRowModel`).
+// For a range's bar, the bar: the scrubbed one, or with no headline the last,
+// whose close the range then shows.
 function moment(o) {
   if (o.history && o.scrubT) {
     var bar = History.historyBarAt(o.history, History.historyFraction(o.history, o.scrubT))
@@ -72,8 +68,8 @@ function moment(o) {
     var read = Quote.readingAt(o.day, o.scrubT)
     return { t: read.t, close: read.close, bar: null }
   }
-  // At rest, the newest price since the close (`newest`) where it is the
-  // one on top, on the day and on a range, whose line ends on it.
+  // At rest, the newest price since the close where it is on top, on the day
+  // and on a range, whose line ends on it.
   if (o.newest) return { t: o.newest.t, close: false, bar: null, phase: o.newest.phase }
   var head = Quote.headlineQuote(o.quote)
   if (!head && o.history) {
@@ -84,10 +80,8 @@ function moment(o) {
   return { t: close ? o.quote.session.regular.end : head ? head.t : 0, close: close, bar: null }
 }
 
-// A range's bar as its scrub names it (`History.historyScrubForms`): its
-// date, a week's "WEEK OF", and an intraday bar's time, or the newest
-// price's (`History.withNewest`), here always with its zone, without the
-// price, which the picture shows large.
+// As its scrub names it (`History.historyScrubForms`), a time always with its
+// zone, and without the price, which the picture shows large.
 function barDate(history, bar) {
   var timed = !!bar.newest || history.interval === "15m" || history.interval === "30m" || history.interval === "1h"
   var date = History.historyDateText(history, bar.t, History.historySpansYears(history), bar.newest ? "1d" : history.interval)
@@ -99,26 +93,16 @@ function barDate(history, bar) {
   return date
 }
 
-// The picture's words, from what the surface shows: `quote` (Yahoo's),
-// `day` (the 1D chart's), `history` (a range's, or null on the day),
-// `latest`, `newest` (the newest price since the close, on top at rest:
-// `Figures.rowModel`'s), `scrubT` (0 at rest), `changeMode`, `range`,
-// `now`, and `calendars`.
-//   when: what the price is, and its time and zone; a scrub outside the
-//   regular session named by its session, as the line under the price is;
-//   on a range, its date too, which on the day the foot says;
-//   from: what the change is measured from, as the chart's dashed line;
-//   extended: the line under the price the panel shows, with its time,
-//   and its tone (`extendedTone`);
-//   since: after the close, on its own day, the move since it, in its own
-//   tone (`sinceTone`), as the panel shows it beside that line;
-//   currency: beside the price; none beside an index's level, which isn't
-//   money;
-//   start, end: the day's axis's two ends; a range has none;
-//   span: when, at the foot: on the day, the date of the price on show,
-//   the day its move belongs to (after midnight, the close before the
-//   chart's day); on a range, the range's length and its first and last
-//   dates, said once here;
+// The picture's words, from what the surface shows (`newest` is the price on
+// top at rest; `scrubT` is 0 at rest):
+//   when: the price's time and zone, a scrub outside the regular session
+//   named by its session, and on a range its date;
+//   from: what the change is measured from, as the dashed line;
+//   extended, since: the line under the price, as the panel shows it;
+//   currency: none beside an index's level, which isn't money;
+//   start, end: the day's axis's ends;
+//   span: on the day, the date its move belongs to (after midnight, the close
+//   before the chart's day); on a range, its length and first and last dates;
 //   said: the moment in the footer's words.
 function words(o) {
   var quote = o.quote
@@ -148,10 +132,8 @@ function words(o) {
         + " – " + History.historyDateText(o.history, bars[bars.length - 1].t, true, o.history.interval)
     }
   } else {
-    // What the change on show is measured from: the quote's at rest
-    // (`Quote.restingRead`); with a newest price on top, or while scrubbed,
-    // the chart's dashed line, named as the panel names it
-    // (`Figures.dayBaselineText`).
+    // With a newest price on top, or while scrubbed, the dashed line, named as
+    // the panel names it.
     var today = Figures.exchangeDay(o.day, o.now)
     var base = o.scrubT ? Figures.scrubbedBase(o.day, o.scrubT) : Quote.restingRead(quote, o.newest || null).base
     out.from = o.changeMode === "open" ? "OPEN " + Format.money(base.dayOpen, digits)
@@ -163,15 +145,11 @@ function words(o) {
       var first = local(o.day, axis.start, o.calendars)
       var last = local(o.day, pts[pts.length - 1].t, o.calendars)
       out.start = first.clock
-      // A chart that runs past its day, into the night and the next
-      // morning, names the weekday it ends on.
+      // A chart that runs into the next morning names the weekday it ends on.
       out.end = (last.d !== first.d ? Format.WEEKDAYS[last.weekday].toUpperCase() + " " : "") + last.clock
     }
   }
-  // The panel's line under the price, as it shows it: at rest, the close
-  // under a newest price on top, and the move since it in its own tone
-  // (`Figures.closeLine`), else the extended-hours print, its tone, and an
-  // old overnight print dimmed (`Figures.extendedStack`).
+  // The panel's line under the price, as it shows it.
   if (!o.scrubT && o.newest) {
     var below = Figures.closeLine(quote, Figures.exchangeDay(quote, o.now), o.changeMode, o.newest)
     out.extended = below.label + " · " + below.price + " " + below.changeText
@@ -190,17 +168,13 @@ function words(o) {
   return out
 }
 
-// What the screenshot is of, as the footer names it: the symbol, the range
-// off the day, and the moment ("AAPL at the close", "AAPL 1Y on 3 AUG
-// 2026").
+// "AAPL at the close", "AAPL 1Y on 3 AUG 2026".
 function subject(symbol, range, said) {
   return symbol + (range && range !== "1D" ? " " + range : "") + (said ? " " + said : "")
 }
 
-// The symbol as the file's name carries it: lower case, letters, digits,
-// dots, and dashes only, so no symbol can name another folder or carry a
-// character a shell or a file manager reads; 32 at most. "^GSPC" is
-// "gspc", "BRK-B" "brk-b".
+// So no symbol can name another folder or carry a character a shell or a file
+// manager reads.
 function fileSymbol(symbol) {
   return String(symbol).toLowerCase().replace(/[^a-z0-9.-]/g, "").slice(0, 32) || "chart"
 }

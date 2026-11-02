@@ -3,28 +3,25 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons as Commons
 import "Cells.js" as Cells
-// The look a click switches to, as a small line chart, the way a button
-// shows what pressing it does, since the chart already shows the current
-// look: Stonks' mark in square cells (`StonksMark`) in smooth, the same shape
-// as a smooth curve in retro. As the look changes the cells step in over the
-// curve column by column, or give way to it, in 200 ms; a change mid-step
-// turns back from where it is. A closing surface (`still`) stops the step
-// where it is; an opening one settles it (`settle`).
+// The look a click switches to, as a button shows what pressing it does: the
+// chart already shows the current look. Stonks' mark in cells (`StonksMark`)
+// in smooth, the same shape as a curve in retro. As the look changes, the
+// cells step in over the curve column by column, or give way to it, in 200 ms;
+// a change mid-step turns back from where it is.
 Item {
   id: root
 
-  // The current look; the icon shows the other one.
   property bool retro: false
   property bool still: false
   property color color: Commons.Color.foreground
 
-  // The mark's shape, left to right, 0 at the top: a line that climbs.
+  // Left to right, 0 at the top.
   readonly property var points: Cells.markPoints()
-  // The cell, a pixel short of the header's grid (`HeaderStatus.cell`), so
-  // the icon grows with the text beside the speaker and the camera.
+  // A pixel short of the header's grid (`HeaderStatus.cell`), so it grows with
+  // the text.
   property int pixel: 2
   readonly property int gap: 1
-  // How far the cells have stepped in: 0 is the curve, 1 the cells.
+  // 0 is the curve, 1 the cells.
   property real cells: 0
   readonly property int cellColumns: Math.round(cells * points.length)
 
@@ -39,7 +36,6 @@ Item {
   onStillChanged: if (still && step.running) step.pause()
   NumberAnimation { id: step; target: root; property: "cells"; duration: 200; easing.type: Easing.OutCubic }
 
-  // At rest on the other look, as a surface opens.
   function settle() {
     step.stop()
     cells = retro ? 0 : 1
@@ -50,7 +46,6 @@ Item {
 
   onColorChanged: curve.requestPaint()
 
-  // The curve, cut where the cells have reached.
   Item {
     x: root.cellColumns * (root.pixel + root.gap)
     width: Math.max(0, root.width - x)
@@ -72,7 +67,7 @@ Item {
         var h = height
         var at = function(p) { return { x: 1 + p.x * (w - 2), y: 1 + p.y * (h - 2) } }
         ctx.strokeStyle = root.color
-        // The header's pen: 1.5 px on its smallest grid, thickening with it.
+        // 1.5 px on the header's smallest grid, thickening with it.
         ctx.lineWidth = Math.max(1.5, (root.pixel + root.gap) / 2)
         ctx.lineCap = "round"
         ctx.lineJoin = "round"
@@ -92,7 +87,6 @@ Item {
     }
   }
 
-  // The cells, as far as they have stepped in.
   StonksMark {
     id: mark
     pixel: root.pixel

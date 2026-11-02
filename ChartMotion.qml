@@ -2,40 +2,30 @@ import QtQuick
 import "Chart.js" as Chart
 import "History.js" as History
 import "Quote.js" as Quote
-// The chart a surface presents, its moment, and how it arrives: the chart
-// on screen, which moment it shows (the scrub, and the replay that drives
-// it), and the one motion, a draw-in from the left, for every change of
-// the chart on screen. It decides once per change of the view the surface
-// holds (`StonksBody`'s held inputs), whoever made it. It draws nothing
-// itself.
+// The chart a surface shows, the moment it shows (the scrub, and the replay
+// that drives it), and the one motion, a draw-in from the left, for every
+// change of chart. It decides once per change of the view the surface holds,
+// whoever made it, and draws nothing itself.
 Item {
   id: root
 
-  // The view the surface holds, value in, and the look, whose retro grain
-  // snaps the day's moment to five minutes.
   property var view: null
   property bool surfaceOpen: false
+  // Retro snaps the day's moment to five minutes.
   property bool retro: false
-  // The exchanges' calendars, for the breaks in a day (`Chart.chartGeometry`).
   property var calendars: null
 
-  // The chart on screen: the view's once it can be drawn, until then the
-  // one already on screen; null only before any chart has been in. A
-  // binding, so no reader sees it out of step with the view. `held`, set
-  // only by the view handler below, changes only in a change that brings a
-  // chart, when this reads the view's instead, and is read here only while
-  // the view has no chart, so the order the handler and this binding run
-  // in cannot matter.
+  // The view's chart once it can be drawn, until then the one already on
+  // screen. A binding, so no reader sees it out of step with the view. `held`
+  // changes only with a view that brings a chart, and is read only while the
+  // view has none, so the order the handler and this binding run in can't
+  // matter.
   readonly property var chart: view && view.chart ? view.chart : held
   property var held: null
-  // The chart asked for is still on its way: the one on screen is another.
   readonly property bool loading: !chart || !view || chart.symbol !== view.featured || chart.range !== view.range
-  // How far the held chart has dimmed, 0..1: to 1 once the chart asked for
-  // has been on its way a quarter of a second since the last change that
-  // asked for another, so one that arrives sooner changes nothing; back to
-  // 0 as it lands and draws in. Another chart asked for while the dim lifts
-  // goes back to it at once; one asked for while it holds keeps it. The
-  // hero reads it; this piece runs it.
+  // The held chart dims once the next is a quarter of a second on its way, so
+  // one that comes sooner changes nothing, and lifts as it lands. Another chart
+  // asked for while the dim lifts goes back to it at once.
   property real dimmed: 0
   onLoadingChanged: {
     if (!loading) {
@@ -64,66 +54,51 @@ Item {
     easing.type: Easing.OutCubic
   }
 
-  // The chart on screen, measured: a range's history, or the day: Yahoo's
-  // quote, the headline and the day's figures, and the day the 1D chart
-  // draws and a scrub reads, its last session and the night after it where
-  // it has an overnight market (`Chart.viewChart`).
+  // A range's history, or the day (`Chart.viewChart`).
   readonly property bool historyActive: !!chart && chart.range !== "1D"
   readonly property var history: chart ? chart.history : null
   readonly property bool historyShown: historyActive && !!history
   readonly property var quote: chart ? chart.quote : null
   readonly property var day: chart ? chart.day : null
-  // The newest print of all, for the line under the price, where the day
-  // has one apart from the quote's.
+  // Where the day has a newer print than the quote's own, for the line under
+  // the price.
   readonly property var latest: chart ? chart.latest : null
   readonly property var dayGeometry: day ? Chart.chartGeometry(day, calendars) : null
   // A range whose first fetch failed shows the day.
   readonly property var geometry: historyShown ? History.historyGeometry(history) : dayGeometry
-  // Scrubbing and replay keep to the prints: from the first to the last.
-  // While the day runs its axis runs on past them to its end, and those
-  // hours hold no price to read and no session to name.
+  // Scrubbing and replay keep from the first print to the last: while the day
+  // runs, its axis runs past them, through hours with no price to read.
   readonly property int scrubStart: day && day.points.length ? day.points[0].t : 0
   readonly property int scrubEnd: day && Quote.lastPrintTime(day) !== null ? Quote.lastPrintTime(day) : 0
 
-  // The moment shown: 0 for now, otherwise a time on the day or a bar's.
+  // 0 for now.
   property int scrubT: 0
-  // The moment as the look shows it: retro's day moves in five minutes,
-  // never past the first or last print, and a scrub held at either reads
-  // that print, so a lone trade or the newest isn't swapped for the one
-  // before it.
+  // Retro's day moves in five minutes, but a scrub held at either end reads
+  // that print, so a lone trade or the newest isn't swapped for the one before.
   readonly property int scrubShown: historyActive || !retro || !scrubT || scrubT === scrubStart || scrubT === scrubEnd ? scrubT
     : Math.max(scrubStart, Math.min(scrubEnd, Math.round(scrubT / 300) * 300))
-  // Where the moment shown sits on the chart, 0..1, or -1.
   readonly property real scrubX: historyShown && scrubShown ? History.historyFraction(history, scrubShown)
     : (!historyActive && day && scrubShown ? Chart.fractionAtTime(day, scrubShown) : -1)
-  // How much of the chart's ink the draw-in has drawn, 0..1: the painters
-  // sweep it from the left edge to the newest drawn print, so a day partly
-  // gone takes its whole time too.
+  // The painters sweep the draw-in to the newest print, so a day partly gone
+  // takes its whole time too.
   property real reveal: 1
-  // Where a replay has reached, 0..1 along the chart.
   property real replayPosition: 0
   readonly property bool replayRunning: replayAnim.running
-  // A replay's length: what plays alongside it keeps to it, and to its
-  // InOutSine.
+  // What plays alongside keeps to it, and to its InOutSine.
   readonly property int replayDuration: 2000
-  // A replay starts, from `from` to `to` along the chart: said before its
-  // first frame, so what plays alongside starts with it.
+  // Said before its first frame, so what plays alongside starts with it.
   signal replayStarted(real from, real to)
-  // A replay cut short: stopped, or held by a closing surface. One that runs
-  // to its end says nothing.
+  // Stopped, or held by a closing surface; one that runs to its end says
+  // nothing.
   signal replayCut()
-  // Where a replay's scrub has reached along the plot, 0..1, or -1 with no
-  // replay running: the painters draw it in behind that, in the plot's own
-  // terms, retro's whole columns included, apart from the draw-in's sweep.
+  // The painters draw in behind it in the plot's terms, retro's whole columns
+  // included.
   readonly property real replayX: replayRunning && scrubX >= 0 ? scrubX : -1
-  // How much of the chart is drawn, 0..1: a replay draws it in behind its
-  // scrub, and otherwise the draw-in says.
   readonly property real drawn: replayX >= 0 ? replayX : reveal
 
-  // The view as this piece last saw it. Each change of the view is compared
-  // with it once: another chart on screen draws in; a chart asked for and
-  // not ready keeps the one on screen whole and still; new data for the
-  // same chart is taken as it is.
+  // Each change of the view is compared with this once: another chart on
+  // screen draws in; one asked for and not ready keeps the chart on screen
+  // whole and still; new data for the same chart is taken as it is.
   property var seen: null
   onViewChanged: {
     var before = seen
@@ -136,7 +111,7 @@ Item {
     var refreshed = !moved && next !== last
     var asked = view.featured !== before.featured || view.range !== before.range
     // A replay and a scrub belong to the chart they started on, and to data
-    // that still covers their moment.
+    // that still holds their moment.
     if (moved || asked || (refreshed && scrubT && !covers(next, scrubT))) clearScrub()
     if (moved) {
       if (surfaceOpen) drawIn()
@@ -147,21 +122,21 @@ Item {
     }
   }
 
-  // A chart's identity: its symbol and range, and whether the day stands in
-  // for a range whose first fetch failed, so a retry that lands is a change.
+  // With the day standing in for a failed range, a retry that lands is a
+  // change.
   function chartKeyOf(chart) {
     return chart ? chart.symbol + "|" + chart.range + (chart.failed ? "|failed" : "") : ""
   }
 
-  // Whether `chart`'s data still holds the moment `t`: a refresh that brings
-  // a range's new history, or the day's next session, may not.
+  // A refresh that brings a range's new history, or the day's next session,
+  // may not hold `t`.
   function covers(chart, t) {
     if (chart.history) return History.historyFraction(chart.history, t) >= 0
     return !!chart.day && Chart.fractionAtTime(chart.day, t) >= 0
   }
 
-  // A chart kept on show while the next one loads takes no scrub and no
-  // replay; nor does a closing surface.
+  // A chart held while the next loads takes no scrub and no replay; nor does a
+  // closing surface.
   function scrubTo(fraction) {
     if (loading || !surfaceOpen) return
     if (historyActive) {
@@ -192,15 +167,14 @@ Item {
     scrubT = 0
   }
 
-  // The one motion: the chart draws in from the left, in 320 ms.
+  // The one motion: 320 ms from the left.
   readonly property bool drawingIn: drawInAnim.running
   function drawIn() {
     drawInAnim.restart()
   }
 
-  // An opening surface draws the chart on screen in. While the chart asked
-  // for is on its way, the one on screen stays whole, and the new one draws
-  // in when it lands; the open is the change the dim counts from.
+  // While the chart asked for is on its way, the one on screen stays whole and
+  // the new one draws in when it lands; the open is what the dim counts from.
   function revealChart() {
     drawInAnim.stop()
     reveal = 1
@@ -208,10 +182,9 @@ Item {
     else slowTimer.restart()
   }
 
-  // A replay is a scrub that drives itself, with the chart drawing in behind
-  // it, so the header, the price, and the bull or bear follow it: along the
-  // chart, the way it is laid out: on the day by print for a US listing and
-  // by time for any other, and by bar on a range.
+  // A scrub that drives itself, the chart drawing in behind it, so the header,
+  // the price and the animal follow it: by print on a US listing's day, by
+  // time on any other's, and by bar on a range.
   function replay() {
     if (loading) return
     stopReplay()
@@ -220,7 +193,7 @@ Item {
     if (historyActive ? !historyShown || history.bars.length < 2 : !geometry || !scrubEnd) return
     replayAnim.from = historyActive ? 0 : Chart.fractionAtTime(day, scrubStart)
     replayAnim.to = historyActive ? 1 : Chart.fractionAtTime(day, scrubEnd)
-    // On its first moment at once, before the animation's first step.
+    // Its first moment at once, before the animation's first step.
     scrubTo(replayAnim.from)
     replayStarted(replayAnim.from, replayAnim.to)
     replayAnim.start()
@@ -232,9 +205,8 @@ Item {
     replayCut()
   }
 
-  // A closing surface stops what moves where it is: a replay keeps what it
-  // had drawn, a draw-in what it had revealed, and the dim where it was.
-  // Only what runs can pause.
+  // A closing surface stops what moves where it is: a replay keeps what it had
+  // drawn, a draw-in what it had revealed, the dim where it was.
   function freeze() {
     if (replayAnim.running) {
       replayAnim.pause()
@@ -245,7 +217,7 @@ Item {
     dimAnim.stop()
   }
 
-  // At rest before an open's first frame: now, whole, and undimmed.
+  // Before an open's first frame.
   function reset() {
     stopReplay()
     reveal = 1

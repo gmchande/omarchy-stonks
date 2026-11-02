@@ -5,16 +5,12 @@ import qs.Commons
 import qs.Commons as Commons
 import "Tones.js" as Tones
 
-// The shared history range control. The words share the row with equal
-// space between them, the first starting at its left and the last ending at
-// its right, so they line up with the blocks above and below; each token's
-// target reaches halfway to its neighbours', so the targets tile the row.
-// The chosen one sits in the shell's selected fill, reaching past its word
-// as the featured row's does, and alone has a bright label; the hovered one
-// takes the hover fill and keeps its dim label, so a hover never reads as a
-// second choice; a pressed one takes the pressed fill from the moment the
-// button goes down, as the shell's buttons do. A wheel notch is one range,
-// however finely the wheel reports it.
+// The range row. The words are spaced evenly from the row's left edge to its
+// right, so they line up with the blocks above and below, and their targets
+// tile the row. The chosen one alone sits in the shell's selected fill with a
+// bright label; a hovered one keeps its dim label, so a hover never reads as a
+// second choice. A wheel notch is one range, however finely the wheel reports
+// it.
 Item {
   id: root
 
@@ -29,11 +25,8 @@ Item {
 
   signal selected(string value)
 
-  // The words in the tokens' font, each as wide as it is drawn, and the
-  // space between two of them. The row is the caption's line, as the info
-  // lines and the list's header are, so the band's gaps are the gaps seen;
-  // a token's fill reaches 2 px past it above and below, as the list's
-  // name's does, and its target further, to the shell's 22 px.
+  // The caption's line, as the info lines and the list's header are, so the
+  // band's gaps are the gaps seen.
   readonly property font wordFont: Qt.font({ family: fontFamily, pixelSize: Style.font.caption, bold: true, letterSpacing: 1 })
   FontMetrics { id: metrics; font: root.wordFont }
   implicitHeight: Math.ceil(metrics.ascent) + Math.ceil(metrics.descent)
@@ -74,7 +67,7 @@ Item {
       objectName: "rangeOption"
       required property var modelData
       required property int index
-      // From halfway to the word before to halfway to the word after.
+      // Halfway to the word before and halfway to the word after.
       x: root.wordX(index) - root.wordSpace / 2
       width: (root.wordWidths[index] || 0) + root.wordSpace
       height: root.height
@@ -105,8 +98,8 @@ Item {
 
       MouseArea {
         id: tokenMouse
-        // 4 px into the gap over the row, short of the chart's own target
-        // above, and 8 into the one under it.
+        // 4 px into the gap over the row, short of the chart's own target, and
+        // 8 into the one under it.
         anchors.fill: parent
         anchors.topMargin: -Style.space(4)
         anchors.bottomMargin: -Style.space(8)

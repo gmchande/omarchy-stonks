@@ -1,29 +1,22 @@
 import QtQuick
-// One host's gate, which every request to that host asks first, from every
-// feed: a budget, and a pause when the host stops answering or says no. On
-// the service's clock.
+// One host's gate, which every request to that host asks first: a budget, and
+// a pause when the host stops answering or says no.
 //
-// The budget holds `capacity` requests and refills at `perMinute`; normal
-// use never reaches its edge, and the first time it holds a request back it
-// says so. Runs of quotes (`bulk`) leave `reserve` of it for single requests,
-// a history, a search, cap and P/E, so a long list never starves them. A
-// pause comes from what came back (`report`): no answer at all waits 2 s,
-// doubling to 60, since nothing reached the server; a refusal (429, 503)
-// waits for Retry-After, else 1 minute, doubling, either for 30 minutes at
-// most, so a huge or hostile Retry-After can't silence Stonks for days.
-// Each wait varies by ±20%, so installs don't all come back at the same
-// second. Once a pause has run out, one request goes alone, and only its
-// answer reopens the host: each request carries the `ticket` it was let
-// through on, and an answer to one let through before the latest pause
-// began says nothing of the host now. A reader asking again (`hurry`) ends
-// a pause for no answer at once, never a refusal's.
+// Normal use never reaches the budget's edge, and the first time it holds a
+// request back it says so. A run of quotes (`bulk`) leaves `reserve` for single
+// requests, so a long list never starves a history, a search or a P/E. No
+// answer at all pauses 2 s, doubling to 60, since nothing reached the server;
+// a refusal (429, 503) pauses for Retry-After, else a minute, doubling, and at
+// most 30 minutes, so a hostile Retry-After can't silence Stonks for days. Each
+// pause varies by ±20%, so installs don't all come back at once. After a pause
+// one request goes alone, and only its answer reopens the host: an answer to a
+// request let through before the latest pause (`ticket`) says nothing of it.
 Item {
   id: root
 
   property string host: ""
-  // Whatever keeps the clock, the service: its wall clock (`wallSecond`),
-  // read at each call, never its `now`, which trails the wall between ticks
-  // while nothing is open, nor a binding's copy.
+  // The service: its wall clock (`wallSecond`), read at each call, never its
+  // `now`, which trails the wall between ticks while nothing is open.
   property var clock: null
   property int capacity: 80
   property real perMinute: 40
@@ -36,15 +29,14 @@ Item {
   property int pausedUntil: 0
   // Pauses of this kind in a row, which set the next one's length.
   property int strikes: 0
-  // The one request sent alone after a pause is out.
+  // The lone request after a pause is out.
   property bool probing: false
   property bool warned: false
-  // Moves on as each pause begins: what a request is let through on.
+  // Moves on as each pause begins.
   property int ticket: 0
 
   readonly property bool paused: pause !== ""
 
-  // The host answered again after a pause.
   signal reopened()
 
   function now() {
@@ -56,9 +48,7 @@ Item {
     root.filledAt = now()
   }
 
-  // How many of `count` requests may go now: up to the budget while the host
-  // answers, less the reserve for a `bulk` run; one alone once a pause has
-  // run out; none while it lasts. Each goes on the gate's `ticket` as it is.
+  // One alone once a pause has run out; none while it lasts.
   function take(count, bulk) {
     if (count <= 0) return 0
     refill()
@@ -77,18 +67,16 @@ Item {
     return granted
   }
 
-  // Whether a request that can wait (a chart fetched ahead of a click) may
-  // go: only while the host answers and at least half the budget is left,
-  // so quotes and the charts on show always find it. It takes nothing.
+  // For a request that can wait, such as a chart fetched ahead of a click:
+  // only while half the budget is left, so quotes and the charts on show always
+  // find it. Takes nothing.
   function spare() {
     refill()
     return !paused && tokens >= capacity / 2
   }
 
-  // What the answers to requests let through on `ticket` said, by kind
-  // (`Fetch.answerKind`): a refusal pauses the host, any other answer
-  // reopens it, and no answer at all pauses it briefly. Answers on an older
-  // ticket can only refuse.
+  // `kinds` as `Fetch.answerKind` names them. Answers on an older ticket can
+  // only refuse.
   function report(kinds, retryAfter, ticket) {
     var current = ticket === root.ticket
     if (current) root.probing = false
@@ -110,17 +98,14 @@ Item {
     }
   }
 
-  // A reader asked again, by r or RETRY: the network may be back, so a pause
-  // for no answer at all ends now, and its lone request goes with what was
-  // asked, rather than up to a minute after the network is back. A
-  // refusal's pause holds: the host asked for fewer requests.
+  // By r or RETRY: the network may be back, so a pause for no answer ends now.
+  // A refusal's holds: the host asked for fewer requests.
   function hurry() {
     if (pause === "none" && !probing && pausedUntil > now()) root.pausedUntil = now()
   }
 
-  // A pause of `kind` for about `seconds`, on a new ticket: whatever was let
-  // through before it, a probe still out included, no longer speaks for the
-  // host, and the next probe may go once it ends.
+  // Whatever was let through before it, a probe still out included, no longer
+  // speaks for the host.
   function begin(kind, seconds) {
     root.pause = kind
     root.ticket = root.ticket + 1

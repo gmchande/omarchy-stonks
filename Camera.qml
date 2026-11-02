@@ -2,34 +2,20 @@ import QtQuick
 import QtCore
 import Quickshell.Io
 // The screenshot's hand-off, as Omarchy's own screenshot does it after its
-// grab, on the Omarchy installed. With Omasnap installed, as on Omarchy 4.5,
-// the folder is Omasnap's: OMASNAP_SCREENSHOT_DIR, else
-// OMARCHY_SCREENSHOT_DIR, which `omarchy-capture-screenshot` hands on as
-// it, else the directory in omasnap.conf's [output], ~ expanded, else
-// Screenshots in the pictures folder; the settings and the pictures folder
-// read through Qt as Omasnap reads them (QSettings, QStandardPaths), so
-// from XDG_CONFIG_HOME, and never written. The editor is `omasnap`.
-// Without Omasnap, as on Omarchy 4.0, the folder is OMARCHY_SCREENSHOT_DIR,
-// else XDG_PICTURES_DIR read from ~/.config/user-dirs.dirs as text, $HOME
-// expanded, never run, else ~/Pictures; the editor is
-// OMARCHY_SCREENSHOT_EDITOR, else Tensaku. A `sh` picks the folder and the
-// editor, makes the folder if it isn't there, and names the file in it as
-// stonks-<symbol>-<YYYY-MM-DD_HH-MM-SS>.png, "-2" and on after a name taken
-// that second; the picture (`ShareCard`) is grabbed at its size and saved
-// there, with no copy anywhere else; `wl-copy` reads it on its input onto
-// the clipboard; and `omarchy-notification-send` says so in Omarchy 4.0's
-// words, its thumbnail the picture and a click on it the editor on the
-// file, the editor and the file as separate words. Each command has 5
-// seconds. One shot at a time. The surfaces say what is shot; this knows
-// only how.
+// grab. With Omasnap, as on Omarchy 4.5, the folder is OMASNAP_SCREENSHOT_DIR,
+// else OMARCHY_SCREENSHOT_DIR, which `omarchy-capture-screenshot` passes on as
+// it, else omasnap.conf's [output] directory, else Screenshots in the pictures
+// folder, read through Qt as Omasnap reads them, so from XDG_CONFIG_HOME, and
+// never written; the editor is `omasnap`. Without it, as on Omarchy 4.0, the
+// folder is OMARCHY_SCREENSHOT_DIR, else XDG_PICTURES_DIR from user-dirs.dirs,
+// read as text and never run, else ~/Pictures; the editor is
+// OMARCHY_SCREENSHOT_EDITOR, else Tensaku. The picture is saved there and
+// nowhere else, copied to the clipboard, and announced in Omarchy 4.0's words,
+// a click opening it in the editor. Each command has 5 s; one shot at a time.
 Item {
   id: root
 
-  // The shot under way (`shoot`): its symbol, its item, the folder
-  // omasnap.conf names and the pictures folder as Omasnap reads them, the
-  // file it is saved as and the editor a click opens it in, what to call
-  // once the picture is taken, and what to call with how it ended; no
-  // `shotDone`, no shot.
+  // The shot under way; no `shotDone`, no shot.
   property string shotSymbol: ""
   property var shotItem: null
   property string shotOmasnapFolder: ""
@@ -45,11 +31,9 @@ Item {
     location: StandardPaths.writableLocation(StandardPaths.ConfigLocation) + "/omasnap/omasnap.conf"
   }
 
-  // Saves `item` as a picture named for `symbol` (`Share.fileSymbol`), copies
-  // it, and announces it. `taken()` hears the picture taken, before it is
-  // saved; then `item` may go. `done(code)` hears how it ended: 0 saved,
-  // copied, and announced; 1 not saved; 2 saved but not copied. False while
-  // another shot is under way.
+  // `taken()` hears the picture taken, before it is saved; then `item` may go.
+  // `done(code)`: 0 saved, copied and announced; 1 not saved; 2 saved but not
+  // copied.
   function shoot(item, symbol, taken, done) {
     if (busy) return false
     shotSymbol = symbol
@@ -75,10 +59,9 @@ Item {
     if (done) done(code)
   }
 
-  // The editor on its first line, then the file's name: printed only once
-  // its folder is there to take it. Read through `head` up to 8 KB, twice
-  // the longest path Linux opens (PATH_MAX, 4096 bytes), a byte past it
-  // too, so an answer that reaches the cap shows it and names no file.
+  // The editor, then the file, printed once its folder can take it. Read up to
+  // 8 KB, twice Linux's PATH_MAX, and a byte past, so an answer over the cap
+  // names no file.
   Process {
     id: naming
     command: ["timeout", "5", "sh", "-c", "{\n"
@@ -119,12 +102,10 @@ Item {
         root.shotEditor = printed.slice(0, cut)
         root.shotFile = file
         var item = root.shotItem
-        // Grabbed at the item's size, which on the window's screen is the
-        // picture's in pixels (`ShareCard`). No size is passed: Qt sizes
-        // the grab from the item's fractional size times the screen's
-        // ratio, so a scale such as 1.75, where 2400 pixels are no whole
-        // number of units, still saves 2400. The PNG is encoded here, on
-        // this thread, once the picture is taken.
+        // No size is passed: Qt sizes the grab from the item's fractional size
+        // times the screen's ratio, so at a scale such as 1.75, where 2400
+        // pixels are no whole number of units, it still saves 2400. The PNG is
+        // encoded on this thread.
         if (!item.grabToImage(function(result) {
           var taken = root.shotTaken
           root.shotTaken = null
