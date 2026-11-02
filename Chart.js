@@ -107,21 +107,6 @@ function newestPrints(symbols, quotes, nights, allDay, calendars) {
   return out
 }
 
-// The stretches Robinhood's trades fill on the day each of `symbols`
-// draws (`Overnight.filledStretches`), by symbol, for those with any:
-// `symbols` are those Robinhood trades all day, whose day is drawn from its
-// prints (`nights`, its answers) where they are in hand (`dayDrawn`).
-function dayFills(symbols, quotes, nights) {
-  var out = {}
-  for (var i = 0; i < symbols.length; i++) {
-    var q = quotes[symbols[i]]
-    var night = nights[symbols[i]]
-    var filled = q && night ? Overnight.filledStretches(q, night.bars) : []
-    if (filled.length) out[symbols[i]] = filled
-  }
-  return out
-}
-
 // Robinhood's answer before it comes (`Overnight.overnightAnswer`'s shape).
 var NO_ANSWER = { bars: [], from: null, through: null }
 

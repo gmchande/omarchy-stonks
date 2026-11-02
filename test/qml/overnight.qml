@@ -752,8 +752,8 @@ Harness {
       var said = Object.keys(service.saidFills).filter(function(k) { return k.indexOf("NBIS ") === 0 })
       check("on a morning Yahoo left an hour empty, the pill's stock is asked once more for its prints when Robinhood's bars for the hour are in, never again, and its line draws Robinhood's trades there, said once in the log",
         night && reached && [nightAsks, early, holeAsks, harness.printsAsked("NBIS")].join(",") === "1,1,2,2"
-          && (service.filled.NBIS || []).length === 1 && service.filled.NBIS[0].bars.length === 12 && said.length === 1,
-        [night, reached, nightAsks, early, holeAsks, harness.printsAsked("NBIS")].join(",") + " | filled " + JSON.stringify(service.filled.NBIS || null) + " | said " + said.join(";"))
+          && !!service.fills.NBIS && service.fills.NBIS.stretches.length === 1 && service.fills.NBIS.stretches[0].bars.length === 12 && said.length === 1,
+        [night, reached, nightAsks, early, holeAsks, harness.printsAsked("NBIS")].join(",") + " | filled " + JSON.stringify(service.fills.NBIS ? service.fills.NBIS.stretches : null) + " | said " + said.join(";"))
 
       // Every request of the run, Robinhood's instruments' too.
       var never = ["^GSPC", "BTC-USD", "SHOP.TO"]

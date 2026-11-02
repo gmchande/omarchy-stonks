@@ -223,26 +223,35 @@ Item {
   readonly property var nights: overnightFeed.entries
   readonly property var allDay: allDayFeed.entries
   // The stretches Yahoo left empty that Robinhood's trades fill on each
-  // day drawn (`Chart.dayFills`), All's and a preview's outside it, each
-  // said once in the shell's log, as a dropped stray price is. `saidFills`
-  // holds those said, by symbol and stretch; it notifies nothing.
-  readonly property var filled: {
+  // day drawn (`Overnight.filledStretches`), All's and a preview's outside
+  // it, each said once in the shell's log, as a dropped stray price is.
+  // Worked out again for a stock only when its quote or its prints change:
+  // a pass over 150 stocks takes about 28 ms of the shell's thread. `fills`
+  // holds each stock's stretches with the quote and prints they came from,
+  // and `saidFills` those said, by symbol and stretch; neither notifies.
+  readonly property var fills: ({})
+  readonly property var saidFills: ({})
+  readonly property var fillsFrom: [allDaySymbols, feed.quotes, overnightFeed.entries, allDayFeed.entries, previewFeed.quotes, previewSymbol]
+  onFillsFromChanged: Qt.callLater(root.sayFills)
+  function sayFills() {
     var previewed = root.previewSymbol
     var tradability = previewed ? allDayFeed.entries[previewed] : null
-    var preview = tradability && tradability.allDay && library.indexOf(previewed) < 0 ? previewFeed.quotes[previewed] : null
-    if (!preview) return Chart.dayFills(allDaySymbols, feed.quotes, overnightFeed.entries)
-    var quotes = Object.assign({}, feed.quotes)
-    quotes[previewed] = preview
-    return Chart.dayFills(allDaySymbols.concat([previewed]), quotes, overnightFeed.entries)
-  }
-  readonly property var saidFills: ({})
-  onFilledChanged: {
-    for (var symbol in filled) filled[symbol].forEach(function(stretch) {
-      var key = symbol + " " + stretch.from + " " + stretch.to
-      if (saidFills[key]) return
-      saidFills[key] = true
-      console.warn("stonks: " + symbol + " filled from Robinhood's " + stretch.bars.length + " trades between "
-        + new Date(stretch.from * 1000).toISOString() + " and " + new Date(stretch.to * 1000).toISOString() + ", where Yahoo sent no bar")
+    var preview = tradability && tradability.allDay && root.library.indexOf(previewed) < 0 ? previewFeed.quotes[previewed] : null
+    var symbols = preview ? root.allDaySymbols.concat([previewed]) : root.allDaySymbols
+    symbols.forEach(function(symbol) {
+      var quote = symbol === previewed && preview ? preview : feed.quotes[symbol]
+      var night = overnightFeed.entries[symbol]
+      var had = root.fills[symbol]
+      if (!quote || !night || (had && had.quote === quote && had.bars === night.bars)) return
+      var stretches = Overnight.filledStretches(quote, night.bars)
+      root.fills[symbol] = { quote: quote, bars: night.bars, stretches: stretches }
+      stretches.forEach(function(stretch) {
+        var key = symbol + " " + stretch.from + " " + stretch.to
+        if (root.saidFills[key]) return
+        root.saidFills[key] = true
+        console.warn("stonks: " + symbol + " filled from Robinhood's " + stretch.bars.length + " trades between "
+          + new Date(stretch.from * 1000).toISOString() + " and " + new Date(stretch.to * 1000).toISOString() + ", where Yahoo sent no bar")
+      })
     })
   }
   // Robinhood's two questions, whether it trades a listing all day and its
@@ -991,6 +1000,7 @@ Item {
     var removed = root.lastRemoval ? root.lastRemoval.symbol : ""
     var keep = function(s) { return root.library.indexOf(s) >= 0 || s === root.previewSymbol || s === removed }
     for (var symbol in root.builtDays) if (!keep(symbol)) delete root.builtDays[symbol]
+    for (var gone in root.fills) if (!keep(gone)) delete root.fills[gone]
     var prune = function(cache, fresh) {
       var next = {}
       var dropped = false
