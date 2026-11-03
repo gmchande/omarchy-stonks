@@ -233,7 +233,7 @@ function scan(source) {
 // to the next line of code after them.
 function cases(path, harness) {
   const source = readFileSync(join(root, path), "utf8")
-  const text = source.split("\n")
+  const text = masked(source)
   const { calls, functions } = scan(source)
   const own = calls.filter(c => harness
     ? /^((harness|root)\.)?check$/.test(c.name)
