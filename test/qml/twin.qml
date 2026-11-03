@@ -172,13 +172,23 @@ Harness {
           && releaseCopy.windowHost.toplevel === releaseToplevel && devCopy.windowHost.toplevel === devToplevel,
         releaseCopy.windowHost.app.testWindow.title + " | " + devCopy.windowHost.app.testWindow.title)
 
-      // The mark: on Stonks dev's pill and header alone, never a user's.
+      // The mark: on Stonks dev's pill and header alone, never a user's; on
+      // a side bar, under the pill.
       var shown = function(item, name) { var mark = harness.find(item, name); return !!mark && mark.visible }
-      var releaseMarks = [shown(releasePill, "pillCopyMark"), shown(releaseCopy.windowHost.app.body, "headerCopyMark")]
-      var devMarks = [shown(devPill, "pillCopyMark"), shown(devCopy.windowHost.app.body, "headerCopyMark")]
-      harness.check("under grvc.stonks the pill and the header wear no mark; under grvc.stonks-dev both do",
-        releaseMarks.join(",") === "false,false" && devMarks.join(",") === "true,true",
-        "grvc.stonks pill, header: " + releaseMarks + " | grvc.stonks-dev: " + devMarks)
+      var marks = function(pill, copy) {
+        return [shown(pill, "pillCopyMark"), shown(copy.windowHost.app.body, "headerCopyMark")]
+      }
+      var releaseMarks = marks(releasePill, releaseCopy)
+      var devMarks = marks(devPill, devCopy)
+      releaseBar.vertical = true
+      devBar.vertical = true
+      var releaseSide = shown(releasePill, "pillCopyMarkUnder")
+      var devSide = shown(devPill, "pillCopyMarkUnder")
+      releaseBar.vertical = false
+      devBar.vertical = false
+      harness.check("under grvc.stonks the pill and the header wear no mark, on a side bar neither; under grvc.stonks-dev all do",
+        releaseMarks.concat([releaseSide]).join(",") === "false,false,false" && devMarks.concat([devSide]).join(",") === "true,true,true",
+        "grvc.stonks pill, header, side bar: " + releaseMarks.concat([releaseSide]) + " | grvc.stonks-dev: " + devMarks.concat([devSide]))
 
       // Only the clone, which `omarchy plugin update` can update, asks
       // GitHub, and offers what main has.
