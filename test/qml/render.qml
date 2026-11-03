@@ -36,12 +36,17 @@ Harness {
   // its full size, in place of the surface; share-scrub-of-<state>: the
   // same scrubbed to the day's middle print. lit-<state>: the surface after
   // a screenshot, its camera lit; quiet-<state>: with sounds off; both may
-  // lead, quiet- first. <state>-size-N: the state at text size N
+  // lead, quiet- first. dev-<state>: the state as a second copy beside a
+  // user's draws it, run under grvc.stonks-dev, its mark on; it leads any
+  // other. <state>-size-N: the state at text size N
   // (render.sh) in the frame the shell gives it there, the panel and the
   // smallest window grown with the text, as a reader sees it; the state as
   // named without the suffix. The pill sheet keeps its name and draws its
   // own frame.
-  readonly property string asked: Quickshell.env("STONKS_VISUAL_STATE") || "retro"
+  readonly property string named: Quickshell.env("STONKS_VISUAL_STATE") || "retro"
+  readonly property bool devCopy: /^dev-/.test(named)
+  readonly property string copyId: devCopy ? "grvc.stonks-dev" : "grvc.stonks"
+  readonly property string asked: named.replace(/^dev-/, "")
   readonly property bool quiet: /^quiet-/.test(asked)
   readonly property bool lit: /^(quiet-)?lit-/.test(asked)
   readonly property bool shareScrub: asked.indexOf("share-scrub-of-") === 0
@@ -339,6 +344,8 @@ Harness {
   QtObject {
     id: stub
     property var symbols: ["AAPL", "SHOP.TO"]
+    // The copy's id (dev-<state>): the header wears the mark under another.
+    readonly property string pluginId: root.copyId
     property bool settingsUnreadable: false
     // A save that didn't land (popup-notice-save-*), said again after a
     // click that still didn't (popup-notice-save-again-*).
@@ -1363,15 +1370,15 @@ Harness {
               }
               PluginBarApi {
                 id: pillApi
-                pluginId: "grvc.stonks"
-                moduleName: "grvc.stonks"
+                pluginId: root.copyId
+                moduleName: root.copyId
                 shell: pillShell
                 // The bar mirrors these onto the facade; the render sets them.
                 foreground: Commons.Color.bar.text
                 barForeground: Commons.Color.bar.text
                 fontFamily: Style.font.family
                 barSize: Style.bar.sizeHorizontal
-                layoutConfig: pillRow.modelData.right ? { left: [], center: [], right: [{ id: "grvc.stonks" }] } : ({})
+                layoutConfig: pillRow.modelData.right ? { left: [], center: [], right: [{ id: root.copyId }] } : ({})
               }
               BarWidget {
                 id: horizontalPill
@@ -1380,15 +1387,15 @@ Harness {
                 width: implicitWidth
                 height: parent.height
                 bar: pillApi
-                moduleName: "grvc.stonks"
-                settings: ({ id: "grvc.stonks", barStyle: pillRow.modelData.style })
+                moduleName: root.copyId
+                settings: ({ id: root.copyId, barStyle: pillRow.modelData.style })
               }
               // An Omarchy bar icon beside it, Bluetooth's, as the right
               // section draws its icons: what the animal is sized against.
               BarIconButton {
                 visible: pillRow.modelData.right === true
                 anchors.verticalCenter: parent.verticalCenter
-                x: parent.width - 8 - 2 * Style.bar.iconSlot
+                x: horizontalPill.x - Style.bar.iconSlot
                 height: parent.height
                 bar: pillApi
                 text: "\uDB80\uDCAF"
@@ -1407,8 +1414,8 @@ Harness {
 
               PluginBarApi {
                 id: verticalApi
-                pluginId: "grvc.stonks"
-                moduleName: "grvc.stonks"
+                pluginId: root.copyId
+                moduleName: root.copyId
                 shell: pillShell
                 vertical: true
                 foreground: Commons.Color.bar.text
@@ -1423,8 +1430,8 @@ Harness {
                 width: parent.width
                 height: implicitHeight
                 bar: verticalApi
-                moduleName: "grvc.stonks"
-                settings: ({ id: "grvc.stonks", barStyleVertical: pillRow.modelData.style === "icon" ? "icon" : "stacked" })
+                moduleName: root.copyId
+                settings: ({ id: root.copyId, barStyleVertical: pillRow.modelData.style === "icon" ? "icon" : "stacked" })
               }
             }
 

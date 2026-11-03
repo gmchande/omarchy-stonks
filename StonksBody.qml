@@ -11,6 +11,7 @@ import "KeyText.js" as KeyText
 import "Market.js" as Market
 import "Overnight.js" as Overnight
 import "Quote.js" as Quote
+import "Release.js" as Release
 import "Settings.js" as Settings
 import "Share.js" as Share
 import "Tones.js" as Tones
@@ -1038,6 +1039,7 @@ Item {
     retro: root.retro
     soundsOn: root.soundsOn
     cameraLit: root.cameraLit
+    marked: Release.otherCopy(root.service ? root.service.pluginId : "")
     animal: root.animal
     ground: root.ground
     scrubbing: root.scrubT !== 0

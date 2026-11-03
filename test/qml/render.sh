@@ -294,6 +294,11 @@ every_state() (
   for size in 9 16 20; do
     states="$states quiet-lit-popup-sweep-2026-10-07-1455-spy-smooth-size-$size"
   done
+  # A second copy beside a user's, run under grvc.stonks-dev: its mark on
+  # every pill form and on the header, in the panel, at 16 and in the window,
+  # a long name cut short before it.
+  states="$states dev-pill-sheet dev-popup-sweep-2026-10-07-1455-spy-smooth dev-popup-sweep-2026-10-07-1455-spy-retro"
+  states="$states dev-popup-sweep-2026-10-07-1455-spy-smooth-size-16 dev-window-undo-retro"
   echo $states
 )
 all=$(every_state)

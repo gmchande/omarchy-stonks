@@ -8,6 +8,7 @@ import "Cells.js" as Cells
 import "Chart.js" as Chart
 import "Figures.js" as Figures
 import "Format.js" as Format
+import "Release.js" as Release
 import "Tones.js" as Tones
 // The pill: the stock you last looked at, with its day's line and change
 // whatever range the panel or the window shows.
@@ -19,6 +20,11 @@ BarWidget {
   readonly property var plugin: bar && bar.shell && typeof bar.shell.serviceFor === "function"
     ? bar.shell.serviceFor(moduleName) : null
   readonly property var service: plugin ? plugin.service : null
+  // Under an id other than a user's, a second copy beside it: a dim flask
+  // at the pill's end, or under it on a side bar, so the two tell apart.
+  readonly property bool marked: Release.otherCopy(moduleName)
+  // Its room, the same whatever the pill shows, so nothing moves for it.
+  readonly property int markRoom: marked ? (vertical ? Math.ceil(sideMark.implicitHeight) : content.spacing + Math.ceil(rowMark.implicitWidth)) : 0
   readonly property var panel: panelLoader.item
   readonly property string featuredSymbol: service ? service.featuredSymbol : ""
   readonly property var featuredQuote: service && featuredSymbol ? (service.quotes[featuredSymbol] || null) : null
@@ -218,11 +224,11 @@ BarWidget {
     bar: root.bar
     labelVisible: false
     hasVisualContent: true
-    fixedWidth: root.vertical ? -1 : (root.iconOnly ? Style.bar.iconSlot : content.implicitWidth + Style.space(17))
+    fixedWidth: root.vertical ? -1 : (root.iconOnly ? Style.bar.iconSlot + root.markRoom : content.implicitWidth + Style.space(17))
     // The animal and the room under it for a "!", a pixel to spare each end,
-    // and at least an icon slot.
+    // and at least an icon slot; and the mark's room under it all.
     fixedHeight: root.vertical ? (root.iconOnly ? Math.max(Style.bar.iconSlot, Math.ceil(iconForm.implicitHeight) + 2)
-      : root.stackedHeight) : -1
+      : root.stackedHeight) + root.markRoom : -1
     // Only what the pill can't say: the icon form's symbol and change, a
     // newest price's session and time ("Overnight 23:25"), and what a "!"
     // means. None while the panel is open: the bubble would land on its header.
@@ -240,6 +246,7 @@ BarWidget {
     Row {
       id: content
       anchors.centerIn: parent
+      anchors.verticalCenterOffset: root.vertical ? -root.markRoom / 2 : 0
       spacing: Style.space(6)
       visible: !root.vertical || root.iconOnly
 
@@ -385,6 +392,34 @@ BarWidget {
         font.family: button.fontFamily
         font.pixelSize: button.fontSize
       }
+
+      Text {
+        id: rowMark
+        objectName: "pillCopyMark"
+        visible: root.marked && !root.vertical
+        anchors.verticalCenter: parent.verticalCenter
+        // The icon form's "!" hangs past the animal: kept clear, shown or not.
+        leftPadding: root.iconOnly ? 1 + Math.ceil(warning.implicitWidth) : 0
+        textFormat: Text.PlainText
+        text: "\uDB80\uDC96"
+        color: root.dimColor
+        font.family: button.fontFamily
+        font.pixelSize: button.fontSize
+      }
+    }
+
+    // On a side bar, too narrow for it beside the pill, the mark goes under.
+    Text {
+      id: sideMark
+      objectName: "pillCopyMarkUnder"
+      visible: root.marked && root.vertical
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.bottom: parent.bottom
+      textFormat: Text.PlainText
+      text: "\uDB80\uDC96"
+      color: root.dimColor
+      font.family: button.fontFamily
+      font.pixelSize: button.fontSize
     }
 
     // As Omarchy's clock draws a vertical bar: a line to an icon slot, 90% at
@@ -393,6 +428,7 @@ BarWidget {
       objectName: "pillStack"
       visible: root.vertical && !root.iconOnly
       anchors.centerIn: parent
+      anchors.verticalCenterOffset: -root.markRoom / 2
 
       Repeater {
         model: root.stackedLines

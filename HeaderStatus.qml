@@ -203,7 +203,14 @@ Item {
   // spaced, else closed up, so beside the icons Tokyo's "Constitution Memorial
   // Day" keeps its name at the everyday text size.
   readonly property real wordsRoom: Math.max(0, soundIcon.x - Style.space(8) - statusWords.x
-    - (root.offersRetry ? retry.implicitWidth + Style.space(16) : 0))
+    - (root.offersRetry ? retry.implicitWidth + Style.space(16) : 0) - (root.titled ? 0 : root.markRoom))
+  // A second copy, run under an id other than a user's (`Release.otherCopy`):
+  // a dim flask at the end of the name's line, or of the words' where the
+  // name gives way, in room kept for it, so the two copies tell apart.
+  property bool marked: false
+  // From the mark's left edge to the speaker's, the line's text ends a gap
+  // before it.
+  readonly property int markRoom: marked ? Math.ceil(copyMark.implicitWidth) + Style.space(14) : 0
   readonly property var measured: [form0, form1, form2].slice(0, statusForms.length)
   // Where none fits, the last, closed up and cut.
   readonly property var fit: {
@@ -248,7 +255,7 @@ Item {
     anchors.left: slot.right
     anchors.leftMargin: Style.space(14)
     y: Math.round((root.contentHeight - implicitHeight - Style.space(2) - statusWords.implicitHeight) / 2)
-    width: Math.min(implicitWidth, Math.max(0, soundIcon.x - Style.space(8) - x))
+    width: Math.min(implicitWidth, Math.max(0, soundIcon.x - Style.space(8) - root.markRoom - x))
     textFormat: Text.PlainText
     text: root.title
     color: root.foreground
@@ -256,6 +263,20 @@ Item {
     font.pixelSize: Style.font.title
     font.bold: true
     elide: Text.ElideRight
+  }
+
+  Text {
+    id: copyMark
+    objectName: "headerCopyMark"
+    visible: root.marked
+    anchors.right: soundIcon.left
+    anchors.rightMargin: Style.space(14)
+    anchors.verticalCenter: root.titled ? titleText.verticalCenter : statusWords.verticalCenter
+    textFormat: Text.PlainText
+    text: "\uDB80\uDC96"
+    color: root.dim
+    font.family: root.fontFamily
+    font.pixelSize: Style.font.caption
   }
 
   // The rule as the footer's, the shell's own separator.
