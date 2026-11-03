@@ -54,14 +54,25 @@ const changed = touched.filter(path => existsSync(join(root, path)))
 const product = touched.filter(path => !/^(test|\.github|media)\/|\.(md|png)$/.test(path))
 const show = path => run(["git", "show", `${base}:${path}`]).out
 const now = path => existsSync(join(root, path)) ? readFileSync(join(root, path), "utf8") : ""
-const code = (path, source) => {
-  if (!/\.(qml|js)$/.test(path)) return source
-  const { comments } = scan(source)
-  let kept = "", from = 0
-  for (const [start, end] of comments) { kept += source.slice(from, start); from = end }
-  kept += source.slice(from)
-  return kept.split("\n").map(l => l.trim()).filter(l => l).join("\n")
+// canon SOURCE: SOURCE's code alone: comments set aside and each run of
+// space outside a string or a regular expression made one space, so
+// comments, blank lines and indenting change nothing and a string's every
+// character still counts.
+function canon(source) {
+  const { comments, literals } = scan(source)
+  const marks = [...comments.map(([s, e]) => [s, e, false]), ...literals.map(([s, e]) => [s, e, true])]
+    .sort((a, b) => a[0] - b[0])
+  let out = "", pending = "", from = 0
+  for (const [start, end, literal] of marks) {
+    if (start < from) continue
+    pending += source.slice(from, start)
+    if (literal) { out += pending.replace(/\s+/g, " ") + source.slice(start, end); pending = "" }
+    else pending += " "
+    from = end
+  }
+  return (out + (pending + source.slice(from)).replace(/\s+/g, " ")).trim()
 }
+const code = (path, source) => /\.(qml|js)$/.test(path) ? canon(source) : source
 const codeChanged = product.filter(path => code(path, show(path)) !== code(path, now(path)))
 if (codeChanged.length === 0) {
   console.log(`no product code changed since ${baseName} (${short}), only tests, docs or comments: nothing to compare`)
@@ -84,8 +95,9 @@ const harnessOf = path => {
 const tests = changed.filter(path => /\.test\.js$/.test(path) || harnessOf(path))
 
 // changedLines PATH: the lines of PATH that differ from the base's, by
-// their number here. A comment or a blank line changes nothing. A deletion
-// with nothing added in its place marks the line now there.
+// their number here. A hunk whose code is the same, as one that changes
+// only comments or blank lines, changes nothing. A deletion with nothing
+// added in its place marks the line now there.
 const quiet = text => /^\s*(\/\/.*|\/\*.*|\*.*)?$/.test(text)
 function changedLines(path) {
   const lines = new Set()
@@ -100,6 +112,7 @@ function changedLines(path) {
     const body = hunk.split("\n").slice(1)
     const added = body.filter(l => l[0] === "+").map(l => l.slice(1))
     const removed = body.filter(l => l[0] === "-").map(l => l.slice(1))
+    if (canon(added.join("\n")) === canon(removed.join("\n"))) continue
     added.forEach((l, i) => { if (!quiet(l)) lines.add(from + i) })
     if (removed.some(l => !quiet(l)) && added.every(quiet)) lines.add(added.length ? from : from + 1)
   }
@@ -116,7 +129,7 @@ function scan(source) {
     lineAt.push(line)
     if (source[i] === "\n") line++
   }
-  const calls = [], functions = [], comments = [], stack = [], close = new Map(), opened = new Map()
+  const calls = [], functions = [], comments = [], literals = [], stack = [], close = new Map(), opened = new Map()
   // last: the word or character before, which tells a regular expression
   // from a division; lastAt: where it ends.
   let last = "", lastAt = -1, i = 0
@@ -133,25 +146,29 @@ function scan(source) {
     }
     if (/\s/.test(c)) { i++; continue }
     if (c === "\"" || c === "'") {
+      const start = i
       for (i++; i < source.length && source[i] !== c; i++) if (source[i] === "\\") i++
-      last = "x"; lastAt = i++; continue
+      last = "x"; lastAt = i++; literals.push([start, i]); continue
     }
     if (c === "/" && regexAfter.test(last)) {
+      const start = i
       let inClass = false
       for (i++; i < source.length && (inClass || source[i] !== "/"); i++) {
         if (source[i] === "\\") i++
         else if (source[i] === "[") inClass = true
         else if (source[i] === "]") inClass = false
       }
-      last = "x"; lastAt = i++; continue
+      last = "x"; lastAt = i++; literals.push([start, i]); continue
     }
     if (c === "`" || (c === "}" && stack.at(-1)?.template)) {
+      const start = i
       if (c === "}") close.set(stack.pop().at, i)
       for (i++; i < source.length && source[i] !== "`" && !(source[i] === "$" && source[i + 1] === "{"); i++) {
         if (source[i] === "\\") i++
       }
       if (source[i] === "$") { stack.push({ at: i + 1, template: true }); i += 2; last = "{" }
       else { last = "x"; lastAt = i++ }
+      literals.push([start, i])
       continue
     }
     wordAt.lastIndex = i
@@ -196,7 +213,7 @@ function scan(source) {
     call.start = lineAt[call.open]
     call.endLine = lineAt[end]
   }
-  return { calls, functions, comments }
+  return { calls, functions, comments, literals }
 }
 
 // cases PATH: the test cases, or the harness's steps, that changed lines
