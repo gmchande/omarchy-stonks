@@ -37,7 +37,10 @@ FocusScope {
   }
 
   property bool active: false
+  // Shown through the close fade, but takes no pointer or key.
   enabled: active
+  // Turned on, it takes the keys a turn later only if still on; turned
+  // off, however it closes, it gives them up.
   onActiveChanged: {
     if (active) {
       reset()
@@ -213,6 +216,7 @@ FocusScope {
       id: listsBar
       policy: scroll.interactive ? Controls.ScrollBar.AlwaysOn : Controls.ScrollBar.AlwaysOff
       visible: scroll.interactive
+      // At least 24 px long, so a long view's thumb is there to see and grab.
       minimumSize: Math.min(1, Style.space(24) / Math.max(1, availableHeight))
     }
 

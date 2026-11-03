@@ -16,6 +16,8 @@ FocusScope {
   property color foreground: Commons.Color.foreground
   property color dim: Tones.dim(foreground, Commons.Color.background)
   property string fontFamily: Style.font.family
+  // Why a typed name was refused, said under the field and brought into
+  // view; as its line goes, the list rests within its rows at once.
   property string problem: ""
   onProblemChanged: if (problem !== "") Qt.callLater(showProblem); else settle()
   // The column lays out a turn after the problem's line appears.
@@ -61,6 +63,8 @@ FocusScope {
   property bool active: false
   // Shown through the close fade, but inert.
   enabled: active
+  // Turned on, it takes the keys a turn later only if still on; turned
+  // off, however it closes, it gives them up, its rename field's too.
   onActiveChanged: {
     if (active) {
       reset()
@@ -105,7 +109,8 @@ FocusScope {
   }
 
   // After a scroll by hand: the nearest list wholly in sight, or in a view
-  // too short for one, the list across its middle.
+  // too short for one, the list across its middle. A rename or a delete's
+  // question keeps its row.
   function keepCursorInSight() {
     if (renaming || confirming) return
     var top = scroll.contentY
@@ -155,6 +160,7 @@ FocusScope {
     renameRequested(pendingName, nameField.text)
   }
 
+  // An emptied field keeps the old name.
   function keepName() {
     if (nameField.text.trim() === "") stopEditing()
     else saveName()
@@ -183,6 +189,7 @@ FocusScope {
     interval: Application.styleHints.mouseDoubleClickInterval
   }
 
+  // Enter always answers, inside the double-click interval too.
   function confirmDelete() {
     if (!confirming) return
     var name = pendingName
@@ -192,6 +199,7 @@ FocusScope {
   }
 
   Keys.onPressed: function(event) {
+    // While renaming, the field has the keys; what it lets past goes nowhere.
     event.accepted = true
     if (root.renaming) return
     var shifted = (event.modifiers & ~Qt.KeypadModifier) === Qt.ShiftModifier
@@ -274,6 +282,7 @@ FocusScope {
       id: manageBar
       policy: scroll.interactive ? Controls.ScrollBar.AlwaysOn : Controls.ScrollBar.AlwaysOff
       visible: scroll.interactive
+      // At least 24 px long, so a long view's thumb is there to see and grab.
       minimumSize: Math.min(1, Style.space(24) / Math.max(1, availableHeight))
     }
 
@@ -350,6 +359,7 @@ FocusScope {
             height: root.itemHeight
             spacing: Style.space(14)
 
+            // An arrow with nowhere to move its list can't act, and is faded.
             ListAction {
               view: root
               objectName: "moveUp"

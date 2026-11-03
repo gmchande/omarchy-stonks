@@ -33,12 +33,14 @@ Item {
   // "Undo NVDA", or "" for none.
   property string undoLabel: ""
   property real undoOpacity: 1
+  // The undo stays while the pointer is on it.
   readonly property bool undoHovered: undoMouse.containsMouse
   property string updateLabel: ""
   readonly property bool undoing: undoLabel !== ""
   readonly property string sideLabel: undoing ? undoLabel : updateLabel
   readonly property real undoRoom: sideLabel !== "" ? undoText.implicitWidth + Style.space(20) + Style.space(4) : 0
 
+  // A note stays while the pointer is on the bar.
   readonly property bool hovered: addMouse.containsMouse
   property real noteOpacity: 1
   property real coveredOpacity: 1
@@ -81,8 +83,8 @@ Item {
     id: hintMetrics
     font: hintText.font
   }
-  // Only the whole action goes beside the notice; a shorter form takes a
-  // line of its own.
+  // The notice stays whole: only the whole action goes beside it; a shorter
+  // form takes a line of its own.
   readonly property var noticeShown: {
     if (notice === "" || noticeActions.length === 0) return { action: "", lines: 1 }
     var room = width - gutter - undoRoom - Style.space(20)
@@ -108,6 +110,7 @@ Item {
     color: root.ground
   }
 
+  // The hint takes no click.
   Text {
     id: hintText
     objectName: "footerHint"

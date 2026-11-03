@@ -28,6 +28,7 @@ FocusScope {
   // so on a short list it grows the panel no taller than a full one.
   readonly property int resultsGap: Style.space(4)
   readonly property int desiredHeight: fieldBar.height + resultsGap + rowPitch * maxResults - rowGap
+  // Whole rows only: a row is never cut.
   readonly property int resultsHeight: {
     var rows = Math.floor((Math.max(0, height - fieldBar.height - resultsGap) + rowGap) / rowPitch)
     return rows > 0 ? rows * rowPitch - rowGap : 0
@@ -39,7 +40,9 @@ FocusScope {
   // or "" before any.
   property string resultsQuery: ""
   property string answer: ""
+  // An earlier query's answer, shown dimmed while the new one is out.
   readonly property bool stale: answer !== "" && resultsQuery !== searchText.trim()
+  // An Enter kept for the query before its answer; an edit drops it.
   property string enterFor: ""
   // Set once a lookup has been out a quarter second, so a quick answer shows
   // no waiting line, and kept through an edit, so the line doesn't blink.
@@ -100,7 +103,10 @@ FocusScope {
   signal cancelled()
 
   property bool active: false
+  // Off, it still shows through the close fade but takes no pointer or key.
   enabled: active
+  // Turned off, any way it closes, it drops a lookup still out and keeps
+  // what it shows for the close fade.
   onActiveChanged: {
     if (active) {
       reset()
@@ -162,6 +168,7 @@ FocusScope {
     else if (index >= 0 && index < results.length) picked(results[index].symbol)
   }
 
+  // Asked once: a lookup of it still waiting on the typing pause goes now.
   function retry() {
     if (stale || answer !== "failed" || failure === "missing") return
     searchDebounce.stop()
@@ -175,12 +182,15 @@ FocusScope {
     }
   }
 
+  // A click is Enter on the result: chosen first, so the hero is on it, then
+  // taken.
   function take(index) {
     if (stale) return
     showResult(index)
     accept(index)
   }
 
+  // An emptied field drops a search still out.
   function setQuery(text) {
     var changed = text.trim() !== searchText.trim()
     searchText = text
@@ -220,10 +230,12 @@ FocusScope {
   // question wrong (as it does an emoji), or "other".
   property string failure: ""
 
+  // Only a lookup that failed for want of Yahoo is asked again as it answers.
   function yahooBack() {
     if (active && (failure === "none" || failure === "refused")) retry()
   }
 
+  // A lookup already out for this same query answers it.
   function runSearch() {
     var q = searchText.trim()
     if (q.length < 1) return
@@ -250,7 +262,8 @@ FocusScope {
     if (active && requestedQuery !== "" && !fetchRun.out) root.runSearch()
   }
 
-  // A body of "" fails to parse: no answer.
+  // An answer counts only for the query still in the field. A body of ""
+  // fails to parse: no answer.
   function land(body) {
     slowSearch.stop()
     if (root.active && root.activeQuery !== "" && root.activeQuery === root.searchText.trim()) {
@@ -356,6 +369,8 @@ FocusScope {
             : chosen ? Style.hoverFillFor(root.foreground, Commons.Color.accent)
             : rowMouse.containsMouse ? Style.normalFillFor(root.foreground, Commons.Color.accent) : "transparent"
 
+          // The pointer only tints a row: one resting over the results never
+          // changes what Enter adds.
           MouseArea {
             id: rowMouse
             anchors.fill: parent

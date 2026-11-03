@@ -23,13 +23,16 @@ Flickable {
   property int inset: 0
   property int edge: 0
   property string version: ""
-  // One part a line, so a half column never breaks one mid-phrase.
+  // One part a line, so a half column never breaks one mid-phrase. With no
+  // version known the credit leaves it off rather than show a blank.
   readonly property string credit: (version !== "" ? ["Stonks " + version] : [])
     .concat(["Prices from Yahoo", "Overnight from Robinhood"]).join("\n")
 
   signal closeRequested()
 
   readonly property var groups: sheet.groups
+  // Two columns, the first taking groups until it holds about half the
+  // lines: one column would leave half the window empty.
   readonly property int split: {
     var lines = function(group) { return group.rows.length + 1 }
     var total = 0
@@ -58,10 +61,12 @@ Flickable {
   clip: true
   boundsBehavior: Flickable.StopAtBounds
   interactive: contentHeight > height
+  // While more of the sheet is out of sight the scrollbar says so, at rest too.
   Controls.ScrollBar.vertical: Controls.ScrollBar {
     objectName: "helpScrollBar"
     policy: root.interactive ? Controls.ScrollBar.AlwaysOn : Controls.ScrollBar.AlwaysOff
     visible: root.interactive
+    // At least 24 px long, so a long sheet's thumb is there to see and grab.
     minimumSize: Math.min(1, Style.space(24) / Math.max(1, availableHeight))
   }
 
@@ -137,6 +142,8 @@ Flickable {
 
           Text {
             objectName: "helpCredit"
+            // The credit closes the second column, so a window of ordinary
+            // height shows it without a scroll.
             visible: sheetSide.index === 1
             width: root.columnWidth - root.edge
             textFormat: Text.PlainText

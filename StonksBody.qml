@@ -114,7 +114,9 @@ Item {
   readonly property int leastScreenChart: Math.round(chartHeight / 5)
   readonly property int screenChartHeight: screenRoom <= 0 ? chartHeight
     : Math.max(leastScreenChart, Math.min(chartHeight, screenRoom - chromeBesideScreenChart - threeRowsHeight))
-  // From the screen's room, never the card's, which fits the footer.
+  // The hint gives way, after the chart, where it would leave fewer than
+  // three rows: read from the screen's room, never the card's, which fits
+  // the footer.
   readonly property bool hintShown: hint !== "" && (screenRoom <= 0
     || chromeBesideScreenChart + screenChartHeight + footer.hintRoom + threeRowsHeight <= screenRoom)
   // A save that didn't land is said ahead of the update, since a restart
@@ -326,6 +328,7 @@ Item {
     if (troubleForms) return troubleForms
     // Before any chart, only the empty hero names what's loading.
     if (chartLoading) return [chart ? loadingText : ""]
+    // A refresh you asked for is said while out, unless a scrub reads a moment.
     if (refreshing && !scrubShown) return ["Refreshing"]
     if (historyActive && historyFailed) return [unavailableText]
     // A refetch the service makes itself says nothing, out or failed.
@@ -479,6 +482,8 @@ Item {
   function pressKey(event) {
     var key = event.key
     var mods = event.modifiers & ~Qt.KeypadModifier
+    // A letter's command is its key and Shift, never its text: Caps Lock
+    // sends "O" for o, which would reverse the order.
     var t = KeyText.typed(event)
     if (mods === Qt.ControlModifier && key === Qt.Key_C) takeScreenshot()
     else if (mods === Qt.ControlModifier && key === Qt.Key_Z) undoRemoval()
@@ -543,7 +548,7 @@ Item {
       say("Keep at least one symbol")
       return
     }
-    // The rows as shown, before what covers them closes.
+    // The rows as shown, before what covers them closes, so the removal shows.
     var rows = watchlist.displayedSymbols
     var at = rows.indexOf(symbol)
     var successor = symbol === watchlist.cursorRow && at >= 0 ? (rows[at + 1] || rows[at - 1] || "") : ""
@@ -709,6 +714,7 @@ Item {
   function takeScreenshot() {
     showingHelp = false
     if (!camera || camera.busy || String(shareLoader.source) !== "") return
+    // With no chart on show, the footer says why nothing was taken.
     if (!featuredQuote || !featuredDay || !featured) {
       say("No chart to take a screenshot of")
       return
@@ -743,6 +749,7 @@ Item {
     var shown = Share.subject(card.symbol, card.range, card.words ? card.words.said : "")
     var taken = camera.shoot(card, Share.fileSymbol(card.symbol), function() {
       shareLoader.source = ""
+      // As the picture is taken; the footer says after how the save went.
       sound("shutter")
     }, function(code) {
       shareLoader.source = ""
@@ -788,7 +795,7 @@ Item {
   }
 
   // An add joins the rows once its first answer is in, and is featured once
-  // it and the list rest.
+  // it and the list rest. A result already in the list is shown, not added.
   function acceptSymbol(symbol) {
     if (!service) return
     var s = String(symbol || "").trim().toUpperCase()
@@ -814,8 +821,9 @@ Item {
     land()
   }
 
-  // Show ends an add still landing itself: the hero may already be the
-  // result, so `onFeaturedSymbolChanged` wouldn't.
+  // Show features the member before the preview ends, so the chart on show
+  // never changes for it, and ends an add still landing itself: the hero may
+  // already be the result, so `onFeaturedSymbolChanged` wouldn't.
   function showSymbol(symbol) {
     landing = ""
     service.feature(symbol)
@@ -834,6 +842,8 @@ Item {
     }
     if (landing === "" || !service || service.arriving.indexOf(landing) >= 0) return
     var failed = !quotes[landing] && !!entries[landing] && entries[landing].status === "failed"
+    // A failed first fetch is done: the hero stays where it was, its row
+    // saying it failed.
     if (view.rows.indexOf(landing) < 0 || (failed && !landingShows)) {
       landing = ""
       return
@@ -923,6 +933,8 @@ Item {
     else service.setMembership(listsSymbol, name, member, watchlist.displayedSymbols)
   }
 
+  // A close drops a pending add, so nothing lands or glides during the fade
+  // or after it.
   function freeze() {
     keepTyped()
     landing = ""

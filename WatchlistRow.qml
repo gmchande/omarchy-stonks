@@ -183,6 +183,7 @@ Rectangle {
           x: row.gap
           anchors.bottom: parent.bottom
           anchors.bottomMargin: row.inset
+          // The name gives way to the newest price's time, so the time stays whole.
           width: Math.min(implicitWidth, row.width - x - row.priceWidth - row.gap * 2 - row.sparkWidth - row.gap - timeText.implicitWidth)
           textFormat: Text.PlainText
           text: row.detail

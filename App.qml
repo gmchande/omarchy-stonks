@@ -32,8 +32,8 @@ Item {
     requestedSymbol = String(payload.symbol || "").toUpperCase()
     requestedRange = History.historyRanges().indexOf(payload.range) >= 0 ? payload.range : ""
     closingFromHost = false
-    // Shown first, so the body reads the service again and the reset lays
-    // out the latest.
+    // The views reset as the window opens, not as it closes. Shown first, so
+    // the body reads the service again and the reset lays out the latest.
     var opening = !window.visible
     bodyLoader.active = true
     window.visible = true
@@ -66,6 +66,7 @@ Item {
 
   function refocusKeys() { Qt.callLater(function() { if (keyCatcher) keyCatcher.forceActiveFocus() }) }
 
+  // A window summoned while its service starts draws its chart in once ready.
   onReadyChanged: if (ready) Qt.callLater(function() {
     root.applyRequest()
     if (window.visible) root.body.motion.revealChart()
@@ -77,6 +78,7 @@ Item {
     color: Commons.Color.background
     implicitWidth: 720
     implicitHeight: 760
+    // The smallest height shows three whole rows, the chart giving way first.
     // The width scales with the text size: at a fixed 560, size 16 cuts
     // Tokyo's holiday header and leaves VOL and P/E off the info lines.
     minimumSize: Qt.size(Style.space(560), root.body ? root.body.smallestHeight : 0)
@@ -123,6 +125,7 @@ Item {
           camera: root.camera
           surfaceOpen: window.visible
           onScreen: root.onScreen
+          // Before the service is ready the empty hero's label says Loading.
           headerWhenMissing: root.ready ? "No data" : ""
           margins: Style.space(16)
           chartHeight: Style.space(220)

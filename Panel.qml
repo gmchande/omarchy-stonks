@@ -70,6 +70,7 @@ Panel {
     if (opening) {
       root.body.resetInteraction()
       offerHint()
+      // An open during the close's fade eases the edge from where it is.
       if (fading) easeEdge()
       else {
         heldAnchor.hold()
@@ -84,6 +85,7 @@ Panel {
   function close() {
     setCenterHoverRevealSuppressed(false)
     if (root.body) root.body.freeze()
+    // Closing stops the edge where it is for the fade.
     edgeEase.stop()
     root.controller.hide()
   }
@@ -158,7 +160,10 @@ Panel {
         anchors.top: parent.top
         height: root.fittedCardHeight - panel.verticalContentInset
         sourceComponent: StonksBody {
+          // The rows' view is judged by the rows' room while the card has
+          // shrunk to the key sheet or a view.
           rowsRoom: root.bodyRoom
+          // The screen's room, so the first-run hint gives way to the rows.
           screenRoom: panel.availableCardHeight > 0 ? panel.availableCardHeight - panel.verticalContentInset : 0
           edge: Math.round(root.cardHeight) - panel.verticalContentInset
           service: root.service

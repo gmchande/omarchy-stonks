@@ -30,6 +30,7 @@ Text {
     width: parent.implicitWidth + Style.space(12)
     height: parent.implicitHeight + Style.space(4)
     radius: root.view.retro ? 0 : Style.cornerRadius
+    // The pressed fill while the button is down.
     color: mouse.pressed ? Style.pressedFillFor(root.view.foreground, Commons.Color.accent)
       : root.hovered ? Style.hoverFillFor(root.view.foreground, Commons.Color.accent)
       : root.enterTakes ? Style.selectedFillFor(root.view.foreground, Commons.Color.accent) : "transparent"
@@ -40,6 +41,7 @@ Text {
     anchors.fill: parent
     anchors.margins: -Style.space(6)
     hoverEnabled: true
+    // One that can't act shows no hand, so it never invites a click.
     cursorShape: root.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
     onClicked: root.activated()
   }

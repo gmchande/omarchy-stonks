@@ -50,6 +50,8 @@ FocusScope {
   property bool active: false
   // Shown through the close fade, but inert.
   enabled: active
+  // Turned on, it takes the keys a turn later only if still on; turned
+  // off, however it closes, it gives them up, its name field's too.
   onActiveChanged: {
     if (active) {
       reset()
@@ -79,6 +81,8 @@ FocusScope {
     showCursor()
   }
 
+  // A key stops the wheel's motion, so it can't carry the cursor on from
+  // where the key put it.
   function showCursor() {
     scroll.cancelFlick()
     var end = Math.max(0, scroll.contentHeight - scroll.height)
@@ -111,6 +115,7 @@ FocusScope {
     property: "contentY"
     duration: 160
     easing.type: Easing.OutCubic
+    // Settled under a still pointer, the cursor takes the row now under it.
     onFinished: if (root.active && pointer.hovered) root.pointAt(pointer.scenePosition.x, pointer.scenePosition.y)
   }
 
@@ -148,6 +153,7 @@ FocusScope {
     problem = reason
   }
 
+  // While a name is typed, the field keeps the cursor.
   function pointAt(x, y) {
     if (naming) return
     var pin = pinned.mapFromItem(null, x, y)
@@ -171,7 +177,9 @@ FocusScope {
   }
 
   Keys.onPressed: function(event) {
+    // While naming, the field has the keys; what it lets past goes nowhere.
     if (root.naming) { event.accepted = true; return }
+    // A letter by its key and Shift: Caps Lock sends "W" for w.
     var t = KeyText.typed(event)
     if (event.key === Qt.Key_Escape) { root.dismissed(); event.accepted = true }
     else if (event.key === Qt.Key_Down) { root.moveCursor(1); event.accepted = true }
@@ -224,6 +232,7 @@ FocusScope {
       id: menuBar
       policy: scroll.interactive ? Controls.ScrollBar.AlwaysOn : Controls.ScrollBar.AlwaysOff
       visible: scroll.interactive
+      // At least 24 px long, so a long view's thumb is there to see and grab.
       minimumSize: Math.min(1, Style.space(24) / Math.max(1, availableHeight))
       onPressedChanged: if (!pressed) root.settleOnRow()
     }
@@ -379,6 +388,7 @@ FocusScope {
         anchors.bottom: parent.bottom
         visible: root.naming
         verticalPadding: 0
+        // The typed name starts where "New list…" and the lists' names do.
         leftPadding: Style.space(24)
         retro: root.retro
         foreground: root.foreground

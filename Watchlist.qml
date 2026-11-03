@@ -41,6 +41,7 @@ Flickable {
   property int rowHeight: Style.space(40)
   property int rowGap: Style.space(2)
   property int gutter: Style.space(8)
+  // Closed or closing: a pointer moving over it moves no cursor.
   property bool surfaceOpen: true
   // The card's colour, under a moving row's fill.
   property color ground: "transparent"
@@ -72,6 +73,7 @@ Flickable {
       takeOver()
       contentY = clampY(top * rowPitch)
       cursorSymbol = own
+      // And keeps the cursor's row whole in sight, as a shorter surface does.
       keepCursorInSight()
     }
     lastPitch = rowPitch
@@ -84,6 +86,7 @@ Flickable {
     if (ownInSight(top)) return cursorSymbol
     var hero = displayedSymbols.indexOf(featuredSymbol)
     if (hero >= 0 && wholeInSight(hero, top)) return featuredSymbol
+    // Else the first whole row in sight: a key never acts on a row unseen.
     var first = Math.max(0, Math.ceil((top - 0.5) / rowPitch))
     return displayedSymbols[Math.min(first, displayedSymbols.length - 1)] || ""
   }
@@ -105,9 +108,13 @@ Flickable {
     var keep = cursorSymbol !== "" ? (cursorSymbol !== dragSymbol ? cursorSymbol : "")
       : featuredSymbol
     var at = displayedSymbols.indexOf(keep)
+    // The featured row only if it was whole in sight before, so a resize
+    // never pulls the list back to it.
     if (keep !== "" && cursorSymbol === "" && !(at >= 0 && wholeInSightOf(at, headedY, lastSight))) at = -1
     if (at >= 0 && sightHeight >= rowHeight && !wholeInSight(at, headedY)) {
       var own = cursorSymbol
+      // Judged from where a key's glide was headed, so stopping the glide
+      // never lets the cursor go on the way.
       var to = restingTopFor(at, headedY)
       takeOver()
       contentY = to
@@ -139,6 +146,7 @@ Flickable {
   boundsBehavior: Flickable.StopAtBounds
   flickableDirection: Flickable.VerticalFlick
   interactive: contentHeight > height
+  // A drag or a flick takes the list over from the wheel.
   onMovementStarted: takeOver()
   onMovementEnded: snapToRow()
   ScrollBar.vertical: ScrollBar {
@@ -199,6 +207,8 @@ Flickable {
   // the pointer.
   function pointAt(x, y) {
     var seen = mapFromItem(null, x, y)
+    // A lifted row is the drag's, and the gutter the scrollbar's: neither
+    // moves the cursor.
     if (dragSymbol !== "" || seen.x >= rowsBox.width) return false
     var at = Math.floor((seen.y + headedY) / rowPitch)
     if (at < 0 || at >= displayedSymbols.length) return false
@@ -264,6 +274,8 @@ Flickable {
     wheelQuiet.restart()
   }
 
+  // The touchpad moves the list directly; it settles on a row once the
+  // finger stops.
   function followBy(pixels) {
     glide.stop()
     contentY = clampY(contentY + pixels)
@@ -279,6 +291,8 @@ Flickable {
     glide.start()
   }
 
+  // Glides, as the wheel does, to rest on a row boundary: never a jump, and
+  // never between rows.
   function scrollToRow(index) {
     wheelQuiet.stop()
     var y = index * rowPitch
@@ -349,6 +363,7 @@ Flickable {
     rowClickAt = 0
     clickEndedAt = 0
   }
+  // Rows hidden behind a view forget the last click, so the next one acts.
   onVisibleChanged: {
     forgetClicks()
     if (visible) listHover.rest()
@@ -523,6 +538,7 @@ Flickable {
     dropAnim.start()
   }
 
+  // The drag over, the list it took from the wheel settles on a row.
   function cancelDrag() {
     dropAnim.stop()
     if (dragSymbol === "") return
@@ -530,6 +546,8 @@ Flickable {
     glideTo(snappedY(contentY))
   }
 
+  // Closing mid-drag, every row, the lifted one too, stays where it is on
+  // screen until the next open.
   function releaseDragInPlace() {
     if (dragSymbol === "") return
     var rows = []
@@ -542,6 +560,8 @@ Flickable {
     rows.forEach(function(r) { r.row.holdAt(r.y) })
   }
 
+  // Another list, another order, or an opening surface is a new arrangement:
+  // the rows take their places at once.
   function layOut() {
     display(view.shown.slice(), false)
     settleRows()
@@ -637,9 +657,11 @@ Flickable {
         readonly property int place: root.slotOf(symbol)
         visible: place >= 0
         y: lifted ? root.dragY : place * root.rowPitch + shift
-        // Slides by easing `shift`, its distance from its place, to zero, so a
-        // change mid-slide goes on from where it is. The row travelling
-        // farther rides on top, the cursor's on a tie, so none print through.
+        // A row slides only if it was in sight before and after, so one that
+        // joins starts at its own place. It eases `shift`, its distance from
+        // its place, to zero, so a change mid-slide goes on from where it is.
+        // The row travelling farther rides on top, the cursor's on a tie, so
+        // none print through.
         property int lastPlace: -1
         property real shift: 0
         property int travel: 0
@@ -749,6 +771,7 @@ Flickable {
         sourceDown: root.sourceDown
         featuredRow: symbol === root.featuredSymbol
         cursor: symbol === root.cursorRow
+        // Only a cursor of your own shows the remove button, not the resting one.
         removable: symbol === root.cursorRow && symbol === root.cursorSymbol && symbol !== root.scrolledUnder
           && root.dragSymbol === ""
         lifted: symbol === root.dragSymbol
