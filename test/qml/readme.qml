@@ -25,8 +25,8 @@ Harness {
   readonly property string themeLink: Quickshell.env("HOME") + "/.local/state/omarchy/current/theme"
   property bool themeLinked: false
 
-  Stonks.Service { id: service }
-  Stonks.Updates { id: updates }
+  Stonks.Service { id: service; pluginId: "grvc.stonks" }
+  Stonks.Updates { id: updates; pluginId: "grvc.stonks" }
   Stonks.TrendColors { id: colors }
   QtObject {
     id: shellApi
@@ -66,6 +66,7 @@ Harness {
           width: implicitWidth
           height: parent.height
           bar: barApi
+          moduleName: "grvc.stonks"
           settings: ({ id: "grvc.stonks", barStyle: "sparkline" })
         }
       }
@@ -88,6 +89,7 @@ Harness {
               width: implicitWidth
               height: parent.height
               bar: barApi
+              moduleName: "grvc.stonks"
               settings: ({ id: "grvc.stonks", barStyle: parent.modelData })
             }
           }

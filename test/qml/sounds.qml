@@ -89,8 +89,8 @@ Harness {
     return chime ? Number(chime[1]) : /\/lead-[^\/]*\.wav$/.test(e.file) ? 150 : 0
   }
 
-  Stonks.Service { id: service }
-  Stonks.Updates { id: updates }
+  Stonks.Service { id: service; pluginId: "grvc.stonks" }
+  Stonks.Updates { id: updates; pluginId: "grvc.stonks" }
   Stonks.Sounds { id: sounds; turnedOn: service.soundsOn; retro: service.retro; files: service.files }
   // The screenshot's camera, its commands the stand-ins on PATH (bin/).
   Stonks.Camera { id: camera }

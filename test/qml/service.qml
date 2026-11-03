@@ -107,8 +107,8 @@ Harness {
     ticker.start()
   }
 
-  Service { id: service }
-  Updates { id: updates }
+  Service { id: service; pluginId: "grvc.stonks" }
+  Updates { id: updates; pluginId: "grvc.stonks" }
   // The service's reads of its data file: a read after a change is its
   // file watch reading that change back.
   property int loads: 0
@@ -118,10 +118,10 @@ Harness {
     function onLoaded() { harness.loads++ }
   }
   // A shell started while the data file can't be read.
-  Component { id: secondService; Service {} }
+  Component { id: secondService; Service { pluginId: "grvc.stonks" } }
   // A Service whose data file the harness steps through (service.sh's
   // SteppedService.qml, on DataFileStandIn.qml).
-  Component { id: steppedService; SteppedService {} }
+  Component { id: steppedService; SteppedService { pluginId: "grvc.stonks" } }
   property var stepped: null
   // Ends the stepped Service's read in flight, one a tick, so a read it
   // starts once a handler has returned is ended too: true while there was

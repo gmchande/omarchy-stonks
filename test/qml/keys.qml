@@ -63,8 +63,8 @@ Harness {
   // Stonks' among them, as one of the listed keys (Ui/PanelKeyCatcher.qml).
   readonly property var omarchy: ({ "j": "↓", "k": "↑", "h": "←", "l": "→", "Space": "⏎", "x": "Delete", "Shift+X": "Delete" })
 
-  Stonks.Service { id: service }
-  Stonks.Updates { id: updates }
+  Stonks.Service { id: service; pluginId: "grvc.stonks" }
+  Stonks.Updates { id: updates; pluginId: "grvc.stonks" }
   // The camera hands its shots to the stand-ins on PATH (bin/).
   Stonks.Camera { id: camera }
   QtObject {

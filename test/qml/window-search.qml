@@ -16,7 +16,7 @@ Harness {
     return !!got && got.join("|") === want.join("|")
   }
 
-  Stonks.Service { id: service }
+  Stonks.Service { id: service; pluginId: "grvc.stonks" }
   readonly property string fakeState: Quickshell.env("STONKS_FAKE_STATE")
   Process { id: fileProc }
   Stonks.App { id: app; service: service }

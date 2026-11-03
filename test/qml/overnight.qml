@@ -69,7 +69,7 @@ Harness {
     return [find(body, "changeCaption").text, body.featured.priceText, body.featured.changeText].join(" ")
   }
 
-  Stonks.Service { id: service }
+  Stonks.Service { id: service; pluginId: "grvc.stonks" }
   Stonks.App { id: app; service: service }
 
   Process { id: setProc }

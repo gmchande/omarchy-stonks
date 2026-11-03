@@ -29,6 +29,7 @@ Harness {
         width: 150
         height: 32
         bar: api
+        moduleName: "grvc.stonks"
         settings: ({id: "grvc.stonks", barStyle: "text"})
       }
     }

@@ -10,7 +10,7 @@ Harness {
   property int snapshotEnd: 0
   property bool chainHistory: false
   readonly property string state: Quickshell.env("STONKS_FAKE_STATE")
-  Stonks.Service { id: service }
+  Stonks.Service { id: service; pluginId: "grvc.stonks" }
   Stonks.App { id: app; service: service }
   Stonks.OvernightFeed { id: nights }
   Connections {

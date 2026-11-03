@@ -48,6 +48,11 @@ ShellRoot {
     return text
   }
 
+  // The tree's manifest (plugin_tree), as the shell hands it to the plugin.
+  function pluginManifest() {
+    return JSON.parse(readFile(String(Qt.resolvedUrl("plugin/manifest.json")).replace(/^file:\/\//, "")))
+  }
+
   // How many times the fake curl answered `name` (STONKS_FAKE_STATE).
   function calls(name) {
     return Number(readFile(Quickshell.env("STONKS_FAKE_STATE") + "/" + name + ".calls").trim() || "0")

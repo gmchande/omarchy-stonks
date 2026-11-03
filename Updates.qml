@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import Quickshell.Io
 import "Release.js" as Release
 
@@ -8,6 +9,12 @@ import "Release.js" as Release
 Item {
   id: root
 
+  // The manifest's id (`Plugin`), which `omarchy plugin update` takes.
+  property string pluginId: ""
+  // `omarchy plugin update` takes only a folder holding its own clone, a
+  // `.git` folder; a copy or a worktree it refuses. There the service never
+  // asks GitHub for main's version, so no update is offered.
+  property bool updatable: false
   // The manifest's version when first read: the code running.
   property string runningVersion: ""
   property string newVersion: ""
@@ -69,6 +76,13 @@ Item {
     onFileChanged: root.check()
   }
 
+  FileView {
+    id: gitHead
+    path: root.pluginId ? Quickshell.env("HOME") + "/.config/omarchy/plugins/" + root.pluginId + "/.git/HEAD" : ""
+    printErrors: false
+    onLoaded: root.updatable = true
+  }
+
   Timer {
     id: reread
     property int tries: 0
@@ -83,14 +97,14 @@ Item {
 
   Process {
     id: updatePlugin
-    command: ["omarchy", "launch", "floating", "terminal", "with", "presentation", "omarchy", "plugin", "update", "grvc.stonks"]
+    command: ["omarchy", "launch", "floating", "terminal", "with", "presentation", "omarchy", "plugin", "update", root.pluginId]
   }
 
   Process {
     id: updateAndRestart
     command: ["omarchy", "launch", "floating", "terminal", "with", "presentation",
-      "p=$HOME/.config/omarchy/plugins/grvc.stonks; was=$(git -C \"$p\" rev-parse HEAD);"
-      + " omarchy plugin update grvc.stonks && [[ $(git -C \"$p\" rev-parse HEAD) != \"$was\" ]]"
+      "p=$HOME/.config/omarchy/plugins/" + root.pluginId + "; was=$(git -C \"$p\" rev-parse HEAD);"
+      + " omarchy plugin update " + root.pluginId + " && [[ $(git -C \"$p\" rev-parse HEAD) != \"$was\" ]]"
       + " && echo 'Restarting the shell…' && omarchy restart shell"]
   }
 }

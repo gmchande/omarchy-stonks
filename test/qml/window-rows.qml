@@ -25,8 +25,8 @@ Harness {
     return service.symbols.join(",") === expected.join(",")
   }
 
-  Stonks.Service { id: service }
-  Stonks.Updates { id: updates }
+  Stonks.Service { id: service; pluginId: "grvc.stonks" }
+  Stonks.Updates { id: updates; pluginId: "grvc.stonks" }
   Stonks.App { id: app; service: service; updates: updates }
 
   readonly property string dataPath: Quickshell.env("HOME") + "/.config/omarchy/grvc.stonks.json"

@@ -37,7 +37,7 @@ Harness {
     updateCheck: false
   })
 
-  Service { id: service }
+  Service { id: service; pluginId: "grvc.stonks" }
 
   Steps {
     name: "DataFiles"

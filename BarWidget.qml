@@ -13,10 +13,11 @@ import "Tones.js" as Tones
 // whatever range the panel or the window shows.
 BarWidget {
   id: root
-  moduleName: "grvc.stonks"
+  // `moduleName` is the bar entry's id, which the bar sets: the plugin's
+  // id, the manifest's. The shell hands a plugin only its own service.
 
   readonly property var plugin: bar && bar.shell && typeof bar.shell.serviceFor === "function"
-    ? bar.shell.serviceFor("grvc.stonks") : null
+    ? bar.shell.serviceFor(moduleName) : null
   readonly property var service: plugin ? plugin.service : null
   readonly property var panel: panelLoader.item
   readonly property string featuredSymbol: service ? service.featuredSymbol : ""
@@ -188,6 +189,7 @@ BarWidget {
     if (!target) return
     if ("bar" in target) target.bar = root.bar
     if ("settings" in target) target.settings = root.settings
+    if ("moduleName" in target) target.moduleName = root.moduleName
     if ("anchorItem" in target) target.anchorItem = button
     if ("hostWidget" in target) target.hostWidget = root
   }
@@ -197,6 +199,7 @@ BarWidget {
 
   onBarChanged: injectPanel()
   onSettingsChanged: injectPanel()
+  onModuleNameChanged: injectPanel()
 
   Loader {
     id: panelLoader

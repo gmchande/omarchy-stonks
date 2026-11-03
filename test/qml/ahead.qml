@@ -32,7 +32,7 @@ Harness {
       .map(function(line) { return line.split(" ")[1].replace("%5E", "^") })
   }
 
-  Stonks.Service { id: service }
+  Stonks.Service { id: service; pluginId: "grvc.stonks" }
   Stonks.App { id: app; service: service }
 
   // Whether every screen is off, as the window's host would say.

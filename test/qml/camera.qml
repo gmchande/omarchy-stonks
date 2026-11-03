@@ -84,8 +84,8 @@ Harness {
   }
   Process { id: runner }
 
-  Stonks.Service { id: service }
-  Stonks.Updates { id: updates }
+  Stonks.Service { id: service; pluginId: "grvc.stonks" }
+  Stonks.Updates { id: updates; pluginId: "grvc.stonks" }
   Stonks.Camera { id: camera }
   QtObject {
     id: shellApi
