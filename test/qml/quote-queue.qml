@@ -178,10 +178,86 @@ Harness {
     } else if (harness.step === 18) {
       check("a symbol a reader asks for again while its last run is out stays waited on as that run ends",
         harness.reaskedWaited, JSON.stringify(feed.userAsked))
+      feed.symbols = ["FAIL", "SLOW"]
+    } else if (harness.step === 19) {
+      // A reader's refresh of both: FAIL answers badly at once, SLOW a
+      // second later.
+      harness.now += 60
+      feed.ask(["FAIL", "SLOW"], harness.now, true)
+      badWatch.start()
+      return
+    } else if (harness.step === 20) {
+      check("a reader's refresh stops waiting on a symbol once its answer is back, a bad one included",
+        harness.badSeen && !harness.badWaited, harness.badSeen + "|" + harness.badWaited)
+      // As a spark day with a jump no chart has judged would: FAIL's chart
+      // goes only to judge it, and fails.
+      harness.failCalls = calls("FAIL")
+      feed.toJudge = ["FAIL"]
+      feed.pump()
+    } else if (harness.step === 21) {
+      harness.judgeCalls = calls("FAIL") - harness.failCalls
+      harness.refresh()
+    } else if (harness.step === 22) {
+      check("a chart fetched only to judge that fails changes nothing: the next refresh still gets its three tries",
+        harness.judgeCalls === 1 && calls("FAIL") - harness.failCalls === 4 && status("FAIL") === "failed",
+        harness.judgeCalls + " to judge, " + (calls("FAIL") - harness.failCalls) + " in all, " + status("FAIL"))
+      // A refresh of both, SLOW first; FAIL stops being watched while the
+      // run is out, and answers badly after.
+      feed.symbols = ["SLOW", "FAIL"]
+      harness.failCalls = calls("FAIL")
+      harness.refresh()
+      feed.watched = ["SLOW"]
+      harness.unwatchedKept = "FAIL" in feed.asked && feed.refreshRun.indexOf("FAIL") >= 0
+    } else if (harness.step === 23) {
+      check("a refresh for a symbol no longer watched stays asked while its run is out",
+        harness.unwatchedKept, String(harness.unwatchedKept))
+      check("once its run ends, a refresh for a symbol no longer watched that answered badly is not tried again",
+        calls("FAIL") - harness.failCalls === 1 && !("FAIL" in feed.asked), (calls("FAIL") - harness.failCalls) + " requests")
+      feed.watched = Qt.binding(function() { return feed.symbols })
+      feed.symbols = ["SLOW", "MSFT"]
+    } else if (harness.step === 24) {
+      // SLOW holds the refresh lane; a reader's refresh of MSFT waits
+      // behind it, and MSFT is removed before it goes.
+      harness.now += 60
+      feed.ask(["SLOW"], harness.now)
+      feed.ask(["MSFT"], harness.now, true)
+      var waited = "MSFT" in feed.userAsked && feed.refreshRun.indexOf("MSFT") < 0
+      feed.symbols = ["SLOW"]
+      check("a symbol that leaves the queue is no longer waited on by a reader's refresh",
+        waited && !("MSFT" in feed.userAsked), waited + "|" + JSON.stringify(feed.userAsked))
+    } else if (harness.step === 25) {
+      // SLOW never left: a removal taken back, or a saved quote, for it
+      // changes nothing it shows.
+      var own = feed.quotes["SLOW"]
+      var ownReceipt = receipt("SLOW")
+      feed.restore("SLOW", harness.aaplQuote, { receivedAt: 1 })
+      check("a symbol given back that never left keeps its own quote and receipt",
+        feed.quotes["SLOW"] === own && receipt("SLOW") === ownReceipt, receipt("SLOW") + " vs " + ownReceipt)
+      feed.seed({ SLOW: { quote: harness.aaplQuote, receivedAt: 1 } })
+      check("a saved quote for a symbol already answered is not shown",
+        feed.quotes["SLOW"] === own && status("SLOW") === "ok", status("SLOW"))
       finish()
       return
     }
     ticker.start()
+  }
+
+  // FAIL's bad answer is in and SLOW's still out: is FAIL still waited on?
+  property bool badSeen: false
+  property bool badWaited: false
+  property int judgeCalls: 0
+  property bool unwatchedKept: false
+  Timer {
+    id: badWatch
+    interval: 20
+    repeat: true
+    onTriggered: {
+      if (!(feed.tries["FAIL"] >= 1) || !("SLOW" in feed.asked)) return
+      badWatch.stop()
+      harness.badSeen = true
+      harness.badWaited = "FAIL" in feed.userAsked
+      ticker.start()
+    }
   }
 
   // MSFT's answer is in and SLOW's still out: MSFT is asked for again.

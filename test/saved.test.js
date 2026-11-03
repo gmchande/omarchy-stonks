@@ -1169,6 +1169,9 @@ test("a published closure is closed, whatever Yahoo's periods say", () => {
   // every form keeps the time.
   expect(M.statusForms(fakeOpen, labor, 0, calendars)).toEqual(["Labor Day · opens Tue 09:30", "Closed · opens Tue 09:30", "Opens Tue 09:30"])
   expect(M.statusForms(fakeOpen, labor, 0, null)).toEqual(["Power hour · closes in 1h", "Closes in 1h"])
+  // A held answer that puts the holiday in pre-market sleeps, and is asked on the slow clock.
+  const fakePre = { ...sep4, session: { pre: { start: labor - 3600, end: labor + 3600 }, regular: { start: labor + 3600, end: labor + 7200 }, post: null } }
+  expect([M.marketAsleep(fakePre, false, labor, calendars), quoteCadence(fakePre, labor, 60, false)]).toEqual([true, 900])
 })
 
 test("the bell rings once at a market's open and once at its close, never late, on a holiday, or for a coin", () => {
@@ -1187,6 +1190,8 @@ test("the bell rings once at a market's open and once at its close, never late, 
   expect([bell(fakeOpen, labor - 3630, labor - 3570), bell(fakeOpen, labor + 3570, labor + 3630)]).toEqual(["", ""])
   const day = btc.session.regular
   expect([bell(btc, day.start - 30, day.start + 30), bell(btc, day.end - 30, day.end + 30)]).toEqual(["", ""])
+  // A coin is never in a regular session, which it doesn't have.
+  expect(M.inRegularSession(btc, day.start + 3600, calendars)).toBe(false)
 })
 
 test("freshness keeps quote age, an unanswered ask, and the refresh outcome apart", () => {
@@ -2540,6 +2545,11 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   expect(M.rowModel(open("1920", "2d/7203.t.json"), 0, "pct").changeText).toBe("\u22120.62%")
   const restarted = M.carryClose(JSON.parse(JSON.stringify(M.carryClose(null, open("1910", "2d/7203.t.json"), calendars))), open("1920", "7203.t.json"), calendars)
   expect(M.rowModel(restarted, 0, "pct").changeText).toBe("\u22120.65%")
+  // A one-day answer of Monday before its first trade still reads Friday's move.
+  expect(M.rowModel(M.carryClose(open("1855", "7203.t.json"), open("1903", "7203.t.json"), calendars), 0, "pct").changeText).toBe("\u22120.23%")
+  // An index or a coin keeps Yahoo's previous close, as a US stock does.
+  const kept = kind => M.carryClose(open("1855", "7203.t.json"), { ...open("1920", "7203.t.json"), ...kind }, calendars).prevClose
+  expect([kept({ instrumentType: "INDEX" }), kept({ crypto: true })]).toEqual([3077, 3077])
   // Friday 30 October at 09:26 there, with Friday's first bars: Friday's
   // move, from Thursday's close.
   const after = M.parseChart(fixture("moments/tokyo-2026-10-30-0926/7203.t.json"), cents)
@@ -2879,6 +2889,11 @@ test("a quote held from an earlier day trades by its calendar, and one answered 
   const russell = { ...gspc, exchange: "WCB" }
   expect(quoteCadence(russell, thursday, 60, false)).toBe(900)
   expect(quiet(russell, at("2026-10-07", "20:30"), at("2026-10-07", "22:00"))).toBe(0)
+  // Answered within 15 minutes of its close, its late prints may still land, though Yahoo's next period is a day off.
+  const russellClose = gspc.session.regular.end
+  const russellNext = { ...russell, current: { pre: null, regular: { start: gspc.session.regular.start + DAY, end: russellClose + DAY }, post: null } }
+  expect([quiet(russellNext, russellClose + 300, russellClose + 600), quiet(russellNext, russellClose + 1200, russellClose + 1500)])
+    .toEqual([0, russellNext.current.regular.start])
   // London's calendar has no pre-market, but Yahoo's period for it does:
   // answered at 03:50 on Monday 26 October, in that pre-market, SHEL.L may
   // still move, and is asked on its cadence.
@@ -2886,6 +2901,9 @@ test("a quote held from an earlier day trades by its calendar, and one answered 
   expect(quiet(shelPre, at("2026-10-26", "03:50"), at("2026-10-26", "03:56"))).toBe(0)
   // A cryptocurrency always trades.
   expect(quiet(btc, btc.session.regular.end + 3600, btc.session.regular.end + 7200)).toBe(0)
+  // Whatever period Yahoo says comes next for it.
+  const btcNext = { ...btc, current: { pre: null, regular: { start: btc.session.regular.end + DAY, end: btc.session.regular.end + 2 * DAY }, post: null } }
+  expect(quiet(btcNext, btc.session.regular.end + 3600, btc.session.regular.end + 7200)).toBe(0)
 })
 
 test("the header's animal sleeps while its market does: by phase and calendar, never by the data's age", () => {

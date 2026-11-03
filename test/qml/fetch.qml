@@ -626,12 +626,18 @@ Harness {
       openWindow()
       remove("YAHOO.refuse")
       var recovered = 0
+      var announced = false
+      var noteRefreshing = function() { if (service.refreshing) announced = true }
+      service.refreshingChanged.connect(noteRefreshing)
       tick(180, 1, function() { if (!recovered && service.testYahooGate.pause === "" && idle() && Object.keys(service.asked).length === 0) recovered = service.now })
+      service.refreshingChanged.disconnect(noteRefreshing)
       var refused = harness.yahoo(harness.requests().slice(refusedFrom)).filter(function(l) { return / 429$/.test(l) })
       harness.check("Yahoo back: the next lone request reopens it, the next run carries everything, and the marks clear",
         recovered > 0 && marks().length === 0, (recovered ? recovered - askedAt : "never") + " s | " + marks().join(" | "))
       harness.check("through the refusal, one request per pause: one alone before the one that found Yahoo back",
         refused.length === 1, refused.join(", "))
+      // r while Yahoo refused waits on nothing: what it asked for goes once Yahoo is back, unannounced.
+      harness.check("what r asked for while Yahoo refused goes once Yahoo is back without saying Refreshing", !announced, String(announced))
 
       // Back within seconds of the network, as after a wake: it goes
       // with the next run, and comes back 10 s later. A search's preview
