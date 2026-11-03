@@ -7,18 +7,25 @@
 # STONKS_FAKE_STATE/pw-cat.exit present it ends on its own, logging
 # "exited MS", as pw-cat does when PipeWire restarts. It waits in short
 # sleeps, so a kill that skips its trap leaves nothing behind for long.
+# It reads the clock without starting a process: Stonks' timeout kills it
+# 1 s after asking it to stop, and on a busy machine a `date` started in its
+# trap can take longer, which loses the "stopped" line and leaves the stream
+# reading as running.
 log="$STONKS_FAKE_STATE/pw-cat.log"
-ms() { echo $(( $(date +%s%N) / 1000000 )); }
-trap 'echo "stopped $(ms)" >> "$log"; exit 0' TERM INT
-echo "start $(ms) $*" >> "$log"
+ms() { local t=${EPOCHREALTIME/[.,]/}; REPLY=${t%???}; }
+trap 'ms; echo "stopped $REPLY" >> "$log"; exit 0' TERM INT
+ms
+echo "start $REPLY $*" >> "$log"
 sleep 0.1
 if [ ! -e "$STONKS_FAKE_STATE/pw-cat.exit" ]; then
-  echo "streaming $(ms)" >> "$log"
+  ms
+  echo "streaming $REPLY" >> "$log"
   echo "stream state changed paused -> streaming" >&2
 fi
 while :; do
   if [ -e "$STONKS_FAKE_STATE/pw-cat.exit" ]; then
-    echo "exited $(ms)" >> "$log"
+    ms
+    echo "exited $REPLY" >> "$log"
     exit 1
   fi
   sleep 0.2
