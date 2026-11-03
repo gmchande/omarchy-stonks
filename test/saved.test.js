@@ -2041,7 +2041,7 @@ test("in every phase, a stock that has traded since its close shows that newest 
   // price's session and time, so the week's move never reads as the
   // night's beside the row's; a scrub at the line's end reading it, and the
   // range's low taking it. The range's volume stays Yahoo's bars'.
-  for (const [set, moment, when] of [["watch-2026-10-25-2335", "2026-10-25-2335", "OVERNIGHT 23:30"], ["watch-2026-10-26-2005", "2026-10-26-2005", "OVERNIGHT 20:00"]]) {
+  for (const [set, moment, when, day] of [["watch-2026-10-25-2335", "2026-10-25-2335", "OVERNIGHT 23:30", "25 OCT"], ["watch-2026-10-26-2005", "2026-10-26-2005", "OVERNIGHT 20:00", "26 OCT"]]) {
     const at = topsAt(set)
     const top = M.rowModel(at.quotes.NBIS, 0, "pct", at.newest.NBIS)
     for (const [range, span] of [["1W", "5d"], ["1M", "1mo"], ["1Y", "1y"]]) {
@@ -2057,7 +2057,7 @@ test("in every phase, a stock that has traded since its close shows that newest 
       expect([where, M.historyRowModel(history, at.quotes.NBIS, at.newest.NBIS.t).priceText]).toEqual([where, top.priceText])
       // The range line marks the newest price's place, and a scrub names it by its day and time.
       expect([where, M.rangeLine(history, M.rangeEnds(history), at.quotes.NBIS).range.price]).toEqual([where, at.newest.NBIS.p])
-      expect([where, M.historyScrubForms(history, history.bars.at(-1))[1].endsWith(when.slice(-5))]).toEqual([where, true])
+      expect([where, M.historyScrubForms(history, history.bars.at(-1))[1]]).toEqual([where, `${day}${range === "1Y" ? " 2026" : ""} ${when.slice(-5)}`])
       expect([where, M.rangeVolume(history)]).toEqual([where, M.rangeVolume(raw)])
     }
   }

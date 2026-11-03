@@ -95,10 +95,11 @@ function laneJudging(toJudge, asked, held) {
   return toJudge.filter(function(s) { return !(s in asked) && held.indexOf(s) < 0 })
 }
 
-// A batch of one is a chart: one request either way, and a chart has
-// opens. A coin's open is its price 24 hours ago, read from the closes, but
-// it asks for two days (`Market.twoDays`), and a batch asks two days for
-// all when one wants two, so coins batch apart from stocks.
+// A stock's batch of one is a chart: one request either way, and a chart
+// has opens; a coin's stays spark, even alone. A coin's open is its price 24
+// hours ago, read from the closes, but it asks for two days
+// (`Market.twoDays`), and a batch asks two days for all when one wants two,
+// so coins batch apart from stocks.
 function quoteSlots(waiting, asked, symbols, lead, heroes, bulk, coins) {
   var order = waiting.slice().sort(function(a, b) {
     return (b === lead) - (a === lead) || asked[a] - asked[b] || symbols.indexOf(a) - symbols.indexOf(b)

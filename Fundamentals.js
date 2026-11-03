@@ -74,7 +74,7 @@ function capCloseUrl(symbol, figures) {
     + "&period2=" + (dateEpoch(figures.cap.date) + 2 * 24 * 60 * 60)
 }
 
-// Null without the cap's close, so the feed keeps what it had.
+// Null without the cap's close: the new EPS stands and the cap goes unknown.
 function withCapClose(figures, json) {
   var result = json && json.chart && json.chart.result && json.chart.result[0]
   if (!result || !result.meta) return null
@@ -140,9 +140,9 @@ function peText(value) {
 // first day. Elsewhere a trade Stonks shows past Yahoo's marks widens them,
 // as the day does: Yahoo's 52 weeks leave out the night and the hours around
 // the session. A longer range never stands in: its ends can be older than a
-// year. Prices compare at the listing's decimals, so float noise never
-// passes a mark. The cap and P/E slots stay while unknown, so the line keeps
-// its shape.
+// year. Trades, and on 1Y the day's high and low, compare at the listing's
+// decimals, so float noise never passes a mark. The cap and P/E slots stay
+// while unknown, so the line keeps its shape.
 function yearLine(quote, figures, yearEnds, rates, trades) {
   if (!quote) return null
   var q = quote

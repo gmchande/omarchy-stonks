@@ -272,8 +272,8 @@ function yahooHole(quote) {
 }
 
 // The prints in hand may stop at the night's end, short of Yahoo's empty
-// stretch. Asked once Robinhood's bar for its last slot is in: any answer
-// from then on settles it.
+// stretch. Asked once Robinhood's bar for its last slot is in; a failed
+// answer is asked again OVERNIGHT_INTERVAL later.
 function holeDue(hole, entry, now) {
   var due = hole + OVERNIGHT_LAG
   if (now < due || (entry.through !== null && entry.through >= hole)) return false

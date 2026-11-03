@@ -36,7 +36,7 @@ function sessionPhase(quote, t) {
     return "open"
   }
   if (s.post && t >= s.post.start && t < s.post.end) return "post"
-// Saudi's exchange trades on Sunday.
+  // Saudi's exchange trades on Sunday.
   var day = function(at) { return Math.floor((at + Quote.clockAt(quote, at).offset) / 86400) }
   var weekend = (local.weekday === 0 || local.weekday === 6) && day(t) !== day(s.regular.start)
   return weekend ? "weekend" : "closed"
@@ -280,15 +280,15 @@ function statusForms(quote, now, scrubT, calendars, overnight) {
     var reopens = "reopens " + calendarClock(cal, brk, quote)
     return ["Lunch break · " + reopens + " · in " + Format.duration(brk - now), "Lunch break · " + reopens, sentence(reopens)]
   }
-// The calendar's clock today, not the held answer's, which may be from
-// before a change of clocks.
+  // The calendar's clock today, not the held answer's, which may be from
+  // before a change of clocks.
   var held = !overnight && !isTrading(sessionPhase(quote, now)) ? calendarRegular(cal, now) : null
   var q = held ? Object.assign({}, quote, { session: { pre: null, regular: held, post: null }, current: null,
     clocks: [], gmtoffset: localDate(now, cal).offset }) : quote
   var phase = overnight ? "overnight" : sessionPhase(q, now)
   var bell = secondsToBell(q, now) || indexBell(quote, cal, now)
   var kind = cal ? dayKind(cal, dateStringOf(localDate(now, cal))) : null
-// On a holiday Yahoo may still send a session nobody trades.
+  // On a holiday Yahoo may still send a session nobody trades.
   var closure = !overnight && kind && kind.kind === "closure"
   if (!closure && bell && bell.bell === "close") {
     var named = phase === "opening" || phase === "lunch" || phase === "power" || phase === "closing"
@@ -461,8 +461,8 @@ function carryClose(previous, quote, calendars) {
   if (!quote || quote.crypto || quote.instrumentType === "INDEX" || !quote.session.regular) return quote
   var cal = calendarFor(calendars, quote)
   if (cal && cal.pre) return quote
-// The next quote reads the close from this one, so an unchanged answer
-// after the bell stays unchanged.
+  // The next quote reads the close from this one, so an unchanged answer
+  // after the bell stays unchanged.
   var seen = previous && !sessionClose(quote) ? sessionClose(previous) || previous.closeSeen || null : null
   if (!seen) return quote
   var reg = quote.session.regular

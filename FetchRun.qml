@@ -4,7 +4,7 @@ import "Fetch.js" as Fetch
 // Every request Stonks sends goes through a FetchRun: one curl at a time.
 // The gate hears the answers (`Gate.report`) before the feed reads the
 // last, so whatever a request sent alone after a pause sets off finds the
-// host open again.
+// gate as that answer left it.
 Item {
   id: root
 

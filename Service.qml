@@ -37,7 +37,7 @@ Item {
     root.lastRemoval = null
   }
   // Added symbols with no first answer yet, quote or failure: saved and
-  // fetched, but in no list until it comes.
+  // fetched, but no list shows them until it comes.
   property var arriving: []
   // { symbol, before }: the hero an add from search took before its first
   // answer, and the one it left.
@@ -713,9 +713,10 @@ Item {
   }
   property bool opening: false
 
-  // While a chart draws in, the feeds read no answer, so reading never
-  // stutters it. Only an open surface counts: one taken down mid-draw-in,
-  // as a rebuilt bar takes its panel, can start its draw-in again as it goes.
+  // While a chart draws in, the quote and night feeds read no answer, so
+  // reading never stutters it. Only an open surface counts: one taken down
+  // mid-draw-in, as a rebuilt bar takes its panel, can start its draw-in
+  // again as it goes.
   property var drawing: []
   function drawingIn(surface, running) {
     var others = root.drawing.filter(function(s) { return s !== surface })
