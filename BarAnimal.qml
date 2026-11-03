@@ -2,12 +2,9 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import "Cells.js" as Cells
-// The pill's icon form: the day's bull or bear in the header's cells
-// (`Cells.spriteFor`), the bull in up's colour and the bear in down's.
-// A day that turns (`turnTo`) steps it to the other animal left to right in
-// 200 ms, each column taking the new animal's cells and colour as it turns;
-// a turn reversed mid-step turns back from where it is. At rest, and after
-// `settle`, it is simply `kind`, and nothing at all for "".
+// The pill's icon form: the day's bull or bear in the header's cells, in the up
+// or the down colour. A day that turns (`turnTo`) steps it to the other animal
+// left to right in 200 ms, column by column.
 Item {
   id: root
   property string kind: ""
@@ -17,8 +14,8 @@ Item {
   readonly property int columns: Cells.BULL_SPRITE[0].length
   readonly property int rows: Cells.BULL_SPRITE.length
 
-  // While a turn steps: the columns left of `turnedColumns` show
-  // `turnKind`, the rest `fromKind`.
+  // Mid-turn, the columns left of `turnedColumns` show `turnKind`, the rest
+  // `fromKind`.
   property real turn: 1
   readonly property bool turning: step.running
   readonly property int turnedColumns: turning ? Math.round(turn * columns) : columns
@@ -27,10 +24,9 @@ Item {
 
   NumberAnimation { id: step; target: root; property: "turn"; duration: 200; easing.type: Easing.OutCubic }
 
-  // The day now reads `now`, after `was`. Only the bull and the bear turn
-  // into each other: to or from no animal, or out of sight, it changes at
-  // once. Mid-step, the turn heads for the new animal: back toward where it
-  // came from, or on, never queued.
+  // Only the bull and the bear turn into each other: to or from no animal, or
+  // out of sight, it changes at once. A turn reversed mid-step heads back from
+  // where it is, never queued.
   function turnTo(now, was) {
     var to
     if (now === "" || !visible) return settle()
@@ -51,7 +47,6 @@ Item {
     step.start()
   }
 
-  // At once to `kind`: another symbol, or the animal hidden.
   function settle() {
     step.stop()
     turn = 1
@@ -63,7 +58,6 @@ Item {
   implicitWidth: columns * cell
   implicitHeight: rows * cell
 
-  // The animal at rest, or the columns a turn has reached.
   Item {
     readonly property string shows: root.turning ? root.turnKind : root.kind
     visible: shows !== ""
@@ -82,7 +76,6 @@ Item {
     }
   }
 
-  // The columns a turn has yet to reach.
   Item {
     visible: root.turning
     x: root.turnedColumns * root.cell

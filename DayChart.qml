@@ -2,15 +2,13 @@ import QtQuick
 import qs.Commons as Commons
 import "Chart.js" as Chart
 import "Tones.js" as Tones
-// The hero chart, one rule for the day and every range: a dashed baseline at
-// the price the change is measured from, and the line and the area between
-// it and the baseline in the up colour above and the down colour below, the
-// way the retro columns fall. The day adds its own furniture: the dimmer
-// hours, all but what trades now or else the session, the ticks at the
-// bell and the night's edges, a line that starts again after a break in
-// the exchange's day, and the dot on the newest bright print.
-// Three layers, so each paints only when what it draws changes: the
-// baseline, the data's ink under a clip the draw-in widens, and the scrub.
+// The smooth chart, one rule for the day and every range: a dashed baseline at
+// the price the change is measured from, and the line and its wash in the up
+// colour above it and the down colour below, as the retro columns fall. The day
+// adds dimmer hours, ticks at the bell and the night's edges, breaks, and the
+// dot on the newest bright print. Three layers, so each paints only when what
+// it draws changes: the baseline, the ink under a clip the draw-in widens, and
+// the scrub.
 Item {
   id: root
 
@@ -22,31 +20,26 @@ Item {
   property var up: true
   // 0..1 along the axis, or -1 when not scrubbing.
   property real scrubX: -1
-  // How much of the ink has been drawn, 0..1. The baseline is always there;
-  // the line draws in from the left edge to the newest drawn print, and at
-  // 1 the whole chart shows.
+  // The baseline is always there; the ink draws in from the left to the
+  // newest print.
   property real reveal: 1
-  // A replay's place along the plot, 0..1, or -1 without one: the line draws
-  // in behind it, in the plot's own terms.
+  // A replay's place, 0..1, or -1 without one: the ink draws in behind it.
   property real replayX: -1
-  // The dot ripples while the market trades, the way Apple's does: three
-  // times as a new price arrives (`newestPrice`, the newest print's) or the
-  // surface opens, then it rests.
+  // The dot ripples while the market trades, as Apple's does: three times as a
+  // new price arrives or the surface opens, then it rests.
   property bool live: false
   property string newestPrice: ""
   property bool surfaceOpen: true
-  // A closing surface: the live mark stops where it is, as the rest of the
-  // surface does; it ripples again as the surface opens.
+  // Closing: the live mark stops where it is, and ripples again as the surface
+  // opens.
   property bool still: false
   // The surface under the chart, which the wash is seen against.
   property color ground: Commons.Color.background
-  // The size of every stroke, the dot, and the pad, as a multiple of the
-  // screen's: the screenshot lays its chart out at the picture's pixels,
-  // 2 to its unit (`ShareCard`).
+  // A multiple of every stroke, the dot and the pad: the screenshot lays its
+  // chart out at 2 (`ShareCard`).
   property real weight: 1
-  // The baseline's dashes, which Canvas also multiplies by the line's
-  // width: the weight, or the picture's 2 on a screen of any scale, so the
-  // screenshot's dashes are the same length on each (`ShareCard`).
+  // Canvas multiplies the dashes by the line's width too: the picture's 2 on a
+  // screen of any scale keeps them one length (`ShareCard`).
   property real dashUnit: weight
 
   readonly property bool directionKnown: typeof up === "boolean"
@@ -60,16 +53,14 @@ Item {
   readonly property bool drawable: !!geometry && !!geometry.points && geometry.points.length >= 1
   // The baseline draws with no print too, as on a day nobody traded.
   readonly property bool hasBaseline: !!geometry && typeof geometry.baselineY === "number" && isFinite(geometry.baselineY)
-  // Where the ink ends, in pixels: the newest drawn print and its dot (the
-  // line's width and a half, and a pixel). The draw-in sweeps to here.
+  // The draw-in sweeps to the newest print's dot: the line's width and a half,
+  // and a pixel.
   readonly property real inkLast: drawable ? geometry.points[geometry.points.length - 1].x : 0
   readonly property real inkRight: Math.min(width, pad + inkLast * (width - pad * 2) + 4)
-  // How far the ink has drawn in, in pixels: what is laid over the ink
-  // draws in with it (`RangeMarks`).
+  // What is laid over the ink draws in with it (`RangeMarks`).
   readonly property real inkDrawn: curtain.width
-  // The wash: the up colour's at 16%, and each side at the alpha that adds
-  // the same lightness over the ground (`Tones.washAlpha`), so a down day's
-  // reads as strongly as an up day's; never more than half the line's ink.
+  // Each side's wash adds the lightness the up colour's does at 16%
+  // (`Tones.washAlpha`), so a down day's reads as strongly as an up day's.
   readonly property real aboveWash: Tones.washAlpha(aboveColor, upColor, ground, 0.16, 1)
   readonly property real belowWash: Tones.washAlpha(belowColor, upColor, ground, 0.16, 1)
 
@@ -90,11 +81,9 @@ Item {
     return pad + fraction * (width - pad * 2)
   }
 
-  // How high and low the ink reaches between `x0` and `x1`, in pixels: the
-  // prints there and the nearest either side, which the line joins to
-  // them, each with the line's half width, or a lone print's dot
-  // (`strokeRuns`); and the baseline, which runs the whole
-  // width. What is laid over the chart keeps clear of it (`RangeMarks`).
+  // The prints between `x0` and `x1` and the nearest either side, which the
+  // line joins to them, each with its half width or a lone print's dot, and
+  // the baseline. What is laid over the chart keeps clear of it (`RangeMarks`).
   function inkExtentIn(x0, x1) {
     var g = geometry
     var h = height - pad * 2
@@ -116,9 +105,8 @@ Item {
     return { top: top, bottom: bottom }
   }
 
-  // The ticks: a mark on the baseline at the bell, and at the night's
-  // edges. Those the line has reached draw in with it; those ahead of the
-  // newest print, in the hours still to come, are there with the baseline.
+  // Ticks the line has reached draw in with it; those ahead, in hours still to
+  // come, are there with the baseline.
   function strokeTicks(ctx, by, ahead) {
     var w = width - pad * 2
     ctx.strokeStyle = baselineColor
@@ -156,7 +144,6 @@ Item {
     }
   }
 
-  // The draw-in widens this clip over ink that is already painted.
   Item {
     id: curtain
     width: root.replayX >= 0 ? root.width * Math.min(1, root.replayX)
@@ -181,15 +168,13 @@ Item {
         var w = width - pad * 2
         var h = height - pad * 2
         var by = pad + geometry.baselineY * h
-        // Everything up to the last regular print, the hours before it
-        // included: that is the day the fill is about. A range has no
-        // extended prints, so it is all of it.
+        // The fill is about the day up to its last regular print. A range has
+        // no extended prints.
         var lastRegular = -1
         for (var n = 0; n < pts.length; n++) if (!pts[n].ext) lastRegular = n
         var filled = runs(pts.slice(0, lastRegular + 1), function() { return true })
 
-        // The wash runs from the line to the baseline: with no previous
-        // close known there is none, and only the line draws.
+        // With no previous close known there is no wash, only the line.
         ctx.fillStyle = sides(ctx, by, root.aboveWash, root.belowWash)
         for (var r = 0; root.hasBaseline && r < filled.length; r++) {
           var run = filled[r]
@@ -205,21 +190,17 @@ Item {
         ctx.lineJoin = "round"
         ctx.lineCap = "round"
         ctx.lineWidth = 2 * root.weight
-        // The whole series in dim ink, then what is bright over it in full
-        // ink (`dim`, `Chart.chartGeometry`): the regular session, or what
-        // trades now, so the rest reads as the quieter part of one
-        // continuous line.
+        // The whole series in dim ink, then the bright part over it (`dim`),
+        // so the rest reads as the quieter part of one line.
         ctx.strokeStyle = sides(ctx, by, 0.45, 0.45)
         strokeRuns(ctx, runs(pts, function() { return true }), pad, w, h)
         ctx.strokeStyle = sides(ctx, by, 1, 1)
         strokeRuns(ctx, runs(pts, function(p) { return !p.dim }), pad, w, h)
 
-        // The ticks the line has reached draw in with it, on the baseline.
         if (root.hasBaseline) root.strokeTicks(ctx, by, false)
       }
 
-      // The stretches the line joins: a point that `keep` refuses, or one
-      // that starts again after a break (`brk`, Tokyo's lunch), ends a stretch.
+      // A point `keep` refuses, or a break (`brk`), ends a stretch.
       function runs(pts, keep) {
         var out = []
         var run = []
@@ -234,11 +215,10 @@ Item {
         return out
       }
 
-      // The above colour over the baseline and the below colour under it, in
-      // one pass: stroking each line twice, clipped to each side, doubles the
-      // paint. Two stops at one offset merge, so the second sits a hair below.
-      // The line's dim ink is one share of its own colour on both sides: it
-      // reads against the full line beside it, not against the other side.
+      // One gradient for both sides: stroking each line twice, clipped to each
+      // side, doubles the paint. Two stops at one offset merge, so the second
+      // sits a hair below. The dim ink is one share of its own colour: it reads
+      // against the full line beside it, not against the other side.
       function sides(ctx, by, aboveAlpha, belowAlpha) {
         var stop = Math.max(0, Math.min(1, by / height))
         var g = ctx.createLinearGradient(0, 0, 0, height)
@@ -247,10 +227,9 @@ Item {
         return g
       }
 
-      // A stretch of one print, a day's only one or one alone beside a
-      // break, is a dot three times the line's width, in its session's tone,
-      // so it reads at a glance. It never breathes: that is the live dot's
-      // alone.
+      // A lone print, a day's only one or one beside a break, is a dot three
+      // times the line's width, so it reads at a glance. It never breathes:
+      // that is the live dot's alone.
       function strokeRuns(ctx, lines, pad, w, h) {
         for (var r = 0; r < lines.length; r++) {
           var line = lines[r]
@@ -304,21 +283,18 @@ Item {
     }
   }
 
-  // The dot on the last regular print lives outside the canvas so it can
-  // ripple without repainting the line: a core, and a halo that grows out
-  // and fades. While the market is open a new price, or the dot's first
-  // showing (an open, a new chart, the end of a draw-in), starts three
-  // ripples, about 6 s, and a newer price during them starts the three
-  // over; then the halo rests as it does with the market closed. A range
-  // has no dot: its last bar need not be the headline print.
+  // Outside the canvas, so it ripples without repainting the line. While the
+  // market is open, a new price or the dot's first showing (an open, a new
+  // chart, a draw-in's end) starts three ripples, about 6 s, and a newer price
+  // starts them over. A range has no dot: its last bar need not be the
+  // headline print.
   Item {
     id: dot
     visible: root.day && root.lastPoint !== null && root.reveal >= 1 && root.replayX < 0
     x: root.lastPoint ? root.pad + root.lastPoint.x * (root.width - root.pad * 2) : 0
     y: root.lastPoint ? root.pad + root.lastPoint.y * (root.height - root.pad * 2) : 0
-    // Hidden mid-ripple by an open's draw-in, it owes them still, and
-    // ripples once it shows; any other hide, a sheet over it, stops them
-    // for good.
+    // Hidden mid-ripple by an open's draw-in, it owes them and ripples once it
+    // shows; any other hide, as a sheet over it, stops them.
     onVisibleChanged: {
       if (visible) root.ripple()
       else {
@@ -360,18 +336,17 @@ Item {
     }
   }
 
-  // The price the last ripples were for, and an open's ripples owed until
-  // the dot can show them (`opening`, from the open until its ripples
-  // stop): a scrub's end, a sheet closing, or the market turning live again
-  // with the price the dot already rippled for starts nothing.
+  // A scrub's end, a sheet closing, or the market turning live again with the
+  // price already rippled for starts nothing. `opening` lasts from the open
+  // until its ripples stop.
   property string rippledPrice: ""
   property bool rippleOwed: false
   property bool opening: false
   function ripple() {
     if (!root.live || !dot.visible || root.still) return
     if (!root.rippleOwed && root.newestPrice === root.rippledPrice) return
-    // The restart's stop of a paused burst would end `opening`: an open's
-    // ripples keep it, whichever of the open's changes starts them.
+    // A restart's stop of a paused burst would end `opening`; an open's
+    // ripples keep it.
     var opening = root.opening
     root.rippleOwed = false
     root.rippledPrice = root.newestPrice

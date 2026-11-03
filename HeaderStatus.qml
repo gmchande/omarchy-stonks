@@ -4,60 +4,41 @@ import qs.Commons as Commons
 import qs.Ui
 import "Cells.js" as Cells
 import "Tones.js" as Tones
-// The animal, the stock's name over the live status, the sounds, the
-// camera, the look, and the help mark, with a rule under them, as a shell
-// panel's hero has: an icon, a bold title, and its state in small capitals.
-// Surfaces own the actions; this only draws and signals. The animal is the
-// day's bull or bear in cells (`Cells.spriteFor`), the same in both looks,
-// in one slot the status words start after, drawn or not, so neither the
-// look nor a flat day moves them. While its market rests it sleeps: eyes
-// shut and a dim "z" just past the slot, above the words. The height is the
-// slot's in both looks, and the look is one small icon in both, so toggling
-// moves nothing. Each icon on the right says on hover what a click does,
-// in the shell's own tooltip, under the icon and inside the card, covering
-// what is there while the pointer rests: a panel hangs from a top bar, at
-// the screen's top, with no room above. The animal has none.
+// The header: the animal, the stock's name over its status, the speaker, the
+// camera, the look and the ?, with a rule under them, as a shell panel's hero
+// has. The words start after the animal's slot, drawn or not, so neither the
+// look nor a flat day moves them. Each icon's tip hangs under it, inside the
+// card: a panel hangs from a top bar, with no room above.
 Item {
   id: root
 
-  // The words, then the same said in less, each form shorter than the one
-  // before (`StonksBody.headerForms`), up to three: where one doesn't fit,
-  // the next shows.
+  // The words, then up to two shorter forms of them (`StonksBody.headerForms`):
+  // the first that fits shows.
   property var statusForms: []
-  // The stock's name, over the status words. Its line stays while there is
-  // none, so a name arriving moves nothing.
+  // Its line stays while there is none, so a name arriving moves nothing.
   property string title: ""
-  // Whether the title's line and the rule show: the body gives them way
-  // where large text on a short screen would leave fewer than three rows
-  // beside the chart's least (`StonksBody.headerTitled`), and the header is
-  // the words alone on one line, the name back on the hero's.
+  // False where large text on a short screen would leave fewer than three rows
+  // beside the chart (`StonksBody.headerTitled`): the words stand alone, and the
+  // name goes on the hero's line.
   property bool titled: true
-  // The words say a range failed, and its button asks again, as r does.
+  // A range failed; the button asks again, as r does.
   property bool offersRetry: false
   property bool retro: false
-  // The sounds are on: the speaker shows its waves, or, off, a cross.
   property bool soundsOn: false
-  // The animal, as the body decides it: `kind` "bull", "bear", or "" (a
-  // flat day, or no direction yet), and `chart`, what it reads. A turn of
-  // the same chart crossfades in smooth; any other change, and every one in
-  // retro, is at once. `asleep`, its market resting, and `bell`, the clock
-  // alone put it to sleep or woke it: then, on the same chart, the eyes
-  // close or open over 320 ms; any other change of sleep is at once.
-  // `scrubbed`: a scrub has it awake, so the sleep that follows its end is
-  // no bell.
+  // `kind` is "bull", "bear" or "" (a flat day, or no direction yet), and
+  // `chart` what it reads: a turn on the same chart crossfades in smooth, any
+  // other change is at once. `asleep` is its market resting; `bell`, that the
+  // clock alone changed that, so the eyes close or open over 320 ms;
+  // `scrubbed`, that a scrub has it awake, so the sleep after it is no bell.
   property var animal: ({ kind: "", chart: "", asleep: false, bell: false, scrubbed: false })
   property bool scrubbing: false
   property bool live: false
-  // The words say prices stopped (`StonksBody.troubleForms`): at full
-  // strength, so they stand out with no colour, since red says down.
+  // In full ink, standing out without colour, since red says down.
   property bool trouble: false
-  // The surface is closing: the look icon's step and the animal's turn stop
-  // where they are.
+  // Closing: the look icon's step and the animal's turn stop where they are.
   property bool still: false
-  // The key sheet shows, so a click on ? hides it.
   property bool helpShown: false
-  // A screenshot was taken on this visit: the camera stays lit until the
-  // surface closes.
+  // Lit from a screenshot until the surface closes.
   property bool cameraLit: false
   property color foreground: Commons.Color.foreground
   property color dim: Tones.dim(foreground, Commons.Color.background)
@@ -67,14 +48,13 @@ Item {
   property string fontFamily: Style.font.family
 
   readonly property string kind: animal ? animal.kind : ""
-  // The chart the animal last showed, by which a change is a turn.
+  // The chart the animal last showed: a change on it is a turn.
   property string shownChart: ""
-  // The sleep last shown, and whether a scrub had it awake.
   property bool shownAsleep: false
   property bool shownScrubbed: false
-  // How far the eyes have closed, 0 to 1, evenly in time, and whether they
-  // last moved open: a wake steps from shut, so the cells show the lids
-  // half way at the middle of either move (`lids`: 0 open, 1 half, 2 shut).
+  // How far the eyes have closed, 0 to 1, evenly in time. A wake steps from
+  // shut, so the lids are half way at the middle of either move (`lids`: 0
+  // open, 1 half, 2 shut).
   property real closing: 0
   property bool waking: false
   readonly property real moved: waking ? 1 - closing : closing
@@ -88,16 +68,11 @@ Item {
   signal replayRequested()
   signal retryRequested()
 
-  // At rest as a surface opens: the icon on the look, the animal on what
-  // it reads.
   function settle() {
     lookIcon.settle()
     show(false)
   }
 
-  // The layers to the animal: crossfading in smooth when it turns on the
-  // chart it showed, from wherever a turn under way has them; else at
-  // once. Its sleep as `sleep` decides.
   function show(fade) {
     var k = animal ? animal.kind : ""
     shownChart = animal ? animal.chart : ""
@@ -112,9 +87,8 @@ Item {
     sleep(fade)
   }
 
-  // The eyes close or open over 320 ms at the bell, `fade` allowing, unless
-  // a scrub let go is what puts it to sleep; a move under way runs on
-  // through a turn. Any other change is at once.
+  // Asleep after a scrub is let go is at once, never the bell's close; a move
+  // under way runs on through a turn.
   function sleep(fade) {
     var asleep = !!(animal && animal.asleep)
     var afterScrub = shownScrubbed
@@ -140,18 +114,16 @@ Item {
 
   NumberAnimation { id: shutting; target: root; property: "closing"; duration: 320 }
 
-  // An icon's tip, 3 px under its target, centred on it but never past the
-  // header's right edge. Declared in the target, inside its icon.
+  // 3 px under its target, centred, but never past the header's right edge.
   component HeaderTip: PanelToolTip {
     readonly property Item icon: parent.parent
     y: parent.height + 3
     x: Math.min((parent.width - implicitWidth) / 2, icon.parent.width - icon.x - parent.x - implicitWidth)
   }
 
-  // The title and the words, then the rule, a band's gap short of a group's
-  // under them, so the group's gap the body leaves after the header makes
-  // the gap below the rule the gap above it. The rest centre on the two
-  // lines, not on the rule.
+  // The rule sits a band's gap short of a group's under the two lines, so with
+  // the group's gap the body leaves after the header, the gap below it matches
+  // the one above. The icons centre on the two lines, not on the rule.
   readonly property int twoLines: Math.max(Style.space(28),
     titleText.implicitHeight + Style.space(2) + statusWords.implicitHeight)
   readonly property int ruleGap: Style.space(14)
@@ -208,9 +180,8 @@ Item {
     }
   }
 
-  // Asleep, a small dim "z" in cells over the animal's back, just past its
-  // slot, coming in as the eyes shut. It sits at the header's top, never
-  // above it: the panel's body starts there and clips what draws past it.
+  // At the header's top, never above: the panel's body starts there and clips
+  // what draws past it.
   PixelSprite {
     objectName: "sleepCells"
     readonly property int cell: Math.floor(Math.min(slot.width / 20, slot.height / 14))
@@ -225,21 +196,16 @@ Item {
     color: root.dim
   }
 
-  // Live is said by the chart's breathing dot and by these words in the
-  // foreground; a mark in front of them would push them over each time it
-  // came and went, with every range change and every scrub. A failed
-  // range's retry follows them. They start twice as far from the sleeping
-  // z as the bull is, so it reads as the animal's and not as a mark on the
-  // first word, and stop as much sooner, so their room is the same. The
-  // first form that fits that room shows: with its letters spaced, else
-  // closed up. Without this, beside the speaker and the camera, Tokyo's
-  // Constitution Memorial Day loses its name in the panel at the everyday
-  // text size, and after hours at size 16 loses its time.
+  // Live shows as the chart's breathing dot and these words in full ink: a
+  // mark before them would push them over at every range change and scrub.
+  // They start twice as far from the z as the bull is, so it reads as the
+  // animal's, and stop as much sooner. The first form that fits shows, letters
+  // spaced, else closed up, so beside the icons Tokyo's "Constitution Memorial
+  // Day" keeps its name at the everyday text size.
   readonly property real wordsRoom: Math.max(0, soundIcon.x - Style.space(8) - statusWords.x
     - (root.offersRetry ? retry.implicitWidth + Style.space(16) : 0))
   readonly property var measured: [form0, form1, form2].slice(0, statusForms.length)
-  // The form on show (`form`) and whether its letters close up (`tight`);
-  // where none fits, the last, closed up and cut.
+  // Where none fits, the last, closed up and cut.
   readonly property var fit: {
     for (var i = 0; i < measured.length; i++) {
       if (measured[i].spaced <= wordsRoom) return { form: i, tight: false }
@@ -247,8 +213,7 @@ Item {
     }
     return { form: Math.max(0, measured.length - 1), tight: true }
   }
-  // A form's width with its letters spaced and closed up, measured, never
-  // shown.
+  // Measured, never shown.
   component FormWidths: Item {
     property string words: ""
     property string family: ""
@@ -332,17 +297,13 @@ Item {
     onActivated: root.retryRequested()
   }
 
-  // Stonks' own speaker and camera, solid and the same in both looks
-  // (`Cells.SOUND_ON` and the rest), and the look icon, on one grid whose
-  // cell grows with the text (`Cells.iconCell`), so the header's four keep
-  // their weight beside the words at every size; the ? is a word and grows
-  // with them already.
+  // The speaker, the camera and the look icon share a grid whose cell grows
+  // with the text (`Cells.iconCell`), so they keep their weight beside the
+  // words at every size.
   readonly property int cell: Cells.iconCell(Style.fontScale)
 
-  // The sounds as they are, the speaker with its waves, or off with a
-  // cross; a click turns them off or on, as m does. One width on or
-  // off, so the toggle moves nothing. It hovers and presses as the look
-  // icon does, and its target is the header's full height too.
+  // One width on or off, so the toggle moves nothing. Each icon's target is the
+  // height of the header's two lines.
   GridIcon {
     id: soundIcon
     objectName: "soundIcon"
@@ -385,11 +346,6 @@ Item {
     }
   }
 
-  // The camera, which takes a screenshot of the chart on show, as Ctrl+C does:
-  // solid, its lens a hole at rest; once it has taken one, lit in the full
-  // ink with the shot's dot in its lens until the surface closes. It hovers
-  // and presses as the look icon does, its target the header's full
-  // height.
   GridIcon {
     id: camera
     objectName: "camera"
@@ -432,10 +388,7 @@ Item {
     }
   }
 
-  // The look a click switches to, as s does, about a word tall: the chart
-  // already shows the current one. The target is the header's full height,
-  // so a click above or below the icon still lands. Like the `?`, it hovers
-  // in brighter ink, and takes the pressed fill while the button is down.
+  // The look a click switches to: the chart already shows the current one.
   LookIcon {
     id: lookIcon
     objectName: "lookIcon"

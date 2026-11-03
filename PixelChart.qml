@@ -3,14 +3,12 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons as Commons
 import "Tones.js" as Tones
-// The retro chart, one rule for the day and every range: pixel columns fill
-// from the baseline row, the previous close or the period's starting price,
-// in the up colour above it and the down colour below. The day adds the
-// dimmer extended hours, the bell and the night's edges, and the lit last
-// print.
-// The grid and the lit columns are painted when the data changes; the
-// draw-in widens a clip over the columns a whole column at a time, and the
-// bell and the scrub are cells laid over them.
+// The retro chart, one rule for the day and every range: columns of cells
+// fill from the baseline row, in the up colour above it and the down colour
+// below. The day adds dimmer hours, the bell and the night's edges, and the
+// lit last print. The grid and the columns paint when the data changes; the
+// draw-in widens a clip a whole column at a time, and the ticks and the scrub
+// are cells laid over them.
 Item {
   id: root
 
@@ -19,66 +17,54 @@ Item {
   property color downColor: Commons.Color.urgent
   property color baselineColor: Tones.dimmer(Commons.Color.foreground, Commons.Color.background)
   property var up: true
-  // Light the last regular print's cap white. Off for small copies, and a
-  // range has none: its last bar need not be the headline print.
+  // Lights the last regular print's cap. Off for small copies, and a range
+  // has none: its last bar need not be the headline print.
   property bool glow: false
-  // Twinkle that cap while the market trades: white, colour, white, in
-  // steps, the way a sprite blinks; four blinks, about 6 s, as a new price
-  // arrives (`newestPrice`, the newest print's) or the surface opens, as the
-  // smooth dot ripples, then it rests, shown and still.
+  // The cap blinks while the market trades, white, colour, white, as a sprite
+  // does: four blinks, about 6 s, as a new price arrives or the surface opens,
+  // as the smooth dot ripples, then it rests.
   property bool live: false
   property string newestPrice: ""
   property bool surfaceOpen: true
-  // A closing surface: the live mark stops where it is, as the rest of the
-  // surface does; it blinks again as the surface opens.
+  // Closing: the live mark stops where it is, and blinks again as the surface
+  // opens.
   property bool still: false
   property color hairlineColor: Commons.Color.foreground
-  // The unlit cells of the display, the way an LCD shows every segment
-  // faintly. Transparent draws none.
+  // The unlit cells, as an LCD shows every segment faintly.
   property color ghostColor: "transparent"
-  // A cell and the seam after it, in window units: whole pixels of the
-  // screen, or of the picture on a screen of any scale (`ShareCard`).
+  // A cell and the seam after it, in window units, or in pixels of the
+  // picture on a screen of any scale (`ShareCard`).
   property real pixel: 5
   property real gap: 1
   // 0..1 along the axis, or -1 when not scrubbing.
   property real scrubX: -1
-  // How much of the ink has been drawn, 0..1. The grid and baseline are
-  // always there; the lit columns fill in from the left edge to the newest
-  // drawn print's, and at 1 the whole chart shows.
+  // The grid and the baseline are always there; the columns fill in from the
+  // left to the newest print's.
   property real reveal: 1
-  // A replay's place along the plot, 0..1, or -1 without one: the columns
-  // fill in behind it, whole columns of the plot.
+  // A replay's place, 0..1, or -1 without one: the columns fill in behind it.
   property real replayX: -1
   // The surface under the chart, which the stems are seen against.
   property color ground: Commons.Color.background
 
-  // The grid the day is drawn on, shared by the paint and the cap overlay.
   readonly property var grid: layout()
   readonly property bool day: !!geometry && geometry.day === true
   readonly property bool directionKnown: typeof up === "boolean"
   readonly property color aboveColor: directionKnown ? upColor : baselineColor
   readonly property color belowColor: directionKnown ? downColor : baselineColor
-  // One print draws: the first print after midnight is a cell on its day.
+  // One print draws, as the first after midnight does: a cell.
   readonly property bool drawable: !!geometry && !!geometry.points && geometry.points.length >= 1
   // The baseline draws with no print too, as on a day nobody traded.
   readonly property bool hasBaseline: !!geometry && typeof geometry.baselineY === "number" && isFinite(geometry.baselineY)
-  // The columns the ink reaches, through the newest drawn print's. The
-  // draw-in sweeps across these, a whole column at a time.
+  // Through the newest print's column.
   readonly property int inkColumns: drawable
     ? Math.min(grid.columns, Math.floor(geometry.points[geometry.points.length - 1].x * grid.columns) + 1) : 0
   readonly property int scrubColumn: scrubX >= 0 ? Math.min(grid.columns - 1, Math.floor(scrubX * grid.columns)) : -1
-  // How far the lit columns have drawn in, in pixels, and the whole width
-  // once they have: what is laid over the ink draws in with it
-  // (`RangeMarks`).
+  // What is laid over the ink draws in with it (`RangeMarks`).
   readonly property real inkDrawn: replayX < 0 && reveal >= 1 ? width : curtain.width
-  // The stems are retro's wash: the up colour's at 35%, dimmer under a cap
-  // the line draws dim, and each side at the alpha that adds the same
-  // lightness over the ground (`Tones.washAlpha`), never more than half the
-  // ink of the cap above it (full, or a dim cap's 45%). A cap is the line,
-  // one share of its own colour on both sides.
-  // `solid` draws each stem at its cap's ink instead, for a chart so small
-  // that faint stems leave only the caps, a dotted line: the pill's, 13
-  // columns at 1x.
+  // The stems are retro's wash: each side adds the lightness the up colour's
+  // does at 35% (`Tones.washAlpha`), less under a dim cap. `solid` draws each
+  // stem at its cap's ink, for a chart so small that faint stems leave the
+  // caps a dotted line: the pill's, 13 columns at 1x.
   property bool solid: false
   readonly property real aboveStem: solid ? 1 : Tones.washAlpha(aboveColor, upColor, ground, 0.35, 1)
   readonly property real belowStem: solid ? 1 : Tones.washAlpha(belowColor, upColor, ground, 0.35, 1)
@@ -95,13 +81,9 @@ Item {
   onAboveStemDimChanged: ink.requestPaint()
   onBelowStemDimChanged: ink.requestPaint()
 
-  // Bucket the points by column; the last point in a bucket wins, which is
-  // the price at the end of that stretch of the axis. A column no print
-  // falls in, between two prints the line joins, holds the last print
-  // before it: the price then. Only a break (`brk`) leaves columns dark, as
-  // it lifts the smooth look's pen. A column's cap and stem are dimmer
-  // where the line draws dim (`dim`): the extended hours, or all but what
-  // trades now.
+  // The last print in a column wins: the price at the end of that stretch. A
+  // column between two prints the line joins holds the one before it; only a
+  // break (`brk`) leaves columns dark, as it lifts the smooth line.
   function layout() {
     var pitch = pixel + gap
     var g = {
@@ -114,12 +96,11 @@ Item {
       lastLit: -1
     }
     if (!geometry || !geometry.points) return g
-    // With no previous close known, the columns stand on the chart's floor.
+    // With no previous close known, the columns stand on the floor.
     g.baseRow = hasBaseline ? Math.round(geometry.baselineY * (g.rows - 1)) : g.rows - 1
     var pts = geometry.points
     // The lit cell sits on the last column whose own last print is bright,
-    // never on one held after it. A column stays on the grid at both ends,
-    // so the fill between two prints never runs past it.
+    // never on one held after it.
     var last = -1
     for (var i = 0; i < pts.length; i++) {
       var col = Math.max(0, Math.min(g.columns - 1, Math.floor(pts[i].x * g.columns)))
@@ -136,16 +117,14 @@ Item {
     return g
   }
 
-  // Where a point `fraction` along the axis is drawn: the centre of its
-  // column, as `layout` buckets it.
+  // The centre of the column `layout` puts it in.
   function xAt(fraction) {
     var col = Math.max(0, Math.min(grid.columns - 1, Math.floor(fraction * grid.columns)))
     return col * grid.pitch + pixel / 2
   }
 
-  // How high and low the ink reaches between `x0` and `x1`, in pixels: the
-  // lit rows of the columns there, and the baseline's, which runs the whole
-  // width. What is laid over the chart keeps clear of it (`RangeMarks`).
+  // The lit rows of the columns between `x0` and `x1`, and the baseline's. What
+  // is laid over the chart keeps clear of it (`RangeMarks`).
   function inkExtentIn(x0, x1) {
     var g = grid
     var rows = hasBaseline ? [g.baseRow] : []
@@ -157,7 +136,6 @@ Item {
     return { top: Math.min.apply(null, rows) * pixel, bottom: (Math.max.apply(null, rows) + 1) * pixel }
   }
 
-  // The unlit grid and the dashed baseline row: always all there.
   Canvas {
     id: base
     anchors.fill: parent
@@ -173,14 +151,13 @@ Item {
         }
       }
       if (!root.hasBaseline) return
-      // The baseline: a dashed row of cells, every other column, so it lives
-      // on the same grid as the bars instead of a hairline drawn across them.
+      // Every other cell, so it lives on the bars' grid, not as a hairline
+      // across them.
       ctx.fillStyle = root.baselineColor
       for (var bc = 0; bc < g.columns; bc += 2) ctx.fillRect(bc * g.pitch, g.baseRow * pixel, pixel, pixel - root.gap)
     }
   }
 
-  // The lit columns, revealed a whole column at a time.
   Item {
     id: curtain
     objectName: "curtain"
@@ -211,7 +188,6 @@ Item {
           var x = c * g.pitch
           var top = Math.min(y, baseY)
           var h = Math.abs(y - baseY)
-          // The stem from each cap down to the baseline.
           if (h > 0) {
             var stem = g.dim[c] ? (above ? root.aboveStemDim : root.belowStemDim) : (above ? root.aboveStem : root.belowStem)
             ctx.fillStyle = Qt.rgba(color.r, color.g, color.b, stem)
@@ -224,12 +200,10 @@ Item {
     }
   }
 
-  // The ticks, the bell and the night's edges: each a short column of cells,
-  // cut at the chart's edges, as a canvas cuts it. On the pill's six rows a
-  // baseline on the top or bottom row would put a cell outside the chart.
-  // Those the columns have reached draw in with them, as the smooth look's
-  // ticks draw in with its line; those ahead of the newest print, in the
-  // hours still to come, are there with the baseline.
+  // The ticks, cut at the chart's edges as a canvas cuts: on the pill's six
+  // rows a baseline on the top or bottom row would put a cell outside it.
+  // Those the columns have reached draw in with them; those ahead, in hours
+  // still to come, are there with the baseline.
   Repeater {
     model: root.hasBaseline ? root.geometry.ticks.length : 0
 
@@ -247,7 +221,6 @@ Item {
     }
   }
 
-  // The scrub: a faint column of cells with the cap lit.
   Rectangle {
     visible: root.drawable && root.scrubColumn >= 0
     x: root.scrubColumn * root.grid.pitch
@@ -265,8 +238,7 @@ Item {
     color: root.hairlineColor
   }
 
-  // The newest bright print: one white cell over the cap, the pixel
-  // version of the smooth chart's dot. Only once the day has drawn in.
+  // The pixel version of the smooth chart's live dot, once the day has drawn in.
   Rectangle {
     id: cap
     objectName: "liveCap"
@@ -276,8 +248,8 @@ Item {
     width: root.pixel
     height: root.pixel
     color: root.hairlineColor
-    // Hidden mid-blink by an open's draw-in, it owes them still, and blinks
-    // once it shows; any other hide, a sheet over it, stops them for good.
+    // Hidden mid-blink by an open's draw-in, it owes them and blinks once it
+    // shows; any other hide, as a sheet over it, stops them.
     onVisibleChanged: {
       if (visible) root.blink()
       else {
@@ -303,18 +275,17 @@ Item {
     }
   }
 
-  // The price the last blinks were for, and an open's blinks owed until the
-  // cap can show them (`opening`, from the open until its blinks stop): a
-  // scrub's end, a sheet closing, or the market turning live again with the
-  // price the cap already blinked for starts nothing.
+  // A scrub's end, a sheet closing, or the market turning live again with the
+  // price already blinked for starts nothing. `opening` lasts from the open
+  // until its blinks stop.
   property string blinkedPrice: ""
   property bool blinkOwed: false
   property bool opening: false
   function blink() {
     if (!root.live || !cap.visible || root.still) return
     if (!root.blinkOwed && root.newestPrice === root.blinkedPrice) return
-    // The restart's stop of a paused burst would end `opening`: an open's
-    // blinks keep it, whichever of the open's changes starts them.
+    // A restart's stop of a paused burst would end `opening`; an open's blinks
+    // keep it.
     var opening = root.opening
     root.blinkOwed = false
     root.blinkedPrice = root.newestPrice
