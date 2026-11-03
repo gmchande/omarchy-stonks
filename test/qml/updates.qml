@@ -33,7 +33,7 @@ Harness {
   }
 
   // The plugin as the shell composes it, with this harness as its shell.
-  Stonks.Plugin { id: plugin; shell: shellApi }
+  Stonks.Plugin { id: plugin; shell: shellApi; manifest: harness.pluginManifest() }
   readonly property var service: plugin.service
   readonly property var app: plugin.windowHost.app
   readonly property var feed: service.testReleaseFeed
@@ -77,6 +77,7 @@ Harness {
       width: implicitWidth
       height: 32
       bar: barApi
+      moduleName: "grvc.stonks"
       settings: ({ id: "grvc.stonks", barStyle: "text" })
     }
   }

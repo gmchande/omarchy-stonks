@@ -21,7 +21,7 @@ Harness {
     return service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0
   }
 
-  Stonks.Service { id: service }
+  Stonks.Service { id: service; pluginId: "grvc.stonks" }
   Stonks.App { id: app; service: service }
   Process { id: quoteFile }
 

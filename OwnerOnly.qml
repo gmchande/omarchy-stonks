@@ -1,14 +1,18 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
-// Keeps Stonks' files its owner's alone. Nothing is written in the cache
-// folder until it is 0700; writes asked sooner wait, the latest per path.
+// Keeps Stonks' files its owner's alone. The cache folder is named for the
+// plugin's id, and nothing is written in it until the id is known and it is
+// 0700; writes asked sooner wait, the latest per path.
 // Quickshell writes a new file 0644, the shell's umask, and an atomic write
 // keeps an old file's mode, so each written file gets `chmod go=`.
 Item {
   id: root
 
-  readonly property string folder: (Quickshell.env("XDG_CACHE_HOME") || Quickshell.env("HOME") + "/.cache") + "/grvc.stonks"
+  // The plugin's id, the cache folder's name; "" until the manifest has
+  // named it, and meanwhile there is no folder.
+  property string pluginId: ""
+  readonly property string folder: pluginId ? (Quickshell.env("XDG_CACHE_HOME") || Quickshell.env("HOME") + "/.cache") + "/" + pluginId : ""
   property bool made: false
   property var held: ({})
   property var owed: []
@@ -72,9 +76,14 @@ Item {
     onSaveFailed: root.failed = true
   }
 
+  // The id comes once: as the service is made, or just after (`Plugin`).
+  // The make starts a turn later, once its command names the folder.
+  Component.onCompleted: if (root.folder !== "") Qt.callLater(root.makeFolder)
+  onFolderChanged: if (root.folder !== "") Qt.callLater(root.makeFolder)
+  function makeFolder() { if (!make.running && !root.made) make.running = true }
+
   Process {
     id: make
-    running: true
     command: ["timeout", "5", "sh", "-c", "umask 077 && mkdir -p -- \"$1\" && chmod go= -- \"$1\"", "sh", root.folder]
     onExited: function(code) {
       root.made = code === 0

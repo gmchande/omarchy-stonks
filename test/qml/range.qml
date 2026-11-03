@@ -104,7 +104,7 @@ Harness {
   }
 
   // The plugin as the shell composes it, with this harness as its shell.
-  Stonks.Plugin { id: plugin; shell: shellApi }
+  Stonks.Plugin { id: plugin; shell: shellApi; manifest: harness.pluginManifest() }
   readonly property var service: plugin.service
   readonly property var windowHost: plugin.windowHost
   readonly property var app: plugin.windowHost.app
@@ -146,7 +146,7 @@ Harness {
   }
   Binding { target: plugin.windowHost; property: "hyprlandStandIn"; value: hyprlandStandIn }
 
-  Component { id: serviceAgain; Stonks.Service {} }
+  Component { id: serviceAgain; Stonks.Service { pluginId: "grvc.stonks" } }
   Component { id: appAgain; Stonks.App {} }
 
   QtObject {
@@ -181,6 +181,7 @@ Harness {
       width: implicitWidth
       height: 32
       bar: barApi
+      moduleName: "grvc.stonks"
       settings: ({ id: "grvc.stonks", barStyle: "sparkline", host: "kept" })
     }
   }

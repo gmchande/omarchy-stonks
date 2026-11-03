@@ -9,15 +9,13 @@ import qs.Ui
 // does the rest; it is built as the panel first opens, and kept.
 Panel {
   id: root
-  moduleName: "grvc.stonks"
-  ipcTarget: "grvc.stonks"
-  manageIpc: false
+  // `moduleName` is the pill's, the plugin's id, which it hands over.
 
   property var anchorItem: null
   property var hostWidget: null
   readonly property var barIdentity: hostWidget || root
   readonly property var plugin: bar && bar.shell && typeof bar.shell.serviceFor === "function"
-    ? bar.shell.serviceFor("grvc.stonks") : null
+    ? bar.shell.serviceFor(moduleName) : null
   readonly property var service: plugin ? plugin.service : null
   readonly property var updates: plugin ? plugin.updates : null
   readonly property var sounds: plugin ? plugin.sounds : null

@@ -28,7 +28,7 @@ Harness {
     return item.contentItem ? showsPrice(item.contentItem, text) : false
   }
 
-  Stonks.Service { id: service }
+  Stonks.Service { id: service; pluginId: "grvc.stonks" }
   Stonks.App { id: app; service: service }
   QtObject {
     id: shellApi

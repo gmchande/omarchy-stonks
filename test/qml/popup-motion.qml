@@ -22,7 +22,7 @@ Harness {
 
   property bool marked: false
 
-  Stonks.Service { id: service }
+  Stonks.Service { id: service; pluginId: "grvc.stonks" }
   QtObject {
     id: shellApi
     function serviceFor(id) { return { service: service } }
@@ -61,6 +61,7 @@ Harness {
       width: implicitWidth
       height: 32
       bar: pillApi
+      moduleName: "grvc.stonks"
       settings: ({ id: "grvc.stonks", barStyle: "icon" })
     }
   }

@@ -26,6 +26,10 @@ mv "$work/manifest.json" "$root/plugin/manifest.json"
 # Main names this build's version as the service starts.
 echo 1.0.9 > "$STONKS_FAKE_STATE/MANIFEST.version"
 scratch_home v1-data.json grvc.stonks.json
+# Its folder is a clone, as `omarchy plugin add` leaves it, so
+# `omarchy plugin update` can update it.
+mkdir -p "$HOME/.config/omarchy/plugins/grvc.stonks/.git"
+echo "ref: refs/heads/main" > "$HOME/.config/omarchy/plugins/grvc.stonks/.git/HEAD"
 export QT_QPA_PLATFORM=offscreen
 run_qs 60
 finish "UPDATES DONE"

@@ -8,11 +8,18 @@ import "History.js" as History
 import "Market.js" as Market
 import "Overnight.js" as Overnight
 import "Settings.js" as Settings
-// The one owner of the data file, grvc.stonks.json: the lists and what you
-// look at, the stock on show and the range the panel and the window share.
+// The one owner of the lists file, ~/.config/omarchy/<id>.json: the lists
+// and what you look at, the stock on show and the range the panel and the
+// window share.
 Item {
   id: root
 
+  // The plugin's id, the manifest's (`Plugin`): "" until the shell hands
+  // it over, and meanwhile the lists file and the cache are left alone.
+  property string pluginId: ""
+  // Whether `omarchy plugin update` can update this copy (`Updates`):
+  // where it can't, GitHub is never asked for main's version.
+  property bool updatable: false
   property var dataSettings: Settings.fileSettings(null)
   property bool pluginsReady: false
   property bool settingsUnreadable: false
@@ -53,8 +60,8 @@ Item {
   readonly property bool previewShown: previewRests && openSurfaces.indexOf(previewSurface) >= 0
   property var watched: []
 
-  readonly property string dataPath: Quickshell.env("HOME") + "/.config/omarchy/grvc.stonks.json"
-  readonly property string quotesPath: ownerOnly.folder + "/quotes.json"
+  readonly property string dataPath: pluginId ? Quickshell.env("HOME") + "/.config/omarchy/" + pluginId + ".json" : ""
+  readonly property string quotesPath: ownerOnly.folder ? ownerOnly.folder + "/quotes.json" : ""
 
   // All: every symbol, fetched once whatever lists hold it.
   readonly property var library: dataSettings.symbols
@@ -526,9 +533,10 @@ Item {
     onEntriesChanged: Qt.callLater(root.askOvernight)
     onBusyChanged: Qt.callLater(root.releaseOrder)
   }
+
   ReleaseFeed {
     id: releaseFeed
-    ready: root.pluginsReady && root.dataSettings.updateCheck
+    ready: root.pluginsReady && root.dataSettings.updateCheck && root.updatable
     now: root.now
     clock: root
     clearance: function() { return root.screensClear() }
@@ -879,7 +887,7 @@ Item {
     printErrors: false
   }
   // The one keeper of the cache; the sounds write through it too.
-  OwnerOnly { id: ownerOnly }
+  OwnerOnly { id: ownerOnly; pluginId: root.pluginId }
   readonly property alias files: ownerOnly
 
   // { symbol: { quote, receivedAt } }
@@ -943,7 +951,7 @@ Item {
   function takeMissingFile() {
     root.settingsUnreadable = false
     if (!root.pluginsReady) {
-      var fromBar = Settings.settingsFromBar(root.parseShell())
+      var fromBar = Settings.settingsFromBar(root.parseShell(), root.pluginId)
       if (fromBar) {
         root.adopt(fromBar)
         root.writeDataFile(fromBar)

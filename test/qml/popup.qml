@@ -101,13 +101,14 @@ Harness {
   Stonks.BarWidget {
     id: pill
     bar: api
+    moduleName: "grvc.stonks"
     settings: ({ id: "grvc.stonks", barStyle: "sparkline" })
   }
 
   // The real data service and a panel on it. HOME is the harness's scratch
   // one, with no data file, as on a fresh install. The panel opens at once,
   // while the service still reads its settings. A restart makes both again.
-  Component { id: hintServiceComponent; Stonks.Service {} }
+  Component { id: hintServiceComponent; Stonks.Service { pluginId: "grvc.stonks" } }
   Component { id: hintPanelComponent; Stonks.Panel { bar: hintApi; settings: ({}) } }
   property var hintService: null
   property var hintPanel: null
@@ -125,7 +126,7 @@ Harness {
     function serviceFor() { return { service: harness.hintService, updates: hintUpdates } }
   }
   // The real version watch, on the tree's copy of the manifest.
-  Stonks.Updates { id: hintUpdates }
+  Stonks.Updates { id: hintUpdates; pluginId: "grvc.stonks" }
   PluginBarApi {
     id: hintApi
     pluginId: "grvc.stonks"

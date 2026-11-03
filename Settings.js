@@ -324,9 +324,9 @@ function listsHeld(settings) {
   return JSON.stringify([settings.symbols, settings.lists.map(function(list) { return [list.name, list.symbols] })])
 }
 
-// The settings rode the bar entry before the data file.
-function settingsFromBar(config) {
-  var bar = barEntryFor(config, "grvc.stonks")
+// The settings rode the plugin ID's bar entry before the data file.
+function settingsFromBar(config, id) {
+  var bar = barEntryFor(config, id)
   if (!bar || !bar.symbols || !bar.symbols.length) return null
   var from = {}
   for (var key in fileSettings(null)) if (key in bar) from[key] = bar[key]

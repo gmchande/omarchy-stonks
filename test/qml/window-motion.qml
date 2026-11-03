@@ -12,7 +12,7 @@ Harness {
   id: harness
   marker: "WINDOW MOTION DONE"
 
-  Stonks.Service { id: service }
+  Stonks.Service { id: service; pluginId: "grvc.stonks" }
   Stonks.App { id: app; service: service }
   // The hero chart's or the body's rendered frames, for frames.js.
   FrameGrab { id: grab }

@@ -391,6 +391,7 @@ Harness {
       width: Style.bar.sizeVertical
       height: implicitHeight
       bar: sideBar
+      moduleName: "grvc.stonks"
       settings: ({ id: "grvc.stonks", barStyleVertical: "stacked" })
     }
 

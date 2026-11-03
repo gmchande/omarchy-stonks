@@ -59,6 +59,7 @@ start "save, clock and pending work harness" bash test/qml/resilience.sh
 start "Quickshell crash handling (stand-in)" bash test/qml/crash-check.sh
 start "camera harness" env QT_SCALE_FACTOR=1 bash test/qml/camera.sh
 start "update check harness" bash test/qml/updates.sh
+start "two copies side by side harness" bash test/qml/twin.sh
 start "history harness" bash test/qml/history.sh
 # On a scale-2 screen too, and on 1.75, where 2400 pixels are no whole
 # number of units: the picture is drawn and saved at 2400 x 1350 there, not

@@ -1202,6 +1202,7 @@ Harness {
           width: root.anchorPose ? root.anchorPose.pillWidth : 150
           height: parent.height
           bar: anchorApi
+          moduleName: "grvc.stonks"
           settings: ({id: "grvc.stonks", barStyle: "text"})
         }
       }
@@ -1379,6 +1380,7 @@ Harness {
                 width: implicitWidth
                 height: parent.height
                 bar: pillApi
+                moduleName: "grvc.stonks"
                 settings: ({ id: "grvc.stonks", barStyle: pillRow.modelData.style })
               }
               // An Omarchy bar icon beside it, Bluetooth's, as the right
@@ -1421,6 +1423,7 @@ Harness {
                 width: parent.width
                 height: implicitHeight
                 bar: verticalApi
+                moduleName: "grvc.stonks"
                 settings: ({ id: "grvc.stonks", barStyleVertical: pillRow.modelData.style === "icon" ? "icon" : "stacked" })
               }
             }

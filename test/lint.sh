@@ -27,7 +27,7 @@ declare -A listed=(
   ["Watchlist.qml missing-property settle"]=1
   # BarWidget.qml: injectPanel sets each property the loaded panel has,
   # checked with `in`; Qt 6.12 types Loader.item as a bare QObject.
-  ["BarWidget.qml missing-property target"]=4
+  ["BarWidget.qml missing-property target"]=5
   # An alias that exposes an inner object by its own id, which Qt 6.12
   # counts as shadowing: the alias and the id's line each.
   ["StonksBody.qml id-shadows-member motion"]=2

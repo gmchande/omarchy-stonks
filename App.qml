@@ -10,6 +10,9 @@ import "History.js" as History
 Item {
   id: root
 
+  // The plugin's name, the manifest's (`Plugin`), the window's title: how
+  // a window rule, and Stonks itself (`WindowHost.isWindow`), find it.
+  property string name: ""
   property var service: null
   property var updates: null
   property var sounds: null
@@ -74,7 +77,7 @@ Item {
 
   FloatingWindow {
     id: window
-    title: "Stonks"
+    title: root.name
     color: Commons.Color.background
     implicitWidth: 720
     implicitHeight: 760

@@ -10,6 +10,11 @@ Item {
   id: root
 
   property var shell: null
+  // The plugin's id and name, the manifest's (`Plugin`): the id names the
+  // panel to the shell, and the name titles the window, which is how
+  // Hyprland's list tells it from another copy's.
+  property string pluginId: ""
+  property string name: ""
   property var service: null
   property var updates: null
   property var sounds: null
@@ -34,11 +39,11 @@ Item {
   }
 
   function isWindow(t) {
-    return t.title === "Stonks" && !!t.wayland && t.wayland.appId === "org.quickshell"
+    return t.title === root.name && !!t.wayland && t.wayland.appId === "org.quickshell"
   }
 
   function popupOpen() {
-    return !!shell && typeof shell.isPluginOpen === "function" && shell.isPluginOpen("grvc.stonks")
+    return !!shell && typeof shell.isPluginOpen === "function" && shell.isPluginOpen(root.pluginId)
   }
 
   function toggle() {
@@ -48,7 +53,7 @@ Item {
 
   function open(payloadJson) {
     var shown = app.opened
-    if (popupOpen()) shell.hide("grvc.stonks")
+    if (popupOpen()) shell.hide(root.pluginId)
     app.open(payloadJson)
     if (shown) focusWindow()
   }
@@ -104,12 +109,13 @@ Item {
     target: Hyprland
     enabled: root.popupOpen()
     function onRawEvent(event) {
-      if (event.name === "openwindow" && event.parse(4)[2] === "org.omarchy.screensaver") root.shell.hide("grvc.stonks")
+      if (event.name === "openwindow" && event.parse(4)[2] === "org.omarchy.screensaver") root.shell.hide(root.pluginId)
     }
   }
 
   App {
     id: app
+    name: root.name
     service: root.service
     updates: root.updates
     sounds: root.sounds
