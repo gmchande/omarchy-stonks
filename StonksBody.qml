@@ -93,7 +93,8 @@ Item {
   onRowMenuGroundNowChanged: if (rowMenu && rowMenuGroundNow !== rowMenu.ground) Qt.callLater(function() {
     if (root.rowMenu && root.rowMenuGround(root.rowMenu.symbol) !== root.rowMenu.ground) root.rowMenu = null
   })
-  // Why an action did nothing, said in the footer's place for a moment.
+  // Why an action did nothing, or what a screenshot did, said in the
+  // footer's place for a moment.
   property string note: ""
   // After a screenshot, the header's camera stays lit until the next open.
   property bool cameraLit: false
@@ -842,8 +843,8 @@ Item {
     }
     if (landing === "" || !service || service.arriving.indexOf(landing) >= 0) return
     var failed = !quotes[landing] && !!entries[landing] && entries[landing].status === "failed"
-    // A failed first fetch is done: the hero stays where it was, its row
-    // saying it failed.
+    // A new symbol's failed first fetch is done: the hero stays where it
+    // was, its row saying it failed. A Show of a member still features it.
     if (view.rows.indexOf(landing) < 0 || (failed && !landingShows)) {
       landing = ""
       return

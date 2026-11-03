@@ -130,9 +130,10 @@ function iconCell(fontScale) {
   return Math.max(3, Math.round(3 * fontScale))
 }
 
-// The bull's eyes shut to slits a row lower. The bear's have no half shut:
-// shut, each opens as a two-cell slit at eye level, widened outward; inward
-// it crowds the nose, and a row lower it frowns.
+// The bull's eyes shut to slits a row lower. The bear's one-cell eyes have
+// no half-shut shape: at half the lid covers them; shut, each opens as a
+// two-cell slit at eye level, widened outward: inward it crowds the nose,
+// and a row lower it frowns.
 var BULL_HALF = BULL_SPRITE.slice()
 BULL_HALF[6] = "...##############..."
 var BULL_SHUT = BULL_HALF.slice()

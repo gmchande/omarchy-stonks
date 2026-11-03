@@ -48,7 +48,8 @@ Item {
     chmod.running = true
   }
 
-  // done(false) where the file couldn't be made, one there by then included.
+  // Calls done(false) while another create is running, and where the file
+  // couldn't be made, even if one is there by then.
   // mktemp makes the file 0600 and `ln` names it, never over a file there,
   // so no other account reads it and no reader sees it half written. The
   // text rides in the environment, whole as the command starts: a command

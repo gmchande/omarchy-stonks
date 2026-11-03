@@ -83,8 +83,8 @@ Item {
     id: hintMetrics
     font: hintText.font
   }
-  // The notice stays whole: only the whole action goes beside it; a shorter
-  // form takes a line of its own.
+  // The action goes beside the notice only whole; a shorter form takes a
+  // line of its own, so the action never cuts the notice.
   readonly property var noticeShown: {
     if (notice === "" || noticeActions.length === 0) return { action: "", lines: 1 }
     var room = width - gutter - undoRoom - Style.space(20)

@@ -25,7 +25,7 @@ Panel {
   readonly property var trendColors: plugin ? plugin.trendColors : null
   readonly property string range: service ? service.range : "1D"
   readonly property int panelWidth: Style.space(480)
-  // Six whole rows at any font or text size.
+  // Up to six whole rows, at any font or text size.
   readonly property int maxRows: 6
   readonly property var body: bodyLoader.item
   readonly property int heightCap: body ? panel.verticalContentInset + body.chromeHeight

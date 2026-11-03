@@ -40,7 +40,8 @@ FocusScope {
   // or "" before any.
   property string resultsQuery: ""
   property string answer: ""
-  // An earlier query's answer, shown dimmed while the new one is out.
+  // An earlier query's answer, shown dimmed once the field no longer holds
+  // its query.
   readonly property bool stale: answer !== "" && resultsQuery !== searchText.trim()
   // An Enter kept for the query before its answer; an edit drops it.
   property string enterFor: ""

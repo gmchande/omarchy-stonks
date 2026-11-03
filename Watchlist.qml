@@ -657,11 +657,11 @@ Flickable {
         readonly property int place: root.slotOf(symbol)
         visible: place >= 0
         y: lifted ? root.dragY : place * root.rowPitch + shift
-        // A row slides only if it was in sight before and after, so one that
-        // joins starts at its own place. It eases `shift`, its distance from
-        // its place, to zero, so a change mid-slide goes on from where it is.
-        // The row travelling farther rides on top, the cursor's on a tie, so
-        // none print through.
+        // A row slides only from one place in the list to another, so one
+        // that joins starts at its own place. It eases `shift`, its distance
+        // from its place, to zero, so a change mid-slide goes on from where
+        // it is. The row travelling farther rides on top, the cursor's on a
+        // tie, so none print through.
         property int lastPlace: -1
         property real shift: 0
         property int travel: 0
