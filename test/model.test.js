@@ -1818,7 +1818,8 @@ test("a fetched name or code past its length reads as not sent", () => {
 
 // Every open the calendars hold, minute by minute, from 20 minutes before
 // each session's bell to 40 after: what a row says as Yahoo's answers come
-// in, for a Stonks that holds no close and one that has run all along.
+// in, for a Stonks that has run all along, and for one started at each of
+// those minutes, holding no close, through every refresh after.
 // Yahoo's one-day answers are modeled on its captures at Tokyo's and
 // London's opens (saved.test.js): until the day's first trade, the last
 // session's quote; from it the day's, counting from the close before last
@@ -1864,32 +1865,42 @@ test("at every open the calendars hold, a row's move counts from the close befor
       return answer(day, day, close(i) + 1, trades[trades.length - 1], stale ? close(i - 2) : close(i - 1), bars)
     }
     let held = null
+    const clock = t => new Date(t * 1000).toISOString().slice(11, 16) + "Z"
     for (let i = 2; i < days.length; i++) {
       const first = days[i].start + 60 * (i % 15)
       for (const seg of days[i].segs) {
+        const minutes = []
         for (let now = seg.start - 20 * 60; now < seg.start + 40 * 60; now += 60) {
-          const quote = M.parseChart(yahoo(i, now), [])
           const traded = now >= first
-          const base = traded ? close(i - 1) : close(i - 2)
-          const price = traded ? close(i) + 1 : close(i - 1)
-          held = M.carryClose(held, quote, calendars)
-          for (const [who, shown] of [["fresh", M.carryClose(null, quote, calendars)], ["running", held]]) {
-            const row = M.rowModel(shown, 0, "pct")
-            const where = `${name} ${days[i].date} ${new Date(now * 1000).toISOString().slice(11, 16)}Z ${who}`
-            if (row.pct === null) {
-              // Left out only for a Stonks that holds no close, and only
-              // until Yahoo has caught up.
-              if (who === "running" || !traded || now >= first + 20 * 60 || cal.pre) failures.push(`${where}: left out`)
-            } else if (Math.abs(row.pct - (price - base) / base * 100) > 1e-9 || (traded && M.dayBase(shown) !== base)) {
-              failures.push(`${where}: ${row.changeText} from ${M.dayBase(shown)}, not from ${base}`)
-            }
+          minutes.push({ now, traded, quote: M.parseChart(yahoo(i, now), []),
+            base: traded ? close(i - 1) : close(i - 2), price: traded ? close(i) + 1 : close(i - 1) })
+        }
+        // `from`: when the shell started, or null for the one that ran all along.
+        const check = (m, shown, from) => {
+          const row = M.rowModel(shown, 0, "pct")
+          const where = () => `${name} ${days[i].date} ${clock(m.now)} ${from === null ? "running" : "started " + clock(from)}`
+          if (row.pct === null) {
+            // Left out only for a Stonks that holds no close, and only
+            // until Yahoo has caught up.
+            if (from === null || !m.traded || m.now >= first + 20 * 60 || cal.pre) failures.push(`${where()}: left out`)
+          } else if (Math.abs(row.pct - (m.price - m.base) / m.base * 100) > 1e-9 || (m.traded && M.dayBase(shown) !== m.base)) {
+            failures.push(`${where()}: ${row.changeText} from ${M.dayBase(shown)}, not from ${m.base}`)
           }
+        }
+        for (const m of minutes) check(m, held = M.carryClose(held, m.quote, calendars), null)
+        // A shell started before the bell holds the last close once it has
+        // seen it; after 20 minutes of trades each refresh reads as a fresh
+        // start's, so a shell is followed from its start to then.
+        for (let s = 0; s < minutes.length; s++) {
+          let started = null
+          for (let j = s; j === s || (j < minutes.length && minutes[s].now >= seg.start - 120 && minutes[j].now < first + 20 * 60); j++)
+            check(minutes[j], started = M.carryClose(started, minutes[j].quote, calendars), minutes[s].now)
         }
       }
     }
   }
   expect(failures.slice(0, 10)).toEqual([])
-})
+}, 60000)
 
 // The update check offers main's version only when it comes after the
 // running one, number by number.

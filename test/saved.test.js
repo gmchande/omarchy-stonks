@@ -2553,10 +2553,21 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   // counted from Friday's close, London's below from the close before its
   // first day. So it leaves the move out until the trades are ten minutes
   // past the first, by when Yahoo had caught up: Yahoo's own figures read
-  // 0.00% at 09:15. The carried close is saved with the quote, so a
-  // restart in those minutes keeps it.
+  // 0.00% at 09:15. Its first answer at each minute, and one started at
+  // 09:15 through its refreshes, restarted before the last: never −0.88%
+  // from Thursday's close at 09:20. The carried close is saved with the quote,
+  // so a restart in those minutes keeps it.
   const fresh = (time, file) => M.rowModel(M.carryClose(null, open(time, file), calendars), 0, "pct").changeText
   expect(["1915", "1920", "1921"].map(time => fresh(time, "2d/7203.t.json"))).toEqual(["\u2014", "\u2014", "\u2014"])
+  let started = null
+  const startedRows = []
+  for (const time of ["1915", "1920", "1921"]) {
+    const two = M.twoDays(started, nyAt(time), calendars)
+    if (time === "1921") started = JSON.parse(JSON.stringify(started))
+    started = M.carryClose(started, open(time, (two ? "2d/" : "") + "7203.t.json"), calendars)
+    startedRows.push(`${time} ${two ? "2d" : "1d"} ${M.rowModel(started, 0, "pct").changeText}`)
+  }
+  expect(startedRows).toEqual(["1915 2d \u2014", "1920 1d \u2014", "1921 1d \u2014"])
   const restarted = M.carryClose(JSON.parse(JSON.stringify(M.carryClose(null, open("1910", "2d/7203.t.json"), calendars))), open("1920", "7203.t.json"), calendars)
   expect(M.rowModel(restarted, 0, "pct").changeText).toBe("\u22120.65%")
   // A one-day answer of Monday before its first trade still reads Friday's move.
