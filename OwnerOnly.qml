@@ -77,8 +77,10 @@ Item {
   }
 
   // The id comes once: as the service is made, or just after (`Plugin`).
-  Component.onCompleted: if (root.folder !== "") make.running = true
-  onFolderChanged: if (root.folder !== "") make.running = true
+  // The make starts a turn later, once its command names the folder.
+  Component.onCompleted: if (root.folder !== "") Qt.callLater(root.makeFolder)
+  onFolderChanged: if (root.folder !== "") Qt.callLater(root.makeFolder)
+  function makeFolder() { if (!make.running && !root.made) make.running = true }
 
   Process {
     id: make

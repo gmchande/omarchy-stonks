@@ -34,8 +34,15 @@ Harness {
     function updateEntryInline(id, settings) { return true }
   }
 
-  Stonks.Plugin { id: releaseCopy; shell: releaseShell; manifest: harness.released }
-  Stonks.Plugin { id: devCopy; shell: devShell; manifest: harness.dev }
+  // The shell sets a service's manifest just after making it (shell.qml,
+  // createObject then `inst.manifest`), once its parts have completed, so
+  // the copies start with none and get theirs a turn later.
+  Stonks.Plugin { id: releaseCopy; shell: releaseShell }
+  Stonks.Plugin { id: devCopy; shell: devShell }
+  Component.onCompleted: Qt.callLater(function() {
+    releaseCopy.manifest = harness.released
+    devCopy.manifest = harness.dev
+  })
   ShellStandIn { id: releaseShell; plugin: releaseCopy }
   ShellStandIn { id: devShell; plugin: devCopy }
   PluginBarApi { id: releaseBar; pluginId: "grvc.stonks"; moduleName: "grvc.stonks"; shell: releaseShell }
