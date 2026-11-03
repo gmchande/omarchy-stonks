@@ -117,6 +117,12 @@ Harness {
       return grab.verdict
     }
 
+    // A check on a film, its line naming the main thread's work and wait
+    // over the frames judged (FrameGrab `work`), pass or fail.
+    function filmed(label, ok, told, more) {
+      check(label + " — " + grab.judgedWork, ok, told.own + (more || ""))
+    }
+
     // The footer and the card's bottom inset: what rides the edge.
     function band() {
       return [String(find(panel.testBody, "footer").height + panel.testCard.card.contentBottomInset)]
@@ -153,8 +159,8 @@ Harness {
       within(2000, function() { return kind() === "bear" && !animal.turning })
       moreFrames(4)
       var turn = verdict("columns:200:" + animal.columns)
-      check("a new price that turns the pill's day turns its bull into the bear left to right in 200 ms, each column taking its new cells and colour as it turns",
-        turn.ok && kind() === "bear", turn.detail)
+      filmed("a new price that turns the pill's day turns its bull into the bear left to right in 200 ms, each column taking its new cells and colour as it turns",
+        turn.ok && kind() === "bear", turn)
       grab.source = animal
       grab.begin("animal-wheel")
       moreFrames(4)
@@ -163,15 +169,15 @@ Harness {
       within(2000, function() { return service.featuredSymbol !== "AAPL" && kind() === "bull" && !animal.turning })
       moreFrames(4)
       var wheel = verdict("turn:0")
-      check("a wheel step to a symbol that is up switches the pill's animal at once",
-        wheel.ok && service.featuredSymbol !== "AAPL" && kind() === "bull", wheel.detail + " | " + service.featuredSymbol)
+      filmed("a wheel step to a symbol that is up switches the pill's animal at once",
+        wheel.ok && service.featuredSymbol !== "AAPL" && kind() === "bull", wheel, " | " + service.featuredSymbol)
       service.testFeed.quotes = quotes
     }
 
     // An ease of the edge after `act`, judged on the frames.
     function eases(label, act) {
       var verdict = frames(label.replace(/[^a-z0-9]+/gi, "-"), act, "edge", band())
-      check(label, verdict.ok, verdict.detail)
+      filmed(label, verdict.ok, verdict)
     }
 
     function test_edge() {
@@ -194,7 +200,7 @@ Harness {
       // Half a second of frames in which the edge must not move.
       wait(500)
       var opened = verdict("edgeheld")
-      check("an open from closed shows the fitted height from its first frame", opened.ok, opened.detail)
+      filmed("an open from closed shows the fitted height from its first frame", opened.ok, opened)
 
       eases("a switch to a shorter list eases the edge up, the footer riding it", function() { service.switchList("Short") })
       eases("a switch to a longer list eases the edge down, the footer covering the rows it passes", function() { service.switchList("") })
@@ -216,15 +222,15 @@ Harness {
       service.switchList("Empty")
       rest()
       var menu = frames("menu", function() { key("w") }, "edge", ["0"])
-      check("the list menu on an empty list eases the edge down to room for it and the footer",
-        menu.ok && service.listName === "Empty", menu.detail)
+      filmed("the list menu on an empty list eases the edge down to room for it and the footer",
+        menu.ok && service.listName === "Empty", menu)
       panel.testBody.closeListMenu()
       rest()
 
       // Search on the empty list: its field stands at the top, so nothing
       // rides the edge as it opens.
       var opening = frames("search-open", function() { key("a") }, "edge", ["0"])
-      check("search opening eases the edge down to its room", opening.ok && panel.testBody.adding, opening.detail)
+      filmed("search opening eases the edge down to its room", opening.ok && panel.testBody.adding, opening)
       eases("search closing eases the edge back up, the footer riding it", function() { panel.testBody.cancelAdding() })
 
       service.switchList("")

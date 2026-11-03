@@ -16,8 +16,12 @@ import Quickshell.Io
 // that tick (a change made at the mark shows at once). Timed by the render
 // instead, a late clock shows each moment later than it was, and a
 // 160 ms ease on a busy machine reads as 240. Times are ms since `start`,
-// which a harness sets as its motion starts (`markStart`). A harness copies
-// this beside its shell.qml (`frame_tools`, lib.sh).
+// which a harness sets as its motion starts (`markStart`). Each frame also
+// notes how long the main thread had worked and had waited for a CPU, from
+// /proc/self/schedstat (the thread Quickshell started on, which runs the
+// QML, the animations and the software render), so a slow frame tells a
+// slow Stonks from a busy machine (`work`), and every verdict says both. A
+// harness copies this beside its shell.qml (`frame_tools`, lib.sh).
 Item {
   id: grabber
 
@@ -31,8 +35,12 @@ Item {
   property real tick: 0
   property real shown: 0
   property Item ground: null
+  // The main thread's figures over the frames last judged, in words.
+  property string judgedWork: ""
 
   // Starts a run of frames named `runName`, timed from now until marked.
+  // The main thread's times are read once first, since a FileView's first
+  // read comes back empty and would leave the film's first frame untimed.
   function begin(runName) {
     if (ground) ground.destroy()
     ground = Qt.createQmlObject('import QtQuick; Rectangle { anchors.fill: parent; z: -1000 }', source)
@@ -43,7 +51,40 @@ Item {
     shown = 0
     verdict = null
     start = Date.now()
+    threadTimes()
     ticker.running = true
+  }
+
+  // The main thread's time on a CPU and waiting for one, in ms since it
+  // started; NaN where the file can't be read.
+  function threadTimes() {
+    sched.reload()
+    var fields = String(sched.text()).split(" ")
+    return { run: Number(fields[0]) / 1e6 || NaN, queued: Number(fields[1]) / 1e6 }
+  }
+
+  // Between each two of `list`'s frames (every frame by default): the
+  // longest the main thread worked, how long passed between those two
+  // frames' grabs and how much of it the thread waited for a CPU; the wait
+  // in all; and those in words.
+  function work(list) {
+    var judged = list || frames
+    var out = { timed: judged.length >= 2, longest: 0, gap: 0, gapQueued: 0, queued: 0 }
+    for (var k = 1; k < judged.length; k++) {
+      var run = judged[k].run - judged[k - 1].run
+      var queued = judged[k].queued - judged[k - 1].queued
+      if (!isFinite(run) || !isFinite(queued)) out.timed = false
+      out.queued += queued
+      if (run <= out.longest) continue
+      out.longest = run
+      out.gap = judged[k].taken - judged[k - 1].taken
+      out.gapQueued = queued
+    }
+    out.text = !out.timed ? "the main thread's times unread (/proc/self/schedstat)"
+      : "the main thread worked at most " + Math.round(out.longest) + " ms between two frames (grabbed " + Math.round(out.gap)
+        + " ms apart, " + Math.round(out.gapQueued) + " ms of it waiting for a CPU), and waited " + Math.round(out.queued)
+        + " ms for a CPU in all"
+    return out
   }
 
   function markStart() { start = Date.now() }
@@ -51,10 +92,12 @@ Item {
   function end() { ticker.running = false }
   function resume() { ticker.running = true }
 
-  // One frame: this render's picture, timed by its moment.
+  // One frame: this render's picture, timed by its moment, and when it was
+  // taken, with the main thread's times then.
   function shot(at) {
     var path = Quickshell.env("STONKS_FRAMES") + "/" + name + "-" + String(frames.length).padStart(3, "0") + ".ppm"
-    frames.push({ path: path, at: at })
+    var times = threadTimes()
+    frames.push({ path: path, at: at, taken: Date.now(), run: times.run, queued: times.queued })
     shown = at
     waiting++
     source.grabToImage(function(result) {
@@ -73,11 +116,13 @@ Item {
   // own `args` (edge's band, press's fill and box, a draw-in's `plot=`).
   // The run is over: the ground goes. A verdict always comes within 9 s, a
   // failing one if frames.js gave none, so a harness waiting 10 s for it
-  // never reads null.
+  // never reads null. Its detail ends with the main thread's figures over
+  // the judged frames (`work`); `own` is frames.js's words alone.
   function judge(mode, judged, args) {
     verdict = null
     if (ground) ground.destroy()
     ground = null
+    judgedWork = work(judged).text
     judgeProc.command = ["bun", Quickshell.env("STONKS_FRAME_CHECK"), mode].concat(args || []).concat((judged || frames).map(function(frame) {
       return frame.path + "@" + Math.round(frame.at - grabber.start)
     }))
@@ -88,7 +133,8 @@ Item {
   Timer {
     id: noVerdict
     interval: 9000
-    onTriggered: if (grabber.verdict === null) grabber.verdict = { ok: false, detail: "no verdict from frames.js in 9 s" }
+    onTriggered: if (grabber.verdict === null)
+      grabber.verdict = { ok: false, own: "no verdict from frames.js in 9 s", detail: "no verdict from frames.js in 9 s | " + grabber.judgedWork }
   }
 
   // Keeps the window rendering on every tick while grabbing, still pictures
@@ -115,9 +161,17 @@ Item {
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
-        try { grabber.verdict = JSON.parse(String(text || "").trim()) }
-        catch (e) { grabber.verdict = { ok: false, detail: "no verdict: " + text } }
+        var told
+        try { told = JSON.parse(String(text || "").trim()) }
+        catch (e) { told = { ok: false, detail: "no verdict: " + text } }
+        told.own = told.detail
+        told.detail += " | " + grabber.judgedWork
+        grabber.verdict = told
       }
     }
   }
+
+  // blockAllReads: with blockLoading alone, reload() hands back the last
+  // read's text while the new one loads, a frame or more late.
+  FileView { id: sched; path: "/proc/self/schedstat"; blockAllReads: true; printErrors: false }
 }
