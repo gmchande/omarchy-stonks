@@ -159,6 +159,11 @@ every_state() (
   for moment in london-2026-11-03-0255 london-2026-11-03-0303 london-2026-11-03-0320 london-2026-11-03-0330; do
     states="$states popup-sweep-$moment-shel.l-smooth popup-sweep-$moment-shel.l-retro"
   done
+  # BHP at Sydney's open on Wednesday 4 November: Tuesday's move until
+  # Wednesday's first bar, then Wednesday's, from Tuesday's close.
+  for moment in sydney-2026-11-03-1755 sydney-2026-11-03-1803 sydney-2026-11-03-1820 sydney-2026-11-03-1830; do
+    states="$states popup-sweep-$moment-bhp.ax-smooth popup-sweep-$moment-bhp.ax-retro"
+  done
   # Sunday 1 November at 21:48, when Friday's line and tonight's stood apart
   # on every chart: each runs on from Friday's last trade to tonight's first,
   # the weekend taking no room; SHOP's Friday ended at 18:35.

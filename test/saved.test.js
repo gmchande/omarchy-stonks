@@ -2585,19 +2585,27 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   // from Monday's 3,921. Yahoo had caught up by the first bars Stonks saw.
   // A shell started at 08:20 leaves the move out, and one started at 08:30,
   // its trades 14 minutes past the first, shows it.
-  const shell = (time, file) => M.parseChart(fixture(`moments/london-2026-11-03-${time}/${file}`), cents)
-  const londonRows = []
-  let londonHeld = null
-  for (const time of ["0255", "0303", "0310", "0320", "0330"]) {
-    const two = M.twoDays(londonHeld, at("2026-11-03", time.slice(0, 2) + ":" + time.slice(2)), calendars)
-    londonHeld = M.carryClose(londonHeld, shell(time, (two ? "2d/" : "") + "shel.l.json"), calendars)
-    const row = M.rowModel(londonHeld, 0, "pct")
-    londonRows.push(`${time} ${row.priceText} ${row.changeText}`)
+  const answerAt = (place, time, file) => M.parseChart(fixture(`moments/${place}-2026-11-03-${time}/${file}`), cents)
+  const opening = (place, symbol, times) => {
+    let held = null
+    return times.map(time => {
+      const two = M.twoDays(held, at("2026-11-03", time.slice(0, 2) + ":" + time.slice(2)), calendars)
+      held = M.carryClose(held, answerAt(place, time, (two ? "2d/" : "") + symbol + ".json"), calendars)
+      const row = M.rowModel(held, 0, "pct")
+      return `${time} ${row.priceText} ${row.changeText}`
+    })
   }
-  expect(londonRows).toEqual(["0255 3,921.00 \u22122.86%", "0303 3,921.00 \u22122.86%", "0310 3,921.00 \u22122.86%",
-    "0320 3,906.50 \u22120.37%", "0330 3,913.00 \u22120.20%"])
-  const londonFresh = time => M.rowModel(M.carryClose(null, shell(time, "2d/shel.l.json"), calendars), 0, "pct").changeText
-  expect([londonFresh("0320"), londonFresh("0330")]).toEqual(["\u2014", "\u22120.20%"])
+  const startedAt = (place, symbol, time) => M.rowModel(M.carryClose(null, answerAt(place, time, `2d/${symbol}.json`), calendars), 0, "pct").changeText
+  expect(opening("london", "shel.l", ["0255", "0303", "0310", "0320", "0330"])).toEqual(["0255 3,921.00 \u22122.86%",
+    "0303 3,921.00 \u22122.86%", "0310 3,921.00 \u22122.86%", "0320 3,906.50 \u22120.37%", "0330 3,913.00 \u22120.20%"])
+  expect([startedAt("london", "shel.l", "0320"), startedAt("london", "shel.l", "0330")]).toEqual(["\u2014", "\u22120.20%"])
+  // BHP at Sydney's open on Wednesday 4 November, 09:55 to 10:30 there
+  // (Tuesday 17:55 to 18:30 New York): Tuesday's move from Monday's 56.74,
+  // then Wednesday's from Tuesday's 56.42, Yahoo's own from its first bars.
+  // Sydney has no calendar, so a shell started at 10:20 reads Yahoo's.
+  expect(opening("sydney", "bhp.ax", ["1755", "1803", "1810", "1820", "1830"])).toEqual(["1755 56.42 \u22120.56%",
+    "1803 56.42 \u22120.56%", "1810 56.42 \u22120.56%", "1820 55.78 \u22121.13%", "1830 55.75 \u22121.19%"])
+  expect(startedAt("sydney", "bhp.ax", "1820")).toBe("\u22121.13%")
   // Friday 30 October at 09:26 there, with Friday's first bars: Friday's
   // move, from Thursday's close.
   const after = M.parseChart(fixture("moments/tokyo-2026-10-30-0926/7203.t.json"), cents)
