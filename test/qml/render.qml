@@ -585,10 +585,12 @@ Harness {
         : { day: 1790962920, night: 1790910000, sunday: 1790562600, live: 1791175013 }[root.overnight.moment]
       var quotes = {}, entries = {}, nights = {}, allDay = {}
       // Read as the feeds read them, answered at the moment: the US listings
-      // in cents from $1.
+      // in cents from $1, and by a shell that holds no close of the session
+      // before (`Market.carryClose`), which leaves the move out where Yahoo
+      // may not have caught up with it.
       var ranges = {}
       var parsed = function(answer) {
-        var quote = Quote.parseChart(answer, Market.centExchanges(stub.calendars), root.now)
+        var quote = Market.carryClose(null, Quote.parseChart(answer, Market.centExchanges(stub.calendars), root.now), stub.calendars)
         return root.overnight.lastTrade ? Object.assign({}, quote, { price: null, marketTime: null }) : quote
       }
       listed.forEach(function(s) {

@@ -145,11 +145,19 @@ every_state() (
     states="$states popup-sweep-$moment-smooth popup-sweep-$moment-retro"
   done
   # Toyota at Tokyo's open on Monday 2 November: Friday's move before the
-  # open and before Monday's first bar, never 0.00%, then Monday's trades
-  # from Friday's close. 19:15 and 19:20, which read right only from the
-  # close a running shell held, are in test/saved.test.js.
-  for moment in tokyo-2026-11-01-1855 tokyo-2026-11-01-1903 tokyo-2026-11-01-1921; do
+  # open and before Monday's first bar, never 0.00%, then, read by a shell
+  # that holds no close of Friday's, Monday's trades with the move left out
+  # while Yahoo may still count from Thursday's. A running shell counts
+  # them from Friday's close; that is in test/saved.test.js.
+  for moment in tokyo-2026-11-01-1855 tokyo-2026-11-01-1903 tokyo-2026-11-01-1915 tokyo-2026-11-01-1921; do
     states="$states popup-sweep-$moment-7203.t-smooth popup-sweep-$moment-7203.t-retro"
+  done
+  # Shell at London's open on Tuesday 3 November: Monday's move until
+  # Tuesday's first bar; then the move left out, read by a shell that holds
+  # no close of Monday's, until Tuesday's trades are ten minutes past the
+  # first.
+  for moment in london-2026-11-03-0255 london-2026-11-03-0303 london-2026-11-03-0320 london-2026-11-03-0330; do
+    states="$states popup-sweep-$moment-shel.l-smooth popup-sweep-$moment-shel.l-retro"
   done
   # Sunday 1 November at 21:48, when Friday's line and tonight's stood apart
   # on every chart: each runs on from Friday's last trade to tonight's first,

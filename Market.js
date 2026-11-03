@@ -451,12 +451,15 @@ function twoDays(quote, now, calendars) {
   return !!open && now >= open.start && now < open.end && !printedSince(open.start)
 }
 
-// For minutes after an open, Yahoo's answers, all but a two-day chart, can
-// still count the day from the close before last. Each quote carries the
-// last close Stonks saw (`closeSeen`, saved with it) for the next weekday's
-// session to count from. A split, a dividend or a holiday moves Yahoo's
-// base, and Yahoo's stands. A US stock's day turns at 04:00, hours before its
-// first trade: a calendar with a pre-market keeps Yahoo's.
+// For minutes after an open, Yahoo's answers can still count the day from
+// the close before last. Each quote carries the last close Stonks saw
+// (`closeSeen`, saved with it) for the next session to count from. A split
+// or a dividend moves Yahoo's base, and Yahoo's stands. A Stonks that holds
+// no close from the session before leaves the move out until Yahoo has
+// caught up (`CATCH_UP`): no field of Yahoo's answers names that close at
+// every open. A US stock's day turns at 04:00, hours before its first
+// trade: a calendar with a pre-market keeps Yahoo's, and so does a listing
+// with no calendar, which may be one.
 function carryClose(previous, quote, calendars) {
   if (!quote || quote.crypto || quote.instrumentType === "INDEX" || !quote.session.regular) return quote
   var cal = calendarFor(calendars, quote)
@@ -464,12 +467,14 @@ function carryClose(previous, quote, calendars) {
   // The next quote reads the close from this one, so an unchanged answer
   // after the bell stays unchanged.
   var seen = previous && !sessionClose(quote) ? sessionClose(previous) || previous.closeSeen || null : null
-  if (!seen) return quote
   var reg = quote.session.regular
   var head = Quote.headlineQuote(quote)
   var traded = !!head && head.source === "quote" && head.t !== null && head.t >= reg.start
-  var stale = traded && nextWeekday(quote, seen.day, reg.start) && quote.prevClose === seen.before && seen.before !== seen.close
-  return Object.assign({}, quote, stale ? { closeSeen: seen, prevClose: seen.close } : { closeSeen: seen })
+  var held = !!seen && nextSession(quote, seen.day, reg.start, cal)
+  var stale = traded && held && quote.prevClose === seen.before && seen.before !== seen.close
+  var unknown = traded && !held && !!cal && head.t < firstTrade(quote, head) + CATCH_UP
+  if (!seen && !unknown) return quote
+  return Object.assign({}, quote, seen ? { closeSeen: seen } : {}, stale ? { prevClose: seen.close } : unknown ? { prevClose: null } : {})
 }
 
 function sessionClose(quote) {
@@ -479,10 +484,29 @@ function sessionClose(quote) {
     ? { day: reg.start, close: head.price, before: quote.prevClose } : null
 }
 
-function nextWeekday(quote, from, to) {
+// Whether the session `to` starts is the next after the one `from` starts:
+// by the listing's calendar where it covers the day, so Tuesday's follows
+// Friday's over a Monday holiday, else by weekdays.
+function nextSession(quote, from, to, cal) {
+  var date = function(t) { return dateStringOf(localDate(t, cal)) }
+  if (cal && date(to) <= cal.validThrough) {
+    var open = nextOpen(cal, epochAt(cal, nextDateString(date(from)), "00:00"))
+    return !!open && open.dateString === date(to)
+  }
   var day = function(t) { return Math.floor((t + (quote.gmtoffset || 0)) / 86400) }
   var weekday = new Date(day(from) * 86400000).getUTCDay()
   return day(to) - day(from) === (weekday === 5 ? 3 : weekday === 6 ? 2 : 1)
+}
+
+// Toyota's answers at Tokyo's open on Monday 2 November counted from
+// Thursday's close until its trades reached 09:05, five minutes after the
+// first; Shell's at London's on Tuesday 3 November were right by 08:05.
+// Twice that, from the first trade Yahoo sent: its bar, else the quote.
+var CATCH_UP = 10 * 60
+
+function firstTrade(quote, head) {
+  var pts = Quote.regularPoints(quote)
+  return pts.length ? pts[0].t : head.t
 }
 
 // Yahoo can answer with the last session's quote for seconds after the open.
