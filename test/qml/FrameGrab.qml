@@ -39,6 +39,8 @@ Item {
   property string judgedWork: ""
 
   // Starts a run of frames named `runName`, timed from now until marked.
+  // The main thread's times are read once first, since a FileView's first
+  // read comes back empty and would leave the film's first frame untimed.
   function begin(runName) {
     if (ground) ground.destroy()
     ground = Qt.createQmlObject('import QtQuick; Rectangle { anchors.fill: parent; z: -1000 }', source)
@@ -49,6 +51,7 @@ Item {
     shown = 0
     verdict = null
     start = Date.now()
+    threadTimes()
     ticker.running = true
   }
 
