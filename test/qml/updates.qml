@@ -125,9 +125,13 @@ Harness {
       return within(5000, function() { return harness.asked() === count && !harness.feed.testAsking })
     }
 
-    // The clock a day on from the last look: everything due there asked.
-    function nextDay() {
-      service.now = harness.feed.askedAt + 24 * 60 * 60
+    // The clock a day on from the last look, or `short` seconds less:
+    // everything due there asked. It waits until no quote is out first: the
+    // jump would make that quote a day late, and its "!" would be no answer
+    // of GitHub's.
+    function nextDay(short) {
+      tryVerify(function() { return Object.keys(service.owed).length === 0 }, 5000)
+      service.now = harness.feed.askedAt + 24 * 60 * 60 - (short || 0)
     }
 
     // What the footer says, its notice's action included, and what its
@@ -229,7 +233,7 @@ Harness {
 
       // A second short of a day: nothing. A day on: asked again, older.
       put("MANIFEST.version", "1.0.8")
-      service.now = harness.feed.askedAt + 24 * 60 * 60 - 1
+      nextDay(1)
       var early = harness.feed.testAsking || harness.asked() !== 1
       nextDay()
       var older = answered(2) && visit()
