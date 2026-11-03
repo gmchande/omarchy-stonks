@@ -383,7 +383,8 @@ async function runOne(t, index) {
   clearInterval(watch)
   // The lines that say why a run failed, a check's own result aside.
   const errors = [...new Set((out + "\n" + err).split("\n")
-    .filter(l => /\bFAIL|Error\b|\berror\b|not found|missed/.test(l) && !/STEP \d+ /.test(l))
+    .filter(l => /\bfail|error/i.test(l) || /not found|missed/.test(l))
+    .filter(l => !/STEP \d+ /.test(l))
     .map(l => l.replace(/^\s*(DEBUG|INFO|WARN|ERROR|FATAL)?:?\s*(qml:\s*)?/, "").trim()))]
   if (t.harness) return stopped ? { results: seen } : { code, results: steps(out), errors }
   const results = []
