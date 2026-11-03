@@ -188,6 +188,9 @@ Harness {
 
   // The data file's mode ("600"), and the end of service.sh's hold on chmod.
   property var afterMode: null
+  // What each read-back said while the data file was being made.
+  property var judgedWhileMade: []
+  property var noteJudged: null
   Process {
     id: modeProc
     command: ["stat", "-c", "%a", harness.dataPath]
@@ -562,10 +565,15 @@ Harness {
         harness.readThen(function(obj, text) {
           check("a first save that can't be made its owner's alone is said unsaved, and leaves no file another account could read",
             service.saveFailed && text === null && service.range === "5Y", service.saveFailed + "|" + text + "|" + service.range)
-          // Two changes, the second while the first is being made.
+          // Two changes, the second while the first is being made, and a
+          // read meanwhile, which judges nothing: no save is said lost.
+          harness.judgedWhileMade = []
+          harness.noteJudged = function(saved) { harness.judgedWhileMade.push(saved) }
+          service.saveChecked.connect(harness.noteJudged)
           harness.stateThen("rm -f \"$1/ln.fail\" && touch \"$1/ln.hold\"", function() {
             service.persist({ range: "1Y" })
             service.persist({ range: "3M" })
+            service.readDataFile()
             harness.stateThen("rm -f \"$1/ln.hold\"", function() { harness.go(43) })
           })
         })
@@ -573,9 +581,12 @@ Harness {
         harness.readThen(function(obj) {
           var landed = !!obj && obj.range === "3M" && !service.saveFailed && service.range === "3M"
           if (!landed && harness.waited < 3000) return
+          service.saveChecked.disconnect(harness.noteJudged)
+          var judged = harness.judgedWhileMade
           harness.afterMode = function(mode) {
             check("the next change makes it, its owner's alone from its first write, and a change made meanwhile lands in it",
               landed && mode === "600", JSON.stringify({ file: obj && obj.range, range: service.range, failed: service.saveFailed, mode: mode }))
+            check("a read while the file is being made says no save was lost", judged.indexOf(false) < 0, judged.join(","))
             releaseChmod.running = true
             harness.go(25)
           }

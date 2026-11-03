@@ -800,6 +800,7 @@ Item {
   function answersLanded() {
     root.tick()
     root.askDue()
+    // The pill's first live answer asks Robinhood for it at once.
     root.askOvernight()
   }
   onLibraryChanged: {
@@ -1069,6 +1070,7 @@ Item {
     var s = String(symbol || "").trim().toUpperCase()
     if (s && s === root.previewSymbol && previewFeed.entries[s])
       feed.restore(s, previewFeed.quotes[s] || null, previewFeed.entries[s])
+    // A symbol already in All is a row at once.
     if (s && root.library.indexOf(s) < 0 && root.arriving.indexOf(s) < 0 && !root.answered(s))
       root.arriving = root.arriving.concat([s])
     var previewed = s !== "" && s === root.previewSymbol
@@ -1108,6 +1110,7 @@ Item {
   function undoRemoval(symbol) {
     if (!root.lastRemoval || root.lastRemoval.symbol !== symbol) return
     var removal = root.lastRemoval
+    // Only once.
     root.lastRemoval = null
     if (removal.quote) feed.restore(symbol, removal.quote, removal.entry)
     root.save(Settings.withRemovalUndone(root.dataSettings, removal.before, symbol, removal.left))

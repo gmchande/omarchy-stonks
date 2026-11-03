@@ -101,6 +101,8 @@ Harness {
       // An hour on the schedule's clock, and a user's refresh. The fetch
       // must not come, so time passes: a fetch answers in 0.4 s.
       service.now += 3600
+      // The minute's prune keeps the cap and P/E of the preview on show.
+      harness.check("the minute's prune keeps the preview's cap and P/E", !!service.fundamentals["SHOP.TO"], JSON.stringify(service.fundamentals["SHOP.TO"]))
       service.askDue()
       service.refresh()
       wait(600)
