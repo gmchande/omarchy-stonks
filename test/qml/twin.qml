@@ -122,14 +122,25 @@ Harness {
           && releasePill.featuredSymbol === "MSFT" && devPill.featuredSymbol === "NVDA",
         releaseService.library + " | " + devService.library + " | " + releasePill.featuredSymbol + " | " + devPill.featuredSymbol)
 
-      // Each saves the prices of its own list, once they have come. Before
-      // the edits below: a stock just added holds the save until its first
-      // run has landed (`Service.flushQuotes`).
-      var cached = within(30000, function() {
+      // Each saves the prices of its own list once they have come and the
+      // runs that brought them have landed, on its clock's next tick
+      // (`Service.flushQuotes`). A run whose end is heard after its answers
+      // were read leaves the save to that tick, which with nothing open is up
+      // to a minute on: once each feed is quiet, the clocks tick here until
+      // the saves land. Before the edits below, whose asks would hold the
+      // save again.
+      var quiet = within(30000, function() {
+        return [releaseService, devService].every(function(s) {
+          return !s.testFeed.busy && s.library.every(function(symbol) { return !!s.quotes[symbol] })
+        })
+      })
+      var cached = quiet && within(5000, function() {
+        releaseService.tick()
+        devService.tick()
         return harness.cachedSymbols("grvc.stonks") === "AAPL,MSFT,NVDA" && harness.cachedSymbols("grvc.stonks-dev") === "NVDA"
       })
       harness.check("each copy keeps the last prices of its own list in its own cache folder",
-        cached, harness.cachedSymbols("grvc.stonks") + " | " + harness.cachedSymbols("grvc.stonks-dev"))
+        cached, (quiet ? "" : "the feeds never went quiet | ") + harness.cachedSymbols("grvc.stonks") + " | " + harness.cachedSymbols("grvc.stonks-dev"))
 
       // An edit in each lands in its own file alone.
       var releaseText = harness.readFile(harness.config + "grvc.stonks.json")
