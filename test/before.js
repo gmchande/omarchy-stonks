@@ -79,6 +79,26 @@ if (codeChanged.length === 0) {
   process.exit(0)
 }
 
+// What the branch adds to the product: the files the base hasn't, and the
+// names in its code that no product file at the base has. A case that
+// can't run on the code before counts as failing there only when the error
+// names one of them.
+const words = text => new Set(text.match(/[A-Za-z_$][\w$]{2,}/g) || [])
+const isProduct = path => !/^(test|\.github|media)\/|\.(md|png)$/.test(path)
+const baseNames = new Set()
+for (const path of git("ls-tree", "-r", "--name-only", base).split("\n")) {
+  if (isProduct(path) && /\.(qml|js)$/.test(path)) for (const w of words(canon(show(path)))) baseNames.add(w)
+}
+const addedFiles = product.filter(path => existsSync(join(root, path)) && run(["git", "cat-file", "-e", `${base}:${path}`]).code !== 0)
+const addedNames = new Set(addedFiles.flatMap(path => {
+  const file = path.split("/").pop()
+  return [file, file.replace(/\.\w+$/, "")]
+}))
+for (const path of codeChanged) {
+  if (/\.(qml|js)$/.test(path)) for (const w of words(canon(now(path)))) if (!baseNames.has(w)) addedNames.add(w)
+}
+const namesAdded = line => [...words(line)].some(w => addedNames.has(w)) || addedFiles.some(path => line.includes(path.split("/").pop()))
+
 // The harnesses a runner starts, by name, each with the command it starts
 // it with: the first, where a runner starts one more than once.
 const starts = new Map()
@@ -308,17 +328,23 @@ writeFileSync(harnessFile, harnessSource.replace(opening, opening
   + "    var at = String(new Error().stack).split(\"\\n\").filter(function(f) { return /\\/shell\\.qml:\\d+$/.test(f) })[0]\n"
   + "    if (at) console.log(\"STEP \" + at.replace(/^.*:/, \"\") + \" \" + (ok ? \"PASS\" : \"FAIL\") + \" \" + label)\n"))
 
-// failing T RESULTS CODE: the first of T's cases to fail on the code
-// before, as { start, name }: a check of it failed there, or its file's run
-// failed before it ran, as a file needing what the change adds does. A
-// skipped case fails on nothing.
+// failing T RESULTS CODE ERRORS: the first of T's cases to fail on the code
+// before, as { start, name } or { start, error }: a check of it failed
+// there, or its file's run failed before it ran with an error that names a
+// file or a name the branch adds, as a file needing the change does. An
+// error that names none of them is kept in `breaks`, never taken as proof:
+// something else broken at the base. A skipped case fails on nothing.
 const inCase = (checks, r) => checks.some(c => c.start <= r.line && r.line <= c.end)
-function failing(t, results, code) {
+const breaks = []
+function failing(t, results, code, errors = []) {
   for (const checks of t.cases) {
     const own = results.filter(r => inCase(checks, r))
     const failed = own.find(r => !r.pass && !r.skip)
     if (failed) return { start: checks[0].start, name: failed.name }
-    if (!own.length && code !== undefined && code !== 0 && code !== 77) return { start: checks[0].start }
+    if (own.length || code === undefined || code === 0 || code === 77) continue
+    const error = errors.find(namesAdded)
+    if (error) return { start: checks[0].start, error }
+    if (!breaks.some(b => b.t === t)) breaks.push({ t, errors })
   }
   return null
 }
@@ -351,45 +377,54 @@ async function runOne(t, index) {
     }
     if (!stopped && (found || failing(t, seen))) { stopped = true; child.kill("SIGTERM") }
   }, 500)
-  const [out] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()])
+  const [out, err] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()])
   const code = await child.exited
   running.delete(child)
   clearInterval(watch)
-  if (t.harness) return stopped ? { results: seen } : { code, results: steps(out) }
+  // The lines that say why a run failed, a check's own result aside.
+  const errors = [...new Set((out + "\n" + err).split("\n")
+    .filter(l => /\bFAIL|Error\b|\berror\b|not found|missed/.test(l) && !/STEP \d+ /.test(l))
+    .map(l => l.replace(/^\s*(DEBUG|INFO|WARN|ERROR|FATAL)?:?\s*(qml:\s*)?/, "").trim()))]
+  if (t.harness) return stopped ? { results: seen } : { code, results: steps(out), errors }
   const results = []
   const text = existsSync(report) ? readFileSync(report, "utf8") : ""
   for (const m of text.matchAll(/<testcase name="([^"]*)"[^>]*? line="(\d+)"[^>]*?(\/>|>([\s\S]*?)<\/testcase>)/g)) {
     const body = m[4] || ""
     results.push({ line: Number(m[2]), pass: !/<(failure|error)\b/.test(body), skip: /<skipped\b/.test(body), name: xml(m[1]) })
   }
-  return { code, results }
+  return { code, results, errors }
 }
 
-// The unit test files one by one, then the harnesses three at a time, until
-// a changed case fails on the code before.
+// The unit test files, then the harnesses, one at a time, until a changed
+// case fails on the code before. One at a time, so test/all.sh, whose queue
+// gives this check one of its slots, never runs more harnesses at once
+// than test/queue.sh allows.
 let skipped = 0
-const record = (t, { code, results }) => {
+for (const [index, t] of due.entries()) {
+  if (found) break
+  const { code, results, errors } = await runOne(t, index)
   if (code === 77) {
     console.log(`skipped ${t.path}: no saved answers to run its ${t.cases.length} changed cases on`)
     skipped += t.cases.length
   }
-  const f = !found && failing(t, results, code)
+  const f = failing(t, results, code, errors)
   if (f) found = { t, ...f }
 }
-let next = 0
-while (next < due.length && !due[next].harness && !found) record(due[next], await runOne(due[next], next++))
-await Promise.all([1, 2, 3].map(async () => {
-  while (next < due.length && !found) {
-    const index = next++
-    record(due[index], await runOne(due[index], index))
-  }
-}))
 
 if (found) {
-  const where = found.name ? `"${found.name}" (${found.t.path}:${found.start}) fails` : `the case at ${found.t.path}:${found.start} can't run`
+  const where = found.name ? `"${found.name}" (${found.t.path}:${found.start}) fails`
+    : `the case at ${found.t.path}:${found.start} can't run, as "${found.error}" says,`
   console.log(`${where} on ${baseName}'s code (${short}), so the branch's tests tell its change from the code before it`)
   process.exit(0)
 }
+// A run that broke at the base for a reason the branch doesn't name proves
+// nothing: say what broke, and fail.
+for (const { t, errors } of breaks) {
+  console.log(`FAILED before the change: ${t.path} broke on ${baseName}'s code (${short}) before reaching its changed cases, `
+    + "and the error names nothing this branch adds, so it can't show the change is needed. Fix what broke there, or check it "
+    + `fails for the change. It said:\n${(errors.length ? errors.slice(0, 5) : ["nothing"]).map(l => "  " + l).join("\n")}`)
+}
+if (breaks.length) process.exit(1)
 if (skipped) {
   console.log(`no changed case that ran fails on ${baseName}'s code (${short}); the ${skipped} with no saved answers may`)
   process.exit(77)
