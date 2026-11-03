@@ -21,7 +21,8 @@ Item {
   // 0..1 along the session, or -1 for none.
   property real cursorX: -1
   readonly property real pad: 1.5
-  // The baseline is always there; the line shows to the newest print's dot.
+  // The baseline, where there is one, shows whole; the line shows to the
+  // newest print's dot.
   property real reveal: 1
   // One print draws as a dot, as the hero's does.
   readonly property bool drawable: !!geometry && !!geometry.points && geometry.points.length >= 1

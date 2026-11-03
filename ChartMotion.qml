@@ -134,8 +134,8 @@ Item {
     return !!chart.day && Chart.fractionAtTime(chart.day, t) >= 0
   }
 
-  // A chart held while the next loads takes no scrub and no replay; nor does a
-  // closing surface.
+  // A chart held while the next loads takes no scrub and no replay; a closing
+  // surface takes no scrub.
   function scrubTo(fraction) {
     if (loading || !surfaceOpen) return
     if (historyActive) {
