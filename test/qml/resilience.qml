@@ -350,6 +350,31 @@ Harness {
       check("a rate whose fetch failed is asked nothing more on its own, by either listing sharing it, and a refresh asks again, once, and it comes",
         failSettled && failedCalls === 1 && withoutRate && refreshedRate && calls("RATE") === rateCalls + 2,
         JSON.stringify({ settled: failSettled, beforeRefresh: failedCalls, came: refreshedRate, asked: calls("RATE") - rateCalls, held: feed.rates.USDCAD }))
+      // A pair whose rate failed is asked anew once no wanted listing needs it and one does again.
+      noRate = Object.assign({}, feed.rates)
+      delete noRate.USDCAD
+      feed.rates = noRate
+      flag("RATE.down", true)
+      rateCalls = calls("RATE")
+      feed.wanted = [{ symbol: "MSFT", currency: "CAD" }]
+      var pairFailed = within(3000, function() { return calls("RATE") === rateCalls + 1 && !feed.busy })
+      flag("RATE.down", false)
+      feed.wanted = []
+      feed.wanted = [{ symbol: "MSFT", currency: "CAD" }]
+      var pairAnew = within(5000, function() { return !!feed.rates.USDCAD && !!feed.rates.USDCAD.value && !feed.busy })
+      check("a pair whose rate failed is asked anew when a listing wants it anew",
+        pairFailed && pairAnew && calls("RATE") === rateCalls + 2,
+        JSON.stringify({ failed: pairFailed, anew: pairAnew, asked: calls("RATE") - rateCalls }))
+      // A cap and P/E asked while Yahoo's pause holds fail at once, and come once Yahoo answers again.
+      before = calls("FUNDAMENTALS")
+      gate.report(["refused"], 60, gate.ticket)
+      feed.wanted = [{ symbol: "TSLA", currency: "USD" }]
+      var pausedFailed = within(2000, function() { return !!feed.entries.TSLA && feed.entries.TSLA.status === "failed" && !feed.busy })
+      gate.report(["ok"], 0, gate.ticket)
+      var pausedCame = within(5000, function() { return !!feed.entries.TSLA && feed.entries.TSLA.status === "ok" && !feed.busy })
+      check("a cap and P/E asked while Yahoo's pause holds fail at once, and come once Yahoo answers again",
+        pausedFailed && pausedCame && calls("FUNDAMENTALS") === before + 1,
+        JSON.stringify({ failed: pausedFailed, came: pausedCame, asked: calls("FUNDAMENTALS") - before, entry: feed.entries.TSLA }))
       feed.wanted = Qt.binding(function() { return service.figuresWanted })
     }
 

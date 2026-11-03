@@ -1,20 +1,17 @@
 .pragma library
-// The one curl every feed runs: one or several URLs in one run, over one
-// connection, compressed, each answer capped and followed by a line that
-// says what came back. Knows nothing of what it fetches.
+// The one curl every feed runs, several URLs over one connection. Knows
+// nothing of what it fetches.
 
 var USER_AGENT = "Mozilla/5.0 (Omarchy Stonks)"
 
-// The line curl writes after each answer: the URL's place in the run, the
-// HTTP status (000 when nothing answered), curl's exit code for it, and any
-// Retry-After. A JSON body never holds a newline followed by this.
+// Curl writes this line after each answer; a JSON body never holds a
+// newline followed by it. Curl's status is 000 when nothing answered.
 var ANSWER_MARK = "@@stonks"
 
-// Caps, each above the largest real answer even uncompressed: a day's chart
-// about 13 KB (BTC-USD's 22), a spark of 20 listings about 90 KB (closes
-// only), a history of 500 bars about 60 KB, Robinhood's prints 56.3 KB a
-// listing a day and 2.6 KB an hour; cap and P/E, search, instruments a few
-// KB; the manifest under 2 KB.
+// Each cap is above the largest real answer, uncompressed: a day's chart up
+// to 22 KB, a spark of 20 listings 90 KB, a history of 500 bars 60 KB,
+// Robinhood's prints 56.3 KB a listing a day and 2.6 KB an hour, the rest a
+// few KB.
 var DAY_CAP = 64000
 var SPARK_CAP = 400000
 var FUNDAMENTALS_CAP = 64000
@@ -22,7 +19,6 @@ var SEARCH_CAP = 64000
 var HISTORY_CAP = 256000
 var MANIFEST_CAP = 16000
 
-// Robinhood's prints for `count` listings over `span`, "day" or "hour".
 function overnightCap(count, span) {
   return 16000 + (span === "hour" ? 8000 : 80000) * count
 }
@@ -31,7 +27,6 @@ function instrumentsCap(count) {
   return 16000 + 8000 * count
 }
 
-// `urls` are fetched in turn; an answer over `maxBytes` is a bad answer.
 // `--max-time` is per URL, so no URL holds a run more than 10 s.
 function curlCommand(urls, maxBytes) {
   return ["curl", "-sS", "--compressed", "--max-filesize", String(maxBytes),
@@ -39,13 +34,8 @@ function curlCommand(urls, maxBytes) {
     "-w", "\\n" + ANSWER_MARK + " %{urlnum} %{http_code} %{exitcode} %header{retry-after}\\n"].concat(urls)
 }
 
-// What one answer means for whoever sent it:
-//   ok       a whole 200 answer, for the feed to parse;
-//   none     no HTTP answer at all: no network, no connection, no TLS, or a
-//            timeout before the status;
-//   refused  429 or 503: the host wants fewer requests;
-//   bad      another 5xx, an answer cut short, or one over its cap;
-//   missing  another 4xx: the question is wrong, asking again won't help.
+// none: no HTTP answer, as with no network or a timeout before the status.
+// refused: the host wants fewer requests. missing: asking again won't help.
 function answerKind(status, exit) {
   if (status === 0) return "none"
   if (status === 429 || status === 503) return "refused"
@@ -54,11 +44,6 @@ function answerKind(status, exit) {
   return status === 200 ? "ok" : "bad"
 }
 
-// A run's output as its answers, by the URL's place in the run: { index,
-// status, kind, body, retryAfter } (seconds, 0 when none was sent), and
-// `end`, where the next answer's text begins. From `from`, where an earlier
-// read of the same run's output left off, so a run read as it comes reads
-// each answer once. A URL the run never reached, stopped first, has none.
 function answers(text, from) {
   var out = []
   var pattern = new RegExp("\\n" + ANSWER_MARK + " (\\d+) (\\d{3}) (\\d+) ?([^\\n]*)\\n", "g")

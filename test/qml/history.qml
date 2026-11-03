@@ -116,6 +116,21 @@ Harness {
       feed.request("HISTSTRAY", "1W", true)
       waitFor(9)
     } else if (step === 9) {
+      // A run fetched ahead whose first chart fails is not tried again.
+      harness.failCalls = calls("FAIL")
+      feed.requestAhead(["FAIL", "AAPL"], "5Y")
+      waitFor(10)
+    } else if (step === 10) {
+      check("a run fetched ahead is tried once, keeping only good answers",
+        calls("FAIL") === failCalls + 1 && entry("FAIL", "5Y") === null && !!entry("AAPL", "5Y"),
+        (calls("FAIL") - failCalls) + "|" + JSON.stringify(entry("FAIL", "5Y")))
+      // A cached chart on the run's range lets the run go on.
+      feed.requestAhead(["MSFT"], "5Y")
+      feed.request("AAPL", "5Y")
+      waitFor(11)
+    } else if (step === 11) {
+      check("a cached chart on the range of a run fetched ahead lets the run go on",
+        !!entry("MSFT", "5Y") && entry("MSFT", "5Y").status === "ok", JSON.stringify(entry("MSFT", "5Y")))
       finish()
     }
   }

@@ -5,5 +5,11 @@
 # way `omarchy restart shell` does while the session is locked, so the
 # service is left running, as it would be then.
 echo "$*" >> "$STONKS_FAKE_STATE/omarchy.calls"
+# `plugin update` succeeds, as one with nothing new does; with PLUGIN.moves
+# in the state folder, it moves the clone's HEAD, as a real update does.
+if [ "$1 $2" = "plugin update" ]; then
+  [ ! -e "$STONKS_FAKE_STATE/PLUGIN.moves" ] || git -C "$HOME/.config/omarchy/plugins/grvc.stonks" -c user.name=t -c user.email=t commit -q --allow-empty -m update
+  exit 0
+fi
 echo "Refusing to restart Omarchy shell while the session is locked." >&2
 exit 1

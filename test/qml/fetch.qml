@@ -626,12 +626,18 @@ Harness {
       openWindow()
       remove("YAHOO.refuse")
       var recovered = 0
+      var announced = false
+      var noteRefreshing = function() { if (service.refreshing) announced = true }
+      service.refreshingChanged.connect(noteRefreshing)
       tick(180, 1, function() { if (!recovered && service.testYahooGate.pause === "" && idle() && Object.keys(service.asked).length === 0) recovered = service.now })
+      service.refreshingChanged.disconnect(noteRefreshing)
       var refused = harness.yahoo(harness.requests().slice(refusedFrom)).filter(function(l) { return / 429$/.test(l) })
       harness.check("Yahoo back: the next lone request reopens it, the next run carries everything, and the marks clear",
         recovered > 0 && marks().length === 0, (recovered ? recovered - askedAt : "never") + " s | " + marks().join(" | "))
       harness.check("through the refusal, one request per pause: one alone before the one that found Yahoo back",
         refused.length === 1, refused.join(", "))
+      // r while Yahoo refused waits on nothing: what it asked for goes once Yahoo is back, unannounced.
+      harness.check("what r asked for while Yahoo refused goes once Yahoo is back without saying Refreshing", !announced, String(announced))
 
       // Back within seconds of the network, as after a wake: it goes
       // with the next run, and comes back 10 s later. A search's preview
@@ -1080,6 +1086,20 @@ Harness {
       var litHistory = harness.calls("NEST.history") - historyFrom
       app.testBody.selectRange("1D")
       settle()
+      // With every screen off, a refresh's quotes are asked at once and wait
+      // their turn for a screen; only the rest is owed.
+      screenStandIn.on = false
+      wait(1100)
+      service.now += 20
+      service.refresh()
+      screensHeard()
+      var darkUserAsked = "NEST" in service.testFeed.userAsked
+      screenStandIn.on = true
+      wait(1100)
+      service.now += 5
+      settle()
+      harness.check("a refresh while every screen is off asks its quotes at once, to wait their turn for a screen", darkUserAsked,
+        JSON.stringify(service.testFeed.userAsked))
       closeWindow()
       plugin.windowHost.monitors = []
       harness.check("a refresh while every screen is off asks the range's history once a screen is on, not before, and says nothing meanwhile",
@@ -1354,7 +1374,16 @@ Harness {
       // Yahoo answers again; the refused row goes with the next run.
       gate.report(["ok"], 0, gate.ticket)
       settle()
-      service.setOrder("manual")
+      // Changing the order, the list, or its rows lets a held order go at once.
+      var home = service.view.list
+      service.createList("Held")
+      var letGo = [function() { service.switchList(home) }, function() { service.deleteList("Held") },
+        function() { service.setOrder("manual") }].map(function(change) {
+        service.heldOrder = service.view.shown.slice()
+        change()
+        return !service.heldOrder
+      })
+      harness.check("a held order goes at once on a list switch, a change to the lists' rows, and an order change", letGo.join(",") === "true,true,true", letGo.join(","))
       closeWindow()
 
       // The saved prices, due while a run is out, wait for that run and not
@@ -1466,6 +1495,22 @@ Harness {
       remove("YAHOO.refuse")
       harness.check("the saved prices due during Yahoo's pause are written, though the asks it holds wait", refused && savedInPause,
         refused + " | " + savedInPause)
+
+      // A removal taken back keeps what was chosen since, and is on offer
+      // only until the next change to what the lists hold.
+      var rangeThen = service.view.range
+      service.removeSymbol("KILN")
+      service.persist({ range: rangeThen === "1Y" ? "5Y" : "1Y" })
+      var chosen = service.view.range
+      service.undoRemoval("KILN")
+      var undoneKept = service.library.indexOf("KILN") >= 0 && service.view.range === chosen && chosen !== rangeThen
+      service.removeSymbol("KILN")
+      service.createList("Since")
+      service.deleteList("Since")
+      service.undoRemoval("KILN")
+      var offerEnded = service.library.indexOf("KILN") < 0
+      harness.check("a removal taken back keeps the range chosen since, and a change to the lists ends its offer",
+        undoneKept && offerEnded, undoneKept + " | " + offerEnded)
 
       harness.finish()
     }

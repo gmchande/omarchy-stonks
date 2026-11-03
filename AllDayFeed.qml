@@ -1,31 +1,20 @@
 import QtQuick
 import "Fetch.js" as Fetch
 import "Overnight.js" as Overnight
-// Whether Robinhood trades each US stock or ETF all day in its 24 Hour
-// Market (`all_day_tradability`), from its keyless instruments: only a
-// listing it does draws its overnight prints after its day
-// (`Chart.viewChart`). Every listing asked goes in one run of requests of at
-// most 50 listings each (`Overnight.ALL_DAY_BATCH`), so each answer fits one
-// page. An entry is { status, allDay, at }, `at` the service's clock as it
-// asked: "ok" with Robinhood's answer, kept a day (`Overnight.allDayDue`); or
-// "failed", keeping the last good answer, and not all-day without one.
-// `entries` holds answers only. One run at a time: a request asked for while
-// one is out is not sent, and the service asks again for what it still wants
-// once that is answered. The gate's budget may let only some of a run's
-// requests go.
+// Whether Robinhood trades each US stock or ETF all day, in one run of
+// requests. A fetch while a run is out is dropped: the service asks again
+// for what it still wants once that run lands.
 Item {
   id: root
 
   property var entries: ({})
   property var gate: null
   property int askedAt: 0
-  // The run out, as its requests' symbols, in the order of their URLs,
-  // until it is answered.
   property var batches: []
   readonly property bool busy: batches.length > 0
 
-  // While the gate holds the host, the request fails a turn later, out of
-  // the change that asked for it.
+  // A run the gate holds back fails a turn later, out of the change that
+  // asked for it.
   function fetch(symbols, at) {
     if (busy || !symbols.length) return
     var batches = []
@@ -40,8 +29,6 @@ Item {
     fetchRun.send(root.batches.map(Overnight.allDayUrl), Fetch.instrumentsCap(root.batches[0].length))
   }
 
-  // Each request's answer is read with its own symbols; a bad one fails
-  // them, as does a run the gate held back (none).
   function receive(got) {
     var next = Object.assign({}, entries)
     batches.forEach(function(batch, b) {

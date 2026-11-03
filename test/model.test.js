@@ -543,6 +543,9 @@ test("coverage is short only when the response begins within one interval of lis
 test("a response with no bars draws nothing and claims nothing", () => {
   const empty = M.parseHistory({ chart: { result: [{ meta: { symbol: "NEW", chartPreviousClose: 10 }, indicators: { quote: [{}] } }] } }, "1Y")
   expect(M.periodStats(empty)).toMatchObject({ last: null, high: null, low: null, coverage: { short: false } })
+  // A bar without a close counts only beside a bar drawn.
+  const closeless = { ...empty, unclosed: [{ t: 1, o: null, h: 12, l: 9, c: null, v: 100 }] }
+  expect([M.periodStats(closeless).high, M.periodStats(closeless).low, M.rangeVolume(closeless)]).toEqual([null, null, ""])
   expect(M.historyGeometry(empty).points).toEqual([])
   expect(M.historyBarAt(empty, 0.5)).toBeNull()
   expect(M.historyFraction(empty, 1)).toBe(-1)
@@ -808,6 +811,8 @@ test("the rule under the list name counts up, flat, and down as the rows' tones 
   }
   expect(M.listBreadth(symbols, quotes, 0, "pct")).toEqual({ up: 1, flat: 1, down: 1, none: 1 })
   expect(M.listBreadth(symbols, quotes, 0, "open")).toEqual({ up: 2, flat: 0, down: 1, none: 1 })
+  // A row whose quote has no close to count from yet counts as none, not flat.
+  expect(M.listBreadth(["NEW"], { NEW: q("NEW", null, null, 50) }, 0, "pct")).toEqual({ up: 0, flat: 0, down: 0, none: 1 })
 })
 
 // What ends the undo on offer: a data file, hand-edited or another
@@ -1123,6 +1128,9 @@ test("a session's one bar says nothing until its day is over", () => {
     points: [{ t: bell, p: 100 }] }
   expect(["09:33", "09:35", "15:59"].map(c => M.dayNote(day, at("2026-10-20", c), calendars))).toEqual(["", "", ""])
   expect(M.dayNote(day, at("2026-10-20", "16:00"), calendars)).toBe("Traded only at 09:30")
+  // A reader on another clock is told the bar's zone.
+  process.env.TZ = "Europe/London"
+  try { expect(M.dayNote(day, at("2026-10-20", "16:00"), calendars)).toBe("Traded only at 09:30 EDT") } finally { process.env.TZ = "America/New_York" }
 })
 
 test("Robinhood's word on all-day trading is asked once, again a day on, or five minutes after a failure", () => {
@@ -1262,6 +1270,8 @@ test("a quote run charts the pill's quote first and the other heroes next, then 
     { symbols: ["S5"], spark: false }, { symbols: ["S9"], spark: false },
     { symbols: batch, spark: true }, { symbols: ["S21"], spark: false }
   ])
+  // The pill's chart leads the other heroes', wherever it stands in the list.
+  expect(M.quoteSlots(symbols, asked, symbols, "S9", ["S5", "S9"], true)[0]).toEqual({ symbols: ["S9"], spark: false })
   // The preview's feed asks only charts.
   expect(M.quoteSlots(["P", "Q"], { P: 1, Q: 1 }, ["P", "Q"], "", [], false))
     .toEqual([{ symbols: ["P"], spark: false }, { symbols: ["Q"], spark: false }])
@@ -1355,6 +1365,11 @@ test("Robinhood is asked once for each stock the pill shows with nothing open by
   const nvda = { preview: "NVDA", previewShown: true, previewQuote: { symbol: "NVDA", exchange: "NASDAQ", instrumentType: "EQUITY" } }
   expect(asks({ ...pillAnswered(60), ...nvda })).toEqual({ tradability: ["NVDA"], prints: ["NVDA"] })
   expect(asks({ ...pillAnswered(60), ...nvda, previewShown: false })).toEqual({ tradability: ["MSFT"], prints: ["MSFT"] })
+  // A preview already in All is asked as its row, not first; Toronto's never.
+  const inAll = { ...pillAnswered(60), ...nvda, library: [...base.library, "NVDA"], overnightSymbols: ["AAPL", "MSFT", "NVDA"] }
+  expect(asks(inAll)).toEqual({ tradability: ["MSFT", "NVDA"], prints: ["MSFT", "NVDA"] })
+  const toronto = { preview: "SHOP.TO", previewShown: true, previewQuote: { symbol: "SHOP.TO", exchange: "TOR", instrumentType: "EQUITY" } }
+  expect(asks({ ...pillAnswered(60), ...toronto })).toEqual({ tradability: ["MSFT"], prints: ["MSFT"] })
 })
 
 test("a refresh's chart is owed until a new answer replaces the one it had, then a chart with no answer is asked, and the day asks none", () => {
@@ -1369,6 +1384,8 @@ test("a refresh's chart is owed until a new answer replaces the one it had, then
   const both = { "AAPL|1W": { status: "ok", history: {} }, "NVDA|1W": { status: "ok", history: {} } }
   expect(M.nextHistory(charts, "1W", both, {})).toBe(null)
   expect(M.nextHistory(charts, "1W", { "AAPL|1W": both["AAPL|1W"] }, {})).toEqual({ symbol: "NVDA", force: false })
+  // A failed answer is an answer: only a refresh asks for it again.
+  expect(M.nextHistory(charts, "1W", { "AAPL|1W": { status: "failed" }, "NVDA|1W": both["NVDA|1W"] }, {})).toBe(null)
   // A refresh owes both, fetched fresh in turn; a failed answer settles one
   // as a good one does.
   const owing = M.historyOwing(charts, "1W", both)
@@ -1789,6 +1806,8 @@ test("a version is newer number by number, and a manifest names one only whole",
   const R = load("Release.js")
   expect(R.isNewer("1.0.10", "1.0.9")).toBe(true)
   expect([["1.0.8", "1.0.9"], ["1.0.9", "1.0.9"], ["x", "1.0.9"]].map(([a, b]) => R.isNewer(a, b))).toEqual([false, false, false])
+  // Nothing is offered over a running version not read yet, nor for a main version that isn't one.
+  expect([R.isNewer("1.0.10", ""), R.isNewer("2.x", "1.0.9")]).toEqual([false, false])
   expect(R.manifestVersion('{ "version": "9.9.9" }')).toBe("9.9.9")
   expect([R.manifestVersion('{\n  "id": "grvc.st'), R.manifestVersion('{ "id": "grvc.stonks" }')]).toEqual(["", ""])
 })

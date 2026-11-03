@@ -284,6 +284,9 @@ Harness {
       check("the night's newest price is on top, named from Wednesday's close, Thursday's close beneath, and the night is never in the day's high: its 243.20 leaves Thursday's 239.63",
         /^SINCE WED CLOSE · \d\d:\d\d 234\.27 /.test(harness.top()) && harness.strip().indexOf("CLOSE 232.28 ") === 0
           && !!info && info.range.highText === "239.63", harness.top() + " | " + harness.strip() + " | " + JSON.stringify(info))
+      // A day asked of Robinhood replaces the prints in hand, never joins them.
+      check("a day's answer from Robinhood replaces the prints in hand: none of the weekend's stays",
+        feed.entries.NEST.bars[0].t > harness.night - 2 * 86400, "oldest kept " + new Date(feed.entries.NEST.bars[0].t * 1000).toISOString())
 
       var row = body.watchlist.rowItem("NEST")
       var breadth = JSON.stringify(body.breadth)
@@ -479,6 +482,12 @@ Harness {
 
       // Robinhood's instruments down as SPY joins: not all-day meanwhile.
       runCommand(["touch", harness.state + "/INSTRUMENTS.down"])
+      // A failed answer keeps the last good one: NEST, asked again while they are down, still trades all day.
+      within(3000, function() { return !service.testAllDayFeed.busy })
+      service.testAllDayFeed.fetch(["NEST"], service.now)
+      var nestFailed = within(3000, function() { return service.testAllDayFeed.entries.NEST.status === "failed" })
+      check("with Robinhood's instruments down, NEST's failed answer keeps its last: it still trades all day",
+        nestFailed && service.testAllDayFeed.entries.NEST.allDay === true, JSON.stringify(service.testAllDayFeed.entries.NEST))
       service.addSymbol("SPY")
       within(8000, function() { return !!service.quotes.SPY && service.arriving.length === 0 })
       var landed = featureShown("SPY")
@@ -528,6 +537,14 @@ Harness {
       service.now += 60
       // The clock's own ask out first: a feed with a request out sends none.
       within(3000, function() { return !allDay.busy })
+      // After a pause the gate lets one request through: only that one of the three goes.
+      service.testRobinhoodGate.pause = "refused"
+      service.testRobinhoodGate.pausedUntil = service.testRobinhoodGate.now()
+      allDay.fetch(hundred, service.now)
+      var instrumentsProbe = allDay.batches.length
+      within(5000, function() { return !allDay.busy && service.testRobinhoodGate.pause === "" })
+      check("after a pause, Robinhood's instruments send only the one request the gate lets through", instrumentsProbe === 1,
+        instrumentsProbe + " requests out")
       allDay.fetch(hundred, service.now)
       var hundredAnswered = within(5000, function() { return hundred.every(function(s) { return answeredNow(allDay, s) }) })
       var hundredAsked = harness.record("INSTRUMENTS.asked").split("\n").slice(hundredFrom).map(function(line) { return line.split(",").length })
@@ -564,13 +581,15 @@ Harness {
       runCommand(["rm", "-f", harness.state + "/ROBINHOOD.refuse"])
       var probedFrom = harness.record("OVERNIGHT.asked").split("\n").length
       service.now = thursdayNight + 5 * 60 + 5
+      // The probe is the prints' one request alone, of the four.
+      var probeAlone = prints.batches.length === 1
       var caughtUp = within(5000, function() {
         return longs.every(function(s) { return prints.entries[s].status === "ok" && prints.entries[s].at > thursdayNight })
       })
       var afterProbe = harness.record("OVERNIGHT.asked").split("\n").slice(probedFrom).map(function(line) { return line.split(",").length })
       check("a trading night, Robinhood back after a refusal: its first probe lets one request go alone, and the rest goes once that reopens it",
-        refused && caughtUp && afterProbe.length > 2 && afterProbe[0] === 25,
-        "refused " + refused + "; requests after the pause of " + afterProbe.join(", ") + "; every night refreshed " + caughtUp)
+        refused && caughtUp && probeAlone && afterProbe.length > 2 && afterProbe[0] === 25,
+        "refused " + refused + "; probe alone " + probeAlone + "; requests after the pause of " + afterProbe.join(", ") + "; every night refreshed " + caughtUp)
 
       // The same night, the window closed for 40 minutes and the list in
       // order of change. The pill's own prints are out, held, as the window
