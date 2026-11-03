@@ -642,9 +642,10 @@ test("the data file reads as written and repairs hand edits", () => {
     lists: [{ name: "Yen", symbols: ["MSFT"], order: "abs" }] })
   expect([byAmount.order, byAmount.reversed]).toEqual(["pct", true])
   expect(byAmount.lists).toEqual([{ name: "Yen", symbols: ["MSFT"], order: "pct", reversed: false }])
-  // Before the data file, the bar entry held the settings: they move over
-  // without the pill's own keys, and an entry with no symbols moves none.
-  const fromBar = entry => M.settingsFromBar({ bar: { layout: { right: [{ id: "grvc.stonks", ...entry }] } } })
+  // Before the data file, the plugin's bar entry held the settings: they
+  // move over without the pill's own keys, and an entry with no symbols
+  // moves none.
+  const fromBar = entry => M.settingsFromBar({ bar: { layout: { right: [{ id: "grvc.stonks", ...entry }] } } }, "grvc.stonks")
   const moved = fromBar({ symbols: ["nvda", "spy"], order: "name", barStyle: "icon" })
   expect([moved.symbols, moved.order, "barStyle" in moved]).toEqual([["NVDA", "SPY"], "name", false])
   expect(fromBar({ barStyle: "icon" })).toBeNull()
