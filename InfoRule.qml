@@ -4,8 +4,8 @@ import QtQuick
 import qs.Commons as Commons
 import "Cells.js" as Cells
 
-// A range as a thin rule, low at the left and high at the right, with a tick
-// where the price sits, in the breadth rule's ink. Without both ends and a
+// A range as a thin rule in the breadth rule's ink, low at the left and high
+// at the right, with a tick where the price sits. Without both ends and a
 // price it is the empty track, as the 1D chart leaves hours still to come.
 Item {
   id: root

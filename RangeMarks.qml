@@ -12,7 +12,7 @@ import "Tones.js" as Tones
 // ink has drawn in, and how high its ink reaches under a mark. A mark that
 // would touch the ink lifts off the edge by up to `lift`, else is left out.
 // While the scrub's line runs within `clear` of a mark, the whole mark steps
-// one mark's width aside, before it or else after, where it touches no more
+// its width and twice `clear` aside, before it or else after, where it touches no more
 // ink; with room on neither side it gives way. It moves rather than hides, so
 // the high stays in view as you scrub toward it.
 Item {

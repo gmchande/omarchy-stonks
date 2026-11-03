@@ -73,7 +73,7 @@ function levelled(x, db) {
 }
 
 // Smooth strikes the chimes as the place moves onto each bar, as a sweeping
-// pointer does (`Sounds.chime`): 45 ms apart at most, none where the line
+// pointer does (`Sounds.chime`): at least 45 ms apart, none where the line
 // breaks, each ringing out over what follows. A lone print, as a thin night's
 // trade, is struck as the place passes it, though no step lands on its point.
 // No tick where the line crosses its baseline: a tone there, at A6, the top

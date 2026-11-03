@@ -25,7 +25,7 @@ Item {
   property real reveal: 1
   // One print draws as a dot, as the hero's does.
   readonly property bool drawable: !!geometry && !!geometry.points && geometry.points.length >= 1
-  // Unknown for a quote without a previous close: no line, and no direction to
+  // Unknown for a quote without a previous close: no dashed baseline, and no direction to
   // split by.
   readonly property bool hasBaseline: !!geometry && typeof geometry.baselineY === "number" && isFinite(geometry.baselineY)
 

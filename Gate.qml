@@ -10,7 +10,7 @@ import QtQuick
 // most 30 minutes, so a hostile Retry-After can't silence Stonks for days. Each
 // pause varies by ±20%, so installs don't all come back at once. After a pause
 // one request goes alone, and only its answer reopens the host: an answer to a
-// request let through before the latest pause (`ticket`) says nothing of it.
+// request let through before the latest pause (`ticket`) can only refuse.
 Item {
   id: root
 

@@ -32,7 +32,7 @@ Item {
   property color hairlineColor: Commons.Color.foreground
   // The unlit cells, as an LCD shows every segment faintly.
   property color ghostColor: "transparent"
-  // A cell and the seam after it, in whole pixels of the screen, or of the
+  // A cell and the seam after it, in window units, or in pixels of the
   // picture on a screen of any scale (`ShareCard`).
   property real pixel: 5
   property real gap: 1

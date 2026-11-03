@@ -232,8 +232,8 @@ Item {
     return list
   }
 
-  // A look's files are written ahead one every 100 ms, so a first scrub writes
-  // none: back to back, smooth's eleven chimes hold the shell's thread 80 ms.
+  // A look's files are written ahead one every 100 ms, so a scrub after the
+  // first few seconds writes none: back to back, smooth's eleven chimes hold the shell's thread 80 ms.
   onTurnedOnChanged: {
     if (!turnedOn) {
       replayOwner = null

@@ -87,8 +87,9 @@ function newestPrints(symbols, quotes, nights, allDay, calendars) {
 // Robinhood's answer before it comes (`Overnight.overnightAnswer`'s shape).
 var NO_ANSWER = { bars: [], from: null, through: null }
 
-// x runs by the clock along the day's axis (`chartSpan`): from the pre-market
-// open, so the line reaches the bell from where it came, to hold every print;
+// x runs by the clock along the day's axis (`chartSpan`): from the first print
+// or the open, whichever is earlier, so the line reaches the bell from where it
+// came, to hold every print;
 // or, for a US listing, its trading day, so a quiet hour shows as one and a
 // finished day ends at its last print. `ext` marks prints outside the regular
 // session, and `dim` those drawn dim: the extended hours, or on a day lit
@@ -187,7 +188,7 @@ function fractionAtTime(quote, t) {
   return axisFraction(axis, t)
 }
 
-// Five minutes a step, kept on the day and short of `last`, the last print.
+// Five minutes a step, kept on the day and no later than `last`, the last print.
 function stepTime(quote, t, steps, last) {
   var axis = chartSpan(quote)
   return Format.clamp(t + steps * 300, axis.start, last || axis.end)

@@ -114,7 +114,7 @@ Item {
 
   NumberAnimation { id: shutting; target: root; property: "closing"; duration: 320 }
 
-  // 3 px under its icon, centred, but never past the header's right edge.
+  // 3 px under its target, centred, but never past the header's right edge.
   component HeaderTip: PanelToolTip {
     readonly property Item icon: parent.parent
     y: parent.height + 3
@@ -303,7 +303,7 @@ Item {
   readonly property int cell: Cells.iconCell(Style.fontScale)
 
   // One width on or off, so the toggle moves nothing. Each icon's target is the
-  // header's full height.
+  // height of the header's two lines.
   GridIcon {
     id: soundIcon
     objectName: "soundIcon"
