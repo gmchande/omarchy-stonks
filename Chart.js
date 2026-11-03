@@ -89,16 +89,15 @@ var NO_ANSWER = { bars: [], from: null, through: null }
 
 // x runs by the clock along the day's axis (`chartSpan`): from the first print
 // or the open, whichever is earlier, so the line reaches the bell from where it
-// came, to hold every print;
-// or, for a US listing, its trading day, so a quiet hour shows as one and a
-// finished day ends at its last print. `ext` marks prints outside the regular
-// session, and `dim` those drawn dim: the extended hours, or on a day lit
-// where it trades now (`Overnight.litFrom`), every print before that. `brk`
-// lifts the line across hours of the exchange's day that take room, such as
-// Tokyo's lunch, which Yahoo sends inside one 09:00 to 15:30 session. Hours
-// that take no room (`axis.skip`), such as a weekend, are no break: the line
-// runs across them, as through a quiet hour of a US night. The scale holds
-// every print and the close, so the baseline stays in view.
+// came, to hold every print; or, for a US listing, its trading day, so a quiet
+// hour shows as one and a finished day ends at its last print. `ext` marks
+// prints outside the regular session, and `dim` those drawn dim: the extended
+// hours, or on a day lit where it trades now (`Overnight.litFrom`), every print
+// before that. `brk` lifts the line across hours of the exchange's day that
+// take room, such as Tokyo's lunch, which Yahoo sends inside one 09:00 to 15:30
+// session. Hours that take no room (`axis.skip`), such as a weekend, are no
+// break: the line runs across them, as through a quiet hour of a US night. The
+// scale holds every print and the close, so the baseline stays in view.
 function chartGeometry(quote, calendars) {
   var pts = quote.points
   var axis = chartSpan(quote)
@@ -188,7 +187,8 @@ function fractionAtTime(quote, t) {
   return axisFraction(axis, t)
 }
 
-// Five minutes a step, kept on the day and no later than `last`, the last print.
+// Five minutes a step, kept on the day and no later than `last`, the last
+// print.
 function stepTime(quote, t, steps, last) {
   var axis = chartSpan(quote)
   return Format.clamp(t + steps * 300, axis.start, last || axis.end)
