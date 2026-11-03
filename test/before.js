@@ -1,23 +1,22 @@
-// Before the change: every test case and harness step this branch adds or
-// changes must fail on the code before the change, or it can't tell the
-// change from the code it replaces. The code before is the merge base with
-// dev (origin/dev, or STONKS_BASE). It is checked out in a scratch tree with
-// this checkout's test/ beside it, an uncommitted edit included, and each
-// changed test file and harness runs there once.
+// Before the change: a branch that changes what the product code does must
+// change or add at least one test case or harness step that fails on the
+// code before the change. Otherwise its tests can't tell the change from
+// the code it replaces, as a fix's test that passes with the bug still in.
+// The code before is the merge base with dev (origin/dev, or STONKS_BASE).
+// It is checked out in a scratch tree with this checkout's test/ beside it,
+// an uncommitted edit included, and the changed test files run there: the
+// unit test files first, then the harnesses, until one changed case fails.
 //
 // A test case is a bun test(...) or it(...) in a *.test.js. A harness step
 // is a check(...) in test/qml/NAME.qml with what drives it: the lines of
 // its function since the check before, which drive every check that follows
 // them with no code between. A changed line elsewhere, such as in a helper,
-// belongs to no case. A comment or a blank line isn't a change.
+// belongs to no case. A comment or a blank line isn't a change, in the
+// tests or in the product.
 //
-// One that passes on the code before may only be one the change made
-// change: its old form, by its name, fails on the new code. That runs the
-// base's test/ beside this checkout's code, for those files alone.
-//
-// A branch that changes nothing outside test/ and the docs has no code
-// before the change to compare, so it passes. Exits 77 when a changed case
-// had no saved answers to run on (test/fixtures-dir.sh) and none failed.
+// A branch that changes no product code, or no test, has nothing to compare
+// and passes. Exits 77 when no changed case failed and some had no saved
+// answers to run on (test/fixtures-dir.sh).
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -43,14 +42,29 @@ const base = git("merge-base", "HEAD", baseRef).trim()
 const short = base.slice(0, 7)
 
 // What changed since the base, in this checkout as it is: tracked files
-// against the base, and new files git doesn't ignore.
-const changed = [
+// against the base, deleted ones too, and new files git doesn't ignore.
+const touched = [
   ...git("diff", "--name-only", "-z", base).split("\0"),
   ...git("ls-files", "--others", "--exclude-standard", "-z").split("\0"),
-].filter(path => path && existsSync(join(root, path)))
-const product = changed.filter(path => !/^(test|\.github)\/|\.md$/.test(path))
-if (product.length === 0) {
-  console.log(`nothing outside test/ and the docs changed since ${baseName} (${short}): no code before the change to compare`)
+].filter(path => path)
+const changed = touched.filter(path => existsSync(join(root, path)))
+// The product's files, outside test/ and the docs and pictures; its code
+// changed when one differs from the base's with comments and blank lines
+// set aside.
+const product = touched.filter(path => !/^(test|\.github|media)\/|\.(md|png)$/.test(path))
+const show = path => run(["git", "show", `${base}:${path}`]).out
+const now = path => existsSync(join(root, path)) ? readFileSync(join(root, path), "utf8") : ""
+const code = (path, source) => {
+  if (!/\.(qml|js)$/.test(path)) return source
+  const { comments } = scan(source)
+  let kept = "", from = 0
+  for (const [start, end] of comments) { kept += source.slice(from, start); from = end }
+  kept += source.slice(from)
+  return kept.split("\n").map(l => l.trim()).filter(l => l).join("\n")
+}
+const codeChanged = product.filter(path => code(path, show(path)) !== code(path, now(path)))
+if (codeChanged.length === 0) {
+  console.log(`no product code changed since ${baseName} (${short}), only tests, docs or comments: nothing to compare`)
   process.exit(0)
 }
 
@@ -102,7 +116,7 @@ function scan(source) {
     lineAt.push(line)
     if (source[i] === "\n") line++
   }
-  const calls = [], functions = [], stack = [], close = new Map(), opened = new Map()
+  const calls = [], functions = [], comments = [], stack = [], close = new Map(), opened = new Map()
   // last: the word or character before, which tells a regular expression
   // from a division; lastAt: where it ends.
   let last = "", lastAt = -1, i = 0
@@ -110,8 +124,13 @@ function scan(source) {
   const wordAt = /[\w$]+/y, spaceParen = /\s*\(/y
   while (i < source.length) {
     const c = source[i], next = source[i + 1]
-    if (c === "/" && next === "/") { i = source.indexOf("\n", i); if (i < 0) break; continue }
-    if (c === "/" && next === "*") { i = source.indexOf("*/", i + 2) + 2; if (i < 2) break; continue }
+    if (c === "/" && (next === "/" || next === "*")) {
+      const end = next === "/" ? source.indexOf("\n", i) : source.indexOf("*/", i + 2) + 2
+      comments.push([i, end < 2 ? source.length : end])
+      if (end < 2) break
+      i = end
+      continue
+    }
     if (/\s/.test(c)) { i++; continue }
     if (c === "\"" || c === "'") {
       for (i++; i < source.length && source[i] !== c; i++) if (source[i] === "\\") i++
@@ -177,7 +196,7 @@ function scan(source) {
     call.start = lineAt[call.open]
     call.endLine = lineAt[end]
   }
-  return { calls, functions }
+  return { calls, functions, comments }
 }
 
 // cases PATH: the test cases, or the harness's steps, that changed lines
@@ -217,21 +236,22 @@ function cases(path, harness) {
 const due = tests.map(path => ({ path, harness: harnessOf(path) }))
   .map(t => ({ ...t, cases: cases(t.path, t.harness) }))
   .filter(t => t.cases.length)
+  // The unit test files first: they take seconds, a harness a minute.
+  .sort((a, b) => !!a.harness - !!b.harness)
 const total = due.reduce((n, t) => n + t.cases.length, 0)
 if (total === 0) {
-  console.log(`no test case or harness step changed since ${baseName} (${short})`)
+  console.log(`no test case or harness step changed since ${baseName} (${short}): nothing to compare`)
   process.exit(0)
 }
 
-// tree TESTS: a scratch tree of the base's files with this checkout's test/
-// ("here"), or of this checkout's files with the base's test/ ("base"),
-// the saved answers linked in where there are some. A harness's check there
-// also says where it was called from, by the harness's line; it returns
-// null when Harness.qml's check can't be found to say so.
-// Each tree goes as the run ends; an interrupt first stops what runs in
-// them, and waits for it to end.
-const trees = [], running = new Set()
-process.on("exit", () => trees.forEach(tree => rmSync(tree, { recursive: true, force: true })))
+// The scratch tree: the base's files with this checkout's test/, the saved
+// answers linked in where there are some. A harness's check there also
+// says where it was called from, by the harness's line. The tree goes as
+// the run ends; an interrupt first stops what runs in it, and waits for it
+// to end.
+const tree = mkdtempSync(join(process.env.TMPDIR || tmpdir(), "before."))
+const running = new Set()
+process.on("exit", () => rmSync(tree, { recursive: true, force: true }))
 for (const [signal, code] of [["SIGINT", 130], ["SIGTERM", 143]]) {
   process.on(signal, async () => {
     for (const child of running) child.kill("SIGTERM")
@@ -239,40 +259,56 @@ for (const [signal, code] of [["SIGINT", 130], ["SIGTERM", 143]]) {
     process.exit(code)
   })
 }
-function tree(tests) {
-  const tree = mkdtempSync(join(process.env.TMPDIR || tmpdir(), "before."))
-  trees.push(tree)
-  const fromBase = run(["bash", "-c", 'git archive "$1" $3 | tar -x -C "$2"', "_", base, tree, tests === "base" ? "test" : ""])
-  if (fromBase.code !== 0) throw new Error(`could not check out ${short}: ${fromBase.err.trim()}`)
-  if (tests === "here") rmSync(join(tree, "test"), { recursive: true, force: true })
-  for (const path of git("ls-files", "-z", "--cached", "--others", "--exclude-standard").split("\0")) {
-    if (!path || !existsSync(join(root, path)) || (tests === "here") !== path.startsWith("test/")) continue
-    cpSync(join(root, path), join(tree, path), { recursive: true })
+const fromBase = run(["bash", "-c", 'git archive "$1" | tar -x -C "$2"', "_", base, tree])
+if (fromBase.code !== 0) {
+  console.log(`FAILED before the change: could not check out ${short}: ${fromBase.err.trim()}`)
+  process.exit(1)
+}
+rmSync(join(tree, "test"), { recursive: true, force: true })
+for (const path of git("ls-files", "-z", "--cached", "--others", "--exclude-standard", "test").split("\0")) {
+  if (path && existsSync(join(root, path))) cpSync(join(root, path), join(tree, path), { recursive: true })
+}
+const fixtures = run([join(root, "test/fixtures-dir.sh")])
+if (fixtures.code === 0) symlinkSync(fixtures.out.trim(), join(tree, "test/fixtures"))
+const harnessFile = join(tree, "test/qml/Harness.qml")
+const harnessSource = readFileSync(harnessFile, "utf8")
+const opening = "  function check(label, ok, detail) {\n"
+if (!harnessSource.includes(opening)) {
+  console.log("FAILED before the change: Harness.qml's check is no longer `function check(label, ok, detail)`; change test/before.js with it")
+  process.exit(1)
+}
+writeFileSync(harnessFile, harnessSource.replace(opening, opening
+  + "    var at = String(new Error().stack).split(\"\\n\").filter(function(f) { return /\\/shell\\.qml:\\d+$/.test(f) })[0]\n"
+  + "    if (at) console.log(\"STEP \" + at.replace(/^.*:/, \"\") + \" \" + (ok ? \"PASS\" : \"FAIL\") + \" \" + label)\n"))
+
+// failing T RESULTS CODE: the first of T's cases to fail on the code
+// before, as { start, name }: a check of it failed there, or its file's run
+// failed before it ran, as a file needing what the change adds does. A
+// skipped case fails on nothing.
+const inCase = (checks, r) => checks.some(c => c.start <= r.line && r.line <= c.end)
+function failing(t, results, code) {
+  for (const checks of t.cases) {
+    const own = results.filter(r => inCase(checks, r))
+    const failed = own.find(r => !r.pass && !r.skip)
+    if (failed) return { start: checks[0].start, name: failed.name }
+    if (!own.length && code !== undefined && code !== 0 && code !== 77) return { start: checks[0].start }
   }
-  const fixtures = run([join(root, "test/fixtures-dir.sh")])
-  if (fixtures.code === 0) symlinkSync(fixtures.out.trim(), join(tree, "test/fixtures"))
-  const harnessFile = join(tree, "test/qml/Harness.qml")
-  const source = existsSync(harnessFile) ? readFileSync(harnessFile, "utf8") : ""
-  const opening = "  function check(label, ok, detail) {\n"
-  if (!source.includes(opening)) return null
-  writeFileSync(harnessFile, source.replace(opening, opening
-    + "    var at = String(new Error().stack).split(\"\\n\").filter(function(f) { return /\\/shell\\.qml:\\d+$/.test(f) })[0]\n"
-    + "    if (at) console.log(\"STEP \" + at.replace(/^.*:/, \"\") + \" \" + (ok ? \"PASS\" : \"FAIL\") + \" \" + label)\n"))
-  return tree
+  return null
 }
 
-// runAll TREE FILES: runs each file in TREE, three at a time: a harness by
-// its runner's command, a test file in bun with a JUnit report. Each
-// outcome is its exit code and its checks' results, each with its line,
-// whether it passed, and its name. A harness stops as soon as SETTLED says
-// its results so far answer the question, read from its log as it runs.
+// runOne T: runs T's file in the tree, a harness by its runner's command, a
+// test file in bun with a JUnit report, and returns its exit code and its
+// checks' results, each with its line, whether it passed, and its name. A
+// harness is read from its log as it runs, and stopped once one of its
+// cases fails, or once another file's has.
 const xml = s => s.replace(/&#10;/g, " ").replace(/&quot;/g, "\"").replace(/&apos;/g, "'")
   .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")
 const steps = text => [...text.matchAll(/STEP (\d+) (PASS|FAIL) (.*)/g)]
   .map(m => ({ line: Number(m[1]), pass: m[2] === "PASS", name: m[3] }))
-async function runOne(tree, t, index, settled) {
+let found = null
+async function runOne(t, index) {
   const report = join(tree, `junit-${index}.xml`)
-  // A harness's work folder, and so its Quickshell's log, under this one
+  // A harness's work folder, and so its Quickshell's log, under the tree
   // (test/scratch.sh).
   const work = join(tree, `work-${index}`)
   mkdirSync(work)
@@ -286,13 +322,13 @@ async function runOne(tree, t, index, settled) {
       const log = join(work, name, "log")
       if (existsSync(log)) seen = steps(readFileSync(log, "utf8"))
     }
-    if (!stopped && settled(seen)) { stopped = true; child.kill("SIGTERM") }
+    if (!stopped && (found || failing(t, seen))) { stopped = true; child.kill("SIGTERM") }
   }, 500)
   const [out] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()])
   const code = await child.exited
   running.delete(child)
   clearInterval(watch)
-  if (t.harness) return { code, results: stopped ? seen : steps(out) }
+  if (t.harness) return stopped ? { results: seen } : { code, results: steps(out) }
   const results = []
   const text = existsSync(report) ? readFileSync(report, "utf8") : ""
   for (const m of text.matchAll(/<testcase name="([^"]*)"[^>]*? line="(\d+)"[^>]*?(\/>|>([\s\S]*?)<\/testcase>)/g)) {
@@ -301,82 +337,38 @@ async function runOne(tree, t, index, settled) {
   }
   return { code, results }
 }
-async function runAll(tree, files, settled) {
-  const outcomes = []
-  let next = 0
-  await Promise.all([1, 2, 3].map(async () => {
-    while (next < files.length) {
-      const index = next++
-      outcomes[index] = await runOne(tree, files[index], index, results => settled(files[index], results))
-    }
-  }))
-  return outcomes
-}
 
-// On the code before: a case passes there when each of its checks that ran
-// passed, and one did. A harness has said enough once each of its cases has
-// a check that failed.
-const inCase = (checks, r) => checks.some(c => c.start <= r.line && r.line <= c.end)
-const here = tree("here")
-if (!here) {
-  console.log("FAILED before the change: Harness.qml's check is no longer `function check(label, ok, detail)`; change test/before.js with it")
-  process.exit(1)
-}
-const outcomes = await runAll(here, due, (t, results) =>
-  t.cases.every(checks => results.some(r => !r.pass && inCase(checks, r))))
+// The unit test files one by one, then the harnesses three at a time, until
+// a changed case fails on the code before.
 let skipped = 0
-const passing = [], unverified = []
-due.forEach((t, index) => {
-  const { code, results } = outcomes[index]
+const record = (t, { code, results }) => {
   if (code === 77) {
     console.log(`skipped ${t.path}: no saved answers to run its ${t.cases.length} changed cases on`)
     skipped += t.cases.length
-    return
   }
-  for (const checks of t.cases) {
-    const own = results.filter(r => inCase(checks, r))
-    const found = { t, start: checks[0].start, names: [...new Set(own.map(r => r.name))], skip: own.some(r => r.skip) }
-    // One that never ran there passes when the run did, and is unknown
-    // when the run failed before it, as a file that can't load does.
-    if (own.length ? own.every(r => r.pass) : code === 0) passing.push(found)
-    else if (!own.length) unverified.push(found)
+  const f = !found && failing(t, results, code)
+  if (f) found = { t, ...f }
+}
+let next = 0
+while (next < due.length && !due[next].harness && !found) record(due[next], await runOne(due[next], next++))
+await Promise.all([1, 2, 3].map(async () => {
+  while (next < due.length && !found) {
+    const index = next++
+    record(due[index], await runOne(due[index], index))
   }
-})
+}))
 
-// A case that passes on the code before may only be one the change made
-// change: its form in the base's tests, by its name, fails on this
-// checkout's code. A skipped case tests no code, so it never is.
-const adapted = new Set()
-const recheck = [...new Set(passing.filter(p => !p.skip).map(p => p.t))]
-const old = recheck.length ? tree("base") : null
-if (old) {
-  const after = await runAll(old, recheck, (t, results) =>
-    passing.filter(p => p.t === t && !p.skip).every(p => results.some(r => !r.pass && p.names.includes(r.name))))
-  for (const p of passing.filter(p => !p.skip)) {
-    const failedAfter = after[recheck.indexOf(p.t)].results.filter(r => !r.pass).map(r => r.name)
-    if (p.names.some(name => failedAfter.includes(name))) adapted.add(p)
-  }
+if (found) {
+  const where = found.name ? `"${found.name}" (${found.t.path}:${found.start}) fails` : `the case at ${found.t.path}:${found.start} can't run`
+  console.log(`${where} on ${baseName}'s code (${short}), so the branch's tests tell its change from the code before it`)
+  process.exit(0)
 }
-for (const p of unverified) {
-  console.log(`unknown: the case at ${p.t.path}:${p.start} never ran on ${baseName}'s code, whose run failed before it, so it may pass there too`)
+if (skipped) {
+  console.log(`no changed case that ran fails on ${baseName}'s code (${short}); the ${skipped} with no saved answers may`)
+  process.exit(77)
 }
-for (const p of passing) {
-  if (p.skip) {
-    console.log(`FAILED before the change: "${p.names[0]}" (${p.t.path}:${p.start}) is skipped, so it fails on no code. Let it run, and see it fail on ${baseName}'s code (${short}).`)
-    continue
-  }
-  const where = p.names.length ? `"${p.names[0]}" (${p.t.path}:${p.start}) passes`
-    : `the case at ${p.t.path}:${p.start} never runs, and nothing fails,`
-  if (adapted.has(p)) {
-    console.log(`${where} on ${baseName}'s code too, but its form on ${baseName} fails on this code: the change made it change`)
-  } else {
-    console.log(`FAILED before the change: ${where} on ${baseName}'s code too (${short}), `
-      + "so it can't tell the change from the code it replaces. Check what the reader sees, not a request or a value the code computed, "
-      + `and see it fail on ${baseName}'s code.`)
-  }
-}
-const failed = passing.length - adapted.size
-if (failed) process.exit(1)
-const checked = total - skipped - adapted.size - unverified.length
-if (checked) console.log(`${checked} changed test cases and harness steps each fail on ${baseName}'s code (${short})`)
-process.exit(skipped ? 77 : 0)
+console.log(`FAILED before the change: this branch changes the code in ${codeChanged.slice(0, 3).join(", ")}${codeChanged.length > 3 ? " and more" : ""}, `
+  + `but ${total - skipped === 1 ? "the one test case or harness step" : `each of the ${total - skipped} test cases and harness steps`} it adds or changes passes on ${baseName}'s code too (${short}), `
+  + "so none can tell the change from the code it replaces. Add or change a case that checks what the reader sees, "
+  + `not a request or a value the code computed, and see it fail on ${baseName}'s code.`)
+process.exit(1)
