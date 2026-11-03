@@ -64,7 +64,6 @@ function freshness(entry, quote, now, owedSince, inGrace, newest) {
   var asOf = head ? head.t : null
   var shownAt = head && newest ? newest.t : asOf
   var overdue = owedSince > 0 && now - owedSince >= OVERDUE_AFTER
-  var earlier = !!shownAt && exchangeDay(quote, shownAt) !== exchangeDay(quote, now)
   var asking = (!!inGrace && !!entry && now - entry.answeredAt > LIVE_QUOTE_MAX_AGE) || Market.awaitingOpen(quote, now)
   var state = entry && entry.status === "failed" ? "failed"
     : overdue ? "overdue"
@@ -72,7 +71,8 @@ function freshness(entry, quote, now, owedSince, inGrace, newest) {
     : entry && entry.status === "saved" ? "saved"
     : asOf !== null && Market.isTrading(phase) && now - asOf > LIVE_QUOTE_MAX_AGE ? (asking ? "asking" : "aged")
     : "fresh"
-  return { state: state, asOf: shownAt, session: newest ? newest.phase : "", earlier: earlier,
+  // `now`: the words name the day when it isn't the clock's, as a print does (`Market.printDay`).
+  return { state: state, asOf: shownAt, session: newest ? newest.phase : "", now: now,
     live: asOf !== null && state === "fresh" && Market.isTrading(phase), phase: phase }
 }
 
@@ -86,7 +86,7 @@ function freshnessText(fresh, quote, calendars) {
   }
   var chartTrade = head && head.source === "chart"
   var lead = fresh.session ? Market.phaseLabel(fresh.session).toUpperCase() + " " : chartTrade ? "LAST TRADE · " : "AS OF "
-  var asOf = lead + (fresh.earlier ? Format.WEEKDAYS[Format.localClock(fresh.asOf, quote.gmtoffset).weekday].toUpperCase() + " " : "")
+  var asOf = lead + Market.printDay(quote, fresh.asOf, fresh.now, calendars).toUpperCase()
     + Market.printClock(quote, fresh.asOf, calendars)
   if (fresh.state === "failed") return "REFRESH FAILED · " + asOf
   if (fresh.state === "overdue") return "NOT UPDATING · " + asOf

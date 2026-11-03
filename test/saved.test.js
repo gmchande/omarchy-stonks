@@ -217,7 +217,7 @@ test("the headline uses the regular quote or labels the last chart trade with it
     expect(M.headlineQuote(fallback)).toEqual({ price: 249.77999877929688, t: 1791316500, source: "chart" })
     expect(M.freshnessText(fresh, fallback, calendars)).toBe("LAST TRADE · TUE 15:55")
     expect(M.freshnessWarns(fresh)).toBe(false)
-    expect(M.freshnessText({ ...fresh, earlier: false }, fallback, calendars)).toBe("LAST TRADE · 15:55")
+    expect(M.freshnessText({ ...fresh, now: fresh.asOf }, fallback, calendars)).toBe("LAST TRADE · 15:55")
     expect(M.freshnessText({ ...fresh, state: "failed" }, fallback, calendars)).toBe("REFRESH FAILED · LAST TRADE · TUE 15:55")
     expect(M.freshnessText({ ...fresh, state: "overdue" }, fallback, calendars)).toBe("NOT UPDATING · LAST TRADE · TUE 15:55")
   }
@@ -610,7 +610,7 @@ test("an exchange's time names its zone only where the reader's clock differs", 
   expect(readAs("Europe/London", usNext)).toBe("Weekend · opens Mon 09:30 EST")
   // A listing with no calendar names its zone as Yahoo does; "AS OF" too.
   const btc = M.parseChart(fixture("btc-usd-day.json"))
-  expect(M.freshnessText({ state: "aged", asOf: btc.marketTime }, btc)).toBe("AS OF 18:32 UTC")
+  expect(M.freshnessText({ state: "aged", asOf: btc.marketTime, now: btc.marketTime }, btc)).toBe("AS OF 18:32 UTC")
 })
 
 test("an exchange's time across a change of clocks reads by its own day's clock, for every reader", () => {
@@ -638,7 +638,7 @@ test("an exchange's time across a change of clocks reads by its own day's clock,
   for (const reader of READERS) readAs(reader, () => {
     // New York's own clock is named only to the other readers.
     const edt = reader === "America/New_York" ? "" : " EDT"
-    expect(M.freshnessText({ state: "aged", asOf: close }, aapl, calendars)).toBe("AS OF 16:00" + edt)
+    expect(M.freshnessText({ state: "aged", asOf: close, now: close }, aapl, calendars)).toBe("AS OF 16:00" + edt)
     expect(M.historyScrubForms(bhp, bhp.bars[0])[0]).toBe("21 SEP 10:00 AEST · 60.56")
     expect(M.historyScrubForms(bhp, bhp.bars[bhp.bars.length - 2])[0]).toBe("20 OCT 16:00 AEDT · 59.50")
     for (const [n, s, v, a, d, m] of [sides.map(side => side[0]), sides.map(side => side[1])]) {
@@ -649,10 +649,10 @@ test("an exchange's time across a change of clocks reads by its own day's clock,
       const nasdaq = M.parseChart(d)
       expect(M.historyScrubForms(month, month.bars[0])[0]).toBe("12 AUG 09:30" + edt + " · 233.17")
       expect(M.historyScrubForms(week, week.bars[0])[0]).toBe("14 OCT 09:00 CEST · 196.32")
-      expect(M.freshnessText({ state: "aged", asOf: chicago.marketTime, earlier: true }, chicago, calendars)).toBe("AS OF TUE 09:35 CDT")
-      expect(M.freshnessText({ state: "aged", asOf: otc.marketTime, earlier: true }, otc, calendars)).toBe("AS OF FRI 16:00" + edt)
+      expect(M.freshnessText({ state: "aged", asOf: chicago.marketTime, now: chicago.marketTime + DAY }, chicago, calendars)).toBe("AS OF TUE 09:35 CDT")
+      expect(M.freshnessText({ state: "aged", asOf: otc.marketTime, now: otc.marketTime + DAY }, otc, calendars)).toBe("AS OF FRI 16:00" + edt)
       const madrid = M.parseChart(m)
-      expect(M.freshnessText({ state: "aged", asOf: madrid.marketTime, earlier: true }, madrid, calendars)).toBe("AS OF FRI 17:35 CEST")
+      expect(M.freshnessText({ state: "aged", asOf: madrid.marketTime, now: madrid.marketTime + DAY }, madrid, calendars)).toBe("AS OF FRI 17:35 CEST")
       // The day's lunch lull is New York's noon, whichever clock the
       // answer was sent by.
       const noon = nasdaq.session.regular.start + 2.5 * 3600
@@ -1255,6 +1255,9 @@ test("a quote kept from an earlier session says when it is from, and warns only 
     .toEqual(["saved", false, false, "AS OF TUE 15:59"])
   const late = M.freshness(saved, close, reg.start + DAY + 90, reg.start + DAY)
   expect([late.state, M.freshnessText(late, q)]).toEqual(["overdue", "NOT UPDATING · AS OF TUE 15:59"])
+  // A week or more back: its date, as a print says it, never a weekday read as this week's.
+  const weekOld = M.freshness(saved, close, reg.start + 7 * DAY + 60, 0)
+  expect(M.freshnessText(weekOld, q)).toBe("AS OF 1 SEP 15:59")
 })
 
 test("outside trading an old close is normal, but a failed refresh still shows", () => {
