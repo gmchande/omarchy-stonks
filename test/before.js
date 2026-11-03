@@ -98,7 +98,17 @@ const tests = changed.filter(path => /\.test\.js$/.test(path) || harnessOf(path)
 // their number here. A hunk whose code is the same, as one that changes
 // only comments or blank lines, changes nothing. A deletion with nothing
 // added in its place marks the line now there.
-const quiet = text => /^\s*(\/\/.*|\/\*.*|\*.*)?$/.test(text)
+// masked SOURCE: SOURCE's lines with every comment blanked out, read in
+// the whole file, so a line inside a block comment is blank too.
+function masked(source) {
+  let out = "", from = 0
+  for (const [start, end] of scan(source).comments) {
+    out += source.slice(from, start) + source.slice(start, end).replace(/[^\n]/g, " ")
+    from = end
+  }
+  return (out + source.slice(from)).split("\n")
+}
+const quiet = line => line.trim() === ""
 function changedLines(path) {
   const lines = new Set()
   const text = readFileSync(join(root, path), "utf8")
@@ -106,12 +116,12 @@ function changedLines(path) {
     text.split("\n").forEach((_, i) => lines.add(i + 1))
     return lines
   }
+  const now = masked(text), before = masked(show(path))
   const hunks = git("diff", "-U0", "--no-color", "--no-ext-diff", base, "--", path).split(/^(?=@@ )/m).slice(1)
   for (const hunk of hunks) {
-    const from = Number(hunk.match(/^@@ -\S+ \+(\d+)/)[1])
-    const body = hunk.split("\n").slice(1)
-    const added = body.filter(l => l[0] === "+").map(l => l.slice(1))
-    const removed = body.filter(l => l[0] === "-").map(l => l.slice(1))
+    const [, oldFrom, oldCount, from, count] = hunk.match(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/).map(Number)
+    const removed = before.slice(oldFrom - 1, oldFrom - 1 + (Number.isNaN(oldCount) ? 1 : oldCount))
+    const added = now.slice(from - 1, from - 1 + (Number.isNaN(count) ? 1 : count))
     if (canon(added.join("\n")) === canon(removed.join("\n"))) continue
     added.forEach((l, i) => { if (!quiet(l)) lines.add(from + i) })
     if (removed.some(l => !quiet(l)) && added.every(quiet)) lines.add(added.length ? from : from + 1)
