@@ -246,6 +246,11 @@ Harness {
     function screensHeard() {
       tryVerify(function() { return screenStandIn.unanswered === 0 }, 5000)
     }
+    // The screens' last answer, which the service trusts for a second of the
+    // wall clock, has run out, so the next run asks them afresh.
+    function screensAnswerAged() {
+      within(2000, function() { return Date.now() - service.screensAnsweredMs >= 1000 })
+    }
     // A run waiting on the stand-in screen's answer goes once it comes, a
     // turn or two later: let it come, and the run land.
     function answerScreens() {
@@ -1089,13 +1094,13 @@ Harness {
       // With every screen off, a refresh's quotes are asked at once and wait
       // their turn for a screen; only the rest is owed.
       screenStandIn.on = false
-      wait(1100)
+      screensAnswerAged()
       service.now += 20
       service.refresh()
       screensHeard()
       var darkUserAsked = "NEST" in service.testFeed.userAsked
       screenStandIn.on = true
-      wait(1100)
+      screensAnswerAged()
       service.now += 5
       settle()
       harness.check("a refresh while every screen is off asks its quotes at once, to wait their turn for a screen", darkUserAsked,
