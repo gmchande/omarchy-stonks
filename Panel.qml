@@ -5,9 +5,8 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 
-// The watchlist panel. Owns its lifecycle, keys, and look; the body reads
-// the service and owns the list, search, scrub, help, and the motion when
-// the chart changes. The body is built as the panel first opens, and kept.
+// The watchlist panel: its opening, closing, keys and card. StonksBody
+// does the rest; it is built as the panel first opens, and kept.
 Panel {
   id: root
   moduleName: "grvc.stonks"
@@ -26,26 +25,16 @@ Panel {
   readonly property var trendColors: plugin ? plugin.trendColors : null
   readonly property string range: service ? service.range : "1D"
   readonly property int panelWidth: Style.space(480)
-  // The panel shows up to six whole rows under its fixed content. Stated in
-  // rows, so a different font or text size still gets six.
+  // Up to six whole rows, at any font or text size.
   readonly property int maxRows: 6
-  // Null until the panel first opens.
   readonly property var body: bodyLoader.item
   readonly property int heightCap: body ? panel.verticalContentInset + body.chromeHeight
     + maxRows * body.rowPitch - body.rowGap : 0
-  // The card's height for what the body shows: whole rows up to the cap, so
-  // the footer ends the panel with no gap, or a view's own height. The
-  // body's room is the most the card gives it.
   readonly property int bodyRoom: Math.min(root.heightCap, panel.availableCardHeight > 0 ? panel.availableCardHeight : root.heightCap)
     - panel.verticalContentInset
   readonly property int fittedCardHeight: body ? panel.fittedContentHeight(body.fittedHeight(root.bodyRoom), root.heightCap) : 0
-  // While the panel is open its edge eases to that height, so a view that
-  // changes it moves the edge instead of jumping it; the body lays out at
-  // the new height at once and the card's edge reveals or covers it, the
-  // footer riding it. The shell's card is an item
-  // inside a full-screen surface, so no window resizes. Closing stops the
-  // edge where it is for the fade. An open from closed settles it before
-  // the first frame; one during the close's fade eases from where it is.
+  // The shell's card is an item in a full-screen surface, so easing its
+  // height resizes no window.
   property real cardHeight: 0
   onFittedCardHeightChanged: if (root.opened) easeEdge()
   NumberAnimation { id: edgeEase; target: root; property: "cardHeight"; duration: 160; easing.type: Easing.OutCubic }
@@ -55,12 +44,6 @@ Panel {
     edgeEase.start()
   }
 
-  // The first visit there ever was says how Stonks is moved and changed,
-  // once: the service saves that it has. A panel opened while the service
-  // still reads its file says it as soon as the service is ready. A visit
-  // whose footer has a notice ahead of the hint (the data file can't be
-  // read, a save didn't land, an update waits) neither shows nor records
-  // it: a later one does.
   function offerHint() {
     if (!root.opened || !root.body || !service || !service.pluginsReady || service.hinted || root.body.notice !== "") return
     root.body.showFirstRunHint()
@@ -69,28 +52,25 @@ Panel {
   readonly property bool serviceReady: !!service && service.pluginsReady === true
   onServiceReadyChanged: offerHint()
 
-  // The card's place along the bar, held from an open from closed until the
-  // next; an open during the close fade keeps it, since the card is still on
-  // screen.
+  // An open during the close's fade leaves the card where it is on screen.
   HeldAnchor {
     id: heldAnchor
     pill: root.anchorItem
   }
 
-  // The views reset as the panel opens, before its first frame, not as it
-  // closes: the card fades out showing what you were looking at. Shown
-  // first, so the body reads the service again (its held inputs) and the
-  // reset lays out the latest. An open while open changes nothing on screen.
+  // Shown first, so the body reads the service again and the reset lays out
+  // the latest.
   function open() {
     var opening = !root.opened
     var fading = opening && panel.visible
     bodyLoader.active = true
     root.controller.show()
-    // Before the hint is offered: the footer's notices go ahead of it.
+    // Before offerHint: an update notice goes ahead of the hint.
     if (updates) updates.check()
     if (opening) {
       root.body.resetInteraction()
       offerHint()
+      // An open during the close's fade eases the edge from where it is.
       if (fading) easeEdge()
       else {
         heldAnchor.hold()
@@ -105,6 +85,7 @@ Panel {
   function close() {
     setCenterHoverRevealSuppressed(false)
     if (root.body) root.body.freeze()
+    // Closing stops the edge where it is for the fade.
     edgeEase.stop()
     root.controller.hide()
   }
@@ -144,11 +125,10 @@ Panel {
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      // The body is laid out at the card's new height while the edge eases.
+      // The body takes its new height at once; the edge eases over it.
       clip: true
       blocked: !!root.body && root.body.ownsKeys
-      // Omarchy's keys for every panel, past the body's own: j k move the
-      // selection, h l the scrub, Space is Enter, x removes.
+      // Omarchy's panel keys: j k and h l move, Space activates, x removes.
       onMoveRequested: function(dx, dy) {
         if (dy !== 0) root.body.moveCursor(dy)
         if (dx !== 0) root.body.nudgeScrub(dx)
@@ -164,8 +144,7 @@ Panel {
         root.switchPanel(direction)
       }
 
-      // The panel's keys land here first, and the body's map takes them,
-      // as the window's do. Every other key goes on to the catcher.
+      // Keys reach the body's map first; any it leaves go on to the catcher.
       Item {
         id: bodyKeys
         Keys.onPressed: function(event) {
@@ -181,12 +160,11 @@ Panel {
         anchors.top: parent.top
         height: root.fittedCardHeight - panel.verticalContentInset
         sourceComponent: StonksBody {
-          // The rows' room, so the list judges its sight by the rows' view
-          // while the card has shrunk to the key sheet or a view.
+          // The rows' view is judged by the rows' room while the card has
+          // shrunk to the key sheet or a view.
           rowsRoom: root.bodyRoom
           // The screen's room, so the first-run hint gives way to the rows.
           screenRoom: panel.availableCardHeight > 0 ? panel.availableCardHeight - panel.verticalContentInset : 0
-          // The card's edge as it eases: the footer and the field ride it.
           edge: Math.round(root.cardHeight) - panel.verticalContentInset
           service: root.service
           updates: root.updates
@@ -197,7 +175,7 @@ Panel {
           chartHeight: Style.space(190)
           foreground: root.bar ? root.bar.foreground : Commons.Color.foreground
           fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
-          // The card's colour, opaque whatever the theme's panel alpha.
+          // Opaque: the theme's popup colour may carry an alpha.
           ground: Qt.rgba(Commons.Color.popups.background.r, Commons.Color.popups.background.g, Commons.Color.popups.background.b, 1)
           upColor: root.trendColors ? root.trendColors.upOn(ground) : Commons.Color.foreground
           downColor: root.trendColors ? root.trendColors.downOn(ground) : Commons.Color.urgent

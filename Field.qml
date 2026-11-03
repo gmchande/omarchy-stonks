@@ -1,10 +1,8 @@
 import QtQuick
 import qs.Ui
-// The shell's text field, in Stonks' looks: search's, a new list's name, and
-// a rename. Its hint is secondary text's dim, as the shell's own
-// Qt.darker(foreground) is as dark as typed text on a light theme, and in
-// retro its corners are square, as every fill there is. The shell's focus
-// and hover borders stay.
+// The shell's text field, its focus and hover borders kept. Its placeholder
+// takes Stonks' dim: the shell's Qt.darker(foreground) is as dark as typed
+// text on a light theme.
 TextField {
   id: root
 
@@ -13,6 +11,7 @@ TextField {
 
   placeholderTextColor: dim
 
+  // In retro its corners are square, as every fill there is.
   Binding {
     target: root.background
     property: "radius"

@@ -2,11 +2,10 @@
 .import "History.js" as History
 .import "Quote.js" as Quote
 
-// The data file's settings and lists, and every rule that changes them:
-// settings in, settings out. Knows nothing of quotes, except to rank them.
-// Each rule takes settings as `fileSettings` returns them, changes none it
-// is given, and normalises what it returns once: normalising at each step,
-// a save at 150 symbols in 12 lists normalises every list four to nine times.
+// Settings in, settings out. Each rule takes settings as `fileSettings`
+// returns them, changes none it is given, and normalises its result once:
+// normalising at every step, a save of 150 symbols in 12 lists normalised
+// each list four to nine times.
 
 function nextChangeMode(mode) {
   return mode === "pct" ? "abs" : mode === "abs" ? "open" : "pct"
@@ -28,26 +27,14 @@ function normalizeSymbols(value) {
   return out
 }
 
-// All always keeps one symbol: the pill, the hero, and the window all need
-// one to show. A named list may be empty. The service refuses All's last
-// removal and the body says why, from this one rule.
 function canRemove(symbols) {
   return !!symbols && symbols.length > 1
 }
 
-// A list's order; each list has its own. Manual is the symbols array as
-// saved; the rest are views over it, so sorting never rewrites what you
-// arranged by hand. The order and the change mode are separate settings:
-// sorting by % change ranks the rows by the percent they show, from the
-// open when they show since the open. There is no order by the amount:
-// Stonks converts no currency, so yen, dollars, and index points would rank
-// as one number; showing amounts, the rows stay in percent order.
 var ORDERS = ["manual", "symbol", "name", "pct"]
 
 var ORDER_LABELS = { manual: "MANUAL", symbol: "SYMBOL", name: "NAME", pct: "% CHANGE" }
 
-// An order saved by an older build as "abs", the amount, reads as % change,
-// which runs the same way.
 function normalizeOrder(value) {
   if (value === "abs") return "pct"
   return ORDERS.indexOf(value) >= 0 ? value : "manual"
@@ -57,33 +44,23 @@ function nextOrder(order) {
   return ORDERS[(ORDERS.indexOf(normalizeOrder(order)) + 1) % ORDERS.length]
 }
 
-// A sorted order runs its own way, A to Z or biggest gain first, or,
-// reversed, the other. Manual has no direction, so it is never reversed.
 function normalizeReversed(order, value) {
   return normalizeOrder(order) !== "manual" && value === true
 }
 
-// True when a sorted order puts the smallest value first: text unreversed,
-// a change reversed.
 function sortsAscending(order, reversed) {
   order = normalizeOrder(order)
   return (order === "pct") === normalizeReversed(order, reversed)
 }
 
-// The order control's word, its arrow the way the values run down the list:
-// ↑ ascending, ↓ descending, ↕ manual.
 function orderLabel(order, reversed) {
   order = normalizeOrder(order)
   var arrow = order === "manual" ? "↕" : sortsAscending(order, reversed) ? "↑" : "↓"
   return arrow + "  " + ORDER_LABELS[order]
 }
 
-// Symbols in display order. Sorted views keep quotes that have not
-// arrived at the bottom, in their manual order, and the sort is stable so
-// ties keep their manual order too, whichever way it runs. `changeMode` is
-// the rows' unit, which % change ranks by, the move each row shows: from
-// its newest price since the close where it has one (`newest`, by symbol,
-// `Overnight.newestPrint`).
+// `newest`: each symbol's newest print since the close
+// (`Overnight.newestPrint`).
 function sortedSymbols(symbols, quotes, order, reversed, changeMode, newest) {
   order = normalizeOrder(order)
   if (order === "manual") return symbols.slice()
@@ -106,9 +83,6 @@ function sortedSymbols(symbols, quotes, order, reversed, changeMode, newest) {
   return out
 }
 
-// The rows in the order they show: `sorted`, unless an order held while an
-// open's prices come in (`held`) orders exactly the same rows, so the list
-// moves once, when they're in.
 function shownOrder(held, sorted) {
   if (!held || held.length !== sorted.length) return sorted
   for (var i = 0; i < sorted.length; i++) if (held.indexOf(sorted[i]) < 0) return sorted
@@ -143,15 +117,8 @@ function normalizeRefreshInterval(value) {
   return n
 }
 
-// The data file. `symbols` is All, the library, in its manual order, and
-// `order` is All's order: the version-1 keys keep their meaning, so an older
-// build reads the same All. `reversed` is All's direction, a key of its own
-// for the same reason. Named lists are subsets of All with their own
-// order and direction; `list` is the current one, "" for All. A symbol a hand-edited file
-// puts only in a named list joins All rather than being dropped. `range` is
-// the chart range the panel and the window show. A key this version doesn't
-// know, at the top or in a list, stays as it is: a later version's, after a
-// downgrade or from another machine sharing the file.
+// `symbols`, `order` and `reversed` are All's, as version 1 wrote them; a
+// named list is a subset of All.
 function fileSettings(src) {
   var from = src || {}
   var lists = normalizeLists(from.lists)
@@ -165,27 +132,17 @@ function fileSettings(src) {
     order: normalizeOrder(from.order || "manual"),
     reversed: normalizeReversed(from.order, from.reversed),
     changeMode: from.changeMode === "abs" || from.changeMode === "open" ? from.changeMode : "pct",
-    // A new install opens in retro, the look every picture of Stonks shows;
-    // smooth is a key or a click away.
     style: from.style === "smooth" ? "smooth" : "retro",
     refreshIntervalSec: normalizeRefreshInterval(from.refreshIntervalSec),
     lists: lists,
     list: listIndex(lists, from.list) >= 0 ? lists[listIndex(lists, from.list)].name : "",
     range: History.historyRanges().indexOf(from.range) >= 0 ? from.range : "1D",
-    // The panel's first-run hint has shown, and never shows again.
     hinted: from.hinted === true,
-    // The sounds, off until the file says true: a new install and a file
-    // from before them start silent.
     sounds: from.sounds === true,
-    // The daily look on GitHub for a newer Stonks, on unless the file says
-    // false: off, Stonks asks GitHub nothing.
     updateCheck: from.updateCheck !== false
   })
 }
 
-// Named lists: a name, the symbols in their manual order, and the list's own
-// order and direction. Names are trimmed and unique ignoring case; "All" is
-// the library's.
 function normalizeLists(value) {
   var out = []
   if (!value || typeof value.length !== "number") return out
@@ -210,7 +167,6 @@ function listIndex(lists, name) {
   return -1
 }
 
-// Why a new list cannot have this name, or "" when it can.
 function listNameProblem(name, lists) {
   var n = listName(name)
   if (!n) return "Name the list"
@@ -224,7 +180,6 @@ function currentList(settings) {
   return i >= 0 ? settings.lists[i] : null
 }
 
-// The rows' symbols in their manual order, and the order they show in.
 function listSymbols(settings) {
   var list = currentList(settings)
   return list ? list.symbols : settings.symbols
@@ -240,8 +195,6 @@ function listReversed(settings) {
   return list ? list.reversed : settings.reversed
 }
 
-// All first, then the named lists: what the menu offers.
-// Each carries its symbols, so a symbol's checklist can read its ticks.
 function listChoices(settings) {
   var out = [{ name: "", label: "All", count: settings.symbols.length, symbols: settings.symbols }]
   for (var i = 0; i < settings.lists.length; i++) {
@@ -251,7 +204,6 @@ function listChoices(settings) {
   return out
 }
 
-// The settings with one named list changed, or All when name is "".
 function withList(settings, name, change) {
   var i = listIndex(settings.lists, name)
   if (i < 0) {
@@ -263,8 +215,6 @@ function withList(settings, name, change) {
   return fileSettings(Object.assign({}, settings, { lists: lists }))
 }
 
-// Adding on a named list puts the symbol in it and in All; on All, in All
-// only. The surface features it once its first answer is in.
 function withSymbolAdded(settings, symbol) {
   var s = String(symbol || "").trim().toUpperCase()
   if (!s) return settings
@@ -273,10 +223,6 @@ function withSymbolAdded(settings, symbol) {
   })
 }
 
-// One symbol's membership of one list, "" for All. Adding to a named list
-// puts the symbol in All too. Taking it out of a named list takes that
-// membership only; out of All, out of every list, and All keeps one symbol.
-// A featured symbol that leaves All hands the hero to its neighbour in `shown`.
 function withMembership(settings, symbol, name, member, shown) {
   var without = function(list) { return list.filter(function(s) { return s !== symbol }) }
   if (listIndex(settings.lists, name) >= 0) {
@@ -284,7 +230,7 @@ function withMembership(settings, symbol, name, member, shown) {
       return Object.assign({}, list, { symbols: member ? list.symbols.concat([symbol]) : without(list.symbols) })
     })
   }
-  // A symbol in the checklist is always in All; there is nothing to tick.
+  // Every symbol is in All already.
   if (member || !canRemove(settings.symbols) || settings.symbols.indexOf(symbol) < 0) return settings
   var symbols = without(settings.symbols)
   var featured = settings.featured
@@ -296,10 +242,7 @@ function withMembership(settings, symbol, name, member, shown) {
     lists: settings.lists.map(function(list) { return Object.assign({}, list, { symbols: without(list.symbols) }) }) }))
 }
 
-// A removal taken back: the symbol returns to the place it had in All and in
-// every list that held it, as `before` recorded them, and to the hero only if
-// the removal moved it off and the hero is still the one it `left`. Anything
-// else changed since stays as it is now.
+// `before`: the settings before the removal; `left`: the hero it left.
 function withRemovalUndone(settings, before, symbol, left) {
   var restore = function(now, was) {
     var at = was.indexOf(symbol)
@@ -318,21 +261,18 @@ function withRemovalUndone(settings, before, symbol, left) {
     featured: back ? symbol : settings.featured }))
 }
 
-// Another order starts in its own direction.
 function withListOrder(settings, order) {
   return withList(settings, settings.list, function(list) {
     return Object.assign({}, list, { order: normalizeOrder(order), reversed: false })
   })
 }
 
-// The current list's sorted order the other way; manual has no direction.
 function withListReversed(settings) {
   return withList(settings, settings.list, function(list) {
     return Object.assign({}, list, { reversed: normalizeReversed(list.order, !list.reversed) })
   })
 }
 
-// A hand-arranged order for the current list; it must hold the same symbols.
 function withManualOrder(settings, symbols) {
   return withList(settings, settings.list, function(list) {
     var moved = normalizeSymbols(symbols)
@@ -342,20 +282,16 @@ function withManualOrder(settings, symbols) {
   })
 }
 
-// A new, empty list, made current. Unchanged when the name is refused.
 function withListCreated(settings, name) {
   if (listNameProblem(name, settings.lists) !== "") return settings
   var list = { name: listName(name), symbols: [], order: "manual", reversed: false }
   return fileSettings(Object.assign({}, settings, { lists: settings.lists.concat([list]), list: list.name }))
 }
 
-// Why a list cannot take a new name, or "" when it can: the new-list rules
-// against every other list, so changing only the case is fine.
 function renameProblem(settings, name, newName) {
   return listNameProblem(newName, settings.lists.filter(function(list) { return list.name !== name }))
 }
 
-// The current list follows its new name. Unchanged when the name is refused.
 function withListRenamed(settings, name, newName) {
   var i = listIndex(settings.lists, name)
   if (i < 0 || renameProblem(settings, settings.lists[i].name, newName) !== "") return settings
@@ -365,15 +301,12 @@ function withListRenamed(settings, name, newName) {
   return fileSettings(Object.assign({}, settings, { lists: lists, list: current }))
 }
 
-// A named list one place up or down among the named lists; All stays first.
 function withListMoved(settings, name, delta) {
   var from = listIndex(settings.lists, name)
   if (from < 0) return settings
   return fileSettings(Object.assign({}, settings, { lists: movedSymbols(settings.lists, from, from + delta) }))
 }
 
-// Deleting a list leaves All and every other list as they were; deleting the
-// current one goes back to All.
 function withListDeleted(settings, name) {
   var i = listIndex(settings.lists, name)
   if (i < 0) return settings
@@ -382,22 +315,16 @@ function withListDeleted(settings, name) {
   return fileSettings(Object.assign({}, settings, { lists: lists }))
 }
 
-// Whether two settings, as `fileSettings` returns them, say the same.
+// Both as `fileSettings` returns them, so their keys come in one order.
 function settingsEqual(left, right) {
   return left === right || JSON.stringify(left) === JSON.stringify(right)
 }
 
-// What the lists hold, as one value two settings hold equally or not: All's
-// symbols and each named list's name and symbols, in their saved order. A
-// list's sort order and direction are views over it.
 function listsHeld(settings) {
   return JSON.stringify([settings.symbols, settings.lists.map(function(list) { return [list.name, list.symbols] })])
 }
 
-// First-run copy of data settings off the bar entry, which held them before
-// the data file: its data-file keys only, never the pill's own. Null when
-// that entry has no symbols, so the service can fall back to defaults
-// without writing.
+// The settings rode the bar entry before the data file.
 function settingsFromBar(config) {
   var bar = barEntryFor(config, "grvc.stonks")
   if (!bar || !bar.symbols || !bar.symbols.length) return null

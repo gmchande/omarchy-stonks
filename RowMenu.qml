@@ -4,26 +4,18 @@ import QtQuick
 import qs.Commons
 import qs.Commons as Commons
 
-// A row's menu: the ways to remove it, each line saying which lists the
-// removal reaches, such as "Remove from Growth" and "Remove from all 3
-// lists". Value-in, signals out; the body says the lines and removes. It
-// looks and moves as the list menu does, with one cursor: opened by a key,
-// it starts on `startLine`; opened by the pointer, on no line, until the
-// pointer moves onto one. The arrows move it, Enter or a click takes a
-// line, and Escape backs out.
+// A row's removals, each line naming the lists it reaches ("Remove from all
+// 3 lists"). It looks and moves as the list menu does.
 FocusScope {
   id: root
 
-  // Each line's words, top to bottom.
   property var lines: []
-  // The line the cursor starts on as the menu opens, -1 for none.
   property int startLine: -1
   property int cursor: -1
   property bool retro: false
   property color foreground: Commons.Color.foreground
   property string fontFamily: Style.font.family
   property color background: Qt.rgba(Commons.Color.popups.background.r, Commons.Color.popups.background.g, Commons.Color.popups.background.b, 1)
-  // The most it may be across; a longer line ends in an ellipsis.
   property int maxWidth: 0
 
   readonly property int itemHeight: Style.space(26)
@@ -33,7 +25,7 @@ FocusScope {
   signal taken(int index)
   signal dismissed()
 
-  // Read, so a new font measures again.
+  // Reading `metrics.font` measures again at a new font.
   width: { var font = metrics.font; return Math.min(maxWidth, Math.ceil(lines.reduce(function(widest, line) { return Math.max(widest, metrics.advanceWidth(line)) }, Style.space(120)))
     + padding * 2 + inset * 2) }
   height: lines.length * itemHeight + inset * 2
@@ -43,13 +35,9 @@ FocusScope {
     font.pixelSize: Style.font.bodySmall
   }
 
-  // True while the menu is open on an open surface. Turned on, it starts
-  // on its line and takes the keys a turn later if it is still on; turned
-  // off, however it closes, the surface's closing included, it gives them
-  // up and keeps what it shows for the close fade.
+  // Open, on an open surface. Off, the menu still shows through the close
+  // fade, but takes no pointer or key.
   property bool active: false
-  // Off, it still shows, through the close fade, but takes no pointer or
-  // key.
   enabled: active
   onActiveChanged: {
     if (active) {
@@ -73,7 +61,6 @@ FocusScope {
     event.accepted = true
   }
 
-  // The edge is drawn over the ground, as the list menu's is.
   Rectangle {
     anchors.fill: parent
     radius: root.retro ? 0 : Style.cornerRadius
@@ -82,7 +69,6 @@ FocusScope {
     border.color: Qt.tint(root.background, Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.18))
   }
 
-  // A view showing through its surface's close moves no cursor.
   RowPointer {
     id: pointer
     onMoved: function(x, y) {

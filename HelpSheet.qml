@@ -7,14 +7,8 @@ import qs.Commons as Commons
 import qs.Ui
 import "Tones.js" as Tones
 
-// Shortcut sheet, the same on both surfaces: the key groups in two columns,
-// a dim credit line (the version and where prices come from) closing the
-// second, then the mouse's lines across both under them, and its close
-// button.
-// One column would leave half the window empty and push the last group
-// below the fold. The two stack independently, groups in order, the first
-// taking groups until it holds about half the lines, so a short group never
-// sits beside a long one with a hole under it.
+// The `?` sheet on both surfaces: key groups in two columns, the credit
+// closing the second, the mouse's lines across both, then CLOSE.
 Flickable {
   id: root
 
@@ -24,24 +18,21 @@ Flickable {
   property color dim: Tones.dim(foreground, Commons.Color.background)
   property string fontFamily: Style.font.family
   property bool retro: false
-  // The words start at the rows' inset (`inset`), and CLOSE ends where the
-  // rows' figures do, one gutter and an inset short of the right (`edge`):
-  // the sheet clips at its edges, so CLOSE's fill reaching past its word
-  // stays whole. What each key does may run on past that edge, as wrapped
-  // words do, rather than break a line in the panel.
+  // `edge` is the room right of the rows' figures. CLOSE ends there, so its
+  // fill stays inside the clip; what a key does may run past it.
   property int inset: 0
   property int edge: 0
-  // Stonks' version, as the version watch read it from the manifest; ""
-  // leaves it off the credit rather than show a blank.
   property string version: ""
-  // One part a line, so a half column never breaks one mid-phrase.
+  // One part a line, so a half column never breaks one mid-phrase. With no
+  // version known the credit leaves it off rather than show a blank.
   readonly property string credit: (version !== "" ? ["Stonks " + version] : [])
     .concat(["Prices from Yahoo", "Overnight from Robinhood"]).join("\n")
 
   signal closeRequested()
 
   readonly property var groups: sheet.groups
-  // How many groups the first column takes.
+  // Two columns, the first taking groups until it holds about half the
+  // lines: one column would leave half the window empty.
   readonly property int split: {
     var lines = function(group) { return group.rows.length + 1 }
     var total = 0
@@ -54,10 +45,7 @@ Flickable {
     return groups.length
   }
   readonly property int columnWidth: (width - inset - columns.spacing) / 2
-  // The key column, as wide as the widest key or gesture, so what each
-  // does keeps the room a panel's half column has. The binding reads
-  // keyMetrics.font so a new font measures again: a text size changed while
-  // the shell runs would otherwise run a key into its words.
+  // Reads keyMetrics.font so a new font or text size measures again.
   readonly property int keyWidth: {
     var font = keyMetrics.font
     var widest = 0
@@ -73,8 +61,7 @@ Flickable {
   clip: true
   boundsBehavior: Flickable.StopAtBounds
   interactive: contentHeight > height
-  // While more of the sheet sits out of sight, as in a short window, the
-  // scrollbar says so, at rest too, in the gutter CLOSE ends short of.
+  // While more of the sheet is out of sight the scrollbar says so, at rest too.
   Controls.ScrollBar.vertical: Controls.ScrollBar {
     objectName: "helpScrollBar"
     policy: root.interactive ? Controls.ScrollBar.AlwaysOn : Controls.ScrollBar.AlwaysOff
@@ -83,8 +70,6 @@ Flickable {
     minimumSize: Math.min(1, Style.space(24) / Math.max(1, availableHeight))
   }
 
-  // One group: its title, then a line per entry, the key bold and what it
-  // does dim. `keyName` tells the keys from the mouse's gestures.
   component Group: Column {
     id: group
     required property var modelData
@@ -155,11 +140,10 @@ Flickable {
             delegate: Group { width: root.columnWidth }
           }
 
-          // The credit closes the second column, in the room the first's
-          // longer groups leave beside it, so a window of ordinary height
-          // shows it without a scroll.
           Text {
             objectName: "helpCredit"
+            // The credit closes the second column, so a window of ordinary
+            // height shows it without a scroll.
             visible: sheetSide.index === 1
             width: root.columnWidth - root.edge
             textFormat: Text.PlainText
@@ -178,7 +162,6 @@ Flickable {
       delegate: Group { width: sheetColumn.width; keyName: "helpGesture" }
     }
 
-    // Escape, as a button.
     ListAction {
       id: close
       objectName: "helpClose"

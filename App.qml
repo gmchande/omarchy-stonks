@@ -5,30 +5,25 @@ import Quickshell
 import qs.Commons
 import qs.Commons as Commons
 import "History.js" as History
-// Tiled app window. Owns window lifecycle, keys, and look; the body reads
-// the service and owns the list, search, scrub, and help.
+// The Stonks window. StonksBody does the rest; it is built as the window
+// first opens, and kept.
 Item {
   id: root
 
   property var service: null
   property var updates: null
-  // The sounds (`Sounds`), or null for none.
   property var sounds: null
-  // The screenshot's hand-off (`Camera`), or null for none.
   property var camera: null
-  // The theme's up and down (`TrendColors`).
   property var trendColors: null
   property bool closingFromHost: false
   property string requestedSymbol: ""
   property string requestedRange: ""
-  // A screen shows the window's workspace (`WindowHost.onScreen`).
   property bool onScreen: true
 
   readonly property bool ready: !!(service && service.pluginsReady)
   readonly property bool opened: window.visible
   readonly property string featuredSymbol: ready ? service.featuredSymbol : ""
   readonly property string range: ready ? service.range : "1D"
-  // Built as the window first opens, and kept: null until then.
   readonly property var body: bodyLoader.item
 
   function open(payloadJson) {
@@ -37,9 +32,8 @@ Item {
     requestedSymbol = String(payload.symbol || "").toUpperCase()
     requestedRange = History.historyRanges().indexOf(payload.range) >= 0 ? payload.range : ""
     closingFromHost = false
-    // At rest before the first frame; closing left the window as it was.
-    // Shown first, so the body reads the service again and the reset lays
-    // out the latest.
+    // The views reset as the window opens, not as it closes. Shown first, so
+    // the body reads the service again and the reset lays out the latest.
     var opening = !window.visible
     bodyLoader.active = true
     window.visible = true
@@ -57,10 +51,6 @@ Item {
     closingFromHost = false
   }
 
-  // The summon payload's symbol and range, once the service can act on them,
-  // in one change. Both are shared with the panel, and the symbol with the
-  // bar, so a request belongs to the visit that made it: one waiting on a
-  // service not yet ready is dropped if the window has closed by then.
   function applyRequest() {
     if (!ready || !window.visible) return
     var symbol = requestedSymbol
@@ -76,8 +66,7 @@ Item {
 
   function refocusKeys() { Qt.callLater(function() { if (keyCatcher) keyCatcher.forceActiveFocus() }) }
 
-  // A window summoned while its service starts draws its chart in once
-  // there is a symbol to draw.
+  // A window summoned while its service starts draws its chart in once ready.
   onReadyChanged: if (ready) Qt.callLater(function() {
     root.applyRequest()
     if (window.visible) root.body.motion.revealChart()
@@ -89,15 +78,13 @@ Item {
     color: Commons.Color.background
     implicitWidth: 720
     implicitHeight: 760
-    // The fixed content at its whole chart plus one row: below this the
-    // list would have no room at all. The chart gives way first, so here
-    // three rows show (StonksBody.minChartHeight). The width scales with
-    // the text size, as the panel's does: at a fixed 560, size 16 cuts
+    // The smallest height shows three whole rows, the chart giving way first.
+    // The width scales with the text size: at a fixed 560, size 16 cuts
     // Tokyo's holiday header and leaves VOL and P/E off the info lines.
     minimumSize: Qt.size(Style.space(560), root.body ? root.body.smallestHeight : 0)
     visible: false
 
-    // A close by the compositor freezes the body as one of ours does.
+    // The compositor's close freezes the body as ours does.
     onVisibleChanged: if (!visible && !root.closingFromHost) root.close()
 
     FocusScope {
@@ -114,8 +101,6 @@ Item {
         } else if (body.pressKey(event)) event.accepted = true
       }
 
-      // Past the body's width, on the window's margins, a click off the
-      // row's menu closes it too, as one on the body does.
       MouseArea {
         objectName: "marginCatcher"
         anchors.fill: parent
@@ -125,9 +110,8 @@ Item {
         onWheel: function(wheel) { wheel.accepted = true }
       }
 
-      // A tiled window can be very wide; past the width the layout is drawn
-      // for, the body keeps that width and centres, so a row never splits
-      // into two islands. Narrower, it fills.
+      // Past the width the layout is drawn for, the body centres, so a wide
+      // tiled window never splits a row into two islands.
       Loader {
         id: bodyLoader
         active: false

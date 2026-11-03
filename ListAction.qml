@@ -2,20 +2,14 @@ import QtQuick
 import qs.Commons
 import qs.Commons as Commons
 
-// A caption-sized word that acts, in the list views and wherever a view
-// needs a button: DONE, RENAME, SAVE, the moves. It says only what it does;
-// the keys are on the key sheet. It hovers the way the order control does,
-// and takes the pressed fill while the button is down. One that can't act
-// (`enabled` false) neither hovers nor shows the hand, so it never invites
-// a click: a disabled MouseArea keeps the hover it had. `view` is the view
-// it sits in, for the look and the colours.
+// A word that acts as a button. A disabled MouseArea keeps the hover it
+// had, so `hovered` checks `enabled` too.
 Text {
   id: root
 
   property var view: null
-  // The button Enter takes, marked as the shell marks its default (its
-  // Button's `selected`, ConfirmDialog's chosen button): the selected fill
-  // at rest, the word in the selected colour.
+  // Marked as the shell marks its default button (its Button's `selected`,
+  // ConfirmDialog's chosen one).
   property bool enterTakes: false
   readonly property bool hovered: enabled && mouse.containsMouse
 
@@ -36,6 +30,7 @@ Text {
     width: parent.implicitWidth + Style.space(12)
     height: parent.implicitHeight + Style.space(4)
     radius: root.view.retro ? 0 : Style.cornerRadius
+    // The pressed fill while the button is down.
     color: mouse.pressed ? Style.pressedFillFor(root.view.foreground, Commons.Color.accent)
       : root.hovered ? Style.hoverFillFor(root.view.foreground, Commons.Color.accent)
       : root.enterTakes ? Style.selectedFillFor(root.view.foreground, Commons.Color.accent) : "transparent"
@@ -46,6 +41,7 @@ Text {
     anchors.fill: parent
     anchors.margins: -Style.space(6)
     hoverEnabled: true
+    // One that can't act shows no hand, so it never invites a click.
     cursorShape: root.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
     onClicked: root.activated()
   }

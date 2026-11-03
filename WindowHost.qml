@@ -4,11 +4,8 @@ import QtQuick
 import Quickshell.Hyprland
 import Quickshell.Wayland
 
-// Hosts the window, whatever is on the bar, and decides what a request for
-// it does with the panel and Hyprland's workspaces, and whether a screen
-// shows it. The window itself is App's. It also asks Hyprland, for the
-// service, whether every screen is off, and closes the panel as Omarchy's
-// screensaver starts.
+// Hosts the window (App), with or without a pill on the bar, and tells the
+// service whether every screen is off.
 Item {
   id: root
 
@@ -21,15 +18,10 @@ Item {
 
   readonly property alias app: app
   readonly property bool opened: app.opened
-  // The window as Hyprland lists it, once it is mapped.
   readonly property var toplevel: app.opened ? Hyprland.toplevels.values.find(root.isWindow) || null : null
-  // Hyprland has it on a workspace other than the focused one.
   readonly property bool elsewhere: !!toplevel && !!toplevel.workspace && toplevel.workspace !== Hyprland.focusedWorkspace
-  // A screen shows it: a monitor that is on (as `screensOff` reads it) has
-  // the window's workspace active, or the special workspace over it; until
-  // Hyprland lists it, or with no screens to ask, as in a harness, it counts
-  // as shown. Out of sight it stays open as it was left, and the service
-  // asks only for what a closed surface asks.
+  // Until Hyprland lists the window, or with no monitors (a harness), it
+  // counts as shown.
   readonly property bool onScreen: {
     var workspace = toplevel ? toplevel.workspace : null
     if (!workspace || root.monitors.length === 0) return true
@@ -49,15 +41,11 @@ Item {
     return !!shell && typeof shell.isPluginOpen === "function" && shell.isPluginOpen("grvc.stonks")
   }
 
-  // The pill's right-click and IPC toggleWindow: the window open on this
-  // workspace, with no panel over it, closes; otherwise it comes forward.
   function toggle() {
     if (app.opened && !elsewhere && !popupOpen()) app.close()
     else open("{}")
   }
 
-  // Opens the window, or brings it forward where it is, closing the panel.
-  // The payload may name a symbol and a range.
   function open(payloadJson) {
     var shown = app.opened
     if (popupOpen()) shell.hide("grvc.stonks")
@@ -65,21 +53,15 @@ Item {
     if (shown) focusWindow()
   }
 
-  // Omarchy 4 configures Hyprland in Lua, where the classic dispatcher
-  // syntax fails.
+  // Omarchy 4 configures Hyprland in Lua; the classic dispatch syntax fails.
   function focusWindow() {
     if (!toplevel || !toplevel.address) return
     Hyprland.dispatch("hl.dsp.focus({ window = \"address:0x" + toplevel.address + "\" })")
   }
 
-  // Hyprland's screens. Every one off (DPMS) as Hyprland last answered
-  // holds the service's quote runs. `askScreens` asks afresh, before each
-  // run; each screen's answer says so (`screensAnswered`). With no screens
-  // to ask, it asks nothing and says so. While every screen is off, or the
-  // window is open with one off, any word from Hyprland asks again, so a
-  // run waits no longer than it must and a screen back on shows the window
-  // at once; so does a special workspace shown or hidden, which is in the
-  // screens' answer alone.
+  // A screen's DPMS state and its special workspace come only in Hyprland's
+  // answer about monitors (`lastIpcObject`), fresh only when asked. While a
+  // screen is off, or a special workspace toggles, any event asks again.
   readonly property var monitors: Hyprland.monitors.values
   readonly property bool screensOff: monitors.length > 0 && monitors.every(function(m) {
     return !!m.lastIpcObject && m.lastIpcObject.dpmsStatus === false
@@ -108,10 +90,8 @@ Item {
       if (root.screensOff || root.screenOff || event.name === "activespecial") Hyprland.refreshMonitors()
     }
   }
-  // Hyprland says nothing when a screen comes back on, so while every
-  // screen is off the first input after a second of none, the key press or
-  // pointer move that wakes them, asks again: what fell due goes at once,
-  // not at the clock's next step. Off, it hears nothing.
+  // Hyprland sends no event when a screen wakes, so while all are off the
+  // input that wakes them asks again.
   IdleMonitor {
     id: input
     enabled: root.screensOff
@@ -120,9 +100,6 @@ Item {
     onIsIdleChanged: if (!isIdle && root.screensOff) Hyprland.refreshMonitors()
   }
 
-  // Omarchy's screensaver window opening closes the panel, which would
-  // otherwise stay over it; the window stays, under it, as any app does.
-  // Heard only while the panel is open.
   Connections {
     target: Hyprland
     enabled: root.popupOpen()

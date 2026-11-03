@@ -642,6 +642,12 @@ test("the data file reads as written and repairs hand edits", () => {
     lists: [{ name: "Yen", symbols: ["MSFT"], order: "abs" }] })
   expect([byAmount.order, byAmount.reversed]).toEqual(["pct", true])
   expect(byAmount.lists).toEqual([{ name: "Yen", symbols: ["MSFT"], order: "pct", reversed: false }])
+  // Before the data file, the bar entry held the settings: they move over
+  // without the pill's own keys, and an entry with no symbols moves none.
+  const fromBar = entry => M.settingsFromBar({ bar: { layout: { right: [{ id: "grvc.stonks", ...entry }] } } })
+  const moved = fromBar({ symbols: ["nvda", "spy"], order: "name", barStyle: "icon" })
+  expect([moved.symbols, moved.order, "barStyle" in moved]).toEqual([["NVDA", "SPY"], "name", false])
+  expect(fromBar({ barStyle: "icon" })).toBeNull()
 })
 
 // Each data file a release wrote (test/data-files/VERSION.json; data-files.sh
@@ -768,6 +774,7 @@ test("a list's name is refused empty, as All, or taken in any case or padding; a
   expect([M.renameProblem(s, "Growth", "my watchlist"), M.renameProblem(s, "Growth", "GROWTH")]).toEqual(["my watchlist already exists", ""])
   const renamed = M.withListRenamed(library({ list: "Growth" }), "Growth", "GROWTH")
   expect([renamed.list, renamed.lists.map(list => list.name)]).toEqual(["GROWTH", ["My Watchlist", "GROWTH"]])
+  expect(M.withListRenamed(library({ list: "Growth" }), "Growth", "Wins").list).toBe("Wins")
 })
 
 test("All can't be renamed, moved, or deleted, a list moves only between the named lists, and deleting one leaves the rest as they were", () => {
@@ -822,6 +829,8 @@ test("only a change to what the lists hold ends the undo", () => {
   const s = library()
   expect(M.listsHeld(Object.assign({}, s, { range: "1Y", featured: "SPY", order: "symbol", list: "Growth" }))).toBe(M.listsHeld(s))
   expect(M.listsHeld(Object.assign({}, s, { lists: s.lists.concat([{ name: "Made elsewhere", symbols: [] }]) }))).not.toBe(M.listsHeld(s))
+  const growth = library({ list: "Growth" })
+  expect(M.listsHeld(M.withListOrder(growth, "symbol"))).toBe(M.listsHeld(growth))
 })
 
 test("sorting ranks the rows as a view over the manual list", () => {
@@ -889,11 +898,16 @@ test("the key sheet lists exactly the README's keys for each surface, the row's 
   expect(drawn("manual", false)).toEqual(readme("window"))
   expect(drawn("pct", true)).toEqual(readme("panel").filter(k => !moves.includes(k)))
   expect(drawn("symbol", false)).toEqual(readme("window").filter(k => !moves.includes(k)))
+  // The mouse's drag is offered only in manual order, the order's arrow only
+  // in a sorted one.
+  const mouse = order => M.sheet(order, true).mouse.rows.map(r => r.does).join(" | ")
+  expect(["manual", "pct"].map(order => [mouse(order).includes("lists · drag moves it"), mouse(order).includes("arrow")]))
+    .toEqual([[true, false], [false, true]])
 })
 
 test("a letter says its key and Shift, never its text's case, and nothing held with Ctrl or Alt", () => {
   const { typed } = load("KeyText.js")
-  const SHIFT = 0x02000000, CTRL = 0x04000000, ALT = 0x08000000, KEYPAD = 0x20000000
+  const SHIFT = 0x02000000, CTRL = 0x04000000, ALT = 0x08000000, META = 0x10000000, KEYPAD = 0x20000000
   // Caps Lock sends "O" with no Shift, and "o" with it.
   expect(["o", "l", "m"].map(l => typed({ key: l.toUpperCase().charCodeAt(0), modifiers: 0, text: l.toUpperCase() })))
     .toEqual(["o", "l", "m"])
@@ -902,6 +916,7 @@ test("a letter says its key and Shift, never its text's case, and nothing held w
   expect(typed({ key: 80, modifiers: 0, text: "p" })).toBe("p")
   expect(typed({ key: 80, modifiers: CTRL, text: "\u0010" })).toBe("")
   expect(typed({ key: 80, modifiers: ALT, text: "p" })).toBe("")
+  expect(typed({ key: 80, modifiers: META, text: "p" })).toBe("")
   expect(typed({ key: 63, modifiers: SHIFT, text: "?" })).toBe("?")
 })
 
