@@ -122,6 +122,15 @@ Harness {
           && releasePill.featuredSymbol === "MSFT" && devPill.featuredSymbol === "NVDA",
         releaseService.library + " | " + devService.library + " | " + releasePill.featuredSymbol + " | " + devPill.featuredSymbol)
 
+      // Each saves the prices of its own list, once they have come. Before
+      // the edits below: a stock just added holds the save until its first
+      // run has landed (`Service.flushQuotes`).
+      var cached = within(30000, function() {
+        return harness.cachedSymbols("grvc.stonks") === "AAPL,MSFT,NVDA" && harness.cachedSymbols("grvc.stonks-dev") === "NVDA"
+      })
+      harness.check("each copy keeps the last prices of its own list in its own cache folder",
+        cached, harness.cachedSymbols("grvc.stonks") + " | " + harness.cachedSymbols("grvc.stonks-dev"))
+
       // An edit in each lands in its own file alone.
       var releaseText = harness.readFile(harness.config + "grvc.stonks.json")
       devService.addSymbol("AAPL")
@@ -134,13 +143,6 @@ Harness {
       harness.check("an edit in one copy is saved to its lists file and leaves the other's as it was",
         devSaved && releaseKept && releaseSaved && devKept,
         harness.lists("grvc.stonks") + " | " + harness.lists("grvc.stonks-dev") + " | " + releaseKept + "," + devKept)
-
-      var cached = within(10000, function() {
-        return harness.cachedSymbols("grvc.stonks") !== "" && harness.cachedSymbols("grvc.stonks-dev") !== ""
-      })
-      harness.check("each copy keeps its last prices in its own cache folder",
-        cached && harness.cachedSymbols("grvc.stonks-dev").split(",").indexOf("MSFT") < 0,
-        harness.cachedSymbols("grvc.stonks") + " | " + harness.cachedSymbols("grvc.stonks-dev"))
 
       // IPC: each target opens its own window and asks for its own panel.
       ipc("grvc.stonks-dev", "openWindow", "{}")
