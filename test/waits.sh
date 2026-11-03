@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# The set-time wait gate: counts each harness file's wait(N) with a number
-# written in, outside strings and comments, and passes only when each count
-# is its baseline below. A count may only go down: a step waits for what it
-# needs, with within(ms, fn) (Steps.qml), never for a set time. Many of
-# today's step a stand-in clock on purpose.
+# The set-time wait gate: counts each harness file's wait(...) outside
+# strings and comments, a computed one such as wait(interval - 150) too,
+# and passes only when each count is its baseline below. A count may only
+# go down: a step waits for what it needs, with within(ms, fn) (Steps.qml),
+# never for a set time. Many of today's step a stand-in clock on purpose.
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
@@ -14,11 +14,11 @@ declare -A baseline=(
   [camera.qml]=2
   [fetch.qml]=19
   [keys.qml]=1
-  [layout.qml]=155
-  [lists.qml]=5
+  [layout.qml]=158
+  [lists.qml]=6
   [long-list.qml]=4
   [overnight.qml]=11
-  [pointer.qml]=16
+  [pointer.qml]=21
   [popup-motion.qml]=2
   [popup.qml]=1
   [range.qml]=24
@@ -28,14 +28,14 @@ declare -A baseline=(
   [updates.qml]=2
   [window-adds.qml]=3
   [window-motion.qml]=4
-  [window-rows.qml]=5
-  [window-search.qml]=45
+  [window-rows.qml]=6
+  [window-search.qml]=46
 )
 
 # Strings and comments, either kind, are skipped (\x22 and \x27 are the two
 # quotes).
 code_only='\x22(?:\\.|[^\x22\\\n])*\x22(*SKIP)(*F)|\x27(?:\\.|[^\x27\\\n])*\x27(*SKIP)(*F)|/\*[\s\S]*?\*/(*SKIP)(*F)|//.*(*SKIP)(*F)'
-counts=$(rg -U --count-matches -P "$code_only|\\bwait\\s*\\(\\s*[0-9]" -g '*.qml' -- test/qml)
+counts=$(rg -U --count-matches -P "$code_only|\\bwait\\s*\\(" -g '*.qml' -- test/qml)
 code=$?
 [ "$code" -le 1 ] || { echo "FAILED rg could not count the waits in test/qml"; exit 1; }
 failed=0

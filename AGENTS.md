@@ -70,7 +70,8 @@ for someone who has never seen Stonks and gives it thirty seconds.
 - Test a rule in its `.js` file with `bun`. Walk the panel or the window only
   for what passes between pieces, such as a key and its action, or a save and
   the next read.
-- A fix's test is a case in a test that already exists.
+- A fix's test fails on the code before the fix, as a case in a test that
+  already exists.
 - How Stonks looks and moves is `test/review.sh`'s to show, not
   `test/all.sh`'s.
 
