@@ -307,6 +307,12 @@ again.
   switched it to since the open. On a longer range, it's from the range's
   start. Stonks
   leaves out prices of zero or less, and stray points in Yahoo's charts.
+- **A dash for the move just after an open.** For a few minutes after a
+  stock in London, Tokyo or Toronto first trades, Yahoo can still count
+  its day from the close before last. Stonks counts from the last close it
+  saw itself. If it started in those minutes and hasn't seen that close, it
+  shows a dash for the move until the stock has traded for ten minutes,
+  then fills it in.
 - **"No trades today", "No trades on" a day, or "Traded only at" a time.**
   The listing traded too little that day to draw a line.
 - **"1W unavailable" or "Couldn't search", with RETRY.** Yahoo didn't

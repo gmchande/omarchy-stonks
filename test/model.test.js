@@ -1816,6 +1816,92 @@ test("a fetched name or code past its length reads as not sent", () => {
   expect([Object.keys(spark("X")), Object.keys(spark(long(1e5)))]).toEqual([["X"], []])
 })
 
+// Every open the calendars hold, minute by minute, from 20 minutes before
+// each session's bell to 40 after: what a row says as Yahoo's answers come
+// in, for a Stonks that has run all along, and for one started at each of
+// those minutes, holding no close, through every refresh after.
+// Yahoo's one-day answers are modeled on its captures at Tokyo's and
+// London's opens (saved.test.js): until the day's first trade, the last
+// session's quote; from it the day's, counting from the close before last
+// for six minutes on a calendar with no pre-market. The first trade comes
+// up to 14 minutes after the bell, and no two closes in a row are the same.
+test("at every open the calendars hold, a row's move counts from the close before its day, or is left out", () => {
+  const STALE = 6 * 60
+  const codes = { US: "NMS", TSX: "TOR", LSE: "LSE", JPX: "JPX" }
+  const failures = []
+  for (const [name, cal] of Object.entries(calendars.calendars)) {
+    const days = []
+    for (let d = "2026-01-01"; d <= cal.validThrough; d = M.nextDateString(d)) {
+      const segs = M.segmentsOn(cal, d)
+      if (segs.length) days.push({ date: d, segs, start: segs[0].start, end: segs[segs.length - 1].end, offset: M.localDate(segs[0].start, cal).offset })
+    }
+    const close = i => 1000 + 7 * (i % 3)
+    const span = (start, end, day) => ({ start, end, gmtoffset: day.offset, timezone: "Z" })
+    const periods = day => cal.pre
+      ? { pre: span(M.epochAt(cal, day.date, cal.pre.open), day.start, day), regular: span(day.start, day.end, day), post: span(day.end, M.epochAt(cal, day.date, cal.post.close), day) }
+      : { pre: span(day.start, day.start, day), regular: span(day.start, day.end, day), post: span(day.end, day.end, day) }
+    const answer = (day, current, price, time, prevClose, bars) => {
+      const p = periods(day)
+      return { chart: { result: [{
+        meta: { symbol: "X", exchangeName: codes[name], instrumentType: "EQUITY", gmtoffset: day.offset, range: "1d", priceHint: 2,
+          regularMarketPrice: price, regularMarketTime: time, regularMarketDayHigh: price, regularMarketDayLow: price,
+          previousClose: prevClose, chartPreviousClose: prevClose, currentTradingPeriod: periods(current),
+          tradingPeriods: cal.pre ? { pre: [[p.pre]], regular: [[p.regular]], post: [[p.post]] } : [[p.regular]] },
+        timestamp: bars.map(b => b.t),
+        indicators: { quote: [{ open: bars.map(b => b.c), high: bars.map(b => b.c), low: bars.map(b => b.c), close: bars.map(b => b.c) }] }
+      }] } }
+    }
+    // Yahoo's answer at `now` on day `i`: one trade a minute in each session
+    // from the first, in five-minute bars.
+    const yahoo = (i, now) => {
+      const day = days[i], last = days[i - 1]
+      const first = day.start + 60 * (i % 15)
+      if (now < day.start) return answer(last, day, close(i - 1), last.end, close(i - 2), [{ t: last.start, c: close(i - 1) }, { t: last.end - 300, c: close(i - 1) }])
+      if (now < first) return answer(day, day, close(i - 1), last.end, close(i - 2), [])
+      const trades = []
+      for (let t = first; t <= now; t += 60) if (day.segs.some(s => t >= s.start && t < s.end)) trades.push(t)
+      const bars = [...new Set(trades.map(t => t - (t - day.start) % 300))].map(t => ({ t, c: close(i) + 1 }))
+      const stale = !cal.pre && now < first + STALE
+      return answer(day, day, close(i) + 1, trades[trades.length - 1], stale ? close(i - 2) : close(i - 1), bars)
+    }
+    let held = null
+    const clock = t => new Date(t * 1000).toISOString().slice(11, 16) + "Z"
+    for (let i = 2; i < days.length; i++) {
+      const first = days[i].start + 60 * (i % 15)
+      for (const seg of days[i].segs) {
+        const minutes = []
+        for (let now = seg.start - 20 * 60; now < seg.start + 40 * 60; now += 60) {
+          const traded = now >= first
+          minutes.push({ now, traded, quote: M.parseChart(yahoo(i, now), []),
+            base: traded ? close(i - 1) : close(i - 2), price: traded ? close(i) + 1 : close(i - 1) })
+        }
+        // `from`: when the shell started, or null for the one that ran all along.
+        const check = (m, shown, from) => {
+          const row = M.rowModel(shown, 0, "pct")
+          const where = () => `${name} ${days[i].date} ${clock(m.now)} ${from === null ? "running" : "started " + clock(from)}`
+          if (row.pct === null) {
+            // Left out only for a Stonks that holds no close, and only
+            // until Yahoo has caught up.
+            if (from === null || !m.traded || m.now >= first + 20 * 60 || cal.pre) failures.push(`${where()}: left out`)
+          } else if (Math.abs(row.pct - (m.price - m.base) / m.base * 100) > 1e-9 || (m.traded && M.dayBase(shown) !== m.base)) {
+            failures.push(`${where()}: ${row.changeText} from ${M.dayBase(shown)}, not from ${m.base}`)
+          }
+        }
+        for (const m of minutes) check(m, held = M.carryClose(held, m.quote, calendars), null)
+        // A shell started before the bell holds the last close once it has
+        // seen it; after 20 minutes of trades each refresh reads as a fresh
+        // start's, so a shell is followed from its start to then.
+        for (let s = 0; s < minutes.length; s++) {
+          let started = null
+          for (let j = s; j === s || (j < minutes.length && minutes[s].now >= seg.start - 120 && minutes[j].now < first + 20 * 60); j++)
+            check(minutes[j], started = M.carryClose(started, minutes[j].quote, calendars), minutes[s].now)
+        }
+      }
+    }
+  }
+  expect(failures.slice(0, 10)).toEqual([])
+}, 60000)
+
 // The update check offers main's version only when it comes after the
 // running one, number by number.
 test("a version is newer number by number, and a manifest names one only whole", () => {

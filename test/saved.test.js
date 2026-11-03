@@ -2548,17 +2548,64 @@ test("at the open the chart moves to the new session, and a listing abroad shows
     "1903 3,070.00 \u22120.23%", "1903 row 3,070.00 \u22120.23%", "1910 3,070.00 \u22120.23%", "1910 row 3,070.00 \u22120.23%",
     "1915 3,077.00 +0.23%", "1915 row 3,072.00 +0.07%", "1920 3,050.00 \u22120.65%", "1920 row 3,049.00 \u22120.68%",
     "1921 3,053.00 \u22120.55%", "1921 row 3,054.00 \u22120.52%"])
-  // A shell started at 09:20, asking two days for its first answer, reads
-  // Friday's close from Yahoo itself; and the carried close is saved with
-  // the quote, so a restart in those minutes keeps it.
-  expect(M.rowModel(open("1920", "2d/7203.t.json"), 0, "pct").changeText).toBe("\u22120.62%")
+  // A shell started in those minutes holds no close of Friday's, and no
+  // field of Yahoo's answers names it at every open: Tokyo's two-day answer
+  // counted from Friday's close, London's below from the close before its
+  // first day. So it leaves the move out until the trades are ten minutes
+  // past the first, by when Yahoo had caught up: Yahoo's own figures read
+  // 0.00% at 09:15. Its first answer at each minute, and one started at
+  // 09:15 through its refreshes, restarted before the last: never −0.88%
+  // from Thursday's close at 09:20. The carried close is saved with the quote,
+  // so a restart in those minutes keeps it.
+  const fresh = (time, file) => M.rowModel(M.carryClose(null, open(time, file), calendars), 0, "pct").changeText
+  expect(["1915", "1920", "1921"].map(time => fresh(time, "2d/7203.t.json"))).toEqual(["\u2014", "\u2014", "\u2014"])
+  let started = null
+  const startedRows = []
+  for (const time of ["1915", "1920", "1921"]) {
+    const two = M.twoDays(started, nyAt(time), calendars)
+    if (time === "1921") started = JSON.parse(JSON.stringify(started))
+    started = M.carryClose(started, open(time, (two ? "2d/" : "") + "7203.t.json"), calendars)
+    startedRows.push(`${time} ${two ? "2d" : "1d"} ${M.rowModel(started, 0, "pct").changeText}`)
+  }
+  expect(startedRows).toEqual(["1915 2d \u2014", "1920 1d \u2014", "1921 1d \u2014"])
   const restarted = M.carryClose(JSON.parse(JSON.stringify(M.carryClose(null, open("1910", "2d/7203.t.json"), calendars))), open("1920", "7203.t.json"), calendars)
   expect(M.rowModel(restarted, 0, "pct").changeText).toBe("\u22120.65%")
   // A one-day answer of Monday before its first trade still reads Friday's move.
   expect(M.rowModel(M.carryClose(open("1855", "7203.t.json"), open("1903", "7203.t.json"), calendars), 0, "pct").changeText).toBe("\u22120.23%")
-  // An index or a coin keeps Yahoo's previous close, as a US stock does.
-  const kept = kind => M.carryClose(open("1855", "7203.t.json"), { ...open("1920", "7203.t.json"), ...kind }, calendars).prevClose
-  expect([kept({ instrumentType: "INDEX" }), kept({ crypto: true })]).toEqual([3077, 3077])
+  // An index or a coin keeps Yahoo's previous close, as a US stock does,
+  // with a close held or none: NBIS at 09:35, five minutes into its day.
+  const kept = (previous, kind) => M.carryClose(previous, { ...open("1920", "7203.t.json"), ...kind }, calendars).prevClose
+  expect([kept(open("1855", "7203.t.json"), { instrumentType: "INDEX" }), kept(open("1855", "7203.t.json"), { crypto: true }),
+    kept(null, { instrumentType: "INDEX" }), kept(null, { crypto: true })]).toEqual([3077, 3077, 3077, 3077])
+  const nbis = savedDay("watch-2026-10-26-0935", "nbis")
+  expect(M.rowModel(M.carryClose(null, nbis, calendars), 0, "pct").changeText).toBe(M.rowModel(nbis, 0, "pct").changeText)
+  // Shell at London's open on Tuesday 3 November, 07:55 to 08:30 there
+  // (02:55 to 03:30 New York), each answer as Stonks asks for it: Monday's
+  // move from Friday's 4,036.50 until Tuesday's first bar, then Tuesday's
+  // from Monday's 3,921. Yahoo had caught up by the first bars Stonks saw.
+  // A shell started at 08:20 leaves the move out, and one started at 08:30,
+  // its trades 14 minutes past the first, shows it.
+  const answerAt = (place, time, file) => M.parseChart(fixture(`moments/${place}-2026-11-03-${time}/${file}`), cents)
+  const opening = (place, symbol, times) => {
+    let held = null
+    return times.map(time => {
+      const two = M.twoDays(held, at("2026-11-03", time.slice(0, 2) + ":" + time.slice(2)), calendars)
+      held = M.carryClose(held, answerAt(place, time, (two ? "2d/" : "") + symbol + ".json"), calendars)
+      const row = M.rowModel(held, 0, "pct")
+      return `${time} ${row.priceText} ${row.changeText}`
+    })
+  }
+  const startedAt = (place, symbol, time) => M.rowModel(M.carryClose(null, answerAt(place, time, `2d/${symbol}.json`), calendars), 0, "pct").changeText
+  expect(opening("london", "shel.l", ["0255", "0303", "0310", "0320", "0330"])).toEqual(["0255 3,921.00 \u22122.86%",
+    "0303 3,921.00 \u22122.86%", "0310 3,921.00 \u22122.86%", "0320 3,906.50 \u22120.37%", "0330 3,913.00 \u22120.20%"])
+  expect([startedAt("london", "shel.l", "0320"), startedAt("london", "shel.l", "0330")]).toEqual(["\u2014", "\u22120.20%"])
+  // BHP at Sydney's open on Wednesday 4 November, 09:55 to 10:30 there
+  // (Tuesday 17:55 to 18:30 New York): Tuesday's move from Monday's 56.74,
+  // then Wednesday's from Tuesday's 56.42, Yahoo's own from its first bars.
+  // Sydney has no calendar, so a shell started at 10:20 reads Yahoo's.
+  expect(opening("sydney", "bhp.ax", ["1755", "1803", "1810", "1820", "1830"])).toEqual(["1755 56.42 \u22120.56%",
+    "1803 56.42 \u22120.56%", "1810 56.42 \u22120.56%", "1820 55.78 \u22121.13%", "1830 55.75 \u22121.19%"])
+  expect(startedAt("sydney", "bhp.ax", "1820")).toBe("\u22121.13%")
   // Friday 30 October at 09:26 there, with Friday's first bars: Friday's
   // move, from Thursday's close.
   const after = M.parseChart(fixture("moments/tokyo-2026-10-30-0926/7203.t.json"), cents)
