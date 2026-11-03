@@ -15,7 +15,7 @@ Item {
   id: root
 
   // The plugin's id, the manifest's (`Plugin`): "" until the shell hands
-  // it over, and meanwhile no file is read or written.
+  // it over, and meanwhile the lists file and the cache are left alone.
   property string pluginId: ""
   // Whether `omarchy plugin update` can update this copy (`Updates`):
   // where it can't, GitHub is never asked for main's version.
