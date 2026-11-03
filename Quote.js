@@ -107,7 +107,7 @@ function sameLevel(a, b, tick) {
 // Yahoo has sent at most two strays in a row.
 var STRAY_RUN = 3
 
-// Yahoo has mixed in at most four strays in one extended session.
+// Yahoo has mixed in at most four strays in one run.
 var MIXED_RUN = 4
 
 // Yahoo drops stray prints into intraday buckets, such as a bell bucket
