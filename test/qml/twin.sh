@@ -9,6 +9,8 @@
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree twin.qml
 patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property alias testWindow: window'
+# The cache step waits for each copy's quote runs to land.
+patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testFeed: feed'
 # The pills' panels stay unloaded: the offscreen platform has no
 # PopupWindow to put one in.
 patch_copy plugin/BarWidget.qml '/id: panelLoader/,/source:/s/active: true/active: false/'
