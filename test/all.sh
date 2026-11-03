@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Every check a pull request needs: what Stonks does, fetches, saves and
 # says, and what a key or a click changes. Every unit-test file
-# (test/unit.sh), source boundaries, QML lint, manifest and launcher
-# validation, the Quickshell flow harnesses, and the frame checker's
-# self-check on made-up frames.
+# (test/unit.sh), source boundaries, QML lint, the harnesses' set-time
+# waits, manifest and launcher validation, the Quickshell flow harnesses,
+# the frame checker's self-check on made-up frames, and each test the
+# branch changes failing on the code before the change.
 # Pictures, positions and motion belong to test/review.sh; input readiness
 # and a target's reachability to the action they protect; the queue, the
 # lock and the verdict to test/queue.sh. Needs
@@ -38,6 +39,9 @@ validate_clone() {
   return "$code"
 }
 
+# Each test case and harness step the branch changes, on the code before
+# the change (test/before.js): first, since it runs the harnesses it touches.
+picked before && start "changed tests fail on the code before the change" bun test/before.js
 # Longest first, as measured.
 start "window search harness" bash test/qml/window-search.sh
 start "sounds harness" bash test/qml/sounds.sh
@@ -64,13 +68,14 @@ start "camera harness at scale 2" env QT_SCALE_FACTOR=2 STONKS_CAMERA_SIZES=1 ba
 start "camera harness at scale 1.75" env QT_SCALE_FACTOR=1.75 STONKS_CAMERA_SIZES=1 bash test/qml/camera.sh
 start "keys harness" bash test/qml/keys.sh
 start "panel harness" bash test/qml/popup.sh
-known_names unit frames font boundaries lint lint-gate validate launcher
+known_names unit frames font boundaries waits lint lint-gate validate launcher
 fill
 
 picked unit && run "unit tests (every *.test.js)" bash test/unit.sh
 picked frames && run "frame checker self-check" bun test/qml/frames.js self-check
 picked font && run "required font glyphs" bun test/font.js
 picked boundaries && run "source boundaries" bash test/boundaries.sh
+picked waits && run "set-time waits (only the baseline in test/waits.sh)" bash test/waits.sh
 picked lint && run "qmllint (only the baseline in test/lint.sh)" bash test/lint.sh
 picked lint-gate && run "qmllint gate self-check" bash test/lint.sh self-check
 picked validate && run "omarchy plugin validate (what a clone holds)" validate_clone

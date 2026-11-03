@@ -72,8 +72,8 @@ for someone who has never seen Stonks and gives it thirty seconds.
   the next read.
 - A fix's test fails on the code before the fix, as a case in a test that
   already exists.
-- Wait for what a step needs, never for a set time. How Stonks looks and
-  moves is `test/review.sh`'s to show, not `test/all.sh`'s.
+- How Stonks looks and moves is `test/review.sh`'s to show, not
+  `test/all.sh`'s.
 
 ## Code
 
@@ -82,8 +82,6 @@ for someone who has never seen Stonks and gives it thirty seconds.
   timing.
 - Rule files (`*.js`) start with `.pragma library`, so QML loads each once,
   and hold pure functions imported one way.
-- Secondary text is mixed toward its ground (`Tones.dim`). `Qt.darker` gets
-  louder on a light theme.
 - Read Omarchy's colors as `Commons.Color`, after `import qs.Commons as
   Commons`: a bare `Color` is Qt's own type.
 
