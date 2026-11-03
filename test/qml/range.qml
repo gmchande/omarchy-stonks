@@ -1193,6 +1193,11 @@ Harness {
       // colour, and one back above it the bull, every column in the up
       // colour. A wheel step to another symbol shows that one's animal at
       // once, and back again. (popup-motion.sh judges the turn's frames.)
+      // The steps above ask Yahoo in half a minute for what a session asks
+      // over hours, and leave its budget a few requests above the reserve a
+      // run of quotes must leave (Gate.qml). It starts full here, as in a
+      // session: a refresh it held back would turn no animal.
+      service.yahooGate.tokens = service.yahooGate.capacity
       var settingsBeforeTurn = pill.settings
       barApi.layoutConfig = { left: [], center: [], right: [{ id: "grvc.stonks" }] }
       service.addSymbol("TURN")

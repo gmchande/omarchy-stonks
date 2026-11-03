@@ -1690,8 +1690,12 @@ Harness {
           : control === "done" ? root.findAll(target, "actionFill")[0]
           : control === "symbol" ? root.findAll(target, "rowFill")[0]
           : control === "remove" ? root.findAll(target, "rowRemoveFill")[0] : target
+        // Inside the fill's edge, in the film's pixels: a frame is the
+        // window's pixels, so at scale 1.75 each unit is 1.75 of them.
         var corner = fill.mapToItem(body, 0, 0)
-        var box = [Math.ceil(corner.x) + 1, Math.ceil(corner.y) + 1, Math.floor(fill.width) - 3, Math.floor(fill.height) - 3]
+        var ratio = body.Window.window.devicePixelRatio
+        var left = Math.ceil((corner.x + 1) * ratio), top = Math.ceil((corner.y + 1) * ratio)
+        var box = [left, top, Math.floor((corner.x + fill.width - 2) * ratio) - left, Math.floor((corner.y + fill.height - 2) * ratio) - top]
         // Off the control, so the film opens on it at rest; the time lets
         // any hover fill the move left fade (160 ms).
         mouseMove(body, body.width / 2, 10)
