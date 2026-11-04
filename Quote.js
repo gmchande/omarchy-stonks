@@ -510,6 +510,20 @@ function currentPeriods(current) {
   return true
 }
 
+// The cache's quotes, { symbol: { quote, receivedAt } }, as this or an
+// earlier Stonks saved them. Before 1.1.1 a period could span centuries, and
+// `Overnight.extendedSlots` walks the pre- and post-markets slot by slot.
+function keptQuotes(saved) {
+  var out = {}
+  for (var symbol in saved) {
+    var quote = saved[symbol] && saved[symbol].quote
+    var days = quote && quote.session ? [quote.session, quote.next] : []
+    if (days.length && days.every(function(day) { return !day || ((!day.pre || isPeriod(day.pre)) && (!day.post || isPeriod(day.post))) }))
+      out[symbol] = saved[symbol]
+  }
+  return out
+}
+
 function isOffset(v) {
   return Format.isFiniteNumber(v) && Math.abs(v) < 86400
 }

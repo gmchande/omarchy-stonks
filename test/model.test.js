@@ -1568,6 +1568,13 @@ const bars = r => r.indicators.quote[0]
 test("a hostile chart or spark answer reads as no answer, at once", async () => {
   const read = "M.parseChart(json, []) && 'read'"
   const spark = "M.sparkResults(json) && 'read'"
+  // The cache's quote, read back as Stonks starts.
+  const kept = "M.keptQuotes({ X: { quote: json, receivedAt: 1 } }).X ? 'read' : null"
+  const saved = edit => {
+    const quote = JSON.parse(JSON.stringify(M.parseChart(chartAnswer(), [])))
+    if (edit) edit(quote)
+    return quote
+  }
   const cases = [
     { name: "a day answer, as sent", call: read, answer: chartAnswer(), want: "read" },
     { name: "bar times posing", call: read, answer: chartAnswer(r => { r.timestamp = POSING }) },
@@ -1598,6 +1605,10 @@ test("a hostile chart or spark answer reads as no answer, at once", async () => 
     }) },
     { name: "a day's periods spanning centuries", call: read,
       answer: chartAnswer(r => { r.meta.tradingPeriods.pre = [[period(T0 - 3600, T0 - 3000), period(1e12, 1e12 + 300)]] }) },
+    { name: "a saved quote, as kept", call: kept, answer: saved(), want: "read" },
+    // 1.1.0 read and kept such a pre-market.
+    { name: "a saved quote whose pre-market spans centuries", call: kept,
+      answer: saved(q => { q.session.pre = { start: T0 - 3600, end: 1e12 } }) },
     { name: "bar times over budget", call: read, answer: chartAnswer(r => { r.timestamp = times(M.MOST_BARS + 1) }) },
     { name: "closes over budget", call: read, answer: chartAnswer(r => { bars(r).close = times(M.MOST_BARS + 1).map(() => 10) }) },
     { name: "a session's days over budget", call: read,

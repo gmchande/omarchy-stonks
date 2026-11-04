@@ -7,6 +7,7 @@ import "Figures.js" as Figures
 import "History.js" as History
 import "Market.js" as Market
 import "Overnight.js" as Overnight
+import "Quote.js" as Quote
 import "Settings.js" as Settings
 // The one owner of the lists file, ~/.config/omarchy/<id>.json: the lists
 // and what you look at, the stock on show and the range the panel and the
@@ -894,7 +895,7 @@ Item {
   function parseSavedQuotes() {
     try {
       var parsed = JSON.parse(quotesFile.text())
-      return parsed && parsed.version === 1 && parsed.quotes ? parsed.quotes : {}
+      return parsed && parsed.version === 1 && parsed.quotes ? Quote.keptQuotes(parsed.quotes) : {}
     } catch (e) {
       return {}
     }
