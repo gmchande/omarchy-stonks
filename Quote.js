@@ -37,6 +37,9 @@ function sparkUrl(symbols, twoDays) {
   return SPARK_URL + "?symbols=" + symbols.map(encodeURIComponent).join(",") + "&range=" + (twoDays ? "2d" : "1d") + "&interval=5m&includePrePost=true"
 }
 
+// The length of the bars Stonks asks for, in seconds.
+var BAR = 5 * 60
+
 // Yahoo leaves out a symbol it doesn't know.
 function sparkResults(json) {
   var out = {}
@@ -283,9 +286,14 @@ function parseChart(json, centExchanges, receivedAt) {
   var ahead = !knownPrice(meta.regularMarketDayHigh) && !knownPrice(meta.regularMarketDayLow) && !!current.regular
   var figuresDay = ahead ? current.regular.start : !regular ? null
     : quoted !== null && quoted < regular.start ? quoted : regular.start
+  // Yahoo's bars sit on the five-minute grid from the bell. Off it, at the
+  // quote's time, is Yahoo's echo of its price: one price, no shares. Its open
+  // is that price, not the day's: at Tokyo's open on 4 November, 09:00:03's
+  // held Monday's close, 3,051, with the day already traded 3,030 to 3,040.
+  // So the day's open waits for Yahoo's first bar of the day.
   var firstRegular = null
   for (var k = 0; regular && !ahead && k < kept.length && !firstRegular; k++)
-    if (kept[k].t >= regular.start && kept[k].t < regular.end) firstRegular = kept[k]
+    if (kept[k].t >= regular.start && kept[k].t < regular.end && (kept[k].t - regular.start) % BAR === 0) firstRegular = kept[k]
   // A stock's next day has begun once Yahoo sends it, from its pre-market on.
   // An index's bars stay the last session's until its open, so its next day
   // begins with the pre-market, else the open, of Yahoo's later current period.
