@@ -100,7 +100,10 @@ Item {
     font.family: root.fontFamily
     font.pixelSize: Style.font.bodySmall
   }
-  readonly property int barHeight: Math.max(rowHeight, footerRow.implicitHeight + Style.space(8)) + Style.space(6)
+  // A note covers a notice for a moment in the notice's room, so nothing
+  // under or over the bar moves.
+  readonly property int wordLines: notice !== "" ? noticeShown.lines : 1
+  readonly property int barHeight: Math.max(rowHeight, footerWords.implicitHeight * wordLines + Style.space(8)) + Style.space(6)
 
   implicitHeight: hintHeight + barHeight
   height: implicitHeight

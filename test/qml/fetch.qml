@@ -396,7 +396,7 @@ Harness {
       var lateNotes = [pill.warns, nestRow.detail, body.watchlist.rowItem("SHOP.TO").detail, body.headerText].join(" | ")
       // Every listing unanswered is Yahoo's trouble, said once in the
       // header, not by every row, with why and when Stonks tries again.
-      var noAnswer = "Can't connect. Check your internet. Retrying in 1 minute."
+      var noAnswer = "Can't connect · Check your internet · Retrying in 1 minute"
       harness.check("90 s asked and unanswered for every listing: the pill warns, the window's header says once why prices stopped and when Stonks tries again, a saved row says when its price is from, and a row with nothing saved says nothing",
         new RegExp("^true \\| As of Tue \\d\\d:\\d\\d \\|  \\| " + noAnswer + "$").test(lateNotes), lateNotes)
       // A chart asked for meanwhile, SHOP.TO's, with nothing saved: the

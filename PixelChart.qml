@@ -45,6 +45,9 @@ Item {
   property real replayX: -1
   // The surface under the chart, which the stems are seen against.
   property color ground: Commons.Color.background
+  // The ticks at the bells. A row's copy leaves them out, as its smooth line
+  // does: on a few rows of cells they stand as tall as its prices.
+  property bool bells: true
 
   readonly property var grid: layout()
   readonly property bool day: !!geometry && geometry.day === true
@@ -205,7 +208,7 @@ Item {
   // Those the columns have reached draw in with them; those ahead, in hours
   // still to come, are there with the baseline.
   Repeater {
-    model: root.hasBaseline ? root.geometry.ticks.length : 0
+    model: root.bells && root.hasBaseline ? root.geometry.ticks.length : 0
 
     Rectangle {
       required property int index

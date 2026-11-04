@@ -102,6 +102,7 @@ Flickable {
           font.bold: true
         }
         Text {
+          objectName: "helpDoes"
           width: parent.width - root.keyWidth - parent.spacing
           textFormat: Text.PlainText
           text: helpRow.modelData.does

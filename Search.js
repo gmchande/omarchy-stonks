@@ -10,6 +10,16 @@ function searchUrl(query) {
   return SEARCH_URL + "?q=" + encodeURIComponent(query) + "&quotesCount=8&newsCount=0"
 }
 
+// Why a lookup failed, from its answer (`Fetch.answers`), or none: "none"
+// when nothing answered, "refused" when Yahoo wants fewer requests, and
+// "missing" for the 400 Yahoo gives a question it can't search, such as an
+// emoji, which asking again won't change. Any other refusal, such as a 403,
+// may pass, so it is "other" and can be asked again.
+function failure(answer) {
+  if (!answer || answer.kind === "none" || answer.kind === "refused") return answer ? answer.kind : "none"
+  return answer.status === 400 ? "missing" : "other"
+}
+
 // Yahoo sends at most the 8 asked for; past this, an answer is bad.
 var MOST_QUOTES = 40
 

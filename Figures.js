@@ -100,25 +100,23 @@ function freshnessWarns(fresh) {
 
 // From the quote host's gate (`Gate.qml`); null while the host answers. A
 // pause for no answer lasts 72 s at most, so it says minutes, rounded up; a
-// refusal's can last half an hour, so it says the time. `forms` is the
-// panel's header, each shorter than the last, the last fitting at text size
-// 20.
+// refusal's can last half an hour, so it says the time. `why` and `when` are
+// the pill's hover, a sentence each. `forms` is the header, each shorter than
+// the last: the window starts at the first, the panel at the second, and the
+// last fits at text size 20.
 function hostPause(pause, pausedUntil, now) {
   var left = pausedUntil - now
   if (pause === "none") {
     var minutes = Format.duration(Math.max(1, left))
-    var noAnswer = { why: "Can't connect. Check your internet.",
-      when: "Retrying in " + (left > 60 ? Math.ceil(left / 60) + " minutes." : "1 minute.") }
-    noAnswer.sentence = noAnswer.why + " " + noAnswer.when
-    noAnswer.forms = ["Can't connect · Retrying in " + minutes, "Can't connect · " + minutes]
-    return noAnswer
+    var inWords = left > 60 ? Math.ceil(left / 60) + " minutes" : "1 minute"
+    return { why: "Can't connect. Check your internet.", when: "Retrying in " + inWords + ".",
+      forms: ["Can't connect · Check your internet · Retrying in " + inWords, "Can't connect · Retrying in " + minutes, "Can't connect · " + minutes] }
   }
   if (pause === "refused") {
     var at = left > 0 ? Format.hhmm(pausedUntil, Format.readerOffset(pausedUntil)) : ""
-    var refused = { why: "The price server is busy.", when: at ? "Retrying at " + at + "." : "Retrying now." }
-    refused.sentence = refused.why + " " + refused.when
-    refused.forms = ["Server busy · Retrying " + (at ? "at " + at : "now"), at ? "Server busy · " + at : "Server busy · Retrying"]
-    return refused
+    var retrying = at ? "Retrying at " + at : "Retrying now"
+    return { why: "The price server is busy.", when: retrying + ".",
+      forms: ["The price server is busy · " + retrying, "Server busy · " + retrying, at ? "Server busy · " + at : "Server busy · Retrying"] }
   }
   return null
 }
@@ -293,10 +291,13 @@ function scrubbedBase(quote, t) {
   return { prevClose: Quote.dayBase(quote), dayOpen: quote.dayOpen }
 }
 
+// A coin never closes: its day starts at its price 24 hours ago.
 function dayBaselineText(day, today, scrubT) {
+  var base = Format.money(Quote.dayBase(day), day.priceDigits)
+  if (day.rolling) return "24H AGO " + base
   var reg = day.session.regular
   var closed = !!reg && (pastDayName(day, reg.start, today) !== "" || (scrubT > 0 && scrubT >= reg.end))
-  return (closed ? "CLOSE BEFORE " + sessionName(day, reg.start, today) : "PREV CLOSE") + " " + Format.money(Quote.dayBase(day), day.priceDigits)
+  return (closed ? "CLOSE BEFORE " + sessionName(day, reg.start, today) : "PREV CLOSE") + " " + base
 }
 
 function closeLabel(quote, today) {

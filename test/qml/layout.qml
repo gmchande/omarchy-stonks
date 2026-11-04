@@ -1040,9 +1040,8 @@ Harness {
           ["At 16:30 BST · Closing bell", "At 16:30 BST"], ["At 02:25 EDT · Overnight", "At 02:25 EDT"],
           ["WEEK OF 28 SEP 2026 · 712,345.00", "WEEK OF 28 SEP 2026"], ["21 SEP 10:00 AEST · 712,345.00", "21 SEP 10:00 AEST"],
           ["Can't get prices · Stonks keeps trying", "Can't get prices"],
+          Figures.hostPause("none", 72, 0).forms.slice(1), Figures.hostPause("refused", 30 * 60, 0).forms.slice(1),
           Figures.hostPause("none", 72, 0).forms, Figures.hostPause("refused", 30 * 60, 0).forms,
-          [Figures.hostPause("none", 72, 0).sentence].concat(Figures.hostPause("none", 72, 0).forms),
-          [Figures.hostPause("refused", 30 * 60, 0).sentence].concat(Figures.hostPause("refused", 30 * 60, 0).forms),
           ["Refresh failed for SHIB-USD · Retrying", "Refresh failed · Retrying", "Refresh failed"], ["Refreshing"], ["Loading SHIB-USD YTD"]]
         var closures = 0
         var unnamed = []
@@ -1248,6 +1247,28 @@ Harness {
         root.check("in a 720 × 520 window the key sheet shows its credit whole without a scroll, and a scrollbar says when more runs past the bottom",
           creditWhole && barSays, creditSaid + " ends at " + creditEnd + " of the sheet's " + sheetHeight
             + " | " + Math.round(sheet.contentHeight) + " tall, bar " + (helpBar ? helpBar.visible + " " + helpBar.size : "none"))
+
+        // At the everyday size, what each key and gesture does takes one
+        // line, in the panel and in the window at its narrowest.
+        var wrapped = []
+        var gatherDoes = function(node, where) {
+          if (!node || node.visible === false) return
+          if (node.objectName === "helpDoes" && node.lineCount !== 1) wrapped.push(where + ": " + node.text + " " + node.lineCount + " lines")
+          for (var c = 0; c < node.children.length; c++) gatherDoes(node.children[c], where)
+        }
+        ;[false, true].forEach(function(wide) {
+          surface.wide = wide
+          if (wide) surface.windowWidth = Style.space(560)
+          body.showingHelp = true
+          wait(50)
+          gatherDoes(sheet, wide ? "window" : "panel")
+          body.showingHelp = false
+        })
+        surface.wide = sheetBefore.wide
+        surface.windowWidth = sheetBefore.windowWidth
+        wait(50)
+        root.check("at the everyday size, every line of the key sheet fits on one line, in the panel and the window",
+          wrapped.length === 0, wrapped.join(", "))
 
         // After the text size changes while Stonks runs (`omarchy display
         // text size 16`), every key and gesture on the key sheet still fits

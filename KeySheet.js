@@ -33,7 +33,7 @@ function sheet(order, switchesPanels) {
       ]},
       { title: "Look", rows: [
         // On a range the hero shows the period: c changes it only on the day.
-        { key: "c", does: "Show the change in %, price or since the open" },
+        { key: "c", does: "%, price or since open" },
         { key: "s", does: "Smooth or retro" },
         { key: "m", does: "Sound on or off" },
         { key: "r", does: "Refresh" },
