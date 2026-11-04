@@ -904,6 +904,23 @@ Harness {
       // The bubble must not blink: a moment for a stray show to land.
       wait(100)
       var resting = [shows, JSON.stringify(opened), JSON.stringify(bubble), JSON.stringify(widget.tooltipText), pill.warns]
+      // A newer trade since the close under the resting pointer: the bubble
+      // shows again, once a trade, with that trade's time, since the shell
+      // keeps the words it was handed.
+      var late = quotesBeforeRest.LATE
+      var bell = late.session.regular.end
+      var showsBeforeTrades = shows
+      var traded = function(minutes) {
+        var next = Object.assign({}, quotesBeforeRest)
+        next.LATE = Object.assign({}, late, { points: late.points.concat(minutes.map(function(m, k) {
+          return { t: bell + m * 60, p: late.price + k + 1, s: "post" }
+        })) })
+        service.testFeed.quotes = next
+        within(1000, function() { return pill.newestNote !== "" && bubble === widget.tooltipText && bubble.indexOf(pill.newestNote) >= 0 })
+        return [shows - showsBeforeTrades, JSON.stringify(bubble), JSON.stringify(widget.tooltipText), pill.newestNote]
+      }
+      var firstTrade = traded([5])
+      var secondTrade = traded([5, 10])
       // A wheel step under the resting pointer puts another symbol on the
       // pill: the bubble names that one, once.
       service.testFeed.quotes = quotesBeforeRest
@@ -924,6 +941,10 @@ Harness {
       harness.check("a wheel step under a resting pointer shows the bubble again, naming the symbol now on the pill",
         wheeled[0] === 1 && wheeled[1] !== "LATE" && wheeled[2].indexOf('"' + wheeled[1] + " ") === 0,
         wheeled.join(" | "))
+      harness.check("a newer trade since the close under a resting pointer shows the bubble again, once a trade, with its time",
+        firstTrade[0] === 1 && secondTrade[0] === 2 && firstTrade[1] === firstTrade[2] && secondTrade[1] === secondTrade[2]
+          && /^After hours /.test(secondTrade[3]) && firstTrade[3] !== secondTrade[3] && secondTrade[1].indexOf(secondTrade[3]) >= 0,
+        firstTrade.join(" | ") + " || " + secondTrade.join(" | "))
       pill.settings = settingsBeforeLate
       service.feature("FAIL")
       service.removeSymbol("LATE")
