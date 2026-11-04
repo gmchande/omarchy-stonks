@@ -2070,6 +2070,28 @@ test("in every phase, a stock that has traded since its close shows that newest 
       expect([where, M.rangeVolume(history)]).toEqual([where, M.rangeVolume(raw)])
     }
   }
+  // Its own day and clock, as 1D names it, though the range's periods are
+  // stamped otherwise: at 23:00 on Sunday 25 October, a day's bar reads
+  // midnight by its offset, and the picture's range ends on that Sunday.
+  {
+    const at23 = at("2026-10-25", "23:00")
+    const nights = { NBIS: { ...sunday.nights.NBIS, bars: sunday.nights.NBIS.bars.filter(b => b.t <= at23), through: at23 } }
+    const raw = M.parseHistory(fixture("history/nbis-2026-10-25-2335-1y.json"), "1Y")
+    const chart = M.viewChart("NBIS", "1Y", sunday.quotes, {}, { "NBIS|1Y": { status: "ok", history: raw } }, nights, sunday.allDay, calendars)
+    const newest = M.historyRowModel(chart.history, sunday.quotes.NBIS, 0).newest
+    expect(newest.t).toBe(at23)
+    expect(M.historyScrubForms(chart.history, chart.history.bars.at(-1))[1]).toBe("25 OCT 2026 23:00")
+    expect(load("Share.js").words({ quote: sunday.quotes.NBIS, day: chart.day, history: chart.history, latest: chart.latest, newest, scrubT: 0,
+      changeMode: "pct", range: "1Y", now: at23 + 600, calendars }).span).toBe("1 YEAR · 24 OCT 2025 – 25 OCT 2026")
+  }
+  // Sunday 1 November at 21:48, the clocks gone back, under a week kept from
+  // before: the night's trade reads New York's clock now, 21:40 EST.
+  {
+    const gap = topsAt("gap-2026-11-01-2148")
+    const raw = M.parseHistory(fixture("history/nbis-2026-10-26-2005-5d.json"), "1W")
+    const history = M.viewChart("NBIS", "1W", gap.quotes, {}, { "NBIS|1W": { status: "ok", history: raw } }, gap.nights, gap.allDay, calendars).history
+    expect([M.historyScrubForms(history, history.bars.at(-1))[1], load("Share.js").barDate(history, history.bars.at(-1))]).toEqual(["1 NOV 21:40", "1 NOV 21:40 EST"])
+  }
   const week = M.viewChart("NBIS", "1W", sunday.quotes, {},
     { "NBIS|1W": { status: "ok", history: M.parseHistory(fixture("history/nbis-2026-10-25-2335-5d.json"), "1W") } }, sunday.nights, sunday.allDay, calendars).history
   expect(M.rangeEnds(week).low).toEqual({ p: 152.51, t: sunday.newest.NBIS.t })

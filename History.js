@@ -225,8 +225,11 @@ function historyFraction(history, t) {
 // Intraday bars take Yahoo's periods. Longer bars have none: Yahoo stamps a
 // week or month at its first day's midnight by that day's offset, an hour
 // off the answer's across a change of clocks. Any other stamp, the live
-// moment too (a coin's at 23:00 UTC), keeps the answer's offset.
+// moment too (a coin's at 23:00 UTC), keeps the answer's offset. The newest
+// price is a trade, not a period, so it keeps the clock it traded by.
 function barOffset(history, t) {
+  var newest = newestBar(history)
+  if (newest && newest.t === t) return newest.clock.offset
   if (history.clocks && history.clocks.length) return Quote.clockAt(history, t).offset
   var offset = history.gmtoffset || 0
   if (t === history.liveAt) return offset
@@ -272,14 +275,20 @@ function liveBarAppended(history) {
 }
 
 // Robinhood's ranges end on the newest price too. It replaces the live
-// moment, which also stands for the price now.
-function withNewest(history, print) {
+// moment, which also stands for the price now. `clock` is the exchange's at
+// that trade (`Market.tradeClock`): the history's may be from before a change
+// of clocks.
+function withNewest(history, print, clock) {
   var bars = history.bars
   if (!print || !bars.length || print.t <= bars[bars.length - 1].t) return history
   var own = liveBarAppended(history) ? bars.slice(0, -1) : bars
   return Object.assign({}, history, {
-    bars: own.concat([{ t: print.t, o: print.p, h: print.p, l: print.p, c: print.p, v: null, newest: print.phase, closed: !!print.closed }])
+    bars: own.concat([{ t: print.t, o: print.p, h: print.p, l: print.p, c: print.p, v: null, newest: print.phase, closed: !!print.closed, clock: clock }])
   })
+}
+
+function barClock(history, bar) {
+  return bar.newest ? bar.clock : Quote.clockAt(history, bar.t)
 }
 
 function newestBar(history) {
@@ -387,7 +396,7 @@ function historyScrubForms(history, bar, digits) {
   var date = historyDateText(history, bar.t, years, bar.newest ? "1d" : history.interval)
   if (history.interval === "1wk" && !bar.newest) date = "WEEK OF " + date
   if (bar.newest || history.interval === "15m" || history.interval === "30m" || history.interval === "1h") {
-    var clock = Quote.clockAt(history, bar.t)
+    var clock = barClock(history, bar)
     date += " " + Format.zonedHhmm(bar.t, clock.offset, clock.zone)
   }
   return [date + " · " + Format.money(bar.c, digits), date]

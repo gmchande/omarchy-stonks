@@ -33,8 +33,10 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
   if (range === "1D" || !quote) return chart
   var entry = histories[History.historyKey(symbol, range)]
   if (!entry) return null
-  if (entry.history) chart.history = History.withNewest(entry.history, Overnight.newestPrint(quote, chart.latest, calendars, chart.day))
-  else chart.failed = true
+  if (entry.history) {
+    var print = Overnight.newestPrint(quote, chart.latest, calendars, chart.day)
+    chart.history = History.withNewest(entry.history, print, print ? Market.tradeClock(quote, print.t, calendars) : null)
+  } else chart.failed = true
   return chart
 }
 
