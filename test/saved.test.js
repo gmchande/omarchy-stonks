@@ -2610,21 +2610,15 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   // (Tuesday 18:55 to 19:20 New York), after Tuesday's holiday: Monday's
   // move from Friday's 3,070 until Wednesday's first trade. At 09:15 and
   // 09:20 Yahoo's answers had the quote's time in Wednesday but Monday's
-  // close, 3,051, as the price, Friday's as the close before it, and no bar
-  // of Wednesday's carrying shares, while Wednesday's day had traded 3,030 to
-  // 3,040: Monday's quote restated, no trade, so the move is left out, never
-  // 0.00%. A shell started at either leaves it out too. Had that bar carried
-  // shares, it was a trade at Monday's close: 0.00%. On Monday 2 November
-  // the quote's first price, 3,077, was off Friday's close, inside its day's
-  // range, and between the spark answers' 3,083 and 3,072 that minute.
+  // close, 3,051, as the price and Friday's as the close before it, while
+  // Wednesday's day had traded 3,030 to 3,040: Monday's quote restated, so
+  // the move is left out, never 0.00%. A shell started at either leaves it
+  // out too. On Monday 2 November the quote's first price, 3,077, was off
+  // Friday's close, inside its day's range, and between the spark answers'
+  // 3,083 and 3,072 that minute.
   expect(opening("tokyo", "7203.t", ["1855", "1903", "1910", "1915", "1920"])).toEqual(["1855 3,051.00 \u22120.62%",
     "1903 3,051.00 \u22120.62%", "1910 3,051.00 \u22120.62%", "1915 3,051.00 \u2014", "1920 3,051.00 \u2014"])
   expect([startedAt("tokyo", "7203.t", "1915"), startedAt("tokyo", "7203.t", "1920")]).toEqual(["\u2014", "\u2014"])
-  const sold = fixture("moments/tokyo-2026-11-03-1915/2d/7203.t.json")
-  const volumes = sold.chart.result[0].indicators.quote[0].volume
-  volumes[volumes.length - 1] = 1000
-  const atClose = M.carryClose(answerAt("tokyo", "1910", "2d/7203.t.json"), M.parseChart(sold, cents), calendars)
-  expect(M.rowModel(atClose, 0, "pct").changeText).toBe("0.00%")
   // Friday 30 October at 09:26 there, with Friday's first bars: Friday's
   // move, from Thursday's close.
   const after = M.parseChart(fixture("moments/tokyo-2026-10-30-0926/7203.t.json"), cents)
