@@ -312,7 +312,10 @@ again.
   its day from the close before last. Stonks counts from the last close it
   saw itself. If it started in those minutes and hasn't seen that close, it
   shows a dash for the move until the stock has traded for ten minutes,
-  then fills it in.
+  then fills it in. With the rows set to since the open, the move shows a
+  dash too, and the open under the chart stays blank, until Yahoo sends the
+  day's first five-minute bar. That can take a few minutes at any market's
+  open.
 - **"No trades today", "No trades on" a day, or "Traded only at" a time.**
   The listing traded too little that day to draw a line.
 - **"1W unavailable" or "Couldn't search", with RETRY.** Yahoo didn't

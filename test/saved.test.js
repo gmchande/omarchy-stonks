@@ -2532,6 +2532,7 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   const open = (time, file) => M.parseChart(fixture(`moments/tokyo-2026-11-01-${time}/${file}`), cents)
   const spark = (time, file) => M.parseChart({ chart: { result: [fixture(`moments/tokyo-2026-11-01-${time}/spark/${file}`).spark.result[0].response[0]] } }, cents)
   const asks = []
+  const sinceOpen = []
   let held = null
   const read = (time, quote) => {
     held = M.carryClose(held, quote, calendars)
@@ -2541,13 +2542,25 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   const nyAt = time => at("2026-11-01", time.slice(0, 2) + ":" + time.slice(2))
   for (const time of ["1855", "1903", "1910", "1915", "1920", "1921"]) {
     const two = M.twoDays(held, nyAt(time), calendars)
-    read(time, open(time, (two ? "2d/" : "") + "7203.t.json"))
-    read(time + " row", spark(time, (two ? "2d/" : "") + "7203.t.json"))
+    const file = (two ? "2d/" : "") + "7203.t.json"
+    read(time, open(time, file))
+    // A row's spark answer takes its open from the chart's verdict.
+    const row = M.sparkQuote(fixture(`moments/tokyo-2026-11-01-${time}/spark/${file}`).spark.result[0].response[0], held.verdict, cents).quote
+    sinceOpen.push(`${time} ${M.rowModel(held, 0, "open").changeText}`, `${time} row ${M.rowModel(M.carryClose(held, row, calendars), 0, "open").changeText}`)
+    read(time + " row", spark(time, file))
   }
   expect(asks).toEqual(["1855 3,070.00 \u22120.23%", "1855 row 3,070.00 \u22120.23%",
     "1903 3,070.00 \u22120.23%", "1903 row 3,070.00 \u22120.23%", "1910 3,070.00 \u22120.23%", "1910 row 3,070.00 \u22120.23%",
     "1915 3,077.00 +0.23%", "1915 row 3,072.00 +0.07%", "1920 3,050.00 \u22120.65%", "1920 row 3,049.00 \u22120.68%",
     "1921 3,053.00 \u22120.55%", "1921 row 3,054.00 \u22120.52%"])
+  // Since the open, Friday's move from Friday's open until Monday's first
+  // bar. At 09:15 Monday's only bar is 09:00:03's: Yahoo's echo of its
+  // quote, one price and no shares, off the five-minute grid. Its price is
+  // not the day's open, which Yahoo's 09:00 bar gives at 09:20: 3,090, where
+  // the echo held 3,077. So the move since the open is left out until then.
+  expect(sinceOpen).toEqual(["1855 \u22121.19%", "1855 row \u22121.19%", "1903 \u22121.19%", "1903 row \u22121.19%",
+    "1910 \u22121.19%", "1910 row \u22121.19%", "1915 \u2014", "1915 row \u2014", "1920 \u22121.29%", "1920 row \u22121.33%",
+    "1921 \u22121.20%", "1921 row \u22121.17%"])
   // A shell started in those minutes holds no close of Friday's, and no
   // field of Yahoo's answers names it at every open: Tokyo's two-day answer
   // counted from Friday's close, London's below from the close before its
@@ -2557,8 +2570,9 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   // 09:15 through its refreshes, restarted before the last: never −0.88%
   // from Thursday's close at 09:20. The carried close is saved with the quote,
   // so a restart in those minutes keeps it.
-  const fresh = (time, file) => M.rowModel(M.carryClose(null, open(time, file), calendars), 0, "pct").changeText
+  const fresh = (time, file, mode = "pct") => M.rowModel(M.carryClose(null, open(time, file), calendars), 0, mode).changeText
   expect(["1915", "1920", "1921"].map(time => fresh(time, "2d/7203.t.json"))).toEqual(["\u2014", "\u2014", "\u2014"])
+  expect(["1915", "1920"].map(time => fresh(time, "2d/7203.t.json", "open"))).toEqual(["\u2014", "\u22121.26%"])
   let started = null
   const startedRows = []
   for (const time of ["1915", "1920", "1921"]) {
@@ -2595,7 +2609,7 @@ test("at the open the chart moves to the new session, and a listing abroad shows
       return `${time} ${row.priceText} ${row.changeText}`
     })
   }
-  const startedAt = (place, symbol, time) => M.rowModel(M.carryClose(null, answerAt(place, time, `2d/${symbol}.json`), calendars), 0, "pct").changeText
+  const startedAt = (place, symbol, time, mode = "pct") => M.rowModel(M.carryClose(null, answerAt(place, time, `2d/${symbol}.json`), calendars), 0, mode).changeText
   expect(opening("london", "shel.l", ["0255", "0303", "0310", "0320", "0330"])).toEqual(["0255 3,921.00 \u22122.86%",
     "0303 3,921.00 \u22122.86%", "0310 3,921.00 \u22122.86%", "0320 3,906.50 \u22120.37%", "0330 3,913.00 \u22120.20%"])
   expect([startedAt("london", "shel.l", "0320"), startedAt("london", "shel.l", "0330")]).toEqual(["\u2014", "\u22120.20%"])
@@ -2606,6 +2620,13 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   expect(opening("sydney", "bhp.ax", ["1755", "1803", "1810", "1820", "1830"])).toEqual(["1755 56.42 \u22120.56%",
     "1803 56.42 \u22120.56%", "1810 56.42 \u22120.56%", "1820 55.78 \u22121.13%", "1830 55.75 \u22121.19%"])
   expect(startedAt("sydney", "bhp.ax", "1820")).toBe("\u22121.13%")
+  // At 10:20 there the two-day answer's only bar of Wednesday is Yahoo's
+  // echo of its quote at 10:00:03, 55.78, inside the day's range. The day
+  // opened at 55.905, Yahoo's 10:00 bar says at 10:30: since the open is
+  // left out until then, with a close held or none.
+  expect(opening("sydney", "bhp.ax", ["1755", "1803", "1810", "1820", "1830"], "open")).toEqual(["1755 56.42 \u22121.35%",
+    "1803 56.42 \u22121.35%", "1810 56.42 \u22121.35%", "1820 55.78 \u2014", "1830 55.75 \u22120.28%"])
+  expect([startedAt("sydney", "bhp.ax", "1820", "open"), startedAt("sydney", "bhp.ax", "1830", "open")]).toEqual(["\u2014", "\u22120.29%"])
   // Toyota at Tokyo's open on Wednesday 4 November, 08:55 to 09:20 there
   // (Tuesday 18:55 to 19:20 New York), after Tuesday's holiday: Monday's
   // move from Friday's 3,070 until Wednesday's first trade. At 09:15 and
@@ -2622,6 +2643,10 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   expect(opening("tokyo", "7203.t", tokyoTimes, "open")).toEqual(["1855 3,051.00 \u22121.26%",
     "1903 3,051.00 \u22121.26%", "1910 3,051.00 \u22121.26%", "1915 3,051.00 \u2014", "1920 3,051.00 \u2014"])
   expect([startedAt("tokyo", "7203.t", "1915"), startedAt("tokyo", "7203.t", "1920")]).toEqual(["\u2014", "\u2014"])
+  // Nor does either know the day's open: the only bars of Wednesday are
+  // Yahoo's echoes of its quote, 09:00:03's at Monday's close and 09:05:03's
+  // at 3,048, each one price, no shares, off the five-minute grid.
+  expect([startedAt("tokyo", "7203.t", "1915", "open"), startedAt("tokyo", "7203.t", "1920", "open")]).toEqual(["\u2014", "\u2014"])
   // Friday 30 October at 09:26 there, with Friday's first bars: Friday's
   // move, from Thursday's close.
   const after = M.parseChart(fixture("moments/tokyo-2026-10-30-0926/7203.t.json"), cents)

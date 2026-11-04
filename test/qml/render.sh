@@ -147,14 +147,16 @@ every_state() (
   # Toyota at Tokyo's open on Monday 2 November: Friday's move before the
   # open and before Monday's first bar, never 0.00%, then, read by a shell
   # that holds no close of Friday's, Monday's trades with the move left out
-  # while Yahoo may still count from Thursday's. A running shell counts
-  # them from Friday's close; that is in test/saved.test.js.
+  # while Yahoo may still count from Thursday's, and the open left out at
+  # 09:15, before Yahoo's first five-minute bar of Monday. A running shell
+  # counts them from Friday's close; that is in test/saved.test.js.
   for moment in tokyo-2026-11-01-1855 tokyo-2026-11-01-1903 tokyo-2026-11-01-1915 tokyo-2026-11-01-1921; do
     states="$states popup-sweep-$moment-7203.t-smooth popup-sweep-$moment-7203.t-retro"
   done
   # Toyota at Tokyo's open on Wednesday 4 November: Monday's move before the
   # open and before Wednesday's first trade, then the move left out while
-  # Yahoo's answers hold Monday's close as the price at Wednesday's time.
+  # Yahoo's answers hold Monday's close as the price at Wednesday's time,
+  # and the open, before Yahoo's first five-minute bar of Wednesday.
   for moment in tokyo-2026-11-03-1855 tokyo-2026-11-03-1903 tokyo-2026-11-03-1915 tokyo-2026-11-03-1920; do
     states="$states popup-sweep-$moment-7203.t-smooth popup-sweep-$moment-7203.t-retro"
   done
@@ -166,7 +168,8 @@ every_state() (
     states="$states popup-sweep-$moment-shel.l-smooth popup-sweep-$moment-shel.l-retro"
   done
   # BHP at Sydney's open on Wednesday 4 November: Tuesday's move until
-  # Wednesday's first bar, then Wednesday's, from Tuesday's close.
+  # Wednesday's first bar, then Wednesday's, from Tuesday's close, the open
+  # left out at 10:20, before Yahoo's first five-minute bar of Wednesday.
   for moment in sydney-2026-11-03-1755 sydney-2026-11-03-1803 sydney-2026-11-03-1820 sydney-2026-11-03-1830; do
     states="$states popup-sweep-$moment-bhp.ax-smooth popup-sweep-$moment-bhp.ax-retro"
   done
