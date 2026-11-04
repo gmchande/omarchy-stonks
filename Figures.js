@@ -172,15 +172,24 @@ function exchangeDay(quote, t) {
 }
 
 // Titled against the later of today and the day drawn, so Monday's figures
-// under Tuesday's chart, from its first night trade, say MON. An end at the
-// 52-week mark takes that direction's tone, as `Fundamentals.yearLine`'s.
-// The open keeps its slot before the first bar, so the line keeps its shape.
+// under Tuesday's chart, from its first night trade, say MON. Its low and
+// high take in every trade the chart draws for that day (`figuresTrades`),
+// since Yahoo's are the regular session's. An end at the 52-week mark takes
+// that direction's tone, as `Fundamentals.yearLine`'s. The open keeps its
+// slot before the first bar, so the line keeps its shape.
 function dayLine(quote, today, day) {
   if (!quote) return null
   var q = quote
   var drawn = day && day.session && day.session.regular ? exchangeDay(q, day.session.regular.start) : null
   var head = Quote.headlineQuote(q)
-  var range = Format.infoRange(q.dayLow, q.dayHigh, head ? head.price : null, q.priceDigits)
+  var low = q.dayLow
+  var high = q.dayHigh
+  var trades = figuresTrades(q, day)
+  for (var i = 0; i < trades.length; i++) {
+    if (low === null || trades[i].p < low) low = trades[i].p
+    if (high === null || trades[i].p > high) high = trades[i].p
+  }
+  var range = Format.infoRange(low, high, head ? head.price : null, q.priceDigits)
   if (range.high !== null && Format.isFiniteNumber(q.fiftyTwoWeekHigh) && range.high >= q.fiftyTwoWeekHigh) range.highTone = "up"
   if (range.low !== null && Format.isFiniteNumber(q.fiftyTwoWeekLow) && range.low <= q.fiftyTwoWeekLow) range.lowTone = "down"
   return {
@@ -191,6 +200,15 @@ function dayLine(quote, today, day) {
       { label: "VOL", value: Format.isFiniteNumber(q.volume) ? Format.compactNumber(q.volume) : "", widest: Format.widest("999.9M") }
     ]
   }
+}
+
+// The trades the chart draws for the day the quote's figures are of: its
+// night, pre-market and after hours, but not tonight's, joined after it, nor
+// the coming day's. None when the chart is another day's.
+function figuresTrades(quote, day) {
+  if (!day || !day.session || !day.session.regular || exchangeDay(quote, day.session.regular.start) !== exchangeDay(quote, quote.figuresDay)) return []
+  var until = day.tonight || Quote.tailStart(day) || Infinity
+  return day.points.filter(function(p) { return p.t < until })
 }
 
 // Three letters at most, as a range's token is.

@@ -297,9 +297,9 @@ Harness {
       })
       within(3000, function() { return harness.top().indexOf("SINCE") === 0 })
       var info = body.dayLine
-      check("the night's newest price is on top, named from Wednesday's close, Thursday's close beneath, and the night is never in the day's high: its 243.20 leaves Thursday's 239.63",
+      check("the night's newest price is on top, named from Wednesday's close, Thursday's close beneath, and the day's high takes in its own night: 243.20 at 02:30 passes Yahoo's 239.63",
         /^SINCE WED CLOSE · \d\d:\d\d 234\.27 /.test(harness.top()) && harness.strip().indexOf("CLOSE 232.28 ") === 0
-          && !!info && info.range.highText === "239.63", harness.top() + " | " + harness.strip() + " | " + JSON.stringify(info))
+          && !!info && info.range.highText === "243.20", harness.top() + " | " + harness.strip() + " | " + JSON.stringify(info))
       // A day asked of Robinhood replaces the prints in hand, never joins them.
       check("a day's answer from Robinhood replaces the prints in hand: none of the weekend's stays",
         feed.entries.NEST.bars[0].t > harness.night - 2 * 86400, "oldest kept " + new Date(feed.entries.NEST.bars[0].t * 1000).toISOString())

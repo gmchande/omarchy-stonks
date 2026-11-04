@@ -2731,6 +2731,23 @@ test("an overnight print is its own line under the price, measured from the clos
   expect(strip("silk")).toMatchObject({ label: "OVERNIGHT", time: "22:20", stale: true })
   // REED has not traded tonight: no overnight line, its after-hours stays.
   expect(strip("reed")).toMatchObject({ label: "AFTER HOURS", time: "" })
+  // The 1D row's low and high take in every trade its chart draws for the
+  // day, as the 52W row does: REED's one trade at 21.00, at 23:25 the night
+  // before, is the day's low under Yahoo's 21.27, so both rows end at it in
+  // the 52-week low's tone. Tonight's trades, joined at the chart's end, are
+  // the next day's.
+  const reed = dayAt("night", "reed")
+  const reedNight = reed.day.points.filter(p => p.t < reed.quote.session.regular.start && p.s === "overnight")
+  expect([M.money(reed.quote.dayLow), M.money(Math.min(...reedNight.map(p => p.p)))]).toEqual(["21.27", "21.00"])
+  const reedDay = M.dayLine(reed.quote, M.exchangeDay(reed.quote, now), reed.day).range
+  const reedYear = M.yearLine(reed.quote, null, null, null, reed.day.points).range
+  expect([M.money(reedDay.low), reedDay.lowTone, M.money(reedYear.low), reedYear.lowTone]).toEqual(["21.00", "down", "21.00", "down"])
+  // Sunday 25 October at 23:35: NBIS's night has fallen to 152.15, under
+  // Friday's low; the row is still Friday's.
+  const nbis = dayAt("watch-2026-10-25-2335", "nbis")
+  const sundayNight = nbis.day.points.filter(p => p.t >= nbis.day.tonight)
+  const friday = M.dayLine(nbis.quote, M.exchangeDay(nbis.quote, at("2026-10-25", "23:35")), nbis.day)
+  expect([friday.title, M.money(friday.range.low), M.money(Math.min(...sundayNight.map(p => p.p)))]).toEqual(["FRI", "155.86", "152.15"])
   // While a scrub reads the night, the header names it.
   expect(M.marketStatus(nestDay, now, at("2026-10-01", "21:30"), calendars)).toBe("At 21:30 · Overnight")
 })
