@@ -152,6 +152,12 @@ every_state() (
   for moment in tokyo-2026-11-01-1855 tokyo-2026-11-01-1903 tokyo-2026-11-01-1915 tokyo-2026-11-01-1921; do
     states="$states popup-sweep-$moment-7203.t-smooth popup-sweep-$moment-7203.t-retro"
   done
+  # Toyota at Tokyo's open on Wednesday 4 November: Monday's move before the
+  # open and before Wednesday's first trade, then the move left out while
+  # Yahoo's answers hold Monday's close as the price at Wednesday's time.
+  for moment in tokyo-2026-11-03-1855 tokyo-2026-11-03-1903 tokyo-2026-11-03-1915 tokyo-2026-11-03-1920; do
+    states="$states popup-sweep-$moment-7203.t-smooth popup-sweep-$moment-7203.t-retro"
+  done
   # Shell at London's open on Tuesday 3 November: Monday's move until
   # Tuesday's first bar; then the move left out, read by a shell that holds
   # no close of Monday's, until Tuesday's trades are ten minutes past the

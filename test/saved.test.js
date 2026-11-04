@@ -2586,12 +2586,12 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   // A shell started at 08:20 leaves the move out, and one started at 08:30,
   // its trades 14 minutes past the first, shows it.
   const answerAt = (place, time, file) => M.parseChart(fixture(`moments/${place}-2026-11-03-${time}/${file}`), cents)
-  const opening = (place, symbol, times) => {
+  const opening = (place, symbol, times, mode = "pct") => {
     let held = null
     return times.map(time => {
       const two = M.twoDays(held, at("2026-11-03", time.slice(0, 2) + ":" + time.slice(2)), calendars)
       held = M.carryClose(held, answerAt(place, time, (two ? "2d/" : "") + symbol + ".json"), calendars)
-      const row = M.rowModel(held, 0, "pct")
+      const row = M.rowModel(held, 0, mode)
       return `${time} ${row.priceText} ${row.changeText}`
     })
   }
@@ -2606,6 +2606,22 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   expect(opening("sydney", "bhp.ax", ["1755", "1803", "1810", "1820", "1830"])).toEqual(["1755 56.42 \u22120.56%",
     "1803 56.42 \u22120.56%", "1810 56.42 \u22120.56%", "1820 55.78 \u22121.13%", "1830 55.75 \u22121.19%"])
   expect(startedAt("sydney", "bhp.ax", "1820")).toBe("\u22121.13%")
+  // Toyota at Tokyo's open on Wednesday 4 November, 08:55 to 09:20 there
+  // (Tuesday 18:55 to 19:20 New York), after Tuesday's holiday: Monday's
+  // move from Friday's 3,070 until Wednesday's first trade. At 09:15 and
+  // 09:20 Yahoo's answers had the quote's time in Wednesday but Monday's
+  // close, 3,051, as the price and Friday's as the close before it, while
+  // Wednesday's day had traded 3,030 to 3,040: Monday's quote restated, so
+  // the move and the open are left out, never 0.00%. A shell started at
+  // either leaves the move out too. On Monday 2 November the quote's first
+  // price, 3,077, was off Friday's close, inside its day's range, and
+  // between the spark answers' 3,083 and 3,072 that minute.
+  const tokyoTimes = ["1855", "1903", "1910", "1915", "1920"]
+  expect(opening("tokyo", "7203.t", tokyoTimes)).toEqual(["1855 3,051.00 \u22120.62%",
+    "1903 3,051.00 \u22120.62%", "1910 3,051.00 \u22120.62%", "1915 3,051.00 \u2014", "1920 3,051.00 \u2014"])
+  expect(opening("tokyo", "7203.t", tokyoTimes, "open")).toEqual(["1855 3,051.00 \u22121.26%",
+    "1903 3,051.00 \u22121.26%", "1910 3,051.00 \u22121.26%", "1915 3,051.00 \u2014", "1920 3,051.00 \u2014"])
+  expect([startedAt("tokyo", "7203.t", "1915"), startedAt("tokyo", "7203.t", "1920")]).toEqual(["\u2014", "\u2014"])
   // Friday 30 October at 09:26 there, with Friday's first bars: Friday's
   // move, from Thursday's close.
   const after = M.parseChart(fixture("moments/tokyo-2026-10-30-0926/7203.t.json"), cents)
