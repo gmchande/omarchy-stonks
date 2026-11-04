@@ -173,10 +173,10 @@ function exchangeDay(quote, t) {
 
 // Titled against the later of today and the day drawn, so Monday's figures
 // under Tuesday's chart, from its first night trade, say MON. Its low and
-// high take in every trade the chart draws for that day (`figuresTrades`),
-// since Yahoo's are the regular session's. An end at the 52-week mark takes
-// that direction's tone, as `Fundamentals.yearLine`'s. The open keeps its
-// slot before the first bar, so the line keeps its shape.
+// high are Yahoo's for the session, widened by the trades the chart draws
+// around it (`figuresTrades`). An end at the 52-week mark takes that
+// direction's tone, as `Fundamentals.yearLine`'s. The open keeps its slot
+// before the first bar, so the line keeps its shape.
 function dayLine(quote, today, day) {
   if (!quote) return null
   var q = quote
@@ -202,13 +202,15 @@ function dayLine(quote, today, day) {
   }
 }
 
-// The trades the chart draws for the day the quote's figures are of: its
-// night, pre-market and after hours, but not tonight's, joined after it, nor
-// the coming day's. None when the chart is another day's.
+// The trades the chart draws outside the session, for the day the quote's
+// figures are of: its night, pre-market and after hours, but not tonight's,
+// joined after it, nor the coming day's. None when the chart is another
+// day's. Inside the session Yahoo's figures are the trades', and a bar there
+// can be Yahoo echoing its quote, as Tokyo's at the bell.
 function figuresTrades(quote, day) {
   if (!day || !day.session || !day.session.regular || exchangeDay(quote, day.session.regular.start) !== exchangeDay(quote, quote.figuresDay)) return []
   var until = day.tonight || Quote.tailStart(day) || Infinity
-  return day.points.filter(function(p) { return p.t < until })
+  return day.points.filter(function(p) { return p.t < until && Quote.pointSession(day, p) !== "reg" })
 }
 
 // Three letters at most, as a range's token is.

@@ -2675,6 +2675,12 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   // Yahoo's echoes of its quote, 09:00:03's at Monday's close and 09:05:03's
   // at 3,048, each one price, no shares, off the five-minute grid.
   expect([startedAt("tokyo", "7203.t", "1915", "open"), startedAt("tokyo", "7203.t", "1920", "open")]).toEqual(["\u2014", "\u2014"])
+  // Nor its high: an echo is no trade, so the 1D line keeps Yahoo's 3,030
+  // to 3,040, the session's own, though the chart draws the echo at 3,051.
+  const echo = answerAt("tokyo", "1915", "2d/7203.t.json")
+  const echoDay = M.viewChart("7203.T", "1D", { "7203.T": echo }, {}, {}, {}, {}, calendars).day
+  const echoLine = M.dayLine(echo, M.exchangeDay(echo, at("2026-11-03", "19:15")), echoDay).range
+  expect([M.money(Math.max(...echoDay.points.map(p => p.p))), echoLine.lowText, echoLine.highText]).toEqual(["3,051.00", "3,030.00", "3,040.00"])
   // Friday 30 October at 09:26 there, with Friday's first bars: Friday's
   // move, from Thursday's close.
   const after = M.parseChart(fixture("moments/tokyo-2026-10-30-0926/7203.t.json"), cents)
