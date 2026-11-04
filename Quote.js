@@ -284,8 +284,12 @@ function parseChart(json, centExchanges, receivedAt) {
   var figuresDay = ahead ? current.regular.start : !regular ? null
     : quoted !== null && quoted < regular.start ? quoted : regular.start
   var firstRegular = null
-  for (var k = 0; regular && !ahead && k < kept.length && !firstRegular; k++)
-    if (kept[k].t >= regular.start && kept[k].t < regular.end) firstRegular = kept[k]
+  var sessionTraded = false
+  for (var k = 0; regular && !ahead && k < kept.length; k++) {
+    if (kept[k].t < regular.start || kept[k].t >= regular.end) continue
+    if (!firstRegular) firstRegular = kept[k]
+    if (traded(kept[k])) sessionTraded = true
+  }
   // A stock's next day has begun once Yahoo sends it, from its pre-market on.
   // An index's bars stay the last session's until its open, so its next day
   // begins with the pre-market, else the open, of Yahoo's later current period.
@@ -322,6 +326,9 @@ function parseChart(json, centExchanges, receivedAt) {
     dayOpen: firstRegular ? knownPrice(firstRegular.o) : null,
     // The session `dayOpen` opened.
     openSession: firstRegular ? regular.start : null,
+    // Whether a bar of the session carries shares. Yahoo's newest price alone
+    // isn't a trade at an open (`Market.carryClose`); spark sends no volume.
+    sessionTraded: sessionTraded,
     dayHigh: knownPrice(meta.regularMarketDayHigh),
     dayLow: knownPrice(meta.regularMarketDayLow),
     volume: meta.regularMarketVolume,
