@@ -15,6 +15,10 @@ var MOST_BARS = 5000
 // A coin's month lists 31 days; every saved answer has one period a day.
 var MOST_DAYS = 100
 var MOST_PERIODS = 10
+// A coin's period lasts 23:59, the longest saved; 25 hours allows a day the
+// clocks go back. One spanning centuries would walk billions of five-minute
+// slots on the shell's one thread (`Overnight.extendedSlots`).
+var LONGEST_PERIOD = 25 * 3600
 var MOST_SPARKS = 2 * SPARK_BATCH
 
 // Yahoo's exchange codes to the names people use. A listing without one
@@ -486,6 +490,8 @@ function answerClocks(periods) {
         var midnight = (Math.floor((p.start + p.gmtoffset) / 86400) + 1) * 86400 - p.gmtoffset
         out.push({ start: p.start, until: midnight, offset: p.gmtoffset, zone: Format.fetchedText(p.timezone, Format.MOST_CODE) })
       }
+      // `answerDays` reads a day from its first period's start to its last's end.
+      if (day.length && !isPeriod({ start: day[0].start, end: day[day.length - 1].end })) return null
     }
   }
   return out
@@ -494,7 +500,7 @@ function answerClocks(periods) {
 // A period whose end is {"toString": null} would throw on every comparison,
 // and no row would be asked for again until Stonks restarts.
 function isPeriod(p) {
-  return !!p && typeof p === "object" && Format.isMoment(p.start) && Format.isMoment(p.end)
+  return !!p && typeof p === "object" && Format.isMoment(p.start) && Format.isMoment(p.end) && p.end - p.start <= LONGEST_PERIOD
 }
 
 // Their offsets are never read, so only the periods are checked.

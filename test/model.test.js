@@ -1589,6 +1589,15 @@ test("a hostile chart or spark answer reads as no answer, at once", async () => 
       answer: chartAnswer(r => { r.meta.currentTradingPeriod = { regular: period(T0, { toString: null }) } }) },
     { name: "a period's start as text", call: read, answer: chartAnswer(r => { r.meta.tradingPeriods.regular[0][0].start = String(T0) }) },
     { name: "a period's offset an object", call: read, answer: chartAnswer(r => { r.meta.tradingPeriods.post[0][0].gmtoffset = { toString: null } }) },
+    // A pre-market spanning centuries, with bars as far apart, would walk
+    // billions of five-minute slots on the shell's one thread.
+    { name: "a current pre-market spanning centuries", call: read, answer: chartAnswer(r => {
+      delete r.meta.tradingPeriods
+      r.meta.currentTradingPeriod = { pre: period(T0, 1e12 + 300), regular: period(1e12 + 300, 1e12 + 23700) }
+      r.timestamp = [T0, T0 + 300, 1e12]
+    }) },
+    { name: "a day's periods spanning centuries", call: read,
+      answer: chartAnswer(r => { r.meta.tradingPeriods.pre = [[period(T0 - 3600, T0 - 3000), period(1e12, 1e12 + 300)]] }) },
     { name: "bar times over budget", call: read, answer: chartAnswer(r => { r.timestamp = times(M.MOST_BARS + 1) }) },
     { name: "closes over budget", call: read, answer: chartAnswer(r => { bars(r).close = times(M.MOST_BARS + 1).map(() => 10) }) },
     { name: "a session's days over budget", call: read,
@@ -1678,6 +1687,7 @@ test("a hostile search or Robinhood answer reads as no answer, at once", async (
     { name: "Robinhood's results over budget", call: "M.overnightResults(json) && 'read'", answer: { results: times(M.MOST_RESULTS + 1).map(() => result([])) } },
     { name: "a listing's prints posing", call: nest, answer: { results: [result(POSING)] }, want: 0 },
     { name: "a listing's prints over budget", call: nest, answer: { results: [result(times(M.MOST_PRINTS + 1).map(() => print))] }, want: 0 },
+    { name: "a print in a session Robinhood never sends", call: nest, answer: { results: [result([{ ...print, session: "__proto__" }])] }, want: 0 },
     { name: "instruments, as sent", call: "M.parseAllDay(json, ['NEST'])", answer: { results: [{ symbol: "NEST", all_day_tradability: "tradable" }] }, want: { NEST: true } },
     { name: "instruments posing", call: "M.parseAllDay(json, ['NEST'])", answer: { results: POSING } },
     { name: "instruments over budget", call: "M.parseAllDay(json, ['NEST'])", answer: { results: times(3).map(() => ({ symbol: "NEST", all_day_tradability: "tradable" })) } }

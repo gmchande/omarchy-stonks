@@ -122,7 +122,10 @@ function overnightResults(json) {
 
 // bounds=24_5 fills a quiet name's gaps with flat `interpolated` bars,
 // which are no trades. `from` and `through` count every slot, traded or
-// not: how far the answer reaches.
+// not: how far the answer reaches. A print in a session Robinhood never
+// sends, such as "__proto__", is left out: its name becomes the warning's.
+var SESSIONS = ["pre", "reg", "post", "overnight"]
+
 function overnightAnswer(result, symbol) {
   var out = { bars: [], from: null, through: null }
   var historicals = result && result.symbol === robinhoodSymbol(symbol) ? Format.fetchedList(result.historicals, MOST_PRINTS) : null
@@ -133,7 +136,8 @@ function overnightAnswer(result, symbol) {
     var p = Number(bar.close_price)
     if (Format.isFiniteNumber(t) && (out.from === null || t < out.from)) out.from = t
     if (Format.isFiniteNumber(t) && (out.through === null || t > out.through)) out.through = t
-    if (!bar.interpolated && Format.isFiniteNumber(t) && Format.isFiniteNumber(p) && p > 0) out.bars.push({ t: t, p: p, s: bar.session })
+    if (!bar.interpolated && Format.isFiniteNumber(t) && Format.isFiniteNumber(p) && p > 0 && SESSIONS.indexOf(bar.session) >= 0)
+      out.bars.push({ t: t, p: p, s: bar.session })
   }
   return out
 }
