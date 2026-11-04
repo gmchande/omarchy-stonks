@@ -1260,13 +1260,12 @@ Harness {
           surface.wide = wide
           if (wide) surface.windowWidth = Style.space(560)
           body.showingHelp = true
-          wait(50)
+          within(1000, function() { return sheet.visible })
           gatherDoes(sheet, wide ? "window" : "panel")
           body.showingHelp = false
         })
         surface.wide = sheetBefore.wide
         surface.windowWidth = sheetBefore.windowWidth
-        wait(50)
         root.check("at the everyday size, every line of the key sheet fits on one line, in the panel and the window",
           wrapped.length === 0, wrapped.join(", "))
 
