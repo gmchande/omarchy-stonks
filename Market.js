@@ -456,14 +456,15 @@ function twoDays(quote, now, calendars) {
 // (`closeSeen`, saved with it) for the next session to count from. Such an
 // answer can also still hold the last close as its price, at the new day's
 // time: Yahoo restating the last session, or a trade at its close, which
-// its answers can't tell apart (a spark answer has no volume), so the move
-// is left out until Yahoo's base moves on. A split or a dividend moves
-// Yahoo's base, and Yahoo's stands. A Stonks that holds no close from the
-// session before leaves the move out until Yahoo has caught up
-// (`CATCH_UP`): no field of Yahoo's answers names that close at every open.
-// A US stock's day turns at 04:00, hours before its first trade: a calendar
-// with a pre-market keeps Yahoo's, and so does a listing with no calendar,
-// which may be one.
+// its answers can't tell apart (a spark answer has no volume). The move is
+// left out until Yahoo's base moves on, and so is the day's open, the same
+// restatement, until a chart answer has the day's own. A split or a
+// dividend moves Yahoo's base, and Yahoo's stands. A Stonks that holds no
+// close from the session before leaves the move out until Yahoo has caught
+// up (`CATCH_UP`): no field of Yahoo's answers names that close at every
+// open. A US stock's day turns at 04:00, hours before its first trade: a
+// calendar with a pre-market keeps Yahoo's, and so does a listing with no
+// calendar, which may be one.
 function carryClose(previous, quote, calendars) {
   if (!quote || quote.crypto || quote.instrumentType === "INDEX" || !quote.session.regular) return quote
   var cal = calendarFor(calendars, quote)
@@ -479,7 +480,8 @@ function carryClose(previous, quote, calendars) {
   var restated = stale && head.price === seen.close
   var unknown = traded && !held && !!cal && head.t < firstTrade(quote, head) + CATCH_UP
   if (!seen && !unknown) return quote
-  return Object.assign({}, quote, seen ? { closeSeen: seen } : {}, restated || unknown ? { prevClose: null } : stale ? { prevClose: seen.close } : {})
+  var untold = { prevClose: null, dayOpen: null, openSession: null, verdict: quote.verdict && Object.assign({}, quote.verdict, { open: null, openSession: null }) }
+  return Object.assign({}, quote, seen ? { closeSeen: seen } : {}, restated ? untold : unknown ? { prevClose: null } : stale ? { prevClose: seen.close } : {})
 }
 
 function sessionClose(quote) {
