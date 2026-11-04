@@ -171,10 +171,11 @@ function clockRoom(axis, t) {
   return t - axis.start - skipped
 }
 
-// `clockRoom`'s inverse: the moment `room` along the axis.
+// `clockRoom`'s inverse: the moment `room` along the axis. Where the skipped
+// hours join, the later side's, where trading resumes.
 function clockAt(axis, room) {
   var t = axis.start + room
-  return axis.skip && t > axis.skip.from ? t + Math.max(0, axis.skip.to - axis.skip.from) : t
+  return axis.skip && t >= axis.skip.from ? t + Math.max(0, axis.skip.to - axis.skip.from) : t
 }
 
 function timeAtFraction(quote, fraction) {
@@ -189,11 +190,11 @@ function fractionAtTime(quote, t) {
   return axisFraction(axis, t)
 }
 
-// Five minutes a step, kept on the day and no later than `last`, the last
-// print.
+// Five minutes of room a step, so one crosses the hours that take none, kept
+// on the day and no later than `last`, the last print.
 function stepTime(quote, t, steps, last) {
   var axis = chartSpan(quote)
-  return Format.clamp(t + steps * 300, axis.start, last || axis.end)
+  return Format.clamp(clockAt(axis, clockRoom(axis, t) + steps * 300), axis.start, last || axis.end)
 }
 
 // Where the dot sits: the newest print of what trades now, else the regular

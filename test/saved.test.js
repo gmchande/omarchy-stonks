@@ -2375,6 +2375,12 @@ test("every price stands at its time from its day's first trade, a quiet night a
     expect([name, line[first].brk, M.yAt(line, between) !== null, chime.lineBars({ points: line })(between) >= 0])
       .toEqual([name, false, true, true])
   }
+  // By keys, one press crosses the weekend each way, as the pointer does:
+  // Left from tonight's first slot lands on Friday's last, Right brings it back.
+  const shop = dayAt("gap-2026-11-01-2148", "shop").day
+  const nightOpen = at("2026-11-01", "20:00"), fridayLast = at("2026-10-30", "19:55")
+  expect([M.stepTime(shop, nightOpen, -1, M.lastPrintTime(shop)), M.stepTime(shop, fridayLast, 1, M.lastPrintTime(shop))])
+    .toEqual([fridayLast, nightOpen])
   expect(dayAt("watch-2026-10-25-2335", "jnj").day.points.filter(p => p.t >= at("2026-10-25", "20:00")).length).toBe(19)
   // REED had no print on Sunday night: Friday from its first trade, the
   // night's hours after it to Robinhood's newest slot, as every chart's

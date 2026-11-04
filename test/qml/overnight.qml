@@ -226,6 +226,22 @@ Harness {
               && harness.top() === "SINCE THU CLOSE · 22:20 234.84 \u22123.55%"
           }),
         calls + ", " + sundayCalls + ", " + harness.record("OVERNIGHT.calls") + " " + lastSpan() + " | " + harness.top())
+      // By keys alone, Left walks tonight back five minutes a press to its
+      // first slot, and the next press crosses the weekend onto Friday's
+      // last, as the pointer does; Right brings it back.
+      var weekend = body.featuredDay.axis.skip
+      var walked = []
+      for (var press = 0; press < 60 && !(body.scrubT && body.scrubT < weekend.from); press++) {
+        pressKey(Qt.Key_Left)
+        walked.push(body.headerText)
+      }
+      var crossed = body.scrubT === weekend.from - 300 && walked[walked.length - 2].indexOf("20:00") >= 0
+      pressKey(Qt.Key_Right)
+      var back = body.scrubT === weekend.to
+      var landed = walked[walked.length - 1]
+      endScrub()
+      check("by keys, one Left crosses the weekend from Sunday night's first slot to Friday's last, and one Right brings it back",
+        crossed && back && /fri 19:55/i.test(landed), walked.length + " presses: " + walked.slice(-2).join(" → ") + " | back " + back)
 
       // Monday 04:11, the night's last bars due, and Robinhood down.
       var feed = service.testOvernightFeed
