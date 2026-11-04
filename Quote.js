@@ -27,18 +27,18 @@ var EXCHANGE_NAMES = {
   SNP: "S&P", DJI: "DOW", NIM: "NASDAQ", PNK: "OTC", OQB: "OTC", OQX: "OTC", OEM: "OTC", JNB: "JSE"
 }
 
+// The length of the bars Stonks asks for, in seconds.
+var BAR = 5 * 60
+
 // Two days once Yahoo's day has turned to the coming one, so the last
 // session is still in the answer (`Market.twoDays`).
 function chartUrl(symbol, twoDays) {
-  return CHART_URL + encodeURIComponent(symbol) + "?range=" + (twoDays ? "2d" : "1d") + "&interval=5m&includePrePost=true"
+  return CHART_URL + encodeURIComponent(symbol) + "?range=" + (twoDays ? "2d" : "1d") + "&interval=" + BAR / 60 + "m&includePrePost=true"
 }
 
 function sparkUrl(symbols, twoDays) {
-  return SPARK_URL + "?symbols=" + symbols.map(encodeURIComponent).join(",") + "&range=" + (twoDays ? "2d" : "1d") + "&interval=5m&includePrePost=true"
+  return SPARK_URL + "?symbols=" + symbols.map(encodeURIComponent).join(",") + "&range=" + (twoDays ? "2d" : "1d") + "&interval=" + BAR / 60 + "m&includePrePost=true"
 }
-
-// The length of the bars Stonks asks for, in seconds.
-var BAR = 5 * 60
 
 // Yahoo leaves out a symbol it doesn't know.
 function sparkResults(json) {
