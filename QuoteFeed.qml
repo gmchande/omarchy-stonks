@@ -313,7 +313,7 @@ Item {
     var nextJudge = toJudge.slice()
     var show = function(symbol, answered) {
       var previous = quotes[symbol]
-      var quote = Market.carryClose(previous, answered, calendars)
+      var quote = Market.carryClose(previous, answered, calendars, at)
       var dropped = Quote.bucketTimes(quote.droppedTimes)
       var previousDropped = Quote.bucketTimes(previous ? previous.droppedTimes : null)
       if (dropped && dropped !== previousDropped && !quote.closesOnly)

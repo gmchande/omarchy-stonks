@@ -1887,14 +1887,14 @@ test("at every open the calendars hold, a row's move counts from the close befor
             failures.push(`${where()}: ${row.changeText} from ${M.dayBase(shown)}, not from ${m.base}`)
           }
         }
-        for (const m of minutes) check(m, held = M.carryClose(held, m.quote, calendars), null)
+        for (const m of minutes) check(m, held = M.carryClose(held, m.quote, calendars, m.now), null)
         // A shell started before the bell holds the last close once it has
         // seen it; after 20 minutes of trades each refresh reads as a fresh
         // start's, so a shell is followed from its start to then.
         for (let s = 0; s < minutes.length; s++) {
           let started = null
           for (let j = s; j === s || (j < minutes.length && minutes[s].now >= seg.start - 120 && minutes[j].now < first + 20 * 60); j++)
-            check(minutes[j], started = M.carryClose(started, minutes[j].quote, calendars), minutes[s].now)
+            check(minutes[j], started = M.carryClose(started, minutes[j].quote, calendars, minutes[j].now), minutes[s].now)
         }
       }
     }

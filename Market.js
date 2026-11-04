@@ -462,10 +462,11 @@ function twoDays(quote, now, calendars) {
 // dividend moves Yahoo's base, and Yahoo's stands. A Stonks that holds no
 // close from the session before leaves the move out until Yahoo has caught
 // up (`CATCH_UP`): no field of Yahoo's answers names that close at every
-// open. A US stock's day turns at 04:00, hours before its first trade: a
-// calendar with a pre-market keeps Yahoo's, and so does a listing with no
-// calendar, which may be one.
-function carryClose(previous, quote, calendars) {
+// open. A stock that doesn't trade again can't show Yahoo catching up, so
+// the clock ends the wait too (`BEHIND`). A US stock's day turns at 04:00,
+// hours before its first trade: a calendar with a pre-market keeps Yahoo's,
+// and so does a listing with no calendar, which may be one.
+function carryClose(previous, quote, calendars, now) {
   if (!quote || quote.crypto || quote.instrumentType === "INDEX" || !quote.session.regular) return quote
   var cal = calendarFor(calendars, quote)
   if (cal && cal.pre) return quote
@@ -478,7 +479,8 @@ function carryClose(previous, quote, calendars) {
   var held = !!seen && nextSession(quote, seen.day, reg.start, cal)
   var stale = traded && held && quote.prevClose === seen.before && seen.before !== seen.close
   var restated = stale && head.price === seen.close
-  var unknown = traded && !held && !!cal && head.t < firstTrade(quote, head) + CATCH_UP
+  var first = traded ? firstTrade(quote, head) : null
+  var unknown = traded && !held && !!cal && head.t < first + CATCH_UP && now < first + CATCH_UP + BEHIND
   if (!seen && !unknown) return quote
   var untold = { prevClose: null, dayOpen: null, openSession: null, verdict: quote.verdict && Object.assign({}, quote.verdict, { open: null, openSession: null }) }
   return Object.assign({}, quote, seen ? { closeSeen: seen } : {}, restated ? untold : unknown ? { prevClose: null } : stale ? { prevClose: seen.close } : {})
@@ -510,6 +512,10 @@ function nextSession(quote, from, to, cal) {
 // first; Shell's at London's on Tuesday 3 November were right by 08:05.
 // Twice that, from the first trade Yahoo sent: its bar, else the quote.
 var CATCH_UP = 10 * 60
+// Yahoo's answers from Tokyo and London ran 15 minutes behind the clock,
+// Toronto's not at all, so by then Yahoo's trades have caught up, whether
+// or not the stock traded again.
+var BEHIND = 15 * 60
 
 function firstTrade(quote, head) {
   var pts = Quote.regularPoints(quote)

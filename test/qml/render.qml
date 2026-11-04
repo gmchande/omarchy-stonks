@@ -597,7 +597,7 @@ Harness {
       // may not have caught up with it.
       var ranges = {}
       var parsed = function(answer) {
-        var quote = Market.carryClose(null, Quote.parseChart(answer, Market.centExchanges(stub.calendars), root.now), stub.calendars)
+        var quote = Market.carryClose(null, Quote.parseChart(answer, Market.centExchanges(stub.calendars), root.now), stub.calendars, root.now)
         return root.overnight.lastTrade ? Object.assign({}, quote, { price: null, marketTime: null }) : quote
       }
       listed.forEach(function(s) {
