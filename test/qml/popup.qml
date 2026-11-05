@@ -266,9 +266,16 @@ Harness {
       var rowTop = firstRow.mapToItem(catcher, 0, 0).y
       var footerEnd = footer.mapToItem(catcher, 0, footer.height).y
       var inside = function(y) { return isFinite(y) && y >= 0 && y <= catcher.height + 0.5 }
+      // And nothing between them and the window hides them or fades them out.
+      var hidden = function(item) {
+        for (var at = item; at; at = at.parent)
+          if (!at.visible || at.opacity <= 0) return at.objectName || String(at)
+        return ""
+      }
+      var hiding = hidden(firstRow) || hidden(footer)
       harness.check("the open panel shows its rows and footer inside its card",
-        catcher.height > 0 && inside(rowTop) && inside(footerEnd) && footer.visible,
-        "shown " + catcher.height + ", first row at " + rowTop + ", footer ends at " + footerEnd)
+        catcher.height > 0 && inside(rowTop) && inside(footerEnd) && hiding === "",
+        "shown " + catcher.height + ", first row at " + rowTop + ", footer ends at " + footerEnd + (hiding ? ", hidden by " + hiding : ""))
 
       // The key sheet closes before a view opens or a row key acts.
       body.showingHelp = true
