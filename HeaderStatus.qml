@@ -112,7 +112,7 @@ Item {
     if (shutting.running) shutting.pause()
   }
 
-  NumberAnimation { id: shutting; target: root; property: "closing"; duration: 320 }
+  NumberAnimation { id: shutting; target: root; property: "closing"; duration: Style.duration(320) }
 
   // 3 px under its target, centred, but never past the header's right edge.
   component HeaderTip: PanelToolTip {
@@ -165,8 +165,8 @@ Item {
 
     ParallelAnimation {
       id: turn
-      NumberAnimation { id: turnBull; target: bull; property: "opacity"; duration: 160; easing.type: Easing.OutCubic }
-      NumberAnimation { id: turnBear; target: bear; property: "opacity"; duration: 160; easing.type: Easing.OutCubic }
+      NumberAnimation { id: turnBull; target: bull; property: "opacity"; duration: Style.duration(160); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut }
+      NumberAnimation { id: turnBear; target: bear; property: "opacity"; duration: Style.duration(160); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut }
     }
 
     MouseArea {
@@ -446,7 +446,7 @@ Item {
     font.family: root.fontFamily
     font.pixelSize: Style.font.caption
     font.bold: true
-    Behavior on color { ColorAnimation { duration: 160; easing.type: Easing.OutCubic } }
+    Behavior on color { ColorAnimation { duration: Style.duration(160); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut } }
     Rectangle {
       objectName: "helpFill"
       z: -1

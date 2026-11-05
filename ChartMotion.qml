@@ -1,4 +1,5 @@
 import QtQuick
+import qs.Commons
 import "Chart.js" as Chart
 import "History.js" as History
 import "Quote.js" as Quote
@@ -50,8 +51,9 @@ Item {
     id: dimAnim
     target: root
     property: "dimmed"
-    duration: 160
-    easing.type: Easing.OutCubic
+    duration: Style.duration(160)
+    easing.type: Easing.Bezier
+    easing.bezierCurve: Style.easeOut
   }
 
   readonly property bool historyActive: !!chart && chart.range !== "1D"
@@ -83,8 +85,10 @@ Item {
   property real reveal: 1
   property real replayPosition: 0
   readonly property bool replayRunning: replayAnim.running
-  // What plays alongside keeps to it, and to its InOutSine.
-  readonly property int replayDuration: 2000
+  // What plays alongside keeps to it, and to its InOutSine. With the
+  // shell's animations off it is 0, and a replay shows the whole chart at
+  // once, with no sound.
+  readonly property int replayDuration: Style.duration(2000)
   // Said before its first frame, so what plays alongside starts with it.
   signal replayStarted(real from, real to)
   // Stopped, or held by a closing surface; one that runs to its end says
@@ -189,6 +193,7 @@ Item {
     drawInAnim.stop()
     reveal = 1
     if (historyActive ? !historyShown || history.bars.length < 2 : !geometry || !scrubEnd) return
+    if (!replayDuration) return
     replayAnim.from = historyActive ? 0 : Chart.fractionAtTime(day, scrubStart)
     replayAnim.to = historyActive ? 1 : Chart.fractionAtTime(day, scrubEnd)
     // Its first moment at once, before the animation's first step.
@@ -229,8 +234,9 @@ Item {
     property: "reveal"
     from: 0
     to: 1
-    duration: 320
-    easing.type: Easing.OutCubic
+    duration: Style.duration(320)
+    easing.type: Easing.Bezier
+    easing.bezierCurve: Style.easeOut
   }
 
   NumberAnimation {

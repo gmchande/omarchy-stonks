@@ -9,12 +9,12 @@ import qs.Ui
 // window is stood in: the card is the shell's BorderSurface, with the
 // shell's border spec, padding, and radius. What lives on KeyboardPanel
 // itself is copied from /usr/share/omarchy/shell/Ui/KeyboardPanel.qml: the
-// properties Panel.qml sets (lines 40-63), the window's visibility (81) and
-// the focus on open (226-235) without the fade, the content inset and the
-// fitted sizes (159-174) with no screen to cap them, and the card with its
-// content holder (379-417) without the fade. No placement and no twins on
-// other screens: the card sits at the window's top left, on a ground no
-// card has.
+// properties Panel.qml sets, the card's drawn height and its ease, the
+// window's visibility and the focus on open without the fade, the content
+// inset and the fitted sizes with no screen to cap them, and the card with
+// its content holder without the fade or the morph from another panel. No
+// placement and no twins on other screens: the card sits at the window's
+// top left, on a ground no card has.
 FloatingWindow {
   id: root
 
@@ -27,6 +27,23 @@ FloatingWindow {
   property var borderSpec: Border.surfaceSpec("popups", "border", Commons.Color.popups.border, Math.max(1, Style.space(2)))
   property bool open: false
   property Item focusTarget: null
+
+  // The card's height on screen: it snaps just after an open, then eases.
+  property real drawnHeight: contentHeight
+  property bool heightLive: false
+  Behavior on drawnHeight {
+    enabled: root.heightLive
+    NumberAnimation {
+      duration: Style.duration(200)
+      easing.type: Easing.Bezier
+      easing.bezierCurve: Style.easeOut
+    }
+  }
+  Timer {
+    id: heightSettle
+    interval: 60
+    onTriggered: root.heightLive = root.open
+  }
   default property alias contentItem: contentHolder.children
   readonly property alias card: card
   // The window's picture, for FrameGrab: the window's own content item has
@@ -56,7 +73,11 @@ FloatingWindow {
   implicitWidth: contentWidth + 40
   implicitHeight: 900
 
-  onOpenChanged: if (open && focusTarget) Qt.callLater(function() { root.focusTarget.forceActiveFocus() })
+  onOpenChanged: {
+    heightLive = false
+    if (open) heightSettle.restart()
+    if (open && focusTarget) Qt.callLater(function() { root.focusTarget.forceActiveFocus() })
+  }
 
   Item {
     id: surface
@@ -65,7 +86,9 @@ FloatingWindow {
     BorderSurface {
       id: card
       width: root.contentWidth
-      height: root.contentHeight
+      height: root.drawnHeight
+      // While it grows, the content keeps its own size and the card crops it.
+      clip: root.drawnHeight < root.contentHeight - 0.5
       color: Commons.Color.popups.background
       borderSpec: root.borderSpec
       padding: root.padding
@@ -73,10 +96,11 @@ FloatingWindow {
 
       Item {
         id: contentHolder
-        anchors.fill: parent
+        anchors.top: parent.top
+        anchors.left: parent.left
+        width: root.contentWidth - card.contentLeftInset - card.contentRightInset
+        height: root.contentHeight - card.contentTopInset - card.contentBottomInset
         anchors.topMargin: card.contentTopInset
-        anchors.rightMargin: card.contentRightInset
-        anchors.bottomMargin: card.contentBottomInset
         anchors.leftMargin: card.contentLeftInset
       }
     }

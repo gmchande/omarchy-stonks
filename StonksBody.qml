@@ -655,7 +655,7 @@ Item {
     property: "undoShown"
     from: 1
     to: 0
-    duration: 600
+    duration: Style.duration(600)
     onFinished: root.endUndo()
   }
 
@@ -1016,7 +1016,7 @@ Item {
     property: "noteShown"
     from: 1
     to: 0
-    duration: 600
+    duration: Style.duration(600)
     onFinished: {
       root.clearNote()
       footer.fadeIn()

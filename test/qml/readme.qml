@@ -138,6 +138,7 @@ Harness {
       var rule = find(body, "breadthRule")
       var share = function(n) { return rule.total ? n / rule.total : 0 }
       return !body.chartLoading && body.motion.reveal === 1
+        && panel.testCard.drawnHeight === panel.testCard.contentHeight
         && Math.abs(rule.upShare - share(rule.breadth.up)) < 1e-6
         && Math.abs(rule.downShare - share(rule.breadth.down)) < 1e-6
         && liveStill(body)

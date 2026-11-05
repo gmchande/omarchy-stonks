@@ -81,7 +81,7 @@ Harness {
     }
 
     function edgeAtRest() {
-      return panel.cardHeight === panel.fittedCardHeight
+      return panel.testCard.drawnHeight === panel.fittedCardHeight
     }
 
     function rest() {
@@ -254,7 +254,31 @@ Harness {
       check("each later open of the panel holds the thread at most 20 ms", Math.max.apply(null, later) <= 20, later.join(", ") + " ms")
       pillTurns()
       viewsThroughClose()
+      stillWithMotionOff()
       harness.finish()
+    }
+
+    // With the shell's animations off (`omarchy toggle animations`), the
+    // panel opens with its chart whole and a list switch puts the edge in
+    // place at once: every frame from the change on is the same picture.
+    function stillWithMotionOff() {
+      // An ease begun before the switch runs to its end.
+      tryVerify(function() { return panel.testCard.drawnHeight === panel.testCard.contentHeight }, 2000)
+      Style.reduceMotion = true
+      panel.open()
+      grab.source = panel.testCard.surface
+      grab.begin("still-open")
+      wait(500)
+      var opened = verdict("same")
+      filmed("with animations off, the panel opens whole and still", opened.ok, opened)
+      service.switchList("Short")
+      grab.begin("still-switch")
+      wait(400)
+      var switched = verdict("same")
+      filmed("with animations off, a switch to a shorter list moves the edge at once", switched.ok && service.listName === "Short", switched)
+      service.switchList("")
+      panel.close()
+      Style.reduceMotion = false
     }
 
     function viewsThroughClose() {

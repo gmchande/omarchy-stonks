@@ -156,7 +156,7 @@ BarWidget {
   SequentialAnimation {
     id: refreshAcknowledgement
     PropertyAction { target: root; property: "opacity"; value: 0.55 }
-    NumberAnimation { target: root; property: "opacity"; to: 1; duration: 160; easing.type: Easing.OutCubic }
+    NumberAnimation { target: root; property: "opacity"; to: 1; duration: Style.duration(160); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut }
   }
 
   function persistBarStyle(next) {
@@ -289,7 +289,7 @@ BarWidget {
         font.family: button.fontFamily
         font.pixelSize: Style.font.icon
         rotation: root.featured ? -Figures.arrowAngle(root.featured.pct) : 0
-        Behavior on rotation { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        Behavior on rotation { NumberAnimation { duration: Style.duration(160); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut } }
       }
 
       // The day's animal, the same in both looks, one cell a pixel. Without

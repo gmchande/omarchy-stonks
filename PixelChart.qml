@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import qs.Commons
 import qs.Commons as Commons
 import "Tones.js" as Tones
 // The retro chart, one rule for the day and every range: columns of cells
@@ -276,13 +277,13 @@ Item {
       onRunningChanged: if (!running) { cap.opacity = 1; root.opening = false }
 
       PropertyAction { target: cap; property: "opacity"; value: 1 }
-      PauseAnimation { duration: 700 }
+      PauseAnimation { duration: Style.duration(700) }
       PropertyAction { target: cap; property: "opacity"; value: 0.5 }
-      PauseAnimation { duration: 160 }
+      PauseAnimation { duration: Style.duration(160) }
       PropertyAction { target: cap; property: "opacity"; value: 0 }
-      PauseAnimation { duration: 480 }
+      PauseAnimation { duration: Style.duration(480) }
       PropertyAction { target: cap; property: "opacity"; value: 0.5 }
-      PauseAnimation { duration: 160 }
+      PauseAnimation { duration: Style.duration(160) }
     }
   }
 
@@ -292,8 +293,9 @@ Item {
   property string blinkedPrice: ""
   property bool blinkOwed: false
   property bool opening: false
+  // With the shell's animations off, the cap stays lit.
   function blink() {
-    if (!root.live || !cap.visible || root.still) return
+    if (!root.live || !cap.visible || root.still || Style.reduceMotion) return
     if (!root.blinkOwed && root.newestPrice === root.blinkedPrice) return
     // A restart's stop of a paused burst would end `opening`; an open's blinks
     // keep it.

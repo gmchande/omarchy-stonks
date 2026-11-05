@@ -31,16 +31,6 @@ Panel {
   readonly property int bodyRoom: Math.min(root.heightCap, panel.availableCardHeight > 0 ? panel.availableCardHeight : root.heightCap)
     - panel.verticalContentInset
   readonly property int fittedCardHeight: body ? panel.fittedContentHeight(body.fittedHeight(root.bodyRoom), root.heightCap) : 0
-  // The shell's card is an item in a full-screen surface, so easing its
-  // height resizes no window.
-  property real cardHeight: 0
-  onFittedCardHeightChanged: if (root.opened) easeEdge()
-  NumberAnimation { id: edgeEase; target: root; property: "cardHeight"; duration: 160; easing.type: Easing.OutCubic }
-  function easeEdge() {
-    edgeEase.stop()
-    edgeEase.to = root.fittedCardHeight
-    edgeEase.start()
-  }
 
   function offerHint() {
     if (!root.opened || !root.body || !service || !service.pluginsReady || service.hinted || root.body.notice !== "") return
@@ -68,13 +58,7 @@ Panel {
     if (opening) {
       root.body.resetInteraction()
       offerHint()
-      // An open during the close's fade eases the edge from where it is.
-      if (fading) easeEdge()
-      else {
-        heldAnchor.hold()
-        edgeEase.stop()
-        root.cardHeight = root.fittedCardHeight
-      }
+      if (!fading) heldAnchor.hold()
     }
     if (opening) root.body.motion.revealChart()
     Qt.callLater(function() { if (root.opened) setCenterHoverRevealSuppressed(true) })
@@ -83,8 +67,6 @@ Panel {
   function close() {
     setCenterHoverRevealSuppressed(false)
     if (root.body) root.body.freeze()
-    // Closing stops the edge where it is for the fade.
-    edgeEase.stop()
     root.controller.hide()
   }
 
@@ -118,12 +100,17 @@ Panel {
     open: root.opened
     focusTarget: bodyKeys
     contentWidth: panel.fittedContentWidth(root.panelWidth)
-    contentHeight: Math.round(root.cardHeight)
+    // The shell eases the card to it, as `drawnHeight`.
+    contentHeight: root.fittedCardHeight
 
     PanelKeyCatcher {
       id: keyCatcher
-      anchors.fill: parent
-      // The body takes its new height at once; the edge eases over it.
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: parent.top
+      // The body takes its new height at once; the shell's edge eases over
+      // it, and rows end at the edge's inner side, never in its padding.
+      height: Math.round(panel.drawnHeight) - panel.verticalContentInset
       clip: true
       blocked: !!root.body && root.body.ownsKeys
       // Omarchy's panel keys: j k and h l move, Space activates, x removes.
@@ -163,7 +150,7 @@ Panel {
           rowsRoom: root.bodyRoom
           // The screen's room, so the first-run hint gives way to the rows.
           screenRoom: panel.availableCardHeight > 0 ? panel.availableCardHeight - panel.verticalContentInset : 0
-          edge: Math.round(root.cardHeight) - panel.verticalContentInset
+          edge: Math.round(panel.drawnHeight) - panel.verticalContentInset
           service: root.service
           updates: root.updates
           sounds: root.sounds

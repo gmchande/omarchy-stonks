@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import qs.Commons
 import "Cells.js" as Cells
 // The pill's icon form: the day's bull or bear in the header's cells, in the up
 // or the down colour. A day that turns (`turnTo`) steps it to the other animal
@@ -22,7 +23,7 @@ Item {
   property string turnKind: ""
   property string fromKind: ""
 
-  NumberAnimation { id: step; target: root; property: "turn"; duration: 200; easing.type: Easing.OutCubic }
+  NumberAnimation { id: step; target: root; property: "turn"; duration: Style.duration(200); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut }
 
   // Only the bull and the bear turn into each other: to or from no animal, or
   // out of sight, it changes at once. A turn reversed mid-step heads back from

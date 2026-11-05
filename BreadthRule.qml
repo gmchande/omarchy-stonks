@@ -89,15 +89,15 @@ Item {
     showBreadth()
   }
 
-  NumberAnimation { id: upEase; target: root; property: "upShare"; duration: 160; easing.type: Easing.OutCubic }
-  NumberAnimation { id: downEase; target: root; property: "downShare"; duration: 160; easing.type: Easing.OutCubic }
+  NumberAnimation { id: upEase; target: root; property: "upShare"; duration: Style.duration(160); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut }
+  NumberAnimation { id: downEase; target: root; property: "downShare"; duration: Style.duration(160); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut }
 
   HoverHandler { id: hover }
 
   Item {
     anchors.fill: parent
     opacity: root.revealed ? 0 : 1
-    Behavior on opacity { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+    Behavior on opacity { NumberAnimation { duration: Style.duration(160); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut } }
 
     Rectangle {
       visible: !root.retro
@@ -153,7 +153,7 @@ Item {
     objectName: "breadthCounts"
     anchors.centerIn: parent
     opacity: root.revealed ? 1 : 0
-    Behavior on opacity { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+    Behavior on opacity { NumberAnimation { duration: Style.duration(160); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut } }
     textFormat: Text.PlainText
     text: root.counts
     color: root.dim

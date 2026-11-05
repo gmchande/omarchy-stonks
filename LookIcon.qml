@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import qs.Commons
 import qs.Commons as Commons
 import "Cells.js" as Cells
 // The look a click switches to, as a button shows what pressing it does: the
@@ -34,7 +35,7 @@ Item {
     step.start()
   }
   onStillChanged: if (still && step.running) step.pause()
-  NumberAnimation { id: step; target: root; property: "cells"; duration: 200; easing.type: Easing.OutCubic }
+  NumberAnimation { id: step; target: root; property: "cells"; duration: Style.duration(200); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut }
 
   function settle() {
     step.stop()

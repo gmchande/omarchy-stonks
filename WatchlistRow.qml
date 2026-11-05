@@ -88,7 +88,7 @@ Rectangle {
   border.color: Style.normalBorderFor(foreground, Commons.Color.accent)
 
   // The shell's hover speed (CursorSurface).
-  Behavior on color { ColorAnimation { duration: 60 } }
+  Behavior on color { ColorAnimation { duration: Style.duration(60) } }
 
   Rectangle {
     objectName: "rowGround"
@@ -223,7 +223,7 @@ Rectangle {
             radius: row.retro ? 0 : Style.cornerRadius
             color: removeButton.hovered && mouse.pressed && mouse.pressedOnRemove && !mouse.dragged ? Style.pressedFillFor(row.foreground, Commons.Color.accent)
               : removeButton.hovered ? Style.hoverFillFor(row.foreground, Commons.Color.accent) : "transparent"
-            Behavior on color { ColorAnimation { duration: 60 } }
+            Behavior on color { ColorAnimation { duration: Style.duration(60) } }
           }
 
           // Smooth: ×.

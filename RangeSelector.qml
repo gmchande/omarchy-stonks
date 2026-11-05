@@ -83,7 +83,7 @@ Item {
         color: tokenMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
           : parent.chosen ? Style.selectedFillFor(root.foreground, Commons.Color.accent)
           : (tokenMouse.containsMouse ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent")
-        Behavior on color { ColorAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        Behavior on color { ColorAnimation { duration: Style.duration(160); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut } }
       }
 
       Text {
@@ -93,7 +93,7 @@ Item {
         text: String(parent.modelData).toUpperCase()
         color: parent.chosen ? root.foreground : root.dim
         font: root.wordFont
-        Behavior on color { ColorAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        Behavior on color { ColorAnimation { duration: Style.duration(160); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut } }
       }
 
       MouseArea {

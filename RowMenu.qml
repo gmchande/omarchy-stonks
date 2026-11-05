@@ -99,7 +99,7 @@ FocusScope {
           anchors.fill: parent
           radius: root.retro ? 0 : Style.cornerRadius
           color: line.isCursor ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
-          Behavior on color { ColorAnimation { duration: 60 } }
+          Behavior on color { ColorAnimation { duration: Style.duration(60) } }
         }
 
         CursorBar {
