@@ -48,10 +48,16 @@ code=0
 # Commons of another, named by STONKS_SHELL (test/old-shell.sh's Omarchy
 # 4.0.6, which Stonks still works on).
 shell="${STONKS_SHELL:-/usr/share/omarchy/shell}"
-if [ ! -f "$shell/Ui/KeyboardPanel.qml" ]; then
-  echo "FAIL no shell at $shell"
-  exit 1
-fi
+
+# need_shell: stops a harness that loads the shell's Ui and Commons before
+# Quickshell starts, when there's no shell at $shell. A feed's harness loads
+# neither, and runs without one.
+need_shell() {
+  if [ ! -f "$shell/Ui/KeyboardPanel.qml" ]; then
+    echo "FAIL no shell at $shell"
+    exit 1
+  fi
+}
 
 # feed_tree HARNESS FILE...: copies of just the named plugin files, so a
 # feed loads without the shell's Ui and Commons. Copies, so a script can
@@ -73,6 +79,7 @@ feed_tree() {
 # Hyprland whether theirs are off, and its quote runs never wait on them;
 # a harness that steps through screens off hands the host its own.
 plugin_tree() {
+  need_shell
   root="$work"
   mkdir -p "$root/plugin"
   cp "$plugin"/*.qml "$plugin"/*.js "$plugin/calendars.json" "$plugin/manifest.json" "$root/plugin/"
@@ -87,6 +94,7 @@ plugin_tree() {
 # shell sizes it: on a shell whose card has no drawnHeight, such as Omarchy
 # 4.0's, the card takes the height it's given at once.
 card_window() {
+  need_shell
   cp "$here/CardWindow.qml" "$root/plugin/"
   patch_copy plugin/Panel.qml 's/^  KeyboardPanel {$/  CardWindow {/'
   if ! grep -q 'property real drawnHeight' "$shell/Ui/KeyboardPanel.qml"; then
