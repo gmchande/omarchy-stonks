@@ -309,10 +309,17 @@ Harness {
       var grabWork = still.length ? still[Math.floor(still.length / 2)] : NaN
       var builtRows = building.reduce(function(sum, b) { return sum + b.rows }, 0)
       var perRow = building.reduce(function(sum, b) { return sum + b.own - grabWork }, 0) / Math.max(1, builtRows)
+      // What failed leads the detail: a bare run under a row's pitch is the
+      // space between two rows' words, not a bare row.
+      var failed = verdicts.filter(function(v) { return !v.ok }).map(function(v) { return "bare rows in the " + v.name })
+      if (grab.frames.length < 10 || !work.timed || still.length < 3) failed.push("too few frames to judge")
+      if (!(endY > 0 && list.contentY < endY)) failed.push("the glide or the wheel didn't move the list")
+      if (builtRows <= nearSight) failed.push("rows weren't built as they came")
+      if (mostBuilt > nearSight) failed.push("rows built beyond sight")
+      if (!(perRow < 5)) failed.push("a row took " + perRow.toFixed(1) + " ms to build")
       harness.check("a glide down the whole list and the wheel back up draw every row's symbol, day line, and price in sight on every frame, build only the rows near sight, and each row in under 5 ms of work",
-        verdicts.every(function(v) { return v.ok }) && grab.frames.length >= 10 && work.timed && endY > 0 && list.contentY < endY
-          && still.length >= 3 && builtRows > nearSight && mostBuilt <= nearSight && perRow < 5,
-        verdicts.map(function(v) { return v.name + ": " + v.detail }).join("; ") + "; " + builtRows + " rows built as they came, at most "
+        failed.length === 0,
+        failed.join(", ") + " | " + verdicts.map(function(v) { return v.name + ": " + v.detail }).join("; ") + "; " + builtRows + " rows built as they came, at most "
           + mostBuilt + " at once of " + nearSight + " near sight; " + perRow.toFixed(1) + " ms of work a row beyond a frame's own "
           + Math.round(grabWork) + " ms, over " + grab.frames.length + " frames; " + work.text + "; at " + Math.round(endY) + " then " + Math.round(list.contentY))
 
