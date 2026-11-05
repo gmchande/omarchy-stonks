@@ -63,17 +63,17 @@ FocusScope {
   property bool slow: false
   property int resultIndex: 0
   // The stock chosen, kept by name, so rows arriving or leaving above and
-  // below it never move the choice off it. The list's own take it from an
-  // older query's answer.
+  // below it never move the choice off it. The list's own take it, in
+  // sight, from an older query's answer.
   property string chosenSymbol: ""
   onShownChanged: {
     if (chosenSymbol === "") {
-      if (ownCount > 0) choose(0)
+      if (ownCount > 0) showResult(0)
       return
     }
     var at = shown.map(function(r) { return r.symbol }).indexOf(chosenSymbol)
     if (at >= 0 && !(ownCount > 0 && dimmed(at))) resultIndex = at
-    else if (ownCount > 0) choose(0)
+    else if (ownCount > 0) showResult(0)
     // Until Yahoo answers, the chart stays on what it shows.
     else resultIndex = -1
   }

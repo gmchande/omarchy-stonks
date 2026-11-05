@@ -806,6 +806,7 @@ Harness {
         var drawn = harness.find(harness.find(body.search, "searchResult"), "searchExchange").text
         return drawn === row.view.changeLine && drawn !== wasMove
       })
+      service.testFeed.quotes = Object.assign({}, service.testFeed.quotes, { MSFT: msft })
       var ledDetail = led + "|" + JSON.stringify(body.search.shown) + "|" + (row && row.view ? row.view.changeLine : "")
       led = led === "true,true,true,true,SHOW,true"
       keyClick(Qt.Key_Return)
@@ -834,13 +835,24 @@ Harness {
       within(1000, function() {
         return rows().length === body.search.shown.length && rows().every(function(r) { return r.y === r.index * body.search.rowPitch })
       })
+      // Scrolled down to Yahoo's last, more typing gives the choice back to
+      // the list's first, scrolled into sight.
+      var results = harness.find(body.search, "searchResults")
+      for (var d = 0; d < body.search.shown.length; d++) keyClick(Qt.Key_Down)
+      var scrolled = results.contentY > 0
+      keyClick("P")
+      var back = [scrolled, within(1000, function() { return body.search.chosenSymbol === "NVDA" && results.contentY === 0 })].join(",")
+      within(3000, function() { return body.search.resultsQuery === "APP" })
+      within(1000, function() {
+        return rows().length === body.search.shown.length && rows().every(function(r) { return r.y === r.index * body.search.rowPitch })
+      })
       var first = rows().filter(function(r) { return r.index === 0 })[0]
       var at = first.mapToItem(body, first.width / 2, first.height / 2)
       mouseClick(body, at.x, at.y)
       var clicked = within(2000, function() { return !body.adding && service.featuredSymbol === "NVDA" && watchlist.cursorRow === "NVDA" })
-      harness.check("search shows the list's own stocks first, by symbol or name, each with its row's move, kept current as prices land; Enter or a click on one shows it with its row selected, and Enter before the typing pause asks Yahoo nothing; Yahoo's answer joins below without moving the choice",
-        led && shown && kept === "true,AAPL,AAPL,1,NVDA AAPL MSFT,true" && clicked,
-        ledDetail + " / " + shownDetail + " / " + kept + " / " + service.featuredSymbol)
+      harness.check("search shows the list's own stocks first, by symbol or name, each with its row's move, kept current as prices land; Enter or a click on one shows it with its row selected, and Enter before the typing pause asks Yahoo nothing; Yahoo's answer joins below without moving the choice, and more typing brings the list's first back into sight",
+        led && shown && kept === "true,AAPL,AAPL,1,NVDA AAPL MSFT,true" && back === "true,true" && clicked,
+        ledDetail + " / " + shownDetail + " / " + kept + " / " + back + " / " + service.featuredSymbol)
       service.feature(featured)
       body.resetInteraction()
     }

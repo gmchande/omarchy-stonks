@@ -1950,5 +1950,5 @@ test("search finds the list's own stocks by symbol or by a word of their name, t
   expect(M.ownMatches(" ", list, quotes)).toEqual([])
   // No more than Yahoo is asked for, so its answers stay in reach below.
   const long = Array.from({ length: 20 }, (_, i) => "A" + i)
-  expect(M.ownMatches("a", long, {}).length).toBe(M.SHOWN_RESULTS)
+  expect(M.ownMatches("a", long, {}).length).toBe(8)
 })

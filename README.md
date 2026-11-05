@@ -155,9 +155,8 @@ Ctrl+Enter.
 To find a stock or add one, click "+ Find or add a symbol", or press `/`,
 and type a name or a symbol. Stocks already in the list you're looking at
 come first, with today's move, and Enter or a click shows one with its row
-selected. Below them come Yahoo's results, and the chart shows the
-highlighted one before you add it. Press Enter to add it, or click any
-result to add that one.
+selected. Below them come Yahoo's results: the chart shows the highlighted
+one before you add it, and Enter or a click adds it.
 
 To remove a row, point at it and click the × beside its symbol, or select
 it and press Delete. It leaves the list you're looking at. Removing it from
