@@ -319,7 +319,18 @@ Harness {
       var moved = panel.fittedCardHeight !== before && edgeAtRest()
       filmed("with animations off, a switch to a shorter list moves the edge at once",
         switched.ok && moved && service.listName === "Short", switched, moved ? "" : " | the switch moved no edge: " + before + " -> " + panel.fittedCardHeight)
+      // A replay is the reader's own ask, as a press of play is: with
+      // animations off it still plays its 2 s.
       service.switchList("")
+      var motion = panel.testBody.motion
+      tryVerify(function() { return !motion.loading }, 3000)
+      var askedAt = Date.now()
+      key("p")
+      var began = within(500, function() { return motion.replayRunning })
+      tryVerify(function() { return !motion.replayRunning }, 4000)
+      var played = Date.now() - askedAt
+      check("with animations off, p still replays the chart over its 2 s",
+        began && played >= 1700 && played <= 2600, (began ? "played " : "never began, ") + played + " ms")
       panel.close()
       Style.reduceMotion = false
     }
