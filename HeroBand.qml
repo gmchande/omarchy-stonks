@@ -196,10 +196,10 @@ Item {
 
       RangeMarks {
         id: rangeMarks
+        parent: rangeMarks.chart.underScrub
         anchors.fill: parent
         marks: root.rangeMarks
         chart: root.retro ? pixelChart : dayChart
-        scrubX: root.scrubX
         foreground: root.foreground
         dim: root.dim
         fontFamily: root.fontFamily
