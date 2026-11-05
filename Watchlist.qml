@@ -527,7 +527,7 @@ Flickable {
     if (dragSymbol === "") return
     dragPointer = y - contentY
     dragY = Math.max(0, Math.min((displayedSymbols.length - 1) * rowPitch, y - dragOffset))
-    dragTarget = Math.round(dragY / rowPitch)
+    dragTarget = Settings.dragSlot(dragY / rowPitch, dragTarget, displayedSymbols.length)
   }
 
   function endDrag() {
