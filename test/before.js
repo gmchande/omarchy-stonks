@@ -99,13 +99,14 @@ for (const path of codeChanged) {
 }
 const namesAdded = line => [...words(line)].some(w => addedNames.has(w)) || addedFiles.some(path => line.includes(path.split("/").pop()))
 
-// The harnesses a runner starts, by name, each with the command it starts
-// it with: the first, where a runner starts one more than once.
+// The harnesses a runner starts, by name, each with every command a runner
+// starts it with, since a harness such as layout.sh runs some of its steps
+// under one command and the rest under another.
 const starts = new Map()
 for (const runner of ["test/all.sh", "test/review.sh"]) {
   for (const line of readFileSync(join(root, runner), "utf8").split("\n")) {
     const m = line.match(/^start "[^"]*" (.*\bbash test\/qml\/([\w-]+)\.sh\b.*)$/)
-    if (m && !starts.has(m[2])) starts.set(m[2], m[1])
+    if (m) starts.set(m[2], [...(starts.get(m[2]) || []), m[1]])
   }
 }
 const harnessOf = path => {
@@ -359,13 +360,13 @@ const xml = s => s.replace(/&#10;/g, " ").replace(/&quot;/g, "\"").replace(/&apo
 const steps = text => [...text.matchAll(/STEP (\d+) (PASS|FAIL) (.*)/g)]
   .map(m => ({ line: Number(m[1]), pass: m[2] === "PASS", name: m[3] }))
 let found = null
-async function runOne(t, index) {
+async function runOne(t, index, command) {
   const report = join(tree, `junit-${index}.xml`)
   // A harness's work folder, and so its Quickshell's log, under the tree
   // (test/scratch.sh).
   const work = join(tree, `work-${index}`)
   mkdirSync(work)
-  const args = t.harness ? ["bash", "-c", starts.get(t.harness)]
+  const args = t.harness ? ["bash", "-c", command]
     : ["bun", "test", `./${t.path}`, "--reporter=junit", `--reporter-outfile=${report}`]
   const child = Bun.spawn(args, { cwd: tree, stdout: "pipe", stderr: "pipe", env: { ...process.env, STONKS_TEST_TMP: work } })
   running.add(child)
@@ -396,20 +397,23 @@ async function runOne(t, index) {
   return { code, results, errors }
 }
 
-// The unit test files, then the harnesses, one at a time, until a changed
-// case fails on the code before. One at a time, so test/all.sh, whose queue
-// gives this check one of its slots, never runs more harnesses at once
-// than test/queue.sh allows.
+// The unit test files, then the harnesses, one at a time and each of a
+// harness's commands in turn, until a changed case fails on the code
+// before. One at a time, so test/all.sh, whose queue gives this check one
+// of its slots, never runs more harnesses at once than test/queue.sh allows.
 let skipped = 0
 for (const [index, t] of due.entries()) {
-  if (found) break
-  const { code, results, errors } = await runOne(t, index)
-  if (code === 77) {
-    console.log(`skipped ${t.path}: no saved answers to run its ${t.cases.length} changed cases on`)
-    skipped += t.cases.length
+  for (const [part, command] of (t.harness ? starts.get(t.harness) : [null]).entries()) {
+    if (found) break
+    const { code, results, errors } = await runOne(t, `${index}-${part}`, command)
+    if (code === 77) {
+      console.log(`skipped ${t.path}: no saved answers to run its ${t.cases.length} changed cases on`)
+      skipped += t.cases.length
+      break
+    }
+    const f = failing(t, results, code, errors)
+    if (f) found = { t, ...f }
   }
-  const f = failing(t, results, code, errors)
-  if (f) found = { t, ...f }
 }
 
 if (found) {
