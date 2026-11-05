@@ -67,7 +67,11 @@ FocusScope {
   // older query's answer.
   property string chosenSymbol: ""
   onShownChanged: {
-    var at = chosenSymbol === "" ? -1 : shown.map(function(r) { return r.symbol }).indexOf(chosenSymbol)
+    if (chosenSymbol === "") {
+      if (ownCount > 0) choose(0)
+      return
+    }
+    var at = shown.map(function(r) { return r.symbol }).indexOf(chosenSymbol)
     if (at >= 0 && !(ownCount > 0 && dimmed(at))) resultIndex = at
     else if (ownCount > 0) choose(0)
     // Until Yahoo answers, the chart stays on what it shows.

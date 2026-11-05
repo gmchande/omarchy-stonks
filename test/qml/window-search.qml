@@ -798,8 +798,16 @@ Harness {
       var top = harness.find(body.search, "searchResult")
       led = [led, body.search.resultIndex === 0, !!row && body.search.shown[0].move === row.view.changeLine,
         !!top && harness.find(top, "searchAdd").opacity === 1, body.search.actionFor("MSFT")].join(",")
+      // A new price for MSFT, here its close moved, redraws the move.
+      var wasMove = body.search.shown[0].move
+      var msft = service.testFeed.quotes.MSFT
+      service.testFeed.quotes = Object.assign({}, service.testFeed.quotes, { MSFT: Object.assign({}, msft, { prevClose: msft.prevClose * 0.9 }) })
+      led += "," + within(1000, function() {
+        var drawn = harness.find(harness.find(body.search, "searchResult"), "searchExchange").text
+        return drawn === row.view.changeLine && drawn !== wasMove
+      })
       var ledDetail = led + "|" + JSON.stringify(body.search.shown) + "|" + (row && row.view ? row.view.changeLine : "")
-      led = led === "true,true,true,true,SHOW"
+      led = led === "true,true,true,true,SHOW,true"
       keyClick(Qt.Key_Return)
       var shown = within(2000, function() { return !body.adding && service.featuredSymbol === "MSFT" && watchlist.cursorRow === "MSFT" })
         && service.library.join(",") === library && harness.calls("SEARCH.asked") === asked
@@ -820,11 +828,17 @@ Harness {
       var joined = within(3000, function() { return body.search.resultsQuery === "AP" })
       var kept = [joined, chosen, body.search.chosenSymbol, body.search.resultIndex,
         body.search.shown.slice(0, 3).map(function(r) { return r.symbol }).join(" "), body.search.shown.length > 3].join(",")
-      var first = harness.findAll(body.search, "searchResult").filter(function(r) { return r.index === 0 })[0]
+      // Once the column has placed Yahoo's rows under the list's own, as it
+      // does before the next frame shows them.
+      var rows = function() { return harness.findAll(body.search, "searchResult") }
+      within(1000, function() {
+        return rows().length === body.search.shown.length && rows().every(function(r) { return r.y === r.index * body.search.rowPitch })
+      })
+      var first = rows().filter(function(r) { return r.index === 0 })[0]
       var at = first.mapToItem(body, first.width / 2, first.height / 2)
       mouseClick(body, at.x, at.y)
       var clicked = within(2000, function() { return !body.adding && service.featuredSymbol === "NVDA" && watchlist.cursorRow === "NVDA" })
-      harness.check("search shows the list's own stocks first, by symbol or name, each with its row's move; Enter or a click on one shows it with its row selected, and Enter before the typing pause asks Yahoo nothing; Yahoo's answer joins below without moving the choice",
+      harness.check("search shows the list's own stocks first, by symbol or name, each with its row's move, kept current as prices land; Enter or a click on one shows it with its row selected, and Enter before the typing pause asks Yahoo nothing; Yahoo's answer joins below without moving the choice",
         led && shown && kept === "true,AAPL,AAPL,1,NVDA AAPL MSFT,true" && clicked,
         ledDetail + " / " + shownDetail + " / " + kept + " / " + service.featuredSymbol)
       service.feature(featured)
