@@ -195,7 +195,7 @@ Harness {
     // header's title, not in capitals like a caption. Its price's currency,
     // USD for every shot here, stands beside the price, and its foot says
     // when: `span`, the saved day's date of the price on show, or the
-    // range's length and dates.
+    // range's length.
     function ofChart(shot, symbol, range, span, rows) {
       var problems = []
       if (!shot.card.texts) return ["no card laid out"]
@@ -272,7 +272,7 @@ Harness {
       tryVerify(function() { return button && button.visible && button.width > 0 }, 2000)
       waitForRendering(button)
       var year = shoot(win, function() { if (button) mouseClick(button, button.width / 2, button.height / 2) })
-      problems = landed(year, "aapl", /^AAPL 1Y at .+$/).concat(ofChart(year, "AAPL", "1Y", "1 YEAR · 12 SEP 2025 – 11 SEP 2026", rows))
+      problems = landed(year, "aapl", /^AAPL 1Y at .+$/).concat(ofChart(year, "AAPL", "1Y", "1 YEAR", rows))
       var marks = harness.marksSaid(win)
       if (year.card.marks !== marks || /none/.test(marks)) problems.push("marks " + year.card.marks + " against the window's " + marks)
       check("a click on the window's camera, in retro, takes AAPL's 1Y as it is shown, its high and low marked",
@@ -291,7 +291,7 @@ Harness {
       mouseMove(chart, chart.width * 0.4, chart.height / 2)
       tryVerify(function() { return win.scrubT !== 0 }, 2000)
       var hovered = shoot(win, function() { keyClick(Qt.Key_C, Qt.ControlModifier) })
-      problems = landed(hovered, "aapl", /^AAPL 1Y on .+$/).concat(ofChart(hovered, "AAPL", "1Y", "1 YEAR · 12 SEP 2025 – 11 SEP 2026", rows))
+      problems = landed(hovered, "aapl", /^AAPL 1Y on .+$/).concat(ofChart(hovered, "AAPL", "1Y", "1 YEAR", rows))
       check("Ctrl+C with the pointer on the window's chart takes the bar the pointer reads",
         problems.length === 0 && hovered.card.scrubT === win.scrubShown && hovered.card.scrubX >= 0,
         problems.join("; ") + " | " + hovered.card.scrubT + " vs " + win.scrubShown)

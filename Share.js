@@ -92,12 +92,14 @@ function barDate(history, bar) {
 // top at rest; `scrubT` is 0 at rest):
 //   when: the price's time and zone, a scrub outside the regular session
 //   named by its session, and on a range its date;
-//   from: what the change is measured from, as the dashed line;
+//   from: what the change is measured from, as the dashed line; on a range,
+//   the range;
 //   extended, since: the line under the price, as the panel shows it;
 //   currency: none beside an index's level, which isn't money;
 //   start, end: the day's axis's ends;
 //   span: on the day, the date its move belongs to (after midnight, the close
-//   before the chart's day); on a range, its length and first and last dates;
+//   before the chart's day); on a range, its length, and its first day where
+//   the chart starts later than that;
 //   said: the moment in the footer's words.
 function words(o) {
   var quote = o.quote
@@ -118,13 +120,15 @@ function words(o) {
     out.said = at.close ? "at the close" : "at " + Market.printClock(quote, at.t, o.calendars)
   }
   if (o.history) {
-    out.from = String(o.range).toUpperCase() + " START " + Format.money(o.history.baseline, digits)
+    out.from = String(o.range).toUpperCase()
     out.span = SPANS[o.range] || String(o.range).toUpperCase()
-    // Each end with its year: the picture is read later, elsewhere.
+    // A chart that starts later than its range says names its first day, as
+    // a young listing's 5Y, and All, which says no length.
     var bars = o.history.bars
-    if (bars.length) {
-      out.span += " · " + History.historyDateText(o.history, bars[0].t, true, o.history.interval)
-        + " – " + History.historyDateText(o.history, bars[bars.length - 1].t, true, o.history.interval)
+    if (History.periodStats(o.history).coverage.short) {
+      out.span += " · FROM " + History.historyStatsDateText(o.history, o.history.firstTradeDate, true, "1d")
+    } else if (o.range === "All" && bars.length) {
+      out.span += " · FROM " + History.historyStatsDateText(o.history, bars[0].t, true, o.history.interval)
     }
   } else {
     // With a newest price on top, or while scrubbed, the dashed line, named as

@@ -2079,7 +2079,7 @@ test("in every phase, a stock that has traded since its close shows that newest 
   }
   // Its own day and clock, as 1D names it, though the range's periods are
   // stamped otherwise: at 23:00 on Sunday 25 October, a day's bar reads
-  // midnight by its offset, and the picture's range ends on that Sunday.
+  // midnight by its offset, and the picture says that Sunday.
   {
     const at23 = at("2026-10-25", "23:00")
     const nights = { NBIS: { ...sunday.nights.NBIS, bars: sunday.nights.NBIS.bars.filter(b => b.t <= at23), through: at23 } }
@@ -2089,7 +2089,7 @@ test("in every phase, a stock that has traded since its close shows that newest 
     expect(newest.t).toBe(at23)
     expect(M.historyScrubForms(chart.history, chart.history.bars.at(-1))[1]).toBe("25 OCT 2026 23:00")
     expect(load("Share.js").words({ quote: sunday.quotes.NBIS, day: chart.day, history: chart.history, latest: chart.latest, newest, scrubT: 0,
-      changeMode: "pct", range: "1Y", now: at23 + 600, calendars }).span).toBe("1 YEAR · 24 OCT 2025 – 25 OCT 2026")
+      changeMode: "pct", range: "1Y", now: at23 + 600, calendars }).when).toBe("OVERNIGHT 23:00 EDT · SUN 25 OCT 2026")
   }
   // Sunday 1 November at 21:48, the clocks gone back, under a week kept from
   // before: the night's trade reads New York's clock now, 21:40 EST.
@@ -3159,10 +3159,12 @@ test("the header's animal sleeps while its market does: by phase and calendar, n
 // Bitcoin's picture says its day, in UTC, the time it has no calendar for;
 // its file and the footer keep the dash. A scrub outside the regular session
 // names it, as the picture at rest does: a big price read as the session's
-// would mislead. A range says its dates once, at the foot, with no axis
-// dates for a mark to repeat. An index's level isn't money: no currency.
-// After the close, the move since it keeps its own tone, as on the panel.
-test("a screenshot says when its price is, its session, its range's dates once, an index's level without a currency, and the move since the close in its own tone", () => {
+// would mislead. A range names itself alone, at the foot with no dates, and
+// with no axis dates for a mark to repeat, unless its chart starts later than
+// it says: Nebius, listed on 21 October 2024, on 5Y and All. An index's level
+// isn't money: no currency. After the close, the move since it keeps its own
+// tone, as on the panel.
+test("a screenshot says when its price is, its session, its range alone or the day its chart starts, an index's level without a currency, and the move since the close in its own tone", () => {
   const Share = load("Share.js")
   const words = Share.words({ quote: btc, day: M.dayChart(btc, null, calendars).day, history: null, latest: null,
     scrubT: 0, changeMode: "pct", range: "1D", now: btc.marketTime + 60, calendars })
@@ -3175,9 +3177,14 @@ test("a screenshot says when its price is, its session, its range's dates once, 
     .toEqual(["PRE-MARKET 07:30 EDT", "AT 12:00 EDT", "AFTER HOURS 18:10 EDT"])
   const night = dayAt("night", "nest")
   expect(scrubbed(night.day, night.quote, at("2026-10-01", "21:30"))).toBe("OVERNIGHT 21:30 EDT")
-  const year = Share.words({ quote, day: quote, history: M.parseHistory(fixture("history/aapl-1y.json"), "1Y"),
-    latest: null, scrubT: 0, changeMode: "pct", range: "1Y", now: quote.marketTime + 60, calendars })
-  expect([year.span, year.start, year.end]).toEqual(["1 YEAR · 12 SEP 2025 – 11 SEP 2026", "", ""])
+  const ranged = (file, range, q) => Share.words({ quote: q, day: q, history: M.parseHistory(fixture("history/" + file + ".json"), range),
+    latest: null, scrubT: 0, changeMode: "pct", range, now: q.marketTime + 60, calendars })
+  const year = ranged("aapl-1y", "1Y", quote)
+  expect([year.from, year.span, year.start, year.end]).toEqual(["1Y", "1 YEAR", "", ""])
+  const young = savedDay("ranges-2026-11-04-2330", "nbis")
+  expect([["nbis-2026-11-04-2330-5y", "5Y"], ["nbis-2026-11-04-2330-max", "All"]]
+    .map(([file, range]) => { const w = ranged(file, range, young); return w.from + " / " + w.span }))
+    .toEqual(["5Y / 5 YEARS · FROM 21 OCT 2024", "ALL / ALL · FROM 21 OCT 2024"])
   const gspc = savedDay("listings-2026-10-07-1455", "gspc")
   expect([gspc, spy, savedDay("listings-2026-10-07-1455", "shel.l")].map(q => Share.words({ quote: q, day: q,
     history: null, latest: null, scrubT: 0, changeMode: "pct", range: "1D", now: q.marketTime + 60, calendars }).currency))
