@@ -94,7 +94,9 @@ function barDate(history, bar) {
 //   named by its session, and on a range its date;
 //   from: what the change is measured from, as the dashed line; on a range,
 //   the range;
-//   extended, since: the line under the price, as the panel shows it;
+//   extended: the line under the price, as the panel shows it; since: the
+//   move since the close, named by its session, as the panel says it under
+//   the change;
 //   currency: none beside an index's level, which isn't money;
 //   start, end: the day's axis's ends;
 //   span: on the day, the date its move belongs to (after midnight, the close
@@ -148,13 +150,16 @@ function words(o) {
       out.end = (last.d !== first.d ? Format.WEEKDAYS[last.weekday].toUpperCase() + " " : "") + last.clock
     }
   }
-  // The panel's line under the price, as it shows it.
+  // The panel's line under the price, as it shows it, and the move since the
+  // close it shows under the change, which a range or a mode's period takes
+  // the place of.
   if (!o.scrubT && o.newest) {
-    var below = Figures.closeLine(quote, Figures.exchangeDay(quote, o.now), o.changeMode, o.newest)
+    var below = Figures.closeLine(quote, Figures.exchangeDay(quote, o.now), o.changeMode)
+    var caption = Figures.captionLine(quote, o.newest, o.changeMode, o.history ? String(o.range) : Format.changeCaption(o.changeMode), false)
     out.extended = below.label + " · " + below.price + " " + below.changeText
     out.extendedTone = below.tone
-    out.since = below.since
-    out.sinceTone = below.sinceTone
+    out.since = caption.changeText ? caption.label + " " + caption.changeText : ""
+    out.sinceTone = caption.tone
     return out
   }
   var ext = !o.scrubT ? Figures.extendedStack(quote, o.latest, o.now, o.day, o.changeMode) : null

@@ -1874,15 +1874,16 @@ test("through a night, until 04:00, the chart keeps the day that closed with ton
   // Wednesday 00:05: Robinhood's newest bar is Tuesday 23:55. The chart is
   // Tuesday's, as wide as it ended its day, from its midnight to its 20:00:
   // the last 20 hours of trading up to that bar, dashed at Monday's close,
-  // the price on top measured from it, and Tuesday's close and its day
-  // under the price, with the move since it.
+  // the price on top measured from it, Tuesday's close and its day under the
+  // price, and the night's move since it under the change.
   const built = dayAt("2026-10-07-0005", "nest")
   const { day, latest, quote } = built
   expect(M.chartSpan(day)).toMatchObject({ start: at("2026-10-06", "04:00"), end: at("2026-10-06", "23:55") })
   expect(M.lastPrintTime(day)).toBe(at("2026-10-06", "23:55"))
   const newest = M.newestPrint(quote, latest, calendars, day)
   expect([newest.base, M.dayBase(day), newest.closed]).toEqual([quote.prevClose, quote.prevClose, true])
-  expect(M.closeLine(quote, M.exchangeDay(quote, at("2026-10-07", "00:05")), "pct", newest)).toMatchObject({ label: "TUE CLOSE", since: "\u22120.66%" })
+  expect([M.closeLine(quote, M.exchangeDay(quote, at("2026-10-07", "00:05")), "pct").label, M.captionLine(quote, newest, "pct", "", false)])
+    .toEqual(["TUE CLOSE", { label: "OVERNIGHT", changeText: "\u22120.66%", tone: "down" }])
   // Yahoo still on Friday while Robinhood answers Monday's night (Tuesday
   // 01:30): the night is joined to Monday all the same, and named so.
   const stale = savedDay("watch-2026-10-25-1000", "nbis")
@@ -1890,8 +1891,8 @@ test("through a night, until 04:00, the chart keeps the day that closed with ton
   const late = M.dayChart(stale, traded("watch-2026-10-27-0130", asked).NBIS, calendars)
   const lateNewest = M.newestPrint(stale, late.latest, calendars, late.day)
   const tue = at("2026-10-27", "01:30")
-  expect([M.newestCaptions(stale, lateNewest, tue, calendars)[0], M.newestNote(stale, lateNewest, tue, calendars),
-    M.rowsDay(["NBIS"], { NBIS: stale }, { NBIS: lateNewest }, tue, calendars)]).toEqual(["SINCE FRI CLOSE · 01:25", "Since Fri close · 01:25", "MON + NIGHT"])
+  expect([M.newestNote(stale, lateNewest, tue, calendars), M.rowsDay(["NBIS"], { NBIS: stale }, { NBIS: lateNewest }, tue, calendars)])
+    .toEqual(["Since Fri close · 01:25", "MON + NIGHT"])
 })
 
 // Wherever the pointer is on a 1D chart, its change and its animal say
@@ -1911,10 +1912,9 @@ const againstDashedLine = (day, where) => {
 test("once a listing trades after its close, its newest price is on top, measured from the chart's dashed line, and a scrub of the night reads the same", () => {
   // Wednesday 01:00: NEST closed Tuesday at 249.87, +7.44%, and traded at
   // 248.04 at 00:50, joined to Tuesday's chart. The price on top is 248.04,
-  // +6.65% from the dashed line, Monday's close, with a bull, the close it
-  // counts from named beside it; Tuesday's close and move go on the line
-  // beneath, and the move since it. A scrub of that print reads the same
-  // +6.65%.
+  // +6.65% from the dashed line, Monday's close, with a bull; Tuesday's close
+  // and move go on the line beneath, and the night's move since it under the
+  // change. A scrub of that print reads the same +6.65%.
   const quote = savedDay("2026-10-07-0100", "nest")
   const built = dayAt("2026-10-07-0100", "nest")
   const { day, latest } = built
@@ -1924,9 +1924,9 @@ test("once a listing trades after its close, its newest price is on top, measure
   expect(M.money(newest.base)).toBe("232.57")
   const top = M.rowModel(quote, 0, "pct", newest)
   expect([top.priceText, top.changeText, M.animalKind(top)]).toEqual(["248.04", "+6.65%", "bull"])
-  expect(M.newestCaptions(quote, newest, one, calendars)).toEqual(["SINCE MON CLOSE · 00:50", "SINCE MON CLOSE · 00:50", "SINCE MON CLOSE"])
   expect(M.newestNote(quote, newest, one, calendars)).toBe("Since Mon close · 00:50")
-  expect(M.closeLine(quote, M.exchangeDay(quote, one), "pct", newest)).toMatchObject({ label: "TUE CLOSE", price: "249.87", changeText: "+7.44%", tone: "up", since: "\u22120.73%" })
+  expect(M.closeLine(quote, M.exchangeDay(quote, one), "pct")).toMatchObject({ label: "TUE CLOSE", price: "249.87", changeText: "+7.44%", tone: "up" })
+  expect(M.captionLine(quote, newest, "pct", "", false)).toEqual({ label: "OVERNIGHT", changeText: "\u22120.73%", tone: "down" })
   expect(M.rowModel(day, latest.t, "pct")).toMatchObject({ changeText: "+6.65%", dayUp: true })
   expect(M.dayBaselineText(day, M.exchangeDay(day, one), latest.t)).toBe("CLOSE BEFORE TUE 232.57")
   expect(againstDashedLine(day, "01:00")).toBe("01:00 all against 232.57")
@@ -1959,17 +1959,17 @@ const topsAt = set => {
   }
   const symbols = Object.keys(quotes)
   const newest = M.newestPrints(symbols, quotes, nights, allDay, calendars)
-  // The line under the price: the close, its day's move, and the move
-  // since it, where said.
+  // Under the price, the close and its day's move; under the change, the
+  // move since that close, named by the newest price's session, where said.
   const below = s => {
-    const line = M.closeLine(quotes[s], M.exchangeDay(quotes[s], now), "pct", newest[s])
-    return `${line.label} ${line.changeText}` + (line.since ? ` · ${line.since} SINCE` : "")
+    const line = M.closeLine(quotes[s], M.exchangeDay(quotes[s], now), "pct")
+    const caption = M.captionLine(quotes[s], newest[s], "pct", "", false)
+    return [line.label, line.changeText, caption.label, caption.changeText].filter(Boolean).join(" ")
   }
   // What a listing shows on top, as its row, the pill, and the panel read it.
   const top = s => {
     const row = M.rowModel(quotes[s], 0, "pct", newest[s] || null)
-    return [row.priceText, row.changeText, newest[s] ? M.newestCaptions(quotes[s], newest[s], now, calendars)[0] : "",
-      newest[s] ? below(s) : ""].join(" ")
+    return [row.priceText, row.changeText, newest[s] ? below(s) : ""].join(" ")
   }
   return { now, quotes, nights, allDay, symbols, newest, top }
 }
@@ -1983,25 +1983,27 @@ test("in every phase, a stock that has traded since its close shows that newest 
   // its after hours, and on Sunday night with the night joined to Friday,
   // named as Thursday's close; Monday's from 04:00, from Friday's close,
   // and Monday's evening night joined to it, from Friday's close too. After
-  // the close on its own day the line under the price adds the move since
-  // it, unless that rounds to nothing, the price on top being the close's.
+  // the close on its own day, the caption under the change says the move
+  // since it, AFTER HOURS until 20:00 and OVERNIGHT after, unless that rounds
+  // to nothing, the price on top being the close's; from 04:00 the move on
+  // top is that one, so it says none.
   const phases = {
-    "watch-2026-10-25-1000": ["NBIS 158.74 −0.27% AFTER HOURS FRI 19:59 FRI CLOSE −0.27%",
-      "JNJ 263.16 −1.66% AFTER HOURS FRI 18:46 FRI CLOSE −1.42% · −0.25% SINCE", "PSIX 45.69 −3.14% AFTER HOURS FRI 19:00 FRI CLOSE −3.26% · +0.13% SINCE"],
-    "watch-2026-10-25-2335": ["NBIS 152.51 −4.18% SINCE THU CLOSE · 23:30 FRI CLOSE −0.27% · −3.92% SINCE",
-      "JNJ 264.11 −1.31% SINCE THU CLOSE · 23:25 FRI CLOSE −1.42% · +0.11% SINCE",
-      "PSIX 45.69 −3.14% AFTER HOURS FRI 19:00 FRI CLOSE −3.26% · +0.13% SINCE"],
-    "watch-2026-10-26-0100": ["NBIS 153.07 −3.83% SINCE THU CLOSE · 00:55 FRI CLOSE −0.27% · −3.57% SINCE",
-      "JNJ 264.05 −1.33% SINCE THU CLOSE · 00:35 FRI CLOSE −1.42% · +0.09% SINCE"],
-    "watch-2026-10-26-0420": ["NBIS 151.28 −4.70% PRE-MARKET 04:19 FRI CLOSE −0.27%", "JNJ 264.55 +0.28% PRE-MARKET 04:06 FRI CLOSE −1.42%"],
-    "watch-2026-10-26-1200": ["NBIS 163.31 +2.88%  ", "JNJ 265.78 +0.75%  "],
-    "watch-2026-10-26-1800": ["NBIS 155.34 −2.14% AFTER HOURS 17:58 CLOSE −3.45% · +1.35% SINCE",
-      "JNJ 266.42 +0.99% AFTER HOURS 17:30 CLOSE +0.94% · +0.05% SINCE", "PSIX 47.15 +3.33% AFTER HOURS 16:56 CLOSE +3.33%",
-      "CVR 9.82 −6.48%  "],
-    "watch-2026-10-26-2005": ["NBIS 156.80 −1.22% SINCE FRI CLOSE · 20:00 CLOSE −3.45% · +2.30% SINCE", "JNJ 266.30 +0.94% AFTER HOURS 19:57 CLOSE +0.94%"],
-    "watch-2026-10-27-0350": ["NBIS 153.03 −3.60% SINCE FRI CLOSE · 03:45 MON CLOSE −3.45% · −0.16% SINCE",
-      "JNJ 266.89 +1.17% SINCE FRI CLOSE · 03:30 MON CLOSE +0.94% · +0.22% SINCE"],
-    "watch-2026-10-27-0405": ["NBIS 154.04 +0.50% PRE-MARKET 04:05 MON CLOSE −3.45%", "JNJ 266.60 +0.11% PRE-MARKET 04:01 MON CLOSE +0.94%"]
+    "watch-2026-10-25-1000": ["NBIS 158.74 −0.27% FRI CLOSE −0.27%",
+      "JNJ 263.16 −1.66% FRI CLOSE −1.42% AFTER HOURS −0.25%", "PSIX 45.69 −3.14% FRI CLOSE −3.26% AFTER HOURS +0.13%"],
+    "watch-2026-10-25-2335": ["NBIS 152.51 −4.18% FRI CLOSE −0.27% OVERNIGHT −3.92%",
+      "JNJ 264.11 −1.31% FRI CLOSE −1.42% OVERNIGHT +0.11%",
+      "PSIX 45.69 −3.14% FRI CLOSE −3.26% AFTER HOURS +0.13%"],
+    "watch-2026-10-26-0100": ["NBIS 153.07 −3.83% FRI CLOSE −0.27% OVERNIGHT −3.57%",
+      "JNJ 264.05 −1.33% FRI CLOSE −1.42% OVERNIGHT +0.09%"],
+    "watch-2026-10-26-0420": ["NBIS 151.28 −4.70% FRI CLOSE −0.27%", "JNJ 264.55 +0.28% FRI CLOSE −1.42%"],
+    "watch-2026-10-26-1200": ["NBIS 163.31 +2.88% ", "JNJ 265.78 +0.75% "],
+    "watch-2026-10-26-1800": ["NBIS 155.34 −2.14% CLOSE −3.45% AFTER HOURS +1.35%",
+      "JNJ 266.42 +0.99% CLOSE +0.94% AFTER HOURS +0.05%", "PSIX 47.15 +3.33% CLOSE +3.33%",
+      "CVR 9.82 −6.48% "],
+    "watch-2026-10-26-2005": ["NBIS 156.80 −1.22% CLOSE −3.45% OVERNIGHT +2.30%", "JNJ 266.30 +0.94% CLOSE +0.94%"],
+    "watch-2026-10-27-0350": ["NBIS 153.03 −3.60% MON CLOSE −3.45% OVERNIGHT −0.16%",
+      "JNJ 266.89 +1.17% MON CLOSE +0.94% OVERNIGHT +0.22%"],
+    "watch-2026-10-27-0405": ["NBIS 154.04 +0.50% MON CLOSE −3.45%", "JNJ 266.60 +0.11% MON CLOSE +0.94%"]
   }
   for (const [set, expected] of Object.entries(phases)) {
     const at = topsAt(set)
@@ -2070,19 +2072,18 @@ test("in every phase, a stock that has traded since its close shows that newest 
       expect([set, s, waiting[s].t <= at.newest[s].t]).toEqual([set, s, true])
     }
   }
-  // Monday 17:58, since the open: the change still says SINCE OPEN, then
-  // the newest price's session and time.
+  // Monday 17:58, since the open: the change says SINCE OPEN alone, as the
+  // move since the close would read as the open's.
   {
     const at = topsAt("watch-2026-10-26-1800")
     const open = M.rowModel(at.quotes.NBIS, 0, "open", at.newest.NBIS)
-    // Where no form with the time fits beside the line under the price,
-    // SINCE OPEN alone.
-    expect(M.newestCaptions(at.quotes.NBIS, open.newest, at.now, calendars, open.periodLabel))
-      .toEqual(["SINCE OPEN · AFTER HOURS 17:58", "SINCE OPEN · AFTER HOURS 17:58", "SINCE OPEN"])
+    expect(M.captionLine(at.quotes.NBIS, open.newest, "open", open.periodLabel, false)).toEqual({ label: "SINCE OPEN", changeText: "", tone: "flat" })
     expect(M.rowModel(at.quotes.NBIS, 0, "pct", at.newest.NBIS).periodLabel).toBe("")
-    // c makes the line under the price an amount; since the open it stays a percent.
-    expect(["abs", "open"].map(mode => M.closeLine(at.quotes.NBIS, M.exchangeDay(at.quotes.NBIS, at.now), mode, at.newest.NBIS).changeText))
+    // c makes the line under the price and the move since an amount; since
+    // the open they stay a percent.
+    expect(["abs", "open"].map(mode => M.closeLine(at.quotes.NBIS, M.exchangeDay(at.quotes.NBIS, at.now), mode).changeText))
       .toEqual(["\u22125.47", "\u22123.45%"])
+    expect(M.captionLine(at.quotes.NBIS, at.newest.NBIS, "abs", "", false).changeText).toBe("+2.07")
   }
   // Sunday 23:35, the list sorted by change and its up and down count read
   // the price on top: NBIS, −4.18% since Thursday's close, is the list's
@@ -2111,11 +2112,11 @@ test("in every phase, a stock that has traded since its close shows that newest 
   expect(M.newestTime(sunday.quotes.PSIX, sunday.newest.PSIX, sunday.now + 7 * DAY, calendars)).toBe("23 Oct 19:00")
   // On 1W, 1M and 1Y too, NBIS's line ends on its newest price, the price
   // on top, as Robinhood's ranges did at 20:00 on 28 October: the move from
-  // the range's start to it, said under it by the range's name and then the
-  // price's session and time, so the week's move never reads as the
-  // night's beside the row's; a scrub at the line's end reading it, and the
-  // range's low taking it. The range's volume stays Yahoo's bars'.
-  for (const [set, moment, when, day] of [["watch-2026-10-25-2335", "2026-10-25-2335", "OVERNIGHT 23:30", "25 OCT"], ["watch-2026-10-26-2005", "2026-10-26-2005", "OVERNIGHT 20:00", "26 OCT"]]) {
+  // the range's start to it, said under it by the range's name alone, so the
+  // week's move never reads as the night's; a scrub at the line's end
+  // reading it, and the range's low taking it. The range's volume stays
+  // Yahoo's bars'.
+  for (const [set, moment, when, day] of [["watch-2026-10-25-2335", "2026-10-25-2335", "23:30", "25 OCT"], ["watch-2026-10-26-2005", "2026-10-26-2005", "20:00", "26 OCT"]]) {
     const at = topsAt(set)
     const top = M.rowModel(at.quotes.NBIS, 0, "pct", at.newest.NBIS)
     for (const [range, span] of [["1W", "5d"], ["1M", "1mo"], ["1Y", "1y"]]) {
@@ -2126,12 +2127,12 @@ test("in every phase, a stock that has traded since its close shows that newest 
       const model = M.historyRowModel(history, at.quotes.NBIS, 0)
       const line = M.historyGeometry(history).points
       expect([where, model.priceText, model.newest.t, line.at(-1).p]).toEqual([where, top.priceText, at.newest.NBIS.t, at.newest.NBIS.p])
-      expect([where, M.newestCaptions(at.quotes.NBIS, model.newest, at.now, calendars, model.periodLabel)[0]]).toEqual([where, `${range} · ${when}`])
+      expect([where, M.captionLine(at.quotes.NBIS, model.newest, "pct", model.periodLabel, false).label]).toEqual([where, range])
       expect([where, model.changeText]).toEqual([where, M.pct((at.newest.NBIS.p - raw.baseline) / raw.baseline * 100)])
       expect([where, M.historyRowModel(history, at.quotes.NBIS, at.newest.NBIS.t).priceText]).toEqual([where, top.priceText])
       // The range line marks the newest price's place, and a scrub names it by its day and time.
       expect([where, M.rangeLine(history, M.rangeEnds(history), at.quotes.NBIS).range.price]).toEqual([where, at.newest.NBIS.p])
-      expect([where, M.historyScrubForms(history, history.bars.at(-1))[1]]).toEqual([where, `${day}${range === "1Y" ? " 2026" : ""} ${when.slice(-5)}`])
+      expect([where, M.historyScrubForms(history, history.bars.at(-1))[1]]).toEqual([where, `${day}${range === "1Y" ? " 2026" : ""} ${when}`])
       expect([where, M.rangeVolume(history)]).toEqual([where, M.rangeVolume(raw)])
     }
   }
@@ -2161,16 +2162,18 @@ test("in every phase, a stock that has traded since its close shows that newest 
     { "NBIS|1W": { status: "ok", history: M.parseHistory(fixture("history/nbis-2026-10-25-2335-5d.json"), "1W") } }, sunday.nights, sunday.allDay, calendars).history
   expect(M.rangeEnds(week).low).toEqual({ p: 152.51, t: sunday.newest.NBIS.t })
   // Monday 17:58 on 1W, Yahoo's week as it stood then (the 20:05 answer cut
-  // to its bars before 17:58): the line under the price shows the close, so
-  // it adds the move since it, as 1D does.
+  // to its bars before 17:58): the line under the price shows the close and
+  // its day's move, as 1D does, and the caption under the change the range
+  // alone, so the move since the close is said on 1D only.
   {
     const at = topsAt("watch-2026-10-26-1800")
     const raw = M.parseHistory(fixture("history/nbis-2026-10-26-2005-5d.json"), "1W")
     const then = { ...raw, bars: raw.bars.filter(b => b.t < at.newest.NBIS.t) }
     const chart = M.viewChart("NBIS", "1W", at.quotes, {}, { "NBIS|1W": { status: "ok", history: then } }, at.nights, at.allDay, calendars)
     const model = M.historyRowModel(chart.history, at.quotes.NBIS, 0)
-    const line = M.closeLine(at.quotes.NBIS, M.exchangeDay(at.quotes.NBIS, at.now), "pct", model.newest)
-    expect([line.label, line.changeText, line.since, line.sinceTone]).toEqual(["CLOSE", "\u22123.45%", "+1.35%", "up"])
+    const line = M.closeLine(at.quotes.NBIS, M.exchangeDay(at.quotes.NBIS, at.now), "pct")
+    expect([line.label, line.changeText, M.captionLine(at.quotes.NBIS, model.newest, "pct", model.periodLabel, false)])
+      .toEqual(["CLOSE", "\u22123.45%", { label: "1W", changeText: "", tone: "flat" }])
   }
 })
 
@@ -2556,7 +2559,8 @@ test("until 04:00 a listing Robinhood trades all day shows the day that closed w
       expect([nvda, aapl, jnj].map(read)).toEqual([nvda, aapl, jnj].map(top))
       expect(read(nvda)).toEqual(["214.37", "\u22123.42%", "bear"])
       const newest = M.newestPrint(nvda.quote, nvda.latest, calendars, nvda.day)
-      expect(M.closeLine(nvda.quote, M.exchangeDay(nvda.quote, at("2026-10-23", "02:30")), "pct", newest)).toMatchObject({ label: "THU CLOSE", since: "+1.02%" })
+      expect([M.closeLine(nvda.quote, M.exchangeDay(nvda.quote, at("2026-10-23", "02:30")), "pct").label, M.captionLine(nvda.quote, newest, "pct", "", false).changeText])
+        .toEqual(["THU CLOSE", "+1.02%"])
     }
   }
   // 06:00, a two-day answer holding Thursday and Friday's pre-market: the
@@ -3258,5 +3262,9 @@ test("a screenshot says when its price is, its session, its range alone or the d
   const nbis = dayAt("watch-2026-10-26-1800", "nbis")
   const after = Share.words({ quote: tops.quotes.NBIS, day: nbis.day, history: null, latest: nbis.latest, newest: tops.newest.NBIS,
     scrubT: 0, changeMode: "pct", range: "1D", now: tops.now, calendars })
-  expect([after.extended, after.extendedTone, after.since, after.sinceTone]).toEqual(["CLOSE · 153.27 \u22123.45%", "down", "+1.35%", "up"])
+  expect([after.extended, after.extendedTone, after.since, after.sinceTone]).toEqual(["CLOSE · 153.27 \u22123.45%", "down", "AFTER HOURS +1.35%", "up"])
+  // On a range the move since the close isn't said, as the panel says the range there.
+  const week = Share.words({ quote: tops.quotes.NBIS, day: nbis.day, history: M.parseHistory(fixture("history/nbis-2026-10-26-2005-5d.json"), "1W"),
+    latest: nbis.latest, newest: tops.newest.NBIS, scrubT: 0, changeMode: "pct", range: "1W", now: tops.now, calendars })
+  expect([week.extended, week.since]).toEqual(["CLOSE · 153.27 \u22123.45%", ""])
 })

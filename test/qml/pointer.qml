@@ -787,7 +787,7 @@ Harness {
         var heroChange = root.find(body, "changeText")
         var firstShown = body.watchlist.rowItem(body.watchlist.displayedSymbols[0])
         var sinceOpen = function() {
-          return heroCaption.text === "SINCE OPEN" && heroChange.text.indexOf("open") < 0
+          return root.rowWords(heroCaption) === "SINCE OPEN" && heroChange.text.indexOf("open") < 0
             && firstShown.view.changeLine.indexOf(" open") > 0
         }
         root.check("a change since the open is captioned SINCE OPEN, never AT CLOSE", within(1000, sinceOpen))

@@ -247,7 +247,7 @@ Rectangle {
     visible: !!root.words && root.words.since !== ""
     x: extendedText.x + extendedText.implicitWidth
     y: extendedText.y
-    text: root.words && root.words.since ? " · " + Format.lookSigns(root.words.since, root.retro) + " SINCE" : ""
+    text: root.words && root.words.since ? " · " + Format.lookSigns(root.words.since, root.retro) : ""
     color: root.toneColor(root.words ? root.words.sinceTone : "flat")
   }
 

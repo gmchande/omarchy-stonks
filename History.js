@@ -423,8 +423,8 @@ function historyRowModel(history, quote, scrubT) {
     dayTone: Format.changeTone(chg, "pct"),
     changeText: Format.pct(chg.pct),
     changeLine: Format.pct(chg.pct),
-    // Said under the change, as AT CLOSE is; the newest price's session and
-    // time follow it (`Figures.newestCaptions`).
+    // Said under the change, as AT CLOSE is, in place of the move since the
+    // close (`Figures.captionLine`).
     periodLabel: stats.coverage.short && history.range !== "All"
       ? "SINCE " + historyStatsDateText(history, history.firstTradeDate, true, "1d")
       : String(history.range || "").toUpperCase(),

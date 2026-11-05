@@ -91,18 +91,17 @@ Yahoo's rate for the day, inside the P/E and nowhere else.
 
 The top line names the moment in the market's day, such as Power hour, and
 says when the market opens or closes, by the exchange's clock. A US stock
-that has traded since the close shows that newest price on top, with its
-session and time, such as AFTER HOURS 17:55, and its row shows the time
-after the company's name. At night, the words under the move name the
-close it counts from instead: SINCE WED CLOSE · 21:50. The move beside the
-price runs from the chart's dashed line, the close before the day on the
-chart, so the number, the line, the bull or bear, the rows and the pill
-agree. Since the open, it runs from that day's open instead. The line under
-the price shows the close and its day's move, and after the close, the
-move since it: CLOSE 153.27 ▼3.45% · ▲1.35% SINCE, on every range. On a
-longer range the chart ends on that price, and the move is the range's, up
-to it. Elsewhere, a smaller line under the price shows the pre-market or
-after-hours price.
+that has traded since the close shows that newest price on top, and its row
+shows the time after the company's name. The move beside the price runs
+from the chart's dashed line, the close before the day on the chart, so the
+number, the line, the bull or bear, the rows and the pill agree. Since the
+open, it runs from that day's open instead. Under the price are the last
+close and its day's move, CLOSE 153.27 ▼3.45%, which names the day once it
+has passed, as MON CLOSE. On 1D, under the move is the move since that
+close, named by the newest trade's session: AFTER HOURS ▲1.35% until 20:00,
+then OVERNIGHT. On a longer range the chart ends on that price, and the
+move is the range's, up to it, with the range's name under it. Elsewhere, a
+smaller line under the price shows the pre-market or after-hours price.
 
 The 1D chart shows one trading day, each price at its time, from the
 day's first trade, or the open if that's earlier, to the day's end while

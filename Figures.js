@@ -331,32 +331,28 @@ function closeLabel(quote, today) {
   return (day ? day + " " : "") + "CLOSE"
 }
 
-// After the close on its own day (`newest.closed`), the move since that
-// close is said too, unless it rounds to nothing. From the next day on, the
-// move on top is that one, so it isn't said twice.
-function closeLine(quote, today, changeMode, newest) {
-  var unit = changeMode === "abs" ? "abs" : "pct"
-  var row = rowModel(quote, 0, unit)
-  var since = newest.closed ? Quote.change({ prevClose: Quote.regularClose(quote), points: [] }, newest.p, unit) : null
-  var sinceTone = since ? Format.changeTone(since, unit, quote.priceDigits) : "flat"
-  return { label: closeLabel(quote, today), time: "", price: row.priceText, changeText: row.changeText, tone: row.tone, stale: false,
-    since: since && sinceTone !== "flat" ? Format.changeText(since, unit, quote.priceDigits) : "", sinceTone: sinceTone }
+// The line under the price with the newest price on top: the last close and
+// its day's move, CLOSE 171.99 −5.68%, or MON CLOSE once that day is past.
+function closeLine(quote, today, changeMode) {
+  var row = rowModel(quote, 0, changeMode === "abs" ? "abs" : "pct")
+  return { label: closeLabel(quote, today), time: "", price: row.priceText, changeText: row.changeText, tone: row.tone, stale: false }
 }
 
-// Each form is shorter than the last, for a caption with no room for it. A
-// period comes first, so a range's move never reads as the night's. A night
-// joined to the day that closed names that close, as its move covers the
-// day too.
-function newestCaptions(quote, newest, now, calendars, period) {
-  var day = Market.printDay(quote, newest.t, now, calendars).toUpperCase()
-  var clock = Market.printClock(quote, newest.t, calendars)
-  if (!period && nightJoined(newest)) {
-    var named = "SINCE " + closeBefore(quote, newest, calendars).toUpperCase() + " CLOSE"
-    return [named + " · " + day + clock, named + " · " + clock, named]
-  }
-  var label = (period ? period + " · " : "") + (newest.phase === "overnight" ? "OVERNIGHT" : newest.phase === "post" ? "AFTER HOURS" : "PRE-MARKET")
-  var forms = [label + " " + day + clock, label + " " + clock]
-  return period ? forms.concat([period]) : forms
+// The caption under the change. A range's or a mode's period comes first,
+// so a range's move never reads as the night's. After the close on its own
+// day (`newest.closed`), the move since that close, named by the session of
+// the price on top: AFTER HOURS +1.35%, then OVERNIGHT −7.90% from 20:00.
+// None from the next day on, where the move on top is that one, nor where
+// it rounds to nothing. With no newest price on top, AT CLOSE beside the
+// pre-market or after-hours price under the price (`extendedStack`).
+function captionLine(quote, newest, changeMode, period, extended) {
+  var none = { label: period || (!newest && extended ? "AT CLOSE" : ""), changeText: "", tone: "flat" }
+  if (period || !newest || !newest.closed) return none
+  var unit = changeMode === "abs" ? "abs" : "pct"
+  var since = Quote.change({ prevClose: Quote.regularClose(quote), points: [] }, newest.p, unit)
+  var tone = Format.changeTone(since, unit, quote.priceDigits)
+  if (tone === "flat") return none
+  return { label: newest.phase === "overnight" ? "OVERNIGHT" : "AFTER HOURS", changeText: Format.changeText(since, unit, quote.priceDigits), tone: tone }
 }
 
 function nightJoined(newest) {

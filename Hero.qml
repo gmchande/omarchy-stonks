@@ -46,14 +46,14 @@ Item {
   property int priceSize: Style.font.displayLarge * 2
 
   readonly property string freshnessText: quote ? Figures.freshnessText(shownFreshness, quote, calendars) : ""
-  // The newest price since the close, when it is on top: its session and time
-  // go under the change, and the line under the price is the close and its
-  // move. None once its quote is gone, as a failed preview's is.
+  // The newest price since the close, when it is on top: the line under the
+  // price is the close and its move, and the caption under the change the
+  // move since it. None once its quote is gone, as a failed preview's is.
   readonly property var newest: quote && view && view.newest ? view.newest : null
   readonly property bool newestOld: Figures.newestStale(newest, now)
   // A scrub's price is a past one, so the line rests and the baseline's legend
   // takes its place.
-  readonly property var extended: newest ? Figures.closeLine(quote, Figures.exchangeDay(quote, now), changeMode, newest)
+  readonly property var extended: newest ? Figures.closeLine(quote, Figures.exchangeDay(quote, now), changeMode)
     : quote && !scrubbing ? Figures.extendedStack(quote, latest, now, day, changeMode) : null
   readonly property string priceText: view ? view.priceText
     : (freshness && freshness.state === "failed" ? "—" : "…")
@@ -78,21 +78,10 @@ Item {
     return (listingLead !== "" ? " · " : "") + Figures.listingMeta(quote, cut)
   }
   readonly property real listingRoom: Math.max(0, listingRow.width - symbolText.implicitWidth - Style.space(8))
-  // The longest caption that fits beside the strip's left side, so the two
-  // never meet; none where even the shortest doesn't.
-  readonly property var newestCaptions: newest
-    ? Figures.newestCaptions(quote, newest, now, calendars, view && view.periodLabel ? view.periodLabel : "") : null
+  readonly property var caption: Figures.captionLine(quote, newest, changeMode, view && view.periodLabel ? view.periodLabel : "", extended !== null)
+  // Drawn only clear of the strip's left side, so the two never meet.
   readonly property real captionRoom: width - Style.space(12)
     - Math.max(extendedLine.visible ? extendedLine.implicitWidth : 0, baselineLegend.visible ? baselineLegend.implicitWidth : 0)
-  readonly property string changeCaption: {
-    var forms = newestCaptions || [view && view.periodLabel ? view.periodLabel : (extended !== null ? "AT CLOSE" : "")]
-    var font = captionMetrics.font // read, so a new text size measures again
-    for (var i = 0; i < forms.length; i++) {
-      // A pixel of letter spacing a letter.
-      if (forms[i] === "" || captionMetrics.advanceWidth(forms[i]) + forms[i].length <= captionRoom) return forms[i]
-    }
-    return ""
-  }
 
   readonly property int gap: Style.space(28)
   // A whole number of retro cells, so both renderers land on the same rows.
@@ -292,35 +281,6 @@ Item {
       font.pixelSize: Style.font.caption
       font.bold: true
     }
-    // After the close, on its own day, the move since it.
-    Text {
-      visible: !!root.extended && !!root.extended.since
-      textFormat: Text.PlainText
-      text: "·"
-      color: root.dim
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
-      font.bold: true
-    }
-    Text {
-      visible: !!root.extended && !!root.extended.since
-      textFormat: Text.PlainText
-      text: root.extended && root.extended.since ? Format.lookSigns(root.extended.since, root.retro) : ""
-      color: root.toneColor(root.extended && root.extended.since ? root.extended.sinceTone : "flat")
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
-      font.bold: true
-    }
-    Text {
-      visible: !!root.extended && !!root.extended.since
-      textFormat: Text.PlainText
-      text: "SINCE"
-      color: root.dim
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
-      font.bold: true
-      font.letterSpacing: 1
-    }
   }
 
   Text {
@@ -337,17 +297,33 @@ Item {
     font.letterSpacing: 1
   }
 
-  Text {
-    id: captionText
+  Row {
+    id: captionLine
     objectName: "changeCaption"
+    visible: root.caption.label !== "" && implicitWidth <= root.captionRoom
     anchors.right: parent.right
-    y: root.baselineY + root.captionDrop - baselineOffset
-    textFormat: Text.PlainText
-    text: root.changeCaption
-    color: root.dim
-    font.family: root.fontFamily
-    font.pixelSize: Style.font.caption
-    font.bold: true
-    font.letterSpacing: 1
+    y: root.baselineY + root.captionDrop - captionLabel.baselineOffset
+    spacing: Style.space(6)
+
+    Text {
+      id: captionLabel
+      textFormat: Text.PlainText
+      text: root.caption.label
+      color: root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.bold: true
+      font.letterSpacing: 1
+    }
+    // The move since the close dims with an old night's price.
+    Text {
+      visible: text !== ""
+      textFormat: Text.PlainText
+      text: Format.lookSigns(root.caption.changeText, root.retro)
+      color: root.newestOld ? root.dim : root.toneColor(root.caption.tone)
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.bold: true
+    }
   }
 }
