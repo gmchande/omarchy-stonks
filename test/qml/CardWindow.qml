@@ -10,9 +10,10 @@ import qs.Ui
 // shell's border spec, padding, and radius. What lives on KeyboardPanel
 // itself is copied from /usr/share/omarchy/shell/Ui/KeyboardPanel.qml: the
 // properties Panel.qml sets, the card's drawn height and its ease, the
-// window's visibility and the focus on open without the fade, the content
-// inset and the fitted sizes with no screen to cap them, and the card with
-// its content holder without the fade or the morph from another panel. No
+// window's visibility and the focus on open, the card's fade in and out
+// where a harness sets `fades`, the content inset and the fitted sizes with
+// no screen to cap them, and the card with its content holder without the
+// morph from another panel. No
 // placement and no twins on other screens: the card sits at the window's
 // top left, on a ground no card has.
 FloatingWindow {
@@ -68,7 +69,20 @@ FloatingWindow {
     return Math.round(Math.min(desired, maxHeight))
   }
 
-  visible: open
+  // With `fades`, the card fades in and out, and the window stays up
+  // through the fade: a reopen can come during it.
+  property bool fades: false
+  property real shown: open ? 1 : 0
+  Behavior on shown {
+    id: showing
+    enabled: root.fades
+    NumberAnimation {
+      duration: Style.duration(showing.targetValue > 0 ? 180 : 120)
+      easing.type: Easing.Bezier
+      easing.bezierCurve: Style.easeOut
+    }
+  }
+  visible: open || shown > 0
   color: "#ff00ff"
   implicitWidth: contentWidth + 40
   implicitHeight: 900
@@ -87,6 +101,7 @@ FloatingWindow {
       id: card
       width: root.contentWidth
       height: root.drawnHeight
+      opacity: root.shown
       // While it grows, the content keeps its own size and the card crops it.
       clip: root.drawnHeight < root.contentHeight - 0.5
       color: Commons.Color.popups.background

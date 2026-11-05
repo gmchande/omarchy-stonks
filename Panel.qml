@@ -31,6 +31,14 @@ Panel {
   readonly property int bodyRoom: Math.min(root.heightCap, panel.availableCardHeight > 0 ? panel.availableCardHeight : root.heightCap)
     - panel.verticalContentInset
   readonly property int fittedCardHeight: body ? panel.fittedContentHeight(body.fittedHeight(root.bodyRoom), root.heightCap) : 0
+  // An open during the close's fade holds the card at the height on screen
+  // until the shell eases its height again, just after the open, so the
+  // reset's change (the key sheet giving way to the rows) eases from there.
+  property int heldHeight: -1
+  Connections {
+    target: panel
+    function onHeightLiveChanged() { if (panel.heightLive) root.heldHeight = -1 }
+  }
 
   function offerHint() {
     if (!root.opened || !root.body || !service || !service.pluginsReady || service.hinted || root.body.notice !== "") return
@@ -51,6 +59,7 @@ Panel {
   function open() {
     var opening = !root.opened
     var fading = opening && panel.visible
+    if (opening) root.heldHeight = fading ? Math.round(panel.drawnHeight) : -1
     bodyLoader.active = true
     root.controller.show()
     // Before offerHint: an update notice goes ahead of the hint.
@@ -101,7 +110,7 @@ Panel {
     focusTarget: bodyKeys
     contentWidth: panel.fittedContentWidth(root.panelWidth)
     // The shell eases the card to it, as `drawnHeight`.
-    contentHeight: root.fittedCardHeight
+    contentHeight: root.heldHeight >= 0 ? root.heldHeight : root.fittedCardHeight
 
     PanelKeyCatcher {
       id: keyCatcher

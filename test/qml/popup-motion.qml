@@ -254,8 +254,34 @@ Harness {
       check("each later open of the panel holds the thread at most 20 ms", Math.max.apply(null, later) <= 20, later.join(", ") + " ms")
       pillTurns()
       viewsThroughClose()
+      reopenMidFade()
       stillWithMotionOff()
       harness.finish()
+    }
+
+    // Reopened during its close's fade, the panel eases from the height still
+    // on screen: the key sheet, closed by the open, gives way to the rows
+    // from the sheet's height, never at once.
+    function reopenMidFade() {
+      panel.open()
+      rest()
+      key("?")
+      tryVerify(function() { return panel.testBody.showingHelp && edgeAtRest() }, 2000)
+      var sheet = panel.testCard.drawnHeight
+      panel.close()
+      var fading = panel.testCard.visible
+      panel.open()
+      var first = panel.testCard.drawnHeight
+      var between = false
+      tryVerify(function() {
+        var h = panel.testCard.drawnHeight
+        if (Math.abs(h - sheet) > 1 && Math.abs(h - panel.fittedCardHeight) > 1) between = true
+        return h === panel.fittedCardHeight
+      }, 2000)
+      check("reopened during its close's fade, the panel eases from the height still on screen",
+        fading && Math.abs(first - sheet) <= 1 && between && Math.abs(sheet - panel.fittedCardHeight) > 1,
+        fading + " | " + sheet + " -> " + first + " -> " + panel.testCard.drawnHeight + (between ? ", eased" : ", at once"))
+      panel.close()
     }
 
     // With the shell's animations off (`omarchy toggle animations`), the
