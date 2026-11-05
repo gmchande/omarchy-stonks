@@ -379,15 +379,17 @@ Harness {
         within(4000, function() { return !body.motion.replayRunning })
         body.headerTextChanged.disconnect(watch)
         // A trade before midnight is Sunday's, and says so. The replay starts
-        // at the chart's first trade, Friday's, and runs by the clock, so it
-        // reads each trade's price as it passes it, not its minute.
+        // at the chart's first trade, Friday's, at its time and in its own
+        // session, and runs by the clock, so it reads each trade's price as
+        // it passes it, not its minute.
         var read = replayRead.concat([replayed.split(" | ")[1]])
         var digits = service.quotes.TOY.priceDigits
         var missed = trades.filter(function(p) { return read.indexOf(Format.money(p.p, digits)) < 0 })
           .map(function(p) { return Format.hhmm(p.t, offset) })
+        var first = toy.points[0]
         check(look + ": a replay starts at Friday's first trade, at its time, and reads every trade of the night",
-          trades.length === 5 && replayed === "At Fri " + Format.hhmm(toy.points[0].t, offset) + " · Overnight | " + Format.money(toy.points[0].p, digits)
-            && missed.length === 0,
+          trades.length === 5 && replayed.indexOf("At Fri " + Format.hhmm(first.t, offset) + " · ") === 0
+            && replayed.split(" | ")[1] === Format.money(first.p, digits) && missed.length === 0,
           trades.length + " trades ; " + replayed + " ; missed " + missed.join(", "))
       })
 
@@ -510,9 +512,11 @@ Harness {
       var down = body.featuredGeometry.start + " | " + harness.strip()
       runCommand(["rm", "-f", harness.state + "/INSTRUMENTS.down"])
       service.now = 1791399300 + 6 * 60
-      within(4000, function() { return body.featuredGeometry.start === harness.midnight.wed7 - 4 * 3600 })
-      check("with Robinhood's instruments down, SPY lands on Yahoo's day; asked again five minutes on, it turns to its trading day, from its night's first trade",
-        landed && down.indexOf(String(harness.midnight.wed7 + 4 * 3600)) === 0 && body.featuredGeometry.start === harness.midnight.wed7 - 4 * 3600
+      // 15:01: its trading day, its start slid from the night's open to its
+      // midnight by 13:30.
+      within(4000, function() { return body.featuredGeometry.start === harness.midnight.wed7 })
+      check("with Robinhood's instruments down, SPY lands on Yahoo's day; asked again five minutes on, it turns to its trading day, from its midnight's first trade",
+        landed && down.indexOf(String(harness.midnight.wed7 + 4 * 3600)) === 0 && body.featuredGeometry.start === harness.midnight.wed7
           && body.featuredGeometry.start === body.featuredDay.points[0].t && harness.allDayAsked("SPY") === 2,
         down + " then " + body.featuredGeometry.start + ", asked " + harness.allDayAsked("SPY"))
 

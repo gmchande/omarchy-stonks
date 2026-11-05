@@ -306,7 +306,7 @@ Item {
     .concat(yearLine ? [History.rangeFacts(yearLine.range.widest)] : [])
   readonly property var yearLine: chart ? Fundamentals.yearLine(featuredQuote, fundamentals ? fundamentals.figures : null,
     historyShown && history.range === "1Y" ? rangeEnds : null, rates,
-    (featuredDay ? featuredDay.points : []).concat(featuredNewest ? [featuredNewest] : [])) : null
+    (featuredDay ? featuredDay.trades || featuredDay.points : []).concat(featuredNewest ? [featuredNewest] : [])) : null
   readonly property var rangeMarks: historyShown ? History.rangeMarks(history, rangeEnds, featuredQuote) : null
   // Said under the price: what a scrub's move counts from.
   readonly property string baselineText: historyShown ? "┄ " + chartRange.toUpperCase() + " START " + Format.money(history.baseline, featuredQuote ? featuredQuote.priceDigits : undefined)

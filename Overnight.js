@@ -300,8 +300,10 @@ function newestPrint(quote, latest, calendars, day) {
     joined: print.phase === "overnight" && !!day.tonight && print.t >= day.tonight, dayStart: day.session.regular.start }
 }
 
-// To the next night's open, or with no night after it, to the post-market's
-// close. Null past the calendar.
+// From the night's open the evening before to the next night's open, or
+// with no night after it, to the post-market's close; `midnight` is where
+// its start has slid to by the afternoon (`slidWindow`). Null past the
+// calendar.
 function dayWindow(cal, date) {
   var next = Market.nextDateString(date)
   var nextKind = Market.dayKind(cal, next).kind
@@ -309,8 +311,19 @@ function dayWindow(cal, date) {
   return {
     date: date,
     start: marketDay(cal, date).start,
+    midnight: Market.epochAt(cal, date, "00:00"),
     end: nextKind === "open" ? Market.epochAt(cal, date, cal.overnight.open) : postClose(cal, date)
   }
+}
+
+// Until the open the day starts with its night, at 20:00 the evening before.
+// From the open its start slides toward its own midnight five minutes at a
+// time, as tonight slides in at night, reaching it as many hours after the
+// open as the night held before midnight: at 13:30. Read from the prints'
+// reach, never the clock.
+function slidWindow(win, open, reach) {
+  var slid = reach !== null && reach > open ? Math.floor((reach - open) / SLOT) * SLOT : 0
+  return Object.assign({}, win, { start: Math.min(win.midnight, win.start + slid) })
 }
 
 // Robinhood's post-market lasts as long after a half day's 13:00 close as
@@ -327,12 +340,11 @@ function chartWindow(cal, quote, latest) {
   return dayWindow(cal, marketDayAt(cal, latest ? latest.t : quote.session.regular.start).date)
 }
 
-var DAY = 24 * 60 * 60
-
 // The day that closed, then tonight, the shut hours between them taking no
-// room (`skip`). Like Robinhood's day answer it holds the 288 slots up to
-// `reach`, so from 20:00 five minutes leave the left as five arrive on the
-// right. A listing with no trade since before the closed day keeps its own.
+// room (`skip`). It keeps the width the closed day ended with, from its
+// midnight to its end, so from 20:00 five minutes leave the left as five
+// arrive on the right. A listing with no trade since before the closed day
+// keeps its own.
 function eveningWindow(cal, latestT, reach) {
   var night = nightAt(cal, reach)
   if (!night || !night.open) return null
@@ -346,7 +358,7 @@ function eveningWindow(cal, latestT, reach) {
   var skip = closed.end < night.start ? { from: closed.end, to: night.start } : null
   return {
     date: closed.date,
-    start: Math.max(closed.start, reach - DAY + SLOT - (skip ? skip.to - skip.from : 0)),
+    start: Math.max(closed.midnight, reach - (closed.end - closed.midnight) + SLOT - (skip ? skip.to - skip.from : 0)),
     end: reach,
     skip: skip,
     night: night
@@ -412,14 +424,19 @@ function dayChart(quote, answer, calendars) {
   var win = evening || chartWindow(cal, quote, latest)
   if (!win) return { day: quote, latest: latest }
   var session = windowSession(cal, quote, win)
+  if (!evening) win = slidWindow(win, session.regular.start, reach)
   var own = session === quote.session
   var points = all.filter(function(p) { return p.t >= win.start })
+  var opened = marketDay(cal, win.date).start
   var over = !evening && ((answer.through !== null && answer.through + SLOT >= win.end) || (own && !!quote.wholeDay))
   return {
     day: Object.assign({}, quote, {
       session: session,
       next: null,
       points: points,
+      // Every trade of the day from its night's open, which its low and high
+      // count (`Figures.figuresTrades`) wherever the chart's start has slid.
+      trades: all.filter(function(p) { return p.t >= opened }),
       prevClose: own ? quote.prevClose : Quote.regularClose(quote),
       dayOpen: own ? quote.dayOpen : null,
       openSession: own ? quote.openSession : null,
