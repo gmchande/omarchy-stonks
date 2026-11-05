@@ -857,6 +857,64 @@ Harness {
       body.resetInteraction()
     }
 
+    // A pick by a click whose row comes to rest under the pointer that
+    // picked it, on sixRows' list: that row's × waits for the pointer to move, so a second
+    // click where the first was features it again and removes nothing.
+    function pickUnderPointer(body, watchlist, keys) {
+      var library = service.library.join(",")
+      var featured = service.featuredSymbol
+      mouseMove(body, 1, 1)
+      hold("SEARCH.hold", true)
+      keys.forceActiveFocus()
+      keyClick("/")
+      tryVerify(function() { return body.adding && body.search.active }, 2000)
+      // The stand-in names the six rows "Apple Inc." or "Nest Holdings
+      // Inc", so "inc" finds each of them, in the list's order. A search row
+      // is shorter than a list row, so a later one lies over its row's ×.
+      ;["I", "N", "C"].forEach(function(k) { keyClick(k) })
+      within(1000, function() { return body.search.ownCount >= 6 })
+      var rows = []
+      within(1000, function() {
+        rows = harness.findAll(body.search, "searchResult")
+        return rows.length === body.search.shown.length && rows.every(function(r) { return r.y === r.index * body.search.rowPitch })
+      })
+      // The first of the list's own whose search row lies over its row's ×.
+      var picked = "", at = null, geometry = []
+      rows.forEach(function(r) {
+        var cross = harness.find(watchlist.rowItem(r.modelData.symbol), "rowRemove")
+        var c = cross.mapToItem(body, cross.width / 2, cross.height / 2)
+        var top = r.mapToItem(body, 0, 0).y
+        if (!at && c.y > top + 2 && c.y < top + r.height - 2) { picked = r.modelData.symbol; at = c }
+        geometry.push(r.modelData.symbol + " row " + Math.round(top) + "-" + Math.round(top + r.height) + " x " + Math.round(c.x) + "," + Math.round(c.y))
+      })
+      var shown = false, kept = false, after = ""
+      if (at) {
+        mouseClick(body, at.x, at.y)
+        within(2000, function() { return !body.adding && service.featuredSymbol === picked && watchlist.cursorRow === picked })
+        wait(300)
+        var cross = harness.find(watchlist.rowItem(picked), "rowRemove")
+        shown = cross.visible
+        wait(Application.styleHints.mouseDoubleClickInterval + 50)
+        mouseClick(body, at.x, at.y)
+        wait(500)
+        kept = service.library.join(",") === library
+        var crossShown = function() { var row = watchlist.rowItem(picked); return !!row && harness.find(row, "rowRemove").visible }
+        // The first place the pointer is seen at after the rows show is no
+        // move (RowPointer), so it moves twice.
+        mouseMove(body, at.x + 3, at.y)
+        mouseMove(body, at.x + 6, at.y)
+        after = String(within(1000, crossShown))
+      }
+      hold("SEARCH.hold", false)
+      harness.check("a pick whose row comes to rest under the still pointer hides its × until the pointer moves, so a click there removes nothing",
+        !!at && !shown && kept && after === "true",
+        [picked || "no search row over its row's × (" + geometry.join("; ") + ", rows from " + Math.round(watchlist.mapToItem(body, 0, 0).y) + ", pitch " + watchlist.rowPitch + ")", "× shown " + shown, "kept " + kept, "after a move " + after, service.library.join(",")].join(" | "))
+      if (!kept) service.persist({ symbols: library.split(",") })
+      service.feature(featured)
+      body.resetInteraction()
+      mouseMove(body, 1, 1)
+    }
+
     function test_flows() {
       tryVerify(function() {
         return service.quotes.AAPL && service.quotes.MSFT && service.quotes.NVDA
@@ -1047,6 +1105,7 @@ Harness {
       previewKeepsItsFigures(body, keys)
       previewLeavesItsFigures(body, keys)
       earlyEnter(body, keys, held.kept)
+      pickUnderPointer(body, watchlist, keys)
       app.close()
       harness.finish()
     }

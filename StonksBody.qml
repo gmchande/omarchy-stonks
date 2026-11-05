@@ -60,6 +60,8 @@ Item {
   property bool landingJoined: false
   // A Show of a member still arriving: featured even if its first fetch fails.
   property bool landingShows: false
+  // Picked by a click: its row's × waits for the pointer to move.
+  property bool landingPointed: false
   // Each add is heard as its row joins, whatever is featured or added meanwhile.
   property var unheardAdds: []
   // The surface's colour, which a moving row carries.
@@ -807,11 +809,11 @@ Item {
 
   // An add joins the rows once its first answer is in, and is featured once
   // it and the list rest. A result already in the list is shown, not added.
-  function acceptSymbol(symbol) {
+  function acceptSymbol(symbol, pointed) {
     if (!service) return
     var s = String(symbol || "").trim().toUpperCase()
     if (view.rows.indexOf(s) >= 0) {
-      showSymbol(s)
+      showSymbol(s, pointed)
       return
     }
     if (putBack && s === putBack.symbol) {
@@ -827,6 +829,7 @@ Item {
     // After the preview has gone, whose hero was a choice, not a landing.
     landing = s
     landingShows = member
+    landingPointed = !!pointed
     if (!member) unheardAdds = unheardAdds.filter(function(a) { return a !== s }).concat([s])
     landingJoined = false
     land()
@@ -835,11 +838,11 @@ Item {
   // Show features the member before the preview ends, so the chart on show
   // never changes for it, and ends an add still landing itself: the hero may
   // already be the result, so `onFeaturedSymbolChanged` wouldn't.
-  function showSymbol(symbol) {
+  function showSymbol(symbol, pointed) {
     landing = ""
     service.feature(symbol)
     cancelAdding()
-    watchlist.select(symbol)
+    watchlist.select(symbol, pointed)
   }
 
   // Called once the rows show the service's latest view.
@@ -862,7 +865,7 @@ Item {
     if (!quotes[landing] && !failed) return
     if (!landingJoined) {
       landingJoined = true
-      watchlist.select(landing)
+      watchlist.select(landing, landingPointed)
     }
     featureLanding()
   }
@@ -1221,7 +1224,7 @@ Item {
     upColor: root.upColor
     downColor: root.downColor
     putBack: root.putBack
-    onPicked: function(symbol) { root.acceptSymbol(symbol) }
+    onPicked: function(symbol, pointed) { root.acceptSymbol(symbol, pointed) }
     onChose: function(symbol, result) { root.previewTo(symbol, result) }
     onCancelled: root.cancelAdding()
   }

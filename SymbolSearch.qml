@@ -128,7 +128,8 @@ FocusScope {
   }
   FontMetrics { id: symbolMetrics; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
 
-  signal picked(string symbol)
+  // `pointed`: picked by a click, so the pointer rests where the pick was.
+  signal picked(string symbol, bool pointed)
   signal chose(string symbol, var result)
   signal cancelled()
 
@@ -190,9 +191,9 @@ FocusScope {
   }
 
   // One of the list's own is taken at once, whatever Yahoo has said.
-  function accept(index) {
+  function accept(index, pointed) {
     if (index >= 0 && index < ownCount) {
-      picked(shown[index].symbol)
+      picked(shown[index].symbol, !!pointed)
       return
     }
     if (stale || (answer === "" && searchText.trim() !== "")) {
@@ -200,7 +201,7 @@ FocusScope {
       return
     }
     if (answer === "failed") retry()
-    else if (index >= 0 && index < shown.length) picked(shown[index].symbol)
+    else if (index >= 0 && index < shown.length) picked(shown[index].symbol, !!pointed)
   }
 
   // Asked once: a lookup of it still waiting on the typing pause goes now.
@@ -222,7 +223,7 @@ FocusScope {
   function take(index) {
     if (dimmed(index)) return
     showResult(index)
-    accept(index)
+    accept(index, true)
   }
 
   // An emptied field drops a search still out.
