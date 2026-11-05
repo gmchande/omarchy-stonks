@@ -912,6 +912,81 @@ Harness {
       service.feature(featured)
       body.resetInteraction()
       mouseMove(body, 1, 1)
+
+      // PUT BACK by a click: the row comes back at its place, which is
+      // chosen to lie under the offer, and waits the same way.
+      var searchTop = 0
+      keys.forceActiveFocus()
+      keyClick("/")
+      ;["I", "N", "C"].forEach(function(k) { keyClick(k) })
+      within(1000, function() {
+        var first = harness.findAll(body.search, "searchResult").filter(function(r) { return r.index === 0 && r.y === 0 })[0]
+        if (first) searchTop = first.mapToItem(body, 0, 0).y
+        return !!first
+      })
+      keyClick(Qt.Key_Escape)
+      var back = "", backAt = null
+      watchlist.displayedSymbols.forEach(function(symbol) {
+        var cross = harness.find(watchlist.rowItem(symbol), "rowRemove")
+        var c = cross.mapToItem(body, cross.width / 2, cross.height / 2)
+        if (!backAt && c.y > searchTop + 2 && c.y < searchTop + body.search.rowHeight - 2) { back = symbol; backAt = c }
+      })
+      var putShown = false, putKept = false, putAfter = ""
+      if (backAt) {
+        body.removeRow(back)
+        within(1000, function() { return service.library.indexOf(back) < 0 })
+        keys.forceActiveFocus()
+        keyClick("/")
+        within(1000, function() { return body.search.shown.length === 1 && body.search.shown[0].symbol === back })
+        mouseClick(body, backAt.x, backAt.y)
+        within(2000, function() { return !body.adding && service.library.indexOf(back) >= 0 && watchlist.cursorRow === back })
+        var backShown = function() { var row = watchlist.rowItem(back); return !!row && harness.find(row, "rowRemove").visible }
+        putShown = within(500, backShown)
+        watchlist.forgetClicks()
+        mouseClick(body, backAt.x, backAt.y)
+        putKept = !within(1000, function() { return service.library.indexOf(back) < 0 })
+        mouseMove(body, backAt.x + 3, backAt.y)
+        mouseMove(body, backAt.x + 6, backAt.y)
+        putAfter = String(within(1000, backShown))
+      }
+      harness.check("PUT BACK by a click whose row comes back under the still pointer hides its × until the pointer moves, so a click there removes nothing",
+        !!backAt && !putShown && putKept && putAfter === "true",
+        [back || "no row's × under the search's first row", "× shown " + putShown, "kept " + putKept, "after a move " + putAfter, service.library.join(",")].join(" | "))
+      if (service.library.indexOf(back) < 0) service.addSymbol(back)
+      body.resetInteraction()
+      mouseMove(body, 1, 1)
+
+      // An add by a click whose pointer moves over the rows before its row
+      // joins: the row shows its × as it lands.
+      hold("SHOP.TO.quote.hold", true)
+      keys.forceActiveFocus()
+      keyClick("/")
+      keyClick("S")
+      keyClick("H")
+      var shop = null
+      within(3000, function() {
+        shop = harness.findAll(body.search, "searchResult").filter(function(r) { return r.modelData.symbol === "SHOP.TO" && r.y === r.index * body.search.rowPitch })[0]
+        return body.search.resultsQuery === "SH" && !!shop
+      })
+      var landedShown = false
+      if (shop) {
+        var shopAt = shop.mapToItem(body, shop.width / 2, shop.height / 2)
+        mouseClick(body, shopAt.x, shopAt.y)
+        within(2000, function() { return !body.adding && service.arriving.indexOf("SHOP.TO") >= 0 })
+        var over = watchlist.rowItem(watchlist.displayedSymbols[1])
+        mouseMove(over, over.width / 2, over.height / 2)
+        mouseMove(over, over.width / 2 + 4, over.height / 2)
+        hold("SHOP.TO.quote.hold", false)
+        within(5000, function() { return watchlist.cursorRow === "SHOP.TO" && !watchlist.settling })
+        landedShown = within(1000, function() { var row = watchlist.rowItem("SHOP.TO"); return !!row && harness.find(row, "rowRemove").visible })
+      }
+      hold("SHOP.TO.quote.hold", false)
+      harness.check("an add by a click whose pointer moves over the rows before the row joins shows its × as it lands",
+        !!shop && landedShown, [!!shop, watchlist.cursorRow, landedShown].join(" | "))
+      service.removeSymbol("SHOP.TO")
+      service.feature(featured)
+      body.resetInteraction()
+      mouseMove(body, 1, 1)
     }
 
     function test_flows() {

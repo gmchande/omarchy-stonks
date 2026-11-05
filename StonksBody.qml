@@ -60,7 +60,8 @@ Item {
   property bool landingJoined: false
   // A Show of a member still arriving: featured even if its first fetch fails.
   property bool landingShows: false
-  // Picked by a click: its row's × waits for the pointer to move.
+  // Picked by a click: its row's × waits for the pointer to move, unless it
+  // moves over the rows before the row joins.
   property bool landingPointed: false
   // Each add is heard as its row joins, whatever is featured or added meanwhile.
   property var unheardAdds: []
@@ -621,7 +622,8 @@ Item {
   }
   onSaveFailedChanged: if (!saveFailed && note === stillUnsaved) clearNote()
 
-  function undoRemoval() {
+  // `pointed`: put back by a click, as PUT BACK in search can be (`select`).
+  function undoRemoval(pointed) {
     if (!service) return
     showingHelp = false
     if (!removal) {
@@ -631,7 +633,7 @@ Item {
     var symbol = removal.symbol
     service.undoRemoval(symbol)
     sound("undo")
-    watchlist.select(symbol)
+    watchlist.select(symbol, pointed)
   }
 
   // Ctrl+Z works long after the offer goes. Its time waits while the
@@ -818,7 +820,7 @@ Item {
     }
     if (putBack && s === putBack.symbol) {
       cancelAdding()
-      undoRemoval()
+      undoRemoval(pointed)
       return
     }
     var member = members.indexOf(s) >= 0
@@ -1194,6 +1196,7 @@ Item {
     }
     onMoveRefused: root.say("Switch to manual order to move rows")
     onListsRequested: function(symbol) { root.openSymbolLists(symbol) }
+    onPointerMoved: root.landingPointed = false
   }
 
   SymbolSearch {

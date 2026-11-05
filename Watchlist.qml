@@ -138,6 +138,8 @@ Flickable {
   signal moveRefused()
   signal arranged()
   signal rowRested(string symbol)
+  // The pointer moved over the rows.
+  signal pointerMoved()
 
   implicitHeight: rowsLength()
   contentWidth: width
@@ -200,6 +202,7 @@ Flickable {
       if (!root.surfaceOpen) return
       root.scrolledUnder = ""
       root.pointAt(x, y)
+      root.pointerMoved()
     }
   }
 
