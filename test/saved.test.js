@@ -176,7 +176,7 @@ test("a young listing's ranges start at its first trade and keep its thin trades
   }
 })
 
-test("a day with no bar says nothing against the trade its quote holds", () => {
+test("a day with no bar says nothing against the trade its quote holds, and a thin day's note counts every trade of its day", () => {
   // WREN at 09:37 on Friday 23 October: Yahoo's quote is its 09:30 trade,
   // 20.62 on 366 shares, and its day has no bar: no "No trades today"
   // under "1D 20.62 20.62 VOL 366".
@@ -188,6 +188,18 @@ test("a day with no bar says nothing against the trade its quote holds", () => {
   const cvr = M.parseChart(fixture("moments/power-user-2026-10-16/cvr.json"), cents)
   expect(M.dayNote(cvr, M.epochAt(US, "2026-10-16", "14:09"), calendars)).toBe("No trades today")
   expect(M.dayNote(cvr, M.epochAt(US, "2026-10-17", "12:00"), calendars)).toBe("No trades on Fri")
+  // CVR's Monday 26 October at 20:30, its 16:00 trade the session's last,
+  // with a night trade added at 21:00 on Sunday: by then the chart's start
+  // has slid past Sunday's trade, but the day traded twice, so nothing is
+  // said. With Sunday's trade alone, the chart draws none of the day and
+  // the note says the one trade it had.
+  const monday = M.parseChart(fixture("moments/watch-2026-10-26-1800/cvr.json"))
+  const cvrNight = traded("watch-2026-10-26-1800", fixture("moments/watch-2026-10-26-1800/robinhood-day.json").results.map(r => r.symbol)).CVR
+  const sundayTrade = { t: at("2026-10-25", "21:00"), p: 10.2, s: "overnight" }
+  const thin = points => M.dayChart({ ...monday, points }, { ...cvrNight, bars: [sundayTrade] }, calendars).day
+  const evening = at("2026-10-26", "20:30")
+  expect([thin(monday.points.slice(-1)), thin([])].map(day => [day.points.length, M.dayNote(day, evening, calendars)]))
+    .toEqual([[1, ""], [0, "Traded only at Sun 21:00"]])
 })
 
 test("the headline uses the regular quote or labels the last chart trade with its time", () => {

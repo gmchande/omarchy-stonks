@@ -146,15 +146,19 @@ function extendedStack(quote, latest, now, day, changeMode) {
 
 // A bar is five minutes of trades, so the words speak of the chart. One bar
 // is the only one once its day is over (`axis.closes` where a night follows);
-// before that it may be the first of many. An empty day says nothing before
-// its bell, as an index has no print before it, nor beside a quote that is a
-// trade of its session. Yahoo stamps its live moment at the price's own
-// second, apart from the bars at their five-minute starts.
+// before that it may be the first of many. They count every trade of the
+// day (`day.trades`), as its low and high do, though the chart's start may
+// have slid past some, and name the day of one that isn't today's. An empty
+// day says nothing before its bell, as an index has no print before it, nor
+// beside a quote that is a trade of its session. Yahoo stamps its live
+// moment at the price's own second, apart from the bars at their five-minute
+// starts.
 function dayNote(day, now, calendars) {
   if (!day) return ""
-  var pts = day.points
+  var pts = day.trades || day.points
   var over = now >= (day.axis && day.axis.closes ? day.axis.closes : Quote.dayEnd(day))
-  if (pts.length === 1) return pts[0].t % (5 * 60) === 0 && over ? "Traded only at " + Market.printClock(day, pts[0].t, calendars) : ""
+  if (pts.length === 1) return pts[0].t % (5 * 60) === 0 && over
+    ? "Traded only at " + Market.printDay(day, pts[0].t, now, calendars) + Market.printClock(day, pts[0].t, calendars) : ""
   if (pts.length > 1) return ""
   var regular = day.session.regular
   if (!regular) return "No trades today"
