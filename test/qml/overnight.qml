@@ -235,7 +235,7 @@ Harness {
         pressKey(Qt.Key_Left)
         walked.push(body.headerText)
       }
-      var crossed = body.scrubT === weekend.from - 300 && walked[walked.length - 2].indexOf("20:00") >= 0
+      var crossed = body.scrubT === weekend.from - 300 && walked.length > 1 && walked[walked.length - 2].indexOf("20:00") >= 0
       pressKey(Qt.Key_Right)
       var back = body.scrubT === weekend.to
       var landed = walked[walked.length - 1]
