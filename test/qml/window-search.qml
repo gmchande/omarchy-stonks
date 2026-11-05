@@ -891,14 +891,13 @@ Harness {
       if (at) {
         mouseClick(body, at.x, at.y)
         within(2000, function() { return !body.adding && service.featuredSymbol === picked && watchlist.cursorRow === picked })
-        wait(300)
-        var cross = harness.find(watchlist.rowItem(picked), "rowRemove")
-        shown = cross.visible
-        wait(Application.styleHints.mouseDoubleClickInterval + 50)
-        mouseClick(body, at.x, at.y)
-        wait(500)
-        kept = service.library.join(",") === library
         var crossShown = function() { var row = watchlist.rowItem(picked); return !!row && harness.find(row, "rowRemove").visible }
+        shown = within(500, crossShown)
+        // As a second click after the double-click interval, which a press
+        // within it would make one with the first.
+        watchlist.forgetClicks()
+        mouseClick(body, at.x, at.y)
+        kept = !within(1000, function() { return service.library.join(",") !== library })
         // The first place the pointer is seen at after the rows show is no
         // move (RowPointer), so it moves twice.
         mouseMove(body, at.x + 3, at.y)
