@@ -62,9 +62,10 @@ right-click it for the window, and drag it to move it along the bar.
 
 <img src="media/scrub.png" width="480" alt="The panel scrubbed back an hour and a half, to 10:15 in the morning. The price, the change, and the rows show that moment">
 
-Run the pointer along the chart to go back through the day. The price, the
-change, and the rows follow it. Click the icon at the top left to replay
-the chart.
+To see where a stock was at any moment, such as the morning's low, run the
+pointer along the chart. The price and the change follow it, and so do the
+rows, through the pre-market, the session and after hours. Click the icon
+at the top left to replay the chart.
 
 Pick a range under the chart, from 1D to ALL. Every stock then shows that
 range, even after a restart. The rows always show the day.
@@ -110,7 +111,8 @@ bright and the hours around it dim.
 
 For a US stock Robinhood trades at night, a day runs 24 hours, from its
 night's open the evening before (20:00, New York time) to the next. Through
-the night, until 04:00, the chart keeps the day that just closed and adds
+the night, until 04:00, the chart keeps the day that just closed, so it
+doesn't vanish at midnight while you're still reading it, and adds
 tonight's trades at its right end. Once the day's 24 hours are full, each
 five minutes added on the right takes five off the left, so nothing jumps.
 The session trading now is bright and the rest dim: the pre-market, the
@@ -211,8 +213,9 @@ switch, press `s`, or click the small chart icon at the top right.
 <img src="media/light.png" width="480" alt="The panel on Catppuccin Latte, a light theme, in Stonks' own green and red, made for a light background">
 
 Both use your theme's green for up and its red for down, on light themes
-too. Where a theme's pair is missing, too alike, or too faint, Stonks uses
-its own.
+too, and never its accent color, which Omarchy keeps for what's selected.
+Where a theme's pair is missing, too alike, or too faint, Stonks uses its
+own.
 
 ## Sounds
 
@@ -301,8 +304,8 @@ again.
   A thinly traded stock says "As of" when its last trade was more than two
   minutes ago. Overnight prices usually run 10 to 15 minutes behind, since
   Robinhood reports those trades late.
-- **A price looks wrong.** Check the currency: Stonks never converts.
-  PENCE means pence, as Yahoo quotes many London listings, so 3,580.00 is
+- **A price looks wrong.** Check the currency: Stonks never converts,
+  since a converted price is one nobody traded at. PENCE means pence, as Yahoo quotes many London listings, so 3,580.00 is
   £35.80. A US stock's large price is its newest trade, after the close
   too, with the close on the line under it. Elsewhere the large price is
   the regular session's, and the smaller line shows trades outside it.
@@ -327,9 +330,11 @@ again.
   36 minutes on.
 - **"Couldn't search · try other words".** Yahoo can't search for what you
   typed, such as an emoji. Type other words.
-- **"market hours unknown".** Stonks' calendar for this exchange has run
-  out, so it can't say when the market next opens. Prices and
-  times are still right. [Update Stonks](#update) for a new calendar.
+- **"market hours unknown".** Stonks carries each exchange's holidays and
+  early closes, and this exchange's calendar has run out. An early Stonks
+  worked out the next open for itself and got Labor Day wrong, so now it
+  says when it doesn't know. Prices and times are still right.
+  [Update Stonks](#update) for a new calendar.
 - **"Couldn't load your lists" in the footer.** Your lists file,
   `~/.config/omarchy/grvc.stonks.json`, can't be read or isn't valid JSON,
   often after a hand edit. Stonks won't write over it. Changes you make
@@ -354,7 +359,11 @@ and what your broker or the exchange showed then.
 
 Stonks isn't investment advice, and isn't affiliated with Yahoo or
 Robinhood. Yahoo's endpoints are unofficial, and Robinhood's data is for
-personal use, so either may change or stop without notice.
+personal use, so either may change or stop without notice. Stonks uses
+them because when we looked, in September 2026, no other free source
+without a key had live prices, the day's chart and years of history
+together. Robinhood's prices fill the night, from 20:00 to 04:00 New York
+time, when Yahoo's charts are empty.
 
 <details>
 <summary>The commands it runs, the sites it asks, and the files it writes</summary>
