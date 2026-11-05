@@ -294,6 +294,8 @@ Harness {
       tryVerify(function() { return panel.testCard.drawnHeight === panel.testCard.contentHeight }, 2000)
       Style.reduceMotion = true
       panel.open()
+      // Whole from the open: no draw-in begins.
+      var whole = panel.testBody.motion.reveal === 1 && !panel.testBody.motion.drawingIn
       grab.source = panel.testCard.surface
       grab.begin("still-open")
       moreFrames(15)
@@ -307,13 +309,16 @@ Harness {
       grab.judge("same:" + [Math.round(at.x), Math.round(at.y), Math.round(chart.width), Math.round(chart.height)].join(","), grab.frames.slice(3), [])
       tryVerify(function() { return grab.verdict !== null }, 10000)
       var opened = grab.verdict
-      filmed("with animations off, the panel opens whole and still", opened.ok, opened)
+      filmed("with animations off, the panel opens whole and still", opened.ok && whole, opened, whole ? "" : " | a draw-in began")
+      var before = panel.fittedCardHeight
       service.switchList("Short")
       waitForRendering(panel.testCard.surface)
       grab.begin("still-switch")
       moreFrames(12)
       var switched = verdict("edgeheld")
-      filmed("with animations off, a switch to a shorter list moves the edge at once", switched.ok && service.listName === "Short", switched)
+      var moved = panel.fittedCardHeight !== before && edgeAtRest()
+      filmed("with animations off, a switch to a shorter list moves the edge at once",
+        switched.ok && moved && service.listName === "Short", switched, moved ? "" : " | the switch moved no edge: " + before + " -> " + panel.fittedCardHeight)
       service.switchList("")
       panel.close()
       Style.reduceMotion = false

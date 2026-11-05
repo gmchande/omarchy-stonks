@@ -191,7 +191,7 @@ function groundUnder(a, b) {
 // sooner changes nothing; then an ease to 0.4 of the ink (0.33 to 0.47),
 // on the shell's curve over about 160 ms, read off it as an edge's is
 // (`timeAt(p)` a straight line in time), starting within a few frames of
-// `delay`, through at least three distinct partial frames, never back,
+// `delay`, through at least two distinct partial frames, never back,
 // within a trace of its end once the curve has ended, and from 100 ms
 // after that the same picture on every frame: what was held stays still.
 // Coming back: the same ease, from about 0.4 to whole, from the mark.
@@ -216,8 +216,8 @@ function dim(frames, delay) {
   const distinct = new Set(partial.map(f => f.p.toFixed(2))).size
   // A share is read off every pixel, not a column's step: the curve reads
   // to 0.97 of the way, and from two frames, since the shell's curve is 0.97
-  // of the way in 0.4 of its time and a busy machine's frames come 9 to 50 ms
-  // apart.
+  // of the way in about half its time and a busy machine's frames come 9 to
+  // 50 ms apart.
   const line = partial.filter(f => f.p < 0.97).map(f => ({ t: f.t, y: 1 - timeAt(f.p) }))
   const median = values => values.sort((a, b) => a - b)[Math.floor(values.length / 2)]
   const slopes = []

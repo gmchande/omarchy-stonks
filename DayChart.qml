@@ -351,9 +351,16 @@ Item {
   property string rippledPrice: ""
   property bool rippleOwed: false
   property bool opening: false
-  // With the shell's animations off, the dot stays still.
   function ripple() {
-    if (!root.live || !dot.visible || root.still || Style.reduceMotion) return
+    if (!root.live || !dot.visible || root.still) return
+    // With the shell's animations off, the dot stays still, and the price
+    // counts as rippled for: animations back on, it never ripples for it.
+    if (Style.reduceMotion) {
+      root.rippleOwed = false
+      root.rippledPrice = root.newestPrice
+      root.opening = false
+      return
+    }
     if (!root.rippleOwed && root.newestPrice === root.rippledPrice) return
     // A restart's stop of a paused burst would end `opening`; an open's
     // ripples keep it.

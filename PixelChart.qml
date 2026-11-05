@@ -293,9 +293,16 @@ Item {
   property string blinkedPrice: ""
   property bool blinkOwed: false
   property bool opening: false
-  // With the shell's animations off, the cap stays lit.
   function blink() {
-    if (!root.live || !cap.visible || root.still || Style.reduceMotion) return
+    if (!root.live || !cap.visible || root.still) return
+    // With the shell's animations off, the cap stays lit, and the price
+    // counts as blinked for: animations back on, it never blinks for it.
+    if (Style.reduceMotion) {
+      root.blinkOwed = false
+      root.blinkedPrice = root.newestPrice
+      root.opening = false
+      return
+    }
     if (!root.blinkOwed && root.newestPrice === root.blinkedPrice) return
     // A restart's stop of a paused burst would end `opening`; an open's blinks
     // keep it.
