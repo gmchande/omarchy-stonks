@@ -66,6 +66,32 @@ Item {
   signal undoClicked()
   signal updateClicked()
 
+  // A button as the shell draws one (Ui/Button.qml, `bordered`): the
+  // theme's border at rest, the cursor's border and fill under the pointer,
+  // the pressed fill, and a little give while held. `mouse` is its own.
+  component FooterButton: BorderSurface {
+    property MouseArea mouse: null
+    property bool acts: true
+    property bool retro: false
+    property color foreground: Commons.Color.foreground
+    readonly property bool hot: acts && !!mouse && mouse.containsMouse
+    radius: retro ? 0 : Style.cornerRadius
+    color: !acts || !mouse ? "transparent"
+      : mouse.pressed ? Style.pressedFillFor(foreground, Commons.Color.accent)
+      : hot ? Style.hoverFillFor(foreground, Commons.Color.accent) : "transparent"
+    Behavior on color { ColorAnimation { duration: Style.duration(120) } }
+    borderSpec: !acts ? Border.none()
+      : Border.controlSpec(hot ? "hover-cursor" : "normal", foreground, Commons.Color.accent)
+    scale: acts && !!mouse && mouse.pressed ? 0.97 : 1
+    Behavior on scale {
+      NumberAnimation {
+        duration: Style.duration(160)
+        easing.type: Easing.Bezier
+        easing.bezierCurve: Style.easeOut
+      }
+    }
+  }
+
   // Measured even while the hint is hidden, so the surface can judge whether
   // it fits.
   readonly property int hintRoom: hint !== "" ? hintText.implicitHeight + Style.space(6) : 0
@@ -133,22 +159,15 @@ Item {
     font.pixelSize: Style.font.bodySmall
   }
 
-  PanelSeparator {
-    y: root.hintHeight
-    width: root.width - root.gutter
-    foreground: root.foreground
-    strength: 0.08
-  }
-
-  Rectangle {
+  FooterButton {
     objectName: "footerFill"
     anchors.fill: parent
     anchors.topMargin: root.hintHeight + Style.space(6)
     anchors.rightMargin: root.gutter + root.undoRoom
-    radius: root.retro ? 0 : Style.cornerRadius
-    color: !root.acts ? "transparent"
-      : addMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
-      : addMouse.containsMouse ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
+    mouse: addMouse
+    acts: root.acts
+    retro: root.retro
+    foreground: root.foreground
 
     // Centred on the whole bar, so the end button coming or going moves
     // nothing, unless the words would run into it.
@@ -204,6 +223,8 @@ Item {
     MouseArea {
       id: addMouse
       anchors.fill: parent
+      // Undoes the press's give, so a press near the edge still counts.
+      scale: 1 / parent.scale
       hoverEnabled: true
       cursorShape: root.acts ? Qt.PointingHandCursor : Qt.ArrowCursor
       onClicked: root.clicked()
@@ -212,7 +233,7 @@ Item {
     }
   }
 
-  Rectangle {
+  FooterButton {
     objectName: "footerUndo"
     visible: root.sideLabel !== ""
     anchors.top: parent.top
@@ -221,10 +242,10 @@ Item {
     anchors.right: parent.right
     anchors.rightMargin: root.gutter
     width: root.undoRoom - Style.space(4)
-    radius: root.retro ? 0 : Style.cornerRadius
     opacity: root.undoing ? root.undoOpacity : 1
-    color: undoMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
-      : undoMouse.containsMouse ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
+    mouse: undoMouse
+    retro: root.retro
+    foreground: root.foreground
 
     Text {
       id: undoText
@@ -240,6 +261,7 @@ Item {
     MouseArea {
       id: undoMouse
       anchors.fill: parent
+      scale: 1 / parent.scale
       hoverEnabled: true
       cursorShape: Qt.PointingHandCursor
       onClicked: root.undoing ? root.undoClicked() : root.updateClicked()
