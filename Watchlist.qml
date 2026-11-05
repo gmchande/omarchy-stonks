@@ -8,6 +8,7 @@ import "Chart.js" as Chart
 import "Figures.js" as Figures
 import "Settings.js" as Settings
 import "Tones.js" as Tones
+import "Motion.js" as Motion
 // The scrolling rows: cursor, drag, scroll and wheel. Surfaces pass data in
 // and save what the signals ask. One row for each symbol in All: a list
 // hides the rows it lacks, so a switch builds nothing.
@@ -178,9 +179,9 @@ Flickable {
     id: glide
     target: root
     property: "contentY"
-    duration: Style.duration(160)
+    duration: Motion.duration(Style, 160)
     easing.type: Easing.Bezier
-    easing.bezierCurve: Style.easeOut
+    easing.bezierCurve: Motion.curve(Style)
   }
 
   // Longer than the glide, so a stream of ticks never snaps mid-scroll.
@@ -638,9 +639,9 @@ Flickable {
     id: dropAnim
     target: root
     property: "dragY"
-    duration: Style.duration(160)
+    duration: Motion.duration(Style, 160)
     easing.type: Easing.Bezier
-    easing.bezierCurve: Style.easeOut
+    easing.bezierCurve: Motion.curve(Style)
     onFinished: root.cancelDrag()
   }
 
@@ -678,7 +679,7 @@ Flickable {
           shift += (from - place) * root.rowPitch
           slide.restart()
         }
-        NumberAnimation { id: slide; target: rowDelegate; property: "shift"; to: 0; duration: Style.duration(160); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut }
+        NumberAnimation { id: slide; target: rowDelegate; property: "shift"; to: 0; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
         moving: lifted || slide.running
         ground: root.ground
         z: lifted ? rowRepeater.count + 2 : (slide.running ? 1 + travel + (cursor ? 0.5 : 0) : 0)
@@ -735,8 +736,8 @@ Flickable {
           travel = Math.max(travel, Math.round(Math.abs(shift) / root.rowPitch))
           slide.restart()
         }
-        NumberAnimation { id: fadeIn; target: rowDelegate; property: "opacity"; to: 1; duration: Style.duration(160); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut }
-        NumberAnimation { id: drawIn; target: rowDelegate; property: "reveal"; from: 0; to: 1; duration: Style.duration(320); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut }
+        NumberAnimation { id: fadeIn; target: rowDelegate; property: "opacity"; to: 1; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
+        NumberAnimation { id: drawIn; target: rowDelegate; property: "reveal"; from: 0; to: 1; duration: Motion.duration(Style, 320); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
         width: parent.width
         // A row more than a row out of sight keeps the quote it showed, so
         // answers repaint only rows in sight; it takes the latest before the

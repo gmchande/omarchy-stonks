@@ -6,6 +6,7 @@ import qs.Commons
 import qs.Commons as Commons
 import "Tones.js" as Tones
 import "KeyText.js" as KeyText
+import "Motion.js" as Motion
 
 // The list menu: All and each named list, then "New list…" and "Manage
 // lists…", pinned under the lists.
@@ -113,9 +114,9 @@ FocusScope {
     id: settle
     target: scroll
     property: "contentY"
-    duration: Style.duration(160)
+    duration: Motion.duration(Style, 160)
     easing.type: Easing.Bezier
-    easing.bezierCurve: Style.easeOut
+    easing.bezierCurve: Motion.curve(Style)
     // Settled under a still pointer, the cursor takes the row now under it.
     onFinished: if (root.active && pointer.hovered) root.pointAt(pointer.scenePosition.x, pointer.scenePosition.y)
   }
@@ -259,7 +260,7 @@ FocusScope {
             anchors.fill: parent
             radius: root.retro ? 0 : Style.cornerRadius
             color: entry.isCursor ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
-            Behavior on color { ColorAnimation { duration: Style.duration(60) } }
+            Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
           }
 
           CursorBar {
@@ -351,7 +352,7 @@ FocusScope {
         visible: !root.naming
         radius: root.retro ? 0 : Style.cornerRadius
         color: root.cursor === root.newIndex ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
-        Behavior on color { ColorAnimation { duration: Style.duration(60) } }
+        Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
       }
 
       CursorBar {
@@ -444,7 +445,7 @@ FocusScope {
         anchors.fill: parent
         radius: root.retro ? 0 : Style.cornerRadius
         color: manageRow.isCursor ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
-        Behavior on color { ColorAnimation { duration: Style.duration(60) } }
+        Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
       }
 
       CursorBar {

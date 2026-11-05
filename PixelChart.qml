@@ -4,6 +4,7 @@ import QtQuick
 import qs.Commons
 import qs.Commons as Commons
 import "Tones.js" as Tones
+import "Motion.js" as Motion
 // The retro chart, one rule for the day and every range: columns of cells
 // fill from the baseline row, in the up colour above it and the down colour
 // below. The day adds dimmer hours, the bell and the night's edges, and the
@@ -277,13 +278,13 @@ Item {
       onRunningChanged: if (!running) { cap.opacity = 1; root.opening = false }
 
       PropertyAction { target: cap; property: "opacity"; value: 1 }
-      PauseAnimation { duration: Style.duration(700) }
+      PauseAnimation { duration: Motion.duration(Style, 700) }
       PropertyAction { target: cap; property: "opacity"; value: 0.5 }
-      PauseAnimation { duration: Style.duration(160) }
+      PauseAnimation { duration: Motion.duration(Style, 160) }
       PropertyAction { target: cap; property: "opacity"; value: 0 }
-      PauseAnimation { duration: Style.duration(480) }
+      PauseAnimation { duration: Motion.duration(Style, 480) }
       PropertyAction { target: cap; property: "opacity"; value: 0.5 }
-      PauseAnimation { duration: Style.duration(160) }
+      PauseAnimation { duration: Motion.duration(Style, 160) }
     }
   }
 

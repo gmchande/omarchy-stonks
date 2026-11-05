@@ -4,6 +4,7 @@ import QtQuick
 import qs.Commons
 import qs.Commons as Commons
 import "Cells.js" as Cells
+import "Motion.js" as Motion
 // The look a click switches to, as a button shows what pressing it does: the
 // chart already shows the current look. Stonks' mark in cells (`StonksMark`)
 // in smooth, the same shape as a curve in retro. As the look changes, the
@@ -35,7 +36,7 @@ Item {
     step.start()
   }
   onStillChanged: if (still && step.running) step.pause()
-  NumberAnimation { id: step; target: root; property: "cells"; duration: Style.duration(200); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut }
+  NumberAnimation { id: step; target: root; property: "cells"; duration: Motion.duration(Style, 200); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
 
   function settle() {
     step.stop()

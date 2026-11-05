@@ -7,6 +7,7 @@ import "Chart.js" as Chart
 import "Figures.js" as Figures
 import "Format.js" as Format
 import "Tones.js" as Tones
+import "Motion.js" as Motion
 // A row, set as Apple's Stocks sets one: symbol over name, price over
 // change, the day line between.
 Rectangle {
@@ -88,7 +89,7 @@ Rectangle {
   border.color: Style.normalBorderFor(foreground, Commons.Color.accent)
 
   // The shell's hover speed (CursorSurface).
-  Behavior on color { ColorAnimation { duration: Style.duration(60) } }
+  Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
 
   Rectangle {
     objectName: "rowGround"
@@ -223,7 +224,7 @@ Rectangle {
             radius: row.retro ? 0 : Style.cornerRadius
             color: removeButton.hovered && mouse.pressed && mouse.pressedOnRemove && !mouse.dragged ? Style.pressedFillFor(row.foreground, Commons.Color.accent)
               : removeButton.hovered ? Style.hoverFillFor(row.foreground, Commons.Color.accent) : "transparent"
-            Behavior on color { ColorAnimation { duration: Style.duration(60) } }
+            Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
           }
 
           // Smooth: ×.

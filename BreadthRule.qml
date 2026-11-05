@@ -5,6 +5,7 @@ import qs.Commons
 import qs.Commons as Commons
 import "Cells.js" as Cells
 import "Tones.js" as Tones
+import "Motion.js" as Motion
 
 // The rule between the list's name and its order, drawn as the list's
 // breadth: rows up in the up colour from the left, rows down in the down
@@ -89,15 +90,15 @@ Item {
     showBreadth()
   }
 
-  NumberAnimation { id: upEase; target: root; property: "upShare"; duration: Style.duration(160); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut }
-  NumberAnimation { id: downEase; target: root; property: "downShare"; duration: Style.duration(160); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut }
+  NumberAnimation { id: upEase; target: root; property: "upShare"; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
+  NumberAnimation { id: downEase; target: root; property: "downShare"; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
 
   HoverHandler { id: hover }
 
   Item {
     anchors.fill: parent
     opacity: root.revealed ? 0 : 1
-    Behavior on opacity { NumberAnimation { duration: Style.duration(160); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut } }
+    Behavior on opacity { NumberAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
 
     Rectangle {
       visible: !root.retro
@@ -153,7 +154,7 @@ Item {
     objectName: "breadthCounts"
     anchors.centerIn: parent
     opacity: root.revealed ? 1 : 0
-    Behavior on opacity { NumberAnimation { duration: Style.duration(160); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut } }
+    Behavior on opacity { NumberAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
     textFormat: Text.PlainText
     text: root.counts
     color: root.dim

@@ -3,6 +3,7 @@ import Quickshell
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "Motion.js" as Motion
 
 // The panel's card in a plain window, for the offscreen platform, where the
 // shell's KeyboardPanel, a layer-shell PanelWindow, does not load. Only the
@@ -29,7 +30,9 @@ FloatingWindow {
   property bool open: false
   property Item focusTarget: null
 
-  // The card's height on screen: it snaps just after an open, then eases.
+  // From Omarchy 4.5's card, which lib.sh's card_window drops for a shell
+  // whose card has none: the card's height on screen, which snaps just after
+  // an open, then eases.
   property real drawnHeight: contentHeight
   property bool heightLive: false
   Behavior on drawnHeight {
@@ -45,6 +48,14 @@ FloatingWindow {
     interval: 60
     onTriggered: root.heightLive = root.open
   }
+  Connections {
+    target: root
+    function onOpenChanged() {
+      root.heightLive = false
+      if (root.open) heightSettle.restart()
+    }
+  }
+  // The end of 4.5's card height.
   default property alias contentItem: contentHolder.children
   readonly property alias card: card
   // The window's picture, for FrameGrab: the window's own content item has
@@ -77,9 +88,9 @@ FloatingWindow {
     id: showing
     enabled: root.fades
     NumberAnimation {
-      duration: Style.duration(showing.targetValue > 0 ? 180 : 120)
+      duration: Motion.duration(Style, showing.targetValue > 0 ? 180 : 120)
       easing.type: Easing.Bezier
-      easing.bezierCurve: Style.easeOut
+      easing.bezierCurve: Motion.curve(Style)
     }
   }
   visible: open || shown > 0
@@ -87,11 +98,7 @@ FloatingWindow {
   implicitWidth: contentWidth + 40
   implicitHeight: 900
 
-  onOpenChanged: {
-    heightLive = false
-    if (open) heightSettle.restart()
-    if (open && focusTarget) Qt.callLater(function() { root.focusTarget.forceActiveFocus() })
-  }
+  onOpenChanged: if (open && focusTarget) Qt.callLater(function() { root.focusTarget.forceActiveFocus() })
 
   Item {
     id: surface

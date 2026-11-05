@@ -3,6 +3,7 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 import "Tones.js" as Tones
+import "Motion.js" as Motion
 
 // The pinned "+ Add a symbol" bar. A note there says for a moment why a key
 // did nothing; a notice says, until it is fixed, what needs fixing. Painted
@@ -57,9 +58,9 @@ Item {
     property: "coveredOpacity"
     from: 0
     to: 1
-    duration: Style.duration(160)
+    duration: Motion.duration(Style, 160)
     easing.type: Easing.Bezier
-    easing.bezierCurve: Style.easeOut
+    easing.bezierCurve: Motion.curve(Style)
   }
 
   signal clicked()
@@ -79,15 +80,15 @@ Item {
     color: !acts || !mouse ? "transparent"
       : mouse.pressed ? Style.pressedFillFor(foreground, Commons.Color.accent)
       : hot ? Style.hoverFillFor(foreground, Commons.Color.accent) : "transparent"
-    Behavior on color { ColorAnimation { duration: Style.duration(120) } }
+    Behavior on color { ColorAnimation { duration: Motion.duration(Style, 120) } }
     borderSpec: !acts ? Border.none()
       : Border.controlSpec(hot ? "hover-cursor" : "normal", foreground, Commons.Color.accent)
     scale: acts && !!mouse && mouse.pressed ? 0.97 : 1
     Behavior on scale {
       NumberAnimation {
-        duration: Style.duration(160)
+        duration: Motion.duration(Style, 160)
         easing.type: Easing.Bezier
-        easing.bezierCurve: Style.easeOut
+        easing.bezierCurve: Motion.curve(Style)
       }
     }
   }

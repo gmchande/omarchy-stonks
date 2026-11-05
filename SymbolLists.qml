@@ -5,6 +5,7 @@ import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Commons as Commons
 import "Tones.js" as Tones
+import "Motion.js" as Motion
 
 // A symbol's lists, in the rows' place: a tick box for each list, All first.
 FocusScope {
@@ -243,7 +244,7 @@ FocusScope {
             radius: root.retro ? 0 : Style.cornerRadius
             color: rowMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
               : entry.index === root.cursor ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
-            Behavior on color { ColorAnimation { duration: Style.duration(60) } }
+            Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
           }
 
           CursorBar {

@@ -5,6 +5,7 @@ import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Commons as Commons
 import "Tones.js" as Tones
+import "Motion.js" as Motion
 
 // Manage lists, in the rows' place: rename, reorder, and delete the named
 // lists. All comes first and can't change.
@@ -312,7 +313,7 @@ FocusScope {
             height: root.itemHeight
             radius: root.retro ? 0 : Style.cornerRadius
             color: entry.isCursor ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
-            Behavior on color { ColorAnimation { duration: Style.duration(60) } }
+            Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
           }
 
           CursorBar {

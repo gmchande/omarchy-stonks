@@ -8,8 +8,7 @@
 # HOME and curl are scratch.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree lists.qml
-cp "$here/CardWindow.qml" "$root/plugin/"
-patch_copy plugin/Panel.qml 's/^  KeyboardPanel {$/  CardWindow {/'
+card_window
 patch_copy plugin/Panel.qml '/readonly property int panelWidth:/a\  readonly property var testBody: root.body'
 patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property var testBody: root.body\n  readonly property alias testKeyCatcher: keyCatcher\n  readonly property alias testWindow: window'
 # The flows wait for the quote feed to go quiet: nothing in flight or queued.

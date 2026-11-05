@@ -3,6 +3,7 @@ import qs.Commons
 import qs.Commons as Commons
 import "Chart.js" as Chart
 import "Tones.js" as Tones
+import "Motion.js" as Motion
 // The smooth chart, one rule for the day and every range: a dashed baseline at
 // the price the change is measured from, and the line and its wash in the up
 // colour above it and the down colour below, as the retro columns fall. The day
@@ -338,10 +339,10 @@ Item {
       onRunningChanged: if (!running) { halo.scale = 1; halo.opacity = 0.25; root.opening = false }
 
       ParallelAnimation {
-        NumberAnimation { target: halo; property: "scale"; from: 1; to: 2.2; duration: Style.duration(1400); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut }
-        NumberAnimation { target: halo; property: "opacity"; from: 0.35; to: 0; duration: Style.duration(1400); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut }
+        NumberAnimation { target: halo; property: "scale"; from: 1; to: 2.2; duration: Motion.duration(Style, 1400); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
+        NumberAnimation { target: halo; property: "opacity"; from: 0.35; to: 0; duration: Motion.duration(Style, 1400); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
       }
-      PauseAnimation { duration: Style.duration(600) }
+      PauseAnimation { duration: Motion.duration(Style, 600) }
     }
   }
 

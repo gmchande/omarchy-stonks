@@ -44,6 +44,14 @@ export STONKS_FAKE_STATE="$work/state"
 mkdir -p "$HOME/.config/omarchy" "$STONKS_FAKE_STATE"
 root=""
 code=0
+# The shell a harness runs the plugin on: the installed one, or the Ui and
+# Commons of another, named by STONKS_SHELL (test/old-shell.sh's Omarchy
+# 4.0.6, which Stonks still works on).
+shell="${STONKS_SHELL:-/usr/share/omarchy/shell}"
+if [ ! -f "$shell/Ui/KeyboardPanel.qml" ]; then
+  echo "FAIL no shell at $shell"
+  exit 1
+fi
 
 # feed_tree HARNESS FILE...: copies of just the named plugin files, so a
 # feed loads without the shell's Ui and Commons. Copies, so a script can
@@ -69,10 +77,23 @@ plugin_tree() {
   mkdir -p "$root/plugin"
   cp "$plugin"/*.qml "$plugin"/*.js "$plugin/calendars.json" "$plugin/manifest.json" "$root/plugin/"
   cp -r "$plugin/sounds" "$root/plugin/"
-  ln -s /usr/share/omarchy/shell/Ui /usr/share/omarchy/shell/Commons "$root/"
+  ln -s "$shell/Ui" "$shell/Commons" "$root/"
   cp "$here/$1" "$root/shell.qml"
   cp "$here/HarnessExit.qml" "$here/Harness.qml" "$here/Steps.qml" "$root/"
   patch_copy plugin/WindowHost.qml 's/readonly property var monitors: Hyprland.monitors.values/property var monitors: []/'
+}
+
+# card_window: the panel's card in CardWindow.qml, a plain window, as the
+# shell sizes it: on a shell whose card has no drawnHeight, such as Omarchy
+# 4.0's, the card takes the height it's given at once.
+card_window() {
+  cp "$here/CardWindow.qml" "$root/plugin/"
+  patch_copy plugin/Panel.qml 's/^  KeyboardPanel {$/  CardWindow {/'
+  if ! grep -q 'property real drawnHeight' "$shell/Ui/KeyboardPanel.qml"; then
+    patch_copy plugin/CardWindow.qml '/^  \/\/ From Omarchy 4.5.s card/,/^  \/\/ The end of 4.5.s card height\.$/d'
+    patch_copy plugin/CardWindow.qml 's/^      height: root.drawnHeight$/      height: root.contentHeight/'
+    patch_copy plugin/CardWindow.qml '/^      clip: root.drawnHeight/d'
+  fi
 }
 
 # frame_tools: FrameGrab.qml beside the harness, a folder for its frames,

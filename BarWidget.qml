@@ -10,6 +10,7 @@ import "Figures.js" as Figures
 import "Format.js" as Format
 import "Release.js" as Release
 import "Tones.js" as Tones
+import "Motion.js" as Motion
 // The pill: the stock you last looked at, with its day's line and change
 // whatever range the panel or the window shows.
 BarWidget {
@@ -156,7 +157,7 @@ BarWidget {
   SequentialAnimation {
     id: refreshAcknowledgement
     PropertyAction { target: root; property: "opacity"; value: 0.55 }
-    NumberAnimation { target: root; property: "opacity"; to: 1; duration: Style.duration(160); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut }
+    NumberAnimation { target: root; property: "opacity"; to: 1; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
   }
 
   function persistBarStyle(next) {
@@ -246,10 +247,11 @@ BarWidget {
 
     // What the pill draws takes the button's press, as the shell's own bar
     // icons do (BarIconButton): held down, it gives a little, while the hit
-    // area and the bar's layout hold still.
+    // area and the bar's layout hold still. Omarchy 4.0's bar icons don't
+    // give, and its button has no `pressScale`.
     Row {
       id: content
-      scale: button.pressScale
+      scale: button.pressScale || 1
       anchors.centerIn: parent
       anchors.verticalCenterOffset: root.vertical ? -root.markRoom / 2 : 0
       spacing: Style.space(6)
@@ -293,7 +295,7 @@ BarWidget {
         font.family: button.fontFamily
         font.pixelSize: Style.font.icon
         rotation: root.featured ? -Figures.arrowAngle(root.featured.pct) : 0
-        Behavior on rotation { NumberAnimation { duration: Style.duration(160); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut } }
+        Behavior on rotation { NumberAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
       }
 
       // The day's animal, the same in both looks, one cell a pixel. Without
@@ -417,7 +419,7 @@ BarWidget {
     Text {
       id: sideMark
       objectName: "pillCopyMarkUnder"
-      scale: button.pressScale
+      scale: button.pressScale || 1
       visible: root.marked && root.vertical
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.bottom: parent.bottom
@@ -432,7 +434,7 @@ BarWidget {
     // four characters.
     Column {
       objectName: "pillStack"
-      scale: button.pressScale
+      scale: button.pressScale || 1
       visible: root.vertical && !root.iconOnly
       anchors.centerIn: parent
       anchors.verticalCenterOffset: -root.markRoom / 2

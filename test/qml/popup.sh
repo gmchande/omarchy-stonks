@@ -6,8 +6,7 @@
 # as keys.sh does: nothing maps on the desktop.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree popup.qml
-cp "$here/CardWindow.qml" "$root/plugin/"
-patch_copy plugin/Panel.qml 's/^  KeyboardPanel {$/  CardWindow {/'
+card_window
 patch_copy plugin/Panel.qml '/readonly property int panelWidth:/a\  readonly property var testWatchlist: root.body ? root.body.watchlist : null\n  readonly property var testBody: root.body\n  readonly property alias testKeyCatcher: keyCatcher\n  readonly property alias testBodyKeys: bodyKeys'
 patch_copy plugin/BarWidget.qml '/readonly property var panel: panelLoader.item/a\  readonly property alias testButton: button'
 export STONKS_WATCHLIST_FIXTURE="$STONKS_FIXTURES/list-22.json"

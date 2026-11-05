@@ -7,9 +7,8 @@
 # puts the card in CardWindow.qml. HOME and curl are scratch.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree keys.qml
-cp "$here/CardWindow.qml" "$root/plugin/"
 cp "$plugin/README.md" "$root/"
-patch_copy plugin/Panel.qml 's/^  KeyboardPanel {$/  CardWindow {/'
+card_window
 patch_copy plugin/Panel.qml '/readonly property int panelWidth:/a\  readonly property var testBody: root.body\n  readonly property alias testKeyCatcher: keyCatcher'
 patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property var testBody: root.body\n  readonly property alias testKeyCatcher: keyCatcher'
 # r reaches the service's refresh, counted: a refresh of quotes this fresh

@@ -3,6 +3,7 @@ import qs.Commons
 import "Chart.js" as Chart
 import "History.js" as History
 import "Quote.js" as Quote
+import "Motion.js" as Motion
 // The chart a surface shows, the moment it shows (the scrub, and the replay
 // that drives it), and the one motion, a draw-in from the left, for every
 // change of chart. It decides once per change of the view the surface holds,
@@ -51,9 +52,9 @@ Item {
     id: dimAnim
     target: root
     property: "dimmed"
-    duration: Style.duration(160)
+    duration: Motion.duration(Style, 160)
     easing.type: Easing.Bezier
-    easing.bezierCurve: Style.easeOut
+    easing.bezierCurve: Motion.curve(Style)
   }
 
   readonly property bool historyActive: !!chart && chart.range !== "1D"
@@ -88,7 +89,7 @@ Item {
   // What plays alongside keeps to it, and to its InOutSine. With the
   // shell's animations off it is 0, and a replay shows the whole chart at
   // once, with no sound.
-  readonly property int replayDuration: Style.duration(2000)
+  readonly property int replayDuration: Motion.duration(Style, 2000)
   // Said before its first frame, so what plays alongside starts with it.
   signal replayStarted(real from, real to)
   // Stopped, or held by a closing surface; one that runs to its end says
@@ -234,9 +235,9 @@ Item {
     property: "reveal"
     from: 0
     to: 1
-    duration: Style.duration(320)
+    duration: Motion.duration(Style, 320)
     easing.type: Easing.Bezier
-    easing.bezierCurve: Style.easeOut
+    easing.bezierCurve: Motion.curve(Style)
   }
 
   NumberAnimation {
