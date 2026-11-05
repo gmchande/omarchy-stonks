@@ -97,11 +97,13 @@ from the chart's dashed line, the close before the day on the chart, so the
 number, the line, the bull or bear, the rows and the pill agree. Since the
 open, it runs from that day's open instead. Under the price are the last
 close and its day's move, CLOSE 153.27 ▼3.45%, which names the day once it
-has passed, as MON CLOSE. On 1D, under the move is the move since that
-close, named by the newest trade's session: AFTER HOURS ▲1.35% until 20:00,
-then OVERNIGHT. On a longer range the chart ends on that price, and the
-move is the range's, up to it, with the range's name under it. Elsewhere, a
-smaller line under the price shows the pre-market or after-hours price.
+has passed, as MON CLOSE. When the price on top is that close's, the line
+just says CLOSE, so the price and move aren't said twice. On 1D, under the
+move is the move since that close, named by the newest trade's session:
+AFTER HOURS ▲1.35% until 20:00, then OVERNIGHT. On a longer range the chart
+ends on that price, and the move is the range's, up to it, with the range's
+name under it. Elsewhere, a smaller line under the price shows the
+pre-market or after-hours price.
 
 The 1D chart shows one trading day, each price at its time, from the
 day's first trade, or the open if that's earlier, to the day's end while

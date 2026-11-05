@@ -89,14 +89,14 @@ function barDate(history, bar) {
 }
 
 // The picture's words, from what the surface shows (`newest` is the price on
-// top at rest; `scrubT` is 0 at rest):
+// top at rest, `top` the price and move drawn large; `scrubT` is 0 at rest):
 //   when: the price's time and zone, a scrub outside the regular session
-//   named by its session, and on a range its date;
+//   named by its session, and on a range its date; with a move since the
+//   close, that price's session alone, followed by the move (since,
+//   sinceTone) and its time (sinceTime), as in OVERNIGHT −0.73% · 00:50 EDT;
 //   from: what the change is measured from, as the dashed line; on a range,
 //   the range;
-//   extended: the line under the price, as the panel shows it; since: the
-//   move since the close, named by its session, as the panel says it under
-//   the change;
+//   extended: the line under the price, as the panel shows it;
 //   currency: none beside an index's level, which isn't money;
 //   start, end: the day's axis's ends;
 //   span: on the day, the date its move belongs to (after midnight, the close
@@ -107,7 +107,7 @@ function words(o) {
   var quote = o.quote
   var digits = quote.priceDigits
   var at = moment(o)
-  var out = { when: "", from: "", extended: "", extendedTone: "flat", since: "", sinceTone: "flat", start: "", end: "", span: "", said: "",
+  var out = { when: "", from: "", extended: "", extendedTone: "flat", since: "", sinceTone: "flat", sinceTime: "", start: "", end: "", span: "", said: "",
     currency: quote.instrumentType === "INDEX" ? "" : Figures.currencyLabel(String(quote.currency || "")) }
   if (at.bar) {
     out.when = barDate(o.history, at.bar)
@@ -150,16 +150,20 @@ function words(o) {
       out.end = (last.d !== first.d ? Format.WEEKDAYS[last.weekday].toUpperCase() + " " : "") + last.clock
     }
   }
-  // The panel's line under the price, as it shows it, and the move since the
-  // close it shows under the change, which a range or a mode's period takes
-  // the place of.
+  // The panel's line under the price, as it shows it. The move since the
+  // close, which a range or a mode's period takes the place of, joins the
+  // line that names its session, worded as the panel words it.
   if (!o.scrubT && o.newest) {
-    var below = Figures.closeLine(quote, Figures.exchangeDay(quote, o.now), o.changeMode)
+    var below = Figures.closeLine(quote, Figures.exchangeDay(quote, o.now), o.changeMode, o.top)
     var caption = Figures.captionLine(quote, o.newest, o.changeMode, o.history ? String(o.range) : Format.changeCaption(o.changeMode), false)
-    out.extended = below.label + " · " + below.price + " " + below.changeText
+    out.extended = below.label + (below.price ? " · " + below.price + " " + below.changeText : "")
     out.extendedTone = below.tone
-    out.since = caption.changeText ? caption.label + " " + caption.changeText : ""
-    out.sinceTone = caption.tone
+    if (caption.changeText) {
+      out.when = caption.label
+      out.since = caption.changeText
+      out.sinceTone = caption.tone
+      out.sinceTime = clockOf(quote, o.newest.t, o.calendars)
+    }
     return out
   }
   var ext = !o.scrubT ? Figures.extendedStack(quote, o.latest, o.now, o.day, o.changeMode) : null

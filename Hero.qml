@@ -53,7 +53,7 @@ Item {
   readonly property bool newestOld: Figures.newestStale(newest, now)
   // A scrub's price is a past one, so the line rests and the baseline's legend
   // takes its place.
-  readonly property var extended: newest ? Figures.closeLine(quote, Figures.exchangeDay(quote, now), changeMode)
+  readonly property var extended: newest ? Figures.closeLine(quote, Figures.exchangeDay(quote, now), changeMode, view)
     : quote && !scrubbing ? Figures.extendedStack(quote, latest, now, day, changeMode) : null
   readonly property string priceText: view ? view.priceText
     : (freshness && freshness.state === "failed" ? "—" : "…")
@@ -266,6 +266,7 @@ Item {
       font.letterSpacing: 1
     }
     Text {
+      visible: text !== ""
       textFormat: Text.PlainText
       text: root.extended ? root.extended.price : ""
       color: extendedLine.old ? root.dim : root.foreground
@@ -274,6 +275,7 @@ Item {
       font.bold: true
     }
     Text {
+      visible: text !== ""
       textFormat: Text.PlainText
       text: root.extended ? Format.lookSigns(root.extended.changeText, root.retro) : ""
       color: extendedLine.old ? root.dim : root.toneColor(root.extended ? root.extended.tone : "flat")

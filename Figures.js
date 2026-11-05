@@ -333,9 +333,13 @@ function closeLabel(quote, today) {
 
 // The line under the price with the newest price on top: the last close and
 // its day's move, CLOSE 171.99 −5.68%, or MON CLOSE once that day is past.
-function closeLine(quote, today, changeMode) {
+// Where they would only repeat the price and the move on top (`shown`), as
+// when nothing has moved since the close, it names that price alone: CLOSE.
+function closeLine(quote, today, changeMode, shown) {
   var row = rowModel(quote, 0, changeMode === "abs" ? "abs" : "pct")
-  return { label: closeLabel(quote, today), time: "", price: row.priceText, changeText: row.changeText, tone: row.tone, stale: false }
+  var same = row.priceText === shown.priceText && row.changeText === shown.changeText
+  return { label: closeLabel(quote, today), time: "", price: same ? "" : row.priceText, changeText: same ? "" : row.changeText,
+    tone: same ? "flat" : row.tone, stale: false }
 }
 
 // The caption under the change. A range's or a mode's period comes first,
