@@ -149,9 +149,11 @@ Item {
   property var entries: ({})
   // Each listing's newest price since its close.
   property var newestPrints: ({})
-  // Robinhood's answers, for the day each row's line draws.
+  // Robinhood's answers, for the day each row's line draws, and the clock
+  // that slides its start, held still while the surface is closed.
   property var nights: ({})
   property var allDay: ({})
+  property int slideAt: 0
   property var previewEntries: ({})
   // Each symbol's cap and P/E, and the currency rates P/Es need.
   property var fundamentalEntries: ({})
@@ -191,6 +193,7 @@ Item {
   Binding on newestPrints { when: root.reading; value: root.service?.newestPrints; restoreMode: Binding.RestoreNone }
   Binding on nights { when: root.reading; value: root.service?.nights; restoreMode: Binding.RestoreNone }
   Binding on allDay { when: root.reading; value: root.service?.allDay; restoreMode: Binding.RestoreNone }
+  Binding on slideAt { when: root.reading; value: root.service?.viewSlideAt ?? 0; restoreMode: Binding.RestoreNone }
   Binding on previewEntries { when: root.reading; value: root.service?.previewEntries; restoreMode: Binding.RestoreNone }
   Binding on fundamentalEntries { when: root.reading; value: root.service?.fundamentals; restoreMode: Binding.RestoreNone }
   Binding on rates { when: root.reading; value: root.service?.rates; restoreMode: Binding.RestoreNone }
@@ -1149,6 +1152,7 @@ Item {
     newestPrints: root.newestPrints
     nights: root.nights
     allDay: root.allDay
+    slideAt: root.slideAt
     entries: root.entries
     featuredSymbol: root.featuredSymbol
     scrubShown: root.watchlistScrubShown

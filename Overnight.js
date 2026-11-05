@@ -317,12 +317,13 @@ function dayWindow(cal, date) {
 }
 
 // Until the open the day starts with its night, at 20:00 the evening before.
-// From the open its start slides toward its own midnight five minutes at a
-// time, as tonight slides in at night, reaching it as many hours after the
-// open as the night held before midnight: at 13:30. Read from the prints'
-// reach, never the clock.
-function slidWindow(win, open, reach) {
-  var slid = reach !== null && reach > open ? Math.floor((reach - open) / SLOT) * SLOT : 0
+// From the open its start slides toward its own midnight by the shell's clock
+// (`slideAt`, five minutes at a time), as tonight slides in at night,
+// reaching it as many hours after the open as the night held before
+// midnight: at 13:30. A quiet stock's trades come when they come, so the
+// clock, not its newest print, moves the start.
+function slidWindow(win, open, slideAt) {
+  var slid = slideAt > open ? Math.floor((slideAt - open) / SLOT) * SLOT : 0
   return Object.assign({}, win, { start: Math.min(win.midnight, win.start + slid) })
 }
 
@@ -416,8 +417,11 @@ function litFrom(points, evening, over) {
 }
 
 // `day` is shaped as a quote, so the chart and a scrub read it as they
-// read Yahoo's; the day's figures stay the quote's.
-function dayChart(quote, answer, calendars) {
+// read Yahoo's; the day's figures stay the quote's. `slideAt` slides the
+// day's start (`slidWindow`); without it, as where only the newest price is
+// wanted (`Chart.newestPrints`) or a harness gives no clock, the newest print
+// stands in for it.
+function dayChart(quote, answer, calendars, slideAt) {
   var cal = Market.calendarFor(calendars, quote)
   if (!cal || !cal.overnight || !quote.session.regular) return { day: quote, latest: null }
   var all = prints(quote, answer.bars)
@@ -427,7 +431,7 @@ function dayChart(quote, answer, calendars) {
   var win = evening || chartWindow(cal, quote, latest)
   if (!win) return { day: quote, latest: latest }
   var session = windowSession(cal, quote, win)
-  if (!evening) win = slidWindow(win, session.regular.start, reach)
+  if (!evening) win = slidWindow(win, session.regular.start, slideAt > 0 ? slideAt : reach)
   var own = session === quote.session
   var points = all.filter(function(p) { return p.t >= win.start })
   var opened = marketDay(cal, win.date).start

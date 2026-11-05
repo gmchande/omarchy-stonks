@@ -1843,6 +1843,31 @@ test("the 1D chart is the trading day: from its night's open the evening before 
   const startAt = through => M.chartSpan(M.dayChart({ ...silk, points: silk.points.filter(p => p.t <= silkOpen) },
     { bars: silkNight.bars.filter(b => b.t <= silkOpen), through }, calendars).day).start
   expect([startAt(silkOpen), startAt(silkOpen + 300)]).toEqual([at("2026-10-01", "20:00"), at("2026-10-01", "20:05")])
+  // A quiet day and night slide by the clock, five minutes at a time. Nebius
+  // on Monday 26 October, thinned to five trades by day and three by night,
+  // read as a running shell holds it every five minutes from 04:10 to 03:55
+  // on Tuesday: by day Robinhood answered once, after 04:00, so its newest
+  // slot stays 04:05; by night it answers every five minutes, its newest slot
+  // five minutes old, quiet ones included. The left edge never moves more
+  // than five minutes at a time: at noon it is 22:30 though the last trade
+  // came at 09:35, never jumping when the 14:00 trade comes.
+  const quiet = savedDay("watch-2026-10-27-0130", "nbis")
+  const sparse = ["04:30", "09:35", "14:00", "16:00", "18:00"].map(c => at("2026-10-26", c))
+  const quietDay = quiet.points.filter(p => sparse.includes(p.t))
+  const robinhood = set => traded(set, fixture(`moments/${set}/robinhood-day.json`).results.map(r => r.symbol)).NBIS
+  const joinedNights = [robinhood("watch-2026-10-26-2005"), robinhood("watch-2026-10-27-0130")].flatMap(n => n.bars)
+  const quietNight = [at("2026-10-25", "21:00"), at("2026-10-26", "22:00"), at("2026-10-27", "00:30")].map(t => joinedNights.find(b => b.t === t))
+  expect([quietDay.length, quietNight.every(Boolean)]).toEqual([5, true])
+  const starts = []
+  for (let t = at("2026-10-26", "04:10"); t <= at("2026-10-27", "03:55"); t += 300) {
+    const through = t < at("2026-10-26", "20:00") ? at("2026-10-26", "04:05") : t - 300
+    const day = M.dayChart({ ...quiet, points: quietDay.filter(p => p.t + 300 <= t) }, { bars: quietNight.filter(b => b.t <= through), through }, calendars, t).day
+    starts.push([t, M.chartSpan(day).start])
+  }
+  const steps = starts.slice(1).map(([t, start], k) => [t, start - starts[k][1]]).filter(([, step]) => step < 0 || step > 300)
+  expect(steps).toEqual([])
+  expect([at("2026-10-26", "12:00"), at("2026-10-26", "15:00"), at("2026-10-27", "01:30")].map(t => starts.find(s => s[0] === t)[1]))
+    .toEqual([at("2026-10-25", "22:30"), at("2026-10-26", "00:00"), at("2026-10-26", "05:30")])
 })
 
 test("through a night, until 04:00, the chart keeps the day that closed with tonight at its end, measured from the close before that day", () => {

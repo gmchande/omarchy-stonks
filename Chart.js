@@ -17,14 +17,14 @@
 // fetch is an answer: a quote's shows the symbol alone, and a range's has the
 // day stand in (`failed`). `latest` is the newest print of all, or null where
 // the quote's own last print is it.
-function viewChart(symbol, range, quotes, entries, histories, nights, allDay, calendars) {
+function viewChart(symbol, range, quotes, entries, histories, nights, allDay, calendars, slideAt) {
   if (!symbol) return null
   var quote = quotes[symbol] || null
   var quoteFailed = !quote && !!entries[symbol] && entries[symbol].status === "failed"
   if (!quote && !quoteFailed) return null
   var chart = { symbol: symbol, range: range, quote: quote, day: null, latest: null, history: null, failed: false, allDay: false }
   if (quote) {
-    var drawn = dayDrawn(symbol, quote, nights, allDay, calendars)
+    var drawn = dayDrawn(symbol, quote, nights, allDay, calendars, slideAt)
     if (drawn.waiting && range === "1D") return null
     chart.day = drawn.day
     chart.latest = drawn.latest
@@ -42,12 +42,13 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
 
 // The day the chart, a row's line and the pill's draw, so all three show one.
 // For a US stock or ETF Robinhood trades all day, the newest print's trading
-// day with its night (`Overnight.dayChart`); for one it doesn't, Yahoo's own
+// day with its night (`Overnight.dayChart`), its start slid by `slideAt`, the
+// shell's clock five minutes at a time; for one it doesn't, Yahoo's own
 // (`Overnight.sessionDay`); `waiting` until Robinhood says which. Without
 // `allDay`, as in a harness that stubs the service, Yahoo's own. Any other
 // listing's is its quote's day, or the coming day once it has a print
 // (`Quote.tailDay`): London's or Tokyo's stays the last until its first bar.
-function dayDrawn(symbol, quote, nights, allDay, calendars) {
+function dayDrawn(symbol, quote, nights, allDay, calendars, slideAt) {
   var out = { day: Quote.tailDay(quote) || quote, latest: null, allDay: false, waiting: false }
   if (!Overnight.hasOvernight(quote, calendars)) return out
   var tradability = allDay ? allDay[symbol] : { allDay: false }
@@ -55,7 +56,7 @@ function dayDrawn(symbol, quote, nights, allDay, calendars) {
   out.allDay = !!tradability && tradability.allDay
   if (tradability && !tradability.allDay) out.day = Overnight.sessionDay(quote)
   else if (tradability && night) {
-    var built = Overnight.dayChart(quote, night, calendars)
+    var built = Overnight.dayChart(quote, night, calendars, slideAt)
     out.day = built.day
     out.latest = built.latest
   } else out.waiting = true
@@ -64,8 +65,8 @@ function dayDrawn(symbol, quote, nights, allDay, calendars) {
 
 // Null while the day waits on Robinhood, as the chart does, so a line draws
 // once, in the shape it keeps until a new price changes it.
-function lineDay(symbol, quote, nights, allDay, calendars) {
-  var drawn = dayDrawn(symbol, quote, nights, allDay, calendars)
+function lineDay(symbol, quote, nights, allDay, calendars, slideAt) {
+  var drawn = dayDrawn(symbol, quote, nights, allDay, calendars, slideAt)
   return drawn.waiting ? null : drawn.day
 }
 

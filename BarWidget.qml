@@ -36,10 +36,10 @@ BarWidget {
   readonly property string newestNote: featured && featured.newest
     ? Figures.newestNote(featuredQuote, featured.newest, service.now, service.calendars) : ""
   readonly property string newestPhase: featured && featured.newest ? featured.newest.phase : ""
-  // The day the 1D chart draws, once Robinhood has said which, so the clock
-  // never redraws it.
+  // The day the 1D chart draws, once Robinhood has said which. Only the
+  // five-minute clock that slides its start redraws it, never the second.
   readonly property var lineDay: featuredQuote
-    ? Chart.lineDay(featuredSymbol, featuredQuote, service.nights, service.allDay, service.calendars) : null
+    ? Chart.lineDay(featuredSymbol, featuredQuote, service.nights, service.allDay, service.calendars, service.slideAt) : null
   readonly property var lineGeometry: lineDay && lineDay.points.length ? Chart.chartGeometry(lineDay, service.calendars) : null
   // The right section, among the bar's bare icons, and a side bar each keep
   // a form of their own, the icon until a middle-click picks another, as the
