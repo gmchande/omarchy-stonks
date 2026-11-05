@@ -4,7 +4,7 @@ import qs.Commons as Commons
 import qs.Ui
 import "Tones.js" as Tones
 
-// The pinned "+ Add a symbol" bar. A note there says for a moment why a key
+// The pinned "+ Find or add a symbol" bar. A note there says for a moment why a key
 // did nothing; a notice says, until it is fixed, what needs fixing. Painted
 // in its surface's ground, it covers the rows it passes on a growing edge.
 Item {
@@ -26,9 +26,7 @@ Item {
   property bool showsHint: true
   // A click does something: the add, or the notice's own action.
   property bool acts: true
-  property string label: "+  Add a symbol"
-  // Shown where `label` won't fit, as beside an undo; "" when there is none.
-  property string labelShort: ""
+  property string label: "+  Find or add a symbol"
   property color ground: "transparent"
   // "Undo NVDA", or "" for none.
   property string undoLabel: ""
@@ -163,13 +161,6 @@ Item {
         horizontalItemAlignment: Grid.AlignHCenter
 
         Text {
-          id: fullWords
-          visible: false
-          textFormat: Text.PlainText
-          text: root.note !== "" ? root.note : root.notice !== "" ? root.notice : root.label
-          font: footerWords.font
-        }
-        Text {
           id: footerWords
           objectName: "footerText"
           readonly property real room: root.width - root.gutter - root.undoRoom - Style.space(20)
@@ -179,7 +170,7 @@ Item {
           // Cut short, it ends against its action, not a gap's width away.
           horizontalAlignment: Text.AlignRight
           textFormat: Text.PlainText
-          text: root.note === "" && root.notice === "" && root.labelShort !== "" && fullWords.implicitWidth > room ? root.labelShort : fullWords.text
+          text: root.note !== "" ? root.note : root.notice !== "" ? root.notice : root.label
           color: root.note !== "" || root.notice !== "" ? root.foreground : root.dim
           opacity: root.note !== "" ? root.noteOpacity : root.coveredOpacity
           font.family: root.fontFamily
