@@ -1083,7 +1083,7 @@ Harness {
         // On the same sweep, the footer's add on a named list, beside an
         // undo and once it goes: where the add doesn't fit beside it, it
         // says less, and never cuts the list's name.
-        var named = "+  Find or add a symbol in My Watchlist"
+        var named = "+  Find or add in My Watchlist"
         var addWords = find(body, "footerText")
         var addCut = []
         var addShort = []
@@ -2497,10 +2497,12 @@ Harness {
           { symbol: "SHOP.TO", name: "Shopify Inc.", exchange: "TSX" },
           { symbol: "SHHI.NE", name: "Ninepoint Shopify High Income", exchange: "NEO" }
         ]
-        var answer = function(results) {
+        // `query` names no stock in the list, so Yahoo's answer alone is
+        // there to take.
+        var answer = function(results, query) {
           body.search.results = results
-          body.search.searchText = "SHOP"
-          body.search.resultsQuery = "SHOP"
+          body.search.searchText = query
+          body.search.resultsQuery = query
           body.search.answer = results.length ? "results" : "none"
         }
         var listsBefore = stub.lists
@@ -2509,11 +2511,11 @@ Harness {
         // `enter`: the one marked as Enter's, or "" for none.
         var views = [
           { name: "search", scope: body.search, enter: "", open: function() { body.startAdding() }, close: function() { body.cancelAdding() } },
-          { name: "search with results", scope: body.search, enter: "searchAdd", open: function() { body.startAdding(); answer(shopResults) }, close: function() { body.cancelAdding() } },
-          { name: "search with none", scope: body.search, enter: "", open: function() { body.startAdding(); answer([]) }, close: function() { body.cancelAdding() } },
+          { name: "search with results", scope: body.search, enter: "searchAdd", open: function() { body.startAdding(); answer(shopResults, "SHOPX") }, close: function() { body.cancelAdding() } },
+          { name: "search with none", scope: body.search, enter: "", open: function() { body.startAdding(); answer([], "ZZZ") }, close: function() { body.cancelAdding() } },
           // An earlier query's answer, dimmed: nothing in it can be taken.
           { name: "search with a stale answer", scope: body.search, enter: "",
-            open: function() { body.startAdding(); answer(shopResults); body.search.searchText = "SHOPI" }, close: function() { body.cancelAdding() } },
+            open: function() { body.startAdding(); answer(shopResults, "SHOPX"); body.search.searchText = "SHOPXY" }, close: function() { body.cancelAdding() } },
           { name: "a symbol's lists", scope: find(body, "symbolLists"), enter: "", open: function() { body.openSymbolLists("MZ") }, close: function() { body.closeListViews() } },
           { name: "manage lists", scope: manage, enter: "renameAction", open: function() { body.openManageLists() }, close: function() { body.closeListViews() } },
           { name: "renaming a list", scope: manage, enter: "saveName", open: function() { body.openManageLists(); manage.startRenaming(2) }, close: function() { body.closeListViews() } },

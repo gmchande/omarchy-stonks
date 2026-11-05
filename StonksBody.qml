@@ -1319,7 +1319,7 @@ Item {
     hint: root.hint
     showsHint: root.hintShown
     ground: root.ground
-    label: root.listName !== "" ? "+  Find or add a symbol in " + root.listName : "+  Find or add a symbol"
+    label: root.listName !== "" ? "+  Find or add in " + root.listName : "+  Find or add a symbol"
     labelShort: root.listName !== "" ? "+  Find or add a symbol" : ""
     acts: !root.settingsUnreadable
     onHoveredChanged: root.holdNote()
