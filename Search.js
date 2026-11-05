@@ -6,8 +6,11 @@
 
 var SEARCH_URL = "https://query2.finance.yahoo.com/v1/finance/search"
 
+// Yahoo's answers asked for, and the most of the list's own shown above them.
+var SHOWN_RESULTS = 8
+
 function searchUrl(query) {
-  return SEARCH_URL + "?q=" + encodeURIComponent(query) + "&quotesCount=8&newsCount=0"
+  return SEARCH_URL + "?q=" + encodeURIComponent(query) + "&quotesCount=" + SHOWN_RESULTS + "&newsCount=0"
 }
 
 // Why a lookup failed, from its answer (`Fetch.answers`), or none: "none"
@@ -85,4 +88,25 @@ function searchName(q) {
   while (spaces < name.length - 1 && /\s/.test(name.charAt(name.length - 2 - spaces))) spaces++
   var lettered = spaces >= 2 && /[A-Z]/.test(name.charAt(name.length - 1))
   return (lettered ? name.slice(0, -1) : name).trim()
+}
+
+// The list's own stocks a query names, at most as many as Yahoo is asked
+// for: a symbol it spells first, then symbols that start with it, then
+// names with a word that does, each group in the list's order. It reads
+// nothing but the list, so it answers as each letter lands.
+function ownMatches(query, symbols, quotes) {
+  var q = String(query || "").trim().toLowerCase()
+  if (q === "") return []
+  var exact = []
+  var bySymbol = []
+  var byName = []
+  for (var i = 0; i < symbols.length; i++) {
+    var symbol = symbols[i]
+    var lower = symbol.toLowerCase()
+    var quote = quotes[symbol]
+    if (lower === q) exact.push(symbol)
+    else if (lower.indexOf(q) === 0) bySymbol.push(symbol)
+    else if (quote && (" " + String(quote.name || "").toLowerCase()).indexOf(" " + q) >= 0) byName.push(symbol)
+  }
+  return exact.concat(bySymbol, byName).slice(0, SHOWN_RESULTS)
 }

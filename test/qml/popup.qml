@@ -421,7 +421,7 @@ Harness {
       var secondHint = harness.hintLine(popup)
       popup.close()
       harness.check("the first panel visit shows the hint beside the add action, opened before the service was ready, and the next does not",
-        harness.openedUnready && firstHint.indexOf(harness.hintStart) === 0 && firstFooter === "+  Add a symbol"
+        harness.openedUnready && firstHint.indexOf(harness.hintStart) === 0 && firstFooter === "+  Find or add a symbol"
           && secondHint === "",
         [harness.openedUnready, firstHint, firstFooter, secondHint].join("|"))
 

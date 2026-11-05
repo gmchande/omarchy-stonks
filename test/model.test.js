@@ -1935,3 +1935,20 @@ test("a version is newer number by number, and a manifest names one only whole",
   expect(R.manifestVersion('{ "version": "9.9.9" }')).toBe("9.9.9")
   expect([R.manifestVersion('{\n  "id": "grvc.st'), R.manifestVersion('{ "id": "grvc.stonks" }')]).toEqual(["", ""])
 })
+
+test("search finds the list's own stocks by symbol or by a word of their name, the symbol typed first", () => {
+  const quotes = { "^GSPC": { name: "S&P 500" }, SPY: { name: "SPDR S&P 500 ETF Trust" }, VOO: { name: "Vanguard S&P 500 ETF" },
+    GOOG: { name: "Alphabet Inc." }, S: { name: "SentinelOne, Inc." }, "SHOP.TO": { name: "Shopify Inc." } }
+  const list = ["^GSPC", "SPY", "VOO", "GOOG", "SHOP.TO", "S", "SNOW"]
+  expect(M.ownMatches("s&p", list, quotes)).toEqual(["^GSPC", "SPY", "VOO"])
+  expect(M.ownMatches("alph", list, quotes)).toEqual(["GOOG"])
+  // An exact symbol before those it starts, those before names; SNOW,
+  // still loading, by its symbol alone.
+  expect(M.ownMatches("S ", list, quotes)).toEqual(["S", "SPY", "SHOP.TO", "SNOW", "^GSPC", "VOO"])
+  // "ph" starts no word: Alphabet isn't found inside one.
+  expect(M.ownMatches("ph", list, quotes)).toEqual([])
+  expect(M.ownMatches(" ", list, quotes)).toEqual([])
+  // No more than Yahoo is asked for, so its answers stay in reach below.
+  const long = Array.from({ length: 20 }, (_, i) => "A" + i)
+  expect(M.ownMatches("a", long, {}).length).toBe(M.SHOWN_RESULTS)
+})

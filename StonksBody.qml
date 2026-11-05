@@ -11,6 +11,7 @@ import "KeyText.js" as KeyText
 import "Market.js" as Market
 import "Overnight.js" as Overnight
 import "Quote.js" as Quote
+import "Search.js" as Search
 import "Settings.js" as Settings
 import "Share.js" as Share
 import "Tones.js" as Tones
@@ -384,6 +385,14 @@ Item {
     Figures.listBreadth(view.rows, quotes, watchlistScrubShown, changeMode, newestPrints))
   readonly property alias watchlist: watchlist
   readonly property alias search: search
+  // The list's own stocks the search names, each with the move its row
+  // shows at rest. Asked only while search is open.
+  readonly property var ownFound: adding ? Search.ownMatches(search.searchText, members, quotes).map(function(symbol) {
+    var quote = quotes[symbol]
+    var row = quote ? Figures.rowModel(quote, 0, changeMode, newestPrints[symbol] || null) : null
+    return { symbol: symbol, name: quote ? quote.name : "", exchange: quote ? quote.exchange : "",
+      move: row ? Format.lookSigns(row.changeLine, retro) : "", tone: row ? row.tone : "flat" }
+  }) : []
   readonly property alias chartItem: heroBand.chartItem
   readonly property alias motion: motion
 
@@ -499,7 +508,7 @@ Item {
     else if (key === Qt.Key_Return || key === Qt.Key_Enter) featureSymbol(watchlist.cursorRow)
     else if (key === Qt.Key_Delete || key === Qt.Key_Backspace) removeRow(watchlist.cursorRow)
     else if (t === "?") toggleHelp()
-    else if (t === "a") startAdding()
+    else if (t === "a" || t === "/") startAdding()
     else if (t === "c") cycleChangeMode()
     else if (t === "r") refreshRequested()
     else if (t === "[") stepRange(-1)
@@ -1208,6 +1217,9 @@ Item {
     // Short, so a list's name fits the panel's field.
     placeholder: root.listName !== "" ? "Symbol or company for " + root.listName + "…" : "Symbol or company…"
     members: root.members
+    own: root.ownFound
+    upColor: root.upColor
+    downColor: root.downColor
     putBack: root.putBack
     onPicked: function(symbol) { root.acceptSymbol(symbol) }
     onChose: function(symbol, result) { root.previewTo(symbol, result) }
@@ -1307,8 +1319,8 @@ Item {
     hint: root.hint
     showsHint: root.hintShown
     ground: root.ground
-    label: root.listName !== "" ? "+  Add a symbol to " + root.listName : "+  Add a symbol"
-    labelShort: root.listName !== "" ? "+  Add a symbol" : ""
+    label: root.listName !== "" ? "+  Find or add a symbol in " + root.listName : "+  Find or add a symbol"
+    labelShort: root.listName !== "" ? "+  Find or add a symbol" : ""
     acts: !root.settingsUnreadable
     onHoveredChanged: root.holdNote()
     undoLabel: root.undoOffered ? "Undo " + root.undoOffered.symbol : ""

@@ -1071,7 +1071,7 @@ Harness {
         text() + action() + "|" + service.changeMode + "|" + body.adding)
       harness.writeFile(harness.dataPath, good)
       harness.check("fixed, the window's footer is the add again",
-        within(5000, function() { return text().indexOf("+  Add a symbol") === 0 }), text())
+        within(5000, function() { return text().indexOf("+  Find or add a symbol") === 0 }), text())
       service.switchList("")
       service.deleteList("Short")
     }

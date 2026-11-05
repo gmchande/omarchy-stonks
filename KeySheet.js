@@ -9,7 +9,7 @@ function sheet(order, switchesPanels) {
     { key: "↑ ↓", does: "Move the selection" },
     { key: "⏎", does: "Show the row's chart" },
     { key: "Ctrl+⏎", does: "Choose the row's lists" },
-    { key: "a", does: "Add a symbol" },
+    { key: "a /", does: "Find or add a symbol" },
     { key: "Del ⌫", does: "Remove the selected row" },
     { key: "Ctrl+Z", does: "Undo a removal" }
   ]

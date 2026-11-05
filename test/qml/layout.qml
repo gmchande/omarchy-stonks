@@ -1083,7 +1083,7 @@ Harness {
         // On the same sweep, the footer's add on a named list, beside an
         // undo and once it goes: where the add doesn't fit beside it, it
         // says less, and never cuts the list's name.
-        var named = "+  Add a symbol to My Watchlist"
+        var named = "+  Find or add a symbol in My Watchlist"
         var addWords = find(body, "footerText")
         var addCut = []
         var addShort = []
@@ -1121,7 +1121,7 @@ Harness {
               body.undoOffered = null
               wait(1)
               var alone = addWords.text + (addWords.truncated ? " (cut)" : "")
-              if (alone !== named || (beside !== named && beside !== "+  Add a symbol"))
+              if (alone !== named || (beside !== named && beside !== "+  Find or add a symbol"))
                 addCut.push(where + beside + " / " + alone)
               if (beside !== named) addShort.push(where.trim())
             }
@@ -1148,7 +1148,7 @@ Harness {
           closures > 50 && unnamed.length === 0 && roomless.length === 0,
           closures + " closures | " + unnamed.join(" | ") + " | " + roomless.slice(0, 12).join(" | ") + (roomless.length > 12 ? " | … " + roomless.length : ""))
         console.log("the add said less beside the undo: " + addShort.join(", "))
-        root.check("on a named list the footer's add reads whole, or beside an undo it has no room beside \"+ Add a symbol\", never cut, and whole again once the undo goes, in the panel and the window at its widest and narrowest, at every text size from 9 to 20, and in the panel with its spacing kept",
+        root.check("on a named list the footer's add reads whole, or beside an undo it has no room beside \"+ Find or add a symbol\", never cut, and whole again once the undo goes, in the panel and the window at its widest and narrowest, at every text size from 9 to 20, and in the panel with its spacing kept",
           addCut.length === 0, addCut.slice(0, 12).join(" | "))
 
         // NBIS at 17:58, after hours on its close's own day: the line under

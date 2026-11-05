@@ -779,6 +779,58 @@ Harness {
         [offered, byEnter, joined, offline, paused, byClick, heldByProbe, byItself, closed].join(" ; "))
     }
 
+    // The list's own stocks lead search as each letter lands, each with its
+    // row's move: / opens it, and Enter shows one with its row selected
+    // before Yahoo is asked. Yahoo's answer joins below them and leaves the
+    // choice where it was, and a click on one of them shows it too.
+    function ownFirst(body, watchlist, keys) {
+      var library = service.library.join(",")
+      var featured = service.featuredSymbol
+      hold("SEARCH.hold", true)
+      var asked = harness.calls("SEARCH.asked")
+      keys.forceActiveFocus()
+      keyClick("/")
+      tryVerify(function() { return body.adding && body.search.active }, 2000)
+      keyClick("M")
+      keyClick("S")
+      var row = watchlist.rowItem("MSFT")
+      var led = within(1000, function() { return body.search.shown.length === 1 && body.search.shown[0].symbol === "MSFT" })
+      var top = harness.find(body.search, "searchResult")
+      led = [led, body.search.resultIndex === 0, !!row && body.search.shown[0].move === row.view.changeLine,
+        !!top && harness.find(top, "searchAdd").opacity === 1, body.search.actionFor("MSFT")].join(",")
+      var ledDetail = led + "|" + JSON.stringify(body.search.shown) + "|" + (row && row.view ? row.view.changeLine : "")
+      led = led === "true,true,true,true,SHOW"
+      keyClick(Qt.Key_Return)
+      var shown = within(2000, function() { return !body.adding && service.featuredSymbol === "MSFT" && watchlist.cursorRow === "MSFT" })
+        && service.library.join(",") === library && harness.calls("SEARCH.asked") === asked
+      var shownDetail = [body.adding, service.featuredSymbol, watchlist.cursorRow, harness.calls("SEARCH.asked") - asked,
+        service.library.join(",") === library].join(",")
+
+      keys.forceActiveFocus()
+      keyClick(Qt.Key_A)
+      tryVerify(function() { return body.adding && body.search.active }, 2000)
+      // The stand-in names every stock as Apple's, so AP finds all three by
+      // that name, in the list's order.
+      keyClick("A")
+      keyClick("P")
+      within(1000, function() { return body.search.ownCount === 3 })
+      keyClick(Qt.Key_Down)
+      var chosen = body.search.chosenSymbol
+      hold("SEARCH.hold", false)
+      var joined = within(3000, function() { return body.search.resultsQuery === "AP" })
+      var kept = [joined, chosen, body.search.chosenSymbol, body.search.resultIndex,
+        body.search.shown.slice(0, 3).map(function(r) { return r.symbol }).join(" "), body.search.shown.length > 3].join(",")
+      var first = harness.findAll(body.search, "searchResult").filter(function(r) { return r.index === 0 })[0]
+      var at = first.mapToItem(body, first.width / 2, first.height / 2)
+      mouseClick(body, at.x, at.y)
+      var clicked = within(2000, function() { return !body.adding && service.featuredSymbol === "NVDA" && watchlist.cursorRow === "NVDA" })
+      harness.check("search shows the list's own stocks first, by symbol or name, each with its row's move; Enter or a click on one shows it with its row selected, and Enter before the typing pause asks Yahoo nothing; Yahoo's answer joins below without moving the choice",
+        led && shown && kept === "true,AAPL,AAPL,1,NVDA AAPL MSFT,true" && clicked,
+        ledDetail + " / " + shownDetail + " / " + kept + " / " + service.featuredSymbol)
+      service.feature(featured)
+      body.resetInteraction()
+    }
+
     function test_flows() {
       tryVerify(function() {
         return service.quotes.AAPL && service.quotes.MSFT && service.quotes.NVDA
@@ -798,8 +850,10 @@ Harness {
       service.setRange("1Y")
       wait(300)
 
+      ownFirst(body, watchlist, keys)
+
       // Results belong to their query. Search SH and let its answer land,
-      // replace the field with NVDA, and act before NVDA's answer (the fake
+      // replace the field with AMZN, in no list, and act before AMZN's answer (the fake
       // curl answers 0.4 s after the 250 ms debounce): neither Enter nor a
       // click where SHOP was adds anything.
       var beforeSearch = service.dataSettings
@@ -816,15 +870,15 @@ Harness {
         for (c = 0; c < then.length; c++) keyClick(then[c])
         return at
       }
-      searchFor("SH", "NVDA")
+      searchFor("SH", "AMZN")
       keyClick(Qt.Key_Return)
       wait(50)
       var early = harness.same(service.library, beforeSearch.symbols) && service.featuredSymbol === beforeFeatured
-        && body.adding && body.search.searchText === "NVDA"
+        && body.adding && body.search.searchText === "AMZN"
       var earlyDetail = service.library + "|" + service.featuredSymbol + "|" + body.adding + "|" + body.search.searchText
       body.resetInteraction()
       service.persist(beforeSearch)
-      var oldTop = searchFor("SH", "NVDA")
+      var oldTop = searchFor("SH", "AMZN")
       mouseClick(body, oldTop.x, oldTop.y)
       wait(50)
       harness.check("a click where an old result was, before the new results, adds nothing",

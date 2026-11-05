@@ -132,7 +132,7 @@ Harness {
           said() + " | save failures " + (harness.saveFailures - failed))
       } finally { run(["chmod", "u+w", dir]) }
       click()
-      var landed = within(3000, function() { return holds("Keep", "BTC-USD").file && said().indexOf("+  Add a symbol") === 0 })
+      var landed = within(3000, function() { return holds("Keep", "BTC-USD").file && said().indexOf("+  Find or add a symbol") === 0 })
       check("once the folder can be written, a click saves every change, and the footer is the add again", landed, said())
       // All, so the row stays as the next change takes it from Keep.
       service.switchList("")
