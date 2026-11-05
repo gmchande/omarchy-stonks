@@ -192,14 +192,17 @@ test("a day with no bar says nothing against the trade its quote holds, and a th
   // with a night trade added at 21:00 on Sunday: by then the chart's start
   // has slid past Sunday's trade, but the day traded twice, so nothing is
   // said. With Sunday's trade alone, the chart draws none of the day and
-  // the note says the one trade it had.
+  // the note says the one trade it had. Once Robinhood's answer reaches
+  // 19:55 the day is over, and its axis still runs from where its start
+  // slid, its midnight, to 20:00: the slid-off trade never sets its end.
   const monday = M.parseChart(fixture("moments/watch-2026-10-26-1800/cvr.json"))
   const cvrNight = traded("watch-2026-10-26-1800", fixture("moments/watch-2026-10-26-1800/robinhood-day.json").results.map(r => r.symbol)).CVR
   const sundayTrade = { t: at("2026-10-25", "21:00"), p: 10.2, s: "overnight" }
-  const thin = points => M.dayChart({ ...monday, points }, { ...cvrNight, bars: [sundayTrade] }, calendars).day
+  const thin = (points, through = cvrNight.through) => M.dayChart({ ...monday, points }, { ...cvrNight, bars: [sundayTrade], through }, calendars).day
   const evening = at("2026-10-26", "20:30")
   expect([thin(monday.points.slice(-1)), thin([])].map(day => [day.points.length, M.dayNote(day, evening, calendars)]))
     .toEqual([[1, ""], [0, "Traded only at Sun 21:00"]])
+  expect(M.chartSpan(thin([], at("2026-10-26", "19:55")))).toMatchObject({ start: at("2026-10-26", "00:00"), end: at("2026-10-26", "20:00") })
 })
 
 test("the headline uses the regular quote or labels the last chart trade with its time", () => {

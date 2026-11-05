@@ -379,17 +379,18 @@ Harness {
         within(4000, function() { return !body.motion.replayRunning })
         body.headerTextChanged.disconnect(watch)
         // A trade before midnight is Sunday's, and says so. The replay starts
-        // at the chart's first trade, Friday's, at its time and in its own
-        // session, and runs by the clock, so it reads each trade's price as
-        // it passes it, not its minute.
+        // at the chart's first trade, Friday's 05:00 in the pre-market, since
+        // by 00:36 Friday's first hours have slid off the left, and runs by
+        // the clock, so it reads each trade's price as it passes it, not its
+        // minute.
         var read = replayRead.concat([replayed.split(" | ")[1]])
         var digits = service.quotes.TOY.priceDigits
         var missed = trades.filter(function(p) { return read.indexOf(Format.money(p.p, digits)) < 0 })
           .map(function(p) { return Format.hhmm(p.t, offset) })
         var first = toy.points[0]
         check(look + ": a replay starts at Friday's first trade, at its time, and reads every trade of the night",
-          trades.length === 5 && replayed.indexOf("At Fri " + Format.hhmm(first.t, offset) + " · ") === 0
-            && replayed.split(" | ")[1] === Format.money(first.p, digits) && missed.length === 0,
+          trades.length === 5 && Format.hhmm(first.t, offset) === "05:00"
+            && replayed === "At Fri 05:00 · Pre-market | " + Format.money(first.p, digits) && missed.length === 0,
           trades.length + " trades ; " + replayed + " ; missed " + missed.join(", "))
       })
 

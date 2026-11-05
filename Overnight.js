@@ -379,15 +379,15 @@ function windowSession(cal, quote, win) {
 // Robinhood's bars are five minutes each.
 var SLOT = 5 * 60
 
-// Hours before the day's first trade and after its last take no room, so a
-// finished day runs edge to edge. Once the chart's start (`from`) has slid
-// past that first trade, the axis starts there, five minutes at a time, so a
-// quiet hour leaves the left as the clock passes it, never in one step.
-function tradedAxis(session, points, end, over, ticks, from) {
+// Hours before the first trade drawn and after the last take no room, so a
+// finished day runs edge to edge. Where the chart's start has slid past some
+// of the day's trades (`slid`), the axis starts there instead, five minutes
+// at a time, so a quiet hour leaves the left as the start passes it, never
+// in one step.
+function tradedAxis(session, points, end, over, ticks, slid) {
   var open = session.regular.start
-  var first = points.length ? Math.min(points[0].t, open) : open
   return {
-    start: from !== undefined ? Math.max(from, first) : first,
+    start: slid !== undefined ? slid : points.length ? Math.min(points[0].t, open) : open,
     end: over && points.length ? points[points.length - 1].t : end,
     ticks: ticks
   }
@@ -445,7 +445,8 @@ function dayChart(quote, answer, calendars) {
       dayOpen: own ? quote.dayOpen : null,
       openSession: own ? quote.openSession : null,
       // `closes`: when the day's last hour ends (`Figures.dayNote`).
-      axis: Object.assign(tradedAxis(session, trades, win.end, over, windowTicks(cal, win, session), win.start),
+      axis: Object.assign(tradedAxis(session, points, win.end, over, windowTicks(cal, win, session),
+        trades.length && trades[0].t < win.start ? win.start : undefined),
         { closes: evening ? evening.night.end : win.end }, win.skip ? { skip: win.skip } : {}),
       litFrom: litFrom(points, evening, over),
       tonight: evening ? evening.night.start : null,
