@@ -271,6 +271,9 @@ test("formatting", () => {
   expect(M.money(1234.5)).toBe("1,234.50")
   expect(M.money(118204)).toBe("118,204")
   expect(M.money(undefined)).toBe("—")
+  // A half-cent rounds up, as other apps show it: Nebius's 31 December close,
+  // sent as 83.705, which a double holds as 83.70499…; and a move of 1.005.
+  expect([M.money(83.705), M.money(-83.705), M.changeText({ abs: 1.005, pct: 0.5 }, "abs")]).toEqual(["83.71", "\u221283.71", "+1.01"])
   expect(M.pct(-1.137)).toBe("\u22121.14%")
   expect(M.pct(1267.16)).toBe("+1,267%")
   expect(M.pct(71789.6)).toBe("+71,790%")

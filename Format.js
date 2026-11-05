@@ -92,8 +92,15 @@ function grouped(digits) {
   return parts.join(".")
 }
 
+// A double can't hold a half-cent: Yahoo's 83.705 is 83.70499…, which toFixed
+// rounds down. Nudged away from zero by far less than any price's last digit,
+// a half rounds away from zero, as other apps round it.
+function fixed(value, digits) {
+  return (value * (1 + 1e-12)).toFixed(digits)
+}
+
 function shownSign(value, digits) {
-  if (!isFiniteNumber(value) || Number(Math.abs(value).toFixed(digits)) === 0) return 0
+  if (!isFiniteNumber(value) || Number(fixed(Math.abs(value), digits)) === 0) return 0
   return value > 0 ? 1 : -1
 }
 
@@ -142,7 +149,7 @@ function money(value, digits) {
   if (value === null || value === undefined || isNaN(value)) return "—"
   var abs = Math.abs(value)
   var shown = isFiniteNumber(digits) ? digits : moneyDigits(abs)
-  return (shownSign(value, shown) < 0 ? MINUS : "") + grouped(abs.toFixed(shown))
+  return (shownSign(value, shown) < 0 ? MINUS : "") + grouped(fixed(abs, shown))
 }
 
 function pct(value) {
@@ -151,7 +158,7 @@ function pct(value) {
 
 function narrowPctShown(value) {
   var abs = Math.abs(value)
-  var hundredths = Math.round(Number(abs.toFixed(pctDigits(abs))) * 100)
+  var hundredths = Math.round(Number(fixed(abs, pctDigits(abs))) * 100)
   var tenths = Math.round(hundredths / 10)
   return tenths >= 100 ? { digits: 0, shown: Math.round(hundredths / 100) } : { digits: 1, shown: tenths / 10 }
 }
@@ -200,17 +207,17 @@ function stackedMoney(value, digits) {
   if (!isFiniteNumber(value)) return { lines: ["—"], sign: 0 }
   var shown = moveDigits(Math.abs(value), digits)
   var sign = shownSign(value, shown)
-  var fixed = Math.abs(value).toFixed(shown)
-  if (Number(fixed) >= 1000) {
-    var big = stackedThousands(Number(fixed))
+  var fixedText = fixed(Math.abs(value), shown)
+  if (Number(fixedText) >= 1000) {
+    var big = stackedThousands(Number(fixedText))
     return { lines: [signText(sign) + big.figure, big.unit], sign: sign }
   }
-  var parts = fixed.split(".")
+  var parts = fixedText.split(".")
   return { lines: [signText(sign) + parts[0]].concat(parts.length > 1 ? stackChunks("." + parts[1]) : []), sign: sign }
 }
 
 function percent(value, digits) {
-  return signText(shownSign(value, digits)) + grouped(Math.abs(value).toFixed(digits)) + "%"
+  return signText(shownSign(value, digits)) + grouped(fixed(Math.abs(value), digits)) + "%"
 }
 
 function signedMoney(value, digits) {

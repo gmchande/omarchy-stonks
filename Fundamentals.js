@@ -147,7 +147,7 @@ function yearLine(quote, figures, yearEnds, rates, trades) {
   if (!quote) return null
   var q = quote
   var head = Quote.headlineQuote(q)
-  var reads = function(v) { return Number(v.toFixed(Format.isFiniteNumber(q.priceDigits) ? q.priceDigits : Format.moneyDigits(Math.abs(v)))) }
+  var reads = function(v) { return Number(Format.fixed(v, Format.isFiniteNumber(q.priceDigits) ? q.priceDigits : Format.moneyDigits(Math.abs(v)))) }
   var both = Format.isFiniteNumber(q.fiftyTwoWeekLow) && Format.isFiniteNumber(q.fiftyTwoWeekHigh)
   var low = null
   var high = null
