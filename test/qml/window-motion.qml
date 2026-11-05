@@ -226,12 +226,24 @@ Harness {
       rest()
     }
 
-    // OutCubic's origin: Qt may count from the tick before the change,
-    // so a wall-time mark alone makes a correct animation read early.
+    // An animation's origin, read back off its own curve: Qt may count from
+    // the tick before the change, so a wall-time mark alone makes a correct
+    // animation read early. Every eased motion is a cubic Bézier
+    // (Motion.curve: the shell's, or OutCubic's on Omarchy 4.0), whose
+    // progress at its own step s is y(s), reached at the share x(s) of its
+    // time; s is found by halving.
     function animationOrigin(anim, value) {
       if (anim.duration <= 0 || anim.from === anim.to) return 0
       var progress = Math.max(0, Math.min(1, (value - anim.from) / (anim.to - anim.from)))
-      return Date.now() - (1 - Math.cbrt(1 - progress)) * anim.duration
+      var c = anim.easing.bezierCurve
+      var along = function(s, p1, p2) { return 3 * (1 - s) * (1 - s) * s * p1 + 3 * (1 - s) * s * s * p2 + s * s * s }
+      var lo = 0, hi = 1
+      for (var i = 0; i < 40; i++) {
+        var mid = (lo + hi) / 2
+        if (along(mid, c[1], c[3]) < progress) lo = mid
+        else hi = mid
+      }
+      return Date.now() - along(lo, c[0], c[2]) * anim.duration
     }
 
     function captureOrigin(origin, tick, mark) {
