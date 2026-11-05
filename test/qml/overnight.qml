@@ -226,6 +226,22 @@ Harness {
               && harness.top() === "SINCE THU CLOSE · 22:20 234.84 \u22123.55%"
           }),
         calls + ", " + sundayCalls + ", " + harness.record("OVERNIGHT.calls") + " " + lastSpan() + " | " + harness.top())
+      // By keys alone, Left walks tonight back five minutes a press to its
+      // first slot, and the next press crosses the weekend onto Friday's
+      // last, as the pointer does; Right brings it back.
+      var weekend = body.featuredDay.axis.skip
+      var walked = []
+      for (var press = 0; press < 60 && !(body.scrubT && body.scrubT < weekend.from); press++) {
+        pressKey(Qt.Key_Left)
+        walked.push(body.headerText)
+      }
+      var crossed = body.scrubT === weekend.from - 300 && walked.length > 1 && walked[walked.length - 2].indexOf("20:00") >= 0
+      pressKey(Qt.Key_Right)
+      var back = body.scrubT === weekend.to
+      var landed = walked[walked.length - 1]
+      endScrub()
+      check("by keys, one Left crosses the weekend from Sunday night's first slot to Friday's last, and one Right brings it back",
+        crossed && back && /fri 19:55/i.test(landed), walked.length + " presses: " + walked.slice(-2).join(" → ") + " | back " + back)
 
       // Monday 04:11, the night's last bars due, and Robinhood down.
       var feed = service.testOvernightFeed
@@ -281,9 +297,9 @@ Harness {
       })
       within(3000, function() { return harness.top().indexOf("SINCE") === 0 })
       var info = body.dayLine
-      check("the night's newest price is on top, named from Wednesday's close, Thursday's close beneath, and the night is never in the day's high: its 243.20 leaves Thursday's 239.63",
+      check("the night's newest price is on top, named from Wednesday's close, Thursday's close beneath, and the day's high takes in its own night: 243.20 at 02:30 passes Yahoo's 239.63",
         /^SINCE WED CLOSE · \d\d:\d\d 234\.27 /.test(harness.top()) && harness.strip().indexOf("CLOSE 232.28 ") === 0
-          && !!info && info.range.highText === "239.63", harness.top() + " | " + harness.strip() + " | " + JSON.stringify(info))
+          && !!info && info.range.highText === "243.20", harness.top() + " | " + harness.strip() + " | " + JSON.stringify(info))
       // A day asked of Robinhood replaces the prints in hand, never joins them.
       check("a day's answer from Robinhood replaces the prints in hand: none of the weekend's stays",
         feed.entries.NEST.bars[0].t > harness.night - 2 * 86400, "oldest kept " + new Date(feed.entries.NEST.bars[0].t * 1000).toISOString())

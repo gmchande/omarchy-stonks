@@ -19,15 +19,10 @@ function pictureDay(day) {
   return Object.assign({}, day, { axis: Object.assign({}, axis, { end: Math.max(axis.start, newest) }) })
 }
 
-// By the calendar that knows that day's clock (`Market.clockCalendar`), else
+// By the calendar that knows that day's clock (`Market.tradeClock`), else
 // by Yahoo's.
 function local(quote, t, calendars) {
-  var cal = Market.clockCalendar(quote, t, calendars)
-  if (cal) {
-    var day = Market.localDate(t, cal)
-    return { y: day.y, m: day.m, d: day.d, weekday: day.weekday, clock: Market.clockOf(day), zone: Market.zoneName(cal, day.offset, quote) }
-  }
-  var at = Quote.clockAt(quote, t)
+  var at = Market.tradeClock(quote, t, calendars)
   var d = new Date((t + at.offset) * 1000)
   return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1, d: d.getUTCDate(), weekday: d.getUTCDay(),
     clock: Format.hhmm(t, at.offset), zone: at.zone || Format.offsetName(at.offset) }
@@ -87,7 +82,7 @@ function barDate(history, bar) {
   var date = History.historyDateText(history, bar.t, History.historySpansYears(history), bar.newest ? "1d" : history.interval)
   if (history.interval === "1wk" && !bar.newest) date = "WEEK OF " + date
   if (timed) {
-    var clock = Quote.clockAt(history, bar.t)
+    var clock = History.barClock(history, bar)
     date += " " + Format.hhmm(bar.t, clock.offset) + " " + (clock.zone || Format.offsetName(clock.offset))
   }
   return date

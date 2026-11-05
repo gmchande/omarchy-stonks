@@ -68,15 +68,16 @@ BarWidget {
       + (hostPause ? "\n" + hostPause.why + "\n" + hostPause.when
         : freshness.state === "failed" && featured ? "\nRetrying" : "")
   // The shell copies a hover's words only as the pointer enters, so they go
-  // to the bar again while it stays: a warning's, a new symbol's, a new
-  // session's. Qt.callLater runs a function once, so changes together show
-  // once. A new figure alone never does, so a resting pointer sees no blink.
+  // to the bar again while it stays: a warning's, a new symbol's, a newest
+  // price's session and time. Qt.callLater runs a function once, so changes
+  // together show once. A new figure alone never does, so a resting pointer
+  // sees no blink but for a newer trade's time.
   function reshowTooltip() {
     if (button.tooltipHovered && button.bar) button.bar.showTooltip(button, button.tooltipText)
   }
   onWarningTextChanged: Qt.callLater(reshowTooltip)
   onFeaturedSymbolChanged: Qt.callLater(reshowTooltip)
-  onNewestPhaseChanged: Qt.callLater(reshowTooltip)
+  onNewestNoteChanged: Qt.callLater(reshowTooltip)
   onOpenedChanged: Qt.callLater(reshowTooltip)
   // Up and down for the bar's own ground (`TrendColors`).
   readonly property color upColor: plugin && plugin.trendColors ? plugin.trendColors.upOn(barGround) : button.foreground

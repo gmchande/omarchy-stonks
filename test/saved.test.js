@@ -2077,6 +2077,28 @@ test("in every phase, a stock that has traded since its close shows that newest 
       expect([where, M.rangeVolume(history)]).toEqual([where, M.rangeVolume(raw)])
     }
   }
+  // Its own day and clock, as 1D names it, though the range's periods are
+  // stamped otherwise: at 23:00 on Sunday 25 October, a day's bar reads
+  // midnight by its offset, and the picture's range ends on that Sunday.
+  {
+    const at23 = at("2026-10-25", "23:00")
+    const nights = { NBIS: { ...sunday.nights.NBIS, bars: sunday.nights.NBIS.bars.filter(b => b.t <= at23), through: at23 } }
+    const raw = M.parseHistory(fixture("history/nbis-2026-10-25-2335-1y.json"), "1Y")
+    const chart = M.viewChart("NBIS", "1Y", sunday.quotes, {}, { "NBIS|1Y": { status: "ok", history: raw } }, nights, sunday.allDay, calendars)
+    const newest = M.historyRowModel(chart.history, sunday.quotes.NBIS, 0).newest
+    expect(newest.t).toBe(at23)
+    expect(M.historyScrubForms(chart.history, chart.history.bars.at(-1))[1]).toBe("25 OCT 2026 23:00")
+    expect(load("Share.js").words({ quote: sunday.quotes.NBIS, day: chart.day, history: chart.history, latest: chart.latest, newest, scrubT: 0,
+      changeMode: "pct", range: "1Y", now: at23 + 600, calendars }).span).toBe("1 YEAR · 24 OCT 2025 – 25 OCT 2026")
+  }
+  // Sunday 1 November at 21:48, the clocks gone back, under a week kept from
+  // before: the night's trade reads New York's clock now, 21:40 EST.
+  {
+    const gap = topsAt("gap-2026-11-01-2148")
+    const raw = M.parseHistory(fixture("history/nbis-2026-10-26-2005-5d.json"), "1W")
+    const history = M.viewChart("NBIS", "1W", gap.quotes, {}, { "NBIS|1W": { status: "ok", history: raw } }, gap.nights, gap.allDay, calendars).history
+    expect([M.historyScrubForms(history, history.bars.at(-1))[1], load("Share.js").barDate(history, history.bars.at(-1))]).toEqual(["1 NOV 21:40", "1 NOV 21:40 EST"])
+  }
   const week = M.viewChart("NBIS", "1W", sunday.quotes, {},
     { "NBIS|1W": { status: "ok", history: M.parseHistory(fixture("history/nbis-2026-10-25-2335-5d.json"), "1W") } }, sunday.nights, sunday.allDay, calendars).history
   expect(M.rangeEnds(week).low).toEqual({ p: 152.51, t: sunday.newest.NBIS.t })
@@ -2360,6 +2382,12 @@ test("every price stands at its time from its day's first trade, a quiet night a
     expect([name, line[first].brk, M.yAt(line, between) !== null, chime.lineBars({ points: line })(between) >= 0])
       .toEqual([name, false, true, true])
   }
+  // By keys, one press crosses the weekend each way, as the pointer does:
+  // Left from tonight's first slot lands on Friday's last, Right brings it back.
+  const shop = dayAt("gap-2026-11-01-2148", "shop").day
+  const nightOpen = at("2026-11-01", "20:00"), fridayLast = at("2026-10-30", "19:55")
+  expect([M.stepTime(shop, nightOpen, -1, M.lastPrintTime(shop)), M.stepTime(shop, fridayLast, 1, M.lastPrintTime(shop))])
+    .toEqual([fridayLast, nightOpen])
   expect(dayAt("watch-2026-10-25-2335", "jnj").day.points.filter(p => p.t >= at("2026-10-25", "20:00")).length).toBe(19)
   // REED had no print on Sunday night: Friday from its first trade, the
   // night's hours after it to Robinhood's newest slot, as every chart's
@@ -2677,6 +2705,12 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   // Yahoo's echoes of its quote, 09:00:03's at Monday's close and 09:05:03's
   // at 3,048, each one price, no shares, off the five-minute grid.
   expect([startedAt("tokyo", "7203.t", "1915", "open"), startedAt("tokyo", "7203.t", "1920", "open")]).toEqual(["\u2014", "\u2014"])
+  // Nor its high: an echo is no trade, so the 1D line keeps Yahoo's 3,030
+  // to 3,040, the session's own, though the chart draws the echo at 3,051.
+  const echo = answerAt("tokyo", "1915", "2d/7203.t.json")
+  const echoDay = M.viewChart("7203.T", "1D", { "7203.T": echo }, {}, {}, {}, {}, calendars).day
+  const echoLine = M.dayLine(echo, M.exchangeDay(echo, at("2026-11-03", "19:15")), echoDay).range
+  expect([M.money(Math.max(...echoDay.points.map(p => p.p))), echoLine.lowText, echoLine.highText]).toEqual(["3,051.00", "3,030.00", "3,040.00"])
   // Friday 30 October at 09:26 there, with Friday's first bars: Friday's
   // move, from Thursday's close.
   const after = M.parseChart(fixture("moments/tokyo-2026-10-30-0926/7203.t.json"), cents)
@@ -2733,6 +2767,23 @@ test("an overnight print is its own line under the price, measured from the clos
   expect(strip("silk")).toMatchObject({ label: "OVERNIGHT", time: "22:20", stale: true })
   // REED has not traded tonight: no overnight line, its after-hours stays.
   expect(strip("reed")).toMatchObject({ label: "AFTER HOURS", time: "" })
+  // The 1D row's low and high take in every trade its chart draws for the
+  // day, as the 52W row does: REED's one trade at 21.00, at 23:25 the night
+  // before, is the day's low under Yahoo's 21.27, so both rows end at it in
+  // the 52-week low's tone. Tonight's trades, joined at the chart's end, are
+  // the next day's.
+  const reed = dayAt("night", "reed")
+  const reedNight = reed.day.points.filter(p => p.t < reed.quote.session.regular.start && p.s === "overnight")
+  expect([M.money(reed.quote.dayLow), M.money(Math.min(...reedNight.map(p => p.p)))]).toEqual(["21.27", "21.00"])
+  const reedDay = M.dayLine(reed.quote, M.exchangeDay(reed.quote, now), reed.day).range
+  const reedYear = M.yearLine(reed.quote, null, null, null, reed.day.points).range
+  expect([M.money(reedDay.low), reedDay.lowTone, M.money(reedYear.low), reedYear.lowTone]).toEqual(["21.00", "down", "21.00", "down"])
+  // Sunday 25 October at 23:35: NBIS's night has fallen to 152.15, under
+  // Friday's low; the row is still Friday's.
+  const nbis = dayAt("watch-2026-10-25-2335", "nbis")
+  const sundayNight = nbis.day.points.filter(p => p.t >= nbis.day.tonight)
+  const friday = M.dayLine(nbis.quote, M.exchangeDay(nbis.quote, at("2026-10-25", "23:35")), nbis.day)
+  expect([friday.title, M.money(friday.range.low), M.money(Math.min(...sundayNight.map(p => p.p)))]).toEqual(["FRI", "155.86", "152.15"])
   // While a scrub reads the night, the header names it.
   expect(M.marketStatus(nestDay, now, at("2026-10-01", "21:30"), calendars)).toBe("At 21:30 · Overnight")
 })

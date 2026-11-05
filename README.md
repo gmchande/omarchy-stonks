@@ -74,8 +74,10 @@ since the open. To switch, click the %, ±, or bell at the end of the list's
 header.
 
 Under the ranges, the first line shows the range's low and high, with the
-price between them. Beside it are the open and the volume on 1D, or the
-range's starting price and volume on a longer range. The second line shows
+price between them. On 1D they take in the trades the chart draws outside
+the session too: that day's night, pre-market and after hours. Beside
+them are the open and the volume on 1D, or the range's starting price and
+volume on a longer range. The second line shows
 the 52-week low and high, with the market cap and P/E. On 1Y those are
 the chart's own low and high. On every other range they're Yahoo's, which
 leave out trades before and after the session, so when Stonks shows a

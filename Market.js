@@ -250,10 +250,16 @@ function clockCalendar(quote, t, calendars) {
   return cal && dateStringOf(localDate(t, cal)) <= cal.validThrough ? cal : null
 }
 
-function printClock(quote, t, calendars) {
+// The exchange's own clock at `t`, `{ offset, zone }`.
+function tradeClock(quote, t, calendars) {
   var cal = clockCalendar(quote, t, calendars)
-  if (cal) return calendarClock(cal, t, quote)
-  var clock = Quote.clockAt(quote, t)
+  if (!cal) return Quote.clockAt(quote, t)
+  var offset = localDate(t, cal).offset
+  return { offset: offset, zone: zoneName(cal, offset, quote) }
+}
+
+function printClock(quote, t, calendars) {
+  var clock = tradeClock(quote, t, calendars)
   return Format.zonedHhmm(t, clock.offset, clock.zone)
 }
 
@@ -315,9 +321,7 @@ function statusForms(quote, now, scrubT, calendars, overnight) {
 // By the clock `printClock` reads.
 function printDay(quote, t, now, calendars) {
   var day = function(at) {
-    var cal = clockCalendar(quote, at, calendars)
-    var offset = cal ? localDate(at, cal).offset : Quote.clockAt(quote, at).offset
-    return Math.floor((at + offset) / 86400)
+    return Math.floor((at + tradeClock(quote, at, calendars).offset) / 86400)
   }
   var days = day(now) - day(t)
   if (days === 0) return ""
