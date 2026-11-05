@@ -29,6 +29,8 @@ Item {
   property string name: ""
   property real start: 0
   property var frames: []
+  // Asked at each frame, its answer kept as the frame's `note`.
+  property var note: null
   property int waiting: 0
   property var verdict: null
   // When the animation clock last ticked, and the moment of the last frame.
@@ -96,8 +98,9 @@ Item {
   // taken, with the main thread's times then.
   function shot(at) {
     var path = Quickshell.env("STONKS_FRAMES") + "/" + name + "-" + String(frames.length).padStart(3, "0") + ".ppm"
+    var noted = note ? note() : null
     var times = threadTimes()
-    frames.push({ path: path, at: at, taken: Date.now(), run: times.run, queued: times.queued })
+    frames.push({ path: path, at: at, taken: Date.now(), run: times.run, queued: times.queued, note: noted })
     shown = at
     waiting++
     source.grabToImage(function(result) {

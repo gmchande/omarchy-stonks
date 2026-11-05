@@ -243,11 +243,15 @@ Harness {
 
       // A glide from the top to the end of the list, and the wheel back up:
       // on every rendered frame each row in sight is drawn, its symbol, its
-      // day line, and its price (frames.js `filled`, down each column),
-      // though only rows near sight are built; and the rows built as they
-      // come never take the main thread more than 100 ms between two
-      // frames. That is its own work: time it waited for a CPU on a busy
-      // machine doesn't count, and a failure says how long it waited.
+      // day line, and its price (frames.js `filled`, down each column);
+      // only rows within a screen above sight and two below are built
+      // (Watchlist `built`); and each row built as it comes costs the main
+      // thread under 5 ms of its own work, so the one row a wheel notch
+      // brings in builds within a 60 Hz frame. The cost is each frame's work
+      // beyond a frame that builds nothing, which is the grab's own, shared
+      // among the rows it built: a frame's whole work counts how far the
+      // list moved since the last grab, so it grows with a busy machine's
+      // slower grabs, and time the thread waited for a CPU never counts.
       var list = app.testBody.watchlist
       list.contentY = 0
       wait(100)
@@ -258,6 +262,17 @@ Harness {
         ["day lines", top.width - top.gap - top.priceWidth - top.gap - top.sparkWidth, top.sparkWidth],
         ["prices", top.width - top.gap - top.priceWidth, top.priceWidth]
       ]
+      // The rows built at a frame, in one pass over the list's rows.
+      grab.note = function() {
+        var built = []
+        var boxes = list.contentItem.children
+        for (var b = 0; b < boxes.length; b++)
+          for (var k = 0; k < boxes[b].children.length; k++) {
+            var row = boxes[b].children[k]
+            if (row.built === true && row.place >= 0) built.push(row.symbol)
+          }
+        return built
+      }
       grab.source = list
       grab.begin("glide")
       wait(100)
@@ -269,6 +284,7 @@ Harness {
       tryVerify(function() { return !list.settling }, 5000)
       wait(100)
       grab.end()
+      grab.note = null
       tryVerify(function() { return grab.waiting === 0 }, 5000)
       var work = grab.work()
       // A row drawn empty leaves a bare run longer than a row's pitch; a
@@ -278,10 +294,27 @@ Harness {
         tryVerify(function() { return grab.verdict !== null }, 10000)
         return { name: c[0], ok: grab.verdict.ok, detail: grab.verdict.own }
       })
-      harness.check("a glide down the whole list and the wheel back up draw every row's symbol, day line, and price in sight on every frame, and build the rows in under 100 ms of work between two frames",
-        verdicts.every(function(v) { return v.ok }) && grab.frames.length >= 10 && work.timed && work.longest <= 100 && endY > 0 && list.contentY < endY,
-        verdicts.map(function(v) { return v.name + ": " + v.detail }).join("; ") + "; " + work.text + "; at "
-          + Math.round(endY) + " then " + Math.round(list.contentY))
+      // A screen above sight, two below, and a row cut at each end.
+      var nearSight = Math.ceil((3 * list.sightHeight + list.rowHeight) / list.rowPitch) + 1
+      var mostBuilt = 0, still = [], building = []
+      for (var f = 1; f < grab.frames.length; f++) {
+        var was = grab.frames[f - 1].note || [], now = grab.frames[f].note || []
+        mostBuilt = Math.max(mostBuilt, now.length)
+        var fresh = now.filter(function(s) { return was.indexOf(s) < 0 }).length
+        var own = grab.frames[f].run - grab.frames[f - 1].run
+        if (fresh === 0) still.push(own)
+        else building.push({ own: own, rows: fresh })
+      }
+      still.sort(function(a, b) { return a - b })
+      var grabWork = still.length ? still[Math.floor(still.length / 2)] : NaN
+      var builtRows = building.reduce(function(sum, b) { return sum + b.rows }, 0)
+      var perRow = building.reduce(function(sum, b) { return sum + b.own - grabWork }, 0) / Math.max(1, builtRows)
+      harness.check("a glide down the whole list and the wheel back up draw every row's symbol, day line, and price in sight on every frame, build only the rows near sight, and each row in under 5 ms of work",
+        verdicts.every(function(v) { return v.ok }) && grab.frames.length >= 10 && work.timed && endY > 0 && list.contentY < endY
+          && still.length >= 3 && builtRows > nearSight && mostBuilt <= nearSight && perRow < 5,
+        verdicts.map(function(v) { return v.name + ": " + v.detail }).join("; ") + "; " + builtRows + " rows built as they came, at most "
+          + mostBuilt + " at once of " + nearSight + " near sight; " + perRow.toFixed(1) + " ms of work a row beyond a frame's own "
+          + Math.round(grabWork) + " ms, over " + grab.frames.length + " frames; " + work.text + "; at " + Math.round(endY) + " then " + Math.round(list.contentY))
 
       // A row featured while its spark request is out: once that lands, the
       // hero's chart goes, so its line and the day's open have the bars'
