@@ -3266,18 +3266,18 @@ test("a screenshot says when its price is, its session, its range alone or the d
   const after = Share.words({ quote: tops.quotes.NBIS, day: nbis.day, history: null, latest: nbis.latest, newest: tops.newest.NBIS,
     top: M.rowModel(tops.quotes.NBIS, 0, "pct", tops.newest.NBIS), scrubT: 0, changeMode: "pct", range: "1D", now: tops.now, calendars })
   // The move since the close joins the line that names its session.
-  expect([after.when, after.since, after.sinceTone, after.sinceTime, after.extended, after.extendedTone])
-    .toEqual(["AFTER HOURS", "+1.35%", "up", "17:58 EDT", "CLOSE · 153.27 \u22123.45%", "down"])
+  expect([after.when, after.since, after.sinceTone, after.sinceTime, after.extended, after.extendedChange, after.extendedTone])
+    .toEqual(["AFTER HOURS", "+1.35%", "up", "17:58 EDT", "CLOSE · 153.27", "\u22123.45%", "down"])
   // On a range the move since the close isn't said, as the panel says the range there.
   const weekHistory = M.parseHistory(fixture("history/nbis-2026-10-26-2005-5d.json"), "1W")
   const week = Share.words({ quote: tops.quotes.NBIS, day: nbis.day, history: weekHistory, latest: nbis.latest, newest: tops.newest.NBIS,
     top: M.historyRowModel(weekHistory, tops.quotes.NBIS, 0), scrubT: 0, changeMode: "pct", range: "1W", now: tops.now, calendars })
-  expect([week.extended, week.since]).toEqual(["CLOSE · 153.27 \u22123.45%", ""])
-  // JNJ at 20:05, its after-hours price its close's: the line names the
-  // price on top, the session line its time alone.
+  expect([week.extended, week.extendedChange, week.since]).toEqual(["CLOSE · 153.27", "\u22123.45%", ""])
+  // JNJ at 20:05, its after-hours price its close's: the session line says
+  // when the price is from, and no line under it names the close again.
   const evening = topsAt("watch-2026-10-26-2005")
   const jnj = dayAt("watch-2026-10-26-2005", "jnj")
   const flat = Share.words({ quote: evening.quotes.JNJ, day: jnj.day, history: null, latest: jnj.latest, newest: evening.newest.JNJ,
     top: M.rowModel(evening.quotes.JNJ, 0, "pct", evening.newest.JNJ), scrubT: 0, changeMode: "pct", range: "1D", now: evening.now, calendars })
-  expect([flat.when, flat.since, flat.extended, flat.extendedTone]).toEqual(["AFTER HOURS 19:57 EDT", "", "CLOSE", "flat"])
+  expect([flat.when, flat.since, flat.extended, flat.extendedChange]).toEqual(["AFTER HOURS 19:57 EDT", "", "", ""])
 })

@@ -96,7 +96,8 @@ function barDate(history, bar) {
 //   sinceTone) and its time (sinceTime), as in OVERNIGHT −0.73% · 00:50 EDT;
 //   from: what the change is measured from, as the dashed line; on a range,
 //   the range;
-//   extended: the line under the price, as the panel shows it;
+//   extended: the line under the price, as the panel shows it, but for its
+//   move (extendedChange, extendedTone);
 //   currency: none beside an index's level, which isn't money;
 //   start, end: the day's axis's ends;
 //   span: on the day, the date its move belongs to (after midnight, the close
@@ -107,7 +108,8 @@ function words(o) {
   var quote = o.quote
   var digits = quote.priceDigits
   var at = moment(o)
-  var out = { when: "", from: "", extended: "", extendedTone: "flat", since: "", sinceTone: "flat", sinceTime: "", start: "", end: "", span: "", said: "",
+  var out = { when: "", from: "", extended: "", extendedChange: "", extendedTone: "flat", since: "", sinceTone: "flat", sinceTime: "",
+    start: "", end: "", span: "", said: "",
     currency: quote.instrumentType === "INDEX" ? "" : Figures.currencyLabel(String(quote.currency || "")) }
   if (at.bar) {
     out.when = barDate(o.history, at.bar)
@@ -150,14 +152,19 @@ function words(o) {
       out.end = (last.d !== first.d ? Format.WEEKDAYS[last.weekday].toUpperCase() + " " : "") + last.clock
     }
   }
-  // The panel's line under the price, as it shows it. The move since the
-  // close, which a range or a mode's period takes the place of, joins the
+  // The panel's line under the price, as it shows it, its move apart so it
+  // alone takes its tone; none where the panel's would only name the close,
+  // since the line above already says when the price is from. The move since
+  // the close, which a range or a mode's period takes the place of, joins the
   // line that names its session, worded as the panel words it.
   if (!o.scrubT && o.newest) {
     var below = Figures.closeLine(quote, Figures.exchangeDay(quote, o.now), o.changeMode, o.top)
     var caption = Figures.captionLine(quote, o.newest, o.changeMode, o.history ? String(o.range) : Format.changeCaption(o.changeMode), false)
-    out.extended = below.label + (below.price ? " · " + below.price + " " + below.changeText : "")
-    out.extendedTone = below.tone
+    if (below.price) {
+      out.extended = below.label + " · " + below.price
+      out.extendedChange = below.changeText
+      out.extendedTone = below.tone
+    }
     if (caption.changeText) {
       out.when = caption.label
       out.since = caption.changeText
@@ -170,7 +177,8 @@ function words(o) {
   var print = ext ? Quote.extendedPrint(quote, o.latest) : null
   if (ext && print) {
     var l = local(ext.label === "OVERNIGHT" && o.day ? o.day : quote, print.t, o.calendars)
-    out.extended = ext.label + " " + l.clock + " " + l.zone + " · " + ext.price + " " + ext.changeText
+    out.extended = ext.label + " " + l.clock + " " + l.zone + " · " + ext.price
+    out.extendedChange = ext.changeText
     out.extendedTone = ext.stale ? "old" : ext.tone
   }
   return out

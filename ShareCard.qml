@@ -239,7 +239,14 @@ Rectangle {
     objectName: "shareExtended"
     x: root.margin
     y: 294 * root.u - baselineOffset
-    text: root.words ? Format.lookSigns(root.words.extended, root.retro) : ""
+    text: root.words ? root.words.extended : ""
+  }
+  Caption {
+    objectName: "shareExtendedChange"
+    visible: !!root.words && root.words.extendedChange !== ""
+    x: extendedText.x + extendedText.implicitWidth
+    y: extendedText.y
+    text: root.words && root.words.extendedChange ? " " + Format.lookSigns(root.words.extendedChange, root.retro) : ""
     color: root.words && root.words.extendedTone !== "old" ? root.toneColor(root.words.extendedTone) : root.dim
   }
   // The move since the close and its time, after the session that names it.
