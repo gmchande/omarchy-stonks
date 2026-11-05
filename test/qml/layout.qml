@@ -2974,11 +2974,10 @@ Harness {
         root.check("after the text size changes with the list scrolled, no row is cut at the list's top or bottom, the row at its top stays there unless the list's end comes first, and the cursor's row stays in sight, in the panel and the window",
           rowsCut.length === 0, rowsCut.join(" | "))
 
-        // A scrub whose line runs through a range's mark keeps the mark, all
-        // of it clear of the line: over its own bar, its price, its date, and
-        // either end; and the pointer leaving puts it back where it rests.
-        // Both looks, both marks, on a year with a sharp high early, which
-        // has no room before it, and a sharp low late, which has.
+        // A scrub whose line runs through a range's mark leaves the mark
+        // shown where it rests: over its own bar, its price, its date, and
+        // either end. Both looks, both marks, on a year with a sharp high
+        // early and a sharp low late.
         var scrubNow = stub.quotes.AAPL.marketTime
         var sharp = []
         for (var sb = 0; sb < 40; sb++) {
@@ -3000,7 +2999,7 @@ Harness {
             var marks = mark.parent.parent
             var price = find(mark, "markPrice")
             var date = find(mark, "markDate")
-            var place = function() { return [mark.visible, mark.x].join(",") }
+            var place = function() { return [mark.visible, mark.x, mark.y].join(",") }
             var atRest = place()
             var rest = mark.x
             var spots = { bar: marks.chart.xAt(mark.modelData.x), left: rest + 2, price: rest + price.x + price.width / 2,
@@ -3010,23 +3009,19 @@ Harness {
               var over = marks.mapToItem(body.chartItem, spots[spot], 0)
               mouseMove(body.chartItem, over.x, body.chartItem.height / 2)
               wait(50)
-              var line = marks.scrubAt
-              var clear = line < mark.x - 1 || line > mark.x + mark.width + 1
-              if (!mark.visible || !clear || mark.x < 0 || mark.x + mark.width > marks.width)
-                faults.push(spot + ": line " + Math.round(line) + ", mark " + mark.visible + " at " + Math.round(mark.x) + "–" + Math.round(mark.x + mark.width))
+              if (body.scrubT === 0 || place() !== atRest) faults.push(spot + ": scrubbed " + (body.scrubT !== 0) + ", mark " + place())
             }
             mouseMove(body.chartItem, 1, -Style.space(40))
             wait(50)
-            var after = place()
-            if (!atRest.startsWith("true") || faults.length || after !== atRest)
-              crossed.push((retro ? "retro " : "smooth ") + name + ": at rest " + atRest + "; " + faults.join(", ") + "; after " + after)
+            if (!atRest.startsWith("true") || faults.length)
+              crossed.push((retro ? "retro " : "smooth ") + name + ": at rest " + atRest + "; " + faults.join(", "))
           })
         })
         stub.retro = false
         stub.range = "1D"
         stub.historyEntry = null
         wait(50)
-        root.check("a scrub through a range's mark, its own bar included, keeps all of it clear of the line, and the pointer leaving puts it back, both marks, both looks",
+        root.check("a scrub through a range's mark, its own bar included, leaves the mark shown where it rests, both marks, both looks",
           crossed.length === 0, crossed.join(" | "))
 
         // On a side bar the stacked pill keeps a short line for a warning's

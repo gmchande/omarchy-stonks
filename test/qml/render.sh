@@ -88,8 +88,8 @@ every_state() (
   # The buttons that stand in for key hints: a new list's ⏎ MAKE, and a
   # failed range's R RETRY, in both looks.
   states="$states popup-lists-naming-smooth popup-history-unavailable-smooth popup-history-unavailable-retro"
-  # A scrub through where the 1Y high's date rests, and the low's: the whole
-  # mark stands clear of the line, in both looks.
+  # A scrub through where the 1Y high's date rests, and the low's: the mark
+  # stays where it rests, under the line and the dot, in both looks.
   states="$states popup-history-1y-crossed-smooth popup-history-1y-crossed-retro"
   states="$states popup-history-1y-crossedlow-smooth popup-history-1y-crossedlow-retro"
   # A refresh the reader asked for, out: the header says so, in both looks.

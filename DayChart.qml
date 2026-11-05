@@ -253,6 +253,14 @@ Item {
     }
   }
 
+  // What is laid over the ink but under the scrub's line and dot
+  // (`RangeMarks`).
+  readonly property Item underScrub: underScrubLayer
+  Item {
+    id: underScrubLayer
+    anchors.fill: parent
+  }
+
   Canvas {
     id: marks
     objectName: "scrubMarks"
