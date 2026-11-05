@@ -1818,6 +1818,16 @@ test("the 1D chart is the trading day: from its night's open the evening before 
   expect(["0700", "0935", "1200", "1500", "1955"].map(m => M.chartSpan(dayAt(`watch-2026-10-26-${m}`, "nbis").day)).map(a => [a.start, a.end]))
     .toEqual([["2026-10-25", "20:00"], ["2026-10-25", "20:05"], ["2026-10-25", "22:30"], ["2026-10-26", "00:00"], ["2026-10-26", "00:00"]]
       .map(([date, clock]) => [at(date, clock), at("2026-10-26", "20:00")]))
+  // A quiet night leaves the left five minutes at a time: SILK's first two
+  // trades of Thursday night came at 20:00 and 20:20, and with its trades
+  // held at the open, one bar past it the chart starts at 20:05, not at its
+  // next trade.
+  const silk = savedDay("day", "silk")
+  const silkOpen = silk.session.regular.start
+  const silkNight = traded("day", fixture("moments/day/robinhood-day.json").results.map(r => r.symbol)).SILK
+  const startAt = through => M.chartSpan(M.dayChart({ ...silk, points: silk.points.filter(p => p.t <= silkOpen) },
+    { bars: silkNight.bars.filter(b => b.t <= silkOpen), through }, calendars).day).start
+  expect([startAt(silkOpen), startAt(silkOpen + 300)]).toEqual([at("2026-10-01", "20:00"), at("2026-10-01", "20:05")])
 })
 
 test("through a night, until 04:00, the chart keeps the day that closed with tonight at its end, measured from the close before that day", () => {
