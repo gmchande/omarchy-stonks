@@ -937,6 +937,18 @@ Harness {
         stub.entries = Object.assign({}, stub.entries, { "SHOP.TO": { status: "ok", receivedAt: root.now } })
         body.search.showResult(body.search.shown.map(function(r) { return r.symbol }).indexOf("SHOP.TO"))
       }
+      // popup-search-own-retry-*: "inc" typed, eight of the list's own
+      // found by name, and Yahoo's lookup failed: what it said, and RETRY,
+      // in sight under them.
+      if (root.stateName.indexOf("-own-retry-") > 0) {
+        body.search.results = []
+        body.search.searchText = "inc"
+        root.searchField(body.search).text = "inc"
+        body.search.resultsQuery = "inc"
+        body.search.failure = "none"
+        body.search.answer = "failed"
+        body.search.showResult(0)
+      }
       // popup-search-waiting-*: "berk" typed, Yahoo not yet answered: the
       // list's Berkshire found by its name, chosen, the wait said under it.
       if (root.stateName.indexOf("-waiting-") > 0) {

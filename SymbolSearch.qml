@@ -49,6 +49,11 @@ FocusScope {
   function dimmed(index) { return stale && index >= ownCount }
   property string note: ""
   readonly property bool messageShown: answer === "none" || answer === "failed" || (answer === "" && slow)
+  // What Yahoo said goes under the list's own; with more of them than the
+  // view's rows, it takes the view's last line, so it and its RETRY stay in
+  // sight and the search keeps its height.
+  readonly property int viewRows: Math.floor((resultsHeight + rowGap) / rowPitch)
+  readonly property bool messagePinned: messageShown && ownCount >= viewRows
   // For the answer on screen: its query, and "results", "none", "failed",
   // or "" before any.
   property string resultsQuery: ""
@@ -253,7 +258,7 @@ FocusScope {
     if (index < 0 || index >= shown.length) return
     root.choose(index)
     var top = index * rowPitch
-    var bottom = top + (index === shown.length - 1 && (note !== "" || searchMessage.visible) ? rowPitch : 0) + rowHeight
+    var bottom = top + (index === shown.length - 1 && note !== "" ? rowPitch : 0) + rowHeight
     var limit = Math.max(0, resultsColumn.implicitHeight - resultsScroll.height)
     if (top < resultsScroll.contentY) resultsScroll.contentY = Math.min(limit, top)
     else if (bottom > resultsScroll.contentY + resultsScroll.height)
@@ -377,8 +382,8 @@ FocusScope {
     anchors.right: parent.right
     anchors.top: fieldBar.bottom
     anchors.topMargin: root.resultsGap
-    height: root.resultsHeight
-    visible: root.shown.length > 0 || root.note !== "" || root.messageShown
+    height: root.resultsHeight - (root.messagePinned ? root.rowPitch : 0)
+    visible: root.shown.length > 0 || root.note !== ""
     contentWidth: width
     contentHeight: resultsColumn.implicitHeight
     clip: true
@@ -502,48 +507,53 @@ FocusScope {
         font.pixelSize: Style.font.bodySmall
         elide: Text.ElideRight
       }
+    }
+  }
 
-      // What Yahoo said, or that it is still being asked, under any of the
-      // list's own.
-      Item {
-        visible: root.messageShown
-        opacity: root.stale ? 0.4 : 1
-        width: parent.width
-        height: root.rowHeight
+  // What Yahoo said, or that it is still being asked, under any of the
+  // list's own, or on the view's last line (`messagePinned`).
+  Item {
+    visible: root.messageShown
+    opacity: root.stale ? 0.4 : 1
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.rightMargin: root.gutter
+    anchors.top: fieldBar.bottom
+    anchors.topMargin: root.resultsGap + (root.messagePinned ? (root.viewRows - 1) * root.rowPitch
+      : root.ownCount * root.rowPitch - resultsScroll.contentY)
+    height: root.rowHeight
 
-        Text {
-          id: searchMessage
-          objectName: "searchMessage"
-          visible: root.messageShown
-          anchors.left: parent.left
-          width: Math.min(implicitWidth, parent.width - (retrySearch.visible ? retrySearch.implicitWidth + Style.space(16) + root.rowPadding : 0))
-          height: parent.height
-          leftPadding: root.rowPadding
-          verticalAlignment: Text.AlignVCenter
-          textFormat: Text.PlainText
-          text: root.answer === "none" ? (root.ownCount > 0 ? "No other matches for “" : "No matches for “") + root.resultsQuery + "”"
-            : root.answer === "failed" ? "Couldn’t search · " + (root.failure === "refused" ? "server busy"
-              : root.failure === "none" ? "check your connection" : root.failure === "missing" ? "try other words" : "try again")
-            : "Searching for “" + root.searchText.trim() + "”…"
-          color: root.dim
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.bodySmall
-          elide: Text.ElideRight
-        }
+    Text {
+      id: searchMessage
+      objectName: "searchMessage"
+      visible: root.messageShown
+      anchors.left: parent.left
+      width: Math.min(implicitWidth, parent.width - (retrySearch.visible ? retrySearch.implicitWidth + Style.space(16) + root.rowPadding : 0))
+      height: parent.height
+      leftPadding: root.rowPadding
+      verticalAlignment: Text.AlignVCenter
+      textFormat: Text.PlainText
+      text: root.answer === "none" ? (root.ownCount > 0 ? "No other matches for “" : "No matches for “") + root.resultsQuery + "”"
+        : root.answer === "failed" ? "Couldn’t search · " + (root.failure === "refused" ? "server busy"
+          : root.failure === "none" ? "check your connection" : root.failure === "missing" ? "try other words" : "try again")
+        : "Searching for “" + root.searchText.trim() + "”…"
+      color: root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.bodySmall
+      elide: Text.ElideRight
+    }
 
-        ListAction {
-          id: retrySearch
-          objectName: "searchRetry"
-          view: root
-          visible: root.answer === "failed" && root.failure !== "missing"
-          enabled: !root.stale
-          anchors.left: searchMessage.right
-          anchors.leftMargin: Style.space(16)
-          anchors.verticalCenter: searchMessage.verticalCenter
-          text: "RETRY"
-          onActivated: root.retry()
-        }
-      }
+    ListAction {
+      id: retrySearch
+      objectName: "searchRetry"
+      view: root
+      visible: root.answer === "failed" && root.failure !== "missing"
+      enabled: !root.stale
+      anchors.left: searchMessage.right
+      anchors.leftMargin: Style.space(16)
+      anchors.verticalCenter: searchMessage.verticalCenter
+      text: "RETRY"
+      onActivated: root.retry()
     }
   }
 

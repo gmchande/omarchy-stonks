@@ -818,8 +818,9 @@ Harness {
       keys.forceActiveFocus()
       keyClick(Qt.Key_A)
       tryVerify(function() { return body.adding && body.search.active }, 2000)
-      // The stand-in names every stock as Apple's, so AP finds all three by
-      // that name, in the list's order.
+      // The stand-in names every stock as Apple's: A finds AAPL by its
+      // symbol and the other two by that name, AAPL chosen; AP finds all
+      // three by the name, in the list's order, and AAPL stays chosen.
       keyClick("A")
       keyClick("P")
       within(1000, function() { return body.search.ownCount === 3 })
@@ -851,7 +852,7 @@ Harness {
       mouseClick(body, at.x, at.y)
       var clicked = within(2000, function() { return !body.adding && service.featuredSymbol === "NVDA" && watchlist.cursorRow === "NVDA" })
       harness.check("search shows the list's own stocks first, by symbol or name, each with its row's move, kept current as prices land; Enter or a click on one shows it with its row selected, and Enter before the typing pause asks Yahoo nothing; Yahoo's answer joins below without moving the choice, and more typing brings the list's first back into sight",
-        led && shown && kept === "true,AAPL,AAPL,1,NVDA AAPL MSFT,true" && back === "true,true" && clicked,
+        led && shown && kept === "true,MSFT,MSFT,2,NVDA AAPL MSFT,true" && back === "true,true" && clicked,
         ledDetail + " / " + shownDetail + " / " + kept + " / " + back + " / " + service.featuredSymbol)
       service.feature(featured)
       body.resetInteraction()
@@ -986,6 +987,56 @@ Harness {
       service.removeSymbol("SHOP.TO")
       service.feature(featured)
       body.resetInteraction()
+      mouseMove(body, 1, 1)
+    }
+
+    // With eight of the list's own found and Yahoo's lookup failed, what it
+    // said and its RETRY stay in sight under them, over no row, and RETRY
+    // asks again.
+    function statusInSight(body, watchlist, keys) {
+      ;["TALL1", "TALL2"].forEach(function(s) { service.addSymbol(s) })
+      tryVerify(function() { return service.arriving.length === 0 && !!service.quotes.TALL2 }, 8000)
+      // A short window, whose search has room for fewer rows than it found.
+      var tall = app.testWindow.implicitHeight
+      app.close()
+      app.testWindow.implicitHeight = body.chromeHeight + 4 * body.rowPitch
+      app.open("{}")
+      tryVerify(function() { return app.opened }, 2000)
+      hold("SEARCH.down", true)
+      keys.forceActiveFocus()
+      keyClick("/")
+      ;["I", "N", "C"].forEach(function(k) { keyClick(k) })
+      var failed = within(4000, function() { return body.search.answer === "failed" && body.search.ownCount === 8 })
+      var view = harness.find(body.search, "searchResults")
+      var message = harness.find(body.search, "searchMessage")
+      var retry = harness.find(body.search, "searchRetry")
+      var top = view.mapToItem(body, 0, 0).y, bottom = top + body.search.resultsHeight
+      var inSight = function(item) {
+        var y = item.mapToItem(body, 0, 0).y
+        return item.visible && item.width > 0 && y >= top - 1 && y + item.height <= bottom + 1
+      }
+      var said = message.mapToItem(body, 0, 0).y
+      // A row under the line would be covered: every row the view shows
+      // ends above it.
+      var viewBottom = top + view.height
+      var covered = harness.findAll(body.search, "searchResult").filter(function(r) {
+        var y = r.mapToItem(body, 0, 0).y
+        return y + r.height > said && y < said + message.height && y + r.height > top && y < viewBottom
+      }).map(function(r) { return r.modelData.symbol })
+      var shown = [failed, inSight(message), inSight(retry), covered.join(" ") || "none"].join(",")
+      hold("SEARCH.down", false)
+      var asked = harness.calls("SEARCH.asked")
+      var at = retry.mapToItem(body, retry.width / 2, retry.height / 2)
+      if (inSight(retry)) mouseClick(body, at.x, at.y)
+      var retried = within(3000, function() { return harness.calls("SEARCH.asked") > asked })
+      harness.check("with eight of the list's own found, a failed search's words and RETRY stay in sight under them, over no row, and RETRY asks again",
+        shown === "true,true,true,none" && retried, shown + " | retried " + retried + " | message at " + Math.round(said) + " in " + Math.round(top) + "-" + Math.round(bottom))
+      body.resetInteraction()
+      ;["TALL1", "TALL2"].forEach(function(s) { service.removeSymbol(s) })
+      app.close()
+      app.testWindow.implicitHeight = tall
+      app.open("{}")
+      tryVerify(function() { return app.opened }, 2000)
       mouseMove(body, 1, 1)
     }
 
@@ -1180,6 +1231,7 @@ Harness {
       previewLeavesItsFigures(body, keys)
       earlyEnter(body, keys, held.kept)
       pickUnderPointer(body, watchlist, keys)
+      statusInSight(body, watchlist, keys)
       app.close()
       harness.finish()
     }
