@@ -1319,8 +1319,8 @@ Item {
     hint: root.hint
     showsHint: root.hintShown
     ground: root.ground
-    label: root.listName !== "" ? "+  Find or add in " + root.listName : "+  Find or add a symbol"
-    labelShort: root.listName !== "" ? "+  Find or add a symbol" : ""
+    // The same on every list: the list's name is already at its top.
+    label: "+  Find or add a symbol"
     acts: !root.settingsUnreadable
     onHoveredChanged: root.holdNote()
     undoLabel: root.undoOffered ? "Undo " + root.undoOffered.symbol : ""
