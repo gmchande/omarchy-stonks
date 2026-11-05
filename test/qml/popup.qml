@@ -300,7 +300,7 @@ Harness {
       var opensBefore = harness.opensTold
       panel.open()
       harness.check("an open panel's clock and Yahoo's pause are the service's",
-        body.now === service.now && !!body.hostPause && body.hostPause.forms[0].indexOf("Server busy") === 0)
+        body.now === service.now && !!body.hostPause && body.hostPause.forms[1].indexOf("Server busy") === 0)
       service.yahooGate = null
       harness.check("reopen tells the service the panel is open", harness.opensTold > opensBefore)
 
@@ -461,6 +461,15 @@ Harness {
       harness.check("a file that can't be read is said over an update, its sentence whole and the file named with its folder",
         updateFirst && both === harness.fileNotice && /^( · f|F)ix or remove ~\/\.config\/omarchy\/grvc\.stonks\.json$/.test(fix),
         updateFirst + "|" + both + "|" + fix)
+      // A note over the notice says itself in the notice's room: the footer,
+      // and the card over it, keep their height.
+      var noticeFooter = find(popup.testBody, "footer")
+      var noticeHeight = noticeFooter.height
+      popup.testBody.say("Nothing to undo")
+      var noted = harness.footerText(popup) + " | " + noticeFooter.height
+      popup.testBody.clearNote()
+      harness.check("a note over the file's notice keeps the footer's height", noted === "Nothing to undo | " + noticeHeight,
+        noted + " over " + noticeHeight)
       harness.writeFile(harness.dataPath, goodData)
       within(5000, function() { return !harness.hintService.settingsUnreadable })
 

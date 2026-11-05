@@ -64,6 +64,15 @@ function zonedHhmm(t, gmtoffset, name) {
   return zoned(hhmm(t, gmtoffset), t, gmtoffset, name)
 }
 
+// Sentence case for words the header writes in capitals, keeping a day's
+// and a month's name and a zone: "As of Thu 16:39 BST", "As of 2 Sep 13:17".
+var NAMED = new RegExp("\\b(" + WEEKDAYS.concat(MONTHS).join("|").toLowerCase() + ")\\b", "g")
+function sentenceCase(text) {
+  var sentence = text.charAt(0) + text.slice(1).toLowerCase()
+  return sentence.replace(NAMED, function(name) { return name.charAt(0).toUpperCase() + name.slice(1) })
+    .replace(/(\d\d:\d\d) (\S+)/, function(all, clock, zone) { return clock + " " + zone.toUpperCase() })
+}
+
 function duration(seconds) {
   var s = Math.ceil(Math.abs(seconds) / 60) * 60
   var d = Math.floor(s / 86400)

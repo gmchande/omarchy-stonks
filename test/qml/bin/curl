@@ -49,7 +49,8 @@
 # can still be out when the panel closes and opens again; FAST answers them
 # at once, as Yahoo does on a normal network; ZZZ answers with
 # no matches, OOPS gets no answer, WRONG answers 400, as Yahoo does a
-# question it calls wrong, ONE answers the first SHOP result alone,
+# question it calls wrong, BLOCK answers 403, as a refusal for a reason of
+# Yahoo's own would, ONE answers the first SHOP result alone,
 # BTC Yahoo's five long symbols for "wrapped btc", VFIAX and EURUSD
 # Yahoo's answers for those, which hold kinds Stonks leaves out, and MIXED
 # the five SHOP results with EURUSD's currency after them. Each SHOP answer
@@ -225,6 +226,7 @@ serve() {
       *"q=ZZZ"*) echo '{"quotes":[]}' ;;
       *"q=OOPS"*) exit 22 ;;
       *"q=WRONG&"*) echo '{"finance":{"result":null,"error":{"code":"Bad Request","description":"Invalid Search Query"}}}'; exit 40 ;;
+      *"q=BLOCK&"*) echo 'Forbidden'; exit 43 ;;
       *"q=ONE&"*) jq -c '.quotes |= .[:1]' "$fixtures/search.json" ;;
       *"q=VFIAX&"*) cat "$fixtures/search-vfiax.json" ;;
       *"q=EURUSD&"*) cat "$fixtures/search-eurusd.json" ;;
@@ -465,6 +467,7 @@ for i in "${!urls[@]}"; do
     case $served in
       0) status=200 ;;
       40) status=400 ;;
+      43) status=403 ;;
       44) status=404 ;;
       7) status=000; exit_code=7; body="" ;;
       *) status=502 ;;

@@ -68,17 +68,10 @@ Rectangle {
   readonly property string freshnessNote: quote ? Figures.freshnessText(shownFreshness, quote, calendars) : ""
   property string newestTime: ""
   readonly property string detail: quote
-    ? (freshnessNote !== "" ? (warns ? "! " : "") + capitalize(freshnessNote) : view.name)
+    ? (freshnessNote !== "" ? (warns ? "! " : "") + Format.sentenceCase(freshnessNote) : view.name)
     : sourceDown ? "" : (status === "failed" ? "! No data for this symbol" : warns ? "! No data" : "Loading…")
   readonly property string detailTime: quote && freshnessNote === "" && newestTime !== ""
     ? (detail !== "" ? " · " : "") + newestTime : ""
-
-  // Sentence case that keeps a day's name and a zone: "As of Thu 16:39 BST".
-  function capitalize(text) {
-    var sentence = String(text.charAt(0) + text.slice(1).toLowerCase())
-    return sentence.replace(/\b(mon|tue|wed|thu|fri|sat|sun)\b/, function(day) { return day.charAt(0).toUpperCase() + day.slice(1) })
-      .replace(/(\d\d:\d\d) (\S+)/, function(all, clock, zone) { return clock + " " + zone.toUpperCase() })
-  }
 
   readonly property int sparkWidth: Style.space(72)
   readonly property int priceWidth: Style.space(96)
@@ -145,6 +138,7 @@ Rectangle {
       ground: Qt.tint(row.ground, row.fill)
       pixel: 2
       gap: 1
+      bells: false
       scrubX: row.scrubX
       reveal: row.reveal
     }

@@ -228,7 +228,9 @@ FocusScope {
   property var gate: null
   property var clearance: null
   // "none" when nothing answered, "refused", "missing" when Yahoo called the
-  // question wrong (as it does an emoji), or "other".
+  // question wrong (as it does an emoji), or "other" (`Search.failure`). Set
+  // by the answer that lands, so a run stopped or overtaken by typing never
+  // changes what the answer on screen says.
   property string failure: ""
 
   // Only a lookup that failed for want of Yahoo is asked again as it answers.
@@ -251,8 +253,7 @@ FocusScope {
     requestedQuery = ""
     activeQuery = q
     if (gate && gate.take(1) === 0) {
-      root.failure = gate.pause === "refused" || gate.pause === "none" ? gate.pause : "other"
-      land("")
+      land("", gate.pause === "refused" || gate.pause === "none" ? gate.pause : "other")
       return
     }
     fetchRun.send([Search.searchUrl(q)], Fetch.SEARCH_CAP)
@@ -264,10 +265,11 @@ FocusScope {
   }
 
   // An answer counts only for the query still in the field. A body of ""
-  // fails to parse: no answer.
-  function land(body) {
+  // fails to parse: no answer, failed for `why`.
+  function land(body, why) {
     slowSearch.stop()
     if (root.active && root.activeQuery !== "" && root.activeQuery === root.searchText.trim()) {
+      root.failure = why
       var first = 0
       try {
         var parsed = Search.parseSearch(JSON.parse(body))
@@ -322,9 +324,8 @@ FocusScope {
     gate: root.gate
     onEnded: function(got) {
       // No answer at all, as from a curl stopped short, is nothing answered.
-      var kind = got.length ? got[0].kind : "none"
-      root.failure = kind === "none" || kind === "refused" || kind === "missing" ? kind : "other"
-      root.land(kind === "ok" ? got[0].body : "")
+      var answer = got.length ? got[0] : null
+      root.land(answer && answer.kind === "ok" ? answer.body : "", Search.failure(answer))
     }
   }
 

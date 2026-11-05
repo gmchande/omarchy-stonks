@@ -132,9 +132,10 @@ draws Robinhood's trades there. They never replace a price Yahoo sent.
 A US stock that doesn't trade at night shows its day up to 20:00, and
 keeps that day until its next trade. Once the chart shows a day
 before today, the low, high, open and volume under it name it, such as
-MON. When the rows all measure a day that has ended, such as Friday at the
-weekend, the list says so where it says TODAY. A coin never closes, so its
-chart, its change, and its low and high cover the last 24 hours.
+MON. When the list's US stocks and ETFs all measure a day that has ended,
+such as Friday at the weekend, the list says so where it says TODAY. A coin
+never closes, so its chart, its change, and its low and high cover the last
+24 hours.
 
 A price says "As of" and its time when it's old: more than two minutes
 behind while its market trades, or saved from before and not yet
@@ -321,7 +322,7 @@ again.
 - **"1W unavailable" or "Couldn't search", with RETRY.** Yahoo didn't
   send that chart or those results. Click RETRY. While search says
   "server busy", RETRY works again once Yahoo lets Stonks back in, at most
-  about half an hour on.
+  36 minutes on.
 - **"Couldn't search · try other words".** Yahoo can't search for what you
   typed, such as an emoji. Type other words.
 - **"market hours unknown".** Stonks' calendar for this exchange has run
@@ -334,9 +335,11 @@ again.
   restarts. Fix the file and save it, and Stonks reads it at once. Or
   remove it to start over.
 - **"Your changes aren't saved" in the footer.** Stonks can't write your
-  lists file, because the disk is full or the file or its folder is
-  read-only. A restart loses every change since the last save. Free some
-  space or fix the permissions, then click the footer.
+  lists file. Beside "click to try again", the disk is full or the file or
+  its folder is read-only: free some space or fix the permissions, then
+  click the footer. Beside "fix or remove", Stonks can't read the file and
+  won't write over it: fix it or remove it, as above. Either way, a
+  restart loses every change since the last save.
 
 To report a wrong price or anything else, use the
 [bug form](https://github.com/gmchande/omarchy-stonks/issues/new?template=bug.yml).
@@ -400,8 +403,8 @@ personal use, so either may change or stop without notice.
   `~/.config/omarchy/grvc.stonks.json`.
 
 Stonks asks for nothing while every screen is off. When a site turns it
-away, it waits before asking again: as long as the site asks, or longer
-each time, up to about half an hour.
+away, it waits before asking again: about as long as the site asks, or
+longer each time, up to 36 minutes.
 
 **Files:**
 
@@ -428,9 +431,9 @@ omarchy restart shell
 
 Or, when the footer says "Update to …", click it or press `Shift+U`. A
 terminal opens and shows what changes. Say yes, and it updates Stonks and
-restarts the shell, unless Stonks has changes it hasn't saved. Then, or
-after an update run anywhere else, the footer says "Updated to … · click to
-restart the shell". Stonks never updates itself.
+restarts the shell, unless Stonks has changes it hasn't saved or can't read
+your lists file. Then, or after an update run anywhere else, the footer says
+"Updated to … · click to restart the shell". Stonks never updates itself.
 
 ## Remove
 

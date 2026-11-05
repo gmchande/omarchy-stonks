@@ -861,6 +861,21 @@ Harness {
       // Time for a request that mustn't go (search answers in 0.4 s).
       wait(600)
       var wrong = [message.visible, message.text, retry.visible, harness.calls("SEARCH.asked") - askedWrong, body.search.answer].join(",")
+      // Typing on while that answer shows: a lookup stopped by the next key
+      // changes neither its words nor RETRY.
+      hold("SEARCH.hold", true)
+      keyClick("X")
+      within(2000, function() { return body.search.activeQuery === "WRONGX" })
+      keyClick("Y")
+      within(2000, function() { return body.search.activeQuery === "WRONGXY" })
+      var typedOn = [message.text, retry.visible].join(",")
+      hold("SEARCH.hold", false)
+      tryVerify(function() { return body.search.resultsQuery === "WRONGXY" }, 3000)
+      // Any other refusal may pass: it says to try again, and offers RETRY.
+      keyClick(Qt.Key_A, Qt.ControlModifier)
+      ;["B", "L", "O", "C", "K"].forEach(function(k) { keyClick(k) })
+      tryVerify(function() { return body.search.resultsQuery === "BLOCK" }, 3000)
+      var blocked = [message.text, retry.visible].join(",")
       // An answer holding only kinds Stonks leaves out says what it found
       // where "No matches" would be; one with results too lists them and
       // says the rest under them, and the arrows stop at the last result.
@@ -891,11 +906,13 @@ Harness {
       var cleared = [body.search.results.length === 0, body.adding, watchlist.visible].join(",")
       harness.check("a query out keeps the last results stale and the rows away",
         whileOut === "true,true,true" && freshAgain && cleared === "true,true,false", whileOut + "|" + freshAgain + "|" + cleared)
-      harness.check("an empty answer and a failed lookup each say so in place, differently, and a query Yahoo calls wrong asks for other words, never again",
+      harness.check("an empty answer and a failed lookup each say so in place, differently, and a query Yahoo calls wrong asks for other words, never again, and says so while the next is typed; any other refusal offers RETRY",
         noMatches === "true,true,No matches for “ZZZ”"
           && failed === "true,Couldn’t search · try again"
-          && wrong === "true,Couldn’t search · try other words,false,0,failed",
-        noMatches + " / " + failed + " / " + wrong)
+          && wrong === "true,Couldn’t search · try other words,false,0,failed"
+          && typedOn === "Couldn’t search · try other words,false"
+          && blocked === "Couldn’t search · try again,true",
+        noMatches + " / " + failed + " / " + wrong + " / " + typedOn + " / " + blocked)
       harness.check("an answer of kinds Stonks leaves out names them where \"No matches\" would be, and under the results it shows, the arrows stopping at the last result",
         fundAlone === "0,false,true,Stonks doesn’t show mutual funds"
           && beside === "18QQ.Z Q0SF.Z,false,true,Stonks doesn’t show currencies or futures,1",

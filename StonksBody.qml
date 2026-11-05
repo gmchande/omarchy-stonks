@@ -320,7 +320,7 @@ Item {
   // The panel says Yahoo's pause short; the window has room for a sentence.
   readonly property var troubleForms: {
     if (!service || scrubShown || refreshing || (historyActive && historyFailed)) return null
-    if (hostPause && warnings > 0) return switchesPanels ? hostPause.forms : [hostPause.sentence].concat(hostPause.forms)
+    if (hostPause && warnings > 0) return switchesPanels ? hostPause.forms.slice(1) : hostPause.forms
     if (yahooDown) return ["Can't get prices · Stonks keeps trying", "Can't get prices"]
     if (featuredQuote && featuredFreshness.state === "failed")
       return ["Refresh failed for " + (chartSymbol || featuredSymbol) + " · Retrying", "Refresh failed · Retrying", "Refresh failed"]

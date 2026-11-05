@@ -529,6 +529,11 @@ test("crypto is always open, never sees a weekend, reads its last 24 hours every
     .toEqual([M.pct((coin.price - ago.p) / ago.p * 100), "24H", "24H"])
   const line = M.chartGeometry(coin)
   expect([M.dayBase(coin), line.points[0].x, line.points.at(-1).x, M.lastLitPoint(line)]).toEqual([ago.p, 0, 1, line.points.at(-1)])
+  // A coin never closes: the line under its chart names the price 24 hours
+  // ago, scrubbed or at rest.
+  const today = M.exchangeDay(coin, coin.marketTime)
+  expect([0, coin.points[5].t].map(scrubT => M.dayBaselineText(coin, today, scrubT)))
+    .toEqual(["24H AGO " + M.money(ago.p, coin.priceDigits), "24H AGO " + M.money(ago.p, coin.priceDigits)])
   // An answer that doesn't reach back 24 hours, a one-day answer, has no
   // price 24 hours ago: its quote stays Yahoo's UTC day, titled as a day.
   expect([btc.rolling, btc.prevClose, M.dayTitle(btc, M.exchangeDay(btc, btc.marketTime))])
@@ -1258,6 +1263,8 @@ test("a quote kept from an earlier session says when it is from, and warns only 
   // A week or more back: its date, as a print says it, never a weekday read as this week's.
   const weekOld = M.freshness(saved, close, reg.start + 7 * DAY + 60, 0)
   expect(M.freshnessText(weekOld, q)).toBe("AS OF 1 SEP 15:59")
+  // A row says it in sentence case, its day and month named as the hero names them.
+  expect([nextDay, weekOld].map(f => M.sentenceCase(M.freshnessText(f, q)))).toEqual(["As of Tue 15:59", "As of 1 Sep 15:59"])
 })
 
 test("outside trading an old close is normal, but a failed refresh still shows", () => {
