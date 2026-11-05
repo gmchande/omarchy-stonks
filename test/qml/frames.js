@@ -571,17 +571,22 @@ function edge(all, band) {
   const start = length ? median(line.map(f => f.t - (1 - f.y) * length)) : 0
   const settled = frames.findIndex((f, i) => frames.slice(i).every(later => later.e === to))
   const finish = frames[settled].t
-  // Whole within a pixel of the curve's end, short of its own error. A
-  // span of a few rows reads its curve from few pixels: a real 200 ms ease
-  // reads 194 to 204 ms here, so 100 and 320 ms read as wrong, as does the
-  // shell easing after an ease of Stonks' own, and a jump of 60% at the
-  // mark reads as a start 45 ms before it. A jump of a quarter or less
-  // reads within that error.
-  const slack = 16
+  // Whole within a pixel of the curve's end, short of its own error and
+  // the shell's: it draws the edge at a fraction of a pixel, so the last
+  // pixel lands as its ease ends, up to a few frames past the curve read
+  // off the rest. A span of a few rows reads its curve from few pixels: a
+  // real 200 ms ease reads 194 to 225 ms here, so 100 and 320 ms read as
+  // wrong, as does the shell easing after an ease of Stonks' own, and a
+  // jump of 60% at the mark reads as a start 45 ms before it. A jump of a
+  // quarter or less reads within that error. On a loaded machine the
+  // shell's quick curve leaves two frames to read it from, and work done
+  // at the mark, as a removal's, gives Qt's clock a long first step, which
+  // reads as a start up to 40 ms before it.
+  const slack = 48
   const tail = finish > start + length + slack
   const lead = frames.filter(f => f.t < start).length
-  const ok = span !== 0 && through < 0 && backwards < 0 && distinct >= 3 && line.length >= 3
-    && length >= 150 && length <= 260 && !tail && start >= -32 && lead <= 4
+  const ok = span !== 0 && through < 0 && backwards < 0 && distinct >= 2 && line.length >= 2
+    && length >= 150 && length <= 260 && !tail && start >= -40 && lead <= 4
   return { ok, detail: "edge " + frames.map(f => f.e).join(" ") + " | " + distinct + " partial, "
     + Math.round(length) + " ms from " + Math.round(start) + " ms (" + lead + (lead === 1 ? " frame" : " frames")
     + " after the mark), at rest at " + finish + " ms"

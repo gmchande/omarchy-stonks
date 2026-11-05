@@ -260,7 +260,9 @@ Harness {
 
     // With the shell's animations off (`omarchy toggle animations`), the
     // panel opens with its chart whole and a list switch puts the edge in
-    // place at once: every frame from the change on is the same picture.
+    // place at once: from the change on, every frame shows the same chart,
+    // and the edge where it rests. The words may change meanwhile, as the
+    // clock turns a minute.
     function stillWithMotionOff() {
       // An ease begun before the switch runs to its end.
       tryVerify(function() { return panel.testCard.drawnHeight === panel.testCard.contentHeight }, 2000)
@@ -269,13 +271,22 @@ Harness {
       grab.source = panel.testCard.surface
       grab.begin("still-open")
       moreFrames(15)
-      var opened = verdict("same")
+      // From the open's fourth frame: a hover's fade begun before the switch
+      // can finish in the first three. The draw-in an open used to start
+      // runs 320 ms.
+      grab.end()
+      tryVerify(function() { return grab.waiting === 0 }, 5000)
+      var chart = find(panel.testBody, "heroChart")
+      var at = chart.mapToItem(panel.testCard.surface, 0, 0)
+      grab.judge("same:" + [Math.round(at.x), Math.round(at.y), Math.round(chart.width), Math.round(chart.height)].join(","), grab.frames.slice(3), [])
+      tryVerify(function() { return grab.verdict !== null }, 10000)
+      var opened = grab.verdict
       filmed("with animations off, the panel opens whole and still", opened.ok, opened)
       service.switchList("Short")
       waitForRendering(panel.testCard.surface)
       grab.begin("still-switch")
       moreFrames(12)
-      var switched = verdict("same")
+      var switched = verdict("edgeheld")
       filmed("with animations off, a switch to a shorter list moves the edge at once", switched.ok && service.listName === "Short", switched)
       service.switchList("")
       panel.close()
