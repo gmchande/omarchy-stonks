@@ -244,8 +244,12 @@ BarWidget {
     }
     onWheelMoved: function(delta) { root.walk(delta) }
 
+    // What the pill draws takes the button's press, as the shell's own bar
+    // icons do (BarIconButton): held down, it gives a little, while the hit
+    // area and the bar's layout hold still.
     Row {
       id: content
+      scale: button.pressScale
       anchors.centerIn: parent
       anchors.verticalCenterOffset: root.vertical ? -root.markRoom / 2 : 0
       spacing: Style.space(6)
@@ -413,6 +417,7 @@ BarWidget {
     Text {
       id: sideMark
       objectName: "pillCopyMarkUnder"
+      scale: button.pressScale
       visible: root.marked && root.vertical
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.bottom: parent.bottom
@@ -427,6 +432,7 @@ BarWidget {
     // four characters.
     Column {
       objectName: "pillStack"
+      scale: button.pressScale
       visible: root.vertical && !root.iconOnly
       anchors.centerIn: parent
       anchors.verticalCenterOffset: -root.markRoom / 2

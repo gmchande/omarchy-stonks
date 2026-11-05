@@ -317,6 +317,27 @@ Harness {
       harness.check("the icon pill's hover names its symbol, and says nothing while its panel is open",
         closedTip !== "" && openTip === "", JSON.stringify(closedTip) + " -> " + JSON.stringify(openTip))
 
+      // Held down, what the pill draws gives a little, as the shell's own bar
+      // icons do, its slot holding still, in both looks and either form; let
+      // go, it is whole again. It is held as the bar holds a pill it drags
+      // (WidgetButton's heldButtons), since this pill has no window to press.
+      var lookBefore = service.retro ? "retro" : "smooth"
+      var gives = [["smooth", "icon"], ["retro", "sparkline"]].map(function(way) {
+        service.persist({ style: way[0] })
+        pill.settings = Object.assign({}, formBefore, { barStyle: way[1] })
+        var drawn = find(pill, "pillIcon").parent
+        var width = pill.testButton.width
+        pill.testButton.heldButtons = Qt.LeftButton
+        var held = within(1000, function() { return drawn.scale < 0.95 }) && pill.testButton.width === width
+        pill.testButton.heldButtons = Qt.NoButton
+        var whole = within(1000, function() { return drawn.scale === 1 }) && pill.testButton.width === width
+        return way.join(" ") + " " + held + "," + whole
+      })
+      service.persist({ style: lookBefore })
+      pill.settings = formBefore
+      harness.check("a pill held down gives a little and its slot holds still, in both looks and either form, and is whole once let go",
+        gives.every(function(g) { return /true,true$/.test(g) }), gives.join(" | "))
+
       panel.close()
       panel.open()
       harness.check("hover suppressed", within(1000, function() { return api.centerHoverRevealSuppressed }))
