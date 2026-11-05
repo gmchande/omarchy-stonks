@@ -344,7 +344,7 @@ Harness {
   QtObject {
     id: stub
     property var symbols: ["AAPL", "SHOP.TO"]
-    // The copy's id (dev-<state>): the header wears the mark under another.
+    // The copy's id (dev-<state>), as its lists file is named.
     readonly property string pluginId: root.copyId
     property bool settingsUnreadable: false
     // A save that didn't land (popup-notice-save-*), said again after a

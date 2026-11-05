@@ -317,8 +317,8 @@ every_state() (
     states="$states quiet-lit-popup-sweep-2026-10-07-1455-spy-smooth-size-$size"
   done
   # A second copy beside a user's, run under grvc.stonks-dev: its mark on
-  # every pill form and on the header, in the panel, at 16 and in the window,
-  # a long name cut short before it.
+  # every pill form, and its header as a user's, in the panel, at 16 and in
+  # the window.
   states="$states dev-pill-sheet dev-popup-sweep-2026-10-07-1455-spy-smooth dev-popup-sweep-2026-10-07-1455-spy-retro"
   states="$states dev-popup-sweep-2026-10-07-1455-spy-smooth-size-16 dev-window-undo-retro"
   echo $states

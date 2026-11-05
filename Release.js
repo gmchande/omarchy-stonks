@@ -5,8 +5,8 @@
 var MANIFEST_URL = "https://raw.githubusercontent.com/gmchande/omarchy-stonks/main/manifest.json"
 
 // The id every user's install has. A copy run under another, beside it,
-// wears a mark on its pill and its header (`otherCopy`), so the two tell
-// apart; a user never sees it.
+// wears a mark on its pill (`otherCopy`), so the two tell apart; a user
+// never sees it.
 var RELEASED_ID = "grvc.stonks"
 
 function otherCopy(id) {
