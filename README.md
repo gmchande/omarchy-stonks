@@ -1,8 +1,8 @@
 # Stonks
 
-Stonks puts a stock ticker and your watchlist in the Omarchy 4 bar. A
-small pill shows how one stock is doing today. Click it for the chart and
-your lists.
+Stonks puts a stock ticker and your watchlist in the Omarchy bar, made for
+Omarchy 4.5. A small pill shows how one stock is doing today. Click it for
+the chart and your lists.
 
 <img src="preview.png" alt="Stonks in the Omarchy bar. The pill shows Nebius (NBIS) up 2.88%. Below it, the panel shows Nebius Group at 163.31 over the day's chart in pixel columns. Beside it: 'Stocks in your Omarchy bar. Free · No account · No API key'">
 
@@ -29,7 +29,10 @@ Website: [getstonks.app](https://getstonks.app)
 
 ## Install
 
-You need Omarchy 4.
+Stonks is made for Omarchy 4.5: it moves at the shell's own pace, keeps
+still when you turn animations off, presses in like the bar's own icons,
+and saves screenshots where Omasnap saves yours. On earlier Omarchy 4
+releases, back to 4.0, it runs without them.
 
 ```sh
 omarchy plugin add https://github.com/gmchande/omarchy-stonks.git --enable
