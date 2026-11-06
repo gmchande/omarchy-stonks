@@ -162,9 +162,39 @@ function spritePixels(rows) {
   return out
 }
 
-function spriteFor(up, lids) {
+// Fidget's pricked horns and ears, a row higher than the sprite's: its top
+// four rows, in place of the sprite's own.
+var BULL_PRICKED = [
+  "#..................#",
+  "##................##",
+  ".###............###.",
+  "...##..........##..."
+]
+var BEAR_PRICKED = [
+  "..###..........###..",
+  ".#####........#####.",
+  ".#####........#####.",
+  ".##################."
+]
+
+// Fidget, the header animal's loop: how long each step holds, in ms, and
+// what it does then. It pricks its horns or ears twice, blinks, and sits
+// still: 2.4 s a loop, a step for each change it draws. After an open it
+// sits still for FIDGET_OPENING first.
+var FIDGET = [
+  { ms: 200, pricked: true },
+  { ms: 150 },
+  { ms: 150, pricked: true },
+  { ms: 150, blink: true },
+  { ms: 1750 }
+]
+var FIDGET_OPENING = 1500
+
+function spriteFor(up, lids, pricked) {
   var open = up ? BULL_SPRITE : BEAR_SPRITE
   var half = up ? BULL_HALF : BEAR_HALF
   var shut = up ? BULL_SHUT : BEAR_SHUT
-  return spritePixels(lids === 2 ? shut : lids === 1 ? half : open)
+  var rows = lids === 2 ? shut : lids === 1 ? half : open
+  if (pricked) rows = (up ? BULL_PRICKED : BEAR_PRICKED).concat(rows.slice(4))
+  return spritePixels(rows)
 }

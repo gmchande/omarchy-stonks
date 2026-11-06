@@ -23,6 +23,16 @@ Harness {
   property bool marked: false
 
   Stonks.Service { id: service; pluginId: "grvc.stonks" }
+  // Hyprland's word on the screens (WindowHost), with the panel's own
+  // screen on or off while the rest stay on.
+  QtObject {
+    id: fakeScreens
+    property bool panelScreenOn: true
+    readonly property bool screensOff: false
+    signal screensAnswered()
+    function askScreens() { return false }
+    function screenOn(screen) { return panelScreenOn }
+  }
   QtObject {
     id: shellApi
     function serviceFor(id) { return { service: service } }
@@ -256,6 +266,7 @@ Harness {
       viewsThroughClose()
       reopenMidFade()
       stillWithMotionOff()
+      darkScreen()
       harness.finish()
     }
 
@@ -310,6 +321,15 @@ Harness {
       tryVerify(function() { return grab.verdict !== null }, 10000)
       var opened = grab.verdict
       filmed("with animations off, the panel opens whole and still", opened.ok && whole, opened, whole ? "" : " | a draw-in began")
+      // The animal doesn't fidget: over a loop and more, its square holds.
+      var slot = find(panel.testBody, "animal")
+      var animal = slot.mapToItem(panel.testCard.surface, 0, 0)
+      var shown = slot.parent.kind !== ""
+      grab.begin("still-animal")
+      grab.markStart()
+      tryVerify(function() { return grab.frames.length > 0 && grab.frames[grab.frames.length - 1].at - grab.start >= 2600 }, 6000)
+      var sat = verdict("same:" + [Math.round(animal.x), Math.round(animal.y), Math.round(slot.width), Math.round(slot.height)].join(","))
+      filmed("with animations off, the animal sits still", sat.ok && shown, sat, shown ? "" : " | no animal shows")
       var before = panel.fittedCardHeight
       service.switchList("Short")
       waitForRendering(panel.testCard.surface)
@@ -333,6 +353,23 @@ Harness {
         began && played >= 1700 && played <= 2600, (began ? "played " : "never began, ") + played + " ms")
       panel.close()
       Style.reduceMotion = false
+    }
+
+    // The panel's own screen turned off, the others still on: the animal
+    // stops fidgeting, and starts again when its screen comes back.
+    function darkScreen() {
+      service.screens = fakeScreens
+      panel.open()
+      var header = find(panel.testBody, "animal").parent
+      var ran = within(2000, function() { return header.fidgeting })
+      fakeScreens.panelScreenOn = false
+      var stopped = !header.fidgeting
+      fakeScreens.panelScreenOn = true
+      var again = header.fidgeting
+      panel.close()
+      service.screens = null
+      check("with the panel's own screen off and the others on, the animal stops fidgeting, and starts again when it comes back",
+        ran && stopped && again, "ran " + ran + ", stopped " + stopped + ", again " + again)
     }
 
     function viewsThroughClose() {

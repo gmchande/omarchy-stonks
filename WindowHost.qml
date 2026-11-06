@@ -74,6 +74,12 @@ Item {
   readonly property bool screenOff: monitors.some(function(m) {
     return !!m.lastIpcObject && m.lastIpcObject.dpmsStatus === false
   })
+  // Whether one screen is on: off only once Hyprland has said so, as the
+  // service asks before each fetch.
+  function screenOn(screen) {
+    var monitor = screen ? Hyprland.monitorFor(screen) : null
+    return !monitor || !monitor.lastIpcObject || monitor.lastIpcObject.dpmsStatus !== false
+  }
   signal screensAnswered()
   function askScreens() {
     if (root.monitors.length === 0) return false

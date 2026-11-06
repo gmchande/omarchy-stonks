@@ -2,6 +2,7 @@ import QtQuick
 import QtTest
 import Quickshell
 import Quickshell.Io
+import qs.Commons
 import "plugin" as Stonks
 import "plugin/Quote.js" as Quote
 
@@ -592,6 +593,9 @@ Harness {
     // the slot's pictures (frames.js), each run from a few frames before
     // the change to 400 ms after it.
     function animalFrames(body) {
+      // Fidget held still: each film judges only the change it makes.
+      var header = harness.find(body, "animal").parent
+      header.seen = false
       var featuredBefore = service.featuredSymbol
       var rangeBefore = service.range
       service.persist({ style: "smooth" })
@@ -654,6 +658,7 @@ Harness {
       service.setRange(rangeBefore)
       service.feature(featuredBefore)
       tryVerify(function() { return !body.chartLoading && body.motion.drawn === 1 }, 5000)
+      header.seen = Qt.binding(function() { return body.seen })
     }
 
     // The header's animal falling asleep and waking, as it is rendered with
@@ -669,6 +674,8 @@ Harness {
       var rangeBefore = service.range
       var slot = harness.find(body, "animal")
       var header = slot.parent
+      // Fidget held still: each film judges only the change it makes.
+      header.seen = false
       var words = harness.find(header, "statusText")
       var icon = harness.find(body, "lookIcon")
       var bull = harness.find(body, "bullCells")
@@ -717,6 +724,23 @@ Harness {
       })
       harness.check("the clock closing the market closes the animal's eyes over 320 ms in two steps, in both looks, retro's clock skipping the closing second — "
         + bells.join(" | "), bells.every(function(b) { return /^\w+: ok, /.test(b) }))
+      // The bell landing on Fidget's blink: the eyes it shut never open
+      // again on the way to sleep.
+      look("smooth")
+      awake()
+      header.seen = Qt.binding(function() { return body.seen })
+      tryVerify(function() { return header.fidgeting }, 2000)
+      for (var step = 0; !header.fidget.blink; step++) header.fidgetStep = step
+      var drawn = [header.drawnLids]
+      var noteLids = function() { drawn.push(header.drawnLids) }
+      header.drawnLidsChanged.connect(noteLids)
+      service.now = close
+      tryVerify(function() { return body.animal.asleep && header.closing === 1 && !header.fidget.blink }, 3000)
+      header.drawnLidsChanged.disconnect(noteLids)
+      header.seen = false
+      harness.check("the clock closing the market on the animal's blink never opens its eyes on the way to sleep",
+        drawn[drawn.length - 1] === 2 && drawn.every(function(lids, i) { return i === 0 || lids >= drawn[i - 1] }),
+        "lids went " + drawn.join(","))
       // Sunday at 20:00, DOWN's night starting: it trades all night.
       var wake = close + 2 * 86400
       var wakes = ["smooth", "retro"].map(function(style) {
@@ -769,9 +793,72 @@ Harness {
         + opened.detail, opened.ok && body.animal.asleep && header.closing === 1, body.animal.asleep + ": " + opened.detail)
       words.visible = true
       service.testClockHeld = false
+      header.seen = Qt.binding(function() { return body.seen })
       service.setRange(rangeBefore)
       service.feature(featuredBefore)
       tryVerify(function() { return !body.chartLoading && body.motion.drawn === 1 }, 5000)
+    }
+
+    // Fidget, as it is rendered: from still, the animal holds 1.5 s, then
+    // pricks its horns, rests, pricks them again, blinks, and rests, inside
+    // its own square, while the rest of the header, the words on a held
+    // clock and the icons, holds still. The poses are what the sprites draw
+    // from, each timed from the start; its square's last picture is its
+    // first.
+    function fidgetFrames(body) {
+      var slot = harness.find(body, "animal")
+      var header = slot.parent
+      service.testClockHeld = true
+      tryVerify(function() { return body.animal.kind !== "" && header.fidgeting }, 3000)
+      header.seen = false
+      grab.source = header
+      grab.begin("fidget")
+      var at = grab.frames.length
+      tryVerify(function() { return grab.frames.length >= at + 3 }, 2000)
+      var poses = []
+      var pose = function() {
+        var now = header.pricked ? "prick" : header.drawnLids > header.lids ? "blink" : "rest"
+        if (!poses.length || poses[poses.length - 1].pose !== now) poses.push({ pose: now, at: Date.now() - grab.start })
+      }
+      header.fidgetStepChanged.connect(pose)
+      header.seen = Qt.binding(function() { return body.seen })
+      grab.markStart()
+      pose()
+      tryVerify(function() { return grab.frames.length > 0 && grab.frames[grab.frames.length - 1].at - grab.start >= 3000 }, 6000)
+      grab.end()
+      header.fidgetStepChanged.disconnect(pose)
+      var judged = function(rect) {
+        tryVerify(function() { return grab.waiting === 0 }, 3000)
+        grab.judge("same:" + rect.map(Math.round).join(","))
+        tryVerify(function() { return grab.verdict !== null }, 10000)
+        return grab.verdict
+      }
+      var square = [slot.x, slot.y, slot.width, slot.height]
+      var animal = judged(square)
+      var rest = judged([slot.x + slot.width, 0, header.width - slot.x - slot.width, header.height])
+      tryVerify(function() { return grab.waiting === 0 }, 3000)
+      grab.judge("same:" + square.map(Math.round).join(","), [grab.frames[0], grab.frames[grab.frames.length - 1]])
+      tryVerify(function() { return grab.verdict !== null }, 10000)
+      var back = grab.verdict
+      var told = poses.map(function(p) { return p.pose + "@" + p.at }).join(" ")
+      var near = function(i, at) { return !!poses[i] && Math.abs(poses[i].at - at) <= 250 }
+      var loop = poses.map(function(p) { return p.pose }).join(" ") === "rest prick rest prick blink rest"
+        && near(1, 1500) && near(2, 1700) && near(3, 1850) && near(4, 2000) && near(5, 2150)
+      service.testClockHeld = false
+      harness.check("the animal fidgets inside its own square 1.5 s after it starts: a prick, rest, a prick, a blink, and back to rest; the rest of the header holds still",
+        !animal.ok && animal.changedAt >= 1300 && animal.changedAt <= 1900 && loop && back.ok && rest.ok,
+        "poses " + told + " | the square: " + animal.detail + " | back to its first picture: " + back.detail + " | the rest: " + rest.detail)
+      // Closed mid-blink, then the shell's animations turned off: the next
+      // open starts from the animal's resting pose.
+      for (var step = 0; !header.fidget.blink; step++) header.fidgetStep = step
+      app.close()
+      Style.reduceMotion = true
+      app.open("{}")
+      tryVerify(function() { return body.seen }, 2000)
+      var resting = !header.fidget.blink && !header.pricked && header.drawnLids === header.lids
+      harness.check("closed mid-blink, then opened with animations off, the animal shows its resting pose",
+        resting && !body.animal.asleep, "blink " + header.fidget.blink + ", lids drawn " + header.drawnLids + " of " + header.lids)
+      Style.reduceMotion = false
     }
 
     // A closing surface holds its picture: from the close until the next
@@ -851,6 +938,10 @@ Harness {
       keyClick(Qt.Key_Z, Qt.ControlModifier)
       rest()
       var noted = body.note === "Nothing to undo"
+      // The animal mid-fidget, its horns pricked.
+      var header = harness.find(body, "animal").parent
+      for (var step = 0; !header.fidget.pricked; step++) header.fidgetStep = step
+      var pricked = header.fidgeting && header.pricked
       grab.begin("closing-at-rest")
       frames(3)
       grab.end()
@@ -880,9 +971,9 @@ Harness {
       reopen()
       var adopted = [service.featuredSymbol === "MSFT", body.chartSymbol === "MSFT",
         watchlist.displayedSymbols.indexOf("AAPL") < 0, body.motion.reveal < 1].join(",")
-      harness.check("a closing surface stops the look icon, the rows, and the rule where they are, and holds its chart, figures, rows, and note through an answer, another surface's choice, a removal from All, and the note's time; the next open takes the latest and draws in — in flight "
-        + stepping + " " + inFlight.detail + " | at rest " + noted + " " + atRest.detail + " | open " + adopted,
-        stepping && inFlight.ok && noted && atRest.ok && adopted === "true,true,true,true")
+      harness.check("a closing surface stops the look icon, the animal's fidget, the rows, and the rule where they are, and holds its chart, figures, rows, and note through an answer, another surface's choice, a removal from All, and the note's time; the next open takes the latest and draws in — in flight "
+        + stepping + " " + inFlight.detail + " | at rest " + noted + " " + pricked + " " + atRest.detail + " | open " + adopted,
+        stepping && inFlight.ok && noted && pricked && atRest.ok && adopted === "true,true,true,true")
       service.undoRemoval("AAPL")
       service.testFeed.quotes = quotesBefore
       tryVerify(function() { return service.arriving.length === 0 && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 5000)
@@ -1145,6 +1236,7 @@ Harness {
       joinFrames(body, watchlist, keys)
       animalFrames(body)
       sleepFrames(body)
+      fidgetFrames(body)
       closingHolds(body, watchlist, keys)
       // Each later open holds the thread at most 20 ms.
       var later = []
