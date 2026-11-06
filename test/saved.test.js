@@ -2115,7 +2115,7 @@ test("in every phase, a stock that has traded since its close shows that newest 
     // the move since it under the change.
     expect(said(under(evening, "PSIX"))).toEqual(["FRI CLOSE 45.63", "TODAY +1.52"])
     expect(said(under(evening, "JNJ"))).toEqual(["CLOSE 266.35 +0.96%", "AFTER HOURS \u22120.02%"])
-    // Saturday: Friday's close on top for the S&P 500, and for Nebius, whose
+    // Sunday: Friday's close on top for the S&P 500, and for Nebius, whose
     // last after-hours trade was at its close; the move is Friday's, from
     // Thursday's close, and named so.
     const saturday = topsAt("watch-2026-10-25-1000")
