@@ -14,6 +14,10 @@ patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property 
 patch_copy plugin/Service.qml 's/function wallSecond() { return Math.floor(Date.now() \/ 1000) }/function wallSecond() { return root.now }/'
 patch_copy plugin/Service.qml 's/property int now: Math.floor(Date.now() \/ 1000)/property int now: 1791399600/'
 patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testFeed: feed\n  readonly property alias testYahooGate: yahooGate'
+# Each row's content timed as it is built, in milliseconds: asked for as
+# the row's `built` turns on, done as its Loader has it (the glide check).
+patch_copy plugin/WatchlistRow.qml '/^  property bool built: true/a\  property real buildAsked: 0\n  property real buildCost: -1'
+patch_copy plugin/WatchlistRow.qml 's/^    active: row.built$/    active: row.built \&\& (row.buildAsked = Date.now()) > 0\n    onLoaded: row.buildCost = Date.now() - row.buildAsked/'
 # The pill's panel stays unloaded, and the window host asks a stand-in, not
 # the owner's Hyprland (as fetch.sh).
 patch_copy plugin/BarWidget.qml '/id: panelLoader/,/source:/s/active: true/active: false/'
