@@ -37,8 +37,8 @@ the rules a change is judged by.
 - Render the states you change, as in
   `test/qml/render.sh 'popup-lists-*'`.
 - `test/review.sh` compares Stonks' pictures before and after your change,
-  on your Omarchy and on 4.0.6's shell, the oldest Stonks supports. The
-  maintainer runs it when a change affects how Stonks looks.
+  on your Omarchy, and the bar's on 4.0.6's shell, the oldest Stonks
+  supports. The maintainer runs it when a change affects how Stonks looks.
 
 ## Pull requests
 
