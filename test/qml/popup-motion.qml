@@ -321,7 +321,7 @@ Harness {
       tryVerify(function() { return grab.verdict !== null }, 10000)
       var opened = grab.verdict
       filmed("with animations off, the panel opens whole and still", opened.ok && whole, opened, whole ? "" : " | a draw-in began")
-      // The animal doesn't fidget: over a loop and more, its square holds.
+      // The animal doesn't fidget: past its greeting, its square holds.
       var slot = find(panel.testBody, "animal")
       var animal = slot.mapToItem(panel.testCard.surface, 0, 0)
       var shown = slot.parent.kind !== ""

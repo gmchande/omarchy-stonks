@@ -1279,6 +1279,8 @@ Harness {
           downColor: stub.downColor
           fontFamily: stub.fontFamily
           surfaceOpen: true
+          // The animal held still: its fidget is motion, which review's films judge.
+          screenOn: false
           headerWhenMissing: root.coldState === "loading" ? "Loading" : "No data"
           switchesPanels: root.popup
           margins: root.popup ? 0 : Style.space(16)

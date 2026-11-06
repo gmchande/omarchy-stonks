@@ -729,7 +729,7 @@ Harness {
       look("smooth")
       awake()
       header.seen = Qt.binding(function() { return body.seen })
-      tryVerify(function() { return header.fidgeting }, 2000)
+      pastGreeting(header)
       for (var step = 0; !header.fidget.blink; step++) header.fidgetStep = step
       var drawn = [header.drawnLids]
       var noteLids = function() { drawn.push(header.drawnLids) }
@@ -799,17 +799,26 @@ Harness {
       tryVerify(function() { return !body.chartLoading && body.motion.drawn === 1 }, 5000)
     }
 
-    // Fidget, as it is rendered: from still, the animal holds 1.5 s, then
-    // pricks its horns, rests, pricks them again, blinks, and rests, inside
-    // its own square, while the rest of the header, the words on a held
-    // clock and the icons, holds still. The poses are what the sprites draw
-    // from, each timed from the start; its square's last picture is its
-    // first.
+    // Past its greeting, Fidget rests 4 s, so a pose set by hand holds.
+    function pastGreeting(header) {
+      tryVerify(function() { return header.fidgeting && header.fidgetMoves >= 2 && header.fidgetStep === -1 }, 3000)
+    }
+
+    // Fidget, as it is rendered: at the open it waits out the panel's
+    // 180 ms fade, then greets, pricking its horns, resting, pricking them
+    // again, resting and blinking, still by 0.85 s; 4 s later it pricks
+    // them, rests and blinks. It moves inside its own square, while the
+    // rest of the header, the words on a held clock and the icons, holds
+    // still. The poses are what the sprites draw from, each timed from the
+    // start; its square's last picture is its first. Then the rest of its
+    // course, its clock fired by hand: rests of 8, 16 and 32 s, then a
+    // minute, and the clock stopped while it isn't seen.
     function fidgetFrames(body) {
       var slot = harness.find(body, "animal")
       var header = slot.parent
+      var clock = header.testFidgetClock
       service.testClockHeld = true
-      tryVerify(function() { return body.animal.kind !== "" && header.fidgeting }, 3000)
+      pastGreeting(header)
       header.seen = false
       grab.source = header
       grab.begin("fidget")
@@ -824,7 +833,7 @@ Harness {
       header.seen = Qt.binding(function() { return body.seen })
       grab.markStart()
       pose()
-      tryVerify(function() { return grab.frames.length > 0 && grab.frames[grab.frames.length - 1].at - grab.start >= 3000 }, 6000)
+      tryVerify(function() { return grab.frames.length > 0 && grab.frames[grab.frames.length - 1].at - grab.start >= 5600 }, 9000)
       grab.end()
       header.fidgetStepChanged.disconnect(pose)
       var judged = function(rect) {
@@ -842,12 +851,25 @@ Harness {
       var back = grab.verdict
       var told = poses.map(function(p) { return p.pose + "@" + p.at }).join(" ")
       var near = function(i, at) { return !!poses[i] && Math.abs(poses[i].at - at) <= 250 }
-      var loop = poses.map(function(p) { return p.pose }).join(" ") === "rest prick rest prick blink rest"
-        && near(1, 1500) && near(2, 1700) && near(3, 1850) && near(4, 2000) && near(5, 2150)
-      service.testClockHeld = false
-      harness.check("the animal fidgets inside its own square 1.5 s after it starts: a prick, rest, a prick, a blink, and back to rest; the rest of the header holds still",
-        !animal.ok && animal.changedAt >= 1300 && animal.changedAt <= 1900 && loop && back.ok && rest.ok,
+      var timed = poses.map(function(p) { return p.pose }).join(" ") === "rest prick rest prick rest blink rest prick rest blink rest"
+        && poses[1].at >= 150 && near(1, 180) && poses[6].at <= 1100 && near(7, 4840) && near(10, 5330)
+      harness.check("the animal greets inside its own square once the panel has faded in, a prick, rest, a prick, rest, a blink, still by 0.85 s, and 4 s later a prick, rest and a blink; the rest of the header holds still",
+        !animal.ok && animal.changedAt >= 120 && animal.changedAt <= 500 && timed && back.ok && rest.ok,
         "poses " + told + " | the square: " + animal.detail + " | back to its first picture: " + back.detail + " | the rest: " + rest.detail)
+      // The rest of the course: each rest, read from the running clock,
+      // then the move after it played out, step by step.
+      var rests = []
+      for (var move = 0; move < 5; move++) {
+        rests.push((clock.running && header.fidgetStep === -1 ? "" : "not resting: ") + clock.interval / 1000)
+        do { clock.triggered() }
+        while (header.fidgetStep !== -1)
+      }
+      header.seen = false
+      var stopped = !clock.running
+      header.seen = Qt.binding(function() { return body.seen })
+      service.testClockHeld = false
+      harness.check("after its first fidget the animal rests 8, 16 and 32 s, then a minute, its clock stopped while it isn't seen",
+        rests.join(" ") === "8 16 32 60 60" && stopped, "rests " + rests.join(" ") + " s, stopped " + stopped)
       // Closed mid-blink, then the shell's animations turned off: the next
       // open starts from the animal's resting pose.
       for (var step = 0; !header.fidget.blink; step++) header.fidgetStep = step
@@ -940,6 +962,7 @@ Harness {
       var noted = body.note === "Nothing to undo"
       // The animal mid-fidget, its horns pricked.
       var header = harness.find(body, "animal").parent
+      pastGreeting(header)
       for (var step = 0; !header.fidget.pricked; step++) header.fidgetStep = step
       var pricked = header.fidgeting && header.pricked
       grab.begin("closing-at-rest")

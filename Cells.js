@@ -177,18 +177,30 @@ var BEAR_PRICKED = [
   ".##################."
 ]
 
-// Fidget, the header animal's loop: how long each step holds, in ms, and
-// what it does then. It pricks its horns or ears twice, blinks, and sits
-// still: 2.4 s a loop, a step for each change it draws. After an open it
-// sits still for FIDGET_OPENING first.
-var FIDGET = [
-  { ms: 200, pricked: true },
-  { ms: 150 },
-  { ms: 150, pricked: true },
-  { ms: 150, blink: true },
-  { ms: 1750 }
+// Fidget, how the header animal moves while the panel or window shows. At
+// each open, once the panel has faded in, it greets you: it pricks its horns
+// or ears, pricks them again and blinks, the pauses between them growing,
+// and is still by 0.85 s. Then it settles in: it fidgets 4 s later, then 8, 16 and
+// 32 s apart, then once a minute. A step holds for ms, pricked or blinking.
+var FIDGET_GREETING = [
+  { ms: 70, pricked: true },
+  { ms: 90 },
+  { ms: 130, pricked: true },
+  { ms: 220 },
+  { ms: 150, blink: true }
 ]
-var FIDGET_OPENING = 1500
+var FIDGET_AGAIN = [
+  { ms: 140, pricked: true },
+  { ms: 200 },
+  { ms: 150, blink: true }
+]
+
+// The nth move since the open, the greeting first: how long it waits, still,
+// and then its steps.
+function fidgetMove(n) {
+  if (n === 0) return { wait: 180, steps: FIDGET_GREETING }
+  return { wait: Math.min(4000 * Math.pow(2, n - 1), 60000), steps: FIDGET_AGAIN }
+}
 
 function spriteFor(up, lids, pricked) {
   var open = up ? BULL_SPRITE : BEAR_SPRITE
