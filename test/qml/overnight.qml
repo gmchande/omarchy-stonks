@@ -49,24 +49,15 @@ Harness {
   function sleep() { return app.testBody.animal.asleep ? "asleep" : "awake" }
 
   // The words and figures of the line under the price.
-  function strip() {
-    var row = find(app.testBody, "extendedLine")
-    if (!row || !row.visible) return ""
-    var words = []
-    for (var i = 0; i < row.children.length; i++) {
-      var child = row.children[i]
-      if (child.visible && child.text) words.push(child.text)
-    }
-    return words.join(" ")
-  }
+  function strip() { return rowWords(find(app.testBody, "extendedLine")) }
 
   // What's on top while the listing on show has traded since its close: the
-  // session and time, the newest price, and its move since the close
-  // ("OVERNIGHT 22:20 234.84 −1.05%"); "" without.
+  // caption under the change, the newest price, and its move from the dashed
+  // line ("OVERNIGHT −1.05% 234.84 −3.55%"); "" without.
   function top() {
     var body = app.testBody
     if (!body.featured || !body.featured.newest) return ""
-    return [find(body, "changeCaption").text, body.featured.priceText, body.featured.changeText].join(" ")
+    return [rowWords(find(body, "changeCaption")), body.featured.priceText, body.featured.changeText].join(" ")
   }
 
   Stonks.Service { id: service; pluginId: "grvc.stonks" }
@@ -209,9 +200,10 @@ Harness {
       // the open surface asks by itself, and five minutes on, again.
       useSet("sunday")
       service.now = harness.sunday
-      within(3000, function() { return harness.top().indexOf("SINCE") === 0 })
-      check("Sunday night trades on top, measured from Thursday's close and named so, Friday's close beneath with the move since it",
-        harness.top() === "SINCE THU CLOSE · 22:20 234.84 \u22123.55%" && harness.strip() === "FRI CLOSE 237.33 \u22122.53% · \u22121.05% SINCE",
+      var sundayTop = "OVERNIGHT \u22121.05% 234.84 \u22123.55%"
+      within(3000, function() { return harness.top().indexOf("OVERNIGHT") === 0 })
+      check("Sunday night trades on top, measured from Thursday's close, Friday's close beneath, and the night's move since it under the change",
+        harness.top() === sundayTop && harness.strip() === "FRI CLOSE 237.33 \u22122.53%",
         harness.top() + " | " + harness.strip())
       var sundayCalls = Number(harness.record("OVERNIGHT.calls"))
       service.now = harness.sunday + 5 * 60
@@ -223,7 +215,7 @@ Harness {
             var skip = day.axis.skip
             return !!skip && skip.to === harness.midnight.fri25 + 2 * 86400 + 20 * 3600
               && day.points.some(function(p) { return p.t < skip.from }) && day.points.some(function(p) { return p.t >= skip.to && p.s === "overnight" })
-              && harness.top() === "SINCE THU CLOSE · 22:20 234.84 \u22123.55%"
+              && harness.top() === sundayTop
           }),
         calls + ", " + sundayCalls + ", " + harness.record("OVERNIGHT.calls") + " " + lastSpan() + " | " + harness.top())
       // By keys alone, Left walks tonight back five minutes a press to its
@@ -258,7 +250,7 @@ Harness {
       service.now = 1790583060 + 6 * 60
       within(2000, function() { return feed.entries.NEST.status === "ok" })
       check("a failed answer keeps the last good prints, and is asked again five minutes on until it answers",
-        keptLine.indexOf("SINCE THU CLOSE · SUN 22:20") === 0 && paced === before + 1 && feed.entries.NEST.status === "ok"
+        keptLine === sundayTop && paced === before + 1 && feed.entries.NEST.status === "ok"
           && Number(harness.record("OVERNIGHT.calls")) === before + 2,
         keptLine + " | " + before + ", " + paced + ", " + harness.record("OVERNIGHT.calls") + " " + feed.entries.NEST.status)
 
@@ -295,10 +287,10 @@ Harness {
             return service.quotes[s].session.regular.start === service.quotes.NEST.session.regular.start
           })
       })
-      within(3000, function() { return harness.top().indexOf("SINCE") === 0 })
+      within(3000, function() { return harness.top().indexOf("OVERNIGHT") === 0 })
       var info = body.dayLine
-      check("the night's newest price is on top, named from Wednesday's close, Thursday's close beneath, and the day's high takes in its own night: 243.20 at 02:30 passes Yahoo's 239.63",
-        /^SINCE WED CLOSE · \d\d:\d\d 234\.27 /.test(harness.top()) && harness.strip().indexOf("CLOSE 232.28 ") === 0
+      check("the night's newest price is on top, Thursday's close beneath, the night's move since it under the change, and the day's high takes in its own night: 243.20 at 02:30 passes Yahoo's 239.63",
+        /^OVERNIGHT [+\u2212]\d+\.\d\d% 234\.27 /.test(harness.top()) && harness.strip().indexOf("CLOSE 232.28 ") === 0
           && !!info && info.range.highText === "243.20", harness.top() + " | " + harness.strip() + " | " + JSON.stringify(info))
       // A day asked of Robinhood replaces the prints in hand, never joins them.
       check("a day's answer from Robinhood replaces the prints in hand: none of the weekend's stays",
@@ -395,8 +387,8 @@ Harness {
       })
 
       // On 1M, with its history in: the night's price on top, as on the
-      // day, named after the range, and the close and its day's move under
-      // it.
+      // day, the range's name alone under its move, and the close and its
+      // day's move under it.
       useLook(false)
       featureShown("NEST")
       pressKey(Qt.Key_BracketRight)
@@ -408,8 +400,8 @@ Harness {
       var legend = find(body, "baselineLegend")
       var scrubbedMonth = harness.strip() + " | " + (legend.visible ? legend.text : "")
       endScrub()
-      check("smooth: on 1M at night the night's price is on top after the range's name; a scrub rests the line under it, and the baseline's legend takes its place; the scrub's end brings it back",
-        monthTop.indexOf("1M · OVERNIGHT ") === 0 && month.indexOf("FRI CLOSE ") === 0 && scrubbedMonth.indexOf(" | ┄ 1M START ") === 0
+      check("smooth: on 1M at night the night's price is on top, the range's name alone under its move; a scrub rests the line under it, and the baseline's legend takes its place; the scrub's end brings it back",
+        /^1M \d/.test(monthTop) && month.indexOf("FRI CLOSE ") === 0 && scrubbedMonth.indexOf(" | ┄ 1M START ") === 0
           && harness.strip() === month,
         monthTop + " | " + month + " | " + scrubbedMonth + " then " + harness.strip())
 
@@ -457,7 +449,7 @@ Harness {
       var nestHeader = body.headerText + " | " + harness.top()
       featureShown("KILN")
       var kiln = harness.sleep()
-      var kilnHeader = body.headerText + " | " + harness.top()
+      var kilnHeader = body.headerText + " | " + harness.top() + " | " + harness.strip()
       scrubAt(0.5)
       var scrubbedAwake = harness.sleep()
       endScrub()
@@ -465,8 +457,8 @@ Harness {
       var sleeps = "NEST " + nest + ", KILN " + kiln + ", scrubbed " + scrubbedAwake + ", let go " + harness.sleep()
       check("01:00: NEST, whose night trades, is awake; KILN sleeps, a scrub wakes it, and letting go puts it back to sleep at once",
         sleeps === "NEST awake, KILN asleep, scrubbed awake, let go asleep", sleeps)
-      check("01:00: NEST's header says Overnight, and the caption by its price names the close its move counts from; KILN's says Closed, its price on top Tuesday's after hours",
-        nestHeader.indexOf("Overnight · opens Wed 09:30 | SINCE MON CLOSE · ") === 0 && kilnHeader.indexOf("Closed · opens Wed 09:30 | AFTER HOURS TUE ") === 0,
+      check("01:00: NEST's header says Overnight, and the caption under its change the night's move since Tuesday's close; KILN's says Closed, its price on top Tuesday's after hours at its close, so the line under it names that close alone and nothing is said under its change",
+        nestHeader.indexOf("Overnight · opens Wed 09:30 | OVERNIGHT ") === 0 && kilnHeader === "Closed · opens Wed 09:30 |  47.93 +6.82% | TUE CLOSE",
         nestHeader + " || " + kilnHeader)
       // The clock reaching KILN's pre-market wakes it while it is on show.
       service.now = harness.midnight.wed7 + 4 * 3600 - 2

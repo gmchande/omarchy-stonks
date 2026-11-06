@@ -766,12 +766,12 @@ Harness {
                 if (r[1]) {
                   var caption = find(body, "changeCaption")
                   var strip = find(body, "extendedLine")
-                  // With the night's price on top, its session and time
-                  // follow the range's name (`Figures.newestCaptions`).
+                  // With the night's price on top too, the range's name alone
+                  // (`Figures.captionLine`).
                   var period = r[1] === youngMonth ? "SINCE \\d{1,2} [A-Z]{3} \\d{4}" : r[0].toUpperCase()
-                  var want = new RegExp("^" + period + "( · (OVERNIGHT|AFTER HOURS|PRE-MARKET) .+)?$")
-                  if (!want.test(caption.text) || (strip.visible && xIn(strip, strip.width) >= xIn(caption, 0)))
-                    captions.push(where + " " + r[0] + " says \"" + caption.text + "\" from " + xIn(caption, 0)
+                  var shown = root.rowWords(caption)
+                  if (!new RegExp("^" + period + "$").test(shown) || (strip.visible && xIn(strip, strip.width) >= xIn(caption, 0)))
+                    captions.push(where + " " + r[0] + " says \"" + shown + "\" from " + xIn(caption, 0)
                       + (strip.visible ? ", the line under the price ending at " + xIn(strip, strip.width) : ""))
                 }
               })
@@ -1146,18 +1146,15 @@ Harness {
         root.check("on a named list the footer's add reads \"+ Find or add a symbol\" whole, beside an undo too, never cut, and whole again once the undo goes, in the panel and the window at its widest and narrowest, at every text size from 9 to 20, and in the panel with its spacing kept",
           addCut.length === 0, addCut.slice(0, 12).join(" | "))
 
-        // NBIS at 17:58, after hours on its close's own day: the line under
-        // the price says the close and the move since it, and the caption
-        // under the change its session and time, after SINCE OPEN since the
-        // open. At every text size, in both looks, in the panel and the
-        // window at its narrowest and widest, the caption keeps clear of the
-        // line, in the longest form that fits: at the everyday size in the
-        // panel, SINCE OPEN alone, since its time doesn't fit beside the line.
+        // NBIS at 17:58, after hours on its close's own day: under the price
+        // the close and its day's move, and under the change the move since
+        // that close, named AFTER HOURS, or SINCE OPEN alone since the open.
+        // At every text size, in both looks, in the panel and the window at
+        // its narrowest and widest, both read whole, clear of each other.
         var captionBefore = { quotes: stub.quotes, nights: stub.nights, allDay: stub.allDay, calendars: stub.calendars, now: stub.now,
           featured: stub.featuredSymbol, mode: stub.changeMode, size: Style.fontBaseSize, wide: surface.wide,
           windowWidth: surface.windowWidth, retro: stub.retro }
         var clashes = []
-        var everyday = []
         try {
           stub.now = 1793052024
           stub.quotes = Object.assign({}, stub.quotes, { NBIS: Quote.parseChart(JSON.parse(eveningFile.text()), undefined, stub.now) })
@@ -1178,13 +1175,13 @@ Harness {
                   wait(20)
                   var strip = find(body, "extendedLine")
                   var caption = find(body, "changeCaption")
-                  var said = strip.visible ? strip.children.filter(function(c) { return c.visible && c.text !== undefined })
-                    .map(function(c) { return c.text }).join(" ") : ""
+                  var said = root.rowWords(strip)
+                  var shown = root.rowWords(caption)
                   var where = "size " + csize + " " + (surface.wide ? "window " + surface.width : "panel") + (stub.retro ? " retro " : " smooth ") + mode
-                  if (said.indexOf("SINCE") < 0) clashes.push(where + " shows \"" + said + "\" under the price")
-                  else if (caption.text !== "" && xIn(strip, strip.width) + Style.space(12) > xIn(caption, 0))
-                    clashes.push(where + ": \"" + said + "\" ends at " + xIn(strip, strip.width) + ", \"" + caption.text + "\" starts at " + xIn(caption, 0))
-                  if (csize === captionBefore.size && !surface.wide && !stub.retro) everyday.push(caption.text)
+                  if (said !== Format.lookSigns("CLOSE 153.27 \u22123.45%", stub.retro)
+                    || shown !== (mode === "pct" ? Format.lookSigns("AFTER HOURS +1.35%", stub.retro) : "SINCE OPEN")
+                    || xIn(strip, strip.width) + Style.space(12) > xIn(caption, 0))
+                    clashes.push(where + ": \"" + said + "\" ends at " + xIn(strip, strip.width) + ", \"" + shown + "\" starts at " + xIn(caption, 0))
                 })
               }
             }
@@ -1203,9 +1200,8 @@ Harness {
           stub.retro = captionBefore.retro
           wait(50)
         }
-        root.check("after the close, the caption under the change keeps clear of the line under the price and its SINCE, since the open too, at every text size, in both looks, in the panel and the window at its narrowest and widest",
-          clashes.length === 0 && everyday.join(" / ") === "AFTER HOURS 17:58 / SINCE OPEN",
-          "at the everyday size in the panel " + everyday.join(" / ") + " | " + clashes.slice(0, 12).join(" | ") + (clashes.length > 12 ? " | … " + clashes.length : ""))
+        root.check("after the close, under the price the close and its day's move, and under the change the move since it, named AFTER HOURS, or SINCE OPEN since the open, whole and clear of each other at every text size, in both looks, in the panel and the window at its narrowest and widest",
+          clashes.length === 0, clashes.slice(0, 12).join(" | ") + (clashes.length > 12 ? " | … " + clashes.length : ""))
 
         // In a window of ordinary height, 720 × 520, the key sheet shows its
         // credit whole without a scroll, the version included, and where

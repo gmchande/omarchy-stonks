@@ -38,6 +38,14 @@ ShellRoot {
     return out
   }
 
+  // The words a row of texts draws, its shown ones joined by spaces; "" while
+  // the row is hidden.
+  function rowWords(row) {
+    if (!row || !row.visible) return ""
+    return row.children.filter(function(child) { return child.visible && child.text })
+      .map(function(child) { return child.text }).join(" ")
+  }
+
   // A fresh view per read: a FileView that has loaded once returns its old
   // text straight after reload().
   function readFile(path) {
