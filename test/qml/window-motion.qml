@@ -723,6 +723,23 @@ Harness {
       })
       harness.check("the clock closing the market closes the animal's eyes over 320 ms in two steps, in both looks, retro's clock skipping the closing second — "
         + bells.join(" | "), bells.every(function(b) { return /^\w+: ok, /.test(b) }))
+      // The bell landing on Fidget's blink: the eyes it shut never open
+      // again on the way to sleep.
+      look("smooth")
+      awake()
+      header.seen = Qt.binding(function() { return body.seen })
+      tryVerify(function() { return header.fidgeting }, 2000)
+      for (var step = 0; !header.fidget.blink; step++) header.fidgetStep = step
+      var drawn = [header.drawnLids]
+      var noteLids = function() { drawn.push(header.drawnLids) }
+      header.drawnLidsChanged.connect(noteLids)
+      service.now = close
+      tryVerify(function() { return body.animal.asleep && header.closing === 1 && !header.fidget.blink }, 3000)
+      header.drawnLidsChanged.disconnect(noteLids)
+      header.seen = false
+      harness.check("the clock closing the market on the animal's blink never opens its eyes on the way to sleep",
+        drawn[drawn.length - 1] === 2 && drawn.every(function(lids, i) { return i === 0 || lids >= drawn[i - 1] }),
+        "lids went " + drawn.join(","))
       // Sunday at 20:00, DOWN's night starting: it trades all night.
       var wake = close + 2 * 86400
       var wakes = ["smooth", "retro"].map(function(style) {
@@ -889,6 +906,10 @@ Harness {
       keyClick(Qt.Key_Z, Qt.ControlModifier)
       rest()
       var noted = body.note === "Nothing to undo"
+      // The animal mid-fidget, its horns pricked.
+      var header = harness.find(body, "animal").parent
+      for (var step = 0; !header.fidget.pricked; step++) header.fidgetStep = step
+      var pricked = header.fidgeting
       grab.begin("closing-at-rest")
       frames(3)
       grab.end()
@@ -918,9 +939,9 @@ Harness {
       reopen()
       var adopted = [service.featuredSymbol === "MSFT", body.chartSymbol === "MSFT",
         watchlist.displayedSymbols.indexOf("AAPL") < 0, body.motion.reveal < 1].join(",")
-      harness.check("a closing surface stops the look icon, the rows, and the rule where they are, and holds its chart, figures, rows, and note through an answer, another surface's choice, a removal from All, and the note's time; the next open takes the latest and draws in — in flight "
-        + stepping + " " + inFlight.detail + " | at rest " + noted + " " + atRest.detail + " | open " + adopted,
-        stepping && inFlight.ok && noted && atRest.ok && adopted === "true,true,true,true")
+      harness.check("a closing surface stops the look icon, the animal's fidget, the rows, and the rule where they are, and holds its chart, figures, rows, and note through an answer, another surface's choice, a removal from All, and the note's time; the next open takes the latest and draws in — in flight "
+        + stepping + " " + inFlight.detail + " | at rest " + noted + " " + pricked + " " + atRest.detail + " | open " + adopted,
+        stepping && inFlight.ok && noted && pricked && atRest.ok && adopted === "true,true,true,true")
       service.undoRemoval("AAPL")
       service.testFeed.quotes = quotesBefore
       tryVerify(function() { return service.arriving.length === 0 && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 5000)

@@ -178,16 +178,17 @@ var BEAR_PRICKED = [
 ]
 
 // Fidget, the header animal's loop: how long each step holds, in ms, and
-// what it does then. It sits still, pricks its horns or ears twice, then
-// blinks: 2.4 s a loop, the animal drawn anew 5 times.
+// what it does then. It pricks its horns or ears twice, blinks, and sits
+// still: 2.4 s a loop, a step for each change it draws. After an open it
+// sits still for FIDGET_OPENING first.
 var FIDGET = [
-  { ms: 1500 },
   { ms: 200, pricked: true },
   { ms: 150 },
   { ms: 150, pricked: true },
   { ms: 150, blink: true },
-  { ms: 250 }
+  { ms: 1750 }
 ]
+var FIDGET_OPENING = 1500
 
 function spriteFor(up, lids, pricked) {
   var open = up ? BULL_SPRITE : BEAR_SPRITE

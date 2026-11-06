@@ -64,23 +64,30 @@ Item {
 
   // While the panel or window shows (`seen`), the animal fidgets
   // (`Cells.FIDGET`), from still at each open; asleep, its eyes stay shut.
-  // Only its own cells change, and with the shell's animations off it sits
-  // still.
+  // Only its own cells change. A close holds its pose through the fade;
+  // with the shell's animations off, or no animal, it sits still.
   property bool seen: false
-  property int fidgetStep: 0
+  property int fidgetStep: Cells.FIDGET.length - 1
   readonly property bool fidgeting: seen && kind !== "" && !Style.reduceMotion
-  readonly property var fidget: Cells.FIDGET[fidgeting ? fidgetStep : 0]
+  readonly property var fidget: Cells.FIDGET[fidgetStep]
+  // Plain values, so a step that changes neither draws nothing.
+  readonly property bool pricked: !!fidget.pricked
   readonly property int drawnLids: fidget.blink ? 2 : lids
-  onFidgetingChanged: {
-    fidgetStep = 0
+  function fidgetAnew() {
+    fidgetStep = Cells.FIDGET.length - 1
+    fidgetClock.interval = Cells.FIDGET_OPENING
     if (fidgeting) fidgetClock.restart()
+    else fidgetClock.stop()
+  }
+  onFidgetingChanged: {
+    if (seen) fidgetAnew()
     else fidgetClock.stop()
   }
   Timer {
     id: fidgetClock
-    interval: Cells.FIDGET[root.fidgetStep].ms
     onTriggered: {
       root.fidgetStep = (root.fidgetStep + 1) % Cells.FIDGET.length
+      interval = Cells.FIDGET[root.fidgetStep].ms
       restart()
     }
   }
@@ -120,12 +127,16 @@ Item {
     if (fade && asleep === shownAsleep) return
     shownAsleep = asleep
     shutting.stop()
-    if (fade && animal.bell && !afterScrub) {
+    // The bell owns the eyes: eyes Fidget's blink already shut fall asleep
+    // at once, and the loop starts over, still.
+    var rung = fade && animal.bell && !afterScrub
+    if (rung && !(asleep && fidget.blink)) {
       waking = !asleep
       shutting.from = asleep ? 0 : 1
       shutting.to = asleep ? 1 : 0
       shutting.start()
     } else closing = asleep ? 1 : 0
+    if (rung) fidgetAnew()
   }
 
   Component.onCompleted: settle()
@@ -175,7 +186,7 @@ Item {
       objectName: "bullCells"
       anchors.fill: parent
       visible: opacity > 0
-      pixels: Cells.spriteFor(true, root.drawnLids, root.fidget.pricked)
+      pixels: Cells.spriteFor(true, root.drawnLids, root.pricked)
       color: root.upColor
     }
     PixelSprite {
@@ -183,7 +194,7 @@ Item {
       objectName: "bearCells"
       anchors.fill: parent
       visible: opacity > 0
-      pixels: Cells.spriteFor(false, root.drawnLids, root.fidget.pricked)
+      pixels: Cells.spriteFor(false, root.drawnLids, root.pricked)
       color: root.downColor
     }
 
