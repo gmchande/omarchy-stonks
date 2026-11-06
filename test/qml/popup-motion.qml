@@ -90,8 +90,14 @@ Harness {
       grab.markStart()
     }
 
+    // The card's edge on screen: on 4.5 the shell eases it (drawnHeight);
+    // on 4.0 the card takes the height Stonks eases.
+    function edgeHeight() {
+      return panel.testCard.card.height
+    }
+
     function edgeAtRest() {
-      return panel.testCard.drawnHeight === panel.fittedCardHeight
+      return edgeHeight() === panel.fittedCardHeight
     }
 
     function rest() {
@@ -265,7 +271,8 @@ Harness {
       pillTurns()
       viewsThroughClose()
       reopenMidFade()
-      stillWithMotionOff()
+      // Omarchy 4.0 has no switch to turn its animations off.
+      if (Style.reduceMotion !== undefined) stillWithMotionOff()
       darkScreen()
       harness.finish()
     }
@@ -278,20 +285,20 @@ Harness {
       rest()
       key("?")
       tryVerify(function() { return panel.testBody.showingHelp && edgeAtRest() }, 2000)
-      var sheet = panel.testCard.drawnHeight
+      var sheet = edgeHeight()
       panel.close()
       var fading = panel.testCard.visible
       panel.open()
-      var first = panel.testCard.drawnHeight
+      var first = edgeHeight()
       var between = false
       tryVerify(function() {
-        var h = panel.testCard.drawnHeight
+        var h = edgeHeight()
         if (Math.abs(h - sheet) > 1 && Math.abs(h - panel.fittedCardHeight) > 1) between = true
         return h === panel.fittedCardHeight
       }, 2000)
       check("reopened during its close's fade, the panel eases from the height still on screen",
         fading && Math.abs(first - sheet) <= 1 && between && Math.abs(sheet - panel.fittedCardHeight) > 1,
-        fading + " | " + sheet + " -> " + first + " -> " + panel.testCard.drawnHeight + (between ? ", eased" : ", at once"))
+        fading + " | " + sheet + " -> " + first + " -> " + edgeHeight() + (between ? ", eased" : ", at once"))
       panel.close()
     }
 
@@ -302,7 +309,7 @@ Harness {
     // clock turns a minute.
     function stillWithMotionOff() {
       // An ease begun before the switch runs to its end.
-      tryVerify(function() { return panel.testCard.drawnHeight === panel.testCard.contentHeight }, 2000)
+      tryVerify(function() { return edgeHeight() === panel.testCard.contentHeight }, 2000)
       Style.reduceMotion = true
       panel.open()
       // Whole from the open: no draw-in begins.

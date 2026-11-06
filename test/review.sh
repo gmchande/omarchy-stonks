@@ -18,15 +18,18 @@
 # - Window and panel motion, judged on rendered frames (test/qml/frames.js),
 #   never on the property behind it.
 # - The long list: a power user's 154 symbols, on wall-clock budgets.
-# - Omarchy 4.0.6, the oldest shell Stonks works on: the panel, its keys and
-#   the window on its shell (test/old-shell.sh), failing as on the installed
-#   one on a TypeError or the plugin's Qt warnings, and on a panel that shows
-#   nothing (popup.qml).
+# - Omarchy 4.0.6, the oldest shell Stonks works on (test/old-shell.sh): the
+#   renders again on its shell, in out/render-omarchy-4.0/ with their own
+#   diff in out/render-diff-omarchy-4.0/; the window and panel motion, on
+#   its curve; the screenshot; and the panel, its keys and the window rows,
+#   failing as on the installed one on a TypeError or the plugin's Qt
+#   warnings, and on a panel that shows nothing (popup.qml).
 #
-# Each set of renders, the head's and the base's, is drawn once: a run keeps
-# each set it draws whole under the name test/render-key.sh makes from
-# everything that draws it, and a later run with that name uses the kept
-# set instead. The log says which sets were kept and which run drew them.
+# Each set of renders, the head's and the base's on each shell, is drawn
+# once: a run keeps each set it draws whole under the name
+# test/render-key.sh makes from everything that draws it, and a later run
+# with that name uses the kept set instead. The log says which sets were
+# kept and which run drew them.
 # The newest 20 sets stay, about 22 MB each, in the git folder every
 # worktree shares. --fresh reuses none and replaces what it draws: a
 # release's run, which has to catch a change from outside the repo
@@ -73,26 +76,27 @@ keep_set() {
 # keep_sets: keeps each set this run drew once every part of it passed;
 # then only the newest $keep.
 keep_sets() {
-  local what=${commit:0:7} status=0 old
+  local what=${commit:0:7} status=0 old i
   [ -z "$edited" ] || what="$what with uncommitted edits"
-  if [ "${#head_parts[@]}" -gt 0 ] && passed "${head_parts[@]}"; then
-    keep_set "$head_key" . out/render "$what" || status=1
-  fi
-  if [ "${#base_parts[@]}" -gt 0 ] && passed "${base_parts[@]}"; then
-    keep_set "$base_key" "$logs/base" "$base_render" "${base:0:7}, the base" || status=1
-  fi
+  for i in "${!draw_keys[@]}"; do
+    # shellcheck disable=SC2086 # the parts' numbers, one word each
+    passed ${draw_parts[i]} || continue
+    STONKS_SHELL=${draw_shells[i]} keep_set "${draw_keys[i]}" "${draw_trees[i]}" "${draw_folders[i]}" \
+      "$([ "${draw_trees[i]}" = . ] && echo "$what" || echo "${base:0:7}, the base")${draw_names[i]}" || status=1
+  done
   [ -d "$store" ] || { echo "no sets kept"; return "$status"; }
   while IFS= read -r old; do drop "$old" || status=1; done < <(ls -dt "$store"/*/ | tail -n +$((keep + 1)))
   echo "$(ls -d "$store"/*/ | wc -l) sets kept, $(du -sh "$store" | cut -f1), in $store"
   return "$status"
 }
 
-# render_diff: the pictures the change moved, once both sets are rendered.
+# render_diff BASE HEAD OUT: the pictures the change moved, once both sets
+# are rendered.
 render_diff() {
   local why
   why=$(test/fixtures-dir.sh 2>&1 > /dev/null) || { echo "SKIP render diff: $why"; return 77; }
   [ -n "$base" ] || { echo "FAILED no base: HEAD and $base_ref share no commit"; return 1; }
-  test/render-diff.sh "$base_render" out/render out/render-diff
+  test/render-diff.sh "$@"
 }
 
 # The base's tree, outside git, with this checkout's saved answers beside it.
@@ -103,67 +107,89 @@ if [ -n "$base" ]; then
   git archive "$base" | tar -x -C "$logs/base"
   fixtures=$(test/fixtures-dir.sh 2> /dev/null) && ln -s "$fixtures" "$logs/base/test/fixtures"
 fi
-# Each set's name; none without the saved answers, where the renders skip.
-head_key=$(test/render-key.sh 2> /dev/null) || head_key=""
-base_key=""
-[ -z "$base" ] || base_key=$(test/render-key.sh "$logs/base" 2> /dev/null) || base_key=""
 
-# out/render holds this run's pictures only, so the diff reads no other's.
-rm -rf out/render
-head_set=$(kept "$head_key") || head_set=""
-if [ -n "$head_set" ]; then
-  mkdir -p out/render && cp "$head_set"/*.png out/render/
-  echo "== the head's renders: kept as $head_key, $(cat "$head_set/drawn")"
-fi
-# The base's renders: kept, the head's when the same files draw both, or
-# drawn here.
-base_render=""
-draw_base=""
-if [ -n "$base" ]; then
+# The pictures are drawn on two shells: the installed one, into out/render,
+# and Omarchy 4.0.6's (test/old-shell.sh), into out/render-omarchy-4.0,
+# each with its own render diff. A shell that can't be had names no folder,
+# and its renders fail. A base from before Stonks' harnesses could take
+# another shell (STONKS_SHELL, test/qml/lib.sh) draws on the installed one
+# alone, so on 4.0 the head's pictures have no diff.
+old_shell=$(test/old-shell.sh) || old_shell=/no-omarchy-4.0.6-shell
+shells=("" "$old_shell")
+names=("" " on Omarchy 4.0.6")
+suffixes=("" "-omarchy-4.0")
+base_takes_shell=""
+[ -z "$base" ] || ! grep -q STONKS_SHELL "$logs/base/test/qml/lib.sh" || base_takes_shell=1
+
+# Each set this run draws: its key, tree, folder, shell, name, and the
+# queue numbers of its parts (keep_sets). The head's and the base's on each
+# shell are kept, the head's on that shell when the same files draw both,
+# or drawn here. out/render* holds this run's pictures only, so a diff reads
+# no other's.
+draw_keys=() draw_trees=() draw_folders=() draw_shells=() draw_names=() draw_parts=() draw_states=()
+diffs=()
+for i in "${!shells[@]}"; do
+  shell=${shells[i]} name=${names[i]} head_render=out/render${suffixes[i]}
+  rm -rf "$head_render"
+  # Each set's name; none without the saved answers, where the renders skip.
+  head_key=$(STONKS_SHELL=$shell test/render-key.sh 2> /dev/null) || head_key=""
+  if head_set=$(kept "$head_key"); then
+    mkdir -p "$head_render" && cp "$head_set"/*.png "$head_render/"
+    echo "== the head's renders$name: kept as $head_key, $(cat "$head_set/drawn")"
+  else
+    draw_keys+=("$head_key") draw_trees+=(.) draw_folders+=("$head_render") draw_shells+=("$shell") draw_names+=("$name") draw_states+=(head)
+  fi
+  [ -n "$base" ] || continue
+  if [ -n "$shell" ] && [ -z "$base_takes_shell" ]; then
+    echo "== the base's renders$name: none, since ${base:0:7}'s harnesses draw on the installed shell alone"
+    continue
+  fi
+  base_key=$(STONKS_SHELL=$shell test/render-key.sh "$logs/base" 2> /dev/null) || base_key=""
   if base_set=$(kept "$base_key"); then
     base_render=$base_set
-    echo "== the base's renders: kept as $base_key, $(cat "$base_set/drawn")"
+    echo "== the base's renders$name: kept as $base_key, $(cat "$base_set/drawn")"
   elif [ -n "$base_key" ] && [ "$base_key" = "$head_key" ]; then
-    base_render=out/render
-    echo "== the base's renders: the head's, which the same files draw"
+    base_render=$head_render
+    echo "== the base's renders$name: the head's, which the same files draw"
   else
-    base_render=$logs/base-render
-    draw_base=1
+    base_render=$logs/base-render${suffixes[i]}
+    draw_keys+=("$base_key") draw_trees+=("$logs/base") draw_folders+=("$base_render") draw_shells+=("$shell") draw_names+=("$name") draw_states+=(base)
   fi
-fi
+  diffs+=("$base_render" "$head_render" "out/render-diff${suffixes[i]}" "$name")
+done
 
-# Longest first, as measured. The renders each set this run draws run in
-# parts, two each when it draws both, else four. Each part's number in the
-# queue goes in head_parts or base_parts, so its set is kept only once every
-# part passed.
-head_parts=()
-base_parts=()
-if [ -z "$head_set" ]; then
-  parts=4
-  [ -z "$draw_base" ] || parts=2
-  for part in $(seq "$parts"); do
-    head_parts+=("${#labels[@]}")
-    start "offscreen renders, $part of $parts" bash test/qml/render.sh --part "$part/$parts"
-  done
-fi
-# The base's in two parts by name, smooth and the rest, about half each,
-# since --part would run its anchor check.
-if [ -n "$draw_base" ]; then
-  part=0
-  for states in '!(popup-anchor-*|!(*smooth*))' '!(popup-anchor-*|*smooth*)'; do
-    part=$((part + 1))
-    base_parts+=("${#labels[@]}")
-    start "base renders, $part of 2" env STONKS_VISUAL_DIR="$base_render" bash "$logs/base/test/qml/render.sh" "$states"
-  done
-fi
+# Longest first, as measured. Each set this run draws runs in two parts, or
+# four when it is the only one. The head's take --part; the base's, by
+# name, smooth and the rest, about half each, since --part would run its
+# anchor check, which judges the base's own harness on today's Omarchy, not
+# the change.
+parts=2
+[ "${#draw_keys[@]}" -gt 1 ] || parts=4
+for i in "${!draw_keys[@]}"; do
+  draw_parts+=("")
+  if [ "${draw_states[i]}" = head ]; then
+    for part in $(seq "$parts"); do
+      draw_parts[i]+=" ${#labels[@]}"
+      start "offscreen renders${draw_names[i]}, $part of $parts" env STONKS_SHELL="${draw_shells[i]}" STONKS_VISUAL_DIR="${draw_folders[i]}" bash test/qml/render.sh --part "$part/$parts"
+    done
+  else
+    part=0
+    for states in '!(popup-anchor-*|!(*smooth*))' '!(popup-anchor-*|*smooth*)'; do
+      part=$((part + 1))
+      draw_parts[i]+=" ${#labels[@]}"
+      start "base renders${draw_names[i]}, $part of 2" env STONKS_SHELL="${draw_shells[i]}" STONKS_VISUAL_DIR="${draw_folders[i]}" bash "${draw_trees[i]}/test/qml/render.sh" "$states"
+    done
+  fi
+done
 start "nothing-jumps layout harness, surfaces" bash test/qml/layout.sh surfaces
 start "window motion harness" bash test/qml/window-motion.sh
+start "window motion harness on Omarchy 4.0.6" env STONKS_SHELL="$old_shell" bash test/qml/window-motion.sh
 start "nothing-jumps layout harness, live" bash test/qml/layout.sh live
 start "long list harness" bash test/qml/long-list.sh
 start "nothing-jumps layout harness, sizes" bash test/qml/layout.sh sizes
 start "panel motion harness" bash test/qml/popup-motion.sh
-# A shell that can't be had names no folder, and each of these fails.
-old_shell=$(test/old-shell.sh) || old_shell=/no-omarchy-4.0.6-shell
+start "panel motion harness on Omarchy 4.0.6" env STONKS_SHELL="$old_shell" bash test/qml/popup-motion.sh
+start "camera harness on Omarchy 4.0.6" env STONKS_SHELL="$old_shell" QT_SCALE_FACTOR=1 bash test/qml/camera.sh
 for harness in popup keys window-rows; do
   start "$harness harness on Omarchy 4.0.6" env STONKS_SHELL="$old_shell" bash "test/qml/$harness.sh"
 done
@@ -171,6 +197,8 @@ fill
 
 run "installed theme diagnostic" bun test/themes.js
 drain
-run "render diff, against ${base:0:7} (out/render-diff/)" render_diff
+for ((i = 0; i < ${#diffs[@]}; i += 4)); do
+  run "render diff${diffs[i + 3]}, against ${base:0:7} (${diffs[i + 2]}/)" render_diff "${diffs[@]:i:3}"
+done
 run "keep the renders this run drew" keep_sets
 verdict
