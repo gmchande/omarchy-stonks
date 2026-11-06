@@ -12,6 +12,8 @@
 #   (test/render-diff.sh) lists every picture the change moved, side by
 #   side in out/render-diff/. The base is the merge-base with origin/dev,
 #   or with STONKS_RENDER_BASE (a release's tag, before the next release).
+#   The base draws every state but the panel-anchor ones, whose check
+#   judges the base's own harness on today's Omarchy, not the change.
 # - Nothing jumps: positions across looks, symbols, and ranges.
 # - Window and panel motion, judged on rendered frames (test/qml/frames.js),
 #   never on the property behind it.
@@ -144,10 +146,14 @@ if [ -z "$head_set" ]; then
     start "offscreen renders, $part of $parts" bash test/qml/render.sh --part "$part/$parts"
   done
 fi
+# The base's in two parts by name, smooth and the rest, about half each,
+# since --part would run its anchor check.
 if [ -n "$draw_base" ]; then
-  for part in 1 2; do
+  part=0
+  for states in '!(popup-anchor-*|!(*smooth*))' '!(popup-anchor-*|*smooth*)'; do
+    part=$((part + 1))
     base_parts+=("${#labels[@]}")
-    start "base renders, $part of 2" env STONKS_VISUAL_DIR="$base_render" bash "$logs/base/test/qml/render.sh" --part "$part/2"
+    start "base renders, $part of 2" env STONKS_VISUAL_DIR="$base_render" bash "$logs/base/test/qml/render.sh" "$states"
   done
 fi
 start "nothing-jumps layout harness, surfaces" bash test/qml/layout.sh surfaces
