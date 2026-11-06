@@ -143,7 +143,8 @@ Item {
     shownAsleep = asleep
     shutting.stop()
     // The bell owns the eyes: eyes Fidget's blink already shut fall asleep
-    // at once, and Fidget stops and rests until its next move.
+    // at once, and a fidget under way stops and rests. A rest runs on: a
+    // fidget's first blink comes 340 ms in, after the bell's 320 ms.
     var rung = fade && animal.bell && !afterScrub
     if (rung && !(asleep && fidget.blink)) {
       waking = !asleep
@@ -151,7 +152,7 @@ Item {
       shutting.to = asleep ? 1 : 0
       shutting.start()
     } else closing = asleep ? 1 : 0
-    if (rung) fidgetNext()
+    if (rung && fidgetStep >= 0) fidgetNext()
   }
 
   Component.onCompleted: settle()

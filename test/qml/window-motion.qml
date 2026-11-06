@@ -754,6 +754,18 @@ Harness {
       })
       harness.check("the clock waking the market opens the animal's eyes over 320 ms in two steps, the \"z\" going with them, in both looks — "
         + wakes.join(" | "), wakes.every(function(w) { return /^\w+: ok, /.test(w) }))
+      // A bell while the animal rests leaves its next fidget where it was.
+      service.now = wake - 60
+      header.seen = Qt.binding(function() { return body.seen })
+      tryVerify(function() { return body.animal.asleep && header.closing === 1 }, 2000)
+      pastGreeting(header)
+      var pending = [header.fidgetMoves, header.fidgetStep].join(",")
+      service.now = wake + 2
+      tryVerify(function() { return !body.animal.asleep && header.closing === 0 }, 2000)
+      var kept = [header.fidgetMoves, header.fidgetStep].join(",")
+      header.seen = false
+      harness.check("a bell while the animal rests leaves its next fidget where it was", kept === pending,
+        "moves begun, and the step drawn: " + pending + " before the bell, " + kept + " after")
       look("smooth")
       // Two seconds after the close, inside the bell's few seconds, a scrub
       // on the same side of the close, so the animal reads a bear on both
