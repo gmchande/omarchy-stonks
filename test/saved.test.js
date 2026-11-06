@@ -904,8 +904,9 @@ test("the day line is 1D, or its figures' weekday when they are not today's: its
   // On Labor Day, Monday 7 September, AAPL's Friday 4 September.
   expect(dayLineAt(M.parseChart(fixture("aapl-2026-09-04-day-prepost.json")), at("2026-09-07", "12:00")).title).toBe("FRI")
   // Six days on, the weekday still names one day of the week before; a
-  // week on it would read as today's, so the month stands in.
-  expect([dayLineAt(nest, at("2026-09-17", "12:00")).title, dayLineAt(nest, at("2026-09-18", "12:00")).title]).toEqual(["FRI", "SEP"])
+  // week on it would read as today's, and a month alone as the month, so
+  // the line is 1D and the line under the price names the day.
+  expect([dayLineAt(nest, at("2026-09-17", "12:00")).title, dayLineAt(nest, at("2026-09-18", "12:00")).title]).toEqual(["FRI", "1D"])
   // VOL's slot is as wide as 999.9M, whatever the day's volume.
   expect(dayLineAt(quote, at("2026-09-01", "17:30")).facts[1].widest).toBe("888.8M")
   // A listing untraded on its answer's day keeps its last trading day's
@@ -938,11 +939,11 @@ test("the day line is 1D, or its figures' weekday when they are not today's: its
 
 })
 
-test("the day line's title is 1D through its figures' last second, their weekday from the next midnight, over a weekend and a holiday, their month a week on", () => {
+test("the day line's title is 1D through its figures' last second, their weekday from the next midnight, over a weekend and a holiday, and 1D again a week on", () => {
   // AAPL's figures are Tuesday 1 September's.
   const title = t => dayLineAt(quote, t).title
   expect([title(at("2026-09-01", "23:59") + 59), title(at("2026-09-02", "00:00")), title(at("2026-09-05", "12:00")),
-    title(at("2026-09-07", "12:00")), title(at("2026-09-08", "12:00"))]).toEqual(["1D", "TUE", "TUE", "TUE", "SEP"])
+    title(at("2026-09-07", "12:00")), title(at("2026-09-08", "12:00"))]).toEqual(["1D", "TUE", "TUE", "TUE", "1D"])
   // CKX traded on Friday 16 October, so at 23:09 that Friday its figures
   // are the day's; CVR's are Wednesday's.
   const ckx = M.parseChart(fixture("moments/power-user-2026-10-16/ckx.json"))
@@ -1935,6 +1936,16 @@ test("once a listing trades after its close, its newest price is on top, measure
   expect(M.freshnessText(failed, quote, calendars)).toBe("REFRESH FAILED · OVERNIGHT 00:50")
   // Read with no newest price, the close is on top.
   expect(M.rowModel(quote, 0, "pct").changeText).toBe("+7.44%")
+  // Where Yahoo sent no price, the headline is the chart's 15:55 bar: the
+  // line beneath calls it the last trade, never the close, and the row
+  // keeps its name, the night's price being on top.
+  const untraded = { ...quote, price: null }
+  const lines = M.heroLines(untraded, M.rowModel(untraded, 0, "pct", newest), null, one, day, calendars, "pct", false)
+  expect(lines.close).toMatchObject({ label: "LAST TRADE", time: "TUE 15:55", price: "249.78", changeText: "+7.40%" })
+  expect(M.freshnessText(M.freshness({ status: "ok", answeredAt: one - 60 }, untraded, one, 0, false, newest), untraded, calendars)).toBe("")
+  // With no night price on top, the chart's bar is, and its move is not the
+  // move at the close.
+  expect(M.heroLines(untraded, M.rowModel(untraded, 0, "pct"), latest, one, day, calendars, "pct", false).caption.label).toBe("")
 })
 
 // A watch moment's listings as the service holds them, answered at the

@@ -534,7 +534,7 @@ Harness {
         // Each line's title: the day's 1D, weekday, or month on the day, the
         // range's name on a range, and 52W; and the lows' column one gap past
         // 52W, as wide as any of them, on every range.
-        var dayTitles = ["1D"].concat(Format.WEEKDAYS.map(function(w) { return w.toUpperCase() }), Format.MONTHS)
+        var dayTitles = ["1D"].concat(Format.WEEKDAYS.map(function(w) { return w.toUpperCase() }))
         var mistitled = []
         var byLeft = function(a, b) { return a.left - b.left }
         var titled = function(label, range) {
@@ -795,7 +795,7 @@ Harness {
         root.check("under the change a range says its name, and a listing younger than it SINCE its first day, clear of the line under the price",
           captions.length === 0, captions.join(" | "))
         // AAPL's figures are Tuesday 1 September's: the day line is 1D that
-        // Tuesday, TUE from Wednesday's first second, and SEP a week on (the
+        // Tuesday, TUE from Wednesday's first second, and 1D again a week on (the
         // titles at every moment are saved.test.js's). Only the title
         // changes: every other cell of both lines, and both rules, stay where
         // they were at the Tuesday's close. Both looks, both surfaces.
@@ -805,7 +805,7 @@ Harness {
         stub.historyEntry = null
         stub.figures = aapl
         var moments = [["Tuesday", tuesday, "1D"], ["Wednesday 00:00", Date.UTC(2026, 8, 2, 4) / 1000, "TUE"],
-          ["a week on", Date.UTC(2026, 8, 8, 16) / 1000, "SEP"]]
+          ["a week on", Date.UTC(2026, 8, 8, 16) / 1000, "1D"]]
         // Every cell of both lines but the day's title, and both rules.
         var rest = function() {
           var cells = root.drawnSpans(find(body, "periodLine")).sort(byLeft).slice(1)
@@ -834,7 +834,7 @@ Harness {
         }
         stub.now = tuesday
         wait(50)
-        root.check("the day line is 1D on its figures' own day, their weekday from the next midnight, their month a week on, and nothing else moves",
+        root.check("the day line is 1D on its figures' own day, their weekday from the next midnight, 1D again a week on, and nothing else moves",
           dated.length === 0, dated.join(" | "))
 
         // A refresh moves the tick and nothing else: AAPL's volume from

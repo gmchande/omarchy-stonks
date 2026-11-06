@@ -1056,7 +1056,12 @@ test("the close the day's move counts from is named by the trading day before, a
   expect(lines(at("2026-09-08", "12:00"))).toEqual({ close: { label: "FRI CLOSE", time: "", price: "100.00", changeText: "", tone: "flat", stale: false },
     caption: { label: "TODAY", changeText: "+2.50", tone: "up" } })
   expect(lines(at("2026-09-08", "12:00"), "abs").caption).toEqual({ label: "TODAY", changeText: "+2.50%", tone: "up" })
-  expect(lines(at("2026-09-15", "12:00")).close.label).toBe("4 SEP CLOSE")
+  // A week on, every line names the day by its date: SEP alone reads as the
+  // month. The day's move, the close above a night's price, and the rows.
+  expect(lines(at("2026-09-15", "12:00"))).toMatchObject({ close: { label: "4 SEP CLOSE" }, caption: { label: "8 SEP" } })
+  const night = { t: at("2026-09-08", "20:30"), p: 103, phase: "overnight", base: 100, own: true, closed: true, dayStart: at("2026-09-08", "09:30") }
+  expect(M.heroLines(quote, M.rowModel(quote, 0, "pct", night), null, at("2026-09-15", "12:00"), null, calendars, "pct", false).close.label).toBe("8 SEP CLOSE")
+  expect(M.rowsDay(["X"], { X: quote }, { X: night }, at("2026-09-15", "12:00"), calendars)).toBe("8 SEP")
   // A scrub rests both lines: the dashed line's legend takes the first's place.
   expect(lines(at("2026-09-08", "12:00"), "pct", true)).toEqual({ close: null, caption: { label: "", changeText: "", tone: "flat" } })
   // An unknown move is left out, with its day; the close it would count from stays.

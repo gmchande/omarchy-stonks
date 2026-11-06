@@ -164,10 +164,10 @@ function words(o) {
   // the close, which a range or a mode's period takes the place of, joins the
   // line that names its session, worded as the panel words it.
   if (!o.scrubT && o.newest) {
-    var below = Figures.closeLine(quote, Figures.exchangeDay(quote, o.now), o.changeMode, o.top)
+    var below = Figures.closeLine(quote, Figures.exchangeDay(quote, o.now), o.changeMode, o.top, o.calendars)
     var caption = Figures.captionLine(quote, o.newest, o.changeMode, o.history ? String(o.range) : Format.changeCaption(o.changeMode), false)
     if (below.price) {
-      out.extended = below.label + " · " + below.price
+      out.extended = below.label + (below.time ? " " + below.time : "") + " · " + below.price
       out.extendedChange = below.changeText
       out.extendedTone = below.tone
     }

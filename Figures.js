@@ -84,13 +84,15 @@ function freshnessText(fresh, quote, calendars) {
       : fresh.state === "overdue" ? "NOT UPDATING · " : "") + "TIME UNKNOWN"
     return fresh.state === "failed" ? "NO DATA FOR THIS SYMBOL" : fresh.state === "unavailable" || fresh.state === "overdue" ? "NO DATA" : ""
   }
+  // The chart's last bar on top is a trade, not the close, so it says when;
+  // a newer price on top says its own time only when it warns.
   var chartTrade = head && head.source === "chart"
   var lead = fresh.session ? Market.phaseLabel(fresh.session).toUpperCase() + " " : chartTrade ? "LAST TRADE · " : "AS OF "
   var asOf = lead + Market.printDay(quote, fresh.asOf, fresh.now, calendars).toUpperCase()
     + Market.printClock(quote, fresh.asOf, calendars)
   if (fresh.state === "failed") return "REFRESH FAILED · " + asOf
   if (fresh.state === "overdue") return "NOT UPDATING · " + asOf
-  if (chartTrade || fresh.state === "aged" || fresh.state === "saved") return asOf
+  if ((chartTrade && !fresh.session) || fresh.state === "aged" || fresh.state === "saved") return asOf
   return ""
 }
 
@@ -216,10 +218,12 @@ function figuresTrades(quote, day) {
   return (day.trades || day.points).filter(function(p) { return p.t < until && Quote.pointSession(day, p) !== "reg" })
 }
 
-// Three letters at most, as a range's token is.
+// Three letters at most, as a range's token is, so a day a week old or more,
+// whose name is its date, is 1D: the line under the price names it.
 function dayTitle(quote, today) {
   if (quote.rolling) return "24H"
-  return pastDayName(quote, quote.figuresDay, today) || "1D"
+  var day = exchangeDay(quote, quote.figuresDay)
+  return day !== null && today - day > 0 && today - day < 7 ? dayName(quote, quote.figuresDay, today) : "1D"
 }
 
 function pastDayName(quote, t, today) {
@@ -228,14 +232,16 @@ function pastDayName(quote, t, today) {
 }
 
 // No calendar closes longer than five days (Tokyo's Golden Week), so a
-// weekday names one of the six days before today.
+// weekday names one of the six days before today. A week old or more says
+// its date, 4 SEP: a weekday would read as this week's, a month alone as
+// the month.
 function dayName(quote, t, today) {
   var d = new Date((t + (quote.gmtoffset || 0)) * 1000)
-  return today - exchangeDay(quote, t) < 7 ? Format.WEEKDAYS[d.getUTCDay()].toUpperCase() : Format.MONTHS[d.getUTCMonth()]
+  return today - exchangeDay(quote, t) < 7 ? Format.WEEKDAYS[d.getUTCDay()].toUpperCase() : d.getUTCDate() + " " + Format.MONTHS[d.getUTCMonth()]
 }
 
 function dayTitles() {
-  return ["1D", "24H"].concat(Format.WEEKDAYS.map(function(w) { return w.toUpperCase() }), Format.MONTHS)
+  return ["1D", "24H"].concat(Format.WEEKDAYS.map(function(w) { return w.toUpperCase() }))
 }
 
 // Only US stocks and ETFs, which trade at night, share one day here;
@@ -328,20 +334,25 @@ function dayBaselineText(day, today, calendars) {
   return (reg ? closeName(day, reg.start, today, calendars) : "PREV CLOSE") + " " + base
 }
 
-function closeLabel(quote, today) {
+// The headline's close, named by its day once that day is past. Where Yahoo
+// sent no price, the headline is the chart's last bar, which isn't the
+// close: LAST TRADE and its time.
+function closeLabel(quote, today, calendars) {
   var head = Quote.headlineQuote(quote)
   var day = head && head.t !== null ? pastDayName(quote, head.t, today) : ""
-  return (day ? day + " " : "") + "CLOSE"
+  if (head && head.source === "chart") return { label: "LAST TRADE", time: (day ? day + " " : "") + Market.printClock(quote, head.t, calendars) }
+  return { label: (day ? day + " " : "") + "CLOSE", time: "" }
 }
 
 // The line under the price with the newest price on top: the last close and
 // its day's move, CLOSE 171.99 −5.68%, or MON CLOSE once that day is past.
 // Where they would only repeat the price and the move on top (`shown`), as
 // when nothing has moved since the close, it names that price alone: CLOSE.
-function closeLine(quote, today, changeMode, shown) {
+function closeLine(quote, today, changeMode, shown, calendars) {
   var row = rowModel(quote, 0, changeMode === "abs" ? "abs" : "pct")
   var same = row.priceText === shown.priceText && row.changeText === shown.changeText
-  return { label: closeLabel(quote, today), time: "", price: same ? "" : row.priceText, changeText: same ? "" : row.changeText,
+  var named = closeLabel(quote, today, calendars)
+  return { label: named.label, time: named.time, price: same ? "" : row.priceText, changeText: same ? "" : row.changeText,
     tone: same ? "flat" : row.tone, stale: false }
 }
 
@@ -351,9 +362,11 @@ function closeLine(quote, today, changeMode, shown) {
 // the price on top: AFTER HOURS +1.35%, then OVERNIGHT −7.90% from 20:00.
 // None from the next day on, where the move on top is that one, nor where
 // it rounds to nothing. With no newest price on top, AT CLOSE beside the
-// pre-market or after-hours price under the price (`extendedStack`).
+// pre-market or after-hours price under the price (`extendedStack`), unless
+// the price on top is the chart's last bar, which isn't the close.
 function captionLine(quote, newest, changeMode, period, extended) {
-  var none = { label: period || (!newest && extended ? "AT CLOSE" : ""), changeText: "", tone: "flat" }
+  var atClose = !newest && extended && Quote.headlineQuote(quote).source === "quote"
+  var none = { label: period || (atClose ? "AT CLOSE" : ""), changeText: "", tone: "flat" }
   if (period || !newest || !newest.closed) return none
   var unit = changeMode === "abs" ? "abs" : "pct"
   var since = Quote.change({ prevClose: Quote.regularClose(quote), points: [] }, newest.p, unit)
@@ -392,7 +405,7 @@ function closeBefore(quote, newest, calendars) {
 function closeName(quote, t, today, calendars) {
   var cal = Market.calendarFor(calendars, quote)
   var date = closeBeforeDate(cal, t)
-  return date === null ? "PREV CLOSE" : sessionName(quote, Market.epochAt(cal, date, "12:00"), today) + " CLOSE"
+  return date === null ? "PREV CLOSE" : dayName(quote, Market.epochAt(cal, date, "12:00"), today) + " CLOSE"
 }
 
 // The close the move on top counts from (`view.close`), named by its day,
@@ -447,7 +460,7 @@ function heroLines(quote, view, latest, now, day, calendars, changeMode, scrubbi
   var period = view && view.periodLabel ? view.periodLabel : ""
   var newest = quote && view && view.newest ? view.newest : null
   var today = quote ? exchangeDay(quote, now) : null
-  var close = !quote ? null : newest ? closeLine(quote, today, changeMode, view)
+  var close = !quote ? null : newest ? closeLine(quote, today, changeMode, view, calendars)
     : scrubbing ? null : extendedStack(quote, latest, now, day, changeMode)
   var caption = captionLine(quote, newest, changeMode, period, close !== null)
   var rests = quote && view && !scrubbing && (period === "" || period === "24H")
@@ -468,14 +481,6 @@ function newestTime(quote, newest, now, calendars) {
 
 function newestStale(newest, now) {
   return !!newest && newest.phase === "overnight" && now - newest.t > Overnight.OVERNIGHT_STALE
-}
-
-// A week old or more says its date: "BEFORE SEP" would read as before
-// September.
-function sessionName(day, start, today) {
-  if (today - exchangeDay(day, start) < 7) return dayName(day, start, today)
-  var d = new Date((start + (day.gmtoffset || 0)) * 1000)
-  return d.getUTCDate() + " " + Format.MONTHS[d.getUTCMonth()]
 }
 
 // The header and the pill read this one rule, so they never disagree.
