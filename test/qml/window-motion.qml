@@ -800,8 +800,11 @@ Harness {
     }
 
     // Fidget, as it is rendered: from still, the animal holds 1.5 s, then
-    // pricks its horns and blinks inside its own square, while the rest of
-    // the header, the words on a held clock and the icons, holds still.
+    // pricks its horns, rests, pricks them again, blinks, and rests, inside
+    // its own square, while the rest of the header, the words on a held
+    // clock and the icons, holds still. The poses are what the sprites draw
+    // from, each timed from the start; its square's last picture is its
+    // first.
     function fidgetFrames(body) {
       var slot = harness.find(body, "animal")
       var header = slot.parent
@@ -812,22 +815,39 @@ Harness {
       grab.begin("fidget")
       var at = grab.frames.length
       tryVerify(function() { return grab.frames.length >= at + 3 }, 2000)
+      var poses = []
+      var pose = function() {
+        var now = header.pricked ? "prick" : header.drawnLids > header.lids ? "blink" : "rest"
+        if (!poses.length || poses[poses.length - 1].pose !== now) poses.push({ pose: now, at: Date.now() - grab.start })
+      }
+      header.fidgetStepChanged.connect(pose)
       header.seen = Qt.binding(function() { return body.seen })
       grab.markStart()
-      tryVerify(function() { return grab.frames.length > 0 && grab.frames[grab.frames.length - 1].at - grab.start >= 2400 }, 6000)
+      pose()
+      tryVerify(function() { return grab.frames.length > 0 && grab.frames[grab.frames.length - 1].at - grab.start >= 3000 }, 6000)
       grab.end()
+      header.fidgetStepChanged.disconnect(pose)
       var judged = function(rect) {
         tryVerify(function() { return grab.waiting === 0 }, 3000)
         grab.judge("same:" + rect.map(Math.round).join(","))
         tryVerify(function() { return grab.verdict !== null }, 10000)
         return grab.verdict
       }
-      var animal = judged([slot.x, slot.y, slot.width, slot.height])
+      var square = [slot.x, slot.y, slot.width, slot.height]
+      var animal = judged(square)
       var rest = judged([slot.x + slot.width, 0, header.width - slot.x - slot.width, header.height])
+      tryVerify(function() { return grab.waiting === 0 }, 3000)
+      grab.judge("same:" + square.map(Math.round).join(","), [grab.frames[0], grab.frames[grab.frames.length - 1]])
+      tryVerify(function() { return grab.verdict !== null }, 10000)
+      var back = grab.verdict
+      var told = poses.map(function(p) { return p.pose + "@" + p.at }).join(" ")
+      var near = function(i, at) { return !!poses[i] && Math.abs(poses[i].at - at) <= 250 }
+      var loop = poses.map(function(p) { return p.pose }).join(" ") === "rest prick rest prick blink rest"
+        && near(1, 1500) && near(2, 1700) && near(3, 1850) && near(4, 2000) && near(5, 2150)
       service.testClockHeld = false
-      harness.check("the animal fidgets inside its own square 1.5 s after it starts, and the rest of the header holds still",
-        !animal.ok && animal.changedAt >= 1300 && animal.changedAt <= 1900 && rest.ok,
-        "the square: " + animal.detail + " | the rest: " + rest.detail)
+      harness.check("the animal fidgets inside its own square 1.5 s after it starts: a prick, rest, a prick, a blink, and back to rest; the rest of the header holds still",
+        !animal.ok && animal.changedAt >= 1300 && animal.changedAt <= 1900 && loop && back.ok && rest.ok,
+        "poses " + told + " | the square: " + animal.detail + " | back to its first picture: " + back.detail + " | the rest: " + rest.detail)
       // Closed mid-blink, then the shell's animations turned off: the next
       // open starts from the animal's resting pose.
       for (var step = 0; !header.fidget.blink; step++) header.fidgetStep = step
@@ -921,7 +941,7 @@ Harness {
       // The animal mid-fidget, its horns pricked.
       var header = harness.find(body, "animal").parent
       for (var step = 0; !header.fidget.pricked; step++) header.fidgetStep = step
-      var pricked = header.fidgeting
+      var pricked = header.fidgeting && header.pricked
       grab.begin("closing-at-rest")
       frames(3)
       grab.end()

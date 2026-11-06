@@ -434,6 +434,10 @@ Item {
     if (onScreen) search.pump()
   }
   onServiceChanged: if (service && surfaceOpen && onScreen) service.surfaceShown(root, true)
+  // The panel's own screen on. The panel's asks heed only every screen
+  // off: one that waited for its own screen might not ask again when it
+  // wakes. The animal's fidget, which asks for nothing, heeds this too.
+  property bool screenOn: true
   // On a screen that's on: the panel's `onScreen` doesn't follow screens
   // turning off.
   readonly property bool seen: surfaceOpen && onScreen && !(service && service.screensOff)
@@ -1057,7 +1061,7 @@ Item {
     soundsOn: root.soundsOn
     cameraLit: root.cameraLit
     animal: root.animal
-    seen: root.seen
+    seen: root.seen && root.screenOn
     ground: root.ground
     scrubbing: root.scrubT !== 0
     live: root.heroLive
