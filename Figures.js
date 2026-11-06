@@ -146,15 +146,19 @@ function extendedStack(quote, latest, now, day, changeMode) {
 
 // A bar is five minutes of trades, so the words speak of the chart. One bar
 // is the only one once its day is over (`axis.closes` where a night follows);
-// before that it may be the first of many. An empty day says nothing before
-// its bell, as an index has no print before it, nor beside a quote that is a
-// trade of its session. Yahoo stamps its live moment at the price's own
-// second, apart from the bars at their five-minute starts.
+// before that it may be the first of many. They count every trade of the
+// day (`day.trades`), as its low and high do, though the chart's start may
+// have slid past some, and name the day of one that isn't today's. An empty
+// day says nothing before its bell, as an index has no print before it, nor
+// beside a quote that is a trade of its session. Yahoo stamps its live
+// moment at the price's own second, apart from the bars at their five-minute
+// starts.
 function dayNote(day, now, calendars) {
   if (!day) return ""
-  var pts = day.points
+  var pts = day.trades || day.points
   var over = now >= (day.axis && day.axis.closes ? day.axis.closes : Quote.dayEnd(day))
-  if (pts.length === 1) return pts[0].t % (5 * 60) === 0 && over ? "Traded only at " + Market.printClock(day, pts[0].t, calendars) : ""
+  if (pts.length === 1) return pts[0].t % (5 * 60) === 0 && over
+    ? "Traded only at " + Market.printDay(day, pts[0].t, now, calendars) + Market.printClock(day, pts[0].t, calendars) : ""
   if (pts.length > 1) return ""
   var regular = day.session.regular
   if (!regular) return "No trades today"
@@ -171,10 +175,11 @@ function exchangeDay(quote, t) {
 
 // Titled against the later of today and the day drawn, so Monday's figures
 // under Tuesday's chart, from its first night trade, say MON. Its low and
-// high are Yahoo's for the session, widened by the trades the chart draws
-// around it (`figuresTrades`). An end at the 52-week mark takes that
-// direction's tone, as `Fundamentals.yearLine`'s. The open keeps its slot
-// before the first bar, so the line keeps its shape.
+// high are Yahoo's for the session, widened by the day's trades around it
+// from its night's open, drawn or slid off the chart's left (`figuresTrades`).
+// An end at the 52-week mark takes that direction's tone, as
+// `Fundamentals.yearLine`'s. The open keeps its slot before the first bar,
+// so the line keeps its shape.
 function dayLine(quote, today, day) {
   if (!quote) return null
   var q = quote
@@ -208,7 +213,7 @@ function dayLine(quote, today, day) {
 function figuresTrades(quote, day) {
   if (!day || !day.session || !day.session.regular || exchangeDay(quote, day.session.regular.start) !== exchangeDay(quote, quote.figuresDay)) return []
   var until = day.tonight || Quote.tailStart(day) || Infinity
-  return day.points.filter(function(p) { return p.t < until && Quote.pointSession(day, p) !== "reg" })
+  return (day.trades || day.points).filter(function(p) { return p.t < until && Quote.pointSession(day, p) !== "reg" })
 }
 
 // Three letters at most, as a range's token is.

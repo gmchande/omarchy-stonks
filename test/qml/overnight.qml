@@ -379,15 +379,18 @@ Harness {
         within(4000, function() { return !body.motion.replayRunning })
         body.headerTextChanged.disconnect(watch)
         // A trade before midnight is Sunday's, and says so. The replay starts
-        // at the chart's first trade, Friday's, and runs by the clock, so it
-        // reads each trade's price as it passes it, not its minute.
+        // at the chart's first trade, Friday's 05:00 in the pre-market, since
+        // by 00:36 Friday's first hours have slid off the left, and runs by
+        // the clock, so it reads each trade's price as it passes it, not its
+        // minute.
         var read = replayRead.concat([replayed.split(" | ")[1]])
         var digits = service.quotes.TOY.priceDigits
         var missed = trades.filter(function(p) { return read.indexOf(Format.money(p.p, digits)) < 0 })
           .map(function(p) { return Format.hhmm(p.t, offset) })
+        var first = toy.points[0]
         check(look + ": a replay starts at Friday's first trade, at its time, and reads every trade of the night",
-          trades.length === 5 && replayed === "At Fri " + Format.hhmm(toy.points[0].t, offset) + " · Overnight | " + Format.money(toy.points[0].p, digits)
-            && missed.length === 0,
+          trades.length === 5 && Format.hhmm(first.t, offset) === "05:00"
+            && replayed === "At Fri 05:00 · Pre-market | " + Format.money(first.p, digits) && missed.length === 0,
           trades.length + " trades ; " + replayed + " ; missed " + missed.join(", "))
       })
 
@@ -510,9 +513,11 @@ Harness {
       var down = body.featuredGeometry.start + " | " + harness.strip()
       runCommand(["rm", "-f", harness.state + "/INSTRUMENTS.down"])
       service.now = 1791399300 + 6 * 60
-      within(4000, function() { return body.featuredGeometry.start === harness.midnight.wed7 - 4 * 3600 })
-      check("with Robinhood's instruments down, SPY lands on Yahoo's day; asked again five minutes on, it turns to its trading day, from its night's first trade",
-        landed && down.indexOf(String(harness.midnight.wed7 + 4 * 3600)) === 0 && body.featuredGeometry.start === harness.midnight.wed7 - 4 * 3600
+      // 15:01: its trading day, its start slid from the night's open to its
+      // midnight by 13:30.
+      within(4000, function() { return body.featuredGeometry.start === harness.midnight.wed7 })
+      check("with Robinhood's instruments down, SPY lands on Yahoo's day; asked again five minutes on, it turns to its trading day, from its midnight's first trade",
+        landed && down.indexOf(String(harness.midnight.wed7 + 4 * 3600)) === 0 && body.featuredGeometry.start === harness.midnight.wed7
           && body.featuredGeometry.start === body.featuredDay.points[0].t && harness.allDayAsked("SPY") === 2,
         down + " then " + body.featuredGeometry.start + ", asked " + harness.allDayAsked("SPY"))
 
@@ -735,6 +740,32 @@ Harness {
       useLook(false)
       check("retro: a scrub of BRK-A's lone trade at 09:31 reads it, not the close before it",
         lone.indexOf("At 09:31") === 0 && /\| 813,23[45]$/.test(lone), lone)
+
+      // Still 09:35, SPY on show, its 1D start sliding by the clock. With
+      // another surface open on a screen, the window moved to another
+      // workspace holds its chart as the clock moves five minutes on; back
+      // on screen, it takes the slid start.
+      var hadSpy = service.library.indexOf("SPY") >= 0
+      if (!hadSpy) service.addSymbol("SPY")
+      within(8000, function() { return !!service.quotes.SPY && service.arriving.length === 0 })
+      featureShown("SPY")
+      // Once Robinhood's night is in: the chart from Sunday's 20:05.
+      within(8000, function() { return body.chartSymbol === "SPY" && !body.chartLoading && !!body.featuredDay.axis && body.featuredDay.axis.start === 1792973100 })
+      var otherSurface = {}
+      service.surfaceShown(otherSurface, true)
+      app.onScreen = false
+      var hiddenDay = body.featuredDay
+      service.now += 5 * 60
+      // Once the shared view has slid for the surface a screen shows.
+      var slid = within(2000, function() { return !!service.view.chart && service.view.chart.day.axis.start === hiddenDay.axis.start + 5 * 60 })
+      var heldHidden = slid && body.featuredDay === hiddenDay
+      app.onScreen = true
+      var caughtUp = within(2000, function() { return body.featuredDay.axis.start === hiddenDay.axis.start + 5 * 60 })
+      service.surfaceShown(otherSurface, false)
+      check("a window no screen shows holds its chart as the clock slides 1D's start, and takes the slid start back on screen",
+        heldHidden && caughtUp, "held " + heldHidden + ", caught up " + caughtUp + ": " + hiddenDay.axis.start + " then " + body.featuredDay.axis.start)
+      if (!hadSpy) service.removeSymbol("SPY")
+      featureShown("BRK-A")
 
       // The window closed, JNJ added and the pill wheeled onto it from
       // BRK-A, by day, with Robinhood failing: JNJ is asked once, as the

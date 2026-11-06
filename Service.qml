@@ -32,6 +32,21 @@ Item {
   property bool saveFailed: false
   signal saveChecked(bool saved)
   property int now: Math.floor(Date.now() / 1000)
+  // The clock five minutes at a time, which slides 1D's start
+  // (`Overnight.slidWindow`): the pill's line follows it while a screen is
+  // on, and the panel's and window's chart and rows (`viewSlideAt`) only
+  // while one is open, so nothing rebuilds for a surface no screen shows.
+  property int slideAt: 0
+  property int viewSlideAt: 0
+  function slideClock() {
+    if (root.screensOff) return
+    var at = root.now - root.now % 300
+    if (at !== root.slideAt) root.slideAt = at
+    if (root.openSurfaces.length > 0 && root.viewSlideAt !== root.slideAt) root.viewSlideAt = root.slideAt
+  }
+  onScreensOffChanged: slideClock()
+  onOpenSurfacesChanged: slideClock()
+  Component.onCompleted: slideClock()
   property var lastRemoval: null
   property string listsHeld: ""
   // The same array until what the lists hold changes, so a save of a range
@@ -89,7 +104,7 @@ Item {
     // for a quoted symbol on the day recomputes nothing.
     var chart = Chart.viewChart(featured, range, feed.quotes,
       feed.quotes[featured] ? ({}) : feed.entries, range === "1D" ? ({}) : historyFeed.entries,
-      overnightFeed.entries, allDayFeed.entries, calendars)
+      overnightFeed.entries, allDayFeed.entries, calendars, root.viewSlideAt)
     root.keepDay(featured, chart, overnightFeed.entries, allDayFeed.entries)
     return {
       featured: featured,
@@ -114,7 +129,7 @@ Item {
     var entries = own ? previewFeed.entries : feed.entries
     var range = view.range
     var chart = Chart.viewChart(symbol, range, quotes, quotes[symbol] ? ({}) : entries,
-      range === "1D" ? ({}) : historyFeed.entries, overnightFeed.entries, allDayFeed.entries, calendars)
+      range === "1D" ? ({}) : historyFeed.entries, overnightFeed.entries, allDayFeed.entries, calendars, root.viewSlideAt)
     root.keepDay(symbol, chart, overnightFeed.entries, allDayFeed.entries)
     return Object.assign({}, view, { featured: symbol, chart: chart })
   }
@@ -241,6 +256,7 @@ Item {
     })
   }
   onNowChanged: {
+    slideClock()
     askOvernight()
     if ((root.dueAt > 0 && root.now >= root.dueAt) || Math.floor(root.now / 60) !== root.askedMinute) askDue()
     if (Math.floor(root.now / 60) !== root.prunedMinute) {
@@ -312,8 +328,9 @@ Item {
   }
   signal screensReady()
   // Reused while built from the same objects, its quote and an all-day
-  // listing's prints and reach: an answer for another symbol repaints
-  // nothing, and a preview's Yahoo day never stands in once it is added.
+  // listing's prints and reach, and while its start hasn't slid: an answer
+  // for another symbol repaints nothing, nor does a clock that moves no
+  // start, and a preview's Yahoo day never stands in once it is added.
   readonly property var builtDays: ({})
   function keepDay(symbol, chart, nights, allDay) {
     if (!chart || !chart.quote || chart.day === chart.quote) return
@@ -321,12 +338,13 @@ Item {
     var night = tradability && tradability.allDay ? nights[symbol] : null
     var bars = night ? night.bars : null
     var through = night ? night.through : null
+    var start = chart.day.axis ? chart.day.axis.start : null
     var built = builtDays[symbol]
-    if (built && built.quote === chart.quote && built.bars === bars && built.through === through) {
+    if (built && built.quote === chart.quote && built.bars === bars && built.through === through && built.start === start) {
       chart.day = built.day
       chart.latest = built.latest
     } else {
-      builtDays[symbol] = { quote: chart.quote, bars: bars, through: through, day: chart.day, latest: chart.latest }
+      builtDays[symbol] = { quote: chart.quote, bars: bars, through: through, start: start, day: chart.day, latest: chart.latest }
     }
   }
 

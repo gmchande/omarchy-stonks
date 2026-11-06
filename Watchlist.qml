@@ -20,9 +20,11 @@ Flickable {
   property var view: ({ list: "", listKey: "=", order: "manual", reversed: false, rows: [], shown: [], library: [] })
   property var quotes: ({})
   property var newestPrints: ({})
-  // Robinhood's answers, by symbol.
+  // Robinhood's answers, by symbol, and the clock that slides a row's 1D
+  // start, five minutes at a time (`Service.viewSlideAt`).
   property var nights: ({})
   property var allDay: ({})
+  property int slideAt: 0
   property var entries: ({})
   property string featuredSymbol: ""
   property int scrubShown: 0
@@ -764,7 +766,7 @@ Flickable {
         // Taken in sight, as the quote is.
         property var sightDay: null
         Binding on sightDay {
-          value: rowDelegate.quote ? Chart.lineDay(rowDelegate.symbol, rowDelegate.quote, root.nights, root.allDay, root.calendars) : null
+          value: rowDelegate.quote ? Chart.lineDay(rowDelegate.symbol, rowDelegate.quote, root.nights, root.allDay, root.calendars, root.slideAt) : null
           when: rowDelegate.place >= 0 && rowDelegate.inSight
           restoreMode: Binding.RestoreNone
         }

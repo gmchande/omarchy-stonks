@@ -1084,8 +1084,11 @@ test("each print says its own time across a change of clocks, the 1D's day keeps
   expect(M.chartGeometry(monday).points.map(p => p.dim)).toEqual([true, true, false])
   // The day after Thanksgiving closes at 13:00, and its tick says so, by
   // the clock between the 12:55 print and the 15:00 one. Its after hours
-  // end at 17:00, as Robinhood's hours for it say: the day runs from its
-  // first trade, Thanksgiving's 22:00, to 17:00.
+  // end at 17:00, as Robinhood's hours for it say. Its start slides to its
+  // midnight by 13:30 as any day's, though its session closed at 13:00, so
+  // at 15:00 Thanksgiving's 22:00 trade has slid off the chart, which runs
+  // from 00:00, its quiet morning keeping its hours, to 17:00. That trade
+  // still counts in the day's low and high.
   const early = {
     ...quote, gmtoffset: -18000, marketTime: at("2026-11-27", "13:00"),
     session: {
@@ -1098,9 +1101,10 @@ test("each print says its own time across a change of clocks, the 1D's day keeps
   const thursdayPrint = { t: at("2026-11-26", "22:00"), p: 100.2, s: "overnight" }
   const friday27 = M.dayChart(early, { bars: [thursdayPrint], through: thursdayPrint.t }, calendars).day
   const geometry = M.chartGeometry(friday27)
-  const [, noon, afternoon] = geometry.points.map(p => p.x)
+  const [noon, afternoon] = geometry.points.map(p => p.x)
   expect(geometry.ticks.filter(x => x > noon && x < afternoon).map(x => M.timeAtFraction(friday27, x))).toEqual([at("2026-11-27", "13:00")])
-  expect(M.chartSpan(friday27)).toMatchObject({ start: at("2026-11-26", "22:00"), end: at("2026-11-27", "17:00") })
+  expect(M.chartSpan(friday27)).toMatchObject({ start: at("2026-11-27", "00:00"), end: at("2026-11-27", "17:00") })
+  expect(friday27.trades[0]).toEqual(thursdayPrint)
   // Wednesday before it, with no trade before the open, runs from the open
   // to its own 20:00, no night trading before the holiday; it stays on
   // through Thanksgiving. Thanksgiving's night joins it, the holiday taking

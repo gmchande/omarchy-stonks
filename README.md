@@ -109,12 +109,16 @@ day's first trade, or the open if that's earlier, to the day's end while
 it runs, and to its last trade once it's over. The regular session is
 bright and the hours around it dim.
 
-For a US stock Robinhood trades at night, a day runs 24 hours, from its
-night's open the evening before (20:00, New York time) to the next. Through
-the night, until 04:00, the chart keeps the day that just closed, so it
-doesn't vanish at midnight while you're still reading it, and adds
-tonight's trades at its right end. Once the day's 24 hours are full, each
-five minutes added on the right takes five off the left, so nothing jumps.
+For a US stock Robinhood trades at night, a day starts with its night, at
+20:00 the evening before (New York time), and runs to 20:00. From the open
+at 09:30 its start slides toward midnight, five minutes for every five that
+pass, so by 13:30 the chart runs from 00:00 to 20:00 and gives the session
+more room, whether the stock traded all morning or not. The trades it
+slides past still count in the day's low and high.
+Through the night, until 04:00, the chart keeps the day that just closed, so
+it doesn't vanish at midnight while you're still reading it, and adds
+tonight's trades at its right end: each five minutes added on the right
+takes five off the left, so nothing jumps.
 The session trading now is bright and the rest dim: the pre-market, the
 regular session, after hours, or tonight. Until that session's first trade,
 and while the market rests, the regular session stays bright.
