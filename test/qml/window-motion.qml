@@ -592,6 +592,9 @@ Harness {
     // the slot's pictures (frames.js), each run from a few frames before
     // the change to 400 ms after it.
     function animalFrames(body) {
+      // Fidget held still: each film judges only the change it makes.
+      var header = harness.find(body, "animal").parent
+      header.seen = false
       var featuredBefore = service.featuredSymbol
       var rangeBefore = service.range
       service.persist({ style: "smooth" })
@@ -654,6 +657,7 @@ Harness {
       service.setRange(rangeBefore)
       service.feature(featuredBefore)
       tryVerify(function() { return !body.chartLoading && body.motion.drawn === 1 }, 5000)
+      header.seen = Qt.binding(function() { return body.seen })
     }
 
     // The header's animal falling asleep and waking, as it is rendered with
@@ -669,6 +673,8 @@ Harness {
       var rangeBefore = service.range
       var slot = harness.find(body, "animal")
       var header = slot.parent
+      // Fidget held still: each film judges only the change it makes.
+      header.seen = false
       var words = harness.find(header, "statusText")
       var icon = harness.find(body, "lookIcon")
       var bull = harness.find(body, "bullCells")
@@ -769,9 +775,41 @@ Harness {
         + opened.detail, opened.ok && body.animal.asleep && header.closing === 1, body.animal.asleep + ": " + opened.detail)
       words.visible = true
       service.testClockHeld = false
+      header.seen = Qt.binding(function() { return body.seen })
       service.setRange(rangeBefore)
       service.feature(featuredBefore)
       tryVerify(function() { return !body.chartLoading && body.motion.drawn === 1 }, 5000)
+    }
+
+    // Fidget, as it is rendered: from still, the animal holds 1.5 s, then
+    // pricks its horns and blinks inside its own square, while the rest of
+    // the header, the words on a held clock and the icons, holds still.
+    function fidgetFrames(body) {
+      var slot = harness.find(body, "animal")
+      var header = slot.parent
+      service.testClockHeld = true
+      tryVerify(function() { return body.animal.kind !== "" && header.fidgeting }, 3000)
+      header.seen = false
+      grab.source = header
+      grab.begin("fidget")
+      var at = grab.frames.length
+      tryVerify(function() { return grab.frames.length >= at + 3 }, 2000)
+      header.seen = Qt.binding(function() { return body.seen })
+      grab.markStart()
+      tryVerify(function() { return grab.frames.length > 0 && grab.frames[grab.frames.length - 1].at - grab.start >= 2400 }, 6000)
+      grab.end()
+      var judged = function(rect) {
+        tryVerify(function() { return grab.waiting === 0 }, 3000)
+        grab.judge("same:" + rect.map(Math.round).join(","))
+        tryVerify(function() { return grab.verdict !== null }, 10000)
+        return grab.verdict
+      }
+      var animal = judged([slot.x, slot.y, slot.width, slot.height])
+      var rest = judged([slot.x + slot.width, 0, header.width - slot.x - slot.width, header.height])
+      service.testClockHeld = false
+      harness.check("the animal fidgets inside its own square 1.5 s after it starts, and the rest of the header holds still",
+        !animal.ok && animal.changedAt >= 1300 && animal.changedAt <= 1900 && rest.ok,
+        "the square: " + animal.detail + " | the rest: " + rest.detail)
     }
 
     // A closing surface holds its picture: from the close until the next
@@ -1145,6 +1183,7 @@ Harness {
       joinFrames(body, watchlist, keys)
       animalFrames(body)
       sleepFrames(body)
+      fidgetFrames(body)
       closingHolds(body, watchlist, keys)
       // Each later open holds the thread at most 20 ms.
       var later = []

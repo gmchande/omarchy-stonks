@@ -310,6 +310,15 @@ Harness {
       tryVerify(function() { return grab.verdict !== null }, 10000)
       var opened = grab.verdict
       filmed("with animations off, the panel opens whole and still", opened.ok && whole, opened, whole ? "" : " | a draw-in began")
+      // The animal doesn't fidget: over a loop and more, its square holds.
+      var slot = find(panel.testBody, "animal")
+      var animal = slot.mapToItem(panel.testCard.surface, 0, 0)
+      var shown = slot.parent.kind !== ""
+      grab.begin("still-animal")
+      grab.markStart()
+      tryVerify(function() { return grab.frames.length > 0 && grab.frames[grab.frames.length - 1].at - grab.start >= 2600 }, 6000)
+      var sat = verdict("same:" + [Math.round(animal.x), Math.round(animal.y), Math.round(slot.width), Math.round(slot.height)].join(","))
+      filmed("with animations off, the animal sits still", sat.ok && shown, sat, shown ? "" : " | no animal shows")
       var before = panel.fittedCardHeight
       service.switchList("Short")
       waitForRendering(panel.testCard.surface)
