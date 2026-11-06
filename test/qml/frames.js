@@ -73,12 +73,16 @@
 // too.
 import { readFileSync } from "node:fs"
 
-// Every motion runs on the shell's ease-out, Style.easeOut: a cubic Bézier
-// through (0.23, 1) and (0.32, 1). At the curve's own step s its progress
-// is 1 − (1 − s)³, reached at the share of its time `curveTime(s)`. So
-// `timeAt(p)`, the share of its time at which it shows progress p, is a
-// straight line in time, and a motion's length and start are read off it.
-const curveTime = s => 3 * (1 - s) ** 2 * s * 0.23 + 3 * (1 - s) * s * s * 0.32 + s ** 3
+// Every motion runs on the shell's ease-out: a cubic Bézier through (x1, 1)
+// and (x2, 1), STONKS_FRAME_CURVE "x1 x2" (lib.sh, frame_tools). Omarchy
+// 4.5's Style.easeOut is (0.23, 1) and (0.32, 1), the default here; 4.0 has
+// none, and there Stonks eases on OutCubic, (1/3, 1) and (2/3, 1). At the
+// curve's own step s its progress is 1 − (1 − s)³, reached at the share of
+// its time `curveTime(s)`. So `timeAt(p)`, the share of its time at which it
+// shows progress p, is a straight line in time, and a motion's length and
+// start are read off it.
+const [x1, x2] = (process.env.STONKS_FRAME_CURVE || "0.23 0.32").split(" ").map(Number)
+const curveTime = s => 3 * (1 - s) ** 2 * s * x1 + 3 * (1 - s) * s * s * x2 + s ** 3
 const timeAt = p => curveTime(1 - Math.cbrt(1 - Math.min(1, Math.max(0, p))))
 // Its progress at share x of its time.
 function progressAt(x) {

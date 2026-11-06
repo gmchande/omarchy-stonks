@@ -14,13 +14,18 @@ if [ "${1:-}" = --anchors ]; then
   plugin_tree popup-anchor.qml
   patch_copy plugin/Panel.qml 's/open: root.opened/open: false/'
   patch_copy plugin/Panel.qml '/readonly property int panelWidth:/a\  readonly property alias testCard: panel\n  readonly property alias testHeldAnchor: heldAnchor'
-  # A fixed screen for the unmapped placement specimen; the installed
+  # A fixed screen for the unmapped placement specimen; the shell's own
   # KeyboardPanel still computes its actual anchor, origin and clamping.
   rm "$root/Ui"
-  cp -r /usr/share/omarchy/shell/Ui "$root/Ui"
+  cp -r "$shell/Ui" "$root/Ui"
   patch_copy Ui/KeyboardPanel.qml 's/readonly property real screenW: screen ? screen.width : 0/readonly property real screenW: 1000/; s/readonly property real screenH: screen ? screen.height : 0/readonly property real screenH: 900/'
   patch_copy Ui/KeyboardPanel.qml 's/readonly property var anchorWindow: /property var anchorWindow: /'
   patch_copy plugin/HeldAnchor.qml 's/readonly property var barWindow: /property var barWindow: /'
+  # A shell whose bar has no barSize (Omarchy 4.0) measures the bar by its
+  # window alone.
+  if ! grep -q 'property int barSize' "$shell/Ui/PluginBarApi.qml"; then
+    patch_copy shell.qml 's/; barSize: 32 }/ }/; s/api\.barSize/32/g'
+  fi
   export QT_QPA_PLATFORM=wayland
   run_qs 15
   sed -n 's/^.*qml: ANCHOR POSES //p' "$work/log" > "$2"

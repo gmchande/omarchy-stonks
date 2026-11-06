@@ -882,6 +882,8 @@ Harness {
       service.testClockHeld = false
       harness.check("after its first fidget the animal rests 8, 16 and 32 s, then a minute, its clock stopped while it isn't seen",
         rests.join(" ") === "8 16 32 60 60" && stopped, "rests " + rests.join(" ") + " s, stopped " + stopped)
+      // Omarchy 4.0 has no switch to turn its animations off.
+      if (Style.reduceMotion === undefined) return
       // Closed mid-blink, then the shell's animations turned off: the next
       // open starts from the animal's resting pose.
       for (var step = 0; !header.fidget.blink; step++) header.fidgetStep = step

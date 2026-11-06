@@ -19,6 +19,8 @@
 # - What the shell's own components read as they start: the corner rounding
 #   and outer gap from the running Hyprland (Commons/Style.qml), and
 #   Omarchy's settings from the environment, with the locale and Qt's.
+# - Another shell's files, when STONKS_SHELL names one (test/qml/lib.sh),
+#   and the states drawn, when STONKS_RENDER_STATES names only some.
 #
 # DIR is a git checkout, whose tracked and untracked files count, an edit
 # included, or a tree git archive wrote (test/review.sh's base). The same
@@ -49,6 +51,8 @@ hashes() { [ ! -d "$1" ] || (cd "$1" && find -L . -type f -print0 | sort -z | xa
   hashes /etc/fonts
   hashes "${XDG_CONFIG_HOME:-$HOME/.config}/fontconfig"
   hashes "${XDG_DATA_HOME:-$HOME/.local/share}/fonts"
+  [ -z "${STONKS_SHELL:-}" ] || { echo "shell $STONKS_SHELL"; hashes "$STONKS_SHELL"; }
+  [ -z "${STONKS_RENDER_STATES:-}" ] || echo "states $STONKS_RENDER_STATES"
   hyprctl -j getoption decoration:rounding 2> /dev/null || true
   hyprctl -j getoption general:gaps_out 2> /dev/null || true
   env | grep -E '^(LANG|LANGUAGE|LC_[A-Z]+|QT_[A-Z_]+|QML[A-Z0-9_]*|QSG_[A-Z_]+|FONTCONFIG_[A-Z_]+|OMARCHY_[A-Z0-9_]+)=' | sort || true
