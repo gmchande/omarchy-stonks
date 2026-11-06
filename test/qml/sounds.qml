@@ -605,9 +605,17 @@ Harness {
       app.open("{}")
       var win = app.testBody
       tryVerify(function() { return win && win.surfaceOpen && !win.chartLoading && win.featuredSymbol === "AAPL" }, 5000)
+      // Its first frame drawn: offscreen, that frame tells the chart the
+      // pointer left, which would reset the chimes mid-sweep.
+      waitForRendering(win)
       mouseMove(win, 1, 1)
+      // The pointer reaches the look button before it clicks, and leaves, as
+      // a hand does: a click alone leaves the button hovered, and the tip
+      // that then opens and closes would reset the chimes too.
       var look = harness.find(win, "lookToggle")
+      mouseMove(look, look.width / 2, look.height / 2)
       mouseClick(look, look.width / 2, look.height / 2)
+      mouseMove(win, 1, 1)
       tryVerify(function() { return service.retro }, 2000)
       // Retro's chart drawn in, and its files written ahead, so no write
       // holds the thread mid-sweep.
