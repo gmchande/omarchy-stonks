@@ -79,6 +79,8 @@ Item {
     if (fidgeting) fidgetClock.restart()
     else fidgetClock.stop()
   }
+  // Each open starts from rest, running or not.
+  onSeenChanged: if (seen) fidgetAnew()
   onFidgetingChanged: {
     if (seen) fidgetAnew()
     else fidgetClock.stop()

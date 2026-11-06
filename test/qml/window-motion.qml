@@ -2,6 +2,7 @@ import QtQuick
 import QtTest
 import Quickshell
 import Quickshell.Io
+import qs.Commons
 import "plugin" as Stonks
 import "plugin/Quote.js" as Quote
 
@@ -827,6 +828,17 @@ Harness {
       harness.check("the animal fidgets inside its own square 1.5 s after it starts, and the rest of the header holds still",
         !animal.ok && animal.changedAt >= 1300 && animal.changedAt <= 1900 && rest.ok,
         "the square: " + animal.detail + " | the rest: " + rest.detail)
+      // Closed mid-blink, then the shell's animations turned off: the next
+      // open starts from the animal's resting pose.
+      for (var step = 0; !header.fidget.blink; step++) header.fidgetStep = step
+      app.close()
+      Style.reduceMotion = true
+      app.open("{}")
+      tryVerify(function() { return body.seen }, 2000)
+      var resting = !header.fidget.blink && !header.pricked && header.drawnLids === header.lids
+      harness.check("closed mid-blink, then opened with animations off, the animal shows its resting pose",
+        resting && !body.animal.asleep, "blink " + header.fidget.blink + ", lids drawn " + header.drawnLids + " of " + header.lids)
+      Style.reduceMotion = false
     }
 
     // A closing surface holds its picture: from the close until the next
