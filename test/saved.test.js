@@ -1937,12 +1937,14 @@ test("once a listing trades after its close, its newest price is on top, measure
   // Read with no newest price, the close is on top.
   expect(M.rowModel(quote, 0, "pct").changeText).toBe("+7.44%")
   // Where Yahoo sent no price, the headline is the chart's 15:55 bar: the
-  // line beneath calls it the last trade, never the close, and the row
-  // keeps its name, the night's price being on top.
+  // line beneath calls it the last trade, never the close. The line above
+  // the price says the night's price on top is the 00:50 trade; a row says
+  // that time after its name, so it keeps its name.
   const untraded = { ...quote, price: null }
   const lines = M.heroLines(untraded, M.rowModel(untraded, 0, "pct", newest), null, one, day, calendars, "pct", false)
   expect(lines.close).toMatchObject({ label: "LAST TRADE", time: "TUE 15:55", price: "249.78", changeText: "+7.40%" })
-  expect(M.freshnessText(M.freshness({ status: "ok", answeredAt: one - 60 }, untraded, one, 0, false, newest), untraded, calendars)).toBe("")
+  const untradedFresh = M.freshness({ status: "ok", answeredAt: one - 60 }, untraded, one, 0, false, newest)
+  expect([M.freshnessText(untradedFresh, untraded, calendars), M.freshnessText(untradedFresh, untraded, calendars, true)]).toEqual(["OVERNIGHT 00:50", ""])
   // With no night price on top, the chart's bar is, and its move is not the
   // move at the close.
   expect(M.heroLines(untraded, M.rowModel(untraded, 0, "pct"), latest, one, day, calendars, "pct", false).caption.label).toBe("")

@@ -76,7 +76,9 @@ function freshness(entry, quote, now, owedSince, inGrace, newest) {
     live: asOf !== null && state === "fresh" && Market.isTrading(phase), phase: phase }
 }
 
-function freshnessText(fresh, quote, calendars) {
+// `timed`: the caller says the newest price's time itself, as a row does
+// after its name, so a note that would only repeat it is left out.
+function freshnessText(fresh, quote, calendars, timed) {
   if (!fresh) return ""
   var head = quote ? Quote.headlineQuote(quote) : null
   if (!fresh.asOf) {
@@ -84,15 +86,15 @@ function freshnessText(fresh, quote, calendars) {
       : fresh.state === "overdue" ? "NOT UPDATING · " : "") + "TIME UNKNOWN"
     return fresh.state === "failed" ? "NO DATA FOR THIS SYMBOL" : fresh.state === "unavailable" || fresh.state === "overdue" ? "NO DATA" : ""
   }
-  // The chart's last bar on top is a trade, not the close, so it says when;
-  // a newer price on top says its own time only when it warns.
+  // Where Yahoo sent no price, what's on top is a trade, not the close, so
+  // it says when.
   var chartTrade = head && head.source === "chart"
   var lead = fresh.session ? Market.phaseLabel(fresh.session).toUpperCase() + " " : chartTrade ? "LAST TRADE · " : "AS OF "
   var asOf = lead + Market.printDay(quote, fresh.asOf, fresh.now, calendars).toUpperCase()
     + Market.printClock(quote, fresh.asOf, calendars)
   if (fresh.state === "failed") return "REFRESH FAILED · " + asOf
   if (fresh.state === "overdue") return "NOT UPDATING · " + asOf
-  if ((chartTrade && !fresh.session) || fresh.state === "aged" || fresh.state === "saved") return asOf
+  if ((chartTrade && !(fresh.session && timed)) || fresh.state === "aged" || fresh.state === "saved") return asOf
   return ""
 }
 

@@ -66,7 +66,7 @@ Rectangle {
   property bool sourceDown: false
   readonly property var shownFreshness: sourceDown ? Figures.quietFreshness(freshness) : freshness
   readonly property bool warns: Figures.freshnessWarns(shownFreshness)
-  readonly property string freshnessNote: quote ? Figures.freshnessText(shownFreshness, quote, calendars) : ""
+  readonly property string freshnessNote: quote ? Figures.freshnessText(shownFreshness, quote, calendars, newestTime !== "") : ""
   property string newestTime: ""
   readonly property string detail: quote
     ? (freshnessNote !== "" ? (warns ? "! " : "") + Format.sentenceCase(freshnessNote) : view.name)
