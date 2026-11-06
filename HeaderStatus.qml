@@ -62,6 +62,29 @@ Item {
   readonly property int steps: moved >= 1 ? 2 : moved >= 0.5 ? 1 : 0
   readonly property int lids: waking ? 2 - steps : steps
 
+  // While the panel or window shows (`seen`), the animal fidgets
+  // (`Cells.FIDGET`), from still at each open; asleep, its eyes stay shut.
+  // Only its own cells change, and with the shell's animations off it sits
+  // still.
+  property bool seen: false
+  property int fidgetStep: 0
+  readonly property bool fidgeting: seen && kind !== "" && !Style.reduceMotion
+  readonly property var fidget: Cells.FIDGET[fidgeting ? fidgetStep : 0]
+  readonly property int drawnLids: fidget.blink ? 2 : lids
+  onFidgetingChanged: {
+    fidgetStep = 0
+    if (fidgeting) fidgetClock.restart()
+    else fidgetClock.stop()
+  }
+  Timer {
+    id: fidgetClock
+    interval: Cells.FIDGET[root.fidgetStep].ms
+    onTriggered: {
+      root.fidgetStep = (root.fidgetStep + 1) % Cells.FIDGET.length
+      restart()
+    }
+  }
+
   signal styleRequested(string style)
   signal soundsRequested()
   signal screenshotRequested()
@@ -152,7 +175,7 @@ Item {
       objectName: "bullCells"
       anchors.fill: parent
       visible: opacity > 0
-      pixels: Cells.spriteFor(true, root.lids)
+      pixels: Cells.spriteFor(true, root.drawnLids, root.fidget.pricked)
       color: root.upColor
     }
     PixelSprite {
@@ -160,7 +183,7 @@ Item {
       objectName: "bearCells"
       anchors.fill: parent
       visible: opacity > 0
-      pixels: Cells.spriteFor(false, root.lids)
+      pixels: Cells.spriteFor(false, root.drawnLids, root.fidget.pricked)
       color: root.downColor
     }
 

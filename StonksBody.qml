@@ -434,9 +434,12 @@ Item {
     if (onScreen) search.pump()
   }
   onServiceChanged: if (service && surfaceOpen && onScreen) service.surfaceShown(root, true)
-  // The panel's `onScreen` doesn't follow screens turning off. The sounds
-  // keep the output awake a second after the scrub last moves, for chimes.
-  readonly property bool scrubbing: surfaceOpen && onScreen && !(service && service.screensOff) && motion.scrubT !== 0
+  // On a screen that's on: the panel's `onScreen` doesn't follow screens
+  // turning off.
+  readonly property bool seen: surfaceOpen && onScreen && !(service && service.screensOff)
+  // The sounds keep the output awake a second after the scrub last moves,
+  // for chimes.
+  readonly property bool scrubbing: seen && motion.scrubT !== 0
   onScrubbingChanged: if (sounds) sounds.scrubMoved()
   onScrubTChanged: if (sounds && scrubbing) sounds.scrubMoved()
   // A rebuilt bar or a removed screen takes the panel down mid-replay.
@@ -1054,6 +1057,7 @@ Item {
     soundsOn: root.soundsOn
     cameraLit: root.cameraLit
     animal: root.animal
+    seen: root.seen
     ground: root.ground
     scrubbing: root.scrubT !== 0
     live: root.heroLive
