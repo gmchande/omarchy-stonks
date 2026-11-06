@@ -245,13 +245,16 @@ Harness {
       // on every rendered frame each row in sight is drawn, its symbol, its
       // day line, and its price (frames.js `filled`, down each column);
       // only rows within a screen above sight and two below are built
-      // (Watchlist `built`); and each row built as it comes costs the main
-      // thread under 5 ms of its own work, so the one row a wheel notch
-      // brings in builds within a 60 Hz frame. The cost is each frame's work
-      // beyond a frame that builds nothing, which is the grab's own, shared
-      // among the rows it built: a frame's whole work counts how far the
-      // list moved since the last grab, so it grows with a busy machine's
-      // slower grabs, and time the thread waited for a CPU never counts.
+      // (Watchlist `built`); the rows built as they come cost the main
+      // thread under 5 ms of its own work each on average, so the one row a
+      // wheel notch brings in builds within a 60 Hz frame; and no one row
+      // takes 10 ms, over half that frame, to build. The average is each
+      // frame's work beyond a frame that builds nothing, which is the grab's
+      // own, shared among the rows it built: a frame's whole work counts how
+      // far the list moved since the last grab, so it grows with a busy
+      // machine's slower grabs, and time the thread waited for a CPU never
+      // counts. That average hides one slow row among the dozens a frame
+      // builds, so each row's build is timed too (long-list.sh's patch).
       var list = app.testBody.watchlist
       list.contentY = 0
       wait(100)
@@ -308,6 +311,17 @@ Harness {
       still.sort(function(a, b) { return a - b })
       var grabWork = still.length ? still[Math.floor(still.length / 2)] : NaN
       var builtRows = building.reduce(function(sum, b) { return sum + b.rows }, 0)
+      // The rows the glide built, each with its own build's time.
+      var glideBuilt = {}
+      for (var g = 1; g < grab.frames.length; g++) {
+        var before = grab.frames[g - 1].note || []
+        ;(grab.frames[g].note || []).forEach(function(s) { if (before.indexOf(s) < 0) glideBuilt[s] = true })
+      }
+      var slowest = { symbol: "", ms: -1 }
+      Object.keys(glideBuilt).forEach(function(s) {
+        var row = list.rowItem(s)
+        if (row && row.buildCost > slowest.ms) slowest = { symbol: s, ms: row.buildCost }
+      })
       var perRow = building.reduce(function(sum, b) { return sum + b.own - grabWork }, 0) / Math.max(1, builtRows)
       // What failed leads the detail: a bare run under a row's pitch is the
       // space between two rows' words, not a bare row.
@@ -316,12 +330,14 @@ Harness {
       if (!(endY > 0 && list.contentY < endY)) failed.push("the glide or the wheel didn't move the list")
       if (builtRows <= nearSight) failed.push("rows weren't built as they came")
       if (mostBuilt > nearSight) failed.push("rows built beyond sight")
-      if (!(perRow < 5)) failed.push("a row took " + perRow.toFixed(1) + " ms to build")
-      harness.check("a glide down the whole list and the wheel back up draw every row's symbol, day line, and price in sight on every frame, build only the rows near sight, and each row in under 5 ms of work",
+      if (!(perRow < 5)) failed.push("a row took " + perRow.toFixed(1) + " ms to build on average")
+      if (slowest.ms < 0) failed.push("no row's build was timed")
+      else if (slowest.ms >= 10) failed.push(slowest.symbol + " took " + slowest.ms + " ms to build")
+      harness.check("a glide down the whole list and the wheel back up draw every row's symbol, day line, and price in sight on every frame, build only the rows near sight, and each row in under 5 ms of work on average and under 10 ms alone",
         failed.length === 0,
         failed.join(", ") + " | " + verdicts.map(function(v) { return v.name + ": " + v.detail }).join("; ") + "; " + builtRows + " rows built as they came, at most "
           + mostBuilt + " at once of " + nearSight + " near sight; " + perRow.toFixed(1) + " ms of work a row beyond a frame's own "
-          + Math.round(grabWork) + " ms, over " + grab.frames.length + " frames; " + work.text + "; at " + Math.round(endY) + " then " + Math.round(list.contentY))
+          + Math.round(grabWork) + " ms, the slowest " + slowest.symbol + " in " + slowest.ms + " ms, over " + grab.frames.length + " frames; " + work.text + "; at " + Math.round(endY) + " then " + Math.round(list.contentY))
 
       // A row featured while its spark request is out: once that lands, the
       // hero's chart goes, so its line and the day's open have the bars'
