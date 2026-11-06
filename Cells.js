@@ -179,8 +179,8 @@ var BEAR_PRICKED = [
 
 // Fidget, how the header animal moves while the panel or window shows. At
 // each open, once the panel has faded in, it greets you: it pricks its horns
-// or ears, pricks them again and blinks, each step slower than the last,
-// still by 0.85 s. Then it settles in: it fidgets 4 s later, then 8, 16 and
+// or ears, pricks them again and blinks, the pauses between them growing,
+// and is still by 0.85 s. Then it settles in: it fidgets 4 s later, then 8, 16 and
 // 32 s apart, then once a minute. A step holds for ms, pricked or blinking.
 var FIDGET_GREETING = [
   { ms: 70, pricked: true },
