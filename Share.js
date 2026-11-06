@@ -135,13 +135,19 @@ function words(o) {
       out.span += " · FROM " + History.historyStatsDateText(o.history, bars[0].t, true, o.history.interval)
     }
   } else {
-    // With a newest price on top, or while scrubbed, the dashed line, named as
-    // the panel names it.
+    // With a newest price on top, or while scrubbed, the dashed line; else
+    // the close the price on top counts from. Each named as the panel names
+    // it, and left out where it isn't known.
     var today = Figures.exchangeDay(o.day, o.now)
-    var base = o.scrubT ? Figures.scrubbedBase(o.day, o.scrubT) : Quote.restingRead(quote, o.newest || null).base
-    out.from = o.changeMode === "open" ? "OPEN " + Format.money(base.dayOpen, digits)
-      : o.scrubT || o.newest ? Figures.dayBaselineText(o.day, today, o.scrubT)
-      : "PREV CLOSE " + Format.money(base.prevClose, digits)
+    if (o.changeMode === "open") {
+      var base = o.scrubT ? Figures.scrubbedBase(o.day, o.scrubT) : Quote.restingRead(quote, o.newest || null).base
+      out.from = "OPEN " + Format.money(base.dayOpen, digits)
+    } else if (o.scrubT || o.newest) {
+      out.from = Figures.dayBaselineText(o.day, today, o.calendars)
+    } else {
+      var from = o.top ? Figures.closeCountedFrom(quote, o.top, today, o.calendars) : null
+      out.from = from ? from.label + " " + from.price : ""
+    }
     var pts = o.day.points
     if (pts.length) {
       var axis = Chart.chartSpan(pictureDay(o.day))

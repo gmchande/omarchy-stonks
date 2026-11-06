@@ -321,7 +321,7 @@ Item {
   readonly property var rangeMarks: historyShown ? History.rangeMarks(history, rangeEnds, featuredQuote) : null
   // Said under the price: what a scrub's move counts from.
   readonly property string baselineText: historyShown ? "┄ " + chartRange.toUpperCase() + " START " + Format.money(history.baseline, featuredQuote ? featuredQuote.priceDigits : undefined)
-    : (!historyActive && featuredDay ? "┄ " + Figures.dayBaselineText(featuredDay, Figures.exchangeDay(featuredDay, now), scrubShown) : "")
+    : (!historyActive && featuredDay ? "┄ " + Figures.dayBaselineText(featuredDay, Figures.exchangeDay(featuredDay, now), calendars) : "")
   readonly property string unavailableText: chartRange.toUpperCase() + " unavailable"
   readonly property bool offersRetry: headerText === unavailableText
   readonly property string loadingText: "Loading" + (featuredSymbol ? " " + featuredSymbol + (range !== "1D" ? " " + range : "") : "")

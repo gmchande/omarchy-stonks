@@ -294,6 +294,8 @@ function rowModel(quote, scrubT, mode, newest) {
     price: read.price,
     priceText: Format.money(read.price, quote.priceDigits),
     asOf: read.t,
+    // The close the day's change counts from, the dashed line's for a scrub.
+    close: read.base.prevClose,
     pct: chg.pct,
     abs: chg.abs,
     tone: Format.changeTone(chg, mode, quote.priceDigits),
@@ -316,13 +318,14 @@ function scrubbedBase(quote, t) {
   return { prevClose: Quote.dayBase(quote), dayOpen: quote.dayOpen }
 }
 
-// A coin never closes: its day starts at its price 24 hours ago.
-function dayBaselineText(day, today, scrubT) {
+// The chart's dashed line in words: the close before the day on the chart,
+// named by its day (`closeName`). A coin never closes: its day starts at its
+// price 24 hours ago.
+function dayBaselineText(day, today, calendars) {
   var base = Format.money(Quote.dayBase(day), day.priceDigits)
   if (day.rolling) return "24H AGO " + base
   var reg = day.session.regular
-  var closed = !!reg && (pastDayName(day, reg.start, today) !== "" || (scrubT > 0 && scrubT >= reg.end))
-  return (closed ? "CLOSE BEFORE " + sessionName(day, reg.start, today) : "PREV CLOSE") + " " + base
+  return (reg ? closeName(day, reg.start, today, calendars) : "PREV CLOSE") + " " + base
 }
 
 function closeLabel(quote, today) {
@@ -382,32 +385,49 @@ function closeBefore(quote, newest, calendars) {
   return date === null ? "" : Format.WEEKDAYS[new Date(date + "T12:00:00Z").getUTCDay()]
 }
 
+// A close named by its day, the trading day before the one `t` falls in:
+// FRI CLOSE within the week, 4 SEP CLOSE beyond, and PREV CLOSE where no
+// calendar can say which day that was. The panel's lines, the scrub's
+// legend and the screenshot all name a close this one way.
+function closeName(quote, t, today, calendars) {
+  var cal = Market.calendarFor(calendars, quote)
+  var date = closeBeforeDate(cal, t)
+  return date === null ? "PREV CLOSE" : sessionName(quote, Market.epochAt(cal, date, "12:00"), today) + " CLOSE"
+}
+
+// The close the move on top counts from (`view.close`), named by its day,
+// and the day the price on top is of (`view.asOf`): the session's, or the
+// last one's while Yahoo's quote is still its close, before the new day's
+// first trade. None where that close isn't known, as at Tokyo's open before
+// its first bar.
+function closeCountedFrom(quote, view, today, calendars) {
+  var reg = quote.session.regular
+  if (!reg || !Format.isFiniteNumber(view.close)) return null
+  var dayT = Format.isFiniteNumber(view.asOf) && view.asOf < reg.start ? view.asOf : reg.start
+  return { label: quote.rolling ? "24H AGO" : closeName(quote, dayT, today, calendars),
+    price: Format.money(view.close, quote.priceDigits), dayT: dayT }
+}
+
 // The lines while the price on top is a trade of the session or the close
 // itself, nothing having traded since at a price of its own: under the
-// price the close the move counts from, named by its day, FRI CLOSE 158.74,
-// the chart's dashed line in words; under the move the same move in the
-// other unit, TODAY +4.57, or TODAY +2.88% when the figure on top is an
-// amount, named by the day the move is of, as the rows' header names it:
-// FRI on a day the market rests. A coin's day is its last 24 hours, 24H AGO
-// and 24H, as its dashed line and its rows say. None where the close isn't
-// known, as at Tokyo's open before its first bar; PREV CLOSE where its day
-// can't be named, on an exchange with no calendar; and nothing under the
-// move where the move isn't known.
+// price the close the move counts from, named by its day, FRI CLOSE 158.74
+// (`closeCountedFrom`); under the move the same move in the other unit,
+// TODAY +4.57, or TODAY +2.88% when the figure on top is an amount, named by
+// the day the move is of, as the rows' header names it: FRI on a day the
+// market rests, and until the new day's first trade. A coin's day is its
+// last 24 hours, 24H AGO and 24H, as its dashed line and its rows say.
+// Nothing under the move where the move isn't known.
 function sessionLines(quote, view, today, calendars, changeMode) {
-  var reg = quote.session.regular
-  var base = Quote.dayBase(quote)
-  if (!reg || !Format.isFiniteNumber(base)) return null
-  var cal = Market.calendarFor(calendars, quote)
-  var date = quote.rolling ? null : closeBeforeDate(cal, reg.start)
+  var from = closeCountedFrom(quote, view, today, calendars)
+  if (!from) return null
   var digits = quote.priceDigits
   var unit = changeMode === "abs" ? "pct" : "abs"
   var move = { abs: view.abs, pct: view.pct }
   var none = { label: "", changeText: "", tone: "flat" }
   return {
-    close: { label: quote.rolling ? "24H AGO" : date === null ? "PREV CLOSE" : sessionName(quote, Market.epochAt(cal, date, "12:00"), today) + " CLOSE",
-      time: "", price: Format.money(base, digits), changeText: "", tone: "flat", stale: false },
+    close: { label: from.label, time: "", price: from.price, changeText: "", tone: "flat", stale: false },
     caption: view.pct === null ? none : {
-      label: quote.rolling ? "24H" : exchangeDay(quote, reg.start) >= today ? "TODAY" : dayName(quote, reg.start, today),
+      label: quote.rolling ? "24H" : exchangeDay(quote, from.dayT) >= today ? "TODAY" : dayName(quote, from.dayT, today),
       changeText: Format.changeText(move, unit, digits),
       tone: Format.changeTone(move, unit, digits)
     }
