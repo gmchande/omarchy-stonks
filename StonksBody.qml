@@ -150,7 +150,7 @@ Item {
   // Each listing's newest price since its close.
   property var newestPrints: ({})
   // Robinhood's answers, for the day each row's line draws, and the clock
-  // that slides its start, held still while the surface is closed.
+  // that slides its start, held still while no screen shows the surface.
   property var nights: ({})
   property var allDay: ({})
   property int slideAt: 0
@@ -182,9 +182,12 @@ Item {
   // A closed surface's clock holds still too.
   property int now: 0
   readonly property bool reading: surfaceOpen && !!service
+  // The view, its chart rebuilt as the clock slides 1D's start, holds still
+  // for a surface no screen shows, such as a window on another workspace.
+  readonly property bool showing: reading && onScreen
   readonly property bool previewing: previewSymbol !== "" && !!service && service.previewSurface === root
   Binding on view {
-    when: root.reading
+    when: root.showing
     value: root.previewing ? root.service?.previewView : root.service?.view
     restoreMode: Binding.RestoreNone
   }
@@ -193,7 +196,7 @@ Item {
   Binding on newestPrints { when: root.reading; value: root.service?.newestPrints; restoreMode: Binding.RestoreNone }
   Binding on nights { when: root.reading; value: root.service?.nights; restoreMode: Binding.RestoreNone }
   Binding on allDay { when: root.reading; value: root.service?.allDay; restoreMode: Binding.RestoreNone }
-  Binding on slideAt { when: root.reading; value: root.service?.viewSlideAt ?? 0; restoreMode: Binding.RestoreNone }
+  Binding on slideAt { when: root.showing; value: root.service?.viewSlideAt ?? 0; restoreMode: Binding.RestoreNone }
   Binding on previewEntries { when: root.reading; value: root.service?.previewEntries; restoreMode: Binding.RestoreNone }
   Binding on fundamentalEntries { when: root.reading; value: root.service?.fundamentals; restoreMode: Binding.RestoreNone }
   Binding on rates { when: root.reading; value: root.service?.rates; restoreMode: Binding.RestoreNone }

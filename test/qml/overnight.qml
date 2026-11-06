@@ -741,6 +741,32 @@ Harness {
       check("retro: a scrub of BRK-A's lone trade at 09:31 reads it, not the close before it",
         lone.indexOf("At 09:31") === 0 && /\| 813,23[45]$/.test(lone), lone)
 
+      // Still 09:35, SPY on show, its 1D start sliding by the clock. With
+      // another surface open on a screen, the window moved to another
+      // workspace holds its chart as the clock moves five minutes on; back
+      // on screen, it takes the slid start.
+      var hadSpy = service.library.indexOf("SPY") >= 0
+      if (!hadSpy) service.addSymbol("SPY")
+      within(8000, function() { return !!service.quotes.SPY && service.arriving.length === 0 })
+      featureShown("SPY")
+      // Once Robinhood's night is in: the chart from Sunday's 20:05.
+      within(8000, function() { return body.chartSymbol === "SPY" && !body.chartLoading && !!body.featuredDay.axis && body.featuredDay.axis.start === 1792973100 })
+      var otherSurface = {}
+      service.surfaceShown(otherSurface, true)
+      app.onScreen = false
+      var hiddenDay = body.featuredDay
+      service.now += 5 * 60
+      // Once the shared view has slid for the surface a screen shows.
+      var slid = within(2000, function() { return !!service.view.chart && service.view.chart.day.axis.start === hiddenDay.axis.start + 5 * 60 })
+      var heldHidden = slid && body.featuredDay === hiddenDay
+      app.onScreen = true
+      var caughtUp = within(2000, function() { return body.featuredDay.axis.start === hiddenDay.axis.start + 5 * 60 })
+      service.surfaceShown(otherSurface, false)
+      check("a window no screen shows holds its chart as the clock slides 1D's start, and takes the slid start back on screen",
+        heldHidden && caughtUp, "held " + heldHidden + ", caught up " + caughtUp + ": " + hiddenDay.axis.start + " then " + body.featuredDay.axis.start)
+      if (!hadSpy) service.removeSymbol("SPY")
+      featureShown("BRK-A")
+
       // The window closed, JNJ added and the pill wheeled onto it from
       // BRK-A, by day, with Robinhood failing: JNJ is asked once, as the
       // pill lands, with no step of the clock, and never again.
