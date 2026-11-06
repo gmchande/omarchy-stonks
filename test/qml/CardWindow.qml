@@ -3,18 +3,20 @@ import Quickshell
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "Motion.js" as Motion
 
 // The panel's card in a plain window, for the offscreen platform, where the
 // shell's KeyboardPanel, a layer-shell PanelWindow, does not load. Only the
 // window is stood in: the card is the shell's BorderSurface, with the
 // shell's border spec, padding, and radius. What lives on KeyboardPanel
 // itself is copied from /usr/share/omarchy/shell/Ui/KeyboardPanel.qml: the
-// properties Panel.qml sets (lines 40-63), the window's visibility (81) and
-// the focus on open (226-235) without the fade, the content inset and the
-// fitted sizes (159-174) with no screen to cap them, and the card with its
-// content holder (379-417) without the fade. No placement and no twins on
-// other screens: the card sits at the window's top left, on a ground no
-// card has.
+// properties Panel.qml sets, the card's drawn height and its ease, the
+// window's visibility and the focus on open, the card's fade in and out
+// where a harness sets `fades`, the content inset and the fitted sizes with
+// no screen to cap them, and the card with its content holder without the
+// morph from another panel. No
+// placement and no twins on other screens: the card sits at the window's
+// top left, on a ground no card has.
 FloatingWindow {
   id: root
 
@@ -27,6 +29,33 @@ FloatingWindow {
   property var borderSpec: Border.surfaceSpec("popups", "border", Commons.Color.popups.border, Math.max(1, Style.space(2)))
   property bool open: false
   property Item focusTarget: null
+
+  // From Omarchy 4.5's card, which lib.sh's card_window drops for a shell
+  // whose card has none: the card's height on screen, which snaps just after
+  // an open, then eases.
+  property real drawnHeight: contentHeight
+  property bool heightLive: false
+  Behavior on drawnHeight {
+    enabled: root.heightLive
+    NumberAnimation {
+      duration: Style.duration(200)
+      easing.type: Easing.Bezier
+      easing.bezierCurve: Style.easeOut
+    }
+  }
+  Timer {
+    id: heightSettle
+    interval: 60
+    onTriggered: root.heightLive = root.open
+  }
+  Connections {
+    target: root
+    function onOpenChanged() {
+      root.heightLive = false
+      if (root.open) heightSettle.restart()
+    }
+  }
+  // The end of 4.5's card height.
   default property alias contentItem: contentHolder.children
   readonly property alias card: card
   // The window's picture, for FrameGrab: the window's own content item has
@@ -51,7 +80,20 @@ FloatingWindow {
     return Math.round(Math.min(desired, maxHeight))
   }
 
-  visible: open
+  // With `fades`, the card fades in and out, and the window stays up
+  // through the fade: a reopen can come during it.
+  property bool fades: false
+  property real shown: open ? 1 : 0
+  Behavior on shown {
+    id: showing
+    enabled: root.fades
+    NumberAnimation {
+      duration: Motion.duration(Style, showing.targetValue > 0 ? 180 : 120)
+      easing.type: Easing.Bezier
+      easing.bezierCurve: Motion.curve(Style)
+    }
+  }
+  visible: open || shown > 0
   color: "#ff00ff"
   implicitWidth: contentWidth + 40
   implicitHeight: 900
@@ -65,7 +107,10 @@ FloatingWindow {
     BorderSurface {
       id: card
       width: root.contentWidth
-      height: root.contentHeight
+      height: root.drawnHeight
+      opacity: root.shown
+      // While it grows, the content keeps its own size and the card crops it.
+      clip: root.drawnHeight < root.contentHeight - 0.5
       color: Commons.Color.popups.background
       borderSpec: root.borderSpec
       padding: root.padding
@@ -73,10 +118,11 @@ FloatingWindow {
 
       Item {
         id: contentHolder
-        anchors.fill: parent
+        anchors.top: parent.top
+        anchors.left: parent.left
+        width: root.contentWidth - card.contentLeftInset - card.contentRightInset
+        height: root.contentHeight - card.contentTopInset - card.contentBottomInset
         anchors.topMargin: card.contentTopInset
-        anchors.rightMargin: card.contentRightInset
-        anchors.bottomMargin: card.contentBottomInset
         anchors.leftMargin: card.contentLeftInset
       }
     }

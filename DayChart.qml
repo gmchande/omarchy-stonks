@@ -1,7 +1,9 @@
 import QtQuick
+import qs.Commons
 import qs.Commons as Commons
 import "Chart.js" as Chart
 import "Tones.js" as Tones
+import "Motion.js" as Motion
 // The smooth chart, one rule for the day and every range: a dashed baseline at
 // the price the change is measured from, and the line and its wash in the up
 // colour above it and the down colour below, as the retro columns fall. The day
@@ -337,10 +339,10 @@ Item {
       onRunningChanged: if (!running) { halo.scale = 1; halo.opacity = 0.25; root.opening = false }
 
       ParallelAnimation {
-        NumberAnimation { target: halo; property: "scale"; from: 1; to: 2.2; duration: 1400; easing.type: Easing.OutCubic }
-        NumberAnimation { target: halo; property: "opacity"; from: 0.35; to: 0; duration: 1400; easing.type: Easing.OutCubic }
+        NumberAnimation { target: halo; property: "scale"; from: 1; to: 2.2; duration: Motion.duration(Style, 1400); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
+        NumberAnimation { target: halo; property: "opacity"; from: 0.35; to: 0; duration: Motion.duration(Style, 1400); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
       }
-      PauseAnimation { duration: 600 }
+      PauseAnimation { duration: Motion.duration(Style, 600) }
     }
   }
 
@@ -352,6 +354,14 @@ Item {
   property bool opening: false
   function ripple() {
     if (!root.live || !dot.visible || root.still) return
+    // With the shell's animations off, the dot stays still, and the price
+    // counts as rippled for: animations back on, it never ripples for it.
+    if (Style.reduceMotion) {
+      root.rippleOwed = false
+      root.rippledPrice = root.newestPrice
+      root.opening = false
+      return
+    }
     if (!root.rippleOwed && root.newestPrice === root.rippledPrice) return
     // A restart's stop of a paused burst would end `opening`; an open's
     // ripples keep it.

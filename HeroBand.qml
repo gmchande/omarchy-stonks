@@ -5,6 +5,7 @@ import "Cells.js" as Cells
 import "Figures.js" as Figures
 import "Settings.js" as Settings
 import "Tones.js" as Tones
+import "Motion.js" as Motion
 // The hero, the chart, the range row, the info block and the list's header.
 // Each keeps its height for every symbol, range and look, so the list below
 // never moves.
@@ -338,7 +339,7 @@ Item {
         color: listMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
           : root.listMenuOpen ? Style.selectedFillFor(root.foreground, Commons.Color.accent)
           : listMouse.containsMouse ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
-        Behavior on color { ColorAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        Behavior on color { ColorAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
       }
 
       Text {
@@ -437,7 +438,7 @@ Item {
         readonly property bool pressed: wordMouse.pressed || !orderText.sorted && arrowMouse.pressed
         color: pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
           : hovered ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
-        Behavior on color { ColorAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        Behavior on color { ColorAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
       }
 
       // Padded as the word's fill pads the word, so the two read as two
@@ -452,7 +453,7 @@ Item {
         radius: root.retro ? 0 : Style.cornerRadius
         color: arrowMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
           : arrowMouse.containsMouse ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
-        Behavior on color { ColorAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        Behavior on color { ColorAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
       }
 
       // The arrow alone, and with the two spaces after it.
@@ -484,7 +485,7 @@ Item {
         readonly property real arrowReach: Math.min(breadthRule.anchors.rightMargin,
           Math.max(Style.space(6), Style.space(22) - wordStart))
         property real lift: arrowMouse.containsMouse || wordMouse.containsMouse ? 1 : 0
-        Behavior on lift { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        Behavior on lift { NumberAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
         // Brighter only under the pointer: the list's name is the header's one
         // word in full ink.
         color: Qt.tint(root.dim, Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, lift))
@@ -534,7 +535,7 @@ Item {
         radius: root.retro ? 0 : Style.cornerRadius
         color: unitMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
           : unitMouse.containsMouse ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
-        Behavior on color { ColorAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        Behavior on color { ColorAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
       }
 
       GridIcon {

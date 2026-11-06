@@ -333,6 +333,15 @@ function settingsFromBar(config, id) {
   return fileSettings(from)
 }
 
+// The slot a dragged row takes when its top is `rows` rows down the list,
+// a fraction, among `count`: it keeps `held` until it is 0.6 of a row past
+// it, so a pointer resting near another row's edge never swaps the two back
+// and forth.
+function dragSlot(rows, held, count) {
+  var next = held < 0 || Math.abs(rows - held) >= 0.6 ? Math.round(rows) : held
+  return Math.max(0, Math.min(count - 1, next))
+}
+
 function movedSymbols(symbols, from, to) {
   var list = symbols.slice()
   if (from < 0 || from >= list.length || to < 0 || to >= list.length) return list

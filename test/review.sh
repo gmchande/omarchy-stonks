@@ -16,6 +16,10 @@
 # - Window and panel motion, judged on rendered frames (test/qml/frames.js),
 #   never on the property behind it.
 # - The long list: a power user's 154 symbols, on wall-clock budgets.
+# - Omarchy 4.0.6, the oldest shell Stonks works on: the panel, its keys and
+#   the window on its shell (test/old-shell.sh), failing as on the installed
+#   one on a TypeError or the plugin's Qt warnings, and on a panel that shows
+#   nothing (popup.qml).
 #
 # Each set of renders, the head's and the base's, is drawn once: a run keeps
 # each set it draws whole under the name test/render-key.sh makes from
@@ -152,6 +156,11 @@ start "nothing-jumps layout harness, live" bash test/qml/layout.sh live
 start "long list harness" bash test/qml/long-list.sh
 start "nothing-jumps layout harness, sizes" bash test/qml/layout.sh sizes
 start "panel motion harness" bash test/qml/popup-motion.sh
+# A shell that can't be had names no folder, and each of these fails.
+old_shell=$(test/old-shell.sh) || old_shell=/no-omarchy-4.0.6-shell
+for harness in popup keys window-rows; do
+  start "$harness harness on Omarchy 4.0.6" env STONKS_SHELL="$old_shell" bash "test/qml/$harness.sh"
+done
 fill
 
 run "installed theme diagnostic" bun test/themes.js

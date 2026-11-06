@@ -35,8 +35,7 @@ at=$(( $(date -d "${stamp:0:10} ${stamp:11:2}:${stamp:13:2}" +%s) + 60 ))
 echo "the demo watchlist at $moment"
 
 plugin_tree readme.qml
-cp "$here/CardWindow.qml" "$root/plugin/"
-patch_copy plugin/Panel.qml 's/^  KeyboardPanel {$/  CardWindow {/'
+card_window
 patch_copy plugin/Panel.qml '/readonly property int panelWidth:/a\  readonly property var testBody: root.body\n  readonly property alias testCard: panel'
 # Offscreen, a grab's empty pixels are black, not the window's colour, so
 # the window's grab takes a ground of that colour under the body.

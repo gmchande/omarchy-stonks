@@ -11,8 +11,9 @@
 # loads no panel of its own. HOME and curl are scratch.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree popup-motion.qml
-cp "$here/CardWindow.qml" "$root/plugin/"
-patch_copy plugin/Panel.qml 's/^  KeyboardPanel {$/  CardWindow {/'
+card_window
+# The card fades as the shell's does, so a reopen can come during the fade.
+patch_copy plugin/Panel.qml 's/^    owner: root.barIdentity$/    owner: root.barIdentity\n    fades: true/'
 patch_copy plugin/Panel.qml '/readonly property int panelWidth:/a\  readonly property var testBody: root.body\n  readonly property alias testBodyKeys: bodyKeys\n  readonly property alias testCard: panel'
 patch_copy plugin/BarWidget.qml '/id: panelLoader/,/source:/s/active: true/active: false/'
 # The flows wait for the quote feed to go quiet: nothing in flight or queued.

@@ -256,6 +256,27 @@ Harness {
       panel.open()
       var body = panel.testBody
 
+      // The open panel shows its rows and its footer, inside the edge its
+      // card draws, on the shell it runs on: Omarchy 4.0's card has no
+      // height of its own to ease, and a panel that read one drew nothing.
+      var catcher = panel.testKeyCatcher
+      within(1000, function() { return body.watchlist.displayedSymbols.length > 0 })
+      var firstRow = body.watchlist.rowItem(body.watchlist.displayedSymbols[0])
+      var footer = find(body, "footer")
+      var rowTop = firstRow.mapToItem(catcher, 0, 0).y
+      var footerEnd = footer.mapToItem(catcher, 0, footer.height).y
+      var inside = function(y) { return isFinite(y) && y >= 0 && y <= catcher.height + 0.5 }
+      // And nothing between them and the window hides them or fades them out.
+      var hidden = function(item) {
+        for (var at = item; at; at = at.parent)
+          if (!at.visible || at.opacity <= 0) return at.objectName || String(at)
+        return ""
+      }
+      var hiding = hidden(firstRow) || hidden(footer)
+      harness.check("the open panel shows its rows and footer inside its card",
+        catcher.height > 0 && inside(rowTop) && inside(footerEnd) && hiding === "",
+        "shown " + catcher.height + ", first row at " + rowTop + ", footer ends at " + footerEnd + (hiding ? ", hidden by " + hiding : ""))
+
       // The key sheet closes before a view opens or a row key acts.
       body.showingHelp = true
       focusKeys(panel)
@@ -316,6 +337,30 @@ Harness {
       pill.settings = formBefore
       harness.check("the icon pill's hover names its symbol, and says nothing while its panel is open",
         closedTip !== "" && openTip === "", JSON.stringify(closedTip) + " -> " + JSON.stringify(openTip))
+
+      // Held down, what the pill draws gives a little, as the shell's own bar
+      // icons do, its slot holding still, in both looks and either form; let
+      // go, it is whole again. It is held as the bar holds a pill it drags
+      // (WidgetButton's heldButtons), since this pill has no window to press.
+      // Omarchy 4.0's bar icons don't give: there the pill keeps its size.
+      var pressGives = "heldButtons" in pill.testButton
+      var lookBefore = service.retro ? "retro" : "smooth"
+      var gives = [["smooth", "icon"], ["retro", "sparkline"]].map(function(way) {
+        service.persist({ style: way[0] })
+        pill.settings = Object.assign({}, formBefore, { barStyle: way[1] })
+        var drawn = find(pill, "pillIcon").parent
+        var width = pill.testButton.width
+        if (!pressGives) return way.join(" ") + " n/a," + (drawn.scale === 1 && pill.testButton.width === width)
+        pill.testButton.heldButtons = Qt.LeftButton
+        var held = within(1000, function() { return drawn.scale < 0.95 }) && pill.testButton.width === width
+        pill.testButton.heldButtons = Qt.NoButton
+        var whole = within(1000, function() { return drawn.scale === 1 }) && pill.testButton.width === width
+        return way.join(" ") + " " + held + "," + whole
+      })
+      service.persist({ style: lookBefore })
+      pill.settings = formBefore
+      harness.check("a pill held down gives a little and its slot holds still, in both looks and either form, and is whole once let go",
+        gives.every(function(g) { return /(true|n\/a),true$/.test(g) }), gives.join(" | "))
 
       panel.close()
       panel.open()

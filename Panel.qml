@@ -4,6 +4,7 @@ import QtQuick
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "Motion.js" as Motion
 
 // The watchlist panel: its opening, closing, keys and card. StonksBody
 // does the rest; it is built as the panel first opens, and kept.
@@ -31,15 +32,29 @@ Panel {
   readonly property int bodyRoom: Math.min(root.heightCap, panel.availableCardHeight > 0 ? panel.availableCardHeight : root.heightCap)
     - panel.verticalContentInset
   readonly property int fittedCardHeight: body ? panel.fittedContentHeight(body.fittedHeight(root.bodyRoom), root.heightCap) : 0
-  // The shell's card is an item in a full-screen surface, so easing its
+  // Omarchy 4.5's card eases its own height, as `drawnHeight`. Omarchy
+  // 4.0's takes the height it's given at once, so there Stonks eases it, as
+  // 1.1.0 did: the card is an item in a full-screen surface, so easing its
   // height resizes no window.
+  readonly property bool shellEases: panel.drawnHeight !== undefined
   property real cardHeight: 0
-  onFittedCardHeightChanged: if (root.opened) easeEdge()
-  NumberAnimation { id: edgeEase; target: root; property: "cardHeight"; duration: 160; easing.type: Easing.OutCubic }
+  onFittedCardHeightChanged: if (!root.shellEases && root.opened) easeEdge()
+  NumberAnimation { id: edgeEase; target: root; property: "cardHeight"; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
   function easeEdge() {
     edgeEase.stop()
     edgeEase.to = root.fittedCardHeight
     edgeEase.start()
+  }
+  // The card's edge as drawn, which the footer rides and the rows end at.
+  readonly property real shownHeight: shellEases ? panel.drawnHeight : cardHeight
+  // On 4.5, an open during the close's fade holds the card at the height on
+  // screen until the shell eases its height again, just after the open, so
+  // the reset's change (the key sheet giving way to the rows) eases from there.
+  property int heldHeight: -1
+  Connections {
+    target: panel
+    ignoreUnknownSignals: true
+    function onHeightLiveChanged() { if (panel.heightLive) root.heldHeight = -1 }
   }
 
   function offerHint() {
@@ -61,6 +76,7 @@ Panel {
   function open() {
     var opening = !root.opened
     var fading = opening && panel.visible
+    if (opening) root.heldHeight = fading && root.shellEases ? Math.round(panel.drawnHeight) : -1
     bodyLoader.active = true
     root.controller.show()
     // Before offerHint: an update notice goes ahead of the hint.
@@ -68,12 +84,15 @@ Panel {
     if (opening) {
       root.body.resetInteraction()
       offerHint()
-      // An open during the close's fade eases the edge from where it is.
-      if (fading) easeEdge()
-      else {
-        heldAnchor.hold()
-        edgeEase.stop()
-        root.cardHeight = root.fittedCardHeight
+      if (!fading) heldAnchor.hold()
+      // On 4.0, an open during the close's fade eases the edge from where
+      // it is.
+      if (!root.shellEases) {
+        if (fading) easeEdge()
+        else {
+          edgeEase.stop()
+          root.cardHeight = root.fittedCardHeight
+        }
       }
     }
     if (opening) root.body.motion.revealChart()
@@ -83,7 +102,7 @@ Panel {
   function close() {
     setCenterHoverRevealSuppressed(false)
     if (root.body) root.body.freeze()
-    // Closing stops the edge where it is for the fade.
+    // Closing stops Stonks' own ease where it is for the fade.
     edgeEase.stop()
     root.controller.hide()
   }
@@ -118,12 +137,17 @@ Panel {
     open: root.opened
     focusTarget: bodyKeys
     contentWidth: panel.fittedContentWidth(root.panelWidth)
-    contentHeight: Math.round(root.cardHeight)
+    contentHeight: !root.shellEases ? Math.round(root.cardHeight)
+      : root.heldHeight >= 0 ? root.heldHeight : root.fittedCardHeight
 
     PanelKeyCatcher {
       id: keyCatcher
-      anchors.fill: parent
-      // The body takes its new height at once; the edge eases over it.
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: parent.top
+      // The body takes its new height at once; the edge eases over it, and
+      // rows end at the edge's inner side, never in its padding.
+      height: Math.round(root.shownHeight) - panel.verticalContentInset
       clip: true
       blocked: !!root.body && root.body.ownsKeys
       // Omarchy's panel keys: j k and h l move, Space activates, x removes.
@@ -163,7 +187,7 @@ Panel {
           rowsRoom: root.bodyRoom
           // The screen's room, so the first-run hint gives way to the rows.
           screenRoom: panel.availableCardHeight > 0 ? panel.availableCardHeight - panel.verticalContentInset : 0
-          edge: Math.round(root.cardHeight) - panel.verticalContentInset
+          edge: Math.round(root.shownHeight) - panel.verticalContentInset
           service: root.service
           updates: root.updates
           sounds: root.sounds

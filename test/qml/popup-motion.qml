@@ -81,7 +81,7 @@ Harness {
     }
 
     function edgeAtRest() {
-      return panel.cardHeight === panel.fittedCardHeight
+      return panel.testCard.drawnHeight === panel.fittedCardHeight
     }
 
     function rest() {
@@ -254,7 +254,85 @@ Harness {
       check("each later open of the panel holds the thread at most 20 ms", Math.max.apply(null, later) <= 20, later.join(", ") + " ms")
       pillTurns()
       viewsThroughClose()
+      reopenMidFade()
+      stillWithMotionOff()
       harness.finish()
+    }
+
+    // Reopened during its close's fade, the panel eases from the height still
+    // on screen: the key sheet, closed by the open, gives way to the rows
+    // from the sheet's height, never at once.
+    function reopenMidFade() {
+      panel.open()
+      rest()
+      key("?")
+      tryVerify(function() { return panel.testBody.showingHelp && edgeAtRest() }, 2000)
+      var sheet = panel.testCard.drawnHeight
+      panel.close()
+      var fading = panel.testCard.visible
+      panel.open()
+      var first = panel.testCard.drawnHeight
+      var between = false
+      tryVerify(function() {
+        var h = panel.testCard.drawnHeight
+        if (Math.abs(h - sheet) > 1 && Math.abs(h - panel.fittedCardHeight) > 1) between = true
+        return h === panel.fittedCardHeight
+      }, 2000)
+      check("reopened during its close's fade, the panel eases from the height still on screen",
+        fading && Math.abs(first - sheet) <= 1 && between && Math.abs(sheet - panel.fittedCardHeight) > 1,
+        fading + " | " + sheet + " -> " + first + " -> " + panel.testCard.drawnHeight + (between ? ", eased" : ", at once"))
+      panel.close()
+    }
+
+    // With the shell's animations off (`omarchy toggle animations`), the
+    // panel opens with its chart whole and a list switch puts the edge in
+    // place at once: from the change on, every frame shows the same chart,
+    // and the edge where it rests. The words may change meanwhile, as the
+    // clock turns a minute.
+    function stillWithMotionOff() {
+      // An ease begun before the switch runs to its end.
+      tryVerify(function() { return panel.testCard.drawnHeight === panel.testCard.contentHeight }, 2000)
+      Style.reduceMotion = true
+      panel.open()
+      // Whole from the open: no draw-in begins.
+      var whole = panel.testBody.motion.reveal === 1 && !panel.testBody.motion.drawingIn
+      grab.source = panel.testCard.surface
+      grab.begin("still-open")
+      moreFrames(15)
+      // From the open's fourth frame: a hover's fade begun before the switch
+      // can finish in the first three. The draw-in an open used to start
+      // runs 320 ms.
+      grab.end()
+      tryVerify(function() { return grab.waiting === 0 }, 5000)
+      var chart = find(panel.testBody, "heroChart")
+      var at = chart.mapToItem(panel.testCard.surface, 0, 0)
+      grab.judge("same:" + [Math.round(at.x), Math.round(at.y), Math.round(chart.width), Math.round(chart.height)].join(","), grab.frames.slice(3), [])
+      tryVerify(function() { return grab.verdict !== null }, 10000)
+      var opened = grab.verdict
+      filmed("with animations off, the panel opens whole and still", opened.ok && whole, opened, whole ? "" : " | a draw-in began")
+      var before = panel.fittedCardHeight
+      service.switchList("Short")
+      waitForRendering(panel.testCard.surface)
+      grab.begin("still-switch")
+      moreFrames(12)
+      var switched = verdict("edgeheld")
+      var moved = panel.fittedCardHeight !== before && edgeAtRest()
+      filmed("with animations off, a switch to a shorter list moves the edge at once",
+        switched.ok && moved && service.listName === "Short", switched, moved ? "" : " | the switch moved no edge: " + before + " -> " + panel.fittedCardHeight)
+      // A replay is the reader's own ask, as a press of play is: with
+      // animations off it still plays its 2 s.
+      service.switchList("")
+      var motion = panel.testBody.motion
+      tryVerify(function() { return !motion.loading }, 3000)
+      var askedAt = Date.now()
+      key("p")
+      var began = within(500, function() { return motion.replayRunning })
+      tryVerify(function() { return !motion.replayRunning }, 4000)
+      var played = Date.now() - askedAt
+      check("with animations off, p still replays the chart over its 2 s",
+        began && played >= 1700 && played <= 2600, (began ? "played " : "never began, ") + played + " ms")
+      panel.close()
+      Style.reduceMotion = false
     }
 
     function viewsThroughClose() {

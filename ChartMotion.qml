@@ -1,7 +1,9 @@
 import QtQuick
+import qs.Commons
 import "Chart.js" as Chart
 import "History.js" as History
 import "Quote.js" as Quote
+import "Motion.js" as Motion
 // The chart a surface shows, the moment it shows (the scrub, and the replay
 // that drives it), and the one motion, a draw-in from the left, for every
 // change of chart. It decides once per change of the view the surface holds,
@@ -50,8 +52,9 @@ Item {
     id: dimAnim
     target: root
     property: "dimmed"
-    duration: 160
-    easing.type: Easing.OutCubic
+    duration: Motion.duration(Style, 160)
+    easing.type: Easing.Bezier
+    easing.bezierCurve: Motion.curve(Style)
   }
 
   readonly property bool historyActive: !!chart && chart.range !== "1D"
@@ -83,7 +86,9 @@ Item {
   property real reveal: 1
   property real replayPosition: 0
   readonly property bool replayRunning: replayAnim.running
-  // What plays alongside keeps to it, and to its InOutSine.
+  // What plays alongside keeps to it, and to its InOutSine. The reader asks
+  // for a replay, as they would press play, so it plays its 2 s even with the
+  // shell's animations off.
   readonly property int replayDuration: 2000
   // Said before its first frame, so what plays alongside starts with it.
   signal replayStarted(real from, real to)
@@ -229,8 +234,9 @@ Item {
     property: "reveal"
     from: 0
     to: 1
-    duration: 320
-    easing.type: Easing.OutCubic
+    duration: Motion.duration(Style, 320)
+    easing.type: Easing.Bezier
+    easing.bezierCurve: Motion.curve(Style)
   }
 
   NumberAnimation {

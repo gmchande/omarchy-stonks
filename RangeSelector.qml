@@ -4,6 +4,7 @@ import QtQuick
 import qs.Commons
 import qs.Commons as Commons
 import "Tones.js" as Tones
+import "Motion.js" as Motion
 
 // The range row. The words are spaced evenly from the row's left edge to its
 // right, so they line up with the blocks above and below, and their targets
@@ -83,7 +84,7 @@ Item {
         color: tokenMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
           : parent.chosen ? Style.selectedFillFor(root.foreground, Commons.Color.accent)
           : (tokenMouse.containsMouse ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent")
-        Behavior on color { ColorAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        Behavior on color { ColorAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
       }
 
       Text {
@@ -93,7 +94,7 @@ Item {
         text: String(parent.modelData).toUpperCase()
         color: parent.chosen ? root.foreground : root.dim
         font: root.wordFont
-        Behavior on color { ColorAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        Behavior on color { ColorAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
       }
 
       MouseArea {

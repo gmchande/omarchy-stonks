@@ -15,6 +15,7 @@ import "Search.js" as Search
 import "Settings.js" as Settings
 import "Share.js" as Share
 import "Tones.js" as Tones
+import "Motion.js" as Motion
 // The body the window and the panel share. It reads the service and acts
 // through it; the surface keeps its lifecycle, keys, and look.
 Item {
@@ -668,7 +669,7 @@ Item {
     property: "undoShown"
     from: 1
     to: 0
-    duration: 600
+    duration: Motion.duration(Style, 600)
     onFinished: root.endUndo()
   }
 
@@ -1030,7 +1031,7 @@ Item {
     property: "noteShown"
     from: 1
     to: 0
-    duration: 600
+    duration: Motion.duration(Style, 600)
     onFinished: {
       root.clearNote()
       footer.fadeIn()

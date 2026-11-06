@@ -137,7 +137,10 @@ Harness {
     function atRest(body) {
       var rule = find(body, "breadthRule")
       var share = function(n) { return rule.total ? n / rule.total : 0 }
+      // The panel's card at its height, eased by the shell: closed, as for
+      // the window's pictures, it holds still there too.
       return !body.chartLoading && body.motion.reveal === 1
+        && panel.testCard.drawnHeight === panel.testCard.contentHeight
         && Math.abs(rule.upShare - share(rule.breadth.up)) < 1e-6
         && Math.abs(rule.downShare - share(rule.breadth.down)) < 1e-6
         && liveStill(body)

@@ -545,6 +545,9 @@ Harness {
       tryVerify(function() { return service.library.length === count }, 2000)
       body.acceptSymbol("SPY")
       quiet()
+      // p replays the chart on show, so it waits for SPY's to replace the
+      // one before: the chart can land a moment after the quote.
+      tryVerify(function() { return service.featuredSymbol === "SPY" && !body.motion.loading }, 3000)
       keyClick(Qt.Key_P)
       tryVerify(function() { return body.motion.replayRunning }, 2000)
       tryVerify(function() { return !body.motion.replayRunning }, 4000)

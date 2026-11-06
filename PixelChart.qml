@@ -1,8 +1,10 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import qs.Commons
 import qs.Commons as Commons
 import "Tones.js" as Tones
+import "Motion.js" as Motion
 // The retro chart, one rule for the day and every range: columns of cells
 // fill from the baseline row, in the up colour above it and the down colour
 // below. The day adds dimmer hours, the bell and the night's edges, and the
@@ -276,13 +278,13 @@ Item {
       onRunningChanged: if (!running) { cap.opacity = 1; root.opening = false }
 
       PropertyAction { target: cap; property: "opacity"; value: 1 }
-      PauseAnimation { duration: 700 }
+      PauseAnimation { duration: Motion.duration(Style, 700) }
       PropertyAction { target: cap; property: "opacity"; value: 0.5 }
-      PauseAnimation { duration: 160 }
+      PauseAnimation { duration: Motion.duration(Style, 160) }
       PropertyAction { target: cap; property: "opacity"; value: 0 }
-      PauseAnimation { duration: 480 }
+      PauseAnimation { duration: Motion.duration(Style, 480) }
       PropertyAction { target: cap; property: "opacity"; value: 0.5 }
-      PauseAnimation { duration: 160 }
+      PauseAnimation { duration: Motion.duration(Style, 160) }
     }
   }
 
@@ -294,6 +296,14 @@ Item {
   property bool opening: false
   function blink() {
     if (!root.live || !cap.visible || root.still) return
+    // With the shell's animations off, the cap stays lit, and the price
+    // counts as blinked for: animations back on, it never blinks for it.
+    if (Style.reduceMotion) {
+      root.blinkOwed = false
+      root.blinkedPrice = root.newestPrice
+      root.opening = false
+      return
+    }
     if (!root.blinkOwed && root.newestPrice === root.blinkedPrice) return
     // A restart's stop of a paused burst would end `opening`; an open's blinks
     // keep it.

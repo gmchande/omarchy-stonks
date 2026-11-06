@@ -837,6 +837,24 @@ test("only a change to what the lists hold ends the undo", () => {
   expect(M.listsHeld(M.withListOrder(growth, "symbol"))).toBe(M.listsHeld(growth))
 })
 
+test("a dragged row takes the next slot only 0.6 of a row past its own, and a pointer jittering near the edge never swaps it back and forth", () => {
+  // Down from slot 2: half a row past stays, 0.6 takes slot 3.
+  expect(M.dragSlot(2.5, 2, 6)).toBe(2)
+  expect(M.dragSlot(2.6, 2, 6)).toBe(3)
+  // Held at 3, back to 2.45 stays at 3; only 2.4 gives it back.
+  expect(M.dragSlot(2.45, 3, 6)).toBe(3)
+  expect(M.dragSlot(2.4, 3, 6)).toBe(2)
+  // A pointer at the edge between slots 2 and 3, jittering a few pixels.
+  let held = 2
+  const seen = new Set()
+  for (const rows of [2.48, 2.52, 2.47, 2.53, 2.5, 2.55, 2.45]) seen.add(held = M.dragSlot(rows, held, 6))
+  expect([...seen]).toEqual([2])
+  // A fast drag lands where the row is, and never past the list's ends.
+  expect(M.dragSlot(4.2, 1, 6)).toBe(4)
+  expect(M.dragSlot(7.9, 4, 6)).toBe(5)
+  expect(M.dragSlot(-1, 0, 6)).toBe(0)
+})
+
 test("sorting ranks the rows as a view over the manual list", () => {
   const q = (symbol, name, prevClose, price) => ({ symbol, name, prevClose, price, marketTime: 1, points: [], session: { regular: null } })
   // Names that sort unlike the symbols, so each order is its own.

@@ -20,7 +20,7 @@
 //                                      the same within that rectangle
 //   bun frames.js edge BAND FRAME@T...
 //                                      the card's bottom edge eases to its
-//                                      new place over about 160 ms, and the
+//                                      new place over about 200 ms, and the
 //                                      BAND px above it, the footer riding
 //                                      it, are the same picture on every
 //                                      frame: nothing draws through them
@@ -35,7 +35,7 @@
 //                                      down
 //   bun frames.js dim[:DELAY[:X,Y,W,H]] FRAME@T...
 //                                      what is on show dims to 0.4 of its
-//                                      ink in about 160 ms OutCubic, DELAY
+//                                      ink in about 160 ms, DELAY
 //                                      ms after the mark (250 by default),
 //                                      the first picture on every frame till
 //                                      then; or, its first frame dimmer than
@@ -51,7 +51,7 @@
 //                                      side across the picture, turns from
 //                                      the first picture to the last left
 //                                      to right, each column whole, over
-//                                      about LENGTH ms OutCubic, never
+//                                      about LENGTH ms, never
 //                                      through a blank or faint frame
 //   bun frames.js filled:GAP[:X,Y,W,H] FRAME@T...
 //                                      every frame shows ink all the way
@@ -72,6 +72,26 @@
 // is not whole. Any ink counts, in either look, the area and the dim hours
 // too.
 import { readFileSync } from "node:fs"
+
+// Every motion runs on the shell's ease-out, Style.easeOut: a cubic Bézier
+// through (0.23, 1) and (0.32, 1). At the curve's own step s its progress
+// is 1 − (1 − s)³, reached at the share of its time `curveTime(s)`. So
+// `timeAt(p)`, the share of its time at which it shows progress p, is a
+// straight line in time, and a motion's length and start are read off it.
+const curveTime = s => 3 * (1 - s) ** 2 * s * 0.23 + 3 * (1 - s) * s * s * 0.32 + s ** 3
+const timeAt = p => curveTime(1 - Math.cbrt(1 - Math.min(1, Math.max(0, p))))
+// Its progress at share x of its time.
+function progressAt(x) {
+  if (x <= 0) return 0
+  if (x >= 1) return 1
+  let lo = 0, hi = 1
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2
+    if (curveTime(mid) < x) lo = mid
+    else hi = mid
+  }
+  return 1 - (1 - lo) ** 3
+}
 
 // P6: magic, width, height, maximum, each after whitespace, then RGB bytes.
 function picture(bytes) {
@@ -169,9 +189,9 @@ function groundUnder(a, b) {
 // (`inkShare`). Dimming: until `delay` ms after the mark, short of a
 // frame's grace, every frame is the first picture, so a chart that lands
 // sooner changes nothing; then an ease to 0.4 of the ink (0.33 to 0.47),
-// OutCubic over about 160 ms, read off its own curve as an edge's is
-// (∛(1 − p) a straight line in time), starting within a few frames of
-// `delay`, through at least three distinct partial frames, never back,
+// on the shell's curve over about 160 ms, read off it as an edge's is
+// (`timeAt(p)` a straight line in time), starting within a few frames of
+// `delay`, through at least two distinct partial frames, never back,
 // within a trace of its end once the curve has ended, and from 100 ms
 // after that the same picture on every frame: what was held stays still.
 // Coming back: the same ease, from about 0.4 to whole, from the mark.
@@ -195,8 +215,10 @@ function dim(frames, delay) {
   const partial = after.filter(f => f.p > 0.02 && f.p < 0.98)
   const distinct = new Set(partial.map(f => f.p.toFixed(2))).size
   // A share is read off every pixel, not a column's step: the curve reads
-  // to 0.97 of the way, so a busy machine's few frames still draw it.
-  const line = partial.filter(f => f.p < 0.97).map(f => ({ t: f.t, y: Math.cbrt(1 - f.p) }))
+  // to 0.97 of the way, and from two frames, since the shell's curve is 0.97
+  // of the way in about half its time and a busy machine's frames come 9 to
+  // 50 ms apart.
+  const line = partial.filter(f => f.p < 0.97).map(f => ({ t: f.t, y: 1 - timeAt(f.p) }))
   const median = values => values.sort((a, b) => a - b)[Math.floor(values.length / 2)]
   const slopes = []
   for (let i = 0; i < line.length; i++)
@@ -215,7 +237,7 @@ function dim(frames, delay) {
   const resting = frames.filter(f => f.t >= restFrom)
   const rests = resting.length >= 2 && resting.every(f => f.image.data.equals(last.data))
   const level = lifting ? from : to
-  const ok = early < 0 && backwards < 0 && distinct >= 3 && line.length >= 3 && length >= 120 && length <= 220
+  const ok = early < 0 && backwards < 0 && distinct >= 2 && line.length >= 2 && length >= 120 && length <= 220
     && start >= at - 24 && start <= at + 40 && !tail && rests && level >= 0.33 && level <= 0.47
   return { ok, detail: (lifting ? "comes back" : "dims") + ": ink " + shares.map(s => s.toFixed(2)).join(" ") + " at " + frames.map(f => f.t).join(" ")
     + " ms | " + distinct + " partial, " + Math.round(length) + " ms from " + Math.round(start) + " ms, at rest at " + finish + " ms, dim at " + level.toFixed(2)
@@ -260,8 +282,8 @@ function steps(frames, length) {
 // The pill's animal turning column by column, `n` columns side by side
 // across the picture. Every frame shows each column whole, as the first
 // picture's or the last's, the turned ones (the last's) left of the rest,
-// never fewer than the frame before. The count turned keeps to an OutCubic
-// step over about `length` ms (0.8 to 1.25 of it) starting at the mark,
+// never fewer than the frame before. The count turned keeps to a step on
+// the shell's curve over about `length` ms (0.8 to 1.25 of it) starting at the mark,
 // give or take a frame: a column turns once the step passes its middle
 // (Math.round). At least two frames show part turned, and none is blank or
 // faint.
@@ -288,8 +310,8 @@ function columnTurn(frames, length, n) {
   const wrong = states.findIndex(s => !/^n*o*$/.test(s))
   const backwards = counts.findIndex((c, i) => i > 0 && c < counts[i - 1])
   const partial = new Set(counts.filter(c => c > 0 && c < n)).size
-  // Columns an OutCubic step of `l` ms from `s` has turned by `t`.
-  const due = (t, s, l) => ks.filter(k => t - s >= l * (1 - Math.cbrt(1 - (k + 0.5) / n))).length
+  // Columns a step of `l` ms from `s` has turned by `t`.
+  const due = (t, s, l) => ks.filter(k => t - s >= l * timeAt((k + 0.5) / n)).length
   // A frame shows the clock's last tick, up to a frame before its time.
   const fits = (s, l) => frames.every((f, i) => counts[i] >= due(f.t - 24, s, l) && counts[i] <= due(f.t + 8, s, l))
   const lengths = []
@@ -391,14 +413,14 @@ function drawin(all, end = 1, plot = null, first = false) {
   const gapAt = gaps.findIndex(share => share > 0.05)
   const partial = edges.map((e, i) => ({ e, t: frames[i].t })).filter(f => f.e > 0 && f.e < last - step)
   const distinct = new Set(partial.map(f => f.e.toFixed(3))).size
-  // OutCubic over `length` ms from `start`: an edge e at t has
-  // ∛(1 − e) = 1 − (t − start) / length, a straight line in time. Its slope
+  // The shell's curve over `length` ms from `start`: an edge e at t has
+  // 1 − timeAt(e) = 1 − (t − start) / length, a straight line in time. Its slope
   // gives the length and where it leaves 1 the start, from the pictures and
   // their own times, however late after the mark the motion began and
   // however unevenly the frames came. The median of the slopes between
   // every two frames up to 0.9 of the plot, where a retro column's whole
   // step weighs least, so one odd frame cannot tilt it.
-  const line = partial.filter(f => f.e < 0.9).map(f => ({ t: f.t, y: Math.cbrt(1 - f.e) }))
+  const line = partial.filter(f => f.e < 0.9).map(f => ({ t: f.t, y: 1 - timeAt(f.e) }))
   const median = values => values.sort((a, b) => a - b)[Math.floor(values.length / 2)]
   const slopes = []
   for (let i = 0; i < line.length; i++)
@@ -408,7 +430,7 @@ function drawin(all, end = 1, plot = null, first = false) {
   const length = slope < 0 ? -1 / slope : 0
   const start = length ? median(line.map(f => f.t - (1 - f.y) * length)) : 0
   // When the line has reached a point of the plot.
-  const reaches = e => start + length * (1 - Math.cbrt(1 - Math.min(1, Math.max(0, e))))
+  const reaches = e => start + length * timeAt(e)
   // Whole: the first frame from which every frame is the last picture. Not
   // before the line reaches the ink's right end, short of a retro column (a
   // column shows whole once the clip enters it) and a pixel of the line's
@@ -443,7 +465,7 @@ function drawin(all, end = 1, plot = null, first = false) {
   // than three frames on it under 0.9 of the way, or fewer than four
   // distinct), with fewer than three frames in the first 150 ms, where a
   // right one is still short of 0.85, and the frames say nothing either
-  // way: some allowed draw-in, 270 to 380 ms OutCubic starting within 24 ms
+  // way: some allowed draw-in, 270 to 380 ms on the curve starting within 24 ms
   // before the mark to 32 after, shows every one of them, give or take
   // 10 ms of a frame's time and a column of edge (0.02 behind, 0.06 ahead
   // for retro's whole columns); the chart is not whole before 200 ms, which
@@ -457,7 +479,7 @@ function drawin(all, end = 1, plot = null, first = false) {
   // 208 ms, contradict the motion and fail as wrong. A harness can film an
   // unreadable draw-in again; it never passes as one.
   const readable = frames.filter(f => f.t > 0 && f.t <= 150).length
-  const reach = (t, s, l) => t <= s ? 0 : t - s >= l ? 1 : 1 - Math.pow(1 - (t - s) / l, 3)
+  const reach = (t, s, l) => progressAt((t - s) / l)
   const shows = (s, l) => frames.every((f, i) => edges[i] >= reach(f.t - 10, s, l) - 0.02 && edges[i] <= reach(f.t + 10, s, l) + 0.06)
   let possible = false
   for (let l = 270; l <= 380 && !possible; l += 5)
@@ -504,19 +526,29 @@ function bandAt(image, edge, band) {
   return image.data.subarray(Math.max(0, edge - band) * row, edge * row)
 }
 
-// The edge eases from where it was to its new place in OutCubic over about
-// 160 ms, read from its own curve the way a draw-in is (∛(1 − p) is a
-// straight line in time), and from the mark on every frame's `band` rows
-// above its edge are the last frame's: the footer rides the edge whole, and
-// no row shows through it as it passes. Before the mark the footer may say
+// The shell draws the moving card's edge at a fraction of a pixel, blended
+// into the rows around it, while what rides the edge keeps to whole pixels:
+// a frame's band holds the resting one's when, short of the edge's last
+// three rows, it matches it there or a row higher.
+function bandHolds(image, edge, band, rest) {
+  const restBand = bandAt(rest.image, rest.edge - 3, band - 3)
+  return [0, 1].some(up => bandAt(image, edge - 3 - up, band - 3).equals(restBand))
+}
+
+// The edge eases from where it was to its new place on the shell's curve
+// over about 200 ms, as the shell's card does, read from the curve the way
+// a draw-in is (`timeAt(p)` is a straight line in time), and from the mark
+// on every frame's `band` rows above its edge are the last frame's (as
+// `bandHolds` reads them): the footer rides the edge whole, and no row
+// shows through it as it passes. Before the mark the footer may say
 // something else (another list's name).
 function edge(all, band) {
   if (all.length < 2) return { ok: false, detail: all.length + " frames grabbed" }
   const ground = groundOf(all[all.length - 1].image)
   const edges = all.map(f => edgeRow(f.image, ground))
   const to = edges[edges.length - 1]
-  const lastBand = bandAt(all[all.length - 1].image, to, band)
-  const through = all.findIndex((f, i) => f.t >= 0 && edges[i] > 0 && !bandAt(f.image, edges[i], band).equals(lastBand))
+  const rest = { image: all[all.length - 1].image, edge: to }
+  const through = all.findIndex((f, i) => f.t >= 0 && edges[i] > 0 && !bandHolds(f.image, edges[i], band, rest))
   const frames = all.map((f, i) => ({ t: f.t, e: edges[i] })).filter(f => f.t >= 0 && f.e > 0)
   if (frames.length < 2) return { ok: false, detail: frames.length + " frames with the card after the mark" }
   // The travel starts where the card stood before the mark, so a jump at
@@ -528,7 +560,7 @@ function edge(all, band) {
   const backwards = frames.findIndex((f, i) => i > 0 && progress(f.e) < progress(frames[i - 1].e))
   const partial = frames.filter(f => f.e !== from && f.e !== to)
   const distinct = new Set(partial.map(f => f.e)).size
-  const line = partial.filter(f => progress(f.e) < 0.9).map(f => ({ t: f.t, y: Math.cbrt(1 - progress(f.e)) }))
+  const line = partial.filter(f => progress(f.e) < 0.9).map(f => ({ t: f.t, y: 1 - timeAt(progress(f.e)) }))
   const median = values => values.sort((a, b) => a - b)[Math.floor(values.length / 2)]
   const slopes = []
   for (let i = 0; i < line.length; i++)
@@ -539,17 +571,22 @@ function edge(all, band) {
   const start = length ? median(line.map(f => f.t - (1 - f.y) * length)) : 0
   const settled = frames.findIndex((f, i) => frames.slice(i).every(later => later.e === to))
   const finish = frames[settled].t
-  // Whole within a pixel of the curve's end, short of its own error. A
-  // span of a few rows reads its curve from few pixels: a real 160 ms ease
-  // reads 130 to 204 ms, starting up to 23 ms before the mark, so 100 and
-  // 240 ms read as wrong and 160 never does, and a jump of 60% at the mark
-  // reads as a start 50 ms before it. A jump of a quarter or less reads
-  // within that error.
-  const slack = 16
+  // Whole within a pixel of the curve's end, short of its own error and
+  // the shell's: it draws the edge at a fraction of a pixel, so the last
+  // pixel lands as its ease ends, up to a few frames past the curve read
+  // off the rest. A span of a few rows reads its curve from few pixels: a
+  // real 200 ms ease reads 194 to 225 ms here, so 100 and 320 ms read as
+  // wrong, as does the shell easing after an ease of Stonks' own, and a
+  // jump of 60% at the mark reads as a start 45 ms before it. A jump of a
+  // quarter or less reads within that error. On a loaded machine the
+  // shell's quick curve leaves two frames to read it from, and work done
+  // at the mark, as a removal's, gives Qt's clock a long first step, which
+  // reads as a start up to 40 ms before it.
+  const slack = 48
   const tail = finish > start + length + slack
   const lead = frames.filter(f => f.t < start).length
-  const ok = span !== 0 && through < 0 && backwards < 0 && distinct >= 3 && line.length >= 3
-    && length >= 120 && length <= 220 && !tail && start >= -32 && lead <= 4
+  const ok = span !== 0 && through < 0 && backwards < 0 && distinct >= 2 && line.length >= 2
+    && length >= 150 && length <= 260 && !tail && start >= -40 && lead <= 4
   return { ok, detail: "edge " + frames.map(f => f.e).join(" ") + " | " + distinct + " partial, "
     + Math.round(length) + " ms from " + Math.round(start) + " ms (" + lead + (lead === 1 ? " frame" : " frames")
     + " after the mark), at rest at " + finish + " ms"
@@ -656,36 +693,36 @@ function cardFrames(edgeAt, covers = true, until = 360, uneven = null) {
 }
 
 function selfCheck() {
-  // OutCubic over `length` ms, starting `from` ms after the mark.
-  const outCubic = (t, length, from = 0) => t < from ? 0 : t - from >= length ? 1 : 1 - Math.pow(1 - (t - from) / length, 3)
+  // The shell's ease-out over `length` ms, starting `from` ms after the mark.
+  const easeOut = (t, length, from = 0) => progressAt((t - from) / length)
   // Retro's whole columns, 6 px of the 120: a column shows once the clip enters it.
   const columns = e => Math.ceil(20 * e) / 20
   const busy = [12, 41, 9, 27, 50, 14, 33, 18]
   const cases = [
-    ["320 ms draw-in", true, (x, t) => x < outCubic(t, 320)],
-    ["320 ms, frames 9 to 50 ms apart, starting 20 ms after the mark", true, (x, t) => x < outCubic(t, 320, 20), 520, busy],
-    ["320 ms in whole columns, whole from about 200 ms", true, (x, t) => x < columns(outCubic(t, 320))],
+    ["320 ms draw-in", true, (x, t) => x < easeOut(t, 320)],
+    ["320 ms, frames 9 to 50 ms apart, starting 20 ms after the mark", true, (x, t) => x < easeOut(t, 320, 20), 520, busy],
+    ["320 ms in whole columns, whole from about 200 ms", true, (x, t) => x < columns(easeOut(t, 320))],
     ["0 ms", false, (x, t) => t > 0],
-    ["160 ms draw-in", false, (x, t) => x < outCubic(t, 160)],
-    ["160 ms, frames 9 to 50 ms apart", false, (x, t) => x < outCubic(t, 160), 480, busy],
+    ["160 ms draw-in", false, (x, t) => x < easeOut(t, 160)],
+    ["160 ms, frames 9 to 50 ms apart", false, (x, t) => x < easeOut(t, 160), 480, busy],
     ["ink hidden until the end", false, (x, t) => t >= 320],
-    ["a slit erasing what it passed", false, (x, t) => t >= 320 || Math.abs(x - outCubic(t, 320)) < 0.02],
-    ["cut short at 80%", false, (x, t) => x < Math.min(0.8, outCubic(t, 320))],
-    ["400 ms draw-in", false, (x, t) => x < outCubic(t, 400), 560],
-    ["400 ms, frames 9 to 50 ms apart", false, (x, t) => x < outCubic(t, 400), 640, busy],
-    ["320 ms, starting 200 ms after the mark", false, (x, t) => x < outCubic(t, 320, 200), 680],
-    ["whole at once 150 ms in", false, (x, t) => x < (t >= 150 ? 1 : outCubic(t, 320))],
-    ["its last tenth 200 ms after the rest", false, (x, t) => x < (x < 0.9 ? outCubic(t, 320) : outCubic(t, 320, 200)), 680],
-    ["a quarter drawn at once, the rest as if 320 ms all along", false, (x, t) => x < 0.25 + 0.75 * outCubic(t, 291)],
-    ["60% drawn at once, the rest in 224 ms", false, (x, t) => x < 0.6 + 0.4 * outCubic(t, 224)],
-    ["60% drawn at once, the rest in 224 ms, frames 9 to 50 ms apart", false, (x, t) => x < 0.6 + 0.4 * outCubic(t, 224), 480, busy],
+    ["a slit erasing what it passed", false, (x, t) => t >= 320 || Math.abs(x - easeOut(t, 320)) < 0.02],
+    ["cut short at 80%", false, (x, t) => x < Math.min(0.8, easeOut(t, 320))],
+    ["400 ms draw-in", false, (x, t) => x < easeOut(t, 400), 560],
+    ["400 ms, frames 9 to 50 ms apart", false, (x, t) => x < easeOut(t, 400), 640, busy],
+    ["320 ms, starting 200 ms after the mark", false, (x, t) => x < easeOut(t, 320, 200), 680],
+    ["whole at once 48 ms in", false, (x, t) => x < (t >= 48 ? 1 : easeOut(t, 320))],
+    ["its last tenth 200 ms after the rest", false, (x, t) => x < (x < 0.9 ? easeOut(t, 320) : easeOut(t, 320, 200)), 680],
+    ["half drawn at once, the rest as if begun 42 ms before the mark", false, (x, t) => x < (t < 0 ? 0 : easeOut(t + 42, 320))],
+    ["60% drawn at once, the rest in 224 ms", false, (x, t) => x < 0.6 + 0.4 * easeOut(t, 224)],
+    ["60% drawn at once, the rest in 224 ms, frames 9 to 50 ms apart", false, (x, t) => x < 0.6 + 0.4 * easeOut(t, 224), 480, busy],
     // A day half gone: its ink ends at 50% of the plot, the rest to come,
     // the extent read from the last frame's ink.
-    ["a half day swept to its newest print in 320 ms", true, (x, t) => x < 0.5 && x < 0.5 * outCubic(t, 320), 480, null, "ink"],
-    ["a half day swept to its newest print in 320 ms in whole columns", true, (x, t) => x < 0.5 && x < columns(0.5 * outCubic(t, 320)), 480, null, "ink"],
-    ["a half day swept across the whole plot in 320 ms, its ink whole in 66 ms", false, (x, t) => x < 0.5 && x < outCubic(t, 320), 480, null, "ink"],
-    ["a half day swept to 45% in 320 ms, the rest shown at its end", false, (x, t) => x < 0.5 && (t >= 320 || x < 0.45 * outCubic(t, 320)), 480, null, "ink"],
-    ["a half day cut short at 30%", false, (x, t) => x < 0.3 && x < 0.5 * outCubic(t, 320), 480, null, 0.5],
+    ["a half day swept to its newest print in 320 ms", true, (x, t) => x < 0.5 && x < 0.5 * easeOut(t, 320), 480, null, "ink"],
+    ["a half day swept to its newest print in 320 ms in whole columns", true, (x, t) => x < 0.5 && x < columns(0.5 * easeOut(t, 320)), 480, null, "ink"],
+    ["a half day swept across the whole plot in 320 ms, its ink whole in 66 ms", false, (x, t) => x < 0.5 && x < easeOut(t, 320), 480, null, "ink"],
+    ["a half day swept to 45% in 320 ms, the rest shown at its end", false, (x, t) => x < 0.5 && (t >= 320 || x < 0.45 * easeOut(t, 320)), 480, null, "ink"],
+    ["a half day cut short at 30%", false, (x, t) => x < 0.3 && x < 0.5 * easeOut(t, 320), 480, null, 0.5],
   ]
   let failed = 0
   for (const [name, expected, shown, until, uneven, end] of cases) {
@@ -702,31 +739,31 @@ function selfCheck() {
   const pinned = [93, 46, 52, 70, 27, 13, 8, 25, 8, 17, 15, 24, 12, 21, 14]
   const oneCore = [76, 41, 54, 68, 25, 14, 10, 15, 17, 22, 17, 12, 22, 14, 10, 15]
   const sparse = [
-    ["320 ms, on a busy run's frames on one core, 0, 76, 117, 171 ms", (x, t) => x < outCubic(t, 320), oneCore, true],
-    ["320 ms, its frames stalled 162 ms after the mark", (x, t) => x < outCubic(t, 320), stalled, true],
-    ["320 ms, on a pinned busy run's frames, 0, 93, 139, 191 ms", (x, t) => x < outCubic(t, 320), pinned, true],
+    ["320 ms, on a busy run's frames on one core, 0, 76, 117, 171 ms", (x, t) => x < easeOut(t, 320), oneCore, true],
+    ["320 ms, its frames stalled 162 ms after the mark", (x, t) => x < easeOut(t, 320), stalled, true],
+    ["320 ms, on a pinned busy run's frames, 0, 93, 139, 191 ms", (x, t) => x < easeOut(t, 320), pinned, true],
     ["none, on even frames", (x, t) => t > 0, null, false],
-    ["160 ms, on even frames", (x, t) => x < outCubic(t, 160), null, false],
-    ["160 ms, on a busy machine's frames, 9 to 50 ms apart", (x, t) => x < outCubic(t, 160), busy, false],
+    ["160 ms, on even frames", (x, t) => x < easeOut(t, 160), null, false],
+    ["160 ms, on a busy machine's frames, 9 to 50 ms apart", (x, t) => x < easeOut(t, 160), busy, false],
     ["ink hidden until the end, on even frames", (x, t) => t >= 320, null, false],
     // Wrong on sparse frames, and plainly so: read, not retried.
-    ["400 ms, on a pinned busy run's frames", (x, t) => x < outCubic(t, 400), pinned, false],
-    ["a slit erasing what it passed, on a pinned busy run's frames", (x, t) => t >= 320 || Math.abs(x - outCubic(t, 320)) < 0.02, pinned, false],
-    ["cut short at 80%, on a pinned busy run's frames", (x, t) => x < Math.min(0.8, outCubic(t, 320)), pinned, false],
+    ["640 ms, on a pinned busy run's frames", (x, t) => x < easeOut(t, 640), pinned, false],
+    ["a slit erasing what it passed, on a pinned busy run's frames", (x, t) => t >= 320 || Math.abs(x - easeOut(t, 320)) < 0.02, pinned, false],
+    ["cut short at 80%, on a pinned busy run's frames", (x, t) => x < Math.min(0.8, easeOut(t, 320)), pinned, false],
     ["none, its frames stalled 162 ms after the mark", (x, t) => t > 0, stalled, false],
-    ["160 ms, its frames stalled 162 ms after the mark", (x, t) => x < outCubic(t, 160), stalled, false],
-    ["400 ms, its frames stalled after the third partial, 0, 93, 139, 191, 400 ms", (x, t) => x < outCubic(t, 400), [93, 46, 52, 209, 16, 16, 16, 16], false],
+    ["160 ms, its frames stalled 162 ms after the mark", (x, t) => x < easeOut(t, 160), stalled, false],
+    ["640 ms, its frames stalled after the third partial, 0, 93, 139, 191, 400 ms", (x, t) => x < easeOut(t, 640), [93, 46, 52, 209, 16, 16, 16, 16], false],
     // Two partial frames that already contradict every allowed draw-in:
     // too fast, too slow.
-    ["160 ms, on frames at 0, 50, 80, 208 ms", (x, t) => x < outCubic(t, 160), [50, 30, 128, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16], false],
-    ["600 ms, on frames at 0, 93, 139, 560 ms", (x, t) => x < outCubic(t, 600), [93, 46, 421, 16, 16, 16, 16, 16], false, 680],
+    ["160 ms, on frames at 0, 50, 80, 208 ms", (x, t) => x < easeOut(t, 160), [50, 30, 128, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16], false],
+    ["600 ms, on frames at 0, 93, 139, 560 ms", (x, t) => x < easeOut(t, 600), [93, 46, 421, 16, 16, 16, 16, 16], false, 680],
     // Within a frame's error of an allowed 380 ms one: it says nothing.
-    ["400 ms, on frames at 0, 93, 139, 400 ms", (x, t) => x < outCubic(t, 400), [93, 46, 261, 16, 16, 16, 16, 16], true],
+    ["400 ms, on frames at 0, 93, 139, 400 ms", (x, t) => x < easeOut(t, 400), [93, 46, 261, 16, 16, 16, 16, 16], true],
     // A busy run that starts 60% drawn, on frames at 0, 93, 139, 400 ms:
     // read against the empty plot its first frame is 0.60 drawn, and
     // judged without one it is never unreadable.
-    ["one starting 60% drawn, on frames at 0, 93, 139, 400 ms", (x, t) => x < 0.6 + 0.4 * outCubic(t, 320), [93, 46, 261, 16, 16, 16, 16, 16], false],
-    ["one starting 60% drawn, on frames at 0, 93, 139, 400 ms, judged without the empty plot", (x, t) => x < 0.6 + 0.4 * outCubic(t, 320), [93, 46, 261, 16, 16, 16, 16, 16], false, 480, false],
+    ["one starting 60% drawn, on frames at 0, 93, 139, 400 ms", (x, t) => x < 0.6 + 0.4 * easeOut(t, 320), [93, 46, 261, 16, 16, 16, 16, 16], false],
+    ["one starting 60% drawn, on frames at 0, 93, 139, 400 ms, judged without the empty plot", (x, t) => x < 0.6 + 0.4 * easeOut(t, 320), [93, 46, 261, 16, 16, 16, 16, 16], false, 480, false],
   ]
   const blankPlot = synthetic(() => false, 0)[0].image
   for (const [name, shown, uneven, unreadable, until = 480, withPlot = true] of sparse) {
@@ -742,13 +779,13 @@ function selfCheck() {
   // animation that sweeps on from there; frames before it that show
   // nothing pass; and before another run's draw-in, not a first, a held
   // chart is that run's own.
-  const rightIn = synthetic((x, t) => x < outCubic(t, 320))
+  const rightIn = synthetic((x, t) => x < easeOut(t, 320))
   const emptyPlot = rightIn[0].image
   const flash = [{ t: -64, image: rightIn[rightIn.length - 1].image }].concat(rightIn)
   const blankFirst = [{ t: -32, image: emptyPlot }].concat(rightIn)
   const sixtyAhead = synthetic(x => x < 0.6, 0)[0].image
   const ahead = [-128, -112, -96, -80, -64, -48, -32, -16].map(t => ({ t, image: sixtyAhead }))
-    .concat(synthetic((x, t) => x < Math.max(0.6, outCubic(t, 320))))
+    .concat(synthetic((x, t) => x < Math.max(0.6, easeOut(t, 320))))
   const firstCases = [
     ["a chart whole before its draw-in began, cleared, then drawn in, on a first open", false, flash, emptyPlot, true],
     ["a chart painted 60% ahead of its animation, then sweeping on from there, on a first open", false, ahead, emptyPlot, true],
@@ -761,7 +798,7 @@ function selfCheck() {
     if (!right) failed++
     console.log((right ? "PASS " : "FAIL ") + name + (expected ? " passes" : " fails") + " — " + verdict.detail.replace(/^edge [^|]*\| /, ""))
   }
-  const sameRight = same(synthetic(() => true, 100)).ok && !same(synthetic((x, t) => x < outCubic(t, 320), 100)).ok
+  const sameRight = same(synthetic(() => true, 100)).ok && !same(synthetic((x, t) => x < easeOut(t, 320), 100)).ok
   if (!sameRight) failed++
   console.log((sameRight ? "PASS " : "FAIL ") + "a still picture is the same on every frame, a moving one is not")
   const changedRight = synthetic((x, t) => x >= 0.9 && t > 50, 100)
@@ -770,19 +807,19 @@ function selfCheck() {
   if (!cropRight) failed++
   console.log((cropRight ? "PASS " : "FAIL ") + "a crop is the same while only what is outside it changes, and not when what is inside does")
   // The card's edge, from 60 to 100 px or back.
-  const ease = (t, length, from = 0) => 60 + 40 * outCubic(t, length, from)
+  const ease = (t, length, from = 0) => 60 + 40 * easeOut(t, length, from)
   const edgeCases = [
-    ["grows in 160 ms, the footer covering the rows", true, t => ease(t, 160)],
-    ["shrinks in 160 ms", true, t => 160 - ease(t, 160)],
-    ["grows in 160 ms, frames 9 to 50 ms apart", true, t => ease(t, 160), true, 480, busy],
-    ["grows in 160 ms, the rows drawn through the footer", false, t => ease(t, 160), false],
+    ["grows in 200 ms, the footer covering the rows", true, t => ease(t, 200)],
+    ["shrinks in 200 ms", true, t => 160 - ease(t, 200)],
+    ["grows in 200 ms, frames 9 to 50 ms apart", true, t => ease(t, 200), true, 480, busy],
+    ["grows in 200 ms, the rows drawn through the footer", false, t => ease(t, 200), false],
     ["jumps in one frame", false, t => t > 0 ? 100 : 60],
     ["never moves", false, t => 60],
     ["grows in 100 ms", false, t => ease(t, 100)],
-    ["grows in 240 ms", false, t => ease(t, 240), true, 480],
-    ["grows in 400 ms", false, t => ease(t, 400), true, 560],
-    ["grows in 160 ms, starting 200 ms after the mark", false, t => ease(t, 160, 200), true, 560],
-    ["jumps 60% at the mark, then eases the rest in 160 ms", false, t => t < 0 ? 60 : 84 + 16 * outCubic(t, 160)],
+    ["grows in 320 ms", false, t => ease(t, 320), true, 560],
+    ["grows in 480 ms", false, t => ease(t, 480), true, 720],
+    ["grows in 200 ms, starting 200 ms after the mark", false, t => ease(t, 200, 200), true, 560],
+    ["jumps 60% at the mark, then eases the rest in 200 ms", false, t => t < 0 ? 60 : 84 + 16 * easeOut(t, 200)],
   ]
   for (const [name, expected, edgeAt, covers, until, uneven] of edgeCases) {
     const verdict = edge(cardFrames(edgeAt, covers, until, uneven), 14)
@@ -790,7 +827,7 @@ function selfCheck() {
     if (!right) failed++
     console.log((right ? "PASS " : "FAIL ") + name + (expected ? " passes" : " fails") + " — " + verdict.detail.replace(/^edge [^|]*\| /, ""))
   }
-  const heldRight = edgeheld(cardFrames(() => 100)).ok && !edgeheld(cardFrames(t => ease(t, 160))).ok
+  const heldRight = edgeheld(cardFrames(() => 100)).ok && !edgeheld(cardFrames(t => ease(t, 200))).ok
   if (!heldRight) failed++
   console.log((heldRight ? "PASS " : "FAIL ") + "an open held at its height passes, one that grows fails")
   // What is on show dimming: the draw-in's whole picture laid over its
@@ -807,9 +844,9 @@ function selfCheck() {
     }
     return frames
   }
-  const dimming = (length, at = 250, to = 0.4) => t => 1 - (1 - to) * outCubic(t, length, at)
-  const shown = (length, at = 250) => t => outCubic(t, length, at)
-  const lifting = length => t => t < 0 ? 0.4 : 0.4 + 0.6 * outCubic(t, length)
+  const dimming = (length, at = 250, to = 0.4) => t => 1 - (1 - to) * easeOut(t, length, at)
+  const shown = (length, at = 250) => t => easeOut(t, length, at)
+  const lifting = length => t => t < 0 ? 0.4 : 0.4 + 0.6 * easeOut(t, length)
   const dimCases = [
     ["dims to 0.4 over 160 ms from 250 ms", true, dimming(160), shown(160)],
     ["dims over 160 ms from 250 ms, frames 9 to 50 ms apart", true, dimming(160), shown(160), 800, busy],
@@ -849,7 +886,7 @@ function selfCheck() {
     }
     return frames
   }
-  const fade = (t, length, from = 0) => { const p = outCubic(t, length, from); return [1 - p, p] }
+  const fade = (t, length, from = 0) => { const p = easeOut(t, length, from); return [1 - p, p] }
   const turnCases = [
     ["crossfades in 160 ms", true, false, t => fade(t, 160)],
     ["crossfades in 160 ms, frames 9 to 50 ms apart", true, false, t => fade(t, 160), 480, busy],
@@ -857,11 +894,11 @@ function selfCheck() {
     ["crossfades in 60 ms", false, false, t => fade(t, 60)],
     ["crossfades in 320 ms", false, false, t => fade(t, 320), 560],
     ["crossfades in 160 ms, starting 200 ms after the mark", false, false, t => fade(t, 160, 200), 560],
-    ["fades out in 160 ms, then in", false, false, t => [1 - outCubic(t, 160), outCubic(t, 160, 160)], 560],
+    ["fades out in 160 ms, then in", false, false, t => [1 - easeOut(t, 160), easeOut(t, 160, 160)], 560],
     ["changes at once", true, true, t => t >= 0 ? [0, 1] : [1, 0]],
     ["changes at once through a blank frame", false, true, t => t < 0 ? [1, 0] : t < 16 ? [0, 0] : [0, 1]],
     ["crossfades in 160 ms, judged as at once", false, true, t => fade(t, 160)],
-    ["fades away for good in 160 ms, nothing taking its place", false, false, t => [1 - outCubic(t, 160), 0]],
+    ["fades away for good in 160 ms, nothing taking its place", false, false, t => [1 - easeOut(t, 160), 0]],
     ["changes at once 320 ms after the mark", false, true, t => t >= 320 ? [0, 1] : [1, 0], 480],
     ["changes at once, back at 160 ms, and again at 240", false, true, t => t >= 0 && (t < 160 || t >= 240) ? [0, 1] : [1, 0], 400],
   ]
@@ -907,13 +944,13 @@ function selfCheck() {
     return frames
   }
   const pressCases = [
-    ["eases to the pressed fill in 160 ms", true, t => outCubic(t, 160)],
+    ["eases to the pressed fill in 160 ms", true, t => easeOut(t, 160)],
     ["takes the pressed fill at once", true, t => t >= 0 ? 1 : 0],
-    ["eases in 160 ms, frames 9 to 50 ms apart", true, t => outCubic(t, 160), 480, busy],
-    ["eases in 60 ms, its first tick on a 20 ms frame", true, t => outCubic(t, 60, 20), 360, [17]],
+    ["eases in 160 ms, frames 9 to 50 ms apart", true, t => easeOut(t, 160), 480, busy],
+    ["eases in 60 ms, its first tick on a 20 ms frame", true, t => easeOut(t, 60, 20), 360, [17]],
     ["waits for a release 400 ms in", false, t => t >= 400 ? 1 : 0, 480],
-    ["settles on the hover's fill", false, t => outCubic(t, 160) * 0.08 / 0.22],
-    ["starts 100 ms late", false, t => outCubic(t, 160, 100)],
+    ["settles on the hover's fill", false, t => easeOut(t, 160) * 0.08 / 0.22],
+    ["starts 100 ms late", false, t => easeOut(t, 160, 100)],
     ["lets go while still held", false, t => t >= 0 && t < 200 ? 1 : 0],
   ]
   for (const [name, expected, share, until, uneven] of pressCases) {
@@ -970,7 +1007,7 @@ function selfCheck() {
     }
     return frames
   }
-  const stepped = (length, from = 0) => t => Math.round(outCubic(t, length, from) * 20)
+  const stepped = (length, from = 0) => t => Math.round(easeOut(t, length, from) * 20)
   const animalCases = [
     ["turns left to right in 200 ms", true, stepped(200)],
     ["turns in 200 ms, frames 9 to 50 ms apart", true, stepped(200), 480, busy],

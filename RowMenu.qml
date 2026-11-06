@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons
 import qs.Commons as Commons
+import "Motion.js" as Motion
 
 // A row's removals, each line naming the lists it reaches ("Remove from all
 // 3 lists"). It looks and moves as the list menu does.
@@ -99,7 +100,7 @@ FocusScope {
           anchors.fill: parent
           radius: root.retro ? 0 : Style.cornerRadius
           color: line.isCursor ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
-          Behavior on color { ColorAnimation { duration: 60 } }
+          Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
         }
 
         CursorBar {
