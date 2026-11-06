@@ -457,8 +457,8 @@ Harness {
       var sleeps = "NEST " + nest + ", KILN " + kiln + ", scrubbed " + scrubbedAwake + ", let go " + harness.sleep()
       check("01:00: NEST, whose night trades, is awake; KILN sleeps, a scrub wakes it, and letting go puts it back to sleep at once",
         sleeps === "NEST awake, KILN asleep, scrubbed awake, let go asleep", sleeps)
-      check("01:00: NEST's header says Overnight, and the caption under its change the night's move since Tuesday's close; KILN's says Closed, its price on top Tuesday's after hours at its close, so the line under it names that close alone and nothing is said under its change",
-        nestHeader.indexOf("Overnight · opens Wed 09:30 | OVERNIGHT ") === 0 && kilnHeader === "Closed · opens Wed 09:30 |  47.93 +6.82% | TUE CLOSE",
+      check("01:00: NEST's header says Overnight, and the caption under its change the night's move since Tuesday's close; KILN's says Closed, its price on top Tuesday's after hours at its close, so under it is the close Tuesday's move counts from, and under its change that move in dollars, named by its day",
+        nestHeader.indexOf("Overnight · opens Wed 09:30 | OVERNIGHT ") === 0 && kilnHeader === "Closed · opens Wed 09:30 | TUE +3.06 47.93 +6.82% | MON CLOSE 44.87",
         nestHeader + " || " + kilnHeader)
       // The clock reaching KILN's pre-market wakes it while it is on show.
       service.now = harness.midnight.wed7 + 4 * 3600 - 2

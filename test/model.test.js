@@ -1036,6 +1036,35 @@ test("a run of Robinhood's prints never takes more requests than a day for all w
   expect(spans(M.overnightBatches(long.concat(["N1", "N2", "N3"]), inHand, now))).toBe("day 3, hour 75, hour 40")
 })
 
+test("the close the day's move counts from is named by the trading day before, across a weekend and a holiday", () => {
+  // Tuesday 8 September 2026, after Labor Day: the close before is
+  // Friday's, named by its weekday within the week and by its date beyond.
+  expect(M.dayKind(US, "2026-09-07").kind).toBe("closure")
+  expect(M.closeBeforeDate(US, at("2026-09-08", "09:30"))).toBe("2026-09-04")
+  expect(M.closeBeforeDate(null, at("2026-09-08", "09:30"))).toBeNull()
+  const quote = {
+    symbol: "X", instrumentType: "EQUITY", exchange: "NASDAQ", gmtoffset: -14400, prevClose: 100, price: 102.5,
+    priceDigits: 2, marketTime: at("2026-09-08", "12:00"),
+    session: {
+      pre: { start: at("2026-09-08", "04:00"), end: at("2026-09-08", "09:30") },
+      regular: { start: at("2026-09-08", "09:30"), end: at("2026-09-08", "16:00") },
+      post: { start: at("2026-09-08", "16:00"), end: at("2026-09-08", "20:00") }
+    },
+    points: [{ t: at("2026-09-08", "09:30"), p: 101 }, { t: at("2026-09-08", "11:55"), p: 102.5 }]
+  }
+  const lines = (now, mode = "pct", scrubbing = false) => M.heroLines(quote, M.rowModel(quote, 0, mode), null, now, null, calendars, mode, scrubbing)
+  expect(lines(at("2026-09-08", "12:00"))).toEqual({ close: { label: "FRI CLOSE", time: "", price: "100.00", changeText: "", tone: "flat", stale: false },
+    caption: { label: "TODAY", changeText: "+2.50", tone: "up" } })
+  expect(lines(at("2026-09-08", "12:00"), "abs").caption).toEqual({ label: "TODAY", changeText: "+2.50%", tone: "up" })
+  expect(lines(at("2026-09-15", "12:00")).close.label).toBe("4 SEP CLOSE")
+  // A scrub rests both lines: the dashed line's legend takes the first's place.
+  expect(lines(at("2026-09-08", "12:00"), "pct", true)).toEqual({ close: null, caption: { label: "", changeText: "", tone: "flat" } })
+  // An unknown move is left out, with its day; the close it would count from stays.
+  const unpriced = { ...quote, price: null, marketTime: null, points: [] }
+  expect(M.heroLines(unpriced, M.rowModel(unpriced, 0, "pct"), null, at("2026-09-08", "12:00"), null, calendars, "pct", false))
+    .toEqual({ close: { label: "FRI CLOSE", time: "", price: "100.00", changeText: "", tone: "flat", stale: false }, caption: { label: "", changeText: "", tone: "flat" } })
+})
+
 test("each print says its own time across a change of clocks, the 1D's day keeps its hours across it, and the day marks an early close", () => {
   // Summer time ends Sunday 1 November 2026. On Sunday night Yahoo's response
   // is still Friday's, in summer time; the night's print is not.

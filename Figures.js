@@ -363,14 +363,76 @@ function nightJoined(newest) {
   return !!newest && !!newest.joined
 }
 
-function closeBefore(quote, newest, calendars) {
-  var cal = Market.calendarFor(calendars, quote)
-  var date = Market.dateStringOf(Market.localDate(newest.dayStart, cal))
+// The trading day before the one that starts at `dayStart`, by the listing's
+// calendar, as a date string: none without a calendar, or past its reach.
+function closeBeforeDate(cal, dayStart) {
+  if (!cal) return null
+  var date = Market.dateStringOf(Market.localDate(dayStart, cal))
   for (var i = 0; i < 10; i++) {
     date = Market.previousDateString(date)
-    if (Market.dayKind(cal, date).kind === "open") break
+    var kind = Market.dayKind(cal, date).kind
+    if (kind === "open") return date
+    if (kind === "unknown") return null
   }
-  return Format.WEEKDAYS[new Date(date + "T12:00:00Z").getUTCDay()]
+  return null
+}
+
+function closeBefore(quote, newest, calendars) {
+  var date = closeBeforeDate(Market.calendarFor(calendars, quote), newest.dayStart)
+  return date === null ? "" : Format.WEEKDAYS[new Date(date + "T12:00:00Z").getUTCDay()]
+}
+
+// The lines while the price on top is a trade of the session or the close
+// itself, nothing having traded since at a price of its own: under the
+// price the close the move counts from, named by its day, FRI CLOSE 158.74,
+// the chart's dashed line in words; under the move the same move in the
+// other unit, TODAY +4.57, or TODAY +2.88% when the figure on top is an
+// amount, named by the day the move is of, as the rows' header names it:
+// FRI on a day the market rests. A coin's day is its last 24 hours, 24H AGO
+// and 24H, as its dashed line and its rows say. None where the close isn't
+// known, as at Tokyo's open before its first bar; PREV CLOSE where its day
+// can't be named, on an exchange with no calendar; and nothing under the
+// move where the move isn't known.
+function sessionLines(quote, view, today, calendars, changeMode) {
+  var reg = quote.session.regular
+  var base = Quote.dayBase(quote)
+  if (!reg || !Format.isFiniteNumber(base)) return null
+  var cal = Market.calendarFor(calendars, quote)
+  var date = quote.rolling ? null : closeBeforeDate(cal, reg.start)
+  var digits = quote.priceDigits
+  var unit = changeMode === "abs" ? "pct" : "abs"
+  var move = { abs: view.abs, pct: view.pct }
+  var none = { label: "", changeText: "", tone: "flat" }
+  return {
+    close: { label: quote.rolling ? "24H AGO" : date === null ? "PREV CLOSE" : sessionName(quote, Market.epochAt(cal, date, "12:00"), today) + " CLOSE",
+      time: "", price: Format.money(base, digits), changeText: "", tone: "flat", stale: false },
+    caption: view.pct === null ? none : {
+      label: quote.rolling ? "24H" : exchangeDay(quote, reg.start) >= today ? "TODAY" : dayName(quote, reg.start, today),
+      changeText: Format.changeText(move, unit, digits),
+      tone: Format.changeTone(move, unit, digits)
+    }
+  }
+}
+
+// The two lines under the price and the move, at rest. With a price since
+// the close on top (`view.newest`), the close and the move since it
+// (`closeLine`, `captionLine`); with a pre-market or after-hours print Yahoo
+// holds and nothing on top, that print (`extendedStack`); else the price on
+// top is a trade of the session or the close itself, and the lines say what
+// it counts from and the day's move in the other unit (`sessionLines`),
+// unless a mode or a range names its period, or the pre-market's print
+// repeats the close. A scrub rests both lines, and the dashed line's legend
+// takes the first's place.
+function heroLines(quote, view, latest, now, day, calendars, changeMode, scrubbing) {
+  var period = view && view.periodLabel ? view.periodLabel : ""
+  var newest = quote && view && view.newest ? view.newest : null
+  var today = quote ? exchangeDay(quote, now) : null
+  var close = !quote ? null : newest ? closeLine(quote, today, changeMode, view)
+    : scrubbing ? null : extendedStack(quote, latest, now, day, changeMode)
+  var caption = captionLine(quote, newest, changeMode, period, close !== null)
+  var rests = quote && view && !scrubbing && (period === "" || period === "24H")
+    && (!newest || newest.closed) && (close === null || close.price === "") && caption.changeText === ""
+  return (rests && sessionLines(quote, view, today, calendars, changeMode)) || { close: close, caption: caption }
 }
 
 function newestNote(quote, newest, now, calendars) {
