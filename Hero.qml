@@ -46,15 +46,17 @@ Item {
   property int priceSize: Style.font.displayLarge * 2
 
   readonly property string freshnessText: quote ? Figures.freshnessText(shownFreshness, quote, calendars) : ""
-  // The newest price since the close, when it is on top: the line under the
-  // price is the close and its move, and the caption under the change the
-  // move since it. None once its quote is gone, as a failed preview's is.
+  // The newest price since the close, when it is on top. None once its quote
+  // is gone, as a failed preview's is.
   readonly property var newest: quote && view && view.newest ? view.newest : null
   readonly property bool newestOld: Figures.newestStale(newest, now)
-  // A scrub's price is a past one, so the line rests and the baseline's legend
-  // takes its place.
-  readonly property var extended: newest ? Figures.closeLine(quote, Figures.exchangeDay(quote, now), changeMode, view)
-    : quote && !scrubbing ? Figures.extendedStack(quote, latest, now, day, changeMode) : null
+  // The line under the price and the caption under the change
+  // (`Figures.heroLines`): the close and its move with the move since it,
+  // a print outside the session, or the close the move counts from with the
+  // day's move in the other unit. A scrub's price is a past one, so the line
+  // rests and the baseline's legend takes its place.
+  readonly property var lines: Figures.heroLines(quote, view, latest, now, day, calendars, changeMode, scrubbing)
+  readonly property var extended: lines.close
   readonly property string priceText: view ? view.priceText
     : (freshness && freshness.state === "failed" ? "—" : "…")
   readonly property string listingLead: {
@@ -78,7 +80,7 @@ Item {
     return (listingLead !== "" ? " · " : "") + Figures.listingMeta(quote, cut)
   }
   readonly property real listingRoom: Math.max(0, listingRow.width - symbolText.implicitWidth - Style.space(8))
-  readonly property var caption: Figures.captionLine(quote, newest, changeMode, view && view.periodLabel ? view.periodLabel : "", extended !== null)
+  readonly property var caption: lines.caption
   // Drawn only clear of the strip's left side, so the two never meet.
   readonly property real captionRoom: width - Style.space(12)
     - Math.max(extendedLine.visible ? extendedLine.implicitWidth : 0, baselineLegend.visible ? baselineLegend.implicitWidth : 0)
