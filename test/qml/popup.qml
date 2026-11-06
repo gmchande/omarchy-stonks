@@ -350,7 +350,7 @@ Harness {
         pill.settings = Object.assign({}, formBefore, { barStyle: way[1] })
         var drawn = find(pill, "pillIcon").parent
         var width = pill.testButton.width
-        if (!pressGives) return way.join(" ") + " n/a," + (drawn.scale === 1 && pill.testButton.width === width)
+        if (!pressGives) return way.join(" ") + " " + (drawn.scale === 1 && pill.testButton.width === width)
         pill.testButton.heldButtons = Qt.LeftButton
         var held = within(1000, function() { return drawn.scale < 0.95 }) && pill.testButton.width === width
         pill.testButton.heldButtons = Qt.NoButton
@@ -359,8 +359,12 @@ Harness {
       })
       service.persist({ style: lookBefore })
       pill.settings = formBefore
-      harness.check("a pill held down gives a little and its slot holds still, in both looks and either form, and is whole once let go",
-        gives.every(function(g) { return /(true|n\/a),true$/.test(g) }), gives.join(" | "))
+      if (pressGives)
+        harness.check("a pill held down gives a little and its slot holds still, in both looks and either form, and is whole once let go",
+          gives.every(function(g) { return /true,true$/.test(g) }), gives.join(" | "))
+      else
+        harness.check("on a shell whose bar icons don't give when pressed, such as Omarchy 4.0's, a pill keeps its size in both looks and either form; the press itself isn't measured",
+          gives.every(function(g) { return /true$/.test(g) }), gives.join(" | "))
 
       panel.close()
       panel.open()
