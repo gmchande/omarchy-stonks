@@ -22,6 +22,8 @@ scratch_home v1-data.json grvc.stonks.json
 # The draw-in check runs on a wrong draw-in too, the real animation made
 # 160 ms; and the dim's on a wrong dim, its wait and ease.
 patch_copy plugin/ChartMotion.qml '/^  property real reveal: 1$/a\  property alias testDrawIn: drawInAnim\n  property alias testSlow: slowTimer\n  property alias testDim: dimAnim'
+# Fidget's course is judged past its first minutes by firing its clock.
+patch_copy plugin/HeaderStatus.qml '/^  property int fidgetStep: -1$/a\  readonly property alias testFidgetClock: fidgetClock'
 frame_tools
 export QT_QPA_PLATFORM=offscreen
 run_qs 110

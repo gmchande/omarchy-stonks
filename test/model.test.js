@@ -2003,3 +2003,31 @@ test("search finds the list's own stocks by symbol or by a word of their name, t
   const long = Array.from({ length: 20 }, (_, i) => "A" + i)
   expect(M.ownMatches("a", long, {}).length).toBe(8)
 })
+
+test("Fidget greets each open once the panel has faded in, then fidgets ever more rarely, down to once a minute", () => {
+  // Each move: when it starts, ms since the open, its steps, and when it ends.
+  const moves = []
+  for (let n = 0, end = 0; end < 3600 * 1000; n++) {
+    const move = M.fidgetMove(n)
+    const start = end + move.wait
+    end = start + move.steps.reduce((sum, step) => sum + step.ms, 0)
+    moves.push({ start, steps: move.steps, end })
+  }
+  // Quick, then slowing: two pricks and a blink after the 180 ms fade, each
+  // gap longer than the one before, and still by 0.85 s.
+  const greeting = moves[0]
+  const gaps = greeting.steps.slice(0, -1).map(step => step.ms)
+  expect(greeting.start).toBeGreaterThanOrEqual(180)
+  expect(greeting.steps.filter(step => step.pricked).length).toBe(2)
+  expect(greeting.steps.filter(step => step.blink).length).toBe(1)
+  expect(gaps.every((ms, i) => i === 0 || ms > gaps[i - 1])).toBe(true)
+  expect(greeting.end).toBeLessThanOrEqual(850)
+  // Rests of 4, 8, 16 and 32 s, then a minute each.
+  const rests = moves.slice(1).map((move, i) => move.start - moves[i].end)
+  expect(rests.slice(0, 6)).toEqual([4000, 8000, 16000, 32000, 60000, 60000])
+  expect(Math.max(...rests)).toBe(60000)
+  // Light on the shell: an hour open wakes its clock once a step and once a
+  // move, a few hundred times, where a loop every 2.4 s woke it 7,500.
+  const wakes = moves.reduce((sum, move) => sum + 1 + move.steps.length, 0)
+  expect(wakes).toBeLessThan(300)
+})

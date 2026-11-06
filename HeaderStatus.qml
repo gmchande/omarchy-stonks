@@ -62,24 +62,35 @@ Item {
   readonly property int steps: moved >= 1 ? 2 : moved >= 0.5 ? 1 : 0
   readonly property int lids: waking ? 2 - steps : steps
 
-  // While the panel or window shows (`seen`), the animal fidgets
-  // (`Cells.FIDGET`), from still at each open; asleep, its eyes stay shut.
-  // Only its own cells change. A close holds its pose through the fade;
-  // with the shell's animations off, or no animal, it sits still.
+  // While the panel or window shows (`seen`), the animal greets you at each
+  // open and then fidgets ever more rarely (`Cells.fidgetMove`); asleep, its
+  // eyes stay shut. Only its own cells change. A close holds its pose through
+  // the fade; with the shell's animations off, or no animal, it sits still.
   property bool seen: false
-  property int fidgetStep: Cells.FIDGET.length - 1
+  // Moves begun since the open; the steps of the one playing or next, and
+  // which is drawn, -1 being still.
+  property int fidgetMoves: 0
+  property var fidgetSteps: []
+  property int fidgetStep: -1
   readonly property bool fidgeting: seen && kind !== "" && !Style.reduceMotion
-  readonly property var fidget: Cells.FIDGET[fidgetStep]
+  readonly property var fidget: fidgetStep >= 0 ? fidgetSteps[fidgetStep] : ({})
   // Plain values, so a step that changes neither draws nothing.
   readonly property bool pricked: !!fidget.pricked
   readonly property int drawnLids: fidget.blink ? 2 : lids
   function fidgetAnew() {
-    fidgetStep = Cells.FIDGET.length - 1
-    fidgetClock.interval = Cells.FIDGET_OPENING
+    fidgetMoves = 0
+    fidgetNext()
+  }
+  // Still, until the next move.
+  function fidgetNext() {
+    var move = Cells.fidgetMove(fidgetMoves++)
+    fidgetStep = -1
+    fidgetSteps = move.steps
+    fidgetClock.interval = move.wait
     if (fidgeting) fidgetClock.restart()
     else fidgetClock.stop()
   }
-  // Each open starts from rest, running or not.
+  // Each open starts with the greeting, running or not.
   onSeenChanged: if (seen) fidgetAnew()
   onFidgetingChanged: {
     if (seen) fidgetAnew()
@@ -88,9 +99,11 @@ Item {
   Timer {
     id: fidgetClock
     onTriggered: {
-      root.fidgetStep = (root.fidgetStep + 1) % Cells.FIDGET.length
-      interval = Cells.FIDGET[root.fidgetStep].ms
-      restart()
+      if (root.fidgetStep + 1 < root.fidgetSteps.length) {
+        root.fidgetStep++
+        interval = root.fidgetSteps[root.fidgetStep].ms
+        restart()
+      } else root.fidgetNext()
     }
   }
 
@@ -130,7 +143,7 @@ Item {
     shownAsleep = asleep
     shutting.stop()
     // The bell owns the eyes: eyes Fidget's blink already shut fall asleep
-    // at once, and the loop starts over, still.
+    // at once, and Fidget stops and rests until its next move.
     var rung = fade && animal.bell && !afterScrub
     if (rung && !(asleep && fidget.blink)) {
       waking = !asleep
@@ -138,7 +151,7 @@ Item {
       shutting.to = asleep ? 1 : 0
       shutting.start()
     } else closing = asleep ? 1 : 0
-    if (rung) fidgetAnew()
+    if (rung) fidgetNext()
   }
 
   Component.onCompleted: settle()
