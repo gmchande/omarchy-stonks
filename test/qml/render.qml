@@ -930,12 +930,34 @@ Harness {
         stub.entries = Object.assign({}, stub.entries, { "SHOP.TO": { status: "ok", receivedAt: root.now } })
         body.search.showResult(1)
       }
-      // popup-search-show-*: SHOP.TO, already in the list, chosen: its
-      // button and the field's hint say Show, in Add's slot.
+      // popup-search-show-*: SHOP.TO, already in the list, first with its
+      // move, and chosen: its button says Show, in Add's slot.
       if (root.stateName.indexOf("-show-") > 0) {
         root.now = stub.quotes["SHOP.TO"].marketTime + 120
         stub.entries = Object.assign({}, stub.entries, { "SHOP.TO": { status: "ok", receivedAt: root.now } })
-        body.search.showResult(1)
+        body.search.showResult(body.search.shown.map(function(r) { return r.symbol }).indexOf("SHOP.TO"))
+      }
+      // popup-search-own-retry-*: "inc" typed, eight of the list's own
+      // found by name, and Yahoo's lookup failed: what it said, and RETRY,
+      // in sight under them.
+      if (root.stateName.indexOf("-own-retry-") > 0) {
+        body.search.results = []
+        body.search.searchText = "inc"
+        root.searchField(body.search).text = "inc"
+        body.search.resultsQuery = "inc"
+        body.search.failure = "none"
+        body.search.answer = "failed"
+        body.search.showResult(0)
+      }
+      // popup-search-waiting-*: "berk" typed, Yahoo not yet answered: the
+      // list's Berkshire found by its name, chosen, the wait said under it.
+      if (root.stateName.indexOf("-waiting-") > 0) {
+        body.search.results = []
+        body.search.answer = ""
+        body.search.resultsQuery = ""
+        body.search.searchText = "berk"
+        root.searchField(body.search).text = "berk"
+        body.search.slow = true
       }
       // popup-search-putback-*: SHOP.TO just removed, and search opened on
       // an empty field: its one result is the removal, chosen, PUT BACK, the
@@ -1026,7 +1048,7 @@ Harness {
       body.undoOffered = { symbol: "SHOP.TO" }
     } else if (root.stateName.indexOf("popup-hint-") === 0) {
       // The first open's footer: the hint's lines have to fit the panel's
-      // width, above "+ Add a symbol".
+      // width, above "+ Find or add a symbol".
       body.showFirstRunHint()
     } else if (/^(popup|window)-notice-file-/.test(root.stateName)) {
       // The footer's notices whole, in the panel's width and the window's;

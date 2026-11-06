@@ -11,6 +11,7 @@ import "KeyText.js" as KeyText
 import "Market.js" as Market
 import "Overnight.js" as Overnight
 import "Quote.js" as Quote
+import "Search.js" as Search
 import "Settings.js" as Settings
 import "Share.js" as Share
 import "Tones.js" as Tones
@@ -59,6 +60,9 @@ Item {
   property bool landingJoined: false
   // A Show of a member still arriving: featured even if its first fetch fails.
   property bool landingShows: false
+  // Picked by a click: its row's × waits for the pointer to move, unless it
+  // moves over the rows before the row joins.
+  property bool landingPointed: false
   // Each add is heard as its row joins, whatever is featured or added meanwhile.
   property var unheardAdds: []
   // The surface's colour, which a moving row carries.
@@ -384,6 +388,14 @@ Item {
     Figures.listBreadth(view.rows, quotes, watchlistScrubShown, changeMode, newestPrints))
   readonly property alias watchlist: watchlist
   readonly property alias search: search
+  // The list's own stocks the search names, each with the move its row
+  // shows at rest. Asked only while search is open.
+  readonly property var ownFound: adding ? Search.ownMatches(search.searchText, members, quotes).map(function(symbol) {
+    var quote = quotes[symbol]
+    var row = quote ? Figures.rowModel(quote, 0, changeMode, newestPrints[symbol] || null) : null
+    return { symbol: symbol, name: quote ? quote.name : "", exchange: quote ? quote.exchange : "",
+      move: row ? Format.lookSigns(row.changeLine, retro) : "", tone: row ? row.tone : "flat" }
+  }) : []
   readonly property alias chartItem: heroBand.chartItem
   readonly property alias motion: motion
 
@@ -499,7 +511,7 @@ Item {
     else if (key === Qt.Key_Return || key === Qt.Key_Enter) featureSymbol(watchlist.cursorRow)
     else if (key === Qt.Key_Delete || key === Qt.Key_Backspace) removeRow(watchlist.cursorRow)
     else if (t === "?") toggleHelp()
-    else if (t === "a") startAdding()
+    else if (t === "a" || t === "/") startAdding()
     else if (t === "c") cycleChangeMode()
     else if (t === "r") refreshRequested()
     else if (t === "[") stepRange(-1)
@@ -610,7 +622,8 @@ Item {
   }
   onSaveFailedChanged: if (!saveFailed && note === stillUnsaved) clearNote()
 
-  function undoRemoval() {
+  // `pointed`: put back by a click, as PUT BACK in search can be (`select`).
+  function undoRemoval(pointed) {
     if (!service) return
     showingHelp = false
     if (!removal) {
@@ -620,7 +633,7 @@ Item {
     var symbol = removal.symbol
     service.undoRemoval(symbol)
     sound("undo")
-    watchlist.select(symbol)
+    watchlist.select(symbol, pointed)
   }
 
   // Ctrl+Z works long after the offer goes. Its time waits while the
@@ -798,16 +811,16 @@ Item {
 
   // An add joins the rows once its first answer is in, and is featured once
   // it and the list rest. A result already in the list is shown, not added.
-  function acceptSymbol(symbol) {
+  function acceptSymbol(symbol, pointed) {
     if (!service) return
     var s = String(symbol || "").trim().toUpperCase()
     if (view.rows.indexOf(s) >= 0) {
-      showSymbol(s)
+      showSymbol(s, pointed)
       return
     }
     if (putBack && s === putBack.symbol) {
       cancelAdding()
-      undoRemoval()
+      undoRemoval(pointed)
       return
     }
     var member = members.indexOf(s) >= 0
@@ -818,6 +831,7 @@ Item {
     // After the preview has gone, whose hero was a choice, not a landing.
     landing = s
     landingShows = member
+    landingPointed = !!pointed
     if (!member) unheardAdds = unheardAdds.filter(function(a) { return a !== s }).concat([s])
     landingJoined = false
     land()
@@ -826,11 +840,11 @@ Item {
   // Show features the member before the preview ends, so the chart on show
   // never changes for it, and ends an add still landing itself: the hero may
   // already be the result, so `onFeaturedSymbolChanged` wouldn't.
-  function showSymbol(symbol) {
+  function showSymbol(symbol, pointed) {
     landing = ""
     service.feature(symbol)
     cancelAdding()
-    watchlist.select(symbol)
+    watchlist.select(symbol, pointed)
   }
 
   // Called once the rows show the service's latest view.
@@ -853,7 +867,7 @@ Item {
     if (!quotes[landing] && !failed) return
     if (!landingJoined) {
       landingJoined = true
-      watchlist.select(landing)
+      watchlist.select(landing, landingPointed)
     }
     featureLanding()
   }
@@ -1182,6 +1196,7 @@ Item {
     }
     onMoveRefused: root.say("Switch to manual order to move rows")
     onListsRequested: function(symbol) { root.openSymbolLists(symbol) }
+    onPointerMoved: root.landingPointed = false
   }
 
   SymbolSearch {
@@ -1208,8 +1223,11 @@ Item {
     // Short, so a list's name fits the panel's field.
     placeholder: root.listName !== "" ? "Symbol or company for " + root.listName + "…" : "Symbol or company…"
     members: root.members
+    own: root.ownFound
+    upColor: root.upColor
+    downColor: root.downColor
     putBack: root.putBack
-    onPicked: function(symbol) { root.acceptSymbol(symbol) }
+    onPicked: function(symbol, pointed) { root.acceptSymbol(symbol, pointed) }
     onChose: function(symbol, result) { root.previewTo(symbol, result) }
     onCancelled: root.cancelAdding()
   }
@@ -1307,8 +1325,8 @@ Item {
     hint: root.hint
     showsHint: root.hintShown
     ground: root.ground
-    label: root.listName !== "" ? "+  Add a symbol to " + root.listName : "+  Add a symbol"
-    labelShort: root.listName !== "" ? "+  Add a symbol" : ""
+    // The same on every list: the list's name is already at its top.
+    label: "+  Find or add a symbol"
     acts: !root.settingsUnreadable
     onHoveredChanged: root.holdNote()
     undoLabel: root.undoOffered ? "Undo " + root.undoOffered.symbol : ""

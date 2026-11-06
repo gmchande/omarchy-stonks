@@ -138,6 +138,8 @@ Flickable {
   signal moveRefused()
   signal arranged()
   signal rowRested(string symbol)
+  // The pointer moved over the rows.
+  signal pointerMoved()
 
   implicitHeight: rowsLength()
   contentWidth: width
@@ -200,6 +202,7 @@ Flickable {
       if (!root.surfaceOpen) return
       root.scrolledUnder = ""
       root.pointAt(x, y)
+      root.pointerMoved()
     }
   }
 
@@ -302,13 +305,15 @@ Flickable {
     glideTo(snappedY(at))
   }
 
-  // Heads for the row first, so the cursor is set on a row in sight.
-  function select(symbol) {
+  // Heads for the row first, so the cursor is set on a row in sight. A row
+  // picked by a click (`pointed`) may come to rest under the pointer that
+  // picked it, so its remove button waits as one scrolled under it does.
+  function select(symbol, pointed) {
     var index = displayedSymbols.indexOf(symbol)
     if (index < 0) return
     scrollToRow(index)
     cursorSymbol = symbol
-    scrolledUnder = ""
+    scrolledUnder = pointed ? symbol : ""
   }
 
   // A removal hands the cursor on: a row in sight keeps the list where the

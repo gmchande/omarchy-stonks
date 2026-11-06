@@ -102,7 +102,7 @@ Harness {
       keyClick(Qt.Key_H)
       tryVerify(function() {
         return body.search.resultsQuery.toUpperCase() === "SH" && !body.search.stale
-          && body.search.results.length > 1 && shownResults(body).length === body.search.results.length
+          && body.search.results.length > 1 && shownResults(body).length === body.search.shown.length
       }, 3000)
     }
 
@@ -110,8 +110,14 @@ Harness {
     // one row, laid out in order. findAll lists rows in the order they were
     // made, and a new answer's rows sit below the last answer's until those
     // go.
+    // ↓ until search chooses SYMBOL.
+    function chooseShown(body, symbol) {
+      for (var i = 0; i < body.search.shown.length && body.search.chosenSymbol !== symbol; i++) keyClick(Qt.Key_Down)
+    }
+
+    // The rows search shows, the list's own first, Yahoo's after.
     function shownResults(body) {
-      var results = body.search.results
+      var results = body.search.shown
       var made = findAll(body.search, "searchResult")
       var rows = []
       made.forEach(function(r) { if (results[r.index] && results[r.index].symbol === r.modelData.symbol) rows[r.index] = r })
@@ -284,8 +290,7 @@ Harness {
       service.feature("AAPL")
       service.addSymbol("SHHI.NE")
       searchShop(body, keys)
-      keyClick(Qt.Key_Down)
-      keyClick(Qt.Key_Down)
+      chooseShown(body, "SHHI.NE")
       var arrivingShow = [service.arriving.indexOf("SHHI.NE") >= 0,
         find(shownResult(body, "SHHI.NE"), "searchAdd").children[0].text].join(",")
       keyClick(Qt.Key_Return)
@@ -310,14 +315,13 @@ Harness {
       searchShop(body, keys)
       var results = shownResults(body)
       var words = results.map(function(r) { return find(r, "searchAdd").children[0].text })
-      keyClick(Qt.Key_Down)
-      keyClick(Qt.Key_Down)
+      chooseShown(body, "SHHI.NE")
       keyClick(Qt.Key_Return)
       within(1500, function() { return service.featuredSymbol === "SHHI.NE" && watchlist.cursorRow === "SHHI.NE" })
       var failedMember = [words.join("/"), service.featuredSymbol, !body.adding, service.library.join(",") === library,
         watchlist.cursorRow === "SHHI.NE"].join("|")
       check("Show features a member whose first fetch failed",
-        failedMember === "ADD/SHOW/SHOW/ADD/ADD|SHHI.NE|true|true|true", failedMember)
+        failedMember === "SHOW/SHOW/ADD/ADD/ADD|SHHI.NE|true|true|true", failedMember)
 
       // Show is a choice of hero: it ends an add still waiting for its quote,
       // and the shown symbol stays featured when that quote lands. Shown here
@@ -330,7 +334,8 @@ Harness {
       pickSymbol(body, keys, "FLAKY")
       var waiting = [body.landing, service.arriving.indexOf("FLAKY") >= 0].join(",")
       searchShop(body, keys)
-      var shownWord = find(shownResults(body)[0], "searchAdd").children[0].text
+      chooseShown(body, "SHOP")
+      var shownWord = find(shownResults(body)[body.search.resultIndex], "searchAdd").children[0].text
       keyClick(Qt.Key_Return)
       within(1000, function() { return !body.adding })
       var shownFirst = [shownWord, service.featuredSymbol, body.adding].join(",")

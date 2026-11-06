@@ -19,7 +19,7 @@ FocusScope {
   property string fontFamily: Style.font.family
   property int rowHeight: Style.space(30)
   // As many as `Search.searchUrl` asks for.
-  readonly property int maxResults: 8
+  readonly property int maxResults: Search.SHOWN_RESULTS
   readonly property int rowGap: Style.space(2)
   // The rows' scrollbar gutter, so the field and results line up with them.
   property int gutter: 0
@@ -34,8 +34,26 @@ FocusScope {
     return rows > 0 ? rows * rowPitch - rowGap : 0
   }
 
+  // Yahoo's answer.
   property var results: []
+  // The list's own stocks the field names (`Search.ownMatches`), each with
+  // its row's move and that move's tone: they lead, and Yahoo's same stock
+  // shows once, as theirs.
+  property var own: []
+  readonly property var ownSymbols: own.map(function(r) { return r.symbol })
+  readonly property var shown: own.concat(results.filter(function(r) { return ownSymbols.indexOf(r.symbol) < 0 }))
+  readonly property int ownCount: own.length
+  property color upColor: foreground
+  property color downColor: foreground
+  // Yahoo's rows dim under a newer query; the list's own follow every letter.
+  function dimmed(index) { return stale && index >= ownCount }
   property string note: ""
+  readonly property bool messageShown: answer === "none" || answer === "failed" || (answer === "" && slow)
+  // What Yahoo said goes under the list's own; with more of them than the
+  // view's rows, it takes the view's last line, so it and its RETRY stay in
+  // sight and the search keeps its height.
+  readonly property int viewRows: Math.floor((resultsHeight + rowGap) / rowPitch)
+  readonly property bool messagePinned: messageShown && ownCount >= viewRows
   // For the answer on screen: its query, and "results", "none", "failed",
   // or "" before any.
   property string resultsQuery: ""
@@ -49,6 +67,21 @@ FocusScope {
   // no waiting line, and kept through an edit, so the line doesn't blink.
   property bool slow: false
   property int resultIndex: 0
+  // The stock chosen, kept by name, so rows arriving or leaving above and
+  // below it never move the choice off it. The list's own take it, in
+  // sight, from an older query's answer.
+  property string chosenSymbol: ""
+  onShownChanged: {
+    if (chosenSymbol === "") {
+      if (ownCount > 0) showResult(0)
+      return
+    }
+    var at = shown.map(function(r) { return r.symbol }).indexOf(chosenSymbol)
+    if (at >= 0 && !(ownCount > 0 && dimmed(at))) resultIndex = at
+    else if (ownCount > 0) showResult(0)
+    // Until Yahoo answers, the chart stays on what it shows.
+    else resultIndex = -1
+  }
   property string activeQuery: ""
   property string requestedQuery: ""
   property string searchText: ""
@@ -62,6 +95,7 @@ FocusScope {
     return members.indexOf(symbol) >= 0 ? "SHOW" : "ADD"
   }
   function showEmpty() {
+    chosenSymbol = ""
     results = putBack ? [putBack] : []
     note = ""
     answer = putBack ? "results" : ""
@@ -82,8 +116,8 @@ FocusScope {
   readonly property int exchangeWidth: {
     var font = exchangeMetrics.font // read, so a look's new font measures again
     var widest = 0
-    for (var i = 0; i < results.length; i++)
-      widest = Math.max(widest, Math.ceil(exchangeMetrics.advanceWidth(results[i].exchange || "")))
+    for (var i = 0; i < shown.length; i++)
+      widest = Math.max(widest, Math.ceil(exchangeMetrics.advanceWidth(shown[i].move || shown[i].exchange || "")))
     return Math.min(widest, Style.space(110))
   }
   FontMetrics { id: exchangeMetrics; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
@@ -93,13 +127,14 @@ FocusScope {
   readonly property int symbolWidth: {
     var font = symbolMetrics.font // read, so a look's new font measures again
     var widest = Style.space(80)
-    for (var i = 0; i < results.length; i++)
-      widest = Math.max(widest, Math.ceil(symbolMetrics.advanceWidth(results[i].symbol)))
+    for (var i = 0; i < shown.length; i++)
+      widest = Math.max(widest, Math.ceil(symbolMetrics.advanceWidth(shown[i].symbol)))
     return Math.min(widest, Math.floor(sharedWidth / 2))
   }
   FontMetrics { id: symbolMetrics; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
 
-  signal picked(string symbol)
+  // `pointed`: picked by a click, so the pointer rests where the pick was.
+  signal picked(string symbol, bool pointed)
   signal chose(string symbol, var result)
   signal cancelled()
 
@@ -152,7 +187,7 @@ FocusScope {
       root.accept(root.resultIndex)
       event.accepted = true
     } else if (event.key === Qt.Key_Down) {
-      root.showResult(Math.min(root.results.length - 1, root.resultIndex + 1))
+      root.showResult(Math.min(root.shown.length - 1, root.resultIndex + 1))
       event.accepted = true
     } else if (event.key === Qt.Key_Up) {
       root.showResult(Math.max(0, root.resultIndex - 1))
@@ -160,13 +195,18 @@ FocusScope {
     }
   }
 
-  function accept(index) {
+  // One of the list's own is taken at once, whatever Yahoo has said.
+  function accept(index, pointed) {
+    if (index >= 0 && index < ownCount) {
+      picked(shown[index].symbol, !!pointed)
+      return
+    }
     if (stale || (answer === "" && searchText.trim() !== "")) {
       enterFor = searchText.trim()
       return
     }
     if (answer === "failed") retry()
-    else if (index >= 0 && index < results.length) picked(results[index].symbol)
+    else if (index >= 0 && index < shown.length) picked(shown[index].symbol, !!pointed)
   }
 
   // Asked once: a lookup of it still waiting on the typing pause goes now.
@@ -186,9 +226,9 @@ FocusScope {
   // A click is Enter on the result: chosen first, so the hero is on it, then
   // taken.
   function take(index) {
-    if (stale) return
+    if (dimmed(index)) return
     showResult(index)
-    accept(index)
+    accept(index, true)
   }
 
   // An emptied field drops a search still out.
@@ -209,15 +249,16 @@ FocusScope {
 
   function choose(index) {
     resultIndex = index
-    var result = index >= 0 && index < results.length ? results[index] : null
-    chose(result ? result.symbol : "", result)
+    var result = index >= 0 && index < shown.length ? shown[index] : null
+    chosenSymbol = result ? result.symbol : ""
+    chose(chosenSymbol, result)
   }
 
   function showResult(index) {
-    if (index < 0 || index >= results.length) return
+    if (index < 0 || index >= shown.length) return
     root.choose(index)
     var top = index * rowPitch
-    var bottom = top + (index === results.length - 1 && note !== "" ? rowPitch : 0) + rowHeight
+    var bottom = top + (index === shown.length - 1 && note !== "" ? rowPitch : 0) + rowHeight
     var limit = Math.max(0, resultsColumn.implicitHeight - resultsScroll.height)
     if (top < resultsScroll.contentY) resultsScroll.contentY = Math.min(limit, top)
     else if (bottom > resultsScroll.contentY + resultsScroll.height)
@@ -284,12 +325,17 @@ FocusScope {
       }
       root.resultsQuery = root.activeQuery
       root.slow = false
-      resultsScroll.contentY = 0
-      root.choose(first)
-      searchField.forceActiveFocus()
       var kept = root.enterFor
       root.enterFor = ""
-      if (kept === root.resultsQuery && root.answer !== "failed") root.accept(root.resultIndex)
+      // Yahoo's rows join below the list's own, so the choice stays, unless
+      // an Enter waited for this answer: it takes Yahoo's first.
+      var taken = kept === root.resultsQuery && root.answer !== "failed"
+      if (root.ownCount === 0 || taken) {
+        resultsScroll.contentY = 0
+        root.choose(first < 0 ? -1 : root.ownCount + first)
+      }
+      searchField.forceActiveFocus()
+      if (taken) root.accept(root.resultIndex)
     }
     if (root.requestedQuery !== "") {
       root.requestedQuery = ""
@@ -336,9 +382,8 @@ FocusScope {
     anchors.right: parent.right
     anchors.top: fieldBar.bottom
     anchors.topMargin: root.resultsGap
-    height: root.resultsHeight
-    visible: root.results.length > 0 || root.note !== ""
-    opacity: root.stale ? 0.4 : 1
+    height: root.resultsHeight - (root.messagePinned ? root.rowPitch : 0)
+    visible: root.shown.length > 0 || root.note !== ""
     contentWidth: width
     contentHeight: resultsColumn.implicitHeight
     clip: true
@@ -357,13 +402,15 @@ FocusScope {
       spacing: root.rowGap
 
       Repeater {
-        model: root.results
+        model: root.shown
         Rectangle {
           id: resultRow
           objectName: "searchResult"
           required property var modelData
           required property int index
           readonly property bool chosen: index === root.resultIndex
+          readonly property bool dimmed: root.dimmed(index)
+          opacity: dimmed ? 0.4 : 1
           width: parent.width
           height: root.rowHeight
           radius: root.retro ? 0 : Style.cornerRadius
@@ -376,7 +423,7 @@ FocusScope {
           MouseArea {
             id: rowMouse
             anchors.fill: parent
-            enabled: !root.stale
+            enabled: !resultRow.dimmed
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: root.take(resultRow.index)
@@ -415,8 +462,9 @@ FocusScope {
               anchors.verticalCenter: parent.verticalCenter
               horizontalAlignment: Text.AlignRight
               textFormat: Text.PlainText
-              text: resultRow.modelData.exchange || ""
-              color: root.dim
+              text: resultRow.modelData.move || resultRow.modelData.exchange || ""
+              color: resultRow.modelData.tone === "up" ? root.upColor
+                : resultRow.modelData.tone === "down" ? root.downColor : root.dim
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
               elide: Text.ElideRight
@@ -424,7 +472,7 @@ FocusScope {
             Rectangle {
               id: addButton
               objectName: "searchAdd"
-              opacity: resultRow.chosen && !root.stale ? 1 : 0
+              opacity: resultRow.chosen && !resultRow.dimmed ? 1 : 0
               anchors.verticalCenter: parent.verticalCenter
               width: root.buttonWidth
               height: addLabel.implicitHeight + Style.space(4)
@@ -446,6 +494,7 @@ FocusScope {
       Text {
         objectName: "searchNote"
         visible: root.note !== ""
+        opacity: root.stale ? 0.4 : 1
         width: parent.width
         height: root.rowHeight
         leftPadding: root.rowPadding
@@ -461,41 +510,51 @@ FocusScope {
     }
   }
 
-  Text {
-    id: searchMessage
-    objectName: "searchMessage"
-    visible: root.answer === "none" || root.answer === "failed" || (root.answer === "" && root.slow)
+  // What Yahoo said, or that it is still being asked, under any of the
+  // list's own, or on the view's last line (`messagePinned`).
+  Item {
+    visible: root.messageShown
     opacity: root.stale ? 0.4 : 1
     anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.rightMargin: root.gutter
     anchors.top: fieldBar.bottom
-    anchors.topMargin: root.resultsGap
-    width: Math.min(implicitWidth, parent.width - (retrySearch.visible ? retrySearch.implicitWidth + Style.space(16) + root.rowPadding : 0))
+    anchors.topMargin: root.resultsGap + (root.messagePinned ? (root.viewRows - 1) * root.rowPitch
+      : root.ownCount * root.rowPitch - resultsScroll.contentY)
     height: root.rowHeight
-    leftPadding: root.rowPadding
-    verticalAlignment: Text.AlignVCenter
-    textFormat: Text.PlainText
-    text: root.answer === "none" ? "No matches for “" + root.resultsQuery + "”"
-      : root.answer === "failed" ? "Couldn’t search · " + (root.failure === "refused" ? "server busy"
-        : root.failure === "none" ? "check your connection" : root.failure === "missing" ? "try other words" : "try again")
-      : "Searching for “" + root.searchText.trim() + "”…"
-    color: root.dim
-    font.family: root.fontFamily
-    font.pixelSize: Style.font.bodySmall
-    elide: Text.ElideRight
-  }
 
-  ListAction {
-    id: retrySearch
-    objectName: "searchRetry"
-    view: root
-    visible: root.answer === "failed" && root.failure !== "missing"
-    enabled: !root.stale
-    opacity: searchMessage.opacity
-    anchors.left: searchMessage.right
-    anchors.leftMargin: Style.space(16)
-    anchors.verticalCenter: searchMessage.verticalCenter
-    text: "RETRY"
-    onActivated: root.retry()
+    Text {
+      id: searchMessage
+      objectName: "searchMessage"
+      visible: root.messageShown
+      anchors.left: parent.left
+      width: Math.min(implicitWidth, parent.width - (retrySearch.visible ? retrySearch.implicitWidth + Style.space(16) + root.rowPadding : 0))
+      height: parent.height
+      leftPadding: root.rowPadding
+      verticalAlignment: Text.AlignVCenter
+      textFormat: Text.PlainText
+      text: root.answer === "none" ? (root.ownCount > 0 ? "No other matches for “" : "No matches for “") + root.resultsQuery + "”"
+        : root.answer === "failed" ? "Couldn’t search · " + (root.failure === "refused" ? "server busy"
+          : root.failure === "none" ? "check your connection" : root.failure === "missing" ? "try other words" : "try again")
+        : "Searching for “" + root.searchText.trim() + "”…"
+      color: root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.bodySmall
+      elide: Text.ElideRight
+    }
+
+    ListAction {
+      id: retrySearch
+      objectName: "searchRetry"
+      view: root
+      visible: root.answer === "failed" && root.failure !== "missing"
+      enabled: !root.stale
+      anchors.left: searchMessage.right
+      anchors.leftMargin: Style.space(16)
+      anchors.verticalCenter: searchMessage.verticalCenter
+      text: "RETRY"
+      onActivated: root.retry()
+    }
   }
 
   // No rule under the field: its border is its edge.

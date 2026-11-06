@@ -204,8 +204,8 @@ Harness {
 
     function test_updates() {
       var quoted = within(5000, function() { return ["AAPL", "MSFT", "NVDA"].every(function(s) { return !!service.quotes[s] }) })
-      var add = "+  Add a symbol |  | "
-      var newer = "+  Add a symbol | Update to 1.0.10 | "
+      var add = "+  Find or add a symbol |  | "
+      var newer = "+  Find or add a symbol | Update to 1.0.10 | "
 
       // As the service starts, main names this build's version. Shift+U,
       // with nothing offered, runs nothing and says so, as Ctrl+Z does with
@@ -333,7 +333,7 @@ Harness {
       var keyed = within(5000, function() { return calls() === harness.updateCall + "\n" + harness.updateCall + "\n" })
       closeWindow()
       harness.check("opened again, the update is still offered; a click on the add starts adding, and Shift+U runs the update",
-        again === "+  Add a symbol | Update to 1.0.10" && adding && keyed, again + " | adding " + adding + " | " + calls())
+        again === "+  Find or add a symbol | Update to 1.0.10" && adding && keyed, again + " | adding " + adding + " | " + calls())
 
       // A failed answer names nothing new: the version known stays offered.
       put("MANIFEST.down", "")
@@ -406,7 +406,7 @@ Harness {
       writeManifest(JSON.stringify(downgrade, null, 2) + "\n")
       var downgraded = within(3000, function() { return footer() === "Updated to 1.0.8 · click to restart the shell" })
       writeManifest(thisBuild)
-      var putBack = within(3000, function() { return footer() === "+  Add a symbol" && offer() === "Update to 1.0.10" })
+      var putBack = within(3000, function() { return footer() === "+  Find or add a symbol" && offer() === "Update to 1.0.10" })
       closeWindow()
       harness.check("a manifest read cut off, the rest of its write unseen by the watch, is read again shortly, and so is a later read once the first one's reads again ran out: the open window's restart notice comes, and goes once the manifest is put back",
         spent && cutOffNotice && putBack, spent + " " + cutOffNotice + " " + putBack + " | " + footer() + " | " + offer())

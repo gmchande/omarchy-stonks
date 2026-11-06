@@ -154,15 +154,17 @@ holds every symbol you follow, and your own lists each hold some of them.
 To choose which lists a row is in, Ctrl-click it, or select it and press
 Ctrl+Enter.
 
-To add a stock, click "+ Add a symbol" and type a name or a symbol. The
-chart shows the highlighted result before you add it. Press Enter to add
-it, or click any result to add that one.
+To find a stock or add one, click "+ Find or add a symbol", or press `/`,
+and type a name or a symbol. Stocks already in the list you're looking at
+come first, with today's move, and Enter or a click shows one with its row
+selected. Below them come Yahoo's results: the chart shows the highlighted
+one before you add it, and Enter or a click adds it.
 
 To remove a row, point at it and click the × beside its symbol, or select
 it and press Delete. It leaves the list you're looking at. Removing it from
 All removes it from every list, and asks first if one of your lists holds
 it. Right-click a row to choose which lists it leaves. For 5 seconds, a
-button such as "Undo NVDA" shows beside "+ Add a symbol". `Ctrl+Z` also
+button such as "Undo NVDA" shows beside "+ Find or add a symbol". `Ctrl+Z` also
 undoes it, until you change a list again.
 
 The line beside the list's name shows how many rows are up, in green, and
@@ -254,7 +256,7 @@ screenshot editor.
 | `[` `]` | Change the range |
 | `p` | Replay the chart |
 | `Ctrl+C` | Take a screenshot |
-| `a` | Add a symbol |
+| `a` or `/` | Find or add a symbol |
 | Delete or Backspace | Remove the selected row |
 | `Ctrl+Z` | Undo a removal |
 | `Shift+↑` `Shift+↓` | Move the selected row, in your own order |

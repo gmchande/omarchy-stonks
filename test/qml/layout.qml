@@ -1081,12 +1081,10 @@ Harness {
         var before = { size: Style.fontBaseSize, wide: surface.wide, windowWidth: surface.windowWidth, retro: stub.retro,
           contentY: body.watchlist.contentY, cursor: body.watchlist.cursorSymbol, listName: stub.listName, layout: settled() }
         // On the same sweep, the footer's add on a named list, beside an
-        // undo and once it goes: where the add doesn't fit beside it, it
-        // says less, and never cuts the list's name.
-        var named = "+  Add a symbol to My Watchlist"
+        // undo and once it goes: the same words as on All, never cut.
+        var named = "+  Find or add a symbol"
         var addWords = find(body, "footerText")
         var addCut = []
-        var addShort = []
         stub.lists = stub.lists.concat([{ name: "My Watchlist", label: "My Watchlist", count: stub.symbols.length, symbols: stub.symbols }])
         stub.listName = "My Watchlist"
         try {
@@ -1121,9 +1119,7 @@ Harness {
               body.undoOffered = null
               wait(1)
               var alone = addWords.text + (addWords.truncated ? " (cut)" : "")
-              if (alone !== named || (beside !== named && beside !== "+  Add a symbol"))
-                addCut.push(where + beside + " / " + alone)
-              if (beside !== named) addShort.push(where.trim())
+              if (alone !== named || beside !== named) addCut.push(where + beside + " / " + alone)
             }
           }
         } finally {
@@ -1147,8 +1143,7 @@ Harness {
         root.check("the header's longest real states read whole or in a shorter form that keeps their time, never cut, and every closure in calendars.json is said in full where it fits, else without its holiday's name, else with when it opens alone, a zone named, in the panel and the window at its widest and narrowest, at every text size from 9 to 20, and in the panel with its spacing kept",
           closures > 50 && unnamed.length === 0 && roomless.length === 0,
           closures + " closures | " + unnamed.join(" | ") + " | " + roomless.slice(0, 12).join(" | ") + (roomless.length > 12 ? " | … " + roomless.length : ""))
-        console.log("the add said less beside the undo: " + addShort.join(", "))
-        root.check("on a named list the footer's add reads whole, or beside an undo it has no room beside \"+ Add a symbol\", never cut, and whole again once the undo goes, in the panel and the window at its widest and narrowest, at every text size from 9 to 20, and in the panel with its spacing kept",
+        root.check("on a named list the footer's add reads \"+ Find or add a symbol\" whole, beside an undo too, never cut, and whole again once the undo goes, in the panel and the window at its widest and narrowest, at every text size from 9 to 20, and in the panel with its spacing kept",
           addCut.length === 0, addCut.slice(0, 12).join(" | "))
 
         // NBIS at 17:58, after hours on its close's own day: the line under
@@ -2497,10 +2492,12 @@ Harness {
           { symbol: "SHOP.TO", name: "Shopify Inc.", exchange: "TSX" },
           { symbol: "SHHI.NE", name: "Ninepoint Shopify High Income", exchange: "NEO" }
         ]
-        var answer = function(results) {
+        // `query` names no stock in the list, so Yahoo's answer alone is
+        // there to take.
+        var answer = function(results, query) {
           body.search.results = results
-          body.search.searchText = "SHOP"
-          body.search.resultsQuery = "SHOP"
+          body.search.searchText = query
+          body.search.resultsQuery = query
           body.search.answer = results.length ? "results" : "none"
         }
         var listsBefore = stub.lists
@@ -2509,11 +2506,11 @@ Harness {
         // `enter`: the one marked as Enter's, or "" for none.
         var views = [
           { name: "search", scope: body.search, enter: "", open: function() { body.startAdding() }, close: function() { body.cancelAdding() } },
-          { name: "search with results", scope: body.search, enter: "searchAdd", open: function() { body.startAdding(); answer(shopResults) }, close: function() { body.cancelAdding() } },
-          { name: "search with none", scope: body.search, enter: "", open: function() { body.startAdding(); answer([]) }, close: function() { body.cancelAdding() } },
+          { name: "search with results", scope: body.search, enter: "searchAdd", open: function() { body.startAdding(); answer(shopResults, "SHOPX") }, close: function() { body.cancelAdding() } },
+          { name: "search with none", scope: body.search, enter: "", open: function() { body.startAdding(); answer([], "ZZZ") }, close: function() { body.cancelAdding() } },
           // An earlier query's answer, dimmed: nothing in it can be taken.
           { name: "search with a stale answer", scope: body.search, enter: "",
-            open: function() { body.startAdding(); answer(shopResults); body.search.searchText = "SHOPI" }, close: function() { body.cancelAdding() } },
+            open: function() { body.startAdding(); answer(shopResults, "SHOPX"); body.search.searchText = "SHOPXY" }, close: function() { body.cancelAdding() } },
           { name: "a symbol's lists", scope: find(body, "symbolLists"), enter: "", open: function() { body.openSymbolLists("MZ") }, close: function() { body.closeListViews() } },
           { name: "manage lists", scope: manage, enter: "renameAction", open: function() { body.openManageLists() }, close: function() { body.closeListViews() } },
           { name: "renaming a list", scope: manage, enter: "saveName", open: function() { body.openManageLists(); manage.startRenaming(2) }, close: function() { body.closeListViews() } },

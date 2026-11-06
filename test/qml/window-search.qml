@@ -779,6 +779,267 @@ Harness {
         [offered, byEnter, joined, offline, paused, byClick, heldByProbe, byItself, closed].join(" ; "))
     }
 
+    // The list's own stocks lead search as each letter lands, each with its
+    // row's move: / opens it, and Enter shows one with its row selected
+    // before Yahoo is asked. Yahoo's answer joins below them and leaves the
+    // choice where it was, and a click on one of them shows it too.
+    function ownFirst(body, watchlist, keys) {
+      var library = service.library.join(",")
+      var featured = service.featuredSymbol
+      hold("SEARCH.hold", true)
+      var asked = harness.calls("SEARCH.asked")
+      keys.forceActiveFocus()
+      keyClick("/")
+      tryVerify(function() { return body.adding && body.search.active }, 2000)
+      keyClick("M")
+      keyClick("S")
+      var row = watchlist.rowItem("MSFT")
+      var led = within(1000, function() { return body.search.shown.length === 1 && body.search.shown[0].symbol === "MSFT" })
+      var top = harness.find(body.search, "searchResult")
+      led = [led, body.search.resultIndex === 0, !!row && body.search.shown[0].move === row.view.changeLine,
+        !!top && harness.find(top, "searchAdd").opacity === 1, body.search.actionFor("MSFT")].join(",")
+      // A new price for MSFT, here its close moved, redraws the move.
+      var wasMove = body.search.shown[0].move
+      var msft = service.testFeed.quotes.MSFT
+      service.testFeed.quotes = Object.assign({}, service.testFeed.quotes, { MSFT: Object.assign({}, msft, { prevClose: msft.prevClose * 0.9 }) })
+      led += "," + within(1000, function() {
+        var drawn = harness.find(harness.find(body.search, "searchResult"), "searchExchange").text
+        return drawn === row.view.changeLine && drawn !== wasMove
+      })
+      service.testFeed.quotes = Object.assign({}, service.testFeed.quotes, { MSFT: msft })
+      var ledDetail = led + "|" + JSON.stringify(body.search.shown) + "|" + (row && row.view ? row.view.changeLine : "")
+      led = led === "true,true,true,true,SHOW,true"
+      keyClick(Qt.Key_Return)
+      var shown = within(2000, function() { return !body.adding && service.featuredSymbol === "MSFT" && watchlist.cursorRow === "MSFT" })
+        && service.library.join(",") === library && harness.calls("SEARCH.asked") === asked
+      var shownDetail = [body.adding, service.featuredSymbol, watchlist.cursorRow, harness.calls("SEARCH.asked") - asked,
+        service.library.join(",") === library].join(",")
+
+      keys.forceActiveFocus()
+      keyClick(Qt.Key_A)
+      tryVerify(function() { return body.adding && body.search.active }, 2000)
+      // The stand-in names every stock as Apple's: A finds AAPL by its
+      // symbol and the other two by that name, AAPL chosen; AP finds all
+      // three by the name, in the list's order, and AAPL stays chosen.
+      keyClick("A")
+      keyClick("P")
+      within(1000, function() { return body.search.ownCount === 3 })
+      keyClick(Qt.Key_Down)
+      var chosen = body.search.chosenSymbol
+      hold("SEARCH.hold", false)
+      var joined = within(3000, function() { return body.search.resultsQuery === "AP" })
+      var kept = [joined, chosen, body.search.chosenSymbol, body.search.resultIndex,
+        body.search.shown.slice(0, 3).map(function(r) { return r.symbol }).join(" "), body.search.shown.length > 3].join(",")
+      // Once the column has placed Yahoo's rows under the list's own, as it
+      // does before the next frame shows them.
+      var rows = function() { return harness.findAll(body.search, "searchResult") }
+      within(1000, function() {
+        return rows().length === body.search.shown.length && rows().every(function(r) { return r.y === r.index * body.search.rowPitch })
+      })
+      // Scrolled down to Yahoo's last, more typing gives the choice back to
+      // the list's first, scrolled into sight.
+      var results = harness.find(body.search, "searchResults")
+      for (var d = 0; d < body.search.shown.length; d++) keyClick(Qt.Key_Down)
+      var scrolled = results.contentY > 0
+      keyClick("P")
+      var back = [scrolled, within(1000, function() { return body.search.chosenSymbol === "NVDA" && results.contentY === 0 })].join(",")
+      within(3000, function() { return body.search.resultsQuery === "APP" })
+      within(1000, function() {
+        return rows().length === body.search.shown.length && rows().every(function(r) { return r.y === r.index * body.search.rowPitch })
+      })
+      var first = rows().filter(function(r) { return r.index === 0 })[0]
+      var at = first.mapToItem(body, first.width / 2, first.height / 2)
+      mouseClick(body, at.x, at.y)
+      var clicked = within(2000, function() { return !body.adding && service.featuredSymbol === "NVDA" && watchlist.cursorRow === "NVDA" })
+      harness.check("search shows the list's own stocks first, by symbol or name, each with its row's move, kept current as prices land; Enter or a click on one shows it with its row selected, and Enter before the typing pause asks Yahoo nothing; Yahoo's answer joins below without moving the choice, and more typing brings the list's first back into sight",
+        led && shown && kept === "true,MSFT,MSFT,2,NVDA AAPL MSFT,true" && back === "true,true" && clicked,
+        ledDetail + " / " + shownDetail + " / " + kept + " / " + back + " / " + service.featuredSymbol)
+      service.feature(featured)
+      body.resetInteraction()
+    }
+
+    // A pick by a click whose row comes to rest under the pointer that
+    // picked it, on sixRows' list: that row's × waits for the pointer to move, so a second
+    // click where the first was features it again and removes nothing.
+    function pickUnderPointer(body, watchlist, keys) {
+      var library = service.library.join(",")
+      var featured = service.featuredSymbol
+      mouseMove(body, 1, 1)
+      hold("SEARCH.hold", true)
+      keys.forceActiveFocus()
+      keyClick("/")
+      tryVerify(function() { return body.adding && body.search.active }, 2000)
+      // The stand-in names the six rows "Apple Inc." or "Nest Holdings
+      // Inc", so "inc" finds each of them, in the list's order. A search row
+      // is shorter than a list row, so a later one lies over its row's ×.
+      ;["I", "N", "C"].forEach(function(k) { keyClick(k) })
+      within(1000, function() { return body.search.ownCount >= 6 })
+      var rows = []
+      within(1000, function() {
+        rows = harness.findAll(body.search, "searchResult")
+        return rows.length === body.search.shown.length && rows.every(function(r) { return r.y === r.index * body.search.rowPitch })
+      })
+      // The first of the list's own whose search row lies over its row's ×.
+      var picked = "", at = null, geometry = []
+      rows.forEach(function(r) {
+        var cross = harness.find(watchlist.rowItem(r.modelData.symbol), "rowRemove")
+        var c = cross.mapToItem(body, cross.width / 2, cross.height / 2)
+        var top = r.mapToItem(body, 0, 0).y
+        if (!at && c.y > top + 2 && c.y < top + r.height - 2) { picked = r.modelData.symbol; at = c }
+        geometry.push(r.modelData.symbol + " row " + Math.round(top) + "-" + Math.round(top + r.height) + " x " + Math.round(c.x) + "," + Math.round(c.y))
+      })
+      var shown = false, kept = false, after = ""
+      if (at) {
+        mouseClick(body, at.x, at.y)
+        within(2000, function() { return !body.adding && service.featuredSymbol === picked && watchlist.cursorRow === picked })
+        var crossShown = function() { var row = watchlist.rowItem(picked); return !!row && harness.find(row, "rowRemove").visible }
+        shown = within(500, crossShown)
+        // As a second click after the double-click interval, which a press
+        // within it would make one with the first.
+        watchlist.forgetClicks()
+        mouseClick(body, at.x, at.y)
+        kept = !within(1000, function() { return service.library.join(",") !== library })
+        // The first place the pointer is seen at after the rows show is no
+        // move (RowPointer), so it moves twice.
+        mouseMove(body, at.x + 3, at.y)
+        mouseMove(body, at.x + 6, at.y)
+        after = String(within(1000, crossShown))
+      }
+      hold("SEARCH.hold", false)
+      harness.check("a pick whose row comes to rest under the still pointer hides its × until the pointer moves, so a click there removes nothing",
+        !!at && !shown && kept && after === "true",
+        [picked || "no search row over its row's × (" + geometry.join("; ") + ", rows from " + Math.round(watchlist.mapToItem(body, 0, 0).y) + ", pitch " + watchlist.rowPitch + ")", "× shown " + shown, "kept " + kept, "after a move " + after, service.library.join(",")].join(" | "))
+      if (!kept) service.persist({ symbols: library.split(",") })
+      service.feature(featured)
+      body.resetInteraction()
+      mouseMove(body, 1, 1)
+
+      // PUT BACK by a click: the row comes back at its place, which is
+      // chosen to lie under the offer, and waits the same way.
+      var searchTop = 0
+      keys.forceActiveFocus()
+      keyClick("/")
+      ;["I", "N", "C"].forEach(function(k) { keyClick(k) })
+      within(1000, function() {
+        var first = harness.findAll(body.search, "searchResult").filter(function(r) { return r.index === 0 && r.y === 0 })[0]
+        if (first) searchTop = first.mapToItem(body, 0, 0).y
+        return !!first
+      })
+      keyClick(Qt.Key_Escape)
+      var back = "", backAt = null
+      watchlist.displayedSymbols.forEach(function(symbol) {
+        var cross = harness.find(watchlist.rowItem(symbol), "rowRemove")
+        var c = cross.mapToItem(body, cross.width / 2, cross.height / 2)
+        if (!backAt && c.y > searchTop + 2 && c.y < searchTop + body.search.rowHeight - 2) { back = symbol; backAt = c }
+      })
+      var putShown = false, putKept = false, putAfter = ""
+      if (backAt) {
+        body.removeRow(back)
+        within(1000, function() { return service.library.indexOf(back) < 0 })
+        keys.forceActiveFocus()
+        keyClick("/")
+        within(1000, function() { return body.search.shown.length === 1 && body.search.shown[0].symbol === back })
+        mouseClick(body, backAt.x, backAt.y)
+        within(2000, function() { return !body.adding && service.library.indexOf(back) >= 0 && watchlist.cursorRow === back })
+        var backShown = function() { var row = watchlist.rowItem(back); return !!row && harness.find(row, "rowRemove").visible }
+        putShown = within(500, backShown)
+        watchlist.forgetClicks()
+        mouseClick(body, backAt.x, backAt.y)
+        putKept = !within(1000, function() { return service.library.indexOf(back) < 0 })
+        mouseMove(body, backAt.x + 3, backAt.y)
+        mouseMove(body, backAt.x + 6, backAt.y)
+        putAfter = String(within(1000, backShown))
+      }
+      harness.check("PUT BACK by a click whose row comes back under the still pointer hides its × until the pointer moves, so a click there removes nothing",
+        !!backAt && !putShown && putKept && putAfter === "true",
+        [back || "no row's × under the search's first row", "× shown " + putShown, "kept " + putKept, "after a move " + putAfter, service.library.join(",")].join(" | "))
+      if (service.library.indexOf(back) < 0) service.addSymbol(back)
+      body.resetInteraction()
+      mouseMove(body, 1, 1)
+
+      // An add by a click whose pointer moves over the rows before its row
+      // joins: the row shows its × as it lands.
+      hold("SHOP.TO.quote.hold", true)
+      keys.forceActiveFocus()
+      keyClick("/")
+      keyClick("S")
+      keyClick("H")
+      var shop = null
+      within(3000, function() {
+        shop = harness.findAll(body.search, "searchResult").filter(function(r) { return r.modelData.symbol === "SHOP.TO" && r.y === r.index * body.search.rowPitch })[0]
+        return body.search.resultsQuery === "SH" && !!shop
+      })
+      var landedShown = false
+      if (shop) {
+        var shopAt = shop.mapToItem(body, shop.width / 2, shop.height / 2)
+        mouseClick(body, shopAt.x, shopAt.y)
+        within(2000, function() { return !body.adding && service.arriving.indexOf("SHOP.TO") >= 0 })
+        var over = watchlist.rowItem(watchlist.displayedSymbols[1])
+        mouseMove(over, over.width / 2, over.height / 2)
+        mouseMove(over, over.width / 2 + 4, over.height / 2)
+        hold("SHOP.TO.quote.hold", false)
+        within(5000, function() { return watchlist.cursorRow === "SHOP.TO" && !watchlist.settling })
+        landedShown = within(1000, function() { var row = watchlist.rowItem("SHOP.TO"); return !!row && harness.find(row, "rowRemove").visible })
+      }
+      hold("SHOP.TO.quote.hold", false)
+      harness.check("an add by a click whose pointer moves over the rows before the row joins shows its × as it lands",
+        !!shop && landedShown, [!!shop, watchlist.cursorRow, landedShown].join(" | "))
+      service.removeSymbol("SHOP.TO")
+      service.feature(featured)
+      body.resetInteraction()
+      mouseMove(body, 1, 1)
+    }
+
+    // With eight of the list's own found and Yahoo's lookup failed, what it
+    // said and its RETRY stay in sight under them, over no row, and RETRY
+    // asks again.
+    function statusInSight(body, watchlist, keys) {
+      ;["TALL1", "TALL2"].forEach(function(s) { service.addSymbol(s) })
+      tryVerify(function() { return service.arriving.length === 0 && !!service.quotes.TALL2 }, 8000)
+      // A short window, whose search has room for fewer rows than it found.
+      var tall = app.testWindow.implicitHeight
+      app.close()
+      app.testWindow.implicitHeight = body.chromeHeight + 4 * body.rowPitch
+      app.open("{}")
+      tryVerify(function() { return app.opened }, 2000)
+      hold("SEARCH.down", true)
+      keys.forceActiveFocus()
+      keyClick("/")
+      ;["I", "N", "C"].forEach(function(k) { keyClick(k) })
+      var failed = within(4000, function() { return body.search.answer === "failed" && body.search.ownCount === 8 })
+      var view = harness.find(body.search, "searchResults")
+      var message = harness.find(body.search, "searchMessage")
+      var retry = harness.find(body.search, "searchRetry")
+      var top = view.mapToItem(body, 0, 0).y, bottom = top + body.search.resultsHeight
+      var inSight = function(item) {
+        var y = item.mapToItem(body, 0, 0).y
+        return item.visible && item.width > 0 && y >= top - 1 && y + item.height <= bottom + 1
+      }
+      var said = message.mapToItem(body, 0, 0).y
+      // A row under the line would be covered: every row the view shows
+      // ends above it.
+      var viewBottom = top + view.height
+      var covered = harness.findAll(body.search, "searchResult").filter(function(r) {
+        var y = r.mapToItem(body, 0, 0).y
+        return y + r.height > said && y < said + message.height && y + r.height > top && y < viewBottom
+      }).map(function(r) { return r.modelData.symbol })
+      var shown = [failed, inSight(message), inSight(retry), covered.join(" ") || "none"].join(",")
+      hold("SEARCH.down", false)
+      var asked = harness.calls("SEARCH.asked")
+      var at = retry.mapToItem(body, retry.width / 2, retry.height / 2)
+      if (inSight(retry)) mouseClick(body, at.x, at.y)
+      var retried = within(3000, function() { return harness.calls("SEARCH.asked") > asked })
+      harness.check("with eight of the list's own found, a failed search's words and RETRY stay in sight under them, over no row, and RETRY asks again",
+        shown === "true,true,true,none" && retried, shown + " | retried " + retried + " | message at " + Math.round(said) + " in " + Math.round(top) + "-" + Math.round(bottom))
+      body.resetInteraction()
+      ;["TALL1", "TALL2"].forEach(function(s) { service.removeSymbol(s) })
+      app.close()
+      app.testWindow.implicitHeight = tall
+      app.open("{}")
+      tryVerify(function() { return app.opened }, 2000)
+      mouseMove(body, 1, 1)
+    }
+
     function test_flows() {
       tryVerify(function() {
         return service.quotes.AAPL && service.quotes.MSFT && service.quotes.NVDA
@@ -798,8 +1059,10 @@ Harness {
       service.setRange("1Y")
       wait(300)
 
+      ownFirst(body, watchlist, keys)
+
       // Results belong to their query. Search SH and let its answer land,
-      // replace the field with NVDA, and act before NVDA's answer (the fake
+      // replace the field with AMZN, in no list, and act before AMZN's answer (the fake
       // curl answers 0.4 s after the 250 ms debounce): neither Enter nor a
       // click where SHOP was adds anything.
       var beforeSearch = service.dataSettings
@@ -816,15 +1079,15 @@ Harness {
         for (c = 0; c < then.length; c++) keyClick(then[c])
         return at
       }
-      searchFor("SH", "NVDA")
+      searchFor("SH", "AMZN")
       keyClick(Qt.Key_Return)
       wait(50)
       var early = harness.same(service.library, beforeSearch.symbols) && service.featuredSymbol === beforeFeatured
-        && body.adding && body.search.searchText === "NVDA"
+        && body.adding && body.search.searchText === "AMZN"
       var earlyDetail = service.library + "|" + service.featuredSymbol + "|" + body.adding + "|" + body.search.searchText
       body.resetInteraction()
       service.persist(beforeSearch)
-      var oldTop = searchFor("SH", "NVDA")
+      var oldTop = searchFor("SH", "AMZN")
       mouseClick(body, oldTop.x, oldTop.y)
       wait(50)
       harness.check("a click where an old result was, before the new results, adds nothing",
@@ -967,6 +1230,8 @@ Harness {
       previewKeepsItsFigures(body, keys)
       previewLeavesItsFigures(body, keys)
       earlyEnter(body, keys, held.kept)
+      pickUnderPointer(body, watchlist, keys)
+      statusInSight(body, watchlist, keys)
       app.close()
       harness.finish()
     }

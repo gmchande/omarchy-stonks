@@ -207,7 +207,7 @@ Harness {
         changed = ["range"]
         effect = function() { return service.range === (token === "[" ? "1D" : "1W") }
       } else if (token === "p") { changed = ["scrub", "replay"]; effect = function() { return b.motion.replayRunning } }
-      else if (token === "a") { changed = ["adding"]; effect = function() { return b.adding && b.search.active } }
+      else if (token === "a" || token === "/") { changed = ["adding"]; effect = function() { return b.adding && b.search.active } }
       else if (token === "Delete" || token === "Backspace") {
         changed = ["symbols", "cursor"]
         effect = function() { return service.symbols.join(",") === rows.filter(function(r) { return r !== selected }).join(",") }
