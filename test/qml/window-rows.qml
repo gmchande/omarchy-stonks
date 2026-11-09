@@ -1,5 +1,4 @@
 import QtQuick
-import QtTest
 import Quickshell
 import Quickshell.Io
 import "plugin" as Stonks
@@ -8,7 +7,7 @@ import "plugin/Quote.js" as Quote
 // The window's rows by hand, through the real App and Service with real Qt
 // keys and pointer: removal by click, the sorted view's guards, the help
 // sheet, moves by keys and drag, the wheel, the cursor, scrolling, undo,
-// rows held by a close, the chart's own clicks and keys, and the footer's
+// a drag a close cancels, the chart's own clicks and keys, and the footer's
 // notices. HOME and curl are scratch fixtures.
 Harness {
   id: harness
@@ -178,8 +177,9 @@ Harness {
         /^true,true,true,true /.test(ownCursor) && /^true,true,true,true /.test(sortedEnd), ownCursor + " | " + sortedEnd)
       openAt(heightBefore)
 
-      // The first row on All by % change, the second on a list by $ change,
-      // and the hero's neighbour after a middle-click and after Delete.
+      // The first row on All by % change, the second on a list by % change
+      // reversed, and the hero's neighbour after a right-click's menu and
+      // after Delete.
       var quotesBefore = service.testFeed.quotes
       var rank = function(changes) {
         var next = Object.assign({}, service.testFeed.quotes)
@@ -335,7 +335,7 @@ Harness {
 
     // A drag and the wheel: the lifted row stays under the pointer, a drag or
     // anything else that takes the list from the wheel leaves it on a row, a
-    // new order ends a drag, and a close holds a drag where it is.
+    // new order ends a drag, and a close cancels a drag.
     function dragsAndTheWheel(body, watchlist, keys) {
       var six = ["AAPL", "MSFT", "NVDA", "FLAT", "DOWN", "STRAY"]
       service.createList("Drags")
@@ -1044,9 +1044,8 @@ Harness {
     }
 
     // The window's footer says the file's notice and what to do, and a real
-    // click on it does nothing. Over a short list it sits one gap under the
-    // rows, not at the window's bottom. A change while the file can't be
-    // read is said unsaved, and why.
+    // click on it does nothing. A change while the file can't be read is
+    // said unsaved, and why.
     function noticesInTheWindow(body) {
       openAt(760)
       service.createList("Short")

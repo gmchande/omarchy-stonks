@@ -1,6 +1,5 @@
 import QtQuick
 import Quickshell
-import Quickshell.Io
 
 // Drives the real QuoteFeed through its scenarios with the fake curl that
 // quote-queue.sh puts first on PATH: runs of several symbols, the first

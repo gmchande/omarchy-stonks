@@ -20,7 +20,8 @@
 //                                      the same within that rectangle
 //   bun frames.js edge BAND FRAME@T...
 //                                      the card's bottom edge eases to its
-//                                      new place over about 200 ms, and the
+//                                      new place over about 200 ms (160 on
+//                                      Omarchy 4.0), and the
 //                                      BAND px above it, the footer riding
 //                                      it, are the same picture on every
 //                                      frame: nothing draws through them
@@ -42,10 +43,16 @@
 //                                      its last, comes back whole in about
 //                                      160 ms from the mark; within that
 //                                      rectangle, if given
-//   bun frames.js turn[:0] FRAME@T... the header's animal crossfades to its
-//                                      new picture in about 160 ms, or with
-//                                      :0 changes at once, never through a
+//   bun frames.js turn[:0] FRAME@T... an animal crossfades to its new
+//                                      picture in about 160 ms, or with :0
+//                                      changes at once, never through a
 //                                      blank or faint frame
+//   bun frames.js steps:LENGTH FRAME@T...
+//                                      the header's animal closes its eyes
+//                                      over LENGTH ms in whole steps: half
+//                                      shut from about halfway, shut at the
+//                                      end, never through a blank or faint
+//                                      frame
 //   bun frames.js columns:LENGTH:N FRAME@T...
 //                                      the pill's animal, N columns side by
 //                                      side across the picture, turns from
@@ -254,7 +261,7 @@ function dim(frames, delay) {
 
 // The header's animal turning, from the first frame's picture to the
 // last's, both of them an animal: neither may be the bare ground. A turn
-// over `length` ms (the crossfade's 160, the eyes' close's 320) leaves the
+// over `length` ms (the crossfade's 160) leaves the
 // first picture within a few frames of the mark, shows the two mixed on
 // three or more distinct frames, and rests on the last from about `length`
 // on. A change at once (`length` 0) shows the first picture until a few
@@ -271,7 +278,7 @@ function turn(frames, length) {
   return { ok, detail: describe(ends) }
 }
 
-// Retro's eyes closing over `length` ms in whole steps: the first picture
+// The eyes closing over `length` ms in whole steps: the first picture
 // until about halfway, then one step, the half-shut eyes, on every frame
 // until about `length`, then the last; no blank or faint frame.
 function steps(frames, length) {
@@ -540,7 +547,8 @@ function bandHolds(image, edge, band, rest) {
 }
 
 // The edge eases from where it was to its new place on the shell's curve
-// over about 200 ms, as the shell's card does, read from the curve the way
+// over about 200 ms, as the shell's card does (Stonks' own 160 on Omarchy
+// 4.0), read from the curve the way
 // a draw-in is (`timeAt(p)` is a straight line in time), and from the mark
 // on every frame's `band` rows above its edge are the last frame's (as
 // `bandHolds` reads them): the footer rides the edge whole, and no row
@@ -912,12 +920,9 @@ function selfCheck() {
     if (!right) failed++
     console.log((right ? "PASS " : "FAIL ") + "the animal " + name + (expected ? " passes" : " fails") + " — " + verdict.detail)
   }
-  // The eyes' close: smooth's over 320 ms, retro's in two steps.
+  // The eyes' close, in two steps in either look.
   const halfway = (t, at) => t < at ? [1, 0] : t < 320 ? [0.5, 0.5] : [0, 1]
   const closeCases = [
-    ["eyes close in 320 ms", true, turn, t => fade(t, 320)],
-    ["eyes close in 160 ms, judged as 320", false, turn, t => fade(t, 160)],
-    ["eyes close in 640 ms, judged as 320", false, turn, t => fade(t, 640), 800],
     ["eyes step half shut at 160 ms and shut at 320", true, steps, t => halfway(t, 160)],
     ["eyes shut at once, judged as steps", false, steps, t => t >= 0 ? [0, 1] : [1, 0]],
     ["eyes close smoothly, judged as steps", false, steps, t => fade(t, 320)],

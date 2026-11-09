@@ -100,7 +100,7 @@
 # symbol's own day as the chart route would, closes only, in Yahoo's spark
 # shape, counting each symbol's call as a chart's. A symbol the chart route
 # would fail or answer 404 is left out, as Yahoo leaves out one it has no
-# day for. HUGE pads the answer past the spark cap.
+# day for.
 #
 # Runs: like curl, it takes several URLs in one call and answers each in
 # turn, each followed by the -w line Fetch.js asks for, with the status
@@ -187,18 +187,16 @@ serve() {
     exit
   fi
   if [[ "$url" == *"/v7/finance/spark"* ]]; then
-    local list="${url#*symbols=}" range="${url#*range=}" sym body served days=() huge=0
+    local list="${url#*symbols=}" range="${url#*range=}" sym body served days=()
     list="${list%%&*}"
     range="${range%%&*}"
     for sym in ${list//,/ }; do
       body=$(serve "https://query1.finance.yahoo.com/v8/finance/chart/$sym?range=$range&interval=5m&includePrePost=true")
       served=$?
       [ "$served" = 0 ] && days+=("$body")
-      [ "$sym" = HUGE ] && huge=1
     done
     printf '%s\n' "${days[@]}" | jq -cs '{ spark: { result: map(.chart.result[0] | { symbol: .meta.symbol,
       response: [{ meta: .meta, timestamp: .timestamp, indicators: { quote: [{ close: .indicators.quote[0].close }] } }] }) } }'
-    [ "$huge" = 1 ] && head -c 450000 /dev/zero | tr '\0' ' '
     exit 0
   fi
   if [[ "$url" == *"/v1/finance/search"* ]]; then

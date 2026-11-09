@@ -1,5 +1,4 @@
 import QtQuick
-import QtTest
 import Quickshell
 import Quickshell.Io
 import qs.Commons
@@ -351,18 +350,18 @@ Harness {
       wait(100)
       // Nothing that happens by itself, and nothing done to look around
       // but the scrub: a refresh and its answers, a range and back, the
-      // look and back, the change, the selection, the key sheet, a row's
-      // chart. The keys come 60 ms apart, past the chimes' 45 ms gap, so
-      // each scrub step strikes its own.
+      // look and back, the change, the selection, the key sheet. The keys
+      // come 60 ms apart, past the chimes' 45 ms gap, so each scrub step
+      // strikes its own.
       var quietKeys = [Qt.Key_R, Qt.Key_Left, Qt.Key_Left, Qt.Key_Right, Qt.Key_Escape, Qt.Key_BracketRight, Qt.Key_BracketLeft,
-        Qt.Key_S, Qt.Key_S, Qt.Key_C, Qt.Key_C, Qt.Key_C, Qt.Key_Down, Qt.Key_Up, Qt.Key_Question, Qt.Key_Question, Qt.Key_2, Qt.Key_1]
+        Qt.Key_S, Qt.Key_S, Qt.Key_C, Qt.Key_C, Qt.Key_C, Qt.Key_Down, Qt.Key_Up, Qt.Key_Question, Qt.Key_Question]
       quietKeys.forEach(function(key) { keyClick(key); wait(60) })
       service.refresh()
       quiet()
       // Time for a sound that mustn't start.
       wait(500)
       var stepChimes = harness.chimes().map(harness.bar)
-      harness.check("with sounds on, a refresh, its answers, a range, the look, the change, the selection, the sheet, and a row's chart play nothing, and the scrub's three key steps strike three of smooth's chimes",
+      harness.check("with sounds on, a refresh, its answers, a range, the look, the change, the selection, and the sheet play nothing, and the scrub's three key steps strike three of smooth's chimes",
         harness.starts().length === 0 && stepChimes.length === 3 && stepChimes.every(function(b) { return /^smooth-([0-9]|10)$/.test(b) }),
         JSON.stringify(harness.record()))
 

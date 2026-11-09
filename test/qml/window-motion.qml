@@ -135,7 +135,7 @@ Harness {
 
     // Each change of chart ends the last one's motion first: a running
     // draw-in or replay, whatever changed.
-    function motionEnds(body, watchlist, keys) {
+    function motionEnds(body, watchlist) {
       var dropEntry = function(key) {
         var next = Object.assign({}, service.testHistoryFeed.entries)
         delete next[key]
@@ -1268,7 +1268,7 @@ Harness {
       sixRows(body, "MSFT", "1D")
 
       bellDrawIn(body)
-      motionEnds(body, watchlist, keys)
+      motionEnds(body, watchlist)
       drawInFrames(body, keys)
       joinFrames(body, watchlist, keys)
       animalFrames(body)

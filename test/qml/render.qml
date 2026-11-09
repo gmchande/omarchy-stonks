@@ -453,7 +453,7 @@ Harness {
     root.savedFigures = { AAPL: root.figures("aapl"), NEST: root.figures("nest"), "SHOP.TO": root.figures("shop-to"),
       "7203.T": root.figures("7203-t"), "SHEL.L": root.figures("shel-l") }
     root.savedRates = { USDCAD: root.rate("USDCAD"), USDGBP: root.rate("USDGBP") }
-    try { stub.calendars = JSON.parse(calendarFile.text()) } catch (e) { stub.calendars = null }
+    stub.calendars = JSON.parse(calendarFile.text())
     if (root.pillSheet) {
       root.pillQuote = nestDay
       root.now = nestDay.marketTime + 120
@@ -997,7 +997,7 @@ Harness {
       }
     } else if (root.help) {
       // Manual order, so the sheet shows every entry it can; popup-help-sorted
-      // shows a sorted order's instead, without J K and the drag.
+      // shows a sorted order's instead, without ⇧↑ ⇧↓ and the drag.
       stub.order = root.help.sorted ? "pct" : "manual"
       body.showingHelp = true
     } else if (root.room) {
@@ -1031,8 +1031,8 @@ Harness {
       quotes["SHOP.TO"] = Object.assign({}, still, { prevClose: Quote.regularClose(still) })
       stub.quotes = quotes
     } else if (/^(popup|window)-note-/.test(root.stateName)) {
-      // popup-note-<look>: a refusal. <popup|window>-note-sorted-<look>: J
-      // refused in a sorted order.
+      // popup-note-<look>: a refusal. <popup|window>-note-sorted-<look>: a
+      // move refused in a sorted order.
       if (root.stateName.indexOf("-sorted-") > 0) {
         stub.order = "pct"
         Qt.callLater(function() {
@@ -1120,7 +1120,7 @@ Harness {
         // <popup|window>-lists-rowmenu-<look>: My Watchlist's second row,
         // in sight at every text size, right-clicked, which Wins holds too:
         // this list by its name, or all 3. popup-lists-rowmenuall-<look>:
-        // that symbol's menu in All by Shift+X, its one line chosen. Opened
+        // that symbol's menu in All by Delete, its one line chosen. Opened
         // as the picture is taken, once the rows and a -size-N text size
         // have landed: the menu stands where it opens, and a later size
         // closes it.

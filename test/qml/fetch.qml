@@ -1,7 +1,6 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import qs.Commons
 import qs.Ui
 import "plugin" as Stonks
 
@@ -13,11 +12,13 @@ import "plugin" as Stonks
 // featured), a thin one (KILN), an ETF (SPY), an index (^GSPC), a
 // cryptocurrency (BTC-USD), London (SHEL.L), Tokyo (7203.T), and Toronto
 // (SHOP.TO). It counts every request in requests.log and every curl call
-// in runs.log. fetch.sh runs this three times: the main run, which starts
+// in runs.log. fetch.sh runs this four times: the main run, which starts
 // offline with saved quotes; the holiday run (STONKS_FETCH_RUN=holiday),
 // whose calendars close New York on 7 October while London and Toronto
-// trade; and the bell run (STONKS_FETCH_RUN=bell), AAPL and the S&P 500
-// across Friday 23 October's open, from Yahoo's answers either side of it.
+// trade; the bell run (STONKS_FETCH_RUN=bell), AAPL and the S&P 500 across
+// Friday 23 October's open, from Yahoo's answers either side of it; and
+// the cold run (STONKS_FETCH_RUN=cold), a first start whose every price
+// fails.
 Harness {
   id: harness
   marker: mode === "main" ? "FETCH DONE" : mode === "holiday" ? "FETCH HOLIDAY DONE" : mode === "bell" ? "FETCH BELL DONE" : "FETCH COLD DONE"
