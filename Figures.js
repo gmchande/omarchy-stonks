@@ -322,12 +322,15 @@ function rowModel(quote, scrubT, mode, newest) {
 // A moment of the coming day that a two-day answer holds, once that day has
 // a print, counts from the quote's own close with no open yet, as the 1D
 // chart draws it (`Quote.tailDay`), so a row scrubbed into the pre-market
-// reads what the hero does. Once tonight has traded (`newest.joined`), a
-// moment past the bell counts from the close just gone, where the dashed
-// line steps (`Overnight.nightBell`).
+// reads what the hero does. Once tonight has traded, a moment past the bell
+// counts from the close just gone, where the dashed line steps: the day
+// drawn says so (`Overnight.nightBell`), and a row's quote by its newest
+// price (`newest.joined`).
 function scrubbedBase(quote, t, newest) {
   var reg = quote.session.regular
-  if (newest && newest.joined && reg && t >= reg.end) return { prevClose: newest.base, dayOpen: null }
+  var bell = Overnight.nightBell(quote)
+  if (bell === null && newest && newest.joined && reg) bell = reg.end
+  if (bell !== null && t >= bell) return { prevClose: Quote.regularClose(quote), dayOpen: null }
   var tail = Quote.tailStart(quote)
   if (tail !== null && t >= tail && Quote.lastPrintTime(quote) >= tail) return { prevClose: Quote.regularClose(quote), dayOpen: null }
   return { prevClose: Quote.dayBase(quote), dayOpen: quote.dayOpen }
@@ -365,14 +368,14 @@ function closeLabel(quote, today, calendars) {
 
 // The close before the price on top, which the price on top no longer is,
 // and its day's move: CLOSE 171.99 −5.68%, or MON CLOSE once that day is
-// past. Where they would only repeat the price and the move on top
-// (`shown`), the price on top is that close itself: no price, no move.
+// past. Where the price on top is that close, counted from the same close
+// (`shown`), it would only repeat it: no price, no move.
 function closeLine(quote, today, changeMode, shown, calendars) {
   var row = rowModel(quote, 0, changeMode === "abs" ? "abs" : "pct")
-  var same = row.priceText === shown.priceText && row.changeText === shown.changeText
+  var same = row.priceText === shown.priceText && row.close === shown.close
   var named = closeLabel(quote, today, calendars)
   return { label: named.label, time: named.time, price: same ? "" : row.priceText, changeText: same ? "" : row.changeText,
-    tone: same ? "flat" : row.tone, stale: false, since: null }
+    tone: same ? "flat" : row.tone, stale: false }
 }
 
 // The part of a day's move since its close, while the price on top is a
@@ -472,7 +475,7 @@ function heroLines(quote, view, latest, now, day, calendars, changeMode, scrubbi
 }
 
 function closeOnly(from) {
-  return from ? { label: from.label, time: "", price: from.price, changeText: "", tone: "flat", stale: false, since: null } : null
+  return from ? { label: from.label, time: "", price: from.price, changeText: "", tone: "flat", stale: false } : null
 }
 
 // The pill's hover: the newest price's session and time.

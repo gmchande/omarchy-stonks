@@ -138,7 +138,7 @@ Harness {
       var take = function() {
         var card = loader.item
         seen = { symbol: card.symbol, range: card.range, retro: card.retro, scrubX: card.scrubX, scrubT: card.scrubT,
-          when: card.words ? card.words.when : "", span: card.words ? card.words.span : "",
+          foot: card.words ? card.words.foot : "",
           name: card.quote ? String(card.quote.name || "") : "",
           currency: card.quote ? String(card.quote.currency || "") : "", texts: harness.texts(card), marks: harness.marksSaid(card),
           inset: harness.find(card, "shareDayChart").xAt(0) * card.dpr }
@@ -194,13 +194,12 @@ Harness {
     // symbol and no list's name. The stock's name is in its own case, as the
     // header's title, not in capitals like a caption. Its price's currency,
     // USD for every shot here, stands beside the price, and its foot says
-    // when: `span`, the saved day's date of the price on show, or the
-    // range's length.
-    function ofChart(shot, symbol, range, span, rows) {
+    // when the price on show is from, matching `foot`.
+    function ofChart(shot, symbol, range, foot, rows) {
       var problems = []
       if (!shot.card.texts) return ["no card laid out"]
       if (shot.card.symbol !== symbol || shot.card.range !== range) problems.push("card of " + shot.card.symbol + " " + shot.card.range)
-      if (shot.card.texts.indexOf(symbol) < 0 || shot.card.span !== span || shot.card.texts.indexOf(span) < 0
+      if (shot.card.texts.indexOf(symbol) < 0 || !foot.test(shot.card.foot) || shot.card.texts.indexOf(shot.card.foot) < 0
         || !shot.card.name || shot.card.texts.indexOf(shot.card.name) < 0
         || shot.card.currency !== "USD" || shot.card.texts.indexOf("USD") < 0)
         problems.push("words " + shot.card.texts.join(" | "))
@@ -226,7 +225,8 @@ Harness {
       var unlit = !body.cameraLit
       var rest = shoot(body, function() { keyClick(Qt.Key_C, Qt.ControlModifier) })
       var lit = body.cameraLit
-      var problems = landed(rest, "aapl", /^AAPL at .+$/).concat(ofChart(rest, "AAPL", "1D", "TUE 1 SEP 2026", rows))
+      var day = /^TUE 1 SEP 2026 · (CLOSE )?\d\d:\d\d [A-Z]+$/
+      var problems = landed(rest, "aapl", /^AAPL at .+$/).concat(ofChart(rest, "AAPL", "1D", day, rows))
       check("Ctrl+C in the panel saves one picture of AAPL's day in the pictures folder, copies it as a PNG, and sends Omarchy's notification with it",
         problems.length === 0 && still === 0 && rest.card.scrubX === -1 && !rest.card.retro, problems.join("; "))
       // The day's line starts 6 of the picture's pixels in from the chart's
@@ -236,16 +236,17 @@ Harness {
 
       if (!harness.sizeOnly) {
         // Scrubbed back two steps, into AAPL's after hours: the picture shows
-        // the scrub and says its session and time, and the footer names it.
+        // the scrub and says its date and time at its foot, and the footer
+        // names it.
         keyClick(Qt.Key_Left)
         keyClick(Qt.Key_Left)
         tryVerify(function() { return body.scrubT !== 0 }, 2000)
         var scrubbed = shoot(body, function() { keyClick(Qt.Key_C, Qt.ControlModifier) })
-        problems = landed(scrubbed, "aapl", /^AAPL at \d\d:\d\d$/).concat(ofChart(scrubbed, "AAPL", "1D", "TUE 1 SEP 2026", rows))
-        check("scrubbed, Ctrl+C takes the scrub: the picture shows it and says its session and time, its date only at the foot, and the footer says it too",
-          problems.length === 0 && scrubbed.card.scrubT === body.scrubShown && scrubbed.card.scrubX >= 0 && /^AFTER HOURS \d\d:\d\d [A-Z]+$/.test(scrubbed.card.when)
+        problems = landed(scrubbed, "aapl", /^AAPL at \d\d:\d\d$/).concat(ofChart(scrubbed, "AAPL", "1D", /^TUE 1 SEP 2026 · \d\d:\d\d [A-Z]+$/, rows))
+        check("scrubbed, Ctrl+C takes the scrub: the picture shows it and says its date and time at its foot, and the footer says it too",
+          problems.length === 0 && scrubbed.card.scrubT === body.scrubShown && scrubbed.card.scrubX >= 0 && scrubbed.card.foot !== rest.card.foot
             && scrubbed.name !== rest.name,
-          problems.join("; ") + " | " + scrubbed.card.when + " | " + scrubbed.footer)
+          problems.join("; ") + " | " + scrubbed.card.foot + " | " + scrubbed.footer)
 
         // Lit through the close's fade, and out when the panel opens again;
         // the wait lets the fade end.
@@ -272,7 +273,7 @@ Harness {
       tryVerify(function() { return button && button.visible && button.width > 0 }, 2000)
       waitForRendering(button)
       var year = shoot(win, function() { if (button) mouseClick(button, button.width / 2, button.height / 2) })
-      problems = landed(year, "aapl", /^AAPL 1Y at .+$/).concat(ofChart(year, "AAPL", "1Y", "1 YEAR", rows))
+      problems = landed(year, "aapl", /^AAPL 1Y at .+$/).concat(ofChart(year, "AAPL", "1Y", day, rows))
       var marks = harness.marksSaid(win)
       if (year.card.marks !== marks || /none/.test(marks)) problems.push("marks " + year.card.marks + " against the window's " + marks)
       check("a click on the window's camera, in retro, takes AAPL's 1Y as it is shown, its high and low marked",
@@ -291,7 +292,7 @@ Harness {
       mouseMove(chart, chart.width * 0.4, chart.height / 2)
       tryVerify(function() { return win.scrubT !== 0 }, 2000)
       var hovered = shoot(win, function() { keyClick(Qt.Key_C, Qt.ControlModifier) })
-      problems = landed(hovered, "aapl", /^AAPL 1Y on .+$/).concat(ofChart(hovered, "AAPL", "1Y", "1 YEAR", rows))
+      problems = landed(hovered, "aapl", /^AAPL 1Y on .+$/).concat(ofChart(hovered, "AAPL", "1Y", /^\d{1,2} [A-Z]{3} \d{4}/, rows))
       check("Ctrl+C with the pointer on the window's chart takes the bar the pointer reads",
         problems.length === 0 && hovered.card.scrubT === win.scrubShown && hovered.card.scrubX >= 0,
         problems.join("; ") + " | " + hovered.card.scrubT + " vs " + win.scrubShown)

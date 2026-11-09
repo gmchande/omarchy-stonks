@@ -779,18 +779,18 @@ Harness {
         stub.order = orderWas
         root.check("both visible edges of a sorted order's arrow act in both looks", edgeFaults.length === 0, edgeFaults.join(" | "))
 
-        // Since the open, the hero's caption names it, in the slot AT CLOSE
-        // would take, and the figure is bare; a row says "open" inline.
+        // Since the open, the hero's caption names it beside its amount, and
+        // the figure is bare; a row says "open" inline.
         stub.featuredSymbol = "MZ"
         stub.changeMode = "open"
         var heroCaption = root.find(body, "changeCaption")
         var heroChange = root.find(body, "changeText")
         var firstShown = body.watchlist.rowItem(body.watchlist.displayedSymbols[0])
         var sinceOpen = function() {
-          return root.rowWords(heroCaption) === "SINCE OPEN" && heroChange.text.indexOf("open") < 0
+          return /^SINCE OPEN [+\u2212][\d,.]+$/.test(root.rowWords(heroCaption)) && heroChange.text.indexOf("open") < 0
             && firstShown.view.changeLine.indexOf(" open") > 0
         }
-        root.check("a change since the open is captioned SINCE OPEN, never AT CLOSE", within(1000, sinceOpen))
+        root.check("a change since the open is captioned SINCE OPEN beside its amount", within(1000, sinceOpen))
         stub.changeMode = "pct"
 
         root.setQuotes(["FIT1", "FIT2"], [101, 102])

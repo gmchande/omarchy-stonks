@@ -59,8 +59,10 @@ Item {
   // The part since the close goes whole or not at all, and first: the
   // caption keeps its room.
   readonly property var since: extended && extended.since ? extended.since : null
+  readonly property real coreWidth: [extendedLabel, extendedTime, extendedPrice, extendedMove]
+    .reduce(function(sum, text) { return sum + (text.text !== "" ? text.implicitWidth + extendedLine.spacing : 0) }, 0)
   readonly property bool sinceShown: !!since
-    && extendedCore.implicitWidth + sinceLine.implicitWidth + extendedLine.spacing + Style.space(12) + captionLine.implicitWidth <= width
+    && coreWidth + sinceLabel.implicitWidth + sinceMove.implicitWidth + extendedLine.spacing + Style.space(12) + captionLine.implicitWidth <= width
   readonly property string priceText: view ? view.priceText
     : (freshness && freshness.state === "failed" ? "—" : "…")
   readonly property string listingLead: {
@@ -251,74 +253,70 @@ Item {
     y: root.baselineY + root.captionDrop - extendedLabel.baselineOffset
     spacing: Style.space(6)
 
-    Row {
-      id: extendedCore
-      spacing: extendedLine.spacing
-
-      Text {
-        id: extendedLabel
-        textFormat: Text.PlainText
-        text: root.extended ? root.extended.label : ""
-        color: root.dim
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
-        font.bold: true
-        font.letterSpacing: 1
-      }
-      Text {
-        visible: text !== ""
-        textFormat: Text.PlainText
-        text: root.extended ? root.extended.time : ""
-        color: root.dim
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
-        font.bold: true
-        font.letterSpacing: 1
-      }
-      Text {
-        visible: text !== ""
-        textFormat: Text.PlainText
-        text: root.extended ? root.extended.price : ""
-        color: extendedLine.old ? root.dim : root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
-        font.bold: true
-      }
-      Text {
-        visible: text !== ""
-        textFormat: Text.PlainText
-        text: root.extended ? Format.lookSigns(root.extended.changeText, root.retro) : ""
-        color: extendedLine.old ? root.dim : root.toneColor(root.extended ? root.extended.tone : "flat")
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
-        font.bold: true
-      }
+    Text {
+      id: extendedLabel
+      textFormat: Text.PlainText
+      text: root.extended ? root.extended.label : ""
+      color: root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.bold: true
+      font.letterSpacing: 1
     }
-
+    Text {
+      id: extendedTime
+      visible: text !== ""
+      textFormat: Text.PlainText
+      text: root.extended ? root.extended.time : ""
+      color: root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.bold: true
+      font.letterSpacing: 1
+    }
+    Text {
+      id: extendedPrice
+      visible: text !== ""
+      textFormat: Text.PlainText
+      text: root.extended ? root.extended.price : ""
+      color: extendedLine.old ? root.dim : root.foreground
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.bold: true
+    }
+    Text {
+      id: extendedMove
+      visible: text !== ""
+      textFormat: Text.PlainText
+      text: root.extended ? Format.lookSigns(root.extended.changeText, root.retro) : ""
+      color: extendedLine.old ? root.dim : root.toneColor(root.extended ? root.extended.tone : "flat")
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.bold: true
+    }
     // The part since the close: · AFTER HOURS +1.35%.
-    Row {
-      id: sinceLine
+    Text {
+      id: sinceLabel
       objectName: "sinceClose"
       visible: root.sinceShown
-      spacing: extendedLine.spacing
-
-      Text {
-        textFormat: Text.PlainText
-        text: root.since ? "· " + root.since.label : ""
-        color: root.dim
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
-        font.bold: true
-        font.letterSpacing: 1
-      }
-      Text {
-        textFormat: Text.PlainText
-        text: root.since ? Format.lookSigns(root.since.changeText, root.retro) : ""
-        color: root.toneColor(root.since ? root.since.tone : "flat")
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
-        font.bold: true
-      }
+      textFormat: Text.PlainText
+      text: root.since ? "· " + root.since.label : ""
+      color: root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.bold: true
+      font.letterSpacing: 1
+    }
+    Text {
+      id: sinceMove
+      objectName: "sinceMove"
+      visible: root.sinceShown
+      textFormat: Text.PlainText
+      text: root.since ? Format.lookSigns(root.since.changeText, root.retro) : ""
+      color: root.toneColor(root.since ? root.since.tone : "flat")
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.bold: true
     }
   }
 
