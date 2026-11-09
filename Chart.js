@@ -90,6 +90,32 @@ function newestPrints(symbols, quotes, nights, allDay, calendars) {
 // Robinhood's answer before it comes (`Overnight.overnightAnswer`'s shape).
 var NO_ANSWER = { bars: [], from: null, through: null }
 
+// `newestPrints`, working a listing's out again only when its quote or
+// Robinhood's answers for it are other objects than `kept` last saw: a whole
+// pass builds every listing's day, about 30 ms of the shell's thread for 150,
+// and an answer changes a few. A listing as it was keeps the print it had,
+// the same object. `kept` is the caller's to hold and to prune.
+function newestPrintsKept(kept, symbols, quotes, nights, allDay, calendars) {
+  var out = {}
+  for (var i = 0; i < symbols.length; i++) {
+    var symbol = symbols[i]
+    var quote = quotes[symbol]
+    if (!quote) continue
+    var night = nights ? nights[symbol] : null
+    var tradability = allDay ? allDay[symbol] : null
+    var bars = night ? night.bars : null
+    var through = night ? night.through : null
+    var traded = tradability ? !!tradability.allDay : null
+    var had = kept[symbol]
+    if (!had || had.quote !== quote || had.bars !== bars || had.through !== through || had.traded !== traded) {
+      had = kept[symbol] = { quote: quote, bars: bars, through: through, traded: traded,
+        print: newestPrints([symbol], quotes, nights, allDay, calendars)[symbol] || null }
+    }
+    if (had.print) out[symbol] = had.print
+  }
+  return out
+}
+
 // x runs by the clock along the day's axis (`chartSpan`): from the first print
 // or the open, whichever is earlier, so the line reaches the bell from where it
 // came, to hold every print; or, for a US listing, its trading day, so a quiet

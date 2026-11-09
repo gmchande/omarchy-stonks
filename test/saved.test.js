@@ -3371,3 +3371,25 @@ test("a screenshot says when its price is, its session, its range alone or the d
     top: M.rowModel(evening.quotes.JNJ, 0, "pct", evening.newest.JNJ), scrubT: 0, changeMode: "pct", range: "1D", now: evening.now, calendars })
   expect([flat.when, flat.since, flat.extended, flat.extendedChange]).toEqual(["AFTER HOURS 19:57 EDT", "", "", ""])
 })
+
+test("an answer for one stock works out that stock's newest price alone", () => {
+  const at = topsAt("watch-2026-10-26-2005")
+  // Kept between answers, as the service keeps them.
+  const kept = {}
+  const prices = (quotes, nights) => M.newestPrintsKept(kept, at.symbols, quotes, nights, at.allDay, calendars)
+  const first = prices(at.quotes, at.nights)
+  expect(first).toEqual(at.newest)
+  const priced = at.symbols.filter(s => first[s] && at.nights[s])
+  const one = priced[0]
+  const workedOut = (before, after) => priced.filter(s => after[s] !== before[s])
+  // Its quote answered anew: every price as it was, and only its own worked out.
+  const answered = { ...at.quotes, [one]: { ...at.quotes[one] } }
+  const again = prices(answered, at.nights)
+  expect(again).toEqual(at.newest)
+  expect(workedOut(first, again)).toEqual([one])
+  // Robinhood's answer as it was works out nothing; new prints, its own.
+  const same = prices(answered, { ...at.nights, [one]: { ...at.nights[one] } })
+  expect(workedOut(again, same)).toEqual([])
+  const printed = prices(answered, { ...at.nights, [one]: { ...at.nights[one], bars: at.nights[one].bars.slice() } })
+  expect(workedOut(same, printed)).toEqual([one])
+})

@@ -187,8 +187,12 @@ Item {
   readonly property var allDaySymbols: overnightSymbols.filter(function(s) {
     return !!allDayFeed.entries[s] && allDayFeed.entries[s].allDay
   })
-  // The price on top on the pill, the rows, and the hero.
-  readonly property var newestPrints: Chart.newestPrints(library, feed.quotes, overnightFeed.entries, allDayFeed.entries, calendars)
+  // The price on top on the pill, the rows, and the hero. Each listing's is
+  // worked out again only when its quote or Robinhood's answers for it change
+  // (`printsKept`, which doesn't notify): each turn of a run's answers changes
+  // a few quotes, and a pass over 150 takes about 30 ms of the shell's thread.
+  readonly property var printsKept: ({})
+  readonly property var newestPrints: Chart.newestPrintsKept(printsKept, library, feed.quotes, overnightFeed.entries, allDayFeed.entries, calendars)
   readonly property var nights: overnightFeed.entries
   readonly property var allDay: allDayFeed.entries
   // Where Robinhood's trades fill stretches Yahoo left empty, each logged
@@ -846,6 +850,7 @@ Item {
     var keep = function(s) { return root.library.indexOf(s) >= 0 || s === root.previewSymbol || s === removed }
     for (var symbol in root.builtDays) if (!keep(symbol)) delete root.builtDays[symbol]
     for (var gone in root.fills) if (!keep(gone)) delete root.fills[gone]
+    for (var left in root.printsKept) if (!keep(left)) delete root.printsKept[left]
     var prune = function(cache, fresh) {
       var next = {}
       var dropped = false
