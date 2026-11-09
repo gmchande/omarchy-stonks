@@ -53,8 +53,9 @@ began=$(centiseconds)
 # Before anything runs: every harness script sources lib.sh, ends on finish
 # and its finish line, and is started by one of the runners. A script that
 # misses one can pass without its checks having run. quickshell.sh is
-# lib.sh's runner, crash-check.sh proves it without the saved answers, and
-# data-files.sh and readme.sh are release tools no runner starts.
+# lib.sh's runner, crash-check.sh proves it without the saved answers,
+# render.sh ends on each state's own check, and data-files.sh and readme.sh
+# are release tools no runner starts.
 for script in test/qml/*.sh; do
   name=${script##*/}
   case "$name" in lib.sh|quickshell.sh|crash-check.sh|render.sh|data-files.sh|readme.sh) continue ;; esac
@@ -84,7 +85,7 @@ stop_all() {
 trap stop_all INT TERM
 trap 'rm -rf "$logs"' EXIT
 
-# At most this many checks started below run at once: all nineteen at once
+# At most this many checks started below run at once: nineteen at once
 # peak at 1.9 GB, four at 0.8 GB. The harnesses wait on their own steps, not
 # the machine (test/all.sh at four uses 1.5 of 16 cores), so six at once end
 # a run sooner.
