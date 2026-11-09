@@ -15,7 +15,6 @@ FocusScope {
   property bool retro: false
   property color foreground: Commons.Color.foreground
   property color dim: Tones.dim(foreground, Commons.Color.background)
-  property color dimmer: Tones.dimmer(foreground, Commons.Color.background)
   property string fontFamily: Style.font.family
   property int rowHeight: Style.space(30)
   // As many as `Search.searchUrl` asks for.
@@ -470,7 +469,6 @@ FocusScope {
               elide: Text.ElideRight
             }
             Rectangle {
-              id: addButton
               objectName: "searchAdd"
               opacity: resultRow.chosen && !resultRow.dimmed ? 1 : 0
               anchors.verticalCenter: parent.verticalCenter
@@ -578,7 +576,6 @@ FocusScope {
       dim: root.dim
       placeholderText: root.placeholder
       onTextChanged: root.setQuery(text)
-      onAccepted: root.accept(root.resultIndex)
       Keys.onPressed: function(event) { root.handleKey(event) }
     }
 

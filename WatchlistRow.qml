@@ -56,8 +56,9 @@ Rectangle {
   signal dragCanceled()
 
   // The 1D chart's day (`Chart.lineDay`), null until Robinhood says which. It
-  // changes with this quote or Robinhood's answer, never with the clock, the
-  // change mode, or another symbol's quote.
+  // changes with this quote, Robinhood's answer, or the clock's five
+  // minutes that slide its start, never with each second, the change mode,
+  // or another symbol's quote.
   property var day: null
   readonly property var geometry: day && day.points.length ? Chart.chartGeometry(day, calendars) : null
 

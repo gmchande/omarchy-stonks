@@ -17,7 +17,8 @@ export function requestUrl(raw) {
   const symbol = s => !!s && !/[\s/?&#%]/u.test(s)
   const symbols = s => s.split(',').every(symbol)
   const epoch = s => /^\d+$/.test(s) && Number(s) > 0
-  // A day's answer: one day, or two before a session opens.
+  // A day's answer: one day, or two for a coin, a first answer, or a
+  // session with no print yet.
   const days = s => s === '1d' || s === '2d'
   const chart = /^\/v8\/finance\/chart\/([^/]+)$/.exec(u.pathname)
   if (u.hostname === 'raw.githubusercontent.com') {

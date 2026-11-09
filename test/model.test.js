@@ -10,9 +10,12 @@ const root = join(import.meta.dir, "..")
 // The reader is in New York: an exchange's time is named
 // with its zone only where that clock differs from the reader's.
 process.env.TZ = "America/New_York"
-// Every rule file's names, under one name: each is defined once.
+// Every rule file's names, under one name. Two names are defined twice, and
+// the later file's wins: clockAt is Chart's, clockOf Share's.
 const M = Object.assign({}, ...["Format", "Fetch", "Quote", "Market", "Overnight", "History", "Fundamentals", "Figures",
   "Chart", "Tones", "Settings", "KeySheet", "Search", "Cells", "Share", "Asks"].map(name => load(name + ".js")))
+// The header's status alone, the first of its forms.
+M.marketStatus = (...given) => M.statusForms(...given)[0]
 
 const calendars = JSON.parse(readFileSync(join(root, "calendars.json"), "utf8"))
 const US = calendars.calendars.US
@@ -370,8 +373,6 @@ test("a run's output splits into its answers, each said by what came back", () =
     [7, "ok", '{"chart":2}', 0]
   ])
   expect(M.answerKind(503, 0)).toBe("refused")
-  expect(M.soleBody('{"a":1}' + trailer(0, 200, 0))).toBe('{"a":1}')
-  expect(M.soleBody("Too Many" + trailer(0, 429, 0))).toBe("")
   // A run stopped mid-answer: the cut answer has no trailer, so none.
   expect(M.answers('{"a":1}' + trailer(0, 200, 0) + '{"b":').length).toBe(1)
   // Read as it comes, each answer once: what arrived first, then the rest

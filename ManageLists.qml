@@ -54,7 +54,6 @@ FocusScope {
   readonly property int inset: Style.space(10)
   readonly property int rowsHeight: choices.length * itemHeight + (problem !== "" ? itemHeight : 0)
   readonly property int contentHeight: itemHeight + rowsHeight
-  readonly property var cursorChoice: choices[cursor] || null
 
   signal renameRequested(string name, string newName)
   signal moveRequested(string name, int delta)

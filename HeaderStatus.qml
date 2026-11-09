@@ -45,7 +45,6 @@ Item {
   property color dim: Tones.dim(foreground, Commons.Color.background)
   property color upColor: Commons.Color.foreground
   property color downColor: Commons.Color.urgent
-  property color ground: Commons.Color.background
   property string fontFamily: Style.font.family
 
   readonly property string kind: animal ? animal.kind : ""
@@ -221,7 +220,6 @@ Item {
     }
 
     MouseArea {
-      id: animalMouse
       objectName: "animalToggle"
       anchors.fill: parent
       enabled: root.kind !== ""

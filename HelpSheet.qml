@@ -164,7 +164,6 @@ Flickable {
     }
 
     ListAction {
-      id: close
       objectName: "helpClose"
       view: root
       anchors.right: parent.right

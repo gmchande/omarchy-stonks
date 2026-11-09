@@ -186,8 +186,8 @@ Item {
   }
 
   // A scrub that drives itself, the chart drawing in behind it, so the header,
-  // the price and the animal follow it: by print on a US listing's day, by
-  // time on any other's, and by bar on a range.
+  // the price and the animal follow it: by time on the day, and by bar on a
+  // range.
   function replay() {
     if (loading) return
     stopReplay()

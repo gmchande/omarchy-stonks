@@ -268,10 +268,6 @@ function holidayName(name) {
   return name.replace(/ (observed|\(substitute\))$/, "")
 }
 
-function marketStatus(quote, now, scrubT, calendars, overnight) {
-  return statusForms(quote, now, scrubT, calendars, overnight)[0]
-}
-
 // The status, then shorter forms for a narrower header; each keeps the
 // time, its day and its zone.
 function statusForms(quote, now, scrubT, calendars, overnight) {

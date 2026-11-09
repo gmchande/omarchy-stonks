@@ -18,9 +18,12 @@ const fixtures = found.stdout.toString().trim()
 // The reader is in New York: an exchange's time is named
 // with its zone only where that clock differs from the reader's.
 process.env.TZ = "America/New_York"
-// Every rule file's names, under one name: each is defined once.
+// Every rule file's names, under one name. One name is defined twice, and
+// the later file's wins: clockAt is Chart's.
 const M = Object.assign({}, ...["Format", "Fetch", "Quote", "Market", "Overnight", "History", "Fundamentals", "Figures",
   "Chart", "Tones", "Settings", "KeySheet", "Search", "Cells", "Asks"].map(name => load(name + ".js")))
+// The header's status alone, the first of its forms.
+M.marketStatus = (...given) => M.statusForms(...given)[0]
 
 const fixture = name => JSON.parse(readFileSync(join(fixtures, name), "utf8"))
 const calendars = JSON.parse(readFileSync(join(import.meta.dir, "..", "calendars.json"), "utf8"))
@@ -28,8 +31,7 @@ const US = calendars.calendars.US
 const JPX = calendars.calendars.JPX
 // The exchanges that trade in whole cents from $1, as the feeds read with.
 const cents = M.centExchanges(calendars)
-// A listing's cadence and warmth, by its calendar's reading, as askDue
-// reads them.
+// A listing's cadence, by its calendar's reading, as askDue reads it.
 const calNow = (q, now) => M.calendarNow(M.calendarFor(calendars, q), now)
 const quoteCadence = (q, now, interval, hero) => M.quoteCadence(q, now, interval, hero, calNow(q, now))
 const quote = M.parseChart(fixture("aapl.json"))
@@ -298,7 +300,7 @@ test("a scrub reads the print at or before it, from the day's first print throug
   // Toyota on Wednesday 7 October, its whole day: 30 morning prints, the
   // last 11:30's at 2,915, then none until 12:30's at 2,917, and the day
   // closing at 2,900.50 at 15:30, after its last print, 15:20's.
-  const toyota = M.parseChart(fixture("overnight/sweep-2026-10-07-1455/7203.t.json"))
+  const toyota = M.parseChart(fixture("moments/listings-2026-10-07-1455/7203.t.json"))
   const pts = toyota.points
   const read = t => M.readingAt(toyota, t)
   const reopen = pts.findIndex((p, i) => i > 0 && p.t - pts[i - 1].t > 1800)
@@ -312,7 +314,7 @@ test("a scrub reads the print at or before it, from the day's first print throug
 })
 
 test("a scrub inside Tokyo's lunch draws no dot, as the line and the chimes leave it; either side of it the dot is on the line", () => {
-  const toyota = M.parseChart(fixture("overnight/sweep-2026-10-07-1455/7203.t.json"))
+  const toyota = M.parseChart(fixture("moments/listings-2026-10-07-1455/7203.t.json"))
   const pts = M.chartGeometry(toyota, calendars).points
   const reopen = pts.findIndex(p => p.brk)
   const [morning, afternoon] = [pts[reopen - 1], pts[reopen]]
@@ -2985,8 +2987,7 @@ test("the line under the price: Friday night's is the after-hours, a quiet night
   expect(M.extendedStack(gspc, null, at("2026-10-01", "23:00"))).toBeNull()
   const index = M.chartSpan(M.viewChart("^GSPC", "1D", { "^GSPC": gspc }, {}, {}, {}, {}, calendars).day)
   expect(index.end - index.start).toBeLessThan(8 * 3600)
-  const coin = M.extendedStack(savedDay("listings-2026-10-07-0100", "btc-usd"), null, now)
-  expect(coin && coin.label).not.toBe("OVERNIGHT")
+  expect(M.extendedStack(savedDay("listings-2026-10-07-0100", "btc-usd"), null, now)).toBeNull()
 })
 
 test("a listing Robinhood doesn't trade all day draws Yahoo's day by the clock from its first trade, to its last once over, the coming day from its first print, and its stray night trade makes no overnight line", () => {
