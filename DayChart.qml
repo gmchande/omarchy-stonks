@@ -8,7 +8,9 @@ import "Motion.js" as Motion
 // the price the change is measured from, and the line and its wash in the up
 // colour above it and the down colour below, as the retro columns fall. The day
 // adds dimmer hours, ticks at the bell and the night's edges, breaks, and the
-// dot on the newest bright print. Three layers, so each paints only when what
+// dot on the newest bright print. Once tonight has traded, the baseline steps
+// at the bell to the close just gone (`geometry.step`), and the line past it
+// takes its colours from there. Three layers, so each paints only when what
 // it draws changes: the baseline, the ink under a clip the draw-in widens, and
 // the scrub.
 Item {
@@ -50,7 +52,7 @@ Item {
   readonly property real pad: 3 * weight
   readonly property var lastPoint: Chart.lastLitPoint(geometry)
   readonly property bool day: !!geometry && geometry.day === true
-  readonly property color dotColor: lastPoint && lastPoint.y > geometry.baselineY ? belowColor : aboveColor
+  readonly property color dotColor: lastPoint && lastPoint.y > Chart.baseAt(geometry, lastPoint.x) ? belowColor : aboveColor
   // One print draws: the first print after midnight is a dot on its day.
   readonly property bool drawable: !!geometry && !!geometry.points && geometry.points.length >= 1
   // The baseline draws with no print too, as on a day nobody traded.
@@ -108,17 +110,20 @@ Item {
   }
 
   // Ticks the line has reached draw in with it; those ahead, in hours still to
-  // come, are there with the baseline.
-  function strokeTicks(ctx, by, ahead) {
+  // come, are there with the baseline. The bell's stays on the day's line.
+  function strokeTicks(ctx, ahead) {
     var w = width - pad * 2
+    var h = height - pad * 2
+    var step = geometry.step
     ctx.strokeStyle = baselineColor
     ctx.lineWidth = weight
     for (var k = 0; k < geometry.ticks.length; k++) {
       if ((geometry.ticks[k] > inkLast) !== ahead) continue
       var cx = pad + geometry.ticks[k] * w
+      var cy = pad + (step && geometry.ticks[k] > step.x ? step.y : geometry.baselineY) * h
       ctx.beginPath()
-      ctx.moveTo(cx, by - 4 * weight)
-      ctx.lineTo(cx, by + 4 * weight)
+      ctx.moveTo(cx, cy - 4 * weight)
+      ctx.lineTo(cx, cy + 4 * weight)
       ctx.stroke()
     }
   }
@@ -132,17 +137,24 @@ Item {
       var ctx = getContext("2d")
       ctx.clearRect(0, 0, width, height)
       if (!root.hasBaseline) return
-      var by = root.pad + root.geometry.baselineY * (height - root.pad * 2)
+      var h = height - root.pad * 2
+      var step = root.geometry.step
+      var by = root.pad + root.geometry.baselineY * h
+      var sx = step ? root.xAt(step.x) : width - root.pad
       ctx.strokeStyle = root.baselineColor
       ctx.lineWidth = root.weight
       ctx.lineCap = "round"
       ctx.setLineDash([3 * root.dashUnit, 4 * root.dashUnit])
       ctx.beginPath()
       ctx.moveTo(root.pad, by)
-      ctx.lineTo(width - root.pad, by)
+      ctx.lineTo(sx, by)
+      if (step) {
+        ctx.moveTo(sx, root.pad + step.y * h)
+        ctx.lineTo(width - root.pad, root.pad + step.y * h)
+      }
       ctx.stroke()
       ctx.setLineDash([])
-      root.strokeTicks(ctx, by, true)
+      root.strokeTicks(ctx, true)
     }
   }
 
@@ -193,13 +205,26 @@ Item {
         ctx.lineCap = "round"
         ctx.lineWidth = 2 * root.weight
         // The whole series in dim ink, then the bright part over it (`dim`),
-        // so the rest reads as the quieter part of one line.
-        ctx.strokeStyle = sides(ctx, by, 0.45, 0.45)
-        strokeRuns(ctx, runs(pts, function() { return true }), pad, w, h)
-        ctx.strokeStyle = sides(ctx, by, 1, 1)
-        strokeRuns(ctx, runs(pts, function(p) { return !p.dim }), pad, w, h)
+        // so the rest reads as the quieter part of one line. Each side of the
+        // step takes its colours from its own baseline.
+        var stepX = geometry.step ? pad + geometry.step.x * w : width
+        var parts = [{ from: 0, to: stepX, by: by }]
+        if (geometry.step) parts.push({ from: stepX, to: width, by: pad + geometry.step.y * h })
+        for (var s = 0; s < parts.length; s++) {
+          ctx.save()
+          if (geometry.step) {
+            ctx.beginPath()
+            ctx.rect(parts[s].from, 0, parts[s].to - parts[s].from, height)
+            ctx.clip()
+          }
+          ctx.strokeStyle = sides(ctx, parts[s].by, 0.45, 0.45)
+          strokeRuns(ctx, runs(pts, function() { return true }), pad, w, h)
+          ctx.strokeStyle = sides(ctx, parts[s].by, 1, 1)
+          strokeRuns(ctx, runs(pts, function(p) { return !p.dim }), pad, w, h)
+          ctx.restore()
+        }
 
-        if (root.hasBaseline) root.strokeTicks(ctx, by, false)
+        if (root.hasBaseline) root.strokeTicks(ctx, false)
       }
 
       // A point `keep` refuses, or a break (`brk`), ends a stretch.

@@ -50,13 +50,17 @@ Item {
   // is gone, as a failed preview's is.
   readonly property var newest: quote && view && view.newest ? view.newest : null
   readonly property bool newestOld: Figures.newestStale(newest, now)
-  // The line under the price and the caption under the change
-  // (`Figures.heroLines`): the close and its move with the move since it,
-  // a print outside the session, or the close the move counts from with the
-  // day's move in the other unit. A scrub's price is a past one, so the line
-  // rests and the baseline's legend takes its place.
+  // The line under the price and the caption under the change, one rule at
+  // every hour (`Figures.heroLines`): the close before the price on top, and
+  // the move's name with the same move in the other unit. A scrub's price is
+  // a past one, so the line rests and the baseline's legend takes its place.
   readonly property var lines: Figures.heroLines(quote, view, latest, now, day, calendars, changeMode, scrubbing)
   readonly property var extended: lines.close
+  // The part since the close goes whole or not at all, and first: the
+  // caption keeps its room.
+  readonly property var since: extended && extended.since ? extended.since : null
+  readonly property bool sinceShown: !!since
+    && extendedCore.implicitWidth + sinceLine.implicitWidth + extendedLine.spacing + Style.space(12) + captionLine.implicitWidth <= width
   readonly property string priceText: view ? view.priceText
     : (freshness && freshness.state === "failed" ? "—" : "…")
   readonly property string listingLead: {
@@ -236,9 +240,9 @@ Item {
     }
   }
 
-  // The extended-hours print on the left, always in the same place and shape;
-  // the change's caption on the right. An old print is drawn dim, price and
-  // change too, so it reads as old beside a fresh one.
+  // The line under the price on the left, always in the same place and
+  // shape; the change's caption on the right. An old print is drawn dim,
+  // price and change too, so it reads as old beside a fresh one.
   Row {
     id: extendedLine
     objectName: "extendedLine"
@@ -247,43 +251,74 @@ Item {
     y: root.baselineY + root.captionDrop - extendedLabel.baselineOffset
     spacing: Style.space(6)
 
-    Text {
-      id: extendedLabel
-      textFormat: Text.PlainText
-      text: root.extended ? root.extended.label : ""
-      color: root.dim
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
-      font.bold: true
-      font.letterSpacing: 1
+    Row {
+      id: extendedCore
+      spacing: extendedLine.spacing
+
+      Text {
+        id: extendedLabel
+        textFormat: Text.PlainText
+        text: root.extended ? root.extended.label : ""
+        color: root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        font.bold: true
+        font.letterSpacing: 1
+      }
+      Text {
+        visible: text !== ""
+        textFormat: Text.PlainText
+        text: root.extended ? root.extended.time : ""
+        color: root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        font.bold: true
+        font.letterSpacing: 1
+      }
+      Text {
+        visible: text !== ""
+        textFormat: Text.PlainText
+        text: root.extended ? root.extended.price : ""
+        color: extendedLine.old ? root.dim : root.foreground
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        font.bold: true
+      }
+      Text {
+        visible: text !== ""
+        textFormat: Text.PlainText
+        text: root.extended ? Format.lookSigns(root.extended.changeText, root.retro) : ""
+        color: extendedLine.old ? root.dim : root.toneColor(root.extended ? root.extended.tone : "flat")
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        font.bold: true
+      }
     }
-    Text {
-      visible: text !== ""
-      textFormat: Text.PlainText
-      text: root.extended ? root.extended.time : ""
-      color: root.dim
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
-      font.bold: true
-      font.letterSpacing: 1
-    }
-    Text {
-      visible: text !== ""
-      textFormat: Text.PlainText
-      text: root.extended ? root.extended.price : ""
-      color: extendedLine.old ? root.dim : root.foreground
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
-      font.bold: true
-    }
-    Text {
-      visible: text !== ""
-      textFormat: Text.PlainText
-      text: root.extended ? Format.lookSigns(root.extended.changeText, root.retro) : ""
-      color: extendedLine.old ? root.dim : root.toneColor(root.extended ? root.extended.tone : "flat")
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
-      font.bold: true
+
+    // The part since the close: · AFTER HOURS +1.35%.
+    Row {
+      id: sinceLine
+      objectName: "sinceClose"
+      visible: root.sinceShown
+      spacing: extendedLine.spacing
+
+      Text {
+        textFormat: Text.PlainText
+        text: root.since ? "· " + root.since.label : ""
+        color: root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        font.bold: true
+        font.letterSpacing: 1
+      }
+      Text {
+        textFormat: Text.PlainText
+        text: root.since ? Format.lookSigns(root.since.changeText, root.retro) : ""
+        color: root.toneColor(root.since ? root.since.tone : "flat")
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        font.bold: true
+      }
     }
   }
 
@@ -304,13 +339,14 @@ Item {
   Row {
     id: captionLine
     objectName: "changeCaption"
-    visible: root.caption.label !== "" && implicitWidth <= root.captionRoom
+    visible: (root.caption.label !== "" || root.caption.changeText !== "") && implicitWidth <= root.captionRoom
     anchors.right: parent.right
     y: root.baselineY + root.captionDrop - captionLabel.baselineOffset
     spacing: Style.space(6)
 
     Text {
       id: captionLabel
+      visible: text !== ""
       textFormat: Text.PlainText
       text: root.caption.label
       color: root.dim
@@ -319,7 +355,7 @@ Item {
       font.bold: true
       font.letterSpacing: 1
     }
-    // The move since the close dims with an old night's price.
+    // The move dims with an old night's price.
     Text {
       visible: text !== ""
       textFormat: Text.PlainText

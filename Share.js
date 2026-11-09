@@ -40,10 +40,6 @@ function dateOf(quote, t, calendars) {
   return Format.WEEKDAYS[l.weekday].toUpperCase() + " " + l.d + " " + Format.MONTHS[l.m - 1] + " " + l.y
 }
 
-// For the picture's foot.
-var SPANS = { "1W": "1 WEEK", "1M": "1 MONTH", "3M": "3 MONTHS", "6M": "6 MONTHS", "YTD": "YEAR TO DATE",
-  "1Y": "1 YEAR", "2Y": "2 YEARS", "5Y": "5 YEARS", "10Y": "10 YEARS", "All": "ALL" }
-
 // As a scrub at the bell reads it (`Quote.readingAt`); a cryptocurrency has no
 // close.
 function headlineIsClose(quote) {
@@ -65,7 +61,7 @@ function moment(o) {
   }
   // At rest, the newest price since the close where it is on top, on the day
   // and on a range, whose line ends on it.
-  if (o.newest) return { t: o.newest.t, close: false, bar: null, phase: o.newest.phase }
+  if (o.newest) return { t: o.newest.t, close: false, bar: null }
   var head = Quote.headlineQuote(o.quote)
   if (!head && o.history) {
     var last = History.historyBarAt(o.history, 1)
@@ -88,104 +84,35 @@ function barDate(history, bar) {
   return date
 }
 
-// The picture's words, from what the surface shows (`newest` is the price on
-// top at rest, `top` the price and move drawn large; `scrubT` is 0 at rest):
-//   when: the price's time and zone, a scrub outside the regular session
-//   named by its session, and on a range its date; with a move since the
-//   close, that price's session alone, followed by the move (since,
-//   sinceTone) and its time (sinceTime), as in OVERNIGHT −0.73% · 00:50 EDT;
-//   from: what the change is measured from, as the dashed line; on a range,
-//   the range;
-//   extended: the line under the price, as the panel shows it, but for its
-//   move (extendedChange, extendedTone);
+// The picture's words beyond the panel's two lines (`Figures.heroLines`),
+// which it draws as the panel does, from what the surface shows (`newest`
+// is the price on top at rest; `scrubT` is 0 at rest):
+//   foot: when the price on top is from, with its date, since the picture
+//   outlives the reader's clock: WED 7 OCT 2026 · 00:50 EDT, a close as
+//   CLOSE 16:00 EDT, and a range's bar by its own date;
 //   currency: none beside an index's level, which isn't money;
 //   start, end: the day's axis's ends;
-//   span: on the day, the date its move belongs to (after midnight, the close
-//   before the chart's day); on a range, its length, and its first day where
-//   the chart starts later than that;
-//   said: the moment in the footer's words.
+//   said: the moment in the notification's words.
 function words(o) {
   var quote = o.quote
-  var digits = quote.priceDigits
   var at = moment(o)
-  var out = { when: "", from: "", extended: "", extendedChange: "", extendedTone: "flat", since: "", sinceTone: "flat", sinceTime: "",
-    start: "", end: "", span: "", said: "",
+  var out = { foot: "", start: "", end: "", said: "",
     currency: quote.instrumentType === "INDEX" ? "" : Figures.currencyLabel(String(quote.currency || "")) }
   if (at.bar) {
-    out.when = barDate(o.history, at.bar)
-    out.said = "on " + out.when
+    out.foot = barDate(o.history, at.bar)
+    out.said = "on " + out.foot
   } else if (at.t) {
-    var phase = at.phase || (o.scrubT && !at.close ? Market.scrubPhase(o.day, o.scrubT) : "")
-    var outside = phase === "pre" || phase === "post" || phase === "overnight"
-    out.when = (at.close ? quote.exchange + " CLOSE · " : outside ? Market.phaseLabel(phase).toUpperCase() + " " : "AT ")
-      + clockOf(quote, at.t, o.calendars)
-      + (o.history ? " · " + dateOf(quote, at.t, o.calendars) : "")
-    if (!o.history) out.span = dateOf(quote, at.t, o.calendars)
+    out.foot = dateOf(quote, at.t, o.calendars) + " · " + (at.close ? "CLOSE " : "") + clockOf(quote, at.t, o.calendars)
     out.said = at.close ? "at the close" : "at " + Market.printClock(quote, at.t, o.calendars)
   }
-  if (o.history) {
-    out.from = String(o.range).toUpperCase()
-    out.span = SPANS[o.range] || String(o.range).toUpperCase()
-    // A chart that starts later than its range says names its first day, as
-    // a young listing's 5Y, and All, which says no length.
-    var bars = o.history.bars
-    if (History.periodStats(o.history).coverage.short) {
-      out.span += " · FROM " + History.historyStatsDateText(o.history, o.history.firstTradeDate, true, "1d")
-    } else if (o.range === "All" && bars.length) {
-      out.span += " · FROM " + History.historyStatsDateText(o.history, bars[0].t, true, o.history.interval)
-    }
-  } else {
-    // With a newest price on top, or while scrubbed, the dashed line; else
-    // the close the price on top counts from. Each named as the panel names
-    // it, and left out where it isn't known.
-    var today = Figures.exchangeDay(o.day, o.now)
-    if (o.changeMode === "open") {
-      var base = o.scrubT ? Figures.scrubbedBase(o.day, o.scrubT) : Quote.restingRead(quote, o.newest || null).base
-      out.from = "OPEN " + Format.money(base.dayOpen, digits)
-    } else if (o.scrubT || o.newest) {
-      out.from = Figures.dayBaselineText(o.day, today, o.calendars)
-    } else {
-      var from = o.top ? Figures.closeCountedFrom(quote, o.top, today, o.calendars) : null
-      out.from = from ? from.label + " " + from.price : ""
-    }
-    var pts = o.day.points
-    if (pts.length) {
-      var axis = Chart.chartSpan(pictureDay(o.day))
-      var first = local(o.day, axis.start, o.calendars)
-      var last = local(o.day, pts[pts.length - 1].t, o.calendars)
-      out.start = first.clock
-      // A chart that runs into the next morning names the weekday it ends on.
-      out.end = (last.d !== first.d ? Format.WEEKDAYS[last.weekday].toUpperCase() + " " : "") + last.clock
-    }
-  }
-  // The panel's line under the price, as it shows it, its move apart so it
-  // alone takes its tone; none where the panel's would only name the close,
-  // since the line above already says when the price is from. The move since
-  // the close, which a range or a mode's period takes the place of, joins the
-  // line that names its session, worded as the panel words it.
-  if (!o.scrubT && o.newest) {
-    var below = Figures.closeLine(quote, Figures.exchangeDay(quote, o.now), o.changeMode, o.top, o.calendars)
-    var caption = Figures.captionLine(quote, o.newest, o.changeMode, o.history ? String(o.range) : Format.changeCaption(o.changeMode), false)
-    if (below.price) {
-      out.extended = below.label + (below.time ? " " + below.time : "") + " · " + below.price
-      out.extendedChange = below.changeText
-      out.extendedTone = below.tone
-    }
-    if (caption.changeText) {
-      out.when = caption.label
-      out.since = caption.changeText
-      out.sinceTone = caption.tone
-      out.sinceTime = clockOf(quote, o.newest.t, o.calendars)
-    }
-    return out
-  }
-  var ext = !o.scrubT ? Figures.extendedStack(quote, o.latest, o.now, o.day, o.changeMode) : null
-  var print = ext ? Quote.extendedPrint(quote, o.latest) : null
-  if (ext && print) {
-    var l = local(ext.label === "OVERNIGHT" && o.day ? o.day : quote, print.t, o.calendars)
-    out.extended = ext.label + " " + l.clock + " " + l.zone + " · " + ext.price
-    out.extendedChange = ext.changeText
-    out.extendedTone = ext.stale ? "old" : ext.tone
+  var pts = o.history ? [] : o.day.points
+  if (pts.length) {
+    var axis = Chart.chartSpan(pictureDay(o.day))
+    var first = local(o.day, axis.start, o.calendars)
+    var last = local(o.day, pts[pts.length - 1].t, o.calendars)
+    out.start = first.clock
+    // A chart that runs into the next morning names the weekday it ends on.
+    out.end = (last.d !== first.d ? Format.WEEKDAYS[last.weekday].toUpperCase() + " " : "") + last.clock
   }
   return out
 }

@@ -182,7 +182,8 @@ function nesVolume(t, start, stepMs, floor) {
 // Retro plays each column the replay reaches as its lit row's note (`grid` is
 // PixelChart's), silent over dark ones. A repeated note is held, its volume
 // falling in the console's steps, and struck again after silence. Where a lit
-// column lands across the baseline from the last, the noise channel ticks.
+// column lands across the baseline under it from the last, the noise channel
+// ticks.
 function retro(grid, from, to, seconds) {
   var x = new Float32Array(Math.round((seconds + 0.1) * RATE))
   var slewK = 1 - Math.exp(-1 / (0.0012 * RATE)), slew = 0
@@ -206,7 +207,7 @@ function retro(grid, from, to, seconds) {
           wave = pulseBar(note)
           step = f / RATE * TABLE
         }
-        var side = Math.sign(grid.baseRow - row)
+        var side = Math.sign((col >= grid.stepCol ? grid.stepRow : grid.baseRow) - row)
         if (side && lastSide && side !== lastSide) ticks.push(i)
         if (side) lastSide = side
       }

@@ -291,13 +291,28 @@ function beside(quote, t) {
 
 // `closed`: the print came after its day's regular close, through the
 // night until 04:00 and the weekend after a Friday; never in a pre-market.
-// `joined`: tonight's print on the day that closed. `dayStart` names that day.
+// `joined`: tonight's print on the day that closed. Tonight's trades belong
+// to the day ahead, so a joined print counts from the close just gone, with
+// no open yet, as the pre-market's does after 04:00 (`Quote.tailDay`).
+// `own`: the day drawn is Yahoo's quote's, whose open the move may count
+// from. `dayStart` names the day drawn.
 function newestPrint(quote, latest, calendars, day) {
   var print = quote && hasOvernight(quote, calendars) ? Quote.extendedPrint(quote, latest) : null
   if (!print) return null
   var own = day.session.regular.start === quote.session.regular.start
-  return { t: print.t, p: print.p, phase: print.phase, base: Quote.dayBase(day), own: own, closed: own && print.t >= quote.session.regular.end,
-    joined: print.phase === "overnight" && !!day.tonight && print.t >= day.tonight, dayStart: day.session.regular.start }
+  var joined = print.phase === "overnight" && !!day.tonight && print.t >= day.tonight
+  return { t: print.t, p: print.p, phase: print.phase, base: joined ? Quote.regularClose(quote) : Quote.dayBase(day), own: own && !joined,
+    closed: own && print.t >= quote.session.regular.end, joined: joined, dayStart: day.session.regular.start }
+}
+
+// Where tonight's trades, joined to the day that closed, start counting
+// from its close: its bell, so its after hours read against that close too.
+// Null before tonight's first trade, and on any other day.
+function nightBell(day) {
+  var pts = day && day.points ? day.points : []
+  var last = pts.length ? pts[pts.length - 1] : null
+  if (!last || !day.tonight || !day.session.regular || last.s !== "overnight" || last.t < day.tonight) return null
+  return day.session.regular.end
 }
 
 // From the night's open the evening before to the next night's open, or

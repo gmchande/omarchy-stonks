@@ -8,9 +8,11 @@ import "Motion.js" as Motion
 // The retro chart, one rule for the day and every range: columns of cells
 // fill from the baseline row, in the up colour above it and the down colour
 // below. The day adds dimmer hours, the bell and the night's edges, and the
-// lit last print. The grid and the columns paint when the data changes; the
-// draw-in widens a clip a whole column at a time, and the ticks and the scrub
-// are cells laid over them.
+// lit last print. Once tonight has traded, the baseline steps at the bell to
+// the close just gone (`geometry.step`), and the columns from there stand on
+// it. The grid and the columns paint when the data changes; the draw-in
+// widens a clip a whole column at a time, and the ticks and the scrub are
+// cells laid over them.
 Item {
   id: root
 
@@ -88,14 +90,18 @@ Item {
 
   // The last print in a column wins: the price at the end of that stretch. A
   // column between two prints the line joins holds the one before it; only a
-  // break (`brk`) leaves columns dark, as it lifts the smooth line.
+  // break (`brk`) leaves columns dark, as it lifts the smooth line. Columns
+  // from `stepCol` on stand on `stepRow` (`baseRowAt`).
   function layout() {
     var pitch = pixel + gap
+    var columns = Math.max(1, Math.floor(width / pitch))
     var g = {
       pitch: pitch,
-      columns: Math.max(1, Math.floor(width / pitch)),
+      columns: columns,
       rows: Math.max(1, Math.floor(height / pixel)),
       baseRow: 0,
+      stepCol: columns,
+      stepRow: 0,
       levels: [],
       dim: [],
       lastLit: -1
@@ -103,6 +109,9 @@ Item {
     if (!geometry || !geometry.points) return g
     // With no previous close known, the columns stand on the floor.
     g.baseRow = hasBaseline ? Math.round(geometry.baselineY * (g.rows - 1)) : g.rows - 1
+    var step = hasBaseline ? geometry.step : null
+    g.stepCol = step ? Math.max(0, Math.min(g.columns - 1, Math.floor(step.x * g.columns))) : g.columns
+    g.stepRow = step ? Math.round(step.y * (g.rows - 1)) : g.baseRow
     var pts = geometry.points
     // The lit cell sits on the last column whose own last print is bright,
     // never on one held after it.
@@ -122,6 +131,11 @@ Item {
     return g
   }
 
+  // The baseline's row under column `c`.
+  function baseRowAt(g, c) {
+    return c >= g.stepCol ? g.stepRow : g.baseRow
+  }
+
   // The centre of the column `layout` puts it in.
   function xAt(fraction) {
     var col = Math.max(0, Math.min(grid.columns - 1, Math.floor(fraction * grid.columns)))
@@ -132,7 +146,7 @@ Item {
   // is laid over the chart keeps clear of it (`RangeMarks`).
   function inkExtentIn(x0, x1) {
     var g = grid
-    var rows = hasBaseline ? [g.baseRow] : []
+    var rows = hasBaseline ? [g.baseRow].concat(g.stepCol < g.columns ? [g.stepRow] : []) : []
     var last = Math.min(g.columns - 1, Math.floor(x1 / g.pitch))
     for (var c = Math.max(0, Math.floor(x0 / g.pitch)); c <= last; c++) {
       if (g.levels[c] !== undefined) rows.push(g.levels[c])
@@ -159,7 +173,7 @@ Item {
       // Every other cell, so it lives on the bars' grid, not as a hairline
       // across them.
       ctx.fillStyle = root.baselineColor
-      for (var bc = 0; bc < g.columns; bc += 2) ctx.fillRect(bc * g.pitch, g.baseRow * pixel, pixel, pixel - root.gap)
+      for (var bc = 0; bc < g.columns; bc += 2) ctx.fillRect(bc * g.pitch, root.baseRowAt(g, bc) * pixel, pixel, pixel - root.gap)
     }
   }
 
@@ -182,10 +196,10 @@ Item {
         if (!root.drawable) return
         var g = root.grid
         var pixel = root.pixel
-        var baseRow = g.baseRow
-        var baseY = baseRow * pixel
         for (var c = 0; c < g.columns; c++) {
           if (g.levels[c] === undefined) continue
+          var baseRow = root.baseRowAt(g, c)
+          var baseY = baseRow * pixel
           var y = g.levels[c] * pixel
           var above = g.levels[c] <= baseRow
           var color = above ? root.aboveColor : root.belowColor
@@ -208,20 +222,22 @@ Item {
   // The ticks, cut at the chart's edges as a canvas cuts: on the pill's six
   // rows a baseline on the top or bottom row would put a cell outside it.
   // Those the columns have reached draw in with them; those ahead, in hours
-  // still to come, are there with the baseline.
+  // still to come, are there with the baseline. The bell's stays on the
+  // day's row.
   Repeater {
     model: root.bells && root.hasBaseline ? root.geometry.ticks.length : 0
 
     Rectangle {
       required property int index
-      readonly property real cellTop: Math.max(0, (root.grid.baseRow - 1) * root.pixel)
       readonly property int column: Math.min(root.grid.columns - 1, Math.floor(root.geometry.ticks[index] * root.grid.columns))
+      readonly property int row: column > root.grid.stepCol ? root.grid.stepRow : root.grid.baseRow
+      readonly property real cellTop: Math.max(0, (row - 1) * root.pixel)
       objectName: "retroBell"
       visible: column >= root.inkColumns || column * root.grid.pitch < curtain.width
       x: column * root.grid.pitch
       y: cellTop
       width: root.pixel
-      height: Math.min(root.height, (root.grid.baseRow + 2) * root.pixel) - cellTop
+      height: Math.min(root.height, (row + 2) * root.pixel) - cellTop
       color: root.baselineColor
     }
   }

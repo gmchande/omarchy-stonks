@@ -418,13 +418,15 @@ function historyRowModel(history, quote, scrubT) {
     priceText: Format.money(price, quote ? quote.priceDigits : undefined),
     asOf: bar ? bar.t : tail ? tail.t : (head ? head.t : stats.coverage.to),
     pct: chg.pct,
+    abs: chg.abs,
+    unit: "pct",
     tone: Format.changeTone(chg, "pct"),
     dayUp: chg.pct === null ? null : chg.up,
     dayTone: Format.changeTone(chg, "pct"),
     changeText: Format.pct(chg.pct),
     changeLine: Format.pct(chg.pct),
-    // Said under the change, as AT CLOSE is, in place of the move since the
-    // close (`Figures.captionLine`).
+    // Said under the change, as the day's move names its day
+    // (`Figures.heroLines`).
     periodLabel: stats.coverage.short && history.range !== "All"
       ? "SINCE " + historyStatsDateText(history, history.firstTradeDate, true, "1d")
       : String(history.range || "").toUpperCase(),
