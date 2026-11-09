@@ -72,8 +72,8 @@ function lineDay(symbol, quote, nights, allDay, calendars, slideAt) {
 
 // Measured from the dashed line of the day each chart draws. While that day
 // waits on Robinhood, Yahoo's own prints make it: until 04:00 the day that
-// closed, as the chart will draw it, so the answer brings only a newer price,
-// never another footing.
+// closed, as the chart will draw it, its after hours counted as the day's
+// until Robinhood's answer brings tonight's trade.
 function newestPrints(symbols, quotes, nights, allDay, calendars) {
   var out = {}
   for (var i = 0; i < symbols.length; i++) {
@@ -147,14 +147,16 @@ function chartGeometry(quote, calendars) {
   return {
     points: out,
     baselineY: known ? 1 - (base - lo) / (hi - lo) : null,
-    step: known && Format.isFiniteNumber(stepBase) ? { x: axisFraction(axis, bell), y: 1 - (stepBase - lo) / (hi - lo) } : null,
+    // Known apart from the day's: Yahoo can send the close without the one before.
+    step: Format.isFiniteNumber(stepBase) ? { x: axisFraction(axis, bell), y: 1 - (stepBase - lo) / (hi - lo) } : null,
     ticks: ticks,
     lo: lo, hi: hi, start: axis.start, end: axis.end,
     day: true
   }
 }
 
-// The dashed line's height at `x`: the step's past the bell.
+// The dashed line's height at `x`: the step's past the bell. Null where
+// there is no line.
 function baseAt(geometry, x) {
   return geometry.step && x >= geometry.step.x ? geometry.step.y : geometry.baselineY
 }

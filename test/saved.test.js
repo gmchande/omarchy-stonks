@@ -1889,6 +1889,10 @@ test("through a night, until 04:00, the chart keeps the day that closed with ton
     .toEqual(["\u22120.66%", "TUE CLOSE", "249.87", "+7.44%", "OVERNIGHT", "\u22121.64"])
   const geometry = M.chartGeometry(day, calendars)
   expect([geometry.step.x, geometry.step.y < geometry.baselineY]).toEqual([M.axisFraction(M.chartSpan(day), day.session.regular.end), true])
+  // Yahoo can send the close without the one before it: the night keeps its
+  // line, and its price on top stands below it, as the move says.
+  const unanchored = M.chartGeometry({ ...day, prevClose: null }, calendars)
+  expect([unanchored.baselineY, unanchored.points.at(-1).y > unanchored.step.y, top.changeText.startsWith("\u2212")]).toEqual([null, true, true])
   // Yahoo still on Friday while Robinhood answers Monday's night (Tuesday
   // 01:30): the night is joined to Monday all the same, but Yahoo holds no
   // close of Monday's, so the move counts from Friday's, named under the

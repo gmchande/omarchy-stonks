@@ -52,11 +52,16 @@ Item {
   readonly property real pad: 3 * weight
   readonly property var lastPoint: Chart.lastLitPoint(geometry)
   readonly property bool day: !!geometry && geometry.day === true
-  readonly property color dotColor: lastPoint && lastPoint.y > Chart.baseAt(geometry, lastPoint.x) ? belowColor : aboveColor
+  // Against the dashed line under it, and in the line's own ink with none.
+  readonly property color dotColor: {
+    var base = lastPoint ? Chart.baseAt(geometry, lastPoint.x) : null
+    return base === null ? baselineColor : lastPoint.y > base ? belowColor : aboveColor
+  }
   // One print draws: the first print after midnight is a dot on its day.
   readonly property bool drawable: !!geometry && !!geometry.points && geometry.points.length >= 1
   // The baseline draws with no print too, as on a day nobody traded.
   readonly property bool hasBaseline: !!geometry && typeof geometry.baselineY === "number" && isFinite(geometry.baselineY)
+  readonly property bool hasStep: !!geometry && !!geometry.step
   // The draw-in sweeps to the newest print's dot: the line's width and a half,
   // and a pixel.
   readonly property real inkLast: drawable ? geometry.points[geometry.points.length - 1].x : 0
@@ -98,6 +103,7 @@ Item {
       bottom = Math.max(bottom, pad + y * h + r)
     }
     if (g && typeof g.baselineY === "number" && isFinite(g.baselineY)) reach(g.baselineY, weight)
+    if (g && g.step) reach(g.step.y, weight)
     var pts = g && g.points ? g.points : []
     for (var i = 0; i < pts.length; i++) {
       var lone = (i === 0 || pts[i].brk) && (i === pts.length - 1 || pts[i + 1].brk)
@@ -110,7 +116,8 @@ Item {
   }
 
   // Ticks the line has reached draw in with it; those ahead, in hours still to
-  // come, are there with the baseline. The bell's stays on the day's line.
+  // come, are there with the baseline. The bell's stays on the day's line;
+  // with no line under them, none.
   function strokeTicks(ctx, ahead) {
     var w = width - pad * 2
     var h = height - pad * 2
@@ -118,9 +125,10 @@ Item {
     ctx.strokeStyle = baselineColor
     ctx.lineWidth = weight
     for (var k = 0; k < geometry.ticks.length; k++) {
-      if ((geometry.ticks[k] > inkLast) !== ahead) continue
+      var base = step && geometry.ticks[k] > step.x ? step.y : geometry.baselineY
+      if ((geometry.ticks[k] > inkLast) !== ahead || base === null) continue
       var cx = pad + geometry.ticks[k] * w
-      var cy = pad + (step && geometry.ticks[k] > step.x ? step.y : geometry.baselineY) * h
+      var cy = pad + base * h
       ctx.beginPath()
       ctx.moveTo(cx, cy - 4 * weight)
       ctx.lineTo(cx, cy + 4 * weight)
@@ -136,18 +144,19 @@ Item {
     onPaint: {
       var ctx = getContext("2d")
       ctx.clearRect(0, 0, width, height)
-      if (!root.hasBaseline) return
+      if (!root.hasBaseline && !root.hasStep) return
       var h = height - root.pad * 2
       var step = root.geometry.step
-      var by = root.pad + root.geometry.baselineY * h
       var sx = step ? root.xAt(step.x) : width - root.pad
       ctx.strokeStyle = root.baselineColor
       ctx.lineWidth = root.weight
       ctx.lineCap = "round"
       ctx.setLineDash([3 * root.dashUnit, 4 * root.dashUnit])
       ctx.beginPath()
-      ctx.moveTo(root.pad, by)
-      ctx.lineTo(sx, by)
+      if (root.hasBaseline) {
+        ctx.moveTo(root.pad, root.pad + root.geometry.baselineY * h)
+        ctx.lineTo(sx, root.pad + root.geometry.baselineY * h)
+      }
       if (step) {
         ctx.moveTo(sx, root.pad + step.y * h)
         ctx.lineTo(width - root.pad, root.pad + step.y * h)
@@ -206,9 +215,10 @@ Item {
         ctx.lineWidth = 2 * root.weight
         // The whole series in dim ink, then the bright part over it (`dim`),
         // so the rest reads as the quieter part of one line. Each side of the
-        // step takes its colours from its own baseline.
+        // step takes its colours from its own baseline, or with none, the
+        // line's own ink.
         var stepX = geometry.step ? pad + geometry.step.x * w : width
-        var parts = [{ from: 0, to: stepX, by: by }]
+        var parts = [{ from: 0, to: stepX, by: root.hasBaseline ? by : null }]
         if (geometry.step) parts.push({ from: stepX, to: width, by: pad + geometry.step.y * h })
         for (var s = 0; s < parts.length; s++) {
           ctx.save()
@@ -224,7 +234,7 @@ Item {
           ctx.restore()
         }
 
-        if (root.hasBaseline) root.strokeTicks(ctx, false)
+        if (root.hasBaseline || root.hasStep) root.strokeTicks(ctx, false)
       }
 
       // A point `keep` refuses, or a break (`brk`), ends a stretch.
@@ -245,8 +255,10 @@ Item {
       // One gradient for both sides: stroking each line twice, clipped to each
       // side, doubles the paint. Two stops at one offset merge, so the second
       // sits a hair below. The dim ink is one share of its own colour: it reads
-      // against the full line beside it, not against the other side.
+      // against the full line beside it, not against the other side. With no
+      // line to stand against (`by` null), the baseline's ink.
       function sides(ctx, by, aboveAlpha, belowAlpha) {
+        if (by === null) return Qt.rgba(root.baselineColor.r, root.baselineColor.g, root.baselineColor.b, aboveAlpha)
         var stop = Math.max(0, Math.min(1, by / height))
         var g = ctx.createLinearGradient(0, 0, 0, height)
         g.addColorStop(stop, Qt.rgba(root.aboveColor.r, root.aboveColor.g, root.aboveColor.b, aboveAlpha))

@@ -107,9 +107,10 @@ Item {
       lastLit: -1
     }
     if (!geometry || !geometry.points) return g
-    // With no previous close known, the columns stand on the floor.
+    // With no previous close known, the columns stand on the floor, until a
+    // step to a close that is known.
     g.baseRow = hasBaseline ? Math.round(geometry.baselineY * (g.rows - 1)) : g.rows - 1
-    var step = hasBaseline ? geometry.step : null
+    var step = geometry.step
     g.stepCol = step ? Math.max(0, Math.min(g.columns - 1, Math.floor(step.x * g.columns))) : g.columns
     g.stepRow = step ? Math.round(step.y * (g.rows - 1)) : g.baseRow
     var pts = geometry.points
@@ -142,11 +143,11 @@ Item {
     return col * grid.pitch + pixel / 2
   }
 
-  // The lit rows of the columns between `x0` and `x1`, and the baseline's. What
-  // is laid over the chart keeps clear of it (`RangeMarks`).
+  // The lit rows of the columns between `x0` and `x1`, and the baselines'.
+  // What is laid over the chart keeps clear of it (`RangeMarks`).
   function inkExtentIn(x0, x1) {
     var g = grid
-    var rows = hasBaseline ? [g.baseRow].concat(g.stepCol < g.columns ? [g.stepRow] : []) : []
+    var rows = (hasBaseline ? [g.baseRow] : []).concat(g.stepCol < g.columns ? [g.stepRow] : [])
     var last = Math.min(g.columns - 1, Math.floor(x1 / g.pitch))
     for (var c = Math.max(0, Math.floor(x0 / g.pitch)); c <= last; c++) {
       if (g.levels[c] !== undefined) rows.push(g.levels[c])
@@ -169,11 +170,12 @@ Item {
           for (var gr = 0; gr < g.rows; gr++) ctx.fillRect(gc * g.pitch, gr * pixel, pixel, pixel - root.gap)
         }
       }
-      if (!root.hasBaseline) return
+      if (!root.hasBaseline && g.stepCol >= g.columns) return
       // Every other cell, so it lives on the bars' grid, not as a hairline
       // across them.
       ctx.fillStyle = root.baselineColor
-      for (var bc = 0; bc < g.columns; bc += 2) ctx.fillRect(bc * g.pitch, root.baseRowAt(g, bc) * pixel, pixel, pixel - root.gap)
+      for (var bc = 0; bc < g.columns; bc += 2)
+        if (root.hasBaseline || bc >= g.stepCol) ctx.fillRect(bc * g.pitch, root.baseRowAt(g, bc) * pixel, pixel, pixel - root.gap)
     }
   }
 
@@ -202,7 +204,8 @@ Item {
           var baseY = baseRow * pixel
           var y = g.levels[c] * pixel
           var above = g.levels[c] <= baseRow
-          var color = above ? root.aboveColor : root.belowColor
+          // With no line under it, a column takes the baseline's ink.
+          var color = !root.hasBaseline && c < g.stepCol ? root.baselineColor : above ? root.aboveColor : root.belowColor
           var dim = g.dim[c] ? 0.45 : 1
           var x = c * g.pitch
           var top = Math.min(y, baseY)

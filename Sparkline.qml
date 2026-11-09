@@ -56,12 +56,13 @@ Item {
       var w = width - pad * 2
       var h = height - pad * 2
 
-      var by = pad + (root.hasBaseline ? root.geometry.baselineY : 1) * h
-      var step = root.hasBaseline ? root.geometry.step : null
+      // With no line under a part, it takes the line's own ink (`by` null).
+      var by = root.hasBaseline ? pad + root.geometry.baselineY * h : null
+      var step = root.geometry.step
       var stepX = step ? pad + step.x * w : width
       var parts = [{ from: 0, to: stepX, by: by }]
       if (step) parts.push({ from: stepX, to: width, by: pad + step.y * h })
-      if (root.hasBaseline) {
+      if (root.hasBaseline || step) {
         ctx.strokeStyle = root.baselineColor
         ctx.lineWidth = 1
         // Round ends on every paint: the context keeps the last paint's cap,
@@ -69,8 +70,10 @@ Item {
         ctx.lineCap = "round"
         ctx.setLineDash([2, 3])
         ctx.beginPath()
-        ctx.moveTo(pad, by)
-        ctx.lineTo(Math.min(stepX, pad + w), by)
+        if (root.hasBaseline) {
+          ctx.moveTo(pad, by)
+          ctx.lineTo(Math.min(stepX, pad + w), by)
+        }
         if (step) {
           ctx.moveTo(stepX, parts[1].by)
           ctx.lineTo(pad + w, parts[1].by)
@@ -98,7 +101,7 @@ Item {
           ctx.clip()
         }
         // Two stops at one offset merge, so the second sits a hair below.
-        if (root.split) {
+        if (root.split && parts[s].by !== null) {
           var stop = Math.max(0, Math.min(1, parts[s].by / height))
           var g = ctx.createLinearGradient(0, 0, 0, height)
           g.addColorStop(stop, root.upColor)
@@ -120,7 +123,8 @@ Item {
       for (var k = 0; k < pts.length; k++) {
         if (!(k === 0 || pts[k].brk) || !(k === pts.length - 1 || pts[k + 1].brk)) continue
         var dy = pad + pts[k].y * h
-        ctx.fillStyle = !root.split ? root.lineColor : dy <= pad + Chart.baseAt(root.geometry, pts[k].x) * h ? root.upColor : root.downColor
+        var under = Chart.baseAt(root.geometry, pts[k].x)
+        ctx.fillStyle = !root.split || under === null ? root.lineColor : dy <= pad + under * h ? root.upColor : root.downColor
         ctx.beginPath()
         ctx.arc(pad + pts[k].x * w, dy, root.lineWidth * 1.5, 0, Math.PI * 2)
         ctx.fill()
@@ -143,10 +147,10 @@ Item {
       var pad = root.pad
       var w = width - pad * 2
       var h = height - pad * 2
-      var by = pad + Chart.baseAt(root.geometry, root.cursorX) * h
+      var under = Chart.baseAt(root.geometry, root.cursorX)
       var cy = Chart.yAt(pts, root.cursorX)
       if (cy !== null) {
-        ctx.fillStyle = !root.split ? root.lineColor : pad + cy * h <= by ? root.upColor : root.downColor
+        ctx.fillStyle = !root.split || under === null ? root.lineColor : cy <= under ? root.upColor : root.downColor
         ctx.beginPath()
         ctx.arc(pad + root.cursorX * w, pad + cy * h, 2.5, 0, Math.PI * 2)
         ctx.fill()
