@@ -1,10 +1,7 @@
 import QtQuick
-import QtQuick.Controls
-import QtTest
 import Quickshell
 import Quickshell.Io
 import qs.Commons
-import qs.Commons as Commons
 import "plugin/Chart.js" as Chart
 import "plugin/Quote.js" as Quote
 import "plugin/Settings.js" as Settings
@@ -272,6 +269,38 @@ Harness {
         root.check("hover scrubbing stops at the last print", body.scrubT === lastPrint)
         body.motion.scrubT = 0
 
+        // In retro the pointer where a moment is drawn reads that moment, at
+        // each five minutes the day has printed, on a chart five pixels wider
+        // than its columns: they stop short of its right edge by what is left
+        // after the last whole one.
+        stub.retro = true
+        var heroChart = body.chartItem
+        var columns = null
+        for (var k = 0; k < heroChart.children.length; k++) {
+          if (heroChart.children[k].scrubColumn !== undefined) columns = heroChart.children[k]
+        }
+        body.anchors.rightMargin = body.anchors.margins - 5
+        var spare = function() { return heroChart.width - columns.grid.columns * columns.grid.pitch }
+        within(2000, function() { return columns.visible && columns.inkColumns > 1 && spare() === 5 })
+        var drawn = columns.grid.columns * columns.grid.pitch
+        var left = spare()
+        var misread = []
+        var moments = 0
+        for (var moment = lastPrint; moment >= stub.now - 19800; moment -= 300) {
+          mouseMove(heroChart, Chart.fractionAtTime(stub.view.chart.day, moment) * drawn, heroChart.height / 2)
+          moments++
+          if (body.scrubShown !== moment) misread.push((lastPrint - moment) / 60 + " min back read " + (lastPrint - body.scrubShown) / 60)
+        }
+        root.check("in retro the pointer where a moment is drawn reads that moment",
+          left === 5 && moments > 1 && misread.length === 0,
+          misread.length + " of " + moments + ": " + misread.slice(0, 6).join(", ") + "; " + columns.grid.columns + " columns, "
+          + left + " px spare")
+        mouseMove(body, body.width / 2, body.height - 4)
+        stub.retro = false
+        body.motion.scrubT = 0
+        body.anchors.rightMargin = body.anchors.margins
+        within(2000, function() { return spare() === 0 })
+
         // Rows under the pointer hold their order as quotes re-sort them;
         // leaving applies the newest sort.
         mouseMove(body.watchlist, 12, 12)
@@ -455,7 +484,7 @@ Harness {
         // The wheel or a key between two clicks at one place makes them two
         // clicks, even when Qt takes the second for a double-click's: the
         // second stops the list and acts, and x then removes its row. So does
-        // a row's move by Shift+J.
+        // a row's move by Shift+↓.
         var between = function(interrupt) {
           body.watchlist.contentY = 0
           within(2000, rowsAtRest)
@@ -495,7 +524,7 @@ Harness {
         var afterMove = (body.watchlist.displayedSymbols[2] === takenPlace && stub.featuredSymbol === takenPlace
           && body.watchlist.cursorRow === takenPlace) + " " + stub.featuredSymbol + "/" + body.watchlist.cursorRow + " for " + takenPlace
         fixture()
-        root.check("the wheel, a key, or Shift+J between two clicks at one place makes the second act, a double-click's too",
+        root.check("the wheel, a key, or Shift+↓ between two clicks at one place makes the second act, a double-click's too",
           [afterWheel, afterKey, afterMove].every(function(r) { return /^true /.test(r) }),
           [afterWheel, afterKey, afterMove].join(" | "))
 

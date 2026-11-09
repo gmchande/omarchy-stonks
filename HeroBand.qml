@@ -262,9 +262,11 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         // Read where the chart is drawn, so the right edge reaches the last
-        // print.
+        // print: retro's columns stop short of the chart's width by what is
+        // left of it after the last whole one.
         onPositionChanged: function(mouse) {
-          if (!root.replayRunning) root.scrubRequested(root.retro ? mouse.x / width : dayChart.fractionAt(mouse.x))
+          if (!root.replayRunning) root.scrubRequested(root.retro
+            ? mouse.x / (pixelChart.grid.columns * pixelChart.grid.pitch) : dayChart.fractionAt(mouse.x))
         }
         onExited: if (!root.replayRunning) root.scrubCleared()
         onClicked: root.snapToNow()
