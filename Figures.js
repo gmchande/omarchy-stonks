@@ -455,7 +455,8 @@ function closeCountedFrom(quote, view, today, calendars) {
 // +4.57, OVERNIGHT −1.83, PRE-MARKET −5.74, FRI −0.43, 24H −795.72,
 // 1M −90.97, SINCE OPEN +9.34. A scrubbed moment keeps its amount and a
 // range's name, and the dashed line's legend takes the first line's place.
-// Both are empty where the move isn't known.
+// Where the move isn't known, the first is the close it would count from,
+// if known, and the second a mode's or a range's name alone.
 function heroLines(quote, view, latest, now, day, calendars, changeMode, scrubbing) {
   var none = { label: "", changeText: "", tone: "flat" }
   if (!quote || !view) return { close: null, caption: none }
@@ -469,9 +470,9 @@ function heroLines(quote, view, latest, now, day, calendars, changeMode, scrubbi
   if (whole && close.price === "") close = closeOnly(from) || close
   else if (whole && period === "") close.since = sinceClose(quote, newest, changeMode)
   var other = view.unit === "abs" ? "pct" : "abs"
+  if (view.pct === null) return { close: close, caption: { label: period === "24H" ? "" : period, changeText: "", tone: "flat" } }
   var label = scrubbing ? (period === "24H" ? "" : period) : period || moveName(quote, newest, from, today)
-  return { close: close, caption: view.pct === null ? none
-    : { label: label, changeText: Format.changeText(view, other, quote.priceDigits), tone: Format.changeTone(view, other, quote.priceDigits) } }
+  return { close: close, caption: { label: label, changeText: Format.changeText(view, other, quote.priceDigits), tone: Format.changeTone(view, other, quote.priceDigits) } }
 }
 
 function closeOnly(from) {
