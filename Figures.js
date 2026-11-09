@@ -248,15 +248,14 @@ function dayTitles() {
 
 // Only US stocks and ETFs, which trade at night, share one day here;
 // listings abroad and coins name their own on their rows. A row with no
-// time names no day: its freshness says so. Once a row has traded tonight,
-// its move is the night's, counted from the close just gone: OVERNIGHT.
+// time names no day: its freshness says so. A row whose move is the
+// night's says so itself (`rowTime`), so the header keeps the day.
 function rowsDay(symbols, quotes, newest, now, calendars) {
   var shared = null
   var mixed = false
   for (var i = 0; i < symbols.length; i++) {
     var q = quotes[symbols[i]]
     if (!q || !Overnight.hasOvernight(q, calendars)) continue
-    if (newest[symbols[i]] && newest[symbols[i]].joined) return "OVERNIGHT"
     var head = Quote.headlineQuote(q)
     var t = newest[symbols[i]] ? newest[symbols[i]].dayStart : head ? head.t : null
     if (t === null) continue
@@ -487,6 +486,12 @@ function newestNote(quote, newest, now, calendars) {
 // A row says it after the name.
 function newestTime(quote, newest, now, calendars) {
   return Market.printDay(quote, newest.t, now, calendars) + Market.printClock(quote, newest.t, calendars)
+}
+
+// A row's time after its name; where its move is the night's, counted from
+// the close just gone, it says so: Overnight 01:25.
+function rowTime(quote, newest, now, calendars) {
+  return (newest.joined ? Market.phaseLabel("overnight") + " " : "") + newestTime(quote, newest, now, calendars)
 }
 
 function newestStale(newest, now) {

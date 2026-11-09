@@ -95,27 +95,26 @@ Yahoo's rate for the day, inside the P/E and nowhere else.
 The top line names the moment in the market's day, such as Power hour, and
 says when the market opens or closes, by the exchange's clock. A US stock
 that has traded since the close shows that newest price on top, and its row
-shows the time after the company's name. The move beside the price runs
-from the chart's dashed line, the close before the day on the chart, so the
+shows the time after the company's name. The move beside the price counts
+from the close the chart's dashed line marks under that price, so the
 number, the line, the bull or bear, the rows and the pill agree. Since the
-open, it runs from that day's open instead, with SINCE OPEN under it. On 1D,
-while the price on top is a trade of the session, or the close itself, under
-the price is the close the move counts from, named by its day, FRI CLOSE
-158.74, and under the move is the same move in the other unit, TODAY ▲4.57,
-or TODAY ▲2.88% when the figure on top is an amount. On a day the market
-rests, the close keeps its own day's name and the move takes the day it is
-of, as the rows' header does: THU CLOSE 7,663.43 and FRI ▼39.75. A coin's
+open, it counts from that day's open instead.
+
+The two lines under the price and the move each keep one job. Under the
+price is the close before the price on top, named by its day: FRI CLOSE
+158.74. Until the next session opens, it also shows how that day went:
+CLOSE 153.27 ▼3.45%, or MON CLOSE once the day has passed. While the move
+on top is a whole day's with trades after the bell in it, the part since the
+close follows, · AFTER HOURS ▲1.35%, and it's the first thing to go when the
+line runs out of room. Under the move is its name and the same move in the
+other unit: TODAY ▲4.57, OVERNIGHT ▼1.83, PRE-MARKET ▼5.74, FRI ▼0.43 on a
+day the market rests, or TODAY ▲2.88% when the figure on top is an amount.
+Since the open it says SINCE OPEN, and on a longer range the range's name,
+or SINCE and its first day for a listing younger than the range. A coin's
 day is its last 24 hours: 24H AGO 80,711 and 24H ▼795.72. Where Stonks
-doesn't know the close, as at Tokyo's open before Yahoo's first bar, neither
-line shows, and where it has no calendar to name the close's day by, the
-close is PREV CLOSE. Once a trade after the close moves the price, under the
-price are that close and its day's move, CLOSE 153.27 ▼3.45%, which names
-the day once it has passed, as MON CLOSE, and until the next pre-market, on
-1D, under the move is the move since that close, named by the newest trade's
-session: AFTER HOURS ▲1.35% until 20:00, then OVERNIGHT. On a longer range
-the chart ends on that price, and the move is the range's, up to it, with
-the range's name under it, or SINCE and its first day for a listing younger
-than the range. Elsewhere, a smaller line under the price shows the
+doesn't know the close, as at Tokyo's open before Yahoo's first bar, both
+lines stay empty, and where it has no calendar to name the close's day by,
+the close is PREV CLOSE. Elsewhere, the line under the price shows the
 pre-market or after-hours price.
 
 The 1D chart shows one trading day, each price at its time, from the
@@ -136,12 +135,19 @@ takes five off the left, so nothing jumps.
 The session trading now is bright and the rest dim: the pre-market, the
 regular session, after hours, or tonight. Until that session's first trade,
 and while the market rests, the regular session stays bright.
-Soon after 04:00, once the new day's first prices arrive, the chart turns
-to the new day, which starts with the night just gone, and the move starts
-counting from the close just gone. A stock that didn't trade that night
-keeps its day until its next trade. Once the day's date has passed, the
-list says the day and its night: MON + NIGHT after midnight, FRI + NIGHT
-on Sunday night. Over a weekend or a holiday the chart shows the last
+Tonight's trades belong to the day ahead. From the night's first trade the
+move counts from the close just gone, and the dashed line steps to that
+close at the bell, with tonight's line green above it and red below.
+Pointing at the chart reads against the dashed line under the pointer. The
+move keeps counting from that close through the pre-market and the session,
+until the next night starts, so nothing turns at 04:00. Since the open, the
+move shows a dash until the day ahead opens. Soon after 04:00, once the new
+day's first prices arrive, the chart turns to the new day, which starts with
+the night just gone. A stock that didn't trade that night keeps its day
+until its next trade. Once the day's date has passed, the list names the
+day its rows measure, MON after midnight and FRI on Sunday night, and a row
+whose move is the night's says Overnight before its time. Over a weekend or
+a holiday the chart shows the last
 trading day. On Sunday night and a holiday's evening, that day comes
 first, then the night: the hours closed between them take no room, and
 the line runs on from the day's last trade to the night's first. A day
@@ -250,11 +256,12 @@ Refreshes and prices make no sound.
 ## Screenshots
 
 Press `Ctrl+C`, or click the camera at the top right, for a picture of the
-chart, sized so X shows it whole. It shows the price, its move, the
-exchange, and the time with its zone. If you've moved along the chart with
-`←` `→`, it shows that moment. With the pointer, press `Ctrl+C` while it's
-still on the chart: moving it off to the camera ends the scrub. Your list is
-never in it.
+chart, sized so X shows it whole. It shows the company's name, the price in
+its currency, its move, and the same two lines the panel shows under them,
+with the date, time and zone of the price at its foot. If you've moved along
+the chart with `←` `→`, it shows that moment. With the pointer, press
+`Ctrl+C` while it's still on the chart: moving it off to the camera ends the
+scrub. Your list is never in it.
 
 Stonks treats it like Omarchy's own screenshots. It saves the picture to
 your screenshots folder, copies it to the clipboard, and shows a
@@ -329,9 +336,9 @@ again.
   £35.80. A US stock's large price is its newest trade, after the close
   too, with the close on the line under it. Elsewhere the large price is
   the regular session's, and the smaller line shows trades outside it.
-  The change is from the close before the day on the chart, unless you've
-  switched it to since the open. On a longer range, it's from the range's
-  start. Stonks
+  The change counts from the close the chart's dashed line marks under the
+  price, which at night is the close just gone, unless you've switched it
+  to since the open. On a longer range, it's from the range's start. Stonks
   leaves out prices of zero or less, and stray points in Yahoo's charts.
 - **A dash for the move just after an open.** For a few minutes after a
   stock in London, Tokyo or Toronto first trades, Yahoo can still count
