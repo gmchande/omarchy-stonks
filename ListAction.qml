@@ -8,8 +8,6 @@ Text {
   id: root
 
   property Look look
-  // Square corners. The key sheet's CLOSE keeps round ones in retro too.
-  property bool retro: look.retro
   // Marked as the shell marks its default button (its Button's `selected`,
   // ConfirmDialog's chosen one).
   property bool enterTakes: false
@@ -31,7 +29,7 @@ Text {
     anchors.centerIn: parent
     width: parent.implicitWidth + Style.space(12)
     height: parent.implicitHeight + Style.space(4)
-    radius: root.retro ? 0 : Style.cornerRadius
+    radius: root.look.retro ? 0 : Style.cornerRadius
     // The pressed fill while the button is down.
     color: mouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
       : root.hovered ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent)

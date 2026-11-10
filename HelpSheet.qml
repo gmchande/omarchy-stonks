@@ -155,8 +155,6 @@ Flickable {
     ListAction {
       objectName: "helpClose"
       look: root.look
-      // Round in retro too.
-      retro: false
       anchors.right: parent.right
       anchors.rightMargin: root.edge
       text: "CLOSE"
