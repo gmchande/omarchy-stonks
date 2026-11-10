@@ -77,14 +77,19 @@ function lineDay(symbol, quote, nights, allDay, calendars, slideAt) {
 function newestPrints(symbols, quotes, nights, allDay, calendars) {
   var out = {}
   for (var i = 0; i < symbols.length; i++) {
-    var q = quotes[symbols[i]]
-    if (!q || !Overnight.hasOvernight(q, calendars)) continue
-    var drawn = dayDrawn(symbols[i], q, nights, allDay, calendars)
-    if (drawn.waiting) drawn = Overnight.dayChart(q, NO_ANSWER, calendars)
-    var newest = Overnight.newestPrint(q, drawn.latest, calendars, drawn.day)
+    var newest = newestPrintOf(symbols[i], quotes[symbols[i]], nights, allDay, calendars)
     if (newest) out[symbols[i]] = newest
   }
   return out
+}
+
+// One listing's: it reads the listing's quote, its night's prints and reach,
+// and Robinhood's word on whether it trades all day, and nothing else.
+function newestPrintOf(symbol, quote, nights, allDay, calendars) {
+  if (!quote || !Overnight.hasOvernight(quote, calendars)) return null
+  var drawn = dayDrawn(symbol, quote, nights, allDay, calendars)
+  if (drawn.waiting) drawn = Overnight.dayChart(quote, NO_ANSWER, calendars)
+  return Overnight.newestPrint(quote, drawn.latest, calendars, drawn.day)
 }
 
 // Robinhood's answer before it comes (`Overnight.overnightAnswer`'s shape).
