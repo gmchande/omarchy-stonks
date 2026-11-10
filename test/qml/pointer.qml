@@ -272,6 +272,31 @@ Harness {
         root.check("hover scrubbing stops at the last print", body.scrubT === lastPrint)
         body.motion.scrubT = 0
 
+        // In retro the pointer lights the column it is over, from the first
+        // print's to the last's, at a width that holds no whole number of
+        // columns: five pixels are left over past the last.
+        stub.retro = true
+        var heroChart = root.find(body, "heroChart")
+        var pixels = null
+        for (var k = 0; k < heroChart.children.length; k++) if (heroChart.children[k].scrubColumn !== undefined) pixels = heroChart.children[k]
+        var spare = function() { return pixels.width - pixels.grid.columns * pixels.grid.pitch }
+        body.anchors.rightMargin = Style.space(16) + (spare() + 1) % pixels.grid.pitch
+        within(1000, function() { return pixels.inkColumns > 1 && spare() === pixels.grid.pitch - 1 })
+        var firstColumn = Math.floor(pixels.geometry.points[0].x * pixels.grid.columns)
+        var unlit = []
+        for (var column = firstColumn; column < pixels.inkColumns; column++) {
+          var over = pixels.mapToItem(body, column * pixels.grid.pitch + pixels.grid.pitch / 2, pixels.height / 2)
+          mouseMove(body, over.x, over.y)
+          if (pixels.scrubColumn !== column) unlit.push(column + " lit " + pixels.scrubColumn)
+        }
+        root.check("in retro the pointer lights the column it is over",
+          spare() === pixels.grid.pitch - 1 && pixels.inkColumns - firstColumn > 20 && unlit.length === 0,
+          (pixels.inkColumns - firstColumn) + " columns, " + spare() + " px spare: " + unlit.join(", "))
+        mouseMove(body, body.width / 2, body.height - 4)
+        body.anchors.rightMargin = Style.space(16)
+        stub.retro = false
+        body.motion.scrubT = 0
+
         // Rows under the pointer hold their order as quotes re-sort them;
         // leaving applies the newest sort.
         mouseMove(body.watchlist, 12, 12)
