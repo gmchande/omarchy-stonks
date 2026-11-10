@@ -8,6 +8,7 @@ import "History.js" as History
 import "Overnight.js" as Overnight
 import "Quote.js" as Quote
 import "Settings.js" as Settings
+import "Rows.js" as Rows
 // What every surface reads and acts through: what you follow and look at,
 // the lists file that keeps it (~/.config/omarchy/<id>.json, which only this
 // service reads and writes), the feeds and what is asked of them, the saved
@@ -109,7 +110,7 @@ Item {
       order: order,
       reversed: reversed,
       rows: rows,
-      shown: Settings.shownOrder(root.heldOrder, Settings.sortedSymbols(rows, feed.quotes, order, reversed,
+      shown: Rows.shownOrder(root.heldOrder, Rows.sortedSymbols(rows, feed.quotes, order, reversed,
         dataSettings.changeMode, order === "manual" ? null : root.newestTrades)),
       library: all,
       // Null while on its way: each surface keeps the chart it has on screen.

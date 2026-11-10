@@ -15,7 +15,7 @@ import "plugin/History.js" as History
 import "plugin/Market.js" as Market
 import "plugin/Overnight.js" as Overnight
 import "plugin/Quote.js" as Quote
-import "plugin/Settings.js" as Settings
+import "plugin/Rows.js" as Rows
 import "plugin/Search.js" as Search
 import "plugin/Freshness.js" as Freshness
 import "plugin"
@@ -293,7 +293,7 @@ Harness {
     property var lastRemoval: null
     property bool settingsUnreadable: false
     readonly property var view: ({ featured: featuredSymbol, range: range, list: listName, listKey: "=" + listName,
-      order: order, reversed: reversed, rows: symbols, shown: Settings.sortedSymbols(symbols, quotes, order, reversed, changeMode),
+      order: order, reversed: reversed, rows: symbols, shown: Rows.sortedSymbols(symbols, quotes, order, reversed, changeMode),
       library: library, chart: Chart.viewChart(featuredSymbol, range, quotes, entries, histories, nights,
         allDay, nights[featuredSymbol] ? nightCalendars : null) })
     // NEST's prints, and the calendars its chart's day reads; only NEST has

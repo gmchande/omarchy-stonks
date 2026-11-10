@@ -2,7 +2,7 @@ import QtQuick
 import qs.Commons
 import qs.Commons as Commons
 import "Cells.js" as Cells
-import "Settings.js" as Settings
+import "Rows.js" as Rows
 import "Tones.js" as Tones
 import "Motion.js" as Motion
 // The list's header: its name, a menu, left of the rule, as Apple puts it
@@ -197,7 +197,7 @@ Item {
     anchors.rightMargin: Style.space(10)
     anchors.verticalCenter: parent.verticalCenter
     textFormat: Text.PlainText
-    text: Settings.orderLabel(root.order, root.reversed)
+    text: Rows.orderLabel(root.order, root.reversed)
     readonly property bool sorted: root.order !== "manual"
     // The arrow's target runs to the word's first letter, and left to make
     // the shell's 22 px, but never into the breadth rule, whose hover says

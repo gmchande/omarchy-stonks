@@ -8,6 +8,7 @@ import "Chart.js" as Chart
 import "Figures.js" as Figures
 import "Freshness.js" as Freshness
 import "Settings.js" as Settings
+import "Rows.js" as Rows
 import "Tones.js" as Tones
 import "Motion.js" as Motion
 // The scrolling rows: cursor, drag, scroll and wheel. Surfaces pass data in
@@ -482,12 +483,7 @@ Flickable {
   }
 
   function slotOf(symbol) {
-    var i = displayedSymbols.indexOf(symbol)
-    if (dragSymbol === "") return i
-    var from = displayedSymbols.indexOf(dragSymbol)
-    if (from < dragTarget && i > from && i <= dragTarget) return i - 1
-    if (dragTarget < from && i >= dragTarget && i < from) return i + 1
-    return i
+    return Rows.slotOf(displayedSymbols, symbol, dragSymbol, dragTarget)
   }
 
   // So a lifted row stays under the pointer as the wheel scrolls.
@@ -512,7 +508,7 @@ Flickable {
     if (dragSymbol === "") return
     dragPointer = y - contentY
     dragY = Math.max(0, Math.min((displayedSymbols.length - 1) * rowPitch, y - dragOffset))
-    dragTarget = Settings.dragSlot(dragY / rowPitch, dragTarget, displayedSymbols.length)
+    dragTarget = Rows.dragSlot(dragY / rowPitch, dragTarget, displayedSymbols.length)
   }
 
   function endDrag() {

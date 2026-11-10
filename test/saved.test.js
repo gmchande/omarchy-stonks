@@ -21,7 +21,7 @@ process.env.TZ = "America/New_York"
 // The rule files' names these tests read, under one name. A name two files
 // define is read from its file (test/load.js).
 const M = rules(["Format", "Quote", "Calendar", "Market", "CarriedClose", "Overnight", "Day", "History", "Fundamentals", "Figures", "Freshness",
-  "Chart", "Settings", "Search", "Asks"])
+  "Chart", "Settings", "Rows", "Search", "Asks"])
 
 const fixture = name => JSON.parse(readFileSync(join(fixtures, name), "utf8"))
 const calendars = JSON.parse(readFileSync(join(import.meta.dir, "..", "calendars.json"), "utf8"))

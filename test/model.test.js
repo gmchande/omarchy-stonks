@@ -13,7 +13,7 @@ process.env.TZ = "America/New_York"
 // Every rule file's names, under one name. A name two files define is read
 // from its file (test/load.js).
 const M = rules(["Format", "Fetch", "Quote", "Calendar", "Market", "CarriedClose", "Overnight", "Day", "History", "Fundamentals", "Figures", "Freshness",
-  "Chart", "Tones", "Settings", "KeySheet", "Search", "Cells", "Share", "Asks"])
+  "Chart", "Tones", "Settings", "Rows", "KeySheet", "Search", "Cells", "Share", "Asks"])
 
 const calendars = JSON.parse(readFileSync(join(root, "calendars.json"), "utf8"))
 // The header's status at full width, the first of its forms.
@@ -865,6 +865,14 @@ test("a dragged row takes the next slot only 0.6 of a row past its own, and a po
   expect(M.dragSlot(4.2, 1, 6)).toBe(4)
   expect(M.dragSlot(7.9, 4, 6)).toBe(5)
   expect(M.dragSlot(-1, 0, 6)).toBe(0)
+  // The rows it passes each give up a place toward the one it left; the
+  // rest stay, and so does every row with nothing held.
+  const rows = ["A", "B", "C", "D", "E"]
+  const places = (dragged, slot) => rows.map(symbol => M.slotOf(rows, symbol, dragged, slot))
+  expect(places("B", 3)).toEqual([0, 1, 1, 2, 4])
+  expect(places("D", 0)).toEqual([1, 2, 3, 3, 4])
+  expect(places("C", 2)).toEqual([0, 1, 2, 3, 4])
+  expect(places("", -1)).toEqual([0, 1, 2, 3, 4])
 })
 
 test("sorting ranks the rows as a view over the manual list", () => {

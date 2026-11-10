@@ -16,7 +16,7 @@ import "plugin/Overnight.js" as Overnight
 import "plugin/Day.js" as Day
 import "plugin/Quote.js" as Quote
 import "plugin/Search.js" as Search
-import "plugin/Settings.js" as Settings
+import "plugin/Rows.js" as Rows
 import "plugin"
 
 // Offscreen window body. A stub surface feeds StonksBody from fixtures.
@@ -832,7 +832,7 @@ Harness {
       if (root.orderState) {
         stub.order = "pct"
         stub.reversed = root.stateName.indexOf("-rises-") > 0
-        stub.shown = Settings.sortedSymbols(stub.symbols, stub.quotes, stub.order, stub.reversed, stub.changeMode)
+        stub.shown = Rows.sortedSymbols(stub.symbols, stub.quotes, stub.order, stub.reversed, stub.changeMode)
       }
       if (root.w22 && root.w22.range === "5y") {
         root.shownRange = "5Y"
