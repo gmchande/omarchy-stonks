@@ -2082,14 +2082,14 @@ test("in every phase, a stock that has traded since its close shows that newest 
   }
   // The list's header names the day the rows measure: Friday all weekend,
   // Sunday night too, today until midnight, then Monday until the new day's
-  // first trade. A row whose move is the night's says so before its time,
-  // and one that still shows its day says its time alone.
+  // first trade. A row says its newest price's time alone, the night's
+  // too: the header keeps the day.
   const header = set => { const at = topsAt(set); return M.rowsDay(at.symbols, at.quotes, at.newest, at.now, calendars) }
   expect(["watch-2026-10-25-1000", "watch-2026-10-25-2335", "watch-2026-10-26-1200", "watch-2026-10-26-2005", "watch-2026-10-27-0350", "watch-2026-10-27-0405"].map(header))
     .toEqual(["FRI", "FRI", "TODAY", "TODAY", "MON", "TODAY"])
   {
     const at = topsAt("watch-2026-10-26-2005")
-    expect(["NBIS", "JNJ"].map(s => M.rowTime(at.quotes[s], at.newest[s], at.now, calendars))).toEqual(["Overnight 20:00", "19:57"])
+    expect(["NBIS", "JNJ"].map(s => M.newestTime(at.quotes[s], at.newest[s], at.now, calendars))).toEqual(["20:00", "19:57"])
   }
   // A row Yahoo sent no time for measures no day it can name: the rest
   // still name theirs.

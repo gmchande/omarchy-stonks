@@ -145,9 +145,8 @@ move shows a dash until the day ahead opens. Soon after 04:00, once the new
 day's first prices arrive, the chart turns to the new day, which starts with
 the night just gone. A stock that didn't trade that night keeps its day
 until its next trade. Once the day's date has passed, the list names the
-day its rows measure, MON after midnight and FRI on Sunday night, and a row
-whose move is the night's says Overnight before its time. Over a weekend or
-a holiday the chart shows the last
+day its rows measure, MON after midnight and FRI on Sunday night. Over a
+weekend or a holiday the chart shows the last
 trading day. On Sunday night and a holiday's evening, that day comes
 first, then the night: the hours closed between them take no room, and
 the line runs on from the day's last trade to the night's first. A day
