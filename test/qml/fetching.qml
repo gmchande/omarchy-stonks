@@ -30,11 +30,6 @@ Harness {
     return readFile(harness.state + "/" + name)
   }
 
-  // The last good quotes the service saved, by symbol.
-  function cached() {
-    try { return JSON.parse(readFile(Quickshell.env("XDG_CACHE_HOME") + "/grvc.stonks/quotes.json")).quotes || {} } catch (e) { return {} }
-  }
-
   // Every request answered, as "kind name status", in order.
   function requests() {
     return record("requests.log").split("\n").filter(function(line) { return line !== "" })
@@ -132,11 +127,6 @@ Harness {
   }
 
   Process { id: fileProc }
-  // Each path's mode, as `stat` gives it ("600").
-  Process {
-    id: statProc
-    stdout: StdioCollector { id: statOut; waitForEnd: true }
-  }
 
   // A screen as Hyprland reports it, for the window host (fetch.sh): on or
   // off, as it says when asked again, a turn later, as Hyprland's answer
@@ -175,17 +165,6 @@ Harness {
     function refresh() { Qt.callLater(function() { otherScreen.lastIpcObject = { dpmsStatus: true } }) }
   }
 
-  // The service's writes of the data file, each as it is saved.
-  readonly property string dataPath: Quickshell.env("HOME") + "/.config/omarchy/grvc.stonks.json"
-  property int dataWrites: 0
-  Connections {
-    target: service.testDataFile
-    function onSaved() { harness.dataWrites++ }
-  }
-  function savedFeatured() {
-    try { return JSON.parse(readFile(harness.dataPath)).featured } catch (e) { return "" }
-  }
-
   Steps {
     name: "Fetch"
     when: service.pluginsReady && pillWindow.visible
@@ -197,12 +176,6 @@ Harness {
     }
     function touch(name) { runCommand(["touch", harness.state + "/" + name]) }
     function remove(name) { runCommand(["rm", "-f", harness.state + "/" + name]) }
-    function modes(paths) {
-      statProc.command = ["stat", "-c", "%a"].concat(paths)
-      statProc.running = true
-      tryVerify(function() { return !statProc.running }, 2000)
-      return String(statOut.text).trim().split("\n").join(",")
-    }
 
     // No quote run is out, the preview's included: the clock moves on only
     // once each run has landed, as it would in the seconds a run takes.
@@ -215,21 +188,6 @@ Harness {
       verify(within(10000, idle), "a quote run never landed")
     }
 
-    // What the window's header says from now, each change as it happens:
-    // the function returned stops listening and gives them. Read on the
-    // header's own change, not on frames: under load no frame may be drawn
-    // between an answer landing and the step reading what was said.
-    function listen() {
-      var body = app.testBody
-      var said = [body.headerText]
-      var heard = function() { if (said[said.length - 1] !== body.headerText) said.push(body.headerText) }
-      body.headerTextChanged.connect(heard)
-      return function() {
-        body.headerTextChanged.disconnect(heard)
-        return said
-      }
-    }
-
     // Every ask of the screens answered. A step waits on this before it
     // counts what went while they were off, and before it turns one on, so
     // an answer still out, as on a loaded machine, can't report the next
@@ -238,11 +196,6 @@ Harness {
     // still waits that long first.
     function screensHeard() {
       tryVerify(function() { return screenStandIn.unanswered === 0 }, 5000)
-    }
-    // The screens' last answer, which the service trusts for a second of the
-    // wall clock, has run out, so the next run asks them afresh.
-    function screensAnswerAged() {
-      within(2000, function() { return Date.now() - service.screensAnsweredMs >= 1000 })
     }
     // A run waiting on the stand-in screen's answer goes once it comes, a
     // turn or two later: let it come, and the run land.

@@ -39,11 +39,10 @@ Harness {
       mouseClick(item, item.width / 2, item.height / 2, button || Qt.LeftButton)
     }
     function row(symbol) { return body.watchlist.rowItem(symbol) }
-    function holds(ms, fn) { return within(ms, fn) }
     // The rows have landed: a place read sooner belongs to a row still moving.
     function rest() {
       var list = body.watchlist
-      holds(2500, function() {
+      within(2500, function() {
         return list.dragSymbol === "" && !list.settling && list.displayedSymbols.every(function(symbol) { return list.rowResting(symbol) })
       })
     }
@@ -60,7 +59,7 @@ Harness {
 
       click(row(rows[1]))
       harness.check("a click on a row shows its chart",
-        holds(1500, function() { return service.featuredSymbol === rows[1] }), service.featuredSymbol)
+        within(1500, function() { return service.featuredSymbol === rows[1] }), service.featuredSymbol)
 
       // Held and carried past the next row, in your own order.
       var held = row(rows[0])
@@ -69,70 +68,70 @@ Harness {
       mousePress(body, grip.x, grip.y)
       mouseMove(body, grip.x, grip.y + down / 2, -1, Qt.LeftButton)
       mouseMove(body, grip.x, grip.y + down, -1, Qt.LeftButton)
-      holds(1000, function() { return body.watchlist.dragSymbol === rows[0] })
+      within(1000, function() { return body.watchlist.dragSymbol === rows[0] })
       mouseRelease(body, grip.x, grip.y + down)
       var carried = rows.slice(1, 2).concat([rows[0]]).concat(rows.slice(2))
       harness.check("a row dragged past the next takes its place, and the order is the lists' own",
-        holds(2000, function() { return service.symbols.join(",") === carried.join(",") }), service.symbols.join(","))
+        within(2000, function() { return service.symbols.join(",") === carried.join(",") }), service.symbols.join(","))
       rows = service.symbols.slice()
       rest()
 
       click(row(rows[0]), Qt.RightButton)
-      var menu = holds(1500, function() { return harness.findAll(body, "rowMenuLine").length > 0 && harness.inPlace(harness.findAll(body, "rowMenuLine")) })
+      var menu = within(1500, function() { return harness.findAll(body, "rowMenuLine").length > 0 && harness.inPlace(harness.findAll(body, "rowMenuLine")) })
       var lines = harness.findAll(body, "rowMenuLine")
       click(lines[lines.length - 1])
       harness.check("a right click opens the row's menu, and its last line chooses the row's lists",
-        menu && holds(1500, function() { return body.listsSymbol === rows[0] }), menu + " " + body.listsSymbol)
+        menu && within(1500, function() { return body.listsSymbol === rows[0] }), menu + " " + body.listsSymbol)
       body.closeViews()
 
       click("listControl")
       var choices = function() { return harness.findAll(body, "listChoice") }
-      var listed = holds(1500, function() { return body.listMenuOpen && choices().length === 2 && harness.inPlace(choices()) })
+      var listed = within(1500, function() { return body.listMenuOpen && choices().length === 2 && harness.inPlace(choices()) })
       click(choices()[1])
       harness.check("a click on the list's name opens the menu, and a list's line shows that list",
-        listed && holds(1500, function() { return service.listName === "Tech" && !body.listMenuOpen }), listed + " " + service.listName)
+        listed && within(1500, function() { return service.listName === "Tech" && !body.listMenuOpen }), listed + " " + service.listName)
       service.switchList("")
       quiet()
 
       click("orderLabel")
-      var ordered = holds(1500, function() { return service.order === "symbol" })
+      var ordered = within(1500, function() { return service.order === "symbol" })
       click("orderArrow")
-      var reversed = holds(1500, function() { return service.reversed })
+      var reversed = within(1500, function() { return service.reversed })
       var mode = service.changeMode
       click("unitTarget")
       harness.check("the order's word steps the order, its arrow reverses it, and the unit steps the unit",
-        ordered && reversed && holds(1500, function() { return service.changeMode !== mode }), [service.order, service.reversed, service.changeMode].join(" "))
+        ordered && reversed && within(1500, function() { return service.changeMode !== mode }), [service.order, service.reversed, service.changeMode].join(" "))
       service.setOrder("manual")
 
       var tokens = harness.findAll(body, "rangeToken")
       click(tokens[1])
       harness.check("a click on a range shows that range",
-        holds(1500, function() { return service.range !== "1D" }), service.range)
+        within(1500, function() { return service.range !== "1D" }), service.range)
       service.setRange("1D")
 
       var retro = service.retro, sounds = service.soundsOn
       click("lookToggle")
-      var looked = holds(1500, function() { return service.retro === !retro })
+      var looked = within(1500, function() { return service.retro === !retro })
       click("soundToggle")
-      var sounded = holds(1500, function() { return service.soundsOn === !sounds })
+      var sounded = within(1500, function() { return service.soundsOn === !sounds })
       click("cameraButton")
-      var shot = holds(3000, function() { return body.cameraLit })
+      var shot = within(3000, function() { return body.cameraLit })
       click("helpToggle")
-      var sheet = holds(1500, function() { return body.showingHelp })
+      var sheet = within(1500, function() { return body.showingHelp })
       click("helpToggle")
       harness.check("the header's look, sound, camera and ? each act, and ? again closes the sheet",
-        looked && sounded && shot && sheet && holds(1500, function() { return !body.showingHelp }), [looked, sounded, shot, sheet, body.showingHelp].join(" "))
+        looked && sounded && shot && sheet && within(1500, function() { return !body.showingHelp }), [looked, sounded, shot, sheet, body.showingHelp].join(" "))
 
       // The words are typed; the rest is the pointer's.
       click("footerText")
-      var searching = holds(1500, function() { var field = harness.find(body, "searchField"); return body.adding && !!field && field.activeFocus })
+      var searching = within(1500, function() { var field = harness.find(body, "searchField"); return body.adding && !!field && field.activeFocus })
       "shop".split("").forEach(function(c) { keyClick(c) })
       // Yahoo's first result, once its rows are placed.
       var results = function() { return harness.findAll(body, "searchResult").filter(function(r) { return r.visible }).sort(function(a, b) { return a.y - b.y }) }
-      var found = holds(4000, function() { return results().length > 1 && harness.inPlace(results()) })
+      var found = within(4000, function() { return results().length > 1 && harness.inPlace(results()) })
       click(results()[0])
       harness.check("the footer opens search, and a click on a result adds it",
-        searching && found && holds(5000, function() { return service.symbols.indexOf("SHOP") >= 0 && !body.adding }), [searching, found, service.symbols.join(",")].join(" "))
+        searching && found && within(5000, function() { return service.symbols.indexOf("SHOP") >= 0 && !body.adding }), [searching, found, service.symbols.join(",")].join(" "))
       quiet()
       rest()
 
@@ -142,21 +141,21 @@ Harness {
       var gone = row(doomed)
       mouseMove(gone, gone.width / 2, gone.height / 2 - 1)
       mouseMove(gone, gone.width / 2, gone.height / 2)
-      var shown = holds(1500, function() { var x = harness.find(gone, "rowRemove"); return !!x && x.visible })
+      var shown = within(1500, function() { var x = harness.find(gone, "rowRemove"); return !!x && x.visible })
       click(harness.find(gone, "rowRemove"))
-      var removed = holds(1500, function() { return service.symbols.indexOf(doomed) < 0 })
+      var removed = within(1500, function() { return service.symbols.indexOf(doomed) < 0 })
       click("footerUndo")
       harness.check("a row's × removes it, and UNDO puts it back",
-        shown && removed && holds(1500, function() { return service.symbols.indexOf(doomed) >= 0 }), [shown, removed, service.symbols.join(",")].join(" "))
+        shown && removed && within(1500, function() { return service.symbols.indexOf(doomed) >= 0 }), [shown, removed, service.symbols.join(",")].join(" "))
       rest()
 
       var chart = at("heroChart")
       mouseMove(chart, chart.width / 3, chart.height / 2)
       mouseMove(chart, chart.width / 2, chart.height / 2)
-      var scrubbed = holds(1500, function() { return body.scrubT !== 0 })
+      var scrubbed = within(1500, function() { return body.scrubT !== 0 })
       mouseClick(chart, chart.width / 2, chart.height / 2)
       harness.check("the pointer over the chart reads that moment, and a click goes back to now",
-        scrubbed && holds(1500, function() { return body.scrubT === 0 }), scrubbed + " " + body.scrubT)
+        scrubbed && within(1500, function() { return body.scrubT === 0 }), scrubbed + " " + body.scrubT)
 
       var before = service.symbols.join(",")
       var list = body.watchlist
@@ -164,7 +163,7 @@ Harness {
       mouseMove(body, over.x, over.y)
       mouseWheel(body, over.x, over.y, 0, -120)
       harness.check("the wheel scrolls the rows and moves none",
-        list.contentHeight > list.height && holds(1500, function() { return list.contentY > 0 }) && service.symbols.join(",") === before,
+        list.contentHeight > list.height && within(1500, function() { return list.contentY > 0 }) && service.symbols.join(",") === before,
         [list.contentHeight, list.height, list.contentY, service.symbols.join(",")].join(" "))
 
       app.close()
