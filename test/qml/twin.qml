@@ -74,7 +74,9 @@ Harness {
     signal rawEvent(var event)
   }
   Binding { target: releaseCopy.windowHost; property: "hyprlandStandIn"; value: hyprlandStandIn }
+  Binding { target: releaseCopy.service.screens; property: "hyprlandStandIn"; value: hyprlandStandIn }
   Binding { target: devCopy.windowHost; property: "hyprlandStandIn"; value: hyprlandStandIn }
+  Binding { target: devCopy.service.screens; property: "hyprlandStandIn"; value: hyprlandStandIn }
 
   FloatingWindow {
     id: pillWindow

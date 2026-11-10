@@ -18,6 +18,8 @@ patch_copy plugin/BarWidget.qml '/id: panelLoader/,/source:/s/active: true/activ
 patch_copy plugin/WindowHost.qml '/readonly property bool opened:/a\  property var hyprlandStandIn: null'
 patch_copy plugin/WindowHost.qml 's/Hyprland\.\(toplevels\|focusedWorkspace\|dispatch\)/root.hyprlandStandIn.\1/g'
 patch_copy plugin/WindowHost.qml 's/target: Hyprland$/target: root.hyprlandStandIn/'
+patch_copy plugin/Screens.qml '/property bool watching:/a\  property var hyprlandStandIn: null'
+patch_copy plugin/Screens.qml 's/target: Hyprland$/target: root.hyprlandStandIn/'
 scratch_home v1-data.json grvc.stonks.json
 printf '{ "version": 1, "symbols": ["NVDA"], "featured": "NVDA", "order": "manual", "refreshIntervalSec": 60 }\n' \
   > "$HOME/.config/omarchy/grvc.stonks-dev.json"

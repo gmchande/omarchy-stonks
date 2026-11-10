@@ -3,7 +3,8 @@
 # queued before/while the screens are off. Everything owned by this run.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree resilience.qml
-patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testGate: yahooGate\n  readonly property alias testFeed: feed\n  readonly property alias testHistory: historyFeed\n  readonly property alias testFundamentals: fundamentalsFeed\n  readonly property alias testDataFile: dataFile'
+patch_copy plugin/ListsFile.qml '/signal started()/a\  readonly property alias testDataFile: dataFile'
+patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testGate: yahooGate\n  readonly property alias testFeed: feed\n  readonly property alias testHistory: historyFeed\n  readonly property alias testFundamentals: fundamentalsFeed\n  readonly property alias testDataFile: listsFile.testDataFile'
 patch_copy plugin/Service.qml 's/function wallSecond() { return Math.floor(Date.now() \/ 1000) }/property int clockOffset: 0\n  function wallSecond() { return Math.floor(Date.now() \/ 1000) + root.clockOffset }/'
 patch_copy plugin/FetchRun.qml '/id: root/a\  readonly property alias testCommand: proc.command'
 patch_copy plugin/FundamentalsFeed.qml '/id: root/a\  readonly property var testCommand: fetchRun.testCommand'
@@ -30,7 +31,7 @@ PATH="$work/bin:$PATH" run_qs 90
 # The test's lost saves warn as Quickshell does for any: three refused by
 # the read-only folder, two on the full disk.
 for expected in "Unknown error when opening file\\.:3" "Atomic commit failed\\.:2"; do
-  pattern="WARN scene: QML FileView at @plugin/Service.qml.*Write of .*grvc.stonks.json failed: ${expected%:*}"
+  pattern="WARN scene: QML FileView at @plugin/ListsFile.qml.*Write of .*grvc.stonks.json failed: ${expected%:*}"
   count=$(rg -c "$pattern" "$work/log" || true)
   if [ "${count:-0}" != "${expected##*:}" ]; then
     echo "FAIL expected ${expected##*:} warnings of a lost save matching '${expected%:*}', got ${count:-0}"

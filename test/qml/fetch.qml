@@ -99,6 +99,7 @@ Harness {
     signal rawEvent(var event)
   }
   Binding { target: plugin.windowHost; property: "hyprlandStandIn"; value: hyprlandStandIn }
+  Binding { target: plugin.service.screens; property: "hyprlandStandIn"; value: hyprlandStandIn }
 
   QtObject {
     id: shellApi
@@ -845,7 +846,7 @@ Harness {
       // night, for the pill's newest price alone. Back in sight, what fell
       // due goes at once.
       hyprlandStandIn.toplevels = { values: [stonksToplevel] }
-      plugin.windowHost.monitors = [screenStandIn]
+      plugin.service.screens.monitors = [screenStandIn]
       stonksToplevel.workspace = workspaceThere
       var nightAsks = function(lines) { return lines.filter(function(l) { return /^overnight /.test(l) }).length }
       var away = countsOver("00:00, the window open on a workspace no screen shows: the pill's symbol every 15 minutes, nothing else",
@@ -983,7 +984,7 @@ Harness {
       // showing another workspace. No screen shows the window, so it asks
       // what a closed one asks, though not every screen is off: Robinhood
       // every 5 minutes too, for the pill on the screen that's on.
-      plugin.windowHost.monitors = [screenStandIn, otherScreen]
+      plugin.service.screens.monitors = [screenStandIn, otherScreen]
       var dark = countsOver("00:35, the window's screen off and the other on: the pill's symbol, nothing else",
         900, counts([1, 0, 0, 0, 0, 0, 0, 0]), function() {
           screenStandIn.on = false
@@ -1000,13 +1001,13 @@ Harness {
       settle()
       closeWindow()
       hyprlandStandIn.toplevels = { values: [] }
-      plugin.windowHost.monitors = []
+      plugin.service.screens.monitors = []
 
       // Thursday 11:15, nothing open, every screen off: nothing is asked
       // for, the pill's symbol included. The key press that turns a screen
       // on again asks at once for the pill's, with the clock still.
       startAt(at(harness.wed7 + 86400, 11, 15))()
-      plugin.windowHost.monitors = [screenStandIn]
+      plugin.service.screens.monitors = [screenStandIn]
       screenStandIn.on = false
       // The screens' last answer, trusted for a second, runs out first.
       wait(1100)
@@ -1029,9 +1030,9 @@ Harness {
       // A second with no input, then the key press that wakes the screen,
       // when the screens' last answer is long past.
       wait(1100)
-      plugin.windowHost.testInput.isIdle = true
+      plugin.service.screens.testInput.isIdle = true
       screenStandIn.on = true
-      plugin.windowHost.testInput.isIdle = false
+      plugin.service.screens.testInput.isIdle = false
       var woke = within(2000, function() { return harness.quoteCounts(harness.requests().slice(darkFrom)).NEST > 0 })
       settle()
       var lit = harness.quoteCounts(harness.requests().slice(darkFrom))
@@ -1107,7 +1108,7 @@ Harness {
       harness.check("a refresh while every screen is off asks its quotes at once, to wait their turn for a screen", darkUserAsked,
         JSON.stringify(service.testFeed.userAsked))
       closeWindow()
-      plugin.windowHost.monitors = []
+      plugin.service.screens.monitors = []
       harness.check("a refresh while every screen is off asks the range's history once a screen is on, not before, and says nothing meanwhile",
         darkHistory === 0 && litHistory === 1 && darkSaid.length === 1 && darkSaid[0] !== "Refreshing",
         darkHistory + " while off, " + litHistory + " after | " + darkSaid.join(" / "))

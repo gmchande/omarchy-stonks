@@ -87,7 +87,7 @@ plugin_tree() {
   ln -s "$shell/Ui" "$shell/Commons" "$root/"
   cp "$here/$1" "$root/shell.qml"
   cp "$here/HarnessExit.qml" "$here/Harness.qml" "$here/Steps.qml" "$root/"
-  patch_copy plugin/WindowHost.qml 's/readonly property var monitors: Hyprland.monitors.values/property var monitors: []/'
+  patch_copy plugin/Screens.qml 's/readonly property var monitors: Hyprland.monitors.values/property var monitors: []/'
 }
 
 # card_window: the panel's card in CardWindow.qml, a plain window, as the

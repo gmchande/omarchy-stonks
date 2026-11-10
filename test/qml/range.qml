@@ -143,6 +143,7 @@ Harness {
     }
   }
   Binding { target: plugin.windowHost; property: "hyprlandStandIn"; value: hyprlandStandIn }
+  Binding { target: plugin.service.screens; property: "hyprlandStandIn"; value: hyprlandStandIn }
 
   Component { id: serviceAgain; Stonks.Service { pluginId: "grvc.stonks" } }
   Component { id: appAgain; Stonks.App {} }
