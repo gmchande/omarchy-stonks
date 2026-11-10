@@ -3220,6 +3220,12 @@ test("a quote held from an earlier day trades by its calendar, and one answered 
   // Saturday Thursday and Friday have traded, and it is asked again.
   expect(quiet(nest, at("2026-10-07", "20:30"), at("2026-10-07", "22:00"))).toBe(at("2026-10-08", "04:00"))
   expect(quiet(nest, at("2026-10-07", "20:30"), at("2026-10-10", "12:00"))).toBe(0)
+  // A half day's after-hours end at 17:00: answered at 17:20 on the Friday
+  // after Thanksgiving, it waits for Monday's pre-market, not until 20:15.
+  const halfDay = clock => at("2026-11-27", clock)
+  const half = { pre: { start: halfDay("04:00"), end: halfDay("09:30") }, regular: { start: halfDay("09:30"), end: halfDay("13:00") },
+    post: { start: halfDay("13:00"), end: halfDay("17:00") } }
+  expect(quiet({ ...nest, session: half, current: half }, halfDay("17:20"), halfDay("18:00"))).toBe(at("2026-11-30", "04:00"))
   // The S&P 500 is on the US calendar (S&P is one of its exchanges), at the
   // refresh interval through Thursday's session. Its periods stay the last
   // session's until its open, so its calendar's hours say whether it may

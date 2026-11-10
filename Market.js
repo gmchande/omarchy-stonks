@@ -169,6 +169,14 @@ function segmentsOn(cal, dateString) {
   return out
 }
 
+// The after-hours last as long after a half day's 13:00 close as after a
+// full day's, so they end at 17:00. For a day the market trades.
+function postClose(cal, date) {
+  var segs = segmentsOn(cal, date)
+  var full = epochAt(cal, date, cal.post.close)
+  return Math.min(full, segs[segs.length - 1].end + full - epochAt(cal, date, cal.post.open))
+}
+
 function nextOpen(cal, t) {
   if (!cal) return null
   var dateString = dateStringOf(localDate(t, cal))
@@ -397,7 +405,7 @@ function tradingDay(cal, date) {
   var open = nextOpen(cal, epochAt(cal, nextDateString(date), "00:00"))
   return {
     from: segs.length ? opens(date, segs[0].start) : 0,
-    to: segs.length ? (cal.post ? epochAt(cal, date, cal.post.close) : segs[segs.length - 1].end) : 0,
+    to: segs.length ? (cal.post ? postClose(cal, date) : segs[segs.length - 1].end) : 0,
     next: open ? opens(open.dateString, open.t) : 0
   }
 }
@@ -451,7 +459,7 @@ function twoDays(quote, now, calendars) {
   var printedSince = function(t) { return pts.length > 0 && pts[pts.length - 1].t >= t }
   if (cal && cal.pre) {
     var pre = epochAt(cal, date, cal.pre.open)
-    return segs.length > 0 && now >= pre && (now < segs[0].start || (now < epochAt(cal, date, cal.post.close) && !printedSince(pre)))
+    return segs.length > 0 && now >= pre && (now < segs[0].start || (now < postClose(cal, date) && !printedSince(pre)))
   }
   var open = segs.length ? { start: segs[0].start, end: segs[segs.length - 1].end } : !cal && quote.current ? quote.current.regular : null
   return !!open && now >= open.start && now < open.end && !printedSince(open.start)
