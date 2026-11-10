@@ -9,8 +9,8 @@ import "plugin/Settings.js" as Settings
 import "plugin" as Stonks
 
 // The real Panel and a real pill on a stub service, offscreen, its card in a
-// plain window (CardWindow.qml) and pressed with real Qt keys: the card
-// shrinking to the key sheet, its key route through the shell's catcher,
+// plain window (CardWindow.qml) and pressed with real Qt keys: the key
+// sheet over the card, its key route through the shell's catcher,
 // what an open tells the service and the bar, and the pill's wheel and
 // tooltip. On the real Service and version watch, the first-run hint, the
 // footer's notices, the undo, and search's field keeping the keys.
@@ -288,8 +288,8 @@ Harness {
       harness.check("in the panel, a over the key sheet opens search alone, and ↓ shows the rows",
         searchAlone && !body.showingHelp, searchAlone + "|" + body.showingHelp)
 
-      // The card shrinks to the key sheet, the list with it; Manage lists
-      // keeps the card's height. A key pressed over them acts on the cursor.
+      // The key sheet and Manage lists keep the card's height. A key pressed
+      // over them acts on the cursor.
       var wl = body.watchlist
       var keyedRow = wl.cursorRow
       var kept = []
@@ -384,10 +384,10 @@ Harness {
         replaying && !body.motion.replayRunning && body.scrubT === 0 && !body.showingHelp,
         [replaying, body.motion.replayRunning, body.scrubT, body.showingHelp].join("|"))
 
-      // Under the key sheet the rows' view is what counts, though the card
-      // has shrunk to the sheet: a cursor whose row leaves it, by a removal
-      // of a row above it on the view's top row or by a sort that carries it
-      // below, is let go, so Delete or Enter never acts out of sight.
+      // Under the key sheet the rows' view is what counts: a cursor whose
+      // row leaves it, by a removal of a row above it on the view's top row
+      // or by a sort that carries it below, is let go, so Delete or Enter
+      // never acts out of sight.
       harness.setFixtureWatchlist()
       var list = panel.testWatchlist
       within(2000, function() { return list.displayedSymbols.length === 22 && list.interactive })

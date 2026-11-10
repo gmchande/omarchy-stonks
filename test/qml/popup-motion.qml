@@ -197,6 +197,27 @@ Harness {
       filmed(label, verdict.ok, verdict)
     }
 
+    // The key sheet opened and closed again, filmed: every frame shows the
+    // card's edge where it rests, and the footer comes back where it was.
+    function sheetHolds(label) {
+      var footer = find(panel.testBody, "footer")
+      var footerAt = footer.mapToItem(panel.testCard.surface, 0, 0).y
+      var edge = edgeHeight()
+      grab.source = panel.testCard.surface
+      grab.begin(label.replace(/[^a-z0-9]+/gi, "-"))
+      moreFrames(4)
+      key("?")
+      tryVerify(function() { return panel.testBody.showingHelp }, 2000)
+      moreFrames(8)
+      key("?")
+      tryVerify(function() { return !panel.testBody.showingHelp }, 2000)
+      moreFrames(8)
+      var held = verdict("edgeheld")
+      var footerAfter = footer.mapToItem(panel.testCard.surface, 0, 0).y
+      var still = edgeHeight() === edge && footerAfter === footerAt
+      filmed(label, held.ok && still, held, still ? "" : " | edge " + edge + " -> " + edgeHeight() + ", footer " + footerAt + " -> " + footerAfter)
+    }
+
     function test_edge() {
       // All of six, a list of two, and an empty one.
       ["FLAT", "DOWN", "STRAY"].forEach(function(s) { service.addSymbol(s) })
@@ -222,11 +243,13 @@ Harness {
       eases("a switch to a shorter list eases the edge up, the footer riding it", function() { service.switchList("Short") })
       eases("a switch to a longer list eases the edge down, the footer covering the rows it passes", function() { service.switchList("") })
 
-      // As the key sheet closes and the card grows, the footer's line and
-      // words must not draw through the rows.
-      key("?")
-      tryVerify(function() { return panel.testBody.showingHelp && edgeAtRest() }, 2000)
-      eases("the key sheet closing eases the edge down, the footer covering the rows it passes", function() { key("?") })
+      // The key sheet keeps the card's height, on a full list and on an
+      // empty one, so nothing under its edge moves.
+      ;[["", "the full list"], ["Empty", "an empty list"]].forEach(function(list) {
+        service.switchList(list[0])
+        rest()
+        sheetHolds("on " + list[1] + ", opening and closing the key sheet leaves the edge where it is and the footer where it was")
+      })
 
       service.switchList("Short")
       rest()
@@ -279,14 +302,16 @@ Harness {
     }
 
     // Reopened during its close's fade, the panel eases from the height still
-    // on screen: the key sheet, closed by the open, gives way to the rows
-    // from the sheet's height, never at once.
+    // on screen: the list menu on an empty list, closed by the open, gives
+    // way to the list from the menu's height, never at once.
     function reopenMidFade() {
+      service.createList("Bare")
+      service.switchList("Bare")
       panel.open()
       rest()
-      key("?")
-      tryVerify(function() { return panel.testBody.showingHelp && edgeAtRest() }, 2000)
-      var sheet = edgeHeight()
+      key("w")
+      tryVerify(function() { return panel.testBody.listMenuOpen && edgeAtRest() }, 2000)
+      var menu = edgeHeight()
       panel.close()
       var fading = panel.testCard.visible
       panel.open()
@@ -294,13 +319,14 @@ Harness {
       var between = false
       tryVerify(function() {
         var h = edgeHeight()
-        if (Math.abs(h - sheet) > 1 && Math.abs(h - panel.fittedCardHeight) > 1) between = true
+        if (Math.abs(h - menu) > 1 && Math.abs(h - panel.fittedCardHeight) > 1) between = true
         return h === panel.fittedCardHeight
       }, 2000)
       check("reopened during its close's fade, the panel eases from the height still on screen",
-        fading && Math.abs(first - sheet) <= 1 && between && Math.abs(sheet - panel.fittedCardHeight) > 1,
-        fading + " | " + sheet + " -> " + first + " -> " + edgeHeight() + (between ? ", eased" : ", at once"))
+        fading && Math.abs(first - menu) <= 1 && between && Math.abs(menu - panel.fittedCardHeight) > 1,
+        fading + " | " + menu + " -> " + first + " -> " + edgeHeight() + (between ? ", eased" : ", at once"))
       panel.close()
+      service.switchList("")
     }
 
     // With the shell's animations off (`omarchy toggle animations`), the
