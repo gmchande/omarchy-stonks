@@ -264,7 +264,7 @@ Item {
         // Read where the chart is drawn, so the right edge reaches the last
         // print.
         onPositionChanged: function(mouse) {
-          if (!root.replayRunning) root.scrubRequested((root.retro ? pixelChart : dayChart).fractionAt(mouse.x))
+          if (!root.replayRunning) root.scrubRequested(root.retro ? pixelChart.fractionAt(mouse.x) : dayChart.fractionAt(mouse.x))
         }
         onExited: if (!root.replayRunning) root.scrubCleared()
         onClicked: root.snapToNow()
