@@ -132,7 +132,7 @@ Item {
   readonly property string notice: unsaved ? "Your changes aren't saved"
     : settingsUnreadable ? "Couldn't load your lists"
     : updatedTo !== "" ? "Updated to " + updatedTo + " · click to restart the shell" : ""
-  readonly property string listsFile: "~/.config/omarchy/" + (service ? service.pluginId : "") + ".json"
+  readonly property string listsFile: "~/" + Settings.listsFile(service ? service.pluginId : "")
   readonly property var noticeActions: settingsUnreadable
     ? ["fix or remove " + listsFile, "fix " + listsFile]
     : unsaved ? ["click to try again"] : []

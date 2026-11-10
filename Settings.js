@@ -108,6 +108,12 @@ function barEntryFor(config, id) {
   return null
 }
 
+// The lists file, from the home folder: Omarchy's config folder holds one
+// for a plugin, named by its id.
+function listsFile(pluginId) {
+  return ".config/omarchy/" + pluginId + ".json"
+}
+
 function normalizeRefreshInterval(value) {
   if (value === undefined || value === null || value === "") return 60
   var n = Math.floor(Number(value))

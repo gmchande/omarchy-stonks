@@ -76,7 +76,7 @@ Item {
   readonly property bool previewShown: previewRests && openSurfaces.indexOf(previewSurface) >= 0
   property var watched: []
 
-  readonly property string dataPath: pluginId ? Quickshell.env("HOME") + "/.config/omarchy/" + pluginId + ".json" : ""
+  readonly property string dataPath: pluginId ? Quickshell.env("HOME") + "/" + Settings.listsFile(pluginId) : ""
   readonly property string quotesPath: ownerOnly.folder ? ownerOnly.folder + "/quotes.json" : ""
 
   // All: every symbol, fetched once whatever lists hold it.
