@@ -131,8 +131,9 @@ function peRatio(figures, price, currency, rates) {
   return rate ? price / units.per / (eps.value * rate) : null
 }
 
+// One decimal under 100, as far as that decimal doesn't round up to it.
 function peText(value) {
-  return value < 100 ? value.toFixed(1) : Format.grouped(String(Math.round(value)))
+  return value < 99.95 ? value.toFixed(1) : Format.grouped(String(Math.round(value)))
 }
 
 // On 1Y the range is the chart's own low and high (`yearEnds`), so the line

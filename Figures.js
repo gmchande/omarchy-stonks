@@ -204,7 +204,8 @@ function dayLine(quote, today, day) {
     range: range,
     facts: [
       { label: "OPEN", value: Format.isFiniteNumber(q.dayOpen) ? Format.money(q.dayOpen, q.priceDigits) : "", widest: range.widest },
-      { label: "VOL", value: Format.isFiniteNumber(q.volume) ? Format.compactNumber(q.volume) : "", widest: Format.widest("999.9M") }
+      // Yahoo sends an index or a currency pair no volume, as a 0.
+      { label: "VOL", value: Format.isFiniteNumber(q.volume) && q.volume > 0 ? Format.compactNumber(q.volume) : "", widest: Format.widest("999.9M") }
     ]
   }
 }

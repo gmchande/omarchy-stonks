@@ -141,7 +141,7 @@ function words(o) {
     var today = Figures.exchangeDay(o.day, o.now)
     if (o.changeMode === "open") {
       var base = o.scrubT ? Figures.scrubbedBase(o.day, o.scrubT) : Quote.restingRead(quote, o.newest || null).base
-      out.from = "OPEN " + Format.money(base.dayOpen, digits)
+      out.from = Format.isFiniteNumber(base.dayOpen) ? "OPEN " + Format.money(base.dayOpen, digits) : ""
     } else if (o.scrubT || o.newest) {
       out.from = Figures.dayBaselineText(o.day, today, o.calendars)
     } else {
