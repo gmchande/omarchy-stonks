@@ -10,7 +10,7 @@
 // already shows or knows. The picture outlives the reader's clock, so its
 // times always name their zone. Knows nothing of drawing or of files.
 
-// Its axis ends at the newest print, so a picture taken at 16:03 has no empty
+// Its axis ends at the newest trade, so a picture taken at 16:03 has no empty
 // evening.
 function pictureDay(day) {
   if (!day || !day.points.length) return day
@@ -106,7 +106,7 @@ function words(o) {
     out.said = "on " + out.foot
   } else if (at.t) {
     out.foot = dateOf(quote, at.t, o.calendars) + " · " + (at.close ? "CLOSE " : "") + clockOf(quote, at.t, o.calendars)
-    out.said = at.close ? "at the close" : "at " + Market.printClock(quote, at.t, o.calendars)
+    out.said = at.close ? "at the close" : "at " + Market.tradeTime(quote, at.t, o.calendars)
   }
   var pts = o.history ? [] : o.day.points
   if (pts.length) {

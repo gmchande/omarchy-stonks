@@ -31,7 +31,7 @@ BarWidget {
   readonly property var featuredQuote: service && featuredSymbol ? (service.quotes[featuredSymbol] || null) : null
   // As its row shows it, with its newest price since the close.
   readonly property var featured: featuredQuote
-    ? Figures.rowModel(featuredQuote, 0, service.changeMode, service.newestPrints[featuredSymbol] || null) : null
+    ? Figures.rowModel(featuredQuote, 0, service.changeMode, service.newestTrades[featuredSymbol] || null) : null
   // The pill has no room for the newest price's session and time; the hover
   // says them.
   readonly property string newestNote: featured && featured.newest
@@ -60,7 +60,7 @@ BarWidget {
   // Judged without a quote too: a first fetch that failed is "! No data".
   readonly property var freshness: service && featuredSymbol
     ? Figures.freshness(service.entries[featuredSymbol] || null, featuredQuote, service.now, service.owed[featuredSymbol] || 0, false,
-      service.newestPrints[featuredSymbol] || null) : null
+      service.newestTrades[featuredSymbol] || null) : null
   readonly property bool warns: Figures.freshnessWarns(freshness)
   // The hover's words for the "!", in sentence case as a row says them, then
   // why and when Stonks tries again.

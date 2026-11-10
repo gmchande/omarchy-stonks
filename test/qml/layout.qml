@@ -274,7 +274,7 @@ Harness {
     property string listName: ""
     property var lists: [{ name: "", label: "All", count: symbols.length, symbols: symbols }]
     property var quotes: ({})
-    property var newestPrints: ({})
+    property var newestTrades: ({})
     property var entries: ({})
     property var calendars: null
     property string featuredSymbol: "AAPL"

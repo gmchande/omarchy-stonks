@@ -228,21 +228,21 @@ test("a Toronto time in 2027 and 2028 reads by Toronto's clock, and before any c
     clocks: [], session: { pre: null, post: null, regular: null }, points: [] }
   const july2027 = Date.UTC(2027, 6, 14, 20) / 1000
   const july2028 = Date.UTC(2028, 6, 14, 20) / 1000
-  expect([M.printClock(shop, july2027, calendars), M.printClock(shop, july2028, calendars)]).toEqual(["16:00", "16:00"])
+  expect([M.tradeTime(shop, july2027, calendars), M.tradeTime(shop, july2028, calendars)]).toEqual(["16:00", "16:00"])
   // A trade from before the calendars' first day, as a halted listing's last:
   // August 2025 was summer time, which no calendar lists.
   const august2025 = Date.UTC(2025, 7, 14, 19, 59) / 1000
-  expect([M.printClock(shop, august2025, calendars), load("Share.js").clockOf(shop, august2025, calendars)]).toEqual(["15:59", "15:59 EDT"])
+  expect([M.tradeTime(shop, august2025, calendars), load("Share.js").clockOf(shop, august2025, calendars)]).toEqual(["15:59", "15:59 EDT"])
   // A calendar that has run out, here Toronto's cut short at 31 December
   // 2026: its times come from Yahoo's offset, never its standard time.
   const ran = JSON.parse(JSON.stringify(calendars))
   ran.calendars.TSX.validThrough = "2026-12-31"
   ran.calendars.TSX.utcOffsets = ran.calendars.TSX.utcOffsets.slice(0, 1)
-  expect([M.printClock(shop, july2027, ran), load("Share.js").clockOf(shop, july2027, ran), M.dateOf(shop, july2027, ran)])
+  expect([M.tradeTime(shop, july2027, ran), load("Share.js").clockOf(shop, july2027, ran), M.dateOf(shop, july2027, ran)])
     .toEqual(["16:00", "16:00 EDT", "WED 14 JUL 2027"])
   // Inside the calendar, its clock still decides, whatever offset the quote
   // holds: December's close is 16:00 EST, not 17:00 EDT.
-  expect(M.printClock(shop, M.epochAt(TSX, "2026-12-30", "16:00"), ran)).toBe("16:00")
+  expect(M.tradeTime(shop, M.epochAt(TSX, "2026-12-30", "16:00"), ran)).toBe("16:00")
   // The years' holidays and Christmas Eve's early close, by TSX's rules.
   const kinds = ["2027-05-24", "2027-12-24", "2027-12-27", "2027-12-28", "2028-01-03", "2028-07-03", "2028-12-26", "2028-12-29"]
     .map(day => M.dayKind(TSX, day).kind)
@@ -1338,8 +1338,8 @@ test("a refresh asks again only for quotes answered more than 10 s ago, and for 
   const now = at(WED, "12:00")
   const entries = { OLD: answered(now - 11), NEW: answered(now - 10), KEPT: { status: "saved", receivedAt: 1, answeredAt: 0 } }
   expect(M.refreshQuotes(["OLD", "NEW", "KEPT", "NONE"], entries, now)).toEqual(["OLD"])
-  expect(M.refreshPrints(["AAPL", "SHEL.L"], ["AAPL"], now - 11, now)).toEqual(["AAPL"])
-  expect(M.refreshPrints(["AAPL"], ["AAPL"], now - 10, now)).toEqual([])
+  expect(M.refreshTrades(["AAPL", "SHEL.L"], ["AAPL"], now - 11, now)).toEqual(["AAPL"])
+  expect(M.refreshTrades(["AAPL"], ["AAPL"], now - 10, now)).toEqual([])
 })
 
 test("a quote run charts the pill's quote first and the other heroes next, then the rest in spark batches of 20 in the order asked", () => {
@@ -1412,33 +1412,33 @@ test("Robinhood is asked once for each stock the pill shows with nothing open by
   // live; what Robinhood has answered for it is enough, failed or not. The
   // pill moved to another stock asks about that one.
   const noon = at(WED, "14:00")
-  expect(asks({ now: noon })).toEqual({ tradability: ["AAPL"], prints: ["AAPL"] })
+  expect(asks({ now: noon })).toEqual({ tradability: ["AAPL"], trades: ["AAPL"] })
   expect(asks({ now: noon, quoteEntries: { AAPL: { status: "saved", receivedAt: 1, answeredAt: 0 } } })).toBe(null)
   const answeredNoon = status => ({ allDay: { AAPL: { status, allDay: false, at: noon - DAY - 60 } }, nights: { AAPL: { status, bars: [], at: noon - 3600 } } })
   expect(asks({ now: noon, ...answeredNoon("ok") })).toBe(null)
   expect(asks({ now: noon, ...answeredNoon("failed") })).toBe(null)
   expect(asks({ now: noon, ...answeredNoon("ok"), pill: "MSFT", quoteEntries: { MSFT: answered(noon) } }))
-    .toEqual({ tradability: ["MSFT"], prints: ["MSFT"] })
+    .toEqual({ tradability: ["MSFT"], trades: ["MSFT"] })
   // Nothing open while a night trades: the pill's stock alone, each 5
   // minutes, so its newest price stays current; All's rows wait for a
   // surface to open, asked or not.
-  expect(asks({})).toEqual({ tradability: ["AAPL"], prints: ["AAPL"] })
+  expect(asks({})).toEqual({ tradability: ["AAPL"], trades: ["AAPL"] })
   const pillAnsweredAgo = ago => ({ allDay: { AAPL: { status: "ok", allDay: true, at: now - 60 } },
     nights: { AAPL: { status: "ok", at: now - ago } } })
   expect(asks(pillAnsweredAgo(60))).toBe(null)
-  expect(asks(pillAnsweredAgo(5 * 60))).toEqual({ tradability: [], prints: ["AAPL"] })
+  expect(asks(pillAnsweredAgo(5 * 60))).toEqual({ tradability: [], trades: ["AAPL"] })
   // The pill on an index, answered live: with nothing open, by day or while
   // a night trades, Robinhood is never asked about it.
   const index = { pill: "^GSPC", quoteEntries: { "^GSPC": answered(now) } }
   expect([asks({ ...index, now: noon }), asks(index)]).toEqual([null, null])
   // A surface open: every US listing, the pill's alone while it has no
   // answer.
-  expect(asks({ open: true })).toEqual({ tradability: ["AAPL"], prints: ["AAPL"] })
+  expect(asks({ open: true })).toEqual({ tradability: ["AAPL"], trades: ["AAPL"] })
   const pillAnswered = ago => ({ open: true, allDay: { AAPL: { status: "ok", allDay: true, at: now - 60 } }, nights: { AAPL: { status: "ok", at: now - ago } } })
-  expect(asks(pillAnswered(60))).toEqual({ tradability: ["MSFT"], prints: ["MSFT"] })
+  expect(asks(pillAnswered(60))).toEqual({ tradability: ["MSFT"], trades: ["MSFT"] })
   // Prints asked 3 minutes ago go with those due, within half of a night's
   // 5 minutes.
-  expect(asks(pillAnswered(180)).prints).toEqual(["AAPL", "MSFT"])
+  expect(asks(pillAnswered(180)).trades).toEqual(["AAPL", "MSFT"])
   // One Robinhood trades only by day never has its prints asked.
   const byDay = { ...pillAnswered(60), allDay: { AAPL: { status: "ok", allDay: true, at: now - 60 }, MSFT: { status: "ok", allDay: false, at: now - 60 } } }
   expect(asks(byDay)).toBe(null)
@@ -1446,13 +1446,13 @@ test("Robinhood is asked once for each stock the pill shows with nothing open by
   // quote, is asked with them, alone first while it has no answer; off
   // view, it waits.
   const nvda = { preview: "NVDA", previewShown: true, previewQuote: { symbol: "NVDA", exchange: "NASDAQ", instrumentType: "EQUITY" } }
-  expect(asks({ ...pillAnswered(60), ...nvda })).toEqual({ tradability: ["NVDA"], prints: ["NVDA"] })
-  expect(asks({ ...pillAnswered(60), ...nvda, previewShown: false })).toEqual({ tradability: ["MSFT"], prints: ["MSFT"] })
+  expect(asks({ ...pillAnswered(60), ...nvda })).toEqual({ tradability: ["NVDA"], trades: ["NVDA"] })
+  expect(asks({ ...pillAnswered(60), ...nvda, previewShown: false })).toEqual({ tradability: ["MSFT"], trades: ["MSFT"] })
   // A preview already in All is asked as its row, not first; Toronto's never.
   const inAll = { ...pillAnswered(60), ...nvda, library: [...base.library, "NVDA"], overnightSymbols: ["AAPL", "MSFT", "NVDA"] }
-  expect(asks(inAll)).toEqual({ tradability: ["MSFT", "NVDA"], prints: ["MSFT", "NVDA"] })
+  expect(asks(inAll)).toEqual({ tradability: ["MSFT", "NVDA"], trades: ["MSFT", "NVDA"] })
   const toronto = { preview: "SHOP.TO", previewShown: true, previewQuote: { symbol: "SHOP.TO", exchange: "TOR", instrumentType: "EQUITY" } }
-  expect(asks({ ...pillAnswered(60), ...toronto })).toEqual({ tradability: ["MSFT"], prints: ["MSFT"] })
+  expect(asks({ ...pillAnswered(60), ...toronto })).toEqual({ tradability: ["MSFT"], trades: ["MSFT"] })
 })
 
 test("a refresh's chart is owed until a new answer replaces the one it had, then a chart with no answer is asked, and the day asks none", () => {

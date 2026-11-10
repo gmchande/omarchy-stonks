@@ -153,7 +153,7 @@ Item {
   property var quotes: ({})
   property var entries: ({})
   // Each listing's newest price since its close.
-  property var newestPrints: ({})
+  property var newestTrades: ({})
   // Robinhood's answers, for the day each row's line draws, held still while
   // the surface is closed; and the clock that slides its start, held still
   // while no screen shows the surface.
@@ -199,7 +199,7 @@ Item {
   }
   Binding on quotes { when: root.reading; value: root.service?.quotes; restoreMode: Binding.RestoreNone }
   Binding on entries { when: root.reading; value: root.service?.entries; restoreMode: Binding.RestoreNone }
-  Binding on newestPrints { when: root.reading; value: root.service?.newestPrints; restoreMode: Binding.RestoreNone }
+  Binding on newestTrades { when: root.reading; value: root.service?.newestTrades; restoreMode: Binding.RestoreNone }
   Binding on nights { when: root.reading; value: root.service?.nights; restoreMode: Binding.RestoreNone }
   Binding on allDay { when: root.reading; value: root.service?.allDay; restoreMode: Binding.RestoreNone }
   Binding on slideAt { when: root.showing; value: root.service?.viewSlideAt ?? 0; restoreMode: Binding.RestoreNone }
@@ -282,7 +282,7 @@ Item {
   readonly property var featuredGeometry: motion.geometry
   readonly property real scrubX: motion.scrubX
   readonly property bool dayScrubbed: !historyActive && scrubShown !== 0
-  readonly property var featuredNewest: featuredQuote && featuredDay ? Overnight.newestPrint(featuredQuote, motion.latest, calendars, featuredDay) : null
+  readonly property var featuredNewest: featuredQuote && featuredDay ? Overnight.newestTrade(featuredQuote, motion.latest, calendars, featuredDay) : null
   readonly property var dailyFeatured: featuredQuote
     ? Figures.rowModel(dayScrubbed ? featuredDay : featuredQuote, dayScrubbed ? scrubShown : 0, changeMode, featuredNewest) : null
   readonly property var featured: historyShown ? History.historyRowModel(history, featuredQuote, scrubShown) : dailyFeatured
@@ -396,14 +396,14 @@ Item {
   readonly property var keySheet: KeySheet.sheet()
   // Read from the view: `symbols` may lag a switch.
   readonly property var breadth: Object.assign({ list: view.list },
-    Figures.listBreadth(view.rows, quotes, watchlistScrubShown, changeMode, newestPrints))
+    Figures.listBreadth(view.rows, quotes, watchlistScrubShown, changeMode, newestTrades))
   readonly property alias watchlist: watchlist
   readonly property alias search: search
   // The list's own stocks the search names, each with the move its row
   // shows at rest. Asked only while search is open.
   readonly property var ownFound: adding ? Search.ownMatches(search.searchText, members, quotes).map(function(symbol) {
     var quote = quotes[symbol]
-    var row = quote ? Figures.rowModel(quote, 0, changeMode, newestPrints[symbol] || null) : null
+    var row = quote ? Figures.rowModel(quote, 0, changeMode, newestTrades[symbol] || null) : null
     return { symbol: symbol, name: quote ? quote.name : "", exchange: quote ? quote.exchange : "",
       move: row ? Format.lookSigns(row.changeLine, retro) : "", tone: row ? row.tone : "flat" }
   }) : []
@@ -1100,7 +1100,7 @@ Item {
   HeroBand {
     id: heroBand
     calendars: root.calendars
-    rowsDay: Figures.rowsDay(root.view.rows, root.quotes, root.newestPrints, root.now, root.calendars)
+    rowsDay: Figures.rowsDay(root.view.rows, root.quotes, root.newestTrades, root.now, root.calendars)
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: header.bottom
@@ -1185,7 +1185,7 @@ Item {
     visible: root.rowsShown
     view: root.view
     quotes: root.quotes
-    newestPrints: root.newestPrints
+    newestTrades: root.newestTrades
     nights: root.nights
     allDay: root.allDay
     slideAt: root.slideAt

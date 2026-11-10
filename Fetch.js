@@ -10,7 +10,7 @@ var ANSWER_MARK = "@@stonks"
 
 // Each cap is above the largest real answer, uncompressed: a day's chart up
 // to 22 KB, a spark of 20 listings 90 KB, a history of 500 bars 60 KB,
-// Robinhood's prints 56.3 KB a listing a day and 2.6 KB an hour, the rest a
+// Robinhood's trades 56.3 KB a listing a day and 2.6 KB an hour, the rest a
 // few KB.
 var DAY_CAP = 64000
 var SPARK_CAP = 400000

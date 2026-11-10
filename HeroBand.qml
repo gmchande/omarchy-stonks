@@ -75,7 +75,7 @@ Item {
   property var factLists: []
   property var rangeMarks: null
   property string baselineText: ""
-  // The clock, by which the hero's overnight print is old.
+  // The clock, by which the hero's overnight trade is old.
   property int now: 0
   // Whether the hero's change is the day's, which a click cycles.
   property bool changeCycles: true
@@ -233,14 +233,14 @@ Item {
 
       // A day with one bar or none says so on a patch of the ground, which
       // stops the dashed baseline short of it: a lone dot or an empty chart
-      // reads as broken. Beside a lone print it stands in the other half.
+      // reads as broken. Beside a lone trade it stands in the other half.
       Rectangle {
         objectName: "dayNote"
         readonly property string text: root.geometry && root.geometry.day ? Figures.dayNote(root.day, root.now, root.calendars) : ""
-        readonly property real printX: root.geometry && root.geometry.points.length === 1 ? root.geometry.points[0].x : -1
-        x: (printX < 0 ? parent.width / 2 : printX > 0.5 ? parent.width / 4 : parent.width * 3 / 4) - width / 2
+        readonly property real tradeX: root.geometry && root.geometry.points.length === 1 ? root.geometry.points[0].x : -1
+        x: (tradeX < 0 ? parent.width / 2 : tradeX > 0.5 ? parent.width / 4 : parent.width * 3 / 4) - width / 2
         anchors.verticalCenter: parent.verticalCenter
-        width: Math.min(parent.width / (printX < 0 ? 1 : 2), dayNoteText.implicitWidth + Style.space(16))
+        width: Math.min(parent.width / (tradeX < 0 ? 1 : 2), dayNoteText.implicitWidth + Style.space(16))
         height: dayNoteText.implicitHeight
         visible: text !== "" && !(root.held && root.dimmed > 0)
         color: root.ground
@@ -262,7 +262,7 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         // Read where the chart is drawn, so the right edge reaches the last
-        // print.
+        // trade.
         onPositionChanged: function(mouse) {
           if (!root.replayRunning) root.scrubRequested(root.retro ? retroChart.fractionAt(mouse.x) : smoothChart.fractionAt(mouse.x))
         }

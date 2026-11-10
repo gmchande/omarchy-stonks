@@ -16,7 +16,7 @@ Item {
   property var quote: null
   // For the time an "AS OF" names.
   property var calendars: null
-  // The line under the price names the newest print of all, by the day's
+  // The line under the price names the newest trade of all, by the day's
   // clock, against the quote's close.
   property var day: null
   property var latest: null
@@ -29,7 +29,7 @@ Item {
   // The line under the price takes its unit.
   property string changeMode: "pct"
   property bool scrubbing: false
-  // By which an overnight print is old.
+  // By which an overnight trade is old.
   property int now: 0
   property color foreground: Commons.Color.foreground
   property color dim: Tones.dim(foreground, Commons.Color.background)
@@ -41,7 +41,7 @@ Item {
   // Where the header gives its title way (`Header.titled`).
   property bool nameOnLine: false
   // The dashed line's legend, said in the strip while a scrub reads against
-  // it, where the extended-hours print steps aside.
+  // it, where the extended-hours trade steps aside.
   property string baselineText: ""
   property int priceSize: Style.font.displayLarge * 2
 
@@ -242,7 +242,7 @@ Item {
   }
 
   // The line under the price on the left, always in the same place and
-  // shape; the change's caption on the right. An old print is drawn dim,
+  // shape; the change's caption on the right. An old trade is drawn dim,
   // price and change too, so it reads as old beside a fresh one.
   Row {
     id: extendedLine

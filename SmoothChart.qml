@@ -8,7 +8,7 @@ import "Motion.js" as Motion
 // the price the change is measured from, and the line and its wash in the up
 // colour above it and the down colour below, as the retro columns fall. The day
 // adds dimmer hours, ticks at the bell and the night's edges, breaks, and the
-// dot on the newest bright print. Once tonight has traded, the baseline steps
+// dot on the newest bright trade. Once tonight has traded, the baseline steps
 // at the bell to the close just gone (`geometry.step`), and the line past it
 // takes its colours from there. Three layers, so each paints only when what
 // it draws changes: the baseline, the ink under a clip the draw-in widens, and
@@ -25,7 +25,7 @@ Item {
   // 0..1 along the axis, or -1 when not scrubbing.
   property real scrubX: -1
   // The baseline is always there; the ink draws in from the left to the
-  // newest print.
+  // newest trade.
   property real reveal: 1
   // A replay's place, 0..1, or -1 without one: the ink draws in behind it.
   property real replayX: -1
@@ -57,12 +57,12 @@ Item {
     var base = lastPoint ? Chart.baseAt(geometry, lastPoint.x) : null
     return base === null ? baselineColor : lastPoint.y > base ? belowColor : aboveColor
   }
-  // One print draws: the first print after midnight is a dot on its day.
+  // One trade draws: the first trade after midnight is a dot on its day.
   readonly property bool drawable: !!geometry && !!geometry.points && geometry.points.length >= 1
-  // The baseline draws with no print too, as on a day nobody traded.
+  // The baseline draws with no trade too, as on a day nobody traded.
   readonly property bool hasBaseline: !!geometry && typeof geometry.baselineY === "number" && isFinite(geometry.baselineY)
   readonly property bool hasStep: !!geometry && !!geometry.step
-  // The draw-in sweeps to the newest print's dot: the line's width and a half,
+  // The draw-in sweeps to the newest trade's dot: the line's width and a half,
   // and a pixel.
   readonly property real inkLast: drawable ? geometry.points[geometry.points.length - 1].x : 0
   readonly property real inkRight: Math.min(width, pad + inkLast * (width - pad * 2) + 4)
@@ -90,8 +90,8 @@ Item {
     return pad + fraction * (width - pad * 2)
   }
 
-  // The prints between `x0` and `x1` and the nearest either side, which the
-  // line joins to them, each with its half width or a lone print's dot, and
+  // The trades between `x0` and `x1` and the nearest either side, which the
+  // line joins to them, each with its half width or a lone trade's dot, and
   // the baseline. What is laid over the chart keeps clear of it (`RangeMarks`).
   function inkExtentIn(x0, x1) {
     var g = geometry
@@ -191,8 +191,8 @@ Item {
         var w = width - pad * 2
         var h = height - pad * 2
         var by = pad + geometry.baselineY * h
-        // The fill is about the day up to its last regular print. A range has
-        // no extended prints.
+        // The fill is about the day up to its last regular trade. A range has
+        // no extended trades.
         var lastRegular = -1
         for (var n = 0; n < pts.length; n++) if (!pts[n].ext) lastRegular = n
         var filled = runs(pts.slice(0, lastRegular + 1), function() { return true })
@@ -266,7 +266,7 @@ Item {
         return g
       }
 
-      // A lone print, a day's only one or one beside a break, is a dot three
+      // A lone trade, a day's only one or one beside a break, is a dot three
       // times the line's width, so it reads at a glance. It never breathes:
       // that is the live dot's alone.
       function strokeRuns(ctx, lines, pad, w, h) {
@@ -334,7 +334,7 @@ Item {
   // market is open, a new price or the dot's first showing (an open, a new
   // chart, a draw-in's end) starts three ripples, about 6 s, and a newer price
   // starts them over. A range has no dot: its last bar need not be the
-  // headline print.
+  // headline trade.
   Item {
     id: dot
     visible: root.day && root.lastPoint !== null && root.reveal >= 1 && root.replayX < 0

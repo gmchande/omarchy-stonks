@@ -117,7 +117,7 @@ var STRAY_RUN = 3
 // Yahoo has mixed in at most four strays in one run.
 var MIXED_RUN = 4
 
-// Yahoo drops stray prints into intraday buckets, such as a bell bucket
+// Yahoo drops stray trades into intraday buckets, such as a bell bucket
 // back at yesterday's close. A stray shows by the series carrying on as if it
 // never happened, not by its size: one saved stray is 0.8%. A move within two
 // ticks, or a bar with shares traded, is a trade: no saved stray traded any,
@@ -342,7 +342,7 @@ function parseChart(json, centExchanges, receivedAt) {
     // The session the day's open, high, low and volume belong to.
     figuresDay: figuresDay,
     nextDayBegun: nextDayBegun,
-    // Its prints are all the day will have, so the chart ends at the last
+    // Its trades are all the day will have, so the chart ends at the last
     // (`Overnight.tradedAxis`).
     wholeDay: !!regular && Format.isFiniteNumber(receivedAt) && receivedAt >= (periods.post || periods.regular).end,
     session: {
@@ -374,7 +374,7 @@ function parseChart(json, centExchanges, receivedAt) {
   return rolled ? Object.assign(out, rolled) : out
 }
 
-// A coin never closes, so its day is its last 24 hours, from the print 24
+// A coin never closes, so its day is its last 24 hours, from the trade 24
 // hours before the newest: the move, the chart and the figures all read them.
 // Its low and high come from its bars, which a close can miss. Yahoo's
 // `regularMarketVolume` already covers 24 hours for a coin. Null for an answer
@@ -555,7 +555,7 @@ function regularPoints(quote) {
   return out
 }
 
-// Yahoo's regular-market quote, the latest regular print or the close, can
+// Yahoo's regular-market quote, the latest regular trade or the close, can
 // be stamped after the bell or belong to the previous session.
 function headlineQuote(quote) {
   if (Format.isFiniteNumber(quote.price)) {
@@ -585,7 +585,7 @@ function headlineBase(quote) {
 }
 
 // Every place a price shows at rest reads this, so none disagree: the newest
-// print since the close (`Overnight.newestPrint`), else the headline.
+// trade since the close (`Overnight.newestTrade`), else the headline.
 function restingRead(quote, newest) {
   if (newest)
     return { price: newest.p, t: newest.t, base: { prevClose: newest.base, dayOpen: newest.own ? headlineBase(quote).dayOpen : null } }
@@ -593,7 +593,7 @@ function restingRead(quote, newest) {
   return { price: head ? head.price : null, t: head ? head.t : null, base: headlineBase(quote) }
 }
 
-function extendedPrint(quote, latest) {
+function extendedTrade(quote, latest) {
   var pts = quote.points
   var last = latest || pts[pts.length - 1]
   if (!quote.session.regular || !last) return null
@@ -601,15 +601,15 @@ function extendedPrint(quote, latest) {
   return phase === "reg" ? null : { t: last.t, p: last.p, phase: phase }
 }
 
-// Once Yahoo's quote is the close, the session's last print reads it at the
+// Once Yahoo's quote is the close, the session's last trade reads it at the
 // bell: the S&P 500's last bar is 15:55's, not its close. Not at the quote's
 // own stamp, which can come later: London's 16:30 close has come stamped
 // 17:20, after its after-hours buckets.
 function readingAt(quote, t) {
   var pts = quote.points
   if (!pts.length || t < pts[0].t) return { price: dayBase(quote), t: t, close: false }
-  // Search by halves: walking from the first print would cost every row a
-  // step per print on each scrub step.
+  // Search by halves: walking from the first trade would cost every row a
+  // step per trade on each scrub step.
   var k = 0
   var top = pts.length - 1
   while (k < top) {
@@ -633,31 +633,31 @@ function change(quote, priceNow, mode) {
 }
 
 // The bell's bucket is the session's when it holds the closing trade, and so
-// is a print at the close's price seconds later: Yahoo restating the close.
+// is a trade at the close's price seconds later: Yahoo restating the close.
 function pointSession(quote, pt) {
   if (pt.s) return pt.s
   if (quote.crypto) return "reg"
-  var reg = regularOrPrints(quote)
-  if (pt.t === reg.end && closingPrint(quote, pt)) return "reg"
-  if (pt.t > reg.end && pt.t < reg.end + 60 && !!quote.session.regular && closingPrint(quote, { t: reg.end, p: pt.p })) return "reg"
+  var reg = regularOrTrades(quote)
+  if (pt.t === reg.end && closingTrade(quote, pt)) return "reg"
+  if (pt.t > reg.end && pt.t < reg.end + 60 && !!quote.session.regular && closingTrade(quote, { t: reg.end, p: pt.p })) return "reg"
   return pt.t >= reg.end ? "post" : pt.t < reg.start ? "pre" : "reg"
 }
 
 // Yahoo stamps its regular price inside the bell's bucket when that bucket
 // holds the close. London stamps its close an hour on (`readingAt`).
-function closingPrint(quote, pt) {
+function closingTrade(quote, pt) {
   var t = quote.marketTime
   return !!quote.session.regular && Format.isFiniteNumber(quote.price) && t !== null && t >= pt.t && t < pt.t + 300
     && sameClose(pt.p, quote.price)
 }
 
 // Yahoo can send no regular session.
-function regularOrPrints(quote) {
+function regularOrTrades(quote) {
   var pts = quote.points
   return quote.session.regular || { start: pts[0] ? pts[0].t : 0, end: pts.length ? pts[pts.length - 1].t : 1 }
 }
 
-function lastPrintTime(quote) {
+function lastTradeTime(quote) {
   var pts = quote.points
   return pts.length ? pts[pts.length - 1].t : null
 }

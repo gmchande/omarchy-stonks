@@ -57,7 +57,7 @@ var ASKED_GRACE = 2
 // `owedSince` is `QuoteFeed.owed`'s, `inGrace` `Service.asking`'s. Only a
 // quote Stonks let go old keeps its age unsaid while asked: a source that
 // sends late, as London's 15 minutes, is answered every minute and says
-// "As of" throughout. The time is the newest price's, as a Robinhood print
+// "As of" throughout. The time is the newest price's, as a Robinhood trade
 // stays on top while Yahoo fails.
 function freshness(entry, quote, now, owedSince, inGrace, newest) {
   var head = quote ? Quote.headlineQuote(quote) : null
@@ -72,7 +72,7 @@ function freshness(entry, quote, now, owedSince, inGrace, newest) {
     : entry && entry.status === "saved" ? "saved"
     : asOf !== null && Market.isTrading(phase) && now - asOf > LIVE_QUOTE_MAX_AGE ? (asking ? "asking" : "aged")
     : "fresh"
-  // `now`: the words name the day when it isn't the clock's, as a print does (`Market.printDay`).
+  // `now`: the words name the day when it isn't the clock's, as a trade does (`Market.tradeDay`).
   return { state: state, asOf: shownAt, session: newest ? newest.phase : "", now: now,
     live: asOf !== null && state === "fresh" && Market.isTrading(phase), phase: phase }
 }
@@ -91,8 +91,8 @@ function freshnessText(fresh, quote, calendars, timed) {
   // it says when.
   var chartTrade = head && head.source === "chart"
   var lead = fresh.session ? Market.phaseLabel(fresh.session).toUpperCase() + " " : chartTrade ? "LAST TRADE · " : "AS OF "
-  var asOf = lead + Market.printDay(quote, fresh.asOf, fresh.now, calendars).toUpperCase()
-    + Market.printClock(quote, fresh.asOf, calendars)
+  var asOf = lead + Market.tradeDay(quote, fresh.asOf, fresh.now, calendars).toUpperCase()
+    + Market.tradeTime(quote, fresh.asOf, calendars)
   if (fresh.state === "failed") return "REFRESH FAILED · " + asOf
   if (fresh.state === "overdue") return "NOT UPDATING · " + asOf
   if ((chartTrade && !(fresh.session && timed)) || fresh.state === "aged" || fresh.state === "saved") return asOf
@@ -127,12 +127,12 @@ function hostPause(pause, pausedUntil, now) {
 }
 
 // An exchange with no extended session echoes its close as a pre- or
-// post-market print, so one that reads as the close is left out; an
-// overnight print is a trade, and stays. Since the open the move still
+// post-market price, so one that reads as the close is left out; an
+// overnight one is a trade, and stays. Since the open the move still
 // counts from the close: one from the open would count the regular session
 // again under an AFTER HOURS label.
 function extendedStack(quote, latest, now, day, changeMode) {
-  var ext = Quote.extendedPrint(quote, latest)
+  var ext = Quote.extendedTrade(quote, latest)
   var close = Quote.regularClose(quote)
   var overnight = !!ext && ext.phase === "overnight"
   var digits = quote.priceDigits
@@ -144,7 +144,7 @@ function extendedStack(quote, latest, now, day, changeMode) {
     changeText: Format.changeText(chg, unit, digits),
     tone: Format.changeTone(chg, unit, digits),
     label: overnight ? "OVERNIGHT" : ext.phase === "post" ? "AFTER HOURS" : "PRE-MARKET",
-    time: overnight ? Market.printClock(day || quote, ext.t) : "",
+    time: overnight ? Market.tradeTime(day || quote, ext.t) : "",
     stale: overnight && now - ext.t > Overnight.OVERNIGHT_STALE
   }
 }
@@ -154,7 +154,7 @@ function extendedStack(quote, latest, now, day, changeMode) {
 // before that it may be the first of many. They count every trade of the
 // day (`day.trades`), as its low and high do, though the chart's start may
 // have slid past some, and name the day of one that isn't today's. An empty
-// day says nothing before its bell, as an index has no print before it, nor
+// day says nothing before its bell, as an index has no trade before it, nor
 // beside a quote that is a trade of its session. Yahoo stamps its live
 // moment at the price's own second, apart from the bars at their five-minute
 // starts.
@@ -163,7 +163,7 @@ function dayNote(day, now, calendars) {
   var pts = day.trades || day.points
   var over = now >= (day.axis && day.axis.closes ? day.axis.closes : Quote.dayEnd(day))
   if (pts.length === 1) return pts[0].t % (5 * 60) === 0 && over
-    ? "Traded only at " + Market.printDay(day, pts[0].t, now, calendars) + Market.printClock(day, pts[0].t, calendars) : ""
+    ? "Traded only at " + Market.tradeDay(day, pts[0].t, now, calendars) + Market.tradeTime(day, pts[0].t, calendars) : ""
   if (pts.length > 1) return ""
   var regular = day.session.regular
   if (!regular) return "No trades today"
@@ -321,7 +321,7 @@ function rowModel(quote, scrubT, mode, newest) {
 }
 
 // A moment of the coming day that a two-day answer holds, once that day has
-// a print, counts from the quote's own close with no open yet, as the 1D
+// a trade, counts from the quote's own close with no open yet, as the 1D
 // chart draws it (`Quote.tailDay`), so a row scrubbed into the pre-market
 // reads what the hero does. Once tonight has traded, a moment past the bell
 // counts from the close just gone, where the dashed line steps: the day
@@ -333,7 +333,7 @@ function scrubbedBase(quote, t, newest) {
   if (bell === null && newest && newest.joined && reg) bell = reg.end
   if (bell !== null && t >= bell) return { prevClose: Quote.regularClose(quote), dayOpen: null }
   var tail = Quote.tailStart(quote)
-  if (tail !== null && t >= tail && Quote.lastPrintTime(quote) >= tail) return { prevClose: Quote.regularClose(quote), dayOpen: null }
+  if (tail !== null && t >= tail && Quote.lastTradeTime(quote) >= tail) return { prevClose: Quote.regularClose(quote), dayOpen: null }
   return { prevClose: Quote.dayBase(quote), dayOpen: quote.dayOpen }
 }
 
@@ -363,7 +363,7 @@ function scrubBaselineText(day, t, today, calendars) {
 function closeLabel(quote, today, calendars) {
   var head = Quote.headlineQuote(quote)
   var day = head && head.t !== null ? pastDayName(quote, head.t, today) : ""
-  if (head && head.source === "chart") return { label: "LAST TRADE", time: (day ? day + " " : "") + Market.printClock(quote, head.t, calendars) }
+  if (head && head.source === "chart") return { label: "LAST TRADE", time: (day ? day + " " : "") + Market.tradeTime(quote, head.t, calendars) }
   return { label: (day ? day + " " : "") + "CLOSE", time: "" }
 }
 
@@ -451,7 +451,7 @@ function closeCountedFrom(quote, view, today, calendars) {
 // part since the close (`since`), which gives way first. Where the price on
 // top is a trade of the session or the close itself, the close it counts
 // from (`closeCountedFrom`); where it is the close and Yahoo holds a pre-
-// or after-hours print beside it, that print (`extendedStack`). Under the
+// or after-hours trade beside it, that trade (`extendedStack`). Under the
 // move, its name and the same move in the other unit (`view.unit`): TODAY
 // +4.57, OVERNIGHT −1.83, PRE-MARKET −5.74, FRI −0.43, 24H −795.72,
 // 1M −90.97, SINCE OPEN +9.34. A scrubbed moment keeps its amount and a
@@ -487,7 +487,7 @@ function newestNote(quote, newest, now, calendars) {
 
 // A row says it after the name.
 function newestTime(quote, newest, now, calendars) {
-  return Market.printDay(quote, newest.t, now, calendars) + Market.printClock(quote, newest.t, calendars)
+  return Market.tradeDay(quote, newest.t, now, calendars) + Market.tradeTime(quote, newest.t, calendars)
 }
 
 function newestStale(newest, now) {

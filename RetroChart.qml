@@ -8,7 +8,7 @@ import "Motion.js" as Motion
 // The retro chart, one rule for the day and every range: columns of cells
 // fill from the baseline row, in the up colour above it and the down colour
 // below. The day adds dimmer hours, the bell and the night's edges, and the
-// lit last print. Once tonight has traded, the baseline steps at the bell to
+// lit last trade. Once tonight has traded, the baseline steps at the bell to
 // the close just gone (`geometry.step`), and the columns from there stand on
 // it. The grid and the columns paint when the data changes; the draw-in
 // widens a clip a whole column at a time, and the ticks and the scrub are
@@ -21,8 +21,8 @@ Item {
   property color downColor: Commons.Color.urgent
   property color baselineColor: Tones.dimmer(Commons.Color.foreground, Commons.Color.background)
   property var up: true
-  // Lights the last regular print's cap. Off for small copies, and a range
-  // has none: its last bar need not be the headline print.
+  // Lights the last regular trade's cap. Off for small copies, and a range
+  // has none: its last bar need not be the headline trade.
   property bool glow: false
   // The cap blinks while the market trades, white, colour, white, as a sprite
   // does: four blinks, about 6 s, as a new price arrives or the surface opens,
@@ -43,7 +43,7 @@ Item {
   // 0..1 along the axis, or -1 when not scrubbing.
   property real scrubX: -1
   // The grid and the baseline are always there; the columns fill in from the
-  // left to the newest print's.
+  // left to the newest trade's.
   property real reveal: 1
   // A replay's place, 0..1, or -1 without one: the columns fill in behind it.
   property real replayX: -1
@@ -58,11 +58,11 @@ Item {
   readonly property bool directionKnown: typeof up === "boolean"
   readonly property color aboveColor: directionKnown ? upColor : baselineColor
   readonly property color belowColor: directionKnown ? downColor : baselineColor
-  // One print draws, as the first after midnight does: a cell.
+  // One trade draws, as the first after midnight does: a cell.
   readonly property bool drawable: !!geometry && !!geometry.points && geometry.points.length >= 1
-  // The baseline draws with no print too, as on a day nobody traded.
+  // The baseline draws with no trade too, as on a day nobody traded.
   readonly property bool hasBaseline: !!geometry && typeof geometry.baselineY === "number" && isFinite(geometry.baselineY)
-  // Through the newest print's column.
+  // Through the newest trade's column.
   readonly property int inkColumns: drawable
     ? Math.min(grid.columns, Math.floor(geometry.points[geometry.points.length - 1].x * grid.columns) + 1) : 0
   readonly property int scrubColumn: scrubX >= 0 ? Math.min(grid.columns - 1, Math.floor(scrubX * grid.columns)) : -1
@@ -88,8 +88,8 @@ Item {
   onAboveStemDimChanged: ink.requestPaint()
   onBelowStemDimChanged: ink.requestPaint()
 
-  // The last print in a column wins: the price at the end of that stretch. A
-  // column between two prints the line joins holds the one before it; only a
+  // The last trade in a column wins: the price at the end of that stretch. A
+  // column between two trades the line joins holds the one before it; only a
   // break (`brk`) leaves columns dark, as it lifts the smooth line. Columns
   // from `stepCol` on stand on `stepRow` (`baseRowAt`).
   function layout() {
@@ -114,7 +114,7 @@ Item {
     g.stepCol = step ? Math.max(0, Math.min(g.columns - 1, Math.floor(step.x * g.columns))) : g.columns
     g.stepRow = step ? Math.round(step.y * (g.rows - 1)) : g.baseRow
     var pts = geometry.points
-    // The lit cell sits on the last column whose own last print is bright,
+    // The lit cell sits on the last column whose own last trade is bright,
     // never on one held after it.
     var last = -1
     for (var i = 0; i < pts.length; i++) {

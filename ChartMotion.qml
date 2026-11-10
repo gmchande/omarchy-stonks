@@ -62,26 +62,26 @@ Item {
   readonly property bool historyShown: historyActive && !!history
   readonly property var quote: chart ? chart.quote : null
   readonly property var day: chart ? chart.day : null
-  // Where the day has a newer print than the quote's own, for the line under
+  // Where the day has a newer trade than the quote's own, for the line under
   // the price.
   readonly property var latest: chart ? chart.latest : null
   // A range whose first fetch failed shows the day.
   readonly property var geometry: historyShown ? History.historyGeometry(history)
     : day ? Chart.chartGeometry(day, calendars) : null
-  // Scrubbing and replay keep from the first print to the last: while the day
+  // Scrubbing and replay keep from the first trade to the last: while the day
   // runs, its axis runs past them, through hours with no price to read.
   readonly property int scrubStart: day && day.points.length ? day.points[0].t : 0
-  readonly property int scrubEnd: day && Quote.lastPrintTime(day) !== null ? Quote.lastPrintTime(day) : 0
+  readonly property int scrubEnd: day && Quote.lastTradeTime(day) !== null ? Quote.lastTradeTime(day) : 0
 
   // 0 for now.
   property int scrubT: 0
   // Retro's day moves in five minutes, but a scrub held at either end reads
-  // that print, so a lone trade or the newest isn't swapped for the one before.
+  // that trade, so a lone trade or the newest isn't swapped for the one before.
   readonly property int scrubShown: historyActive || !retro || !scrubT || scrubT === scrubStart || scrubT === scrubEnd ? scrubT
     : Math.max(scrubStart, Math.min(scrubEnd, Math.round(scrubT / 300) * 300))
   readonly property real scrubX: historyShown && scrubShown ? History.historyFraction(history, scrubShown)
     : (!historyActive && day && scrubShown ? Chart.fractionAtTime(day, scrubShown) : -1)
-  // The painters sweep the draw-in to the newest print, so a day partly gone
+  // The painters sweep the draw-in to the newest trade, so a day partly gone
   // takes its whole time too.
   property real reveal: 1
   property real replayPosition: 0

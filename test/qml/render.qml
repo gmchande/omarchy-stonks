@@ -394,7 +394,7 @@ Harness {
     property var nights: ({})
     property var allDay: null
     // Each listing's newest price since its close, as the service reads it.
-    readonly property var newestPrints: Chart.newestPrints(symbols, quotes, nights, allDay, calendars)
+    readonly property var newestTrades: Chart.newestTrades(symbols, quotes, nights, allDay, calendars)
     readonly property var view: ({ featured: featuredSymbol, range: range, list: listName, listKey: "=" + listName,
       order: order, reversed: reversed, rows: symbols, shown: shown, library: library,
       chart: Chart.viewChart(featuredSymbol, range, quotes, entries, histories, nights, allDay, root.overnight ? calendars : null) })
@@ -478,7 +478,7 @@ Harness {
         var day = moment("robinhood-day")
         var night = Overnight.parseOvernight(day, day.results.map(function(r) { return r.symbol })).JNJ
         var built = Overnight.dayChart(jnj, night, stub.calendars)
-        root.nightPill = { quote: jnj, newest: Overnight.newestPrint(jnj, built.latest, stub.calendars, built.day),
+        root.nightPill = { quote: jnj, newest: Overnight.newestTrade(jnj, built.latest, stub.calendars, built.day),
           night: Object.assign({ status: "ok" }, night) }
         root.now = sunday
       }
@@ -1390,7 +1390,7 @@ Harness {
                 property int now: root.now
                 property var owed: pillRow.modelData.trouble && pillRow.modelData.trouble !== "failed" ? { NEST: root.now - 91 } : ({})
                 readonly property var yahooGate: root.troubleGate((pillRow.modelData.trouble || "").replace("-noprice", ""))
-                property var newestPrints: night ? ({ JNJ: root.nightPill.newest }) : ({})
+                property var newestTrades: night ? ({ JNJ: root.nightPill.newest }) : ({})
                 property var nights: night ? ({ JNJ: root.nightPill.night }) : ({})
                 property var allDay: night ? ({ JNJ: { status: "ok", allDay: true, at: 0 } }) : ({})
                 property var calendars: night ? stub.calendars : null

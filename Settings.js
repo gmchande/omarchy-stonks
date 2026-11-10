@@ -59,8 +59,8 @@ function orderLabel(order, reversed) {
   return arrow + "  " + ORDER_LABELS[order]
 }
 
-// `newest`: each symbol's newest print since the close
-// (`Overnight.newestPrint`).
+// `newest`: each symbol's newest trade since the close
+// (`Overnight.newestTrade`).
 function sortedSymbols(symbols, quotes, order, reversed, changeMode, newest) {
   order = normalizeOrder(order)
   if (order === "manual") return symbols.slice()
