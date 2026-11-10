@@ -1,4 +1,6 @@
 import QtQuick
+import Quickshell
+import Quickshell.Io
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
@@ -60,6 +62,9 @@ Harness {
   // What Omarchy's panel keys mean in every widget's panel on the bar,
   // Stonks' among them, as one of the listed keys (Ui/PanelKeyCatcher.qml).
   readonly property var omarchy: ({ "j": "↓", "k": "↑", "h": "←", "l": "→", "Space": "⏎", "x": "Delete", "Shift+X": "Delete" })
+
+  // The stand-in curl's flags (bin/curl): a file there turns a fault on.
+  Process { id: flag }
 
   Stonks.Service { id: service; pluginId: "grvc.stonks" }
   Stonks.Updates { id: updates; pluginId: "grvc.stonks" }
@@ -290,6 +295,30 @@ Harness {
       var added = within(5000, function() { return service.symbols.indexOf("SHOP") >= 0 && !b.adding })
       harness.check("by keys alone, a, the words and Enter add the stock Yahoo finds",
         searching && added, searching + " " + service.symbols.join(",") + " adding " + b.adding)
+
+      // Yahoo's search down: the words say so beside RETRY, and Enter asks
+      // again, once. Words that name none of the list's own, which Enter
+      // would take at once.
+      var fault = function(on) {
+        flag.command = [on ? "touch" : "rm", "-f", Quickshell.env("STONKS_FAKE_STATE") + "/SEARCH.down"].filter(function(a) { return on ? a !== "-f" : true })
+        flag.running = true
+        tryVerify(function() { return !flag.running }, 2000)
+      }
+      quiet()
+      fault(true)
+      press("a")
+      typing("searchField")
+      type("zzz")
+      var retry = function() { var r = harness.find(b, "searchRetry"); return !!r && r.visible }
+      var failed = within(5000, retry)
+      var said = harness.texts(harness.find(b, "symbolSearch"), "searchMessage").join("")
+      fault(false)
+      var askedBefore = harness.calls("SEARCH.asked")
+      press("⏎")
+      var back = within(5000, function() { return !retry() && harness.findAll(b, "searchResult").length > 1 })
+      harness.check("with Yahoo's search down the words say so beside RETRY, and Enter asks again, once, and its results come",
+        failed && said !== "" && back && harness.calls("SEARCH.asked") === askedBefore + 1, [failed, said, back, harness.calls("SEARCH.asked") - askedBefore].join(" | "))
+      press("Esc")
 
       // w, down to New list, Enter, a name, Enter: the list is made and
       // shown, with search open to fill it.

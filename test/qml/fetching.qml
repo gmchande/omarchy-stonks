@@ -319,6 +319,25 @@ Harness {
       var rRuns = harness.runs().slice(runsBefore).filter(function(r) { return /chart:/.test(r) })
       harness.check("r twice within 5 s asks once", rRuns.length === 1, rRuns.join(" / "))
 
+      // A range's history is asked once, and kept a quarter hour: picked
+      // again inside it, nothing is asked, and after it, once more.
+      var asked = function() { return harness.calls("NEST.history") }
+      var historyFrom = asked()
+      body.selectRange("1M")
+      var once = within(3000, function() { return asked() === historyFrom + 1 && !!service.histories["NEST|1M"] })
+      body.selectRange("1D")
+      tick(300)
+      body.selectRange("1M")
+      tick(5, 1)
+      var kept = asked() === historyFrom + 1
+      body.selectRange("1D")
+      tick(900)
+      body.selectRange("1M")
+      var again = within(3000, function() { return asked() === historyFrom + 2 })
+      body.selectRange("1D")
+      harness.check("a range's history is asked once, kept a quarter hour, and asked again after it",
+        once && kept && again, [once, kept, again, asked() - historyFrom].join(" "))
+
       // Yahoo refuses: the run that meets it is the last for a pause of
       // about a minute, then one request goes alone. Back, the next lone
       // request reopens it.
