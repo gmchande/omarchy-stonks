@@ -218,7 +218,7 @@ o.bind("SUPER + SHIFT + T", "Stonks window", "omarchy-shell grvc.stonks toggleWi
 To use the window without the pill, run `omarchy plugin disable grvc.stonks`,
 then add `{ "id": "grvc.stonks" }` to `plugins` in
 `~/.config/omarchy/shell.json` to keep Stonks loaded. To bring the pill
-back, remove that entry, then run `omarchy plugin enable grvc.stonks center`.
+back, remove that entry, then run `omarchy plugin enable grvc.stonks`.
 
 To add Stonks to the app launcher:
 
@@ -311,7 +311,7 @@ again.
   If other sites load, Yahoo may be down or out of reach. Stonks retries
   within two minutes, and `r` retries at once.
 - **"Server busy".** Yahoo asked Stonks to send fewer requests. Stonks
-  retries at the time shown, at most about half an hour on, and `r` won't
+  retries at the time shown, at most 36 minutes on, and `r` won't
   hurry it.
 - **"Not updating" or "No data" on a row, or "Can't get prices" in the
   header.** A price hasn't come in time. When that's true of every stock
@@ -357,8 +357,9 @@ again.
   36 minutes on.
 - **"Couldn't search · try other words".** Yahoo can't search for what you
   typed, such as an emoji. Type other words.
-- **"market hours unknown".** Stonks carries each exchange's holidays and
-  early closes, and this exchange's calendar has run out. An early Stonks
+- **"market hours unknown".** Stonks carries the holidays and early
+  closes of New York, Toronto, London and Tokyo, and this exchange's
+  calendar has run out. An early Stonks
   worked out the next open for itself and got Labor Day wrong, so now it
   says when it doesn't know. Prices and times are still right.
   [Update Stonks](#update) for a new calendar.
@@ -409,10 +410,13 @@ time, when Yahoo's charts are empty.
   `md5sum` and `head`, once a run, to check its saved sounds.
 - For a screenshot: `sh` with `sed`, `tail`, `date`, and `head` to find
   your screenshots folder and name the file, `wl-copy` for the clipboard,
-  and `omarchy-notification-send`.
+  and `omarchy-notification-send`. A click on the notification opens the
+  picture in `omasnap`, or without it in `tensaku-edit` or the editor
+  `OMARCHY_SCREENSHOT_EDITOR` names.
 - Only when you ask for an update: `omarchy plugin update grvc.stonks` in
   a terminal, then `omarchy restart shell` when `git` shows the update
-  moved Stonks' folder.
+  moved Stonks' folder. After an update run elsewhere, `omarchy restart
+  shell` alone, when you click the footer or press `U`.
 
 **Sites**, and nothing else:
 

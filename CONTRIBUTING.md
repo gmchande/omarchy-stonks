@@ -8,7 +8,7 @@ the rules a change is judged by.
 - Clone the repo, or your fork, into
   `~/.config/omarchy/plugins/grvc.stonks`. Then run
   `omarchy-shell shell rescanPlugins` and
-  `omarchy plugin enable grvc.stonks center`. If Stonks is already
+  `omarchy plugin enable grvc.stonks`. If Stonks is already
   installed, that folder is already a clone: work there, or run
   `omarchy plugin remove grvc.stonks` first.
 - After a change, run `omarchy restart shell`. A hot reload can leave the
