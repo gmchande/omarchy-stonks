@@ -174,8 +174,8 @@ refreshed.
 
 Click the list's name to switch lists, start a new one, or manage them. All
 holds every symbol you follow, and your own lists each hold some of them.
-To choose which lists a row is in, Ctrl-click it, or select it and press
-Ctrl+Enter.
+To choose which lists a row is in, right-click it and pick "Choose lists…",
+Ctrl-click it, or select it and press Ctrl+Enter.
 
 To find a stock or add one, click "+ Find or add a symbol", or press `/`,
 and type a name or a symbol. Stocks already in the list you're looking at
@@ -186,17 +186,17 @@ one before you add it, and Enter or a click adds it.
 To remove a row, point at it and click the × beside its symbol, or select
 it and press Delete. It leaves the list you're looking at. Removing it from
 All removes it from every list, and asks first if one of your lists holds
-it. Right-click a row to remove it from this list or from every list, and
-Ctrl-click it to choose its lists one by one. For 5 seconds, a
-button such as "Undo NVDA" shows beside "+ Find or add a symbol". `Ctrl+Z` also
-undoes it, until you change a list again.
+it. Right-click a row to remove it from this list or from every list. For
+5 seconds, a button such as "Undo NVDA" shows beside "+ Find or add a
+symbol". `Ctrl+Z` also undoes it, until you change a list again.
 
 The line beside the list's name shows how many rows are up, in green, and
 down, in red. Point at it for the counts. Click the order at the right of
 the header, such as MANUAL, to sort by symbol, name, or change, or to go
 back to your own order. Click its arrow to reverse the sort. Sorting by
 change ranks rows by percent, even while they show amounts, since amounts
-in different currencies can't be compared.
+in different currencies can't be compared. In your own order, drag a row
+to move it.
 
 ## The window
 
@@ -271,7 +271,7 @@ screenshot editor.
 
 ## Keys
 
-`?` lists the same keys as this table:
+`?` lists the keys you'll use every day. This table has them all:
 
 | Key | Does |
 | --- | --- |
@@ -295,7 +295,7 @@ screenshot editor.
 | `r` | Refresh |
 | `Shift+U` | Update Stonks when a new version is out, and restart the shell to run it |
 | Tab or `Shift+Tab` | Switch to the bar's next or previous panel (panel only) |
-| `?` | Show every key |
+| `?` | Show the keys you'll use every day |
 | `Esc` | Close |
 
 ## If something's wrong

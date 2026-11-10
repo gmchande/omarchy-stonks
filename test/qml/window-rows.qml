@@ -245,7 +245,7 @@ Harness {
       var byClick = handOff(function() {
         var row = watchlist.rowItem("MSFT")
         mouseClick(row, row.width / 2, row.height / 2, Qt.RightButton)
-        tryVerify(function() { return harness.find(body, "rowMenuLine") !== null }, 1000)
+        tryVerify(function() { var lines = harness.findAll(body, "rowMenuLine"); return lines.length > 0 && harness.inPlace(lines) }, 1000)
         var line = harness.find(body, "rowMenuLine")
         mouseClick(line, line.width / 2, line.height / 2)
       })
@@ -866,7 +866,7 @@ Harness {
       wait(Application.styleHints.mouseDoubleClickInterval)
       var takeLine = function(row) {
         mouseClick(row, row.width / 2, row.height / 2, Qt.RightButton)
-        tryVerify(function() { return harness.find(body, "rowMenuLine") !== null }, 1000)
+        tryVerify(function() { var lines = harness.findAll(body, "rowMenuLine"); return lines.length > 0 && harness.inPlace(lines) }, 1000)
         var line = harness.find(body, "rowMenuLine")
         mouseClick(line, line.width / 2, line.height / 2)
         within(1000, function() { return body.rowMenu === null && settled(watchlist) })

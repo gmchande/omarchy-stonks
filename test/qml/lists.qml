@@ -89,14 +89,12 @@ Harness {
       within(interval + 100, function() { return Date.now() - app.testBody.watchlist.lastClickTime > interval })
     }
 
-    // The rows named `name` once their column has placed them: a
-    // Repeater's new rows sit at its top until the next frame.
+    // The rows named `name` once their column has placed them.
     function placed(name) {
       var items = []
       within(1000, function() {
         items = harness.findAll(app.testBody, name)
-        for (var i = 1; i < items.length; i++) if (items[i].y < items[i - 1].y + items[i - 1].height - 0.5) return false
-        return true
+        return harness.inPlace(items)
       })
       return items
     }
@@ -558,8 +556,9 @@ Harness {
         ctrlDouble === "true,true,true" && ctrlThenClick === "true,true,true", ctrlDouble + " | " + ctrlThenClick)
 
       // A right-click opens the row's menu at the pointer, on no line, and
-      // removes nothing, Escape closes it, and its first line takes the row
-      // out of this list only.
+      // removes nothing, Escape closes it, its last line opens the row's
+      // lists as Ctrl-click does, and its first takes the row out of this
+      // list only.
       clickApart()
       var aaplRow = wl.rowItem("AAPL")
       var held = function(symbol) { return service.lists.filter(function(l) { return l.symbols.indexOf(symbol) >= 0 }).length }
@@ -581,12 +580,21 @@ Harness {
       var escaped = menuShown() + "," + harness.same(service.symbols, ["AAPL", "NVDA"])
       clickApart()
       mouseClick(body, aaplAt.x, aaplAt.y, Qt.RightButton)
+      var menuLines = placed("rowMenuLine")
+      var chooseLists = menuLines[menuLines.length - 1]
+      var featuredBefore = service.featuredSymbol
+      mouseClick(chooseLists, chooseLists.width / 2, chooseLists.height / 2)
+      var chose = [menuShown(), body.listsSymbol, service.featuredSymbol === featuredBefore].join(",")
+      body.closeListViews()
+      keysBack()
+      clickApart()
+      mouseClick(body, aaplAt.x, aaplAt.y, Qt.RightButton)
       var fromWins = placed("rowMenuLine")[0]
       mouseClick(fromWins, fromWins.width / 2, fromWins.height / 2)
-      harness.check("a right-click on a row of a named list opens its menu at the pointer, removing nothing; Escape closes it; and \"Remove from Wins\" takes it out of that list only",
-        both && openedMenu === "AAPL Remove from Wins/Remove from all " + aaplLists + " lists -1,true,true" && escaped === "shut,true"
-          && harness.same(service.symbols, ["NVDA"]) && service.library.indexOf("AAPL") >= 0,
-        [both, openedMenu, escaped, service.symbols, service.library].join(" | "))
+      harness.check("a right-click on a row of a named list opens its menu at the pointer, removing nothing; Escape closes it; \"Choose lists…\" opens that row's lists; and \"Remove from Wins\" takes it out of that list only",
+        both && openedMenu === "AAPL Remove from Wins/Remove from all " + aaplLists + " lists/Choose lists… -1,true,true" && escaped === "shut,true"
+          && chose === "shut,AAPL,true" && harness.same(service.symbols, ["NVDA"]) && service.library.indexOf("AAPL") >= 0,
+        [both, openedMenu, escaped, chose, service.symbols, service.library].join(" | "))
 
       // Another surface switching the list closes a menu opened on Wins, so
       // "Remove from Wins" never acts in All. Opened as a key opens it, on

@@ -196,9 +196,12 @@ Harness {
       name: "Pointer"
       when: window.visible
 
-      // A click on the open row menu's line `index`, where its words are.
+      // A click on the open row menu's line `index`, where its words are, once
+      // its column has placed its lines.
       function takeMenuLine(index) {
-        var line = root.findAll(body, "rowMenuLine")[index]
+        var lines = []
+        within(1000, function() { lines = root.findAll(body, "rowMenuLine"); return lines.length > index && root.inPlace(lines) })
+        var line = lines[index]
         if (line) mouseClick(line, Style.space(20), line.height / 2)
       }
 

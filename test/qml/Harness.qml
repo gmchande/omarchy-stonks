@@ -38,6 +38,14 @@ ShellRoot {
     return out
   }
 
+  // Whether a column has placed `items`, each below the one before: a
+  // Repeater's new items sit at its top until the next frame, where a click
+  // meant for the first lands on the last.
+  function inPlace(items) {
+    for (var i = 1; i < items.length; i++) if (items[i].y < items[i - 1].y + items[i - 1].height - 0.5) return false
+    return true
+  }
+
   // The words a row of texts draws, its shown ones joined by spaces; "" while
   // the row is hidden.
   function rowWords(row) {

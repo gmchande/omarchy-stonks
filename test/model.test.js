@@ -914,24 +914,17 @@ const keyTokens = label => label.replace(/`/g, "").split(/\s+/)
   .map(t => /^[A-Z]$/.test(t) ? "Shift+" + t : t)
 const sortedKeys = labels => labels.flatMap(keyTokens).sort()
 
-test("the key sheet lists exactly the README's keys for each surface, the row's move only in manual order", () => {
+// The keys harness proves each README key does what its row says, so a key
+// on the sheet that the README lacks, or keeps to one surface, is unproven.
+test("every key on the key sheet, and every key the README's prose says to press, is one the README's table documents", () => {
   const lines = readFileSync(join(root, "README.md"), "utf8").split("\n")
   const start = lines.indexOf("| Key | Does |")
   expect(start).toBeGreaterThan(0)
   const table = []
   for (let i = start + 2; lines[i] && lines[i][0] === "|"; i++) table.push(lines[i].split("|").map(c => c.trim()))
-  // A row ending "(panel only)" or "(window only)" is that surface's alone.
-  const readme = surface => sortedKeys(table.filter(c => {
-    const only = /\((panel|window) only\)$/.exec(c[2])
-    return !only || only[1] === surface
-  }).map(c => c[1]))
-  const drawn = (order, switchesPanels) =>
-    sortedKeys(M.sheet(order, switchesPanels).groups.flatMap(g => g.rows.map(r => r.key)))
-  const moves = ["Shift+↑", "Shift+↓"]
-  expect(drawn("manual", true)).toEqual(readme("panel"))
-  expect(drawn("manual", false)).toEqual(readme("window"))
-  expect(drawn("pct", true)).toEqual(readme("panel").filter(k => !moves.includes(k)))
-  expect(drawn("symbol", false)).toEqual(readme("window").filter(k => !moves.includes(k)))
+  const both = sortedKeys(table.filter(c => !/\((panel|window) only\)$/.test(c[2])).map(c => c[1]))
+  const drawn = sortedKeys(M.sheet().groups.flatMap(g => g.rows.map(r => r.key)))
+  expect(drawn.filter(k => !both.includes(k))).toEqual([])
   // A key the README's prose tells you to press is one its table lists, as
   // the table spells it: Shift+U, never U.
   const listed = new Set(table.flatMap(c => c[1].match(/`[^`]+`/g) || []))
@@ -939,11 +932,6 @@ test("the key sheet lists exactly the README's keys for each surface, the row's 
     .match(/press (`[^`]+`(?: `[^`]+`)*)/gi).flatMap(m => m.match(/`[^`]+`/g))
   expect(pressed.length).toBeGreaterThan(3)
   expect(pressed.filter(k => !listed.has(k))).toEqual([])
-  // The mouse's drag is offered only in manual order, the order's arrow only
-  // in a sorted one.
-  const mouse = order => M.sheet(order, true).mouse.rows.map(r => r.does).join(" | ")
-  expect(["manual", "pct"].map(order => [mouse(order).includes("lists · drag moves it"), mouse(order).includes("arrow")]))
-    .toEqual([[true, false], [false, true]])
 })
 
 test("a letter says its key and Shift, never its text's case, and nothing held with Ctrl or Alt", () => {

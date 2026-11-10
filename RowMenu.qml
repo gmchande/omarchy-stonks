@@ -6,7 +6,8 @@ import qs.Commons as Commons
 import "Motion.js" as Motion
 
 // A row's removals, each line naming the lists it reaches ("Remove from all
-// 3 lists"). It looks and moves as the list menu does.
+// 3 lists"), and from a right-click, "Choose lists…". It looks and moves as
+// the list menu does.
 FocusScope {
   id: root
 

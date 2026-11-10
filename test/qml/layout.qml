@@ -1246,8 +1246,8 @@ Harness {
           creditWhole && barSays, creditSaid + " ends at " + creditEnd + " of the sheet's " + sheetHeight
             + " | " + Math.round(sheet.contentHeight) + " tall, bar " + (helpBar ? helpBar.visible + " " + helpBar.size : "none"))
 
-        // At the everyday size, what each key and gesture does takes one
-        // line, in the panel and in the window at its narrowest.
+        // At the everyday size, what each key does takes one line, in the
+        // panel and in the window at its narrowest.
         var wrapped = []
         var gatherDoes = function(node, where) {
           if (!node || node.visible === false) return
@@ -1268,8 +1268,7 @@ Harness {
           wrapped.length === 0, wrapped.join(", "))
 
         // After the text size changes while Stonks runs (`omarchy display
-        // text size 16`), every key and gesture on the key sheet still fits
-        // its column.
+        // text size 16`), every key on the key sheet still fits its column.
         var keySizeBefore = Style.fontBaseSize
         body.showingHelp = true
         wait(50)
@@ -1278,7 +1277,7 @@ Harness {
         var keysOver = []
         var gatherKeys = function(node) {
           if (!node || node.visible === false) return
-          if ((node.objectName === "helpKey" || node.objectName === "helpGesture") && Math.ceil(node.implicitWidth) > node.width)
+          if (node.objectName === "helpKey" && Math.ceil(node.implicitWidth) > node.width)
             keysOver.push(node.text + " " + Math.ceil(node.implicitWidth) + " px in " + node.width)
           for (var c = 0; c < node.children.length; c++) gatherKeys(node.children[c])
         }
@@ -1286,7 +1285,7 @@ Harness {
         Style.fontBaseSize = keySizeBefore
         body.showingHelp = false
         wait(50)
-        root.check("after the text size changes, every key and gesture on the key sheet fits its column",
+        root.check("after the text size changes, every key on the key sheet fits its column",
           keysOver.length === 0, keysOver.join(", "))
 
         // The band lines up with the rows and keeps one rhythm: the range
@@ -2330,7 +2329,7 @@ Harness {
         var tipFaults = []
         var tipWords = []
         ;[["animalToggle"], ["soundToggle", "Turn sounds off"], ["cameraButton", "Take a screenshot"],
-          ["lookToggle", "Switch to retro", "Switch to smooth"], ["helpToggle", "Show all keys"]].forEach(function(want) {
+          ["lookToggle", "Switch to retro", "Switch to smooth"], ["helpToggle", "Show the keys"]].forEach(function(want) {
           var toggle = find(body, want[0])
           ;(want[2] ? [false, true] : [false]).forEach(function(retro) {
             stub.retro = retro
@@ -2468,7 +2467,7 @@ Harness {
           var walk = function(node) {
             if (!node || !node.visible || visited.indexOf(node) >= 0) return
             visited.push(node)
-            var reference = node.objectName === "helpKey" || node.objectName === "helpGesture"
+            var reference = node.objectName === "helpKey"
             var text = String(node.text)
             var key = namesKey(text) || (/^[1-9]$/.test(text) && node.objectName !== "listCount")
             if (!reference && node.lineCount !== undefined && key && shown(node)) out.keys.push(node)

@@ -601,7 +601,9 @@ Item {
   }
 
   // At the pointer, on no line; from a key, under the row's symbol, on its
-  // first line. Without room under, it opens upward.
+  // first line. Without room under, it opens upward. A right-click's menu
+  // also offers the row's lists, as Ctrl-click opens them, last, so its
+  // first line stays where it was.
   function openRowMenu(symbol, point) {
     var row = watchlist.rowItem(symbol)
     if (!service || !row || watchlist.displayedSymbols.indexOf(symbol) < 0) return
@@ -609,13 +611,16 @@ Item {
     watchlist.cursorSymbol = symbol
     var top = row.mapToItem(root, Style.space(28), 0)
     var at = point ? root.mapFromItem(null, point.x, point.y) : top
-    rowMenu = { symbol: symbol, lines: rowMenuLines(symbol), ground: rowMenuGround(symbol), startLine: point ? -1 : 0, x: at.x,
+    var lines = rowMenuLines(symbol).concat(point ? [{ label: "Choose lists…", lists: true }] : [])
+    rowMenu = { symbol: symbol, lines: lines, ground: rowMenuGround(symbol), startLine: point ? -1 : 0, x: at.x,
       below: point ? at.y : top.y + row.height, above: at.y }
   }
 
   function takeRowMenu(index) {
     var menu = rowMenu
-    if (menu && index >= 0 && index < menu.lines.length) removeFrom(menu.symbol, menu.lines[index].everywhere)
+    var line = menu && index >= 0 && index < menu.lines.length ? menu.lines[index] : null
+    if (line && line.lists) openSymbolLists(menu.symbol)
+    else if (line) removeFrom(menu.symbol, line.everywhere)
     rowMenu = null
   }
 
