@@ -214,7 +214,7 @@ test("Toronto and London close early when their exchanges say, and London's 2028
   expect(status(easter, "2028-04-14")).toBe("Good Friday · opens Tue 08:00 BST")
 })
 
-test("a Toronto time in 2027 and 2028 reads by Toronto's clock, and past any calendar's last day by the clock Yahoo sends", () => {
+test("a Toronto time in 2027 and 2028 reads by Toronto's clock, and before any calendar's first day or past its last by the clock Yahoo sends", () => {
   const TSX = calendars.calendars.TSX
   // SHOP.TO as Yahoo sends it in summer: EDT, the reader's own clock, so
   // no zone is named.
@@ -223,8 +223,12 @@ test("a Toronto time in 2027 and 2028 reads by Toronto's clock, and past any cal
   const july2027 = Date.UTC(2027, 6, 14, 20) / 1000
   const july2028 = Date.UTC(2028, 6, 14, 20) / 1000
   expect([M.printClock(shop, july2027, calendars), M.printClock(shop, july2028, calendars)]).toEqual(["16:00", "16:00"])
-  // A calendar that has run out, as Toronto's does after 31 December 2026:
-  // its times come from Yahoo's offset, never its standard time.
+  // A trade from before the calendars' first day, as a halted listing's last:
+  // August 2025 was summer time, which no calendar lists.
+  const august2025 = Date.UTC(2025, 7, 14, 19, 59) / 1000
+  expect([M.printClock(shop, august2025, calendars), M.clockOf(shop, august2025, calendars)]).toEqual(["15:59", "15:59 EDT"])
+  // A calendar that has run out, here Toronto's cut short at 31 December
+  // 2026: its times come from Yahoo's offset, never its standard time.
   const ran = JSON.parse(JSON.stringify(calendars))
   ran.calendars.TSX.validThrough = "2026-12-31"
   ran.calendars.TSX.utcOffsets = ran.calendars.TSX.utcOffsets.slice(0, 1)
