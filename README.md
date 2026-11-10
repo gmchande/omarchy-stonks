@@ -32,7 +32,7 @@ Website: [getstonks.app](https://getstonks.app)
 Stonks is made for Omarchy 4.5: it moves at the shell's own pace, keeps
 still when you turn animations off, presses in like the bar's own icons,
 and saves screenshots where Omasnap saves yours. On earlier Omarchy 4
-releases, back to 4.0, it runs without them.
+releases, back to 4.0.6, it runs without them.
 
 ```sh
 omarchy plugin add https://github.com/gmchande/omarchy-stonks.git --enable
@@ -186,7 +186,8 @@ one before you add it, and Enter or a click adds it.
 To remove a row, point at it and click the × beside its symbol, or select
 it and press Delete. It leaves the list you're looking at. Removing it from
 All removes it from every list, and asks first if one of your lists holds
-it. Right-click a row to choose which lists it leaves. For 5 seconds, a
+it. Right-click a row to remove it from this list or from every list, and
+Ctrl-click it to choose its lists one by one. For 5 seconds, a
 button such as "Undo NVDA" shows beside "+ Find or add a symbol". `Ctrl+Z` also
 undoes it, until you change a list again.
 
@@ -246,7 +247,8 @@ own.
 
 Sounds are off until you turn them on. Press `m`, or click the speaker at
 the top right. With sounds on, adding, removing, or undoing a row makes a
-short sound, and the chart chimes as you run the pointer along it. A soft
+short sound, a screenshot clicks like a shutter, a replay plays the chart's
+line as it draws, and the chart chimes as you run the pointer along it. A soft
 bell rings as the market of the stock you last looked at opens and closes.
 The bell keeps quiet while Omarchy's Do Not Disturb is on or an app is
 recording from your microphone; the sounds of what you do still play.
