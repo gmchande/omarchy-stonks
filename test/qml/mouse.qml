@@ -155,8 +155,8 @@ Harness {
       // stands in the footer after.
       // One a person can see: the added stock may have brought the end of
       // the list into sight.
-      var rowsList = body.watchlist
-      var doomed = rowsList.displayedSymbols.filter(function(symbol, i) { return rowsList.wholeInSight(i, rowsList.contentY) })[1]
+      var list = body.watchlist
+      var doomed = list.displayedSymbols.filter(function(symbol, i) { return list.wholeInSight(i, list.contentY) })[1]
       var gone = row(doomed)
       mouseMove(gone, gone.width / 2, gone.height / 2 - 1)
       mouseMove(gone, gone.width / 2, gone.height / 2)
@@ -177,7 +177,6 @@ Harness {
         scrubbed && within(1500, function() { return body.scrubT === 0 }), scrubbed + " " + body.scrubT)
 
       var before = service.symbols.join(",")
-      var list = body.watchlist
       var over = list.mapToItem(body, list.width / 2, list.height / 2)
       mouseMove(body, over.x, over.y)
       mouseWheel(body, over.x, over.y, 0, -120)
