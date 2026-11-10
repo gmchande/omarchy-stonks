@@ -328,6 +328,14 @@ every_state() (
   # the window.
   states="$states dev-pill-sheet dev-popup-sweep-2026-10-07-1455-spy-smooth dev-popup-sweep-2026-10-07-1455-spy-retro"
   states="$states dev-popup-sweep-2026-10-07-1455-spy-smooth-size-16 dev-window-undo-retro"
+  # On a desktop with rounded corners (round-<state>): smooth takes the
+  # shell's radius and retro stays square, on the panel, its menus and
+  # sheets, and a control under the pointer and pressed.
+  for state in popup-sweep-2026-10-07-1455-spy popup-lists-menu popup-help popup-search window-lists-menu; do
+    states="$states round-$state-smooth round-$state-retro"
+  done
+  states="$states round-popup-lists-manage-smooth round-popup-lists-symbol-smooth"
+  states="$states round-popup-controls-list-hover-smooth round-popup-controls-list-press-smooth round-popup-controls-done-press-smooth"
   echo $states
 )
 all=$(every_state)
@@ -395,7 +403,12 @@ for state in $states; do
       [[ -e $answer && $name != robinhood-* ]] && saved="$saved ${name%.json}"
     done
   fi
-  STONKS_VISUAL_SAVED="$saved" STONKS_VISUAL_STATE="$state" STONKS_VISUAL_OUT="$shot" quickshell_run 15 "$work/$state.log" -p "$root"
+  # The stand-ins in bin/ first on PATH: the shell asks hyprctl for the
+  # desktop's rounding, and a picture must not change with the desktop it
+  # is drawn on.
+  rounding=0
+  [[ $state == round-* ]] && rounding=8
+  PATH="$here/bin:$PATH" STONKS_ROUNDING=$rounding STONKS_VISUAL_SAVED="$saved" STONKS_VISUAL_STATE="$state" STONKS_VISUAL_OUT="$shot" quickshell_run 15 "$work/$state.log" -p "$root"
   code=$qs_code
   # A state whose QML threw still writes a picture; the log is what tells,
   # and so is a Qt warning from the plugin's files (lib.sh).

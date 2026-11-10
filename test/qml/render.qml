@@ -41,12 +41,13 @@ Harness {
   // a screenshot, its camera lit; quiet-<state>: with sounds off; both may
   // lead, quiet- first. dev-<state>: the state as a second copy beside a
   // user's draws it, run under grvc.stonks-dev, its mark on; it leads any
-  // other. <state>-size-N: the state at text size N
+  // other. round-<state>: the state on a desktop with rounded corners
+  // (render.sh), ahead of every other. <state>-size-N: the state at text size N
   // (render.sh) in the frame the shell gives it there, the panel and the
   // smallest window grown with the text, as a reader sees it; the state as
   // named without the suffix. The pill sheet keeps its name and draws its
   // own frame.
-  readonly property string named: Quickshell.env("STONKS_VISUAL_STATE") || "retro"
+  readonly property string named: (Quickshell.env("STONKS_VISUAL_STATE") || "retro").replace(/^round-/, "")
   readonly property bool devCopy: /^dev-/.test(named)
   readonly property string copyId: devCopy ? "grvc.stonks-dev" : "grvc.stonks"
   readonly property string asked: named.replace(/^dev-/, "")
