@@ -1286,8 +1286,14 @@ Harness {
           downColor: stub.downColor
           fontFamily: stub.fontFamily
           surfaceOpen: true
-          // The animal held still: its fidget is motion, which review's films judge.
+          // The animal held still: its fidget is motion.
           screenOn: false
+          // So are the live mark's blink and ripple, six seconds from the
+          // end of the draw-in: held, the mark is drawn as it rests.
+          Component.onCompleted: {
+            var charts = root.find(body, "heroChart").children
+            for (var i = 0; i < charts.length; i++) if (charts[i].still !== undefined) charts[i].still = true
+          }
           headerWhenMissing: root.coldState === "loading" ? "Loading" : "No data"
           switchesPanels: root.popup
           margins: root.popup ? 0 : Style.space(16)
@@ -1556,11 +1562,18 @@ Harness {
     }
 
     // A still state's picture, 300 ms in, once its window has laid out and
-    // drawn: nothing in the shell says when that is done.
+    // drawn: nothing in the shell says when that is done. Then once its
+    // chart has drawn in, which takes 320 ms and the chart says itself: a
+    // picture taken at 300 ms had no live mark, and one a moment late had.
     Timer {
       interval: 300
       running: !root.interactivePicture && renderWindow.visible
       onTriggered: {
+        if (body.motion.drawingIn) {
+          interval = 20
+          restart()
+          return
+        }
         if (root.shareOf) {
           body.camera = shareCamera
           body.takeScreenshot()
