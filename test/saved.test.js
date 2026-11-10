@@ -916,6 +916,10 @@ test("the day line is 1D, or its figures' weekday when they are not today's: its
   const cvr = M.parseChart(fixture("moments/power-user-2026-10-16/cvr.json"))
   expect(said(dayLineAt(cvr, at("2026-10-16", "23:09")))).toBe("WED · 11.28–11.87 @11.28 · OPEN _ · VOL 68")
   expect(M.dayLine(null)).toBeNull()
+  // Yahoo sends an index no volume, as a 0: the FTSE's VOL is left out, as
+  // a range's is, not said to be none.
+  const ftse = M.parseChart(fixture("ftse-day.json"))
+  expect(said(dayLineAt(ftse, ftse.marketTime)).split(" · ").pop()).toBe("VOL _")
   // Before the session's first bar there is no open to give: its slot is
   // kept, empty, so the line keeps its shape.
   const early = fixture("aapl.json")
@@ -1020,6 +1024,8 @@ test("the 52-week line moves the cap with the price, and divides the price by th
   // and from 100 a P/E has no decimals.
   expect(listing("shop-to").pair).toBe("USDCAD")
   expect(read("shop-to")).toBe("MKT CAP CAD 304.6B · P/E 114")
+  // One that rounds up to 100 has none either: never "100.0".
+  expect([M.peText(99.94), M.peText(99.96)]).toEqual(["99.9", "100"])
   // London's price in pence over earnings in pounds: 40.33 / (4.52 × 0.7477).
   expect(listing("shel-l").pair).toBe("USDGBP")
   expect(read("shel-l")).toBe("MKT CAP GBP 223.5B · P/E 11.9")
