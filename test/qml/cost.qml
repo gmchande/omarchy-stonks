@@ -162,14 +162,9 @@ Harness {
       // The rows built: those within a screen above sight and two below,
       // at the top, at the end of the list, and back at the top.
       var list = app.testBody.watchlist
-      var built = function() {
-        var n = 0
-        var boxes = list.contentItem.children
-        for (var b = 0; b < boxes.length; b++)
-          for (var k = 0; k < boxes[b].children.length; k++)
-            if (boxes[b].children[k].built === true && boxes[b].children[k].place >= 0) n++
-        return n
-      }
+      // Counted as what was made, not what the list says should be: a row's
+      // words and line are one `rowContent` each, built by its Loader.
+      var built = function() { return harness.findAll(list, "rowContent").length }
       var nearSight = Math.ceil((3 * list.sightHeight + list.rowHeight) / list.rowPitch) + 1
       var rested = function() { return within(5000, function() { return !list.settling }) }
       list.contentY = 0
