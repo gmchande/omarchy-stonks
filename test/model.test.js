@@ -10,11 +10,14 @@ const root = join(import.meta.dir, "..")
 // The reader is in New York: an exchange's time is named
 // with its zone only where that clock differs from the reader's.
 process.env.TZ = "America/New_York"
-// Every rule file's names, under one name: each is defined once.
+// Every rule file's names, under one name. Two names are defined twice: of
+// each pair M holds the later file's, Share's clockOf and Chart's clockAt.
 const M = Object.assign({}, ...["Format", "Fetch", "Quote", "Market", "Overnight", "History", "Fundamentals", "Figures",
   "Chart", "Tones", "Settings", "KeySheet", "Search", "Cells", "Share", "Asks"].map(name => load(name + ".js")))
 
 const calendars = JSON.parse(readFileSync(join(root, "calendars.json"), "utf8"))
+// The header's status at full width, the first of its forms.
+const marketStatus = (...args) => M.statusForms(...args)[0]
 const US = calendars.calendars.US
 const JPX = calendars.calendars.JPX
 const DAY = 24 * 3600
@@ -173,9 +176,9 @@ test("Tokyo's lunch break comes from the calendar; the morning session stays on 
   }
   // 11:00: the morning ends at the 11:30 break, not at the 15:30 close.
   expect(M.statusForms(jpx, morning, 0, calendars)).toEqual(["Lunch break in 30m", "Lunch break in 30m"])
-  expect(M.marketStatus(jpx, M.epochAt(JPX, "2026-09-08", "11:26"), 0, calendars)).toBe("Lunch break in 4m")
+  expect(marketStatus(jpx, M.epochAt(JPX, "2026-09-08", "11:26"), 0, calendars)).toBe("Lunch break in 4m")
   // Tokyo's clock is named for a reader in New York.
-  expect(M.marketStatus(jpx, lunch, 0, calendars)).toBe("Lunch break · reopens 12:30 JST · in 30m")
+  expect(marketStatus(jpx, lunch, 0, calendars)).toBe("Lunch break · reopens 12:30 JST · in 30m")
   // Asked every minute through the morning, on the slow clock at lunch.
   expect(quoteCadence(jpx, morning, 60, true)).toBe(60)
   expect(quoteCadence(jpx, lunch, 60, true)).toBe(900)
@@ -207,7 +210,7 @@ test("Toronto and London close early when their exchanges say, and London's 2028
   expect([cadence(shel, LSE, "2027-12-24", "12:00"), cadence(shel, LSE, "2027-12-24", "13:00")]).toEqual([60, 900])
   // In the exchange's own wording, less its "(substitute)", its zone named
   // for a reader in New York.
-  const status = (quote, day) => M.marketStatus(quote, M.epochAt(LSE, day, "12:00"), 0, calendars)
+  const status = (quote, day) => marketStatus(quote, M.epochAt(LSE, day, "12:00"), 0, calendars)
   const late = held("SHEL.L", "LSE", LSE, "2027-12-31", "08:00", "12:30")
   expect(status(late, "2028-01-03")).toBe("New Year's Day · opens Tue 08:00 GMT")
   const easter = held("SHEL.L", "LSE", LSE, "2028-04-13", "08:00", "16:30")
@@ -259,8 +262,8 @@ test("a listing's overnight session is named so, a holiday's evening too, and th
   // all day; the evening before it, nothing.
   expect([night("2026-11-26", true), night("2026-11-26", false), night("2026-11-25", true)]).toEqual([true, false, false])
   const thursday = at("2026-11-26", "21:00")
-  expect(M.marketStatus(nest, thursday, 0, calendars, true)).toBe("Overnight · opens Fri 09:30")
-  expect(M.marketStatus(nest, thursday, 0, calendars, false)).toBe("Thanksgiving Day · opens Fri 09:30")
+  expect(marketStatus(nest, thursday, 0, calendars, true)).toBe("Overnight · opens Fri 09:30")
+  expect(marketStatus(nest, thursday, 0, calendars, false)).toBe("Thanksgiving Day · opens Fri 09:30")
 })
 
 test("formatting", () => {
@@ -374,8 +377,6 @@ test("a run's output splits into its answers, each said by what came back", () =
     [7, "ok", '{"chart":2}', 0]
   ])
   expect(M.answerKind(503, 0)).toBe("refused")
-  expect(M.soleBody('{"a":1}' + trailer(0, 200, 0))).toBe('{"a":1}')
-  expect(M.soleBody("Too Many" + trailer(0, 429, 0))).toBe("")
   // A run stopped mid-answer: the cut answer has no trailer, so none.
   expect(M.answers('{"a":1}' + trailer(0, 200, 0) + '{"b":').length).toBe(1)
   // Read as it comes, each answer once: what arrived first, then the rest

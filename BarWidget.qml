@@ -36,7 +36,6 @@ BarWidget {
   // says them.
   readonly property string newestNote: featured && featured.newest
     ? Figures.newestNote(featuredQuote, featured.newest, service.now, service.calendars) : ""
-  readonly property string newestPhase: featured && featured.newest ? featured.newest.phase : ""
   // The day the 1D chart draws, once Robinhood has said which. Only the
   // five-minute clock that slides its start redraws it, never the second.
   readonly property var lineDay: featuredQuote

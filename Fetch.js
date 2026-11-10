@@ -66,9 +66,3 @@ function answers(text, from) {
   }
   return out
 }
-
-// The run's one answer as a body to parse, "" for anything but a whole 200.
-function soleBody(text) {
-  var all = answers(text)
-  return all.length && all[0].kind === "ok" ? all[0].body : ""
-}
