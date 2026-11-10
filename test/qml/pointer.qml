@@ -481,7 +481,7 @@ Harness {
         // The wheel or a key between two clicks at one place makes them two
         // clicks, even when Qt takes the second for a double-click's: the
         // second stops the list and acts, and x then removes its row. So does
-        // a row's move, as Shift+↓ makes.
+        // a row's move, as Ctrl+↓ makes.
         var between = function(interrupt) {
           body.watchlist.contentY = 0
           within(2000, rowsAtRest)

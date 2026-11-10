@@ -213,9 +213,9 @@ Harness {
         changed = ["symbols", "cursor"]
         var removed = b.removal.symbol
         effect = function() { return service.symbols.indexOf(removed) >= 0 && service.symbols.length === rows.length + 1 }
-      } else if (token === "Shift+↑" || token === "Shift+↓") {
+      } else if (token === "Ctrl+↑" || token === "Ctrl+↓") {
         changed = ["symbols"]
-        var reordered = rows.slice(), at = rows.indexOf(selected), to = at + (token === "Shift+↓" ? 1 : -1)
+        var reordered = rows.slice(), at = rows.indexOf(selected), to = at + (token === "Ctrl+↓" ? 1 : -1)
         reordered.splice(at, 1); reordered.splice(to, 0, selected)
         effect = function() { return service.symbols.join(",") === reordered.join(",") && b.watchlist.cursorRow === selected }
       } else if (token === "o") {
