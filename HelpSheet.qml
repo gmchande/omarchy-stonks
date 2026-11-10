@@ -8,12 +8,12 @@ import qs.Ui
 import "Tones.js" as Tones
 
 // The `?` sheet on both surfaces: key groups in two columns, the credit
-// closing the second, the mouse's lines across both, then CLOSE.
+// closing the second, then CLOSE.
 Flickable {
   id: root
 
-  // KeySheet.sheet: { groups, mouse }.
-  property var sheet: ({ groups: [], mouse: null })
+  // KeySheet.sheet: { groups }.
+  property var sheet: ({ groups: [] })
   property color foreground: Commons.Color.foreground
   property color dim: Tones.dim(foreground, Commons.Color.background)
   property string fontFamily: Style.font.family
@@ -24,7 +24,8 @@ Flickable {
   property string version: ""
   // One part a line, so a half column never breaks one mid-phrase. With no
   // version known the credit leaves it off rather than show a blank.
-  readonly property string credit: (version !== "" ? ["Stonks " + version] : [])
+  readonly property string credit: ["Every key is in the README"]
+    .concat(version !== "" ? ["Stonks " + version] : [])
     .concat(["Prices from Yahoo", "Overnight from Robinhood"]).join("\n")
 
   signal closeRequested()
@@ -48,9 +49,8 @@ Flickable {
   readonly property int keyWidth: {
     var font = keyMetrics.font
     var widest = 0
-    var all = groups.concat(sheet.mouse ? [sheet.mouse] : [])
-    for (var g = 0; g < all.length; g++)
-      for (var r = 0; r < all[g].rows.length; r++) widest = Math.max(widest, Math.ceil(keyMetrics.advanceWidth(all[g].rows[r].key)))
+    for (var g = 0; g < groups.length; g++)
+      for (var r = 0; r < groups[g].rows.length; r++) widest = Math.max(widest, Math.ceil(keyMetrics.advanceWidth(groups[g].rows[r].key)))
     return widest
   }
   FontMetrics { id: keyMetrics; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; font.bold: true }
@@ -72,7 +72,6 @@ Flickable {
   component Group: Column {
     id: group
     required property var modelData
-    property string keyName: "helpKey"
     spacing: Style.space(4)
 
     PanelSectionHeader {
@@ -91,7 +90,7 @@ Flickable {
         spacing: Style.space(10)
 
         Text {
-          objectName: group.keyName
+          objectName: "helpKey"
           width: root.keyWidth
           textFormat: Text.PlainText
           text: helpRow.modelData.key
@@ -155,11 +154,6 @@ Flickable {
           }
         }
       }
-    }
-
-    Repeater {
-      model: root.sheet.mouse ? [root.sheet.mouse] : []
-      delegate: Group { width: sheetColumn.width; keyName: "helpGesture" }
     }
 
     ListAction {

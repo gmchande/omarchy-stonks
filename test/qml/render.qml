@@ -160,10 +160,11 @@ Harness {
   // The pill at night (pill-sheet-night), { quote, newest }.
   property var nightPill: null
   readonly property bool popup: windowOf ? false : w22 ? w22.popup : stateName.indexOf("popup") === 0 || themeState
-  // <popup-help|popup-help-sorted|window-help>-<look>: the key sheet.
+  // <popup-help|popup-help-sorted|window-help|min-window-help>-<look>: the
+  // key sheet, min-window- in the smallest window.
   readonly property var help: {
-    var match = /^(popup-help|popup-help-sorted|window-help)-(smooth|retro)$/.exec(stateName)
-    return match ? { sorted: match[1] === "popup-help-sorted", window: match[1] === "window-help" } : null
+    var match = /^(popup-help|popup-help-sorted|window-help|min-window-help)-(smooth|retro)$/.exec(stateName)
+    return match ? { sorted: match[1] === "popup-help-sorted", window: match[1] !== "popup-help" && match[1] !== "popup-help-sorted" } : null
   }
   readonly property bool historyState: stateName.indexOf("history-") === 0
     || stateName.indexOf("popup-history-") === 0

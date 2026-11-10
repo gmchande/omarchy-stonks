@@ -519,7 +519,7 @@ Item {
       HeaderTip {
         objectName: "helpTip"
         visible: helpMouse.containsMouse
-        text: root.helpShown ? "Hide the keys" : "Show all keys"
+        text: root.helpShown ? "Hide the keys" : "Show the keys"
         fontFamily: root.fontFamily
       }
     }

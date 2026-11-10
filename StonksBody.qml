@@ -393,7 +393,7 @@ Item {
     var quote = removal.quote
     return { symbol: removal.symbol, name: quote ? quote.name : removal.symbol, exchange: quote ? quote.exchange : "" }
   }
-  readonly property var keySheet: KeySheet.sheet(order, switchesPanels)
+  readonly property var keySheet: KeySheet.sheet()
   // Read from the view: `symbols` may lag a switch.
   readonly property var breadth: Object.assign({ list: view.list },
     Figures.listBreadth(view.rows, quotes, watchlistScrubShown, changeMode, newestPrints))
@@ -425,8 +425,10 @@ Item {
   }
 
   function fittedHeight(maxHeight) {
-    if (showingHelp) return Math.min(maxHeight, helpHeight)
     var rows = chromeHeight + wholeRowsHeight(maxHeight - chromeHeight)
+    // The sheet keeps the rows' height, so opening it moves nothing, and
+    // grows the panel only past rows shorter than itself.
+    if (showingHelp) return Math.max(rows, Math.min(maxHeight, helpHeight))
     var view = listViewOpen ? listViewHeight : adding ? searchHeight : listMenuOpen ? listMenuBottom : 0
     var least = listMenuOpen ? Math.min(maxHeight, listMenuLeastBottom) : 0
     return Math.max(rows, least, Math.min(chromeHeight + rowsHeight(Infinity, maxHeight - chromeHeight), view))
