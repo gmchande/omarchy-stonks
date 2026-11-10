@@ -19,18 +19,26 @@ the rules a change is judged by.
 
 ## Test it
 
-- `test/all.sh` runs every check a pull request needs. It takes about a
-  minute and a half, on a machine with Omarchy and a Wayland session.
+- `test/all.sh` runs every check a pull request needs. It takes about two
+  minutes, on a machine with Omarchy and a Wayland session.
 - Most checks replay saved answers from Yahoo and Robinhood. These stay
   private, since the sites' terms forbid republishing them. Without them,
   those checks skip and the run ends `PASSED, N SKIPPED`: say so in your
   pull request, and the maintainer runs them on your branch. With them,
   the last line must be `ALL PASS`.
 - A test of a rule goes in `test/model.test.js`, which every clone runs, or
-  in `test/saved.test.js` if it needs a saved answer. A test of a flow goes
-  in the harness that walks it, `test/qml/NAME.qml`.
+  in `test/saved.test.js` if it needs a saved answer. Most tests are these.
+- Five walks drive the real plugin, each for what passes between its
+  pieces: `keys` (a key and what it does), `mouse` (what looks clickable
+  acts), `saving` (a save and the next read), `fetching` (what is asked,
+  and when) and `cost` (what a long list costs, counted). A new step goes
+  in the walk it belongs to, `test/qml/NAME.qml`, judged by what a person
+  then sees or what is then saved or asked. No step reads a position, a
+  size, a colour or a time in milliseconds: how Stonks looks is for the
+  pictures below, and how it moves and feels for a hand on the running
+  plugin.
 - While you work, run just the checks for what you change, side by side,
-  as in `test/all.sh lists keys unit`. A harness goes by the NAME in its
+  as in `test/all.sh keys mouse unit`. A walk goes by the NAME in its
   `test/qml/NAME.sh`, and other checks by names such as `unit`; an unknown
   name lists them all. Such a run ends `PASSED ONLY`, never `ALL PASS`, so
   run the whole of `test/all.sh` before a pull request.
