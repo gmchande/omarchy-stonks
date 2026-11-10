@@ -1,4 +1,5 @@
 .pragma library
+.import "Calendar.js" as Calendar
 .import "Fundamentals.js" as Fundamentals
 .import "History.js" as History
 .import "Market.js" as Market
@@ -23,8 +24,8 @@ var TRIES = 3
 function calendarsAt(calendars, now) {
   var read = new Map()
   return function(quote) {
-    var cal = Market.calendarFor(calendars, quote)
-    if (!read.has(cal)) read.set(cal, Market.calendarNow(cal, now))
+    var cal = Calendar.calendarFor(calendars, quote)
+    if (!read.has(cal)) read.set(cal, Calendar.calendarNow(cal, now))
     return read.get(cal)
   }
 }
@@ -42,19 +43,19 @@ function readingOrder(featured, sights, shown, library) {
   return order
 }
 
-// The pill skips the quiet wait (`Market.quietUntil`), so a calendar wrong
+// The pill skips the quiet wait (`quietUntil`), so a calendar wrong
 // about a session can't leave the pill behind; so does a failed answer,
 // which may answer next time.
 function quotesDue(watched, entries, asked, quotes, heroes, pill, now, interval, calNow) {
   var at = {}
-  var dayOf = Market.tradingDays()
+  var dayOf = Calendar.tradingDays()
   watched.forEach(function(s) {
     var entry = entries[s]
     if (!entry || entry.status === "saved" || s in asked) return
     var cal = calNow(quotes[s])
-    var quiet = s === pill || entry.status !== "ok" ? 0 : Market.quietUntil(quotes[s], entry.receivedAt, now, cal.cal, dayOf)
+    var quiet = s === pill || entry.status !== "ok" ? 0 : quietUntil(quotes[s], entry.receivedAt, now, cal.cal, dayOf)
     at[s] = entry.answeredAt > now ? now : quiet
-      || entry.answeredAt + Market.quoteCadence(quotes[s], now, interval, heroes.indexOf(s) >= 0, cal)
+      || entry.answeredAt + quoteCadence(quotes[s], now, interval, heroes.indexOf(s) >= 0, cal)
   })
   var symbols = Object.keys(at)
   var asking = symbols.some(function(s) { return at[s] <= now })
@@ -98,7 +99,7 @@ function laneJudging(toJudge, asked, held) {
 // A stock's batch of one is a chart: one request either way, and a chart
 // has opens; a coin's stays spark, even alone. A coin's open is its price 24
 // hours ago, read from the closes, but it asks for two days
-// (`Market.twoDays`), and a batch asks two days for all when one wants two,
+// (`twoDays`), and a batch asks two days for all when one wants two,
 // so coins batch apart from stocks.
 function quoteSlots(waiting, asked, symbols, lead, heroes, bulk, coins) {
   var order = waiting.slice().sort(function(a, b) {
@@ -136,6 +137,67 @@ function answerVerdict(kind, outcome, tries, judgingOnly) {
   if (judgingOnly) return "unchanged"
   if (kind !== "missing" && outcome !== "missing" && tries < TRIES - 1) return "retry"
   return "fail"
+}
+
+// The close and late prints settle within this of a market's last trade.
+var SETTLED = 15 * 60
+
+// Asking sooner brings back the same price. An index's periods stay the last
+// session's until its open, and London's pre-market is Yahoo's alone, so the
+// calendar and Yahoo's current period both have a say.
+function quietUntil(quote, receivedAt, now, cal, dayOf) {
+  if (!quote || quote.crypto || !receivedAt) return 0
+  var s = quote.session
+  if (!s || !s.regular || receivedAt < (s.post || s.regular).end + SETTLED) return 0
+  var c = quote.current
+  if (c && c.regular && receivedAt >= (c.pre || c.regular).start && receivedAt < (c.post || c.regular).end + SETTLED) return 0
+  var starts = []
+  if (cal) {
+    var day = dayOf(cal, receivedAt)
+    if (day.to && receivedAt >= day.from && receivedAt < day.to + SETTLED) return 0
+    var open = receivedAt < day.from ? day.from : day.next
+    if (open) starts.push(open)
+  }
+  if (c && c.regular && (c.pre || c.regular).start > receivedAt) starts.push((c.pre || c.regular).start)
+  var next = starts.length ? Math.min.apply(null, starts) : 0
+  return next > now ? next : 0
+}
+
+// Yahoo's day answer for a stock turns to the coming day with its
+// pre-market, and London's and Tokyo's with their open, whose first bar
+// comes about 15 minutes late. Two days keep the last session in the answer
+// until the new one has a print. An index's answer stays the last session's
+// until its open.
+function twoDays(quote, now, calendars) {
+  if (!quote) return true
+  if (quote.crypto) return true
+  if (quote.instrumentType === "INDEX") return false
+  var cal = Calendar.calendarFor(calendars, quote)
+  var date = cal ? Calendar.dateStringOf(Calendar.localDate(now, cal)) : ""
+  var segs = cal ? Calendar.segmentsOn(cal, date) : []
+  var pts = quote.points
+  var printedSince = function(t) { return pts.length > 0 && pts[pts.length - 1].t >= t }
+  if (cal && cal.pre) {
+    var pre = Calendar.epochAt(cal, date, cal.pre.open)
+    return segs.length > 0 && now >= pre && (now < segs[0].start || (now < Calendar.epochAt(cal, date, cal.post.close) && !printedSince(pre)))
+  }
+  var open = segs.length ? { start: segs[0].start, end: segs[segs.length - 1].end } : !cal && quote.current ? quote.current.regular : null
+  return !!open && now >= open.start && now < open.end && !printedSince(open.start)
+}
+
+// How often, while Yahoo may still answer with the last session's quote
+// (`Market.awaitingOpen`).
+var OPENING_ASK = 15
+
+// Outside the session only the day's dim tail can move, so only a hero
+// keeps the interval.
+function quoteCadence(quote, now, interval, hero, calNow) {
+  if (!quote) return 15 * 60
+  if (quote.crypto || Market.regularNow(quote, now, calNow)) return Market.awaitingOpen(quote, now) ? Math.min(OPENING_ASK, interval) : interval
+  if (calNow.quiet || calNow.breakEnd) return 15 * 60
+  var phase = Market.sessionPhase(quote, now)
+  if (phase === "pre" || phase === "post") return hero ? interval : Math.max(5 * 60, interval)
+  return 15 * 60
 }
 
 // ---- Robinhood

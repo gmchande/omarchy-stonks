@@ -1,7 +1,7 @@
 import QtQuick
 import "Asks.js" as Asks
+import "CarriedClose.js" as CarriedClose
 import "Fetch.js" as Fetch
-import "Market.js" as Market
 import "Quote.js" as Quote
 // Every symbol due goes in one curl run over one connection, and the
 // symbols waiting for their first answer go in a run of their own.
@@ -33,10 +33,10 @@ Item {
   // preview's feed.
   property bool bulk: true
   property var centExchanges: []
-  // A spark batch asks two days for all when one wants two (`Market.twoDays`),
+  // A spark batch asks two days for all when one wants two (`Asks.twoDays`),
   // so the requests stay as many.
   property var calendars: null
-  function twoDays(symbol) { return Market.twoDays(quotes[symbol] || null, stamp(), calendars) }
+  function twoDays(symbol) { return Asks.twoDays(quotes[symbol] || null, stamp(), calendars) }
 
   property var quotes: ({})
   // Each symbol's last answer, by the service's clock. "saved": a quote kept
@@ -314,7 +314,7 @@ Item {
     var nextJudge = toJudge.slice()
     var show = function(symbol, answered) {
       var previous = quotes[symbol]
-      var quote = Market.carryClose(previous, answered, calendars, at)
+      var quote = CarriedClose.carryClose(previous, answered, calendars, at)
       var dropped = Quote.bucketTimes(quote.droppedTimes)
       var previousDropped = Quote.bucketTimes(previous ? previous.droppedTimes : null)
       if (dropped && dropped !== previousDropped && !quote.closesOnly)

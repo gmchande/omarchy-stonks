@@ -35,7 +35,7 @@ var EXCHANGE_NAMES = {
 var BAR = 5 * 60
 
 // Two days once Yahoo's day has turned to the coming one, so the last
-// session is still in the answer (`Market.twoDays`).
+// session is still in the answer (`Asks.twoDays`).
 function chartUrl(symbol, twoDays) {
   return CHART_URL + encodeURIComponent(symbol) + "?range=" + (twoDays ? "2d" : "1d") + "&interval=" + BAR / 60 + "m&includePrePost=true"
 }
@@ -217,7 +217,7 @@ function exchangeOf(meta) {
 }
 
 // `centExchanges`: the exchanges that trade in whole cents from $1
-// (`Market.centExchanges`).
+// (`Calendar.centExchanges`).
 function inCents(meta, centExchanges) {
   return !!centExchanges && centExchanges.indexOf(exchangeOf(meta)) >= 0
 }

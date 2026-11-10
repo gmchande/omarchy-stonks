@@ -2,10 +2,10 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "Asks.js" as Asks
+import "Calendar.js" as Calendar
 import "Chart.js" as Chart
 import "Figures.js" as Figures
 import "History.js" as History
-import "Market.js" as Market
 import "Overnight.js" as Overnight
 import "Quote.js" as Quote
 import "Settings.js" as Settings
@@ -493,7 +493,7 @@ Item {
     clock: root
   }
   readonly property alias yahooGate: yahooGate
-  readonly property var centExchanges: Market.centExchanges(calendars)
+  readonly property var centExchanges: Calendar.centExchanges(calendars)
 
   QuoteFeed {
     id: feed

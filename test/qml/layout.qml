@@ -6,6 +6,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "plugin/Calendar.js" as Calendar
 import "plugin/Chart.js" as Chart
 import "plugin/Cells.js" as Cells
 import "plugin/Format.js" as Format
@@ -1047,14 +1048,14 @@ Harness {
         for (var calId in calendars.calendars) {
           var cal = calendars.calendars[calId]
           var listing = stub.quotes[["AAPL", "SHOP.TO", "7203.T", "SHEL.L"].filter(function(s) {
-            return Market.calendarFor(calendars, stub.quotes[s]) === cal
+            return Calendar.calendarFor(calendars, stub.quotes[s]) === cal
           })[0]]
           for (var day in cal.closures) {
-            var noon = Market.epochAt(cal, day, "12:00")
+            var noon = Calendar.epochAt(cal, day, "12:00")
             // Past the calendar's last day the header says the schedule is
             // unavailable, with no time to name a zone for.
-            var next = Market.nextOpen(cal, noon)
-            var zone = next ? Market.zoneName(cal, Market.localDate(next.t, cal).offset) : ""
+            var next = Calendar.nextOpen(cal, noon)
+            var zone = next ? Calendar.zoneName(cal, Calendar.localDate(next.t, cal).offset) : ""
             var forms = Market.statusForms(listing, noon, 0, calendars).map(function(form) {
               return zone !== "" && form.slice(-zone.length) !== zone ? form + " " + zone : form
             })

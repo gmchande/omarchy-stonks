@@ -20,7 +20,7 @@ const fixtures = found.stdout.toString().trim()
 process.env.TZ = "America/New_York"
 // The rule files' names these tests read, under one name. A name two files
 // define is read from its file (test/load.js).
-const M = rules(["Format", "Quote", "Market", "Overnight", "History", "Fundamentals", "Figures",
+const M = rules(["Format", "Quote", "Calendar", "Market", "CarriedClose", "Overnight", "History", "Fundamentals", "Figures",
   "Chart", "Settings", "Search", "Asks"])
 
 const fixture = name => JSON.parse(readFileSync(join(fixtures, name), "utf8"))

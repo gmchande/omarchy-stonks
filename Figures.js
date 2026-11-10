@@ -1,4 +1,5 @@
 .pragma library
+.import "Calendar.js" as Calendar
 .import "Format.js" as Format
 .import "Market.js" as Market
 .import "Overnight.js" as Overnight
@@ -410,10 +411,10 @@ function moveName(quote, newest, from, today) {
 // calendar, as a date string: none without a calendar, or past its reach.
 function closeBeforeDate(cal, dayStart) {
   if (!cal) return null
-  var date = Market.dateStringOf(Market.localDate(dayStart, cal))
+  var date = Calendar.dateStringOf(Calendar.localDate(dayStart, cal))
   for (var i = 0; i < 10; i++) {
-    date = Market.previousDateString(date)
-    var kind = Market.dayKind(cal, date).kind
+    date = Calendar.previousDateString(date)
+    var kind = Calendar.dayKind(cal, date).kind
     if (kind === "open") return date
     if (kind === "unknown") return null
   }
@@ -425,9 +426,9 @@ function closeBeforeDate(cal, dayStart) {
 // calendar can say which day that was. The panel's lines, the scrub's
 // legend and the screenshot all name a close this one way.
 function closeName(quote, t, today, calendars) {
-  var cal = Market.calendarFor(calendars, quote)
+  var cal = Calendar.calendarFor(calendars, quote)
   var date = closeBeforeDate(cal, t)
-  return date === null ? "PREV CLOSE" : dayName(quote, Market.epochAt(cal, date, "12:00"), today) + " CLOSE"
+  return date === null ? "PREV CLOSE" : dayName(quote, Calendar.epochAt(cal, date, "12:00"), today) + " CLOSE"
 }
 
 // The close the move on top counts from (`view.close`), named by its day,

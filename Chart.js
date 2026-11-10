@@ -1,4 +1,5 @@
 .pragma library
+.import "Calendar.js" as Calendar
 .import "Format.js" as Format
 .import "History.js" as History
 .import "Market.js" as Market
@@ -112,7 +113,7 @@ function chartGeometry(quote, calendars) {
   var pts = quote.points
   var axis = chartSpan(quote)
   var reg = quote.session.regular
-  var breaks = reg ? Market.sessionBreaks(Market.calendarFor(calendars, quote), reg.start) : []
+  var breaks = reg ? Calendar.sessionBreaks(Calendar.calendarFor(calendars, quote), reg.start) : []
   var across = function(a, b) {
     return breaks.some(function(gap) { return a <= gap.start && b >= gap.end })
   }

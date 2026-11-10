@@ -6,11 +6,12 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 import "plugin/Asks.js" as Asks
+import "plugin/Calendar.js" as Calendar
+import "plugin/CarriedClose.js" as CarriedClose
 import "plugin/Cells.js" as Cells
 import "plugin/Chart.js" as Chart
 import "plugin/Fundamentals.js" as Fundamentals
 import "plugin/History.js" as History
-import "plugin/Market.js" as Market
 import "plugin/Overnight.js" as Overnight
 import "plugin/Quote.js" as Quote
 import "plugin/Search.js" as Search
@@ -472,8 +473,8 @@ Harness {
           view.destroy()
           return text
         }
-        var sunday = Market.epochAt(stub.calendars.calendars.US, "2026-10-25", "23:35")
-        var jnj = Quote.parseChart(moment("jnj"), Market.centExchanges(stub.calendars), sunday)
+        var sunday = Calendar.epochAt(stub.calendars.calendars.US, "2026-10-25", "23:35")
+        var jnj = Quote.parseChart(moment("jnj"), Calendar.centExchanges(stub.calendars), sunday)
         var day = moment("robinhood-day")
         var night = Overnight.parseOvernight(day, day.results.map(function(r) { return r.symbol })).JNJ
         var built = Overnight.dayChart(jnj, night, stub.calendars)
@@ -592,16 +593,16 @@ Harness {
       // 1 October 23:00, Sunday 27 September 22:30, Monday 5 October 00:36;
       // a dated one at its name, New York time.
       var dated = root.overnight.dated ? /^(.{10})-(\d\d)(\d\d)$/.exec(root.overnight.moment) : null
-      root.now = dated ? Market.epochAt(Overnight.overnightMarket(stub.calendars), dated[1], dated[2] + ":" + dated[3])
+      root.now = dated ? Calendar.epochAt(Overnight.overnightMarket(stub.calendars), dated[1], dated[2] + ":" + dated[3])
         : { day: 1790962920, night: 1790910000, sunday: 1790562600, live: 1791175013 }[root.overnight.moment]
       var quotes = {}, entries = {}, nights = {}, allDay = {}
       // Read as the feeds read them, answered at the moment: the US listings
       // in cents from $1, and by a shell that holds no close of the session
-      // before (`Market.carryClose`), which leaves the move out where Yahoo
+      // before (`CarriedClose.carryClose`), which leaves the move out where Yahoo
       // may not have caught up with it.
       var ranges = {}
       var parsed = function(answer) {
-        var quote = Market.carryClose(null, Quote.parseChart(answer, Market.centExchanges(stub.calendars), root.now), stub.calendars, root.now)
+        var quote = CarriedClose.carryClose(null, Quote.parseChart(answer, Calendar.centExchanges(stub.calendars), root.now), stub.calendars, root.now)
         return root.overnight.lastTrade ? Object.assign({}, quote, { price: null, marketTime: null }) : quote
       }
       listed.forEach(function(s) {
@@ -612,7 +613,7 @@ Harness {
       // Each answer as Stonks asks for it at the moment, Yahoo's one day or
       // two: two for every listing on a fresh shell's first ask, so a moment
       // saved in two days throughout is that; otherwise as a surface open a
-      // while asks, by `Market.twoDays` judged on the saved answer, a row in
+      // while asks, by `Asks.twoDays` judged on the saved answer, a row in
       // a spark batch two when any of its batch wants two
       // (`Asks.quoteSlots`). A capture saves Yahoo's two days beside its one
       // (2d/<file>.json, test/capture-demo.sh), read where Stonks asks for
@@ -621,7 +622,7 @@ Harness {
       // and a featured stock saved only in it fails the state, naming the
       // answer to save.
       var judged = Object.assign({}, quotes)
-      var twoDays = function(s) { return Market.twoDays(judged[s], root.now, stub.calendars) }
+      var twoDays = function(s) { return Asks.twoDays(judged[s], root.now, stub.calendars) }
       var askedRange = function(kept) {
         var asks = {}
         Asks.quoteSlots(kept, {}, kept, featured, [featured], true, kept.filter(function(s) { return judged[s].crypto })).forEach(function(slot) {
@@ -720,7 +721,7 @@ Harness {
       closed.path = fixtureDir + "/" + root.closure.file + ".json"
       var closedQuote = Quote.parseChart(JSON.parse(closed.text()))
       closed.destroy()
-      root.now = Market.epochAt(Market.calendarFor(stub.calendars, closedQuote), root.closure.date, "12:00")
+      root.now = Calendar.epochAt(Calendar.calendarFor(stub.calendars, closedQuote), root.closure.date, "12:00")
       stub.symbols = [root.closure.symbol, "AAPL"]
       stub.shown = stub.symbols.slice()
       stub.quotes = { [root.closure.symbol]: closedQuote, AAPL: aapl }
