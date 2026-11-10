@@ -4,7 +4,6 @@ import QtQuick
 import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Commons as Commons
-import "Tones.js" as Tones
 import "Motion.js" as Motion
 
 // A symbol's lists, in the rows' place: a tick box for each list, All first.
@@ -14,10 +13,7 @@ FocusScope {
   property var choices: []
   property string symbol: ""
   property string symbolName: ""
-  property bool retro: false
-  property color foreground: Commons.Color.foreground
-  property color dim: Tones.dim(foreground, Commons.Color.background)
-  property string fontFamily: Style.font.family
+  property Look look
   // Said in the title's place for a moment: why a tick did nothing.
   property string note: ""
 
@@ -132,8 +128,8 @@ FocusScope {
       anchors.baseline: symbolText.baseline
       textFormat: Text.PlainText
       text: "LISTS WITH"
-      color: root.dim
-      font.family: root.fontFamily
+      color: root.look.dim
+      font.family: root.look.fontFamily
       font.pixelSize: Style.font.caption
       font.bold: true
       font.letterSpacing: 1
@@ -147,8 +143,8 @@ FocusScope {
       anchors.verticalCenter: parent.verticalCenter
       textFormat: Text.PlainText
       text: root.symbol
-      color: root.foreground
-      font.family: root.fontFamily
+      color: root.look.foreground
+      font.family: root.look.fontFamily
       font.pixelSize: Style.font.bodySmall
       font.bold: true
     }
@@ -162,8 +158,8 @@ FocusScope {
       anchors.baseline: symbolText.baseline
       textFormat: Text.PlainText
       text: root.symbolName.toUpperCase()
-      color: root.dim
-      font.family: root.fontFamily
+      color: root.look.dim
+      font.family: root.look.fontFamily
       font.pixelSize: Style.font.caption
       font.letterSpacing: 1
       elide: Text.ElideRight
@@ -178,8 +174,8 @@ FocusScope {
       anchors.verticalCenter: parent.verticalCenter
       textFormat: Text.PlainText
       text: root.note
-      color: root.foreground
-      font.family: root.fontFamily
+      color: root.look.foreground
+      font.family: root.look.fontFamily
       font.pixelSize: Style.font.bodySmall
       elide: Text.ElideRight
     }
@@ -187,7 +183,7 @@ FocusScope {
     ListAction {
       id: done
       objectName: "symbolListsDone"
-      view: root
+      look: root.look
       anchors.right: parent.right
       anchors.rightMargin: root.gutter + root.inset
       anchors.verticalCenter: parent.verticalCenter
@@ -241,16 +237,16 @@ FocusScope {
           Rectangle {
             objectName: "rowFill"
             anchors.fill: parent
-            radius: root.retro ? 0 : Style.cornerRadius
-            color: rowMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
-              : entry.index === root.cursor ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
+            radius: root.look.retro ? 0 : Style.cornerRadius
+            color: rowMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
+              : entry.index === root.cursor ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
             Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
           }
 
           CursorBar {
             visible: entry.index === root.cursor
-            retro: root.retro
-            foreground: root.foreground
+            retro: root.look.retro
+            foreground: root.look.foreground
           }
 
           Rectangle {
@@ -260,17 +256,17 @@ FocusScope {
             anchors.verticalCenter: parent.verticalCenter
             width: Style.space(12)
             height: width
-            radius: root.retro ? 0 : Style.space(3)
+            radius: root.look.retro ? 0 : Style.space(3)
             color: "transparent"
             border.width: 1
-            border.color: entry.ticked ? root.foreground : root.dim
+            border.color: entry.ticked ? root.look.foreground : root.look.dim
 
             Text {
               anchors.centerIn: parent
               visible: entry.ticked
               text: "✓"
-              color: root.foreground
-              font.family: root.fontFamily
+              color: root.look.foreground
+              font.family: root.look.fontFamily
               font.pixelSize: Style.font.caption
               font.bold: true
             }
@@ -284,8 +280,8 @@ FocusScope {
             anchors.verticalCenter: parent.verticalCenter
             textFormat: Text.PlainText
             text: entry.choice.label
-            color: root.foreground
-            font.family: root.fontFamily
+            color: root.look.foreground
+            font.family: root.look.fontFamily
             font.pixelSize: Style.font.bodySmall
             elide: Text.ElideRight
           }
@@ -298,8 +294,8 @@ FocusScope {
             anchors.verticalCenter: parent.verticalCenter
             textFormat: Text.PlainText
             text: "UNCHECK TO REMOVE IT EVERYWHERE"
-            color: root.dim
-            font.family: root.fontFamily
+            color: root.look.dim
+            font.family: root.look.fontFamily
             font.pixelSize: Style.font.caption
             font.bold: true
             font.letterSpacing: 1
@@ -313,8 +309,8 @@ FocusScope {
             anchors.verticalCenter: parent.verticalCenter
             textFormat: Text.PlainText
             text: String(entry.choice.count)
-            color: root.dim
-            font.family: root.fontFamily
+            color: root.look.dim
+            font.family: root.look.fontFamily
             font.pixelSize: Style.font.caption
             font.bold: true
           }

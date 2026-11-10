@@ -3,9 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls as Controls
 import qs.Commons
-import qs.Commons as Commons
 import qs.Ui
-import "Tones.js" as Tones
 
 // The `?` sheet on both surfaces: key groups in two columns, the credit
 // closing the second, then CLOSE.
@@ -14,9 +12,7 @@ Flickable {
 
   // KeySheet.sheet: { groups }.
   property var sheet: ({ groups: [] })
-  property color foreground: Commons.Color.foreground
-  property color dim: Tones.dim(foreground, Commons.Color.background)
-  property string fontFamily: Style.font.family
+  property Look look
   // `edge` is the room right of the rows' figures. CLOSE ends there, so its
   // fill stays inside the clip; what a key does may run past it.
   property int inset: 0
@@ -53,7 +49,7 @@ Flickable {
       for (var r = 0; r < groups[g].rows.length; r++) widest = Math.max(widest, Math.ceil(keyMetrics.advanceWidth(groups[g].rows[r].key)))
     return widest
   }
-  FontMetrics { id: keyMetrics; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; font.bold: true }
+  FontMetrics { id: keyMetrics; font.family: root.look.fontFamily; font.pixelSize: Style.font.bodySmall; font.bold: true }
 
   contentWidth: width
   contentHeight: sheetColumn.y + sheetColumn.implicitHeight
@@ -76,8 +72,8 @@ Flickable {
 
     PanelSectionHeader {
       text: group.modelData.title
-      foreground: root.foreground
-      fontFamily: root.fontFamily
+      foreground: root.look.foreground
+      fontFamily: root.look.fontFamily
     }
 
     Repeater {
@@ -94,8 +90,8 @@ Flickable {
           width: root.keyWidth
           textFormat: Text.PlainText
           text: helpRow.modelData.key
-          color: root.foreground
-          font.family: root.fontFamily
+          color: root.look.foreground
+          font.family: root.look.fontFamily
           font.pixelSize: Style.font.bodySmall
           font.bold: true
         }
@@ -104,8 +100,8 @@ Flickable {
           width: parent.width - root.keyWidth - parent.spacing
           textFormat: Text.PlainText
           text: helpRow.modelData.does
-          color: root.dim
-          font.family: root.fontFamily
+          color: root.look.dim
+          font.family: root.look.fontFamily
           font.pixelSize: Style.font.bodySmall
           wrapMode: Text.WordWrap
         }
@@ -147,8 +143,8 @@ Flickable {
             width: root.columnWidth - root.edge
             textFormat: Text.PlainText
             text: root.credit
-            color: root.dim
-            font.family: root.fontFamily
+            color: root.look.dim
+            font.family: root.look.fontFamily
             font.pixelSize: Style.font.bodySmall
             wrapMode: Text.WordWrap
           }
@@ -158,7 +154,9 @@ Flickable {
 
     ListAction {
       objectName: "helpClose"
-      view: root
+      look: root.look
+      // Round in retro too.
+      retro: false
       anchors.right: parent.right
       anchors.rightMargin: root.edge
       text: "CLOSE"

@@ -2,9 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.Commons
-import qs.Commons as Commons
 import "Cells.js" as Cells
-import "Tones.js" as Tones
 import "Motion.js" as Motion
 
 // The rule between the list's name and its order, drawn as the list's
@@ -15,12 +13,7 @@ Item {
   id: root
 
   property var breadth: ({ list: "", up: 0, flat: 0, down: 0, none: 0 })
-  property bool retro: false
-  property color foreground: Commons.Color.foreground
-  property color dim: Tones.dim(foreground, Commons.Color.background)
-  property color upColor: Commons.Color.foreground
-  property color downColor: Commons.Color.urgent
-  property string fontFamily: Style.font.family
+  property Look look
 
   readonly property int total: breadth.up + breadth.flat + breadth.down + breadth.none
   readonly property string counts: {
@@ -34,7 +27,7 @@ Item {
   // At 1 px the colours don't read. The info lines' rules share its ink and
   // grain (`Cells.RULE_*`).
   readonly property int thickness: Cells.RULE_THICKNESS
-  readonly property color plain: Qt.rgba(foreground.r, foreground.g, foreground.b, Cells.RULE_INK)
+  readonly property color plain: Util.alpha(look.foreground, Cells.RULE_INK)
   // Retro draws it as cells on the pixel chart's grain.
   readonly property int pitch: Cells.RULE_PITCH
   readonly property int cells: Math.max(0, Math.floor((width + 1) / pitch))
@@ -101,7 +94,7 @@ Item {
     Behavior on opacity { NumberAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
 
     Rectangle {
-      visible: !root.retro
+      visible: !root.look.retro
       anchors.verticalCenter: parent.verticalCenter
       width: parent.width
       height: 1
@@ -112,39 +105,39 @@ Item {
     // than vanishing.
     Rectangle {
       objectName: "breadthUp"
-      visible: !root.retro
+      visible: !root.look.retro
       anchors.verticalCenter: parent.verticalCenter
       width: Math.floor(parent.width * root.upShare)
       height: root.thickness
       radius: root.thickness / 2
-      color: root.upColor
+      color: root.look.upColor
     }
 
     Rectangle {
       objectName: "breadthDown"
-      visible: !root.retro
+      visible: !root.look.retro
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       width: Math.floor(parent.width * root.downShare)
       height: root.thickness
       radius: root.thickness / 2
-      color: root.downColor
+      color: root.look.downColor
     }
 
     Row {
-      visible: root.retro
+      visible: root.look.retro
       anchors.verticalCenter: parent.verticalCenter
       spacing: root.pitch - root.thickness
 
       Repeater {
-        model: root.retro ? root.cells : 0
+        model: root.look.retro ? root.cells : 0
 
         Rectangle {
           required property int index
           width: root.thickness
           height: root.thickness
-          color: index < root.upCells ? root.upColor
-            : index >= root.cells - root.downCells ? root.downColor : root.plain
+          color: index < root.upCells ? root.look.upColor
+            : index >= root.cells - root.downCells ? root.look.downColor : root.plain
         }
       }
     }
@@ -157,8 +150,8 @@ Item {
     Behavior on opacity { NumberAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
     textFormat: Text.PlainText
     text: root.counts
-    color: root.dim
-    font.family: root.fontFamily
+    color: root.look.dim
+    font.family: root.look.fontFamily
     font.pixelSize: Style.font.caption
     font.bold: true
     font.letterSpacing: 1

@@ -15,7 +15,6 @@ import "Quote.js" as Quote
 import "Search.js" as Search
 import "Settings.js" as Settings
 import "Share.js" as Share
-import "Tones.js" as Tones
 import "Motion.js" as Motion
 // The body the window and the panel share. It reads the service and acts
 // through it; the surface keeps its lifecycle, keys, and look.
@@ -172,6 +171,15 @@ Item {
   property var removal: null
   property string changeMode: "pct"
   property bool retro: false
+  // How this surface looks, for everything drawn on it.
+  readonly property Look look: Look {
+    retro: root.retro
+    fontFamily: root.fontFamily
+    foreground: root.foreground
+    ground: root.ground
+    upColor: root.upColor
+    downColor: root.downColor
+  }
   property bool soundsOn: false
   property int chimed: -1
   // Each symbol waiting on Yahoo, by the second it began.
@@ -242,9 +250,6 @@ Item {
   readonly property string chartSymbol: chart ? chart.symbol : ""
   readonly property string chartRange: chart ? chart.range : "1D"
   readonly property var fundamentals: chartSymbol ? fundamentalEntries[chartSymbol] || null : null
-  readonly property color dim: Tones.dim(foreground, ground)
-  readonly property color dimmer: Tones.dimmer(foreground, ground)
-  readonly property color ghost: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.05)
   readonly property int rowHeight: Style.space(30)
   readonly property int listRowHeight: Style.space(40)
   readonly property int rowGap: Style.space(2)
@@ -1075,7 +1080,7 @@ Item {
     title: root.featured && root.featuredQuote ? root.featured.name : ""
     titled: root.headerTitled
     offersRetry: root.offersRetry
-    retro: root.retro
+    look: root.look
     soundsOn: root.soundsOn
     cameraLit: root.cameraLit
     animal: root.animal
@@ -1085,11 +1090,6 @@ Item {
     trouble: !!root.troubleForms
     still: !root.surfaceOpen
     helpShown: root.showingHelp
-    foreground: root.foreground
-    dim: root.dim
-    upColor: root.upColor
-    downColor: root.downColor
-    fontFamily: root.fontFamily
     onStyleRequested: function(v) { root.setStyle(v) }
     onSoundsRequested: root.toggleSounds()
     onScreenshotRequested: root.takeScreenshot()
@@ -1112,7 +1112,7 @@ Item {
     visible: !root.showingHelp
     freshness: root.featuredFreshness
     sourceDown: root.yahooDown
-    retro: root.retro
+    look: root.look
     changeMode: root.changeMode
     scrubbing: root.scrubT !== 0
     live: root.heroLive
@@ -1121,14 +1121,6 @@ Item {
     dimmed: motion.dimmed
     // Nothing is said to be on its way while the header says no prices come.
     loadingText: root.yahooDown ? "" : root.loadingText
-    foreground: root.foreground
-    dim: root.dim
-    dimmer: root.dimmer
-    upColor: root.upColor
-    downColor: root.downColor
-    ghost: root.ghost
-    ground: root.ground
-    fontFamily: root.fontFamily
     // Before any chart, the coming symbol, never a dash.
     symbol: root.chartSymbol || root.featuredSymbol
     nameOnLine: !root.headerTitled
@@ -1197,13 +1189,7 @@ Item {
     now: root.now
     owed: root.owed
     asking: root.asking
-    retro: root.retro
-    upColor: root.upColor
-    downColor: root.downColor
-    foreground: root.foreground
-    dim: root.dim
-    dimmer: root.dimmer
-    fontFamily: root.fontFamily
+    look: root.look
     rowHeight: root.listRowHeight
     rowGap: root.rowGap
     gutter: root.gutter
@@ -1213,7 +1199,6 @@ Item {
     onArranged: Qt.callLater(root.land)
     onSettlingChanged: Qt.callLater(root.featureLanding)
     onRowRested: Qt.callLater(root.featureLanding)
-    ground: root.ground
     onFeatureRequested: function(symbol) { root.featureSymbol(symbol) }
     onRemoveRequested: function(symbol) { root.removeRow(symbol) }
     onMenuRequested: function(symbol, x, y) { root.openRowMenu(symbol, Qt.point(x, y)) }
@@ -1241,17 +1226,12 @@ Item {
     gate: root.service ? root.service.yahooGate : null
     clearance: root.service ? function() { return root.onScreen && root.service.screensClear() } : null
     active: root.adding && root.surfaceOpen
-    retro: root.retro
-    foreground: root.foreground
-    dim: root.dim
-    fontFamily: root.fontFamily
+    look: root.look
     gutter: root.gutter
     // Short, so a list's name fits the panel's field.
     placeholder: root.listName !== "" ? "Symbol or company for " + root.listName + "…" : "Symbol or company…"
     members: root.members
     own: root.ownFound
-    upColor: root.upColor
-    downColor: root.downColor
     putBack: root.putBack
     onPicked: function(symbol, pointed) { root.acceptSymbol(symbol, pointed) }
     onChose: function(symbol, result) { root.previewTo(symbol, result) }
@@ -1272,10 +1252,7 @@ Item {
     visible: root.managingLists
     active: root.managingLists && root.surfaceOpen
     choices: root.lists
-    retro: root.retro
-    foreground: root.foreground
-    dim: root.dim
-    fontFamily: root.fontFamily
+    look: root.look
     gutter: root.gutter
     onRenameRequested: function(name, newName) { root.renameList(name, newName) }
     onMoveRequested: function(name, delta) { if (root.service) root.service.moveList(name, delta) }
@@ -1300,10 +1277,7 @@ Item {
     symbol: root.listsSymbol
     symbolName: root.quotes[root.listsSymbol] ? root.quotes[root.listsSymbol].name : ""
     note: root.note
-    retro: root.retro
-    foreground: root.foreground
-    dim: root.dim
-    fontFamily: root.fontFamily
+    look: root.look
     gutter: root.gutter
     onToggled: function(name, member) { root.setMembership(name, member) }
     onDismissed: root.closeListViews()
@@ -1321,7 +1295,7 @@ Item {
     verticalAlignment: Text.AlignVCenter
     textFormat: Text.PlainText
     text: "No symbols in " + root.listLabel + " yet"
-    color: root.dim
+    color: root.look.dim
     font.family: root.fontFamily
     font.pixelSize: Style.font.bodySmall
     elide: Text.ElideRight
@@ -1338,10 +1312,7 @@ Item {
     anchors.rightMargin: root.margins
     y: root.edge - root.margins - height
     visible: root.rowsShown
-    retro: root.retro
-    foreground: root.foreground
-    dim: root.dim
-    fontFamily: root.fontFamily
+    look: root.look
     gutter: root.gutter
     rowHeight: root.rowHeight
     note: root.note
@@ -1350,7 +1321,6 @@ Item {
     noticeActions: root.noticeActions
     hint: root.hint
     showsHint: root.hintShown
-    ground: root.ground
     // The same on every list: the list's name is already at its top.
     label: "+  Find or add a symbol"
     acts: !root.settingsUnreadable
@@ -1404,9 +1374,7 @@ Item {
     edge: root.gutter + root.inset
     sheet: root.keySheet
     version: root.updates && root.updates.runningVersion || ""
-    foreground: root.foreground
-    dim: root.dim
-    fontFamily: root.fontFamily
+    look: root.look
     onCloseRequested: root.showingHelp = false
   }
 
@@ -1453,9 +1421,7 @@ Item {
       : Math.max(root.margins, root.rowMenu.above - height)
     lines: root.rowMenu ? root.rowMenu.lines.map(function(line) { return line.label }) : []
     startLine: root.rowMenu ? root.rowMenu.startLine : -1
-    retro: root.retro
-    foreground: root.foreground
-    fontFamily: root.fontFamily
+    look: root.look
     onTaken: function(index) { root.takeRowMenu(index) }
     onDismissed: root.rowMenu = null
   }
@@ -1471,10 +1437,7 @@ Item {
     maxHeight: root.height - root.listMenuTop - root.margins - (root.chartFitsSurface ? 0 : root.groupGap + footer.height)
     choices: root.lists
     current: root.listName
-    retro: root.retro
-    foreground: root.foreground
-    dim: root.dim
-    fontFamily: root.fontFamily
+    look: root.look
     onChosen: function(name) { root.chooseList(name) }
     onCreateRequested: function(name) { root.createList(name) }
     onManageRequested: root.openManageLists()

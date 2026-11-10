@@ -3,13 +3,11 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import qs.Commons
-import qs.Commons as Commons
 import "Chart.js" as Chart
 import "Figures.js" as Figures
 import "Freshness.js" as Freshness
 import "Settings.js" as Settings
 import "Rows.js" as Rows
-import "Tones.js" as Tones
 import "Motion.js" as Motion
 // The scrolling rows: cursor, drag, scroll and wheel. Surfaces pass data in
 // and save what the signals ask. One row for each symbol in All: a list
@@ -35,21 +33,13 @@ Flickable {
   property var owed: ({})
   // Symbols asked to refresh under 2 s ago: freshness gives them grace.
   property var asking: ({})
-  property bool retro: false
+  property Look look
   property var calendars: null
-  property color upColor: Commons.Color.foreground
-  property color downColor: Commons.Color.urgent
-  property color foreground: Commons.Color.foreground
-  property color dim: Tones.dim(foreground, Commons.Color.background)
-  property color dimmer: Tones.dimmer(foreground, Commons.Color.background)
-  property string fontFamily: Style.font.family
   property int rowHeight: Style.space(40)
   property int rowGap: Style.space(2)
   property int gutter: Style.space(8)
   // Closed or closing: a pointer moving over it moves no cursor.
   property bool surfaceOpen: true
-  // The card's colour, under a moving row's fill.
-  property color ground: "transparent"
   // The rows' view height while they show. The panel's card shrinks to the
   // key sheet or a view, hiding the rows, but sight is still judged by this.
   property real sightHeight: height
@@ -665,7 +655,7 @@ Flickable {
         }
         NumberAnimation { id: slide; target: rowDelegate; property: "shift"; to: 0; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
         moving: lifted || slide.running
-        ground: root.ground
+        look: root.look
         z: lifted ? rowRepeater.count + 2 : (slide.running ? 1 + travel + (cursor ? 0.5 : 0) : 0)
         readonly property bool resting: !slide.running && !fadeIn.running && !lifted
         onRestingChanged: if (resting) root.rowRested(symbol)
@@ -762,14 +752,7 @@ Flickable {
         removable: symbol === root.cursorRow && symbol === root.cursorSymbol && symbol !== root.scrolledUnder
           && root.dragSymbol === ""
         lifted: symbol === root.dragSymbol
-        retro: root.retro
         scrubX: day && sightScrub ? Chart.fractionAtTime(day, sightScrub) : -1
-        foreground: root.foreground
-        dim: root.dim
-        dimmer: root.dimmer
-        upColor: root.upColor
-        downColor: root.downColor
-        fontFamily: root.fontFamily
         onFeatureRequested: function(x, y, second) { if (root.clickRow(symbol, x, y, second)) root.featureRequested(symbol) }
         onMenuRequested: function(x, y, second) { if (root.clickRow(symbol, x, y, second)) root.menuRequested(symbol, x, y) }
         onRemovePressed: function(x, y, second) { root.removeArmed = root.clickCounts(x, y, second) ? symbol : "" }

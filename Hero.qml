@@ -1,11 +1,9 @@
 import QtQuick
 import qs.Commons
-import qs.Commons as Commons
 import "Cells.js" as Cells
 import "Figures.js" as Figures
 import "Freshness.js" as Freshness
 import "Format.js" as Format
-import "Tones.js" as Tones
 // The symbol, the listing line, the price in both looks, the change, and the
 // strip under them. One fitted ink height drives both digit renderers, so they
 // share a top line, a baseline and a left edge at any width. The change and
@@ -26,18 +24,12 @@ Item {
   // this line says only when the price is from, as the rows do.
   property bool sourceDown: false
   readonly property var shownFreshness: sourceDown ? Freshness.quietFreshness(freshness) : freshness
-  property bool retro: false
+  property Look look
   // The line under the price takes its unit.
   property string changeMode: "pct"
   property bool scrubbing: false
   // By which an overnight trade is old.
   property int now: 0
-  property color foreground: Commons.Color.foreground
-  property color dim: Tones.dim(foreground, Commons.Color.background)
-  property color upColor: Commons.Color.foreground
-  property color downColor: Commons.Color.urgent
-  property color ghost: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.05)
-  property string fontFamily: Style.font.family
   property string symbol: ""
   // Where the header gives its title way (`Header.titled`).
   property bool nameOnLine: false
@@ -118,7 +110,7 @@ Item {
   signal changeClicked()
 
   function toneColor(tone) {
-    return tone === "up" ? upColor : tone === "down" ? downColor : dim
+    return tone === "up" ? look.upColor : tone === "down" ? look.downColor : look.dim
   }
 
   implicitHeight: baselineY + captionDrop + Math.ceil(captionMetrics.descent)
@@ -128,7 +120,7 @@ Item {
 
   TextMetrics {
     id: digitInk
-    font.family: root.fontFamily
+    font.family: root.look.fontFamily
     font.pixelSize: root.priceSize
     font.bold: true
     text: "0123456789"
@@ -136,7 +128,7 @@ Item {
 
   TextMetrics {
     id: priceInk
-    font.family: root.fontFamily
+    font.family: root.look.fontFamily
     font.pixelSize: root.priceSize
     font.bold: true
     font.letterSpacing: -1
@@ -145,7 +137,7 @@ Item {
 
   FontMetrics {
     id: captionMetrics
-    font.family: root.fontFamily
+    font.family: root.look.fontFamily
     font.pixelSize: Style.font.caption
     font.bold: true
   }
@@ -158,8 +150,8 @@ Item {
       objectName: "heroSymbol"
       textFormat: Text.PlainText
       text: root.symbol || "—"
-      color: root.foreground
-      font.family: root.fontFamily
+      color: root.look.foreground
+      font.family: root.look.fontFamily
       font.pixelSize: Style.font.title
       font.bold: true
     }
@@ -171,8 +163,8 @@ Item {
       anchors.baseline: symbolText.baseline
       textFormat: Text.PlainText
       text: root.listingLead
-      color: Freshness.freshnessWarns(root.shownFreshness) ? root.foreground : root.dim
-      font.family: root.fontFamily
+      color: Freshness.freshnessWarns(root.shownFreshness) ? root.look.foreground : root.look.dim
+      font.family: root.look.fontFamily
       font.pixelSize: Style.font.caption
       font.bold: true
       font.letterSpacing: 1
@@ -198,14 +190,14 @@ Item {
   Text {
     id: smoothPrice
     objectName: "smoothPrice"
-    visible: !root.retro
+    visible: !root.look.retro
     x: -Math.round(root.inkLeft)
     y: root.baselineY - baselineOffset
     textFormat: Text.PlainText
     text: root.priceText
     // An old night's price dims, as its line did.
-    color: root.newestOld ? root.dim : root.foreground
-    font.family: root.fontFamily
+    color: root.newestOld ? root.look.dim : root.look.foreground
+    font.family: root.look.fontFamily
     font.pixelSize: root.fittedSize
     font.bold: true
     font.letterSpacing: -1
@@ -213,13 +205,13 @@ Item {
 
   BlockDigits {
     objectName: "blockPrice"
-    visible: root.retro
+    visible: root.look.retro
     y: root.baselineY - baselineOffset
     // Hidden, it rests, or a scrub in smooth would repaint it every step.
-    text: root.retro ? root.priceText : ""
+    text: root.look.retro ? root.priceText : ""
     cell: root.fittedCell
-    color: root.newestOld ? root.dim : root.foreground
-    ghostColor: root.ghost
+    color: root.newestOld ? root.look.dim : root.look.foreground
+    ghostColor: root.look.ghost
   }
 
   Text {
@@ -228,9 +220,9 @@ Item {
     anchors.right: parent.right
     y: root.baselineY - baselineOffset
     textFormat: Text.PlainText
-    text: root.view ? Format.lookSigns(root.view.changeText, root.retro) : ""
+    text: root.view ? Format.lookSigns(root.view.changeText, root.look.retro) : ""
     color: root.toneColor(root.view ? root.view.tone : "flat")
-    font.family: root.fontFamily
+    font.family: root.look.fontFamily
     font.pixelSize: Style.font.display
     font.bold: true
     // A range's change is always its percentage, so only the day's cycles.
@@ -257,8 +249,8 @@ Item {
       id: extendedLabel
       textFormat: Text.PlainText
       text: root.extended ? root.extended.label : ""
-      color: root.dim
-      font.family: root.fontFamily
+      color: root.look.dim
+      font.family: root.look.fontFamily
       font.pixelSize: Style.font.caption
       font.bold: true
       font.letterSpacing: 1
@@ -268,8 +260,8 @@ Item {
       visible: text !== ""
       textFormat: Text.PlainText
       text: root.extended ? root.extended.time : ""
-      color: root.dim
-      font.family: root.fontFamily
+      color: root.look.dim
+      font.family: root.look.fontFamily
       font.pixelSize: Style.font.caption
       font.bold: true
       font.letterSpacing: 1
@@ -279,8 +271,8 @@ Item {
       visible: text !== ""
       textFormat: Text.PlainText
       text: root.extended ? root.extended.price : ""
-      color: extendedLine.old ? root.dim : root.foreground
-      font.family: root.fontFamily
+      color: extendedLine.old ? root.look.dim : root.look.foreground
+      font.family: root.look.fontFamily
       font.pixelSize: Style.font.caption
       font.bold: true
     }
@@ -288,9 +280,9 @@ Item {
       id: extendedMove
       visible: text !== ""
       textFormat: Text.PlainText
-      text: root.extended ? Format.lookSigns(root.extended.changeText, root.retro) : ""
-      color: extendedLine.old ? root.dim : root.toneColor(root.extended ? root.extended.tone : "flat")
-      font.family: root.fontFamily
+      text: root.extended ? Format.lookSigns(root.extended.changeText, root.look.retro) : ""
+      color: extendedLine.old ? root.look.dim : root.toneColor(root.extended ? root.extended.tone : "flat")
+      font.family: root.look.fontFamily
       font.pixelSize: Style.font.caption
       font.bold: true
     }
@@ -301,8 +293,8 @@ Item {
       visible: root.sinceShown
       textFormat: Text.PlainText
       text: root.since ? "· " + root.since.label : ""
-      color: root.dim
-      font.family: root.fontFamily
+      color: root.look.dim
+      font.family: root.look.fontFamily
       font.pixelSize: Style.font.caption
       font.bold: true
       font.letterSpacing: 1
@@ -312,9 +304,9 @@ Item {
       objectName: "sinceMove"
       visible: root.sinceShown
       textFormat: Text.PlainText
-      text: root.since ? Format.lookSigns(root.since.changeText, root.retro) : ""
+      text: root.since ? Format.lookSigns(root.since.changeText, root.look.retro) : ""
       color: root.toneColor(root.since ? root.since.tone : "flat")
-      font.family: root.fontFamily
+      font.family: root.look.fontFamily
       font.pixelSize: Style.font.caption
       font.bold: true
     }
@@ -327,8 +319,8 @@ Item {
     y: root.baselineY + root.captionDrop - baselineOffset
     textFormat: Text.PlainText
     text: root.baselineText
-    color: root.dim
-    font.family: root.fontFamily
+    color: root.look.dim
+    font.family: root.look.fontFamily
     font.pixelSize: Style.font.caption
     font.bold: true
     font.letterSpacing: 1
@@ -347,8 +339,8 @@ Item {
       visible: text !== ""
       textFormat: Text.PlainText
       text: root.caption.label
-      color: root.dim
-      font.family: root.fontFamily
+      color: root.look.dim
+      font.family: root.look.fontFamily
       font.pixelSize: Style.font.caption
       font.bold: true
       font.letterSpacing: 1
@@ -357,9 +349,9 @@ Item {
     Text {
       visible: text !== ""
       textFormat: Text.PlainText
-      text: Format.lookSigns(root.caption.changeText, root.retro)
-      color: root.newestOld ? root.dim : root.toneColor(root.caption.tone)
-      font.family: root.fontFamily
+      text: Format.lookSigns(root.caption.changeText, root.look.retro)
+      color: root.newestOld ? root.look.dim : root.toneColor(root.caption.tone)
+      font.family: root.look.fontFamily
       font.pixelSize: Style.font.caption
       font.bold: true
     }

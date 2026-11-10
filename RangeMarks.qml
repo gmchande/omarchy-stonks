@@ -2,8 +2,6 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.Commons
-import qs.Commons as Commons
-import "Tones.js" as Tones
 
 // A range's own high and low on its chart (`History.rangeMarks`): the price
 // bright and the date dim, the high on the top edge and the low on the bottom,
@@ -18,9 +16,7 @@ Item {
 
   property var marks: null
   property var chart: null
-  property color foreground: Commons.Color.foreground
-  property color dim: Tones.dim(foreground, Commons.Color.background)
-  property string fontFamily: Style.font.family
+  property Look look
   // The shell's text size and spacing, or the picture's own in the screenshot,
   // which no text size moves.
   property real fontSize: Style.font.caption
@@ -75,8 +71,8 @@ Item {
           objectName: "markPrice"
           textFormat: Text.PlainText
           text: mark.modelData.price
-          color: root.foreground
-          font.family: root.fontFamily
+          color: root.look.foreground
+          font.family: root.look.fontFamily
           font.pixelSize: root.fontSize
           font.bold: true
         }
@@ -86,8 +82,8 @@ Item {
           x: priceText.implicitWidth + mark.gap
           textFormat: Text.PlainText
           text: mark.modelData.date
-          color: root.dim
-          font.family: root.fontFamily
+          color: root.look.dim
+          font.family: root.look.fontFamily
           font.pixelSize: root.fontSize
           font.bold: true
           font.letterSpacing: root.letterSpacing

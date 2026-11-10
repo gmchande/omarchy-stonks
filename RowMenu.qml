@@ -14,10 +14,8 @@ FocusScope {
   property var lines: []
   property int startLine: -1
   property int cursor: -1
-  property bool retro: false
-  property color foreground: Commons.Color.foreground
-  property string fontFamily: Style.font.family
-  property color background: Qt.rgba(Commons.Color.popups.background.r, Commons.Color.popups.background.g, Commons.Color.popups.background.b, 1)
+  property Look look
+  property color background: Util.alpha(Commons.Color.popups.background, 1)
   property int maxWidth: 0
 
   readonly property int itemHeight: Style.space(26)
@@ -33,7 +31,7 @@ FocusScope {
   height: lines.length * itemHeight + inset * 2
   FontMetrics {
     id: metrics
-    font.family: root.fontFamily
+    font.family: root.look.fontFamily
     font.pixelSize: Style.font.bodySmall
   }
 
@@ -65,10 +63,10 @@ FocusScope {
 
   Rectangle {
     anchors.fill: parent
-    radius: root.retro ? 0 : Style.cornerRadius
+    radius: root.look.retro ? 0 : Style.cornerRadius
     color: root.background
     border.width: 1
-    border.color: Qt.tint(root.background, Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.18))
+    border.color: Qt.tint(root.background, Util.alpha(root.look.foreground, 0.18))
   }
 
   RowPointer {
@@ -99,15 +97,15 @@ FocusScope {
 
         Rectangle {
           anchors.fill: parent
-          radius: root.retro ? 0 : Style.cornerRadius
-          color: line.isCursor ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
+          radius: root.look.retro ? 0 : Style.cornerRadius
+          color: line.isCursor ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
           Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
         }
 
         CursorBar {
           visible: line.isCursor
-          retro: root.retro
-          foreground: root.foreground
+          retro: root.look.retro
+          foreground: root.look.foreground
         }
 
         Text {
@@ -117,8 +115,8 @@ FocusScope {
           anchors.verticalCenter: parent.verticalCenter
           textFormat: Text.PlainText
           text: line.modelData
-          color: root.foreground
-          font.family: root.fontFamily
+          color: root.look.foreground
+          font.family: root.look.fontFamily
           font.pixelSize: Style.font.bodySmall
         }
 

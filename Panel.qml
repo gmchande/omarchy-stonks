@@ -198,7 +198,7 @@ Panel {
           foreground: root.bar ? root.bar.foreground : Commons.Color.foreground
           fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
           // Opaque: the theme's popup colour may carry an alpha.
-          ground: Qt.rgba(Commons.Color.popups.background.r, Commons.Color.popups.background.g, Commons.Color.popups.background.b, 1)
+          ground: Util.alpha(Commons.Color.popups.background, 1)
           upColor: root.trendColors ? root.trendColors.upOn(ground) : Commons.Color.foreground
           downColor: root.trendColors ? root.trendColors.downOn(ground) : Commons.Color.urgent
           onKeysReleased: root.refocusKeys()

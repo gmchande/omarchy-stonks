@@ -6,7 +6,6 @@ import "Cells.js" as Cells
 import "Chart.js" as Chart
 import "Freshness.js" as Freshness
 import "Format.js" as Format
-import "Tones.js" as Tones
 import "Motion.js" as Motion
 // A row, set as Apple's Stocks sets one: symbol over name, price over
 // change, the day line between.
@@ -20,7 +19,7 @@ Rectangle {
   property bool featuredRow: false
   property bool cursor: false
   property bool removable: false
-  property bool retro: false
+  property Look look
   property bool lifted: false
   // The list builds the words and the pointer only for rows near sight, so a
   // long list costs about what a screenful does.
@@ -30,16 +29,9 @@ Rectangle {
   // Lifted or sliding, the row lays the card's ground under its fill, at
   // once, so the rows it passes never show through.
   property bool moving: false
-  property color ground: "transparent"
   property real scrubX: -1
   property real reveal: 1
   property var calendars: null
-  property color foreground: Commons.Color.foreground
-  property color dim: Tones.dim(foreground, Commons.Color.background)
-  property color dimmer: Tones.dimmer(foreground, Commons.Color.background)
-  property color upColor: Commons.Color.foreground
-  property color downColor: Commons.Color.urgent
-  property string fontFamily: Style.font.family
 
   // In scene coordinates. `second` is Qt's double-click second press, which
   // the list may not act on (Watchlist.clickRow).
@@ -62,7 +54,7 @@ Rectangle {
   property var day: null
   readonly property var geometry: day && day.points.length ? Chart.chartGeometry(day, calendars) : null
 
-  readonly property color trend: !view || view.tone === "flat" ? dim : view.tone === "up" ? upColor : downColor
+  readonly property color trend: !view || view.tone === "flat" ? look.dim : view.tone === "up" ? look.upColor : look.downColor
   property var freshness: null
   property bool sourceDown: false
   readonly property var shownFreshness: sourceDown ? Freshness.quietFreshness(freshness) : freshness
@@ -81,13 +73,13 @@ Rectangle {
   readonly property int inset: Style.space(4)
 
   height: Style.space(40)
-  radius: retro ? 0 : Style.cornerRadius
-  readonly property color fill: lifted ? Style.pressedFillFor(foreground, Commons.Color.accent)
-    : featuredRow ? Style.selectedFillFor(foreground, Commons.Color.accent)
-    : cursor ? Style.hoverFillFor(foreground, Commons.Color.accent) : "transparent"
+  radius: look.retro ? 0 : Style.cornerRadius
+  readonly property color fill: lifted ? Style.pressedFillFor(look.foreground, Commons.Color.accent)
+    : featuredRow ? Style.selectedFillFor(look.foreground, Commons.Color.accent)
+    : cursor ? Style.hoverFillFor(look.foreground, Commons.Color.accent) : "transparent"
   color: fill
   border.width: lifted ? 1 : 0
-  border.color: Style.normalBorderFor(foreground, Commons.Color.accent)
+  border.color: Style.normalBorderFor(look.foreground, Commons.Color.accent)
 
   // The shell's hover speed (CursorSurface).
   Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
@@ -98,7 +90,7 @@ Rectangle {
     anchors.fill: parent
     radius: row.radius
     visible: row.moving
-    color: row.ground
+    color: row.look.ground
   }
 
   // Built even out of sight: a canvas built as its row comes into sight draws
@@ -108,7 +100,7 @@ Rectangle {
     width: row.sparkWidth
     height: Style.space(22)
     anchors.verticalCenter: parent.verticalCenter
-    sourceComponent: row.retro ? cellsLine : smoothLine
+    sourceComponent: row.look.retro ? cellsLine : smoothLine
   }
 
   Component {
@@ -117,10 +109,10 @@ Rectangle {
       objectName: "rowLine"
       geometry: row.geometry
       up: row.view ? row.view.dayUp : null
-      upColor: row.upColor
-      downColor: row.downColor
-      lineColor: row.dim
-      baselineColor: row.dimmer
+      upColor: row.look.upColor
+      downColor: row.look.downColor
+      lineColor: row.look.dim
+      baselineColor: row.look.dimmer
       cursorX: row.scrubX
       reveal: row.reveal
     }
@@ -133,11 +125,11 @@ Rectangle {
       objectName: "rowCells"
       geometry: row.geometry
       up: row.view ? row.view.dayUp : null
-      upColor: row.upColor
-      downColor: row.downColor
-      baselineColor: row.dimmer
-      hairlineColor: row.foreground
-      ground: Qt.tint(row.ground, row.fill)
+      upColor: row.look.upColor
+      downColor: row.look.downColor
+      baselineColor: row.look.dimmer
+      hairlineColor: row.look.foreground
+      ground: Qt.tint(row.look.ground, row.fill)
       pixel: 2
       gap: 1
       bells: false
@@ -154,8 +146,8 @@ Rectangle {
         objectName: "rowContent"
         CursorBar {
           visible: row.cursor
-          retro: row.retro
-          foreground: row.foreground
+          retro: row.look.retro
+          foreground: row.look.foreground
         }
 
         Text {
@@ -166,8 +158,8 @@ Rectangle {
           y: row.inset
           textFormat: Text.PlainText
           text: row.symbol
-          color: row.foreground
-          font.family: row.fontFamily
+          color: row.look.foreground
+          font.family: row.look.fontFamily
           font.pixelSize: Style.font.body
           font.bold: true
         }
@@ -183,8 +175,8 @@ Rectangle {
           width: Math.min(implicitWidth, row.width - x - row.priceWidth - row.gap * 2 - row.sparkWidth - row.gap - timeText.implicitWidth)
           textFormat: Text.PlainText
           text: row.detail
-          color: row.warns ? row.foreground : row.dim
-          font.family: row.fontFamily
+          color: row.warns ? row.look.foreground : row.look.dim
+          font.family: row.look.fontFamily
           font.pixelSize: Style.font.bodySmall
           font.bold: row.warns
           elide: Text.ElideRight
@@ -197,8 +189,8 @@ Rectangle {
           anchors.baseline: detailText.baseline
           textFormat: Text.PlainText
           text: row.detailTime
-          color: row.dim
-          font.family: row.fontFamily
+          color: row.look.dim
+          font.family: row.look.fontFamily
           font.pixelSize: Style.font.bodySmall
         }
 
@@ -215,34 +207,34 @@ Rectangle {
           x: symbolText.x + symbolText.width + Style.space(4)
           y: symbolText.y + (symbolText.height - height) / 2
           readonly property bool hovered: mouse.containsMouse && mouse.onRemove(mouse.mouseX, mouse.mouseY)
-          readonly property color ink: hovered ? row.foreground : row.dim
+          readonly property color ink: hovered ? row.look.foreground : row.look.dim
 
           // The shell's 22 px target, its fill inset to clear the row's top.
           Rectangle {
             objectName: "rowRemoveFill"
             anchors.fill: parent
             anchors.margins: Style.space(2)
-            radius: row.retro ? 0 : Style.cornerRadius
-            color: removeButton.hovered && mouse.pressed && mouse.pressedOnRemove && !mouse.dragged ? Style.pressedFillFor(row.foreground, Commons.Color.accent)
-              : removeButton.hovered ? Style.hoverFillFor(row.foreground, Commons.Color.accent) : "transparent"
+            radius: row.look.retro ? 0 : Style.cornerRadius
+            color: removeButton.hovered && mouse.pressed && mouse.pressedOnRemove && !mouse.dragged ? Style.pressedFillFor(row.look.foreground, Commons.Color.accent)
+              : removeButton.hovered ? Style.hoverFillFor(row.look.foreground, Commons.Color.accent) : "transparent"
             Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
           }
 
           // Smooth: ×.
           Text {
             objectName: "rowRemoveGlyph"
-            visible: !row.retro
+            visible: !row.look.retro
             anchors.centerIn: parent
             textFormat: Text.PlainText
             text: "󰅖"
             color: removeButton.ink
-            font.family: row.fontFamily
+            font.family: row.look.fontFamily
             font.pixelSize: Style.font.body
           }
 
           Loader {
             anchors.centerIn: parent
-            active: row.retro
+            active: row.look.retro
             sourceComponent: Component {
               PixelSprite {
                 objectName: "rowRemoveCells"
@@ -264,8 +256,8 @@ Rectangle {
           horizontalAlignment: Text.AlignRight
           textFormat: Text.PlainText
           text: row.view ? row.view.priceText : ""
-          color: row.foreground
-          font.family: row.fontFamily
+          color: row.look.foreground
+          font.family: row.look.fontFamily
           font.pixelSize: Style.font.body
         }
 
@@ -276,9 +268,9 @@ Rectangle {
           anchors.bottomMargin: row.inset
           horizontalAlignment: Text.AlignRight
           textFormat: Text.PlainText
-          text: row.view ? Format.lookSigns(row.view.changeLine, row.retro) : ""
+          text: row.view ? Format.lookSigns(row.view.changeLine, row.look.retro) : ""
           color: row.trend
-          font.family: row.fontFamily
+          font.family: row.look.fontFamily
           font.pixelSize: Style.font.body
           font.bold: true
         }

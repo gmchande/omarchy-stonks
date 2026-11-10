@@ -4,7 +4,6 @@ import QtQuick
 import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Commons as Commons
-import "Tones.js" as Tones
 import "KeyText.js" as KeyText
 import "Motion.js" as Motion
 
@@ -15,13 +14,10 @@ FocusScope {
 
   property var choices: []
   property string current: ""
-  property bool retro: false
-  property color foreground: Commons.Color.foreground
-  property color dim: Tones.dim(foreground, Commons.Color.background)
-  property string fontFamily: Style.font.family
+  property Look look
   property int maxHeight: 0
   // Opaque whatever the theme's panel alpha.
-  property color background: Qt.rgba(Commons.Color.popups.background.r, Commons.Color.popups.background.g, Commons.Color.popups.background.b, 1)
+  property color background: Util.alpha(Commons.Color.popups.background, 1)
   property string problem: ""
 
   property int cursor: 0
@@ -196,10 +192,10 @@ FocusScope {
   // show the rows' cursor bar under it.
   Rectangle {
     anchors.fill: parent
-    radius: root.retro ? 0 : Style.cornerRadius
+    radius: root.look.retro ? 0 : Style.cornerRadius
     color: root.background
     border.width: 1
-    border.color: Qt.tint(root.background, Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.18))
+    border.color: Qt.tint(root.background, Util.alpha(root.look.foreground, 0.18))
   }
 
   RowPointer {
@@ -258,15 +254,15 @@ FocusScope {
 
           Rectangle {
             anchors.fill: parent
-            radius: root.retro ? 0 : Style.cornerRadius
-            color: entry.isCursor ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
+            radius: root.look.retro ? 0 : Style.cornerRadius
+            color: entry.isCursor ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
             Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
           }
 
           CursorBar {
             visible: entry.isCursor
-            retro: root.retro
-            foreground: root.foreground
+            retro: root.look.retro
+            foreground: root.look.foreground
           }
 
           Text {
@@ -275,8 +271,8 @@ FocusScope {
             width: Style.space(16)
             anchors.verticalCenter: parent.verticalCenter
             text: entry.choice.name === root.current ? "✓" : ""
-            color: root.foreground
-            font.family: root.fontFamily
+            color: root.look.foreground
+            font.family: root.look.fontFamily
             font.pixelSize: Style.font.bodySmall
             font.bold: true
           }
@@ -288,8 +284,8 @@ FocusScope {
             anchors.verticalCenter: parent.verticalCenter
             textFormat: Text.PlainText
             text: entry.choice.label
-            color: root.foreground
-            font.family: root.fontFamily
+            color: root.look.foreground
+            font.family: root.look.fontFamily
             font.pixelSize: Style.font.bodySmall
             elide: Text.ElideRight
           }
@@ -302,8 +298,8 @@ FocusScope {
             anchors.verticalCenter: parent.verticalCenter
             textFormat: Text.PlainText
             text: String(entry.choice.count)
-            color: root.dim
-            font.family: root.fontFamily
+            color: root.look.dim
+            font.family: root.look.fontFamily
             font.pixelSize: Style.font.caption
             font.bold: true
           }
@@ -337,7 +333,7 @@ FocusScope {
         x: Style.space(8)
         width: parent.width - Style.space(16)
         height: 1
-        color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.12)
+        color: Util.alpha(root.look.foreground, 0.12)
       }
     }
 
@@ -350,15 +346,15 @@ FocusScope {
       Rectangle {
         anchors.fill: parent
         visible: !root.naming
-        radius: root.retro ? 0 : Style.cornerRadius
-        color: root.cursor === root.newIndex ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
+        radius: root.look.retro ? 0 : Style.cornerRadius
+        color: root.cursor === root.newIndex ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
         Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
       }
 
       CursorBar {
         visible: root.cursor === root.newIndex && !root.naming
-        retro: root.retro
-        foreground: root.foreground
+        retro: root.look.retro
+        foreground: root.look.foreground
       }
 
       Text {
@@ -367,8 +363,8 @@ FocusScope {
         anchors.verticalCenter: parent.verticalCenter
         textFormat: Text.PlainText
         text: "New list…"
-        color: root.dim
-        font.family: root.fontFamily
+        color: root.look.dim
+        font.family: root.look.fontFamily
         font.pixelSize: Style.font.bodySmall
       }
 
@@ -392,10 +388,10 @@ FocusScope {
         verticalPadding: 0
         // The typed name starts where "New list…" and the lists' names do.
         leftPadding: Style.space(24)
-        retro: root.retro
-        foreground: root.foreground
-        dim: root.dim
-        font.family: root.fontFamily
+        retro: root.look.retro
+        foreground: root.look.foreground
+        dim: root.look.dim
+        font.family: root.look.fontFamily
         font.pixelSize: Style.font.bodySmall
         placeholderText: "List name"
         onTextChanged: root.problem = ""
@@ -408,7 +404,7 @@ FocusScope {
       ListAction {
         id: makeButton
         objectName: "makeList"
-        view: root
+        look: root.look
         visible: root.naming
         anchors.right: parent.right
         anchors.rightMargin: Style.space(8)
@@ -428,8 +424,8 @@ FocusScope {
       verticalAlignment: Text.AlignVCenter
       textFormat: Text.PlainText
       text: root.problem
-      color: root.foreground
-      font.family: root.fontFamily
+      color: root.look.foreground
+      font.family: root.look.fontFamily
       font.pixelSize: Style.font.caption
       elide: Text.ElideRight
     }
@@ -443,15 +439,15 @@ FocusScope {
 
       Rectangle {
         anchors.fill: parent
-        radius: root.retro ? 0 : Style.cornerRadius
-        color: manageRow.isCursor ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
+        radius: root.look.retro ? 0 : Style.cornerRadius
+        color: manageRow.isCursor ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
         Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
       }
 
       CursorBar {
         visible: manageRow.isCursor
-        retro: root.retro
-        foreground: root.foreground
+        retro: root.look.retro
+        foreground: root.look.foreground
       }
 
       Text {
@@ -459,8 +455,8 @@ FocusScope {
         anchors.verticalCenter: parent.verticalCenter
         textFormat: Text.PlainText
         text: "Manage lists…"
-        color: root.dim
-        font.family: root.fontFamily
+        color: root.look.dim
+        font.family: root.look.fontFamily
         font.pixelSize: Style.font.bodySmall
       }
 

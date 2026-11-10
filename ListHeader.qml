@@ -3,7 +3,6 @@ import qs.Commons
 import qs.Commons as Commons
 import "Cells.js" as Cells
 import "Rows.js" as Rows
-import "Tones.js" as Tones
 import "Motion.js" as Motion
 // The list's header: its name, a menu, left of the rule, as Apple puts it
 // atop a list; the order and the rows' unit on the right. Its height is the
@@ -25,14 +24,9 @@ Item {
   property string order: "manual"
   property bool reversed: false
   property string changeMode: "pct"
-  property bool retro: false
+  property Look look
   // Closing: what moves stops where it is.
   property bool still: false
-  property color foreground: Commons.Color.foreground
-  property color dim: Tones.dim(foreground, Commons.Color.background)
-  property color upColor: Commons.Color.foreground
-  property color downColor: Commons.Color.urgent
-  property string fontFamily: Style.font.family
 
   signal listClicked()
   signal orderClicked()
@@ -56,10 +50,10 @@ Item {
     anchors.rightMargin: -Style.space(6)
     anchors.verticalCenter: parent.verticalCenter
     height: parent.height + Style.space(4)
-    radius: root.retro ? 0 : Style.cornerRadius
-    color: listMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
-      : root.listMenuOpen ? Style.selectedFillFor(root.foreground, Commons.Color.accent)
-      : listMouse.containsMouse ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
+    radius: root.look.retro ? 0 : Style.cornerRadius
+    color: listMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
+      : root.listMenuOpen ? Style.selectedFillFor(root.look.foreground, Commons.Color.accent)
+      : listMouse.containsMouse ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
     Behavior on color { ColorAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
   }
 
@@ -72,8 +66,8 @@ Item {
       - unitSign.width - orderText.anchors.rightMargin - Style.space(80))
     textFormat: Text.PlainText
     text: root.listLabel.toUpperCase()
-    color: root.foreground
-    font.family: root.fontFamily
+    color: root.look.foreground
+    font.family: root.look.fontFamily
     font.pixelSize: Style.font.caption
     font.bold: true
     font.letterSpacing: 1
@@ -86,8 +80,8 @@ Item {
     anchors.leftMargin: Style.space(6)
     anchors.verticalCenter: parent.verticalCenter
     text: "󰅀"
-    color: root.dim
-    font.family: root.fontFamily
+    color: root.look.dim
+    font.family: root.look.fontFamily
     font.pixelSize: Style.font.caption
     font.bold: true
   }
@@ -114,8 +108,8 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     textFormat: Text.PlainText
     text: root.rowsDay
-    color: root.dim
-    font.family: root.fontFamily
+    color: root.look.dim
+    font.family: root.look.fontFamily
     font.pixelSize: Style.font.caption
     font.bold: true
     font.letterSpacing: 1
@@ -133,13 +127,8 @@ Item {
     anchors.top: parent.top
     anchors.bottom: parent.bottom
     breadth: root.breadth
-    retro: root.retro
+    look: root.look
     still: root.still || root.rowsCovered
-    foreground: root.foreground
-    dim: root.dim
-    upColor: root.upColor
-    downColor: root.downColor
-    fontFamily: root.fontFamily
   }
 
   // Hovers as a range does, so it reads as a control, not a label. In a
@@ -154,11 +143,11 @@ Item {
     width: orderText.sorted ? orderText.implicitWidth - orderText.wordStart + Style.space(12)
       : orderText.implicitWidth + Style.space(12)
     height: parent.height + Style.space(4)
-    radius: root.retro ? 0 : Style.cornerRadius
+    radius: root.look.retro ? 0 : Style.cornerRadius
     readonly property bool hovered: wordMouse.containsMouse || !orderText.sorted && arrowMouse.containsMouse
     readonly property bool pressed: wordMouse.pressed || !orderText.sorted && arrowMouse.pressed
-    color: pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
-      : hovered ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
+    color: pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
+      : hovered ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
     Behavior on color { ColorAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
   }
 
@@ -171,9 +160,9 @@ Item {
     width: Math.round(arrowMetrics.advanceWidth) + Style.space(12)
     anchors.verticalCenter: orderText.verticalCenter
     height: parent.height + Style.space(4)
-    radius: root.retro ? 0 : Style.cornerRadius
-    color: arrowMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
-      : arrowMouse.containsMouse ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
+    radius: root.look.retro ? 0 : Style.cornerRadius
+    color: arrowMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
+      : arrowMouse.containsMouse ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
     Behavior on color { ColorAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
   }
 
@@ -209,8 +198,8 @@ Item {
     Behavior on lift { NumberAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
     // Brighter only under the pointer: the list's name is the header's one
     // word in full ink.
-    color: Qt.tint(root.dim, Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, lift))
-    font.family: root.fontFamily
+    color: Qt.tint(root.look.dim, Util.alpha(root.look.foreground, lift))
+    font.family: root.look.fontFamily
     font.pixelSize: Style.font.caption
     font.bold: true
     font.letterSpacing: 1
@@ -253,9 +242,9 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     width: unitSign.width + Style.space(12)
     height: parent.height + Style.space(4)
-    radius: root.retro ? 0 : Style.cornerRadius
-    color: unitMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
-      : unitMouse.containsMouse ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
+    radius: root.look.retro ? 0 : Style.cornerRadius
+    color: unitMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
+      : unitMouse.containsMouse ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
     Behavior on color { ColorAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
   }
 
@@ -267,7 +256,7 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     cell: Cells.iconCell(Style.fontScale)
     shape: Cells.UNIT_SIGNS[root.changeMode]
-    color: unitMouse.containsMouse ? root.foreground : root.dim
+    color: unitMouse.containsMouse ? root.look.foreground : root.look.dim
   }
 
   MouseArea {

@@ -7,7 +7,9 @@ import qs.Commons as Commons
 Text {
   id: root
 
-  property var view: null
+  property Look look
+  // Square corners. The key sheet's CLOSE keeps round ones in retro too.
+  property bool retro: look.retro
   // Marked as the shell marks its default button (its Button's `selected`,
   // ConfirmDialog's chosen one).
   property bool enterTakes: false
@@ -16,9 +18,9 @@ Text {
   signal activated()
 
   textFormat: Text.PlainText
-  color: enterTakes ? Style.selectedStateColor(view.foreground, Commons.Color.accent)
-    : hovered ? view.foreground : view.dim
-  font.family: view.fontFamily
+  color: enterTakes ? Style.selectedStateColor(look.foreground, Commons.Color.accent)
+    : hovered ? look.foreground : look.dim
+  font.family: look.fontFamily
   font.pixelSize: Style.font.caption
   font.bold: true
   font.letterSpacing: 1
@@ -29,11 +31,11 @@ Text {
     anchors.centerIn: parent
     width: parent.implicitWidth + Style.space(12)
     height: parent.implicitHeight + Style.space(4)
-    radius: root.view.retro ? 0 : Style.cornerRadius
+    radius: root.retro ? 0 : Style.cornerRadius
     // The pressed fill while the button is down.
-    color: mouse.pressed ? Style.pressedFillFor(root.view.foreground, Commons.Color.accent)
-      : root.hovered ? Style.hoverFillFor(root.view.foreground, Commons.Color.accent)
-      : root.enterTakes ? Style.selectedFillFor(root.view.foreground, Commons.Color.accent) : "transparent"
+    color: mouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
+      : root.hovered ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent)
+      : root.enterTakes ? Style.selectedFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
   }
 
   MouseArea {

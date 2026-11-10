@@ -612,7 +612,7 @@ Harness {
               "smooth " + root.describe(smooth) + " retro " + root.describe(retro))
             caseCheck(6, label,
               find(body, "todayLabel").visible && find(body, "todayLabel").text === "TODAY"
-                && String(find(body, "todayLabel").color) === String(body.dim)
+                && String(find(body, "todayLabel").color) === String(body.look.dim)
                 && smooth.today > smooth.listRight && retro.today > retro.listRight
                 && smooth.rule > smooth.todayRight && retro.rule > retro.todayRight,
               find(body, "todayLabel").color + " vs " + body.dim + " " + root.describe(smooth))
@@ -2475,11 +2475,11 @@ Harness {
             var button = node.enterTakes !== undefined && node.activated !== undefined
             if (button && shown(node)) {
               out.buttons.push(node)
-              if (paintedMarked(node, find(node, "actionFill"), node.view.foreground)) out.marked.push(node.objectName)
+              if (paintedMarked(node, find(node, "actionFill"), node.look.foreground)) out.marked.push(node.objectName)
             }
             if (node.objectName === "searchAdd" && shown(node)) {
               out.buttons.push(node.children[0])
-              if (paintedMarked(node.children[0], node, body.search.foreground)) out.marked.push(node.objectName)
+              if (paintedMarked(node.children[0], node, body.search.look.foreground)) out.marked.push(node.objectName)
             }
             for (var i = 0; i < node.children.length; i++) walk(node.children[i])
           }
