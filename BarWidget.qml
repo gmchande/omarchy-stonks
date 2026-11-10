@@ -38,7 +38,9 @@ BarWidget {
     ? Figures.newestNote(featuredQuote, featured.newest, service.now, service.calendars) : ""
   // The day the 1D chart draws, once Robinhood has said which. Only the
   // five-minute clock that slides its start redraws it, never the second.
-  readonly property var lineDay: featuredQuote
+  // Built only for the form that draws it, and handed only to the look on
+  // show.
+  readonly property var lineDay: featuredQuote && barStyle === "sparkline"
     ? Chart.lineDay(featuredSymbol, featuredQuote, service.nights, service.allDay, service.calendars, service.slideAt) : null
   readonly property var lineGeometry: lineDay && lineDay.points.length ? Chart.chartGeometry(lineDay, service.calendars) : null
   // The right section, among the bar's bare icons, and a side bar each keep
@@ -262,7 +264,7 @@ BarWidget {
         anchors.verticalCenter: parent.verticalCenter
         width: Style.space(40)
         height: Style.space(12)
-        geometry: root.lineGeometry
+        geometry: root.retro ? null : root.lineGeometry
         lineColor: root.trendColor
         baselineColor: Qt.rgba(button.foreground.r, button.foreground.g, button.foreground.b, 0.25)
         lineWidth: 1.5
@@ -275,7 +277,7 @@ BarWidget {
         anchors.verticalCenter: parent.verticalCenter
         width: Style.space(40)
         height: Style.space(12)
-        geometry: root.lineGeometry
+        geometry: root.retro ? root.lineGeometry : null
         upColor: root.trendColor
         downColor: root.trendColor
         baselineColor: Qt.rgba(button.foreground.r, button.foreground.g, button.foreground.b, 0.25)
