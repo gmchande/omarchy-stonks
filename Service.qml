@@ -191,32 +191,25 @@ Item {
   // out again only when what it is read from changes (`Chart.newestPrintOf`):
   // each builds the stock's whole day, and a price that lands changes one
   // stock's, not every stock's. `newestKept` doesn't notify.
-  readonly property var newestKept: ({})
+  readonly property var newestKept: ({ by: {} })
   readonly property var newestPrints: {
-    var quotes = feed.quotes
     var nights = overnightFeed.entries
     var allDay = allDayFeed.entries
     var out = {}
     var kept = {}
-    for (var i = 0; i < library.length; i++) {
-      var symbol = library[i]
-      var quote = quotes[symbol]
-      if (!quote) continue
-      var night = nights[symbol] || null
-      var tradability = allDay[symbol] || null
-      var had = root.newestKept[symbol]
-      var same = had && had.quote === quote && had.calendars === calendars
-        && had.night === !!night && had.bars === (night ? night.bars : null) && had.through === (night ? night.through : null)
-        && had.tradability === !!tradability && had.allDay === (tradability ? tradability.allDay : null)
-      kept[symbol] = same ? had : {
-        quote: quote, calendars: calendars, night: !!night, bars: night ? night.bars : null, through: night ? night.through : null,
-        tradability: !!tradability, allDay: tradability ? tradability.allDay : null,
-        newest: Chart.newestPrintOf(symbol, quote, nights, allDay, calendars)
-      }
+    library.forEach(function(symbol) {
+      var quote = feed.quotes[symbol]
+      if (!quote) return
+      var night = nights[symbol]
+      var bars = night ? night.bars : null
+      var through = night ? night.through : null
+      var trades = allDay[symbol] ? allDay[symbol].allDay : null
+      var had = root.newestKept.by[symbol]
+      kept[symbol] = had && had.quote === quote && had.bars === bars && had.through === through && had.trades === trades ? had
+        : { quote: quote, bars: bars, through: through, trades: trades, newest: Chart.newestPrintOf(symbol, quote, nights, allDay, calendars) }
       if (kept[symbol].newest) out[symbol] = kept[symbol].newest
-    }
-    for (var gone in root.newestKept) if (!(gone in kept)) delete root.newestKept[gone]
-    for (var s in kept) root.newestKept[s] = kept[s]
+    })
+    root.newestKept.by = kept
     return out
   }
   readonly property var nights: overnightFeed.entries
