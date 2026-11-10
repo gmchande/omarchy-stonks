@@ -90,8 +90,8 @@ every_state() (
   # The list menu over the cursor's row in both looks on both surfaces: its
   # edge shows nothing of the row under it.
   states="$states popup-lists-menu-smooth window-lists-menu-smooth window-lists-menu-retro"
-  # The buttons that stand in for key hints: a new list's ⏎ MAKE, and a
-  # failed range's R RETRY, in both looks.
+  # The buttons that stand in for key hints: a new list's MAKE, and a
+  # failed range's RETRY, in both looks.
   states="$states popup-lists-naming-smooth popup-history-unavailable-smooth popup-history-unavailable-retro"
   # A scrub through where the 1Y high's date rests, and the low's: the mark
   # stays where it rests, under the line and the dot, in both looks.

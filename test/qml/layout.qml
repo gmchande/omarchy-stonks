@@ -2051,7 +2051,7 @@ Harness {
           body.openListMenu()
           wait(50)
           var menu = find(body, "listMenu")
-          menu.resumeNaming("All", "A list has that name already")
+          menu.resumeNaming("All", "All already exists")
           wait(50)
           var least = body.listMenuTop + menu.itemHeight + menu.pinnedHeight + menu.inset * 2 + body.groupGap
             + find(body, "footer").height + body.margins

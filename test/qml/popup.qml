@@ -97,7 +97,7 @@ Harness {
     settings: ({ symbols: [] })
   }
   // A real pill whose own loader loads the copied Panel, never mapped, so
-  // its wheel reaches Panel.featureNext as it does on the bar.
+  // its wheel reaches the service's featureStep as it does on the bar.
   Stonks.BarWidget {
     id: pill
     bar: api

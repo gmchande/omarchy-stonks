@@ -907,7 +907,6 @@ Harness {
         [service.order, service.symbols, body.note].join("|"))
 
       body.clearNote()
-      body.note = ""
       var sortedRow = watchlist.rowItem("NVDA")
       var sortedX = sortedRow.width / 2
       var sortedY = sortedRow.height / 2
@@ -922,7 +921,6 @@ Harness {
           && service.featuredSymbol === "AAPL" && watchlist.dragSymbol === "" && body.note === refused,
         [service.symbols, service.featuredSymbol, watchlist.dragSymbol, body.note].join("|"))
       body.clearNote()
-      body.note = ""
 
       // Two slots each way, so a swap of the ends, or a move cut short in
       // either direction, cannot pass.

@@ -53,7 +53,8 @@ began=$(centiseconds)
 # Before anything runs: every harness script sources lib.sh, ends on finish
 # and its finish line, and is started by one of the runners. A script that
 # misses one can pass without its checks having run. quickshell.sh is
-# lib.sh's runner, crash-check.sh proves it without the saved answers, and
+# lib.sh's runner, crash-check.sh proves it without the saved answers,
+# render.sh draws review.sh's pictures and ends on no finish line, and
 # data-files.sh and readme.sh are release tools no runner starts.
 for script in test/qml/*.sh; do
   name=${script##*/}
