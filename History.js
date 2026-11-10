@@ -393,16 +393,20 @@ function rangeMarks(history, ends, quote) {
   return { high: mark(ends.high), low: mark(ends.low) }
 }
 
+// A range bar's day as its scrub and its screenshot name it, with the clock
+// of a bar that has a time: `{ date, clock }`, `clock` null for a day's bar.
+function barDay(history, bar) {
+  var date = historyDateText(history, bar.t, historySpansYears(history), bar.newest ? "1d" : history.interval)
+  if (history.interval === "1wk" && !bar.newest) date = "WEEK OF " + date
+  var timed = bar.newest || history.interval === "15m" || history.interval === "30m" || history.interval === "1h"
+  return { date: date, clock: timed ? barClock(history, bar) : null }
+}
+
 // The date alone is for a header with no room: the hero shows the price.
 function historyScrubForms(history, bar, digits) {
   if (!history || !bar) return [""]
-  var years = historySpansYears(history)
-  var date = historyDateText(history, bar.t, years, bar.newest ? "1d" : history.interval)
-  if (history.interval === "1wk" && !bar.newest) date = "WEEK OF " + date
-  if (bar.newest || history.interval === "15m" || history.interval === "30m" || history.interval === "1h") {
-    var clock = barClock(history, bar)
-    date += " " + Format.zonedHhmm(bar.t, clock.offset, clock.zone)
-  }
+  var day = barDay(history, bar)
+  var date = day.clock ? day.date + " " + Format.zonedHhmm(bar.t, day.clock.offset, day.clock.zone) : day.date
   return [date + " · " + Format.money(bar.c, digits), date]
 }
 
