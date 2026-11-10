@@ -12,7 +12,7 @@
 # - The font's glyphs (test/font.js): it reads the installed JetBrainsMono
 #   Nerd Font.
 # - Changed tests failing on the code before the change (test/before.js): it
-#   runs the harnesses a branch changes.
+#   runs the unit tests and the harnesses a branch changes.
 #
 # And the maintainer's review kit (test/review.sh): pictures and frame
 # timings vary by machine.

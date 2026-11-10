@@ -417,7 +417,7 @@ time, when Yahoo's charts are empty.
 - Only when you ask for an update: `omarchy plugin update grvc.stonks` in
   a terminal, then `omarchy restart shell` when `git` shows the update
   moved Stonks' folder. After an update run elsewhere, `omarchy restart
-  shell` alone, when you click the footer or press `U`.
+  shell` alone, when you click the footer or press `Shift+U`.
 
 **Sites**, and nothing else:
 

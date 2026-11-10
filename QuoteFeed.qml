@@ -3,8 +3,9 @@ import "Asks.js" as Asks
 import "Fetch.js" as Fetch
 import "Market.js" as Market
 import "Quote.js" as Quote
-// Every symbol due goes in one curl run over one connection, first answers
-// in a run of their own, its answers read as each lands (`FetchRun`). The panel never touches a Process.
+// Every symbol due goes in one curl run over one connection, and the
+// symbols waiting for their first answer go in a run of their own.
+// `FetchRun` reads each answer as it lands. The panel never touches a Process.
 Item {
   id: root
 

@@ -932,6 +932,13 @@ test("the key sheet lists exactly the README's keys for each surface, the row's 
   expect(drawn("manual", false)).toEqual(readme("window"))
   expect(drawn("pct", true)).toEqual(readme("panel").filter(k => !moves.includes(k)))
   expect(drawn("symbol", false)).toEqual(readme("window").filter(k => !moves.includes(k)))
+  // A key the README's prose tells you to press is one its table lists, as
+  // the table spells it: Shift+U, never U.
+  const listed = new Set(table.flatMap(c => c[1].match(/`[^`]+`/g) || []))
+  const pressed = lines.slice(0, start).concat(lines.slice(start + 2 + table.length)).join("\n")
+    .match(/press (`[^`]+`(?: `[^`]+`)*)/gi).flatMap(m => m.match(/`[^`]+`/g))
+  expect(pressed.length).toBeGreaterThan(3)
+  expect(pressed.filter(k => !listed.has(k))).toEqual([])
   // The mouse's drag is offered only in manual order, the order's arrow only
   // in a sorted one.
   const mouse = order => M.sheet(order, true).mouse.rows.map(r => r.does).join(" | ")

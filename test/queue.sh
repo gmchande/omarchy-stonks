@@ -85,10 +85,10 @@ stop_all() {
 trap stop_all INT TERM
 trap 'rm -rf "$logs"' EXIT
 
-# At most this many checks started below run at once: nineteen at once
-# peak at 1.9 GB, four at 0.8 GB. The harnesses wait on their own steps, not
-# the machine (test/all.sh at four uses 1.5 of 16 cores), so six at once end
-# a run sooner.
+# At most this many checks started below run at once. Nineteen at once
+# peaked at 1.9 GB, four at 0.8 GB, and the harnesses wait on their own
+# steps, not the machine (test/all.sh at four uses 1.5 of 16 cores), so six
+# at once end a run sooner.
 slots=6
 queue=()
 
