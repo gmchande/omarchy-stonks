@@ -11,9 +11,10 @@ import "History.js" as History
 import "Share.js" as Share
 import "Tones.js" as Tones
 // The screenshot: what the panel shows above its ranges, never the list, laid
-// out again at 1200 × 675 (16:9, which X shows whole), with the facts the
-// panel leaves out (`Share.words`), in the surface's look and colours. Drawn at
-// twice that in the screen's own pixels on a screen of any scale, so its
+// out again at 1200 × 675 (16:9, which X shows whole), with the panel's two
+// lines under the price and the move (`Figures.heroLines`) and the facts the
+// panel leaves out (`Share.words`), in the surface's look and colours. Drawn
+// at twice that in the screen's own pixels on a screen of any scale, so its
 // canvases paint sharp and no larger than the picture: every measure is in
 // `u`, the layout's unit in window units. Built for a shot and gone after it.
 Rectangle {
@@ -52,7 +53,16 @@ Rectangle {
   readonly property color dimmer: Tones.dimmer(foreground, ground)
   readonly property color ghost: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.05)
   readonly property var words: quote && day ? Share.words({ quote: quote, day: day, history: history, latest: latest,
-    newest: view ? view.newest : null, top: view, scrubT: scrubT, changeMode: changeMode, range: range, now: now, calendars: calendars }) : null
+    newest: view ? view.newest : null, scrubT: scrubT, changeMode: changeMode, calendars: calendars }) : null
+  readonly property var lines: Figures.heroLines(quote, view, latest, now, day, calendars, changeMode, scrubT !== 0)
+  // Since the open, the open the move counts from takes the line under the
+  // price, at rest and scrubbed (`Share.words`).
+  readonly property var open: words && words.open ? words.open : null
+  // A scrub's move counts from the line under the pointer, named as the
+  // panel names it.
+  readonly property string legend: !scrubT || !quote || open ? ""
+    : history ? "┄ " + String(range).toUpperCase() + " START " + Format.money(history.baseline, quote.priceDigits)
+    : day ? "┄ " + Figures.scrubBaselineText(day, scrubT, Figures.exchangeDay(day, now), calendars) : ""
   readonly property var shownDay: Share.pictureDay(day)
   readonly property var geometry: history ? History.historyGeometry(history) : shownDay ? Chart.chartGeometry(shownDay, calendars) : null
   readonly property real scrubX: !scrubT ? -1 : history ? History.historyFraction(history, scrubT)
@@ -208,63 +218,60 @@ Rectangle {
     font.bold: true
   }
 
-  // What the price is and what the move is measured from.
+  // The panel's two lines, as the panel says them: under the price the close
+  // before it, under the move its name and the same move in the other unit.
   component Caption: Text {
     textFormat: Text.PlainText
+    visible: text !== ""
     color: root.dim
     font.family: root.fontFamily
     font.pixelSize: 18 * root.u
     font.bold: true
     font.letterSpacing: 2 * root.u
   }
-  Caption {
-    id: whenText
-    objectName: "shareWhen"
+  component Figure: Text {
+    textFormat: Text.PlainText
+    visible: text !== ""
+    color: root.foreground
+    font.family: root.fontFamily
+    font.pixelSize: 18 * root.u
+    font.bold: true
+  }
+  readonly property var close: open ? { label: open.label, time: "", price: open.price, changeText: "", tone: "flat", stale: false } : lines.close
+  Row {
+    objectName: "shareClose"
     x: root.margin
-    y: 266 * root.u - baselineOffset
-    width: Math.min(implicitWidth, fromText.x - x - 32 * root.u)
-    elide: Text.ElideRight
-    text: root.words ? root.words.when : ""
+    y: 266 * root.u - closeLabel.baselineOffset
+    spacing: 10 * root.u
+    Caption {
+      id: closeLabel
+      text: root.legend !== "" ? root.legend : root.close ? root.close.label : ""
+    }
+    Caption { text: root.close ? root.close.time : "" }
+    Figure {
+      text: root.close ? root.close.price : ""
+      color: root.close && root.close.stale ? root.dim : root.foreground
+    }
+    Figure {
+      text: root.close ? Format.lookSigns(root.close.changeText, root.retro) : ""
+      color: root.close && root.close.stale ? root.dim : root.toneColor(root.close ? root.close.tone : "flat")
+    }
+    Caption { text: root.close && root.close.since ? "· " + root.close.since.label : "" }
+    Figure {
+      text: root.close && root.close.since ? Format.lookSigns(root.close.since.changeText, root.retro) : ""
+      color: root.toneColor(root.close && root.close.since ? root.close.since.tone : "flat")
+    }
   }
-  Caption {
-    id: fromText
-    objectName: "shareFrom"
-    x: root.width - root.margin - implicitWidth
-    y: 266 * root.u - baselineOffset
-    text: root.words ? root.words.from : ""
-  }
-  // The line under the price the panel shows.
-  Caption {
-    id: extendedText
-    objectName: "shareExtended"
-    x: root.margin
-    y: 294 * root.u - baselineOffset
-    text: root.words ? root.words.extended : ""
-  }
-  Caption {
-    objectName: "shareExtendedChange"
-    visible: !!root.words && root.words.extendedChange !== ""
-    x: extendedText.x + extendedText.implicitWidth
-    y: extendedText.y
-    text: root.words && root.words.extendedChange ? " " + Format.lookSigns(root.words.extendedChange, root.retro) : ""
-    color: root.words && root.words.extendedTone !== "old" ? root.toneColor(root.words.extendedTone) : root.dim
-  }
-  // The move since the close and its time, after the session that names it.
-  Caption {
-    id: sinceText
-    objectName: "shareSince"
-    visible: !!root.words && root.words.since !== ""
-    x: whenText.x + whenText.width
-    y: whenText.y
-    text: root.words && root.words.since ? " " + Format.lookSigns(root.words.since, root.retro) : ""
-    color: root.toneColor(root.words ? root.words.sinceTone : "flat")
-  }
-  Caption {
-    objectName: "shareSinceTime"
-    visible: sinceText.visible
-    x: sinceText.x + sinceText.implicitWidth
-    y: whenText.y
-    text: root.words && root.words.sinceTime ? " · " + root.words.sinceTime : ""
+  Row {
+    objectName: "shareCaption"
+    x: root.width - root.margin - width
+    y: 266 * root.u - captionLabel.baselineOffset
+    spacing: 10 * root.u
+    Caption { id: captionLabel; text: root.lines.caption.label }
+    Figure {
+      text: Format.lookSigns(root.lines.caption.changeText, root.retro)
+      color: root.toneColor(root.lines.caption.tone)
+    }
   }
 
   // At twice its strokes and cells, still: no draw-in, ripple or blink. A range
@@ -272,9 +279,9 @@ Rectangle {
   Item {
     id: chart
     x: root.margin
-    y: 314 * root.u
+    y: 296 * root.u
     width: root.width - root.margin * 2
-    height: (root.history ? 276 : 252) * root.u
+    height: (root.history ? 294 : 270) * root.u
 
     DayChart {
       id: dayChart
@@ -368,17 +375,15 @@ Rectangle {
     color: root.ghost
   }
 
-  // Spaced as the day's axis is, so the longest, "YEAR TO DATE · 2 JAN 2026 –
-  // 11 SEP 2026", stays clear of the logo. The logo's bull is in the name's
-  // ink, whatever the day's animal: on a down day a green bull would read as
-  // the day's.
+  // When the price on top is from. Spaced as the day's axis is, so it stays
+  // clear of the logo. The logo's bull is in the name's ink, whatever the
+  // day's animal: on a down day a green bull would read as the day's.
   Caption {
-    objectName: "shareSpan"
+    objectName: "shareFoot"
     x: root.margin
     y: 654 * root.u - baselineOffset
     font.pixelSize: 28 * root.u
-    font.letterSpacing: (root.history ? 1 : 2) * root.u
-    text: root.words ? root.words.span : ""
+    text: root.words ? root.words.foot : ""
   }
   Text {
     id: forOmarchy

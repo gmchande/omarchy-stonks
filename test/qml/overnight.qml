@@ -200,9 +200,9 @@ Harness {
       // the open surface asks by itself, and five minutes on, again.
       useSet("sunday")
       service.now = harness.sunday
-      var sundayTop = "OVERNIGHT \u22121.05% 234.84 \u22123.55%"
+      var sundayTop = "OVERNIGHT \u22122.49 234.84 \u22121.05%"
       within(3000, function() { return harness.top().indexOf("OVERNIGHT") === 0 })
-      check("Sunday night trades on top, measured from Thursday's close, Friday's close beneath, and the night's move since it under the change",
+      check("Sunday night trades on top, measured from Friday's close, which is beneath with its day's move, and the night's move in money under the change",
         harness.top() === sundayTop && harness.strip() === "FRI CLOSE 237.33 \u22122.53%",
         harness.top() + " | " + harness.strip())
       var sundayCalls = Number(harness.record("OVERNIGHT.calls"))
@@ -289,8 +289,8 @@ Harness {
       })
       within(3000, function() { return harness.top().indexOf("OVERNIGHT") === 0 })
       var info = body.dayLine
-      check("the night's newest price is on top, Thursday's close beneath, the night's move since it under the change, and the day's high takes in its own night: 243.20 at 02:30 passes Yahoo's 239.63",
-        /^OVERNIGHT [+\u2212]\d+\.\d\d% 234\.27 /.test(harness.top()) && harness.strip().indexOf("CLOSE 232.28 ") === 0
+      check("the night's newest price is on top, measured from Thursday's close, which is beneath, the night's move in money under the change, and the day's high takes in its own night: 243.20 at 02:30 passes Yahoo's 239.63",
+        /^OVERNIGHT [+\u2212]\d+\.\d\d 234\.27 /.test(harness.top()) && harness.strip().indexOf("CLOSE 232.28 ") === 0
           && !!info && info.range.highText === "243.20", harness.top() + " | " + harness.strip() + " | " + JSON.stringify(info))
       // A day asked of Robinhood replaces the prints in hand, never joins them.
       check("a day's answer from Robinhood replaces the prints in hand: none of the weekend's stays",
@@ -387,8 +387,8 @@ Harness {
       })
 
       // On 1M, with its history in: the night's price on top, as on the
-      // day, the range's name alone under its move, and the close and its
-      // day's move under it.
+      // day, the range's name and its amount under its move, and the close
+      // and its day's move under it.
       useLook(false)
       featureShown("NEST")
       pressKey(Qt.Key_BracketRight)
@@ -400,8 +400,8 @@ Harness {
       var legend = find(body, "baselineLegend")
       var scrubbedMonth = harness.strip() + " | " + (legend.visible ? legend.text : "")
       endScrub()
-      check("smooth: on 1M at night the night's price is on top, the range's name alone under its move; a scrub rests the line under it, and the baseline's legend takes its place; the scrub's end brings it back",
-        /^1M \d/.test(monthTop) && month.indexOf("FRI CLOSE ") === 0 && scrubbedMonth.indexOf(" | ┄ 1M START ") === 0
+      check("smooth: on 1M at night the night's price is on top, the range's name and amount under its move; a scrub rests the line under it, and the baseline's legend takes its place; the scrub's end brings it back",
+        /^1M [+\u2212]\d/.test(monthTop) && month.indexOf("FRI CLOSE ") === 0 && scrubbedMonth.indexOf(" | ┄ 1M START ") === 0
           && harness.strip() === month,
         monthTop + " | " + month + " | " + scrubbedMonth + " then " + harness.strip())
 
@@ -428,13 +428,12 @@ Harness {
         amountSays === "true,true,true" && harness.strip() === line.join(" "),
         line.join(" ") + " -> " + asAmount.join(" ") + " (" + amountSays + ") -> " + harness.strip())
       var nestRow = body.watchlist.rowItem("NEST")
-      // 01:00 on Wednesday: the chart is Tuesday's with its night, so the
-      // move since the open is since Tuesday's, on the hero as on its row.
-      var tuesdayOpen = body.featuredQuote.dayOpen
-      check("since the open, at rest, with Tuesday's chart and its night on show, the hero says the move since Tuesday's open, as its row does",
+      // 01:00 on Wednesday: tonight's trades belong to Wednesday, which
+      // hasn't opened, so since the open the move is left out, on the hero
+      // as on its row, as in the pre-market.
+      check("since the open, at night, the hero and its row leave the move out until the day ahead opens",
         body.featuredGeometry.start === body.featuredDay.points[0].t && body.featuredGeometry.end > harness.midnight.wed7
-          && body.featured.changeText === nestRow.view.changeText
-          && body.featured.changeText === Format.pct((body.featured.price - tuesdayOpen) / tuesdayOpen * 100),
+          && body.featured.changeText === "\u2014" && nestRow.view.changeText === "\u2014",
         body.featuredGeometry.start + " | " + body.featured.changeText + " vs " + nestRow.view.changeText)
       keyClick(Qt.Key_C)
       within(2000, function() { return service.changeMode === "pct" })

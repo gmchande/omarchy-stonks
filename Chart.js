@@ -71,9 +71,9 @@ function lineDay(symbol, quote, nights, allDay, calendars, slideAt) {
 }
 
 // Measured from the dashed line of the day each chart draws. While that day
-// waits on Robinhood, Yahoo's own prints make it: until 04:00 the day that
-// closed, as the chart will draw it, so the answer brings only a newer price,
-// never another footing.
+// waits on Robinhood, Yahoo's own prints make it. Until 04:00 that is the
+// day that closed, as the chart will draw it, with its after hours counted
+// as its own, until Robinhood's answer brings tonight's trade.
 function newestPrints(symbols, quotes, nights, allDay, calendars) {
   var out = {}
   for (var i = 0; i < symbols.length; i++) {
@@ -100,7 +100,9 @@ var NO_ANSWER = { bars: [], from: null, through: null }
 // take room, such as Tokyo's lunch, which Yahoo sends inside one 09:00 to 15:30
 // session. Hours that take no room (`axis.skip`), such as a weekend, are no
 // break: the line runs across them, as through a quiet hour of a US night. The
-// scale holds every print and the close, so the baseline stays in view.
+// scale holds every print and the close, so the baseline stays in view. Once
+// tonight has traded, the dashed line steps at the bell to the close just
+// gone (`Overnight.nightBell`), which the scale holds too: `step`.
 function chartGeometry(quote, calendars) {
   var pts = quote.points
   var axis = chartSpan(quote)
@@ -113,8 +115,11 @@ function chartGeometry(quote, calendars) {
   // day against a baseline.
   var base = Quote.dayBase(quote)
   var known = Format.isFiniteNumber(base)
+  var bell = Overnight.nightBell(quote)
+  var stepBase = bell !== null ? Quote.regularClose(quote) : null
   var lo = known ? base : (pts.length ? pts[0].p : 0)
   var hi = lo
+  if (Format.isFiniteNumber(stepBase)) { lo = Math.min(lo, stepBase); hi = Math.max(hi, stepBase) }
   for (var j = 0; j < pts.length; j++) {
     if (pts[j].p < lo) lo = pts[j].p
     if (pts[j].p > hi) hi = pts[j].p
@@ -142,10 +147,18 @@ function chartGeometry(quote, calendars) {
   return {
     points: out,
     baselineY: known ? 1 - (base - lo) / (hi - lo) : null,
+    // Known apart from the day's: Yahoo can send the close without the one before.
+    step: Format.isFiniteNumber(stepBase) ? { x: axisFraction(axis, bell), y: 1 - (stepBase - lo) / (hi - lo) } : null,
     ticks: ticks,
     lo: lo, hi: hi, start: axis.start, end: axis.end,
     day: true
   }
+}
+
+// The dashed line's height at `x`: the step's height once `x` is past the
+// bell, the day's before it, and null where there is no line.
+function baseAt(geometry, x) {
+  return geometry.step && x >= geometry.step.x ? geometry.step.y : geometry.baselineY
 }
 
 // Without the drawing: a scrub step asks it of every row. A quote with the

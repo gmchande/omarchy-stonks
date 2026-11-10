@@ -766,9 +766,9 @@ Harness {
                 if (r[1]) {
                   var caption = find(body, "changeCaption")
                   var strip = find(body, "extendedLine")
-                  // With the night's price on top too, the range's name alone
-                  // (`Figures.captionLine`).
-                  var period = r[1] === youngMonth ? "SINCE \\d{1,2} [A-Z]{3} \\d{4}" : r[0].toUpperCase()
+                  // With the night's price on top too, the range's name and
+                  // its amount (`Figures.heroLines`).
+                  var period = (r[1] === youngMonth ? "SINCE \\d{1,2} [A-Z]{3} \\d{4}" : r[0].toUpperCase()) + "( [+\u2212\u25b2\u25bc]?[\\d,.]+)?"
                   var shown = root.rowWords(caption)
                   if (!new RegExp("^" + period + "$").test(shown) || (strip.visible && xIn(strip, strip.width) >= xIn(caption, 0)))
                     captions.push(where + " " + r[0] + " says \"" + shown + "\" from " + xIn(caption, 0)
@@ -1147,8 +1147,9 @@ Harness {
           addCut.length === 0, addCut.slice(0, 12).join(" | "))
 
         // NBIS at 17:58, after hours on its close's own day: under the price
-        // the close and its day's move, and under the change the move since
-        // that close, named AFTER HOURS, or SINCE OPEN alone since the open.
+        // the close and its day's move, then the part since the close where
+        // it fits whole, and under the change the day's move, TODAY, or
+        // SINCE OPEN since the open, with its amount.
         // At every text size, in both looks, in the panel and the window at
         // its narrowest and widest, both read whole, clear of each other.
         var captionBefore = { quotes: stub.quotes, nights: stub.nights, allDay: stub.allDay, calendars: stub.calendars, now: stub.now,
@@ -1175,12 +1176,19 @@ Harness {
                   wait(20)
                   var strip = find(body, "extendedLine")
                   var caption = find(body, "changeCaption")
+                  var since = [find(body, "sinceClose"), find(body, "sinceMove")]
                   var said = root.rowWords(strip)
                   var shown = root.rowWords(caption)
                   var where = "size " + csize + " " + (surface.wide ? "window " + surface.width : "panel") + (stub.retro ? " retro " : " smooth ") + mode
-                  if (said !== Format.lookSigns("CLOSE 153.27 \u22123.45%", stub.retro)
-                    || shown !== (mode === "pct" ? Format.lookSigns("AFTER HOURS +1.35%", stub.retro) : "SINCE OPEN")
-                    || xIn(strip, strip.width) + Style.space(12) > xIn(caption, 0))
+                  var close = Format.lookSigns("CLOSE 153.27 \u22123.45%", stub.retro)
+                  var whole = close + " " + Format.lookSigns("· AFTER HOURS +1.35%", stub.retro)
+                  // The part since the close gives way only where it would
+                  // reach the caption.
+                  var room = xIn(caption, 0) - xIn(strip, strip.width) - Style.space(12)
+                  var left = mode === "pct" && said === close && room >= 2 * strip.spacing + since[0].implicitWidth + since[1].implicitWidth
+                  if ((said !== (mode === "pct" ? whole : close) && !(mode === "pct" && said === close)) || left
+                    || shown !== Format.lookSigns(mode === "pct" ? "TODAY \u22123.40" : "SINCE OPEN +1.37", stub.retro)
+                    || room < 0)
                     clashes.push(where + ": \"" + said + "\" ends at " + xIn(strip, strip.width) + ", \"" + shown + "\" starts at " + xIn(caption, 0))
                 })
               }
@@ -1200,7 +1208,7 @@ Harness {
           stub.retro = captionBefore.retro
           wait(50)
         }
-        root.check("after the close, under the price the close and its day's move, and under the change the move since it, named AFTER HOURS, or SINCE OPEN since the open, whole and clear of each other at every text size, in both looks, in the panel and the window at its narrowest and widest",
+        root.check("after the close, under the price the close and its day's move, then the part since it where it fits whole, and under the change the day's move, or SINCE OPEN since the open, with its amount, whole and clear of each other at every text size, in both looks, in the panel and the window at its narrowest and widest",
           clashes.length === 0, clashes.slice(0, 12).join(" | ") + (clashes.length > 12 ? " | … " + clashes.length : ""))
 
         // In a window of ordinary height, 720 × 520, the key sheet shows its

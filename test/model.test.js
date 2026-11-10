@@ -1062,8 +1062,9 @@ test("the close the day's move counts from is named by the trading day before, a
   const night = { t: at("2026-09-08", "20:30"), p: 103, phase: "overnight", base: 100, own: true, closed: true, dayStart: at("2026-09-08", "09:30") }
   expect(M.heroLines(quote, M.rowModel(quote, 0, "pct", night), null, at("2026-09-15", "12:00"), null, calendars, "pct", false).close.label).toBe("8 SEP CLOSE")
   expect(M.rowsDay(["X"], { X: quote }, { X: night }, at("2026-09-15", "12:00"), calendars)).toBe("8 SEP")
-  // A scrub rests both lines: the dashed line's legend takes the first's place.
-  expect(lines(at("2026-09-08", "12:00"), "pct", true)).toEqual({ close: null, caption: { label: "", changeText: "", tone: "flat" } })
+  // A scrub rests the line under the price, whose place the dashed line's
+  // legend takes; the moment's move keeps its amount.
+  expect(lines(at("2026-09-08", "12:00"), "pct", true)).toEqual({ close: null, caption: { label: "", changeText: "+2.50", tone: "up" } })
   // An unknown move is left out, with its day; the close it would count from stays.
   const unpriced = { ...quote, price: null, marketTime: null, points: [] }
   expect(M.heroLines(unpriced, M.rowModel(unpriced, 0, "pct"), null, at("2026-09-08", "12:00"), null, calendars, "pct", false))

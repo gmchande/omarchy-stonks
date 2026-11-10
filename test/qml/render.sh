@@ -196,8 +196,9 @@ every_state() (
   # counts from named, at text size 16 too; J&J's thin night; Power
   # Solutions' finished day, edge to edge; bitcoin's two-day answer, its
   # last 24 hours. Sunday 21:00, Friday then tonight; Tuesday 01:30, Monday
-  # and its night under MON + NIGHT; Tuesday 03:50 and the turn at 04:05;
-  # Monday 07:00, the pre-market bright.
+  # and its night, the dashed line stepping to Monday's close at its bell;
+  # Tuesday 03:50 and 04:05, the count carrying on; Monday 07:00, the
+  # pre-market bright.
   for moment in thu-2026-10-29-2155-nbis thu-2026-10-29-2155-jnj thu-2026-10-29-2155-psix thu-2026-10-29-2155-btc-usd \
     watch-2026-10-25-2100-nbis watch-2026-10-27-0130-nbis watch-2026-10-27-0350-nbis watch-2026-10-27-0405-nbis \
     watch-2026-10-26-0700-nbis; do
@@ -309,7 +310,7 @@ every_state() (
       states="$states share-of-$state-$look"
     done
     states="$states share-scrub-of-sweep-2026-10-07-1455-nest-$look share-scrub-of-history-1y-$look"
-    # After midnight, the change measured from the close before the chart's;
+    # After midnight, the night's move from the close just gone;
     # and an intraday bar of a range scrubbed, its time's zone named.
     states="$states share-of-sweep-2026-10-07-0100-nest-$look share-scrub-of-history-1w-$look"
     for size in 9 16 20; do

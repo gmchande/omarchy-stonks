@@ -50,13 +50,19 @@ Item {
   // is gone, as a failed preview's is.
   readonly property var newest: quote && view && view.newest ? view.newest : null
   readonly property bool newestOld: Figures.newestStale(newest, now)
-  // The line under the price and the caption under the change
-  // (`Figures.heroLines`): the close and its move with the move since it,
-  // a print outside the session, or the close the move counts from with the
-  // day's move in the other unit. A scrub's price is a past one, so the line
-  // rests and the baseline's legend takes its place.
+  // The line under the price and the caption under the change, one rule at
+  // every hour (`Figures.heroLines`): the close before the price on top, and
+  // the move's name with the same move in the other unit. A scrub's price is
+  // a past one, so the line rests and the baseline's legend takes its place.
   readonly property var lines: Figures.heroLines(quote, view, latest, now, day, calendars, changeMode, scrubbing)
   readonly property var extended: lines.close
+  // The part since the close goes whole or not at all, and first: the
+  // caption keeps its room.
+  readonly property var since: extended && extended.since ? extended.since : null
+  readonly property real coreWidth: [extendedLabel, extendedTime, extendedPrice, extendedMove]
+    .reduce(function(sum, text) { return sum + (text.text !== "" ? text.implicitWidth + extendedLine.spacing : 0) }, 0)
+  readonly property bool sinceShown: !!since
+    && coreWidth + sinceLabel.implicitWidth + sinceMove.implicitWidth + extendedLine.spacing + Style.space(12) + captionLine.implicitWidth <= width
   readonly property string priceText: view ? view.priceText
     : (freshness && freshness.state === "failed" ? "—" : "…")
   readonly property string listingLead: {
@@ -236,9 +242,9 @@ Item {
     }
   }
 
-  // The extended-hours print on the left, always in the same place and shape;
-  // the change's caption on the right. An old print is drawn dim, price and
-  // change too, so it reads as old beside a fresh one.
+  // The line under the price on the left, always in the same place and
+  // shape; the change's caption on the right. An old print is drawn dim,
+  // price and change too, so it reads as old beside a fresh one.
   Row {
     id: extendedLine
     objectName: "extendedLine"
@@ -258,6 +264,7 @@ Item {
       font.letterSpacing: 1
     }
     Text {
+      id: extendedTime
       visible: text !== ""
       textFormat: Text.PlainText
       text: root.extended ? root.extended.time : ""
@@ -268,6 +275,7 @@ Item {
       font.letterSpacing: 1
     }
     Text {
+      id: extendedPrice
       visible: text !== ""
       textFormat: Text.PlainText
       text: root.extended ? root.extended.price : ""
@@ -277,10 +285,35 @@ Item {
       font.bold: true
     }
     Text {
+      id: extendedMove
       visible: text !== ""
       textFormat: Text.PlainText
       text: root.extended ? Format.lookSigns(root.extended.changeText, root.retro) : ""
       color: extendedLine.old ? root.dim : root.toneColor(root.extended ? root.extended.tone : "flat")
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.bold: true
+    }
+    // The part since the close: · AFTER HOURS +1.35%.
+    Text {
+      id: sinceLabel
+      objectName: "sinceClose"
+      visible: root.sinceShown
+      textFormat: Text.PlainText
+      text: root.since ? "· " + root.since.label : ""
+      color: root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.bold: true
+      font.letterSpacing: 1
+    }
+    Text {
+      id: sinceMove
+      objectName: "sinceMove"
+      visible: root.sinceShown
+      textFormat: Text.PlainText
+      text: root.since ? Format.lookSigns(root.since.changeText, root.retro) : ""
+      color: root.toneColor(root.since ? root.since.tone : "flat")
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
       font.bold: true
@@ -304,13 +337,14 @@ Item {
   Row {
     id: captionLine
     objectName: "changeCaption"
-    visible: root.caption.label !== "" && implicitWidth <= root.captionRoom
+    visible: (root.caption.label !== "" || root.caption.changeText !== "") && implicitWidth <= root.captionRoom
     anchors.right: parent.right
     y: root.baselineY + root.captionDrop - captionLabel.baselineOffset
     spacing: Style.space(6)
 
     Text {
       id: captionLabel
+      visible: text !== ""
       textFormat: Text.PlainText
       text: root.caption.label
       color: root.dim
@@ -319,7 +353,7 @@ Item {
       font.bold: true
       font.letterSpacing: 1
     }
-    // The move since the close dims with an old night's price.
+    // The move dims with an old night's price.
     Text {
       visible: text !== ""
       textFormat: Text.PlainText
