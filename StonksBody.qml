@@ -154,8 +154,9 @@ Item {
   property var entries: ({})
   // Each listing's newest price since its close.
   property var newestPrints: ({})
-  // Robinhood's answers, for the day each row's line draws, and the clock
-  // that slides its start, held still while no screen shows the surface.
+  // Robinhood's answers, for the day each row's line draws, held still while
+  // the surface is closed; and the clock that slides its start, held still
+  // while no screen shows the surface.
   property var nights: ({})
   property var allDay: ({})
   property int slideAt: 0

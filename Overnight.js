@@ -162,7 +162,6 @@ function marketDay(cal, dateString) {
   return {
     date: dateString,
     start: Market.epochAt(cal, Market.previousDateString(dateString), cal.overnight.open),
-    end: Market.epochAt(cal, dateString, cal.post.close),
     open: Market.dayKind(cal, dateString).kind === "open"
   }
 }

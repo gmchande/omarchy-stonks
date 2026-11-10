@@ -603,8 +603,8 @@ Item {
     }
     root.refreshRest()
   }
-  // Rows never draw Robinhood's prints: for 150 rows they come to two
-  // answers of 4 MB each.
+  // Only the charts on show: the rows' prints come on their own five-minute
+  // asks, and for 150 rows they are two answers of 4 MB each.
   function refreshRest() {
     var now = root.wallSecond()
     root.showHistory(true)

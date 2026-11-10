@@ -576,7 +576,6 @@ FocusScope {
       dim: root.dim
       placeholderText: root.placeholder
       onTextChanged: root.setQuery(text)
-      onAccepted: root.accept(root.resultIndex)
       Keys.onPressed: function(event) { root.handleKey(event) }
     }
 

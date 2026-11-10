@@ -31,8 +31,7 @@ const US = calendars.calendars.US
 const JPX = calendars.calendars.JPX
 // The exchanges that trade in whole cents from $1, as the feeds read with.
 const cents = M.centExchanges(calendars)
-// A listing's cadence and warmth, by its calendar's reading, as askDue
-// reads them.
+// A listing's cadence, by its calendar's reading, as askDue reads it.
 const calNow = (q, now) => M.calendarNow(M.calendarFor(calendars, q), now)
 const quoteCadence = (q, now, interval, hero) => M.quoteCadence(q, now, interval, hero, calNow(q, now))
 const quote = M.parseChart(fixture("aapl.json"))
@@ -3025,8 +3024,7 @@ test("the line under the price: Friday night's is the after-hours, a quiet night
   expect(M.extendedStack(gspc, null, at("2026-10-01", "23:00"))).toBeNull()
   const index = M.chartSpan(M.viewChart("^GSPC", "1D", { "^GSPC": gspc }, {}, {}, {}, {}, calendars).day)
   expect(index.end - index.start).toBeLessThan(8 * 3600)
-  const coin = M.extendedStack(savedDay("listings-2026-10-07-0100", "btc-usd"), null, now)
-  expect(coin && coin.label).not.toBe("OVERNIGHT")
+  expect(M.extendedStack(savedDay("listings-2026-10-07-0100", "btc-usd"), null, now)).toBeNull()
 })
 
 test("a listing Robinhood doesn't trade all day draws Yahoo's day by the clock from its first trade, to its last once over, the coming day from its first print, and its stray night trade makes no overnight line", () => {
