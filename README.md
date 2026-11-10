@@ -397,7 +397,7 @@ time, when Yahoo's charts are empty.
   hang.
 - With sounds on: `pw-play` for each sound; `pw-cat` playing silence while
   you move along the chart, so each chime plays at once; as the bell is
-  due, `bash` with `omarchy-shell notifications dndState` to check Do Not
+  due, `bash` with `omarchy-shell notifications isDnd` to check Do Not
   Disturb, and `pw-dump` to check that no app is recording; and `sh` with
   `md5sum` and `head`, once a run, to check its saved sounds.
 - For a screenshot: `sh` with `sed`, `tail`, `date`, and `head` to find

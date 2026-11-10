@@ -2,19 +2,24 @@
 # A stand-in for omarchy-shell, first on PATH inside the harnesses, so a
 # harness never asks the owner's shell anything. It appends its arguments as
 # one line to STONKS_FAKE_STATE/omarchy-shell.calls, and answers
-# `notifications dndState` with what STONKS_FAKE_STATE/dnd holds, "on" or
+# `notifications isDnd` with what STONKS_FAKE_STATE/dnd holds, "on" or
 # "off". With no such file it fails as omarchy-shell does when the shell
 # has no notifications target, as with another app showing notifications.
-# Under -q it prints nothing and succeeds, as omarchy-shell does: -q hides
-# answers too. Every other call answers nothing.
+# Any other question of the notifications fails as one Omarchy 4.5's shell
+# doesn't know does, such as 4.0.6's dndState. Under -q it prints nothing
+# and succeeds, as omarchy-shell does: -q hides answers too. Every other
+# call answers nothing.
 echo "$*" >> "$STONKS_FAKE_STATE/omarchy-shell.calls"
 [ "$1" = "-q" ] && exit 0
-if [ "$1 $2" = "notifications dndState" ]; then
+if [ "$1 $2" = "notifications isDnd" ]; then
   if [ -e "$STONKS_FAKE_STATE/dnd" ]; then
     cat "$STONKS_FAKE_STATE/dnd"
   else
     echo "Target not found." >&2
     exit 1
   fi
+elif [ "$1" = notifications ]; then
+  echo "Function not found." >&2
+  exit 1
 fi
 exit 0

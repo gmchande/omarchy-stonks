@@ -390,7 +390,7 @@ Item {
   // hide its answer too.
   Process {
     id: listening
-    command: ["bash", "-c", "[ \"$(timeout -k 1 2 omarchy-shell notifications dndState 2> /dev/null)\" = on ] && exit 1\n"
+    command: ["bash", "-c", "[ \"$(timeout -k 1 2 omarchy-shell notifications isDnd 2> /dev/null)\" = on ] && exit 1\n"
       + "set -o pipefail; timeout -k 1 3 pw-dump | head -c 4000001"]
     stdout: StdioCollector { id: answer }
     onExited: function(code) {
