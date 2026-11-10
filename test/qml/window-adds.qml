@@ -46,7 +46,7 @@ Harness {
 
     // MSFT is answered just before each removal, so its put-back comes well
     // before its next scheduled refresh, and its answer is held back while
-    // out. Ctrl+Z and PUT BACK are both checked: the label names both.
+    // out. Ctrl+Z and UNDO are both checked: the label names both.
     function putsBack(body, watchlist, keys) {
       service.setRange("1D")
       service.feature("AAPL")
@@ -81,14 +81,14 @@ Harness {
         var offer = function() { return findAll(body.search, "searchResult")[0] }
         tryVerify(function() {
           return body.adding && body.search.results.length > 0 && !!offer()
-            && body.search.actionFor(body.search.results[0].symbol) === "PUT BACK"
+            && body.search.actionFor(body.search.results[0].symbol) === "UNDO"
         }, 2000)
         var button = find(offer(), "searchAdd")
         mouseClick(button, button.width / 2, button.height / 2)
       })
-      check("a stock put back by Ctrl+Z, and by PUT BACK clicked, asks for its quote at once, once, showing the quote it had until the new one lands, and the header says nothing of it",
+      check("a stock put back by Ctrl+Z, and by UNDO clicked, asks for its quote at once, once, showing the quote it had until the new one lands, and the header says nothing of it",
         byU === "true,true,1,true" && byClick === "true,true,1,true" && !body.adding,
-        "Ctrl+Z " + byU + " | PUT BACK " + byClick + " | adding " + body.adding)
+        "Ctrl+Z " + byU + " | UNDO " + byClick + " | adding " + body.adding)
     }
 
     // Search open with its answer to SH (the saved SHOP results) in the
@@ -276,8 +276,8 @@ Harness {
       within(2000, function() { return !body.adding && service.featuredSymbol === "AAPL" && service.lastRemoval === null })
       // Time for the second click to do harm.
       wait(200)
-      check("after a removal, the footer's search offers it back first, chosen, with PUT BACK, and a double-click puts it back once in its lists at its place, the hero as it was",
-        gone && offered === "NVDA PUT BACK chosen true hero NVDA" && !body.adding && JSON.stringify(service.lists) === listsBefore
+      check("after a removal, the footer's search offers it back first, chosen, with UNDO, and a double-click puts it back once in its lists at its place, the hero as it was",
+        gone && offered === "NVDA UNDO chosen true hero NVDA" && !body.adding && JSON.stringify(service.lists) === listsBefore
           && service.featuredSymbol === "AAPL" && service.lastRemoval === null,
         [gone, offered, body.adding, JSON.stringify(service.lists), service.featuredSymbol, JSON.stringify(service.lastRemoval)].join(" | "))
       mouseMove(body, 1, 1)

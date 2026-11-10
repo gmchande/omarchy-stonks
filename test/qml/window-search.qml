@@ -770,10 +770,10 @@ Harness {
       var closed = [closedProbe, harness.calls("SEARCH.asked") - askedBefore].join(",")
       body.resetInteraction()
       harness.check("a failed lookup says why and offers RETRY; Enter and a click on it ask the same query again, once, through Yahoo's gate, held by a refusal, which the line names as the server being busy, and not by a pause for no answer, and adding nothing; one failed while Yahoo pauses goes by itself, once, when Yahoo answers, unless closed",
-        offered === "Couldn’t search · try again,true"
-          && byEnter === "Couldn’t search · try again / - / Searching for “SH”… / Couldn’t search · try again,1,true"
-          && joined === "true,1,failed" && offline === "Couldn’t search · check your connection"
-          && paused === "0,0,failed,true,Couldn’t search · server busy" && byClick === "SH,true,1,false,true,true"
+        offered === "Couldn't search · try again,true"
+          && byEnter === "Couldn't search · try again / - / Searching for “SH”… / Couldn't search · try again,1,true"
+          && joined === "true,1,failed" && offline === "Couldn't search · check your internet"
+          && paused === "0,0,failed,true,Couldn't search · server busy" && byClick === "SH,true,1,false,true,true"
           && heldByProbe === "true,0,failed" && byItself === "SH,1,false" && closed === "true,0",
         [offered, byEnter, joined, offline, paused, byClick, heldByProbe, byItself, closed].join(" ; "))
     }
@@ -913,7 +913,7 @@ Harness {
       body.resetInteraction()
       mouseMove(body, 1, 1)
 
-      // PUT BACK by a click: the row comes back at its place, which is
+      // UNDO by a click: the row comes back at its place, which is
       // chosen to lie under the offer, and waits the same way.
       var searchTop = 0
       keys.forceActiveFocus()
@@ -949,7 +949,7 @@ Harness {
         mouseMove(body, backAt.x + 6, backAt.y)
         putAfter = String(within(1000, backShown))
       }
-      harness.check("PUT BACK by a click whose row comes back under the still pointer hides its × until the pointer moves, so a click there removes nothing",
+      harness.check("UNDO by a click whose row comes back under the still pointer hides its × until the pointer moves, so a click there removes nothing",
         !!backAt && !putShown && putKept && putAfter === "true",
         [back || "no row's × under the search's first row", "× shown " + putShown, "kept " + putKept, "after a move " + putAfter, service.library.join(",")].join(" | "))
       if (service.library.indexOf(back) < 0) service.addSymbol(back)
@@ -1170,14 +1170,14 @@ Harness {
         whileOut === "true,true,true" && freshAgain && cleared === "true,true,false", whileOut + "|" + freshAgain + "|" + cleared)
       harness.check("an empty answer and a failed lookup each say so in place, differently, and a query Yahoo calls wrong asks for other words, never again, and says so while the next is typed; any other refusal offers RETRY",
         noMatches === "true,true,No matches for “ZZZ”"
-          && failed === "true,Couldn’t search · try again"
-          && wrong === "true,Couldn’t search · try other words,false,0,failed"
-          && typedOn === "Couldn’t search · try other words,false"
-          && blocked === "Couldn’t search · try again,true",
+          && failed === "true,Couldn't search · try again"
+          && wrong === "true,Couldn't search · try other words,false,0,failed"
+          && typedOn === "Couldn't search · try other words,false"
+          && blocked === "Couldn't search · try again,true",
         noMatches + " / " + failed + " / " + wrong + " / " + typedOn + " / " + blocked)
       harness.check("an answer of kinds Stonks leaves out names them where \"No matches\" would be, and under the results it shows, the arrows stopping at the last result",
-        fundAlone === "0,false,true,Stonks doesn’t show mutual funds"
-          && beside === "18QQ.Z Q0SF.Z,false,true,Stonks doesn’t show currencies or futures,1",
+        fundAlone === "0,false,true,Stonks doesn't show mutual funds"
+          && beside === "18QQ.Z Q0SF.Z,false,true,Stonks doesn't show currencies or futures,1",
         fundAlone + " / " + beside)
       harness.check("a search whose top answer is a kind Stonks leaves out chooses no result, and Enter adds nothing",
         enterOnCurrency === "-1,true,true,EURUSD", enterOnCurrency)

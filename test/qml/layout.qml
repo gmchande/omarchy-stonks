@@ -1565,7 +1565,7 @@ Harness {
         var searchNote = find(body.search, "searchNote")
         var inView = function(item) { return !!item && yIn(item, 0) >= yIn(view, 0) && yIn(item, item.height) <= yIn(view, view.height) }
         var reached = body.search.resultIndex === 4 && body.search.results.length === 5 && inView(lastRow) && inView(searchNote)
-          && searchNote.visible && searchNote.text === "Stonks doesn’t show currencies"
+          && searchNote.visible && searchNote.text === "Stonks doesn't show currencies"
         var reachedSaid = "on " + body.search.resultIndex + " of " + body.search.results.length + ", the view " + yIn(view, 0) + "–" + yIn(view, view.height)
           + ", the last result " + (lastRow ? yIn(lastRow, 0) + "–" + yIn(lastRow, lastRow.height) : "none")
           + ", the note \"" + searchNote.text + "\" " + yIn(searchNote, 0) + "–" + yIn(searchNote, searchNote.height)

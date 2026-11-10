@@ -2,7 +2,7 @@
 # Adding symbols in the window through the real App and Service with real
 # Qt keys and pointer: an add held until its price is in, its row joining
 # at its place, adds out at a close or a list switch, two adds in a row,
-# adds from search, and a stock put back, by Ctrl+Z and by PUT BACK, asking
+# adds from search, and a stock put back, by Ctrl+Z and by UNDO, asking
 # for its quote at once. HOME and curl are scratch.
 # Each chapter starts a fresh service: driving all three at machine speed
 # would spend a host's minute budget on unrelated scenarios.

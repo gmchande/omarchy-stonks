@@ -963,7 +963,7 @@ Harness {
         body.search.slow = true
       }
       // popup-search-putback-*: SHOP.TO just removed, and search opened on
-      // an empty field: its one result is the removal, chosen, PUT BACK, the
+      // an empty field: its one result is the removal, chosen, UNDO, the
       // hero showing it.
       if (root.stateName.indexOf("-putback-") > 0) {
         stub.lastRemoval = { symbol: "SHOP.TO", before: { symbols: stub.symbols, lists: [] }, quote: stub.quotes["SHOP.TO"] }

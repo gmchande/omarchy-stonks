@@ -90,7 +90,7 @@ FocusScope {
   // The removal on offer, the empty field's one result (`StonksBody.putBack`).
   property var putBack: null
   function actionFor(symbol) {
-    if (putBack && symbol === putBack.symbol) return "PUT BACK"
+    if (putBack && symbol === putBack.symbol) return "UNDO"
     return members.indexOf(symbol) >= 0 ? "SHOW" : "ADD"
   }
   function showEmpty() {
@@ -109,7 +109,7 @@ FocusScope {
     putBack ? putBackMetrics.advanceWidth : 0)) + Style.space(12)
   TextMetrics { id: addMetrics; font: root.buttonFont; text: "ADD" }
   TextMetrics { id: showMetrics; font: root.buttonFont; text: "SHOW" }
-  TextMetrics { id: putBackMetrics; font: root.buttonFont; text: "PUT BACK" }
+  TextMetrics { id: putBackMetrics; font: root.buttonFont; text: "UNDO" }
   readonly property int rowPadding: Style.space(10)
   readonly property int columnGap: Style.space(10)
   readonly property int exchangeWidth: {
@@ -532,8 +532,8 @@ FocusScope {
       verticalAlignment: Text.AlignVCenter
       textFormat: Text.PlainText
       text: root.answer === "none" ? (root.ownCount > 0 ? "No other matches for “" : "No matches for “") + root.resultsQuery + "”"
-        : root.answer === "failed" ? "Couldn’t search · " + (root.failure === "refused" ? "server busy"
-          : root.failure === "none" ? "check your connection" : root.failure === "missing" ? "try other words" : "try again")
+        : root.answer === "failed" ? "Couldn't search · " + (root.failure === "refused" ? "server busy"
+          : root.failure === "none" ? "check your internet" : root.failure === "missing" ? "try other words" : "try again")
         : "Searching for “" + root.searchText.trim() + "”…"
       color: root.dim
       font.family: root.fontFamily

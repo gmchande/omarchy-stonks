@@ -67,8 +67,8 @@ right-click it for the window, and drag it to move it along the bar.
 
 To see where a stock was at any moment, such as the morning's low, run the
 pointer along the chart. The price and the change follow it, and so do the
-rows, through the pre-market, the session and after hours. Click the icon
-at the top left to replay the chart.
+rows, through the pre-market, the session and after hours. Click the bull
+or bear at the top left to replay the chart.
 
 Pick a range under the chart, from 1D to ALL. Every stock then shows that
 range, even after a restart. The rows always show the day.
@@ -287,7 +287,7 @@ screenshot editor.
 | `o` | Change the order |
 | `Shift+O` | Reverse the order |
 | `w` | Open the list menu |
-| `c` | Show the change in %, price or since the open |
+| `c` | Show the change in %, an amount or since the open |
 | `s` | Switch between smooth and retro |
 | `m` | Turn sounds on or off |
 | `r` | Refresh |
@@ -312,9 +312,9 @@ again.
 - **"Server busy".** Yahoo asked Stonks to send fewer requests. Stonks
   retries at the time shown, at most 36 minutes on, and `r` won't
   hurry it.
-- **"Not updating" or "No data" on a row, or "Can't get prices" in the
-  header.** A price hasn't come in time. When that's true of every stock
-  you follow, the header says so once instead of on every row. Rows keep
+- **"Not updating" or "No data" on a row, or "Can't get prices" on the top
+  line.** A price hasn't come in time. When that's true of every stock you
+  follow, the top line says so once instead of on every row. Rows keep
   any price they had, with its time. Stonks keeps trying on its own, less
   often the longer Yahoo stays away. If Yahoo has changed what it sends,
   only a newer Stonks can fix it.

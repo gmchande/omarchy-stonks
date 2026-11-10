@@ -1316,19 +1316,19 @@ test("parseSearch keeps tradable results with names and readable exchanges", () 
 test("search names the kinds it leaves out, beside what it shows or alone", () => {
   const vfiax = fixture("search-vfiax.json")
   const eurusd = fixture("search-eurusd.json")
-  expect(M.parseSearch(vfiax)).toEqual({ results: [], note: "Stonks doesn’t show mutual funds", topLeftOut: true })
+  expect(M.parseSearch(vfiax)).toEqual({ results: [], note: "Stonks doesn't show mutual funds", topLeftOut: true })
   const pair = M.parseSearch(eurusd)
   expect(pair.results.map(r => r.symbol)).toEqual(["18QQ.Z", "Q0SF.Z"])
-  expect(pair.note).toBe("Stonks doesn’t show currencies or futures")
+  expect(pair.note).toBe("Stonks doesn't show currencies or futures")
   // Yahoo's top answer is the currency, so search takes neither index for
   // it (window-search.qml).
   expect([pair.topLeftOut, M.parseSearch(search).topLeftOut]).toEqual([true, false])
   // Three kinds, in the answer's order; a kind with no name of Stonks' own
   // goes by Yahoo's word for it.
   expect(M.parseSearch({ quotes: vfiax.quotes.concat(eurusd.quotes) }).note)
-    .toBe("Stonks doesn’t show mutual funds, currencies, or futures")
+    .toBe("Stonks doesn't show mutual funds, currencies, or futures")
   expect(M.parseSearch({ quotes: [{ symbol: "W", quoteType: "WARRANT", typeDisp: "Warrant" }] }).note)
-    .toBe("Stonks doesn’t show warrants")
+    .toBe("Stonks doesn't show warrants")
 })
 
 test("request URLs are the exact strings Yahoo is sent, and history never takes the 1D path", () => {

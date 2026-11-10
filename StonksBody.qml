@@ -640,7 +640,7 @@ Item {
   }
   onSaveFailedChanged: if (!saveFailed && note === stillUnsaved) clearNote()
 
-  // `pointed`: put back by a click, as PUT BACK in search can be (`select`).
+  // `pointed`: put back by a click, as UNDO in search can be (`select`).
   function undoRemoval(pointed) {
     if (!service) return
     showingHelp = false

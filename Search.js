@@ -74,7 +74,7 @@ function leftOutNote(left) {
   if (names.length === 0) return ""
   var listed = names.length < 3 ? names.join(" or ")
     : names.slice(0, -1).join(", ") + ", or " + names[names.length - 1]
-  return "Stonks doesn’t show " + listed
+  return "Stonks doesn't show " + listed
 }
 
 // Read from the end, a character at a time: a regex for "two spaces, a
