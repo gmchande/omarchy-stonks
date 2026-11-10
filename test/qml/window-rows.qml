@@ -263,7 +263,7 @@ Harness {
       service.setOrder("manual")
     }
 
-    // Moving a row by Shift+↓ and Shift+↑, and the keys that carry the cursor
+    // Moving a row by Ctrl+↓ and Ctrl+↑, and the keys that carry the cursor
     // past the edge: the list gliding along so nothing jumps on screen.
     // Shift and the wheel scroll as the wheel does.
     function movesByKeys(body, watchlist, keys) {
@@ -280,7 +280,7 @@ Harness {
       service.createList("Moves")
       six.forEach(function(s) { service.setMembership(s, "Moves", true) })
 
-      // Shift+↓ at the bottom, and Shift+↑ at the top of a list scrolled to
+      // Ctrl+↓ at the bottom, and Ctrl+↑ at the top of a list scrolled to
       // its end; ↓ past the edge glides the list.
       var heightBefore = app.testWindow.implicitHeight
       openAt(body.chromeHeight + 3 * body.rowPitch)
@@ -294,13 +294,13 @@ Harness {
       reset("", "smooth")
       watchlist.cursorSymbol = "NVDA"
       keys.forceActiveFocus()
-      var jAtBottom = carried("NVDA", function() { keyClick(Qt.Key_Down, Qt.ShiftModifier) })
+      var jAtBottom = carried("NVDA", function() { keyClick(Qt.Key_Down, Qt.ControlModifier) })
       reset("Moves", "retro")
       watchlist.contentY = watchlist.contentHeight - watchlist.height
       var topRow = watchlist.displayedSymbols[3]
       watchlist.cursorSymbol = topRow
       keys.forceActiveFocus()
-      var kAtTop = carried(topRow, function() { keyClick(Qt.Key_Up, Qt.ShiftModifier) })
+      var kAtTop = carried(topRow, function() { keyClick(Qt.Key_Up, Qt.ControlModifier) })
       var notchOver = function(modifiers) {
         reset("", "smooth")
         var before = watchlist.displayedSymbols.join(",")
@@ -325,7 +325,7 @@ Harness {
       var downTarget = watchlist.displayedSymbols[3]
       tryVerify(function() { return watchlist.cursorRow === downTarget }, 2000)
       within(2000, function() { return watchlist.wholeInSight(3, watchlist.contentY) })
-      harness.check("Shift+↓ and Shift+↑ move their selected row, and Down selects the next row",
+      harness.check("Ctrl+↓ and Ctrl+↑ move their selected row, and Down selects the next row",
         /^true /.test(jAtBottom) && /^true /.test(kAtTop) && watchlist.cursorRow === downTarget && watchlist.wholeInSight(3, watchlist.contentY),
         [jAtBottom, kAtTop, watchlist.cursorRow].join(" | "))
       openAt(heightBefore)
@@ -903,8 +903,8 @@ Harness {
       var refused = "Switch to manual order to move rows"
       watchlist.cursorSymbol = "AAPL"
       keys.forceActiveFocus()
-      keyClick(Qt.Key_Down, Qt.ShiftModifier)
-      harness.check("Shift+↓ cannot replace manual order from a sorted view",
+      keyClick(Qt.Key_Down, Qt.ControlModifier)
+      harness.check("Ctrl+↓ cannot replace manual order from a sorted view",
         service.order === "pct" && service.symbols.join(",") === before && body.note === refused,
         [service.order, service.symbols, body.note].join("|"))
 

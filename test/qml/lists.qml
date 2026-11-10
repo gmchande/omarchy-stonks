@@ -628,8 +628,8 @@ Harness {
       keyClick(Qt.Key_Return)
       harness.check("a change of case alone renames",
         !manage.renaming && harness.same(names(), ["GROWTH", "Wins"]), names())
-      keyClick(Qt.Key_Down, Qt.ShiftModifier)
-      harness.check("Shift+↓ moves the list down, and the cursor goes with it",
+      keyClick(Qt.Key_Down, Qt.ControlModifier)
+      harness.check("Ctrl+↓ moves the list down, and the cursor goes with it",
         harness.same(names(), ["Wins", "GROWTH"]) && manage.cursor === 2, names() + "|" + manage.cursor)
       keyClick(Qt.Key_Delete)
       var askedFirst = manage.confirming && harness.same(names(), ["Wins", "GROWTH"])

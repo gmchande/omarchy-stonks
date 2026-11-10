@@ -632,7 +632,7 @@ Harness {
       watchlist.cursorSymbol = watchlist.displayedSymbols[0]
       var movedSymbol = watchlist.cursorSymbol
       var membersBefore = service.symbols.slice()
-      keyClick(Qt.Key_Down, Qt.ShiftModifier)
+      keyClick(Qt.Key_Down, Qt.ControlModifier)
       within(1000, function() { return service.symbols.indexOf(movedSymbol) === membersBefore.indexOf(movedSymbol) + 1 })
       var membersAfter = service.symbols.slice()
       check("a manual reorder with an add still out saves every member",
