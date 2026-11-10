@@ -53,11 +53,14 @@ Rectangle {
   readonly property color dimmer: Tones.dimmer(foreground, ground)
   readonly property color ghost: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.05)
   readonly property var words: quote && day ? Share.words({ quote: quote, day: day, history: history, latest: latest,
-    newest: view ? view.newest : null, scrubT: scrubT, calendars: calendars }) : null
+    newest: view ? view.newest : null, scrubT: scrubT, changeMode: changeMode, calendars: calendars }) : null
   readonly property var lines: Figures.heroLines(quote, view, latest, now, day, calendars, changeMode, scrubT !== 0)
+  // Since the open, the open the move counts from takes the line under the
+  // price, at rest and scrubbed (`Share.words`).
+  readonly property var open: words && words.open ? words.open : null
   // A scrub's move counts from the line under the pointer, named as the
   // panel names it.
-  readonly property string legend: !scrubT || !quote ? ""
+  readonly property string legend: !scrubT || !quote || open ? ""
     : history ? "┄ " + String(range).toUpperCase() + " START " + Format.money(history.baseline, quote.priceDigits)
     : day ? "┄ " + Figures.scrubBaselineText(day, scrubT, Figures.exchangeDay(day, now), calendars) : ""
   readonly property var shownDay: Share.pictureDay(day)
@@ -234,7 +237,7 @@ Rectangle {
     font.pixelSize: 18 * root.u
     font.bold: true
   }
-  readonly property var close: lines.close
+  readonly property var close: open ? { label: open.label, time: "", price: open.price, changeText: "", tone: "flat", stale: false } : lines.close
   Row {
     objectName: "shareClose"
     x: root.margin

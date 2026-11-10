@@ -225,8 +225,8 @@ Harness {
       var unlit = !body.cameraLit
       var rest = shoot(body, function() { keyClick(Qt.Key_C, Qt.ControlModifier) })
       var lit = body.cameraLit
-      var day = /^TUE 1 SEP 2026 · (CLOSE )?\d\d:\d\d [A-Z]+$/
-      var problems = landed(rest, "aapl", /^AAPL at .+$/).concat(ofChart(rest, "AAPL", "1D", day, rows))
+      // The after-hours trade on top, at 17:31.
+      var problems = landed(rest, "aapl", /^AAPL at .+$/).concat(ofChart(rest, "AAPL", "1D", /^TUE 1 SEP 2026 · 17:31 EDT$/, rows))
       check("Ctrl+C in the panel saves one picture of AAPL's day in the pictures folder, copies it as a PNG, and sends Omarchy's notification with it",
         problems.length === 0 && still === 0 && rest.card.scrubX === -1 && !rest.card.retro, problems.join("; "))
       // The day's line starts 6 of the picture's pixels in from the chart's
@@ -273,7 +273,7 @@ Harness {
       tryVerify(function() { return button && button.visible && button.width > 0 }, 2000)
       waitForRendering(button)
       var year = shoot(win, function() { if (button) mouseClick(button, button.width / 2, button.height / 2) })
-      problems = landed(year, "aapl", /^AAPL 1Y at .+$/).concat(ofChart(year, "AAPL", "1Y", day, rows))
+      problems = landed(year, "aapl", /^AAPL 1Y at .+$/).concat(ofChart(year, "AAPL", "1Y", /^TUE 1 SEP 2026 · CLOSE 16:00 EDT$/, rows))
       var marks = harness.marksSaid(win)
       if (year.card.marks !== marks || /none/.test(marks)) problems.push("marks " + year.card.marks + " against the window's " + marks)
       check("a click on the window's camera, in retro, takes AAPL's 1Y as it is shown, its high and low marked",

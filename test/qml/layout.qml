@@ -768,7 +768,7 @@ Harness {
                   var strip = find(body, "extendedLine")
                   // With the night's price on top too, the range's name and
                   // its amount (`Figures.heroLines`).
-                  var period = (r[1] === youngMonth ? "SINCE \\d{1,2} [A-Z]{3} \\d{4}" : r[0].toUpperCase()) + "( [+\u2212\u25b2\u25bc][\\d,.]+)?"
+                  var period = (r[1] === youngMonth ? "SINCE \\d{1,2} [A-Z]{3} \\d{4}" : r[0].toUpperCase()) + "( [+\u2212\u25b2\u25bc]?[\\d,.]+)?"
                   var shown = root.rowWords(caption)
                   if (!new RegExp("^" + period + "$").test(shown) || (strip.visible && xIn(strip, strip.width) >= xIn(caption, 0)))
                     captions.push(where + " " + r[0] + " says \"" + shown + "\" from " + xIn(caption, 0)

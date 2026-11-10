@@ -3379,4 +3379,14 @@ test("a screenshot's foot says when its price is from, a close as the close, and
   const weekHistory = M.parseHistory(fixture("history/nbis-2026-10-26-2005-5d.json"), "1W")
   expect([null, weekHistory].map(history => Share.words({ quote: tops.quotes.NBIS, day: nbis.day, history, latest: nbis.latest,
     newest: tops.newest.NBIS, scrubT: 0, calendars }).foot)).toEqual(["MON 26 OCT 2026 · 17:58 EDT", "MON 26 OCT 2026 · 17:58 EDT"])
+  // Since the open, the picture says the open its move counts from, which
+  // the panel says under its ranges, at rest and scrubbed into the session;
+  // not where the move counts from a close, nor at night, where the day
+  // ahead hasn't opened and the move is a dash.
+  const openOf = (at, built, s, mode, scrubT = 0) => Share.words({ quote: at.quotes[s], day: built.day, history: null, latest: built.latest,
+    newest: at.newest[s] || null, scrubT, changeMode: mode, calendars }).open
+  const noon = at("2026-10-26", "12:00")
+  expect([openOf(tops, nbis, "NBIS", "open"), openOf(tops, nbis, "NBIS", "open", noon), openOf(tops, nbis, "NBIS", "pct")])
+    .toEqual([{ label: "OPEN", price: "153.97" }, { label: "OPEN", price: "153.97" }, null])
+  expect(openOf(topsAt("watch-2026-10-27-0350"), dayAt("watch-2026-10-27-0350", "nbis"), "NBIS", "open")).toBeNull()
 })
