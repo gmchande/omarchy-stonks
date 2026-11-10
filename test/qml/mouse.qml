@@ -84,6 +84,16 @@ Harness {
         menu && within(1500, function() { return body.listsSymbol === rows[0] }), menu + " " + body.listsSymbol)
       body.closeViews()
 
+      // Its first line removes the row, and UNDO puts it back.
+      click(row(rows[2]), Qt.RightButton)
+      var again = within(1500, function() { return harness.findAll(body, "rowMenuLine").length > 0 && harness.inPlace(harness.findAll(body, "rowMenuLine")) })
+      click(harness.findAll(body, "rowMenuLine").sort(function(a, b) { return a.y - b.y })[0])
+      var dropped = within(1500, function() { return service.symbols.indexOf(rows[2]) < 0 })
+      click("footerUndo")
+      harness.check("the row menu's first line removes the row, and UNDO puts it back",
+        again && dropped && within(1500, function() { return service.symbols.join(",") === rows.join(",") }), [again, dropped, service.symbols.join(",")].join(" "))
+      rest()
+
       click("listControl")
       var choices = function() { return harness.findAll(body, "listChoice") }
       var listed = within(1500, function() { return body.listMenuOpen && choices().length === 2 && harness.inPlace(choices()) })
@@ -97,16 +107,22 @@ Harness {
       var ordered = within(1500, function() { return service.order === "symbol" })
       click("orderArrow")
       var reversed = within(1500, function() { return service.reversed })
-      var mode = service.changeMode
+      // A percent, then an amount, then since the open.
+      var next = ({ pct: "abs", abs: "open", open: "pct" })[service.changeMode]
       click("unitTarget")
-      harness.check("the order's word steps the order, its arrow reverses it, and the unit steps the unit",
-        ordered && reversed && within(1500, function() { return service.changeMode !== mode }), [service.order, service.reversed, service.changeMode].join(" "))
+      harness.check("the order's word steps the order, its arrow reverses it, and the unit steps to the next unit",
+        ordered && reversed && within(1500, function() { return service.changeMode === next }), [service.order, service.reversed, service.changeMode, "wanted " + next].join(" "))
       service.setOrder("manual")
 
-      var tokens = harness.findAll(body, "rangeToken")
-      click(tokens[1])
+      // Two of them, so one range for every click can't pass.
+      var options = harness.findAll(body, "rangeOption")
+      var picked = [options[1], options[3]].map(function(option) {
+        click(harness.find(option, "rangeToken"))
+        var want = String(option.modelData)
+        return within(1500, function() { return service.range === want }) ? "" : want + " gave " + service.range
+      })
       harness.check("a click on a range shows that range",
-        within(1500, function() { return service.range !== "1D" }), service.range)
+        options.length > 3 && picked.join("") === "", picked.join(", "))
       service.setRange("1D")
 
       var retro = service.retro, sounds = service.soundsOn
@@ -137,7 +153,10 @@ Harness {
 
       // A row's × shows once the pointer has put the cursor on it; UNDO
       // stands in the footer after.
-      var doomed = service.symbols[1]
+      // One a person can see: the added stock may have brought the end of
+      // the list into sight.
+      var rowsList = body.watchlist
+      var doomed = rowsList.displayedSymbols.filter(function(symbol, i) { return rowsList.wholeInSight(i, rowsList.contentY) })[1]
       var gone = row(doomed)
       mouseMove(gone, gone.width / 2, gone.height / 2 - 1)
       mouseMove(gone, gone.width / 2, gone.height / 2)
