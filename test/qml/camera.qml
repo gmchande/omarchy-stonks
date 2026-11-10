@@ -104,7 +104,7 @@ Harness {
 
   Steps {
     name: "Camera"
-    when: service.pluginsReady
+    when: service.ready
 
     function quiet() {
       tryVerify(function() { return service.arriving.length === 0 && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 8000)
@@ -212,7 +212,7 @@ Harness {
       quiet()
       // Every row's symbol and every list's name, the one on show too: none
       // is the chart's, so none may be on the picture.
-      var rows = service.library.concat(service.lists.map(function(l) { return l.label }), ["All"])
+      var rows = service.allSymbols.concat(service.lists.map(function(l) { return l.label }), ["All"])
 
       // The panel by keys, in smooth, on AAPL's day at rest.
       service.feature("AAPL")

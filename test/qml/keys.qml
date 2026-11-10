@@ -99,7 +99,7 @@ Harness {
 
   Steps {
     name: "Keys"
-    when: service.pluginsReady
+    when: service.ready
 
     function quiet() {
       tryVerify(function() { return service.arriving.length === 0 && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 8000)

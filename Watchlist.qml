@@ -17,7 +17,7 @@ Flickable {
 
   // Arrives whole, so comparing it with the last says what changed.
   // Handlers read it, not a binding derived from it, which may lag behind.
-  property var view: ({ list: "", listKey: "=", order: "manual", reversed: false, rows: [], shown: [], library: [] })
+  property var view: ({ list: "", listKey: "=", order: "manual", reversed: false, rows: [], shown: [], allSymbols: [] })
   property var quotes: ({})
   property var newestTrades: ({})
   // Robinhood's answers, by symbol, and the clock that slides a row's 1D
@@ -552,7 +552,7 @@ Flickable {
     var before = arrangedView
     arrangedView = view
     if (!before) return
-    if (before.library.join() !== view.library.join()) syncRows()
+    if (before.allSymbols.join() !== view.allSymbols.join()) syncRows()
     // A rename keeps the key. StonksBody holds a closed surface's view, so
     // this runs only while open or opening, before reopen().
     var switched = view.listKey !== before.listKey
@@ -595,17 +595,17 @@ Flickable {
   }
 
   function syncRows() {
-    var library = view.library
+    var allSymbols = view.allSymbols
     var wanted = {}
-    for (var j = 0; j < library.length; j++) wanted[library[j]] = true
+    for (var j = 0; j < allSymbols.length; j++) wanted[allSymbols[j]] = true
     var have = {}
     for (var i = rowsModel.count - 1; i >= 0; i--) {
       var symbol = rowsModel.get(i).symbol
       if (wanted[symbol] === true) have[symbol] = true
       else rowsModel.remove(i)
     }
-    for (j = 0; j < library.length; j++) {
-      if (have[library[j]] !== true) rowsModel.append({ symbol: library[j] })
+    for (j = 0; j < allSymbols.length; j++) {
+      if (have[allSymbols[j]] !== true) rowsModel.append({ symbol: allSymbols[j] })
     }
   }
 

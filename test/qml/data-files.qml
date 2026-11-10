@@ -39,14 +39,14 @@ Harness {
 
   Steps {
     name: "DataFiles"
-    when: service.pluginsReady
+    when: service.ready
 
     function test_make() {
       var all = harness.made.lists[0]
       // From the defaults: the demo's symbols in, the rest out, then All
       // arranged by hand.
-      all.symbols.forEach(function(s) { if (service.library.indexOf(s) < 0) service.addSymbol(s) })
-      service.library.slice().forEach(function(s) { if (all.symbols.indexOf(s) < 0) service.removeSymbol(s) })
+      all.symbols.forEach(function(s) { if (service.allSymbols.indexOf(s) < 0) service.addSymbol(s) })
+      service.allSymbols.slice().forEach(function(s) { if (all.symbols.indexOf(s) < 0) service.removeSymbol(s) })
       service.setManualOrder(all.symbols)
       harness.made.lists.slice(1).forEach(function(list) {
         service.createList(list.name)

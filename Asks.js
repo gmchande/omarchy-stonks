@@ -30,16 +30,16 @@ function calendarsAt(calendars, now) {
   }
 }
 
-function watchedSymbols(library, featured, open) {
-  return library.filter(function(s) { return open || s === featured })
+function watchedSymbols(allSymbols, featured, open) {
+  return allSymbols.filter(function(s) { return open || s === featured })
 }
 
-function readingOrder(featured, sights, shown, library) {
+function readingOrder(featured, sights, shown, allSymbols) {
   var order = featured ? [featured] : []
   var add = function(s) { if (order.indexOf(s) < 0) order.push(s) }
   sights.forEach(function(sight) { sight.symbols.forEach(add) })
   shown.forEach(add)
-  library.forEach(add)
+  allSymbols.forEach(add)
   return order
 }
 
@@ -216,7 +216,7 @@ function overnightAsks(s) {
   var pillEntry = s.quoteEntries[pill]
   var live = !!pillEntry && pillEntry.status === "ok" && s.overnightSymbols.indexOf(pill) >= 0
   if (!kept && !live) return null
-  var previewing = s.open && s.previewShown && !!s.previewQuote && s.library.indexOf(s.preview) < 0
+  var previewing = s.open && s.previewShown && !!s.previewQuote && s.allSymbols.indexOf(s.preview) < 0
     && Overnight.hasOvernight(s.previewQuote, s.calendars)
   var waited = previewing ? s.preview : pill
   var listings = s.open ? s.overnightSymbols.concat(previewing ? [s.preview] : []) : [pill]

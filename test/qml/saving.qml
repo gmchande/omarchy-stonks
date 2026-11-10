@@ -33,7 +33,7 @@ Harness {
 
   Steps {
     name: "Saving"
-    when: service.pluginsReady
+    when: service.ready
 
     readonly property var body: app.testBody
 
@@ -79,7 +79,7 @@ Harness {
       var mode = ""
       within(3000, function() { mode = sh('/usr/bin/stat -c %a "$1"'); return mode === "600" })
       var next = restart.createObject(started)
-      var began = within(5000, function() { return next.pluginsReady })
+      var began = within(5000, function() { return next.ready })
       var read = [next.listName, next.symbols.join(","), next.order, next.featuredSymbol, next.range].join(" ")
       next.destroy()
       harness.check("a change is in the file, the file is its owner's alone, and a fresh start reads what was saved",

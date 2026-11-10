@@ -75,7 +75,7 @@ Harness {
 
   Steps {
     name: "Cost"
-    when: service.pluginsReady && pillWindow.visible
+    when: service.ready && pillWindow.visible
 
     function runCommand(command) {
       fileProc.command = command
@@ -104,7 +104,7 @@ Harness {
     // into sight, by what it would show there.
     function warned() {
       var body = app.testBody
-      var out = service.library.filter(function(s) {
+      var out = service.allSymbols.filter(function(s) {
         var row = body.watchlist.rowItem(s)
         if (row && row.inSight) return /^!/.test(row.detail)
         return Freshness.freshnessWarns(Freshness.freshness(service.entries[s] || null, service.quotes[s] || null, service.now, service.owed[s] || 0))
@@ -133,7 +133,7 @@ Harness {
 
       // Loading: the pill's chart and eight spark requests carry the list.
       // Then each day with a jump is judged on the chart, a few a run.
-      for (var t = 0; t < 600 && (!service.library.every(function(s) { return !!service.quotes[s] }) || service.testFeed.toJudge.length > 0); t++) {
+      for (var t = 0; t < 600 && (!service.allSymbols.every(function(s) { return !!service.quotes[s] }) || service.testFeed.toJudge.length > 0); t++) {
         service.now += 1
         settle()
       }
@@ -141,9 +141,9 @@ Harness {
       // in runs of their own.
       var firstRun = harness.lines("runs.log").filter(function(r) { return /^(chart|spark):/.test(r) })[0] || ""
       harness.check("154 symbols answer in one run of nine requests: the pill's chart and eight for the rest",
-        service.library.length === 154 && service.library.every(function(s) { return !!service.quotes[s] })
+        service.allSymbols.length === 154 && service.allSymbols.every(function(s) { return !!service.quotes[s] })
           && /^chart:TALL001( spark:\S+){8}$/.test(firstRun),
-        service.library.length + " symbols; first run " + firstRun.split(" ").map(function(u) { return u.split(":")[0] }).join(" "))
+        service.allSymbols.length + " symbols; first run " + firstRun.split(" ").map(function(u) { return u.split(":")[0] }).join(" "))
 
       // Ten minutes of trading: every row is due each minute.
       var reqFrom = harness.lines("requests.log").length
@@ -153,7 +153,7 @@ Harness {
       var steady = harness.lines("requests.log").slice(reqFrom)
       var runs = harness.lines("runs.log").slice(runFrom)
       var counts = perSymbol(steady)
-      var behind = service.library.filter(function(s) { return (counts[encodeURIComponent(s)] || 0) < 9 })
+      var behind = service.allSymbols.filter(function(s) { return (counts[encodeURIComponent(s)] || 0) < 9 })
       harness.check("ten minutes of trading: every row refreshed every minute, in at most 15 requests and 2 curl runs a minute, and nothing warns",
         behind.length === 0 && steady.length <= 150 && runs.length <= 20 && warnedSteps === 0 && !service.testYahooGate.warned,
         (steady.length / 10).toFixed(1) + " requests and " + (runs.length / 10).toFixed(1) + " runs a minute; behind: " + behind.slice(0, 5).join(",")

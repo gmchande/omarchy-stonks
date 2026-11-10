@@ -26,7 +26,7 @@ Item {
   // ---- What you follow and look at
 
   // All: every symbol, fetched once whatever lists hold it.
-  readonly property var library: dataSettings.symbols
+  readonly property var allSymbols: dataSettings.symbols
   // "" is All.
   readonly property string listName: dataSettings.list
   readonly property var symbols: Settings.listSymbols(dataSettings)
@@ -76,7 +76,7 @@ Item {
 
   // One that took the hero and failed hands it back.
   function settleArrivals() {
-    var still = root.arriving.filter(function(s) { return root.library.indexOf(s) >= 0 && !root.answered(s) })
+    var still = root.arriving.filter(function(s) { return root.allSymbols.indexOf(s) >= 0 && !root.answered(s) })
     if (still.length !== root.arriving.length) root.arriving = still
     var taken = root.heroTaken
     if (!taken || still.indexOf(taken.symbol) >= 0) return
@@ -112,7 +112,7 @@ Item {
       rows: rows,
       shown: Rows.shownOrder(root.heldOrder, Rows.sortedSymbols(rows, feed.quotes, order, reversed,
         dataSettings.changeMode, order === "manual" ? null : root.newestTrades)),
-      library: all,
+      allSymbols: all,
       // Null while on its way: each surface keeps the chart it has on screen.
       chart: chart
     }
@@ -161,7 +161,7 @@ Item {
     var allDay = allDayFeed.entries
     var out = {}
     var kept = {}
-    library.forEach(function(symbol) {
+    allSymbols.forEach(function(symbol) {
       var quote = feed.quotes[symbol]
       if (!quote) return
       var night = nights[symbol]
@@ -298,7 +298,7 @@ Item {
   // A hero chosen ends an add's hold on it (`heroTaken`).
   function feature(symbol, settles) {
     var s = String(symbol || "").toUpperCase()
-    if (root.library.indexOf(s) < 0) return
+    if (root.allSymbols.indexOf(s) < 0) return
     root.heroTaken = null
     root.persist({ featured: s }, settles)
   }
@@ -315,7 +315,7 @@ Item {
   function summon(symbol, range) {
     var values = {}
     var s = String(symbol || "").toUpperCase()
-    if (s && root.library.indexOf(s) >= 0) {
+    if (s && root.allSymbols.indexOf(s) >= 0) {
       values.featured = s
       root.heroTaken = null
     }
@@ -332,7 +332,7 @@ Item {
     if (s && s === root.previewSymbol && previewFeed.entries[s])
       feed.restore(s, previewFeed.quotes[s] || null, previewFeed.entries[s])
     // A symbol already in All is a row at once.
-    if (s && root.library.indexOf(s) < 0 && root.arriving.indexOf(s) < 0 && !root.answered(s))
+    if (s && root.allSymbols.indexOf(s) < 0 && root.arriving.indexOf(s) < 0 && !root.answered(s))
       root.arriving = root.arriving.concat([s])
     var previewed = s !== "" && s === root.previewSymbol
     var coming = previewed && root.arriving.indexOf(s) >= 0
@@ -454,7 +454,7 @@ Item {
   // bindings have run, and the view is worked out before that.
   readonly property var dataSettings: listsFile.dataSettings
   readonly property string dataPath: listsFile.dataPath
-  readonly property bool pluginsReady: listsFile.pluginsReady
+  readonly property bool ready: listsFile.ready
   readonly property bool settingsUnreadable: listsFile.settingsUnreadable
   readonly property bool editsUnsaved: listsFile.editsUnsaved
   readonly property bool saveFailed: listsFile.saveFailed
@@ -507,11 +507,11 @@ Item {
 
   QuoteFeed {
     id: feed
-    symbols: root.pluginsReady ? root.library : []
+    symbols: root.ready ? root.allSymbols : []
     watched: root.watched
     lead: root.view.featured
-    heroes: [root.view.featured].concat(root.previewShown && root.library.indexOf(root.previewSymbol) >= 0 ? [root.previewSymbol] : [])
-    reading: function() { return Asks.readingOrder(root.view.featured, root.sights, root.view.shown, root.library) }
+    heroes: [root.view.featured].concat(root.previewShown && root.allSymbols.indexOf(root.previewSymbol) >= 0 ? [root.previewSymbol] : [])
+    reading: function() { return Asks.readingOrder(root.view.featured, root.sights, root.view.shown, root.allSymbols) }
     holding: root.drawing.length > 0
     onBusyChanged: Qt.callLater(root.releaseOrder)
     onLandingChanged: Qt.callLater(root.releaseOrder)
@@ -580,7 +580,7 @@ Item {
   readonly property var rates: fundamentalsFeed.rates
   QuoteFeed {
     id: previewFeed
-    symbols: root.previewRests && root.previewSymbol !== "" && root.library.indexOf(root.previewSymbol) < 0
+    symbols: root.previewRests && root.previewSymbol !== "" && root.allSymbols.indexOf(root.previewSymbol) < 0
       ? [root.previewSymbol] : []
     now: root.now
     clock: root
@@ -627,7 +627,7 @@ Item {
   readonly property var allDay: allDayFeed.entries
   // By Yahoo's quote, never Robinhood's answer: Robinhood is asked whether
   // it trades each all day.
-  readonly property var overnightSymbols: library.filter(function(s) {
+  readonly property var overnightSymbols: allSymbols.filter(function(s) {
     return !!feed.quotes[s] && Overnight.hasOvernight(feed.quotes[s], calendars)
   })
   // Only these draw Robinhood's trades.
@@ -644,7 +644,7 @@ Item {
   function sayFills() {
     var previewed = root.previewSymbol
     var tradability = previewed ? allDayFeed.entries[previewed] : null
-    var preview = tradability && tradability.allDay && root.library.indexOf(previewed) < 0 ? previewFeed.quotes[previewed] : null
+    var preview = tradability && tradability.allDay && root.allSymbols.indexOf(previewed) < 0 ? previewFeed.quotes[previewed] : null
     var symbols = preview ? root.allDaySymbols.concat([previewed]) : root.allDaySymbols
     symbols.forEach(function(symbol) {
       var quote = symbol === previewed && preview ? preview : feed.quotes[symbol]
@@ -670,7 +670,7 @@ Item {
 
   ReleaseFeed {
     id: releaseFeed
-    ready: root.pluginsReady && root.dataSettings.updateCheck && root.updatable
+    ready: root.ready && root.dataSettings.updateCheck && root.updatable
     now: root.now
     clock: root
     clearance: function() { return root.screensClear() }
@@ -688,13 +688,13 @@ Item {
   property int dueAt: 0
   property int askedMinute: -1
   function askDue() {
-    if (!root.pluginsReady) return
+    if (!root.ready) return
     var now = root.wallSecond()
     root.askedMinute = Math.floor(now / 60)
     var open = root.openSurfaces.length > 0
     var featured = root.view.featured
     var calNow = Asks.calendarsAt(root.calendars, now)
-    var watched = Asks.watchedSymbols(root.library, featured, open)
+    var watched = Asks.watchedSymbols(root.allSymbols, featured, open)
     if (watched.join(",") !== root.watched.join(",")) root.watched = watched
     var asks = Asks.quotesDue(watched, feed.entries, feed.asked, feed.quotes, root.heroesOnShow(), featured, now, root.refreshIntervalSec, calNow)
     root.dueAt = asks.next
@@ -705,7 +705,7 @@ Item {
   // Robinhood's two questions go side by side, so a 1D chart waits for one
   // answer, never two in a row.
   function askOvernight() {
-    if (!root.pluginsReady) return
+    if (!root.ready) return
     var open = root.openSurfaces.length > 0
     var asks = root.overnightWanted()
     if (!asks || !root.screensClear()) return
@@ -722,7 +722,7 @@ Item {
       quoteEntries: feed.entries,
       quotes: feed.quotes,
       overnightSymbols: root.overnightSymbols,
-      library: root.library,
+      allSymbols: root.allSymbols,
       preview: previewed,
       previewShown: root.previewShown,
       // By search's result before its quote, so Robinhood is asked as Yahoo is.
@@ -778,7 +778,7 @@ Item {
     // The pill's first live answer asks Robinhood for it at once.
     root.askOvernight()
   }
-  onLibraryChanged: {
+  onAllSymbolsChanged: {
     settleArrivals()
     Qt.callLater(forgetLeft)
   }
@@ -790,7 +790,7 @@ Item {
   function forgetLeft() {
     var now = root.wallSecond()
     var removed = root.lastRemoval ? root.lastRemoval.symbol : ""
-    var keep = function(s) { return root.library.indexOf(s) >= 0 || s === root.previewSymbol || s === removed }
+    var keep = function(s) { return root.allSymbols.indexOf(s) >= 0 || s === root.previewSymbol || s === removed }
     for (var symbol in root.builtDays) if (!keep(symbol)) delete root.builtDays[symbol]
     for (var gone in root.fills) if (!keep(gone)) delete root.fills[gone]
     var prune = function(cache, fresh) {
@@ -811,7 +811,7 @@ Item {
   // every screen is off, the history and trades are owed until one is on.
   property bool refreshOwed: false
   function refresh() {
-    if (!root.pluginsReady) return
+    if (!root.ready) return
     yahooGate.hurry()
     robinhoodGate.hurry()
     var now = root.wallSecond()
@@ -845,7 +845,7 @@ Item {
   // The day needs no history, nor does the pill, which always shows the
   // day. With nothing named next, the last chart, the preview's, goes.
   function showHistory(force) {
-    if (!root.pluginsReady) return
+    if (!root.ready) return
     var charts = root.historyCharts()
     if (charts.length === 0) {
       root.historyOwed = ({})
@@ -862,7 +862,7 @@ Item {
   // A range on show is asked again as its market moves it, so its line and
   // its low and high keep up: one hero's at a time, when the feed is idle.
   function refreshRange() {
-    if (!root.pluginsReady || historyFeed.busy) return
+    if (!root.ready || historyFeed.busy) return
     var range = root.view.range
     var stale = Asks.staleHistory(root.historyCharts(), range, historyFeed.entries, feed.quotes, previewFeed.quotes,
       root.wallSecond(), root.calendars)
@@ -905,7 +905,7 @@ Item {
 
   // What a run leaves goes when the feed is idle again, or on the clock.
   function fetchAhead() {
-    if (!root.pluginsReady || historyFeed.busy || root.screensOff || !yahooGate.spare()) return
+    if (!root.ready || historyFeed.busy || root.screensOff || !yahooGate.spare()) return
     var range = root.view.range
     var charts = Asks.aheadCharts(root.aheadRows(), range, historyFeed.entries, root.aheadMissed)
     if (charts.length === 0 || !root.screensClear()) return
@@ -971,7 +971,7 @@ Item {
     root.quotesUnsaved = false
     root.quotesSavedAt = root.now
     var saved = {}
-    root.library.forEach(function(s) {
+    root.allSymbols.forEach(function(s) {
       if (feed.quotes[s]) saved[s] = { quote: feed.quotes[s], receivedAt: (feed.entries[s] || {}).receivedAt || 0 }
     })
     ownerOnly.write(root.quotesPath, JSON.stringify({ version: 1, quotes: saved }) + "\n")
@@ -1027,14 +1027,14 @@ Item {
     root.armClock()
   }
   function armClock() {
-    if (!root.pluginsReady) return
+    if (!root.ready) return
     clock.interval = Asks.clockWait(root.openSurfaces.length > 0, Date.now(), root.now,
       [root.dueAt, yahooGate.pausedUntil, robinhoodGate.pausedUntil, githubGate.pausedUntil, Freshness.overdueAt(root.owed, root.now)])
     clock.restart()
   }
   onDueAtChanged: armClock()
   onOwedChanged: armClock()
-  onPluginsReadyChanged: armClock()
+  onReadyChanged: armClock()
   Connections {
     target: yahooGate
     function onPausedUntilChanged() { root.armClock() }

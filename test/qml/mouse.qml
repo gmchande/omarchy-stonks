@@ -19,7 +19,7 @@ Harness {
 
   Steps {
     name: "Mouse"
-    when: service.pluginsReady
+    when: service.ready
 
     readonly property var body: app.testBody
 

@@ -167,7 +167,7 @@ Harness {
 
   Steps {
     name: "Fetch"
-    when: service.pluginsReady && pillWindow.visible
+    when: service.ready && pillWindow.visible
 
     function runCommand(command) {
       fileProc.command = command

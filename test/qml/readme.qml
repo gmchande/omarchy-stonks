@@ -111,7 +111,7 @@ Harness {
 
   Steps {
     name: "Readme"
-    when: service.pluginsReady
+    when: service.ready
 
     function quiet() {
       tryVerify(function() {

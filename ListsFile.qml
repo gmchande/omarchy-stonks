@@ -20,7 +20,7 @@ Item {
   signal started()
 
   readonly property string dataPath: pluginId ? Quickshell.env("HOME") + "/" + Settings.listsFile(pluginId) : ""
-  property bool pluginsReady: false
+  property bool ready: false
   property bool settingsUnreadable: false
   // A change made while the file can't be read: only memory holds it.
   property bool editsUnsaved: false
@@ -41,7 +41,7 @@ Item {
   function store(next, settles) {
     var changed = !Settings.settingsEqual(next, root.dataSettings)
     root.dataSettings = next
-    if (!root.pluginsReady) return
+    if (!root.ready) return
     if (root.settingsUnreadable) {
       if (changed) root.editsUnsaved = true
       return
@@ -62,7 +62,7 @@ Item {
     onTriggered: root.writeSettled()
   }
   function writeSettled() {
-    if (root.pluginsReady && !root.settingsUnreadable) root.writeDataFile(root.dataSettings)
+    if (root.ready && !root.settingsUnreadable) root.writeDataFile(root.dataSettings)
   }
   // The footer's try again.
   function saveAgain() {
@@ -160,8 +160,8 @@ Item {
 
   function adopt(settings) {
     root.dataSettings = Settings.fileSettings(settings)
-    if (!root.pluginsReady) {
-      root.pluginsReady = true
+    if (!root.ready) {
+      root.ready = true
       root.started()
     }
   }
@@ -174,7 +174,7 @@ Item {
     }
     root.settingsUnreadable = false
     if (settleWrite.running) parsed = Settings.fileSettings(Object.assign({}, parsed, { featured: root.dataSettings.featured }))
-    if (root.pluginsReady && Settings.settingsEqual(parsed, root.dataSettings)) return
+    if (root.ready && Settings.settingsEqual(parsed, root.dataSettings)) return
     root.adopt(parsed)
   }
 
@@ -182,12 +182,12 @@ Item {
     if (!root.settingsUnreadable)
       console.warn("stonks: " + root.dataPath + " can't be read; saving nothing until it can")
     root.settingsUnreadable = true
-    if (!root.pluginsReady) root.adopt(root.dataSettings)
+    if (!root.ready) root.adopt(root.dataSettings)
   }
 
   function takeMissingFile() {
     root.settingsUnreadable = false
-    if (!root.pluginsReady) {
+    if (!root.ready) {
       var fromBar = Settings.settingsFromBar(root.parseShell(), root.pluginId)
       if (fromBar) {
         root.adopt(fromBar)

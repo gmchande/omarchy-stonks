@@ -365,7 +365,7 @@ Harness {
     // off for quiet-.
     property bool soundsOn: !root.quiet
     property var shown: ["AAPL", "SHOP.TO"]
-    property var library: symbols
+    property var allSymbols: symbols
     property string listName: ""
     property var lists: [{ name: "", label: "All", count: symbols.length, symbols: symbols }]
     property var quotes: ({})
@@ -397,7 +397,7 @@ Harness {
     // Each listing's newest price since its close, as the service reads it.
     readonly property var newestTrades: Chart.newestTrades(symbols, quotes, nights, allDay, calendars)
     readonly property var view: ({ featured: featuredSymbol, range: range, list: listName, listKey: "=" + listName,
-      order: order, reversed: reversed, rows: symbols, shown: shown, library: library,
+      order: order, reversed: reversed, rows: symbols, shown: shown, allSymbols: allSymbols,
       chart: Chart.viewChart(featuredSymbol, range, quotes, entries, histories, nights, allDay, root.overnight ? calendars : null) })
     // The search's choice on the hero, unadded (popup-search-preview-*).
     property string previewSymbol: ""
@@ -811,7 +811,7 @@ Harness {
       // popup-breadth-even-<look>: a list three up and three down, whose two
       // ends of the rule must be the same length and never meet.
       if (root.stateName.indexOf("popup-breadth-even-") === 0) {
-        stub.library = stub.symbols.slice()
+        stub.allSymbols = stub.symbols.slice()
         stub.listName = "Even"
         stub.symbols = ["MZ", "BRK-A", "LONG", "MSFT", "TSLA", "AMZN"]
         stub.shown = stub.symbols.slice()
@@ -821,7 +821,7 @@ Harness {
       if (root.room) {
         var lists = { one: ["AAPL"], four: ["AAPL", "NVDA", "MSFT", "SPY"], five: ["NVDA", "AAPL", "MSFT", "SPY", "TSLA"], growth: [] }
         if (root.room.list === "growth") {
-          stub.library = stub.symbols.slice()
+          stub.allSymbols = stub.symbols.slice()
           stub.listName = "Growth"
         }
         stub.symbols = lists[root.room.list]
@@ -1077,8 +1077,8 @@ Harness {
     } else if (/^(popup|window|min-window)-lists-/.test(root.stateName)) {
       // popup-lists-<menu|naming|named|empty|long|manage|rename|confirm|symbol>-<look>,
       // window-lists-<manage|symbol>-<look>, and min-window-lists-<menu|manage|symbol>-<look>,
-      // the window at its smallest: named watchlists over the 22-symbol
-      // library, the featured symbol staying put on a switch. -menu12- and
+      // the window at its smallest: named watchlists over All's 22 symbols,
+      // the featured symbol staying put on a switch. -menu12- and
       // -menu30-: the menu over 12 or 30 lists.
       var all = stub.symbols.slice()
       var named = /-(named|rowmenu)-/.test(root.stateName) ? { name: "My Watchlist", symbols: all.slice(0, 8) }
@@ -1089,8 +1089,8 @@ Harness {
       stub.lists = [choice("", all), choice("My Watchlist", all.slice(0, 8)), choice("Watching", all.slice(3, 8)),
         choice("Growth", []), choice("Wins", all.slice(10, 14)), choice("Losses", all.slice(14, 17))]
       if (named) {
-        // All stays the library, so the panel keeps All's height on a list.
-        stub.library = all
+        // All stays every symbol, so the panel keeps All's height on a list.
+        stub.allSymbols = all
         stub.listName = named.name
         stub.order = "manual"
         stub.symbols = named.symbols
