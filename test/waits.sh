@@ -13,12 +13,8 @@ declare -A baseline=(
   [camera.qml]=2
   [fetching.qml]=3
   [keys.qml]=1
-  [layout.qml]=158
-  [long-list.qml]=4
-  [popup-motion.qml]=2
   [render.qml]=2
   [saving.qml]=1
-  [window-motion.qml]=4
 )
 
 # Strings and comments, either kind, are skipped (\x22 and \x27 are the two

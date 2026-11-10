@@ -75,7 +75,9 @@ Harness {
       service.feature("NVDA")
       service.setRange("1Y")
       var wrote = landed()
-      var mode = sh('/usr/bin/stat -c %a "$1"')
+      // The file is made its owner's a moment after each write.
+      var mode = ""
+      within(3000, function() { mode = sh('/usr/bin/stat -c %a "$1"'); return mode === "600" })
       var next = restart.createObject(started)
       var began = within(5000, function() { return next.pluginsReady })
       var read = [next.listName, next.symbols.join(","), next.order, next.featuredSymbol, next.range].join(" ")

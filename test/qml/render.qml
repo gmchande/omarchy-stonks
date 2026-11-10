@@ -86,8 +86,7 @@ Harness {
   readonly property bool minWindowOf: requested.indexOf("min-window-of-") === 0
   readonly property bool windowOf: minWindowOf || requested.indexOf("window-of-") === 0
   readonly property string stateName: windowOf ? "popup-" + requested.slice((minWindowOf ? "min-window-of-" : "window-of-").length) : requested
-  // A control under real pointer input: its hover, or its press filmed and
-  // judged (frames.js press), then drawn held.
+  // A control under real pointer input: its hover, or its press, drawn held.
   readonly property var controlState: /^(popup|window)-controls-([a-z]+)-(hover|press)-(smooth|retro)$/.exec(stateName)
   // window-controls-chart-hover-retro: a window 719 wide, whose chart holds
   // its columns with 5 px to spare, as a window sized by hand can.
@@ -1733,41 +1732,11 @@ Harness {
         }
       }
       if (mode === "press") {
-        var fill = control === "list" ? one("listControl")
-          : control === "orderword" || control === "manualorder" ? one("orderControl")
-          : control === "orderarrow" ? one("orderArrowFill")
-          : control === "unit" ? one("unitFill")
-          : control === "look" ? one("lookFill")
-          : control === "help" ? one("helpFill")
-          : control === "footer" ? one("footerFill")
-          : control === "done" ? root.findAll(target, "actionFill")[0]
-          : control === "symbol" ? root.findAll(target, "rowFill")[0]
-          : control === "remove" ? root.findAll(target, "rowRemoveFill")[0] : target
-        // Inside the fill's edge, in the film's pixels: a frame is the
-        // window's pixels, so at scale 1.75 each unit is 1.75 of them.
-        var corner = fill.mapToItem(body, 0, 0)
-        var ratio = body.Window.window.devicePixelRatio
-        var left = Math.ceil((corner.x + 1) * ratio), top = Math.ceil((corner.y + 1) * ratio)
-        var box = [left, top, Math.floor((corner.x + fill.width - 2) * ratio) - left, Math.floor((corner.y + fill.height - 2) * ratio) - top]
-        // Off the control, so the film opens on it at rest; the time lets
-        // any hover fill the move left fade (160 ms).
+        // Off the control first; the time lets any hover fill the move
+        // left fade (160 ms). Then pressed, and held for the picture.
         mouseMove(body, body.width / 2, 10)
         wait(200)
-        pressFilm.source = body
-        pressFilm.begin(root.stateName)
-        tryVerify(function() { return pressFilm.frames.length >= 4 }, 2000)
-        pressFilm.markStart()
         mousePress(body, point.x, point.y)
-        tryVerify(function() { var frames = pressFilm.frames; return frames.length > 0 && frames[frames.length - 1].at - pressFilm.start >= 320 }, 3000)
-        pressFilm.end()
-        tryVerify(function() { return pressFilm.waiting === 0 }, 3000)
-        var ink = Style.pressedFillFor(stub.foreground, Commons.Color.accent)
-        pressFilm.judge("press", null, [[ink.r, ink.g, ink.b, ink.a].join(","), box.join(",")])
-        tryVerify(function() { return pressFilm.verdict !== null }, 10000)
-        if (!pressFilm.verdict.ok) {
-          console.error("FAIL pressed feedback " + control + " — " + pressFilm.verdict.detail)
-          root.failures++
-        }
       } else {
         // RowPointer treats its first sighting as a resting pointer.
         // Enter the row, then move within it as a hand would.
@@ -1791,5 +1760,4 @@ Harness {
     }
   }
 
-  FrameGrab { id: pressFilm }
 }

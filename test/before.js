@@ -100,8 +100,8 @@ for (const path of codeChanged) {
 const namesAdded = line => [...words(line)].some(w => addedNames.has(w)) || addedFiles.some(path => line.includes(path.split("/").pop()))
 
 // The harnesses a runner starts, by name, each with every command a runner
-// starts it with, since a harness such as layout.sh runs some of its steps
-// under one command and the rest under another. A command on Omarchy
+// starts it with, since a harness such as camera.sh runs under one command
+// at each scale. A command on Omarchy
 // 4.0.6's shell is left out: here its $old_shell is unset, so it would run
 // its harness on the installed shell a second time.
 const starts = new Map()

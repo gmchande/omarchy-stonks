@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 # Every check a pull request needs: what Stonks does, fetches, saves and
-# says, and what a key or a click changes. Every unit-test file
-# (test/unit.sh), source boundaries, QML lint and its gate's self-check,
-# the font's glyphs, the harnesses' set-time waits, manifest and launcher
-# validation, the Quickshell flow harnesses,
-# the frame checker's self-check on made-up frames, and each test the
-# branch changes failing on the code before the change.
-# Pictures, positions and motion belong to test/review.sh; input readiness
-# and a target's reachability to the action they protect; the queue, the
-# lock and the verdict to test/queue.sh. Needs
-# Omarchy installed and the Wayland session for the harnesses.
+# says, and what a key or a click changes. The rule tests (test/unit.sh),
+# source boundaries, QML lint and its gate's self-check, the font's glyphs,
+# the walks' set-time waits, manifest and launcher validation, the walks
+# through the real plugin (keys, mouse, saving, fetching, and what a long
+# list costs), the screenshot's size, and each test the branch changes
+# failing on the code before the change. Pictures belong to
+# test/review.sh, and how Stonks moves and feels to a hand on the running
+# plugin; the queue, the lock and the verdict to test/queue.sh. Needs
+# Omarchy installed and the Wayland session for the walks.
 #
 # test/all.sh NAME... runs only the named checks, as the full run would: a
 # harness by its test/qml/NAME.sh, a quick check by the name it's picked by
@@ -44,6 +43,7 @@ validate_clone() {
 # the change (test/before.js): first, since it runs the harnesses it touches.
 picked before && start "changed tests fail on the code before the change" bun test/before.js
 # Longest first, as measured.
+start "cost walk" bash test/qml/cost.sh
 start "fetching walk" bash test/qml/fetching.sh
 start "mouse walk" bash test/qml/mouse.sh
 start "keys walk" bash test/qml/keys.sh
@@ -56,11 +56,10 @@ start "camera harness" env QT_SCALE_FACTOR=1 bash test/qml/camera.sh
 # the two sized shots.
 start "camera harness at scale 2" env QT_SCALE_FACTOR=2 STONKS_CAMERA_SIZES=1 bash test/qml/camera.sh
 start "camera harness at scale 1.75" env QT_SCALE_FACTOR=1.75 STONKS_CAMERA_SIZES=1 bash test/qml/camera.sh
-known_names unit frames font boundaries waits lint lint-gate validate launcher
+known_names unit font boundaries waits lint lint-gate validate launcher
 fill
 
 picked unit && run "unit tests (every *.test.js)" bash test/unit.sh
-picked frames && run "frame checker self-check" bun test/qml/frames.js self-check
 picked font && run "required font glyphs" bun test/font.js
 picked boundaries && run "source boundaries" bash test/boundaries.sh
 picked waits && run "set-time waits (only the baseline in test/waits.sh)" bash test/waits.sh

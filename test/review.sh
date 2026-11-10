@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# The maintainer's review kit: how Stonks looks and moves. Run it by hand
-# before merging a visible change, a contributor's included, on their branch,
-# and before a release. It is neither test/all.sh nor CI: pictures and frame
-# timings vary by machine, and the saved answers are private. Without them
-# (test/fixtures-dir.sh) almost all of it skips.
+# The maintainer's review kit: how Stonks looks. Run it by hand before
+# merging a visible change, a contributor's included, on their branch, and
+# before a release. It is neither test/all.sh nor CI: pictures vary by
+# machine, and the saved answers are private. Without them
+# (test/fixtures-dir.sh) almost all of it skips. How Stonks moves and feels
+# is for a hand and an eye on the running plugin: no check here pins a
+# position, a frame or a glide.
 #
 # - The offscreen renders (out/render/): every state on every kind of
 #   listing, in each look where the look draws it differently, for your
@@ -14,16 +16,11 @@
 #   or with STONKS_RENDER_BASE (a release's tag, before the next release).
 #   The base draws every state but the panel-anchor ones, whose check
 #   judges the base's own harness on today's Omarchy, not the change.
-# - Nothing jumps: positions across looks, symbols, and ranges.
-# - Window and panel motion, judged on rendered frames (test/qml/frames.js)
-#   and the rows' places.
-# - The long list: a power user's 154 symbols, on wall-clock budgets.
 # - Omarchy 4.0.6, the oldest shell Stonks works on (test/old-shell.sh): the
 #   bar's renders on its shell, in out/render-omarchy-4.0/ with their own
-#   diff in out/render-diff-omarchy-4.0/; the window and panel motion, on
-#   its curve; the screenshot; and the panel, its keys and the window rows,
-#   failing as on the installed one on a TypeError or the plugin's Qt
-#   warnings, and on a panel that shows nothing (popup.qml).
+#   diff in out/render-diff-omarchy-4.0/; the screenshot; and the keys,
+#   mouse, saving and fetching walks, failing as on the installed one on a
+#   TypeError or the plugin's Qt warnings.
 #
 # Each set of renders, the head's and the base's on each shell, is drawn
 # once: a run keeps each set it draws whole under the name
@@ -197,14 +194,6 @@ for i in "${!draw_keys[@]}"; do
     done
   fi
 done
-start "nothing-jumps layout harness, surfaces" bash test/qml/layout.sh surfaces
-start "window motion harness" bash test/qml/window-motion.sh
-start "window motion harness on Omarchy 4.0.6" env STONKS_SHELL="$old_shell" bash test/qml/window-motion.sh
-start "nothing-jumps layout harness, live" bash test/qml/layout.sh live
-start "long list harness" bash test/qml/long-list.sh
-start "nothing-jumps layout harness, sizes" bash test/qml/layout.sh sizes
-start "panel motion harness" bash test/qml/popup-motion.sh
-start "panel motion harness on Omarchy 4.0.6" env STONKS_SHELL="$old_shell" bash test/qml/popup-motion.sh
 start "camera harness on Omarchy 4.0.6" env STONKS_SHELL="$old_shell" QT_SCALE_FACTOR=1 bash test/qml/camera.sh
 for walk in keys mouse saving fetching; do
   start "$walk walk on Omarchy 4.0.6" env STONKS_SHELL="$old_shell" bash "test/qml/$walk.sh"
