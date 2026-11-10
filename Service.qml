@@ -987,10 +987,6 @@ Item {
   // started inside a read's handlers (fileview.cpp, operationFinished).
   function writeDataFile(settings) {
     var body = JSON.stringify(settings, null, 2) + "\n"
-    if (typeof dataFile.setText !== "function") {
-      console.warn("stonks: cannot write " + root.dataPath)
-      return
-    }
     var before = dataFile.text()
     if (body === before && root.staleTexts === null) return
     if (root.staleTexts === null) root.staleTexts = {}

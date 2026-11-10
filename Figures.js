@@ -137,7 +137,7 @@ function extendedStack(quote, latest, now, day, changeMode) {
   var digits = quote.priceDigits
   if (!ext || !Format.isFiniteNumber(close) || (!overnight && Format.money(ext.p, digits) === Format.money(close, digits))) return null
   var unit = changeMode === "abs" ? "abs" : "pct"
-  var chg = Quote.change({ prevClose: close, points: [] }, ext.p, unit)
+  var chg = Quote.change({ prevClose: close }, ext.p, unit)
   return {
     price: Format.money(ext.p, digits),
     changeText: Format.changeText(chg, unit, digits),
@@ -372,7 +372,7 @@ function captionLine(quote, newest, changeMode, period, extended) {
   var none = { label: period || (atClose ? "AT CLOSE" : ""), changeText: "", tone: "flat" }
   if (period || !newest || !newest.closed) return none
   var unit = changeMode === "abs" ? "abs" : "pct"
-  var since = Quote.change({ prevClose: Quote.regularClose(quote), points: [] }, newest.p, unit)
+  var since = Quote.change({ prevClose: Quote.regularClose(quote) }, newest.p, unit)
   var tone = Format.changeTone(since, unit, quote.priceDigits)
   if (tone === "flat") return none
   return { label: newest.phase === "overnight" ? "OVERNIGHT" : "AFTER HOURS", changeText: Format.changeText(since, unit, quote.priceDigits), tone: tone }

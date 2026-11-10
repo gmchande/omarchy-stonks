@@ -253,7 +253,7 @@ Item {
   readonly property var history: motion.history
   // A range whose first fetch failed: the day stands in, figures and all.
   readonly property bool historyFailed: !!chart && chart.failed
-  readonly property bool historyShown: historyActive && !!history
+  readonly property bool historyShown: motion.historyShown
   readonly property var historyStats: historyShown ? History.periodStats(history) : null
   readonly property var historyBar: historyShown && scrubT
     ? History.historyBarAt(history, History.historyFraction(history, scrubT)) : null
@@ -1068,7 +1068,6 @@ Item {
     cameraLit: root.cameraLit
     animal: root.animal
     seen: root.seen && root.screenOn
-    ground: root.ground
     scrubbing: root.scrubT !== 0
     live: root.heroLive
     trouble: !!root.troubleForms
@@ -1233,7 +1232,6 @@ Item {
     retro: root.retro
     foreground: root.foreground
     dim: root.dim
-    dimmer: root.dimmer
     fontFamily: root.fontFamily
     gutter: root.gutter
     // Short, so a list's name fits the panel's field.
@@ -1397,7 +1395,6 @@ Item {
     foreground: root.foreground
     dim: root.dim
     fontFamily: root.fontFamily
-    retro: root.retro
     onCloseRequested: root.showingHelp = false
   }
 

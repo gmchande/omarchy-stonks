@@ -22,7 +22,6 @@ Panel {
   readonly property var sounds: plugin ? plugin.sounds : null
   readonly property var camera: plugin ? plugin.camera : null
   readonly property var trendColors: plugin ? plugin.trendColors : null
-  readonly property string range: service ? service.range : "1D"
   readonly property int panelWidth: Style.space(480)
   // Up to six whole rows, at any font or text size.
   readonly property int maxRows: 6

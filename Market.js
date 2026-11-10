@@ -62,7 +62,7 @@ function secondsToBell(quote, now) {
 
 function calendarMap(calendars) {
   if (!calendars) return null
-  return calendars.calendars ? calendars.calendars : calendars
+  return calendars.calendars
 }
 
 // Yahoo files some indexes under a name that holds indexes on other hours
@@ -272,10 +272,6 @@ function printClock(quote, t, calendars) {
 // The calendars keep their source's names, since they are renewed from it.
 function holidayName(name) {
   return name.replace(/ (observed|\(substitute\))$/, "")
-}
-
-function marketStatus(quote, now, scrubT, calendars, overnight) {
-  return statusForms(quote, now, scrubT, calendars, overnight)[0]
 }
 
 // The status, then shorter forms for a narrower header; each keeps the

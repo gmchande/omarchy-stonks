@@ -18,12 +18,15 @@ const fixtures = found.stdout.toString().trim()
 // The reader is in New York: an exchange's time is named
 // with its zone only where that clock differs from the reader's.
 process.env.TZ = "America/New_York"
-// Every rule file's names, under one name: each is defined once.
-const M = Object.assign({}, ...["Format", "Fetch", "Quote", "Market", "Overnight", "History", "Fundamentals", "Figures",
-  "Chart", "Tones", "Settings", "KeySheet", "Search", "Cells", "Asks"].map(name => load(name + ".js")))
+// The rule files' names these tests read, under one name. clockAt is
+// defined twice: M holds the later file's, Chart's.
+const M = Object.assign({}, ...["Format", "Quote", "Market", "Overnight", "History", "Fundamentals", "Figures",
+  "Chart", "Settings", "Search", "Asks"].map(name => load(name + ".js")))
 
 const fixture = name => JSON.parse(readFileSync(join(fixtures, name), "utf8"))
 const calendars = JSON.parse(readFileSync(join(import.meta.dir, "..", "calendars.json"), "utf8"))
+// The header's status at full width, the first of its forms.
+const marketStatus = (...args) => M.statusForms(...args)[0]
 const US = calendars.calendars.US
 const JPX = calendars.calendars.JPX
 // The exchanges that trade in whole cents from $1, as the feeds read with.
@@ -265,7 +268,7 @@ test("a bucket stamped at the bell is post-market, unless it holds the closing t
   expect([rest.priceText, rest.changeText, M.animalKind(rest)]).toEqual(["9.82", "\u22126.48%", "bear"])
   const scrub = M.rowModel(cvr, cvr.points[1].t, "pct")
   expect([scrub.priceText, M.animalKind(scrub)]).toEqual(["9.82", "bear"])
-  expect(M.marketStatus(cvr, at("2026-10-26", "18:00"), cvr.points[1].t, calendars)).toBe("At 16:00 · Closing bell")
+  expect(marketStatus(cvr, at("2026-10-26", "18:00"), cvr.points[1].t, calendars)).toBe("At 16:00 · Closing bell")
   // The trade at 13:10 reads its own price, not the close.
   expect(M.rowModel(cvr, cvr.points[0].t, "pct").priceText).toBe("10.55")
   // Thursday 29 October at 20:20: PSIX made no after-hours trade. Yahoo's
@@ -290,7 +293,7 @@ test("after the close, the session's last print reads the close at the bell, and
   const bell = london.session.regular.end
   expect(london.marketTime).toBeGreaterThan(bell)
   expect(M.readingAt(london, bell - 300)).toEqual({ price: 3648, t: bell, close: true })
-  expect(M.marketStatus(london, at("2026-10-07", "14:55"), bell - 300, calendars)).toBe("At 16:30 BST · Closing bell")
+  expect(marketStatus(london, at("2026-10-07", "14:55"), bell - 300, calendars)).toBe("At 16:30 BST · Closing bell")
   expect(M.readingAt(london, bell)).toEqual({ price: 3657, t: bell, close: false })
 })
 
@@ -514,7 +517,7 @@ test("crypto is always open, never sees a weekend, reads its last 24 hours every
   const t = btc.session.regular.start + 3600
   expect(M.sessionPhase(btc, t)).toBe("always")
   expect(M.sessionPhase(btc, t + 5 * DAY)).toBe("always")
-  expect(M.marketStatus(btc, t, 0, calendars)).toBe("Open around the clock")
+  expect(marketStatus(btc, t, 0, calendars)).toBe("Open around the clock")
   const ok = { status: "ok", receivedAt: t - 5 }
   expect(M.freshness(ok, { ...btc, marketTime: t - 10 }, t, 0)).toMatchObject({ state: "fresh", live: true })
   expect(M.freshness(ok, { ...btc, marketTime: t - 500 }, t, 0)).toMatchObject({ state: "aged", live: false })
@@ -573,7 +576,7 @@ test("after the close the header names the day and the next open from the calend
     // Past validThrough the schedule is unknown, and the header says so.
     [saturday, short, "Weekend · market hours unknown"]
   ]
-  for (const [now, cals, expected] of rows) expect([now, M.marketStatus(sep4, now, 0, cals)]).toEqual([now, expected])
+  for (const [now, cals, expected] of rows) expect([now, marketStatus(sep4, now, 0, cals)]).toEqual([now, expected])
 })
 
 // The readers every exchange's clock is pinned for, and an answer as Yahoo
@@ -597,9 +600,9 @@ test("the popular indexes Yahoo files under their own codes keep their exchange'
   // after each close each says when it opens.
   const n225 = M.parseChart(fixture("first-day-2026-10-14/n225-day.json"))
   const lunch = n225.session.regular.start + 2.75 * 3600
-  expect(M.marketStatus(n225, lunch, 0, calendars)).toBe("Lunch break · reopens 12:30 JST · in 45m")
+  expect(marketStatus(n225, lunch, 0, calendars)).toBe("Lunch break · reopens 12:30 JST · in 45m")
   expect(quoteCadence(n225, lunch, 60, false)).toBe(15 * 60)
-  const closed = q => M.marketStatus(q, q.session.regular.end + 4 * 3600, 0, calendars)
+  const closed = q => marketStatus(q, q.session.regular.end + 4 * 3600, 0, calendars)
   expect(closed(n225)).toBe("Closed · opens Thu 09:00 JST")
   const ftse = M.parseChart(fixture("ftse-day.json"))
   expect(closed(ftse)).toBe("Closed · opens Wed 08:00 BST")
@@ -618,12 +621,12 @@ test("an exchange's time names its zone only where the reader's clock differs", 
   const aapl = M.parseChart(fixture("aapl.json"))
   // Saturday 31 October: New York's clocks go back that night.
   const saturday = M.epochAt(US, "2026-10-31", "12:00")
-  const tokyoNext = () => M.marketStatus(tokyo, evening, 0, calendars)
+  const tokyoNext = () => marketStatus(tokyo, evening, 0, calendars)
   expect(readAs("America/New_York", tokyoNext)).toMatch(/^Closed · opens \w{3} 09:00 JST$/)
   expect(readAs("Asia/Tokyo", tokyoNext)).toMatch(/^Closed · opens \w{3} 09:00$/)
   // Nasdaq's Monday open, after the clocks change: nothing to name in New
   // York or Toronto; London, already on GMT, is told it is EST.
-  const usNext = () => M.marketStatus(aapl, saturday, 0, calendars)
+  const usNext = () => marketStatus(aapl, saturday, 0, calendars)
   expect(readAs("America/New_York", usNext)).toBe("Weekend · opens Mon 09:30")
   expect(readAs("America/Toronto", usNext)).toBe("Weekend · opens Mon 09:30")
   expect(readAs("Europe/London", usNext)).toBe("Weekend · opens Mon 09:30 EST")
@@ -675,7 +678,7 @@ test("an exchange's time across a change of clocks reads by its own day's clock,
       // The day's lunch lull is New York's noon, whichever clock the
       // answer was sent by.
       const noon = nasdaq.session.regular.start + 2.5 * 3600
-      expect(M.marketStatus(nasdaq, nasdaq.session.post.end, noon, calendars)).toBe("At 12:00" + edt + " · Lunch lull")
+      expect(marketStatus(nasdaq, nasdaq.session.post.end, noon, calendars)).toBe("At 12:00" + edt + " · Lunch lull")
     }
   })
 })
@@ -697,13 +700,13 @@ test("a weeknight after post-market leads with closed and the next open", () => 
   const nextPre = M.epochAt(US, "2026-09-18", "04:00")
   for (const clock of ["20:01", "23:59"]) {
     const now = M.epochAt(US, "2026-09-17", clock)
-    expect(M.marketStatus(q, now, 0, calendars)).toBe("Closed · opens Fri 09:30")
+    expect(marketStatus(q, now, 0, calendars)).toBe("Closed · opens Fri 09:30")
   }
   for (const clock of ["00:01", "03:59"]) {
     const now = M.epochAt(US, "2026-09-18", clock)
-    expect(M.marketStatus(q, now, 0, calendars)).toBe("Closed · opens Fri 09:30")
+    expect(marketStatus(q, now, 0, calendars)).toBe("Closed · opens Fri 09:30")
   }
-  expect(M.marketStatus(q, nextPre, 0, calendars)).toBe("Closed · opens Fri 09:30")
+  expect(marketStatus(q, nextPre, 0, calendars)).toBe("Closed · opens Fri 09:30")
   const geometry = M.chartGeometry(q)
   expect(geometry.end).toBe(q.points[q.points.length - 1].t)
 })
@@ -800,19 +803,19 @@ test("rowModel shows the regular close at rest and the print under the finger", 
   expect(M.historyRowModel(emptyHistory, nothing, 0).dayUp).toBeNull()
 })
 
-test("marketStatus says whether the market is open, and where the finger is while scrubbing", () => {
+test("the header's status says whether the market is open, and where the finger is while scrubbing", () => {
   const q = duringSession(quote)
-  expect(M.marketStatus(q, reg.start + 2 * 3600, 0, calendars)).toBe("Market closes in 4h 30m")
-  expect(M.marketStatus(q, reg.start - 600, 0, calendars)).toBe("Pre-market · opens in 10m")
-  expect(M.marketStatus(q, q.session.pre.start - 600, 0, calendars)).toBe("Market opens in 5h 40m")
-  expect(M.marketStatus(quote, quote.session.post.start + 60, 0, calendars)).toBe("After hours · closed at 16:00")
-  expect(M.marketStatus(q, reg.start + 2 * 3600, reg.start + 3600)).toBe("At 10:30 · Market open")
-  expect(M.marketStatus(q, reg.start + 2 * 3600, reg.start + 2.75 * 3600)).toBe("At 12:15 · Lunch lull")
+  expect(marketStatus(q, reg.start + 2 * 3600, 0, calendars)).toBe("Market closes in 4h 30m")
+  expect(marketStatus(q, reg.start - 600, 0, calendars)).toBe("Pre-market · opens in 10m")
+  expect(marketStatus(q, q.session.pre.start - 600, 0, calendars)).toBe("Market opens in 5h 40m")
+  expect(marketStatus(quote, quote.session.post.start + 60, 0, calendars)).toBe("After hours · closed at 16:00")
+  expect(marketStatus(q, reg.start + 2 * 3600, reg.start + 3600)).toBe("At 10:30 · Market open")
+  expect(marketStatus(q, reg.start + 2 * 3600, reg.start + 2.75 * 3600)).toBe("At 12:15 · Lunch lull")
   // At rest the day's named moments lead too, as they do while scrubbing.
-  expect(M.marketStatus(q, reg.start + 600, 0, calendars)).toBe("Opening bell · closes in 6h 20m")
-  expect(M.marketStatus(q, reg.start + 2.75 * 3600, 0, calendars)).toBe("Lunch lull · closes in 3h 45m")
-  expect(M.marketStatus(q, reg.end - 40 * 60, 0, calendars)).toBe("Power hour · closes in 40m")
-  expect(M.marketStatus(q, reg.end - 3 * 60, 0, calendars)).toBe("Closing bell · closes in 3m")
+  expect(marketStatus(q, reg.start + 600, 0, calendars)).toBe("Opening bell · closes in 6h 20m")
+  expect(marketStatus(q, reg.start + 2.75 * 3600, 0, calendars)).toBe("Lunch lull · closes in 3h 45m")
+  expect(marketStatus(q, reg.end - 40 * 60, 0, calendars)).toBe("Power hour · closes in 40m")
+  expect(marketStatus(q, reg.end - 3 * 60, 0, calendars)).toBe("Closing bell · closes in 3m")
   // With less room, each says its time alone: the session is named on the
   // line under the price, and a scrub's moment goes before its time.
   expect(M.statusForms(quote, quote.session.post.start + 60, 0, calendars)).toEqual(["After hours · closed at 16:00", "Closed at 16:00"])
@@ -883,10 +886,10 @@ test("a day answer whose trading periods are one list of days has them as its re
   const london = calendars.calendars.LSE
   expect(shel.session).toEqual({ pre: null, regular: { start: M.epochAt(london, "2026-10-23", "08:00"), end: M.epochAt(london, "2026-10-23", "16:30") }, post: null })
   const opening = M.epochAt(london, "2026-10-23", "08:10")
-  expect(M.marketStatus(shel, opening, 0, calendars)).toBe("Opening bell · closes in 8h 20m")
+  expect(marketStatus(shel, opening, 0, calendars)).toBe("Opening bell · closes in 8h 20m")
   const toyota = M.parseChart(fixture("7203-t-2026-10-23-day.json"))
   expect(toyota.session.regular).toEqual({ start: M.epochAt(JPX, "2026-10-23", "09:00"), end: M.epochAt(JPX, "2026-10-23", "15:30") })
-  expect(M.marketStatus(toyota, M.epochAt(JPX, "2026-10-23", "11:00"), 0, calendars)).toBe("Lunch break in 30m")
+  expect(marketStatus(toyota, M.epochAt(JPX, "2026-10-23", "11:00"), 0, calendars)).toBe("Lunch break in 30m")
   const gspc = M.parseChart(fixture("gspc-2026-10-23-night.json"))
   expect(gspc.session.regular).toEqual({ start: M.epochAt(US, "2026-10-22", "09:30"), end: M.epochAt(US, "2026-10-22", "16:00") })
   expect(dayLineAt(gspc, at("2026-10-23", "03:03")).title).toBe("THU")
@@ -1166,20 +1169,20 @@ test("each symbol is asked for on its own market's clock", () => {
 test("a quote held from an earlier session says the calendar's session while it trades", () => {
   const shel = M.parseChart(fixture("shel-l-2026-10-23-trading.json"))
   const london = calendars.calendars.LSE
-  const monday = hm => M.marketStatus(shel, M.epochAt(london, "2026-10-26", hm), 0, calendars)
+  const monday = hm => marketStatus(shel, M.epochAt(london, "2026-10-26", hm), 0, calendars)
   expect(monday("07:59")).toBe("Closed · opens Mon 08:00 GMT")
   expect(monday("08:00")).toBe("Opening bell · closes in 8h 30m")
   expect(monday("12:00")).toBe("Market closes in 4h 30m")
   expect(monday("16:40")).toBe("Closed · opens Tue 08:00 GMT")
-  expect(M.marketStatus(shel, M.epochAt(london, "2026-10-24", "10:00"), 0, calendars)).toBe("Weekend · opens Mon 08:00 GMT")
+  expect(marketStatus(shel, M.epochAt(london, "2026-10-24", "10:00"), 0, calendars)).toBe("Weekend · opens Mon 08:00 GMT")
   const toyota = M.parseChart(fixture("7203-t-2026-10-23-day.json"))
-  const tokyo = hm => M.marketStatus(toyota, M.epochAt(JPX, "2026-10-26", hm), 0, calendars)
+  const tokyo = hm => marketStatus(toyota, M.epochAt(JPX, "2026-10-26", hm), 0, calendars)
   expect([tokyo("09:00"), tokyo("11:45"), tokyo("13:00")])
     .toEqual(["Opening bell · lunch break in 2h 30m", "Lunch break · reopens 12:30 JST · in 45m", "Market closes in 2h 30m"])
   // The hour is the calendar's on the day, not the held answer's: AAPL's
   // answer of Tuesday 1 September, in EDT, held to Monday 2 November, in
   // EST: no "Lunch lull" at 11:00.
-  const aapl = hm => M.marketStatus(quote, M.epochAt(US, "2026-11-02", hm), 0, calendars)
+  const aapl = hm => marketStatus(quote, M.epochAt(US, "2026-11-02", hm), 0, calendars)
   expect([aapl("11:00"), aapl("12:10")]).toEqual(["Market closes in 5h", "Lunch lull · closes in 3h 50m"])
 })
 
@@ -1194,8 +1197,8 @@ test("a published closure is closed, whatever Yahoo's periods say", () => {
   expect(M.inRegularSession(fakeOpen, labor, calendars)).toBe(false)
   // The header agrees: the published closure outranks a response that still
   // describes a session.
-  expect(M.marketStatus(fakeOpen, labor, 0, calendars)).toBe("Labor Day · opens Tue 09:30")
-  expect(M.marketStatus(fakeOpen, labor, 0, null)).toBe("Power hour · closes in 1h")
+  expect(marketStatus(fakeOpen, labor, 0, calendars)).toBe("Labor Day · opens Tue 09:30")
+  expect(marketStatus(fakeOpen, labor, 0, null)).toBe("Power hour · closes in 1h")
   // Where the header has no room for the holiday's name, it says the
   // closure as a weekend is said, and with less room still, when it opens:
   // every form keeps the time.
@@ -2326,7 +2329,7 @@ test("before the open an index counts to the bell, closed, and its open goes whe
   const gspc = read("premarket-2026-10-23-0622", "gspc", at("2026-10-23", "06:22"))
   const aapl = read("premarket-2026-10-23-0622", "aapl", at("2026-10-23", "06:22"))
   expect(M.statusForms(gspc, now, 0, calendars)).toEqual(["Closed · opens in 3h 10m", "Opens in 3h 10m"])
-  expect(M.marketStatus(aapl, now, 0, calendars)).toBe("Pre-market · opens in 3h 10m")
+  expect(marketStatus(aapl, now, 0, calendars)).toBe("Pre-market · opens in 3h 10m")
   for (const q of [gspc, aapl]) expect([q.symbol, M.rowModel(q, 0, "open").changeLine]).toEqual([q.symbol, "—"])
   // At 01:00 the stocks' answers are still Tuesday's, and so is the
   // index's open, though Yahoo's current period is Wednesday's: the index
@@ -2340,7 +2343,7 @@ test("before the open an index counts to the bell, closed, and its open goes whe
   // Its headline is still Thursday's close and move, as theirs are.
   expect(M.rowModel(gspc, 0, "pct").changeText).toBe("\u22121.21%")
   // Before the pre-market it names the open's day, as a stock does.
-  expect(M.marketStatus(gspc, at("2026-10-23", "03:59"), 0, calendars)).toBe("Closed · opens Fri 09:30")
+  expect(marketStatus(gspc, at("2026-10-23", "03:59"), 0, calendars)).toBe("Closed · opens Fri 09:30")
 })
 
 test("a night's trades join the day that closed, dashed at the close before it, read from it at rest and scrubbed, the after hours and the night bright", () => {
@@ -2419,8 +2422,8 @@ test("a weekend shows Friday from its midnight to its last trade, then Monday fr
   expect(M.chartSpan(thinFeed)).toMatchObject({ start: at("2026-10-23", "04:00"), end: shopLast })
   expect(Math.abs(shopLast - at("2026-10-23", "19:05"))).toBeLessThan(60)
   expect(M.chartGeometry(thinFeed).points.at(-1).x).toBe(1)
-  expect(M.marketStatus(thinFeed, at("2026-10-23", "20:30"), shopLast, calendars)).toBe("At 19:05 · After hours")
-  expect(M.marketStatus(thinFeed, at("2026-10-26", "00:13"), shopLast, calendars)).toBe("At Fri 19:05 · After hours")
+  expect(marketStatus(thinFeed, at("2026-10-23", "20:30"), shopLast, calendars)).toBe("At 19:05 · After hours")
+  expect(marketStatus(thinFeed, at("2026-10-26", "00:13"), shopLast, calendars)).toBe("At Fri 19:05 · After hours")
   // Yahoo answered after the day, so it is over, edge to edge, though Robinhood's answer stopped at 18:55.
   const short = { bars: fridayNight.bars.filter(b => b.t <= at("2026-10-23", "18:55")), through: at("2026-10-23", "18:55") }
   expect(M.chartSpan(M.dayChart(shopQuote, short, calendars).day).end).toBe(shopLast)
@@ -2457,8 +2460,8 @@ test("a weekend shows Friday from its midnight to its last trade, then Monday fr
   expect(M.rowModel(night.day, night.latest.t, "pct").changeText).toBe(top.changeText)
   // A scrub names the day of a print that isn't from today.
   const ten = night.day.points.find(p => p.t === at("2026-10-25", "21:10")).t
-  expect(M.marketStatus(night.day, at("2026-10-25", "23:35"), ten, calendars)).toBe("At 21:10 · Overnight")
-  expect(M.marketStatus(night.day, at("2026-10-26", "01:00"), ten, calendars)).toBe("At Sun 21:10 · Overnight")
+  expect(marketStatus(night.day, at("2026-10-25", "23:35"), ten, calendars)).toBe("At 21:10 · Overnight")
+  expect(marketStatus(night.day, at("2026-10-26", "01:00"), ten, calendars)).toBe("At Sun 21:10 · Overnight")
   // Monday 01:00: still Friday and the night, its first hours gone off the
   // left, ticked at Friday's close, the night's open and its midnight.
   // 04:20 and 09:35: Monday's chart from Sunday's 20:00, five minutes on by
@@ -2951,7 +2954,7 @@ test("an overnight print is its own line under the price, measured from the clos
   const friday = M.dayLine(nbis.quote, M.exchangeDay(nbis.quote, at("2026-10-25", "23:35")), nbis.day)
   expect([friday.title, M.money(friday.range.low), M.money(Math.min(...sundayNight.map(p => p.p)))]).toEqual(["FRI", "155.86", "152.15"])
   // While a scrub reads the night, the header names it.
-  expect(M.marketStatus(nestDay, now, at("2026-10-01", "21:30"), calendars)).toBe("At 21:30 · Overnight")
+  expect(marketStatus(nestDay, now, at("2026-10-01", "21:30"), calendars)).toBe("At 21:30 · Overnight")
 })
 
 test("no session on Friday or Saturday night, or the night before a holiday", () => {
@@ -3080,14 +3083,14 @@ test("a night's chart on each saved moment: its span, its trades, and what a scr
   // holds, Friday's own night after its midnight, never the previous close.
   const sunday = dayAt("sunday", "nest")
   const edge = M.timeAtFraction(sunday.day, 0.03)
-  expect(M.marketStatus(sunday.day, at("2026-09-27", "22:30"), edge, calendars)).toMatch(/^At Fri 0\d:\d\d · Overnight$/)
+  expect(marketStatus(sunday.day, at("2026-09-27", "22:30"), edge, calendars)).toMatch(/^At Fri 0\d:\d\d · Overnight$/)
   expect(M.rowModel(sunday.day, edge, "pct").priceText).not.toBe("243.48")
   // Monday 08:00: Monday from Sunday's 20:00, a scrub a quarter in reading
   // the night after midnight against Friday's close.
   const monday = dayAt("monday", "nest")
   expect(M.chartSpan(monday.day)).toMatchObject({ start: at("2026-09-27", "20:00"), end: at("2026-09-28", "20:00") })
   const dawn = M.timeAtFraction(monday.day, 0.27)
-  expect(M.marketStatus(monday.day, at("2026-09-28", "08:00"), dawn, calendars)).toMatch(/^At 02:\d\d · Overnight$/)
+  expect(marketStatus(monday.day, at("2026-09-28", "08:00"), dawn, calendars)).toMatch(/^At 02:\d\d · Overnight$/)
   expect(M.rowModel(monday.day, dawn, "pct").priceText).not.toBe("237.33")
   // Thursday 23:00: NEST's night joins Thursday's chart up to Robinhood's
   // newest slot; REED, with no trade tonight, moves on with the same clock,
@@ -3128,7 +3131,7 @@ test("after the close a scrub to the bell reads the close at 16:00, an index's a
   const now = at("2026-10-01", "23:00")
   const gspc = savedDay("night", "gspc")
   const end = M.timeAtFraction(gspc, 1)
-  expect(M.marketStatus(gspc, now, end, calendars)).toBe("At 16:00 · Closing bell")
+  expect(marketStatus(gspc, now, end, calendars)).toBe("At 16:00 · Closing bell")
   expect(M.rowModel(gspc, end, "pct").priceText).toBe(M.rowModel(gspc, 0, "pct").priceText)
   // SILK's Thursday, as Yahoo answered it, its after hours after the bell.
   const silk = savedDay("night", "silk")
@@ -3136,11 +3139,11 @@ test("after the close a scrub to the bell reads the close at 16:00, an index's a
   // The session's last print is its closing trade's, stamped at the bell.
   const bell = silk.points.findLastIndex(p => M.pointSession(silk, p) === "reg")
   expect(silk.points[bell].t).toBe(silk.session.regular.end)
-  expect(M.marketStatus(silk, now, silk.points[bell].t, calendars)).toBe("At 16:00 · Closing bell")
+  expect(marketStatus(silk, now, silk.points[bell].t, calendars)).toBe("At 16:00 · Closing bell")
   expect(M.rowModel(silk, silk.points[bell].t, "pct").priceText).toBe(rest)
   let off = bell + 1
   while (M.money(silk.points[off].p, silk.priceDigits) === rest) off++
-  expect(M.marketStatus(silk, now, silk.points[off].t, calendars)).toMatch(/^At \d\d:\d\d · After hours$/)
+  expect(marketStatus(silk, now, silk.points[off].t, calendars)).toMatch(/^At \d\d:\d\d · After hours$/)
   expect(M.rowModel(silk, silk.points[off].t, "pct").priceText).toBe(M.money(silk.points[off].p, silk.priceDigits))
   // An index at 01:00 has no flat tail of its close after the bell.
   const night = savedDay("listings-2026-10-07-0100", "gspc")
@@ -3177,12 +3180,12 @@ test("after midnight the answer is still Friday's: its date, its open, its print
     const points = M.chartGeometry(quote).points
     expect([points[0].x, points[points.length - 1].x]).toEqual([0, 1])
     // The next open comes from the calendar.
-    expect(M.marketStatus(quote, now, 0, calendars)).toBe("Closed · opens Mon 09:30")
+    expect(marketStatus(quote, now, 0, calendars)).toBe("Closed · opens Mon 09:30")
   }
   // A daytime answer reads as it did: Friday 2 October at 13:40.
   const day = savedDay("day", "nest")
   expect(said(dayLineAt(day, at("2026-10-02", "13:40")))).toBe("1D · 235.34–248.34 @241.72 · OPEN 235.81 · VOL 9.5M")
-  expect(M.marketStatus(day, at("2026-10-02", "13:40"), 0, calendars)).toBe("Market closes in 2h 20m")
+  expect(marketStatus(day, at("2026-10-02", "13:40"), 0, calendars)).toBe("Market closes in 2h 20m")
 })
 
 test("a quote held past its bars' session takes the phase and the bell from Yahoo's current period", () => {
@@ -3191,7 +3194,7 @@ test("a quote held past its bars' session takes the phase and the bell from Yaho
   // cadence, at the boundary itself, not at the next fetch.
   const nest = M.parseChart(fixture("moments/live-2026-10-05/nest.json"))
   const dawn = at("2026-10-05", "04:30")
-  expect(M.marketStatus(nest, dawn, 0, calendars)).toBe("Pre-market · opens in 5h")
+  expect(marketStatus(nest, dawn, 0, calendars)).toBe("Pre-market · opens in 5h")
   expect([quoteCadence(nest, dawn, 60, true), quoteCadence(nest, dawn, 60, false)]).toEqual([60, 300])
   // The chart, the open, and the info line stay the bars' Friday.
   expect(said(dayLineAt(nest, dawn))).toBe("FRI · 235.34–248.34 @242.81 · OPEN 235.81 · VOL 12.3M")
@@ -3200,7 +3203,7 @@ test("a quote held past its bars' session takes the phase and the bell from Yaho
   // still held at 08:30 London: Friday's session is open.
   const london = M.parseChart(fixture("shel-l-day.json"))
   const morning = M.epochAt(calendars.calendars.LSE, "2026-10-02", "08:30")
-  expect(M.marketStatus(london, morning, 0, calendars)).toBe("Market closes in 8h")
+  expect(marketStatus(london, morning, 0, calendars)).toBe("Market closes in 8h")
   expect([M.inRegularSession(london, morning, calendars), quoteCadence(london, morning, 60, false)]).toEqual([true, 60])
 })
 

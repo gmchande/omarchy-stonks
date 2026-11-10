@@ -65,9 +65,9 @@ Item {
   // Where the day has a newer print than the quote's own, for the line under
   // the price.
   readonly property var latest: chart ? chart.latest : null
-  readonly property var dayGeometry: day ? Chart.chartGeometry(day, calendars) : null
   // A range whose first fetch failed shows the day.
-  readonly property var geometry: historyShown ? History.historyGeometry(history) : dayGeometry
+  readonly property var geometry: historyShown ? History.historyGeometry(history)
+    : day ? Chart.chartGeometry(day, calendars) : null
   // Scrubbing and replay keep from the first print to the last: while the day
   // runs, its axis runs past them, through hours with no price to read.
   readonly property int scrubStart: day && day.points.length ? day.points[0].t : 0
@@ -186,8 +186,8 @@ Item {
   }
 
   // A scrub that drives itself, the chart drawing in behind it, so the header,
-  // the price and the animal follow it: by print on a US listing's day, by
-  // time on any other's, and by bar on a range.
+  // the price and the animal follow it: by time on the day, and by bar on a
+  // range.
   function replay() {
     if (loading) return
     stopReplay()

@@ -205,7 +205,6 @@ Item {
   }
 
   BlockDigits {
-    id: blockDigits
     objectName: "blockPrice"
     visible: root.retro
     y: root.baselineY - baselineOffset
