@@ -445,7 +445,7 @@ Harness {
         var beforeArrival = function() {
           if (wheel !== "before" || wheeled || !service.quotes.SLOW) return
           wheeled = true
-          watchlist.wheelBy(-1)
+          watchlist.wheelEvent(Qt.NoScrollPhase, 0, 40)
         }
         // The wheel turns as the joined row glides in: a turn after the
         // join, whose own glide to the row starts after it says so. The
@@ -456,8 +456,8 @@ Harness {
             if (turned) return
             turned = true
             wheeled = body.landing === "SLOW"
-            watchlist.wheelBy(1)
-            destination = watchlist.displayedSymbols[Math.round(watchlist.wheelTarget() / watchlist.rowPitch)]
+            watchlist.wheelEvent(Qt.NoScrollPhase, 0, -40)
+            destination = watchlist.displayedSymbols[Math.round(watchlist.headedY / watchlist.rowPitch)]
             var next = Object.assign({}, service.testFeed.quotes)
             next.DOWN = Object.assign({}, next.DOWN, { price: next.DOWN.price + 0.01 })
             service.testFeed.quotes = next

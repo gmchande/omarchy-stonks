@@ -1149,8 +1149,8 @@ Harness {
     }
 
     // The wheel moves the list below a held row, never the row away from
-    // its pointer. Observe every animation frame, including the glide's
-    // middle: the final drop order alone cannot catch a drifting picture.
+    // its pointer. Observe every animation frame: the final drop order alone
+    // cannot catch a drifting picture.
     function wheelKeepsLift(body, watchlist) {
       var results = []
       ;["smooth", "retro"].forEach(function(look) {
@@ -1171,27 +1171,25 @@ Harness {
         var top = row.mapToItem(body, 0, 0).y
         var scrollBefore = watchlist.contentY
         var offsets = [0]
-        var scrolls = [scrollBefore]
         var sample = function() {
           offsets.push(row.mapToItem(body, 0, 0).y - top)
-          scrolls.push(watchlist.contentY)
         }
         var frames = Qt.createQmlObject('import QtQuick; FrameAnimation { running: true }', harness)
         frames.triggered.connect(sample)
-        mouseWheel(body, at.x, at.y + by, 0, up ? 120 : -120, Qt.LeftButton)
+        // A third of a notch: a row, as the six rows have room for.
+        mouseWheel(body, at.x, at.y + by, 0, up ? 40 : -40, Qt.LeftButton)
         tryVerify(function() { return !watchlist.settling }, 3000)
         waitForRendering(watchlist)
         sample()
         frames.destroy()
         var scrollAfter = watchlist.contentY
-        var inBetween = scrolls.some(function(y) { return y > Math.min(scrollBefore, scrollAfter) && y < Math.max(scrollBefore, scrollAfter) })
         var kept = Math.abs(Math.abs(scrollAfter - scrollBefore) - watchlist.rowPitch) < 1
-          && inBetween && offsets.every(function(y) { return Math.abs(y) < 0.5 })
+          && offsets.every(function(y) { return Math.abs(y) < 0.5 })
         results.push(look + ":" + kept + " offsets=" + offsets.join(","))
         mouseRelease(body, at.x, at.y + by)
         tryVerify(function() { return watchlist.dragSymbol === "" && watchlist.rowResting(symbol) }, 3000)
       })
-      harness.check("a lifted row stays under the pointer throughout a wheel glide, down in smooth and up in retro",
+      harness.check("a lifted row stays under the pointer as the wheel moves the list, down in smooth and up in retro",
         results.every(function(r) { return /:true offsets=/.test(r) }), results.join(" | "))
     }
 

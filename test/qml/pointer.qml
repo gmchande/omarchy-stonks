@@ -351,20 +351,20 @@ Harness {
         body.watchlist.contentY = 0
         var wheelRow = body.watchlist.rowItem(body.watchlist.displayedSymbols[2])
 
-        // A high-resolution wheel sends many small ticks per notch. Each
-        // moves its fraction of a row, and the list settles on a boundary
-        // once they stop, not on every tick; a short touchpad stroke settles
-        // the same way.
+        // A high-resolution wheel sends many small ticks per notch, each
+        // moving its part of three rows, and a touchpad moves the list by its
+        // pixels. Both move it at once and leave it where they stop, between
+        // rows too: nothing glides or waits to settle afterwards.
         var pitch = body.watchlist.rowPitch
         within(2000, rowsAtRest)
         mouseWheel(wheelRow, wheelRow.width / 2, wheelRow.height / 2,
           0, -30, Qt.NoModifier)
-        within(2000, function() { return !body.watchlist.settling })
-        var tickInReach = firstWhole(body.watchlist) === 0
+        var tickStays = !body.watchlist.settling && body.watchlist.contentY === 0.75 * pitch
         body.watchlist.contentY = 0
-        body.watchlist.followBy(15)
-        within(2000, function() { return !body.watchlist.settling })
-        root.check("a high-resolution tick leaves the first row in reach", tickInReach && firstWhole(body.watchlist) === 0)
+        body.watchlist.wheelEvent(Qt.ScrollUpdate, -15, -180)
+        body.watchlist.wheelEvent(Qt.ScrollEnd, 0, 0)
+        root.check("a high-resolution tick and a touchpad stroke move the list at once and leave it where they stop",
+          tickStays && !body.watchlist.settling && body.watchlist.contentY === 15, tickStays + " " + body.watchlist.contentY)
         body.watchlist.contentY = 0
         within(2000, rowsAtRest)
         for (var tick = 0; tick < 4; tick++) {
@@ -373,17 +373,18 @@ Harness {
           wait(30) // ticks a hand's wheel apart
         }
         within(2000, function() { return !body.watchlist.settling })
-        root.check("four high-resolution ticks add up to one row",
-          firstWhole(body.watchlist) === 1)
+        root.check("four high-resolution ticks add up to a notch's three rows",
+          body.watchlist.contentY === 3 * pitch, body.watchlist.contentY)
 
-        body.watchlist.wheelBy(0.3)
+        body.watchlist.contentY = 0
+        body.watchlist.glideTo(3 * pitch)
         wait(40) // into the glide
         var lifted = body.watchlist.displayedSymbols[2]
         body.watchlist.beginDrag(lifted, 2 * pitch + 10)
-        var heldAt = firstWhole(body.watchlist)
-        wait(500) // the glide and the settle's quiet, which must not move it
-        root.check("lifting a row stops the wheel's glide and its settle",
-          body.watchlist.dragSymbol === lifted && firstWhole(body.watchlist) === heldAt)
+        var heldAt = body.watchlist.contentY
+        wait(300) // longer than the glide, which must not move it
+        root.check("lifting a row stops a glide",
+          body.watchlist.dragSymbol === lifted && body.watchlist.contentY === heldAt)
         body.watchlist.cancelDrag()
         body.watchlist.snapToRow()
 
@@ -405,7 +406,7 @@ Harness {
         var clickedThenX = function() {
           body.watchlist.contentY = 0
           within(2000, rowsAtRest)
-          var target = body.watchlist.displayedSymbols[0]
+          var target = body.watchlist.displayedSymbols[3]
           mouseMove(body.watchlist, 12, 10)
           mouseMove(body.watchlist, 12, 12)
           mouseWheel(body.watchlist, 12, 12, 0, -120, Qt.NoModifier)
@@ -420,7 +421,7 @@ Harness {
           return (acted && cursor === target && removedIt) + " " + target + " cursor " + cursor
         }
         var byClick = clickedThenX()
-        root.check("a click mid-glide puts the cursor on its row, and x then removes that row",
+        root.check("a click right after a notch puts the cursor on the row the notch brought under the pointer, and x then removes that row",
           /^true /.test(byClick), byClick)
 
         // A double-click is one click for the list, not only for a row: its
@@ -432,7 +433,7 @@ Harness {
         var featuredSeen = []
         var noteFeatured = function() { featuredSeen.push(stub.featuredSymbol) }
         stub.featuredSymbolChanged.connect(noteFeatured)
-        body.watchlist.followBy(17)
+        body.watchlist.wheelEvent(Qt.ScrollUpdate, -17, -204)
         var partRow = body.watchlist.displayedSymbols[1]
         var partY = pitch + 2 - 17
         mouseMove(body.watchlist, 12, partY - 6)
@@ -451,7 +452,7 @@ Harness {
         // Off a row boundary too: a right double-click opens the row's menu
         // once, its second press no click off it, and the removal it takes
         // hands the cursor on, the list staying where the click stopped it.
-        body.watchlist.followBy(17)
+        body.watchlist.wheelEvent(Qt.ScrollUpdate, -17, -204)
         var shownBefore = body.watchlist.displayedSymbols.slice()
         var thirdY = 2 * pitch + 20 - 17
         mouseMove(body.watchlist, 12, thirdY - 6)
@@ -500,7 +501,8 @@ Harness {
           fixture()
           return (cursor === target && removedIt) + " " + cursor + " for " + target
         }
-        var afterWheel = between(function(y) { mouseWheel(body.watchlist, 12, y, 0, -120, Qt.NoModifier) })
+        // A tick, which leaves the same row under the pointer.
+        var afterWheel = between(function(y) { mouseWheel(body.watchlist, 12, y, 0, -10, Qt.NoModifier) })
         var afterKey = between(function() { body.moveCursor(1) })
         body.watchlist.contentY = 0
         within(2000, rowsAtRest)
@@ -677,8 +679,9 @@ Harness {
         mouseMove(third, third.width / 2, third.height / 2)
         within(1000, function() { return wl.cursorRow === wl.displayedSymbols[2] })
         var onThird = [wl.cursorRow === wl.displayedSymbols[2]]
-        mouseWheel(third, third.width / 2, third.height / 2, 0, -120, Qt.NoModifier)
-        // At once, before the glide: the row that will rest under the pointer.
+        // A third of a notch, a row, as far as these rows go.
+        mouseWheel(third, third.width / 2, third.height / 2, 0, -40, Qt.NoModifier)
+        // At once: the row then under the pointer.
         var atOnce = wl.cursorRow === wl.displayedSymbols[3]
         within(2000, function() { return !wl.settling })
         var afterWheel = [atOnce, firstWhole(wl) === 1, wl.cursorRow === wl.displayedSymbols[3], wl.cursorRow !== wl.displayedSymbols[1]]
@@ -970,7 +973,8 @@ Harness {
         if (secondRemove && secondRemove.visible) {
           var onSecond = secondRemove.mapToItem(body, secondRemove.width / 2, secondRemove.height / 2)
           mouseMove(body, onSecond.x, onSecond.y)
-          mouseWheel(body, onSecond.x, onSecond.y, 0, -120, Qt.NoButton, Qt.NoModifier)
+          // A third of a notch, a row, as far as these rows go.
+          mouseWheel(body, onSecond.x, onSecond.y, 0, -40, Qt.NoButton, Qt.NoModifier)
           within(2000, function() { return !body.watchlist.settling })
           waits.push("wheel " + body.watchlist.cursorRow + " " + removesShown())
           mouseClick(body, onSecond.x, onSecond.y)
@@ -980,7 +984,7 @@ Harness {
           mouseMove(body, onSecond.x + 3, onSecond.y)
           within(1000, function() { return removesShown() !== "none" })
           waits.push("move " + removesShown())
-          mouseWheel(body, onSecond.x + 3, onSecond.y, 0, -120, Qt.NoButton, Qt.NoModifier)
+          mouseWheel(body, onSecond.x + 3, onSecond.y, 0, -40, Qt.NoButton, Qt.NoModifier)
           within(2000, function() { return !body.watchlist.settling })
           body.moveCursor(1)
           within(2000, function() { return !body.watchlist.settling })
@@ -988,32 +992,13 @@ Harness {
           mouseMove(body, onSecond.x, onSecond.y)
           within(1000, function() { return removesShown() !== "none" })
           var before = body.watchlist.cursorRow + " " + removesShown()
-          mouseWheel(body, onSecond.x, onSecond.y, 0, -30, Qt.NoButton, Qt.NoModifier)
+          mouseWheel(body, onSecond.x, onSecond.y, 0, -10, Qt.NoButton, Qt.NoModifier)
           within(2000, function() { return !body.watchlist.settling })
           waits.push("tick " + before + " " + body.watchlist.cursorRow + " " + removesShown())
-          // A click during a glide stops the list on a row on the way, which
-          // waits too. It lands once the list has moved, on a row, not the
-          // gap between two that slides under the pointer, where a click
-          // acts on nothing.
-          mouseMove(body, onSecond.x + 3, onSecond.y)
-          within(1000, function() { return removesShown() !== "none" })
-          var glideFrom = body.watchlist.contentY
-          for (var notch = 0; notch < 4; notch++) mouseWheel(body, onSecond.x + 3, onSecond.y, 0, -120, Qt.NoButton, Qt.NoModifier)
-          within(1000, function() {
-            var list = body.watchlist
-            return list.contentY !== glideFrom && list.contentY !== list.headedY && list.displayedSymbols.some(function(s) {
-              var row = list.rowItem(s)
-              return !!row && row.contains(row.mapFromItem(body, onSecond.x + 3, onSecond.y))
-            })
-          })
-          mouseClick(body, onSecond.x + 3, onSecond.y)
-          within(2000, function() { return !body.watchlist.settling })
-          waits.push("glide " + (stub.featuredSymbol === body.watchlist.cursorRow) + " " + stub.symbols.length + " " + removesShown())
         }
-        root.check("a row the wheel scrolls under a still pointer shows no remove button, a click there features it, mid-glide too, and a move or a key shows it",
+        root.check("a row the wheel scrolls under a still pointer shows no remove button, a click there features it, and a move or a key shows it",
           waits.join(" | ") === ["pointer " + even[1], "wheel " + even[2] + " none", "click " + even[2] + " 20 none",
-            "move " + even[2], "key " + even[4] + " " + even[4], "tick " + even[3] + " " + even[3] + " " + even[3] + " none",
-            "glide true 20 none"].join(" | "),
+            "move " + even[2], "key " + even[4] + " " + even[4], "tick " + even[3] + " " + even[3] + " " + even[3] + " none"].join(" | "),
           waits.join(" | "))
         body.closeListViews()
         stub.range = "1D"

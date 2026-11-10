@@ -306,7 +306,8 @@ Harness {
         var before = watchlist.displayedSymbols.join(",")
         var at = watchlist.mapToItem(body, watchlist.width / 2, 2 * watchlist.rowPitch + watchlist.rowHeight / 2)
         mouseMove(body, at.x, at.y)
-        mouseWheel(body, at.x, at.y, 0, -120, Qt.NoButton, modifiers)
+        // A third of a notch, a row.
+        mouseWheel(body, at.x, at.y, 0, -40, Qt.NoButton, modifiers)
         tryVerify(function() { return !watchlist.settling }, 2000)
         within(2000, function() { return firstWhole(watchlist) === 1 })
         var seen = (firstWhole(watchlist) === 1) + " " + (watchlist.displayedSymbols.join(",") === before)
@@ -315,7 +316,7 @@ Harness {
       }
       var plainNotch = notchOver(Qt.NoModifier)
       var shiftNotch = notchOver(Qt.ShiftModifier)
-      harness.check("Shift and a wheel notch over a row scroll the list a row, as the wheel does, and move no row",
+      harness.check("Shift and the wheel over a row scroll the list as the wheel does, and move no row",
         plainNotch === "true true" && shiftNotch === plainNotch, plainNotch + " | " + shiftNotch)
       reset("", "smooth")
       watchlist.cursorSymbol = "NVDA"
@@ -374,7 +375,7 @@ Harness {
         mouseWheel(body, at.x, at.y, 0, notch, Qt.LeftButton)
         tryVerify(function() { return !watchlist.settling }, 2000)
         var kept = watchlist.dragSymbol === symbol
-        var wheeled = Math.abs(watchlist.contentY - scrollBefore + notch / 120 * watchlist.rowPitch) < 1
+        var wheeled = Math.abs(watchlist.contentY - scrollBefore + notch / 120 * 3 * watchlist.rowPitch) < 1
         var drop = watchlist.displayedSymbols.slice()
         var from = drop.indexOf(symbol)
         var to = Math.round(from + (by + watchlist.contentY - scrollBefore) / watchlist.rowPitch)
@@ -385,10 +386,10 @@ Harness {
         return (kept && wheeled && service.symbols.join() === drop.join()) + " dragged " + symbol + " -> " + service.symbols.join() + " wanted " + drop.join()
       }
       reset("", "smooth")
-      var wheelDown = underPointer("AAPL", 8, -120)
+      var wheelDown = underPointer("AAPL", 8, -40)
       reset("Drags", "retro")
       watchlist.contentY = watchlist.contentHeight - watchlist.height
-      var wheelUp = underPointer(watchlist.displayedSymbols[5], -8, 120)
+      var wheelUp = underPointer(watchlist.displayedSymbols[5], -8, 40)
       harness.check("the wheel during a drag keeps the chosen symbol, down in smooth and up in retro",
         /^true /.test(wheelDown) && /^true /.test(wheelUp), wheelDown + " | " + wheelUp)
 
@@ -413,18 +414,19 @@ Harness {
       harness.check("a new order mid-drag ends the drag: the release moves nothing and saves nothing, All in smooth and a list in retro",
         inAll === "true,true,true" && inList === "true,true,true", inAll + " | " + inList)
 
-      // Each gesture comes while the wheel's glide is still under way. The
-      // hero is the second row, which a reopen leaves where it is, so after
-      // a close only the open's own snap puts the list on a row.
+      // Each gesture comes while the wheel has left the list between rows.
+      // The hero is the second row, which a reopen leaves where it is, so
+      // after a close only the open's own snap puts the list on a row.
       var onRow = function() {
         var pitch = watchlist.rowPitch
         return Math.abs(watchlist.contentY - Math.round(watchlist.contentY / pitch) * pitch) < 0.5
       }
-      var gliding = function() { return watchlist.contentY > 0.5 && watchlist.contentY < watchlist.rowPitch - 0.5 }
+      var betweenRows = function() { return watchlist.contentY > 0.5 && watchlist.contentY < watchlist.rowPitch - 0.5 }
       reset("", "smooth")
       var at = centre("AAPL")
-      mouseWheel(body, at.x, at.y, 0, -60)
-      within(1000, gliding)
+      // Less than a third of a row, so the row's centre stays in sight to lift.
+      mouseWheel(body, at.x, at.y, 0, -13)
+      within(1000, betweenRows)
       lift("AAPL", 8)
       mouseRelease(body, at.x, at.y + 8)
       within(2000, ready)
@@ -435,8 +437,8 @@ Harness {
       keyClick(Qt.Key_Delete)
       within(1000, function() { return watchlist.displayedSymbols.indexOf("MSFT") < 0 && ready() })
       at = centre("AAPL")
-      mouseWheel(body, at.x, at.y, 0, -60)
-      within(1000, gliding)
+      mouseWheel(body, at.x, at.y, 0, -20)
+      within(1000, betweenRows)
       keyClick(Qt.Key_Z, Qt.ControlModifier)
       within(2000, ready)
       var afterUndo = canAct() + "@" + watchlist.cursorRow
@@ -444,16 +446,16 @@ Harness {
       reset("", "smooth")
       service.feature("MSFT")
       at = centre("AAPL")
-      mouseWheel(body, at.x, at.y, 0, -120)
-      var notchMid = within(1000, gliding)
+      mouseWheel(body, at.x, at.y, 0, -20)
+      var notchMid = within(1000, betweenRows)
       app.close()
       app.open("{}")
       var afterNotch = (notchMid && canAct() && onRow()) + "@" + watchlist.cursorRow + " " + watchlist.contentY
       reset("Drags", "retro")
       service.feature("MSFT")
       at = centre("AAPL")
-      mouseWheel(body, at.x, at.y, 0, -40)
-      var tickMid = within(1000, gliding)
+      mouseWheel(body, at.x, at.y, 0, -13)
+      var tickMid = within(1000, betweenRows)
       app.close()
       app.open("{}")
       var afterTick = (tickMid && canAct() && onRow()) + "@" + watchlist.cursorRow + " " + watchlist.contentY

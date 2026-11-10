@@ -151,34 +151,40 @@ Flickable {
   boundsBehavior: Flickable.StopAtBounds
   flickableDirection: Flickable.VerticalFlick
   interactive: contentHeight > height
-  // A drag or a flick takes the list over from the wheel.
+  // A drag or a flick takes the list over from a glide.
   onMovementStarted: takeOver()
-  onMovementEnded: snapToRow()
   ScrollBar.vertical: ScrollBar {
     policy: ScrollBar.AsNeeded
     visible: root.interactive
     active: root.interactive
     minimumSize: Math.min(1, Style.space(24) / Math.max(1, availableHeight))
-    onPressedChanged: if (!pressed) root.snapToRow()
   }
 
   // A WheelHandler ignores the touchpad's events unless it accepts TouchPad.
   WheelHandler {
     acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
     onWheel: function(event) {
-      root.endClick()
-      var from = root.headedY
-      // A touchpad sends pixels, which the list follows exactly.
-      if (event.pixelDelta.y !== 0) root.followBy(-event.pixelDelta.y)
-      // A notch is 120 units and one row; a high-resolution mouse sends parts.
-      else if (event.angleDelta.y !== 0) root.wheelBy(-event.angleDelta.y / 120)
-      else { event.accepted = false; return }
-      root.pointAtPointer(root.headedY !== from)
+      event.accepted = root.wheelEvent(event.phase, event.pixelDelta.y, event.angleDelta.y)
     }
   }
 
-  // The wheel glides the list rather than stepping it: snapping every tick
-  // lurches.
+  // The wheel and the touchpad move the list at once and leave it where they
+  // stop, as Omarchy's own lists do. Says whether the list took the event.
+  function wheelEvent(phase, pixels, angle) {
+    // A wheel's notches come with no scroll phase: 120 units, and three rows,
+    // a notch, or parts of one from a high-resolution wheel. On Wayland a
+    // notch carries 15 pixels too, so only the touchpad moves by pixels.
+    var by = phase === Qt.NoScrollPhase ? -angle / 120 * 3 * rowPitch : -pixels
+    if (by === 0) return false
+    endClick()
+    var from = headedY
+    takeOver()
+    contentY = clampY(from + by)
+    pointAtPointer(headedY !== from)
+    return true
+  }
+
+  // A key or a drop glides the list to its row.
   NumberAnimation {
     id: glide
     target: root
@@ -186,17 +192,6 @@ Flickable {
     duration: Motion.duration(Style, 160)
     easing.type: Easing.Bezier
     easing.bezierCurve: Motion.curve(Style)
-  }
-
-  // Longer than the glide, so a stream of ticks never snaps mid-scroll.
-  Timer {
-    id: wheelQuiet
-    interval: 260
-    onTriggered: {
-      var from = root.headedY
-      root.glideTo(root.snappedY(root.wheelTarget()))
-      root.pointAtPointer(root.headedY !== from)
-    }
   }
 
   RowPointer {
@@ -262,31 +257,13 @@ Flickable {
     contentY = snappedY(contentY)
   }
 
-  // A glide the wheel stops and restarts in one turn passes through false,
-  // so a reader waits a turn.
-  readonly property bool settling: glide.running || wheelQuiet.running || moving
+  // A glide stopped and restarted in one turn passes through false, so a
+  // reader waits a turn.
+  readonly property bool settling: glide.running || moving
 
-  // Another hand moves the list: the wheel's glide and pending settle stop.
+  // Another hand moves the list: a glide stops.
   function takeOver() {
     glide.stop()
-    wheelQuiet.stop()
-  }
-
-  function wheelTarget() {
-    return glide.running ? glide.to : contentY
-  }
-
-  function wheelBy(rows) {
-    glideTo(wheelTarget() + rows * rowPitch)
-    wheelQuiet.restart()
-  }
-
-  // The touchpad moves the list directly; it settles on a row once the
-  // finger stops.
-  function followBy(pixels) {
-    glide.stop()
-    contentY = clampY(contentY + pixels)
-    wheelQuiet.restart()
   }
 
   function glideTo(y) {
@@ -298,15 +275,14 @@ Flickable {
     glide.start()
   }
 
-  // Glides, as the wheel does, to rest on a row boundary: never a jump, and
-  // never between rows.
+  // Glides to bring the row whole into view, resting on a row boundary. A
+  // row already whole leaves the list where it is, between rows too.
   function scrollToRow(index) {
-    wheelQuiet.stop()
     var y = index * rowPitch
-    var at = wheelTarget()
+    var at = headedY
     if (y < at) at = y
     else if (y + rowHeight > at + height) at = y + rowHeight - height
-    glideTo(snappedY(at))
+    if (at !== headedY) glideTo(snappedY(at))
   }
 
   // Heads for the row first, so the cursor is set on a row in sight. A row
@@ -547,12 +523,16 @@ Flickable {
     dropAnim.start()
   }
 
-  // The drag over, the list it took from the wheel settles on a row.
   function cancelDrag() {
     dropAnim.stop()
-    if (dragSymbol === "") return
     dragSymbol = ""
-    glideTo(snappedY(contentY))
+  }
+
+  // The dropped row comes whole into view, as a key's row does.
+  function landDrop() {
+    var at = displayedSymbols.indexOf(dragSymbol)
+    cancelDrag()
+    if (at >= 0) scrollToRow(at)
   }
 
   // Closing mid-drag, every row, the lifted one too, stays where it is on
@@ -590,7 +570,7 @@ Flickable {
     // this runs only while open or opening, before reopen().
     var switched = view.listKey !== before.listKey
     if (switched) {
-      places[before.listKey] = snappedY(wheelTarget())
+      places[before.listKey] = headedY
       cancelDrag()
       cursorSymbol = ""
       forgetClicks()
@@ -649,7 +629,7 @@ Flickable {
     duration: Motion.duration(Style, 160)
     easing.type: Easing.Bezier
     easing.bezierCurve: Motion.curve(Style)
-    onFinished: root.cancelDrag()
+    onFinished: root.landDrop()
   }
 
   Item {
