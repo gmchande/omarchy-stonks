@@ -4,6 +4,7 @@
 .import "History.js" as History
 .import "Market.js" as Market
 .import "Overnight.js" as Overnight
+.import "Day.js" as Day
 .import "Quote.js" as Quote
 
 // Which chart a view shows (the day, or a range), and how it is laid out and
@@ -43,9 +44,9 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
 
 // The day the chart, a row's line and the pill's draw, so all three show one.
 // For a US stock or ETF Robinhood trades all day, the newest trade's trading
-// day with its night (`Overnight.dayChart`), its start slid by `slideAt`, the
+// day with its night (`Day.dayChart`), its start slid by `slideAt`, the
 // shell's clock five minutes at a time; for one it doesn't, Yahoo's own
-// (`Overnight.sessionDay`); `waiting` until Robinhood says which. Without
+// (`Day.sessionDay`); `waiting` until Robinhood says which. Without
 // `allDay`, as in a harness that stubs the service, Yahoo's own. Any other
 // listing's is its quote's day, or the coming day once it has a trade
 // (`Quote.tailDay`): London's or Tokyo's stays the last until its first bar.
@@ -55,9 +56,9 @@ function dayDrawn(symbol, quote, nights, allDay, calendars, slideAt) {
   var tradability = allDay ? allDay[symbol] : { allDay: false }
   var night = nights ? nights[symbol] : null
   out.allDay = !!tradability && tradability.allDay
-  if (tradability && !tradability.allDay) out.day = Overnight.sessionDay(quote)
+  if (tradability && !tradability.allDay) out.day = Day.sessionDay(quote)
   else if (tradability && night) {
-    var built = Overnight.dayChart(quote, night, calendars, slideAt)
+    var built = Day.dayChart(quote, night, calendars, slideAt)
     out.day = built.day
     out.latest = built.latest
   } else out.waiting = true
@@ -89,7 +90,7 @@ function newestTrades(symbols, quotes, nights, allDay, calendars) {
 function newestTradeOf(symbol, quote, nights, allDay, calendars) {
   if (!quote || !Overnight.hasOvernight(quote, calendars)) return null
   var drawn = dayDrawn(symbol, quote, nights, allDay, calendars)
-  if (drawn.waiting) drawn = Overnight.dayChart(quote, NO_ANSWER, calendars)
+  if (drawn.waiting) drawn = Day.dayChart(quote, NO_ANSWER, calendars)
   return Overnight.newestTrade(quote, drawn.latest, calendars, drawn.day)
 }
 
@@ -101,14 +102,14 @@ var NO_ANSWER = { bars: [], from: null, through: null }
 // came, to hold every trade; or, for a US listing, its trading day, so a quiet
 // hour shows as one and a finished day ends at its last trade. `ext` marks
 // trades outside the regular session, and `dim` those drawn dim: the extended
-// hours, or on a day lit where it trades now (`Overnight.litFrom`), every trade
+// hours, or on a day lit where it trades now (`Day.litFrom`), every trade
 // before that. `brk` lifts the line across hours of the exchange's day that
 // take room, such as Tokyo's lunch, which Yahoo sends inside one 09:00 to 15:30
 // session. Hours that take no room (`axis.skip`), such as a weekend, are no
 // break: the line runs across them, as through a quiet hour of a US night. The
 // scale holds every trade and the close, so the baseline stays in view. Once
 // tonight has traded, the dashed line steps at the bell to the close just
-// gone (`Overnight.nightBell`), which the scale holds too: `step`.
+// gone (`Day.nightBell`), which the scale holds too: `step`.
 function chartGeometry(quote, calendars) {
   var pts = quote.points
   var axis = chartSpan(quote)
@@ -121,7 +122,7 @@ function chartGeometry(quote, calendars) {
   // day against a baseline.
   var base = Quote.dayBase(quote)
   var known = Format.isFiniteNumber(base)
-  var bell = Overnight.nightBell(quote)
+  var bell = Day.nightBell(quote)
   var stepBase = bell !== null ? Quote.regularClose(quote) : null
   var lo = known ? base : (pts.length ? pts[0].p : 0)
   var hi = lo

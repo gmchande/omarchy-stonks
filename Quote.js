@@ -343,7 +343,7 @@ function parseChart(json, centExchanges, receivedAt) {
     figuresDay: figuresDay,
     nextDayBegun: nextDayBegun,
     // Its trades are all the day will have, so the chart ends at the last
-    // (`Overnight.tradedAxis`).
+    // (`Day.tradedAxis`).
     wholeDay: !!regular && Format.isFiniteNumber(receivedAt) && receivedAt >= (periods.post || periods.regular).end,
     session: {
       pre: index ? null : periodOf(periods.pre),

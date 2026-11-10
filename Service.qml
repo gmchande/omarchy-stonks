@@ -1072,7 +1072,7 @@ Item {
   }
   property int prunedMinute: -1
   // The clock five minutes at a time, which slides 1D's start
-  // (`Overnight.slidWindow`): the pill's line follows it while a screen is
+  // (`Day.slidWindow`): the pill's line follows it while a screen is
   // on, and the panel's and window's chart and rows (`viewSlideAt`) only
   // while one is open, so nothing rebuilds for a surface no screen shows.
   property int slideAt: 0

@@ -6,7 +6,7 @@
 # written over; a save from elsewhere mid-read; and the version watch on the
 # tree's manifest.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-feed_tree service.qml Service.qml ListsFile.qml OwnerOnly.qml Gate.qml Updates.qml FetchRun.qml QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml AllDayFeed.qml OvernightFeed.qml ReleaseFeed.qml Asks.js Fetch.js Quote.js Format.js Calendar.js CarriedClose.js Market.js Overnight.js History.js Fundamentals.js Freshness.js Chart.js Settings.js Release.js calendars.json manifest.json
+feed_tree service.qml Service.qml ListsFile.qml OwnerOnly.qml Gate.qml Updates.qml FetchRun.qml QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml AllDayFeed.qml OvernightFeed.qml ReleaseFeed.qml Asks.js Fetch.js Quote.js Format.js Calendar.js CarriedClose.js Market.js Overnight.js Day.js History.js Fundamentals.js Freshness.js Chart.js Settings.js Release.js calendars.json manifest.json
 # The harness ages a fundamentals entry by a day, asks a quote again, and
 # counts the data file's reads, so a check waits on its read-back.
 patch_copy ListsFile.qml '/signal started()/a\  readonly property alias testDataFile: dataFile'

@@ -12,7 +12,7 @@ const root = join(import.meta.dir, "..")
 process.env.TZ = "America/New_York"
 // Every rule file's names, under one name. A name two files define is read
 // from its file (test/load.js).
-const M = rules(["Format", "Fetch", "Quote", "Calendar", "Market", "CarriedClose", "Overnight", "History", "Fundamentals", "Figures", "Freshness",
+const M = rules(["Format", "Fetch", "Quote", "Calendar", "Market", "CarriedClose", "Overnight", "Day", "History", "Fundamentals", "Figures", "Freshness",
   "Chart", "Tones", "Settings", "KeySheet", "Search", "Cells", "Share", "Asks"])
 
 const calendars = JSON.parse(readFileSync(join(root, "calendars.json"), "utf8"))

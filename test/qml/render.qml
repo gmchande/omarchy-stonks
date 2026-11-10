@@ -13,6 +13,7 @@ import "plugin/Chart.js" as Chart
 import "plugin/Fundamentals.js" as Fundamentals
 import "plugin/History.js" as History
 import "plugin/Overnight.js" as Overnight
+import "plugin/Day.js" as Day
 import "plugin/Quote.js" as Quote
 import "plugin/Search.js" as Search
 import "plugin/Settings.js" as Settings
@@ -477,7 +478,7 @@ Harness {
         var jnj = Quote.parseChart(moment("jnj"), Calendar.centExchanges(stub.calendars), sunday)
         var day = moment("robinhood-day")
         var night = Overnight.parseOvernight(day, day.results.map(function(r) { return r.symbol })).JNJ
-        var built = Overnight.dayChart(jnj, night, stub.calendars)
+        var built = Day.dayChart(jnj, night, stub.calendars)
         root.nightPill = { quote: jnj, newest: Overnight.newestTrade(jnj, built.latest, stub.calendars, built.day),
           night: Object.assign({ status: "ok" }, night) }
         root.now = sunday

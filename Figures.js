@@ -3,6 +3,7 @@
 .import "Format.js" as Format
 .import "Market.js" as Market
 .import "Overnight.js" as Overnight
+.import "Day.js" as Day
 .import "Quote.js" as Quote
 
 // What a quote shows on screen, in rows, the hero, the info lines and the
@@ -225,11 +226,11 @@ function rowModel(quote, scrubT, mode, newest) {
 // chart draws it (`Quote.tailDay`), so a row scrubbed into the pre-market
 // reads what the hero does. Once tonight has traded, a moment past the bell
 // counts from the close just gone, where the dashed line steps: the day
-// drawn says so (`Overnight.nightBell`), and a row's quote by its newest
+// drawn says so (`Day.nightBell`), and a row's quote by its newest
 // price (`newest.joined`).
 function scrubbedBase(quote, t, newest) {
   var reg = quote.session.regular
-  var bell = Overnight.nightBell(quote)
+  var bell = Day.nightBell(quote)
   if (bell === null && newest && newest.joined && reg) bell = reg.end
   if (bell !== null && t >= bell) return { prevClose: Quote.regularClose(quote), dayOpen: null }
   var tail = Quote.tailStart(quote)
@@ -249,9 +250,9 @@ function dayBaselineText(day, today, calendars) {
 
 // The dashed line under a scrubbed moment `t`, in words: past the bell of a
 // day tonight has traded on, the close just gone, where the line steps
-// (`Overnight.nightBell`).
+// (`Day.nightBell`).
 function scrubBaselineText(day, t, today, calendars) {
-  var bell = Overnight.nightBell(day)
+  var bell = Day.nightBell(day)
   if (bell === null || t < bell) return dayBaselineText(day, today, calendars)
   var named = closeLabel(day, today, calendars)
   return named.label + (named.time ? " " + named.time : "") + " " + Format.money(Quote.regularClose(day), day.priceDigits)
