@@ -253,7 +253,9 @@ Item {
   readonly property var history: motion.history
   // A range whose first fetch failed: the day stands in, figures and all.
   readonly property bool historyFailed: !!chart && chart.failed
-  readonly property bool historyShown: motion.historyShown
+  // Worked out here from the same two values the chart reads, not read from
+  // the chart: its own would turn true a binding before `history` here does.
+  readonly property bool historyShown: historyActive && !!history
   readonly property var historyStats: historyShown ? History.periodStats(history) : null
   readonly property var historyBar: historyShown && scrubT
     ? History.historyBarAt(history, History.historyFraction(history, scrubT)) : null
