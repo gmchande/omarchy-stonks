@@ -1,7 +1,7 @@
 import { test, expect, describe } from "bun:test"
 import { readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
-import { load } from "./load.js"
+import { load, rules } from "./load.js"
 
 // The pure rules: tests that read no saved answer, so they run on any
 // clone. Those that read Yahoo's and Robinhood's saved answers are in
@@ -10,10 +10,10 @@ const root = join(import.meta.dir, "..")
 // The reader is in New York: an exchange's time is named
 // with its zone only where that clock differs from the reader's.
 process.env.TZ = "America/New_York"
-// Every rule file's names, under one name. Two names are defined twice: of
-// each pair M holds the later file's, Share's clockOf and Chart's clockAt.
-const M = Object.assign({}, ...["Format", "Fetch", "Quote", "Market", "Overnight", "History", "Fundamentals", "Figures",
-  "Chart", "Tones", "Settings", "KeySheet", "Search", "Cells", "Share", "Asks"].map(name => load(name + ".js")))
+// Every rule file's names, under one name. A name two files define is read
+// from its file (test/load.js).
+const M = rules(["Format", "Fetch", "Quote", "Market", "Overnight", "History", "Fundamentals", "Figures",
+  "Chart", "Tones", "Settings", "KeySheet", "Search", "Cells", "Share", "Asks"])
 
 const calendars = JSON.parse(readFileSync(join(root, "calendars.json"), "utf8"))
 // The header's status at full width, the first of its forms.
@@ -232,13 +232,13 @@ test("a Toronto time in 2027 and 2028 reads by Toronto's clock, and before any c
   // A trade from before the calendars' first day, as a halted listing's last:
   // August 2025 was summer time, which no calendar lists.
   const august2025 = Date.UTC(2025, 7, 14, 19, 59) / 1000
-  expect([M.printClock(shop, august2025, calendars), M.clockOf(shop, august2025, calendars)]).toEqual(["15:59", "15:59 EDT"])
+  expect([M.printClock(shop, august2025, calendars), load("Share.js").clockOf(shop, august2025, calendars)]).toEqual(["15:59", "15:59 EDT"])
   // A calendar that has run out, here Toronto's cut short at 31 December
   // 2026: its times come from Yahoo's offset, never its standard time.
   const ran = JSON.parse(JSON.stringify(calendars))
   ran.calendars.TSX.validThrough = "2026-12-31"
   ran.calendars.TSX.utcOffsets = ran.calendars.TSX.utcOffsets.slice(0, 1)
-  expect([M.printClock(shop, july2027, ran), M.clockOf(shop, july2027, ran), M.dateOf(shop, july2027, ran)])
+  expect([M.printClock(shop, july2027, ran), load("Share.js").clockOf(shop, july2027, ran), M.dateOf(shop, july2027, ran)])
     .toEqual(["16:00", "16:00 EDT", "WED 14 JUL 2027"])
   // Inside the calendar, its clock still decides, whatever offset the quote
   // holds: December's close is 16:00 EST, not 17:00 EDT.

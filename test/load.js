@@ -18,3 +18,24 @@ export function load(file) {
   loaded[file] = new Function(...qualifiers, body + `\nreturn { ${names.join(", ")} }`)(...imports.map(m => load(m[1])))
   return loaded[file]
 }
+
+// Several rule files' names under one object, as the tests read them. A
+// name two of them define belongs to neither here: reading it throws, so a
+// test asks the file it means, as `load("Share.js").clockOf`.
+export function rules(files) {
+  const all = {}, from = {}
+  for (const file of files) {
+    for (const [name, value] of Object.entries(load(file + ".js"))) {
+      if (name in from) {
+        const first = from[name]
+        Object.defineProperty(all, name, { configurable: true, get() {
+          throw new Error(`${name} is in ${first}.js and ${file}.js: read it from the one you mean, as load("${file}.js").${name}`)
+        } })
+      } else {
+        all[name] = value
+        from[name] = file
+      }
+    }
+  }
+  return all
+}
