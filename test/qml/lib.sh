@@ -143,7 +143,7 @@ scratch_home() {
   done
 }
 
-# run_qs SECONDS: run Quickshell on the tree, with the fake curl first on
+# run_qs SECONDS: run Quickshell on the tree, with the stand-ins in bin/ first on
 # PATH, into $work/log (quickshell.sh).
 run_qs() {
   PATH="$here/bin:$PATH" quickshell_run "$1" "$work/log" -p "$root" --no-color
