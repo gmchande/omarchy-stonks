@@ -209,12 +209,15 @@ test("Toronto and London close early when their exchanges say, and London's 2028
   const shel = held("SHEL.L", "LSE", LSE, "2027-12-23", "08:00", "16:30")
   expect([cadence(shel, LSE, "2027-12-24", "12:00"), cadence(shel, LSE, "2027-12-24", "13:00")]).toEqual([60, 900])
   // In the exchange's own wording, less its "(substitute)", its zone named
-  // for a reader in New York.
+  // for a reader in New York. Toronto's "In Lieu of Boxing Day" reads as
+  // London's Boxing Day does.
   const status = (quote, day) => marketStatus(quote, M.epochAt(LSE, day, "12:00"), 0, calendars)
   const late = held("SHEL.L", "LSE", LSE, "2027-12-31", "08:00", "12:30")
   expect(status(late, "2028-01-03")).toBe("New Year's Day · opens Tue 08:00 GMT")
   const easter = held("SHEL.L", "LSE", LSE, "2028-04-13", "08:00", "16:30")
   expect(status(easter, "2028-04-14")).toBe("Good Friday · opens Tue 08:00 BST")
+  const boxing = held("SHOP.TO", "TSX", TSX, "2026-12-24", "09:30", "13:00")
+  expect(marketStatus(boxing, M.epochAt(TSX, "2026-12-28", "12:00"), 0, calendars)).toBe("Boxing Day · opens Tue 09:30")
 })
 
 test("a Toronto time in 2027 and 2028 reads by Toronto's clock, and before any calendar's first day or past its last by the clock Yahoo sends", () => {

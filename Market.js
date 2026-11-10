@@ -269,9 +269,10 @@ function printClock(quote, t, calendars) {
   return Format.zonedHhmm(t, clock.offset, clock.zone)
 }
 
-// The calendars keep their source's names, since they are renewed from it.
+// The calendars keep their source's names, since they are renewed from it:
+// Toronto's "In Lieu of Boxing Day" reads as London's "Boxing Day" does.
 function holidayName(name) {
-  return name.replace(/ (observed|\(substitute\))$/, "")
+  return name.replace(/^In Lieu of /, "").replace(/ (observed|\(substitute\))$/, "")
 }
 
 // The status, then shorter forms for a narrower header; each keeps the

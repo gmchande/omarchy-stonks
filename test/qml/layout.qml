@@ -1059,7 +1059,7 @@ Harness {
               return zone !== "" && form.slice(-zone.length) !== zone ? form + " " + zone : form
             })
             var notice = forms[0].slice(forms[0].indexOf(" · "))
-            if (forms[0].indexOf(cal.closures[day].split(" ")[0] + " ") !== 0 || forms[0].indexOf(" · ") < 0
+            if (forms[0].indexOf(Market.holidayName(cal.closures[day]).split(" ")[0] + " ") !== 0 || forms[0].indexOf(" · ") < 0
               || JSON.stringify(forms.slice(1)) !== JSON.stringify(["Closed" + notice, notice.charAt(3).toUpperCase() + notice.slice(4)]))
               unnamed.push(calId + " " + day + " " + forms.join(" / "))
             states.push(forms)
