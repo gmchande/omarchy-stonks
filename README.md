@@ -175,7 +175,9 @@ refreshed.
 Click the list's name to switch lists, start a new one, or manage them. All
 holds every symbol you follow, and your own lists each hold some of them.
 To choose which lists a row is in, right-click it and pick "Choose lists…",
-Ctrl-click it, or select it and press Ctrl+Enter.
+Ctrl-click it, or select it and press Ctrl+Enter. In Manage lists, Enter
+renames the selected list, Ctrl with an arrow moves it up or down, and
+Delete asks before deleting it.
 
 To find a stock or add one, click "+ Find or add a symbol", or press `/`,
 and type a name or a symbol. Stocks already in the list you're looking at
@@ -289,6 +291,9 @@ screenshot editor.
 | `o` | Change the order |
 | `Shift+O` | Reverse the order |
 | `w` | Open the list menu |
+| `⏎` | Rename the selected list, in Manage lists |
+| `Ctrl+↑` `Ctrl+↓` | Move the selected list, in Manage lists |
+| Delete or Backspace | Ask to delete the selected list, in Manage lists; `⏎` deletes it |
 | `c` | Show the change in %, an amount or since the open |
 | `s` | Switch between smooth and retro |
 | `m` | Turn sounds on or off |
