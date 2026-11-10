@@ -122,6 +122,12 @@ Item {
     return g
   }
 
+  // How far along the columns `x` is: they end short of the chart's width
+  // where it holds no whole number of them.
+  function fractionAt(x) {
+    return x / (grid.columns * grid.pitch)
+  }
+
   // The centre of the column `layout` puts it in.
   function xAt(fraction) {
     var col = Math.max(0, Math.min(grid.columns - 1, Math.floor(fraction * grid.columns)))
