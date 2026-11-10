@@ -771,8 +771,7 @@ test("rowModel shows the regular close at rest and the trade under the finger", 
   expect(view(0, "abs")).toEqual({ ...close, changeText: "+8.28" })
   // Since the open: from the OPEN the info line shows, 316.98.
   expect(view(0, "open")).toEqual({ ...close, changeText: "+2.57%" })
-  // The rows carry the mode's word inline; the hero's SINCE OPEN caption is
-  // pointer.qml's. Percent and amount carry none.
+  // The rows carry the mode's word inline. Percent and amount carry none.
   expect(M.rowModel(quote, 0, "open")).toMatchObject({ changeLine: "+2.57% open", periodLabel: "SINCE OPEN" })
   expect(M.rowModel(quote, 0, "abs")).toMatchObject({ changeLine: "+8.28", periodLabel: "" })
   // Scrubbing reads the trade at that moment and holds it until the next;

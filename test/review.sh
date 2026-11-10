@@ -206,8 +206,8 @@ start "nothing-jumps layout harness, sizes" bash test/qml/layout.sh sizes
 start "panel motion harness" bash test/qml/popup-motion.sh
 start "panel motion harness on Omarchy 4.0.6" env STONKS_SHELL="$old_shell" bash test/qml/popup-motion.sh
 start "camera harness on Omarchy 4.0.6" env STONKS_SHELL="$old_shell" QT_SCALE_FACTOR=1 bash test/qml/camera.sh
-for harness in popup keys window-rows; do
-  start "$harness harness on Omarchy 4.0.6" env STONKS_SHELL="$old_shell" bash "test/qml/$harness.sh"
+for walk in keys mouse saving fetching; do
+  start "$walk walk on Omarchy 4.0.6" env STONKS_SHELL="$old_shell" bash "test/qml/$walk.sh"
 done
 fill
 

@@ -725,9 +725,9 @@ for (const file of readdirSync(dataFiles).filter(name => name.endsWith(".json"))
   })
 })
 
-// lists.qml drives adding, removing, stepping, naming, and ordering through
-// the real Service and keys, on a library where no symbol is in two named
-// lists and every add is already in All. These are the cases it cannot reach.
+// The keys and mouse walks add, remove, name and order through the real
+// Service, on a library where no symbol is in two named lists. These are
+// the cases they cannot reach.
 test("membership across several lists", () => {
   // A new symbol added on a named list joins All; one added on All joins no list.
   const onGrowth = M.withSymbolAdded(library({ list: "Growth" }), "fslr")

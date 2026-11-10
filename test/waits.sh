@@ -10,26 +10,15 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 # Each file's count today. Remove a set-time wait and lower its count here.
 declare -A baseline=(
   [Steps.qml]=1
-  [ahead.qml]=7
   [camera.qml]=2
-  [fetch.qml]=19
+  [fetching.qml]=3
   [keys.qml]=1
   [layout.qml]=158
-  [lists.qml]=6
   [long-list.qml]=4
-  [overnight.qml]=11
-  [pointer.qml]=21
   [popup-motion.qml]=2
-  [popup.qml]=1
-  [range.qml]=24
   [render.qml]=2
-  [resilience.qml]=1
-  [sounds.qml]=22
-  [updates.qml]=2
-  [window-adds.qml]=3
+  [saving.qml]=1
   [window-motion.qml]=4
-  [window-rows.qml]=6
-  [window-search.qml]=46
 )
 
 # Strings and comments, either kind, are skipped (\x22 and \x27 are the two
