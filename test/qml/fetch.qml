@@ -413,7 +413,7 @@ Harness {
       harness.check("with no prices coming, a chart asked for says nothing of loading under the header that says so",
         coming === "true | false | " + noAnswer, coming)
       harness.check("a pill with no price, its symbol unanswered for 90 s, says it can't get prices, and its hover why and when it tries again",
-        pillUnanswered === "! Can't get prices | NO DATA\nCan't connect. Check your internet.\nRetrying in 1 minute.", pillUnanswered)
+        pillUnanswered === "! Can't get prices | No data\nCan't connect. Check your internet.\nRetrying in 1 minute.", pillUnanswered)
       tick(9, 1, noteTries)
       // The run is two requests, the pill's chart and one spark of the
       // rest; then each pause doubles from 2 s, to a minute at most, a fifth

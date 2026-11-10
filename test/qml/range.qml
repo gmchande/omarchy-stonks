@@ -792,8 +792,8 @@ Harness {
       // in the panel's words; the text's says nothing else.
       var warningTips = hoverEveryForm()
       harness.check("hovering a pill with a failed first fetch says so on every form, and the text form says only that",
-        warningTips.slice(0, 3).join(" | ") === 'text "NO DATA FOR THIS SYMBOL" | sparkline "NO DATA FOR THIS SYMBOL" | arrow "NO DATA FOR THIS SYMBOL"'
-          && /^icon "FAIL .* · NO DATA FOR THIS SYMBOL"$/.test(warningTips[3]),
+        warningTips.slice(0, 3).join(" | ") === 'text "No data for this symbol" | sparkline "No data for this symbol" | arrow "No data for this symbol"'
+          && /^icon "FAIL .* · No data for this symbol"$/.test(warningTips[3]),
         warningTips.join(" | "))
       // The icon form, on the top bar and a side bar, and the side bar's
       // stacked form show the "!" too, the stacked one naming its symbol;
@@ -945,8 +945,8 @@ Harness {
       service.feature("FAIL")
       service.removeSymbol("LATE")
       harness.check("an answer landing under the pointer takes the warning out of the bubble: the text pill's goes, the icon's keeps the rest",
-        textLanding[1] === '"NO DATA FOR THIS SYMBOL"' && textLanding[2] === '""'
-          && /^"LATE .* · REFRESH FAILED · AS OF /.test(iconLanding[1]) && /^"LATE /.test(iconLanding[2]) && iconLanding[2].indexOf("REFRESH") < 0,
+        textLanding[1] === '"No data for this symbol"' && textLanding[2] === '""'
+          && /^"LATE .* · Refresh failed · as of /.test(iconLanding[1]) && /^"LATE /.test(iconLanding[2]) && iconLanding[2].indexOf("Refresh") < 0,
         textLanding.join(" ") + " | " + iconLanding.join(" "))
 
       // While a chart loads, the hero keeps what was on screen, chart,
