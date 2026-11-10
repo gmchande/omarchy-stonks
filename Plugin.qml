@@ -27,7 +27,7 @@ Item {
   Service {
     id: dataService
     pluginId: root.pluginId
-    screens: host
+    screens: displays
     updatable: versionWatch.updatable
   }
 
@@ -46,8 +46,11 @@ Item {
 
   Camera { id: shutter }
 
+  Screens { id: displays; watching: host.opened }
+
   WindowHost {
     id: host
+    screens: displays
     shell: root.shell
     pluginId: root.pluginId
     name: root.name

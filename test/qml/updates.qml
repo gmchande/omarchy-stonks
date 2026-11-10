@@ -48,6 +48,7 @@ Harness {
     signal rawEvent(var event)
   }
   Binding { target: plugin.windowHost; property: "hyprlandStandIn"; value: hyprlandStandIn }
+  Binding { target: plugin.service.screens; property: "hyprlandStandIn"; value: hyprlandStandIn }
 
   QtObject {
     id: shellApi
@@ -285,14 +286,14 @@ Harness {
       put("MANIFEST.version", "1.0.10")
       screenStandIn.on = false
       screenStandIn.lastIpcObject = { dpmsStatus: false }
-      plugin.windowHost.monitors = [screenStandIn]
+      plugin.service.screens.monitors = [screenStandIn]
       nextDay()
       tryVerify(function() { return screenStandIn.unanswered === 0 }, 3000)
       var dark = harness.asked() === 6 && !harness.feed.testAsking
       screenStandIn.on = true
       hyprlandStandIn.rawEvent({})
       var lit = answered(7)
-      plugin.windowHost.monitors = []
+      plugin.service.screens.monitors = []
       openWindow()
       var said = footer() + " | " + offer() + " | " + marks().join(", ")
       harness.check("while every screen is off it asks nothing; with one on, it asks, and the next open offers the newer version beside the add",

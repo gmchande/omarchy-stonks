@@ -50,7 +50,7 @@ none() {
 # quote URL is the quote feed's, the fundamentals URLs the fundamentals
 # feed's, the overnight URL the overnight feed's, the all-day URL the
 # all-day feed's, and the manifest's URL the release feed's. The plugin has
-# one IPC target; only the window's host acts on Hyprland.
+# one IPC target; only the window's host and the screens act on Hyprland.
 only '\bProcess\s*\{' FetchRun.qml Updates.qml Sounds.qml Camera.qml OwnerOnly.qml
 only '\bFileView\s*\{' Service.qml Updates.qml TrendColors.qml OwnerOnly.qml Sounds.qml
 only '\bSettings\s*\{|^import QtCore' Camera.qml
@@ -68,7 +68,7 @@ none '(?<!timeout -k 1 2 )pw-play --' Sounds.qml
 # Every command the camera and the file keeper run is under `timeout`.
 none 'command:\s*\[(?!"timeout",)' Camera.qml OwnerOnly.qml
 only '\bIpcHandler\s*\{' IpcTarget.qml
-only '^import Quickshell\.Hyprland' WindowHost.qml
+only '^import Quickshell\.Hyprland' WindowHost.qml Screens.qml
 only '\b(QuoteFeed|HistoryFeed|FundamentalsFeed|OvernightFeed|AllDayFeed|ReleaseFeed)\s*\{' Service.qml
 only '\bFetchRun\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml
 only 'Fetch\.curlCommand\(' FetchRun.qml

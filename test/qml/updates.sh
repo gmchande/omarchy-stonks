@@ -20,7 +20,9 @@ patch_copy plugin/BarWidget.qml '/id: panelLoader/,/source:/s/active: true/activ
 patch_copy plugin/WindowHost.qml '/readonly property bool opened:/a\  property var hyprlandStandIn: null'
 patch_copy plugin/WindowHost.qml 's/Hyprland\.\(toplevels\|focusedWorkspace\|dispatch\)/root.hyprlandStandIn.\1/g'
 patch_copy plugin/WindowHost.qml 's/target: Hyprland$/target: root.hyprlandStandIn/'
-patch_copy plugin/WindowHost.qml 's/Hyprland\.refreshMonitors()/root.monitors.forEach(function(m) { m.refresh() })/g'
+patch_copy plugin/Screens.qml '/property bool watching:/a\  property var hyprlandStandIn: null'
+patch_copy plugin/Screens.qml 's/target: Hyprland$/target: root.hyprlandStandIn/'
+patch_copy plugin/Screens.qml 's/Hyprland\.refreshMonitors()/root.monitors.forEach(function(m) { m.refresh() })/g'
 jq '.version = "1.0.9"' "$root/plugin/manifest.json" > "$work/manifest.json"
 mv "$work/manifest.json" "$root/plugin/manifest.json"
 # Main names this build's version as the service starts.

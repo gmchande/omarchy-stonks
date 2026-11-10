@@ -34,13 +34,15 @@ patch_copy plugin/BarWidget.qml '/id: panelLoader/,/source:/s/active: true/activ
 patch_copy plugin/WindowHost.qml '/readonly property bool opened:/a\  property var hyprlandStandIn: null'
 patch_copy plugin/WindowHost.qml 's/Hyprland\.\(toplevels\|focusedWorkspace\|dispatch\)/root.hyprlandStandIn.\1/g'
 patch_copy plugin/WindowHost.qml 's/target: Hyprland$/target: root.hyprlandStandIn/'
+patch_copy plugin/Screens.qml '/property bool watching:/a\  property var hyprlandStandIn: null'
+patch_copy plugin/Screens.qml 's/target: Hyprland$/target: root.hyprlandStandIn/'
 # Whether every screen is off is asked of the screens the harness hands the
 # host, stand-ins that answer as they are set.
-patch_copy plugin/WindowHost.qml 's/Hyprland\.refreshMonitors()/root.monitors.forEach(function(m) { m.refresh() })/g'
+patch_copy plugin/Screens.qml 's/Hyprland\.refreshMonitors()/root.monitors.forEach(function(m) { m.refresh() })/g'
 # The input that wakes the screens comes from the harness too, never the
 # owner's own keys and pointer.
-patch_copy plugin/WindowHost.qml 's/^  IdleMonitor {$/  QtObject {\n    property bool enabled\n    property int timeout\n    property bool respectInhibitors\n    property bool isIdle: false/'
-patch_copy plugin/WindowHost.qml '/readonly property bool opened:/a\  readonly property alias testInput: input'
+patch_copy plugin/Screens.qml 's/^  IdleMonitor {$/  QtObject {\n    property bool enabled\n    property int timeout\n    property bool respectInhibitors\n    property bool isIdle: false/'
+patch_copy plugin/Screens.qml '/property bool watching:/a\  readonly property alias testInput: input'
 export QT_QPA_PLATFORM=offscreen
 
 # The main run starts offline, with last session's quotes saved: NEST at
