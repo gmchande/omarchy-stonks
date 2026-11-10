@@ -17,7 +17,7 @@ import "plugin/Overnight.js" as Overnight
 import "plugin/Quote.js" as Quote
 import "plugin/Settings.js" as Settings
 import "plugin/Search.js" as Search
-import "plugin/Figures.js" as Figures
+import "plugin/Freshness.js" as Freshness
 import "plugin"
 
 // Nothing jumps. The 22-symbol list with a cap symbol, an ETF, non-US
@@ -1040,8 +1040,8 @@ Harness {
           ["At 16:30 BST · Closing bell", "At 16:30 BST"], ["At 02:25 EDT · Overnight", "At 02:25 EDT"],
           ["WEEK OF 28 SEP 2026 · 712,345.00", "WEEK OF 28 SEP 2026"], ["21 SEP 10:00 AEST · 712,345.00", "21 SEP 10:00 AEST"],
           ["Can't get prices · Stonks keeps trying", "Can't get prices"],
-          Figures.hostPause("none", 72, 0).forms.slice(1), Figures.hostPause("refused", 30 * 60, 0).forms.slice(1),
-          Figures.hostPause("none", 72, 0).forms, Figures.hostPause("refused", 30 * 60, 0).forms,
+          Freshness.hostPause("none", 72, 0).forms.slice(1), Freshness.hostPause("refused", 30 * 60, 0).forms.slice(1),
+          Freshness.hostPause("none", 72, 0).forms, Freshness.hostPause("refused", 30 * 60, 0).forms,
           ["Refresh failed for SHIB-USD · Retrying", "Refresh failed · Retrying", "Refresh failed"], ["Refreshing"], ["Loading SHIB-USD YTD"]]
         var closures = 0
         var unnamed = []

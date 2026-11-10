@@ -6,6 +6,7 @@ import qs.Commons
 import qs.Commons as Commons
 import "Chart.js" as Chart
 import "Figures.js" as Figures
+import "Freshness.js" as Freshness
 import "Settings.js" as Settings
 import "Tones.js" as Tones
 import "Motion.js" as Motion
@@ -228,7 +229,7 @@ Flickable {
   }
 
   function freshnessOf(symbol) {
-    return Figures.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0, !!asking[symbol], newestTrades[symbol] || null)
+    return Freshness.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0, !!asking[symbol], newestTrades[symbol] || null)
   }
 
   function moveCursor(delta) {

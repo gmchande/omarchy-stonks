@@ -4,7 +4,7 @@ import Quickshell
 import Quickshell.Io
 import qs.Ui
 import "plugin" as Stonks
-import "plugin/Figures.js" as Figures
+import "plugin/Freshness.js" as Freshness
 import "plugin/Format.js" as Format
 
 // A power user's list: 154 symbols through the real Plugin, Service, App,
@@ -113,7 +113,7 @@ Harness {
       var out = service.library.filter(function(s) {
         var row = body.watchlist.rowItem(s)
         if (row && row.inSight) return /^!/.test(row.detail)
-        return Figures.freshnessWarns(Figures.freshness(service.entries[s] || null, service.quotes[s] || null, service.now, service.owed[s] || 0))
+        return Freshness.freshnessWarns(Freshness.freshness(service.entries[s] || null, service.quotes[s] || null, service.now, service.owed[s] || 0))
       })
       if (pill.warns) out.push("pill")
       return out
@@ -391,7 +391,7 @@ Harness {
       var saidOnce = ""
       var overdue = function() {
         return service.library.filter(function(s) {
-          return Figures.freshnessWarns(Figures.freshness(service.entries[s] || null, service.quotes[s] || null, service.now, service.owed[s] || 0))
+          return Freshness.freshnessWarns(Freshness.freshness(service.entries[s] || null, service.quotes[s] || null, service.now, service.owed[s] || 0))
         }).length + (pill.warns ? 1 : 0)
       }
       tick(170, 5, function() {

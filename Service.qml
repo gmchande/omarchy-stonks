@@ -3,7 +3,7 @@ import Quickshell.Io
 import "Asks.js" as Asks
 import "Calendar.js" as Calendar
 import "Chart.js" as Chart
-import "Figures.js" as Figures
+import "Freshness.js" as Freshness
 import "History.js" as History
 import "Overnight.js" as Overnight
 import "Quote.js" as Quote
@@ -526,7 +526,7 @@ Item {
   readonly property var asked: feed.asked
   // Those waiting on Yahoo, from when: freshness's overdue counts from it.
   readonly property var owed: feed.owed
-  // Asked under `Figures.ASKED_GRACE` ago, timed to the millisecond: in the
+  // Asked under `Freshness.ASKED_GRACE` ago, timed to the millisecond: in the
   // clock's whole seconds the grace would end anywhere from 1 to 2 s on.
   property var asking: ({})
   property var askedMs: ({})
@@ -537,7 +537,7 @@ Item {
     var ends = 0
     for (var s in feed.asked) {
       since[s] = s in root.askedMs ? root.askedMs[s] : nowMs
-      var end = since[s] + Figures.ASKED_GRACE * 1000
+      var end = since[s] + Freshness.ASKED_GRACE * 1000
       if (end > nowMs) {
         inGrace[s] = true
         if (!ends || end < ends) ends = end
@@ -1028,7 +1028,7 @@ Item {
   function armClock() {
     if (!root.pluginsReady) return
     clock.interval = Asks.clockWait(root.openSurfaces.length > 0, Date.now(), root.now,
-      [root.dueAt, yahooGate.pausedUntil, robinhoodGate.pausedUntil, githubGate.pausedUntil, Figures.overdueAt(root.owed, root.now)])
+      [root.dueAt, yahooGate.pausedUntil, robinhoodGate.pausedUntil, githubGate.pausedUntil, Freshness.overdueAt(root.owed, root.now)])
     clock.restart()
   }
   onDueAtChanged: armClock()

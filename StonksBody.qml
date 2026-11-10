@@ -3,6 +3,7 @@ import qs.Commons
 import qs.Commons as Commons
 import "ChartSound.js" as ChartSound
 import "Figures.js" as Figures
+import "Freshness.js" as Freshness
 import "Format.js" as Format
 import "Fundamentals.js" as Fundamentals
 import "History.js" as History
@@ -272,13 +273,13 @@ Item {
   readonly property var featuredQuote: motion.quote
   // The day the 1D chart draws; its baseline is `prevClose`.
   readonly property var featuredDay: motion.day
-  readonly property var featuredFreshness: Figures.freshness(entryOf(chartSymbol || featuredSymbol), featuredQuote, now,
+  readonly property var featuredFreshness: Freshness.freshness(entryOf(chartSymbol || featuredSymbol), featuredQuote, now,
     owed[chartSymbol || featuredSymbol] || 0, !!asking[chartSymbol || featuredSymbol], featuredNewest)
   readonly property int warnings: lists.length > 0 ? lists[0].symbols.filter(function(symbol) {
-    return Figures.freshnessWarns(Figures.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0, !!asking[symbol]))
+    return Freshness.freshnessWarns(Freshness.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0, !!asking[symbol]))
   }).length : 0
   readonly property bool yahooDown: warnings > 0 && warnings === lists[0].symbols.length
-  readonly property var hostPause: Figures.hostPause(yahooPause, yahooPausedUntil, now)
+  readonly property var hostPause: Freshness.hostPause(yahooPause, yahooPausedUntil, now)
   readonly property var featuredGeometry: motion.geometry
   readonly property real scrubX: motion.scrubX
   readonly property bool dayScrubbed: !historyActive && scrubShown !== 0

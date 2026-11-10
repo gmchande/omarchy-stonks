@@ -3,6 +3,7 @@ import qs.Commons
 import qs.Commons as Commons
 import "Cells.js" as Cells
 import "Figures.js" as Figures
+import "Freshness.js" as Freshness
 import "Format.js" as Format
 import "Tones.js" as Tones
 // The symbol, the listing line, the price in both looks, the change, and the
@@ -24,7 +25,7 @@ Item {
   // Yahoo is sending nothing for any listing, which the header says once, so
   // this line says only when the price is from, as the rows do.
   property bool sourceDown: false
-  readonly property var shownFreshness: sourceDown ? Figures.quietFreshness(freshness) : freshness
+  readonly property var shownFreshness: sourceDown ? Freshness.quietFreshness(freshness) : freshness
   property bool retro: false
   // The line under the price takes its unit.
   property string changeMode: "pct"
@@ -45,7 +46,7 @@ Item {
   property string baselineText: ""
   property int priceSize: Style.font.displayLarge * 2
 
-  readonly property string freshnessText: quote ? Figures.freshnessText(shownFreshness, quote, calendars) : ""
+  readonly property string freshnessText: quote ? Freshness.freshnessText(shownFreshness, quote, calendars) : ""
   // The newest price since the close, when it is on top. None once its quote
   // is gone, as a failed preview's is.
   readonly property var newest: quote && view && view.newest ? view.newest : null
@@ -70,7 +71,7 @@ Item {
       // Only a warning takes the mark; an aged quote is said plainly, as its
       // row says it.
       var fresh = root.scrubbing || root.freshnessText === "" ? ""
-        : (Figures.freshnessWarns(root.shownFreshness) ? "! " : "") + root.freshnessText
+        : (Freshness.freshnessWarns(root.shownFreshness) ? "! " : "") + root.freshnessText
       return !root.nameOnLine ? fresh : (fresh ? fresh + " · " : "") + view.name.toUpperCase()
     }
     // A first fetch that failed says what the row says.
@@ -170,7 +171,7 @@ Item {
       anchors.baseline: symbolText.baseline
       textFormat: Text.PlainText
       text: root.listingLead
-      color: Figures.freshnessWarns(root.shownFreshness) ? root.foreground : root.dim
+      color: Freshness.freshnessWarns(root.shownFreshness) ? root.foreground : root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
       font.bold: true

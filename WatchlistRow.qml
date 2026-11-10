@@ -4,7 +4,7 @@ import qs.Commons
 import qs.Commons as Commons
 import "Cells.js" as Cells
 import "Chart.js" as Chart
-import "Figures.js" as Figures
+import "Freshness.js" as Freshness
 import "Format.js" as Format
 import "Tones.js" as Tones
 import "Motion.js" as Motion
@@ -65,9 +65,9 @@ Rectangle {
   readonly property color trend: !view || view.tone === "flat" ? dim : view.tone === "up" ? upColor : downColor
   property var freshness: null
   property bool sourceDown: false
-  readonly property var shownFreshness: sourceDown ? Figures.quietFreshness(freshness) : freshness
-  readonly property bool warns: Figures.freshnessWarns(shownFreshness)
-  readonly property string freshnessNote: quote ? Figures.freshnessText(shownFreshness, quote, calendars, newestTime !== "") : ""
+  readonly property var shownFreshness: sourceDown ? Freshness.quietFreshness(freshness) : freshness
+  readonly property bool warns: Freshness.freshnessWarns(shownFreshness)
+  readonly property string freshnessNote: quote ? Freshness.freshnessText(shownFreshness, quote, calendars, newestTime !== "") : ""
   property string newestTime: ""
   readonly property string detail: quote
     ? (freshnessNote !== "" ? (warns ? "! " : "") + Format.sentenceCase(freshnessNote) : view.name)

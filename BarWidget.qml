@@ -7,6 +7,7 @@ import qs.Ui
 import "Cells.js" as Cells
 import "Chart.js" as Chart
 import "Figures.js" as Figures
+import "Freshness.js" as Freshness
 import "Format.js" as Format
 import "Release.js" as Release
 import "Tones.js" as Tones
@@ -59,15 +60,15 @@ BarWidget {
   readonly property bool retro: service ? service.retro : setting("style", "retro") === "retro"
   // Judged without a quote too: a first fetch that failed is "! No data".
   readonly property var freshness: service && featuredSymbol
-    ? Figures.freshness(service.entries[featuredSymbol] || null, featuredQuote, service.now, service.owed[featuredSymbol] || 0, false,
+    ? Freshness.freshness(service.entries[featuredSymbol] || null, featuredQuote, service.now, service.owed[featuredSymbol] || 0, false,
       service.newestTrades[featuredSymbol] || null) : null
-  readonly property bool warns: Figures.freshnessWarns(freshness)
+  readonly property bool warns: Freshness.freshnessWarns(freshness)
   // The hover's words for the "!", in sentence case as a row says them, then
   // why and when Stonks tries again.
   readonly property var hostPause: service && service.yahooGate
-    ? Figures.hostPause(service.yahooGate.pause, service.yahooGate.pausedUntil, service.now) : null
+    ? Freshness.hostPause(service.yahooGate.pause, service.yahooGate.pausedUntil, service.now) : null
   readonly property string warningText: !warns ? ""
-    : Format.sentenceCase(Figures.freshnessText(freshness, featuredQuote, service.calendars))
+    : Format.sentenceCase(Freshness.freshnessText(freshness, featuredQuote, service.calendars))
       + (hostPause ? "\n" + hostPause.why + "\n" + hostPause.when
         : freshness.state === "failed" && featured ? "\nRetrying" : "")
   // The shell copies a hover's words only as the pointer enters, so they go
