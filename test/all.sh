@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Every check a pull request needs: what Stonks does, fetches, saves and
 # says, and what a key or a click changes. Every unit-test file
-# (test/unit.sh), source boundaries, QML lint, the harnesses' set-time
-# waits, manifest and launcher validation, the Quickshell flow harnesses,
+# (test/unit.sh), source boundaries, QML lint and its gate's self-check,
+# the font's glyphs, the harnesses' set-time waits, manifest and launcher
+# validation, the Quickshell flow harnesses,
 # the frame checker's self-check on made-up frames, and each test the
 # branch changes failing on the code before the change.
 # Pictures, positions and motion belong to test/review.sh; input readiness

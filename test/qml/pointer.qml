@@ -480,7 +480,7 @@ Harness {
         // The wheel or a key between two clicks at one place makes them two
         // clicks, even when Qt takes the second for a double-click's: the
         // second stops the list and acts, and x then removes its row. So does
-        // a row's move by Shift+J.
+        // a row's move, as Shift+↓ makes.
         var between = function(interrupt) {
           body.watchlist.contentY = 0
           within(2000, rowsAtRest)
@@ -520,7 +520,7 @@ Harness {
         var afterMove = (body.watchlist.displayedSymbols[2] === takenPlace && stub.featuredSymbol === takenPlace
           && body.watchlist.cursorRow === takenPlace) + " " + stub.featuredSymbol + "/" + body.watchlist.cursorRow + " for " + takenPlace
         fixture()
-        root.check("the wheel, a key, or Shift+J between two clicks at one place makes the second act, a double-click's too",
+        root.check("the wheel, a key, or a row's move between two clicks at one place makes the second act, a double-click's too",
           [afterWheel, afterKey, afterMove].every(function(r) { return /^true /.test(r) }),
           [afterWheel, afterKey, afterMove].join(" | "))
 

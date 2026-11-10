@@ -489,7 +489,7 @@ Harness {
 
     // With search open and text typed, the Stonks keys that are also edit
     // keys or letters go to the field: Ctrl+C, Ctrl+Z, Delete, Backspace,
-    // l, m, s and o remove no row, undo nothing, open no list menu, and
+    // w, m, s and o remove no row, undo nothing, open no list menu, and
     // leave the sound, the look and the order as they were.
     function fieldOwnsKeys(body, watchlist, keys) {
       service.switchList("")

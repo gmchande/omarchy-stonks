@@ -95,8 +95,14 @@ keep_sets() {
 render_diff() {
   local why
   why=$(test/fixtures-dir.sh 2>&1 > /dev/null) || { echo "SKIP render diff: $why"; return 77; }
-  [ -n "$base" ] || { echo "FAILED no base: HEAD and $base_ref share no commit"; return 1; }
   test/render-diff.sh "$@"
+}
+
+# With no base nothing is compared, so the run fails: it never ends ALL PASS
+# on a base's name mistyped or not fetched.
+no_base() {
+  echo "FAILED no base: HEAD and $base_ref share no commit. Fetch it, or name the base in STONKS_RENDER_BASE."
+  return 1
 }
 
 # The base's tree, outside git, with this checkout's saved answers beside it.
@@ -210,5 +216,6 @@ drain
 for ((i = 0; i < ${#diffs[@]}; i += 4)); do
   run "render diff${diffs[i + 3]}, against ${base:0:7} (${diffs[i + 2]}/)" render_diff "${diffs[@]:i:3}"
 done
+[ -n "$base" ] || run "render diff, against a base" no_base
 run "keep the renders this run drew" keep_sets
 verdict

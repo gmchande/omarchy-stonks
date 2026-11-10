@@ -101,12 +101,14 @@ const namesAdded = line => [...words(line)].some(w => addedNames.has(w)) || adde
 
 // The harnesses a runner starts, by name, each with every command a runner
 // starts it with, since a harness such as layout.sh runs some of its steps
-// under one command and the rest under another.
+// under one command and the rest under another. A command on Omarchy
+// 4.0.6's shell is left out: here its $old_shell is unset, so it would run
+// its harness on the installed shell a second time.
 const starts = new Map()
 for (const runner of ["test/all.sh", "test/review.sh"]) {
   for (const line of readFileSync(join(root, runner), "utf8").split("\n")) {
     const m = line.match(/^start "[^"]*" (.*\bbash test\/qml\/([\w-]+)\.sh\b.*)$/)
-    if (m) starts.set(m[2], [...(starts.get(m[2]) || []), m[1]])
+    if (m && !m[1].includes("$old_shell")) starts.set(m[2], [...(starts.get(m[2]) || []), m[1]])
   }
 }
 const harnessOf = path => {

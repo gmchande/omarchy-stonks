@@ -407,7 +407,9 @@ Harness {
         // Time for a cursor that wrongly follows the pointer to move.
         wait(50)
         var after = view.cursor
-        body.surfaceOpen = true
+        // Bound to the panel again, as Panel binds it: the flows after this
+        // one close and open the panel, and the body has to hear it.
+        body.surfaceOpen = Qt.binding(function() { return panel.opened })
         v[1]()
         tryVerify(function() { return !find(body, v[2]) || !find(body, v[2]).visible }, 2000, v[2] + " closed")
         return (before === 2 && after === 2) + " " + v[2] + " " + before + "->" + after
