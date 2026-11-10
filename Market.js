@@ -62,7 +62,7 @@ function secondsToBell(quote, now) {
 
 function calendarMap(calendars) {
   if (!calendars) return null
-  return calendars.calendars ? calendars.calendars : calendars
+  return calendars.calendars
 }
 
 // Yahoo files some indexes under a name that holds indexes on other hours
@@ -143,8 +143,14 @@ function epochAt(cal, dateString, hm) {
   return utc - offsetForDate(cal, dateString)
 }
 
+// A calendar knows the days from its `validFrom` to its `validThrough`: no
+// holiday and no change of clocks outside them.
+function covers(cal, dateString) {
+  return dateString >= cal.validFrom && dateString <= cal.validThrough
+}
+
 function dayKind(cal, dateString) {
-  if (!cal || !dateString || dateString > cal.validThrough) return { kind: "unknown" }
+  if (!cal || !dateString || !covers(cal, dateString)) return { kind: "unknown" }
   var weekday = localDate(epochAt(cal, dateString, "12:00"), cal).weekday
   if ((cal.weekend || [6, 0]).indexOf(weekday) >= 0) return { kind: "weekend" }
   if (cal.closures && cal.closures[dateString]) return { kind: "closure", name: cal.closures[dateString] }
@@ -243,11 +249,11 @@ function scrubPhase(quote, t) {
   return session === "reg" ? "open" : session || "closed"
 }
 
-// Past `validThrough` a change of clocks the calendar doesn't list would
-// read as standard time, an hour out.
+// On a day the calendar doesn't cover, a change of clocks it doesn't list
+// would read as standard time, an hour out.
 function clockCalendar(quote, t, calendars) {
   var cal = quote.calendar || calendarFor(calendars, quote)
-  return cal && dateStringOf(localDate(t, cal)) <= cal.validThrough ? cal : null
+  return cal && covers(cal, dateStringOf(localDate(t, cal))) ? cal : null
 }
 
 // The exchange's own clock at `t`, `{ offset, zone }`.
@@ -263,13 +269,10 @@ function printClock(quote, t, calendars) {
   return Format.zonedHhmm(t, clock.offset, clock.zone)
 }
 
-// The calendars keep their source's names, since they are renewed from it.
+// The calendars keep their source's names, since they are renewed from it:
+// Toronto's "In Lieu of Boxing Day" reads as London's "Boxing Day" does.
 function holidayName(name) {
-  return name.replace(/ (observed|\(substitute\))$/, "")
-}
-
-function marketStatus(quote, now, scrubT, calendars, overnight) {
-  return statusForms(quote, now, scrubT, calendars, overnight)[0]
+  return name.replace(/^In Lieu of /, "").replace(/ (observed|\(substitute\))$/, "")
 }
 
 // The status, then shorter forms for a narrower header; each keeps the
@@ -502,7 +505,7 @@ function sessionClose(quote) {
 // Friday's over a Monday holiday, else by weekdays.
 function nextSession(quote, from, to, cal) {
   var date = function(t) { return dateStringOf(localDate(t, cal)) }
-  if (cal && date(to) <= cal.validThrough) {
+  if (cal && covers(cal, date(from)) && covers(cal, date(to))) {
     var open = nextOpen(cal, epochAt(cal, nextDateString(date(from)), "00:00"))
     return !!open && open.dateString === date(to)
   }

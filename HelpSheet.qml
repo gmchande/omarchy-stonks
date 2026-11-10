@@ -17,7 +17,6 @@ Flickable {
   property color foreground: Commons.Color.foreground
   property color dim: Tones.dim(foreground, Commons.Color.background)
   property string fontFamily: Style.font.family
-  property bool retro: false
   // `edge` is the room right of the rows' figures. CLOSE ends there, so its
   // fill stays inside the clip; what a key does may run past it.
   property int inset: 0
@@ -164,7 +163,6 @@ Flickable {
     }
 
     ListAction {
-      id: close
       objectName: "helpClose"
       view: root
       anchors.right: parent.right

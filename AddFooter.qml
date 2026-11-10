@@ -5,8 +5,9 @@ import qs.Ui
 import "Tones.js" as Tones
 import "Motion.js" as Motion
 
-// The pinned "+ Find or add a symbol" bar. A note there says for a moment why a key
-// did nothing; a notice says, until it is fixed, what needs fixing. Painted
+// The pinned "+ Find or add a symbol" bar. A note there says for a moment
+// what just happened, or why a key did nothing; a notice says, until it is
+// fixed, what needs fixing. Painted
 // in its surface's ground, it covers the rows it passes on a growing edge.
 Item {
   id: root

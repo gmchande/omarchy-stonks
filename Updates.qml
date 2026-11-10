@@ -77,7 +77,6 @@ Item {
   }
 
   FileView {
-    id: gitHead
     path: root.pluginId ? Quickshell.env("HOME") + "/.config/omarchy/plugins/" + root.pluginId + "/.git/HEAD" : ""
     printErrors: false
     onLoaded: root.updatable = true

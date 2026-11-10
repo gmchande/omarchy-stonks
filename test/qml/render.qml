@@ -87,6 +87,9 @@ Harness {
   // A control under real pointer input: its hover, or its press filmed and
   // judged (frames.js press), then drawn held.
   readonly property var controlState: /^(popup|window)-controls-([a-z]+)-(hover|press)-(smooth|retro)$/.exec(stateName)
+  // window-controls-chart-hover-retro: a window 719 wide, whose chart holds
+  // its columns with 5 px to spare, as a window sized by hand can.
+  readonly property bool chartHover: stateName === "window-controls-chart-hover-retro"
   readonly property var anchorState: /^popup-anchor-(left|center|right)-(open|held|next)-(smooth|retro)$/.exec(stateName)
   FileView { id: anchorPoses; path: Quickshell.env("STONKS_ANCHOR_POSES"); blockLoading: true }
   readonly property var anchorPose: anchorState ? JSON.parse(anchorPoses.text())[anchorState[1] + "-" + anchorState[2]] : null
@@ -453,7 +456,7 @@ Harness {
     root.savedFigures = { AAPL: root.figures("aapl"), NEST: root.figures("nest"), "SHOP.TO": root.figures("shop-to"),
       "7203.T": root.figures("7203-t"), "SHEL.L": root.figures("shel-l") }
     root.savedRates = { USDCAD: root.rate("USDCAD"), USDGBP: root.rate("USDGBP") }
-    try { stub.calendars = JSON.parse(calendarFile.text()) } catch (e) { stub.calendars = null }
+    stub.calendars = JSON.parse(calendarFile.text())
     if (root.pillSheet) {
       root.pillQuote = nestDay
       root.now = nestDay.marketTime + 120
@@ -960,7 +963,7 @@ Harness {
         body.search.slow = true
       }
       // popup-search-putback-*: SHOP.TO just removed, and search opened on
-      // an empty field: its one result is the removal, chosen, PUT BACK, the
+      // an empty field: its one result is the removal, chosen, UNDO, the
       // hero showing it.
       if (root.stateName.indexOf("-putback-") > 0) {
         stub.lastRemoval = { symbol: "SHOP.TO", before: { symbols: stub.symbols, lists: [] }, quote: stub.quotes["SHOP.TO"] }
@@ -997,7 +1000,7 @@ Harness {
       }
     } else if (root.help) {
       // Manual order, so the sheet shows every entry it can; popup-help-sorted
-      // shows a sorted order's instead, without J K and the drag.
+      // shows a sorted order's instead, without ⇧↑ ⇧↓ and the drag.
       stub.order = root.help.sorted ? "pct" : "manual"
       body.showingHelp = true
     } else if (root.room) {
@@ -1031,8 +1034,8 @@ Harness {
       quotes["SHOP.TO"] = Object.assign({}, still, { prevClose: Quote.regularClose(still) })
       stub.quotes = quotes
     } else if (/^(popup|window)-note-/.test(root.stateName)) {
-      // popup-note-<look>: a refusal. <popup|window>-note-sorted-<look>: J
-      // refused in a sorted order.
+      // popup-note-<look>: a refusal. <popup|window>-note-sorted-<look>: a
+      // move refused in a sorted order.
       if (root.stateName.indexOf("-sorted-") > 0) {
         stub.order = "pct"
         Qt.callLater(function() {
@@ -1120,7 +1123,7 @@ Harness {
         // <popup|window>-lists-rowmenu-<look>: My Watchlist's second row,
         // in sight at every text size, right-clicked, which Wins holds too:
         // this list by its name, or all 3. popup-lists-rowmenuall-<look>:
-        // that symbol's menu in All by Shift+X, its one line chosen. Opened
+        // that symbol's menu in All by Delete, its one line chosen. Opened
         // as the picture is taken, once the rows and a -size-N text size
         // have landed: the menu stands where it opens, and a later size
         // closes it.
@@ -1199,7 +1202,7 @@ Harness {
     // grow with the text, and the window is 720 or its smallest, whichever
     // is wider.
     implicitWidth: root.anchorState ? 1000 : root.pillSheet ? Math.max(520, pillColumn.implicitWidth + 48) : root.themeState ? 480 + 410 : root.sheet ? 1000
-      : (root.windowWidth ? root.windowWidth : (root.smallest ? Math.round(560 * root.sizeScale)
+      : (root.windowWidth ? root.windowWidth : root.chartHover ? 719 : (root.smallest ? Math.round(560 * root.sizeScale)
         : (root.popup ? Math.round(480 * root.sizeScale) : Math.max(720, Math.round(560 * root.sizeScale)))))
     implicitHeight: root.anchorState ? body.fittedHeight(body.chromeHeight + 6 * body.rowPitch - body.rowGap) + content.inset * 2 + 56
       : root.stateName === "pill-sheet-large" ? 720 : root.pillSheet ? pillColumn.implicitHeight + 40 : root.sheet ? 460
@@ -1706,12 +1709,26 @@ Harness {
         body.search.suspend()
         waitForRendering(body)
         target = root.findAll(body.search, "searchResult")[1]
+      } else if (control === "chart") {
+        var heroChart = one("heroChart")
+        for (var k = 0; k < heroChart.children.length; k++) if (heroChart.children[k].scrubColumn !== undefined) target = heroChart.children[k]
       }
       verify(!!target, "review control exists: " + control)
       waitForRendering(body)
       var point = target.mapToItem(body, target.width / 2, target.height / 2)
       // The word's right end is its own control; its left is the arrow.
       if (control === "orderword") point = target.mapToItem(body, target.width - 2, target.height / 2)
+      // Retro's last lit column, under the middle of it, in a window 5 px
+      // wider than its columns (`chartHover`): there a pointer read across
+      // the chart's whole width lit the column to its left.
+      if (control === "chart") {
+        point = target.mapToItem(body, (target.inkColumns - 0.5) * target.grid.pitch, target.height / 2)
+        var spare = target.width - target.grid.columns * target.grid.pitch
+        if (spare !== 5) {
+          console.error("FAIL the chart's columns leave " + spare + " px spare, not 5")
+          root.failures++
+        }
+      }
       if (mode === "press") {
         var fill = control === "list" ? one("listControl")
           : control === "orderword" || control === "manualorder" ? one("orderControl")

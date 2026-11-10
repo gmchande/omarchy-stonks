@@ -87,11 +87,13 @@ every_state() (
     states="$states popup-controls-$control-hover-smooth popup-controls-$control-press-smooth"
   done
   states="$states popup-controls-deadmove-hover-smooth popup-controls-livemove-hover-smooth popup-controls-breadth-hover-smooth"
+  # Retro's chart under the pointer, on its last lit column.
+  states="$states window-controls-chart-hover-retro"
   # The list menu over the cursor's row in both looks on both surfaces: its
   # edge shows nothing of the row under it.
   states="$states popup-lists-menu-smooth window-lists-menu-smooth window-lists-menu-retro"
-  # The buttons that stand in for key hints: a new list's ⏎ MAKE, and a
-  # failed range's R RETRY, in both looks.
+  # The buttons that stand in for key hints: a new list's MAKE, and a
+  # failed range's RETRY, in both looks.
   states="$states popup-lists-naming-smooth popup-history-unavailable-smooth popup-history-unavailable-retro"
   # A scrub through where the 1Y high's date rests, and the low's: the mark
   # stays where it rests, under the line and the dot, in both looks.
@@ -232,7 +234,7 @@ every_state() (
     states="$states popup-note-sorted-$look window-note-sorted-$look"
   done
   # A row's menu: right-clicked in a list, its two lines, on both surfaces;
-  # by Shift+X in All, its one line chosen; and after a removal, search's
+  # by Delete in All, its one line chosen; and after a removal, search's
   # one result putting it back. In both looks.
   for look in smooth retro; do
     states="$states popup-lists-rowmenu-$look window-lists-rowmenu-$look popup-lists-rowmenuall-$look popup-search-putback-$look"

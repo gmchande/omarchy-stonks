@@ -104,8 +104,15 @@ function shownSign(value, digits) {
   return value > 0 ? 1 : -1
 }
 
+// The digits a figure shows below `limit`, from which it shows none. One
+// that rounds up to the limit shows none either: 999.996% reads +1,000%,
+// as 1,000% does, not +1,000.00%.
+function digitsBelow(abs, limit, digits) {
+  return Number(fixed(abs, digits)) >= limit ? 0 : digits
+}
+
 function moneyDigits(abs) {
-  return abs >= 10000 ? 0 : 2
+  return digitsBelow(abs, 10000, 2)
 }
 
 // toFixed's own limit; no price comes near it.
@@ -134,11 +141,11 @@ function priceTick(price, hint, inCents) {
 }
 
 function moveDigits(abs, digits) {
-  return abs >= 10000 ? 0 : Math.max(2, isFiniteNumber(digits) ? digits : 2)
+  return digitsBelow(abs, 10000, Math.max(2, isFiniteNumber(digits) ? digits : 2))
 }
 
 function pctDigits(abs) {
-  return abs >= 1000 ? 0 : 2
+  return digitsBelow(abs, 1000, 2)
 }
 
 function signText(sign) {

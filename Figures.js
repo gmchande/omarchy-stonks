@@ -137,7 +137,7 @@ function extendedStack(quote, latest, now, day, changeMode) {
   var digits = quote.priceDigits
   if (!ext || !Format.isFiniteNumber(close) || (!overnight && Format.money(ext.p, digits) === Format.money(close, digits))) return null
   var unit = changeMode === "abs" ? "abs" : "pct"
-  var chg = Quote.change({ prevClose: close, points: [] }, ext.p, unit)
+  var chg = Quote.change({ prevClose: close }, ext.p, unit)
   return {
     price: Format.money(ext.p, digits),
     changeText: Format.changeText(chg, unit, digits),
@@ -204,7 +204,8 @@ function dayLine(quote, today, day) {
     range: range,
     facts: [
       { label: "OPEN", value: Format.isFiniteNumber(q.dayOpen) ? Format.money(q.dayOpen, q.priceDigits) : "", widest: range.widest },
-      { label: "VOL", value: Format.isFiniteNumber(q.volume) ? Format.compactNumber(q.volume) : "", widest: Format.widest("999.9M") }
+      // Yahoo sends an index or a currency pair no volume, as a 0.
+      { label: "VOL", value: Format.isFiniteNumber(q.volume) && q.volume > 0 ? Format.compactNumber(q.volume) : "", widest: Format.widest("999.9M") }
     ]
   }
 }
@@ -249,7 +250,7 @@ function dayTitles() {
 // Only US stocks and ETFs, which trade at night, share one day here;
 // listings abroad and coins name their own on their rows. A row with no
 // time names no day: its freshness says so. A row whose move is the
-// night's says so itself (`rowTime`), so the header keeps the day.
+// night's says its time alone, as any other, so the header keeps the day.
 function rowsDay(symbols, quotes, newest, now, calendars) {
   var shared = null
   var mixed = false
@@ -381,7 +382,7 @@ function closeLine(quote, today, changeMode, shown, calendars) {
 // trade after its bell: AFTER HOURS +1.35%. None where it rounds to nothing.
 function sinceClose(quote, newest, changeMode) {
   var unit = changeMode === "abs" ? "abs" : "pct"
-  var since = Quote.change({ prevClose: Quote.regularClose(quote), points: [] }, newest.p, unit)
+  var since = Quote.change({ prevClose: Quote.regularClose(quote) }, newest.p, unit)
   var tone = Format.changeTone(since, unit, quote.priceDigits)
   return tone === "flat" ? null
     : { label: Market.phaseLabel(newest.phase).toUpperCase(), changeText: Format.changeText(since, unit, quote.priceDigits), tone: tone }
@@ -486,12 +487,6 @@ function newestNote(quote, newest, now, calendars) {
 // A row says it after the name.
 function newestTime(quote, newest, now, calendars) {
   return Market.printDay(quote, newest.t, now, calendars) + Market.printClock(quote, newest.t, calendars)
-}
-
-// A row's time after its name; where its move is the night's, counted from
-// the close just gone, it says so: Overnight 01:25.
-function rowTime(quote, newest, now, calendars) {
-  return (newest.joined ? Market.phaseLabel("overnight") + " " : "") + newestTime(quote, newest, now, calendars)
 }
 
 function newestStale(newest, now) {

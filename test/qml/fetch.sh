@@ -62,9 +62,16 @@ bun -e '
 run_qs 400
 mv "$work/log" "$work/main.log"
 
+# fresh_state: the next run's fake curl state and cache, empty. The requests
+# the run before made that no harness expects are kept, for finish to say.
+fresh_state() {
+  cat "$STONKS_FAKE_STATE/unexpected.requests" >> "$work/unexpected.requests" 2> /dev/null || true
+  rm -rf "$STONKS_FAKE_STATE" "$XDG_CACHE_HOME/grvc.stonks"
+  mkdir -p "$STONKS_FAKE_STATE"
+}
+
 # The holiday run: New York closed on 7 October, London and Toronto open.
-rm -rf "$STONKS_FAKE_STATE" "$XDG_CACHE_HOME/grvc.stonks"
-mkdir -p "$STONKS_FAKE_STATE"
+fresh_state
 echo fetch-2026-10-07 listings-2026-10-07-1455 > "$STONKS_FAKE_STATE/overnight.set"
 scratch_home fetch-watchlist.json grvc.stonks.json
 patch_copy plugin/calendars.json 's/"2026-11-26": *"Thanksgiving Day"/"2026-10-07": "Fetch holiday", &/'
@@ -76,8 +83,7 @@ mv "$work/log" "$work/holiday.log"
 # The bell run: Friday 23 October from 09:28 New York, AAPL and the S&P 500,
 # Yahoo answering with Thursday's quotes until the harness turns it to the
 # session's first.
-rm -rf "$STONKS_FAKE_STATE" "$XDG_CACHE_HOME/grvc.stonks"
-mkdir -p "$STONKS_FAKE_STATE"
+fresh_state
 echo bell-2026-10-23-0929 listings-2026-10-07-1455 > "$STONKS_FAKE_STATE/overnight.set"
 printf '{ "version": 1, "symbols": ["AAPL", "^GSPC"], "featured": "AAPL", "order": "manual", "refreshIntervalSec": 60 }\n' \
   > "$HOME/.config/omarchy/grvc.stonks.json"
@@ -87,8 +93,7 @@ bell_code=$code
 mv "$work/log" "$work/bell.log"
 
 # The cold run: a first start, nothing saved, LATE alone.
-rm -rf "$STONKS_FAKE_STATE" "$XDG_CACHE_HOME/grvc.stonks"
-mkdir -p "$STONKS_FAKE_STATE"
+fresh_state
 echo bell-2026-10-23-0929 listings-2026-10-07-1455 > "$STONKS_FAKE_STATE/overnight.set"
 printf '{ "version": 1, "symbols": ["LATE"], "featured": "LATE", "order": "manual", "refreshIntervalSec": 60 }\n' \
   > "$HOME/.config/omarchy/grvc.stonks.json"
@@ -109,4 +114,5 @@ for done_line in "FETCH DONE" "FETCH HOLIDAY DONE" "FETCH BELL DONE"; do
     code=1
   fi
 done
+cat "$work/unexpected.requests" >> "$STONKS_FAKE_STATE/unexpected.requests" 2> /dev/null || true
 finish "FETCH COLD DONE"

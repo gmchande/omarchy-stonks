@@ -34,8 +34,7 @@ import "plugin"
 // rows stop short of the scrollbar's gutter, an open list menu makes room
 // for itself, and the window's smallest permitted height still holds a whole
 // row. The price and change text are measured as displayed, at whatever
-// size they are fitted to. Every key-hint row is one line of six keys at
-// most. Nothing is mapped into the running shell.
+// size they are fitted to. Nothing is mapped into the running shell.
 Harness {
   id: root
   marker: "LAYOUT DONE"
@@ -1060,7 +1059,7 @@ Harness {
               return zone !== "" && form.slice(-zone.length) !== zone ? form + " " + zone : form
             })
             var notice = forms[0].slice(forms[0].indexOf(" · "))
-            if (forms[0].indexOf(cal.closures[day].split(" ")[0] + " ") !== 0 || forms[0].indexOf(" · ") < 0
+            if (forms[0].indexOf(Market.holidayName(cal.closures[day]).split(" ")[0] + " ") !== 0 || forms[0].indexOf(" · ") < 0
               || JSON.stringify(forms.slice(1)) !== JSON.stringify(["Closed" + notice, notice.charAt(3).toUpperCase() + notice.slice(4)]))
               unnamed.push(calId + " " + day + " " + forms.join(" / "))
             states.push(forms)
@@ -1373,7 +1372,7 @@ Harness {
         body.minChartHeight = Style.space(136)
         wait(50)
         var usualChart = body.chartItem.height
-        surface.fixedHeight = body.smallestHeight !== undefined ? body.smallestHeight : body.chromeHeight + body.listRowHeight
+        surface.fixedHeight = body.smallestHeight
         stub.featuredSymbol = "MZ"
         stub.range = "1D"
         stub.historyEntry = null
@@ -1566,7 +1565,7 @@ Harness {
         var searchNote = find(body.search, "searchNote")
         var inView = function(item) { return !!item && yIn(item, 0) >= yIn(view, 0) && yIn(item, item.height) <= yIn(view, view.height) }
         var reached = body.search.resultIndex === 4 && body.search.results.length === 5 && inView(lastRow) && inView(searchNote)
-          && searchNote.visible && searchNote.text === "Stonks doesn’t show currencies"
+          && searchNote.visible && searchNote.text === "Stonks doesn't show currencies"
         var reachedSaid = "on " + body.search.resultIndex + " of " + body.search.results.length + ", the view " + yIn(view, 0) + "–" + yIn(view, view.height)
           + ", the last result " + (lastRow ? yIn(lastRow, 0) + "–" + yIn(lastRow, lastRow.height) : "none")
           + ", the note \"" + searchNote.text + "\" " + yIn(searchNote, 0) + "–" + yIn(searchNote, searchNote.height)
@@ -2051,7 +2050,7 @@ Harness {
           body.openListMenu()
           wait(50)
           var menu = find(body, "listMenu")
-          menu.resumeNaming("All", "A list has that name already")
+          menu.resumeNaming("All", "All already exists")
           wait(50)
           var least = body.listMenuTop + menu.itemHeight + menu.pinnedHeight + menu.inset * 2 + body.groupGap
             + find(body, "footer").height + body.margins

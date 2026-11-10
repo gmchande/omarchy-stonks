@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The window's rows by hand through the real App and Service with real Qt
 # keys and pointer: removal, the sorted view's guards, help, moves by keys,
-# drag, and the wheel, the cursor, rows held by a close, the chart's own
+# drag, and the wheel, the cursor, a drag cancelled by a close, the chart's own
 # clicks and keys, and the footer's notices. HOME and curl are scratch.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree window-rows.qml

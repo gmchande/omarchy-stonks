@@ -381,11 +381,11 @@ Harness {
     function test_5_malformedOvernightRecovers() { guarded("test_5_malformedOvernightRecovers", checks_test_5_malformedOvernightRecovers) }
     function checks_test_5_malformedOvernightRecovers() {
       flag("OVERNIGHT.malformed", true)
-      nights.entries = { NEST: {status:"ok",bars:[{t:1,o:2,c:3}],at:1} }
+      nights.entries = { NEST: { status: "ok", bars: [{ t: 1, p: 3, s: "overnight" }], at: 1 } }
       nights.fetch(["NEST", "KILN"], 2)
       var settled = within(3000, function() { return !nights.busy })
       check("a malformed overnight listing settles the failed batch and preserves last good prints",
-        settled && nights.entries.NEST.status === "failed" && nights.entries.NEST.bars[0].c === 3 && nights.entries.NEST.bars[0].t === 1 && nights.entries.KILN.status === "failed")
+        settled && nights.entries.NEST.status === "failed" && nights.entries.NEST.bars[0].p === 3 && nights.entries.NEST.bars[0].t === 1 && nights.entries.KILN.status === "failed")
       if (!settled) { flag("OVERNIGHT.malformed", false); return }
       flag("OVERNIGHT.malformed", false)
       nights.fetch(["NEST", "KILN"], 3)

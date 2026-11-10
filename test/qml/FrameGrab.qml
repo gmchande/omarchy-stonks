@@ -109,13 +109,8 @@ Item {
     })
   }
 
-  // The frames rendered before the start was marked.
-  function framesBefore() {
-    return frames.filter(function(frame) { return frame.at < grabber.start })
-  }
-
   // Asks frames.js for its verdict on `judged` (every frame by default), in
-  // `mode` (drawin, same, edge, edgeheld, turn, or press) with the mode's
+  // `mode` (any of frames.js's, such as drawin, edge or press) with the mode's
   // own `args` (edge's band, press's fill and box, a draw-in's `plot=`).
   // The run is over: the ground goes. A verdict always comes within 9 s, a
   // failing one if frames.js gave none, so a harness waiting 10 s for it

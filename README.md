@@ -32,7 +32,7 @@ Website: [getstonks.app](https://getstonks.app)
 Stonks is made for Omarchy 4.5: it moves at the shell's own pace, keeps
 still when you turn animations off, presses in like the bar's own icons,
 and saves screenshots where Omasnap saves yours. On earlier Omarchy 4
-releases, back to 4.0, it runs without them.
+releases, back to 4.0.6, it runs without them.
 
 ```sh
 omarchy plugin add https://github.com/gmchande/omarchy-stonks.git --enable
@@ -67,8 +67,8 @@ right-click it for the window, and drag it to move it along the bar.
 
 To see where a stock was at any moment, such as the morning's low, run the
 pointer along the chart. The price and the change follow it, and so do the
-rows, through the pre-market, the session and after hours. Click the icon
-at the top left to replay the chart.
+rows, through the pre-market, the session and after hours. Click the bull
+or bear at the top left to replay the chart.
 
 Pick a range under the chart, from 1D to ALL. Every stock then shows that
 range, even after a restart. The rows always show the day.
@@ -145,9 +145,8 @@ move shows a dash until the day ahead opens. Soon after 04:00, once the new
 day's first prices arrive, the chart turns to the new day, which starts with
 the night just gone. A stock that didn't trade that night keeps its day
 until its next trade. Once the day's date has passed, the list names the
-day its rows measure, MON after midnight and FRI on Sunday night, and a row
-whose move is the night's says Overnight before its time. Over a weekend or
-a holiday the chart shows the last
+day its rows measure, MON after midnight and FRI on Sunday night. Over a
+weekend or a holiday the chart shows the last
 trading day. On Sunday night and a holiday's evening, that day comes
 first, then the night: the hours closed between them take no room, and
 the line runs on from the day's last trade to the night's first. A day
@@ -187,7 +186,8 @@ one before you add it, and Enter or a click adds it.
 To remove a row, point at it and click the × beside its symbol, or select
 it and press Delete. It leaves the list you're looking at. Removing it from
 All removes it from every list, and asks first if one of your lists holds
-it. Right-click a row to choose which lists it leaves. For 5 seconds, a
+it. Right-click a row to remove it from this list or from every list, and
+Ctrl-click it to choose its lists one by one. For 5 seconds, a
 button such as "Undo NVDA" shows beside "+ Find or add a symbol". `Ctrl+Z` also
 undoes it, until you change a list again.
 
@@ -218,7 +218,7 @@ o.bind("SUPER + SHIFT + T", "Stonks window", "omarchy-shell grvc.stonks toggleWi
 To use the window without the pill, run `omarchy plugin disable grvc.stonks`,
 then add `{ "id": "grvc.stonks" }` to `plugins` in
 `~/.config/omarchy/shell.json` to keep Stonks loaded. To bring the pill
-back, remove that entry, then run `omarchy plugin enable grvc.stonks center`.
+back, remove that entry, then run `omarchy plugin enable grvc.stonks`.
 
 To add Stonks to the app launcher:
 
@@ -247,7 +247,8 @@ own.
 
 Sounds are off until you turn them on. Press `m`, or click the speaker at
 the top right. With sounds on, adding, removing, or undoing a row makes a
-short sound, and the chart chimes as you run the pointer along it. A soft
+short sound, a screenshot clicks like a shutter, a replay plays the chart's
+line as it draws, and the chart chimes as you run the pointer along it. A soft
 bell rings as the market of the stock you last looked at opens and closes.
 The bell keeps quiet while Omarchy's Do Not Disturb is on or an app is
 recording from your microphone; the sounds of what you do still play.
@@ -288,7 +289,7 @@ screenshot editor.
 | `o` | Change the order |
 | `Shift+O` | Reverse the order |
 | `w` | Open the list menu |
-| `c` | Show the change in %, price or since the open |
+| `c` | Show the change in %, an amount or since the open |
 | `s` | Switch between smooth and retro |
 | `m` | Turn sounds on or off |
 | `r` | Refresh |
@@ -311,11 +312,11 @@ again.
   If other sites load, Yahoo may be down or out of reach. Stonks retries
   within two minutes, and `r` retries at once.
 - **"Server busy".** Yahoo asked Stonks to send fewer requests. Stonks
-  retries at the time shown, at most about half an hour on, and `r` won't
+  retries at the time shown, at most 36 minutes on, and `r` won't
   hurry it.
-- **"Not updating" or "No data" on a row, or "Can't get prices" in the
-  header.** A price hasn't come in time. When that's true of every stock
-  you follow, the header says so once instead of on every row. Rows keep
+- **"Not updating" or "No data" on a row, or "Can't get prices" on the top
+  line.** A price hasn't come in time. When that's true of every stock you
+  follow, the top line says so once instead of on every row. Rows keep
   any price they had, with its time. Stonks keeps trying on its own, less
   often the longer Yahoo stays away. If Yahoo has changed what it sends,
   only a newer Stonks can fix it.
@@ -357,8 +358,9 @@ again.
   36 minutes on.
 - **"Couldn't search · try other words".** Yahoo can't search for what you
   typed, such as an emoji. Type other words.
-- **"market hours unknown".** Stonks carries each exchange's holidays and
-  early closes, and this exchange's calendar has run out. An early Stonks
+- **"market hours unknown".** Stonks carries the holidays and early
+  closes of New York, Toronto, London and Tokyo, and this exchange's
+  calendar has run out. An early Stonks
   worked out the next open for itself and got Labor Day wrong, so now it
   says when it doesn't know. Prices and times are still right.
   [Update Stonks](#update) for a new calendar.
@@ -404,15 +406,18 @@ time, when Yahoo's charts are empty.
   hang.
 - With sounds on: `pw-play` for each sound; `pw-cat` playing silence while
   you move along the chart, so each chime plays at once; as the bell is
-  due, `bash` with `omarchy-shell notifications dndState` to check Do Not
+  due, `bash` with `omarchy-shell notifications isDnd` to check Do Not
   Disturb, and `pw-dump` to check that no app is recording; and `sh` with
   `md5sum` and `head`, once a run, to check its saved sounds.
 - For a screenshot: `sh` with `sed`, `tail`, `date`, and `head` to find
   your screenshots folder and name the file, `wl-copy` for the clipboard,
-  and `omarchy-notification-send`.
+  and `omarchy-notification-send`. A click on the notification opens the
+  picture in `omasnap`, or without it in `tensaku-edit` or the editor
+  `OMARCHY_SCREENSHOT_EDITOR` names.
 - Only when you ask for an update: `omarchy plugin update grvc.stonks` in
   a terminal, then `omarchy restart shell` when `git` shows the update
-  moved Stonks' folder.
+  moved Stonks' folder. After an update run elsewhere, `omarchy restart
+  shell` alone, when you click the footer or press `Shift+U`.
 
 **Sites**, and nothing else:
 

@@ -187,8 +187,31 @@ Item {
   readonly property var allDaySymbols: overnightSymbols.filter(function(s) {
     return !!allDayFeed.entries[s] && allDayFeed.entries[s].allDay
   })
-  // The price on top on the pill, the rows, and the hero.
-  readonly property var newestPrints: Chart.newestPrints(library, feed.quotes, overnightFeed.entries, allDayFeed.entries, calendars)
+  // The price on top on the pill, the rows, and the hero. A stock's is worked
+  // out again only when what it is read from changes (`Chart.newestPrintOf`):
+  // each builds the stock's whole day, and a price that lands changes one
+  // stock's, not every stock's. `newestKept` doesn't notify.
+  readonly property var newestKept: ({ by: {} })
+  readonly property var newestPrints: {
+    var nights = overnightFeed.entries
+    var allDay = allDayFeed.entries
+    var out = {}
+    var kept = {}
+    library.forEach(function(symbol) {
+      var quote = feed.quotes[symbol]
+      if (!quote) return
+      var night = nights[symbol]
+      var bars = night ? night.bars : null
+      var through = night ? night.through : null
+      var trades = allDay[symbol] ? allDay[symbol].allDay : null
+      var had = root.newestKept.by[symbol]
+      kept[symbol] = had && had.quote === quote && had.bars === bars && had.through === through && had.trades === trades ? had
+        : { quote: quote, bars: bars, through: through, trades: trades, newest: Chart.newestPrintOf(symbol, quote, nights, allDay, calendars) }
+      if (kept[symbol].newest) out[symbol] = kept[symbol].newest
+    })
+    root.newestKept.by = kept
+    return out
+  }
   readonly property var nights: overnightFeed.entries
   readonly property var allDay: allDayFeed.entries
   // Where Robinhood's trades fill stretches Yahoo left empty, each logged
@@ -580,8 +603,8 @@ Item {
     }
     root.refreshRest()
   }
-  // Rows never draw Robinhood's prints: for 150 rows they come to two
-  // answers of 4 MB each.
+  // Only the charts on show: the rows' prints come on their own five-minute
+  // asks, and for 150 rows they are two answers of 4 MB each.
   function refreshRest() {
     var now = root.wallSecond()
     root.showHistory(true)
@@ -987,10 +1010,6 @@ Item {
   // started inside a read's handlers (fileview.cpp, operationFinished).
   function writeDataFile(settings) {
     var body = JSON.stringify(settings, null, 2) + "\n"
-    if (typeof dataFile.setText !== "function") {
-      console.warn("stonks: cannot write " + root.dataPath)
-      return
-    }
     var before = dataFile.text()
     if (body === before && root.staleTexts === null) return
     if (root.staleTexts === null) root.staleTexts = {}

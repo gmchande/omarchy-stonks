@@ -176,7 +176,7 @@ Harness {
     // shot in the same second keeps the first: its name ends "-2".
     function landed(shot, symbol, said, folder, editor) {
       var named = new RegExp("^stonks-" + symbol + "-\\d{4}-\\d\\d-\\d\\d_\\d\\d-\\d\\d-\\d\\d(-\\d+)?\\.png$")
-      var expected = ["Screenshot saved to clipboard and file", "Edit with Super + Alt + , (or click this)",
+      var expected = ["Screenshot saved to clipboard and file", "Click to edit",
         "--image", shot.file, "--exec", editor || "tensaku-edit", shot.file]
       var problems = []
       if (shot.added !== 1) problems.push(shot.added + " pictures saved")

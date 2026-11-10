@@ -2,7 +2,6 @@ import QtQuick
 import QtTest
 import Quickshell
 import Quickshell.Io
-import qs.Commons
 import qs.Ui
 import "plugin/Chart.js" as Chart
 import "plugin/Quote.js" as Quote
@@ -97,7 +96,7 @@ Harness {
     settings: ({ symbols: [] })
   }
   // A real pill whose own loader loads the copied Panel, never mapped, so
-  // its wheel reaches Panel.featureNext as it does on the bar.
+  // its wheel reaches the service's featureStep as it does on the bar.
   Stonks.BarWidget {
     id: pill
     bar: api

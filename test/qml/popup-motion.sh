@@ -2,8 +2,9 @@
 # The panel's card edge in motion through the real Panel and Service with
 # real Qt keys, judged on rendered frames: a list switch either way, the key
 # sheet closing, a removal, an add that lands, the list menu, and search
-# opening and closing each ease the edge in 160 ms, the footer riding it
-# whole where it shows; an open from closed holds its fitted height. The
+# opening and closing each ease the edge in 200 ms (160 on Omarchy 4.0),
+# the footer riding it whole where it shows; an open from closed holds its
+# fitted height. The
 # pill's animal turns column by column in 200 ms as its day crosses its
 # close, and a wheel step switches it at once.
 # The shell's layer-shell card window does not load offscreen, so the copy

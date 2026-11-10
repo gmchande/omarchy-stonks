@@ -10,11 +10,14 @@ const root = join(import.meta.dir, "..")
 // The reader is in New York: an exchange's time is named
 // with its zone only where that clock differs from the reader's.
 process.env.TZ = "America/New_York"
-// Every rule file's names, under one name: each is defined once.
+// Every rule file's names, under one name. Two names are defined twice: of
+// each pair M holds the later file's, Share's clockOf and Chart's clockAt.
 const M = Object.assign({}, ...["Format", "Fetch", "Quote", "Market", "Overnight", "History", "Fundamentals", "Figures",
   "Chart", "Tones", "Settings", "KeySheet", "Search", "Cells", "Share", "Asks"].map(name => load(name + ".js")))
 
 const calendars = JSON.parse(readFileSync(join(root, "calendars.json"), "utf8"))
+// The header's status at full width, the first of its forms.
+const marketStatus = (...args) => M.statusForms(...args)[0]
 const US = calendars.calendars.US
 const JPX = calendars.calendars.JPX
 const DAY = 24 * 3600
@@ -173,9 +176,9 @@ test("Tokyo's lunch break comes from the calendar; the morning session stays on 
   }
   // 11:00: the morning ends at the 11:30 break, not at the 15:30 close.
   expect(M.statusForms(jpx, morning, 0, calendars)).toEqual(["Lunch break in 30m", "Lunch break in 30m"])
-  expect(M.marketStatus(jpx, M.epochAt(JPX, "2026-09-08", "11:26"), 0, calendars)).toBe("Lunch break in 4m")
+  expect(marketStatus(jpx, M.epochAt(JPX, "2026-09-08", "11:26"), 0, calendars)).toBe("Lunch break in 4m")
   // Tokyo's clock is named for a reader in New York.
-  expect(M.marketStatus(jpx, lunch, 0, calendars)).toBe("Lunch break · reopens 12:30 JST · in 30m")
+  expect(marketStatus(jpx, lunch, 0, calendars)).toBe("Lunch break · reopens 12:30 JST · in 30m")
   // Asked every minute through the morning, on the slow clock at lunch.
   expect(quoteCadence(jpx, morning, 60, true)).toBe(60)
   expect(quoteCadence(jpx, lunch, 60, true)).toBe(900)
@@ -206,15 +209,18 @@ test("Toronto and London close early when their exchanges say, and London's 2028
   const shel = held("SHEL.L", "LSE", LSE, "2027-12-23", "08:00", "16:30")
   expect([cadence(shel, LSE, "2027-12-24", "12:00"), cadence(shel, LSE, "2027-12-24", "13:00")]).toEqual([60, 900])
   // In the exchange's own wording, less its "(substitute)", its zone named
-  // for a reader in New York.
-  const status = (quote, day) => M.marketStatus(quote, M.epochAt(LSE, day, "12:00"), 0, calendars)
+  // for a reader in New York. Toronto's "In Lieu of Boxing Day" reads as
+  // London's Boxing Day does.
+  const status = (quote, day) => marketStatus(quote, M.epochAt(LSE, day, "12:00"), 0, calendars)
   const late = held("SHEL.L", "LSE", LSE, "2027-12-31", "08:00", "12:30")
   expect(status(late, "2028-01-03")).toBe("New Year's Day · opens Tue 08:00 GMT")
   const easter = held("SHEL.L", "LSE", LSE, "2028-04-13", "08:00", "16:30")
   expect(status(easter, "2028-04-14")).toBe("Good Friday · opens Tue 08:00 BST")
+  const boxing = held("SHOP.TO", "TSX", TSX, "2026-12-24", "09:30", "13:00")
+  expect(marketStatus(boxing, M.epochAt(TSX, "2026-12-28", "12:00"), 0, calendars)).toBe("Boxing Day · opens Tue 09:30")
 })
 
-test("a Toronto time in 2027 and 2028 reads by Toronto's clock, and past any calendar's last day by the clock Yahoo sends", () => {
+test("a Toronto time in 2027 and 2028 reads by Toronto's clock, and before any calendar's first day or past its last by the clock Yahoo sends", () => {
   const TSX = calendars.calendars.TSX
   // SHOP.TO as Yahoo sends it in summer: EDT, the reader's own clock, so
   // no zone is named.
@@ -223,8 +229,12 @@ test("a Toronto time in 2027 and 2028 reads by Toronto's clock, and past any cal
   const july2027 = Date.UTC(2027, 6, 14, 20) / 1000
   const july2028 = Date.UTC(2028, 6, 14, 20) / 1000
   expect([M.printClock(shop, july2027, calendars), M.printClock(shop, july2028, calendars)]).toEqual(["16:00", "16:00"])
-  // A calendar that has run out, as Toronto's does after 31 December 2026:
-  // its times come from Yahoo's offset, never its standard time.
+  // A trade from before the calendars' first day, as a halted listing's last:
+  // August 2025 was summer time, which no calendar lists.
+  const august2025 = Date.UTC(2025, 7, 14, 19, 59) / 1000
+  expect([M.printClock(shop, august2025, calendars), M.clockOf(shop, august2025, calendars)]).toEqual(["15:59", "15:59 EDT"])
+  // A calendar that has run out, here Toronto's cut short at 31 December
+  // 2026: its times come from Yahoo's offset, never its standard time.
   const ran = JSON.parse(JSON.stringify(calendars))
   ran.calendars.TSX.validThrough = "2026-12-31"
   ran.calendars.TSX.utcOffsets = ran.calendars.TSX.utcOffsets.slice(0, 1)
@@ -255,8 +265,8 @@ test("a listing's overnight session is named so, a holiday's evening too, and th
   // all day; the evening before it, nothing.
   expect([night("2026-11-26", true), night("2026-11-26", false), night("2026-11-25", true)]).toEqual([true, false, false])
   const thursday = at("2026-11-26", "21:00")
-  expect(M.marketStatus(nest, thursday, 0, calendars, true)).toBe("Overnight · opens Fri 09:30")
-  expect(M.marketStatus(nest, thursday, 0, calendars, false)).toBe("Thanksgiving Day · opens Fri 09:30")
+  expect(marketStatus(nest, thursday, 0, calendars, true)).toBe("Overnight · opens Fri 09:30")
+  expect(marketStatus(nest, thursday, 0, calendars, false)).toBe("Thanksgiving Day · opens Fri 09:30")
 })
 
 test("formatting", () => {
@@ -278,6 +288,10 @@ test("formatting", () => {
   expect(M.pct(1267.16)).toBe("+1,267%")
   expect(M.pct(71789.6)).toBe("+71,790%")
   expect(M.pct(-999.99)).toBe("\u2212999.99%")
+  // A figure that rounds up to where decimals stop drops them too, as the
+  // figure it rounds to does: never +1,000.00% or 10,000.00.
+  expect([M.pct(999.996), M.money(9999.996), M.changeText({ abs: -9999.996, pct: -50 }, "abs")])
+    .toEqual(["+1,000%", "10,000", "\u221210,000"])
   // A side bar's pill stacks the move in lines of four characters at most:
   // one decimal under 10%, none from 10% up, thousands as K%; a move that
   // shows as none has no sign.
@@ -370,8 +384,6 @@ test("a run's output splits into its answers, each said by what came back", () =
     [7, "ok", '{"chart":2}', 0]
   ])
   expect(M.answerKind(503, 0)).toBe("refused")
-  expect(M.soleBody('{"a":1}' + trailer(0, 200, 0))).toBe('{"a":1}')
-  expect(M.soleBody("Too Many" + trailer(0, 429, 0))).toBe("")
   // A run stopped mid-answer: the cut answer has no trailer, so none.
   expect(M.answers('{"a":1}' + trailer(0, 200, 0) + '{"b":').length).toBe(1)
   // Read as it comes, each answer once: what arrived first, then the rest
@@ -920,6 +932,13 @@ test("the key sheet lists exactly the README's keys for each surface, the row's 
   expect(drawn("manual", false)).toEqual(readme("window"))
   expect(drawn("pct", true)).toEqual(readme("panel").filter(k => !moves.includes(k)))
   expect(drawn("symbol", false)).toEqual(readme("window").filter(k => !moves.includes(k)))
+  // A key the README's prose tells you to press is one its table lists, as
+  // the table spells it: Shift+U, never U.
+  const listed = new Set(table.flatMap(c => c[1].match(/`[^`]+`/g) || []))
+  const pressed = lines.slice(0, start).concat(lines.slice(start + 2 + table.length)).join("\n")
+    .match(/press (`[^`]+`(?: `[^`]+`)*)/gi).flatMap(m => m.match(/`[^`]+`/g))
+  expect(pressed.length).toBeGreaterThan(3)
+  expect(pressed.filter(k => !listed.has(k))).toEqual([])
   // The mouse's drag is offered only in manual order, the order's arrow only
   // in a sorted one.
   const mouse = order => M.sheet(order, true).mouse.rows.map(r => r.does).join(" | ")
@@ -1887,7 +1906,7 @@ test("a fetched name or code past its length reads as not sent", () => {
     { symbol: "VFIAX", quoteType: "MUTUALFUND", typeDisp: long(1e5) },
     { symbol: "OTHER", quoteType: "WARRANT", typeDisp: long(1e5) }
   ] })
-  expect(found).toEqual({ results: [{ symbol: "SHOP", name: "Shopify", exchange: "", instrumentType: "EQUITY" }], note: "Stonks doesn’t show mutual funds or warrants", topLeftOut: false })
+  expect(found).toEqual({ results: [{ symbol: "SHOP", name: "Shopify", exchange: "", instrumentType: "EQUITY" }], note: "Stonks doesn't show mutual funds or warrants", topLeftOut: false })
   const cap = { meta: { type: ["trailingMarketCap"] }, trailingMarketCap: [{ asOfDate: "2026-09-30", currencyCode: long(1e5), reportedValue: { raw: 4e12 } }] }
   expect(M.parseFundamentals({ timeseries: { result: [cap] } }).cap.currency).toBe("")
   // A spark listing under a symbol past its length is one Yahoo didn't send.

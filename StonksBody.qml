@@ -154,8 +154,9 @@ Item {
   property var entries: ({})
   // Each listing's newest price since its close.
   property var newestPrints: ({})
-  // Robinhood's answers, for the day each row's line draws, and the clock
-  // that slides its start, held still while no screen shows the surface.
+  // Robinhood's answers, for the day each row's line draws, held still while
+  // the surface is closed; and the clock that slides its start, held still
+  // while no screen shows the surface.
   property var nights: ({})
   property var allDay: ({})
   property int slideAt: 0
@@ -253,6 +254,8 @@ Item {
   readonly property var history: motion.history
   // A range whose first fetch failed: the day stands in, figures and all.
   readonly property bool historyFailed: !!chart && chart.failed
+  // Worked out here from the same two values the chart reads, not read from
+  // the chart: its own would turn true a binding before `history` here does.
   readonly property bool historyShown: historyActive && !!history
   readonly property var historyStats: historyShown ? History.periodStats(history) : null
   readonly property var historyBar: historyShown && scrubT
@@ -637,7 +640,7 @@ Item {
   }
   onSaveFailedChanged: if (!saveFailed && note === stillUnsaved) clearNote()
 
-  // `pointed`: put back by a click, as PUT BACK in search can be (`select`).
+  // `pointed`: put back by a click, as UNDO in search can be (`select`).
   function undoRemoval(pointed) {
     if (!service) return
     showingHelp = false
@@ -1069,7 +1072,6 @@ Item {
     cameraLit: root.cameraLit
     animal: root.animal
     seen: root.seen && root.screenOn
-    ground: root.ground
     scrubbing: root.scrubT !== 0
     live: root.heroLive
     trouble: !!root.troubleForms
@@ -1234,7 +1236,6 @@ Item {
     retro: root.retro
     foreground: root.foreground
     dim: root.dim
-    dimmer: root.dimmer
     fontFamily: root.fontFamily
     gutter: root.gutter
     // Short, so a list's name fits the panel's field.
@@ -1398,7 +1399,6 @@ Item {
     foreground: root.foreground
     dim: root.dim
     fontFamily: root.fontFamily
-    retro: root.retro
     onCloseRequested: root.showingHelp = false
   }
 

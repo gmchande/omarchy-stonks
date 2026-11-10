@@ -9,6 +9,10 @@
 # - The Quickshell harnesses (test/qml/*.sh): they need Quickshell and a
 #   Wayland session. The crash handling's self-check runs: its Quickshell is
 #   a stand-in.
+# - The font's glyphs (test/font.js): it reads the installed JetBrainsMono
+#   Nerd Font.
+# - Changed tests failing on the code before the change (test/before.js): it
+#   runs the unit tests and the harnesses a branch changes.
 #
 # And the maintainer's review kit (test/review.sh): pictures and frame
 # timings vary by machine.
