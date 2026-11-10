@@ -101,10 +101,9 @@ Item {
     var range = dataSettings.range
     // Receipts and histories only when the chart needs them, so a receipt
     // for a quoted symbol on the day recomputes nothing.
-    var chart = Chart.viewChart(featured, range, feed.quotes,
+    var chart = root.keptDay(featured, Chart.viewChart(featured, range, feed.quotes,
       feed.quotes[featured] ? ({}) : feed.entries, range === "1D" ? ({}) : historyFeed.entries,
-      overnightFeed.entries, allDayFeed.entries, calendars, root.viewSlideAt)
-    root.keepDay(featured, chart, overnightFeed.entries, allDayFeed.entries)
+      overnightFeed.entries, allDayFeed.entries, calendars, root.viewSlideAt), overnightFeed.entries, allDayFeed.entries)
     return {
       featured: featured,
       range: range,
@@ -127,32 +126,32 @@ Item {
     var quotes = own ? previewFeed.quotes : feed.quotes
     var entries = own ? previewFeed.entries : feed.entries
     var range = view.range
-    var chart = Chart.viewChart(symbol, range, quotes, quotes[symbol] ? ({}) : entries,
-      range === "1D" ? ({}) : historyFeed.entries, overnightFeed.entries, allDayFeed.entries, calendars, root.viewSlideAt)
-    root.keepDay(symbol, chart, overnightFeed.entries, allDayFeed.entries)
+    var chart = root.keptDay(symbol, Chart.viewChart(symbol, range, quotes, quotes[symbol] ? ({}) : entries,
+      range === "1D" ? ({}) : historyFeed.entries, overnightFeed.entries, allDayFeed.entries, calendars, root.viewSlideAt),
+      overnightFeed.entries, allDayFeed.entries)
     return Object.assign({}, view, { featured: symbol, chart: chart })
   }
   readonly property string featuredSymbol: view.featured
   readonly property var shown: view.shown
-  // Reused while built from the same objects, its quote and an all-day
-  // listing's prints and reach, and while its start hasn't slid: an answer
-  // for another symbol repaints nothing, nor does a clock that moves no
-  // start, and a preview's Yahoo day never stands in once it is added.
+  // The chart to show: `chart`, with the day built for it before while that
+  // was built from the same objects, its quote and an all-day listing's
+  // prints and reach, and while its start hasn't slid. So an answer for
+  // another symbol repaints nothing, nor does a clock that moves no start,
+  // and a preview's Yahoo day never stands in once it is added. `builtDays`
+  // is a cache the bindings above fill as they read; it doesn't notify.
   readonly property var builtDays: ({})
-  function keepDay(symbol, chart, nights, allDay) {
-    if (!chart || !chart.quote || chart.day === chart.quote) return
+  function keptDay(symbol, chart, nights, allDay) {
+    if (!chart || !chart.quote || chart.day === chart.quote) return chart
     var tradability = allDay ? allDay[symbol] : null
     var night = tradability && tradability.allDay ? nights[symbol] : null
     var bars = night ? night.bars : null
     var through = night ? night.through : null
     var start = chart.day.axis ? chart.day.axis.start : null
     var built = builtDays[symbol]
-    if (built && built.quote === chart.quote && built.bars === bars && built.through === through && built.start === start) {
-      chart.day = built.day
-      chart.latest = built.latest
-    } else {
-      builtDays[symbol] = { quote: chart.quote, bars: bars, through: through, start: start, day: chart.day, latest: chart.latest }
-    }
+    if (built && built.quote === chart.quote && built.bars === bars && built.through === through && built.start === start)
+      return Object.assign({}, chart, { day: built.day, latest: built.latest })
+    builtDays[symbol] = { quote: chart.quote, bars: bars, through: through, start: start, day: chart.day, latest: chart.latest }
+    return chart
   }
   // The price on top on the pill, the rows, and the hero. A stock's is worked
   // out again only when what it is read from changes (`Chart.newestPrintOf`):
