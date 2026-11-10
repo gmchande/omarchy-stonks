@@ -17,9 +17,15 @@ import "Settings.js" as Settings
 import "Share.js" as Share
 import "Motion.js" as Motion
 // The body the window and the panel share. It reads the service and acts
-// through it; the surface keeps its lifecycle, keys, and look.
+// through it; the surface keeps its lifecycle, keys, and look. Each of its
+// jobs stands under a banner: what it is handed and what the service says,
+// then the stock on show, the rows, the header's words and what fits, then
+// what opens over the rows, the keys, the chart's actions and the footer's
+// notes, and last the pieces it places.
 Item {
   id: root
+
+  // ---- What the panel or the window hands it
 
   property var service: null
   property var updates: null
@@ -33,118 +39,52 @@ Item {
   // The panel's: Tab steps to the next widget's panel.
   property bool switchesPanels: false
   property int margins: 0
-  // The panel's card eases to a new height while the body lays out at once,
-  // so rows past the edge are out of sight.
-  property real edge: Math.min(height, fittedHeight(Infinity))
-  // A band's gap stands between the band's blocks, a group's gap between a
-  // thing and what it heads, measured from words, not a control's fill.
-  readonly property int bandGap: Style.space(16)
-  readonly property int groupGap: Style.space(8)
-  // Every block's words stand `inset` in from the rows' fills, which leave a
-  // `gutter` on the right for the scrollbar.
-  readonly property int inset: Style.space(10)
-  readonly property int gutter: Style.space(8)
-  readonly property int textLeft: margins + inset
-  readonly property int textRight: margins + gutter + inset
+
   property int chartHeight: Style.space(190)
   // Set (the window's 136 px), the chart takes the surface's spare height
   // and gives way first as it gets short, so three rows still show. The
   // panel's 0 never changes, so no chartHeight change finds it stale.
   property int minChartHeight: 0
+
+  // The height the screen leaves the panel's body; 0 in the window.
+  property int screenRoom: 0
+
+  // The most height the panel's card gives the body; 0 in the window. The
+  // rows' sight is measured at that height, whatever the card has shrunk to
+  // for the key sheet or a view.
+  property int rowsRoom: 0
+
+  // The panel's own screen on. The panel's asks heed only every screen
+  // off: one that waited for its own screen might not ask again when it
+  // wakes. The animal's fidget, which asks for nothing, heeds this too.
+  property bool screenOn: true
+
   property color foreground: Commons.Color.foreground
   property string fontFamily: Style.font.family
   property color upColor: Commons.Color.foreground
   property color downColor: Commons.Color.urgent
-  // The added symbol the chart changes to once its answer is in, its row in
-  // view, and the list at rest.
-  property string landing: ""
-  property bool landingJoined: false
-  // A Show of a member still arriving: featured even if its first fetch fails.
-  property bool landingShows: false
-  // Picked by a click: its row's × waits for the pointer to move, unless it
-  // moves over the rows before the row joins.
-  property bool landingPointed: false
-  // Each add is heard as its row joins, whatever is featured or added meanwhile.
-  property var unheardAdds: []
   // The surface's colour, which a moving row carries.
   property color ground: Commons.Color.background
-  property var rangeOptions: History.historyRanges()
+
+  // How this surface looks, for everything drawn on it.
+  readonly property Look look: Look {
+    retro: root.retro
+    fontFamily: root.fontFamily
+    foreground: root.foreground
+    ground: root.ground
+    upColor: root.upColor
+    downColor: root.downColor
+  }
 
   signal keysReleased()
   signal refreshRequested()
 
-  // The moment a scrub or a replay shows.
-  readonly property int scrubT: motion.scrubT
-  property bool adding: false
-  property string previewSymbol: ""
-  property bool showingHelp: false
-  property bool listMenuOpen: false
-  property bool managingLists: false
-  property string listsSymbol: ""
-  property var rowMenu: null
-  // It stays where it opened, so a resize, as tiling makes, closes it, as a
-  // desktop's menus close.
-  onWidthChanged: rowMenu = null
-  onHeightChanged: rowMenu = null
-  // It also closes when its list, its symbol's lists, or its row change. A
-  // binding, not a handler: a handler could read the list's name before it
-  // moves, and the lists can keep their array when only the list changes.
-  function rowMenuGround(symbol) {
-    if (view.rows.indexOf(symbol) < 0) return ""
-    return JSON.stringify([view.list, lists.filter(function(list) { return list.symbols.indexOf(symbol) >= 0 }).map(function(list) { return list.name })])
-  }
-  readonly property string rowMenuGroundNow: rowMenu ? rowMenuGround(rowMenu.symbol) : ""
-  // Closed a turn later, so the binding doesn't read itself again.
-  onRowMenuGroundNowChanged: if (rowMenu && rowMenuGroundNow !== rowMenu.ground) Qt.callLater(function() {
-    if (root.rowMenu && root.rowMenuGround(root.rowMenu.symbol) !== root.rowMenu.ground) root.rowMenu = null
-  })
-  // Why an action did nothing, or what a screenshot did, said in the
-  // footer's place for a moment.
-  property string note: ""
-  // After a screenshot, the header's camera stays lit until the next open.
-  property bool cameraLit: false
-  // The panel's first-run hint above the footer, cleared at the next open.
-  property string hint: ""
-  function showFirstRunHint() {
-    hint = "Drag the pill in your bar to move it\nMiddle-click changes its look · right-click opens the window"
-  }
-  // The height the screen leaves the panel's body; 0 in the window.
-  property int screenRoom: 0
-  readonly property int chromeBesideHeader: margins * 2 + heroBand.heightBesideChart + footer.barHeight + groupGap * 3
-  readonly property int chromeBesideScreenChart: chromeBesideHeader + header.height
-  // The title gives way after the chart: where three rows won't fit beside
-  // the least chart, the header is the status words alone.
-  readonly property bool headerTitled: screenRoom <= 0
-    || chromeBesideHeader + header.titledHeight + leastScreenChart + threeRowsHeight <= screenRoom
-  // From the screen's room, never the card's, which fits the chart.
-  readonly property int leastScreenChart: Math.round(chartHeight / 5)
-  readonly property int screenChartHeight: screenRoom <= 0 ? chartHeight
-    : Math.max(leastScreenChart, Math.min(chartHeight, screenRoom - chromeBesideScreenChart - threeRowsHeight))
-  // The hint gives way, after the chart, where it would leave fewer than
-  // three rows: read from the screen's room, never the card's, which fits
-  // the footer.
-  readonly property bool hintShown: hint !== "" && (screenRoom <= 0
-    || chromeBesideScreenChart + screenChartHeight + footer.hintRoom + threeRowsHeight <= screenRoom)
-  // A save that didn't land is said ahead of the update, since a restart
-  // would lose the changes. Where the fix won't fit beside the notice, it
-  // drops "or remove" and keeps the file's full path.
-  readonly property bool unsaved: settingsUnreadable ? editsUnsaved : saveFailed
-  readonly property string notice: unsaved ? "Your changes aren't saved"
-    : settingsUnreadable ? "Couldn't load your lists"
-    : updatedTo !== "" ? "Updated to " + updatedTo + " · click to restart the shell" : ""
-  readonly property string listsFile: "~/" + Settings.listsFile(service ? service.pluginId : "")
-  readonly property var noticeActions: settingsUnreadable
-    ? ["fix or remove " + listsFile, "fix " + listsFile]
-    : unsaved ? ["click to try again"] : []
-  readonly property string updateOffer: releasedTo !== "" && updatedTo === "" ? releasedTo : ""
-  readonly property bool restartable: !unsaved && !settingsUnreadable
-  readonly property bool restartOffered: updatedTo !== "" && restartable
-  function runOffered() {
-    if (!updates) return
-    if (restartOffered) updates.restart()
-    else if (updateOffer !== "") updates.update(restartable)
-    else say("Nothing to update")
-  }
+  readonly property alias watchlist: watchlist
+  readonly property alias search: search
+  readonly property alias chartItem: heroBand.chartItem
+  readonly property alias motion: motion
+
+  // ---- What the service says, held still while the surface is closed
 
   readonly property var emptyView: ({ featured: "", range: "1D", list: "", listKey: "=", order: "manual", reversed: false,
     rows: [], shown: [], library: [], chart: null })
@@ -171,17 +111,7 @@ Item {
   property var removal: null
   property string changeMode: "pct"
   property bool retro: false
-  // How this surface looks, for everything drawn on it.
-  readonly property Look look: Look {
-    retro: root.retro
-    fontFamily: root.fontFamily
-    foreground: root.foreground
-    ground: root.ground
-    upColor: root.upColor
-    downColor: root.downColor
-  }
   property bool soundsOn: false
-  property int chimed: -1
   // Each symbol waiting on Yahoo, by the second it began.
   property var owed: ({})
   // Symbols asked for under 2 s ago: a quote opened old isn't late yet.
@@ -236,25 +166,70 @@ Item {
   Binding on yahooPausedUntil { when: root.reading; value: root.service?.yahooGate?.pausedUntil ?? 0; restoreMode: Binding.RestoreNone }
   Binding on now { when: root.reading; value: root.service?.now; restoreMode: Binding.RestoreNone }
 
+  readonly property var calendars: service ? service.calendars : null
   readonly property var symbols: view.rows
   readonly property string listName: view.list
   readonly property string listLabel: listName !== "" ? listName : "All"
   readonly property var shown: view.shown
-  readonly property var calendars: service ? service.calendars : null
   readonly property string featuredSymbol: view.featured
   readonly property string range: view.range
   readonly property string order: view.order
   readonly property bool reversed: view.reversed
+
+  function entryOf(symbol) {
+    if (entries && entries[symbol]) return entries[symbol]
+    return previewEntries && previewEntries[symbol] ? previewEntries[symbol] : null
+  }
+
+  // ---- What it tells the service
+
+  // A search held back while no screen showed it goes once one does.
+  onSurfaceOpenChanged: {
+    if (service) service.surfaceShown(root, surfaceOpen && onScreen)
+    if (!surfaceOpen) previewTo("")
+  }
+  onOnScreenChanged: {
+    if (service) service.surfaceShown(root, surfaceOpen && onScreen)
+    if (onScreen) search.pump()
+  }
+  onServiceChanged: if (service && surfaceOpen && onScreen) service.surfaceShown(root, true)
+
+  // On a screen that's on: the panel's `onScreen` doesn't follow screens
+  // turning off.
+  readonly property bool seen: surfaceOpen && onScreen && !(service && service.screensOff)
+
+  // Asked for first on open, and fetched ahead on a range.
+  readonly property var rowsInSight: surfaceOpen && onScreen && rowsShown ? watchlist.sightSymbols : []
+  onRowsInSightChanged: if (service) service.rowsSeen(root, rowsInSight)
+  // The service holds answers that would stutter the chart drawing in.
+  readonly property bool drawingIn: surfaceOpen && onScreen && motion.drawingIn
+  onDrawingInChanged: if (service) service.drawingIn(root, drawingIn)
+
+  // A rebuilt bar or a removed screen takes the panel down mid-replay.
+  Component.onDestruction: {
+    if (sounds) sounds.stopReplay(root)
+    if (service) {
+      service.surfaceShown(root, false)
+      service.preview(root, "")
+    }
+  }
+
+  Connections {
+    target: root.service
+    ignoreUnknownSignals: true
+    function onPreviewTaken(surface) { if (surface === root) root.cancelAdding() }
+    function onScreensReady() { search.pump() }
+    function onYahooBack() { if (root.onScreen) search.yahooBack() }
+  }
+
+  // ---- The stock on show
+
+  property var rangeOptions: History.historyRanges()
   readonly property var chart: motion.chart
   readonly property bool chartLoading: motion.loading
   readonly property string chartSymbol: chart ? chart.symbol : ""
   readonly property string chartRange: chart ? chart.range : "1D"
   readonly property var fundamentals: chartSymbol ? fundamentalEntries[chartSymbol] || null : null
-  readonly property int rowHeight: Style.space(30)
-  readonly property int listRowHeight: Style.space(40)
-  readonly property int rowGap: Style.space(2)
-  readonly property int rowPitch: listRowHeight + rowGap
-  readonly property int threeRowsHeight: 3 * rowPitch - rowGap
 
   readonly property bool historyActive: motion.historyActive
   readonly property var history: motion.history
@@ -267,27 +242,17 @@ Item {
   readonly property var historyBar: historyShown && scrubT
     ? History.historyBarAt(history, History.historyFraction(history, scrubT)) : null
   readonly property int scrubShown: motion.scrubShown
-  // The rows follow a scrub of the day. They stay on now for a range and for
-  // hours outside Yahoo's day, but not the coming day's pre-market, which
-  // each row's quote holds too. The quote can change before the day does:
-  // until the day comes, the scrub stands.
-  readonly property var featuredTail: featuredQuote ? Quote.tailStart(featuredQuote) : null
-  readonly property int watchlistScrubShown: historyActive || !featuredQuote || scrubShown < Quote.dayStart(featuredQuote)
-    || (!!featuredDay && !!featuredDay.axis && scrubShown >= Quote.dayEnd(featuredQuote)
-      && !(featuredTail !== null && scrubShown >= featuredTail)) ? 0 : scrubShown
+  // The moment a scrub or a replay shows.
+  readonly property int scrubT: motion.scrubT
+  readonly property real scrubX: motion.scrubX
+  readonly property bool dayScrubbed: !historyActive && scrubShown !== 0
+
   readonly property var featuredQuote: motion.quote
   // The day the 1D chart draws; its baseline is `prevClose`.
   readonly property var featuredDay: motion.day
   readonly property var featuredFreshness: Freshness.freshness(entryOf(chartSymbol || featuredSymbol), featuredQuote, now,
     owed[chartSymbol || featuredSymbol] || 0, !!asking[chartSymbol || featuredSymbol], featuredNewest)
-  readonly property int warnings: lists.length > 0 ? lists[0].symbols.filter(function(symbol) {
-    return Freshness.freshnessWarns(Freshness.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0, !!asking[symbol]))
-  }).length : 0
-  readonly property bool yahooDown: warnings > 0 && warnings === lists[0].symbols.length
-  readonly property var hostPause: Freshness.hostPause(yahooPause, yahooPausedUntil, now)
   readonly property var featuredGeometry: motion.geometry
-  readonly property real scrubX: motion.scrubX
-  readonly property bool dayScrubbed: !historyActive && scrubShown !== 0
   readonly property var featuredNewest: featuredQuote && featuredDay ? Overnight.newestTrade(featuredQuote, motion.latest, calendars, featuredDay) : null
   readonly property var dailyFeatured: featuredQuote
     ? Figures.rowModel(dayScrubbed ? featuredDay : featuredQuote, dayScrubbed ? scrubShown : 0, changeMode, featuredNewest) : null
@@ -295,6 +260,25 @@ Item {
   // A live marker is honest only when the headline and chart endpoint are the same day quote.
   readonly property bool heroLive: (!historyActive || historyFailed)
     && !scrubT && featuredFreshness.live
+
+  // Changes only at the exchange's midnight, unlike `now`.
+  readonly property int featuredToday: featuredQuote ? Figures.exchangeDay(featuredQuote, now) : 0
+  // The table holds room for both first lines' facts on every range, so a
+  // range change moves nothing.
+  readonly property var dayLine: chart ? Figures.dayLine(featuredQuote, featuredToday, featuredDay) : null
+  readonly property var rangeEnds: historyShown ? History.rangeEnds(history, historyStats, featuredQuote) : null
+  readonly property var periodLine: !chart ? null : historyShown ? History.rangeLine(history, rangeEnds, featuredQuote) : dayLine
+  readonly property var infoFactLists: !dayLine ? [] : [dayLine.facts, History.rangeFacts(dayLine.range.widest)]
+    .concat(yearLine ? [History.rangeFacts(yearLine.range.widest)] : [])
+  readonly property var yearLine: chart ? Fundamentals.yearLine(featuredQuote, fundamentals ? fundamentals.figures : null,
+    historyShown && history.range === "1Y" ? rangeEnds : null, rates,
+    (featuredDay ? featuredDay.trades || featuredDay.points : []).concat(featuredNewest ? [featuredNewest] : [])) : null
+  readonly property var rangeMarks: historyShown ? History.rangeMarks(history, rangeEnds, featuredQuote) : null
+  // Said under the price: what a scrub's move counts from, the dashed line
+  // under the pointer.
+  readonly property string baselineText: historyShown ? "┄ " + chartRange.toUpperCase() + " START " + Format.money(history.baseline, featuredQuote ? featuredQuote.priceDigits : undefined)
+    : (!historyActive && featuredDay ? "┄ " + Figures.scrubBaselineText(featuredDay, scrubShown, Figures.exchangeDay(featuredDay, now), calendars) : "")
+
   // The moment shown against the baseline; the pill's reads the day.
   readonly property string animalKind: Figures.animalKind(featured)
   // A change of chart, list, or look is no turn: the animal changes at once.
@@ -315,23 +299,30 @@ Item {
   }
   readonly property var animal: ({ kind: animalKind, chart: animalChart,
     asleep: animalSleep === 1 || animalSleep === 2, bell: animalSleep === 2 || animalSleep === 4, scrubbed: animalSleep === 3 })
-  // Changes only at the exchange's midnight, unlike `now`.
-  readonly property int featuredToday: featuredQuote ? Figures.exchangeDay(featuredQuote, now) : 0
-  // The table holds room for both first lines' facts on every range, so a
-  // range change moves nothing.
-  readonly property var dayLine: chart ? Figures.dayLine(featuredQuote, featuredToday, featuredDay) : null
-  readonly property var rangeEnds: historyShown ? History.rangeEnds(history, historyStats, featuredQuote) : null
-  readonly property var periodLine: !chart ? null : historyShown ? History.rangeLine(history, rangeEnds, featuredQuote) : dayLine
-  readonly property var infoFactLists: !dayLine ? [] : [dayLine.facts, History.rangeFacts(dayLine.range.widest)]
-    .concat(yearLine ? [History.rangeFacts(yearLine.range.widest)] : [])
-  readonly property var yearLine: chart ? Fundamentals.yearLine(featuredQuote, fundamentals ? fundamentals.figures : null,
-    historyShown && history.range === "1Y" ? rangeEnds : null, rates,
-    (featuredDay ? featuredDay.trades || featuredDay.points : []).concat(featuredNewest ? [featuredNewest] : [])) : null
-  readonly property var rangeMarks: historyShown ? History.rangeMarks(history, rangeEnds, featuredQuote) : null
-  // Said under the price: what a scrub's move counts from, the dashed line
-  // under the pointer.
-  readonly property string baselineText: historyShown ? "┄ " + chartRange.toUpperCase() + " START " + Format.money(history.baseline, featuredQuote ? featuredQuote.priceDigits : undefined)
-    : (!historyActive && featuredDay ? "┄ " + Figures.scrubBaselineText(featuredDay, scrubShown, Figures.exchangeDay(featuredDay, now), calendars) : "")
+
+  // ---- The rows
+
+  // The rows follow a scrub of the day. They stay on now for a range and for
+  // hours outside Yahoo's day, but not the coming day's pre-market, which
+  // each row's quote holds too. The quote can change before the day does:
+  // until the day comes, the scrub stands.
+  readonly property var featuredTail: featuredQuote ? Quote.tailStart(featuredQuote) : null
+  readonly property int watchlistScrubShown: historyActive || !featuredQuote || scrubShown < Quote.dayStart(featuredQuote)
+    || (!!featuredDay && !!featuredDay.axis && scrubShown >= Quote.dayEnd(featuredQuote)
+      && !(featuredTail !== null && scrubShown >= featuredTail)) ? 0 : scrubShown
+
+  // Read from the view: `symbols` may lag a switch.
+  readonly property var breadth: Object.assign({ list: view.list },
+    Figures.listBreadth(view.rows, quotes, watchlistScrubShown, changeMode, newestTrades))
+
+  // ---- The header's words
+
+  readonly property int warnings: lists.length > 0 ? lists[0].symbols.filter(function(symbol) {
+    return Freshness.freshnessWarns(Freshness.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0, !!asking[symbol]))
+  }).length : 0
+  readonly property bool yahooDown: warnings > 0 && warnings === lists[0].symbols.length
+  readonly property var hostPause: Freshness.hostPause(yahooPause, yahooPausedUntil, now)
+
   readonly property string unavailableText: chartRange.toUpperCase() + " unavailable"
   readonly property bool offersRetry: headerText === unavailableText
   readonly property string loadingText: "Loading" + (featuredSymbol ? " " + featuredSymbol + (range !== "1D" ? " " + range : "") : "")
@@ -360,6 +351,45 @@ Item {
     return [headerWhenMissing]
   }
   readonly property string headerText: headerForms[0] || ""
+
+  // ---- What fits
+
+  // The panel's card eases to a new height while the body lays out at once,
+  // so rows past the edge are out of sight.
+  property real edge: Math.min(height, fittedHeight(Infinity))
+  // A band's gap stands between the band's blocks, a group's gap between a
+  // thing and what it heads, measured from words, not a control's fill.
+  readonly property int bandGap: Style.space(16)
+  readonly property int groupGap: Style.space(8)
+  // Every block's words stand `inset` in from the rows' fills, which leave a
+  // `gutter` on the right for the scrollbar.
+  readonly property int inset: Style.space(10)
+  readonly property int gutter: Style.space(8)
+  readonly property int textLeft: margins + inset
+  readonly property int textRight: margins + gutter + inset
+
+  readonly property int rowHeight: Style.space(30)
+  readonly property int listRowHeight: Style.space(40)
+  readonly property int rowGap: Style.space(2)
+  readonly property int rowPitch: listRowHeight + rowGap
+  readonly property int threeRowsHeight: 3 * rowPitch - rowGap
+
+  readonly property int chromeBesideHeader: margins * 2 + heroBand.heightBesideChart + footer.barHeight + groupGap * 3
+  readonly property int chromeBesideScreenChart: chromeBesideHeader + header.height
+  // The title gives way after the chart: where three rows won't fit beside
+  // the least chart, the header is the status words alone.
+  readonly property bool headerTitled: screenRoom <= 0
+    || chromeBesideHeader + header.titledHeight + leastScreenChart + threeRowsHeight <= screenRoom
+  // From the screen's room, never the card's, which fits the chart.
+  readonly property int leastScreenChart: Math.round(chartHeight / 5)
+  readonly property int screenChartHeight: screenRoom <= 0 ? chartHeight
+    : Math.max(leastScreenChart, Math.min(chartHeight, screenRoom - chromeBesideScreenChart - threeRowsHeight))
+  // The hint gives way, after the chart, where it would leave fewer than
+  // three rows: read from the screen's room, never the card's, which fits
+  // the footer.
+  readonly property bool hintShown: hint !== "" && (screenRoom <= 0
+    || chromeBesideScreenChart + screenChartHeight + footer.hintRoom + threeRowsHeight <= screenRoom)
+
   readonly property int chromeHeight: chartFitsSurface ? chromeBesideChart + shownChartHeight
     : margins * 2 + header.height + heroBand.implicitHeight + footer.height + groupGap * 3
   readonly property int chromeBesideChart: margins * 2 + header.height + heroBand.heightBesideChart + footer.height + groupGap * 3
@@ -378,48 +408,14 @@ Item {
   readonly property int searchHeight: margins * 2 + header.height + heroBand.implicitHeight
     + groupGap * 2 + search.desiredHeight
   readonly property int wholeListHeight: wholeRowsHeight(height - chromeHeight)
-  // The most height the panel's card gives the body; 0 in the window. The
-  // rows' sight is measured at that height, whatever the card has shrunk to
-  // for the key sheet or a view.
-  property int rowsRoom: 0
+
   readonly property int rowsSightHeight: rowsRoom > 0 ? wholeRowsHeight(rowsRoom - chromeHeight) : wholeListHeight
   readonly property int listMenuTop: margins + header.height + groupGap + heroBand.implicitHeight + Style.space(4)
   // The menu ends one gap above the footer, which stays in sight under it.
   readonly property int listMenuBottom: listMenuTop + listMenu.contentHeight + groupGap + footer.height + margins
   readonly property int listMenuLeastBottom: listMenuTop + listMenu.leastHeight + groupGap + footer.height + margins
-  readonly property bool listViewOpen: managingLists || listsSymbol !== ""
   readonly property int listViewHeight: margins * 2 + header.height + heroBand.implicitHeight + groupGap * 2
     + (managingLists ? manageLists.contentHeight : symbolLists.contentHeight)
-  readonly property bool rowsShown: !showingHelp && !adding && !listViewOpen
-  readonly property bool ownsKeys: adding || listMenuOpen || listViewOpen || rowMenu !== null
-  readonly property var putBack: {
-    if (!removal || members.indexOf(removal.symbol) >= 0) return null
-    var was = Settings.listChoices(removal.before).filter(function(list) { return list.name === listName })[0]
-    if (!was || was.symbols.indexOf(removal.symbol) < 0) return null
-    var quote = removal.quote
-    return { symbol: removal.symbol, name: quote ? quote.name : removal.symbol, exchange: quote ? quote.exchange : "" }
-  }
-  readonly property var keySheet: KeySheet.sheet()
-  // Read from the view: `symbols` may lag a switch.
-  readonly property var breadth: Object.assign({ list: view.list },
-    Figures.listBreadth(view.rows, quotes, watchlistScrubShown, changeMode, newestTrades))
-  readonly property alias watchlist: watchlist
-  readonly property alias search: search
-  // The list's own stocks the search names, each with the move its row
-  // shows at rest. Asked only while search is open.
-  readonly property var ownFound: adding ? Search.ownMatches(search.searchText, members, quotes).map(function(symbol) {
-    var quote = quotes[symbol]
-    var row = quote ? Figures.rowModel(quote, 0, changeMode, newestTrades[symbol] || null) : null
-    return { symbol: symbol, name: quote ? quote.name : "", exchange: quote ? quote.exchange : "",
-      move: row ? Format.lookSigns(row.changeLine, retro) : "", tone: row ? row.tone : "flat" }
-  }) : []
-  readonly property alias chartItem: heroBand.chartItem
-  readonly property alias motion: motion
-
-  function entryOf(symbol) {
-    if (entries && entries[symbol]) return entries[symbol]
-    return previewEntries && previewEntries[symbol] ? previewEntries[symbol] : null
-  }
 
   function rowsHeight(count, space) {
     var rows = Math.min(count, Math.floor((Math.max(0, space) + rowGap) / rowPitch))
@@ -440,377 +436,23 @@ Item {
     return Math.max(rows, least, Math.min(chromeHeight + rowsHeight(Infinity, maxHeight - chromeHeight), view))
   }
 
-  onFeaturedSymbolChanged: if (featuredSymbol !== landing) landing = ""
+  // ---- What is open over the rows
 
-  // A search held back while no screen showed it goes once one does.
-  onSurfaceOpenChanged: {
-    if (service) service.surfaceShown(root, surfaceOpen && onScreen)
-    if (!surfaceOpen) previewTo("")
-  }
-  onOnScreenChanged: {
-    if (service) service.surfaceShown(root, surfaceOpen && onScreen)
-    if (onScreen) search.pump()
-  }
-  onServiceChanged: if (service && surfaceOpen && onScreen) service.surfaceShown(root, true)
-  // The panel's own screen on. The panel's asks heed only every screen
-  // off: one that waited for its own screen might not ask again when it
-  // wakes. The animal's fidget, which asks for nothing, heeds this too.
-  property bool screenOn: true
-  // On a screen that's on: the panel's `onScreen` doesn't follow screens
-  // turning off.
-  readonly property bool seen: surfaceOpen && onScreen && !(service && service.screensOff)
-  // The sounds keep the output awake a second after the scrub last moves,
-  // for chimes.
-  readonly property bool scrubbing: seen && motion.scrubT !== 0
-  onScrubbingChanged: if (sounds) sounds.scrubMoved()
-  onScrubTChanged: if (sounds && scrubbing) sounds.scrubMoved()
-  // A rebuilt bar or a removed screen takes the panel down mid-replay.
-  Component.onDestruction: {
-    if (sounds) sounds.stopReplay(root)
-    if (service) {
-      service.surfaceShown(root, false)
-      service.preview(root, "")
-    }
-  }
-  // Asked for first on open, and fetched ahead on a range.
-  readonly property var rowsInSight: surfaceOpen && onScreen && rowsShown ? watchlist.sightSymbols : []
-  onRowsInSightChanged: if (service) service.rowsSeen(root, rowsInSight)
-  // The service holds answers that would stutter the chart drawing in.
-  readonly property bool drawingIn: surfaceOpen && onScreen && motion.drawingIn
-  onDrawingInChanged: if (service) service.drawingIn(root, drawingIn)
-  Connections {
-    target: root.service
-    ignoreUnknownSignals: true
-    function onPreviewTaken(surface) { if (surface === root) root.cancelAdding() }
-    function onScreensReady() { search.pump() }
-    function onYahooBack() { if (root.onScreen) search.yahooBack() }
-  }
+  property bool adding: false
+  property string previewSymbol: ""
+  property bool showingHelp: false
+  property bool listMenuOpen: false
+  property bool managingLists: false
+  property string listsSymbol: ""
+  property var rowMenu: null
+  readonly property bool listViewOpen: managingLists || listsSymbol !== ""
+  readonly property bool rowsShown: !showingHelp && !adding && !listViewOpen
+  readonly property bool ownsKeys: adding || listMenuOpen || listViewOpen || rowMenu !== null
 
-  // The order and the change mode are separate settings; each key moves one.
-  function cycleChangeMode() {
-    showingHelp = false
-    if (service) service.persist({ changeMode: Settings.nextChangeMode(changeMode) })
-  }
-  function setStyle(style) {
-    showingHelp = false
-    if (service) service.persist({ style: style })
-  }
-  function toggleStyle() { setStyle(retro ? "smooth" : "retro") }
-  // Turned on, the add sound plays once, so you hear how loud they are.
-  function toggleSounds() {
-    showingHelp = false
-    if (!service) return
-    var on = !service.soundsOn
-    service.persist({ sounds: on })
-    if (on) sound("add")
-  }
-  function sound(name) {
-    if (sounds) sounds.play(name)
-  }
-  function cycleOrder() {
-    showingHelp = false
-    if (service) service.setOrder(Settings.nextOrder(order))
-  }
-  // Manual has no direction: there it does nothing at all.
-  function reverseOrder() {
-    if (order === "manual") return
-    showingHelp = false
-    if (service) service.reverseOrder()
-  }
+  // A turn later, so a view closing as another opens hands the keys across.
+  onOwnsKeysChanged: if (!ownsKeys) Qt.callLater(function() { if (!root.ownsKeys) root.keysReleased() })
 
-  // The keys both surfaces answer; each reads Esc, and the panel Tab, itself.
-  function pressKey(event) {
-    var key = event.key
-    var mods = event.modifiers & ~Qt.KeypadModifier
-    // A letter's command is its key and Shift, never its text: Caps Lock
-    // sends "O" for o, which would reverse the order.
-    var t = KeyText.typed(event)
-    if (mods === Qt.ControlModifier && key === Qt.Key_C) takeScreenshot()
-    else if (mods === Qt.ControlModifier && key === Qt.Key_Z) undoRemoval()
-    else if (mods === Qt.ShiftModifier && key === Qt.Key_Up) moveSelected(-1)
-    else if (mods === Qt.ShiftModifier && key === Qt.Key_Down) moveSelected(1)
-    else if (mods === Qt.ControlModifier && (key === Qt.Key_Return || key === Qt.Key_Enter)) openSymbolLists(watchlist.cursorRow)
-    else if (key === Qt.Key_Up) moveCursor(-1)
-    else if (key === Qt.Key_Down) moveCursor(1)
-    else if (key === Qt.Key_Left) nudgeScrub(-1)
-    else if (key === Qt.Key_Right) nudgeScrub(1)
-    else if (key === Qt.Key_Return || key === Qt.Key_Enter) featureSymbol(watchlist.cursorRow)
-    else if (key === Qt.Key_Delete || key === Qt.Key_Backspace) removeRow(watchlist.cursorRow)
-    else if (t === "?") toggleHelp()
-    else if (t === "a" || t === "/") startAdding()
-    else if (t === "c") cycleChangeMode()
-    else if (t === "r") refreshRequested()
-    else if (t === "[") stepRange(-1)
-    else if (t === "]") stepRange(1)
-    else if (t === "p") replay()
-    else if (t === "s") toggleStyle()
-    else if (t === "m") toggleSounds()
-    else if (t === "o") cycleOrder()
-    else if (t === "O") reverseOrder()
-    else if (t === "U") runOffered()
-    else if (t === "w") openListMenu()
-    else return false
-    return true
-  }
-
-  function featureSymbol(symbol) {
-    showingHelp = false
-    cancelAdding()
-    if (service && symbol) service.feature(symbol)
-  }
-
-  function moveCursor(delta) {
-    showingHelp = false
-    watchlist.moveCursor(delta)
-  }
-
-  function moveSelected(delta) {
-    showingHelp = false
-    watchlist.moveSelected(delta)
-  }
-
-  // In All, removing a stock a named list holds too reaches that list, so
-  // the row's menu asks first.
-  function removeRow(symbol) {
-    if (!service || !symbol) return
-    if (listName === "" && listsHolding(symbol) > 1) openRowMenu(symbol, null)
-    else removeFrom(symbol, listName === "")
-  }
-
-  function listsHolding(symbol) {
-    return lists.filter(function(list) { return list.symbols.indexOf(symbol) >= 0 }).length
-  }
-
-  function removeFrom(symbol, everywhere) {
-    if (!service) return
-    showingHelp = false
-    if (everywhere && !Settings.canRemove(lists[0].symbols)) {
-      say("Keep at least one symbol")
-      return
-    }
-    // The rows as shown, before what covers them closes, so the removal shows.
-    var rows = watchlist.displayedSymbols
-    var at = rows.indexOf(symbol)
-    var successor = symbol === watchlist.cursorRow && at >= 0 ? (rows[at + 1] || rows[at - 1] || "") : ""
-    if (everywhere && listName !== "") service.setMembership(symbol, "", false, rows)
-    else service.removeSymbol(symbol, rows)
-    closeViews()
-    sound("remove")
-    if (removal && removal.symbol === symbol) offerUndo()
-    if (successor !== "") watchlist.handTo(successor)
-  }
-
-  function rowMenuLines(symbol) {
-    var held = listsHolding(symbol)
-    var everywhere = { label: held > 1 ? "Remove from all " + held + " lists" : "Remove from All", everywhere: true }
-    return listName !== "" ? [{ label: "Remove from " + listName, everywhere: false }, everywhere] : [everywhere]
-  }
-
-  // At the pointer, on no line; from a key, under the row's symbol, on its
-  // first line. Without room under, it opens upward. A right-click's menu
-  // also offers the row's lists, as Ctrl-click opens them, last, so its
-  // first line stays where it was.
-  function openRowMenu(symbol, point) {
-    var row = watchlist.rowItem(symbol)
-    if (!service || !row || watchlist.displayedSymbols.indexOf(symbol) < 0) return
-    closeViews()
-    watchlist.cursorSymbol = symbol
-    var top = row.mapToItem(root, Style.space(28), 0)
-    var at = point ? root.mapFromItem(null, point.x, point.y) : top
-    var lines = rowMenuLines(symbol).concat(point ? [{ label: "Choose lists…", lists: true }] : [])
-    rowMenu = { symbol: symbol, lines: lines, ground: rowMenuGround(symbol), startLine: point ? -1 : 0, x: at.x,
-      below: point ? at.y : top.y + row.height, above: at.y }
-  }
-
-  function takeRowMenu(index) {
-    var menu = rowMenu
-    var line = menu && index >= 0 && index < menu.lines.length ? menu.lines[index] : null
-    if (line && line.lists) openSymbolLists(menu.symbol)
-    else if (line) removeFrom(menu.symbol, line.everywhere)
-    rowMenu = null
-  }
-
-  function say(text) {
-    note = text
-    holdNote()
-  }
-
-  readonly property string stillUnsaved: "Still not saved · your disk may be full"
-  property bool savingAgain: false
-  function saveAgain() {
-    clearNote()
-    savingAgain = true
-    service.saveAgain()
-  }
-  Connections {
-    target: root.service
-    ignoreUnknownSignals: true
-    function onSaveChecked(saved) {
-      if (!root.savingAgain) return
-      root.savingAgain = false
-      if (!saved) root.say(root.stillUnsaved)
-    }
-  }
-  onSaveFailedChanged: if (!saveFailed && note === stillUnsaved) clearNote()
-
-  // `pointed`: put back by a click, as UNDO in search can be (`select`).
-  function undoRemoval(pointed) {
-    if (!service) return
-    showingHelp = false
-    if (!removal) {
-      say("Nothing to undo")
-      return
-    }
-    var symbol = removal.symbol
-    service.undoRemoval(symbol)
-    sound("undo")
-    watchlist.select(symbol, pointed)
-  }
-
-  // Ctrl+Z works long after the offer goes. Its time waits while the
-  // pointer is on it.
-  property var undoOffered: null
-  property real undoShown: 1
-  onRemovalChanged: if (undoOffered !== null && removal !== undoOffered) endUndo()
-  function offerUndo() {
-    undoOffered = removal
-    holdUndo()
-  }
-  function holdUndo() {
-    undoFade.stop()
-    undoShown = 1
-    if (undoOffered !== null && surfaceOpen && !footer.undoHovered) undoTimer.restart()
-    else undoTimer.stop()
-  }
-  function endUndo() {
-    undoTimer.stop()
-    undoFade.stop()
-    undoShown = 1
-    undoOffered = null
-  }
-  Timer {
-    id: undoTimer
-    interval: 5000 - undoFade.duration
-    onTriggered: undoFade.start()
-  }
-  NumberAnimation {
-    id: undoFade
-    target: root
-    property: "undoShown"
-    from: 1
-    to: 0
-    duration: Motion.duration(Style, 600)
-    onFinished: root.endUndo()
-  }
-
-  // The note waits while the pointer is on it, so it never turns into the
-  // add under a click. A closed surface's note stays as the close left it.
-  function holdNote() {
-    if (!surfaceOpen) {
-      noteTimer.stop()
-      return
-    }
-    noteFade.stop()
-    noteShown = 1
-    if (note !== "" && surfaceOpen && !footer.hovered) noteTimer.restart()
-    else noteTimer.stop()
-  }
-
-  function clearNote() {
-    noteTimer.stop()
-    noteFade.stop()
-    noteShown = 1
-    note = ""
-  }
-
-  function selectRange(value) {
-    showingHelp = false
-    motion.clearScrub()
-    if (service) service.setRange(value)
-  }
-
-  function stepRange(delta) {
-    var index = rangeOptions.indexOf(range)
-    var target = Math.max(0, Math.min(rangeOptions.length - 1, index + delta))
-    if (target !== index) selectRange(rangeOptions[target])
-  }
-
-  function nudgeScrub(steps) {
-    showingHelp = false
-    var before = motion.scrubT
-    motion.nudgeScrub(steps)
-    if (motion.scrubT !== before) chime(true)
-  }
-
-  // The pointer strikes a bar as it reaches it; each key step strikes, even
-  // the same bar.
-  function chime(again) {
-    if (!sounds || motion.replayRunning) return
-    var bar = ChartSound.barAt({ retro: retro, geometry: motion.geometry, grid: heroBand.pixelGrid }, motion.scrubX)
-    if (bar !== chimed || again) sounds.chime(bar)
-    chimed = bar
-  }
-
-  function replay() {
-    showingHelp = false
-    if (!sounds) return motion.replay()
-    sounds.whenAwake(root, function() { if (root.surfaceOpen) motion.replay() })
-  }
-
-  function takeScreenshot() {
-    showingHelp = false
-    if (!camera || camera.busy || String(shareLoader.source) !== "") return
-    // With no chart on show, the footer says why nothing was taken.
-    if (!featuredQuote || !featuredDay || !featured) {
-      say("No chart to take a screenshot of")
-      return
-    }
-    shareLoader.setSource("ShareCard.qml", {
-      objectName: "shareCard",
-      symbol: chartSymbol || featuredSymbol,
-      quote: featuredQuote,
-      day: featuredDay,
-      history: historyShown ? history : null,
-      marks: rangeMarks,
-      latest: motion.latest,
-      view: featured,
-      scrubT: scrubShown,
-      changeMode: changeMode,
-      range: historyShown ? chartRange : "1D",
-      now: now,
-      calendars: calendars,
-      retro: retro,
-      animalKind: animalKind,
-      asleep: animal.asleep,
-      foreground: foreground,
-      ground: ground,
-      upColor: upColor,
-      downColor: downColor,
-      fontFamily: fontFamily
-    })
-  }
-  // The other surface may take the camera while this card waits: then this
-  // card goes.
-  function shootCard(card) {
-    var shown = Share.subject(card.symbol, card.range, card.words ? card.words.said : "")
-    var taken = camera.shoot(card, Share.fileSymbol(card.symbol), function() {
-      shareLoader.source = ""
-      // As the picture is taken; the footer says after how the save went.
-      sound("shutter")
-    }, function(code) {
-      shareLoader.source = ""
-      if (code === 1) return say("Screenshot not saved · the screenshots folder can't be written")
-      cameraLit = true
-      say(code === 0 ? "Copied a screenshot of " + shown : "Saved a screenshot of " + shown + " · copying it failed")
-    })
-    if (!taken) shareLoader.source = ""
-  }
-
-  function endScrub() {
-    if (!motion.replayRunning && !motion.scrubT) return false
-    motion.clearScrub()
-    return true
-  }
+  readonly property var keySheet: KeySheet.sheet()
 
   function closeViews() {
     cancelAdding()
@@ -833,6 +475,31 @@ Item {
     showingHelp = !shown
     if (showingHelp) helpSheet.contentY = 0
   }
+
+  // ---- Search, and a stock being added
+
+  // The added symbol the chart changes to once its answer is in, its row in
+  // view, and the list at rest.
+  property string landing: ""
+  property bool landingJoined: false
+  // A Show of a member still arriving: featured even if its first fetch fails.
+  property bool landingShows: false
+  // Picked by a click: its row's × waits for the pointer to move, unless it
+  // moves over the rows before the row joins.
+  property bool landingPointed: false
+  // Each add is heard as its row joins, whatever is featured or added meanwhile.
+  property var unheardAdds: []
+
+  onFeaturedSymbolChanged: if (featuredSymbol !== landing) landing = ""
+
+  // The list's own stocks the search names, each with the move its row
+  // shows at rest. Asked only while search is open.
+  readonly property var ownFound: adding ? Search.ownMatches(search.searchText, members, quotes).map(function(symbol) {
+    var quote = quotes[symbol]
+    var row = quote ? Figures.rowModel(quote, 0, changeMode, newestTrades[symbol] || null) : null
+    return { symbol: symbol, name: quote ? quote.name : "", exchange: quote ? quote.exchange : "",
+      move: row ? Format.lookSigns(row.changeLine, retro) : "", tone: row ? row.tone : "flat" }
+  }) : []
 
   function startAdding() {
     if (!keepRename()) return
@@ -923,6 +590,8 @@ Item {
     previewSymbol = s
   }
 
+  // ---- The list menu and the list views
+
   function openListMenu() {
     if (!keepRename()) return
     closeViews()
@@ -964,9 +633,6 @@ Item {
   // Once its symbol leaves All, however, there is nothing to tick.
   onViewChanged: if (listsSymbol !== "" && view.library.indexOf(listsSymbol) < 0) listsSymbol = ""
 
-  // A turn later, so a view closing as another opens hands the keys across.
-  onOwnsKeysChanged: if (!ownsKeys) Qt.callLater(function() { if (!root.ownsKeys) root.keysReleased() })
-
   function renameList(name, newName) {
     if (!service) return
     var problem = service.renameList(name, newName)
@@ -979,6 +645,427 @@ Item {
     if (name === "" && !member) removeFrom(listsSymbol, true)
     else service.setMembership(listsSymbol, name, member, watchlist.displayedSymbols)
   }
+
+  // ---- A row's menu
+
+  // It stays where it opened, so a resize, as tiling makes, closes it, as a
+  // desktop's menus close.
+  onWidthChanged: rowMenu = null
+  onHeightChanged: rowMenu = null
+  // It also closes when its list, its symbol's lists, or its row change. A
+  // binding, not a handler: a handler could read the list's name before it
+  // moves, and the lists can keep their array when only the list changes.
+  function rowMenuGround(symbol) {
+    if (view.rows.indexOf(symbol) < 0) return ""
+    return JSON.stringify([view.list, lists.filter(function(list) { return list.symbols.indexOf(symbol) >= 0 }).map(function(list) { return list.name })])
+  }
+  readonly property string rowMenuGroundNow: rowMenu ? rowMenuGround(rowMenu.symbol) : ""
+  // Closed a turn later, so the binding doesn't read itself again.
+  onRowMenuGroundNowChanged: if (rowMenu && rowMenuGroundNow !== rowMenu.ground) Qt.callLater(function() {
+    if (root.rowMenu && root.rowMenuGround(root.rowMenu.symbol) !== root.rowMenu.ground) root.rowMenu = null
+  })
+
+  function rowMenuLines(symbol) {
+    var held = listsHolding(symbol)
+    var everywhere = { label: held > 1 ? "Remove from all " + held + " lists" : "Remove from All", everywhere: true }
+    return listName !== "" ? [{ label: "Remove from " + listName, everywhere: false }, everywhere] : [everywhere]
+  }
+
+  // At the pointer, on no line; from a key, under the row's symbol, on its
+  // first line. Without room under, it opens upward. A right-click's menu
+  // also offers the row's lists, as Ctrl-click opens them, last, so its
+  // first line stays where it was.
+  function openRowMenu(symbol, point) {
+    var row = watchlist.rowItem(symbol)
+    if (!service || !row || watchlist.displayedSymbols.indexOf(symbol) < 0) return
+    closeViews()
+    watchlist.cursorSymbol = symbol
+    var top = row.mapToItem(root, Style.space(28), 0)
+    var at = point ? root.mapFromItem(null, point.x, point.y) : top
+    var lines = rowMenuLines(symbol).concat(point ? [{ label: "Choose lists…", lists: true }] : [])
+    rowMenu = { symbol: symbol, lines: lines, ground: rowMenuGround(symbol), startLine: point ? -1 : 0, x: at.x,
+      below: point ? at.y : top.y + row.height, above: at.y }
+  }
+
+  function takeRowMenu(index) {
+    var menu = rowMenu
+    var line = menu && index >= 0 && index < menu.lines.length ? menu.lines[index] : null
+    if (line && line.lists) openSymbolLists(menu.symbol)
+    else if (line) removeFrom(menu.symbol, line.everywhere)
+    rowMenu = null
+  }
+
+  // ---- Keys, and what they change
+
+  // The keys both surfaces answer; each reads Esc, and the panel Tab, itself.
+  function pressKey(event) {
+    var key = event.key
+    var mods = event.modifiers & ~Qt.KeypadModifier
+    // A letter's command is its key and Shift, never its text: Caps Lock
+    // sends "O" for o, which would reverse the order.
+    var t = KeyText.typed(event)
+    if (mods === Qt.ControlModifier && key === Qt.Key_C) takeScreenshot()
+    else if (mods === Qt.ControlModifier && key === Qt.Key_Z) undoRemoval()
+    else if (mods === Qt.ShiftModifier && key === Qt.Key_Up) moveSelected(-1)
+    else if (mods === Qt.ShiftModifier && key === Qt.Key_Down) moveSelected(1)
+    else if (mods === Qt.ControlModifier && (key === Qt.Key_Return || key === Qt.Key_Enter)) openSymbolLists(watchlist.cursorRow)
+    else if (key === Qt.Key_Up) moveCursor(-1)
+    else if (key === Qt.Key_Down) moveCursor(1)
+    else if (key === Qt.Key_Left) nudgeScrub(-1)
+    else if (key === Qt.Key_Right) nudgeScrub(1)
+    else if (key === Qt.Key_Return || key === Qt.Key_Enter) featureSymbol(watchlist.cursorRow)
+    else if (key === Qt.Key_Delete || key === Qt.Key_Backspace) removeRow(watchlist.cursorRow)
+    else if (t === "?") toggleHelp()
+    else if (t === "a" || t === "/") startAdding()
+    else if (t === "c") cycleChangeMode()
+    else if (t === "r") refreshRequested()
+    else if (t === "[") stepRange(-1)
+    else if (t === "]") stepRange(1)
+    else if (t === "p") replay()
+    else if (t === "s") toggleStyle()
+    else if (t === "m") toggleSounds()
+    else if (t === "o") cycleOrder()
+    else if (t === "O") reverseOrder()
+    else if (t === "U") runOffered()
+    else if (t === "w") openListMenu()
+    else return false
+    return true
+  }
+
+  // The order and the change mode are separate settings; each key moves one.
+  function cycleChangeMode() {
+    showingHelp = false
+    if (service) service.persist({ changeMode: Settings.nextChangeMode(changeMode) })
+  }
+  function setStyle(style) {
+    showingHelp = false
+    if (service) service.persist({ style: style })
+  }
+  function toggleStyle() { setStyle(retro ? "smooth" : "retro") }
+  // Turned on, the add sound plays once, so you hear how loud they are.
+  function toggleSounds() {
+    showingHelp = false
+    if (!service) return
+    var on = !service.soundsOn
+    service.persist({ sounds: on })
+    if (on) sound("add")
+  }
+  function sound(name) {
+    if (sounds) sounds.play(name)
+  }
+  function cycleOrder() {
+    showingHelp = false
+    if (service) service.setOrder(Settings.nextOrder(order))
+  }
+  // Manual has no direction: there it does nothing at all.
+  function reverseOrder() {
+    if (order === "manual") return
+    showingHelp = false
+    if (service) service.reverseOrder()
+  }
+
+  function featureSymbol(symbol) {
+    showingHelp = false
+    cancelAdding()
+    if (service && symbol) service.feature(symbol)
+  }
+
+  function moveCursor(delta) {
+    showingHelp = false
+    watchlist.moveCursor(delta)
+  }
+
+  function moveSelected(delta) {
+    showingHelp = false
+    watchlist.moveSelected(delta)
+  }
+
+  // In All, removing a stock a named list holds too reaches that list, so
+  // the row's menu asks first.
+  function removeRow(symbol) {
+    if (!service || !symbol) return
+    if (listName === "" && listsHolding(symbol) > 1) openRowMenu(symbol, null)
+    else removeFrom(symbol, listName === "")
+  }
+
+  function listsHolding(symbol) {
+    return lists.filter(function(list) { return list.symbols.indexOf(symbol) >= 0 }).length
+  }
+
+  function removeFrom(symbol, everywhere) {
+    if (!service) return
+    showingHelp = false
+    if (everywhere && !Settings.canRemove(lists[0].symbols)) {
+      say("Keep at least one symbol")
+      return
+    }
+    // The rows as shown, before what covers them closes, so the removal shows.
+    var rows = watchlist.displayedSymbols
+    var at = rows.indexOf(symbol)
+    var successor = symbol === watchlist.cursorRow && at >= 0 ? (rows[at + 1] || rows[at - 1] || "") : ""
+    if (everywhere && listName !== "") service.setMembership(symbol, "", false, rows)
+    else service.removeSymbol(symbol, rows)
+    closeViews()
+    sound("remove")
+    if (removal && removal.symbol === symbol) offerUndo()
+    if (successor !== "") watchlist.handTo(successor)
+  }
+
+  readonly property var putBack: {
+    if (!removal || members.indexOf(removal.symbol) >= 0) return null
+    var was = Settings.listChoices(removal.before).filter(function(list) { return list.name === listName })[0]
+    if (!was || was.symbols.indexOf(removal.symbol) < 0) return null
+    var quote = removal.quote
+    return { symbol: removal.symbol, name: quote ? quote.name : removal.symbol, exchange: quote ? quote.exchange : "" }
+  }
+
+  // `pointed`: put back by a click, as UNDO in search can be (`select`).
+  function undoRemoval(pointed) {
+    if (!service) return
+    showingHelp = false
+    if (!removal) {
+      say("Nothing to undo")
+      return
+    }
+    var symbol = removal.symbol
+    service.undoRemoval(symbol)
+    sound("undo")
+    watchlist.select(symbol, pointed)
+  }
+
+  // Ctrl+Z works long after the offer goes. Its time waits while the
+  // pointer is on it.
+  property var undoOffered: null
+  property real undoShown: 1
+  onRemovalChanged: if (undoOffered !== null && removal !== undoOffered) endUndo()
+  function offerUndo() {
+    undoOffered = removal
+    holdUndo()
+  }
+  function holdUndo() {
+    undoFade.stop()
+    undoShown = 1
+    if (undoOffered !== null && surfaceOpen && !footer.undoHovered) undoTimer.restart()
+    else undoTimer.stop()
+  }
+  function endUndo() {
+    undoTimer.stop()
+    undoFade.stop()
+    undoShown = 1
+    undoOffered = null
+  }
+  Timer {
+    id: undoTimer
+    interval: 5000 - undoFade.duration
+    onTriggered: undoFade.start()
+  }
+  NumberAnimation {
+    id: undoFade
+    target: root
+    property: "undoShown"
+    from: 1
+    to: 0
+    duration: Motion.duration(Style, 600)
+    onFinished: root.endUndo()
+  }
+
+  // ---- The chart's range, scrub, replay and screenshot
+
+  function selectRange(value) {
+    showingHelp = false
+    motion.clearScrub()
+    if (service) service.setRange(value)
+  }
+
+  function stepRange(delta) {
+    var index = rangeOptions.indexOf(range)
+    var target = Math.max(0, Math.min(rangeOptions.length - 1, index + delta))
+    if (target !== index) selectRange(rangeOptions[target])
+  }
+
+  function nudgeScrub(steps) {
+    showingHelp = false
+    var before = motion.scrubT
+    motion.nudgeScrub(steps)
+    if (motion.scrubT !== before) chime(true)
+  }
+
+  function endScrub() {
+    if (!motion.replayRunning && !motion.scrubT) return false
+    motion.clearScrub()
+    return true
+  }
+
+  // The sounds keep the output awake a second after the scrub last moves,
+  // for chimes.
+  readonly property bool scrubbing: seen && motion.scrubT !== 0
+  onScrubbingChanged: if (sounds) sounds.scrubMoved()
+  onScrubTChanged: if (sounds && scrubbing) sounds.scrubMoved()
+
+  property int chimed: -1
+  // The pointer strikes a bar as it reaches it; each key step strikes, even
+  // the same bar.
+  function chime(again) {
+    if (!sounds || motion.replayRunning) return
+    var bar = ChartSound.barAt({ retro: retro, geometry: motion.geometry, grid: heroBand.pixelGrid }, motion.scrubX)
+    if (bar !== chimed || again) sounds.chime(bar)
+    chimed = bar
+  }
+
+  function replay() {
+    showingHelp = false
+    if (!sounds) return motion.replay()
+    sounds.whenAwake(root, function() { if (root.surfaceOpen) motion.replay() })
+  }
+
+  // After a screenshot, the header's camera stays lit until the next open.
+  property bool cameraLit: false
+  function takeScreenshot() {
+    showingHelp = false
+    if (!camera || camera.busy || String(shareLoader.source) !== "") return
+    // With no chart on show, the footer says why nothing was taken.
+    if (!featuredQuote || !featuredDay || !featured) {
+      say("No chart to take a screenshot of")
+      return
+    }
+    shareLoader.setSource("ShareCard.qml", {
+      objectName: "shareCard",
+      symbol: chartSymbol || featuredSymbol,
+      quote: featuredQuote,
+      day: featuredDay,
+      history: historyShown ? history : null,
+      marks: rangeMarks,
+      latest: motion.latest,
+      view: featured,
+      scrubT: scrubShown,
+      changeMode: changeMode,
+      range: historyShown ? chartRange : "1D",
+      now: now,
+      calendars: calendars,
+      retro: retro,
+      animalKind: animalKind,
+      asleep: animal.asleep,
+      foreground: foreground,
+      ground: ground,
+      upColor: upColor,
+      downColor: downColor,
+      fontFamily: fontFamily
+    })
+  }
+  // The other surface may take the camera while this card waits: then this
+  // card goes.
+  function shootCard(card) {
+    var shown = Share.subject(card.symbol, card.range, card.words ? card.words.said : "")
+    var taken = camera.shoot(card, Share.fileSymbol(card.symbol), function() {
+      shareLoader.source = ""
+      // As the picture is taken; the footer says after how the save went.
+      sound("shutter")
+    }, function(code) {
+      shareLoader.source = ""
+      if (code === 1) return say("Screenshot not saved · the screenshots folder can't be written")
+      cameraLit = true
+      say(code === 0 ? "Copied a screenshot of " + shown : "Saved a screenshot of " + shown + " · copying it failed")
+    })
+    if (!taken) shareLoader.source = ""
+  }
+
+  // ---- The footer's notes, hint and notices
+
+  // Why an action did nothing, or what a screenshot did, said in the
+  // footer's place for a moment.
+  property string note: ""
+  function say(text) {
+    note = text
+    holdNote()
+  }
+
+  // The note waits while the pointer is on it, so it never turns into the
+  // add under a click. A closed surface's note stays as the close left it.
+  function holdNote() {
+    if (!surfaceOpen) {
+      noteTimer.stop()
+      return
+    }
+    noteFade.stop()
+    noteShown = 1
+    if (note !== "" && surfaceOpen && !footer.hovered) noteTimer.restart()
+    else noteTimer.stop()
+  }
+
+  function clearNote() {
+    noteTimer.stop()
+    noteFade.stop()
+    noteShown = 1
+    note = ""
+  }
+
+  // What a refusal covered fades in after it: a click meant for the note,
+  // just after it went, would otherwise open search.
+  property real noteShown: 1
+  Timer {
+    id: noteTimer
+    interval: 2500 - noteFade.duration
+    onTriggered: noteFade.start()
+  }
+  NumberAnimation {
+    id: noteFade
+    target: root
+    property: "noteShown"
+    from: 1
+    to: 0
+    duration: Motion.duration(Style, 600)
+    onFinished: {
+      root.clearNote()
+      footer.fadeIn()
+    }
+  }
+
+  // The panel's first-run hint above the footer, cleared at the next open.
+  property string hint: ""
+  function showFirstRunHint() {
+    hint = "Drag the pill in your bar to move it\nMiddle-click changes its look · right-click opens the window"
+  }
+
+  // A save that didn't land is said ahead of the update, since a restart
+  // would lose the changes. Where the fix won't fit beside the notice, it
+  // drops "or remove" and keeps the file's full path.
+  readonly property bool unsaved: settingsUnreadable ? editsUnsaved : saveFailed
+  readonly property string notice: unsaved ? "Your changes aren't saved"
+    : settingsUnreadable ? "Couldn't load your lists"
+    : updatedTo !== "" ? "Updated to " + updatedTo + " · click to restart the shell" : ""
+  readonly property string listsFile: "~/" + Settings.listsFile(service ? service.pluginId : "")
+  readonly property var noticeActions: settingsUnreadable
+    ? ["fix or remove " + listsFile, "fix " + listsFile]
+    : unsaved ? ["click to try again"] : []
+  readonly property string updateOffer: releasedTo !== "" && updatedTo === "" ? releasedTo : ""
+  readonly property bool restartable: !unsaved && !settingsUnreadable
+  readonly property bool restartOffered: updatedTo !== "" && restartable
+  function runOffered() {
+    if (!updates) return
+    if (restartOffered) updates.restart()
+    else if (updateOffer !== "") updates.update(restartable)
+    else say("Nothing to update")
+  }
+
+  readonly property string stillUnsaved: "Still not saved · your disk may be full"
+  property bool savingAgain: false
+  function saveAgain() {
+    clearNote()
+    savingAgain = true
+    service.saveAgain()
+  }
+  Connections {
+    target: root.service
+    ignoreUnknownSignals: true
+    function onSaveChecked(saved) {
+      if (!root.savingAgain) return
+      root.savingAgain = false
+      if (!saved) root.say(root.stillUnsaved)
+    }
+  }
+  onSaveFailedChanged: if (!saveFailed && note === stillUnsaved) clearNote()
+
+  // ---- Closing and opening again
 
   // A close drops a pending add, so nothing lands or glides during the fade
   // or after it.
@@ -1047,26 +1134,7 @@ Item {
     resumeTyped()
   }
 
-  // What a refusal covered fades in after it: a click meant for the note,
-  // just after it went, would otherwise open search.
-  property real noteShown: 1
-  Timer {
-    id: noteTimer
-    interval: 2500 - noteFade.duration
-    onTriggered: noteFade.start()
-  }
-  NumberAnimation {
-    id: noteFade
-    target: root
-    property: "noteShown"
-    from: 1
-    to: 0
-    duration: Motion.duration(Style, 600)
-    onFinished: {
-      root.clearNote()
-      footer.fadeIn()
-    }
-  }
+  // ---- The pieces
 
   // On the margins, not the words' edges: the longest closure status (a
   // holiday, the next open, its zone) needs the panel's whole width.
