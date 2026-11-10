@@ -267,7 +267,7 @@ Harness {
       var searches = calls("SEARCH.asked")
       keyClick("Z"); keyClick("Z"); keyClick("Z")
       var searchHeld = within(5000, function() {
-        return (service.testFundamentals.pendingUrl !== "" && body.search.requestedQuery === "ZZZ")
+        return (service.testFundamentals.pendingUrl !== "" && body.search.feed.requestedQuery === "ZZZ")
           || calls("SEARCH.asked") > searches || calls("FUNDAMENTALS") > before
       })
       check("dark fundamentals and a first search start no HTTP request",

@@ -45,11 +45,12 @@ none() {
 # their own bundled sounds,
 # the cache's files, the saved quotes and the sounds' replay, chimes, and
 # lead-ins, are written only through OwnerOnly, and the camera writes its
-# screenshot and reads Omasnap's settings; one service owns the feeds; every
-# request leaves from FetchRun, which only the feeds and search use; the
-# quote URL is the quote feed's, the fundamentals URLs the fundamentals
-# feed's, the overnight URL the overnight feed's, the all-day URL the
-# all-day feed's, and the manifest's URL the release feed's. The plugin has
+# screenshot and reads Omasnap's settings; one service owns the feeds, and
+# each surface its own search's; every request leaves from FetchRun, which
+# only the feeds use; the quote URL is the quote feed's, the fundamentals
+# URLs the fundamentals feed's, the overnight URL the overnight feed's, the
+# all-day URL the all-day feed's, the search URL the search feed's, and the
+# manifest's URL the release feed's. The plugin has
 # one IPC target; only the window's host and the screens act on Hyprland.
 only '\bProcess\s*\{' FetchRun.qml Updates.qml Sounds.qml Camera.qml OwnerOnly.qml
 only '\bFileView\s*\{' Service.qml ListsFile.qml Updates.qml TrendColors.qml OwnerOnly.qml Sounds.qml
@@ -70,12 +71,14 @@ none 'command:\s*\[(?!"timeout",)' Camera.qml OwnerOnly.qml
 only '\bIpcHandler\s*\{' IpcTarget.qml
 only '^import Quickshell\.Hyprland' WindowHost.qml Screens.qml
 only '\b(QuoteFeed|HistoryFeed|FundamentalsFeed|OvernightFeed|AllDayFeed|ReleaseFeed)\s*\{' Service.qml
-only '\bFetchRun\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SymbolSearch.qml
+only '\bSearchFeed\s*\{' StonksBody.qml
+only '\bFetchRun\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SearchFeed.qml
 only 'Fetch\.curlCommand\(' FetchRun.qml
 only 'Quote\.chartUrl\(' QuoteFeed.qml
 only 'Fundamentals\.(fundamentalsUrl|capCloseUrl|rateUrl)\(' FundamentalsFeed.qml
 only 'Overnight\.overnightUrl\(' OvernightFeed.qml
 only 'Overnight\.allDayUrl\(' AllDayFeed.qml
+only 'Search\.searchUrl\(' SearchFeed.qml
 only 'Release\.MANIFEST_URL\b' ReleaseFeed.qml
 none 'execDetached|XMLHttpRequest|https?://' *.qml
 # GitHub's address is the release rule's alone: no other file names it.

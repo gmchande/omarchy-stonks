@@ -556,7 +556,7 @@ Harness {
       keyClick("X")
       var previousResults = body.search.results.length > 0 && body.search.resultsQuery === "SH"
         && service.library.indexOf(body.search.results[0].symbol) < 0
-      var lookupOut = within(3000, function() { return body.search.activeQuery === "SHX" && harness.calls("SEARCH.asked") === askedBefore + 1 })
+      var lookupOut = within(3000, function() { return body.search.feed.activeQuery === "SHX" && harness.calls("SEARCH.asked") === askedBefore + 1 })
       var members = service.library.join(",")
       var top = body.search.results.length > 0 ? body.search.results[0].symbol : ""
       keyClick(Qt.Key_Return)
@@ -619,9 +619,9 @@ Harness {
       var askedBefore = harness.calls("SEARCH.asked")
       var answeredBefore = harness.calls("SEARCH.answered")
       type("SH")
-      var firstOut = within(3000, function() { return body.search.activeQuery === "SH" && harness.calls("SEARCH.asked") === askedBefore + 1 })
+      var firstOut = within(3000, function() { return body.search.feed.activeQuery === "SH" && harness.calls("SEARCH.asked") === askedBefore + 1 })
       keyClick("X")
-      var secondOut = within(3000, function() { return body.search.activeQuery === "SHX" && harness.calls("SEARCH.asked") === askedBefore + 2 })
+      var secondOut = within(3000, function() { return body.search.feed.activeQuery === "SHX" && harness.calls("SEARCH.asked") === askedBefore + 2 })
       hold("SEARCH.hold", false)
       tryVerify(function() { return body.search.resultsQuery === "SHX" }, 4000)
       // Time for SH's answer to land too, had its lookup run on.
@@ -1127,9 +1127,9 @@ Harness {
       // changes neither its words nor RETRY.
       hold("SEARCH.hold", true)
       keyClick("X")
-      within(2000, function() { return body.search.activeQuery === "WRONGX" })
+      within(2000, function() { return body.search.feed.activeQuery === "WRONGX" })
       keyClick("Y")
-      within(2000, function() { return body.search.activeQuery === "WRONGXY" })
+      within(2000, function() { return body.search.feed.activeQuery === "WRONGXY" })
       var typedOn = [message.text, retry.visible].join(",")
       hold("SEARCH.hold", false)
       tryVerify(function() { return body.search.resultsQuery === "WRONGXY" }, 3000)
@@ -1204,7 +1204,7 @@ Harness {
       // Out once the fake curl has counted it, before its pause: activeQuery
       // is set before curl starts, so a count read on it alone could miss
       // the first search and count it as the second.
-      var searched = within(2000, function() { return body.search.activeQuery === "SH" && harness.calls("SEARCH.asked") === askedFirst + 1 })
+      var searched = within(2000, function() { return body.search.feed.activeQuery === "SH" && harness.calls("SEARCH.asked") === askedFirst + 1 })
       var askedBefore = harness.calls("SEARCH.asked")
       var answeredBefore = harness.calls("SEARCH.answered")
       app.close()

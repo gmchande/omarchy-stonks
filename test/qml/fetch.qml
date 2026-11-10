@@ -946,7 +946,7 @@ Harness {
       screenStandIn.holding = true
       var searchFrom = harness.calls("SEARCH.asked")
       yahoo.report(["ok"], 0, yahoo.ticket)
-      var searchQueued = body.search.requestedQuery === "SH"
+      var searchQueued = body.search.feed.requestedQuery === "SH"
       stonksToplevel.workspace = workspaceThere
       var searchHidden = within(3000, function() { return service.openSurfaces.length === 0 })
       screenStandIn.holding = false
@@ -968,7 +968,7 @@ Harness {
       var oldOut = within(3000, function() { return harness.calls("SEARCH.asked") > oldFrom })
       var editFrom = harness.calls("SEARCH.asked")
       body.search.setQuery("SHEL")
-      body.search.runSearch()
+      body.search.feed.ask()
       stonksToplevel.workspace = workspaceThere
       remove("SEARCH.hold")
       wait(800)
