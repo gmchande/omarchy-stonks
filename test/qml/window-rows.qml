@@ -294,6 +294,13 @@ Harness {
       reset("", "smooth")
       watchlist.cursorSymbol = "NVDA"
       keys.forceActiveFocus()
+      // Shift moves the selection alone.
+      var orderBefore = service.symbols.join(",")
+      keyClick(Qt.Key_Up, Qt.ShiftModifier)
+      harness.check("Shift+↑ moves the selection and leaves the rows in their order",
+        service.symbols.join(",") === orderBefore && watchlist.cursorRow !== "NVDA",
+        service.symbols.join(",") + " | " + watchlist.cursorRow)
+      watchlist.cursorSymbol = "NVDA"
       var jAtBottom = carried("NVDA", function() { keyClick(Qt.Key_Down, Qt.ControlModifier) })
       reset("Moves", "retro")
       watchlist.contentY = watchlist.contentHeight - watchlist.height
