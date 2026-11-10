@@ -288,6 +288,10 @@ test("formatting", () => {
   expect(M.pct(1267.16)).toBe("+1,267%")
   expect(M.pct(71789.6)).toBe("+71,790%")
   expect(M.pct(-999.99)).toBe("\u2212999.99%")
+  // A figure that rounds up to where decimals stop drops them too, as the
+  // figure it rounds to does: never +1,000.00% or 10,000.00.
+  expect([M.pct(999.996), M.money(9999.996), M.changeText({ abs: -9999.996, pct: -50 }, "abs")])
+    .toEqual(["+1,000%", "10,000", "\u221210,000"])
   // A side bar's pill stacks the move in lines of four characters at most:
   // one decimal under 10%, none from 10% up, thousands as K%; a move that
   // shows as none has no sign.
