@@ -232,7 +232,7 @@ every_state() (
     states="$states popup-note-sorted-$look window-note-sorted-$look"
   done
   # A row's menu: right-clicked in a list, its two lines, on both surfaces;
-  # by Shift+X in All, its one line chosen; and after a removal, search's
+  # by Delete in All, its one line chosen; and after a removal, search's
   # one result putting it back. In both looks.
   for look in smooth retro; do
     states="$states popup-lists-rowmenu-$look window-lists-rowmenu-$look popup-lists-rowmenuall-$look popup-search-putback-$look"

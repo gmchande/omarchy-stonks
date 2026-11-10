@@ -1,15 +1,14 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import qs.Commons
 import qs.Ui
 import "plugin" as Stonks
 
 // The look for a newer Stonks, through the real Plugin, Service, Updates,
 // App, and a pill, on a clock this harness sets (updates.sh). This build is
 // 1.0.9. The service asks GitHub for main's manifest as it starts and a day
-// after each ask GitHub answered, within seconds after one it didn't, never
-// while every screen is off. An equal, an older, a failed, and a refused
+// after each ask GitHub answered, once Yahoo answers again after one that
+// got no answer, never while every screen is off. An equal, an older, a failed, and a refused
 // answer say nothing and show no "!". A newer one is offered at the footer's
 // right end each time the window opens, beside the add, which still adds:
 // its click and Shift+U run the update in a terminal, which restarts the

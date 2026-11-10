@@ -17,8 +17,8 @@ patch_copy plugin/QuoteFeed.qml 's/interval: 2500/interval: 200/'
 patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property var testBody: root.body\n  readonly property alias testKeyCatcher: keyCatcher'
 # The harness owns the clock.
 patch_copy plugin/Service.qml 's/function wallSecond() { return Math.floor(Date.now() \/ 1000) }/function wallSecond() { return root.now }/'
-# The failure step reads the feed's answers; the midnight walk takes a
-# quote's regular price away.
+# The failure step reads the feed's answers, and steps wait for the quote
+# feed to go quiet and read its runs.
 patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testOvernightFeed: overnightFeed\n  readonly property alias testAllDayFeed: allDayFeed\n  readonly property alias testFeed: feed\n  readonly property alias testYahooGate: yahooGate\n  readonly property alias testRobinhoodGate: robinhoodGate'
 # A step hands Robinhood's prints run its output by hand (`FetchRun`).
 patch_copy plugin/OvernightFeed.qml '/property var landing: null/a\  readonly property alias testRun: fetchRun'

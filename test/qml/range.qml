@@ -1,5 +1,4 @@
 import QtQuick
-import QtTest
 import Quickshell
 import Quickshell.Io
 import qs.Commons
@@ -106,7 +105,6 @@ Harness {
   // The plugin as the shell composes it, with this harness as its shell.
   Stonks.Plugin { id: plugin; shell: shellApi; manifest: harness.pluginManifest() }
   readonly property var service: plugin.service
-  readonly property var windowHost: plugin.windowHost
   readonly property var app: plugin.windowHost.app
 
   // Hyprland as the window host reads it: the window on a workspace, and a
@@ -174,7 +172,6 @@ Harness {
   // The two pills, each in a Loader, so a flow can take one away as an
   // unplugged screen does.
   readonly property var pill: pillLoader.item
-  readonly property var otherPill: otherPillLoader.item
   Component {
     id: pillComponent
     Stonks.BarWidget {
@@ -321,7 +318,7 @@ Harness {
       service.setManualOrder(["AAPL", "SLOW"].concat(service.symbols.filter(function(s) { return s !== "AAPL" && s !== "SLOW" })))
 
       // An open while the chart is on its way shows the last one whole, the
-      // header naming what is coming, and draws the new one in as it lands:
+      // header naming what is coming, until the new one lands:
       // a symbol stepped to with the window shut, and a summon that opens it
       // on a symbol and range.
       var opensHeld = function(before, change, key, coming) {
@@ -594,9 +591,8 @@ Harness {
           && service.fundamentals.AAPL.status === "ok",
         freshAsks + "|" + (harness.calls("AAPL.fundamentals") - asksBefore))
 
-      // IPC refreshes once, not once per pill, and every pill acknowledges
-      // it: dimmed, then eased back. The answers are aged past the
-      // refresh's 10 s floor first.
+      // IPC refreshes once, not once per pill. The answers are aged past
+      // the refresh's 10 s floor first.
       service.feature("AAPL")
       tryVerify(function() { return harness.answered("AAPL|1W") && !service.testFeed.busy && !service.testHistoryFeed.busy }, 10000)
       var agedEntries = {}
@@ -977,11 +973,8 @@ Harness {
       // Switches with `change`, runs `during` while the new chart is out,
       // waits for `key` to land, and returns the states the hero took, "A"
       // for the one before, "B" for the one it settles on, "?" for any other,
-      // run-length collapsed; how many held-A states said Loading and how many
-      // did not; once the new chart is up, whether it drew in and whether a
-      // replay or scrub ran on it; and the dim: the most it reached in the
-      // first 200 ms, whether it reached whole while held, what the label
-      // said then, and what was left of it a moment after the landing.
+      // run-length collapsed; and how many held-A states said Loading and how
+      // many carried a replay or a scrub.
       var switchChart = function(change, key, during) {
         var a = sig()
         var seen = [a]
@@ -1250,11 +1243,11 @@ Harness {
       for (var w = 0; w < 3; w++) {
         var before = harness.iconDrawn()
         mouseWheel(pill, pill.width / 2, pill.height / 2, 0, w === 0 ? -120 : 120)
-        wheels.push(service.featuredSymbol + " " + "" + harness.iconDrawn()
+        wheels.push(service.featuredSymbol + " " + harness.iconDrawn()
           + (harness.iconDrawn() === animalOf(service.featuredSymbol) ? "" : " want " + animalOf(service.featuredSymbol)))
         if (harness.iconDrawn() !== before && service.featuredSymbol !== "TURN") break
       }
-      var wheelsRight = wheels.every(function(line) { return !/turning| want /.test(line) })
+      var wheelsRight = wheels.every(function(line) { return !/ want /.test(line) })
         && harness.iconDrawn() !== animalOf("TURN")
       harness.check("a new price and a wheel step give the pill the current day's animal and its colour",
         turnStart === animalOf("TURN") && turnedDown === "bear in " + pill.downColor

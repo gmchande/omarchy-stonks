@@ -1,5 +1,4 @@
 import QtQuick
-import QtTest
 import Quickshell
 import Quickshell.Io
 import "plugin" as Stonks
@@ -106,16 +105,15 @@ Harness {
       }, 3000)
     }
 
-    // The result rows on screen, top first, or none until each result has
-    // one row, laid out in order. findAll lists rows in the order they were
-    // made, and a new answer's rows sit below the last answer's until those
-    // go.
     // ↓ until search chooses SYMBOL.
     function chooseShown(body, symbol) {
       for (var i = 0; i < body.search.shown.length && body.search.chosenSymbol !== symbol; i++) keyClick(Qt.Key_Down)
     }
 
-    // The rows search shows, the list's own first, Yahoo's after.
+    // The rows search shows, the list's own first, Yahoo's after: the result
+    // rows on screen, top first, or none until each result has one row, laid
+    // out in order. findAll lists rows in the order they were made, and a new
+    // answer's rows sit below the last answer's until those go.
     function shownResults(body) {
       var results = body.search.shown
       var made = findAll(body.search, "searchResult")
@@ -398,8 +396,8 @@ Harness {
           && service.featuredSymbol === "MSFT" && watchlist.cursorSymbol === "MSFT" && inView(),
         [outOfView, said, service.symbols, service.featuredSymbol, watchlist.cursorSymbol, inView()].join("|"))
 
-      // Accepting a pending preview names it at once. Its row is not a
-      // number-key target until it has an answer; a later choice wins.
+      // Accepting a pending preview names it at once. ↓ can't reach its row
+      // until it has an answer; a later choice wins.
       mouseMove(body, 1, 1)
       var rangeBefore = service.range
       // The add steps below sort by % change; the order goes back after them.

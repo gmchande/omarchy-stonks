@@ -38,9 +38,8 @@ declare -A listed=(
 )
 
 # The house baseline, what qmllint cannot see in the installed shell: these
-# members of its QtObject-typed Style.font, Style.bar,
-# Commons.Color.popups, and Commons.Color.bar, and of the `bar` that Panel
-# and BarWidget inherit.
+# members of its QtObject-typed Style.font, Style.bar, Commons.Color.popups,
+# and Commons.Color.bar, and of the `bar` that Panel and BarWidget inherit.
 shell_members=" Style.font.family Style.font.title Style.font.body Style.font.bodySmall
   Style.font.caption Style.font.display Style.font.displayLarge Style.font.icon
   Style.bar.iconSlot Style.bar.iconCanvas Commons.Color.popups.background Commons.Color.bar.background BarWidget.qml:bar.shell BarWidget.qml:bar.layoutConfig

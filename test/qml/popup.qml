@@ -2,7 +2,6 @@ import QtQuick
 import QtTest
 import Quickshell
 import Quickshell.Io
-import qs.Commons
 import qs.Ui
 import "plugin/Chart.js" as Chart
 import "plugin/Quote.js" as Quote

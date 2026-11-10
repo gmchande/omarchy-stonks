@@ -1,5 +1,4 @@
 import QtQuick
-import QtTest
 import Quickshell
 import Quickshell.Io
 import "plugin" as Stonks
@@ -21,8 +20,7 @@ Harness {
   readonly property int night: 1790910000
   readonly property int live: 1791175013
   // Midnight in New York.
-  readonly property var midnight: ({ fri25: 1790308800, thu1: 1790827200, fri2: 1790913600, tue6: 1791259200,
-    wed7: 1791345600, thu8: 1791432000 })
+  readonly property var midnight: ({ fri25: 1790308800, fri2: 1790913600, wed7: 1791345600, thu8: 1791432000 })
   readonly property string state: Quickshell.env("STONKS_FAKE_STATE")
 
   function record(name) { return readFile(harness.state + "/" + name).trim() }
@@ -178,7 +176,7 @@ Harness {
             + " -> " + (laterShapes[i] === landedShapes[i] ? "kept" : "reshaped")
         }).join(", "))
       featureShown("NEST")
-      // Read at the end, where every later ask is in the logs too.
+      // Read now, before later asks join the logs; checked at the end.
       var openAsked = harness.record("OVERNIGHT.calls") + " calls for " + harness.asked("OVERNIGHT.asked").join(",") + ", " + lastSpan()
 
       // r asks Robinhood again for the chart on show alone.

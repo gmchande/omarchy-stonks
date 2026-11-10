@@ -11,7 +11,8 @@ import "plugin/Figures.js" as Figures
 // the real Panel and Service with real Qt keys, the card in a plain window
 // (CardWindow.qml) since the shell's layer-shell one does not load
 // offscreen. Each change of what the card fits eases its edge there in the
-// house 160 ms, the footer riding it whole and covering the rows it passes;
+// shell's 200 ms (Stonks' own 160 on Omarchy 4.0, whose card takes its
+// height at once), the footer riding it whole and covering the rows it passes;
 // an open from closed shows the fitted height from its first frame. Beside
 // it, a real pill's animal turns column by column as its day crosses its
 // close, and switches at once on a wheel step. HOME and curl are scratch

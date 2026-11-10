@@ -1,6 +1,4 @@
 import QtQuick
-import Quickshell
-import Quickshell.Io
 import "Settings.js" as Settings
 
 // Makes a release's data file through the real Service (data-files.sh

@@ -5,9 +5,9 @@
 # It counts its calls per symbol in STONKS_FAKE_STATE/<SYMBOL>.calls, and a
 # symbol's history requests again in <SYMBOL>.history.calls; while
 # <SYMBOL>.history.hold exists, that symbol's history answer waits, and
-# while <SYMBOL>.quote.hold exists, its day's answer waits. Every chart answer names the symbol asked
-# for, whichever saved day it carries, so a quote kept under another symbol
-# shows.
+# while <SYMBOL>.quote.hold exists, its day's answer waits. Every chart
+# answer names the symbol asked for, whichever saved day it carries, so a
+# quote kept under another symbol shows.
 #
 #   AAPL, MSFT, NVDA   answer test/fixtures/aapl.json, up 2.61%, without its
 #                after-hours trades, so the day's move is on top; while
@@ -42,15 +42,14 @@
 #                range answers
 # A symbol search answers the saved SHOP results after 0.4 s, so a search
 # can still be out when the panel closes and opens again; ZZZ answers with
-# no matches, OOPS gets no answer, WRONG answers 400, as Yahoo does a
-# question it calls wrong, BLOCK answers 403, as a refusal for a reason of
-# Yahoo's own would, ONE answers the first SHOP result alone, and VFIAX and
-# EURUSD Yahoo's answers for those, which hold kinds Stonks leaves out. Each
-# SHOP answer
-# given, after the pause, is counted in SEARCH.answered.calls; a search
-# stopped first is not. Every search is counted in SEARCH.asked.calls as it
-# comes, before the pause. While STONKS_FAKE_STATE/SEARCH.down exists, every
-# search fails.
+# no matches, OOPS fails, WRONG answers 400, as Yahoo does a question it
+# calls wrong, BLOCK answers 403, as a refusal for a reason of Yahoo's own
+# would, ONE answers the first SHOP result alone, and VFIAX and EURUSD
+# Yahoo's answers for those, which hold kinds Stonks leaves out. Each SHOP
+# answer given, after the pause, is counted in SEARCH.answered.calls; a
+# search stopped first is not. Every search is counted in
+# SEARCH.asked.calls as it comes, before the pause. While
+# STONKS_FAKE_STATE/SEARCH.down exists, every search fails.
 # History requests use the saved AAPL year response for AAPL and MSFT, and
 # NEST's saved month for NEST; KILN, SPY, ^GSPC, BTC-USD, SHEL.L, and
 # 7203.T, one of each kind of listing, answer their own saved years.
@@ -101,7 +100,7 @@
 # symbol's own day as the chart route would, closes only, in Yahoo's spark
 # shape, counting each symbol's call as a chart's. A symbol the chart route
 # would fail or answer 404 is left out, as Yahoo leaves out one it has no
-# day for. HUGE pads the answer past the spark cap.
+# day for.
 #
 # Runs: like curl, it takes several URLs in one call and answers each in
 # turn, each followed by the -w line Fetch.js asks for, with the status
@@ -177,7 +176,7 @@ name_of() {
 
 # serve URL: one URL's answer on stdout; its exit code says what kind:
 # 0 an answer, 22 a failure (502), 40 a request refused as asked (400),
-# 44 not found (404), 7 no answer.
+# 43 forbidden (403), 44 not found (404).
 serve() {
   local url=$1
   if [[ "$url" == *"raw.githubusercontent.com/"* ]]; then
@@ -188,18 +187,16 @@ serve() {
     exit
   fi
   if [[ "$url" == *"/v7/finance/spark"* ]]; then
-    local list="${url#*symbols=}" range="${url#*range=}" sym body served days=() huge=0
+    local list="${url#*symbols=}" range="${url#*range=}" sym body served days=()
     list="${list%%&*}"
     range="${range%%&*}"
     for sym in ${list//,/ }; do
       body=$(serve "https://query1.finance.yahoo.com/v8/finance/chart/$sym?range=$range&interval=5m&includePrePost=true")
       served=$?
       [ "$served" = 0 ] && days+=("$body")
-      [ "$sym" = HUGE ] && huge=1
     done
     printf '%s\n' "${days[@]}" | jq -cs '{ spark: { result: map(.chart.result[0] | { symbol: .meta.symbol,
       response: [{ meta: .meta, timestamp: .timestamp, indicators: { quote: [{ close: .indicators.quote[0].close }] } }] }) } }'
-    [ "$huge" = 1 ] && head -c 450000 /dev/zero | tr '\0' ' '
     exit 0
   fi
   if [[ "$url" == *"/v1/finance/search"* ]]; then
@@ -394,7 +391,7 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     -w) format=$2; shift 2 ;;
     --max-filesize) cap=$2; shift 2 ;;
-    -A|-H|--max-time|--connect-timeout|--rate) shift 2 ;;
+    -A|--max-time|--connect-timeout) shift 2 ;;
     http*) urls+=("$1"); shift ;;
     *) shift ;;
   esac
@@ -447,7 +444,6 @@ for i in "${!urls[@]}"; do
       40) status=400 ;;
       43) status=403 ;;
       44) status=404 ;;
-      7) status=000; exit_code=7; body="" ;;
       *) status=502 ;;
     esac
     if [ "$cap" -gt 0 ] && [ "${#body}" -gt "$cap" ]; then

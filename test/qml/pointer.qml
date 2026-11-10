@@ -1,10 +1,7 @@
 import QtQuick
-import QtQuick.Controls
-import QtTest
 import Quickshell
 import Quickshell.Io
 import qs.Commons
-import qs.Commons as Commons
 import "plugin/Chart.js" as Chart
 import "plugin/Quote.js" as Quote
 import "plugin/Settings.js" as Settings

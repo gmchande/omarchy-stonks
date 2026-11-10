@@ -15,8 +15,8 @@
 #   The base draws every state but the panel-anchor ones, whose check
 #   judges the base's own harness on today's Omarchy, not the change.
 # - Nothing jumps: positions across looks, symbols, and ranges.
-# - Window and panel motion, judged on rendered frames (test/qml/frames.js),
-#   never on the property behind it.
+# - Window and panel motion, judged on rendered frames (test/qml/frames.js)
+#   and the rows' places.
 # - The long list: a power user's 154 symbols, on wall-clock budgets.
 # - Omarchy 4.0.6, the oldest shell Stonks works on (test/old-shell.sh): the
 #   bar's renders on its shell, in out/render-omarchy-4.0/ with their own
@@ -168,10 +168,10 @@ for i in "${!shells[@]}"; do
 done
 
 # Longest first, as measured. A whole set this run draws runs in two parts,
-# or four when it is the only one; the bar's alone, in one. The head's whole
-# set takes --part; the base's, by name, smooth and the rest, about half
-# each, since --part would run its anchor check, which judges the base's own
-# harness on today's Omarchy, not the change.
+# the head's in four when it is the only one; the bar's alone, in one. The
+# head's whole set takes --part; the base's, by name, smooth and the rest,
+# about half each, since --part would run its anchor check, which judges the
+# base's own harness on today's Omarchy, not the change.
 whole=0
 for pattern in "${draw_patterns[@]}"; do [ -n "$pattern" ] || whole=$((whole + 1)); done
 parts=2

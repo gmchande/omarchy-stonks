@@ -1,5 +1,4 @@
 import QtQuick
-import QtTest
 import Quickshell
 import Quickshell.Io
 import "plugin" as Stonks

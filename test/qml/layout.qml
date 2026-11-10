@@ -34,8 +34,7 @@ import "plugin"
 // rows stop short of the scrollbar's gutter, an open list menu makes room
 // for itself, and the window's smallest permitted height still holds a whole
 // row. The price and change text are measured as displayed, at whatever
-// size they are fitted to. Every key-hint row is one line of six keys at
-// most. Nothing is mapped into the running shell.
+// size they are fitted to. Nothing is mapped into the running shell.
 Harness {
   id: root
   marker: "LAYOUT DONE"
@@ -1373,7 +1372,7 @@ Harness {
         body.minChartHeight = Style.space(136)
         wait(50)
         var usualChart = body.chartItem.height
-        surface.fixedHeight = body.smallestHeight !== undefined ? body.smallestHeight : body.chromeHeight + body.listRowHeight
+        surface.fixedHeight = body.smallestHeight
         stub.featuredSymbol = "MZ"
         stub.range = "1D"
         stub.historyEntry = null
