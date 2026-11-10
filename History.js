@@ -18,6 +18,10 @@ var HISTORY_RANGES = {
   "All": { range: "max", interval: "1mo", scale: "log" }
 }
 
+// A range answered within this is fresh: only a reader's refresh asks for
+// it again sooner.
+var HISTORY_FRESH = 15 * 60
+
 function historyUrl(symbol, range) {
   var spec = HISTORY_RANGES[range]
   if (!spec) return null
@@ -32,13 +36,13 @@ function historyKey(symbol, range) {
   return String(symbol || "").toUpperCase() + "|" + String(range || "")
 }
 
-// A history holds regular hours only. No wait is shorter than HistoryFeed's
-// 15-minute cache.
+// A history holds regular hours only. No wait is shorter than the feed
+// keeps an answer fresh (`HISTORY_FRESH`).
 function historyDue(range, entry, quote, now, trading) {
   var spec = HISTORY_RANGES[range]
   if (!spec || !entry || !quote) return false
   var intraday = historyIntervalSeconds(spec.interval) < 24 * 60 * 60
-  if (now - entry.answeredAt < (intraday ? 15 : 60) * 60) return false
+  if (now - entry.answeredAt < (intraday ? HISTORY_FRESH : 60 * 60)) return false
   if (trading) return true
   var regular = quote.session && quote.session.regular
   return !!regular && regular.end <= now && entry.receivedAt < regular.end
