@@ -49,6 +49,7 @@
         "2028-11-23": "Thanksgiving Day",
         "2028-12-25": "Christmas Day"
       },
+      "validFrom": "2026-01-01",
       "validThrough": "2028-12-31",
       "source": "https://www.nyse.com/trade/hours-calendars"
     },
@@ -98,6 +99,7 @@
         "2028-12-25": "Christmas Day",
         "2028-12-26": "Boxing Day"
       },
+      "validFrom": "2026-01-01",
       "validThrough": "2028-12-31",
       "source": "https://www.tsx.com/en/trading/calendars-and-trading-hours/calendar",
       "yearSources": {
@@ -146,6 +148,7 @@
         "2028-12-25": "Christmas Day",
         "2028-12-26": "Boxing Day"
       },
+      "validFrom": "2026-01-01",
       "validThrough": "2028-12-31",
       "source": "https://www.londonstockexchange.com/equities-trading/business-days"
     },
@@ -199,6 +202,7 @@
         "2027-11-23": "Labor Thanksgiving Day",
         "2027-12-31": "Market Holiday"
       },
+      "validFrom": "2026-01-01",
       "validThrough": "2027-12-31",
       "source": "https://www.jpx.co.jp/english/corporate/about-jpx/calendar/index.html"
     }
