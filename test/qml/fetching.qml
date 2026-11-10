@@ -322,19 +322,25 @@ Harness {
       // A range's history is asked once, and kept a quarter hour: picked
       // again inside it, nothing is asked, and after it, once more.
       var asked = function() { return harness.calls("NEST.history") }
+      // The month's chart on show: a count read sooner is of a selection
+      // that hasn't reached the feed.
+      var month = function() { return within(3000, function() { return body.historyShown && body.chartRange === "1M" }) }
+      var day = function() { body.selectRange("1D"); within(3000, function() { return !body.historyActive }) }
       var historyFrom = asked()
       body.selectRange("1M")
-      var once = within(3000, function() { return asked() === historyFrom + 1 && !!service.histories["NEST|1M"] })
-      body.selectRange("1D")
+      var once = month() && asked() === historyFrom + 1
+      day()
       tick(300)
       body.selectRange("1M")
-      tick(5, 1)
-      var kept = asked() === historyFrom + 1
-      body.selectRange("1D")
+      var shown = month()
+      // Time for a request that must not go.
+      wait(700)
+      var kept = shown && asked() === historyFrom + 1
+      day()
       tick(900)
       body.selectRange("1M")
-      var again = within(3000, function() { return asked() === historyFrom + 2 })
-      body.selectRange("1D")
+      var again = within(3000, function() { return asked() === historyFrom + 2 }) && month()
+      day()
       harness.check("a range's history is asked once, kept a quarter hour, and asked again after it",
         once && kept && again, [once, kept, again, asked() - historyFrom].join(" "))
 
@@ -344,11 +350,12 @@ Harness {
       touch("YAHOO.refuse")
       var askedAt = 0
       tick(70, 1, function() { if (!askedAt && gate.pause === "refused") askedAt = service.now })
-      // The header names the trouble once a price is 90 s overdue.
+      // The header names the trouble once a price is 90 s overdue: on to
+      // 100 s after the refusal, wherever in the minute it came.
       var said = ""
       var refusedFrom = harness.requests().length
       var lone = []
-      tick(78, 1, function() {
+      while (askedAt > 0 && service.now - askedAt < 100) tick(1, 1, function() {
         var sent = harness.yahoo(harness.requests().slice(refusedFrom)).length
         if (sent > lone.length) lone.push(service.now - askedAt)
         if (/busy/i.test(body.headerText)) said = body.headerText
@@ -436,6 +443,29 @@ Harness {
         woke && harness.listed.every(function(s) { return dark[s] === 0 })
           && harness.listed.every(function(s) { return lit[s] === (s === "NEST" ? 1 : 0) }),
         (woke ? "" : "not within 2 s | ") + "off: " + JSON.stringify(dark) + " | on: " + JSON.stringify(lit))
+
+      // Words typed into search with every screen off ask Yahoo nothing,
+      // and the key that wakes a screen sends them, once.
+      openWindow()
+      body.startAdding()
+      var field = null
+      within(3000, function() { field = harness.find(body, "searchField"); return body.search.active && !!field })
+      screenStandIn.on = false
+      wait(1100)
+      var searchesFrom = harness.calls("SEARCH.asked")
+      field.text = "zzz"
+      var held = within(3000, function() { return body.search.feed.requestedQuery === "zzz" })
+      screensHeard()
+      var darkSearches = harness.calls("SEARCH.asked") - searchesFrom
+      wait(1100)
+      plugin.service.screens.testInput.isIdle = true
+      screenStandIn.on = true
+      plugin.service.screens.testInput.isIdle = false
+      var sent = within(3000, function() { return harness.calls("SEARCH.asked") === searchesFrom + 1 })
+      harness.check("every screen off, words typed into search ask nothing, and the key that wakes a screen sends them, once",
+        held && darkSearches === 0 && sent, [held, darkSearches, harness.calls("SEARCH.asked") - searchesFrom].join(" "))
+      body.cancelAdding()
+      closeWindow()
 
       harness.finish()
     }

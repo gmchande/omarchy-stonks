@@ -11,7 +11,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 declare -A baseline=(
   [Steps.qml]=1
   [camera.qml]=2
-  [fetching.qml]=3
+  [fetching.qml]=6
   [keys.qml]=1
   [render.qml]=2
   [saving.qml]=1
