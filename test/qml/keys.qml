@@ -307,7 +307,8 @@ Harness {
       // again, once. Words that name none of the list's own, which Enter
       // would take at once.
       var fault = function(on) {
-        flag.command = [on ? "touch" : "rm", "-f", Quickshell.env("STONKS_FAKE_STATE") + "/SEARCH.down"].filter(function(a) { return on ? a !== "-f" : true })
+        var file = Quickshell.env("STONKS_FAKE_STATE") + "/SEARCH.down"
+        flag.command = on ? ["touch", file] : ["rm", "-f", file]
         flag.running = true
         tryVerify(function() { return !flag.running }, 2000)
       }
