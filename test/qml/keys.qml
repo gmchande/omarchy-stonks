@@ -274,6 +274,55 @@ Harness {
       escapeOrder(s)
     }
 
+    // What a person does with stocks and lists, by keys alone: no step moves
+    // the pointer, and each is judged by what the lists then hold.
+    function flows(s) {
+      base(s)
+      var b = s.body
+      var type = function(words) { words.split("").forEach(function(c) { keyClick(c) }) }
+      var typing = function(name) { return within(1500, function() { var field = harness.find(b, name); return !!field && field.activeFocus }) }
+
+      // Enter waits for Yahoo's answer and takes its first.
+      press("a")
+      var searching = typing("searchField")
+      type("shop")
+      press("⏎")
+      var added = within(5000, function() { return service.symbols.indexOf("SHOP") >= 0 && !b.adding })
+      harness.check("by keys alone, a, the words and Enter add the stock Yahoo finds",
+        searching && added, searching + " " + service.symbols.join(",") + " adding " + b.adding)
+
+      // w, down to New list, Enter, a name, Enter: the list is made and
+      // shown, with search open to fill it.
+      quiet()
+      press("w")
+      press("↓")
+      press("⏎")
+      var naming = typing("listNameField")
+      type("tech")
+      press("⏎")
+      var made = within(2000, function() { return service.listName === "tech" && b.adding })
+      type("shop")
+      press("⏎")
+      var filled = within(5000, function() { return service.symbols.join(",") === "SHOP" && !b.adding })
+      harness.check("by keys alone, w makes a list and the words and Enter fill it",
+        naming && made && filled, [naming, made, service.listName, service.symbols.join(",")].join(" "))
+
+      // w, down past the lists and New list to Manage lists, Enter; Delete
+      // asks, Enter deletes, and All keeps the stock.
+      quiet()
+      press("w")
+      press("↓")
+      press("↓")
+      press("⏎")
+      var managing = within(1500, function() { return b.managingLists })
+      press("Delete")
+      press("⏎")
+      var gone = within(2000, function() { return service.lists.length === 1 && service.listName === "" })
+      press("Esc")
+      harness.check("by keys alone, Manage lists deletes a list, and All keeps its stock",
+        managing && gone && service.symbols.indexOf("SHOP") >= 0, [managing, service.lists.length, service.listName, service.symbols.join(",")].join(" "))
+    }
+
     function test_keys() {
       // Ten rows to move through.
       for (var n = 1; n <= 7; n++) service.addSymbol("LONG" + n)
@@ -304,6 +353,7 @@ Harness {
       press("o")
       harness.check("in the window, after Tab a key still does its action",
         within(1500, function() { return service.order === "symbol" }), service.order)
+      flows(harness.window)
       app.close()
       harness.finish()
     }
