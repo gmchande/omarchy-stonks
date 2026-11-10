@@ -38,7 +38,7 @@ Item {
   property color ghost: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.05)
   property string fontFamily: Style.font.family
   property string symbol: ""
-  // Where the header gives its title way (`HeaderStatus.titled`).
+  // Where the header gives its title way (`Header.titled`).
   property bool nameOnLine: false
   // The dashed line's legend, said in the strip while a scrub reads against
   // it, where the extended-hours print steps aside.

@@ -81,7 +81,7 @@ Item {
   property bool changeCycles: true
   readonly property alias chartItem: heroChart
   // A replay's sound steps through it in retro, a note a column.
-  readonly property var pixelGrid: pixelChart.grid
+  readonly property var pixelGrid: retroChart.grid
 
   // The hero's change or the rows' unit, clicked: the unit steps.
   signal changeClicked()
@@ -151,8 +151,8 @@ Item {
       width: parent.width
       height: root.chartHeight
 
-      DayChart {
-        id: dayChart
+      SmoothChart {
+        id: smoothChart
         visible: !root.retro
         anchors.fill: parent
         // The hidden look draws nothing and follows no scrub until it shows,
@@ -173,8 +173,8 @@ Item {
         still: root.still || root.held
       }
 
-      PixelChart {
-        id: pixelChart
+      RetroChart {
+        id: retroChart
         visible: root.retro
         anchors.fill: parent
         geometry: root.retro ? root.geometry : null
@@ -200,7 +200,7 @@ Item {
         parent: rangeMarks.chart.underScrub
         anchors.fill: parent
         marks: root.rangeMarks
-        chart: root.retro ? pixelChart : dayChart
+        chart: root.retro ? retroChart : smoothChart
         foreground: root.foreground
         dim: root.dim
         fontFamily: root.fontFamily
@@ -264,7 +264,7 @@ Item {
         // Read where the chart is drawn, so the right edge reaches the last
         // print.
         onPositionChanged: function(mouse) {
-          if (!root.replayRunning) root.scrubRequested(root.retro ? pixelChart.fractionAt(mouse.x) : dayChart.fractionAt(mouse.x))
+          if (!root.replayRunning) root.scrubRequested(root.retro ? retroChart.fractionAt(mouse.x) : smoothChart.fractionAt(mouse.x))
         }
         onExited: if (!root.replayRunning) root.scrubCleared()
         onClicked: root.snapToNow()

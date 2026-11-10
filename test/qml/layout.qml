@@ -1027,7 +1027,7 @@ Harness {
         // text size Omarchy offers (9 to 20), and in the panel with the
         // shell's spacing kept at size 12's as the text grows (`[spacing]
         // scale-with-font = false`). Smooth alone: retro changes only the
-        // corner radius and the look toggle's words here (HeaderStatus.qml).
+        // corner radius and the look toggle's words here (Header.qml).
         // At the everyday size 12 the panel names Constitution Memorial Day
         // in full.
         var header = find(body, "statusText").parent

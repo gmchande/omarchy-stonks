@@ -141,7 +141,7 @@ Harness {
           foot: card.words ? card.words.foot : "",
           name: card.quote ? String(card.quote.name || "") : "",
           currency: card.quote ? String(card.quote.currency || "") : "", texts: harness.texts(card), marks: harness.marksSaid(card),
-          inset: harness.find(card, "shareDayChart").xAt(0) * card.dpr }
+          inset: harness.find(card, "shareSmoothChart").xAt(0) * card.dpr }
       }
       if (loader) loader.loaded.connect(take)
       act()

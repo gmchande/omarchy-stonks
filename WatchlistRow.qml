@@ -129,7 +129,7 @@ Rectangle {
   // The hero's retro chart at a finer pitch: one drawing at two sizes.
   Component {
     id: cellsLine
-    PixelChart {
+    RetroChart {
       objectName: "rowCells"
       geometry: row.geometry
       up: row.view ? row.view.dayUp : null

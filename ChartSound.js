@@ -180,7 +180,7 @@ function nesVolume(t, start, stepMs, floor) {
 }
 
 // Retro plays each column the replay reaches as its lit row's note (`grid` is
-// PixelChart's), silent over dark ones. A repeated note is held, its volume
+// RetroChart's), silent over dark ones. A repeated note is held, its volume
 // falling in the console's steps, and struck again after silence. Where a lit
 // column lands across the baseline under it from the last, the noise channel
 // ticks.

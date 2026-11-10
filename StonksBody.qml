@@ -1064,7 +1064,7 @@ Item {
 
   // On the margins, not the words' edges: the longest closure status (a
   // holiday, the next open, its zone) needs the panel's whole width.
-  HeaderStatus {
+  Header {
     id: header
     anchors.left: parent.left
     anchors.right: parent.right
@@ -1328,7 +1328,7 @@ Item {
 
   // It rides the panel's easing edge, carrying the surface's ground over the
   // rows and the empty list's line, so its words never cross a row.
-  AddFooter {
+  Footer {
     id: footer
     objectName: "footer"
     anchors.left: parent.left

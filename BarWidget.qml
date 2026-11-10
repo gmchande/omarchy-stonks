@@ -273,7 +273,7 @@ BarWidget {
 
       // The rows' histogram at pill size, its stems solid: faint ones read as
       // a dotted line here.
-      PixelChart {
+      RetroChart {
         visible: root.barStyle === "sparkline" && root.retro
         anchors.verticalCenter: parent.verticalCenter
         width: Style.space(40)
