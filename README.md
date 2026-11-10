@@ -285,7 +285,7 @@ screenshot editor.
 | `a` or `/` | Find or add a symbol |
 | Delete or Backspace | Remove the selected row |
 | `Ctrl+Z` | Undo a removal |
-| `Shift+↑` `Shift+↓` | Move the selected row, in your own order |
+| `Ctrl+↑` `Ctrl+↓` | Move the selected row, in your own order |
 | `o` | Change the order |
 | `Shift+O` | Reverse the order |
 | `w` | Open the list menu |
