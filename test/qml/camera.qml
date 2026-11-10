@@ -169,14 +169,14 @@ Harness {
     // A shot that landed as Omarchy's own screenshots do: one picture,
     // named for `symbol`, in `folder` (the reader's pictures folder unless
     // named), and no copy of it in Stonks' cache; that picture on the
-    // clipboard as a PNG; Omarchy's notification in Omarchy's own words, the
+    // clipboard as a PNG; Omarchy's notification, naming no key, the
     // picture as its thumbnail and a click that opens `editor` (Tensaku
     // unless named) on it; the footer saying what it shows, `said` matching
     // what follows "Copied a screenshot of "; and the card gone. A second
     // shot in the same second keeps the first: its name ends "-2".
     function landed(shot, symbol, said, folder, editor) {
       var named = new RegExp("^stonks-" + symbol + "-\\d{4}-\\d\\d-\\d\\d_\\d\\d-\\d\\d-\\d\\d(-\\d+)?\\.png$")
-      var expected = ["Screenshot saved to clipboard and file", "Edit with Super + Alt + , (or click this)",
+      var expected = ["Screenshot saved to clipboard and file", "Click this to edit",
         "--image", shot.file, "--exec", editor || "tensaku-edit", shot.file]
       var problems = []
       if (shot.added !== 1) problems.push(shot.added + " pictures saved")

@@ -132,7 +132,7 @@ Item {
   Process {
     id: announcing
     command: ["timeout", "5", "omarchy-notification-send", "Screenshot saved to clipboard and file",
-      "Edit with Super + Alt + , (or click this)", "--image", root.shotFile, "--exec", root.shotEditor, root.shotFile]
+      "Click this to edit", "--image", root.shotFile, "--exec", root.shotEditor, root.shotFile]
     onExited: root.finish(0)
   }
 }
