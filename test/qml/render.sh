@@ -87,6 +87,8 @@ every_state() (
     states="$states popup-controls-$control-hover-smooth popup-controls-$control-press-smooth"
   done
   states="$states popup-controls-deadmove-hover-smooth popup-controls-livemove-hover-smooth popup-controls-breadth-hover-smooth"
+  # Retro's chart under the pointer, on its last lit column.
+  states="$states window-controls-chart-hover-retro"
   # The list menu over the cursor's row in both looks on both surfaces: its
   # edge shows nothing of the row under it.
   states="$states popup-lists-menu-smooth window-lists-menu-smooth window-lists-menu-retro"

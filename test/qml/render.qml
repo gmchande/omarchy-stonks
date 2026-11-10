@@ -87,6 +87,9 @@ Harness {
   // A control under real pointer input: its hover, or its press filmed and
   // judged (frames.js press), then drawn held.
   readonly property var controlState: /^(popup|window)-controls-([a-z]+)-(hover|press)-(smooth|retro)$/.exec(stateName)
+  // window-controls-chart-hover-retro: a window 719 wide, whose chart holds
+  // its columns with 5 px to spare, as a window sized by hand can.
+  readonly property bool chartHover: stateName === "window-controls-chart-hover-retro"
   readonly property var anchorState: /^popup-anchor-(left|center|right)-(open|held|next)-(smooth|retro)$/.exec(stateName)
   FileView { id: anchorPoses; path: Quickshell.env("STONKS_ANCHOR_POSES"); blockLoading: true }
   readonly property var anchorPose: anchorState ? JSON.parse(anchorPoses.text())[anchorState[1] + "-" + anchorState[2]] : null
@@ -1199,7 +1202,7 @@ Harness {
     // grow with the text, and the window is 720 or its smallest, whichever
     // is wider.
     implicitWidth: root.anchorState ? 1000 : root.pillSheet ? Math.max(520, pillColumn.implicitWidth + 48) : root.themeState ? 480 + 410 : root.sheet ? 1000
-      : (root.windowWidth ? root.windowWidth : (root.smallest ? Math.round(560 * root.sizeScale)
+      : (root.windowWidth ? root.windowWidth : root.chartHover ? 719 : (root.smallest ? Math.round(560 * root.sizeScale)
         : (root.popup ? Math.round(480 * root.sizeScale) : Math.max(720, Math.round(560 * root.sizeScale)))))
     implicitHeight: root.anchorState ? body.fittedHeight(body.chromeHeight + 6 * body.rowPitch - body.rowGap) + content.inset * 2 + 56
       : root.stateName === "pill-sheet-large" ? 720 : root.pillSheet ? pillColumn.implicitHeight + 40 : root.sheet ? 460
@@ -1706,12 +1709,26 @@ Harness {
         body.search.suspend()
         waitForRendering(body)
         target = root.findAll(body.search, "searchResult")[1]
+      } else if (control === "chart") {
+        var heroChart = one("heroChart")
+        for (var k = 0; k < heroChart.children.length; k++) if (heroChart.children[k].scrubColumn !== undefined) target = heroChart.children[k]
       }
       verify(!!target, "review control exists: " + control)
       waitForRendering(body)
       var point = target.mapToItem(body, target.width / 2, target.height / 2)
       // The word's right end is its own control; its left is the arrow.
       if (control === "orderword") point = target.mapToItem(body, target.width - 2, target.height / 2)
+      // Retro's last lit column, under the middle of it, in a window 5 px
+      // wider than its columns (`chartHover`): there a pointer read across
+      // the chart's whole width lit the column to its left.
+      if (control === "chart") {
+        point = target.mapToItem(body, (target.inkColumns - 0.5) * target.grid.pitch, target.height / 2)
+        var spare = target.width - target.grid.columns * target.grid.pitch
+        if (spare !== 5) {
+          console.error("FAIL the chart's columns leave " + spare + " px spare, not 5")
+          root.failures++
+        }
+      }
       if (mode === "press") {
         var fill = control === "list" ? one("listControl")
           : control === "orderword" || control === "manualorder" ? one("orderControl")
