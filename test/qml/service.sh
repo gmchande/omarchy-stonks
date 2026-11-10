@@ -6,15 +6,18 @@
 # written over; a save from elsewhere mid-read; and the version watch on the
 # tree's manifest.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-feed_tree service.qml Service.qml OwnerOnly.qml Gate.qml Updates.qml FetchRun.qml QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml AllDayFeed.qml OvernightFeed.qml ReleaseFeed.qml Asks.js Fetch.js Quote.js Format.js Calendar.js CarriedClose.js Market.js Overnight.js History.js Fundamentals.js Figures.js Chart.js Settings.js Release.js calendars.json manifest.json
+feed_tree service.qml Service.qml ListsFile.qml OwnerOnly.qml Gate.qml Updates.qml FetchRun.qml QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml AllDayFeed.qml OvernightFeed.qml ReleaseFeed.qml Asks.js Fetch.js Quote.js Format.js Calendar.js CarriedClose.js Market.js Overnight.js History.js Fundamentals.js Figures.js Chart.js Settings.js Release.js calendars.json manifest.json
 # The harness ages a fundamentals entry by a day, asks a quote again, and
 # counts the data file's reads, so a check waits on its read-back.
-patch_copy Service.qml '/readonly property var fundamentals:/a\  readonly property alias testFundamentalsFeed: fundamentalsFeed\n  readonly property alias testFeed: feed\n  readonly property alias testDataFile: dataFile'
+patch_copy ListsFile.qml '/signal started()/a\  readonly property alias testDataFile: dataFile'
+patch_copy Service.qml '/readonly property var fundamentals:/a\  readonly property alias testFundamentalsFeed: fundamentalsFeed\n  readonly property alias testFeed: feed\n  readonly property alias testDataFile: listsFile.testDataFile\n  readonly property alias testListsFile: listsFile'
 # A second Service whose data file is a stand-in the harness steps through
 # (DataFileStandIn.qml): Quickshell's own read can't be held part-way.
 cp "$here/DataFileStandIn.qml" "$root/"
+cp "$root/ListsFile.qml" "$root/SteppedListsFile.qml"
+patch_copy SteppedListsFile.qml '/^  FileView {$/{N;s/^  FileView {\n    id: dataFile$/  DataFileStandIn {\n    id: dataFile/}'
 cp "$root/Service.qml" "$root/SteppedService.qml"
-patch_copy SteppedService.qml '/^  FileView {$/{N;s/^  FileView {\n    id: dataFile$/  DataFileStandIn {\n    id: dataFile/}'
+patch_copy SteppedService.qml 's/^  ListsFile {$/  SteppedListsFile {/'
 scratch_home shell-bar-only.json shell.json
 # Under the umask most machines have, every chmod waits until the harness
 # has read the data file's first mode (bin/chmod).

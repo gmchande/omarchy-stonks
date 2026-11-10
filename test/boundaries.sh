@@ -40,7 +40,7 @@ none() {
 # bell's omarchy-shell and pw-dump, and the silence's pw-cat, the camera's
 # screenshot hand-off, and the sh and chmod that keep Stonks' files its
 # owner's and the sh that makes the data file so (OwnerOnly); files are
-# read and written only by the service, the version watch reads the
+# read and written only by the service and its lists file, the version watch reads the
 # manifest, the trend colours read the theme's colours, the sounds read
 # their own bundled sounds,
 # the cache's files, the saved quotes and the sounds' replay, chimes, and
@@ -52,9 +52,9 @@ none() {
 # all-day feed's, and the manifest's URL the release feed's. The plugin has
 # one IPC target; only the window's host and the screens act on Hyprland.
 only '\bProcess\s*\{' FetchRun.qml Updates.qml Sounds.qml Camera.qml OwnerOnly.qml
-only '\bFileView\s*\{' Service.qml Updates.qml TrendColors.qml OwnerOnly.qml Sounds.qml
+only '\bFileView\s*\{' Service.qml ListsFile.qml Updates.qml TrendColors.qml OwnerOnly.qml Sounds.qml
 only '\bSettings\s*\{|^import QtCore' Camera.qml
-only '^import Quickshell\.Io' FetchRun.qml Service.qml IpcTarget.qml Updates.qml TrendColors.qml Sounds.qml Camera.qml OwnerOnly.qml
+only '^import Quickshell\.Io' FetchRun.qml Service.qml ListsFile.qml IpcTarget.qml Updates.qml TrendColors.qml Sounds.qml Camera.qml OwnerOnly.qml
 # Only the camera grabs and saves a picture, puts it on the clipboard, and
 # sends a notification.
 only 'grabToImage|saveToFile|wl-copy|wl-paste|omarchy-notification-send|notify-send' Camera.qml

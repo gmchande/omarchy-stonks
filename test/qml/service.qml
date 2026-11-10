@@ -557,7 +557,7 @@ Harness {
           harness.writeTo(harness.dataPath, "", "remove", function() { harness.go(41) })
         })
       } else if (harness.step === 41) {
-        if (!service.dataMissing && harness.waited < 2000) return
+        if (!service.testListsFile.dataMissing && harness.waited < 2000) return
         service.persist({ range: "5Y" })
         harness.go(42)
       } else if (harness.step === 42) {
@@ -573,7 +573,7 @@ Harness {
           harness.stateThen("rm -f \"$1/ln.fail\" && touch \"$1/ln.hold\"", function() {
             service.persist({ range: "1Y" })
             service.persist({ range: "3M" })
-            service.readDataFile()
+            service.testListsFile.readDataFile()
             harness.stateThen("rm -f \"$1/ln.hold\"", function() { harness.go(43) })
           })
         })

@@ -691,7 +691,7 @@ for (const file of readdirSync(dataFiles).filter(name => name.endsWith(".json"))
     sounds: !old, updateCheck: old
   }
   const text = readFileSync(join(dataFiles, file), "utf8")
-  // As Service.parseDataText reads it: one JSON object, through fileSettings.
+  // As ListsFile.parseDataText reads it: one JSON object, through fileSettings.
   const parsed = (() => { try { return JSON.parse(text.trim()) } catch (e) { return null } })()
   const read = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? M.fileSettings(parsed) : null
   const label = list => (list.name || "All") + ": " + (list.symbols.join(", ") || "empty") + ", " + list.order + (list.reversed ? " reversed" : "")
