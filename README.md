@@ -433,7 +433,8 @@ time, when Yahoo's charts are empty.
   leaves out a row whose market hasn't traded since its last price. When
   you pause on a search result you haven't added, it asks for that stock
   too, while it's on screen.
-- `query2.finance.yahoo.com` for search, as you type.
+- `query2.finance.yahoo.com` for search, as you type. Words it has looked
+  up since you opened search aren't asked again.
 - `api.robinhood.com` for overnight prices, and for the trades that fill a
   stretch Yahoo left empty: once a day for which stocks trade overnight, at
   most once for each stock the pill shows, and every 5 minutes through the

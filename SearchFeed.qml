@@ -4,6 +4,7 @@ import "Search.js" as Search
 // Yahoo's lookup for the words in the search field: one request at a time,
 // a quarter second after the typing stops. Words typed while a lookup is
 // out wait behind it, and an answer counts only for the words still wanted.
+// While search stays open, words Yahoo has answered are not asked again.
 Item {
   id: root
 
@@ -19,6 +20,10 @@ Item {
   property string activeQuery: ""
   property string requestedQuery: ""
   readonly property bool out: fetchRun.out
+  // Yahoo's answers since search opened, by their words: typed again, as
+  // after a Backspace, they answer at once and nothing is asked.
+  property var kept: ({})
+  onActiveChanged: if (!active) kept = ({})
 
   // A lookup is out for the words wanted.
   signal asked()
@@ -30,7 +35,12 @@ Item {
   // (`Search.failure`).
   signal answered(string query, string body, string why)
 
-  function askSoon() { debounce.restart() }
+  function askSoon() {
+    if (wanted in kept) {
+      debounce.stop()
+      ask()
+    } else debounce.restart()
+  }
 
   // A lookup already out for these same words answers them.
   function ask() {
@@ -41,6 +51,12 @@ Item {
       requestedQuery = q
       activeQuery = ""
       fetchRun.stop()
+      return
+    }
+    if (q in kept) {
+      requestedQuery = ""
+      activeQuery = q
+      land(kept[q], "")
       return
     }
     if (clearance && !clearance()) { requestedQuery = q; return }
@@ -55,9 +71,11 @@ Item {
   }
 
   // Asked once more: a lookup of the same words still waiting on the typing
-  // pause goes now, and one still out answers.
+  // pause goes now, and one still out answers. An answer kept for them was
+  // no use, so Yahoo is asked.
   function askAgain() {
     debounce.stop()
+    delete kept[wanted]
     if (fetchRun.out && activeQuery === wanted) {
       requestedQuery = ""
       asked()
@@ -86,6 +104,7 @@ Item {
 
   function land(body, why) {
     ended()
+    if (activeQuery !== "" && body !== "") kept[activeQuery] = body
     if (active && activeQuery !== "" && activeQuery === wanted) answered(activeQuery, body, why)
     if (requestedQuery !== "") {
       requestedQuery = ""

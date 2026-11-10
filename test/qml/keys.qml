@@ -327,6 +327,31 @@ Harness {
         failed && said !== "" && back && harness.calls("SEARCH.asked") === askedBefore + 1, [failed, said, back, harness.calls("SEARCH.asked") - askedBefore].join(" | "))
       press("Esc")
 
+      // Words Yahoo has answered since search opened answer again at once,
+      // as after a Backspace, and nothing is asked. Opened afresh, they are.
+      quiet()
+      press("a")
+      typing("searchField")
+      type("qqq")
+      var results = function() { return harness.findAll(b, "searchResult").length > 1 }
+      var first = within(5000, function() { return results() && !b.search.stale })
+      press("Backspace")
+      var second = within(5000, function() { return b.search.resultsQuery === "qq" })
+      var askedTwice = harness.calls("SEARCH.asked")
+      type("q")
+      var again = within(2000, function() { return b.search.resultsQuery === "qqq" && !b.search.stale })
+      // Time for a lookup that must not go: the typing pause and more.
+      wait(600)
+      var unasked = harness.calls("SEARCH.asked") === askedTwice
+      press("Esc")
+      press("a")
+      typing("searchField")
+      type("qqq")
+      var afresh = within(5000, function() { return harness.calls("SEARCH.asked") === askedTwice + 1 })
+      press("Esc")
+      harness.check("words looked up since search opened answer again at once and ask nothing; opened afresh, they are asked",
+        first && second && again && unasked && afresh, [first, second, again, unasked, afresh, harness.calls("SEARCH.asked") - askedTwice].join(" "))
+
       // w, down to New list, Enter, a name, Enter: the list is made and
       // shown, with search open to fill it.
       quiet()
