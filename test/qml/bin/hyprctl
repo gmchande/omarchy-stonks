@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# A stand-in for hyprctl, first on PATH inside the harnesses. The shell's
+# Style reads the corner radius, the gap to the screen's edge and whether
+# animations are on from the desktop's Hyprland, at its start and whenever
+# Hyprland reloads its config, as a change of theme does. A harness judges
+# frames against fixed expectations, so those three answer Omarchy's
+# defaults (default/hypr/looknfeel.lua) whatever the desktop is set to:
+# square corners, a gap of 10, animations on. Anything else is the real
+# hyprctl's.
+case "$*" in
+  "-j getoption decoration:rounding") echo '{"option":"decoration:rounding","int":0,"set":true}' ;;
+  "-j getoption general:gaps_out") echo '{"option":"general:gaps_out","css":"10 10 10 10","set":true}' ;;
+  "-j getoption animations:enabled") echo '{"option":"animations:enabled","bool":true,"set":true}' ;;
+  *) exec /usr/bin/hyprctl "$@" ;;
+esac
