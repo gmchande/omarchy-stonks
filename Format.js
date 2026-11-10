@@ -119,7 +119,7 @@ function moneyDigits(abs) {
 var MAX_PRICE_DIGITS = 100
 
 // US markets trade in whole cents from $1, by Reg NMS
-// (`Market.centExchanges`).
+// (`Calendar.centExchanges`).
 function priceDigits(price, hint, inCents) {
   var digits = isFiniteNumber(hint) && hint >= 0 ? hint : 2
   if (isFiniteNumber(price)) {

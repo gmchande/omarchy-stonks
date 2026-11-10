@@ -72,7 +72,7 @@ Item {
     if (wanted && !wanted.ahead && wanted.charts[0].key === key) return
     var cached = entries[key]
     var now = root.stamp()
-    if (!force && cached && cached.status === "ok" && cached.receivedAt && now - cached.receivedAt < 15 * 60) {
+    if (!force && cached && cached.status === "ok" && cached.receivedAt && now - cached.receivedAt < History.HISTORY_FRESH) {
       if (!wanted || !wanted.ahead || wanted.range !== range) root.want(null)
       return
     }

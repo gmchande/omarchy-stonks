@@ -1,7 +1,7 @@
 import { test, expect } from "bun:test"
 import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
-import { load } from "./load.js"
+import { load, rules } from "./load.js"
 
 // The rules read against Yahoo's and Robinhood's saved answers, which are
 // private (test/fixtures; test/fixtures-dir.sh finds them). Without them it
@@ -18,10 +18,10 @@ const fixtures = found.stdout.toString().trim()
 // The reader is in New York: an exchange's time is named
 // with its zone only where that clock differs from the reader's.
 process.env.TZ = "America/New_York"
-// The rule files' names these tests read, under one name. clockAt is
-// defined twice: M holds the later file's, Chart's.
-const M = Object.assign({}, ...["Format", "Quote", "Market", "Overnight", "History", "Fundamentals", "Figures",
-  "Chart", "Settings", "Search", "Asks"].map(name => load(name + ".js")))
+// The rule files' names these tests read, under one name. A name two files
+// define is read from its file (test/load.js).
+const M = rules(["Format", "Quote", "Calendar", "Market", "CarriedClose", "Overnight", "History", "Fundamentals", "Figures",
+  "Chart", "Settings", "Search", "Asks"])
 
 const fixture = name => JSON.parse(readFileSync(join(fixtures, name), "utf8"))
 const calendars = JSON.parse(readFileSync(join(import.meta.dir, "..", "calendars.json"), "utf8"))

@@ -18,6 +18,10 @@ var HISTORY_RANGES = {
   "All": { range: "max", interval: "1mo", scale: "log" }
 }
 
+// A range answered within this is fresh: only a reader's refresh asks for
+// it again sooner.
+var HISTORY_FRESH = 15 * 60
+
 function historyUrl(symbol, range) {
   var spec = HISTORY_RANGES[range]
   if (!spec) return null
@@ -32,13 +36,13 @@ function historyKey(symbol, range) {
   return String(symbol || "").toUpperCase() + "|" + String(range || "")
 }
 
-// A history holds regular hours only. No wait is shorter than HistoryFeed's
-// 15-minute cache.
+// A history holds regular hours only. No wait is shorter than the feed
+// keeps an answer fresh (`HISTORY_FRESH`).
 function historyDue(range, entry, quote, now, trading) {
   var spec = HISTORY_RANGES[range]
   if (!spec || !entry || !quote) return false
   var intraday = historyIntervalSeconds(spec.interval) < 24 * 60 * 60
-  if (now - entry.answeredAt < (intraday ? 15 : 60) * 60) return false
+  if (now - entry.answeredAt < (intraday ? HISTORY_FRESH : 60 * 60)) return false
   if (trading) return true
   var regular = quote.session && quote.session.regular
   return !!regular && regular.end <= now && entry.receivedAt < regular.end
@@ -389,16 +393,20 @@ function rangeMarks(history, ends, quote) {
   return { high: mark(ends.high), low: mark(ends.low) }
 }
 
+// A range bar's day as its scrub and its screenshot name it, with the clock
+// of a bar that has a time: `{ date, clock }`, `clock` null for a day's bar.
+function barDay(history, bar) {
+  var date = historyDateText(history, bar.t, historySpansYears(history), bar.newest ? "1d" : history.interval)
+  if (history.interval === "1wk" && !bar.newest) date = "WEEK OF " + date
+  var timed = bar.newest || history.interval === "15m" || history.interval === "30m" || history.interval === "1h"
+  return { date: date, clock: timed ? barClock(history, bar) : null }
+}
+
 // The date alone is for a header with no room: the hero shows the price.
 function historyScrubForms(history, bar, digits) {
   if (!history || !bar) return [""]
-  var years = historySpansYears(history)
-  var date = historyDateText(history, bar.t, years, bar.newest ? "1d" : history.interval)
-  if (history.interval === "1wk" && !bar.newest) date = "WEEK OF " + date
-  if (bar.newest || history.interval === "15m" || history.interval === "30m" || history.interval === "1h") {
-    var clock = barClock(history, bar)
-    date += " " + Format.zonedHhmm(bar.t, clock.offset, clock.zone)
-  }
+  var day = barDay(history, bar)
+  var date = day.clock ? day.date + " " + Format.zonedHhmm(bar.t, day.clock.offset, day.clock.zone) : day.date
   return [date + " · " + Format.money(bar.c, digits), date]
 }
 

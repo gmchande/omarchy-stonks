@@ -2,10 +2,10 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "Asks.js" as Asks
+import "Calendar.js" as Calendar
 import "Chart.js" as Chart
 import "Figures.js" as Figures
 import "History.js" as History
-import "Market.js" as Market
 import "Overnight.js" as Overnight
 import "Quote.js" as Quote
 import "Settings.js" as Settings
@@ -76,7 +76,7 @@ Item {
   readonly property bool previewShown: previewRests && openSurfaces.indexOf(previewSurface) >= 0
   property var watched: []
 
-  readonly property string dataPath: pluginId ? Quickshell.env("HOME") + "/.config/omarchy/" + pluginId + ".json" : ""
+  readonly property string dataPath: pluginId ? Quickshell.env("HOME") + "/" + Settings.listsFile(pluginId) : ""
   readonly property string quotesPath: ownerOnly.folder ? ownerOnly.folder + "/quotes.json" : ""
 
   // All: every symbol, fetched once whatever lists hold it.
@@ -135,8 +135,7 @@ Item {
   }
   readonly property var previewEntries: previewFeed.entries
   readonly property string featuredSymbol: view.featured
-  readonly property string changeMode: dataSettings.changeMode === "abs" || dataSettings.changeMode === "open"
-    ? dataSettings.changeMode : "pct"
+  readonly property string changeMode: dataSettings.changeMode
   readonly property bool retro: dataSettings.style === "retro"
   readonly property bool soundsOn: dataSettings.sounds
   readonly property int refreshIntervalSec: dataSettings.refreshIntervalSec
@@ -493,7 +492,7 @@ Item {
     clock: root
   }
   readonly property alias yahooGate: yahooGate
-  readonly property var centExchanges: Market.centExchanges(calendars)
+  readonly property var centExchanges: Calendar.centExchanges(calendars)
 
   QuoteFeed {
     id: feed

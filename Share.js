@@ -74,14 +74,9 @@ function moment(o) {
 // As its scrub names it (`History.historyScrubForms`), a time always with its
 // zone, and without the price, which the picture shows large.
 function barDate(history, bar) {
-  var timed = !!bar.newest || history.interval === "15m" || history.interval === "30m" || history.interval === "1h"
-  var date = History.historyDateText(history, bar.t, History.historySpansYears(history), bar.newest ? "1d" : history.interval)
-  if (history.interval === "1wk" && !bar.newest) date = "WEEK OF " + date
-  if (timed) {
-    var clock = History.barClock(history, bar)
-    date += " " + Format.hhmm(bar.t, clock.offset) + " " + (clock.zone || Format.offsetName(clock.offset))
-  }
-  return date
+  var day = History.barDay(history, bar)
+  var clock = day.clock
+  return clock ? day.date + " " + Format.hhmm(bar.t, clock.offset) + " " + (clock.zone || Format.offsetName(clock.offset)) : day.date
 }
 
 // The picture's words beyond the panel's two lines (`Figures.heroLines`),

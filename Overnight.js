@@ -1,4 +1,5 @@
 .pragma library
+.import "Calendar.js" as Calendar
 .import "Format.js" as Format
 .import "Market.js" as Market
 .import "Quote.js" as Quote
@@ -21,14 +22,14 @@ var OVERNIGHT_INTERVAL = 5 * 60
 var ALL_DAY_INTERVAL = 24 * 60 * 60
 
 function overnightMarket(calendars) {
-  var map = Market.calendarMap(calendars)
+  var map = Calendar.calendarMap(calendars)
   for (var id in map) if (map[id] && map[id].overnight) return map[id]
   return null
 }
 
 function hasOvernight(quote, calendars) {
   if (!quote || (quote.instrumentType !== "EQUITY" && quote.instrumentType !== "ETF")) return false
-  var cal = Market.calendarFor(calendars, quote)
+  var cal = Calendar.calendarFor(calendars, quote)
   return !!cal && !!cal.overnight
 }
 
@@ -161,27 +162,27 @@ function sameBars(a, b) {
 function marketDay(cal, dateString) {
   return {
     date: dateString,
-    start: Market.epochAt(cal, Market.previousDateString(dateString), cal.overnight.open),
-    open: Market.dayKind(cal, dateString).kind === "open"
+    start: Calendar.epochAt(cal, Calendar.previousDateString(dateString), cal.overnight.open),
+    open: Calendar.dayKind(cal, dateString).kind === "open"
   }
 }
 
 function marketDayAt(cal, t) {
-  var local = Market.localDate(t, cal)
-  var dateString = Market.dateStringOf(local)
-  return marketDay(cal, Market.clockOf(local) >= cal.overnight.open ? Market.nextDateString(dateString) : dateString)
+  var local = Calendar.localDate(t, cal)
+  var dateString = Calendar.dateStringOf(local)
+  return marketDay(cal, Calendar.clockOf(local) >= cal.overnight.open ? Calendar.nextDateString(dateString) : dateString)
 }
 
 function nightAt(cal, t) {
-  var local = Market.localDate(t, cal)
-  var clock = Market.clockOf(local)
+  var local = Calendar.localDate(t, cal)
+  var clock = Calendar.clockOf(local)
   if (clock >= cal.overnight.close && clock < cal.overnight.open) return null
   var day = marketDayAt(cal, t)
-  return { start: day.start, end: Market.epochAt(cal, day.date, cal.overnight.close), open: day.open }
+  return { start: day.start, end: Calendar.epochAt(cal, day.date, cal.overnight.close), open: day.open }
 }
 
 function nightTrades(quote, allDay, t, calendars) {
-  var cal = allDay ? Market.calendarFor(calendars, quote) : null
+  var cal = allDay ? Calendar.calendarFor(calendars, quote) : null
   var night = cal && cal.overnight ? nightAt(cal, t) : null
   return !!night && night.open
 }
@@ -319,14 +320,14 @@ function nightBell(day) {
 // its start has slid to by the afternoon (`slidWindow`). Null past the
 // calendar.
 function dayWindow(cal, date) {
-  var next = Market.nextDateString(date)
-  var nextKind = Market.dayKind(cal, next).kind
-  if (Market.dayKind(cal, date).kind !== "open" || nextKind === "unknown") return null
+  var next = Calendar.nextDateString(date)
+  var nextKind = Calendar.dayKind(cal, next).kind
+  if (Calendar.dayKind(cal, date).kind !== "open" || nextKind === "unknown") return null
   return {
     date: date,
     start: marketDay(cal, date).start,
-    midnight: Market.epochAt(cal, date, "00:00"),
-    end: nextKind === "open" ? Market.epochAt(cal, date, cal.overnight.open) : postClose(cal, date)
+    midnight: Calendar.epochAt(cal, date, "00:00"),
+    end: nextKind === "open" ? Calendar.epochAt(cal, date, cal.overnight.open) : postClose(cal, date)
   }
 }
 
@@ -344,9 +345,9 @@ function slidWindow(win, open, slideAt) {
 // Robinhood's post-market lasts as long after a half day's 13:00 close as
 // after a full day's, so it ends at 17:00.
 function postClose(cal, date) {
-  var segs = Market.segmentsOn(cal, date)
-  var full = Market.epochAt(cal, date, cal.post.close)
-  return Math.min(full, segs[segs.length - 1].end + full - Market.epochAt(cal, date, cal.post.open))
+  var segs = Calendar.segmentsOn(cal, date)
+  var full = Calendar.epochAt(cal, date, cal.post.close)
+  return Math.min(full, segs[segs.length - 1].end + full - Calendar.epochAt(cal, date, cal.post.open))
 }
 
 // A day stays on through the weekend or holiday after it, until the next
@@ -366,7 +367,7 @@ function eveningWindow(cal, latestT, reach) {
   var date = marketDayAt(cal, reach).date
   var closed = null
   for (var i = 0; i < 10 && !closed; i++) {
-    date = Market.previousDateString(date)
+    date = Calendar.previousDateString(date)
     closed = dayWindow(cal, date)
   }
   if (!closed || latestT < closed.start) return null
@@ -381,13 +382,13 @@ function eveningWindow(cal, latestT, reach) {
 }
 
 function windowSession(cal, quote, win) {
-  var on = function(s) { return !!s && !!s.regular && Market.dateStringOf(Market.localDate(s.regular.start, cal)) === win.date }
+  var on = function(s) { return !!s && !!s.regular && Calendar.dateStringOf(Calendar.localDate(s.regular.start, cal)) === win.date }
   if (on(quote.session)) return quote.session
   if (on(quote.next)) return quote.next
-  var segs = Market.segmentsOn(cal, win.date)
+  var segs = Calendar.segmentsOn(cal, win.date)
   var open = segs[0].start
   var close = segs[segs.length - 1].end
-  return { pre: { start: Market.epochAt(cal, win.date, cal.pre.open), end: open }, regular: { start: open, end: close },
+  return { pre: { start: Calendar.epochAt(cal, win.date, cal.pre.open), end: open }, regular: { start: open, end: close },
     post: { start: close, end: postClose(cal, win.date) } }
 }
 
@@ -409,11 +410,11 @@ function tradedAxis(session, points, end, over, ticks, slid) {
 }
 
 function windowTicks(cal, win, session) {
-  var ticks = [Market.epochAt(cal, win.date, "00:00"), Market.epochAt(cal, win.date, cal.overnight.close)]
-  var segs = Market.segmentsOn(cal, win.date)
+  var ticks = [Calendar.epochAt(cal, win.date, "00:00"), Calendar.epochAt(cal, win.date, cal.overnight.close)]
+  var segs = Calendar.segmentsOn(cal, win.date)
   if (segs.length && segs[0].start === session.regular.start) ticks.push(session.regular.end)
   else for (var i = 0; i < segs.length; i++) ticks.push(segs[i].end)
-  if (win.night) ticks.push(win.night.start, Market.epochAt(cal, Market.dateStringOf(Market.localDate(win.night.end, cal)), "00:00"))
+  if (win.night) ticks.push(win.night.start, Calendar.epochAt(cal, Calendar.dateStringOf(Calendar.localDate(win.night.end, cal)), "00:00"))
   return ticks
 }
 
@@ -436,7 +437,7 @@ function litFrom(points, evening, over) {
 // wanted (`Chart.newestPrints`) or a harness gives no clock, the newest print
 // stands in for it.
 function dayChart(quote, answer, calendars, slideAt) {
-  var cal = Market.calendarFor(calendars, quote)
+  var cal = Calendar.calendarFor(calendars, quote)
   if (!cal || !cal.overnight || !quote.session.regular) return { day: quote, latest: null }
   var all = prints(quote, answer.bars)
   var latest = all.length ? all[all.length - 1] : null
@@ -493,8 +494,8 @@ function overnightDue(askedAt, now, calendars, failed) {
   if (failed) return now - askedAt >= OVERNIGHT_INTERVAL
   var night = nightAt(cal, now)
   if (night && night.open) return now - askedAt >= OVERNIGHT_INTERVAL
-  for (var day = marketDayAt(cal, now), i = 0; i < 14; i++, day = marketDay(cal, Market.previousDateString(day.date))) {
-    var ended = Market.epochAt(cal, day.date, cal.overnight.close) + OVERNIGHT_LAG
+  for (var day = marketDayAt(cal, now), i = 0; i < 14; i++, day = marketDay(cal, Calendar.previousDateString(day.date))) {
+    var ended = Calendar.epochAt(cal, day.date, cal.overnight.close) + OVERNIGHT_LAG
     if (day.open && ended <= now) return askedAt < ended
   }
   return false
