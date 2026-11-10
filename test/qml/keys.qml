@@ -276,6 +276,13 @@ Harness {
       var dead = (listed || []).filter(function(t) { return !acts(s, t) })
       harness.check("in the " + s.name + ", every README key does its documented action (" + (listed || []).length + " keys)",
         listed !== null && dead.length === 0, listed === null ? "no key table in the README" : "wrong: " + dead.join(" "))
+      // Ctrl moves a row; Shift, which moved it once, moves the selection alone.
+      base(s)
+      var order = service.symbols.join(","), cursor = s.body.watchlist.cursorRow
+      press("Shift+↓")
+      harness.check("in the " + s.name + ", Shift with an arrow moves the selection and leaves the rows in their order",
+        within(1500, function() { return s.body.watchlist.cursorRow !== cursor }) && service.symbols.join(",") === order,
+        s.body.watchlist.cursorRow + " | " + service.symbols.join(","))
       escapeOrder(s)
     }
 
