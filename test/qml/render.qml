@@ -28,6 +28,7 @@ import "plugin"
 // for NEST in every bar style and look, on a horizontal and a vertical bar.
 Harness {
   id: root
+  walk: false
   marker: "RENDER DONE"
 
   // window-of-<state>: a popup-<state> in the window instead (the ranges,

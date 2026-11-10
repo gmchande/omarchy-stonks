@@ -16,6 +16,7 @@ import "plugin" as Stonks
 // the bar.
 Harness {
   id: harness
+  walk: false
   marker: "README DONE"
 
   readonly property string rawDir: Quickshell.env("STONKS_README_RAW")
