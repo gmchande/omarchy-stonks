@@ -33,10 +33,11 @@ the rules a change is judged by.
   acts), `saving` (a save and the next read), `fetching` (what is asked,
   and when) and `cost` (what a long list costs, counted). A new step goes
   in the walk it belongs to, `test/qml/NAME.qml`, judged by what a person
-  then sees or what is then saved or asked. No step reads a position, a
-  size, a colour or a time in milliseconds: how Stonks looks is for the
-  pictures below, and how it moves and feels for a hand on the running
-  plugin.
+  then sees or what is then saved or asked. A step may read where a thing
+  is, to click it or to know what is in sight, and may give a thing time to
+  happen. None says what a position, a size, a colour or a duration must
+  be: how Stonks looks is for the pictures below, and how it moves and
+  feels for a hand on the running plugin.
 - While you work, run just the checks for what you change, side by side,
   as in `test/all.sh keys mouse unit`. A walk goes by the NAME in its
   `test/qml/NAME.sh`, and other checks by names such as `unit`; an unknown
