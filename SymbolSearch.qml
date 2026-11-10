@@ -257,22 +257,14 @@ FocusScope {
     if (active && (failure === "none" || failure === "refused")) retry()
   }
 
-  // The answer for the words in the field. A body of "" fails to parse: no
-  // answer, failed for `why`.
-  function land(query, body, why) {
+  // The answer for the words in the field, as its feed read it. A null is
+  // no answer, failed for `why`.
+  function land(query, found, why) {
     root.failure = why
-    var first = 0
-    try {
-      var parsed = Search.parseSearch(JSON.parse(body))
-      root.results = parsed.results
-      root.note = parsed.note
-      root.answer = parsed.results.length > 0 || parsed.note !== "" ? "results" : "none"
-      if (parsed.topLeftOut) first = -1
-    } catch (e) {
-      root.results = []
-      root.note = ""
-      root.answer = "failed"
-    }
+    root.results = found ? found.results : []
+    root.note = found ? found.note : ""
+    if (!found) root.answer = "failed"
+    else root.answer = found.results.length > 0 || found.note !== "" ? "results" : "none"
     root.resultsQuery = query
     root.slow = false
     var kept = root.enterFor
@@ -282,7 +274,7 @@ FocusScope {
     var taken = kept === root.resultsQuery && root.answer !== "failed"
     if (root.ownCount === 0 || taken) {
       resultsScroll.contentY = 0
-      root.choose(first < 0 ? -1 : root.ownCount + first)
+      root.choose(found && found.topLeftOut ? -1 : root.ownCount)
     }
     searchField.forceActiveFocus()
     if (taken) root.accept(root.resultIndex)
@@ -298,7 +290,7 @@ FocusScope {
     target: root.feed
     function onAsked() { if (root.answer === "" && !root.slow) slowSearch.restart() }
     function onEnded() { slowSearch.stop() }
-    function onAnswered(query, body, why) { root.land(query, body, why) }
+    function onAnswered(query, found, why) { root.land(query, found, why) }
   }
 
   Timer {
