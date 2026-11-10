@@ -81,10 +81,10 @@ function overnightBatches(symbols, entries, now) {
   return batches
 }
 
-// Past these, an answer is bad (`Format.fetchedList`). MOST_PRINTS also caps
+// Past these, an answer is bad (`Format.fetchedList`). MOST_TRADES also caps
 // the trades kept (`joinHour`): a 1D chart draws at most 336 slots.
 var MOST_RESULTS = 2 * HOUR_BATCH
-var MOST_PRINTS = 1000
+var MOST_TRADES = 1000
 
 function allDayUrl(symbols) {
   return INSTRUMENTS_URL + "?symbols=" + symbols.map(function(s) { return encodeURIComponent(robinhoodSymbol(s)) }).join(",")
@@ -133,7 +133,7 @@ var SESSIONS = ["pre", "reg", "post", "overnight"]
 
 function overnightAnswer(result, symbol) {
   var out = { bars: [], from: null, through: null }
-  var historicals = result && result.symbol === robinhoodSymbol(symbol) ? Format.fetchedList(result.historicals, MOST_PRINTS) : null
+  var historicals = result && result.symbol === robinhoodSymbol(symbol) ? Format.fetchedList(result.historicals, MOST_TRADES) : null
   if (!historicals) return out
   for (var j = 0; j < historicals.length; j++) {
     var bar = historicals[j]
@@ -152,7 +152,7 @@ function overnightAnswer(result, symbol) {
 function joinHour(had, hour) {
   if (hour.from === null) return { bars: had.bars, through: had.through }
   return {
-    bars: had.bars.filter(function(b) { return b.t < hour.from }).concat(hour.bars).slice(-MOST_PRINTS),
+    bars: had.bars.filter(function(b) { return b.t < hour.from }).concat(hour.bars).slice(-MOST_TRADES),
     through: had.through === null || hour.through > had.through ? hour.through : had.through
   }
 }
