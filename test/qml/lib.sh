@@ -134,11 +134,6 @@ run_qs() {
   code=$qs_code
 }
 
-# fetched NAME: how many times the fake curl answered NAME.
-fetched() {
-  cat "$STONKS_FAKE_STATE/$1.calls" 2>/dev/null || echo 0
-}
-
 # stonks_warnings LOG: the Qt warnings (and errors) in LOG that name one of
 # the plugin's own files, on the line itself or on a stack line under it,
 # each printed with its stack: a binding loop names where the object was
