@@ -135,8 +135,7 @@ Item {
   }
   readonly property var previewEntries: previewFeed.entries
   readonly property string featuredSymbol: view.featured
-  readonly property string changeMode: dataSettings.changeMode === "abs" || dataSettings.changeMode === "open"
-    ? dataSettings.changeMode : "pct"
+  readonly property string changeMode: dataSettings.changeMode
   readonly property bool retro: dataSettings.style === "retro"
   readonly property bool soundsOn: dataSettings.sounds
   readonly property int refreshIntervalSec: dataSettings.refreshIntervalSec
