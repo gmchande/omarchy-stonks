@@ -880,6 +880,9 @@ test("retro draws each column at the price its last trade ended on, holds it acr
   expect(g.lastLit).toBe(10)
   // A last trade that is dim leaves the light on the column before it.
   expect(grid([point(0, 0), point(0.2, 0.5, { dim: true })]).lastLit).toBe(0)
+  // Columns a trade's price holds across are as dim as that trade.
+  expect(grid([point(0, 0, { dim: true }), point(0.2, 0.5, { dim: true })]).dim.slice(0, 6).map(Boolean)).toEqual([true, true, true, true, true, true])
+  expect(grid([point(0, 0), point(0.2, 0.5, { dim: true })]).dim.slice(0, 6).map(Boolean)).toEqual([false, false, false, false, false, true])
   // The baseline: a known close's row; none known, the floor; a step to a
   // close known from its column on.
   expect([g.baseRow, M.retroGrid({ points: [point(0, 0)] }, 100, 30, 3, 1).baseRow]).toEqual([5, 9])
