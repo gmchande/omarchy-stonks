@@ -113,14 +113,6 @@ function allDayDue(entry, now) {
   return now - entry.at >= (entry.status === "ok" ? ALL_DAY_INTERVAL : OVERNIGHT_INTERVAL)
 }
 
-function parseOvernight(json, symbols) {
-  var results = overnightResults(json)
-  if (!results) return null
-  var out = {}
-  for (var i = 0; i < symbols.length; i++) out[symbols[i]] = overnightAnswer(results[i], symbols[i])
-  return out
-}
-
 function overnightResults(json) {
   return Format.fetchedList(json && json.results, MOST_RESULTS)
 }

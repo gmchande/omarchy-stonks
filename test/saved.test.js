@@ -1688,9 +1688,15 @@ test("a spark day with a jump shows at once and is checked on a chart, whose ans
 
 // ---------------------------------------------------------------- overnight
 
+// Robinhood's answer by symbol, read as the feed reads it: each result is
+// for the symbol asked in its place.
+const overnight = (answer, symbols) => {
+  const results = M.overnightResults(answer)
+  return results && Object.fromEntries(symbols.map((symbol, i) => [symbol, M.overnightAnswer(results[i], symbol)]))
+}
 // Robinhood's saved span=day answer for a moment, by symbol: the bars that
 // traded, and how far it reached.
-const traded = (set, symbols) => M.parseOvernight(fixture(`moments/${set}/robinhood-day.json`), symbols)
+const traded = (set, symbols) => overnight(fixture(`moments/${set}/robinhood-day.json`), symbols)
 const savedDay = (set, name) => M.parseChart(fixture(`moments/${set}/${name}.json`))
 const at = (date, clock) => M.epochAt(US, date, clock)
 
@@ -1711,9 +1717,9 @@ test("Robinhood's answer keeps only the bars that traded, by the symbols asked f
   expect([bars.NEST.through, bars.SILK.through]).toEqual([bars.REED.through, bars.REED.through])
   // Asked out of the order it answers in, an answer names another symbol
   // and is no answer for the one asked.
-  expect(M.parseOvernight(fixture("moments/day/robinhood-day.json"), ["SILK", "NEST"]))
+  expect(overnight(fixture("moments/day/robinhood-day.json"), ["SILK", "NEST"]))
     .toEqual({ SILK: { bars: [], from: null, through: null }, NEST: { bars: [], from: null, through: null } })
-  expect(M.parseOvernight({ chart: {} }, ["NEST"])).toBeNull()
+  expect(overnight({ chart: {} }, ["NEST"])).toBeNull()
 })
 
 test("a refresh within half an hour asks Robinhood for the last hour, which brings the day in hand up to what a day asked then holds", () => {
@@ -1722,8 +1728,8 @@ test("a refresh within half an hour asks Robinhood for the last hour, which brin
   const earlier = traded("2026-10-07-0005", ["NEST"]).NEST
   const later = fixture("moments/2026-10-07-0100/robinhood-day.json")
   const hour = { results: later.results.map(r => ({ ...r, span: "hour", historicals: r.historicals.slice(-12) })) }
-  const joined = M.joinHour(earlier, M.parseOvernight(hour, ["NEST"]).NEST)
-  const day = M.parseOvernight(later, ["NEST"]).NEST
+  const joined = M.joinHour(earlier, overnight(hour, ["NEST"]).NEST)
+  const day = overnight(later, ["NEST"]).NEST
   expect(joined.through).toBe(day.through)
   expect(joined.bars.filter(b => b.t >= day.from)).toEqual(day.bars)
   // The older trades stay: a chart of the day before still has them.
@@ -1811,7 +1817,7 @@ test("the trades Stonks keeps for a listing hold every one its 1D chart draws, h
   const sets = readdirSync(join(fixtures, "moments")).filter(set => existsSync(join(fixtures, "moments", set, "robinhood-day.json")))
     .map(set => {
       const answer = fixture(`moments/${set}/robinhood-day.json`)
-      const parsed = M.parseOvernight(answer, answer.results.map(r => r.symbol))
+      const parsed = overnight(answer, answer.results.map(r => r.symbol))
       return { set, parsed, through: Math.max(...Object.values(parsed).map(a => a.through ?? 0)) }
     })
     .sort((a, b) => a.through - b.through)
@@ -1855,7 +1861,7 @@ test("Robinhood's instruments say which listings it trades all day, by the symbo
 test("which listings have an overnight market comes from Yahoo, never from Robinhood's answer", () => {
   // Asked for SPX, ^GSPC, BTC, and BTC-USD, Robinhood answers the index and
   // the cryptocurrency with nothing, and BTC with the bars of a bitcoin ETF.
-  const answer = M.parseOvernight(fixture("moments/robinhood-index-crypto.json"), ["SPX", "^GSPC", "BTC", "BTC-USD"])
+  const answer = overnight(fixture("moments/robinhood-index-crypto.json"), ["SPX", "^GSPC", "BTC", "BTC-USD"])
   expect([answer.SPX.bars.length, answer["^GSPC"].bars.length, answer["BTC-USD"].bars.length]).toEqual([0, 0, 0])
   expect(answer.BTC.bars.length).toBeGreaterThan(0)
   // So the quote decides: a stock or an ETF on a US exchange.
@@ -2506,7 +2512,7 @@ test("a weekend shows Friday from its midnight to its last trade, then Monday fr
   // trade, 04:00, to its last, 19:05, on the right edge, where a scrub says
   // its own time: nothing made up after it.
   const shopRaw = fixture("moments/shop-2026-10-26-0013/robinhood-week.json")
-  const week = M.parseOvernight(shopRaw, ["SHOP"]).SHOP
+  const week = overnight(shopRaw, ["SHOP"]).SHOP
   const fridayNight = { bars: week.bars.filter(b => b.t < at("2026-10-23", "20:00")), through: at("2026-10-23", "19:55") }
   const shopQuote = M.parseChart(fixture("moments/shop-2026-10-26-0013/shop.json"), cents, at("2026-10-23", "20:30"))
   const thinFeed = M.dayChart(shopQuote, fridayNight, calendars).day

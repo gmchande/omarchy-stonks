@@ -1959,7 +1959,7 @@ test("a hostile search or Robinhood answer reads as no answer, at once", async (
     { name: "search quotes posing", call: "M.parseSearch(json)", answer: { quotes: POSING } },
     { name: "search quotes over budget", call: "M.parseSearch(json) && 'read'", answer: { quotes: times(M.MOST_QUOTES + 1).map(() => quote) } },
     { name: "trades, as sent", call: nest, answer: { results: [result([trade])] }, want: 1 },
-    { name: "Robinhood's results posing", call: "M.parseOvernight(json, ['NEST'])", answer: { results: POSING } },
+    { name: "Robinhood's results posing", call: "M.overnightResults(json)", answer: { results: POSING } },
     { name: "Robinhood's results over budget", call: "M.overnightResults(json) && 'read'", answer: { results: times(M.MOST_RESULTS + 1).map(() => result([])) } },
     { name: "a listing's trades posing", call: nest, answer: { results: [result(POSING)] }, want: 0 },
     { name: "a listing's trades over budget", call: nest, answer: { results: [result(times(M.MOST_TRADES + 1).map(() => trade))] }, want: 0 },
