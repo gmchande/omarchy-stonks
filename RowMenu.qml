@@ -3,11 +3,10 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons
 import qs.Commons as Commons
-import qs.Ui
 
 // A row's removals, each line naming the lists it reaches ("Remove from all
 // 3 lists"), and from a right-click, "Choose lists…". It looks and moves as
-// the list menu does, in the theme's popup border.
+// the list menu does.
 OverRows {
   id: root
 
@@ -54,11 +53,12 @@ OverRows {
     event.accepted = true
   }
 
-  BorderSurface {
+  Rectangle {
     anchors.fill: parent
     radius: root.look.retro ? 0 : Style.cornerRadius
     color: root.background
-    borderSpec: Border.localOrSurfaceSpec("popups", "border", Commons.Color.popups.border, Commons.Color.popups.border, Math.max(1, Style.space(2)))
+    border.width: 1
+    border.color: Qt.tint(root.background, Util.alpha(root.look.foreground, 0.18))
   }
 
   RowPointer {
@@ -100,7 +100,7 @@ OverRows {
             anchors.verticalCenter: parent.verticalCenter
             textFormat: Text.PlainText
             text: line.modelData
-            color: Commons.Color.popups.text
+            color: root.look.foreground
             font.family: root.look.fontFamily
             font.pixelSize: Style.font.bodySmall
           }
