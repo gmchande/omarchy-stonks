@@ -26,12 +26,99 @@ Rectangle {
   property bool built: true
   // How far down this row the open list menu reaches; 0 while it's shut.
   property real menuCovers: 0
-  // Lifted or sliding, the row lays the card's ground under its fill, at
-  // once, so the rows it passes never show through.
-  property bool moving: false
   property real scrubX: -1
   property real reveal: 1
   property var calendars: null
+
+  // Where the list puts the row: its place among the rows shown, -1 while
+  // it isn't one; the rows' pitch; where a lifted row is held; and how many
+  // rows there are, so a lifted row rides above them all.
+  property int place: -1
+  property real pitch: 0
+  property real liftedY: 0
+  property int rowCount: 0
+
+  // A row slides only from one place in the list to another, so one that
+  // joins starts at its own place. It eases `shift`, its distance from its
+  // place, to zero, so a change mid-slide goes on from where it is. The row
+  // travelling farther rides on top, the cursor's on a tie, so none print
+  // through.
+  y: lifted ? liftedY : place * pitch + shift
+  property int lastPlace: -1
+  property real shift: 0
+  property int travel: 0
+  onPlaceChanged: {
+    var from = lastPlace
+    lastPlace = place
+    if (lifted || !visible || from < 0 || place < 0) {
+      settle()
+      return
+    }
+    travel = Math.abs(place - from)
+    shift += (from - place) * pitch
+    slide.restart()
+  }
+  NumberAnimation { id: slide; target: row; property: "shift"; to: 0; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
+  // Lifted or sliding, the row lays the card's ground under its fill, at
+  // once, so the rows it passes never show through.
+  readonly property bool moving: lifted || slide.running
+  z: lifted ? rowCount + 2 : (slide.running ? 1 + travel + (cursor ? 0.5 : 0) : 0)
+  readonly property bool resting: !slide.running && !fadeIn.running && !lifted
+  signal rested()
+  onRestingChanged: if (resting) rested()
+  function settle() {
+    slide.stop()
+    shift = 0
+    travel = 0
+    fadeIn.stop()
+    opacity = 1
+    drawIn.stop()
+    reveal = 1
+    lineOwed = false
+  }
+  function pause() {
+    if (slide.running) slide.pause()
+    if (fadeIn.running) fadeIn.pause()
+    if (drawIn.running) drawIn.pause()
+  }
+  function holdAt(atY) {
+    if (place < 0) return
+    slide.stop()
+    shift = atY - place * pitch
+  }
+  // A day line that arrives while the row fades in draws in; one that
+  // arrives later shows at once.
+  property bool lineOwed: false
+  function join() {
+    opacity = 0
+    fadeIn.restart()
+    lineOwed = !geometry
+    if (geometry) drawLineIn()
+  }
+  function drawLineIn() {
+    reveal = 0
+    drawIn.restart()
+  }
+  onGeometryChanged: {
+    if (!lineOwed || !geometry) return
+    lineOwed = false
+    if (fadeIn.running && !fadeIn.paused) drawLineIn()
+  }
+  // Holds the row on screen while the scroll moves `distance`, then slides
+  // it home.
+  function carry(distance) {
+    shift -= distance
+    if (Math.abs(shift) < 0.5) {
+      slide.stop()
+      shift = 0
+      travel = 0
+      return
+    }
+    travel = Math.max(travel, Math.round(Math.abs(shift) / pitch))
+    slide.restart()
+  }
+  NumberAnimation { id: fadeIn; target: row; property: "opacity"; to: 1; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
+  NumberAnimation { id: drawIn; target: row; property: "reveal"; from: 0; to: 1; duration: Motion.duration(Style, 320); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
 
   // In scene coordinates. `second` is Qt's double-click second press, which
   // the list may not act on (Watchlist.clickRow).

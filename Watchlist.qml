@@ -606,87 +606,13 @@ Flickable {
       WatchlistRow {
         id: rowDelegate
         calendars: root.calendars
-        readonly property int place: root.slotOf(symbol)
+        place: root.slotOf(symbol)
         visible: place >= 0
-        y: lifted ? root.dragY : place * root.rowPitch + shift
-        // A row slides only from one place in the list to another, so one
-        // that joins starts at its own place. It eases `shift`, its distance
-        // from its place, to zero, so a change mid-slide goes on from where
-        // it is. The row travelling farther rides on top, the cursor's on a
-        // tie, so none print through.
-        property int lastPlace: -1
-        property real shift: 0
-        property int travel: 0
-        onPlaceChanged: {
-          var from = lastPlace
-          lastPlace = place
-          if (lifted || !visible || from < 0 || place < 0) {
-            settle()
-            return
-          }
-          travel = Math.abs(place - from)
-          shift += (from - place) * root.rowPitch
-          slide.restart()
-        }
-        NumberAnimation { id: slide; target: rowDelegate; property: "shift"; to: 0; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
-        moving: lifted || slide.running
+        pitch: root.rowPitch
+        liftedY: root.dragY
+        rowCount: rowRepeater.count
+        onRested: root.rowRested(symbol)
         look: root.look
-        z: lifted ? rowRepeater.count + 2 : (slide.running ? 1 + travel + (cursor ? 0.5 : 0) : 0)
-        readonly property bool resting: !slide.running && !fadeIn.running && !lifted
-        onRestingChanged: if (resting) root.rowRested(symbol)
-        function settle() {
-          slide.stop()
-          shift = 0
-          travel = 0
-          fadeIn.stop()
-          opacity = 1
-          drawIn.stop()
-          reveal = 1
-          lineOwed = false
-        }
-        function pause() {
-          if (slide.running) slide.pause()
-          if (fadeIn.running) fadeIn.pause()
-          if (drawIn.running) drawIn.pause()
-        }
-        function holdAt(atY) {
-          if (place < 0) return
-          slide.stop()
-          shift = atY - place * root.rowPitch
-        }
-        // A day line that arrives while the row fades in draws in; one that
-        // arrives later shows at once.
-        property bool lineOwed: false
-        function join() {
-          opacity = 0
-          fadeIn.restart()
-          lineOwed = !geometry
-          if (geometry) drawLineIn()
-        }
-        function drawLineIn() {
-          reveal = 0
-          drawIn.restart()
-        }
-        onGeometryChanged: {
-          if (!lineOwed || !geometry) return
-          lineOwed = false
-          if (fadeIn.running && !fadeIn.paused) drawLineIn()
-        }
-        // Holds the row on screen while the scroll moves `distance`, then
-        // slides it home.
-        function carry(distance) {
-          shift -= distance
-          if (Math.abs(shift) < 0.5) {
-            slide.stop()
-            shift = 0
-            travel = 0
-            return
-          }
-          travel = Math.max(travel, Math.round(Math.abs(shift) / root.rowPitch))
-          slide.restart()
-        }
-        NumberAnimation { id: fadeIn; target: rowDelegate; property: "opacity"; to: 1; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
-        NumberAnimation { id: drawIn; target: rowDelegate; property: "reveal"; from: 0; to: 1; duration: Motion.duration(Style, 320); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
         width: parent.width
         // A row more than a row out of sight keeps the quote it showed, so
         // answers repaint only rows in sight; it takes the latest before the
