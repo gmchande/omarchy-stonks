@@ -174,6 +174,9 @@ Harness {
   readonly property bool nestState: stateName.indexOf("popup-history-1w-") === 0
     || stateName.indexOf("popup-history-1m-") === 0
   readonly property bool nestDayState: stateName.indexOf("popup-nest-1d-") === 0
+  // SHOP.TO's saved day closed two cents under the close before, -0.01%: its
+  // last trades hug the baseline from under it.
+  readonly property bool shopDayState: stateName.indexOf("popup-shop-1d-") === 0
   readonly property bool holidayState: /^popup-holiday-(smooth|retro)$/.test(stateName)
   // <popup|min-window>-holiday-<tokyo|london>-<look>: the calendars' longest
   // closures, at the exchange's noon, the listing's own saved day featured:
@@ -519,6 +522,11 @@ Harness {
       stub.quotes = { NEST: nestDay, AAPL: aapl }
       stub.entries = { NEST: { status: "ok", receivedAt: root.now }, AAPL: { status: "ok", receivedAt: root.now } }
       stub.featuredSymbol = "NEST"
+    }
+
+    if (root.shopDayState) {
+      stub.shown = ["SHOP.TO", "AAPL"]
+      stub.featuredSymbol = "SHOP.TO"
     }
 
     if (root.fill) {

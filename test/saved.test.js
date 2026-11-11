@@ -435,6 +435,18 @@ test("smooth's replay of a thin night follows the line through its trades", () =
   followsLine(heard)
 })
 
+test("retro colours each column by its own price's side of the close, as smooth does: SHOP.TO's day a hair under it, on the close's row, is down", () => {
+  // SHOP.TO closed at 194.60 against a close of 194.62: its last trades
+  // round onto the close's row in a chart 300 by 80 of 3-pixel cells.
+  const geometry = M.chartGeometry(shop, calendars), g = M.retroGrid(geometry, 300, 80, 3, 1)
+  const side = []
+  for (const p of geometry.points) side[Math.min(g.columns - 1, Math.floor(p.x * g.columns))] = p.y <= geometry.baselineY
+  const hugging = side.map((up, c) => up === false && g.levels[c] === g.baseRow ? c : -1).filter(c => c >= 0)
+  expect(hugging.length).toBeGreaterThan(0)
+  expect(hugging.map(c => g.above[c])).toEqual(hugging.map(() => false))
+  expect(side.map((up, c) => up === undefined ? undefined : g.above[c])).toEqual(side)
+})
+
 test("the day is drawn whole, and its range holds the previous close", () => {
   const spy = M.parseChart(fixture("spy-2026-09-11-day-prepost.json"))
   const spyReg = spy.session.regular

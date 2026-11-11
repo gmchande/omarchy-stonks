@@ -8,8 +8,9 @@ import "Motion.js" as Motion
 import "Chart.js" as Chart
 // The retro chart, one rule for the day and every range: columns of cells
 // fill from the baseline row, in the up colour above it and the down colour
-// below. The day adds dimmer hours, the bell and the night's edges, and the
-// lit last trade. Once tonight has traded, the baseline steps at the bell to
+// below, each by its own price's side of the close, as smooth's line is. The
+// day adds dimmer hours, the bell and the night's edges, and the lit last
+// trade. Once tonight has traded, the baseline steps at the bell to
 // the close just gone (`geometry.step`), and the columns from there stand on
 // it. The grid and the columns paint when the data changes; the draw-in
 // widens a clip a whole column at a time, and the ticks and the scrub are
@@ -162,7 +163,7 @@ Item {
           var baseRow = root.baseRowAt(g, c)
           var baseY = baseRow * pixel
           var y = g.levels[c] * pixel
-          var above = g.levels[c] <= baseRow
+          var above = g.above[c]
           // With no line under it, a column takes the baseline's ink.
           var color = !root.hasBaseline && c < g.stepCol ? root.baselineColor : above ? root.aboveColor : root.belowColor
           var dim = g.dim[c] ? 0.45 : 1
