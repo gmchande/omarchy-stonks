@@ -160,6 +160,12 @@ test("a quiet trading span joins its trades; Tokyo's scheduled lunch alone break
   const one={...us,points:[us.points[0]]}
   expect(M.chartGeometry(one,calendars).points).toHaveLength(1)
   expect(M.timeAtFraction(one,M.chartGeometry(one,calendars).points[0].x)).toBe(us.points[0].t)
+  // One trade draws, and a day nobody traded draws its baseline alone; with
+  // no previous close there is no baseline.
+  const drawn = q => [M.drawable(M.chartGeometry(q,calendars)), M.hasBaseline(M.chartGeometry(q,calendars))]
+  expect(drawn(one)).toEqual([true, true])
+  expect(drawn({...us, points: []})).toEqual([false, true])
+  expect(drawn({...one, prevClose: null})).toEqual([true, false])
 })
 
 test("Tokyo's lunch break comes from the calendar; the morning session stays on Yahoo, counting to the break", () => {
@@ -562,6 +568,11 @@ test("a response with no bars draws nothing and claims nothing", () => {
   const closeless = { ...empty, unclosed: [{ t: 1, o: null, h: 12, l: 9, c: null, v: 100 }] }
   expect([M.periodStats(closeless).high, M.periodStats(closeless).low, M.rangeVolume(closeless)]).toEqual([null, null, ""])
   expect(M.historyGeometry(empty).points).toEqual([])
+  expect([M.drawable(M.historyGeometry(empty)), M.hasBaseline(M.historyGeometry(empty))]).toEqual([false, false])
+  // Nor does a chart still on its way, which has no geometry yet.
+  expect([M.drawable(null), M.hasBaseline(null)]).toEqual([false, false])
+  // On a log scale, a close before the range below zero has no place.
+  expect(M.hasBaseline(M.historyGeometry({ range: "5Y", baseline: -5, bars: [{ t: 1, c: 20 }, { t: 2, c: 30 }] }))).toBe(false)
   expect(M.historyBarAt(empty, 0.5)).toBeNull()
   expect(M.historyFraction(empty, 1)).toBe(-1)
   expect(M.historyBarAt({ bars: [{ t: 1, c: 2 }] }, NaN)).toBeNull()

@@ -25,11 +25,9 @@ Item {
   // The baseline, where there is one, shows whole; the line shows to the
   // newest trade's dot.
   property real reveal: 1
-  // One trade draws as a dot, as the hero's does.
-  readonly property bool drawable: !!geometry && !!geometry.points && geometry.points.length >= 1
-  // Unknown for a quote without a previous close: no dashed baseline, and no
-  // direction to split by.
-  readonly property bool hasBaseline: !!geometry && typeof geometry.baselineY === "number" && isFinite(geometry.baselineY)
+  readonly property bool drawable: Chart.drawable(geometry)
+  // Without it, no direction to split by.
+  readonly property bool hasBaseline: Chart.hasBaseline(geometry)
 
   onGeometryChanged: { ink.requestPaint(); marks.requestPaint() }
   onLineColorChanged: { ink.requestPaint(); marks.requestPaint() }

@@ -162,6 +162,18 @@ function chartGeometry(quote, calendars) {
   }
 }
 
+// One trade draws: the first after midnight is a dot on its day, or a cell.
+function drawable(geometry) {
+  return !!geometry && !!geometry.points && geometry.points.length >= 1
+}
+
+// The dashed baseline draws with no trade too, as on a day nobody traded.
+// It is unknown for a quote without a previous close, and for a range on a
+// log scale whose close before it is below zero, as oil's was in 2020.
+function hasBaseline(geometry) {
+  return !!geometry && typeof geometry.baselineY === "number" && isFinite(geometry.baselineY)
+}
+
 // The dashed line's height at `x`: the step's height once `x` is past the
 // bell, the day's before it, and null where there is no line.
 function baseAt(geometry, x) {
@@ -231,8 +243,7 @@ function retroGrid(geometry, width, height, pixel, gap) {
   var columns = Math.max(1, Math.floor(width / pitch))
   var g = { pitch: pitch, columns: columns, rows: Math.max(1, Math.floor(height / pixel)), baseRow: 0, stepCol: columns, stepRow: 0, levels: [], dim: [], lastLit: -1 }
   if (!geometry || !geometry.points) return g
-  var known = typeof geometry.baselineY === "number" && isFinite(geometry.baselineY)
-  g.baseRow = known ? Math.round(geometry.baselineY * (g.rows - 1)) : g.rows - 1
+  g.baseRow = hasBaseline(geometry) ? Math.round(geometry.baselineY * (g.rows - 1)) : g.rows - 1
   var step = geometry.step
   g.stepCol = step ? Math.max(0, Math.min(g.columns - 1, Math.floor(step.x * g.columns))) : g.columns
   g.stepRow = step ? Math.round(step.y * (g.rows - 1)) : g.baseRow

@@ -57,10 +57,8 @@ Item {
     var base = lastPoint ? Chart.baseAt(geometry, lastPoint.x) : null
     return base === null ? baselineColor : lastPoint.y > base ? belowColor : aboveColor
   }
-  // One trade draws: the first trade after midnight is a dot on its day.
-  readonly property bool drawable: !!geometry && !!geometry.points && geometry.points.length >= 1
-  // The baseline draws with no trade too, as on a day nobody traded.
-  readonly property bool hasBaseline: !!geometry && typeof geometry.baselineY === "number" && isFinite(geometry.baselineY)
+  readonly property bool drawable: Chart.drawable(geometry)
+  readonly property bool hasBaseline: Chart.hasBaseline(geometry)
   readonly property bool hasStep: !!geometry && !!geometry.step
   // The draw-in sweeps to the newest trade's dot: the line's width and a half,
   // and a pixel.

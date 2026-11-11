@@ -59,10 +59,8 @@ Item {
   readonly property bool directionKnown: typeof up === "boolean"
   readonly property color aboveColor: directionKnown ? upColor : baselineColor
   readonly property color belowColor: directionKnown ? downColor : baselineColor
-  // One trade draws, as the first after midnight does: a cell.
-  readonly property bool drawable: !!geometry && !!geometry.points && geometry.points.length >= 1
-  // The baseline draws with no trade too, as on a day nobody traded.
-  readonly property bool hasBaseline: !!geometry && typeof geometry.baselineY === "number" && isFinite(geometry.baselineY)
+  readonly property bool drawable: Chart.drawable(geometry)
+  readonly property bool hasBaseline: Chart.hasBaseline(geometry)
   // Through the newest trade's column.
   readonly property int inkColumns: drawable
     ? Math.min(grid.columns, Math.floor(geometry.points[geometry.points.length - 1].x * grid.columns) + 1) : 0
