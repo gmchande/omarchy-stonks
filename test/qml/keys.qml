@@ -1,4 +1,6 @@
 import QtQuick
+import Quickshell
+import Quickshell.Io
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
@@ -61,6 +63,9 @@ Harness {
   // Stonks' among them, as one of the listed keys (Ui/PanelKeyCatcher.qml).
   readonly property var omarchy: ({ "j": "↓", "k": "↑", "h": "←", "l": "→", "Space": "⏎", "x": "Delete", "Shift+X": "Delete" })
 
+  // The stand-in curl's flags (bin/curl): a file there turns a fault on.
+  Process { id: flag }
+
   Stonks.Service { id: service; pluginId: "grvc.stonks" }
   Stonks.Updates { id: updates; pluginId: "grvc.stonks" }
   // The camera hands its shots to the stand-ins on PATH (bin/).
@@ -99,7 +104,7 @@ Harness {
 
   Steps {
     name: "Keys"
-    when: service.pluginsReady
+    when: service.ready
 
     function quiet() {
       tryVerify(function() { return service.arriving.length === 0 && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 8000)
@@ -271,7 +276,88 @@ Harness {
       var dead = (listed || []).filter(function(t) { return !acts(s, t) })
       harness.check("in the " + s.name + ", every README key does its documented action (" + (listed || []).length + " keys)",
         listed !== null && dead.length === 0, listed === null ? "no key table in the README" : "wrong: " + dead.join(" "))
+      // Ctrl moves a row; Shift, which moved it once, moves the selection alone.
+      base(s)
+      var order = service.symbols.join(","), cursor = s.body.watchlist.cursorRow
+      press("Shift+↓")
+      harness.check("in the " + s.name + ", Shift with an arrow moves the selection and leaves the rows in their order",
+        within(1500, function() { return s.body.watchlist.cursorRow !== cursor }) && service.symbols.join(",") === order,
+        s.body.watchlist.cursorRow + " | " + service.symbols.join(","))
       escapeOrder(s)
+    }
+
+    // What a person does with stocks and lists, by keys alone: no step moves
+    // the pointer, and each is judged by what the lists then hold.
+    function flows(s) {
+      base(s)
+      var b = s.body
+      var type = function(words) { words.split("").forEach(function(c) { keyClick(c) }) }
+      var typing = function(name) { return within(1500, function() { var field = harness.find(b, name); return !!field && field.activeFocus }) }
+
+      // Enter waits for Yahoo's answer and takes its first.
+      press("a")
+      var searching = typing("searchField")
+      type("shop")
+      press("⏎")
+      var added = within(5000, function() { return service.symbols.indexOf("SHOP") >= 0 && !b.adding })
+      harness.check("by keys alone, a, the words and Enter add the stock Yahoo finds",
+        searching && added, searching + " " + service.symbols.join(",") + " adding " + b.adding)
+
+      // Yahoo's search down: the words say so beside RETRY, and Enter asks
+      // again, once. Words that name none of the list's own, which Enter
+      // would take at once.
+      var fault = function(on) {
+        var file = Quickshell.env("STONKS_FAKE_STATE") + "/SEARCH.down"
+        flag.command = on ? ["touch", file] : ["rm", "-f", file]
+        flag.running = true
+        tryVerify(function() { return !flag.running }, 2000)
+      }
+      quiet()
+      fault(true)
+      press("a")
+      typing("searchField")
+      type("zzz")
+      var retry = function() { var r = harness.find(b, "searchRetry"); return !!r && r.visible }
+      var failed = within(5000, retry)
+      var said = harness.texts(harness.find(b, "symbolSearch"), "searchMessage").join("")
+      fault(false)
+      var askedBefore = harness.calls("SEARCH.asked")
+      press("⏎")
+      var back = within(5000, function() { return !retry() && harness.findAll(b, "searchResult").length > 1 })
+      harness.check("with Yahoo's search down the words say so beside RETRY, and Enter asks again, once, and its results come",
+        failed && said !== "" && back && harness.calls("SEARCH.asked") === askedBefore + 1, [failed, said, back, harness.calls("SEARCH.asked") - askedBefore].join(" | "))
+      press("Esc")
+
+      // w, down to New list, Enter, a name, Enter: the list is made and
+      // shown, with search open to fill it.
+      quiet()
+      press("w")
+      press("↓")
+      press("⏎")
+      var naming = typing("listNameField")
+      type("tech")
+      press("⏎")
+      var made = within(2000, function() { return service.listName === "tech" && b.adding })
+      type("shop")
+      press("⏎")
+      var filled = within(5000, function() { return service.symbols.join(",") === "SHOP" && !b.adding })
+      harness.check("by keys alone, w makes a list and the words and Enter fill it",
+        naming && made && filled, [naming, made, service.listName, service.symbols.join(",")].join(" "))
+
+      // w, down past the lists and New list to Manage lists, Enter; Delete
+      // asks, Enter deletes, and All keeps the stock.
+      quiet()
+      press("w")
+      press("↓")
+      press("↓")
+      press("⏎")
+      var managing = within(1500, function() { return b.managingLists })
+      press("Delete")
+      press("⏎")
+      var gone = within(2000, function() { return service.lists.length === 1 && service.listName === "" })
+      press("Esc")
+      harness.check("by keys alone, Manage lists deletes a list, and All keeps its stock",
+        managing && gone && service.symbols.indexOf("SHOP") >= 0, [managing, service.lists.length, service.listName, service.symbols.join(",")].join(" "))
     }
 
     function test_keys() {
@@ -304,6 +390,7 @@ Harness {
       press("o")
       harness.check("in the window, after Tab a key still does its action",
         within(1500, function() { return service.order === "symbol" }), service.order)
+      flows(harness.window)
       app.close()
       harness.finish()
     }

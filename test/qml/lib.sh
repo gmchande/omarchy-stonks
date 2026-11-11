@@ -104,22 +104,6 @@ card_window() {
   fi
 }
 
-# frame_tools: FrameGrab.qml beside the harness, a folder for its frames,
-# and frames.js to judge them, on the shell's ease-out: its Style.easeOut,
-# or, on a shell without one (Omarchy 4.0), OutCubic, which Stonks eases on
-# there.
-frame_tools() {
-  cp "$here/FrameGrab.qml" "$root/"
-  local curve
-  curve=$(sed -n 's/^ *readonly property var easeOut: \[\([0-9.]*\), 1\.0, \([0-9.]*\), 1\.0, 1\.0, 1\.0\]$/\1 \2/p' "$shell/Commons/Style.qml")
-  if [ -z "$curve" ]; then
-    grep -q easeOut "$shell/Commons/Style.qml" && { echo "FAIL frame_tools can't read $shell/Commons/Style.qml's easeOut"; exit 1; }
-    curve="0.333333 0.666667"
-  fi
-  export STONKS_FRAMES="$work/frames" STONKS_FRAME_CHECK="$here/frames.js" STONKS_FRAME_CURVE="$curve"
-  mkdir -p "$STONKS_FRAMES"
-}
-
 # patch_copy FILE SED: run one sed command on the tree's copy of FILE (a
 # path under the tree), and stop before Quickshell starts if it changed
 # nothing: a reworded line would otherwise leave the harness running on
@@ -148,11 +132,6 @@ scratch_home() {
 run_qs() {
   PATH="$here/bin:$PATH" quickshell_run "$1" "$work/log" -p "$root" --no-color
   code=$qs_code
-}
-
-# fetched NAME: how many times the fake curl answered NAME.
-fetched() {
-  cat "$STONKS_FAKE_STATE/$1.calls" 2>/dev/null || echo 0
 }
 
 # stonks_warnings LOG: the Qt warnings (and errors) in LOG that name one of

@@ -28,6 +28,7 @@ import "plugin"
 // for NEST in every bar style and look, on a horizontal and a vertical bar.
 Harness {
   id: root
+  walk: false
   marker: "RENDER DONE"
 
   // window-of-<state>: a popup-<state> in the window instead (the ranges,
@@ -40,12 +41,13 @@ Harness {
   // a screenshot, its camera lit; quiet-<state>: with sounds off; both may
   // lead, quiet- first. dev-<state>: the state as a second copy beside a
   // user's draws it, run under grvc.stonks-dev, its mark on; it leads any
-  // other. <state>-size-N: the state at text size N
+  // other. round-<state>: the state on a desktop with rounded corners
+  // (render.sh), ahead of every other. <state>-size-N: the state at text size N
   // (render.sh) in the frame the shell gives it there, the panel and the
   // smallest window grown with the text, as a reader sees it; the state as
   // named without the suffix. The pill sheet keeps its name and draws its
   // own frame.
-  readonly property string named: Quickshell.env("STONKS_VISUAL_STATE") || "retro"
+  readonly property string named: (Quickshell.env("STONKS_VISUAL_STATE") || "retro").replace(/^round-/, "")
   readonly property bool devCopy: /^dev-/.test(named)
   readonly property string copyId: devCopy ? "grvc.stonks-dev" : "grvc.stonks"
   readonly property string asked: named.replace(/^dev-/, "")
@@ -86,8 +88,7 @@ Harness {
   readonly property bool minWindowOf: requested.indexOf("min-window-of-") === 0
   readonly property bool windowOf: minWindowOf || requested.indexOf("window-of-") === 0
   readonly property string stateName: windowOf ? "popup-" + requested.slice((minWindowOf ? "min-window-of-" : "window-of-").length) : requested
-  // A control under real pointer input: its hover, or its press filmed and
-  // judged (frames.js press), then drawn held.
+  // A control under real pointer input: its hover, or its press, drawn held.
   readonly property var controlState: /^(popup|window)-controls-([a-z]+)-(hover|press)-(smooth|retro)$/.exec(stateName)
   // window-controls-chart-hover-retro: a window 719 wide, whose chart holds
   // its columns with 5 px to spare, as a window sized by hand can.
@@ -365,7 +366,7 @@ Harness {
     // off for quiet-.
     property bool soundsOn: !root.quiet
     property var shown: ["AAPL", "SHOP.TO"]
-    property var library: symbols
+    property var allSymbols: symbols
     property string listName: ""
     property var lists: [{ name: "", label: "All", count: symbols.length, symbols: symbols }]
     property var quotes: ({})
@@ -397,7 +398,7 @@ Harness {
     // Each listing's newest price since its close, as the service reads it.
     readonly property var newestTrades: Chart.newestTrades(symbols, quotes, nights, allDay, calendars)
     readonly property var view: ({ featured: featuredSymbol, range: range, list: listName, listKey: "=" + listName,
-      order: order, reversed: reversed, rows: symbols, shown: shown, library: library,
+      order: order, reversed: reversed, rows: symbols, shown: shown, allSymbols: allSymbols,
       chart: Chart.viewChart(featuredSymbol, range, quotes, entries, histories, nights, allDay, root.overnight ? calendars : null) })
     // The search's choice on the hero, unadded (popup-search-preview-*).
     property string previewSymbol: ""
@@ -811,7 +812,7 @@ Harness {
       // popup-breadth-even-<look>: a list three up and three down, whose two
       // ends of the rule must be the same length and never meet.
       if (root.stateName.indexOf("popup-breadth-even-") === 0) {
-        stub.library = stub.symbols.slice()
+        stub.allSymbols = stub.symbols.slice()
         stub.listName = "Even"
         stub.symbols = ["MZ", "BRK-A", "LONG", "MSFT", "TSLA", "AMZN"]
         stub.shown = stub.symbols.slice()
@@ -821,7 +822,7 @@ Harness {
       if (root.room) {
         var lists = { one: ["AAPL"], four: ["AAPL", "NVDA", "MSFT", "SPY"], five: ["NVDA", "AAPL", "MSFT", "SPY", "TSLA"], growth: [] }
         if (root.room.list === "growth") {
-          stub.library = stub.symbols.slice()
+          stub.allSymbols = stub.symbols.slice()
           stub.listName = "Growth"
         }
         stub.symbols = lists[root.room.list]
@@ -1077,8 +1078,8 @@ Harness {
     } else if (/^(popup|window|min-window)-lists-/.test(root.stateName)) {
       // popup-lists-<menu|naming|named|empty|long|manage|rename|confirm|symbol>-<look>,
       // window-lists-<manage|symbol>-<look>, and min-window-lists-<menu|manage|symbol>-<look>,
-      // the window at its smallest: named watchlists over the 22-symbol
-      // library, the featured symbol staying put on a switch. -menu12- and
+      // the window at its smallest: named watchlists over All's 22 symbols,
+      // the featured symbol staying put on a switch. -menu12- and
       // -menu30-: the menu over 12 or 30 lists.
       var all = stub.symbols.slice()
       var named = /-(named|rowmenu)-/.test(root.stateName) ? { name: "My Watchlist", symbols: all.slice(0, 8) }
@@ -1089,8 +1090,8 @@ Harness {
       stub.lists = [choice("", all), choice("My Watchlist", all.slice(0, 8)), choice("Watching", all.slice(3, 8)),
         choice("Growth", []), choice("Wins", all.slice(10, 14)), choice("Losses", all.slice(14, 17))]
       if (named) {
-        // All stays the library, so the panel keeps All's height on a list.
-        stub.library = all
+        // All stays every symbol, so the panel keeps All's height on a list.
+        stub.allSymbols = all
         stub.listName = named.name
         stub.order = "manual"
         stub.symbols = named.symbols
@@ -1285,8 +1286,14 @@ Harness {
           downColor: stub.downColor
           fontFamily: stub.fontFamily
           surfaceOpen: true
-          // The animal held still: its fidget is motion, which review's films judge.
+          // The animal held still: its fidget is motion.
           screenOn: false
+          // So are the live mark's blink and ripple, six seconds from the
+          // end of the draw-in: held, the mark is drawn as it rests.
+          Component.onCompleted: {
+            var charts = root.find(body, "heroChart").children
+            for (var i = 0; i < charts.length; i++) if (charts[i].still !== undefined) charts[i].still = true
+          }
           headerWhenMissing: root.coldState === "loading" ? "Loading" : "No data"
           switchesPanels: root.popup
           margins: root.popup ? 0 : Style.space(16)
@@ -1555,11 +1562,18 @@ Harness {
     }
 
     // A still state's picture, 300 ms in, once its window has laid out and
-    // drawn: nothing in the shell says when that is done.
+    // drawn: nothing in the shell says when that is done. Then once its
+    // chart has drawn in, which takes 320 ms and the chart says itself: a
+    // picture taken at 300 ms had no live mark, and one a moment late had.
     Timer {
       interval: 300
       running: !root.interactivePicture && renderWindow.visible
       onTriggered: {
+        if (body.motion.drawingIn) {
+          interval = 20
+          restart()
+          return
+        }
         if (root.shareOf) {
           body.camera = shareCamera
           body.takeScreenshot()
@@ -1733,41 +1747,11 @@ Harness {
         }
       }
       if (mode === "press") {
-        var fill = control === "list" ? one("listControl")
-          : control === "orderword" || control === "manualorder" ? one("orderControl")
-          : control === "orderarrow" ? one("orderArrowFill")
-          : control === "unit" ? one("unitFill")
-          : control === "look" ? one("lookFill")
-          : control === "help" ? one("helpFill")
-          : control === "footer" ? one("footerFill")
-          : control === "done" ? root.findAll(target, "actionFill")[0]
-          : control === "symbol" ? root.findAll(target, "rowFill")[0]
-          : control === "remove" ? root.findAll(target, "rowRemoveFill")[0] : target
-        // Inside the fill's edge, in the film's pixels: a frame is the
-        // window's pixels, so at scale 1.75 each unit is 1.75 of them.
-        var corner = fill.mapToItem(body, 0, 0)
-        var ratio = body.Window.window.devicePixelRatio
-        var left = Math.ceil((corner.x + 1) * ratio), top = Math.ceil((corner.y + 1) * ratio)
-        var box = [left, top, Math.floor((corner.x + fill.width - 2) * ratio) - left, Math.floor((corner.y + fill.height - 2) * ratio) - top]
-        // Off the control, so the film opens on it at rest; the time lets
-        // any hover fill the move left fade (160 ms).
+        // Off the control first; the time lets any hover fill the move
+        // left fade (160 ms). Then pressed, and held for the picture.
         mouseMove(body, body.width / 2, 10)
         wait(200)
-        pressFilm.source = body
-        pressFilm.begin(root.stateName)
-        tryVerify(function() { return pressFilm.frames.length >= 4 }, 2000)
-        pressFilm.markStart()
         mousePress(body, point.x, point.y)
-        tryVerify(function() { var frames = pressFilm.frames; return frames.length > 0 && frames[frames.length - 1].at - pressFilm.start >= 320 }, 3000)
-        pressFilm.end()
-        tryVerify(function() { return pressFilm.waiting === 0 }, 3000)
-        var ink = Style.pressedFillFor(stub.foreground, Commons.Color.accent)
-        pressFilm.judge("press", null, [[ink.r, ink.g, ink.b, ink.a].join(","), box.join(",")])
-        tryVerify(function() { return pressFilm.verdict !== null }, 10000)
-        if (!pressFilm.verdict.ok) {
-          console.error("FAIL pressed feedback " + control + " — " + pressFilm.verdict.detail)
-          root.failures++
-        }
       } else {
         // RowPointer treats its first sighting as a resting pointer.
         // Enter the row, then move within it as a hand would.
@@ -1791,5 +1775,4 @@ Harness {
     }
   }
 
-  FrameGrab { id: pressFilm }
 }

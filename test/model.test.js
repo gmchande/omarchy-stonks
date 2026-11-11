@@ -725,9 +725,9 @@ for (const file of readdirSync(dataFiles).filter(name => name.endsWith(".json"))
   })
 })
 
-// lists.qml drives adding, removing, stepping, naming, and ordering through
-// the real Service and keys, on a library where no symbol is in two named
-// lists and every add is already in All. These are the cases it cannot reach.
+// The keys and mouse walks add, remove, name and order through the real
+// Service, on a library where no symbol is in two named lists. These are
+// the cases they cannot reach.
 test("membership across several lists", () => {
   // A new symbol added on a named list joins All; one added on All joins no list.
   const onGrowth = M.withSymbolAdded(library({ list: "Growth" }), "fslr")
@@ -1413,7 +1413,7 @@ test("Robinhood is asked once for each stock the pill shows with nothing open by
   const now = at(WED, "21:00")
   const base = {
     open: false, pill: "AAPL", quoteEntries: { AAPL: answered(now) }, quotes: {}, overnightSymbols: ["AAPL", "MSFT"],
-    library: ["AAPL", "MSFT", "SHEL.L"], preview: "", previewShown: false, previewQuote: null, allDay: {}, nights: {}, now, calendars
+    allSymbols: ["AAPL", "MSFT", "SHEL.L"], preview: "", previewShown: false, previewQuote: null, allDay: {}, nights: {}, now, calendars
   }
   const asks = changes => M.overnightAsks({ ...base, ...changes })
   // Nothing open by day: the pill's stock alone, once Yahoo has answered it
@@ -1457,7 +1457,7 @@ test("Robinhood is asked once for each stock the pill shows with nothing open by
   expect(asks({ ...pillAnswered(60), ...nvda })).toEqual({ tradability: ["NVDA"], trades: ["NVDA"] })
   expect(asks({ ...pillAnswered(60), ...nvda, previewShown: false })).toEqual({ tradability: ["MSFT"], trades: ["MSFT"] })
   // A preview already in All is asked as its row, not first; Toronto's never.
-  const inAll = { ...pillAnswered(60), ...nvda, library: [...base.library, "NVDA"], overnightSymbols: ["AAPL", "MSFT", "NVDA"] }
+  const inAll = { ...pillAnswered(60), ...nvda, allSymbols: [...base.allSymbols, "NVDA"], overnightSymbols: ["AAPL", "MSFT", "NVDA"] }
   expect(asks(inAll)).toEqual({ tradability: ["MSFT", "NVDA"], trades: ["MSFT", "NVDA"] })
   const toronto = { preview: "SHOP.TO", previewShown: true, previewQuote: { symbol: "SHOP.TO", exchange: "TOR", instrumentType: "EQUITY" } }
   expect(asks({ ...pillAnswered(60), ...toronto })).toEqual({ tradability: ["MSFT"], trades: ["MSFT"] })

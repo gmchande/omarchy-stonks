@@ -771,8 +771,7 @@ test("rowModel shows the regular close at rest and the trade under the finger", 
   expect(view(0, "abs")).toEqual({ ...close, changeText: "+8.28" })
   // Since the open: from the OPEN the info line shows, 316.98.
   expect(view(0, "open")).toEqual({ ...close, changeText: "+2.57%" })
-  // The rows carry the mode's word inline; the hero's SINCE OPEN caption is
-  // pointer.qml's. Percent and amount carry none.
+  // The rows carry the mode's word inline. Percent and amount carry none.
   expect(M.rowModel(quote, 0, "open")).toMatchObject({ changeLine: "+2.57% open", periodLabel: "SINCE OPEN" })
   expect(M.rowModel(quote, 0, "abs")).toMatchObject({ changeLine: "+8.28", periodLabel: "" })
   // Scrubbing reads the trade at that moment and holds it until the next;
@@ -1689,7 +1688,7 @@ test("on a morning Yahoo left an hour empty, Robinhood is asked once more for th
   const asks = (clock, changes = {}) => {
     const now = at("2026-11-02", clock)
     return M.overnightAsks({ open: false, pill: "NBIS", quoteEntries: Object.fromEntries(names.map(s => [s, { status: "ok", receivedAt: now, answeredAt: now }])),
-      quotes, overnightSymbols: names, library: names, preview: "", previewShown: false, previewQuote: null, allDay, nights: inHand, now, calendars, ...changes })
+      quotes, overnightSymbols: names, allSymbols: names, preview: "", previewShown: false, previewQuote: null, allDay, nights: inHand, now, calendars, ...changes })
   }
   // NBIS and CRWV traded on Yahoo in every slot up to 08:25; SHOP, thin,
   // left no stretch of its own, but is asked with them on such a day.
@@ -1715,7 +1714,7 @@ test("on a morning Yahoo left an hour empty, Robinhood is asked once more for th
   expect(asks("09:35", { allDay: {} })).toEqual({ tradability: ["NBIS"], trades: [] })
   // NBIS previewed outside All, whose only listing trades abroad: its own
   // quote tells of the hour, and it is asked.
-  expect(asks("09:35", { open: true, library: ["SHEL.L"], overnightSymbols: [], preview: "NBIS", previewShown: true, previewQuote: quotes.NBIS }))
+  expect(asks("09:35", { open: true, allSymbols: ["SHEL.L"], overnightSymbols: [], preview: "NBIS", previewShown: true, previewQuote: quotes.NBIS }))
     .toEqual({ tradability: [], trades: ["NBIS"] })
   // Every other saved day of a US stock or ETF, Yahoo's pre-market whole or
   // a thin stock's sparse: no such stretch, so no ask.

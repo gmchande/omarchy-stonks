@@ -58,8 +58,8 @@ FloatingWindow {
   // The end of 4.5's card height.
   default property alias contentItem: contentHolder.children
   readonly property alias card: card
-  // The window's picture, for FrameGrab: the window's own content item has
-  // no QML engine to grab with.
+  // The window's picture: the window's own content item has no QML engine
+  // to grab with.
   readonly property alias surface: surface
 
   readonly property real availableCardWidth: 0

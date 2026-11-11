@@ -1,33 +1,12 @@
 #!/usr/bin/env bash
-# A stand-in for pw-play, first on PATH inside the harnesses, so no harness
-# ever plays a sound. It records what it was asked to play and when, as
-# lines in STONKS_FAKE_STATE/pw-play.log: "start MS N ARGS", N counting the
-# starts from 1, then "ended MS N" after the sound's length or "stopped MS N"
-# when Stonks stops it; chimes overlap, so their lines interleave. A copy of
-# each file it was given is kept as pw-play.N.wav, so a harness can read a
-# replay's sound as it was when it played. It reads the clock as pw-cat does
-# (bin/pw-cat).
-log="$STONKS_FAKE_STATE/pw-play.log"
-ms() { local t=${EPOCHREALTIME/[.,]/}; REPLY=${t%???}; }
-# Overlapping chimes start at once: each counts its N under a lock.
-exec 9>> "$log.lock"
-flock 9
-n=$(( $(grep -c '^start ' "$log" 2> /dev/null) + 1 ))
-ms
-echo "start $REPLY $n $*" >> "$log"
-flock -u 9
-exec 9>&-
+# A stand-in for pw-play, first on PATH inside the walks, so no walk ever
+# plays a sound. It plays nothing and takes as long as the sound would: its
+# 16-bit mono data after the 44-byte header, at the rate the header names.
 sleeper=""
-trap '[ -n "$sleeper" ] && kill "$sleeper" 2> /dev/null; ms; echo "stopped $REPLY $n" >> "$log"; exit 0' TERM INT
+trap '[ -n "$sleeper" ] && kill "$sleeper" 2> /dev/null; exit 0' TERM INT
 file="${!#}"
-cp "$file" "$STONKS_FAKE_STATE/pw-play.$n.wav" 2> /dev/null
-# The length a real player takes: the 16-bit mono data after the 44-byte
-# header, at the rate the header names.
 size=$(stat -c %s "$file" 2> /dev/null || echo 44)
 rate=$(od -An -t u4 -j 24 -N 4 "$file" 2> /dev/null | tr -d ' ')
-length=$(awk -v s="$size" -v r="${rate:-48000}" 'BEGIN { printf "%.3f", (s - 44) / 2 / (r > 0 ? r : 48000) }')
-sleep "$length" &
+sleep "$(awk -v s="$size" -v r="${rate:-48000}" 'BEGIN { printf "%.3f", (s - 44) / 2 / (r > 0 ? r : 48000) }')" &
 sleeper=$!
 wait "$sleeper"
-ms
-echo "ended $REPLY $n" >> "$log"

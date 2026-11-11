@@ -16,6 +16,7 @@ import "plugin" as Stonks
 // the bar.
 Harness {
   id: harness
+  walk: false
   marker: "README DONE"
 
   readonly property string rawDir: Quickshell.env("STONKS_README_RAW")
@@ -110,7 +111,7 @@ Harness {
 
   Steps {
     name: "Readme"
-    when: service.pluginsReady
+    when: service.ready
 
     function quiet() {
       tryVerify(function() {

@@ -10,9 +10,14 @@ ShellRoot {
 
   property string marker
   property int failures: 0
+  // A walk that reaches its end having checked nothing fails. A picture
+  // maker checks nothing, and says so.
+  property bool walk: true
+  property int checked: 0
 
   function check(label, ok, detail) {
     console.log((ok ? "PASS " : "FAIL ") + label + (!ok && detail !== undefined ? " — " + detail : ""))
+    checked++
     if (!ok) failures++
   }
 
@@ -75,6 +80,10 @@ ShellRoot {
   }
 
   function finish() {
+    if (walk && checked === 0) {
+      console.log("FAIL the walk checked nothing")
+      failures++
+    }
     console.log(marker)
     exit.exitCode = failures ? 1 : 0
     exit.start()

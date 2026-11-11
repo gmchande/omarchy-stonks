@@ -57,11 +57,11 @@ Panel {
   }
 
   function offerHint() {
-    if (!root.opened || !root.body || !service || !service.pluginsReady || service.hinted || root.body.notice !== "") return
+    if (!root.opened || !root.body || !service || !service.ready || service.hinted || root.body.notice !== "") return
     root.body.showFirstRunHint()
     service.persist({ hinted: true })
   }
-  readonly property bool serviceReady: !!service && service.pluginsReady === true
+  readonly property bool serviceReady: !!service && service.ready === true
   onServiceReadyChanged: offerHint()
 
   // An open during the close's fade leaves the card where it is on screen.

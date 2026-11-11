@@ -87,7 +87,7 @@ Item {
   // ---- What the service says, held still while the surface is closed
 
   readonly property var emptyView: ({ featured: "", range: "1D", list: "", listKey: "=", order: "manual", reversed: false,
-    rows: [], shown: [], library: [], chart: null })
+    rows: [], shown: [], allSymbols: [], chart: null })
   // One value, so each change of the rows, hero, range, and chart is whole.
   property var view: emptyView
   property var quotes: ({})
@@ -631,7 +631,7 @@ Item {
     listsSymbol = ""
   }
   // Once its symbol leaves All, however, there is nothing to tick.
-  onViewChanged: if (listsSymbol !== "" && view.library.indexOf(listsSymbol) < 0) listsSymbol = ""
+  onViewChanged: if (listsSymbol !== "" && view.allSymbols.indexOf(listsSymbol) < 0) listsSymbol = ""
 
   function renameList(name, newName) {
     if (!service) return

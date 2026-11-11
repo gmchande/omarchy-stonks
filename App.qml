@@ -23,7 +23,7 @@ Item {
   property string requestedRange: ""
   property bool onScreen: true
 
-  readonly property bool ready: !!(service && service.pluginsReady)
+  readonly property bool ready: !!(service && service.ready)
   readonly property bool opened: window.visible
   readonly property string featuredSymbol: ready ? service.featuredSymbol : ""
   readonly property string range: ready ? service.range : "1D"
