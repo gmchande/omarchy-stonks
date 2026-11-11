@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import qs.Commons
 import qs.Commons as Commons
@@ -54,11 +56,47 @@ Item {
 
   Component.onCompleted: settle()
 
-  // 3 px under its target, centred, but never past the header's right edge.
-  component HeaderTip: PanelToolTip {
-    readonly property Item icon: parent.parent
-    y: parent.height + 3
-    x: Math.min((parent.width - implicitWidth) / 2, icon.parent.width - icon.x - parent.x - implicitWidth)
+  // What makes an icon a button: its fill while pressed, a target as tall as
+  // the header's two lines, and its tip 3 px under the target, centred, but
+  // never past the header's right edge. Under the icon it is put in.
+  component HeaderPress: Item {
+    id: press
+    property string tip: ""
+    // The fill's height past the icon's, and the target's least width.
+    property real fillPad: Style.space(6)
+    property real leastWidth: 0
+    readonly property alias containsMouse: area.containsMouse
+    signal clicked()
+    readonly property Item icon: parent
+    z: -1
+    anchors.fill: parent
+
+    Rectangle {
+      anchors.centerIn: parent
+      width: parent.width + Style.space(12)
+      height: parent.height + press.fillPad
+      radius: root.look.retro ? 0 : Style.cornerRadius
+      color: area.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
+    }
+
+    MouseArea {
+      id: area
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.verticalCenter: parent.verticalCenter
+      width: Math.max(press.leastWidth, parent.width + Style.space(12))
+      height: root.contentHeight
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onClicked: press.clicked()
+
+      PanelToolTip {
+        visible: area.containsMouse
+        text: press.tip
+        fontFamily: root.look.fontFamily
+        y: parent.height + 3
+        x: Math.min((parent.width - implicitWidth) / 2, press.icon.parent.width - press.icon.x - parent.x - implicitWidth)
+      }
+    }
   }
 
   // The rule sits a band's gap short of a group's under the two lines, so with
@@ -217,33 +255,13 @@ Item {
     anchors.verticalCenterOffset: root.centerOffset
     cell: root.cell
     shape: on ? Cells.SOUND_ON : Cells.SOUND_OFF
-    color: soundMouse.containsMouse ? root.look.foreground : root.look.dim
+    color: soundPress.containsMouse ? root.look.foreground : root.look.dim
 
-    Rectangle {
-      z: -1
-      anchors.centerIn: parent
-      width: parent.width + Style.space(12)
-      height: parent.height + Style.space(6)
-      radius: root.look.retro ? 0 : Style.cornerRadius
-      color: soundMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
-    }
-
-    MouseArea {
-      id: soundMouse
+    HeaderPress {
+      id: soundPress
       objectName: "soundToggle"
-      anchors.horizontalCenter: parent.horizontalCenter
-      anchors.verticalCenter: parent.verticalCenter
-      width: parent.width + Style.space(12)
-      height: root.contentHeight
-      hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
+      tip: root.soundsOn ? "Turn sounds off" : "Turn sounds on"
       onClicked: root.soundsRequested()
-
-      HeaderTip {
-        visible: soundMouse.containsMouse
-        text: root.soundsOn ? "Turn sounds off" : "Turn sounds on"
-        fontFamily: root.look.fontFamily
-      }
     }
   }
 
@@ -257,33 +275,13 @@ Item {
     anchors.verticalCenterOffset: root.centerOffset
     cell: root.cell
     shape: lit ? Cells.CAMERA_LIT : Cells.CAMERA
-    color: lit || cameraMouse.containsMouse ? root.look.foreground : root.look.dim
+    color: lit || cameraPress.containsMouse ? root.look.foreground : root.look.dim
 
-    Rectangle {
-      z: -1
-      anchors.centerIn: parent
-      width: parent.width + Style.space(12)
-      height: parent.height + Style.space(6)
-      radius: root.look.retro ? 0 : Style.cornerRadius
-      color: cameraMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
-    }
-
-    MouseArea {
-      id: cameraMouse
+    HeaderPress {
+      id: cameraPress
       objectName: "cameraButton"
-      anchors.horizontalCenter: parent.horizontalCenter
-      anchors.verticalCenter: parent.verticalCenter
-      width: parent.width + Style.space(12)
-      height: root.contentHeight
-      hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
+      tip: "Take a screenshot"
       onClicked: root.screenshotRequested()
-
-      HeaderTip {
-        visible: cameraMouse.containsMouse
-        text: "Take a screenshot"
-        fontFamily: root.look.fontFamily
-      }
     }
   }
 
@@ -298,33 +296,13 @@ Item {
     retro: root.look.retro
     still: root.still
     pixel: root.cell - 1
-    color: lookMouse.containsMouse ? root.look.foreground : root.look.dim
+    color: lookPress.containsMouse ? root.look.foreground : root.look.dim
 
-    Rectangle {
-      z: -1
-      anchors.centerIn: parent
-      width: parent.width + Style.space(12)
-      height: parent.height + Style.space(6)
-      radius: root.look.retro ? 0 : Style.cornerRadius
-      color: lookMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
-    }
-
-    MouseArea {
-      id: lookMouse
+    HeaderPress {
+      id: lookPress
       objectName: "lookToggle"
-      anchors.horizontalCenter: parent.horizontalCenter
-      anchors.verticalCenter: parent.verticalCenter
-      width: parent.width + Style.space(12)
-      height: root.contentHeight
-      hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
+      tip: root.look.retro ? "Switch to smooth" : "Switch to retro"
       onClicked: root.styleRequested(root.look.retro ? "smooth" : "retro")
-
-      HeaderTip {
-        visible: lookMouse.containsMouse
-        text: root.look.retro ? "Switch to smooth" : "Switch to retro"
-        fontFamily: root.look.fontFamily
-      }
     }
   }
 
@@ -339,35 +317,20 @@ Item {
     anchors.verticalCenterOffset: root.centerOffset
     textFormat: Text.PlainText
     text: "?"
-    color: helpMouse.containsMouse ? root.look.foreground : root.look.dim
+    color: helpPress.containsMouse ? root.look.foreground : root.look.dim
     font.family: root.look.fontFamily
     font.pixelSize: Style.font.caption
     font.bold: true
     Behavior on color { ColorAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
-    Rectangle {
-      z: -1
-      anchors.centerIn: parent
-      width: parent.implicitWidth + Style.space(12)
-      height: parent.implicitHeight + Style.space(4)
-      radius: root.look.retro ? 0 : Style.cornerRadius
-      color: helpMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
-    }
-    MouseArea {
-      id: helpMouse
+    HeaderPress {
+      id: helpPress
       objectName: "helpToggle"
-      anchors.horizontalCenter: parent.horizontalCenter
-      anchors.verticalCenter: parent.verticalCenter
-      width: Math.max(Style.space(24), parent.width + Style.space(12))
-      height: root.contentHeight
-      hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
+      // A narrower fill, as the glyph is shorter than an icon, and a target
+      // at least 24 wide.
+      fillPad: Style.space(4)
+      leastWidth: Style.space(24)
+      tip: root.helpShown ? "Hide the keys" : "Show the keys"
       onClicked: root.helpRequested()
-
-      HeaderTip {
-        visible: helpMouse.containsMouse
-        text: root.helpShown ? "Hide the keys" : "Show the keys"
-        fontFamily: root.look.fontFamily
-      }
     }
   }
 }
