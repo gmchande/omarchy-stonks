@@ -69,7 +69,7 @@ Harness {
     plugin.service.tick()
   }
   Stonks.Plugin { id: plugin; shell: shellApi; manifest: harness.pluginManifest(); hyprland: hyprlandStandIn
-    wallClock: function() { return harness.time } }
+    input: inputStandIn; wallClock: function() { return harness.time } }
   readonly property var service: plugin.service
   // A bad answer is tried again in a fifth of a second, not 2.5: the walk's
   // clock runs faster than the wall's.
@@ -86,6 +86,12 @@ Harness {
     property var wayland: ({ appId: "org.quickshell" })
     property string address: "5ab1e"
     property var workspace: workspaceHere
+  }
+  // The input that wakes the screens, which a step moves: never the owner's
+  // own keys and pointer.
+  QtObject {
+    id: inputStandIn
+    property bool isIdle: false
   }
   // Hyprland as the plugin is handed it: the screens and the windows a step
   // gives it, each screen asked as the real ones are.
@@ -448,8 +454,9 @@ Harness {
       screensHeard()
       var dark = harness.quoteCounts(harness.requests().slice(darkFrom))
       wait(1100)
+      inputStandIn.isIdle = true
       screenStandIn.on = true
-      plugin.service.screens.inputSeen()
+      inputStandIn.isIdle = false
       var woke = within(2000, function() { return harness.quoteCounts(harness.requests().slice(darkFrom)).NEST > 0 })
       settle()
       var lit = harness.quoteCounts(harness.requests().slice(darkFrom))
@@ -472,8 +479,9 @@ Harness {
       screensHeard()
       var darkSearches = harness.calls("SEARCH.asked") - searchesFrom
       wait(1100)
+      inputStandIn.isIdle = true
       screenStandIn.on = true
-      plugin.service.screens.inputSeen()
+      inputStandIn.isIdle = false
       var sent = within(3000, function() { return harness.calls("SEARCH.asked") === searchesFrom + 1 })
       harness.check("every screen off, words typed into search ask nothing, and the key that wakes a screen sends them, once",
         held && darkSearches === 0 && sent, [held, darkSearches, harness.calls("SEARCH.asked") - searchesFrom].join(" "))
