@@ -1621,6 +1621,71 @@ test("historyRowModel uses the quote until a historical bar is scrubbed", () => 
   expect(M.historyRowModel(null, quote, 0)).toBeNull()
 })
 
+// ---------------------------------------------------------------- a run's answers
+
+// NEST's and SPY's Friday 11 September, as a chart answers, and a run of
+// one request each or one spark for both.
+const nestDay = () => M.parseChart(fixture("nest-2026-09-11-day-prepost.json"), cents)
+const spyDay = () => M.parseChart(fixture("spy-2026-09-11-day-prepost.json"), cents)
+const charts = (...symbols) => symbols.map(symbol => ({ symbols: [symbol], spark: false }))
+const answer = (index, kind, outcomes = {}) => ({ index, kind, outcomes })
+const read = (quote, unjudged = false) => ({ quote, unjudged })
+const nothingHeld = asked => ({ quotes: {}, entries: {}, asked, tries: {}, toJudge: [] })
+
+test("a run's answers show their quotes, give nothing to a stock removed while it was out, and a quote that comes again unchanged keeps the one on screen", () => {
+  const now = nestDay().marketTime + 60
+  const first = M.quotesLanded(nothingHeld({ NEST: now - 5, SPY: now - 5 }), charts("NEST", "SPY"),
+    [answer(0, "ok", { NEST: read(nestDay()) }), answer(1, "ok", { SPY: read(spyDay()) })], ["NEST"], calendars, now)
+  expect([Object.keys(first.quotes), first.entries.NEST, "NEST" in first.asked, first.back])
+    .toEqual([["NEST"], { status: "ok", receivedAt: now, answeredAt: now }, false, ["NEST", "SPY"]])
+  // A minute on the same day comes again: the row keeps the quote it shows,
+  // so nothing is worked out again, and says it was answered now.
+  const held = { ...first, asked: { NEST: now + 55 } }
+  const again = M.quotesLanded(held, charts("NEST"), [answer(0, "ok", { NEST: read(nestDay()) })], ["NEST"], calendars, now + 60)
+  expect([again.quotes === first.quotes, again.entries.NEST.receivedAt]).toEqual([true, now + 60])
+  // Tokyo's first answer a quarter hour into Monday 2 November, with no
+  // close of Friday's held: Yahoo may still count from Thursday's, so the
+  // row leaves the move out (`carryClose`).
+  const monday = at("2026-11-01", "19:15")
+  const tokyo = M.quotesLanded(nothingHeld({ "7203.T": monday }), charts("7203.T"),
+    [answer(0, "ok", { "7203.T": read(M.parseChart(fixture("moments/tokyo-2026-11-01-1915/2d/7203.t.json"), cents)) })], ["7203.T"], calendars, monday)
+  expect(M.rowModel(tokyo.quotes["7203.T"], 0, "pct").changeText).toBe("\u2014")
+})
+
+test("a bad answer is asked again after a wait, twice, then the row says it failed and keeps its last price; a refusal leaves it asked, for the gate to pace", () => {
+  const now = nestDay().marketTime + 60
+  const shown = M.quotesLanded(nothingHeld({ NEST: now }), charts("NEST"), [answer(0, "ok", { NEST: read(nestDay()) })], ["NEST"], calendars, now)
+  var held = { ...shown, asked: { NEST: now + 60 } }
+  const tried = []
+  for (let i = 0; i < 3; i++) {
+    const next = M.quotesLanded(held, charts("NEST"), [answer(0, "bad")], ["NEST"], calendars, now + 60 + i)
+    tried.push([next.retry, next.entries.NEST.status, "NEST" in next.asked])
+    held = next
+  }
+  expect(tried).toEqual([[["NEST"], "ok", true], [["NEST"], "ok", true], [[], "failed", false]])
+  expect([held.quotes.NEST === shown.quotes.NEST, held.entries.NEST.receivedAt, held.entries.NEST.answeredAt]).toEqual([true, now, now + 62])
+  // Refused, or no answer at all: still asked, with no try counted.
+  for (const kind of ["refused", "none"]) {
+    const paced = M.quotesLanded({ ...shown, asked: { NEST: now + 60 } }, charts("NEST"), [answer(0, kind)], ["NEST"], calendars, now + 60)
+    expect([paced.retry, "NEST" in paced.asked, paced.tries, paced.entries]).toEqual([[], true, {}, shown.entries])
+  }
+})
+
+test("a spark day with a jump shows at once and is checked on a chart, whose answer, good or bad, ends the check and keeps the spark's time for the row's next ask", () => {
+  const now = nestDay().marketTime + 60
+  const spark = [{ symbols: ["NEST", "SPY"], spark: true }]
+  const sparked = M.quotesLanded(nothingHeld({ NEST: now, SPY: now }), spark,
+    [answer(0, "ok", { NEST: read(nestDay(), true), SPY: read(spyDay()) })], ["NEST", "SPY"], calendars, now)
+  expect([Object.keys(sparked.quotes), sparked.toJudge]).toEqual([["NEST", "SPY"], ["NEST"]])
+  // The chart asked only to check it, answered 30 s on: the row shows the
+  // chart's quote, and is next asked a minute from the spark's answer.
+  const checked = M.quotesLanded(sparked, charts("NEST"), [answer(0, "ok", { NEST: read(nestDay()) })], ["NEST", "SPY"], calendars, now + 30)
+  expect([checked.toJudge, checked.entries.NEST.receivedAt, checked.entries.NEST.answeredAt]).toEqual([[], now + 30, now])
+  // A bad chart changes nothing on the row, and the check ends.
+  const failed = M.quotesLanded(sparked, charts("NEST"), [answer(0, "bad")], ["NEST", "SPY"], calendars, now + 30)
+  expect([failed.toJudge, failed.entries.NEST, failed.retry, failed.quotes]).toEqual([[], sparked.entries.NEST, [], sparked.quotes])
+})
+
 // ---------------------------------------------------------------- overnight
 
 // Robinhood's saved span=day answer for a moment, by symbol: the bars that

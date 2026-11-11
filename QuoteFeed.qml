@@ -1,6 +1,5 @@
 import QtQuick
 import "Asks.js" as Asks
-import "CarriedClose.js" as CarriedClose
 import "Fetch.js" as Fetch
 import "Quote.js" as Quote
 // Every symbol due goes in one curl run over one connection, and the
@@ -309,70 +308,19 @@ Item {
   property bool applying: false
   function apply(job, got) {
     root.applying = true
-    var at = root.stamp()
-    var nextQuotes = null
-    var nextEntries = Object.assign({}, entries)
-    var nextAsked = Object.assign({}, asked)
-    var nextTries = Object.assign({}, tries)
-    var nextJudge = toJudge.slice()
-    var show = function(symbol, answered) {
-      var previous = quotes[symbol]
-      var quote = CarriedClose.carryClose(previous, answered, calendars, at)
-      var dropped = Quote.bucketTimes(quote.droppedTimes)
-      var previousDropped = Quote.bucketTimes(previous ? previous.droppedTimes : null)
-      if (dropped && dropped !== previousDropped && !quote.closesOnly)
-        console.warn("stonks: " + symbol + " dropped stray buckets " + dropped)
-      // An unchanged answer keeps the quote shown, so nothing is derived again
-      // and no line repaints.
-      if (!previous || !Quote.sameQuote(quote, previous)) {
-        if (!nextQuotes) nextQuotes = Object.assign({}, quotes)
-        nextQuotes[symbol] = quote
-      }
-      nextEntries[symbol] = { status: "ok", receivedAt: at, answeredAt: at }
-    }
-    var settle = function(answer, slot, symbol) {
-      // Removed while its run was out.
-      if (symbols.indexOf(symbol) < 0) return
-      // A judging chart keeps the spark answer's second: the symbol stays due
-      // with the rest of its run.
-      var judging = !slot.spark && toJudge.indexOf(symbol) >= 0
-      var outcome = answer.kind === "ok" ? answer.outcomes[symbol] : null
-      var verdict = Asks.answerVerdict(answer.kind, outcome, nextTries[symbol] || 0, judging && !(symbol in asked))
-      // A refusal or no answer leaves it asked, for the gate to pace.
-      if (verdict === "host") return
-      if (!slot.spark) nextJudge = nextJudge.filter(function(s) { return s !== symbol })
-      if (verdict === "unchanged") return
-      if (verdict === "show") {
-        if (outcome.unjudged && nextJudge.indexOf(symbol) < 0) nextJudge.push(symbol)
-        show(symbol, outcome.quote)
-        if (judging && entries[symbol]) nextEntries[symbol].answeredAt = entries[symbol].answeredAt
-      } else if (verdict === "retry") {
-        nextTries[symbol] = (nextTries[symbol] || 0) + 1
-        job.cool.push(symbol)
-        return
-      } else {
-        var entry = nextEntries[symbol] || { receivedAt: 0 }
-        nextEntries[symbol] = Object.assign({}, entry, { status: "failed", answeredAt: at })
-      }
-      delete nextAsked[symbol]
-      delete nextTries[symbol]
-    }
-    var back = []
-    got.forEach(function(answer) {
-      var slot = job.slots[answer.index]
-      if (!slot) return
-      slot.symbols.forEach(function(symbol) { settle(answer, slot, symbol) })
-      back = back.concat(slot.symbols)
-    })
+    var next = Asks.quotesLanded({ quotes: quotes, entries: entries, asked: asked, tries: tries, toJudge: toJudge },
+      job.slots, got, symbols, calendars, root.stamp())
+    next.warnings.forEach(function(warning) { console.warn("stonks: " + warning) })
+    job.cool = job.cool.concat(next.retry)
     if (!job.first) {
-      job.back = job.back.concat(back)
-      root.userAsked = without(userAsked, back)
+      job.back = job.back.concat(next.back)
+      root.userAsked = without(userAsked, next.back)
     }
-    if (nextQuotes) root.quotes = nextQuotes
-    root.entries = nextEntries
-    root.toJudge = nextJudge.filter(function(s) { return symbols.indexOf(s) >= 0 })
-    root.asked = nextAsked
-    root.tries = nextTries
+    if (next.quotes !== quotes) root.quotes = next.quotes
+    root.entries = next.entries
+    root.toJudge = next.toJudge
+    root.asked = next.asked
+    root.tries = next.tries
     root.applying = false
   }
 

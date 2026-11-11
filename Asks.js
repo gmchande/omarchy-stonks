@@ -1,5 +1,6 @@
 .pragma library
 .import "Calendar.js" as Calendar
+.import "CarriedClose.js" as CarriedClose
 .import "Fundamentals.js" as Fundamentals
 .import "History.js" as History
 .import "Market.js" as Market
@@ -137,6 +138,71 @@ function answerVerdict(kind, outcome, tries, judgingOnly) {
   if (judgingOnly) return "unchanged"
   if (kind !== "missing" && outcome !== "missing" && tries < TRIES - 1) return "retry"
   return "fail"
+}
+
+// What a run's answers do to the quotes held. `held` is the feed's { quotes,
+// entries, asked, tries, toJudge }; `requests` are the run's, by each
+// answer's `index`, and `symbols` those the feed still keeps. Returns the
+// next of each, `quotes` the same object when no quote changed, so nothing
+// is worked out again and no line repaints; and `retry`, the symbols to ask
+// again once the feed has waited, `back`, every symbol answered, and
+// `warnings`, what to say in the log.
+function quotesLanded(held, requests, got, symbols, calendars, now) {
+  var quotes = null
+  var entries = Object.assign({}, held.entries)
+  var asked = Object.assign({}, held.asked)
+  var tries = Object.assign({}, held.tries)
+  var toJudge = held.toJudge.slice()
+  var retry = [], back = [], warnings = []
+  var show = function(symbol, answered) {
+    var previous = held.quotes[symbol]
+    var quote = CarriedClose.carryClose(previous, answered, calendars, now)
+    var dropped = Quote.bucketTimes(quote.droppedTimes)
+    if (dropped && dropped !== Quote.bucketTimes(previous ? previous.droppedTimes : null) && !quote.closesOnly)
+      warnings.push(symbol + " dropped stray buckets " + dropped)
+    if (!previous || !Quote.sameQuote(quote, previous)) {
+      if (!quotes) quotes = Object.assign({}, held.quotes)
+      quotes[symbol] = quote
+    }
+    entries[symbol] = { status: "ok", receivedAt: now, answeredAt: now }
+  }
+  var heard = function(answer, request, symbol) {
+    // Removed while its run was out.
+    if (symbols.indexOf(symbol) < 0) return
+    // A judging chart keeps the spark answer's second: the symbol stays due
+    // with the rest of its run.
+    var judging = !request.spark && held.toJudge.indexOf(symbol) >= 0
+    var outcome = answer.kind === "ok" ? answer.outcomes[symbol] : null
+    var verdict = answerVerdict(answer.kind, outcome, tries[symbol] || 0, judging && !(symbol in held.asked))
+    // A refusal or no answer leaves it asked, for the gate to pace.
+    if (verdict === "host") return
+    if (!request.spark) toJudge = toJudge.filter(function(s) { return s !== symbol })
+    if (verdict === "unchanged") return
+    if (verdict === "show") {
+      if (outcome.unjudged && toJudge.indexOf(symbol) < 0) toJudge.push(symbol)
+      show(symbol, outcome.quote)
+      if (judging && held.entries[symbol]) entries[symbol].answeredAt = held.entries[symbol].answeredAt
+    } else if (verdict === "retry") {
+      tries[symbol] = (tries[symbol] || 0) + 1
+      retry.push(symbol)
+      return
+    } else {
+      entries[symbol] = Object.assign({}, entries[symbol] || { receivedAt: 0 }, { status: "failed", answeredAt: now })
+    }
+    delete asked[symbol]
+    delete tries[symbol]
+  }
+  got.forEach(function(answer) {
+    var request = requests[answer.index]
+    if (!request) return
+    request.symbols.forEach(function(symbol) { heard(answer, request, symbol) })
+    back = back.concat(request.symbols)
+  })
+  return {
+    quotes: quotes || held.quotes, entries: entries, asked: asked, tries: tries,
+    toJudge: toJudge.filter(function(s) { return symbols.indexOf(s) >= 0 }),
+    retry: retry, back: back, warnings: warnings
+  }
 }
 
 // The close and late trades settle within this of a market's last trade.
