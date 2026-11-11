@@ -606,6 +606,10 @@ const library = (extra = {}) => M.fileSettings({
 test("the data file reads as written and repairs hand edits", () => {
   const v1 = { version: 1, symbols: ["NEST", "SILK"], featured: "SILK", order: "pct", changeMode: "pct", style: "retro", refreshIntervalSec: 60 }
   const read = M.fileSettings(v1)
+  expect(M.readListsFile("  " + JSON.stringify(v1, null, 2) + "\n")).toEqual(read)
+  // A file that holds anything but one object can't be read, and is never
+  // written over.
+  expect(["", "null", "[]", '["NEST"]', "7", '"NEST"', '{"symbols": ['].map(M.readListsFile)).toEqual([null, null, null, null, null, null, null])
   // Sounds start off, in a new install and in a file from before them, and
   // only a saved true turns them on; the version check stays on unless a
   // saved false turns it off. Newer settings may add other defaults.
@@ -691,9 +695,7 @@ for (const file of readdirSync(dataFiles).filter(name => name.endsWith(".json"))
     sounds: !old, updateCheck: old
   }
   const text = readFileSync(join(dataFiles, file), "utf8")
-  // As ListsFile.parseText reads it: one JSON object, through fileSettings.
-  const parsed = (() => { try { return JSON.parse(text.trim()) } catch (e) { return null } })()
-  const read = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? M.fileSettings(parsed) : null
+  const read = M.readListsFile(text)
   const label = list => (list.name || "All") + ": " + (list.symbols.join(", ") || "empty") + ", " + list.order + (list.reversed ? " reversed" : "")
   const shown = s => ({ name: s.list, symbols: M.listSymbols(s), order: M.listOrder(s), reversed: M.listReversed(s) })
   // A switch to a list, as the Service persists it.
@@ -854,6 +856,25 @@ test("only a change to what the lists hold ends the undo", () => {
 const tall = { pitch: 42, height: 40 }
 const lines = { pitch: 26, height: 26 }
 const ten = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
+
+test("retro draws each column at the price its last trade ended on, holds it across columns the line joins, leaves a break dark, and lights the last bright column", () => {
+  // 100 by 31 in 3-pixel cells a pixel apart: 25 columns of 10 whole rows.
+  const point = (x, y, more = {}) => ({ x, y, ...more })
+  const grid = points => M.retroGrid({ points, baselineY: 0.5 }, 100, 31, 3, 1)
+  const g = grid([point(0, 0), point(0.02, 1), point(0.2, 0.5), point(0.4, 1, { brk: true })])
+  expect([g.columns, g.rows, g.pitch]).toEqual([25, 10, 4])
+  // Two trades in column 0: the second wins. Columns 1 to 4 hold column 0's
+  // price until column 5's trade; columns 6 to 9 stay dark before the break.
+  expect(g.levels.slice(0, 11)).toEqual([9, 9, 9, 9, 9, 5, undefined, undefined, undefined, undefined, 9])
+  expect(g.lastLit).toBe(10)
+  // A last trade that is dim leaves the light on the column before it.
+  expect(grid([point(0, 0), point(0.2, 0.5, { dim: true })]).lastLit).toBe(0)
+  // The baseline: a known close's row; none known, the floor; a step to a
+  // close known from its column on.
+  expect([g.baseRow, M.retroGrid({ points: [point(0, 0)] }, 100, 30, 3, 1).baseRow]).toEqual([5, 9])
+  const stepped = M.retroGrid({ points: [point(0, 0)], step: { x: 0.5, y: 0 } }, 100, 30, 3, 1)
+  expect([M.retroBaseRow(stepped, 11), M.retroBaseRow(stepped, 12)]).toEqual([9, 0])
+})
 
 test("keys act on the row you chose while any of it shows, else the stock you last looked at while it shows whole, else the first row whole in sight", () => {
   const row = (own, featured, top, lifted = false) => M.cursorRow(ten, own, lifted, featured, tall, top, 200)

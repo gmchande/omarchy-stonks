@@ -5,6 +5,7 @@ import qs.Commons
 import qs.Commons as Commons
 import "Tones.js" as Tones
 import "Motion.js" as Motion
+import "Chart.js" as Chart
 // The retro chart, one rule for the day and every range: columns of cells
 // fill from the baseline row, in the up colour above it and the down colour
 // below. The day adds dimmer hours, the bell and the night's edges, and the
@@ -53,7 +54,7 @@ Item {
   // does: on a few rows of cells they stand as tall as its prices.
   property bool bells: true
 
-  readonly property var grid: layout()
+  readonly property var grid: Chart.retroGrid(geometry, width, height, pixel, gap)
   readonly property bool day: !!geometry && geometry.day === true
   readonly property bool directionKnown: typeof up === "boolean"
   readonly property color aboveColor: directionKnown ? upColor : baselineColor
@@ -88,53 +89,8 @@ Item {
   onAboveStemDimChanged: ink.requestPaint()
   onBelowStemDimChanged: ink.requestPaint()
 
-  // The last trade in a column wins: the price at the end of that stretch. A
-  // column between two trades the line joins holds the one before it; only a
-  // break (`brk`) leaves columns dark, as it lifts the smooth line. Columns
-  // from `stepCol` on stand on `stepRow` (`baseRowAt`).
-  function layout() {
-    var pitch = pixel + gap
-    var columns = Math.max(1, Math.floor(width / pitch))
-    var g = {
-      pitch: pitch,
-      columns: columns,
-      rows: Math.max(1, Math.floor(height / pixel)),
-      baseRow: 0,
-      stepCol: columns,
-      stepRow: 0,
-      levels: [],
-      dim: [],
-      lastLit: -1
-    }
-    if (!geometry || !geometry.points) return g
-    // With no previous close known, the columns stand on the floor, until a
-    // step to a close that is known.
-    g.baseRow = hasBaseline ? Math.round(geometry.baselineY * (g.rows - 1)) : g.rows - 1
-    var step = geometry.step
-    g.stepCol = step ? Math.max(0, Math.min(g.columns - 1, Math.floor(step.x * g.columns))) : g.columns
-    g.stepRow = step ? Math.round(step.y * (g.rows - 1)) : g.baseRow
-    var pts = geometry.points
-    // The lit cell sits on the last column whose own last trade is bright,
-    // never on one held after it.
-    var last = -1
-    for (var i = 0; i < pts.length; i++) {
-      var col = Math.max(0, Math.min(g.columns - 1, Math.floor(pts[i].x * g.columns)))
-      if (col !== last && last >= 0 && !g.dim[last]) g.lastLit = last
-      for (var held = last + 1; i > 0 && !pts[i].brk && held < col; held++) {
-        g.levels[held] = g.levels[last]
-        g.dim[held] = g.dim[last]
-      }
-      g.levels[col] = Math.round(pts[i].y * (g.rows - 1))
-      g.dim[col] = pts[i].dim
-      last = col
-    }
-    if (last >= 0 && !g.dim[last]) g.lastLit = last
-    return g
-  }
-
-  // The baseline's row under column `c`.
   function baseRowAt(g, c) {
-    return c >= g.stepCol ? g.stepRow : g.baseRow
+    return Chart.retroBaseRow(g, c)
   }
 
   // How far along the columns `x` is: they end short of the chart's width

@@ -73,6 +73,18 @@ function normalizeRefreshInterval(value) {
   return n
 }
 
+// The lists file's text: one JSON object, read through `fileSettings`, or
+// null for anything else, which is never written over.
+function readListsFile(text) {
+  try {
+    var parsed = JSON.parse(String(text || "").trim())
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null
+    return fileSettings(parsed)
+  } catch (e) {
+    return null
+  }
+}
+
 // `symbols`, `order` and `reversed` are All's, as version 1 wrote them; a
 // named list is a subset of All.
 function fileSettings(src) {

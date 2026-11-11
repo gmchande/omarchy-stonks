@@ -148,16 +148,6 @@ Item {
     return !lost
   }
 
-  function parseText(text) {
-    try {
-      var parsed = JSON.parse(String(text || "").trim())
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null
-      return Settings.fileSettings(parsed)
-    } catch (e) {
-      return null
-    }
-  }
-
   function adopt(settings) {
     root.fileSettings = Settings.fileSettings(settings)
     if (!root.ready) {
@@ -167,7 +157,7 @@ Item {
   }
 
   function takeLoadedSettings() {
-    var parsed = root.parseText(file.text())
+    var parsed = Settings.readListsFile(file.text())
     if (!parsed) {
       root.takeUnreadableFile()
       return
