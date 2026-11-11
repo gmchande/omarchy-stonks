@@ -84,7 +84,6 @@ Rectangle {
   // The name gives way to the exchange, which stays whole.
   Text {
     id: symbolText
-    objectName: "shareSymbol"
     x: root.margin
     y: 96 * root.u - baselineOffset
     textFormat: Text.PlainText
@@ -96,7 +95,6 @@ Rectangle {
   }
   Text {
     id: nameText
-    objectName: "shareName"
     readonly property real room: animal.x - 32 * root.u - x - metaText.implicitWidth
     x: symbolText.x + symbolText.implicitWidth + 20 * root.u
     width: Math.max(0, Math.min(implicitWidth, room))
@@ -111,7 +109,6 @@ Rectangle {
   }
   Text {
     id: metaText
-    objectName: "shareListing"
     x: nameText.x + nameText.width
     anchors.baseline: symbolText.baseline
     textFormat: Text.PlainText
@@ -126,7 +123,6 @@ Rectangle {
   // As the header draws it, the same in both looks.
   PixelSprite {
     id: animal
-    objectName: "shareAnimal"
     visible: root.animalKind !== ""
     x: root.width - root.margin - width
     y: 52 * root.u
@@ -175,7 +171,6 @@ Rectangle {
   readonly property real priceBaseline: 222 * u
   Text {
     id: priceSmooth
-    objectName: "sharePrice"
     visible: !root.retro
     x: root.margin - Math.round(priceInk.tightBoundingRect.x * root.priceScale) * root.px
     y: root.priceBaseline - baselineOffset
@@ -201,7 +196,6 @@ Rectangle {
   // Set like a unit, dim at the ticker's size: a price in pence says "PENCE".
   Text {
     id: currencyText
-    objectName: "shareCurrency"
     x: (root.retro ? priceRetro.x + priceRetro.width : priceSmooth.x + priceSmooth.implicitWidth) + root.currencyGap
     y: root.priceBaseline - baselineOffset
     textFormat: Text.PlainText
@@ -211,7 +205,6 @@ Rectangle {
   }
   Text {
     id: changeText
-    objectName: "shareChange"
     anchors.right: parent.right
     anchors.rightMargin: root.margin
     y: root.priceBaseline - baselineOffset
@@ -244,7 +237,6 @@ Rectangle {
   }
   readonly property var close: open ? { label: open.label, time: "", price: open.price, changeText: "", tone: "flat", stale: false } : lines.close
   Row {
-    objectName: "shareClose"
     x: root.margin
     y: 266 * root.u - closeLabel.baselineOffset
     spacing: 10 * root.u
@@ -268,7 +260,6 @@ Rectangle {
     }
   }
   Row {
-    objectName: "shareCaption"
     x: root.width - root.margin - width
     y: 266 * root.u - captionLabel.baselineOffset
     spacing: 10 * root.u
@@ -356,14 +347,12 @@ Rectangle {
   }
 
   Caption {
-    objectName: "shareStart"
     x: root.margin
     y: 596 * root.u - baselineOffset
     font.letterSpacing: 1 * root.u
     text: root.words ? root.words.start : ""
   }
   Caption {
-    objectName: "shareEnd"
     x: root.width - root.margin - implicitWidth
     y: 596 * root.u - baselineOffset
     font.letterSpacing: 1 * root.u
@@ -382,7 +371,6 @@ Rectangle {
   // clear of the logo. The logo's bull is in the name's ink, whatever the
   // day's animal: on a down day a green bull would read as the day's.
   Caption {
-    objectName: "shareFoot"
     x: root.margin
     y: 654 * root.u - baselineOffset
     font.pixelSize: 28 * root.u
@@ -410,7 +398,6 @@ Rectangle {
     font.bold: true
   }
   PixelSprite {
-    objectName: "shareLogo"
     readonly property real cell: 2 * root.u
     x: stonksText.x - width - 14 * root.u
     y: 654 * root.u - height

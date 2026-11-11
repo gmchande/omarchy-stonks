@@ -166,7 +166,6 @@ FocusScope {
     }
 
     Text {
-      objectName: "symbolListsNote"
       visible: root.note !== ""
       x: root.inset
       anchors.right: done.left
@@ -182,7 +181,6 @@ FocusScope {
 
     ListAction {
       id: done
-      objectName: "symbolListsDone"
       look: root.look
       anchors.right: parent.right
       anchors.rightMargin: root.gutter + root.inset
@@ -194,7 +192,6 @@ FocusScope {
 
   Flickable {
     id: scroll
-    objectName: "symbolListsScroll"
     anchors.top: title.bottom
     anchors.bottom: parent.bottom
     width: parent.width
@@ -235,7 +232,6 @@ FocusScope {
           height: root.itemHeight
 
           Rectangle {
-            objectName: "rowFill"
             anchors.fill: parent
             radius: root.look.retro ? 0 : Style.cornerRadius
             color: rowMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
@@ -251,7 +247,6 @@ FocusScope {
 
           Rectangle {
             id: box
-            objectName: "tickBox"
             x: root.inset
             anchors.verticalCenter: parent.verticalCenter
             width: Style.space(12)
@@ -303,7 +298,6 @@ FocusScope {
 
           Text {
             id: count
-            objectName: "listCount"
             anchors.right: parent.right
             anchors.rightMargin: root.inset
             anchors.verticalCenter: parent.verticalCenter

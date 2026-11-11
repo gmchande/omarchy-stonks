@@ -105,7 +105,6 @@ Item {
       }
 
       MouseArea {
-        objectName: "marginCatcher"
         anchors.fill: parent
         visible: !!root.body && root.body.rowMenu !== null
         acceptedButtons: Qt.AllButtons

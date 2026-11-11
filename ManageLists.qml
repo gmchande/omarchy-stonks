@@ -212,7 +212,6 @@ FocusScope {
   }
 
   MouseArea {
-    objectName: "renameAway"
     anchors.fill: parent
     visible: root.renaming
     onClicked: root.keepName()
@@ -257,7 +256,6 @@ FocusScope {
 
   Flickable {
     id: scroll
-    objectName: "manageScroll"
     anchors.top: title.bottom
     anchors.bottom: parent.bottom
     width: parent.width
@@ -376,7 +374,6 @@ FocusScope {
             }
             ListAction {
               look: root.look
-              objectName: "renameAction"
               anchors.verticalCenter: parent.verticalCenter
               text: "RENAME"
               enterTakes: true
@@ -384,7 +381,6 @@ FocusScope {
             }
             ListAction {
               look: root.look
-              objectName: "deleteAction"
               anchors.verticalCenter: parent.verticalCenter
               text: "DELETE"
               onActivated: {
@@ -396,7 +392,6 @@ FocusScope {
 
           Text {
             id: count
-            objectName: "listCount"
             visible: !entry.editing && !entry.asking
             anchors.right: parent.right
             anchors.rightMargin: root.inset
@@ -438,7 +433,6 @@ FocusScope {
 
             ListAction {
               look: root.look
-              objectName: "confirmDelete"
               anchors.verticalCenter: parent.verticalCenter
               text: "DELETE"
               enterTakes: true
@@ -447,7 +441,6 @@ FocusScope {
             }
             ListAction {
               look: root.look
-              objectName: "cancelDelete"
               anchors.verticalCenter: parent.verticalCenter
               text: "CANCEL"
               onActivated: root.confirming = false
@@ -511,7 +504,6 @@ FocusScope {
 
       ListAction {
         look: root.look
-        objectName: "saveName"
         anchors.verticalCenter: parent.verticalCenter
         text: "SAVE"
         enterTakes: true
@@ -519,7 +511,6 @@ FocusScope {
       }
       ListAction {
         look: root.look
-        objectName: "cancelRename"
         anchors.verticalCenter: parent.verticalCenter
         text: "CANCEL"
         onActivated: root.stopEditing()

@@ -187,7 +187,6 @@ Item {
 
   Item {
     id: curtain
-    objectName: "curtain"
     width: (root.replayX >= 0 ? Math.ceil(root.grid.columns * Math.min(1, root.replayX))
       : root.reveal >= 1 ? root.grid.columns : Math.ceil(root.inkColumns * Math.max(0, root.reveal))) * root.grid.pitch
     height: root.height
@@ -241,7 +240,6 @@ Item {
       readonly property int column: Math.min(root.grid.columns - 1, Math.floor(root.geometry.ticks[index] * root.grid.columns))
       readonly property int row: column > root.grid.stepCol ? root.grid.stepRow : root.grid.baseRow
       readonly property real cellTop: Math.max(0, (row - 1) * root.pixel)
-      objectName: "retroBell"
       visible: column >= root.inkColumns || column * root.grid.pitch < curtain.width
       x: column * root.grid.pitch
       y: cellTop

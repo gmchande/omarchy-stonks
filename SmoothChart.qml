@@ -302,7 +302,6 @@ Item {
 
   Canvas {
     id: marks
-    objectName: "scrubMarks"
     anchors.fill: parent
     onWidthChanged: requestPaint()
     onHeightChanged: requestPaint()

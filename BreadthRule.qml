@@ -104,7 +104,6 @@ Item {
     // An end with no rows is zero long, so each slides to and from zero rather
     // than vanishing.
     Rectangle {
-      objectName: "breadthUp"
       visible: !root.look.retro
       anchors.verticalCenter: parent.verticalCenter
       width: Math.floor(parent.width * root.upShare)
@@ -114,7 +113,6 @@ Item {
     }
 
     Rectangle {
-      objectName: "breadthDown"
       visible: !root.look.retro
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
@@ -144,7 +142,6 @@ Item {
   }
 
   Text {
-    objectName: "breadthCounts"
     anchors.centerIn: parent
     opacity: root.revealed ? 1 : 0
     Behavior on opacity { NumberAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }

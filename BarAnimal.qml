@@ -68,7 +68,6 @@ Item {
     clip: root.turning
 
     PixelSprite {
-      objectName: "animalCells"
       width: root.width
       height: root.height
       columns: root.columns
@@ -86,7 +85,6 @@ Item {
     clip: true
 
     PixelSprite {
-      objectName: "animalCells"
       x: -parent.x
       width: root.width
       height: root.height

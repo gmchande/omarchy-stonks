@@ -9,7 +9,6 @@ Rectangle {
   // A row that grows under itself keeps its bar.
   property real rowHeight: parent ? parent.height : 0
 
-  objectName: "cursorBar"
   x: 0
   y: Style.space(6)
   width: Style.space(2)

@@ -206,7 +206,6 @@ FocusScope {
 
   Flickable {
     id: scroll
-    objectName: "menuScroll"
     anchors.top: parent.top
     anchors.left: parent.left
     anchors.right: parent.right
@@ -288,7 +287,6 @@ FocusScope {
 
             Text {
               id: count
-              objectName: "listCount"
               anchors.right: parent.right
               anchors.rightMargin: Style.space(8)
               anchors.verticalCenter: parent.verticalCenter
@@ -328,7 +326,6 @@ FocusScope {
 
     Item {
       id: newRow
-      objectName: "newListRow"
       width: pinned.width
       height: root.itemHeight
 
@@ -378,7 +375,6 @@ FocusScope {
 
       ListAction {
         id: makeButton
-        objectName: "makeList"
         look: root.look
         visible: root.naming
         anchors.right: parent.right
@@ -391,7 +387,6 @@ FocusScope {
     }
 
     Text {
-      objectName: "listProblem"
       visible: root.problem !== ""
       width: pinned.width
       height: root.itemHeight
@@ -407,7 +402,6 @@ FocusScope {
 
     MenuLine {
       id: manageRow
-      objectName: "manageListsRow"
       width: pinned.width
       height: root.itemHeight
       look: root.look

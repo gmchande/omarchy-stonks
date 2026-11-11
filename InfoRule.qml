@@ -53,7 +53,6 @@ Item {
   }
 
   Rectangle {
-    objectName: "infoTick"
     visible: !root.look.retro && root.tickX >= 0
     x: root.tickX
     width: root.thickness
@@ -63,7 +62,6 @@ Item {
   }
 
   Column {
-    objectName: "infoTickCells"
     visible: root.look.retro && root.tickX >= 0
     x: root.tickX
     spacing: root.pitch - root.thickness

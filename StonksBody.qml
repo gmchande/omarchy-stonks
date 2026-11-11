@@ -929,7 +929,6 @@ Item {
       return
     }
     shareLoader.setSource("ShareCard.qml", {
-      objectName: "shareCard",
       symbol: chartSymbol || featuredSymbol,
       quote: featuredQuote,
       day: featuredDay,
@@ -1360,7 +1359,6 @@ Item {
 
   // A closing surface keeps its rows, so it says nothing.
   Text {
-    objectName: "emptyList"
     visible: root.members.length === 0 && watchlist.displayedSymbols.length === 0 && root.rowsShown
     x: root.margins
     y: watchlist.y
@@ -1455,7 +1453,6 @@ Item {
 
   // Hover passes, so nothing under the pointer changes as the card fades.
   MouseArea {
-    objectName: "closedShield"
     anchors.fill: parent
     z: 20
     visible: !root.surfaceOpen

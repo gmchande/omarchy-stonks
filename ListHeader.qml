@@ -101,7 +101,6 @@ Item {
   // The rows and the rule are the day's on every range, and say which.
   Text {
     id: todayText
-    objectName: "todayLabel"
     visible: !root.rowsCovered
     anchors.left: listChevron.right
     anchors.leftMargin: Style.space(12)
@@ -135,7 +134,6 @@ Item {
   // sorted order the arrow reverses and the word steps to the next order,
   // each with its own fill; manual has no direction, so both step.
   Rectangle {
-    objectName: "orderControl"
     visible: !root.rowsCovered
     anchors.right: orderText.right
     anchors.rightMargin: -Style.space(6)
@@ -154,7 +152,6 @@ Item {
   // Padded as the word's fill pads the word, so the two read as two
   // buttons.
   Rectangle {
-    objectName: "orderArrowFill"
     visible: !root.rowsCovered && orderText.sorted
     x: orderText.x - Style.space(6)
     width: Math.round(arrowMetrics.advanceWidth) + Style.space(12)
@@ -236,7 +233,6 @@ Item {
   // % for a percent, ± for an amount, the market's bell for since the open.
   // The signs are one width, so a step moves nothing.
   Rectangle {
-    objectName: "unitFill"
     visible: !root.rowsCovered
     anchors.horizontalCenter: unitSign.horizontalCenter
     anchors.verticalCenter: parent.verticalCenter
@@ -250,7 +246,6 @@ Item {
 
   GridIcon {
     id: unitSign
-    objectName: "unitSign"
     visible: !root.rowsCovered
     anchors.right: parent.right
     anchors.verticalCenter: parent.verticalCenter

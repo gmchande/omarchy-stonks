@@ -85,7 +85,6 @@ Rectangle {
   Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
 
   Rectangle {
-    objectName: "rowGround"
     z: -1
     anchors.fill: parent
     radius: row.radius
@@ -106,7 +105,6 @@ Rectangle {
   Component {
     id: smoothLine
     Sparkline {
-      objectName: "rowLine"
       geometry: row.geometry
       up: row.view ? row.view.dayUp : null
       upColor: row.look.upColor
@@ -122,7 +120,6 @@ Rectangle {
   Component {
     id: cellsLine
     RetroChart {
-      objectName: "rowCells"
       geometry: row.geometry
       up: row.view ? row.view.dayUp : null
       upColor: row.look.upColor
@@ -152,7 +149,6 @@ Rectangle {
 
         Text {
           id: symbolText
-          objectName: "rowSymbol"
           visible: y >= row.menuCovers
           x: row.gap
           y: row.inset
@@ -166,7 +162,6 @@ Rectangle {
 
         Text {
           id: detailText
-          objectName: "rowDetail"
           visible: y >= row.menuCovers
           x: row.gap
           anchors.bottom: parent.bottom
@@ -183,7 +178,6 @@ Rectangle {
         }
         Text {
           id: timeText
-          objectName: "rowTime"
           visible: detailText.visible
           x: detailText.x + detailText.width
           anchors.baseline: detailText.baseline
@@ -211,7 +205,6 @@ Rectangle {
 
           // The shell's 22 px target, its fill inset to clear the row's top.
           Rectangle {
-            objectName: "rowRemoveFill"
             anchors.fill: parent
             anchors.margins: Style.space(2)
             radius: row.look.retro ? 0 : Style.cornerRadius
@@ -222,7 +215,6 @@ Rectangle {
 
           // Smooth: ×.
           Text {
-            objectName: "rowRemoveGlyph"
             visible: !row.look.retro
             anchors.centerIn: parent
             textFormat: Text.PlainText
@@ -237,7 +229,6 @@ Rectangle {
             active: row.look.retro
             sourceComponent: Component {
               PixelSprite {
-                objectName: "rowRemoveCells"
                 width: Cells.REMOVE_SPRITE[0].length * 2
                 height: Cells.REMOVE_SPRITE.length * 2
                 columns: Cells.REMOVE_SPRITE[0].length

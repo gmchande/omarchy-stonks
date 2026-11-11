@@ -301,7 +301,6 @@ FocusScope {
 
   Flickable {
     id: resultsScroll
-    objectName: "searchResults"
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: fieldBar.bottom
@@ -370,7 +369,6 @@ FocusScope {
               elide: Text.ElideRight
             }
             Text {
-              objectName: "searchName"
               width: root.sharedWidth - root.symbolWidth
               anchors.verticalCenter: parent.verticalCenter
               textFormat: Text.PlainText
@@ -381,7 +379,6 @@ FocusScope {
               elide: Text.ElideRight
             }
             Text {
-              objectName: "searchExchange"
               width: root.exchangeWidth
               anchors.verticalCenter: parent.verticalCenter
               horizontalAlignment: Text.AlignRight
@@ -394,7 +391,6 @@ FocusScope {
               elide: Text.ElideRight
             }
             Rectangle {
-              objectName: "searchAdd"
               opacity: resultRow.chosen && !resultRow.dimmed ? 1 : 0
               anchors.verticalCenter: parent.verticalCenter
               width: root.buttonWidth
@@ -415,7 +411,6 @@ FocusScope {
       }
 
       Text {
-        objectName: "searchNote"
         visible: root.note !== ""
         opacity: root.stale ? 0.4 : 1
         width: parent.width
@@ -506,7 +501,6 @@ FocusScope {
 
     ListAction {
       id: cancelButton
-      objectName: "searchCancel"
       look: root.look
       anchors.right: parent.right
       anchors.rightMargin: root.rowPadding

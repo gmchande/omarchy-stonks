@@ -192,7 +192,6 @@ Item {
     // One layer each, so smooth's turn crossfades between them.
     PixelSprite {
       id: bull
-      objectName: "bullCells"
       anchors.fill: parent
       visible: opacity > 0
       pixels: Cells.spriteFor(true, root.drawnLids, root.pricked)
@@ -200,7 +199,6 @@ Item {
     }
     PixelSprite {
       id: bear
-      objectName: "bearCells"
       anchors.fill: parent
       visible: opacity > 0
       pixels: Cells.spriteFor(false, root.drawnLids, root.pricked)
@@ -214,7 +212,6 @@ Item {
     }
 
     MouseArea {
-      objectName: "animalToggle"
       anchors.fill: parent
       enabled: root.kind !== ""
       hoverEnabled: true
@@ -226,7 +223,6 @@ Item {
   // At the header's top, never above: the panel's body starts there and clips
   // what draws past it.
   PixelSprite {
-    objectName: "sleepCells"
     readonly property int cell: Math.floor(Math.min(slot.width / 20, slot.height / 14))
     visible: root.kind !== "" && root.lids === 2
     columns: 3
@@ -286,7 +282,6 @@ Item {
   FormWidths { id: form2; words: String(root.statusForms[2] || "").toUpperCase(); family: root.look.fontFamily }
   Text {
     id: titleText
-    objectName: "headerTitle"
     visible: root.titled
     anchors.left: slot.right
     anchors.leftMargin: Style.space(14)
@@ -303,7 +298,6 @@ Item {
 
   // The rule as the footer's, the shell's own separator.
   PanelSeparator {
-    objectName: "headerRule"
     visible: root.titled
     y: root.contentHeight + root.ruleGap
     width: root.width
@@ -313,7 +307,6 @@ Item {
 
   Text {
     id: statusWords
-    objectName: "statusText"
     anchors.left: slot.right
     anchors.leftMargin: Style.space(14)
     width: Math.min(implicitWidth, root.wordsRoom)
@@ -330,7 +323,6 @@ Item {
 
   ListAction {
     id: retry
-    objectName: "retryRange"
     look: root.look
     visible: root.offersRetry
     anchors.left: statusWords.right
@@ -349,7 +341,6 @@ Item {
   // height of the header's two lines.
   GridIcon {
     id: soundIcon
-    objectName: "soundIcon"
     readonly property bool on: root.soundsOn
     anchors.right: camera.left
     anchors.rightMargin: Style.space(14)
@@ -360,7 +351,6 @@ Item {
     color: soundMouse.containsMouse ? root.look.foreground : root.look.dim
 
     Rectangle {
-      objectName: "soundFill"
       z: -1
       anchors.centerIn: parent
       width: parent.width + Style.space(12)
@@ -381,7 +371,6 @@ Item {
       onClicked: root.soundsRequested()
 
       HeaderTip {
-        objectName: "soundTip"
         visible: soundMouse.containsMouse
         text: root.soundsOn ? "Turn sounds off" : "Turn sounds on"
         fontFamily: root.look.fontFamily
@@ -402,7 +391,6 @@ Item {
     color: lit || cameraMouse.containsMouse ? root.look.foreground : root.look.dim
 
     Rectangle {
-      objectName: "cameraFill"
       z: -1
       anchors.centerIn: parent
       width: parent.width + Style.space(12)
@@ -423,7 +411,6 @@ Item {
       onClicked: root.screenshotRequested()
 
       HeaderTip {
-        objectName: "cameraTip"
         visible: cameraMouse.containsMouse
         text: "Take a screenshot"
         fontFamily: root.look.fontFamily
@@ -445,7 +432,6 @@ Item {
     color: lookMouse.containsMouse ? root.look.foreground : root.look.dim
 
     Rectangle {
-      objectName: "lookFill"
       z: -1
       anchors.centerIn: parent
       width: parent.width + Style.space(12)
@@ -466,7 +452,6 @@ Item {
       onClicked: root.styleRequested(root.look.retro ? "smooth" : "retro")
 
       HeaderTip {
-        objectName: "lookTip"
         visible: lookMouse.containsMouse
         text: root.look.retro ? "Switch to smooth" : "Switch to retro"
         fontFamily: root.look.fontFamily
@@ -491,7 +476,6 @@ Item {
     font.bold: true
     Behavior on color { ColorAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
     Rectangle {
-      objectName: "helpFill"
       z: -1
       anchors.centerIn: parent
       width: parent.implicitWidth + Style.space(12)
@@ -511,7 +495,6 @@ Item {
       onClicked: root.helpRequested()
 
       HeaderTip {
-        objectName: "helpTip"
         visible: helpMouse.containsMouse
         text: root.helpShown ? "Hide the keys" : "Show the keys"
         fontFamily: root.look.fontFamily
