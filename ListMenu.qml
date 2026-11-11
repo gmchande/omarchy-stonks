@@ -26,7 +26,7 @@ FocusScope {
   readonly property string typedName: naming ? nameField.text : ""
 
   readonly property int itemHeight: Style.space(26)
-  readonly property var rowSize: ({ pitch: itemHeight, height: itemHeight })
+  function rowSize() { return { pitch: itemHeight, height: itemHeight } }
   readonly property int separatorHeight: Style.space(9)
   readonly property int inset: Style.space(4)
   readonly property int newIndex: choices.length
@@ -89,7 +89,7 @@ FocusScope {
     settle.stop()
     scroll.contentY = landed
     if (cursor >= newIndex) return
-    scroll.contentY = Rows.topShowing(cursor, rowSize, scroll.contentY, scroll.height)
+    scroll.contentY = Rows.topShowing(cursor, rowSize(), scroll.contentY, scroll.height)
   }
 
   // A scroll by hand comes to rest on a row's edge, so no list shows cut.
@@ -116,7 +116,7 @@ FocusScope {
   // across the middle.
   function keepCursorInSight() {
     if (naming || cursor >= newIndex) return
-    cursor = Rows.cursorKeptInSight(cursor, newIndex, rowSize, scroll.contentY, scroll.height)
+    cursor = Rows.cursorKeptInSight(cursor, newIndex, rowSize(), scroll.contentY, scroll.height)
   }
 
   function take(index) {

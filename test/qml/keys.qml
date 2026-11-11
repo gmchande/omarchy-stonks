@@ -297,6 +297,23 @@ Harness {
       harness.check("in the " + s.name + ", Shift with an arrow moves the selection and leaves the rows in their order",
         within(1500, function() { return s.body.watchlist.cursorRow !== cursor }) && service.symbols.join(",") === order,
         s.body.watchlist.cursorRow + " | " + service.symbols.join(","))
+      // A bigger text size keeps keys on the row you chose: the last whole
+      // row in sight, which the bigger rows would push out, comes back into
+      // sight.
+      base(s)
+      var list = s.body.watchlist
+      var last = list.displayedSymbols[Math.floor((list.contentY + list.sightHeight + 0.5) / list.rowPitch) - 1]
+      list.cursorSymbol = last
+      var size = Style.fontBaseSize
+      var rows = []
+      var heard = function() { rows.push(list.cursorRow) }
+      list.cursorRowChanged.connect(heard)
+      Style.fontBaseSize = size * 2
+      var shown = within(1500, function() { return list.wholeInSight(list.displayedSymbols.indexOf(last), list.contentY) })
+      list.cursorRowChanged.disconnect(heard)
+      Style.fontBaseSize = size
+      harness.check("in the " + s.name + ", a bigger text size keeps keys on the row you chose, in sight, at every moment",
+        shown && rows.every(function(r) { return r === last }), rows.join(" ") + " | " + last)
       escapeOrder(s)
     }
 
