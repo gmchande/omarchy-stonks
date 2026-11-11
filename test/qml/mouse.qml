@@ -55,6 +55,7 @@ Harness {
       // More rows than the window shows, for the wheel.
       for (var n = 1; n <= 12; n++) service.addSymbol("LONG" + n)
       quiet()
+      rest()
       var rows = service.symbols.slice()
 
       click(row(rows[1]))
@@ -103,15 +104,18 @@ Harness {
       service.switchList("")
       quiet()
 
+      // By symbol, A to Z, then Z to A: the rows themselves, not the setting.
+      var shown = function() { return body.watchlist.displayedSymbols.join(",") }
+      var aToZ = service.symbols.slice().sort()
       click("orderLabel")
-      var ordered = within(1500, function() { return service.order === "symbol" })
+      var ordered = within(1500, function() { return shown() === aToZ.join(",") })
       click("orderArrow")
-      var reversed = within(1500, function() { return service.reversed })
+      var reversed = within(1500, function() { return shown() === aToZ.slice().reverse().join(",") })
       // A percent, then an amount, then since the open.
       var next = ({ pct: "abs", abs: "open", open: "pct" })[service.changeMode]
       click("unitTarget")
-      harness.check("the order's word steps the order, its arrow reverses it, and the unit steps to the next unit",
-        ordered && reversed && within(1500, function() { return service.changeMode === next }), [service.order, service.reversed, service.changeMode, "wanted " + next].join(" "))
+      harness.check("the order's word puts the rows in the next order, its arrow reverses them, and the unit steps to the next unit",
+        ordered && reversed && within(1500, function() { return service.changeMode === next }), [ordered, reversed, shown(), service.changeMode, "wanted " + next].join(" "))
       service.setOrder("manual")
 
       // Two of them, so one range for every click can't pass.
