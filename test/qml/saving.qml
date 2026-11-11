@@ -52,6 +52,11 @@ Harness {
       })
     }
     // The words the footer shows.
+    // The footer's words, clicked as a person clicks them.
+    function clickFooter() {
+      var words = harness.find(body, "footerText")
+      mouseClick(words, words.width / 2, words.height / 2)
+    }
     function footer() {
       var out = []
       var walk = function(node) {
@@ -95,13 +100,16 @@ Harness {
       wait(700)
       var kept = harness.readFile(harness.file) === broken
       var told = footer()
+      // Its words don't act: nothing can be added to lists that can't be read.
+      clickFooter()
+      var still = !body.adding
       // Mended as an editor saves: a new file moved over the old.
       sh('printf %s "$3" > "$1.new" && mv "$1.new" "$1"', good)
       var readAgain = within(3000, function() { return !service.listsUnreadable && service.range === "1Y" })
       service.setRange("3M")
-      harness.check("a file that can't be read is never written over, the footer says so and names the file, and once mended it is read and saved to again",
-        noticed && kept && told.indexOf("aren't saved") >= 0 && told.indexOf("grvc.stonks.json") >= 0 && readAgain && landed(),
-        [noticed, kept, told, readAgain, service.range].join(" | "))
+      harness.check("a file that can't be read is never written over, the footer says so, names the file and doesn't act, and once mended it is read and saved to again",
+        noticed && kept && told.indexOf("aren't saved") >= 0 && told.indexOf("grvc.stonks.json") >= 0 && still && readAgain && landed(),
+        [noticed, kept, told, still, readAgain, service.range].join(" | "))
 
       // A folder nothing can be written into.
       sh('chmod 500 "$2"')
@@ -111,8 +119,7 @@ Harness {
       var unsaved = JSON.parse(harness.readFile(harness.file)).range === "3M"
       sh('chmod 700 "$2"')
       // The footer's words are the way to try again.
-      var notice = harness.find(body, "footerText")
-      mouseClick(notice, notice.width / 2, notice.height / 2)
+      clickFooter()
       harness.check("a save that can't land is said in the footer with a way to try again, and trying again once it can saves it",
         failed && unsaved && asked.indexOf("aren't saved") >= 0 && asked.indexOf("try again") >= 0 && landed()
           && within(3000, function() { return footer().indexOf("aren't saved") < 0 }),
