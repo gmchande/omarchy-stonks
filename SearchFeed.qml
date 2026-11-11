@@ -126,7 +126,7 @@ Item {
       // No answer at all, as from a curl stopped short, is nothing answered.
       var answer = got.length ? got[0] : null
       var found = null
-      try { found = answer && answer.kind === "ok" ? Search.parseSearch(JSON.parse(answer.body)) : null } catch (e) { found = null }
+      try { if (answer && answer.kind === "ok") found = Search.parseSearch(JSON.parse(answer.body)) } catch (e) {}
       root.land(found, Search.failure(answer))
     }
   }

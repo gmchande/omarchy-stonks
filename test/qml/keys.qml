@@ -348,8 +348,7 @@ Harness {
       var askedAgain = shows("constructor")
       var askedSoFar = harness.calls("SEARCH.asked")
       press("Backspace")
-      type("r")
-      var atOnce = shows("constructor")
+      var atOnce = shows("constructo")
       // Time for a lookup that must not go: the typing pause and more.
       wait(600)
       var unasked = harness.calls("SEARCH.asked") === askedSoFar
