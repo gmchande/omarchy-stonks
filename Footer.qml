@@ -34,6 +34,17 @@ Item {
   readonly property bool undoing: undoLabel !== ""
   readonly property string sideLabel: undoing ? undoLabel : updateLabel
   readonly property real undoRoom: sideLabel !== "" ? undoText.implicitWidth + Style.space(20) + Style.space(4) : 0
+  // The room the words are centred beside: it follows the end button's at
+  // the shell's pace, so the words glide as the button comes and goes,
+  // while a change of the bar's own width moves them at once.
+  property real wordsRoom: undoRoom
+  Behavior on wordsRoom {
+    NumberAnimation {
+      duration: Motion.duration(Style, 160)
+      easing.type: Easing.Bezier
+      easing.bezierCurve: Motion.curve(Style)
+    }
+  }
 
   // A note stays while the pointer is on the bar.
   readonly property bool hovered: addMouse.containsMouse
@@ -162,10 +173,9 @@ Item {
     retro: root.look.retro
     foreground: root.look.foreground
 
-    // Centred on the whole bar, so the end button coming or going moves
-    // nothing, unless the words would run into it.
+    // Centred in its own box, beside the end button.
     Item {
-      width: Math.min(root.width - root.gutter, 2 * (root.width - root.gutter - root.undoRoom - Style.space(10)) - footerRow.width)
+      width: root.width - root.gutter - root.wordsRoom
       height: parent.height
 
       Grid {
