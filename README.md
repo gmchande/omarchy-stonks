@@ -359,9 +359,9 @@ again.
 - **"No trades today", "No trades on" a day, or "Traded only at" a time.**
   The listing traded too little that day to draw a line.
 - **"1W unavailable" or "Couldn't search", with RETRY.** Yahoo didn't
-  send that chart or those results. Click RETRY. While search says
-  "server busy", RETRY works again once Yahoo lets Stonks back in, at most
-  36 minutes on.
+  send that chart or those results. Click RETRY, or in search reach it
+  with `↓` and press `⏎`. While search says "server busy", RETRY works
+  again once Yahoo lets Stonks back in, at most 36 minutes on.
 - **"Couldn't search · try other words".** Yahoo can't search for what you
   typed, such as an emoji. Type other words.
 - **"market hours unknown".** Stonks carries the holidays and early

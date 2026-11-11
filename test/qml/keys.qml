@@ -359,6 +359,28 @@ Harness {
         failed && said !== "" && back && harness.calls("SEARCH.asked") === askedBefore + 1, [failed, said, back, harness.calls("SEARCH.asked") - askedBefore].join(" | "))
       press("Esc")
 
+      // Words naming one of the list's own while Yahoo's search is down: ↓
+      // past it reaches RETRY, Enter there asks again, once, and ↑ comes back.
+      quiet()
+      fault(true)
+      press("a")
+      typing("searchField")
+      type("shop")
+      var ownFailed = within(5000, retry)
+      press("↓")
+      var lit = harness.find(b, "searchRetry").enterTakes
+      press("↑")
+      var backUp = !harness.find(b, "searchRetry").enterTakes && b.search.chosenSymbol === "SHOP"
+      press("↓")
+      fault(false)
+      var askedOwn = harness.calls("SEARCH.asked")
+      press("⏎")
+      var ownBack = within(5000, function() { return !retry() && harness.findAll(b, "searchResult").length > 1 })
+      harness.check("with the list's own found and Yahoo's search down, ↓ past them lights RETRY, ↑ comes back, and Enter there asks again, once",
+        ownFailed && lit && backUp && ownBack && b.search.active && harness.calls("SEARCH.asked") === askedOwn + 1,
+        [ownFailed, lit, backUp, ownBack, b.search.active, harness.calls("SEARCH.asked") - askedOwn].join(" | "))
+      press("Esc")
+
       // Words Yahoo has answered since search opened answer again at once,
       // as after a Backspace, and nothing is asked. Words it failed are
       // asked again, and so is every word once search is opened afresh. The

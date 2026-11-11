@@ -938,6 +938,11 @@ Harness {
         body.search.failure = "none"
         body.search.answer = "failed"
         body.search.showResult(0)
+        // -own-retry-down-: ↓ past the last of them, by search's own key
+        // handler, onto the failed line.
+        if (root.stateName.indexOf("-own-retry-down-") > 0) root.beforeGrab = function() {
+          for (var d = 0; d < body.search.ownCount + 1; d++) body.search.handleKey({ key: Qt.Key_Down, accepted: false })
+        }
       }
       // popup-search-waiting-*: "berk" typed, Yahoo not yet answered: the
       // list's Berkshire found by its name, chosen, the wait said under it.
