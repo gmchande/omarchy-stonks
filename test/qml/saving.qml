@@ -110,7 +110,9 @@ Harness {
       var asked = footer()
       var unsaved = JSON.parse(harness.readFile(harness.file)).range === "3M"
       sh('chmod 700 "$2"')
-      body.saveAgain()
+      // The footer's words are the way to try again.
+      var notice = harness.find(body, "footerText")
+      mouseClick(notice, notice.width / 2, notice.height / 2)
       harness.check("a save that can't land is said in the footer with a way to try again, and trying again once it can saves it",
         failed && unsaved && asked.indexOf("aren't saved") >= 0 && asked.indexOf("try again") >= 0 && landed()
           && within(3000, function() { return footer().indexOf("aren't saved") < 0 }),
