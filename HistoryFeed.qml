@@ -43,22 +43,11 @@ Item {
       && next.charts.every(function(c) { return root.holds(request, c.key) })
   }
 
-  // Evicts the oldest set first, never one in use (charts on show, rows
-  // fetched ahead): pushed out, it would be fetched again at once, pushing
-  // out the next.
+  // How many charts it holds, and those in use (`History.historiesKept`).
   readonly property int keep: 40
   property var inUse: []
   function setEntries(values) {
-    var keys = Object.keys(values)
-    var next = {}
-    var others = Object.keys(entries).filter(function(k) { return keys.indexOf(k) < 0 })
-    var over = others.length - (keep - keys.length)
-    others.forEach(function(k) {
-      if (over > 0 && root.inUse.indexOf(k) < 0) over--
-      else next[k] = entries[k]
-    })
-    keys.forEach(function(k) { next[k] = Object.assign({ history: null, receivedAt: 0 }, entries[k], values[k]) })
-    root.entries = next
+    root.entries = History.historiesKept(entries, values, inUse, keep)
   }
 
   // `force` is a user's refresh.
@@ -70,9 +59,7 @@ Item {
     }
     var key = keyFor(normalizedSymbol, range)
     if (wanted && !wanted.ahead && wanted.charts[0].key === key) return
-    var cached = entries[key]
-    var now = root.stamp()
-    if (!force && cached && cached.status === "ok" && cached.receivedAt && now - cached.receivedAt < History.HISTORY_FRESH) {
+    if (!force && History.historyFresh(entries[key], root.stamp())) {
       if (!wanted || !wanted.ahead || wanted.range !== range) root.want(null)
       return
     }

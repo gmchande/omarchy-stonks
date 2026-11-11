@@ -106,6 +106,26 @@ function ratePair(fundamentals, currency) {
   return /^[A-Z]{3}$/.test(eps.currency) && /^[A-Z]{3}$/.test(into) ? eps.currency + into : ""
 }
 
+// A listing's cap and P/E, and a currency rate, are asked for once a day.
+var FUNDAMENTALS_FRESH = 24 * 60 * 60
+
+function freshFundamentals(entry, now) {
+  return entry && entry.status === "ok" && now - entry.checkedAt < FUNDAMENTALS_FRESH ? entry : null
+}
+
+// A pair whose rate failed is held too: every listing that needs it waits
+// with it until a refresh.
+function rateHeld(pair, rates, failedPairs, now) {
+  return !pair || failedPairs.indexOf(pair) >= 0 || (!!rates[pair] && now - rates[pair].checkedAt < FUNDAMENTALS_FRESH)
+}
+
+// A listing's cap and P/E are due when the last ask failed, when they are a
+// day old, or when the rate its P/E needs isn't held.
+function fundamentalsDue(entry, currency, rates, failedPairs, now) {
+  var current = freshFundamentals(entry, now)
+  return !current || !rateHeld(ratePair(current.fundamentals, currency), rates, failedPairs, now)
+}
+
 function rateUrl(pair) {
   return Quote.CHART_URL + encodeURIComponent(pair + "=X") + "?range=1d&interval=1d"
 }

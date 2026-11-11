@@ -1625,6 +1625,37 @@ test("the rows in sight have their charts fetched ahead, the charted stocks' asi
   expect(M.aheadCharts(["A"], "1M", { "A|1W": {} }, {})).toEqual(["A"])
 })
 
+test("a range's chart answered under a quarter hour ago is shown as is, and the 40 charts held let the oldest go first, never one in use", () => {
+  const now = 100000
+  const fresh = (status, receivedAt) => M.historyFresh({ status, receivedAt }, now)
+  expect([fresh("ok", now - 899), fresh("ok", now - 900), fresh("failed", now - 10), M.historyFresh(null, now)]).toEqual([true, false, false, false])
+  // Forty held, oldest first; a forty-first lands.
+  const held = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`S${i}|1M`, { status: "ok", receivedAt: i }]))
+  const landed = M.historiesKept(held, { "NEW|1M": { status: "ok", history: [], receivedAt: 50 } }, [], 40)
+  expect([Object.keys(landed).length, "S0|1M" in landed, "S1|1M" in landed, landed["NEW|1M"].receivedAt]).toEqual([40, false, true, 50])
+  // The oldest is on show: the next oldest goes in its place.
+  const shown = M.historiesKept(held, { "NEW|1M": { status: "ok" } }, ["S0|1M"], 40)
+  expect(["S0|1M" in shown, "S1|1M" in shown]).toEqual([true, false])
+  // A chart answered again keeps what the new answer doesn't say.
+  expect(M.historiesKept(held, { "S3|1M": { status: "failed" } }, [], 40)["S3|1M"]).toEqual({ history: null, status: "failed", receivedAt: 3 })
+})
+
+test("a listing's cap and P/E are asked for once a day, at once after a failure, and when the rate its P/E needs isn't held; a rate that failed waits for a refresh", () => {
+  const now = 1000000
+  const ok = (checkedAt, eps) => ({ status: "ok", checkedAt, fundamentals: { cap: null, eps } })
+  const usd = { value: 7, date: "2026-09-30", currency: "USD" }
+  const gbp = { value: 4.52, date: "2026-06-30", currency: "USD" }
+  const due = (entry, currency, rates = {}, failedPairs = []) => M.fundamentalsDue(entry, currency, rates, failedPairs, now)
+  expect([due(ok(now - 86399, usd), "USD"), due(ok(now - 86400, usd), "USD"), due(undefined, "USD"), due({ status: "failed", checkedAt: now }, "USD")])
+    .toEqual([false, true, true, true])
+  // A London listing's EPS is in dollars: its P/E needs Yahoo's USDGBP,
+  // fresh for a day; one that failed holds until a refresh clears it.
+  const pair = "USDGBP"
+  expect([due(ok(now, gbp), "GBP"), due(ok(now, gbp), "GBP", { [pair]: { value: 0.79, checkedAt: now - 60 } }),
+    due(ok(now, gbp), "GBP", { [pair]: { value: 0.79, checkedAt: now - 86400 } }), due(ok(now, gbp), "GBP", {}, [pair])]).toEqual([true, false, true, false])
+  expect([M.freshFundamentals(ok(now - 60, usd), now), M.freshFundamentals(ok(now - 86400, usd), now)]).toEqual([ok(now - 60, usd), null])
+})
+
 test("the caps and P/Es wanted are the charted stocks', the featured one first, each once its quote is in, and only an equity's", () => {
   const quotes = { MSFT: { ...usStock("MSFT"), currency: "USD" }, "BTC-USD": coin("BTC-USD") }
   const preview = { "SHOP.TO": { ...usStock("SHOP.TO"), exchange: "TOR", currency: "CAD" } }

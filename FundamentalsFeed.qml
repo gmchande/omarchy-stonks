@@ -27,7 +27,6 @@ Item {
   property var failedPairs: []
 
   readonly property bool busy: job !== null || wanted.some(root.due)
-  readonly property int day: 24 * 60 * 60
 
   onWantedChanged: look()
   onNowChanged: look()
@@ -37,11 +36,7 @@ Item {
   }
 
   function due(w) {
-    if (failed.indexOf(w.symbol) >= 0) return false
-    var entry = entries[w.symbol]
-    if (entry && entry.status === "failed") return true
-    var current = root.fresh(w.symbol)
-    return !current || !root.rateHeld(Fundamentals.ratePair(current.fundamentals, w.currency))
+    return failed.indexOf(w.symbol) < 0 && Fundamentals.fundamentalsDue(entries[w.symbol], w.currency, rates, failedPairs, clock.wallSecond())
   }
 
   function miss(symbol) {
@@ -79,12 +74,7 @@ Item {
   }
 
   function fresh(symbol) {
-    var current = entries[symbol]
-    return current && current.status === "ok" && clock.wallSecond() - current.checkedAt < day ? current : null
-  }
-
-  function rateHeld(pair) {
-    return !pair || failedPairs.indexOf(pair) >= 0 || (!!rates[pair] && clock.wallSecond() - rates[pair].checkedAt < day)
+    return Fundamentals.freshFundamentals(entries[symbol], clock.wallSecond())
   }
 
   function run(url) {
@@ -146,7 +136,7 @@ Item {
 
   function askRate(fundamentals) {
     var pair = Fundamentals.ratePair(fundamentals, job.currency)
-    if (root.rateHeld(pair)) {
+    if (Fundamentals.rateHeld(pair, rates, failedPairs, clock.wallSecond())) {
       root.done()
       return
     }
