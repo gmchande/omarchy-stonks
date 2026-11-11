@@ -33,7 +33,7 @@ const JPX = calendars.calendars.JPX
 const cents = M.centExchanges(calendars)
 // A listing's cadence, by its calendar's reading, as askDue reads it.
 const calNow = (q, now) => M.calendarNow(M.calendarFor(calendars, q), now)
-const quoteCadence = (q, now, interval, hero) => M.quoteCadence(q, now, interval, hero, calNow(q, now))
+const quoteCadence = (q, now, interval, charted) => M.quoteCadence(q, now, interval, charted, calNow(q, now))
 const quote = M.parseChart(fixture("aapl.json"))
 const shop = M.parseChart(fixture("shop-to.json"))
 const btc = M.parseChart(fixture("btc-usd-day.json"))
@@ -1138,7 +1138,7 @@ test("on 1Y the 52-week line is the range's low and high", () => {
 test("each symbol is asked for on its own market's clock", () => {
   const q = duringSession(quote)
   const s = q.session
-  const cadence = (quote, now, hero = false, interval = 60) => quoteCadence(quote, now, interval, hero)
+  const cadence = (quote, now, charted = false, interval = 60) => quoteCadence(quote, now, interval, charted)
   // Its regular session: the refresh interval, whatever the setting says.
   expect(cadence(q, reg.start + 3600)).toBe(60)
   expect(cadence(q, reg.start + 3600, false, 45)).toBe(45)
@@ -1687,7 +1687,7 @@ test("on a morning Yahoo left an hour empty, Robinhood is asked once more for th
   const allDay = Object.fromEntries(names.map(s => [s, { status: "ok", allDay: true, at: asked }]))
   const asks = (clock, changes = {}) => {
     const now = at("2026-11-02", clock)
-    return M.overnightAsks({ open: false, pill: "NBIS", quoteEntries: Object.fromEntries(names.map(s => [s, { status: "ok", receivedAt: now, answeredAt: now }])),
+    return M.overnightAsks({ open: false, featured: "NBIS", quoteEntries: Object.fromEntries(names.map(s => [s, { status: "ok", receivedAt: now, answeredAt: now }])),
       quotes, overnightSymbols: names, allSymbols: names, preview: "", previewShown: false, previewQuote: null, allDay, nights: inHand, now, calendars, ...changes })
   }
   // NBIS and CRWV traded on Yahoo in every slot up to 08:25; SHOP, thin,
@@ -1698,7 +1698,7 @@ test("on a morning Yahoo left an hour empty, Robinhood is asked once more for th
   expect(M.yahooHole(twice)).toBe(at("2026-11-02", "09:25"))
   // Robinhood's bar for 09:25 is in by 09:35: the pill's stock alone with
   // nothing open, every row with a surface open, the pill on SHOP too.
-  expect([asks("09:34"), asks("09:35"), asks("09:35", { open: true }), asks("09:35", { pill: "SHOP" })]).toEqual([null,
+  expect([asks("09:34"), asks("09:35"), asks("09:35", { open: true }), asks("09:35", { featured: "SHOP" })]).toEqual([null,
     { tradability: [], trades: ["NBIS"] }, { tradability: [], trades: names }, { tradability: [], trades: ["SHOP"] }])
   // Once an answer from then on is in, nothing asks again, whether it
   // reached the hour or not; a failed one is asked again 5 minutes on.

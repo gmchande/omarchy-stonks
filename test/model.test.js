@@ -24,7 +24,7 @@ const DAY = 24 * 3600
 const keptBars = bars => M.filterStrayCloses(bars).bars
 const at = (date, clock) => M.epochAt(US, date, clock)
 // A listing's cadence, by its calendar's reading, as askDue reads it.
-const quoteCadence = (q, now, interval, hero) => M.quoteCadence(q, now, interval, hero, M.calendarNow(M.calendarFor(calendars, q), now))
+const quoteCadence = (q, now, interval, charted) => M.quoteCadence(q, now, interval, charted, M.calendarNow(M.calendarFor(calendars, q), now))
 
 test("a stray run is the one the series carries on past", () => {
   // The bar after opens back at the level, not from the stray close.
@@ -1350,7 +1350,7 @@ test("a refresh asks again only for quotes answered more than 10 s ago, and for 
   expect(M.refreshTrades(["AAPL"], ["AAPL"], now - 10, now)).toEqual([])
 })
 
-test("a quote run charts the pill's quote first and the other heroes next, then the rest in spark batches of 20 in the order asked", () => {
+test("a quote run charts the featured stock's quote first and the other charted stocks next, then the rest in spark batches of 20 in the order asked", () => {
   const symbols = Array.from({ length: 23 }, (_, i) => "S" + i)
   // S22 was asked a second before the rest: the budget held it back.
   const asked = Object.fromEntries(symbols.map(s => [s, s === "S22" ? 99 : 100]))
@@ -1361,7 +1361,7 @@ test("a quote run charts the pill's quote first and the other heroes next, then 
     { symbols: ["S5"], spark: false }, { symbols: ["S9"], spark: false },
     { symbols: batch, spark: true }, { symbols: ["S21"], spark: false }
   ])
-  // The pill's chart leads the other heroes', wherever it stands in the list.
+  // The featured stock's chart leads the other charts, wherever it stands in the list.
   expect(M.quoteSlots(symbols, asked, symbols, "S9", ["S5", "S9"], true)[0]).toEqual({ symbols: ["S9"], spark: false })
   // The preview's feed asks only charts.
   expect(M.quoteSlots(["P", "Q"], { P: 1, Q: 1 }, ["P", "Q"], "", [], false))
@@ -1382,12 +1382,12 @@ test("a quote run charts the pill's quote first and the other heroes next, then 
   expect(M.laneWaiting(["N", "K", "R", "C", "X"], waiting, entries, true, [])).toEqual(["N", "K"])
   expect(M.laneWaiting(["N", "K", "R", "C", "X"], waiting, entries, false, ["C"])).toEqual(["R"])
   expect(M.laneJudging(["R", "J", "H"], waiting, ["H"])).toEqual(["J"])
-  // A hero whose quote came from spark, with no opens, is asked for its
+  // A charted stock whose quote came from spark, with no opens, is asked for its
   // chart, but not again at once after its chart failed.
   const sparked = { H: { closesOnly: true }, C: {} }
-  expect(M.sparkHeroes(["H", "C"], sparked, {}, false)).toEqual(["H"])
-  expect(M.sparkHeroes(["H"], sparked, { H: { status: "failed" } }, true)).toEqual([])
-  expect(M.sparkHeroes(["H"], sparked, { H: { status: "failed" } }, false)).toEqual(["H"])
+  expect(M.sparkCharted(["H", "C"], sparked, {}, false)).toEqual(["H"])
+  expect(M.sparkCharted(["H"], sparked, { H: { status: "failed" } }, true)).toEqual([])
+  expect(M.sparkCharted(["H"], sparked, { H: { status: "failed" } }, false)).toEqual(["H"])
 })
 
 test("a refresh for a quote no longer watched leaves the queue unless its run is out, and a first answer always stays", () => {
@@ -1412,7 +1412,7 @@ test("a bad quote answer is tried three times in all, a missing symbol fails at 
 test("Robinhood is asked once for each stock the pill shows with nothing open by day, for it alone each 5 minutes while a night trades, and for every US listing while a surface is open, the chart waited on alone first", () => {
   const now = at(WED, "21:00")
   const base = {
-    open: false, pill: "AAPL", quoteEntries: { AAPL: answered(now) }, quotes: {}, overnightSymbols: ["AAPL", "MSFT"],
+    open: false, featured: "AAPL", quoteEntries: { AAPL: answered(now) }, quotes: {}, overnightSymbols: ["AAPL", "MSFT"],
     allSymbols: ["AAPL", "MSFT", "SHEL.L"], preview: "", previewShown: false, previewQuote: null, allDay: {}, nights: {}, now, calendars
   }
   const asks = changes => M.overnightAsks({ ...base, ...changes })
@@ -1425,7 +1425,7 @@ test("Robinhood is asked once for each stock the pill shows with nothing open by
   const answeredNoon = status => ({ allDay: { AAPL: { status, allDay: false, at: noon - DAY - 60 } }, nights: { AAPL: { status, bars: [], at: noon - 3600 } } })
   expect(asks({ now: noon, ...answeredNoon("ok") })).toBe(null)
   expect(asks({ now: noon, ...answeredNoon("failed") })).toBe(null)
-  expect(asks({ now: noon, ...answeredNoon("ok"), pill: "MSFT", quoteEntries: { MSFT: answered(noon) } }))
+  expect(asks({ now: noon, ...answeredNoon("ok"), featured: "MSFT", quoteEntries: { MSFT: answered(noon) } }))
     .toEqual({ tradability: ["MSFT"], trades: ["MSFT"] })
   // Nothing open while a night trades: the pill's stock alone, each 5
   // minutes, so its newest price stays current; All's rows wait for a
@@ -1437,7 +1437,7 @@ test("Robinhood is asked once for each stock the pill shows with nothing open by
   expect(asks(pillAnsweredAgo(5 * 60))).toEqual({ tradability: [], trades: ["AAPL"] })
   // The pill on an index, answered live: with nothing open, by day or while
   // a night trades, Robinhood is never asked about it.
-  const index = { pill: "^GSPC", quoteEntries: { "^GSPC": answered(now) } }
+  const index = { featured: "^GSPC", quoteEntries: { "^GSPC": answered(now) } }
   expect([asks({ ...index, now: noon }), asks(index)]).toEqual([null, null])
   // A surface open: every US listing, the pill's alone while it has no
   // answer.
@@ -1490,7 +1490,7 @@ test("a refresh's chart is owed until a new answer replaces the one it had, then
   expect(M.staleHistory(["NVDA"], "1W", aged, {}, { NVDA: usStock("NVDA") }, noon, calendars)).toBe("")
 })
 
-test("the rows in sight have their charts fetched ahead, the heroes' aside, as many as the cache keeps beside them, and none on the day", () => {
+test("the rows in sight have their charts fetched ahead, the charted stocks' aside, as many as the cache keeps beside them, and none on the day", () => {
   const sights = [{ surface: "popup", symbols: ["A", "B", "HERO"] }, { surface: "window", symbols: ["B", "C", "D"] }]
   expect(M.aheadRows(true, "1W", ["HERO"], sights, 40)).toEqual(["A", "B", "C", "D"])
   expect(M.aheadRows(true, "1W", ["HERO"], sights, 4)).toEqual(["A", "B", "C"])
@@ -1501,16 +1501,16 @@ test("the rows in sight have their charts fetched ahead, the heroes' aside, as m
   expect(M.aheadCharts(["A"], "1M", { "A|1W": {} }, {})).toEqual(["A"])
 })
 
-test("the caps and P/Es wanted are the heroes on show's, the stock on show first, each once its quote is in, and only an equity's", () => {
+test("the caps and P/Es wanted are the charted stocks', the featured one first, each once its quote is in, and only an equity's", () => {
   const quotes = { MSFT: { ...usStock("MSFT"), currency: "USD" }, "BTC-USD": coin("BTC-USD") }
   const preview = { "SHOP.TO": { ...usStock("SHOP.TO"), exchange: "TOR", currency: "CAD" } }
   // SHOP.TO, search's preview, before its quote and after.
-  expect(M.figuresWanted(["MSFT", "SHOP.TO"], quotes, {})).toEqual([{ symbol: "MSFT", currency: "USD" }])
-  expect(M.figuresWanted(["MSFT", "SHOP.TO"], quotes, preview))
+  expect(M.fundamentalsWanted(["MSFT", "SHOP.TO"], quotes, {})).toEqual([{ symbol: "MSFT", currency: "USD" }])
+  expect(M.fundamentalsWanted(["MSFT", "SHOP.TO"], quotes, preview))
     .toEqual([{ symbol: "MSFT", currency: "USD" }, { symbol: "SHOP.TO", currency: "CAD" }])
-  expect(M.figuresWanted(["MSFT", "MSFT"], quotes, {})).toEqual([{ symbol: "MSFT", currency: "USD" }])
-  expect(M.figuresWanted(["BTC-USD"], quotes, {})).toEqual([])
-  expect(M.figuresWanted([], quotes, preview)).toEqual([])
+  expect(M.fundamentalsWanted(["MSFT", "MSFT"], quotes, {})).toEqual([{ symbol: "MSFT", currency: "USD" }])
+  expect(M.fundamentalsWanted(["BTC-USD"], quotes, {})).toEqual([])
+  expect(M.fundamentalsWanted([], quotes, preview)).toEqual([])
 })
 
 test("the clock steps just past each second while a surface is open and each minute while none is, sooner for a quote due, a pause ending or a refresh turning overdue", () => {

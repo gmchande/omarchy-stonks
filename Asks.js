@@ -43,19 +43,19 @@ function readingOrder(featured, sights, shown, allSymbols) {
   return order
 }
 
-// The pill skips the quiet wait (`quietUntil`), so a calendar wrong
+// The featured stock skips the quiet wait (`quietUntil`), so a calendar wrong
 // about a session can't leave the pill behind; so does a failed answer,
 // which may answer next time.
-function quotesDue(watched, entries, asked, quotes, heroes, pill, now, interval, calNow) {
+function quotesDue(watched, entries, asked, quotes, charted, featured, now, interval, calNow) {
   var at = {}
   var dayOf = Calendar.tradingDays()
   watched.forEach(function(s) {
     var entry = entries[s]
     if (!entry || entry.status === "saved" || s in asked) return
     var cal = calNow(quotes[s])
-    var quiet = s === pill || entry.status !== "ok" ? 0 : quietUntil(quotes[s], entry.receivedAt, now, cal.cal, dayOf)
+    var quiet = s === featured || entry.status !== "ok" ? 0 : quietUntil(quotes[s], entry.receivedAt, now, cal.cal, dayOf)
     at[s] = entry.answeredAt > now ? now : quiet
-      || entry.answeredAt + quoteCadence(quotes[s], now, interval, heroes.indexOf(s) >= 0, cal)
+      || entry.answeredAt + quoteCadence(quotes[s], now, interval, charted.indexOf(s) >= 0, cal)
   })
   var symbols = Object.keys(at)
   var asking = symbols.some(function(s) { return at[s] <= now })
@@ -101,20 +101,20 @@ function laneJudging(toJudge, asked, held) {
 // hours ago, read from the closes, but it asks for two days
 // (`twoDays`), and a batch asks two days for all when one wants two,
 // so coins batch apart from stocks.
-function quoteSlots(waiting, asked, symbols, lead, heroes, bulk, coins) {
+function quoteSlots(waiting, asked, symbols, featured, charted, bulk, coins) {
   var order = waiting.slice().sort(function(a, b) {
-    return (b === lead) - (a === lead) || asked[a] - asked[b] || symbols.indexOf(a) - symbols.indexOf(b)
+    return (b === featured) - (a === featured) || asked[a] - asked[b] || symbols.indexOf(a) - symbols.indexOf(b)
   })
-  var charted = function(s) { return !bulk || heroes.indexOf(s) >= 0 }
+  var alone = function(s) { return !bulk || charted.indexOf(s) >= 0 }
   var coin = function(s) { return !!coins && coins.indexOf(s) >= 0 }
-  var slots = order.filter(charted).map(function(s) { return { symbols: [s], spark: false } })
+  var slots = order.filter(alone).map(function(s) { return { symbols: [s], spark: false } })
   var batches = []
-  var batched = order.filter(function(s) { return !charted(s) && !coin(s) })
+  var batched = order.filter(function(s) { return !alone(s) && !coin(s) })
   for (var i = 0; i < batched.length; i += Quote.SPARK_BATCH) {
     var batch = batched.slice(i, i + Quote.SPARK_BATCH)
     batches.push({ symbols: batch, spark: batch.length > 1 })
   }
-  var coined = order.filter(function(s) { return !charted(s) && coin(s) })
+  var coined = order.filter(function(s) { return !alone(s) && coin(s) })
   for (var j = 0; j < coined.length; j += Quote.SPARK_BATCH) batches.push({ symbols: coined.slice(j, j + Quote.SPARK_BATCH), spark: true })
   // Each batch is in the order asked, so its first symbol places it.
   batches.sort(function(x, y) { return order.indexOf(x.symbols[0]) - order.indexOf(y.symbols[0]) })
@@ -122,8 +122,8 @@ function quoteSlots(waiting, asked, symbols, lead, heroes, bulk, coins) {
 }
 
 // A spark quote has no opens for the hero's line or the day's open.
-function sparkHeroes(heroes, quotes, entries, afterLanding) {
-  return heroes.filter(function(s) {
+function sparkCharted(charted, quotes, entries, afterLanding) {
+  return charted.filter(function(s) {
     return !!quotes[s] && !!quotes[s].closesOnly && !(afterLanding && entries[s] && entries[s].status === "failed")
   })
 }
@@ -189,14 +189,14 @@ function twoDays(quote, now, calendars) {
 // (`Market.awaitingOpen`).
 var OPENING_ASK = 15
 
-// Outside the session only the day's dim tail can move, so only a hero
-// keeps the interval.
-function quoteCadence(quote, now, interval, hero, calNow) {
+// Outside the session only the day's dim tail can move, so only a charted
+// stock keeps the interval.
+function quoteCadence(quote, now, interval, charted, calNow) {
   if (!quote) return 15 * 60
   if (quote.crypto || Market.regularNow(quote, now, calNow)) return Market.awaitingOpen(quote, now) ? Math.min(OPENING_ASK, interval) : interval
   if (calNow.quiet || calNow.breakEnd) return 15 * 60
   var phase = Market.sessionPhase(quote, now)
-  if (phase === "pre" || phase === "post") return hero ? interval : Math.max(5 * 60, interval)
+  if (phase === "pre" || phase === "post") return charted ? interval : Math.max(5 * 60, interval)
   return 15 * 60
 }
 
@@ -208,18 +208,18 @@ function quoteCadence(quote, now, interval, hero, calNow) {
 // current. `allDay` and `nights` are Robinhood's entries; `quoteEntries`
 // Yahoo's.
 function overnightAsks(s) {
-  var pill = s.pill
+  var featured = s.featured
   var cal = Overnight.overnightMarket(s.calendars)
   var tonight = cal && !s.open ? Overnight.nightAt(cal, s.now) : null
-  var night = !!tonight && tonight.open && s.overnightSymbols.indexOf(pill) >= 0
+  var night = !!tonight && tonight.open && s.overnightSymbols.indexOf(featured) >= 0
   var kept = s.open || night
-  var pillEntry = s.quoteEntries[pill]
-  var live = !!pillEntry && pillEntry.status === "ok" && s.overnightSymbols.indexOf(pill) >= 0
+  var featuredEntry = s.quoteEntries[featured]
+  var live = !!featuredEntry && featuredEntry.status === "ok" && s.overnightSymbols.indexOf(featured) >= 0
   if (!kept && !live) return null
   var previewing = s.open && s.previewShown && !!s.previewQuote && s.allSymbols.indexOf(s.preview) < 0
     && Overnight.hasOvernight(s.previewQuote, s.calendars)
-  var waited = previewing ? s.preview : pill
-  var listings = s.open ? s.overnightSymbols.concat(previewing ? [s.preview] : []) : [pill]
+  var waited = previewing ? s.preview : featured
+  var listings = s.open ? s.overnightSymbols.concat(previewing ? [s.preview] : []) : [featured]
   var tradability = listings.filter(function(x) {
     return kept ? Overnight.allDayDue(s.allDay[x], s.now) : !s.allDay[x]
   })
@@ -307,13 +307,13 @@ function staleHistory(charts, range, entries, quotes, previewQuotes, now, calend
   return ""
 }
 
-function aheadRows(open, range, heroes, sights, keep) {
+function aheadRows(open, range, charted, sights, keep) {
   if (!open || range === "1D") return []
   var rows = []
   sights.forEach(function(sight) {
-    sight.symbols.forEach(function(s) { if (rows.indexOf(s) < 0 && heroes.indexOf(s) < 0) rows.push(s) })
+    sight.symbols.forEach(function(s) { if (rows.indexOf(s) < 0 && charted.indexOf(s) < 0) rows.push(s) })
   })
-  return rows.slice(0, keep - heroes.length)
+  return rows.slice(0, keep - charted.length)
 }
 
 function aheadCharts(rows, range, entries, missed) {
@@ -325,9 +325,9 @@ function aheadCharts(rows, range, entries, missed) {
 
 // ---- Cap and P/E
 
-function figuresWanted(heroes, quotes, previewQuotes) {
+function fundamentalsWanted(charted, quotes, previewQuotes) {
   var wanted = []
-  heroes.forEach(function(s) {
+  charted.forEach(function(s) {
     var quote = quotes[s] || previewQuotes[s]
     if (!quote || !Fundamentals.hasFundamentals(quote)) return
     if (wanted.some(function(w) { return w.symbol === s })) return

@@ -79,8 +79,8 @@ Flickable {
   readonly property string cursorRow: {
     var top = headedY
     if (ownInSight(top)) return cursorSymbol
-    var hero = displayedSymbols.indexOf(featuredSymbol)
-    if (hero >= 0 && wholeInSight(hero, top)) return featuredSymbol
+    var featuredAt = displayedSymbols.indexOf(featuredSymbol)
+    if (featuredAt >= 0 && wholeInSight(featuredAt, top)) return featuredSymbol
     // Else the first whole row in sight: a key never acts on a row unseen.
     var first = Math.max(0, Math.ceil((top - 0.5) / rowPitch))
     return displayedSymbols[Math.min(first, displayedSymbols.length - 1)] || ""
@@ -581,10 +581,10 @@ Flickable {
     forgetClicks()
     listHover.rest()
     layOut()
-    var hero = displayedSymbols.indexOf(featuredSymbol)
-    if (hero >= 0 && !wholeInSight(hero, contentY)) {
+    var featuredAt = displayedSymbols.indexOf(featuredSymbol)
+    if (featuredAt >= 0 && !wholeInSight(featuredAt, contentY)) {
       takeOver()
-      contentY = restingTopFor(hero, contentY)
+      contentY = restingTopFor(featuredAt, contentY)
     }
   }
   Component.onCompleted: {

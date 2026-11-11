@@ -229,7 +229,7 @@ Item {
   readonly property bool chartLoading: motion.loading
   readonly property string chartSymbol: chart ? chart.symbol : ""
   readonly property string chartRange: chart ? chart.range : "1D"
-  readonly property var fundamentals: chartSymbol ? fundamentalEntries[chartSymbol] || null : null
+  readonly property var fundamentalsEntry: chartSymbol ? fundamentalEntries[chartSymbol] || null : null
 
   readonly property bool historyActive: motion.historyActive
   readonly property var history: motion.history
@@ -270,7 +270,7 @@ Item {
   readonly property var periodLine: !chart ? null : historyShown ? History.rangeLine(history, rangeEnds, featuredQuote) : dayLine
   readonly property var infoFactLists: !dayLine ? [] : [dayLine.facts, History.rangeFacts(dayLine.range.widest)]
     .concat(yearLine ? [History.rangeFacts(yearLine.range.widest)] : [])
-  readonly property var yearLine: chart ? Fundamentals.yearLine(featuredQuote, fundamentals ? fundamentals.figures : null,
+  readonly property var yearLine: chart ? Fundamentals.yearLine(featuredQuote, fundamentalsEntry ? fundamentalsEntry.fundamentals : null,
     historyShown && history.range === "1Y" ? rangeEnds : null, rates,
     (featuredDay ? featuredDay.trades || featuredDay.points : []).concat(featuredNewest ? [featuredNewest] : [])) : null
   readonly property var rangeMarks: historyShown ? History.rangeMarks(history, rangeEnds, featuredQuote) : null

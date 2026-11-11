@@ -11,13 +11,13 @@ Item {
   property var rates: ({})
   property var gate: null
   property var clearance: null
-  // `Service.figuresWanted`, in order.
+  // `Service.fundamentalsWanted`, in order.
   property var wanted: []
   // `now` wakes the feed; it reads `clock.wallSecond()`.
   property int now: 0
   property var clock: null
   property string pendingUrl: ""
-  // `figures` is null until the series is in.
+  // `fundamentals` is null until the series is in.
   property var job: null
   // These wait for `retry` or to be wanted anew, so they aren't asked again
   // every second.
@@ -41,7 +41,7 @@ Item {
     var entry = entries[w.symbol]
     if (entry && entry.status === "failed") return true
     var current = root.fresh(w.symbol)
-    return !current || !root.rateHeld(Fundamentals.ratePair(current.figures, w.currency))
+    return !current || !root.rateHeld(Fundamentals.ratePair(current.fundamentals, w.currency))
   }
 
   function miss(symbol) {
@@ -62,7 +62,7 @@ Item {
     if (still.length !== failed.length) root.failed = still
     var needed = wanted.map(function(w) {
       var current = root.fresh(w.symbol)
-      return current ? Fundamentals.ratePair(current.figures, w.currency) : ""
+      return current ? Fundamentals.ratePair(current.fundamentals, w.currency) : ""
     })
     var pairsStill = failedPairs.filter(function(pair) { return needed.indexOf(pair) >= 0 })
     if (pairsStill.length !== failedPairs.length) root.failedPairs = pairsStill
@@ -73,8 +73,8 @@ Item {
     var next = wanted.filter(root.due)[0]
     if (!next) return
     var current = root.fresh(next.symbol)
-    root.job = { symbol: next.symbol, currency: next.currency, step: "series", figures: null, pair: "" }
-    if (current) root.askRate(current.figures)
+    root.job = { symbol: next.symbol, currency: next.currency, step: "series", fundamentals: null, pair: "" }
+    if (current) root.askRate(current.fundamentals)
     else root.run(Fundamentals.fundamentalsUrl(next.symbol, clock.wallSecond()))
   }
 
@@ -118,7 +118,7 @@ Item {
     try {
       var json = got.length && got[0].kind === "ok" ? JSON.parse(got[0].body) : null
       read = step === "series" ? Fundamentals.parseFundamentals(json)
-        : step === "close" ? Fundamentals.withCapClose(job.figures, json)
+        : step === "close" ? Fundamentals.withCapClose(job.fundamentals, json)
         : Fundamentals.parseRate(json, job.pair)
     } catch (e) {
       read = null
@@ -136,16 +136,16 @@ Item {
     } else if (!read) {
       root.fail(job.symbol)
     } else if (step === "series" && read.cap) {
-      root.job = Object.assign({}, job, { step: "close", figures: read })
+      root.job = Object.assign({}, job, { step: "close", fundamentals: read })
       root.run(Fundamentals.capCloseUrl(job.symbol, read))
     } else {
-      root.keep(job.symbol, { status: "ok", figures: read, checkedAt: clock.wallSecond() })
+      root.keep(job.symbol, { status: "ok", fundamentals: read, checkedAt: clock.wallSecond() })
       root.askRate(read)
     }
   }
 
-  function askRate(figures) {
-    var pair = Fundamentals.ratePair(figures, job.currency)
+  function askRate(fundamentals) {
+    var pair = Fundamentals.ratePair(fundamentals, job.currency)
     if (root.rateHeld(pair)) {
       root.done()
       return
@@ -154,13 +154,13 @@ Item {
     root.run(Fundamentals.rateUrl(pair))
   }
 
-  // A failed fetch keeps the last good figures, but a series that came is
+  // A failed fetch keeps the last good cap and P/E, but a series that came is
   // the truth for the EPS: it stands, and the cap stays unknown.
   function fail(symbol) {
     root.miss(symbol)
-    var series = job.figures ? { figures: { cap: null, eps: job.figures.eps } } : {}
-    root.keep(symbol, Object.assign({ figures: null, checkedAt: 0 }, entries[symbol], { status: "failed" }, series))
-    if (job.figures) root.askRate(job.figures)
+    var series = job.fundamentals ? { fundamentals: { cap: null, eps: job.fundamentals.eps } } : {}
+    root.keep(symbol, Object.assign({ fundamentals: null, checkedAt: 0 }, entries[symbol], { status: "failed" }, series))
+    if (job.fundamentals) root.askRate(job.fundamentals)
     else root.done()
   }
 

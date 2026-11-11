@@ -42,7 +42,7 @@ Item {
   property var lastRemoval: null
   property string listsHeld: ""
   // The same array until what the lists hold changes, so a save of a range
-  // or a hero leaves each surface's list views as they are.
+  // or the featured stock leaves each surface's list views as they are.
   property var lists: Settings.listChoices(Settings.fileSettings(null))
   onFileSettingsChanged: {
     var held = Settings.listsHeld(root.fileSettings)
@@ -66,21 +66,21 @@ Item {
   // Added symbols with no first answer yet, quote or failure: saved and
   // fetched, but no list shows them until it comes.
   property var arriving: []
-  // { symbol, before }: the hero an add from search took before its first
-  // answer, and the one it left.
-  property var heroTaken: null
+  // { symbol, before }: the stock an add from search made featured before
+  // its first answer, and the one featured before it.
+  property var featuredTaken: null
 
   function answered(symbol) {
     return !!feed.quotes[symbol] || !!(feed.entries[symbol] && feed.entries[symbol].status === "failed")
   }
 
-  // One that took the hero and failed hands it back.
+  // One that was made featured and failed hands the place back.
   function settleArrivals() {
     var still = root.arriving.filter(function(s) { return root.allSymbols.indexOf(s) >= 0 && !root.answered(s) })
     if (still.length !== root.arriving.length) root.arriving = still
-    var taken = root.heroTaken
+    var taken = root.featuredTaken
     if (!taken || still.indexOf(taken.symbol) >= 0) return
-    root.heroTaken = null
+    root.featuredTaken = null
     if (root.view.featured === taken.symbol && !feed.quotes[taken.symbol]) root.feature(taken.before)
   }
 
@@ -270,7 +270,7 @@ Item {
     root.previewSymbol = s
     root.previewResult = s && result && String(result.symbol || "").toUpperCase() === s ? result : null
     if (s) {
-      root.shownAsHero(s)
+      root.shownOnChart(s)
       previewRest.restart()
     } else previewRest.stop()
     root.showHistory(false)
@@ -295,11 +295,11 @@ Item {
 
   // ---- Changes to the lists
 
-  // A hero chosen ends an add's hold on it (`heroTaken`).
+  // A stock chosen ends an add's hold on the place (`featuredTaken`).
   function feature(symbol, settles) {
     var s = String(symbol || "").toUpperCase()
     if (root.allSymbols.indexOf(s) < 0) return
-    root.heroTaken = null
+    root.featuredTaken = null
     root.persist({ featured: s }, settles)
   }
 
@@ -317,7 +317,7 @@ Item {
     var s = String(symbol || "").toUpperCase()
     if (s && root.allSymbols.indexOf(s) >= 0) {
       values.featured = s
-      root.heroTaken = null
+      root.featuredTaken = null
     }
     if (History.historyRanges().indexOf(range) >= 0) values.range = range
     if (Object.keys(values).length) root.persist(values)
@@ -337,16 +337,16 @@ Item {
     var previewed = s !== "" && s === root.previewSymbol
     var coming = previewed && root.arriving.indexOf(s) >= 0
     var next = Settings.withSymbolAdded(root.fileSettings, s)
-    // From an add still on its way, hand back the hero before that add.
-    var taken = root.heroTaken
+    // From an add still on its way, hand back the stock featured before it.
+    var taken = root.featuredTaken
     var before = taken && taken.symbol === root.view.featured && !feed.quotes[taken.symbol] ? taken.before : root.view.featured
-    if (coming) root.heroTaken = { symbol: s, before: before }
+    if (coming) root.featuredTaken = { symbol: s, before: before }
     if (coming || (previewed && !!feed.quotes[s])) next.featured = s
     root.save(next)
   }
 
-  // `shown`: the rows as the surface shows them, whose neighbour takes the
-  // hero.
+  // `shown`: the rows as the surface shows them, whose neighbour is featured
+  // next.
   function removeSymbol(symbol, shown) {
     root.remove(symbol, Settings.withMembership(root.fileSettings, symbol, root.listName, false, shown || root.shown))
   }
@@ -509,8 +509,8 @@ Item {
     id: feed
     symbols: root.ready ? root.allSymbols : []
     watched: root.watched
-    lead: root.view.featured
-    heroes: [root.view.featured].concat(root.previewShown && root.allSymbols.indexOf(root.previewSymbol) >= 0 ? [root.previewSymbol] : [])
+    featured: root.view.featured
+    charted: [root.view.featured].concat(root.previewShown && root.allSymbols.indexOf(root.previewSymbol) >= 0 ? [root.previewSymbol] : [])
     reading: function() { return Asks.readingOrder(root.view.featured, root.sights, root.view.shown, root.allSymbols) }
     holding: root.drawing.length > 0
     onBusyChanged: Qt.callLater(root.releaseOrder)
@@ -593,18 +593,18 @@ Item {
   }
   readonly property var previewEntries: previewFeed.entries
 
-  function heroesOnShow() {
+  function chartedOnShow() {
     return root.openSurfaces.length > 0 ? [root.view.featured].concat(root.previewShown ? [root.previewSymbol] : []) : []
   }
   // With nothing open it reads no quote, so the pill's prices don't work it
   // out again.
-  readonly property var figuresWanted: {
-    var heroes = root.heroesOnShow()
-    return heroes.length > 0 ? Asks.figuresWanted(heroes, feed.quotes, previewFeed.quotes) : []
+  readonly property var fundamentalsWanted: {
+    var charted = root.chartedOnShow()
+    return charted.length > 0 ? Asks.fundamentalsWanted(charted, feed.quotes, previewFeed.quotes) : []
   }
   FundamentalsFeed {
     id: fundamentalsFeed
-    wanted: root.figuresWanted
+    wanted: root.fundamentalsWanted
     now: root.now
     clock: root
     gate: yahooGate
@@ -696,7 +696,7 @@ Item {
     var calNow = Asks.calendarsAt(root.calendars, now)
     var watched = Asks.watchedSymbols(root.allSymbols, featured, open)
     if (watched.join(",") !== root.watched.join(",")) root.watched = watched
-    var asks = Asks.quotesDue(watched, feed.entries, feed.asked, feed.quotes, root.heroesOnShow(), featured, now, root.refreshIntervalSec, calNow)
+    var asks = Asks.quotesDue(watched, feed.entries, feed.asked, feed.quotes, root.chartedOnShow(), featured, now, root.refreshIntervalSec, calNow)
     root.dueAt = asks.next
     if (asks.due.length > 0) feed.ask(asks.due, now)
   }
@@ -718,7 +718,7 @@ Item {
     var previewed = root.previewSymbol
     return Asks.overnightAsks({
       open: root.openSurfaces.length > 0,
-      pill: root.view.featured,
+      featured: root.view.featured,
       quoteEntries: feed.entries,
       quotes: feed.quotes,
       overnightSymbols: root.overnightSymbols,
@@ -744,14 +744,14 @@ Item {
     if (chart === chartOnShow) return
     var rangeLeft = chartOnShow !== "" && chartOnShow.split("|")[1] !== view.range
     chartOnShow = chart
-    if (root.heroTaken && view.featured !== root.heroTaken.symbol) root.heroTaken = null
+    if (root.featuredTaken && view.featured !== root.featuredTaken.symbol) root.featuredTaken = null
     if (rangeLeft) {
       // A turn later: the view's change is still being told.
       var left = Object.keys(root.aheadAsked)
       root.aheadAsked = ({})
       root.aheadMissed = ({})
       if (left.length) Qt.callLater(function() { historyFeed.drop(left) })
-    } else root.shownAsHero(view.featured)
+    } else root.shownOnChart(view.featured)
     showHistory(false)
     askDue()
     askOvernight()
@@ -860,7 +860,7 @@ Item {
   }
 
   // A range on show is asked again as its market moves it, so its line and
-  // its low and high keep up: one hero's at a time, when the feed is idle.
+  // its low and high keep up: one chart's at a time, when the feed is idle.
   function refreshRange() {
     if (!root.ready || historyFeed.busy) return
     var range = root.view.range
@@ -870,7 +870,7 @@ Item {
   }
 
   // The featured symbol is already an add from search on its way
-  // (`addSymbol`), so its preview's fetch goes on as the hero's.
+  // (`addSymbol`), so its preview's fetch goes on as the featured stock's.
   function chartsOnShow() {
     return Asks.chartsOnShow(root.openSurfaces, root.view.featured, root.previewSymbol, root.previewSurface, root.previewShown)
   }
@@ -915,8 +915,9 @@ Item {
     historyFeed.requestAhead(charts, range)
   }
 
-  // A chart fetched ahead and now on a hero is the hero's: a new range keeps it.
-  function shownAsHero(symbol) {
+  // A chart fetched ahead and now on show is no longer one fetched ahead: a
+  // new range keeps it.
+  function shownOnChart(symbol) {
     var key = historyFeed.keyFor(symbol, root.view.range)
     if (!(key in root.aheadAsked)) return
     var asked = Object.assign({}, root.aheadAsked)

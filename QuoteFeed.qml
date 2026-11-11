@@ -12,9 +12,10 @@ Item {
   property var symbols: []
   // The members refreshes are owed for; first answers always stay.
   property var watched: []
-  property string lead: ""
-  // The lead and a resting preview: each goes on the chart, for its opens.
-  property var heroes: lead ? [lead] : []
+  property string featured: ""
+  // The featured stock and a resting preview: each goes on a chart, for its
+  // opens.
+  property var charted: featured ? [featured] : []
   // Read at launch (`Asks.readingOrder`): the order a run asks in.
   property var reading: null
   // Answers wait while a chart draws itself in, so reading never stutters it.
@@ -189,7 +190,7 @@ Item {
     var judging = first ? [] : Asks.laneJudging(toJudge, asked, held)
     if ((waiting.length === 0 && judging.length === 0) || (clearance && !clearance())) return
     var coins = waiting.filter(function(s) { return !!quotes[s] && !!quotes[s].crypto })
-    var slots = Asks.quoteSlots(waiting, asked, reading ? reading() : symbols, lead, heroes, bulk, coins)
+    var slots = Asks.quoteSlots(waiting, asked, reading ? reading() : symbols, featured, charted, bulk, coins)
     var granted = slots.length > 0 && gate ? gate.take(slots.length, bulk) : slots.length
     var run = slots.slice(0, granted)
     for (var j = 0; slots.length === 0 && j < Math.min(judging.length, judgeRun) && (!gate || (gate.spare() && gate.take(1, bulk) === 1)); j++)
@@ -213,11 +214,11 @@ Item {
   // Symbols whose spark day holds a jump no chart verdict speaks for.
   property var toJudge: []
 
-  // A hero from spark has no opens for its line or the day's open, so its
-  // chart is asked for.
-  onHeroesChanged: chartHeroes(false)
-  function chartHeroes(afterLanding) {
-    ask(Asks.sparkHeroes(heroes, quotes, entries, afterLanding), root.stamp())
+  // A charted stock from spark has no opens for its line or the day's open,
+  // so its chart is asked for.
+  onChartedChanged: askCharts(false)
+  function askCharts(afterLanding) {
+    ask(Asks.sparkCharted(charted, quotes, entries, afterLanding), root.stamp())
   }
 
   // Answers are read about 8 ms a turn, so a long run never holds the shell's
@@ -301,7 +302,7 @@ Item {
     onTriggered: root.landStep()
   }
 
-  // What answers set off, a new hero or a quote shown, would read the feed
+  // What answers set off, a new charted stock or a quote shown, would read the feed
   // half updated.
   property bool applying: false
   function apply(job, got) {
@@ -388,7 +389,7 @@ Item {
       retryTimer.restart()
     }
     root.applying = false
-    chartHeroes(true)
+    askCharts(true)
   }
 
   // A symbol that comes back with its answer: a removal taken back, or a

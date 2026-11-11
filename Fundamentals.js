@@ -68,14 +68,14 @@ function dateEpoch(date) {
 
 // The cap is taken at its date's close, so that close moves it with the
 // price since. The week before covers holidays.
-function capCloseUrl(symbol, figures) {
-  if (!figures.cap) return null
-  return Quote.CHART_URL + encodeURIComponent(symbol) + "?interval=1d&period1=" + (dateEpoch(figures.cap.date) - 7 * 24 * 60 * 60)
-    + "&period2=" + (dateEpoch(figures.cap.date) + 2 * 24 * 60 * 60)
+function capCloseUrl(symbol, fundamentals) {
+  if (!fundamentals.cap) return null
+  return Quote.CHART_URL + encodeURIComponent(symbol) + "?interval=1d&period1=" + (dateEpoch(fundamentals.cap.date) - 7 * 24 * 60 * 60)
+    + "&period2=" + (dateEpoch(fundamentals.cap.date) + 2 * 24 * 60 * 60)
 }
 
 // Null without the cap's close: the new EPS stands and the cap goes unknown.
-function withCapClose(figures, json) {
+function withCapClose(fundamentals, json) {
   var result = json && json.chart && json.chart.result && json.chart.result[0]
   if (!result || !result.meta) return null
   var times = Format.fetchedList(result.timestamp || [], Quote.MOST_BARS)
@@ -87,9 +87,9 @@ function withCapClose(figures, json) {
   for (var i = 0; i < times.length; i++) {
     if (!Format.isMoment(times[i] + offset)) return null
     var day = new Date((times[i] + offset) * 1000).toISOString().slice(0, 10)
-    if (day <= figures.cap.date && Quote.knownPrice(closes[i]) !== null) close = closes[i]
+    if (day <= fundamentals.cap.date && Quote.knownPrice(closes[i]) !== null) close = closes[i]
   }
-  return close === null ? null : Object.assign({}, figures, { cap: Object.assign({}, figures.cap, { close: close }) })
+  return close === null ? null : Object.assign({}, fundamentals, { cap: Object.assign({}, fundamentals.cap, { close: close }) })
 }
 
 // London quotes pence ("GBp") against earnings in pounds.
@@ -99,8 +99,8 @@ function wholeUnits(currency) {
 
 // As Yahoo names it: "USDCAD" turns USD into CAD. A code that isn't three
 // capitals is a small unit (ZAc), and a P/E through it would be off by 100.
-function ratePair(figures, currency) {
-  var eps = figures && figures.eps
+function ratePair(fundamentals, currency) {
+  var eps = fundamentals && fundamentals.eps
   var into = wholeUnits(currency).currency
   if (!eps || eps.currency === into) return ""
   return /^[A-Z]{3}$/.test(eps.currency) && /^[A-Z]{3}$/.test(into) ? eps.currency + into : ""
@@ -122,11 +122,11 @@ function parseRate(json, pair) {
   return Format.isFiniteNumber(rate) && rate > 0 ? rate : null
 }
 
-function peRatio(figures, price, currency, rates) {
-  var eps = figures ? figures.eps : null
+function peRatio(fundamentals, price, currency, rates) {
+  var eps = fundamentals ? fundamentals.eps : null
   if (!eps) return null
   var units = wholeUnits(currency)
-  var held = rates ? rates[ratePair(figures, currency)] : null
+  var held = rates ? rates[ratePair(fundamentals, currency)] : null
   var rate = eps.currency && eps.currency === units.currency ? 1 : held ? held.value : null
   return rate ? price / units.per / (eps.value * rate) : null
 }
@@ -144,7 +144,7 @@ function peText(value) {
 // year. Trades, and on 1Y the day's high and low, compare at the listing's
 // decimals, so float noise never passes a mark. The cap and P/E slots stay
 // while unknown, so the line keeps its shape.
-function yearLine(quote, figures, yearEnds, rates, trades) {
+function yearLine(quote, fundamentals, yearEnds, rates, trades) {
   if (!quote) return null
   var q = quote
   var head = Quote.headlineQuote(q)
@@ -175,8 +175,8 @@ function yearLine(quote, figures, yearEnds, rates, trades) {
   if (atLow) line.lowTone = "down"
   var facts = []
   if (hasFundamentals(q)) {
-    var cap = figures ? figures.cap : null
-    var pe = head ? peRatio(figures, head.price, q.currency, rates) : null
+    var cap = fundamentals ? fundamentals.cap : null
+    var pe = head ? peRatio(fundamentals, head.price, q.currency, rates) : null
     // Until the cap comes, the listing's code sizes its slot.
     var named = cap ? cap.currency : String(q.currency || "").toUpperCase()
     var code = named ? named + " " : ""

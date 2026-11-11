@@ -352,7 +352,7 @@ Harness {
     readonly property var histories: root.shownHistoryEntry ? ({ [(historySymbol || featuredSymbol) + "|" + range]: root.shownHistoryEntry }) : ({})
     readonly property string hero: previewSymbol || featuredSymbol
     readonly property var fundamentals: root.savedFigures[hero]
-      ? ({ [hero]: { status: "ok", figures: root.savedFigures[hero] } }) : ({})
+      ? ({ [hero]: { status: "ok", fundamentals: root.savedFigures[hero] } }) : ({})
     readonly property var rates: root.savedRates
     property var arriving: []
     property var lastRemoval: null
