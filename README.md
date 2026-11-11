@@ -56,7 +56,8 @@ The pill shows today's move for the stock you last looked at. It can show
 a sparkline, an arrow, the price as text, or an icon: a bull on an up day,
 a bear on a down one. Middle-click it to switch. It keeps your choice after
 a restart. On a bar at the side of the screen, middle-click switches
-between the icon and the symbol over its change.
+between the icon and the symbol over its change. Counting since the open,
+it says so when you point at it.
 
 Scroll over the pill to step through your list. Click it for the panel,
 right-click it for the window, and drag it to move it along the bar.

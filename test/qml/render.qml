@@ -1316,6 +1316,13 @@ Harness {
               })
               return troubled
             }
+            // pill-sheet-open: counted since the open, the text form (the
+            // stacked one on the side bar) and the icon form in each look,
+            // each with the side bar pill's hover words beside it.
+            if (root.stateName === "pill-sheet-open")
+              return [false, true].reduce(function(all, retro) {
+                return all.concat(["text", "icon"].map(function(style) { return { style: style, retro: retro, day: "down", open: true } }))
+              }, [])
             var rows = []
             for (var look = 0; look < 2; look++) {
               var retro = look === 1
@@ -1342,7 +1349,7 @@ Harness {
               width: pillRow.modelData.compact ? 80 : 170
               anchors.verticalCenter: parent.verticalCenter
               text: (pillRow.modelData.compact ? "" : (pillRow.modelData.retro ? "RETRO" : "SMOOTH") + " · ") + (pillRow.modelData.right ? "RIGHT SECTION" : pillRow.modelData.style.toUpperCase())
-                + (pillRow.modelData.trouble ? " · " + pillRow.modelData.trouble.toUpperCase()
+                + (pillRow.modelData.trouble ? " · " + pillRow.modelData.trouble.toUpperCase() : pillRow.modelData.open ? " · SINCE OPEN"
                   : pillRow.modelData.style === "icon" || pillRow.modelData.right || pillRow.modelData.day !== "down" ? " · " + pillRow.modelData.day.toUpperCase() : "")
               color: Commons.Color.muted
               font.family: Style.font.family
@@ -1368,7 +1375,7 @@ Harness {
                 property var entries: ({ [featuredSymbol]: { status: pillRow.modelData.day === "failed" || pillRow.modelData.day === "refresh failed"
                   || pillRow.modelData.trouble === "failed" ? "failed"
                   : pillRow.modelData.day === "waiting" ? "pending" : "ok", receivedAt: root.now } })
-                property string changeMode: "pct"
+                property string changeMode: pillRow.modelData.open ? "open" : "pct"
                 property bool retro: pillRow.modelData.retro
                 property int now: root.now
                 property var owed: pillRow.modelData.trouble && pillRow.modelData.trouble !== "failed" ? { NEST: root.now - 91 } : ({})
@@ -1449,9 +1456,10 @@ Harness {
               }
             }
 
-            // The hover's words, in a bubble drawn as the bar draws its own.
+            // The hover's words, in a bubble drawn as the bar draws its own;
+            // none without words, as the bar shows none.
             Rectangle {
-              visible: !!pillRow.modelData.trouble
+              visible: (!!pillRow.modelData.trouble || !!pillRow.modelData.open) && hoverWords.text !== ""
               anchors.verticalCenter: parent.verticalCenter
               width: hoverWords.implicitWidth + 20
               height: hoverWords.implicitHeight + 14
@@ -1463,7 +1471,8 @@ Harness {
                 id: hoverWords
                 anchors.centerIn: parent
                 textFormat: Text.PlainText
-                text: (pillRow.modelData.style === "icon" ? horizontalPill.featuredSymbol + " " + horizontalPill.changeText + " · " : "")
+                text: pillRow.modelData.open ? verticalPill.children.filter(function(c) { return c.tooltipText !== undefined })[0].tooltipText
+                  : (pillRow.modelData.style === "icon" ? horizontalPill.featuredSymbol + " " + horizontalPill.changeText + " · " : "")
                   + horizontalPill.warningText
                 color: Commons.Color.tooltip.text
                 font.family: Style.font.family

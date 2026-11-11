@@ -37,6 +37,9 @@ BarWidget {
   // says them.
   readonly property string newestNote: featured && featured.newest
     ? Figures.newestNote(featuredQuote, featured.newest, service.now, service.calendars) : ""
+  // A side bar's stacked move has no room for the "open" a top bar's pill
+  // ends with; the hover says where it counts from.
+  readonly property string openNote: vertical && !iconOnly && featured && service.changeMode === "open" ? "Since the open" : ""
   // The day the 1D chart draws, once Robinhood has said which. Only the
   // five-minute clock that slides its start redraws it, never the second.
   // Built only for the form that draws it, and handed only to the look on
@@ -82,6 +85,7 @@ BarWidget {
   onWarningTextChanged: Qt.callLater(reshowTooltip)
   onFeaturedSymbolChanged: Qt.callLater(reshowTooltip)
   onNewestNoteChanged: Qt.callLater(reshowTooltip)
+  onOpenNoteChanged: Qt.callLater(reshowTooltip)
   onOpenedChanged: Qt.callLater(reshowTooltip)
   // Up and down for the bar's own ground (`TrendColors`).
   readonly property color upColor: plugin && plugin.trendColors ? plugin.trendColors.upOn(barGround) : button.foreground
@@ -234,11 +238,12 @@ BarWidget {
     // and at least an icon slot; and the mark's room under it all.
     fixedHeight: root.vertical ? (root.iconOnly ? Math.max(Style.bar.iconSlot, Math.ceil(iconForm.implicitHeight) + 2)
       : root.stackedHeight) + root.markRoom : -1
-    // Only what the pill can't say: the icon form's symbol and change, a
-    // newest price's session and time ("Overnight 23:25"), and what a "!"
-    // means. None while the panel is open: the bubble would land on its header.
+    // Only what the pill can't say: the icon form's symbol and change, that
+    // the stacked form's move counts from the open, a newest price's session
+    // and time ("Overnight 23:25"), and what a "!" means. None while the
+    // panel is open: the bubble would land on its header.
     tooltipText: root.opened ? ""
-      : [root.iconOnly ? (root.featuredSymbol || "STONKS") + " " + root.changeText : "", root.newestNote, root.warningText]
+      : [root.iconOnly ? (root.featuredSymbol || "STONKS") + " " + root.changeText : "", root.openNote, root.newestNote, root.warningText]
         .filter(function(part) { return part !== "" }).join(" · ")
 
     onPressed: function(b) {

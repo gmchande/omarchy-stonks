@@ -65,7 +65,7 @@ every_state() (
       states="$states popup-trouble-$trouble-$look popup-trouble-$trouble-$look-size-16 window-trouble-$trouble-$look"
     done
   done
-  states="$states pill-sheet-trouble"
+  states="$states pill-sheet-trouble pill-sheet-open"
   # Paused mid-motion ink in both looks: breadth only in smooth, since
   # retro's cells draw the breadth and its pose never shows. Hover and held
   # presses with real pointer input, and the refused list views, in smooth:
