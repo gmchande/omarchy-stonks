@@ -2368,19 +2368,25 @@ test("in every phase, a stock that has traded since its close shows that newest 
   {
     const at = topsAt("ranges-2026-11-11-1800")
     const start = range => {
-      const span = { "1W": "5d", "1M": "1mo", "1Y": "1y" }[range]
+      const span = { "1W": "5d", "1M": "1mo", "3M": "3mo", "6M": "6mo", YTD: "ytd", "1Y": "1y", "2Y": "2y", "5Y": "5y", "10Y": "10y", All: "max" }[range]
       const raw = M.parseHistory(fixture(`history/nbis-2026-11-11-1800-${span}.json`), range)
       const history = M.viewChart("NBIS", range, at.quotes, {}, { ["NBIS|" + range]: { status: "ok", history: raw } }, at.nights, at.allDay, calendars).history
       const bar = M.historyBarAt(history, 0)
       const geometry = M.historyGeometry(history)
       const grid = M.retroGrid(geometry, 69 * 6, 120, 4, 2)
       const scrubbed = M.retroColumn(grid, M.historyFraction(history, bar.t))
-      return [M.historyScrubForms(history, bar)[0], load("Share.js").barDate(history, bar), M.historyRowModel(history, at.quotes.NBIS, bar.t).changeText,
-        grid.levels[0] === grid.baseRow, scrubbed, M.retroColumn(grid, geometry.points[1].x)]
+      return [range, M.historyScrubForms(history, bar)[0], load("Share.js").barDate(history, bar), M.historyRowModel(history, at.quotes.NBIS, bar.t).changeText,
+        geometry.points[0].p === raw.baseline, grid.levels[0] === grid.baseRow, scrubbed, M.retroColumn(grid, geometry.points[1].x)]
     }
-    expect(start("1W")).toEqual(["4 NOV 16:00 · 141.52", "4 NOV 16:00 EST", "0.00%", true, 0, 1])
-    expect(start("1M")).toEqual(["9 OCT 16:00 · 221.07", "9 OCT 16:00 EDT", "0.00%", true, 0, 1])
-    expect(start("1Y")).toEqual(["CLOSE BEFORE 12 NOV 2025 · 102.22", "CLOSE BEFORE 12 NOV 2025", "0.00%", true, 0, 1])
+    // A daily range's close is its day's, and a listing younger than the
+    // range, as NBIS since its return on 21 October 2024, starts at its
+    // first day's price.
+    for (const [range, words, picture] of [["1W", "4 NOV 16:00 · 141.52", "4 NOV 16:00 EST"], ["1M", "9 OCT 16:00 · 221.07", "9 OCT 16:00 EDT"],
+      ["3M", "11 AUG · 193.23", "11 AUG"], ["6M", "11 MAY · 186.10", "11 MAY"],
+      ["YTD", "CLOSE BEFORE 2 JAN · 83.71", "CLOSE BEFORE 2 JAN"], ["1Y", "CLOSE BEFORE 12 NOV 2025 · 102.22", "CLOSE BEFORE 12 NOV 2025"],
+      ["2Y", "CLOSE BEFORE 12 NOV 2024 · 20.94", "CLOSE BEFORE 12 NOV 2024"], ["5Y", "21 OCT 2024 · 14.29", "21 OCT 2024"],
+      ["10Y", "21 OCT 2024 · 14.29", "21 OCT 2024"], ["All", "21 OCT 2024 · 14.29", "21 OCT 2024"]])
+      expect(start(range)).toEqual([range, words, picture, "0.00%", true, true, 0, 1])
   }
   // Its own day and clock, as 1D names it, though the range's periods are
   // stamped otherwise: at 23:00 on Sunday 25 October, a day's bar reads
