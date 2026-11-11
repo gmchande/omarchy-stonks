@@ -13,7 +13,6 @@ if [ "${1:-}" = --anchors ]; then
   source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
   plugin_tree popup-anchor.qml
   patch_copy plugin/Panel.qml 's/open: root.opened/open: false/'
-  patch_copy plugin/Panel.qml '/readonly property int panelWidth:/a\  readonly property alias testCard: panel\n  readonly property alias testHeldAnchor: heldAnchor'
   # A fixed screen for the unmapped placement specimen; the shell's own
   # KeyboardPanel still computes its actual anchor, origin and clamping.
   rm "$root/Ui"

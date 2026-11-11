@@ -26,6 +26,7 @@ Panel {
   // Up to six whole rows, at any font or text size.
   readonly property int maxRows: 6
   readonly property var body: bodyLoader.item
+  readonly property alias keyboardPanel: panel
   readonly property int heightCap: body ? panel.verticalContentInset + body.chromeHeight
     + maxRows * body.rowPitch - body.rowGap : 0
   readonly property int bodyRoom: Math.min(root.heightCap, panel.availableCardHeight > 0 ? panel.availableCardHeight : root.heightCap)
@@ -168,6 +169,7 @@ Panel {
       // Keys reach the body's map first; any it leaves go on to the catcher.
       Item {
         id: bodyKeys
+        objectName: "bodyKeys"
         Keys.onPressed: function(event) {
           if (!keyCatcher.blocked && root.body.pressKey(event)) event.accepted = true
         }

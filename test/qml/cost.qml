@@ -23,18 +23,30 @@ Harness {
     return readFile(harness.state + "/" + name).split("\n").filter(function(line) { return line !== "" })
   }
 
-  Stonks.Plugin { id: plugin; shell: shellApi; manifest: harness.pluginManifest() }
+  // The walk's clock, from Wednesday 7 October at 15:00 New York: the
+  // service reads it, and a step moves it on and ticks the service.
+  property int time: 1791399600
+  function clockOn(seconds) {
+    harness.time += seconds
+    plugin.service.tick()
+  }
+  Stonks.Plugin { id: plugin; shell: shellApi; manifest: harness.pluginManifest(); hyprland: hyprlandStandIn
+    wallClock: function() { return harness.time } }
   readonly property var service: plugin.service
   readonly property var app: plugin.windowHost.app
 
   QtObject { id: workspaceHere }
+  // Hyprland as the plugin is handed it: no screens, no windows, no events.
   QtObject {
     id: hyprlandStandIn
+    property var monitors: ({ values: [] })
     property var toplevels: ({ values: [] })
     property var focusedWorkspace: workspaceHere
+    function monitorFor(screen) { return null }
+    function refreshMonitors() {}
     function dispatch(request) {}
+    signal rawEvent(var event)
   }
-  Binding { target: plugin.windowHost; property: "hyprlandStandIn"; value: hyprlandStandIn }
 
   QtObject {
     id: shellApi
@@ -86,14 +98,14 @@ Harness {
     // No quote run is out: the clock moves on only once each run has
     // landed, as it would in the seconds a run takes.
     function idle() {
-      return service.testFeed.firstRun.length === 0 && service.testFeed.refreshRun.length === 0
+      return service.feeds.quotes.firstRun.length === 0 && service.feeds.quotes.refreshRun.length === 0
     }
     function settle() {
       if (!idle()) tryVerify(idle, 30000)
     }
     function tick(seconds, step, each) {
       for (var t = 0; t < seconds; t += step) {
-        service.now += step
+        harness.clockOn(step)
         settle()
         if (each) each()
       }
@@ -103,7 +115,7 @@ Harness {
     // shows, and one out of sight, which works out nothing until it comes
     // into sight, by what it would show there.
     function warned() {
-      var body = app.testBody
+      var body = app.body
       var out = service.allSymbols.filter(function(s) {
         var row = body.watchlist.rowItem(s)
         if (row && row.inSight) return /^!/.test(row.detail)
@@ -127,14 +139,14 @@ Harness {
 
     function test_cost() {
       // A tall window, many rows in sight.
-      app.testWindow.implicitHeight = 1400
+      app.floatingWindow.implicitHeight = 1400
       app.open("{}")
       tryVerify(function() { return app.opened && service.openSurfaces.length === 1 }, 3000)
 
       // Loading: the pill's chart and eight spark requests carry the list.
       // Then each day with a jump is judged on the chart, a few a run.
-      for (var t = 0; t < 600 && (!service.allSymbols.every(function(s) { return !!service.quotes[s] }) || service.testFeed.toJudge.length > 0); t++) {
-        service.now += 1
+      for (var t = 0; t < 600 && (!service.allSymbols.every(function(s) { return !!service.quotes[s] }) || service.feeds.quotes.toJudge.length > 0); t++) {
+        harness.clockOn(1)
         settle()
       }
       // The first quote run: GitHub's look, and the stock's cap and P/E, go
@@ -155,14 +167,14 @@ Harness {
       var counts = perSymbol(steady)
       var behind = service.allSymbols.filter(function(s) { return (counts[encodeURIComponent(s)] || 0) < 9 })
       harness.check("ten minutes of trading: every row refreshed every minute, in at most 15 requests and 2 curl runs a minute, and nothing warns",
-        behind.length === 0 && steady.length <= 150 && runs.length <= 20 && warnedSteps === 0 && !service.testYahooGate.warned,
+        behind.length === 0 && steady.length <= 150 && runs.length <= 20 && warnedSteps === 0 && !service.yahooGate.warned,
         (steady.length / 10).toFixed(1) + " requests and " + (runs.length / 10).toFixed(1) + " runs a minute; behind: " + behind.slice(0, 5).join(",")
           + "; " + warnedSteps + " of 120 steps warned")
 
       // The rows built: those within a screen above sight and two below,
       // at the top, at the end of the list, and after the wheel has carried
       // it part of the way back.
-      var list = app.testBody.watchlist
+      var list = app.body.watchlist
       // Counted as what was made, not what the list says should be: a row's
       // words and line are one `rowContent` each, built by its Loader.
       var built = function() { return harness.findAll(list, "rowContent").length }

@@ -74,10 +74,10 @@ feed_tree() {
 
 # plugin_tree HARNESS: copies of the whole plugin beside the shell's Ui and
 # Commons, its manifest too, which the version watch reads. Copies, so a
-# script can sed test aliases into them, or move the manifest's version.
-# The window host lists no screens, so a harness never asks the owner's
-# Hyprland whether theirs are off, and its quote runs never wait on them;
-# a harness that steps through screens off hands the host its own.
+# script can patch one, or move the manifest's version. A harness that
+# builds the whole plugin hands it a stand-in for Hyprland
+# (test/boundaries.sh), so none asks the owner's desktop whether its screens
+# are off.
 plugin_tree() {
   need_shell
   root="$work"
@@ -87,7 +87,6 @@ plugin_tree() {
   ln -s "$shell/Ui" "$shell/Commons" "$root/"
   cp "$here/$1" "$root/shell.qml"
   cp "$here/HarnessExit.qml" "$here/Harness.qml" "$here/Steps.qml" "$root/"
-  patch_copy plugin/Screens.qml 's/readonly property var monitors: Hyprland.monitors.values/property var monitors: []/'
 }
 
 # card_window: the panel's card in CardWindow.qml, a plain window, as the

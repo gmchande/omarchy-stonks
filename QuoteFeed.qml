@@ -92,8 +92,10 @@ Item {
   property var firstRun: []
   property var refreshRun: []
   property var tries: ({})
-  // Symbols waiting out the pause after a bad answer (`retryTimer`).
+  // Symbols waiting out the pause after a bad answer, `retryAfter`
+  // milliseconds (`retryTimer`).
   property var cooling: []
+  property int retryAfter: 2500
 
   function firstAnswer(symbol) {
     return Asks.firstAnswer(entries[symbol])
@@ -426,7 +428,7 @@ Item {
 
   Timer {
     id: retryTimer
-    interval: 2500
+    interval: root.retryAfter
     onTriggered: {
       root.cooling = []
       root.pump()

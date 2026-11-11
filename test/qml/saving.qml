@@ -35,7 +35,7 @@ Harness {
     name: "Saving"
     when: service.ready
 
-    readonly property var body: app.testBody
+    readonly property var body: app.body
 
     // $1 is the lists file, $2 its folder, $3 what the step hands in.
     function sh(script, text) {

@@ -21,10 +21,10 @@ Harness {
     name: "Mouse"
     when: service.ready
 
-    readonly property var body: app.testBody
+    readonly property var body: app.body
 
     function quiet() {
-      tryVerify(function() { return service.arriving.length === 0 && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 8000)
+      tryVerify(function() { return service.arriving.length === 0 && service.feeds.quotes.firstRun.length + service.feeds.quotes.refreshRun.length === 0 }, 8000)
     }
 
     // The middle of the thing named, or of the item given.

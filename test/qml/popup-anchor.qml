@@ -42,8 +42,8 @@ Harness {
     when: !!pill.panel
     function test_origins() {
       var panel = pill.panel
-      var card = panel.testCard
-      var held = panel.testHeldAnchor
+      var card = panel.keyboardPanel
+      var held = card.anchorItem
       held.barWindow = barWindow
       card.anchorWindow = barWindow
       var poses = {}

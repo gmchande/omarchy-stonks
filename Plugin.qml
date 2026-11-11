@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import Quickshell.Hyprland
 
 // The manifest's service entry. The pills and the panel reach its parts
 // through `serviceFor(id)`. Its id and name are the manifest's, which the
@@ -13,6 +14,10 @@ Item {
 
   property var shell: null
   property var manifest: null
+  // The desktop's Hyprland, for the screens and the window host, and the
+  // service's clock (`Service.wallClock`). A walk hands in its own of each.
+  property var hyprland: Hyprland
+  property var wallClock: null
   readonly property string pluginId: manifest && manifest.id ? String(manifest.id) : ""
   readonly property string name: manifest && manifest.name ? String(manifest.name) : ""
 
@@ -27,6 +32,7 @@ Item {
   Service {
     id: dataService
     pluginId: root.pluginId
+    wallClock: root.wallClock
     screens: displays
     updatable: versionWatch.updatable
   }
@@ -46,10 +52,11 @@ Item {
 
   Camera { id: shutter }
 
-  Screens { id: displays; watching: host.opened }
+  Screens { id: displays; hyprland: root.hyprland; watching: host.opened }
 
   WindowHost {
     id: host
+    hyprland: root.hyprland
     screens: displays
     shell: root.shell
     pluginId: root.pluginId

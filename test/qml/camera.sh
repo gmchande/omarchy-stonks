@@ -16,10 +16,6 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 touch "$STONKS_FAKE_STATE/after-hours"
 plugin_tree camera.qml
 card_window
-patch_copy plugin/Panel.qml '/readonly property int panelWidth:/a\  readonly property var testBody: root.body\n  readonly property alias testKeys: bodyKeys'
-patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property var testBody: root.body\n  readonly property alias testKeyCatcher: keyCatcher'
-# The flows wait for the quote feed to go quiet: nothing in flight or queued.
-patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testFeed: feed'
 scratch_home v1-data.json grvc.stonks.json
 # Omasnap, Omarchy 4.5's screenshot tool, is off the run's PATH: a folder on
 # it that holds a real one is linked in again, tool by tool, without it. A

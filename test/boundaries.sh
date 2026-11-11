@@ -4,8 +4,9 @@
 # runs" says; that the rule files stay pure; that colours come from the
 # theme; that the bar entry holds only the pill's forms; and that no file
 # takes QtQuick's Sprite name.
-# And one in the tests: a harness ends Quickshell only through
-# HarnessExit.qml.
+# And two in the tests: a harness ends Quickshell only through
+# HarnessExit.qml, and one that builds the whole plugin hands it a stand-in
+# for Hyprland.
 # Prints a FAILED line per breach and exits non-zero on any.
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -59,9 +60,12 @@ none '\.exec\s*\((?!\["timeout", "-k", "1", "4", "pw-play",)' Sounds.qml
 none '(?<!timeout -k 1 2 )pw-play --' Sounds.qml
 # Every command the camera and the file keeper run is under `timeout`.
 none 'command:\s*\[(?!"timeout",)' Camera.qml OwnerOnly.qml
-# Hyprland's dispatcher can start a program too: only the window's host and
-# the screens reach Hyprland.
-only '^import Quickshell\.Hyprland' WindowHost.qml Screens.qml
+# Hyprland's dispatcher can start a program too: only the plugin's entry
+# reaches Hyprland, to hand it on, and the one dispatch is the window
+# host's, which focuses the window.
+only '^import Quickshell\.Hyprland' Plugin.qml
+only '\.dispatch\s*\(' WindowHost.qml
+none '\.dispatch\s*\((?!"hl\.dsp\.focus\()' WindowHost.qml
 # A request leaves only from the feeds' runner, which only the feeds use,
 # and no QML names an address or asks any other way.
 only '\bFetchRun\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SearchFeed.qml
@@ -111,6 +115,12 @@ jq -e '[.barWidget.schema[].key] == ["barStyle", "barStyleRight", "barStyleVerti
   || fail "manifest.json: the bar entry's schema holds more than barStyle, barStyleRight, and barStyleVertical"
 # QtQuick owns Sprite: a Sprite.qml here would resolve as QtQuick's type.
 [ -e Sprite.qml ] && fail "Sprite.qml: QtQuick owns the Sprite type"
+# A harness that builds the whole plugin hands it a stand-in for Hyprland, so
+# no walk asks the owner's desktop whether its screens are off.
+hits=$(rg -n 'Stonks\.Plugin \{' -- test/qml | rg -v 'hyprland: ')
+[ -z "$hits" ] || while read -r hit; do
+  fail "$hit: a harness hands the plugin a stand-in for Hyprland (hyprland: ...)"
+done <<< "$hits"
 # Qt.exit tears Quickshell's engine down at the next deferred delete, which
 # QtTest's wait() runs under the test's handler: Qt aborts, and the abort
 # dumps core. HarnessExit.qml exits only once no test is running, so no other

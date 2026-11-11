@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
-# A stand-in for the omarchy command, first on PATH inside the walks, so a
-# footer click that restarts the shell restarts nothing: `plugin update`
-# succeeds, as one with nothing new does, and anything else is refused the
-# way `omarchy restart shell` is while the session is locked.
+# A stand-in for the omarchy command, first on PATH inside the walks. It
+# notes what it was given (STONKS_FAKE_STATE/omarchy.log) and runs nothing:
+# the terminal an update would open doesn't open, `plugin update` succeeds,
+# as one with nothing new does, and anything else is refused the way
+# `omarchy restart shell` is while the session is locked, so a footer click
+# that restarts the shell restarts nothing.
+[ -n "${STONKS_FAKE_STATE:-}" ] && echo "$*" >> "$STONKS_FAKE_STATE/omarchy.log"
+[ "$1" = launch ] && exit 0
 [ "$1 $2" = "plugin update" ] && exit 0
 echo "Refusing to restart Omarchy shell while the session is locked." >&2
 exit 1

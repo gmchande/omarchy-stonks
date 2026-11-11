@@ -6,7 +6,6 @@
 # can't land is said and lands when tried again. HOME and curl are scratch.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree saving.qml
-patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property var testBody: root.body'
 scratch_home v1-data.json grvc.stonks.json
 export QT_QPA_PLATFORM=offscreen
 run_qs 60

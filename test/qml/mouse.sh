@@ -8,9 +8,6 @@
 # never by where a thing is drawn. HOME and curl are scratch.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree mouse.qml
-patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property var testBody: root.body'
-# The flows wait for the quote feed to go quiet: nothing in flight or queued.
-patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testFeed: feed'
 scratch_home v1-data.json grvc.stonks.json
 export QT_QPA_PLATFORM=offscreen
 run_qs 90

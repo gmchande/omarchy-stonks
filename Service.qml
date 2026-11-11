@@ -625,6 +625,8 @@ Item {
   }
   readonly property var nights: overnightFeed.entries
   readonly property var allDay: allDayFeed.entries
+  // The feeds themselves, for whoever waits until no run is out.
+  readonly property var feeds: ({ quotes: feed, preview: previewFeed, overnight: overnightFeed })
   // By Yahoo's quote, never Robinhood's answer: Robinhood is asked whether
   // it trades each all day.
   readonly property var overnightSymbols: allSymbols.filter(function(s) {
@@ -1016,13 +1018,15 @@ Item {
 
   // ---- The clock
 
-  property int now: Math.floor(Date.now() / 1000)
+  // The wall clock in seconds, read only in `wallSecond`: the desktop's,
+  // unless a walk hands in its own.
+  property var wallClock: null
+  function wallSecond() { return wallClock ? wallClock() : Math.floor(Date.now() / 1000) }
+  property int now: wallSecond()
 
   // Each second while a surface is open, each minute otherwise; it also
   // wakes when the next quote falls due, a pause ends, or a refresh turns
-  // overdue, so the pill's "!" comes on time. The wall clock is read only
-  // in `wallSecond`.
-  function wallSecond() { return Math.floor(Date.now() / 1000) }
+  // overdue, so the pill's "!" comes on time.
   function tick() {
     root.now = root.wallSecond()
     root.armClock()
