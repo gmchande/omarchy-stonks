@@ -181,6 +181,15 @@ function trend(green, red, ground) {
   return ownPair(ground)
 }
 
+// The ground the bar's text is read on, opaque. A clear bar takes the
+// theme's background for its text where the wallpaper behind it reads better
+// so (`omarchy-bar-text-color`): a light wallpaper under a dark theme. The
+// bar's background isn't drawn then, and the text was chosen against a ground
+// like the theme's bar text, so the pill's colours are judged on that.
+function barGround(clear, text, themeText, background) {
+  return hexOf(clear && hexOf(text) !== hexOf(themeText) ? themeText : background)
+}
+
 // WCAG 2's contrast between two opaque colours.
 function contrast(x, y) {
   var lum = function(c) { return 0.2126 * linear(c.r) + 0.7152 * linear(c.g) + 0.0722 * linear(c.b) }

@@ -270,6 +270,11 @@ Harness {
     ? Qt.rgba(Commons.Color.popups.background.r, Commons.Color.popups.background.g, Commons.Color.popups.background.b, 1) : Commons.Color.background
   // The bar's own ground and ink, opaque, for the pills.
   readonly property color barGround: Qt.rgba(Commons.Color.bar.background.r, Commons.Color.bar.background.g, Commons.Color.bar.background.b, 1)
+  // pill-sheet-clear: a clear bar over a light wallpaper, a plain light
+  // colour standing for it, its text the theme's background, as the shell
+  // picks it there (`omarchy-bar-text-color`).
+  readonly property bool clearBar: stateName === "pill-sheet-clear"
+  readonly property color lightWallpaper: "#e6e2d8"
   property int now: holidayState ? 1813334400 : (nestState || nestDayState ? 1789156800 : 1788294000)
   property string shownRange: historyState ? "1Y" : "1D"
   property var shownHistoryEntry: null
@@ -1310,6 +1315,14 @@ Harness {
                 .concat([{ style: "text", retro: retroLook, day: "up", compact: true }, { style: "icon", retro: retroLook, day: "up", compact: true }])
             }
             if (!root.pillSheet) return []
+            // On a clear bar over a light wallpaper, the sparkline and text
+            // forms down and up, in each look.
+            if (root.clearBar)
+              return [false, true].reduce(function(all, retro) {
+                return all.concat(["sparkline", "text"].reduce(function(forms, style) {
+                  return forms.concat(["down", "up"].map(function(day) { return { style: style, retro: retro, day: day } }))
+                }, []))
+              }, [])
             // At night, every form in each look, JNJ's price tonight on top.
             if (root.stateName === "pill-sheet-night")
               return [false, true].reduce(function(all, retro) {
@@ -1377,7 +1390,7 @@ Harness {
               width: 230
               height: Style.bar.sizeHorizontal
               anchors.verticalCenter: parent.verticalCenter
-              color: root.barGround
+              color: root.clearBar ? root.lightWallpaper : root.barGround
 
               QtObject {
                 id: pillService
@@ -1409,7 +1422,8 @@ Harness {
                 shell: pillShell
                 // The bar mirrors these onto the facade; the render sets them.
                 foreground: Commons.Color.bar.text
-                barForeground: Commons.Color.bar.text
+                barForeground: root.clearBar ? Commons.Color.background : Commons.Color.bar.text
+                transparent: root.clearBar
                 fontFamily: Style.font.family
                 barSize: Style.bar.sizeHorizontal
                 layoutConfig: pillRow.modelData.right ? { left: [], center: [], right: [{ id: root.copyId }] } : ({})
@@ -1443,7 +1457,7 @@ Harness {
               width: Style.bar.sizeVertical
               height: verticalPill.implicitHeight
               anchors.verticalCenter: parent.verticalCenter
-              color: root.barGround
+              color: root.clearBar ? root.lightWallpaper : root.barGround
               clip: true
 
               PluginBarApi {
@@ -1453,7 +1467,8 @@ Harness {
                 shell: pillShell
                 vertical: true
                 foreground: Commons.Color.bar.text
-                barForeground: Commons.Color.bar.text
+                barForeground: root.clearBar ? Commons.Color.background : Commons.Color.bar.text
+                transparent: root.clearBar
                 fontFamily: Style.font.family
                 barSize: Style.bar.sizeVertical
                 layoutConfig: pillApi.layoutConfig

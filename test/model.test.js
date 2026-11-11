@@ -1791,6 +1791,21 @@ test("community themes that one hue, a faint colour, or a tinted light ground wo
   }
 })
 
+test("on a clear bar over a light wallpaper the pill's colours are judged on the light ground its text was chosen for", () => {
+  const barText = M.hexColor("#c0caf5"), themeBackground = M.hexColor("#1a1b26"), barBackground = M.hexColor("#1a1b26")
+  const colour = c => typeof c === "string" ? M.hexColor(c) : c
+  // The shell turned the clear bar's text to the theme's background: the
+  // ground is like the theme's bar text, and up and down read on it.
+  const light = M.barGround(true, themeBackground, barText, barBackground)
+  expect(light).toBe("#c0caf5")
+  const pair = M.trend("#9ece6a", M.hexColor("#f7768e"), M.hexColor(light))
+  expect([M.contrast(colour(pair.up), M.hexColor(light)) >= 3, M.contrast(colour(pair.down), M.hexColor(light)) >= 3]).toEqual([true, true])
+  // A clear bar over a dark wallpaper keeps the theme's bar text, and an
+  // opaque bar draws its background: the bar's background is the ground.
+  expect(M.barGround(true, barText, barText, barBackground)).toBe("#1a1b26")
+  expect(M.barGround(false, themeBackground, barText, barBackground)).toBe("#1a1b26")
+})
+
 // Each parser fed hostile answers, in a child process with a time limit: a
 // loop without end in a parser holds the shell's one thread, and with it
 // the bar, the launcher, and every other plugin, and the test's own timeout

@@ -294,8 +294,9 @@ every_state() (
     done
   done
   # The pill at a larger and a smaller text size, as `omarchy display text
-  # size` would set it; and at night, its price tonight on top.
-  states="$states pill-sheet-large pill-sheet-small pill-sheet-night"
+  # size` would set it; and at night, its price tonight on top. On a clear
+  # bar over a light wallpaper, its text turned dark for it.
+  states="$states pill-sheet-large pill-sheet-small pill-sheet-night pill-sheet-clear"
   # The screenshot the camera takes, in both looks, of every kind of
   # listing: a thin stock, an ETF, an index, Bitcoin, London after its
   # close, Tokyo at lunch, a stock after hours, scrubbed, and a range at

@@ -42,6 +42,7 @@ declare -A listed=(
 shell_members=" Style.font.family Style.font.title Style.font.body Style.font.bodySmall
   Style.font.caption Style.font.display Style.font.displayLarge Style.font.icon
   Style.bar.iconSlot Style.bar.iconCanvas Commons.Color.popups.background Commons.Color.bar.background BarWidget.qml:bar.shell BarWidget.qml:bar.layoutConfig
+  BarWidget.qml:bar.transparent BarWidget.qml:bar.barForeground BarWidget.qml:bar.foreground
   Panel.qml:bar.shell Panel.qml:bar.foreground Panel.qml:bar.fontFamily
   Panel.qml:bar.switchPanelFrom Panel.qml:bar.setCenterHoverRevealSuppressed "
 shell_members=${shell_members//$'\n'/ }

@@ -113,7 +113,8 @@ BarWidget {
     shownDay = animalDay()
     shownKind = Figures.animalKind(featured)
   }
-  readonly property color barGround: Util.alpha(Commons.Color.bar.background, 1)
+  // On a clear bar over a light wallpaper, the light ground its text was chosen for.
+  readonly property color barGround: Tones.barGround(!!bar && bar.transparent === true, bar && bar.barForeground, bar && bar.foreground, Commons.Color.bar.background)
   readonly property color dimColor: Tones.dim(button.foreground, barGround)
   // The bar is the surface most trusted at a glance, so a failed or overdue
   // refresh marks the pill too. Overdue names no source: not every reader

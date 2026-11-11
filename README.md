@@ -244,7 +244,8 @@ switch, press `s`, or click the small chart icon at the top right.
 Both use your theme's green for up and its red for down, on light themes
 too, and never its accent color, which Omarchy keeps for what's selected.
 Where a theme's pair is missing, too alike, or too faint, Stonks uses its
-own.
+own. On a clear bar over a light wallpaper, where Omarchy turns the bar's
+text dark, the pill's green and red turn dark too.
 
 ## Sounds
 
