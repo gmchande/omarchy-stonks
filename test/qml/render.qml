@@ -24,7 +24,7 @@ import "plugin"
 // w22-<surface>-<look>-<symbol>-<range> states render the 22-symbol list with
 // a real day featured, at identical state in both looks; a panel is as tall
 // as its whole rows, the way Panel sizes it. sprite-candidates draws the
-// bull and bear candidates at 1x and 4x. pill-sheet draws the real bar pill
+// bull and the bear at three sizes. pill-sheet draws the real bar pill
 // for NEST in every bar style and look, on a horizontal and a vertical bar.
 Harness {
   id: root
@@ -295,40 +295,6 @@ Harness {
 
   function rate(pair) {
     return { value: Fundamentals.parseRate(fundamentalsAnswer("fx-" + pair.toLowerCase()), pair), checkedAt: 0 }
-  }
-
-  readonly property var bullCandidates: [
-    [".##..............##.", "##................##", "##................##", ".###............###.",
-     "..#####......#####..", "....############....", "###.############.###", ".##.#.########.#.##.",
-     "....############....", "....############....", "...##############...", "...###.######.###...",
-     "...##############...", "....############...."],
-    Cells.BULL_SPRITE.slice(),
-    [".##..............##.", "##................##", "##................##", ".###............###.",
-     "..#####......#####..", "....############....", "###.############.###", ".##.#.########.#.##.",
-     "....############....", "...##############...", "...###.######.###...", "...##############...",
-     "....#####..#####....", "........####........"]
-  ]
-  // The bear candidates for a face to match the bull's: one read as a pig,
-  // the teddy with inner ears and a mouth, the grizzly (the default), and the
-  // bull's twin with a short muzzle.
-  readonly property var bearCandidates: [
-    ["....................", ".........#####......", ".......##########...", "..###.############..",
-     ".#.###.############.", "####.##############.", "###################.", ".##################.",
-     "...################.", "....####.....#####..", "....####......####..", "....####......####..",
-     "...#####.....#####..", "...................."],
-    ["....................", "..###..........###..", ".#####........#####.", ".##.############.##.",
-     ".##################.", "..################..", "..####.######.####..", ".##################.",
-     ".#######....#######.", ".########..########.", ".#######.##.#######.", "..#######..#######..",
-     "....############....", "......########......"],
-    Cells.BEAR_SPRITE.slice(),
-    ["....................", "..###..........###..", ".#####........#####.", ".##################.",
-     ".##################.", "..####.######.####..", "..################..", "..################..",
-     "...##############...", "....############....", "....############....", "....####....####....",
-     ".....####..####.....", "......########......"]
-  ]
-
-  function isDefaultSprite(rows, standard) {
-    return rows.join("|") === standard.join("|")
   }
 
   FileView { id: aaplFile; path: fixtureDir + "/aapl.json"; blockLoading: true }
@@ -1205,11 +1171,11 @@ Harness {
     // surfaces at size N: the panel's 480 and the smallest window's 560
     // grow with the text, and the window is 720 or its smallest, whichever
     // is wider.
-    implicitWidth: root.anchorState ? 1000 : root.pillSheet ? Math.max(520, pillColumn.implicitWidth + 48) : root.themeState ? 480 + 410 : root.sheet ? 1000
+    implicitWidth: root.anchorState ? 1000 : root.pillSheet ? Math.max(520, pillColumn.implicitWidth + 48) : root.themeState ? 480 + 410 : root.sheet ? 360
       : (root.windowWidth ? root.windowWidth : root.chartHover ? 719 : (root.smallest ? Math.round(560 * root.sizeScale)
         : (root.popup ? Math.round(480 * root.sizeScale) : Math.max(720, Math.round(560 * root.sizeScale)))))
     implicitHeight: root.anchorState ? body.fittedHeight(body.chromeHeight + 6 * body.rowPitch - body.rowGap) + content.inset * 2 + 56
-      : root.stateName === "pill-sheet-large" ? 720 : root.pillSheet ? pillColumn.implicitHeight + 40 : root.sheet ? 460
+      : root.stateName === "pill-sheet-large" ? 720 : root.pillSheet ? pillColumn.implicitHeight + 40 : root.sheet ? 320
       : root.themeState ? Math.max(body.fittedHeight(body.chromeHeight + 3 * body.rowPitch - body.rowGap) + content.inset * 2, pillColumn.implicitHeight + 40)
       : (root.windowWidth ? 850
         : (root.smallest ? body.smallestHeight
@@ -1508,53 +1474,28 @@ Harness {
 
         Repeater {
           model: [
-            { title: "BULL", color: "#8fc08a", sprites: root.bullCandidates, standard: Cells.BULL_SPRITE },
-            { title: "BEAR", color: "#e05a7a", sprites: root.bearCandidates, standard: Cells.BEAR_SPRITE }
+            { title: "BULL", color: "#8fc08a", sprite: Cells.BULL_SPRITE },
+            { title: "BEAR", color: "#e05a7a", sprite: Cells.BEAR_SPRITE }
           ]
 
           Column {
-            id: family
+            id: animal
             required property var modelData
+            readonly property var pixels: Cells.spritePixels(modelData.sprite)
             spacing: 8
 
-            Row {
-              spacing: 32
-              Repeater {
-                model: family.modelData.sprites
-                Column {
-                  id: candidate
-                  required property var modelData
-                  required property int index
-                  spacing: 6
-                  Text {
-                    text: family.modelData.title + " " + (candidate.index + 1)
-                      + (root.isDefaultSprite(candidate.modelData, family.modelData.standard) ? "  DEFAULT" : "")
-                    color: "#8a8d8d"
-                    font.family: Style.font.family
-                    font.pixelSize: 10
-                    font.bold: true
-                  }
-                  Row {
-                    spacing: 16
-                    PixelSprite { width: 40; height: 28; pixels: Cells.spritePixels(candidate.modelData); color: family.modelData.color }
-                    PixelSprite { width: 80; height: 56; pixels: Cells.spritePixels(candidate.modelData); color: family.modelData.color }
-                  }
-                }
-              }
+            Text {
+              text: animal.modelData.title
+              color: "#8a8d8d"
+              font.family: Style.font.family
+              font.pixelSize: 10
+              font.bold: true
             }
-
             Row {
-              spacing: 32
-              Repeater {
-                model: family.modelData.sprites
-                PixelSprite {
-                  required property var modelData
-                  width: 160
-                  height: 112
-                  pixels: Cells.spritePixels(modelData)
-                  color: family.modelData.color
-                }
-              }
+              spacing: 16
+              PixelSprite { width: 40; height: 28; pixels: animal.pixels; color: animal.modelData.color }
+              PixelSprite { width: 80; height: 56; pixels: animal.pixels; color: animal.modelData.color }
+              PixelSprite { width: 160; height: 112; pixels: animal.pixels; color: animal.modelData.color }
             }
           }
         }
