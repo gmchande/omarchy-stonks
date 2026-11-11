@@ -1939,6 +1939,20 @@ test("a hostile search or Robinhood answer reads as no answer, at once", async (
 // Half a UTF-16 pair can't go in a URL: the quote feed would take its
 // first-answer slot, encodeURIComponent would throw before any request
 // started, and no new symbol's quote would come until the shell restarts.
+test("search keeps each answer by the words it answers until it closes: two words get their own, any words at all, and words that failed or are asked again aren't kept", () => {
+  const apple = { results: [{ symbol: "AAPL" }] }
+  const pineapple = { results: [{ symbol: "PINE" }] }
+  var kept = new Map()
+  for (const [words, found] of [["app", apple], ["apple", pineapple], ["constructor", apple], ["__proto__", pineapple], ["App", pineapple]]) kept = M.withAnswer(kept, words, found)
+  expect(["app", "apple", "constructor", "__proto__", "App", "ap"].map(words => M.keptAnswer(kept, words)))
+    .toEqual([apple, pineapple, apple, pineapple, pineapple, null])
+  // A failed lookup keeps nothing, and leaves what was kept.
+  expect(M.withAnswer(kept, "ap", null)).toBe(kept)
+  // Asked again, those words alone are let go; the rest still answer.
+  const again = M.withoutAnswer(kept, "app")
+  expect([M.keptAnswer(again, "app"), M.keptAnswer(again, "apple"), M.keptAnswer(kept, "app")]).toEqual([null, pineapple, apple])
+})
+
 test("search leaves out a symbol no request can carry", () => {
   const found = M.parseSearch(JSON.parse('{"quotes":[{"symbol":"\\ud800","quoteType":"EQUITY"},{"symbol":"AAPL","quoteType":"EQUITY"}]}'))
   expect(found.results.map(r => M.chartUrl(r.symbol))).toEqual([M.chartUrl("AAPL")])
