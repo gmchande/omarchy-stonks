@@ -190,7 +190,7 @@ Item {
   }
   onOnScreenChanged: {
     if (service) service.surfaceShown(root, surfaceOpen && onScreen)
-    if (onScreen) search.pump()
+    if (onScreen) searchFeed.pump()
   }
   onServiceChanged: if (service && surfaceOpen && onScreen) service.surfaceShown(root, true)
 
@@ -218,7 +218,7 @@ Item {
     target: root.service
     ignoreUnknownSignals: true
     function onPreviewTaken(surface) { if (surface === root) root.cancelAdding() }
-    function onScreensReady() { search.pump() }
+    function onScreensReady() { searchFeed.pump() }
     function onYahooBack() { if (root.onScreen) search.yahooBack() }
   }
 
@@ -1279,6 +1279,14 @@ Item {
     onPointerMoved: root.landingPointed = false
   }
 
+  SearchFeed {
+    id: searchFeed
+    gate: root.service ? root.service.yahooGate : null
+    clearance: root.service ? function() { return root.onScreen && root.service.screensClear() } : null
+    active: search.active
+    wanted: search.searchText.trim()
+  }
+
   SymbolSearch {
     id: search
     objectName: "symbolSearch"
@@ -1291,8 +1299,7 @@ Item {
     anchors.topMargin: root.groupGap
     anchors.bottomMargin: root.margins
     visible: root.adding
-    gate: root.service ? root.service.yahooGate : null
-    clearance: root.service ? function() { return root.onScreen && root.service.screensClear() } : null
+    feed: searchFeed
     active: root.adding && root.surfaceOpen
     look: root.look
     gutter: root.gutter

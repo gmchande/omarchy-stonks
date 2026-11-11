@@ -4,10 +4,10 @@ import QtQuick
 import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Commons as Commons
-import "Fetch.js" as Fetch
 import "Search.js" as Search
-// Search's field, results and Yahoo lookup. A FocusScope, so that hiding it
-// takes the keys from the field: a hidden field keeps them otherwise.
+// Search's field and results. Yahoo's lookup is its feed's
+// (`SearchFeed.qml`). A FocusScope, so that hiding it takes the keys from
+// the field: a hidden field keeps them otherwise.
 FocusScope {
   id: root
 
@@ -75,8 +75,6 @@ FocusScope {
     // Until Yahoo answers, the chart stays on what it shows.
     else resultIndex = -1
   }
-  property string activeQuery: ""
-  property string requestedQuery: ""
   property string searchText: ""
   property string placeholder: ""
   // The list on screen's members, arriving ones too.
@@ -154,10 +152,8 @@ FocusScope {
   function reset() {
     slow = false
     resultsScroll.contentY = 0
-    activeQuery = ""
-    requestedQuery = ""
+    feed.forget()
     enterFor = ""
-    searchDebounce.stop()
     searchField.text = ""
     showEmpty()
     var kept = resumed
@@ -166,8 +162,7 @@ FocusScope {
   }
 
   function cancel() {
-    searchDebounce.stop()
-    requestedQuery = ""
+    feed.forget()
     enterFor = ""
     cancelled()
   }
@@ -202,18 +197,10 @@ FocusScope {
     else if (index >= 0 && index < shown.length) picked(shown[index].symbol, !!pointed)
   }
 
-  // Asked once: a lookup of it still waiting on the typing pause goes now.
   function retry() {
     if (stale || answer !== "failed" || failure === "missing") return
-    searchDebounce.stop()
     answer = ""
-    if (fetchRun.out && activeQuery === searchText.trim()) {
-      requestedQuery = ""
-      slowSearch.restart()
-    } else {
-      if (gate) gate.hurry()
-      runSearch()
-    }
+    feed.askAgain()
   }
 
   // A click is Enter on the result: chosen first, so the hero is on it, then
@@ -237,7 +224,7 @@ FocusScope {
       showEmpty()
       return
     }
-    searchDebounce.restart()
+    feed.askSoon()
   }
 
   function choose(index) {
@@ -258,13 +245,11 @@ FocusScope {
       resultsScroll.contentY = Math.max(0, Math.min(limit, bottom - resultsScroll.height))
   }
 
-  // Yahoo's gate (`Gate.qml`), held by the service; null without one.
-  property var gate: null
-  property var clearance: null
-  // "none" when nothing answered, "refused", "missing" when Yahoo called the
-  // question wrong (as it does an emoji), or "other" (`Search.failure`). Set
-  // by the answer that lands, so a run stopped or overtaken by typing never
-  // changes what the answer on screen says.
+  // Yahoo's lookup, which the surface holds.
+  property SearchFeed feed
+  // Why the answer on screen failed (`SearchFeed.answered`). Set by the
+  // answer that lands, so a run stopped or overtaken by typing never changes
+  // what the answer on screen says.
   property string failure: ""
 
   // Only a lookup that failed for want of Yahoo is asked again as it answers.
@@ -272,100 +257,54 @@ FocusScope {
     if (active && (failure === "none" || failure === "refused")) retry()
   }
 
-  // A lookup already out for this same query answers it.
-  function runSearch() {
-    var q = searchText.trim()
-    if (q.length < 1) return
-    if (fetchRun.out) {
-      if (activeQuery === q) return
-      requestedQuery = q
-      activeQuery = ""
-      fetchRun.stop()
-      return
+  // The answer for the words in the field. A body of "" fails to parse: no
+  // answer, failed for `why`.
+  function land(query, body, why) {
+    root.failure = why
+    var first = 0
+    try {
+      var parsed = Search.parseSearch(JSON.parse(body))
+      root.results = parsed.results
+      root.note = parsed.note
+      root.answer = parsed.results.length > 0 || parsed.note !== "" ? "results" : "none"
+      if (parsed.topLeftOut) first = -1
+    } catch (e) {
+      root.results = []
+      root.note = ""
+      root.answer = "failed"
     }
-    if (clearance && !clearance()) { requestedQuery = q; return }
-    requestedQuery = ""
-    activeQuery = q
-    if (gate && gate.take(1) === 0) {
-      land("", gate.pause === "refused" || gate.pause === "none" ? gate.pause : "other")
-      return
+    root.resultsQuery = query
+    root.slow = false
+    var kept = root.enterFor
+    root.enterFor = ""
+    // Yahoo's rows join below the list's own, so the choice stays, unless
+    // an Enter waited for this answer: it takes Yahoo's first.
+    var taken = kept === root.resultsQuery && root.answer !== "failed"
+    if (root.ownCount === 0 || taken) {
+      resultsScroll.contentY = 0
+      root.choose(first < 0 ? -1 : root.ownCount + first)
     }
-    fetchRun.send([Search.searchUrl(q)], Fetch.SEARCH_CAP)
-    if (answer === "" && !slow) slowSearch.restart()
-  }
-
-  function pump() {
-    if (active && requestedQuery !== "" && !fetchRun.out) root.runSearch()
-  }
-
-  // An answer counts only for the query still in the field. A body of ""
-  // fails to parse: no answer, failed for `why`.
-  function land(body, why) {
-    slowSearch.stop()
-    if (root.active && root.activeQuery !== "" && root.activeQuery === root.searchText.trim()) {
-      root.failure = why
-      var first = 0
-      try {
-        var parsed = Search.parseSearch(JSON.parse(body))
-        root.results = parsed.results
-        root.note = parsed.note
-        root.answer = parsed.results.length > 0 || parsed.note !== "" ? "results" : "none"
-        if (parsed.topLeftOut) first = -1
-      } catch (e) {
-        root.results = []
-        root.note = ""
-        root.answer = "failed"
-      }
-      root.resultsQuery = root.activeQuery
-      root.slow = false
-      var kept = root.enterFor
-      root.enterFor = ""
-      // Yahoo's rows join below the list's own, so the choice stays, unless
-      // an Enter waited for this answer: it takes Yahoo's first.
-      var taken = kept === root.resultsQuery && root.answer !== "failed"
-      if (root.ownCount === 0 || taken) {
-        resultsScroll.contentY = 0
-        root.choose(first < 0 ? -1 : root.ownCount + first)
-      }
-      searchField.forceActiveFocus()
-      if (taken) root.accept(root.resultIndex)
-    }
-    if (root.requestedQuery !== "") {
-      root.requestedQuery = ""
-      root.runSearch()
-    }
+    searchField.forceActiveFocus()
+    if (taken) root.accept(root.resultIndex)
   }
 
   function suspend() {
-    searchDebounce.stop()
     slowSearch.stop()
-    requestedQuery = ""
-    activeQuery = ""
     enterFor = ""
-    // Its stream ends at once, empty, with no query left to answer.
-    if (fetchRun.out) fetchRun.stop()
+    feed.drop()
   }
 
-  Timer {
-    id: searchDebounce
-    interval: 250
-    onTriggered: root.runSearch()
+  Connections {
+    target: root.feed
+    function onAsked() { if (root.answer === "" && !root.slow) slowSearch.restart() }
+    function onEnded() { slowSearch.stop() }
+    function onAnswered(query, body, why) { root.land(query, body, why) }
   }
 
   Timer {
     id: slowSearch
     interval: 250
-    onTriggered: if (fetchRun.out && root.answer === "") root.slow = true
-  }
-
-  FetchRun {
-    id: fetchRun
-    gate: root.gate
-    onEnded: function(got) {
-      // No answer at all, as from a curl stopped short, is nothing answered.
-      var answer = got.length ? got[0] : null
-      root.land(answer && answer.kind === "ok" ? answer.body : "", Search.failure(answer))
-    }
+    onTriggered: if (root.feed.out && root.answer === "") root.slow = true
   }
 
   Flickable {
