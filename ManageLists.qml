@@ -202,14 +202,14 @@ FocusScope {
     // While renaming, the field has the keys; what it lets past goes nowhere.
     event.accepted = true
     if (root.renaming) return
-    var shifted = (event.modifiers & ~Qt.KeypadModifier) === Qt.ShiftModifier
+    var moving = (event.modifiers & ~Qt.KeypadModifier) === Qt.ControlModifier
     if (event.key === Qt.Key_Escape) { if (root.confirming) root.confirming = false; else root.dismissed() }
     else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
       if (root.confirming) root.confirmDelete()
       else root.startRenaming(root.cursor)
     }
-    else if (shifted && event.key === Qt.Key_Down) root.move(root.cursor, 1)
-    else if (shifted && event.key === Qt.Key_Up) root.move(root.cursor, -1)
+    else if (moving && event.key === Qt.Key_Down) root.move(root.cursor, 1)
+    else if (moving && event.key === Qt.Key_Up) root.move(root.cursor, -1)
     else if (event.key === Qt.Key_Down) root.moveCursor(1)
     else if (event.key === Qt.Key_Up) root.moveCursor(-1)
     else if (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) root.askDelete(root.cursor)
