@@ -45,7 +45,7 @@ FocusScope {
   readonly property string typedName: renaming ? nameField.text : ""
 
   readonly property int itemHeight: Style.space(30)
-  readonly property var rowSize: ({ pitch: itemHeight, height: itemHeight })
+  function rowSize() { return { pitch: itemHeight, height: itemHeight } }
   // The rows' scrollbar gutter and text inset, so these words line up with
   // the rows underneath.
   property int gutter: 0
@@ -100,7 +100,7 @@ FocusScope {
 
   function showCursor() {
     scroll.cancelFlick()
-    scroll.contentY = Rows.topShowing(cursor, rowSize, scroll.contentY, scroll.height)
+    scroll.contentY = Rows.topShowing(cursor, rowSize(), scroll.contentY, scroll.height)
   }
 
   // After a scroll by hand: the nearest list wholly in sight, or in a view
@@ -108,7 +108,7 @@ FocusScope {
   // question keeps its row.
   function keepCursorInSight() {
     if (renaming || confirming) return
-    cursor = Rows.cursorKeptInSight(cursor, choices.length, rowSize, scroll.contentY, scroll.height)
+    cursor = Rows.cursorKeptInSight(cursor, choices.length, rowSize(), scroll.contentY, scroll.height)
   }
 
   function startRenaming(index) {

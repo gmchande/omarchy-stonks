@@ -60,7 +60,9 @@ Flickable {
   property var arrangedView: null
 
   readonly property int rowPitch: rowHeight + rowGap
-  readonly property var rowSize: ({ pitch: rowPitch, height: rowHeight })
+  // Read at each use: a handler of rowPitch's change runs before a binding
+  // on it would catch up.
+  function rowSize() { return { pitch: rowPitch, height: rowHeight } }
   property int lastPitch: 0
   onRowPitchChanged: {
     if (lastPitch > 0) {
@@ -78,14 +80,14 @@ Flickable {
   // Read where the list is headed, so a key gliding the list to its row
   // keeps it.
   readonly property string cursorRow: Rows.cursorRow(displayedSymbols, cursorSymbol, cursorSymbol === dragSymbol, featuredSymbol,
-    rowSize, headedY, sightHeight)
+    rowSize(), headedY, sightHeight)
   // A cursor of your own that leaves sight is let go, on these changes
   // rather than on cursorRow's, which reads the cursor it would clear.
   onHeadedYChanged: letGoUnseen()
   onSightHeightChanged: keepCursorInSight()
   onDisplayedSymbolsChanged: letGoUnseen()
   function letGoUnseen() {
-    if (cursorSymbol !== "" && !Rows.chosenSeen(displayedSymbols, cursorSymbol, cursorSymbol === dragSymbol, rowSize, headedY, sightHeight))
+    if (cursorSymbol !== "" && !Rows.chosenSeen(displayedSymbols, cursorSymbol, cursorSymbol === dragSymbol, rowSize(), headedY, sightHeight))
       cursorSymbol = ""
   }
   property real lastSight: 0
@@ -95,7 +97,7 @@ Flickable {
     var at = displayedSymbols.indexOf(keep)
     // The featured row only if it was whole in sight before, so a resize
     // never pulls the list back to it.
-    if (keep !== "" && cursorSymbol === "" && !(at >= 0 && Rows.rowWhole(at, rowSize, headedY, lastSight))) at = -1
+    if (keep !== "" && cursorSymbol === "" && !(at >= 0 && Rows.rowWhole(at, rowSize(), headedY, lastSight))) at = -1
     if (at >= 0 && sightHeight >= rowHeight && !wholeInSight(at, headedY)) {
       var own = cursorSymbol
       // Judged from where a key's glide was headed, so stopping the glide
@@ -260,7 +262,7 @@ Flickable {
   // Glides to bring the row whole into view, resting on a row boundary. A
   // row already whole leaves the list where it is, between rows too.
   function scrollToRow(index) {
-    var at = Rows.topShowing(index, rowSize, headedY, height)
+    var at = Rows.topShowing(index, rowSize(), headedY, height)
     if (at !== headedY) glideTo(snappedY(at))
   }
 
@@ -279,7 +281,7 @@ Flickable {
   // click stopped it, even between rows.
   function handTo(symbol) {
     var index = displayedSymbols.indexOf(symbol)
-    if (index >= 0 && Rows.rowSeen(index, rowSize, headedY, sightHeight)) cursorSymbol = symbol
+    if (index >= 0 && Rows.rowSeen(index, rowSize(), headedY, sightHeight)) cursorSymbol = symbol
     else select(symbol)
     scrolledUnder = symbol
   }
@@ -335,17 +337,17 @@ Flickable {
 
   // Against sightHeight, so the card's edge easing past moves no cursor.
   function wholeInSight(index, top) {
-    return Rows.rowWhole(index, rowSize, top, sightHeight)
+    return Rows.rowWhole(index, rowSize(), top, sightHeight)
   }
 
   // The rows in sight where the list is headed, which the service fetches
   // ahead. From row numbers, so it changes only as a row crosses the edge.
-  readonly property int sightFirst: Rows.rowsSeen(rowSize, headedY, sightHeight).first
-  readonly property int sightLast: Rows.rowsSeen(rowSize, headedY, sightHeight).last
+  readonly property int sightFirst: Rows.rowsSeen(rowSize(), headedY, sightHeight).first
+  readonly property int sightLast: Rows.rowsSeen(rowSize(), headedY, sightHeight).last
   readonly property var sightSymbols: displayedSymbols.slice(sightFirst, Math.max(sightFirst, sightLast + 1))
 
   function restingTopFor(index, top) {
-    return Rows.restingTop(index, rowSize, top, sightHeight, rowsLength())
+    return Rows.restingTop(index, rowSize(), top, sightHeight, rowsLength())
   }
 
   // With `animate`, a new row fades in at its place and the rest slide. A
