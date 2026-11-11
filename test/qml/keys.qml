@@ -329,29 +329,38 @@ Harness {
       press("Esc")
 
       // Words Yahoo has answered since search opened answer again at once,
-      // as after a Backspace, and nothing is asked. Opened afresh, they are.
+      // as after a Backspace, and nothing is asked. Words it failed are
+      // asked again, and so is every word once search is opened afresh. The
+      // word here is one every JavaScript object has, asked like any other.
+      var shows = function(words) {
+        return within(5000, function() { return b.search.resultsQuery === words && !retry() && harness.findAll(b, "searchResult").length > 1 })
+      }
       quiet()
+      fault(true)
       press("a")
       typing("searchField")
-      type("qqq")
-      var results = function() { return harness.findAll(b, "searchResult").length > 1 }
-      var first = within(5000, function() { return results() && !b.search.stale })
+      type("constructor")
+      var failedFirst = within(5000, retry)
+      fault(false)
       press("Backspace")
-      var second = within(5000, function() { return b.search.resultsQuery === "qq" })
-      var askedTwice = harness.calls("SEARCH.asked")
-      type("q")
-      var again = within(2000, function() { return b.search.resultsQuery === "qqq" && !b.search.stale })
+      var shorter = shows("constructo")
+      type("r")
+      var askedAgain = shows("constructor")
+      var askedSoFar = harness.calls("SEARCH.asked")
+      press("Backspace")
+      var atOnce = shows("constructo")
       // Time for a lookup that must not go: the typing pause and more.
       wait(600)
-      var unasked = harness.calls("SEARCH.asked") === askedTwice
+      var unasked = harness.calls("SEARCH.asked") === askedSoFar
       press("Esc")
       press("a")
       typing("searchField")
-      type("qqq")
-      var afresh = within(5000, function() { return harness.calls("SEARCH.asked") === askedTwice + 1 })
+      type("constructor")
+      var afresh = within(5000, function() { return harness.calls("SEARCH.asked") === askedSoFar + 1 })
       press("Esc")
-      harness.check("words looked up since search opened answer again at once and ask nothing; opened afresh, they are asked",
-        first && second && again && unasked && afresh, [first, second, again, unasked, afresh, harness.calls("SEARCH.asked") - askedTwice].join(" "))
+      harness.check("words looked up since search opened answer again at once and ask nothing; failed, or opened afresh, they are asked",
+        failedFirst && shorter && askedAgain && atOnce && unasked && afresh,
+        [failedFirst, shorter, askedAgain, atOnce, unasked, afresh, harness.calls("SEARCH.asked") - askedSoFar].join(" "))
 
       // w, down to New list, Enter, a name, Enter: the list is made and
       // shown, with search open to fill it.

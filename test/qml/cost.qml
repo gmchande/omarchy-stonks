@@ -160,7 +160,8 @@ Harness {
           + "; " + warnedSteps + " of 120 steps warned")
 
       // The rows built: those within a screen above sight and two below,
-      // at the top, at the end of the list, and back at the top.
+      // at the top, at the end of the list, and after the wheel has carried
+      // it part of the way back.
       var list = app.testBody.watchlist
       // Counted as what was made, not what the list says should be: a row's
       // words and line are one `rowContent` each, built by its Loader.
