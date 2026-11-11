@@ -36,6 +36,26 @@ function historyKey(symbol, range) {
   return String(symbol || "").toUpperCase() + "|" + String(range || "")
 }
 
+function historyFresh(entry, now) {
+  return !!entry && entry.status === "ok" && !!entry.receivedAt && now - entry.receivedAt < HISTORY_FRESH
+}
+
+// The charts held once `values` land, by key: at most `keep`, the oldest
+// going first, but never one in use (on show, or a row's fetched ahead):
+// pushed out, it would be asked for again at once, and push out the next.
+function historiesKept(entries, values, inUse, keep) {
+  var keys = Object.keys(values)
+  var next = {}
+  var others = Object.keys(entries).filter(function(k) { return keys.indexOf(k) < 0 })
+  var over = others.length - (keep - keys.length)
+  others.forEach(function(k) {
+    if (over > 0 && inUse.indexOf(k) < 0) over--
+    else next[k] = entries[k]
+  })
+  keys.forEach(function(k) { next[k] = Object.assign({ history: null, receivedAt: 0 }, entries[k], values[k]) })
+  return next
+}
+
 // A history holds regular hours only. No wait is shorter than the feed
 // keeps an answer fresh (`HISTORY_FRESH`).
 function historyDue(range, entry, quote, now, trading) {

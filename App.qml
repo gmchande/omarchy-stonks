@@ -28,6 +28,7 @@ Item {
   readonly property string featuredSymbol: ready ? service.featuredSymbol : ""
   readonly property string range: ready ? service.range : "1D"
   readonly property var body: bodyLoader.item
+  readonly property alias floatingWindow: window
 
   function open(payloadJson) {
     var payload = {}
@@ -92,6 +93,7 @@ Item {
 
     FocusScope {
       id: keyCatcher
+      objectName: "keyCatcher"
       anchors.fill: parent
       focus: true
       Keys.onPressed: function(event) {
@@ -105,7 +107,6 @@ Item {
       }
 
       MouseArea {
-        objectName: "marginCatcher"
         anchors.fill: parent
         visible: !!root.body && root.body.rowMenu !== null
         acceptedButtons: Qt.AllButtons

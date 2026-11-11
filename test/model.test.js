@@ -13,7 +13,7 @@ process.env.TZ = "America/New_York"
 // Every rule file's names, under one name. A name two files define is read
 // from its file (test/load.js).
 const M = rules(["Format", "Fetch", "Quote", "Calendar", "Market", "CarriedClose", "Overnight", "Day", "History", "Fundamentals", "Figures", "Freshness",
-  "Chart", "Tones", "Settings", "Rows", "KeySheet", "Search", "Cells", "Share", "Asks"])
+  "Chart", "Tones", "Settings", "Rows", "KeySheet", "Search", "Cells", "Share", "Asks", "Gate", "Release"])
 
 const calendars = JSON.parse(readFileSync(join(root, "calendars.json"), "utf8"))
 // The header's status at full width, the first of its forms.
@@ -24,7 +24,7 @@ const DAY = 24 * 3600
 const keptBars = bars => M.filterStrayCloses(bars).bars
 const at = (date, clock) => M.epochAt(US, date, clock)
 // A listing's cadence, by its calendar's reading, as askDue reads it.
-const quoteCadence = (q, now, interval, hero) => M.quoteCadence(q, now, interval, hero, M.calendarNow(M.calendarFor(calendars, q), now))
+const quoteCadence = (q, now, interval, charted) => M.quoteCadence(q, now, interval, charted, M.calendarNow(M.calendarFor(calendars, q), now))
 
 test("a stray run is the one the series carries on past", () => {
   // The bar after opens back at the level, not from the stray close.
@@ -160,6 +160,12 @@ test("a quiet trading span joins its trades; Tokyo's scheduled lunch alone break
   const one={...us,points:[us.points[0]]}
   expect(M.chartGeometry(one,calendars).points).toHaveLength(1)
   expect(M.timeAtFraction(one,M.chartGeometry(one,calendars).points[0].x)).toBe(us.points[0].t)
+  // One trade draws, and a day nobody traded draws its baseline alone; with
+  // no previous close there is no baseline.
+  const drawn = q => [M.drawable(M.chartGeometry(q,calendars)), M.hasBaseline(M.chartGeometry(q,calendars))]
+  expect(drawn(one)).toEqual([true, true])
+  expect(drawn({...us, points: []})).toEqual([false, true])
+  expect(drawn({...one, prevClose: null})).toEqual([true, false])
 })
 
 test("Tokyo's lunch break comes from the calendar; the morning session stays on Yahoo, counting to the break", () => {
@@ -562,6 +568,11 @@ test("a response with no bars draws nothing and claims nothing", () => {
   const closeless = { ...empty, unclosed: [{ t: 1, o: null, h: 12, l: 9, c: null, v: 100 }] }
   expect([M.periodStats(closeless).high, M.periodStats(closeless).low, M.rangeVolume(closeless)]).toEqual([null, null, ""])
   expect(M.historyGeometry(empty).points).toEqual([])
+  expect([M.drawable(M.historyGeometry(empty)), M.hasBaseline(M.historyGeometry(empty))]).toEqual([false, false])
+  // Nor does a chart still on its way, which has no geometry yet.
+  expect([M.drawable(null), M.hasBaseline(null)]).toEqual([false, false])
+  // On a log scale, a close before the range below zero has no place.
+  expect(M.hasBaseline(M.historyGeometry({ range: "5Y", baseline: -5, bars: [{ t: 1, c: 20 }, { t: 2, c: 30 }] }))).toBe(false)
   expect(M.historyBarAt(empty, 0.5)).toBeNull()
   expect(M.historyFraction(empty, 1)).toBe(-1)
   expect(M.historyBarAt({ bars: [{ t: 1, c: 2 }] }, NaN)).toBeNull()
@@ -606,6 +617,10 @@ const library = (extra = {}) => M.fileSettings({
 test("the data file reads as written and repairs hand edits", () => {
   const v1 = { version: 1, symbols: ["NEST", "SILK"], featured: "SILK", order: "pct", changeMode: "pct", style: "retro", refreshIntervalSec: 60 }
   const read = M.fileSettings(v1)
+  expect(M.readListsFile("  " + JSON.stringify(v1, null, 2) + "\n")).toEqual(read)
+  // A file that holds anything but one object can't be read, and is never
+  // written over.
+  expect(["", "null", "[]", '["NEST"]', "7", '"NEST"', '{"symbols": ['].map(M.readListsFile)).toEqual([null, null, null, null, null, null, null])
   // Sounds start off, in a new install and in a file from before them, and
   // only a saved true turns them on; the version check stays on unless a
   // saved false turns it off. Newer settings may add other defaults.
@@ -691,9 +706,7 @@ for (const file of readdirSync(dataFiles).filter(name => name.endsWith(".json"))
     sounds: !old, updateCheck: old
   }
   const text = readFileSync(join(dataFiles, file), "utf8")
-  // As ListsFile.parseDataText reads it: one JSON object, through fileSettings.
-  const parsed = (() => { try { return JSON.parse(text.trim()) } catch (e) { return null } })()
-  const read = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? M.fileSettings(parsed) : null
+  const read = M.readListsFile(text)
   const label = list => (list.name || "All") + ": " + (list.symbols.join(", ") || "empty") + ", " + list.order + (list.reversed ? " reversed" : "")
   const shown = s => ({ name: s.list, symbols: M.listSymbols(s), order: M.listOrder(s), reversed: M.listReversed(s) })
   // A switch to a list, as the Service persists it.
@@ -847,6 +860,74 @@ test("only a change to what the lists hold ends the undo", () => {
   expect(M.listsHeld(Object.assign({}, s, { lists: s.lists.concat([{ name: "Made elsewhere", symbols: [] }]) }))).not.toBe(M.listsHeld(s))
   const growth = library({ list: "Growth" })
   expect(M.listsHeld(M.withListOrder(growth, "symbol"))).toBe(M.listsHeld(growth))
+})
+
+// Rows 40 high with a gap of 2, in a view 200 high: four rows whole and a
+// part of the fifth. A list menu's lines are 26 high with no gap.
+const tall = { pitch: 42, height: 40 }
+const lines = { pitch: 26, height: 26 }
+const ten = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
+
+test("retro draws each column at the price its last trade ended on, holds it across columns the line joins, leaves a break dark, and lights the last bright column", () => {
+  // 100 by 32 in 3-pixel cells a pixel apart: 25 columns of 10 whole rows,
+  // the two pixels over making none.
+  const point = (x, y, more = {}) => ({ x, y, ...more })
+  const grid = points => M.retroGrid({ points, baselineY: 0.5 }, 100, 32, 3, 1)
+  const g = grid([point(0, 0), point(0.02, 1), point(0.2, 0.5), point(0.4, 1, { brk: true })])
+  expect([g.columns, g.rows, g.pitch]).toEqual([25, 10, 4])
+  // Two trades in column 0: the second wins. Columns 1 to 4 hold column 0's
+  // price until column 5's trade; columns 6 to 9 stay dark before the break.
+  expect(g.levels.slice(0, 11)).toEqual([9, 9, 9, 9, 9, 5, undefined, undefined, undefined, undefined, 9])
+  expect(g.lastLit).toBe(10)
+  // A last trade that is dim leaves the light on the column before it.
+  expect(grid([point(0, 0), point(0.2, 0.5, { dim: true })]).lastLit).toBe(0)
+  // Columns a trade's price holds across are as dim as that trade.
+  expect(grid([point(0, 0, { dim: true }), point(0.2, 0.5, { dim: true })]).dim.slice(0, 6).map(Boolean)).toEqual([true, true, true, true, true, true])
+  expect(grid([point(0, 0), point(0.2, 0.5, { dim: true })]).dim.slice(0, 6).map(Boolean)).toEqual([false, false, false, false, false, true])
+  // The baseline: a known close's row; none known, the floor; a step to a
+  // close known from its column on.
+  expect([g.baseRow, M.retroGrid({ points: [point(0, 0)] }, 100, 30, 3, 1).baseRow]).toEqual([5, 9])
+  const stepped = M.retroGrid({ points: [point(0, 0)], step: { x: 0.5, y: 0 } }, 100, 30, 3, 1)
+  expect([M.retroBaseRow(stepped, 11), M.retroBaseRow(stepped, 12)]).toEqual([9, 0])
+})
+
+test("keys act on the row you chose while any of it shows, else the stock you last looked at while it shows whole, else the first row whole in sight", () => {
+  const row = (own, featured, top, lifted = false) => M.cursorRow(ten, own, lifted, featured, tall, top, 200)
+  // C runs from 84 to 124: scrolled to 123 its last pixel shows, and it
+  // counts; a pixel on it doesn't, and keys go to D, the first row whole.
+  expect([row("C", "", 123), row("C", "", 124), row("B", "", 123)]).toEqual(["C", "D", "D"])
+  // Off the foot, as the list scrolls up.
+  expect([row("F", "", 0), row("E", "", 0)]).toEqual(["A", "E"])
+  // A row you hold up counts wherever it is.
+  expect(row("J", "", 0, true)).toBe("J")
+  // The featured row only while whole: here D is, a fifth of E isn't.
+  expect([row("", "D", 0), row("", "E", 0)]).toEqual(["D", "A"])
+  // The first whole row, half a pixel either way; none past the last.
+  expect([row("", "", 41.5), row("", "", 43), row("", "", 9999)]).toEqual(["B", "C", "J"])
+  expect(M.cursorRow([], "", false, "", tall, 0, 200)).toBe("")
+})
+
+test("a key scrolls the list just far enough to show its row whole, and the rows rest on a row's edge, never past the list's end", () => {
+  // Above: its top at the top. Below: its foot at the foot. In sight: as is.
+  expect([M.topShowing(1, tall, 100, 200), M.topShowing(6, tall, 0, 200), M.topShowing(3, tall, 30, 200)]).toEqual([42, 92, 30])
+  // Resting, the scroll down rounds up to a row's edge, so the row shows
+  // whole and the top row isn't cut, and the list never scrolls past its
+  // last row, 418 long.
+  expect([M.restingTop(6, tall, 0, 200, 418), M.restingTop(9, tall, 0, 200, 418), M.restingTop(3, tall, 30, 200, 418)]).toEqual([126, 218, 30])
+  // The rows any part of which shows, for fetching ahead: from 43, B's last
+  // pixel to F's first; from 83, in the gap under B, C to G.
+  expect([M.rowsSeen(tall, 43, 200), M.rowsSeen(tall, 0, 200), M.rowsSeen(tall, 83, 200)])
+    .toEqual([{ first: 1, last: 5 }, { first: 0, last: 4 }, { first: 2, last: 6 }])
+})
+
+test("after a scroll by hand, a menu's cursor stays on its line while it shows whole, else takes the nearest whole line, else the line across the middle", () => {
+  const kept = (cursor, top, sight = 78) => M.cursorKeptInSight(cursor, 8, lines, top, sight)
+  // Three lines show from 52: lines 2 to 4.
+  expect([kept(3, 52), kept(0, 52), kept(7, 52)]).toEqual([3, 2, 4])
+  // A line a fraction of a pixel short still reads whole.
+  expect(kept(4, 51.7)).toBe(4)
+  // A view too short for one line: the one across its middle, not its top.
+  expect([kept(0, 70, 20), kept(7, 0, 20)]).toEqual([3, 0])
 })
 
 test("a dragged row takes the next slot only 0.6 of a row past its own, and a pointer jittering near the edge never swaps it back and forth", () => {
@@ -1272,7 +1353,7 @@ test("an open asks for the stock at the top, then the rows in sight from the top
   // Asked together, the rows go in that order: those in sight lead the
   // first batch.
   const asked = Object.fromEntries(library.map(s => [s, 100]))
-  expect(M.quoteSlots(library, asked, order, "E", ["E"], true))
+  expect(M.quoteRequests(library, asked, order, "E", ["E"], true))
     .toEqual([{ symbols: ["E"], spark: false }, { symbols: ["D", "B", "C", "A", "F", "G"], spark: true }])
 })
 
@@ -1350,44 +1431,44 @@ test("a refresh asks again only for quotes answered more than 10 s ago, and for 
   expect(M.refreshTrades(["AAPL"], ["AAPL"], now - 10, now)).toEqual([])
 })
 
-test("a quote run charts the pill's quote first and the other heroes next, then the rest in spark batches of 20 in the order asked", () => {
+test("a quote run charts the featured stock's quote first and the other charted stocks next, then the rest in spark batches of 20 in the order asked", () => {
   const symbols = Array.from({ length: 23 }, (_, i) => "S" + i)
   // S22 was asked a second before the rest: the budget held it back.
   const asked = Object.fromEntries(symbols.map(s => [s, s === "S22" ? 99 : 100]))
-  const slots = M.quoteSlots(symbols, asked, symbols, "S5", ["S9", "S5"], true)
+  const slots = M.quoteRequests(symbols, asked, symbols, "S5", ["S9", "S5"], true)
   const batch = ["S22", "S0", "S1", "S2", "S3", "S4", "S6", "S7", "S8"].concat(symbols.slice(10, 21))
   // The one left over is one request either way, and a chart's has opens.
   expect(slots).toEqual([
     { symbols: ["S5"], spark: false }, { symbols: ["S9"], spark: false },
     { symbols: batch, spark: true }, { symbols: ["S21"], spark: false }
   ])
-  // The pill's chart leads the other heroes', wherever it stands in the list.
-  expect(M.quoteSlots(symbols, asked, symbols, "S9", ["S5", "S9"], true)[0]).toEqual({ symbols: ["S9"], spark: false })
+  // The featured stock's chart leads the other charts, wherever it stands in the list.
+  expect(M.quoteRequests(symbols, asked, symbols, "S9", ["S5", "S9"], true)[0]).toEqual({ symbols: ["S9"], spark: false })
   // The preview's feed asks only charts.
-  expect(M.quoteSlots(["P", "Q"], { P: 1, Q: 1 }, ["P", "Q"], "", [], false))
+  expect(M.quoteRequests(["P", "Q"], { P: 1, Q: 1 }, ["P", "Q"], "", [], false))
     .toEqual([{ symbols: ["P"], spark: false }, { symbols: ["Q"], spark: false }])
   // A coin, asked for two days, goes in a spark request of its own, alone
   // too, so the stocks' batch stays one day; asked before them, the budget
   // having held it, it goes first.
-  expect(M.quoteSlots(["A", "BTC-USD", "B", "C"], { A: 1, "BTC-USD": 1, B: 1, C: 1 }, ["A", "BTC-USD", "B", "C"], "", [], true, ["BTC-USD"]))
+  expect(M.quoteRequests(["A", "BTC-USD", "B", "C"], { A: 1, "BTC-USD": 1, B: 1, C: 1 }, ["A", "BTC-USD", "B", "C"], "", [], true, ["BTC-USD"]))
     .toEqual([{ symbols: ["A", "B", "C"], spark: true }, { symbols: ["BTC-USD"], spark: true }])
-  expect(M.quoteSlots(["A", "BTC-USD", "B", "C"], { A: 2, "BTC-USD": 1, B: 2, C: 2 }, ["A", "BTC-USD", "B", "C"], "", [], true, ["BTC-USD"]))
+  expect(M.quoteRequests(["A", "BTC-USD", "B", "C"], { A: 2, "BTC-USD": 1, B: 2, C: 2 }, ["A", "BTC-USD", "B", "C"], "", [], true, ["BTC-USD"]))
     .toEqual([{ symbols: ["BTC-USD"], spark: true }, { symbols: ["A", "B", "C"], spark: true }])
-  // Each lane runs its own kind, a first answer (none yet, or a quote kept
-  // from an earlier session) or a refresh, never one cooling after a bad
+  // Each run asks its own kind, a first answer (none yet, or a quote kept
+  // from an earlier session) or a refresh, never one waiting after a bad
   // answer or out on a run; a day waiting to be judged goes only when its
   // own refresh isn't asked anyway.
   const entries = { R: answered(1), C: answered(1), K: { status: "saved", receivedAt: 1, answeredAt: 0 } }
   const waiting = { N: 1, K: 1, R: 1, C: 1 }
-  expect(M.laneWaiting(["N", "K", "R", "C", "X"], waiting, entries, true, [])).toEqual(["N", "K"])
-  expect(M.laneWaiting(["N", "K", "R", "C", "X"], waiting, entries, false, ["C"])).toEqual(["R"])
-  expect(M.laneJudging(["R", "J", "H"], waiting, ["H"])).toEqual(["J"])
-  // A hero whose quote came from spark, with no opens, is asked for its
+  expect(M.runWaiting(["N", "K", "R", "C", "X"], waiting, entries, true, [])).toEqual(["N", "K"])
+  expect(M.runWaiting(["N", "K", "R", "C", "X"], waiting, entries, false, ["C"])).toEqual(["R"])
+  expect(M.runJudging(["R", "J", "H"], waiting, ["H"])).toEqual(["J"])
+  // A charted stock whose quote came from spark, with no opens, is asked for its
   // chart, but not again at once after its chart failed.
   const sparked = { H: { closesOnly: true }, C: {} }
-  expect(M.sparkHeroes(["H", "C"], sparked, {}, false)).toEqual(["H"])
-  expect(M.sparkHeroes(["H"], sparked, { H: { status: "failed" } }, true)).toEqual([])
-  expect(M.sparkHeroes(["H"], sparked, { H: { status: "failed" } }, false)).toEqual(["H"])
+  expect(M.sparkCharted(["H", "C"], sparked, {}, false)).toEqual(["H"])
+  expect(M.sparkCharted(["H"], sparked, { H: { status: "failed" } }, true)).toEqual([])
+  expect(M.sparkCharted(["H"], sparked, { H: { status: "failed" } }, false)).toEqual(["H"])
 })
 
 test("a refresh for a quote no longer watched leaves the queue unless its run is out, and a first answer always stays", () => {
@@ -1409,10 +1490,89 @@ test("a bad quote answer is tried three times in all, a missing symbol fails at 
   expect([M.answerVerdict("bad", null, 0, true), M.answerVerdict("ok", read, 0, true)]).toEqual(["unchanged", "show"])
 })
 
+// A host's gate, with Yahoo's limits. Each pause is said at the middle of
+// its ±20%, so its seconds read whole.
+const yahoo = { capacity: 80, perMinute: 40, reserve: 10 }
+const heard = (gate, kinds, now, retryAfter = 0, sentUnder = gate.pauses) => M.gateAfterAnswers(gate, kinds, retryAfter, sentUnder, now, 0.5)
+const letThrough = (gate, count, now, bulk = true) => M.takenFromGate(gate, yahoo, count, bulk, now).granted
+
+test("a host's budget gives a run of quotes all but its reserve, fills by the minute to its capacity, and says once how many it held back", () => {
+  const run = M.takenFromGate(M.openGate(80), yahoo, 100, true, 1000)
+  expect([run.granted, run.heldBack]).toEqual([70, 30])
+  // The reserve is there for a history, a search or a P/E.
+  const single = M.takenFromGate(run.gate, yahoo, 1, false, 1000)
+  expect(single.granted).toBe(1)
+  // Held back again, it says nothing more.
+  const again = M.takenFromGate(single.gate, yahoo, 20, true, 1000)
+  expect([again.granted, again.heldBack]).toEqual([0, 0])
+  // Half a minute on 20 more have come, and however long it rests it holds 80.
+  expect(letThrough(again.gate, 30, 1030, false)).toBe(29)
+  expect(letThrough(again.gate, 200, 99999, false)).toBe(80)
+  // A chart fetched ahead of a click waits unless half the budget is left.
+  expect([M.gateHasSpare(M.openGate(80), yahoo), M.gateHasSpare(run.gate, yahoo)]).toEqual([true, false])
+})
+
+test("a host that gives no answer is left alone 2 s, doubling to a minute; then one request goes alone, and its answer reopens the host", () => {
+  var gate = heard(M.openGate(80), ["none"], 1000).gate
+  expect([gate.pause, gate.pausedUntil]).toEqual(["none", 1002])
+  // Nothing goes while it lasts; then one alone, and no second beside it.
+  expect(letThrough(gate, 5, 1001)).toBe(0)
+  const lone = M.takenFromGate(gate, yahoo, 5, true, 1002)
+  expect([lone.granted, letThrough(lone.gate, 5, 1003)]).toEqual([1, 0])
+  // Any answer to it but a refusal reopens the host, and a whole run goes.
+  const back = heard(lone.gate, ["missing"], 1003)
+  expect([back.reopened, back.gate.pause, letThrough(back.gate, 5, 1003)]).toEqual([true, "", 5])
+  // And the next silence is the first again.
+  expect(heard(back.gate, ["none"], 1010).gate.pausedUntil).toBe(1012)
+  // Unanswered again and again, the pauses double to a minute.
+  const waits = []
+  for (var i = 0; i < 6; i++) {
+    gate = heard(M.takenFromGate(gate, yahoo, 1, false, gate.pausedUntil).gate, ["none"], gate.pausedUntil).gate
+    waits.push(gate.pausedUntil - gate.filledAt)
+  }
+  expect(waits).toEqual([4, 8, 16, 32, 60, 60])
+  // r ends such a pause now: the network may be back.
+  expect(letThrough(M.gateRetriedNow(gate, gate.filledAt + 1), 5, gate.filledAt + 1)).toBe(1)
+})
+
+test("a host that refuses is left alone as long as it asks, else a minute, doubling, and never over half an hour, give or take a fifth; r doesn't hurry it", () => {
+  const refused = (gate, now, retryAfter) => heard(gate, ["ok", "refused"], now, retryAfter).gate
+  const open = M.openGate(80)
+  expect([refused(open, 1000, 120), refused(open, 1000, 0), refused(open, 1000, 7 * 86400)].map(gate => gate.pausedUntil - 1000)).toEqual([120, 60, 1800])
+  // Each refusal of the lone request doubles the minute.
+  var gate = refused(open, 1000, 0)
+  const waits = []
+  for (var i = 0; i < 6; i++) {
+    gate = refused(M.takenFromGate(gate, yahoo, 1, false, gate.pausedUntil).gate, gate.pausedUntil, 0)
+    waits.push(gate.pausedUntil - gate.filledAt)
+  }
+  expect(waits).toEqual([120, 240, 480, 960, 1800, 1800])
+  // A fifth either way, so installs don't all come back at once.
+  expect([0, 1].map(spread => M.gateAfterAnswers(open, ["refused"], 0, 0, 1000, spread).gate.pausedUntil - 1000)).toEqual([48, 72])
+  // The host asked for fewer requests: r leaves its pause alone.
+  expect(M.gateRetriedNow(gate, gate.filledAt + 1)).toEqual(gate)
+})
+
+test("only the request sent alone after a pause speaks for the host: answers to a run sent before the pause neither reopen it nor lengthen it", () => {
+  const open = M.openGate(80)
+  const paused = heard(open, ["refused"], 1000).gate
+  // The rest of the run that began the pause: an answer, a refusal, no answer.
+  const late = kinds => heard(paused, kinds, 1001, 0, open.pauses)
+  expect(late(["ok"])).toEqual({ gate: paused, reopened: false })
+  expect(late(["refused"])).toEqual({ gate: paused, reopened: false })
+  expect(late(["none"])).toEqual({ gate: paused, reopened: false })
+  // With the lone request out, such an answer lets no second one through.
+  const lone = M.takenFromGate(paused, yahoo, 1, false, paused.pausedUntil).gate
+  expect(letThrough(heard(lone, ["ok"], paused.pausedUntil, 0, open.pauses).gate, 1, paused.pausedUntil)).toBe(0)
+  // A refusal while no answer came, or the other way, starts its own count.
+  const silent = heard(open, ["none"], 1000).gate
+  expect(heard(M.takenFromGate(silent, yahoo, 1, false, 1002).gate, ["refused"], 1002).gate.pausedUntil - 1002).toBe(60)
+})
+
 test("Robinhood is asked once for each stock the pill shows with nothing open by day, for it alone each 5 minutes while a night trades, and for every US listing while a surface is open, the chart waited on alone first", () => {
   const now = at(WED, "21:00")
   const base = {
-    open: false, pill: "AAPL", quoteEntries: { AAPL: answered(now) }, quotes: {}, overnightSymbols: ["AAPL", "MSFT"],
+    open: false, featured: "AAPL", quoteEntries: { AAPL: answered(now) }, quotes: {}, overnightSymbols: ["AAPL", "MSFT"],
     allSymbols: ["AAPL", "MSFT", "SHEL.L"], preview: "", previewShown: false, previewQuote: null, allDay: {}, nights: {}, now, calendars
   }
   const asks = changes => M.overnightAsks({ ...base, ...changes })
@@ -1425,7 +1585,7 @@ test("Robinhood is asked once for each stock the pill shows with nothing open by
   const answeredNoon = status => ({ allDay: { AAPL: { status, allDay: false, at: noon - DAY - 60 } }, nights: { AAPL: { status, bars: [], at: noon - 3600 } } })
   expect(asks({ now: noon, ...answeredNoon("ok") })).toBe(null)
   expect(asks({ now: noon, ...answeredNoon("failed") })).toBe(null)
-  expect(asks({ now: noon, ...answeredNoon("ok"), pill: "MSFT", quoteEntries: { MSFT: answered(noon) } }))
+  expect(asks({ now: noon, ...answeredNoon("ok"), featured: "MSFT", quoteEntries: { MSFT: answered(noon) } }))
     .toEqual({ tradability: ["MSFT"], trades: ["MSFT"] })
   // Nothing open while a night trades: the pill's stock alone, each 5
   // minutes, so its newest price stays current; All's rows wait for a
@@ -1437,7 +1597,7 @@ test("Robinhood is asked once for each stock the pill shows with nothing open by
   expect(asks(pillAnsweredAgo(5 * 60))).toEqual({ tradability: [], trades: ["AAPL"] })
   // The pill on an index, answered live: with nothing open, by day or while
   // a night trades, Robinhood is never asked about it.
-  const index = { pill: "^GSPC", quoteEntries: { "^GSPC": answered(now) } }
+  const index = { featured: "^GSPC", quoteEntries: { "^GSPC": answered(now) } }
   expect([asks({ ...index, now: noon }), asks(index)]).toEqual([null, null])
   // A surface open: every US listing, the pill's alone while it has no
   // answer.
@@ -1490,7 +1650,7 @@ test("a refresh's chart is owed until a new answer replaces the one it had, then
   expect(M.staleHistory(["NVDA"], "1W", aged, {}, { NVDA: usStock("NVDA") }, noon, calendars)).toBe("")
 })
 
-test("the rows in sight have their charts fetched ahead, the heroes' aside, as many as the cache keeps beside them, and none on the day", () => {
+test("the rows in sight have their charts fetched ahead, the charted stocks' aside, as many as the cache keeps beside them, and none on the day", () => {
   const sights = [{ surface: "popup", symbols: ["A", "B", "HERO"] }, { surface: "window", symbols: ["B", "C", "D"] }]
   expect(M.aheadRows(true, "1W", ["HERO"], sights, 40)).toEqual(["A", "B", "C", "D"])
   expect(M.aheadRows(true, "1W", ["HERO"], sights, 4)).toEqual(["A", "B", "C"])
@@ -1501,16 +1661,47 @@ test("the rows in sight have their charts fetched ahead, the heroes' aside, as m
   expect(M.aheadCharts(["A"], "1M", { "A|1W": {} }, {})).toEqual(["A"])
 })
 
-test("the caps and P/Es wanted are the heroes on show's, the stock on show first, each once its quote is in, and only an equity's", () => {
+test("a range's chart answered under a quarter hour ago is shown as is, and the 40 charts held let the oldest go first, never one in use", () => {
+  const now = 100000
+  const fresh = (status, receivedAt) => M.historyFresh({ status, receivedAt }, now)
+  expect([fresh("ok", now - 899), fresh("ok", now - 900), fresh("failed", now - 10), M.historyFresh(null, now)]).toEqual([true, false, false, false])
+  // Forty held, oldest first; a forty-first lands.
+  const held = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`S${i}|1M`, { status: "ok", receivedAt: i }]))
+  const landed = M.historiesKept(held, { "NEW|1M": { status: "ok", history: [], receivedAt: 50 } }, [], 40)
+  expect([Object.keys(landed).length, "S0|1M" in landed, "S1|1M" in landed, landed["NEW|1M"].receivedAt]).toEqual([40, false, true, 50])
+  // The oldest is on show: the next oldest goes in its place.
+  const shown = M.historiesKept(held, { "NEW|1M": { status: "ok" } }, ["S0|1M"], 40)
+  expect(["S0|1M" in shown, "S1|1M" in shown]).toEqual([true, false])
+  // A chart answered again keeps what the new answer doesn't say.
+  expect(M.historiesKept(held, { "S3|1M": { status: "failed" } }, [], 40)["S3|1M"]).toEqual({ history: null, status: "failed", receivedAt: 3 })
+})
+
+test("a listing's cap and P/E are asked for once a day, at once after a failure, and when the rate its P/E needs isn't held; a rate that failed waits for a refresh", () => {
+  const now = 1000000
+  const ok = (checkedAt, eps) => ({ status: "ok", checkedAt, fundamentals: { cap: null, eps } })
+  const usd = { value: 7, date: "2026-09-30", currency: "USD" }
+  const gbp = { value: 4.52, date: "2026-06-30", currency: "USD" }
+  const due = (entry, currency, rates = {}, failedPairs = []) => M.fundamentalsDue(entry, currency, rates, failedPairs, now)
+  expect([due(ok(now - 86399, usd), "USD"), due(ok(now - 86400, usd), "USD"), due(undefined, "USD"), due({ status: "failed", checkedAt: now }, "USD")])
+    .toEqual([false, true, true, true])
+  // A London listing's EPS is in dollars: its P/E needs Yahoo's USDGBP,
+  // fresh for a day; one that failed holds until a refresh clears it.
+  const pair = "USDGBP"
+  expect([due(ok(now, gbp), "GBP"), due(ok(now, gbp), "GBP", { [pair]: { value: 0.79, checkedAt: now - 60 } }),
+    due(ok(now, gbp), "GBP", { [pair]: { value: 0.79, checkedAt: now - 86400 } }), due(ok(now, gbp), "GBP", {}, [pair])]).toEqual([true, false, true, false])
+  expect([M.freshFundamentals(ok(now - 60, usd), now), M.freshFundamentals(ok(now - 86400, usd), now)]).toEqual([ok(now - 60, usd), null])
+})
+
+test("the caps and P/Es wanted are the charted stocks', the featured one first, each once its quote is in, and only an equity's", () => {
   const quotes = { MSFT: { ...usStock("MSFT"), currency: "USD" }, "BTC-USD": coin("BTC-USD") }
   const preview = { "SHOP.TO": { ...usStock("SHOP.TO"), exchange: "TOR", currency: "CAD" } }
   // SHOP.TO, search's preview, before its quote and after.
-  expect(M.figuresWanted(["MSFT", "SHOP.TO"], quotes, {})).toEqual([{ symbol: "MSFT", currency: "USD" }])
-  expect(M.figuresWanted(["MSFT", "SHOP.TO"], quotes, preview))
+  expect(M.fundamentalsWanted(["MSFT", "SHOP.TO"], quotes, {})).toEqual([{ symbol: "MSFT", currency: "USD" }])
+  expect(M.fundamentalsWanted(["MSFT", "SHOP.TO"], quotes, preview))
     .toEqual([{ symbol: "MSFT", currency: "USD" }, { symbol: "SHOP.TO", currency: "CAD" }])
-  expect(M.figuresWanted(["MSFT", "MSFT"], quotes, {})).toEqual([{ symbol: "MSFT", currency: "USD" }])
-  expect(M.figuresWanted(["BTC-USD"], quotes, {})).toEqual([])
-  expect(M.figuresWanted([], quotes, preview)).toEqual([])
+  expect(M.fundamentalsWanted(["MSFT", "MSFT"], quotes, {})).toEqual([{ symbol: "MSFT", currency: "USD" }])
+  expect(M.fundamentalsWanted(["BTC-USD"], quotes, {})).toEqual([])
+  expect(M.fundamentalsWanted([], quotes, preview)).toEqual([])
 })
 
 test("the clock steps just past each second while a surface is open and each minute while none is, sooner for a quote due, a pause ending or a refresh turning overdue", () => {
@@ -1769,7 +1960,7 @@ test("a hostile search or Robinhood answer reads as no answer, at once", async (
     { name: "search quotes posing", call: "M.parseSearch(json)", answer: { quotes: POSING } },
     { name: "search quotes over budget", call: "M.parseSearch(json) && 'read'", answer: { quotes: times(M.MOST_QUOTES + 1).map(() => quote) } },
     { name: "trades, as sent", call: nest, answer: { results: [result([trade])] }, want: 1 },
-    { name: "Robinhood's results posing", call: "M.parseOvernight(json, ['NEST'])", answer: { results: POSING } },
+    { name: "Robinhood's results posing", call: "M.overnightResults(json)", answer: { results: POSING } },
     { name: "Robinhood's results over budget", call: "M.overnightResults(json) && 'read'", answer: { results: times(M.MOST_RESULTS + 1).map(() => result([])) } },
     { name: "a listing's trades posing", call: nest, answer: { results: [result(POSING)] }, want: 0 },
     { name: "a listing's trades over budget", call: nest, answer: { results: [result(times(M.MOST_TRADES + 1).map(() => trade))] }, want: 0 },
@@ -1784,6 +1975,40 @@ test("a hostile search or Robinhood answer reads as no answer, at once", async (
 // Half a UTF-16 pair can't go in a URL: the quote feed would take its
 // first-answer slot, encodeURIComponent would throw before any request
 // started, and no new symbol's quote would come until the shell restarts.
+test("the footer says a save that didn't land ahead of the update, says what to do with a file it can't read, and offers the update and the restart only when no change would be lost", () => {
+  const file = "~/.config/omarchy/grvc.stonks.json"
+  const says = state => M.footerNotice(state, file)
+  expect(says({})).toMatchObject({ text: "", actions: [], updateOffer: "", restartable: true, restartOffered: false })
+  // A newer Stonks out: offered, and its update may restart the shell.
+  expect(says({ releasedTo: "1.3.0" })).toMatchObject({ text: "", updateOffer: "1.3.0", restartable: true })
+  // Updated: the restart is offered, and no newer one beside it.
+  expect(says({ updatedTo: "1.2.0", releasedTo: "1.2.0" })).toMatchObject({ text: "Updated to 1.2.0 · click to restart the shell", updateOffer: "", restartOffered: true })
+  // A save that didn't land comes first, and holds the restart back.
+  expect(says({ saveFailed: true, updatedTo: "1.2.0" }))
+    .toMatchObject({ text: "Your changes aren't saved", actions: ["click to try again"], restartable: false, restartOffered: false })
+  // A file it can't read: what to do, in a long and a short form; once a
+  // change waits on it, that comes first.
+  expect(says({ unreadable: true, releasedTo: "1.3.0" }))
+    .toMatchObject({ text: "Couldn't load your lists", actions: ["fix or remove " + file, "fix " + file], updateOffer: "1.3.0", restartable: false })
+  expect(says({ unreadable: true, editsUnsaved: true }).text).toBe("Your changes aren't saved")
+  // While the file can't be read, only a change made meanwhile is unsaved.
+  expect(says({ unreadable: true, saveFailed: true }).text).toBe("Couldn't load your lists")
+})
+
+test("search keeps each answer by the words it answers until it closes: two words get their own, any words at all, and words that failed or are asked again aren't kept", () => {
+  const apple = { results: [{ symbol: "AAPL" }] }
+  const pineapple = { results: [{ symbol: "PINE" }] }
+  var kept = new Map()
+  for (const [words, found] of [["app", apple], ["apple", pineapple], ["constructor", apple], ["__proto__", pineapple], ["App", pineapple]]) kept = M.withAnswer(kept, words, found)
+  expect(["app", "apple", "constructor", "__proto__", "App", "ap"].map(words => M.keptAnswer(kept, words)))
+    .toEqual([apple, pineapple, apple, pineapple, pineapple, null])
+  // A failed lookup keeps nothing, and leaves what was kept.
+  expect(M.withAnswer(kept, "ap", null)).toBe(kept)
+  // Asked again, those words alone are let go; the rest still answer.
+  const again = M.withoutAnswer(kept, "app")
+  expect([M.keptAnswer(again, "app"), M.keptAnswer(again, "apple"), M.keptAnswer(kept, "app")]).toEqual([null, pineapple, apple])
+})
+
 test("search leaves out a symbol no request can carry", () => {
   const found = M.parseSearch(JSON.parse('{"quotes":[{"symbol":"\\ud800","quoteType":"EQUITY"},{"symbol":"AAPL","quoteType":"EQUITY"}]}'))
   expect(found.results.map(r => M.chartUrl(r.symbol))).toEqual([M.chartUrl("AAPL")])

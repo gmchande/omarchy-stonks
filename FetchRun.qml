@@ -16,7 +16,8 @@ Item {
   // stopped before that.
   property bool out: false
   property int count: 0
-  property int ticket: 0
+  // The gate's `pauses` as the run was sent (`Gate.js`).
+  property int sentUnder: 0
   property bool told: false
   property int parsed: 0
   property var got: []
@@ -27,7 +28,7 @@ Item {
 
   function send(urls, cap) {
     root.count = urls.length
-    root.ticket = gate ? gate.ticket : 0
+    root.sentUnder = gate ? gate.pauses : 0
     root.told = false
     root.parsed = 0
     root.got = []
@@ -53,7 +54,7 @@ Item {
     if (told) return
     root.told = true
     if (gate) gate.report(got.map(function(a) { return a.kind }),
-      Math.max.apply(null, [0].concat(got.map(function(a) { return a.retryAfter }))), ticket)
+      Math.max.apply(null, [0].concat(got.map(function(a) { return a.retryAfter }))), sentUnder)
   }
 
   function end(text) {

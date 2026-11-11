@@ -192,7 +192,6 @@ Item {
 
       // With no name, as while Yahoo sends nothing, it says nothing.
       Text {
-        objectName: "loadingLabel"
         anchors.centerIn: parent
         width: Math.min(implicitWidth, parent.width)
         visible: root.held && root.dimmed > 0 && root.loadingText !== ""
@@ -260,7 +259,6 @@ Item {
     // Always two lines, so the list keeps its place.
     InfoTable {
       id: infoBlock
-      objectName: "infoBlock"
       width: parent.width
       height: implicitHeight
       lines: [root.periodLine, root.yearLine]

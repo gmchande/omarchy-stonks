@@ -73,6 +73,18 @@ function normalizeRefreshInterval(value) {
   return n
 }
 
+// The lists file's text: one JSON object, read through `fileSettings`, or
+// null for anything else, which is never written over.
+function readListsFile(text) {
+  try {
+    var parsed = JSON.parse(String(text || "").trim())
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null
+    return fileSettings(parsed)
+  } catch (e) {
+    return null
+  }
+}
+
 // `symbols`, `order` and `reversed` are All's, as version 1 wrote them; a
 // named list is a subset of All.
 function fileSettings(src) {
@@ -198,7 +210,7 @@ function withMembership(settings, symbol, name, member, shown) {
     lists: settings.lists.map(function(list) { return Object.assign({}, list, { symbols: without(list.symbols) }) }) }))
 }
 
-// `before`: the settings before the removal; `left`: the hero it left.
+// `before`: the settings before the removal; `left`: the stock it left featured.
 function withRemovalUndone(settings, before, symbol, left) {
   var restore = function(now, was) {
     var at = was.indexOf(symbol)
@@ -211,8 +223,8 @@ function withRemovalUndone(settings, before, symbol, left) {
     var j = listIndex(before.lists, list.name)
     return j < 0 ? list : Object.assign({}, list, { symbols: restore(list.symbols, before.lists[j].symbols) })
   })
-  var hero = function(value) { return String(value || "").toUpperCase() }
-  var back = hero(before.featured) === symbol && hero(left) !== symbol && hero(settings.featured) === hero(left)
+  var upper = function(value) { return String(value || "").toUpperCase() }
+  var back = upper(before.featured) === symbol && upper(left) !== symbol && upper(settings.featured) === upper(left)
   return fileSettings(Object.assign({}, settings, { symbols: restore(settings.symbols, before.symbols), lists: lists,
     featured: back ? symbol : settings.featured }))
 }
@@ -280,7 +292,7 @@ function listsHeld(settings) {
   return JSON.stringify([settings.symbols, settings.lists.map(function(list) { return [list.name, list.symbols] })])
 }
 
-// The settings rode the plugin ID's bar entry before the data file.
+// The settings rode the plugin ID's bar entry before the lists file.
 function settingsFromBar(config, id) {
   var bar = barEntryFor(config, id)
   if (!bar || !bar.symbols || !bar.symbols.length) return null

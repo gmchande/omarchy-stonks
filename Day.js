@@ -152,7 +152,17 @@ function dayChart(quote, answer, calendars, slideAt) {
   var points = all.filter(function(p) { return p.t >= win.start })
   var opened = Overnight.marketDay(cal, win.date).start
   var trades = all.filter(function(p) { return p.t >= opened })
-  var over = !evening && ((answer.through !== null && answer.through + Overnight.SLOT >= win.end) || (own && !!quote.wholeDay))
+  // Over once Robinhood's bars reach the window's end, or Yahoo's own day
+  // is whole; an evening never is.
+  var reachedEnd = answer.through !== null && answer.through + Overnight.SLOT >= win.end
+  var over = !evening && (reachedEnd || (own && !!quote.wholeDay))
+  // Once the window has slid past the day's first trades, the axis starts
+  // where the window does.
+  var slid = trades.length && trades[0].t < win.start ? win.start : undefined
+  var axis = tradedAxis(session, points, win.end, over, windowTicks(cal, win, session), slid)
+  // `closes`: when the day's last hour ends (`Figures.dayNote`).
+  axis.closes = evening ? evening.night.end : win.end
+  if (win.skip) axis.skip = win.skip
   return {
     day: Object.assign({}, quote, {
       session: session,
@@ -164,10 +174,7 @@ function dayChart(quote, answer, calendars, slideAt) {
       prevClose: own ? quote.prevClose : Quote.regularClose(quote),
       dayOpen: own ? quote.dayOpen : null,
       openSession: own ? quote.openSession : null,
-      // `closes`: when the day's last hour ends (`Figures.dayNote`).
-      axis: Object.assign(tradedAxis(session, points, win.end, over, windowTicks(cal, win, session),
-        trades.length && trades[0].t < win.start ? win.start : undefined),
-        { closes: evening ? evening.night.end : win.end }, win.skip ? { skip: win.skip } : {}),
+      axis: axis,
       litFrom: litFrom(points, evening, over),
       tonight: evening ? evening.night.start : null,
       calendar: cal

@@ -36,15 +36,11 @@ echo "the demo watchlist at $moment"
 
 plugin_tree readme.qml
 card_window
-patch_copy plugin/Panel.qml '/readonly property int panelWidth:/a\  readonly property var testBody: root.body\n  readonly property alias testCard: panel'
 # Offscreen, a grab's empty pixels are black, not the window's colour, so
 # the window's grab takes a ground of that colour under the body.
-patch_copy plugin/App.qml '/readonly property bool ready:/a\  readonly property var testBody: root.body\n  readonly property alias testKeyCatcher: keyCatcher'
 patch_copy plugin/App.qml '/^      Loader {$/i\      Rectangle { anchors.fill: parent; color: window.color }'
-patch_copy plugin/Service.qml '/readonly property var entries: feed.entries/a\  readonly property alias testFeed: feed\n  readonly property alias testAllDay: allDayFeed\n  readonly property alias testOvernight: overnightFeed'
 # The clock stands still a minute after the capture.
-patch_copy plugin/Service.qml "s/property int now: Math.floor(Date.now() \/ 1000)/property int now: $at/"
-patch_copy plugin/Service.qml 's/function wallSecond() { return Math.floor(Date.now() \/ 1000) }/function wallSecond() { return root.now }/'
+export STONKS_README_AT=$at
 # The pills on their strips open no panel of their own.
 patch_copy plugin/BarWidget.qml '/id: panelLoader/,/source:/s/active: true/active: false/'
 jq --argjson listed "$listed" '. + { hinted: true, symbols: $listed }' "$plugin/test/demo.json" > "$HOME/.config/omarchy/grvc.stonks.json"

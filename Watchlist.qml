@@ -60,6 +60,9 @@ Flickable {
   property var arrangedView: null
 
   readonly property int rowPitch: rowHeight + rowGap
+  // Read at each use: a handler of rowPitch's change runs before a binding
+  // on it would catch up.
+  function rowSize() { return { pitch: rowPitch, height: rowHeight } }
   property int lastPitch: 0
   onRowPitchChanged: {
     if (lastPitch > 0) {
@@ -76,27 +79,16 @@ Flickable {
   readonly property real headedY: glide.running ? glide.to : contentY
   // Read where the list is headed, so a key gliding the list to its row
   // keeps it.
-  readonly property string cursorRow: {
-    var top = headedY
-    if (ownInSight(top)) return cursorSymbol
-    var hero = displayedSymbols.indexOf(featuredSymbol)
-    if (hero >= 0 && wholeInSight(hero, top)) return featuredSymbol
-    // Else the first whole row in sight: a key never acts on a row unseen.
-    var first = Math.max(0, Math.ceil((top - 0.5) / rowPitch))
-    return displayedSymbols[Math.min(first, displayedSymbols.length - 1)] || ""
-  }
+  readonly property string cursorRow: Rows.cursorRow(displayedSymbols, cursorSymbol, cursorSymbol === dragSymbol, featuredSymbol,
+    rowSize(), headedY, sightHeight)
   // A cursor of your own that leaves sight is let go, on these changes
   // rather than on cursorRow's, which reads the cursor it would clear.
   onHeadedYChanged: letGoUnseen()
   onSightHeightChanged: keepCursorInSight()
   onDisplayedSymbolsChanged: letGoUnseen()
-  function ownInSight(top) {
-    if (cursorSymbol !== "" && cursorSymbol === dragSymbol) return true
-    var own = displayedSymbols.indexOf(cursorSymbol)
-    return cursorSymbol !== "" && own >= 0 && partInSight(own, top)
-  }
   function letGoUnseen() {
-    if (cursorSymbol !== "" && !ownInSight(headedY)) cursorSymbol = ""
+    if (cursorSymbol !== "" && !Rows.chosenSeen(displayedSymbols, cursorSymbol, cursorSymbol === dragSymbol, rowSize(), headedY, sightHeight))
+      cursorSymbol = ""
   }
   property real lastSight: 0
   function keepCursorInSight() {
@@ -105,7 +97,7 @@ Flickable {
     var at = displayedSymbols.indexOf(keep)
     // The featured row only if it was whole in sight before, so a resize
     // never pulls the list back to it.
-    if (keep !== "" && cursorSymbol === "" && !(at >= 0 && wholeInSightOf(at, headedY, lastSight))) at = -1
+    if (keep !== "" && cursorSymbol === "" && !(at >= 0 && Rows.rowWhole(at, rowSize(), headedY, lastSight))) at = -1
     if (at >= 0 && sightHeight >= rowHeight && !wholeInSight(at, headedY)) {
       var own = cursorSymbol
       // Judged from where a key's glide was headed, so stopping the glide
@@ -145,11 +137,11 @@ Flickable {
   interactive: contentHeight > height
   // A drag or a flick takes the list over from a glide.
   onMovementStarted: takeOver()
-  ScrollBar.vertical: ScrollBar {
+  // Shown as needed, as Omarchy's own lists show theirs.
+  ScrollBar.vertical: ViewScrollBar {
+    scrolls: root.interactive
     policy: ScrollBar.AsNeeded
-    visible: root.interactive
     active: root.interactive
-    minimumSize: Math.min(1, Style.space(24) / Math.max(1, availableHeight))
   }
 
   // A WheelHandler ignores the touchpad's events unless it accepts TouchPad.
@@ -270,10 +262,7 @@ Flickable {
   // Glides to bring the row whole into view, resting on a row boundary. A
   // row already whole leaves the list where it is, between rows too.
   function scrollToRow(index) {
-    var y = index * rowPitch
-    var at = headedY
-    if (y < at) at = y
-    else if (y + rowHeight > at + height) at = y + rowHeight - height
+    var at = Rows.topShowing(index, rowSize(), headedY, height)
     if (at !== headedY) glideTo(snappedY(at))
   }
 
@@ -292,7 +281,7 @@ Flickable {
   // click stopped it, even between rows.
   function handTo(symbol) {
     var index = displayedSymbols.indexOf(symbol)
-    if (index >= 0 && partInSight(index, headedY)) cursorSymbol = symbol
+    if (index >= 0 && Rows.rowSeen(index, rowSize(), headedY, sightHeight)) cursorSymbol = symbol
     else select(symbol)
     scrolledUnder = symbol
   }
@@ -348,31 +337,17 @@ Flickable {
 
   // Against sightHeight, so the card's edge easing past moves no cursor.
   function wholeInSight(index, top) {
-    return wholeInSightOf(index, top, sightHeight)
-  }
-  function wholeInSightOf(index, top, sight) {
-    var y = index * rowPitch
-    return y >= top - 0.5 && y + rowHeight <= top + sight + 0.5
-  }
-
-  // Any part: the pointer may rest on a row the list's foot cuts.
-  function partInSight(index, top) {
-    var y = index * rowPitch
-    return y + rowHeight > top + 0.5 && y < top + sightHeight - 0.5
+    return Rows.rowWhole(index, rowSize(), top, sightHeight)
   }
 
   // The rows in sight where the list is headed, which the service fetches
   // ahead. From row numbers, so it changes only as a row crosses the edge.
-  readonly property int sightFirst: Math.max(0, Math.floor((headedY + 0.5 - rowHeight) / rowPitch) + 1)
-  readonly property int sightLast: Math.ceil((headedY + sightHeight - 0.5) / rowPitch) - 1
+  readonly property int sightFirst: Rows.rowsSeen(rowSize(), headedY, sightHeight).first
+  readonly property int sightLast: Rows.rowsSeen(rowSize(), headedY, sightHeight).last
   readonly property var sightSymbols: displayedSymbols.slice(sightFirst, Math.max(sightFirst, sightLast + 1))
 
   function restingTopFor(index, top) {
-    var y = index * rowPitch
-    var bottom = Math.max(0, rowsLength() - sightHeight)
-    if (y < top) return Math.min(bottom, y)
-    if (y + rowHeight > top + sightHeight) return Math.min(bottom, Math.ceil((y + rowHeight - sightHeight) / rowPitch) * rowPitch)
-    return top
+    return Rows.restingTop(index, rowSize(), top, sightHeight, rowsLength())
   }
 
   // With `animate`, a new row fades in at its place and the rest slide. A
@@ -581,10 +556,10 @@ Flickable {
     forgetClicks()
     listHover.rest()
     layOut()
-    var hero = displayedSymbols.indexOf(featuredSymbol)
-    if (hero >= 0 && !wholeInSight(hero, contentY)) {
+    var featuredAt = displayedSymbols.indexOf(featuredSymbol)
+    if (featuredAt >= 0 && !wholeInSight(featuredAt, contentY)) {
       takeOver()
-      contentY = restingTopFor(hero, contentY)
+      contentY = restingTopFor(featuredAt, contentY)
     }
   }
   Component.onCompleted: {
@@ -631,87 +606,13 @@ Flickable {
       WatchlistRow {
         id: rowDelegate
         calendars: root.calendars
-        readonly property int place: root.slotOf(symbol)
+        place: root.slotOf(symbol)
         visible: place >= 0
-        y: lifted ? root.dragY : place * root.rowPitch + shift
-        // A row slides only from one place in the list to another, so one
-        // that joins starts at its own place. It eases `shift`, its distance
-        // from its place, to zero, so a change mid-slide goes on from where
-        // it is. The row travelling farther rides on top, the cursor's on a
-        // tie, so none print through.
-        property int lastPlace: -1
-        property real shift: 0
-        property int travel: 0
-        onPlaceChanged: {
-          var from = lastPlace
-          lastPlace = place
-          if (lifted || !visible || from < 0 || place < 0) {
-            settle()
-            return
-          }
-          travel = Math.abs(place - from)
-          shift += (from - place) * root.rowPitch
-          slide.restart()
-        }
-        NumberAnimation { id: slide; target: rowDelegate; property: "shift"; to: 0; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
-        moving: lifted || slide.running
+        pitch: root.rowPitch
+        liftedY: root.dragY
+        rowCount: rowRepeater.count
+        onRested: root.rowRested(symbol)
         look: root.look
-        z: lifted ? rowRepeater.count + 2 : (slide.running ? 1 + travel + (cursor ? 0.5 : 0) : 0)
-        readonly property bool resting: !slide.running && !fadeIn.running && !lifted
-        onRestingChanged: if (resting) root.rowRested(symbol)
-        function settle() {
-          slide.stop()
-          shift = 0
-          travel = 0
-          fadeIn.stop()
-          opacity = 1
-          drawIn.stop()
-          reveal = 1
-          lineOwed = false
-        }
-        function pause() {
-          if (slide.running) slide.pause()
-          if (fadeIn.running) fadeIn.pause()
-          if (drawIn.running) drawIn.pause()
-        }
-        function holdAt(atY) {
-          if (place < 0) return
-          slide.stop()
-          shift = atY - place * root.rowPitch
-        }
-        // A day line that arrives while the row fades in draws in; one that
-        // arrives later shows at once.
-        property bool lineOwed: false
-        function join() {
-          opacity = 0
-          fadeIn.restart()
-          lineOwed = !geometry
-          if (geometry) drawLineIn()
-        }
-        function drawLineIn() {
-          reveal = 0
-          drawIn.restart()
-        }
-        onGeometryChanged: {
-          if (!lineOwed || !geometry) return
-          lineOwed = false
-          if (fadeIn.running && !fadeIn.paused) drawLineIn()
-        }
-        // Holds the row on screen while the scroll moves `distance`, then
-        // slides it home.
-        function carry(distance) {
-          shift -= distance
-          if (Math.abs(shift) < 0.5) {
-            slide.stop()
-            shift = 0
-            travel = 0
-            return
-          }
-          travel = Math.max(travel, Math.round(Math.abs(shift) / root.rowPitch))
-          slide.restart()
-        }
-        NumberAnimation { id: fadeIn; target: rowDelegate; property: "opacity"; to: 1; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
-        NumberAnimation { id: drawIn; target: rowDelegate; property: "reveal"; from: 0; to: 1; duration: Motion.duration(Style, 320); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
         width: parent.width
         // A row more than a row out of sight keeps the quote it showed, so
         // answers repaint only rows in sight; it takes the latest before the

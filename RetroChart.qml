@@ -5,6 +5,7 @@ import qs.Commons
 import qs.Commons as Commons
 import "Tones.js" as Tones
 import "Motion.js" as Motion
+import "Chart.js" as Chart
 // The retro chart, one rule for the day and every range: columns of cells
 // fill from the baseline row, in the up colour above it and the down colour
 // below. The day adds dimmer hours, the bell and the night's edges, and the
@@ -53,15 +54,13 @@ Item {
   // does: on a few rows of cells they stand as tall as its prices.
   property bool bells: true
 
-  readonly property var grid: layout()
+  readonly property var grid: Chart.retroGrid(geometry, width, height, pixel, gap)
   readonly property bool day: !!geometry && geometry.day === true
   readonly property bool directionKnown: typeof up === "boolean"
   readonly property color aboveColor: directionKnown ? upColor : baselineColor
   readonly property color belowColor: directionKnown ? downColor : baselineColor
-  // One trade draws, as the first after midnight does: a cell.
-  readonly property bool drawable: !!geometry && !!geometry.points && geometry.points.length >= 1
-  // The baseline draws with no trade too, as on a day nobody traded.
-  readonly property bool hasBaseline: !!geometry && typeof geometry.baselineY === "number" && isFinite(geometry.baselineY)
+  readonly property bool drawable: Chart.drawable(geometry)
+  readonly property bool hasBaseline: Chart.hasBaseline(geometry)
   // Through the newest trade's column.
   readonly property int inkColumns: drawable
     ? Math.min(grid.columns, Math.floor(geometry.points[geometry.points.length - 1].x * grid.columns) + 1) : 0
@@ -88,53 +87,8 @@ Item {
   onAboveStemDimChanged: ink.requestPaint()
   onBelowStemDimChanged: ink.requestPaint()
 
-  // The last trade in a column wins: the price at the end of that stretch. A
-  // column between two trades the line joins holds the one before it; only a
-  // break (`brk`) leaves columns dark, as it lifts the smooth line. Columns
-  // from `stepCol` on stand on `stepRow` (`baseRowAt`).
-  function layout() {
-    var pitch = pixel + gap
-    var columns = Math.max(1, Math.floor(width / pitch))
-    var g = {
-      pitch: pitch,
-      columns: columns,
-      rows: Math.max(1, Math.floor(height / pixel)),
-      baseRow: 0,
-      stepCol: columns,
-      stepRow: 0,
-      levels: [],
-      dim: [],
-      lastLit: -1
-    }
-    if (!geometry || !geometry.points) return g
-    // With no previous close known, the columns stand on the floor, until a
-    // step to a close that is known.
-    g.baseRow = hasBaseline ? Math.round(geometry.baselineY * (g.rows - 1)) : g.rows - 1
-    var step = geometry.step
-    g.stepCol = step ? Math.max(0, Math.min(g.columns - 1, Math.floor(step.x * g.columns))) : g.columns
-    g.stepRow = step ? Math.round(step.y * (g.rows - 1)) : g.baseRow
-    var pts = geometry.points
-    // The lit cell sits on the last column whose own last trade is bright,
-    // never on one held after it.
-    var last = -1
-    for (var i = 0; i < pts.length; i++) {
-      var col = Math.max(0, Math.min(g.columns - 1, Math.floor(pts[i].x * g.columns)))
-      if (col !== last && last >= 0 && !g.dim[last]) g.lastLit = last
-      for (var held = last + 1; i > 0 && !pts[i].brk && held < col; held++) {
-        g.levels[held] = g.levels[last]
-        g.dim[held] = g.dim[last]
-      }
-      g.levels[col] = Math.round(pts[i].y * (g.rows - 1))
-      g.dim[col] = pts[i].dim
-      last = col
-    }
-    if (last >= 0 && !g.dim[last]) g.lastLit = last
-    return g
-  }
-
-  // The baseline's row under column `c`.
   function baseRowAt(g, c) {
-    return c >= g.stepCol ? g.stepRow : g.baseRow
+    return Chart.retroBaseRow(g, c)
   }
 
   // How far along the columns `x` is: they end short of the chart's width
@@ -187,7 +141,6 @@ Item {
 
   Item {
     id: curtain
-    objectName: "curtain"
     width: (root.replayX >= 0 ? Math.ceil(root.grid.columns * Math.min(1, root.replayX))
       : root.reveal >= 1 ? root.grid.columns : Math.ceil(root.inkColumns * Math.max(0, root.reveal))) * root.grid.pitch
     height: root.height
@@ -241,7 +194,6 @@ Item {
       readonly property int column: Math.min(root.grid.columns - 1, Math.floor(root.geometry.ticks[index] * root.grid.columns))
       readonly property int row: column > root.grid.stepCol ? root.grid.stepRow : root.grid.baseRow
       readonly property real cellTop: Math.max(0, (row - 1) * root.pixel)
-      objectName: "retroBell"
       visible: column >= root.inkColumns || column * root.grid.pitch < curtain.width
       x: column * root.grid.pitch
       y: cellTop
@@ -276,7 +228,8 @@ Item {
     color: root.hairlineColor
   }
 
-  // The pixel version of the smooth chart's live dot, once the day has drawn in.
+  // The pixel version of the smooth chart's live dot, once the day has drawn
+  // in: four blinks, white, colour, white, when the mark plays (`LiveMark`).
   Rectangle {
     id: cap
     objectName: "liveCap"
@@ -286,21 +239,12 @@ Item {
     width: root.pixel
     height: root.pixel
     color: root.hairlineColor
-    // Hidden mid-blink by an open's draw-in, it owes them and blinks once it
-    // shows; any other hide, as a sheet over it, stops them.
-    onVisibleChanged: {
-      if (visible) root.blink()
-      else {
-        if (blinks.running && root.opening && root.reveal < 1) root.blinkOwed = true
-        blinks.stop()
-      }
-    }
 
     SequentialAnimation {
       id: blinks
       paused: running && root.still
       loops: 4
-      onRunningChanged: if (!running) { cap.opacity = 1; root.opening = false }
+      onRunningChanged: if (!running) cap.opacity = 1
 
       PropertyAction { target: cap; property: "opacity"; value: 1 }
       PauseAnimation { duration: Motion.duration(Style, 700) }
@@ -313,33 +257,13 @@ Item {
     }
   }
 
-  // A scrub's end, a sheet closing, or the market turning live again with the
-  // price already blinked for starts nothing. `opening` lasts from the open
-  // until its blinks stop.
-  property string blinkedPrice: ""
-  property bool blinkOwed: false
-  property bool opening: false
-  function blink() {
-    if (!root.live || !cap.visible || root.still) return
-    // With the shell's animations off, the cap stays lit, and the price
-    // counts as blinked for: animations back on, it never blinks for it.
-    if (Style.reduceMotion) {
-      root.blinkOwed = false
-      root.blinkedPrice = root.newestPrice
-      root.opening = false
-      return
-    }
-    if (!root.blinkOwed && root.newestPrice === root.blinkedPrice) return
-    // A restart's stop of a paused burst would end `opening`; an open's blinks
-    // keep it.
-    var opening = root.opening
-    root.blinkOwed = false
-    root.blinkedPrice = root.newestPrice
-    blinks.restart()
-    root.opening = opening
+  LiveMark {
+    live: root.live
+    still: root.still
+    shown: cap.visible
+    drawing: function() { return root.reveal < 1 }
+    surfaceOpen: root.surfaceOpen
+    price: root.newestPrice
+    burst: blinks
   }
-  onNewestPriceChanged: blink()
-  onSurfaceOpenChanged: if (surfaceOpen) { blinkOwed = true; opening = true; blink() }
-  onLiveChanged: if (live) blink(); else blinks.stop()
-  onStillChanged: if (!still) blink()
 }

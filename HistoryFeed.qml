@@ -11,7 +11,7 @@ Item {
 
   property var entries: ({})
   property var gate: null
-  property var clearance: null
+  property var mayAsk: null
   // The service's wall clock, so answers age by its time.
   property var clock: null
   function stamp() { return clock ? clock.wallSecond() : Math.floor(Date.now() / 1000) }
@@ -43,22 +43,11 @@ Item {
       && next.charts.every(function(c) { return root.holds(request, c.key) })
   }
 
-  // Evicts the oldest set first, never one in use (charts on show, rows
-  // fetched ahead): pushed out, it would be fetched again at once, pushing
-  // out the next.
+  // How many charts it holds, and those in use (`History.historiesKept`).
   readonly property int keep: 40
   property var inUse: []
   function setEntries(values) {
-    var keys = Object.keys(values)
-    var next = {}
-    var others = Object.keys(entries).filter(function(k) { return keys.indexOf(k) < 0 })
-    var over = others.length - (keep - keys.length)
-    others.forEach(function(k) {
-      if (over > 0 && root.inUse.indexOf(k) < 0) over--
-      else next[k] = entries[k]
-    })
-    keys.forEach(function(k) { next[k] = Object.assign({ history: null, receivedAt: 0 }, entries[k], values[k]) })
-    root.entries = next
+    root.entries = History.historiesKept(entries, values, inUse, keep)
   }
 
   // `force` is a user's refresh.
@@ -70,9 +59,7 @@ Item {
     }
     var key = keyFor(normalizedSymbol, range)
     if (wanted && !wanted.ahead && wanted.charts[0].key === key) return
-    var cached = entries[key]
-    var now = root.stamp()
-    if (!force && cached && cached.status === "ok" && cached.receivedAt && now - cached.receivedAt < History.HISTORY_FRESH) {
+    if (!force && History.historyFresh(entries[key], root.stamp())) {
       if (!wanted || !wanted.ahead || wanted.range !== range) root.want(null)
       return
     }
@@ -111,10 +98,10 @@ Item {
       }
       return
     }
-    root.launch()
+    root.sendNext()
   }
 
-  function launch() {
+  function sendNext() {
     if (job) return
     if (!wanted) {
       root.idle()
@@ -128,7 +115,7 @@ Item {
   // While the gate holds the host, a chart to show fails a turn later: the
   // change that asked for it is still being told.
   function run() {
-    if (clearance && !clearance()) { root.waitingForScreen = true; return }
+    if (mayAsk && !mayAsk()) { root.waitingForScreen = true; return }
     root.waitingForScreen = false
     if (job.ahead && gate) {
       var granted = 0
@@ -152,7 +139,7 @@ Item {
     fetchRun.send(job.charts.map(function(c) { return History.historyUrl(c.symbol, range) }), Fetch.HISTORY_CAP)
   }
 
-  function pump() {
+  function sendWaiting() {
     if (job && waitingForScreen) root.run()
   }
 
@@ -161,7 +148,7 @@ Item {
     root.job = null
     root.attempts = 0
     root.stopped = false
-    root.launch()
+    root.sendNext()
   }
 
   function parse(answer, range) {

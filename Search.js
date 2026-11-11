@@ -23,6 +23,29 @@ function failure(answer) {
   return answer.status === 400 ? "missing" : "other"
 }
 
+// The answers read since search opened, kept by the words they answer, so
+// words typed again answer at once and nothing is asked. A Map, since words
+// a person types may be any words, "constructor" among them. Each rule
+// returns a new one.
+function keptAnswer(kept, words) {
+  return kept.has(words) ? kept.get(words) : null
+}
+
+// Only an answer read is kept: words whose lookup failed are asked again.
+function withAnswer(kept, words, found) {
+  if (!found) return kept
+  var next = new Map(kept)
+  next.set(words, found)
+  return next
+}
+
+function withoutAnswer(kept, words) {
+  if (!kept.has(words)) return kept
+  var next = new Map(kept)
+  next.delete(words)
+  return next
+}
+
 // Yahoo sends at most the 8 asked for; past this, an answer is bad.
 var MOST_QUOTES = 40
 

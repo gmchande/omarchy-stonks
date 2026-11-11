@@ -26,29 +26,29 @@ Item {
   // ---- What you follow and look at
 
   // All: every symbol, fetched once whatever lists hold it.
-  readonly property var allSymbols: dataSettings.symbols
+  readonly property var allSymbols: fileSettings.symbols
   // "" is All.
-  readonly property string listName: dataSettings.list
-  readonly property var symbols: Settings.listSymbols(dataSettings)
-  readonly property string order: Settings.listOrder(dataSettings)
-  readonly property bool reversed: Settings.listReversed(dataSettings)
-  readonly property string range: dataSettings.range
+  readonly property string listName: fileSettings.list
+  readonly property var symbols: Settings.listSymbols(fileSettings)
+  readonly property string order: Settings.listOrder(fileSettings)
+  readonly property bool reversed: Settings.listReversed(fileSettings)
+  readonly property string range: fileSettings.range
   // The panel's first-run hint has shown.
-  readonly property bool hinted: dataSettings.hinted
-  readonly property string changeMode: dataSettings.changeMode
-  readonly property bool retro: dataSettings.style === "retro"
-  readonly property bool soundsOn: dataSettings.sounds
-  readonly property int refreshIntervalSec: dataSettings.refreshIntervalSec
+  readonly property bool hinted: fileSettings.hinted
+  readonly property string changeMode: fileSettings.changeMode
+  readonly property bool retro: fileSettings.style === "retro"
+  readonly property bool soundsOn: fileSettings.sounds
+  readonly property int refreshIntervalSec: fileSettings.refreshIntervalSec
   property var lastRemoval: null
   property string listsHeld: ""
   // The same array until what the lists hold changes, so a save of a range
-  // or a hero leaves each surface's list views as they are.
+  // or the featured stock leaves each surface's list views as they are.
   property var lists: Settings.listChoices(Settings.fileSettings(null))
-  onDataSettingsChanged: {
-    var held = Settings.listsHeld(root.dataSettings)
+  onFileSettingsChanged: {
+    var held = Settings.listsHeld(root.fileSettings)
     if (held === root.listsHeld) return
     root.listsHeld = held
-    root.lists = Settings.listChoices(root.dataSettings)
+    root.lists = Settings.listChoices(root.fileSettings)
     root.lastRemoval = null
   }
 
@@ -66,21 +66,21 @@ Item {
   // Added symbols with no first answer yet, quote or failure: saved and
   // fetched, but no list shows them until it comes.
   property var arriving: []
-  // { symbol, before }: the hero an add from search took before its first
-  // answer, and the one it left.
-  property var heroTaken: null
+  // { symbol, before }: the stock an add from search made featured before
+  // its first answer, and the one featured before it.
+  property var featuredTaken: null
 
   function answered(symbol) {
     return !!feed.quotes[symbol] || !!(feed.entries[symbol] && feed.entries[symbol].status === "failed")
   }
 
-  // One that took the hero and failed hands it back.
+  // One that was made featured and failed hands the place back.
   function settleArrivals() {
     var still = root.arriving.filter(function(s) { return root.allSymbols.indexOf(s) >= 0 && !root.answered(s) })
     if (still.length !== root.arriving.length) root.arriving = still
-    var taken = root.heroTaken
+    var taken = root.featuredTaken
     if (!taken || still.indexOf(taken.symbol) >= 0) return
-    root.heroTaken = null
+    root.featuredTaken = null
     if (root.view.featured === taken.symbol && !feed.quotes[taken.symbol]) root.feature(taken.before)
   }
 
@@ -90,28 +90,24 @@ Item {
   // Read from the settings and the feeds, not the bindings above, which may
   // not have caught up yet.
   readonly property var view: {
-    var all = dataSettings.symbols
-    var order = Settings.listOrder(dataSettings)
-    var reversed = Settings.listReversed(dataSettings)
-    var rows = Settings.listSymbols(dataSettings).filter(function(s) { return arriving.indexOf(s) < 0 })
-    var named = String(dataSettings.featured || "").toUpperCase()
+    var all = fileSettings.symbols
+    var order = Settings.listOrder(fileSettings)
+    var reversed = Settings.listReversed(fileSettings)
+    var rows = Settings.listSymbols(fileSettings).filter(function(s) { return arriving.indexOf(s) < 0 })
+    var named = String(fileSettings.featured || "").toUpperCase()
     var featured = all.indexOf(named) >= 0 ? named : (all[0] || "")
-    var range = dataSettings.range
-    // Receipts and histories only when the chart needs them, so a receipt
-    // for a quoted symbol on the day recomputes nothing.
-    var chart = root.keptDay(featured, Chart.viewChart(featured, range, feed.quotes,
-      feed.quotes[featured] ? ({}) : feed.entries, range === "1D" ? ({}) : historyFeed.entries,
-      overnightFeed.entries, allDayFeed.entries, calendars, root.viewSlideAt), overnightFeed.entries, allDayFeed.entries)
+    var range = fileSettings.range
+    var chart = root.chartOf(featured, range, feed)
     return {
       featured: featured,
       range: range,
-      list: dataSettings.list,
-      listKey: root.listKey(dataSettings.list),
+      list: fileSettings.list,
+      listKey: root.listKey(fileSettings.list),
       order: order,
       reversed: reversed,
       rows: rows,
       shown: Rows.shownOrder(root.heldOrder, Rows.sortedSymbols(rows, feed.quotes, order, reversed,
-        dataSettings.changeMode, order === "manual" ? null : root.newestTrades)),
+        fileSettings.changeMode, order === "manual" ? null : root.newestTrades)),
       allSymbols: all,
       // Null while on its way: each surface keeps the chart it has on screen.
       chart: chart
@@ -121,13 +117,16 @@ Item {
     var symbol = root.previewSymbol
     if (!symbol) return view
     var own = !!previewFeed.quotes[symbol] || !!previewFeed.entries[symbol]
-    var quotes = own ? previewFeed.quotes : feed.quotes
-    var entries = own ? previewFeed.entries : feed.entries
-    var range = view.range
-    var chart = root.keptDay(symbol, Chart.viewChart(symbol, range, quotes, quotes[symbol] ? ({}) : entries,
+    return Object.assign({}, view, { featured: symbol, chart: root.chartOf(symbol, view.range, own ? previewFeed : feed) })
+  }
+  // A symbol's chart over a range, from what a quote feed holds. It reads the
+  // feed's receipts only for a symbol without a quote, and the histories only
+  // off 1D, so a receipt for a quoted symbol on the day recomputes nothing.
+  function chartOf(symbol, range, quoteFeed) {
+    var quotes = quoteFeed.quotes
+    return root.keptDay(symbol, Chart.viewChart(symbol, range, quotes, quotes[symbol] ? ({}) : quoteFeed.entries,
       range === "1D" ? ({}) : historyFeed.entries, overnightFeed.entries, allDayFeed.entries, calendars, root.viewSlideAt),
       overnightFeed.entries, allDayFeed.entries)
-    return Object.assign({}, view, { featured: symbol, chart: chart })
   }
   readonly property string featuredSymbol: view.featured
   readonly property var shown: view.shown
@@ -193,14 +192,6 @@ Item {
   onChangeModeChanged: root.heldOrder = null
   onListNameChanged: root.heldOrder = null
   onListsHeldChanged: root.heldOrder = null
-  Connections {
-    target: yahooGate
-    function onPausedChanged() { root.releaseOrder() }
-  }
-  Connections {
-    target: robinhoodGate
-    function onPausedChanged() { root.releaseOrder() }
-  }
 
   // ---- Open surfaces and the search's preview
 
@@ -225,7 +216,7 @@ Item {
       root.saveWaitsFor = null
       Qt.callLater(function() {
         root.opening = false
-        feed.pump()
+        feed.sendWaiting()
       })
     }
     root.tick()
@@ -270,7 +261,7 @@ Item {
     root.previewSymbol = s
     root.previewResult = s && result && String(result.symbol || "").toUpperCase() === s ? result : null
     if (s) {
-      root.shownAsHero(s)
+      root.shownOnChart(s)
       previewRest.restart()
     } else previewRest.stop()
     root.showHistory(false)
@@ -289,17 +280,17 @@ Item {
   }
   // What a preview held back while out of sight goes once a screen shows it.
   onPreviewShownChanged: if (previewShown) {
-    previewFeed.pump()
+    previewFeed.sendWaiting()
     askOvernight()
   }
 
   // ---- Changes to the lists
 
-  // A hero chosen ends an add's hold on it (`heroTaken`).
+  // A stock chosen ends an add's hold on the place (`featuredTaken`).
   function feature(symbol, settles) {
     var s = String(symbol || "").toUpperCase()
     if (root.allSymbols.indexOf(s) < 0) return
-    root.heroTaken = null
+    root.featuredTaken = null
     root.persist({ featured: s }, settles)
   }
 
@@ -317,7 +308,7 @@ Item {
     var s = String(symbol || "").toUpperCase()
     if (s && root.allSymbols.indexOf(s) >= 0) {
       values.featured = s
-      root.heroTaken = null
+      root.featuredTaken = null
     }
     if (History.historyRanges().indexOf(range) >= 0) values.range = range
     if (Object.keys(values).length) root.persist(values)
@@ -336,34 +327,34 @@ Item {
       root.arriving = root.arriving.concat([s])
     var previewed = s !== "" && s === root.previewSymbol
     var coming = previewed && root.arriving.indexOf(s) >= 0
-    var next = Settings.withSymbolAdded(root.dataSettings, s)
-    // From an add still on its way, hand back the hero before that add.
-    var taken = root.heroTaken
+    var next = Settings.withSymbolAdded(root.fileSettings, s)
+    // From an add still on its way, hand back the stock featured before it.
+    var taken = root.featuredTaken
     var before = taken && taken.symbol === root.view.featured && !feed.quotes[taken.symbol] ? taken.before : root.view.featured
-    if (coming) root.heroTaken = { symbol: s, before: before }
+    if (coming) root.featuredTaken = { symbol: s, before: before }
     if (coming || (previewed && !!feed.quotes[s])) next.featured = s
     root.save(next)
   }
 
-  // `shown`: the rows as the surface shows them, whose neighbour takes the
-  // hero.
+  // `shown`: the rows as the surface shows them, whose neighbour is featured
+  // next.
   function removeSymbol(symbol, shown) {
-    root.remove(symbol, Settings.withMembership(root.dataSettings, symbol, root.listName, false, shown || root.shown))
+    root.remove(symbol, Settings.withMembership(root.fileSettings, symbol, root.listName, false, shown || root.shown))
   }
 
   // "" is All: unticking it is a removal, which can be undone.
   function setMembership(symbol, name, member, shown) {
-    var next = Settings.withMembership(root.dataSettings, symbol, name, member, shown || root.shown)
+    var next = Settings.withMembership(root.fileSettings, symbol, name, member, shown || root.shown)
     if (name === "" && !member) root.remove(symbol, next)
     else root.save(next)
   }
 
   function remove(symbol, next) {
-    var before = root.dataSettings
+    var before = root.fileSettings
     var quote = feed.quotes[symbol] || null
     var entry = feed.entries[symbol] || null
     root.save(next)
-    root.lastRemoval = { symbol: symbol, before: before, left: root.dataSettings.featured, quote: quote, entry: entry }
+    root.lastRemoval = { symbol: symbol, before: before, left: root.fileSettings.featured, quote: quote, entry: entry }
   }
 
   // Watched again first (`askDue`), so a run landing before the restore's
@@ -374,7 +365,7 @@ Item {
     // Only once.
     root.lastRemoval = null
     if (removal.quote) feed.restore(symbol, removal.quote, removal.entry)
-    root.save(Settings.withRemovalUndone(root.dataSettings, removal.before, symbol, removal.left))
+    root.save(Settings.withRemovalUndone(root.fileSettings, removal.before, symbol, removal.left))
     root.askDue()
     feed.ask([symbol], root.wallSecond())
   }
@@ -386,15 +377,15 @@ Item {
     var next = rows.slice()
     for (var i = 0; i < members.length; i++)
       if (next.indexOf(members[i]) < 0) next.splice(Math.min(i, next.length), 0, members[i])
-    root.save(Settings.withManualOrder(root.dataSettings, next))
+    root.save(Settings.withManualOrder(root.fileSettings, next))
   }
 
   function setOrder(order) {
-    root.save(Settings.withListOrder(root.dataSettings, order))
+    root.save(Settings.withListOrder(root.fileSettings, order))
   }
 
   function reverseOrder() {
-    root.save(Settings.withListReversed(root.dataSettings))
+    root.save(Settings.withListReversed(root.fileSettings))
   }
 
   function switchList(name) {
@@ -403,34 +394,34 @@ Item {
 
   // Returns why not, or "".
   function createList(name) {
-    var problem = Settings.listNameProblem(name, root.dataSettings.lists)
-    if (problem === "") root.save(Settings.withListCreated(root.dataSettings, name))
+    var problem = Settings.listNameProblem(name, root.fileSettings.lists)
+    if (problem === "") root.save(Settings.withListCreated(root.fileSettings, name))
     return problem
   }
 
   // The new name takes the list's key before the save, so no view shows the
   // list under another key; the freed old name takes a new one after.
   function renameList(name, newName) {
-    var problem = Settings.renameProblem(root.dataSettings, name, newName)
-    var i = Settings.listIndex(root.dataSettings.lists, name)
+    var problem = Settings.renameProblem(root.fileSettings, name, newName)
+    var i = Settings.listIndex(root.fileSettings.lists, name)
     if (problem !== "" || i < 0) return problem
-    var old = root.dataSettings.lists[i].name
+    var old = root.fileSettings.lists[i].name
     var now = Settings.listName(newName)
     if (old !== now) root.keyList(now, root.listKey(old))
-    root.save(Settings.withListRenamed(root.dataSettings, name, newName))
+    root.save(Settings.withListRenamed(root.fileSettings, name, newName))
     if (old !== now) root.keyList(old, "#" + (++root.listKeyCount))
     return problem
   }
 
   function moveList(name, delta) {
-    root.save(Settings.withListMoved(root.dataSettings, name, delta))
+    root.save(Settings.withListMoved(root.fileSettings, name, delta))
   }
 
   function deleteList(name) {
-    var i = Settings.listIndex(root.dataSettings.lists, name)
+    var i = Settings.listIndex(root.fileSettings.lists, name)
     if (i < 0) return
-    var old = root.dataSettings.lists[i].name
-    root.save(Settings.withListDeleted(root.dataSettings, name))
+    var old = root.fileSettings.lists[i].name
+    root.save(Settings.withListDeleted(root.fileSettings, name))
     root.keyList(old, "#" + (++root.listKeyCount))
   }
 
@@ -452,10 +443,10 @@ Item {
   }
   // Bindings, not aliases: an alias reads nothing until the file's own
   // bindings have run, and the view is worked out before that.
-  readonly property var dataSettings: listsFile.dataSettings
-  readonly property string dataPath: listsFile.dataPath
+  readonly property var fileSettings: listsFile.fileSettings
+  readonly property string listsPath: listsFile.path
   readonly property bool ready: listsFile.ready
-  readonly property bool settingsUnreadable: listsFile.settingsUnreadable
+  readonly property bool listsUnreadable: listsFile.unreadable
   readonly property bool editsUnsaved: listsFile.editsUnsaved
   readonly property bool saveFailed: listsFile.saveFailed
   signal saveChecked(bool saved)
@@ -481,6 +472,8 @@ Item {
     id: yahooGate
     host: "Yahoo"
     clock: root
+    onPausedChanged: root.releaseOrder()
+    onPausedUntilChanged: root.armClock()
     // Yahoo answering again says the network is back.
     onReopened: {
       root.showHistory(false)
@@ -498,26 +491,29 @@ Item {
     clock: root
     capacity: 20
     perMinute: 10
+    onPausedChanged: root.releaseOrder()
+    onPausedUntilChanged: root.armClock()
   }
   Gate {
     id: githubGate
     host: "GitHub"
     clock: root
+    onPausedUntilChanged: root.armClock()
   }
 
   QuoteFeed {
     id: feed
     symbols: root.ready ? root.allSymbols : []
     watched: root.watched
-    lead: root.view.featured
-    heroes: [root.view.featured].concat(root.previewShown && root.allSymbols.indexOf(root.previewSymbol) >= 0 ? [root.previewSymbol] : [])
+    featured: root.view.featured
+    charted: [root.view.featured].concat(root.previewShown && root.allSymbols.indexOf(root.previewSymbol) >= 0 ? [root.previewSymbol] : [])
     reading: function() { return Asks.readingOrder(root.view.featured, root.sights, root.view.shown, root.allSymbols) }
     holding: root.drawing.length > 0
     onBusyChanged: Qt.callLater(root.releaseOrder)
     onLandingChanged: Qt.callLater(root.releaseOrder)
     now: root.now
     clock: root
-    clearance: function() { return !root.opening && root.screensClear() }
+    mayAsk: function() { return !root.opening && root.screensClear() }
     gate: yahooGate
     centExchanges: root.centExchanges
     calendars: root.calendars
@@ -560,7 +556,7 @@ Item {
   HistoryFeed {
     id: historyFeed
     gate: yahooGate
-    clearance: function() { return root.screensClear() }
+    mayAsk: function() { return root.screensClear() }
     clock: root
     centExchanges: root.centExchanges
     inUse: root.chartsInUse
@@ -584,7 +580,7 @@ Item {
       ? [root.previewSymbol] : []
     now: root.now
     clock: root
-    clearance: function() { return root.previewShown && root.screensClear() }
+    mayAsk: function() { return root.previewShown && root.screensClear() }
     gate: yahooGate
     centExchanges: root.centExchanges
     calendars: root.calendars
@@ -593,22 +589,22 @@ Item {
   }
   readonly property var previewEntries: previewFeed.entries
 
-  function heroesOnShow() {
+  function chartedOnShow() {
     return root.openSurfaces.length > 0 ? [root.view.featured].concat(root.previewShown ? [root.previewSymbol] : []) : []
   }
   // With nothing open it reads no quote, so the pill's prices don't work it
   // out again.
-  readonly property var figuresWanted: {
-    var heroes = root.heroesOnShow()
-    return heroes.length > 0 ? Asks.figuresWanted(heroes, feed.quotes, previewFeed.quotes) : []
+  readonly property var fundamentalsWanted: {
+    var charted = root.chartedOnShow()
+    return charted.length > 0 ? Asks.fundamentalsWanted(charted, feed.quotes, previewFeed.quotes) : []
   }
   FundamentalsFeed {
     id: fundamentalsFeed
-    wanted: root.figuresWanted
+    wanted: root.fundamentalsWanted
     now: root.now
     clock: root
     gate: yahooGate
-    clearance: function() { return root.screensClear() }
+    mayAsk: function() { return root.screensClear() }
   }
   AllDayFeed {
     id: allDayFeed
@@ -625,6 +621,8 @@ Item {
   }
   readonly property var nights: overnightFeed.entries
   readonly property var allDay: allDayFeed.entries
+  // The feeds themselves, for whoever waits until no run is out.
+  readonly property var feeds: ({ quotes: feed, preview: previewFeed, overnight: overnightFeed })
   // By Yahoo's quote, never Robinhood's answer: Robinhood is asked whether
   // it trades each all day.
   readonly property var overnightSymbols: allSymbols.filter(function(s) {
@@ -670,10 +668,10 @@ Item {
 
   ReleaseFeed {
     id: releaseFeed
-    ready: root.ready && root.dataSettings.updateCheck && root.updatable
+    ready: root.ready && root.fileSettings.updateCheck && root.updatable
     now: root.now
     clock: root
-    clearance: function() { return root.screensClear() }
+    mayAsk: function() { return root.screensClear() }
     gate: githubGate
   }
   // "" until GitHub names one.
@@ -696,7 +694,7 @@ Item {
     var calNow = Asks.calendarsAt(root.calendars, now)
     var watched = Asks.watchedSymbols(root.allSymbols, featured, open)
     if (watched.join(",") !== root.watched.join(",")) root.watched = watched
-    var asks = Asks.quotesDue(watched, feed.entries, feed.asked, feed.quotes, root.heroesOnShow(), featured, now, root.refreshIntervalSec, calNow)
+    var asks = Asks.quotesDue(watched, feed.entries, feed.asked, feed.quotes, root.chartedOnShow(), featured, now, root.refreshIntervalSec, calNow)
     root.dueAt = asks.next
     if (asks.due.length > 0) feed.ask(asks.due, now)
   }
@@ -718,7 +716,7 @@ Item {
     var previewed = root.previewSymbol
     return Asks.overnightAsks({
       open: root.openSurfaces.length > 0,
-      pill: root.view.featured,
+      featured: root.view.featured,
       quoteEntries: feed.entries,
       quotes: feed.quotes,
       overnightSymbols: root.overnightSymbols,
@@ -744,14 +742,14 @@ Item {
     if (chart === chartOnShow) return
     var rangeLeft = chartOnShow !== "" && chartOnShow.split("|")[1] !== view.range
     chartOnShow = chart
-    if (root.heroTaken && view.featured !== root.heroTaken.symbol) root.heroTaken = null
+    if (root.featuredTaken && view.featured !== root.featuredTaken.symbol) root.featuredTaken = null
     if (rangeLeft) {
       // A turn later: the view's change is still being told.
       var left = Object.keys(root.aheadAsked)
       root.aheadAsked = ({})
       root.aheadMissed = ({})
       if (left.length) Qt.callLater(function() { historyFeed.drop(left) })
-    } else root.shownAsHero(view.featured)
+    } else root.shownOnChart(view.featured)
     showHistory(false)
     askDue()
     askOvernight()
@@ -812,8 +810,8 @@ Item {
   property bool refreshOwed: false
   function refresh() {
     if (!root.ready) return
-    yahooGate.hurry()
-    robinhoodGate.hurry()
+    yahooGate.retryNow()
+    robinhoodGate.retryNow()
     var now = root.wallSecond()
     feed.ask(Asks.refreshQuotes(root.watched, feed.entries, now), now, true)
     fundamentalsFeed.retry()
@@ -860,7 +858,7 @@ Item {
   }
 
   // A range on show is asked again as its market moves it, so its line and
-  // its low and high keep up: one hero's at a time, when the feed is idle.
+  // its low and high keep up: one chart's at a time, when the feed is idle.
   function refreshRange() {
     if (!root.ready || historyFeed.busy) return
     var range = root.view.range
@@ -870,7 +868,7 @@ Item {
   }
 
   // The featured symbol is already an add from search on its way
-  // (`addSymbol`), so its preview's fetch goes on as the hero's.
+  // (`addSymbol`), so its preview's fetch goes on as the featured stock's.
   function chartsOnShow() {
     return Asks.chartsOnShow(root.openSurfaces, root.view.featured, root.previewSymbol, root.previewSurface, root.previewShown)
   }
@@ -915,8 +913,9 @@ Item {
     historyFeed.requestAhead(charts, range)
   }
 
-  // A chart fetched ahead and now on a hero is the hero's: a new range keeps it.
-  function shownAsHero(symbol) {
+  // A chart fetched ahead and now on show is no longer one fetched ahead: a
+  // new range keeps it.
+  function shownOnChart(symbol) {
     var key = historyFeed.keyFor(symbol, root.view.range)
     if (!(key in root.aheadAsked)) return
     var asked = Object.assign({}, root.aheadAsked)
@@ -997,10 +996,10 @@ Item {
   function screensAnswered() {
     root.screensAnsweredMs = Date.now()
     if (root.screensOff) return
-    feed.pump()
-    previewFeed.pump()
-    historyFeed.pump()
-    fundamentalsFeed.pump()
+    feed.sendWaiting()
+    previewFeed.sendWaiting()
+    historyFeed.sendWaiting()
+    fundamentalsFeed.sendWaiting()
     root.screensReady()
     root.askOvernight()
     if (root.refreshOwed) {
@@ -1009,19 +1008,21 @@ Item {
     }
     root.refreshRange()
     root.fetchAhead()
-    releaseFeed.pump()
+    releaseFeed.sendWaiting()
   }
   signal screensReady()
 
   // ---- The clock
 
-  property int now: Math.floor(Date.now() / 1000)
+  // The wall clock in seconds, read only in `wallSecond`: the desktop's,
+  // unless a walk hands in its own.
+  property var wallClock: null
+  function wallSecond() { return wallClock ? wallClock() : Math.floor(Date.now() / 1000) }
+  property int now: wallSecond()
 
   // Each second while a surface is open, each minute otherwise; it also
   // wakes when the next quote falls due, a pause ends, or a refresh turns
-  // overdue, so the pill's "!" comes on time. The wall clock is read only
-  // in `wallSecond`.
-  function wallSecond() { return Math.floor(Date.now() / 1000) }
+  // overdue, so the pill's "!" comes on time.
   function tick() {
     root.now = root.wallSecond()
     root.armClock()
@@ -1035,18 +1036,6 @@ Item {
   onDueAtChanged: armClock()
   onOwedChanged: armClock()
   onReadyChanged: armClock()
-  Connections {
-    target: yahooGate
-    function onPausedUntilChanged() { root.armClock() }
-  }
-  Connections {
-    target: robinhoodGate
-    function onPausedUntilChanged() { root.armClock() }
-  }
-  Connections {
-    target: githubGate
-    function onPausedUntilChanged() { root.armClock() }
-  }
   // Each step also tries the next chart ahead, which may have waited on
   // Yahoo's budget.
   Timer {

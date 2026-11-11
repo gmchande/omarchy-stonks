@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Boundaries in the production source that no flow can see: who may run a
-# command, read or write a file, start a feed, or name an endpoint; that the
-# model stays pure; that colours come from the theme; that the bar entry
-# holds only the pill's forms; and that no file takes QtQuick's Sprite name.
-# And one in the tests: a harness ends Quickshell only through
-# HarnessExit.qml.
+# command, read or write a file, or make a request, as the README's "What it
+# runs" says; that the rule files stay pure; that colours come from the
+# theme; that the bar entry holds only the pill's forms; and that no file
+# takes QtQuick's Sprite name.
+# And two in the tests: a harness ends Quickshell only through
+# HarnessExit.qml, and one that builds the whole plugin hands it a stand-in
+# for Hyprland.
 # Prints a FAILED line per breach and exits non-zero on any.
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -35,65 +37,61 @@ none() {
   while read -r hit; do fail "$hit: '$pattern' is not allowed here"; done <<< "$hits"
 }
 
-# External commands run only in the feeds, search, the version watch's
-# shell restart and update, the sounds' pw-play, its chimes' sh, the
-# bell's omarchy-shell and pw-dump, and the silence's pw-cat, the camera's
-# screenshot hand-off, and the sh and chmod that keep Stonks' files its
-# owner's and the sh that makes the data file so (OwnerOnly); files are
-# read and written only by the service and its lists file, the version watch reads the
-# manifest, the trend colours read the theme's colours, the sounds read
-# their own bundled sounds,
-# the cache's files, the saved quotes and the sounds' replay, chimes, and
-# lead-ins, are written only through OwnerOnly, and the camera writes its
-# screenshot and reads Omasnap's settings; one service owns the feeds, and
-# each surface its own search's; every request leaves from FetchRun, which
-# only the feeds use; the quote URL is the quote feed's, the fundamentals
-# URLs the fundamentals feed's, the overnight URL the overnight feed's, the
-# all-day URL the all-day feed's, the search URL the search feed's, and the
-# manifest's URL the release feed's. The plugin has
-# one IPC target; only the window's host and the screens act on Hyprland.
+# External commands run only in the feeds' one runner, the version watch's
+# shell restart and update, the sounds' pw-play, its chimes' sh, the bell's
+# omarchy-shell and pw-dump, the silence's pw-cat, the camera's screenshot
+# hand-off, and the sh and chmod that keep Stonks' files its owner's
+# (OwnerOnly). Files are read and written only by the service and its lists
+# file, the version watch (the manifest), the trend colours (the theme's
+# colours), the sounds (their own), OwnerOnly (the cache), and the camera,
+# which writes its screenshot and reads Omasnap's settings.
 only '\bProcess\s*\{' FetchRun.qml Updates.qml Sounds.qml Camera.qml OwnerOnly.qml
 only '\bFileView\s*\{' Service.qml ListsFile.qml Updates.qml TrendColors.qml OwnerOnly.qml Sounds.qml
 only '\bSettings\s*\{|^import QtCore' Camera.qml
-only '^import Quickshell\.Io' FetchRun.qml Service.qml ListsFile.qml IpcTarget.qml Updates.qml TrendColors.qml Sounds.qml Camera.qml OwnerOnly.qml
 # Only the camera grabs and saves a picture, puts it on the clipboard, and
 # sends a notification.
 only 'grabToImage|saveToFile|wl-copy|wl-paste|omarchy-notification-send|notify-send' Camera.qml
 # A command started by exec is a sound's, and only there; it is pw-play
 # under its time limit, and nothing else. A chime's pw-play has its own 2 s,
 # so a stalled PipeWire piles none up. Only the sounds ask PipeWire
-# anything, or hold its output awake.
-only '\.exec\s*\(|pw-play|pw-dump|pw-cat' Sounds.qml
+# anything, or hold its output awake, by the commands written there or
+# Commands.js's bell check and chime player.
+only '\.exec\s*\(|pw-play|pw-dump|pw-cat|Commands\.(bellCheck|chimePlayer)\b' Sounds.qml
 none '\.exec\s*\((?!\["timeout", "-k", "1", "4", "pw-play",)' Sounds.qml
-none '(?<!timeout -k 1 2 )pw-play --' Sounds.qml
-# Every command the camera and the file keeper run is under `timeout`.
+none '(?<!timeout -k 1 2 )pw-play --' Sounds.qml Commands.js
+# Every command the camera and the file keeper run is under `timeout`, and
+# so is the sounds' survey: those written there, and those in Commands.js.
 none 'command:\s*\[(?!"timeout",)' Camera.qml OwnerOnly.qml
-only '\bIpcHandler\s*\{' IpcTarget.qml
-only '^import Quickshell\.Hyprland' WindowHost.qml Screens.qml
-only '\b(QuoteFeed|HistoryFeed|FundamentalsFeed|OvernightFeed|AllDayFeed|ReleaseFeed)\s*\{' Service.qml
-only '\bSearchFeed\s*\{' StonksBody.qml
+for made in screenshotName createPrivately soundSurvey; do
+  rg -qUP "function $made\\([^)]*\\) \\{\\n  return \\[\"timeout\", " Commands.js || fail "Commands.js: $made does not start with timeout"
+done
+# Hyprland's dispatcher can start a program too: only the plugin's entry
+# reaches Hyprland, to hand it on, and the one dispatch is the window
+# host's, which focuses the window.
+only '^import Quickshell\.Hyprland' Plugin.qml
+only '\.dispatch\s*\(' WindowHost.qml
+none '\.dispatch\s*\((?!"hl\.dsp\.focus\()' WindowHost.qml
+# A request leaves only from the feeds' runner, which only the feeds use,
+# and no QML names an address or asks any other way.
 only '\bFetchRun\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SearchFeed.qml
-only 'Fetch\.curlCommand\(' FetchRun.qml
-only 'Quote\.chartUrl\(' QuoteFeed.qml
-only 'Fundamentals\.(fundamentalsUrl|capCloseUrl|rateUrl)\(' FundamentalsFeed.qml
-only 'Overnight\.overnightUrl\(' OvernightFeed.qml
-only 'Overnight\.allDayUrl\(' AllDayFeed.qml
-only 'Search\.searchUrl\(' SearchFeed.qml
-only 'Release\.MANIFEST_URL\b' ReleaseFeed.qml
 none 'execDetached|XMLHttpRequest|https?://' *.qml
 # GitHub's address is the release rule's alone: no other file names it.
 others=()
 for file in *.js; do [ "$file" = Release.js ] || others+=("$file"); done
 none 'github(usercontent)?\.com' *.qml "${others[@]}"
+# Stonks asks no site but those the README's "What it runs" names.
+sites=$(awk '/^\*\*Sites\*\*/,/^\*\*Files/' README.md | rg -o '^- `([^`]+)`' -r '$1')
+while read -r host; do
+  [ -z "$host" ] || grep -qxF -- "$host" <<< "$sites" || fail "$host: a site the README's \"What it runs\" doesn't name"
+done <<< "$(rg -o --no-filename 'https?://([^/"]+)' -r '$1' -- *.js | sort -u)"
 # Every request goes through Fetch.curlCommand, which compresses and caps
-# it, and through a host's gate, which only the service holds.
+# it.
 while read -r hit; do
   [ -n "$hit" ] && fail "$hit: a command that is not Fetch.curlCommand's"
 done <<< "$(rg -n '\.command\s*=' -- *.qml | rg -v 'Fetch\.curlCommand\(')"
 for flag in --compressed --max-filesize; do
   rg -q -F -- "\"$flag\"" Fetch.js || fail "Fetch.js: curlCommand no longer sends $flag"
 done
-only '\bGate\s*\{' Service.qml
 # The rule files (every *.js here) are data rules: no host, no I/O, no wall
 # clock of their own, and no colour of their own: even Stonks' up and down
 # for a theme without a pair are made from the theme's (`Tones.ownPair`).
@@ -127,6 +125,12 @@ jq -e '[.barWidget.schema[].key] == ["barStyle", "barStyleRight", "barStyleVerti
   || fail "manifest.json: the bar entry's schema holds more than barStyle, barStyleRight, and barStyleVertical"
 # QtQuick owns Sprite: a Sprite.qml here would resolve as QtQuick's type.
 [ -e Sprite.qml ] && fail "Sprite.qml: QtQuick owns the Sprite type"
+# A harness that builds the whole plugin hands it a stand-in for Hyprland, so
+# no walk asks the owner's desktop whether its screens are off.
+hits=$(rg -n 'Stonks\.Plugin \{' -- test/qml | rg -v 'hyprland: ')
+[ -z "$hits" ] || while read -r hit; do
+  fail "$hit: a harness hands the plugin a stand-in for Hyprland (hyprland: ...)"
+done <<< "$hits"
 # Qt.exit tears Quickshell's engine down at the next deferred delete, which
 # QtTest's wait() runs under the test's handler: Qt aborts, and the abort
 # dumps core. HarnessExit.qml exits only once no test is running, so no other

@@ -10,8 +10,8 @@ Item {
 
   // Yahoo's gate (`Gate.qml`), held by the service; null without one.
   property var gate: null
-  // Whether a lookup may go now. One held back waits for `pump`.
-  property var clearance: null
+  // Whether a lookup may go now. One held back waits for `sendWaiting`.
+  property var mayAsk: null
   // The search is open, and the words in its field.
   property bool active: false
   property string wanted: ""
@@ -21,9 +21,10 @@ Item {
   property string requestedQuery: ""
   readonly property bool out: fetchRun.out
   // The answers read since search opened, by their words: typed again, as
-  // after a Backspace, they answer at once and nothing is asked.
+  // after a Backspace, they answer at once and nothing is asked
+  // (`Search.keptAnswer`).
   property var kept: new Map()
-  onActiveChanged: if (!active) kept.clear()
+  onActiveChanged: if (!active) root.kept = new Map()
 
   // A lookup is out for the words wanted.
   signal asked()
@@ -36,7 +37,7 @@ Item {
   signal answered(string query, var found, string why)
 
   function askSoon() {
-    if (kept.has(wanted)) {
+    if (Search.keptAnswer(kept, wanted)) {
       debounce.stop()
       ask()
     } else debounce.restart()
@@ -53,13 +54,14 @@ Item {
       fetchRun.stop()
       return
     }
-    if (kept.has(q)) {
+    var held = Search.keptAnswer(kept, q)
+    if (held) {
       requestedQuery = ""
       activeQuery = q
-      land(kept.get(q), "")
+      land(held, "")
       return
     }
-    if (clearance && !clearance()) { requestedQuery = q; return }
+    if (mayAsk && !mayAsk()) { requestedQuery = q; return }
     requestedQuery = ""
     activeQuery = q
     if (gate && gate.take(1) === 0) {
@@ -75,17 +77,17 @@ Item {
   // no use, so Yahoo is asked.
   function askAgain() {
     debounce.stop()
-    kept.delete(wanted)
+    root.kept = Search.withoutAnswer(kept, wanted)
     if (fetchRun.out && activeQuery === wanted) {
       requestedQuery = ""
       asked()
     } else {
-      if (gate) gate.hurry()
+      if (gate) gate.retryNow()
       ask()
     }
   }
 
-  function pump() {
+  function sendWaiting() {
     if (active && requestedQuery !== "" && !fetchRun.out) ask()
   }
 
@@ -104,7 +106,7 @@ Item {
 
   function land(found, why) {
     ended()
-    if (activeQuery !== "" && found) kept.set(activeQuery, found)
+    if (activeQuery !== "") root.kept = Search.withAnswer(kept, activeQuery, found)
     if (active && activeQuery !== "" && activeQuery === wanted) answered(activeQuery, found, why)
     if (requestedQuery !== "") {
       requestedQuery = ""

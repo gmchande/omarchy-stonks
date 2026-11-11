@@ -24,7 +24,7 @@ import "plugin"
 // w22-<surface>-<look>-<symbol>-<range> states render the 22-symbol list with
 // a real day featured, at identical state in both looks; a panel is as tall
 // as its whole rows, the way Panel sizes it. sprite-candidates draws the
-// bull and bear candidates at 1x and 4x. pill-sheet draws the real bar pill
+// bull and the bear at three sizes. pill-sheet draws the real bar pill
 // for NEST in every bar style and look, on a horizontal and a vertical bar.
 Harness {
   id: root
@@ -297,40 +297,6 @@ Harness {
     return { value: Fundamentals.parseRate(fundamentalsAnswer("fx-" + pair.toLowerCase()), pair), checkedAt: 0 }
   }
 
-  readonly property var bullCandidates: [
-    [".##..............##.", "##................##", "##................##", ".###............###.",
-     "..#####......#####..", "....############....", "###.############.###", ".##.#.########.#.##.",
-     "....############....", "....############....", "...##############...", "...###.######.###...",
-     "...##############...", "....############...."],
-    Cells.BULL_SPRITE.slice(),
-    [".##..............##.", "##................##", "##................##", ".###............###.",
-     "..#####......#####..", "....############....", "###.############.###", ".##.#.########.#.##.",
-     "....############....", "...##############...", "...###.######.###...", "...##############...",
-     "....#####..#####....", "........####........"]
-  ]
-  // The bear candidates for a face to match the bull's: one read as a pig,
-  // the teddy with inner ears and a mouth, the grizzly (the default), and the
-  // bull's twin with a short muzzle.
-  readonly property var bearCandidates: [
-    ["....................", ".........#####......", ".......##########...", "..###.############..",
-     ".#.###.############.", "####.##############.", "###################.", ".##################.",
-     "...################.", "....####.....#####..", "....####......####..", "....####......####..",
-     "...#####.....#####..", "...................."],
-    ["....................", "..###..........###..", ".#####........#####.", ".##.############.##.",
-     ".##################.", "..################..", "..####.######.####..", ".##################.",
-     ".#######....#######.", ".########..########.", ".#######.##.#######.", "..#######..#######..",
-     "....############....", "......########......"],
-    Cells.BEAR_SPRITE.slice(),
-    ["....................", "..###..........###..", ".#####........#####.", ".##################.",
-     ".##################.", "..####.######.####..", "..################..", "..################..",
-     "...##############...", "....############....", "....############....", "....####....####....",
-     ".....####..####.....", "......########......"]
-  ]
-
-  function isDefaultSprite(rows, standard) {
-    return rows.join("|") === standard.join("|")
-  }
-
   FileView { id: aaplFile; path: fixtureDir + "/aapl.json"; blockLoading: true }
   FileView { id: nestDayFile; path: fixtureDir + "/nest-2026-09-11-day-prepost.json"; blockLoading: true }
   FileView { id: spyDayFile; path: fixtureDir + "/spy-2026-09-11-day-prepost.json"; blockLoading: true }
@@ -353,7 +319,7 @@ Harness {
     property var symbols: ["AAPL", "SHOP.TO"]
     // The copy's id (dev-<state>), as its lists file is named.
     readonly property string pluginId: root.copyId
-    property bool settingsUnreadable: false
+    property bool listsUnreadable: false
     // A save that didn't land (popup-notice-save-*), said again after a
     // click that still didn't (popup-notice-save-again-*).
     readonly property bool saveFailed: root.stateName.indexOf("popup-notice-save-") === 0
@@ -386,7 +352,7 @@ Harness {
     readonly property var histories: root.shownHistoryEntry ? ({ [(historySymbol || featuredSymbol) + "|" + range]: root.shownHistoryEntry }) : ({})
     readonly property string hero: previewSymbol || featuredSymbol
     readonly property var fundamentals: root.savedFigures[hero]
-      ? ({ [hero]: { status: "ok", figures: root.savedFigures[hero] } }) : ({})
+      ? ({ [hero]: { status: "ok", fundamentals: root.savedFigures[hero] } }) : ({})
     readonly property var rates: root.savedRates
     property var arriving: []
     property var lastRemoval: null
@@ -439,6 +405,16 @@ Harness {
     property string runningVersion: "1.0.0"
   }
 
+  // Robinhood's answer by symbol, read as the feed reads it: each result is
+  // for the symbol asked in its place.
+  function robinhoodAnswers(answer, symbols) {
+    var results = Overnight.overnightResults(answer)
+    if (!results) return null
+    var out = {}
+    symbols.forEach(function(symbol, i) { out[symbol] = Overnight.overnightAnswer(results[i], symbol) })
+    return out
+  }
+
   function load() {
     var aapl = Quote.parseChart(JSON.parse(aaplFile.text()))
     var nestDay = Quote.parseChart(JSON.parse(nestDayFile.text()))
@@ -478,7 +454,7 @@ Harness {
         var sunday = Calendar.epochAt(stub.calendars.calendars.US, "2026-10-25", "23:35")
         var jnj = Quote.parseChart(moment("jnj"), Calendar.centExchanges(stub.calendars), sunday)
         var day = moment("robinhood-day")
-        var night = Overnight.parseOvernight(day, day.results.map(function(r) { return r.symbol })).JNJ
+        var night = robinhoodAnswers(day, day.results.map(function(r) { return r.symbol })).JNJ
         var built = Day.dayChart(jnj, night, stub.calendars)
         root.nightPill = { quote: jnj, newest: Overnight.newestTrade(jnj, built.latest, stub.calendars, built.day),
           night: Object.assign({ status: "ok" }, night) }
@@ -617,7 +593,7 @@ Harness {
       // saved in two days throughout is that; otherwise as a surface open a
       // while asks, by `Asks.twoDays` judged on the saved answer, a row in
       // a spark batch two when any of its batch wants two
-      // (`Asks.quoteSlots`). A capture saves Yahoo's two days beside its one
+      // (`Asks.quoteRequests`). A capture saves Yahoo's two days beside its one
       // (2d/<file>.json, test/capture-demo.sh), read where Stonks asks for
       // two. Without it, the other range draws another day, or a blank: a
       // row saved only in it is left out, those whose own ask differs first,
@@ -627,7 +603,7 @@ Harness {
       var twoDays = function(s) { return Asks.twoDays(judged[s], root.now, stub.calendars) }
       var askedRange = function(kept) {
         var asks = {}
-        Asks.quoteSlots(kept, {}, kept, featured, [featured], true, kept.filter(function(s) { return judged[s].crypto })).forEach(function(slot) {
+        Asks.quoteRequests(kept, {}, kept, featured, [featured], true, kept.filter(function(s) { return judged[s].crypto })).forEach(function(slot) {
           var two = slot.symbols.some(twoDays)
           slot.symbols.forEach(function(s) { asks[s] = two ? "2d" : "1d" })
         })
@@ -663,7 +639,7 @@ Harness {
       // with the sweep's moments, and every one at the moments before them;
       // at a saved moment's folder, those Stonks asks Robinhood about, in
       // the order its saved answer was asked in, since an answer's results
-      // pair with the symbols asked by place (Overnight.parseOvernight).
+      // pair with the symbols asked by place (`robinhoodAnswers`).
       var day = named ? saved("robinhood-day") : null
       var instruments = named ? saved("robinhood-instruments") : null
       var asked = day ? JSON.parse(day).results.map(function(r) { return r.symbol }) : []
@@ -679,8 +655,8 @@ Harness {
         : root.overnight.sweep ? Overnight.parseAllDay(read("robinhood-instruments"), us) : root.overnight.power ? {} : null
       // What a surface opening at the moment holds: Robinhood's span=day
       // answer.
-      var answer = named ? (day ? Overnight.parseOvernight(JSON.parse(day), us) : null)
-        : root.overnight.power ? {} : Overnight.parseOvernight(read("robinhood-day"), us)
+      var answer = named ? (day ? robinhoodAnswers(JSON.parse(day), us) : null)
+        : root.overnight.power ? {} : robinhoodAnswers(read("robinhood-day"), us)
       us.forEach(function(s) {
         if (named && !tradable) return
         allDay[s] = { status: "ok", allDay: tradable ? tradable[s] : true, at: 0 }
@@ -915,8 +891,7 @@ Harness {
     } else if (body.motion.loading) {
       // A chart still on its way dims a quarter second in, over 160 ms, so
       // a grab at 300 ms catches it partway, further in one run than the
-      // next: it shows at rest, dimmed, so two renders of one tree match
-      // (test/render-diff.sh).
+      // next: it shows at rest, dimmed, so two renders of one tree match.
       body.motion.dimmed = 1
     }
     if (root.searchState) {
@@ -1060,7 +1035,7 @@ Harness {
     } else if (/^(popup|window)-notice-file-/.test(root.stateName)) {
       // The footer's notices whole, in the panel's width and the window's;
       // -update-: beside a newer Stonks offered at the bar's right end.
-      stub.settingsUnreadable = true
+      stub.listsUnreadable = true
       if (root.stateName.indexOf("-update-") > 0) updates.releasedVersion = "1.1.0"
     } else if (root.stateName.indexOf("popup-notice-update-") === 0) {
       updates.newVersion = "1.0.0"
@@ -1205,11 +1180,11 @@ Harness {
     // surfaces at size N: the panel's 480 and the smallest window's 560
     // grow with the text, and the window is 720 or its smallest, whichever
     // is wider.
-    implicitWidth: root.anchorState ? 1000 : root.pillSheet ? Math.max(520, pillColumn.implicitWidth + 48) : root.themeState ? 480 + 410 : root.sheet ? 1000
+    implicitWidth: root.anchorState ? 1000 : root.pillSheet ? Math.max(520, pillColumn.implicitWidth + 48) : root.themeState ? 480 + 410 : root.sheet ? 360
       : (root.windowWidth ? root.windowWidth : root.chartHover ? 719 : (root.smallest ? Math.round(560 * root.sizeScale)
         : (root.popup ? Math.round(480 * root.sizeScale) : Math.max(720, Math.round(560 * root.sizeScale)))))
     implicitHeight: root.anchorState ? body.fittedHeight(body.chromeHeight + 6 * body.rowPitch - body.rowGap) + content.inset * 2 + 56
-      : root.stateName === "pill-sheet-large" ? 720 : root.pillSheet ? pillColumn.implicitHeight + 40 : root.sheet ? 460
+      : root.stateName === "pill-sheet-large" ? 720 : root.pillSheet ? pillColumn.implicitHeight + 40 : root.sheet ? 320
       : root.themeState ? Math.max(body.fittedHeight(body.chromeHeight + 3 * body.rowPitch - body.rowGap) + content.inset * 2, pillColumn.implicitHeight + 40)
       : (root.windowWidth ? 850
         : (root.smallest ? body.smallestHeight
@@ -1508,53 +1483,28 @@ Harness {
 
         Repeater {
           model: [
-            { title: "BULL", color: "#8fc08a", sprites: root.bullCandidates, standard: Cells.BULL_SPRITE },
-            { title: "BEAR", color: "#e05a7a", sprites: root.bearCandidates, standard: Cells.BEAR_SPRITE }
+            { title: "BULL", color: "#8fc08a", sprite: Cells.BULL_SPRITE },
+            { title: "BEAR", color: "#e05a7a", sprite: Cells.BEAR_SPRITE }
           ]
 
           Column {
-            id: family
+            id: animal
             required property var modelData
+            readonly property var pixels: Cells.spritePixels(modelData.sprite)
             spacing: 8
 
-            Row {
-              spacing: 32
-              Repeater {
-                model: family.modelData.sprites
-                Column {
-                  id: candidate
-                  required property var modelData
-                  required property int index
-                  spacing: 6
-                  Text {
-                    text: family.modelData.title + " " + (candidate.index + 1)
-                      + (root.isDefaultSprite(candidate.modelData, family.modelData.standard) ? "  DEFAULT" : "")
-                    color: "#8a8d8d"
-                    font.family: Style.font.family
-                    font.pixelSize: 10
-                    font.bold: true
-                  }
-                  Row {
-                    spacing: 16
-                    PixelSprite { width: 40; height: 28; pixels: Cells.spritePixels(candidate.modelData); color: family.modelData.color }
-                    PixelSprite { width: 80; height: 56; pixels: Cells.spritePixels(candidate.modelData); color: family.modelData.color }
-                  }
-                }
-              }
+            Text {
+              text: animal.modelData.title
+              color: "#8a8d8d"
+              font.family: Style.font.family
+              font.pixelSize: 10
+              font.bold: true
             }
-
             Row {
-              spacing: 32
-              Repeater {
-                model: family.modelData.sprites
-                PixelSprite {
-                  required property var modelData
-                  width: 160
-                  height: 112
-                  pixels: Cells.spritePixels(modelData)
-                  color: family.modelData.color
-                }
-              }
+              spacing: 16
+              PixelSprite { width: 40; height: 28; pixels: animal.pixels; color: animal.modelData.color }
+              PixelSprite { width: 80; height: 56; pixels: animal.pixels; color: animal.modelData.color }
+              PixelSprite { width: 160; height: 112; pixels: animal.pixels; color: animal.modelData.color }
             }
           }
         }

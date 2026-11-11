@@ -107,7 +107,7 @@ Harness {
     when: service.ready
 
     function quiet() {
-      tryVerify(function() { return service.arriving.length === 0 && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 8000)
+      tryVerify(function() { return service.arriving.length === 0 && service.feeds.quotes.firstRun.length + service.feeds.quotes.refreshRun.length === 0 }, 8000)
     }
 
     // The files in `folder` (the pictures folder unless named), by name.
@@ -217,10 +217,10 @@ Harness {
       // The panel by keys, in smooth, on AAPL's day at rest.
       service.feature("AAPL")
       panel.open()
-      var body = panel.testBody
+      var body = panel.body
       tryVerify(function() { return body && body.surfaceOpen && !body.chartLoading && body.featuredSymbol === "AAPL" }, 5000)
       panel.refocusKeys()
-      tryVerify(function() { return panel.testKeys.activeFocus }, 2000)
+      tryVerify(function() { return harness.find(panel.keyboardPanel.card, "bodyKeys").activeFocus }, 2000)
       var still = shots().length
       var unlit = !body.cameraLit
       var rest = shoot(body, function() { keyClick(Qt.Key_C, Qt.ControlModifier) })
@@ -267,7 +267,7 @@ Harness {
       service.persist({ style: "retro" })
       service.setRange("1Y")
       app.open("{}")
-      var win = app.testBody
+      var win = app.body
       tryVerify(function() { return win && win.surfaceOpen && !win.chartLoading && win.historyShown && win.retro }, 8000)
       var button = find(win, "cameraButton")
       tryVerify(function() { return button && button.visible && button.width > 0 }, 2000)
@@ -287,7 +287,7 @@ Harness {
       // The pointer on the chart scrubs it, and Ctrl+C takes that moment: the
       // way a mouse hand takes a scrubbed picture, since leaving the chart
       // for the camera ends the scrub.
-      app.testKeyCatcher.forceActiveFocus()
+      harness.find(app.floatingWindow.contentItem, "keyCatcher").forceActiveFocus()
       var chart = win.chartItem
       mouseMove(chart, chart.width * 0.4, chart.height / 2)
       tryVerify(function() { return win.scrubT !== 0 }, 2000)
@@ -332,7 +332,7 @@ Harness {
         var env = step.env
         if (step.omasnap) env.PATH = Quickshell.env("STONKS_OMASNAP") + ":" + Quickshell.env("PATH")
         camera.testEnvironment = env
-        app.testKeyCatcher.forceActiveFocus()
+        harness.find(app.floatingWindow.contentItem, "keyCatcher").forceActiveFocus()
         var shot = shoot(win, function() { keyClick(Qt.Key_C, Qt.ControlModifier) }, step.folder)
         problems = landed(shot, "aapl", /^AAPL 1Y at .+$/, step.folder, step.editor)
         check(step.label, problems.length === 0, problems.join("; "))

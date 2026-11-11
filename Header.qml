@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import qs.Commons
 import qs.Commons as Commons
@@ -25,12 +27,9 @@ Item {
   property bool offersRetry: false
   property Look look
   property bool soundsOn: false
-  // `kind` is "bull", "bear" or "" (a flat day, or no direction yet), and
-  // `chart` what it reads: a turn on the same chart crossfades in smooth, any
-  // other change is at once. `asleep` is its market resting; `bell`, that the
-  // clock alone changed that, so the eyes close or open over 320 ms;
-  // `scrubbed`, that a scrub has it awake, so the sleep after it is no bell.
+  // The animal's day and rest, and whether a surface shows it (`HeaderAnimal`).
   property var animal: ({ kind: "", chart: "", asleep: false, bell: false, scrubbed: false })
+  property bool seen: false
   property bool scrubbing: false
   property bool live: false
   // In full ink, standing out without colour, since red says down.
@@ -41,64 +40,6 @@ Item {
   // Lit from a screenshot until the surface closes.
   property bool cameraLit: false
 
-  readonly property string kind: animal ? animal.kind : ""
-  // The chart the animal last showed: a change on it is a turn.
-  property string shownChart: ""
-  property bool shownAsleep: false
-  property bool shownScrubbed: false
-  // How far the eyes have closed, 0 to 1, evenly in time. A wake steps from
-  // shut, so the lids are half way at the middle of either move (`lids`: 0
-  // open, 1 half, 2 shut).
-  property real closing: 0
-  property bool waking: false
-  readonly property real moved: waking ? 1 - closing : closing
-  readonly property int steps: moved >= 1 ? 2 : moved >= 0.5 ? 1 : 0
-  readonly property int lids: waking ? 2 - steps : steps
-
-  // While the panel or window shows (`seen`), the animal greets you at each
-  // open and then fidgets ever more rarely (`Cells.fidgetMove`); asleep, its
-  // eyes stay shut. Only its own cells change. A close holds its pose through
-  // the fade; with the shell's animations off, or no animal, it sits still.
-  property bool seen: false
-  // Moves begun since the open; the steps of the one playing or next, and
-  // which is drawn, -1 being still.
-  property int fidgetMoves: 0
-  property var fidgetSteps: []
-  property int fidgetStep: -1
-  readonly property bool fidgeting: seen && kind !== "" && !Style.reduceMotion
-  readonly property var fidget: fidgetStep >= 0 ? fidgetSteps[fidgetStep] : ({})
-  // Plain values, so a step that changes neither draws nothing.
-  readonly property bool pricked: !!fidget.pricked
-  readonly property int drawnLids: fidget.blink ? 2 : lids
-  function fidgetAnew() {
-    fidgetMoves = 0
-    fidgetNext()
-  }
-  // Still, until the next move.
-  function fidgetNext() {
-    var move = Cells.fidgetMove(fidgetMoves++)
-    fidgetStep = -1
-    fidgetSteps = move.steps
-    fidgetClock.interval = move.wait
-    if (fidgeting) fidgetClock.restart()
-    else fidgetClock.stop()
-  }
-  // Each open starts with the greeting, running or not.
-  onSeenChanged: if (seen) fidgetAnew()
-  onFidgetingChanged: {
-    if (seen) fidgetAnew()
-    else fidgetClock.stop()
-  }
-  Timer {
-    id: fidgetClock
-    onTriggered: {
-      if (root.fidgetStep + 1 < root.fidgetSteps.length) {
-        root.fidgetStep++
-        interval = root.fidgetSteps[root.fidgetStep].ms
-        restart()
-      } else root.fidgetNext()
-    }
-  }
 
   signal styleRequested(string style)
   signal soundsRequested()
@@ -109,60 +50,53 @@ Item {
 
   function settle() {
     lookIcon.settle()
-    show(false)
+    slot.settle()
   }
 
-  function show(fade) {
-    var k = animal ? animal.kind : ""
-    shownChart = animal ? animal.chart : ""
-    turn.stop()
-    turnBull.to = k === "bull" ? 1 : 0
-    turnBear.to = k === "bear" ? 1 : 0
-    if (fade && !look.retro) turn.start()
-    else {
-      bull.opacity = turnBull.to
-      bear.opacity = turnBear.to
-    }
-    sleep(fade)
-  }
-
-  // Asleep after a scrub is let go is at once, never the bell's close; a move
-  // under way runs on through a turn.
-  function sleep(fade) {
-    var asleep = !!(animal && animal.asleep)
-    var afterScrub = shownScrubbed
-    shownScrubbed = !!(animal && animal.scrubbed)
-    if (fade && asleep === shownAsleep) return
-    shownAsleep = asleep
-    shutting.stop()
-    // The bell owns the eyes: eyes Fidget's blink already shut fall asleep
-    // at once, and a fidget under way stops and rests. A rest runs on: a
-    // fidget's first blink comes 340 ms in, after the bell's 320 ms.
-    var rung = fade && animal.bell && !afterScrub
-    if (rung && !(asleep && fidget.blink)) {
-      waking = !asleep
-      shutting.from = asleep ? 0 : 1
-      shutting.to = asleep ? 1 : 0
-      shutting.start()
-    } else closing = asleep ? 1 : 0
-    if (rung && fidgetStep >= 0) fidgetNext()
-  }
 
   Component.onCompleted: settle()
-  // While still, nothing moves: a change waits for the open's `settle`.
-  onAnimalChanged: if (!still) show(animal.chart === shownChart)
-  onStillChanged: if (still) {
-    if (turn.running) turn.pause()
-    if (shutting.running) shutting.pause()
-  }
 
-  NumberAnimation { id: shutting; target: root; property: "closing"; duration: Motion.duration(Style, 320) }
+  // What makes an icon a button: its fill while pressed, a target as tall as
+  // the header's two lines, and its tip 3 px under the target, centred, but
+  // never past the header's right edge. Under the icon it is put in.
+  component HeaderPress: Item {
+    id: press
+    property string tip: ""
+    // The fill's height past the icon's, and the target's least width.
+    property real fillPad: Style.space(6)
+    property real leastWidth: 0
+    readonly property alias containsMouse: area.containsMouse
+    signal clicked()
+    readonly property Item icon: parent
+    z: -1
+    anchors.fill: parent
 
-  // 3 px under its target, centred, but never past the header's right edge.
-  component HeaderTip: PanelToolTip {
-    readonly property Item icon: parent.parent
-    y: parent.height + 3
-    x: Math.min((parent.width - implicitWidth) / 2, icon.parent.width - icon.x - parent.x - implicitWidth)
+    Rectangle {
+      anchors.centerIn: parent
+      width: parent.width + Style.space(12)
+      height: parent.height + press.fillPad
+      radius: root.look.retro ? 0 : Style.cornerRadius
+      color: area.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
+    }
+
+    MouseArea {
+      id: area
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.verticalCenter: parent.verticalCenter
+      width: Math.max(press.leastWidth, parent.width + Style.space(12))
+      height: root.contentHeight
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onClicked: press.clicked()
+
+      PanelToolTip {
+        visible: area.containsMouse
+        text: press.tip
+        fontFamily: root.look.fontFamily
+        y: parent.height + 3
+        x: Math.min((parent.width - implicitWidth) / 2, press.icon.parent.width - press.icon.x - parent.x - implicitWidth)
+      }
+    }
   }
 
   // The rule sits a band's gap short of a group's under the two lines, so with
@@ -180,55 +114,24 @@ Item {
   height: implicitHeight
   width: parent ? parent.width : implicitWidth
 
-  Item {
+
+  HeaderAnimal {
     id: slot
-    objectName: "animal"
-    width: Style.space(40)
-    height: Style.space(28)
+    animal: root.animal
+    look: root.look
+    seen: root.seen
+    still: root.still
     anchors.left: parent.left
     anchors.verticalCenter: parent.verticalCenter
     anchors.verticalCenterOffset: root.centerOffset
-
-    // One layer each, so smooth's turn crossfades between them.
-    PixelSprite {
-      id: bull
-      objectName: "bullCells"
-      anchors.fill: parent
-      visible: opacity > 0
-      pixels: Cells.spriteFor(true, root.drawnLids, root.pricked)
-      color: root.look.upColor
-    }
-    PixelSprite {
-      id: bear
-      objectName: "bearCells"
-      anchors.fill: parent
-      visible: opacity > 0
-      pixels: Cells.spriteFor(false, root.drawnLids, root.pricked)
-      color: root.look.downColor
-    }
-
-    ParallelAnimation {
-      id: turn
-      NumberAnimation { id: turnBull; target: bull; property: "opacity"; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
-      NumberAnimation { id: turnBear; target: bear; property: "opacity"; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
-    }
-
-    MouseArea {
-      objectName: "animalToggle"
-      anchors.fill: parent
-      enabled: root.kind !== ""
-      hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
-      onClicked: root.replayRequested()
-    }
+    onReplayRequested: root.replayRequested()
   }
 
   // At the header's top, never above: the panel's body starts there and clips
   // what draws past it.
   PixelSprite {
-    objectName: "sleepCells"
     readonly property int cell: Math.floor(Math.min(slot.width / 20, slot.height / 14))
-    visible: root.kind !== "" && root.lids === 2
+    visible: slot.kind !== "" && slot.lids === 2
     columns: 3
     rows: 5
     width: cell * 3
@@ -286,7 +189,6 @@ Item {
   FormWidths { id: form2; words: String(root.statusForms[2] || "").toUpperCase(); family: root.look.fontFamily }
   Text {
     id: titleText
-    objectName: "headerTitle"
     visible: root.titled
     anchors.left: slot.right
     anchors.leftMargin: Style.space(14)
@@ -303,7 +205,6 @@ Item {
 
   // The rule as the footer's, the shell's own separator.
   PanelSeparator {
-    objectName: "headerRule"
     visible: root.titled
     y: root.contentHeight + root.ruleGap
     width: root.width
@@ -313,7 +214,6 @@ Item {
 
   Text {
     id: statusWords
-    objectName: "statusText"
     anchors.left: slot.right
     anchors.leftMargin: Style.space(14)
     width: Math.min(implicitWidth, root.wordsRoom)
@@ -330,7 +230,6 @@ Item {
 
   ListAction {
     id: retry
-    objectName: "retryRange"
     look: root.look
     visible: root.offersRetry
     anchors.left: statusWords.right
@@ -349,7 +248,6 @@ Item {
   // height of the header's two lines.
   GridIcon {
     id: soundIcon
-    objectName: "soundIcon"
     readonly property bool on: root.soundsOn
     anchors.right: camera.left
     anchors.rightMargin: Style.space(14)
@@ -357,35 +255,13 @@ Item {
     anchors.verticalCenterOffset: root.centerOffset
     cell: root.cell
     shape: on ? Cells.SOUND_ON : Cells.SOUND_OFF
-    color: soundMouse.containsMouse ? root.look.foreground : root.look.dim
+    color: soundPress.containsMouse ? root.look.foreground : root.look.dim
 
-    Rectangle {
-      objectName: "soundFill"
-      z: -1
-      anchors.centerIn: parent
-      width: parent.width + Style.space(12)
-      height: parent.height + Style.space(6)
-      radius: root.look.retro ? 0 : Style.cornerRadius
-      color: soundMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
-    }
-
-    MouseArea {
-      id: soundMouse
+    HeaderPress {
+      id: soundPress
       objectName: "soundToggle"
-      anchors.horizontalCenter: parent.horizontalCenter
-      anchors.verticalCenter: parent.verticalCenter
-      width: parent.width + Style.space(12)
-      height: root.contentHeight
-      hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
+      tip: root.soundsOn ? "Turn sounds off" : "Turn sounds on"
       onClicked: root.soundsRequested()
-
-      HeaderTip {
-        objectName: "soundTip"
-        visible: soundMouse.containsMouse
-        text: root.soundsOn ? "Turn sounds off" : "Turn sounds on"
-        fontFamily: root.look.fontFamily
-      }
     }
   }
 
@@ -399,35 +275,13 @@ Item {
     anchors.verticalCenterOffset: root.centerOffset
     cell: root.cell
     shape: lit ? Cells.CAMERA_LIT : Cells.CAMERA
-    color: lit || cameraMouse.containsMouse ? root.look.foreground : root.look.dim
+    color: lit || cameraPress.containsMouse ? root.look.foreground : root.look.dim
 
-    Rectangle {
-      objectName: "cameraFill"
-      z: -1
-      anchors.centerIn: parent
-      width: parent.width + Style.space(12)
-      height: parent.height + Style.space(6)
-      radius: root.look.retro ? 0 : Style.cornerRadius
-      color: cameraMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
-    }
-
-    MouseArea {
-      id: cameraMouse
+    HeaderPress {
+      id: cameraPress
       objectName: "cameraButton"
-      anchors.horizontalCenter: parent.horizontalCenter
-      anchors.verticalCenter: parent.verticalCenter
-      width: parent.width + Style.space(12)
-      height: root.contentHeight
-      hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
+      tip: "Take a screenshot"
       onClicked: root.screenshotRequested()
-
-      HeaderTip {
-        objectName: "cameraTip"
-        visible: cameraMouse.containsMouse
-        text: "Take a screenshot"
-        fontFamily: root.look.fontFamily
-      }
     }
   }
 
@@ -442,35 +296,13 @@ Item {
     retro: root.look.retro
     still: root.still
     pixel: root.cell - 1
-    color: lookMouse.containsMouse ? root.look.foreground : root.look.dim
+    color: lookPress.containsMouse ? root.look.foreground : root.look.dim
 
-    Rectangle {
-      objectName: "lookFill"
-      z: -1
-      anchors.centerIn: parent
-      width: parent.width + Style.space(12)
-      height: parent.height + Style.space(6)
-      radius: root.look.retro ? 0 : Style.cornerRadius
-      color: lookMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
-    }
-
-    MouseArea {
-      id: lookMouse
+    HeaderPress {
+      id: lookPress
       objectName: "lookToggle"
-      anchors.horizontalCenter: parent.horizontalCenter
-      anchors.verticalCenter: parent.verticalCenter
-      width: parent.width + Style.space(12)
-      height: root.contentHeight
-      hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
+      tip: root.look.retro ? "Switch to smooth" : "Switch to retro"
       onClicked: root.styleRequested(root.look.retro ? "smooth" : "retro")
-
-      HeaderTip {
-        objectName: "lookTip"
-        visible: lookMouse.containsMouse
-        text: root.look.retro ? "Switch to smooth" : "Switch to retro"
-        fontFamily: root.look.fontFamily
-      }
     }
   }
 
@@ -485,37 +317,20 @@ Item {
     anchors.verticalCenterOffset: root.centerOffset
     textFormat: Text.PlainText
     text: "?"
-    color: helpMouse.containsMouse ? root.look.foreground : root.look.dim
+    color: helpPress.containsMouse ? root.look.foreground : root.look.dim
     font.family: root.look.fontFamily
     font.pixelSize: Style.font.caption
     font.bold: true
     Behavior on color { ColorAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
-    Rectangle {
-      objectName: "helpFill"
-      z: -1
-      anchors.centerIn: parent
-      width: parent.implicitWidth + Style.space(12)
-      height: parent.implicitHeight + Style.space(4)
-      radius: root.look.retro ? 0 : Style.cornerRadius
-      color: helpMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
-    }
-    MouseArea {
-      id: helpMouse
+    HeaderPress {
+      id: helpPress
       objectName: "helpToggle"
-      anchors.horizontalCenter: parent.horizontalCenter
-      anchors.verticalCenter: parent.verticalCenter
-      width: Math.max(Style.space(24), parent.width + Style.space(12))
-      height: root.contentHeight
-      hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
+      // A narrower fill, as the glyph is shorter than an icon, and a target
+      // at least 24 wide.
+      fillPad: Style.space(4)
+      leastWidth: Style.space(24)
+      tip: root.helpShown ? "Hide the keys" : "Show the keys"
       onClicked: root.helpRequested()
-
-      HeaderTip {
-        objectName: "helpTip"
-        visible: helpMouse.containsMouse
-        text: root.helpShown ? "Hide the keys" : "Show the keys"
-        fontFamily: root.look.fontFamily
-      }
     }
   }
 }

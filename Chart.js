@@ -162,6 +162,18 @@ function chartGeometry(quote, calendars) {
   }
 }
 
+// One trade draws: the first after midnight is a dot on its day, or a cell.
+function drawable(geometry) {
+  return !!geometry && !!geometry.points && geometry.points.length >= 1
+}
+
+// The dashed baseline draws with no trade too, as on a day nobody traded.
+// It is unknown for a quote without a previous close, and for a range on a
+// log scale whose close before it is below zero, as oil's was in 2020.
+function hasBaseline(geometry) {
+  return !!geometry && typeof geometry.baselineY === "number" && isFinite(geometry.baselineY)
+}
+
 // The dashed line's height at `x`: the step's height once `x` is past the
 // bell, the day's before it, and null where there is no line.
 function baseAt(geometry, x) {
@@ -216,6 +228,47 @@ function fractionAtTime(quote, t) {
 function stepTime(quote, t, steps, last) {
   var axis = chartSpan(quote)
   return Format.clamp(clockAt(axis, clockRoom(axis, t) + steps * 300), axis.start, last || axis.end)
+}
+
+// Retro's cells for a chart `width` by `height`, of `pixel` cells `gap`
+// apart: each column's level, whether it is dim, the last column lit, and
+// the baseline's row, which steps to `stepRow` from `stepCol` on. The last
+// trade in a column wins: the price at the end of that stretch. A column
+// between two trades the line joins holds the one before it; only a break
+// (`brk`) leaves columns dark, as it lifts the smooth line. With no previous
+// close known, the columns stand on the floor, until a step to a close that
+// is known.
+function retroGrid(geometry, width, height, pixel, gap) {
+  var pitch = pixel + gap
+  var columns = Math.max(1, Math.floor(width / pitch))
+  var g = { pitch: pitch, columns: columns, rows: Math.max(1, Math.floor(height / pixel)), baseRow: 0, stepCol: columns, stepRow: 0, levels: [], dim: [], lastLit: -1 }
+  if (!geometry || !geometry.points) return g
+  g.baseRow = hasBaseline(geometry) ? Math.round(geometry.baselineY * (g.rows - 1)) : g.rows - 1
+  var step = geometry.step
+  g.stepCol = step ? Math.max(0, Math.min(g.columns - 1, Math.floor(step.x * g.columns))) : g.columns
+  g.stepRow = step ? Math.round(step.y * (g.rows - 1)) : g.baseRow
+  var pts = geometry.points
+  // The lit cell sits on the last column whose own last trade is bright,
+  // never on one held after it.
+  var last = -1
+  for (var i = 0; i < pts.length; i++) {
+    var col = Math.max(0, Math.min(g.columns - 1, Math.floor(pts[i].x * g.columns)))
+    if (col !== last && last >= 0 && !g.dim[last]) g.lastLit = last
+    for (var held = last + 1; i > 0 && !pts[i].brk && held < col; held++) {
+      g.levels[held] = g.levels[last]
+      g.dim[held] = g.dim[last]
+    }
+    g.levels[col] = Math.round(pts[i].y * (g.rows - 1))
+    g.dim[col] = pts[i].dim
+    last = col
+  }
+  if (last >= 0 && !g.dim[last]) g.lastLit = last
+  return g
+}
+
+// The baseline's row under column `c`.
+function retroBaseRow(g, c) {
+  return c >= g.stepCol ? g.stepRow : g.baseRow
 }
 
 // Where the dot sits: the newest trade of what trades now, else the regular

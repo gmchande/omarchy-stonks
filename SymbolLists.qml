@@ -5,9 +5,10 @@ import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Commons as Commons
 import "Motion.js" as Motion
+import "Rows.js" as Rows
 
 // A symbol's lists, in the rows' place: a tick box for each list, All first.
-FocusScope {
+OverRows {
   id: root
 
   property var choices: []
@@ -20,6 +21,7 @@ FocusScope {
   property int cursor: 0
 
   readonly property int itemHeight: Style.space(30)
+  function rowSize() { return { pitch: itemHeight, height: itemHeight } }
   // The rows' scrollbar gutter and text inset, so these words line up with
   // the rows underneath.
   property int gutter: 0
@@ -33,22 +35,12 @@ FocusScope {
     return !!choices[index] && choices[index].symbols.indexOf(symbol) >= 0
   }
 
-  property bool active: false
-  // Shown through the close fade, but takes no pointer or key.
-  enabled: active
-  // Turned on, it takes the keys a turn later only if still on; turned
-  // off, however it closes, it gives them up.
-  onActiveChanged: {
-    if (active) {
-      reset()
-      pointer.rest()
-      opening.restart()
-      Qt.callLater(function() { if (root.active) root.forceActiveFocus() })
-    } else {
-      root.focus = false
-      scroll.cancelFlick()
-    }
+  onOpened: {
+    reset()
+    pointer.rest()
+    opening.restart()
   }
+  onClosed: scroll.cancelFlick()
 
   function reset() {
     cursor = choices.length > 1 ? 1 : -1
@@ -82,24 +74,14 @@ FocusScope {
 
   function showCursor() {
     scroll.cancelFlick()
-    var top = cursor * itemHeight
-    if (top < scroll.contentY) scroll.contentY = top
-    else if (top + itemHeight > scroll.contentY + scroll.height)
-      scroll.contentY = top + itemHeight - scroll.height
+    scroll.contentY = Rows.topShowing(cursor, rowSize(), scroll.contentY, scroll.height)
   }
 
   // After a scroll by hand: the nearest list wholly in sight, or in a view
   // too short for one, the list across its middle.
   function keepCursorInSight() {
     if (cursor < 0) return
-    var top = scroll.contentY
-    var bottom = top + scroll.height
-    var whole = function(i) { return i * itemHeight >= top - 0.5 && (i + 1) * itemHeight <= bottom + 0.5 }
-    if (whole(cursor)) return
-    var shown = []
-    for (var i = 0; i < choices.length; i++) if (whole(i)) shown.push(i)
-    if (shown.length > 0) cursor = cursor * itemHeight < top ? shown[0] : shown[shown.length - 1]
-    else cursor = Math.max(0, Math.min(choices.length - 1, Math.floor((top + bottom) / 2 / itemHeight)))
+    cursor = Rows.cursorKeptInSight(cursor, choices.length, rowSize(), scroll.contentY, scroll.height)
   }
 
   Keys.onPressed: function(event) {
@@ -166,7 +148,6 @@ FocusScope {
     }
 
     Text {
-      objectName: "symbolListsNote"
       visible: root.note !== ""
       x: root.inset
       anchors.right: done.left
@@ -182,7 +163,6 @@ FocusScope {
 
     ListAction {
       id: done
-      objectName: "symbolListsDone"
       look: root.look
       anchors.right: parent.right
       anchors.rightMargin: root.gutter + root.inset
@@ -194,7 +174,6 @@ FocusScope {
 
   Flickable {
     id: scroll
-    objectName: "symbolListsScroll"
     anchors.top: title.bottom
     anchors.bottom: parent.bottom
     width: parent.width
@@ -209,13 +188,7 @@ FocusScope {
       if (moving && pointer.hovered) root.pointAt(pointer.scenePosition.x, pointer.scenePosition.y)
       root.keepCursorInSight()
     }
-    Controls.ScrollBar.vertical: Controls.ScrollBar {
-      id: listsBar
-      policy: scroll.interactive ? Controls.ScrollBar.AlwaysOn : Controls.ScrollBar.AlwaysOff
-      visible: scroll.interactive
-      // At least 24 px long, so a long view's thumb is there to see and grab.
-      minimumSize: Math.min(1, Style.space(24) / Math.max(1, availableHeight))
-    }
+    Controls.ScrollBar.vertical: ViewScrollBar { id: listsBar; scrolls: scroll.interactive }
 
     Column {
       id: column
@@ -235,7 +208,6 @@ FocusScope {
           height: root.itemHeight
 
           Rectangle {
-            objectName: "rowFill"
             anchors.fill: parent
             radius: root.look.retro ? 0 : Style.cornerRadius
             color: rowMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
@@ -251,7 +223,6 @@ FocusScope {
 
           Rectangle {
             id: box
-            objectName: "tickBox"
             x: root.inset
             anchors.verticalCenter: parent.verticalCenter
             width: Style.space(12)
@@ -303,7 +274,6 @@ FocusScope {
 
           Text {
             id: count
-            objectName: "listCount"
             anchors.right: parent.right
             anchors.rightMargin: root.inset
             anchors.verticalCenter: parent.verticalCenter

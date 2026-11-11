@@ -57,13 +57,7 @@ Flickable {
   boundsBehavior: Flickable.StopAtBounds
   interactive: contentHeight > height
   // While more of the sheet is out of sight the scrollbar says so, at rest too.
-  Controls.ScrollBar.vertical: Controls.ScrollBar {
-    objectName: "helpScrollBar"
-    policy: root.interactive ? Controls.ScrollBar.AlwaysOn : Controls.ScrollBar.AlwaysOff
-    visible: root.interactive
-    // At least 24 px long, so a long sheet's thumb is there to see and grab.
-    minimumSize: Math.min(1, Style.space(24) / Math.max(1, availableHeight))
-  }
+  Controls.ScrollBar.vertical: ViewScrollBar { scrolls: root.interactive }
 
   component Group: Column {
     id: group
@@ -86,7 +80,6 @@ Flickable {
         spacing: Style.space(10)
 
         Text {
-          objectName: "helpKey"
           width: root.keyWidth
           textFormat: Text.PlainText
           text: helpRow.modelData.key
@@ -96,7 +89,6 @@ Flickable {
           font.bold: true
         }
         Text {
-          objectName: "helpDoes"
           width: parent.width - root.keyWidth - parent.spacing
           textFormat: Text.PlainText
           text: helpRow.modelData.does
@@ -153,7 +145,6 @@ Flickable {
     }
 
     ListAction {
-      objectName: "helpClose"
       look: root.look
       anchors.right: parent.right
       anchors.rightMargin: root.edge

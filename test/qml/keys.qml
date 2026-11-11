@@ -66,7 +66,19 @@ Harness {
   // The stand-in curl's flags (bin/curl): a file there turns a fault on.
   Process { id: flag }
 
-  Stonks.Service { id: service; pluginId: "grvc.stonks" }
+  // What the stand-in commands were given (bin/curl, bin/omarchy). Every
+  // row asked for again goes as one spark request, and an update is one
+  // omarchy command that names the plugin.
+  function logged(name) {
+    return readFile(Quickshell.env("STONKS_FAKE_STATE") + "/" + name).split("\n").filter(function(line) { return line !== "" })
+  }
+  function sparks() { return logged("requests.log").filter(function(line) { return line.indexOf("spark ") === 0 }).length }
+  function updateRuns() { return logged("omarchy.log").filter(function(line) { return line.indexOf("plugin update grvc.stonks") >= 0 }).length }
+
+  // The wall's clock, and as far ahead of it as a step has set: prices this
+  // fresh are asked for again only ten seconds on.
+  property int ahead: 0
+  Stonks.Service { id: service; pluginId: "grvc.stonks"; wallClock: function() { return Math.floor(Date.now() / 1000) + harness.ahead } }
   Stonks.Updates { id: updates; pluginId: "grvc.stonks" }
   // The camera hands its shots to the stand-ins on PATH (bin/).
   Stonks.Camera { id: camera }
@@ -91,14 +103,14 @@ Harness {
   // catcher.
   readonly property var popup: ({
     name: "popup",
-    get body() { return panel.testBody },
+    get body() { return panel.body },
     focusKeys: function() { panel.refocusKeys() },
     open: function() { panel.open() }
   })
   readonly property var window: ({
     name: "window",
-    get body() { return app.testBody },
-    focusKeys: function() { app.testKeyCatcher.forceActiveFocus() },
+    get body() { return app.body },
+    focusKeys: function() { harness.find(app.floatingWindow.contentItem, "keyCatcher").forceActiveFocus() },
     open: function() { app.open("{}") }
   })
 
@@ -107,7 +119,7 @@ Harness {
     when: service.ready
 
     function quiet() {
-      tryVerify(function() { return service.arriving.length === 0 && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0 }, 8000)
+      tryVerify(function() { return service.arriving.length === 0 && service.feeds.quotes.firstRun.length + service.feeds.quotes.refreshRun.length === 0 }, 8000)
     }
 
     // Everything a key can change.
@@ -117,8 +129,8 @@ Harness {
         symbols: service.symbols.join(","), retro: service.retro, mode: service.changeMode,
         cursor: b.watchlist.cursorRow, scrub: b.scrubT, replay: b.motion.replayRunning,
         adding: b.adding, menu: b.listMenuOpen, managing: b.managingLists, listsSymbol: b.listsSymbol,
-        help: b.showingHelp, open: b.surfaceOpen, refreshes: service.testRefreshes, tabs: harness.tabs, direction: harness.tabDirection,
-        sounds: service.soundsOn, camera: b.cameraLit, rowMenu: b.rowMenu ? b.rowMenu.symbol : "", updates: updates.testUpdates }
+        help: b.showingHelp, open: b.surfaceOpen, refreshes: harness.sparks(), tabs: harness.tabs, direction: harness.tabDirection,
+        sounds: service.soundsOn, camera: b.cameraLit, rowMenu: b.rowMenu ? b.rowMenu.symbol : "", updates: harness.updateRuns() }
     }
 
     // Every key starts from here: the surface open on All, manual order, the
@@ -162,7 +174,9 @@ Harness {
       // A newer Stonks on main, which the footer offers.
       "Shift+U": function(s) { updates.mainVersion = "99.0.0" },
       // The day is the first range.
-      "[": function(s) { service.setRange("1W") }
+      "[": function(s) { service.setRange("1W") },
+      // Past the ten seconds in which prices just answered aren't asked again.
+      "r": function(s) { harness.ahead += 11 }
     })
 
     // One key, as a person presses it; false for a key it can't name. A
@@ -231,7 +245,7 @@ Harness {
         effect = function() { return service.reversed === !before.reversed }
       } else if (token === "w") { changed = ["menu"]; effect = function() { return b.listMenuOpen } }
       else if (token === "Ctrl+⏎") { changed = ["listsSymbol"]; effect = function() { return b.listsSymbol === selected } }
-      else if (token === "Shift+U") { changed = ["updates"]; effect = function() { return updates.testUpdates === before.updates + 1 } }
+      else if (token === "Shift+U") { changed = ["updates"]; effect = function() { return harness.updateRuns() === before.updates + 1 } }
       else if (token === "c") {
         changed = ["mode"]
         var mode = {pct:"abs", abs:"open", open:"pct"}[before.mode]
@@ -245,7 +259,7 @@ Harness {
       } else if (token === "Ctrl+C") {
         changed = ["camera"]
         effect = function() { return b.cameraLit }
-      } else if (token === "r") { changed = ["refreshes"]; effect = function() { return service.testRefreshes === before.refreshes + 1 } }
+      } else if (token === "r") { changed = ["refreshes"]; effect = function() { return harness.sparks() === before.refreshes + 1 } }
       else if (token === "Tab" || token === "Shift+Tab") {
         changed = ["tabs", "direction"]
         effect = function() { return harness.tabs === before.tabs + 1 && harness.tabDirection === (token === "Tab" ? 1 : -1) }
@@ -283,6 +297,23 @@ Harness {
       harness.check("in the " + s.name + ", Shift with an arrow moves the selection and leaves the rows in their order",
         within(1500, function() { return s.body.watchlist.cursorRow !== cursor }) && service.symbols.join(",") === order,
         s.body.watchlist.cursorRow + " | " + service.symbols.join(","))
+      // A bigger text size keeps keys on the row you chose: the last whole
+      // row in sight, which the bigger rows would push out, comes back into
+      // sight.
+      base(s)
+      var list = s.body.watchlist
+      var last = list.displayedSymbols[Math.floor((list.contentY + list.sightHeight + 0.5) / list.rowPitch) - 1]
+      list.cursorSymbol = last
+      var size = Style.fontBaseSize
+      var rows = []
+      var heard = function() { rows.push(list.cursorRow) }
+      list.cursorRowChanged.connect(heard)
+      Style.fontBaseSize = size * 2
+      var shown = within(1500, function() { return list.wholeInSight(list.displayedSymbols.indexOf(last), list.contentY) })
+      list.cursorRowChanged.disconnect(heard)
+      Style.fontBaseSize = size
+      harness.check("in the " + s.name + ", a bigger text size keeps keys on the row you chose, in sight, at every moment",
+        shown && rows.every(function(r) { return r === last }), rows.join(" ") + " | " + last)
       escapeOrder(s)
     }
 

@@ -33,7 +33,7 @@ const JPX = calendars.calendars.JPX
 const cents = M.centExchanges(calendars)
 // A listing's cadence, by its calendar's reading, as askDue reads it.
 const calNow = (q, now) => M.calendarNow(M.calendarFor(calendars, q), now)
-const quoteCadence = (q, now, interval, hero) => M.quoteCadence(q, now, interval, hero, calNow(q, now))
+const quoteCadence = (q, now, interval, charted) => M.quoteCadence(q, now, interval, charted, calNow(q, now))
 const quote = M.parseChart(fixture("aapl.json"))
 const shop = M.parseChart(fixture("shop-to.json"))
 const btc = M.parseChart(fixture("btc-usd-day.json"))
@@ -1138,7 +1138,7 @@ test("on 1Y the 52-week line is the range's low and high", () => {
 test("each symbol is asked for on its own market's clock", () => {
   const q = duringSession(quote)
   const s = q.session
-  const cadence = (quote, now, hero = false, interval = 60) => quoteCadence(quote, now, interval, hero)
+  const cadence = (quote, now, charted = false, interval = 60) => quoteCadence(quote, now, interval, charted)
   // Its regular session: the refresh interval, whatever the setting says.
   expect(cadence(q, reg.start + 3600)).toBe(60)
   expect(cadence(q, reg.start + 3600, false, 45)).toBe(45)
@@ -1621,11 +1621,82 @@ test("historyRowModel uses the quote until a historical bar is scrubbed", () => 
   expect(M.historyRowModel(null, quote, 0)).toBeNull()
 })
 
+// ---------------------------------------------------------------- a run's answers
+
+// NEST's and SPY's Friday 11 September, as a chart answers, and a run of
+// one request each or one spark for both.
+const nestDay = () => M.parseChart(fixture("nest-2026-09-11-day-prepost.json"), cents)
+const spyDay = () => M.parseChart(fixture("spy-2026-09-11-day-prepost.json"), cents)
+const charts = (...symbols) => symbols.map(symbol => ({ symbols: [symbol], spark: false }))
+const answer = (index, kind, outcomes = {}) => ({ index, kind, outcomes })
+const read = (quote, unjudged = false) => ({ quote, unjudged })
+const nothingHeld = asked => ({ quotes: {}, entries: {}, asked, tries: {}, toJudge: [] })
+
+test("a run's answers show their quotes, give nothing to a stock removed while it was out, and a quote that comes again unchanged keeps the one on screen", () => {
+  const now = nestDay().marketTime + 60
+  const first = M.quotesLanded(nothingHeld({ NEST: now - 5, SPY: now - 5 }), charts("NEST", "SPY"),
+    [answer(0, "ok", { NEST: read(nestDay()) }), answer(1, "ok", { SPY: read(spyDay()) })], ["NEST"], calendars, now)
+  expect([Object.keys(first.quotes), first.entries.NEST, "NEST" in first.asked, first.back])
+    .toEqual([["NEST"], { status: "ok", receivedAt: now, answeredAt: now }, false, ["NEST", "SPY"]])
+  // A minute on the same day comes again: the row keeps the quote it shows,
+  // so nothing is worked out again, and says it was answered now.
+  const held = { ...first, asked: { NEST: now + 55 } }
+  const again = M.quotesLanded(held, charts("NEST"), [answer(0, "ok", { NEST: read(nestDay()) })], ["NEST"], calendars, now + 60)
+  expect([again.quotes === first.quotes, again.entries.NEST.receivedAt]).toEqual([true, now + 60])
+  // Tokyo's first answer a quarter hour into Monday 2 November, with no
+  // close of Friday's held: Yahoo may still count from Thursday's, so the
+  // row leaves the move out (`carryClose`).
+  const monday = at("2026-11-01", "19:15")
+  const tokyo = M.quotesLanded(nothingHeld({ "7203.T": monday }), charts("7203.T"),
+    [answer(0, "ok", { "7203.T": read(M.parseChart(fixture("moments/tokyo-2026-11-01-1915/2d/7203.t.json"), cents)) })], ["7203.T"], calendars, monday)
+  expect(M.rowModel(tokyo.quotes["7203.T"], 0, "pct").changeText).toBe("\u2014")
+})
+
+test("a bad answer is asked again after a wait, twice, then the row says it failed and keeps its last price; a refusal leaves it asked, for the gate to pace", () => {
+  const now = nestDay().marketTime + 60
+  const shown = M.quotesLanded(nothingHeld({ NEST: now }), charts("NEST"), [answer(0, "ok", { NEST: read(nestDay()) })], ["NEST"], calendars, now)
+  var held = { ...shown, asked: { NEST: now + 60 } }
+  const tried = []
+  for (let i = 0; i < 3; i++) {
+    const next = M.quotesLanded(held, charts("NEST"), [answer(0, "bad")], ["NEST"], calendars, now + 60 + i)
+    tried.push([next.retry, next.entries.NEST.status, "NEST" in next.asked])
+    held = next
+  }
+  expect(tried).toEqual([[["NEST"], "ok", true], [["NEST"], "ok", true], [[], "failed", false]])
+  expect([held.quotes.NEST === shown.quotes.NEST, held.entries.NEST.receivedAt, held.entries.NEST.answeredAt]).toEqual([true, now, now + 62])
+  // Refused, or no answer at all: still asked, with no try counted.
+  for (const kind of ["refused", "none"]) {
+    const paced = M.quotesLanded({ ...shown, asked: { NEST: now + 60 } }, charts("NEST"), [answer(0, kind)], ["NEST"], calendars, now + 60)
+    expect([paced.retry, "NEST" in paced.asked, paced.tries, paced.entries]).toEqual([[], true, {}, shown.entries])
+  }
+})
+
+test("a spark day with a jump shows at once and is checked on a chart, whose answer, good or bad, ends the check and keeps the spark's time for the row's next ask", () => {
+  const now = nestDay().marketTime + 60
+  const spark = [{ symbols: ["NEST", "SPY"], spark: true }]
+  const sparked = M.quotesLanded(nothingHeld({ NEST: now, SPY: now }), spark,
+    [answer(0, "ok", { NEST: read(nestDay(), true), SPY: read(spyDay()) })], ["NEST", "SPY"], calendars, now)
+  expect([Object.keys(sparked.quotes), sparked.toJudge]).toEqual([["NEST", "SPY"], ["NEST"]])
+  // The chart asked only to check it, answered 30 s on: the row shows the
+  // chart's quote, and is next asked a minute from the spark's answer.
+  const checked = M.quotesLanded(sparked, charts("NEST"), [answer(0, "ok", { NEST: read(nestDay()) })], ["NEST", "SPY"], calendars, now + 30)
+  expect([checked.toJudge, checked.entries.NEST.receivedAt, checked.entries.NEST.answeredAt]).toEqual([[], now + 30, now])
+  // A bad chart changes nothing on the row, and the check ends.
+  const failed = M.quotesLanded(sparked, charts("NEST"), [answer(0, "bad")], ["NEST", "SPY"], calendars, now + 30)
+  expect([failed.toJudge, failed.entries.NEST, failed.retry, failed.quotes]).toEqual([[], sparked.entries.NEST, [], sparked.quotes])
+})
+
 // ---------------------------------------------------------------- overnight
 
+// Robinhood's answer by symbol, read as the feed reads it: each result is
+// for the symbol asked in its place.
+const overnight = (answer, symbols) => {
+  const results = M.overnightResults(answer)
+  return results && Object.fromEntries(symbols.map((symbol, i) => [symbol, M.overnightAnswer(results[i], symbol)]))
+}
 // Robinhood's saved span=day answer for a moment, by symbol: the bars that
 // traded, and how far it reached.
-const traded = (set, symbols) => M.parseOvernight(fixture(`moments/${set}/robinhood-day.json`), symbols)
+const traded = (set, symbols) => overnight(fixture(`moments/${set}/robinhood-day.json`), symbols)
 const savedDay = (set, name) => M.parseChart(fixture(`moments/${set}/${name}.json`))
 const at = (date, clock) => M.epochAt(US, date, clock)
 
@@ -1646,9 +1717,9 @@ test("Robinhood's answer keeps only the bars that traded, by the symbols asked f
   expect([bars.NEST.through, bars.SILK.through]).toEqual([bars.REED.through, bars.REED.through])
   // Asked out of the order it answers in, an answer names another symbol
   // and is no answer for the one asked.
-  expect(M.parseOvernight(fixture("moments/day/robinhood-day.json"), ["SILK", "NEST"]))
+  expect(overnight(fixture("moments/day/robinhood-day.json"), ["SILK", "NEST"]))
     .toEqual({ SILK: { bars: [], from: null, through: null }, NEST: { bars: [], from: null, through: null } })
-  expect(M.parseOvernight({ chart: {} }, ["NEST"])).toBeNull()
+  expect(overnight({ chart: {} }, ["NEST"])).toBeNull()
 })
 
 test("a refresh within half an hour asks Robinhood for the last hour, which brings the day in hand up to what a day asked then holds", () => {
@@ -1657,8 +1728,8 @@ test("a refresh within half an hour asks Robinhood for the last hour, which brin
   const earlier = traded("2026-10-07-0005", ["NEST"]).NEST
   const later = fixture("moments/2026-10-07-0100/robinhood-day.json")
   const hour = { results: later.results.map(r => ({ ...r, span: "hour", historicals: r.historicals.slice(-12) })) }
-  const joined = M.joinHour(earlier, M.parseOvernight(hour, ["NEST"]).NEST)
-  const day = M.parseOvernight(later, ["NEST"]).NEST
+  const joined = M.joinHour(earlier, overnight(hour, ["NEST"]).NEST)
+  const day = overnight(later, ["NEST"]).NEST
   expect(joined.through).toBe(day.through)
   expect(joined.bars.filter(b => b.t >= day.from)).toEqual(day.bars)
   // The older trades stay: a chart of the day before still has them.
@@ -1687,7 +1758,7 @@ test("on a morning Yahoo left an hour empty, Robinhood is asked once more for th
   const allDay = Object.fromEntries(names.map(s => [s, { status: "ok", allDay: true, at: asked }]))
   const asks = (clock, changes = {}) => {
     const now = at("2026-11-02", clock)
-    return M.overnightAsks({ open: false, pill: "NBIS", quoteEntries: Object.fromEntries(names.map(s => [s, { status: "ok", receivedAt: now, answeredAt: now }])),
+    return M.overnightAsks({ open: false, featured: "NBIS", quoteEntries: Object.fromEntries(names.map(s => [s, { status: "ok", receivedAt: now, answeredAt: now }])),
       quotes, overnightSymbols: names, allSymbols: names, preview: "", previewShown: false, previewQuote: null, allDay, nights: inHand, now, calendars, ...changes })
   }
   // NBIS and CRWV traded on Yahoo in every slot up to 08:25; SHOP, thin,
@@ -1698,7 +1769,7 @@ test("on a morning Yahoo left an hour empty, Robinhood is asked once more for th
   expect(M.yahooHole(twice)).toBe(at("2026-11-02", "09:25"))
   // Robinhood's bar for 09:25 is in by 09:35: the pill's stock alone with
   // nothing open, every row with a surface open, the pill on SHOP too.
-  expect([asks("09:34"), asks("09:35"), asks("09:35", { open: true }), asks("09:35", { pill: "SHOP" })]).toEqual([null,
+  expect([asks("09:34"), asks("09:35"), asks("09:35", { open: true }), asks("09:35", { featured: "SHOP" })]).toEqual([null,
     { tradability: [], trades: ["NBIS"] }, { tradability: [], trades: names }, { tradability: [], trades: ["SHOP"] }])
   // Once an answer from then on is in, nothing asks again, whether it
   // reached the hour or not; a failed one is asked again 5 minutes on.
@@ -1746,7 +1817,7 @@ test("the trades Stonks keeps for a listing hold every one its 1D chart draws, h
   const sets = readdirSync(join(fixtures, "moments")).filter(set => existsSync(join(fixtures, "moments", set, "robinhood-day.json")))
     .map(set => {
       const answer = fixture(`moments/${set}/robinhood-day.json`)
-      const parsed = M.parseOvernight(answer, answer.results.map(r => r.symbol))
+      const parsed = overnight(answer, answer.results.map(r => r.symbol))
       return { set, parsed, through: Math.max(...Object.values(parsed).map(a => a.through ?? 0)) }
     })
     .sort((a, b) => a.through - b.through)
@@ -1790,7 +1861,7 @@ test("Robinhood's instruments say which listings it trades all day, by the symbo
 test("which listings have an overnight market comes from Yahoo, never from Robinhood's answer", () => {
   // Asked for SPX, ^GSPC, BTC, and BTC-USD, Robinhood answers the index and
   // the cryptocurrency with nothing, and BTC with the bars of a bitcoin ETF.
-  const answer = M.parseOvernight(fixture("moments/robinhood-index-crypto.json"), ["SPX", "^GSPC", "BTC", "BTC-USD"])
+  const answer = overnight(fixture("moments/robinhood-index-crypto.json"), ["SPX", "^GSPC", "BTC", "BTC-USD"])
   expect([answer.SPX.bars.length, answer["^GSPC"].bars.length, answer["BTC-USD"].bars.length]).toEqual([0, 0, 0])
   expect(answer.BTC.bars.length).toBeGreaterThan(0)
   // So the quote decides: a stock or an ETF on a US exchange.
@@ -2441,7 +2512,7 @@ test("a weekend shows Friday from its midnight to its last trade, then Monday fr
   // trade, 04:00, to its last, 19:05, on the right edge, where a scrub says
   // its own time: nothing made up after it.
   const shopRaw = fixture("moments/shop-2026-10-26-0013/robinhood-week.json")
-  const week = M.parseOvernight(shopRaw, ["SHOP"]).SHOP
+  const week = overnight(shopRaw, ["SHOP"]).SHOP
   const fridayNight = { bars: week.bars.filter(b => b.t < at("2026-10-23", "20:00")), through: at("2026-10-23", "19:55") }
   const shopQuote = M.parseChart(fixture("moments/shop-2026-10-26-0013/shop.json"), cents, at("2026-10-23", "20:30"))
   const thinFeed = M.dayChart(shopQuote, fridayNight, calendars).day

@@ -26,7 +26,9 @@ Harness {
   readonly property string themeLink: Quickshell.env("HOME") + "/.local/state/omarchy/current/theme"
   property bool themeLinked: false
 
-  Stonks.Service { id: service; pluginId: "grvc.stonks" }
+  // The clock stands still a minute after the capture (readme.sh).
+  readonly property int at: Number(Quickshell.env("STONKS_README_AT"))
+  Stonks.Service { id: service; pluginId: "grvc.stonks"; wallClock: function() { return harness.at } }
   Stonks.Updates { id: updates; pluginId: "grvc.stonks" }
   Stonks.TrendColors { id: colors }
   QtObject {
@@ -58,7 +60,7 @@ Harness {
 
       Rectangle {
         id: heroStrip
-        width: panel.testCard.card.width
+        width: panel.keyboardPanel.card.width
         height: Style.bar.sizeHorizontal
         color: Qt.rgba(Commons.Color.bar.background.r, Commons.Color.bar.background.g, Commons.Color.bar.background.b, 1)
 
@@ -116,7 +118,7 @@ Harness {
     function quiet() {
       tryVerify(function() {
         return harness.demo.every(function(s) { return !!service.quotes[s] })
-          && service.arriving.length === 0 && service.testFeed.firstRun.length + service.testFeed.refreshRun.length === 0
+          && service.arriving.length === 0 && service.feeds.quotes.firstRun.length + service.feeds.quotes.refreshRun.length === 0
       }, 15000, "every demo listing answered")
       verify(colors.green !== "", "the theme's green is read")
     }
@@ -125,8 +127,8 @@ Harness {
     // whether each trades all day, and the prints of those that do.
     function robinhoodIn() {
       return harness.us.every(function(s) {
-        var allDay = service.testAllDay.entries[s]
-        var night = service.testOvernight.entries[s]
+        var allDay = service.allDay[s]
+        var night = service.nights[s]
         return !!allDay && allDay.status === "ok" && (!allDay.allDay || (!!night && night.status === "ok"))
       })
     }
@@ -141,7 +143,7 @@ Harness {
       // The panel's card at its height, eased by the shell: closed, as for
       // the window's pictures, it holds still there too.
       return !body.chartLoading && body.motion.reveal === 1
-        && panel.testCard.drawnHeight === panel.testCard.contentHeight
+        && panel.keyboardPanel.drawnHeight === panel.keyboardPanel.contentHeight
         && Math.abs(rule.upShare - share(rule.breadth.up)) < 1e-6
         && Math.abs(rule.downShare - share(rule.breadth.down)) < 1e-6
         && liveStill(body)
@@ -179,7 +181,7 @@ Harness {
         && service.listName === "" && service.range === "1D", "the demo watchlist, AAPL featured, on All and the day: " + service.symbols.join(","))
 
       panel.open()
-      var body = panel.testBody
+      var body = panel.body
       tryVerify(function() { return body.surfaceOpen }, 3000)
       grab("forms", forms, body, robinhoodIn)
 
@@ -189,7 +191,7 @@ Harness {
       body.nudgeScrub(-1)
       for (var step = 0; step < 500 && body.motion.scrubT > back; step++) body.nudgeScrub(-1)
       verify(body.motion.scrubT > 0 && body.motion.scrubT <= back, "the scrub reached an hour and a half back: " + body.motion.scrubT + " vs " + back)
-      grab("scrub", panel.testCard.card, body, function() { return body.motion.scrubT !== 0 })
+      grab("scrub", panel.keyboardPanel.card, body, function() { return body.motion.scrubT !== 0 })
       body.endScrub()
       tryVerify(function() { return atRest(body) }, 3000, "the rows back on now")
 
@@ -197,7 +199,7 @@ Harness {
       body.openListMenu()
       var control = find(body, "listControl")
       var lastFill = "", heldFor = 0
-      grab("lists", panel.testCard.card, body, function() {
+      grab("lists", panel.keyboardPanel.card, body, function() {
         var fill = String(control.color)
         heldFor = fill === lastFill ? heldFor + 1 : 0
         lastFill = fill
@@ -212,13 +214,13 @@ Harness {
       // before the open's draw-in starts.
       service.persist({ style: "retro" })
       panel.open()
-      grab("retro", panel.testCard.card, body, function() { return service.retro && body.surfaceOpen })
+      grab("retro", panel.keyboardPanel.card, body, function() { return service.retro && body.surfaceOpen })
       panel.close()
       service.persist({ style: "smooth" })
       tryVerify(function() { return !body.surfaceOpen && !service.retro }, 3000)
 
       app.open("{}")
-      grab("window", app.testKeyCatcher, app.testBody, function() { return app.testBody.surfaceOpen })
+      grab("window", harness.find(app.floatingWindow.contentItem, "keyCatcher"), app.body, function() { return app.body.surfaceOpen })
       app.close()
 
       // Catppuccin Latte, as omarchy-theme-set switches it: the theme's
@@ -236,7 +238,7 @@ Harness {
       view.destroy()
       tryVerify(function() { return colors.green !== before }, 2000, "Catppuccin Latte read")
       panel.open()
-      grab("light", panel.testCard.card, body, function() { return body.surfaceOpen })
+      grab("light", panel.keyboardPanel.card, body, function() { return body.surfaceOpen })
       panel.close()
       harness.finish()
     }
@@ -250,8 +252,8 @@ Harness {
       service.feature(symbol)
       tryVerify(function() { return service.featuredSymbol === symbol }, 3000, symbol + " featured")
       panel.open()
-      var body = panel.testBody
-      grab("popup", panel.testCard.card, body, function() { return service.retro && body.surfaceOpen && service.featuredSymbol === symbol })
+      var body = panel.body
+      grab("popup", panel.keyboardPanel.card, body, function() { return service.retro && body.surfaceOpen && service.featuredSymbol === symbol })
       grab("strip", heroStrip, body, robinhoodIn)
       panel.close()
       harness.finish()

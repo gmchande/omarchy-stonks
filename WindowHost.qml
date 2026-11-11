@@ -1,7 +1,6 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import Quickshell.Hyprland
 
 // Hosts the window (App), with or without a pill on the bar.
 Item {
@@ -18,14 +17,17 @@ Item {
   property var sounds: null
   property var camera: null
   property var trendColors: null
+  // Hyprland, handed in (`Plugin`): its windows, its workspace and its
+  // events.
+  property var hyprland: null
   // The screens (`Screens`): which are on, and what each one shows.
   property var screens: null
   readonly property var monitors: screens ? screens.monitors : []
 
   readonly property alias app: app
   readonly property bool opened: app.opened
-  readonly property var toplevel: app.opened ? Hyprland.toplevels.values.find(root.isWindow) || null : null
-  readonly property bool elsewhere: !!toplevel && !!toplevel.workspace && toplevel.workspace !== Hyprland.focusedWorkspace
+  readonly property var toplevel: app.opened ? hyprland.toplevels.values.find(root.isWindow) || null : null
+  readonly property bool elsewhere: !!toplevel && !!toplevel.workspace && toplevel.workspace !== hyprland.focusedWorkspace
   // Until Hyprland lists the window, or with no monitors (a harness), it
   // counts as shown.
   readonly property bool onScreen: {
@@ -62,11 +64,11 @@ Item {
   // Omarchy 4 configures Hyprland in Lua; the classic dispatch syntax fails.
   function focusWindow() {
     if (!toplevel || !toplevel.address) return
-    Hyprland.dispatch("hl.dsp.focus({ window = \"address:0x" + toplevel.address + "\" })")
+    hyprland.dispatch("hl.dsp.focus({ window = \"address:0x" + toplevel.address + "\" })")
   }
 
   Connections {
-    target: Hyprland
+    target: root.hyprland
     enabled: root.popupOpen()
     function onRawEvent(event) {
       if (event.name === "openwindow" && event.parse(4)[2] === "org.omarchy.screensaver") root.shell.hide(root.pluginId)

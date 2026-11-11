@@ -1,27 +1,21 @@
 #!/usr/bin/env bash
-# Every check a pull request needs: what Stonks does, fetches, saves and
-# says, and what a key or a click changes. The rule tests (test/unit.sh),
-# source boundaries, QML lint and its gate's self-check, the font's glyphs,
-# the walks' set-time waits, manifest and launcher validation, the walks
-# through the real plugin (keys, mouse, saving, fetching, and what a long
-# list costs), the screenshot's size, and each test the branch changes
-# failing on the code before the change. Pictures belong to
-# test/review.sh, and how Stonks moves and feels to a hand on the running
-# plugin; the queue, the lock and the verdict to test/queue.sh. Needs
-# Omarchy installed and the Wayland session for the walks.
+# Every check a pull request needs, one after another: the rule tests
+# (test/unit.sh), the source boundaries, QML lint, the font's glyphs, the
+# manifest and the launcher entry, and the walks through the real plugin:
+# keys, mouse, saving, fetching, what a long list costs, and the
+# screenshot. Needs Omarchy installed and a Wayland session for the walks.
+# How Stonks looks is for the pictures (test/qml/render.sh), and how it
+# moves and feels for a hand on the running plugin.
 #
-# test/all.sh NAME... runs only the named checks, as the full run would: a
-# harness by its test/qml/NAME.sh, a quick check by the name it's picked by
-# below. Such a run never ends ALL PASS.
-some=""
-for arg; do
-  shift
-  case $arg in
-    -*) set -- "$@" "$arg" ;;
-    *) some+="${some:+ }$arg" ;;
-  esac
-done
-source "$(dirname "${BASH_SOURCE[0]}")/queue.sh"
+# A check that exits 77 had no saved answers to run on
+# (test/fixtures-dir.sh): it says so, and the last line counts the skips.
+# Only a whole run with none skipped ends ALL PASS.
+#
+#   test/all.sh [NAME...]   only the named checks: a walk by its
+#                           test/qml/NAME.sh, the rest by the names below
+set -uo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+source test/scratch.sh
 
 # validate_clone: omarchy plugin validate on what a clone of this checkout
 # holds: the tracked files as they are here, an uncommitted edit included,
@@ -29,7 +23,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/queue.sh"
 # stay links, so a tracked one still fails.
 validate_clone() {
   local tree code file
-  tree=$(mktemp -d "$logs/clone.XXXXXX")
+  tree=$(mktemp -d) || return 1
   git ls-files -z | while IFS= read -r -d '' file; do
     [[ -e $file || -L $file ]] && printf '%s\0' "$file"
   done | tar -c --null -T - | tar -x -C "$tree"
@@ -39,32 +33,58 @@ validate_clone() {
   return "$code"
 }
 
-# Each test case and harness step the branch changes, on the code before
-# the change (test/before.js): first, since it runs the harnesses it touches.
-picked before && start "changed tests fail on the code before the change" bun test/before.js
-# Longest first, as measured.
-start "cost walk" bash test/qml/cost.sh
-start "fetching walk" bash test/qml/fetching.sh
-start "mouse walk" bash test/qml/mouse.sh
-start "keys walk" bash test/qml/keys.sh
-start "saving walk" bash test/qml/saving.sh
-start "Quickshell crash handling (stand-in)" bash test/qml/crash-check.sh
-start "camera harness" env QT_SCALE_FACTOR=1 bash test/qml/camera.sh
-# On a scale-2 screen too, and on 1.75, where 2400 pixels are no whole
-# number of units: the picture is drawn and saved at 2400 x 1350 there, not
-# at twice that or half of it or a pixel off, and the same on each. Only
-# the two sized shots.
-start "camera harness at scale 2" env QT_SCALE_FACTOR=2 STONKS_CAMERA_SIZES=1 bash test/qml/camera.sh
-start "camera harness at scale 1.75" env QT_SCALE_FACTOR=1.75 STONKS_CAMERA_SIZES=1 bash test/qml/camera.sh
-known_names unit font boundaries waits lint lint-gate validate launcher
-fill
+# Every check: check NAME LABEL COMMAND...
+checks() {
+  check unit "unit tests (every *.test.js)" bash test/unit.sh
+  check font "required font glyphs" bun test/font.js
+  check boundaries "source boundaries" bash test/boundaries.sh
+  check lint "qmllint (only the baseline in test/lint.sh)" bash test/lint.sh
+  check validate "omarchy plugin validate (what a clone holds)" validate_clone
+  check launcher "launcher entry validates" desktop-file-validate share/stonks.desktop
+  check keys "keys walk" bash test/qml/keys.sh
+  check mouse "mouse walk" bash test/qml/mouse.sh
+  check saving "saving walk" bash test/qml/saving.sh
+  check fetching "fetching walk" bash test/qml/fetching.sh
+  check cost "cost walk" bash test/qml/cost.sh
+  check camera "camera harness" env QT_SCALE_FACTOR=1 bash test/qml/camera.sh
+  # On a scale-2 screen too, and on 1.75, where 2400 pixels are no whole
+  # number of units: the picture is drawn and saved at 2400 x 1350 there,
+  # not at twice that or half of it or a pixel off, and the same on each.
+  # Only the two sized shots.
+  check camera "camera harness at scale 2" env QT_SCALE_FACTOR=2 STONKS_CAMERA_SIZES=1 bash test/qml/camera.sh
+  check camera "camera harness at scale 1.75" env QT_SCALE_FACTOR=1.75 STONKS_CAMERA_SIZES=1 bash test/qml/camera.sh
+}
 
-picked unit && run "unit tests (every *.test.js)" bash test/unit.sh
-picked font && run "required font glyphs" bun test/font.js
-picked boundaries && run "source boundaries" bash test/boundaries.sh
-picked waits && run "set-time waits (only the baseline in test/waits.sh)" bash test/waits.sh
-picked lint && run "qmllint (only the baseline in test/lint.sh)" bash test/lint.sh
-picked lint-gate && run "qmllint gate self-check" bash test/lint.sh self-check
-picked validate && run "omarchy plugin validate (what a clone holds)" validate_clone
-picked launcher && run "launcher entry validates" desktop-file-validate share/stonks.desktop
-verdict
+# A name that isn't a check's stops the run before anything starts.
+names=""
+check() { [[ " $names " == *" $1 "* ]] || names+=" $1"; }
+checks
+for name; do
+  [[ " $names " == *" $name "* ]] || { echo "test/all.sh: no check is named $name; the names are:$names"; exit 2; }
+done
+
+picked=" $* "
+failed=0
+skipped=0
+check() {
+  local name=$1 label=$2 code
+  shift 2
+  [ "$picked" = "  " ] || [[ $picked == *" $name "* ]] || return 0
+  echo "== $label"
+  "$@"
+  code=$?
+  if [ "$code" -eq 0 ]; then echo "   ok"
+  elif [ "$code" -eq 77 ]; then echo "   skipped"; skipped=$((skipped + 1))
+  else echo "   FAILED"; failed=1; fi
+}
+checks
+
+echo "test/all.sh took $((SECONDS / 60)) min $((SECONDS % 60)) s"
+if [ "$failed" -ne 0 ]; then last="SOME FAILED"
+elif [ "$picked" != "  " ]; then
+  last="PASSED ONLY $*"
+  [ "$skipped" -eq 0 ] || last+=", $skipped SKIPPED (no saved answers)"
+elif [ "$skipped" -gt 0 ]; then last="PASSED, $skipped SKIPPED (no saved answers)"
+else last="ALL PASS"; fi
+echo "$last"
+exit "$failed"

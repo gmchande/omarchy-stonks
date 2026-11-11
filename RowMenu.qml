@@ -7,7 +7,7 @@ import qs.Commons as Commons
 // A row's removals, each line naming the lists it reaches ("Remove from all
 // 3 lists"), and from a right-click, "Choose lists…". It looks and moves as
 // the list menu does.
-FocusScope {
+OverRows {
   id: root
 
   property var lines: []
@@ -34,16 +34,9 @@ FocusScope {
     font.pixelSize: Style.font.bodySmall
   }
 
-  // Open, on an open surface. Off, the menu still shows through the close
-  // fade, but takes no pointer or key.
-  property bool active: false
-  enabled: active
-  onActiveChanged: {
-    if (active) {
-      cursor = startLine
-      pointer.rest()
-      Qt.callLater(function() { if (root.active) root.forceActiveFocus() })
-    } else root.focus = false
+  onOpened: {
+    cursor = startLine
+    pointer.rest()
   }
   onStartLineChanged: if (active) cursor = startLine
 

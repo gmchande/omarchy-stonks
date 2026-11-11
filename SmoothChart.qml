@@ -57,10 +57,8 @@ Item {
     var base = lastPoint ? Chart.baseAt(geometry, lastPoint.x) : null
     return base === null ? baselineColor : lastPoint.y > base ? belowColor : aboveColor
   }
-  // One trade draws: the first trade after midnight is a dot on its day.
-  readonly property bool drawable: !!geometry && !!geometry.points && geometry.points.length >= 1
-  // The baseline draws with no trade too, as on a day nobody traded.
-  readonly property bool hasBaseline: !!geometry && typeof geometry.baselineY === "number" && isFinite(geometry.baselineY)
+  readonly property bool drawable: Chart.drawable(geometry)
+  readonly property bool hasBaseline: Chart.hasBaseline(geometry)
   readonly property bool hasStep: !!geometry && !!geometry.step
   // The draw-in sweeps to the newest trade's dot: the line's width and a half,
   // and a pixel.
@@ -302,7 +300,6 @@ Item {
 
   Canvas {
     id: marks
-    objectName: "scrubMarks"
     anchors.fill: parent
     onWidthChanged: requestPaint()
     onHeightChanged: requestPaint()
@@ -330,25 +327,14 @@ Item {
     }
   }
 
-  // Outside the canvas, so it ripples without repainting the line. While the
-  // market is open, a new price or the dot's first showing (an open, a new
-  // chart, a draw-in's end) starts three ripples, about 6 s, and a newer price
-  // starts them over. A range has no dot: its last bar need not be the
-  // headline trade.
+  // Outside the canvas, so it ripples without repainting the line: three
+  // ripples, about 6 s, when the mark plays (`LiveMark`). A range has no dot:
+  // its last bar need not be the headline trade.
   Item {
     id: dot
     visible: root.day && root.lastPoint !== null && root.reveal >= 1 && root.replayX < 0
     x: root.lastPoint ? root.pad + root.lastPoint.x * (root.width - root.pad * 2) : 0
     y: root.lastPoint ? root.pad + root.lastPoint.y * (root.height - root.pad * 2) : 0
-    // Hidden mid-ripple by an open's draw-in, it owes them and ripples once it
-    // shows; any other hide, as a sheet over it, stops them.
-    onVisibleChanged: {
-      if (visible) root.ripple()
-      else {
-        if (ripples.running && root.opening && root.reveal < 1) root.rippleOwed = true
-        ripples.stop()
-      }
-    }
 
     Rectangle {
       id: halo
@@ -373,7 +359,7 @@ Item {
       id: ripples
       paused: running && root.still
       loops: 3
-      onRunningChanged: if (!running) { halo.scale = 1; halo.opacity = 0.25; root.opening = false }
+      onRunningChanged: if (!running) { halo.scale = 1; halo.opacity = 0.25 }
 
       ParallelAnimation {
         NumberAnimation { target: halo; property: "scale"; from: 1; to: 2.2; duration: Motion.duration(Style, 1400); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
@@ -383,33 +369,13 @@ Item {
     }
   }
 
-  // A scrub's end, a sheet closing, or the market turning live again with the
-  // price already rippled for starts nothing. `opening` lasts from the open
-  // until its ripples stop.
-  property string rippledPrice: ""
-  property bool rippleOwed: false
-  property bool opening: false
-  function ripple() {
-    if (!root.live || !dot.visible || root.still) return
-    // With the shell's animations off, the dot stays still, and the price
-    // counts as rippled for: animations back on, it never ripples for it.
-    if (Style.reduceMotion) {
-      root.rippleOwed = false
-      root.rippledPrice = root.newestPrice
-      root.opening = false
-      return
-    }
-    if (!root.rippleOwed && root.newestPrice === root.rippledPrice) return
-    // A restart's stop of a paused burst would end `opening`; an open's
-    // ripples keep it.
-    var opening = root.opening
-    root.rippleOwed = false
-    root.rippledPrice = root.newestPrice
-    ripples.restart()
-    root.opening = opening
+  LiveMark {
+    live: root.live
+    still: root.still
+    shown: dot.visible
+    drawing: function() { return root.reveal < 1 }
+    surfaceOpen: root.surfaceOpen
+    price: root.newestPrice
+    burst: ripples
   }
-  onNewestPriceChanged: ripple()
-  onSurfaceOpenChanged: if (surfaceOpen) { rippleOwed = true; opening = true; ripple() }
-  onLiveChanged: if (live) ripple(); else ripples.stop()
-  onStillChanged: if (!still) ripple()
 }

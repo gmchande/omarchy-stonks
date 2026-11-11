@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "Release.js" as Release
+import "Commands.js" as Commands
 
 // `omarchy plugin update` moves the plugin's files, but the shell runs the
 // code it started with until it restarts. The manifest is read again as a
@@ -101,9 +102,6 @@ Item {
 
   Process {
     id: updateAndRestart
-    command: ["omarchy", "launch", "floating", "terminal", "with", "presentation",
-      "p=$HOME/.config/omarchy/plugins/" + root.pluginId + "; was=$(git -C \"$p\" rev-parse HEAD);"
-      + " omarchy plugin update " + root.pluginId + " && [[ $(git -C \"$p\" rev-parse HEAD) != \"$was\" ]]"
-      + " && echo 'Restarting the shell…' && omarchy restart shell"]
+    command: Commands.updateAndRestart(root.pluginId)
   }
 }

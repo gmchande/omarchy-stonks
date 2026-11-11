@@ -36,8 +36,18 @@ function carryClose(previous, quote, calendars, now) {
   var first = traded ? firstTrade(quote, head) : null
   var unknown = traded && !held && !!cal && head.t < first + CATCH_UP && now < first + CATCH_UP + BEHIND
   if (!seen && !unknown) return quote
-  var untold = { prevClose: null, dayOpen: null, openSession: null, verdict: quote.verdict && Object.assign({}, quote.verdict, { open: null, openSession: null }) }
-  return Object.assign({}, quote, seen ? { closeSeen: seen } : {}, restated ? untold : unknown ? { prevClose: null } : stale ? { prevClose: seen.close } : {})
+  var carried = seen ? Object.assign({}, quote, { closeSeen: seen }) : quote
+  // Yahoo restating the last close: no move, and no open, until it moves on.
+  if (restated) {
+    var verdict = quote.verdict && Object.assign({}, quote.verdict, { open: null, openSession: null })
+    return Object.assign({}, carried, { prevClose: null, dayOpen: null, openSession: null, verdict: verdict })
+  }
+  // No close held from the session before: no move until Yahoo catches up.
+  if (unknown) return Object.assign({}, carried, { prevClose: null })
+  // Yahoo still counting from the close before last: the move counts from
+  // the close seen.
+  if (stale) return Object.assign({}, carried, { prevClose: seen.close })
+  return carried
 }
 
 function sessionClose(quote) {

@@ -261,7 +261,6 @@ BarWidget {
       visible: !root.vertical || root.iconOnly
 
       Sparkline {
-        objectName: "pillLine"
         visible: root.barStyle === "sparkline" && !root.retro
         anchors.verticalCenter: parent.verticalCenter
         width: Style.space(40)
@@ -290,7 +289,6 @@ BarWidget {
 
       // Its tilt is the size of today's move: flat at zero, 45° past 5%.
       Text {
-        objectName: "pillArrow"
         visible: root.barStyle === "arrow"
         anchors.verticalCenter: parent.verticalCenter
         text: "➜"
@@ -306,7 +304,6 @@ BarWidget {
       // first quote the text form's dim "…" waits.
       Item {
         id: iconForm
-        objectName: "pillIcon"
         visible: root.iconOnly
         anchors.verticalCenter: parent.verticalCenter
         // A side bar is barely wider than the animal, so a "!" goes under it,
@@ -318,7 +315,6 @@ BarWidget {
 
         BarAnimal {
           id: animal
-          objectName: "pillAnimal"
           kind: Figures.animalKind(root.featured)
           upColor: root.upColor
           downColor: root.downColor
@@ -326,7 +322,6 @@ BarWidget {
         }
 
         Rectangle {
-          objectName: "pillLevel"
           visible: !!root.featured && animal.kind === ""
           y: Math.round((animal.height - height) / 2)
           width: animal.width
@@ -335,7 +330,6 @@ BarWidget {
         }
 
         Text {
-          objectName: "pillWaiting"
           visible: !root.featured && !root.warns
           anchors.centerIn: animal
           textFormat: Text.PlainText
@@ -350,7 +344,6 @@ BarWidget {
         // cells at this size.
         Text {
           id: warning
-          objectName: "pillWarning"
           readonly property bool under: root.vertical && !!root.featured
           visible: root.warns
           x: Math.round(under ? (animal.width - iconForm.warningInk.width) / 2 - iconForm.warningInk.x
@@ -368,7 +361,6 @@ BarWidget {
       }
 
       Text {
-        objectName: "pillSymbol"
         visible: !root.iconOnly
         anchors.verticalCenter: parent.verticalCenter
         textFormat: Text.PlainText
@@ -381,7 +373,6 @@ BarWidget {
 
       // The text form says the price too, as a ticker does.
       Text {
-        objectName: "pillPrice"
         visible: root.barStyle === "text" && !!root.featured
         anchors.verticalCenter: parent.verticalCenter
         textFormat: Text.PlainText
@@ -392,7 +383,6 @@ BarWidget {
       }
 
       Text {
-        objectName: "pillChange"
         visible: !root.iconOnly
         anchors.verticalCenter: parent.verticalCenter
         textFormat: Text.PlainText
@@ -405,7 +395,6 @@ BarWidget {
 
       Text {
         id: rowMark
-        objectName: "pillCopyMark"
         visible: root.marked && !root.vertical
         anchors.verticalCenter: parent.verticalCenter
         // The icon form's "!" hangs past the animal: kept clear, shown or not.
@@ -421,7 +410,6 @@ BarWidget {
     // On a side bar, too narrow for it beside the pill, the mark goes under.
     Text {
       id: sideMark
-      objectName: "pillCopyMarkUnder"
       scale: button.pressScale || 1
       visible: root.marked && root.vertical
       anchors.horizontalCenter: parent.horizontalCenter
@@ -436,7 +424,6 @@ BarWidget {
     // As Omarchy's clock draws a vertical bar: a line to an icon slot, 90% at
     // four characters.
     Column {
-      objectName: "pillStack"
       scale: button.pressScale || 1
       visible: root.vertical && !root.iconOnly
       anchors.centerIn: parent
@@ -447,7 +434,6 @@ BarWidget {
 
         OpticalGlyph {
           required property var modelData
-          objectName: "pillStackLine"
           width: button.width
           height: modelData.warning ? root.stackedWarningHeight : Style.bar.iconSlot
           text: modelData.move ? Format.lookSigns(modelData.text, root.retro) : modelData.text

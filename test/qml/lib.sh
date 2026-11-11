@@ -2,7 +2,7 @@
 # builds a tree, runs Quickshell on it, and finishes on the harness's own
 # finish line. Quickshell loads QML only from inside its config folder, so
 # each tree is assembled in a scratch folder that is removed on exit.
-# Harnesses run side by side (test/queue.sh), so each keeps its own HOME, QML
+# Harnesses can run side by side, so each keeps its own HOME, QML
 # cache, and fake curl state. Every harness reads the saved answers
 # (STONKS_FIXTURES, test/fixtures-dir.sh), the fake curl's too; without them
 # it says so and exits 77, which the runners report as skipped. One that
@@ -45,8 +45,8 @@ mkdir -p "$HOME/.config/omarchy" "$STONKS_FAKE_STATE"
 root=""
 code=0
 # The shell a harness runs the plugin on: the installed one, or the Ui and
-# Commons of another, named by STONKS_SHELL (test/old-shell.sh's Omarchy
-# 4.0.6, which Stonks still works on).
+# Commons of another, named by STONKS_SHELL, such as Omarchy 4.0.6's, which
+# Stonks still works on.
 shell="${STONKS_SHELL:-/usr/share/omarchy/shell}"
 
 # need_shell: stops a harness that loads the shell's Ui and Commons before
@@ -74,10 +74,10 @@ feed_tree() {
 
 # plugin_tree HARNESS: copies of the whole plugin beside the shell's Ui and
 # Commons, its manifest too, which the version watch reads. Copies, so a
-# script can sed test aliases into them, or move the manifest's version.
-# The window host lists no screens, so a harness never asks the owner's
-# Hyprland whether theirs are off, and its quote runs never wait on them;
-# a harness that steps through screens off hands the host its own.
+# script can patch one, or move the manifest's version. A harness that
+# builds the whole plugin hands it a stand-in for Hyprland
+# (test/boundaries.sh), so none asks the owner's desktop whether its screens
+# are off.
 plugin_tree() {
   need_shell
   root="$work"
@@ -87,7 +87,6 @@ plugin_tree() {
   ln -s "$shell/Ui" "$shell/Commons" "$root/"
   cp "$here/$1" "$root/shell.qml"
   cp "$here/HarnessExit.qml" "$here/Harness.qml" "$here/Steps.qml" "$root/"
-  patch_copy plugin/Screens.qml 's/readonly property var monitors: Hyprland.monitors.values/property var monitors: []/'
 }
 
 # card_window: the panel's card in CardWindow.qml, a plain window, as the

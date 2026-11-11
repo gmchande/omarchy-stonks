@@ -9,6 +9,30 @@ var MANIFEST_URL = "https://raw.githubusercontent.com/gmchande/omarchy-stonks/ma
 // never sees it.
 var RELEASED_ID = "grvc.stonks"
 
+// What the footer says of saving and updating, from `state`, { unreadable,
+// saveFailed, editsUnsaved, updatedTo, releasedTo }: the lists file can't be
+// read, a save didn't land, changes made meanwhile wait, Stonks was updated
+// to `updatedTo` and wants the shell restarted, a newer `releasedTo` is out.
+// A save that didn't land is said ahead of the update, since a restart would
+// lose the changes. Where the fix won't fit beside the notice, it drops "or
+// remove" and keeps the file's full path, `listsFile`.
+function footerNotice(state, listsFile) {
+  var updatedTo = state.updatedTo || ""
+  var unsaved = state.unreadable ? !!state.editsUnsaved : !!state.saveFailed
+  var restartable = !unsaved && !state.unreadable
+  return {
+    unreadable: !!state.unreadable,
+    saveFailed: !!state.saveFailed,
+    updatedTo: updatedTo,
+    text: unsaved ? "Your changes aren't saved" : state.unreadable ? "Couldn't load your lists"
+      : updatedTo !== "" ? "Updated to " + updatedTo + " · click to restart the shell" : "",
+    actions: state.unreadable ? ["fix or remove " + listsFile, "fix " + listsFile] : unsaved ? ["click to try again"] : [],
+    updateOffer: state.releasedTo && updatedTo === "" ? state.releasedTo : "",
+    restartable: restartable,
+    restartOffered: updatedTo !== "" && restartable
+  }
+}
+
 function otherCopy(id) {
   return !!id && id !== RELEASED_ID
 }

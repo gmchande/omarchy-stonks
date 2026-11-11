@@ -13,29 +13,29 @@ Item {
   // `now` moves the feed to look; `clock.wallSecond()` is what it reads.
   property int now: 0
   property var clock: null
-  property var clearance: null
+  property var mayAsk: null
   property var gate: null
   property int askedAt: 0
   property bool unanswered: false
 
   readonly property int interval: 24 * 60 * 60
 
-  function pump() {
+  function sendWaiting() {
     if (!ready || fetchRun.out) return
     var now = clock.wallSecond()
     if (askedAt > 0 && now - askedAt < interval) return
-    if (clearance && !clearance()) return
+    if (mayAsk && !mayAsk()) return
     if (gate && gate.take(1) === 0) return
     root.askedAt = now
     fetchRun.send([Release.MANIFEST_URL], Fetch.MANIFEST_CAP)
   }
-  onNowChanged: pump()
-  onReadyChanged: pump()
+  onNowChanged: sendWaiting()
+  onReadyChanged: sendWaiting()
 
   function askAgain() {
     if (!unanswered) return
     root.askedAt = 0
-    pump()
+    sendWaiting()
   }
 
   function receive(got) {

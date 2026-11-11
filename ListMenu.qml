@@ -6,10 +6,11 @@ import qs.Commons
 import qs.Commons as Commons
 import "KeyText.js" as KeyText
 import "Motion.js" as Motion
+import "Rows.js" as Rows
 
 // The list menu: All and each named list, then "New list…" and "Manage
 // lists…", pinned under the lists.
-FocusScope {
+OverRows {
   id: root
 
   property var choices: []
@@ -25,6 +26,7 @@ FocusScope {
   readonly property string typedName: naming ? nameField.text : ""
 
   readonly property int itemHeight: Style.space(26)
+  function rowSize() { return { pitch: itemHeight, height: itemHeight } }
   readonly property int separatorHeight: Style.space(9)
   readonly property int inset: Style.space(4)
   readonly property int newIndex: choices.length
@@ -44,22 +46,16 @@ FocusScope {
   width: Style.space(236)
   height: rowsShown * itemHeight + pinnedHeight + inset * 2
 
-  property bool active: false
-  // Shown through the close fade, but inert.
-  enabled: active
-  // Turned on, it takes the keys a turn later only if still on; turned
-  // off, however it closes, it gives them up, its name field's too.
-  onActiveChanged: {
-    if (active) {
-      reset()
-      pointer.rest()
-      Qt.callLater(function() { if (root.active && !root.naming) root.forceActiveFocus() })
-    } else {
-      nameField.focus = false
-      root.focus = false
-      scroll.cancelFlick()
-      settle.stop()
-    }
+  keysTo: naming ? null : root
+  onOpened: {
+    reset()
+    pointer.rest()
+  }
+  // Closed, it gives up its name field's keys too.
+  onClosed: {
+    nameField.focus = false
+    scroll.cancelFlick()
+    settle.stop()
   }
 
   function reset() {
@@ -87,14 +83,7 @@ FocusScope {
     settle.stop()
     scroll.contentY = landed
     if (cursor >= newIndex) return
-    var top = topOf(cursor)
-    if (top < scroll.contentY) scroll.contentY = top
-    else if (top + itemHeight > scroll.contentY + scroll.height)
-      scroll.contentY = top + itemHeight - scroll.height
-  }
-
-  function topOf(index) {
-    return index * itemHeight
+    scroll.contentY = Rows.topShowing(cursor, rowSize(), scroll.contentY, scroll.height)
   }
 
   // A scroll by hand comes to rest on a row's edge, so no list shows cut.
@@ -121,14 +110,7 @@ FocusScope {
   // across the middle.
   function keepCursorInSight() {
     if (naming || cursor >= newIndex) return
-    var top = scroll.contentY
-    var bottom = top + scroll.height
-    var whole = function(i) { return topOf(i) >= top - 0.5 && topOf(i) + itemHeight <= bottom + 0.5 }
-    if (whole(cursor)) return
-    var shown = []
-    for (var i = 0; i < newIndex; i++) if (whole(i)) shown.push(i)
-    if (shown.length > 0) cursor = topOf(cursor) < top ? shown[0] : shown[shown.length - 1]
-    else for (i = 0; i < newIndex; i++) if (topOf(i) + itemHeight > (top + bottom) / 2) { cursor = i; break }
+    cursor = Rows.cursorKeptInSight(cursor, newIndex, rowSize(), scroll.contentY, scroll.height)
   }
 
   function take(index) {
@@ -206,7 +188,6 @@ FocusScope {
 
   Flickable {
     id: scroll
-    objectName: "menuScroll"
     anchors.top: parent.top
     anchors.left: parent.left
     anchors.right: parent.right
@@ -226,12 +207,9 @@ FocusScope {
       root.keepCursorInSight()
     }
     onMovementEnded: root.settleOnRow()
-    Controls.ScrollBar.vertical: Controls.ScrollBar {
+    Controls.ScrollBar.vertical: ViewScrollBar {
       id: menuBar
-      policy: scroll.interactive ? Controls.ScrollBar.AlwaysOn : Controls.ScrollBar.AlwaysOff
-      visible: scroll.interactive
-      // At least 24 px long, so a long view's thumb is there to see and grab.
-      minimumSize: Math.min(1, Style.space(24) / Math.max(1, availableHeight))
+      scrolls: scroll.interactive
       onPressedChanged: if (!pressed) root.settleOnRow()
     }
 
@@ -288,7 +266,6 @@ FocusScope {
 
             Text {
               id: count
-              objectName: "listCount"
               anchors.right: parent.right
               anchors.rightMargin: Style.space(8)
               anchors.verticalCenter: parent.verticalCenter
@@ -328,7 +305,6 @@ FocusScope {
 
     Item {
       id: newRow
-      objectName: "newListRow"
       width: pinned.width
       height: root.itemHeight
 
@@ -378,7 +354,6 @@ FocusScope {
 
       ListAction {
         id: makeButton
-        objectName: "makeList"
         look: root.look
         visible: root.naming
         anchors.right: parent.right
@@ -391,7 +366,6 @@ FocusScope {
     }
 
     Text {
-      objectName: "listProblem"
       visible: root.problem !== ""
       width: pinned.width
       height: root.itemHeight
@@ -407,7 +381,6 @@ FocusScope {
 
     MenuLine {
       id: manageRow
-      objectName: "manageListsRow"
       width: pinned.width
       height: root.itemHeight
       look: root.look

@@ -61,8 +61,20 @@ Harness {
   }
 
   // The plugin as the shell composes it, with this harness as its shell.
-  Stonks.Plugin { id: plugin; shell: shellApi; manifest: harness.pluginManifest() }
+  // The walk's clock, from Wednesday 7 October at 05:59 New York: the
+  // service reads it, and a step sets it and ticks the service.
+  property int time: 1791367140
+  function clockTo(t) {
+    harness.time = t
+    plugin.service.tick()
+  }
+  Stonks.Plugin { id: plugin; shell: shellApi; manifest: harness.pluginManifest(); hyprland: hyprlandStandIn
+    input: inputStandIn; wallClock: function() { return harness.time } }
   readonly property var service: plugin.service
+  // A bad answer is tried again in a fifth of a second, not 2.5: the walk's
+  // clock runs faster than the wall's.
+  Binding { target: plugin.service.feeds.quotes; property: "retryAfter"; value: 200 }
+  Binding { target: plugin.service.feeds.preview; property: "retryAfter"; value: 200 }
   readonly property var app: plugin.windowHost.app
 
   QtObject { id: workspaceHere }
@@ -75,17 +87,26 @@ Harness {
     property string address: "5ab1e"
     property var workspace: workspaceHere
   }
+  // The input that wakes the screens, which a step moves: never the owner's
+  // own keys and pointer.
+  QtObject {
+    id: inputStandIn
+    property bool isIdle: false
+  }
+  // Hyprland as the plugin is handed it: the screens and the windows a step
+  // gives it, each screen asked as the real ones are.
   QtObject {
     id: hyprlandStandIn
+    property var monitors: ({ values: [] })
     property var toplevels: ({ values: [] })
     property var focusedWorkspace: workspaceHere
+    function monitorFor(screen) { return null }
+    function refreshMonitors() { monitors.values.forEach(function(m) { m.refresh() }) }
     function dispatch(request) {}
     // Hyprland's events, which ask the screens again while every one is
     // off. None come: only a step asks them.
     signal rawEvent(var event)
   }
-  Binding { target: plugin.windowHost; property: "hyprlandStandIn"; value: hyprlandStandIn }
-  Binding { target: plugin.service.screens; property: "hyprlandStandIn"; value: hyprlandStandIn }
 
   QtObject {
     id: shellApi
@@ -180,9 +201,9 @@ Harness {
     // No quote run is out, the preview's included: the clock moves on only
     // once each run has landed, as it would in the seconds a run takes.
     function idle() {
-      return [service.testFeed, service.testPreviewFeed].every(function(feed) {
+      return [service.feeds.quotes, service.feeds.preview].every(function(feed) {
         return feed.firstRun.length === 0 && feed.refreshRun.length === 0
-      }) && !service.testOvernightFeed.busy && !service.opening
+      }) && !service.feeds.overnight.busy && !service.opening
     }
     function settle() {
       verify(within(10000, idle), "a quote run never landed")
@@ -211,7 +232,7 @@ Harness {
     function tick(seconds, step, each) {
       step = step || 5
       for (var t = 0; t < seconds; t += step) {
-        service.now += step
+        harness.clockTo(harness.time + step)
         settle()
         if (each) each()
       }
@@ -224,7 +245,7 @@ Harness {
       if (pill.warns) out.push("pill !")
       if (otherPill.warns) out.push("other pill !")
       if (app.opened) {
-        var body = app.testBody
+        var body = app.body
         var hero = harness.find(body, "hero")
         if (!hero || !hero.visible) out.push("! missing hero")
         else if (/^!/.test(hero.listingLead) || hero.freshnessText !== "") out.push("hero: " + hero.listingLead)
@@ -248,7 +269,7 @@ Harness {
     // A count starts with nothing asked or out, so a step before can't
     // land its answers in it, as the fake curl logs a request as it answers.
     function countsOver(label, seconds, want, begin, each) {
-      var before = Object.keys(service.asked).concat(service.testFeed.landing.length > 0 ? ["a run out"] : [])
+      var before = Object.keys(service.asked).concat(service.feeds.quotes.landing.length > 0 ? ["a run out"] : [])
       var from = harness.requests().length
       begin()
       tick(seconds - 5, 5, each)
@@ -262,7 +283,7 @@ Harness {
     // The clock to `t`, everything due there asked: a window's start.
     function startAt(t) {
       return function() {
-        service.now = t
+        harness.clockTo(t)
         settle()
       }
     }
@@ -283,7 +304,7 @@ Harness {
     // Tall enough that every listing's row is in sight: a row out of sight
     // works out no freshness, so it could say nothing either way.
     function openWindow() {
-      app.testWindow.implicitHeight = 1000
+      app.floatingWindow.implicitHeight = 1000
       app.open("{}")
       tryVerify(function() { return app.opened && service.openSurfaces.length === 1 }, 3000)
       settle()
@@ -294,7 +315,7 @@ Harness {
     }
 
     function test_fetching() {
-      var gate = service.testYahooGate
+      var gate = service.yahooGate
       startAt(at(harness.wed7, 10, 45))()
       tick(60)
 
@@ -305,7 +326,7 @@ Harness {
       // window ends: its last minute's request does not go.
       countsOver("11:15, the window open: every listing trading every minute, London until its close; Tokyo, closed, once in the quarter hour",
         900, counts([15, 15, 15, 15, 15, 14, 1, 15]), openAfter)
-      var body = app.testBody
+      var body = app.body
 
       // The next run, so r finds every answer older than 10 s.
       var runsNow = harness.runs().length
@@ -376,7 +397,7 @@ Harness {
       var pausedLong = false, offline = ""
       for (var offFor = 0; offFor < 240 && !(pausedLong && offline !== ""); offFor++) {
         tick(1, 1)
-        pausedLong = gate.pause === "none" && !gate.probing && gate.pausedUntil - service.now >= 30
+        pausedLong = gate.pause === "none" && !gate.loneOut && gate.pausedUntil - service.now >= 30
         if (/^Can't connect/.test(body.headerText)) offline = body.headerText
       }
       remove("YAHOO.offline")
@@ -395,7 +416,7 @@ Harness {
       // Tokyo though it trades, and Robinhood every 5 minutes through the
       // night. Back in sight, what fell due goes at once.
       hyprlandStandIn.toplevels = { values: [stonksToplevel] }
-      plugin.service.screens.monitors = [screenStandIn]
+      hyprlandStandIn.monitors = { values: [screenStandIn] }
       stonksToplevel.workspace = workspaceThere
       var away = countsOver("00:00, the window open on a workspace no screen shows: the pill's stock every 15 minutes, nothing else",
         1800, counts([2, 0, 0, 0, 0, 0, 0, 0]), function() {
@@ -417,13 +438,13 @@ Harness {
       settle()
       closeWindow()
       hyprlandStandIn.toplevels = { values: [] }
-      plugin.service.screens.monitors = []
+      hyprlandStandIn.monitors = { values: [] }
 
       // Thursday 11:15, nothing open, every screen off: nothing is asked
       // for, the pill's stock and a refresh included. The key press that
       // turns a screen on asks at once for the pill's, with the clock still.
       startAt(at(harness.wed7 + 86400, 11, 15))()
-      plugin.service.screens.monitors = [screenStandIn]
+      hyprlandStandIn.monitors = { values: [screenStandIn] }
       screenStandIn.on = false
       // The screens' last answer, trusted for a second, runs out first.
       wait(1100)
@@ -433,9 +454,9 @@ Harness {
       screensHeard()
       var dark = harness.quoteCounts(harness.requests().slice(darkFrom))
       wait(1100)
-      plugin.service.screens.testInput.isIdle = true
+      inputStandIn.isIdle = true
       screenStandIn.on = true
-      plugin.service.screens.testInput.isIdle = false
+      inputStandIn.isIdle = false
       var woke = within(2000, function() { return harness.quoteCounts(harness.requests().slice(darkFrom)).NEST > 0 })
       settle()
       var lit = harness.quoteCounts(harness.requests().slice(darkFrom))
@@ -458,9 +479,9 @@ Harness {
       screensHeard()
       var darkSearches = harness.calls("SEARCH.asked") - searchesFrom
       wait(1100)
-      plugin.service.screens.testInput.isIdle = true
+      inputStandIn.isIdle = true
       screenStandIn.on = true
-      plugin.service.screens.testInput.isIdle = false
+      inputStandIn.isIdle = false
       var sent = within(3000, function() { return harness.calls("SEARCH.asked") === searchesFrom + 1 })
       harness.check("every screen off, words typed into search ask nothing, and the key that wakes a screen sends them, once",
         held && darkSearches === 0 && sent, [held, darkSearches, harness.calls("SEARCH.asked") - searchesFrom].join(" "))

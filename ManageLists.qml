@@ -5,10 +5,11 @@ import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Commons as Commons
 import "Motion.js" as Motion
+import "Rows.js" as Rows
 
 // Manage lists, in the rows' place: rename, reorder, and delete the named
 // lists. All comes first and can't change.
-FocusScope {
+OverRows {
   id: root
 
   property var choices: []
@@ -44,6 +45,7 @@ FocusScope {
   readonly property string typedName: renaming ? nameField.text : ""
 
   readonly property int itemHeight: Style.space(30)
+  function rowSize() { return { pitch: itemHeight, height: itemHeight } }
   // The rows' scrollbar gutter and text inset, so these words line up with
   // the rows underneath.
   property int gutter: 0
@@ -56,21 +58,15 @@ FocusScope {
   signal deleteRequested(string name)
   signal dismissed()
 
-  property bool active: false
-  // Shown through the close fade, but inert.
-  enabled: active
-  // Turned on, it takes the keys a turn later only if still on; turned
-  // off, however it closes, it gives them up, its rename field's too.
-  onActiveChanged: {
-    if (active) {
-      reset()
-      pointer.rest()
-      Qt.callLater(function() { if (root.active && !root.renaming) root.forceActiveFocus() })
-    } else {
-      nameField.focus = false
-      root.focus = false
-      scroll.cancelFlick()
-    }
+  keysTo: renaming ? null : root
+  onOpened: {
+    reset()
+    pointer.rest()
+  }
+  // Closed, it gives up its rename field's keys too.
+  onClosed: {
+    nameField.focus = false
+    scroll.cancelFlick()
   }
 
   function reset() {
@@ -98,10 +94,7 @@ FocusScope {
 
   function showCursor() {
     scroll.cancelFlick()
-    var top = cursor * itemHeight
-    if (top < scroll.contentY) scroll.contentY = top
-    else if (top + itemHeight > scroll.contentY + scroll.height)
-      scroll.contentY = top + itemHeight - scroll.height
+    scroll.contentY = Rows.topShowing(cursor, rowSize(), scroll.contentY, scroll.height)
   }
 
   // After a scroll by hand: the nearest list wholly in sight, or in a view
@@ -109,14 +102,7 @@ FocusScope {
   // question keeps its row.
   function keepCursorInSight() {
     if (renaming || confirming) return
-    var top = scroll.contentY
-    var bottom = top + scroll.height
-    var whole = function(i) { return i * itemHeight >= top - 0.5 && (i + 1) * itemHeight <= bottom + 0.5 }
-    if (whole(cursor)) return
-    var shown = []
-    for (var i = 0; i < choices.length; i++) if (whole(i)) shown.push(i)
-    if (shown.length > 0) cursor = cursor * itemHeight < top ? shown[0] : shown[shown.length - 1]
-    else cursor = Math.max(0, Math.min(choices.length - 1, Math.floor((top + bottom) / 2 / itemHeight)))
+    cursor = Rows.cursorKeptInSight(cursor, choices.length, rowSize(), scroll.contentY, scroll.height)
   }
 
   function startRenaming(index) {
@@ -212,7 +198,6 @@ FocusScope {
   }
 
   MouseArea {
-    objectName: "renameAway"
     anchors.fill: parent
     visible: root.renaming
     onClicked: root.keepName()
@@ -257,7 +242,6 @@ FocusScope {
 
   Flickable {
     id: scroll
-    objectName: "manageScroll"
     anchors.top: title.bottom
     anchors.bottom: parent.bottom
     width: parent.width
@@ -274,13 +258,7 @@ FocusScope {
       if (moving && pointer.hovered) root.pointAt(pointer.scenePosition.x, pointer.scenePosition.y)
       root.keepCursorInSight()
     }
-    Controls.ScrollBar.vertical: Controls.ScrollBar {
-      id: manageBar
-      policy: scroll.interactive ? Controls.ScrollBar.AlwaysOn : Controls.ScrollBar.AlwaysOff
-      visible: scroll.interactive
-      // At least 24 px long, so a long view's thumb is there to see and grab.
-      minimumSize: Math.min(1, Style.space(24) / Math.max(1, availableHeight))
-    }
+    Controls.ScrollBar.vertical: ViewScrollBar { id: manageBar; scrolls: scroll.interactive }
 
     Column {
       id: column
@@ -376,7 +354,6 @@ FocusScope {
             }
             ListAction {
               look: root.look
-              objectName: "renameAction"
               anchors.verticalCenter: parent.verticalCenter
               text: "RENAME"
               enterTakes: true
@@ -384,7 +361,6 @@ FocusScope {
             }
             ListAction {
               look: root.look
-              objectName: "deleteAction"
               anchors.verticalCenter: parent.verticalCenter
               text: "DELETE"
               onActivated: {
@@ -396,7 +372,6 @@ FocusScope {
 
           Text {
             id: count
-            objectName: "listCount"
             visible: !entry.editing && !entry.asking
             anchors.right: parent.right
             anchors.rightMargin: root.inset
@@ -438,7 +413,6 @@ FocusScope {
 
             ListAction {
               look: root.look
-              objectName: "confirmDelete"
               anchors.verticalCenter: parent.verticalCenter
               text: "DELETE"
               enterTakes: true
@@ -447,7 +421,6 @@ FocusScope {
             }
             ListAction {
               look: root.look
-              objectName: "cancelDelete"
               anchors.verticalCenter: parent.verticalCenter
               text: "CANCEL"
               onActivated: root.confirming = false
@@ -511,7 +484,6 @@ FocusScope {
 
       ListAction {
         look: root.look
-        objectName: "saveName"
         anchors.verticalCenter: parent.verticalCenter
         text: "SAVE"
         enterTakes: true
@@ -519,7 +491,6 @@ FocusScope {
       }
       ListAction {
         look: root.look
-        objectName: "cancelRename"
         anchors.verticalCenter: parent.verticalCenter
         text: "CANCEL"
         onActivated: root.stopEditing()

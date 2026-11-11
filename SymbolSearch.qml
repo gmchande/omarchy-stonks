@@ -8,7 +8,7 @@ import "Search.js" as Search
 // Search's field and results. Yahoo's lookup is its feed's
 // (`SearchFeed.qml`). A FocusScope, so that hiding it takes the keys from
 // the field: a hidden field keeps them otherwise.
-FocusScope {
+OverRows {
   id: root
 
   property Look look
@@ -129,20 +129,13 @@ FocusScope {
   signal chose(string symbol, var result)
   signal cancelled()
 
-  property bool active: false
-  // Off, it still shows through the close fade but takes no pointer or key.
-  enabled: active
-  // Turned off, any way it closes, it drops a lookup still out and keeps
-  // what it shows for the close fade.
-  onActiveChanged: {
-    if (active) {
-      reset()
-      Qt.callLater(function() { if (root.active) searchField.forceActiveFocus() })
-    } else {
-      suspend()
-      searchField.focus = false
-      root.focus = false
-    }
+  keysTo: searchField
+  onOpened: reset()
+  // Closed, it drops a lookup still out and keeps what it shows for the
+  // close fade.
+  onClosed: {
+    suspend()
+    searchField.focus = false
   }
   Keys.onPressed: function(event) { root.handleKey(event) }
 
@@ -301,7 +294,6 @@ FocusScope {
 
   Flickable {
     id: resultsScroll
-    objectName: "searchResults"
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: fieldBar.bottom
@@ -313,12 +305,7 @@ FocusScope {
     clip: true
     boundsBehavior: Flickable.StopAtBounds
     interactive: contentHeight > height
-    Controls.ScrollBar.vertical: Controls.ScrollBar {
-      policy: resultsScroll.interactive ? Controls.ScrollBar.AlwaysOn : Controls.ScrollBar.AlwaysOff
-      visible: resultsScroll.interactive
-      // A thumb big enough to see and grab in a long view.
-      minimumSize: Math.min(1, Style.space(24) / Math.max(1, availableHeight))
-    }
+    Controls.ScrollBar.vertical: ViewScrollBar { scrolls: resultsScroll.interactive }
 
     Column {
       id: resultsColumn
@@ -370,7 +357,6 @@ FocusScope {
               elide: Text.ElideRight
             }
             Text {
-              objectName: "searchName"
               width: root.sharedWidth - root.symbolWidth
               anchors.verticalCenter: parent.verticalCenter
               textFormat: Text.PlainText
@@ -381,7 +367,6 @@ FocusScope {
               elide: Text.ElideRight
             }
             Text {
-              objectName: "searchExchange"
               width: root.exchangeWidth
               anchors.verticalCenter: parent.verticalCenter
               horizontalAlignment: Text.AlignRight
@@ -394,7 +379,6 @@ FocusScope {
               elide: Text.ElideRight
             }
             Rectangle {
-              objectName: "searchAdd"
               opacity: resultRow.chosen && !resultRow.dimmed ? 1 : 0
               anchors.verticalCenter: parent.verticalCenter
               width: root.buttonWidth
@@ -415,7 +399,6 @@ FocusScope {
       }
 
       Text {
-        objectName: "searchNote"
         visible: root.note !== ""
         opacity: root.stale ? 0.4 : 1
         width: parent.width
@@ -506,7 +489,6 @@ FocusScope {
 
     ListAction {
       id: cancelButton
-      objectName: "searchCancel"
       look: root.look
       anchors.right: parent.right
       anchors.rightMargin: root.rowPadding

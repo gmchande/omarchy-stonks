@@ -1,6 +1,7 @@
 import QtQuick
 import QtCore
 import Quickshell.Io
+import "Commands.js" as Commands
 // The screenshot's hand-off, as Omarchy's own screenshot does it after its
 // grab. With Omasnap, as on Omarchy 4.5, the folder is OMASNAP_SCREENSHOT_DIR,
 // else OMARCHY_SCREENSHOT_DIR, which `omarchy-capture-screenshot` passes on as
@@ -59,48 +60,17 @@ Item {
     if (done) done(code)
   }
 
-  // The editor, then the file, printed once its folder can take it. Read up to
-  // 8 KB, twice Linux's PATH_MAX, and a byte past, so an answer over the cap
-  // names no file.
+  // The editor, then the file (`Commands.screenshotName`).
   Process {
     id: naming
-    command: ["timeout", "5", "sh", "-c", "{\n"
-      + "if command -v omasnap > /dev/null; then\n"
-      + "  editor=omasnap\n"
-      + "  conf=$2\n"
-      + "  case $conf in '~') conf=$HOME ;; '~/'*) conf=$HOME${conf#'~'} ;; esac\n"
-      + "  dir=${OMASNAP_SCREENSHOT_DIR:-${OMARCHY_SCREENSHOT_DIR:-${conf:-$3/Screenshots}}}\n"
-      + "else\n"
-      + "  editor=${OMARCHY_SCREENSHOT_EDITOR:-tensaku-edit}\n"
-      + "  dir=${OMARCHY_SCREENSHOT_DIR:-}\n"
-      + "  dirs=$HOME/.config/user-dirs.dirs\n"
-      + "  if [ -z \"$dir\" ] && [ -f \"$dirs\" ]; then\n"
-      + "    dir=$(sed -n 's/^XDG_PICTURES_DIR=\"\\(.*\\)\"[[:space:]]*$/\\1/p' \"$dirs\" | tail -n 1)\n"
-      + "    case $dir in\n"
-      + "      '$HOME'*) dir=$HOME${dir#'$HOME'} ;;\n"
-      + "      '${HOME}'*) dir=$HOME${dir#'${HOME}'} ;;\n"
-      + "    esac\n"
-      + "  fi\n"
-      + "  dir=${dir:-$HOME/Pictures}\n"
-      + "fi\n"
-      + "mkdir -p \"$dir\" && [ -w \"$dir\" ] || exit 1\n"
-      + "stamp=$(date +%Y-%m-%d_%H-%M-%S)\n"
-      + "file=$dir/stonks-$1-$stamp.png\n"
-      + "n=1\n"
-      + "while [ -e \"$file\" ]; do n=$((n + 1)); file=$dir/stonks-$1-$stamp-$n.png; done\n"
-      + "printf '%s\\n%s\\n' \"$editor\" \"$file\"\n"
-      + "} | head -c 8193\n",
-      "sh", root.shotSymbol, root.shotOmasnapFolder, root.shotPictures]
+    command: Commands.screenshotName(root.shotSymbol, root.shotOmasnapFolder, root.shotPictures)
     stdout: StdioCollector {
       id: namingOut
       onStreamFinished: {
-        if (namingOut.data.byteLength > 8192) return root.finish(1)
-        var printed = text.replace(/\n$/, "")
-        var cut = printed.indexOf("\n")
-        var file = printed.slice(cut + 1)
-        if (!root.shotItem || cut < 1 || file.charAt(0) !== "/" || file.indexOf("\n") >= 0) return root.finish(1)
-        root.shotEditor = printed.slice(0, cut)
-        root.shotFile = file
+        var named = namingOut.data.byteLength > 8192 ? null : Commands.readScreenshotName(text)
+        if (!root.shotItem || !named) return root.finish(1)
+        root.shotEditor = named.editor
+        root.shotFile = named.file
         var item = root.shotItem
         // No size is passed: Qt sizes the grab from the item's fractional size
         // times the screen's ratio, so at a scale such as 1.75, where 2400

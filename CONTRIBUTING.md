@@ -38,16 +38,17 @@ the rules a change is judged by.
   happen. None says what a position, a size, a colour or a duration must
   be: how Stonks looks is for the pictures below, and how it moves and
   feels for a hand on the running plugin.
-- While you work, run just the checks for what you change, side by side,
-  as in `test/all.sh keys mouse unit`. A walk goes by the NAME in its
+- While you work, run just the checks for what you change, as in
+  `test/all.sh keys mouse unit`. A walk goes by the NAME in its
   `test/qml/NAME.sh`, and other checks by names such as `unit`; an unknown
   name lists them all. Such a run ends `PASSED ONLY`, never `ALL PASS`, so
   run the whole of `test/all.sh` before a pull request.
 - Render the states you change, as in
   `test/qml/render.sh 'popup-lists-*'`.
-- `test/review.sh` compares Stonks' pictures before and after your change,
-  on your Omarchy, and the bar's on 4.0.6's shell, the oldest Stonks
-  supports. The maintainer runs it when a change affects how Stonks looks.
+- When a change affects how Stonks looks, the maintainer compares every
+  picture before and after it, on today's Omarchy and the bar's on 4.0.6's
+  shell, the oldest Stonks supports, and runs the walks on 4.0.6's shell
+  too.
 
 ## Pull requests
 
@@ -78,9 +79,9 @@ A maintainer releases from `dev`.
    against the code.
 3. Bump the version in `manifest.json` in a release commit on `dev`. If the
    README's pictures should change, render them with `test/qml/readme.sh`.
-4. Run `STONKS_RENDER_BASE=vLAST test/review.sh --fresh` on that commit. It
-   must end `ALL PASS`, and the marketplace's security scan must find
-   nothing.
+4. On that commit, compare every picture with the last release's, drawn
+   afresh, and run the walks on 4.0.6's shell. Every check must pass, and
+   the marketplace's security scan must find nothing.
 5. Run `git push origin dev:main`, tag `vX.Y.Z`, and publish the release
    notes. They say what the release changes for you, then how to update,
    then give a line for each change you'll notice, written as the Words

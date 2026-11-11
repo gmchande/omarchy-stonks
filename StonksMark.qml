@@ -37,7 +37,6 @@ Item {
         opacity: 0.35
       }
       Rectangle {
-        objectName: "markCell"
         y: column.level * (root.pixel + root.gap)
         width: root.pixel
         height: root.pixel

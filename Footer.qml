@@ -138,7 +138,6 @@ Item {
   // The hint takes no click.
   Text {
     id: hintText
-    objectName: "footerHint"
     visible: root.hint !== "" && root.showsHint
     anchors.top: parent.top
     anchors.left: parent.left
@@ -155,7 +154,6 @@ Item {
   }
 
   FooterButton {
-    objectName: "footerFill"
     anchors.fill: parent
     anchors.topMargin: root.hintHeight + Style.space(6)
     anchors.rightMargin: root.gutter + root.undoRoom
@@ -196,7 +194,6 @@ Item {
 
         Text {
           id: noteAction
-          objectName: "footerAction"
           visible: text !== ""
           textFormat: Text.PlainText
           text: root.note === "" && root.notice !== "" ? root.noticeShown.action : ""
@@ -237,7 +234,6 @@ Item {
 
     Text {
       id: undoText
-      objectName: "footerUndoText"
       anchors.centerIn: parent
       textFormat: Text.PlainText
       text: root.sideLabel

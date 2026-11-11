@@ -147,7 +147,6 @@ Item {
     width: parent.width
     Text {
       id: symbolText
-      objectName: "heroSymbol"
       textFormat: Text.PlainText
       text: root.symbol || "—"
       color: root.look.foreground
@@ -157,7 +156,6 @@ Item {
     }
     Text {
       id: listingText
-      objectName: "listingLine"
       leftPadding: Style.space(8)
       width: Math.min(implicitWidth, leftPadding + Math.max(0, root.listingRoom - metaText.implicitWidth))
       anchors.baseline: symbolText.baseline
@@ -189,7 +187,6 @@ Item {
 
   Text {
     id: smoothPrice
-    objectName: "smoothPrice"
     visible: !root.look.retro
     x: -Math.round(root.inkLeft)
     y: root.baselineY - baselineOffset
@@ -204,7 +201,6 @@ Item {
   }
 
   BlockDigits {
-    objectName: "blockPrice"
     visible: root.look.retro
     y: root.baselineY - baselineOffset
     // Hidden, it rests, or a scrub in smooth would repaint it every step.
@@ -239,7 +235,6 @@ Item {
   // price and change too, so it reads as old beside a fresh one.
   Row {
     id: extendedLine
-    objectName: "extendedLine"
     readonly property bool old: !!root.extended && root.extended.stale
     visible: root.extended !== null
     y: root.baselineY + root.captionDrop - extendedLabel.baselineOffset
@@ -289,7 +284,6 @@ Item {
     // The part since the close: · AFTER HOURS +1.35%.
     Text {
       id: sinceLabel
-      objectName: "sinceClose"
       visible: root.sinceShown
       textFormat: Text.PlainText
       text: root.since ? "· " + root.since.label : ""
@@ -301,7 +295,6 @@ Item {
     }
     Text {
       id: sinceMove
-      objectName: "sinceMove"
       visible: root.sinceShown
       textFormat: Text.PlainText
       text: root.since ? Format.lookSigns(root.since.changeText, root.look.retro) : ""
@@ -314,7 +307,6 @@ Item {
 
   Text {
     id: baselineLegend
-    objectName: "baselineLegend"
     visible: root.scrubbing && root.baselineText !== ""
     y: root.baselineY + root.captionDrop - baselineOffset
     textFormat: Text.PlainText
@@ -328,7 +320,6 @@ Item {
 
   Row {
     id: captionLine
-    objectName: "changeCaption"
     visible: (root.caption.label !== "" || root.caption.changeText !== "") && implicitWidth <= root.captionRoom
     anchors.right: parent.right
     y: root.baselineY + root.captionDrop - captionLabel.baselineOffset
