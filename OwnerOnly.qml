@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "Commands.js" as Commands
 // Keeps Stonks' files its owner's alone. The cache folder is named for the
 // plugin's id, and nothing is written in it until the id is known and it is
 // 0700; writes asked sooner wait, the latest per path.
@@ -54,10 +55,8 @@ Item {
 
   // Calls done(false) while another create is running, and where the file
   // couldn't be made, even if one is there by then.
-  // mktemp makes the file 0600 and `ln` names it, never over a file there,
-  // so no other account reads it and no reader sees it half written. The
-  // text rides in the environment, whole as the command starts: a command
-  // line is world-readable, /proc/PID/environ is 0400.
+  // No other account reads it, and no reader sees it half written
+  // (`Commands.createPrivately`).
   function create(path, text, done) {
     if (creating.running || root.creatingDone) return done(false)
     root.creatingPath = path
@@ -105,11 +104,7 @@ Item {
 
   Process {
     id: creating
-    command: ["timeout", "5", "sh", "-c", "umask 077 && tmp=$(mktemp -- \"$1.XXXXXX\") || exit 1\n"
-      + "printf '%s' \"$STONKS_TEXT\" > \"$tmp\" && ln -- \"$tmp\" \"$1\"\n"
-      + "code=$?\n"
-      + "rm -f -- \"$tmp\"\n"
-      + "exit $code", "sh", root.creatingPath]
+    command: Commands.createPrivately(root.creatingPath)
     environment: root.creatingEnvironment
     onExited: function(code) { root.createdCode = code }
     // A process that fails to start ends with no exit.

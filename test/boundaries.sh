@@ -57,9 +57,13 @@ only 'grabToImage|saveToFile|wl-copy|wl-paste|omarchy-notification-send|notify-s
 # anything, or hold its output awake.
 only '\.exec\s*\(|pw-play|pw-dump|pw-cat' Sounds.qml
 none '\.exec\s*\((?!\["timeout", "-k", "1", "4", "pw-play",)' Sounds.qml
-none '(?<!timeout -k 1 2 )pw-play --' Sounds.qml
-# Every command the camera and the file keeper run is under `timeout`.
+none '(?<!timeout -k 1 2 )pw-play --' Sounds.qml Commands.js
+# Every command the camera and the file keeper run is under `timeout`, and
+# so is the sounds' survey: those written there, and those in Commands.js.
 none 'command:\s*\[(?!"timeout",)' Camera.qml OwnerOnly.qml
+for made in screenshotName createPrivately soundSurvey; do
+  rg -qUP "function $made\\([^)]*\\) \\{\\n  return \\[\"timeout\", " Commands.js || fail "Commands.js: $made does not start with timeout"
+done
 # Hyprland's dispatcher can start a program too: only the plugin's entry
 # reaches Hyprland, to hand it on, and the one dispatch is the window
 # host's, which focuses the window.

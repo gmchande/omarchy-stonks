@@ -1,6 +1,8 @@
 import QtQuick
 import Quickshell.Io
 import "ChartSound.js" as ChartSound
+import "Commands.js" as Commands
+import "Waking.js" as Waking
 // The sounds, each in the look's voice: what you just did, a replay, the
 // chimes as a scrub crosses the chart's bars (`ChartSound`), and the market's
 // bell (`Bell`). One sound plays at a time, a new one stopping the last; the
@@ -35,7 +37,7 @@ Item {
   property var rewrote: ({})
   property bool surveyed: false
   readonly property var fixedSounds: ["add", "remove", "undo", "shutter", "bell"]
-  // In ms (`leadAt`).
+  // In ms (`Waking.leadInAt`).
   readonly property var leadSteps: [30, 60, 90, 120, 150]
   // The chimes' player's `case` patterns.
   readonly property string chimeNames: {
@@ -55,11 +57,9 @@ Item {
   // A sound that may wake an output opens with up to 150 ms of silence, for
   // the waking to eat. PipeWire sleeps an output after 5 s of nothing; Stonks
   // hears only its own sounds, so it counts the output asleep 4 s after its
-  // last. The whole lead-in holds until the silence's stream reaches the
-  // output, or 550 ms without one (laptop speakers wake in 135 to 182 ms,
-  // Bluetooth slower), then shrinks a third as fast as time passes, in 30 ms
-  // steps, so no chime, 45 ms apart, overtakes the one before.
-  readonly property int leadIn: 150
+  // last. Laptop speakers wake in 135 to 182 ms, Bluetooth slower
+  // (`Waking.js`).
+  readonly property int leadIn: Waking.LEAD_IN
   property real asleepAfter: 0
   property real wokeAt: 0
   // 0 before the output first woke, -1 while it wakes and nothing has said so.
@@ -72,30 +72,15 @@ Item {
       awakeAt = -1
     }
     asleepAfter = Math.max(asleepAfter, now + 4000)
-    return leadAt(now)
+    return Waking.leadInAt(now, output())
   }
 
-  function leadAt(now) {
-    var from = awakeAt >= 0 ? awakeAt : silence.running ? now : wokeAt + 550
-    return Math.min(leadIn, Math.max(0, Math.ceil((leadIn - (now - from) / 3) / 30) * 30))
+  function output() {
+    return { wokeAt: wokeAt, awakeAt: awakeAt, asleepAfter: asleepAfter, silenceRunning: silence.running }
   }
 
-  // Reached 150 ms ago, so the silence playing since has covered its waking.
   function awake(now) {
-    if (now >= asleepAfter) return false
-    return awakeAt >= 0 ? now >= awakeAt + leadIn : !silence.running && now - wokeAt >= 1000
-  }
-
-  // A WAV with the plain 44-byte header the chimes and the bundled sounds have.
-  function led(bytes, ms) {
-    var zeros = Math.round(new DataView(bytes).getUint32(24, true) * ms / 1000) * 2
-    var out = new ArrayBuffer(bytes.byteLength + zeros)
-    new Uint8Array(out).set(new Uint8Array(bytes, 0, 44))
-    new Uint8Array(out, 44 + zeros).set(new Uint8Array(bytes, 44))
-    var d = new DataView(out)
-    d.setUint32(4, out.byteLength - 8, true)
-    d.setUint32(40, out.byteLength - 44, true)
-    return out
+    return Waking.outputAwake(now, output())
   }
 
   function scrubMoved() {
@@ -206,7 +191,7 @@ Item {
     var file = fileOf(look, what, lead)
     if (!madeThisRun[file]) {
       var bytes = typeof what === "number" ? ChartSound.wav(ChartSound.chime(look === "retro", what)) : bundledBytes(look, what)
-      var landed = files.write(folder + "/" + file, lead ? led(bytes, lead) : bytes)
+      var landed = files.write(folder + "/" + file, lead ? Waking.withLeadIn(bytes, lead) : bytes)
       madeThisRun[file] = true
       if (rewrote[look] !== "failed") rewrote[look] = landed ? "landed" : "failed"
     }
@@ -266,46 +251,25 @@ Item {
     }
   }
 
-  // Once a run: the md5s of what the sounds are made from, each look's stamp,
-  // and the files no newer than it. A newer one was written by an older Stonks,
-  // which kept no stamp. The answer runs under 8 KB and is read up to 64. Read
-  // as `running` falls, since a command that fails to start never exits.
+  // Once a run (`Commands.soundSurvey`). Read as `running` falls, since a
+  // command that fails to start never exits.
   Process {
     id: survey
-    command: ["timeout", "5", "sh", "-c", "{ cd -- \"$1\" && md5sum -- ChartSound.js Sounds.qml sounds/*/*.wav && cd -- \"$2\" || exit 0\n"
-      + "for look in smooth retro; do\n"
-      + "  [ -f \"stamp-$look\" ] || continue\n"
-      + "  printf 'stamp %s %s\\n' \"$look\" \"$(head -c 64 -- \"stamp-$look\")\"\n"
-      + "  for f in chime-*\"$look\"-*.wav lead-\"$look\"-*.wav; do\n"
-      + "    [ -f \"$f\" ] && ! [ \"$f\" -nt \"stamp-$look\" ] && printf 'have %s\\n' \"$f\"\n"
-      + "  done\n"
-      + "done; } | head -c 65536", "sh", String(Qt.resolvedUrl(".")).replace(/^file:\/\//, ""), root.folder]
+    command: Commands.soundSurvey(String(Qt.resolvedUrl(".")).replace(/^file:\/\//, ""), root.folder)
     stdout: StdioCollector { id: surveyAnswer }
     onRunningChanged: if (!running) root.takeSurvey(surveyAnswer.text)
   }
 
   // Without an answer, every file is written ahead.
   function takeSurvey(text) {
-    var sums = { smooth: [], retro: [] }
-    var stamps = {}
-    var have = {}
-    String(text).split("\n").forEach(function(line) {
-      var sum = line.match(/^[0-9a-f]{32}  (.+)$/)
-      var own = sum ? sum[1].match(/^sounds\/(smooth|retro)\//) : null
-      var word = line.split(" ")
-      if (own) sums[own[1]].push(line)
-      else if (sum) ["smooth", "retro"].forEach(function(look) { sums[look].push(line) })
-      else if (word[0] === "stamp" && word.length === 3) stamps[word[1]] = word[2]
-      else if (word[0] === "have" && word.length === 2) have[word[1]] = true
-    })
+    var read = Commands.readSoundSurvey(text, root.fixedSounds.length)
     ;["smooth", "retro"].forEach(function(look) {
-      // ChartSound.js, this file, and every bundled sound.
-      if (sums[look].length !== 2 + root.fixedSounds.length) return
-      root.sources[look] = Qt.md5(sums[look].join("\n"))
-      if (stamps[look] !== root.sources[look]) return
+      if (!read.sums[look]) return
+      root.sources[look] = Qt.md5(read.sums[look].join("\n"))
+      if (read.stamps[look] !== root.sources[look]) return
       root.aheadOf(look).forEach(function(f) {
         var file = root.fileOf(look, f[0], f[1])
-        if (have[file]) root.madeThisRun[file] = true
+        if (read.have[file]) root.madeThisRun[file] = true
       })
     })
     root.surveyed = true
@@ -374,40 +338,21 @@ Item {
     if (turnedOn && !listening.running) listening.running = true
   }
 
-  // An app's capture stream running, not one reading a speaker's monitor, as a
-  // level meter does.
-  function recording(dump) {
-    var nodes
-    try { nodes = JSON.parse(dump) } catch (e) { return true }
-    return !Array.isArray(nodes) || nodes.some(function(node) {
-      var props = node.info && node.info.props || {}
-      return node.type === "PipeWire:Interface:Node" && props["media.class"] === "Stream/Input/Audio"
-        && node.info.state === "running" && String(props["stream.capture.sink"]) !== "true"
-    })
-  }
-
-  // A byte past 4 MB shows an answer over the cap. omarchy-shell's -q would
-  // hide its answer too.
+  // `Commands.bellCheck`, and `Commands.recording`.
   Process {
     id: listening
-    command: ["bash", "-c", "[ \"$(timeout -k 1 2 omarchy-shell notifications isDnd 2> /dev/null)\" = on ] && exit 1\n"
-      + "set -o pipefail; timeout -k 1 3 pw-dump | head -c 4000001"]
+    command: Commands.bellCheck()
     stdout: StdioCollector { id: answer }
     onExited: function(code) {
-      if (root.turnedOn && code === 0 && answer.data.byteLength <= 4000000 && !root.recording(answer.text)) root.play("bell")
+      if (root.turnedOn && code === 0 && answer.data.byteLength <= 4000000 && !Commands.recording(answer.text)) root.play("bell")
     }
   }
 
-  // One shell while sounds are on, starting a pw-play in the background for
-  // each chime named on its input, so chimes overlap and the shell's thread
-  // starts no process per chime. Each has 2 s, so a stalled PipeWire can't pile
-  // them up, and starts from a subshell that ends at once: from this shell,
-  // each grew it by a third of a kilobyte, 10 MB over 20,000 chimes.
+  // One shell while sounds are on (`Commands.chimePlayer`).
   Process {
     id: chimer
     running: root.turnedOn
     stdinEnabled: true
-    command: ["sh", "-c", "while read -r name; do case $name in " + root.chimeNames + ") "
-      + "( timeout -k 1 2 pw-play --media-role Notification --latency 30ms \"$1/$name\" & ) ;; esac; done", "sh", root.folder]
+    command: Commands.chimePlayer(root.chimeNames, root.folder)
   }
 }
