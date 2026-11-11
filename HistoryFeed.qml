@@ -11,7 +11,7 @@ Item {
 
   property var entries: ({})
   property var gate: null
-  property var clearance: null
+  property var mayAsk: null
   // The service's wall clock, so answers age by its time.
   property var clock: null
   function stamp() { return clock ? clock.wallSecond() : Math.floor(Date.now() / 1000) }
@@ -98,10 +98,10 @@ Item {
       }
       return
     }
-    root.launch()
+    root.sendNext()
   }
 
-  function launch() {
+  function sendNext() {
     if (job) return
     if (!wanted) {
       root.idle()
@@ -115,7 +115,7 @@ Item {
   // While the gate holds the host, a chart to show fails a turn later: the
   // change that asked for it is still being told.
   function run() {
-    if (clearance && !clearance()) { root.waitingForScreen = true; return }
+    if (mayAsk && !mayAsk()) { root.waitingForScreen = true; return }
     root.waitingForScreen = false
     if (job.ahead && gate) {
       var granted = 0
@@ -139,7 +139,7 @@ Item {
     fetchRun.send(job.charts.map(function(c) { return History.historyUrl(c.symbol, range) }), Fetch.HISTORY_CAP)
   }
 
-  function pump() {
+  function sendWaiting() {
     if (job && waitingForScreen) root.run()
   }
 
@@ -148,7 +148,7 @@ Item {
     root.job = null
     root.attempts = 0
     root.stopped = false
-    root.launch()
+    root.sendNext()
   }
 
   function parse(answer, range) {

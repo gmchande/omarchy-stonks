@@ -10,7 +10,7 @@ Item {
   // By pair ("USDCAD").
   property var rates: ({})
   property var gate: null
-  property var clearance: null
+  property var mayAsk: null
   // `Service.fundamentalsWanted`, in order.
   property var wanted: []
   // `now` wakes the feed; it reads `clock.wallSecond()`.
@@ -79,11 +79,11 @@ Item {
 
   function run(url) {
     root.pendingUrl = url
-    root.pump()
+    root.sendWaiting()
   }
 
-  function pump() {
-    if (!pendingUrl || (clearance && !clearance())) return
+  function sendWaiting() {
+    if (!pendingUrl || (mayAsk && !mayAsk())) return
     if (gate && gate.take(1) === 0) {
       if (job.step !== "rate") {
         root.fail(job.symbol)

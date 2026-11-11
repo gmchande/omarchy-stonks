@@ -87,13 +87,13 @@ function keptAsks(asked, watched, entries, running) {
   return dropped ? next : asked
 }
 
-function laneWaiting(symbols, asked, entries, first, held) {
+function runWaiting(symbols, asked, entries, first, held) {
   return symbols.filter(function(s) {
     return s in asked && firstAnswer(entries[s]) === first && held.indexOf(s) < 0
   })
 }
 
-function laneJudging(toJudge, asked, held) {
+function runJudging(toJudge, asked, held) {
   return toJudge.filter(function(s) { return !(s in asked) && held.indexOf(s) < 0 })
 }
 
@@ -102,13 +102,13 @@ function laneJudging(toJudge, asked, held) {
 // hours ago, read from the closes, but it asks for two days
 // (`twoDays`), and a batch asks two days for all when one wants two,
 // so coins batch apart from stocks.
-function quoteSlots(waiting, asked, symbols, featured, charted, bulk, coins) {
+function quoteRequests(waiting, asked, symbols, featured, charted, bulk, coins) {
   var order = waiting.slice().sort(function(a, b) {
     return (b === featured) - (a === featured) || asked[a] - asked[b] || symbols.indexOf(a) - symbols.indexOf(b)
   })
   var alone = function(s) { return !bulk || charted.indexOf(s) >= 0 }
   var coin = function(s) { return !!coins && coins.indexOf(s) >= 0 }
-  var slots = order.filter(alone).map(function(s) { return { symbols: [s], spark: false } })
+  var charts = order.filter(alone).map(function(s) { return { symbols: [s], spark: false } })
   var batches = []
   var batched = order.filter(function(s) { return !alone(s) && !coin(s) })
   for (var i = 0; i < batched.length; i += Quote.SPARK_BATCH) {
@@ -119,7 +119,7 @@ function quoteSlots(waiting, asked, symbols, featured, charted, bulk, coins) {
   for (var j = 0; j < coined.length; j += Quote.SPARK_BATCH) batches.push({ symbols: coined.slice(j, j + Quote.SPARK_BATCH), spark: true })
   // Each batch is in the order asked, so its first symbol places it.
   batches.sort(function(x, y) { return order.indexOf(x.symbols[0]) - order.indexOf(y.symbols[0]) })
-  return slots.concat(batches)
+  return charts.concat(batches)
 }
 
 // A spark quote has no opens for the hero's line or the day's open.

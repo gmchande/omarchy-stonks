@@ -583,7 +583,7 @@ Harness {
       // saved in two days throughout is that; otherwise as a surface open a
       // while asks, by `Asks.twoDays` judged on the saved answer, a row in
       // a spark batch two when any of its batch wants two
-      // (`Asks.quoteSlots`). A capture saves Yahoo's two days beside its one
+      // (`Asks.quoteRequests`). A capture saves Yahoo's two days beside its one
       // (2d/<file>.json, test/capture-demo.sh), read where Stonks asks for
       // two. Without it, the other range draws another day, or a blank: a
       // row saved only in it is left out, those whose own ask differs first,
@@ -593,7 +593,7 @@ Harness {
       var twoDays = function(s) { return Asks.twoDays(judged[s], root.now, stub.calendars) }
       var askedRange = function(kept) {
         var asks = {}
-        Asks.quoteSlots(kept, {}, kept, featured, [featured], true, kept.filter(function(s) { return judged[s].crypto })).forEach(function(slot) {
+        Asks.quoteRequests(kept, {}, kept, featured, [featured], true, kept.filter(function(s) { return judged[s].crypto })).forEach(function(slot) {
           var two = slot.symbols.some(twoDays)
           slot.symbols.forEach(function(s) { asks[s] = two ? "2d" : "1d" })
         })

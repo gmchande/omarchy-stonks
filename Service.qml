@@ -225,7 +225,7 @@ Item {
       root.saveWaitsFor = null
       Qt.callLater(function() {
         root.opening = false
-        feed.pump()
+        feed.sendWaiting()
       })
     }
     root.tick()
@@ -289,7 +289,7 @@ Item {
   }
   // What a preview held back while out of sight goes once a screen shows it.
   onPreviewShownChanged: if (previewShown) {
-    previewFeed.pump()
+    previewFeed.sendWaiting()
     askOvernight()
   }
 
@@ -517,7 +517,7 @@ Item {
     onLandingChanged: Qt.callLater(root.releaseOrder)
     now: root.now
     clock: root
-    clearance: function() { return !root.opening && root.screensClear() }
+    mayAsk: function() { return !root.opening && root.screensClear() }
     gate: yahooGate
     centExchanges: root.centExchanges
     calendars: root.calendars
@@ -560,7 +560,7 @@ Item {
   HistoryFeed {
     id: historyFeed
     gate: yahooGate
-    clearance: function() { return root.screensClear() }
+    mayAsk: function() { return root.screensClear() }
     clock: root
     centExchanges: root.centExchanges
     inUse: root.chartsInUse
@@ -584,7 +584,7 @@ Item {
       ? [root.previewSymbol] : []
     now: root.now
     clock: root
-    clearance: function() { return root.previewShown && root.screensClear() }
+    mayAsk: function() { return root.previewShown && root.screensClear() }
     gate: yahooGate
     centExchanges: root.centExchanges
     calendars: root.calendars
@@ -608,7 +608,7 @@ Item {
     now: root.now
     clock: root
     gate: yahooGate
-    clearance: function() { return root.screensClear() }
+    mayAsk: function() { return root.screensClear() }
   }
   AllDayFeed {
     id: allDayFeed
@@ -675,7 +675,7 @@ Item {
     ready: root.ready && root.fileSettings.updateCheck && root.updatable
     now: root.now
     clock: root
-    clearance: function() { return root.screensClear() }
+    mayAsk: function() { return root.screensClear() }
     gate: githubGate
   }
   // "" until GitHub names one.
@@ -1000,10 +1000,10 @@ Item {
   function screensAnswered() {
     root.screensAnsweredMs = Date.now()
     if (root.screensOff) return
-    feed.pump()
-    previewFeed.pump()
-    historyFeed.pump()
-    fundamentalsFeed.pump()
+    feed.sendWaiting()
+    previewFeed.sendWaiting()
+    historyFeed.sendWaiting()
+    fundamentalsFeed.sendWaiting()
     root.screensReady()
     root.askOvernight()
     if (root.refreshOwed) {
@@ -1012,7 +1012,7 @@ Item {
     }
     root.refreshRange()
     root.fetchAhead()
-    releaseFeed.pump()
+    releaseFeed.sendWaiting()
   }
   signal screensReady()
 

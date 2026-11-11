@@ -10,8 +10,8 @@ Item {
 
   // Yahoo's gate (`Gate.qml`), held by the service; null without one.
   property var gate: null
-  // Whether a lookup may go now. One held back waits for `pump`.
-  property var clearance: null
+  // Whether a lookup may go now. One held back waits for `sendWaiting`.
+  property var mayAsk: null
   // The search is open, and the words in its field.
   property bool active: false
   property string wanted: ""
@@ -59,7 +59,7 @@ Item {
       land(kept.get(q), "")
       return
     }
-    if (clearance && !clearance()) { requestedQuery = q; return }
+    if (mayAsk && !mayAsk()) { requestedQuery = q; return }
     requestedQuery = ""
     activeQuery = q
     if (gate && gate.take(1) === 0) {
@@ -85,7 +85,7 @@ Item {
     }
   }
 
-  function pump() {
+  function sendWaiting() {
     if (active && requestedQuery !== "" && !fetchRun.out) ask()
   }
 

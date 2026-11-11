@@ -1317,7 +1317,7 @@ test("an open asks for the stock at the top, then the rows in sight from the top
   // Asked together, the rows go in that order: those in sight lead the
   // first batch.
   const asked = Object.fromEntries(library.map(s => [s, 100]))
-  expect(M.quoteSlots(library, asked, order, "E", ["E"], true))
+  expect(M.quoteRequests(library, asked, order, "E", ["E"], true))
     .toEqual([{ symbols: ["E"], spark: false }, { symbols: ["D", "B", "C", "A", "F", "G"], spark: true }])
 })
 
@@ -1399,7 +1399,7 @@ test("a quote run charts the featured stock's quote first and the other charted 
   const symbols = Array.from({ length: 23 }, (_, i) => "S" + i)
   // S22 was asked a second before the rest: the budget held it back.
   const asked = Object.fromEntries(symbols.map(s => [s, s === "S22" ? 99 : 100]))
-  const slots = M.quoteSlots(symbols, asked, symbols, "S5", ["S9", "S5"], true)
+  const slots = M.quoteRequests(symbols, asked, symbols, "S5", ["S9", "S5"], true)
   const batch = ["S22", "S0", "S1", "S2", "S3", "S4", "S6", "S7", "S8"].concat(symbols.slice(10, 21))
   // The one left over is one request either way, and a chart's has opens.
   expect(slots).toEqual([
@@ -1407,26 +1407,26 @@ test("a quote run charts the featured stock's quote first and the other charted 
     { symbols: batch, spark: true }, { symbols: ["S21"], spark: false }
   ])
   // The featured stock's chart leads the other charts, wherever it stands in the list.
-  expect(M.quoteSlots(symbols, asked, symbols, "S9", ["S5", "S9"], true)[0]).toEqual({ symbols: ["S9"], spark: false })
+  expect(M.quoteRequests(symbols, asked, symbols, "S9", ["S5", "S9"], true)[0]).toEqual({ symbols: ["S9"], spark: false })
   // The preview's feed asks only charts.
-  expect(M.quoteSlots(["P", "Q"], { P: 1, Q: 1 }, ["P", "Q"], "", [], false))
+  expect(M.quoteRequests(["P", "Q"], { P: 1, Q: 1 }, ["P", "Q"], "", [], false))
     .toEqual([{ symbols: ["P"], spark: false }, { symbols: ["Q"], spark: false }])
   // A coin, asked for two days, goes in a spark request of its own, alone
   // too, so the stocks' batch stays one day; asked before them, the budget
   // having held it, it goes first.
-  expect(M.quoteSlots(["A", "BTC-USD", "B", "C"], { A: 1, "BTC-USD": 1, B: 1, C: 1 }, ["A", "BTC-USD", "B", "C"], "", [], true, ["BTC-USD"]))
+  expect(M.quoteRequests(["A", "BTC-USD", "B", "C"], { A: 1, "BTC-USD": 1, B: 1, C: 1 }, ["A", "BTC-USD", "B", "C"], "", [], true, ["BTC-USD"]))
     .toEqual([{ symbols: ["A", "B", "C"], spark: true }, { symbols: ["BTC-USD"], spark: true }])
-  expect(M.quoteSlots(["A", "BTC-USD", "B", "C"], { A: 2, "BTC-USD": 1, B: 2, C: 2 }, ["A", "BTC-USD", "B", "C"], "", [], true, ["BTC-USD"]))
+  expect(M.quoteRequests(["A", "BTC-USD", "B", "C"], { A: 2, "BTC-USD": 1, B: 2, C: 2 }, ["A", "BTC-USD", "B", "C"], "", [], true, ["BTC-USD"]))
     .toEqual([{ symbols: ["BTC-USD"], spark: true }, { symbols: ["A", "B", "C"], spark: true }])
-  // Each lane runs its own kind, a first answer (none yet, or a quote kept
-  // from an earlier session) or a refresh, never one cooling after a bad
+  // Each run asks its own kind, a first answer (none yet, or a quote kept
+  // from an earlier session) or a refresh, never one waiting after a bad
   // answer or out on a run; a day waiting to be judged goes only when its
   // own refresh isn't asked anyway.
   const entries = { R: answered(1), C: answered(1), K: { status: "saved", receivedAt: 1, answeredAt: 0 } }
   const waiting = { N: 1, K: 1, R: 1, C: 1 }
-  expect(M.laneWaiting(["N", "K", "R", "C", "X"], waiting, entries, true, [])).toEqual(["N", "K"])
-  expect(M.laneWaiting(["N", "K", "R", "C", "X"], waiting, entries, false, ["C"])).toEqual(["R"])
-  expect(M.laneJudging(["R", "J", "H"], waiting, ["H"])).toEqual(["J"])
+  expect(M.runWaiting(["N", "K", "R", "C", "X"], waiting, entries, true, [])).toEqual(["N", "K"])
+  expect(M.runWaiting(["N", "K", "R", "C", "X"], waiting, entries, false, ["C"])).toEqual(["R"])
+  expect(M.runJudging(["R", "J", "H"], waiting, ["H"])).toEqual(["J"])
   // A charted stock whose quote came from spark, with no opens, is asked for its
   // chart, but not again at once after its chart failed.
   const sparked = { H: { closesOnly: true }, C: {} }
