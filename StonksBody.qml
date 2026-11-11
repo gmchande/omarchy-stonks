@@ -104,6 +104,8 @@ Item {
   property var previewEntries: ({})
   // Each symbol's cap and P/E, and the currency rates P/Es need.
   property var fundamentalEntries: ({})
+  // Every range the service holds, by `History.historyKey`.
+  property var histories: ({})
   property var rates: ({})
   property var lists: []
   // The current list's members, those still arriving included.
@@ -140,6 +142,7 @@ Item {
   Binding on previewEntries { when: root.reading; value: root.service?.previewEntries; restoreMode: Binding.RestoreNone }
   Binding on fundamentalEntries { when: root.reading; value: root.service?.fundamentals; restoreMode: Binding.RestoreNone }
   Binding on rates { when: root.reading; value: root.service?.rates; restoreMode: Binding.RestoreNone }
+  Binding on histories { when: root.reading; value: root.service?.histories; restoreMode: Binding.RestoreNone }
   Binding on lists { when: root.reading; value: root.service?.lists; restoreMode: Binding.RestoreNone }
   Binding on members { when: root.reading; value: root.service?.symbols; restoreMode: Binding.RestoreNone }
   Binding on arriving { when: root.reading; value: root.service?.arriving; restoreMode: Binding.RestoreNone }
@@ -266,13 +269,18 @@ Item {
 
   // Changes only at the exchange's midnight, unlike `now`.
   readonly property int featuredToday: featuredQuote ? Figures.exchangeDay(featuredQuote, now) : 0
-  // The table holds room for both first lines' facts on every range, so a
-  // range change moves nothing.
+  // The table holds room for both first lines' facts, and their lows and
+  // highs, on every range held for the stock, so a range change moves
+  // nothing. A range first fetched with more digits than any held widens it
+  // once.
   readonly property var dayLine: chart ? Figures.dayLine(featuredQuote, featuredToday, featuredDay) : null
   readonly property var rangeEnds: historyShown ? History.rangeEnds(history, historyStats, featuredQuote) : null
   readonly property var periodLine: !chart ? null : historyShown ? History.rangeLine(history, rangeEnds, featuredQuote) : dayLine
+  readonly property var heldLines: chart ? History.heldLines(histories, chartSymbol, featuredQuote) : []
   readonly property var infoFactLists: !dayLine ? [] : [dayLine.facts, History.rangeFacts(dayLine.range.widest)]
     .concat(yearLine ? [History.rangeFacts(yearLine.range.widest)] : [])
+    .concat(heldLines.map(function(line) { return line.facts }))
+  readonly property var infoRanges: !dayLine ? [] : [dayLine.range].concat(heldLines.map(function(line) { return line.range }))
   readonly property var yearLine: chart ? Fundamentals.yearLine(featuredQuote, fundamentalsEntry ? fundamentalsEntry.fundamentals : null,
     historyShown && history.range === "1Y" ? rangeEnds : null, rates,
     (featuredDay ? featuredDay.trades || featuredDay.points : []).concat(featuredNewest ? [featuredNewest] : [])) : null
@@ -1201,6 +1209,7 @@ Item {
     range: root.range
     periodLine: root.periodLine
     factLists: root.infoFactLists
+    infoRanges: root.infoRanges
     rangeMarks: root.rangeMarks
     baselineText: root.baselineText
     yearLine: root.yearLine

@@ -56,7 +56,8 @@ The pill shows today's move for the stock you last looked at. It can show
 a sparkline, an arrow, the price as text, or an icon: a bull on an up day,
 a bear on a down one. Middle-click it to switch. It keeps your choice after
 a restart. On a bar at the side of the screen, middle-click switches
-between the icon and the symbol over its change.
+between the icon and the symbol over its change. Counting since the open,
+it says so when you point at it.
 
 Scroll over the pill to step through your list. Click it for the panel,
 right-click it for the window, and drag it to move it along the bar.
@@ -175,7 +176,9 @@ refreshed.
 Click the list's name to switch lists, start a new one, or manage them. All
 holds every symbol you follow, and your own lists each hold some of them.
 To choose which lists a row is in, right-click it and pick "Choose lists…",
-Ctrl-click it, or select it and press Ctrl+Enter.
+Ctrl-click it, or select it and press Ctrl+Enter. In Manage lists, Enter
+renames the selected list, Ctrl with an arrow moves it up or down, and
+Delete asks before deleting it.
 
 To find a stock or add one, click "+ Find or add a symbol", or press `/`,
 and type a name or a symbol. Stocks already in the list you're looking at
@@ -207,12 +210,13 @@ the window's width. Right-click the pill, or run
 `omarchy-shell grvc.stonks toggleWindow`. To float it, add a window rule
 that matches class `org.quickshell` and title `Stonks`.
 
-To open the panel and the window from the keyboard, add these lines to
-`~/.config/hypr/bindings.lua`. Omarchy doesn't use either key by default:
+To open the panel or the window from the keyboard, bind a key of your
+choice to its command in `~/.config/hypr/bindings.lua`, where Omarchy keeps
+your own key bindings, with an `o.bind` line like the others there:
 
-```lua
-o.bind("SUPER + ALT + T", "Stonks panel", "omarchy-shell shell toggle grvc.stonks")
-o.bind("SUPER + SHIFT + T", "Stonks window", "omarchy-shell grvc.stonks toggleWindow")
+```sh
+omarchy-shell shell toggle grvc.stonks     # the panel
+omarchy-shell grvc.stonks toggleWindow     # the window
 ```
 
 To use the window without the pill, run `omarchy plugin disable grvc.stonks`,
@@ -241,7 +245,8 @@ switch, press `s`, or click the small chart icon at the top right.
 Both use your theme's green for up and its red for down, on light themes
 too, and never its accent color, which Omarchy keeps for what's selected.
 Where a theme's pair is missing, too alike, or too faint, Stonks uses its
-own.
+own. On a clear bar over a light wallpaper, where Omarchy turns the bar's
+text dark, the pill's green and red turn dark too.
 
 ## Sounds
 
@@ -289,6 +294,9 @@ screenshot editor.
 | `o` | Change the order |
 | `Shift+O` | Reverse the order |
 | `w` | Open the list menu |
+| `⏎` | Rename the selected list, in Manage lists |
+| `Ctrl+↑` `Ctrl+↓` | Move the selected list, in Manage lists |
+| Delete or Backspace | Ask to delete the selected list, in Manage lists; `⏎` deletes it |
 | `c` | Show the change in %, an amount or since the open |
 | `s` | Switch between smooth and retro |
 | `m` | Turn sounds on or off |
@@ -353,9 +361,9 @@ again.
 - **"No trades today", "No trades on" a day, or "Traded only at" a time.**
   The listing traded too little that day to draw a line.
 - **"1W unavailable" or "Couldn't search", with RETRY.** Yahoo didn't
-  send that chart or those results. Click RETRY. While search says
-  "server busy", RETRY works again once Yahoo lets Stonks back in, at most
-  36 minutes on.
+  send that chart or those results. Click RETRY, or in search reach it
+  with `↓` and press `⏎`. While search says "server busy", RETRY works
+  again once Yahoo lets Stonks back in, at most 36 minutes on.
 - **"Couldn't search · try other words".** Yahoo can't search for what you
   typed, such as an emoji. Type other words.
 - **"market hours unknown".** Stonks carries the holidays and early

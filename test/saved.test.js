@@ -178,6 +178,21 @@ test("a young listing's ranges start at its first trade and keep its thin trades
   }
 })
 
+test("the lines under the chart hold room for every range held for the stock, not only the one on show", () => {
+  // FIG on Sunday 1 November at 21:48: its day ran 21.00 to 22.29, its All,
+  // once fetched, 16.60 to 142.92, a digit wider. Another stock's range and
+  // a failed fetch hold no room.
+  const fig = M.parseChart(fixture("moments/gap-2026-11-01-2148/fig.json"))
+  const all = M.parseHistory(fixture("history/fig-max.json"), "All")
+  const held = {
+    "FIG|All": { status: "ok", history: all },
+    "FIG|1M": { status: "failed", history: null },
+    "AAPL|1W": { status: "ok", history: all }
+  }
+  expect(M.heldLines(held, "FIG", fig).map(line => [line.title, line.range.lowText, line.range.highText, line.range.widest]))
+    .toEqual([["ALL", "16.60", "142.92", "888.88"]])
+})
+
 test("a day with no bar says nothing against the trade its quote holds, and a thin day's note counts every trade of its day", () => {
   // WREN at 09:37 on Friday 23 October: Yahoo's quote is its 09:30 trade,
   // 20.62 on 366 shares, and its day has no bar: no "No trades today"
@@ -433,6 +448,18 @@ test("smooth's replay of a thin night follows the line through its trades", () =
   const tonight = heard.geometry.points.filter((p, i) => day.points[i].t >= at("2026-10-04", "20:00"))
   expect([tonight.length, heard.geometry.points.some(p => p.brk)]).toEqual([5, false])
   followsLine(heard)
+})
+
+test("retro colours each column by its own price's side of the close, as smooth does: SHOP.TO's day a hair under it, on the close's row, is down", () => {
+  // SHOP.TO closed at 194.60 against a close of 194.62: its last trades
+  // round onto the close's row in a chart 300 by 80 of 3-pixel cells.
+  const geometry = M.chartGeometry(shop, calendars), g = M.retroGrid(geometry, 300, 80, 3, 1)
+  const side = []
+  for (const p of geometry.points) side[Math.min(g.columns - 1, Math.floor(p.x * g.columns))] = p.y <= geometry.baselineY
+  const hugging = side.map((up, c) => up === false && g.levels[c] === g.baseRow ? c : -1).filter(c => c >= 0)
+  expect(hugging.length).toBeGreaterThan(0)
+  expect(hugging.map(c => g.above[c])).toEqual(hugging.map(() => false))
+  expect(side.map((up, c) => up === undefined ? undefined : g.above[c])).toEqual(side)
 })
 
 test("the day is drawn whole, and its range holds the previous close", () => {

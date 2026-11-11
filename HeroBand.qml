@@ -51,10 +51,12 @@ Item {
   property var rangeOptions: []
   property string range: "1D"
   // The info block's day or range line over the 52 weeks'; every set of facts
-  // the first can hold on any range; and a range's high and low on its chart.
+  // the first can hold on any range, and every low and high on a range held;
+  // and a range's high and low on its chart.
   property var periodLine: null
   property var yearLine: null
   property var factLists: []
+  property var infoRanges: []
   property var rangeMarks: null
   property string baselineText: ""
   // The clock, by which the hero's overnight trade is old.
@@ -266,6 +268,7 @@ Item {
       // `Fundamentals.yearLine`).
       titles: root.rangeOptions.map(function(r) { return String(r).toUpperCase() }).concat(Figures.dayTitles(), ["52W"])
       factLists: root.factLists
+      ranges: root.infoRanges
       look: root.look
       rowGap: Style.space(4)
 

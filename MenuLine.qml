@@ -1,9 +1,8 @@
 import QtQuick
 import qs.Commons
-import qs.Commons as Commons
-import "Motion.js" as Motion
-// One line of a menu: the cursor's fill and bar, what the line says drawn
-// over them, and a click anywhere on it.
+import qs.Ui
+// One line of a menu: the shell's cursor row, what the line says drawn
+// over it, and a click anywhere on it.
 Item {
   id: line
 
@@ -14,17 +13,11 @@ Item {
 
   signal taken()
 
-  Rectangle {
+  CursorSurface {
     anchors.fill: parent
-    radius: line.look.retro ? 0 : Style.cornerRadius
-    color: line.isCursor ? Style.hoverFillFor(line.look.foreground, Commons.Color.accent) : "transparent"
-    Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
-  }
-
-  CursorBar {
-    visible: line.isCursor
-    retro: line.look.retro
+    hasCursor: line.isCursor
     foreground: line.look.foreground
+    radius: line.look.retro ? 0 : Style.cornerRadius
   }
 
   MouseArea {

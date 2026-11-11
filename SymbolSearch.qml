@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Commons as Commons
+import qs.Ui
 import "Search.js" as Search
 // Search's field and results. Yahoo's lookup is its feed's
 // (`SearchFeed.qml`). A FocusScope, so that hiding it takes the keys from
@@ -168,7 +169,7 @@ OverRows {
       root.accept(root.resultIndex)
       event.accepted = true
     } else if (event.key === Qt.Key_Down) {
-      root.showResult(Math.min(root.shown.length - 1, root.resultIndex + 1))
+      root.showResult(Math.min(root.shown.length - (root.retryChoosable ? 0 : 1), root.resultIndex + 1))
       event.accepted = true
     } else if (event.key === Qt.Key_Up) {
       root.showResult(Math.max(0, root.resultIndex - 1))
@@ -227,7 +228,14 @@ OverRows {
     chose(chosenSymbol, result)
   }
 
+  // A failed lookup's RETRY is the choice past the last result, so ↓ and
+  // Enter reach it as a click does. It takes the highlight alone: the chart
+  // stays on what it shows.
+  readonly property bool retryChoosable: answer === "failed" && failure !== "missing" && !stale
+  readonly property bool retryChosen: retryChoosable && resultIndex === shown.length
+
   function showResult(index) {
+    if (index === shown.length && retryChoosable) { resultIndex = index; return }
     if (index < 0 || index >= shown.length) return
     root.choose(index)
     var top = index * rowPitch
@@ -253,6 +261,9 @@ OverRows {
   // The answer for the words in the field, as its feed read it. A null is
   // no answer, failed for `why`.
   function land(query, found, why) {
+    // Asked again from RETRY under the list's own, the highlight takes what
+    // lands in its place.
+    var fromRetry = root.ownCount > 0 && root.resultIndex === root.shown.length
     root.failure = why
     root.results = found ? found.results : []
     root.note = found ? found.note : ""
@@ -268,6 +279,8 @@ OverRows {
     if (root.ownCount === 0 || taken) {
       resultsScroll.contentY = 0
       root.choose(found && found.topLeftOut ? -1 : root.ownCount)
+    } else if (fromRetry) {
+      root.showResult(Math.min(root.ownCount, root.shown.length - (root.retryChoosable ? 0 : 1)))
     }
     searchField.forceActiveFocus()
     if (taken) root.accept(root.resultIndex)
@@ -314,7 +327,8 @@ OverRows {
 
       Repeater {
         model: root.shown
-        Rectangle {
+        // A plain Item at the root, as the list menu's lines have.
+        Item {
           id: resultRow
           objectName: "searchResult"
           required property var modelData
@@ -324,13 +338,18 @@ OverRows {
           opacity: dimmed ? 0.4 : 1
           width: parent.width
           height: root.rowHeight
-          radius: root.look.retro ? 0 : Style.cornerRadius
-          color: rowMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
-            : chosen ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent)
-            : rowMouse.containsMouse ? Style.normalFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
 
           // The pointer only tints a row: one resting over the results never
           // changes what Enter adds.
+          CursorSurface {
+            anchors.fill: parent
+            hasCursor: resultRow.chosen
+            foreground: root.look.foreground
+            radius: root.look.retro ? 0 : Style.cornerRadius
+            color: hasCursor ? fill
+              : rowMouse.containsMouse ? Style.normalFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
+          }
+
           MouseArea {
             id: rowMouse
             anchors.fill: parent
@@ -454,6 +473,7 @@ OverRows {
       objectName: "searchRetry"
       look: root.look
       visible: root.answer === "failed" && root.failure !== "missing"
+      enterTakes: root.retryChosen
       enabled: !root.stale
       anchors.left: searchMessage.right
       anchors.leftMargin: Style.space(16)
@@ -487,14 +507,18 @@ OverRows {
       Keys.onPressed: function(event) { root.handleKey(event) }
     }
 
-    ListAction {
+    Button {
       id: cancelButton
-      look: root.look
       anchors.right: parent.right
       anchors.rightMargin: root.rowPadding
       anchors.verticalCenter: parent.verticalCenter
-      text: "CANCEL"
-      onActivated: root.cancel()
+      bordered: true
+      radius: root.look.retro ? 0 : Style.cornerRadius
+      foreground: root.look.foreground
+      fontFamily: root.look.fontFamily
+      fontSize: Style.font.bodySmall
+      text: "Cancel"
+      onClicked: root.cancel()
     }
   }
 }

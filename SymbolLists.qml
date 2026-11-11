@@ -3,8 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls as Controls
 import qs.Commons
-import qs.Commons as Commons
-import "Motion.js" as Motion
+import qs.Ui
 import "Rows.js" as Rows
 
 // A symbol's lists, in the rows' place: a tick box for each list, All first.
@@ -161,14 +160,18 @@ OverRows {
       elide: Text.ElideRight
     }
 
-    ListAction {
+    Button {
       id: done
-      look: root.look
       anchors.right: parent.right
       anchors.rightMargin: root.gutter + root.inset
       anchors.verticalCenter: parent.verticalCenter
-      text: "DONE"
-      onActivated: root.dismissed()
+      bordered: true
+      radius: root.look.retro ? 0 : Style.cornerRadius
+      foreground: root.look.foreground
+      fontFamily: root.look.fontFamily
+      fontSize: Style.font.bodySmall
+      text: "Done"
+      onClicked: root.dismissed()
     }
   }
 
@@ -207,18 +210,11 @@ OverRows {
           width: column.width
           height: root.itemHeight
 
-          Rectangle {
+          CursorSurface {
             anchors.fill: parent
-            radius: root.look.retro ? 0 : Style.cornerRadius
-            color: rowMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
-              : entry.index === root.cursor ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
-            Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
-          }
-
-          CursorBar {
-            visible: entry.index === root.cursor
-            retro: root.look.retro
+            hasCursor: entry.index === root.cursor
             foreground: root.look.foreground
+            radius: root.look.retro ? 0 : Style.cornerRadius
           }
 
           Rectangle {

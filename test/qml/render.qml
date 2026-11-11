@@ -99,6 +99,7 @@ Harness {
   readonly property var motionPose: /^popup-motion-(join|crossing|dragwheel|scroll|endremove|notefade|breadth|look|neutral)-(smooth|retro)$/.exec(stateName)
   readonly property var refusedList: /^min-window-lists-refused-(menu|manage)-(smooth|retro)$/.exec(stateName)
   readonly property bool interactivePicture: !!controlState || !!anchorState || !!motionPose || !!refusedList
+    || !!(overnight && overnight.held)
   readonly property string outPath: Quickshell.env("STONKS_VISUAL_OUT")
   readonly property string fixtureDir: Quickshell.env("STONKS_FIXTURES")
   readonly property string calendarPath: Quickshell.env("STONKS_VISUAL_CALENDARS")
@@ -174,6 +175,9 @@ Harness {
   readonly property bool nestState: stateName.indexOf("popup-history-1w-") === 0
     || stateName.indexOf("popup-history-1m-") === 0
   readonly property bool nestDayState: stateName.indexOf("popup-nest-1d-") === 0
+  // SHOP.TO's saved day closed two cents under the close before, -0.01%: its
+  // last trades hug the baseline from under it.
+  readonly property bool shopDayState: stateName.indexOf("popup-shop-1d-") === 0
   readonly property bool holidayState: /^popup-holiday-(smooth|retro)$/.test(stateName)
   // <popup|min-window>-holiday-<tokyo|london>-<look>: the calendars' longest
   // closures, at the exchange's noon, the listing's own saved day featured:
@@ -239,10 +243,13 @@ Harness {
     if (match) return { moment: match[1], symbol: match[2] === "gspc" ? "^GSPC" : match[2].toUpperCase(), month: false, scrub: false,
       dated: true, sweep: true }
     // A saved moment's listing on a range: its history saved for that
-    // moment in history/<file>-<moment>-<5d|1mo|ytd|1y>.json.
-    match = /^(?:popup|window)-sweep-([a-z]+-(\d{4}-\d\d-\d\d-\d{4}))-([a-z0-9.^-]+?)(?:-(1w|1m|ytd|1y))?-(smooth|retro)$/.exec(stateName)
+    // moment in history/<file>-<moment>-<5d|1mo|ytd|1y>.json. With
+    // -held-<1d|all>, its All held as the service holds it once fetched
+    // (history/<file>-max.json), and shown by a click on ALL, then for 1d
+    // on 1D.
+    match = /^(?:popup|window)-sweep-([a-z]+-(\d{4}-\d\d-\d\d-\d{4}))-([a-z0-9.^-]+?)(?:-(1w|1m|ytd|1y))?(?:-held-(1d|all))?-(smooth|retro)$/.exec(stateName)
     if (match) return { moment: match[2], folder: match[1], file: match[3], month: false, scrub: false, dated: true, sweep: true,
-      range: match[4] ? match[4].toUpperCase() : "",
+      range: match[4] ? match[4].toUpperCase() : "", held: match[5] || "",
       saved: String(Quickshell.env("STONKS_VISUAL_SAVED") || "").split(" ").filter(function(f) { return f !== "" }) }
     match = /^(?:popup|window)-gaps-(1d|3m)-(smooth|retro)$/.exec(stateName)
     return match ? { moment: "2026-10-21-1006", folder: "gaps-2026-10-21-1006", symbol: "VANE", listed: ["VANE"], month: false,
@@ -267,6 +274,11 @@ Harness {
     ? Qt.rgba(Commons.Color.popups.background.r, Commons.Color.popups.background.g, Commons.Color.popups.background.b, 1) : Commons.Color.background
   // The bar's own ground and ink, opaque, for the pills.
   readonly property color barGround: Qt.rgba(Commons.Color.bar.background.r, Commons.Color.bar.background.g, Commons.Color.bar.background.b, 1)
+  // pill-sheet-clear: a clear bar over a light wallpaper, a plain light
+  // colour standing for it, its text the theme's background, as the shell
+  // picks it there (`omarchy-bar-text-color`).
+  readonly property bool clearBar: stateName === "pill-sheet-clear"
+  readonly property color lightWallpaper: "#e6e2d8"
   property int now: holidayState ? 1813334400 : (nestState || nestDayState ? 1789156800 : 1788294000)
   property string shownRange: historyState ? "1Y" : "1D"
   property var shownHistoryEntry: null
@@ -347,9 +359,12 @@ Harness {
     readonly property var yahooGate: root.troubleGate(root.troubleKind)
     property string range: root.shownRange
     // The history on show, keyed to its symbol: a held chart's stays its own
-    // while the next symbol's is on its way.
+    // while the next symbol's is on its way. Beside it, the other ranges
+    // held (-held-).
     property string historySymbol: ""
-    readonly property var histories: root.shownHistoryEntry ? ({ [(historySymbol || featuredSymbol) + "|" + range]: root.shownHistoryEntry }) : ({})
+    property var heldHistories: ({})
+    readonly property var histories: Object.assign({}, heldHistories, root.shownHistoryEntry
+      ? ({ [(historySymbol || featuredSymbol) + "|" + range]: root.shownHistoryEntry }) : ({}))
     readonly property string hero: previewSymbol || featuredSymbol
     readonly property var fundamentals: root.savedFigures[hero]
       ? ({ [hero]: { status: "ok", fundamentals: root.savedFigures[hero] } }) : ({})
@@ -521,6 +536,11 @@ Harness {
       stub.featuredSymbol = "NEST"
     }
 
+    if (root.shopDayState) {
+      stub.shown = ["SHOP.TO", "AAPL"]
+      stub.featuredSymbol = "SHOP.TO"
+    }
+
     if (root.fill) {
       var days = { up: ["SPY", spyDay], down: ["AAPL", Quote.parseChart(JSON.parse(aaplDownFile.text()))], cross: ["NEST", nestDay] }
       var fillQuotes = {}, fillEntries = {}
@@ -683,6 +703,12 @@ Harness {
         root.shownRange = root.overnight.range
         root.shownHistoryEntry = { status: "ok", history: History.parseHistory(JSON.parse(kept.text()), root.overnight.range), receivedAt: root.now }
         kept.destroy()
+      }
+      if (root.overnight.held) {
+        var max = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', root)
+        max.path = fixtureDir + "/history/" + root.overnight.file + "-max.json"
+        stub.heldHistories = { [featured + "|All"]: { status: "ok", history: History.parseHistory(JSON.parse(max.text()), "All"), receivedAt: root.now } }
+        max.destroy()
       }
       stub.shown = listed.slice()
       stub.quotes = quotes
@@ -930,6 +956,11 @@ Harness {
         body.search.failure = "none"
         body.search.answer = "failed"
         body.search.showResult(0)
+        // -own-retry-down-: ↓ past the last of them, by search's own key
+        // handler, onto the failed line.
+        if (root.stateName.indexOf("-own-retry-down-") > 0) root.beforeGrab = function() {
+          for (var d = 0; d < body.search.ownCount + 1; d++) body.search.handleKey({ key: Qt.Key_Down, accepted: false })
+        }
       }
       // popup-search-waiting-*: "berk" typed, Yahoo not yet answered: the
       // list's Berkshire found by its name, chosen, the wait said under it.
@@ -1297,6 +1328,14 @@ Harness {
                 .concat([{ style: "text", retro: retroLook, day: "up", compact: true }, { style: "icon", retro: retroLook, day: "up", compact: true }])
             }
             if (!root.pillSheet) return []
+            // On a clear bar over a light wallpaper, the sparkline and text
+            // forms down and up, in each look.
+            if (root.clearBar)
+              return [false, true].reduce(function(all, retro) {
+                return all.concat(["sparkline", "text"].reduce(function(forms, style) {
+                  return forms.concat(["down", "up"].map(function(day) { return { style: style, retro: retro, day: day } }))
+                }, []))
+              }, [])
             // At night, every form in each look, JNJ's price tonight on top.
             if (root.stateName === "pill-sheet-night")
               return [false, true].reduce(function(all, retro) {
@@ -1316,6 +1355,13 @@ Harness {
               })
               return troubled
             }
+            // pill-sheet-open: counted since the open, the text form (the
+            // stacked one on the side bar) and the icon form in each look,
+            // each with the side bar pill's hover words beside it.
+            if (root.stateName === "pill-sheet-open")
+              return [false, true].reduce(function(all, retro) {
+                return all.concat(["text", "icon"].map(function(style) { return { style: style, retro: retro, day: "down", open: true } }))
+              }, [])
             var rows = []
             for (var look = 0; look < 2; look++) {
               var retro = look === 1
@@ -1342,7 +1388,7 @@ Harness {
               width: pillRow.modelData.compact ? 80 : 170
               anchors.verticalCenter: parent.verticalCenter
               text: (pillRow.modelData.compact ? "" : (pillRow.modelData.retro ? "RETRO" : "SMOOTH") + " · ") + (pillRow.modelData.right ? "RIGHT SECTION" : pillRow.modelData.style.toUpperCase())
-                + (pillRow.modelData.trouble ? " · " + pillRow.modelData.trouble.toUpperCase()
+                + (pillRow.modelData.trouble ? " · " + pillRow.modelData.trouble.toUpperCase() : pillRow.modelData.open ? " · SINCE OPEN"
                   : pillRow.modelData.style === "icon" || pillRow.modelData.right || pillRow.modelData.day !== "down" ? " · " + pillRow.modelData.day.toUpperCase() : "")
               color: Commons.Color.muted
               font.family: Style.font.family
@@ -1357,7 +1403,7 @@ Harness {
               width: 230
               height: Style.bar.sizeHorizontal
               anchors.verticalCenter: parent.verticalCenter
-              color: root.barGround
+              color: root.clearBar ? root.lightWallpaper : root.barGround
 
               QtObject {
                 id: pillService
@@ -1368,7 +1414,7 @@ Harness {
                 property var entries: ({ [featuredSymbol]: { status: pillRow.modelData.day === "failed" || pillRow.modelData.day === "refresh failed"
                   || pillRow.modelData.trouble === "failed" ? "failed"
                   : pillRow.modelData.day === "waiting" ? "pending" : "ok", receivedAt: root.now } })
-                property string changeMode: "pct"
+                property string changeMode: pillRow.modelData.open ? "open" : "pct"
                 property bool retro: pillRow.modelData.retro
                 property int now: root.now
                 property var owed: pillRow.modelData.trouble && pillRow.modelData.trouble !== "failed" ? { NEST: root.now - 91 } : ({})
@@ -1389,7 +1435,8 @@ Harness {
                 shell: pillShell
                 // The bar mirrors these onto the facade; the render sets them.
                 foreground: Commons.Color.bar.text
-                barForeground: Commons.Color.bar.text
+                barForeground: root.clearBar ? Commons.Color.background : Commons.Color.bar.text
+                transparent: root.clearBar
                 fontFamily: Style.font.family
                 barSize: Style.bar.sizeHorizontal
                 layoutConfig: pillRow.modelData.right ? { left: [], center: [], right: [{ id: root.copyId }] } : ({})
@@ -1423,7 +1470,7 @@ Harness {
               width: Style.bar.sizeVertical
               height: verticalPill.implicitHeight
               anchors.verticalCenter: parent.verticalCenter
-              color: root.barGround
+              color: root.clearBar ? root.lightWallpaper : root.barGround
               clip: true
 
               PluginBarApi {
@@ -1433,7 +1480,8 @@ Harness {
                 shell: pillShell
                 vertical: true
                 foreground: Commons.Color.bar.text
-                barForeground: Commons.Color.bar.text
+                barForeground: root.clearBar ? Commons.Color.background : Commons.Color.bar.text
+                transparent: root.clearBar
                 fontFamily: Style.font.family
                 barSize: Style.bar.sizeVertical
                 layoutConfig: pillApi.layoutConfig
@@ -1449,9 +1497,10 @@ Harness {
               }
             }
 
-            // The hover's words, in a bubble drawn as the bar draws its own.
+            // The hover's words, in a bubble drawn as the bar draws its own;
+            // none without words, as the bar shows none.
             Rectangle {
-              visible: !!pillRow.modelData.trouble
+              visible: (!!pillRow.modelData.trouble || !!pillRow.modelData.open) && hoverWords.text !== ""
               anchors.verticalCenter: parent.verticalCenter
               width: hoverWords.implicitWidth + 20
               height: hoverWords.implicitHeight + 14
@@ -1463,7 +1512,8 @@ Harness {
                 id: hoverWords
                 anchors.centerIn: parent
                 textFormat: Text.PlainText
-                text: (pillRow.modelData.style === "icon" ? horizontalPill.featuredSymbol + " " + horizontalPill.changeText + " · " : "")
+                text: pillRow.modelData.open ? verticalPill.children.filter(function(c) { return c.tooltipText !== undefined })[0].tooltipText
+                  : (pillRow.modelData.style === "icon" ? horizontalPill.featuredSymbol + " " + horizontalPill.changeText + " · " : "")
                   + horizontalPill.warningText
                 color: Commons.Color.tooltip.text
                 font.family: Style.font.family
@@ -1627,6 +1677,22 @@ Harness {
         var heldAt = anchorProbe.mapToItem(renderWindow.contentItem, 0, 0)
         var pillAt = anchorPill.mapToItem(renderWindow.contentItem, 0, 0)
         compare(heldAt.x, pillAt.x, "the real pill's held position")
+        savePicture()
+        return
+      }
+      if (root.overnight && root.overnight.held) {
+        // Clicks on the range row, as a hand would: ALL, then for -1d, 1D.
+        var tokens = root.findAll(one("rangeRow"), "rangeToken")
+        ;(root.overnight.held === "all" ? ["All"] : ["All", "1D"]).forEach(function(range) {
+          var token = tokens[body.rangeOptions.indexOf(range)]
+          waitForRendering(body)
+          var at = token.mapToItem(body, token.width / 2, token.height / 2)
+          mouseMove(body, at.x, at.y)
+          mouseClick(body, at.x, at.y)
+          tryVerify(function() { return body.chartRange === range && !body.chartLoading }, 2000)
+        })
+        // Off the row, so no hover fill shows on it.
+        mouseMove(body, body.width / 2, body.height - 2)
         savePicture()
         return
       }

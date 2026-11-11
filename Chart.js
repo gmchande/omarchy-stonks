@@ -231,17 +231,20 @@ function stepTime(quote, t, steps, last) {
 }
 
 // Retro's cells for a chart `width` by `height`, of `pixel` cells `gap`
-// apart: each column's level, whether it is dim, the last column lit, and
-// the baseline's row, which steps to `stepRow` from `stepCol` on. The last
+// apart: each column's level, whether it is dim, which side of the close
+// it is on (`above`), the last column lit, and the baseline's row, which
+// steps to `stepRow` from `stepCol` on. The last
 // trade in a column wins: the price at the end of that stretch. A column
 // between two trades the line joins holds the one before it; only a break
 // (`brk`) leaves columns dark, as it lifts the smooth line. With no previous
 // close known, the columns stand on the floor, until a step to a close that
-// is known.
+// is known. A column's side is its own price's against the close, unrounded,
+// as smooth's line is: a price a hair under the close, on the close's row, is
+// below; one at the close is above, as smooth's line there is up.
 function retroGrid(geometry, width, height, pixel, gap) {
   var pitch = pixel + gap
   var columns = Math.max(1, Math.floor(width / pitch))
-  var g = { pitch: pitch, columns: columns, rows: Math.max(1, Math.floor(height / pixel)), baseRow: 0, stepCol: columns, stepRow: 0, levels: [], dim: [], lastLit: -1 }
+  var g = { pitch: pitch, columns: columns, rows: Math.max(1, Math.floor(height / pixel)), baseRow: 0, stepCol: columns, stepRow: 0, levels: [], above: [], dim: [], lastLit: -1 }
   if (!geometry || !geometry.points) return g
   g.baseRow = hasBaseline(geometry) ? Math.round(geometry.baselineY * (g.rows - 1)) : g.rows - 1
   var step = geometry.step
@@ -256,9 +259,11 @@ function retroGrid(geometry, width, height, pixel, gap) {
     if (col !== last && last >= 0 && !g.dim[last]) g.lastLit = last
     for (var held = last + 1; i > 0 && !pts[i].brk && held < col; held++) {
       g.levels[held] = g.levels[last]
+      g.above[held] = g.above[last]
       g.dim[held] = g.dim[last]
     }
     g.levels[col] = Math.round(pts[i].y * (g.rows - 1))
+    g.above[col] = pts[i].y <= (col >= g.stepCol ? step.y : hasBaseline(geometry) ? geometry.baselineY : 1)
     g.dim[col] = pts[i].dim
     last = col
   }

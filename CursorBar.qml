@@ -1,18 +1,16 @@
 import QtQuick
 import qs.Commons
 import qs.Commons as Commons
-// The cursor's one mark, on a row and in every list view, in the shell's
-// selected state colour. Its row also takes the shell's hover-cursor fill.
+// The cursor's one mark on a stock's row, in the shell's selected state
+// colour.
 Rectangle {
   property bool retro: false
   property color foreground: Commons.Color.foreground
-  // A row that grows under itself keeps its bar.
-  property real rowHeight: parent ? parent.height : 0
 
   x: 0
   y: Style.space(6)
   width: Style.space(2)
-  height: rowHeight - Style.space(12)
+  height: (parent ? parent.height : 0) - Style.space(12)
   radius: retro ? 0 : width / 2
   color: Style.selectedStateColor(foreground, Commons.Color.accent)
 }

@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Commons as Commons
+import qs.Ui
 import "KeyText.js" as KeyText
 import "Motion.js" as Motion
 import "Rows.js" as Rows
@@ -170,14 +171,12 @@ OverRows {
     else event.accepted = true
   }
 
-  // Qt draws a border in place of the fill, so a translucent edge would
-  // show the rows' cursor bar under it.
-  Rectangle {
+  // The theme's popup border, as the panel's own card wears.
+  BorderSurface {
     anchors.fill: parent
     radius: root.look.retro ? 0 : Style.cornerRadius
     color: root.background
-    border.width: 1
-    border.color: Qt.tint(root.background, Util.alpha(root.look.foreground, 0.18))
+    borderSpec: Border.localOrSurfaceSpec("popups", "border", Commons.Color.popups.border, Commons.Color.popups.border, Math.max(1, Style.space(2)))
   }
 
   RowPointer {
@@ -245,7 +244,7 @@ OverRows {
               width: Style.space(16)
               anchors.verticalCenter: parent.verticalCenter
               text: entry.choice.name === root.current ? "✓" : ""
-              color: root.look.foreground
+              color: Commons.Color.popups.text
               font.family: root.look.fontFamily
               font.pixelSize: Style.font.bodySmall
               font.bold: true
@@ -258,7 +257,7 @@ OverRows {
               anchors.verticalCenter: parent.verticalCenter
               textFormat: Text.PlainText
               text: entry.choice.label
-              color: root.look.foreground
+              color: Commons.Color.popups.text
               font.family: root.look.fontFamily
               font.pixelSize: Style.font.bodySmall
               elide: Text.ElideRight
@@ -373,7 +372,7 @@ OverRows {
       verticalAlignment: Text.AlignVCenter
       textFormat: Text.PlainText
       text: root.problem
-      color: root.look.foreground
+      color: Commons.Color.popups.text
       font.family: root.look.fontFamily
       font.pixelSize: Style.font.caption
       elide: Text.ElideRight

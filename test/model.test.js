@@ -889,6 +889,10 @@ test("retro draws each column at the price its last trade ended on, holds it acr
   expect([g.baseRow, M.retroGrid({ points: [point(0, 0)] }, 100, 30, 3, 1).baseRow]).toEqual([5, 9])
   const stepped = M.retroGrid({ points: [point(0, 0)], step: { x: 0.5, y: 0 } }, 100, 30, 3, 1)
   expect([M.retroBaseRow(stepped, 11), M.retroBaseRow(stepped, 12)]).toEqual([9, 0])
+  // A column's side is its own price's against the close it stands on, and
+  // a price at the close is up: after the step, against the step's close.
+  const sided = M.retroGrid({ points: [point(0, 0.5), point(0.2, 0.52), point(0.6, 0.1), point(0.8, 0.12)], baselineY: 0.5, step: { x: 0.5, y: 0.1 } }, 100, 32, 3, 1)
+  expect([sided.above[0], sided.above[3], sided.above[5], sided.above[15], sided.above[20]]).toEqual([true, true, false, true, false])
 })
 
 test("keys act on the row you chose while any of it shows, else the stock you last looked at while it shows whole, else the first row whole in sight", () => {
@@ -1785,6 +1789,21 @@ test("community themes that one hue, a faint colour, or a tinted light ground wo
     greenAndRed(pair)
     expect([grey, M.contrast(colour(pair.up), ground) >= 6, M.contrast(colour(pair.down), ground) >= 6]).toEqual([grey, true, true])
   }
+})
+
+test("on a clear bar over a light wallpaper the pill's colours are judged on the light ground its text was chosen for", () => {
+  const barText = M.hexColor("#c0caf5"), themeBackground = M.hexColor("#1a1b26"), barBackground = M.hexColor("#1a1b26")
+  const colour = c => typeof c === "string" ? M.hexColor(c) : c
+  // The shell turned the clear bar's text to the theme's background: the
+  // ground is like the theme's bar text, and up and down read on it.
+  const light = M.barGround(true, themeBackground, barText, barBackground)
+  expect(light).toBe("#c0caf5")
+  const pair = M.trend("#9ece6a", M.hexColor("#f7768e"), M.hexColor(light))
+  expect([M.contrast(colour(pair.up), M.hexColor(light)) >= 3, M.contrast(colour(pair.down), M.hexColor(light)) >= 3]).toEqual([true, true])
+  // A clear bar over a dark wallpaper keeps the theme's bar text, and an
+  // opaque bar draws its background: the bar's background is the ground.
+  expect(M.barGround(true, barText, barText, barBackground)).toBe("#1a1b26")
+  expect(M.barGround(false, themeBackground, barText, barBackground)).toBe("#1a1b26")
 })
 
 // Each parser fed hostile answers, in a child process with a time limit: a
