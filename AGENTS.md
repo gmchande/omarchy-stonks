@@ -73,8 +73,8 @@ for someone who has never seen Stonks and gives it thirty seconds.
   the next read.
 - A fix's test fails on the code before the fix, as a case in a test that
   already exists.
-- How Stonks looks and moves is `test/review.sh`'s to show, not
-  `test/all.sh`'s.
+- How Stonks looks is for the pictures (`test/qml/render.sh`), and how it
+  moves for a hand on the running plugin, not for `test/all.sh`.
 
 ## Code
 
