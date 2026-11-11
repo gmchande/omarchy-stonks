@@ -213,11 +213,18 @@ every_state() (
   states="$states popup-sweep-thu-2026-10-29-2155-nbis-smooth-size-16 popup-sweep-thu-2026-10-29-2155-nbis-retro-size-16"
   states="$states window-sweep-thu-2026-10-29-2155-nbis-smooth"
   # NBIS on Sunday night and Monday evening on 1W, 1M and 1Y: each range's
-  # line ends on the newest price, the one on top. And its longest caption,
-  # YTD after hours at the weekend, at text size 16.
+  # line starts at its start and ends on the newest price, the one on top.
+  # And the week it gapped, from Wednesday 4 November's close to Thursday's
+  # open, beside MSFT that week, which didn't. And its longest caption, YTD
+  # after hours at the weekend, at text size 16.
   for moment in watch-2026-10-25-2335 watch-2026-10-26-2005; do
     for range in 1w 1m 1y; do
       states="$states popup-sweep-$moment-nbis-$range-smooth popup-sweep-$moment-nbis-$range-retro"
+    done
+  done
+  for symbol in nbis msft; do
+    for range in 1w 1y; do
+      states="$states popup-sweep-ranges-2026-11-11-1800-$symbol-$range-smooth popup-sweep-ranges-2026-11-11-1800-$symbol-$range-retro"
     done
   done
   states="$states popup-sweep-watch-2026-10-25-1000-nbis-ytd-smooth-size-16 popup-sweep-watch-2026-10-25-1000-nbis-ytd-retro-size-16"

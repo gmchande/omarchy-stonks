@@ -154,12 +154,14 @@ Item {
     scrubT = Math.max(scrubStart, Math.min(t, scrubEnd))
   }
 
+  // A step on a range is one drawn point, the start among them.
   function nudgeScrub(steps) {
     if (loading) return
     if (historyActive) {
-      if (!historyShown || history.bars.length < 2) return
+      var drawn = historyShown ? History.drawnBars(history).length : 0
+      if (drawn < 2) return
       var fraction = scrubT ? History.historyFraction(history, scrubT) : 1
-      scrubTo(fraction + steps / (history.bars.length - 1))
+      scrubTo(fraction + steps / (drawn - 1))
       return
     }
     if (!day || !scrubEnd) return
@@ -193,7 +195,7 @@ Item {
     stopReplay()
     drawInAnim.stop()
     reveal = 1
-    if (historyActive ? !historyShown || history.bars.length < 2 : !geometry || !scrubEnd) return
+    if (historyActive ? !historyShown || History.drawnBars(history).length < 2 : !geometry || !scrubEnd) return
     replayAnim.from = historyActive ? 0 : Chart.fractionAtTime(day, scrubStart)
     replayAnim.to = historyActive ? 1 : Chart.fractionAtTime(day, scrubEnd)
     // Its first moment at once, before the animation's first step.

@@ -347,7 +347,8 @@ again.
   the regular session's, and the smaller line shows trades outside it.
   The change counts from the close the chart's dashed line marks under the
   price, which at night is the close just gone, unless you've switched it
-  to since the open. On a longer range, it's from the range's start. Stonks
+  to since the open. On a longer range, it's from the range's start, the
+  close before the range, where the chart's line begins. Stonks
   leaves out prices of zero or less, and stray points in Yahoo's charts.
 - **A dash for the move just after an open.** For a few minutes after a
   stock in London, Tokyo or Toronto first trades, Yahoo can still count

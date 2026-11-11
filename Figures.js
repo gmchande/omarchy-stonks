@@ -308,27 +308,13 @@ function moveName(quote, newest, from, today) {
   return !from ? "" : quote.rolling ? "24H" : moveDay(quote, from.dayT, today)
 }
 
-// The trading day before the one that starts at `dayStart`, by the listing's
-// calendar, as a date string: none without a calendar, or past its reach.
-function closeBeforeDate(cal, dayStart) {
-  if (!cal) return null
-  var date = Calendar.dateStringOf(Calendar.localDate(dayStart, cal))
-  for (var i = 0; i < 10; i++) {
-    date = Calendar.previousDateString(date)
-    var kind = Calendar.dayKind(cal, date).kind
-    if (kind === "open") return date
-    if (kind === "unknown") return null
-  }
-  return null
-}
-
 // A close named by its day, the trading day before the one `t` falls in:
 // FRI CLOSE within the week, 4 SEP CLOSE beyond, and PREV CLOSE where no
 // calendar can say which day that was. The panel's lines, the scrub's
 // legend and the screenshot all name a close this one way.
 function closeName(quote, t, today, calendars) {
   var cal = Calendar.calendarFor(calendars, quote)
-  var date = closeBeforeDate(cal, t)
+  var date = Calendar.closeBeforeDate(cal, t)
   return date === null ? "PREV CLOSE" : dayName(quote, Calendar.epochAt(cal, date, "12:00"), today) + " CLOSE"
 }
 

@@ -170,6 +170,28 @@ function previousDateString(dateString) {
   return d.getUTCFullYear() + "-" + Format.pad2(d.getUTCMonth() + 1) + "-" + Format.pad2(d.getUTCDate())
 }
 
+// The trading day before the one that starts at `dayStart`, by the listing's
+// calendar, as a date string: none without a calendar, or past its reach.
+function closeBeforeDate(cal, dayStart) {
+  if (!cal) return null
+  var date = dateStringOf(localDate(dayStart, cal))
+  for (var i = 0; i < 10; i++) {
+    date = previousDateString(date)
+    var kind = dayKind(cal, date).kind
+    if (kind === "open") return date
+    if (kind === "unknown") return null
+  }
+  return null
+}
+
+// That day's regular close, an early one included, as a moment.
+function closeBefore(cal, dayStart) {
+  var date = closeBeforeDate(cal, dayStart)
+  if (date === null) return null
+  var segs = segmentsOn(cal, date)
+  return segs[segs.length - 1].end
+}
+
 function clockOf(local) {
   return Format.pad2(local.hour) + ":" + Format.pad2(local.minute)
 }

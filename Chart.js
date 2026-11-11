@@ -13,12 +13,13 @@
 // The chart a view shows, `symbol` on `range`, or null while it is on its way.
 // The day waits for its quote and, where Robinhood may trade it all day, for
 // Robinhood (`dayDrawn`); a range for its history and the quote, since the
-// headline is never the last bar. A range ends on the day's newest price since
-// the close, and never waits for it. `histories` holds answers only, so what
-// is drawn stays while a refetch is out and after one fails. A failed first
-// fetch is an answer: a quote's shows the symbol alone, and a range's has the
-// day stand in (`failed`). `latest` is the newest trade of all, or null where
-// the quote's own last trade is it.
+// headline is never the last bar. A range starts at the close before it, at
+// its time by the listing's calendar (`History.withStart`), and ends on the
+// day's newest price since the close, and never waits for it. `histories`
+// holds answers only, so what is drawn stays while a refetch is out and after
+// one fails. A failed first fetch is an answer: a quote's shows the symbol
+// alone, and a range's has the day stand in (`failed`). `latest` is the
+// newest trade of all, or null where the quote's own last trade is it.
 function viewChart(symbol, range, quotes, entries, histories, nights, allDay, calendars, slideAt) {
   if (!symbol) return null
   var quote = quotes[symbol] || null
@@ -37,7 +38,10 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
   if (!entry) return null
   if (entry.history) {
     var trade = Overnight.newestTrade(quote, chart.latest, calendars, chart.day)
-    chart.history = History.withNewest(entry.history, trade, trade ? Market.tradeClock(quote, trade.t, calendars) : null)
+    var first = entry.history.bars[0]
+    var closeAt = first ? Calendar.closeBefore(Calendar.calendarFor(calendars, quote), first.t) : null
+    chart.history = History.withStart(History.withNewest(entry.history, trade, trade ? Market.tradeClock(quote, trade.t, calendars) : null),
+      closeAt, closeAt !== null ? Market.tradeClock(quote, closeAt, calendars) : null)
   } else chart.failed = true
   return chart
 }

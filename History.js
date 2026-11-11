@@ -174,10 +174,12 @@ function periodStats(history) {
   }
 }
 
-// The log scale (5Y up) shows a decade's growth as a slope, not a flat line
-// and a wall; every price is above zero.
+// The line starts at the range's start, where `withStart` adds it, so the
+// move reads from its left end to its right. The log scale (5Y up) shows a
+// decade's growth as a slope, not a flat line and a wall; every price is
+// above zero.
 function historyGeometry(history) {
-  var bars = history && history.bars ? history.bars : []
+  var bars = drawnBars(history)
   var usable = []
   for (var i = 0; i < bars.length; i++) {
     if (Format.isFiniteNumber(bars[i].t) && Format.isFiniteNumber(bars[i].c)) usable.push(bars[i])
@@ -223,14 +225,14 @@ function historyGeometry(history) {
 }
 
 function historyBarAt(history, fraction) {
-  var bars = history && history.bars ? history.bars : []
+  var bars = drawnBars(history)
   if (!bars.length || !Format.isFiniteNumber(fraction)) return null
   var index = Math.round(Format.clamp(fraction, 0, 1) * (bars.length - 1))
   return bars[index]
 }
 
 function historyFraction(history, t) {
-  var bars = history && history.bars ? history.bars : []
+  var bars = drawnBars(history)
   if (!bars.length || !Format.isFiniteNumber(t) || !Format.isFiniteNumber(bars[0].t) || !Format.isFiniteNumber(bars[bars.length - 1].t)) return -1
   if (t < bars[0].t || t > bars[bars.length - 1].t) return -1
   if (bars.length === 1) return 0
@@ -254,6 +256,7 @@ function historyFraction(history, t) {
 function barOffset(history, t) {
   var newest = newestBar(history)
   if (newest && newest.t === t) return newest.clock.offset
+  if (history.start && history.start.clock && history.start.t === t) return history.start.clock.offset
   if (history.clocks && history.clocks.length) return Quote.clockAt(history, t).offset
   var offset = history.gmtoffset || 0
   if (t === history.liveAt) return offset
@@ -271,7 +274,7 @@ function historyDateParts(history, t) {
 }
 
 function historySpansYears(history) {
-  var bars = history && history.bars ? history.bars : []
+  var bars = drawnBars(history)
   if (!bars.length) return false
   var first = historyDateParts(history, bars[0].t)
   var last = historyDateParts(history, bars[bars.length - 1].t)
@@ -309,6 +312,28 @@ function withNewest(history, trade, clock) {
   return Object.assign({}, history, {
     bars: own.concat([{ t: trade.t, o: trade.p, h: trade.p, l: trade.p, c: trade.p, v: null, newest: trade.phase, closed: !!trade.closed, clock: clock }])
   })
+}
+
+// The range's line starts at its start, the price its move counts from
+// (`baseline`), where Yahoo's first bar doesn't already close on it. That is
+// the close before the range, at `closeAt` with the exchange's `clock` where
+// its calendar names that day, as 1D names its close; or, for a listing that
+// began inside the range, Yahoo's first price for it. Yahoo sends the start
+// rounded and the bar's close as a float, so they match to a millionth.
+function withStart(history, closeAt, clock) {
+  var first = history.bars[0]
+  if (!first || !Format.isFiniteNumber(history.baseline) || Math.abs(history.baseline - first.c) <= first.c * 1e-6) return history
+  var listed = periodStats(history).coverage.short
+  var named = !listed && closeAt !== null
+  return Object.assign({}, history, {
+    start: { t: named ? closeAt : first.t - 1, c: history.baseline, clock: named ? clock : null, listed: listed }
+  })
+}
+
+// The bars the line draws: the start, then Yahoo's.
+function drawnBars(history) {
+  var bars = history && history.bars ? history.bars : []
+  return history && history.start ? [history.start].concat(bars) : bars
 }
 
 function barClock(history, bar) {
@@ -427,10 +452,19 @@ function rangeMarks(history, ends, quote) {
 
 // A range bar's day as its scrub and its screenshot name it, with the clock
 // of a bar that has a time: `{ date, clock }`, `clock` null for a day's bar.
+// The start is the close before the range, by its own day where the
+// calendar names it, or as the close before the first bar; or a listing's
+// first day.
 function barDay(history, bar) {
-  var date = historyDateText(history, bar.t, historySpansYears(history), bar.newest ? "1d" : history.interval)
+  var years = historySpansYears(history)
+  var timed = !!bar.newest || history.interval === "15m" || history.interval === "30m" || history.interval === "1h"
+  if (bar === history.start) {
+    if (bar.clock) return { date: historyDateText(history, bar.t, years, "1d"), clock: timed ? bar.clock : null }
+    if (bar.listed) return { date: historyDateText(history, history.firstTradeDate, years, "1d"), clock: null }
+    return { date: "CLOSE BEFORE " + historyDateText(history, history.bars[0].t, years, "1d"), clock: null }
+  }
+  var date = historyDateText(history, bar.t, years, bar.newest ? "1d" : history.interval)
   if (history.interval === "1wk" && !bar.newest) date = "WEEK OF " + date
-  var timed = bar.newest || history.interval === "15m" || history.interval === "30m" || history.interval === "1h"
   return { date: date, clock: timed ? barClock(history, bar) : null }
 }
 
