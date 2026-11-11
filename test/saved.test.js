@@ -178,6 +178,21 @@ test("a young listing's ranges start at its first trade and keep its thin trades
   }
 })
 
+test("the lines under the chart hold room for every range held for the stock, not only the one on show", () => {
+  // FIG on Sunday 1 November at 21:48: its day ran 21.00 to 22.29, its All,
+  // once fetched, 16.60 to 142.92, a digit wider. Another stock's range and
+  // a failed fetch hold no room.
+  const fig = M.parseChart(fixture("moments/gap-2026-11-01-2148/fig.json"))
+  const all = M.parseHistory(fixture("history/fig-max.json"), "All")
+  const held = {
+    "FIG|All": { status: "ok", history: all },
+    "FIG|1M": { status: "failed", history: null },
+    "AAPL|1W": { status: "ok", history: all }
+  }
+  expect(M.heldLines(held, "FIG", fig).map(line => [line.title, line.range.lowText, line.range.highText, line.range.widest]))
+    .toEqual([["ALL", "16.60", "142.92", "888.88"]])
+})
+
 test("a day with no bar says nothing against the trade its quote holds, and a thin day's note counts every trade of its day", () => {
   // WREN at 09:37 on Friday 23 October: Yahoo's quote is its 09:30 trade,
   // 20.62 on 366 shares, and its day has no bar: no "No trades today"

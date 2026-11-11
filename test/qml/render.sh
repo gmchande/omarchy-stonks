@@ -185,6 +185,11 @@ every_state() (
   for symbol in nbis be fig shop; do
     states="$states popup-sweep-gap-2026-11-01-2148-$symbol-smooth popup-sweep-gap-2026-11-01-2148-$symbol-retro"
   done
+  # FIG with its All held, whose 142.92 has a digit more than its day and
+  # 52 weeks: the info lines' low and high keep their column on 1D and All.
+  for range in 1d all; do
+    states="$states popup-sweep-gap-2026-11-01-2148-fig-held-$range-smooth popup-sweep-gap-2026-11-01-2148-fig-held-$range-retro"
+  done
   # Monday 2 November at 09:41, when Yahoo sent no bar from 08:30 to 09:29:
   # Robinhood's trades fill the hour on each line, CRWV's and NBIS's every
   # slot of it, SHOP's 8 of the 13 slots from its last bar, at 08:20, to

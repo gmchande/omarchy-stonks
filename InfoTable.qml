@@ -6,15 +6,17 @@ import "Cells.js" as Cells
 
 // The info block's two lines as one table, so their rules share a column.
 // Each column is as wide as the widest figure it can hold at the listing's
-// digits on any range, never today's; the rule takes what the columns
+// digits on any range held, never today's; the rule takes what the columns
 // leave, and a trailing column that doesn't fit is left out whole.
 Item {
   id: root
 
   property var lines: [null, null]
-  // Every title and list of facts a line can hold, on any range.
+  // Every title and list of facts a line can hold, on any range, and every
+  // low and high on a range held.
   property var titles: []
   property var factLists: []
+  property var ranges: []
   property Look look
   property int rowGap: Style.space(4)
 
@@ -56,13 +58,17 @@ Item {
     var widen = function(list) {
       for (var f = 0; f < list.length; f++) facts[f] = Math.max(facts[f] || 0, factWidth(list[f]))
     }
+    var hold = function(range) {
+      price = Math.max(price, valueWidth(range.widest), valueWidth(range.lowText), valueWidth(range.highText))
+    }
     for (var i = 0; i < 2; i++) {
       var line = lines ? lines[i] : null
       if (!line) continue
-      price = Math.max(price, valueWidth(line.range.widest), valueWidth(line.range.lowText), valueWidth(line.range.highText))
+      hold(line.range)
       widen(line.facts)
     }
     for (var l = 0; l < factLists.length; l++) widen(factLists[l])
+    for (var r = 0; r < ranges.length; r++) hold(ranges[r])
     var fixed = function(n) {
       var t = titleWidth + gap + price * 2 + innerGap * 2
       for (var k = 0; k < n; k++) t += gap + facts[k]

@@ -99,6 +99,7 @@ Harness {
   readonly property var motionPose: /^popup-motion-(join|crossing|dragwheel|scroll|endremove|notefade|breadth|look|neutral)-(smooth|retro)$/.exec(stateName)
   readonly property var refusedList: /^min-window-lists-refused-(menu|manage)-(smooth|retro)$/.exec(stateName)
   readonly property bool interactivePicture: !!controlState || !!anchorState || !!motionPose || !!refusedList
+    || !!(overnight && overnight.held)
   readonly property string outPath: Quickshell.env("STONKS_VISUAL_OUT")
   readonly property string fixtureDir: Quickshell.env("STONKS_FIXTURES")
   readonly property string calendarPath: Quickshell.env("STONKS_VISUAL_CALENDARS")
@@ -242,10 +243,13 @@ Harness {
     if (match) return { moment: match[1], symbol: match[2] === "gspc" ? "^GSPC" : match[2].toUpperCase(), month: false, scrub: false,
       dated: true, sweep: true }
     // A saved moment's listing on a range: its history saved for that
-    // moment in history/<file>-<moment>-<5d|1mo|ytd|1y>.json.
-    match = /^(?:popup|window)-sweep-([a-z]+-(\d{4}-\d\d-\d\d-\d{4}))-([a-z0-9.^-]+?)(?:-(1w|1m|ytd|1y))?-(smooth|retro)$/.exec(stateName)
+    // moment in history/<file>-<moment>-<5d|1mo|ytd|1y>.json. With
+    // -held-<1d|all>, its All held as the service holds it once fetched
+    // (history/<file>-max.json), and shown by a click on ALL, then for 1d
+    // on 1D.
+    match = /^(?:popup|window)-sweep-([a-z]+-(\d{4}-\d\d-\d\d-\d{4}))-([a-z0-9.^-]+?)(?:-(1w|1m|ytd|1y))?(?:-held-(1d|all))?-(smooth|retro)$/.exec(stateName)
     if (match) return { moment: match[2], folder: match[1], file: match[3], month: false, scrub: false, dated: true, sweep: true,
-      range: match[4] ? match[4].toUpperCase() : "",
+      range: match[4] ? match[4].toUpperCase() : "", held: match[5] || "",
       saved: String(Quickshell.env("STONKS_VISUAL_SAVED") || "").split(" ").filter(function(f) { return f !== "" }) }
     match = /^(?:popup|window)-gaps-(1d|3m)-(smooth|retro)$/.exec(stateName)
     return match ? { moment: "2026-10-21-1006", folder: "gaps-2026-10-21-1006", symbol: "VANE", listed: ["VANE"], month: false,
@@ -355,9 +359,12 @@ Harness {
     readonly property var yahooGate: root.troubleGate(root.troubleKind)
     property string range: root.shownRange
     // The history on show, keyed to its symbol: a held chart's stays its own
-    // while the next symbol's is on its way.
+    // while the next symbol's is on its way. Beside it, the other ranges
+    // held (-held-).
     property string historySymbol: ""
-    readonly property var histories: root.shownHistoryEntry ? ({ [(historySymbol || featuredSymbol) + "|" + range]: root.shownHistoryEntry }) : ({})
+    property var heldHistories: ({})
+    readonly property var histories: Object.assign({}, heldHistories, root.shownHistoryEntry
+      ? ({ [(historySymbol || featuredSymbol) + "|" + range]: root.shownHistoryEntry }) : ({}))
     readonly property string hero: previewSymbol || featuredSymbol
     readonly property var fundamentals: root.savedFigures[hero]
       ? ({ [hero]: { status: "ok", fundamentals: root.savedFigures[hero] } }) : ({})
@@ -696,6 +703,12 @@ Harness {
         root.shownRange = root.overnight.range
         root.shownHistoryEntry = { status: "ok", history: History.parseHistory(JSON.parse(kept.text()), root.overnight.range), receivedAt: root.now }
         kept.destroy()
+      }
+      if (root.overnight.held) {
+        var max = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', root)
+        max.path = fixtureDir + "/history/" + root.overnight.file + "-max.json"
+        stub.heldHistories = { [featured + "|All"]: { status: "ok", history: History.parseHistory(JSON.parse(max.text()), "All"), receivedAt: root.now } }
+        max.destroy()
       }
       stub.shown = listed.slice()
       stub.quotes = quotes
@@ -1664,6 +1677,22 @@ Harness {
         var heldAt = anchorProbe.mapToItem(renderWindow.contentItem, 0, 0)
         var pillAt = anchorPill.mapToItem(renderWindow.contentItem, 0, 0)
         compare(heldAt.x, pillAt.x, "the real pill's held position")
+        savePicture()
+        return
+      }
+      if (root.overnight && root.overnight.held) {
+        // Clicks on the range row, as a hand would: ALL, then for -1d, 1D.
+        var tokens = root.findAll(one("rangeRow"), "rangeToken")
+        ;(root.overnight.held === "all" ? ["All"] : ["All", "1D"]).forEach(function(range) {
+          var token = tokens[body.rangeOptions.indexOf(range)]
+          waitForRendering(body)
+          var at = token.mapToItem(body, token.width / 2, token.height / 2)
+          mouseMove(body, at.x, at.y)
+          mouseClick(body, at.x, at.y)
+          tryVerify(function() { return body.chartRange === range && !body.chartLoading }, 2000)
+        })
+        // Off the row, so no hover fill shows on it.
+        mouseMove(body, body.width / 2, body.height - 2)
         savePicture()
         return
       }

@@ -398,6 +398,18 @@ function rangeLine(history, ends, quote) {
   }
 }
 
+// The line each range held for a symbol would show under its chart, so the
+// info table keeps room for all of them and a change of range moves nothing.
+function heldLines(histories, symbol, quote) {
+  var lines = []
+  Object.keys(HISTORY_RANGES).forEach(function(range) {
+    var entry = histories[historyKey(symbol, range)]
+    var line = entry && entry.history ? rangeLine(entry.history, rangeEnds(entry.history, null, quote), quote) : null
+    if (line) lines.push(line)
+  })
+  return lines
+}
+
 function rangeMarks(history, ends, quote) {
   if (!ends) return null
   var digits = quote ? quote.priceDigits : undefined
