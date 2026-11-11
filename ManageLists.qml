@@ -3,7 +3,8 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls as Controls
 import qs.Commons
-import qs.Ui
+import qs.Commons as Commons
+import "Motion.js" as Motion
 import "Rows.js" as Rows
 
 // Manage lists, in the rows' place: rename, reorder, and delete the named
@@ -280,12 +281,19 @@ OverRows {
           width: column.width
           height: root.itemHeight * (editing && root.problem !== "" ? 2 : 1)
 
-          CursorSurface {
+          Rectangle {
             width: parent.width
             height: root.itemHeight
-            hasCursor: entry.isCursor
-            foreground: root.look.foreground
             radius: root.look.retro ? 0 : Style.cornerRadius
+            color: entry.isCursor ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
+            Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
+          }
+
+          CursorBar {
+            visible: entry.isCursor
+            rowHeight: root.itemHeight
+            retro: root.look.retro
+            foreground: root.look.foreground
           }
 
           Text {

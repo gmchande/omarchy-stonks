@@ -3,7 +3,8 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls as Controls
 import qs.Commons
-import qs.Ui
+import qs.Commons as Commons
+import "Motion.js" as Motion
 import "Rows.js" as Rows
 
 // A symbol's lists, in the rows' place: a tick box for each list, All first.
@@ -206,11 +207,18 @@ OverRows {
           width: column.width
           height: root.itemHeight
 
-          CursorSurface {
+          Rectangle {
             anchors.fill: parent
-            hasCursor: entry.index === root.cursor
-            foreground: root.look.foreground
             radius: root.look.retro ? 0 : Style.cornerRadius
+            color: rowMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
+              : entry.index === root.cursor ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
+            Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
+          }
+
+          CursorBar {
+            visible: entry.index === root.cursor
+            retro: root.look.retro
+            foreground: root.look.foreground
           }
 
           Rectangle {
