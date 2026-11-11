@@ -1,7 +1,6 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import Quickshell.Wayland
 
 // Whether the screens are on, for whoever would fetch or draw for them: the
 // service before it asks a site, the window for its own screen, and the
@@ -11,6 +10,9 @@ Item {
 
   // Hyprland, handed in (`Plugin`): its monitors, its events and its ask.
   property var hyprland: null
+  // The desktop's input, handed in (`Plugin`): `isIdle` turns false as a
+  // key or the pointer moves.
+  property var input: null
   // The window is open: a special workspace's toggle may hide or show it.
   property bool watching: false
 
@@ -53,13 +55,10 @@ Item {
   }
   // Hyprland sends no event when a screen wakes, so while all are off the
   // input that wakes them asks again.
-  function inputSeen() {
-    if (root.screensOff) hyprland.refreshMonitors()
-  }
-  IdleMonitor {
-    enabled: root.screensOff
-    timeout: 1
-    respectInhibitors: false
-    onIsIdleChanged: if (!isIdle) root.inputSeen()
+  Connections {
+    target: root.input
+    function onIsIdleChanged() {
+      if (!root.input.isIdle && root.screensOff) root.hyprland.refreshMonitors()
+    }
   }
 }

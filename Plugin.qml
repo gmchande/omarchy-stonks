@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import Quickshell.Hyprland
+import Quickshell.Wayland
 
 // The manifest's service entry. The pills and the panel reach its parts
 // through `serviceFor(id)`. Its id and name are the manifest's, which the
@@ -14,9 +15,11 @@ Item {
 
   property var shell: null
   property var manifest: null
-  // The desktop's Hyprland, for the screens and the window host, and the
-  // service's clock (`Service.wallClock`). A walk hands in its own of each.
+  // The desktop's Hyprland, for the screens and the window host; its input,
+  // which wakes the screens; and the service's clock (`Service.wallClock`).
+  // A walk hands in its own of each.
   property var hyprland: Hyprland
+  property var input: idle
   property var wallClock: null
   readonly property string pluginId: manifest && manifest.id ? String(manifest.id) : ""
   readonly property string name: manifest && manifest.name ? String(manifest.name) : ""
@@ -52,7 +55,15 @@ Item {
 
   Camera { id: shutter }
 
-  Screens { id: displays; hyprland: root.hyprland; watching: host.opened }
+  Screens { id: displays; hyprland: root.hyprland; input: root.input; watching: host.opened }
+  // Watched only while every screen is off: the key that wakes one asks
+  // Hyprland again (`Screens`).
+  IdleMonitor {
+    id: idle
+    enabled: displays.screensOff
+    timeout: 1
+    respectInhibitors: false
+  }
 
   WindowHost {
     id: host
