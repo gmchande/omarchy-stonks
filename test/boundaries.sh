@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Boundaries in the production source that no flow can see: who may run a
-# command, read or write a file, start a feed, or name an endpoint; that the
-# model stays pure; that colours come from the theme; that the bar entry
-# holds only the pill's forms; and that no file takes QtQuick's Sprite name.
+# command, read or write a file, or make a request, as the README's "What it
+# runs" says; that the rule files stay pure; that colours come from the
+# theme; that the bar entry holds only the pill's forms; and that no file
+# takes QtQuick's Sprite name.
 # And one in the tests: a harness ends Quickshell only through
 # HarnessExit.qml.
 # Prints a FAILED line per breach and exits non-zero on any.
@@ -35,27 +36,17 @@ none() {
   while read -r hit; do fail "$hit: '$pattern' is not allowed here"; done <<< "$hits"
 }
 
-# External commands run only in the feeds, search, the version watch's
-# shell restart and update, the sounds' pw-play, its chimes' sh, the
-# bell's omarchy-shell and pw-dump, and the silence's pw-cat, the camera's
-# screenshot hand-off, and the sh and chmod that keep Stonks' files its
-# owner's and the sh that makes the data file so (OwnerOnly); files are
-# read and written only by the service and its lists file, the version watch reads the
-# manifest, the trend colours read the theme's colours, the sounds read
-# their own bundled sounds,
-# the cache's files, the saved quotes and the sounds' replay, chimes, and
-# lead-ins, are written only through OwnerOnly, and the camera writes its
-# screenshot and reads Omasnap's settings; one service owns the feeds, and
-# each surface its own search's; every request leaves from FetchRun, which
-# only the feeds use; the quote URL is the quote feed's, the fundamentals
-# URLs the fundamentals feed's, the overnight URL the overnight feed's, the
-# all-day URL the all-day feed's, the search URL the search feed's, and the
-# manifest's URL the release feed's. The plugin has
-# one IPC target; only the window's host and the screens act on Hyprland.
+# External commands run only in the feeds' one runner, the version watch's
+# shell restart and update, the sounds' pw-play, its chimes' sh, the bell's
+# omarchy-shell and pw-dump, the silence's pw-cat, the camera's screenshot
+# hand-off, and the sh and chmod that keep Stonks' files its owner's
+# (OwnerOnly). Files are read and written only by the service and its lists
+# file, the version watch (the manifest), the trend colours (the theme's
+# colours), the sounds (their own), OwnerOnly (the cache), and the camera,
+# which writes its screenshot and reads Omasnap's settings.
 only '\bProcess\s*\{' FetchRun.qml Updates.qml Sounds.qml Camera.qml OwnerOnly.qml
 only '\bFileView\s*\{' Service.qml ListsFile.qml Updates.qml TrendColors.qml OwnerOnly.qml Sounds.qml
 only '\bSettings\s*\{|^import QtCore' Camera.qml
-only '^import Quickshell\.Io' FetchRun.qml Service.qml ListsFile.qml IpcTarget.qml Updates.qml TrendColors.qml Sounds.qml Camera.qml OwnerOnly.qml
 # Only the camera grabs and saves a picture, puts it on the clipboard, and
 # sends a notification.
 only 'grabToImage|saveToFile|wl-copy|wl-paste|omarchy-notification-send|notify-send' Camera.qml
@@ -68,32 +59,22 @@ none '\.exec\s*\((?!\["timeout", "-k", "1", "4", "pw-play",)' Sounds.qml
 none '(?<!timeout -k 1 2 )pw-play --' Sounds.qml
 # Every command the camera and the file keeper run is under `timeout`.
 none 'command:\s*\[(?!"timeout",)' Camera.qml OwnerOnly.qml
-only '\bIpcHandler\s*\{' IpcTarget.qml
-only '^import Quickshell\.Hyprland' WindowHost.qml Screens.qml
-only '\b(QuoteFeed|HistoryFeed|FundamentalsFeed|OvernightFeed|AllDayFeed|ReleaseFeed)\s*\{' Service.qml
-only '\bSearchFeed\s*\{' StonksBody.qml
+# A request leaves only from the feeds' runner, which only the feeds use,
+# and no QML names an address or asks any other way.
 only '\bFetchRun\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SearchFeed.qml
-only 'Fetch\.curlCommand\(' FetchRun.qml
-only 'Quote\.chartUrl\(' QuoteFeed.qml
-only 'Fundamentals\.(fundamentalsUrl|capCloseUrl|rateUrl)\(' FundamentalsFeed.qml
-only 'Overnight\.overnightUrl\(' OvernightFeed.qml
-only 'Overnight\.allDayUrl\(' AllDayFeed.qml
-only 'Search\.searchUrl\(' SearchFeed.qml
-only 'Release\.MANIFEST_URL\b' ReleaseFeed.qml
 none 'execDetached|XMLHttpRequest|https?://' *.qml
 # GitHub's address is the release rule's alone: no other file names it.
 others=()
 for file in *.js; do [ "$file" = Release.js ] || others+=("$file"); done
 none 'github(usercontent)?\.com' *.qml "${others[@]}"
 # Every request goes through Fetch.curlCommand, which compresses and caps
-# it, and through a host's gate, which only the service holds.
+# it.
 while read -r hit; do
   [ -n "$hit" ] && fail "$hit: a command that is not Fetch.curlCommand's"
 done <<< "$(rg -n '\.command\s*=' -- *.qml | rg -v 'Fetch\.curlCommand\(')"
 for flag in --compressed --max-filesize; do
   rg -q -F -- "\"$flag\"" Fetch.js || fail "Fetch.js: curlCommand no longer sends $flag"
 done
-only '\bGate\s*\{' Service.qml
 # The rule files (every *.js here) are data rules: no host, no I/O, no wall
 # clock of their own, and no colour of their own: even Stonks' up and down
 # for a theme without a pair are made from the theme's (`Tones.ownPair`).
