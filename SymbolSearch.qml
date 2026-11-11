@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Commons as Commons
+import qs.Ui
 import "Search.js" as Search
 // Search's field and results. Yahoo's lookup is its feed's
 // (`SearchFeed.qml`). A FocusScope, so that hiding it takes the keys from
@@ -326,7 +327,8 @@ OverRows {
 
       Repeater {
         model: root.shown
-        Rectangle {
+        // A plain Item at the root, as the list menu's lines have.
+        Item {
           id: resultRow
           objectName: "searchResult"
           required property var modelData
@@ -336,13 +338,18 @@ OverRows {
           opacity: dimmed ? 0.4 : 1
           width: parent.width
           height: root.rowHeight
-          radius: root.look.retro ? 0 : Style.cornerRadius
-          color: rowMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
-            : chosen ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent)
-            : rowMouse.containsMouse ? Style.normalFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
 
           // The pointer only tints a row: one resting over the results never
           // changes what Enter adds.
+          CursorSurface {
+            anchors.fill: parent
+            hasCursor: resultRow.chosen
+            foreground: root.look.foreground
+            radius: root.look.retro ? 0 : Style.cornerRadius
+            color: hasCursor ? fill
+              : rowMouse.containsMouse ? Style.normalFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
+          }
+
           MouseArea {
             id: rowMouse
             anchors.fill: parent
