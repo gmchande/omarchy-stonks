@@ -13,7 +13,7 @@ process.env.TZ = "America/New_York"
 // Every rule file's names, under one name. A name two files define is read
 // from its file (test/load.js).
 const M = rules(["Format", "Fetch", "Quote", "Calendar", "Market", "CarriedClose", "Overnight", "Day", "History", "Fundamentals", "Figures", "Freshness",
-  "Chart", "Tones", "Settings", "Rows", "KeySheet", "Search", "Cells", "Share", "Asks", "Gate"])
+  "Chart", "Tones", "Settings", "Rows", "KeySheet", "Search", "Cells", "Share", "Asks", "Gate", "Release"])
 
 const calendars = JSON.parse(readFileSync(join(root, "calendars.json"), "utf8"))
 // The header's status at full width, the first of its forms.
@@ -1960,6 +1960,26 @@ test("a hostile search or Robinhood answer reads as no answer, at once", async (
 // Half a UTF-16 pair can't go in a URL: the quote feed would take its
 // first-answer slot, encodeURIComponent would throw before any request
 // started, and no new symbol's quote would come until the shell restarts.
+test("the footer says a save that didn't land ahead of the update, says what to do with a file it can't read, and offers the update and the restart only when no change would be lost", () => {
+  const file = "~/.config/omarchy/grvc.stonks.json"
+  const says = state => M.footerNotice(state, file)
+  expect(says({})).toMatchObject({ text: "", actions: [], updateOffer: "", restartable: true, restartOffered: false })
+  // A newer Stonks out: offered, and its update may restart the shell.
+  expect(says({ releasedTo: "1.3.0" })).toMatchObject({ text: "", updateOffer: "1.3.0", restartable: true })
+  // Updated: the restart is offered, and no newer one beside it.
+  expect(says({ updatedTo: "1.2.0", releasedTo: "1.2.0" })).toMatchObject({ text: "Updated to 1.2.0 · click to restart the shell", updateOffer: "", restartOffered: true })
+  // A save that didn't land comes first, and holds the restart back.
+  expect(says({ saveFailed: true, updatedTo: "1.2.0" }))
+    .toMatchObject({ text: "Your changes aren't saved", actions: ["click to try again"], restartable: false, restartOffered: false })
+  // A file it can't read: what to do, in a long and a short form; once a
+  // change waits on it, that comes first.
+  expect(says({ unreadable: true, releasedTo: "1.3.0" }))
+    .toMatchObject({ text: "Couldn't load your lists", actions: ["fix or remove " + file, "fix " + file], updateOffer: "1.3.0", restartable: false })
+  expect(says({ unreadable: true, editsUnsaved: true }).text).toBe("Your changes aren't saved")
+  // While the file can't be read, only a change made meanwhile is unsaved.
+  expect(says({ unreadable: true, saveFailed: true }).text).toBe("Couldn't load your lists")
+})
+
 test("search keeps each answer by the words it answers until it closes: two words get their own, any words at all, and words that failed or are asked again aren't kept", () => {
   const apple = { results: [{ symbol: "AAPL" }] }
   const pineapple = { results: [{ symbol: "PINE" }] }

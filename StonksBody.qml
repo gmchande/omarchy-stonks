@@ -12,6 +12,7 @@ import "KeyText.js" as KeyText
 import "Market.js" as Market
 import "Overnight.js" as Overnight
 import "Quote.js" as Quote
+import "Release.js" as Release
 import "Search.js" as Search
 import "Settings.js" as Settings
 import "Share.js" as Share
@@ -116,14 +117,8 @@ Item {
   property var owed: ({})
   // Symbols asked for under 2 s ago: a quote opened old isn't late yet.
   property var asking: ({})
-  property bool listsUnreadable: false
-  property bool saveFailed: false
-  property bool editsUnsaved: false
   // A refresh the reader asked for is out.
   property bool refreshing: false
-  property string updatedTo: ""
-  // A newer Stonks on main.
-  property string releasedTo: ""
   // A closed surface's clock holds still too.
   property int now: 0
   readonly property bool reading: surfaceOpen && !!service
@@ -154,16 +149,24 @@ Item {
   Binding on soundsOn { when: root.reading; value: root.service?.soundsOn; restoreMode: Binding.RestoreNone }
   Binding on owed { when: root.reading; value: root.service?.owed; restoreMode: Binding.RestoreNone }
   Binding on asking { when: root.reading; value: root.service?.asking || ({}); restoreMode: Binding.RestoreNone }
-  Binding on listsUnreadable { when: root.reading; value: root.service?.listsUnreadable; restoreMode: Binding.RestoreNone }
-  Binding on saveFailed { when: root.reading; value: root.service?.saveFailed; restoreMode: Binding.RestoreNone }
-  Binding on editsUnsaved { when: root.reading; value: root.service?.editsUnsaved; restoreMode: Binding.RestoreNone }
   Binding on refreshing { when: root.reading; value: root.service?.refreshing; restoreMode: Binding.RestoreNone }
-  Binding on updatedTo { when: root.reading; value: root.updates ? root.updates.newVersion : ""; restoreMode: Binding.RestoreNone }
-  Binding on releasedTo { when: root.reading; value: root.updates ? root.updates.releasedVersion : ""; restoreMode: Binding.RestoreNone }
-  property string yahooPause: ""
-  property int yahooPausedUntil: 0
-  Binding on yahooPause { when: root.reading; value: root.service?.yahooGate?.pause ?? ""; restoreMode: Binding.RestoreNone }
-  Binding on yahooPausedUntil { when: root.reading; value: root.service?.yahooGate?.pausedUntil ?? 0; restoreMode: Binding.RestoreNone }
+  // What the footer says of saving and updating (`Release.footerNotice`).
+  property var footerSays: Release.footerNotice({}, "")
+  Binding on footerSays {
+    when: root.reading
+    value: Release.footerNotice({ unreadable: root.service?.listsUnreadable, saveFailed: root.service?.saveFailed,
+      editsUnsaved: root.service?.editsUnsaved, updatedTo: root.updates ? root.updates.newVersion : "",
+      releasedTo: root.updates ? root.updates.releasedVersion : "" }, root.listsFile)
+    restoreMode: Binding.RestoreNone
+  }
+  readonly property bool saveFailed: footerSays.saveFailed
+  // Why Yahoo is paused, and until when (`Gate.js`).
+  property var yahooPause: ({ pause: "", until: 0 })
+  Binding on yahooPause {
+    when: root.reading
+    value: root.service?.yahooGate ? { pause: root.service.yahooGate.pause, until: root.service.yahooGate.pausedUntil } : { pause: "", until: 0 }
+    restoreMode: Binding.RestoreNone
+  }
   Binding on now { when: root.reading; value: root.service?.now; restoreMode: Binding.RestoreNone }
 
   readonly property var calendars: service ? service.calendars : null
@@ -321,7 +324,7 @@ Item {
     return Freshness.freshnessWarns(Freshness.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0, !!asking[symbol]))
   }).length : 0
   readonly property bool yahooDown: warnings > 0 && warnings === lists[0].symbols.length
-  readonly property var hostPause: Freshness.hostPause(yahooPause, yahooPausedUntil, now)
+  readonly property var hostPause: Freshness.hostPause(yahooPause.pause, yahooPause.until, now)
 
   readonly property string unavailableText: chartRange.toUpperCase() + " unavailable"
   readonly property bool offersRetry: headerText === unavailableText
@@ -1025,24 +1028,11 @@ Item {
     hint = "Drag the pill in your bar to move it\nMiddle-click changes its look · right-click opens the window"
   }
 
-  // A save that didn't land is said ahead of the update, since a restart
-  // would lose the changes. Where the fix won't fit beside the notice, it
-  // drops "or remove" and keeps the file's full path.
-  readonly property bool unsaved: listsUnreadable ? editsUnsaved : saveFailed
-  readonly property string notice: unsaved ? "Your changes aren't saved"
-    : listsUnreadable ? "Couldn't load your lists"
-    : updatedTo !== "" ? "Updated to " + updatedTo + " · click to restart the shell" : ""
   readonly property string listsFile: "~/" + Settings.listsFile(service ? service.pluginId : "")
-  readonly property var noticeActions: listsUnreadable
-    ? ["fix or remove " + listsFile, "fix " + listsFile]
-    : unsaved ? ["click to try again"] : []
-  readonly property string updateOffer: releasedTo !== "" && updatedTo === "" ? releasedTo : ""
-  readonly property bool restartable: !unsaved && !listsUnreadable
-  readonly property bool restartOffered: updatedTo !== "" && restartable
   function runOffered() {
     if (!updates) return
-    if (restartOffered) updates.restart()
-    else if (updateOffer !== "") updates.update(restartable)
+    if (footerSays.restartOffered) updates.restart()
+    else if (footerSays.updateOffer !== "") updates.update(footerSays.restartable)
     else say("Nothing to update")
   }
 
@@ -1390,24 +1380,24 @@ Item {
     rowHeight: root.rowHeight
     note: root.note
     noteOpacity: root.noteShown
-    notice: root.notice
-    noticeActions: root.noticeActions
+    notice: root.footerSays.text
+    noticeActions: root.footerSays.actions
     hint: root.hint
     showsHint: root.hintShown
     // The same on every list: the list's name is already at its top.
     label: "+  Find or add a symbol"
-    acts: !root.listsUnreadable
+    acts: !root.footerSays.unreadable
     onHoveredChanged: root.holdNote()
     undoLabel: root.undoOffered ? "Undo " + root.undoOffered.symbol : ""
     undoOpacity: root.undoShown
     onUndoHoveredChanged: root.holdUndo()
     onUndoClicked: root.undoRemoval()
-    updateLabel: root.updateOffer !== "" ? "Update to " + root.updateOffer : ""
-    onUpdateClicked: root.updates.update(root.restartable)
+    updateLabel: root.footerSays.updateOffer !== "" ? "Update to " + root.footerSays.updateOffer : ""
+    onUpdateClicked: root.updates.update(root.footerSays.restartable)
     onClicked: {
-      if (root.listsUnreadable) return
+      if (root.footerSays.unreadable) return
       else if (root.saveFailed) root.saveAgain()
-      else if (root.note === "" && root.updatedTo !== "") root.updates.restart()
+      else if (root.note === "" && root.footerSays.updatedTo !== "") root.updates.restart()
       else root.startAdding()
     }
   }

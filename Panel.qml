@@ -58,7 +58,7 @@ Panel {
   }
 
   function offerHint() {
-    if (!root.opened || !root.body || !service || !service.ready || service.hinted || root.body.notice !== "") return
+    if (!root.opened || !root.body || !service || !service.ready || service.hinted || root.body.footerSays.text !== "") return
     root.body.showFirstRunHint()
     service.persist({ hinted: true })
   }
