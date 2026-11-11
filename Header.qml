@@ -25,12 +25,9 @@ Item {
   property bool offersRetry: false
   property Look look
   property bool soundsOn: false
-  // `kind` is "bull", "bear" or "" (a flat day, or no direction yet), and
-  // `chart` what it reads: a turn on the same chart crossfades in smooth, any
-  // other change is at once. `asleep` is its market resting; `bell`, that the
-  // clock alone changed that, so the eyes close or open over 320 ms;
-  // `scrubbed`, that a scrub has it awake, so the sleep after it is no bell.
+  // The animal's day and rest, and whether a surface shows it (`HeaderAnimal`).
   property var animal: ({ kind: "", chart: "", asleep: false, bell: false, scrubbed: false })
+  property bool seen: false
   property bool scrubbing: false
   property bool live: false
   // In full ink, standing out without colour, since red says down.
@@ -41,64 +38,6 @@ Item {
   // Lit from a screenshot until the surface closes.
   property bool cameraLit: false
 
-  readonly property string kind: animal ? animal.kind : ""
-  // The chart the animal last showed: a change on it is a turn.
-  property string shownChart: ""
-  property bool shownAsleep: false
-  property bool shownScrubbed: false
-  // How far the eyes have closed, 0 to 1, evenly in time. A wake steps from
-  // shut, so the lids are half way at the middle of either move (`lids`: 0
-  // open, 1 half, 2 shut).
-  property real closing: 0
-  property bool waking: false
-  readonly property real moved: waking ? 1 - closing : closing
-  readonly property int steps: moved >= 1 ? 2 : moved >= 0.5 ? 1 : 0
-  readonly property int lids: waking ? 2 - steps : steps
-
-  // While the panel or window shows (`seen`), the animal greets you at each
-  // open and then fidgets ever more rarely (`Cells.fidgetMove`); asleep, its
-  // eyes stay shut. Only its own cells change. A close holds its pose through
-  // the fade; with the shell's animations off, or no animal, it sits still.
-  property bool seen: false
-  // Moves begun since the open; the steps of the one playing or next, and
-  // which is drawn, -1 being still.
-  property int fidgetMoves: 0
-  property var fidgetSteps: []
-  property int fidgetStep: -1
-  readonly property bool fidgeting: seen && kind !== "" && !Style.reduceMotion
-  readonly property var fidget: fidgetStep >= 0 ? fidgetSteps[fidgetStep] : ({})
-  // Plain values, so a step that changes neither draws nothing.
-  readonly property bool pricked: !!fidget.pricked
-  readonly property int drawnLids: fidget.blink ? 2 : lids
-  function fidgetAnew() {
-    fidgetMoves = 0
-    fidgetNext()
-  }
-  // Still, until the next move.
-  function fidgetNext() {
-    var move = Cells.fidgetMove(fidgetMoves++)
-    fidgetStep = -1
-    fidgetSteps = move.steps
-    fidgetClock.interval = move.wait
-    if (fidgeting) fidgetClock.restart()
-    else fidgetClock.stop()
-  }
-  // Each open starts with the greeting, running or not.
-  onSeenChanged: if (seen) fidgetAnew()
-  onFidgetingChanged: {
-    if (seen) fidgetAnew()
-    else fidgetClock.stop()
-  }
-  Timer {
-    id: fidgetClock
-    onTriggered: {
-      if (root.fidgetStep + 1 < root.fidgetSteps.length) {
-        root.fidgetStep++
-        interval = root.fidgetSteps[root.fidgetStep].ms
-        restart()
-      } else root.fidgetNext()
-    }
-  }
 
   signal styleRequested(string style)
   signal soundsRequested()
@@ -109,54 +48,11 @@ Item {
 
   function settle() {
     lookIcon.settle()
-    show(false)
+    slot.settle()
   }
 
-  function show(fade) {
-    var k = animal ? animal.kind : ""
-    shownChart = animal ? animal.chart : ""
-    turn.stop()
-    turnBull.to = k === "bull" ? 1 : 0
-    turnBear.to = k === "bear" ? 1 : 0
-    if (fade && !look.retro) turn.start()
-    else {
-      bull.opacity = turnBull.to
-      bear.opacity = turnBear.to
-    }
-    sleep(fade)
-  }
-
-  // Asleep after a scrub is let go is at once, never the bell's close; a move
-  // under way runs on through a turn.
-  function sleep(fade) {
-    var asleep = !!(animal && animal.asleep)
-    var afterScrub = shownScrubbed
-    shownScrubbed = !!(animal && animal.scrubbed)
-    if (fade && asleep === shownAsleep) return
-    shownAsleep = asleep
-    shutting.stop()
-    // The bell owns the eyes: eyes Fidget's blink already shut fall asleep
-    // at once, and a fidget under way stops and rests. A rest runs on: a
-    // fidget's first blink comes 340 ms in, after the bell's 320 ms.
-    var rung = fade && animal.bell && !afterScrub
-    if (rung && !(asleep && fidget.blink)) {
-      waking = !asleep
-      shutting.from = asleep ? 0 : 1
-      shutting.to = asleep ? 1 : 0
-      shutting.start()
-    } else closing = asleep ? 1 : 0
-    if (rung && fidgetStep >= 0) fidgetNext()
-  }
 
   Component.onCompleted: settle()
-  // While still, nothing moves: a change waits for the open's `settle`.
-  onAnimalChanged: if (!still) show(animal.chart === shownChart)
-  onStillChanged: if (still) {
-    if (turn.running) turn.pause()
-    if (shutting.running) shutting.pause()
-  }
-
-  NumberAnimation { id: shutting; target: root; property: "closing"; duration: Motion.duration(Style, 320) }
 
   // 3 px under its target, centred, but never past the header's right edge.
   component HeaderTip: PanelToolTip {
@@ -180,51 +76,24 @@ Item {
   height: implicitHeight
   width: parent ? parent.width : implicitWidth
 
-  Item {
+
+  HeaderAnimal {
     id: slot
-    objectName: "animal"
-    width: Style.space(40)
-    height: Style.space(28)
+    animal: root.animal
+    look: root.look
+    seen: root.seen
+    still: root.still
     anchors.left: parent.left
     anchors.verticalCenter: parent.verticalCenter
     anchors.verticalCenterOffset: root.centerOffset
-
-    // One layer each, so smooth's turn crossfades between them.
-    PixelSprite {
-      id: bull
-      anchors.fill: parent
-      visible: opacity > 0
-      pixels: Cells.spriteFor(true, root.drawnLids, root.pricked)
-      color: root.look.upColor
-    }
-    PixelSprite {
-      id: bear
-      anchors.fill: parent
-      visible: opacity > 0
-      pixels: Cells.spriteFor(false, root.drawnLids, root.pricked)
-      color: root.look.downColor
-    }
-
-    ParallelAnimation {
-      id: turn
-      NumberAnimation { id: turnBull; target: bull; property: "opacity"; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
-      NumberAnimation { id: turnBear; target: bear; property: "opacity"; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
-    }
-
-    MouseArea {
-      anchors.fill: parent
-      enabled: root.kind !== ""
-      hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
-      onClicked: root.replayRequested()
-    }
+    onReplayRequested: root.replayRequested()
   }
 
   // At the header's top, never above: the panel's body starts there and clips
   // what draws past it.
   PixelSprite {
     readonly property int cell: Math.floor(Math.min(slot.width / 20, slot.height / 14))
-    visible: root.kind !== "" && root.lids === 2
+    visible: slot.kind !== "" && slot.lids === 2
     columns: 3
     rows: 5
     width: cell * 3
