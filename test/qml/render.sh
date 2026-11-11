@@ -6,8 +6,7 @@
 # With no state named, every state below. A name with *, ?, or [ is a
 # pattern over them ('popup-lists-*'); any other name is rendered as given,
 # such as a saved moment the list leaves out. --part I/N renders every Nth
-# state from the Ith, so N runs side by side render every state once
-# (test/review.sh).
+# state from the Ith, so N runs side by side render every state once.
 if [ "${1:-}" = --anchors ]; then
   saved_answers=none
   source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"

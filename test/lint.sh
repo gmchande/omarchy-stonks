@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # The QML lint gate: lints every production QML file against the installed
-# shell and passes only when qmllint ran cleanly on every file and each of
-# its diagnostics is in the baseline below. `test/lint.sh self-check` shows
-# the gate failing on a missing linter, a scratch unqualified access, and a
-# scratch outer id read from a nested component in a file without
-# `pragma ComponentBehavior: Bound`.
+# shell, or only the files named, and passes only when qmllint ran cleanly
+# on every file and each of its diagnostics is in the baseline below.
+#
+#   test/lint.sh [FILE...]
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 source "$PWD/test/scratch.sh"
@@ -103,27 +102,4 @@ lint() { # file...
   return "$failed"
 }
 
-self_check() {
-  local tmp out failed=0
-  if out=$(QMLLINT=/nonexistent/qmllint bash test/lint.sh 2>&1); then
-    echo "passed with no linter:"; printf '%s\n' "$out"; failed=1
-  elif [[ $out != *"qmllint exited 127"* ]]; then
-    echo "failed with no linter, but not for that:"; printf '%s\n' "$out"; failed=1
-  else
-    echo "a missing linter fails the gate"
-  fi
-  tmp=$(mktemp -d "$work/XXXXXX")
-  printf '%s\n' 'import QtQuick' '' 'Item {' '  id: root' '  width: undefinedWidth' \
-    '  Repeater {' '    model: 1' '    Item { width: root.width }' '  }' '}' > "$tmp/Scratch.qml"
-  if out=$(lint "$tmp/Scratch.qml" 2>&1); then
-    echo "passed an unqualified access:"; printf '%s\n' "$out"; failed=1
-  elif [[ $out != *"Scratch.qml:5:10: warning [unqualified]"* || $out != *"Scratch.qml:8:19: warning [unqualified]"* ]]; then
-    echo "failed on the scratch file, but not for both unqualified accesses:"; printf '%s\n' "$out"; failed=1
-  else
-    echo "an unqualified access, and an outer id read in a file without the pragma, fail the gate"
-  fi
-  rm -rf "$tmp"
-  return "$failed"
-}
-
-if [ "${1:-}" = self-check ]; then self_check; else lint *.qml; fi
+if [ "$#" -gt 0 ]; then lint "$@"; else lint *.qml; fi

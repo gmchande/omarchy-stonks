@@ -1,5 +1,5 @@
-# Process groups and run marks, for the Quickshell runs (qml/quickshell.sh,
-# qml/crash-check.sh). A run marks what it starts with NAME=VALUE in the
+# Process groups and run marks, for the Quickshell runs (qml/quickshell.sh).
+# A run marks what it starts with NAME=VALUE in the
 # inherited environment and finds its processes by that mark, never by
 # name: the user's shell and other runs are the same programs.
 

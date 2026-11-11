@@ -1,5 +1,5 @@
 # The one way a test starts Quickshell (lib.sh's run_qs, render.sh), sourced
-# by lib.sh and by crash-check.sh, which proves it with a stand-in.
+# by lib.sh.
 #
 # Quickshell's crash handler is off (QS_DISABLE_CRASH_HANDLER, Quickshell
 # 0.3.1's src/launch/launch.cpp:154). On a crash it forks a child that dumps
@@ -156,7 +156,7 @@ quickshell_stop() {
 }
 
 # quickshell_exit: what a script's EXIT trap runs. A second interrupt during
-# it (test/queue.sh's TERM after a Ctrl-C) must not cut the stop short.
+# it (a runner's TERM after a Ctrl-C) must not cut the stop short.
 quickshell_exit() {
   trap '' INT TERM
   quickshell_stop
