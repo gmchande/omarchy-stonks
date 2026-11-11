@@ -238,7 +238,9 @@ function stepTime(quote, t, steps, last) {
 // apart: each column's level, whether it is dim, which side of the close
 // it is on (`above`), the last column lit, and the baseline's row, which
 // steps to `stepRow` from `stepCol` on. The last
-// trade in a column wins: the price at the end of that stretch. A column
+// trade in a column wins: the price at the end of that stretch. A range's
+// start (`rangeStart`) keeps the first column to itself, so the column the
+// line starts from is always there (`ownStart`, `retroColumn`). A column
 // between two trades the line joins holds the one before it; only a break
 // (`brk`) leaves columns dark, as it lifts the smooth line. With no previous
 // close known, the columns stand on the floor, until a step to a close that
@@ -248,18 +250,19 @@ function stepTime(quote, t, steps, last) {
 function retroGrid(geometry, width, height, pixel, gap) {
   var pitch = pixel + gap
   var columns = Math.max(1, Math.floor(width / pitch))
-  var g = { pitch: pitch, columns: columns, rows: Math.max(1, Math.floor(height / pixel)), baseRow: 0, stepCol: columns, stepRow: 0, levels: [], above: [], dim: [], lastLit: -1 }
+  var g = { pitch: pitch, columns: columns, rows: Math.max(1, Math.floor(height / pixel)), baseRow: 0, stepCol: columns, stepRow: 0, levels: [], above: [], dim: [], lastLit: -1, ownStart: false }
   if (!geometry || !geometry.points) return g
   g.baseRow = hasBaseline(geometry) ? Math.round(geometry.baselineY * (g.rows - 1)) : g.rows - 1
   var step = geometry.step
   g.stepCol = step ? Math.max(0, Math.min(g.columns - 1, Math.floor(step.x * g.columns))) : g.columns
   g.stepRow = step ? Math.round(step.y * (g.rows - 1)) : g.baseRow
   var pts = geometry.points
+  g.ownStart = pts.length > 1 && columns > 1 && !!pts[0].rangeStart
   // The lit cell sits on the last column whose own last trade is bright,
   // never on one held after it.
   var last = -1
   for (var i = 0; i < pts.length; i++) {
-    var col = Math.max(0, Math.min(g.columns - 1, Math.floor(pts[i].x * g.columns)))
+    var col = retroColumn(g, pts[i].x)
     if (col !== last && last >= 0 && !g.dim[last]) g.lastLit = last
     for (var held = last + 1; i > 0 && !pts[i].brk && held < col; held++) {
       g.levels[held] = g.levels[last]
@@ -278,6 +281,13 @@ function retroGrid(geometry, width, height, pixel, gap) {
 // The baseline's row under column `c`.
 function retroBaseRow(g, c) {
   return c >= g.stepCol ? g.stepRow : g.baseRow
+}
+
+// The column a point at `x` stands in, the scrub's too. With the start in
+// the first column alone, every point after it stands from the second on.
+function retroColumn(g, x) {
+  var col = Math.max(0, Math.min(g.columns - 1, Math.floor(x * g.columns)))
+  return g.ownStart && x > 0 ? Math.max(1, col) : col
 }
 
 // Where the dot sits: the newest trade of what trades now, else the regular

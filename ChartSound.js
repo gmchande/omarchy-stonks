@@ -251,13 +251,13 @@ function rowBar(grid, row) {
 }
 
 // -1 where the chart draws nothing. Smooth reads the line's height, where the
-// scrub's dot sits; retro the lit row of the column.
+// scrub's dot sits; retro the lit row of the scrub's `column`.
 function barAt(chart, x) {
   if (x < 0) return -1
   if (chart.retro) {
     var grid = chart.grid
     if (!grid || !grid.levels) return -1
-    var row = grid.levels[Math.max(0, Math.min(grid.columns - 1, Math.floor(x * grid.columns)))]
+    var row = grid.levels[chart.column]
     return row === undefined ? -1 : rowBar(grid, row)
   }
   return lineBars(chart.geometry)(x)

@@ -202,15 +202,18 @@ function historyGeometry(history) {
   lo -= pad
   hi += pad
   var denominator = Math.max(1, usable.length - 1)
+  // The start is marked: retro keeps a column for it alone (`Chart.retroGrid`).
   var points = []
   for (var k = 0; k < usable.length; k++) {
-    points.push({
+    var point = {
       x: k / denominator,
       y: 1 - (scale(usable[k].c) - lo) / (hi - lo),
       t: usable[k].t,
       p: usable[k].c,
       ext: false
-    })
+    }
+    if (usable[k] === history.start) point.rangeStart = true
+    points.push(point)
   }
   return {
     points: points,
