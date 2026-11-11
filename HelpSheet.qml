@@ -6,14 +6,14 @@ import qs.Commons
 import qs.Ui
 
 // The `?` sheet on both surfaces: key groups in two columns, the credit
-// closing the second, then CLOSE.
+// closing the second, then Close.
 Flickable {
   id: root
 
   // KeySheet.sheet: { groups }.
   property var sheet: ({ groups: [] })
   property Look look
-  // `edge` is the room right of the rows' figures. CLOSE ends there, so its
+  // `edge` is the room right of the rows' figures. Close ends there, so its
   // fill stays inside the clip; what a key does may run past it.
   property int inset: 0
   property int edge: 0
@@ -144,12 +144,16 @@ Flickable {
       }
     }
 
-    ListAction {
-      look: root.look
+    Button {
       anchors.right: parent.right
       anchors.rightMargin: root.edge
-      text: "CLOSE"
-      onActivated: root.closeRequested()
+      bordered: true
+      radius: root.look.retro ? 0 : Style.cornerRadius
+      foreground: root.look.foreground
+      fontFamily: root.look.fontFamily
+      fontSize: Style.font.bodySmall
+      text: "Close"
+      onClicked: root.closeRequested()
     }
   }
 }

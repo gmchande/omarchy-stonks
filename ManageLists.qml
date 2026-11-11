@@ -225,14 +225,18 @@ OverRows {
       font.letterSpacing: 1
     }
 
-    ListAction {
-      look: root.look
+    Button {
       objectName: "manageDone"
       anchors.right: parent.right
       anchors.rightMargin: root.gutter + root.inset
       anchors.verticalCenter: parent.verticalCenter
-      text: "DONE"
-      onActivated: {
+      bordered: true
+      radius: root.look.retro ? 0 : Style.cornerRadius
+      foreground: root.look.foreground
+      fontFamily: root.look.fontFamily
+      fontSize: Style.font.bodySmall
+      text: "Done"
+      onClicked: {
         if (root.renaming) root.keepName()
         if (!root.renaming) root.dismissed()
       }
