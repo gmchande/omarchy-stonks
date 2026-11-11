@@ -116,7 +116,7 @@ Item {
   property var owed: ({})
   // Symbols asked for under 2 s ago: a quote opened old isn't late yet.
   property var asking: ({})
-  property bool settingsUnreadable: false
+  property bool listsUnreadable: false
   property bool saveFailed: false
   property bool editsUnsaved: false
   // A refresh the reader asked for is out.
@@ -154,7 +154,7 @@ Item {
   Binding on soundsOn { when: root.reading; value: root.service?.soundsOn; restoreMode: Binding.RestoreNone }
   Binding on owed { when: root.reading; value: root.service?.owed; restoreMode: Binding.RestoreNone }
   Binding on asking { when: root.reading; value: root.service?.asking || ({}); restoreMode: Binding.RestoreNone }
-  Binding on settingsUnreadable { when: root.reading; value: root.service?.settingsUnreadable; restoreMode: Binding.RestoreNone }
+  Binding on listsUnreadable { when: root.reading; value: root.service?.listsUnreadable; restoreMode: Binding.RestoreNone }
   Binding on saveFailed { when: root.reading; value: root.service?.saveFailed; restoreMode: Binding.RestoreNone }
   Binding on editsUnsaved { when: root.reading; value: root.service?.editsUnsaved; restoreMode: Binding.RestoreNone }
   Binding on refreshing { when: root.reading; value: root.service?.refreshing; restoreMode: Binding.RestoreNone }
@@ -1028,16 +1028,16 @@ Item {
   // A save that didn't land is said ahead of the update, since a restart
   // would lose the changes. Where the fix won't fit beside the notice, it
   // drops "or remove" and keeps the file's full path.
-  readonly property bool unsaved: settingsUnreadable ? editsUnsaved : saveFailed
+  readonly property bool unsaved: listsUnreadable ? editsUnsaved : saveFailed
   readonly property string notice: unsaved ? "Your changes aren't saved"
-    : settingsUnreadable ? "Couldn't load your lists"
+    : listsUnreadable ? "Couldn't load your lists"
     : updatedTo !== "" ? "Updated to " + updatedTo + " · click to restart the shell" : ""
   readonly property string listsFile: "~/" + Settings.listsFile(service ? service.pluginId : "")
-  readonly property var noticeActions: settingsUnreadable
+  readonly property var noticeActions: listsUnreadable
     ? ["fix or remove " + listsFile, "fix " + listsFile]
     : unsaved ? ["click to try again"] : []
   readonly property string updateOffer: releasedTo !== "" && updatedTo === "" ? releasedTo : ""
-  readonly property bool restartable: !unsaved && !settingsUnreadable
+  readonly property bool restartable: !unsaved && !listsUnreadable
   readonly property bool restartOffered: updatedTo !== "" && restartable
   function runOffered() {
     if (!updates) return
@@ -1396,7 +1396,7 @@ Item {
     showsHint: root.hintShown
     // The same on every list: the list's name is already at its top.
     label: "+  Find or add a symbol"
-    acts: !root.settingsUnreadable
+    acts: !root.listsUnreadable
     onHoveredChanged: root.holdNote()
     undoLabel: root.undoOffered ? "Undo " + root.undoOffered.symbol : ""
     undoOpacity: root.undoShown
@@ -1405,7 +1405,7 @@ Item {
     updateLabel: root.updateOffer !== "" ? "Update to " + root.updateOffer : ""
     onUpdateClicked: root.updates.update(root.restartable)
     onClicked: {
-      if (root.settingsUnreadable) return
+      if (root.listsUnreadable) return
       else if (root.saveFailed) root.saveAgain()
       else if (root.note === "" && root.updatedTo !== "") root.updates.restart()
       else root.startAdding()

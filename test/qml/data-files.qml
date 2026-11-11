@@ -68,8 +68,8 @@ Harness {
       service.persist({ sounds: harness.made.sounds, updateCheck: harness.made.updateCheck })
       var text = ""
       var saved = within(5000, function() {
-        text = harness.readFile(service.dataPath)
-        try { return Settings.settingsEqual(JSON.parse(text), service.dataSettings) } catch (e) { return false }
+        text = harness.readFile(service.listsPath)
+        try { return Settings.settingsEqual(JSON.parse(text), service.fileSettings) } catch (e) { return false }
       })
       harness.check("the Service saved what was made", saved
         && JSON.stringify(service.lists.map(function(list) { return list.name })) === JSON.stringify(harness.made.lists.map(function(list) { return list.name }))

@@ -48,7 +48,7 @@ Harness {
     // The file holds what the service holds.
     function landed() {
       return within(5000, function() {
-        try { return Settings.settingsEqual(JSON.parse(harness.readFile(harness.file)), service.dataSettings) } catch (e) { return false }
+        try { return Settings.settingsEqual(JSON.parse(harness.readFile(harness.file)), service.fileSettings) } catch (e) { return false }
       })
     }
     // The words the footer shows.
@@ -89,7 +89,7 @@ Harness {
       var good = harness.readFile(harness.file)
       var broken = "{\n  \"symbols\": [\"AAPL\",\n"
       sh('printf %s "$3" > "$1"', broken)
-      var noticed = within(3000, function() { return service.settingsUnreadable })
+      var noticed = within(3000, function() { return service.listsUnreadable })
       service.setRange("1W")
       // Time for a write that must not come to land.
       wait(700)
@@ -97,7 +97,7 @@ Harness {
       var told = footer()
       // Mended as an editor saves: a new file moved over the old.
       sh('printf %s "$3" > "$1.new" && mv "$1.new" "$1"', good)
-      var readAgain = within(3000, function() { return !service.settingsUnreadable && service.range === "1Y" })
+      var readAgain = within(3000, function() { return !service.listsUnreadable && service.range === "1Y" })
       service.setRange("3M")
       harness.check("a file that can't be read is never written over, the footer says so and names the file, and once mended it is read and saved to again",
         noticed && kept && told.indexOf("aren't saved") >= 0 && told.indexOf("grvc.stonks.json") >= 0 && readAgain && landed(),

@@ -280,7 +280,7 @@ function listsHeld(settings) {
   return JSON.stringify([settings.symbols, settings.lists.map(function(list) { return [list.name, list.symbols] })])
 }
 
-// The settings rode the plugin ID's bar entry before the data file.
+// The settings rode the plugin ID's bar entry before the lists file.
 function settingsFromBar(config, id) {
   var bar = barEntryFor(config, id)
   if (!bar || !bar.symbols || !bar.symbols.length) return null

@@ -26,29 +26,29 @@ Item {
   // ---- What you follow and look at
 
   // All: every symbol, fetched once whatever lists hold it.
-  readonly property var allSymbols: dataSettings.symbols
+  readonly property var allSymbols: fileSettings.symbols
   // "" is All.
-  readonly property string listName: dataSettings.list
-  readonly property var symbols: Settings.listSymbols(dataSettings)
-  readonly property string order: Settings.listOrder(dataSettings)
-  readonly property bool reversed: Settings.listReversed(dataSettings)
-  readonly property string range: dataSettings.range
+  readonly property string listName: fileSettings.list
+  readonly property var symbols: Settings.listSymbols(fileSettings)
+  readonly property string order: Settings.listOrder(fileSettings)
+  readonly property bool reversed: Settings.listReversed(fileSettings)
+  readonly property string range: fileSettings.range
   // The panel's first-run hint has shown.
-  readonly property bool hinted: dataSettings.hinted
-  readonly property string changeMode: dataSettings.changeMode
-  readonly property bool retro: dataSettings.style === "retro"
-  readonly property bool soundsOn: dataSettings.sounds
-  readonly property int refreshIntervalSec: dataSettings.refreshIntervalSec
+  readonly property bool hinted: fileSettings.hinted
+  readonly property string changeMode: fileSettings.changeMode
+  readonly property bool retro: fileSettings.style === "retro"
+  readonly property bool soundsOn: fileSettings.sounds
+  readonly property int refreshIntervalSec: fileSettings.refreshIntervalSec
   property var lastRemoval: null
   property string listsHeld: ""
   // The same array until what the lists hold changes, so a save of a range
   // or a hero leaves each surface's list views as they are.
   property var lists: Settings.listChoices(Settings.fileSettings(null))
-  onDataSettingsChanged: {
-    var held = Settings.listsHeld(root.dataSettings)
+  onFileSettingsChanged: {
+    var held = Settings.listsHeld(root.fileSettings)
     if (held === root.listsHeld) return
     root.listsHeld = held
-    root.lists = Settings.listChoices(root.dataSettings)
+    root.lists = Settings.listChoices(root.fileSettings)
     root.lastRemoval = null
   }
 
@@ -90,13 +90,13 @@ Item {
   // Read from the settings and the feeds, not the bindings above, which may
   // not have caught up yet.
   readonly property var view: {
-    var all = dataSettings.symbols
-    var order = Settings.listOrder(dataSettings)
-    var reversed = Settings.listReversed(dataSettings)
-    var rows = Settings.listSymbols(dataSettings).filter(function(s) { return arriving.indexOf(s) < 0 })
-    var named = String(dataSettings.featured || "").toUpperCase()
+    var all = fileSettings.symbols
+    var order = Settings.listOrder(fileSettings)
+    var reversed = Settings.listReversed(fileSettings)
+    var rows = Settings.listSymbols(fileSettings).filter(function(s) { return arriving.indexOf(s) < 0 })
+    var named = String(fileSettings.featured || "").toUpperCase()
     var featured = all.indexOf(named) >= 0 ? named : (all[0] || "")
-    var range = dataSettings.range
+    var range = fileSettings.range
     // Receipts and histories only when the chart needs them, so a receipt
     // for a quoted symbol on the day recomputes nothing.
     var chart = root.keptDay(featured, Chart.viewChart(featured, range, feed.quotes,
@@ -105,13 +105,13 @@ Item {
     return {
       featured: featured,
       range: range,
-      list: dataSettings.list,
-      listKey: root.listKey(dataSettings.list),
+      list: fileSettings.list,
+      listKey: root.listKey(fileSettings.list),
       order: order,
       reversed: reversed,
       rows: rows,
       shown: Rows.shownOrder(root.heldOrder, Rows.sortedSymbols(rows, feed.quotes, order, reversed,
-        dataSettings.changeMode, order === "manual" ? null : root.newestTrades)),
+        fileSettings.changeMode, order === "manual" ? null : root.newestTrades)),
       allSymbols: all,
       // Null while on its way: each surface keeps the chart it has on screen.
       chart: chart
@@ -336,7 +336,7 @@ Item {
       root.arriving = root.arriving.concat([s])
     var previewed = s !== "" && s === root.previewSymbol
     var coming = previewed && root.arriving.indexOf(s) >= 0
-    var next = Settings.withSymbolAdded(root.dataSettings, s)
+    var next = Settings.withSymbolAdded(root.fileSettings, s)
     // From an add still on its way, hand back the hero before that add.
     var taken = root.heroTaken
     var before = taken && taken.symbol === root.view.featured && !feed.quotes[taken.symbol] ? taken.before : root.view.featured
@@ -348,22 +348,22 @@ Item {
   // `shown`: the rows as the surface shows them, whose neighbour takes the
   // hero.
   function removeSymbol(symbol, shown) {
-    root.remove(symbol, Settings.withMembership(root.dataSettings, symbol, root.listName, false, shown || root.shown))
+    root.remove(symbol, Settings.withMembership(root.fileSettings, symbol, root.listName, false, shown || root.shown))
   }
 
   // "" is All: unticking it is a removal, which can be undone.
   function setMembership(symbol, name, member, shown) {
-    var next = Settings.withMembership(root.dataSettings, symbol, name, member, shown || root.shown)
+    var next = Settings.withMembership(root.fileSettings, symbol, name, member, shown || root.shown)
     if (name === "" && !member) root.remove(symbol, next)
     else root.save(next)
   }
 
   function remove(symbol, next) {
-    var before = root.dataSettings
+    var before = root.fileSettings
     var quote = feed.quotes[symbol] || null
     var entry = feed.entries[symbol] || null
     root.save(next)
-    root.lastRemoval = { symbol: symbol, before: before, left: root.dataSettings.featured, quote: quote, entry: entry }
+    root.lastRemoval = { symbol: symbol, before: before, left: root.fileSettings.featured, quote: quote, entry: entry }
   }
 
   // Watched again first (`askDue`), so a run landing before the restore's
@@ -374,7 +374,7 @@ Item {
     // Only once.
     root.lastRemoval = null
     if (removal.quote) feed.restore(symbol, removal.quote, removal.entry)
-    root.save(Settings.withRemovalUndone(root.dataSettings, removal.before, symbol, removal.left))
+    root.save(Settings.withRemovalUndone(root.fileSettings, removal.before, symbol, removal.left))
     root.askDue()
     feed.ask([symbol], root.wallSecond())
   }
@@ -386,15 +386,15 @@ Item {
     var next = rows.slice()
     for (var i = 0; i < members.length; i++)
       if (next.indexOf(members[i]) < 0) next.splice(Math.min(i, next.length), 0, members[i])
-    root.save(Settings.withManualOrder(root.dataSettings, next))
+    root.save(Settings.withManualOrder(root.fileSettings, next))
   }
 
   function setOrder(order) {
-    root.save(Settings.withListOrder(root.dataSettings, order))
+    root.save(Settings.withListOrder(root.fileSettings, order))
   }
 
   function reverseOrder() {
-    root.save(Settings.withListReversed(root.dataSettings))
+    root.save(Settings.withListReversed(root.fileSettings))
   }
 
   function switchList(name) {
@@ -403,34 +403,34 @@ Item {
 
   // Returns why not, or "".
   function createList(name) {
-    var problem = Settings.listNameProblem(name, root.dataSettings.lists)
-    if (problem === "") root.save(Settings.withListCreated(root.dataSettings, name))
+    var problem = Settings.listNameProblem(name, root.fileSettings.lists)
+    if (problem === "") root.save(Settings.withListCreated(root.fileSettings, name))
     return problem
   }
 
   // The new name takes the list's key before the save, so no view shows the
   // list under another key; the freed old name takes a new one after.
   function renameList(name, newName) {
-    var problem = Settings.renameProblem(root.dataSettings, name, newName)
-    var i = Settings.listIndex(root.dataSettings.lists, name)
+    var problem = Settings.renameProblem(root.fileSettings, name, newName)
+    var i = Settings.listIndex(root.fileSettings.lists, name)
     if (problem !== "" || i < 0) return problem
-    var old = root.dataSettings.lists[i].name
+    var old = root.fileSettings.lists[i].name
     var now = Settings.listName(newName)
     if (old !== now) root.keyList(now, root.listKey(old))
-    root.save(Settings.withListRenamed(root.dataSettings, name, newName))
+    root.save(Settings.withListRenamed(root.fileSettings, name, newName))
     if (old !== now) root.keyList(old, "#" + (++root.listKeyCount))
     return problem
   }
 
   function moveList(name, delta) {
-    root.save(Settings.withListMoved(root.dataSettings, name, delta))
+    root.save(Settings.withListMoved(root.fileSettings, name, delta))
   }
 
   function deleteList(name) {
-    var i = Settings.listIndex(root.dataSettings.lists, name)
+    var i = Settings.listIndex(root.fileSettings.lists, name)
     if (i < 0) return
-    var old = root.dataSettings.lists[i].name
-    root.save(Settings.withListDeleted(root.dataSettings, name))
+    var old = root.fileSettings.lists[i].name
+    root.save(Settings.withListDeleted(root.fileSettings, name))
     root.keyList(old, "#" + (++root.listKeyCount))
   }
 
@@ -452,10 +452,10 @@ Item {
   }
   // Bindings, not aliases: an alias reads nothing until the file's own
   // bindings have run, and the view is worked out before that.
-  readonly property var dataSettings: listsFile.dataSettings
-  readonly property string dataPath: listsFile.dataPath
+  readonly property var fileSettings: listsFile.fileSettings
+  readonly property string listsPath: listsFile.path
   readonly property bool ready: listsFile.ready
-  readonly property bool settingsUnreadable: listsFile.settingsUnreadable
+  readonly property bool listsUnreadable: listsFile.unreadable
   readonly property bool editsUnsaved: listsFile.editsUnsaved
   readonly property bool saveFailed: listsFile.saveFailed
   signal saveChecked(bool saved)
@@ -670,7 +670,7 @@ Item {
 
   ReleaseFeed {
     id: releaseFeed
-    ready: root.ready && root.dataSettings.updateCheck && root.updatable
+    ready: root.ready && root.fileSettings.updateCheck && root.updatable
     now: root.now
     clock: root
     clearance: function() { return root.screensClear() }

@@ -319,7 +319,7 @@ Harness {
     property var symbols: ["AAPL", "SHOP.TO"]
     // The copy's id (dev-<state>), as its lists file is named.
     readonly property string pluginId: root.copyId
-    property bool settingsUnreadable: false
+    property bool listsUnreadable: false
     // A save that didn't land (popup-notice-save-*), said again after a
     // click that still didn't (popup-notice-save-again-*).
     readonly property bool saveFailed: root.stateName.indexOf("popup-notice-save-") === 0
@@ -1026,7 +1026,7 @@ Harness {
     } else if (/^(popup|window)-notice-file-/.test(root.stateName)) {
       // The footer's notices whole, in the panel's width and the window's;
       // -update-: beside a newer Stonks offered at the bar's right end.
-      stub.settingsUnreadable = true
+      stub.listsUnreadable = true
       if (root.stateName.indexOf("-update-") > 0) updates.releasedVersion = "1.1.0"
     } else if (root.stateName.indexOf("popup-notice-update-") === 0) {
       updates.newVersion = "1.0.0"
