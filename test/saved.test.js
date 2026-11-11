@@ -2375,8 +2375,12 @@ test("in every phase, a stock that has traded since its close shows that newest 
       const geometry = M.historyGeometry(history)
       const grid = M.retroGrid(geometry, 69 * 6, 120, 4, 2)
       const scrubbed = M.retroColumn(grid, M.historyFraction(history, bar.t))
+      // A replay's place stands in the column of the point the scrub reads
+      // there, from the start to the first bar, and so sounds it.
+      const replayed = [0, 0.4, 0.6, 1].map(k => k * geometry.points[1].x)
+        .every(x => M.retroColumn(grid, x) === M.retroColumn(grid, M.historyFraction(history, M.historyBarAt(history, x).t)))
       return [range, M.historyScrubForms(history, bar)[0], load("Share.js").barDate(history, bar), M.historyRowModel(history, at.quotes.NBIS, bar.t).changeText,
-        geometry.points[0].p === raw.baseline, grid.levels[0] === grid.baseRow, scrubbed, M.retroColumn(grid, geometry.points[1].x)]
+        geometry.points[0].p === raw.baseline, grid.levels[0] === grid.baseRow, scrubbed, M.retroColumn(grid, geometry.points[1].x), replayed]
     }
     // A daily range's close is its day's, and a listing younger than the
     // range, as NBIS since its return on 21 October 2024, starts at its
@@ -2386,7 +2390,7 @@ test("in every phase, a stock that has traded since its close shows that newest 
       ["YTD", "CLOSE BEFORE 2 JAN · 83.71", "CLOSE BEFORE 2 JAN"], ["1Y", "CLOSE BEFORE 12 NOV 2025 · 102.22", "CLOSE BEFORE 12 NOV 2025"],
       ["2Y", "CLOSE BEFORE 12 NOV 2024 · 20.94", "CLOSE BEFORE 12 NOV 2024"], ["5Y", "21 OCT 2024 · 14.29", "21 OCT 2024"],
       ["10Y", "21 OCT 2024 · 14.29", "21 OCT 2024"], ["All", "21 OCT 2024 · 14.29", "21 OCT 2024"]])
-      expect(start(range)).toEqual([range, words, picture, "0.00%", true, true, 0, 1])
+      expect(start(range)).toEqual([range, words, picture, "0.00%", true, true, 0, 1, true])
   }
   // Its own day and clock, as 1D names it, though the range's periods are
   // stamped otherwise: at 23:00 on Sunday 25 October, a day's bar reads

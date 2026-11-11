@@ -145,11 +145,11 @@ Item {
     }
   }
 
-  // A replay past the start reveals the column after it, where every later
-  // point stands (`Chart.retroColumn`).
+  // A replay that has left the start reveals the column after it, where
+  // every later point stands (`Chart.retroColumn`).
   Item {
     id: curtain
-    width: (root.replayX >= 0 ? Math.max(Math.ceil(root.grid.columns * Math.min(1, root.replayX)), root.grid.ownStart && root.replayX > 0 ? 2 : 0)
+    width: (root.replayX >= 0 ? Math.max(Math.ceil(root.grid.columns * Math.min(1, root.replayX)), root.grid.ownStart ? Chart.retroColumn(root.grid, root.replayX) + 1 : 0)
       : root.reveal >= 1 ? root.grid.columns : Math.ceil(root.inkColumns * Math.max(0, root.reveal))) * root.grid.pitch
     height: root.height
     clip: true

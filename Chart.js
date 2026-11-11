@@ -258,6 +258,9 @@ function retroGrid(geometry, width, height, pixel, gap) {
   g.stepRow = step ? Math.round(step.y * (g.rows - 1)) : g.baseRow
   var pts = geometry.points
   g.ownStart = pts.length > 1 && columns > 1 && !!pts[0].rangeStart
+  // Halfway to the next point, where a scrub, which reads the nearest
+  // point, leaves the start.
+  g.startReach = g.ownStart ? pts[1].x / 2 : 0
   // The lit cell sits on the last column whose own last trade is bright,
   // never on one held after it.
   var last = -1
@@ -283,11 +286,13 @@ function retroBaseRow(g, c) {
   return c >= g.stepCol ? g.stepRow : g.baseRow
 }
 
-// The column a point at `x` stands in, the scrub's too. With the start in
-// the first column alone, every point after it stands from the second on.
+// The column a place `x` along the chart stands in: a point's, a scrub's or
+// a replay's. With the start in the first column alone, every place a scrub
+// reads as the start stands there, and every later one from the second on.
 function retroColumn(g, x) {
   var col = Math.max(0, Math.min(g.columns - 1, Math.floor(x * g.columns)))
-  return g.ownStart && x > 0 ? Math.max(1, col) : col
+  if (!g.ownStart) return col
+  return x < g.startReach ? 0 : Math.max(1, col)
 }
 
 // Where the dot sits: the newest trade of what trades now, else the regular
