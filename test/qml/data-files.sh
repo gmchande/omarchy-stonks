@@ -15,7 +15,7 @@ if [[ $2 == 1.0.0 ]]; then
 fi
 saved_answers=none
 source "$here/lib.sh"
-feed_tree data-files.qml Service.qml ListsFile.qml OwnerOnly.qml Gate.qml Gate.js FetchRun.qml QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml AllDayFeed.qml OvernightFeed.qml ReleaseFeed.qml Asks.js Fetch.js Quote.js Format.js Calendar.js CarriedClose.js Market.js Overnight.js Day.js History.js Fundamentals.js Freshness.js Chart.js Settings.js Rows.js Release.js calendars.json
+feed_tree data-files.qml Service.qml ListsFile.qml OwnerOnly.qml Commands.js Gate.qml Gate.js FetchRun.qml QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml AllDayFeed.qml OvernightFeed.qml ReleaseFeed.qml Asks.js Fetch.js Quote.js Format.js Calendar.js CarriedClose.js Market.js Overnight.js Day.js History.js Fundamentals.js Freshness.js Chart.js Settings.js Rows.js Release.js calendars.json
 data=$HOME/.config/omarchy/grvc.stonks.json
 file=$plugin/test/data-files/$2.json
 # Adding five symbols in a moment, each asked for as it is added, asks

@@ -54,8 +54,9 @@ only 'grabToImage|saveToFile|wl-copy|wl-paste|omarchy-notification-send|notify-s
 # A command started by exec is a sound's, and only there; it is pw-play
 # under its time limit, and nothing else. A chime's pw-play has its own 2 s,
 # so a stalled PipeWire piles none up. Only the sounds ask PipeWire
-# anything, or hold its output awake.
-only '\.exec\s*\(|pw-play|pw-dump|pw-cat' Sounds.qml
+# anything, or hold its output awake, by the commands written there or
+# Commands.js's bell check and chime player.
+only '\.exec\s*\(|pw-play|pw-dump|pw-cat|Commands\.(bellCheck|chimePlayer)\b' Sounds.qml
 none '\.exec\s*\((?!\["timeout", "-k", "1", "4", "pw-play",)' Sounds.qml
 none '(?<!timeout -k 1 2 )pw-play --' Sounds.qml Commands.js
 # Every command the camera and the file keeper run is under `timeout`, and
