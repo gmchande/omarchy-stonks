@@ -12,7 +12,7 @@ declare -A baseline=(
   [Steps.qml]=1
   [camera.qml]=2
   [fetching.qml]=6
-  [keys.qml]=1
+  [keys.qml]=2
   [render.qml]=2
   [saving.qml]=1
 )

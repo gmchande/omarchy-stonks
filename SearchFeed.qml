@@ -4,6 +4,7 @@ import "Search.js" as Search
 // Yahoo's lookup for the words in the search field: one request at a time,
 // a quarter second after the typing stops. Words typed while a lookup is
 // out wait behind it, and an answer counts only for the words still wanted.
+// While search stays open, words Yahoo has answered are not asked again.
 Item {
   id: root
 
@@ -19,18 +20,27 @@ Item {
   property string activeQuery: ""
   property string requestedQuery: ""
   readonly property bool out: fetchRun.out
+  // The answers read since search opened, by their words: typed again, as
+  // after a Backspace, they answer at once and nothing is asked.
+  property var kept: new Map()
+  onActiveChanged: if (!active) kept.clear()
 
   // A lookup is out for the words wanted.
   signal asked()
   // A lookup ended, whatever it was for.
   signal ended()
-  // The answer for the words still wanted. A body of "" is no answer,
-  // failed for `why`: "none" when nothing answered, "refused", "missing"
-  // when Yahoo called the question wrong (as it does an emoji), or "other"
-  // (`Search.failure`).
-  signal answered(string query, string body, string why)
+  // The answer for the words still wanted, as `Search.parseSearch` read it.
+  // A null is no answer, failed for `why`: "none" when nothing answered,
+  // "refused", "missing" when Yahoo called the question wrong (as it does an
+  // emoji), or "other" (`Search.failure`).
+  signal answered(string query, var found, string why)
 
-  function askSoon() { debounce.restart() }
+  function askSoon() {
+    if (kept.has(wanted)) {
+      debounce.stop()
+      ask()
+    } else debounce.restart()
+  }
 
   // A lookup already out for these same words answers them.
   function ask() {
@@ -43,11 +53,17 @@ Item {
       fetchRun.stop()
       return
     }
+    if (kept.has(q)) {
+      requestedQuery = ""
+      activeQuery = q
+      land(kept.get(q), "")
+      return
+    }
     if (clearance && !clearance()) { requestedQuery = q; return }
     requestedQuery = ""
     activeQuery = q
     if (gate && gate.take(1) === 0) {
-      land("", gate.pause === "refused" || gate.pause === "none" ? gate.pause : "other")
+      land(null, gate.pause === "refused" || gate.pause === "none" ? gate.pause : "other")
       return
     }
     fetchRun.send([Search.searchUrl(q)], Fetch.SEARCH_CAP)
@@ -55,9 +71,11 @@ Item {
   }
 
   // Asked once more: a lookup of the same words still waiting on the typing
-  // pause goes now, and one still out answers.
+  // pause goes now, and one still out answers. An answer kept for them was
+  // no use, so Yahoo is asked.
   function askAgain() {
     debounce.stop()
+    kept.delete(wanted)
     if (fetchRun.out && activeQuery === wanted) {
       requestedQuery = ""
       asked()
@@ -84,12 +102,14 @@ Item {
     if (fetchRun.out) fetchRun.stop()
   }
 
-  function land(body, why) {
+  function land(found, why) {
     ended()
-    if (active && activeQuery !== "" && activeQuery === wanted) answered(activeQuery, body, why)
+    if (activeQuery !== "" && found) kept.set(activeQuery, found)
+    if (active && activeQuery !== "" && activeQuery === wanted) answered(activeQuery, found, why)
     if (requestedQuery !== "") {
       requestedQuery = ""
-      ask()
+      // Words typed since wait out their own pause.
+      if (!debounce.running) ask()
     }
   }
 
@@ -105,7 +125,9 @@ Item {
     onEnded: function(got) {
       // No answer at all, as from a curl stopped short, is nothing answered.
       var answer = got.length ? got[0] : null
-      root.land(answer && answer.kind === "ok" ? answer.body : "", Search.failure(answer))
+      var found = null
+      try { if (answer && answer.kind === "ok") found = Search.parseSearch(JSON.parse(answer.body)) } catch (e) {}
+      root.land(found, Search.failure(answer))
     }
   }
 }
