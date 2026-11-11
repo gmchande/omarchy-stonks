@@ -59,6 +59,9 @@ none '\.exec\s*\((?!\["timeout", "-k", "1", "4", "pw-play",)' Sounds.qml
 none '(?<!timeout -k 1 2 )pw-play --' Sounds.qml
 # Every command the camera and the file keeper run is under `timeout`.
 none 'command:\s*\[(?!"timeout",)' Camera.qml OwnerOnly.qml
+# Hyprland's dispatcher can start a program too: only the window's host and
+# the screens reach Hyprland.
+only '^import Quickshell\.Hyprland' WindowHost.qml Screens.qml
 # A request leaves only from the feeds' runner, which only the feeds use,
 # and no QML names an address or asks any other way.
 only '\bFetchRun\s*\{' QuoteFeed.qml HistoryFeed.qml FundamentalsFeed.qml OvernightFeed.qml AllDayFeed.qml ReleaseFeed.qml SearchFeed.qml
