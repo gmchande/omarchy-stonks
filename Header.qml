@@ -3,7 +3,6 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 import "Cells.js" as Cells
-import "Tones.js" as Tones
 import "Motion.js" as Motion
 // The header: the animal, the stock's name over its status, the speaker, the
 // camera, the look and the ?, with a rule under them, as a shell panel's hero
@@ -24,7 +23,7 @@ Item {
   property bool titled: true
   // A range failed; the button asks again, as r does.
   property bool offersRetry: false
-  property bool retro: false
+  property Look look
   property bool soundsOn: false
   // `kind` is "bull", "bear" or "" (a flat day, or no direction yet), and
   // `chart` what it reads: a turn on the same chart crossfades in smooth, any
@@ -41,11 +40,6 @@ Item {
   property bool helpShown: false
   // Lit from a screenshot until the surface closes.
   property bool cameraLit: false
-  property color foreground: Commons.Color.foreground
-  property color dim: Tones.dim(foreground, Commons.Color.background)
-  property color upColor: Commons.Color.foreground
-  property color downColor: Commons.Color.urgent
-  property string fontFamily: Style.font.family
 
   readonly property string kind: animal ? animal.kind : ""
   // The chart the animal last showed: a change on it is a turn.
@@ -124,7 +118,7 @@ Item {
     turn.stop()
     turnBull.to = k === "bull" ? 1 : 0
     turnBear.to = k === "bear" ? 1 : 0
-    if (fade && !retro) turn.start()
+    if (fade && !look.retro) turn.start()
     else {
       bull.opacity = turnBull.to
       bear.opacity = turnBear.to
@@ -202,7 +196,7 @@ Item {
       anchors.fill: parent
       visible: opacity > 0
       pixels: Cells.spriteFor(true, root.drawnLids, root.pricked)
-      color: root.upColor
+      color: root.look.upColor
     }
     PixelSprite {
       id: bear
@@ -210,7 +204,7 @@ Item {
       anchors.fill: parent
       visible: opacity > 0
       pixels: Cells.spriteFor(false, root.drawnLids, root.pricked)
-      color: root.downColor
+      color: root.look.downColor
     }
 
     ParallelAnimation {
@@ -242,7 +236,7 @@ Item {
     x: slot.x + slot.width + Style.space(1)
     y: 0
     pixels: Cells.spritePixels(Cells.SLEEP_Z)
-    color: root.dim
+    color: root.look.dim
   }
 
   // Live shows as the chart's breathing dot and these words in full ink: a
@@ -287,9 +281,9 @@ Item {
       font.bold: true
     }
   }
-  FormWidths { id: form0; words: String(root.statusForms[0] || "").toUpperCase(); family: root.fontFamily }
-  FormWidths { id: form1; words: String(root.statusForms[1] || "").toUpperCase(); family: root.fontFamily }
-  FormWidths { id: form2; words: String(root.statusForms[2] || "").toUpperCase(); family: root.fontFamily }
+  FormWidths { id: form0; words: String(root.statusForms[0] || "").toUpperCase(); family: root.look.fontFamily }
+  FormWidths { id: form1; words: String(root.statusForms[1] || "").toUpperCase(); family: root.look.fontFamily }
+  FormWidths { id: form2; words: String(root.statusForms[2] || "").toUpperCase(); family: root.look.fontFamily }
   Text {
     id: titleText
     objectName: "headerTitle"
@@ -300,8 +294,8 @@ Item {
     width: Math.min(implicitWidth, Math.max(0, soundIcon.x - Style.space(8) - x))
     textFormat: Text.PlainText
     text: root.title
-    color: root.foreground
-    font.family: root.fontFamily
+    color: root.look.foreground
+    font.family: root.look.fontFamily
     font.pixelSize: Style.font.title
     font.bold: true
     elide: Text.ElideRight
@@ -313,7 +307,7 @@ Item {
     visible: root.titled
     y: root.contentHeight + root.ruleGap
     width: root.width
-    foreground: root.foreground
+    foreground: root.look.foreground
     strength: 0.08
   }
 
@@ -326,8 +320,8 @@ Item {
     y: root.titled ? titleText.y + titleText.implicitHeight + Style.space(2) : Math.round((root.contentHeight - implicitHeight) / 2)
     textFormat: Text.PlainText
     text: root.measured.length ? root.measured[root.fit.form].words : ""
-    color: root.scrubbing || root.live || root.trouble ? root.foreground : root.dim
-    font.family: root.fontFamily
+    color: root.scrubbing || root.live || root.trouble ? root.look.foreground : root.look.dim
+    font.family: root.look.fontFamily
     font.pixelSize: Style.font.caption
     font.bold: true
     font.letterSpacing: root.fit.tight ? 0 : 1
@@ -337,7 +331,7 @@ Item {
   ListAction {
     id: retry
     objectName: "retryRange"
-    view: root
+    look: root.look
     visible: root.offersRetry
     anchors.left: statusWords.right
     anchors.leftMargin: Style.space(16)
@@ -363,7 +357,7 @@ Item {
     anchors.verticalCenterOffset: root.centerOffset
     cell: root.cell
     shape: on ? Cells.SOUND_ON : Cells.SOUND_OFF
-    color: soundMouse.containsMouse ? root.foreground : root.dim
+    color: soundMouse.containsMouse ? root.look.foreground : root.look.dim
 
     Rectangle {
       objectName: "soundFill"
@@ -371,8 +365,8 @@ Item {
       anchors.centerIn: parent
       width: parent.width + Style.space(12)
       height: parent.height + Style.space(6)
-      radius: root.retro ? 0 : Style.cornerRadius
-      color: soundMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent) : "transparent"
+      radius: root.look.retro ? 0 : Style.cornerRadius
+      color: soundMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
     }
 
     MouseArea {
@@ -390,7 +384,7 @@ Item {
         objectName: "soundTip"
         visible: soundMouse.containsMouse
         text: root.soundsOn ? "Turn sounds off" : "Turn sounds on"
-        fontFamily: root.fontFamily
+        fontFamily: root.look.fontFamily
       }
     }
   }
@@ -405,7 +399,7 @@ Item {
     anchors.verticalCenterOffset: root.centerOffset
     cell: root.cell
     shape: lit ? Cells.CAMERA_LIT : Cells.CAMERA
-    color: lit || cameraMouse.containsMouse ? root.foreground : root.dim
+    color: lit || cameraMouse.containsMouse ? root.look.foreground : root.look.dim
 
     Rectangle {
       objectName: "cameraFill"
@@ -413,8 +407,8 @@ Item {
       anchors.centerIn: parent
       width: parent.width + Style.space(12)
       height: parent.height + Style.space(6)
-      radius: root.retro ? 0 : Style.cornerRadius
-      color: cameraMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent) : "transparent"
+      radius: root.look.retro ? 0 : Style.cornerRadius
+      color: cameraMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
     }
 
     MouseArea {
@@ -432,7 +426,7 @@ Item {
         objectName: "cameraTip"
         visible: cameraMouse.containsMouse
         text: "Take a screenshot"
-        fontFamily: root.fontFamily
+        fontFamily: root.look.fontFamily
       }
     }
   }
@@ -445,10 +439,10 @@ Item {
     anchors.rightMargin: Style.space(14)
     anchors.verticalCenter: parent.verticalCenter
     anchors.verticalCenterOffset: root.centerOffset
-    retro: root.retro
+    retro: root.look.retro
     still: root.still
     pixel: root.cell - 1
-    color: lookMouse.containsMouse ? root.foreground : root.dim
+    color: lookMouse.containsMouse ? root.look.foreground : root.look.dim
 
     Rectangle {
       objectName: "lookFill"
@@ -456,8 +450,8 @@ Item {
       anchors.centerIn: parent
       width: parent.width + Style.space(12)
       height: parent.height + Style.space(6)
-      radius: root.retro ? 0 : Style.cornerRadius
-      color: lookMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent) : "transparent"
+      radius: root.look.retro ? 0 : Style.cornerRadius
+      color: lookMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
     }
 
     MouseArea {
@@ -469,13 +463,13 @@ Item {
       height: root.contentHeight
       hoverEnabled: true
       cursorShape: Qt.PointingHandCursor
-      onClicked: root.styleRequested(root.retro ? "smooth" : "retro")
+      onClicked: root.styleRequested(root.look.retro ? "smooth" : "retro")
 
       HeaderTip {
         objectName: "lookTip"
         visible: lookMouse.containsMouse
-        text: root.retro ? "Switch to smooth" : "Switch to retro"
-        fontFamily: root.fontFamily
+        text: root.look.retro ? "Switch to smooth" : "Switch to retro"
+        fontFamily: root.look.fontFamily
       }
     }
   }
@@ -491,8 +485,8 @@ Item {
     anchors.verticalCenterOffset: root.centerOffset
     textFormat: Text.PlainText
     text: "?"
-    color: helpMouse.containsMouse ? root.foreground : root.dim
-    font.family: root.fontFamily
+    color: helpMouse.containsMouse ? root.look.foreground : root.look.dim
+    font.family: root.look.fontFamily
     font.pixelSize: Style.font.caption
     font.bold: true
     Behavior on color { ColorAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
@@ -502,8 +496,8 @@ Item {
       anchors.centerIn: parent
       width: parent.implicitWidth + Style.space(12)
       height: parent.implicitHeight + Style.space(4)
-      radius: root.retro ? 0 : Style.cornerRadius
-      color: helpMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent) : "transparent"
+      radius: root.look.retro ? 0 : Style.cornerRadius
+      color: helpMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
     }
     MouseArea {
       id: helpMouse
@@ -520,7 +514,7 @@ Item {
         objectName: "helpTip"
         visible: helpMouse.containsMouse
         text: root.helpShown ? "Hide the keys" : "Show the keys"
-        fontFamily: root.fontFamily
+        fontFamily: root.look.fontFamily
       }
     }
   }

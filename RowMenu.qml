@@ -3,7 +3,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons
 import qs.Commons as Commons
-import "Motion.js" as Motion
 
 // A row's removals, each line naming the lists it reaches ("Remove from all
 // 3 lists"), and from a right-click, "Choose lists…". It looks and moves as
@@ -14,10 +13,8 @@ FocusScope {
   property var lines: []
   property int startLine: -1
   property int cursor: -1
-  property bool retro: false
-  property color foreground: Commons.Color.foreground
-  property string fontFamily: Style.font.family
-  property color background: Qt.rgba(Commons.Color.popups.background.r, Commons.Color.popups.background.g, Commons.Color.popups.background.b, 1)
+  property Look look
+  property color background: Util.alpha(Commons.Color.popups.background, 1)
   property int maxWidth: 0
 
   readonly property int itemHeight: Style.space(26)
@@ -33,7 +30,7 @@ FocusScope {
   height: lines.length * itemHeight + inset * 2
   FontMetrics {
     id: metrics
-    font.family: root.fontFamily
+    font.family: root.look.fontFamily
     font.pixelSize: Style.font.bodySmall
   }
 
@@ -65,10 +62,10 @@ FocusScope {
 
   Rectangle {
     anchors.fill: parent
-    radius: root.retro ? 0 : Style.cornerRadius
+    radius: root.look.retro ? 0 : Style.cornerRadius
     color: root.background
     border.width: 1
-    border.color: Qt.tint(root.background, Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.18))
+    border.color: Qt.tint(root.background, Util.alpha(root.look.foreground, 0.18))
   }
 
   RowPointer {
@@ -88,45 +85,32 @@ FocusScope {
     Repeater {
       model: root.lines
 
+      // A plain Item at the root, as the list menu's lines have.
       Item {
         id: line
         objectName: "rowMenuLine"
         required property string modelData
         required property int index
-        readonly property bool isCursor: index === root.cursor
         width: column.width
         height: root.itemHeight
 
-        Rectangle {
+        MenuLine {
           anchors.fill: parent
-          radius: root.retro ? 0 : Style.cornerRadius
-          color: line.isCursor ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
-          Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
-        }
+          look: root.look
+          isCursor: line.index === root.cursor
+          onTaken: root.taken(line.index)
 
-        CursorBar {
-          visible: line.isCursor
-          retro: root.retro
-          foreground: root.foreground
-        }
-
-        Text {
-          x: root.padding
-          width: parent.width - root.padding * 2
-          elide: Text.ElideRight
-          anchors.verticalCenter: parent.verticalCenter
-          textFormat: Text.PlainText
-          text: line.modelData
-          color: root.foreground
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.bodySmall
-        }
-
-        MouseArea {
-          anchors.fill: parent
-          hoverEnabled: true
-          cursorShape: Qt.PointingHandCursor
-          onClicked: root.taken(line.index)
+          Text {
+            x: root.padding
+            width: parent.width - root.padding * 2
+            elide: Text.ElideRight
+            anchors.verticalCenter: parent.verticalCenter
+            textFormat: Text.PlainText
+            text: line.modelData
+            color: root.look.foreground
+            font.family: root.look.fontFamily
+            font.pixelSize: Style.font.bodySmall
+          }
         }
       }
     }

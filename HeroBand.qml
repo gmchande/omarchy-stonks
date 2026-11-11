@@ -1,8 +1,6 @@
 import QtQuick
 import qs.Commons
-import qs.Commons as Commons
 import "Figures.js" as Figures
-import "Tones.js" as Tones
 // The hero, the chart, the range row, the info block and the list's header.
 // Each keeps its height for every symbol, range and look, so the list below
 // never moves.
@@ -12,7 +10,7 @@ Item {
   property var freshness: null
   // Yahoo is sending nothing for any listing (`Hero.sourceDown`).
   property bool sourceDown: false
-  property bool retro: false
+  property Look look
   property string changeMode: "pct"
   property bool scrubbing: false
   property bool live: false
@@ -25,19 +23,10 @@ Item {
   // piece, to 0.6, as if each faded to 0.4 with no layer to flatten first.
   property real dimmed: 0
   property string loadingText: ""
-  readonly property color veil: Qt.rgba(ground.r, ground.g, ground.b, 0.6 * dimmed)
+  readonly property color veil: Util.alpha(look.ground, 0.6 * dimmed)
   // A new one ripples the live dot, and blinks retro's cap.
   readonly property string newestPrice: root.day && root.day.points && root.day.points.length
     ? String(root.day.points[root.day.points.length - 1].p) : ""
-  property color foreground: Commons.Color.foreground
-  property color dim: Tones.dim(foreground, Commons.Color.background)
-  property color dimmer: Tones.dimmer(foreground, Commons.Color.background)
-  property color upColor: Commons.Color.foreground
-  property color downColor: Commons.Color.urgent
-  property color ghost: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.05)
-  // The surface under the chart, which the wash is seen against.
-  property color ground: Commons.Color.background
-  property string fontFamily: Style.font.family
   property string symbol: ""
   property bool nameOnLine: false
   property var view: null
@@ -117,16 +106,10 @@ Item {
       latest: root.latest
       freshness: root.freshness
       sourceDown: root.sourceDown
-      retro: root.retro
+      look: root.look
       changeMode: root.changeMode
       scrubbing: root.scrubbing
       now: root.now
-      foreground: root.foreground
-      dim: root.dim
-      upColor: root.upColor
-      downColor: root.downColor
-      ghost: root.ghost
-      fontFamily: root.fontFamily
       baselineText: root.baselineText
       changeCycles: root.changeCycles
       onChangeClicked: root.changeClicked()
@@ -146,21 +129,21 @@ Item {
 
       SmoothChart {
         id: smoothChart
-        visible: !root.retro
+        visible: !root.look.retro
         anchors.fill: parent
         // The hidden look draws nothing and follows no scrub until it shows,
         // so a new chart paints once.
-        geometry: root.retro ? null : root.geometry
+        geometry: root.look.retro ? null : root.geometry
         up: root.view ? root.view.dayUp : true
-        upColor: root.upColor
-        downColor: root.downColor
-        baselineColor: root.dimmer
-        hairlineColor: root.foreground
-        ground: root.ground
-        scrubX: root.retro ? -1 : root.scrubX
-        reveal: root.retro ? 1 : root.reveal
-        replayX: root.retro ? -1 : root.replayX
-        live: root.live && !root.retro
+        upColor: root.look.upColor
+        downColor: root.look.downColor
+        baselineColor: root.look.dimmer
+        hairlineColor: root.look.foreground
+        ground: root.look.ground
+        scrubX: root.look.retro ? -1 : root.scrubX
+        reveal: root.look.retro ? 1 : root.reveal
+        replayX: root.look.retro ? -1 : root.replayX
+        live: root.live && !root.look.retro
         newestPrice: root.newestPrice
         surfaceOpen: !root.still
         still: root.still || root.held
@@ -168,24 +151,24 @@ Item {
 
       RetroChart {
         id: retroChart
-        visible: root.retro
+        visible: root.look.retro
         anchors.fill: parent
-        geometry: root.retro ? root.geometry : null
-        upColor: root.upColor
-        downColor: root.downColor
+        geometry: root.look.retro ? root.geometry : null
+        upColor: root.look.upColor
+        downColor: root.look.downColor
         up: root.view ? root.view.dayUp : true
-        baselineColor: root.dimmer
+        baselineColor: root.look.dimmer
         glow: true
-        live: root.live && root.retro
+        live: root.live && root.look.retro
         newestPrice: root.newestPrice
         surfaceOpen: !root.still
         still: root.still || root.held
-        hairlineColor: root.foreground
-        ghostColor: root.ghost
-        ground: root.ground
-        scrubX: root.retro ? root.scrubX : -1
-        reveal: root.retro ? root.reveal : 1
-        replayX: root.retro ? root.replayX : -1
+        hairlineColor: root.look.foreground
+        ghostColor: root.look.ghost
+        ground: root.look.ground
+        scrubX: root.look.retro ? root.scrubX : -1
+        reveal: root.look.retro ? root.reveal : 1
+        replayX: root.look.retro ? root.replayX : -1
       }
 
       RangeMarks {
@@ -193,10 +176,8 @@ Item {
         parent: rangeMarks.chart.underScrub
         anchors.fill: parent
         marks: root.rangeMarks
-        chart: root.retro ? retroChart : smoothChart
-        foreground: root.foreground
-        dim: root.dim
-        fontFamily: root.fontFamily
+        chart: root.look.retro ? retroChart : smoothChart
+        look: root.look
       }
 
       // The chart that lands draws in at full ink. The veil reaches as far past
@@ -218,8 +199,8 @@ Item {
         opacity: root.dimmed
         textFormat: Text.PlainText
         text: root.loadingText + "…"
-        color: root.foreground
-        font.family: root.fontFamily
+        color: root.look.foreground
+        font.family: root.look.fontFamily
         font.pixelSize: Style.font.body
         elide: Text.ElideRight
       }
@@ -236,7 +217,7 @@ Item {
         width: Math.min(parent.width / (tradeX < 0 ? 1 : 2), dayNoteText.implicitWidth + Style.space(16))
         height: dayNoteText.implicitHeight
         visible: text !== "" && !(root.held && root.dimmed > 0)
-        color: root.ground
+        color: root.look.ground
 
         Text {
           id: dayNoteText
@@ -244,8 +225,8 @@ Item {
           width: Math.min(implicitWidth, parent.width)
           textFormat: Text.PlainText
           text: parent.text
-          color: root.dim
-          font.family: root.fontFamily
+          color: root.look.dim
+          font.family: root.look.fontFamily
           font.pixelSize: Style.font.bodySmall
           elide: Text.ElideRight
         }
@@ -257,7 +238,7 @@ Item {
         // Read where the chart is drawn, so the right edge reaches the last
         // trade.
         onPositionChanged: function(mouse) {
-          if (!root.replayRunning) root.scrubRequested(root.retro ? retroChart.fractionAt(mouse.x) : smoothChart.fractionAt(mouse.x))
+          if (!root.replayRunning) root.scrubRequested(root.look.retro ? retroChart.fractionAt(mouse.x) : smoothChart.fractionAt(mouse.x))
         }
         onExited: if (!root.replayRunning) root.scrubCleared()
         onClicked: root.snapToNow()
@@ -272,10 +253,7 @@ Item {
       width: parent.width
       options: root.rangeOptions
       value: root.range
-      retro: root.retro
-      foreground: root.foreground
-      dim: root.dim
-      fontFamily: root.fontFamily
+      look: root.look
       onSelected: function(value) { root.rangeRequested(value) }
     }
 
@@ -290,12 +268,7 @@ Item {
       // `Fundamentals.yearLine`).
       titles: root.rangeOptions.map(function(r) { return String(r).toUpperCase() }).concat(Figures.dayTitles(), ["52W"])
       factLists: root.factLists
-      retro: root.retro
-      foreground: root.foreground
-      dim: root.dim
-      upColor: root.upColor
-      downColor: root.downColor
-      fontFamily: root.fontFamily
+      look: root.look
       rowGap: Style.space(4)
 
       Rectangle {
@@ -316,13 +289,8 @@ Item {
       order: root.order
       reversed: root.reversed
       changeMode: root.changeMode
-      retro: root.retro
+      look: root.look
       still: root.still
-      foreground: root.foreground
-      dim: root.dim
-      upColor: root.upColor
-      downColor: root.downColor
-      fontFamily: root.fontFamily
       onListClicked: root.listClicked()
       onOrderClicked: root.orderClicked()
       onOrderReverseClicked: root.orderReverseClicked()

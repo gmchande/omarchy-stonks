@@ -4,7 +4,6 @@ import QtQuick
 import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Commons as Commons
-import "Tones.js" as Tones
 import "KeyText.js" as KeyText
 import "Motion.js" as Motion
 
@@ -15,13 +14,10 @@ FocusScope {
 
   property var choices: []
   property string current: ""
-  property bool retro: false
-  property color foreground: Commons.Color.foreground
-  property color dim: Tones.dim(foreground, Commons.Color.background)
-  property string fontFamily: Style.font.family
+  property Look look
   property int maxHeight: 0
   // Opaque whatever the theme's panel alpha.
-  property color background: Qt.rgba(Commons.Color.popups.background.r, Commons.Color.popups.background.g, Commons.Color.popups.background.b, 1)
+  property color background: Util.alpha(Commons.Color.popups.background, 1)
   property string problem: ""
 
   property int cursor: 0
@@ -196,10 +192,10 @@ FocusScope {
   // show the rows' cursor bar under it.
   Rectangle {
     anchors.fill: parent
-    radius: root.retro ? 0 : Style.cornerRadius
+    radius: root.look.retro ? 0 : Style.cornerRadius
     color: root.background
     border.width: 1
-    border.color: Qt.tint(root.background, Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.18))
+    border.color: Qt.tint(root.background, Util.alpha(root.look.foreground, 0.18))
   }
 
   RowPointer {
@@ -247,73 +243,62 @@ FocusScope {
         // By count: a change to the lists rebinds the rows, not rebuilds them.
         model: root.choices.length
 
+        // A plain Item at the root: when a list goes, the Repeater switches
+        // off the bindings of a root that is the delegate's own, and no
+        // others, so nothing here reads a list that has gone.
         Item {
           id: entry
           objectName: "listChoice"
           required property int index
           readonly property var choice: root.choices[index]
-          readonly property bool isCursor: index === root.cursor && !root.naming
           width: column.width
           height: root.itemHeight
 
-          Rectangle {
+          MenuLine {
             anchors.fill: parent
-            radius: root.retro ? 0 : Style.cornerRadius
-            color: entry.isCursor ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
-            Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
-          }
+            look: root.look
+            isCursor: entry.index === root.cursor && !root.naming
+            takes: !root.naming
+            onTaken: root.take(entry.index)
 
-          CursorBar {
-            visible: entry.isCursor
-            retro: root.retro
-            foreground: root.foreground
-          }
+            Text {
+              id: mark
+              x: Style.space(8)
+              width: Style.space(16)
+              anchors.verticalCenter: parent.verticalCenter
+              text: entry.choice.name === root.current ? "✓" : ""
+              color: root.look.foreground
+              font.family: root.look.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              font.bold: true
+            }
 
-          Text {
-            id: mark
-            x: Style.space(8)
-            width: Style.space(16)
-            anchors.verticalCenter: parent.verticalCenter
-            text: entry.choice.name === root.current ? "✓" : ""
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.bodySmall
-            font.bold: true
-          }
+            Text {
+              anchors.left: mark.right
+              anchors.right: count.left
+              anchors.rightMargin: Style.space(10)
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              text: entry.choice.label
+              color: root.look.foreground
+              font.family: root.look.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              elide: Text.ElideRight
+            }
 
-          Text {
-            anchors.left: mark.right
-            anchors.right: count.left
-            anchors.rightMargin: Style.space(10)
-            anchors.verticalCenter: parent.verticalCenter
-            textFormat: Text.PlainText
-            text: entry.choice.label
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.bodySmall
-            elide: Text.ElideRight
-          }
-
-          Text {
-            id: count
-            objectName: "listCount"
-            anchors.right: parent.right
-            anchors.rightMargin: Style.space(8)
-            anchors.verticalCenter: parent.verticalCenter
-            textFormat: Text.PlainText
-            text: String(entry.choice.count)
-            color: root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-            font.bold: true
-          }
-
-          MouseArea {
-            anchors.fill: parent
-            enabled: !root.naming
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: root.take(entry.index)
+            Text {
+              id: count
+              objectName: "listCount"
+              anchors.right: parent.right
+              anchors.rightMargin: Style.space(8)
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              text: String(entry.choice.count)
+              color: root.look.dim
+              font.family: root.look.fontFamily
+              font.pixelSize: Style.font.caption
+              font.bold: true
+            }
           }
         }
       }
@@ -337,7 +322,7 @@ FocusScope {
         x: Style.space(8)
         width: parent.width - Style.space(16)
         height: 1
-        color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.12)
+        color: Util.alpha(root.look.foreground, 0.12)
       }
     }
 
@@ -347,37 +332,23 @@ FocusScope {
       width: pinned.width
       height: root.itemHeight
 
-      Rectangle {
+      // The line gives way whole to the field while a name is typed.
+      MenuLine {
         anchors.fill: parent
         visible: !root.naming
-        radius: root.retro ? 0 : Style.cornerRadius
-        color: root.cursor === root.newIndex ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
-        Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
-      }
+        look: root.look
+        isCursor: root.cursor === root.newIndex
+        onTaken: root.startNaming()
 
-      CursorBar {
-        visible: root.cursor === root.newIndex && !root.naming
-        retro: root.retro
-        foreground: root.foreground
-      }
-
-      Text {
-        visible: !root.naming
-        x: Style.space(24)
-        anchors.verticalCenter: parent.verticalCenter
-        textFormat: Text.PlainText
-        text: "New list…"
-        color: root.dim
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.bodySmall
-      }
-
-      MouseArea {
-        anchors.fill: parent
-        visible: !root.naming
-        hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
-        onClicked: root.startNaming()
+        Text {
+          x: Style.space(24)
+          anchors.verticalCenter: parent.verticalCenter
+          textFormat: Text.PlainText
+          text: "New list…"
+          color: root.look.dim
+          font.family: root.look.fontFamily
+          font.pixelSize: Style.font.bodySmall
+        }
       }
 
       Field {
@@ -392,10 +363,10 @@ FocusScope {
         verticalPadding: 0
         // The typed name starts where "New list…" and the lists' names do.
         leftPadding: Style.space(24)
-        retro: root.retro
-        foreground: root.foreground
-        dim: root.dim
-        font.family: root.fontFamily
+        retro: root.look.retro
+        foreground: root.look.foreground
+        dim: root.look.dim
+        font.family: root.look.fontFamily
         font.pixelSize: Style.font.bodySmall
         placeholderText: "List name"
         onTextChanged: root.problem = ""
@@ -408,7 +379,7 @@ FocusScope {
       ListAction {
         id: makeButton
         objectName: "makeList"
-        view: root
+        look: root.look
         visible: root.naming
         anchors.right: parent.right
         anchors.rightMargin: Style.space(8)
@@ -428,48 +399,30 @@ FocusScope {
       verticalAlignment: Text.AlignVCenter
       textFormat: Text.PlainText
       text: root.problem
-      color: root.foreground
-      font.family: root.fontFamily
+      color: root.look.foreground
+      font.family: root.look.fontFamily
       font.pixelSize: Style.font.caption
       elide: Text.ElideRight
     }
 
-    Item {
+    MenuLine {
       id: manageRow
       objectName: "manageListsRow"
       width: pinned.width
       height: root.itemHeight
-      readonly property bool isCursor: root.cursor === root.manageIndex && !root.naming
-
-      Rectangle {
-        anchors.fill: parent
-        radius: root.retro ? 0 : Style.cornerRadius
-        color: manageRow.isCursor ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
-        Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
-      }
-
-      CursorBar {
-        visible: manageRow.isCursor
-        retro: root.retro
-        foreground: root.foreground
-      }
+      look: root.look
+      isCursor: root.cursor === root.manageIndex && !root.naming
+      takes: !root.naming
+      onTaken: root.manageRequested()
 
       Text {
         x: Style.space(24)
         anchors.verticalCenter: parent.verticalCenter
         textFormat: Text.PlainText
         text: "Manage lists…"
-        color: root.dim
-        font.family: root.fontFamily
+        color: root.look.dim
+        font.family: root.look.fontFamily
         font.pixelSize: Style.font.bodySmall
-      }
-
-      MouseArea {
-        anchors.fill: parent
-        enabled: !root.naming
-        hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
-        onClicked: root.manageRequested()
       }
     }
   }

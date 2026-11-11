@@ -109,7 +109,7 @@ BarWidget {
     shownDay = animalDay()
     shownKind = Figures.animalKind(featured)
   }
-  readonly property color barGround: Qt.rgba(Commons.Color.bar.background.r, Commons.Color.bar.background.g, Commons.Color.bar.background.b, 1)
+  readonly property color barGround: Util.alpha(Commons.Color.bar.background, 1)
   readonly property color dimColor: Tones.dim(button.foreground, barGround)
   // The bar is the surface most trusted at a glance, so a failed or overdue
   // refresh marks the pill too. Overdue names no source: not every reader
@@ -268,7 +268,7 @@ BarWidget {
         height: Style.space(12)
         geometry: root.retro ? null : root.lineGeometry
         lineColor: root.trendColor
-        baselineColor: Qt.rgba(button.foreground.r, button.foreground.g, button.foreground.b, 0.25)
+        baselineColor: Util.alpha(button.foreground, 0.25)
         lineWidth: 1.5
       }
 
@@ -282,7 +282,7 @@ BarWidget {
         geometry: root.retro ? root.lineGeometry : null
         upColor: root.trendColor
         downColor: root.trendColor
-        baselineColor: Qt.rgba(button.foreground.r, button.foreground.g, button.foreground.b, 0.25)
+        baselineColor: Util.alpha(button.foreground, 0.25)
         pixel: 2
         gap: 1
         solid: true

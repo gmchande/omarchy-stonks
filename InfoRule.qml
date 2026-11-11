@@ -1,7 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import qs.Commons as Commons
+import qs.Commons
 import "Cells.js" as Cells
 
 // A range as a thin rule in the breadth rule's ink, low at the left and high
@@ -13,12 +13,11 @@ Item {
   property var low: null
   property var high: null
   property var price: null
-  property bool retro: false
-  property color foreground: Commons.Color.foreground
+  property Look look
 
   readonly property int thickness: Cells.RULE_THICKNESS
   readonly property int pitch: Cells.RULE_PITCH
-  readonly property color plain: Qt.rgba(foreground.r, foreground.g, foreground.b, Cells.RULE_INK)
+  readonly property color plain: Util.alpha(look.foreground, Cells.RULE_INK)
   readonly property int cells: Math.max(0, Math.floor((width + 1) / pitch))
   // -1 for no tick.
   readonly property real place: low !== null && high !== null && price !== null && high > low
@@ -29,7 +28,7 @@ Item {
   implicitHeight: pitch * 2 + thickness
 
   Rectangle {
-    visible: !root.retro
+    visible: !root.look.retro
     anchors.verticalCenter: parent.verticalCenter
     width: parent.width
     height: root.thickness
@@ -38,12 +37,12 @@ Item {
   }
 
   Row {
-    visible: root.retro
+    visible: root.look.retro
     anchors.verticalCenter: parent.verticalCenter
     spacing: root.pitch - root.thickness
 
     Repeater {
-      model: root.retro ? root.cells : 0
+      model: root.look.retro ? root.cells : 0
 
       Rectangle {
         width: root.thickness
@@ -55,17 +54,17 @@ Item {
 
   Rectangle {
     objectName: "infoTick"
-    visible: !root.retro && root.tickX >= 0
+    visible: !root.look.retro && root.tickX >= 0
     x: root.tickX
     width: root.thickness
     height: root.height
     radius: root.thickness / 2
-    color: root.foreground
+    color: root.look.foreground
   }
 
   Column {
     objectName: "infoTickCells"
-    visible: root.retro && root.tickX >= 0
+    visible: root.look.retro && root.tickX >= 0
     x: root.tickX
     spacing: root.pitch - root.thickness
 
@@ -75,7 +74,7 @@ Item {
       Rectangle {
         width: root.thickness
         height: root.thickness
-        color: root.foreground
+        color: root.look.foreground
       }
     }
   }

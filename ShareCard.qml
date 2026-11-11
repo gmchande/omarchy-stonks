@@ -9,7 +9,6 @@ import "Figures.js" as Figures
 import "Format.js" as Format
 import "History.js" as History
 import "Share.js" as Share
-import "Tones.js" as Tones
 // The screenshot: what the panel shows above its ranges, never the list, laid
 // out again at 1200 × 675 (16:9, which X shows whole), with the panel's two
 // lines under the price and the move (`Figures.heroLines`) and the facts the
@@ -42,6 +41,15 @@ Rectangle {
   property color upColor: Commons.Color.foreground
   property color downColor: Commons.Color.urgent
   property string fontFamily: Style.font.family
+  // How this surface looks, for everything drawn on it.
+  readonly property Look look: Look {
+    retro: root.retro
+    fontFamily: root.fontFamily
+    foreground: root.foreground
+    ground: root.ground
+    upColor: root.upColor
+    downColor: root.downColor
+  }
 
   // `px` is one of the picture's pixels in window units: half a unit on a
   // scale-2 screen.
@@ -49,9 +57,6 @@ Rectangle {
   readonly property real u: 2 / dpr
   readonly property real px: 1 / dpr
   readonly property real margin: 64 * u
-  readonly property color dim: Tones.dim(foreground, ground)
-  readonly property color dimmer: Tones.dimmer(foreground, ground)
-  readonly property color ghost: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.05)
   readonly property var words: quote && day ? Share.words({ quote: quote, day: day, history: history, latest: latest,
     newest: view ? view.newest : null, scrubT: scrubT, changeMode: changeMode, calendars: calendars }) : null
   readonly property var lines: Figures.heroLines(quote, view, latest, now, day, calendars, changeMode, scrubT !== 0)
@@ -69,7 +74,7 @@ Rectangle {
     : shownDay ? Chart.fractionAtTime(shownDay, scrubT) : -1
 
   function toneColor(tone) {
-    return tone === "up" ? upColor : tone === "down" ? downColor : dim
+    return tone === "up" ? upColor : tone === "down" ? downColor : look.dim
   }
 
   width: 1200 * u
@@ -111,7 +116,7 @@ Rectangle {
     anchors.baseline: symbolText.baseline
     textFormat: Text.PlainText
     text: root.quote ? " · " + root.quote.exchange : ""
-    color: root.dim
+    color: root.look.dim
     font.family: root.fontFamily
     font.pixelSize: 18 * root.u
     font.bold: true
@@ -141,7 +146,7 @@ Rectangle {
     height: 20 * root.u
     pixels: Cells.spritePixels(Cells.SLEEP_Z)
     pixelRatio: root.dpr
-    color: root.dim
+    color: root.look.dim
   }
 
   // As large as the room the move leaves it.
@@ -191,7 +196,7 @@ Rectangle {
     cell: root.cell
     gap: root.px
     color: root.foreground
-    ghostColor: root.ghost
+    ghostColor: root.look.ghost
   }
   // Set like a unit, dim at the ticker's size: a price in pence says "PENCE".
   Text {
@@ -201,7 +206,7 @@ Rectangle {
     y: root.priceBaseline - baselineOffset
     textFormat: Text.PlainText
     text: root.words ? root.words.currency : ""
-    color: root.dim
+    color: root.look.dim
     font: symbolText.font
   }
   Text {
@@ -223,7 +228,7 @@ Rectangle {
   component Caption: Text {
     textFormat: Text.PlainText
     visible: text !== ""
-    color: root.dim
+    color: root.look.dim
     font.family: root.fontFamily
     font.pixelSize: 18 * root.u
     font.bold: true
@@ -250,11 +255,11 @@ Rectangle {
     Caption { text: root.close ? root.close.time : "" }
     Figure {
       text: root.close ? root.close.price : ""
-      color: root.close && root.close.stale ? root.dim : root.foreground
+      color: root.close && root.close.stale ? root.look.dim : root.foreground
     }
     Figure {
       text: root.close ? Format.lookSigns(root.close.changeText, root.retro) : ""
-      color: root.close && root.close.stale ? root.dim : root.toneColor(root.close ? root.close.tone : "flat")
+      color: root.close && root.close.stale ? root.look.dim : root.toneColor(root.close ? root.close.tone : "flat")
     }
     Caption { text: root.close && root.close.since ? "· " + root.close.since.label : "" }
     Figure {
@@ -294,7 +299,7 @@ Rectangle {
       up: root.view ? root.view.dayUp : true
       upColor: root.upColor
       downColor: root.downColor
-      baselineColor: root.dimmer
+      baselineColor: root.look.dimmer
       hairlineColor: root.foreground
       ground: root.ground
       scrubX: root.scrubX
@@ -311,9 +316,9 @@ Rectangle {
       up: root.view ? root.view.dayUp : true
       upColor: root.upColor
       downColor: root.downColor
-      baselineColor: root.dimmer
+      baselineColor: root.look.dimmer
       hairlineColor: root.foreground
-      ghostColor: root.ghost
+      ghostColor: root.look.ghost
       ground: root.ground
       glow: true
       scrubX: root.scrubX
@@ -326,9 +331,7 @@ Rectangle {
       anchors.fill: parent
       marks: root.marks
       chart: root.retro ? retroChart : smoothChart
-      foreground: root.foreground
-      dim: root.dim
-      fontFamily: root.fontFamily
+      look: root.look
       fontSize: 18 * root.u
       letterSpacing: root.u
       spacing: 1.8 * root.u
@@ -345,7 +348,7 @@ Rectangle {
         anchors.centerIn: parent
         textFormat: Text.PlainText
         text: parent.text
-        color: root.dim
+        color: root.look.dim
         font.family: root.fontFamily
         font.pixelSize: 20 * root.u
       }
@@ -372,7 +375,7 @@ Rectangle {
     y: 616 * root.u
     width: root.width - root.margin * 2
     height: root.u
-    color: root.ghost
+    color: root.look.ghost
   }
 
   // When the price on top is from. Spaced as the day's axis is, so it stays
@@ -391,7 +394,7 @@ Rectangle {
     y: 654 * root.u - baselineOffset
     textFormat: Text.PlainText
     text: "for Omarchy"
-    color: root.dim
+    color: root.look.dim
     font.family: root.fontFamily
     font.pixelSize: 28 * root.u
   }

@@ -6,16 +6,12 @@ import qs.Commons
 import qs.Commons as Commons
 import "Fetch.js" as Fetch
 import "Search.js" as Search
-import "Tones.js" as Tones
 // Search's field, results and Yahoo lookup. A FocusScope, so that hiding it
 // takes the keys from the field: a hidden field keeps them otherwise.
 FocusScope {
   id: root
 
-  property bool retro: false
-  property color foreground: Commons.Color.foreground
-  property color dim: Tones.dim(foreground, Commons.Color.background)
-  property string fontFamily: Style.font.family
+  property Look look
   property int rowHeight: Style.space(30)
   // As many as `Search.searchUrl` asks for.
   readonly property int maxResults: Search.SHOWN_RESULTS
@@ -42,8 +38,6 @@ FocusScope {
   readonly property var ownSymbols: own.map(function(r) { return r.symbol })
   readonly property var shown: own.concat(results.filter(function(r) { return ownSymbols.indexOf(r.symbol) < 0 }))
   readonly property int ownCount: own.length
-  property color upColor: foreground
-  property color downColor: foreground
   // Yahoo's rows dim under a newer query; the list's own follow every letter.
   function dimmed(index) { return stale && index >= ownCount }
   property string note: ""
@@ -104,7 +98,7 @@ FocusScope {
   onPutBackChanged: if (searchText.trim() === "" && active) showEmpty()
   // Every label takes the widest word's slot, so the exchange codes keep
   // their column whichever shows.
-  readonly property font buttonFont: Qt.font({ family: fontFamily, pixelSize: Style.font.caption, bold: true, letterSpacing: 1 })
+  readonly property font buttonFont: Qt.font({ family: look.fontFamily, pixelSize: Style.font.caption, bold: true, letterSpacing: 1 })
   readonly property int buttonWidth: Math.ceil(Math.max(addMetrics.advanceWidth, showMetrics.advanceWidth,
     putBack ? putBackMetrics.advanceWidth : 0)) + Style.space(12)
   TextMetrics { id: addMetrics; font: root.buttonFont; text: "ADD" }
@@ -119,7 +113,7 @@ FocusScope {
       widest = Math.max(widest, Math.ceil(exchangeMetrics.advanceWidth(shown[i].move || shown[i].exchange || "")))
     return Math.min(widest, Style.space(110))
   }
-  FontMetrics { id: exchangeMetrics; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
+  FontMetrics { id: exchangeMetrics; font.family: root.look.fontFamily; font.pixelSize: Style.font.caption }
   // The name gives way to the symbol, which is what you match on, until the
   // name is down to half the room they share.
   readonly property int sharedWidth: width - gutter - rowPadding * 2 - columnGap * 3 - exchangeWidth - buttonWidth
@@ -130,7 +124,7 @@ FocusScope {
       widest = Math.max(widest, Math.ceil(symbolMetrics.advanceWidth(shown[i].symbol)))
     return Math.min(widest, Math.floor(sharedWidth / 2))
   }
-  FontMetrics { id: symbolMetrics; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
+  FontMetrics { id: symbolMetrics; font.family: root.look.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
 
   // `pointed`: picked by a click, so the pointer rests where the pick was.
   signal picked(string symbol, bool pointed)
@@ -412,10 +406,10 @@ FocusScope {
           opacity: dimmed ? 0.4 : 1
           width: parent.width
           height: root.rowHeight
-          radius: root.retro ? 0 : Style.cornerRadius
-          color: rowMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
-            : chosen ? Style.hoverFillFor(root.foreground, Commons.Color.accent)
-            : rowMouse.containsMouse ? Style.normalFillFor(root.foreground, Commons.Color.accent) : "transparent"
+          radius: root.look.retro ? 0 : Style.cornerRadius
+          color: rowMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
+            : chosen ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent)
+            : rowMouse.containsMouse ? Style.normalFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
 
           // The pointer only tints a row: one resting over the results never
           // changes what Enter adds.
@@ -438,8 +432,8 @@ FocusScope {
               anchors.verticalCenter: parent.verticalCenter
               textFormat: Text.PlainText
               text: resultRow.modelData.symbol
-              color: root.foreground
-              font.family: root.fontFamily
+              color: root.look.foreground
+              font.family: root.look.fontFamily
               font.pixelSize: Style.font.body
               font.bold: true
               elide: Text.ElideRight
@@ -450,8 +444,8 @@ FocusScope {
               anchors.verticalCenter: parent.verticalCenter
               textFormat: Text.PlainText
               text: resultRow.modelData.name
-              color: root.dim
-              font.family: root.fontFamily
+              color: root.look.dim
+              font.family: root.look.fontFamily
               font.pixelSize: Style.font.bodySmall
               elide: Text.ElideRight
             }
@@ -462,9 +456,9 @@ FocusScope {
               horizontalAlignment: Text.AlignRight
               textFormat: Text.PlainText
               text: resultRow.modelData.move || resultRow.modelData.exchange || ""
-              color: resultRow.modelData.tone === "up" ? root.upColor
-                : resultRow.modelData.tone === "down" ? root.downColor : root.dim
-              font.family: root.fontFamily
+              color: resultRow.modelData.tone === "up" ? root.look.upColor
+                : resultRow.modelData.tone === "down" ? root.look.downColor : root.look.dim
+              font.family: root.look.fontFamily
               font.pixelSize: Style.font.caption
               elide: Text.ElideRight
             }
@@ -474,14 +468,14 @@ FocusScope {
               anchors.verticalCenter: parent.verticalCenter
               width: root.buttonWidth
               height: addLabel.implicitHeight + Style.space(4)
-              radius: root.retro ? 0 : Style.cornerRadius
-              color: Style.selectedFillFor(root.foreground, Commons.Color.accent)
+              radius: root.look.retro ? 0 : Style.cornerRadius
+              color: Style.selectedFillFor(root.look.foreground, Commons.Color.accent)
               Text {
                 id: addLabel
                 anchors.centerIn: parent
                 textFormat: Text.PlainText
                 text: root.actionFor(resultRow.modelData.symbol)
-                color: Style.selectedStateColor(root.foreground, Commons.Color.accent)
+                color: Style.selectedStateColor(root.look.foreground, Commons.Color.accent)
                 font: root.buttonFont
               }
             }
@@ -500,8 +494,8 @@ FocusScope {
         verticalAlignment: Text.AlignVCenter
         textFormat: Text.PlainText
         text: root.note
-        color: root.dim
-        font.family: root.fontFamily
+        color: root.look.dim
+        font.family: root.look.fontFamily
         font.pixelSize: Style.font.bodySmall
         elide: Text.ElideRight
       }
@@ -535,8 +529,8 @@ FocusScope {
         : root.answer === "failed" ? "Couldn't search · " + (root.failure === "refused" ? "server busy"
           : root.failure === "none" ? "check your internet" : root.failure === "missing" ? "try other words" : "try again")
         : "Searching for “" + root.searchText.trim() + "”…"
-      color: root.dim
-      font.family: root.fontFamily
+      color: root.look.dim
+      font.family: root.look.fontFamily
       font.pixelSize: Style.font.bodySmall
       elide: Text.ElideRight
     }
@@ -544,7 +538,7 @@ FocusScope {
     ListAction {
       id: retrySearch
       objectName: "searchRetry"
-      view: root
+      look: root.look
       visible: root.answer === "failed" && root.failure !== "missing"
       enabled: !root.stale
       anchors.left: searchMessage.right
@@ -571,9 +565,9 @@ FocusScope {
       anchors.right: cancelButton.left
       anchors.rightMargin: Style.space(10)
       anchors.verticalCenter: parent.verticalCenter
-      retro: root.retro
-      foreground: root.foreground
-      dim: root.dim
+      retro: root.look.retro
+      foreground: root.look.foreground
+      dim: root.look.dim
       placeholderText: root.placeholder
       onTextChanged: root.setQuery(text)
       Keys.onPressed: function(event) { root.handleKey(event) }
@@ -582,7 +576,7 @@ FocusScope {
     ListAction {
       id: cancelButton
       objectName: "searchCancel"
-      view: root
+      look: root.look
       anchors.right: parent.right
       anchors.rightMargin: root.rowPadding
       anchors.verticalCenter: parent.verticalCenter

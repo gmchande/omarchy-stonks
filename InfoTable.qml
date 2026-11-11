@@ -2,9 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.Commons
-import qs.Commons as Commons
 import "Cells.js" as Cells
-import "Tones.js" as Tones
 
 // The info block's two lines as one table, so their rules share a column.
 // Each column is as wide as the widest figure it can hold at the listing's
@@ -17,21 +15,16 @@ Item {
   // Every title and list of facts a line can hold, on any range.
   property var titles: []
   property var factLists: []
-  property bool retro: false
-  property color foreground: Commons.Color.foreground
-  property color dim: Tones.dim(foreground, Commons.Color.background)
-  property color upColor: Commons.Color.foreground
-  property color downColor: Commons.Color.urgent
-  property string fontFamily: Style.font.family
+  property Look look
   property int rowGap: Style.space(4)
 
   readonly property int gap: Style.space(14)
   readonly property int innerGap: Style.space(6)
   readonly property int minRule: Style.space(32)
-  readonly property font valueFont: Qt.font({ family: fontFamily, pixelSize: Style.font.caption, bold: true })
-  readonly property font labelFont: Qt.font({ family: fontFamily, pixelSize: Style.font.caption, bold: true, letterSpacing: 1 })
+  readonly property font valueFont: Qt.font({ family: look.fontFamily, pixelSize: Style.font.caption, bold: true })
+  readonly property font labelFont: Qt.font({ family: look.fontFamily, pixelSize: Style.font.caption, bold: true, letterSpacing: 1 })
   // A label as the shell's panels set one: plain, in sentence case.
-  readonly property font factFont: Qt.font({ family: fontFamily, pixelSize: Style.font.caption })
+  readonly property font factFont: Qt.font({ family: look.fontFamily, pixelSize: Style.font.caption })
   function factLabel(text) { return text === "P/E" ? text : text.charAt(0) + text.slice(1).toLowerCase() }
   // Rounds ascent and descent up each, as a line of text does.
   readonly property int lineHeight: Math.ceil(metrics.ascent) + Math.ceil(metrics.descent)
@@ -46,7 +39,7 @@ Item {
     var label = f.label ? Math.ceil(factMetrics.advanceWidth(factLabel(f.label))) : 0
     return label + (f.label ? innerGap : 0) + value
   }
-  function toneColor(tone) { return tone === "up" ? upColor : tone === "down" ? downColor : foreground }
+  function toneColor(tone) { return tone === "up" ? look.upColor : tone === "down" ? look.downColor : look.foreground }
 
   // Reading `metrics.font` measures again at a new text size.
   readonly property int titleWidth: {
@@ -111,7 +104,7 @@ Item {
       Text {
         textFormat: Text.PlainText
         text: row.line ? row.line.title : ""
-        color: root.dim
+        color: root.look.dim
         font: root.labelFont
       }
 
@@ -134,8 +127,7 @@ Item {
         low: row.line ? row.line.range.low : null
         high: row.line ? row.line.range.high : null
         price: row.line ? row.line.range.price : null
-        retro: root.retro
-        foreground: root.foreground
+        look: root.look
       }
 
       Text {
@@ -162,14 +154,14 @@ Item {
             visible: text !== ""
             textFormat: Text.PlainText
             text: root.factLabel(fact.f.label)
-            color: root.dim
+            color: root.look.dim
             font: root.factFont
           }
           Text {
             anchors.right: parent.right
             textFormat: Text.PlainText
             text: fact.f.value
-            color: root.foreground
+            color: root.look.foreground
             font: root.valueFont
           }
         }

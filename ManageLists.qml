@@ -4,7 +4,6 @@ import QtQuick
 import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Commons as Commons
-import "Tones.js" as Tones
 import "Motion.js" as Motion
 
 // Manage lists, in the rows' place: rename, reorder, and delete the named
@@ -13,10 +12,7 @@ FocusScope {
   id: root
 
   property var choices: []
-  property bool retro: false
-  property color foreground: Commons.Color.foreground
-  property color dim: Tones.dim(foreground, Commons.Color.background)
-  property string fontFamily: Style.font.family
+  property Look look
   // Why a typed name was refused, said under the field and brought into
   // view; as its line goes, the list rests within its rows at once.
   property string problem: ""
@@ -238,15 +234,15 @@ FocusScope {
       anchors.verticalCenter: parent.verticalCenter
       textFormat: Text.PlainText
       text: "MANAGE LISTS"
-      color: root.dim
-      font.family: root.fontFamily
+      color: root.look.dim
+      font.family: root.look.fontFamily
       font.pixelSize: Style.font.caption
       font.bold: true
       font.letterSpacing: 1
     }
 
     ListAction {
-      view: root
+      look: root.look
       objectName: "manageDone"
       anchors.right: parent.right
       anchors.rightMargin: root.gutter + root.inset
@@ -310,16 +306,16 @@ FocusScope {
           Rectangle {
             width: parent.width
             height: root.itemHeight
-            radius: root.retro ? 0 : Style.cornerRadius
-            color: entry.isCursor ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
+            radius: root.look.retro ? 0 : Style.cornerRadius
+            color: entry.isCursor ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent"
             Behavior on color { ColorAnimation { duration: Motion.duration(Style, 60) } }
           }
 
           CursorBar {
             visible: entry.isCursor
             rowHeight: root.itemHeight
-            retro: root.retro
-            foreground: root.foreground
+            retro: root.look.retro
+            foreground: root.look.foreground
           }
 
           Text {
@@ -330,8 +326,8 @@ FocusScope {
             verticalAlignment: Text.AlignVCenter
             textFormat: Text.PlainText
             text: entry.choice.label
-            color: entry.named ? root.foreground : root.dim
-            font.family: root.fontFamily
+            color: entry.named ? root.look.foreground : root.look.dim
+            font.family: root.look.fontFamily
             font.pixelSize: Style.font.bodySmall
             elide: Text.ElideRight
           }
@@ -344,8 +340,8 @@ FocusScope {
             verticalAlignment: Text.AlignVCenter
             textFormat: Text.PlainText
             text: "EVERY SYMBOL"
-            color: root.dim
-            font.family: root.fontFamily
+            color: root.look.dim
+            font.family: root.look.fontFamily
             font.pixelSize: Style.font.caption
             font.bold: true
             font.letterSpacing: 1
@@ -361,7 +357,7 @@ FocusScope {
 
             // An arrow with nowhere to move its list can't act, and is faded.
             ListAction {
-              view: root
+              look: root.look
               objectName: "moveUp"
               anchors.verticalCenter: parent.verticalCenter
               text: "↑"
@@ -370,7 +366,7 @@ FocusScope {
               onActivated: root.move(entry.index, -1)
             }
             ListAction {
-              view: root
+              look: root.look
               objectName: "moveDown"
               anchors.verticalCenter: parent.verticalCenter
               text: "↓"
@@ -379,7 +375,7 @@ FocusScope {
               onActivated: root.move(entry.index, 1)
             }
             ListAction {
-              view: root
+              look: root.look
               objectName: "renameAction"
               anchors.verticalCenter: parent.verticalCenter
               text: "RENAME"
@@ -387,7 +383,7 @@ FocusScope {
               onActivated: root.startRenaming(entry.index)
             }
             ListAction {
-              view: root
+              look: root.look
               objectName: "deleteAction"
               anchors.verticalCenter: parent.verticalCenter
               text: "DELETE"
@@ -408,8 +404,8 @@ FocusScope {
             verticalAlignment: Text.AlignVCenter
             textFormat: Text.PlainText
             text: String(entry.choice.count)
-            color: root.dim
-            font.family: root.fontFamily
+            color: root.look.dim
+            font.family: root.look.fontFamily
             font.pixelSize: Style.font.caption
             font.bold: true
           }
@@ -426,8 +422,8 @@ FocusScope {
               + (entry.choice.count === 0 ? "It's empty."
                 : entry.choice.count === 1 ? "Its symbol stays in All."
                 : "Its " + entry.choice.count + " symbols stay in All.")
-            color: root.foreground
-            font.family: root.fontFamily
+            color: root.look.foreground
+            font.family: root.look.fontFamily
             font.pixelSize: Style.font.bodySmall
             elide: Text.ElideRight
           }
@@ -441,7 +437,7 @@ FocusScope {
             spacing: Style.space(14)
 
             ListAction {
-              view: root
+              look: root.look
               objectName: "confirmDelete"
               anchors.verticalCenter: parent.verticalCenter
               text: "DELETE"
@@ -450,7 +446,7 @@ FocusScope {
               onActivated: root.confirmDelete()
             }
             ListAction {
-              view: root
+              look: root.look
               objectName: "cancelDelete"
               anchors.verticalCenter: parent.verticalCenter
               text: "CANCEL"
@@ -467,8 +463,8 @@ FocusScope {
             verticalAlignment: Text.AlignVCenter
             textFormat: Text.PlainText
             text: root.problem
-            color: root.foreground
-            font.family: root.fontFamily
+            color: root.look.foreground
+            font.family: root.look.fontFamily
             font.pixelSize: Style.font.caption
             elide: Text.ElideRight
           }
@@ -487,10 +483,10 @@ FocusScope {
       leftPadding: root.inset - x
       height: root.itemHeight
       verticalPadding: 0
-      retro: root.retro
-      foreground: root.foreground
-      dim: root.dim
-      font.family: root.fontFamily
+      retro: root.look.retro
+      foreground: root.look.foreground
+      dim: root.look.dim
+      font.family: root.look.fontFamily
       font.pixelSize: Style.font.bodySmall
       onTextChanged: root.problem = ""
       // Enter is taken here, not on accepted: the press would go on to the
@@ -514,7 +510,7 @@ FocusScope {
       spacing: Style.space(14)
 
       ListAction {
-        view: root
+        look: root.look
         objectName: "saveName"
         anchors.verticalCenter: parent.verticalCenter
         text: "SAVE"
@@ -522,7 +518,7 @@ FocusScope {
         onActivated: root.saveName()
       }
       ListAction {
-        view: root
+        look: root.look
         objectName: "cancelRename"
         anchors.verticalCenter: parent.verticalCenter
         text: "CANCEL"

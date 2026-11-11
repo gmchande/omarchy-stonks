@@ -2,7 +2,6 @@ import QtQuick
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
-import "Tones.js" as Tones
 import "Motion.js" as Motion
 
 // The pinned "+ Find or add a symbol" bar. A note there says for a moment
@@ -12,10 +11,7 @@ import "Motion.js" as Motion
 Item {
   id: root
 
-  property bool retro: false
-  property color foreground: Commons.Color.foreground
-  property color dim: Tones.dim(foreground, Commons.Color.background)
-  property string fontFamily: Style.font.family
+  property Look look
   property int rowHeight: Style.space(30)
   // The rows' scrollbar gutter: the words and fill stop short of it, the
   // ground doesn't.
@@ -29,7 +25,6 @@ Item {
   // A click does something: the add, or the notice's own action.
   property bool acts: true
   property string label: "+  Find or add a symbol"
-  property color ground: "transparent"
   // "Undo NVDA", or "" for none.
   property string undoLabel: ""
   property real undoOpacity: 1
@@ -124,7 +119,7 @@ Item {
   }
   FontMetrics {
     id: footerMetrics
-    font.family: root.fontFamily
+    font.family: root.look.fontFamily
     font.pixelSize: Style.font.bodySmall
   }
   // A note covers a notice for a moment in the notice's room, so nothing
@@ -137,7 +132,7 @@ Item {
 
   Rectangle {
     anchors.fill: parent
-    color: root.ground
+    color: root.look.ground
   }
 
   // The hint takes no click.
@@ -154,8 +149,8 @@ Item {
     horizontalAlignment: Text.AlignHCenter
     textFormat: Text.PlainText
     text: root.hintLines
-    color: root.dim
-    font.family: root.fontFamily
+    color: root.look.dim
+    font.family: root.look.fontFamily
     font.pixelSize: Style.font.bodySmall
   }
 
@@ -166,8 +161,8 @@ Item {
     anchors.rightMargin: root.gutter + root.undoRoom
     mouse: addMouse
     acts: root.acts
-    retro: root.retro
-    foreground: root.foreground
+    retro: root.look.retro
+    foreground: root.look.foreground
 
     // Centred on the whole bar, so the end button coming or going moves
     // nothing, unless the words would run into it.
@@ -193,9 +188,9 @@ Item {
           horizontalAlignment: Text.AlignRight
           textFormat: Text.PlainText
           text: root.note !== "" ? root.note : root.notice !== "" ? root.notice : root.label
-          color: root.note !== "" || root.notice !== "" ? root.foreground : root.dim
+          color: root.note !== "" || root.notice !== "" ? root.look.foreground : root.look.dim
           opacity: root.note !== "" ? root.noteOpacity : root.coveredOpacity
-          font.family: root.fontFamily
+          font.family: root.look.fontFamily
           font.pixelSize: Style.font.bodySmall
         }
 
@@ -205,9 +200,9 @@ Item {
           visible: text !== ""
           textFormat: Text.PlainText
           text: root.note === "" && root.notice !== "" ? root.noticeShown.action : ""
-          color: root.foreground
+          color: root.look.foreground
           opacity: root.note !== "" ? root.noteOpacity : root.coveredOpacity
-          font.family: root.fontFamily
+          font.family: root.look.fontFamily
           font.pixelSize: Style.font.bodySmall
         }
       }
@@ -237,8 +232,8 @@ Item {
     width: root.undoRoom - Style.space(4)
     opacity: root.undoing ? root.undoOpacity : 1
     mouse: undoMouse
-    retro: root.retro
-    foreground: root.foreground
+    retro: root.look.retro
+    foreground: root.look.foreground
 
     Text {
       id: undoText
@@ -246,8 +241,8 @@ Item {
       anchors.centerIn: parent
       textFormat: Text.PlainText
       text: root.sideLabel
-      color: root.foreground
-      font.family: root.fontFamily
+      color: root.look.foreground
+      font.family: root.look.fontFamily
       font.pixelSize: Style.font.bodySmall
     }
 

@@ -3,7 +3,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons
 import qs.Commons as Commons
-import "Tones.js" as Tones
 import "Motion.js" as Motion
 
 // The range row. The words are spaced evenly from the row's left edge to its
@@ -17,10 +16,7 @@ Item {
 
   property var options: []
   property string value: "1D"
-  property bool retro: false
-  property color foreground: Commons.Color.foreground
-  property color dim: Tones.dim(foreground, Commons.Color.background)
-  property string fontFamily: Style.font.family
+  property Look look
   // What is left of a notch between wheel events.
   property real wheelRemainder: 0
 
@@ -28,7 +24,7 @@ Item {
 
   // The caption's line, as the info lines and the list's header are, so the
   // band's gaps are the gaps seen.
-  readonly property font wordFont: Qt.font({ family: fontFamily, pixelSize: Style.font.caption, bold: true, letterSpacing: 1 })
+  readonly property font wordFont: Qt.font({ family: look.fontFamily, pixelSize: Style.font.caption, bold: true, letterSpacing: 1 })
   FontMetrics { id: metrics; font: root.wordFont }
   implicitHeight: Math.ceil(metrics.ascent) + Math.ceil(metrics.descent)
   // The metrics' font carries the letter spacing, so its advance is the word
@@ -80,10 +76,10 @@ Item {
         anchors.centerIn: parent
         width: token.implicitWidth + Style.space(12)
         height: parent.height + Style.space(4)
-        radius: root.retro ? 0 : Style.cornerRadius
-        color: tokenMouse.pressed ? Style.pressedFillFor(root.foreground, Commons.Color.accent)
-          : parent.chosen ? Style.selectedFillFor(root.foreground, Commons.Color.accent)
-          : (tokenMouse.containsMouse ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent")
+        radius: root.look.retro ? 0 : Style.cornerRadius
+        color: tokenMouse.pressed ? Style.pressedFillFor(root.look.foreground, Commons.Color.accent)
+          : parent.chosen ? Style.selectedFillFor(root.look.foreground, Commons.Color.accent)
+          : (tokenMouse.containsMouse ? Style.hoverFillFor(root.look.foreground, Commons.Color.accent) : "transparent")
         Behavior on color { ColorAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
       }
 
@@ -92,7 +88,7 @@ Item {
         anchors.centerIn: parent
         textFormat: Text.PlainText
         text: String(parent.modelData).toUpperCase()
-        color: parent.chosen ? root.foreground : root.dim
+        color: parent.chosen ? root.look.foreground : root.look.dim
         font: root.wordFont
         Behavior on color { ColorAnimation { duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) } }
       }

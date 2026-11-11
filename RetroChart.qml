@@ -264,7 +264,7 @@ Item {
     x: root.scrubColumn * root.grid.pitch
     width: root.pixel
     height: root.height
-    color: Qt.rgba(root.hairlineColor.r, root.hairlineColor.g, root.hairlineColor.b, 0.3)
+    color: Util.alpha(root.hairlineColor, 0.3)
   }
 
   Rectangle {
