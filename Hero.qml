@@ -3,6 +3,7 @@ import qs.Commons
 import qs.Commons as Commons
 import "Cells.js" as Cells
 import "Figures.js" as Figures
+import "Freshness.js" as Freshness
 import "Format.js" as Format
 import "Tones.js" as Tones
 // The symbol, the listing line, the price in both looks, the change, and the
@@ -16,7 +17,7 @@ Item {
   property var quote: null
   // For the time an "AS OF" names.
   property var calendars: null
-  // The line under the price names the newest print of all, by the day's
+  // The line under the price names the newest trade of all, by the day's
   // clock, against the quote's close.
   property var day: null
   property var latest: null
@@ -24,12 +25,12 @@ Item {
   // Yahoo is sending nothing for any listing, which the header says once, so
   // this line says only when the price is from, as the rows do.
   property bool sourceDown: false
-  readonly property var shownFreshness: sourceDown ? Figures.quietFreshness(freshness) : freshness
+  readonly property var shownFreshness: sourceDown ? Freshness.quietFreshness(freshness) : freshness
   property bool retro: false
   // The line under the price takes its unit.
   property string changeMode: "pct"
   property bool scrubbing: false
-  // By which an overnight print is old.
+  // By which an overnight trade is old.
   property int now: 0
   property color foreground: Commons.Color.foreground
   property color dim: Tones.dim(foreground, Commons.Color.background)
@@ -38,14 +39,14 @@ Item {
   property color ghost: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.05)
   property string fontFamily: Style.font.family
   property string symbol: ""
-  // Where the header gives its title way (`HeaderStatus.titled`).
+  // Where the header gives its title way (`Header.titled`).
   property bool nameOnLine: false
   // The dashed line's legend, said in the strip while a scrub reads against
-  // it, where the extended-hours print steps aside.
+  // it, where the extended-hours trade steps aside.
   property string baselineText: ""
   property int priceSize: Style.font.displayLarge * 2
 
-  readonly property string freshnessText: quote ? Figures.freshnessText(shownFreshness, quote, calendars) : ""
+  readonly property string freshnessText: quote ? Freshness.freshnessText(shownFreshness, quote, calendars) : ""
   // The newest price since the close, when it is on top. None once its quote
   // is gone, as a failed preview's is.
   readonly property var newest: quote && view && view.newest ? view.newest : null
@@ -70,7 +71,7 @@ Item {
       // Only a warning takes the mark; an aged quote is said plainly, as its
       // row says it.
       var fresh = root.scrubbing || root.freshnessText === "" ? ""
-        : (Figures.freshnessWarns(root.shownFreshness) ? "! " : "") + root.freshnessText
+        : (Freshness.freshnessWarns(root.shownFreshness) ? "! " : "") + root.freshnessText
       return !root.nameOnLine ? fresh : (fresh ? fresh + " · " : "") + view.name.toUpperCase()
     }
     // A first fetch that failed says what the row says.
@@ -170,7 +171,7 @@ Item {
       anchors.baseline: symbolText.baseline
       textFormat: Text.PlainText
       text: root.listingLead
-      color: Figures.freshnessWarns(root.shownFreshness) ? root.foreground : root.dim
+      color: Freshness.freshnessWarns(root.shownFreshness) ? root.foreground : root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
       font.bold: true
@@ -242,7 +243,7 @@ Item {
   }
 
   // The line under the price on the left, always in the same place and
-  // shape; the change's caption on the right. An old print is drawn dim,
+  // shape; the change's caption on the right. An old trade is drawn dim,
   // price and change too, so it reads as old beside a fresh one.
   Row {
     id: extendedLine

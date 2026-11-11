@@ -74,13 +74,13 @@ function levelled(x, db) {
 
 // Smooth strikes the chimes as the place moves onto each bar, as a sweeping
 // pointer does (`Sounds.chime`): at least 45 ms apart, none where the line
-// breaks, each ringing out over what follows. A lone print, as a thin night's
+// breaks, each ringing out over what follows. A lone trade, as a thin night's
 // trade, is struck as the place passes it, though no step lands on its point.
 // No tick where the line crosses its baseline: a tone there, at A6, the top
 // bar's pitch, reads as one more bar.
 function smooth(geometry, from, to, seconds) {
   var bars = lineBars(geometry)
-  var passed = lonePrints(geometry)
+  var passed = loneTrades(geometry)
   var x = new Float32Array(Math.round((seconds + 0.6) * RATE))
   var gap = Math.round(0.045 * RATE), end = Math.round(seconds * RATE)
   var heard = -1, last = -gap, waiting = -1, waitingAlone = false, before = from
@@ -93,7 +93,7 @@ function smooth(geometry, from, to, seconds) {
     waiting = -1
     waitingAlone = false
   }
-  // The last step lands on the replay's end, so a lone print there is passed.
+  // The last step lands on the replay's end, so a lone trade there is passed.
   for (var i = 0; i < end + STEP; i += STEP) {
     var place = placeAt(i / RATE, from, to, seconds)
     var bar = bars(place)
@@ -104,7 +104,7 @@ function smooth(geometry, from, to, seconds) {
     }
     before = place
     // Where the line lifts, a bar waiting is dropped: nothing starts there.
-    // A lone print passed waits on: the gap after it is its own.
+    // A lone trade passed waits on: the gap after it is its own.
     if (bar < 0 && !waitingAlone) waiting = -1
     if (waiting >= 0 && i >= last + gap) strike(waiting, last + gap)
     if (bar === heard) continue
@@ -120,10 +120,10 @@ function smooth(geometry, from, to, seconds) {
   return { samples: x, gain: 1 }
 }
 
-// The bar of a lone print (`brk` on both sides: a thin night's trade, or a
-// day's only print) passed after `a` and up to `b`, or -1. It walks on from
+// The bar of a lone trade (`brk` on both sides: a thin night's trade, or a
+// day's only trade) passed after `a` and up to `b`, or -1. It walks on from
 // where it was last asked, as a replay's place only moves on.
-function lonePrints(geometry) {
+function loneTrades(geometry) {
   var pts = geometry ? geometry.points : [], lone = []
   for (var i = 0; i < pts.length; i++) {
     if ((i === 0 || pts[i].brk) && (i === pts.length - 1 || pts[i + 1].brk)) lone.push(pts[i])
@@ -180,7 +180,7 @@ function nesVolume(t, start, stepMs, floor) {
 }
 
 // Retro plays each column the replay reaches as its lit row's note (`grid` is
-// PixelChart's), silent over dark ones. A repeated note is held, its volume
+// RetroChart's), silent over dark ones. A repeated note is held, its volume
 // falling in the console's steps, and struck again after silence. Where a lit
 // column lands across the baseline under it from the last, the noise channel
 // ticks.
@@ -263,7 +263,7 @@ function barAt(chart, x) {
   return lineBars(chart.geometry)(x)
 }
 
-// As `Chart.yAt` reads the line: -1 outside its prints and across a break
+// As `Chart.yAt` reads the line: -1 outside its trades and across a break
 // (`brk`), where it lifts. It walks on from where it was last asked, so a
 // replay reads the line once.
 function lineBars(geometry) {

@@ -139,7 +139,7 @@ function answerVerdict(kind, outcome, tries, judgingOnly) {
   return "fail"
 }
 
-// The close and late prints settle within this of a market's last trade.
+// The close and late trades settle within this of a market's last trade.
 var SETTLED = 15 * 60
 
 // Asking sooner brings back the same price. An index's periods stay the last
@@ -166,7 +166,7 @@ function quietUntil(quote, receivedAt, now, cal, dayOf) {
 // Yahoo's day answer for a stock turns to the coming day with its
 // pre-market, and London's and Tokyo's with their open, whose first bar
 // comes about 15 minutes late. Two days keep the last session in the answer
-// until the new one has a print. An index's answer stays the last session's
+// until the new one has a trade. An index's answer stays the last session's
 // until its open.
 function twoDays(quote, now, calendars) {
   if (!quote) return true
@@ -176,13 +176,13 @@ function twoDays(quote, now, calendars) {
   var date = cal ? Calendar.dateStringOf(Calendar.localDate(now, cal)) : ""
   var segs = cal ? Calendar.segmentsOn(cal, date) : []
   var pts = quote.points
-  var printedSince = function(t) { return pts.length > 0 && pts[pts.length - 1].t >= t }
+  var tradedSince = function(t) { return pts.length > 0 && pts[pts.length - 1].t >= t }
   if (cal && cal.pre) {
     var pre = Calendar.epochAt(cal, date, cal.pre.open)
-    return segs.length > 0 && now >= pre && (now < segs[0].start || (now < Calendar.epochAt(cal, date, cal.post.close) && !printedSince(pre)))
+    return segs.length > 0 && now >= pre && (now < segs[0].start || (now < Calendar.epochAt(cal, date, cal.post.close) && !tradedSince(pre)))
   }
   var open = segs.length ? { start: segs[0].start, end: segs[segs.length - 1].end } : !cal && quote.current ? quote.current.regular : null
-  return !!open && now >= open.start && now < open.end && !printedSince(open.start)
+  return !!open && now >= open.start && now < open.end && !tradedSince(open.start)
 }
 
 // How often, while Yahoo may still answer with the last session's quote
@@ -202,7 +202,7 @@ function quoteCadence(quote, now, interval, hero, calNow) {
 
 // ---- Robinhood
 
-// Prints due within half an interval go with those due now, so the list
+// Trades due within half an interval go with those due now, so the list
 // stays one request each night's 5 minutes. With nothing open while a
 // night trades, the pill's symbol is asked so its newest price stays
 // current. `allDay` and `nights` are Robinhood's entries; `quoteEntries`
@@ -237,7 +237,7 @@ function overnightAsks(s) {
   var holeDue = function(x) {
     return hole !== null && !!s.allDay[x] && s.allDay[x].allDay && Overnight.holeDue(hole, s.nights[x], s.now)
   }
-  var printsDue = function(x, at) {
+  var tradesDue = function(x, at) {
     var entry = s.nights[x]
     if (!entry) return true
     // At the clock's own second, not `at`: Robinhood's bars for the stretch
@@ -248,17 +248,17 @@ function overnightAsks(s) {
     if (!(key in judged)) judged[key] = Overnight.overnightDue(entry.at, at, s.calendars, entry.status === "failed")
     return judged[key]
   }
-  var prints = drawn.filter(function(x) { return printsDue(x, s.now) })
-  if (prints.length > 0)
-    prints = drawn.filter(function(x) { return printsDue(x, s.now + Overnight.OVERNIGHT_INTERVAL / 2) })
-  if (tradability.length === 0 && prints.length === 0) return null
+  var trades = drawn.filter(function(x) { return tradesDue(x, s.now) })
+  if (trades.length > 0)
+    trades = drawn.filter(function(x) { return tradesDue(x, s.now + Overnight.OVERNIGHT_INTERVAL / 2) })
+  if (tradability.length === 0 && trades.length === 0) return null
   var alone = function(symbols, answers) {
     return symbols.length > 1 && symbols.indexOf(waited) >= 0 && !answers[waited] ? [waited] : symbols
   }
-  return { tradability: alone(tradability, s.allDay), prints: alone(prints, s.nights) }
+  return { tradability: alone(tradability, s.allDay), trades: alone(trades, s.nights) }
 }
 
-function refreshPrints(charts, allDaySymbols, askedAt, now) {
+function refreshTrades(charts, allDaySymbols, askedAt, now) {
   if (now - askedAt <= REFRESH_AGAIN) return []
   return charts.filter(function(s) { return allDaySymbols.indexOf(s) >= 0 })
 }

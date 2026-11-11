@@ -15,9 +15,9 @@ import "plugin/History.js" as History
 import "plugin/Market.js" as Market
 import "plugin/Overnight.js" as Overnight
 import "plugin/Quote.js" as Quote
-import "plugin/Settings.js" as Settings
+import "plugin/Rows.js" as Rows
 import "plugin/Search.js" as Search
-import "plugin/Figures.js" as Figures
+import "plugin/Freshness.js" as Freshness
 import "plugin"
 
 // Nothing jumps. The 22-symbol list with a cap symbol, an ETF, non-US
@@ -274,7 +274,7 @@ Harness {
     property string listName: ""
     property var lists: [{ name: "", label: "All", count: symbols.length, symbols: symbols }]
     property var quotes: ({})
-    property var newestPrints: ({})
+    property var newestTrades: ({})
     property var entries: ({})
     property var calendars: null
     property string featuredSymbol: "AAPL"
@@ -293,7 +293,7 @@ Harness {
     property var lastRemoval: null
     property bool settingsUnreadable: false
     readonly property var view: ({ featured: featuredSymbol, range: range, list: listName, listKey: "=" + listName,
-      order: order, reversed: reversed, rows: symbols, shown: Settings.sortedSymbols(symbols, quotes, order, reversed, changeMode),
+      order: order, reversed: reversed, rows: symbols, shown: Rows.sortedSymbols(symbols, quotes, order, reversed, changeMode),
       library: library, chart: Chart.viewChart(featuredSymbol, range, quotes, entries, histories, nights,
         allDay, nights[featuredSymbol] ? nightCalendars : null) })
     // NEST's prints, and the calendars its chart's day reads; only NEST has
@@ -1027,7 +1027,7 @@ Harness {
         // text size Omarchy offers (9 to 20), and in the panel with the
         // shell's spacing kept at size 12's as the text grows (`[spacing]
         // scale-with-font = false`). Smooth alone: retro changes only the
-        // corner radius and the look toggle's words here (HeaderStatus.qml).
+        // corner radius and the look toggle's words here (Header.qml).
         // At the everyday size 12 the panel names Constitution Memorial Day
         // in full.
         var header = find(body, "statusText").parent
@@ -1040,8 +1040,8 @@ Harness {
           ["At 16:30 BST · Closing bell", "At 16:30 BST"], ["At 02:25 EDT · Overnight", "At 02:25 EDT"],
           ["WEEK OF 28 SEP 2026 · 712,345.00", "WEEK OF 28 SEP 2026"], ["21 SEP 10:00 AEST · 712,345.00", "21 SEP 10:00 AEST"],
           ["Can't get prices · Stonks keeps trying", "Can't get prices"],
-          Figures.hostPause("none", 72, 0).forms.slice(1), Figures.hostPause("refused", 30 * 60, 0).forms.slice(1),
-          Figures.hostPause("none", 72, 0).forms, Figures.hostPause("refused", 30 * 60, 0).forms,
+          Freshness.hostPause("none", 72, 0).forms.slice(1), Freshness.hostPause("refused", 30 * 60, 0).forms.slice(1),
+          Freshness.hostPause("none", 72, 0).forms, Freshness.hostPause("refused", 30 * 60, 0).forms,
           ["Refresh failed for SHIB-USD · Retrying", "Refresh failed · Retrying", "Refresh failed"], ["Refreshing"], ["Loading SHIB-USD YTD"]]
         var closures = 0
         var unnamed = []

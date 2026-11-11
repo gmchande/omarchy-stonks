@@ -4,7 +4,7 @@ import Quickshell.Io
 import qs.Commons
 import "plugin/Chart.js" as Chart
 import "plugin/Quote.js" as Quote
-import "plugin/Settings.js" as Settings
+import "plugin/Rows.js" as Rows
 import "plugin"
 
 // StonksBody under a real offscreen pointer and wheel, on a stub service:
@@ -63,7 +63,7 @@ Harness {
     stub.symbols = symbols.slice()
     stub.quotes = nextQuotes
     stub.entries = nextEntries
-    stub.shown = Settings.sortedSymbols(stub.symbols, stub.quotes, stub.order, stub.reversed)
+    stub.shown = Rows.sortedSymbols(stub.symbols, stub.quotes, stub.order, stub.reversed)
     stub.featuredSymbol = symbols[0]
   }
 
@@ -98,7 +98,7 @@ Harness {
     property string listName: ""
     property var lists: [{ name: "", label: "All", count: symbols.length, symbols: symbols }]
     property var quotes: ({})
-    property var newestPrints: ({})
+    property var newestTrades: ({})
     property var nights: ({})
     property var allDay: ({})
     property var entries: ({})
@@ -140,7 +140,7 @@ Harness {
       var before = { symbols: symbols, lists: [] }
       var next = symbols.filter(function(value) { return value !== symbol })
       symbols = next
-      shown = Settings.sortedSymbols(next, quotes, order, reversed)
+      shown = Rows.sortedSymbols(next, quotes, order, reversed)
       if (featuredSymbol === symbol) featuredSymbol = next[0] || ""
       lastRemoval = { symbol: symbol, before: before }
     }
@@ -153,16 +153,16 @@ Harness {
         arriving = arriving.concat([upper])
       }
       symbols = next
-      shown = Settings.sortedSymbols(next, quotes, order, reversed)
+      shown = Rows.sortedSymbols(next, quotes, order, reversed)
     }
     function setOrder(value) {
       order = value
-      shown = Settings.sortedSymbols(symbols, quotes, order, reversed)
+      shown = Rows.sortedSymbols(symbols, quotes, order, reversed)
       lastSettings = { order: value }
     }
     function reverseOrder() {
       reversed = !reversed
-      shown = Settings.sortedSymbols(symbols, quotes, order, reversed)
+      shown = Rows.sortedSymbols(symbols, quotes, order, reversed)
       lastSettings = { reversed: reversed }
     }
     property var memberships: []
@@ -335,7 +335,7 @@ Harness {
         var addedRow = body.watchlist.rowItem("NEW")
         stub.quotes = Object.assign({}, stub.quotes, { NEW: root.quote("NEW", 200, 100) })
         stub.entries = Object.assign({}, stub.entries, { NEW: { status: "ok", receivedAt: stub.now } })
-        stub.shown = Settings.sortedSymbols(stub.symbols, stub.quotes, stub.order, stub.reversed)
+        stub.shown = Rows.sortedSymbols(stub.symbols, stub.quotes, stub.order, stub.reversed)
         stub.arriving = []
         within(2000, function() { return body.watchlist.cursorSymbol === "NEW" && rowsAtRest() })
         var landedAt = body.watchlist.displayedSymbols.indexOf("NEW")

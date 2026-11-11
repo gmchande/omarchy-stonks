@@ -33,8 +33,6 @@ function canRemove(symbols) {
 
 var ORDERS = ["manual", "symbol", "name", "pct"]
 
-var ORDER_LABELS = { manual: "MANUAL", symbol: "SYMBOL", name: "NAME", pct: "% CHANGE" }
-
 function normalizeOrder(value) {
   if (value === "abs") return "pct"
   return ORDERS.indexOf(value) >= 0 ? value : "manual"
@@ -46,54 +44,6 @@ function nextOrder(order) {
 
 function normalizeReversed(order, value) {
   return normalizeOrder(order) !== "manual" && value === true
-}
-
-function sortsAscending(order, reversed) {
-  order = normalizeOrder(order)
-  return (order === "pct") === normalizeReversed(order, reversed)
-}
-
-function orderLabel(order, reversed) {
-  order = normalizeOrder(order)
-  var arrow = order === "manual" ? "↕" : sortsAscending(order, reversed) ? "↑" : "↓"
-  return arrow + "  " + ORDER_LABELS[order]
-}
-
-// `newest`: each symbol's newest print since the close
-// (`Overnight.newestPrint`).
-function sortedSymbols(symbols, quotes, order, reversed, changeMode, newest) {
-  order = normalizeOrder(order)
-  if (order === "manual") return symbols.slice()
-  var keyed = []
-  for (var i = 0; i < symbols.length; i++) {
-    var q = quotes[symbols[i]]
-    keyed.push({ symbol: symbols[i], index: i, key: q ? sortKey(q, order, changeMode, newest ? newest[symbols[i]] : null) : null })
-  }
-  var first = sortsAscending(order, reversed) ? -1 : 1
-  keyed.sort(function(a, b) {
-    if (a.key === null && b.key === null) return a.index - b.index
-    if (a.key === null) return 1
-    if (b.key === null) return -1
-    if (a.key < b.key) return first
-    if (a.key > b.key) return -first
-    return a.index - b.index
-  })
-  var out = []
-  for (var k = 0; k < keyed.length; k++) out.push(keyed[k].symbol)
-  return out
-}
-
-function shownOrder(held, sorted) {
-  if (!held || held.length !== sorted.length) return sorted
-  for (var i = 0; i < sorted.length; i++) if (held.indexOf(sorted[i]) < 0) return sorted
-  return held
-}
-
-function sortKey(quote, order, changeMode, newest) {
-  if (order === "symbol") return quote.symbol.toUpperCase()
-  if (order === "name") return String(quote.name || quote.symbol).toUpperCase()
-  var read = Quote.restingRead(quote, newest)
-  return Quote.change(read.base, read.price, changeMode === "open" ? "open" : "pct").pct
 }
 
 function barEntryFor(config, id) {
@@ -337,15 +287,6 @@ function settingsFromBar(config, id) {
   var from = {}
   for (var key in fileSettings(null)) if (key in bar) from[key] = bar[key]
   return fileSettings(from)
-}
-
-// The slot a dragged row takes when its top is `rows` rows down the list,
-// a fraction, among `count`: it keeps `held` until it is 0.6 of a row past
-// it, so a pointer resting near another row's edge never swaps the two back
-// and forth.
-function dragSlot(rows, held, count) {
-  var next = held < 0 || Math.abs(rows - held) >= 0.6 ? Math.round(rows) : held
-  return Math.max(0, Math.min(count - 1, next))
 }
 
 function movedSymbols(symbols, from, to) {

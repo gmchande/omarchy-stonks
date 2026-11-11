@@ -283,9 +283,9 @@ Rectangle {
     width: root.width - root.margin * 2
     height: (root.history ? 294 : 270) * root.u
 
-    DayChart {
-      id: dayChart
-      objectName: "shareDayChart"
+    SmoothChart {
+      id: smoothChart
+      objectName: "shareSmoothChart"
       visible: !root.retro
       anchors.fill: parent
       weight: root.u
@@ -301,8 +301,8 @@ Rectangle {
       surfaceOpen: false
       still: true
     }
-    PixelChart {
-      id: pixelChart
+    RetroChart {
+      id: retroChart
       visible: root.retro
       anchors.fill: parent
       pixel: 8 * root.u
@@ -325,7 +325,7 @@ Rectangle {
       parent: rangeMarks.chart.underScrub
       anchors.fill: parent
       marks: root.marks
-      chart: root.retro ? pixelChart : dayChart
+      chart: root.retro ? retroChart : smoothChart
       foreground: root.foreground
       dim: root.dim
       fontFamily: root.fontFamily

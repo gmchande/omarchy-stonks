@@ -4,8 +4,9 @@
 .import "Market.js" as Market
 .import "Quote.js" as Quote
 
-// Robinhood's overnight prints and the 1D chart's day built from them.
-// Knows nothing of how the chart or the line under the price shows them.
+// Robinhood's trades: what is asked of it and when, its answers, the
+// night's hours, and a listing's trades with Yahoo's (`allTrades`). The day
+// a 1D chart draws from them is `Day.js`'s.
 
 var ROBINHOOD_URL = "https://api.robinhood.com/marketdata/historicals/"
 var INSTRUMENTS_URL = "https://api.robinhood.com/instruments/"
@@ -13,9 +14,12 @@ var INSTRUMENTS_URL = "https://api.robinhood.com/instruments/"
 // Robinhood's newest bar arrives five to ten minutes after it starts.
 var OVERNIGHT_LAG = 10 * 60
 
-// A liquid name's newest bar is ten to fifteen minutes old, so a print
+// A liquid name's newest bar is ten to fifteen minutes old, so a trade
 // dims only once it has missed one.
 var OVERNIGHT_STALE = 20 * 60
+
+// Robinhood's bars are five minutes each.
+var SLOT = 5 * 60
 
 var OVERNIGHT_INTERVAL = 5 * 60
 
@@ -39,7 +43,7 @@ function robinhoodSymbol(symbol) {
 }
 
 // span=day holds the last 288 five-minute slots the 24/5 market traded, its
-// closed days left out: every print a 1D chart can draw. span=hour holds
+// closed days left out: every trade a 1D chart can draw. span=hour holds
 // the last 12 slots by the clock, a twenty-fourth of the bytes.
 function overnightUrl(symbols, span) {
   return ROBINHOOD_URL + "?symbols=" + symbols.map(function(s) { return encodeURIComponent(robinhoodSymbol(s)) }).join(",")
@@ -56,7 +60,7 @@ var HOUR_BATCH = 75
 // Half of span=hour's hour: room for a newest bar ten minutes late.
 var HOUR_REACH = 30 * 60
 
-// An hour's answer joins on to the prints in hand with no slot missed
+// An hour's answer joins on to the trades in hand with no slot missed
 // between. A newest slot ahead of the clock is no honest answer.
 function overnightSpan(entry, now) {
   return !!entry && entry.through !== null && entry.through !== undefined && entry.through <= now && now - entry.through <= HOUR_REACH ? "hour" : "day"
@@ -77,10 +81,10 @@ function overnightBatches(symbols, entries, now) {
   return batches
 }
 
-// Past these, an answer is bad (`Format.fetchedList`). MOST_PRINTS also caps
-// the prints kept (`joinHour`): a 1D chart draws at most 336 slots.
+// Past these, an answer is bad (`Format.fetchedList`). MOST_TRADES also caps
+// the trades kept (`joinHour`): a 1D chart draws at most 336 slots.
 var MOST_RESULTS = 2 * HOUR_BATCH
-var MOST_PRINTS = 1000
+var MOST_TRADES = 1000
 
 function allDayUrl(symbols) {
   return INSTRUMENTS_URL + "?symbols=" + symbols.map(function(s) { return encodeURIComponent(robinhoodSymbol(s)) }).join(",")
@@ -123,13 +127,13 @@ function overnightResults(json) {
 
 // bounds=24_5 fills a quiet name's gaps with flat `interpolated` bars,
 // which are no trades. `from` and `through` count every slot, traded or
-// not: how far the answer reaches. A print in a session Robinhood never
+// not: how far the answer reaches. A trade in a session Robinhood never
 // sends, such as "__proto__", is left out: its name becomes the warning's.
 var SESSIONS = ["pre", "reg", "post", "overnight"]
 
 function overnightAnswer(result, symbol) {
   var out = { bars: [], from: null, through: null }
-  var historicals = result && result.symbol === robinhoodSymbol(symbol) ? Format.fetchedList(result.historicals, MOST_PRINTS) : null
+  var historicals = result && result.symbol === robinhoodSymbol(symbol) ? Format.fetchedList(result.historicals, MOST_TRADES) : null
   if (!historicals) return out
   for (var j = 0; j < historicals.length; j++) {
     var bar = historicals[j]
@@ -148,7 +152,7 @@ function overnightAnswer(result, symbol) {
 function joinHour(had, hour) {
   if (hour.from === null) return { bars: had.bars, through: had.through }
   return {
-    bars: had.bars.filter(function(b) { return b.t < hour.from }).concat(hour.bars).slice(-MOST_PRINTS),
+    bars: had.bars.filter(function(b) { return b.t < hour.from }).concat(hour.bars).slice(-MOST_TRADES),
     through: had.through === null || hour.through > had.through ? hour.through : had.through
   }
 }
@@ -192,15 +196,15 @@ function marketAsleep(quote, allDay, t, calendars) {
   return !nightTrades(quote, allDay, t, calendars) && !Market.inRegularSession(quote, t, calendars) && !Market.inExtendedHours(quote, t, calendars)
 }
 
-function prints(quote, bars) {
-  var own = ownPrints(quote, bars)
+function allTrades(quote, bars) {
+  var own = ownTrades(quote, bars)
   var filled = fillsBetween(quote, bars, own)
   for (var k = 0; k < filled.length; k++) own = own.concat(filled[k].bars)
   if (filled.length) own.sort(function(a, b) { return a.t - b.t })
   return own
 }
 
-function ownPrints(quote, bars) {
+function ownTrades(quote, bars) {
   var out = []
   for (var i = 0; i < bars.length; i++) if (beside(quote, bars[i].t)) out.push(bars[i])
   for (var j = 0; j < quote.points.length; j++) {
@@ -228,12 +232,12 @@ function extendedSlots(quote, a, b) {
 }
 
 // Yahoo can send no bar for an hour of a pre-market. Robinhood's trades
-// fill such a stretch, HOLE_SLOTS or more slots with no print, where it
+// fill such a stretch, HOLE_SLOTS or more slots with no trade, where it
 // traded in at least half of them: a thin stock's sparse trading is no such
-// stretch. A stretch lies between two prints, so the price on top is never
+// stretch. A stretch lies between two trades, so the price on top is never
 // Robinhood's from it.
 function filledStretches(quote, bars) {
-  return fillsBetween(quote, bars, ownPrints(quote, bars))
+  return fillsBetween(quote, bars, ownTrades(quote, bars))
 }
 
 function fillsBetween(quote, bars, drawn) {
@@ -275,7 +279,7 @@ function yahooHole(quote) {
   return last
 }
 
-// The prints in hand may stop at the night's end, short of Yahoo's empty
+// The trades in hand may stop at the night's end, short of Yahoo's empty
 // stretch. Asked once Robinhood's bar for its last slot is in; a failed
 // answer is asked again OVERNIGHT_INTERVAL later.
 function holeDue(hole, entry, now) {
@@ -289,202 +293,20 @@ function beside(quote, t) {
   return (t < Quote.dayStart(quote) || t >= Quote.dayEnd(quote)) && (yahooAgain === null || t < yahooAgain)
 }
 
-// `closed`: the print came after its day's regular close, through the
+// `closed`: the trade came after its day's regular close, through the
 // night until 04:00 and the weekend after a Friday; never in a pre-market.
-// `joined`: tonight's print on the day that closed. Tonight's trades belong
-// to the day ahead, so a joined print counts from the close just gone, with
+// `joined`: tonight's trade on the day that closed. Tonight's trades belong
+// to the day ahead, so a joined trade counts from the close just gone, with
 // no open yet, as the pre-market's does after 04:00 (`Quote.tailDay`).
 // `own`: the day drawn is Yahoo's quote's, whose open the move may count
 // from. `dayStart` names the day drawn.
-function newestPrint(quote, latest, calendars, day) {
-  var print = quote && hasOvernight(quote, calendars) ? Quote.extendedPrint(quote, latest) : null
-  if (!print) return null
+function newestTrade(quote, latest, calendars, day) {
+  var trade = quote && hasOvernight(quote, calendars) ? Quote.extendedTrade(quote, latest) : null
+  if (!trade) return null
   var own = day.session.regular.start === quote.session.regular.start
-  var joined = print.phase === "overnight" && !!day.tonight && print.t >= day.tonight
-  return { t: print.t, p: print.p, phase: print.phase, base: joined ? Quote.regularClose(quote) : Quote.dayBase(day), own: own && !joined,
-    closed: own && print.t >= quote.session.regular.end, joined: joined, dayStart: day.session.regular.start }
-}
-
-// Where tonight's trades, joined to the day that closed, start counting
-// from its close: its bell, so its after hours read against that close too.
-// Null before tonight's first trade, and on any other day.
-function nightBell(day) {
-  var pts = day && day.points ? day.points : []
-  var last = pts.length ? pts[pts.length - 1] : null
-  if (!last || !day.tonight || !day.session.regular || last.s !== "overnight" || last.t < day.tonight) return null
-  return day.session.regular.end
-}
-
-// From the night's open the evening before to the next night's open, or
-// with no night after it, to the post-market's close; `midnight` is where
-// its start has slid to by the afternoon (`slidWindow`). Null past the
-// calendar.
-function dayWindow(cal, date) {
-  var next = Calendar.nextDateString(date)
-  var nextKind = Calendar.dayKind(cal, next).kind
-  if (Calendar.dayKind(cal, date).kind !== "open" || nextKind === "unknown") return null
-  return {
-    date: date,
-    start: marketDay(cal, date).start,
-    midnight: Calendar.epochAt(cal, date, "00:00"),
-    end: nextKind === "open" ? Calendar.epochAt(cal, date, cal.overnight.open) : postClose(cal, date)
-  }
-}
-
-// Until the open the day starts with its night, at 20:00 the evening before.
-// From the open its start slides toward its own midnight by the shell's clock
-// (`slideAt`, five minutes at a time), as tonight slides in at night,
-// reaching it as many hours after the open as the night held before
-// midnight: at 13:30. A quiet stock's trades come when they come, so the
-// clock, not its newest print, moves the start.
-function slidWindow(win, open, slideAt) {
-  var slid = slideAt > open ? Math.floor((slideAt - open) / SLOT) * SLOT : 0
-  return Object.assign({}, win, { start: Math.min(win.midnight, win.start + slid) })
-}
-
-// Robinhood's post-market lasts as long after a half day's 13:00 close as
-// after a full day's, so it ends at 17:00.
-function postClose(cal, date) {
-  var segs = Calendar.segmentsOn(cal, date)
-  var full = Calendar.epochAt(cal, date, cal.post.close)
-  return Math.min(full, segs[segs.length - 1].end + full - Calendar.epochAt(cal, date, cal.post.open))
-}
-
-// A day stays on through the weekend or holiday after it, until the next
-// print.
-function chartWindow(cal, quote, latest) {
-  return dayWindow(cal, marketDayAt(cal, latest ? latest.t : quote.session.regular.start).date)
-}
-
-// The day that closed, then tonight, the shut hours between them taking no
-// room (`skip`). It keeps the width the closed day ended with, from its
-// midnight to its end, so from 20:00 five minutes leave the left as five
-// arrive on the right. A listing with no trade since before the closed day
-// keeps its own.
-function eveningWindow(cal, latestT, reach) {
-  var night = nightAt(cal, reach)
-  if (!night || !night.open) return null
-  var date = marketDayAt(cal, reach).date
-  var closed = null
-  for (var i = 0; i < 10 && !closed; i++) {
-    date = Calendar.previousDateString(date)
-    closed = dayWindow(cal, date)
-  }
-  if (!closed || latestT < closed.start) return null
-  var skip = closed.end < night.start ? { from: closed.end, to: night.start } : null
-  return {
-    date: closed.date,
-    start: Math.max(closed.midnight, reach - (closed.end - closed.midnight) + SLOT - (skip ? skip.to - skip.from : 0)),
-    end: reach,
-    skip: skip,
-    night: night
-  }
-}
-
-function windowSession(cal, quote, win) {
-  var on = function(s) { return !!s && !!s.regular && Calendar.dateStringOf(Calendar.localDate(s.regular.start, cal)) === win.date }
-  if (on(quote.session)) return quote.session
-  if (on(quote.next)) return quote.next
-  var segs = Calendar.segmentsOn(cal, win.date)
-  var open = segs[0].start
-  var close = segs[segs.length - 1].end
-  return { pre: { start: Calendar.epochAt(cal, win.date, cal.pre.open), end: open }, regular: { start: open, end: close },
-    post: { start: close, end: postClose(cal, win.date) } }
-}
-
-// Robinhood's bars are five minutes each.
-var SLOT = 5 * 60
-
-// Hours before the first trade drawn and after the last take no room, so a
-// finished day runs edge to edge. Where the chart's start has slid past some
-// of the day's trades (`slid`), the axis starts there instead, five minutes
-// at a time, so a quiet hour leaves the left as the start passes it, never
-// in one step.
-function tradedAxis(session, points, end, over, ticks, slid) {
-  var open = session.regular.start
-  return {
-    start: slid !== undefined ? slid : points.length ? Math.min(points[0].t, open) : open,
-    end: over && points.length ? points[points.length - 1].t : end,
-    ticks: ticks
-  }
-}
-
-function windowTicks(cal, win, session) {
-  var ticks = [Calendar.epochAt(cal, win.date, "00:00"), Calendar.epochAt(cal, win.date, cal.overnight.close)]
-  var segs = Calendar.segmentsOn(cal, win.date)
-  if (segs.length && segs[0].start === session.regular.start) ticks.push(session.regular.end)
-  else for (var i = 0; i < segs.length; i++) ticks.push(segs[i].end)
-  if (win.night) ticks.push(win.night.start, Calendar.epochAt(cal, Calendar.dateStringOf(Calendar.localDate(win.night.end, cal)), "00:00"))
-  return ticks
-}
-
-var LIT_SESSIONS = ["pre", "post", "overnight"]
-
-// Read from the prints, never the clock, so a night with no trade yet
-// stays dim.
-function litFrom(points, evening, over) {
-  var last = points.length ? points[points.length - 1] : null
-  if (!last || over || LIT_SESSIONS.indexOf(last.s) < 0) return null
-  if (evening ? last.s !== "overnight" || last.t < evening.night.start : last.s === "overnight") return null
-  var i = points.length - 1
-  while (i > 0 && points[i - 1].s === last.s) i--
-  return points[i].t
-}
-
-// `day` is shaped as a quote, so the chart and a scrub read it as they
-// read Yahoo's; the day's figures stay the quote's. `slideAt` slides the
-// day's start (`slidWindow`); without it, as where only the newest price is
-// wanted (`Chart.newestPrints`) or a harness gives no clock, the newest print
-// stands in for it.
-function dayChart(quote, answer, calendars, slideAt) {
-  var cal = Calendar.calendarFor(calendars, quote)
-  if (!cal || !cal.overnight || !quote.session.regular) return { day: quote, latest: null }
-  var all = prints(quote, answer.bars)
-  var latest = all.length ? all[all.length - 1] : null
-  var reach = latest ? Math.max(latest.t, answer.through !== null ? answer.through : latest.t) : answer.through
-  var evening = reach !== null && latest ? eveningWindow(cal, latest.t, reach) : null
-  var win = evening || chartWindow(cal, quote, latest)
-  if (!win) return { day: quote, latest: latest }
-  var session = windowSession(cal, quote, win)
-  if (!evening) win = slidWindow(win, session.regular.start, slideAt > 0 ? slideAt : reach)
-  var own = session === quote.session
-  var points = all.filter(function(p) { return p.t >= win.start })
-  var opened = marketDay(cal, win.date).start
-  var trades = all.filter(function(p) { return p.t >= opened })
-  var over = !evening && ((answer.through !== null && answer.through + SLOT >= win.end) || (own && !!quote.wholeDay))
-  return {
-    day: Object.assign({}, quote, {
-      session: session,
-      next: null,
-      points: points,
-      // Every trade of the day from its night's open, which its low and high
-      // count (`Figures.figuresTrades`) wherever the chart's start has slid.
-      trades: trades,
-      prevClose: own ? quote.prevClose : Quote.regularClose(quote),
-      dayOpen: own ? quote.dayOpen : null,
-      openSession: own ? quote.openSession : null,
-      // `closes`: when the day's last hour ends (`Figures.dayNote`).
-      axis: Object.assign(tradedAxis(session, points, win.end, over, windowTicks(cal, win, session),
-        trades.length && trades[0].t < win.start ? win.start : undefined),
-        { closes: evening ? evening.night.end : win.end }, win.skip ? { skip: win.skip } : {}),
-      litFrom: litFrom(points, evening, over),
-      tonight: evening ? evening.night.start : null,
-      calendar: cal
-    }),
-    latest: latest
-  }
-}
-
-// A thin listing Robinhood doesn't trade all day prints a few night
-// trades, and none is a night's price.
-function sessionDay(quote) {
-  if (!quote.session.regular) return quote
-  var day = Quote.tailDay(quote) || quote
-  var pts = day.points
-  return Object.assign({}, day, {
-    axis: tradedAxis(day.session, pts, Math.max(Quote.dayEnd(day), pts.length ? pts[pts.length - 1].t : 0), !!day.wholeDay,
-      [day.session.regular.end])
-  })
+  var joined = trade.phase === "overnight" && !!day.tonight && trade.t >= day.tonight
+  return { t: trade.t, p: trade.p, phase: trade.phase, base: joined ? Quote.regularClose(quote) : Quote.dayBase(day), own: own && !joined,
+    closed: own && trade.t >= quote.session.regular.end, joined: joined, dayStart: day.session.regular.start }
 }
 
 function overnightDue(askedAt, now, calendars, failed) {

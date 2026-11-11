@@ -282,12 +282,12 @@ function liveBarAppended(history) {
 // moment, which also stands for the price now. `clock` is the exchange's at
 // that trade (`Market.tradeClock`): the history's may be from before a change
 // of clocks.
-function withNewest(history, print, clock) {
+function withNewest(history, trade, clock) {
   var bars = history.bars
-  if (!print || !bars.length || print.t <= bars[bars.length - 1].t) return history
+  if (!trade || !bars.length || trade.t <= bars[bars.length - 1].t) return history
   var own = liveBarAppended(history) ? bars.slice(0, -1) : bars
   return Object.assign({}, history, {
-    bars: own.concat([{ t: print.t, o: print.p, h: print.p, l: print.p, c: print.p, v: null, newest: print.phase, closed: !!print.closed, clock: clock }])
+    bars: own.concat([{ t: trade.t, o: trade.p, h: trade.p, l: trade.p, c: trade.p, v: null, newest: trade.phase, closed: !!trade.closed, clock: clock }])
   })
 }
 

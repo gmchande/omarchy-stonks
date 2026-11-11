@@ -13,9 +13,10 @@ import "plugin/Chart.js" as Chart
 import "plugin/Fundamentals.js" as Fundamentals
 import "plugin/History.js" as History
 import "plugin/Overnight.js" as Overnight
+import "plugin/Day.js" as Day
 import "plugin/Quote.js" as Quote
 import "plugin/Search.js" as Search
-import "plugin/Settings.js" as Settings
+import "plugin/Rows.js" as Rows
 import "plugin"
 
 // Offscreen window body. A stub surface feeds StonksBody from fixtures.
@@ -394,7 +395,7 @@ Harness {
     property var nights: ({})
     property var allDay: null
     // Each listing's newest price since its close, as the service reads it.
-    readonly property var newestPrints: Chart.newestPrints(symbols, quotes, nights, allDay, calendars)
+    readonly property var newestTrades: Chart.newestTrades(symbols, quotes, nights, allDay, calendars)
     readonly property var view: ({ featured: featuredSymbol, range: range, list: listName, listKey: "=" + listName,
       order: order, reversed: reversed, rows: symbols, shown: shown, library: library,
       chart: Chart.viewChart(featuredSymbol, range, quotes, entries, histories, nights, allDay, root.overnight ? calendars : null) })
@@ -477,8 +478,8 @@ Harness {
         var jnj = Quote.parseChart(moment("jnj"), Calendar.centExchanges(stub.calendars), sunday)
         var day = moment("robinhood-day")
         var night = Overnight.parseOvernight(day, day.results.map(function(r) { return r.symbol })).JNJ
-        var built = Overnight.dayChart(jnj, night, stub.calendars)
-        root.nightPill = { quote: jnj, newest: Overnight.newestPrint(jnj, built.latest, stub.calendars, built.day),
+        var built = Day.dayChart(jnj, night, stub.calendars)
+        root.nightPill = { quote: jnj, newest: Overnight.newestTrade(jnj, built.latest, stub.calendars, built.day),
           night: Object.assign({ status: "ok" }, night) }
         root.now = sunday
       }
@@ -831,7 +832,7 @@ Harness {
       if (root.orderState) {
         stub.order = "pct"
         stub.reversed = root.stateName.indexOf("-rises-") > 0
-        stub.shown = Settings.sortedSymbols(stub.symbols, stub.quotes, stub.order, stub.reversed, stub.changeMode)
+        stub.shown = Rows.sortedSymbols(stub.symbols, stub.quotes, stub.order, stub.reversed, stub.changeMode)
       }
       if (root.w22 && root.w22.range === "5y") {
         root.shownRange = "5Y"
@@ -1390,7 +1391,7 @@ Harness {
                 property int now: root.now
                 property var owed: pillRow.modelData.trouble && pillRow.modelData.trouble !== "failed" ? { NEST: root.now - 91 } : ({})
                 readonly property var yahooGate: root.troubleGate((pillRow.modelData.trouble || "").replace("-noprice", ""))
-                property var newestPrints: night ? ({ JNJ: root.nightPill.newest }) : ({})
+                property var newestTrades: night ? ({ JNJ: root.nightPill.newest }) : ({})
                 property var nights: night ? ({ JNJ: root.nightPill.night }) : ({})
                 property var allDay: night ? ({ JNJ: { status: "ok", allDay: true, at: 0 } }) : ({})
                 property var calendars: night ? stub.calendars : null

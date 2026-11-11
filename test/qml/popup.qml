@@ -5,7 +5,7 @@ import Quickshell.Io
 import qs.Ui
 import "plugin/Chart.js" as Chart
 import "plugin/Quote.js" as Quote
-import "plugin/Settings.js" as Settings
+import "plugin/Rows.js" as Rows
 import "plugin" as Stonks
 
 // The real Panel and a real pill on a stub service, offscreen, its card in a
@@ -31,7 +31,7 @@ Harness {
       return { name: l.name, label: l.name, count: l.symbols.length, symbols: l.symbols }
     }))
     property var quotes: ({})
-    property var newestPrints: ({})
+    property var newestTrades: ({})
     property var nights: ({})
     property var allDay: ({})
     property var entries: ({})
@@ -51,7 +51,7 @@ Harness {
     property var arriving: []
     property var lastRemoval: null
     readonly property var view: ({ featured: featuredSymbol, range: range, list: listName, listKey: "=" + listName,
-      order: order, reversed: reversed, rows: symbols, shown: Settings.sortedSymbols(symbols, quotes, order, reversed, changeMode),
+      order: order, reversed: reversed, rows: symbols, shown: Rows.sortedSymbols(symbols, quotes, order, reversed, changeMode),
       library: library, chart: Chart.viewChart(featuredSymbol, range, quotes, entries, histories) })
     function featureStep(delta) {
       var shown = view.shown
@@ -405,7 +405,7 @@ Harness {
       within(2000, function() { return list.displayedSymbols.length === 22 })
       list.contentY = 0
       var inView = Math.floor((list.height + list.rowGap) / list.rowPitch)
-      var sortedPct = Settings.sortedSymbols(service.symbols, service.quotes, "pct", false)
+      var sortedPct = Rows.sortedSymbols(service.symbols, service.quotes, "pct", false)
       var carriedRow = list.displayedSymbols.filter(function(s, i) {
         return i < inView - 1 && sortedPct.indexOf(s) > inView + 1
       })[0]

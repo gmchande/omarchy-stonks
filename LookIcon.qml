@@ -19,7 +19,7 @@ Item {
 
   // Left to right, 0 at the top.
   readonly property var points: Cells.markPoints()
-  // A pixel short of the header's grid (`HeaderStatus.cell`), so it grows with
+  // A pixel short of the header's grid (`Header.cell`), so it grows with
   // the text.
   property int pixel: 2
   readonly property int gap: 1

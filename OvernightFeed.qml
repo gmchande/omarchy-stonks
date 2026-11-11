@@ -1,7 +1,7 @@
 import QtQuick
 import "Fetch.js" as Fetch
 import "Overnight.js" as Overnight
-// Robinhood's prints for every listing asked, in one run of requests. A
+// Robinhood's trades for every listing asked, in one run of requests. A
 // fetch while a run is out is dropped: the service asks again for what it
 // still wants once that run lands.
 Item {
@@ -36,7 +36,7 @@ Item {
   }
 
   // Answers are read about 8 ms a turn, an answer's text or one listing at
-  // a time, so a long list never holds the shell's thread for long. Prints
+  // a time, so a long list never holds the shell's thread for long. Trades
   // that didn't change keep their array, so the chart isn't built again.
   property var landing: null
   function receive(got) {
@@ -64,7 +64,7 @@ Item {
         var answer = null
         try { answer = Overnight.overnightAnswer(job.results[job.read], symbol) } catch (e) { answer = null }
         var had = entries[symbol]
-        // An hour can't stand for a day: a listing whose prints went
+        // An hour can't stand for a day: a listing whose trades went
         // meanwhile (`Service.forgetLeft`) is left unanswered.
         var hour = batches[job.batch].span === "hour"
         var kept = !answer ? null : !hour ? answer : had ? Overnight.joinHour(had, answer) : null
@@ -81,7 +81,7 @@ Item {
     else land(job)
   }
 
-  // A listing asked for an hour with no prints left gets no entry, so its day
+  // A listing asked for an hour with no trades left gets no entry, so its day
   // is asked at once. Stamped failed, a preview left and come back to would
   // show no overnight price for five minutes.
   function land(job) {

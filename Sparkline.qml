@@ -23,9 +23,9 @@ Item {
   property real cursorX: -1
   readonly property real pad: 1.5
   // The baseline, where there is one, shows whole; the line shows to the
-  // newest print's dot.
+  // newest trade's dot.
   property real reveal: 1
-  // One print draws as a dot, as the hero's does.
+  // One trade draws as a dot, as the hero's does.
   readonly property bool drawable: !!geometry && !!geometry.points && geometry.points.length >= 1
   // Unknown for a quote without a previous close: no dashed baseline, and no
   // direction to split by.
@@ -85,7 +85,7 @@ Item {
       ctx.lineWidth = root.lineWidth
       ctx.lineJoin = "round"
       ctx.lineCap = "round"
-      // The sweep runs to the newest print's dot.
+      // The sweep runs to the newest trade's dot.
       ctx.save()
       if (root.reveal < 1) {
         var inkRight = pad + pts[pts.length - 1].x * w + root.lineWidth * 1.5 + 1
@@ -119,7 +119,7 @@ Item {
         ctx.stroke()
         ctx.restore()
       }
-      // A lone print is a dot three line widths across.
+      // A lone trade is a dot three line widths across.
       for (var k = 0; k < pts.length; k++) {
         if (!(k === 0 || pts[k].brk) || !(k === pts.length - 1 || pts[k + 1].brk)) continue
         var dy = pad + pts[k].y * h

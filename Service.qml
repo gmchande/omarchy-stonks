@@ -3,11 +3,12 @@ import Quickshell.Io
 import "Asks.js" as Asks
 import "Calendar.js" as Calendar
 import "Chart.js" as Chart
-import "Figures.js" as Figures
+import "Freshness.js" as Freshness
 import "History.js" as History
 import "Overnight.js" as Overnight
 import "Quote.js" as Quote
 import "Settings.js" as Settings
+import "Rows.js" as Rows
 // What every surface reads and acts through: what you follow and look at,
 // the lists file that keeps it (~/.config/omarchy/<id>.json, which only this
 // service reads and writes), the feeds and what is asked of them, the saved
@@ -109,8 +110,8 @@ Item {
       order: order,
       reversed: reversed,
       rows: rows,
-      shown: Settings.shownOrder(root.heldOrder, Settings.sortedSymbols(rows, feed.quotes, order, reversed,
-        dataSettings.changeMode, order === "manual" ? null : root.newestPrints)),
+      shown: Rows.shownOrder(root.heldOrder, Rows.sortedSymbols(rows, feed.quotes, order, reversed,
+        dataSettings.changeMode, order === "manual" ? null : root.newestTrades)),
       library: all,
       // Null while on its way: each surface keeps the chart it has on screen.
       chart: chart
@@ -132,7 +133,7 @@ Item {
   readonly property var shown: view.shown
   // The chart to show: `chart`, with the day built for it before while that
   // was built from the same objects, its quote and an all-day listing's
-  // prints and reach, and while its start hasn't slid. So an answer for
+  // trades and reach, and while its start hasn't slid. So an answer for
   // another symbol repaints nothing, nor does a clock that moves no start,
   // and a preview's Yahoo day never stands in once it is added. `builtDays`
   // is a cache the bindings above fill as they read; it doesn't notify.
@@ -151,11 +152,11 @@ Item {
     return chart
   }
   // The price on top on the pill, the rows, and the hero. A stock's is worked
-  // out again only when what it is read from changes (`Chart.newestPrintOf`):
+  // out again only when what it is read from changes (`Chart.newestTradeOf`):
   // each builds the stock's whole day, and a price that lands changes one
   // stock's, not every stock's. `newestKept` doesn't notify.
   readonly property var newestKept: ({ by: {} })
-  readonly property var newestPrints: {
+  readonly property var newestTrades: {
     var nights = overnightFeed.entries
     var allDay = allDayFeed.entries
     var out = {}
@@ -169,7 +170,7 @@ Item {
       var trades = allDay[symbol] ? allDay[symbol].allDay : null
       var had = root.newestKept.by[symbol]
       kept[symbol] = had && had.quote === quote && had.bars === bars && had.through === through && had.trades === trades ? had
-        : { quote: quote, bars: bars, through: through, trades: trades, newest: Chart.newestPrintOf(symbol, quote, nights, allDay, calendars) }
+        : { quote: quote, bars: bars, through: through, trades: trades, newest: Chart.newestTradeOf(symbol, quote, nights, allDay, calendars) }
       if (kept[symbol].newest) out[symbol] = kept[symbol].newest
     })
     root.newestKept.by = kept
@@ -526,7 +527,7 @@ Item {
   readonly property var asked: feed.asked
   // Those waiting on Yahoo, from when: freshness's overdue counts from it.
   readonly property var owed: feed.owed
-  // Asked under `Figures.ASKED_GRACE` ago, timed to the millisecond: in the
+  // Asked under `Freshness.ASKED_GRACE` ago, timed to the millisecond: in the
   // clock's whole seconds the grace would end anywhere from 1 to 2 s on.
   property var asking: ({})
   property var askedMs: ({})
@@ -537,7 +538,7 @@ Item {
     var ends = 0
     for (var s in feed.asked) {
       since[s] = s in root.askedMs ? root.askedMs[s] : nowMs
-      var end = since[s] + Figures.ASKED_GRACE * 1000
+      var end = since[s] + Freshness.ASKED_GRACE * 1000
       if (end > nowMs) {
         inGrace[s] = true
         if (!ends || end < ends) ends = end
@@ -629,12 +630,12 @@ Item {
   readonly property var overnightSymbols: library.filter(function(s) {
     return !!feed.quotes[s] && Overnight.hasOvernight(feed.quotes[s], calendars)
   })
-  // Only these draw Robinhood's prints.
+  // Only these draw Robinhood's trades.
   readonly property var allDaySymbols: overnightSymbols.filter(function(s) {
     return !!allDayFeed.entries[s] && allDayFeed.entries[s].allDay
   })
   // Where Robinhood's trades fill stretches Yahoo left empty, each logged
-  // once. Worked out again for a stock only when its quote or prints change:
+  // once. Worked out again for a stock only when its quote or trades change:
   // 150 stocks take about 28 ms of the shell's thread. Neither notifies.
   readonly property var fills: ({})
   readonly property var saidFills: ({})
@@ -711,7 +712,7 @@ Item {
     // The pill's own ask waits for a request already out.
     if (!open && (allDayFeed.busy || overnightFeed.busy)) return
     allDayFeed.fetch(asks.tradability, root.now)
-    overnightFeed.fetch(asks.prints, root.now)
+    overnightFeed.fetch(asks.trades, root.now)
   }
   function overnightWanted() {
     var previewed = root.previewSymbol
@@ -807,7 +808,7 @@ Item {
   }
 
   // A user's refresh. A host paused for no answer is tried at once. While
-  // every screen is off, the history and prints are owed until one is on.
+  // every screen is off, the history and trades are owed until one is on.
   property bool refreshOwed: false
   function refresh() {
     if (!root.pluginsReady) return
@@ -822,13 +823,13 @@ Item {
     }
     root.refreshRest()
   }
-  // Only the charts on show: the rows' prints come on their own five-minute
+  // Only the charts on show: the rows' trades come on their own five-minute
   // asks, and for 150 rows they are two answers of 4 MB each.
   function refreshRest() {
     var now = root.wallSecond()
     root.showHistory(true)
-    var prints = Asks.refreshPrints(root.chartsOnShow(), root.allDaySymbols, overnightFeed.askedAt, now)
-    if (prints.length > 0) overnightFeed.fetch(prints, now)
+    var trades = Asks.refreshTrades(root.chartsOnShow(), root.allDaySymbols, overnightFeed.askedAt, now)
+    if (trades.length > 0) overnightFeed.fetch(trades, now)
   }
 
   // "Refreshing" while a request a user's refresh made is out, whatever its
@@ -1028,7 +1029,7 @@ Item {
   function armClock() {
     if (!root.pluginsReady) return
     clock.interval = Asks.clockWait(root.openSurfaces.length > 0, Date.now(), root.now,
-      [root.dueAt, yahooGate.pausedUntil, robinhoodGate.pausedUntil, githubGate.pausedUntil, Figures.overdueAt(root.owed, root.now)])
+      [root.dueAt, yahooGate.pausedUntil, robinhoodGate.pausedUntil, githubGate.pausedUntil, Freshness.overdueAt(root.owed, root.now)])
     clock.restart()
   }
   onDueAtChanged: armClock()
@@ -1072,7 +1073,7 @@ Item {
   }
   property int prunedMinute: -1
   // The clock five minutes at a time, which slides 1D's start
-  // (`Overnight.slidWindow`): the pill's line follows it while a screen is
+  // (`Day.slidWindow`): the pill's line follows it while a screen is
   // on, and the panel's and window's chart and rows (`viewSlideAt`) only
   // while one is open, so nothing rebuilds for a surface no screen shows.
   property int slideAt: 0

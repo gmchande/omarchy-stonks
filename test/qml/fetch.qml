@@ -804,7 +804,7 @@ Harness {
       // 17:10, the crypto's saved quote hours old and nothing kept it fresh
       // for five minutes: an open asks for it, its answer held out, as on a
       // real network. Its row shows its last price with no "As of" for the
-      // 2 s an answer takes (`Figures.ASKED_GRACE`), says "As of" from then
+      // 2 s an answer takes (`Freshness.ASKED_GRACE`), says "As of" from then
       // on, and goes on saying it once its answer, as old, lands: the source
       // is late, not Stonks. The service's clock runs as a real one does,
       // its next second 100 ms after the open, so the ask goes 0.9 s into

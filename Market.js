@@ -96,7 +96,7 @@ function tradeClock(quote, t, calendars) {
   return { offset: offset, zone: Calendar.zoneName(cal, offset, quote) }
 }
 
-function printClock(quote, t, calendars) {
+function tradeTime(quote, t, calendars) {
   var clock = tradeClock(quote, t, calendars)
   return Format.zonedHhmm(t, clock.offset, clock.zone)
 }
@@ -112,7 +112,7 @@ function holidayName(name) {
 function statusForms(quote, now, scrubT, calendars, overnight) {
   if (scrubT) {
     var read = Quote.readingAt(quote, scrubT)
-    var at = "At " + printDay(quote, read.t, now, calendars) + printClock(quote, read.t, calendars)
+    var at = "At " + tradeDay(quote, read.t, now, calendars) + tradeTime(quote, read.t, calendars)
     return [at + " · " + phaseLabel(read.close ? "closing" : scrubPhase(quote, scrubT)), at]
   }
   var cal = Calendar.calendarFor(calendars, quote)
@@ -145,7 +145,7 @@ function statusForms(quote, now, scrubT, calendars, overnight) {
   }
   var reg = clockSession(q, now).regular
   if (!closure && phase === "post" && reg && now >= reg.end) {
-    var closedAt = "closed at " + printClock(quote, reg.end, calendars)
+    var closedAt = "closed at " + tradeTime(quote, reg.end, calendars)
     return [phaseLabel(phase) + " · " + closedAt, sentence(closedAt)]
   }
   var note = phase === "post" ? "" : scheduleNote(quote, now, calendars)
@@ -153,8 +153,8 @@ function statusForms(quote, now, scrubT, calendars, overnight) {
   return names.map(function(name) { return name + note }).concat(note ? [sentence(note.slice(" · ".length))] : [])
 }
 
-// By the clock `printClock` reads.
-function printDay(quote, t, now, calendars) {
+// By the clock `tradeTime` reads.
+function tradeDay(quote, t, now, calendars) {
   var day = function(at) {
     return Math.floor((at + tradeClock(quote, at, calendars).offset) / 86400)
   }
