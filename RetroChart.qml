@@ -230,7 +230,8 @@ Item {
     color: root.hairlineColor
   }
 
-  // The pixel version of the smooth chart's live dot, once the day has drawn in.
+  // The pixel version of the smooth chart's live dot, once the day has drawn
+  // in: four blinks, white, colour, white, when the mark plays (`LiveMark`).
   Rectangle {
     id: cap
     objectName: "liveCap"
@@ -240,21 +241,12 @@ Item {
     width: root.pixel
     height: root.pixel
     color: root.hairlineColor
-    // Hidden mid-blink by an open's draw-in, it owes them and blinks once it
-    // shows; any other hide, as a sheet over it, stops them.
-    onVisibleChanged: {
-      if (visible) root.blink()
-      else {
-        if (blinks.running && root.opening && root.reveal < 1) root.blinkOwed = true
-        blinks.stop()
-      }
-    }
 
     SequentialAnimation {
       id: blinks
       paused: running && root.still
       loops: 4
-      onRunningChanged: if (!running) { cap.opacity = 1; root.opening = false }
+      onRunningChanged: if (!running) cap.opacity = 1
 
       PropertyAction { target: cap; property: "opacity"; value: 1 }
       PauseAnimation { duration: Motion.duration(Style, 700) }
@@ -267,33 +259,13 @@ Item {
     }
   }
 
-  // A scrub's end, a sheet closing, or the market turning live again with the
-  // price already blinked for starts nothing. `opening` lasts from the open
-  // until its blinks stop.
-  property string blinkedPrice: ""
-  property bool blinkOwed: false
-  property bool opening: false
-  function blink() {
-    if (!root.live || !cap.visible || root.still) return
-    // With the shell's animations off, the cap stays lit, and the price
-    // counts as blinked for: animations back on, it never blinks for it.
-    if (Style.reduceMotion) {
-      root.blinkOwed = false
-      root.blinkedPrice = root.newestPrice
-      root.opening = false
-      return
-    }
-    if (!root.blinkOwed && root.newestPrice === root.blinkedPrice) return
-    // A restart's stop of a paused burst would end `opening`; an open's blinks
-    // keep it.
-    var opening = root.opening
-    root.blinkOwed = false
-    root.blinkedPrice = root.newestPrice
-    blinks.restart()
-    root.opening = opening
+  LiveMark {
+    live: root.live
+    still: root.still
+    shown: cap.visible
+    drawing: root.reveal < 1
+    surfaceOpen: root.surfaceOpen
+    price: root.newestPrice
+    burst: blinks
   }
-  onNewestPriceChanged: blink()
-  onSurfaceOpenChanged: if (surfaceOpen) { blinkOwed = true; opening = true; blink() }
-  onLiveChanged: if (live) blink(); else blinks.stop()
-  onStillChanged: if (!still) blink()
 }
