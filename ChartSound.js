@@ -191,7 +191,11 @@ function retro(grid, from, to, seconds) {
   var ticks = []
   for (var i = 0; i < x.length; i += STEP) {
     var t = i / RATE
-    var col = Math.max(0, Math.min(grid.columns - 1, Math.floor(placeAt(t, from, to, seconds) * grid.columns)))
+    var place = placeAt(t, from, to, seconds)
+    // A range's start keeps the first column to itself; past it, the
+    // columns run from the second (`Chart.retroColumn`).
+    var col = Math.max(0, Math.min(grid.columns - 1, Math.floor(place * grid.columns)))
+    if (grid.ownStart && place > 0) col = Math.max(1, col)
     if (col !== lastCol) {
       lastCol = col
       var row = grid.levels[col]
