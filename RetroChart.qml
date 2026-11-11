@@ -261,7 +261,7 @@ Item {
     live: root.live
     still: root.still
     shown: cap.visible
-    drawing: root.reveal < 1
+    drawing: function() { return root.reveal < 1 }
     surfaceOpen: root.surfaceOpen
     price: root.newestPrice
     burst: blinks
