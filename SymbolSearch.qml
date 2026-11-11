@@ -507,18 +507,14 @@ OverRows {
       Keys.onPressed: function(event) { root.handleKey(event) }
     }
 
-    Button {
+    ListAction {
       id: cancelButton
+      look: root.look
       anchors.right: parent.right
       anchors.rightMargin: root.rowPadding
       anchors.verticalCenter: parent.verticalCenter
-      bordered: true
-      radius: root.look.retro ? 0 : Style.cornerRadius
-      foreground: root.look.foreground
-      fontFamily: root.look.fontFamily
-      fontSize: Style.font.bodySmall
-      text: "Cancel"
-      onClicked: root.cancel()
+      text: "CANCEL"
+      onActivated: root.cancel()
     }
   }
 }

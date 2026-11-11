@@ -160,18 +160,14 @@ OverRows {
       elide: Text.ElideRight
     }
 
-    Button {
+    ListAction {
       id: done
+      look: root.look
       anchors.right: parent.right
       anchors.rightMargin: root.gutter + root.inset
       anchors.verticalCenter: parent.verticalCenter
-      bordered: true
-      radius: root.look.retro ? 0 : Style.cornerRadius
-      foreground: root.look.foreground
-      fontFamily: root.look.fontFamily
-      fontSize: Style.font.bodySmall
-      text: "Done"
-      onClicked: root.dismissed()
+      text: "DONE"
+      onActivated: root.dismissed()
     }
   }
 
