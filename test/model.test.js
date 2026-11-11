@@ -869,9 +869,10 @@ const lines = { pitch: 26, height: 26 }
 const ten = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
 
 test("retro draws each column at the price its last trade ended on, holds it across columns the line joins, leaves a break dark, and lights the last bright column", () => {
-  // 100 by 31 in 3-pixel cells a pixel apart: 25 columns of 10 whole rows.
+  // 100 by 32 in 3-pixel cells a pixel apart: 25 columns of 10 whole rows,
+  // the two pixels over making none.
   const point = (x, y, more = {}) => ({ x, y, ...more })
-  const grid = points => M.retroGrid({ points, baselineY: 0.5 }, 100, 31, 3, 1)
+  const grid = points => M.retroGrid({ points, baselineY: 0.5 }, 100, 32, 3, 1)
   const g = grid([point(0, 0), point(0.02, 1), point(0.2, 0.5), point(0.4, 1, { brk: true })])
   expect([g.columns, g.rows, g.pitch]).toEqual([25, 10, 4])
   // Two trades in column 0: the second wins. Columns 1 to 4 hold column 0's
@@ -880,6 +881,9 @@ test("retro draws each column at the price its last trade ended on, holds it acr
   expect(g.lastLit).toBe(10)
   // A last trade that is dim leaves the light on the column before it.
   expect(grid([point(0, 0), point(0.2, 0.5, { dim: true })]).lastLit).toBe(0)
+  // Columns a trade's price holds across are as dim as that trade.
+  expect(grid([point(0, 0, { dim: true }), point(0.2, 0.5, { dim: true })]).dim.slice(0, 6).map(Boolean)).toEqual([true, true, true, true, true, true])
+  expect(grid([point(0, 0), point(0.2, 0.5, { dim: true })]).dim.slice(0, 6).map(Boolean)).toEqual([false, false, false, false, false, true])
   // The baseline: a known close's row; none known, the floor; a step to a
   // close known from its column on.
   expect([g.baseRow, M.retroGrid({ points: [point(0, 0)] }, 100, 30, 3, 1).baseRow]).toEqual([5, 9])
@@ -1956,7 +1960,7 @@ test("a hostile search or Robinhood answer reads as no answer, at once", async (
     { name: "search quotes posing", call: "M.parseSearch(json)", answer: { quotes: POSING } },
     { name: "search quotes over budget", call: "M.parseSearch(json) && 'read'", answer: { quotes: times(M.MOST_QUOTES + 1).map(() => quote) } },
     { name: "trades, as sent", call: nest, answer: { results: [result([trade])] }, want: 1 },
-    { name: "Robinhood's results posing", call: "M.parseOvernight(json, ['NEST'])", answer: { results: POSING } },
+    { name: "Robinhood's results posing", call: "M.overnightResults(json)", answer: { results: POSING } },
     { name: "Robinhood's results over budget", call: "M.overnightResults(json) && 'read'", answer: { results: times(M.MOST_RESULTS + 1).map(() => result([])) } },
     { name: "a listing's trades posing", call: nest, answer: { results: [result(POSING)] }, want: 0 },
     { name: "a listing's trades over budget", call: nest, answer: { results: [result(times(M.MOST_TRADES + 1).map(() => trade))] }, want: 0 },

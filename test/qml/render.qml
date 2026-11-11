@@ -405,6 +405,16 @@ Harness {
     property string runningVersion: "1.0.0"
   }
 
+  // Robinhood's answer by symbol, read as the feed reads it: each result is
+  // for the symbol asked in its place.
+  function robinhoodAnswers(answer, symbols) {
+    var results = Overnight.overnightResults(answer)
+    if (!results) return null
+    var out = {}
+    symbols.forEach(function(symbol, i) { out[symbol] = Overnight.overnightAnswer(results[i], symbol) })
+    return out
+  }
+
   function load() {
     var aapl = Quote.parseChart(JSON.parse(aaplFile.text()))
     var nestDay = Quote.parseChart(JSON.parse(nestDayFile.text()))
@@ -444,7 +454,7 @@ Harness {
         var sunday = Calendar.epochAt(stub.calendars.calendars.US, "2026-10-25", "23:35")
         var jnj = Quote.parseChart(moment("jnj"), Calendar.centExchanges(stub.calendars), sunday)
         var day = moment("robinhood-day")
-        var night = Overnight.parseOvernight(day, day.results.map(function(r) { return r.symbol })).JNJ
+        var night = robinhoodAnswers(day, day.results.map(function(r) { return r.symbol })).JNJ
         var built = Day.dayChart(jnj, night, stub.calendars)
         root.nightPill = { quote: jnj, newest: Overnight.newestTrade(jnj, built.latest, stub.calendars, built.day),
           night: Object.assign({ status: "ok" }, night) }
@@ -629,7 +639,7 @@ Harness {
       // with the sweep's moments, and every one at the moments before them;
       // at a saved moment's folder, those Stonks asks Robinhood about, in
       // the order its saved answer was asked in, since an answer's results
-      // pair with the symbols asked by place (Overnight.parseOvernight).
+      // pair with the symbols asked by place (`robinhoodAnswers`).
       var day = named ? saved("robinhood-day") : null
       var instruments = named ? saved("robinhood-instruments") : null
       var asked = day ? JSON.parse(day).results.map(function(r) { return r.symbol }) : []
@@ -645,8 +655,8 @@ Harness {
         : root.overnight.sweep ? Overnight.parseAllDay(read("robinhood-instruments"), us) : root.overnight.power ? {} : null
       // What a surface opening at the moment holds: Robinhood's span=day
       // answer.
-      var answer = named ? (day ? Overnight.parseOvernight(JSON.parse(day), us) : null)
-        : root.overnight.power ? {} : Overnight.parseOvernight(read("robinhood-day"), us)
+      var answer = named ? (day ? robinhoodAnswers(JSON.parse(day), us) : null)
+        : root.overnight.power ? {} : robinhoodAnswers(read("robinhood-day"), us)
       us.forEach(function(s) {
         if (named && !tradable) return
         allDay[s] = { status: "ok", allDay: tradable ? tradable[s] : true, at: 0 }
