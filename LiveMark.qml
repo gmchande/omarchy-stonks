@@ -14,7 +14,9 @@ Item {
   property bool live: false
   property bool still: false
   property bool shown: false
-  property bool drawing: false
+  // Whether the chart is drawing in, asked at a hide: a binding could still
+  // hold the value from before the draw-in that hid the mark.
+  property var drawing: function() { return false }
   property bool surfaceOpen: false
   property string price: ""
   property Animation burst: null
@@ -50,7 +52,7 @@ Item {
   onShownChanged: {
     if (shown) play()
     else {
-      if (burst.running && opening && drawing) owed = true
+      if (burst.running && opening && drawing()) owed = true
       burst.stop()
     }
   }

@@ -373,7 +373,7 @@ Item {
     live: root.live
     still: root.still
     shown: dot.visible
-    drawing: root.reveal < 1
+    drawing: function() { return root.reveal < 1 }
     surfaceOpen: root.surfaceOpen
     price: root.newestPrice
     burst: ripples
