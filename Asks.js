@@ -292,14 +292,9 @@ function overnightAsks(s) {
   var drawn = listings.filter(function(x) { return !s.allDay[x] || s.allDay[x].allDay })
   // Listings asked together share `entry.at`, so each ask is judged once.
   var judged = {}
-  // The newest stretch Yahoo left empty, once Robinhood's bars for it are in.
   var quotes = s.overnightSymbols.map(function(x) { return s.quotes[x] })
   if (previewing && s.previewQuote.session) quotes.push(s.previewQuote)
-  var hole = null
-  for (var i = 0; i < quotes.length; i++) {
-    var last = quotes[i] ? Overnight.yahooHole(quotes[i]) : null
-    if (last !== null && last + Overnight.OVERNIGHT_LAG <= s.now && (hole === null || last > hole)) hole = last
-  }
+  var hole = newestHole(quotes, s.now)
   var holeDue = function(x) {
     return hole !== null && !!s.allDay[x] && s.allDay[x].allDay && Overnight.holeDue(hole, s.nights[x], s.now)
   }
@@ -318,10 +313,26 @@ function overnightAsks(s) {
   if (trades.length > 0)
     trades = drawn.filter(function(x) { return tradesDue(x, s.now + Overnight.OVERNIGHT_INTERVAL / 2) })
   if (tradability.length === 0 && trades.length === 0) return null
-  var alone = function(symbols, answers) {
-    return symbols.length > 1 && symbols.indexOf(waited) >= 0 && !answers[waited] ? [waited] : symbols
+  return { tradability: waitedAlone(tradability, waited, s.allDay), trades: waitedAlone(trades, waited, s.nights) }
+}
+
+// The newest stretch Yahoo left empty in these quotes, once Robinhood's bars
+// for it are in; null if none.
+function newestHole(quotes, now) {
+  var hole = null
+  for (var i = 0; i < quotes.length; i++) {
+    var last = quotes[i] ? Overnight.yahooHole(quotes[i]) : null
+    if (last === null || last + Overnight.OVERNIGHT_LAG > now) continue
+    if (hole === null || last > hole) hole = last
   }
-  return { tradability: alone(tradability, s.allDay), trades: alone(trades, s.nights) }
+  return hole
+}
+
+// The chart waited on, the preview's or else the featured stock's, goes
+// alone ahead of the rest while it has no answer.
+function waitedAlone(symbols, waited, answers) {
+  if (symbols.length > 1 && symbols.indexOf(waited) >= 0 && !answers[waited]) return [waited]
+  return symbols
 }
 
 function refreshTrades(charts, allDaySymbols, askedAt, now) {

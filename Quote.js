@@ -253,56 +253,22 @@ function parseChart(json, centExchanges, receivedAt) {
   var quoted = Format.isFiniteNumber(meta.regularMarketTime) && meta.regularMarketTime > 0 ? meta.regularMarketTime : null
   var coin = meta.instrumentType === "CRYPTOCURRENCY"
   var days = meta.tradingPeriods ? answerDays(meta.tradingPeriods) : [current]
-  var since = function(d) { return quoted !== null ? quoted : barIn(timestamps, closes, days[d].regular) }
-  var chosen = 0
-  for (var d = 1; d < days.length; d++) if (days[d].regular && since(d) !== null && days[d].regular.start <= since(d)) chosen = d
+  var chosen = headlineDay(days, quoted, timestamps, closes)
   var periods = days[chosen]
   var next = !coin && chosen + 1 < days.length ? days[chosen + 1] : null
   var from = !coin && chosen > 0 ? periodsStart(periods) : null
-  var bars = []
-  for (var i = 0; i < timestamps.length; i++) {
-    if (!Format.isMoment(timestamps[i]) || (i > 0 && !(timestamps[i] > timestamps[i - 1]))) return null
-    if (knownPrice(closes[i]) !== null && (from === null || timestamps[i] >= from))
-      bars.push({ t: timestamps[i], o: opens[i], c: closes[i], v: volumes ? volumes[i] : null, h: highs ? highs[i] : null, l: lows ? lows[i] : null })
-  }
+  var bars = answerBars(timestamps, { o: opens, c: closes, v: volumes, h: highs, l: lows }, from)
+  if (!bars) return null
   var filtered = filterStrayCloses(bars, periods, answerTick(meta, bars, centExchanges))
   var kept = filtered.bars
-  // A stray run reaches at most MIXED_RUN bars on, so no later bar can change
-  // the verdict before that. The newest bar is the live moment.
-  var wholeBars = bars.slice(0, Math.max(0, bars.length - 1))
-  var settledBars = bars.slice(0, Math.max(0, bars.length - MIXED_RUN))
   var regular = periodOf(periods.regular)
-  // Yahoo gives an index pre- and post-market periods and repeats its close
-  // through the evening, but an index is worked out only while its exchange
-  // trades.
   var index = meta.instrumentType === "INDEX"
-  var tailFrom = next ? periodsStart(next) : null
-  var points = []
-  for (var j = 0; j < kept.length; j++) {
-    var tail = tailFrom !== null && kept[j].t >= tailFrom
-    if (tail && !index) points.push({ t: kept[j].t, p: kept[j].c, s: POINT_SESSIONS[sessionAt(next, kept[j].t)] || "pre" })
-    else if (!tail && (!index || !regular || (kept[j].t >= regular.start && kept[j].t < regular.end)))
-      points.push({ t: kept[j].t, p: kept[j].c })
-  }
+  var points = dayPoints(kept, next, regular, index)
   // Before a session, Yahoo already sends the coming day's high and low, as 0
   // in London's case: the figures are then that day's, and the bars' open
-  // isn't. An untraded listing's figures and quote stay its last trading day's.
+  // isn't.
   var ahead = !knownPrice(meta.regularMarketDayHigh) && !knownPrice(meta.regularMarketDayLow) && !!current.regular
-  var figuresDay = ahead ? current.regular.start : !regular ? null
-    : quoted !== null && quoted < regular.start ? quoted : regular.start
-  // Yahoo's bars sit on the five-minute grid from the bell. Off it, at the
-  // quote's time, is Yahoo's echo of its price: one price, no shares. Its open
-  // is that price, not the day's: at Tokyo's open on 4 November, 09:00:03's
-  // held Monday's close, 3,051, with the day already traded 3,030 to 3,040.
-  // So the day's open waits for Yahoo's first bar of the day.
-  var firstRegular = null
-  for (var k = 0; regular && !ahead && k < kept.length && !firstRegular; k++)
-    if (kept[k].t >= regular.start && kept[k].t < regular.end && (kept[k].t - regular.start) % BAR === 0) firstRegular = kept[k]
-  // A stock's next day has begun once Yahoo sends it, from its pre-market on.
-  // An index's bars stay the last session's until its open, so its next day
-  // begins with the pre-market, else the open, of Yahoo's later current period.
-  var nextDay = !!regular && !!current.regular && current.regular.start > regular.start ? (current.pre || current.regular) : null
-  var nextDayBegun = index ? !!nextDay && Format.isFiniteNumber(receivedAt) && receivedAt >= nextDay.start : !!next
+  var firstRegular = regular && !ahead ? firstRegularBar(kept, regular) : null
   var symbol = Format.fetchedText(meta.symbol, Format.MOST_CODE)
   var instrumentType = Format.fetchedText(meta.instrumentType, Format.MOST_CODE)
   var out = {
@@ -322,14 +288,7 @@ function parseChart(json, centExchanges, receivedAt) {
     price: knownPrice(meta.regularMarketPrice),
     priceDigits: Format.priceDigits(knownPrice(meta.regularMarketPrice) !== null ? meta.regularMarketPrice
       : (points.length ? points[points.length - 1].p : null), meta.priceHint, inCents(meta, centExchanges)),
-    // Yahoo's previous close is the close before the day it counts as
-    // current, its chart previous close the one before the answer's first day.
-    // Tokyo's two-day answer before Monday's first bar holds Friday alone, with
-    // Friday's own close as its previous close. A one-day answer's quote can be
-    // an older day's, for a listing that hasn't traded.
-    prevClose: knownPrice(meta.chartPreviousClose !== undefined
-      && ((days.length === 1 && meta.range !== "2d") || (chosen === 0 && (quoted === null || !regular || quoted < regular.start)))
-      ? meta.chartPreviousClose : meta.previousClose),
+    prevClose: answerPrevClose(meta, days, chosen, quoted, regular),
     marketTime: Format.isMoment(meta.regularMarketTime) && meta.regularMarketTime > 0 ? meta.regularMarketTime : null,
     dayOpen: firstRegular ? knownPrice(firstRegular.o) : null,
     // The session `dayOpen` opened.
@@ -340,8 +299,8 @@ function parseChart(json, centExchanges, receivedAt) {
     fiftyTwoWeekHigh: knownPrice(meta.fiftyTwoWeekHigh),
     fiftyTwoWeekLow: knownPrice(meta.fiftyTwoWeekLow),
     // The session the day's open, high, low and volume belong to.
-    figuresDay: figuresDay,
-    nextDayBegun: nextDayBegun,
+    figuresDay: figuresDayOf(ahead, current, regular, quoted),
+    nextDayBegun: nextDayHasBegun(index, next, regular, current, receivedAt),
     // Its trades are all the day will have, so the chart ends at the last
     // (`Day.tradedAxis`).
     wholeDay: !!regular && Format.isFiniteNumber(receivedAt) && receivedAt >= (periods.post || periods.regular).end,
@@ -358,20 +317,126 @@ function parseChart(json, centExchanges, receivedAt) {
     next: next && !index ? { pre: periodOf(next.pre), regular: periodOf(next.regular), post: periodOf(next.post) } : null,
     points: points,
     droppedTimes: filtered.droppedTimes,
-    // For a later spark answer (`sparkQuote`). Null without opens, when the
-    // filter judged nothing.
-    verdict: opens.length ? {
-      newest: wholeBars.length ? wholeBars[wholeBars.length - 1].t : 0,
-      settled: settledBars.length ? settledBars[settledBars.length - 1].t : 0,
-      times: wholeBars.map(function(b) { return b.t }),
-      closes: wholeBars.map(function(b) { return b.c }),
-      dropped: filtered.droppedTimes,
-      open: firstRegular ? knownPrice(firstRegular.o) : null,
-      openSession: firstRegular ? regular.start : null
-    } : null
+    verdict: chartVerdict(bars, opens, filtered, firstRegular, regular)
   }
   var rolled = coin ? coinDay(points, kept) : null
   return rolled ? Object.assign(out, rolled) : out
+}
+
+// Which of an answer's days is the headline's: the last whose session has
+// begun by the quote's time, or without one, by a bar in it.
+function headlineDay(days, quoted, timestamps, closes) {
+  var chosen = 0
+  for (var d = 1; d < days.length; d++) {
+    var regular = days[d].regular
+    if (!regular) continue
+    var since = quoted !== null ? quoted : barIn(timestamps, closes, regular)
+    if (since !== null && regular.start <= since) chosen = d
+  }
+  return chosen
+}
+
+// The bars from `from` on that have a close; null if a time is malformed or
+// out of order. `series` holds the answer's opens, closes, volumes, highs and
+// lows by the bar's own names, the last three null in a spark answer.
+function answerBars(timestamps, series, from) {
+  var bars = []
+  for (var i = 0; i < timestamps.length; i++) {
+    if (!Format.isMoment(timestamps[i]) || (i > 0 && !(timestamps[i] > timestamps[i - 1]))) return null
+    if (knownPrice(series.c[i]) === null) continue
+    if (from !== null && timestamps[i] < from) continue
+    bars.push({
+      t: timestamps[i],
+      o: series.o[i],
+      c: series.c[i],
+      v: series.v ? series.v[i] : null,
+      h: series.h ? series.h[i] : null,
+      l: series.l ? series.l[i] : null
+    })
+  }
+  return bars
+}
+
+// The headline day's trades, and the coming day's pre-market as its tail,
+// each tail trade named by its session. Yahoo gives an index pre- and
+// post-market periods and repeats its close through the evening, but an
+// index is worked out only while its exchange trades.
+function dayPoints(kept, next, regular, index) {
+  var tailFrom = next ? periodsStart(next) : null
+  var points = []
+  for (var j = 0; j < kept.length; j++) {
+    var bar = kept[j]
+    if (tailFrom !== null && bar.t >= tailFrom) {
+      if (!index) points.push({ t: bar.t, p: bar.c, s: POINT_SESSIONS[sessionAt(next, bar.t)] || "pre" })
+    } else if (!index || !regular || (bar.t >= regular.start && bar.t < regular.end)) {
+      points.push({ t: bar.t, p: bar.c })
+    }
+  }
+  return points
+}
+
+// Yahoo's bars sit on the five-minute grid from the bell. Off it, at the
+// quote's time, is Yahoo's echo of its price: one price, no shares. Its open
+// is that price, not the day's: at Tokyo's open on 4 November, 09:00:03's
+// held Monday's close, 3,051, with the day already traded 3,030 to 3,040.
+// So the day's open waits for Yahoo's first bar of the day.
+function firstRegularBar(kept, regular) {
+  for (var k = 0; k < kept.length; k++) {
+    var t = kept[k].t
+    if (t >= regular.start && t < regular.end && (t - regular.start) % BAR === 0) return kept[k]
+  }
+  return null
+}
+
+// Yahoo's previous close is the close before the day it counts as current,
+// its chart previous close the one before the answer's first day. Tokyo's
+// two-day answer before Monday's first bar holds Friday alone, with Friday's
+// own close as its previous close. A one-day answer's quote can be an older
+// day's, for a listing that hasn't traded.
+function answerPrevClose(meta, days, chosen, quoted, regular) {
+  var oneDay = days.length === 1 && meta.range !== "2d"
+  var beforeHeadline = chosen === 0 && (quoted === null || !regular || quoted < regular.start)
+  if (meta.chartPreviousClose !== undefined && (oneDay || beforeHeadline)) return knownPrice(meta.chartPreviousClose)
+  return knownPrice(meta.previousClose)
+}
+
+// The session the day's figures belong to: the coming day's once Yahoo sends
+// its high and low (`ahead`). An untraded listing's figures and quote stay
+// its last trading day's.
+function figuresDayOf(ahead, current, regular, quoted) {
+  if (ahead) return current.regular.start
+  if (!regular) return null
+  if (quoted !== null && quoted < regular.start) return quoted
+  return regular.start
+}
+
+// A stock's next day has begun once Yahoo sends it, from its pre-market on.
+// An index's bars stay the last session's until its open, so its next day
+// begins with the pre-market, else the open, of Yahoo's later current period.
+function nextDayHasBegun(index, next, regular, current, receivedAt) {
+  if (!index) return !!next
+  if (!regular || !current.regular || current.regular.start <= regular.start) return false
+  var nextDay = current.pre || current.regular
+  return Format.isFiniteNumber(receivedAt) && receivedAt >= nextDay.start
+}
+
+// For a later spark answer (`sparkQuote`). Null without opens, when the
+// filter judged nothing. A stray run reaches at most MIXED_RUN bars on, so no
+// later bar can change the verdict before that. The newest bar is the live
+// moment.
+function chartVerdict(bars, opens, filtered, firstRegular, regular) {
+  if (!opens.length) return null
+  var whole = bars.slice(0, Math.max(0, bars.length - 1))
+  var settled = bars.slice(0, Math.max(0, bars.length - MIXED_RUN))
+  return {
+    newest: whole.length ? whole[whole.length - 1].t : 0,
+    settled: settled.length ? settled[settled.length - 1].t : 0,
+    times: whole.map(function(b) { return b.t }),
+    closes: whole.map(function(b) { return b.c }),
+    dropped: filtered.droppedTimes,
+    open: firstRegular ? knownPrice(firstRegular.o) : null,
+    openSession: firstRegular ? regular.start : null
+  }
 }
 
 // A coin never closes, so its day is its last 24 hours, from the trade 24

@@ -195,8 +195,10 @@ Item {
     var requests = Asks.quoteRequests(waiting, asked, reading ? reading() : symbols, featured, charted, bulk, coins)
     var granted = requests.length > 0 && gate ? gate.take(requests.length, bulk) : requests.length
     var run = requests.slice(0, granted)
-    for (var j = 0; requests.length === 0 && j < Math.min(judging.length, judgeRun) && (!gate || (gate.spare() && gate.take(1, bulk) === 1)); j++)
+    for (var j = 0; requests.length === 0 && j < Math.min(judging.length, judgeRun); j++) {
+      if (gate && !(gate.spare() && gate.take(1, bulk) === 1)) break
       run.push({ symbols: [judging[j]], spark: false })
+    }
     if (run.length === 0) return
     var runSymbols = []
     run.forEach(function(request) { runSymbols = runSymbols.concat(request.symbols) })

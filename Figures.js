@@ -366,15 +366,18 @@ function heroLines(quote, view, latest, now, day, calendars, changeMode, scrubbi
   var newest = view.newest || null
   var period = view.periodLabel || ""
   var from = closeCountedFrom(quote, view, today, calendars)
-  var close = scrubbing ? null : newest ? closeLine(quote, today, changeMode, view, calendars)
-    : extendedStack(quote, latest, now, day, changeMode) || closeOnly(from)
+  var close = null
+  if (!scrubbing && newest) close = closeLine(quote, today, changeMode, view, calendars)
+  else if (!scrubbing) close = extendedStack(quote, latest, now, day, changeMode) || closeOnly(from)
   var whole = !!close && !!newest && newest.closed && !newest.joined
   if (whole && close.price === "") close = closeOnly(from) || close
   else if (whole && period === "") close.since = sinceClose(quote, newest, changeMode)
+  var rangeName = period === "24H" ? "" : period
+  if (view.pct === null) return { close: close, caption: { label: rangeName, changeText: "", tone: "flat" } }
+  var label = scrubbing ? rangeName : period || moveName(quote, newest, from, today)
   var other = view.unit === "abs" ? "pct" : "abs"
-  if (view.pct === null) return { close: close, caption: { label: period === "24H" ? "" : period, changeText: "", tone: "flat" } }
-  var label = scrubbing ? (period === "24H" ? "" : period) : period || moveName(quote, newest, from, today)
-  return { close: close, caption: { label: label, changeText: Format.changeText(view, other, quote.priceDigits), tone: Format.changeTone(view, other, quote.priceDigits) } }
+  var caption = { label: label, changeText: Format.changeText(view, other, quote.priceDigits), tone: Format.changeTone(view, other, quote.priceDigits) }
+  return { close: close, caption: caption }
 }
 
 function closeOnly(from) {
