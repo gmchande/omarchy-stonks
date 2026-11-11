@@ -63,7 +63,7 @@ function createPrivately(path) {
 // an older Stonks, which kept no stamp. The answer runs under 8 KB and is
 // read up to 64.
 function soundSurvey(pluginFolder, cacheFolder) {
-  return ["timeout", "5", "sh", "-c", "{ cd -- \"$1\" && md5sum -- ChartSound.js Sounds.qml sounds/*/*.wav && cd -- \"$2\" || exit 0\n"
+  return ["timeout", "5", "sh", "-c", "{ cd -- \"$1\" && md5sum -- ChartSound.js Sounds.qml Waking.js sounds/*/*.wav && cd -- \"$2\" || exit 0\n"
     + "for look in smooth retro; do\n"
     + "  [ -f \"stamp-$look\" ] || continue\n"
     + "  printf 'stamp %s %s\\n' \"$look\" \"$(head -c 64 -- \"stamp-$look\")\"\n"
@@ -74,8 +74,8 @@ function soundSurvey(pluginFolder, cacheFolder) {
 }
 
 // Per look, the md5 lines its sounds are made from, null unless all of
-// them came: ChartSound.js, Sounds.qml and each of its `fixed` bundled
-// sounds; each look's stamp; and the files kept, as keys.
+// them came: ChartSound.js, Sounds.qml, Waking.js and each of its `fixed`
+// bundled sounds; each look's stamp; and the files kept, as keys.
 function readSoundSurvey(text, fixed) {
   var sums = { smooth: [], retro: [] }
   var stamps = {}
@@ -89,7 +89,7 @@ function readSoundSurvey(text, fixed) {
     else if (word[0] === "stamp" && word.length === 3) stamps[word[1]] = word[2]
     else if (word[0] === "have" && word.length === 2) have[word[1]] = true
   })
-  ;["smooth", "retro"].forEach(function(look) { if (sums[look].length !== 2 + fixed) sums[look] = null })
+  ;["smooth", "retro"].forEach(function(look) { if (sums[look].length !== 3 + fixed) sums[look] = null })
   return { sums: sums, stamps: stamps, have: have }
 }
 

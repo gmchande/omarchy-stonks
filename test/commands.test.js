@@ -81,9 +81,12 @@ test("the sounds made in an earlier run are used again only while what they're m
   const cache = join(dir, "cache")
   mkdirSync(cache)
   const survey = () => C.readSoundSurvey(run(C.soundSurvey(root, cache), { PATH: process.env.PATH }).out, 5)
-  // Nothing made yet: each look's sources come whole, with no stamp.
+  // Nothing made yet: each look's sources come whole, with no stamp. They
+  // name every file the sounds are made from, so a change to any of them
+  // makes the sounds again.
   const first = survey()
-  expect([first.sums.smooth.length, first.sums.retro.length, first.stamps, first.have]).toEqual([7, 7, {}, {}])
+  expect([first.sums.smooth.length, first.sums.retro.length, first.stamps, first.have]).toEqual([8, 8, {}, {}])
+  expect(first.sums.smooth.map(line => line.slice(34)).filter(name => !name.startsWith("sounds/"))).toEqual(["ChartSound.js", "Sounds.qml", "Waking.js"])
   // A stamp, a file made before it, and one written after it by an older Stonks.
   writeFileSync(join(cache, "stamp-smooth"), "abc123\n")
   writeFileSync(join(cache, "chime-smooth-1.wav"), "")
