@@ -8,7 +8,7 @@ import "Motion.js" as Motion
 import "Rows.js" as Rows
 
 // A symbol's lists, in the rows' place: a tick box for each list, All first.
-FocusScope {
+OverRows {
   id: root
 
   property var choices: []
@@ -35,22 +35,12 @@ FocusScope {
     return !!choices[index] && choices[index].symbols.indexOf(symbol) >= 0
   }
 
-  property bool active: false
-  // Shown through the close fade, but takes no pointer or key.
-  enabled: active
-  // Turned on, it takes the keys a turn later only if still on; turned
-  // off, however it closes, it gives them up.
-  onActiveChanged: {
-    if (active) {
-      reset()
-      pointer.rest()
-      opening.restart()
-      Qt.callLater(function() { if (root.active) root.forceActiveFocus() })
-    } else {
-      root.focus = false
-      scroll.cancelFlick()
-    }
+  onOpened: {
+    reset()
+    pointer.rest()
+    opening.restart()
   }
+  onClosed: scroll.cancelFlick()
 
   function reset() {
     cursor = choices.length > 1 ? 1 : -1

@@ -8,7 +8,7 @@ import "Search.js" as Search
 // Search's field and results. Yahoo's lookup is its feed's
 // (`SearchFeed.qml`). A FocusScope, so that hiding it takes the keys from
 // the field: a hidden field keeps them otherwise.
-FocusScope {
+OverRows {
   id: root
 
   property Look look
@@ -129,20 +129,13 @@ FocusScope {
   signal chose(string symbol, var result)
   signal cancelled()
 
-  property bool active: false
-  // Off, it still shows through the close fade but takes no pointer or key.
-  enabled: active
-  // Turned off, any way it closes, it drops a lookup still out and keeps
-  // what it shows for the close fade.
-  onActiveChanged: {
-    if (active) {
-      reset()
-      Qt.callLater(function() { if (root.active) searchField.forceActiveFocus() })
-    } else {
-      suspend()
-      searchField.focus = false
-      root.focus = false
-    }
+  keysTo: searchField
+  onOpened: reset()
+  // Closed, it drops a lookup still out and keeps what it shows for the
+  // close fade.
+  onClosed: {
+    suspend()
+    searchField.focus = false
   }
   Keys.onPressed: function(event) { root.handleKey(event) }
 

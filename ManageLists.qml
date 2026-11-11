@@ -9,7 +9,7 @@ import "Rows.js" as Rows
 
 // Manage lists, in the rows' place: rename, reorder, and delete the named
 // lists. All comes first and can't change.
-FocusScope {
+OverRows {
   id: root
 
   property var choices: []
@@ -58,21 +58,15 @@ FocusScope {
   signal deleteRequested(string name)
   signal dismissed()
 
-  property bool active: false
-  // Shown through the close fade, but inert.
-  enabled: active
-  // Turned on, it takes the keys a turn later only if still on; turned
-  // off, however it closes, it gives them up, its rename field's too.
-  onActiveChanged: {
-    if (active) {
-      reset()
-      pointer.rest()
-      Qt.callLater(function() { if (root.active && !root.renaming) root.forceActiveFocus() })
-    } else {
-      nameField.focus = false
-      root.focus = false
-      scroll.cancelFlick()
-    }
+  keysTo: renaming ? null : root
+  onOpened: {
+    reset()
+    pointer.rest()
+  }
+  // Closed, it gives up its rename field's keys too.
+  onClosed: {
+    nameField.focus = false
+    scroll.cancelFlick()
   }
 
   function reset() {

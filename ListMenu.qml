@@ -10,7 +10,7 @@ import "Rows.js" as Rows
 
 // The list menu: All and each named list, then "New list…" and "Manage
 // lists…", pinned under the lists.
-FocusScope {
+OverRows {
   id: root
 
   property var choices: []
@@ -46,22 +46,16 @@ FocusScope {
   width: Style.space(236)
   height: rowsShown * itemHeight + pinnedHeight + inset * 2
 
-  property bool active: false
-  // Shown through the close fade, but inert.
-  enabled: active
-  // Turned on, it takes the keys a turn later only if still on; turned
-  // off, however it closes, it gives them up, its name field's too.
-  onActiveChanged: {
-    if (active) {
-      reset()
-      pointer.rest()
-      Qt.callLater(function() { if (root.active && !root.naming) root.forceActiveFocus() })
-    } else {
-      nameField.focus = false
-      root.focus = false
-      scroll.cancelFlick()
-      settle.stop()
-    }
+  keysTo: naming ? null : root
+  onOpened: {
+    reset()
+    pointer.rest()
+  }
+  // Closed, it gives up its name field's keys too.
+  onClosed: {
+    nameField.focus = false
+    scroll.cancelFlick()
+    settle.stop()
   }
 
   function reset() {
