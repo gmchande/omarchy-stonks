@@ -97,11 +97,7 @@ Item {
     var named = String(fileSettings.featured || "").toUpperCase()
     var featured = all.indexOf(named) >= 0 ? named : (all[0] || "")
     var range = fileSettings.range
-    // Receipts and histories only when the chart needs them, so a receipt
-    // for a quoted symbol on the day recomputes nothing.
-    var chart = root.keptDay(featured, Chart.viewChart(featured, range, feed.quotes,
-      feed.quotes[featured] ? ({}) : feed.entries, range === "1D" ? ({}) : historyFeed.entries,
-      overnightFeed.entries, allDayFeed.entries, calendars, root.viewSlideAt), overnightFeed.entries, allDayFeed.entries)
+    var chart = root.chartOf(featured, range, feed)
     return {
       featured: featured,
       range: range,
@@ -121,13 +117,16 @@ Item {
     var symbol = root.previewSymbol
     if (!symbol) return view
     var own = !!previewFeed.quotes[symbol] || !!previewFeed.entries[symbol]
-    var quotes = own ? previewFeed.quotes : feed.quotes
-    var entries = own ? previewFeed.entries : feed.entries
-    var range = view.range
-    var chart = root.keptDay(symbol, Chart.viewChart(symbol, range, quotes, quotes[symbol] ? ({}) : entries,
+    return Object.assign({}, view, { featured: symbol, chart: root.chartOf(symbol, view.range, own ? previewFeed : feed) })
+  }
+  // A symbol's chart over a range, from what a quote feed holds. It reads the
+  // feed's receipts only for a symbol without a quote, and the histories only
+  // off 1D, so a receipt for a quoted symbol on the day recomputes nothing.
+  function chartOf(symbol, range, quoteFeed) {
+    var quotes = quoteFeed.quotes
+    return root.keptDay(symbol, Chart.viewChart(symbol, range, quotes, quotes[symbol] ? ({}) : quoteFeed.entries,
       range === "1D" ? ({}) : historyFeed.entries, overnightFeed.entries, allDayFeed.entries, calendars, root.viewSlideAt),
       overnightFeed.entries, allDayFeed.entries)
-    return Object.assign({}, view, { featured: symbol, chart: chart })
   }
   readonly property string featuredSymbol: view.featured
   readonly property var shown: view.shown
@@ -193,14 +192,6 @@ Item {
   onChangeModeChanged: root.heldOrder = null
   onListNameChanged: root.heldOrder = null
   onListsHeldChanged: root.heldOrder = null
-  Connections {
-    target: yahooGate
-    function onPausedChanged() { root.releaseOrder() }
-  }
-  Connections {
-    target: robinhoodGate
-    function onPausedChanged() { root.releaseOrder() }
-  }
 
   // ---- Open surfaces and the search's preview
 
@@ -481,6 +472,8 @@ Item {
     id: yahooGate
     host: "Yahoo"
     clock: root
+    onPausedChanged: root.releaseOrder()
+    onPausedUntilChanged: root.armClock()
     // Yahoo answering again says the network is back.
     onReopened: {
       root.showHistory(false)
@@ -498,11 +491,14 @@ Item {
     clock: root
     capacity: 20
     perMinute: 10
+    onPausedChanged: root.releaseOrder()
+    onPausedUntilChanged: root.armClock()
   }
   Gate {
     id: githubGate
     host: "GitHub"
     clock: root
+    onPausedUntilChanged: root.armClock()
   }
 
   QuoteFeed {
@@ -1040,18 +1036,6 @@ Item {
   onDueAtChanged: armClock()
   onOwedChanged: armClock()
   onReadyChanged: armClock()
-  Connections {
-    target: yahooGate
-    function onPausedUntilChanged() { root.armClock() }
-  }
-  Connections {
-    target: robinhoodGate
-    function onPausedUntilChanged() { root.armClock() }
-  }
-  Connections {
-    target: githubGate
-    function onPausedUntilChanged() { root.armClock() }
-  }
   // Each step also tries the next chart ahead, which may have waited on
   // Yahoo's budget.
   Timer {
