@@ -70,6 +70,11 @@ none 'execDetached|XMLHttpRequest|https?://' *.qml
 others=()
 for file in *.js; do [ "$file" = Release.js ] || others+=("$file"); done
 none 'github(usercontent)?\.com' *.qml "${others[@]}"
+# Stonks asks no site but those the README's "What it runs" names.
+sites=$(awk '/^\*\*Sites\*\*/,/^\*\*Files/' README.md | rg -o '^- `([^`]+)`' -r '$1')
+while read -r host; do
+  [ -z "$host" ] || grep -qxF -- "$host" <<< "$sites" || fail "$host: a site the README's \"What it runs\" doesn't name"
+done <<< "$(rg -o --no-filename 'https?://([^/"]+)' -r '$1' -- *.js | sort -u)"
 # Every request goes through Fetch.curlCommand, which compresses and caps
 # it.
 while read -r hit; do
