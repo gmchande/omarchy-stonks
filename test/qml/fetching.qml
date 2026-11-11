@@ -391,7 +391,7 @@ Harness {
       var pausedLong = false, offline = ""
       for (var offFor = 0; offFor < 240 && !(pausedLong && offline !== ""); offFor++) {
         tick(1, 1)
-        pausedLong = gate.pause === "none" && !gate.probing && gate.pausedUntil - service.now >= 30
+        pausedLong = gate.pause === "none" && !gate.loneOut && gate.pausedUntil - service.now >= 30
         if (/^Can't connect/.test(body.headerText)) offline = body.headerText
       }
       remove("YAHOO.offline")

@@ -814,8 +814,8 @@ Item {
   property bool refreshOwed: false
   function refresh() {
     if (!root.ready) return
-    yahooGate.hurry()
-    robinhoodGate.hurry()
+    yahooGate.retryNow()
+    robinhoodGate.retryNow()
     var now = root.wallSecond()
     feed.ask(Asks.refreshQuotes(root.watched, feed.entries, now), now, true)
     fundamentalsFeed.retry()

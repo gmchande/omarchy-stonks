@@ -80,7 +80,7 @@ Item {
       requestedQuery = ""
       asked()
     } else {
-      if (gate) gate.hurry()
+      if (gate) gate.retryNow()
       ask()
     }
   }

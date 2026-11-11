@@ -13,7 +13,7 @@ process.env.TZ = "America/New_York"
 // Every rule file's names, under one name. A name two files define is read
 // from its file (test/load.js).
 const M = rules(["Format", "Fetch", "Quote", "Calendar", "Market", "CarriedClose", "Overnight", "Day", "History", "Fundamentals", "Figures", "Freshness",
-  "Chart", "Tones", "Settings", "Rows", "KeySheet", "Search", "Cells", "Share", "Asks"])
+  "Chart", "Tones", "Settings", "Rows", "KeySheet", "Search", "Cells", "Share", "Asks", "Gate"])
 
 const calendars = JSON.parse(readFileSync(join(root, "calendars.json"), "utf8"))
 // The header's status at full width, the first of its forms.
@@ -1407,6 +1407,85 @@ test("a bad quote answer is tried three times in all, a missing symbol fails at 
   // A chart asked only to judge a day already shown changes nothing when
   // it brings no quote.
   expect([M.answerVerdict("bad", null, 0, true), M.answerVerdict("ok", read, 0, true)]).toEqual(["unchanged", "show"])
+})
+
+// A host's gate, with Yahoo's limits. Each pause is said at the middle of
+// its ±20%, so its seconds read whole.
+const yahoo = { capacity: 80, perMinute: 40, reserve: 10 }
+const heard = (gate, kinds, now, retryAfter = 0, sentUnder = gate.pauses) => M.gateAfterAnswers(gate, kinds, retryAfter, sentUnder, now, 0.5)
+const letThrough = (gate, count, now, bulk = true) => M.takenFromGate(gate, yahoo, count, bulk, now).granted
+
+test("a host's budget gives a run of quotes all but its reserve, fills by the minute to its capacity, and says once how many it held back", () => {
+  const run = M.takenFromGate(M.openGate(80), yahoo, 100, true, 1000)
+  expect([run.granted, run.heldBack]).toEqual([70, 30])
+  // The reserve is there for a history, a search or a P/E.
+  const single = M.takenFromGate(run.gate, yahoo, 1, false, 1000)
+  expect(single.granted).toBe(1)
+  // Held back again, it says nothing more.
+  const again = M.takenFromGate(single.gate, yahoo, 20, true, 1000)
+  expect([again.granted, again.heldBack]).toEqual([0, 0])
+  // Half a minute on 20 more have come, and however long it rests it holds 80.
+  expect(letThrough(again.gate, 30, 1030, false)).toBe(29)
+  expect(letThrough(again.gate, 200, 99999, false)).toBe(80)
+  // A chart fetched ahead of a click waits unless half the budget is left.
+  expect([M.gateHasSpare(M.openGate(80), yahoo), M.gateHasSpare(run.gate, yahoo)]).toEqual([true, false])
+})
+
+test("a host that gives no answer is left alone 2 s, doubling to a minute; then one request goes alone, and its answer reopens the host", () => {
+  var gate = heard(M.openGate(80), ["none"], 1000).gate
+  expect([gate.pause, gate.pausedUntil]).toEqual(["none", 1002])
+  // Nothing goes while it lasts; then one alone, and no second beside it.
+  expect(letThrough(gate, 5, 1001)).toBe(0)
+  const lone = M.takenFromGate(gate, yahoo, 5, true, 1002)
+  expect([lone.granted, letThrough(lone.gate, 5, 1003)]).toEqual([1, 0])
+  // Any answer to it but a refusal reopens the host, and a whole run goes.
+  const back = heard(lone.gate, ["missing"], 1003)
+  expect([back.reopened, back.gate.pause, letThrough(back.gate, 5, 1003)]).toEqual([true, "", 5])
+  // And the next silence is the first again.
+  expect(heard(back.gate, ["none"], 1010).gate.pausedUntil).toBe(1012)
+  // Unanswered again and again, the pauses double to a minute.
+  const waits = []
+  for (var i = 0; i < 6; i++) {
+    gate = heard(M.takenFromGate(gate, yahoo, 1, false, gate.pausedUntil).gate, ["none"], gate.pausedUntil).gate
+    waits.push(gate.pausedUntil - gate.filledAt)
+  }
+  expect(waits).toEqual([4, 8, 16, 32, 60, 60])
+  // r ends such a pause now: the network may be back.
+  expect(letThrough(M.gateRetriedNow(gate, gate.filledAt + 1), 5, gate.filledAt + 1)).toBe(1)
+})
+
+test("a host that refuses is left alone as long as it asks, else a minute, doubling, and never over half an hour, give or take a fifth; r doesn't hurry it", () => {
+  const refused = (gate, now, retryAfter) => heard(gate, ["ok", "refused"], now, retryAfter).gate
+  const open = M.openGate(80)
+  expect([refused(open, 1000, 120), refused(open, 1000, 0), refused(open, 1000, 7 * 86400)].map(gate => gate.pausedUntil - 1000)).toEqual([120, 60, 1800])
+  // Each refusal of the lone request doubles the minute.
+  var gate = refused(open, 1000, 0)
+  const waits = []
+  for (var i = 0; i < 6; i++) {
+    gate = refused(M.takenFromGate(gate, yahoo, 1, false, gate.pausedUntil).gate, gate.pausedUntil, 0)
+    waits.push(gate.pausedUntil - gate.filledAt)
+  }
+  expect(waits).toEqual([120, 240, 480, 960, 1800, 1800])
+  // A fifth either way, so installs don't all come back at once.
+  expect([0, 1].map(spread => M.gateAfterAnswers(open, ["refused"], 0, 0, 1000, spread).gate.pausedUntil - 1000)).toEqual([48, 72])
+  // The host asked for fewer requests: r leaves its pause alone.
+  expect(M.gateRetriedNow(gate, gate.filledAt + 1)).toEqual(gate)
+})
+
+test("only the request sent alone after a pause speaks for the host: answers to a run sent before the pause neither reopen it nor lengthen it", () => {
+  const open = M.openGate(80)
+  const paused = heard(open, ["refused"], 1000).gate
+  // The rest of the run that began the pause: an answer, a refusal, no answer.
+  const late = kinds => heard(paused, kinds, 1001, 0, open.pauses)
+  expect(late(["ok"])).toEqual({ gate: paused, reopened: false })
+  expect(late(["refused"])).toEqual({ gate: paused, reopened: false })
+  expect(late(["none"])).toEqual({ gate: paused, reopened: false })
+  // With the lone request out, such an answer lets no second one through.
+  const lone = M.takenFromGate(paused, yahoo, 1, false, paused.pausedUntil).gate
+  expect(letThrough(heard(lone, ["ok"], paused.pausedUntil, 0, open.pauses).gate, 1, paused.pausedUntil)).toBe(0)
+  // A refusal while no answer came, or the other way, starts its own count.
+  const silent = heard(open, ["none"], 1000).gate
+  expect(heard(M.takenFromGate(silent, yahoo, 1, false, 1002).gate, ["refused"], 1002).gate.pausedUntil - 1002).toBe(60)
 })
 
 test("Robinhood is asked once for each stock the pill shows with nothing open by day, for it alone each 5 minutes while a night trades, and for every US listing while a surface is open, the chart waited on alone first", () => {
