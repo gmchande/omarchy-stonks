@@ -5,6 +5,7 @@ import QtQuick.Controls as Controls
 import qs.Commons
 import qs.Commons as Commons
 import "Motion.js" as Motion
+import "Rows.js" as Rows
 
 // A symbol's lists, in the rows' place: a tick box for each list, All first.
 FocusScope {
@@ -20,6 +21,7 @@ FocusScope {
   property int cursor: 0
 
   readonly property int itemHeight: Style.space(30)
+  readonly property var rowSize: ({ pitch: itemHeight, height: itemHeight })
   // The rows' scrollbar gutter and text inset, so these words line up with
   // the rows underneath.
   property int gutter: 0
@@ -82,24 +84,14 @@ FocusScope {
 
   function showCursor() {
     scroll.cancelFlick()
-    var top = cursor * itemHeight
-    if (top < scroll.contentY) scroll.contentY = top
-    else if (top + itemHeight > scroll.contentY + scroll.height)
-      scroll.contentY = top + itemHeight - scroll.height
+    scroll.contentY = Rows.topShowing(cursor, rowSize, scroll.contentY, scroll.height)
   }
 
   // After a scroll by hand: the nearest list wholly in sight, or in a view
   // too short for one, the list across its middle.
   function keepCursorInSight() {
     if (cursor < 0) return
-    var top = scroll.contentY
-    var bottom = top + scroll.height
-    var whole = function(i) { return i * itemHeight >= top - 0.5 && (i + 1) * itemHeight <= bottom + 0.5 }
-    if (whole(cursor)) return
-    var shown = []
-    for (var i = 0; i < choices.length; i++) if (whole(i)) shown.push(i)
-    if (shown.length > 0) cursor = cursor * itemHeight < top ? shown[0] : shown[shown.length - 1]
-    else cursor = Math.max(0, Math.min(choices.length - 1, Math.floor((top + bottom) / 2 / itemHeight)))
+    cursor = Rows.cursorKeptInSight(cursor, choices.length, rowSize, scroll.contentY, scroll.height)
   }
 
   Keys.onPressed: function(event) {

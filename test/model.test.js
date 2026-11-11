@@ -849,6 +849,51 @@ test("only a change to what the lists hold ends the undo", () => {
   expect(M.listsHeld(M.withListOrder(growth, "symbol"))).toBe(M.listsHeld(growth))
 })
 
+// Rows 40 high with a gap of 2, in a view 200 high: four rows whole and a
+// part of the fifth. A list menu's lines are 26 high with no gap.
+const tall = { pitch: 42, height: 40 }
+const lines = { pitch: 26, height: 26 }
+const ten = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
+
+test("keys act on the row you chose while any of it shows, else the stock you last looked at while it shows whole, else the first row whole in sight", () => {
+  const row = (own, featured, top, lifted = false) => M.cursorRow(ten, own, lifted, featured, tall, top, 200)
+  // C runs from 84 to 124: scrolled to 123 its last pixel shows, and it
+  // counts; a pixel on it doesn't, and keys go to D, the first row whole.
+  expect([row("C", "", 123), row("C", "", 124), row("B", "", 123)]).toEqual(["C", "D", "D"])
+  // Off the foot, as the list scrolls up.
+  expect([row("F", "", 0), row("E", "", 0)]).toEqual(["A", "E"])
+  // A row you hold up counts wherever it is.
+  expect(row("J", "", 0, true)).toBe("J")
+  // The featured row only while whole: here D is, a fifth of E isn't.
+  expect([row("", "D", 0), row("", "E", 0)]).toEqual(["D", "A"])
+  // The first whole row, half a pixel either way; none past the last.
+  expect([row("", "", 41.5), row("", "", 43), row("", "", 9999)]).toEqual(["B", "C", "J"])
+  expect(M.cursorRow([], "", false, "", tall, 0, 200)).toBe("")
+})
+
+test("a key scrolls the list just far enough to show its row whole, and the rows rest on a row's edge, never past the list's end", () => {
+  // Above: its top at the top. Below: its foot at the foot. In sight: as is.
+  expect([M.topShowing(1, tall, 100, 200), M.topShowing(6, tall, 0, 200), M.topShowing(3, tall, 30, 200)]).toEqual([42, 92, 30])
+  // Resting, the scroll down rounds up to a row's edge, so the row shows
+  // whole and the top row isn't cut, and the list never scrolls past its
+  // last row, 418 long.
+  expect([M.restingTop(6, tall, 0, 200, 418), M.restingTop(9, tall, 0, 200, 418), M.restingTop(3, tall, 30, 200, 418)]).toEqual([126, 218, 30])
+  // The rows any part of which shows, for fetching ahead: from 43, B's last
+  // pixel to F's first; from 83, in the gap under B, C to G.
+  expect([M.rowsSeen(tall, 43, 200), M.rowsSeen(tall, 0, 200), M.rowsSeen(tall, 83, 200)])
+    .toEqual([{ first: 1, last: 5 }, { first: 0, last: 4 }, { first: 2, last: 6 }])
+})
+
+test("after a scroll by hand, a menu's cursor stays on its line while it shows whole, else takes the nearest whole line, else the line across the middle", () => {
+  const kept = (cursor, top, sight = 78) => M.cursorKeptInSight(cursor, 8, lines, top, sight)
+  // Three lines show from 52: lines 2 to 4.
+  expect([kept(3, 52), kept(0, 52), kept(7, 52)]).toEqual([3, 2, 4])
+  // A line a fraction of a pixel short still reads whole.
+  expect(kept(4, 51.7)).toBe(4)
+  // A view too short for one line: the one across its middle, not its top.
+  expect([kept(0, 70, 20), kept(7, 0, 20)]).toEqual([3, 0])
+})
+
 test("a dragged row takes the next slot only 0.6 of a row past its own, and a pointer jittering near the edge never swaps it back and forth", () => {
   // Down from slot 2: half a row past stays, 0.6 takes slot 3.
   expect(M.dragSlot(2.5, 2, 6)).toBe(2)

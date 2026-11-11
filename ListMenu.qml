@@ -6,6 +6,7 @@ import qs.Commons
 import qs.Commons as Commons
 import "KeyText.js" as KeyText
 import "Motion.js" as Motion
+import "Rows.js" as Rows
 
 // The list menu: All and each named list, then "New list…" and "Manage
 // lists…", pinned under the lists.
@@ -25,6 +26,7 @@ FocusScope {
   readonly property string typedName: naming ? nameField.text : ""
 
   readonly property int itemHeight: Style.space(26)
+  readonly property var rowSize: ({ pitch: itemHeight, height: itemHeight })
   readonly property int separatorHeight: Style.space(9)
   readonly property int inset: Style.space(4)
   readonly property int newIndex: choices.length
@@ -87,14 +89,7 @@ FocusScope {
     settle.stop()
     scroll.contentY = landed
     if (cursor >= newIndex) return
-    var top = topOf(cursor)
-    if (top < scroll.contentY) scroll.contentY = top
-    else if (top + itemHeight > scroll.contentY + scroll.height)
-      scroll.contentY = top + itemHeight - scroll.height
-  }
-
-  function topOf(index) {
-    return index * itemHeight
+    scroll.contentY = Rows.topShowing(cursor, rowSize, scroll.contentY, scroll.height)
   }
 
   // A scroll by hand comes to rest on a row's edge, so no list shows cut.
@@ -121,14 +116,7 @@ FocusScope {
   // across the middle.
   function keepCursorInSight() {
     if (naming || cursor >= newIndex) return
-    var top = scroll.contentY
-    var bottom = top + scroll.height
-    var whole = function(i) { return topOf(i) >= top - 0.5 && topOf(i) + itemHeight <= bottom + 0.5 }
-    if (whole(cursor)) return
-    var shown = []
-    for (var i = 0; i < newIndex; i++) if (whole(i)) shown.push(i)
-    if (shown.length > 0) cursor = topOf(cursor) < top ? shown[0] : shown[shown.length - 1]
-    else for (i = 0; i < newIndex; i++) if (topOf(i) + itemHeight > (top + bottom) / 2) { cursor = i; break }
+    cursor = Rows.cursorKeptInSight(cursor, newIndex, rowSize, scroll.contentY, scroll.height)
   }
 
   function take(index) {

@@ -75,3 +75,71 @@ function slotOf(symbols, symbol, dragged, slot) {
   if (slot < from && i >= slot && i < from) return i + 1
   return i
 }
+
+// ---- Sight
+//
+// A list's rows by `row`, { pitch, height }: row i runs from i * pitch, for
+// `height`, and the gap to the next is the rest of its pitch. `top` is how
+// far the list is scrolled and `sight` how much of it shows. Half a pixel
+// either way still counts, so a row a fraction off reads whole.
+
+function rowWhole(index, row, top, sight) {
+  var y = index * row.pitch
+  return y >= top - 0.5 && y + row.height <= top + sight + 0.5
+}
+
+// Any part: the pointer may rest on a row the list's foot cuts.
+function rowSeen(index, row, top, sight) {
+  var y = index * row.pitch
+  return y + row.height > top + 0.5 && y < top + sight - 0.5
+}
+
+// The first and last rows any part of which shows.
+function rowsSeen(row, top, sight) {
+  return { first: Math.max(0, Math.floor((top + 0.5 - row.height) / row.pitch) + 1), last: Math.ceil((top + sight - 0.5) / row.pitch) - 1 }
+}
+
+// The least scroll that shows a row whole: a row already whole leaves the
+// list where it is.
+function topShowing(index, row, top, sight) {
+  var y = index * row.pitch
+  if (y < top) return y
+  if (y + row.height > top + sight) return y + row.height - sight
+  return top
+}
+
+// The same, resting on a row's edge and never past the list's end, which
+// is `length` down.
+function restingTop(index, row, top, sight, length) {
+  var to = topShowing(index, row, top, sight)
+  return to === top ? top : Math.min(Math.max(0, length - sight), Math.ceil(to / row.pitch) * row.pitch)
+}
+
+// The row you chose still counts while any of it shows, or while you hold
+// it up (`lifted`).
+function chosenSeen(symbols, own, lifted, row, top, sight) {
+  var at = symbols.indexOf(own)
+  return own !== "" && (lifted || (at >= 0 && rowSeen(at, row, top, sight)))
+}
+
+// The row keys act on, where the list is headed: the one you chose while it
+// counts (`chosenSeen`); else the featured row, while it shows whole; else
+// the first row whole in sight, so a key never acts on a row unseen.
+function cursorRow(symbols, own, lifted, featured, row, top, sight) {
+  if (chosenSeen(symbols, own, lifted, row, top, sight)) return own
+  var featuredAt = symbols.indexOf(featured)
+  if (featuredAt >= 0 && rowWhole(featuredAt, row, top, sight)) return featured
+  var first = Math.max(0, Math.ceil((top - 0.5) / row.pitch))
+  return symbols[Math.min(first, symbols.length - 1)] || ""
+}
+
+// After a scroll by hand, the cursor among `count` rows: where it is while
+// whole in sight; else the nearest row whole in sight; or, in a view too
+// short for one, the row across its middle.
+function cursorKeptInSight(cursor, count, row, top, sight) {
+  if (rowWhole(cursor, row, top, sight)) return cursor
+  var shown = []
+  for (var i = 0; i < count; i++) if (rowWhole(i, row, top, sight)) shown.push(i)
+  if (shown.length > 0) return cursor * row.pitch < top ? shown[0] : shown[shown.length - 1]
+  return Math.max(0, Math.min(count - 1, Math.floor((top + sight / 2) / row.pitch)))
+}
