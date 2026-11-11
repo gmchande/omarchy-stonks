@@ -198,13 +198,7 @@ FocusScope {
       if (moving && pointer.hovered) root.pointAt(pointer.scenePosition.x, pointer.scenePosition.y)
       root.keepCursorInSight()
     }
-    Controls.ScrollBar.vertical: Controls.ScrollBar {
-      id: listsBar
-      policy: scroll.interactive ? Controls.ScrollBar.AlwaysOn : Controls.ScrollBar.AlwaysOff
-      visible: scroll.interactive
-      // At least 24 px long, so a long view's thumb is there to see and grab.
-      minimumSize: Math.min(1, Style.space(24) / Math.max(1, availableHeight))
-    }
+    Controls.ScrollBar.vertical: ViewScrollBar { id: listsBar; scrolls: scroll.interactive }
 
     Column {
       id: column

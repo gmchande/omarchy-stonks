@@ -137,11 +137,11 @@ Flickable {
   interactive: contentHeight > height
   // A drag or a flick takes the list over from a glide.
   onMovementStarted: takeOver()
-  ScrollBar.vertical: ScrollBar {
+  // Shown as needed, as Omarchy's own lists show theirs.
+  ScrollBar.vertical: ViewScrollBar {
+    scrolls: root.interactive
     policy: ScrollBar.AsNeeded
-    visible: root.interactive
     active: root.interactive
-    minimumSize: Math.min(1, Style.space(24) / Math.max(1, availableHeight))
   }
 
   // A WheelHandler ignores the touchpad's events unless it accepts TouchPad.

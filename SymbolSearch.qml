@@ -312,12 +312,7 @@ FocusScope {
     clip: true
     boundsBehavior: Flickable.StopAtBounds
     interactive: contentHeight > height
-    Controls.ScrollBar.vertical: Controls.ScrollBar {
-      policy: resultsScroll.interactive ? Controls.ScrollBar.AlwaysOn : Controls.ScrollBar.AlwaysOff
-      visible: resultsScroll.interactive
-      // A thumb big enough to see and grab in a long view.
-      minimumSize: Math.min(1, Style.space(24) / Math.max(1, availableHeight))
-    }
+    Controls.ScrollBar.vertical: ViewScrollBar { scrolls: resultsScroll.interactive }
 
     Column {
       id: resultsColumn
