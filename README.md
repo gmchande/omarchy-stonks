@@ -210,12 +210,13 @@ the window's width. Right-click the pill, or run
 `omarchy-shell grvc.stonks toggleWindow`. To float it, add a window rule
 that matches class `org.quickshell` and title `Stonks`.
 
-To open the panel and the window from the keyboard, add these lines to
-`~/.config/hypr/bindings.lua`. Omarchy doesn't use either key by default:
+To open the panel or the window from the keyboard, bind a key of your
+choice to its command in `~/.config/hypr/bindings.lua`, where Omarchy keeps
+your own key bindings, with an `o.bind` line like the others there:
 
-```lua
-o.bind("SUPER + ALT + T", "Stonks panel", "omarchy-shell shell toggle grvc.stonks")
-o.bind("SUPER + SHIFT + T", "Stonks window", "omarchy-shell grvc.stonks toggleWindow")
+```sh
+omarchy-shell shell toggle grvc.stonks     # the panel
+omarchy-shell grvc.stonks toggleWindow     # the window
 ```
 
 To use the window without the pill, run `omarchy plugin disable grvc.stonks`,
