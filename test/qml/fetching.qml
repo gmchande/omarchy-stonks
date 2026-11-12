@@ -646,6 +646,36 @@ Harness {
         [seriesOut, seriesIn, quiet, whole].join(" ") + " | " + harness.requests().slice(capFrom).join(", "))
       closeWindow()
 
+      // The bell, sounds on, Do Not Disturb and the microphone answering a
+      // second after it is due: at Thursday's close, a screen on as it is
+      // due and every screen off before they answer, it keeps quiet; at
+      // Friday's open, a screen on, it rings.
+      var bells = function() {
+        return harness.record("played").split("\n").filter(function(line) { return /bell\.wav$/.test(line) }).length
+      }
+      service.persist({ sounds: true })
+      verify(within(3000, function() { return service.soundsOn }), "sounds never turned on")
+      runCommand(["sh", "-c", "echo 1 > \"$0/pw-dump.delay\"", harness.state])
+      hyprlandStandIn.monitors = { values: [screenStandIn] }
+      startAt(at(harness.wed7 + 86400, 15, 59) + 55)()
+      var closeFrom = bells()
+      harness.clockTo(at(harness.wed7 + 86400, 16, 0) + 5)
+      screenStandIn.on = false
+      hyprlandStandIn.refreshMonitors()
+      screensHeard()
+      var dark = within(1000, function() { return service.screensOff })
+      wait(2500)
+      var atClose = bells() - closeFrom
+      screenStandIn.on = true
+      hyprlandStandIn.refreshMonitors()
+      screensHeard()
+      startAt(at(harness.wed7 + 2 * 86400, 9, 29) + 55)()
+      var openFrom = bells()
+      harness.clockTo(at(harness.wed7 + 2 * 86400, 9, 30) + 5)
+      var rang = within(4000, function() { return bells() > openFrom })
+      harness.check("the bell keeps quiet once every screen goes off before Do Not Disturb and the microphone answer, and rings with a screen on",
+        dark && atClose === 0 && rang, "screens off " + dark + ", bells at the close " + atClose + ", at the open " + (bells() - openFrom))
+
       harness.finish()
     }
   }

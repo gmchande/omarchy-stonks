@@ -334,17 +334,21 @@ Item {
   // doesn't answer, as with another notifier, leaves the bell to ring.
   // `pw-dump` runs to about half a megabyte; one that times out, fails or
   // passes 4 MB counts as recording. Both stop within 7 s, before the next bell.
-  function ring() {
-    if (turnedOn && !listening.running) listening.running = true
+  // `wanted` says, as they stop, whether the bell is still wanted then.
+  function ring(wanted) {
+    if (!turnedOn || listening.running) return
+    listening.wanted = wanted
+    listening.running = true
   }
 
   // `Commands.bellCheck`, and `Commands.recording`.
   Process {
     id: listening
+    property var wanted: null
     command: Commands.bellCheck()
     stdout: StdioCollector { id: answer }
     onExited: function(code) {
-      if (root.turnedOn && code === 0 && answer.data.byteLength <= 4000000 && !Commands.recording(answer.text)) root.play("bell")
+      if (listening.wanted() && code === 0 && answer.data.byteLength <= 4000000 && !Commands.recording(answer.text)) root.play("bell")
     }
   }
 

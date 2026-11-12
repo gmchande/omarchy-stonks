@@ -13,6 +13,9 @@ Item {
   // it passes this again, so no bell rings twice.
   property int heardAt: 0
   Component.onCompleted: if (service) heardAt = service.now
+  // Asked as the bell is due, and again as Sounds' check ends up to 7 s
+  // later: every screen may have gone off meanwhile.
+  readonly property bool wanted: !!sounds && sounds.turnedOn && !service.screensOff
 
   Connections {
     target: root.service
@@ -20,9 +23,10 @@ Item {
       var before = root.heardAt
       if (root.service.now <= before) return
       root.heardAt = root.service.now
-      if (!root.sounds || !root.sounds.turnedOn || root.service.screensOff) return
+      if (!root.wanted) return
       var quote = root.service.quotes[root.service.featuredSymbol]
-      if (Market.bellBetween(quote, before, root.service.now, root.service.calendars) !== "") root.sounds.ring()
+      if (Market.bellBetween(quote, before, root.service.now, root.service.calendars) !== "")
+        root.sounds.ring(function() { return root.wanted })
     }
   }
 }
