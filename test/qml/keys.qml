@@ -134,8 +134,8 @@ Harness {
     }
 
     // Every key starts from here: the surface open on All, manual order, the
-    // day, nothing open over the rows, the last of the ten rows featured,
-    // and the cursor on the second.
+    // day, nothing open over the rows, the last of the ten rows featured
+    // with its chart on screen, and the cursor on the second.
     function base(s) {
       if (!s.body || !s.body.surfaceOpen) s.open()
       var b = s.body
@@ -152,6 +152,9 @@ Harness {
       updates.mainVersion = ""
       var rows = b.watchlist.displayedSymbols
       service.feature(rows[rows.length - 1])
+      // As a person waits for the chart before moving along it: a row's day
+      // can wait on Robinhood saying whether it trades all day.
+      tryVerify(function() { return !b.chartLoading }, 5000)
       // The second row in sight: an open brings the featured last row into
       // sight, and a cursor of your own is one in sight.
       b.watchlist.takeOver()
