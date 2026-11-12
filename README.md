@@ -95,8 +95,8 @@ Yahoo's rate for the day, inside the P/E and nowhere else.
 
 The top line names the moment in the market's day, such as Power hour, and
 says when the market opens or closes, by the exchange's clock. A US stock
-that has traded since the close shows that newest price on top, and its row
-shows the time after the company's name. The move beside the price counts
+that has traded since the close shows that newest price on top. The move
+beside the price counts
 from the close the chart's dashed line marks under that price, so the
 number, the line, the bull or bear, the rows and the pill agree. Since the
 open, it counts from that day's open instead.

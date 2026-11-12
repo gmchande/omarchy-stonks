@@ -58,9 +58,7 @@ function freshness(entry, quote, now, owedSince, inGrace, newest) {
     live: asOf !== null && state === "fresh" && Market.isTrading(phase), phase: phase }
 }
 
-// `timed`: the caller says the newest price's time itself, as a row does
-// after its name, so a note that would only repeat it is left out.
-function freshnessText(fresh, quote, calendars, timed) {
+function freshnessText(fresh, quote, calendars) {
   if (!fresh) return ""
   var head = quote ? Quote.headlineQuote(quote) : null
   if (!fresh.asOf) {
@@ -76,7 +74,7 @@ function freshnessText(fresh, quote, calendars, timed) {
     + Market.tradeTime(quote, fresh.asOf, calendars)
   if (fresh.state === "failed") return "REFRESH FAILED · " + asOf
   if (fresh.state === "overdue") return "NOT UPDATING · " + asOf
-  if ((chartTrade && !(fresh.session && timed)) || fresh.state === "aged" || fresh.state === "saved") return asOf
+  if (chartTrade || fresh.state === "aged" || fresh.state === "saved") return asOf
   return ""
 }
 

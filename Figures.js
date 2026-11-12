@@ -372,12 +372,7 @@ function closeOnly(from) {
 
 // The pill's hover: the newest price's session and time.
 function newestNote(quote, newest, now, calendars) {
-  return Market.phaseLabel(newest.phase) + " " + newestTime(quote, newest, now, calendars)
-}
-
-// A row says it after the name.
-function newestTime(quote, newest, now, calendars) {
-  return Market.tradeDay(quote, newest.t, now, calendars) + Market.tradeTime(quote, newest.t, calendars)
+  return Market.phaseLabel(newest.phase) + " " + Market.tradeDay(quote, newest.t, now, calendars) + Market.tradeTime(quote, newest.t, calendars)
 }
 
 function newestStale(newest, now) {

@@ -146,13 +146,10 @@ Rectangle {
   property bool sourceDown: false
   readonly property var shownFreshness: sourceDown ? Freshness.quietFreshness(freshness) : freshness
   readonly property bool warns: Freshness.freshnessWarns(shownFreshness)
-  readonly property string freshnessNote: quote ? Freshness.freshnessText(shownFreshness, quote, calendars, newestTime !== "") : ""
-  property string newestTime: ""
+  readonly property string freshnessNote: quote ? Freshness.freshnessText(shownFreshness, quote, calendars) : ""
   readonly property string detail: quote
     ? (freshnessNote !== "" ? (warns ? "! " : "") + Format.sentenceCase(freshnessNote) : view.name)
     : sourceDown ? "" : (status === "failed" ? "! No data for this symbol" : warns ? "! No data" : "Loading…")
-  readonly property string detailTime: quote && freshnessNote === "" && newestTime !== ""
-    ? (detail !== "" ? " · " : "") + newestTime : ""
 
   readonly property int sparkWidth: Style.space(72)
   readonly property int priceWidth: Style.space(96)
@@ -253,8 +250,7 @@ Rectangle {
           x: row.gap
           anchors.bottom: parent.bottom
           anchors.bottomMargin: row.inset
-          // The name gives way to the newest price's time, so the time stays whole.
-          width: Math.min(implicitWidth, row.width - x - row.priceWidth - row.gap * 2 - row.sparkWidth - row.gap - timeText.implicitWidth)
+          width: row.width - x - row.priceWidth - row.gap * 2 - row.sparkWidth - row.gap
           textFormat: Text.PlainText
           text: row.detail
           color: row.warns ? row.look.foreground : row.look.dim
@@ -262,17 +258,6 @@ Rectangle {
           font.pixelSize: Style.font.bodySmall
           font.bold: row.warns
           elide: Text.ElideRight
-        }
-        Text {
-          id: timeText
-          visible: detailText.visible
-          x: detailText.x + detailText.width
-          anchors.baseline: detailText.baseline
-          textFormat: Text.PlainText
-          text: row.detailTime
-          color: row.look.dim
-          font.family: row.look.fontFamily
-          font.pixelSize: Style.font.bodySmall
         }
 
         // The shell's row action (PanelActionButton): dim, the foreground

@@ -642,7 +642,6 @@ Flickable {
         // Only rows in sight follow the scrub, or each step repaints every row.
         readonly property int sightScrub: inSight ? root.scrubShown : 0
         view: quote ? Figures.rowModel(quote, sightScrub, root.changeMode, root.newestTrades[symbol] || null) : null
-        newestTime: view && view.newest && inSight ? Figures.newestTime(quote, view.newest, root.now, root.calendars) : ""
         status: root.entryOf(symbol) ? root.entryOf(symbol).status : "loading"
         // Freshness reads the clock every second: only rows in sight do.
         freshness: place >= 0 && inSight ? root.freshnessOf(symbol) : null
