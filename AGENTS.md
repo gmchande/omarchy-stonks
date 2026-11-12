@@ -21,9 +21,11 @@ change. This file says what a change is judged by, and why.
 - **Only what's true.** People act on these prices. Show what Yahoo or
   Robinhood sent, in the listing's own currency and its exchange's own time,
   naming the zone when it isn't the reader's. Never convert, adjust or guess:
-  leave out a figure that isn't known. A rate from Yahoo may sit inside a
-  ratio, such as a P/E reported in another currency. A "!" means a refresh
-  failed or is late, nothing else.
+  leave out a figure that isn't known. Two exceptions, each one the README
+  names: a rate from Yahoo may sit inside a ratio, such as a P/E reported in
+  another currency, and the market cap moves with the price from Yahoo's
+  last reported figure, since the shares behind it change only when the
+  company reports. A "!" means a refresh failed or is late, nothing else.
 - **Sources.** Yahoo's unofficial endpoints and Robinhood's public price
   history, with no account or key. The README says so, and Stonks never shows
   Robinhood's logo.
@@ -81,8 +83,9 @@ for someone who has never seen Stonks and gives it thirty seconds.
 ## Code
 
 - QML components take values in and derive the rest with `readonly
-  property`. Every side effect is a `Process`. Animations use the shell's own
-  timing.
+  property`. Every side effect is a `Process` or a `FileView`. Animations
+  use the shell's own timing, except a replay the reader starts, which
+  plays its two seconds as a press of play would.
 - Rule files (`*.js`) start with `.pragma library`, so QML loads each once,
   and hold pure functions imported one way.
 - Read Omarchy's colors as `Commons.Color`, after `import qs.Commons as
