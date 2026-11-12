@@ -248,8 +248,9 @@ function parseChart(json, centExchanges, receivedAt) {
   // Yahoo's current period moves to the next session before the bars do
   // (Monday's at 00:36, the bars still Friday's), so the trading periods name
   // the bars' session. A two-day answer is read as the headline's day: earlier
-  // days' bars go, and the coming day's pre-market stays as its tail. A coin's
-  // answer is read whole (`coinDay`).
+  // days' bars go, and the coming day's pre-market stays as its tail. The
+  // day before a headline day just begun stays too, for the chart to hold
+  // (`CarriedClose.heldDay`). A coin's answer is read whole (`coinDay`).
   var quoted = Format.isFiniteNumber(meta.regularMarketTime) && meta.regularMarketTime > 0 ? meta.regularMarketTime : null
   var coin = meta.instrumentType === "CRYPTOCURRENCY"
   var days = meta.tradingPeriods ? answerDays(meta.tradingPeriods) : [current]
@@ -257,9 +258,11 @@ function parseChart(json, centExchanges, receivedAt) {
   var periods = days[chosen]
   var next = !coin && chosen + 1 < days.length ? days[chosen + 1] : null
   var from = !coin && chosen > 0 ? periodsStart(periods) : null
-  var bars = answerBars(timestamps, { o: opens, c: closes, v: volumes, h: highs, l: lows }, from)
+  var series = { o: opens, c: closes, v: volumes, h: highs, l: lows }
+  var bars = answerBars(timestamps, series, from)
   if (!bars) return null
-  var filtered = filterStrayCloses(bars, periods, answerTick(meta, bars, centExchanges))
+  var tick = answerTick(meta, bars, centExchanges)
+  var filtered = filterStrayCloses(bars, periods, tick)
   var kept = filtered.bars
   var regular = periodOf(periods.regular)
   var index = meta.instrumentType === "INDEX"
@@ -315,6 +318,7 @@ function parseChart(json, centExchanges, receivedAt) {
       post: index ? null : periodOf(current.post)
     },
     next: next && !index ? { pre: periodOf(next.pre), regular: periodOf(next.regular), post: periodOf(next.post) } : null,
+    before: from !== null ? dayBefore(timestamps, series, days[chosen - 1], from, tick, index) : null,
     points: points,
     droppedTimes: filtered.droppedTimes,
     verdict: chartVerdict(bars, opens, filtered, firstRegular, regular)
@@ -334,6 +338,17 @@ function headlineDay(days, quoted, timestamps, closes) {
     if (since !== null && regular.start <= since) chosen = d
   }
   return chosen
+}
+
+// The day before the headline's in a two-day answer: its session and its
+// trades, read as the headline day's are.
+function dayBefore(timestamps, series, periods, until, tick, index) {
+  var bars = answerBars(timestamps, series, periodsStart(periods)).filter(function(b) { return b.t < until })
+  var regular = periodOf(periods.regular)
+  return {
+    session: { pre: index ? null : periodOf(periods.pre), regular: regular, post: index ? null : periodOf(periods.post) },
+    points: dayPoints(filterStrayCloses(bars, periods, tick).bars, null, regular, index)
+  }
 }
 
 // The bars from `from` on that have a close; null if a time is malformed or
@@ -628,12 +643,13 @@ function regularPoints(quote) {
 }
 
 // Yahoo's regular-market quote, the latest regular trade or the close, can
-// be stamped after the bell or belong to the previous session.
+// be stamped after the bell or belong to the previous session. A held day's
+// close is the one carried, never its last trade (`CarriedClose.heldDay`).
 function headlineQuote(quote) {
   if (Format.isFiniteNumber(quote.price)) {
     return { price: quote.price, t: Format.isFiniteNumber(quote.marketTime) ? quote.marketTime : null, source: "quote" }
   }
-  var pts = regularPoints(quote)
+  var pts = quote.held ? [] : regularPoints(quote)
   if (pts.length) return { price: pts[pts.length - 1].p, t: pts[pts.length - 1].t, source: "chart" }
   return null
 }
@@ -676,7 +692,8 @@ function extendedTrade(quote, latest) {
 // Once Yahoo's quote is the close, the session's last trade reads it at the
 // bell: the S&P 500's last bar is 15:55's, not its close. Not at the quote's
 // own stamp, which can come later: London's 16:30 close has come stamped
-// 17:20, after its after-hours buckets.
+// 17:20, after its after-hours buckets. The coming day's trades after it
+// (`tailStart`) are no part of the session.
 function readingAt(quote, t) {
   var pts = quote.points
   if (!pts.length || t < pts[0].t) return { price: dayBase(quote), t: t, close: false }
@@ -691,8 +708,10 @@ function readingAt(quote, t) {
   }
   var head = headlineQuote(quote)
   var reg = quote.session.regular
+  var tail = tailStart(quote)
+  var inSession = function(p) { return pointSession(quote, p) === "reg" && (tail === null || p.t < tail) }
   if (!quote.crypto && head && head.source === "quote" && reg && head.t >= reg.end
-      && pointSession(quote, pts[k]) === "reg" && (k + 1 === pts.length || pointSession(quote, pts[k + 1]) !== "reg"))
+      && inSession(pts[k]) && (k + 1 === pts.length || !inSession(pts[k + 1])))
     return { price: head.price, t: reg.end, close: true }
   return { price: pts[k].p, t: t, close: false }
 }

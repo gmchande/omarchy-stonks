@@ -1053,7 +1053,7 @@ test("a letter says its key and Shift, never its text's case, and nothing held w
   expect(typed({ key: 63, modifiers: SHIFT, text: "?" })).toBe("?")
 })
 
-test("a stock's day is asked for two days from its pre-market until the bell, and past it until it trades, when Yahoo's day no longer holds the last session", () => {
+test("a stock's day is asked for two days from its pre-market until the bell, and past it until it trades, abroad until its third bar, when Yahoo's day no longer holds the last session", () => {
   const stock = { symbol: "X", exchange: "NASDAQ", instrumentType: "EQUITY", crypto: false, points: [{ t: at("2026-10-23", "04:05"), p: 1 }] }
   const two = (q, date, clock) => M.twoDays(q, at(date, clock), calendars)
   // Friday 23 October: one day through the night, which still holds
@@ -1073,11 +1073,15 @@ test("a stock's day is asked for two days from its pre-market until the bell, an
   expect(two({ ...stock, symbol: "BTC-USD", exchange: "CRYPTO", instrumentType: "CRYPTOCURRENCY", crypto: true }, "2026-10-24", "03:00")).toBe(true)
   // London has no pre-market: two days from its open, Monday 26 October at
   // 08:00 GMT, 04:00 New York, until the quote holds a trade of the session,
-  // which Yahoo sends a quarter of an hour late.
+  // which Yahoo sends a quarter of an hour late, and on until it has three
+  // five-minute bars, while the chart holds Friday; a listing that trades
+  // less, until an hour after the open.
   const london = { ...stock, symbol: "SHEL.L", exchange: "LSE", points: [{ t: at("2026-10-23", "11:30"), p: 1 }] }
   expect(["03:59", "04:00", "04:15", "12:30"].map(c => two(london, "2026-10-26", c))).toEqual([false, true, true, false])
-  const traded = { ...london, points: [...london.points, { t: at("2026-10-26", "04:00"), p: 1 }] }
-  expect(two(traded, "2026-10-26", "04:20")).toBe(false)
+  const session = { regular: { start: at("2026-10-26", "04:00"), end: at("2026-10-26", "12:30") } }
+  const traded = (...clocks) => ({ ...london, session, points: clocks.map(c => ({ t: at("2026-10-26", c), p: 1 })) })
+  expect([two(traded("04:00", "04:05"), "2026-10-26", "04:20"), two(traded("04:00", "04:05", "04:10"), "2026-10-26", "04:20"),
+    two(traded("04:00"), "2026-10-26", "04:59"), two(traded("04:00"), "2026-10-26", "05:00")]).toEqual([true, false, true, false])
   // Sydney has no calendar: Yahoo's current period says when it opens.
   const sydney = { ...stock, symbol: "BHP.AX", exchange: "ASX", points: [], current: { regular: { start: at("2026-10-25", "19:00"), end: at("2026-10-26", "01:00") } } }
   expect(["18:59", "20:05"].map(c => two(sydney, "2026-10-25", c))).toEqual([false, true])

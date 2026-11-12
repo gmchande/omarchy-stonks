@@ -1,5 +1,6 @@
 .pragma library
 .import "Calendar.js" as Calendar
+.import "CarriedClose.js" as CarriedClose
 .import "Format.js" as Format
 .import "History.js" as History
 .import "Market.js" as Market
@@ -54,9 +55,10 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
 // `waiting` until Robinhood says which. Without `allDay`, as in a harness
 // that stubs the service, Yahoo's own. Any other
 // listing's is its quote's day, or the coming day once it has a trade
-// (`Quote.tailDay`): London's or Tokyo's stays the last until its first bar.
+// (`Quote.tailDay`): London's or Tokyo's stays the last until its first bar,
+// then holds it through the new day's first minutes (`CarriedClose.heldDay`).
 function dayDrawn(symbol, quote, nights, allDay, calendars, slideAt) {
-  var out = { day: Quote.tailDay(quote) || quote, latest: null, allDay: false, waiting: false }
+  var out = { day: Quote.tailDay(quote) || CarriedClose.heldDay(quote) || quote, latest: null, allDay: false, waiting: false }
   if (!Overnight.hasOvernight(quote, calendars)) return out
   var tradability = allDay ? allDay[symbol] : { allDay: false }
   var night = nights ? nights[symbol] : null

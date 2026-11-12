@@ -233,8 +233,9 @@ function quietUntil(quote, receivedAt, now, cal, dayOf) {
 // Yahoo's day answer for a stock turns to the coming day with its
 // pre-market, and London's and Tokyo's with their open, whose first bar
 // comes about 15 minutes late. Two days keep the last session in the answer
-// until the new one has a trade. An index's answer stays the last session's
-// until its open.
+// until the new one has a trade, and through its first minutes, while the
+// chart holds the last (`CarriedClose.heldDay`). An index's answer stays the
+// last session's until its open.
 function twoDays(quote, now, calendars) {
   if (!quote) return true
   if (quote.crypto) return true
@@ -249,7 +250,8 @@ function twoDays(quote, now, calendars) {
     return segs.length > 0 && now >= pre && (now < segs[0].start || (now < Calendar.postClose(cal, date) && !tradedSince(pre)))
   }
   var open = segs.length ? { start: segs[0].start, end: segs[segs.length - 1].end } : !cal && quote.current ? quote.current.regular : null
-  return !!open && now >= open.start && now < open.end && !tradedSince(open.start)
+  if (!open || now < open.start || now >= open.end) return false
+  return !tradedSince(open.start) || (CarriedClose.firstMinutes(quote) && now < open.start + CarriedClose.HOLD_LIMIT)
 }
 
 // How often, while Yahoo may still answer with the last session's quote
