@@ -269,7 +269,8 @@ function barAt(chart, x) {
 }
 
 // As `Chart.yAt` reads the line: -1 outside its trades and across a break
-// (`brk`), where it lifts. It walks on from where it was last asked, so a
+// (`brk`), where it lifts, and the trade before a stretch with no trade
+// (`untraded`) across it. It walks on from where it was last asked, so a
 // replay reads the line once.
 function lineBars(geometry) {
   var pts = geometry ? geometry.points : [], k = 0
@@ -280,6 +281,7 @@ function lineBars(geometry) {
     while (k < pts.length - 2 && pts[k + 1].x < x) k++
     var a = pts[k], b = pts[k + 1]
     if (b.brk && x > a.x && x < b.x) return -1
+    if (b.untraded && x < b.x) return barOf(1 - a.y)
     return barOf(1 - (a.y + (b.y - a.y) * (b.x === a.x ? 0 : (x - a.x) / (b.x - a.x))))
   }
 }

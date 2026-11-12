@@ -202,7 +202,10 @@ Item {
           if (run.length < 2) continue
           ctx.beginPath()
           ctx.moveTo(pad + run[0].x * w, by)
-          for (var i = 0; i < run.length; i++) ctx.lineTo(pad + run[i].x * w, pad + run[i].y * h)
+          for (var i = 0; i < run.length; i++) {
+            if (i > 0 && run[i].untraded) ctx.lineTo(pad + run[i].x * w, pad + run[i - 1].y * h)
+            ctx.lineTo(pad + run[i].x * w, pad + run[i].y * h)
+          }
           ctx.lineTo(pad + run[run.length - 1].x * w, by)
           ctx.closePath()
           ctx.fill()
@@ -266,7 +269,9 @@ Item {
 
       // A lone trade, a day's only one or one beside a break, is a dot three
       // times the line's width, so it reads at a glance. It never breathes:
-      // that is the live dot's alone.
+      // that is the live dot's alone. Across a stretch with no trade
+      // (`untraded`) the line holds the trade before it, dotted, and steps to
+      // the next.
       function strokeRuns(ctx, lines, pad, w, h) {
         for (var r = 0; r < lines.length; r++) {
           var line = lines[r]
@@ -277,14 +282,31 @@ Item {
             ctx.fill()
             continue
           }
+          var held = []
           ctx.beginPath()
           for (var j = 0; j < line.length; j++) {
             var x = pad + line[j].x * w
             var y = pad + line[j].y * h
             if (j === 0) ctx.moveTo(x, y)
-            else ctx.lineTo(x, y)
+            else if (line[j].untraded) {
+              var heldY = pad + line[j - 1].y * h
+              held.push({ from: pad + line[j - 1].x * w, to: x, y: heldY })
+              ctx.moveTo(x, heldY)
+              ctx.lineTo(x, y)
+            } else ctx.lineTo(x, y)
           }
           ctx.stroke()
+          if (!held.length) continue
+          // Dots the line's width across, a width apart: the dashes count in
+          // its widths, and stretch in the screenshot as the baseline's do.
+          ctx.setLineDash([0.01, 2 * root.dashUnit])
+          ctx.beginPath()
+          for (var d = 0; d < held.length; d++) {
+            ctx.moveTo(held[d].from, held[d].y)
+            ctx.lineTo(held[d].to, held[d].y)
+          }
+          ctx.stroke()
+          ctx.setLineDash([])
         }
       }
     }

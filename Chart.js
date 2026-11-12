@@ -111,10 +111,14 @@ var NO_ANSWER = { bars: [], from: null, through: null }
 // before that. `brk` lifts the line across hours of the exchange's day that
 // take room, such as Tokyo's lunch, which Yahoo sends inside one 09:00 to 15:30
 // session. Hours that take no room (`axis.skip`), such as a weekend, are no
-// break: the line runs across them, as through a quiet hour of a US night. The
-// scale holds every trade and the close, so the baseline stays in view. Once
-// tonight has traded, the dashed line steps at the bell to the close just
-// gone (`Day.nightBell`), which the scale holds too: `step`.
+// break: the line runs across them. Neither is a stretch with no trade, as a
+// thin night or pre-market leaves: more than half an hour of room between two
+// trades, which `Overnight.fillsBetween` calls a stretch too. The line holds
+// the trade before it there and steps to the one after (`untraded`), where a
+// slope would draw trading that never happened. The scale holds every trade
+// and the close, so the baseline stays in view. Once tonight has traded, the
+// dashed line steps at the bell to the close just gone (`Day.nightBell`),
+// which the scale holds too: `step`.
 function chartGeometry(quote, calendars) {
   var pts = quote.points
   var axis = chartSpan(quote)
@@ -143,12 +147,14 @@ function chartGeometry(quote, calendars) {
   for (var k = 0; k < pts.length; k++) {
     var session = Quote.pointSession(quote, pts[k])
     var prev = k > 0 ? pts[k - 1] : null
+    var brk = !!prev && across(prev.t, pts[k].t)
     out.push({
       x: axisFraction(axis, pts[k].t),
       y: 1 - (pts[k].p - lo) / (hi - lo),
       ext: session !== "reg",
       dim: lit ? pts[k].t < quote.litFrom : session !== "reg",
-      brk: !!prev && across(prev.t, pts[k].t)
+      brk: brk,
+      untraded: !!prev && !brk && clockRoom(axis, pts[k].t) - clockRoom(axis, prev.t) > Overnight.HOLE_SLOTS * Overnight.SLOT
     })
   }
   var ticks = []
@@ -242,8 +248,8 @@ function stepTime(quote, t, steps, last) {
 // trade in a column wins: the price at the end of that stretch. A range's
 // start (`rangeStart`) keeps the first column to itself, so the column the
 // line starts from is always there (`ownStart`, `retroColumn`). A column
-// between two trades the line joins holds the one before it; only a break
-// (`brk`) leaves columns dark, as it lifts the smooth line. With no previous
+// between two trades the line joins holds the one before it; a break (`brk`)
+// and a stretch with no trade (`untraded`) leave columns dark. With no previous
 // close known, the columns stand on the floor, until a step to a close that
 // is known. A column's side is its own price's against the close, unrounded,
 // as smooth's line is: a price a hair under the close, on the close's row, is
@@ -268,7 +274,7 @@ function retroGrid(geometry, width, height, pixel, gap) {
   for (var i = 0; i < pts.length; i++) {
     var col = retroColumn(g, pts[i].x)
     if (col !== last && last >= 0 && !g.dim[last]) g.lastLit = last
-    for (var held = last + 1; i > 0 && !pts[i].brk && held < col; held++) {
+    for (var held = last + 1; i > 0 && !pts[i].brk && !pts[i].untraded && held < col; held++) {
       g.levels[held] = g.levels[last]
       g.above[held] = g.above[last]
       g.dim[held] = g.dim[last]
@@ -306,7 +312,8 @@ function lastLitPoint(geometry) {
   return null
 }
 
-// Null past the line and across a break, where the line lifts.
+// Null past the line and across a break, where the line lifts. Across a
+// stretch with no trade, the trade before it, as the line holds it.
 function yAt(points, x) {
   if (!points || !points.length) return null
   if (x < points[0].x || x > points[points.length - 1].x) return null
@@ -315,6 +322,7 @@ function yAt(points, x) {
     if (points[i].x >= x) {
       var a = points[i - 1], b = points[i]
       if (b.brk && x > a.x && x < b.x) return null
+      if (b.untraded && x < b.x) return a.y
       var f = b.x === a.x ? 0 : (x - a.x) / (b.x - a.x)
       return a.y + (b.y - a.y) * f
     }

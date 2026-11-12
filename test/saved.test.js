@@ -356,13 +356,15 @@ function smoothHeard(day) {
   const from = M.fractionAtTime(day, day.points[0].t), to = M.fractionAtTime(day, M.lastTradeTime(day))
   const s = sound.smooth(geometry, from, to, 2).samples, rate = sound.RATE, penta = sound.PENTATONIC
   const place = t => sound.placeAt(t, from, to, 2)
-  // The line's height at `x`, null where it lifts (`brk`).
+  // The line's height at `x`, null where it lifts (`brk`), the trade before
+  // a stretch with no trade across it (`untraded`).
   const lineY = x => {
     if (x <= pts[0].x) return pts[0].y
     const k = pts.findIndex((p, i) => i > 0 && p.x >= x)
     if (k < 0) return pts.at(-1).y
     const [a, b] = [pts[k - 1], pts[k]]
     if (b.brk && x > a.x && x < b.x) return null
+    if (b.untraded && x < b.x) return a.y
     return a.y + (b.y - a.y) * (x - a.x) / Math.max(1e-9, b.x - a.x)
   }
   const barAt = t => {
@@ -441,8 +443,9 @@ test("smooth's replay of Tokyo's day strikes no bar across lunch, where the char
 
 test("smooth's replay of a thin night follows the line through its trades", () => {
   // TOY at 00:36 on Monday 5 October: Friday, then Sunday night's five
-  // trades, a line through them where the clock puts each, running on from
-  // Friday across the weekend that takes no room.
+  // trades where the clock puts each, the line running on from Friday
+  // across the weekend that takes no room, and holding each trade until
+  // the next.
   const day = dayAt("live-2026-10-05", "toy").day
   const heard = smoothHeard(day)
   const tonight = heard.geometry.points.filter((p, i) => day.points[i].t >= at("2026-10-04", "20:00"))
@@ -3413,7 +3416,7 @@ test("a listing Robinhood doesn't trade all day draws Yahoo's day by the clock f
   expect(M.stepTime(bolt, bolt.points[0].t, 3)).toBe(bolt.points[0].t + 15 * 60)
 })
 
-test("a thin US day's quiet spans take their hours, the line joining across them", () => {
+test("a thin US day's quiet spans take their hours, the line holding its last trade across them", () => {
   const set = "gaps-2026-10-21-1006"
   const q = savedDay(set, "vane")
   const allDay = M.parseAllDay(fixture(`moments/${set}/robinhood-instruments.json`), ["VANE"])
@@ -3426,6 +3429,30 @@ test("a thin US day's quiet spans take their hours, the line joining across them
     const [a, b] = [from, to].map(t => line[day.points.findIndex(p => p.t === t)].x)
     expect(b - a).toBeCloseTo((to - from) / (span.end - span.start), 9)
   }
+  // A thin night, weekend or pre-market: across a stretch of more than half
+  // an hour with no trade, the line, and a scrub's dot on it, stand at the
+  // price the scrub reads, the trade before it, and retro lights no column:
+  // a slope would draw trading that never happened. EZ's Friday 19:59 to
+  // Sunday 22:40, TOY's few trades on Sunday night, REED's pre-markets.
+  const sloped = []
+  for (const [set, name] of [["live-2026-10-05", "ez"], ["live-2026-10-05", "toy"], ["night", "reed"], ["day", "reed"]]) {
+    const thin = dayAt(set, name).day
+    const geometry = M.chartGeometry(thin, calendars)
+    const axis = M.chartSpan(thin)
+    const grid = M.retroGrid(geometry, 300, 80, 3, 1)
+    const quiet = thin.points.map((p, k) => k).filter(k => k > 0 && M.clockRoom(axis, thin.points[k].t) - M.clockRoom(axis, thin.points[k - 1].t) > 30 * 60)
+    expect([set, name, quiet.length > 0]).toEqual([set, name, true])
+    for (const k of quiet) {
+      const [a, b] = [geometry.points[k - 1], geometry.points[k]]
+      const mid = (a.x + b.x) / 2
+      const read = M.readingAt(thin, M.timeAtFraction(thin, mid)).price
+      const dot = M.yAt(geometry.points, mid)
+      if (Math.abs(dot - (1 - (read - geometry.lo) / (geometry.hi - geometry.lo))) > 1e-9) sloped.push(`${set} ${name} dot off ${read} at ${M.timeAtFraction(thin, mid)}`)
+      for (let c = M.retroColumn(grid, a.x) + 1; c < M.retroColumn(grid, b.x); c++)
+        if (grid.levels[c] !== undefined) sloped.push(`${set} ${name} column ${c} lit between ${thin.points[k - 1].t} and ${thin.points[k].t}`)
+    }
+  }
+  expect(sloped).toEqual([])
 })
 
 test("a night's chart on each saved moment: its span, its trades, and what a scrub of it reads", () => {
