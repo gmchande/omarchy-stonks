@@ -410,24 +410,14 @@ BarWidget {
       }
 
       Text {
-        id: moveText
         visible: !root.iconOnly
         anchors.verticalCenter: parent.verticalCenter
-        // A dash keeps a small move's room, so the pill keeps its width as
-        // the move since the open comes and goes.
-        width: root.featured && root.featured.pct === null ? Math.max(implicitWidth, Math.ceil(dashRoom.width)) : implicitWidth
         textFormat: Text.PlainText
         text: root.changeText
         // With no price, trouble is in the bar's ink, as the header says it.
         color: root.featured ? root.trendColor : root.warns ? button.foreground : root.dimColor
         font.family: button.fontFamily
         font.pixelSize: button.fontSize
-
-        TextMetrics {
-          id: dashRoom
-          font: moveText.font
-          text: "+0.00%" + (root.service && root.service.changeMode === "open" ? " open" : "")
-        }
       }
 
       Text {
