@@ -441,9 +441,11 @@ function chartVerdict(bars, opens, filtered, firstRegular, regular) {
 
 // A coin never closes, so its day is its last 24 hours, from the trade 24
 // hours before the newest: the move, the chart and the figures all read them.
-// Its low and high come from its bars, which a close can miss. Yahoo's
-// `regularMarketVolume` already covers 24 hours for a coin. Null for an answer
-// that doesn't reach back that far, whose quote stays Yahoo's UTC day.
+// Its low and high come from its bars, which a close can miss, with the bar
+// each came from (`dayHighAt`, `dayLowAt`): the 24 hours cross midnight.
+// Yahoo's `regularMarketVolume` already covers 24 hours for a coin. Null for
+// an answer that doesn't reach back that far, whose quote stays Yahoo's UTC
+// day.
 function coinDay(points, bars) {
   var newest = points.length ? points[points.length - 1] : null
   var first = 0
@@ -452,14 +454,19 @@ function coinDay(points, bars) {
   var day = points.slice(first)
   var since = bars.filter(function(b) { return b.t > day[0].t })
   var ranged = since.length > 0 && since.every(function(b) { return knownPrice(b.h) !== null && knownPrice(b.l) !== null })
+  var reach = since.concat([{ t: day[0].t, h: day[0].p, l: day[0].p }])
+  var high = ranged ? reach.reduce(function(a, b) { return b.h > a.h ? b : a }) : null
+  var low = ranged ? reach.reduce(function(a, b) { return b.l < a.l ? b : a }) : null
   return {
     rolling: true,
     points: day,
     prevClose: day[0].p,
     dayOpen: day[0].p,
     openSession: null,
-    dayHigh: ranged ? Math.max.apply(null, since.map(function(b) { return b.h }).concat([day[0].p])) : null,
-    dayLow: ranged ? Math.min.apply(null, since.map(function(b) { return b.l }).concat([day[0].p])) : null,
+    dayHigh: high ? high.h : null,
+    dayLow: low ? low.l : null,
+    dayHighAt: high ? high.t : null,
+    dayLowAt: low ? low.t : null,
     figuresDay: day[0].t,
     nextDayBegun: false,
     session: { pre: null, regular: { start: day[0].t, end: newest.t }, post: null }

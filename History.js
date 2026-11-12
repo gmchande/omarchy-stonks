@@ -370,19 +370,25 @@ function ownLast(history) {
 // the 52W line takes them in (`Fundamentals.yearLine`), so no range reads
 // under the day. The range is fetched hourly and the quote each minute, so
 // the day can pass every bar: it is dated by its day, and drawn at its last
-// bar on 15-minute and hourly bars. A trade is dated when it traded. Each
-// compares at the listing's decimals, so float noise never moves a mark.
+// bar on 15-minute and hourly bars; a coin's 24 hours by the bar each end
+// came from. A trade is dated when it traded. Nothing before the range's
+// first bar counts, as a quote kept from an older day. Each compares at the
+// listing's decimals, so float noise never moves a mark.
 function rangeEnds(history, stats, quote, trades) {
   stats = stats || periodStats(history)
   if (!stats.high || !stats.low) return null
   var high = stats.high
   var low = stats.low
+  var from = history.bars[0].t
   var digits = quote ? quote.priceDigits : undefined
   var reads = function(v) { return Number(Format.fixed(v, Format.isFiniteNumber(digits) ? digits : Format.moneyDigits(Math.abs(v)))) }
+  var highRead = reads(high.p)
+  var lowRead = reads(low.p)
   var take = function(p, t) {
-    if (!Format.isFiniteNumber(p)) return
-    if (reads(p) > reads(high.p)) high = { p: p, t: t }
-    if (reads(p) < reads(low.p)) low = { p: p, t: t }
+    if (!Format.isFiniteNumber(p) || t < from) return
+    var read = reads(p)
+    if (read > highRead) { high = { p: p, t: t }; highRead = read }
+    if (read < lowRead) { low = { p: p, t: t }; lowRead = read }
   }
   if (quote && Format.isFiniteNumber(quote.figuresDay)) {
     var at = quote.figuresDay
@@ -390,8 +396,8 @@ function rangeEnds(history, stats, quote, trades) {
     var day = historyDateParts(history, at)
     var lastDay = historyDateParts(history, last.t)
     if (last.t > at && lastDay.day === day.day && lastDay.month === day.month && lastDay.year === day.year) at = last.t
-    take(quote.dayHigh, at)
-    take(quote.dayLow, at)
+    take(quote.dayHigh, Format.isFiniteNumber(quote.dayHighAt) ? quote.dayHighAt : at)
+    take(quote.dayLow, Format.isFiniteNumber(quote.dayLowAt) ? quote.dayLowAt : at)
   }
   ;(trades || []).forEach(function(trade) { take(trade.p, trade.t) })
   return { high: high, low: low }

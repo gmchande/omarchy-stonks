@@ -1577,6 +1577,18 @@ test("every range's line and marks take in the quote's day, dated by its day", (
   const open = week.bars.find(b => lastBar.t - b.t < 7 * 3600)
   const high = marksOf(week, { figuresDay: open.t, dayHigh: 999, dayLow: 1, priceDigits: 2 }).high
   expect([M.historyBarAt(week, high.x), high.price, high.date]).toEqual([lastBar, "999.00", "11 SEP"])
+  // A coin's 24 hours cross midnight, so each end is dated by the bar it
+  // came from: Bitcoin's at 13:22 New York on 28 October began at 17:20 UTC
+  // on the 27th, and its high of 81,694 came at 08:35 UTC on the 28th.
+  const coin = M.parseChart(fixture("moments/coin-2026-10-28-1322/btc-usd.json"), cents)
+  const year = M.parseHistory(fixture("history/btc-usd-1y.json"), "1Y")
+  const under = { ...year, bars: year.bars.map(b => ({ ...b, h: Math.min(b.h, 80000) })) }
+  expect(marksOf(under, coin).high).toEqual({ x: 1, price: "81,694", date: "28 OCT 2026" })
+  // A quote kept from before the range counts for nothing, nor do its
+  // trades: MSFT's of 11 September beside its week to 11 November.
+  const september = M.parseChart(fixture("msft-2026-09-11-day-prepost.json"))
+  const november = M.parseHistory(fixture("history/msft-2026-11-11-1800-5d.json"), "1W")
+  expect(M.rangeEnds(november, null, september, september.points)).toEqual(M.rangeEnds(november))
 })
 
 // Yahoo's daily answer for Tokyo leaves the day's close out after the
