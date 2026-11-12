@@ -298,6 +298,9 @@ test("formatting", () => {
   // figure it rounds to does: never +1,000.00% or 10,000.00.
   expect([M.pct(999.996), M.money(9999.996), M.changeText({ abs: -9999.996, pct: -50 }, "abs")])
     .toEqual(["+1,000%", "10,000", "\u221210,000"])
+  // A listing's own decimals too: its price a hair under 10,000 reads as
+  // 10,000 does, and one that still rounds under it keeps its cents.
+  expect([9999.996, 10000, 9999.99].map(p => M.money(p, M.priceDigits(p, 2, true)))).toEqual(["10,000", "10,000", "9,999.99"])
   // A side bar's pill stacks the move in lines of four characters at most:
   // one decimal under 10%, none from 10% up, thousands as K%; a move that
   // shows as none has no sign.

@@ -124,9 +124,9 @@ function priceDigits(price, hint, inCents) {
   var digits = isFiniteNumber(hint) && hint >= 0 ? hint : 2
   if (isFiniteNumber(price)) {
     var abs = Math.abs(price)
-    if (abs >= 10000) return 0
     if (abs >= 1 && inCents) digits = Math.min(digits, 2)
     else if (abs > 0 && abs < 1) digits = Math.max(digits, 3 - Math.floor(Math.log(abs) / Math.LN10))
+    return digitsBelow(abs, 10000, Math.min(MAX_PRICE_DIGITS, digits))
   }
   return Math.min(MAX_PRICE_DIGITS, digits)
 }
