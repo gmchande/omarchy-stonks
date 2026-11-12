@@ -371,7 +371,10 @@ empty.
   5 minutes before and after the session, but every minute for the stock
   on show and never for a row whose market hasn't traded since its last
   price. With no pill in a bar, it asks nothing until you open the panel
-  or the window. It also asks for a search result you pause on.
+  or the window. It also asks for a search result you pause on. To change
+  "every minute", set `"refreshIntervalSec"` in
+  `~/.config/omarchy/grvc.stonks.json` to a number of seconds from 30 to
+  900.
 - `query2.finance.yahoo.com` for search, as you type, asking each word
   once while search is open.
 - `api.robinhood.com` for overnight prices, and for trades that fill a
