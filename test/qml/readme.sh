@@ -8,7 +8,7 @@
 #
 # `readme.sh --marketplace SCALE DIR` writes no README picture: it grabs
 # the maintainer's marketplace picture's two, drawn at SCALE, into DIR:
-# popup.png, Nebius's (NBIS) retro panel, and strip.png, its pill on the
+# popup.png, Nebius's (NBIS) smooth panel, and strip.png, its pill on the
 # bar, from the capture named below with NBIS on the demo watchlist.
 # The panel's card window is CardWindow.qml, as in keys.sh. HOME and curl
 # are scratch.

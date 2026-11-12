@@ -3,7 +3,7 @@
 Stonks puts your stock watchlist in the Omarchy bar. A small pill shows how
 one stock is doing today. Click it for the chart and your lists.
 
-<img src="preview.png" alt="Stonks in the Omarchy bar. The pill shows Nebius (NBIS) up 2.88%. Below it, the panel shows Nebius Group at 163.31 over the day's chart in pixel columns. Beside it: 'Stocks in your Omarchy bar. Free · No account · No API key'">
+<img src="preview.png" alt="Stonks in the Omarchy bar. The pill shows Nebius (NBIS) up 2.88%. Below it, the panel shows Nebius Group at 163.31 over the day's line chart. Beside it: 'Stocks in your Omarchy bar. Free · No account · No API key'">
 
 - Stocks, ETFs, indexes and crypto from New York to London and Tokyo,
   with charts from one day to all time.

@@ -12,7 +12,7 @@ import "plugin" as Stonks
 // demo watchlist at the saved moment readme.sh names. Each picture is
 // grabbed into STONKS_README_RAW; readme.sh makes the README's from them.
 // With STONKS_README_MARKETPLACE naming a symbol on the list, it grabs only
-// the marketplace picture's two: that symbol's retro panel and its pill on
+// the marketplace picture's two: that symbol's smooth panel and its pill on
 // the bar.
 Harness {
   id: harness
@@ -243,17 +243,17 @@ Harness {
       harness.finish()
     }
 
-    // The marketplace picture's: the symbol featured in retro, from a fresh
+    // The marketplace picture's: the symbol featured in smooth, from a fresh
     // open, and its pill on the bar.
     function marketplacePictures() {
       var symbol = harness.marketplace
       verify(service.symbols.join(",") === harness.demo.join(","), "the demo watchlist and " + symbol + ": " + service.symbols.join(","))
-      service.persist({ style: "retro" })
+      service.persist({ style: "smooth" })
       service.feature(symbol)
       tryVerify(function() { return service.featuredSymbol === symbol }, 3000, symbol + " featured")
       panel.open()
       var body = panel.body
-      grab("popup", panel.keyboardPanel.card, body, function() { return service.retro && body.surfaceOpen && service.featuredSymbol === symbol })
+      grab("popup", panel.keyboardPanel.card, body, function() { return !service.retro && body.surfaceOpen && service.featuredSymbol === symbol })
       grab("strip", heroStrip, body, robinhoodIn)
       panel.close()
       harness.finish()
