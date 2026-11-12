@@ -53,8 +53,9 @@ follow.
 <img src="media/pill.png" width="200" alt="The pill four ways: a sparkline, an arrow, the price as text, and an icon for the day">
 
 The pill shows today's move for the stock you last looked at. After the
-stock's first trade at night, it keeps the day's close and move until
-04:00: point at it for tonight's price and move. It can show
+stock's first trade at night, it keeps the day's close and move until the
+new day's first prices arrive, soon after 04:00: point at it for tonight's
+price and move. It can show
 a sparkline, an arrow, the price as text, or an icon: a bull on an up day,
 a bear on a down one. Middle-click it to switch. It keeps your choice after
 a restart. On a bar at the side of the screen, middle-click switches
@@ -102,8 +103,9 @@ beside the price counts
 from the close the chart's dashed line marks under that price, so the
 number, the line and the bull or bear agree. Since the open, it counts from
 that day's open instead. The rows and the pill agree with it too, but at
-night: from a stock's first trade at night until 04:00, its row and the pill
-keep the day's close and move, the ones on the line under the price.
+night: from a stock's first trade at night until the new day's first prices
+arrive, soon after 04:00, its row and the pill keep the day's close and move,
+the ones on the line under the price.
 
 The two lines under the price and the move each keep one job. Under the
 price is the close before the price on top, named by its day: FRI CLOSE

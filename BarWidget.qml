@@ -32,14 +32,14 @@ BarWidget {
   readonly property string featuredSymbol: service ? service.featuredSymbol : ""
   readonly property var featuredQuote: service && featuredSymbol ? (service.quotes[featuredSymbol] || null) : null
   // As its row shows it (`Figures.listRow`): at night the day's close and
-  // move until 04:00.
+  // move until the new day's first prices arrive, soon after 04:00.
   readonly property var newest: featuredQuote ? (service.newestTrades[featuredSymbol] || null) : null
   readonly property var featured: featuredQuote ? Figures.listRow(featuredQuote, 0, service.changeMode, newest) : null
   // The pill has no room for the newest price's session and time, nor at
   // night for tonight's price and move; the hover says them.
   readonly property string newestNote: newest
     ? Figures.pillNote(featuredQuote, newest, service.changeMode, service.now, service.calendars, retro) : ""
-  readonly property real newestTime: newest ? newest.t : 0
+  readonly property string newestKey: newest ? newest.t + (newest.joined ? " joined" : "") : ""
   // A side bar's stacked move has no room for the "open" a top bar's pill
   // ends with; the hover says where it counts from.
   readonly property string openNote: vertical && !iconOnly && featured && service.changeMode === "open" ? "Since the open" : ""
@@ -80,15 +80,16 @@ BarWidget {
         : freshness.state === "failed" && featured ? "\nRetrying" : "")
   // The shell copies a hover's words only as the pointer enters, so they go
   // to the bar again while it stays: a warning's, a new symbol's, a newest
-  // price's time. Qt.callLater runs a function once, so changes together
-  // show once. A new figure alone never does, so a resting pointer sees no
-  // blink but for a newer trade's time.
+  // price's time, the pill's turn from the day to its row's newest price.
+  // Qt.callLater runs a function once, so changes together show once. A
+  // new figure alone never does, so a resting pointer sees no blink but for
+  // a newer trade or that turn.
   function reshowTooltip() {
     if (button.tooltipHovered && button.bar) button.bar.showTooltip(button, button.tooltipText)
   }
   onWarningTextChanged: Qt.callLater(reshowTooltip)
   onFeaturedSymbolChanged: Qt.callLater(reshowTooltip)
-  onNewestTimeChanged: Qt.callLater(reshowTooltip)
+  onNewestKeyChanged: Qt.callLater(reshowTooltip)
   onOpenNoteChanged: Qt.callLater(reshowTooltip)
   onOpenedChanged: Qt.callLater(reshowTooltip)
   // Up and down for the bar's own ground (`TrendColors`).
@@ -139,9 +140,12 @@ BarWidget {
     : !warns ? "…" : freshness.state === "overdue" ? "! Can't get prices" : "! No data"
   // A side bar's stacked form: the symbol over the move, four characters a
   // line at most, in the rows' unit. The "!" takes a short line of its own
-  // before the move, kept empty without one, so the pill never changes height.
+  // before the move, kept empty without one, and a percent's dash keeps the
+  // "%"'s line empty, so the pill never changes height as the move since the
+  // open comes and goes.
   readonly property var stackedMove: !featured ? { lines: warns ? [] : ["…"], sign: 0 }
-    : service.changeMode === "abs" ? Format.stackedMoney(featured.abs, featuredQuote.priceDigits) : Format.stackedPct(featured.pct)
+    : service.changeMode === "abs" ? Format.stackedMoney(featured.abs, featuredQuote.priceDigits)
+    : featured.pct === null ? { lines: ["—", ""], sign: 0 } : Format.stackedPct(featured.pct)
   readonly property var stackedLines: Format.stackedSymbol(featuredSymbol || "ST")
     .map(function(t) { return { text: t, move: false, warning: false } })
     .concat(featured ? [{ text: warns ? "!" : "", move: false, warning: true }]

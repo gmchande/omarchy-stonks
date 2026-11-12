@@ -324,8 +324,9 @@ function newestTrade(quote, latest, calendars, day) {
 }
 
 // The newest trade as the rows and the pill read it at rest: none once
-// tonight has traded, so they keep the day's close and move until 04:00,
-// when a pre-market trade takes over. The panel's price on top is tonight's.
+// tonight has traded, so they keep the day's close and move until the new
+// day's first prices arrive, soon after 04:00, as the 1D chart keeps its
+// day. The panel's price on top is tonight's.
 function restingNewest(newest) {
   return newest && newest.joined ? null : newest
 }
