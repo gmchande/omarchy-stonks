@@ -5,7 +5,8 @@
 # moves; r twice asks once; a Yahoo that refuses is left alone until its
 # time and one that doesn't answer is tried again within two minutes, r at
 # once; a window no screen shows asks what a closed one asks, and a night's
-# trades come every five minutes; with every screen off nothing is asked,
+# trades come every five minutes, and a pointer on the pill reads tonight's
+# price as it changes; with every screen off nothing is asked,
 # and the key that wakes one asks at once. HOME and curl are scratch; the
 # fake curl answers from test/fixtures/moments/fetch-2026-10-07.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"

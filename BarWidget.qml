@@ -39,7 +39,6 @@ BarWidget {
   // night for tonight's price and move; the hover says them.
   readonly property string newestNote: newest
     ? Figures.pillNote(featuredQuote, newest, service.changeMode, service.now, service.calendars, retro) : ""
-  readonly property string newestKey: newest ? [newest.t, newest.joined, service.changeMode].join(" ") : ""
   // A side bar's stacked move has no room for the "open" a top bar's pill
   // ends with; the hover says where it counts from.
   readonly property string openNote: vertical && !iconOnly && featured && service.changeMode === "open" ? "Since the open" : ""
@@ -79,17 +78,17 @@ BarWidget {
       + (hostPause ? "\n" + hostPause.why + "\n" + hostPause.when
         : freshness.state === "failed" && featured ? "\nRetrying" : "")
   // The shell copies a hover's words only as the pointer enters, so they go
-  // to the bar again while it stays: a warning's, a new symbol's, a newest
-  // price's time, the pill's turn from the day to its row's newest price,
-  // a change of unit made in the window. Qt.callLater runs a function once,
-  // so changes together show once. A new figure alone never does, so a
-  // resting pointer sees no blink but for a newer trade or those turns.
+  // to the bar again while it stays: a warning's, a new symbol's, and the
+  // newest price's, its time and, at night, tonight's price and move, which
+  // the pill shows nowhere else. Qt.callLater runs a function once, so
+  // changes together show once. A new figure on the pill alone never does,
+  // so a resting pointer sees no blink for what it can read on the pill.
   function reshowTooltip() {
     if (button.tooltipHovered && button.bar) button.bar.showTooltip(button, button.tooltipText)
   }
   onWarningTextChanged: Qt.callLater(reshowTooltip)
   onFeaturedSymbolChanged: Qt.callLater(reshowTooltip)
-  onNewestKeyChanged: Qt.callLater(reshowTooltip)
+  onNewestNoteChanged: Qt.callLater(reshowTooltip)
   onOpenNoteChanged: Qt.callLater(reshowTooltip)
   onOpenedChanged: Qt.callLater(reshowTooltip)
   // Up and down for the bar's own ground (`TrendColors`).

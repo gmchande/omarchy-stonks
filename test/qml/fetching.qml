@@ -116,11 +116,16 @@ Harness {
     function updateEntryInline(id, settings) { return true }
   }
 
+  // The pill's hover as the shell's bar shows it: copied as the pointer
+  // enters, and again whenever the pill asks.
+  property string copiedHover: ""
   PluginBarApi {
     id: barApi
     pluginId: "grvc.stonks"
     moduleName: "grvc.stonks"
     shell: shellApi
+    _showTooltip: function(target, text) { harness.copiedHover = text }
+    _hideTooltip: function(target) { harness.copiedHover = "" }
   }
 
   // A pill per screen, sharing the one service.
@@ -456,6 +461,30 @@ Harness {
       tick(600, 5, function() { if (markedAt && !clearedAt && !pill.warns) clearedAt = service.now })
       harness.check("Robinhood gone in the night: the pill says its refresh failed, and once Robinhood answers again the \"!\" goes",
         markedAt > 0 && /^Refresh failed/.test(hover) && clearedAt > 0, [markedAt, hover, clearedAt].join(" | "))
+
+      // A pointer resting on the pill at night: Robinhood answers a bar
+      // still forming, then the same bar at a new price, and the hover
+      // shows tonight's price as it is now.
+      startAt(at(harness.wed7 + 86400, 1, 0))()
+      var forming = function(price) {
+        runCommand(["sh", "-c", "echo 2026-10-08T05:00:00Z " + price + " > \"$STONKS_FAKE_STATE/NIGHT.bar\""])
+      }
+      var tonight = function(price) {
+        return !!pill.newest && pill.newest.joined && pill.newest.p === price
+      }
+      forming("240.00")
+      tick(600, 5, function() {})
+      var joinedFirst = tonight(240)
+      mouseMove(pill, pill.width / 2, pill.height / 2)
+      var entered = harness.copiedHover
+      forming("241.50")
+      tick(600, 5, function() {})
+      var after = harness.copiedHover
+      mouseMove(pillWindow.contentItem, 1, 100)
+      remove("NIGHT.bar")
+      harness.check("a pointer resting on the pill at night sees tonight's newest price in its hover, a new price on the same bar included",
+        joinedFirst && / 240\.00 /.test(entered) && tonight(241.5) && / 241\.50 /.test(after),
+        [joinedFirst, entered, pill.newest ? pill.newest.p + " " + pill.newest.joined : "no newest", after].join(" | "))
 
       // Thursday 11:15, nothing open, every screen off: nothing is asked
       // for, the pill's stock and a refresh included. The key press that
