@@ -6,22 +6,24 @@
 // `reserve` for single requests, so a long list never starves a history, a
 // search or a P/E. No answer at all pauses 2 s, doubling to 60, since nothing
 // reached the server; a refusal (429, 503) pauses for Retry-After, else a
-// minute, doubling, and at most 30 minutes, so a hostile Retry-After can't
-// silence Stonks for days. Each pause varies by ±20%, so installs don't all
-// come back at once. After a pause one request goes alone, and only its
-// answer reopens the host.
+// minute, doubling with each refusal until the host answers again, and at
+// most 30 minutes, so a hostile Retry-After can't silence Stonks for days.
+// Each pause varies by ±20%, or by up to +20% for the host's own
+// Retry-After, so installs don't all come back at once. After a pause one
+// request goes alone, and only its answer reopens the host.
 //
-// A gate is { left, filledAt, pause, pausedUntil, inARow, loneOut, warned,
-// pauses }: the requests left in its budget and when that was last filled;
-// why the host is paused ("" while it answers, "none" or "refused") and
-// until when; how many pauses of that kind have come in a row while it is
-// paused, which sets the next one's length; whether the lone request after
-// a pause is out; whether the budget has held a request back yet; and how
-// many pauses have begun. Every rule here returns a new gate. `limits` is { capacity,
-// perMinute, reserve }, and every time a second on the wall clock.
+// A gate is { left, filledAt, pause, pausedUntil, silences, refusals,
+// loneOut, warned, pauses }: the requests left in its budget and when that
+// was last filled; why the host is paused ("" while it answers, "none" or
+// "refused") and until when; how many times in a row no answer came, and
+// how many refusals came since the host last answered, which set the next
+// pause's length; whether the lone request after a pause is out; whether
+// the budget has held a request back yet; and how many pauses have begun.
+// Every rule here returns a new gate. `limits` is { capacity, perMinute,
+// reserve }, and every time a second on the wall clock.
 
 function openGate(capacity) {
-  return { left: capacity, filledAt: 0, pause: "", pausedUntil: 0, inARow: 0, loneOut: false, warned: false, pauses: 0 }
+  return { left: capacity, filledAt: 0, pause: "", pausedUntil: 0, silences: 0, refusals: 0, loneOut: false, warned: false, pauses: 0 }
 }
 
 function refilledGate(gate, limits, now) {
@@ -65,26 +67,28 @@ function gateAfterAnswers(gate, kinds, retryAfter, sentUnder, now, spread) {
   var current = sentUnder === gate.pauses
   var heard = current ? Object.assign({}, gate, { loneOut: false }) : gate
   if (kinds.indexOf("refused") >= 0) {
-    // The rest of the run that began this pause adds none in a row.
+    // The rest of the run that began this pause adds no refusal.
     if (!current && heard.pause === "refused") return { gate: heard, reopened: false }
-    var refusals = heard.pause === "refused" ? heard.inARow + 1 : 1
+    var refusals = heard.refusals + 1
     var asked = Math.min(retryAfter > 0 ? retryAfter : 60 * Math.pow(2, refusals - 1), 30 * 60)
-    return { gate: pausedGate(heard, "refused", refusals, asked, now, spread), reopened: false }
+    // The host's own wait is never cut short.
+    var varied = asked * (retryAfter > 0 ? 1 + 0.2 * spread : 0.8 + 0.4 * spread)
+    return { gate: pausedGate(Object.assign({}, heard, { refusals: refusals, silences: 0 }), "refused", varied, now), reopened: false }
   }
   if (!current || kinds.length === 0) return { gate: heard, reopened: false }
   if (kinds.some(function(k) { return k !== "none" }))
-    return { gate: Object.assign({}, heard, { pause: "" }), reopened: heard.pause !== "" }
-  var silences = heard.pause === "none" ? heard.inARow + 1 : 1
-  return { gate: pausedGate(heard, "none", silences, Math.min(2 * Math.pow(2, silences - 1), 60), now, spread), reopened: false }
+    return { gate: Object.assign({}, heard, { pause: "", silences: 0, refusals: 0 }), reopened: heard.pause !== "" }
+  var silences = heard.silences + 1
+  var waited = Math.min(2 * Math.pow(2, silences - 1), 60) * (0.8 + 0.4 * spread)
+  return { gate: pausedGate(Object.assign({}, heard, { silences: silences }), "none", waited, now), reopened: false }
 }
 
-function pausedGate(gate, kind, inARow, seconds, now, spread) {
+function pausedGate(gate, kind, seconds, now) {
   return Object.assign({}, gate, {
     pause: kind,
-    inARow: inARow,
     pauses: gate.pauses + 1,
     loneOut: false,
-    pausedUntil: now + Math.max(1, Math.round(seconds * (0.8 + 0.4 * spread)))
+    pausedUntil: now + Math.max(1, Math.round(seconds))
   })
 }
 

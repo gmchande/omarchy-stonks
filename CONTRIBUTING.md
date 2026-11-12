@@ -20,7 +20,8 @@ the rules a change is judged by.
 ## Test it
 
 - `test/all.sh` runs every check a pull request needs. It takes about two
-  minutes, on a machine with Omarchy and a Wayland session.
+  minutes, on a machine with Omarchy: the walks draw offscreen, but need
+  Quickshell, Omarchy's shell and a display for Qt's GTK theme.
 - Most checks replay saved answers from Yahoo and Robinhood. These stay
   private, since the sites' terms forbid republishing them. Without them,
   those checks skip and the run ends `PASSED, N SKIPPED`: say so in your

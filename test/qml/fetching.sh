@@ -6,9 +6,14 @@
 # time and one that doesn't answer is tried again within two minutes, r at
 # once; a window no screen shows asks what a closed one asks, and a night's
 # trades come every five minutes, and a pointer on the pill reads tonight's
-# price as it changes; with every screen off nothing is asked,
-# and the key that wakes one asks at once. HOME and curl are scratch; the
-# fake curl answers from test/fixtures/moments/fetch-2026-10-07.
+# price as it changes; with every screen off nothing is asked, and the key
+# that wakes one asks at once; a panel open on a screen that's off asks what
+# a closed one asks, and the key that wakes that screen asks its rows at
+# once; a click that stops a run ahead shows its chart from the answers
+# already in; a window closed while a cap is on its way asks nothing more
+# for it; and the bell keeps quiet once every screen goes off before it
+# rings. HOME and curl are scratch; the fake curl answers from
+# test/fixtures/moments/fetch-2026-10-07.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree fetching.qml
 # The pills' panels have their cards in CardWindow.qml, as in keys.sh.

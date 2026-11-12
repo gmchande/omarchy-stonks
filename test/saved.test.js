@@ -356,13 +356,15 @@ function smoothHeard(day) {
   const from = M.fractionAtTime(day, day.points[0].t), to = M.fractionAtTime(day, M.lastTradeTime(day))
   const s = sound.smooth(geometry, from, to, 2).samples, rate = sound.RATE, penta = sound.PENTATONIC
   const place = t => sound.placeAt(t, from, to, 2)
-  // The line's height at `x`, null where it lifts (`brk`).
+  // The line's height at `x`, null where it lifts (`brk`), the trade before
+  // a stretch with no trade across it (`untraded`).
   const lineY = x => {
     if (x <= pts[0].x) return pts[0].y
     const k = pts.findIndex((p, i) => i > 0 && p.x >= x)
     if (k < 0) return pts.at(-1).y
     const [a, b] = [pts[k - 1], pts[k]]
     if (b.brk && x > a.x && x < b.x) return null
+    if (b.untraded && x < b.x) return a.y
     return a.y + (b.y - a.y) * (x - a.x) / Math.max(1e-9, b.x - a.x)
   }
   const barAt = t => {
@@ -441,8 +443,9 @@ test("smooth's replay of Tokyo's day strikes no bar across lunch, where the char
 
 test("smooth's replay of a thin night follows the line through its trades", () => {
   // TOY at 00:36 on Monday 5 October: Friday, then Sunday night's five
-  // trades, a line through them where the clock puts each, running on from
-  // Friday across the weekend that takes no room.
+  // trades where the clock puts each, the line running on from Friday
+  // across the weekend that takes no room, and holding each trade until
+  // the next.
   const day = dayAt("live-2026-10-05", "toy").day
   const heard = smoothHeard(day)
   const tonight = heard.geometry.points.filter((p, i) => day.points[i].t >= at("2026-10-04", "20:00"))
@@ -1835,7 +1838,7 @@ test("on a morning Yahoo left an hour empty, Robinhood is asked once more for th
   const asks = (clock, changes = {}) => {
     const now = at("2026-11-02", clock)
     return M.overnightAsks({ open: false, pill: true, featured: "NBIS", quoteEntries: Object.fromEntries(names.map(s => [s, { status: "ok", receivedAt: now, answeredAt: now }])),
-      quotes, overnightSymbols: names, allSymbols: names, preview: "", previewShown: false, previewQuote: null, allDay, nights: inHand, now, calendars, ...changes })
+      quotes, overnightSymbols: names, allSymbols: names, inSight: names, preview: "", previewShown: false, previewQuote: null, allDay, nights: inHand, now, calendars, ...changes })
   }
   // NBIS and CRWV traded on Yahoo in every slot up to 08:25; SHOP, thin,
   // left no stretch of its own, but is asked with them on such a day.
@@ -1844,7 +1847,7 @@ test("on a morning Yahoo left an hour empty, Robinhood is asked once more for th
   const twice = { ...quotes.NBIS, points: quotes.NBIS.points.filter(p => p.t < at("2026-11-02", "06:00") || p.t >= at("2026-11-02", "06:40")) }
   expect(M.yahooHole(twice)).toBe(at("2026-11-02", "09:25"))
   // Robinhood's bar for 09:25 is in by 09:35: the pill's stock alone with
-  // nothing open, every row with a surface open, the pill on SHOP too.
+  // nothing open, every row in sight with a surface open, the pill on SHOP too.
   expect([asks("09:34"), asks("09:35"), asks("09:35", { open: true }), asks("09:35", { featured: "SHOP" })]).toEqual([null,
     { tradability: [], trades: ["NBIS"] }, { tradability: [], trades: names }, { tradability: [], trades: ["SHOP"] }])
   // Once an answer from then on is in, nothing asks again, whether it
@@ -2993,7 +2996,7 @@ test("until 04:00 a listing Robinhood trades all day shows the day that closed w
   expect(sessionDate(gspc.day)).toBe("2026-10-22")
 })
 
-test("at the open the chart moves to the new session, and a listing abroad shows its last session and its move until its new one has a bar", () => {
+test("at the open the chart moves to the new session, and a listing abroad shows its last session and its move until its new one has a bar, and that session's chart until three", () => {
   // Friday 09:31: AAPL's chart is Friday from midnight, the S&P 500's Friday's
   // session.
   for (const { day, symbol } of chartsAt("night-2026-10-23-0931", ["aapl", "gspc"]))
@@ -3019,12 +3022,15 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   const tokyoDay = q => M.viewChart("7203.T", "1D", { "7203.T": q }, {}, {}, {}, {}, calendars).day
   const friday = tokyoDay(both("watch-2026-10-25-2005"))
   expect([tokyoDate(friday), friday.points.length]).toEqual(["2026-10-23", 66])
+  // By 20:20 Monday's first two bars are in, which alone, scaled to the
+  // chart's height, draw a line from top to bottom: the chart holds Friday,
+  // with Monday's trades joined after it, until Monday has three bars.
   const monday = tokyoDay(both("watch-2026-10-25-2020"))
-  expect([tokyoDate(monday), monday.points.length]).toEqual(["2026-10-26", 2])
+  expect([tokyoDate(monday), monday.points.length]).toEqual(["2026-10-23", 68])
   // Toyota at Tokyo's open on Monday 2 November, from 08:55 to 09:21 there
   // (Sunday 18:55 to 19:21 New York), each answer as Stonks asks for it:
-  // one day before the open, two from the open until the quote holds a
-  // trade of Monday, then one; the rows' spark answers beside the charts.
+  // one day before the open, two from the open until Monday has three bars,
+  // then one; the rows' spark answers beside the charts.
   // Friday closed at 3,070, −0.23% from Thursday's 3,077. Until Monday's
   // first bar the row reads Friday's move, never 0.00% (the two-day answer
   // holding Friday alone gives Friday's own close as its previous close).
@@ -3053,16 +3059,24 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   }
   expect(asks).toEqual(["1855 3,070.00 \u22120.23%", "1855 row 3,070.00 \u22120.23%",
     "1903 3,070.00 \u22120.23%", "1903 row 3,070.00 \u22120.23%", "1910 3,070.00 \u22120.23%", "1910 row 3,070.00 \u22120.23%",
-    "1915 3,077.00 +0.23%", "1915 row 3,072.00 +0.07%", "1920 3,050.00 \u22120.65%", "1920 row 3,049.00 \u22120.68%",
-    "1921 3,053.00 \u22120.55%", "1921 row 3,054.00 \u22120.52%"])
+    "1915 3,077.00 +0.23%", "1915 row 3,072.00 +0.07%", "1920 3,051.00 \u22120.62%", "1920 row 3,052.00 \u22120.59%",
+    "1921 3,054.00 \u22120.52%", "1921 row 3,054.00 \u22120.52%"])
   // Since the open, Friday's move from Friday's open until Monday's first
   // bar. At 09:15 Monday's only bar is 09:00:03's: Yahoo's echo of its
   // quote, one price and no shares, off the five-minute grid. Its price is
   // not the day's open, which Yahoo's 09:00 bar gives at 09:20: 3,090, where
   // the echo held 3,077. So the move since the open is left out until then.
   expect(sinceOpen).toEqual(["1855 \u22121.19%", "1855 row \u22121.19%", "1903 \u22121.19%", "1903 row \u22121.19%",
-    "1910 \u22121.19%", "1910 row \u22121.19%", "1915 \u2014", "1915 row \u2014", "1920 \u22121.29%", "1920 row \u22121.33%",
-    "1921 \u22121.20%", "1921 row \u22121.17%"])
+    "1910 \u22121.19%", "1910 row \u22121.19%", "1915 \u2014", "1915 row \u2014", "1920 \u22121.26%", "1920 row \u22121.23%",
+    "1921 \u22121.17%", "1921 row \u22121.17%"])
+  // Pointed at on the 1D chart, which holds Friday through those minutes,
+  // Monday's newest trade reads since Monday's open, as at rest, and a
+  // moment of Friday since Friday's, as before the open.
+  const heldAt1920 = M.carryClose(open("1855", "7203.t.json"), open("1920", "2d/7203.t.json"), calendars, nyAt("1920"))
+  const heldChart = M.viewChart("7203.T", "1D", { "7203.T": heldAt1920 }, {}, {}, {}, {}, calendars).day
+  const sinceOpenAt = t => `${M.rowModel(heldChart, t, "open").changeText} ${M.scrubLegend(heldChart, t, M.exchangeDay(heldChart, nyAt("1920")), calendars, "open", null)}`
+  expect([M.rowModel(heldAt1920, 0, "open").changeText, sinceOpenAt(heldAt1920.points.at(-1).t), sinceOpenAt(Date.UTC(2026, 9, 30, 3, 30) / 1000)])
+    .toEqual(["\u22121.26%", "\u22121.26% OPEN 3,090.00", "\u22121.51% OPEN 3,107.00"])
   // A shell started in those minutes holds no close of Friday's, and no
   // field of Yahoo's answers names it at every open: Tokyo's two-day answer
   // counted from Friday's close, London's below from the close before its
@@ -3075,11 +3089,14 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   const fresh = (time, file, mode = "pct") => M.rowModel(M.carryClose(null, open(time, file), calendars, nyAt(time)), 0, mode).changeText
   expect(["1915", "1920", "1921"].map(time => fresh(time, "2d/7203.t.json"))).toEqual(["\u2014", "\u2014", "\u2014"])
   expect(["1915", "1920"].map(time => fresh(time, "2d/7203.t.json", "open"))).toEqual(["\u2014", "\u22121.26%"])
-  // The lines under the price and the move are left out with it: neither
-  // names a close the shell doesn't hold.
+  // The line under the price is left out with it, naming no close the shell
+  // doesn't hold, and the caption under the dash says the move comes after
+  // the day's first trades. The header's animal stays, as the plain bull:
+  // no move to cheer or mourn.
   const started1915 = M.carryClose(null, open("1915", "2d/7203.t.json"), calendars, nyAt("1915"))
   expect(M.heroLines(started1915, M.rowModel(started1915, 0, "pct"), null, nyAt("1915"), null, calendars, "pct", false))
-    .toEqual({ close: null, caption: { label: "", changeText: "", tone: "flat" } })
+    .toEqual({ close: null, caption: { label: "FIRST TRADES · MOVE SOON", changeText: "", tone: "flat" } })
+  expect(M.headerAnimal(M.rowModel(started1915, 0, "pct"))).toBe("plain")
   let started = null
   const startedRows = []
   for (const time of ["1915", "1920", "1921"]) {
@@ -3088,7 +3105,7 @@ test("at the open the chart moves to the new session, and a listing abroad shows
     started = M.carryClose(started, open(time, (two ? "2d/" : "") + "7203.t.json"), calendars, nyAt(time))
     startedRows.push(`${time} ${two ? "2d" : "1d"} ${M.rowModel(started, 0, "pct").changeText}`)
   }
-  expect(startedRows).toEqual(["1915 2d \u2014", "1920 1d \u2014", "1921 1d \u2014"])
+  expect(startedRows).toEqual(["1915 2d \u2014", "1920 2d \u2014", "1921 2d \u2014"])
   const restarted = M.carryClose(JSON.parse(JSON.stringify(M.carryClose(null, open("1910", "2d/7203.t.json"), calendars, nyAt("1910")))), open("1920", "7203.t.json"), calendars, nyAt("1920"))
   expect(M.rowModel(restarted, 0, "pct").changeText).toBe("\u22120.65%")
   // A one-day answer of Monday before its first trade still reads Friday's move.
@@ -3143,42 +3160,81 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   expect(opening("london", "shel.l", ["0255", "0303", "0310", "0320", "0330"])).toEqual(["0255 3,921.00 \u22122.86%",
     "0303 3,921.00 \u22122.86%", "0310 3,921.00 \u22122.86%", "0320 3,906.50 \u22120.37%", "0330 3,913.00 \u22120.20%"])
   expect([startedAt("london", "shel.l", "0320"), startedAt("london", "shel.l", "0330")]).toEqual(["\u2014", "\u22120.20%"])
+  // While it's left out, the caption and the plain bull, as at Tokyo's; then
+  // the day's move and its animal.
+  const waiting = (place, symbol, time) => {
+    const quote = M.carryClose(null, answerAt(place, time, `2d/${symbol}.json`), calendars, nyOn3(time))
+    const row = M.rowModel(quote, 0, "pct")
+    return [time, M.heroLines(quote, row, null, nyOn3(time), null, calendars, "pct", false).caption.label, M.headerAnimal(row)]
+  }
+  expect([waiting("london", "shel.l", "0320"), waiting("london", "shel.l", "0330")])
+    .toEqual([["0320", "FIRST TRADES · MOVE SOON", "plain"], ["0330", "TODAY", "bear"]])
   // BHP at Sydney's open on Wednesday 4 November, 09:55 to 10:30 there
   // (Tuesday 17:55 to 18:30 New York): Tuesday's move from Monday's 56.74,
   // then Wednesday's from Tuesday's 56.42, Yahoo's own from its first bars.
   // Sydney has no calendar, so a shell started at 10:20 reads Yahoo's.
   expect(opening("sydney", "bhp.ax", ["1755", "1803", "1810", "1820", "1830"])).toEqual(["1755 56.42 \u22120.56%",
-    "1803 56.42 \u22120.56%", "1810 56.42 \u22120.56%", "1820 55.78 \u22121.13%", "1830 55.75 \u22121.19%"])
+    "1803 56.42 \u22120.56%", "1810 56.42 \u22120.56%", "1820 55.78 \u22121.13%", "1830 55.75 \u22121.20%"])
   expect(startedAt("sydney", "bhp.ax", "1820")).toBe("\u22121.13%")
   // At 10:20 there the two-day answer's only bar of Wednesday is Yahoo's
   // echo of its quote at 10:00:03, 55.78, inside the day's range. The day
   // opened at 55.905, Yahoo's 10:00 bar says at 10:30: since the open is
   // left out until then, with a close held or none.
   expect(opening("sydney", "bhp.ax", ["1755", "1803", "1810", "1820", "1830"], "open")).toEqual(["1755 56.42 \u22121.35%",
-    "1803 56.42 \u22121.35%", "1810 56.42 \u22121.35%", "1820 55.78 \u2014", "1830 55.75 \u22120.28%"])
+    "1803 56.42 \u22121.35%", "1810 56.42 \u22121.35%", "1820 55.78 \u2014", "1830 55.75 \u22120.29%"])
   expect([startedAt("sydney", "bhp.ax", "1820", "open"), startedAt("sydney", "bhp.ax", "1830", "open")]).toEqual(["\u2014", "\u22120.29%"])
   // Toyota at Tokyo's open on Wednesday 4 November, 08:55 to 09:20 there
   // (Tuesday 18:55 to 19:20 New York), after Tuesday's holiday: Monday's
-  // move from Friday's 3,070 until Wednesday's first trade. At 09:15 and
-  // 09:20 Yahoo's answers had the quote's time in Wednesday but Monday's
-  // close, 3,051, as the price and Friday's as the close before it, while
+  // move from Friday's 3,070 until Wednesday's first trade. At 09:15
+  // Yahoo's answer had the quote's time in Wednesday but Monday's close,
+  // 3,051, as the price and Friday's as the close before it, while
   // Wednesday's day had traded 3,030 to 3,040: Monday's quote restated, so
-  // the move and the open are left out, never 0.00%. A shell started at
-  // either leaves the move out too. On Monday 2 November the quote's first
-  // price, 3,077, was off Friday's close, inside its day's range, and
-  // between the spark answers' 3,083 and 3,072 that minute.
+  // the move and the open are left out, never 0.00%. By 09:20 its two-day
+  // answer, asked while Wednesday had no bar, counted from Monday's close.
+  // A shell started at either leaves the move out. On Monday 2 November the
+  // quote's first price, 3,077, was off Friday's close, inside its day's
+  // range, and between the spark answers' 3,083 and 3,072 that minute.
   const tokyoTimes = ["1855", "1903", "1910", "1915", "1920"]
   expect(opening("tokyo", "7203.t", tokyoTimes)).toEqual(["1855 3,051.00 \u22120.62%",
-    "1903 3,051.00 \u22120.62%", "1910 3,051.00 \u22120.62%", "1915 3,051.00 \u2014", "1920 3,051.00 \u2014"])
+    "1903 3,051.00 \u22120.62%", "1910 3,051.00 \u22120.62%", "1915 3,051.00 \u2014", "1920 3,048.00 \u22120.10%"])
   expect(opening("tokyo", "7203.t", tokyoTimes, "open")).toEqual(["1855 3,051.00 \u22121.26%",
-    "1903 3,051.00 \u22121.26%", "1910 3,051.00 \u22121.26%", "1915 3,051.00 \u2014", "1920 3,051.00 \u2014"])
+    "1903 3,051.00 \u22121.26%", "1910 3,051.00 \u22121.26%", "1915 3,051.00 \u2014", "1920 3,048.00 \u2014"])
   expect([startedAt("tokyo", "7203.t", "1915"), startedAt("tokyo", "7203.t", "1920")]).toEqual(["\u2014", "\u2014"])
+  // The 1D chart in those minutes, each answer as Stonks asks for it: the
+  // last session as drawn before the open, its dashed line and all, with the
+  // new one's first trades joined after it, the dot at the newest, until the
+  // new one has three bars. One or two alone, scaled to the chart's height,
+  // drew a dot, a line from top to bottom, or, from BHP's close above, a
+  // crash. At the bell the dashed line steps to the close the move counts
+  // from, as at night, where that is known. A shell started in those minutes
+  // drew no dashed line before the open, and draws none for the last
+  // session.
+  const charted = (place, symbol, times, started = false) => {
+    let held = null
+    return times.map(time => {
+      held = M.carryClose(started ? null : held, answerAt(place, time, (started || M.twoDays(held, nyOn3(time), calendars) ? "2d/" : "") + symbol + ".json"),
+        calendars, nyOn3(time))
+      const day = M.viewChart(held.symbol, "1D", { [held.symbol]: held }, {}, {}, {}, {}, calendars).day
+      const weekday = M.WEEKDAYS[M.localClock(day.session.regular.start, day.gmtoffset).weekday]
+      const money = p => M.money(p, day.priceDigits) || "\u2014"
+      const step = M.chartGeometry(day, calendars).step ? money(M.regularClose(day)) : "\u2014"
+      return `${time} ${weekday} ${money(M.dayBase(day))} ${step} ${money(day.points.at(-1).p)}`
+    })
+  }
+  expect(charted("tokyo", "7203.t", ["1910", "1915", "1920"]))
+    .toEqual(["1910 Mon 3,070.00 \u2014 3,051.00", "1915 Mon 3,070.00 \u2014 3,051.00", "1920 Mon 3,070.00 3,051.00 3,048.00"])
+  expect(charted("london", "shel.l", ["0310", "0320", "0330"]))
+    .toEqual(["0310 Mon 4,036.50 \u2014 3,921.00", "0320 Mon 4,036.50 3,921.00 3,906.50", "0330 Tue 3,921.00 \u2014 3,913.00"])
+  expect(charted("sydney", "bhp.ax", ["1810", "1820", "1830"]))
+    .toEqual(["1810 Tue 56.74 \u2014 56.42", "1820 Tue 56.74 56.42 55.78", "1830 Tue 56.74 56.42 55.74"])
+  expect(charted("sydney", "bhp.ax", ["1820", "1830"], true)).toEqual(["1820 Tue \u2014 56.42 55.78", "1830 Tue \u2014 56.42 55.74"])
+  expect(charted("tokyo", "7203.t", ["1915"], true)).toEqual(["1915 Mon \u2014 \u2014 3,051.00"])
   // With no calendar for Tokyo, the close held, Monday's, is from before a
-  // weekday with no session seen, and Yahoo still counts from the close
-  // before it: the move is left out, never −0.62% from Friday's close.
+  // weekday with no session seen, and at 09:15 Yahoo still counts from the
+  // close before it: the move is left out, never −0.62% from Friday's close.
   const noTokyo = { ...calendars, calendars: Object.fromEntries(Object.entries(calendars.calendars).filter(([id]) => id !== "JPX")) }
   expect(opening("tokyo", "7203.t", tokyoTimes, "pct", noTokyo)).toEqual(["1855 3,051.00 \u22120.62%",
-    "1903 3,051.00 \u22120.62%", "1910 3,051.00 \u22120.62%", "1915 3,051.00 \u2014", "1920 3,051.00 \u2014"])
+    "1903 3,051.00 \u22120.62%", "1910 3,051.00 \u22120.62%", "1915 3,051.00 \u2014", "1920 3,048.00 \u22120.10%"])
   // Saudi's exchange trades Sunday to Thursday, 10:00 to 15:00 at UTC+3,
   // with no calendar here. No saved answer is from it, so Toyota's day is
   // moved to Thursday 22 October, closing at 2,856 from 2,900, and to Sunday
@@ -3216,11 +3272,12 @@ test("at the open the chart moves to the new session, and a listing abroad shows
   const echo = answerAt("tokyo", "1915", "2d/7203.t.json")
   const echoDay = M.viewChart("7203.T", "1D", { "7203.T": echo }, {}, {}, {}, {}, calendars).day
   const echoLine = M.dayLine(echo, M.exchangeDay(echo, at("2026-11-03", "19:15")), echoDay).range
-  expect([M.money(Math.max(...echoDay.points.map(p => p.p))), echoLine.lowText, echoLine.highText]).toEqual(["3,051.00", "3,030.00", "3,040.00"])
-  // Friday 30 October at 09:26 there, with Friday's first bars: Friday's
-  // move, from Thursday's close.
+  expect([M.money(echoDay.points.at(-1).p), echoLine.lowText, echoLine.highText]).toEqual(["3,051.00", "3,030.00", "3,040.00"])
+  // Friday 30 October at 09:26 there, with Friday's first two bars: Friday's
+  // move, from Thursday's close, over Thursday's chart, Friday's trades
+  // joined after it.
   const after = M.parseChart(fixture("moments/tokyo-2026-10-30-0926/7203.t.json"), cents)
-  expect([tokyoDate(tokyoDay(after)), M.rowModel(after, 0, "pct").changeText]).toEqual(["2026-10-30", "+0.71%"])
+  expect([tokyoDate(tokyoDay(after)), M.rowModel(after, 0, "pct").changeText]).toEqual(["2026-10-29", "+0.71%"])
 })
 
 test("a two-day answer is read as the headline's session, with the coming day's pre-market after it", () => {
@@ -3401,7 +3458,7 @@ test("a listing Robinhood doesn't trade all day draws Yahoo's day by the clock f
   expect(M.stepTime(bolt, bolt.points[0].t, 3)).toBe(bolt.points[0].t + 15 * 60)
 })
 
-test("a thin US day's quiet spans take their hours, the line joining across them", () => {
+test("a thin US day's quiet spans take their hours, the line holding its last trade across them", () => {
   const set = "gaps-2026-10-21-1006"
   const q = savedDay(set, "vane")
   const allDay = M.parseAllDay(fixture(`moments/${set}/robinhood-instruments.json`), ["VANE"])
@@ -3414,6 +3471,30 @@ test("a thin US day's quiet spans take their hours, the line joining across them
     const [a, b] = [from, to].map(t => line[day.points.findIndex(p => p.t === t)].x)
     expect(b - a).toBeCloseTo((to - from) / (span.end - span.start), 9)
   }
+  // A thin night, weekend or pre-market: across a stretch of more than half
+  // an hour with no trade, the line, and a scrub's dot on it, stand at the
+  // price the scrub reads, the trade before it, and retro lights no column:
+  // a slope would draw trading that never happened. EZ's Friday 19:59 to
+  // Sunday 22:40, TOY's few trades on Sunday night, REED's pre-markets.
+  const sloped = []
+  for (const [set, name] of [["live-2026-10-05", "ez"], ["live-2026-10-05", "toy"], ["night", "reed"], ["day", "reed"]]) {
+    const thin = dayAt(set, name).day
+    const geometry = M.chartGeometry(thin, calendars)
+    const axis = M.chartSpan(thin)
+    const grid = M.retroGrid(geometry, 300, 80, 3, 1)
+    const quiet = thin.points.map((p, k) => k).filter(k => k > 0 && M.clockRoom(axis, thin.points[k].t) - M.clockRoom(axis, thin.points[k - 1].t) > 30 * 60)
+    expect([set, name, quiet.length > 0]).toEqual([set, name, true])
+    for (const k of quiet) {
+      const [a, b] = [geometry.points[k - 1], geometry.points[k]]
+      const mid = (a.x + b.x) / 2
+      const read = M.readingAt(thin, M.timeAtFraction(thin, mid)).price
+      const dot = M.yAt(geometry.points, mid)
+      if (Math.abs(dot - (1 - (read - geometry.lo) / (geometry.hi - geometry.lo))) > 1e-9) sloped.push(`${set} ${name} dot off ${read} at ${M.timeAtFraction(thin, mid)}`)
+      for (let c = M.retroColumn(grid, a.x) + 1; c < M.retroColumn(grid, b.x); c++)
+        if (grid.levels[c] !== undefined) sloped.push(`${set} ${name} column ${c} lit between ${thin.points[k - 1].t} and ${thin.points[k].t}`)
+    }
+  }
+  expect(sloped).toEqual([])
 })
 
 test("a night's chart on each saved moment: its span, its trades, and what a scrub of it reads", () => {
@@ -3701,14 +3782,17 @@ test("a screenshot's foot says when its price is from, a close as the close, and
   const weekHistory = M.parseHistory(fixture("history/nbis-2026-10-26-2005-5d.json"), "1W")
   expect([null, weekHistory].map(history => Share.words({ quote: tops.quotes.NBIS, day: nbis.day, history, latest: nbis.latest,
     newest: tops.newest.NBIS, scrubT: 0, calendars }).foot)).toEqual(["MON 26 OCT 2026 · 17:58 EDT", "MON 26 OCT 2026 · 17:58 EDT"])
-  // Since the open, the picture says the open its move counts from, which
-  // the panel says under its ranges, at rest and scrubbed into the session;
-  // not where the move counts from a close, nor at night, where the day
-  // ahead hasn't opened and the move is a dash.
+  // Since the open, the picture at rest says the open its move counts from,
+  // which the panel says under its ranges; not where the move counts from a
+  // close, nor at night, where the day ahead hasn't opened and the move is a
+  // dash. Scrubbed into the session, the panel's legend and the picture's
+  // name that open, where from a close they name the dashed line.
   const openOf = (at, built, s, mode, scrubT = 0) => Share.words({ quote: at.quotes[s], day: built.day, history: null, latest: built.latest,
     newest: at.newest[s] || null, scrubT, changeMode: mode, calendars }).open
   const noon = at("2026-10-26", "12:00")
   expect([openOf(tops, nbis, "NBIS", "open"), openOf(tops, nbis, "NBIS", "open", noon), openOf(tops, nbis, "NBIS", "pct")])
-    .toEqual([{ label: "OPEN", price: "153.97" }, { label: "OPEN", price: "153.97" }, null])
+    .toEqual([{ label: "OPEN", price: "153.97" }, null, null])
+  const legend = mode => M.scrubLegend(nbis.day, noon, M.exchangeDay(nbis.day, at("2026-10-26", "18:00")), calendars, mode, tops.newest.NBIS || null)
+  expect([legend("open"), legend("pct")]).toEqual(["OPEN 153.97", "┄ FRI CLOSE 158.74"])
   expect(openOf(topsAt("watch-2026-10-27-0350"), dayAt("watch-2026-10-27-0350", "nbis"), "NBIS", "open")).toBeNull()
 })

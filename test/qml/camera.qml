@@ -248,6 +248,19 @@ Harness {
             && scrubbed.name !== rest.name,
           problems.join("; ") + " | " + scrubbed.card.foot + " | " + scrubbed.footer)
 
+        // Since the open, still scrubbed: the picture says what the move
+        // counts from in the words the panel's legend says it.
+        var mode = service.changeMode
+        for (var press = 0; press < 3 && service.changeMode !== "open"; press++) keyClick(Qt.Key_C)
+        keyClick(Qt.Key_Left)
+        tryVerify(function() { return body.changeMode === "open" && body.scrubT !== 0 }, 2000)
+        var legend = body.baselineText
+        var opened = shoot(body, function() { keyClick(Qt.Key_C, Qt.ControlModifier) })
+        var said = opened.card.texts || []
+        check("since the open, a scrubbed picture names what its move counts from as the panel's legend does",
+          opened.card.scrubT === body.scrubShown && legend !== "" && said.indexOf(legend) >= 0, legend + " against " + said.join(" | "))
+        for (press = 0; press < 3 && service.changeMode !== mode; press++) keyClick(Qt.Key_C)
+
         // Lit through the close's fade, and out when the panel opens again;
         // the wait lets the fade end.
         panel.close()

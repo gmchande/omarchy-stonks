@@ -4,8 +4,10 @@
 #
 # Left out, because they can't run here:
 # - QML lint (test/lint.sh): it lints against the installed shell's QML.
-# - The Quickshell harnesses (test/qml/*.sh): they need Quickshell and a
-#   Wayland session.
+# - The walks through the real plugin (test/qml/*.sh): they draw offscreen,
+#   but need Quickshell, Omarchy's shell QML and, for most of them, the
+#   private saved answers. Qt's GTK theme, which they take, still needs a
+#   display to start.
 # - The font's glyphs (test/font.js): it reads the installed JetBrainsMono
 #   Nerd Font.
 #

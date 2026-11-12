@@ -50,8 +50,8 @@ Item {
     root.look()
   }
 
-  // A series not yet sent for a symbol no longer wanted goes; one sent still
-  // lands.
+  // A request not yet sent for a symbol no longer wanted goes, a cap's close
+  // as `receive` drops it; one sent still lands.
   function look() {
     var still = failed.filter(root.wants)
     if (still.length !== failed.length) root.failed = still
@@ -62,7 +62,10 @@ Item {
     var pairsStill = failedPairs.filter(function(pair) { return needed.indexOf(pair) >= 0 })
     if (pairsStill.length !== failedPairs.length) root.failedPairs = pairsStill
     if (job) {
-      if (pendingUrl && job.step === "series" && !root.wants(job.symbol)) root.done()
+      if (pendingUrl && !root.wants(job.symbol)) {
+        if (job.step === "close") root.fail(job.symbol)
+        else root.done()
+      }
       return
     }
     var next = wanted.filter(root.due)[0]
@@ -127,16 +130,20 @@ Item {
       root.fail(job.symbol)
     } else if (step === "series" && read.cap) {
       root.job = Object.assign({}, job, { step: "close", fundamentals: read })
-      root.run(Fundamentals.capCloseUrl(job.symbol, read))
+      // Off screen by now: the EPS stands, and the cap waits for the next
+      // ask.
+      if (root.wants(job.symbol)) root.run(Fundamentals.capCloseUrl(job.symbol, read))
+      else root.fail(job.symbol)
     } else {
       root.keep(job.symbol, { status: "ok", fundamentals: read, checkedAt: clock.wallSecond() })
       root.askRate(read)
     }
   }
 
+  // A stock off screen by now waits for its next ask for the rate.
   function askRate(fundamentals) {
     var pair = Fundamentals.ratePair(fundamentals, job.currency)
-    if (Fundamentals.rateHeld(pair, rates, failedPairs, clock.wallSecond())) {
+    if (!root.wants(job.symbol) || Fundamentals.rateHeld(pair, rates, failedPairs, clock.wallSecond())) {
       root.done()
       return
     }

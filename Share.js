@@ -85,10 +85,11 @@ function barDate(history, bar) {
 //   foot: when the price on top is from, with its date, since the picture
 //   outlives the reader's clock: WED 7 OCT 2026 · 00:50 EDT, a close as
 //   CLOSE 16:00 EDT, and a range's bar by its own date;
-//   open: since the open on the day, the open the move counts from, which
-//   the panel says under its ranges and the picture has no room for, in
-//   place of the line under the price: OPEN 153.97. Null where the move
-//   doesn't count from an open, or the open isn't known;
+//   open: at rest since the open on the day, the open the move counts
+//   from, which the panel says under its ranges and the picture has no
+//   room for, in place of the line under the price: OPEN 153.97. Null
+//   where the move doesn't count from an open, or the open isn't known,
+//   and for a scrub, whose legend says it as the panel's does;
 //   currency: none beside an index's level, which isn't money;
 //   start, end: the day's axis's ends;
 //   said: the moment in the notification's words.
@@ -97,8 +98,8 @@ function words(o) {
   var at = moment(o)
   var out = { foot: "", open: null, start: "", end: "", said: "",
     currency: quote.instrumentType === "INDEX" ? "" : Figures.currencyLabel(String(quote.currency || "")) }
-  if (o.changeMode === "open" && !o.history) {
-    var base = o.scrubT ? Figures.scrubbedBase(o.day, o.scrubT, o.newest || null) : Quote.restingRead(quote, o.newest || null).base
+  if (o.changeMode === "open" && !o.history && !o.scrubT) {
+    var base = Quote.restingRead(quote, o.newest || null).base
     if (Format.isFiniteNumber(base.dayOpen)) out.open = { label: "OPEN", price: Format.money(base.dayOpen, quote.priceDigits) }
   }
   if (at.bar) {

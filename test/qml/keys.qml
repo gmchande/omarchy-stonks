@@ -85,7 +85,11 @@ Harness {
   QtObject {
     id: shellApi
     function serviceFor(id) { return { service: service, updates: updates, camera: camera } }
+    function updateEntryInline(id, settings) { harness.entrySaves++; return true }
   }
+  // The pill the panel opened from, and its bar entry's saves.
+  property int entrySaves: 0
+  Stonks.BarWidget { id: pill; bar: api; moduleName: "grvc.stonks"; settings: ({ id: "grvc.stonks", barStyle: "sparkline" }) }
   PluginBarApi {
     id: api
     pluginId: "grvc.stonks"
@@ -95,7 +99,7 @@ Harness {
     fontFamily: Style.font.family
     _switchPanelFrom: function(owner, direction) { harness.tabs++; harness.tabDirection = direction; return true }
   }
-  Stonks.Panel { id: panel; bar: api; settings: ({}) }
+  Stonks.Panel { id: panel; bar: api; settings: ({}); hostWidget: pill }
   Stonks.App { id: app; service: service; updates: updates; camera: camera }
 
   // Each surface's body is built as it first opens: read it as it is now.
@@ -130,7 +134,8 @@ Harness {
         cursor: b.watchlist.cursorRow, scrub: b.scrubT, replay: b.motion.replayRunning,
         adding: b.adding, menu: b.listMenuOpen, managing: b.managingLists, listsSymbol: b.listsSymbol,
         help: b.showingHelp, open: b.surfaceOpen, refreshes: harness.sparks(), tabs: harness.tabs, direction: harness.tabDirection,
-        sounds: service.soundsOn, camera: b.cameraLit, rowMenu: b.rowMenu ? b.rowMenu.symbol : "", updates: harness.updateRuns() }
+        sounds: service.soundsOn, camera: b.cameraLit, rowMenu: b.rowMenu ? b.rowMenu.symbol : "", updates: harness.updateRuns(),
+        pill: pill.barStyle, entrySaves: harness.entrySaves }
     }
 
     // Every key starts from here: the surface open on All, manual order, the
@@ -247,7 +252,11 @@ Harness {
         changed = ["reversed", "cursor"]
         effect = function() { return service.reversed === !before.reversed }
       } else if (token === "w") { changed = ["menu"]; effect = function() { return b.listMenuOpen } }
-      else if (token === "Ctrl+⏎") { changed = ["listsSymbol"]; effect = function() { return b.listsSymbol === selected } }
+      else if (token === "b") {
+        changed = ["pill", "entrySaves"]
+        var form = {sparkline:"arrow", arrow:"text", text:"icon", icon:"sparkline"}[before.pill]
+        effect = function() { return pill.barStyle === form && harness.entrySaves === before.entrySaves + 1 }
+      } else if (token === "Ctrl+⏎") { changed = ["listsSymbol"]; effect = function() { return b.listsSymbol === selected } }
       else if (token === "Shift+U") { changed = ["updates"]; effect = function() { return harness.updateRuns() === before.updates + 1 } }
       else if (token === "c") {
         changed = ["mode"]
@@ -476,6 +485,11 @@ Harness {
       // The window has no bar to step through; a Tab there must leave the
       // keys with the window.
       base(harness.window)
+      var still = state(harness.window.body)
+      press("b")
+      harness.check("in the window, b leaves the pill's form alone",
+        !within(200, function() { return JSON.stringify(state(harness.window.body)) !== JSON.stringify(still) }),
+        pill.barStyle + " " + harness.entrySaves)
       press("Tab")
       press("o")
       harness.check("in the window, after Tab a key still does its action",

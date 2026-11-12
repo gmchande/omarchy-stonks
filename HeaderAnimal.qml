@@ -10,10 +10,11 @@ Item {
   id: root
   objectName: "animal"
 
-  // `kind` is "bull", "bear" or "" (a flat day, or no direction yet), and
-  // `chart` what it reads: a turn on the same chart crossfades in smooth, any
-  // other change is at once. `asleep` is its market resting; `bell`, that the
-  // clock alone changed that, so the eyes close or open over 320 ms;
+  // `kind` is "bull", "bear", "plain" (no move known yet: the bull in plain
+  // ink) or "" (a flat day), and `chart` what it reads: a turn on the same
+  // chart crossfades in smooth, any other change is at once. `asleep` is its
+  // market resting; `bell`, that the clock alone changed that, so the eyes
+  // close or open over 320 ms;
   // `scrubbed`, that a scrub has it awake, so the sleep after it is no bell.
   property var animal: ({ kind: "", chart: "", asleep: false, bell: false, scrubbed: false })
   property Look look
@@ -89,7 +90,7 @@ Item {
     var k = animal ? animal.kind : ""
     shownChart = animal ? animal.chart : ""
     turn.stop()
-    turnBull.to = k === "bull" ? 1 : 0
+    turnBull.to = k === "bull" || k === "plain" ? 1 : 0
     turnBear.to = k === "bear" ? 1 : 0
     if (fade && !look.retro) turn.start()
     else {
@@ -139,7 +140,7 @@ Item {
     anchors.fill: parent
     visible: opacity > 0
     pixels: Cells.spriteFor(true, root.drawnLids, root.pricked)
-    color: root.look.upColor
+    color: root.kind === "plain" ? root.look.dim : root.look.upColor
   }
   PixelSprite {
     id: bear
@@ -155,9 +156,10 @@ Item {
     NumberAnimation { id: turnBear; target: bear; property: "opacity"; duration: Motion.duration(Style, 160); easing.type: Easing.Bezier; easing.bezierCurve: Motion.curve(Style) }
   }
 
+  // The plain bull has no move to replay.
   MouseArea {
     anchors.fill: parent
-    enabled: root.kind !== ""
+    enabled: root.kind === "bull" || root.kind === "bear"
     hoverEnabled: true
     cursorShape: Qt.PointingHandCursor
     onClicked: root.replayRequested()

@@ -22,7 +22,9 @@ Item {
   // naming what's coming (`ChartMotion.dimmed`): a veil of the ground over each
   // piece, to 0.6, as if each faded to 0.4 with no layer to flatten first.
   property real dimmed: 0
-  property string loadingText: ""
+  // On the chart: while the next one is on its way, over the dimmed one,
+  // what's coming; with no price at all, why none comes.
+  property string waitingText: ""
   readonly property color veil: Util.alpha(look.ground, 0.6 * dimmed)
   // A new one ripples the live dot, and blinks retro's cap.
   readonly property string newestPrice: root.day && root.day.points && root.day.points.length
@@ -197,18 +199,18 @@ Item {
         color: root.veil
       }
 
-      // With no name, as while Yahoo sends nothing, it says nothing.
       Text {
         anchors.centerIn: parent
         width: Math.min(implicitWidth, parent.width)
-        visible: root.held && root.dimmed > 0 && root.loadingText !== ""
-        opacity: root.dimmed
+        visible: root.waitingText !== "" && (!root.held || root.dimmed > 0)
+        opacity: root.held ? root.dimmed : 1
         textFormat: Text.PlainText
-        text: root.loadingText + "…"
+        text: root.waitingText
         color: root.look.foreground
         font.family: root.look.fontFamily
         font.pixelSize: Style.font.body
-        elide: Text.ElideRight
+        horizontalAlignment: Text.AlignHCenter
+        wrapMode: Text.Wrap
       }
 
       // A day with one bar or none says so on a patch of the ground, which

@@ -759,6 +759,10 @@ test("membership across several lists", () => {
   const offGrowth = M.withMembership(library({ list: "Growth" }), "BO", "Growth", false, ["BO", "IRIS"])
   expect([offGrowth.symbols, offGrowth.lists.map(list => list.symbols)])
     .toEqual([["NEST", "BO", "IRIS", "SPY"], [["NEST", "BO"], ["IRIS"]]])
+  // The stock on the chart leaving the list shown hands the chart to the
+  // next row there, as in All; leaving another list keeps it on the chart.
+  expect(M.withMembership(library({ list: "Growth", featured: "BO" }), "BO", "Growth", false, ["BO", "IRIS"]).featured).toBe("IRIS")
+  expect(M.withMembership(library({ list: "My Watchlist", featured: "BO" }), "BO", "Growth", false, ["NEST", "BO"]).featured).toBe("BO")
   const offAll = M.withMembership(library(), "BO", "", false, ["BO", "NEST", "IRIS", "SPY"])
   expect([offAll.symbols, offAll.lists.map(list => list.symbols)])
     .toEqual([["NEST", "IRIS", "SPY"], [["NEST"], ["IRIS"]]])
@@ -834,9 +838,12 @@ test("undo puts a removed stock back at its place in All and in each list that h
   expect(heroOut.featured).toBe("BO")
   expect(M.withRemovalUndone(heroOut, before, "NEST", heroOut.featured).featured).toBe("NEST")
   expect(M.withRemovalUndone(M.fileSettings({ ...heroOut, featured: "SPY" }), before, "NEST", heroOut.featured).featured).toBe("SPY")
-  // Out of one list only, it goes back into that list at its place.
-  const offGrowth = M.withMembership(library({ list: "Growth" }), "BO", "Growth", false, ["BO", "IRIS"])
-  expect(M.withRemovalUndone(offGrowth, library({ list: "Growth" }), "BO", offGrowth.featured).lists[1].symbols).toEqual(["BO", "IRIS"])
+  // Out of one list only, it goes back into that list at its place, and to
+  // the chart if it was there.
+  const growth = library({ list: "Growth", featured: "BO" })
+  const offGrowth = M.withMembership(growth, "BO", "Growth", false, ["BO", "IRIS"])
+  const growthBack = M.withRemovalUndone(offGrowth, growth, "BO", offGrowth.featured)
+  expect([growthBack.lists[1].symbols, growthBack.featured]).toEqual([["BO", "IRIS"], "BO"])
 })
 
 test("the rule under the list name counts up, flat, and down as the rows' tones read them, and a row with no quote as none", () => {
@@ -1046,7 +1053,7 @@ test("a letter says its key and Shift, never its text's case, and nothing held w
   expect(typed({ key: 63, modifiers: SHIFT, text: "?" })).toBe("?")
 })
 
-test("a stock's day is asked for two days from its pre-market until the bell, and past it until it trades, when Yahoo's day no longer holds the last session", () => {
+test("a stock's day is asked for two days from its pre-market until the bell, and past it until it trades, abroad until its third bar, when Yahoo's day no longer holds the last session", () => {
   const stock = { symbol: "X", exchange: "NASDAQ", instrumentType: "EQUITY", crypto: false, points: [{ t: at("2026-10-23", "04:05"), p: 1 }] }
   const two = (q, date, clock) => M.twoDays(q, at(date, clock), calendars)
   // Friday 23 October: one day through the night, which still holds
@@ -1066,11 +1073,15 @@ test("a stock's day is asked for two days from its pre-market until the bell, an
   expect(two({ ...stock, symbol: "BTC-USD", exchange: "CRYPTO", instrumentType: "CRYPTOCURRENCY", crypto: true }, "2026-10-24", "03:00")).toBe(true)
   // London has no pre-market: two days from its open, Monday 26 October at
   // 08:00 GMT, 04:00 New York, until the quote holds a trade of the session,
-  // which Yahoo sends a quarter of an hour late.
+  // which Yahoo sends a quarter of an hour late, and on until it has three
+  // five-minute bars, while the chart holds Friday; a listing that trades
+  // less, until an hour after the open.
   const london = { ...stock, symbol: "SHEL.L", exchange: "LSE", points: [{ t: at("2026-10-23", "11:30"), p: 1 }] }
   expect(["03:59", "04:00", "04:15", "12:30"].map(c => two(london, "2026-10-26", c))).toEqual([false, true, true, false])
-  const traded = { ...london, points: [...london.points, { t: at("2026-10-26", "04:00"), p: 1 }] }
-  expect(two(traded, "2026-10-26", "04:20")).toBe(false)
+  const session = { regular: { start: at("2026-10-26", "04:00"), end: at("2026-10-26", "12:30") } }
+  const traded = (...clocks) => ({ ...london, session, points: clocks.map(c => ({ t: at("2026-10-26", c), p: 1 })) })
+  expect([two(traded("04:00", "04:05"), "2026-10-26", "04:20"), two(traded("04:00", "04:05", "04:10"), "2026-10-26", "04:20"),
+    two(traded("04:00"), "2026-10-26", "04:59"), two(traded("04:00"), "2026-10-26", "05:00")]).toEqual([true, false, true, false])
   // Sydney has no calendar: Yahoo's current period says when it opens.
   const sydney = { ...stock, symbol: "BHP.AX", exchange: "ASX", points: [], current: { regular: { start: at("2026-10-25", "19:00"), end: at("2026-10-26", "01:00") } } }
   expect(["18:59", "20:05"].map(c => two(sydney, "2026-10-25", c))).toEqual([false, true])
@@ -1465,12 +1476,12 @@ test("a quote run charts the featured stock's quote first and the other charted 
   // Each run asks its own kind, a first answer (none yet, or a quote kept
   // from an earlier session) or a refresh, never one waiting after a bad
   // answer or out on a run; a day waiting to be judged goes only when its
-  // own refresh isn't asked anyway.
+  // own refresh isn't asked anyway, and only for a stock a screen shows.
   const entries = { R: answered(1), C: answered(1), K: { status: "saved", receivedAt: 1, answeredAt: 0 } }
   const waiting = { N: 1, K: 1, R: 1, C: 1 }
   expect(M.runWaiting(["N", "K", "R", "C", "X"], waiting, entries, true, [])).toEqual(["N", "K"])
   expect(M.runWaiting(["N", "K", "R", "C", "X"], waiting, entries, false, ["C"])).toEqual(["R"])
-  expect(M.runJudging(["R", "J", "H"], waiting, ["H"])).toEqual(["J"])
+  expect(M.runJudging(["R", "J", "H", "U"], waiting, ["H"], ["R", "J", "H"])).toEqual(["J"])
   // A charted stock whose quote came from spark, with no opens, is asked for its
   // chart, but not again at once after its chart failed.
   const sparked = { H: { closesOnly: true }, C: {} }
@@ -1543,20 +1554,31 @@ test("a host that gives no answer is left alone 2 s, doubling to a minute; then 
   expect(letThrough(M.gateRetriedNow(gate, gate.filledAt + 1), 5, gate.filledAt + 1)).toBe(1)
 })
 
-test("a host that refuses is left alone as long as it asks, else a minute, doubling, and never over half an hour, give or take a fifth; r doesn't hurry it", () => {
-  const refused = (gate, now, retryAfter) => heard(gate, ["ok", "refused"], now, retryAfter).gate
+test("a host that refuses is left alone as long as it asks or up to a fifth longer, else a minute, doubling until it answers again, and never over 36 minutes; r doesn't hurry it", () => {
+  const refused = (gate, now, retryAfter, spread = 0.5) => M.gateAfterAnswers(gate, ["ok", "refused"], retryAfter, gate.pauses, now, spread).gate
   const open = M.openGate(80)
-  expect([refused(open, 1000, 120), refused(open, 1000, 0), refused(open, 1000, 7 * 86400)].map(gate => gate.pausedUntil - 1000)).toEqual([120, 60, 1800])
+  // Never sooner than it asks, and a fifth longer at most, so installs don't
+  // all come back at once.
+  expect([0, 1].map(spread => [120, 7 * 86400].map(asks => refused(open, 1000, asks, spread).pausedUntil - 1000))).toEqual([[120, 1800], [144, 2160]])
   // Each refusal of the lone request doubles the minute.
+  const lone = gate => M.takenFromGate(gate, yahoo, 1, false, gate.pausedUntil).gate
   var gate = refused(open, 1000, 0)
   const waits = []
   for (var i = 0; i < 6; i++) {
-    gate = refused(M.takenFromGate(gate, yahoo, 1, false, gate.pausedUntil).gate, gate.pausedUntil, 0)
+    gate = refused(lone(gate), gate.pausedUntil, 0)
     waits.push(gate.pausedUntil - gate.filledAt)
   }
   expect(waits).toEqual([120, 240, 480, 960, 1800, 1800])
-  // A fifth either way, so installs don't all come back at once.
-  expect([0, 1].map(spread => M.gateAfterAnswers(open, ["refused"], 0, 0, 1000, spread).gate.pausedUntil - 1000)).toEqual([48, 72])
+  // Its own minute, a fifth either way.
+  expect([0, 1].map(spread => refused(open, 1000, 0, spread).pausedUntil - 1000)).toEqual([48, 72])
+  // No answer between refusals pauses 2 s and keeps their count; only an
+  // answer starts it again.
+  const twice = refused(lone(refused(open, 1000, 0)), 1060, 0)
+  const silent = heard(lone(twice), ["none"], twice.pausedUntil).gate
+  expect(silent.pausedUntil - twice.pausedUntil).toBe(2)
+  expect(refused(lone(silent), silent.pausedUntil, 0).pausedUntil - silent.pausedUntil).toBe(240)
+  const answered = heard(lone(silent), ["ok"], silent.pausedUntil).gate
+  expect(refused(answered, silent.pausedUntil + 10, 0).pausedUntil - silent.pausedUntil - 10).toBe(60)
   // The host asked for fewer requests: r leaves its pause alone.
   expect(M.gateRetriedNow(gate, gate.filledAt + 1)).toEqual(gate)
 })
@@ -1572,16 +1594,16 @@ test("only the request sent alone after a pause speaks for the host: answers to 
   // With the lone request out, such an answer lets no second one through.
   const lone = M.takenFromGate(paused, yahoo, 1, false, paused.pausedUntil).gate
   expect(letThrough(heard(lone, ["ok"], paused.pausedUntil, 0, open.pauses).gate, 1, paused.pausedUntil)).toBe(0)
-  // A refusal while no answer came, or the other way, starts its own count.
+  // A refusal after no answer is the first refusal.
   const silent = heard(open, ["none"], 1000).gate
   expect(heard(M.takenFromGate(silent, yahoo, 1, false, 1002).gate, ["refused"], 1002).gate.pausedUntil - 1002).toBe(60)
 })
 
-test("Robinhood is asked once for each stock the pill shows with nothing open by day, for it alone each 5 minutes while a night trades, and for every US listing while a surface is open, the chart waited on alone first", () => {
+test("Robinhood is asked once for each stock the pill shows with nothing open by day, for it alone each 5 minutes while a night trades, and while a surface is open for the stock on show, a preview and the US rows in sight, the chart waited on alone first", () => {
   const now = at(WED, "21:00")
   const base = {
     open: false, pill: true, featured: "AAPL", quoteEntries: { AAPL: answered(now) }, quotes: {}, overnightSymbols: ["AAPL", "MSFT"],
-    allSymbols: ["AAPL", "MSFT", "SHEL.L"], preview: "", previewShown: false, previewQuote: null, allDay: {}, nights: {}, now, calendars
+    allSymbols: ["AAPL", "MSFT", "SHEL.L"], inSight: [], preview: "", previewShown: false, previewQuote: null, allDay: {}, nights: {}, now, calendars
   }
   const asks = changes => M.overnightAsks({ ...base, ...changes })
   // Nothing open by day: the pill's stock alone, once Yahoo has answered it
@@ -1614,11 +1636,12 @@ test("Robinhood is asked once for each stock the pill shows with nothing open by
   // a night trades, Robinhood is never asked about it.
   const index = { featured: "^GSPC", quoteEntries: { "^GSPC": answered(now) } }
   expect([asks({ ...index, now: noon }), asks(index)]).toEqual([null, null])
-  // A surface open: every US listing, the pill's alone while it has no
-  // answer.
-  expect(asks({ open: true })).toEqual({ tradability: ["AAPL"], trades: ["AAPL"] })
-  const pillAnswered = ago => ({ open: true, allDay: { AAPL: { status: "ok", allDay: true, at: now - 60 } }, nights: { AAPL: { status: "ok", at: now - ago } } })
+  // A surface open: the stock on show and the rows in sight, the pill's
+  // alone while it has no answer; a row out of sight waits.
+  expect(asks({ open: true, inSight: ["MSFT"] })).toEqual({ tradability: ["AAPL"], trades: ["AAPL"] })
+  const pillAnswered = ago => ({ open: true, inSight: ["MSFT"], allDay: { AAPL: { status: "ok", allDay: true, at: now - 60 } }, nights: { AAPL: { status: "ok", at: now - ago } } })
   expect(asks(pillAnswered(60))).toEqual({ tradability: ["MSFT"], trades: ["MSFT"] })
+  expect(asks({ ...pillAnswered(60), inSight: [] })).toBe(null)
   // Trades asked 3 minutes ago go with those due, within half of a night's
   // 5 minutes.
   expect(asks(pillAnswered(180)).trades).toEqual(["AAPL", "MSFT"])
@@ -1631,9 +1654,11 @@ test("Robinhood is asked once for each stock the pill shows with nothing open by
   const nvda = { preview: "NVDA", previewShown: true, previewQuote: { symbol: "NVDA", exchange: "NASDAQ", instrumentType: "EQUITY" } }
   expect(asks({ ...pillAnswered(60), ...nvda })).toEqual({ tradability: ["NVDA"], trades: ["NVDA"] })
   expect(asks({ ...pillAnswered(60), ...nvda, previewShown: false })).toEqual({ tradability: ["MSFT"], trades: ["MSFT"] })
-  // A preview already in All is asked as its row, not first; Toronto's never.
+  // A preview already in All is asked as its row, in sight or not, not
+  // first; Toronto's never.
   const inAll = { ...pillAnswered(60), ...nvda, allSymbols: [...base.allSymbols, "NVDA"], overnightSymbols: ["AAPL", "MSFT", "NVDA"] }
   expect(asks(inAll)).toEqual({ tradability: ["MSFT", "NVDA"], trades: ["MSFT", "NVDA"] })
+  expect(asks({ ...inAll, inSight: [] })).toEqual({ tradability: ["NVDA"], trades: ["NVDA"] })
   const toronto = { preview: "SHOP.TO", previewShown: true, previewQuote: { symbol: "SHOP.TO", exchange: "TOR", instrumentType: "EQUITY" } }
   expect(asks({ ...pillAnswered(60), ...toronto })).toEqual({ tradability: ["MSFT"], trades: ["MSFT"] })
 })
@@ -1647,16 +1672,18 @@ test("a refresh's chart is owed until a new answer replaces the one it had, then
   expect(M.chartsOnShow(["window"], "AAPL", "NVDA", "window", false)).toEqual([])
   expect(M.chartsOnShow([], "AAPL", "", null, false)).toEqual([])
   expect(M.historyCharts(charts, "1D")).toEqual([])
-  const both = { "AAPL|1W": { status: "ok", history: {} }, "NVDA|1W": { status: "ok", history: {} } }
+  const both = { "AAPL|1W": { status: "ok", history: {}, answeredAt: 0 }, "NVDA|1W": { status: "ok", history: {}, answeredAt: 0 } }
   expect(M.nextHistory(charts, "1W", both, {})).toBe(null)
   expect(M.nextHistory(charts, "1W", { "AAPL|1W": both["AAPL|1W"] }, {})).toEqual({ symbol: "NVDA", force: false })
   // A failed answer is an answer: only a refresh asks for it again.
   expect(M.nextHistory(charts, "1W", { "AAPL|1W": { status: "failed" }, "NVDA|1W": both["NVDA|1W"] }, {})).toBe(null)
   // A refresh owes both, fetched fresh in turn; a failed answer settles one
   // as a good one does.
-  const owing = M.historyOwing(charts, "1W", both)
+  const owing = M.historyOwing(charts, "1W", both, 60)
   expect(M.nextHistory(charts, "1W", both, owing)).toEqual({ symbol: "AAPL", force: true })
   expect(M.nextHistory(charts, "1W", { ...both, "AAPL|1W": { status: "failed" } }, owing)).toEqual({ symbol: "NVDA", force: true })
+  // A second refresh owes nothing for a chart answered under 10 s ago.
+  expect(M.historyOwing(charts, "1W", { ...both, "AAPL|1W": { ...both["AAPL|1W"], answeredAt: 55 } }, 60)).toEqual({ "NVDA|1W": both["NVDA|1W"] })
   // Left on show, the first hero whose range has grown old is asked again,
   // by the preview's quote where only it has one.
   const noon = at(WED, "12:00")

@@ -9,7 +9,8 @@ Item {
   id: root
 
   property var symbols: []
-  // The members refreshes are owed for; first answers always stay.
+  // The members refreshes and judging charts are owed for; first answers
+  // always stay.
   property var watched: []
   property string featured: ""
   // The featured stock and a resting preview: each goes on a chart, for its
@@ -189,7 +190,7 @@ Item {
     if (applying || (first ? firstRun : refreshRun).length > 0) return
     var held = retrying.concat(firstRun, refreshRun)
     var waiting = Asks.runWaiting(symbols, asked, entries, first, held)
-    var judging = first ? [] : Asks.runJudging(toJudge, asked, held)
+    var judging = first ? [] : Asks.runJudging(toJudge, asked, held, watched)
     if ((waiting.length === 0 && judging.length === 0) || (mayAsk && !mayAsk())) return
     var coins = waiting.filter(function(s) { return !!quotes[s] && !!quotes[s].crypto })
     var requests = Asks.quoteRequests(waiting, asked, reading ? reading() : symbols, featured, charted, bulk, coins)

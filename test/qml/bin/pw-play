@@ -2,9 +2,11 @@
 # A stand-in for pw-play, first on PATH inside the walks, so no walk ever
 # plays a sound. It plays nothing and takes as long as the sound would: its
 # 16-bit mono data after the 44-byte header, at the rate the header names.
+# Each file it is given goes on a line of STONKS_FAKE_STATE/played.
 sleeper=""
 trap '[ -n "$sleeper" ] && kill "$sleeper" 2> /dev/null; exit 0' TERM INT
 file="${!#}"
+echo "$file" >> "$STONKS_FAKE_STATE/played"
 size=$(stat -c %s "$file" 2> /dev/null || echo 44)
 rate=$(od -An -t u4 -j 24 -N 4 "$file" 2> /dev/null | tr -d ' ')
 sleep "$(awk -v s="$size" -v r="${rate:-48000}" 'BEGIN { printf "%.3f", (s - 44) / 2 / (r > 0 ? r : 48000) }')" &

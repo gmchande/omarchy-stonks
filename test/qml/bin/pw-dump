@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
 # A stand-in for pw-dump, first on PATH inside the walks: a PipeWire with
-# no nodes, so no app is recording from a microphone.
+# no nodes, so no app is recording from a microphone. It answers after the
+# seconds STONKS_FAKE_STATE/pw-dump.delay holds, if a step wrote one.
+sleep "$(cat "$STONKS_FAKE_STATE/pw-dump.delay" 2> /dev/null || echo 0)"
 echo "[]"

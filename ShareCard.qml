@@ -33,7 +33,7 @@ Rectangle {
   property int now: 0
   property var calendars: null
   property bool retro: false
-  // "bull", "bear", or "" on a flat day.
+  // "bull", "bear", "plain" while no move is known, or "" on a flat day.
   property string animalKind: ""
   property bool asleep: false
   property color foreground: Commons.Color.foreground
@@ -60,14 +60,11 @@ Rectangle {
   readonly property var words: quote && day ? Share.words({ quote: quote, day: day, history: history, latest: latest,
     newest: view ? view.newest : null, scrubT: scrubT, changeMode: changeMode, calendars: calendars }) : null
   readonly property var lines: Figures.heroLines(quote, view, latest, now, day, calendars, changeMode, scrubT !== 0)
-  // Since the open, the open the move counts from takes the line under the
-  // price, at rest and scrubbed (`Share.words`).
+  // At rest since the open, the open the move counts from takes the line
+  // under the price (`Share.words`).
   readonly property var open: words && words.open ? words.open : null
-  // A scrub's move counts from the line under the pointer, named as the
-  // panel names it.
-  readonly property string legend: !scrubT || !quote || open ? ""
-    : history ? "┄ " + String(range).toUpperCase() + " START " + Format.money(history.baseline, quote.priceDigits)
-    : day ? "┄ " + Figures.scrubBaselineText(day, scrubT, Figures.exchangeDay(day, now), calendars) : ""
+  // A scrub's legend, as the panel says it (`StonksBody.baselineText`).
+  property string legend: ""
   readonly property var shownDay: Share.pictureDay(day)
   readonly property var geometry: history ? History.historyGeometry(history) : shownDay ? Chart.chartGeometry(shownDay, calendars) : null
   readonly property real scrubX: !scrubT ? -1 : history ? History.historyFraction(history, scrubT)
@@ -128,9 +125,9 @@ Rectangle {
     y: 52 * root.u
     width: 80 * root.u
     height: 56 * root.u
-    pixels: Cells.spriteFor(root.animalKind === "bull", root.asleep ? 2 : 0)
+    pixels: Cells.spriteFor(root.animalKind !== "bear", root.asleep ? 2 : 0)
     pixelRatio: root.dpr
-    color: root.animalKind === "bull" ? root.upColor : root.downColor
+    color: root.animalKind === "plain" ? root.look.dim : root.animalKind === "bull" ? root.upColor : root.downColor
   }
   PixelSprite {
     visible: animal.visible && root.asleep

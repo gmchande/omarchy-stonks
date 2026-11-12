@@ -56,11 +56,11 @@ Item {
   Camera { id: shutter }
 
   Screens { id: displays; hyprland: root.hyprland; input: root.input; watching: host.opened }
-  // Watched only while every screen is off: the key that wakes one asks
-  // Hyprland again (`Screens`).
+  // Watched only while every screen is off, or an open panel's is: the key
+  // that wakes one asks Hyprland again (`Screens`).
   IdleMonitor {
     id: idle
-    enabled: displays.screensOff
+    enabled: displays.waking
     timeout: 1
     respectInhibitors: false
   }

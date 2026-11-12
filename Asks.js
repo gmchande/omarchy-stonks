@@ -93,8 +93,9 @@ function runWaiting(symbols, asked, entries, first, held) {
   })
 }
 
-function runJudging(toJudge, asked, held) {
-  return toJudge.filter(function(s) { return !(s in asked) && held.indexOf(s) < 0 })
+// Only a stock some screen shows: the rest wait until one does.
+function runJudging(toJudge, asked, held, watched) {
+  return toJudge.filter(function(s) { return watched.indexOf(s) >= 0 && !(s in asked) && held.indexOf(s) < 0 })
 }
 
 // A stock's batch of one is a chart: one request either way, and a chart
@@ -232,8 +233,9 @@ function quietUntil(quote, receivedAt, now, cal, dayOf) {
 // Yahoo's day answer for a stock turns to the coming day with its
 // pre-market, and London's and Tokyo's with their open, whose first bar
 // comes about 15 minutes late. Two days keep the last session in the answer
-// until the new one has a trade. An index's answer stays the last session's
-// until its open.
+// until the new one has a trade, and through its first minutes, while the
+// chart holds the last (`CarriedClose.heldDay`). An index's answer stays the
+// last session's until its open.
 function twoDays(quote, now, calendars) {
   if (!quote) return true
   if (quote.crypto) return true
@@ -248,7 +250,8 @@ function twoDays(quote, now, calendars) {
     return segs.length > 0 && now >= pre && (now < segs[0].start || (now < Calendar.postClose(cal, date) && !tradedSince(pre)))
   }
   var open = segs.length ? { start: segs[0].start, end: segs[segs.length - 1].end } : !cal && quote.current ? quote.current.regular : null
-  return !!open && now >= open.start && now < open.end && !tradedSince(open.start)
+  if (!open || now < open.start || now >= open.end) return false
+  return !tradedSince(open.start) || (CarriedClose.firstMinutes(quote) && now < open.start + CarriedClose.HOLD_LIMIT)
 }
 
 // How often, while Yahoo may still answer with the last session's quote
@@ -269,10 +272,11 @@ function quoteCadence(quote, now, interval, charted, calNow) {
 // ---- Robinhood
 
 // Trades due within half an interval go with those due now, so the list
-// stays one request each night's 5 minutes. With nothing open while a
-// night trades, a pill's symbol is asked so its newest price stays
-// current. `allDay` and `nights` are Robinhood's entries; `quoteEntries`
-// Yahoo's.
+// stays one request each night's 5 minutes. With a surface open, the stock
+// on show, a preview and the rows in sight (`inSight`) are asked; with
+// nothing open while a night trades, a pill's symbol is asked so its newest
+// price stays current. `allDay` and `nights` are Robinhood's entries;
+// `quoteEntries` Yahoo's.
 function overnightAsks(s) {
   if (!s.open && !s.pill) return null
   var featured = s.featured
@@ -286,7 +290,8 @@ function overnightAsks(s) {
   var previewing = s.open && s.previewShown && !!s.previewQuote && s.allSymbols.indexOf(s.preview) < 0
     && Overnight.hasOvernight(s.previewQuote, s.calendars)
   var waited = previewing ? s.preview : featured
-  var listings = s.open ? s.overnightSymbols.concat(previewing ? [s.preview] : []) : [featured]
+  var shown = function(x) { return x === featured || (s.previewShown && x === s.preview) || s.inSight.indexOf(x) >= 0 }
+  var listings = s.open ? s.overnightSymbols.filter(shown).concat(previewing ? [s.preview] : []) : [featured]
   // By day with nothing open, once each stock the pill shows, and again
   // while no check has said whether it trades all day.
   var tradability = listings.filter(function(x) {
@@ -360,11 +365,13 @@ function historyCharts(charts, range) {
   return range === "1D" ? [] : charts
 }
 
-function historyOwing(charts, range, entries) {
+// A chart answered under `REFRESH_AGAIN` ago is owed nothing, as a quote.
+function historyOwing(charts, range, entries, now) {
   var owing = {}
   charts.forEach(function(s) {
     var key = History.historyKey(s, range)
-    owing[key] = entries[key] || null
+    var entry = entries[key]
+    if (!entry || now - entry.answeredAt > REFRESH_AGAIN) owing[key] = entry || null
   })
   return owing
 }

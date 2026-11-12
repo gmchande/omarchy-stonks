@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell.Io
+import qs.Commons as Commons
 
 // `omarchy-shell ID <function>`, ID being the plugin's id, with or without
 // a pill on the bar. The panel's verbs go through the shell, which opens the
@@ -16,11 +17,17 @@ Item {
   signal refreshed()
 
   // IpcHandler offers its every property and signal over IPC, so what it
-  // is wired to lives on the item around it.
+  // is wired to lives on the item around it. Where the shell answers
+  // omarchy-shell over its own socket (IpcRegistry, as ShellIpc does), it
+  // reaches the handler without starting a qs ipc client; Omarchy 4.0.6
+  // has no such registry.
   IpcHandler {
     id: handler
     target: root.pluginId
     enabled: root.pluginId !== ""
+
+    Component.onCompleted: if (Commons.IpcRegistry) Commons.IpcRegistry.register(handler)
+    Component.onDestruction: if (Commons.IpcRegistry) Commons.IpcRegistry.unregister(handler)
 
     function refresh(): void {
       if (root.service) root.service.refresh()

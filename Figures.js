@@ -236,14 +236,16 @@ function rowModel(quote, scrubT, mode, newest) {
 // reads what the hero does. Once tonight has traded, a moment past the bell
 // counts from the close just gone, where the dashed line steps: the day
 // drawn says so (`Day.nightBell`), and a row's quote by its newest
-// price (`newest.joined`).
+// price (`newest.joined`). A day abroad just opened, joined to the day
+// before it, has its own open already (`CarriedClose.heldDay`).
 function scrubbedBase(quote, t, newest) {
   var reg = quote.session.regular
   var bell = Day.nightBell(quote)
+  var nextOpen = Format.isFiniteNumber(quote.nextOpen) ? quote.nextOpen : null
   if (bell === null && newest && newest.joined && reg) bell = reg.end
-  if (bell !== null && t >= bell) return { prevClose: Quote.regularClose(quote), dayOpen: null }
+  if (bell !== null && t >= bell) return { prevClose: Quote.regularClose(quote), dayOpen: nextOpen }
   var tail = Quote.tailStart(quote)
-  if (tail !== null && t >= tail && Quote.lastTradeTime(quote) >= tail) return { prevClose: Quote.regularClose(quote), dayOpen: null }
+  if (tail !== null && t >= tail && Quote.lastTradeTime(quote) >= tail) return { prevClose: Quote.regularClose(quote), dayOpen: nextOpen }
   return { prevClose: Quote.dayBase(quote), dayOpen: quote.dayOpen }
 }
 
@@ -265,6 +267,15 @@ function scrubBaselineText(day, t, today, calendars) {
   if (bell === null || t < bell) return dayBaselineText(day, today, calendars)
   var named = closeLabel(day, today, calendars)
   return named.label + (named.time ? " " + named.time : "") + " " + Format.money(Quote.regularClose(day), day.priceDigits)
+}
+
+// What a scrubbed moment's move counts from, said under the price by the
+// panel and the screenshot alike: since the open, the day's open, which no
+// line on the chart marks; else the dashed line under the pointer.
+function scrubLegend(day, t, today, calendars, changeMode, newest) {
+  var base = changeMode === "open" ? scrubbedBase(day, t, newest) : null
+  return base && Format.isFiniteNumber(base.dayOpen) ? "OPEN " + Format.money(base.dayOpen, day.priceDigits)
+    : "┄ " + scrubBaselineText(day, t, today, calendars)
 }
 
 // The headline's close, named by its day once that day is past. Where Yahoo
@@ -351,9 +362,11 @@ function closeCountedFrom(quote, view, today, calendars) {
 // move, its name and the same move in the other unit (`view.unit`): TODAY
 // +4.57, OVERNIGHT −1.83, PRE-MARKET −5.74, FRI −0.43, 24H −795.72,
 // 1M −90.97, SINCE OPEN +9.34. A scrubbed moment keeps its amount and a
-// range's name, and the dashed line's legend takes the first line's place.
-// Where the move isn't known, the first is the close it would count from,
-// if known, and the second a mode's or a range's name alone.
+// range's name, and the legend of what it counts from takes the first
+// line's place. Where the move isn't known, the first is the close it would
+// count from, if known, and the second a mode's or a range's name alone, or
+// at an open while the day's move waits on its close, FIRST TRADES · MOVE
+// SOON.
 function heroLines(quote, view, latest, now, day, calendars, changeMode, scrubbing) {
   var none = { label: "", changeText: "", tone: "flat" }
   if (!quote || !view) return { close: null, caption: none }
@@ -368,7 +381,7 @@ function heroLines(quote, view, latest, now, day, calendars, changeMode, scrubbi
   if (whole && close.price === "") close = closeOnly(from) || close
   else if (whole && period === "") close.since = sinceClose(quote, newest, changeMode)
   var rangeName = period === "24H" ? "" : period
-  if (view.pct === null) return { close: close, caption: { label: rangeName, changeText: "", tone: "flat" } }
+  if (view.pct === null) return { close: close, caption: { label: !scrubbing && period === "" && moveAwaited(quote, view) ? "FIRST TRADES · MOVE SOON" : rangeName, changeText: "", tone: "flat" } }
   var label = scrubbing ? rangeName : period || moveName(quote, newest, from, today)
   var other = view.unit === "abs" ? "pct" : "abs"
   var caption = { label: label, changeText: Format.changeText(view, other, quote.priceDigits), tone: Format.changeTone(view, other, quote.priceDigits) }
@@ -377,6 +390,14 @@ function heroLines(quote, view, latest, now, day, calendars, changeMode, scrubbi
 
 function closeOnly(from) {
   return from ? { label: from.label, time: "", price: from.price, changeText: "", tone: "flat", stale: false } : null
+}
+
+// A price of the session with no close to count from: for minutes after an
+// open, until Yahoo's answers count from the close just gone
+// (`CarriedClose.carryClose`).
+function moveAwaited(quote, view) {
+  var reg = quote.session.regular
+  return !!reg && !Format.isFiniteNumber(view.close) && Format.isFiniteNumber(view.asOf) && view.asOf >= reg.start
 }
 
 var DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
@@ -407,4 +428,12 @@ function newestStale(newest, now) {
 // night the two can differ.
 function animalKind(row) {
   return !row || row.dayTone === "flat" ? "" : row.dayTone === "up" ? "bull" : "bear"
+}
+
+// The header's animal: the day's bull or bear, and while no move is known,
+// as at an open abroad or before any price comes, the plain bull, Stonks'
+// own mark, in neither the up nor the down colour. The pill draws its flat
+// rule then, as the row draws its dash.
+function headerAnimal(row) {
+  return !row || row.dayUp === null ? "plain" : animalKind(row)
 }

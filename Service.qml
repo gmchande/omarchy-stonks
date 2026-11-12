@@ -26,7 +26,7 @@ Item {
   // ---- What you follow and look at
 
   // All: every symbol, fetched once whatever lists hold it.
-  readonly property var allSymbols: fileSettings.symbols
+  property var allSymbols: Settings.fileSettings(null).symbols
   // "" is All.
   readonly property string listName: fileSettings.list
   readonly property var symbols: Settings.listSymbols(fileSettings)
@@ -41,13 +41,15 @@ Item {
   readonly property int refreshIntervalSec: fileSettings.refreshIntervalSec
   property var lastRemoval: null
   property string listsHeld: ""
-  // The same array until what the lists hold changes, so a save of a range
-  // or the featured stock leaves each surface's list views as they are.
+  // The same arrays until what they hold changes, so a save of a range,
+  // a list or the featured stock leaves the feeds and each surface's list
+  // views as they are.
   property var lists: Settings.listChoices(Settings.fileSettings(null))
   onFileSettingsChanged: {
     var held = Settings.listsHeld(root.fileSettings)
     if (held === root.listsHeld) return
     root.listsHeld = held
+    if (JSON.stringify(root.fileSettings.symbols) !== JSON.stringify(root.allSymbols)) root.allSymbols = root.fileSettings.symbols
     root.lists = Settings.listChoices(root.fileSettings)
     root.lastRemoval = null
   }
@@ -153,13 +155,17 @@ Item {
   // The price on top on the pill, the rows, and the hero. A stock's is worked
   // out again only when what it is read from changes (`Chart.newestTradeOf`):
   // each builds the stock's whole day, and a price that lands changes one
-  // stock's, not every stock's. `newestKept` doesn't notify.
-  readonly property var newestKept: ({ by: {} })
+  // stock's, not every stock's. The same object while no stock's changes, so
+  // no row works out its figures again. `newestKept` doesn't notify.
+  readonly property var newestKept: ({ by: {}, out: {} })
   readonly property var newestTrades: {
     var nights = overnightFeed.entries
     var allDay = allDayFeed.entries
+    var before = root.newestKept.out
     var out = {}
     var kept = {}
+    var count = 0
+    var same = true
     allSymbols.forEach(function(symbol) {
       var quote = feed.quotes[symbol]
       if (!quote) return
@@ -170,9 +176,14 @@ Item {
       var had = root.newestKept.by[symbol]
       kept[symbol] = had && had.quote === quote && had.bars === bars && had.through === through && had.trades === trades ? had
         : { quote: quote, bars: bars, through: through, trades: trades, newest: Chart.newestTradeOf(symbol, quote, nights, allDay, calendars) }
-      if (kept[symbol].newest) out[symbol] = kept[symbol].newest
+      if (!kept[symbol].newest) return
+      out[symbol] = kept[symbol].newest
+      count++
+      same = same && before[symbol] === out[symbol]
     })
     root.newestKept.by = kept
+    if (same && count === Object.keys(before).length) return before
+    root.newestKept.out = out
     return out
   }
 
@@ -260,10 +271,8 @@ Item {
     root.previewSurface = s ? surface : null
     root.previewSymbol = s
     root.previewResult = s && result && String(result.symbol || "").toUpperCase() === s ? result : null
-    if (s) {
-      root.shownOnChart(s)
-      previewRest.restart()
-    } else previewRest.stop()
+    if (s) previewRest.restart()
+    else previewRest.stop()
     root.showHistory(false)
     if (before && before !== root.previewSurface && s) root.previewTaken(before)
   }
@@ -743,6 +752,7 @@ Item {
       quotes: feed.quotes,
       overnightSymbols: root.overnightSymbols,
       allSymbols: root.allSymbols,
+      inSight: root.rowsInSight(),
       preview: previewed,
       previewShown: root.previewShown,
       // By search's result before its quote, so Robinhood is asked as Yahoo is.
@@ -765,13 +775,9 @@ Item {
     var rangeLeft = chartOnShow !== "" && chartOnShow.split("|")[1] !== view.range
     chartOnShow = chart
     if (root.featuredTaken && view.featured !== root.featuredTaken.symbol) root.featuredTaken = null
-    if (rangeLeft) {
-      // A turn later: the view's change is still being told.
-      var left = Object.keys(root.aheadAsked)
-      root.aheadAsked = ({})
-      root.aheadMissed = ({})
-      if (left.length) Qt.callLater(function() { historyFeed.drop(left) })
-    } else root.shownOnChart(view.featured)
+    // Their keys name the range, so missed charts on the last are tried
+    // again on a return; charts fetched ahead stay, for the cache to let go.
+    if (rangeLeft) root.aheadMissed = ({})
     showHistory(false)
     askDue()
     askOvernight()
@@ -873,7 +879,7 @@ Item {
       return
     }
     var range = root.view.range
-    if (force) root.historyOwed = Asks.historyOwing(charts, range, historyFeed.entries)
+    if (force) root.historyOwed = Asks.historyOwing(charts, range, historyFeed.entries, root.wallSecond())
     var next = Asks.nextHistory(charts, range, historyFeed.entries, root.historyOwed)
       || { symbol: charts[charts.length - 1], force: false }
     historyFeed.request(next.symbol, range, next.force)
@@ -900,18 +906,23 @@ Item {
   }
 
   // Each open surface's rows in sight, top first: an open asks for their
-  // quotes first, and on a range their charts are fetched ahead of a click.
+  // quotes first, Robinhood's trades only for them, and on a range their
+  // charts are fetched ahead of a click.
   property var sights: []
-  // Charts fetched ahead on this range and not shown since, which a new
-  // range drops; and those with no good answer, not asked ahead again.
-  property var aheadAsked: ({})
+  // Charts with no good answer, not asked ahead again on this range.
   property var aheadMissed: ({})
   function rowsSeen(surface, symbols) {
     var others = root.sights.filter(function(s) { return s.surface !== surface })
     var next = symbols.length ? others.concat([{ surface: surface, symbols: symbols }]) : others
     if (next.length === 0 && root.sights.length === 0) return
     root.sights = next
+    root.askOvernight()
     root.fetchAhead()
+  }
+  function rowsInSight() {
+    var rows = []
+    root.sights.forEach(function(sight) { rows = rows.concat(sight.symbols) })
+    return rows
   }
 
   function aheadRows() {
@@ -929,20 +940,7 @@ Item {
     var range = root.view.range
     var charts = Asks.aheadCharts(root.aheadRows(), range, historyFeed.entries, root.aheadMissed)
     if (charts.length === 0 || !root.screensClear()) return
-    var asked = Object.assign({}, root.aheadAsked)
-    charts.forEach(function(s) { asked[historyFeed.keyFor(s, range)] = true })
-    root.aheadAsked = asked
     historyFeed.requestAhead(charts, range)
-  }
-
-  // A chart fetched ahead and now on show is no longer one fetched ahead: a
-  // new range keeps it.
-  function shownOnChart(symbol) {
-    var key = historyFeed.keyFor(symbol, root.view.range)
-    if (!(key in root.aheadAsked)) return
-    var asked = Object.assign({}, root.aheadAsked)
-    delete asked[key]
-    root.aheadAsked = asked
   }
 
   // ---- The saved prices
@@ -972,13 +970,24 @@ Item {
   // At most every 10 minutes, and only once an answer has come, so quotes
   // from an earlier session are never written back as they are. It waits
   // while a surface opens or a chart draws in, and for the runs out and asks
-  // due when it fell due (`saveWaitsFor`): a long list takes 20 ms of the
-  // shell's thread, which would stall an open's prices.
+  // due when it fell due (`saveWaitsFor`): a long list's file is a megabyte,
+  // written on the shell's thread, which would stall an open's prices.
   property bool quotesUnsaved: false
   property int quotesSavedAt: 0
   property var saveWaitsFor: null
   // What came is saved, though every price may have failed since.
   property bool answeredOnce: false
+
+  // Each of All's quotes as the cache's text, made by a save for a quote
+  // changed since the last, a few milliseconds a turn: the whole cache in
+  // one JSON.stringify took 40 ms of the shell's thread for 150 stocks.
+  // `quoteTexts` doesn't notify.
+  readonly property var quoteTexts: ({ by: {} })
+  Timer {
+    id: quoteTextStep
+    interval: 0
+    onTriggered: root.writeQuotes()
+  }
 
   function flushQuotes() {
     if (!root.quotesUnsaved || (root.quotesSavedAt && root.now - root.quotesSavedAt < 10 * 60)) return
@@ -991,11 +1000,30 @@ Item {
     root.saveWaitsFor = null
     root.quotesUnsaved = false
     root.quotesSavedAt = root.now
-    var saved = {}
-    root.allSymbols.forEach(function(s) {
-      if (feed.quotes[s]) saved[s] = { quote: feed.quotes[s], receivedAt: (feed.entries[s] || {}).receivedAt || 0 }
+    root.writeQuotes()
+  }
+
+  // Written in a turn of its own once every text is made: the text
+  // JSON.stringify makes of { version: 1, quotes: { symbol: { quote,
+  // receivedAt } } }, in All's order, as the quotes stand then.
+  function writeQuotes() {
+    var until = Date.now() + 4
+    var by = root.quoteTexts.by
+    var held = root.allSymbols.filter(function(s) { return !!feed.quotes[s] })
+    var stale = held.filter(function(s) { return !by[s] || by[s].quote !== feed.quotes[s] })
+    if (stale.length > 0) {
+      for (var i = 0; i < stale.length && Date.now() < until; i++)
+        by[stale[i]] = { quote: feed.quotes[stale[i]], text: JSON.stringify(feed.quotes[stale[i]]) }
+      quoteTextStep.start()
+      return
+    }
+    var kept = {}
+    var saved = held.map(function(s) {
+      kept[s] = by[s]
+      return JSON.stringify(s) + ':{"quote":' + by[s].text + ',"receivedAt":' + JSON.stringify((feed.entries[s] || {}).receivedAt || 0) + "}"
     })
-    ownerOnly.write(root.quotesPath, JSON.stringify({ version: 1, quotes: saved }) + "\n")
+    root.quoteTexts.by = kept
+    ownerOnly.write(root.quotesPath, '{"version":1,"quotes":{' + saved.join(",") + "}}\n")
   }
 
   // ---- The screens

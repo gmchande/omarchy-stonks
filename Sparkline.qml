@@ -106,15 +106,30 @@ Item {
           g.addColorStop(Math.min(1, stop + 0.0001), root.downColor)
           ctx.strokeStyle = g
         } else ctx.strokeStyle = root.lineColor
-        // A break (`brk`) lifts the pen, as the hero's line does.
+        // A break (`brk`) lifts the pen, as the hero's line does, and a
+        // stretch with no trade (`untraded`) holds the trade before it, dotted.
+        var held = []
         ctx.beginPath()
         for (var i = 0; i < pts.length; i++) {
           var x = pad + pts[i].x * w
           var y = pad + pts[i].y * h
           if (i === 0 || pts[i].brk) ctx.moveTo(x, y)
-          else ctx.lineTo(x, y)
+          else if (pts[i].untraded) {
+            var heldY = pad + pts[i - 1].y * h
+            held.push({ from: pad + pts[i - 1].x * w, to: x, y: heldY })
+            ctx.moveTo(x, heldY)
+            ctx.lineTo(x, y)
+          } else ctx.lineTo(x, y)
         }
         ctx.stroke()
+        ctx.setLineDash([0.01, 2])
+        ctx.beginPath()
+        for (var d = 0; d < held.length; d++) {
+          ctx.moveTo(held[d].from, held[d].y)
+          ctx.lineTo(held[d].to, held[d].y)
+        }
+        ctx.stroke()
+        ctx.setLineDash([])
         ctx.restore()
       }
       // A lone trade is a dot three line widths across.

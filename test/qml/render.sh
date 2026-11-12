@@ -144,13 +144,13 @@ every_state() (
   # night alone, busy and thin; the night on past midnight; Friday's
   # pre-market; Monday's open, its session, its after hours on a busy day
   # after the bell, and its evening's night, busy and thin; a coin's last 24
-  # hours; Tokyo at its open and London's morning; and CVR's two trades,
-  # its close carrying the dot.
+  # hours; and CVR's two trades, its close carrying the dot. Tokyo's,
+  # London's and Sydney's opens are below, saved in one day and two, as
+  # Stonks asks for them in their first minutes.
   for moment in watch-2026-10-25-1000-nbis watch-2026-10-25-1000-brk-a thinfeed-2026-10-23-2030-shop \
     watch-2026-10-25-2335-nbis watch-2026-10-25-2335-jnj watch-2026-10-26-0100-nbis night-2026-10-23-0600-aapl \
     watch-2026-10-26-0935-nbis watch-2026-10-26-1200-nbis watch-2026-10-26-1800-nbis \
-    watch-2026-10-26-2005-nbis watch-2026-10-26-2005-jnj watch-2026-10-25-2020-7203.t \
-    watch-2026-10-26-0420-shel.l coin-2026-10-25-2005-btc-usd watch-2026-10-26-1800-cvr; do
+    watch-2026-10-26-2005-nbis watch-2026-10-26-2005-jnj coin-2026-10-25-2005-btc-usd watch-2026-10-26-1800-cvr; do
     states="$states popup-sweep-$moment-smooth popup-sweep-$moment-retro"
   done
   # Toyota at Tokyo's open on Monday 2 November: Friday's move before the

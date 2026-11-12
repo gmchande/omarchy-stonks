@@ -26,6 +26,7 @@
 // with no calendar and no close held, which may be one.
 function carryClose(previous, quote, calendars, now) {
   if (!quote || quote.crypto || quote.instrumentType === "INDEX" || !quote.session.regular) return quote
+  if (quote.before) quote = Object.assign({}, quote, { before: Object.assign({}, quote.before, { base: heldBase(previous, quote.before) }) })
   var cal = Calendar.calendarFor(calendars, quote)
   if (cal && cal.pre) return quote
   // The next quote reads the close from this one, so an unchanged answer
@@ -90,4 +91,59 @@ var BEHIND = 15 * 60
 function firstTrade(quote, head) {
   var pts = Quote.regularPoints(quote)
   return pts.length ? pts[0].t : head.t
+}
+
+// One or two trades of a day just begun, scaled to the chart's height, draw
+// a line from top to bottom, or a crash from the close. So until the day has
+// `FIRST_BARS`, the 1D chart holds the day just closed, asked for in two
+// days meanwhile (`Asks.twoDays`), as it was drawn before the open, with the
+// new day's trades joined after it as a pre-market joins a day
+// (`Quote.tailDay`). Its dashed line is the one Stonks drew before the open
+// (`heldBase`), and its open its own; the new day's trades count from its
+// close, the one the move counts from, where the dashed line steps at the
+// bell, as it does for tonight's trades (`Day.nightBell`), or since the new
+// day's open (`nextOpen`). Each is left out where unknown (`held`).
+function heldDay(quote) {
+  if (!quote.before || !firstMinutes(quote)) return null
+  var close = quote.prevClose
+  var known = Format.isFiniteNumber(close)
+  return Object.assign({}, quote, {
+    session: quote.before.session,
+    next: quote.session,
+    before: null,
+    held: true,
+    tonight: known ? Quote.periodsStart(quote.session) : null,
+    points: quote.before.points.concat(quote.points.map(function(p) { return { t: p.t, p: p.p, s: Quote.pointSession(quote, p) } })),
+    prevClose: Format.isFiniteNumber(quote.before.base) ? quote.before.base : null,
+    price: close,
+    marketTime: known ? quote.before.session.regular.end : null,
+    dayOpen: quote.before.dayOpen,
+    openSession: quote.before.openSession,
+    nextOpen: quote.dayOpen
+  })
+}
+
+// Three of Yahoo's five-minute bars, ten minutes of the day, by when its move
+// shows (`CATCH_UP`). Yahoo's echo of its quote, off the grid, is no bar.
+var FIRST_BARS = 3
+
+function firstMinutes(quote) {
+  var reg = quote.session.regular
+  var bars = Quote.regularPoints(quote).filter(function(p) { return (p.t - reg.start) % Quote.BAR === 0 })
+  return bars.length < FIRST_BARS
+}
+
+// Yahoo's first bars came up to half an hour after the open in the saved
+// answers, Sydney's three only after it. A listing with fewer an hour after
+// its open trades too seldom to wait for, and is drawn as it trades.
+var HOLD_LIMIT = 60 * 60
+
+// The dashed line of the day before `quote`'s, as the quote Stonks held drew
+// it: no field of Yahoo's answers names it at every open, as Tokyo's two-day
+// answer gave that day's own close as the close before it.
+function heldBase(previous, before) {
+  var day = before.session.regular.start
+  if (!previous || !previous.session.regular) return null
+  if (previous.session.regular.start === day) return Quote.dayBase(previous)
+  return previous.before && previous.before.session.regular.start === day ? previous.before.base : null
 }

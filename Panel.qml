@@ -57,6 +57,13 @@ Panel {
     function onHeightLiveChanged() { if (panel.heightLive) root.heldHeight = -1 }
   }
 
+  // Open on a screen that's off, the panel asks for no more than the pill,
+  // as a window no screen shows; the screens watch for that one to wake.
+  readonly property bool screenOn: !root.service || !root.service.screens || root.service.screens.screenOn(panel.screen)
+  readonly property bool dark: root.opened && !root.screenOn
+  onDarkChanged: if (root.service && root.service.screens) root.service.screens.panelDark(root, root.dark)
+  Component.onDestruction: if (root.dark) root.service.screens.panelDark(root, false)
+
   function offerHint() {
     if (!root.opened || !root.body || !service || !service.ready || service.hinted || root.body.footerSays.text !== "") return
     root.body.showFirstRunHint()
@@ -194,8 +201,9 @@ Panel {
           sounds: root.sounds
           camera: root.camera
           surfaceOpen: root.opened
-          screenOn: !root.service || !root.service.screens || root.service.screens.screenOn(panel.screen)
+          onScreen: root.screenOn
           switchesPanels: true
+          pill: root.hostWidget
           chartHeight: Style.space(190)
           foreground: root.bar ? root.bar.foreground : Commons.Color.foreground
           fontFamily: root.bar ? root.bar.fontFamily : Style.font.family

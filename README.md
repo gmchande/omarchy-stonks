@@ -57,7 +57,8 @@ stock's first trade at night, it keeps the day's close and move until the
 new day's first prices arrive, soon after 04:00: point at it for tonight's
 price and move. It can show
 a sparkline, an arrow, the price as text, or an icon: a bull on an up day,
-a bear on a down one. Middle-click it to switch. It keeps your choice after
+a bear on a down one. Middle-click it to switch, or press `b` in the
+panel. It keeps your choice after
 a restart. On a bar at the side of the screen, middle-click switches
 between the icon and the symbol over its change. Counting since the open,
 it says so when you point at it.
@@ -109,10 +110,11 @@ that has traded since the close shows that newest price on top. The move
 beside the price counts
 from the close the chart's dashed line marks under that price, so the
 number, the line and the bull or bear agree. Since the open, it counts from
-that day's open instead. The rows and the pill agree with it too, but at
-night: from a stock's first trade at night until the new day's first prices
-arrive, soon after 04:00, its row and the pill keep the day's close and move,
-the ones on the line under the price.
+that day's open instead, and pointing at the chart names that open under
+the price. The rows and the pill agree with it too, but at night: from a
+stock's first trade at night until the new day's first prices arrive, soon
+after 04:00, its row and the pill keep the day's close and move, the ones on
+the line under the price.
 
 The two lines under the price and the move each keep one job. Under the
 price is the close before the price on top, named by its day: FRI CLOSE
@@ -125,9 +127,11 @@ other unit: TODAY ▲4.57, OVERNIGHT ▼1.83, PRE-MARKET ▼5.74, FRI ▼0.43 on
 day the market rests, or TODAY ▲2.88% when the figure on top is an amount.
 Since the open it says SINCE OPEN, and on a longer range the range's name,
 or SINCE and its first day for a listing younger than the range. A coin's
-day is its last 24 hours: 24H AGO 80,711 and 24H ▼795.72. Where Stonks
-doesn't know the close, as at Tokyo's open before Yahoo's first bar, both
-lines stay empty, and where it has no calendar to name the close's day by,
+day is its last 24 hours: 24H AGO 80,711 and 24H ▼795.72. For a few
+minutes after a market abroad opens, Stonks may not know the close yet:
+the line under the price stays empty, the move's line says FIRST TRADES ·
+MOVE SOON, and the bull at the top stands in plain ink, neither up nor
+down. Where Stonks has no calendar to name the close's day by,
 the close is PREV CLOSE. Elsewhere, the line under the price shows the
 pre-market or after-hours price.
 
@@ -135,6 +139,12 @@ The 1D chart shows one trading day, each price at its time, from the
 day's first trade, or the open if that's earlier, to the day's end while
 it runs, and to its last trade once it's over. The regular session is
 bright and the hours around it dim.
+
+For about ten minutes after a market abroad opens, until the new day has
+three of Yahoo's five-minute bars, the chart keeps the day just closed and
+adds the new day's first trades at its right end, so it never shows a lone
+dot. As at night, the dashed line steps at the bell to the close the move
+counts from, when Stonks knows it.
 
 For a US stock Robinhood trades at night, a day starts with its night, at
 20:00 the evening before (New York time), and runs to 20:00. From the open
@@ -315,6 +325,7 @@ screenshot editor.
 | `m` | Turn sounds on or off |
 | `r` | Refresh |
 | `Shift+U` | Update Stonks when a new version is out, and restart the shell to run it |
+| `b` | Change how the pill looks, as a middle-click on it does (panel only) |
 | Tab or `Shift+Tab` | Switch to the bar's next or previous panel (panel only) |
 | `?` | Show the keys you'll use every day |
 | `Esc` | Close |
@@ -337,7 +348,8 @@ again.
   hurry it.
 - **"Not updating" or "No data" on a row, or "Can't get prices" on the top
   line.** A price hasn't come in time. When that's true of every stock you
-  follow, the top line says so once instead of on every row. Rows keep
+  follow, the top line says so once instead of on every row, and a chart
+  with no price yet says so too. Rows keep
   any price they had, with its time. Stonks keeps trying on its own, less
   often the longer Yahoo stays away. If Yahoo has changed what it sends,
   only a newer Stonks can fix it.
@@ -369,8 +381,9 @@ again.
   stock in London, Tokyo or Toronto first trades, Yahoo can still count
   its day from the close before last. Stonks counts from the last close it
   saw itself. If it started in those minutes and hasn't seen that close, it
-  shows a dash for the move until the stock has traded for ten minutes,
-  then fills it in. With the rows set to since the open, the move shows a
+  shows a dash for the move, with FIRST TRADES · MOVE SOON under it, until
+  the stock has traded for ten minutes, then fills it in. With the rows set
+  to since the open, the move shows a
   dash too, and the open under the chart stays blank, until Yahoo sends the
   day's first five-minute bar. That can take a few minutes at any market's
   open.
@@ -464,10 +477,11 @@ time, when Yahoo's charts are empty.
   stretch Yahoo left empty: once a day for which stocks trade overnight, at
   most once for each stock the pill shows, and again 5 minutes after a
   first check that failed; every 5 minutes through the night for the
-  pill's stock, and for every row that trades overnight while the panel or
-  the window is open; and once more on a morning Yahoo sends no
-  prices for half an hour or more of the pre-market. It asks the same for
-  a US stock or ETF you pause on in search and haven't added.
+  pill's stock, and while the panel or the window is open, for the stock
+  on show and the rows you can see that trade overnight; and once more on
+  a morning Yahoo sends no prices for half an hour or more of the
+  pre-market. It asks the same for a US stock or ETF you pause on in
+  search and haven't added.
 - `raw.githubusercontent.com` for the newest version number, as the shell
   starts and once a day. To turn this off, add `"updateCheck": false` to
   `~/.config/omarchy/grvc.stonks.json`.

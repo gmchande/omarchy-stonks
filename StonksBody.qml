@@ -33,12 +33,14 @@ Item {
   property var sounds: null
   property var camera: null
   property bool surfaceOpen: false
-  // False for the window on a workspace no screen shows: it stays open, as
-  // it was left, but asks for nothing.
+  // False for the window on a workspace no screen shows, or the panel on a
+  // screen that's off: it stays open, as it was left, but asks for nothing.
   property bool onScreen: true
   property string headerWhenMissing: "No data"
   // The panel's: Tab steps to the next widget's panel.
   property bool switchesPanels: false
+  // The panel's: the pill it opened from, whose form `b` changes.
+  property var pill: null
   property int margins: 0
 
   property int chartHeight: Style.space(190)
@@ -55,9 +57,7 @@ Item {
   // for the key sheet or a view.
   property int rowsRoom: 0
 
-  // The panel's own screen on. The panel's asks heed only every screen
-  // off: one that waited for its own screen might not ask again when it
-  // wakes. The animal's fidget, which asks for nothing, heeds this too.
+  // False holds the animal's fidget still.
   property bool screenOn: true
 
   property color foreground: Commons.Color.foreground
@@ -204,8 +204,8 @@ Item {
   }
   onServiceChanged: if (service && surfaceOpen && onScreen) service.surfaceShown(root, true)
 
-  // On a screen that's on: the panel's `onScreen` doesn't follow screens
-  // turning off.
+  // On a screen that's on, as far as Hyprland has said: `onScreen` counts a
+  // surface whose screen it hasn't named as shown.
   readonly property bool seen: surfaceOpen && onScreen && !(service && service.screensOff)
 
   // Asked for first on open, and fetched ahead on a range.
@@ -294,12 +294,12 @@ Item {
   readonly property var rangeMarks: historyShown ? History.rangeMarks(history, rangeEnds, featuredQuote,
     function(t) { return Market.tradeClock(featuredQuote, t, calendars) }) : null
   // Said under the price: what a scrub's move counts from, the dashed line
-  // under the pointer.
+  // under the pointer, or since the open the day's open.
   readonly property string baselineText: historyShown ? "┄ " + chartRange.toUpperCase() + " START " + Format.money(history.baseline, featuredQuote ? featuredQuote.priceDigits : undefined)
-    : (!historyActive && featuredDay ? "┄ " + Figures.scrubBaselineText(featuredDay, scrubShown, Figures.exchangeDay(featuredDay, now), calendars) : "")
+    : (!historyActive && featuredDay ? Figures.scrubLegend(featuredDay, scrubShown, Figures.exchangeDay(featuredDay, now), calendars, changeMode, featuredNewest) : "")
 
   // The moment shown against the baseline; the pill's reads the day.
-  readonly property string animalKind: Figures.animalKind(featured)
+  readonly property string animalKind: Figures.headerAnimal(featured)
   // A change of chart, list, or look is no turn: the animal changes at once.
   // A failed range's stand-in day is another chart than its history.
   readonly property string animalChart: [motion.chartKeyOf(chart), view.listKey, retro].join(" ")
@@ -747,6 +747,7 @@ Item {
     else if (t === "O") reverseOrder()
     else if (t === "U") runOffered()
     else if (t === "w") openListMenu()
+    else if (t === "b" && pill) pill.cycleBarStyle()
     else return false
     return true
   }
@@ -957,6 +958,7 @@ Item {
       latest: motion.latest,
       view: featured,
       scrubT: scrubShown,
+      legend: scrubShown ? baselineText : "",
       changeMode: changeMode,
       range: historyShown ? chartRange : "1D",
       now: now,
@@ -1193,8 +1195,9 @@ Item {
     still: !root.surfaceOpen
     held: root.chartLoading
     dimmed: motion.dimmed
-    // Nothing is said to be on its way while the header says no prices come.
-    loadingText: root.yahooDown ? "" : root.loadingText
+    // While the header says no prices come, the empty chart says why.
+    waitingText: root.yahooDown && !root.featuredQuote ? "No price for " + root.featuredSymbol + " yet · Yahoo hasn't sent one"
+      : root.yahooDown || !root.chartLoading ? "" : root.loadingText + "…"
     // Before any chart, the coming symbol, never a dash.
     symbol: root.chartSymbol || root.featuredSymbol
     nameOnLine: !root.headerTitled

@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.Commons as Commons
 import qs.Ui
 import "plugin" as Stonks
 
@@ -100,7 +101,9 @@ Harness {
     property var monitors: ({ values: [] })
     property var toplevels: ({ values: [] })
     property var focusedWorkspace: workspaceHere
-    function monitorFor(screen) { return null }
+    // The screen a pill's panel sits on, which a step names.
+    property var panelScreen: null
+    function monitorFor(screen) { return panelScreen }
     function refreshMonitors() { monitors.values.forEach(function(m) { m.refresh() }) }
     function dispatch(request) {}
     // Hyprland's events, which ask the screens again while every one is
@@ -324,6 +327,39 @@ Harness {
       startAt(at(harness.wed7, 10, 45))()
       tick(60)
 
+      // Nothing open: no other listing has its day judged on a chart.
+      var judgedAway = harness.yahoo(harness.requests()).filter(function(l) { return /^chart /.test(l) && l.split(" ")[1] !== "NEST" })
+      harness.check("nothing open: no listing but the pill's is asked a chart", judgedAway.length === 0, judgedAway.join(", "))
+
+      // The window open with a row in sight: the rows drawn (it and the one
+      // past each edge) have their days judged, and Robinhood is asked the
+      // night's trades for them and the stock on show alone. A row scrolled
+      // into sight has its trades asked at once.
+      var nightsFrom = harness.requests().length
+      app.floatingWindow.implicitHeight = 560
+      app.open("{}")
+      tryVerify(function() { return app.opened && service.openSurfaces.length === 1 }, 3000)
+      settle()
+      var inSight = function() { return [].concat.apply([], service.sights.map(function(s) { return s.symbols })) }
+      var traded = function(from) {
+        return [].concat.apply([], harness.requests().slice(from).filter(function(l) { return /^overnight /.test(l) })
+          .map(function(l) { return l.split(" ")[1].split(",") }))
+      }
+      var judged = within(10000, function() {
+        return inSight().length > 0 && inSight().every(function(s) { return service.feeds.quotes.toJudge.indexOf(s) < 0 })
+      })
+      within(3000, function() { return traded(nightsFrom).length > 0 })
+      var seen = inSight()
+      var tradedUnseen = traded(nightsFrom).filter(function(s) { return s !== "NEST" && seen.indexOf(s) < 0 })
+      var scrollFrom = harness.requests().length
+      app.body.watchlist.scrollToRow(app.body.watchlist.displayedSymbols.indexOf("SPY"))
+      var scrolledIn = within(3000, function() { return traded(scrollFrom).indexOf("SPY") >= 0 })
+      harness.check("the window open: the rows in sight have their days judged, Robinhood is asked trades for no row out of sight, and a row scrolled into sight has them at once",
+        judged && seen.indexOf("SPY") < 0 && tradedUnseen.length === 0 && scrolledIn,
+        [judged, "in sight " + seen.join(","), "asked out of sight " + tradedUnseen.join(","), scrolledIn].join(" | "))
+      settle()
+      closeWindow()
+
       // By day: no row is kept fresh for a surface no screen shows.
       countsOver("11:00, nothing open: the pill's stock alone, every minute, though every market but Tokyo trades",
         900, counts([15, 0, 0, 0, 0, 0, 0, 0]), startAt(at(harness.wed7, 11, 0)))
@@ -344,6 +380,16 @@ Harness {
       tick(3, 1)
       var rRuns = harness.runs().slice(runsBefore).filter(function(r) { return /chart:/.test(r) })
       harness.check("r twice within 5 s asks once", rRuns.length === 1, rRuns.join(" / "))
+
+      // omarchy-shell's refresh asks as r does, through the shell's own
+      // socket where the shell has one (Omarchy 4.0.6 has none).
+      tick(20)
+      var socketFrom = harness.runs().length
+      var socket = Commons.IpcRegistry ? Commons.IpcRegistry.call(plugin.pluginId, "refresh", []) : null
+      tick(2, 1)
+      var socketRuns = harness.runs().slice(socketFrom).filter(function(r) { return /chart:/.test(r) })
+      if (socket) harness.check("omarchy-shell's refresh reaches Stonks through the shell's own socket and asks again",
+        socket.ran && socketRuns.length === 1, socket.ran + " | " + socketRuns.join(" / "))
 
       // A range's history is asked once, and kept a quarter hour: picked
       // again inside it, nothing is asked, and after it, once more.
@@ -370,12 +416,54 @@ Harness {
       harness.check("a range's history is asked once, kept a quarter hour, and asked again after it",
         once && kept && again, [once, kept, again, asked() - historyFrom].join(" "))
 
-      // Yahoo refuses: the run that meets it is the last for a pause of
-      // about a minute, then one request goes alone. Back, the next lone
-      // request reopens it.
+      // The rows' charts fetched ahead on a range stay theirs: back on it
+      // from another, none is downloaded again inside its quarter hour.
+      var rows = harness.listed.filter(function(s) { return s !== "NEST" })
+      var aheadDone = function(range) {
+        return rows.every(function(s) { var key = s + "|" + range; return !!service.histories[key] || !!service.aheadMissed[key] })
+      }
+      var onRange = function(range) { return body.historyShown && body.chartRange === range }
+      body.selectRange("3M")
+      var aheadIn = within(20000, function() { return onRange("3M") && aheadDone("3M") })
+      // A row whose chart failed is tried again on a return.
+      var held = rows.filter(function(s) { return !!service.histories[s + "|3M"] })
+      var rowCalls = function() { return held.map(function(s) { return s + " " + harness.calls(s.replace("^", "%5E") + ".history") }).join(", ") }
+      var rowsBefore = rowCalls()
+      body.selectRange("6M")
+      var sixIn = within(3000, function() { return onRange("6M") })
+      body.selectRange("3M")
+      var backIn = within(3000, function() { return onRange("3M") })
+      // Time for a download that must not go.
+      var rowsAgain = within(2000, function() { return rowCalls() !== rowsBefore })
+      harness.check("back on a range inside its quarter hour, no row's chart fetched ahead is downloaded again",
+        aheadIn && sixIn && backIn && !rowsAgain, [aheadIn, sixIn, backIn, rowsBefore + " -> " + rowCalls()].join(" | "))
+
+      // r once the chart is over 10 s old, its chart in, then r again 3 s
+      // later: the chart is downloaded once, as the quotes are asked once.
+      tick(15)
+      var heroFrom = asked()
+      app.refresh()
+      var heroIn = within(5000, function() { return asked() === heroFrom + 1 && !service.refreshing })
+      tick(3, 1)
+      app.refresh()
+      var heroAgain = within(1000, function() { return asked() !== heroFrom + 1 })
+      harness.check("r again 3 s after r's chart came downloads the chart no more", heroIn && !heroAgain, [heroIn, asked() - heroFrom].join(" "))
+      settle()
+      day()
+
+      // Yahoo refuses: the run that meets it stops at that refusal, and is
+      // the last for a pause of about a minute, then one request goes
+      // alone. Back, the next lone request reopens it.
+      var beforeRefusal = harness.requests().length
       touch("YAHOO.refuse")
-      var askedAt = 0
-      tick(70, 1, function() { if (!askedAt && gate.pause === "refused") askedAt = service.now })
+      var askedAt = 0, metRefusal = []
+      tick(70, 1, function() {
+        if (askedAt || gate.pause !== "refused") return
+        askedAt = service.now
+        metRefusal = harness.requests().slice(beforeRefusal).filter(function(line) { return / 429$/.test(line) })
+      })
+      harness.check("Yahoo refusing: the run that meets it asks nothing after the refusal",
+        metRefusal.length === 1, metRefusal.join(" | "))
       // The header names the trouble once a price is 90 s overdue: on to
       // 100 s after the refusal, wherever in the minute it came.
       var said = ""
@@ -550,6 +638,148 @@ Harness {
       harness.check("with no pill, Robinhood is asked nothing either, and a pill put back asks for its stock at once",
         unseen.filter(function(l) { return /^(overnight|instruments) /.test(l) }).length === 0 && asksAgain,
         unseen.join(", ") + " | back: " + harness.requests().slice(pillFrom).join(", "))
+
+      // The panel open on a screen that's off, the other screen on: its rows
+      // are asked as with the panel closed, the pill's stock alone. The key
+      // that wakes its screen asks for them at once, with the clock still.
+      hyprlandStandIn.monitors = { values: [otherScreen, screenStandIn] }
+      hyprlandStandIn.panelScreen = screenStandIn
+      pill.open()
+      tryVerify(function() { return !!pill.panel && !!pill.panel.body && service.openSurfaces.length === 1 }, 3000)
+      settle()
+      screenStandIn.on = false
+      hyprlandStandIn.refreshMonitors()
+      screensHeard()
+      countsOver("the panel open on a screen that's off, another on: the pill's stock alone, every minute",
+        300, counts([5, 0, 0, 0, 0, 0, 0, 0]), function() {
+          startAt(service.now + 5)()
+          answerScreens()
+        }, answerScreens)
+      var wakeFrom = harness.requests().length
+      inputStandIn.isIdle = true
+      screenStandIn.on = true
+      inputStandIn.isIdle = false
+      var rowsBack = within(2000, function() { return harness.quoteCounts(harness.requests().slice(wakeFrom)).KILN > 0 })
+      harness.check("the key that wakes the panel's screen asks for its rows at once", rowsBack,
+        harness.requests().slice(wakeFrom).join(", "))
+      settle()
+      pill.close()
+      tryVerify(function() { return service.openSurfaces.length === 0 }, 3000)
+      hyprlandStandIn.panelScreen = null
+      hyprlandStandIn.monitors = { values: [] }
+
+      // A click that stops a run ahead shows its chart from the answers the
+      // run already has: KILN's is in, SPY's still on its way.
+      openWindow()
+      var kilnFrom = harness.calls("KILN.history")
+      var spyFrom = harness.calls("SPY.history")
+      var aheadFrom = harness.requests().length
+      touch("history.SPY.hold")
+      body.selectRange("1Y")
+      var kilnIn = within(10000, function() {
+        return harness.calls("SPY.history") > spyFrom && harness.requests().slice(aheadFrom).indexOf("history KILN 200") >= 0
+      })
+      body.featureSymbol("KILN")
+      var kilnShown = within(3000, function() { return body.historyShown && body.chartSymbol === "KILN" && body.chartRange === "1Y" })
+      remove("history.SPY.hold")
+      settle()
+      harness.check("a click on a chart a run ahead already holds shows it without downloading it again",
+        kilnIn && kilnShown && harness.calls("KILN.history") === kilnFrom + 1,
+        [kilnIn, kilnShown, harness.calls("KILN.history") - kilnFrom].join(" "))
+      body.selectRange("1D")
+
+      // The window closed while a stock's cap waits on a screen check: once
+      // the screens answer, nothing more is asked for it, its close or its
+      // rate. Open again, the cap and P/E come whole.
+      hyprlandStandIn.monitors = { values: [screenStandIn] }
+      touch("fundamentals.SHEL.L.hold")
+      var shelFrom = harness.calls("SHEL.L.fundamentals")
+      body.featureSymbol("SHEL.L")
+      var shelOut = within(5000, function() { return harness.calls("SHEL.L.fundamentals") === shelFrom + 1 })
+      screensHeard()
+      screenStandIn.holding = true
+      // The screens' last answer, trusted for a second, runs out first.
+      within(2000, function() { return Date.now() - service.screensAnsweredMs >= 1000 })
+      var waitingFrom = harness.requests().length
+      remove("fundamentals.SHEL.L.hold")
+      var shelIn = within(3000, function() { return harness.requests().slice(waitingFrom).indexOf("fundamentals SHEL.L 200") >= 0 })
+      var checking = within(1000, function() { return screenStandIn.unanswered > 0 })
+      var shelFundamentalsAt = harness.calls("FUNDAMENTALS")
+      var shelRatesAt = harness.calls("RATE")
+      closeWindow()
+      screenStandIn.holding = false
+      screensHeard()
+      // Time for a request that must not go.
+      var shelQuiet = !within(1000, function() {
+        return harness.calls("FUNDAMENTALS") !== shelFundamentalsAt || harness.calls("RATE") !== shelRatesAt
+      })
+      openWindow()
+      var shelWhole = within(5000, function() {
+        var facts = body.yearLine ? body.yearLine.facts : []
+        return facts.length === 2 && facts.every(function(f) { return f.value !== "" })
+      })
+      harness.check("the window closed while a cap's close waits on the screens asks nothing more for it once they answer, and open again shows the cap and P/E",
+        shelOut && shelIn && checking && shelQuiet && shelWhole,
+        [shelOut, shelIn, checking, shelQuiet, shelWhole].join(" ") + " | " + harness.requests().slice(waitingFrom).join(", "))
+      hyprlandStandIn.monitors = { values: [] }
+
+      // The window closed while a stock's cap is on its way: nothing more is
+      // asked for it, its close or its rate. Open again, the cap and P/E
+      // come whole.
+      touch("fundamentals.SHOP.TO.hold")
+      var seriesFrom = harness.calls("SHOP.TO.fundamentals")
+      body.featureSymbol("SHOP.TO")
+      var seriesOut = within(5000, function() { return harness.calls("SHOP.TO.fundamentals") === seriesFrom + 1 })
+      closeWindow()
+      var capFrom = harness.requests().length
+      var fundamentalsAt = harness.calls("FUNDAMENTALS")
+      var ratesAt = harness.calls("RATE")
+      remove("fundamentals.SHOP.TO.hold")
+      var seriesIn = within(3000, function() { return harness.requests().slice(capFrom).indexOf("fundamentals SHOP.TO 200") >= 0 })
+      // Time for a request that must not go.
+      var quiet = !within(1000, function() {
+        return harness.calls("FUNDAMENTALS") !== fundamentalsAt || harness.calls("RATE") !== ratesAt
+      })
+      openWindow()
+      var whole = within(5000, function() {
+        var facts = body.yearLine ? body.yearLine.facts : []
+        return facts.length === 2 && facts.every(function(f) { return f.value !== "" })
+      })
+      harness.check("the window closed while a cap is on its way asks nothing more for it, and open again shows the cap and P/E",
+        seriesOut && seriesIn && quiet && whole,
+        [seriesOut, seriesIn, quiet, whole].join(" ") + " | " + harness.requests().slice(capFrom).join(", "))
+      closeWindow()
+
+      // The bell, sounds on, Do Not Disturb and the microphone answering a
+      // second after it is due: at Thursday's close, a screen on as it is
+      // due and every screen off before they answer, it keeps quiet; at
+      // Friday's open, a screen on, it rings.
+      var bells = function() {
+        return harness.record("played").split("\n").filter(function(line) { return /bell\.wav$/.test(line) }).length
+      }
+      service.persist({ sounds: true })
+      verify(within(3000, function() { return service.soundsOn }), "sounds never turned on")
+      runCommand(["sh", "-c", "echo 1 > \"$0/pw-dump.delay\"", harness.state])
+      hyprlandStandIn.monitors = { values: [screenStandIn] }
+      startAt(at(harness.wed7 + 86400, 15, 59) + 55)()
+      var closeFrom = bells()
+      harness.clockTo(at(harness.wed7 + 86400, 16, 0) + 5)
+      screenStandIn.on = false
+      hyprlandStandIn.refreshMonitors()
+      screensHeard()
+      var dark = within(1000, function() { return service.screensOff })
+      // Time for the bell, past Do Not Disturb's and the microphone's answer.
+      within(2500, function() { return bells() > closeFrom })
+      var atClose = bells() - closeFrom
+      screenStandIn.on = true
+      hyprlandStandIn.refreshMonitors()
+      screensHeard()
+      startAt(at(harness.wed7 + 2 * 86400, 9, 29) + 55)()
+      var openFrom = bells()
+      harness.clockTo(at(harness.wed7 + 2 * 86400, 9, 30) + 5)
+      var rang = within(4000, function() { return bells() > openFrom })
+      harness.check("the bell keeps quiet once every screen goes off before Do Not Disturb and the microphone answer, and rings with a screen on",
+        dark && atClose === 0 && rang, "screens off " + dark + ", bells at the close " + atClose + ", at the open " + (bells() - openFrom))
 
       harness.finish()
     }

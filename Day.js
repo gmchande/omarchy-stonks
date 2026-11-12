@@ -11,11 +11,13 @@
 
 // Where tonight's trades, joined to the day that closed, start counting
 // from its close: its bell, so its after hours read against that close too.
-// Null before tonight's first trade, and on any other day.
+// So do a day abroad's first trades joined to the day before it, where that
+// close is known (`CarriedClose.heldDay`). Null before the first trade
+// joined, and on any other day.
 function nightBell(day) {
   var pts = day && day.points ? day.points : []
   var last = pts.length ? pts[pts.length - 1] : null
-  if (!last || !day.tonight || !day.session.regular || last.s !== "overnight" || last.t < day.tonight) return null
+  if (!last || !day.tonight || !day.session.regular || (last.s !== "overnight" && !day.held) || last.t < day.tonight) return null
   return day.session.regular.end
 }
 
