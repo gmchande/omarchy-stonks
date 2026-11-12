@@ -26,7 +26,7 @@ Item {
   // ---- What you follow and look at
 
   // All: every symbol, fetched once whatever lists hold it.
-  readonly property var allSymbols: fileSettings.symbols
+  property var allSymbols: Settings.fileSettings(null).symbols
   // "" is All.
   readonly property string listName: fileSettings.list
   readonly property var symbols: Settings.listSymbols(fileSettings)
@@ -41,13 +41,15 @@ Item {
   readonly property int refreshIntervalSec: fileSettings.refreshIntervalSec
   property var lastRemoval: null
   property string listsHeld: ""
-  // The same array until what the lists hold changes, so a save of a range
-  // or the featured stock leaves each surface's list views as they are.
+  // The same arrays until what they hold changes, so a save of a range,
+  // a list or the featured stock leaves the feeds and each surface's list
+  // views as they are.
   property var lists: Settings.listChoices(Settings.fileSettings(null))
   onFileSettingsChanged: {
     var held = Settings.listsHeld(root.fileSettings)
     if (held === root.listsHeld) return
     root.listsHeld = held
+    if (JSON.stringify(root.fileSettings.symbols) !== JSON.stringify(root.allSymbols)) root.allSymbols = root.fileSettings.symbols
     root.lists = Settings.listChoices(root.fileSettings)
     root.lastRemoval = null
   }
@@ -153,13 +155,17 @@ Item {
   // The price on top on the pill, the rows, and the hero. A stock's is worked
   // out again only when what it is read from changes (`Chart.newestTradeOf`):
   // each builds the stock's whole day, and a price that lands changes one
-  // stock's, not every stock's. `newestKept` doesn't notify.
-  readonly property var newestKept: ({ by: {} })
+  // stock's, not every stock's. The same object while no stock's changes, so
+  // no row works out its figures again. `newestKept` doesn't notify.
+  readonly property var newestKept: ({ by: {}, out: {} })
   readonly property var newestTrades: {
     var nights = overnightFeed.entries
     var allDay = allDayFeed.entries
+    var before = root.newestKept.out
     var out = {}
     var kept = {}
+    var count = 0
+    var same = true
     allSymbols.forEach(function(symbol) {
       var quote = feed.quotes[symbol]
       if (!quote) return
@@ -170,9 +176,14 @@ Item {
       var had = root.newestKept.by[symbol]
       kept[symbol] = had && had.quote === quote && had.bars === bars && had.through === through && had.trades === trades ? had
         : { quote: quote, bars: bars, through: through, trades: trades, newest: Chart.newestTradeOf(symbol, quote, nights, allDay, calendars) }
-      if (kept[symbol].newest) out[symbol] = kept[symbol].newest
+      if (!kept[symbol].newest) return
+      out[symbol] = kept[symbol].newest
+      count++
+      same = same && before[symbol] === out[symbol]
     })
     root.newestKept.by = kept
+    if (same && count === Object.keys(before).length) return before
+    root.newestKept.out = out
     return out
   }
 

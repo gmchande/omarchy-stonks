@@ -262,6 +262,26 @@ Harness {
         redrawn.length === 0 && stale.length === 0,
         redrawn.length + " rows out of sight redrawn; in sight without their latest: " + stale.slice(0, 5).join(","))
 
+      // A click on a row and a new range save the lists file, and All holds
+      // the same stocks: the feeds go on as they were, and no other row works
+      // out its figures again, the clicked stock's chart answer landing too.
+      rows = list.rowItems()
+      var figures = {}
+      for (s in rows) figures[s] = rows[s].view
+      var fed = service.feeds.quotes.symbols
+      var clicked = rowsInSight()[1]
+      var answer = service.entries[clicked]
+      mouseMove(rows[clicked], rows[clicked].width / 2, rows[clicked].height / 2)
+      mouseClick(rows[clicked], rows[clicked].width / 2, rows[clicked].height / 2)
+      var charted = within(5000, function() { return service.entries[clicked] !== answer && idle() })
+      service.setRange("1W")
+      service.setRange("1D")
+      var reworked = Object.keys(rows).filter(function(s) { return s !== clicked && rows[s].view !== figures[s] })
+      harness.check("a click on a row, its chart's answer and a new range hand the feeds the same stocks and work out no other row's figures again",
+        service.view.featured === clicked && charted && service.feeds.quotes.symbols === fed && reworked.length === 0,
+        "featured " + service.view.featured + " after a click on " + clicked + "; its chart answered: " + charted
+          + "; feeds' stocks the same: " + (service.feeds.quotes.symbols === fed) + "; " + reworked.length + " other rows worked out again")
+
       app.close()
       harness.finish()
     }
