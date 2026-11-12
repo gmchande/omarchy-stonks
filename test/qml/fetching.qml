@@ -620,6 +620,40 @@ Harness {
         [kilnIn, kilnShown, harness.calls("KILN.history") - kilnFrom].join(" "))
       body.selectRange("1D")
 
+      // The window closed while a stock's cap waits on a screen check: once
+      // the screens answer, nothing more is asked for it, its close or its
+      // rate. Open again, the cap and P/E come whole.
+      hyprlandStandIn.monitors = { values: [screenStandIn] }
+      touch("fundamentals.SHEL.L.hold")
+      var shelFrom = harness.calls("SHEL.L.fundamentals")
+      body.featureSymbol("SHEL.L")
+      var shelOut = within(5000, function() { return harness.calls("SHEL.L.fundamentals") === shelFrom + 1 })
+      screensHeard()
+      screenStandIn.holding = true
+      // The screens' last answer, trusted for a second, runs out first.
+      wait(1100)
+      var waitingFrom = harness.requests().length
+      remove("fundamentals.SHEL.L.hold")
+      var shelIn = within(3000, function() { return harness.requests().slice(waitingFrom).indexOf("fundamentals SHEL.L 200") >= 0 })
+      var checking = within(1000, function() { return screenStandIn.unanswered > 0 })
+      var shelFundamentalsAt = harness.calls("FUNDAMENTALS")
+      var shelRatesAt = harness.calls("RATE")
+      closeWindow()
+      screenStandIn.holding = false
+      screensHeard()
+      // Time for a request that must not go.
+      wait(1000)
+      var shelQuiet = harness.calls("FUNDAMENTALS") === shelFundamentalsAt && harness.calls("RATE") === shelRatesAt
+      openWindow()
+      var shelWhole = within(5000, function() {
+        var facts = body.yearLine ? body.yearLine.facts : []
+        return facts.length === 2 && facts.every(function(f) { return f.value !== "" })
+      })
+      harness.check("the window closed while a cap's close waits on the screens asks nothing more for it once they answer, and open again shows the cap and P/E",
+        shelOut && shelIn && checking && shelQuiet && shelWhole,
+        [shelOut, shelIn, checking, shelQuiet, shelWhole].join(" ") + " | " + harness.requests().slice(waitingFrom).join(", "))
+      hyprlandStandIn.monitors = { values: [] }
+
       // The window closed while a stock's cap is on its way: nothing more is
       // asked for it, its close or its rate. Open again, the cap and P/E
       // come whole.
