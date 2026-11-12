@@ -1168,7 +1168,7 @@ Harness {
       // A scrub whose line runs through where the high's date rests, or
       // the low's (-crossedlow-): the line and dot pass over the mark.
       var low = root.stateName.indexOf("-crossedlow-") > 0
-      var marked = root.shownHistoryEntry.history.bars
+      var marked = History.drawnBars(body.motion.history)
       body.motion.scrubT = marked[Math.round(body.rangeMarks[low ? "low" : "high"].x * (marked.length - 1)) + (low ? 55 : -4)].t
     } else if (root.overnight && root.overnight.scrub && root.overnight.month) {
       var bars = root.shownHistoryEntry.history.bars

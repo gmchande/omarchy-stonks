@@ -65,7 +65,7 @@ Item {
   // Through the newest trade's column.
   readonly property int inkColumns: drawable
     ? Math.min(grid.columns, Math.floor(geometry.points[geometry.points.length - 1].x * grid.columns) + 1) : 0
-  readonly property int scrubColumn: scrubX >= 0 ? Math.min(grid.columns - 1, Math.floor(scrubX * grid.columns)) : -1
+  readonly property int scrubColumn: scrubX >= 0 ? Chart.retroColumn(grid, scrubX) : -1
   // What is laid over the ink draws in with it (`RangeMarks`).
   readonly property real inkDrawn: replayX < 0 && reveal >= 1 ? width : curtain.width
   // The stems are retro's wash: each side adds the lightness the up colour's
@@ -93,15 +93,20 @@ Item {
   }
 
   // How far along the columns `x` is: they end short of the chart's width
-  // where it holds no whole number of them.
+  // where it holds no whole number of them. The start's own column reads
+  // the start.
   function fractionAt(x) {
-    return x / (grid.columns * grid.pitch)
+    return grid.ownStart && x < grid.pitch ? 0 : x / (grid.columns * grid.pitch)
+  }
+
+  // The column a point at `fraction` stands in (`Chart.retroColumn`).
+  function columnAt(fraction) {
+    return Chart.retroColumn(grid, fraction)
   }
 
   // The centre of the column `layout` puts it in.
   function xAt(fraction) {
-    var col = Math.max(0, Math.min(grid.columns - 1, Math.floor(fraction * grid.columns)))
-    return col * grid.pitch + pixel / 2
+    return columnAt(fraction) * grid.pitch + pixel / 2
   }
 
   // The lit rows of the columns between `x0` and `x1`, and the baselines'.
@@ -140,9 +145,11 @@ Item {
     }
   }
 
+  // A replay that has left the start reveals the column after it, where
+  // every later point stands (`Chart.retroColumn`).
   Item {
     id: curtain
-    width: (root.replayX >= 0 ? Math.ceil(root.grid.columns * Math.min(1, root.replayX))
+    width: (root.replayX >= 0 ? Math.max(Math.ceil(root.grid.columns * Math.min(1, root.replayX)), root.grid.ownStart ? Chart.retroColumn(root.grid, root.replayX) + 1 : 0)
       : root.reveal >= 1 ? root.grid.columns : Math.ceil(root.inkColumns * Math.max(0, root.reveal))) * root.grid.pitch
     height: root.height
     clip: true

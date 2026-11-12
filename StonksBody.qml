@@ -918,7 +918,8 @@ Item {
   // the same bar.
   function chime(again) {
     if (!sounds || motion.replayRunning) return
-    var bar = ChartSound.barAt({ retro: retro, geometry: motion.geometry, grid: heroBand.pixelGrid }, motion.scrubX)
+    var bar = ChartSound.barAt({ retro: retro, geometry: motion.geometry, grid: heroBand.pixelGrid,
+      column: retro && motion.scrubX >= 0 ? heroBand.pixelColumnAt(motion.scrubX) : -1 }, motion.scrubX)
     if (bar !== chimed || again) sounds.chime(bar)
     chimed = bar
   }

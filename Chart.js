@@ -13,12 +13,13 @@
 // The chart a view shows, `symbol` on `range`, or null while it is on its way.
 // The day waits for its quote and, where Robinhood may trade it all day, for
 // Robinhood (`dayDrawn`); a range for its history and the quote, since the
-// headline is never the last bar. A range ends on the day's newest price since
-// the close, and never waits for it. `histories` holds answers only, so what
-// is drawn stays while a refetch is out and after one fails. A failed first
-// fetch is an answer: a quote's shows the symbol alone, and a range's has the
-// day stand in (`failed`). `latest` is the newest trade of all, or null where
-// the quote's own last trade is it.
+// headline is never the last bar. A range starts at the close before it, at
+// its time by the listing's calendar (`History.withStart`), and ends on the
+// day's newest price since the close, and never waits for it. `histories`
+// holds answers only, so what is drawn stays while a refetch is out and after
+// one fails. A failed first fetch is an answer: a quote's shows the symbol
+// alone, and a range's has the day stand in (`failed`). `latest` is the
+// newest trade of all, or null where the quote's own last trade is it.
 function viewChart(symbol, range, quotes, entries, histories, nights, allDay, calendars, slideAt) {
   if (!symbol) return null
   var quote = quotes[symbol] || null
@@ -37,7 +38,10 @@ function viewChart(symbol, range, quotes, entries, histories, nights, allDay, ca
   if (!entry) return null
   if (entry.history) {
     var trade = Overnight.newestTrade(quote, chart.latest, calendars, chart.day)
-    chart.history = History.withNewest(entry.history, trade, trade ? Market.tradeClock(quote, trade.t, calendars) : null)
+    var first = entry.history.bars[0]
+    var closeAt = first ? Calendar.closeBefore(Calendar.calendarFor(calendars, quote), first.t) : null
+    chart.history = History.withStart(History.withNewest(entry.history, trade, trade ? Market.tradeClock(quote, trade.t, calendars) : null),
+      closeAt, closeAt !== null ? Market.tradeClock(quote, closeAt, calendars) : null)
   } else chart.failed = true
   return chart
 }
@@ -234,7 +238,9 @@ function stepTime(quote, t, steps, last) {
 // apart: each column's level, whether it is dim, which side of the close
 // it is on (`above`), the last column lit, and the baseline's row, which
 // steps to `stepRow` from `stepCol` on. The last
-// trade in a column wins: the price at the end of that stretch. A column
+// trade in a column wins: the price at the end of that stretch. A range's
+// start (`rangeStart`) keeps the first column to itself, so the column the
+// line starts from is always there (`ownStart`, `retroColumn`). A column
 // between two trades the line joins holds the one before it; only a break
 // (`brk`) leaves columns dark, as it lifts the smooth line. With no previous
 // close known, the columns stand on the floor, until a step to a close that
@@ -244,18 +250,22 @@ function stepTime(quote, t, steps, last) {
 function retroGrid(geometry, width, height, pixel, gap) {
   var pitch = pixel + gap
   var columns = Math.max(1, Math.floor(width / pitch))
-  var g = { pitch: pitch, columns: columns, rows: Math.max(1, Math.floor(height / pixel)), baseRow: 0, stepCol: columns, stepRow: 0, levels: [], above: [], dim: [], lastLit: -1 }
+  var g = { pitch: pitch, columns: columns, rows: Math.max(1, Math.floor(height / pixel)), baseRow: 0, stepCol: columns, stepRow: 0, levels: [], above: [], dim: [], lastLit: -1, ownStart: false }
   if (!geometry || !geometry.points) return g
   g.baseRow = hasBaseline(geometry) ? Math.round(geometry.baselineY * (g.rows - 1)) : g.rows - 1
   var step = geometry.step
   g.stepCol = step ? Math.max(0, Math.min(g.columns - 1, Math.floor(step.x * g.columns))) : g.columns
   g.stepRow = step ? Math.round(step.y * (g.rows - 1)) : g.baseRow
   var pts = geometry.points
+  g.ownStart = pts.length > 1 && columns > 1 && !!pts[0].rangeStart
+  // Halfway to the next point, where a scrub, which reads the nearest
+  // point, leaves the start.
+  g.startReach = g.ownStart ? pts[1].x / 2 : 0
   // The lit cell sits on the last column whose own last trade is bright,
   // never on one held after it.
   var last = -1
   for (var i = 0; i < pts.length; i++) {
-    var col = Math.max(0, Math.min(g.columns - 1, Math.floor(pts[i].x * g.columns)))
+    var col = retroColumn(g, pts[i].x)
     if (col !== last && last >= 0 && !g.dim[last]) g.lastLit = last
     for (var held = last + 1; i > 0 && !pts[i].brk && held < col; held++) {
       g.levels[held] = g.levels[last]
@@ -274,6 +284,15 @@ function retroGrid(geometry, width, height, pixel, gap) {
 // The baseline's row under column `c`.
 function retroBaseRow(g, c) {
   return c >= g.stepCol ? g.stepRow : g.baseRow
+}
+
+// The column a place `x` along the chart stands in: a point's, a scrub's or
+// a replay's. With the start in the first column alone, every place a scrub
+// reads as the start stands there, and every later one from the second on.
+function retroColumn(g, x) {
+  var col = Math.max(0, Math.min(g.columns - 1, Math.floor(x * g.columns)))
+  if (!g.ownStart) return col
+  return x < g.startReach ? 0 : Math.max(1, col)
 }
 
 // Where the dot sits: the newest trade of what trades now, else the regular

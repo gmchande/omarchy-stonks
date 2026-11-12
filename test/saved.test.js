@@ -2331,7 +2331,12 @@ test("in every phase, a stock that has traded since its close shows that newest 
   // the range's start to it, named under it by the range, so the week's
   // move never reads as the night's; a scrub at the line's end reading it,
   // and the range's low taking it. The range's volume stays Yahoo's bars'.
-  for (const [set, moment, when, day] of [["watch-2026-10-25-2335", "2026-10-25-2335", "23:30", "25 OCT"], ["watch-2026-10-26-2005", "2026-10-26-2005", "20:00", "26 OCT"]]) {
+  // The line starts at the range's start, on its dashed line, so the move
+  // reads from the line's left end to its right: in the week NBIS gapped
+  // from 141.52 at Wednesday 4 November's close to 127.23 by 09:45 Thursday,
+  // as on any other.
+  for (const [set, moment, when, day] of [["watch-2026-10-25-2335", "2026-10-25-2335", "23:30", "25 OCT"], ["watch-2026-10-26-2005", "2026-10-26-2005", "20:00", "26 OCT"],
+    ["ranges-2026-11-11-1800", "2026-11-11-1800", "17:57", "11 NOV"]]) {
     const at = topsAt(set)
     const top = M.rowModel(at.quotes.NBIS, 0, "pct", at.newest.NBIS)
     for (const [range, span] of [["1W", "5d"], ["1M", "1mo"], ["1Y", "1y"]]) {
@@ -2340,8 +2345,10 @@ test("in every phase, a stock that has traded since its close shows that newest 
       const chart = M.viewChart("NBIS", range, at.quotes, {}, { ["NBIS|" + range]: { status: "ok", history: raw } }, at.nights, at.allDay, calendars)
       const history = chart.history
       const model = M.historyRowModel(history, at.quotes.NBIS, 0)
-      const line = M.historyGeometry(history).points
+      const geometry = M.historyGeometry(history)
+      const line = geometry.points
       expect([where, model.priceText, model.newest.t, line.at(-1).p]).toEqual([where, top.priceText, at.newest.NBIS.t, at.newest.NBIS.p])
+      expect([where, line[0].p, line[0].y]).toEqual([where, raw.baseline, geometry.baselineY])
       expect([where, M.heroLines(at.quotes.NBIS, model, chart.latest, at.now, chart.day, calendars, "pct", false).caption.label]).toEqual([where, range])
       expect([where, model.changeText]).toEqual([where, M.pct((at.newest.NBIS.p - raw.baseline) / raw.baseline * 100)])
       expect([where, M.historyRowModel(history, at.quotes.NBIS, at.newest.NBIS.t).priceText]).toEqual([where, top.priceText])
@@ -2350,6 +2357,40 @@ test("in every phase, a stock that has traded since its close shows that newest 
       expect([where, M.historyScrubForms(history, history.bars.at(-1))[1]]).toEqual([where, `${day}${range === "1Y" ? " 2026" : ""} ${when}`])
       expect([where, M.rangeVolume(history)]).toEqual([where, M.rangeVolume(raw)])
     }
+  }
+  // A scrub at the line's start reads the close the move counts from, by
+  // its day and time where the calendar names it, as 1D names its close, and
+  // as the close before the first bar where it doesn't reach; the screenshot
+  // says it with its zone. Its move is none. Retro, at the panel's 69
+  // columns for 1W's 132 points, keeps the first column for the start, on
+  // the dashed line's row, the column the scrub there lights, and Yahoo's
+  // first bar stands in the next.
+  {
+    const at = topsAt("ranges-2026-11-11-1800")
+    const start = range => {
+      const span = { "1W": "5d", "1M": "1mo", "3M": "3mo", "6M": "6mo", YTD: "ytd", "1Y": "1y", "2Y": "2y", "5Y": "5y", "10Y": "10y", All: "max" }[range]
+      const raw = M.parseHistory(fixture(`history/nbis-2026-11-11-1800-${span}.json`), range)
+      const history = M.viewChart("NBIS", range, at.quotes, {}, { ["NBIS|" + range]: { status: "ok", history: raw } }, at.nights, at.allDay, calendars).history
+      const bar = M.historyBarAt(history, 0)
+      const geometry = M.historyGeometry(history)
+      const grid = M.retroGrid(geometry, 69 * 6, 120, 4, 2)
+      const scrubbed = M.retroColumn(grid, M.historyFraction(history, bar.t))
+      // A replay's place stands in the column of the point the scrub reads
+      // there, from the start to the first bar, and so sounds it.
+      const replayed = [0, 0.4, 0.6, 1].map(k => k * geometry.points[1].x)
+        .every(x => M.retroColumn(grid, x) === M.retroColumn(grid, M.historyFraction(history, M.historyBarAt(history, x).t)))
+      return [range, M.historyScrubForms(history, bar)[0], load("Share.js").barDate(history, bar), M.historyRowModel(history, at.quotes.NBIS, bar.t).changeText,
+        geometry.points[0].p === raw.baseline, grid.levels[0] === grid.baseRow, scrubbed, M.retroColumn(grid, geometry.points[1].x), replayed]
+    }
+    // A daily range's close is its day's, and a listing younger than the
+    // range, as NBIS since its return on 21 October 2024, starts at its
+    // first day's price.
+    for (const [range, words, picture] of [["1W", "4 NOV 16:00 · 141.52", "4 NOV 16:00 EST"], ["1M", "9 OCT 16:00 · 221.07", "9 OCT 16:00 EDT"],
+      ["3M", "11 AUG · 193.23", "11 AUG"], ["6M", "11 MAY · 186.10", "11 MAY"],
+      ["YTD", "CLOSE BEFORE 2 JAN · 83.71", "CLOSE BEFORE 2 JAN"], ["1Y", "CLOSE BEFORE 12 NOV 2025 · 102.22", "CLOSE BEFORE 12 NOV 2025"],
+      ["2Y", "CLOSE BEFORE 12 NOV 2024 · 20.94", "CLOSE BEFORE 12 NOV 2024"], ["5Y", "21 OCT 2024 · 14.29", "21 OCT 2024"],
+      ["10Y", "21 OCT 2024 · 14.29", "21 OCT 2024"], ["All", "21 OCT 2024 · 14.29", "21 OCT 2024"]])
+      expect(start(range)).toEqual([range, words, picture, "0.00%", true, true, 0, 1, true])
   }
   // Its own day and clock, as 1D names it, though the range's periods are
   // stamped otherwise: at 23:00 on Sunday 25 October, a day's bar reads

@@ -191,7 +191,12 @@ function retro(grid, from, to, seconds) {
   var ticks = []
   for (var i = 0; i < x.length; i += STEP) {
     var t = i / RATE
-    var col = Math.max(0, Math.min(grid.columns - 1, Math.floor(placeAt(t, from, to, seconds) * grid.columns)))
+    var place = placeAt(t, from, to, seconds)
+    // A range's start keeps the first column to itself until the scrub,
+    // which reads the nearest point, leaves it; the columns then run from
+    // the second (`Chart.retroColumn`).
+    var col = Math.max(0, Math.min(grid.columns - 1, Math.floor(place * grid.columns)))
+    if (grid.ownStart) col = place < grid.startReach ? 0 : Math.max(1, col)
     if (col !== lastCol) {
       lastCol = col
       var row = grid.levels[col]
@@ -251,13 +256,13 @@ function rowBar(grid, row) {
 }
 
 // -1 where the chart draws nothing. Smooth reads the line's height, where the
-// scrub's dot sits; retro the lit row of the column.
+// scrub's dot sits; retro the lit row of the scrub's `column`.
 function barAt(chart, x) {
   if (x < 0) return -1
   if (chart.retro) {
     var grid = chart.grid
     if (!grid || !grid.levels) return -1
-    var row = grid.levels[Math.max(0, Math.min(grid.columns - 1, Math.floor(x * grid.columns)))]
+    var row = grid.levels[chart.column]
     return row === undefined ? -1 : rowBar(grid, row)
   }
   return lineBars(chart.geometry)(x)

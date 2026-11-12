@@ -66,6 +66,11 @@ Item {
   readonly property alias chartItem: heroChart
   // A replay's sound steps through it in retro, a note a column.
   readonly property var pixelGrid: retroChart.grid
+  // The retro column a place on the chart stands in, which a scrub's chime
+  // strikes.
+  function pixelColumnAt(fraction) {
+    return retroChart.columnAt(fraction)
+  }
 
   // The hero's change or the rows' unit, clicked: the unit steps.
   signal changeClicked()
