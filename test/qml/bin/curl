@@ -297,6 +297,9 @@ for i in "${!urls[@]}"; do
     exit_code=7
     body=""
   elif [ -e "$state/$host.refuse" ]; then
+    # A round trip, as the real one takes, so a run stopped at a refusal
+    # stops before its next request.
+    sleep 0.3 > /dev/null 2>&1
     status=429
     body="Too Many Requests"
   else

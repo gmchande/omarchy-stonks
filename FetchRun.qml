@@ -72,7 +72,13 @@ Item {
       onDataChanged: {
         if (!root.streaming) return
         var fresh = root.read(String(text || ""))
-        if (fresh.length > 0) root.arrived(fresh)
+        if (fresh.length === 0) return
+        // The host said no: the gate pauses it, and the rest of the run
+        // would only be refused too.
+        var refused = fresh.some(function(a) { return a.kind === "refused" })
+        if (refused) root.tell()
+        root.arrived(fresh)
+        if (refused) root.stop()
       }
       onStreamFinished: root.end(String(text || ""))
     }

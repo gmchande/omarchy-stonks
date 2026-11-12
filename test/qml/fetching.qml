@@ -370,12 +370,19 @@ Harness {
       harness.check("a range's history is asked once, kept a quarter hour, and asked again after it",
         once && kept && again, [once, kept, again, asked() - historyFrom].join(" "))
 
-      // Yahoo refuses: the run that meets it is the last for a pause of
-      // about a minute, then one request goes alone. Back, the next lone
-      // request reopens it.
+      // Yahoo refuses: the run that meets it stops at that refusal, and is
+      // the last for a pause of about a minute, then one request goes
+      // alone. Back, the next lone request reopens it.
+      var beforeRefusal = harness.requests().length
       touch("YAHOO.refuse")
-      var askedAt = 0
-      tick(70, 1, function() { if (!askedAt && gate.pause === "refused") askedAt = service.now })
+      var askedAt = 0, metRefusal = []
+      tick(70, 1, function() {
+        if (askedAt || gate.pause !== "refused") return
+        askedAt = service.now
+        metRefusal = harness.requests().slice(beforeRefusal).filter(function(line) { return / 429$/.test(line) })
+      })
+      harness.check("Yahoo refusing: the run that meets it asks nothing after the refusal",
+        metRefusal.length === 1, metRefusal.join(" | "))
       // The header names the trouble once a price is 90 s overdue: on to
       // 100 s after the refusal, wherever in the minute it came.
       var said = ""
