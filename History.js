@@ -286,29 +286,38 @@ function historySpansYears(history) {
   return !!(first && last && first.year !== last.year)
 }
 
-// A quarter of Yahoo's own names its three months, as SEP–NOV 2025: a month
-// alone would date its high or its close to the wrong one. The live moment
-// Yahoo appends to the quarters, the newest price, the quote's day and a
-// trade (with its `clock`) are moments, each its own month.
-function historyDateText(history, t, withYear, interval, clock) {
+// A quarter of Yahoo's own names its three months, as SEP–NOV 2025, and a
+// week whose trading days cross into a new month, given `weekDays`, both, as
+// NOV–DEC 2025: one month alone would date its high or its close to the
+// wrong one. The live moment Yahoo appends to them, the newest price, the
+// quote's day and a trade (with its `clock`) are moments, each its own month.
+function historyDateText(history, t, withYear, interval, clock, weekDays) {
   var date = historyDateParts(history, t, clock)
   if (!date) return "—"
   var year = function(d) { return withYear ? " " + d.year : "" }
   if (interval !== "1mo" && interval !== "3mo") return date.day + " " + Format.MONTHS[date.month] + year(date)
-  if (clock || !isQuarter(history, t)) return Format.MONTHS[date.month] + year(date)
-  var end = new Date(Date.UTC(date.year, date.month + 2, 1))
-  var last = { month: end.getUTCMonth(), year: end.getUTCFullYear() }
+  var last = clock ? null : spanEnd(history, t, date, weekDays)
+  if (!last || (last.month === date.month && last.year === date.year)) return Format.MONTHS[date.month] + year(date)
   return Format.MONTHS[date.month] + (last.year !== date.year ? year(date) : "") + "–" + Format.MONTHS[last.month] + year(last)
 }
 
-function isQuarter(history, t) {
-  if (history.interval !== "3mo" || t === history.liveAt) return false
-  return history.bars.concat(history.unclosed || []).some(function(bar) { return bar.t === t && !bar.newest })
+// The last trading day of a bar of Yahoo's own stamped `t`, which begins on
+// `first`: a quarter's third month, or the `weekDays`th day from its week's
+// Monday (a new listing's first week can start later). Null for any other
+// moment.
+function spanEnd(history, t, first, weekDays) {
+  var week = history.interval === "1wk" && !!weekDays
+  if ((history.interval !== "3mo" && !week) || t === history.liveAt) return null
+  if (!history.bars.concat(history.unclosed || []).some(function(bar) { return bar.t === t && !bar.newest })) return null
+  var sinceMonday = (new Date(Date.UTC(first.year, first.month, first.day)).getUTCDay() + 6) % 7
+  var end = week ? new Date(Date.UTC(first.year, first.month, first.day - sinceMonday + weekDays - 1))
+    : new Date(Date.UTC(first.year, first.month + 2, 1))
+  return { month: end.getUTCMonth(), year: end.getUTCFullYear() }
 }
 
-function historyStatsDateText(history, t, withYear, interval, clock) {
+function historyStatsDateText(history, t, withYear, interval, clock, weekDays) {
   var coarse = interval === "1wk" || interval === "1mo" || interval === "3mo"
-  return historyDateText(history, t, coarse || withYear, coarse ? "1mo" : "1d", clock)
+  return historyDateText(history, t, coarse || withYear, coarse ? "1mo" : "1d", clock, weekDays)
 }
 
 // Yahoo appends the live moment to weekly, monthly and quarterly bars as a
@@ -454,17 +463,19 @@ function heldLines(histories, symbol, quote, trades) {
 // A moment that isn't one of the range's bars (`rangeEnds`) is dated by
 // `clockAt(t)`, the exchange's clock then (`Market.tradeClock`), as the
 // newest price is: a range or a quote held from before a change of clocks
-// would read the old one.
+// would read the old one. A week's bar trades Monday to Friday, or to Sunday
+// for a coin, which never closes.
 function rangeMarks(history, ends, quote, clockAt) {
   if (!ends) return null
   var digits = quote ? quote.priceDigits : undefined
   var years = historySpansYears(history)
   var drawnTo = history.bars[history.bars.length - 1].t
+  var weekDays = quote ? (quote.crypto ? 7 : 5) : null
   var mark = function(point) {
     return {
       x: point.t > drawnTo ? 1 : historyFraction(history, point.t),
       price: Format.money(point.p, digits),
-      date: historyStatsDateText(history, point.t, years, history.interval, point.moment && clockAt ? clockAt(point.t) : null)
+      date: historyStatsDateText(history, point.t, years, history.interval, point.moment && clockAt ? clockAt(point.t) : null, weekDays)
     }
   }
   return { high: mark(ends.high), low: mark(ends.low) }

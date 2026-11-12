@@ -1531,6 +1531,16 @@ test("a range marks its high and low on its chart, over their bars, with their d
   // Yahoo appends to the quarters is a moment, so its own month.
   const december = quarters.bars.filter(b => new Date(b.t * 1000).getUTCMonth() === 11).at(-1)
   expect([december, quarters.bars.at(-1)].map(b => M.historyScrubForms(quarters, b)[0])).toEqual(["DEC 2025–FEB 2026 · 392.74", "NOV 2026 · 521.13"])
+  // A week whose trading days cross into a new month names both months, as
+  // its high could be in either: a stock's Monday to Friday, a coin's Monday
+  // to Sunday. The scrub names the week by its Monday.
+  const weekOf = date => weekly.bars.find(b => M.historyScrubForms(weekly, b)[1] === `WEEK OF ${date}`)
+  const highOf = (bar, quote) => marksOf({ ...weekly, bars: weekly.bars.map(b => (b === bar ? { ...b, h: 1000 } : b)) }, quote).high.date
+  const stock = { priceDigits: 2 }
+  const coin = { priceDigits: 2, crypto: true }
+  expect([stock, coin].map(q => highOf(weekOf("27 OCT 2025"), q))).toEqual(["OCT 2025", "OCT–NOV 2025"])
+  expect([stock, coin].map(q => highOf(weekOf("29 DEC 2025"), q))).toEqual(["DEC 2025–JAN 2026", "DEC 2025–JAN 2026"])
+  expect([stock, coin].map(q => highOf(weekOf("5 JAN 2026"), q))).toEqual(["JAN 2026", "JAN 2026"])
 })
 
 // A range is fetched each hour and the quote each minute, so the quote's day
