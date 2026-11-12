@@ -83,6 +83,13 @@ Harness {
     }
   }
 
+  // Called after each frame's bindings while a step sets it.
+  property var onFrame: null
+  Connections {
+    target: harness.onFrame ? app.body.watchlist.Window.window : null
+    function onAfterAnimating() { harness.onFrame() }
+  }
+
   Process { id: fileProc }
 
   Steps {
@@ -137,6 +144,24 @@ Harness {
       return counts
     }
 
+    // Robinhood's listing answer, as the surface has it, handed to the
+    // surface again with each symbol's read counted in `reads`: a US stock's
+    // row reads its symbol's once each time it works out its day.
+    function countedAllDay(reads) {
+      var answer = app.body.allDay
+      var out = {}
+      service.allSymbols.forEach(function(s) {
+        Object.defineProperty(out, s, { enumerable: true, get: function() { reads[s] = (reads[s] || 0) + 1; return answer[s] } })
+      })
+      app.body.allDay = out
+    }
+    // The rows in sight, by symbol, the featured one aside: the chart reads
+    // its answer too.
+    function rowsInSight() {
+      var rows = app.body.watchlist.rowItems()
+      return Object.keys(rows).filter(function(s) { return rows[s].inSight && s !== service.view.featured })
+    }
+
     function test_cost() {
       // A tall window, many rows in sight.
       app.floatingWindow.implicitHeight = 1400
@@ -183,15 +208,59 @@ Harness {
       list.contentY = 0
       rested()
       var atTop = built()
+      // A glide to the end, frame by frame: the rows it shows, and those it
+      // builds without showing.
+      var shown = {}
+      var passed = {}
+      harness.onFrame = function() {
+        var rows = list.rowItems()
+        for (var s in rows) {
+          if (rows[s].inSight) shown[s] = true
+          else if (rows[s].built) passed[s] = true
+        }
+      }
       list.scrollToRow(list.displayedSymbols.length - 1)
       var moved = within(5000, function() { return !list.settling && list.contentY >= list.contentHeight - list.height - 1 })
+      harness.onFrame = null
       var atEnd = built()
+      var endRows = list.rowItems()
+      var passedOver = Object.keys(passed).filter(function(s) { return !shown[s] && !endRows[s].built })
       for (var notch = 0; notch < 10; notch++) mouseWheel(list, 30, 30, 0, 120)
       rested()
       var back = built()
-      harness.check("of 154 rows, only those near sight are built, wherever the list is scrolled",
-        moved && [atTop, atEnd, back].every(function(n) { return n > 0 && n <= nearSight }) && nearSight < 154,
-        [atTop, atEnd, back].join(", ") + " built of " + nearSight + " near sight")
+      harness.check("of 154 rows, only those near sight are built, wherever the list is scrolled, and a glide builds none it only passes over",
+        moved && [atTop, atEnd, back].every(function(n) { return n > 0 && n <= nearSight }) && nearSight < 154 && passedOver.length === 0,
+        [atTop, atEnd, back].join(", ") + " built of " + nearSight + " near sight; " + passedOver.length + " built only to be passed over")
+
+      // Every row into sight once, then back at the top Robinhood answers.
+      list.takeOver()
+      for (var y = 0; y <= list.contentHeight; y += list.sightHeight / 2) list.contentY = list.clampY(y)
+      list.contentY = 0
+      rested()
+      var answered = {}
+      countedAllDay(answered)
+      var seen = rowsInSight()
+      var unseen = Object.keys(answered).filter(function(s) { return seen.indexOf(s) < 0 && s !== service.view.featured })
+      harness.check("with every row seen once, a Robinhood answer is worked out once by each row in sight and by none out of sight",
+        seen.some(function(s) { return answered[s] === 1 }) && seen.every(function(s) { return !(answered[s] > 1) }) && unseen.length === 0,
+        seen.filter(function(s) { return answered[s] === 1 }).length + " of " + seen.length + " rows in sight worked it out once; "
+          + unseen.length + " out of sight did")
+
+      // To a list of ten and back: the rows out of sight keep the line they
+      // drew, and those in sight show the latest.
+      var rows = list.rowItems()
+      var lines = {}
+      for (var s in rows) lines[s] = rows[s].geometry
+      service.switchList("Ten")
+      tryVerify(function() { return list.displayedSymbols.length === 10 }, 3000)
+      service.switchList("")
+      tryVerify(function() { return list.displayedSymbols.length === 154 }, 3000)
+      rested()
+      var redrawn = Object.keys(rows).filter(function(s) { return !rows[s].inSight && rows[s].geometry !== lines[s] })
+      var stale = Object.keys(rows).filter(function(s) { return rows[s].inSight && (rows[s].quote !== service.quotes[s] || !rows[s].day) })
+      harness.check("a switch to a list and back redraws no row out of sight, and every row in sight shows its latest",
+        redrawn.length === 0 && stale.length === 0,
+        redrawn.length + " rows out of sight redrawn; in sight without their latest: " + stale.slice(0, 5).join(","))
 
       app.close()
       harness.finish()

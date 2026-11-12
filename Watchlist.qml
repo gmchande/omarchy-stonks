@@ -618,37 +618,47 @@ Flickable {
         onRested: root.rowRested(symbol)
         look: root.look
         width: parent.width
-        // A row more than a row out of sight keeps the quote it showed, so
-        // answers repaint only rows in sight; it takes the latest before the
-        // frame it comes into sight.
-        readonly property bool inSight: lifted || (y + height > root.contentY - root.rowPitch
-          && y < root.contentY + root.sightHeight + root.rowPitch)
-        // Words and pointer built within a screen of the view, so a glide or a
-        // page's step finds them built.
-        built: lifted || (place >= 0 && y + height > root.contentY - root.sightHeight
-          && y < root.contentY + 2 * root.sightHeight)
+        // Whether the row lies within `above` and `below` of the view at
+        // `top`. From its place, not `y`, which a new place may not have
+        // reached yet.
+        function near(top, above, below) {
+          var at = place * pitch + shift
+          return place >= 0 && at + height > top - above && at < top + root.sightHeight + below
+        }
+        readonly property bool inSight: lifted || near(root.contentY, root.rowPitch, root.rowPitch)
+        // Words and pointer built within a screen of where the list rests or
+        // is headed, so a page's step finds them built, and for the rows a
+        // glide shows on its way, not those it passes over.
+        built: inSight || near(root.headedY, root.sightHeight, root.sightHeight)
         menuCovers: root.menuCovers > 0 ? root.menuCovers - (y - root.contentY) : 0
+        // A row out of sight, or hidden by a list, keeps the quote and day it
+        // showed, so answers repaint and work out only rows in sight; it takes
+        // the latest before the frame it comes into sight. A Binding signals
+        // each write, the same value too; `quote` and `day` pass on only a
+        // change.
         property var sightQuote: null
         Binding on sightQuote {
-          value: rowDelegate.place >= 0 ? root.quotes[rowDelegate.symbol] || null : null
-          when: rowDelegate.place >= 0 && rowDelegate.inSight
+          value: root.quotes[rowDelegate.symbol] || null
+          when: rowDelegate.inSight
           restoreMode: Binding.RestoreNone
         }
-        quote: place >= 0 ? sightQuote : null
-        // Taken in sight, as the quote is.
+        quote: sightQuote
+        // Out of sight, the day it has, so leaving sight changes nothing.
         property var sightDay: null
         Binding on sightDay {
-          value: rowDelegate.quote ? Chart.lineDay(rowDelegate.symbol, rowDelegate.quote, root.nights, root.allDay, root.calendars, root.slideAt) : null
-          when: rowDelegate.place >= 0 && rowDelegate.inSight
+          value: !rowDelegate.inSight ? rowDelegate.day
+            : root.quotes[rowDelegate.symbol] ? Chart.lineDay(rowDelegate.symbol, root.quotes[rowDelegate.symbol], root.nights, root.allDay, root.calendars, root.slideAt)
+            : null
+          when: rowDelegate.inSight
           restoreMode: Binding.RestoreNone
         }
-        day: quote ? sightDay : null
+        day: sightDay
         // Only rows in sight follow the scrub, or each step repaints every row.
         readonly property int sightScrub: inSight ? root.scrubShown : 0
         view: quote ? Figures.listRow(quote, sightScrub, root.changeMode, root.newestTrades[symbol] || null) : null
         status: root.entryOf(symbol) ? root.entryOf(symbol).status : "loading"
         // Freshness reads the clock every second: only rows in sight do.
-        freshness: place >= 0 && inSight ? root.freshnessOf(symbol) : null
+        freshness: inSight ? root.freshnessOf(symbol) : null
         sourceDown: root.sourceDown
         featuredRow: symbol === root.featuredSymbol
         cursor: symbol === root.cursorRow
