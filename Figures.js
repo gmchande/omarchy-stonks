@@ -39,7 +39,7 @@ function extendedStack(quote, latest, now, day, changeMode) {
   var digits = quote.priceDigits
   if (!ext || !Format.isFiniteNumber(close) || (!overnight && Format.money(ext.p, digits) === Format.money(close, digits))) return null
   var unit = changeMode === "abs" ? "abs" : "pct"
-  var chg = Quote.change({ prevClose: close }, ext.p, unit)
+  var chg = Quote.change({ prevClose: close }, ext.p, unit, digits)
   return {
     price: Format.money(ext.p, digits),
     changeText: Format.changeText(chg, unit, digits),
@@ -177,7 +177,7 @@ function listBreadth(symbols, quotes, scrubT, mode, newest) {
   for (var i = 0; i < symbols.length; i++) {
     var quote = quotes[symbols[i]]
     var read = quote ? reading(quote, scrubT, newest ? newest[symbols[i]] : null) : null
-    var chg = read ? Quote.change(read.base, read.price, mode) : null
+    var chg = read ? Quote.change(read.base, read.price, mode, quote.priceDigits) : null
     if (!chg || chg.pct === null) out.none++
     else out[Format.changeTone(chg, mode, quote.priceDigits)]++
   }
@@ -197,7 +197,7 @@ function reading(quote, scrubT, newest) {
 function rowModel(quote, scrubT, mode, newest) {
   var since = !scrubT && newest ? newest : null
   var read = reading(quote, scrubT, newest || null)
-  var chg = Quote.change(read.base, read.price, mode)
+  var chg = Quote.change(read.base, read.price, mode, quote.priceDigits)
   var direction = Quote.change(read.base, read.price, "pct")
   return {
     symbol: quote.symbol,
@@ -284,7 +284,7 @@ function closeLine(quote, today, changeMode, shown, calendars) {
 // trade after its bell: AFTER HOURS +1.35%. None where it rounds to nothing.
 function sinceClose(quote, newest, changeMode) {
   var unit = changeMode === "abs" ? "abs" : "pct"
-  var since = Quote.change({ prevClose: Quote.regularClose(quote) }, newest.p, unit)
+  var since = Quote.change({ prevClose: Quote.regularClose(quote) }, newest.p, unit, quote.priceDigits)
   var tone = Format.changeTone(since, unit, quote.priceDigits)
   return tone === "flat" ? null
     : { label: Market.phaseLabel(newest.phase).toUpperCase(), changeText: Format.changeText(since, unit, quote.priceDigits), tone: tone }

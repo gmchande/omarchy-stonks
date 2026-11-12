@@ -2275,8 +2275,10 @@ test("in every phase, a stock that has traded since its close shows that newest 
       .toEqual(["24H AGO 80,711", "24H \u2212795.72"])
   }
   // Wherever those lines show, at every saved watch moment: the close plus
-  // the move under the change is the price on top, give or take the rounding
-  // of each, and a price from a past day never says TODAY.
+  // the move under the change is the price on top, to its last digit where
+  // the price shows cents, and a price from a past day never says TODAY.
+  const number = text => Number(text.replace(/,/g, "").replace("\u2212", "-"))
+  const addsUp = (close, move, price, digits) => Math.abs(number(close) + number(move) - number(price)) < (digits >= 2 ? 1e-9 : 2 * Math.pow(10, -digits))
   {
     const off = []
     const sets = readdirSync(join(fixtures, "moments")).filter(set => set.startsWith("watch-") && existsSync(join(fixtures, "moments", set, "times.txt")))
@@ -2286,13 +2288,33 @@ test("in every phase, a stock that has traded since its close shows that newest 
         const view = M.rowModel(at.quotes[s], 0, "pct", at.newest[s] || null)
         const lines = under(at, s)
         if (!lines.close || lines.close.changeText !== "" || lines.caption.changeText === "") continue
-        const number = text => Number(text.replace(/,/g, "").replace("\u2212", "-"))
-        const digits = at.quotes[s].priceDigits
-        const off_by = Math.abs(number(lines.close.price) + number(lines.caption.changeText) - number(view.priceText))
         const today = M.exchangeDay(at.quotes[s], at.now) === M.exchangeDay(at.quotes[s], view.asOf)
-        if (off_by > 2 * Math.pow(10, -digits) || (lines.caption.label === "TODAY" && !today))
+        if (!addsUp(lines.close.price, lines.caption.changeText, view.priceText, at.quotes[s].priceDigits) || (lines.caption.label === "TODAY" && !today))
           off.push(`${set} ${s}: ${view.priceText} ${view.changeText} | ${said(lines).join(" | ")}`)
       }
+    }
+    expect(off).toEqual([])
+  }
+  // And in every saved answer read at rest, where Yahoo sends half-cents:
+  // AAPL's 347.725 under a close of 348.22 shows 347.73 and −0.49, not −0.50.
+  {
+    const off = []
+    const walk = dir => readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(join(dir, e.name)) : e.name.endsWith(".json") ? [join(dir, e.name)] : [])
+    const check = (quote, file) => {
+      const row = quote && M.rowModel(quote, 0, "abs")
+      if (!row || row.pct === null || !M.isFiniteNumber(row.close)) return
+      const close = M.money(row.close, quote.priceDigits)
+      if (!addsUp(close, row.changeText, row.priceText, quote.priceDigits)) off.push(`${file.slice(fixtures.length + 1)} ${quote.symbol}: ${close} ${row.changeText} ${row.priceText}`)
+    }
+    for (const file of walk(fixtures)) {
+      let answer
+      try { answer = JSON.parse(readFileSync(file, "utf8")) } catch { continue }
+      if (answer && answer.spark && answer.spark.result) {
+        for (const r of answer.spark.result) {
+          const day = r.response && r.response[0]
+          if (day && day.meta) check(M.sparkQuote(day, null, cents)?.quote, file)
+        }
+      } else if (answer && answer.chart && answer.chart.result) check(M.parseChart(answer, cents), file)
     }
     expect(off).toEqual([])
   }
