@@ -9,8 +9,9 @@
 # price as it changes; with every screen off nothing is asked, and the key
 # that wakes one asks at once; a panel open on a screen that's off asks what
 # a closed one asks, and the key that wakes that screen asks its rows at
-# once; and a click that stops a run ahead shows its chart from the answers
-# already in. HOME and curl are scratch; the fake curl answers from
+# once; a click that stops a run ahead shows its chart from the answers
+# already in; and a window closed while a cap is on its way asks nothing
+# more for it. HOME and curl are scratch; the fake curl answers from
 # test/fixtures/moments/fetch-2026-10-07.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 plugin_tree fetching.qml

@@ -620,6 +620,32 @@ Harness {
         [kilnIn, kilnShown, harness.calls("KILN.history") - kilnFrom].join(" "))
       body.selectRange("1D")
 
+      // The window closed while a stock's cap is on its way: nothing more is
+      // asked for it, its close or its rate. Open again, the cap and P/E
+      // come whole.
+      touch("fundamentals.SHOP.TO.hold")
+      var seriesFrom = harness.calls("SHOP.TO.fundamentals")
+      body.featureSymbol("SHOP.TO")
+      var seriesOut = within(5000, function() { return harness.calls("SHOP.TO.fundamentals") === seriesFrom + 1 })
+      closeWindow()
+      var capFrom = harness.requests().length
+      var fundamentalsAt = harness.calls("FUNDAMENTALS")
+      var ratesAt = harness.calls("RATE")
+      remove("fundamentals.SHOP.TO.hold")
+      var seriesIn = within(3000, function() { return harness.requests().slice(capFrom).indexOf("fundamentals SHOP.TO 200") >= 0 })
+      // Time for a request that must not go.
+      wait(1000)
+      var quiet = harness.calls("FUNDAMENTALS") === fundamentalsAt && harness.calls("RATE") === ratesAt
+      openWindow()
+      var whole = within(5000, function() {
+        var facts = body.yearLine ? body.yearLine.facts : []
+        return facts.length === 2 && facts.every(function(f) { return f.value !== "" })
+      })
+      harness.check("the window closed while a cap is on its way asks nothing more for it, and open again shows the cap and P/E",
+        seriesOut && seriesIn && quiet && whole,
+        [seriesOut, seriesIn, quiet, whole].join(" ") + " | " + harness.requests().slice(capFrom).join(", "))
+      closeWindow()
+
       harness.finish()
     }
   }

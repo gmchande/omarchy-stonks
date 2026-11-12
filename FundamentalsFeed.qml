@@ -127,16 +127,20 @@ Item {
       root.fail(job.symbol)
     } else if (step === "series" && read.cap) {
       root.job = Object.assign({}, job, { step: "close", fundamentals: read })
-      root.run(Fundamentals.capCloseUrl(job.symbol, read))
+      // Off screen by now: the EPS stands, and the cap waits for the next
+      // ask.
+      if (root.wants(job.symbol)) root.run(Fundamentals.capCloseUrl(job.symbol, read))
+      else root.fail(job.symbol)
     } else {
       root.keep(job.symbol, { status: "ok", fundamentals: read, checkedAt: clock.wallSecond() })
       root.askRate(read)
     }
   }
 
+  // A stock off screen by now waits for its next ask for the rate.
   function askRate(fundamentals) {
     var pair = Fundamentals.ratePair(fundamentals, job.currency)
-    if (Fundamentals.rateHeld(pair, rates, failedPairs, clock.wallSecond())) {
+    if (!root.wants(job.symbol) || Fundamentals.rateHeld(pair, rates, failedPairs, clock.wallSecond())) {
       root.done()
       return
     }
