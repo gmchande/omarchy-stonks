@@ -137,55 +137,64 @@ Item {
   // trades and reach, and while its start hasn't slid. So an answer for
   // another symbol repaints nothing, nor does a clock that moves no start,
   // and a preview's Yahoo day never stands in once it is added. `builtDays`
-  // is a cache the bindings above fill as they read; it doesn't notify.
+  // is kept from each chart the views show (`keepDay`); it doesn't notify.
   readonly property var builtDays: ({})
   function keptDay(symbol, chart, nights, allDay) {
     if (!chart || !chart.quote || chart.day === chart.quote) return chart
-    var tradability = allDay ? allDay[symbol] : null
-    var night = tradability && tradability.allDay ? nights[symbol] : null
-    var bars = night ? night.bars : null
-    var through = night ? night.through : null
-    var start = chart.day.axis ? chart.day.axis.start : null
+    var made = root.dayMadeFrom(symbol, chart, nights, allDay)
     var built = builtDays[symbol]
-    if (built && built.quote === chart.quote && built.bars === bars && built.through === through && built.start === start)
+    if (built && built.quote === made.quote && built.bars === made.bars && built.through === made.through && built.start === made.start)
       return Object.assign({}, chart, { day: built.day, latest: built.latest })
-    builtDays[symbol] = { quote: chart.quote, bars: bars, through: through, start: start, day: chart.day, latest: chart.latest }
     return chart
   }
+  function keepDay(symbol, chart) {
+    if (!chart || !chart.quote || chart.day === chart.quote) return
+    if (builtDays[symbol] && builtDays[symbol].day === chart.day) return
+    builtDays[symbol] = Object.assign(root.dayMadeFrom(symbol, chart, overnightFeed.entries, allDayFeed.entries), { day: chart.day, latest: chart.latest })
+  }
+  function dayMadeFrom(symbol, chart, nights, allDay) {
+    var tradability = allDay ? allDay[symbol] : null
+    var night = tradability && tradability.allDay ? nights[symbol] : null
+    return { quote: chart.quote, bars: night ? night.bars : null, through: night ? night.through : null,
+      start: chart.day.axis ? chart.day.axis.start : null }
+  }
+  onPreviewViewChanged: keepDay(previewView.featured, previewView.chart)
+
   // The price on top on the pill, the rows, and the hero. A stock's is worked
   // out again only when what it is read from changes (`Chart.newestTradeOf`):
   // each builds the stock's whole day, and a price that lands changes one
   // stock's, not every stock's. The same object while no stock's changes, so
-  // no row works out its figures again. `newestKept` doesn't notify.
-  readonly property var newestKept: ({ by: {}, out: {} })
-  readonly property var newestTrades: {
+  // no row works out its figures again.
+  property var newestTrades: ({})
+  // Each stock's newest price, with what it was worked out from.
+  property var newestFrom: ({})
+  function workOutNewest() {
     var nights = overnightFeed.entries
     var allDay = allDayFeed.entries
-    var before = root.newestKept.out
+    var from = {}
     var out = {}
-    var kept = {}
     var count = 0
     var same = true
-    allSymbols.forEach(function(symbol) {
+    root.allSymbols.forEach(function(symbol) {
       var quote = feed.quotes[symbol]
       if (!quote) return
       var night = nights[symbol]
       var bars = night ? night.bars : null
       var through = night ? night.through : null
       var trades = allDay[symbol] ? allDay[symbol].allDay : null
-      var had = root.newestKept.by[symbol]
-      kept[symbol] = had && had.quote === quote && had.bars === bars && had.through === through && had.trades === trades ? had
-        : { quote: quote, bars: bars, through: through, trades: trades, newest: Chart.newestTradeOf(symbol, quote, nights, allDay, calendars) }
-      if (!kept[symbol].newest) return
-      out[symbol] = kept[symbol].newest
+      var had = root.newestFrom[symbol]
+      from[symbol] = had && had.quote === quote && had.bars === bars && had.through === through && had.trades === trades ? had
+        : { quote: quote, bars: bars, through: through, trades: trades, newest: Chart.newestTradeOf(symbol, quote, nights, allDay, root.calendars) }
+      if (!from[symbol].newest) return
+      out[symbol] = from[symbol].newest
       count++
-      same = same && before[symbol] === out[symbol]
+      same = same && root.newestTrades[symbol] === out[symbol]
     })
-    root.newestKept.by = kept
-    if (same && count === Object.keys(before).length) return before
-    root.newestKept.out = out
-    return out
+    root.newestFrom = from
+    if (!same || count !== Object.keys(root.newestTrades).length) root.newestTrades = out
   }
+  onNightsChanged: workOutNewest()
+  onAllDayChanged: workOutNewest()
 
   // Held until every price the open asked for is in, or a site's pause
   // holds the rest once every run out is read, so the rows move once. A
@@ -770,6 +779,7 @@ Item {
   // together never ask for a mixed pair.
   property string chartOnShow: ""
   onViewChanged: {
+    keepDay(view.featured, view.chart)
     var chart = view.featured + "|" + view.range
     if (chart === chartOnShow) return
     var rangeLeft = chartOnShow !== "" && chartOnShow.split("|")[1] !== view.range
@@ -786,6 +796,7 @@ Item {
   // Written once the turn is over: an undo restores the quote before All
   // takes the symbol back, and a write between them left it out.
   onQuotesChanged: {
+    workOutNewest()
     settleArrivals()
     root.quotesUnsaved = true
     Qt.callLater(flushQuotes)
@@ -805,6 +816,7 @@ Item {
     root.askOvernight()
   }
   onAllSymbolsChanged: {
+    workOutNewest()
     settleArrivals()
     Qt.callLater(forgetLeft)
   }
