@@ -631,7 +631,7 @@ Harness {
       screensHeard()
       screenStandIn.holding = true
       // The screens' last answer, trusted for a second, runs out first.
-      wait(1100)
+      within(2000, function() { return Date.now() - service.screensAnsweredMs >= 1000 })
       var waitingFrom = harness.requests().length
       remove("fundamentals.SHEL.L.hold")
       var shelIn = within(3000, function() { return harness.requests().slice(waitingFrom).indexOf("fundamentals SHEL.L 200") >= 0 })
@@ -642,8 +642,9 @@ Harness {
       screenStandIn.holding = false
       screensHeard()
       // Time for a request that must not go.
-      wait(1000)
-      var shelQuiet = harness.calls("FUNDAMENTALS") === shelFundamentalsAt && harness.calls("RATE") === shelRatesAt
+      var shelQuiet = !within(1000, function() {
+        return harness.calls("FUNDAMENTALS") !== shelFundamentalsAt || harness.calls("RATE") !== shelRatesAt
+      })
       openWindow()
       var shelWhole = within(5000, function() {
         var facts = body.yearLine ? body.yearLine.facts : []
@@ -668,8 +669,9 @@ Harness {
       remove("fundamentals.SHOP.TO.hold")
       var seriesIn = within(3000, function() { return harness.requests().slice(capFrom).indexOf("fundamentals SHOP.TO 200") >= 0 })
       // Time for a request that must not go.
-      wait(1000)
-      var quiet = harness.calls("FUNDAMENTALS") === fundamentalsAt && harness.calls("RATE") === ratesAt
+      var quiet = !within(1000, function() {
+        return harness.calls("FUNDAMENTALS") !== fundamentalsAt || harness.calls("RATE") !== ratesAt
+      })
       openWindow()
       var whole = within(5000, function() {
         var facts = body.yearLine ? body.yearLine.facts : []
@@ -698,7 +700,8 @@ Harness {
       hyprlandStandIn.refreshMonitors()
       screensHeard()
       var dark = within(1000, function() { return service.screensOff })
-      wait(2500)
+      // Time for the bell, past Do Not Disturb's and the microphone's answer.
+      within(2500, function() { return bells() > closeFrom })
       var atClose = bells() - closeFrom
       screenStandIn.on = true
       hyprlandStandIn.refreshMonitors()

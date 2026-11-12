@@ -487,9 +487,9 @@ Harness {
       base(harness.window)
       var still = state(harness.window.body)
       press("b")
-      wait(200)
       harness.check("in the window, b leaves the pill's form alone",
-        JSON.stringify(state(harness.window.body)) === JSON.stringify(still), pill.barStyle + " " + harness.entrySaves)
+        !within(200, function() { return JSON.stringify(state(harness.window.body)) !== JSON.stringify(still) }),
+        pill.barStyle + " " + harness.entrySaves)
       press("Tab")
       press("o")
       harness.check("in the window, after Tab a key still does its action",
