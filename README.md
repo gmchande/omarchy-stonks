@@ -61,8 +61,8 @@ to step through your list, and drag it to move it along the bar. Point at
 it for what it has no room for, such as the time of the newest price.
 
 At night, after the stock's first trade, the pill keeps the day's close
-and move until the new day's first prices arrive, soon after 04:00. Point
-at it for tonight's price and move.
+and move until the new day's first prices arrive, soon after 04:00, and
+pointing at it shows tonight's.
 
 ## Reading the chart
 
@@ -96,7 +96,8 @@ marks, and the line under the price names it, such as FRI CLOSE 158.74.
 While the large price is still the close, that line shows the pre-market
 or after-hours price instead. The line under the move names the move and
 gives it in the other unit: TODAY ▲4.57, OVERNIGHT ▼1.83 or PRE-MARKET
-▼5.74. A coin never closes, so its day is its last 24 hours.
+▼5.74. On a longer range, the move counts from the range's start. A coin
+never closes, so its day is its last 24 hours.
 
 The 1D chart shows one trading day, with the regular session bright and
 the hours around it dim. For about ten minutes after a market abroad
@@ -280,11 +281,9 @@ again.
   traded more than two minutes ago.
 - **A price looks wrong.** Check the currency: Stonks never converts, since
   a converted price is one nobody traded at. PENCE means pence, as Yahoo
-  quotes many London listings, so 3,580.00 is £35.80. Then check which
-  price you're comparing: the large one may be a trade after the close,
-  and the move counts from the close the dashed line marks, or from the
-  range's start on a longer range. Stonks leaves out prices of zero or
-  less, and stray points in Yahoo's charts.
+  quotes many London listings, so 3,580.00 is £35.80. For a US stock, the
+  large price may be a trade after the close. Stonks leaves out prices of
+  zero or less, and stray points in Yahoo's charts.
 - **A dash for the move, with FIRST TRADES · MOVE SOON.** For a few
   minutes after a stock in London, Tokyo or Toronto first trades, Yahoo
   can still count its day from the close before last, so Stonks counts
