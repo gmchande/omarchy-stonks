@@ -180,9 +180,10 @@ cp ~/.config/omarchy/plugins/grvc.stonks/share/grvc.stonks.svg ~/.local/share/ic
 
 <img src="media/retro.png" width="480" alt="The panel in retro: block digits and a chart of pixel columns">
 
-Retro draws the price in block digits and the chart in pixel columns, the
-way Omarchy draws its logo. Smooth uses plain digits and a line chart.
-Press `s`, or click the small chart icon at the top right, to switch.
+Stonks opens in smooth, with plain digits and a line chart. Retro draws
+the price in block digits and the chart in pixel columns, the way Omarchy
+draws its logo. Press `s`, or click the small chart icon at the top right,
+to switch.
 
 <img src="media/light.png" width="480" alt="The panel on Catppuccin Latte, a light theme, in Stonks' own green and red, made for a light background">
 
