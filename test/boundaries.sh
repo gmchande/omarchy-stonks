@@ -4,9 +4,9 @@
 # runs" says; that the rule files stay pure; that colours come from the
 # theme; that the bar entry holds only the pill's forms; and that no file
 # takes QtQuick's Sprite name.
-# And two in the tests: a harness ends Quickshell only through
-# HarnessExit.qml, and one that builds the whole plugin hands it a stand-in
-# for Hyprland.
+# And three in the tests: a harness ends Quickshell only through
+# HarnessExit.qml, one that builds the whole plugin hands it a stand-in
+# for Hyprland, and GitHub's checks name only files a clone holds.
 # Prints a FAILED line per breach and exits non-zero on any.
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -140,6 +140,17 @@ code=$?
 [ "$code" -le 1 ] || fail "rg could not check test/ for Qt.exit"
 [ "$code" -ne 0 ] || while read -r hit; do
   fail "$hit: a harness quits only by setting exitCode on its HarnessExit and starting it"
+done <<< "$hits"
+# GitHub's checks (.github/workflows/) name only files a clone holds, so a
+# script deleted here fails this check before the push, not every run there.
+# A file is named by its path, ending in a script's or a data file's
+# extension.
+hits=$(rg -noP '(?<![\w$/.*-])[\w.-]+(?:/[\w.-]+)*\.(?:sh|js|mjs|json|desktop|qml|py)\b' -- .github/workflows)
+code=$?
+[ "$code" -le 1 ] || fail "rg could not check .github/workflows for the files it names"
+[ "$code" -ne 0 ] || while IFS=: read -r workflow line path; do
+  git ls-files --error-unmatch -- ":(literal)$path" > /dev/null 2>&1 && [ -e "$path" ] \
+    || fail "$workflow:$line: names $path, which a clone doesn't hold"
 done <<< "$hits"
 
 exit "$failed"
