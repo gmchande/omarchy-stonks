@@ -1543,20 +1543,31 @@ test("a host that gives no answer is left alone 2 s, doubling to a minute; then 
   expect(letThrough(M.gateRetriedNow(gate, gate.filledAt + 1), 5, gate.filledAt + 1)).toBe(1)
 })
 
-test("a host that refuses is left alone as long as it asks, else a minute, doubling, and never over half an hour, give or take a fifth; r doesn't hurry it", () => {
-  const refused = (gate, now, retryAfter) => heard(gate, ["ok", "refused"], now, retryAfter).gate
+test("a host that refuses is left alone as long as it asks or up to a fifth longer, else a minute, doubling until it answers again, and never over 36 minutes; r doesn't hurry it", () => {
+  const refused = (gate, now, retryAfter, spread = 0.5) => M.gateAfterAnswers(gate, ["ok", "refused"], retryAfter, gate.pauses, now, spread).gate
   const open = M.openGate(80)
-  expect([refused(open, 1000, 120), refused(open, 1000, 0), refused(open, 1000, 7 * 86400)].map(gate => gate.pausedUntil - 1000)).toEqual([120, 60, 1800])
+  // Never sooner than it asks, and a fifth longer at most, so installs don't
+  // all come back at once.
+  expect([0, 1].map(spread => [120, 7 * 86400].map(asks => refused(open, 1000, asks, spread).pausedUntil - 1000))).toEqual([[120, 1800], [144, 2160]])
   // Each refusal of the lone request doubles the minute.
+  const lone = gate => M.takenFromGate(gate, yahoo, 1, false, gate.pausedUntil).gate
   var gate = refused(open, 1000, 0)
   const waits = []
   for (var i = 0; i < 6; i++) {
-    gate = refused(M.takenFromGate(gate, yahoo, 1, false, gate.pausedUntil).gate, gate.pausedUntil, 0)
+    gate = refused(lone(gate), gate.pausedUntil, 0)
     waits.push(gate.pausedUntil - gate.filledAt)
   }
   expect(waits).toEqual([120, 240, 480, 960, 1800, 1800])
-  // A fifth either way, so installs don't all come back at once.
-  expect([0, 1].map(spread => M.gateAfterAnswers(open, ["refused"], 0, 0, 1000, spread).gate.pausedUntil - 1000)).toEqual([48, 72])
+  // Its own minute, a fifth either way.
+  expect([0, 1].map(spread => refused(open, 1000, 0, spread).pausedUntil - 1000)).toEqual([48, 72])
+  // No answer between refusals pauses 2 s and keeps their count; only an
+  // answer starts it again.
+  const twice = refused(lone(refused(open, 1000, 0)), 1060, 0)
+  const silent = heard(lone(twice), ["none"], twice.pausedUntil).gate
+  expect(silent.pausedUntil - twice.pausedUntil).toBe(2)
+  expect(refused(lone(silent), silent.pausedUntil, 0).pausedUntil - silent.pausedUntil).toBe(240)
+  const answered = heard(lone(silent), ["ok"], silent.pausedUntil).gate
+  expect(refused(answered, silent.pausedUntil + 10, 0).pausedUntil - silent.pausedUntil - 10).toBe(60)
   // The host asked for fewer requests: r leaves its pause alone.
   expect(M.gateRetriedNow(gate, gate.filledAt + 1)).toEqual(gate)
 })
@@ -1572,7 +1583,7 @@ test("only the request sent alone after a pause speaks for the host: answers to 
   // With the lone request out, such an answer lets no second one through.
   const lone = M.takenFromGate(paused, yahoo, 1, false, paused.pausedUntil).gate
   expect(letThrough(heard(lone, ["ok"], paused.pausedUntil, 0, open.pauses).gate, 1, paused.pausedUntil)).toBe(0)
-  // A refusal while no answer came, or the other way, starts its own count.
+  // A refusal after no answer is the first refusal.
   const silent = heard(open, ["none"], 1000).gate
   expect(heard(M.takenFromGate(silent, yahoo, 1, false, 1002).gate, ["refused"], 1002).gate.pausedUntil - 1002).toBe(60)
 })
