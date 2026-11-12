@@ -328,10 +328,9 @@ and what your broker or the exchange showed then.
 
 Stonks isn't investment advice, and isn't affiliated with Yahoo or
 Robinhood. Yahoo's endpoints are unofficial and Robinhood's data is for
-personal use, so either may change or stop without notice. When we looked,
-in September 2026, no other free source without a key had live prices,
-the day's chart and years of history together. Robinhood fills the night,
-from 20:00 to 04:00 New York time, when Yahoo's charts are empty.
+personal use, so either may change or stop without notice. Robinhood fills
+the night, from 20:00 to 04:00 New York time, when Yahoo's charts are
+empty.
 
 <details>
 <summary>The commands it runs, the sites it asks, and the files it writes</summary>
