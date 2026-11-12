@@ -140,6 +140,12 @@ day's first trade, or the open if that's earlier, to the day's end while
 it runs, and to its last trade once it's over. The regular session is
 bright and the hours around it dim.
 
+For about ten minutes after a market abroad opens, until the new day has
+three of Yahoo's five-minute bars, the chart keeps the day just closed and
+adds the new day's first trades at its right end, so it never shows a lone
+dot. As at night, the dashed line steps at the bell to the close the move
+counts from, when Stonks knows it.
+
 For a US stock Robinhood trades at night, a day starts with its night, at
 20:00 the evening before (New York time), and runs to 20:00. From the open
 at 09:30 its start slides toward midnight, five minutes for every five that
