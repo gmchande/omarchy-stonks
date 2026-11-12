@@ -5,7 +5,7 @@
   "version": "1.1.1",
   "author": "Gaurav Chande",
   "license": "MIT",
-  "description": "A stock ticker and watchlist for your bar, made for Omarchy 4.5, with pre-market, after-hours and US overnight prices. Stocks, ETFs, indexes and crypto from markets worldwide, each in its own currency on its exchange's clock, from Yahoo Finance and Robinhood with no account or API key.",
+  "description": "Your stock watchlist in the Omarchy bar: a pill with today's move, and the chart a click away. Stocks, ETFs, indexes and crypto from New York to London and Tokyo, with pre-market, after-hours and US overnight prices, each in its own currency. From Yahoo Finance and Robinhood, with no account or API key. Made for Omarchy 4.5.",
   "kinds": ["service", "bar-widget"],
   "keepLoaded": true,
   "entryPoints": {
