@@ -125,6 +125,26 @@ Harness {
           && within(3000, function() { return footer().indexOf("aren't saved") < 0 }),
         [failed, unsaved, asked, footer()].join(" | "))
 
+      // Lists a hand edit named oddly: a case twin, All, and none, the last
+      // holding a symbol no other list or All holds, beside a key Stonks
+      // doesn't know.
+      var odd = JSON.stringify({ version: 1, symbols: ["AAPL", "MSFT", "NVDA"], range: "3M", lists: [
+        { name: "Tech", symbols: ["MSFT", "NVDA"], order: "manual", reversed: false },
+        { name: "tech", symbols: ["AAPL"], order: "manual", reversed: false, note: "mine" },
+        { name: "All", symbols: ["NVDA"], order: "manual", reversed: false },
+        { name: " ", symbols: ["JNJ"], order: "manual", reversed: false }
+      ] }, null, 2)
+      sh('printf %s "$3" > "$1.new" && mv "$1.new" "$1"', odd)
+      var readOdd = within(3000, function() { return service.lists.length === 5 })
+      service.setRange("1Y")
+      var savedOdd = landed()
+      var file = JSON.parse(harness.readFile(harness.file))
+      var held = file.lists.map(function(list) { return list.name + ":" + list.symbols.join(",") }).join(" ")
+      harness.check("a list a hand edit named oddly keeps what it holds and its keys under a free name, through a read and the next save",
+        readOdd && savedOdd && held === "Tech:MSFT,NVDA tech 2:AAPL All 2:NVDA List:JNJ" && file.lists[1].note === "mine"
+          && file.symbols.indexOf("JNJ") >= 0,
+        [readOdd, savedOdd, held, JSON.stringify(file.lists[1]), file.symbols.join(",")].join(" | "))
+
       app.close()
       harness.finish()
     }

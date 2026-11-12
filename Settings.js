@@ -111,17 +111,39 @@ function fileSettings(src) {
   })
 }
 
+// A hand edit can leave a list with no name, the name All, or another
+// list's name in another case. It keeps all it holds under the first free
+// name like its own (`freeListName`); lists named well keep theirs, so they
+// are named first.
 function normalizeLists(value) {
-  var out = []
-  if (!value || typeof value.length !== "number") return out
-  for (var i = 0; i < value.length; i++) {
-    var list = value[i] || {}
+  if (!value || typeof value.length !== "number") return []
+  var lists = []
+  for (var i = 0; i < value.length; i++) if (value[i] && typeof value[i] === "object") lists.push(value[i])
+  var named = []
+  var names = lists.map(function(list) {
     var name = listName(list.name)
-    if (listNameProblem(name, out) !== "") continue
-    out.push(Object.assign({}, list, { name: name, symbols: normalizeSymbols(list.symbols), order: normalizeOrder(list.order || "manual"),
-      reversed: normalizeReversed(list.order, list.reversed) }))
+    if (listNameProblem(name, named) !== "") return null
+    named.push({ name: name })
+    return name
+  })
+  return lists.map(function(list, i) {
+    var name = names[i]
+    if (name === null) {
+      name = freeListName(listName(list.name), named)
+      named.push({ name: name })
+    }
+    return Object.assign({}, list, { name: name, symbols: normalizeSymbols(list.symbols), order: normalizeOrder(list.order || "manual"),
+      reversed: normalizeReversed(list.order, list.reversed) })
+  })
+}
+
+// "List" for no name, then "All 2", "growth 2", "List 3": the first not taken.
+function freeListName(name, lists) {
+  var base = name || "List"
+  for (var n = 1; ; n++) {
+    var tried = n === 1 ? base : base + " " + n
+    if (listNameProblem(tried, lists) === "") return tried
   }
-  return out
 }
 
 function listName(value) {

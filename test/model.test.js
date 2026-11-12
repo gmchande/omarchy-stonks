@@ -654,15 +654,19 @@ test("the data file reads as written and repairs hand edits", () => {
   expect(orphan.list).toBe("")
   expect(M.fileSettings({ symbols: ["NEST"], lists: [{ name: "Growth" }], list: "growth" }).list).toBe("Growth")
   // A hand edit's unknown order is manual, manual is never reversed, and
-  // list names are trimmed, kept once ignoring case, and never All or empty.
+  // list names are trimmed. A list named as another in another case, All, or
+  // nothing keeps what it holds under a free name.
   const edited = M.fileSettings({ symbols: ["BO"], order: "bogus", reversed: true, lists: [
     { name: "  Growth  ", symbols: ["bo", "BO"], reversed: true }, { name: "growth", symbols: ["X"] },
     { name: "All", symbols: [] }, { name: "", symbols: [] }, { name: "Wins", order: "bogus" },
     { name: "Losers", order: "pct", reversed: true }
   ] })
-  expect([edited.order, edited.reversed]).toEqual(["manual", false])
+  expect([edited.order, edited.reversed, edited.symbols]).toEqual(["manual", false, ["BO", "X"]])
   expect(edited.lists).toEqual([
     { name: "Growth", symbols: ["BO"], order: "manual", reversed: false },
+    { name: "growth 2", symbols: ["X"], order: "manual", reversed: false },
+    { name: "All 2", symbols: [], order: "manual", reversed: false },
+    { name: "List", symbols: [], order: "manual", reversed: false },
     { name: "Wins", symbols: [], order: "manual", reversed: false },
     { name: "Losers", symbols: [], order: "pct", reversed: true }
   ])
