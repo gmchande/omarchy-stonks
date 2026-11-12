@@ -38,7 +38,10 @@
 # Robinhood's historicals answer from the moment's robinhood-day.json, in
 # the order asked, span=hour with each listing's last 12 slots, LONG<n> with
 # NEST's under its own name, and every symbol empty with no moment set; more
-# than 75 symbols in one request answer 400, as Robinhood does. Its
+# than 75 symbols in one request answer 400, as Robinhood does. While
+# STONKS_FAKE_STATE/NIGHT.bar holds "BEGINS_AT PRICE", each listing's
+# answer ends with a night bar there at that price, in place of any bar
+# with that start, as Robinhood answers a bar still forming. Its
 # instruments answer from the moment's robinhood-instruments.json, or say
 # every symbol trades all day, 100 results a page.
 #
@@ -153,10 +156,13 @@ serve() {
       exit 40
     fi
     set_name="$(cat "$STONKS_FAKE_STATE/overnight.set" 2>/dev/null)"
+    read -r bar_at bar_price < "$STONKS_FAKE_STATE/NIGHT.bar" 2> /dev/null || bar_at=""
     if [ -n "$set_name" ]; then
-      jq -c --arg asked "$asked" --arg span "$span" '($asked | split(",")) as $want
+      jq -c --arg asked "$asked" --arg span "$span" --arg at "$bar_at" --arg price "${bar_price:-}" '($asked | split(",")) as $want
         | { results: [$want[] as $s | (($s | if test("^LONG[0-9]+$") then "NEST" else . end) as $from
           | [.results[] | select(.symbol == $from)][0] | if . then .symbol = $s | .span = $span
+            | if $at != "" then .historicals |= ([.[] | select(.begins_at != $at)] + [{ begins_at: $at, open_price: $price,
+                close_price: $price, high_price: $price, low_price: $price, volume: 100, session: "overnight", interpolated: false }]) else . end
             | if $span == "hour" then .historicals |= .[-12:] else . end
           else { symbol: "", historicals: [] } end)] }' \
         "$(in_moment robinhood-day.json)"

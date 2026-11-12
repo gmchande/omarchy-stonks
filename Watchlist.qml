@@ -6,6 +6,7 @@ import qs.Commons
 import "Chart.js" as Chart
 import "Figures.js" as Figures
 import "Freshness.js" as Freshness
+import "Overnight.js" as Overnight
 import "Settings.js" as Settings
 import "Rows.js" as Rows
 import "Motion.js" as Motion
@@ -212,9 +213,10 @@ Flickable {
     return entries && entries[symbol] ? entries[symbol] : null
   }
 
+  // Its time is the price's the row shows at rest (`Figures.listRow`).
   function freshnessOf(symbol) {
-    return Freshness.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0, !!asking[symbol], newestTrades[symbol] || null,
-      !!nightFailed[symbol])
+    return Freshness.freshness(entryOf(symbol), quotes[symbol] || null, now, owed[symbol] || 0, !!asking[symbol],
+      Overnight.restingNewest(newestTrades[symbol] || null), !!nightFailed[symbol])
   }
 
   function moveCursor(delta) {
@@ -643,7 +645,7 @@ Flickable {
         day: quote ? sightDay : null
         // Only rows in sight follow the scrub, or each step repaints every row.
         readonly property int sightScrub: inSight ? root.scrubShown : 0
-        view: quote ? Figures.rowModel(quote, sightScrub, root.changeMode, root.newestTrades[symbol] || null) : null
+        view: quote ? Figures.listRow(quote, sightScrub, root.changeMode, root.newestTrades[symbol] || null) : null
         status: root.entryOf(symbol) ? root.entryOf(symbol).status : "loading"
         // Freshness reads the clock every second: only rows in sight do.
         freshness: place >= 0 && inSight ? root.freshnessOf(symbol) : null

@@ -36,9 +36,11 @@ change. This file says what a change is judged by, and why.
   everything keeps its place and size.
 - **1D at night.** A stock that trades at night keeps the day that just
   closed until 04:00, with tonight joined at its end. Tonight's trades belong
-  to the day ahead: from the night's first trade the % counts from the close
-  just gone, and the dashed line steps to that close at the bell. The line
-  breaks only for hours that take room on the chart, such as Tokyo's lunch.
+  to the day ahead: from the night's first trade the panel's % counts from
+  the close just gone, and the dashed line steps to that close at the bell.
+  The line breaks only for hours that take room on the chart, such as
+  Tokyo's lunch. The rows and the pill keep the day's close and move until
+  04:00, with tonight's in the pill's hover.
 - **Character.** The bull and the bear, their sleep while the market rests,
   the live dot and the day's named moments are part of the product. Each says
   something true and none cheers a number, so a cleanup keeps them.

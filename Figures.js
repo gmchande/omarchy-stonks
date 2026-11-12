@@ -151,8 +151,8 @@ function dayTitles() {
 
 // Only US stocks and ETFs, which trade at night, share one day here;
 // listings abroad and coins name their own on their rows. A row with no
-// time names no day: its freshness says so. A row whose move is the
-// night's says its time alone, as any other, so the header keeps the day.
+// time names no day: its freshness says so. Tonight's trades name the day
+// they joined, which the rows keep until 04:00 (`listRow`).
 function rowsDay(symbols, quotes, newest, now, calendars) {
   var shared = null
   var mixed = false
@@ -171,17 +171,26 @@ function rowsDay(symbols, quotes, newest, now, calendars) {
 }
 
 // The rows' own price and tone rules, so the breadth never disagrees with
-// them.
+// them (`listRow`).
 function listBreadth(symbols, quotes, scrubT, mode, newest) {
   var out = { up: 0, flat: 0, down: 0, none: 0 }
   for (var i = 0; i < symbols.length; i++) {
     var quote = quotes[symbols[i]]
-    var read = quote ? reading(quote, scrubT, newest ? newest[symbols[i]] : null) : null
+    var trade = newest ? newest[symbols[i]] || null : null
+    var read = quote ? reading(quote, scrubT, scrubT ? trade : Overnight.restingNewest(trade)) : null
     var chg = read ? Quote.change(read.base, read.price, mode, quote.priceDigits) : null
     if (!chg || chg.pct === null) out.none++
     else out[Format.changeTone(chg, mode, quote.priceDigits)]++
   }
   return out
+}
+
+// A row, and the pill, which shows its row: at rest, once tonight has
+// traded, the day's close and move until 04:00, as the panel's line under
+// the price says them (`closeLine`), while the panel's price on top is
+// tonight's. A scrubbed moment reads as the panel's.
+function listRow(quote, scrubT, mode, newest) {
+  return rowModel(quote, scrubT, mode, scrubT ? newest : Overnight.restingNewest(newest))
 }
 
 function reading(quote, scrubT, newest) {
@@ -370,7 +379,22 @@ function closeOnly(from) {
   return from ? { label: from.label, time: "", price: from.price, changeText: "", tone: "flat", stale: false } : null
 }
 
-// The pill's hover: the newest price's session and time.
+var DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+
+// The pill's hover: the newest price's session and time, and while the pill
+// keeps the day (`listRow`), whose day it is and tonight's price and move:
+// "Monday's move · Overnight 01:25 153.87 +0.39%". Since the open, tonight
+// has no open to count from, so its move is left out.
+function pillNote(quote, newest, mode, now, calendars, retro) {
+  if (!newest) return ""
+  var note = newestNote(quote, newest, now, calendars)
+  if (!newest.joined) return note
+  var tonight = rowModel(quote, 0, mode, newest)
+  var day = DAY_NAMES[Format.localClock(quote.session.regular.start, quote.gmtoffset || 0).weekday]
+  return day + "'s move · " + note + " " + tonight.priceText + (tonight.pct === null ? "" : " " + Format.lookSigns(tonight.changeLine, retro))
+}
+
+// The newest price's session and time.
 function newestNote(quote, newest, now, calendars) {
   return Market.phaseLabel(newest.phase) + " " + Market.tradeDay(quote, newest.t, now, calendars) + Market.tradeTime(quote, newest.t, calendars)
 }
@@ -379,7 +403,8 @@ function newestStale(newest, now) {
   return !!newest && newest.phase === "overnight" && now - newest.t > Overnight.OVERNIGHT_STALE
 }
 
-// The header and the pill read this one rule, so they never disagree.
+// The header reads the panel's move, the pill its row's (`listRow`), so at
+// night the two can differ.
 function animalKind(row) {
   return !row || row.dayTone === "flat" ? "" : row.dayTone === "up" ? "bull" : "bear"
 }

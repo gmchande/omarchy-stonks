@@ -458,9 +458,9 @@ Harness {
     if (root.pillSheet) {
       root.pillQuote = nestDay
       root.now = nestDay.marketTime + 120
-      // pill-sheet-night: JNJ on Sunday 25 October at 23:35, its newest
-      // price tonight on top, up, over tonight's line, as the service reads
-      // them; Friday's day fell.
+      // pill-sheet-night: JNJ on Sunday 25 October at 23:35, as the service
+      // reads it: Friday's close and move on the pill, down, over Friday's
+      // line and tonight's, and tonight's price, up, in its hover.
       if (root.stateName === "pill-sheet-night") {
         var moment = function(name) {
           var view = Qt.createQmlObject('import Quickshell.Io; FileView { blockLoading: true }', root)
@@ -1341,7 +1341,7 @@ Harness {
                   return forms.concat(["down", "up"].map(function(day) { return { style: style, retro: retro, day: day } }))
                 }, []))
               }, [])
-            // At night, every form in each look, JNJ's price tonight on top.
+            // At night, every form in each look, each with its hover's words.
             if (root.stateName === "pill-sheet-night")
               return [false, true].reduce(function(all, retro) {
                 return all.concat(["sparkline", "arrow", "text", "icon"].map(function(style) { return { style: style, retro: retro, day: "night" } }))
@@ -1507,7 +1507,8 @@ Harness {
             // The hover's words, in a bubble drawn as the bar draws its own;
             // none without words, as the bar shows none.
             Rectangle {
-              visible: (!!pillRow.modelData.trouble || !!pillRow.modelData.open) && hoverWords.text !== ""
+              readonly property bool night: pillRow.modelData.day === "night"
+              visible: (!!pillRow.modelData.trouble || !!pillRow.modelData.open || night) && hoverWords.text !== ""
               anchors.verticalCenter: parent.verticalCenter
               width: hoverWords.implicitWidth + 20
               height: hoverWords.implicitHeight + 14
@@ -1519,7 +1520,8 @@ Harness {
                 id: hoverWords
                 anchors.centerIn: parent
                 textFormat: Text.PlainText
-                text: pillRow.modelData.open ? verticalPill.children.filter(function(c) { return c.tooltipText !== undefined })[0].tooltipText
+                text: pillRow.modelData.open || pillRow.modelData.day === "night"
+                  ? (pillRow.modelData.open ? verticalPill : horizontalPill).children.filter(function(c) { return c.tooltipText !== undefined })[0].tooltipText
                   : (pillRow.modelData.style === "icon" ? horizontalPill.featuredSymbol + " " + horizontalPill.changeText + " · " : "")
                   + horizontalPill.warningText
                 color: Commons.Color.tooltip.text

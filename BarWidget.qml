@@ -9,11 +9,12 @@ import "Chart.js" as Chart
 import "Figures.js" as Figures
 import "Freshness.js" as Freshness
 import "Format.js" as Format
+import "Overnight.js" as Overnight
 import "Release.js" as Release
 import "Tones.js" as Tones
 import "Motion.js" as Motion
 // The pill: the stock you last looked at, with its day's line and change
-// whatever range the panel or the window shows.
+// whatever range the panel or the window shows, as its row shows them.
 BarWidget {
   id: root
   // `moduleName` is the bar entry's id, which the bar sets: the plugin's
@@ -30,13 +31,14 @@ BarWidget {
   readonly property var panel: panelLoader.item
   readonly property string featuredSymbol: service ? service.featuredSymbol : ""
   readonly property var featuredQuote: service && featuredSymbol ? (service.quotes[featuredSymbol] || null) : null
-  // As its row shows it, with its newest price since the close.
-  readonly property var featured: featuredQuote
-    ? Figures.rowModel(featuredQuote, 0, service.changeMode, service.newestTrades[featuredSymbol] || null) : null
-  // The pill has no room for the newest price's session and time; the hover
-  // says them.
-  readonly property string newestNote: featured && featured.newest
-    ? Figures.newestNote(featuredQuote, featured.newest, service.now, service.calendars) : ""
+  // As its row shows it (`Figures.listRow`): at night the day's close and
+  // move until the new day's first prices arrive, soon after 04:00.
+  readonly property var newest: featuredQuote ? (service.newestTrades[featuredSymbol] || null) : null
+  readonly property var featured: featuredQuote ? Figures.listRow(featuredQuote, 0, service.changeMode, newest) : null
+  // The pill has no room for the newest price's session and time, nor at
+  // night for tonight's price and move; the hover says them.
+  readonly property string newestNote: newest
+    ? Figures.pillNote(featuredQuote, newest, service.changeMode, service.now, service.calendars, retro) : ""
   // A side bar's stacked move has no room for the "open" a top bar's pill
   // ends with; the hover says where it counts from.
   readonly property string openNote: vertical && !iconOnly && featured && service.changeMode === "open" ? "Since the open" : ""
@@ -62,9 +64,10 @@ BarWidget {
   readonly property bool iconOnly: barStyle === "icon"
   readonly property bool retro: service ? service.retro : setting("style", "retro") === "retro"
   // Judged without a quote too: a first fetch that failed is "! No data".
+  // Its time is the price's the pill shows, as its row's.
   readonly property var freshness: service && featuredSymbol
     ? Freshness.freshness(service.entries[featuredSymbol] || null, featuredQuote, service.now, service.owed[featuredSymbol] || 0, false,
-      service.newestTrades[featuredSymbol] || null, !!service.nightFailed[featuredSymbol]) : null
+      Overnight.restingNewest(newest), !!service.nightFailed[featuredSymbol]) : null
   readonly property bool warns: Freshness.freshnessWarns(freshness)
   // The hover's words for the "!", in sentence case as a row says them, then
   // why and when Stonks tries again.
@@ -75,10 +78,11 @@ BarWidget {
       + (hostPause ? "\n" + hostPause.why + "\n" + hostPause.when
         : freshness.state === "failed" && featured ? "\nRetrying" : "")
   // The shell copies a hover's words only as the pointer enters, so they go
-  // to the bar again while it stays: a warning's, a new symbol's, a newest
-  // price's session and time. Qt.callLater runs a function once, so changes
-  // together show once. A new figure alone never does, so a resting pointer
-  // sees no blink but for a newer trade's time.
+  // to the bar again while it stays: a warning's, a new symbol's, and the
+  // newest price's, its time and, at night, tonight's price and move, which
+  // the pill shows nowhere else. Qt.callLater runs a function once, so
+  // changes together show once. A new figure on the pill alone never does,
+  // so a resting pointer sees no blink for what it can read on the pill.
   function reshowTooltip() {
     if (button.tooltipHovered && button.bar) button.bar.showTooltip(button, button.tooltipText)
   }
@@ -135,9 +139,12 @@ BarWidget {
     : !warns ? "…" : freshness.state === "overdue" ? "! Can't get prices" : "! No data"
   // A side bar's stacked form: the symbol over the move, four characters a
   // line at most, in the rows' unit. The "!" takes a short line of its own
-  // before the move, kept empty without one, so the pill never changes height.
+  // before the move, kept empty without one, and a percent's dash keeps the
+  // "%"'s line empty, so the pill never changes height as the move since the
+  // open comes and goes.
   readonly property var stackedMove: !featured ? { lines: warns ? [] : ["…"], sign: 0 }
-    : service.changeMode === "abs" ? Format.stackedMoney(featured.abs, featuredQuote.priceDigits) : Format.stackedPct(featured.pct)
+    : service.changeMode === "abs" ? Format.stackedMoney(featured.abs, featuredQuote.priceDigits)
+    : featured.pct === null ? { lines: ["—", ""], sign: 0 } : Format.stackedPct(featured.pct)
   readonly property var stackedLines: Format.stackedSymbol(featuredSymbol || "ST")
     .map(function(t) { return { text: t, move: false, warning: false } })
     .concat(featured ? [{ text: warns ? "!" : "", move: false, warning: true }]
@@ -253,7 +260,8 @@ BarWidget {
       : root.stackedHeight) + root.markRoom : -1
     // Only what the pill can't say: the icon form's symbol and change, that
     // the stacked form's move counts from the open, a newest price's session
-    // and time ("Overnight 23:25"), and what a "!" means. None while the
+    // and time ("Overnight 23:25"), at night with whose move the pill shows
+    // and tonight's price and move, and what a "!" means. None while the
     // panel is open: the bubble would land on its header.
     tooltipText: root.opened ? ""
       : [root.iconOnly ? (root.featuredSymbol || "STONKS") + " " + root.changeText : "", root.openNote, root.newestNote, root.warningText]

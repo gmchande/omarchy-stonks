@@ -1,4 +1,5 @@
 .pragma library
+.import "Overnight.js" as Overnight
 .import "Quote.js" as Quote
 .import "Settings.js" as Settings
 
@@ -20,7 +21,7 @@ function orderLabel(order, reversed) {
 }
 
 // `newest`: each symbol's newest trade since the close
-// (`Overnight.newestTrade`).
+// (`Overnight.newestTrade`), read as the rows read it at rest.
 function sortedSymbols(symbols, quotes, order, reversed, changeMode, newest) {
   order = Settings.normalizeOrder(order)
   if (order === "manual") return symbols.slice()
@@ -52,7 +53,7 @@ function shownOrder(held, sorted) {
 function sortKey(quote, order, changeMode, newest) {
   if (order === "symbol") return quote.symbol.toUpperCase()
   if (order === "name") return String(quote.name || quote.symbol).toUpperCase()
-  var read = Quote.restingRead(quote, newest)
+  var read = Quote.restingRead(quote, Overnight.restingNewest(newest))
   return Quote.change(read.base, read.price, changeMode === "open" ? "open" : "pct").pct
 }
 
